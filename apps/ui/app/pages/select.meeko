@@ -46,20 +46,16 @@
 			es un
 			<code>select</code>
 			nativo con
-			<code>appearance: base-select</code>
-			: el navegador trae la lista, el teclado y el valor de formulario, y UI la pinta con sus tokens.
+			<code>appearance: base-select</code>: el navegador trae la lista, el teclado y el valor de formulario, y UI la pinta con sus tokens.
 			<code>UICombobox</code>
 			cubre lo que el nativo no puede: buscar, filtrar en un servidor y elegir varias opciones. El tipo del modelo se infiere de
-			<code>options</code>
-			.
+			<code>options</code>.
 		</p>
 		<h2 id="usage">Una opción en un formulario</h2>
 		<p>
 			Con
-			<code>name</code>
-			, el valor se envía con un formulario nativo sin código adicional. Abre la lista con
-			<code>Intro</code>
-			,
+			<code>name</code>, el valor se envía con un formulario nativo sin código adicional. Abre la lista con
+			<code>Intro</code>,
 			<code>Espacio</code>
 			o un clic y escribe una letra para saltar a la opción que empieza por ella: es el teclado del navegador.
 		</p>
@@ -134,32 +130,25 @@
 		<DocsCode bind:code="examples.select" />
 		<UIAlert tone="info">
 			Con
-			<code>required</code>
-			, un formulario sin valor no se envía: el
+			<code>required</code>, un formulario sin valor no se envía: el
 			<code>select</code>
 			recibe el foco y
-			<code>aria-invalid</code>
-			, sin el aviso del navegador. Escribe además un mensaje visible con
-			<code>UIField</code>
-			, como en el ejemplo. Con
-			<code>useForm</code>
-			, pasa
+			<code>aria-invalid</code>, sin el aviso del navegador. Escribe además un mensaje visible con
+			<code>UIField</code>, como en el ejemplo. Con
+			<code>useForm</code>, pasa
 			<code>bind:field="form.field('plan')"</code>
 			y el campo aporta el id, el nombre, el valor y el estado de error.
 		</UIAlert>
 		<h2 id="browsers">Navegadores</h2>
 		<p>
 			Chrome, Edge y Safari 27 pintan la lista con los tokens de UI, con entrada animada. Firefox y los navegadores antiguos muestran su lista propia: funcionan igual, y en ellos
-			<code>value</code>
-			,
+			<code>value</code>,
 			<code>group</code>
 			y el contenido rico de
 			<code>option</code>
 			quedan en su texto. Una opción oculta al principio representa el
-			<code>placeholder</code>
-			, o un valor que ya no está en
-			<code>options</code>
-			: el modelo lo conserva y el formulario lo sigue enviando.
+			<code>placeholder</code>, o un valor que ya no está en
+			<code>options</code>: el modelo lo conserva y el formulario lo sigue enviando.
 		</p>
 		<h2 id="objects">Objetos, grupos y opciones propias</h2>
 		<p>
@@ -236,44 +225,32 @@
 		/>
 		<p>
 			Admite los snippets
-			<code>option</code>
-			,
+			<code>option</code>,
 			<code>value</code>
 			y
-			<code>group</code>
-			, y el evento
-			<code>change</code>
-			.
-			<code>multiple</code>
-			,
-			<code>searchable</code>
-			,
+			<code>group</code>, y el evento
+			<code>change</code>.
+			<code>multiple</code>,
+			<code>searchable</code>,
 			<code>filter</code>
 			y
 			<code>max</code>
 			son un error de tipos que indica
-			<code>UICombobox</code>
-			.
+			<code>UICombobox</code>.
 		</p>
 		<h2 id="combobox">UICombobox</h2>
 		<p>
 			Una lista propia sobre
-			<a href="/popover">UIPopover</a>
-			, con más JavaScript: úsala sólo si necesitas
-			<code>searchable</code>
-			,
-			<code>filter</code>
-			,
+			<a href="/popover">UIPopover</a>, con más JavaScript: úsala sólo si necesitas
+			<code>searchable</code>,
+			<code>filter</code>,
 			<code>multiple</code>
 			o
-			<code>max</code>
-			. El foco permanece en el disparador mientras
+			<code>max</code>. El foco permanece en el disparador mientras
 			<code>aria-activedescendant</code>
 			recorre la lista. El campo Temas del primer ejemplo es un
-			<code>UICombobox</code>
-			. Con
-			<code>multiple</code>
-			, cada opción se alterna, la lista sigue abierta y el modelo es un array;
+			<code>UICombobox</code>. Con
+			<code>multiple</code>, cada opción se alterna, la lista sigue abierta y el modelo es un array;
 			<code>max</code>
 			deshabilita el resto al llegar al límite.
 		</p>
@@ -282,12 +259,9 @@
 			Para buscar en un servidor, pasa una función
 			<code>filter</code>
 			que devuelva una promesa y use su
-			<code>AbortSignal</code>
-			. Sin resultados, muestra
-			<code>empty</code>
-			: por defecto,
-			<code>Sin resultados</code>
-			.
+			<code>AbortSignal</code>. Sin resultados, muestra
+			<code>empty</code>: por defecto,
+			<code>Sin resultados</code>.
 		</p>
 		<DocsApi
 			caption="Propiedades propias de UICombobox"
@@ -300,22 +274,17 @@
 		/>
 		<p>
 			El resto de propiedades son las de
-			<code>UISelect</code>
-			. Admite además los snippets
+			<code>UISelect</code>. Admite además los snippets
 			<code>empty</code>
 			y
-			<code>loading</code>
-			. Los tipos
-			<code>UISelectProps</code>
-			,
-			<code>UIComboboxProps</code>
-			,
+			<code>loading</code>. Los tipos
+			<code>UISelectProps</code>,
+			<code>UIComboboxProps</code>,
 			<code>SelectModel</code>
 			y
 			<code>ComboboxFilter</code>
 			se exportan desde
-			<code>@meekojs/ui/runtime</code>
-			.
+			<code>@meekojs/ui/runtime</code>.
 		</p>
 	</DocsPage>
 </template>

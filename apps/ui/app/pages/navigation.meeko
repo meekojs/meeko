@@ -32,34 +32,26 @@
 			y
 			<code>search</code>
 			tipados), además de
-			<code>target</code>
-			,
-			<code>rel</code>
-			,
-			<code>download</code>
-			,
-			<code>hreflang</code>
-			,
+			<code>target</code>,
+			<code>rel</code>,
+			<code>download</code>,
+			<code>hreflang</code>,
 			<code>lang</code>
 			y
-			<code>title</code>
-			. Con
+			<code>title</code>. Con
 			<code>to</code>
 			navega sin recargar, se localiza con
 			<code>@meekojs/i18n</code>
 			y
 			<code>aria-current</code>
 			lo decide la ruta activa. Con
-			<code>href</code>
-			, es el actual si coincide con la prop
-			<code>current</code>
-			.
+			<code>href</code>, es el actual si coincide con la prop
+			<code>current</code>.
 		</p>
 		<h2 id="tree">UINavigationTree</h2>
 		<p>
 			La navegación lateral de esta guía. Cada grupo se pliega con un
-			<code>details</code>
-			, y en el grupo actual siempre se ve el enlace actual.
+			<code>details</code>, y en el grupo actual siempre se ve el enlace actual.
 		</p>
 		<DocsPreview layout="stack">
 			<UINavigationTree
@@ -92,19 +84,16 @@
 		/>
 		<p>
 			Admite los snippets
-			<code>item(item, current)</code>
-			,
+			<code>item(item, current)</code>,
 			<code>icon(entry)</code>
 			y
-			<code>empty</code>
-			.
+			<code>empty</code>.
 		</p>
 		<h2 id="tabs">UINavigationTabs y UITabs</h2>
 		<p>
 			<code>UINavigationTabs</code>
 			son enlaces entre páginas, no un
-			<code>tablist</code>
-			: el indicador sigue al actual con posicionamiento por ancla.
+			<code>tablist</code>: el indicador sigue al actual con posicionamiento por ancla.
 			<code>UITabs</code>
 			son paneles de una misma página, con el patrón ARIA de pestañas: las flechas cambian de panel, y el elegido se ve antes de hidratar.
 		</p>
@@ -148,14 +137,11 @@
 		/>
 		<p>
 			Admite los snippets
-			<code>panel-&lt;valor&gt;</code>
-			,
+			<code>panel-&lt;valor&gt;</code>,
 			<code>panel(item)</code>
 			y
-			<code>tab(item)</code>
-			, y el evento
-			<code>change</code>
-			.
+			<code>tab(item)</code>, y el evento
+			<code>change</code>.
 		</p>
 		<h2 id="pagers">UIBreadcrumb, UIPageNavigation y UIPagination</h2>
 		<p>
@@ -213,14 +199,12 @@
 			Admite el snippet
 			<code>default</code>
 			y el evento
-			<code>loadMore</code>
-			.
+			<code>loadMore</code>.
 		</p>
 		<h2 id="toc">UITableOfContents</h2>
 		<p>
 			Pinta la entrada activa con
-			<code>scroll-target-group</code>
-			, sin script, donde existe. Un
+			<code>scroll-target-group</code>, sin script, donde existe. Un
 			<code>IntersectionObserver</code>
 			mínimo mantiene
 			<code>aria-current="location"</code>
@@ -255,8 +239,7 @@
 		<h2 id="locale">UILocaleSwitcher y UILocaleSuggestion</h2>
 		<p>
 			Son presentación: reciben los destinos ya calculados y no leen rutas ni cookies. Con menos de dos idiomas, el selector no pinta nada. La sugerencia va escrita en el idioma que ofrece y el botón
-			<code>stay</code>
-			, en el actual; la aplicación decide cuándo mostrarla, tras montar, y qué guarda.
+			<code>stay</code>, en el actual; la aplicación decide cuándo mostrarla, tras montar, y qué guarda.
 		</p>
 		<DocsPreview>
 			<UILocaleSwitcher
@@ -292,26 +275,18 @@
 		/>
 		<p>
 			Los tipos
-			<code>UINavigationTreeProps</code>
-			,
-			<code>UINavigationTabsProps</code>
-			,
-			<code>UITabsProps</code>
-			,
-			<code>UIBreadcrumbProps</code>
-			,
-			<code>UIPageNavigationProps</code>
-			,
-			<code>UIPaginationProps</code>
-			,
-			<code>UITableOfContentsProps</code>
-			,
+			<code>UINavigationTreeProps</code>,
+			<code>UINavigationTabsProps</code>,
+			<code>UITabsProps</code>,
+			<code>UIBreadcrumbProps</code>,
+			<code>UIPageNavigationProps</code>,
+			<code>UIPaginationProps</code>,
+			<code>UITableOfContentsProps</code>,
 			<code>UILocaleSwitcherProps</code>
 			y
 			<code>UILocaleSuggestionProps</code>
 			se exportan desde
-			<code>@meekojs/ui/runtime</code>
-			.
+			<code>@meekojs/ui/runtime</code>.
 		</p>
 	</DocsPage>
 </template>

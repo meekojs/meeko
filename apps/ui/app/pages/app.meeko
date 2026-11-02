@@ -19,18 +19,15 @@
 		<h2 id="contract">Contrato</h2>
 		<p>
 			No tiene props ni eventos públicos. Requiere el snippet
-			<code>default</code>
-			. El plugin registrado por
+			<code>default</code>. El plugin registrado por
 			<code>@meekojs/ui</code>
 			proporciona el contexto; no necesitas crear un plugin propio ni llamar a
-			<code>provideModal</code>
-			.
+			<code>provideModal</code>.
 		</p>
 		<p>
 			<code>useModal()</code>
 			abre componentes cuyo nombre empieza por
-			<code>Modal</code>
-			, con las props del registro de componentes de tu aplicación.
+			<code>Modal</code>, con las props del registro de componentes de tu aplicación.
 			<code>useModalInstance()</code>
 			cierra la instancia actual con un resultado o la descarta.
 		</p>

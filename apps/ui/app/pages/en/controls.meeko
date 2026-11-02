@@ -22,8 +22,7 @@
 	>
 		<p>
 			They all keep the native control, so the keyboard, the focus and form submission are those of the browser, also without JavaScript. Their models bind to a signal:
-			<code>model="field"</code>
-			.
+			<code>model="field"</code>.
 		</p>
 		<h2 id="textarea">UITextarea</h2>
 		<p>
@@ -69,10 +68,8 @@
 		<p>
 			<code>UISwitch</code>
 			has the same contract as
-			<code>UICheckbox</code>
-			, with
-			<code>role="switch"</code>
-			: use it for something that applies at once.
+			<code>UICheckbox</code>, with
+			<code>role="switch"</code>: use it for something that applies at once.
 		</p>
 		<DocsPreview layout="stack">
 			<UICheckbox
@@ -150,8 +147,7 @@
 			An
 			<code>input type="range"</code>
 			with the label inside its
-			<code>label</code>
-			. The filled part of the track follows the value.
+			<code>label</code>. The filled part of the track follows the value.
 		</p>
 		<DocsPreview layout="stack">
 			<UISlider
@@ -183,18 +179,14 @@
 		/>
 		<p>
 			The types
-			<code>UITextareaProps</code>
-			,
-			<code>UICheckboxProps</code>
-			,
-			<code>UISwitchProps</code>
-			,
+			<code>UITextareaProps</code>,
+			<code>UICheckboxProps</code>,
+			<code>UISwitchProps</code>,
 			<code>UIRadioGroupProps</code>
 			and
 			<code>UISliderProps</code>
 			are exported from
-			<code>@meekojs/ui/runtime</code>
-			.
+			<code>@meekojs/ui/runtime</code>.
 		</p>
 	</DocsPage>
 </template>

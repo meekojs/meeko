@@ -10,8 +10,7 @@
 		<h2 id="strategy">Idioma por defecto sin prefijo</h2>
 		<p>
 			Con
-			<code>strategy: 'prefix_except_default'</code>
-			, la opción por defecto, las URL del idioma por defecto no cambian y cada otro idioma vive bajo su prefijo. El módulo genera las rutas
+			<code>strategy: 'prefix_except_default'</code>, la opción por defecto, las URL del idioma por defecto no cambian y cada otro idioma vive bajo su prefijo. El módulo genera las rutas
 			<code>/en/…</code>
 			a partir de las páginas existentes, con el mismo archivo, layouts y opciones: no hay que duplicar páginas.
 		</p>
@@ -21,14 +20,12 @@
 		/>
 		<p>
 			Una página del proyecto en la URL de otro idioma, como
-			<code>app/pages/en/legal.meeko</code>
-			, sustituye a la ruta generada: así se escribe la prosa de una página en cada idioma.
+			<code>app/pages/en/legal.meeko</code>, sustituye a la ruta generada: así se escribe la prosa de una página en cada idioma.
 			<code>exclude</code>
 			deja una ruta sin versiones y
 			<code>partial</code>
 			limita las de un idioma con traducción parcial. Una URL con el prefijo del idioma por defecto, como
-			<code>/es/guide</code>
-			, no existe.
+			<code>/es/guide</code>, no existe.
 		</p>
 		<h2 id="links">Enlaces localizados</h2>
 		<DocsCode bind:code="examples.links" />
@@ -50,18 +47,14 @@
 		<DocsCode bind:code="examples.head" />
 		<p>
 			Cada página localizada declara
-			<code>lang</code>
-			,
+			<code>lang</code>,
 			<code>dir</code>
 			y un
 			<code>link rel="alternate"</code>
 			por idioma más
-			<code>x-default</code>
-			, con URL absolutas a partir de
-			<code>site</code>
-			. Con
-			<code>sitemap: true</code>
-			, el
+			<code>x-default</code>, con URL absolutas a partir de
+			<code>site</code>. Con
+			<code>sitemap: true</code>, el
 			<code>sitemap.xml</code>
 			de Meeko lista cada versión con sus alternativas.
 		</p>

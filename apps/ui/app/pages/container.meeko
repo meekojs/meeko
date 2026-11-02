@@ -51,8 +51,7 @@
 			La vista previa está limitada por esta columna de documentación. En tu aplicación,
 			<code>4k</code>
 			permite un ancho exterior de hasta
-			<code>240rem</code>
-			: 3840 píxeles CSS con una fuente raíz de 16px.
+			<code>240rem</code>: 3840 píxeles CSS con una fuente raíz de 16px.
 		</p>
 		<DocsCode bind:code="examples.container" />
 		<h2 id="sizes">Anchos máximos</h2>
@@ -76,10 +75,8 @@
 			añade padding lógico a ambos lados, incluido en el ancho exterior. El valor
 			<code>md</code>
 			crece entre 16 y 64px;
-			<code>sm</code>
-			, entre 12 y 24px;
-			<code>lg</code>
-			, entre 24 y 96px. Usa
+			<code>sm</code>, entre 12 y 24px;
+			<code>lg</code>, entre 24 y 96px. Usa
 			<code>none</code>
 			cuando el padre ya aporta ese espacio.
 		</p>
@@ -96,8 +93,7 @@
 		/>
 		<p>
 			Requiere el snippet
-			<code>default</code>
-			. No añade roles, encabezados ni comportamiento interactivo. Elige
+			<code>default</code>. No añade roles, encabezados ni comportamiento interactivo. Elige
 			<code>as</code>
 			según la semántica del contenido; no anides otro
 			<code>main</code>
@@ -108,8 +104,7 @@
 			Usa una clase para sobrescribir
 			<code>--ui-container-max-width</code>
 			o
-			<code>--ui-container-gutter</code>
-			. El contenedor no oculta contenido que desborde: las tablas y los bloques de código deben gestionar su propio scroll.
+			<code>--ui-container-gutter</code>. El contenedor no oculta contenido que desborde: las tablas y los bloques de código deben gestionar su propio scroll.
 		</p>
 		<DocsCode
 			label="app/styles/main.css"

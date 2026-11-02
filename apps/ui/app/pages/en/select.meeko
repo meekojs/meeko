@@ -47,20 +47,16 @@
 			is a native
 			<code>select</code>
 			with
-			<code>appearance: base-select</code>
-			: the browser brings the list, the keyboard and the form value, and UI paints it with its tokens.
+			<code>appearance: base-select</code>: the browser brings the list, the keyboard and the form value, and UI paints it with its tokens.
 			<code>UICombobox</code>
 			covers what the native one cannot: searching, filtering on a server and choosing several options. The type of the model is inferred from
-			<code>options</code>
-			.
+			<code>options</code>.
 		</p>
 		<h2 id="usage">One option in a form</h2>
 		<p>
 			With
-			<code>name</code>
-			, a native form sends the value without extra code. Open the list with
-			<code>Enter</code>
-			,
+			<code>name</code>, a native form sends the value without extra code. Open the list with
+			<code>Enter</code>,
 			<code>Space</code>
 			or a click and type a letter to jump to the option that starts with it: it is the keyboard of the browser.
 		</p>
@@ -135,32 +131,25 @@
 		<DocsCode bind:code="examples.select" />
 		<UIAlert tone="info">
 			With
-			<code>required</code>
-			, a form without a value is not sent: the
+			<code>required</code>, a form without a value is not sent: the
 			<code>select</code>
 			receives the focus and
-			<code>aria-invalid</code>
-			, without the browser message. Write a visible message too with
-			<code>UIField</code>
-			, as in the example. With
-			<code>useForm</code>
-			, pass
+			<code>aria-invalid</code>, without the browser message. Write a visible message too with
+			<code>UIField</code>, as in the example. With
+			<code>useForm</code>, pass
 			<code>bind:field="form.field('plan')"</code>
 			and the field brings the id, the name, the value and the error state.
 		</UIAlert>
 		<h2 id="browsers">Browsers</h2>
 		<p>
 			Chrome, Edge and Safari 27 paint the list with the tokens of UI, with an animated entrance. Firefox and older browsers show their own list: they work the same, and there
-			<code>value</code>
-			,
+			<code>value</code>,
 			<code>group</code>
 			and the rich content of
 			<code>option</code>
 			stay as their text. A hidden option at the start stands for the
-			<code>placeholder</code>
-			, or for a value that is no longer in
-			<code>options</code>
-			: the model keeps it and the form keeps sending it.
+			<code>placeholder</code>, or for a value that is no longer in
+			<code>options</code>: the model keeps it and the form keeps sending it.
 		</p>
 		<h2 id="objects">Objects, groups and custom options</h2>
 		<p>
@@ -237,44 +226,34 @@
 		/>
 		<p>
 			It accepts the
-			<code>option</code>
-			,
+			<code>option</code>,
 			<code>value</code>
 			and
 			<code>group</code>
 			snippets, and the
 			<code>change</code>
 			event.
-			<code>multiple</code>
-			,
-			<code>searchable</code>
-			,
+			<code>multiple</code>,
+			<code>searchable</code>,
 			<code>filter</code>
 			and
 			<code>max</code>
 			are a type error that points to
-			<code>UICombobox</code>
-			.
+			<code>UICombobox</code>.
 		</p>
 		<h2 id="combobox">UICombobox</h2>
 		<p>
 			A list of its own on top of
-			<MeekoLink to="/popover">UIPopover</MeekoLink>
-			, with more JavaScript: use it only if you need
-			<code>searchable</code>
-			,
-			<code>filter</code>
-			,
+			<MeekoLink to="/popover">UIPopover</MeekoLink>, with more JavaScript: use it only if you need
+			<code>searchable</code>,
+			<code>filter</code>,
 			<code>multiple</code>
 			or
-			<code>max</code>
-			. The focus stays on the trigger while
+			<code>max</code>. The focus stays on the trigger while
 			<code>aria-activedescendant</code>
 			walks the list. The Topics field of the first example is a
-			<code>UICombobox</code>
-			. With
-			<code>multiple</code>
-			, each option toggles, the list stays open and the model is an array;
+			<code>UICombobox</code>. With
+			<code>multiple</code>, each option toggles, the list stays open and the model is an array;
 			<code>max</code>
 			disables the rest at the limit.
 		</p>
@@ -283,12 +262,9 @@
 			To search on a server, pass a
 			<code>filter</code>
 			function that returns a promise and uses its
-			<code>AbortSignal</code>
-			. Without results it shows
-			<code>empty</code>
-			: by default,
-			<code>No results</code>
-			.
+			<code>AbortSignal</code>. Without results it shows
+			<code>empty</code>: by default,
+			<code>No results</code>.
 		</p>
 		<DocsApi
 			caption="UICombobox own props"
@@ -301,22 +277,18 @@
 		/>
 		<p>
 			The other props are those of
-			<code>UISelect</code>
-			. It also accepts the
+			<code>UISelect</code>. It also accepts the
 			<code>empty</code>
 			and
 			<code>loading</code>
 			snippets. The types
-			<code>UISelectProps</code>
-			,
-			<code>UIComboboxProps</code>
-			,
+			<code>UISelectProps</code>,
+			<code>UIComboboxProps</code>,
 			<code>SelectModel</code>
 			and
 			<code>ComboboxFilter</code>
 			are exported from
-			<code>@meekojs/ui/runtime</code>
-			.
+			<code>@meekojs/ui/runtime</code>.
 		</p>
 	</DocsPage>
 </template>

@@ -23,14 +23,11 @@
 		<p>
 			<code>UIButton</code>
 			renders the element that matches what it does, with the same look: with
-			<code>to</code>
-			, a link to a route of the application that navigates without reloading; with
-			<code>href</code>
-			, an
+			<code>to</code>, a link to a route of the application that navigates without reloading; with
+			<code>href</code>, an
 			<code>&lt;a&gt;</code>
 			to any URL; with neither, a
-			<code>&lt;button type="button"&gt;</code>
-			.
+			<code>&lt;button type="button"&gt;</code>.
 		</p>
 		<DocsPreview id="button-kinds">
 			<UIButton
@@ -68,22 +65,19 @@
 			and in the editor:
 			<code>to</code>
 			with
-			<code>href</code>
-			,
+			<code>href</code>,
 			<code>type</code>
 			or
 			<code>disabled</code>
 			on a link,
 			<code>target</code>
 			on a button, a route that does not exist or a dynamic route without
-			<code>params</code>
-			. A link cannot be disabled: it has no native state, and
+			<code>params</code>. A link cannot be disabled: it has no native state, and
 			<code>aria-disabled</code>
 			without removing
 			<code>href</code>
 			would still navigate. If the action is not available, do not render the link, or use a button with
-			<code>disabled</code>
-			.
+			<code>disabled</code>.
 		</p>
 		<h2 id="sizes">Sizes and states</h2>
 		<DocsPreview>
@@ -106,10 +100,8 @@
 			keeps the text, adds the spinner, announces
 			<code>aria-busy</code>
 			and blocks the action without taking its focus. With
-			<code>iconOnly</code>
-			, the button is square: always name it with
-			<code>ariaLabel</code>
-			.
+			<code>iconOnly</code>, the button is square: always name it with
+			<code>ariaLabel</code>.
 		</p>
 		<DocsPreview>
 			<UIButton tone="danger">Delete</UIButton>
@@ -161,10 +153,8 @@
 		</p>
 		<p>
 			For a link with its own visual hierarchy and the defaults of
-			<code>ui.defaults.link</code>
-			, use
-			<MeekoLink to="/links">UILink</MeekoLink>
-			.
+			<code>ui.defaults.link</code>, use
+			<MeekoLink to="/links">UILink</MeekoLink>.
 		</p>
 	</DocsPage>
 </template>

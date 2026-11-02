@@ -20,14 +20,11 @@
 			y a 54rem oculta
 			<code>sidebar</code>
 			y muestra
-			<code>bar</code>
-			, donde va el
-			<a href="/overlays">UIDrawer</a>
-			. Esta misma guía es su ejemplo: un
+			<code>bar</code>, donde va el
+			<a href="/overlays">UIDrawer</a>. Esta misma guía es su ejemplo: un
 			<code>UIPage</code>
 			no se puede anidar, porque una página sólo tiene un
-			<code>main</code>
-			.
+			<code>main</code>.
 		</p>
 		<DocsCode bind:code="examples.page" />
 		<DocsApi
@@ -42,28 +39,21 @@
 		/>
 		<p>
 			Sus snippets son
-			<code>default</code>
-			,
-			<code>header</code>
-			,
-			<code>notices</code>
-			,
-			<code>bar</code>
-			,
-			<code>sidebar</code>
-			,
+			<code>default</code>,
+			<code>header</code>,
+			<code>notices</code>,
+			<code>bar</code>,
+			<code>sidebar</code>,
 			<code>aside</code>
 			y
-			<code>footer</code>
-			.
+			<code>footer</code>.
 			<code>notices</code>
 			va bajo la cabecera, con el ancho de la página, y no ocupa sitio si su contenido no pinta nada.
 		</p>
 		<h2 id="page-header">UIPageHeader</h2>
 		<p>
 			El título de una página, con su descripción, sus migas y sus acciones. Es el único
-			<code>h1</code>
-			: el de esta guía es uno.
+			<code>h1</code>: el de esta guía es uno.
 		</p>
 		<DocsApi
 			caption="Propiedades de UIPageHeader"
@@ -76,20 +66,16 @@
 		/>
 		<p>
 			Admite los snippets
-			<code>breadcrumb</code>
-			,
+			<code>breadcrumb</code>,
 			<code>actions</code>
 			y
-			<code>default</code>
-			.
+			<code>default</code>.
 		</p>
 		<h2 id="header">UIHeader y UIFooter</h2>
 		<p>
 			La cabecera tiene una altura fija,
-			<code>--ui-header-height</code>
-			. En pantallas estrechas sus enlaces pasan a un menú con
-			<code>popover</code>
-			, que flota y no mueve la página. Una imagen de
+			<code>--ui-header-height</code>. En pantallas estrechas sus enlaces pasan a un menú con
+			<code>popover</code>, que flota y no mueve la página. Una imagen de
 			<code>brand</code>
 			declara
 			<code>width</code>
@@ -136,14 +122,11 @@
 		/>
 		<p>
 			Admite los snippets
-			<code>brand</code>
-			,
-			<code>nav</code>
-			,
+			<code>brand</code>,
+			<code>nav</code>,
 			<code>actions</code>
 			y
-			<code>menu</code>
-			.
+			<code>menu</code>.
 		</p>
 		<DocsApi
 			caption="Propiedades de UIFooter"
@@ -158,26 +141,19 @@
 		/>
 		<p>
 			Admite los snippets
-			<code>brand</code>
-			,
-			<code>about</code>
-			,
+			<code>brand</code>,
+			<code>about</code>,
 			<code>actions</code>
 			y
-			<code>legal</code>
-			. Los tipos
-			<code>UIPageProps</code>
-			,
-			<code>UIPageHeaderProps</code>
-			,
-			<code>UIHeaderProps</code>
-			,
+			<code>legal</code>. Los tipos
+			<code>UIPageProps</code>,
+			<code>UIPageHeaderProps</code>,
+			<code>UIHeaderProps</code>,
 			<code>UIFooterProps</code>
 			y
 			<code>UIBrand</code>
 			se exportan desde
-			<code>@meekojs/ui/runtime</code>
-			.
+			<code>@meekojs/ui/runtime</code>.
 		</p>
 	</DocsPage>
 </template>

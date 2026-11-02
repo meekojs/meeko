@@ -57,18 +57,14 @@
 		<p>
 			<code>i18nContext</code>
 			es la clave pública para proporcionar una instancia desde una integración propia.
-			<code>localeOf</code>
-			,
-			<code>localizedPath</code>
-			,
+			<code>localeOf</code>,
+			<code>localizedPath</code>,
 			<code>stripLocale</code>
 			y
 			<code>negotiateLocale</code>
 			se documentan en
-			<a href="/routing">idiomas y rutas</a>
-			. Los tipos
-			<code>I18n</code>
-			,
+			<a href="/routing">idiomas y rutas</a>. Los tipos
+			<code>I18n</code>,
 			<code>I18nValue</code>
 			e
 			<code>I18nMessageValues</code>

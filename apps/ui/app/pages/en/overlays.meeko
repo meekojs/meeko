@@ -20,22 +20,18 @@
 	>
 		<p>
 			For a dialog with a result, use
-			<MeekoLink to="/modals">Modal</MeekoLink>
-			; for a menu or a lightweight dialog,
-			<MeekoLink to="/popover">Popover</MeekoLink>
-			. They all use the top layer of the browser, and leave with a View Transition where it exists.
+			<MeekoLink to="/modals">Modal</MeekoLink>; for a menu or a lightweight dialog,
+			<MeekoLink to="/popover">Popover</MeekoLink>. They all use the top layer of the browser, and leave with a View Transition where it exists.
 		</p>
 		<h2 id="drawer">UIDrawer</h2>
 		<p>
 			A side panel. It is a modal
 			<code>dialog</code>
 			with
-			<code>command</code>
-			,
+			<code>command</code>,
 			<code>commandfor</code>
 			and
-			<code>closedby</code>
-			: it opens, closes and returns the focus without JavaScript in the browsers that support them; elsewhere, on hydration. Following a link inside closes it at once, because the navigation already is the transition.
+			<code>closedby</code>: it opens, closes and returns the focus without JavaScript in the browsers that support them; elsewhere, on hydration. Following a link inside closes it at once, because the navigation already is the transition.
 		</p>
 		<DocsPreview>
 			<UIDrawer
@@ -68,8 +64,7 @@
 		/>
 		<p>
 			It accepts the
-			<code>default</code>
-			,
+			<code>default</code>,
 			<code>footer</code>
 			and
 			<code>trigger(id)</code>
@@ -84,8 +79,7 @@
 			with
 			<code>mode="hint"</code>
 			and the look of a tooltip: it opens with the pointer or the focus, never takes the focus, and the trigger references it with
-			<code>aria-describedby</code>
-			. Write complementary information in it.
+			<code>aria-describedby</code>. Write complementary information in it.
 		</p>
 		<DocsPreview>
 			<UITooltip text="It is published when saved">
@@ -105,8 +99,7 @@
 		/>
 		<p>
 			It accepts the
-			<code>default</code>
-			,
+			<code>default</code>,
 			<code>trigger</code>
 			and
 			<code>anchor(trigger)</code>
@@ -119,12 +112,10 @@
 			in your code, search wherever you want (Pagefind, a server or a local list) and pass it
 			<code>results</code>
 			and
-			<code>status</code>
-			. It opens with its button or with
+			<code>status</code>. It opens with its button or with
 			<code>Ctrl</code>
 			and
-			<code>K</code>
-			, and the arrows walk the results without taking the focus out of the field.
+			<code>K</code>, and the arrows walk the results without taking the focus out of the field.
 		</p>
 		<DocsPreview>
 			<UICommandPalette
@@ -151,26 +142,22 @@
 		/>
 		<p>
 			It accepts the
-			<code>item(item, state)</code>
-			,
+			<code>item(item, state)</code>,
 			<code>trigger(modifier)</code>
 			and
 			<code>status(status, query)</code>
 			snippets, and the
-			<code>open</code>
-			,
+			<code>open</code>,
 			<code>close</code>
 			and
 			<code>choose</code>
 			events. The types
-			<code>UIDrawerProps</code>
-			,
+			<code>UIDrawerProps</code>,
 			<code>UITooltipProps</code>
 			and
 			<code>UICommandPaletteProps</code>
 			are exported from
-			<code>@meekojs/ui/runtime</code>
-			.
+			<code>@meekojs/ui/runtime</code>.
 		</p>
 	</DocsPage>
 </template>

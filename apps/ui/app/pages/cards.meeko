@@ -89,8 +89,7 @@
 			y
 			<code>description</code>
 			o del snippet
-			<code>header</code>
-			, que tiene prioridad.
+			<code>header</code>, que tiene prioridad.
 			<code>default</code>
 			contiene el cuerpo y
 			<code>footer</code>

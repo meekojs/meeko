@@ -10,8 +10,7 @@
 		<h2 id="requirements">Antes de empezar</h2>
 		<p>
 			Necesitas una aplicación Meeko, Node.js 24 o superior y Meeko compatible con el rango
-			<code>&gt;=1.8 &lt;2</code>
-			. UI pertenece al ecosistema de Meeko y se distribuye como paquete independiente.
+			<code>&gt;=1.8 &lt;2</code>. UI pertenece al ecosistema de Meeko y se distribuye como paquete independiente.
 		</p>
 		<h2 id="install">Instala el paquete</h2>
 		<DocsCode
@@ -21,10 +20,8 @@
 		<h2 id="module">Registra el módulo</h2>
 		<p>
 			Regístralo por su nombre: sus opciones van en la clave
-			<code>ui</code>
-			, tipada sin importar nada. Los componentes se registran con el prefijo
-			<code>UI</code>
-			.
+			<code>ui</code>, tipada sin importar nada. Los componentes se registran con el prefijo
+			<code>UI</code>.
 		</p>
 		<DocsCode
 			label="meeko.config.ts"
@@ -34,8 +31,7 @@
 		<h2 id="host">Añade UIApp</h2>
 		<p>
 			Envuelve tu aplicación para alojar los modales abiertos mediante
-			<code>useModal()</code>
-			. El plugin del módulo crea el manager y
+			<code>useModal()</code>. El plugin del módulo crea el manager y
 			<code>UIApp</code>
 			representa su pila.
 		</p>
@@ -54,8 +50,7 @@
 			Continúa con
 			<a href="/theming">temas y personalización</a>
 			o explora
-			<a href="/components">todos los componentes</a>
-			.
+			<a href="/components">todos los componentes</a>.
 		</p>
 	</DocsPage>
 </template>

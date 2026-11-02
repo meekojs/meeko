@@ -10,8 +10,7 @@
 		<h2 id="interpolation">Interpolación</h2>
 		<p>
 			Escribe parámetros con la forma
-			<code>{'{name}'}</code>
-			. Cada argumento requerido admite string, number o boolean; un valor requerido no puede ser null ni undefined.
+			<code>{'{name}'}</code>. Cada argumento requerido admite string, number o boolean; un valor requerido no puede ser null ni undefined.
 		</p>
 		<DocsCode
 			label="Catálogo JSON"

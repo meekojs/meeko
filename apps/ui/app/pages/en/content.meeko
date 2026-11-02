@@ -16,9 +16,7 @@
 	>
 		<h2 id="stat">UIStat and UIDescriptionList</h2>
 		<p>
-			A figure with its label, or several label and value pairs. Both are a description list (
-			<code>dl</code>
-			).
+			A figure with its label, or several label and value pairs. Both are a description list (<code>dl</code>).
 			<code>UIDescriptionList</code>
 			stays in one column on mobile.
 		</p>
@@ -64,8 +62,7 @@
 		<h2 id="disclosure">UIDisclosure</h2>
 		<p>
 			A native
-			<code>details</code>
-			: it opens with the keyboard and without JavaScript.
+			<code>details</code>: it opens with the keyboard and without JavaScript.
 		</p>
 		<DocsPreview layout="stack">
 			<UIDisclosure summary="Technical details">
@@ -84,17 +81,11 @@
 		<p>
 			It receives a unified diff and marks each line with
 			<code>data-kind</code>
-			(
-			<code>add</code>
-			,
-			<code>remove</code>
-			,
-			<code>hunk</code>
-			,
-			<code>file</code>
-			,
-			<code>context</code>
-			) and a text for screen readers: color is not the only meaning.
+			(<code>add</code>,
+			<code>remove</code>,
+			<code>hunk</code>,
+			<code>file</code>,
+			<code>context</code>) and a text for screen readers: color is not the only meaning.
 		</p>
 		<UIDiff
 			label="Changes in the guide"
@@ -120,10 +111,8 @@
 			(Shiki with
 			<code>--shiki-light</code>
 			and
-			<code>--shiki-dark</code>
-			) and in
-			<code>code</code>
-			, what is copied.
+			<code>--shiki-dark</code>) and in
+			<code>code</code>, what is copied.
 			<code>mode="log"</code>
 			uses
 			<code>role="log"</code>
@@ -167,20 +156,17 @@ build: done in 1.2 s"
 		<h2 id="prose">UIProse</h2>
 		<p>
 			It dresses rendered Markdown or your own HTML. Text keeps a reading measure, while code and tables may take the whole column. A UI component inside the text keeps its look. All these guides are inside a
-			<code>UIProse</code>
-			.
+			<code>UIProse</code>.
 		</p>
 		<DocsPreview layout="stack">
 			<UIProse as="section">
 				<h3>A section title</h3>
 				<p>
 					A paragraph with
-					<a href="#prose">a link</a>
-					,
+					<a href="#prose">a link</a>,
 					<strong>emphasis</strong>
 					and
-					<code>code</code>
-					.
+					<code>code</code>.
 				</p>
 				<ul>
 					<li>A list</li>
@@ -199,20 +185,15 @@ build: done in 1.2 s"
 		<DocsCode bind:code="examples.codeBlock" />
 		<p>
 			The types
-			<code>UIStatProps</code>
-			,
-			<code>UIDescriptionListProps</code>
-			,
-			<code>UIDisclosureProps</code>
-			,
-			<code>UIDiffProps</code>
-			,
+			<code>UIStatProps</code>,
+			<code>UIDescriptionListProps</code>,
+			<code>UIDisclosureProps</code>,
+			<code>UIDiffProps</code>,
 			<code>UICodeBlockProps</code>
 			and
 			<code>UIProseProps</code>
 			are exported from
-			<code>@meekojs/ui/runtime</code>
-			.
+			<code>@meekojs/ui/runtime</code>.
 		</p>
 	</DocsPage>
 </template>

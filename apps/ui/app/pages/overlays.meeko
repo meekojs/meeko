@@ -19,22 +19,18 @@
 	>
 		<p>
 			Para un diálogo con resultado, usa
-			<a href="/modals">Modal</a>
-			; para un menú o un diálogo ligero,
-			<a href="/popover">Popover</a>
-			. Todos usan la capa superior del navegador, y salen con una View Transition donde existe.
+			<a href="/modals">Modal</a>; para un menú o un diálogo ligero,
+			<a href="/popover">Popover</a>. Todos usan la capa superior del navegador, y salen con una View Transition donde existe.
 		</p>
 		<h2 id="drawer">UIDrawer</h2>
 		<p>
 			Un panel lateral. Es un
 			<code>dialog</code>
 			modal con
-			<code>command</code>
-			,
+			<code>command</code>,
 			<code>commandfor</code>
 			y
-			<code>closedby</code>
-			: abre, cierra y devuelve el foco sin JavaScript en los navegadores que los admiten; donde no, lo hace al hidratar. Al seguir un enlace de dentro se cierra al instante, porque la navegación ya es la transición.
+			<code>closedby</code>: abre, cierra y devuelve el foco sin JavaScript en los navegadores que los admiten; donde no, lo hace al hidratar. Al seguir un enlace de dentro se cierra al instante, porque la navegación ya es la transición.
 		</p>
 		<DocsPreview>
 			<UIDrawer
@@ -67,14 +63,11 @@
 		/>
 		<p>
 			Admite los snippets
-			<code>default</code>
-			,
+			<code>default</code>,
 			<code>footer</code>
 			y
-			<code>trigger(id)</code>
-			, y el evento
-			<code>close</code>
-			.
+			<code>trigger(id)</code>, y el evento
+			<code>close</code>.
 		</p>
 		<h2 id="tooltip">UITooltip</h2>
 		<p>
@@ -83,8 +76,7 @@
 			con
 			<code>mode="hint"</code>
 			y el aspecto de un tooltip: se abre con el puntero o el foco, nunca toma el foco, y el disparador lo referencia con
-			<code>aria-describedby</code>
-			. Escribe en él información complementaria.
+			<code>aria-describedby</code>. Escribe en él información complementaria.
 		</p>
 		<DocsPreview>
 			<UITooltip text="Se publica al guardar">
@@ -104,12 +96,10 @@
 		/>
 		<p>
 			Admite los snippets
-			<code>default</code>
-			,
+			<code>default</code>,
 			<code>trigger</code>
 			y
-			<code>anchor(trigger)</code>
-			, para un disparador propio.
+			<code>anchor(trigger)</code>, para un disparador propio.
 		</p>
 		<h2 id="command-palette">UICommandPalette</h2>
 		<p>
@@ -118,12 +108,10 @@
 			en tu código, busca donde quieras (Pagefind, un servidor o una lista local) y pásale
 			<code>results</code>
 			y
-			<code>status</code>
-			. Se abre con su botón o con
+			<code>status</code>. Se abre con su botón o con
 			<code>Ctrl</code>
 			y
-			<code>K</code>
-			, y las flechas recorren los resultados sin sacar el foco del campo.
+			<code>K</code>, y las flechas recorren los resultados sin sacar el foco del campo.
 		</p>
 		<DocsPreview>
 			<UICommandPalette
@@ -150,26 +138,20 @@
 		/>
 		<p>
 			Admite los snippets
-			<code>item(item, state)</code>
-			,
+			<code>item(item, state)</code>,
 			<code>trigger(modifier)</code>
 			y
-			<code>status(status, query)</code>
-			, y los eventos
-			<code>open</code>
-			,
+			<code>status(status, query)</code>, y los eventos
+			<code>open</code>,
 			<code>close</code>
 			y
-			<code>choose</code>
-			. Los tipos
-			<code>UIDrawerProps</code>
-			,
+			<code>choose</code>. Los tipos
+			<code>UIDrawerProps</code>,
 			<code>UITooltipProps</code>
 			y
 			<code>UICommandPaletteProps</code>
 			se exportan desde
-			<code>@meekojs/ui/runtime</code>
-			.
+			<code>@meekojs/ui/runtime</code>.
 		</p>
 	</DocsPage>
 </template>

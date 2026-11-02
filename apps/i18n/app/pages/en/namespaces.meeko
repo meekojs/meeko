@@ -17,8 +17,7 @@
 		<p>
 			<code>common</code>
 			is always loaded, together with the namespaces of
-			<code>global</code>
-			, such as the catalog of a shared shell.
+			<code>global</code>, such as the catalog of a shared shell.
 			<code>routes</code>
 			maps exact IDs of the manifest to additional namespaces. Every language declares the same namespaces.
 		</p>

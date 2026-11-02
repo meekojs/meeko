@@ -135,12 +135,9 @@
 		<h2 id="tokens">Tokens de uso</h2>
 		<p>
 			Lee el token de uso, no el paso:
-			<code>--ui-color-border</code>
-			, no
-			<code>--ui-color-surface-6</code>
-			. Ningún hex, tamaño o fuente suelto: si te falta algo, se añade a UI. El contrato completo está en
-			<code>packages/ui/DESIGN.md</code>
-			.
+			<code>--ui-color-border</code>, no
+			<code>--ui-color-surface-6</code>. Ningún hex, tamaño o fuente suelto: si te falta algo, se añade a UI. El contrato completo está en
+			<code>packages/ui/DESIGN.md</code>.
 		</p>
 		<DocsCode
 			label="app/styles/main.css"
@@ -166,8 +163,7 @@
 		<h2 id="scale">Escala fluida</h2>
 		<p>
 			La interfaz crece con la pantalla en un solo sitio, la base global: 16 px hasta 1440, 18 px a 2560 y 21 px a 3840, siempre a partir del tamaño de letra del navegador. Todos los tokens están en
-			<code>rem</code>
-			, así que crecen a la vez. Lo que se escribe en
+			<code>rem</code>, así que crecen a la vez. Lo que se escribe en
 			<code>px</code>
 			no crece.
 			<code>{'ui: { base: false }'}</code>
@@ -212,24 +208,19 @@
 		<p>
 			<code>ui.defaults</code>
 			admite
-			<code>button</code>
-			,
+			<code>button</code>,
 			<code>link</code>
 			y
-			<code>card</code>
-			. La prioridad es: props explícitas, defaults de aplicación y valores de base. Los defaults se aíslan por aplicación y petición SSR.
+			<code>card</code>. La prioridad es: props explícitas, defaults de aplicación y valores de base. Los defaults se aíslan por aplicación y petición SSR.
 		</p>
 		<h2 id="messages">Textos e idiomas</h2>
 		<p>
 			Los pocos textos que los componentes pintan por su cuenta (el cierre de
-			<code>UIModal</code>
-			, el estado vacío de
+			<code>UIModal</code>, el estado vacío de
 			<code>UITable</code>
 			y de
-			<code>UICombobox</code>
-			, los nombres de
-			<code>UIThemeToggle</code>
-			) vienen en español e inglés. Con
+			<code>UICombobox</code>, los nombres de
+			<code>UIThemeToggle</code>) vienen en español e inglés. Con
 			<code>@meekojs/i18n</code>
 			siguen el idioma del documento, sin configurar nada. Sin ese módulo,
 			<code>ui.locale</code>
@@ -239,24 +230,20 @@
 		</p>
 		<DocsCode bind:code="examples.messages" />
 		<p>
-			Una prop o un snippet del componente siempre ganan sobre estos textos. Lo que falta en un idioma se toma de su idioma base (
-			<code>pt</code>
+			Una prop o un snippet del componente siempre ganan sobre estos textos. Lo que falta en un idioma se toma de su idioma base (<code>pt</code>
 			para
-			<code>pt-BR</code>
-			), de
+			<code>pt-BR</code>), de
 			<code>ui.locale</code>
 			y, por último, del español. El servidor y el cliente eligen el mismo texto, así que la hidratación no cambia nada.
 		</p>
 		<p>
 			Los tipos
-			<code>UIOptions</code>
-			,
+			<code>UIOptions</code>,
 			<code>UITokens</code>
 			y
 			<code>UIDefaults</code>
 			se exportan desde
-			<code>@meekojs/ui</code>
-			.
+			<code>@meekojs/ui</code>.
 		</p>
 	</DocsPage>
 </template>

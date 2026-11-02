@@ -16,12 +16,9 @@
 		<p>
 			<code>number</code>
 			accepts the options of
-			<code>Intl.NumberFormat</code>
-			;
-			<code>date</code>
-			, those of
-			<code>Intl.DateTimeFormat</code>
-			. The instances are reused per options within the translator.
+			<code>Intl.NumberFormat</code>;
+			<code>date</code>, those of
+			<code>Intl.DateTimeFormat</code>. The instances are reused per options within the translator.
 		</p>
 		<DocsApi
 			caption="Signatures of the formatters"
@@ -38,8 +35,7 @@
 		</p>
 		<p>
 			The currency is chosen with
-			<code>currency</code>
-			; the language defines how it is presented, not a currency conversion.
+			<code>currency</code>; the language defines how it is presented, not a currency conversion.
 		</p>
 		<UILink to="/playground">Compare formats</UILink>
 	</DocsPage>

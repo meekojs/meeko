@@ -11,8 +11,7 @@
 		<h2 id="interpolation">Interpolation</h2>
 		<p>
 			Write parameters in the form
-			<code>{'{name}'}</code>
-			. Each required argument accepts a string, number or boolean; a required value cannot be null or undefined.
+			<code>{'{name}'}</code>. Each required argument accepts a string, number or boolean; a required value cannot be null or undefined.
 		</p>
 		<DocsCode
 			label="JSON catalog"

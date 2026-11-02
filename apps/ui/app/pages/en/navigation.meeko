@@ -31,36 +31,27 @@
 			(a route with typed
 			<code>params</code>
 			and
-			<code>search</code>
-			), plus
-			<code>target</code>
-			,
-			<code>rel</code>
-			,
-			<code>download</code>
-			,
-			<code>hreflang</code>
-			,
+			<code>search</code>), plus
+			<code>target</code>,
+			<code>rel</code>,
+			<code>download</code>,
+			<code>hreflang</code>,
 			<code>lang</code>
 			and
-			<code>title</code>
-			. With
+			<code>title</code>. With
 			<code>to</code>
 			it navigates without reloading, it is localized with
 			<code>@meekojs/i18n</code>
 			and the active route decides
-			<code>aria-current</code>
-			. With
-			<code>href</code>
-			, it is the current one when it matches the
+			<code>aria-current</code>. With
+			<code>href</code>, it is the current one when it matches the
 			<code>current</code>
 			prop.
 		</p>
 		<h2 id="tree">UINavigationTree</h2>
 		<p>
 			The side navigation of this guide. Each group folds with a
-			<code>details</code>
-			, and the current group always shows the current link.
+			<code>details</code>, and the current group always shows the current link.
 		</p>
 		<DocsPreview layout="stack">
 			<UINavigationTree
@@ -93,8 +84,7 @@
 		/>
 		<p>
 			It accepts the
-			<code>item(item, current)</code>
-			,
+			<code>item(item, current)</code>,
 			<code>icon(entry)</code>
 			and
 			<code>empty</code>
@@ -104,8 +94,7 @@
 		<p>
 			<code>UINavigationTabs</code>
 			are links between pages, not a
-			<code>tablist</code>
-			: the indicator follows the current one with anchor positioning.
+			<code>tablist</code>: the indicator follows the current one with anchor positioning.
 			<code>UITabs</code>
 			are panels of one page, with the ARIA tabs pattern: the arrows change the panel, and the chosen one shows before hydration.
 		</p>
@@ -149,8 +138,7 @@
 		/>
 		<p>
 			It accepts the
-			<code>panel-&lt;value&gt;</code>
-			,
+			<code>panel-&lt;value&gt;</code>,
 			<code>panel(item)</code>
 			and
 			<code>tab(item)</code>
@@ -220,8 +208,7 @@
 		<h2 id="toc">UITableOfContents</h2>
 		<p>
 			It paints the active entry with
-			<code>scroll-target-group</code>
-			, without a script, where it exists. A minimal
+			<code>scroll-target-group</code>, without a script, where it exists. A minimal
 			<code>IntersectionObserver</code>
 			keeps
 			<code>aria-current="location"</code>
@@ -293,26 +280,18 @@
 		/>
 		<p>
 			The types
-			<code>UINavigationTreeProps</code>
-			,
-			<code>UINavigationTabsProps</code>
-			,
-			<code>UITabsProps</code>
-			,
-			<code>UIBreadcrumbProps</code>
-			,
-			<code>UIPageNavigationProps</code>
-			,
-			<code>UIPaginationProps</code>
-			,
-			<code>UITableOfContentsProps</code>
-			,
+			<code>UINavigationTreeProps</code>,
+			<code>UINavigationTabsProps</code>,
+			<code>UITabsProps</code>,
+			<code>UIBreadcrumbProps</code>,
+			<code>UIPageNavigationProps</code>,
+			<code>UIPaginationProps</code>,
+			<code>UITableOfContentsProps</code>,
 			<code>UILocaleSwitcherProps</code>
 			and
 			<code>UILocaleSuggestionProps</code>
 			are exported from
-			<code>@meekojs/ui/runtime</code>
-			.
+			<code>@meekojs/ui/runtime</code>.
 		</p>
 	</DocsPage>
 </template>

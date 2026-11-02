@@ -20,19 +20,16 @@
 			is looked up first, then the category of
 			<code>Intl.PluralRules</code>
 			and finally
-			<code>other</code>
-			. The number must be finite.
+			<code>other</code>. The number must be finite.
 		</p>
 		<p>
 			The runtime passes
 			<code>count</code>
 			to the forms as an alias of that number. When the selector is called
-			<code>total</code>
-			, passing
+			<code>total</code>, passing
 			<code>{'{ total: 3 }'}</code>
 			is enough. If the selector is called
-			<code>count</code>
-			, that same argument is still required.
+			<code>count</code>, that same argument is still required.
 		</p>
 		<h2 id="select">Alternatives with select</h2>
 		<DocsCode
@@ -41,14 +38,12 @@
 		/>
 		<p>
 			The selector is converted to text to look up its form; a value without its own alternative uses
-			<code>other</code>
-			. The parameters used by any of its forms are part of the required contract.
+			<code>other</code>. The parameters used by any of its forms are part of the required contract.
 		</p>
 		<h2 id="categories">Categories of each language</h2>
 		<p>
 			Languages may need different categories. Arabic uses zero, one, two, few, many and other; the playground catalog includes those forms. Every plural or select structure requires
-			<code>other</code>
-			. The forms contain text.
+			<code>other</code>. The forms contain text.
 		</p>
 		<UILink to="/playground">Try quantities and permissions</UILink>
 	</DocsPage>

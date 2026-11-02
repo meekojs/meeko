@@ -8,10 +8,8 @@
 		<h2 id="how-it-works">El mismo contrato en tres idiomas</h2>
 		<p>
 			El laboratorio usa catálogos JSON de español, inglés y árabe registrados en
-			<code>meeko.config.ts</code>
-			. Las señales actualizan los argumentos de
-			<code>t</code>
-			; los enlaces de idioma apuntan a
+			<code>meeko.config.ts</code>. Las señales actualizan los argumentos de
+			<code>t</code>; los enlaces de idioma apuntan a
 			<code>switchLocalePath</code>
 			y cargan el otro idioma en una navegación completa, conservando la búsqueda y el fragmento.
 		</p>

@@ -46,6 +46,8 @@ interface HtmlNode {
 	readonly next?: HtmlNode
 	isLeadingSpaceSensitive?: boolean
 	hasLeadingSpaces?: boolean
+	isTrailingSpaceSensitive?: boolean
+	hasTrailingSpaces?: boolean
 	/** Expresión sin espacios exteriores de una interpolación `{expr}`. */
 	meekoExpression?: string
 	setProperty(property: string, value: unknown): void
@@ -264,6 +266,45 @@ function nextBorrowsClosingMarker(node: HtmlNode | undefined): boolean {
 	return Boolean(node?.prev && node.prev.kind !== 'text' && node.prev.kind !== 'comment' && node.isLeadingSpaceSensitive && !node.hasLeadingSpaces)
 }
 
+/** HTML elements that flow inside a line of text, where a space between or inside them is visible. */
+const phrasingElements = new Set(['a', 'abbr', 'b', 'bdi', 'bdo', 'cite', 'code', 'data', 'dfn', 'em', 'i', 'kbd', 'mark', 'q', 's', 'samp', 'small', 'span', 'strong', 'sub', 'sup', 'time', 'u', 'var'])
+
+function isTextLike(node: HtmlNode): boolean {
+	return node.kind === 'text' || node.kind === 'interpolation'
+}
+
+function isPhrasing(node: HtmlNode): boolean {
+	return node.kind === 'element' && node.name !== undefined && phrasingElements.has(node.name)
+}
+
+/**
+ * `htmlWhitespaceSensitivity: "ignore"` lets Prettier put every node on its own line, but the compiler
+ * keeps the text of a template as written: `<code>x</code>.` would render as `x .`. Where the source
+ * has no space between text and an element, between two phrasing elements or at the inner edge of a
+ * phrasing element, the printer must not add one. The rest of that option stays as Prettier defines it.
+ */
+function keepAdjacentInlineContent(ast: HtmlNode): void {
+	ast.walk((node) => {
+		const children = node.children
+		if (!children?.length) return
+		if (isPhrasing(node)) {
+			const first = children[0]!
+			const last = children[children.length - 1]!
+			if (!first.hasLeadingSpaces) first.isLeadingSpaceSensitive = true
+			if (!last.hasTrailingSpaces) last.isTrailingSpaceSensitive = true
+		}
+		for (let index = 1; index < children.length; index++) {
+			const previous = children[index - 1]!
+			const next = children[index]!
+			if (next.hasLeadingSpaces || previous.name === 'br' || next.name === 'br') continue
+			if (isTextLike(previous) || isTextLike(next) || (isPhrasing(previous) && isPhrasing(next))) {
+				previous.isTrailingSpaceSensitive = true
+				next.isLeadingSpaceSensitive = true
+			}
+		}
+	})
+}
+
 const visitorKeys: Record<string, readonly string[]> = {
 	root: ['children'],
 	element: ['attrs', 'startTagComments', 'children'],
@@ -280,7 +321,9 @@ const templatePrinter: Printer<HtmlNode> = {
 		const parser = options.parser
 		options.parser = 'html'
 		try {
-			return host(options).printer.preprocess(ast, options)
+			const processed = host(options).printer.preprocess(ast, options) as HtmlNode
+			if (options.htmlWhitespaceSensitivity === 'ignore') keepAdjacentInlineContent(processed)
+			return processed
 		} finally {
 			options.parser = parser
 		}

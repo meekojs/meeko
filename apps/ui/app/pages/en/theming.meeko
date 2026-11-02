@@ -136,12 +136,9 @@
 		<h2 id="tokens">Usage tokens</h2>
 		<p>
 			Read the usage token, not the step:
-			<code>--ui-color-border</code>
-			, not
-			<code>--ui-color-surface-6</code>
-			. No loose hex, size or font: if you miss something, it is added to UI. The whole contract is in
-			<code>packages/ui/DESIGN.md</code>
-			.
+			<code>--ui-color-border</code>, not
+			<code>--ui-color-surface-6</code>. No loose hex, size or font: if you miss something, it is added to UI. The whole contract is in
+			<code>packages/ui/DESIGN.md</code>.
 		</p>
 		<DocsCode
 			label="app/styles/main.css"
@@ -167,8 +164,7 @@
 		<h2 id="scale">Fluid scale</h2>
 		<p>
 			The interface grows with the screen in one place, the global base: 16 px up to 1440, 18 px at 2560 and 21 px at 3840, always from the font size of the browser. Every token is in
-			<code>rem</code>
-			, so they grow together. What is written in
+			<code>rem</code>, so they grow together. What is written in
 			<code>px</code>
 			does not grow.
 			<code>{'ui: { base: false }'}</code>
@@ -213,24 +209,19 @@
 		<p>
 			<code>ui.defaults</code>
 			accepts
-			<code>button</code>
-			,
+			<code>button</code>,
 			<code>link</code>
 			and
-			<code>card</code>
-			. The priority is: explicit props, application defaults and base values. Defaults are isolated per application and SSR request.
+			<code>card</code>. The priority is: explicit props, application defaults and base values. Defaults are isolated per application and SSR request.
 		</p>
 		<h2 id="messages">Texts and languages</h2>
 		<p>
 			The few texts components paint on their own (the close button of
-			<code>UIModal</code>
-			, the empty state of
+			<code>UIModal</code>, the empty state of
 			<code>UITable</code>
 			and
-			<code>UICombobox</code>
-			, the names of
-			<code>UIThemeToggle</code>
-			) come in Spanish and English. With
+			<code>UICombobox</code>, the names of
+			<code>UIThemeToggle</code>) come in Spanish and English. With
 			<code>@meekojs/i18n</code>
 			they follow the language of the document, without any configuration. Without that module,
 			<code>ui.locale</code>
@@ -240,24 +231,20 @@
 		</p>
 		<DocsCode bind:code="examples.messages" />
 		<p>
-			A prop or a snippet of the component always win over these texts. What a language lacks comes from its base language (
-			<code>pt</code>
+			A prop or a snippet of the component always win over these texts. What a language lacks comes from its base language (<code>pt</code>
 			for
-			<code>pt-BR</code>
-			), from
+			<code>pt-BR</code>), from
 			<code>ui.locale</code>
 			and, last, from Spanish. The server and the client choose the same text, so hydration changes nothing.
 		</p>
 		<p>
 			The types
-			<code>UIOptions</code>
-			,
+			<code>UIOptions</code>,
 			<code>UITokens</code>
 			and
 			<code>UIDefaults</code>
 			are exported from
-			<code>@meekojs/ui</code>
-			.
+			<code>@meekojs/ui</code>.
 		</p>
 	</DocsPage>
 </template>

@@ -22,16 +22,13 @@
 			uses the
 			<code>theme</code>
 			option of
-			<code>meeko.config.ts</code>
-			. It is a form that sends
-			<code>POST /_meeko/theme</code>
-			: without JavaScript, the server stores the preference and goes back to the same page. With JavaScript, the theme changes instantly, without navigating. Both examples and the header share the same preference.
+			<code>meeko.config.ts</code>. It is a form that sends
+			<code>POST /_meeko/theme</code>: without JavaScript, the server stores the preference and goes back to the same page. With JavaScript, the theme changes instantly, without navigating. Both examples and the header share the same preference.
 		</p>
 		<h2 id="cycle">A button that cycles</h2>
 		<p>
 			In
-			<code>mode="cycle"</code>
-			, the default, each press moves to the next choice. Its accessible name states the current theme and the next one.
+			<code>mode="cycle"</code>, the default, each press moves to the next choice. Its accessible name states the current theme and the next one.
 		</p>
 		<DocsPreview>
 			<UIThemeToggle id="theme-cycle" />
@@ -46,8 +43,7 @@
 		<h2 id="select">A group of options</h2>
 		<p>
 			In
-			<code>mode="select"</code>
-			, each choice is a radio. The arrow keys,
+			<code>mode="select"</code>, each choice is a radio. The arrow keys,
 			<code>Home</code>
 			and
 			<code>End</code>
@@ -70,8 +66,7 @@
 			replace their names and the accessible texts for one toggle: by default they follow the language of the document and
 			<code>ui.messages</code>
 			(see
-			<MeekoLink to="/theming">Theming</MeekoLink>
-			). A snippet named after each choice replaces its text, for example with an icon; the name then stays as the accessible label.
+			<MeekoLink to="/theming">Theming</MeekoLink>). A snippet named after each choice replaces its text, for example with an icon; the name then stays as the accessible label.
 		</p>
 		<DocsCode bind:code="examples.themeToggleCustom" />
 		<h2 id="api">API</h2>
@@ -87,16 +82,13 @@
 		/>
 		<p>
 			To read or change the theme from your code, use
-			<code>useTheme()</code>
-			; to build your own switcher, use
+			<code>useTheme()</code>; to build your own switcher, use
 			<code>useThemeToggle()</code>
 			from
-			<code>@meekojs/meeko/framework</code>
-			. The
+			<code>@meekojs/meeko/framework</code>. The
 			<code>UIThemeToggleProps</code>
 			type is exported from
-			<code>@meekojs/ui/runtime</code>
-			.
+			<code>@meekojs/ui/runtime</code>.
 		</p>
 	</DocsPage>
 </template>

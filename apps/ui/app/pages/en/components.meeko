@@ -86,20 +86,17 @@
 		</section>
 		<UIAlert tone="info">
 			The core tags
-			<code>MeekoSelect</code>
-			,
+			<code>MeekoSelect</code>,
 			<code>MeekoPopover</code>
 			and
 			<code>MeekoThemeToggle</code>
 			are deprecated since Meeko 1.8 and will be removed in 2.0. Replace them with
 			<code>UISelect</code>
 			or
-			<code>UICombobox</code>
-			,
+			<code>UICombobox</code>,
 			<code>UIPopover</code>
 			and
-			<code>UIThemeToggle</code>
-			.
+			<code>UIThemeToggle</code>.
 		</UIAlert>
 	</DocsPage>
 </template>

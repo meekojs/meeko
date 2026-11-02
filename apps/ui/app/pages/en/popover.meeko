@@ -24,18 +24,15 @@
 			places its content in the browser's top layer with the
 			<code>popover</code>
 			attribute and anchors it to the trigger with CSS anchor positioning, without JavaScript. When it does not fit, it moves to the other side with
-			<code>position-try-fallbacks</code>
-			. A browser without anchoring opens it unanchored: it still works.
+			<code>position-try-fallbacks</code>. A browser without anchoring opens it unanchored: it still works.
 		</p>
 		<h2 id="menu">Action menu</h2>
 		<p>
 			With
-			<code>role="menu"</code>
-			, the children with
+			<code>role="menu"</code>, the children with
 			<code>role="menuitem"</code>
 			are navigated with the arrow keys,
-			<code>Home</code>
-			,
+			<code>Home</code>,
 			<code>End</code>
 			and the first letter of each action.
 			<code>Esc</code>
@@ -84,8 +81,7 @@
 			With
 			<code>role="dialog"</code>
 			focus moves into the content when it opens. Use it for brief controls that do not need to block the page; for a task that demands attention, use
-			<MeekoLink to="/modals">Modal</MeekoLink>
-			. The model controls the opening from code.
+			<MeekoLink to="/modals">Modal</MeekoLink>. The model controls the opening from code.
 		</p>
 		<DocsPreview>
 			<UIPopover
@@ -133,10 +129,8 @@
 			With
 			<code>mode="hint"</code>
 			the content is a tooltip: it opens when the pointer hovers, after
-			<code>delay</code>
-			, or when the trigger is focused, and it never receives focus. The trigger references it with
-			<code>aria-describedby</code>
-			. Write supplementary information in it, never the only explanation of an action.
+			<code>delay</code>, or when the trigger is focused, and it never receives focus. The trigger references it with
+			<code>aria-describedby</code>. Write supplementary information in it, never the only explanation of an action.
 		</p>
 		<DocsPreview>
 			<UITooltip bind:offset="6">
@@ -150,8 +144,7 @@
 			The
 			<code>anchor</code>
 			snippet replaces the button that UI renders. It receives the attributes of the trigger to apply them with
-			<code>bind="trigger"</code>
-			; UIPopover finds it by its
+			<code>bind="trigger"</code>; UIPopover finds it by its
 			<code>id</code>
 			and adds the keyboard handling and the anchoring.
 		</p>
@@ -174,8 +167,7 @@
 		/>
 		<p>
 			It accepts the
-			<code>default</code>
-			,
+			<code>default</code>,
 			<code>trigger</code>
 			and
 			<code>anchor</code>
@@ -184,22 +176,17 @@
 			event receives an object with
 			<code>open</code>
 			every time the content opens or closes. With a
-			<code>ref:</code>
-			, the component exposes
-			<code>show()</code>
-			,
+			<code>ref:</code>, the component exposes
+			<code>show()</code>,
 			<code>hide()</code>
 			and
-			<code>toggle()</code>
-			. The
-			<code>UIPopoverProps</code>
-			,
+			<code>toggle()</code>. The
+			<code>UIPopoverProps</code>,
 			<code>PopoverPlacement</code>
 			and
 			<code>PopoverTrigger</code>
 			types are exported from
-			<code>@meekojs/ui/runtime</code>
-			.
+			<code>@meekojs/ui/runtime</code>.
 		</p>
 	</DocsPage>
 </template>

@@ -15,9 +15,7 @@
 	>
 		<h2 id="stat">UIStat y UIDescriptionList</h2>
 		<p>
-			Una cifra con su etiqueta, o varios pares etiqueta y valor. Las dos son una lista de definición (
-			<code>dl</code>
-			).
+			Una cifra con su etiqueta, o varios pares etiqueta y valor. Las dos son una lista de definición (<code>dl</code>).
 			<code>UIDescriptionList</code>
 			se queda en una columna en móvil.
 		</p>
@@ -83,17 +81,11 @@
 		<p>
 			Recibe un diff unificado y marca cada línea con
 			<code>data-kind</code>
-			(
-			<code>add</code>
-			,
-			<code>remove</code>
-			,
-			<code>hunk</code>
-			,
-			<code>file</code>
-			,
-			<code>context</code>
-			) y un texto para lectores de pantalla: el color no es el único significado.
+			(<code>add</code>,
+			<code>remove</code>,
+			<code>hunk</code>,
+			<code>file</code>,
+			<code>context</code>) y un texto para lectores de pantalla: el color no es el único significado.
 		</p>
 		<UIDiff
 			label="Cambios en la guía"
@@ -119,10 +111,8 @@
 			ya resaltado (Shiki con
 			<code>--shiki-light</code>
 			y
-			<code>--shiki-dark</code>
-			) y en
-			<code>code</code>
-			, lo que se copia.
+			<code>--shiki-dark</code>) y en
+			<code>code</code>, lo que se copia.
 			<code>mode="log"</code>
 			usa
 			<code>role="log"</code>
@@ -166,20 +156,17 @@ build: listo en 1,2 s"
 		<h2 id="prose">UIProse</h2>
 		<p>
 			Viste Markdown renderizado o tu propio HTML. El texto mantiene una medida de lectura, mientras el código y las tablas pueden ocupar toda la columna. Un componente de UI dentro del texto conserva su aspecto. Todas estas guías van dentro de un
-			<code>UIProse</code>
-			.
+			<code>UIProse</code>.
 		</p>
 		<DocsPreview layout="stack">
 			<UIProse as="section">
 				<h3>Un título de sección</h3>
 				<p>
 					Un párrafo con
-					<a href="#prose">un enlace</a>
-					,
+					<a href="#prose">un enlace</a>,
 					<strong>énfasis</strong>
 					y
-					<code>código</code>
-					.
+					<code>código</code>.
 				</p>
 				<ul>
 					<li>Una lista</li>
@@ -198,20 +185,15 @@ build: listo en 1,2 s"
 		<DocsCode bind:code="examples.codeBlock" />
 		<p>
 			Los tipos
-			<code>UIStatProps</code>
-			,
-			<code>UIDescriptionListProps</code>
-			,
-			<code>UIDisclosureProps</code>
-			,
-			<code>UIDiffProps</code>
-			,
+			<code>UIStatProps</code>,
+			<code>UIDescriptionListProps</code>,
+			<code>UIDisclosureProps</code>,
+			<code>UIDiffProps</code>,
 			<code>UICodeBlockProps</code>
 			y
 			<code>UIProseProps</code>
 			se exportan desde
-			<code>@meekojs/ui/runtime</code>
-			.
+			<code>@meekojs/ui/runtime</code>.
 		</p>
 	</DocsPage>
 </template>

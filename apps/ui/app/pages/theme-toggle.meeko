@@ -20,16 +20,13 @@
 			usa la opción
 			<code>theme</code>
 			de
-			<code>meeko.config.ts</code>
-			. Es un formulario que envía
-			<code>POST /_meeko/theme</code>
-			: sin JavaScript, el servidor guarda la preferencia y vuelve a la misma página. Con JavaScript, el tema cambia al instante, sin navegar. Los dos ejemplos y la cabecera comparten la misma preferencia.
+			<code>meeko.config.ts</code>. Es un formulario que envía
+			<code>POST /_meeko/theme</code>: sin JavaScript, el servidor guarda la preferencia y vuelve a la misma página. Con JavaScript, el tema cambia al instante, sin navegar. Los dos ejemplos y la cabecera comparten la misma preferencia.
 		</p>
 		<h2 id="cycle">Un botón que alterna</h2>
 		<p>
 			En
-			<code>mode="cycle"</code>
-			, el valor por defecto, cada pulsación pasa a la siguiente elección. Su nombre accesible indica el tema actual y el siguiente.
+			<code>mode="cycle"</code>, el valor por defecto, cada pulsación pasa a la siguiente elección. Su nombre accesible indica el tema actual y el siguiente.
 		</p>
 		<DocsPreview>
 			<UIThemeToggle id="theme-cycle" />
@@ -44,8 +41,7 @@
 		<h2 id="select">Un grupo de opciones</h2>
 		<p>
 			En
-			<code>mode="select"</code>
-			, cada elección es un radio. Las flechas,
+			<code>mode="select"</code>, cada elección es un radio. Las flechas,
 			<code>Inicio</code>
 			y
 			<code>Fin</code>
@@ -68,8 +64,7 @@
 			sustituyen sus nombres y los textos accesibles en un selector concreto: por defecto siguen el idioma del documento y
 			<code>ui.messages</code>
 			(véase
-			<MeekoLink to="/theming">Temas</MeekoLink>
-			). Un snippet con el nombre de cada elección sustituye su texto, por ejemplo por un icono; en ese caso el nombre se conserva como etiqueta accesible.
+			<MeekoLink to="/theming">Temas</MeekoLink>). Un snippet con el nombre de cada elección sustituye su texto, por ejemplo por un icono; en ese caso el nombre se conserva como etiqueta accesible.
 		</p>
 		<DocsCode bind:code="examples.themeToggleCustom" />
 		<h2 id="api">API</h2>
@@ -85,16 +80,13 @@
 		/>
 		<p>
 			Para leer o cambiar el tema desde tu código, usa
-			<code>useTheme()</code>
-			; para construir tu propio selector, usa
+			<code>useTheme()</code>; para construir tu propio selector, usa
 			<code>useThemeToggle()</code>
 			de
-			<code>@meekojs/meeko/framework</code>
-			. El tipo
+			<code>@meekojs/meeko/framework</code>. El tipo
 			<code>UIThemeToggleProps</code>
 			se exporta desde
-			<code>@meekojs/ui/runtime</code>
-			.
+			<code>@meekojs/ui/runtime</code>.
 		</p>
 	</DocsPage>
 </template>

@@ -15,12 +15,9 @@
 		<p>
 			<code>number</code>
 			admite las opciones de
-			<code>Intl.NumberFormat</code>
-			;
-			<code>date</code>
-			, las de
-			<code>Intl.DateTimeFormat</code>
-			. Las instancias se reutilizan por sus opciones dentro del traductor.
+			<code>Intl.NumberFormat</code>;
+			<code>date</code>, las de
+			<code>Intl.DateTimeFormat</code>. Las instancias se reutilizan por sus opciones dentro del traductor.
 		</p>
 		<DocsApi
 			caption="Firmas de los formateadores"
@@ -37,8 +34,7 @@
 		</p>
 		<p>
 			La moneda se elige con
-			<code>currency</code>
-			; el idioma define su presentación, no una conversión de divisas.
+			<code>currency</code>; el idioma define su presentación, no una conversión de divisas.
 		</p>
 		<UILink href="/playground">Comparar formatos</UILink>
 	</DocsPage>

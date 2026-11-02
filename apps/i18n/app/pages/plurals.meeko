@@ -15,23 +15,18 @@
 		<p>
 			<code>plural</code>
 			indica el argumento numérico. Primero se busca una coincidencia exacta como
-			<code>=0</code>
-			, luego la categoría de
+			<code>=0</code>, luego la categoría de
 			<code>Intl.PluralRules</code>
 			y finalmente
-			<code>other</code>
-			. El número debe ser finito.
+			<code>other</code>. El número debe ser finito.
 		</p>
 		<p>
 			El runtime entrega
 			<code>count</code>
 			a las formas como alias de ese número. Cuando el selector se llama
-			<code>total</code>
-			, basta con pasar
-			<code>{'{ total: 3 }'}</code>
-			. Si el selector se llama
-			<code>count</code>
-			, ese mismo argumento sigue siendo obligatorio.
+			<code>total</code>, basta con pasar
+			<code>{'{ total: 3 }'}</code>. Si el selector se llama
+			<code>count</code>, ese mismo argumento sigue siendo obligatorio.
 		</p>
 		<h2 id="select">Alternativas con select</h2>
 		<DocsCode
@@ -40,14 +35,12 @@
 		/>
 		<p>
 			El selector se convierte a texto para buscar su forma; un valor sin alternativa propia usa
-			<code>other</code>
-			. Los parámetros utilizados por cualquiera de sus formas forman parte del contrato requerido.
+			<code>other</code>. Los parámetros utilizados por cualquiera de sus formas forman parte del contrato requerido.
 		</p>
 		<h2 id="categories">Categorías de cada idioma</h2>
 		<p>
 			Los idiomas pueden necesitar categorías diferentes. Árabe usa zero, one, two, few, many y other; el catálogo del laboratorio incluye esas formas. Toda estructura plural o select requiere
-			<code>other</code>
-			. Las formas contienen texto.
+			<code>other</code>. Las formas contienen texto.
 		</p>
 		<UILink href="/playground">Probar cantidades y permisos</UILink>
 	</DocsPage>

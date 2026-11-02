@@ -72,8 +72,7 @@
 		<h2 id="declarative">Modal declarativo</h2>
 		<p>
 			Controla la visibilidad mediante una señal booleana y
-			<code>model</code>
-			. El ejemplo de arriba también permite probar un diálogo cuyo cierre exige una acción explícita.
+			<code>model</code>. El ejemplo de arriba también permite probar un diálogo cuyo cierre exige una acción explícita.
 		</p>
 		<DocsCode bind:code="examples.modal" />
 		<h2 id="programmatic">Abrir y esperar un resultado</h2>
@@ -83,8 +82,7 @@
 			en la raíz. Los componentes del registro cuyo nombre empieza por
 			<code>Modal</code>
 			se pueden abrir con props tipadas. Un error de carga rechaza la promesa; descartar el diálogo resuelve
-			<code>undefined</code>
-			.
+			<code>undefined</code>.
 		</p>
 		<DocsCode
 			label="Dentro de un componente"
@@ -97,12 +95,10 @@
 		<h2 id="stack">Modales anidados</h2>
 		<p>
 			Abre la confirmación y luego otro modal para probar tamaños
-			<code>lg</code>
-			,
+			<code>lg</code>,
 			<code>md</code>
 			y
-			<code>sm</code>
-			. Sólo el superior controla el fondo y el foco. Los anteriores conservan su estado, quedan bloqueados y recuperan foco y tamaño al volver. El movimiento se reduce cuando el usuario lo solicita.
+			<code>sm</code>. Sólo el superior controla el fondo y el foco. Los anteriores conservan su estado, quedan bloqueados y recuperan foco y tamaño al volver. El movimiento se reduce cuando el usuario lo solicita.
 		</p>
 		<DocsApi
 			bind:rows="[
@@ -120,18 +116,14 @@
 			Requiere el snippet
 			<code>default</code>
 			y admite
-			<code>footer</code>
-			. El evento
+			<code>footer</code>. El evento
 			<code>dismiss</code>
 			recibe
-			<code>escape</code>
-			,
-			<code>backdrop</code>
-			,
+			<code>escape</code>,
+			<code>backdrop</code>,
 			<code>button</code>
 			o
-			<code>native</code>
-			. No uses un modal para tareas que puedan resolverse dentro de la página.
+			<code>native</code>. No uses un modal para tareas que puedan resolverse dentro de la página.
 		</p>
 	</DocsPage>
 </template>

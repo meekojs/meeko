@@ -23,18 +23,15 @@
 			coloca su contenido en la capa superior del navegador con el atributo
 			<code>popover</code>
 			y lo ancla al disparador con CSS anchor positioning, sin JavaScript. Si no cabe, se coloca al otro lado con
-			<code>position-try-fallbacks</code>
-			. Un navegador sin anclaje lo abre sin anclar: sigue funcionando.
+			<code>position-try-fallbacks</code>. Un navegador sin anclaje lo abre sin anclar: sigue funcionando.
 		</p>
 		<h2 id="menu">Menú de acciones</h2>
 		<p>
 			Con
-			<code>role="menu"</code>
-			, los hijos con
+			<code>role="menu"</code>, los hijos con
 			<code>role="menuitem"</code>
 			se recorren con las flechas,
-			<code>Inicio</code>
-			,
+			<code>Inicio</code>,
 			<code>Fin</code>
 			y la primera letra de cada acción.
 			<code>Esc</code>
@@ -83,8 +80,7 @@
 			Con
 			<code>role="dialog"</code>
 			el foco entra en el contenido al abrirse. Úsalo para controles breves que no necesitan bloquear la página; para una tarea que exige atención, usa
-			<a href="/modals">Modal</a>
-			. El modelo controla la apertura desde código.
+			<a href="/modals">Modal</a>. El modelo controla la apertura desde código.
 		</p>
 		<DocsPreview>
 			<UIPopover
@@ -132,14 +128,11 @@
 			Con
 			<code>mode="hint"</code>
 			el contenido es un tooltip: se abre al pasar el puntero, tras
-			<code>delay</code>
-			, o al enfocar el disparador, y nunca recibe el foco. El disparador lo referencia con
-			<code>aria-describedby</code>
-			. Escribe en él información complementaria, nunca la única explicación de una acción.
+			<code>delay</code>, o al enfocar el disparador, y nunca recibe el foco. El disparador lo referencia con
+			<code>aria-describedby</code>. Escribe en él información complementaria, nunca la única explicación de una acción.
 			<code>UITooltip</code>
 			es esta misma variante con el aspecto de un tooltip, y es la que usa este ejemplo; véase
-			<a href="/overlays">Superposiciones</a>
-			.
+			<a href="/overlays">Superposiciones</a>.
 		</p>
 		<DocsPreview>
 			<UITooltip bind:offset="6">
@@ -153,8 +146,7 @@
 			El snippet
 			<code>anchor</code>
 			sustituye el botón que pinta UI. Recibe los atributos del disparador para aplicarlos con
-			<code>bind="trigger"</code>
-			; UIPopover lo encuentra por su
+			<code>bind="trigger"</code>; UIPopover lo encuentra por su
 			<code>id</code>
 			y le añade el teclado y el anclaje.
 		</p>
@@ -177,32 +169,25 @@
 		/>
 		<p>
 			Admite los snippets
-			<code>default</code>
-			,
+			<code>default</code>,
 			<code>trigger</code>
 			y
-			<code>anchor</code>
-			. El evento
+			<code>anchor</code>. El evento
 			<code>toggle</code>
 			recibe un objeto con
 			<code>open</code>
 			cada vez que el contenido se abre o se cierra. Con una
-			<code>ref:</code>
-			, el componente expone
-			<code>show()</code>
-			,
+			<code>ref:</code>, el componente expone
+			<code>show()</code>,
 			<code>hide()</code>
 			y
-			<code>toggle()</code>
-			. Los tipos
-			<code>UIPopoverProps</code>
-			,
+			<code>toggle()</code>. Los tipos
+			<code>UIPopoverProps</code>,
 			<code>PopoverPlacement</code>
 			y
 			<code>PopoverTrigger</code>
 			se exportan desde
-			<code>@meekojs/ui/runtime</code>
-			.
+			<code>@meekojs/ui/runtime</code>.
 		</p>
 	</DocsPage>
 </template>

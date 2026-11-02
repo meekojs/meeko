@@ -160,8 +160,7 @@
 					<li>
 						<h3>{t('home.flow.signalsTitle')}</h3>
 						<p>
-							<code>signal</code>
-							,
+							<code>signal</code>,
 							<code>computed</code>
 							{t('home.flow.signalsAnd')}
 							<code>effect</code>

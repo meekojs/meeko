@@ -104,16 +104,12 @@
 		<h2 id="other-controls">Other controls</h2>
 		<p>
 			The text area, checkboxes, radios, switch and slider are in
-			<MeekoLink to="/controls">Form controls</MeekoLink>
-			. To choose between options, use
-			<MeekoLink to="/select">UISelect</MeekoLink>
-			, a native
-			<code>select</code>
-			, or
+			<MeekoLink to="/controls">Form controls</MeekoLink>. To choose between options, use
+			<MeekoLink to="/select">UISelect</MeekoLink>, a native
+			<code>select</code>, or
 			<code>UICombobox</code>
 			when you need search or multiple selection. They replace the deprecated core tag
-			<code>MeekoSelect</code>
-			.
+			<code>MeekoSelect</code>.
 		</p>
 	</DocsPage>
 </template>

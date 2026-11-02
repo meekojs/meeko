@@ -14,8 +14,7 @@
 			y aplica
 			<code>dir</code>
 			según
-			<code>directions</code>
-			. Los idiomas sin override usan LTR.
+			<code>directions</code>. Los idiomas sin override usan LTR.
 		</p>
 		<DocsCode
 			label="Configuración y CSS"

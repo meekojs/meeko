@@ -85,20 +85,17 @@
 		</section>
 		<UIAlert tone="info">
 			Las etiquetas del núcleo
-			<code>MeekoSelect</code>
-			,
+			<code>MeekoSelect</code>,
 			<code>MeekoPopover</code>
 			y
 			<code>MeekoThemeToggle</code>
 			están obsoletas desde Meeko 1.8 y se retiran en 2.0. Sustitúyelas por
 			<code>UISelect</code>
 			o
-			<code>UICombobox</code>
-			,
+			<code>UICombobox</code>,
 			<code>UIPopover</code>
 			y
-			<code>UIThemeToggle</code>
-			.
+			<code>UIThemeToggle</code>.
 		</UIAlert>
 	</DocsPage>
 </template>

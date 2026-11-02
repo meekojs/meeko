@@ -21,14 +21,12 @@
 			and at 54rem it hides
 			<code>sidebar</code>
 			and shows
-			<code>bar</code>
-			, where the
+			<code>bar</code>, where the
 			<MeekoLink to="/overlays">UIDrawer</MeekoLink>
 			goes. This very guide is its example: a
 			<code>UIPage</code>
 			cannot be nested, because a page has only one
-			<code>main</code>
-			.
+			<code>main</code>.
 		</p>
 		<DocsCode bind:code="examples.page" />
 		<DocsApi
@@ -43,28 +41,21 @@
 		/>
 		<p>
 			Its snippets are
-			<code>default</code>
-			,
-			<code>header</code>
-			,
-			<code>notices</code>
-			,
-			<code>bar</code>
-			,
-			<code>sidebar</code>
-			,
+			<code>default</code>,
+			<code>header</code>,
+			<code>notices</code>,
+			<code>bar</code>,
+			<code>sidebar</code>,
 			<code>aside</code>
 			and
-			<code>footer</code>
-			.
+			<code>footer</code>.
 			<code>notices</code>
 			goes under the header, with the width of the page, and takes no room when its content paints nothing.
 		</p>
 		<h2 id="page-header">UIPageHeader</h2>
 		<p>
 			The title of a page, with its description, breadcrumb and actions. It is the only
-			<code>h1</code>
-			: the one of this guide is one.
+			<code>h1</code>: the one of this guide is one.
 		</p>
 		<DocsApi
 			caption="UIPageHeader props"
@@ -77,8 +68,7 @@
 		/>
 		<p>
 			It accepts the
-			<code>breadcrumb</code>
-			,
+			<code>breadcrumb</code>,
 			<code>actions</code>
 			and
 			<code>default</code>
@@ -87,10 +77,8 @@
 		<h2 id="header">UIHeader and UIFooter</h2>
 		<p>
 			The header has a fixed height,
-			<code>--ui-header-height</code>
-			. On narrow screens its links move to a menu with
-			<code>popover</code>
-			, which floats and does not move the page. A
+			<code>--ui-header-height</code>. On narrow screens its links move to a menu with
+			<code>popover</code>, which floats and does not move the page. A
 			<code>brand</code>
 			image declares
 			<code>width</code>
@@ -137,10 +125,8 @@
 		/>
 		<p>
 			It accepts the
-			<code>brand</code>
-			,
-			<code>nav</code>
-			,
+			<code>brand</code>,
+			<code>nav</code>,
 			<code>actions</code>
 			and
 			<code>menu</code>
@@ -159,26 +145,20 @@
 		/>
 		<p>
 			It accepts the
-			<code>brand</code>
-			,
-			<code>about</code>
-			,
+			<code>brand</code>,
+			<code>about</code>,
 			<code>actions</code>
 			and
 			<code>legal</code>
 			snippets. The types
-			<code>UIPageProps</code>
-			,
-			<code>UIPageHeaderProps</code>
-			,
-			<code>UIHeaderProps</code>
-			,
+			<code>UIPageProps</code>,
+			<code>UIPageHeaderProps</code>,
+			<code>UIHeaderProps</code>,
 			<code>UIFooterProps</code>
 			and
 			<code>UIBrand</code>
 			are exported from
-			<code>@meekojs/ui/runtime</code>
-			.
+			<code>@meekojs/ui/runtime</code>.
 		</p>
 	</DocsPage>
 </template>

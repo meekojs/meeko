@@ -11,8 +11,7 @@
 		<h2 id="strategy">Default language without a prefix</h2>
 		<p>
 			With
-			<code>strategy: 'prefix_except_default'</code>
-			, the default option, the URLs of the default language do not change and every other language lives under its prefix. The module generates the
+			<code>strategy: 'prefix_except_default'</code>, the default option, the URLs of the default language do not change and every other language lives under its prefix. The module generates the
 			<code>/en/…</code>
 			routes from the existing pages, with the same file, layouts and options: there is no need to duplicate pages.
 		</p>
@@ -22,14 +21,12 @@
 		/>
 		<p>
 			A project page at the URL of another language, such as
-			<code>app/pages/en/legal.meeko</code>
-			, replaces the generated route: that is how the prose of a page is written in each language.
+			<code>app/pages/en/legal.meeko</code>, replaces the generated route: that is how the prose of a page is written in each language.
 			<code>exclude</code>
 			leaves a route without versions and
 			<code>partial</code>
 			limits the ones of a language with a partial translation. A URL with the prefix of the default language, such as
-			<code>/es/guide</code>
-			, does not exist.
+			<code>/es/guide</code>, does not exist.
 		</p>
 		<h2 id="links">Localized links</h2>
 		<DocsCode bind:code="examples.links" />
@@ -51,18 +48,14 @@
 		<DocsCode bind:code="examples.head" />
 		<p>
 			Each localized page declares
-			<code>lang</code>
-			,
+			<code>lang</code>,
 			<code>dir</code>
 			and one
 			<code>link rel="alternate"</code>
 			per language plus
-			<code>x-default</code>
-			, with absolute URLs based on
-			<code>site</code>
-			. With
-			<code>sitemap: true</code>
-			, Meeko's
+			<code>x-default</code>, with absolute URLs based on
+			<code>site</code>. With
+			<code>sitemap: true</code>, Meeko's
 			<code>sitemap.xml</code>
 			lists each version with its alternates.
 		</p>

@@ -17,10 +17,8 @@
 			A notice inside the page, in four tones besides the neutral one.
 			<code>danger</code>
 			uses
-			<code>role="alert"</code>
-			; the others,
-			<code>note</code>
-			. Choose
+			<code>role="alert"</code>; the others,
+			<code>note</code>. Choose
 			<code>status</code>
 			to announce a change, or
 			<code>none</code>
@@ -81,8 +79,7 @@
 		/>
 		<p>
 			It accepts the
-			<code>default</code>
-			,
+			<code>default</code>,
 			<code>icon</code>
 			and
 			<code>actions</code>
@@ -93,8 +90,7 @@
 		<h2 id="toast">UIToast</h2>
 		<p>
 			A short notice floating over the page. It is a manual
-			<code>popover</code>
-			: it does not take the focus.
+			<code>popover</code>: it does not take the focus.
 			<code>useToast()</code>
 			is auto-imported and adds notices from a client action, never during SSR. It needs
 			<MeekoLink to="/app">UIApp</MeekoLink>
@@ -129,8 +125,7 @@
 		<p>
 			<code>add</code>
 			returns an id for
-			<code>remove(id)</code>
-			;
+			<code>remove(id)</code>;
 			<code>clear()</code>
 			closes them all.
 			<code>UIToast</code>
@@ -205,20 +200,15 @@
 			The default texts are in
 			<code>ui.messages.&lt;language&gt;.feedback</code>
 			(see
-			<MeekoLink to="/theming">Theming</MeekoLink>
-			). The types
-			<code>UIAlertProps</code>
-			,
-			<code>UIToastProps</code>
-			,
-			<code>UIToastContext</code>
-			,
+			<MeekoLink to="/theming">Theming</MeekoLink>). The types
+			<code>UIAlertProps</code>,
+			<code>UIToastProps</code>,
+			<code>UIToastContext</code>,
 			<code>UIEmptyProps</code>
 			and
 			<code>UISkeletonProps</code>
 			are exported from
-			<code>@meekojs/ui/runtime</code>
-			.
+			<code>@meekojs/ui/runtime</code>.
 		</p>
 	</DocsPage>
 </template>

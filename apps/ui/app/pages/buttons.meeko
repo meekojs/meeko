@@ -22,14 +22,11 @@
 		<p>
 			<code>UIButton</code>
 			pinta el elemento que corresponde a lo que hace, con el mismo aspecto: con
-			<code>to</code>
-			, un enlace a una ruta de la aplicación que navega sin recargar; con
-			<code>href</code>
-			, un
+			<code>to</code>, un enlace a una ruta de la aplicación que navega sin recargar; con
+			<code>href</code>, un
 			<code>&lt;a&gt;</code>
 			a cualquier URL; sin ninguno, un
-			<code>&lt;button type="button"&gt;</code>
-			.
+			<code>&lt;button type="button"&gt;</code>.
 		</p>
 		<DocsPreview id="button-kinds">
 			<UIButton
@@ -67,22 +64,19 @@
 			y en el editor:
 			<code>to</code>
 			con
-			<code>href</code>
-			,
+			<code>href</code>,
 			<code>type</code>
 			o
 			<code>disabled</code>
 			en un enlace,
 			<code>target</code>
 			en un botón, una ruta que no existe o una ruta dinámica sin
-			<code>params</code>
-			. Un enlace no se puede deshabilitar: no tiene un estado nativo y
+			<code>params</code>. Un enlace no se puede deshabilitar: no tiene un estado nativo y
 			<code>aria-disabled</code>
 			sin quitar
 			<code>href</code>
 			seguiría navegando. Si la acción no está disponible, no pintes el enlace o usa un botón con
-			<code>disabled</code>
-			.
+			<code>disabled</code>.
 		</p>
 		<h2 id="sizes">Tamaños y estados</h2>
 		<DocsPreview>
@@ -105,10 +99,8 @@
 			conserva el texto, añade el spinner, anuncia
 			<code>aria-busy</code>
 			e impide activarla sin quitarle el foco. Con
-			<code>iconOnly</code>
-			, el botón es cuadrado: da siempre su nombre con
-			<code>ariaLabel</code>
-			.
+			<code>iconOnly</code>, el botón es cuadrado: da siempre su nombre con
+			<code>ariaLabel</code>.
 		</p>
 		<DocsPreview>
 			<UIButton tone="danger">Eliminar</UIButton>
@@ -160,10 +152,8 @@
 		</p>
 		<p>
 			Para un enlace con su propia jerarquía visual y los defaults de
-			<code>ui.defaults.link</code>
-			, usa
-			<a href="/links">UILink</a>
-			.
+			<code>ui.defaults.link</code>, usa
+			<a href="/links">UILink</a>.
 		</p>
 	</DocsPage>
 </template>

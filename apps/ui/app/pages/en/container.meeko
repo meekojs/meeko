@@ -52,8 +52,7 @@
 			The preview is limited by this documentation column. In your application,
 			<code>4k</code>
 			allows an outer width of up to
-			<code>240rem</code>
-			: 3840 CSS pixels with a 16px root font.
+			<code>240rem</code>: 3840 CSS pixels with a 16px root font.
 		</p>
 		<DocsCode bind:code="examples.container" />
 		<h2 id="sizes">Maximum widths</h2>
@@ -77,10 +76,8 @@
 			adds logical padding on both sides, included in the outer width. The
 			<code>md</code>
 			value grows between 16 and 64px;
-			<code>sm</code>
-			, between 12 and 24px;
-			<code>lg</code>
-			, between 24 and 96px. Use
+			<code>sm</code>, between 12 and 24px;
+			<code>lg</code>, between 24 and 96px. Use
 			<code>none</code>
 			when the parent already provides that space.
 		</p>
@@ -109,8 +106,7 @@
 			Use a class to override
 			<code>--ui-container-max-width</code>
 			or
-			<code>--ui-container-gutter</code>
-			. The container does not hide overflowing content: tables and code blocks must manage their own scroll.
+			<code>--ui-container-gutter</code>. The container does not hide overflowing content: tables and code blocks must manage their own scroll.
 		</p>
 		<DocsCode
 			label="app/styles/main.css"

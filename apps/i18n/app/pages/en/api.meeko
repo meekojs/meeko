@@ -58,18 +58,14 @@
 		<p>
 			<code>i18nContext</code>
 			is the public key to provide an instance from your own integration.
-			<code>localeOf</code>
-			,
-			<code>localizedPath</code>
-			,
+			<code>localeOf</code>,
+			<code>localizedPath</code>,
 			<code>stripLocale</code>
 			and
 			<code>negotiateLocale</code>
 			are documented in
-			<MeekoLink to="/routing">languages and routes</MeekoLink>
-			. The
-			<code>I18n</code>
-			,
+			<MeekoLink to="/routing">languages and routes</MeekoLink>. The
+			<code>I18n</code>,
 			<code>I18nValue</code>
 			and
 			<code>I18nMessageValues</code>

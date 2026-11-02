@@ -117,32 +117,25 @@
 		<h2 id="snippets">Customize the cells</h2>
 		<p>
 			The optional snippets are
-			<code>header(column)</code>
-			,
-			<code>cell(row, column, value, index)</code>
-			,
+			<code>header(column)</code>,
+			<code>cell(row, column, value, index)</code>,
 			<code>footer(column, rows)</code>
 			and
-			<code>empty()</code>
-			. The footer appears when there is footer content. The container allows horizontal scrolling on narrow screens.
+			<code>empty()</code>. The footer appears when there is footer content. The container allows horizontal scrolling on narrow screens.
 		</p>
 		<h2 id="column-snippets">Cells per column</h2>
 		<p>
 			Each key of the row has its own snippets:
-			<code>cell-&lt;key&gt;(row, value)</code>
-			, with
+			<code>cell-&lt;key&gt;(row, value)</code>, with
 			<code>value</code>
 			of the type of that column, and
-			<code>header-&lt;key&gt;(column)</code>
-			. A key the row does not have is a type error.
+			<code>header-&lt;key&gt;(column)</code>. A key the row does not have is a type error.
 			<code>cell-&lt;key&gt;</code>
 			wins; then
 			<code>cell</code>
 			and finally
-			<code>format</code>
-			. In the header,
-			<code>header-&lt;key&gt;</code>
-			,
+			<code>format</code>. In the header,
+			<code>header-&lt;key&gt;</code>,
 			<code>header</code>
 			and the label.
 		</p>

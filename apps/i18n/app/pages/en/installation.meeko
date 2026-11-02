@@ -11,8 +11,7 @@
 		<h2 id="requirements">Before you start</h2>
 		<p>
 			You need a Meeko application, Node.js 24 or later and Meeko
-			<code>&gt;=1.7 &lt;2</code>
-			. The i18n module ships separately; you can use it with your application's components.
+			<code>&gt;=1.7 &lt;2</code>. The i18n module ships separately; you can use it with your application's components.
 		</p>
 		<DocsCode
 			label="Terminal"
@@ -41,16 +40,14 @@
 			Both languages declare the same keys and parameters. The structure of
 			<code>cart</code>
 			produces the key
-			<code>cart.items</code>
-			.
+			<code>cart.items</code>.
 		</p>
 		<h2 id="component">Translate in a component</h2>
 		<DocsCode bind:code="examples.usage" />
 		<p>
 			<code>useI18n</code>
 			is auto-imported in components once the module is registered. It also supports an explicit import from
-			<code>@meekojs/i18n</code>
-			. The plugin provides one instance per application and SSR request.
+			<code>@meekojs/i18n</code>. The plugin provides one instance per application and SSR request.
 		</p>
 		<UIAlert tone="info">
 			After changing the catalogs, run
@@ -63,8 +60,7 @@
 			Continue with
 			<MeekoLink to="/messages">messages and parameters</MeekoLink>
 			or try the
-			<MeekoLink to="/playground">playground</MeekoLink>
-			.
+			<MeekoLink to="/playground">playground</MeekoLink>.
 		</p>
 	</DocsPage>
 </template>

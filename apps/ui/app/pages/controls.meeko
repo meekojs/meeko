@@ -21,8 +21,7 @@
 	>
 		<p>
 			Todos conservan el control nativo, así que el teclado, el foco y el envío de un formulario son los del navegador, también sin JavaScript. Sus modelos se enlazan con una señal:
-			<code>model="field"</code>
-			.
+			<code>model="field"</code>.
 		</p>
 		<h2 id="textarea">UITextarea</h2>
 		<p>
@@ -68,10 +67,8 @@
 		<p>
 			<code>UISwitch</code>
 			tiene el mismo contrato que
-			<code>UICheckbox</code>
-			, con
-			<code>role="switch"</code>
-			: úsalo para algo que se aplica al instante.
+			<code>UICheckbox</code>, con
+			<code>role="switch"</code>: úsalo para algo que se aplica al instante.
 		</p>
 		<DocsPreview layout="stack">
 			<UICheckbox
@@ -149,8 +146,7 @@
 			Un
 			<code>input type="range"</code>
 			con la etiqueta dentro de su
-			<code>label</code>
-			. La parte llena de la pista sigue al valor.
+			<code>label</code>. La parte llena de la pista sigue al valor.
 		</p>
 		<DocsPreview layout="stack">
 			<UISlider
@@ -182,18 +178,14 @@
 		/>
 		<p>
 			Los tipos
-			<code>UITextareaProps</code>
-			,
-			<code>UICheckboxProps</code>
-			,
-			<code>UISwitchProps</code>
-			,
+			<code>UITextareaProps</code>,
+			<code>UICheckboxProps</code>,
+			<code>UISwitchProps</code>,
 			<code>UIRadioGroupProps</code>
 			y
 			<code>UISliderProps</code>
 			se exportan desde
-			<code>@meekojs/ui/runtime</code>
-			.
+			<code>@meekojs/ui/runtime</code>.
 		</p>
 	</DocsPage>
 </template>

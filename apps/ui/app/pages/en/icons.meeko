@@ -31,27 +31,22 @@
 		<p>
 			<code>UIIcon</code>
 			writes an inline
-			<code>&lt;svg&gt;</code>
-			. Each literal name is resolved during the build with the collection package installed in the project: there are no runtime requests or CDN, and the bundle only carries the icons you use.
+			<code>&lt;svg&gt;</code>. Each literal name is resolved during the build with the collection package installed in the project: there are no runtime requests or CDN, and the bundle only carries the icons you use.
 		</p>
 
 		<h2 id="setup">Installation and collections</h2>
 		<p>
 			Install the module and each Iconify collection you want to use as
-			<code>@iconify-json/&lt;collection&gt;</code>
-			. The module is registered by its name and its options go in the
+			<code>@iconify-json/&lt;collection&gt;</code>. The module is registered by its name and its options go in the
 			<code>icon</code>
 			key, typed in
-			<code>meeko.config.ts</code>
-			.
+			<code>meeko.config.ts</code>.
 		</p>
 		<DocsCode bind:code="examples.iconConfig" />
 		<p>
 			The available names form a TypeScript union that Meeko generates in
-			<code>.meeko/types</code>
-			: the editor completes
-			<code>name="lucide:…"</code>
-			, and a name that does not exist is a
+			<code>.meeko/types</code>: the editor completes
+			<code>name="lucide:…"</code>, and a name that does not exist is a
 			<code>meeko check</code>
 			error with the closest suggestion. If the package of a configured collection is missing, the build prints the command to install it.
 		</p>
@@ -59,12 +54,10 @@
 		<h2 id="dynamic">Dynamic names</h2>
 		<p>
 			With
-			<code>bind:name</code>
-			, the literals of the expression are resolved at build time just like a fixed name. A value that does not appear in the code, such as one that comes from data, only works if it is in
+			<code>bind:name</code>, the literals of the expression are resolved at build time just like a fixed name. A value that does not appear in the code, such as one that comes from data, only works if it is in
 			<code>icon.include</code>
 			(or with
-			<code>'collection:*'</code>
-			, which includes the whole collection). Otherwise an empty
+			<code>'collection:*'</code>, which includes the whole collection). Otherwise an empty
 			<code>&lt;svg&gt;</code>
 			is rendered and
 			<code>meeko dev</code>
@@ -97,16 +90,11 @@
 			Each file in
 			<code>app/icons</code>
 			(or in the folder of
-			<code>icon.local</code>
-			) is
-			<code>local:&lt;name&gt;</code>
-			. It is cleaned at build time:
-			<code>&lt;script&gt;</code>
-			,
-			<code>&lt;style&gt;</code>
-			, event handlers, inline styles and external references are removed, and a single-color icon switches to
-			<code>currentColor</code>
-			.
+			<code>icon.local</code>) is
+			<code>local:&lt;name&gt;</code>. It is cleaned at build time:
+			<code>&lt;script&gt;</code>,
+			<code>&lt;style&gt;</code>, event handlers, inline styles and external references are removed, and a single-color icon switches to
+			<code>currentColor</code>.
 		</p>
 		<DocsPreview>
 			<UIIcon
@@ -120,27 +108,22 @@
 		<h2 id="accessibility">Accessibility, size and color</h2>
 		<p>
 			Without
-			<code>label</code>
-			, the icon is decorative:
+			<code>label</code>, the icon is decorative:
 			<code>aria-hidden="true"</code>
 			and
-			<code>focusable="false"</code>
-			. With
-			<code>label</code>
-			, the
+			<code>focusable="false"</code>. With
+			<code>label</code>, the
 			<code>&lt;svg&gt;</code>
 			gets
 			<code>role="img"</code>
 			and
-			<code>aria-label</code>
-			; use it when the icon is the only content of a button or a link.
+			<code>aria-label</code>; use it when the icon is the only content of a button or a link.
 		</p>
 		<p>
 			It is
 			<code>1em</code>
 			tall by default, so it follows the surrounding text, and it takes its color from
-			<code>currentColor</code>
-			. Width, height and fill are attributes, never inline styles: it works with a strict Content Security Policy.
+			<code>currentColor</code>. Width, height and fill are attributes, never inline styles: it works with a strict Content Security Policy.
 		</p>
 		<DocsPreview>
 			<UIIcon

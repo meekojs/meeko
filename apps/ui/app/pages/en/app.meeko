@@ -24,14 +24,12 @@
 			snippet. The plugin registered by
 			<code>@meekojs/ui</code>
 			provides the context; you do not need to create your own plugin or call
-			<code>provideModal</code>
-			.
+			<code>provideModal</code>.
 		</p>
 		<p>
 			<code>useModal()</code>
 			opens components whose name starts with
-			<code>Modal</code>
-			, with the props of your application's component registry.
+			<code>Modal</code>, with the props of your application's component registry.
 			<code>useModalInstance()</code>
 			closes the current instance with a result or dismisses it.
 		</p>

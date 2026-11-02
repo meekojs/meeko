@@ -2,6 +2,7 @@
 
 ## Sin publicar
 
+- **Corrección: el formato ya no añade un espacio visible con `htmlWhitespaceSensitivity: "ignore"`.** El compilador conserva el texto de la plantilla tal como está escrito, así que `<code>x</code>.` partido en dos líneas se pintaba `x .`. Donde el código no tiene espacio entre un texto y un elemento, entre dos elementos de texto (`code`, `a`, `strong`…) o en el borde interior de uno de ellos, el plugin ya no lo añade. Lo demás de esa opción sigue igual, y las otras sensibilidades no cambian.
 - Añade `meekoClassFunctions` (`[]` por defecto), que ordena con `meekoSortClasses` las cadenas de los argumentos de funciones como `tv()`, `clsx()` o `cn()`, a cualquier profundidad, en el script de un `.meeko` y en los archivos `.ts`, `.tsx` y `.js`. Nunca toca las claves de un objeto.
 - **Cambio de salida con `meekoSortClasses` distinto de `"off"`:** también se ordenan y normalizan las cadenas de `bind:class` y el `class` de una etiqueta de componente. Sin cambios con `"off"`, el valor por defecto.
 - Conserva los elementos HTML sin contenido tal como están escritos, `<div />` o `<div></div>`, que Meeko `1.8` admite en la plantilla; los atributos se siguen formateando (uno por línea con `singleAttributePerLine`, y `/>` en la línea del `>`), y los elementos vacíos se siguen escribiendo `<input />`. No añade una opción para convertir una forma en la otra: esa decisión es de la regla `meeko/html-self-closing` de `@meekojs/eslint-plugin`, cuyo autofix converge con el formato del plugin.

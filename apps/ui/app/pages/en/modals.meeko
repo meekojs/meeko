@@ -73,8 +73,7 @@
 		<h2 id="declarative">Declarative modal</h2>
 		<p>
 			Control the visibility with a boolean signal and
-			<code>model</code>
-			. The example above also lets you try a dialog whose close requires an explicit action.
+			<code>model</code>. The example above also lets you try a dialog whose close requires an explicit action.
 		</p>
 		<DocsCode bind:code="examples.modal" />
 		<h2 id="programmatic">Open and wait for a result</h2>
@@ -84,8 +83,7 @@
 			at the root. Registry components whose name starts with
 			<code>Modal</code>
 			can be opened with typed props. A loading error rejects the promise; dismissing the dialog resolves
-			<code>undefined</code>
-			.
+			<code>undefined</code>.
 		</p>
 		<DocsCode
 			label="Inside a component"
@@ -98,8 +96,7 @@
 		<h2 id="stack">Nested modals</h2>
 		<p>
 			Open the confirmation and then another modal to try the
-			<code>lg</code>
-			,
+			<code>lg</code>,
 			<code>md</code>
 			and
 			<code>sm</code>
@@ -121,18 +118,14 @@
 			It requires the
 			<code>default</code>
 			snippet and accepts
-			<code>footer</code>
-			. The
+			<code>footer</code>. The
 			<code>dismiss</code>
 			event receives
-			<code>escape</code>
-			,
-			<code>backdrop</code>
-			,
+			<code>escape</code>,
+			<code>backdrop</code>,
 			<code>button</code>
 			or
-			<code>native</code>
-			. Do not use a modal for tasks that can be solved within the page.
+			<code>native</code>. Do not use a modal for tasks that can be solved within the page.
 		</p>
 	</DocsPage>
 </template>
