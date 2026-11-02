@@ -27,7 +27,24 @@ export function escapeHtml(value: unknown): string {
 export function rawHtml(value: string | null | undefined, tag?: string, namespace?: HtmlContentNamespace): string {
   if (value === null || value === undefined) return "";
   if (typeof value !== "string") throw new TypeError(`html="..." expects a string of HTML, null or undefined, not ${typeof value}`);
-  return tag === undefined ? value : normalizeHtmlContent(value, tag, namespace);
+  if (tag === undefined) return value;
+  const normalized = normalizeHtmlContent(value, tag, namespace);
+  if (normalized) renderedHtml?.add(value);
+  return normalized;
+}
+
+/** Values of `html` that the server document being rendered shows; see {@link collectRenderedHtml}. */
+let renderedHtml: Set<string> | undefined;
+
+/**
+ * @internal Runs a synchronous server render and adds to `values` every value of `html` that reached
+ * its HTML. One the SSR left empty, for the browser to fill it on hydration, is not there.
+ */
+export function collectRenderedHtml<T>(values: Set<string>, render: () => T): T {
+  const previous = renderedHtml;
+  renderedHtml = values;
+  try { return render(); }
+  finally { renderedHtml = previous; }
 }
 
 /**

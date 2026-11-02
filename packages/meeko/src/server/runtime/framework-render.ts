@@ -33,7 +33,7 @@ import { StateStore, withStateStore } from "../../app/runtime/state";
 import { styleModuleId } from "../../app/runtime/style-modules";
 import { renderWithSuspense } from "../../app/runtime/suspense";
 import { collectTeleports, TeleportCollector } from "../../app/runtime/teleport";
-import { escapeHtml, serializeJson } from "../../core/server";
+import { collectRenderedHtml, escapeHtml, serializeJson } from "../../core/server";
 import { errorTitleEntry, resolveHead, resolveSeo, routeHeadInput } from "../../shared/head";
 import { resolveThemeConfig, THEME_ENDPOINT, withThemeAttributes } from "../../shared/theme";
 import { providePageScope } from "../composables/usePage";
@@ -45,6 +45,7 @@ import { etagMatches } from "./assets";
 import { encodeBase64Url } from "./base64url";
 import { cookieNamed } from "./cookies";
 import { createCspNonce, documentContentSecurityPolicy } from "./csp";
+import { provideDocumentHtmlMarks, withoutDocumentHtml } from "./document-html";
 import { documentHeadEntries, HeadCollector, renderHeadDocument } from "./head";
 import { withRequestContext } from "./request-context";
 import { lockSessionCookie } from "./sessions";
@@ -55,6 +56,10 @@ import { themeEndpoint } from "./theme-endpoint";
 /** Route manifest of the application handling the current request, for `href(id)`. */
 const requestManifest = new AsyncLocalStorage<readonly RouteRecord[]>();
 provideServerRouteManifest(() => requestManifest.getStore());
+
+/** What the current request marked with `documentHtml`. */
+const documentHtmlMarks = new AsyncLocalStorage<Set<string>>();
+provideDocumentHtmlMarks(() => documentHtmlMarks.getStore());
 
 /**
  * Page whose top-level `<script server>` code (or, since 1.6, server route middleware) is running,
@@ -441,7 +446,7 @@ interface ServerNamedLayout {
   readonly writer: LayoutWriter;
 }
 
-type RenderedTree = { rendered: { html: string; state: Record<string, unknown> }; store: StateStore; resources: Record<string, unknown> | undefined; styles: string[]; head: HeadCollector; teleports: readonly TeleportEntry[] };
+type RenderedTree = { rendered: { html: string; state: Record<string, unknown> }; store: StateStore; resources: Record<string, unknown> | undefined; styles: string[]; head: HeadCollector; teleports: readonly TeleportEntry[]; renderedHtml: ReadonlySet<string> };
 
 /** Renders written by the page with `useLayout()` that a request repeats at most. */
 const layoutRenderAttempts = 3;
@@ -543,6 +548,8 @@ async function renderPageTree(
   const styles = new Set<string>();
   // Like the CSS, the useHead entries of the last pass.
   const head = new HeadCollector();
+  // And the values of `html` that the HTML of the last pass shows.
+  const renderedHtml = new Set<string>();
   const rendered = await renderWithSuspense((pass) => {
     if (pass > 1) store = new StateStore(baseline);
     else baseline = initial.snapshot();
@@ -550,17 +557,18 @@ async function renderPageTree(
     styles.clear();
     head.clear();
     teleports.clear();
-    return collectTeleports(teleports, () => collectStyles(styles, () => withResourceScope(scope, () => withStateStore(store, () => {
+    renderedHtml.clear();
+    return collectRenderedHtml(renderedHtml, () => collectTeleports(teleports, () => collectStyles(styles, () => withResourceScope(scope, () => withStateStore(store, () => {
       provideRoute(routeState);
       provideHead(head);
       if (theme) provideServerTheme(theme);
       // Values of the app plugins, which ran for this request.
       plugins.apply();
       return withIdRoot(idPrefix, () => module.renderWithState(input));
-    }))));
+    })))));
   }, signal ? { signal } : {});
   const used = scope.usedData();
-  return { rendered, store, resources: Object.keys(used).length ? used : undefined, styles: [...styles], head, teleports: teleports.entries };
+  return { rendered, store, resources: Object.keys(used).length ? used : undefined, styles: [...styles], head, teleports: teleports.entries, renderedHtml };
 }
 
 /** Production warnings already printed, so a missing teleport target is reported once per message. */
@@ -1245,14 +1253,19 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
     // The payload below is the only copy of this state the browser receives. `url` is the URL this
     // render is for: a static host may serve the prerendered page under another one.
     store.seal();
-    const payload = serializeJson({
+    const payloadValue = {
       v: PAYLOAD_VERSION, route: match.route.id, render: renderMode, url: route.url,
       props: payloadProps, state: rendered.state, sharedState: store.snapshot(),
       head,
       ...(deferredEntries.length ? { deferred: deferredEntries } : {}),
       ...(resources ? { resources } : {}),
       ...(namedLayout ? { layoutProps } : {}),
-    });
+    };
+    // Always serialized: it also checks that the data can travel, whatever the document leaves out.
+    const payload = serializeJson(payloadValue);
+    // A navigation has no HTML of its own, so only a document can leave out what its HTML shows.
+    const lightPayload = wantsPayload(request) ? undefined : withoutDocumentHtml(payloadValue, tree.renderedHtml);
+    const documentPayload = lightPayload ? serializeJson(lightPayload) : payload;
     // Status, headers and cookies are final from here on: session changes still
     // in flight finish first and later ones fail with SESSION_LOCKED. A session
     // revoked while the loader ran must not receive a 200 stream.
@@ -1312,7 +1325,7 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
       const csrfMeta = requestContext?.session.current ? `<meta name="meeko-csrf-token" content="${escapeHtml(requestContext.session.current.csrfToken)}">` : "";
       const parts = documentHead();
       const shellStart = `${parts.prefix}${csrfMeta}${parts.head}${host.head}${styleTags}</head>${parts.bodyOpen}<div id="app">`;
-      const shellEnd = `<script id="meeko-payload" type="application/json">${payload}</script>${script}`;
+      const shellEnd = `<script id="meeko-payload" type="application/json">${documentPayload}</script>${script}`;
       const opening = `${shellStart}${placed.app}</div>${placed.body}${shellEnd}`;
       const closing = `${host.bodyEnd}</body></html>`;
       // The deferred chunks are JSON data blocks, which script-src does not check. The page and its
@@ -1331,7 +1344,7 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
     const csrfMeta = requestContext?.session.current ? `<meta name="meeko-csrf-token" content="${escapeHtml(requestContext.session.current.csrfToken)}">` : "";
     const parts = documentHead();
     const shellStart = `${parts.prefix}${csrfMeta}${parts.head}${host.head}${styleTags}</head>${parts.bodyOpen}<div id="app">`;
-    const shellEnd = `<script id="meeko-payload" type="application/json">${payload}</script>${script}${host.bodyEnd}</body></html>`;
+    const shellEnd = `<script id="meeko-payload" type="application/json">${documentPayload}</script>${script}${host.bodyEnd}</body></html>`;
     const document = `${shellStart}${placed.app}</div>${placed.body}${shellEnd}`;
     // The page and its teleports may carry user content: only what Meeko writes around them is hashed.
     const csp = await documentPolicy(`${shellStart}</div>${shellEnd}`);
@@ -1409,5 +1422,5 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
     }
   };
   // href(id) in pages, layouts, loaders and head resolves against this handler's manifest.
-  return (request) => withRouteManifest(options.routes, () => handle(request));
+  return (request) => withRouteManifest(options.routes, () => documentHtmlMarks.run(new Set(), () => handle(request)));
 }

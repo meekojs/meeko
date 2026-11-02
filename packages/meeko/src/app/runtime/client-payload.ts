@@ -24,6 +24,19 @@ export interface HydrationPayload {
    * the `404.html` of a static host may be served under another URL.
    */
   url: string | undefined;
+  /**
+   * Where the navigation payload of this URL has each `documentHtml` value that this document's
+   * payload replaced by a placeholder, by the position the placeholder names.
+   */
+  documentHtml: readonly (readonly (string | number)[])[];
+}
+
+function readDocumentHtmlPaths(value: unknown): readonly (readonly (string | number)[])[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || !value.every((path) => Array.isArray(path) && path.every((key) => typeof key === "string" || typeof key === "number"))) {
+    throw new TypeError("Invalid Meeko document HTML paths");
+  }
+  return value as (string | number)[][];
 }
 
 const pageRenders: readonly string[] = ["ssr", "stream", "prerender", "client"] satisfies readonly PageRender[];
@@ -61,6 +74,7 @@ export function readPayload(value: unknown): HydrationPayload {
     resources: (parsed.resources as Record<string, unknown> | undefined) ?? {},
     layoutProps: parsed.layoutProps as Record<string, unknown> | undefined,
     url: parsed.url as string | undefined,
+    documentHtml: readDocumentHtmlPaths(parsed.documentHtml),
   };
 }
 

@@ -6,8 +6,9 @@ import type { PropsSource } from "./props";
 import type { Snippet, SnippetData } from "./snippets";
 
 import { observeCallback } from "../../core/error-observer";
-import { batch, createRoot, currentEffectOwner, effect, effectInOrder, finishWithCleanup, isWritableSignal, reserveUpdateOrder, signal, switchOwner, untrack } from "../../core/reactivity";
+import { batch, createContext, createRoot, currentEffectOwner, effect, effectInOrder, findContext, finishWithCleanup, isWritableSignal, provide, reserveUpdateOrder, signal, switchOwner, untrack } from "../../core/reactivity";
 import { attributeValue, rawHtml, serializeJson } from "../../core/server";
+import { documentHtmlIndex } from "../../shared/document-html";
 import { sameChannels } from "./channels";
 import { componentErrorReporter } from "./component-errors";
 import { closeTag, dynamicTagName } from "./dynamic-tag";
@@ -793,20 +794,51 @@ function sameHtml(target: Element, html: string): boolean {
   return inertElement(target.ownerDocument, target.localName, contentNamespace(target), html).innerHTML === target.innerHTML;
 }
 
+/** Reads from the server the value that a `documentHtml` placeholder names; `undefined` when it names none. */
+type DocumentHtmlReader = (index: number) => Promise<string | undefined>;
+
+const documentHtmlReader = /*#__PURE__*/ createContext<DocumentHtmlReader>("Meeko document HTML");
+
+/** @internal How the `html` bindings of an application read a `documentHtml` value they must paint again. */
+export function provideDocumentHtmlReader(reader: DocumentHtmlReader): void {
+  provide(documentHtmlReader, reader);
+}
+
+/** Whether a render in the browser wrote this placeholder in `target`, instead of the server its value. */
+function holdsPlaceholder(target: Element, placeholder: string): boolean {
+  const only = target.firstChild;
+  return only !== null && only.nextSibling === null && only.nodeType === 8 && `<!--${(only as Comment).data}-->` === placeholder;
+}
+
 /**
  * Conecta `html="expresión"` al elemento SSR. Si su contenido coincide con el HTML de la expresión,
  * la hidratación no toca el DOM; si difiere, sustituye `innerHTML`. Después lo sustituye cada vez que
  * cambia el valor. `innerHTML` nunca ejecuta los `<script>` del contenido. Inseguro con contenido
  * no confiable (XSS).
+ *
+ * Un valor de `documentHtml` llega como marcador: el contenido que escribió el servidor se adopta sin
+ * leerlo, y un render posterior pide el valor al servidor. El DOM nunca es el origen de un HTML.
  */
 export function bindHtml(scope: DomScope, id: number, read: () => unknown, location: string, source?: EffectSource): () => void {
   const target = visit(scope, (candidate) => candidate.nodeType === 1 && (candidate as Element).getAttribute(htmlMarker) === String(id)) as Element | undefined;
   if (!target) throw new Error(`Missing Meeko target ${htmlMarker}="${id}" in ${location}`);
+  const reader = findContext(documentHtmlReader);
   let current: string | undefined;
   return effect(() => {
     // The SSR render types the value; the browser only checks it.
     const next = rawHtml(read() as string | null | undefined);
-    if (current === undefined ? sameHtml(target, next) : current === next) {
+    const first = current === undefined;
+    if (!first && current === next) return;
+    const index = documentHtmlIndex(next);
+    if (index !== undefined) {
+      current = next;
+      if (first && !holdsPlaceholder(target, next)) return;
+      void reader?.(index).then((html) => {
+        if (html !== undefined && current === next && target.isConnected) target.innerHTML = html;
+      });
+      return;
+    }
+    if (first && sameHtml(target, next)) {
       current = next;
       return;
     }

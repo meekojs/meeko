@@ -32,7 +32,7 @@ import { withIdRoot } from "./ids";
 import { browserLayoutWriter, createLayoutSlot, resolveLayoutProps, withLayoutWriter } from "./layout";
 import { mountBatch } from "./lifecycle";
 import { fixedRoute, liveRoute, provideNavigation, provideRoute, routeIsActive, routeSnapshot } from "./navigation";
-import { hasRegionRecoveryFailure, parseRegionHtml } from "./renderer";
+import { hasRegionRecoveryFailure, parseRegionHtml, provideDocumentHtmlReader } from "./renderer";
 import { activateRouteManifest, createAppNavigator, matchRoute, reportNavigationError, sameDocument } from "./router";
 import { hydrateWithStateStore, StateStore, withStateStore } from "./state";
 import { lateRender, mayAwaitData, renderWithSuspense } from "./suspense";
@@ -438,6 +438,44 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
   });
   const pending = signal(false);
   const navigationState: NavigationState = { pending: { get value() { return pending.value; } } };
+  /** The navigation payload of a URL, from the server or, on a static host, its file. */
+  const requestPayload = (url: URL, signal?: AbortSignal): Promise<Response> => {
+    const init = { credentials: "same-origin", ...(signal ? { signal } : {}) } as const;
+    return options.serverData === "static"
+      ? (options.fetch ?? fetch)(staticPayloadUrl(url), init)
+      : (options.fetch ?? fetch)(url.href, { ...init, headers: { accept: "application/meeko+json" } });
+  };
+  /** The navigation payload of the first document, once one of its `documentHtml` values must paint again. */
+  let firstPayload: Promise<unknown> | undefined;
+  const loadFirstPayload = async (): Promise<unknown> => {
+    const response = await requestPayload(serverUrl);
+    // A server that does not speak Meeko's protocol has the value only in its document.
+    if ((response.headers.get("content-type") ?? "").toLowerCase().startsWith("text/html")) {
+      void response.body?.cancel().catch(() => {});
+      browser.location.reload();
+      return undefined;
+    }
+    if (!response.ok) throw new Error(`Document HTML request failed: HTTP ${response.status}`);
+    // A stream route answers ndjson, whose first line is the payload.
+    const parsed: unknown = JSON.parse((await response.text()).split("\n", 1)[0]!);
+    readPayload(parsed);
+    return parsed;
+  };
+  // Only the server provides the value, at a path that the server listed in the document.
+  const readDocumentHtml = async (index: number): Promise<string | undefined> => {
+    const path = payload.documentHtml[index];
+    if (!path) return undefined;
+    try {
+      let value = await (firstPayload ??= loadFirstPayload());
+      for (const key of path) value = typeof value === "object" && value !== null ? (value as Record<string | number, unknown>)[key] : undefined;
+      return typeof value === "string" ? value : undefined;
+    } catch (error) {
+      // The next render of the element tries again.
+      firstPayload = undefined;
+      reportNavigationError(browser, error, observeNavigationError);
+      return undefined;
+    }
+  };
   const hydrateApp = (routeState: RouteState, hydrate: () => () => void) => hydrateWithStateStore(stateStore, () => {
     provideAppErrorChannel(errorChannel);
     provideNavigation(navigationState);
@@ -445,6 +483,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
     provideResourceCache(resourceCache);
     provideBrowserWindow(browser);
     provideHead(documentHead);
+    provideDocumentHtmlReader(readDocumentHtml);
     plugins.apply();
     return hydrate();
   });
@@ -673,11 +712,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
       } : undefined);
     } else if (options.serverData && !options.loadRoute) {
       // A static host serves each page's payload as a file next to its index.html.
-      const response = options.serverData === "static"
-        ? await (options.fetch ?? fetch)(staticPayloadUrl(context.url), { credentials: "same-origin", signal: context.signal })
-        : await (options.fetch ?? fetch)(context.url.href, {
-          headers: { accept: "application/meeko+json" }, credentials: "same-origin", signal: context.signal,
-        });
+      const response = await requestPayload(context.url, context.signal);
       // A loader or middleware redirect: follow it instead of this navigation. A browser fetch
       // reports a followed redirect; a custom fetch may hand back the 3xx response itself.
       const location = response.status >= 300 && response.status < 400 ? response.headers.get("location") : null;

@@ -30,6 +30,7 @@ export { definePage } from "./app/definitions/define-page";
 export { PageInputError } from "./app/definitions/define-page";
 export type { ClientPageDefinition, ClientPageLoadContext, PageBodyDefinePage, PageCache, PageCacheContext, PageDefinition, PageHead, PageLoadContext, PageMemoryCache, PageRender, PageSchema } from "./app/definitions/define-page";
 export { notFound, redirect } from "./server/runtime/page-body";
+export { documentHtml } from "./server/runtime/document-html";
 export { usePage } from "./server/composables/usePage";
 export type { PageRequest, PageRequestOf } from "./server/composables/usePage";
 export type { JsonShape, PageBodyHead, SerializableExport, ServerData } from "./server/runtime/page-body";

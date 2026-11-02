@@ -229,10 +229,12 @@ export async function prerenderRoutes(options: PrerenderOptions): Promise<string
     await writeFile(output, html, "utf8");
     outputs.push(output);
     const file = [...parts, "index.html"].join("/");
-    // The payload of the stored document comes from the same loader run as its
-    // HTML; only a document without one asks the handler a second time.
+    // The payload of the stored document comes from the same loader run as its HTML; only a
+    // document without one, or whose payload leaves out `documentHtml` values, which a navigation
+    // has no other way to receive, asks the handler a second time.
     let navigationPayload = rendered.match(embeddedPayload)?.[1];
-    if (navigationPayload === undefined) {
+    if (navigationPayload === undefined || (JSON.parse(navigationPayload) as { documentHtml?: unknown }).documentHtml !== undefined) {
+      navigationPayload = undefined;
       const navigation = await render(pathname, { headers: { accept: "application/meeko+json" } });
       if (navigation.status === 200 && (navigation.headers.get("content-type") ?? "").startsWith("application/meeko+json")) navigationPayload = await navigation.text();
       else await navigation.body?.cancel();
