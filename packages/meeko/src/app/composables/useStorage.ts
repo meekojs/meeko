@@ -1,7 +1,7 @@
-import type { Signal } from "../../core/reactivity";
+import type { Signal } from '../../core/reactivity'
 
-import { logClientError } from "../../core/error-observer";
-import { createContext, findContext, isDryRender, markExternalSignal, onCleanup, provide, signal, untrack } from "../../core/reactivity";
+import { logClientError } from '../../core/error-observer'
+import { createContext, findContext, isDryRender, markExternalSignal, onCleanup, provide, signal, untrack } from '../../core/reactivity'
 /**
  * `useStorage`: an app composable for SSR and hydration, persisted as JSON in browser storage.
  *
@@ -13,9 +13,9 @@ import { createContext, findContext, isDryRender, markExternalSignal, onCleanup,
  * it. Storage that the browser blocks (private mode, quota) never throws: the signal keeps working
  * in memory.
  */
-import { componentErrorReporter } from "../runtime/component-errors";
-import { afterMountBatch, setupPhase } from "../runtime/lifecycle";
-import { canSuspendLate } from "../runtime/suspense";
+import { componentErrorReporter } from '../runtime/component-errors'
+import { afterMountBatch, setupPhase } from '../runtime/lifecycle'
+import { canSuspendLate } from '../runtime/suspense'
 
 /**
  * Almacenamiento del navegador de {@link useStorage}: `"local"` (`localStorage`, persiste entre
@@ -30,17 +30,17 @@ import { canSuspendLate } from "../runtime/suspense";
  * const draft = useStorage("form:draft", "", { storage: area });
  * ```
  */
-export type StorageArea = "local" | "session";
+export type StorageArea = 'local' | 'session'
 
-type ValidationResult<T> = { readonly value: T; readonly issues?: undefined } | { readonly issues: readonly unknown[] };
+type ValidationResult<T> = { readonly value: T; readonly issues?: undefined } | { readonly issues: readonly unknown[] }
 
 /** A Standard Schema (Valibot, Zod, ArkType…) whose output is `T`. */
 type StorageSchema<T> = {
-  readonly "~standard": {
-    readonly validate: (value: unknown) => ValidationResult<T> | Promise<ValidationResult<T>>;
-    readonly types?: { readonly input: unknown; readonly output: T } | undefined;
-  };
-};
+	readonly '~standard': {
+		readonly validate: (value: unknown) => ValidationResult<T> | Promise<ValidationResult<T>>
+		readonly types?: { readonly input: unknown; readonly output: T } | undefined
+	}
+}
 
 /**
  * Opciones de {@link useStorage}.
@@ -57,140 +57,151 @@ type StorageSchema<T> = {
  * ```
  */
 export interface StorageOptions<T = unknown> {
-  /** Dónde se guarda el valor: `"local"` (por defecto) o `"session"`. */
-  readonly storage?: StorageArea;
-  /**
-   * Standard Schema (Valibot, Zod…) que valida lo que se lee del almacenamiento, también lo que
-   * llega de otra pestaña. Un valor que no lo cumple se ignora y la señal usa el valor inicial.
-   * Debe validar de forma síncrona.
-   */
-  readonly schema?: StorageSchema<T>;
+	/** Dónde se guarda el valor: `"local"` (por defecto) o `"session"`. */
+	readonly storage?: StorageArea
+	/**
+	 * Standard Schema (Valibot, Zod…) que valida lo que se lee del almacenamiento, también lo que
+	 * llega de otra pestaña. Un valor que no lo cumple se ignora y la señal usa el valor inicial.
+	 * Debe validar de forma síncrona.
+	 */
+	readonly schema?: StorageSchema<T>
 }
 
 /** What a read of the storage gives: a decoded value, or nothing usable. */
-export type Decoded<T> = { readonly ok: true; readonly value: T } | { readonly ok: false };
+export type Decoded<T> = { readonly ok: true; readonly value: T } | { readonly ok: false }
 
-const browserKey = /*#__PURE__*/ createContext<Window>("Meeko browser window");
+const browserKey = /*#__PURE__*/ createContext<Window>('Meeko browser window')
 
 /** Makes the browser window of a mounted application available to its component tree. */
 export function provideBrowserWindow(browser: Window): void {
-  provide(browserKey, browser);
+	provide(browserKey, browser)
 }
 
 /** The window of the running application, or the global one; `undefined` on the server. */
 export function currentBrowser(): Window | undefined {
-  return findContext(browserKey) ?? (typeof window === "undefined" ? undefined : window);
+	return findContext(browserKey) ?? (typeof window === 'undefined' ? undefined : window)
 }
 
 interface StorageEntry {
-  readonly id: string;
-  readonly key: string;
-  readonly area: StorageArea;
-  readonly browser: Window;
-  readonly initial: unknown;
-  readonly decode: (value: unknown) => Decoded<unknown>;
-  readonly signal: Signal<unknown>;
-  /** `pending` until the stored value was read: writes stay in memory until then. */
-  state: "pending" | "loaded";
-  /** The JSON last read or written, so an equal write does not touch the storage again. */
-  text: string | null | undefined;
-  /** Writes that come from the storage itself are not written back. */
-  applying: boolean;
-  refs: number;
-  readonly reporters: Array<(error: unknown) => void>;
-  readonly listener: (event: StorageEvent) => void;
+	readonly id: string
+	readonly key: string
+	readonly area: StorageArea
+	readonly browser: Window
+	readonly initial: unknown
+	readonly decode: (value: unknown) => Decoded<unknown>
+	readonly signal: Signal<unknown>
+	/** `pending` until the stored value was read: writes stay in memory until then. */
+	state: 'pending' | 'loaded'
+	/** The JSON last read or written, so an equal write does not touch the storage again. */
+	text: string | null | undefined
+	/** Writes that come from the storage itself are not written back. */
+	applying: boolean
+	refs: number
+	readonly reporters: Array<(error: unknown) => void>
+	readonly listener: (event: StorageEvent) => void
 }
 
 /** One registry per window: a storage area belongs to its document. */
-const registries = new WeakMap<object, Map<string, StorageEntry>>();
+const registries = new WeakMap<object, Map<string, StorageEntry>>()
 
 function registryOf(browser: Window): Map<string, StorageEntry> {
-  let registry = registries.get(browser);
-  if (!registry) {
-    registry = new Map();
-    registries.set(browser, registry);
-  }
-  return registry;
+	let registry = registries.get(browser)
+	if (!registry) {
+		registry = new Map()
+		registries.set(browser, registry)
+	}
+	return registry
 }
 
 /** The storage area, or `undefined` when the browser blocks it (a `SecurityError` on access). */
-function areaOf(entry: Pick<StorageEntry, "browser" | "area">): Storage | undefined {
-  try {
-    const storage = entry.area === "session" ? entry.browser.sessionStorage : entry.browser.localStorage;
-    return storage ?? undefined;
-  } catch {
-    return undefined;
-  }
+function areaOf(entry: Pick<StorageEntry, 'browser' | 'area'>): Storage | undefined {
+	try {
+		const storage = entry.area === 'session' ? entry.browser.sessionStorage : entry.browser.localStorage
+		return storage ?? undefined
+	} catch {
+		return undefined
+	}
 }
 
 function report(entry: StorageEntry, error: unknown): void {
-  const reporter = entry.reporters[0];
-  if (reporter) reporter(error);
-  else logClientError(`Meeko useStorage("${entry.key}") failed`, error);
+	const reporter = entry.reporters[0]
+	if (reporter) reporter(error)
+	else logClientError(`Meeko useStorage("${entry.key}") failed`, error)
 }
 
 /** Decodes stored JSON; corrupt or invalid text gives nothing, a failing schema is reported. */
 function decodeText(entry: StorageEntry, text: string | null): Decoded<unknown> {
-  if (text === null) return { ok: false };
-  let parsed: unknown;
-  try { parsed = JSON.parse(text); }
-  catch { return { ok: false }; }
-  try { return entry.decode(parsed); }
-  catch (error) {
-    report(entry, error);
-    return { ok: false };
-  }
+	if (text === null) return { ok: false }
+	let parsed: unknown
+	try {
+		parsed = JSON.parse(text)
+	} catch {
+		return { ok: false }
+	}
+	try {
+		return entry.decode(parsed)
+	} catch (error) {
+		report(entry, error)
+		return { ok: false }
+	}
 }
 
 /** Reads the stored text; a blocked storage reads as empty. */
 function readText(entry: StorageEntry): string | null {
-  const storage = areaOf(entry);
-  if (!storage) return null;
-  try { return storage.getItem(entry.key); }
-  catch { return null; }
+	const storage = areaOf(entry)
+	if (!storage) return null
+	try {
+		return storage.getItem(entry.key)
+	} catch {
+		return null
+	}
 }
 
 /** Writes a value that came from the storage into the signal, without writing it back. */
 function apply(entry: StorageEntry, value: unknown, text: string | null): void {
-  entry.text = text;
-  entry.applying = true;
-  try { entry.signal.value = value; }
-  finally { entry.applying = false; }
+	entry.text = text
+	entry.applying = true
+	try {
+		entry.signal.value = value
+	} finally {
+		entry.applying = false
+	}
 }
 
 /** Reads the stored value into the signal; nothing usable keeps the value in memory. */
 function load(entry: StorageEntry): void {
-  entry.state = "loaded";
-  const text = readText(entry);
-  const decoded = decodeText(entry, text);
-  if (decoded.ok) apply(entry, decoded.value, text);
+	entry.state = 'loaded'
+	const text = readText(entry)
+	const decoded = decodeText(entry, text)
+	if (decoded.ok) apply(entry, decoded.value, text)
 }
 
 function persist(entry: StorageEntry, value: unknown): void {
-  let text: string | null = null;
-  if (value !== undefined) {
-    let serialized: string | undefined;
-    try { serialized = JSON.stringify(value); }
-    catch (error) {
-      report(entry, error);
-      return;
-    }
-    if (serialized === undefined) {
-      report(entry, new TypeError(`useStorage("${entry.key}") cannot store ${typeof value} values as JSON`));
-      return;
-    }
-    text = serialized;
-  }
-  if (text === entry.text) return;
-  entry.text = text;
-  const storage = areaOf(entry);
-  if (!storage) return;
-  try {
-    if (text === null) storage.removeItem(entry.key);
-    else storage.setItem(entry.key, text);
-  } catch {
-    // Blocked or full storage: the value lives in memory for this document.
-  }
+	let text: string | null = null
+	if (value !== undefined) {
+		let serialized: string | undefined
+		try {
+			serialized = JSON.stringify(value)
+		} catch (error) {
+			report(entry, error)
+			return
+		}
+		if (serialized === undefined) {
+			report(entry, new TypeError(`useStorage("${entry.key}") cannot store ${typeof value} values as JSON`))
+			return
+		}
+		text = serialized
+	}
+	if (text === entry.text) return
+	entry.text = text
+	const storage = areaOf(entry)
+	if (!storage) return
+	try {
+		if (text === null) storage.removeItem(entry.key)
+		else storage.setItem(entry.key, text)
+	} catch {
+		// Blocked or full storage: the value lives in memory for this document.
+	}
 }
 
 /**
@@ -198,65 +209,78 @@ function persist(entry: StorageEntry, value: unknown): void {
  * state and HMR leave it out (a stored value never travels in the payload).
  */
 function detached<T>(value: T): Signal<T> {
-  const result = signal(value);
-  markExternalSignal(result as Signal<unknown>);
-  return result;
+	const result = signal(value)
+	markExternalSignal(result as Signal<unknown>)
+	return result
 }
 
 /** A signal whose writes also persist, once the stored value was read. */
 function persistedSignal(initial: unknown, entry: () => StorageEntry): Signal<unknown> {
-  const base = detached(initial);
-  const descriptor = Object.getOwnPropertyDescriptor(base, "value")!;
-  const read = descriptor.get!;
-  const write = descriptor.set!;
-  Object.defineProperty(base, "value", {
-    get: read,
-    set(next: unknown) {
-      const current = entry();
-      if (!current.applying && current.state === "loaded" && !Object.is(untrack(() => read.call(base)), next)) persist(current, next);
-      write.call(base, next);
-    },
-    enumerable: descriptor.enumerable ?? true,
-    configurable: true,
-  });
-  return base;
+	const base = detached(initial)
+	const descriptor = Object.getOwnPropertyDescriptor(base, 'value')!
+	const read = descriptor.get!
+	const write = descriptor.set!
+	Object.defineProperty(base, 'value', {
+		get: read,
+		set(next: unknown) {
+			const current = entry()
+			if (
+				!current.applying &&
+				current.state === 'loaded' &&
+				!Object.is(
+					untrack(() => read.call(base)),
+					next,
+				)
+			)
+				persist(current, next)
+			write.call(base, next)
+		},
+		enumerable: descriptor.enumerable ?? true,
+		configurable: true,
+	})
+	return base
 }
 
 function createEntry(id: string, key: string, area: StorageArea, browser: Window, initial: unknown, decode: (value: unknown) => Decoded<unknown>): StorageEntry {
-  const entry: StorageEntry = {
-    id, key, area, browser, initial, decode,
-    signal: persistedSignal(initial, () => entry),
-    state: "pending",
-    text: undefined,
-    applying: false,
-    refs: 0,
-    reporters: [],
-    listener: (event) => {
-      // Another tab changed this key, or cleared the whole storage (`key` is `null`).
-      if (entry.state !== "loaded" || (event.key !== null && event.key !== entry.key)) return;
-      const storage = areaOf(entry);
-      if (!storage || (event.storageArea && event.storageArea !== storage)) return;
-      const text = event.key === null ? null : event.newValue;
-      const decoded = decodeText(entry, text);
-      apply(entry, decoded.ok ? decoded.value : entry.initial, text);
-    },
-  };
-  return entry;
+	const entry: StorageEntry = {
+		id,
+		key,
+		area,
+		browser,
+		initial,
+		decode,
+		signal: persistedSignal(initial, () => entry),
+		state: 'pending',
+		text: undefined,
+		applying: false,
+		refs: 0,
+		reporters: [],
+		listener: (event) => {
+			// Another tab changed this key, or cleared the whole storage (`key` is `null`).
+			if (entry.state !== 'loaded' || (event.key !== null && event.key !== entry.key)) return
+			const storage = areaOf(entry)
+			if (!storage || (event.storageArea && event.storageArea !== storage)) return
+			const text = event.key === null ? null : event.newValue
+			const decoded = decodeText(entry, text)
+			apply(entry, decoded.ok ? decoded.value : entry.initial, text)
+		},
+	}
+	return entry
 }
 
 /** Ties an entry to the running component: the `storage` listener lives while a component uses it. */
 function acquire(entry: StorageEntry, registry: Map<string, StorageEntry>): void {
-  const reporter = componentErrorReporter();
-  entry.reporters.push(reporter);
-  if (++entry.refs === 1) entry.browser.addEventListener("storage", entry.listener);
-  onCleanup(() => {
-    const index = entry.reporters.indexOf(reporter);
-    if (index >= 0) entry.reporters.splice(index, 1);
-    if (--entry.refs > 0) return;
-    entry.browser.removeEventListener("storage", entry.listener);
-    // The next component that uses the key reads it again.
-    if (registry.get(entry.id) === entry) registry.delete(entry.id);
-  });
+	const reporter = componentErrorReporter()
+	entry.reporters.push(reporter)
+	if (++entry.refs === 1) entry.browser.addEventListener('storage', entry.listener)
+	onCleanup(() => {
+		const index = entry.reporters.indexOf(reporter)
+		if (index >= 0) entry.reporters.splice(index, 1)
+		if (--entry.refs > 0) return
+		entry.browser.removeEventListener('storage', entry.listener)
+		// The next component that uses the key reads it again.
+		if (registry.get(entry.id) === entry) registry.delete(entry.id)
+	})
 }
 
 /**
@@ -264,61 +288,63 @@ function acquire(entry: StorageEntry, registry: Map<string, StorageEntry>): void
  * mutations share it. `label` names the caller in errors.
  */
 export function storageSignal<T>(label: string, key: string, initial: T, area: StorageArea, decode: (value: unknown) => Decoded<T>): Signal<T> {
-  if (typeof key !== "string" || key === "") throw new TypeError(`${label} expects a non-empty storage key`);
-  if (area !== "local" && area !== "session") throw new TypeError(`${label}: storage must be "local" or "session"`);
-  const phase = setupPhase();
-  if (!phase) throw new Error(`${label} must be called while a component script runs`);
-  const browser = currentBrowser();
-  // SSR, and a render outside the browser, never touch the storage.
-  if (!browser) return detached(initial);
-  const registry = registryOf(browser);
-  const id = `${area}:${key}`;
-  let entry = registry.get(id);
-  if (phase === "render") {
-    if (!canSuspendLate()) {
-      // A plain render keeps the initial value, like SSR: server-like HTML may hydrate against it.
-      if (!isDryRender()) return detached(initial);
-      // A dry pass (the data of a navigation or of a later mount) reads a detached copy of the
-      // current value, so the data it requests matches the commit; it is never written back.
-      const probe = entry ?? createEntry(id, key, area, browser, initial, decode);
-      if (probe.refs > 0) return detached(untrack(() => probe.signal.value) as T);
-      const decoded = decodeText(probe, readText(probe));
-      return detached(decoded.ok ? decoded.value as T : initial);
-    }
-    // A browser render whose HTML is inserted and hydrated right away already shows the stored value.
-    if (!entry) {
-      entry = createEntry(id, key, area, browser, initial, decode);
-      registry.set(id, entry);
-    }
-    // An entry no component uses may be stale: read it again.
-    if (entry.refs === 0) load(entry);
-    return entry.signal as Signal<T>;
-  }
-  if (!entry) {
-    entry = createEntry(id, key, area, browser, initial, decode);
-    registry.set(id, entry);
-    const created = entry;
-    // Hydration renders the initial value, like SSR; the stored value arrives once the whole
-    // hydration batch has finished, before onMounted (at once outside a batch).
-    afterMountBatch(() => { if (created.state === "pending") load(created); });
-  }
-  acquire(entry, registry);
-  return entry.signal as Signal<T>;
+	if (typeof key !== 'string' || key === '') throw new TypeError(`${label} expects a non-empty storage key`)
+	if (area !== 'local' && area !== 'session') throw new TypeError(`${label}: storage must be "local" or "session"`)
+	const phase = setupPhase()
+	if (!phase) throw new Error(`${label} must be called while a component script runs`)
+	const browser = currentBrowser()
+	// SSR, and a render outside the browser, never touch the storage.
+	if (!browser) return detached(initial)
+	const registry = registryOf(browser)
+	const id = `${area}:${key}`
+	let entry = registry.get(id)
+	if (phase === 'render') {
+		if (!canSuspendLate()) {
+			// A plain render keeps the initial value, like SSR: server-like HTML may hydrate against it.
+			if (!isDryRender()) return detached(initial)
+			// A dry pass (the data of a navigation or of a later mount) reads a detached copy of the
+			// current value, so the data it requests matches the commit; it is never written back.
+			const probe = entry ?? createEntry(id, key, area, browser, initial, decode)
+			if (probe.refs > 0) return detached(untrack(() => probe.signal.value) as T)
+			const decoded = decodeText(probe, readText(probe))
+			return detached(decoded.ok ? (decoded.value as T) : initial)
+		}
+		// A browser render whose HTML is inserted and hydrated right away already shows the stored value.
+		if (!entry) {
+			entry = createEntry(id, key, area, browser, initial, decode)
+			registry.set(id, entry)
+		}
+		// An entry no component uses may be stale: read it again.
+		if (entry.refs === 0) load(entry)
+		return entry.signal as Signal<T>
+	}
+	if (!entry) {
+		entry = createEntry(id, key, area, browser, initial, decode)
+		registry.set(id, entry)
+		const created = entry
+		// Hydration renders the initial value, like SSR; the stored value arrives once the whole
+		// hydration batch has finished, before onMounted (at once outside a batch).
+		afterMountBatch(() => {
+			if (created.state === 'pending') load(created)
+		})
+	}
+	acquire(entry, registry)
+	return entry.signal as Signal<T>
 }
 
 /** Validates with a Standard Schema; an asynchronous schema is a programming error. */
 function schemaDecoder<T>(label: string, schema: StorageSchema<T> | undefined): (value: unknown) => Decoded<T> {
-  if (!schema) return (value) => ({ ok: true, value: value as T });
-  if (typeof schema["~standard"]?.validate !== "function") throw new TypeError(`${label}: schema must be a Standard Schema`);
-  return (value) => {
-    const result = schema["~standard"].validate(value);
-    if (result && typeof (result as PromiseLike<unknown>).then === "function") {
-      void Promise.resolve(result).catch(() => {});
-      throw new TypeError(`${label}: the schema must validate synchronously`);
-    }
-    const settled = result as ValidationResult<T>;
-    return settled.issues ? { ok: false } : { ok: true, value: (settled as { value: T }).value };
-  };
+	if (!schema) return (value) => ({ ok: true, value: value as T })
+	if (typeof schema['~standard']?.validate !== 'function') throw new TypeError(`${label}: schema must be a Standard Schema`)
+	return (value) => {
+		const result = schema['~standard'].validate(value)
+		if (result && typeof (result as PromiseLike<unknown>).then === 'function') {
+			void Promise.resolve(result).catch(() => {})
+			throw new TypeError(`${label}: the schema must validate synchronously`)
+		}
+		const settled = result as ValidationResult<T>
+		return settled.issues ? { ok: false } : { ok: true, value: (settled as { value: T }).value }
+	}
 }
 
 /**
@@ -357,7 +383,7 @@ function schemaDecoder<T>(label: string, schema: StorageSchema<T> | undefined): 
  * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#estado-persistente-usestorage
  */
-export function useStorage<T>(key: string, initial: T, options?: StorageOptions<T> & { readonly schema?: undefined }): Signal<T>;
+export function useStorage<T>(key: string, initial: T, options?: StorageOptions<T> & { readonly schema?: undefined }): Signal<T>
 /**
  * Devuelve una señal guardada en el almacenamiento del navegador cuyo valor leído se valida con
  * `schema`; el tipo sale del schema.
@@ -377,8 +403,8 @@ export function useStorage<T>(key: string, initial: T, options?: StorageOptions<
  * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#estado-persistente-usestorage
  */
-export function useStorage<T>(key: string, initial: NoInfer<T>, options: StorageOptions<T> & { readonly schema: StorageSchema<T> }): Signal<T>;
+export function useStorage<T>(key: string, initial: NoInfer<T>, options: StorageOptions<T> & { readonly schema: StorageSchema<T> }): Signal<T>
 export function useStorage<T>(key: string, initial: T, options: StorageOptions<T> = {}): Signal<T> {
-  const label = `useStorage("${String(key)}")`;
-  return storageSignal(label, key, initial, options.storage ?? "local", schemaDecoder(label, options.schema));
+	const label = `useStorage("${String(key)}")`
+	return storageSignal(label, key, initial, options.storage ?? 'local', schemaDecoder(label, options.schema))
 }

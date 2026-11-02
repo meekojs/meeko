@@ -1,5 +1,5 @@
-import type { Schema } from "../schema";
-import type { ApiRouteDefinition, ApiSuccessStatus } from "./contracts";
+import type { Schema } from '../schema'
+import type { ApiRouteDefinition, ApiSuccessStatus } from './contracts'
 
 /**
  * Declara un endpoint de API, el export por defecto de `server/api/<ruta>.<método>.ts`. El
@@ -73,5 +73,5 @@ import type { ApiRouteDefinition, ApiSuccessStatus } from "./contracts";
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#api-y-rpc
  */
 export function defineApiRoute<P extends Schema | undefined = undefined, Q extends Schema | undefined = undefined, B extends Schema | undefined = undefined, R extends Schema | undefined = undefined, S = unknown, L = undefined, T extends ApiSuccessStatus = ApiSuccessStatus>(definition: ApiRouteDefinition<P, Q, B, R, S, L, T>): ApiRouteDefinition<P, Q, B, R, S, L, T> {
-  return definition;
+	return definition
 }

@@ -30,6 +30,7 @@ Los schemas públicos viven en `shared/` y son [Standard Schema](https://standar
 ## Uso
 
 <!-- no-check -->
+
 ```ts
 // shared/schemas/user.ts
 import * as v from "valibot";
@@ -39,6 +40,7 @@ export const userSchema = v.object({ id: v.string(), name: v.string() });
 ```
 
 <!-- no-check -->
+
 ```ts
 // server/api/users/[id].get.ts
 import { ApiError, defineApiRoute } from "@meekojs/meeko/server";
@@ -59,21 +61,21 @@ En la aplicación, `await api.users({ id: "7" }).get()` devuelve `{ id: string; 
 
 ## Opciones
 
-| Opción | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `params` | Standard Schema | ninguno | Los segmentos dinámicos (`[id]`), como cadenas obligatorias. Obligatorio en una ruta dinámica y prohibido en una estática. |
-| `query` | Standard Schema | ninguno | La query string. Sus campos aceptan texto o listas de texto; convierte los números dentro del schema. |
-| `body` | Standard Schema | ninguno | El cuerpo JSON (y, con `form`, el del formulario). Límite de 1 MiB. |
-| `response` | Standard Schema | obligatorio salvo con `status: 204` o `contentType: "response"` | El resultado del handler. Uno que no lo supera responde `500` sin detalle. |
-| `status` | `200 \| 201 \| 202 \| 204` | `200` | Desde `1.2`. Estado de una respuesta correcta. Con `204` no hay cuerpo ni `response`. **Debe ser un literal.** |
-| `auth` | `"required" \| "optional"` | `"optional"` | Con `"required"`, una petición sin sesión responde `401`. |
-| `authorize` | `(context) => boolean \| Promise<boolean>` | ninguno | Con `false`, `403 FORBIDDEN`. |
-| `origin` | `"required" \| "none"` | `Origin` obligatorio en `POST`, `PUT`, `PATCH` y `DELETE` (desde `1.8`) | Desde `1.8`, toda mutación exige un `Origin` permitido, haya o no sesión; `"required"` lo deja explícito. `"none"` (**inseguro**) lo desactiva en las peticiones sin sesión, también en los formularios nativos, para un webhook (JSON o form-encoded) o una API pública; con sesión siguen `Origin` y CSRF. |
-| `rateLimit` | `{ limit, window, key? }` | ninguno | Desde `1.2`. Límite de peticiones por ventana; por encima, `429` con `Retry-After`. Sin `key`, cuenta por IP del cliente (`context.clientAddress`; tras Cloudflare Tunnel, `MEEKO_TRUST_PROXY=cloudflare`). |
-| `locals` | `(context) => L \| Promise<L>` | ninguno | Desde `1.2`. Un valor por petición (el usuario actual) que el handler recibe tipado en `locals`. Decláralo antes de `handler`. |
-| `contentType` | `"json" \| "response"` | `"json"` | Con `"response"`, el handler devuelve su propio `Response` (un archivo, un CSV, un stream). |
-| `form` | `true` o `{ redirect?, maxBytes?, files?, echo? }` | sin formularios | Desde `1.7`. Acepta `application/x-www-form-urlencoded` y `multipart/form-data`, validados con `body`, y responde `303` a la página. `echo` lista los campos cuyo valor vuelve a la página tras un error; por defecto, ninguno. Véase abajo. |
-| `handler` | `({ params, query, body, context, locals }) => resultado` | obligatorio | La lógica. `context` es el `RequestContext`: `session`, `services`, `platform`, `requestId`, `clientAddress`, `signal`. |
+| Opción        | Tipo                                                      | Por defecto                                                             | Descripción                                                                                                                                                                                                                                                                                                  |
+| ------------- | --------------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `params`      | Standard Schema                                           | ninguno                                                                 | Los segmentos dinámicos (`[id]`), como cadenas obligatorias. Obligatorio en una ruta dinámica y prohibido en una estática.                                                                                                                                                                                   |
+| `query`       | Standard Schema                                           | ninguno                                                                 | La query string. Sus campos aceptan texto o listas de texto; convierte los números dentro del schema.                                                                                                                                                                                                        |
+| `body`        | Standard Schema                                           | ninguno                                                                 | El cuerpo JSON (y, con `form`, el del formulario). Límite de 1 MiB.                                                                                                                                                                                                                                          |
+| `response`    | Standard Schema                                           | obligatorio salvo con `status: 204` o `contentType: "response"`         | El resultado del handler. Uno que no lo supera responde `500` sin detalle.                                                                                                                                                                                                                                   |
+| `status`      | `200 \| 201 \| 202 \| 204`                                | `200`                                                                   | Desde `1.2`. Estado de una respuesta correcta. Con `204` no hay cuerpo ni `response`. **Debe ser un literal.**                                                                                                                                                                                               |
+| `auth`        | `"required" \| "optional"`                                | `"optional"`                                                            | Con `"required"`, una petición sin sesión responde `401`.                                                                                                                                                                                                                                                    |
+| `authorize`   | `(context) => boolean \| Promise<boolean>`                | ninguno                                                                 | Con `false`, `403 FORBIDDEN`.                                                                                                                                                                                                                                                                                |
+| `origin`      | `"required" \| "none"`                                    | `Origin` obligatorio en `POST`, `PUT`, `PATCH` y `DELETE` (desde `1.8`) | Desde `1.8`, toda mutación exige un `Origin` permitido, haya o no sesión; `"required"` lo deja explícito. `"none"` (**inseguro**) lo desactiva en las peticiones sin sesión, también en los formularios nativos, para un webhook (JSON o form-encoded) o una API pública; con sesión siguen `Origin` y CSRF. |
+| `rateLimit`   | `{ limit, window, key? }`                                 | ninguno                                                                 | Desde `1.2`. Límite de peticiones por ventana; por encima, `429` con `Retry-After`. Sin `key`, cuenta por IP del cliente (`context.clientAddress`; tras Cloudflare Tunnel, `MEEKO_TRUST_PROXY=cloudflare`).                                                                                                  |
+| `locals`      | `(context) => L \| Promise<L>`                            | ninguno                                                                 | Desde `1.2`. Un valor por petición (el usuario actual) que el handler recibe tipado en `locals`. Decláralo antes de `handler`.                                                                                                                                                                               |
+| `contentType` | `"json" \| "response"`                                    | `"json"`                                                                | Con `"response"`, el handler devuelve su propio `Response` (un archivo, un CSV, un stream).                                                                                                                                                                                                                  |
+| `form`        | `true` o `{ redirect?, maxBytes?, files?, echo? }`        | sin formularios                                                         | Desde `1.7`. Acepta `application/x-www-form-urlencoded` y `multipart/form-data`, validados con `body`, y responde `303` a la página. `echo` lista los campos cuyo valor vuelve a la página tras un error; por defecto, ninguno. Véase abajo.                                                                 |
+| `handler`     | `({ params, query, body, context, locals }) => resultado` | obligatorio                                                             | La lógica. `context` es el `RequestContext`: `session`, `services`, `platform`, `requestId`, `clientAddress`, `signal`.                                                                                                                                                                                      |
 
 El orden de cada petición es: `Origin` (desde `1.8`, en toda mutación salvo con `origin: "none"`), `Origin` y CSRF de la sesión, `rateLimit`, `auth`, `authorize`, validación de la entrada, `locals`, `handler` y validación de la respuesta. Un formulario nativo cuenta `rateLimit` antes, tras `Origin` y antes de leer el cuerpo, porque el token CSRF viaja en él.
 
@@ -81,19 +83,20 @@ El orden de cada petición es: `Origin` (desde `1.8`, en toda mutación salvo co
 
 La misma definición, con sus tipos inferidos. Es lo que el servidor ejecuta y de lo que `meeko routes`, `meeko check` y `meeko dev` generan el contrato del cliente. Las respuestas:
 
-| Caso | Respuesta |
-| --- | --- |
-| Correcta | El estado de `status`, con el JSON de `response` (o sin cuerpo con `204`) |
-| Entrada inválida | `400` `INVALID_PARAMS`, `INVALID_QUERY` o `INVALID_BODY`, con `issues: [{ path, message }]` (como mucho 20) |
-| `ApiError(code, status)` | Ese estado, con `{ code, status, requestId }` y sus `issues` si es un `4xx` |
-| Cualquier otro error | `500` `INTERNAL_ERROR`, sin el mensaje; el servidor lo registra |
-| Formulario nativo (`form`) | `303 See Other` a la página, con el resultado en una cookie de un solo uso |
+| Caso                       | Respuesta                                                                                                   |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Correcta                   | El estado de `status`, con el JSON de `response` (o sin cuerpo con `204`)                                   |
+| Entrada inválida           | `400` `INVALID_PARAMS`, `INVALID_QUERY` o `INVALID_BODY`, con `issues: [{ path, message }]` (como mucho 20) |
+| `ApiError(code, status)`   | Ese estado, con `{ code, status, requestId }` y sus `issues` si es un `4xx`                                 |
+| Cualquier otro error       | `500` `INTERNAL_ERROR`, sin el mensaje; el servidor lo registra                                             |
+| Formulario nativo (`form`) | `303 See Other` a la página, con el resultado en una cookie de un solo uso                                  |
 
 ## Ejemplos
 
 ### Crear con `201` y la sesión
 
 <!-- no-check -->
+
 ```ts
 // server/api/orders/index.post.ts
 import { ApiError, defineApiRoute } from "@meekojs/meeko/server";
@@ -117,6 +120,7 @@ export default defineApiRoute({
 ### Borrar con `204`
 
 <!-- no-check -->
+
 ```ts
 // server/api/orders/[id].delete.ts
 import { defineApiRoute } from "@meekojs/meeko/server";
@@ -137,6 +141,7 @@ export default defineApiRoute({
 Desde `1.5`, un `ApiError` con `issues` lleva el mensaje a un campo, que `useForm` muestra junto a él:
 
 <!-- no-check -->
+
 ```ts
 // server/api/signup.post.ts
 import { ApiError, defineApiRoute } from "@meekojs/meeko/server";
@@ -163,6 +168,7 @@ El `message` del tercer argumento es interno y nunca se envía; los `issues` son
 Desde `1.7`, con `form`, el mismo endpoint atiende el envío nativo del navegador. Los campos llegan como texto y, si el schema los rechaza, Meeko los vuelve a validar una vez con su lectura tipada (`""` → `undefined`, `"on"`/`"true"` → `true`, `"false"` → `false`, un número decimal → `number`), así que `v.boolean()` y `v.number()` sirven tal cual. Un schema asíncrono se ejecuta una sola vez, sin ese segundo intento:
 
 <!-- no-check -->
+
 ```ts
 // server/api/feedback.post.ts
 import { defineApiRoute } from "@meekojs/meeko/server";
@@ -208,6 +214,7 @@ Con JavaScript, `form.submit` cancela el envío nativo y manda JSON. Sin él, el
 ### Un archivo con `contentType: "response"`
 
 <!-- no-check -->
+
 ```ts
 // server/api/reports/[id].get.ts
 import { defineApiRoute } from "@meekojs/meeko/server";
@@ -228,6 +235,7 @@ export default defineApiRoute({
 Un webhook llega de otro servidor sin `Origin`, y desde `1.8` una mutación sin `Origin` responde `403 INVALID_ORIGIN`. `origin: "none"` desactiva esa comprobación en la ruta, así que el handler debe probar de otra forma que la petición es legítima, como con la firma del proveedor:
 
 <!-- no-check -->
+
 ```ts
 // server/api/webhooks/payments.post.ts
 import { ApiError, defineApiRoute } from "@meekojs/meeko/server";
@@ -255,6 +263,7 @@ await fetch("http://localhost:4173/api/orders", { method: "POST", headers: { "co
 ```
 
 <!-- no-check -->
+
 ```ts good
 await fetch("http://localhost:4173/api/orders", { method: "POST", headers: { "content-type": "application/json", origin: "http://localhost:4173" }, body });
 ```
@@ -274,6 +283,7 @@ export default defineApiRoute({ response: v.array(item), handler: () => [] });
 `meeko check` se detiene con `server/api/items.get.ts: response debe venir de shared/: item no se importa de shared/ ni de un paquete, …`. Sin `response`: `la API requiere un schema público response`. Véase [Schemas públicos](../../framework.md#schemas-públicos).
 
 <!-- no-check -->
+
 ```ts good
 import { itemList } from "../../shared/schemas/items";
 export default defineApiRoute({ response: itemList, handler: () => [] });
@@ -289,6 +299,7 @@ export default defineApiRoute({ status: 204, handler: async () => {} });
 `server/api/orders/[id].delete.ts: una ruta de API dinámica requiere un schema público params`.
 
 <!-- no-check -->
+
 ```ts good
 export default defineApiRoute({ params: orderParams, status: 204, handler: async ({ params }) => { await deleteOrder(params.id); } });
 ```
@@ -303,6 +314,7 @@ export default defineApiRoute({ params: orderParams, response: orderSchema, stat
 `status debe ser el literal 200, 201, 202 o 204`. Con el literal `204` y `response`: `status 204 responde sin cuerpo y no admite un schema response`.
 
 <!-- no-check -->
+
 ```ts good
 export default defineApiRoute({ params: orderParams, status: 204, handler: async () => {} });
 ```
@@ -316,6 +328,7 @@ export default defineApiRoute({ body: newOrder, response: orderSchema, handler: 
 `meeko check` da `TS2322: Type 'number' is not assignable to type 'string'.` en el handler. En ejecución, un resultado que no supera el schema responde `500` sin detalle.
 
 <!-- no-check -->
+
 ```ts good
 export default defineApiRoute({ body: newOrder, response: orderSchema, handler: ({ body }) => ({ id: "1", item: body.item, qty: body.qty }) });
 ```

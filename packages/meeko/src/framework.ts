@@ -1,75 +1,75 @@
-import type { MeekoPopoverProps as PopoverProps } from "./app/components/MeekoPopover/types";
-import type { MeekoSelectProps as SelectProps } from "./app/components/MeekoSelect/types";
-import type { AwaitMessages, AwaitResource } from "./app/runtime/await";
-import type { RouteRecord } from "./app/runtime/router";
-import type { MeekoTeleportProps as TeleportProps } from "./app/runtime/teleport";
-import type { LayoutName as NamedLayoutName, LayoutProps as NamedLayoutProps } from "./shared/layout";
-import type { ThemeChoice, ThemeToggleMessages } from "./shared/theme";
+import type { MeekoPopoverProps as PopoverProps } from './app/components/MeekoPopover/types'
+import type { MeekoSelectProps as SelectProps } from './app/components/MeekoSelect/types'
+import type { AwaitMessages, AwaitResource } from './app/runtime/await'
+import type { RouteRecord } from './app/runtime/router'
+import type { MeekoTeleportProps as TeleportProps } from './app/runtime/teleport'
+import type { LayoutName as NamedLayoutName, LayoutProps as NamedLayoutProps } from './shared/layout'
+import type { ThemeChoice, ThemeToggleMessages } from './shared/theme'
 
-import { activeRouteManifest, href as runtimeHref } from "./app/runtime/router";
+import { activeRouteManifest, href as runtimeHref } from './app/runtime/router'
 
-export { createNavigator, createRouteManifest, matchRoute } from "./app/runtime/router";
-export { defineMeekoConfig } from "./modules/define-meeko-config";
-export type { MeekoConfig, MeekoDevtoolsConfig, RobotsConfig,ServerHeaders, ServerResponseConfig, SitemapConfig, SitemapEntriesContext, SitemapEntry, StaticHeaderFile } from "./modules/define-meeko-config";
-export { defineMeekoModule } from "./modules/define-meeko-module";
-export type { MeekoHookable, MeekoHooks, MeekoModule, MeekoModuleContext, MeekoModuleDefinition, MeekoModuleEntry, MeekoModuleMeta, MeekoModuleName, MeekoModuleNames, ModulePublicFileOptions, ModuleAutoImport, ModulePlugin, ModuleServerHandler, SitemapAlternate, SitemapResolvedUrl } from "./modules/define-meeko-module";
-export { sitemapXml } from "./framework/sitemap-xml";
-export { definePlugin } from "./app/definitions/define-plugin";
-export type { MeekoPlugin, PluginApp, PluginErrorHandler, PluginErrorInfo, PluginRegistration } from "./app/definitions/define-plugin";
-export type { LinkResolveInput, LinkResolver } from "./shared/link";
-export type { ErrorPageRecord, NamedLayoutRecord, NavigationContext, Navigator, RouteMatch, RouteRecord } from "./app/runtime/router";
-export { defineGroup } from "./shared/definitions/define-group";
-export { useLayout } from "./app/composables/useLayout";
-export type { GroupDefinition, LayoutHandle, LayoutName, LayoutPropsInput, PageBodyLayoutProps, PageLayout, PageLayoutOptions } from "./shared/layout";
-export { mountClientApp } from "./app/runtime/client";
-export type { ClientApp, ClientAppOptions, ClientComponent, ClientRoute } from "./app/runtime/client";
-export { useNavigation } from "./app/composables/useNavigation";
-export { useRoute } from "./app/composables/useRoute";
-export type { NavigationState, RouteState } from "./app/runtime/navigation";
-export { definePage } from "./app/definitions/define-page";
-export { PageInputError } from "./app/definitions/define-page";
-export type { ClientPageDefinition, ClientPageLoadContext, PageBodyDefinePage, PageCache, PageCacheContext, PageDefinition, PageHead, PageLoadContext, PageMemoryCache, PageRender, PageSchema } from "./app/definitions/define-page";
-export { notFound, redirect } from "./server/runtime/page-body";
-export { documentHtml } from "./server/runtime/document-html";
-export { usePage } from "./server/composables/usePage";
-export type { PageRequest, PageRequestOf } from "./server/composables/usePage";
-export type { JsonShape, PageBodyHead, SerializableExport, ServerData } from "./server/runtime/page-body";
-export { StateStore } from "./app/runtime/state";
-export { useState } from "./app/composables/useState";
-export { useForm } from "./app/composables/useForm";
-export type { Form, FormField, FormSubmission } from "./app/composables/useForm";
-export { useStorage } from "./app/composables/useStorage";
-export { useHead } from "./app/composables/use-head";
-export { useSeoMeta } from "./app/composables/use-seo-meta";
-export type { DocumentConfig, DocumentHead, DocumentSeo, HeadInput, HeadLink, HeadMeta, HeadScript, HeadStyle, SeoMetaInput } from "./shared/head";
-export type { StorageArea, StorageOptions } from "./app/composables/useStorage";
-export { useTheme } from "./app/composables/use-theme";
-export { useThemeToggle } from "./app/composables/use-theme-toggle";
-export type { ThemeChoice, ThemeConfig, ThemeName, ThemeState, ThemeToggleMessages, ThemeToggleSnippets, ThemeToggleState, ThemeToggleSystem } from "./shared/theme";
+export { createNavigator, createRouteManifest, matchRoute } from './app/runtime/router'
+export { defineMeekoConfig } from './modules/define-meeko-config'
+export type { MeekoConfig, MeekoDevtoolsConfig, RobotsConfig, ServerHeaders, ServerResponseConfig, SitemapConfig, SitemapEntriesContext, SitemapEntry, StaticHeaderFile } from './modules/define-meeko-config'
+export { defineMeekoModule } from './modules/define-meeko-module'
+export type { MeekoHookable, MeekoHooks, MeekoModule, MeekoModuleContext, MeekoModuleDefinition, MeekoModuleEntry, MeekoModuleMeta, MeekoModuleName, MeekoModuleNames, ModulePublicFileOptions, ModuleAutoImport, ModulePlugin, ModuleServerHandler, SitemapAlternate, SitemapResolvedUrl } from './modules/define-meeko-module'
+export { sitemapXml } from './framework/sitemap-xml'
+export { definePlugin } from './app/definitions/define-plugin'
+export type { MeekoPlugin, PluginApp, PluginErrorHandler, PluginErrorInfo, PluginRegistration } from './app/definitions/define-plugin'
+export type { LinkResolveInput, LinkResolver } from './shared/link'
+export type { ErrorPageRecord, NamedLayoutRecord, NavigationContext, Navigator, RouteMatch, RouteRecord } from './app/runtime/router'
+export { defineGroup } from './shared/definitions/define-group'
+export { useLayout } from './app/composables/useLayout'
+export type { GroupDefinition, LayoutHandle, LayoutName, LayoutPropsInput, PageBodyLayoutProps, PageLayout, PageLayoutOptions } from './shared/layout'
+export { mountClientApp } from './app/runtime/client'
+export type { ClientApp, ClientAppOptions, ClientComponent, ClientRoute } from './app/runtime/client'
+export { useNavigation } from './app/composables/useNavigation'
+export { useRoute } from './app/composables/useRoute'
+export type { NavigationState, RouteState } from './app/runtime/navigation'
+export { definePage } from './app/definitions/define-page'
+export { PageInputError } from './app/definitions/define-page'
+export type { ClientPageDefinition, ClientPageLoadContext, PageBodyDefinePage, PageCache, PageCacheContext, PageDefinition, PageHead, PageLoadContext, PageMemoryCache, PageRender, PageSchema } from './app/definitions/define-page'
+export { notFound, redirect } from './server/runtime/page-body'
+export { documentHtml } from './server/runtime/document-html'
+export { usePage } from './server/composables/usePage'
+export type { PageRequest, PageRequestOf } from './server/composables/usePage'
+export type { JsonShape, PageBodyHead, SerializableExport, ServerData } from './server/runtime/page-body'
+export { StateStore } from './app/runtime/state'
+export { useState } from './app/composables/useState'
+export { useForm } from './app/composables/useForm'
+export type { Form, FormField, FormSubmission } from './app/composables/useForm'
+export { useStorage } from './app/composables/useStorage'
+export { useHead } from './app/composables/use-head'
+export { useSeoMeta } from './app/composables/use-seo-meta'
+export type { DocumentConfig, DocumentHead, DocumentSeo, HeadInput, HeadLink, HeadMeta, HeadScript, HeadStyle, SeoMetaInput } from './shared/head'
+export type { StorageArea, StorageOptions } from './app/composables/useStorage'
+export { useTheme } from './app/composables/use-theme'
+export { useThemeToggle } from './app/composables/use-theme-toggle'
+export type { ThemeChoice, ThemeConfig, ThemeName, ThemeState, ThemeToggleMessages, ThemeToggleSnippets, ThemeToggleState, ThemeToggleSystem } from './shared/theme'
 // Types only: the code of <MeekoPopover> and <MeekoSelect> reaches a bundle only through the tags.
-export type { PopoverExposed, PopoverMode, PopoverPlacement, PopoverRole, PopoverSnippets, PopoverToggleEvent, PopoverTrigger } from "./app/components/MeekoPopover/types";
-export type { SelectField, SelectFilter, SelectFilterContext, SelectModel, SelectOptionState, SelectSnippets } from "./app/components/MeekoSelect/types";
-export { defer } from "./app/runtime/deferred";
-export type { DeferOptions, Deferred, DeferredError, DeferredFactory, DeferredStatus } from "./app/runtime/deferred";
-export { defineRouteMiddleware } from "./app/definitions/define-route-middleware";
-export { defineServerRouteMiddleware } from "./server/middleware/definitions";
-export type { RouteMiddleware, RouteMiddlewareContext, RouteMiddlewareName, RouteMiddlewareOptions } from "./app/middleware/runtime";
-export type { ServerRouteMiddleware, ServerRouteMiddlewareContext } from "./server/middleware/runtime";
-export { ClientError, createApiClient, createPublicServerManifest, createRpcClient, isClientError } from "./shared/clients";
-export type { ApiClient, ApiMutationInput, ApiOperation, ClientOptions, PublicApiEndpoint, PublicRpcEndpoint, PublicServerManifest, RpcClient, RpcOperation, ValidationIssue } from "./shared/clients";
-export { createBrowserClientOptions } from "./app/runtime/browser-clients";
-export { createSocketClient, createSocketRegistry } from "./app/runtime/socket";
-export { useSocket, useSocketClient } from "./app/composables/use-socket-client";
-export { useSocketChannel } from "./app/composables/use-socket-channel";
-export { createUseApi } from "./app/composables/resources/use-api";
-export { createUseApiMutation } from "./app/composables/resources/use-api-mutation";
-export { createUseRpcMutation } from "./app/composables/resources/use-rpc-mutation";
-export { createUseRpcQuery } from "./app/composables/resources/use-rpc-query";
-export type { ApiMutation, ApiMutationContract, ApiQueryContract, ApiQueryOptions, DataResource, DataResourceOptions, LoadedResource, Reactive, RpcMutation, UseApi, UseApiMutation, UseRpcMutation, UseRpcQuery } from "./app/composables/resources/engine";
-export type { AwaitMessages, AwaitResource, MeekoAwaitSnippets } from "./app/runtime/await";
-export type { MutationAttempt, MutationFailure, MutationOptions, RetrySafeMutation, RetrySafeOptions, UncertainMutation } from "./app/runtime/mutations";
-export type { SocketClient, SocketContract, SocketSchema, SocketClientOptions, SocketRegistry, SocketRegistryOptions } from "./app/runtime/socket";
-export type { MeekoTeleportTarget } from "./app/runtime/teleport";
+export type { PopoverExposed, PopoverMode, PopoverPlacement, PopoverRole, PopoverSnippets, PopoverToggleEvent, PopoverTrigger } from './app/components/MeekoPopover/types'
+export type { SelectField, SelectFilter, SelectFilterContext, SelectModel, SelectOptionState, SelectSnippets } from './app/components/MeekoSelect/types'
+export { defer } from './app/runtime/deferred'
+export type { DeferOptions, Deferred, DeferredError, DeferredFactory, DeferredStatus } from './app/runtime/deferred'
+export { defineRouteMiddleware } from './app/definitions/define-route-middleware'
+export { defineServerRouteMiddleware } from './server/middleware/definitions'
+export type { RouteMiddleware, RouteMiddlewareContext, RouteMiddlewareName, RouteMiddlewareOptions } from './app/middleware/runtime'
+export type { ServerRouteMiddleware, ServerRouteMiddlewareContext } from './server/middleware/runtime'
+export { ClientError, createApiClient, createPublicServerManifest, createRpcClient, isClientError } from './shared/clients'
+export type { ApiClient, ApiMutationInput, ApiOperation, ClientOptions, PublicApiEndpoint, PublicRpcEndpoint, PublicServerManifest, RpcClient, RpcOperation, ValidationIssue } from './shared/clients'
+export { createBrowserClientOptions } from './app/runtime/browser-clients'
+export { createSocketClient, createSocketRegistry } from './app/runtime/socket'
+export { useSocket, useSocketClient } from './app/composables/use-socket-client'
+export { useSocketChannel } from './app/composables/use-socket-channel'
+export { createUseApi } from './app/composables/resources/use-api'
+export { createUseApiMutation } from './app/composables/resources/use-api-mutation'
+export { createUseRpcMutation } from './app/composables/resources/use-rpc-mutation'
+export { createUseRpcQuery } from './app/composables/resources/use-rpc-query'
+export type { ApiMutation, ApiMutationContract, ApiQueryContract, ApiQueryOptions, DataResource, DataResourceOptions, LoadedResource, Reactive, RpcMutation, UseApi, UseApiMutation, UseRpcMutation, UseRpcQuery } from './app/composables/resources/engine'
+export type { AwaitMessages, AwaitResource, MeekoAwaitSnippets } from './app/runtime/await'
+export type { MutationAttempt, MutationFailure, MutationOptions, RetrySafeMutation, RetrySafeOptions, UncertainMutation } from './app/runtime/mutations'
+export type { SocketClient, SocketContract, SocketSchema, SocketClientOptions, SocketRegistry, SocketRegistryOptions } from './app/runtime/socket'
+export type { MeekoTeleportTarget } from './app/runtime/teleport'
 
 /**
  * Rutas de la aplicación con sus parámetros, por ID. Está vacía en el paquete: la amplían las
@@ -186,22 +186,16 @@ export interface GeneratedRouteMiddleware {}
  * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#props-del-layout-desde-la-página
  */
-export type LayoutProps<L extends string | false = NamedLayoutName> = NamedLayoutProps<L>;
+export type LayoutProps<L extends string | false = NamedLayoutName> = NamedLayoutProps<L>
 
-type RouteKey = keyof GeneratedRoutes extends never ? string : keyof GeneratedRoutes & string;
-type RouteParams<K extends string> = K extends keyof GeneratedRoutes ? GeneratedRoutes[K] : Record<string, string>;
-type HrefOptions<K extends string> = (keyof GeneratedRoutes extends never
-  ? { params?: Record<string, string> }
-  : keyof RouteParams<K> extends never
-    ? { params?: never }
-    : { params: RouteParams<K> }) & {
-  search?: Readonly<Record<string, string | number | boolean | null | undefined>>;
-};
-type HrefArguments<K extends string> = K extends keyof GeneratedRoutes
-  ? keyof RouteParams<K> extends never ? [options?: HrefOptions<K>] : [options: HrefOptions<K>]
-  : [options?: HrefOptions<K>];
+type RouteKey = keyof GeneratedRoutes extends never ? string : keyof GeneratedRoutes & string
+type RouteParams<K extends string> = K extends keyof GeneratedRoutes ? GeneratedRoutes[K] : Record<string, string>
+type HrefOptions<K extends string> = (keyof GeneratedRoutes extends never ? { params?: Record<string, string> } : keyof RouteParams<K> extends never ? { params?: never } : { params: RouteParams<K> }) & {
+	search?: Readonly<Record<string, string | number | boolean | null | undefined>>
+}
+type HrefArguments<K extends string> = K extends keyof GeneratedRoutes ? (keyof RouteParams<K> extends never ? [options?: HrefOptions<K>] : [options: HrefOptions<K>]) : [options?: HrefOptions<K>]
 
-type RuntimeHrefOptions = Parameters<typeof runtimeHref>[2];
+type RuntimeHrefOptions = Parameters<typeof runtimeHref>[2]
 
 /**
  * ID de cualquier ruta de la aplicación, como `"/users/[id]"`: la unión de las páginas de
@@ -219,7 +213,7 @@ type RuntimeHrefOptions = Parameters<typeof runtimeHref>[2];
  * <template><a bind:href="href(props.to)">{props.label}</a></template>
  * ```
  */
-export type RouteId = RouteKey;
+export type RouteId = RouteKey
 
 /**
  * Props de la etiqueta propia `<MeekoLink>`, que renderiza un `<a>` cuyo `href` construye
@@ -248,52 +242,52 @@ export type RouteId = RouteKey;
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#meekooutlet--y-meekolink
  */
 export interface MeekoLinkProps<K extends RouteId = RouteId> {
-  /**
-   * ID de la ruta de destino, como `to="/users/[id]"`: sólo las rutas que existen. También admite
-   * una expresión con `bind:to`.
-   */
-  readonly to: K;
-  /**
-   * Parámetros de una ruta dinámica, con `bind:params="{ id: user.id }"`. Son obligatorios en las
-   * rutas con segmentos dinámicos y no se admiten en las demás.
-   */
-  readonly params?: RouteParams<K>;
-  /**
-   * Query string, con `bind:search="{ tab: 'perfil' }"`. Omite `null` y `undefined`.
-   */
-  readonly search?: Readonly<Record<string, string | number | boolean | null | undefined>>;
-  /**
-   * Cuándo el enlace está activo. `"exact"` (por defecto): sólo en su ruta, con
-   * `aria-current="page"`. `"prefix"`: también en las rutas por debajo, por segmentos completos
-   * (`/dashboard` cubre `/dashboard/stats`, no `/dashboards`), con `aria-current="true"`, la
-   * sección actual; en su propia ruta sigue siendo `"page"`. `to="/"` sólo coincide exacta. Se
-   * escribe `match="prefix"` o `bind:match`.
-   *
-   * @since 1.5.0
-   * @example
-   * ```html
-   * <nav>
-   *   <MeekoLink to="/">Inicio</MeekoLink>
-   *   <MeekoLink to="/dashboard" match="prefix">Panel</MeekoLink>
-   * </nav>
-   * ```
-   */
-  readonly match?: "exact" | "prefix";
-  /**
-   * Si el `href` pasa por los resolvedores de enlaces de la aplicación (`app.resolveLink` de un
-   * plugin o módulo, como el prefijo de idioma de `@meekojs/i18n`). `true` por defecto;
-   * `bind:resolve="false"` deja el `href` tal como lo construye `href()`. El atributo `hreflang`
-   * del enlace llega al resolvedor, que puede usarlo para elegir otro idioma.
-   *
-   * @since 1.8.0
-   * @example
-   * ```html
-   * <MeekoLink to="/guide">Guía</MeekoLink>
-   * <MeekoLink to="/guide" hreflang="en">Guide (English)</MeekoLink>
-   * <MeekoLink to="/admin" bind:resolve="false">Administración</MeekoLink>
-   * ```
-   */
-  readonly resolve?: boolean;
+	/**
+	 * ID de la ruta de destino, como `to="/users/[id]"`: sólo las rutas que existen. También admite
+	 * una expresión con `bind:to`.
+	 */
+	readonly to: K
+	/**
+	 * Parámetros de una ruta dinámica, con `bind:params="{ id: user.id }"`. Son obligatorios en las
+	 * rutas con segmentos dinámicos y no se admiten en las demás.
+	 */
+	readonly params?: RouteParams<K>
+	/**
+	 * Query string, con `bind:search="{ tab: 'perfil' }"`. Omite `null` y `undefined`.
+	 */
+	readonly search?: Readonly<Record<string, string | number | boolean | null | undefined>>
+	/**
+	 * Cuándo el enlace está activo. `"exact"` (por defecto): sólo en su ruta, con
+	 * `aria-current="page"`. `"prefix"`: también en las rutas por debajo, por segmentos completos
+	 * (`/dashboard` cubre `/dashboard/stats`, no `/dashboards`), con `aria-current="true"`, la
+	 * sección actual; en su propia ruta sigue siendo `"page"`. `to="/"` sólo coincide exacta. Se
+	 * escribe `match="prefix"` o `bind:match`.
+	 *
+	 * @since 1.5.0
+	 * @example
+	 * ```html
+	 * <nav>
+	 *   <MeekoLink to="/">Inicio</MeekoLink>
+	 *   <MeekoLink to="/dashboard" match="prefix">Panel</MeekoLink>
+	 * </nav>
+	 * ```
+	 */
+	readonly match?: 'exact' | 'prefix'
+	/**
+	 * Si el `href` pasa por los resolvedores de enlaces de la aplicación (`app.resolveLink` de un
+	 * plugin o módulo, como el prefijo de idioma de `@meekojs/i18n`). `true` por defecto;
+	 * `bind:resolve="false"` deja el `href` tal como lo construye `href()`. El atributo `hreflang`
+	 * del enlace llega al resolvedor, que puede usarlo para elegir otro idioma.
+	 *
+	 * @since 1.8.0
+	 * @example
+	 * ```html
+	 * <MeekoLink to="/guide">Guía</MeekoLink>
+	 * <MeekoLink to="/guide" hreflang="en">Guide (English)</MeekoLink>
+	 * <MeekoLink to="/admin" bind:resolve="false">Administración</MeekoLink>
+	 * ```
+	 */
+	readonly resolve?: boolean
 }
 
 /**
@@ -337,18 +331,18 @@ export interface MeekoOutletProps {}
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#meekothemetoggle
  */
 export interface MeekoThemeToggleProps {
-  /** `"cycle"` (por defecto), un botón que pasa a la elección siguiente; `"select"`, un grupo de radios. */
-  readonly mode?: "cycle" | "select";
-  /** Elecciones y su orden, como `bind:themes="['light', 'dark']"`; por defecto, los temas de la configuración y `"system"` si está activo. */
-  readonly themes?: readonly ThemeChoice[];
-  /** Nombre de cada elección, como `bind:labels="{ dark: 'Oscuro' }"`; por defecto, «Claro», «Oscuro», «Sistema» y el nombre de los demás temas. */
-  readonly labels?: Partial<Record<ThemeChoice, string>>;
-  /** Textos accesibles del botón y del grupo (`cycle(current, next)`, `unknown` y `group`), para traducirlos. */
-  readonly messages?: ThemeToggleMessages;
-  /** Clases del elemento raíz, el `<form>`. */
-  readonly class?: string;
-  /** `id` del elemento raíz, el `<form>`. */
-  readonly id?: string;
+	/** `"cycle"` (por defecto), un botón que pasa a la elección siguiente; `"select"`, un grupo de radios. */
+	readonly mode?: 'cycle' | 'select'
+	/** Elecciones y su orden, como `bind:themes="['light', 'dark']"`; por defecto, los temas de la configuración y `"system"` si está activo. */
+	readonly themes?: readonly ThemeChoice[]
+	/** Nombre de cada elección, como `bind:labels="{ dark: 'Oscuro' }"`; por defecto, «Claro», «Oscuro», «Sistema» y el nombre de los demás temas. */
+	readonly labels?: Partial<Record<ThemeChoice, string>>
+	/** Textos accesibles del botón y del grupo (`cycle(current, next)`, `unknown` y `group`), para traducirlos. */
+	readonly messages?: ThemeToggleMessages
+	/** Clases del elemento raíz, el `<form>`. */
+	readonly class?: string
+	/** `id` del elemento raíz, el `<form>`. */
+	readonly id?: string
 }
 
 /**
@@ -380,24 +374,24 @@ export interface MeekoThemeToggleProps {
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#meekoawait
  */
 export interface MeekoAwaitProps {
-  /**
-   * Recurso que espera: el resultado de `useApi` o `useRpcQuery` sin `await`, o una lista
-   * (`for="[items, stats]"`). Es una expresión, como `each:of`; también admite `bind:for`. Dentro
-   * del contenido, `meeko check` y el editor leen `items.data.value` como cargado.
-   */
-  readonly for: AwaitResource | readonly AwaitResource[];
-  /**
-   * Reserva de altura: `reserve` recuerda la altura que tuvo la zona con datos y la aplica mientras
-   * espera otra vez (en `sessionStorage`, por ruta, petición e instancia); `reserve="320px"` fija
-   * además un mínimo, también en la primera visita.
-   */
-  readonly reserve?: boolean | string;
-  /** Textos del aviso de error por defecto, sin el snippet `error`. */
-  readonly messages?: AwaitMessages;
-  /** Clases del contenedor, un `<div>`. */
-  readonly class?: string;
-  /** `id` del contenedor. */
-  readonly id?: string;
+	/**
+	 * Recurso que espera: el resultado de `useApi` o `useRpcQuery` sin `await`, o una lista
+	 * (`for="[items, stats]"`). Es una expresión, como `each:of`; también admite `bind:for`. Dentro
+	 * del contenido, `meeko check` y el editor leen `items.data.value` como cargado.
+	 */
+	readonly for: AwaitResource | readonly AwaitResource[]
+	/**
+	 * Reserva de altura: `reserve` recuerda la altura que tuvo la zona con datos y la aplica mientras
+	 * espera otra vez (en `sessionStorage`, por ruta, petición e instancia); `reserve="320px"` fija
+	 * además un mínimo, también en la primera visita.
+	 */
+	readonly reserve?: boolean | string
+	/** Textos del aviso de error por defecto, sin el snippet `error`. */
+	readonly messages?: AwaitMessages
+	/** Clases del contenedor, un `<div>`. */
+	readonly class?: string
+	/** `id` del contenedor. */
+	readonly id?: string
 }
 
 /**
@@ -492,7 +486,7 @@ export interface MeekoSelectProps<T, Multiple extends boolean = false> extends S
  * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#configuración
  */
-export function href<K extends RouteKey>(id: K, ...options: HrefArguments<K>): string;
+export function href<K extends RouteKey>(id: K, ...options: HrefArguments<K>): string
 /**
  * Construye una URL comprobada a partir de un manifiesto de rutas explícito. Es la forma para
  * código fuera de una aplicación, como pruebas unitarias.
@@ -510,8 +504,8 @@ export function href<K extends RouteKey>(id: K, ...options: HrefArguments<K>): s
  * href(routes, "/users/[id]", { params: { id: "42" } }); // "/users/42"
  * ```
  */
-export function href<K extends RouteKey>(routes: readonly RouteRecord[], id: K, ...options: HrefArguments<K>): string;
+export function href<K extends RouteKey>(routes: readonly RouteRecord[], id: K, ...options: HrefArguments<K>): string
 export function href(first: string | readonly RouteRecord[], ...rest: unknown[]): string {
-  if (typeof first === "string") return runtimeHref(activeRouteManifest(), first, rest[0] as RuntimeHrefOptions | undefined);
-  return runtimeHref(first, rest[0] as string, rest[1] as RuntimeHrefOptions | undefined);
+	if (typeof first === 'string') return runtimeHref(activeRouteManifest(), first, rest[0] as RuntimeHrefOptions | undefined)
+	return runtimeHref(first, rest[0] as string, rest[1] as RuntimeHrefOptions | undefined)
 }

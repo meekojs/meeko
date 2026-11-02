@@ -14,7 +14,7 @@ related:
   - "@meekojs/meeko#provideErrorHandler"
   - "@meekojs/meeko/framework#useRoute"
   - docs/framework.md#plugins-de-aplicación
-source-hash: 5222f795bd688a400bc849bfbba7a3bad89e75e6ae3da0dcefdb24876d40ef76
+source-hash: ebf69f1813f3817da1a2e4ed4f504149417381ff1261af402df4148e4cafcb7b
 ---
 
 `definePlugin(setup)` declares an application plugin: a file in `app/plugins` that default-exports it and runs at application startup, before rendering the page. The filename suffix determines where:

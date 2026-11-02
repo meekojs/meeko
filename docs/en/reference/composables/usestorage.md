@@ -14,7 +14,7 @@ related:
   - "autoimport:useRpcMutation"
   - docs/framework.md#estado-persistente-usestorage
   - docs/framework.md#mutaciones-seguras-ante-reintentos
-source-hash: b4b9af5fa11df441e722dd3f4bbef780a3935ed0eef5c7f685892da485a952e7
+source-hash: 26905a1c1ebb337721fc32e3225a6f402882e4f0471c04a6203887db92f6592c
 ---
 
 `useStorage(key, initial, options?)` returns a signal whose value is saved in browser storage: `localStorage` by default or `sessionStorage` with `storage: "session"`. Use it for browser state that must survive a reload or be shared across tabs: an open ticket, the selected register, a draft, a view preference.

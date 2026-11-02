@@ -11,7 +11,7 @@ related:
   - "config:sitemap"
   - "config:site"
   - docs/framework.md#sitemapxml-y-robotstxt
-source-hash: e2e75b1de2511b9e60b03118f93b823d567fcc1c862c8620c8aefd775bf2063a
+source-hash: 7b7a1bfcd1efef083a9e54f94b177669366f1483bb740664ad5ece7835f87e07
 ---
 
 `robots` makes `meeko build` write `robots.txt` with rules for `User-agent: *`: its `allow` and `disallow` entries (`Allow: /` if none are set) and, if `sitemap` is enabled, a `Sitemap:` line with its absolute URL. It works with all adapters: on Node, Bun, Deno and Workers it is served like any other public file, with an `ETag`.

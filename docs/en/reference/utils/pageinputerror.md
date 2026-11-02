@@ -11,7 +11,7 @@ related:
   - "@meekojs/meeko/server#ApiError"
   - "@meekojs/meeko/server#createFrameworkHandler"
   - docs/framework.md#opciones-de-ruta-con-definepage
-source-hash: 0f2d83675f6a60246238cc04c726d5fcfd2a8da7b1204cb850918ff2891a8af7
+source-hash: 24d8065b15f68412ad83b7a0fe8c8d13cb824933618d2ccb7fdf05c62c928b69
 ---
 
 `PageInputError` is the error Meeko throws when a URL's `params` or `search` fail the schemas declared by the page in `definePage`. It occurs after route middleware and before the loader and top-level code, which never receive invalid input.

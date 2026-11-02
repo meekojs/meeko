@@ -57,11 +57,11 @@ async function save(event: SubmitEvent): Promise<void> {
 
 Cada método recibe un objeto opcional:
 
-| Opción | Tipo | Descripción |
-| --- | --- | --- |
-| `query` | la entrada del schema `query` | La query string. |
-| `body` | la entrada del schema `body` | El cuerpo, enviado como JSON. |
-| `signal` | `AbortSignal` | Cancela la petición. |
+| Opción   | Tipo                          | Descripción                   |
+| -------- | ----------------------------- | ----------------------------- |
+| `query`  | la entrada del schema `query` | La query string.              |
+| `body`   | la entrada del schema `body`  | El cuerpo, enviado como JSON. |
+| `signal` | `AbortSignal`                 | Cancela la petición.          |
 
 Un segmento dinámico se llama con un objeto con su único parámetro, como texto: `api.users({ id: "7" })`. Un catch-all `[...path]` recibe los segmentos unidos por `/`.
 
@@ -105,6 +105,7 @@ Con `safeName(() => api.users({ id }).get())`, un `404` del endpoint da «Usuari
 ### Cancelar una búsqueda
 
 <!-- no-check -->
+
 ```ts
 let controller: AbortController | undefined;
 async function search(q: string) {
@@ -144,6 +145,7 @@ await api.users({ id: 7 }).get();
 `meeko check` da `TS2741: Property 'id' is missing in type '{}' but required in type '{ readonly id: string; }'.` y `TS2322: Type 'number' is not assignable to type 'string'.` En ejecución, un objeto sin el parámetro lanza `TypeError`.
 
 <!-- no-check -->
+
 ```ts good
 await api.users({ id: String(userId) }).get();
 ```
@@ -158,6 +160,7 @@ await api.users({ id: "1" }).patch({ body: { title: "x" } });
 `meeko check` da `TS2339: Property 'post' does not exist on type 'ApiMethods<…>'.` y `TS2353: Object literal may only specify known properties, and 'title' does not exist in type '{ name: string; }'.`
 
 <!-- no-check -->
+
 ```ts good
 await api.items.get();
 await api.users({ id: "1" }).patch({ body: { name: "x" } });
@@ -172,6 +175,7 @@ await api.users.get({ params: { id: "1" } });
 `meeko check` da `TS2339: Property 'get' does not exist on type …`: desde `1.2`, el segmento dinámico se llama con su parámetro. La forma `api.users.byId.get({ params })` sigue funcionando en `1.x`, obsoleta, y se retirará en `2.0`.
 
 <!-- no-check -->
+
 ```ts good
 await api.users({ id: "1" }).get();
 ```

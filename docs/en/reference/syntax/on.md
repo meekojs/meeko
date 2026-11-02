@@ -14,7 +14,7 @@ related:
   - "@meekojs/meeko#ErrorSource"
   - docs/api.md#eventos-de-componente-defineemits-y-on
   - docs/api.md#componentes-meeko
-source-hash: b395eb4682ee15e53f1de212ce244cae16206fdb16011a89df60e45c6c5ea5d3
+source-hash: 934f2cc7f62e5e77079448572ad62637aaf1bf3c6a5878558cd37b753a8ca36f
 ---
 
 `on:evento="manejador"` does two things depending on the tag:

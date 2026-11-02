@@ -4,43 +4,43 @@ Esta guía conecta las capacidades existentes. Empieza con la [primera aplicaci�
 
 ## Página y código de servidor
 
-| Necesitas | Empieza por | Usa la otra forma cuando |
-| --- | --- | --- |
-| Declarar la ruta junto a su página | `export const route = definePage(...)` en `<script server>` | Un sidecar `*.route.ts` mantiene separada la lógica de servidor extensa. |
-| Compartir opciones entre un grupo de páginas | `+group.ts` con `defineGroup` | Cada página necesita sus propias opciones o datos. |
-| Ejecutar código durante SSR dentro de un componente | `<script>` | El código es exclusivo de la petición y debe ir en `<script server>` de una página o en un sidecar. |
+| Necesitas                                           | Empieza por                                                 | Usa la otra forma cuando                                                                            |
+| --------------------------------------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Declarar la ruta junto a su página                  | `export const route = definePage(...)` en `<script server>` | Un sidecar `*.route.ts` mantiene separada la lógica de servidor extensa.                            |
+| Compartir opciones entre un grupo de páginas        | `+group.ts` con `defineGroup`                               | Cada página necesita sus propias opciones o datos.                                                  |
+| Ejecutar código durante SSR dentro de un componente | `<script>`                                                  | El código es exclusivo de la petición y debe ir en `<script server>` de una página o en un sidecar. |
 
 `<script server>` y `*.route.ts` son dos ubicaciones para el mismo contrato de ruta. Elige **una por página**: si declaras ambas, el descubrimiento informa un conflicto. El bloque de servidor está limitado a páginas de `app/pages`; `render: "client"` cambia su entorno de ejecución y lo envía al navegador. Antes de usar secretos, revisa el [límite de ejecución](reference/syntax/script-server.md) y los [modos de render](framework.md#modos-de-render).
 
 ## Datos y carga
 
-| Necesitas | Empieza por | Qué ocurre |
-| --- | --- | --- |
-| Datos imprescindibles en el HTML inicial | Loader de `definePage` o código de nivel superior en `<script server>` | La página espera los datos antes de renderizar. |
-| Datos de un componente disponibles en SSR | `await useApi(...)` o `await useRpcQuery(...)` | La consulta participa en el render inicial. |
-| Datos secundarios después del primer pintado | `useApi(...)` o `useRpcQuery(...)` sin `await`, con `<MeekoAwait>` | El componente muestra carga, datos o error sin retrasar el primer pintado. |
-| Entregar una parte de los datos más tarde desde el servidor | `render: "stream"` y `defer(...)` | El servidor envía la página y luego el valor diferido. |
+| Necesitas                                                   | Empieza por                                                            | Qué ocurre                                                                 |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Datos imprescindibles en el HTML inicial                    | Loader de `definePage` o código de nivel superior en `<script server>` | La página espera los datos antes de renderizar.                            |
+| Datos de un componente disponibles en SSR                   | `await useApi(...)` o `await useRpcQuery(...)`                         | La consulta participa en el render inicial.                                |
+| Datos secundarios después del primer pintado                | `useApi(...)` o `useRpcQuery(...)` sin `await`, con `<MeekoAwait>`     | El componente muestra carga, datos o error sin retrasar el primer pintado. |
+| Entregar una parte de los datos más tarde desde el servidor | `render: "stream"` y `defer(...)`                                      | El servidor envía la página y luego el valor diferido.                     |
 
 `<MeekoAwait>` representa los estados del recurso: no crea otro transporte. Consulta [MeekoAwait](reference/components/meekoawait.md), [datos en componentes](framework.md#datos-en-componentes-useapi-userpcquery-y-userpcmutation) y [streaming SSR](framework.md#streaming-ssr-render-stream).
 
 ## API, RPC y Socket
 
-| Necesitas | Elige | Motivo |
-| --- | --- | --- |
-| Una URL HTTP pública, webhook o contrato para otro cliente | `defineApiRoute` | El endpoint conserva semántica HTTP. |
-| Una operación interna tipada entre la aplicación y su servidor | `defineRpc` | El cliente llama una operación del registro RPC. |
-| Mensajes que llegan sin una petición nueva | `defineSocketChannel` | Comunicación persistente en tiempo real. |
+| Necesitas                                                      | Elige                 | Motivo                                           |
+| -------------------------------------------------------------- | --------------------- | ------------------------------------------------ |
+| Una URL HTTP pública, webhook o contrato para otro cliente     | `defineApiRoute`      | El endpoint conserva semántica HTTP.             |
+| Una operación interna tipada entre la aplicación y su servidor | `defineRpc`           | El cliente llama una operación del registro RPC. |
+| Mensajes que llegan sin una petición nueva                     | `defineSocketChannel` | Comunicación persistente en tiempo real.         |
 
 API y RPC comparten validación de contratos y controles del servidor. El tipo TypeScript del cliente no valida por sí solo datos externos: declara schemas de entrada y salida donde corresponda. Consulta [API y RPC](framework.md#api-y-rpc), [defineApiRoute](reference/macros/defineapiroute.md) y [defineRpc](reference/macros/definerpc.md).
 
 ## Valores en la plantilla
 
-| Necesitas | Elige | Dirección |
-| --- | --- | --- |
-| Texto calculado entre etiquetas | `{expresión}` | Lectura. |
-| Atributo HTML o prop calculada | `bind:nombre="expresión"` | Del padre hacia el elemento o componente. |
-| Valor editable de un control o modelo declarado por un componente | `model="señal"` o `model:nombre="señal"` | Lectura y escritura de una señal. |
-| Responder a un evento | `on:nombre="handler"` | El evento llama al handler. |
+| Necesitas                                                         | Elige                                    | Dirección                                 |
+| ----------------------------------------------------------------- | ---------------------------------------- | ----------------------------------------- |
+| Texto calculado entre etiquetas                                   | `{expresión}`                            | Lectura.                                  |
+| Atributo HTML o prop calculada                                    | `bind:nombre="expresión"`                | Del padre hacia el elemento o componente. |
+| Valor editable de un control o modelo declarado por un componente | `model="señal"` o `model:nombre="señal"` | Lectura y escritura de una señal.         |
+| Responder a un evento                                             | `on:nombre="handler"`                    | El evento llama al handler.               |
 
 `bind:` no convierte una expresión en un modelo bidireccional. Si tienes una señal, lee su valor: `bind:disabled="saving.value"`; pasar `saving` entrega el objeto señal. `model` requiere una señal escribible y el componente hijo debe declarar su modelo con `defineModel`. Consulta [bind](reference/syntax/bind.md), [model](reference/syntax/model.md) y [on](reference/syntax/on.md).
 

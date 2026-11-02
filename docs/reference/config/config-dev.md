@@ -26,9 +26,9 @@ export default defineMeekoConfig({ dev: { serverLogs: false } });
 
 ## Opciones
 
-| Opción | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `serverLogs` | `boolean` | `true` | Reenvía los logs del servidor de cada petición a la consola del navegador en `meeko dev`. |
+| Opción       | Tipo      | Por defecto | Descripción                                                                               |
+| ------------ | --------- | ----------- | ----------------------------------------------------------------------------------------- |
+| `serverLogs` | `boolean` | `true`      | Reenvía los logs del servidor de cada petición a la consola del navegador en `meeko dev`. |
 
 ## Resultado
 

@@ -14,7 +14,7 @@ related:
   - docs/framework.md#configuración
   - docs/framework.md#logs-del-servidor-en-la-consola-del-navegador
   - docs/devtools.md#puente-del-editor
-source-hash: 9b8e8e15f721291373b8311bb85584de1a4008eb5441a0d07780a7ba1979c939
+source-hash: e611983970f6de03f2422d7f6d9e388e969b052d727900331f397148d755e3e7
 ---
 
 `meeko dev` starts the application in the specified directory (current directory by default) in development mode. It first reads the project's `.env`, loads `meeko.config.ts` and its modules and generates Vite entry points, route, contract and auto-import types and, since `1.7`, `.meeko/types/services.d.ts` in `.meeko/`. It then creates a Node HTTP server with Vite in middleware mode: SSR with uncompiled `app/` and `server/` modules, component and CSS HMR, and server logs in the browser console.

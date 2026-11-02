@@ -11,7 +11,7 @@ related:
   - "@meekojs/meeko/password#needsRehash"
   - docs/framework.md#contraseñas
   - docs/framework.md#autenticación
-source-hash: 8241bdcbae32ef959ca3e8b6903affc8b4a7455ff188f516591af816eefe0932
+source-hash: 69db54de90c094cf0aed417702409e61552275c2ebc8301f35bda8b68e9fe8e2
 ---
 
 `meeko auth hash` hashes a password with [`hashPassword`](/en/docs/reference/hashpassword), the same hash checked by [`verifyPassword`](/en/docs/reference/verifypassword), without writing code. In a terminal it prompts twice without echoing; with a pipe, it reads stdin. Use it to create an initial administrator's or service account's password without leaving plaintext in shell history.

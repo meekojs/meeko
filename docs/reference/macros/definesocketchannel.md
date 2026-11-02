@@ -24,6 +24,7 @@ El generador emite un contrato público con los schemas, sin importar los handle
 ## Uso
 
 <!-- no-check -->
+
 ```ts
 // shared/schemas/chat.ts
 import * as v from "valibot";
@@ -33,6 +34,7 @@ export const chatMessage = v.object({ text: v.string(), author: v.string() });
 ```
 
 <!-- no-check -->
+
 ```ts
 // server/socket/chat.ts
 import { defineSocketChannel } from "@meekojs/meeko/server";
@@ -76,15 +78,15 @@ async function send(event: SubmitEvent): Promise<void> {
 
 ## Opciones
 
-| Opción | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `clientToServer` | `{ [evento]: schema }` | obligatorio | Los eventos que envía el cliente, con schemas de `shared/`. Un payload inválido cierra el canal. |
-| `serverToClient` | `{ [evento]: schema }` | obligatorio | Los eventos que envía el servidor, con schemas de `shared/`. |
-| `auth` | `"required" \| "optional"` | `"optional"` | `"required"` rechaza la conexión sin sesión: el servidor acepta el upgrade y cierra con `4401`. |
-| `authorize` | `({ context, roomId }) => boolean \| Promise<boolean>` | ninguno | Autoriza la conexión a una sala y cada entrega; `false` cierra con `4403`. |
-| `authorizeEvent` | `({ event, payload, context, roomId }) => boolean \| Promise<boolean>` | ninguno | Autoriza cada evento entrante. |
-| `authorizeSend` | `({ event, payload, context, roomId }) => boolean \| Promise<boolean>` | ninguno | Filtra cada envío a un peer: con `false` no lo recibe y sigue conectado. |
-| `handlers` | `{ [evento]: ({ payload, context, roomId, emit }) => void \| Promise<void> }` | ninguno | Un handler por evento del cliente, con el payload ya validado. `emit` responde sólo a ese cliente. |
+| Opción           | Tipo                                                                          | Por defecto  | Descripción                                                                                        |
+| ---------------- | ----------------------------------------------------------------------------- | ------------ | -------------------------------------------------------------------------------------------------- |
+| `clientToServer` | `{ [evento]: schema }`                                                        | obligatorio  | Los eventos que envía el cliente, con schemas de `shared/`. Un payload inválido cierra el canal.   |
+| `serverToClient` | `{ [evento]: schema }`                                                        | obligatorio  | Los eventos que envía el servidor, con schemas de `shared/`.                                       |
+| `auth`           | `"required" \| "optional"`                                                    | `"optional"` | `"required"` rechaza la conexión sin sesión: el servidor acepta el upgrade y cierra con `4401`.    |
+| `authorize`      | `({ context, roomId }) => boolean \| Promise<boolean>`                        | ninguno      | Autoriza la conexión a una sala y cada entrega; `false` cierra con `4403`.                         |
+| `authorizeEvent` | `({ event, payload, context, roomId }) => boolean \| Promise<boolean>`        | ninguno      | Autoriza cada evento entrante.                                                                     |
+| `authorizeSend`  | `({ event, payload, context, roomId }) => boolean \| Promise<boolean>`        | ninguno      | Filtra cada envío a un peer: con `false` no lo recibe y sigue conectado.                           |
+| `handlers`       | `{ [evento]: ({ payload, context, roomId, emit }) => void \| Promise<void> }` | ninguno      | Un handler por evento del cliente, con el payload ya validado. `emit` responde sólo a ese cliente. |
 
 Cada evento puede escribirse en forma abreviada (`{ message }`) cuando el schema importado se llama como el evento.
 
@@ -99,6 +101,7 @@ La misma definición, con sus tipos inferidos. El hub la usa para validar y desp
 `socket.<canal>.broadcast(roomId, evento, payload)`, autoimportado en el servidor, publica un evento tipado con el contrato del canal:
 
 <!-- no-check -->
+
 ```ts
 // server/socket/operations.ts
 import { defineSocketChannel } from "@meekojs/meeko/server";
@@ -112,6 +115,7 @@ export default defineSocketChannel({
 ```
 
 <!-- no-check -->
+
 ```ts
 // server/api/orders/[id]/ready.post.ts
 import { defineApiRoute } from "@meekojs/meeko/server";
@@ -134,6 +138,7 @@ export default defineApiRoute({
 `authorize` decide quién entra en cada sala; `authorizeEvent`, qué puede enviar:
 
 <!-- no-check -->
+
 ```ts
 // server/socket/team.ts
 import { defineSocketChannel } from "@meekojs/meeko/server";
@@ -167,6 +172,7 @@ export default defineSocketChannel({
 `meeko check` se detiene con `server\socket\chat.ts: clientToServer.message debe referenciar un schema importado de shared/`. Un schema con `any`, `unknown` o tipos sin resolver da `… debe exponer tipos de entrada y salida de Standard Schema concretos`.
 
 <!-- no-check -->
+
 ```ts good
 import { chatInput, chatMessage } from "../../shared/schemas/chat";
 export default defineSocketChannel({ clientToServer: { message: chatInput }, serverToClient: { message: chatMessage } });
@@ -181,6 +187,7 @@ handlers: { message: async ({ payload, emit }) => emit("message", payload) },
 Con `chatMessage` exigiendo `author`, `meeko check` da `TS2741: Property 'author' is missing in type '{ text: string; }' but required in type '{ author: string; text: string; }'.`
 
 <!-- no-check -->
+
 ```ts good
 handlers: { message: async ({ payload, emit }) => emit("message", { text: payload.text, author: "sistema" }) },
 ```
@@ -196,6 +203,7 @@ authorize: ({ roomId }) => roomId.startsWith("team-"),
 `meeko check` da `TS18048: 'roomId' is possibly 'undefined'.`
 
 <!-- no-check -->
+
 ```ts good
 authorize: ({ roomId }) => roomId?.startsWith("team-") ?? false,
 ```

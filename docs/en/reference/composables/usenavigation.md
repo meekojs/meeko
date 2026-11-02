@@ -14,7 +14,7 @@ related:
   - "@meekojs/meeko/framework#mountClientApp"
   - docs/framework.md#estado-de-navegación
   - docs/framework.md#navegación-y-render-client
-source-hash: 83ca95733050c2cbb068454cc146df7363ae96f48d2c8792e8a7d9d2ed51c4aa
+source-hash: 6714267db56b479ba1f3dbe848c5eb0ad5939e63818869e435cc0dc24d149997
 ---
 
 `useNavigation()` tells you whether the application is changing pages. Its `pending` is `true` from the start of a client navigation (a link click, `app.navigate()`, the back button) until the new page is committed, fails or is canceled, including loading its `await useApi`/`await useRpcQuery` calls and the first load of a `render: "client"` page. Use it for a global progress bar, a wait cursor or dimming content while the next page arrives.

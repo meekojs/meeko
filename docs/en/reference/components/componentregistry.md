@@ -12,7 +12,7 @@ symbols:
 related:
   - "syntax:component-tag"
   - docs/framework.md#autoimports-y-typescript
-source-hash: 7e9cabf5fdae4ba415d6462e8126fa46d7885b17bd47f70bb653f5e3287024cf
+source-hash: 5c00e951358e60feefe6a8018b7f64362014bf96b94df2f44f309506b4c27629
 ---
 
 Meeko discovers `.meeko` files in `app/components` without manually importing each module. Declare additional directories in `meeko.config.ts`. The same catalog powers tag auto-imports, the typed registry and a generated loader for loading a component by name.

@@ -1,33 +1,40 @@
-import ts from "@typescript/typescript6";
-import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
-import { writeFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
-import test from "node:test";
+import ts from '@typescript/typescript6'
+import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
+import { writeFile } from 'node:fs/promises'
+import { join, resolve } from 'node:path'
+import test from 'node:test'
 
-import { createTempProject, linkRepositoryPackages } from "./helpers/temp-project.ts";
+import { createTempProject, linkRepositoryPackages } from './helpers/temp-project.ts'
 
 const tsconfig = JSON.stringify({
-  compilerOptions: {
-    target: "ES2022", module: "NodeNext", moduleResolution: "NodeNext", lib: ["ES2022", "DOM"], types: [],
-    strict: true, exactOptionalPropertyTypes: true, noEmit: true, skipLibCheck: true,
-  },
-  include: ["*.ts"],
-});
+	compilerOptions: {
+		target: 'ES2022',
+		module: 'NodeNext',
+		moduleResolution: 'NodeNext',
+		lib: ['ES2022', 'DOM'],
+		types: [],
+		strict: true,
+		exactOptionalPropertyTypes: true,
+		noEmit: true,
+		skipLibCheck: true,
+	},
+	include: ['*.ts'],
+})
 
 /** Type-checks `files` with TypeScript 7 against the built declarations, as an application that imports the package. */
 async function check(files: Record<string, string>): Promise<{ status: number | null; output: string }> {
-  const project = await createTempProject("postcss-utilities-types-");
-  try {
-    await linkRepositoryPackages(project.root);
-    await writeFile(join(project.root, "package.json"), JSON.stringify({ type: "module" }));
-    await writeFile(join(project.root, "tsconfig.json"), tsconfig);
-    for (const [name, source] of Object.entries(files)) await writeFile(join(project.root, name), source);
-    const result = spawnSync(process.execPath, [resolve("node_modules/typescript/bin/tsc"), "-p", join(project.root, "tsconfig.json")], { encoding: "utf8", windowsHide: true });
-    return { status: result.status, output: `${result.stdout}${result.stderr}` };
-  } finally {
-    await project.remove();
-  }
+	const project = await createTempProject('postcss-utilities-types-')
+	try {
+		await linkRepositoryPackages(project.root)
+		await writeFile(join(project.root, 'package.json'), JSON.stringify({ type: 'module' }))
+		await writeFile(join(project.root, 'tsconfig.json'), tsconfig)
+		for (const [name, source] of Object.entries(files)) await writeFile(join(project.root, name), source)
+		const result = spawnSync(process.execPath, [resolve('node_modules/typescript/bin/tsc'), '-p', join(project.root, 'tsconfig.json')], { encoding: 'utf8', windowsHide: true })
+		return { status: result.status, output: `${result.stdout}${result.stderr}` }
+	} finally {
+		await project.remove()
+	}
 }
 
 const declarations = `import type { UtilityAtRuleDeclarations, UtilityDeclarations, UtilityHelpers, UtilityValue } from "@meekojs/meeko/postcss";
@@ -91,7 +98,7 @@ const descriptors: UtilityAtRuleDeclarations = { src: "url(a.woff2)" };
 
 void [valid, unitless, kebab, fallbacks, readonlyFallbacks, important, value, typo, unitlessLength, unitlessTime, keyword,
   undefinedFallback, card, nested, wrongRule, wrongLength, font, property, page, media, wrongDescriptor, body, descriptors];
-`;
+`
 
 /** The examples of docs/framework.md, which build declarations from strings and \`Object.fromEntries\`. */
 const documented = `import { defineUtilities } from "@meekojs/meeko/postcss";
@@ -115,59 +122,63 @@ export const color = defineUtilities(({ rule, atRule }) => [
 
 export const buttonSizes = defineUtilities(({ rule }) =>
   Object.entries(sizes).map(([size, padding]) => rule(\`.button[data-size='\${size}']\`, { padding })));
-`;
+`
 
-test("UtilityDeclarations types properties and values with csstype", async () => {
-  const result = await check({ "declarations.ts": declarations });
-  assert.equal(result.status, 0, result.output);
-});
+test('UtilityDeclarations types properties and values with csstype', async () => {
+	const result = await check({ 'declarations.ts': declarations })
+	assert.equal(result.status, 0, result.output)
+})
 
-test("the documented utilities, built with Object.fromEntries, still compile", async () => {
-  const result = await check({ "documented.ts": documented });
-  assert.equal(result.status, 0, result.output);
-});
+test('the documented utilities, built with Object.fromEntries, still compile', async () => {
+	const result = await check({ 'documented.ts': documented })
+	assert.equal(result.status, 0, result.output)
+})
 
-test("rule() and atRule() complete CSS properties and keywords in the declarations object", () => {
-  // In memory only, next to the published declarations; TypeScript uses `/` separators.
-  const file = resolve("dist/__postcss-completions.ts").replaceAll("\\", "/");
-  const source = `import type { UtilityHelpers } from "./postcss.js";
+test('rule() and atRule() complete CSS properties and keywords in the declarations object', () => {
+	// In memory only, next to the published declarations; TypeScript uses `/` separators.
+	const file = resolve('dist/__postcss-completions.ts').replaceAll('\\', '/')
+	const source = `import type { UtilityHelpers } from "./postcss.js";
 declare const { rule, atRule }: UtilityHelpers;
 rule(".card", { });
 rule(".card", { position: "" });
 atRule("font-face", "", { });
-`;
-  const options: ts.CompilerOptions = {
-    target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.NodeNext, moduleResolution: ts.ModuleResolutionKind.NodeNext,
-    strict: true, exactOptionalPropertyTypes: true, types: ["node"], skipLibCheck: true,
-  };
-  const service = ts.createLanguageService({
-    getScriptFileNames: () => [file],
-    getScriptVersion: () => "1",
-    getScriptSnapshot: (name) => {
-      const text = name === file ? source : ts.sys.readFile(name);
-      return text === undefined ? undefined : ts.ScriptSnapshot.fromString(text);
-    },
-    getCurrentDirectory: () => process.cwd(),
-    getCompilationSettings: () => options,
-    getDefaultLibFileName: (settings) => ts.getDefaultLibFilePath(settings),
-    fileExists: (name) => name === file || ts.sys.fileExists(name),
-    readFile: (name) => name === file ? source : ts.sys.readFile(name),
-    readDirectory: ts.sys.readDirectory,
-    directoryExists: ts.sys.directoryExists,
-    getDirectories: ts.sys.getDirectories,
-  });
-  const names = (marker: string, offset: number): string[] =>
-    service.getCompletionsAtPosition(file, source.indexOf(marker) + offset, {})?.entries.map((entry) => entry.name) ?? [];
-  try {
-    const properties = names(`rule(".card", { })`, `rule(".card", { `.length);
-    for (const name of ["backgroundColor", "padding", "WebkitAppearance", "\"background-color\""]) assert.ok(properties.includes(name), name);
-    // The members of the nodes, the other overload, are not offered.
-    for (const name of ["kind", "selector", "children"]) assert.ok(!properties.includes(name), name);
-    const keywords = names(`position: ""`, `position: "`.length);
-    assert.ok(keywords.includes("absolute") && keywords.includes("sticky"), keywords.join(","));
-    const descriptors = names(`atRule("font-face", "", { })`, `atRule("font-face", "", { `.length);
-    for (const name of ["src", "fontDisplay", "unicodeRange", "fontFamily"]) assert.ok(descriptors.includes(name), name);
-  } finally {
-    service.dispose();
-  }
-});
+`
+	const options: ts.CompilerOptions = {
+		target: ts.ScriptTarget.ES2022,
+		module: ts.ModuleKind.NodeNext,
+		moduleResolution: ts.ModuleResolutionKind.NodeNext,
+		strict: true,
+		exactOptionalPropertyTypes: true,
+		types: ['node'],
+		skipLibCheck: true,
+	}
+	const service = ts.createLanguageService({
+		getScriptFileNames: () => [file],
+		getScriptVersion: () => '1',
+		getScriptSnapshot: (name) => {
+			const text = name === file ? source : ts.sys.readFile(name)
+			return text === undefined ? undefined : ts.ScriptSnapshot.fromString(text)
+		},
+		getCurrentDirectory: () => process.cwd(),
+		getCompilationSettings: () => options,
+		getDefaultLibFileName: (settings) => ts.getDefaultLibFilePath(settings),
+		fileExists: (name) => name === file || ts.sys.fileExists(name),
+		readFile: (name) => (name === file ? source : ts.sys.readFile(name)),
+		readDirectory: ts.sys.readDirectory,
+		directoryExists: ts.sys.directoryExists,
+		getDirectories: ts.sys.getDirectories,
+	})
+	const names = (marker: string, offset: number): string[] => service.getCompletionsAtPosition(file, source.indexOf(marker) + offset, {})?.entries.map((entry) => entry.name) ?? []
+	try {
+		const properties = names(`rule(".card", { })`, `rule(".card", { `.length)
+		for (const name of ['backgroundColor', 'padding', 'WebkitAppearance', '"background-color"']) assert.ok(properties.includes(name), name)
+		// The members of the nodes, the other overload, are not offered.
+		for (const name of ['kind', 'selector', 'children']) assert.ok(!properties.includes(name), name)
+		const keywords = names(`position: ""`, `position: "`.length)
+		assert.ok(keywords.includes('absolute') && keywords.includes('sticky'), keywords.join(','))
+		const descriptors = names(`atRule("font-face", "", { })`, `atRule("font-face", "", { `.length)
+		for (const name of ['src', 'fontDisplay', 'unicodeRange', 'fontFamily']) assert.ok(descriptors.includes(name), name)
+	} finally {
+		service.dispose()
+	}
+})

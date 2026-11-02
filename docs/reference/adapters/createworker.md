@@ -27,6 +27,7 @@ Los upgrades de Socket se comprueban en el propio Worker (ruta, `Origin`, sesió
 ## Uso
 
 <!-- no-check -->
+
 ```ts
 // worker.ts de un Worker propio
 import { DurableObject } from "cloudflare:workers";
@@ -50,25 +51,25 @@ export const MeekoSocketRoom = createSocketRoomClass(createCloudflareApp, Durabl
 
 `createWorker(app, options?)`:
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `app` | `ServerApp` o `({ env, platform }) => ServerApp \| Promise<ServerApp>` | obligatorio | La aplicación, o su fábrica, que se ejecuta una vez por aislado. |
-| `options.socketBinding` | `string` | `"MEEKO_SOCKET"` | El binding del namespace de Durable Objects de las salas. |
-| `options.publicOrigin` | `string` | el de la aplicación, o el origen de la URL enrutada | Origen de la comprobación de `Origin` en HTTP y Socket. |
-| `options.onError` | `(error, requestId) => void` | el de la aplicación | Observador de los fallos, también del arranque. |
+| Parámetro               | Tipo                                                                   | Por defecto                                         | Descripción                                                      |
+| ----------------------- | ---------------------------------------------------------------------- | --------------------------------------------------- | ---------------------------------------------------------------- |
+| `app`                   | `ServerApp` o `({ env, platform }) => ServerApp \| Promise<ServerApp>` | obligatorio                                         | La aplicación, o su fábrica, que se ejecuta una vez por aislado. |
+| `options.socketBinding` | `string`                                                               | `"MEEKO_SOCKET"`                                    | El binding del namespace de Durable Objects de las salas.        |
+| `options.publicOrigin`  | `string`                                                               | el de la aplicación, o el origen de la URL enrutada | Origen de la comprobación de `Origin` en HTTP y Socket.          |
+| `options.onError`       | `(error, requestId) => void`                                           | el de la aplicación                                 | Observador de los fallos, también del arranque.                  |
 
 ## Valor devuelto
 
 Un `CloudflareWorker` con `fetch(request, env, ctx)`:
 
-| Caso | Respuesta |
-| --- | --- |
-| La fábrica falla | La respuesta de `errorResponse` (`500 INTERNAL_ERROR`) y el error en `onError` o en la consola (`[meeko] application startup failed <id>`). |
-| La aplicación declara canales con un broker que no es `DurableObjectSocketPubSub` | La fábrica se rechaza: `500` en cada petición hasta corregirlo. |
-| Upgrade rechazado por ruta, `Origin` o canal | `400`, `403` o `404` por HTTP. |
-| Upgrade rechazado por sesión o autorización | `101` y cierre inmediato con `4401` o `4403`, sin despertar el Durable Object. |
-| Upgrade aceptado | La respuesta del Durable Object de la sala. |
-| Cualquier otra | `app.fetch`, con los assets y las páginas prerenderizadas del binding. |
+| Caso                                                                              | Respuesta                                                                                                                                   |
+| --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| La fábrica falla                                                                  | La respuesta de `errorResponse` (`500 INTERNAL_ERROR`) y el error en `onError` o en la consola (`[meeko] application startup failed <id>`). |
+| La aplicación declara canales con un broker que no es `DurableObjectSocketPubSub` | La fábrica se rechaza: `500` en cada petición hasta corregirlo.                                                                             |
+| Upgrade rechazado por ruta, `Origin` o canal                                      | `400`, `403` o `404` por HTTP.                                                                                                              |
+| Upgrade rechazado por sesión o autorización                                       | `101` y cierre inmediato con `4401` o `4403`, sin despertar el Durable Object.                                                              |
+| Upgrade aceptado                                                                  | La respuesta del Durable Object de la sala.                                                                                                 |
+| Cualquier otra                                                                    | `app.fetch`, con los assets y las páginas prerenderizadas del binding.                                                                      |
 
 ## Ejemplos
 
@@ -120,6 +121,7 @@ export default defineServerRuntime<Env>(({ env, production, prerendering }) => {
 ### Un binding de salas con otro nombre
 
 <!-- no-check -->
+
 ```ts
 export default createWorker(createCloudflareApp, { socketBinding: "ROOMS", publicOrigin: "https://mi-app.example" });
 ```
@@ -138,6 +140,7 @@ export default defineServerRuntime(() => ({}));
 Cada petición responde `500` y el arranque informa `MEEKO_REDIS_URL needs TCP connections, which Cloudflare Workers do not offer: return a SessionManager with SqlSessionStore(new D1SessionDriver(env.DB)), or RedisSessionStore over the Upstash REST API, from server/runtime.ts`. Sin la variable, `Production requires a persistent session store: …`.
 
 <!-- no-check -->
+
 ```ts good
 export default defineServerRuntime<Env>(({ env, production, prerendering }) => ({
   sessions: new SessionManager({ store: new SqlSessionStore(new D1SessionDriver(env.DB!)), production: production && !prerendering }),
@@ -153,6 +156,7 @@ socket: { pubsub: new RedisSocketPubSub({ publisher, subscriber, prefix: "app:" 
 La aplicación no se crea: `Socket channels on Cloudflare Workers require DurableObjectSocketPubSub: leave runtime.socket.pubsub unset and bind MEEKO_SOCKET, or set it to new DurableObjectSocketPubSub(env.MEEKO_SOCKET). Other brokers cannot reach the WebSockets held by Socket room Durable Objects.`
 
 <!-- no-check -->
+
 ```ts good
 socket: env.MEEKO_SOCKET ? { pubsub: new DurableObjectSocketPubSub(env.MEEKO_SOCKET) } : {}
 ```
@@ -178,6 +182,7 @@ createWorker(createCloudflareApp, { publicOrigin: "mi-app.example" });
 `TypeError: Invalid publicOrigin: mi-app.example`, al cargar el módulo.
 
 <!-- no-check -->
+
 ```ts good
 createWorker(createCloudflareApp, { publicOrigin: "https://mi-app.example" });
 ```

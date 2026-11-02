@@ -11,7 +11,7 @@ related:
   - "syntax:interpolation"
   - "@meekojs/meeko#computed"
   - docs/api.md#listas-con-y-sin-eachkey
-source-hash: a8780bc5f215babb5c8438f2ffd3af98f651b53876043acf5510c73c9afba67f
+source-hash: 56c8f5bd32fd9ce13f479838659ad96957fed82b04b80d2f50f0b8f7ec2b411b
 ---
 
 `each:of="lista"` repeats its tag, with its content, once for each item in an iterable (an array, a `Set`, a `Map`, a signal's value…). Other directives in the family name the item (`each:as`), index (`each:index`) and each row's key (`each:key`).

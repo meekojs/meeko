@@ -6,12 +6,12 @@
  * of the hydrated page is the one of the first paint, and a hot update replaces or prunes the
  * stylesheet that the server sent.
  */
-const moduleIds = new Map<string, string>();
+const moduleIds = new Map<string, string>()
 
 /** The component file of a style module id, without Vite's query. */
 function moduleFile(id: string): string {
-  const query = id.indexOf("?");
-  return query < 0 ? id : id.slice(0, query);
+	const query = id.indexOf('?')
+	return query < 0 ? id : id.slice(0, query)
 }
 
 /**
@@ -20,15 +20,15 @@ function moduleFile(id: string): string {
  * previous entry, so hot updates do not accumulate stylesheets.
  */
 export function registerStyleModule(css: string, id: string): void {
-  if (!css) return;
-  const file = moduleFile(id);
-  for (const [known, knownId] of moduleIds) {
-    if (moduleFile(knownId) === file) moduleIds.delete(known);
-  }
-  moduleIds.set(css, id);
+	if (!css) return
+	const file = moduleFile(id)
+	for (const [known, knownId] of moduleIds) {
+		if (moduleFile(knownId) === file) moduleIds.delete(known)
+	}
+	moduleIds.set(css, id)
 }
 
 /** The Vite module that serves `css` in development, when a compiled component registered it. */
 export function styleModuleId(css: string): string | undefined {
-  return moduleIds.get(css);
+	return moduleIds.get(css)
 }

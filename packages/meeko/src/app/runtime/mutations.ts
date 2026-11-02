@@ -1,10 +1,10 @@
-import type { ReadonlySignal, Signal } from "../../core/reactivity";
-import type { Decoded, StorageArea } from "../composables/useStorage";
+import type { ReadonlySignal, Signal } from '../../core/reactivity'
+import type { Decoded, StorageArea } from '../composables/useStorage'
 
-import { observeCallback } from "../../core/error-observer";
-import { batch, computed, signal, untrack } from "../../core/reactivity";
-import { ClientError, idempotencyHeader, isIdempotencyKey } from "../../shared/clients";
-import { currentBrowser, storageSignal } from "../composables/useStorage";
+import { observeCallback } from '../../core/error-observer'
+import { batch, computed, signal, untrack } from '../../core/reactivity'
+import { ClientError, idempotencyHeader, isIdempotencyKey } from '../../shared/clients'
+import { currentBrowser, storageSignal } from '../composables/useStorage'
 /**
  * Mutations of `useRpcMutation` and `useApiMutation`, and their retry-safe mode.
  *
@@ -19,8 +19,8 @@ import { currentBrowser, storageSignal } from "../composables/useStorage";
  * `data` or `error`, `pending` and the stored intent in another one, for every mutation that waits
  * for that request. `onSuccess` and `onError` run after that batch, once per mutation.
  */
-import { componentErrorReporter } from "./component-errors";
-import { whenMounted } from "./lifecycle";
+import { componentErrorReporter } from './component-errors'
+import { whenMounted } from './lifecycle'
 
 /**
  * Opciones del modo `retrySafe` de `useRpcMutation` y `useApiMutation`.
@@ -35,14 +35,14 @@ import { whenMounted } from "./lifecycle";
  * ```
  */
 export interface RetrySafeOptions {
-  /**
-   * Clave del almacenamiento donde se guarda la intención mientras su resultado es incierto, como
-   * `"pos:sale"`. Use una clave por mutación: dos componentes con la misma clave comparten la
-   * intención. Inclúyale lo que la distinga entre usuarios o cuentas si comparten navegador.
-   */
-  readonly key: string;
-  /** `"local"` (por defecto) sobrevive a una recarga y a cerrar el navegador; `"session"`, sólo a una recarga. */
-  readonly storage?: StorageArea;
+	/**
+	 * Clave del almacenamiento donde se guarda la intención mientras su resultado es incierto, como
+	 * `"pos:sale"`. Use una clave por mutación: dos componentes con la misma clave comparten la
+	 * intención. Inclúyale lo que la distinga entre usuarios o cuentas si comparten navegador.
+	 */
+	readonly key: string
+	/** `"local"` (por defecto) sobrevive a una recarga y a cerrar el navegador; `"session"`, sólo a una recarga. */
+	readonly storage?: StorageArea
 }
 
 /**
@@ -60,15 +60,15 @@ export interface RetrySafeOptions {
  * ```
  */
 export interface MutationAttempt<Input> {
-  /** Entrada enviada; con `retrySafe`, tal como viaja en JSON. */
-  readonly input: Input;
-  /** UUID de la cabecera `Idempotency-Key`, o `null` sin `retrySafe`. */
-  readonly idempotencyKey: string | null;
-  /**
-   * Qué envió el intento: `"mutate"`, `"retry"` (una llamada a `retry()`) o `"resume"` (el
-   * reintento automático de `retrySafe` al montarse un componente o al volver la conexión).
-   */
-  readonly trigger: "mutate" | "retry" | "resume";
+	/** Entrada enviada; con `retrySafe`, tal como viaja en JSON. */
+	readonly input: Input
+	/** UUID de la cabecera `Idempotency-Key`, o `null` sin `retrySafe`. */
+	readonly idempotencyKey: string | null
+	/**
+	 * Qué envió el intento: `"mutate"`, `"retry"` (una llamada a `retry()`) o `"resume"` (el
+	 * reintento automático de `retrySafe` al montarse un componente o al volver la conexión).
+	 */
+	readonly trigger: 'mutate' | 'retry' | 'resume'
 }
 
 /**
@@ -84,11 +84,11 @@ export interface MutationAttempt<Input> {
  * ```
  */
 export interface MutationFailure<Input> extends MutationAttempt<Input> {
-  /**
-   * `true` si no hubo respuesta (fallo de red, `5xx`, `408` o `429`) y la intención se conserva
-   * para reintentarla; `false` si el servidor contestó. Sin `retrySafe` siempre es `false`.
-   */
-  readonly uncertain: boolean;
+	/**
+	 * `true` si no hubo respuesta (fallo de red, `5xx`, `408` o `429`) y la intención se conserva
+	 * para reintentarla; `false` si el servidor contestó. Sin `retrySafe` siempre es `false`.
+	 */
+	readonly uncertain: boolean
 }
 
 /**
@@ -110,19 +110,19 @@ export interface MutationFailure<Input> extends MutationAttempt<Input> {
  * ```
  */
 export interface MutationOptions<Input = unknown, Output = unknown> {
-  /**
-   * Hace la mutación segura ante reintentos: cada intención lleva una clave de idempotencia
-   * (cabecera `Idempotency-Key`), se guarda antes de enviarse y, si no hay respuesta, se reintenta
-   * con la misma clave. Véase {@link RetrySafeMutation}.
-   */
-  readonly retrySafe?: RetrySafeOptions;
-  /**
-   * Se llama una vez por cada intento que termina bien, también los reintentos automáticos de
-   * `retrySafe`, después de actualizar `data`, `error`, `pending` y `uncertain`.
-   */
-  readonly onSuccess?: (output: Output, attempt: MutationAttempt<Input>) => unknown;
-  /** Se llama una vez por cada intento que falla, después de actualizar el estado. */
-  readonly onError?: (error: Error, attempt: MutationFailure<Input>) => unknown;
+	/**
+	 * Hace la mutación segura ante reintentos: cada intención lleva una clave de idempotencia
+	 * (cabecera `Idempotency-Key`), se guarda antes de enviarse y, si no hay respuesta, se reintenta
+	 * con la misma clave. Véase {@link RetrySafeMutation}.
+	 */
+	readonly retrySafe?: RetrySafeOptions
+	/**
+	 * Se llama una vez por cada intento que termina bien, también los reintentos automáticos de
+	 * `retrySafe`, después de actualizar `data`, `error`, `pending` y `uncertain`.
+	 */
+	readonly onSuccess?: (output: Output, attempt: MutationAttempt<Input>) => unknown
+	/** Se llama una vez por cada intento que falla, después de actualizar el estado. */
+	readonly onError?: (error: Error, attempt: MutationFailure<Input>) => unknown
 }
 
 /**
@@ -142,12 +142,12 @@ export interface MutationOptions<Input = unknown, Output = unknown> {
  * ```
  */
 export interface UncertainMutation<Input> {
-  /** UUID que viaja en la cabecera `Idempotency-Key`; es el mismo en cada reintento. */
-  readonly idempotencyKey: string;
-  /** Entrada que se envió, tal como viaja en JSON. */
-  readonly input: Input;
-  /** Momento del primer envío, en milisegundos desde la época Unix (`Date.now()`). */
-  readonly startedAt: number;
+	/** UUID que viaja en la cabecera `Idempotency-Key`; es el mismo en cada reintento. */
+	readonly idempotencyKey: string
+	/** Entrada que se envió, tal como viaja en JSON. */
+	readonly input: Input
+	/** Momento del primer envío, en milisegundos desde la época Unix (`Date.now()`). */
+	readonly startedAt: number
 }
 
 /**
@@ -188,38 +188,38 @@ export interface UncertainMutation<Input> {
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#mutaciones-seguras-ante-reintentos
  */
 export interface RetrySafeMutation<Input, Output> {
-  /** La intención enviada sin respuesta, o `null`. Mientras se reintenta conserva su valor. */
-  readonly uncertain: ReadonlySignal<UncertainMutation<Input> | null>;
-  /**
-   * Reenvía la intención incierta con la misma clave de idempotencia. Resuelve con la salida, con
-   * `undefined` si no hay ninguna, o rechaza con el error del intento.
-   */
-  retry(): Promise<Output | undefined>;
-  /** Olvida la intención incierta sin reenviarla y vacía `error`; pida antes confirmación al usuario. */
-  discard(): void;
+	/** La intención enviada sin respuesta, o `null`. Mientras se reintenta conserva su valor. */
+	readonly uncertain: ReadonlySignal<UncertainMutation<Input> | null>
+	/**
+	 * Reenvía la intención incierta con la misma clave de idempotencia. Resuelve con la salida, con
+	 * `undefined` si no hay ninguna, o rechaza con el error del intento.
+	 */
+	retry(): Promise<Output | undefined>
+	/** Olvida la intención incierta sin reenviarla y vacía `error`; pida antes confirmación al usuario. */
+	discard(): void
 }
 
 /** What a mutation sends: the input as JSON, with the framework's headers. */
 export interface MutationTransport {
-  readonly label: string;
-  /** Identifies the endpoint, so an intent saved by another mutation is never sent here. */
-  readonly target: string;
-  readonly send: (input: unknown, headers: Readonly<Record<string, string>> | undefined) => Promise<unknown>;
+	readonly label: string
+	/** Identifies the endpoint, so an intent saved by another mutation is never sent here. */
+	readonly target: string
+	readonly send: (input: unknown, headers: Readonly<Record<string, string>> | undefined) => Promise<unknown>
 }
 
 /** Signals and `mutate` of every mutation, with the retry-safe members when enabled. */
 export interface MutationState {
-  readonly pending: ReadonlySignal<boolean>;
-  readonly error: ReadonlySignal<Error | null>;
-  readonly data: ReadonlySignal<unknown>;
-  mutate(input?: unknown): Promise<unknown>;
-  readonly uncertain?: ReadonlySignal<UncertainMutation<unknown> | null>;
-  retry?(): Promise<unknown>;
-  discard?(): void;
+	readonly pending: ReadonlySignal<boolean>
+	readonly error: ReadonlySignal<Error | null>
+	readonly data: ReadonlySignal<unknown>
+	mutate(input?: unknown): Promise<unknown>
+	readonly uncertain?: ReadonlySignal<UncertainMutation<unknown> | null>
+	retry?(): Promise<unknown>
+	discard?(): void
 }
 
 function toError(error: unknown): Error {
-  return error instanceof Error ? error : new Error(String(error));
+	return error instanceof Error ? error : new Error(String(error))
 }
 
 /**
@@ -227,203 +227,215 @@ function toError(error: unknown): Error {
  * served over plain HTTP in a local network still gets one from `getRandomValues`.
  */
 export function randomUuid(): string {
-  const source = globalThis.crypto;
-  if (typeof source?.randomUUID === "function") return source.randomUUID();
-  if (typeof source?.getRandomValues !== "function") throw new Error("Retry-safe mutations need crypto.getRandomValues to create idempotency keys");
-  const bytes = source.getRandomValues(new Uint8Array(16));
-  bytes[6] = (bytes[6]! & 0x0f) | 0x40;
-  bytes[8] = (bytes[8]! & 0x3f) | 0x80;
-  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+	const source = globalThis.crypto
+	if (typeof source?.randomUUID === 'function') return source.randomUUID()
+	if (typeof source?.getRandomValues !== 'function') throw new Error('Retry-safe mutations need crypto.getRandomValues to create idempotency keys')
+	const bytes = source.getRandomValues(new Uint8Array(16))
+	bytes[6] = (bytes[6]! & 0x0f) | 0x40
+	bytes[8] = (bytes[8]! & 0x3f) | 0x80
+	const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
+	return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
 }
 
 /** The server answered: the intent is settled. 408 and 429 mean it was not processed, so it is kept. */
 function answered(failure: unknown): boolean {
-  return failure instanceof ClientError && failure.status < 500 && failure.status !== 408 && failure.status !== 429;
+	return failure instanceof ClientError && failure.status < 500 && failure.status !== 408 && failure.status !== 429
 }
 
 interface StoredIntent extends UncertainMutation<unknown> {
-  readonly target: string;
+	readonly target: string
 }
 
 function intentDecoder(target: string): (value: unknown) => Decoded<StoredIntent | undefined> {
-  return (value) => {
-    if (value === null) return { ok: true, value: undefined };
-    if (!value || typeof value !== "object") return { ok: false };
-    const record = value as Record<string, unknown>;
-    if (!isIdempotencyKey(record.idempotencyKey)) return { ok: false };
-    // `input` is absent from the JSON when the mutation had none.
-    if (typeof record.startedAt !== "number" || !Number.isFinite(record.startedAt)) return { ok: false };
-    // Another mutation saved it under the same key: never send it to this endpoint.
-    if (record.target !== target) return { ok: false };
-    return { ok: true, value: record as unknown as StoredIntent };
-  };
+	return (value) => {
+		if (value === null) return { ok: true, value: undefined }
+		if (!value || typeof value !== 'object') return { ok: false }
+		const record = value as Record<string, unknown>
+		if (!isIdempotencyKey(record.idempotencyKey)) return { ok: false }
+		// `input` is absent from the JSON when the mutation had none.
+		if (typeof record.startedAt !== 'number' || !Number.isFinite(record.startedAt)) return { ok: false }
+		// Another mutation saved it under the same key: never send it to this endpoint.
+		if (record.target !== target) return { ok: false }
+		return { ok: true, value: record as unknown as StoredIntent }
+	}
 }
 
 /** How the request of an attempt ended. */
-type Outcome = { readonly ok: true; readonly output: unknown } | { readonly ok: false; readonly failure: unknown };
+type Outcome = { readonly ok: true; readonly output: unknown } | { readonly ok: false; readonly failure: unknown }
 
 /**
  * Applies an outcome to one mutation's signals, inside the batch that settles the intent, and
  * returns its notice, which runs after that batch.
  */
-type Listener = (outcome: Outcome) => () => void;
+type Listener = (outcome: Outcome) => () => void
 
 /** The request of the intent in flight and the mutations that wait for it, one listener each. */
 interface Inflight {
-  readonly id: string;
-  readonly promise: Promise<unknown>;
-  readonly listeners: Map<object, Listener>;
+	readonly id: string
+	readonly promise: Promise<unknown>
+	readonly listeners: Map<object, Listener>
 }
 
 /** The request of the intent in flight, by its stored signal: two components never send it twice. */
-const inflight = new WeakMap<Signal<StoredIntent | undefined>, Inflight>();
+const inflight = new WeakMap<Signal<StoredIntent | undefined>, Inflight>()
 
-type Trigger = MutationAttempt<unknown>["trigger"];
+type Trigger = MutationAttempt<unknown>['trigger']
 
 /**
  * Creates the state of one mutation in a component script. With `retrySafe`, the intent lives in
  * the browser storage and is retried on mount and on `online`.
  */
 export function createMutation(transport: MutationTransport, options: MutationOptions | undefined): MutationState {
-  const pending = signal(false);
-  const error = signal<Error | null>(null);
-  const data = signal<unknown>(null);
-  const onSuccess = options?.onSuccess;
-  const onError = options?.onError;
-  if (onSuccess !== undefined && typeof onSuccess !== "function") throw new TypeError(`${transport.label}: onSuccess expects a function`);
-  if (onError !== undefined && typeof onError !== "function") throw new TypeError(`${transport.label}: onError expects a function`);
-  // A failing notice reaches the nearest error handler, like an `on:` handler.
-  const report = onSuccess || onError ? componentErrorReporter("event") : () => {};
-  /** Applies an outcome to this mutation's signals and returns its notice. */
-  const apply = (outcome: Outcome, attempt: MutationAttempt<unknown>, uncertain: boolean): (() => void) => {
-    const failure = outcome.ok ? null : toError(outcome.failure);
-    if (outcome.ok) data.value = outcome.output;
-    error.value = failure;
-    pending.value = false;
-    return () => {
-      if (outcome.ok) {
-        if (onSuccess) observeCallback(() => onSuccess(outcome.output, attempt), report);
-      } else if (onError && failure) observeCallback(() => onError(failure, { ...attempt, uncertain }), report);
-    };
-  };
-  const start = (): void => batch(() => {
-    pending.value = true;
-    error.value = null;
-  });
-  const retrySafe = options?.retrySafe;
-  if (!retrySafe) {
-    return {
-      pending, error, data,
-      async mutate(input) {
-        const attempt: MutationAttempt<unknown> = { input, idempotencyKey: null, trigger: "mutate" };
-        start();
-        let outcome: Outcome;
-        try { outcome = { ok: true, output: await transport.send(input, undefined) }; }
-        catch (failure) { outcome = { ok: false, failure }; }
-        const notice = batch(() => apply(outcome, attempt, false));
-        notice();
-        if (!outcome.ok) throw outcome.failure;
-        return outcome.output;
-      },
-    };
-  }
-  if (typeof retrySafe !== "object") throw new TypeError(`${transport.label}: retrySafe expects { key }`);
-  const label = `${transport.label} retrySafe`;
-  const stored = storageSignal<StoredIntent | undefined>(label, retrySafe.key, undefined, retrySafe.storage ?? "local", intentDecoder(transport.target));
-  // The key of a first send in flight: it is not uncertain until it ends without an answer.
-  const fresh = signal<string | null>(null);
-  const uncertain = computed((): UncertainMutation<unknown> | null => {
-    const intent = stored.value;
-    return intent && intent.idempotencyKey !== fresh.value ? intent : null;
-  });
-  const settle = (intent: StoredIntent): void => {
-    if (untrack(() => stored.value)?.idempotencyKey === intent.idempotencyKey) stored.value = undefined;
-  };
-  /** Identifies this mutation among the listeners of a shared request. */
-  const self = {};
-  // One request per intent, shared by every component that uses the key. Its outcome settles the
-  // intent and updates every waiting mutation in one batch; their notices run after it.
-  const request = (intent: StoredIntent, listener: Listener): Promise<unknown> => {
-    const running = inflight.get(stored);
-    if (running?.id === intent.idempotencyKey) {
-      if (!running.listeners.has(self)) running.listeners.set(self, listener);
-      return running.promise;
-    }
-    const listeners = new Map<object, Listener>([[self, listener]]);
-    const finish = (outcome: Outcome): void => {
-      // A later attempt sends a new request; this one no longer takes listeners.
-      if (inflight.get(stored)?.promise === promise) inflight.delete(stored);
-      const notices = batch(() => {
-        if (outcome.ok || answered(outcome.failure)) settle(intent);
-        return [...listeners.values()].map((notify) => notify(outcome));
-      });
-      for (const notice of notices) notice();
-    };
-    const promise: Promise<unknown> = transport.send(intent.input, idempotencyHeader(intent.idempotencyKey)).then((output) => {
-      finish({ ok: true, output });
-      return output;
-    }, (failure: unknown) => {
-      finish({ ok: false, failure });
-      throw failure;
-    });
-    inflight.set(stored, { id: intent.idempotencyKey, promise, listeners });
-    return promise;
-  };
-  // This mutation's own signals follow the shared request.
-  const send = (intent: StoredIntent, trigger: Trigger): Promise<unknown> => {
-    start();
-    const attempt: MutationAttempt<unknown> = { input: intent.input, idempotencyKey: intent.idempotencyKey, trigger };
-    return request(intent, (outcome) => {
-      if (fresh.value === intent.idempotencyKey) fresh.value = null;
-      return apply(outcome, attempt, !outcome.ok && !answered(outcome.failure));
-    });
-  };
-  const resend = (trigger: Trigger): Promise<unknown> => {
-    const intent = untrack(() => stored.value);
-    return intent ? send(intent, trigger) : Promise.resolve(undefined);
-  };
-  // Runs only once the component is mounted in the browser: never in SSR or in a dry pass.
-  whenMounted(() => {
-    const browser = currentBrowser();
-    const resume = (): void => {
-      if (browser?.navigator?.onLine === false) return;
-      // A failure is already in `error` and `onError`, and the intent stays uncertain.
-      resend("resume").catch(() => {});
-    };
-    resume();
-    if (!browser) return undefined;
-    browser.addEventListener("online", resume);
-    return () => browser.removeEventListener("online", resume);
-  });
-  return {
-    pending, error, data, uncertain,
-    async mutate(input) {
-      if (untrack(() => stored.value)) {
-        throw new Error(`MUTATION_UNCERTAIN: ${transport.label} has an intent without an answer under "${retrySafe.key}"; retry() or discard() it first`);
-      }
-      // The intent is sent and retried exactly as it travels: JSON.
-      const json = input === undefined ? undefined : JSON.stringify(input);
-      const intent: StoredIntent = {
-        idempotencyKey: randomUuid(),
-        input: json === undefined ? undefined : JSON.parse(json) as unknown,
-        startedAt: Date.now(),
-        target: transport.target,
-      };
-      // Saved before sending: if the page closes or the connection drops, it is retried with the same key.
-      batch(() => {
-        fresh.value = intent.idempotencyKey;
-        stored.value = intent;
-      });
-      return send(intent, "mutate");
-    },
-    retry: () => resend("retry"),
-    discard() {
-      batch(() => {
-        stored.value = undefined;
-        // The error described the intent that is forgotten now.
-        error.value = null;
-      });
-    },
-  };
+	const pending = signal(false)
+	const error = signal<Error | null>(null)
+	const data = signal<unknown>(null)
+	const onSuccess = options?.onSuccess
+	const onError = options?.onError
+	if (onSuccess !== undefined && typeof onSuccess !== 'function') throw new TypeError(`${transport.label}: onSuccess expects a function`)
+	if (onError !== undefined && typeof onError !== 'function') throw new TypeError(`${transport.label}: onError expects a function`)
+	// A failing notice reaches the nearest error handler, like an `on:` handler.
+	const report = onSuccess || onError ? componentErrorReporter('event') : () => {}
+	/** Applies an outcome to this mutation's signals and returns its notice. */
+	const apply = (outcome: Outcome, attempt: MutationAttempt<unknown>, uncertain: boolean): (() => void) => {
+		const failure = outcome.ok ? null : toError(outcome.failure)
+		if (outcome.ok) data.value = outcome.output
+		error.value = failure
+		pending.value = false
+		return () => {
+			if (outcome.ok) {
+				if (onSuccess) observeCallback(() => onSuccess(outcome.output, attempt), report)
+			} else if (onError && failure) observeCallback(() => onError(failure, { ...attempt, uncertain }), report)
+		}
+	}
+	const start = (): void =>
+		batch(() => {
+			pending.value = true
+			error.value = null
+		})
+	const retrySafe = options?.retrySafe
+	if (!retrySafe) {
+		return {
+			pending,
+			error,
+			data,
+			async mutate(input) {
+				const attempt: MutationAttempt<unknown> = { input, idempotencyKey: null, trigger: 'mutate' }
+				start()
+				let outcome: Outcome
+				try {
+					outcome = { ok: true, output: await transport.send(input, undefined) }
+				} catch (failure) {
+					outcome = { ok: false, failure }
+				}
+				const notice = batch(() => apply(outcome, attempt, false))
+				notice()
+				if (!outcome.ok) throw outcome.failure
+				return outcome.output
+			},
+		}
+	}
+	if (typeof retrySafe !== 'object') throw new TypeError(`${transport.label}: retrySafe expects { key }`)
+	const label = `${transport.label} retrySafe`
+	const stored = storageSignal<StoredIntent | undefined>(label, retrySafe.key, undefined, retrySafe.storage ?? 'local', intentDecoder(transport.target))
+	// The key of a first send in flight: it is not uncertain until it ends without an answer.
+	const fresh = signal<string | null>(null)
+	const uncertain = computed((): UncertainMutation<unknown> | null => {
+		const intent = stored.value
+		return intent && intent.idempotencyKey !== fresh.value ? intent : null
+	})
+	const settle = (intent: StoredIntent): void => {
+		if (untrack(() => stored.value)?.idempotencyKey === intent.idempotencyKey) stored.value = undefined
+	}
+	/** Identifies this mutation among the listeners of a shared request. */
+	const self = {}
+	// One request per intent, shared by every component that uses the key. Its outcome settles the
+	// intent and updates every waiting mutation in one batch; their notices run after it.
+	const request = (intent: StoredIntent, listener: Listener): Promise<unknown> => {
+		const running = inflight.get(stored)
+		if (running?.id === intent.idempotencyKey) {
+			if (!running.listeners.has(self)) running.listeners.set(self, listener)
+			return running.promise
+		}
+		const listeners = new Map<object, Listener>([[self, listener]])
+		const finish = (outcome: Outcome): void => {
+			// A later attempt sends a new request; this one no longer takes listeners.
+			if (inflight.get(stored)?.promise === promise) inflight.delete(stored)
+			const notices = batch(() => {
+				if (outcome.ok || answered(outcome.failure)) settle(intent)
+				return [...listeners.values()].map((notify) => notify(outcome))
+			})
+			for (const notice of notices) notice()
+		}
+		const promise: Promise<unknown> = transport.send(intent.input, idempotencyHeader(intent.idempotencyKey)).then(
+			(output) => {
+				finish({ ok: true, output })
+				return output
+			},
+			(failure: unknown) => {
+				finish({ ok: false, failure })
+				throw failure
+			},
+		)
+		inflight.set(stored, { id: intent.idempotencyKey, promise, listeners })
+		return promise
+	}
+	// This mutation's own signals follow the shared request.
+	const send = (intent: StoredIntent, trigger: Trigger): Promise<unknown> => {
+		start()
+		const attempt: MutationAttempt<unknown> = { input: intent.input, idempotencyKey: intent.idempotencyKey, trigger }
+		return request(intent, (outcome) => {
+			if (fresh.value === intent.idempotencyKey) fresh.value = null
+			return apply(outcome, attempt, !outcome.ok && !answered(outcome.failure))
+		})
+	}
+	const resend = (trigger: Trigger): Promise<unknown> => {
+		const intent = untrack(() => stored.value)
+		return intent ? send(intent, trigger) : Promise.resolve(undefined)
+	}
+	// Runs only once the component is mounted in the browser: never in SSR or in a dry pass.
+	whenMounted(() => {
+		const browser = currentBrowser()
+		const resume = (): void => {
+			if (browser?.navigator?.onLine === false) return
+			// A failure is already in `error` and `onError`, and the intent stays uncertain.
+			resend('resume').catch(() => {})
+		}
+		resume()
+		if (!browser) return undefined
+		browser.addEventListener('online', resume)
+		return () => browser.removeEventListener('online', resume)
+	})
+	return {
+		pending,
+		error,
+		data,
+		uncertain,
+		async mutate(input) {
+			if (untrack(() => stored.value)) {
+				throw new Error(`MUTATION_UNCERTAIN: ${transport.label} has an intent without an answer under "${retrySafe.key}"; retry() or discard() it first`)
+			}
+			// The intent is sent and retried exactly as it travels: JSON.
+			const json = input === undefined ? undefined : JSON.stringify(input)
+			const intent: StoredIntent = {
+				idempotencyKey: randomUuid(),
+				input: json === undefined ? undefined : (JSON.parse(json) as unknown),
+				startedAt: Date.now(),
+				target: transport.target,
+			}
+			// Saved before sending: if the page closes or the connection drops, it is retried with the same key.
+			batch(() => {
+				fresh.value = intent.idempotencyKey
+				stored.value = intent
+			})
+			return send(intent, 'mutate')
+		},
+		retry: () => resend('retry'),
+		discard() {
+			batch(() => {
+				stored.value = undefined
+				// The error described the intent that is forgotten now.
+				error.value = null
+			})
+		},
+	}
 }

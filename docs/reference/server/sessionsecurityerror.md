@@ -44,9 +44,9 @@ export async function guard(request: Request): Promise<Response | undefined> {
 
 `new SessionSecurityError(code)`:
 
-| Parámetro | Tipo | Descripción |
-| --- | --- | --- |
-| `code` | `"INVALID_ORIGIN" \| "INVALID_CSRF"` | El motivo; también es el `message`. |
+| Parámetro | Tipo                                 | Descripción                         |
+| --------- | ------------------------------------ | ----------------------------------- |
+| `code`    | `"INVALID_ORIGIN" \| "INVALID_CSRF"` | El motivo; también es el `message`. |
 
 ## Valor devuelto
 
@@ -82,6 +82,7 @@ El navegador añade `Origin` por sí mismo. Tras cada respuesta que rota la sesi
 ### Aceptar el panel de otro subdominio
 
 <!-- no-check -->
+
 ```ts
 new SessionManager({ store, production, allowedOrigins: ["https://admin.example.com"] });
 ```
@@ -97,6 +98,7 @@ await fetch("/api/profile", { method: "PUT", body: JSON.stringify({ name: "Ada" 
 Con sesión, la respuesta es `403 INVALID_CSRF`. Use el cliente generado (`api.profile.put({ body })`), que envía el token, o añada `x-meeko-csrf`.
 
 <!-- no-check -->
+
 ```ts good
 await api.profile.put({ body: { name: "Ada" } });
 ```

@@ -33,8 +33,8 @@ export default defineMeekoConfig({
 
 ## Opciones
 
-| Valor | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
+| Valor  | Tipo     | Por defecto                     | Descripción                                                                     |
+| ------ | -------- | ------------------------------- | ------------------------------------------------------------------------------- |
 | `site` | `string` | `MEEKO_PUBLIC_ORIGIN` del build | Una URL absoluta `http:` o `https:` sin ruta, query, fragmento ni credenciales. |
 
 ## Resultado

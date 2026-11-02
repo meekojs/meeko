@@ -18,7 +18,7 @@ related:
   - "@meekojs/meeko/server#defineApiRoute"
   - docs/framework.md#mutaciones
   - docs/framework.md#mutaciones-seguras-ante-reintentos
-source-hash: 83850e340654cde540b2bcf30fbd58efc4debb803269ac8bd04af8023bee96d9
+source-hash: 2d875f07ceba3f33c261b43768190143cc0e88b398c79a264bff0891e5c691e7
 ---
 
 `useApiMutation(ruta, método, opciones?)` prepares a write to a non-`GET` `server/api` endpoint. It makes no request until you call `mutate({ params, query, body })`, and reflects the latest call in `pending`, `data` and `error`. `mutate` sends the session's CSRF token, checks input against the endpoint contract and returns its response, or rejects with its error.

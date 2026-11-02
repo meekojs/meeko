@@ -1,8 +1,8 @@
-import type { HeadInput, HeadSource } from "../../shared/head";
+import type { HeadInput, HeadSource } from '../../shared/head'
 
-import { effect, findContext, isDryRender, onCleanup } from "../../core/reactivity";
-import { normalizeHeadInput } from "../../shared/head";
-import { headLevelKey, headManagerKey, pageHeadSink, reader } from "../runtime/head";
+import { effect, findContext, isDryRender, onCleanup } from '../../core/reactivity'
+import { normalizeHeadInput } from '../../shared/head'
+import { headLevelKey, headManagerKey, pageHeadSink, reader } from '../runtime/head'
 
 /**
  * Añade etiquetas al `<head>` del documento y atributos a `<html>` y `<body>` mientras el componente
@@ -42,20 +42,19 @@ import { headLevelKey, headManagerKey, pageHeadSink, reader } from "../runtime/h
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#head-del-documento-document-usehead-y-useseometa
  */
 export function useHead(input: HeadSource<HeadInput>): void {
-  if (isDryRender()) return;
-  const read = reader(input);
-  const manager = findContext(headManagerKey);
-  if (!manager) {
-    pageHeadSink?.(read);
-    return;
-  }
-  const level = findContext(headLevelKey) ?? 0;
-  if (!manager.live) {
-    manager.add(level, read);
-    return;
-  }
-  const entry = manager.register!(level);
-  effect(() => manager.update!(entry, normalizeHeadInput(read(), "useHead")));
-  onCleanup(() => manager.remove!(entry));
+	if (isDryRender()) return
+	const read = reader(input)
+	const manager = findContext(headManagerKey)
+	if (!manager) {
+		pageHeadSink?.(read)
+		return
+	}
+	const level = findContext(headLevelKey) ?? 0
+	if (!manager.live) {
+		manager.add(level, read)
+		return
+	}
+	const entry = manager.register!(level)
+	effect(() => manager.update!(entry, normalizeHeadInput(read(), 'useHead')))
+	onCleanup(() => manager.remove!(entry))
 }
-

@@ -57,19 +57,19 @@ effect(() => layout.set({ showAlert: failing.value }));
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `L` | parámetro de tipo | el layout de la página | Nombre del layout. En una página lo pone Meeko; en un componente que no es la página, escríbelo: `useLayout<"dashboard">()`. |
+| Parámetro | Tipo              | Por defecto            | Descripción                                                                                                                  |
+| --------- | ----------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `L`       | parámetro de tipo | el layout de la página | Nombre del layout. En una página lo pone Meeko; en un componente que no es la página, escríbelo: `useLayout<"dashboard">()`. |
 
 ## Valor devuelto
 
 Un `LayoutHandle` congelado:
 
-| Propiedad | Tipo | Descripción |
-| --- | --- | --- |
-| `name` | `string \| undefined` | Nombre del layout de la página, o `undefined` con `layout: false`. |
-| `props` | `Readonly<Partial<LayoutProps<L>>>` | Las props que recibe ahora el layout, sin `outlet`: las de `layoutProps` y los `+group.ts` con lo que la página escribió encima. La lectura es reactiva. |
-| `set(patch)` | `void` | Cambia las props que nombra `patch` y conserva las demás. Una prop que el layout no declara, o con otro tipo, es un error de tipos. Un valor que no es un objeto lanza `TypeError: useLayout().set() necesita un objeto con las props del layout`. |
+| Propiedad    | Tipo                                | Descripción                                                                                                                                                                                                                                        |
+| ------------ | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`       | `string \| undefined`               | Nombre del layout de la página, o `undefined` con `layout: false`.                                                                                                                                                                                 |
+| `props`      | `Readonly<Partial<LayoutProps<L>>>` | Las props que recibe ahora el layout, sin `outlet`: las de `layoutProps` y los `+group.ts` con lo que la página escribió encima. La lectura es reactiva.                                                                                           |
+| `set(patch)` | `void`                              | Cambia las props que nombra `patch` y conserva las demás. Una prop que el layout no declara, o con otro tipo, es un error de tipos. Un valor que no es un objeto lanza `TypeError: useLayout().set() necesita un objeto con las props del layout`. |
 
 Fuera de una página que renderiza Meeko lanza `Error: useLayout() necesita una página que renderiza Meeko: sólo funciona en las páginas, en sus componentes y en sus +layout.meeko…`. En una página con `layout: false` devuelve un acceso que no hace nada.
 
@@ -114,12 +114,14 @@ async function test(): Promise<void> {
 Lo estático va en las opciones de ruta, que llegan en el HTML del servidor desde el primer byte; `useLayout` sólo para lo que cambia en el navegador:
 
 <!-- no-check -->
+
 ```ts
 // app/pages/(dashboard)/+group.ts
 export default defineGroup({ layout: "dashboard", layoutProps: { showAlert: false } });
 ```
 
 <!-- no-check -->
+
 ```ts
 // app/pages/(dashboard)/reports.route.ts
 export const route = definePage({ layoutProps: { title: "Informes" } });
@@ -138,6 +140,7 @@ layout.set({ subtitle: "x" });
 `meeko check` da `TS2322: Type 'string' is not assignable to type 'boolean | undefined'` en la primera y `TS2353: Object literal may only specify known properties, and 'subtitle' does not exist in type 'Partial<{ title?: string; showAlert?: boolean | undefined; }> & {}'` en la segunda.
 
 <!-- no-check -->
+
 ```ts good
 layout.set({ showAlert: true });
 ```
@@ -179,6 +182,7 @@ renderToString({}); // la página llama a useLayout()
 Lanza `Error: useLayout() necesita una página que renderiza Meeko… En una prueba unitaria, pasa los valores al componente como props.`
 
 <!-- no-check -->
+
 ```ts good
 renderToString({ title: "Informes" }); // el componente recibe el valor como prop
 ```

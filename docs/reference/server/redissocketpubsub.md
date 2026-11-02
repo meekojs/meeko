@@ -25,6 +25,7 @@ La entrega es a lo sumo una vez: Redis pub/sub no guarda mensajes, así que lo p
 ## Uso
 
 <!-- no-check -->
+
 ```ts
 // server/runtime.ts
 import { createClient } from "redis";
@@ -46,14 +47,14 @@ export default defineServerRuntime(async ({ env }) => {
 
 `new RedisSocketPubSub(options)`:
 
-| Opción | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `publisher` | `RedisPublisherClient` | obligatorio | Conexión normal con `publish(channel, message)` (y `sPublish` con `sharded`). |
-| `subscriber` | `RedisSubscriberClient` | obligatorio | Conexión dedicada en modo suscriptor con `subscribe(channel, listener)` y `unsubscribe(channel, listener)` (y `sSubscribe`/`sUnsubscribe` con `sharded`). |
-| `prefix` | `string` | obligatorio | Prefijo único por aplicación y entorno: no vacío, sin espacios y terminado en `:`. |
-| `maxMessageBytes` | `number` | `1048576` (1 MiB) | Mensaje serializado más grande que acepta `publish`. |
-| `sharded` | `boolean` | `false` | Usa `SPUBLISH`/`SSUBSCRIBE`/`SUNSUBSCRIBE` de Redis 7, que en un clúster mantiene cada sala en su shard. |
-| `onError` | `(error, { channel, room }) => void` | `console.error` | Recibe los mensajes mal formados y los fallos de los listeners. |
+| Opción            | Tipo                                 | Por defecto       | Descripción                                                                                                                                               |
+| ----------------- | ------------------------------------ | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `publisher`       | `RedisPublisherClient`               | obligatorio       | Conexión normal con `publish(channel, message)` (y `sPublish` con `sharded`).                                                                             |
+| `subscriber`      | `RedisSubscriberClient`              | obligatorio       | Conexión dedicada en modo suscriptor con `subscribe(channel, listener)` y `unsubscribe(channel, listener)` (y `sSubscribe`/`sUnsubscribe` con `sharded`). |
+| `prefix`          | `string`                             | obligatorio       | Prefijo único por aplicación y entorno: no vacío, sin espacios y terminado en `:`.                                                                        |
+| `maxMessageBytes` | `number`                             | `1048576` (1 MiB) | Mensaje serializado más grande que acepta `publish`.                                                                                                      |
+| `sharded`         | `boolean`                            | `false`           | Usa `SPUBLISH`/`SSUBSCRIBE`/`SUNSUBSCRIBE` de Redis 7, que en un clúster mantiene cada sala en su shard.                                                  |
+| `onError`         | `(error, { channel, room }) => void` | `console.error`   | Recibe los mensajes mal formados y los fallos de los listeners.                                                                                           |
 
 Los clientes de node-redis 4 o posterior cumplen ambas interfaces tal cual.
 
@@ -61,17 +62,18 @@ Los clientes de node-redis 4 o posterior cumplen ambas interfaces tal cual.
 
 Un `SocketPubSub`:
 
-| Miembro | Descripción |
-| --- | --- |
-| `publish(channel, room, message)` | Serializa `{ v: 1, event, payload }` con `serializeJson` y lo publica; se resuelve cuando Redis lo acepta. Rechaza con `SOCKET_LIMIT_EXCEEDED` (`413`) un mensaje mayor que `maxMessageBytes`. |
-| `subscribe(channel, room, listener)` | Se resuelve con la función `Unsubscribe` cuando Redis confirma la suscripción, así que no se pierde ningún broadcast posterior. `hub.accept` lo espera. |
-| `channelName(channel, room)` | El canal Redis de un par canal/sala. |
+| Miembro                              | Descripción                                                                                                                                                                                    |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `publish(channel, room, message)`    | Serializa `{ v: 1, event, payload }` con `serializeJson` y lo publica; se resuelve cuando Redis lo acepta. Rechaza con `SOCKET_LIMIT_EXCEEDED` (`413`) un mensaje mayor que `maxMessageBytes`. |
+| `subscribe(channel, room, listener)` | Se resuelve con la función `Unsubscribe` cuando Redis confirma la suscripción, así que no se pierde ningún broadcast posterior. `hub.accept` lo espera.                                        |
+| `channelName(channel, room)`         | El canal Redis de un par canal/sala.                                                                                                                                                           |
 
 ## Ejemplos
 
 ### Redis Cluster
 
 <!-- no-check -->
+
 ```ts
 // publisher ofrece sPublish; subscriber, sSubscribe y sUnsubscribe (Redis 7 o posterior).
 const pubsub = new RedisSocketPubSub({ publisher, subscriber, prefix: "chat:prod:", sharded: true });
@@ -80,6 +82,7 @@ const pubsub = new RedisSocketPubSub({ publisher, subscriber, prefix: "chat:prod
 ### Observar los mensajes descartados
 
 <!-- no-check -->
+
 ```ts
 new RedisSocketPubSub({
   publisher: redis,
@@ -119,6 +122,7 @@ new RedisSocketPubSub({ publisher: redis, subscriber, prefix: "chat:prod" });
 `TypeError: Socket Redis prefix must be nonempty, contain no whitespace, and end with ':'`, al crear el runtime.
 
 <!-- no-check -->
+
 ```ts good
 new RedisSocketPubSub({ publisher: redis, subscriber, prefix: "chat:prod:" });
 ```
@@ -132,6 +136,7 @@ new RedisSocketPubSub({ publisher: oldClient, subscriber: oldSubscriber, prefix:
 `TypeError: Redis sharded pub/sub requires sPublish, sSubscribe and sUnsubscribe`. Necesita node-redis con esos métodos y Redis 7 o posterior.
 
 <!-- no-check -->
+
 ```ts good
 new RedisSocketPubSub({ publisher: redis, subscriber, prefix: "chat:prod:" }); // sin sharded fuera de un clúster
 ```
@@ -145,6 +150,7 @@ new RedisSocketPubSub({ publisher: redis, subscriber: redis, prefix: "chat:prod:
 En modo suscriptor, una conexión de node-redis no admite otros comandos: `publish` (y, si la comparte, el store de sesiones) falla al primer broadcast.
 
 <!-- no-check -->
+
 ```ts good
 const subscriber = redis.duplicate();
 await subscriber.connect();

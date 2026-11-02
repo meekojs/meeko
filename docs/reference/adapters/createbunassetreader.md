@@ -20,6 +20,7 @@ related:
 ## Uso
 
 <!-- no-check -->
+
 ```ts
 import { createServerApp } from "@meekojs/meeko/server";
 import { createBunAssetReader } from "@meekojs/meeko/bun";
@@ -32,10 +33,10 @@ const app = await createServerApp({
 
 ## Parámetros
 
-| Opción | Tipo | Descripción |
-| --- | --- | --- |
-| `root` | `string \| URL` | Carpeta con los archivos del manifiesto, como ruta o URL `file:`. En la salida de Bun, `new URL("client/", import.meta.url)`. |
-| `assets` | `AssetManifest` | Las rutas públicas con su `type`, `etag`, `size` e `immutable`. |
+| Opción   | Tipo            | Descripción                                                                                                                   |
+| -------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `root`   | `string \| URL` | Carpeta con los archivos del manifiesto, como ruta o URL `file:`. En la salida de Bun, `new URL("client/", import.meta.url)`. |
+| `assets` | `AssetManifest` | Las rutas públicas con su `type`, `etag`, `size` e `immutable`.                                                               |
 
 ## Valor devuelto
 
@@ -46,6 +47,7 @@ Un `AssetReader` con `get(pathname, request)`: `null` para una ruta que no está
 ### Probar el lector en Bun
 
 <!-- no-check -->
+
 ```ts
 // bun test assets.test.ts
 import { expect, test } from "bun:test";
@@ -77,6 +79,7 @@ await createBunAssetReader({ root, assets }).get("/robots.txt", request);
 La primera lectura lanza `Error: The Meeko Bun adapter requires the Bun runtime`. En Node, use `createNodeAssetReader`.
 
 <!-- no-check -->
+
 ```ts good
 import { createNodeAssetReader } from "@meekojs/meeko/node";
 const assets = createNodeAssetReader({ root: fileURLToPath(new URL("./client/", import.meta.url)), assets: manifest.assets ?? {} });

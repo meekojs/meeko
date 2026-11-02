@@ -1,10 +1,10 @@
-import type { AnyApiOperation, ApiRequestInput, ClientOptions, PublicServerManifest } from "../../../shared/clients";
-import type { MutationOptions } from "../../runtime/mutations";
-import type { ApiMutation, ApiMutationContract, UseApiMutation } from "./engine";
+import type { AnyApiOperation, ApiRequestInput, ClientOptions, PublicServerManifest } from '../../../shared/clients'
+import type { MutationOptions } from '../../runtime/mutations'
+import type { ApiMutation, ApiMutationContract, UseApiMutation } from './engine'
 
-import { requestApi } from "../../../shared/clients";
-import { createMutation } from "../../runtime/mutations";
-import { requireSetup } from "./engine";
+import { requestApi } from '../../../shared/clients'
+import { createMutation } from '../../runtime/mutations'
+import { requireSetup } from './engine'
 
 /**
  * Crea `useApiMutation` para los endpoints `POST`, `PUT`, `PATCH` y `DELETE` de un manifiesto
@@ -25,19 +25,22 @@ import { requireSetup } from "./engine";
  * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#mutaciones
  */
-export function createUseApiMutation<Contract extends Record<string, Record<string, AnyApiOperation>>, Manifest extends Pick<PublicServerManifest, "api">>(manifest: Manifest, options: ClientOptions = {}): UseApiMutation<ApiMutationContract<Manifest, Contract>> {
-  const useApiMutation = (path: string, method: string, mutationOptions?: MutationOptions): ApiMutation<AnyApiOperation> => {
-    const label = `useApiMutation("${path}", "${method}")`;
-    requireSetup(label);
-    const verb = String(method).toUpperCase();
-    if (verb === "GET" || verb === "HEAD") throw new TypeError(`useApiMutation: ${verb} ${path} is a read; use useApi`);
-    const endpoint = manifest.api.find((entry) => entry.pathname === path && entry.method === verb);
-    if (!endpoint) throw new TypeError(`useApiMutation: no ${verb} endpoint at ${path}`);
-    return createMutation({
-      label,
-      target: `${verb} ${path}`,
-      send: (input, headers) => requestApi(endpoint, (input ?? {}) as ApiRequestInput, options, headers),
-    }, mutationOptions) as unknown as ApiMutation<AnyApiOperation>;
-  };
-  return useApiMutation as never;
+export function createUseApiMutation<Contract extends Record<string, Record<string, AnyApiOperation>>, Manifest extends Pick<PublicServerManifest, 'api'>>(manifest: Manifest, options: ClientOptions = {}): UseApiMutation<ApiMutationContract<Manifest, Contract>> {
+	const useApiMutation = (path: string, method: string, mutationOptions?: MutationOptions): ApiMutation<AnyApiOperation> => {
+		const label = `useApiMutation("${path}", "${method}")`
+		requireSetup(label)
+		const verb = String(method).toUpperCase()
+		if (verb === 'GET' || verb === 'HEAD') throw new TypeError(`useApiMutation: ${verb} ${path} is a read; use useApi`)
+		const endpoint = manifest.api.find((entry) => entry.pathname === path && entry.method === verb)
+		if (!endpoint) throw new TypeError(`useApiMutation: no ${verb} endpoint at ${path}`)
+		return createMutation(
+			{
+				label,
+				target: `${verb} ${path}`,
+				send: (input, headers) => requestApi(endpoint, (input ?? {}) as ApiRequestInput, options, headers),
+			},
+			mutationOptions,
+		) as unknown as ApiMutation<AnyApiOperation>
+	}
+	return useApiMutation as never
 }

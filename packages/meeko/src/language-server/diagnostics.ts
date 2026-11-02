@@ -1,70 +1,75 @@
-import type { TextDocument } from "vscode-languageserver-textdocument";
-import type { Diagnostic, Range } from "vscode-languageserver/node";
+import type { TextDocument } from 'vscode-languageserver-textdocument'
+import type { Diagnostic, Range } from 'vscode-languageserver/node'
 
-import ts from "@typescript/typescript6";
-import { existsSync } from "node:fs";
-import { join, relative, resolve, sep } from "node:path";
-import { DiagnosticSeverity, DiagnosticTag } from "vscode-languageserver/node";
+import ts from '@typescript/typescript6'
+import { existsSync } from 'node:fs'
+import { join, relative, resolve, sep } from 'node:path'
+import { DiagnosticSeverity, DiagnosticTag } from 'vscode-languageserver/node'
 
-import type { AutoImport } from "../autoimports/registry";
-import type { CompileDiagnostic } from "../compiler/parser/sfc";
-import type { LocatedDocument } from "./features";
-import type { VirtualComponent } from "./model";
-import type { MeekoProject } from "./project";
+import type { AutoImport } from '../autoimports/registry'
+import type { CompileDiagnostic } from '../compiler/parser/sfc'
+import type { LocatedDocument } from './features'
+import type { VirtualComponent } from './model'
+import type { MeekoProject } from './project'
 
-import { discoverAutoImportsSync } from "../autoimports/registry";
-import { checkSource } from "../check";
-import { doubleBracesMessage } from "../compiler/double-braces";
-import { interpolationClose } from "../compiler/parser/interpolation";
-import { MeekoCompileError, parseSfc } from "../compiler/parser/sfc";
-import { projectRoot } from "../compiler/project-root";
-import { assertRouteBlockPlacement } from "../compiler/transforms/route-block";
-import { configWarnings } from "./config-diagnostics";
-import { documentationMarkdown, identifierRange, virtualDocuments } from "./features";
-import { sourceRange } from "./locations";
-import { pathKey } from "./project";
+import { discoverAutoImportsSync } from '../autoimports/registry'
+import { checkSource } from '../check'
+import { doubleBracesMessage } from '../compiler/double-braces'
+import { interpolationClose } from '../compiler/parser/interpolation'
+import { MeekoCompileError, parseSfc } from '../compiler/parser/sfc'
+import { projectRoot } from '../compiler/project-root'
+import { assertRouteBlockPlacement } from '../compiler/transforms/route-block'
+import { configWarnings } from './config-diagnostics'
+import { documentationMarkdown, identifierRange, virtualDocuments } from './features'
+import { sourceRange } from './locations'
+import { pathKey } from './project'
 
 /** Fin del token que empieza en `offset`; un carácter si no hay token reconocible. */
 export function tokenEnd(source: string, offset: number): number {
-  if (offset >= source.length) return source.length;
-  const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, ts.LanguageVariant.Standard, source.slice(offset, offset + 4096));
-  const kind = scanner.scan();
-  const end = scanner.getTokenEnd();
-  const trivia = kind === ts.SyntaxKind.WhitespaceTrivia || kind === ts.SyntaxKind.NewLineTrivia || kind === ts.SyntaxKind.Unknown || kind === ts.SyntaxKind.EndOfFileToken;
-  return trivia || end <= 0 ? offset + 1 : offset + end;
+	if (offset >= source.length) return source.length
+	const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, ts.LanguageVariant.Standard, source.slice(offset, offset + 4096))
+	const kind = scanner.scan()
+	const end = scanner.getTokenEnd()
+	const trivia = kind === ts.SyntaxKind.WhitespaceTrivia || kind === ts.SyntaxKind.NewLineTrivia || kind === ts.SyntaxKind.Unknown || kind === ts.SyntaxKind.EndOfFileToken
+	return trivia || end <= 0 ? offset + 1 : offset + end
 }
 
 function toRange(document: TextDocument, start: number, end: number): Range {
-  return { start: document.positionAt(start), end: document.positionAt(end) };
+	return { start: document.positionAt(start), end: document.positionAt(end) }
 }
 
 function semanticDiagnostics(project: MeekoProject, component: VirtualComponent): readonly ts.Diagnostic[] {
-  try {
-    return [
-      ...project.service.getSyntacticDiagnostics(component.virtualFilename),
-      ...project.service.getSemanticDiagnostics(component.virtualFilename),
-    ];
-  } catch { return []; }
+	try {
+		return [
+			...project.service.getSyntacticDiagnostics(component.virtualFilename),
+			...project.service.getSemanticDiagnostics(component.virtualFilename),
+		]
+	} catch {
+		return []
+	}
 }
 
 /** Primera línea del script; ubica errores que no pertenecen a una posición concreta. */
 function scriptStart(source: string, filename: string): number {
-  try { return parseSfc(source, filename).script.start; }
-  catch { return 0; }
+	try {
+		return parseSfc(source, filename).script.start
+	} catch {
+		return 0
+	}
 }
 
 function lineRange(document: TextDocument, offset: number): Range {
-  const start = document.positionAt(offset);
-  const text = document.getText();
-  const lineEnd = text.slice(offset).search(/\r?\n|\r|$/);
-  return { start, end: document.positionAt(offset + Math.max(lineEnd, 0)) };
+	const start = document.positionAt(offset)
+	const text = document.getText()
+	const lineEnd = text.slice(offset).search(/\r?\n|\r|$/)
+	return { start, end: document.positionAt(offset + Math.max(lineEnd, 0)) }
 }
 
 /** Etiqueta de apertura `<script ...>` que empieza en `offset`, si la hay. */
 function openingTagRange(source: string, offset: number): [number, number] | undefined {
-  const match = /<script\b[^>]*>/y;
-  match.lastIndex = offset;
-  return match.exec(source) ? [offset, match.lastIndex] : undefined;
+	const match = /<script\b[^>]*>/y
+	match.lastIndex = offset
+	return match.exec(source) ? [offset, match.lastIndex] : undefined
 }
 
 /**
@@ -72,14 +77,14 @@ function openingTagRange(source: string, offset: number): [number, number] | und
  * `offset`: `bind:` in `<div bind: class="x">`. Values in quotes are skipped.
  */
 function attributeInTag(source: string, offset: number, name: string): [number, number] | undefined {
-  const lower = name.toLowerCase();
-  const attribute = /\s([^\s=>"'/]+)|"[^"]*"|'[^']*'|(\/?>)/g;
-  attribute.lastIndex = offset + 1;
-  for (let match = attribute.exec(source); match; match = attribute.exec(source)) {
-    if (match[2]) return undefined;
-    if (match[1]?.toLowerCase() === lower) return [match.index + 1, match.index + 1 + match[1].length];
-  }
-  return undefined;
+	const lower = name.toLowerCase()
+	const attribute = /\s([^\s=>"'/]+)|"[^"]*"|'[^']*'|(\/?>)/g
+	attribute.lastIndex = offset + 1
+	for (let match = attribute.exec(source); match; match = attribute.exec(source)) {
+		if (match[2]) return undefined
+		if (match[1]?.toLowerCase() === lower) return [match.index + 1, match.index + 1 + match[1].length]
+	}
+	return undefined
 }
 
 /**
@@ -87,99 +92,116 @@ function attributeInTag(source: string, offset: number, name: string): [number, 
  * MEEK100: `generic` en una página, un layout, `app.meeko` o una página de error.
  */
 function placementDiagnostic(project: MeekoProject, source: string, filename: string): CompileDiagnostic | undefined {
-  try { assertRouteBlockPlacement(source, filename, project.sourceRoots()); }
-  catch (error) {
-    // Other structural errors come from `meeko check` itself.
-    if (error instanceof MeekoCompileError) return error.diagnostic.code === "MEEK044" || error.diagnostic.code === "MEEK100" ? error.diagnostic : undefined;
-    throw error;
-  }
-  return undefined;
+	try {
+		assertRouteBlockPlacement(source, filename, project.sourceRoots())
+	} catch (error) {
+		// Other structural errors come from `meeko check` itself.
+		if (error instanceof MeekoCompileError) return error.diagnostic.code === 'MEEK044' || error.diagnostic.code === 'MEEK100' ? error.diagnostic : undefined
+		throw error
+	}
+	return undefined
 }
 
 const severities: Partial<Record<ts.DiagnosticCategory, DiagnosticSeverity>> = {
-  [ts.DiagnosticCategory.Error]: DiagnosticSeverity.Error,
-  [ts.DiagnosticCategory.Warning]: DiagnosticSeverity.Warning,
-};
+	[ts.DiagnosticCategory.Error]: DiagnosticSeverity.Error,
+	[ts.DiagnosticCategory.Warning]: DiagnosticSeverity.Warning,
+}
 
 /**
  * Diagnósticos de TypeScript y autoimports del bloque `<script server>`. `meeko check` sólo
  * compila el componente; el bloque se comprueba como un módulo propio en el proyecto del editor.
  */
 function serverBlockDiagnostics(project: MeekoProject, component: VirtualComponent, document: TextDocument): Diagnostic[] {
-  const server = component.server;
-  if (!server) return [];
-  const block = server.spans[0]!;
-  const fallback = lineRange(document, block.sourceStart);
-  const result: Diagnostic[] = [];
-  for (const problem of server.problems) {
-    result.push({
-      range: identifierRange({ component: server, document }, problem.name) ?? fallback,
-      message: problem.message, code: "MEEK_AUTOIMPORT", source: "Meeko", severity: DiagnosticSeverity.Error,
-    });
-  }
-  for (const item of semanticDiagnostics(project, server)) {
-    const severity = severities[item.category];
-    if (severity === undefined) continue;
-    const range = item.start === undefined ? undefined : sourceRange(server, item.start, item.length ?? 0);
-    const message = ts.flattenDiagnosticMessageText(item.messageText, "\n");
-    result.push({
-      range: range ? toRange(document, range[0], range[1] > range[0] ? range[1] : tokenEnd(document.getText(), range[0])) : fallback,
-      message: range ? message : `TypeScript generado: ${message}`,
-      code: `TS${item.code}`, source: "Meeko", severity,
-    });
-  }
-  return result;
+	const server = component.server
+	if (!server) return []
+	const block = server.spans[0]!
+	const fallback = lineRange(document, block.sourceStart)
+	const result: Diagnostic[] = []
+	for (const problem of server.problems) {
+		result.push({
+			range: identifierRange({ component: server, document }, problem.name) ?? fallback,
+			message: problem.message,
+			code: 'MEEK_AUTOIMPORT',
+			source: 'Meeko',
+			severity: DiagnosticSeverity.Error,
+		})
+	}
+	for (const item of semanticDiagnostics(project, server)) {
+		const severity = severities[item.category]
+		if (severity === undefined) continue
+		const range = item.start === undefined ? undefined : sourceRange(server, item.start, item.length ?? 0)
+		const message = ts.flattenDiagnosticMessageText(item.messageText, '\n')
+		result.push({
+			range: range ? toRange(document, range[0], range[1] > range[0] ? range[1] : tokenEnd(document.getText(), range[0])) : fallback,
+			message: range ? message : `TypeScript generado: ${message}`,
+			code: `TS${item.code}`,
+			source: 'Meeko',
+			severity,
+		})
+	}
+	return result
 }
 
 /** Sugerencias de TypeScript para usos de un símbolo `@deprecated`: 6385 (símbolo) y 6387 (firma). */
-const deprecatedCodes = new Set([6385, 6387]);
+const deprecatedCodes = new Set([6385, 6387])
 
 /**
  * Usos de símbolos marcados `@deprecated` en el script y la plantilla, como el alias `useSocket`
  * de `@meekojs/meeko/framework`: una pista tachada con el motivo de su etiqueta `@deprecated`.
  */
 function deprecatedDiagnostics(project: MeekoProject, component: VirtualComponent, document: TextDocument): Diagnostic[] {
-  const result: Diagnostic[] = [];
-  const seen = new Set<string>();
-  const source = document.getText();
-  for (const virtual of virtualDocuments(component)) {
-    let suggestions: readonly ts.DiagnosticWithLocation[];
-    try { suggestions = project.service.getSuggestionDiagnostics(virtual.virtualFilename); }
-    catch { continue; }
-    for (const item of suggestions) {
-      if (item.reportsDeprecated === undefined && !deprecatedCodes.has(item.code)) continue;
-      const range = sourceRange(virtual, item.start, item.length);
-      if (!range || range[1] <= range[0]) continue;
-      const key = `${range[0]}:${range[1]}:${item.code}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      const name = source.slice(range[0], range[1]);
-      let reason: string | undefined;
-      try {
-        const tag = project.service.getQuickInfoAtPosition(virtual.virtualFilename, item.start)?.tags?.find((entry) => entry.name === "deprecated");
-        reason = tag?.text ? documentationMarkdown(tag.text).trim() : undefined;
-      } catch { reason = undefined; }
-      const subject = item.code === 6387 ? `Esta firma de «${name}» está obsoleta` : `«${name}» está obsoleto`;
-      result.push({
-        range: toRange(document, range[0], range[1]),
-        message: reason ? `${subject}: ${reason}` : `${subject}.`,
-        code: `TS${item.code}`, source: "Meeko", severity: DiagnosticSeverity.Hint, tags: [DiagnosticTag.Deprecated],
-      });
-    }
-  }
-  return result;
+	const result: Diagnostic[] = []
+	const seen = new Set<string>()
+	const source = document.getText()
+	for (const virtual of virtualDocuments(component)) {
+		let suggestions: readonly ts.DiagnosticWithLocation[]
+		try {
+			suggestions = project.service.getSuggestionDiagnostics(virtual.virtualFilename)
+		} catch {
+			continue
+		}
+		for (const item of suggestions) {
+			if (item.reportsDeprecated === undefined && !deprecatedCodes.has(item.code)) continue
+			const range = sourceRange(virtual, item.start, item.length)
+			if (!range || range[1] <= range[0]) continue
+			const key = `${range[0]}:${range[1]}:${item.code}`
+			if (seen.has(key)) continue
+			seen.add(key)
+			const name = source.slice(range[0], range[1])
+			let reason: string | undefined
+			try {
+				const tag = project.service.getQuickInfoAtPosition(virtual.virtualFilename, item.start)?.tags?.find((entry) => entry.name === 'deprecated')
+				reason = tag?.text ? documentationMarkdown(tag.text).trim() : undefined
+			} catch {
+				reason = undefined
+			}
+			const subject = item.code === 6387 ? `Esta firma de «${name}» está obsoleta` : `«${name}» está obsoleto`
+			result.push({
+				range: toRange(document, range[0], range[1]),
+				message: reason ? `${subject}: ${reason}` : `${subject}.`,
+				code: `TS${item.code}`,
+				source: 'Meeko',
+				severity: DiagnosticSeverity.Hint,
+				tags: [DiagnosticTag.Deprecated],
+			})
+		}
+	}
+	return result
 }
 
 function staticAutoImports(root: string): readonly AutoImport[] {
-  try { return discoverAutoImportsSync(root); }
-  catch { return []; }
+	try {
+		return discoverAutoImportsSync(root)
+	} catch {
+		return []
+	}
 }
 
-const configNames = ["meeko.config.ts", "meeko.config.mts", "meeko.config.js", "meeko.config.mjs"];
+const configNames = ['meeko.config.ts', 'meeko.config.mts', 'meeko.config.js', 'meeko.config.mjs']
 
 /** `meeko.config.*` of a project root, if there is one. */
 function projectConfigFile(root: string): string | undefined {
-  return configNames.map((name) => join(root, name)).find((file) => existsSync(file));
+	return configNames.map((name) => join(root, name)).find((file) => existsSync(file))
 }
 
 /**
@@ -187,18 +209,18 @@ function projectConfigFile(root: string): string | undefined {
  * validation errors with the file (`<file>: document.head: …`) and wraps import errors in
  * `No se puede cargar <file>: …`.
  */
-const configFailure = /^(No se puede cargar )?(.*?[\\/]meeko\.config\.(?:ts|mts|js|mjs))(?::[ \t]+|[ \t]+)([\s\S]*)$/;
+const configFailure = /^(No se puede cargar )?(.*?[\\/]meeko\.config\.(?:ts|mts|js|mjs))(?::[ \t]+|[ \t]+)([\s\S]*)$/
 
 function unwrapExpression(node: ts.Expression): ts.Expression {
-  let current = node;
-  while (ts.isParenthesizedExpression(current) || ts.isAsExpression(current) || ts.isSatisfiesExpression(current) || ts.isNonNullExpression(current) || ts.isTypeAssertionExpression(current)) {
-    current = current.expression;
-  }
-  return current;
+	let current = node
+	while (ts.isParenthesizedExpression(current) || ts.isAsExpression(current) || ts.isSatisfiesExpression(current) || ts.isNonNullExpression(current) || ts.isTypeAssertionExpression(current)) {
+		current = current.expression
+	}
+	return current
 }
 
 function memberName(name: ts.PropertyName): string | undefined {
-  return ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name) || ts.isNoSubstitutionTemplateLiteral(name) ? name.text : undefined;
+	return ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name) || ts.isNoSubstitutionTemplateLiteral(name) ? name.text : undefined
 }
 
 /**
@@ -208,65 +230,69 @@ function memberName(name: ts.PropertyName): string | undefined {
  * down; the deepest one found is the range. Without one, the `export default` line, or the first one.
  */
 export function configErrorRange(text: string, filename: string, message: string): [number, number] {
-  const source = ts.createSourceFile(filename, text, ts.ScriptTarget.Latest, true, /\.m?js$/.test(filename) ? ts.ScriptKind.JS : ts.ScriptKind.TS);
-  const exported = source.statements.find(ts.isExportAssignment);
-  const lineEnd = (offset: number): number => offset + Math.max(text.slice(offset).search(/\r?\n|\r|$/), 0);
-  if (!exported) return [0, Math.max(lineEnd(0), 1)];
-  let start = exported.getStart(source);
-  let end = lineEnd(start);
-  let current: ts.Expression | undefined = unwrapExpression(exported.expression);
-  // `export default config`, declared in the same file.
-  if (ts.isIdentifier(current)) {
-    const name = current.text;
-    const declaration = source.statements.filter(ts.isVariableStatement).flatMap((statement) => [...statement.declarationList.declarations])
-      .find((item) => ts.isIdentifier(item.name) && item.name.text === name);
-    current = declaration?.initializer ? unwrapExpression(declaration.initializer) : undefined;
-  }
-  // `defineMeekoConfig({ … })`.
-  if (current && ts.isCallExpression(current)) current = current.arguments[0] ? unwrapExpression(current.arguments[0]) : undefined;
-  for (const token of message.match(/[A-Za-z_$][\w$]*|\[\d+\]/g) ?? []) {
-    if (!current) break;
-    if (ts.isObjectLiteralExpression(current)) {
-      if (token.startsWith("[")) break;
-      const member = current.properties.find((item) => item.name !== undefined && memberName(item.name) === token);
-      if (!member?.name) continue;
-      start = member.name.getStart(source);
-      end = member.name.getEnd();
-      current = ts.isPropertyAssignment(member) ? unwrapExpression(member.initializer) : undefined;
-    } else if (ts.isArrayLiteralExpression(current) && token.startsWith("[")) {
-      const element = current.elements[Number(token.slice(1, -1))];
-      if (!element) break;
-      start = element.getStart(source);
-      end = Math.min(element.getEnd(), lineEnd(start));
-      current = unwrapExpression(element);
-    } else {
-      break;
-    }
-  }
-  return [start, end > start ? end : start + 1];
+	const source = ts.createSourceFile(filename, text, ts.ScriptTarget.Latest, true, /\.m?js$/.test(filename) ? ts.ScriptKind.JS : ts.ScriptKind.TS)
+	const exported = source.statements.find(ts.isExportAssignment)
+	const lineEnd = (offset: number): number => offset + Math.max(text.slice(offset).search(/\r?\n|\r|$/), 0)
+	if (!exported) return [0, Math.max(lineEnd(0), 1)]
+	let start = exported.getStart(source)
+	let end = lineEnd(start)
+	let current: ts.Expression | undefined = unwrapExpression(exported.expression)
+	// `export default config`, declared in the same file.
+	if (ts.isIdentifier(current)) {
+		const name = current.text
+		const declaration = source.statements
+			.filter(ts.isVariableStatement)
+			.flatMap((statement) => [...statement.declarationList.declarations])
+			.find((item) => ts.isIdentifier(item.name) && item.name.text === name)
+		current = declaration?.initializer ? unwrapExpression(declaration.initializer) : undefined
+	}
+	// `defineMeekoConfig({ … })`.
+	if (current && ts.isCallExpression(current)) current = current.arguments[0] ? unwrapExpression(current.arguments[0]) : undefined
+	for (const token of message.match(/[A-Za-z_$][\w$]*|\[\d+\]/g) ?? []) {
+		if (!current) break
+		if (ts.isObjectLiteralExpression(current)) {
+			if (token.startsWith('[')) break
+			const member = current.properties.find((item) => item.name !== undefined && memberName(item.name) === token)
+			if (!member?.name) continue
+			start = member.name.getStart(source)
+			end = member.name.getEnd()
+			current = ts.isPropertyAssignment(member) ? unwrapExpression(member.initializer) : undefined
+		} else if (ts.isArrayLiteralExpression(current) && token.startsWith('[')) {
+			const element = current.elements[Number(token.slice(1, -1))]
+			if (!element) break
+			start = element.getStart(source)
+			end = Math.min(element.getEnd(), lineEnd(start))
+			current = unwrapExpression(element)
+		} else {
+			break
+		}
+	}
+	return [start, end > start ? end : start + 1]
 }
 
 /**
  * Receives the diagnostics of a project's `meeko.config.*` found while a component is checked:
  * its validation error, or `[]` once the configuration loads again.
  */
-export type ConfigDiagnosticsReporter = (filename: string, diagnostics: Diagnostic[]) => void;
+export type ConfigDiagnosticsReporter = (filename: string, diagnostics: Diagnostic[]) => void
 
 /** The diagnostic of a configuration failure, in the configuration file itself, or `undefined` if the error is another one. */
 function configDiagnostic(message: string, locate: (filename: string) => LocatedDocument | undefined): { filename: string; uri: string; message: string; diagnostic: Diagnostic } | undefined {
-  const failure = configFailure.exec(message);
-  if (!failure) return undefined;
-  const filename = resolve(failure[2]!);
-  const target = locate(filename);
-  if (!target) return undefined;
-  const loadFailure = failure[1] !== undefined;
-  const detail = failure[3]!.trim();
-  const [start, end] = configErrorRange(target.document.getText(), filename, loadFailure ? "" : detail);
-  const text = loadFailure ? `No se puede cargar la configuración: ${detail}` : detail;
-  return {
-    filename, uri: target.uri, message: text,
-    diagnostic: { range: toRange(target.document, start, end), message: text, code: "MEEK_CONFIG", source: "Meeko", severity: DiagnosticSeverity.Error },
-  };
+	const failure = configFailure.exec(message)
+	if (!failure) return undefined
+	const filename = resolve(failure[2]!)
+	const target = locate(filename)
+	if (!target) return undefined
+	const loadFailure = failure[1] !== undefined
+	const detail = failure[3]!.trim()
+	const [start, end] = configErrorRange(target.document.getText(), filename, loadFailure ? '' : detail)
+	const text = loadFailure ? `No se puede cargar la configuración: ${detail}` : detail
+	return {
+		filename,
+		uri: target.uri,
+		message: text,
+		diagnostic: { range: toRange(target.document, start, end), message: text, code: 'MEEK_CONFIG', source: 'Meeko', severity: DiagnosticSeverity.Error },
+	}
 }
 
 /**
@@ -278,137 +304,148 @@ function configDiagnostic(message: string, locate: (filename: string) => Located
  * archivo de configuración, en la propiedad que nombra, y no en cada componente; sin él, se marca
  * al principio del script con un enlace a esa propiedad.
  */
-export async function componentDiagnostics(
-  project: MeekoProject,
-  document: TextDocument,
-  filename: string,
-  locate: (filename: string) => LocatedDocument | undefined,
-  reportConfig?: ConfigDiagnosticsReporter,
-): Promise<Diagnostic[]> {
-  await project.ready();
-  const source = document.getText();
-  const component = project.component(filename);
-  const current = component && component.source === source ? component : undefined;
-  const trusted = project.trusted;
-  const placement = placementDiagnostic(project, source, filename);
-  const blockDiagnostics = current ? [...serverBlockDiagnostics(project, current, document), ...deprecatedDiagnostics(project, current, document)] : [];
-  let found: CompileDiagnostic[];
-  try {
-    found = await checkSource(source, filename, trusted ? { withinProject: true } : {
-      withinProject: true,
-      autoImports: (root) => pathKey(root) === pathKey(project.root) ? project.autoImports() : staticAutoImports(root),
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    const placed = placement ? [compileDiagnostic(document, placement)] : [];
-    const config = configDiagnostic(message, locate);
-    if (config && reportConfig) {
-      const target = locate(config.filename);
-      reportConfig(config.filename, [config.diagnostic, ...(target ? configWarnings(target.document, config.filename) : [])]);
-      return [...placed, ...blockDiagnostics];
-    }
-    if (!config) clearConfig(project, reportConfig, locate);
-    const autoImport = /^(?:Autoimport ambiguo (\S+?):|El autoimport (\S+) no está disponible)/.exec(message);
-    const name = autoImport?.[1] ?? autoImport?.[2];
-    const range = (name && component && component.source === source && identifierRange({ component, document }, name))
-      || lineRange(document, scriptStart(source, filename));
-    return [
-      ...placed,
-      {
-        range, message, code: name ? "MEEK_AUTOIMPORT" : "MEEK_CHECK", source: "Meeko", severity: DiagnosticSeverity.Error,
-        ...(config ? { relatedInformation: [{ location: { uri: config.uri, range: config.diagnostic.range }, message: config.message }] } : {}),
-      },
-      ...blockDiagnostics,
-    ];
-  }
-  clearConfig(project, reportConfig, locate);
-  if (placement) found = [placement, ...found];
-  const typescript = current ? semanticDiagnostics(project, current) : [];
-  const own = resolve(filename);
-  // The compiler emits template expressions for several render paths; report each error once.
-  const seen = new Set<string>();
-  found = found.filter((item) => {
-    const key = `${item.filename}:${item.code}:${item.location.offset}:${item.message}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-  return found.map((item): Diagnostic => {
-    const diagnostic: Diagnostic = { range: toRange(document, 0, 0), message: item.message, code: item.code, source: "Meeko", severity: item.severity === "warning" ? DiagnosticSeverity.Warning : DiagnosticSeverity.Error };
-    // MEEK121: a deprecated built-in tag, which the editor strikes through.
-    if (item.code === "MEEK121") diagnostic.tags = [DiagnosticTag.Deprecated];
-    if (pathKey(item.filename) !== pathKey(own)) {
-      // Errors in imported modules are reported where the component starts, with a link to their file.
-      const target = locate(item.filename);
-      diagnostic.range = lineRange(document, scriptStart(source, filename));
-      diagnostic.message = `${relative(project.root, item.filename).replaceAll("\\", "/")}:${item.location.line}:${item.location.column} ${item.message}`;
-      if (target) {
-        const position = target.document.positionAt(item.location.offset);
-        diagnostic.relatedInformation = [{
-          location: { uri: target.uri, range: { start: position, end: target.document.positionAt(tokenEnd(target.document.getText(), item.location.offset)) } },
-          message: item.message,
-        }];
-      }
-      return diagnostic;
-    }
-    const offset = item.location.offset;
-    // `bind` without a value is usually `bind:attr` being written: name both forms.
-    if (item.code === "MEEK113" && /^bind(?![\w$:.-])\s*(?!=)/.test(source.slice(offset, offset + 64))) {
-      diagnostic.message = "`bind` sin valor: escribe `bind:atributo=\"expresión\"` para un atributo o una prop, o `bind=\"obj\"` para pasar un objeto";
-    }
-    // `{{ expr }}`: the whole interpolation, both pairs of braces.
-    if (item.code === "MEEK020" && item.message === doubleBracesMessage && source[offset] === "{") {
-      const close = interpolationClose(source, offset);
-      if (close !== undefined) {
-        diagnostic.range = toRange(document, offset, close + 1);
-        return diagnostic;
-      }
-    }
-    // A directive without its value yet (`bind:class`): what it needs, instead of TypeScript's words.
-    const unvalued = item.code === "MEEK020" ? /^((?:bind|on|model|if|each):[\w$.:-]+)(?![\w$.:-]|\s*=)/.exec(source.slice(offset, offset + 128)) : null;
-    if (unvalued) diagnostic.message = `${unvalued[1]} necesita un valor: ${unvalued[1]}="expresión"`;
-    // MEEK012 is reported at the tag: mark the attribute itself (`bind:` while it is written).
-    const invalid = item.code === "MEEK012" ? /^(?:Atributo dinámico no válido: (.*)|Directiva de plantilla no admitida: (.*))$/.exec(item.message) : null;
-    if (invalid && source[offset] === "<") {
-      const name = invalid[1] === undefined ? invalid[2]! : `bind:${invalid[1]}`;
-      const range = attributeInTag(source, offset, name);
-      if (range) {
-        if (name === "bind:") diagnostic.message = "`bind:` necesita el nombre de un atributo o una prop: bind:class=\"expresión\"";
-        diagnostic.range = toRange(document, range[0], range[1]);
-        return diagnostic;
-      }
-    }
-    const tag = item.code === "MEEK043" || item.code === "MEEK044" ? openingTagRange(source, offset) : undefined;
-    if (tag) {
-      diagnostic.range = toRange(document, tag[0], tag[1]);
-      return diagnostic;
-    }
-    let end: number | undefined;
-    if (component) {
-      for (const candidate of typescript) {
-        if (`TS${candidate.code}` !== item.code || candidate.start === undefined || candidate.length === undefined) continue;
-        const range = sourceRange(component, candidate.start, candidate.length);
-        if (range?.[0] === offset && range[1] > offset) { end = range[1]; break; }
-        // A quoted key, such as a hyphenated snippet name (`name="cell-email"`): the value inside the quotes.
-        if (range?.[0] === offset - 1 && (source[offset - 1] === "\"" || source[offset - 1] === "'") && range[1] - 1 > offset) { end = range[1] - 1; break; }
-      }
-    }
-    // MEEK107 marks the whole value of `html="..."`, up to its closing quote, and so do MEEK112,
-    // MEEK113 and MEEK031 when they are about a whole value (`is="..."`, `bind="..."`).
-    if (end === undefined && (item.code === "MEEK107" || item.code === "MEEK112" || item.code === "MEEK113" || item.code === "MEEK031")) {
-      const quote = source[offset - 1];
-      const close = quote === "\"" || quote === "'" ? source.indexOf(quote, offset) : -1;
-      if (close > offset) end = close;
-    }
-    // `on:event`, `model:name` and `bind:prop` on a component are reported at the attribute name, and a missing
-    // model, snippet or `<render args>` at the tag: mark the whole directive or tag name.
-    // MEEK080 marks the whole `useElementRef("name")` call, and MEEK110 the `if:when` of a `<snippet>`.
-    const directive = end === undefined
-      ? (item.code === "MEEK080" ? /^useElementRef\s*\(\s*(["'`])[^"'`]*\1\s*\)/ : item.code === "MEEK110" ? /^if:when/ : /^(?:(?:on|model|bind):[\w$]+|model(?![\w$:])|<[A-Za-z][\w$.-]*)/).exec(source.slice(offset, offset + 256))
-      : null;
-    diagnostic.range = toRange(document, offset, end ?? (directive ? offset + directive[0].length : tokenEnd(source, offset)));
-    return diagnostic;
-  }).concat(blockDiagnostics);
+export async function componentDiagnostics(project: MeekoProject, document: TextDocument, filename: string, locate: (filename: string) => LocatedDocument | undefined, reportConfig?: ConfigDiagnosticsReporter): Promise<Diagnostic[]> {
+	await project.ready()
+	const source = document.getText()
+	const component = project.component(filename)
+	const current = component && component.source === source ? component : undefined
+	const trusted = project.trusted
+	const placement = placementDiagnostic(project, source, filename)
+	const blockDiagnostics = current ? [...serverBlockDiagnostics(project, current, document), ...deprecatedDiagnostics(project, current, document)] : []
+	let found: CompileDiagnostic[]
+	try {
+		found = await checkSource(
+			source,
+			filename,
+			trusted
+				? { withinProject: true }
+				: {
+						withinProject: true,
+						autoImports: (root) => (pathKey(root) === pathKey(project.root) ? project.autoImports() : staticAutoImports(root)),
+					},
+		)
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error)
+		const placed = placement ? [compileDiagnostic(document, placement)] : []
+		const config = configDiagnostic(message, locate)
+		if (config && reportConfig) {
+			const target = locate(config.filename)
+			reportConfig(config.filename, [config.diagnostic, ...(target ? configWarnings(target.document, config.filename) : [])])
+			return [...placed, ...blockDiagnostics]
+		}
+		if (!config) clearConfig(project, reportConfig, locate)
+		const autoImport = /^(?:Autoimport ambiguo (\S+?):|El autoimport (\S+) no está disponible)/.exec(message)
+		const name = autoImport?.[1] ?? autoImport?.[2]
+		const range = (name && component && component.source === source && identifierRange({ component, document }, name)) || lineRange(document, scriptStart(source, filename))
+		return [
+			...placed,
+			{
+				range,
+				message,
+				code: name ? 'MEEK_AUTOIMPORT' : 'MEEK_CHECK',
+				source: 'Meeko',
+				severity: DiagnosticSeverity.Error,
+				...(config ? { relatedInformation: [{ location: { uri: config.uri, range: config.diagnostic.range }, message: config.message }] } : {}),
+			},
+			...blockDiagnostics,
+		]
+	}
+	clearConfig(project, reportConfig, locate)
+	if (placement) found = [placement, ...found]
+	const typescript = current ? semanticDiagnostics(project, current) : []
+	const own = resolve(filename)
+	// The compiler emits template expressions for several render paths; report each error once.
+	const seen = new Set<string>()
+	found = found.filter((item) => {
+		const key = `${item.filename}:${item.code}:${item.location.offset}:${item.message}`
+		if (seen.has(key)) return false
+		seen.add(key)
+		return true
+	})
+	return found
+		.map((item): Diagnostic => {
+			const diagnostic: Diagnostic = { range: toRange(document, 0, 0), message: item.message, code: item.code, source: 'Meeko', severity: item.severity === 'warning' ? DiagnosticSeverity.Warning : DiagnosticSeverity.Error }
+			// MEEK121: a deprecated built-in tag, which the editor strikes through.
+			if (item.code === 'MEEK121') diagnostic.tags = [DiagnosticTag.Deprecated]
+			if (pathKey(item.filename) !== pathKey(own)) {
+				// Errors in imported modules are reported where the component starts, with a link to their file.
+				const target = locate(item.filename)
+				diagnostic.range = lineRange(document, scriptStart(source, filename))
+				diagnostic.message = `${relative(project.root, item.filename).replaceAll('\\', '/')}:${item.location.line}:${item.location.column} ${item.message}`
+				if (target) {
+					const position = target.document.positionAt(item.location.offset)
+					diagnostic.relatedInformation = [
+						{
+							location: { uri: target.uri, range: { start: position, end: target.document.positionAt(tokenEnd(target.document.getText(), item.location.offset)) } },
+							message: item.message,
+						},
+					]
+				}
+				return diagnostic
+			}
+			const offset = item.location.offset
+			// `bind` without a value is usually `bind:attr` being written: name both forms.
+			if (item.code === 'MEEK113' && /^bind(?![\w$:.-])\s*(?!=)/.test(source.slice(offset, offset + 64))) {
+				diagnostic.message = '`bind` sin valor: escribe `bind:atributo="expresión"` para un atributo o una prop, o `bind="obj"` para pasar un objeto'
+			}
+			// `{{ expr }}`: the whole interpolation, both pairs of braces.
+			if (item.code === 'MEEK020' && item.message === doubleBracesMessage && source[offset] === '{') {
+				const close = interpolationClose(source, offset)
+				if (close !== undefined) {
+					diagnostic.range = toRange(document, offset, close + 1)
+					return diagnostic
+				}
+			}
+			// A directive without its value yet (`bind:class`): what it needs, instead of TypeScript's words.
+			const unvalued = item.code === 'MEEK020' ? /^((?:bind|on|model|if|each):[\w$.:-]+)(?![\w$.:-]|\s*=)/.exec(source.slice(offset, offset + 128)) : null
+			if (unvalued) diagnostic.message = `${unvalued[1]} necesita un valor: ${unvalued[1]}="expresión"`
+			// MEEK012 is reported at the tag: mark the attribute itself (`bind:` while it is written).
+			const invalid = item.code === 'MEEK012' ? /^(?:Atributo dinámico no válido: (.*)|Directiva de plantilla no admitida: (.*))$/.exec(item.message) : null
+			if (invalid && source[offset] === '<') {
+				const name = invalid[1] === undefined ? invalid[2]! : `bind:${invalid[1]}`
+				const range = attributeInTag(source, offset, name)
+				if (range) {
+					if (name === 'bind:') diagnostic.message = '`bind:` necesita el nombre de un atributo o una prop: bind:class="expresión"'
+					diagnostic.range = toRange(document, range[0], range[1])
+					return diagnostic
+				}
+			}
+			const tag = item.code === 'MEEK043' || item.code === 'MEEK044' ? openingTagRange(source, offset) : undefined
+			if (tag) {
+				diagnostic.range = toRange(document, tag[0], tag[1])
+				return diagnostic
+			}
+			let end: number | undefined
+			if (component) {
+				for (const candidate of typescript) {
+					if (`TS${candidate.code}` !== item.code || candidate.start === undefined || candidate.length === undefined) continue
+					const range = sourceRange(component, candidate.start, candidate.length)
+					if (range?.[0] === offset && range[1] > offset) {
+						end = range[1]
+						break
+					}
+					// A quoted key, such as a hyphenated snippet name (`name="cell-email"`): the value inside the quotes.
+					if (range?.[0] === offset - 1 && (source[offset - 1] === '"' || source[offset - 1] === "'") && range[1] - 1 > offset) {
+						end = range[1] - 1
+						break
+					}
+				}
+			}
+			// MEEK107 marks the whole value of `html="..."`, up to its closing quote, and so do MEEK112,
+			// MEEK113 and MEEK031 when they are about a whole value (`is="..."`, `bind="..."`).
+			if (end === undefined && (item.code === 'MEEK107' || item.code === 'MEEK112' || item.code === 'MEEK113' || item.code === 'MEEK031')) {
+				const quote = source[offset - 1]
+				const close = quote === '"' || quote === "'" ? source.indexOf(quote, offset) : -1
+				if (close > offset) end = close
+			}
+			// `on:event`, `model:name` and `bind:prop` on a component are reported at the attribute name, and a missing
+			// model, snippet or `<render args>` at the tag: mark the whole directive or tag name.
+			// MEEK080 marks the whole `useElementRef("name")` call, and MEEK110 the `if:when` of a `<snippet>`.
+			const directive = end === undefined ? (item.code === 'MEEK080' ? /^useElementRef\s*\(\s*(["'`])[^"'`]*\1\s*\)/ : item.code === 'MEEK110' ? /^if:when/ : /^(?:(?:on|model|bind):[\w$]+|model(?![\w$:])|<[A-Za-z][\w$.-]*)/).exec(source.slice(offset, offset + 256)) : null
+			diagnostic.range = toRange(document, offset, end ?? (directive ? offset + directive[0].length : tokenEnd(source, offset)))
+			return diagnostic
+		})
+		.concat(blockDiagnostics)
 }
 
 /**
@@ -416,34 +453,36 @@ export async function componentDiagnostics(
  * and only the deprecated entries of `modules` (MEEK126, read from the text) remain.
  */
 function clearConfig(project: MeekoProject, reportConfig: ConfigDiagnosticsReporter | undefined, locate: (filename: string) => LocatedDocument | undefined): void {
-  if (!reportConfig) return;
-  const file = projectConfigFile(project.root);
-  const target = file ? locate(file) : undefined;
-  const warnings = file && target ? configWarnings(target.document, file) : [];
-  if (file && (project.trusted || warnings.length)) reportConfig(file, warnings);
+	if (!reportConfig) return
+	const file = projectConfigFile(project.root)
+	const target = file ? locate(file) : undefined
+	const warnings = file && target ? configWarnings(target.document, file) : []
+	if (file && (project.trusted || warnings.length)) reportConfig(file, warnings)
 }
 
 function compileDiagnostic(document: TextDocument, item: CompileDiagnostic): Diagnostic {
-  const source = document.getText();
-  const [start, end] = openingTagRange(source, item.location.offset) ?? [item.location.offset, tokenEnd(source, item.location.offset)];
-  return { range: toRange(document, start, end), message: item.message, code: item.code, source: "Meeko", severity: DiagnosticSeverity.Error };
+	const source = document.getText()
+	const [start, end] = openingTagRange(source, item.location.offset) ?? [item.location.offset, tokenEnd(source, item.location.offset)]
+	return { range: toRange(document, start, end), message: item.message, code: item.code, source: 'Meeko', severity: DiagnosticSeverity.Error }
 }
 
 /** Rango del tipo de `defineProps` (u otro tipo) que empieza en `offset` dentro del script. */
 export function contractRange(source: string, filename: string, offset: number): [number, number] {
-  try {
-    const script = parseSfc(source, filename).script;
-    const relativeOffset = offset - script.contentStart;
-    const ast = ts.createSourceFile(filename, script.content, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-    let end = -1;
-    const visit = (node: ts.Node): void => {
-      if (node.getStart(ast) === relativeOffset && ts.isTypeNode(node)) end = Math.max(end, node.getEnd());
-      if (node.getStart(ast) <= relativeOffset && relativeOffset < node.getEnd()) ts.forEachChild(node, visit);
-    };
-    visit(ast);
-    if (end > relativeOffset) return [offset, script.contentStart + end];
-  } catch { /* Fall back to the token below. */ }
-  return [offset, tokenEnd(source, offset)];
+	try {
+		const script = parseSfc(source, filename).script
+		const relativeOffset = offset - script.contentStart
+		const ast = ts.createSourceFile(filename, script.content, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+		let end = -1
+		const visit = (node: ts.Node): void => {
+			if (node.getStart(ast) === relativeOffset && ts.isTypeNode(node)) end = Math.max(end, node.getEnd())
+			if (node.getStart(ast) <= relativeOffset && relativeOffset < node.getEnd()) ts.forEachChild(node, visit)
+		}
+		visit(ast)
+		if (end > relativeOffset) return [offset, script.contentStart + end]
+	} catch {
+		/* Fall back to the token below. */
+	}
+	return [offset, tokenEnd(source, offset)]
 }
 
 /**
@@ -453,30 +492,33 @@ export function contractRange(source: string, filename: string, offset: number):
  * `.meeko/` ni las dependencias.
  */
 export function projectCheckRoot(path: string): string | undefined {
-  const root = projectRoot(path);
-  const inner = relative(root, resolve(path));
-  if (!inner || inner === ".." || inner.startsWith(`..${sep}`)) return undefined;
-  const parts = inner.split(sep);
-  if (parts[0] === ".meeko" || parts.some((part) => part === "node_modules" || part === ".git")) return undefined;
-  const name = parts.at(-1)!;
-  const relevant = (/\.(?:meeko|[cm]?ts)$/.test(name) && !name.endsWith(".d.meeko.ts"))
-    || /^meeko\.config\.[cm]?[jt]s$/.test(name) || /^tsconfig.*\.json$/.test(name) || name === "package.json"
-    // A folder: it has no extension, and a removed one cannot be checked on disk.
-    || !name.includes(".");
-  if (!relevant) return undefined;
-  return frameworkContractRoot(path) ?? (existsSync(join(root, "app")) ? root : undefined);
+	const root = projectRoot(path)
+	const inner = relative(root, resolve(path))
+	if (!inner || inner === '..' || inner.startsWith(`..${sep}`)) return undefined
+	const parts = inner.split(sep)
+	if (parts[0] === '.meeko' || parts.some((part) => part === 'node_modules' || part === '.git')) return undefined
+	const name = parts.at(-1)!
+	const relevant =
+		(/\.(?:meeko|[cm]?ts)$/.test(name) && !name.endsWith('.d.meeko.ts')) ||
+		/^meeko\.config\.[cm]?[jt]s$/.test(name) ||
+		/^tsconfig.*\.json$/.test(name) ||
+		name === 'package.json' ||
+		// A folder: it has no extension, and a removed one cannot be checked on disk.
+		!name.includes('.')
+	if (!relevant) return undefined
+	return frameworkContractRoot(path) ?? (existsSync(join(root, 'app')) ? root : undefined)
 }
 
 /** Raíz del proyecto cuyo contrato de páginas depende de este archivo, si lo hay. */
 export function frameworkContractRoot(filename: string): string | undefined {
-  const root = projectRoot(filename);
-  const parts = relative(root, resolve(filename)).split(sep);
-  const app = parts.indexOf("app");
-  if (app < 0) return undefined;
-  const area = parts[app + 1];
-  const basename = parts.at(-1) ?? "";
-  if (area === "pages" && (basename.endsWith(".meeko") || basename.endsWith(".route.ts"))) return root;
-  if (area === "layouts" && basename.endsWith(".meeko")) return root;
-  if (area === "app.meeko" || area === "error.meeko") return root;
-  return undefined;
+	const root = projectRoot(filename)
+	const parts = relative(root, resolve(filename)).split(sep)
+	const app = parts.indexOf('app')
+	if (app < 0) return undefined
+	const area = parts[app + 1]
+	const basename = parts.at(-1) ?? ''
+	if (area === 'pages' && (basename.endsWith('.meeko') || basename.endsWith('.route.ts'))) return root
+	if (area === 'layouts' && basename.endsWith('.meeko')) return root
+	if (area === 'app.meeko' || area === 'error.meeko') return root
+	return undefined
 }

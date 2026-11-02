@@ -15,7 +15,7 @@ related:
   - "syntax:meekoteleport"
   - docs/framework.md#props-del-layout-desde-la-página
   - docs/framework.md#layouts-con-nombre
-source-hash: da043b0a861c9758c7a75fe00f97dbce157e9605a5f6983227f03653f510a823
+source-hash: 08ddd2df9c8b07ed38f59e97df1be4c53a0d13bbd3948b5009b9dff88df674dc
 ---
 
 A named layout (`app/layouts/dashboard.meeko`) declares ordinary props: a title, whether it shows an alert, which tab it marks. The page passes them in two ways: static or calculated from its data in [`definePage`](/en/docs/reference/definepage)'s `layoutProps`, or from its `<script>` with `useLayout()` for values depending on browser state. `layout.set(patch)` changes the named props and the layout updates only what reads them, without remounting.

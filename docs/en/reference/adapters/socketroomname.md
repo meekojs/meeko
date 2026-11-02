@@ -10,7 +10,7 @@ related:
   - "@meekojs/meeko/cloudflare#DurableObjectSocketPubSub"
   - "@meekojs/meeko/cloudflare#createWorker"
   - docs/framework.md#socket-y-durable-objects
-source-hash: 35bfd11d2685598e7e342acc2f5c0c22330e47bee64a798b9d0b3bc24d0a7656
+source-hash: 7edaf65a6a9a4915281f993de97c7f4647774b2a9439c5cb83ea28396b5db60a
 ---
 
 `socketRoomName(channel, room)` returns the name Meeko uses to locate a room's Durable Object: the channel and room separated by a null character (`"chat\u0000general"`). It is used by `createWorker` when forwarding an upgrade, by `DurableObjectSocketPubSub` when publishing and by the room itself to recognize publications addressed to it.

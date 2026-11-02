@@ -16,16 +16,16 @@ El build prepara los cinco paquetes públicos, la base documental privada y sus 
 
 ## Pruebas por categoría
 
-| Categoría             | Comando                        | Alcance                                                     |
-| --------------------- | ------------------------------ | ----------------------------------------------------------- |
-| Núcleo                | `pnpm test`                    | Compilador, SSR, hidratación, framework y runtime.          |
-| Paquetes              | `pnpm test:packages`           | UI, i18n y plugins ESLint/Prettier, usando el build previo. |
-| Verificación ampliada | `pnpm verify`                  | Núcleo, ejemplos, tipos de pruebas, Vite y DevTools.        |
-| Navegador del núcleo  | `pnpm e2e`                     | Interacciones e hidratación del motor.                      |
-| Navegador de UI       | `pnpm -F @meekojs/ui test:e2e` | Web UI, Container, cards, tablas, modales y View Transitions.         |
-| Web i18n | `pnpm -F meeko-i18n-site build && pnpm -F meeko-i18n-site test:e2e` | Build de producción, catálogos reales, cambio de idioma y RTL. |
-| Web pública           | `pnpm -F meeko-site test`      | Referencias y contenido del sitio.                          |
-| Distribución          | `pnpm package:workspace-smoke` | Todos los paquetes instalados desde tarballs.               |
+| Categoría             | Comando                                                             | Alcance                                                        |
+| --------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------- |
+| Núcleo                | `pnpm test`                                                         | Compilador, SSR, hidratación, framework y runtime.             |
+| Paquetes              | `pnpm test:packages`                                                | UI, i18n y plugins ESLint/Prettier, usando el build previo.    |
+| Verificación ampliada | `pnpm verify`                                                       | Núcleo, ejemplos, tipos de pruebas, Vite y DevTools.           |
+| Navegador del núcleo  | `pnpm e2e`                                                          | Interacciones e hidratación del motor.                         |
+| Navegador de UI       | `pnpm -F @meekojs/ui test:e2e`                                      | Web UI, Container, cards, tablas, modales y View Transitions.  |
+| Web i18n              | `pnpm -F meeko-i18n-site build && pnpm -F meeko-i18n-site test:e2e` | Build de producción, catálogos reales, cambio de idioma y RTL. |
+| Web pública           | `pnpm -F meeko-site test`                                           | Referencias y contenido del sitio.                             |
+| Distribución          | `pnpm package:workspace-smoke`                                      | Todos los paquetes instalados desde tarballs.                  |
 
 Las pruebas UI usan Chrome instalado por defecto. En CI se usa Chromium de Playwright mediante `MEEKO_CHROME_PATH`; puedes establecer esa variable para elegir otro ejecutable compatible. Los escenarios UI se ejecutan secuencialmente porque algunos prueban HMR modificando y restaurando artefactos.
 

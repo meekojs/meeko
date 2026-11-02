@@ -30,24 +30,24 @@ const response = errorResponse(new ApiError("NOT_FOUND", 404), crypto.randomUUID
 
 ## Parámetros
 
-| Parámetro | Tipo | Descripción |
-| --- | --- | --- |
-| `error` | `unknown` | El error capturado. |
-| `requestId` | `string` | El ID de la petición: va en el cuerpo y en `x-request-id`, y es el que `onError` recibe con el error privado. |
+| Parámetro   | Tipo      | Descripción                                                                                                   |
+| ----------- | --------- | ------------------------------------------------------------------------------------------------------------- |
+| `error`     | `unknown` | El error capturado.                                                                                           |
+| `requestId` | `string`  | El ID de la petición: va en el cuerpo y en `x-request-id`, y es el que `onError` recibe con el error privado. |
 
 ## Valor devuelto
 
 Un `Response` con `content-type: application/json; charset=utf-8` y `x-request-id`:
 
-| Error | Estado | Cuerpo |
-| --- | --- | --- |
-| `ApiError("CODE", status)` | `status` | `{"code":"CODE","status":…,"requestId":"…"}` |
-| `ApiError` con `issues` y estado `4xx` (desde `1.5`) | `status` | Añade `issues: [{ path, message }]`, como mucho 20. En un `5xx` no se envían. |
-| Entrada que no supera su schema | `400` | `INVALID_PARAMS`, `INVALID_QUERY`, `INVALID_BODY` o `INVALID_INPUT`, con `issues` (desde `1.2`). |
-| `rateLimit` superado | `429` | `RATE_LIMITED`, con `Retry-After` en segundos (desde `1.2`). |
-| `SessionRevokedError` | `401` | `SESSION_REVOKED` |
-| `SessionSecurityError` | `403` | `INVALID_ORIGIN` o `INVALID_CSRF` |
-| Cualquier otro | `500` | `INTERNAL_ERROR`, sin mensaje |
+| Error                                                | Estado   | Cuerpo                                                                                           |
+| ---------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------ |
+| `ApiError("CODE", status)`                           | `status` | `{"code":"CODE","status":…,"requestId":"…"}`                                                     |
+| `ApiError` con `issues` y estado `4xx` (desde `1.5`) | `status` | Añade `issues: [{ path, message }]`, como mucho 20. En un `5xx` no se envían.                    |
+| Entrada que no supera su schema                      | `400`    | `INVALID_PARAMS`, `INVALID_QUERY`, `INVALID_BODY` o `INVALID_INPUT`, con `issues` (desde `1.2`). |
+| `rateLimit` superado                                 | `429`    | `RATE_LIMITED`, con `Retry-After` en segundos (desde `1.2`).                                     |
+| `SessionRevokedError`                                | `401`    | `SESSION_REVOKED`                                                                                |
+| `SessionSecurityError`                               | `403`    | `INVALID_ORIGIN` o `INVALID_CSRF`                                                                |
+| Cualquier otro                                       | `500`    | `INTERNAL_ERROR`, sin mensaje                                                                    |
 
 ## Ejemplos
 
@@ -83,6 +83,7 @@ export const conflict = errorResponse(
 ### Un handler de un host propio que nunca rechaza
 
 <!-- no-check -->
+
 ```ts
 async function handle(request: Request): Promise<Response> {
   const requestId = crypto.randomUUID();
@@ -106,6 +107,7 @@ catch (error) { return Response.json({ error: String(error) }, { status: 500 });
 Un error de base de datos o de un servicio puede llevar consultas, rutas o datos personales. `errorResponse` sólo publica el código; el detalle va a `onError` con el mismo `requestId`, que el usuario puede citar.
 
 <!-- no-check -->
+
 ```ts good
 catch (error) { app.reportError(error, requestId); return errorResponse(error, requestId); }
 ```
@@ -119,6 +121,7 @@ throw Object.assign(new Error("No encontrado"), { status: 404 });
 Sólo `ApiError` conserva el estado: esto responde `500 INTERNAL_ERROR` y llega a `onError` como un fallo del servidor.
 
 <!-- no-check -->
+
 ```ts good
 throw new ApiError("NOT_FOUND", 404);
 ```
@@ -132,6 +135,7 @@ throw new ApiError("BROKEN", 503, { issues: [{ path: "email", message: "El servi
 La respuesta es `503 {"code":"BROKEN",…}` sin `issues`: los mensajes por campo sólo viajan con un estado `4xx`.
 
 <!-- no-check -->
+
 ```ts good
 throw new ApiError("MAIL_UNAVAILABLE", 503);
 ```

@@ -19,7 +19,7 @@ related:
   - docs/api.md#nombres-de-componente-en-is
   - docs/api.md#atributos-en-bloque-con-bind
   - docs/api.md#props-estáticas
-source-hash: ab01c9387c07273e65f80869f5d6c7203ca0ef0c3329c30c2537ac7870825194
+source-hash: 0f20da1eb33a2f71ce68d11900a76846d876b7ece91591c72eef6a853783d715
 ---
 
 `<component is="expresión">` renders the component returned by the expression: a prop receiving a component, one from a view table, one chosen by a condition. Each `bind:` passes a typed prop, each `on:` an event from its `defineEmits`, and `meeko check` checks required props, names and types. If `is` changes, Meeko disposes of the previous instance and renders and hydrates the new one in the same place.

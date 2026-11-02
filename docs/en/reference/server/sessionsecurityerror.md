@@ -12,7 +12,7 @@ related:
   - "@meekojs/meeko/server#errorResponse"
   - docs/framework.md#sesiones-y-seguridad
   - docs/framework.md#origin-en-mutaciones-anónimas
-source-hash: c8b9dae83e12c6662f1824c10c9b17da164df82587ee8708f9ff4c59a55aad01
+source-hash: f130ce59dc5ac5edad569e930e544f5b0496574141fa5fd06498b03bb7e67e2c
 ---
 
 `SessionSecurityError` indicates that a request changing data failed a session check. Its `code` is:

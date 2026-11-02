@@ -34,11 +34,11 @@ Todas las páginas de `app/pages/(dashboard)/` se pintan dentro de `app/layouts/
 
 ## Opciones
 
-| Opción | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `layout` | nombre de un layout, o `false` | el del grupo exterior, o `default` | Layout con nombre de `app/layouts/<nombre>.meeko`. `false` quita el layout con nombre y deja `app/app.meeko` y los `+layout.meeko`. **Debe ser un literal.** |
-| `layoutProps` | `Props` del layout | ninguno | Props para el layout, tipadas contra el que elige `layout` (o el heredado). Un objeto literal de textos, números, booleanos, `null`, arrays y objetos. Se combinan por clave con las de los grupos exteriores y la página, que gana. |
-| `middleware` | nombres de `app/middleware`, o `false` | los heredados | Desde `1.6`. Middleware con nombre que se suman a los de los grupos exteriores, sin repetir. `false` quita los heredados. **Debe ser un array literal.** |
+| Opción        | Tipo                                   | Por defecto                        | Descripción                                                                                                                                                                                                                          |
+| ------------- | -------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `layout`      | nombre de un layout, o `false`         | el del grupo exterior, o `default` | Layout con nombre de `app/layouts/<nombre>.meeko`. `false` quita el layout con nombre y deja `app/app.meeko` y los `+layout.meeko`. **Debe ser un literal.**                                                                         |
+| `layoutProps` | `Props` del layout                     | ninguno                            | Props para el layout, tipadas contra el que elige `layout` (o el heredado). Un objeto literal de textos, números, booleanos, `null`, arrays y objetos. Se combinan por clave con las de los grupos exteriores y la página, que gana. |
+| `middleware`  | nombres de `app/middleware`, o `false` | los heredados                      | Desde `1.6`. Middleware con nombre que se suman a los de los grupos exteriores, sin repetir. `false` quita los heredados. **Debe ser un array literal.**                                                                             |
 
 ## Valor devuelto
 
@@ -96,6 +96,7 @@ export default defineGroup({ layout: "dashboard" });
 Sin `app/layouts/dashboard.meeko`, `meeko check`, `meeko dev` y `meeko build` se detienen con `el layout "dashboard" no existe; crea app/layouts/dashboard.meeko (layouts disponibles: "default")`.
 
 <!-- no-check -->
+
 ```ts good
 // con app/layouts/dashboard.meeko
 export default defineGroup({ layout: "dashboard" });
@@ -113,6 +114,7 @@ export default defineGroup({ layout: name });
 `layout debe ser un literal de texto (el nombre de un layout de app/layouts) o false para que Meeko pueda leerlo durante el build`. Lo mismo con un spread o con `middleware` calculado.
 
 <!-- no-check -->
+
 ```ts good
 export default defineGroup({ layout: "admin" });
 ```
@@ -126,6 +128,7 @@ export default defineGroup({ layout: "default", sidebar: true });
 `opción de grupo desconocida "sidebar"; un +group.ts admite layout, layoutProps y middleware`. Las opciones de la página (`render`, `load`, `head`) van en su `definePage`.
 
 <!-- no-check -->
+
 ```ts good
 export default defineGroup({ layout: "default", layoutProps: { sidebar: true } });
 ```
@@ -139,6 +142,7 @@ export default defineGroup({ layout: "default", layoutProps: { title: "Panel" } 
 Si `app/layouts/default.meeko` no declara `title`, `meeko check` da `TS2344: Type '"Las layoutProps de app/pages/(dash)/+group.ts no coinciden con las props del layout default"' does not satisfy the constraint 'true'.`
 
 <!-- no-check -->
+
 ```ts good
 // app/layouts/default.meeko declara defineProps<{ title?: string }>()
 export default defineGroup({ layout: "default", layoutProps: { title: "Panel" } });
@@ -153,6 +157,7 @@ export default defineGroup({ middleware: ["auth", "locale"] });
 `el middleware "auth" no existe; crea app/middleware/auth.ts con defineRouteMiddleware(..., { global: false }) (middleware con nombre disponibles: ninguno), o app/middleware/auth.server.ts con defineServerRouteMiddleware para uno que sólo se ejecuta en el servidor`. Uno global, como `10-locale.ts` sin opciones, da `el middleware "locale" (…) es global y ya se ejecuta en todas las rutas; quítalo de middleware o decláralo con defineRouteMiddleware(..., { global: false })`.
 
 <!-- no-check -->
+
 ```ts good
 // con app/middleware/auth.server.ts declarado con { global: false }
 export default defineGroup({ middleware: ["auth"] });

@@ -14,7 +14,7 @@ related:
   - "@meekojs/meeko/framework#useForm"
   - docs/api.md#controles-de-formulario-con-model
   - docs/api.md#modelos-de-componente-definemodel-y-model
-source-hash: 47346146f7ceea1e9a6018744f761537bd60dbfe0b1edce228af137a23e8ff1e
+source-hash: b18fa30e85f4f787d0ec951bf31b2675a83dcb7240d150cbecc073872920d4a6
 ---
 
 `model="señal"` binds a form control to a signal in both directions: the control displays the signal's value and every user edit writes to it. It replaces the `bind:value` + `on:input` pair.

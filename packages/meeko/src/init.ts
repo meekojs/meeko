@@ -1,9 +1,9 @@
-import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
-import { basename, dirname, join, resolve } from "node:path";
+import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
+import { basename, dirname, join, resolve } from 'node:path'
 
 /** Entradas que puede dejar un gestor de paquetes antes de generar el proyecto. */
 /** What `meeko init` and `meeko init-framework` accept in the destination: a package being started. */
-const packageScaffoldEntries = new Set(["package.json", "package-lock.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "yarn.lock", "bun.lock", "bun.lockb", "node_modules", ".npmrc", ".git"]);
+const packageScaffoldEntries = new Set(['package.json', 'package-lock.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'yarn.lock', 'bun.lock', 'bun.lockb', 'node_modules', '.npmrc', '.git'])
 
 /**
  * Entries of the destination of `meeko init` and `meeko init-framework`, after checking that it can
@@ -11,42 +11,42 @@ const packageScaffoldEntries = new Set(["package.json", "package-lock.json", "pn
  * a `package.json` with only lockfiles, `node_modules`, `.npmrc` and `.git` around it.
  */
 export async function scaffoldDestinationEntries(target: string): Promise<string[]> {
-  let entries: string[] = [];
-  try {
-    if (!(await stat(target)).isDirectory()) throw new Error(`El destino no es un directorio: ${target}`);
-    entries = await readdir(target);
-  } catch (error) {
-    if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
-  }
-  const unexpected = entries.filter((entry) => !packageScaffoldEntries.has(entry));
-  // Lockfiles or node_modules without their package.json belong to something else.
-  const orphaned = !entries.includes("package.json") && entries.some((entry) => entry !== ".git");
-  if (unexpected.length > 0 || orphaned) {
-    throw new Error(`El destino no está vacío: ${target}${unexpected.length > 0 ? ` (${unexpected.join(", ")})` : " (sin package.json)"}`);
-  }
-  return entries;
+	let entries: string[] = []
+	try {
+		if (!(await stat(target)).isDirectory()) throw new Error(`El destino no es un directorio: ${target}`)
+		entries = await readdir(target)
+	} catch (error) {
+		if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error
+	}
+	const unexpected = entries.filter((entry) => !packageScaffoldEntries.has(entry))
+	// Lockfiles or node_modules without their package.json belong to something else.
+	const orphaned = !entries.includes('package.json') && entries.some((entry) => entry !== '.git')
+	if (unexpected.length > 0 || orphaned) {
+		throw new Error(`El destino no está vacío: ${target}${unexpected.length > 0 ? ` (${unexpected.join(', ')})` : ' (sin package.json)'}`)
+	}
+	return entries
 }
 
 /** Comprueba que un valor JSON sea un objeto de configuración. */
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+	return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 /** Archivos autocontenidos del proyecto inicial, incluidos en la CLI publicada. */
 const starterFiles: Readonly<Record<string, string>> = {
-  ".gitignore": "node_modules/\ndist/\n.meeko/\n",
-  "index.html": `<!doctype html>
+	'.gitignore': 'node_modules/\ndist/\n.meeko/\n',
+	'index.html': `<!doctype html>
 <html lang="es">
   <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Meeko SSR</title></head>
   <body><div id="app"></div><script type="module" src="/src/entry-client.ts"></script></body>
 </html>
 `,
-  "vite.config.ts": `import { defineConfig } from "vite";
+	'vite.config.ts': `import { defineConfig } from "vite";
 import { meeko } from "@meekojs/meeko/vite";
 
 export default defineConfig({ plugins: [meeko()] });
 `,
-  "tsconfig.json": `{
+	'tsconfig.json': `{
   "compilerOptions": {
     "target": "ES2022", "module": "ESNext", "moduleResolution": "Bundler",
     "lib": ["ES2022", "DOM"], "types": ["node", "vite/client"],
@@ -57,7 +57,7 @@ export default defineConfig({ plugins: [meeko()] });
   "include": ["src/**/*.ts", "vite.config.ts", ".meeko/types/routes.d.ts"]
 }
 `,
-  "src/App.meeko": `<script lang="ts">
+	'src/App.meeko': `<script lang="ts">
 import { signal } from "@meekojs/meeko";
 
 /** Propiedades transferidas desde el servidor. */
@@ -79,7 +79,7 @@ main { max-width: 40rem; margin: 4rem auto; font: 1.2rem system-ui; }
 button { cursor: pointer; padding: .65rem 1rem; }
 </style>
 `,
-  "src/entry-server.ts": `import { serializeJson } from "@meekojs/meeko";
+	'src/entry-server.ts': `import { serializeJson } from "@meekojs/meeko";
 import { css, renderWithState } from "./App.meeko";
 
 /** Genera HTML y estado inicial desde el mismo componente que hidrata el cliente. */
@@ -91,7 +91,7 @@ export function renderPage(clientSource: string, initial = 1): string {
     + serializeJson({ props, state: rendered.state }) + '</script><script type="module" src="' + clientSource + '"></script></body></html>';
 }
 `,
-  "src/entry-client.ts": `import { hydrate } from "./App.meeko";
+	'src/entry-client.ts': `import { hydrate } from "./App.meeko";
 import type { HotState } from "@meekojs/meeko";
 
 const root = document.getElementById("app");
@@ -104,7 +104,7 @@ if (typeof props !== "object" || props === null || !("initial" in props) || type
 if (typeof state !== "object" || state === null || !("count" in state) || typeof state.count !== "number" || !Number.isFinite(state.count)) throw new TypeError("Invalid SSR state");
 hydrate(root, { initial: props.initial }, { count: state.count } satisfies HotState);
 `,
-  "server.mjs": `import { createServer } from "node:http";
+	'server.mjs': `import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { dirname, extname, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -180,7 +180,7 @@ const onSignal = () => {
 process.once("SIGINT", onSignal);
 process.once("SIGTERM", onSignal);
 `,
-  "README.md": `# Meeko SSR starter
+	'README.md': `# Meeko SSR starter
 
 Proyecto inicial con renderizado en servidor e hidratación del mismo componente \`.meeko\`.
 
@@ -193,55 +193,64 @@ Abre http://localhost:4173. El servidor produce HTML y transfiere las props y se
 
 \`npm run check\` genera los tipos del componente y comprueba TypeScript. \`npm run build\` compila cliente y servidor; \`npm start\` sirve ambas compilaciones con SSR.
 `,
-};
+}
 
 /** Crea un proyecto SSR independiente sin sobrescribir archivos del usuario. */
 export async function initProject(directory: string): Promise<string> {
-  const target = resolve(directory);
-  const name = basename(target).toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^[._-]+|[._-]+$/g, "") || "meeko-app";
-  const packageMetadata: unknown = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
-  if (typeof packageMetadata !== "object" || packageMetadata === null || !("version" in packageMetadata) || typeof packageMetadata.version !== "string") {
-    throw new Error("No se puede leer la versión del paquete de Meeko");
-  }
-  const existingEntries = await scaffoldDestinationEntries(target);
-  const existing: unknown = existingEntries.includes("package.json") ? JSON.parse(await readFile(join(target, "package.json"), "utf8")) : {};
-  if (!isRecord(existing)) throw new Error(`package.json no válido en ${target}`);
-  const existingScripts = existing.scripts ?? {};
-  const existingDependencies = existing.dependencies ?? {};
-  const existingDevDependencies = existing.devDependencies ?? {};
-  const existingEngines = existing.engines ?? {};
-  if (!isRecord(existingScripts) || !isRecord(existingDependencies) || !isRecord(existingDevDependencies) || !isRecord(existingEngines)) {
-    throw new Error(`package.json no válido en ${target}`);
-  }
-  const scripts = {
-    dev: "node server.mjs",
-    check: "meeko types src/App.meeko && tsc --noEmit",
-    build: "npm run check && vite build --outDir dist/client --manifest && vite build --ssr src/entry-server.ts --outDir dist/server",
-    start: "node server.mjs --production",
-  };
-  const devDependencies = { "@types/node": "^24.0.0", typescript: "^7.0.2", vite: "^8.3.5" };
-  for (const command of Object.keys(scripts)) {
-    if (command in existingScripts) throw new Error(`El destino ya define el script ${command}: ${target}`);
-  }
-  if (Object.keys(existingDependencies).some((dependency) => dependency !== "@meekojs/meeko") || Object.keys(existingDevDependencies).some((dependency) => !(dependency in devDependencies))) {
-    throw new Error(`El destino tiene otras dependencias: ${target}`);
-  }
-  const packageFile = JSON.stringify({
-    ...existing,
-    name: typeof existing.name === "string" ? existing.name : name,
-    private: true,
-    type: "module",
-    engines: { ...existingEngines, node: ">=24" },
-    scripts: { ...existingScripts, ...scripts },
-    dependencies: { ...existingDependencies, "@meekojs/meeko": packageMetadata.version },
-    devDependencies: { ...existingDevDependencies, ...devDependencies },
-  }, null, 2) + "\n";
-  await mkdir(target, { recursive: true });
-  for (const [filename, content] of Object.entries(starterFiles)) {
-    const path = join(target, filename);
-    await mkdir(dirname(path), { recursive: true });
-    await writeFile(path, content, { encoding: "utf8", flag: "wx" });
-  }
-  await writeFile(join(target, "package.json"), packageFile, { encoding: "utf8", flag: existingEntries.includes("package.json") ? "w" : "wx" });
-  return target;
+	const target = resolve(directory)
+	const name =
+		basename(target)
+			.toLowerCase()
+			.replace(/[^a-z0-9._-]+/g, '-')
+			.replace(/^[._-]+|[._-]+$/g, '') || 'meeko-app'
+	const packageMetadata: unknown = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'))
+	if (typeof packageMetadata !== 'object' || packageMetadata === null || !('version' in packageMetadata) || typeof packageMetadata.version !== 'string') {
+		throw new Error('No se puede leer la versión del paquete de Meeko')
+	}
+	const existingEntries = await scaffoldDestinationEntries(target)
+	const existing: unknown = existingEntries.includes('package.json') ? JSON.parse(await readFile(join(target, 'package.json'), 'utf8')) : {}
+	if (!isRecord(existing)) throw new Error(`package.json no válido en ${target}`)
+	const existingScripts = existing.scripts ?? {}
+	const existingDependencies = existing.dependencies ?? {}
+	const existingDevDependencies = existing.devDependencies ?? {}
+	const existingEngines = existing.engines ?? {}
+	if (!isRecord(existingScripts) || !isRecord(existingDependencies) || !isRecord(existingDevDependencies) || !isRecord(existingEngines)) {
+		throw new Error(`package.json no válido en ${target}`)
+	}
+	const scripts = {
+		dev: 'node server.mjs',
+		check: 'meeko types src/App.meeko && tsc --noEmit',
+		build: 'npm run check && vite build --outDir dist/client --manifest && vite build --ssr src/entry-server.ts --outDir dist/server',
+		start: 'node server.mjs --production',
+	}
+	const devDependencies = { '@types/node': '^24.0.0', typescript: '^7.0.2', vite: '^8.3.5' }
+	for (const command of Object.keys(scripts)) {
+		if (command in existingScripts) throw new Error(`El destino ya define el script ${command}: ${target}`)
+	}
+	if (Object.keys(existingDependencies).some((dependency) => dependency !== '@meekojs/meeko') || Object.keys(existingDevDependencies).some((dependency) => !(dependency in devDependencies))) {
+		throw new Error(`El destino tiene otras dependencias: ${target}`)
+	}
+	const packageFile =
+		JSON.stringify(
+			{
+				...existing,
+				name: typeof existing.name === 'string' ? existing.name : name,
+				private: true,
+				type: 'module',
+				engines: { ...existingEngines, node: '>=24' },
+				scripts: { ...existingScripts, ...scripts },
+				dependencies: { ...existingDependencies, '@meekojs/meeko': packageMetadata.version },
+				devDependencies: { ...existingDevDependencies, ...devDependencies },
+			},
+			null,
+			2,
+		) + '\n'
+	await mkdir(target, { recursive: true })
+	for (const [filename, content] of Object.entries(starterFiles)) {
+		const path = join(target, filename)
+		await mkdir(dirname(path), { recursive: true })
+		await writeFile(path, content, { encoding: 'utf8', flag: 'wx' })
+	}
+	await writeFile(join(target, 'package.json'), packageFile, { encoding: 'utf8', flag: existingEntries.includes('package.json') ? 'w' : 'wx' })
+	return target
 }

@@ -11,7 +11,7 @@ related:
   - "@meekojs/meeko#computed"
   - "@meekojs/meeko#untrack"
   - docs/api.md#reactividad
-source-hash: 00580a9da97d298c4fd385154a0d052e15b70b4ebb63aa0fe37bc3c7e88e6ae8
+source-hash: a5da4ace07a06d8b51ca9ec1f90b47023e4cb9b75789c01f49478a2e60267191
 ---
 
 Each signal write immediately runs the observers that read it. If you change three signals in succession, an `effect` that reads all three runs three times and sees two intermediate states. `batch(fn)` delays those notifications until `fn` finishes: affected observers run once, after all writes are complete.

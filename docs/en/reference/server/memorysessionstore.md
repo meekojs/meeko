@@ -13,7 +13,7 @@ related:
   - "@meekojs/meeko/server#SqlSessionStore"
   - docs/framework.md#sesiones-sin-configuración
   - docs/framework.md#sesiones-y-seguridad
-source-hash: 2c6f95cb9da990740f8b7c8ed06bf2fd484ab1cc2d3bc6c82edbde79360698ce
+source-hash: 5bba3375c568b925bc715b08a00f002adf3ff1c1af78d0faa40bdf6c9857926b
 ---
 
 `MemorySessionStore` stores sessions in a process-local `Map`. It implements the full `SessionStore` contract (atomic `replace` and `revokeFamily`, `subscribeRevocations` between managers in the same process and in-memory `rateLimit`), but declares `persistent: false` and `developmentOnly: true`: restarting loses all sessions and two instances do not share them. `SessionManager({ production: true })` rejects it.

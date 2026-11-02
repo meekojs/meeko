@@ -15,7 +15,7 @@ related:
   - "syntax:meekoawait"
   - docs/framework.md#streaming-ssr-render-stream
   - docs/framework.md#modos-de-render
-source-hash: 652caca48bb1b905a565903bf5c7e0530ebb67077259137ce3282d73f31f161d
+source-hash: 5cdb8031f1d211925c885e71c14ae8653c26550628aa11e7ee6b1feaba23389e
 ---
 
 `defer(fábrica)` or `defer(promesa)` marks slow page data. With `render: "stream"`, the server sends HTML before the value resolves and the value arrives later in the same response; the page reads it with reactive `status`, `value` and `error`. With `"ssr"` or `"prerender"`, the server awaits it before rendering, so HTML always contains it.

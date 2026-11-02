@@ -340,8 +340,7 @@ function keepSnippetEdges(node: HtmlNode): void {
 	const closed = node.endSourceSpan?.start
 	if (!opened || !closed) return
 	const Span = node.sourceSpan.constructor as new (start: SourceLocation, end: SourceLocation) => SourceSpan
-	const edge = (start: SourceLocation, end: SourceLocation): HtmlNode =>
-		node.createChild({ kind: 'text', value: snippetEdgeSpace, sourceSpan: new Span(start, end), isLeadingSpaceSensitive: true, hasLeadingSpaces: false, isTrailingSpaceSensitive: true, hasTrailingSpaces: false })
+	const edge = (start: SourceLocation, end: SourceLocation): HtmlNode => node.createChild({ kind: 'text', value: snippetEdgeSpace, sourceSpan: new Span(start, end), isLeadingSpaceSensitive: true, hasLeadingSpaces: false, isTrailingSpaceSensitive: true, hasTrailingSpaces: false })
 	const first = children[0]
 	const last = children[children.length - 1]
 	if (!first || !last) {

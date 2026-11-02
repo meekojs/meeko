@@ -23,6 +23,7 @@ Si escapa de un handler de API o RPC, la respuesta es `401 {"code":"SESSION_REVO
 ## Uso
 
 <!-- no-check -->
+
 ```ts
 // server/api/orders/[id]/pay.post.ts
 import { SessionRevokedError } from "@meekojs/meeko/server";
@@ -48,12 +49,12 @@ export default defineApiRoute({
 
 `new SessionRevokedError()` no recibe argumentos. Hereda de `ApiError`:
 
-| Propiedad | Valor |
-| --- | --- |
-| `code` | `"SESSION_REVOKED"` |
-| `status` | `401` |
+| Propiedad | Valor                                                 |
+| --------- | ----------------------------------------------------- |
+| `code`    | `"SESSION_REVOKED"`                                   |
+| `status`  | `401`                                                 |
 | `message` | `"Session revoked"` (interno; no se envía al cliente) |
-| `name` | `"SessionRevokedError"` |
+| `name`    | `"SessionRevokedError"`                               |
 
 ## Valor devuelto
 
@@ -64,6 +65,7 @@ Un `Error` que es también `ApiError`. `errorResponse` lo convierte en `401` con
 ### Cancelar el trabajo largo de una sesión revocada
 
 <!-- no-check -->
+
 ```ts
 handler: async ({ context }) => {
   // context.signal se aborta si el cliente se va o si otra pestaña cierra la sesión.
@@ -108,6 +110,7 @@ await payments.charge(order);
 El cobro se hace con una sesión que ya no vale. `verify()` existe para cortar antes de un efecto irreversible.
 
 <!-- no-check -->
+
 ```ts good
 await context.session.verify(); // si lanza, la respuesta es 401 y no se cobra
 await payments.charge(order);
@@ -122,6 +125,7 @@ const rows = await db.query(longReportSql); // sin señal
 No hay error: la revocación aborta la señal, pero el aborto es cooperativo y el código que no la observa sigue hasta el final.
 
 <!-- no-check -->
+
 ```ts good
 const rows = await db.query(longReportSql, { signal: context.signal });
 ```

@@ -13,7 +13,7 @@ related:
   - "@meekojs/meeko#computed"
   - docs/api.md#componentes-meeko
   - docs/api.md#condiciones-con-ifwhen-y-tipos
-source-hash: ec2a3b7ef6e193852bac327804396cd6006adea0e5dae4a84ceb498de6d408bf
+source-hash: 23a4fc9098bf6252a2b135cc1fc05c5d8c98a8da47025d8a2f8d2b465a66c8de
 ---
 
 `{expresión}` writes a TypeScript expression's value into an element's content, always **escaped**: `<`, `>`, `&` and quotes arrive as text, never HTML. The expression sees everything declared at `<script>` top level (signals, `props`, functions, imports) and data exported by a page's `<script server>`.

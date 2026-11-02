@@ -35,9 +35,9 @@ export const guide = { body: documentHtml(trustHtml(`<h2>Guía</h2><p>${params.s
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `html` | `TrustedHtml` | obligatorio | HTML ya declarado de confianza con [`trustHtml`](/docs/reference/trusthtml). Un `string` sin marcar es un error de tipos. |
+| Parámetro | Tipo          | Por defecto | Descripción                                                                                                               |
+| --------- | ------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `html`    | `TrustedHtml` | obligatorio | HTML ya declarado de confianza con [`trustHtml`](/docs/reference/trusthtml). Un `string` sin marcar es un error de tipos. |
 
 ## Valor devuelto
 

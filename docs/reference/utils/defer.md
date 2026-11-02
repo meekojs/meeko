@@ -66,10 +66,10 @@ El título llega en el primer byte; los comentarios, cuando la API responde o a 
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `source` | `(signal: AbortSignal) => T \| PromiseLike<T>`, o una promesa | obligatorio | Una fábrica, que Meeko llama cuando el loader o el bloque terminan, o una promesa ya iniciada. La fábrica recibe un `AbortSignal` que se aborta cuando el valor deja de esperarse: plazo agotado, cliente desconectado, sesión revocada, stream cancelado, petición `HEAD` o, en el navegador, al salir de la ruta. |
-| `options.timeoutMs` | `number` | `10000` | Plazo en milisegundos, desde que el loader devuelve. Debe ser finito y positivo (si no, `RangeError`). |
+| Parámetro           | Tipo                                                          | Por defecto | Descripción                                                                                                                                                                                                                                                                                                         |
+| ------------------- | ------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `source`            | `(signal: AbortSignal) => T \| PromiseLike<T>`, o una promesa | obligatorio | Una fábrica, que Meeko llama cuando el loader o el bloque terminan, o una promesa ya iniciada. La fábrica recibe un `AbortSignal` que se aborta cuando el valor deja de esperarse: plazo agotado, cliente desconectado, sesión revocada, stream cancelado, petición `HEAD` o, en el navegador, al salir de la ruta. |
+| `options.timeoutMs` | `number`                                                      | `10000`     | Plazo en milisegundos, desde que el loader devuelve. Debe ser finito y positivo (si no, `RangeError`).                                                                                                                                                                                                              |
 
 Prefiere la fábrica: una promesa ya iniciada no se puede cancelar, sólo dejar de esperar.
 
@@ -77,11 +77,11 @@ Prefiere la fábrica: una promesa ya iniciada no se puede cancelar, sólo dejar 
 
 Un `Deferred<T>`:
 
-| Propiedad | Tipo | Descripción |
-| --- | --- | --- |
-| `status` | `"pending" \| "resolved" \| "rejected"` | El estado. Puede ganar miembros en un minor: un `switch` exhaustivo necesita rama por defecto. |
-| `value` | `T \| undefined` | El valor resuelto, o `undefined` mientras no lo está. |
-| `error` | `{ code, status } \| undefined` | El fallo público si se rechazó: un `ApiError` conserva su código y estado; cualquier otro error llega como `INTERNAL_ERROR`/`500`; un plazo agotado, como `DEFERRED_TIMEOUT`/`504`. |
+| Propiedad | Tipo                                    | Descripción                                                                                                                                                                         |
+| --------- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `status`  | `"pending" \| "resolved" \| "rejected"` | El estado. Puede ganar miembros en un minor: un `switch` exhaustivo necesita rama por defecto.                                                                                      |
+| `value`   | `T \| undefined`                        | El valor resuelto, o `undefined` mientras no lo está.                                                                                                                               |
+| `error`   | `{ code, status } \| undefined`         | El fallo público si se rechazó: un `ApiError` conserva su código y estado; cualquier otro error llega como `INTERNAL_ERROR`/`500`; un plazo agotado, como `DEFERRED_TIMEOUT`/`504`. |
 
 Leer `status`, `value` o `error` en la plantilla, un `computed` o un `effect` se suscribe al resultado.
 
@@ -156,6 +156,7 @@ const slow = defer(load, { timeoutMs: 0 });
 En ejecución, `defer` lanza `RangeError: defer timeoutMs must be a positive finite number of milliseconds`.
 
 <!-- no-check -->
+
 ```ts good
 const slow = defer(load, { timeoutMs: 5_000 });
 ```
@@ -169,6 +170,7 @@ export const route = definePage({ load: async () => ({ comments: defer(loadComme
 ```
 
 <!-- no-check -->
+
 ```ts good
 export const route = definePage({ render: "stream", load: async () => ({ comments: defer(loadComments) }) });
 ```

@@ -36,12 +36,12 @@ export default defineMeekoConfig({
 
 El nombre se forma con el prefijo más los segmentos de la ruta relativa al directorio elegido, en PascalCase. Los guiones y guiones bajos separan palabras:
 
-| Archivo | Directorio que lo registra | Nombre |
-| --- | --- | --- |
-| `app/components/Button.meeko` | `app/components` | `Button` |
+| Archivo                                | Directorio que lo registra            | Nombre           |
+| -------------------------------------- | ------------------------------------- | ---------------- |
+| `app/components/Button.meeko`          | `app/components`                      | `Button`         |
 | `app/components/Form/UserCreate.meeko` | `app/components/Form`, prefijo `Form` | `FormUserCreate` |
-| `app/components/Form/UserEdit.meeko` | `app/components/Form`, prefijo `Form` | `FormUserEdit` |
-| `app/components/user-menu.meeko` | `app/components` | `UserMenu` |
+| `app/components/Form/UserEdit.meeko`   | `app/components/Form`, prefijo `Form` | `FormUserEdit`   |
+| `app/components/user-menu.meeko`       | `app/components`                      | `UserMenu`       |
 
 Si un archivo pertenece a dos directorios configurados de una misma fuente, gana el directorio más específico y el archivo se registra una sola vez. Así, el prefijo `Form` del ejemplo no se suma a la carpeta `Form` por segunda vez. Entre fuentes gana primero el proyecto, luego `extends` y `layers` en el orden de resolución de Meeko, y después los aportes de módulos. Dos archivos distintos con el mismo nombre dentro de una misma fuente producen un error con ambas rutas; cambie el nombre o el prefijo.
 
@@ -51,15 +51,16 @@ Un módulo existente puede aportar componentes con `meeko.addComponentsDir(dir, 
 
 Meeko genera `.meeko/types/components.d.ts` con las entradas de `ComponentRegistry`. Cada entrada apunta al módulo `.meeko` real. Los tipos públicos de `@meekojs/meeko` son:
 
-| Tipo | Significado |
-| --- | --- |
-| `ComponentRegistry` | Relación entre nombre y módulo de cada componente registrado. |
-| `ComponentName` | Unión de los nombres registrados. |
-| `ComponentOf<Name>` | Módulo renderizable correspondiente a `Name`, con sus exports públicos. |
-| `ComponentProps<Name>` | Props de entrada extraídas del contrato de `renderToString` de ese módulo. |
+| Tipo                      | Significado                                                                                                                                                 |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ComponentRegistry`       | Relación entre nombre y módulo de cada componente registrado.                                                                                               |
+| `ComponentName`           | Unión de los nombres registrados.                                                                                                                           |
+| `ComponentOf<Name>`       | Módulo renderizable correspondiente a `Name`, con sus exports públicos.                                                                                     |
+| `ComponentProps<Name>`    | Props de entrada extraídas del contrato de `renderToString` de ese módulo.                                                                                  |
 | `ResolvedComponent<Name>` | Componente con sus props ya asociadas mediante `resolveComponent(name, props)`. `Name` es opcional para almacenar distintos componentes en un mismo estado. |
 
 <!-- no-check -->
+
 ```ts
 // app/utils/component-types.ts
 type Name = ComponentName; // Por ejemplo: "Button" | "FormUserCreate" | "FormUserEdit"
@@ -77,6 +78,7 @@ En un componente genérico, `ComponentOf<Name>` conserva las firmas genéricas e
 Para una función que recibe nombres de una unión, una unión de tuplas conserva la relación entre cada nombre y sus props en la llamada:
 
 <!-- no-check -->
+
 ```ts
 // app/utils/modal-request.ts
 function openModal(...request: ComponentArgs): void {
@@ -136,6 +138,7 @@ El segundo argumento es un objeto de `ComponentProps<Name>`: TypeScript comprueb
 Para limitar una API a un subconjunto del registro, filtre `ComponentArgs` y reenvíe la tupla completa. El resultado conserva ese subconjunto de nombres:
 
 <!-- no-check -->
+
 ```ts
 type ModalName = Extract<ComponentName, `Modal${string}`>;
 type ModalArgs = Extract<ComponentArgs, [name: ModalName, props: unknown]>;
@@ -187,14 +190,14 @@ TypeScript rechaza el nombre porque no figura en `ComponentRegistry`.
 const name: ComponentName = "FormUserCreate";
 ```
 
-| Síntoma | Qué revisar |
-| --- | --- |
-| `Componente de Meeko no registrado` | El nombre distingue mayúsculas; confirme el directorio, prefijo y nombre generado. Valide cadenas externas antes de usarlas. |
-| Nombre duplicado o autoimport ambiguo | Dos archivos generan el mismo nombre; renombre uno o cambie su prefijo. |
-| `ComponentName` no incluye un archivo | Confirme que es `.meeko`, que está bajo un directorio registrado y que la generación de tipos terminó. |
-| TypeScript no acepta las props | Compare la llamada con `defineProps` del componente; `ComponentProps<Name>` no crea props opcionales nuevas. |
-| `<component is>` recibe un valor incompatible | Espere `resolveComponent(name)` y pase el módulo resultante, no la promesa. |
-| El editor no ve componentes de un módulo | En un workspace no confiable no se ejecuta `setup`; abra el proyecto como workspace de confianza si corresponde. |
+| Síntoma                                       | Qué revisar                                                                                                                  |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `Componente de Meeko no registrado`           | El nombre distingue mayúsculas; confirme el directorio, prefijo y nombre generado. Valide cadenas externas antes de usarlas. |
+| Nombre duplicado o autoimport ambiguo         | Dos archivos generan el mismo nombre; renombre uno o cambie su prefijo.                                                      |
+| `ComponentName` no incluye un archivo         | Confirme que es `.meeko`, que está bajo un directorio registrado y que la generación de tipos terminó.                       |
+| TypeScript no acepta las props                | Compare la llamada con `defineProps` del componente; `ComponentProps<Name>` no crea props opcionales nuevas.                 |
+| `<component is>` recibe un valor incompatible | Espere `resolveComponent(name)` y pase el módulo resultante, no la promesa.                                                  |
+| El editor no ve componentes de un módulo      | En un workspace no confiable no se ejecuta `setup`; abra el proyecto como workspace de confianza si corresponde.             |
 
 ## Notas
 

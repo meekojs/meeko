@@ -28,4 +28,11 @@
 </script>
 
 <!-- Sin espacios alrededor de la etiqueta: serían texto dentro de la frase. -->
-<template><I18nTPart each:of="rich(props.key, props.values, props.locale === undefined ? undefined : { locale: props.locale })" each:as="part" each:index="index" each:key="index" bind:snippet="part.tag === undefined ? undefined : byTag[part.tag]" bind:text="part.text" /></template>
+<template><I18nTPart
+		each:of="rich(props.key, props.values, props.locale === undefined ? undefined : { locale: props.locale })"
+		each:as="part"
+		each:index="index"
+		each:key="index"
+		bind:snippet="part.tag === undefined ? undefined : byTag[part.tag]"
+		bind:text="part.text"
+	/></template>

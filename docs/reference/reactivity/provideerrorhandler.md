@@ -44,20 +44,20 @@ Un manejador de cualquier página que rechaza deja el mensaje en el aviso, en lu
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
+| Parámetro | Tipo                                            | Por defecto | Descripción                                                                                                                                                                     |
+| --------- | ----------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `handler` | `(error: unknown, source: ErrorSource) => void` | obligatorio | Recibe cada fallo de la rama. `error` es `unknown`: compruébalo antes de leer sus propiedades. Un fallo dentro del propio `handler` se escribe en la consola junto al original. |
 
 `source` dice dónde se observó el fallo:
 
-| Fuente | Origen |
-| --- | --- |
-| `"event"` | Un manejador `on:` (síncrono o la promesa que devuelve), un aviso `onSuccess`/`onError` de una mutación o un error inesperado de `useForm`. |
-| `"effect"` | Una promesa que un `effect` devolvió por error. |
-| `"cleanup"` | Una promesa que una limpieza devolvió por error. |
-| `"mounted"` | `onMounted`, la continuación tras un `await` de navegador o los datos de un componente que se monta tarde (desde `1.1`). |
-| `"navigation"` | Una navegación del cliente que falla. |
-| `"socket"` | Un cliente Socket sin `onError` propio. |
+| Fuente                      | Origen                                                                                                                                       |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `"event"`                   | Un manejador `on:` (síncrono o la promesa que devuelve), un aviso `onSuccess`/`onError` de una mutación o un error inesperado de `useForm`.  |
+| `"effect"`                  | Una promesa que un `effect` devolvió por error.                                                                                              |
+| `"cleanup"`                 | Una promesa que una limpieza devolvió por error.                                                                                             |
+| `"mounted"`                 | `onMounted`, la continuación tras un `await` de navegador o los datos de un componente que se monta tarde (desde `1.1`).                     |
+| `"navigation"`              | Una navegación del cliente que falla.                                                                                                        |
+| `"socket"`                  | Un cliente Socket sin `onError` propio.                                                                                                      |
 | `"uncaught"`, `"rejection"` | Desde `1.3`, en una aplicación montada: excepciones y promesas sin manejar del código que no pasa por Meeko (un `setTimeout`, una librería). |
 
 ## Valor devuelto
@@ -138,6 +138,7 @@ provideErrorHandler((error) => console.log(error.message));
 `meeko check` da `TS18046: 'error' is of type 'unknown'`: se puede lanzar cualquier valor, no sólo un `Error`.
 
 <!-- no-check -->
+
 ```ts good
 provideErrorHandler((error) => console.log(error instanceof Error ? error.message : String(error)));
 ```
@@ -157,6 +158,7 @@ const first = props.items[0]!.name; // con una lista vacía: TypeError en el ren
 Para un dato que puede faltar, contrólalo en el script; para una página que puede fallar, usa `+error.meeko` o `app/error.meeko`:
 
 <!-- no-check -->
+
 ```ts good
 const first = computed(() => props.items[0]?.name ?? "Sin elementos");
 ```

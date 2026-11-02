@@ -16,7 +16,7 @@ related:
   - "@meekojs/meeko/server#useRequestState"
   - docs/framework.md#código-de-nivel-superior-y-datos-exportados
   - docs/framework.md#dónde-se-usa-cada-api
-source-hash: b57a899d8df04354842e2a75f1e7d50054b06cb39711267dcef7f1ec3c4414a2
+source-hash: 5c60414df65fc01c4fa118bc2c7aa8c63d9a42fe5b6a04f660b75e6161a34791
 ---
 
 `usePage()` provides access to the current request from top-level code in a page's `<script server>`: the URL, `params` and `search` already validated by [`definePage`](/en/docs/reference/definepage) schemas, the original `Request`, request context (session, services, platform) and a cancellation signal. The block can then read the database, check the session, redirect or respond with `404`, and export data the page receives.

@@ -46,10 +46,10 @@ Cualquier componente que llame a `useCart()` lee y escribe la misma lista.
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `key` | `string` | obligatorio | Clave única en la aplicación, como `"cart:items"`. No puede estar vacía ni ser `__proto__`, `constructor` o `prototype` (`TypeError: Invalid state key`). |
-| `factory` | `() => T` | obligatorio | Crea el valor inicial la primera vez que se pide la clave. Debe devolver algo que JSON represente fielmente. |
+| Parámetro | Tipo      | Por defecto | Descripción                                                                                                                                               |
+| --------- | --------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `key`     | `string`  | obligatorio | Clave única en la aplicación, como `"cart:items"`. No puede estar vacía ni ser `__proto__`, `constructor` o `prototype` (`TypeError: Invalid state key`). |
+| `factory` | `() => T` | obligatorio | Crea el valor inicial la primera vez que se pide la clave. Debe devolver algo que JSON represente fielmente.                                              |
 
 ## Valor devuelto
 
@@ -111,6 +111,7 @@ const when = useState("agenda:when", () => new Date());
 El estado viaja en JSON: al serializar el payload la respuesta falla con `TypeError: Non-plain object at $.when`. Guarda el texto y deriva el objeto:
 
 <!-- no-check -->
+
 ```ts good
 const when = useState("agenda:when", () => new Date().toISOString());
 const date = computed(() => new Date(when.value));
@@ -125,6 +126,7 @@ const count = useState<number>("cart:count", 0);
 `meeko check` da `TS2345: Argument of type 'number' is not assignable to parameter of type '() => number'`.
 
 <!-- no-check -->
+
 ```ts good
 const count = useState("cart:count", () => 0);
 ```
@@ -138,6 +140,7 @@ items.value.push(id);
 No hay error, pero la señal no avisa: ni la plantilla ni los demás componentes se enteran. Asigna un valor nuevo:
 
 <!-- no-check -->
+
 ```ts good
 items.value = [...items.value, id];
 ```
@@ -155,6 +158,7 @@ fetchStats().then((value) => { stats.value = value; });
 En SSR, la escritura tardía lanza `STATE_SEALED: Meeko state "stats" cannot change after the page was rendered; the browser already received it` y, sin un `catch`, es un rechazo sin manejar. Carga el dato antes del render, en `<script server>`, `load` o con `await useApi`:
 
 <!-- no-check -->
+
 ```ts good
 const stats = await useRpcQuery("stats.summary");
 ```

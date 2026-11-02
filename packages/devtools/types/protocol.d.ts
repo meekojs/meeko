@@ -46,7 +46,7 @@ export type DevtoolsValue = null | boolean | number | string | DevtoolsValue[] |
  * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/devtools.md#protocolo
  */
-export type DevtoolsReadKind = "text" | "attribute" | "computed" | "if" | "each" | "prop";
+export type DevtoolsReadKind = 'text' | 'attribute' | 'computed' | 'if' | 'each' | 'prop';
 /**
  * Ubicación de una expresión que lee una señal durante desarrollo; línea y columna empiezan en 1.
  *
@@ -85,7 +85,7 @@ export interface DevtoolsReadSite {
  */
 export interface DevtoolsAssignmentSite {
     /** Discriminante: una asignación del código del componente. */
-    kind: "assignment";
+    kind: 'assignment';
     /** Archivo `.meeko`. */
     file: string;
     /** Línea donde empieza la asignación, desde 1. */
@@ -108,7 +108,7 @@ export interface DevtoolsAssignmentSite {
  */
 export interface DevtoolsEditSite {
     /** Discriminante: una edición desde un panel con `setSignal`. */
-    kind: "devtools";
+    kind: 'devtools';
 }
 /**
  * Origen conocido de la escritura que produjo un evento de señal.
@@ -178,7 +178,7 @@ export interface DevtoolsInstance {
     /** Instancias hijas en orden. */
     childIds: string[];
     /** Estado de la instancia. */
-    status: "hydrated";
+    status: 'hydrated';
     /** Si los cambios de sus señales detienen el depurador. */
     breakpoint: boolean;
 }
@@ -194,7 +194,7 @@ export interface DevtoolsInstance {
  * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/devtools.md#protocolo
  */
-export type DevtoolsEventKind = "mount" | "unmount" | "signal" | "breakpoint" | "select" | "hmr" | "navigation" | "data";
+export type DevtoolsEventKind = 'mount' | 'unmount' | 'signal' | 'breakpoint' | 'select' | 'hmr' | 'navigation' | 'data';
 /**
  * Metadatos de navegación o carga; no contienen URLs, parámetros, cabeceras ni valores del usuario.
  * `route` es el patrón declarado de la ruta, no su pathname resuelto.
@@ -211,11 +211,11 @@ export interface DevtoolsActivity {
     /** Patrón de ruta del manifiesto, o null para operaciones sin ruta conocida. */
     route: string | null;
     /** Fase de la operación. */
-    phase: "start" | "ready" | "commit" | "cancel" | "error";
+    phase: 'start' | 'ready' | 'commit' | 'cancel' | 'error';
     /** Duración medida en el navegador, presente al finalizar la operación. */
     durationMs?: number;
     /** Transporte de datos o uso de la caché local de recursos. */
-    source?: "server" | "client" | "static" | "cache";
+    source?: 'server' | 'client' | 'static' | 'cache';
 }
 /**
  * Cambio reciente del árbol de componentes o de una señal en la línea de tiempo.

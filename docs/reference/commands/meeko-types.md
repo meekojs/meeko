@@ -29,8 +29,8 @@ C:\proyectos\contador\.meeko\types\src\App.d.meeko.ts
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
+| Parámetro            | Tipo | Por defecto | Descripción                                                                                                                                          |
+| -------------------- | ---- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `<componente.meeko>` | ruta | obligatorio | El componente de entrada. El proyecto es la carpeta más cercana con `package.json` o `meeko.config.*`; sus aliases de ruta se aplican a los imports. |
 
 ## Resultado
@@ -55,6 +55,7 @@ Para que TypeScript use estas declaraciones al importar `./App.meeko`, el `tscon
 ### Comprobar un consumidor en TypeScript
 
 <!-- no-check -->
+
 ```ts
 // src/entry-server.ts
 import { css, renderWithState } from "./App.meeko";

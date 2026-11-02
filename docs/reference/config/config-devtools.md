@@ -31,10 +31,10 @@ export default defineMeekoConfig({ devtools: true });
 
 `devtools` es un booleano o un objeto. Un objeto activa DevTools: sin `panel`, el panel se monta igual que con `true`.
 
-| Opción | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `panel` | `boolean` | `true` | Monta el panel dentro de la página en `meeko dev`. |
-| `position` | `"bottom-right" \| "bottom-left" \| "top-right" \| "top-left"` | `"bottom-right"` | Esquina de la ventana en la que se fija el panel. |
+| Opción     | Tipo                                                           | Por defecto      | Descripción                                        |
+| ---------- | -------------------------------------------------------------- | ---------------- | -------------------------------------------------- |
+| `panel`    | `boolean`                                                      | `true`           | Monta el panel dentro de la página en `meeko dev`. |
+| `position` | `"bottom-right" \| "bottom-left" \| "top-right" \| "top-left"` | `"bottom-right"` | Esquina de la ventana en la que se fija el panel.  |
 
 ## Resultado
 

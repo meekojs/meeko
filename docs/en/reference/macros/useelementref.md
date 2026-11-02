@@ -12,7 +12,7 @@ related:
   - "@meekojs/meeko#ReadonlySignal"
   - docs/api.md#referencias-a-elementos-ref-y-useelementref
   - docs/api.md#composables-de-nivel-superior-y-await
-source-hash: ff83f435770bcda828482960030a260544a5a42805f5ff77f0df23e89dc82c81
+source-hash: 476862c725a8b7b2a425029f579d16a9d1c34d670be50f5c21f58d0cbb38385f
 ---
 
 `useElementRef("nombre")` reads the element or component named `ref:nombre` in the template. Its type comes from the template: `HTMLInputElement` for an `<input>`, `SVGSVGElement` for an `<svg>` and, for a component, its `defineExpose` value. It is a compile-time macro: do not import it, and call it only at the top level of `<script>`.

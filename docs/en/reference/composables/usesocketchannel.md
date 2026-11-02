@@ -16,7 +16,7 @@ related:
   - "@meekojs/meeko/server#defineSocketChannel"
   - docs/framework.md#websocket
   - docs/framework.md#clientes-con-url-y-contrato-explícitos
-source-hash: caa50d16a57a8c52999c96377a998e7f5ceaecf013d60678729a257742228d17
+source-hash: 71c0695f41ffc027ad415113504e51e7c2fd3fbc11b1b04dc6e7093ee6879bf9
 ---
 
 `useSocketChannel(contratos, nombre, opciones?)` constructs the URL for channel `nombre` (`/_meeko/socket/<nombre>`, with `?room=` if there is a `roomId`) and opens a component-bound client with that channel's contract, like [`useSocketClient`](/en/docs/reference/usesocketclient). Generated clients use it to define the [`useSocket`](/en/docs/reference/use-socket) auto-import:

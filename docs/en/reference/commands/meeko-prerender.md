@@ -10,7 +10,7 @@ related:
   - "@meekojs/meeko/build#prerenderRoutes"
   - "@meekojs/meeko/framework#definePage"
   - docs/framework.md#modos-de-render
-source-hash: 190de89050f6fac597ed5694e0f922919ffdf7b569fcf9a88c3724366b7a6fec
+source-hash: 6af5edfeb9a9a4c2e2ca1563813ff158d74e11a4a46a3631a22a6a68956d28c9
 ---
 
 `meeko prerender` imports the server from `.meeko/output/node/index.mjs`, creates it with `prerendering: true` and renders each URL of `render: "prerender"` routes (using `prerenderEntries` for dynamic routes). It deletes and rewrites `.meeko/output/node/prerender/`: each page's HTML, its navigation payload (`index.meeko.json`) and the `manifest.json` index. It prints the path of each HTML file written.

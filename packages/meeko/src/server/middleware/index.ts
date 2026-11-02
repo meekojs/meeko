@@ -1,4 +1,4 @@
-import { copySocketAddress } from "../runtime/env";
+import { copySocketAddress } from '../runtime/env'
 
 /**
  * Middleware de servidor: envuelve las peticiones HTTP de páginas, API y RPC antes de que Meeko cree
@@ -18,12 +18,9 @@ import { copySocketAddress } from "../runtime/env";
  * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#middleware-de-rutas-y-servidor
  */
-export type ServerMiddleware = (
-  request: Request,
-  next: (request?: Request) => Promise<Response>,
-) => Response | Promise<Response>;
+export type ServerMiddleware = (request: Request, next: (request?: Request) => Promise<Response>) => Response | Promise<Response>
 
-export { defineServerMiddleware } from "./definitions";
+export { defineServerMiddleware } from './definitions'
 
 /**
  * Compone una lista de middleware de servidor alrededor de un handler, en orden de fuera hacia
@@ -42,47 +39,48 @@ export { defineServerMiddleware } from "./definitions";
  * const response = await handle(new Request("http://localhost/"));
  * ```
  */
-export function composeServerMiddleware(
-  middlewares: readonly ServerMiddleware[],
-  handler: (request: Request) => Promise<Response>,
-): (request: Request) => Promise<Response> {
-  const run = async (index: number, request: Request): Promise<Response> => {
-    const middleware = middlewares[index];
-    if (!middleware) return handler(request);
-    let called = false;
-    let downstream: Promise<Response> | undefined;
-    let result: Response | undefined;
-    let middlewareError: unknown;
-    let middlewareFailed = false;
-    try {
-      result = await middleware(request, (nextRequest = request) => {
-        if (called) throw new Error("Server middleware called next() more than once");
-        called = true;
-        if (!(nextRequest instanceof Request)) throw new TypeError("Server middleware next() requires a Request");
-        // A replaced request keeps the client's connection address, so rateLimit still counts per client.
-        downstream = run(index + 1, copySocketAddress(request, nextRequest));
-        // A middleware may forget to await next(). Keep its failure observed
-        // until this frame can propagate it to the HTTP response path.
-        void downstream.catch(() => {});
-        return downstream;
-      });
-    } catch (error) {
-      middlewareFailed = true;
-      middlewareError = error;
-    }
-    let downstreamError: unknown;
-    let downstreamFailed = false;
-    if (downstream) {
-      try { await downstream; }
-      catch (error) { downstreamFailed = true; downstreamError = error; }
-    }
-    if (middlewareFailed && downstreamFailed && !Object.is(middlewareError, downstreamError)) {
-      throw new AggregateError([middlewareError, downstreamError], "Server middleware and downstream failed");
-    }
-    if (middlewareFailed) throw middlewareError;
-    if (downstreamFailed) throw downstreamError;
-    if (!(result instanceof Response)) throw new TypeError("Server middleware must return a Response");
-    return result;
-  };
-  return (request) => run(0, request);
+export function composeServerMiddleware(middlewares: readonly ServerMiddleware[], handler: (request: Request) => Promise<Response>): (request: Request) => Promise<Response> {
+	const run = async (index: number, request: Request): Promise<Response> => {
+		const middleware = middlewares[index]
+		if (!middleware) return handler(request)
+		let called = false
+		let downstream: Promise<Response> | undefined
+		let result: Response | undefined
+		let middlewareError: unknown
+		let middlewareFailed = false
+		try {
+			result = await middleware(request, (nextRequest = request) => {
+				if (called) throw new Error('Server middleware called next() more than once')
+				called = true
+				if (!(nextRequest instanceof Request)) throw new TypeError('Server middleware next() requires a Request')
+				// A replaced request keeps the client's connection address, so rateLimit still counts per client.
+				downstream = run(index + 1, copySocketAddress(request, nextRequest))
+				// A middleware may forget to await next(). Keep its failure observed
+				// until this frame can propagate it to the HTTP response path.
+				void downstream.catch(() => {})
+				return downstream
+			})
+		} catch (error) {
+			middlewareFailed = true
+			middlewareError = error
+		}
+		let downstreamError: unknown
+		let downstreamFailed = false
+		if (downstream) {
+			try {
+				await downstream
+			} catch (error) {
+				downstreamFailed = true
+				downstreamError = error
+			}
+		}
+		if (middlewareFailed && downstreamFailed && !Object.is(middlewareError, downstreamError)) {
+			throw new AggregateError([middlewareError, downstreamError], 'Server middleware and downstream failed')
+		}
+		if (middlewareFailed) throw middlewareError
+		if (downstreamFailed) throw downstreamError
+		if (!(result instanceof Response)) throw new TypeError('Server middleware must return a Response')
+		return result
+	}
+	return (request) => run(0, request)
 }

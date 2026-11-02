@@ -1,14 +1,14 @@
-import type { TemplateNode } from "@meekojs/meeko/parse";
-import type { TSESLint } from "@typescript-eslint/utils";
+import type { TemplateNode } from '@meekojs/meeko/parse'
+import type { TSESLint } from '@typescript-eslint/utils'
 
-import type { MeekoParserServices } from "./parser";
+import type { MeekoParserServices } from './parser'
 
 export function template(context: TSESLint.RuleContext<string, readonly unknown[]>): TemplateNode | undefined {
-  const services = context.sourceCode.parserServices as Partial<MeekoParserServices>;
-  return services.isMeeko ? services.templateBody : undefined;
+	const services = context.sourceCode.parserServices as Partial<MeekoParserServices>
+	return services.isMeeko ? services.templateBody : undefined
 }
 
 export function visit(node: TemplateNode, callback: (node: TemplateNode) => void): void {
-  callback(node);
-  for (const child of [...node.childNodes ?? [], ...node.content?.childNodes ?? []]) visit(child, callback);
+	callback(node)
+	for (const child of [...(node.childNodes ?? []), ...(node.content?.childNodes ?? [])]) visit(child, callback)
 }

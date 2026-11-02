@@ -16,7 +16,7 @@ related:
   - "autoimport:rpc"
   - docs/framework.md#api-y-rpc
   - docs/framework.md#segmentos-dinámicos-en-api
-source-hash: 0f82777886c6c74daa4dd956aae099e6d2c286d4eae8fec2e0a4627ebc500483
+source-hash: 479d1a2f3e81199b02c74b4a2f33b9cace3b8a1abbc4378bd8534c31c03933ea
 ---
 
 `api` is the client Meeko generates from `server/api` endpoints: each folder or file is a level, each method suffix (`.get.ts`, `.post.ts`…) is a method, and each dynamic segment is called with its parameter. Input and response types come from the endpoint's public schemas, so an incorrect route, parameter or field is a `meeko check` error.

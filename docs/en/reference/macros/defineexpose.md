@@ -11,7 +11,7 @@ related:
   - "syntax:defineemits"
   - "syntax:definemodel"
   - docs/api.md#exponer-valores-defineexpose
-source-hash: ce7f015a83ab0192e8ce753a0dba61900ac8a9a1431caa0d49f208c6b6afb161
+source-hash: 16f2d7cc44591b431c829baf9da5bbf42422b7df28b7d5c094cd57eb99315087
 ---
 
 `defineExpose(valor)` exposes a component value to the parent that names it with `ref:nombre` and reads it with `useElementRef("nombre")`. The parent receives the value with its exact type. Without `defineExpose`, the component exposes `null`. It is a compiler macro: you do not import it.

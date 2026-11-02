@@ -1,27 +1,27 @@
-import ts from "@typescript/typescript6";
-import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
-import { readFile, realpath, stat } from "node:fs/promises";
-import { basename, extname, isAbsolute, relative, resolve, sep } from "node:path";
-import { pathToFileURL } from "node:url";
+import ts from '@typescript/typescript6'
+import { createHash } from 'node:crypto'
+import { existsSync, readFileSync } from 'node:fs'
+import { readFile, realpath, stat } from 'node:fs/promises'
+import { basename, extname, isAbsolute, relative, resolve, sep } from 'node:path'
+import { pathToFileURL } from 'node:url'
 
-import type { RouteRecord } from "../app/runtime/router";
-import type { MeekoConfig } from "../modules/define-meeko-config";
-import type { ContentSecurityPolicy } from "../server/runtime/csp";
-import type { ResolvedModules } from "./module-loader";
+import type { RouteRecord } from '../app/runtime/router'
+import type { MeekoConfig } from '../modules/define-meeko-config'
+import type { ContentSecurityPolicy } from '../server/runtime/csp'
+import type { ResolvedModules } from './module-loader'
 
-import { createRouteManifest } from "../app/runtime/router";
-import { isMeekoModule } from "../modules/define-meeko-module";
-import { contentSecurityPolicy } from "../server/runtime/csp";
-import { normalizeDocumentConfig, siteOrigin } from "../shared/head";
-import { resolveThemeConfig } from "../shared/theme";
-import { resolveDevtoolsConfig } from "./dev-devtools";
-import { validateHeaderValues } from "./header-values";
-import { classifyModuleEntry, resolvedDocument, resolveMeekoModules } from "./module-loader";
-import { composeFrameworkRoutes } from "./modules";
-import { discoverLayouts } from "./routes-discovery";
+import { createRouteManifest } from '../app/runtime/router'
+import { isMeekoModule } from '../modules/define-meeko-module'
+import { contentSecurityPolicy } from '../server/runtime/csp'
+import { normalizeDocumentConfig, siteOrigin } from '../shared/head'
+import { resolveThemeConfig } from '../shared/theme'
+import { resolveDevtoolsConfig } from './dev-devtools'
+import { validateHeaderValues } from './header-values'
+import { classifyModuleEntry, resolvedDocument, resolveMeekoModules } from './module-loader'
+import { composeFrameworkRoutes } from './modules'
+import { discoverLayouts } from './routes-discovery'
 
-export type { MeekoConfig } from "../modules/define-meeko-config";
+export type { MeekoConfig } from '../modules/define-meeko-config'
 
 /**
  * Una fuente de páginas y autoimports del proyecto: la aplicación, un layer de `layers` (o
@@ -39,22 +39,22 @@ export type { MeekoConfig } from "../modules/define-meeko-config";
  * ```
  */
 export interface ConfigSource {
-  /** Nombre en los diagnósticos: `"app"` o el nombre de la carpeta del layer o módulo. */
-  readonly name: string;
-  /** Carpeta absoluta de la fuente, que contiene `app/pages`. */
-  readonly root: string;
-  /** Tipo de fuente: `"layer"` para `layers` y `extends`, `"module"` para las que aportan los módulos. */
-  readonly kind: "app" | "layer" | "module";
+	/** Nombre en los diagnósticos: `"app"` o el nombre de la carpeta del layer o módulo. */
+	readonly name: string
+	/** Carpeta absoluta de la fuente, que contiene `app/pages`. */
+	readonly root: string
+	/** Tipo de fuente: `"layer"` para `layers` y `extends`, `"module"` para las que aportan los módulos. */
+	readonly kind: 'app' | 'layer' | 'module'
 }
 
 /** Options of `imports` that add autoimport folders, and the source folder each one lives in. */
-const importDirectoryRoots = { appDirs: "app", sharedDirs: "shared", serverDirs: "server" } as const;
+const importDirectoryRoots = { appDirs: 'app', sharedDirs: 'shared', serverDirs: 'server' } as const
 
 /** An option of `imports` that adds autoimport folders. */
-export type ImportDirectoryOption = keyof typeof importDirectoryRoots;
+export type ImportDirectoryOption = keyof typeof importDirectoryRoots
 
 /** The options of `imports` that add autoimport folders, in the order of the scopes they reach. */
-export const importDirectoryOptions: readonly ImportDirectoryOption[] = ["appDirs", "sharedDirs", "serverDirs"];
+export const importDirectoryOptions: readonly ImportDirectoryOption[] = ['appDirs', 'sharedDirs', 'serverDirs']
 
 /**
  * The folder of an `imports.appDirs`, `sharedDirs` or `serverDirs` entry with `/` separators and no
@@ -62,52 +62,58 @@ export const importDirectoryOptions: readonly ImportDirectoryOption[] = ["appDir
  * its option (`app/`, `shared/` or `server/`) without `.` or `..` segments.
  */
 export function normalizeImportDirectory(option: ImportDirectoryOption, raw: string): string | undefined {
-  const directory = raw.replaceAll("\\", "/").replace(/\/+$/, "");
-  const parts = directory.split("/");
-  if (parts[0] !== importDirectoryRoots[option] || parts.length < 2 || parts.some((part) => !part || part === "." || part === "..")) return undefined;
-  return directory;
+	const directory = raw.replaceAll('\\', '/').replace(/\/+$/, '')
+	const parts = directory.split('/')
+	if (parts[0] !== importDirectoryRoots[option] || parts.length < 2 || parts.some((part) => !part || part === '.' || part === '..')) return undefined
+	return directory
 }
 
 /** Normalize a configured component directory without allowing it to escape a source root. */
 export function normalizeComponentDirectory(raw: string): string | undefined {
-  if (typeof raw !== "string" || !raw || isAbsolute(raw) || /^[A-Za-z]:/.test(raw) || raw.startsWith("\\\\") || raw.startsWith("//")) return undefined;
-  const directory = raw.replaceAll("\\", "/").replace(/\/+$/, "");
-  const parts = directory.split("/");
-  return parts.some((part) => !part || part === "." || part === ".." || part.includes(":")) ? undefined : directory;
+	if (typeof raw !== 'string' || !raw || isAbsolute(raw) || /^[A-Za-z]:/.test(raw) || raw.startsWith('\\\\') || raw.startsWith('//')) return undefined
+	const directory = raw.replaceAll('\\', '/').replace(/\/+$/, '')
+	const parts = directory.split('/')
+	return parts.some((part) => !part || part === '.' || part === '..' || part.includes(':')) ? undefined : directory
 }
 
 /** Validate component directories from both executed and statically read configuration. */
-export function componentDirectories(config: MeekoConfig["components"]): readonly { path: string; prefix: string }[] {
-  if (config !== undefined && (!isPlainObject(config) || (config.dirs !== undefined && !Array.isArray(config.dirs)))) {
-    throw new TypeError("components.dirs debe ser un array de directorios");
-  }
-  return [{ path: "app/components", prefix: "" }, ...(config?.dirs ?? []).map((entry, index) => {
-    if (!isPlainObject(entry) || typeof entry.path !== "string" || normalizeComponentDirectory(entry.path) === undefined) {
-      throw new TypeError(`components.dirs[${index}].path debe ser una ruta relativa segura`);
-    }
-    const prefix = entry.prefix ?? "";
-    if (typeof prefix !== "string" || (prefix !== "" && !/^[A-Z][A-Za-z0-9]*$/.test(prefix))) {
-      throw new TypeError(`components.dirs[${index}].prefix debe ser un nombre PascalCase o una cadena vacía`);
-    }
-    return { path: normalizeComponentDirectory(entry.path)!, prefix };
-  })];
+export function componentDirectories(config: MeekoConfig['components']): readonly { path: string; prefix: string }[] {
+	if (config !== undefined && (!isPlainObject(config) || (config.dirs !== undefined && !Array.isArray(config.dirs)))) {
+		throw new TypeError('components.dirs debe ser un array de directorios')
+	}
+	return [
+		{ path: 'app/components', prefix: '' },
+		...(config?.dirs ?? []).map((entry, index) => {
+			if (!isPlainObject(entry) || typeof entry.path !== 'string' || normalizeComponentDirectory(entry.path) === undefined) {
+				throw new TypeError(`components.dirs[${index}].path debe ser una ruta relativa segura`)
+			}
+			const prefix = entry.prefix ?? ''
+			if (typeof prefix !== 'string' || (prefix !== '' && !/^[A-Z][A-Za-z0-9]*$/.test(prefix))) {
+				throw new TypeError(`components.dirs[${index}].prefix debe ser un nombre PascalCase o una cadena vacía`)
+			}
+			return { path: normalizeComponentDirectory(entry.path)!, prefix }
+		}),
+	]
 }
 
 function inside(root: string, target: string): boolean {
-  const path = relative(root, target);
-  return path === "" || (path !== ".." && !path.startsWith(`..${sep}`) && !isAbsolute(path));
+	const path = relative(root, target)
+	return path === '' || (path !== '..' && !path.startsWith(`..${sep}`) && !isAbsolute(path))
 }
 
 async function configFile(root: string): Promise<string | undefined> {
-  const files = ["meeko.config.ts", "meeko.config.mts", "meeko.config.js", "meeko.config.mjs"];
-  const found: string[] = [];
-  for (const name of files) {
-    const file = resolve(root, name);
-    try { if ((await stat(file)).isFile()) found.push(file); }
-    catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
-  }
-  if (found.length > 1) throw new Error(`Hay varios archivos de configuración de Meeko: ${found.join(", ")}`);
-  return found[0];
+	const files = ['meeko.config.ts', 'meeko.config.mts', 'meeko.config.js', 'meeko.config.mjs']
+	const found: string[] = []
+	for (const name of files) {
+		const file = resolve(root, name)
+		try {
+			if ((await stat(file)).isFile()) found.push(file)
+		} catch (error) {
+			if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+		}
+	}
+	if (found.length > 1) throw new Error(`Hay varios archivos de configuración de Meeko: ${found.join(', ')}`)
+	return found[0]
 }
 
 /**
@@ -131,193 +137,206 @@ async function configFile(root: string): Promise<string | undefined> {
  * ```
  */
 export async function loadMeekoConfig(projectRoot: string): Promise<MeekoConfig> {
-  const root = resolve(projectRoot);
-  const file = await configFile(root);
-  if (!file) return {};
-  const url = pathToFileURL(file);
-  // The content, not the mtime, names the module: two writes within one mtime tick would
-  // otherwise load the first version again from the import cache.
-  url.searchParams.set("v", createHash("sha256").update(await readFile(file)).digest("hex").slice(0, 16));
-  let loaded: unknown;
-  try { loaded = (await import(url.href) as { default?: unknown }).default; }
-  catch (error) { throw new Error(`No se puede cargar ${file}: ${error instanceof Error ? error.message : String(error)}`, { cause: error }); }
-  if (!loaded || typeof loaded !== "object" || Array.isArray(loaded)) throw new TypeError(`${file} debe exportar por defecto un objeto de configuración de Meeko`);
-  const config = loaded as MeekoConfig;
-  componentDirectories(config.components);
-  const imports = config.imports as unknown;
-  if (imports !== undefined && !isPlainObject(imports)) throw new TypeError(`${file}: imports debe ser un objeto`);
-  for (const [key, entries] of [
-    ["layers", config.layers], ["extends", config.extends],
-    ...importDirectoryOptions.map((option) => [`imports.${option}`, config.imports?.[option]] as const),
-  ] as const) {
-    if (entries !== undefined && (!Array.isArray(entries) || entries.some((entry) => typeof entry !== "string" || !entry))) {
-      throw new TypeError(`${file}: ${key} debe ser un array de rutas no vacías`);
-    }
-  }
-  for (const option of importDirectoryOptions) {
-    config.imports?.[option]?.forEach((entry, index) => {
-      if (normalizeImportDirectory(option, entry) === undefined) {
-        throw new TypeError(`${file}: imports.${option}[${index}] debe ser una ruta relativa dentro de ${importDirectoryRoots[option]}/: ${entry}`);
-      }
-    });
-  }
-  validateAliasOption(config.alias, file, root);
-  const modules = config.modules as unknown;
-  if (modules !== undefined) {
-    const reference = (value: unknown): boolean => (typeof value === "string" && value !== "") || isMeekoModule(value);
-    const options = (value: unknown): boolean => value === undefined || (typeof value === "object" && value !== null && !Array.isArray(value));
-    if (!Array.isArray(modules) || modules.some((entry: unknown) => !(reference(entry)
-      || (Array.isArray(entry) && entry.length >= 1 && entry.length <= 2 && reference(entry[0]) && options(entry[1]))))) {
-      throw new TypeError(`${file}: modules debe ser un array de módulos creados con defineMeekoModule, nombres de paquete o rutas, o [módulo, opciones]`);
-    }
-  }
-  const document = config.document as Record<string, unknown> | undefined;
-  if (config.viewTransitions !== undefined && typeof config.viewTransitions !== "boolean") throw new TypeError(`${file}: viewTransitions debe ser un booleano`);
-  if (document !== undefined) {
-    if (!document || typeof document !== "object" || Array.isArray(document)) throw new TypeError(`${file}: document debe ser un objeto`);
-    if (document.lang !== undefined && typeof document.lang !== "string") throw new TypeError(`${file}: document.lang debe ser una cadena`);
-    if (document.head !== undefined && (!document.head || typeof document.head !== "object" || Array.isArray(document.head))) {
-      throw new TypeError(`${file}: document.head debe ser un objeto`);
-    }
-  }
-  const css = config.css as Record<string, unknown> | undefined;
-  if (css !== undefined) {
-    if (!css || typeof css !== "object" || Array.isArray(css)) throw new TypeError(`${file}: css debe ser un objeto`);
-    if (css.scopeAttribute !== undefined && css.scopeAttribute !== "all" && css.scopeAttribute !== "matched") {
-      throw new TypeError(`${file}: css.scopeAttribute debe ser "all" o "matched"`);
-    }
-  }
-  const dev = config.dev as Record<string, unknown> | undefined;
-  if (dev !== undefined) {
-    if (!dev || typeof dev !== "object" || Array.isArray(dev)) throw new TypeError(`${file}: dev debe ser un objeto`);
-    if (dev.serverLogs !== undefined && typeof dev.serverLogs !== "boolean") throw new TypeError(`${file}: dev.serverLogs debe ser un booleano`);
-  }
-  resolveDevtoolsConfig(config.devtools, `${file}: devtools`);
-  // `document.theme` is what the build bakes from `theme`; the configuration has one place for it.
-  if (document !== undefined && document.theme !== undefined) throw new TypeError(`${file}: document.theme no es una opción de meeko.config.ts; use theme en el nivel superior`);
-  try { resolveThemeConfig(config.theme, `${file}: theme`); }
-  catch (error) {
-    // Before 1.4, `theme` could hold the options of a module with `configKey: "theme"`.
-    if (error instanceof TypeError && error.message.includes(": campo desconocido ")) {
-      throw new TypeError(`${error.message}. Desde 1.4, theme es la opción del tema claro/oscuro de Meeko; si son las opciones de un módulo con meta.configKey "theme", dé a ese módulo otra configKey y mueva allí sus opciones (véase docs/migration-1.4.md)`, { cause: error });
-    }
-    throw error;
-  }
-  // The build bakes `document` as JSON: a function titleTemplate fails here, not in production.
-  normalizeDocumentConfig(config.document, `${file}: document`);
-  if (config.site !== undefined) siteOrigin(config.site, `${file}: site`);
-  validateSiteFiles(config, file);
-  const server = config.server as Record<string, unknown> | undefined;
-  if (server !== undefined) {
-    if (!server || typeof server !== "object" || !["node", "cloudflare", "deno", "bun", "static"].includes(server.adapter as string)) {
-      throw new TypeError(`${file}: server.adapter debe ser "node", "cloudflare", "deno", "bun" o "static"`);
-    }
-    if (server.adapter === "static") validateStaticServer(server, file);
-    else {
-      validatePolicy(server, file);
-      validateServerHeaders(server, file, true);
-    }
-    if (server.host !== undefined && (typeof server.host !== "string" || !server.host)) throw new TypeError(`${file}: server.host debe ser una cadena no vacía`);
-    if (server.port !== undefined && (!Number.isInteger(server.port) || (server.port as number) < 0 || (server.port as number) > 65535)) {
-      throw new TypeError(`${file}: server.port debe ser un entero entre 0 y 65535`);
-    }
-    if (server.adapter === "cloudflare") {
-      if (server.name !== undefined && (typeof server.name !== "string" || !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(server.name))) {
-        throw new TypeError(`${file}: server.name debe ser un nombre de Worker (minúsculas, dígitos y guiones)`);
-      }
-      if (server.socketClassName !== undefined && (typeof server.socketClassName !== "string" || !/^[A-Za-z_$][\w$]*$/.test(server.socketClassName))) {
-        throw new TypeError(`${file}: server.socketClassName debe ser un nombre de clase de JavaScript`);
-      }
-      if (server.compatibilityDate !== undefined && (typeof server.compatibilityDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(server.compatibilityDate))) {
-        throw new TypeError(`${file}: server.compatibilityDate debe tener el formato YYYY-MM-DD`);
-      }
-      if (server.wrangler !== undefined && (!server.wrangler || typeof server.wrangler !== "object" || Array.isArray(server.wrangler))) {
-        throw new TypeError(`${file}: server.wrangler debe ser un objeto con campos de wrangler.jsonc`);
-      }
-    }
-  }
-  executedConfigs.add(config);
-  // The unknown keys are reported when the modules run (`resolveMeekoModules`), also without
-  // modules: a key may be the configKey of an installed module missing from `modules` (MEEK127).
-  return config;
+	const root = resolve(projectRoot)
+	const file = await configFile(root)
+	if (!file) return {}
+	const url = pathToFileURL(file)
+	// The content, not the mtime, names the module: two writes within one mtime tick would
+	// otherwise load the first version again from the import cache.
+	url.searchParams.set(
+		'v',
+		createHash('sha256')
+			.update(await readFile(file))
+			.digest('hex')
+			.slice(0, 16),
+	)
+	let loaded: unknown
+	try {
+		loaded = ((await import(url.href)) as { default?: unknown }).default
+	} catch (error) {
+		throw new Error(`No se puede cargar ${file}: ${error instanceof Error ? error.message : String(error)}`, { cause: error })
+	}
+	if (!loaded || typeof loaded !== 'object' || Array.isArray(loaded)) throw new TypeError(`${file} debe exportar por defecto un objeto de configuración de Meeko`)
+	const config = loaded as MeekoConfig
+	componentDirectories(config.components)
+	const imports = config.imports as unknown
+	if (imports !== undefined && !isPlainObject(imports)) throw new TypeError(`${file}: imports debe ser un objeto`)
+	for (const [key, entries] of [
+		['layers', config.layers],
+		['extends', config.extends],
+		...importDirectoryOptions.map((option) => [`imports.${option}`, config.imports?.[option]] as const),
+	] as const) {
+		if (entries !== undefined && (!Array.isArray(entries) || entries.some((entry) => typeof entry !== 'string' || !entry))) {
+			throw new TypeError(`${file}: ${key} debe ser un array de rutas no vacías`)
+		}
+	}
+	for (const option of importDirectoryOptions) {
+		config.imports?.[option]?.forEach((entry, index) => {
+			if (normalizeImportDirectory(option, entry) === undefined) {
+				throw new TypeError(`${file}: imports.${option}[${index}] debe ser una ruta relativa dentro de ${importDirectoryRoots[option]}/: ${entry}`)
+			}
+		})
+	}
+	validateAliasOption(config.alias, file, root)
+	const modules = config.modules as unknown
+	if (modules !== undefined) {
+		const reference = (value: unknown): boolean => (typeof value === 'string' && value !== '') || isMeekoModule(value)
+		const options = (value: unknown): boolean => value === undefined || (typeof value === 'object' && value !== null && !Array.isArray(value))
+		if (!Array.isArray(modules) || modules.some((entry: unknown) => !(reference(entry) || (Array.isArray(entry) && entry.length >= 1 && entry.length <= 2 && reference(entry[0]) && options(entry[1]))))) {
+			throw new TypeError(`${file}: modules debe ser un array de módulos creados con defineMeekoModule, nombres de paquete o rutas, o [módulo, opciones]`)
+		}
+	}
+	const document = config.document as Record<string, unknown> | undefined
+	if (config.viewTransitions !== undefined && typeof config.viewTransitions !== 'boolean') throw new TypeError(`${file}: viewTransitions debe ser un booleano`)
+	if (document !== undefined) {
+		if (!document || typeof document !== 'object' || Array.isArray(document)) throw new TypeError(`${file}: document debe ser un objeto`)
+		if (document.lang !== undefined && typeof document.lang !== 'string') throw new TypeError(`${file}: document.lang debe ser una cadena`)
+		if (document.head !== undefined && (!document.head || typeof document.head !== 'object' || Array.isArray(document.head))) {
+			throw new TypeError(`${file}: document.head debe ser un objeto`)
+		}
+	}
+	const css = config.css as Record<string, unknown> | undefined
+	if (css !== undefined) {
+		if (!css || typeof css !== 'object' || Array.isArray(css)) throw new TypeError(`${file}: css debe ser un objeto`)
+		if (css.scopeAttribute !== undefined && css.scopeAttribute !== 'all' && css.scopeAttribute !== 'matched') {
+			throw new TypeError(`${file}: css.scopeAttribute debe ser "all" o "matched"`)
+		}
+	}
+	const dev = config.dev as Record<string, unknown> | undefined
+	if (dev !== undefined) {
+		if (!dev || typeof dev !== 'object' || Array.isArray(dev)) throw new TypeError(`${file}: dev debe ser un objeto`)
+		if (dev.serverLogs !== undefined && typeof dev.serverLogs !== 'boolean') throw new TypeError(`${file}: dev.serverLogs debe ser un booleano`)
+	}
+	resolveDevtoolsConfig(config.devtools, `${file}: devtools`)
+	// `document.theme` is what the build bakes from `theme`; the configuration has one place for it.
+	if (document !== undefined && document.theme !== undefined) throw new TypeError(`${file}: document.theme no es una opción de meeko.config.ts; use theme en el nivel superior`)
+	try {
+		resolveThemeConfig(config.theme, `${file}: theme`)
+	} catch (error) {
+		// Before 1.4, `theme` could hold the options of a module with `configKey: "theme"`.
+		if (error instanceof TypeError && error.message.includes(': campo desconocido ')) {
+			throw new TypeError(`${error.message}. Desde 1.4, theme es la opción del tema claro/oscuro de Meeko; si son las opciones de un módulo con meta.configKey "theme", dé a ese módulo otra configKey y mueva allí sus opciones (véase docs/migration-1.4.md)`, { cause: error })
+		}
+		throw error
+	}
+	// The build bakes `document` as JSON: a function titleTemplate fails here, not in production.
+	normalizeDocumentConfig(config.document, `${file}: document`)
+	if (config.site !== undefined) siteOrigin(config.site, `${file}: site`)
+	validateSiteFiles(config, file)
+	const server = config.server as Record<string, unknown> | undefined
+	if (server !== undefined) {
+		if (!server || typeof server !== 'object' || !['node', 'cloudflare', 'deno', 'bun', 'static'].includes(server.adapter as string)) {
+			throw new TypeError(`${file}: server.adapter debe ser "node", "cloudflare", "deno", "bun" o "static"`)
+		}
+		if (server.adapter === 'static') validateStaticServer(server, file)
+		else {
+			validatePolicy(server, file)
+			validateServerHeaders(server, file, true)
+		}
+		if (server.host !== undefined && (typeof server.host !== 'string' || !server.host)) throw new TypeError(`${file}: server.host debe ser una cadena no vacía`)
+		if (server.port !== undefined && (!Number.isInteger(server.port) || (server.port as number) < 0 || (server.port as number) > 65535)) {
+			throw new TypeError(`${file}: server.port debe ser un entero entre 0 y 65535`)
+		}
+		if (server.adapter === 'cloudflare') {
+			if (server.name !== undefined && (typeof server.name !== 'string' || !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(server.name))) {
+				throw new TypeError(`${file}: server.name debe ser un nombre de Worker (minúsculas, dígitos y guiones)`)
+			}
+			if (server.socketClassName !== undefined && (typeof server.socketClassName !== 'string' || !/^[A-Za-z_$][\w$]*$/.test(server.socketClassName))) {
+				throw new TypeError(`${file}: server.socketClassName debe ser un nombre de clase de JavaScript`)
+			}
+			if (server.compatibilityDate !== undefined && (typeof server.compatibilityDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(server.compatibilityDate))) {
+				throw new TypeError(`${file}: server.compatibilityDate debe tener el formato YYYY-MM-DD`)
+			}
+			if (server.wrangler !== undefined && (!server.wrangler || typeof server.wrangler !== 'object' || Array.isArray(server.wrangler))) {
+				throw new TypeError(`${file}: server.wrangler debe ser un objeto con campos de wrangler.jsonc`)
+			}
+		}
+	}
+	executedConfigs.add(config)
+	// The unknown keys are reported when the modules run (`resolveMeekoModules`), also without
+	// modules: a key may be the configKey of an installed module missing from `modules` (MEEK127).
+	return config
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === "object" && !Array.isArray(value);
+	return !!value && typeof value === 'object' && !Array.isArray(value)
 }
 
 /** A prefix of `alias`: ends in `/`, without spaces, `*` or `\`, and does not start with `.` or `/`. */
-const aliasPrefix = /^[^\s*?\\./][^\s*?\\]*\/$/;
+const aliasPrefix = /^[^\s*?\\./][^\s*?\\]*\/$/
 
 /** Checks `alias`: prefixes that end in `/`, each with a folder inside the project or `false`. */
 function validateAliasOption(value: unknown, file: string, root: string): void {
-  if (value === undefined) return;
-  if (!isPlainObject(value)) throw new TypeError(`${file}: alias debe ser un objeto de prefijos de ruta y carpetas del proyecto, como { "lib/": "app/lib/" }`);
-  for (const [prefix, target] of Object.entries(value)) {
-    if (!aliasPrefix.test(prefix) || prefix.includes("//")) {
-      throw new TypeError(`${file}: alias ${JSON.stringify(prefix)} debe ser un prefijo que termine en / (como "@/", "~/" o "lib/"), sin espacios, * ni \\, y que no empiece por . ni /`);
-    }
-    if (target === false) continue;
-    if (typeof target !== "string" || !target.trim()) {
-      throw new TypeError(`${file}: alias ${JSON.stringify(prefix)} debe nombrar una carpeta del proyecto (una ruta relativa a su raíz) o ser false`);
-    }
-    if (isAbsolute(target) || !inside(root, resolve(root, target))) {
-      throw new TypeError(`${file}: alias ${JSON.stringify(prefix)} debe ser una ruta relativa dentro del proyecto (su carpeta o la de un layer): ${target}`);
-    }
-  }
+	if (value === undefined) return
+	if (!isPlainObject(value)) throw new TypeError(`${file}: alias debe ser un objeto de prefijos de ruta y carpetas del proyecto, como { "lib/": "app/lib/" }`)
+	for (const [prefix, target] of Object.entries(value)) {
+		if (!aliasPrefix.test(prefix) || prefix.includes('//')) {
+			throw new TypeError(`${file}: alias ${JSON.stringify(prefix)} debe ser un prefijo que termine en / (como "@/", "~/" o "lib/"), sin espacios, * ni \\, y que no empiece por . ni /`)
+		}
+		if (target === false) continue
+		if (typeof target !== 'string' || !target.trim()) {
+			throw new TypeError(`${file}: alias ${JSON.stringify(prefix)} debe nombrar una carpeta del proyecto (una ruta relativa a su raíz) o ser false`)
+		}
+		if (isAbsolute(target) || !inside(root, resolve(root, target))) {
+			throw new TypeError(`${file}: alias ${JSON.stringify(prefix)} debe ser una ruta relativa dentro del proyecto (su carpeta o la de un layer): ${target}`)
+		}
+	}
 }
 
 /** `alias` of a configuration read without running it: an object literal of strings and `false`, or `undefined`. */
 function staticAliasOption(config: ts.ObjectLiteralExpression): Record<string, string | false> | undefined {
-  const value = property(config, "alias");
-  const literal = value && literalValue(value)?.value;
-  if (!isPlainObject(literal)) return undefined;
-  const result: Record<string, string | false> = {};
-  for (const [prefix, target] of Object.entries(literal)) {
-    if (!aliasPrefix.test(prefix) || (target !== false && (typeof target !== "string" || !target.trim()))) return undefined;
-    result[prefix] = target as string | false;
-  }
-  return result;
+	const value = property(config, 'alias')
+	const literal = value && literalValue(value)?.value
+	if (!isPlainObject(literal)) return undefined
+	const result: Record<string, string | false> = {}
+	for (const [prefix, target] of Object.entries(literal)) {
+		if (!aliasPrefix.test(prefix) || (target !== false && (typeof target !== 'string' || !target.trim()))) return undefined
+		result[prefix] = target as string | false
+	}
+	return result
 }
 
 function stringList(value: unknown, label: string, check?: (entry: string) => boolean): void {
-  if (value === undefined) return;
-  if (!Array.isArray(value) || value.some((entry) => typeof entry !== "string" || !entry || (check !== undefined && !check(entry)))) {
-    throw new TypeError(`${label} debe ser un array de cadenas no vacías${check ? " que empiecen por /" : ""}`);
-  }
+	if (value === undefined) return
+	if (!Array.isArray(value) || value.some((entry) => typeof entry !== 'string' || !entry || (check !== undefined && !check(entry)))) {
+		throw new TypeError(`${label} debe ser un array de cadenas no vacías${check ? ' que empiecen por /' : ''}`)
+	}
 }
 
 function onlyFields(value: Record<string, unknown>, fields: readonly string[], label: string): void {
-  for (const name of Object.keys(value)) if (!fields.includes(name)) throw new TypeError(`${label}: campo desconocido ${name}`);
+	for (const name of Object.keys(value)) if (!fields.includes(name)) throw new TypeError(`${label}: campo desconocido ${name}`)
 }
 
 /** Checks `sitemap` and `robots`. */
 function validateSiteFiles(config: MeekoConfig, file: string): void {
-  const path = (entry: string): boolean => entry.startsWith("/") && !/[\s#?]/.test(entry);
-  const sitemap = config.sitemap as unknown;
-  if (sitemap !== undefined && typeof sitemap !== "boolean") {
-    if (!isPlainObject(sitemap)) throw new TypeError(`${file}: sitemap debe ser un booleano o un objeto`);
-    onlyFields(sitemap, ["exclude"], `${file}: sitemap`);
-    stringList(sitemap.exclude, `${file}: sitemap.exclude`, path);
-  }
-  const robots = config.robots as unknown;
-  if (robots !== undefined && typeof robots !== "boolean") {
-    if (!isPlainObject(robots)) throw new TypeError(`${file}: robots debe ser un booleano o un objeto`);
-    onlyFields(robots, ["allow", "disallow"], `${file}: robots`);
-    stringList(robots.allow, `${file}: robots.allow`, path);
-    stringList(robots.disallow, `${file}: robots.disallow`, path);
-  }
+	const path = (entry: string): boolean => entry.startsWith('/') && !/[\s#?]/.test(entry)
+	const sitemap = config.sitemap as unknown
+	if (sitemap !== undefined && typeof sitemap !== 'boolean') {
+		if (!isPlainObject(sitemap)) throw new TypeError(`${file}: sitemap debe ser un booleano o un objeto`)
+		onlyFields(sitemap, ['exclude'], `${file}: sitemap`)
+		stringList(sitemap.exclude, `${file}: sitemap.exclude`, path)
+	}
+	const robots = config.robots as unknown
+	if (robots !== undefined && typeof robots !== 'boolean') {
+		if (!isPlainObject(robots)) throw new TypeError(`${file}: robots debe ser un booleano o un objeto`)
+		onlyFields(robots, ['allow', 'disallow'], `${file}: robots`)
+		stringList(robots.allow, `${file}: robots.allow`, path)
+		stringList(robots.disallow, `${file}: robots.disallow`, path)
+	}
 }
 
 /** Header names of RFC 9110 (a token), and values without line breaks or controls. */
 
 /** Checks `server.contentSecurityPolicy` with the same checks as the header itself, with the file in the message. */
 function validatePolicy(server: Record<string, unknown>, file: string): void {
-  const policy = server.contentSecurityPolicy;
-  if (policy === undefined) return;
-  if (!isPlainObject(policy)) throw new TypeError(`${file}: server.contentSecurityPolicy debe ser un objeto de directivas`);
-  try { contentSecurityPolicy(policy as ContentSecurityPolicy); }
-  catch (error) { throw new TypeError(`${file}: server.${(error as Error).message}`, { cause: error }); }
+	const policy = server.contentSecurityPolicy
+	if (policy === undefined) return
+	if (!isPlainObject(policy)) throw new TypeError(`${file}: server.contentSecurityPolicy debe ser un objeto de directivas`)
+	try {
+		contentSecurityPolicy(policy as ContentSecurityPolicy)
+	} catch (error) {
+		throw new TypeError(`${file}: server.${(error as Error).message}`, { cause: error })
+	}
 }
 
 /** Checks an object of header names and values, `label` naming it in the messages. */
@@ -326,37 +345,40 @@ function validatePolicy(server: Record<string, unknown>, file: string): void {
  * patterns that start with `/` and hold their own header values.
  */
 function validateServerHeaders(server: Record<string, unknown>, file: string, patterns: boolean): void {
-  const headers = server.headers;
-  if (headers === undefined) return;
-  if (!isPlainObject(headers)) throw new TypeError(`${file}: server.headers debe ser un objeto de valores de cabecera`);
-  const global: Record<string, unknown> = {};
-  for (const [name, value] of Object.entries(headers)) {
-    if (!name.startsWith("/")) { global[name] = value; continue; }
-    if (!patterns) throw new TypeError(`${file}: server.headers ${JSON.stringify(name)}: el adaptador static aplica sus cabeceras a todas las rutas; los patrones de ruta necesitan un adaptador con servidor`);
-    if (/[\s?#]/.test(name)) throw new TypeError(`${file}: server.headers ${JSON.stringify(name)} debe ser un patrón de ruta sin espacios, ? ni #`);
-    if (!isPlainObject(value)) throw new TypeError(`${file}: server.headers ${JSON.stringify(name)} debe ser un objeto de valores de cabecera`);
-    validateHeaderValues(value, `server.headers[${JSON.stringify(name)}]`, file);
-  }
-  validateHeaderValues(global, "server.headers", file);
+	const headers = server.headers
+	if (headers === undefined) return
+	if (!isPlainObject(headers)) throw new TypeError(`${file}: server.headers debe ser un objeto de valores de cabecera`)
+	const global: Record<string, unknown> = {}
+	for (const [name, value] of Object.entries(headers)) {
+		if (!name.startsWith('/')) {
+			global[name] = value
+			continue
+		}
+		if (!patterns) throw new TypeError(`${file}: server.headers ${JSON.stringify(name)}: el adaptador static aplica sus cabeceras a todas las rutas; los patrones de ruta necesitan un adaptador con servidor`)
+		if (/[\s?#]/.test(name)) throw new TypeError(`${file}: server.headers ${JSON.stringify(name)} debe ser un patrón de ruta sin espacios, ? ni #`)
+		if (!isPlainObject(value)) throw new TypeError(`${file}: server.headers ${JSON.stringify(name)} debe ser un objeto de valores de cabecera`)
+		validateHeaderValues(value, `server.headers[${JSON.stringify(name)}]`, file)
+	}
+	validateHeaderValues(global, 'server.headers', file)
 }
 
 /** Checks the options of `server: { adapter: "static" }`. */
 function validateStaticServer(server: Record<string, unknown>, file: string): void {
-  onlyFields(server, ["adapter", "contentSecurityPolicy", "headers", "headerFiles"], `${file}: server (static)`);
-  validatePolicy(server, file);
-  validateServerHeaders(server, file, false);
-  const files = server.headerFiles;
-  if (files !== undefined && (!Array.isArray(files) || files.some((entry) => entry !== "_headers" && entry !== "nginx"))) {
-    throw new TypeError(`${file}: server.headerFiles debe ser un array con "_headers" y "nginx"`);
-  }
+	onlyFields(server, ['adapter', 'contentSecurityPolicy', 'headers', 'headerFiles'], `${file}: server (static)`)
+	validatePolicy(server, file)
+	validateServerHeaders(server, file, false)
+	const files = server.headerFiles
+	if (files !== undefined && (!Array.isArray(files) || files.some((entry) => entry !== '_headers' && entry !== 'nginx'))) {
+		throw new TypeError(`${file}: server.headerFiles debe ser un array con "_headers" y "nginx"`)
+	}
 }
 
 /** Configurations that `loadMeekoConfig` executed: only their modules may run. */
-const executedConfigs = new WeakSet<object>();
+const executedConfigs = new WeakSet<object>()
 
 /** Whether `loadMeekoConfig` executed `config`, so its modules may run (not a static reading). */
 export function isExecutedConfig(config: MeekoConfig): boolean {
-  return executedConfigs.has(config);
+	return executedConfigs.has(config)
 }
 
 /**
@@ -380,82 +402,80 @@ export function isExecutedConfig(config: MeekoConfig): boolean {
  * ```
  */
 export function readMeekoConfigSync(projectRoot: string): MeekoConfig {
-  const file = configFileOf(projectRoot);
-  if (!file) return {};
-  const config = staticConfigObject(file);
-  if (!config) return {};
-  const strings = (node: ts.ObjectLiteralExpression, name: string): readonly string[] | undefined => {
-    const value = property(node, name);
-    if (!value) return undefined;
-    if (!ts.isArrayLiteralExpression(value) || value.elements.some((entry) => !ts.isStringLiteral(entry))) {
-      throw new TypeError(`${file}: ${name} debe ser un array estático de cadenas para que el editor lo lea`);
-    }
-    return value.elements.map((entry) => (entry as ts.StringLiteral).text);
-  };
-  const imports = property(config, "imports");
-  const components = property(config, "components");
-  let componentDirs: MeekoConfig["components"];
-  if (components !== undefined) {
-    if (!ts.isObjectLiteralExpression(components)) throw new TypeError(`${file}: components debe ser un objeto literal para que el editor lo lea`);
-    const dirs = property(components, "dirs");
-    if (dirs !== undefined) {
-      if (!ts.isArrayLiteralExpression(dirs)) throw new TypeError(`${file}: components.dirs debe ser un array literal para que el editor lo lea`);
-      componentDirs = { dirs: dirs.elements.map((element, index) => {
-        if (!ts.isObjectLiteralExpression(element)) throw new TypeError(`${file}: components.dirs[${index}] debe ser un objeto literal`);
-        const path = property(element, "path");
-        const prefix = property(element, "prefix");
-        if (!path || !ts.isStringLiteralLike(path) || (prefix && !ts.isStringLiteralLike(prefix))) {
-          throw new TypeError(`${file}: components.dirs[${index}] requiere path y prefix literales`);
-        }
-        return { path: path.text, ...(prefix ? { prefix: prefix.text } : {}) };
-      }) };
-      componentDirectories(componentDirs);
-    } else componentDirs = {};
-  }
-  const importDirs: { -readonly [Option in ImportDirectoryOption]?: readonly string[] } = {};
-  for (const option of importDirectoryOptions) {
-    const entries = imports && ts.isObjectLiteralExpression(imports) ? strings(imports, option) : undefined;
-    if (entries) importDirs[option] = entries;
-  }
-  const layers = strings(config, "layers");
-  const extensions = strings(config, "extends");
-  const moduleList = property(config, "modules");
-  // Imported modules and [module, options] entries need the configuration to run; only strings are known.
-  const modules = moduleList && ts.isArrayLiteralExpression(moduleList)
-    ? moduleList.elements.filter(ts.isStringLiteral).map((entry) => entry.text)
-    : undefined;
-  // Only a literal object is known; otherwise the editor uses the default aliases.
-  const alias = staticAliasOption(config);
-  return {
-    ...(alias ? { alias } : {}),
-    ...(layers ? { layers } : {}),
-    ...(extensions ? { extends: extensions } : {}),
-    ...(modules ? { modules } : {}),
-    ...(Object.keys(importDirs).length ? { imports: importDirs } : {}),
-    ...(componentDirs ? { components: componentDirs } : {}),
-  };
+	const file = configFileOf(projectRoot)
+	if (!file) return {}
+	const config = staticConfigObject(file)
+	if (!config) return {}
+	const strings = (node: ts.ObjectLiteralExpression, name: string): readonly string[] | undefined => {
+		const value = property(node, name)
+		if (!value) return undefined
+		if (!ts.isArrayLiteralExpression(value) || value.elements.some((entry) => !ts.isStringLiteral(entry))) {
+			throw new TypeError(`${file}: ${name} debe ser un array estático de cadenas para que el editor lo lea`)
+		}
+		return value.elements.map((entry) => (entry as ts.StringLiteral).text)
+	}
+	const imports = property(config, 'imports')
+	const components = property(config, 'components')
+	let componentDirs: MeekoConfig['components']
+	if (components !== undefined) {
+		if (!ts.isObjectLiteralExpression(components)) throw new TypeError(`${file}: components debe ser un objeto literal para que el editor lo lea`)
+		const dirs = property(components, 'dirs')
+		if (dirs !== undefined) {
+			if (!ts.isArrayLiteralExpression(dirs)) throw new TypeError(`${file}: components.dirs debe ser un array literal para que el editor lo lea`)
+			componentDirs = {
+				dirs: dirs.elements.map((element, index) => {
+					if (!ts.isObjectLiteralExpression(element)) throw new TypeError(`${file}: components.dirs[${index}] debe ser un objeto literal`)
+					const path = property(element, 'path')
+					const prefix = property(element, 'prefix')
+					if (!path || !ts.isStringLiteralLike(path) || (prefix && !ts.isStringLiteralLike(prefix))) {
+						throw new TypeError(`${file}: components.dirs[${index}] requiere path y prefix literales`)
+					}
+					return { path: path.text, ...(prefix ? { prefix: prefix.text } : {}) }
+				}),
+			}
+			componentDirectories(componentDirs)
+		} else componentDirs = {}
+	}
+	const importDirs: { -readonly [Option in ImportDirectoryOption]?: readonly string[] } = {}
+	for (const option of importDirectoryOptions) {
+		const entries = imports && ts.isObjectLiteralExpression(imports) ? strings(imports, option) : undefined
+		if (entries) importDirs[option] = entries
+	}
+	const layers = strings(config, 'layers')
+	const extensions = strings(config, 'extends')
+	const moduleList = property(config, 'modules')
+	// Imported modules and [module, options] entries need the configuration to run; only strings are known.
+	const modules = moduleList && ts.isArrayLiteralExpression(moduleList) ? moduleList.elements.filter(ts.isStringLiteral).map((entry) => entry.text) : undefined
+	// Only a literal object is known; otherwise the editor uses the default aliases.
+	const alias = staticAliasOption(config)
+	return {
+		...(alias ? { alias } : {}),
+		...(layers ? { layers } : {}),
+		...(extensions ? { extends: extensions } : {}),
+		...(modules ? { modules } : {}),
+		...(Object.keys(importDirs).length ? { imports: importDirs } : {}),
+		...(componentDirs ? { components: componentDirs } : {}),
+	}
 }
 
 /** `meeko.config.*` of a project, if there is one. */
 function configFileOf(projectRoot: string): string | undefined {
-  return ["meeko.config.ts", "meeko.config.mts", "meeko.config.js", "meeko.config.mjs"]
-    .map((name) => resolve(projectRoot, name)).find(existsSync);
+	return ['meeko.config.ts', 'meeko.config.mts', 'meeko.config.js', 'meeko.config.mjs'].map((name) => resolve(projectRoot, name)).find(existsSync)
 }
 
 /** The object literal that a configuration file exports, read without running it. */
 function staticConfigObject(file: string): ts.ObjectLiteralExpression | undefined {
-  const source = ts.createSourceFile(file, readFileSync(file, "utf8"), ts.ScriptTarget.Latest, true);
-  const exported = source.statements.find(ts.isExportAssignment);
-  const expression = exported?.expression;
-  const config = expression && ts.isCallExpression(expression) ? expression.arguments[0] : expression;
-  return config && ts.isObjectLiteralExpression(config) ? config : undefined;
+	const source = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true)
+	const exported = source.statements.find(ts.isExportAssignment)
+	const expression = exported?.expression
+	const config = expression && ts.isCallExpression(expression) ? expression.arguments[0] : expression
+	return config && ts.isObjectLiteralExpression(config) ? config : undefined
 }
 
 /** The value of the property `name` of an object literal, when it is a plain assignment. */
 function property(node: ts.ObjectLiteralExpression, name: string): ts.Expression | undefined {
-  const item = node.properties.find((entry) => ts.isPropertyAssignment(entry) &&
-    ((ts.isIdentifier(entry.name) && entry.name.text === name) || (ts.isStringLiteral(entry.name) && entry.name.text === name)));
-  return item && ts.isPropertyAssignment(item) ? item.initializer : undefined;
+	const item = node.properties.find((entry) => ts.isPropertyAssignment(entry) && ((ts.isIdentifier(entry.name) && entry.name.text === name) || (ts.isStringLiteral(entry.name) && entry.name.text === name)))
+	return item && ts.isPropertyAssignment(item) ? item.initializer : undefined
 }
 
 /**
@@ -467,46 +487,46 @@ function property(node: ts.ObjectLiteralExpression, name: string): ts.Expression
  * renders without `theme`.
  */
 export function readThemeEnabledSync(projectRoot: string): boolean | undefined {
-  const file = configFileOf(projectRoot);
-  if (!file) return undefined;
-  const config = staticConfigObject(file);
-  if (!config) return undefined;
-  const named = config.properties.some((entry) => entry.name !== undefined && (ts.isIdentifier(entry.name) || ts.isStringLiteral(entry.name)) && entry.name.text === "theme");
-  if (!named) return config.properties.some(ts.isSpreadAssignment) ? undefined : false;
-  const value = property(config, "theme");
-  if (!value) return undefined;
-  if (value.kind === ts.SyntaxKind.TrueKeyword || ts.isObjectLiteralExpression(value)) return true;
-  if (value.kind === ts.SyntaxKind.FalseKeyword) return false;
-  return undefined;
+	const file = configFileOf(projectRoot)
+	if (!file) return undefined
+	const config = staticConfigObject(file)
+	if (!config) return undefined
+	const named = config.properties.some((entry) => entry.name !== undefined && (ts.isIdentifier(entry.name) || ts.isStringLiteral(entry.name)) && entry.name.text === 'theme')
+	if (!named) return config.properties.some(ts.isSpreadAssignment) ? undefined : false
+	const value = property(config, 'theme')
+	if (!value) return undefined
+	if (value.kind === ts.SyntaxKind.TrueKeyword || ts.isObjectLiteralExpression(value)) return true
+	if (value.kind === ts.SyntaxKind.FalseKeyword) return false
+	return undefined
 }
 
 /** The value of a literal (`true`, `"dark"`, `["light", "dark"]`, `{ … }`), or `undefined` for an expression. */
 function literalValue(node: ts.Expression): { readonly value: unknown } | undefined {
-  if (ts.isParenthesizedExpression(node) || ts.isAsExpression(node) || ts.isSatisfiesExpression(node)) return literalValue(node.expression);
-  if (node.kind === ts.SyntaxKind.TrueKeyword) return { value: true };
-  if (node.kind === ts.SyntaxKind.FalseKeyword) return { value: false };
-  if (ts.isStringLiteralLike(node)) return { value: node.text };
-  if (ts.isNumericLiteral(node)) return { value: Number(node.text) };
-  if (ts.isArrayLiteralExpression(node)) {
-    const values: unknown[] = [];
-    for (const element of node.elements) {
-      const item = ts.isSpreadElement(element) ? undefined : literalValue(element);
-      if (!item) return undefined;
-      values.push(item.value);
-    }
-    return { value: values };
-  }
-  if (ts.isObjectLiteralExpression(node)) {
-    const value: Record<string, unknown> = {};
-    for (const entry of node.properties) {
-      if (!ts.isPropertyAssignment(entry) || !(ts.isIdentifier(entry.name) || ts.isStringLiteral(entry.name))) return undefined;
-      const item = literalValue(entry.initializer);
-      if (!item) return undefined;
-      value[entry.name.text] = item.value;
-    }
-    return { value };
-  }
-  return undefined;
+	if (ts.isParenthesizedExpression(node) || ts.isAsExpression(node) || ts.isSatisfiesExpression(node)) return literalValue(node.expression)
+	if (node.kind === ts.SyntaxKind.TrueKeyword) return { value: true }
+	if (node.kind === ts.SyntaxKind.FalseKeyword) return { value: false }
+	if (ts.isStringLiteralLike(node)) return { value: node.text }
+	if (ts.isNumericLiteral(node)) return { value: Number(node.text) }
+	if (ts.isArrayLiteralExpression(node)) {
+		const values: unknown[] = []
+		for (const element of node.elements) {
+			const item = ts.isSpreadElement(element) ? undefined : literalValue(element)
+			if (!item) return undefined
+			values.push(item.value)
+		}
+		return { value: values }
+	}
+	if (ts.isObjectLiteralExpression(node)) {
+		const value: Record<string, unknown> = {}
+		for (const entry of node.properties) {
+			if (!ts.isPropertyAssignment(entry) || !(ts.isIdentifier(entry.name) || ts.isStringLiteral(entry.name))) return undefined
+			const item = literalValue(entry.initializer)
+			if (!item) return undefined
+			value[entry.name.text] = item.value
+		}
+		return { value }
+	}
+	return undefined
 }
 
 /**
@@ -515,10 +535,10 @@ function literalValue(node: ts.Expression): { readonly value: unknown } | undefi
  * (no configuration, no `theme`, or a value that only running it tells).
  */
 export function readThemeOptionSync(projectRoot: string): unknown {
-  const file = configFileOf(projectRoot);
-  const config = file ? staticConfigObject(file) : undefined;
-  const value = config && property(config, "theme");
-  return value ? literalValue(value)?.value : undefined;
+	const file = configFileOf(projectRoot)
+	const config = file ? staticConfigObject(file) : undefined
+	const value = config && property(config, 'theme')
+	return value ? literalValue(value)?.value : undefined
 }
 
 /**
@@ -540,44 +560,58 @@ export function readThemeOptionSync(projectRoot: string): unknown {
  * ```
  */
 export async function resolveConfigSources(projectRoot: string, config?: MeekoConfig): Promise<readonly ConfigSource[]> {
-  config ??= await loadMeekoConfig(projectRoot);
-  const root = resolve(projectRoot);
-  const actualRoot = await realpath(root);
-  const result: ConfigSource[] = [{ name: "app", root, kind: "app" }];
-  const names = new Set(["app"]);
-  const roots = new Set([actualRoot.toLowerCase()]);
-  // A string of modules that is not a module (a folder with app/pages, or a missing path) is
-  // checked as the layer it was before 1.2, with the same errors.
-  const folderModules = (config.modules ?? []).filter((entry): entry is string => typeof entry === "string"
-    && classifyModuleEntry(root, entry).kind !== "module");
-  const moduleLayers = executedConfigs.has(config) ? (await resolveMeekoModules(root, config)).layers : [];
-  for (const [kind, entries, linked] of [
-    ["layer", config.extends, false], ["layer", config.layers, false], ["module", folderModules, false], ["module", moduleLayers, true],
-  ] as const) {
-    for (const entry of entries ?? []) {
-      const target = resolve(root, entry);
-      if (!inside(root, target)) throw new Error(`${kind} ${entry} sale de la raíz del proyecto ${root}`);
-      let actualTarget: string;
-      try { actualTarget = await realpath(target); }
-      catch { throw new Error(`${kind} ${entry} no existe: ${target}`); }
-      // A module's layer may live in a linked package (pnpm) whose real path is outside the project.
-      if (!linked && !inside(actualRoot, actualTarget)) throw new Error(`${kind} ${entry} sale de la raíz del proyecto ${root}`);
-      if (roots.has(actualTarget.toLowerCase())) throw new Error(`Raíz de fuentes de Meeko repetida: ${target}`);
-      let name = basename(target, extname(target));
-      if (linked) {
-        // A module chooses its layer folder, not the project: derive a valid name that is not taken.
-        const base = name.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^[^a-z]+/, "").replace(/-+$/, "") || "layer";
-        name = base;
-        for (let index = 2; names.has(name); index++) name = `${base}-${index}`;
-      }
-      if (!/^[a-z][a-z0-9-]*$/.test(name) || names.has(name)) throw new Error(`Nombre de fuente de Meeko no válido o repetido ${name}: ${target}`);
-      try { if (!(await stat(resolve(target, "app", "pages"))).isDirectory()) throw new Error("not a directory"); }
-      catch { throw new Error(`${kind} ${entry} no tiene carpeta app/pages: ${target}`); }
-      roots.add(actualTarget.toLowerCase()); names.add(name);
-      result.push({ name, root: target, kind });
-    }
-  }
-  return result;
+	config ??= await loadMeekoConfig(projectRoot)
+	const root = resolve(projectRoot)
+	const actualRoot = await realpath(root)
+	const result: ConfigSource[] = [{ name: 'app', root, kind: 'app' }]
+	const names = new Set(['app'])
+	const roots = new Set([actualRoot.toLowerCase()])
+	// A string of modules that is not a module (a folder with app/pages, or a missing path) is
+	// checked as the layer it was before 1.2, with the same errors.
+	const folderModules = (config.modules ?? []).filter((entry): entry is string => typeof entry === 'string' && classifyModuleEntry(root, entry).kind !== 'module')
+	const moduleLayers = executedConfigs.has(config) ? (await resolveMeekoModules(root, config)).layers : []
+	for (const [kind, entries, linked] of [
+		['layer', config.extends, false],
+		['layer', config.layers, false],
+		['module', folderModules, false],
+		['module', moduleLayers, true],
+	] as const) {
+		for (const entry of entries ?? []) {
+			const target = resolve(root, entry)
+			if (!inside(root, target)) throw new Error(`${kind} ${entry} sale de la raíz del proyecto ${root}`)
+			let actualTarget: string
+			try {
+				actualTarget = await realpath(target)
+			} catch {
+				throw new Error(`${kind} ${entry} no existe: ${target}`)
+			}
+			// A module's layer may live in a linked package (pnpm) whose real path is outside the project.
+			if (!linked && !inside(actualRoot, actualTarget)) throw new Error(`${kind} ${entry} sale de la raíz del proyecto ${root}`)
+			if (roots.has(actualTarget.toLowerCase())) throw new Error(`Raíz de fuentes de Meeko repetida: ${target}`)
+			let name = basename(target, extname(target))
+			if (linked) {
+				// A module chooses its layer folder, not the project: derive a valid name that is not taken.
+				const base =
+					name
+						.toLowerCase()
+						.replace(/[^a-z0-9-]+/g, '-')
+						.replace(/^[^a-z]+/, '')
+						.replace(/-+$/, '') || 'layer'
+				name = base
+				for (let index = 2; names.has(name); index++) name = `${base}-${index}`
+			}
+			if (!/^[a-z][a-z0-9-]*$/.test(name) || names.has(name)) throw new Error(`Nombre de fuente de Meeko no válido o repetido ${name}: ${target}`)
+			try {
+				if (!(await stat(resolve(target, 'app', 'pages'))).isDirectory()) throw new Error('not a directory')
+			} catch {
+				throw new Error(`${kind} ${entry} no tiene carpeta app/pages: ${target}`)
+			}
+			roots.add(actualTarget.toLowerCase())
+			names.add(name)
+			result.push({ name, root: target, kind })
+		}
+	}
+	return result
 }
 
 /**
@@ -597,31 +631,34 @@ export async function resolveConfigSources(projectRoot: string, config?: MeekoCo
  * ```
  */
 export async function discoverConfiguredRoutes(projectRoot: string): Promise<readonly RouteRecord[]> {
-  const config = await loadMeekoConfig(projectRoot);
-  const sources = await resolveConfigSources(projectRoot, config);
-  const layouts = await configuredModuleLayouts(projectRoot, config);
-  const routes = await composeFrameworkRoutes({
-    projectRoot,
-    layers: sources.slice(1).map(({ name, root }) => ({ name, root })),
-    ...(Object.keys(layouts).length ? { layouts } : {}),
-  });
-  if (!executedConfigs.has(config)) return routes;
-  return extendModuleRoutes(routes, (await resolveMeekoModules(resolve(projectRoot), config)).routeExtenders);
+	const config = await loadMeekoConfig(projectRoot)
+	const sources = await resolveConfigSources(projectRoot, config)
+	const layouts = await configuredModuleLayouts(projectRoot, config)
+	const routes = await composeFrameworkRoutes({
+		projectRoot,
+		layers: sources.slice(1).map(({ name, root }) => ({ name, root })),
+		...(Object.keys(layouts).length ? { layouts } : {}),
+	})
+	if (!executedConfigs.has(config)) return routes
+	return extendModuleRoutes(routes, (await resolveMeekoModules(resolve(projectRoot), config)).routeExtenders)
 }
 
 /**
  * Applies the `extendRoutes` transforms of the modules in order; each result is validated as a
  * manifest (collisions, IDs) and sorted again, naming the module that produced it.
  */
-export function extendModuleRoutes(routes: readonly RouteRecord[], extenders: ResolvedModules["routeExtenders"]): readonly RouteRecord[] {
-  let current = routes;
-  for (const { module, extend } of extenders) {
-    const next = extend(current);
-    if (!Array.isArray(next)) throw new TypeError(`Módulo de Meeko ${module}: extendRoutes debe devolver la lista de rutas`);
-    try { current = createRouteManifest(next as readonly RouteRecord[]); }
-    catch (error) { throw new Error(`Módulo de Meeko ${module}: extendRoutes: ${error instanceof Error ? error.message : String(error)}`, { cause: error }); }
-  }
-  return current;
+export function extendModuleRoutes(routes: readonly RouteRecord[], extenders: ResolvedModules['routeExtenders']): readonly RouteRecord[] {
+	let current = routes
+	for (const { module, extend } of extenders) {
+		const next = extend(current)
+		if (!Array.isArray(next)) throw new TypeError(`Módulo de Meeko ${module}: extendRoutes debe devolver la lista de rutas`)
+		try {
+			current = createRouteManifest(next as readonly RouteRecord[])
+		} catch (error) {
+			throw new Error(`Módulo de Meeko ${module}: extendRoutes: ${error instanceof Error ? error.message : String(error)}`, { cause: error })
+		}
+	}
+	return current
 }
 
 /**
@@ -629,27 +666,27 @@ export function extendModuleRoutes(routes: readonly RouteRecord[], extenders: Re
  * those of the modules; the first source with a name wins.
  */
 export async function discoverConfiguredLayouts(projectRoot: string): Promise<Readonly<Record<string, string>>> {
-  const config = await loadMeekoConfig(projectRoot);
-  const result: Record<string, string> = {};
-  for (const source of await resolveConfigSources(projectRoot, config)) {
-    for (const [name, file] of Object.entries(await discoverLayouts(source.root))) if (!Object.hasOwn(result, name)) result[name] = file;
-  }
-  for (const [name, file] of Object.entries(await configuredModuleLayouts(projectRoot, config))) if (!Object.hasOwn(result, name)) result[name] = file;
-  return result;
+	const config = await loadMeekoConfig(projectRoot)
+	const result: Record<string, string> = {}
+	for (const source of await resolveConfigSources(projectRoot, config)) {
+		for (const [name, file] of Object.entries(await discoverLayouts(source.root))) if (!Object.hasOwn(result, name)) result[name] = file
+	}
+	for (const [name, file] of Object.entries(await configuredModuleLayouts(projectRoot, config))) if (!Object.hasOwn(result, name)) result[name] = file
+	return result
 }
 
 /** Named layouts that the modules of the configuration add with `meeko.addLayout`, by name. */
 export async function configuredModuleLayouts(projectRoot: string, config?: MeekoConfig): Promise<Readonly<Record<string, string>>> {
-  config ??= await loadMeekoConfig(projectRoot);
-  if (!executedConfigs.has(config)) return {};
-  const modules = await resolveMeekoModules(resolve(projectRoot), config);
-  return Object.fromEntries(modules.layouts.map(({ name, file }) => [name, file]));
+	config ??= await loadMeekoConfig(projectRoot)
+	if (!executedConfigs.has(config)) return {}
+	const modules = await resolveMeekoModules(resolve(projectRoot), config)
+	return Object.fromEntries(modules.layouts.map(({ name, file }) => [name, file]))
 }
 
 /** The executed configuration of a project and what its modules added. */
 export async function loadConfiguredModules(projectRoot: string): Promise<{ readonly config: MeekoConfig; readonly modules: ResolvedModules }> {
-  const config = await loadMeekoConfig(projectRoot);
-  return { config, modules: await resolveMeekoModules(projectRoot, config) };
+	const config = await loadMeekoConfig(projectRoot)
+	return { config, modules: await resolveMeekoModules(projectRoot, config) }
 }
 
 /**
@@ -658,7 +695,7 @@ export async function loadConfiguredModules(projectRoot: string): Promise<{ read
  * renderer reads `document` from here, not from `loadMeekoConfig`.
  */
 export async function resolveMeekoConfig(projectRoot: string): Promise<MeekoConfig> {
-  const { config, modules } = await loadConfiguredModules(projectRoot);
-  const document = resolvedDocument(config, modules);
-  return document === undefined ? config : { ...config, document };
+	const { config, modules } = await loadConfiguredModules(projectRoot)
+	const document = resolvedDocument(config, modules)
+	return document === undefined ? config : { ...config, document }
 }

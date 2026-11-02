@@ -13,7 +13,7 @@ related:
   - "@meekojs/meeko/server#createSocketUpgradeHandler"
   - "@meekojs/meeko/server#createSocketHub"
   - docs/framework.md#websocket
-source-hash: 9a83be3777ff2bcdc9862411b2ff1c05a418060bd4dbc02be5e9164db835eb37
+source-hash: c5410fcdfbea9d4d46b0cad7a49438504d786bdc2ec70f0311581fc1b799c120
 ---
 
 `createNodeSocketUpgradeHandler(options)` is the part of `attachNodeWebSocketServer` independent of `ws`: it receives `(incoming, socket, head)` from Node's `upgrade` event, checks the path, method, `Origin`, session and channel authorization with the hub, and only then calls your `upgrade`, which performs the handshake with the host's WebSocket library. It then connects peer messages and closure to the hub.

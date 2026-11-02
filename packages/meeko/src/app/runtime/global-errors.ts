@@ -1,17 +1,17 @@
-import type { ComponentErrorHandler } from "./component-errors";
+import type { ComponentErrorHandler } from './component-errors'
 
-import { logClientError, markObserved, observeCallback, wasObserved } from "../../core/error-observer";
+import { logClientError, markObserved, observeCallback, wasObserved } from '../../core/error-observer'
 
 /** The parts of `ErrorEvent` that a browser (or a test window) fills in. */
 interface UncaughtEvent extends Event {
-  readonly error?: unknown;
-  readonly message?: string;
-  readonly filename?: string;
+	readonly error?: unknown
+	readonly message?: string
+	readonly filename?: string
 }
 
 /** The parts of `PromiseRejectionEvent` that a browser (or a test window) fills in. */
 interface RejectionEvent extends Event {
-  readonly reason?: unknown;
+	readonly reason?: unknown
 }
 
 /**
@@ -19,7 +19,7 @@ interface RejectionEvent extends Event {
  * loaded without CORS: no error object, file or message to report. It is left to the console.
  */
 function opaqueScriptError(event: UncaughtEvent): boolean {
-  return (event.error === undefined || event.error === null) && !event.filename && /^Script error\.?$/.test(event.message ?? "");
+	return (event.error === undefined || event.error === null) && !event.filename && /^Script error\.?$/.test(event.message ?? '')
 }
 
 /**
@@ -33,39 +33,39 @@ function opaqueScriptError(event: UncaughtEvent): boolean {
  * delivered again. Returns the function that removes both listeners.
  */
 export function watchGlobalErrors(browser: Window, observer: () => ComponentErrorHandler | undefined): () => void {
-  const deliver = (event: Event, error: unknown, source: "uncaught" | "rejection"): void => {
-    if (event.defaultPrevented) return;
-    if (wasObserved(error)) {
-      event.preventDefault();
-      return;
-    }
-    const handler = observer();
-    if (!handler) return;
-    event.preventDefault();
-    // Another application on the page sees it as already observed.
-    markObserved(error);
-    observeCallback(() => handler(error, source),
-      (observerError) => logClientError("Meeko application error observer failed", observerError, error));
-  };
-  const onError = (event: Event): void => {
-    const uncaught = event as UncaughtEvent;
-    // Resource load errors do not bubble to `window`; only script exceptions arrive here.
-    if (opaqueScriptError(uncaught)) return;
-    const error = uncaught.error === undefined || uncaught.error === null
-      ? new Error(uncaught.message || "Uncaught error")
-      : uncaught.error;
-    deliver(event, error, "uncaught");
-  };
-  const onRejection = (event: Event): void => {
-    deliver(event, (event as RejectionEvent).reason, "rejection");
-  };
-  browser.addEventListener("error", onError);
-  browser.addEventListener("unhandledrejection", onRejection);
-  let released = false;
-  return () => {
-    if (released) return;
-    released = true;
-    browser.removeEventListener("error", onError);
-    browser.removeEventListener("unhandledrejection", onRejection);
-  };
+	const deliver = (event: Event, error: unknown, source: 'uncaught' | 'rejection'): void => {
+		if (event.defaultPrevented) return
+		if (wasObserved(error)) {
+			event.preventDefault()
+			return
+		}
+		const handler = observer()
+		if (!handler) return
+		event.preventDefault()
+		// Another application on the page sees it as already observed.
+		markObserved(error)
+		observeCallback(
+			() => handler(error, source),
+			(observerError) => logClientError('Meeko application error observer failed', observerError, error),
+		)
+	}
+	const onError = (event: Event): void => {
+		const uncaught = event as UncaughtEvent
+		// Resource load errors do not bubble to `window`; only script exceptions arrive here.
+		if (opaqueScriptError(uncaught)) return
+		const error = uncaught.error === undefined || uncaught.error === null ? new Error(uncaught.message || 'Uncaught error') : uncaught.error
+		deliver(event, error, 'uncaught')
+	}
+	const onRejection = (event: Event): void => {
+		deliver(event, (event as RejectionEvent).reason, 'rejection')
+	}
+	browser.addEventListener('error', onError)
+	browser.addEventListener('unhandledrejection', onRejection)
+	let released = false
+	return () => {
+		if (released) return
+		released = true
+		browser.removeEventListener('error', onError)
+		browser.removeEventListener('unhandledrejection', onRejection)
+	}
 }

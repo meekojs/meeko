@@ -1,7 +1,7 @@
-import type { RouteMatch, RouteRecord } from "../../app/runtime/router";
-import type { ContextServices } from "../runtime/definition";
-import type { ServerPlatform } from "../runtime/platform";
-import type { RequestContext } from "../runtime/request-context";
+import type { RouteMatch, RouteRecord } from '../../app/runtime/router'
+import type { ContextServices } from '../runtime/definition'
+import type { ServerPlatform } from '../runtime/platform'
+import type { RequestContext } from '../runtime/request-context'
 
 /**
  * Contexto del middleware de ruta de servidor (`app/middleware/*.server.ts`): el de `usePage()` en el
@@ -23,31 +23,31 @@ import type { RequestContext } from "../runtime/request-context";
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#middleware-de-ruta-de-servidor
  */
 export interface ServerRouteMiddlewareContext<TServices = unknown, TEnv = unknown> {
-  /** URL de la petición. */
-  readonly url: URL;
-  /** Ruta de destino y sus parámetros. */
-  readonly match: RouteMatch;
-  /** Parámetros de la ruta, sin validar. */
-  readonly params: Readonly<Record<string, string>>;
-  /** Parámetros de búsqueda, sin validar. */
-  readonly search: Readonly<Record<string, string | string[]>>;
-  /** Petición HTTP: la del documento en SSR o la de los datos de la página al navegar. */
-  readonly request: Request;
-  /** Se aborta si el cliente se desconecta o se revoca la sesión. */
-  readonly signal: AbortSignal;
-  /**
-   * Contexto de la petición, el mismo que `usePage().context`. Con `createFrameworkHandler` sin
-   * `createContext`, leerlo (o `session`, `services`, `platform` y `requestId`) lanza un error.
-   */
-  readonly context: RequestContext<TServices, TEnv>;
-  /** Sesión de la petición, como `context.session`. */
-  readonly session: RequestContext<TServices, TEnv>["session"];
-  /** Servicios de `server/runtime.ts`, como `context.services`; desde `1.7`, `AppServices` sin `TServices`. */
-  readonly services: ContextServices<TServices>;
-  /** Runtime que atiende la petición, como `context.platform`. */
-  readonly platform: ServerPlatform<TEnv>;
-  /** ID de la petición, como `context.requestId`. */
-  readonly requestId: string;
+	/** URL de la petición. */
+	readonly url: URL
+	/** Ruta de destino y sus parámetros. */
+	readonly match: RouteMatch
+	/** Parámetros de la ruta, sin validar. */
+	readonly params: Readonly<Record<string, string>>
+	/** Parámetros de búsqueda, sin validar. */
+	readonly search: Readonly<Record<string, string | string[]>>
+	/** Petición HTTP: la del documento en SSR o la de los datos de la página al navegar. */
+	readonly request: Request
+	/** Se aborta si el cliente se desconecta o se revoca la sesión. */
+	readonly signal: AbortSignal
+	/**
+	 * Contexto de la petición, el mismo que `usePage().context`. Con `createFrameworkHandler` sin
+	 * `createContext`, leerlo (o `session`, `services`, `platform` y `requestId`) lanza un error.
+	 */
+	readonly context: RequestContext<TServices, TEnv>
+	/** Sesión de la petición, como `context.session`. */
+	readonly session: RequestContext<TServices, TEnv>['session']
+	/** Servicios de `server/runtime.ts`, como `context.services`; desde `1.7`, `AppServices` sin `TServices`. */
+	readonly services: ContextServices<TServices>
+	/** Runtime que atiende la petición, como `context.platform`. */
+	readonly platform: ServerPlatform<TEnv>
+	/** ID de la petición, como `context.requestId`. */
+	readonly requestId: string
 }
 
 /**
@@ -66,16 +66,15 @@ export interface ServerRouteMiddlewareContext<TServices = unknown, TEnv = unknow
  * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#middleware-de-ruta-de-servidor
  */
-export type ServerRouteMiddleware<TServices = unknown, TEnv = unknown> =
-  (context: ServerRouteMiddlewareContext<TServices, TEnv>) => void | Response | Promise<void | Response>;
+export type ServerRouteMiddleware<TServices = unknown, TEnv = unknown> = (context: ServerRouteMiddlewareContext<TServices, TEnv>) => void | Response | Promise<void | Response>
 
 /** Where a page handler loads server route middleware from. */
 export interface ServerRouteMiddlewareLoaders {
-  readonly loadServerMiddleware?: ((file: string) => Promise<ServerRouteMiddleware>) | undefined;
+	readonly loadServerMiddleware?: ((file: string) => Promise<ServerRouteMiddleware>) | undefined
 }
 
 /** Render modes whose pages never ask the server for their data per request. */
-const withoutServerData = new Set(["client", "prerender"]);
+const withoutServerData = new Set(['client', 'prerender'])
 
 /**
  * The server middleware of `route`: its manifest lists the whole chain, the global ones and then
@@ -84,28 +83,24 @@ const withoutServerData = new Set(["client", "prerender"]);
  * manifest that lists one there fails here instead.
  */
 export async function serverRouteMiddlewareChain(route: RouteRecord, loaders: ServerRouteMiddlewareLoaders): Promise<readonly ServerRouteMiddleware[]> {
-  const files = route.serverMiddleware ?? [];
-  if (route.render && withoutServerData.has(route.render)) {
-    if (files.length) throw new Error(`Route ${route.id} renders "${route.render}" but has server route middleware (${files.join(", ")}), which needs a page that asks the server for its data`);
-    return [];
-  }
-  if (!files.length) return [];
-  const load = loaders.loadServerMiddleware;
-  if (!load) throw new Error(`Route ${route.id} has server route middleware (${files.join(", ")}) but no loadServerMiddleware to load it`);
-  return Promise.all(files.map((file) => load(file)));
+	const files = route.serverMiddleware ?? []
+	if (route.render && withoutServerData.has(route.render)) {
+		if (files.length) throw new Error(`Route ${route.id} renders "${route.render}" but has server route middleware (${files.join(', ')}), which needs a page that asks the server for its data`)
+		return []
+	}
+	if (!files.length) return []
+	const load = loaders.loadServerMiddleware
+	if (!load) throw new Error(`Route ${route.id} has server route middleware (${files.join(', ')}) but no loadServerMiddleware to load it`)
+	return Promise.all(files.map((file) => load(file)))
 }
 
 /** Stops at the first response, like the isomorphic route middleware runner. */
-export async function runServerRouteMiddleware(
-  middlewares: readonly ServerRouteMiddleware[],
-  context: ServerRouteMiddlewareContext,
-): Promise<Response | undefined> {
-  for (const middleware of middlewares) {
-    const result = await middleware(context);
-    if (result === undefined) continue;
-    if (!(result instanceof Response)) throw new TypeError("Server route middleware must return a Response or nothing");
-    return result;
-  }
-  return undefined;
+export async function runServerRouteMiddleware(middlewares: readonly ServerRouteMiddleware[], context: ServerRouteMiddlewareContext): Promise<Response | undefined> {
+	for (const middleware of middlewares) {
+		const result = await middleware(context)
+		if (result === undefined) continue
+		if (!(result instanceof Response)) throw new TypeError('Server route middleware must return a Response or nothing')
+		return result
+	}
+	return undefined
 }
-

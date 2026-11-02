@@ -1,11 +1,11 @@
-import type { DomScope } from "./renderer";
+import type { DomScope } from './renderer'
 
-import { observeCallback } from "../../core/error-observer";
-import { effect, untrack } from "../../core/reactivity";
-import { componentErrorReporter } from "./component-errors";
-import { afterMountBatch } from "./lifecycle";
-import { markerRegion, nestedRegionEnd, parseRegionHtml } from "./renderer";
-import { lateRender } from "./suspense";
+import { observeCallback } from '../../core/error-observer'
+import { effect, untrack } from '../../core/reactivity'
+import { componentErrorReporter } from './component-errors'
+import { afterMountBatch } from './lifecycle'
+import { markerRegion, nestedRegionEnd, parseRegionHtml } from './renderer'
+import { lateRender } from './suspense'
 
 /**
  * Destino de `<MeekoTeleport to>`: `"body"`, el final de `<body>`, o `"#id"`, el elemento con ese
@@ -21,7 +21,7 @@ import { lateRender } from "./suspense";
  * const end: MeekoTeleportTarget = "body";
  * ```
  */
-export type MeekoTeleportTarget = "body" | `#${string}`;
+export type MeekoTeleportTarget = 'body' | `#${string}`
 
 /**
  * Props de la etiqueta integrada `<MeekoTeleport>`, que pinta su contenido (el snippet `default`)
@@ -45,35 +45,35 @@ export type MeekoTeleportTarget = "body" | `#${string}`;
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#meekoteleport
  */
 export interface MeekoTeleportProps {
-  /** Destino: `"body"` o `"#id"` de un elemento del documento. */
-  to: MeekoTeleportTarget;
-  /** Con `true`, el contenido se pinta en su sitio, sin moverse; cambiarlo mueve los mismos nodos. */
-  disabled?: boolean;
+	/** Destino: `"body"` o `"#id"` de un elemento del documento. */
+	to: MeekoTeleportTarget
+	/** Con `true`, el contenido se pinta en su sitio, sin moverse; cambiarlo mueve los mismos nodos. */
+	disabled?: boolean
 }
 
 /** `#id` with the identifiers that need no escaping: a letter, then letters, digits, `-` and `_`. */
-const idTarget = /^#[A-Za-z][A-Za-z0-9_-]*$/;
+const idTarget = /^#[A-Za-z][A-Za-z0-9_-]*$/
 
 /**
  * @internal Whether `value` is a target that `<MeekoTeleport to>` admits: `"body"` or `"#id"`.
  */
 export function isTeleportTarget(value: unknown): value is MeekoTeleportTarget {
-  return value === "body" || (typeof value === "string" && idTarget.test(value));
+	return value === 'body' || (typeof value === 'string' && idTarget.test(value))
 }
 
 /** The admitted target, or a TypeError that names what `to` admits. */
 function checkedTarget(value: unknown): MeekoTeleportTarget {
-  if (isTeleportTarget(value)) return value;
-  throw new TypeError(`<MeekoTeleport> to must be "body" or "#id" (a letter, then letters, digits, - or _), not ${JSON.stringify(value) ?? String(value)}`);
+	if (isTeleportTarget(value)) return value
+	throw new TypeError(`<MeekoTeleport> to must be "body" or "#id" (a letter, then letters, digits, - or _), not ${JSON.stringify(value) ?? String(value)}`)
 }
 
 /** @internal The content of one teleport that the server renders in its target. */
 export interface TeleportEntry {
-  /** Unique in the document: `<!--meeko:portal-ref:KEY-->` marks its place, `<!--meeko:portal:KEY-->` its content. */
-  readonly key: string;
-  readonly to: MeekoTeleportTarget;
-  /** The content between its portal markers; empty while it renders. */
-  html: string;
+	/** Unique in the document: `<!--meeko:portal-ref:KEY-->` marks its place, `<!--meeko:portal:KEY-->` its content. */
+	readonly key: string
+	readonly to: MeekoTeleportTarget
+	/** The content between its portal markers; empty while it renders. */
+	html: string
 }
 
 /**
@@ -81,22 +81,22 @@ export interface TeleportEntry {
  * render pass that suspends is discarded with its entries: call `clear` before each pass.
  */
 export class TeleportCollector {
-  readonly entries: TeleportEntry[] = [];
-  private next = 0;
+	readonly entries: TeleportEntry[] = []
+	private next = 0
 
-  /** A key that no other teleport of this document uses. */
-  key(): string {
-    return `t${this.next++}`;
-  }
+	/** A key that no other teleport of this document uses. */
+	key(): string {
+		return `t${this.next++}`
+	}
 
-  clear(): void {
-    this.entries.length = 0;
-    this.next = 0;
-  }
+	clear(): void {
+		this.entries.length = 0
+		this.next = 0
+	}
 }
 
 /** The document that the server is rendering; see {@link collectTeleports}. */
-let activeCollector: TeleportCollector | undefined;
+let activeCollector: TeleportCollector | undefined
 
 /**
  * @internal Runs a synchronous server render whose teleports go to `collector`, so the document
@@ -104,16 +104,19 @@ let activeCollector: TeleportCollector | undefined;
  * a render in the browser) the content stays in its place and the browser moves it.
  */
 export function collectTeleports<T>(collector: TeleportCollector, render: () => T): T {
-  const previous = activeCollector;
-  activeCollector = collector;
-  try { return render(); }
-  finally { activeCollector = previous; }
+	const previous = activeCollector
+	activeCollector = collector
+	try {
+		return render()
+	} finally {
+		activeCollector = previous
+	}
 }
 
 /** The markers around a teleport's content: `meeko:portal` in its place, `meeko:portal:KEY` in its target. */
 function portal(key: string | undefined, html: string): string {
-  const name = key === undefined ? "meeko:portal" : `meeko:portal:${key}`;
-  return `<!--${name}-->${html}<!--/${name}-->`;
+	const name = key === undefined ? 'meeko:portal' : `meeko:portal:${key}`
+	return `<!--${name}-->${html}<!--/${name}-->`
 }
 
 /**
@@ -122,54 +125,55 @@ function portal(key: string | undefined, html: string): string {
  * stays in its place between portal markers.
  */
 export function renderTeleport(id: number, to: MeekoTeleportTarget, disabled: boolean | undefined, render: () => string): string {
-  const target = checkedTarget(to);
-  const collector = activeCollector;
-  if (disabled || !collector) return `<!--meeko:teleport:${id}-->${portal(undefined, render())}<!--/meeko:teleport:${id}-->`;
-  // The entry takes its place before its content renders, so a teleport inside it comes after it.
-  const entry: TeleportEntry = { key: collector.key(), to: target, html: "" };
-  collector.entries.push(entry);
-  try { entry.html = portal(entry.key, render()); }
-  catch (error) {
-    collector.entries.splice(collector.entries.indexOf(entry), 1);
-    throw error;
-  }
-  return `<!--meeko:teleport:${id}--><!--meeko:portal-ref:${entry.key}--><!--/meeko:teleport:${id}-->`;
+	const target = checkedTarget(to)
+	const collector = activeCollector
+	if (disabled || !collector) return `<!--meeko:teleport:${id}-->${portal(undefined, render())}<!--/meeko:teleport:${id}-->`
+	// The entry takes its place before its content renders, so a teleport inside it comes after it.
+	const entry: TeleportEntry = { key: collector.key(), to: target, html: '' }
+	collector.entries.push(entry)
+	try {
+		entry.html = portal(entry.key, render())
+	} catch (error) {
+		collector.entries.splice(collector.entries.indexOf(entry), 1)
+		throw error
+	}
+	return `<!--meeko:teleport:${id}--><!--meeko:portal-ref:${entry.key}--><!--/meeko:teleport:${id}-->`
 }
 
 /** The element of a target in `document`, or `null` when it does not exist. */
 function resolveTarget(document: Document, to: MeekoTeleportTarget): Element | null {
-  return to === "body" ? document.body : document.getElementById(to.slice(1));
+	return to === 'body' ? document.body : document.getElementById(to.slice(1))
 }
 
 /** The start of the content that the server placed in a target: a child of the target or, failing that, anywhere. */
 function findPortal(document: Document, key: string, hint: Element | null): Comment | undefined {
-  const data = `meeko:portal:${key}`;
-  for (const parent of [hint, document.body]) {
-    if (!parent) continue;
-    for (const child of Array.from(parent.childNodes)) if (child.nodeType === 8 && (child as Comment).data === data) return child as Comment;
-  }
-  const walker = document.createTreeWalker(document, 128 /* NodeFilter.SHOW_COMMENT */);
-  for (let node = walker.nextNode(); node; node = walker.nextNode()) if ((node as Comment).data === data) return node as Comment;
-  return undefined;
+	const data = `meeko:portal:${key}`
+	for (const parent of [hint, document.body]) {
+		if (!parent) continue
+		for (const child of Array.from(parent.childNodes)) if (child.nodeType === 8 && (child as Comment).data === data) return child as Comment
+	}
+	const walker = document.createTreeWalker(document, 128 /* NodeFilter.SHOW_COMMENT */)
+	for (let node = walker.nextNode(); node; node = walker.nextNode()) if ((node as Comment).data === data) return node as Comment
+	return undefined
 }
 
 /** Moves the nodes from `start` to `end`, both included, before `before` in `parent` (at the end without it). */
 function moveRange(start: Comment, end: Comment, parent: Node, before: Node | null): void {
-  const fragment = start.ownerDocument.createDocumentFragment();
-  for (let node: Node | null = start; node;) {
-    const next: Node | null = node === end ? null : node.nextSibling;
-    fragment.appendChild(node);
-    node = next;
-  }
-  parent.insertBefore(fragment, before);
+	const fragment = start.ownerDocument.createDocumentFragment()
+	for (let node: Node | null = start; node;) {
+		const next: Node | null = node === end ? null : node.nextSibling
+		fragment.appendChild(node)
+		node = next
+	}
+	parent.insertBefore(fragment, before)
 }
 
 function removeRange(start: Comment, end: Comment): void {
-  for (let node: Node | null = start; node;) {
-    const next: Node | null = node === end ? null : node.nextSibling;
-    node.parentNode?.removeChild(node);
-    node = next;
-  }
+	for (let node: Node | null = start; node;) {
+		const next: Node | null = node === end ? null : node.nextSibling
+		node.parentNode?.removeChild(node)
+		node = next
+	}
 }
 
 /**
@@ -180,65 +184,68 @@ function removeRange(start: Comment, end: Comment): void {
  * and removes its nodes, wherever they are.
  */
 export function bindTeleport(scope: DomScope, id: number, readTo: () => MeekoTeleportTarget, readDisabled: () => boolean | undefined, render: () => string, hydrate: (inner: DomScope) => () => void): () => void {
-  const outer = markerRegion(scope, "teleport", id);
-  const placeStart = outer.start!;
-  const placeEnd = outer.end!;
-  const document = placeStart.ownerDocument;
-  let start: Comment;
-  let location: Element | null = null;
-  const first = placeStart.nextSibling;
-  const reference = first?.nodeType === 8 ? /^meeko:portal-ref:([\w-]+)$/.exec((first as Comment).data)?.[1] : undefined;
-  if (reference !== undefined) {
-    // The server placed the content in its target: the place only keeps the reference.
-    const initial = untrack(readTo);
-    const found = findPortal(document, reference, isTeleportTarget(initial) ? resolveTarget(document, initial) : null);
-    if (!found) throw new Error(`Hydration mismatch in teleport ${id}: its content ${reference} is not in the document`);
-    first!.parentNode!.removeChild(first!);
-    start = found;
-    location = found.parentNode as Element;
-  } else if (first?.nodeType === 8 && /^meeko:portal(?::[\w-]+)?$/.test((first as Comment).data)) {
-    // In its place: disabled, rendered without a document, or a target that the server did not find.
-    start = first as Comment;
-  } else if (first === placeEnd) {
-    // A place restored without its content, such as a region that recovers from a failed update.
-    placeEnd.parentNode!.insertBefore(parseRegionHtml(placeEnd.parentNode!, portal(undefined, lateRender(render))), placeEnd);
-    start = placeStart.nextSibling as Comment;
-  } else {
-    throw new Error(`Hydration mismatch in teleport ${id}`);
-  }
-  const end = nestedRegionEnd(start);
-  const release = hydrate({ root: scope.root, start, end });
-  const report = componentErrorReporter("mounted");
-  let warned = false;
-  const place = (to: MeekoTeleportTarget, disabled: boolean): void => {
-    const target = disabled ? null : resolveTarget(document, to);
-    if (!disabled && !target && !warned) {
-      warned = true;
-      console.warn(`<MeekoTeleport to="${to}">: the target is not in the document, so the content stays in its place`);
-    }
-    if (target === location) return;
-    if (target) moveRange(start, end, target, null);
-    else moveRange(start, end, placeEnd.parentNode!, placeEnd);
-    location = target;
-  };
-  let cancel = (): void => {};
-  let stop = (): void => {};
-  try {
-    stop = effect(() => {
-      const to = checkedTarget(readTo());
-      const disabled = Boolean(readDisabled());
-      cancel();
-      // A target that the same hydration or navigation renders exists once its batch has finished.
-      cancel = afterMountBatch(() => observeCallback(() => place(to, disabled), report));
-    });
-  } catch (error) {
-    release();
-    throw error;
-  }
-  return () => {
-    stop();
-    cancel();
-    try { release(); }
-    finally { removeRange(start, end); }
-  };
+	const outer = markerRegion(scope, 'teleport', id)
+	const placeStart = outer.start!
+	const placeEnd = outer.end!
+	const document = placeStart.ownerDocument
+	let start: Comment
+	let location: Element | null = null
+	const first = placeStart.nextSibling
+	const reference = first?.nodeType === 8 ? /^meeko:portal-ref:([\w-]+)$/.exec((first as Comment).data)?.[1] : undefined
+	if (reference !== undefined) {
+		// The server placed the content in its target: the place only keeps the reference.
+		const initial = untrack(readTo)
+		const found = findPortal(document, reference, isTeleportTarget(initial) ? resolveTarget(document, initial) : null)
+		if (!found) throw new Error(`Hydration mismatch in teleport ${id}: its content ${reference} is not in the document`)
+		first!.parentNode!.removeChild(first!)
+		start = found
+		location = found.parentNode as Element
+	} else if (first?.nodeType === 8 && /^meeko:portal(?::[\w-]+)?$/.test((first as Comment).data)) {
+		// In its place: disabled, rendered without a document, or a target that the server did not find.
+		start = first as Comment
+	} else if (first === placeEnd) {
+		// A place restored without its content, such as a region that recovers from a failed update.
+		placeEnd.parentNode!.insertBefore(parseRegionHtml(placeEnd.parentNode!, portal(undefined, lateRender(render))), placeEnd)
+		start = placeStart.nextSibling as Comment
+	} else {
+		throw new Error(`Hydration mismatch in teleport ${id}`)
+	}
+	const end = nestedRegionEnd(start)
+	const release = hydrate({ root: scope.root, start, end })
+	const report = componentErrorReporter('mounted')
+	let warned = false
+	const place = (to: MeekoTeleportTarget, disabled: boolean): void => {
+		const target = disabled ? null : resolveTarget(document, to)
+		if (!disabled && !target && !warned) {
+			warned = true
+			console.warn(`<MeekoTeleport to="${to}">: the target is not in the document, so the content stays in its place`)
+		}
+		if (target === location) return
+		if (target) moveRange(start, end, target, null)
+		else moveRange(start, end, placeEnd.parentNode!, placeEnd)
+		location = target
+	}
+	let cancel = (): void => {}
+	let stop = (): void => {}
+	try {
+		stop = effect(() => {
+			const to = checkedTarget(readTo())
+			const disabled = Boolean(readDisabled())
+			cancel()
+			// A target that the same hydration or navigation renders exists once its batch has finished.
+			cancel = afterMountBatch(() => observeCallback(() => place(to, disabled), report))
+		})
+	} catch (error) {
+		release()
+		throw error
+	}
+	return () => {
+		stop()
+		cancel()
+		try {
+			release()
+		} finally {
+			removeRange(start, end)
+		}
+	}
 }

@@ -13,7 +13,7 @@ related:
   - docs/framework.md#build-despliegue-y-verificación
   - docs/framework.md#sesiones-sin-configuración
   - docs/framework.md#csp-y-cabeceras-en-los-adaptadores-con-servidor
-source-hash: 6f593163f0102525646f08c989d1dc6a20918bc35bf987027bfa4bb5ffeda745
+source-hash: 62e9ed4b952fbe6100297f1ab8e7316ed08d22a045be01fd3ee37c63af382033
 ---
 
 `meeko start` imports `.meeko/output/node/index.mjs`, the server written by [`meeko build`](/en/docs/reference/meeko-build) with the `node` adapter, and starts it: SSR, API, RPC, Socket, files from `client/` and pages from `prerender/`, with sessions, graceful shutdown and, since `1.7`, the CSP and headers from `server`. It does not compile anything or read `app/`, `server/` or `meeko.config.ts`: it serves the build as written.

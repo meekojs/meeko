@@ -1,7 +1,7 @@
-import type { SocketConnection, SocketHub, SocketPeer } from "../socket/runtime";
+import type { SocketConnection, SocketHub, SocketPeer } from '../socket/runtime'
 
-import { normalizeServerError, observeErrorCallback } from "../errors";
-import { copySocketAddress } from "./env";
+import { normalizeServerError, observeErrorCallback } from '../errors'
+import { copySocketAddress } from './env'
 
 /**
  * Opciones de {@link createSocketUpgradeHandler}.
@@ -18,16 +18,16 @@ import { copySocketAddress } from "./env";
  * ```
  */
 export interface SocketUpgradeOptions {
-  /** Hub de la aplicación. */
-  hub: SocketHub;
-  /** Origen público fijo; la política de seguridad nunca se deduce de una cabecera `Host` no confiable. */
-  publicOrigin: string;
-  /** Prefijo de los canales, servidos en `<prefix>/<nombre>`. Por defecto, `/_meeko/socket`. */
-  pathnamePrefix?: string;
-  /** Bytes entrantes retenidos mientras el hub autoriza una conexión nueva. Por defecto, 64 KiB. */
-  maxPendingBytes?: number;
-  /** Observador de los fallos del transporte y de las sesiones. */
-  onError?(error: unknown): void;
+	/** Hub de la aplicación. */
+	hub: SocketHub
+	/** Origen público fijo; la política de seguridad nunca se deduce de una cabecera `Host` no confiable. */
+	publicOrigin: string
+	/** Prefijo de los canales, servidos en `<prefix>/<nombre>`. Por defecto, `/_meeko/socket`. */
+	pathnamePrefix?: string
+	/** Bytes entrantes retenidos mientras el hub autoriza una conexión nueva. Por defecto, 64 KiB. */
+	maxPendingBytes?: number
+	/** Observador de los fallos del transporte y de las sesiones. */
+	onError?(error: unknown): void
 }
 
 /**
@@ -42,10 +42,10 @@ export interface SocketUpgradeOptions {
  * ```
  */
 export interface SocketSession {
-  /** Entrega un mensaje. Los mensajes se procesan de uno en uno, en orden de llegada. */
-  receive(message: string | Uint8Array): void;
-  /** Indica que el transporte se cerró. */
-  closed(): void;
+	/** Entrega un mensaje. Los mensajes se procesan de uno en uno, en orden de llegada. */
+	receive(message: string | Uint8Array): void
+	/** Indica que el transporte se cerró. */
+	closed(): void
 }
 
 /**
@@ -63,41 +63,41 @@ export interface SocketSession {
  * ```
  */
 export type SocketUpgrade =
-  /** No es una petición de canal Socket; el host la atiende como HTTP normal. */
-  | {
-    /** Discriminante: la petición no se trata como Socket. */
-    readonly action: "pass";
-  }
-  /**
-   * Responder con este estado HTTP en lugar de hacer el upgrade, salvo que haya `close`.
-   */
-  | {
-    /** Discriminante: la política rechazó el handshake. */
-    readonly action: "reject";
-    /** Estado HTTP del rechazo: `400` si el handshake está mal formado; si no, el del error de la comprobación previa del canal. */
-    readonly status: number;
-    /**
-     * Desde `1.1`, presente sólo cuando el hub rechaza la sesión (`401`) o la autorización del
-     * canal (`403`), nunca en un Origin no permitido. El adaptador acepta el upgrade y cierra en
-     * seguida con este código (`4401` o `4403`) y motivo, sin abrir sesión ni entregar mensajes:
-     * el `WebSocket` del navegador no expone el estado HTTP de un handshake rechazado, pero sí el
-     * código de cierre. Un adaptador que no lo conoce responde `status`, como en `1.0`.
-     */
-    readonly close?: { readonly code: 4401 | 4403; readonly reason: string };
-  }
-  /** Hacer el upgrade del transporte y llamar a `open` cuando la conexión esté lista. */
-  | {
-    /** Discriminante: la política aceptó el handshake. */
-    readonly action: "upgrade";
-    /** Nombre del canal, tomado de la ruta tras el prefijo de Socket. */
-    readonly channel: string;
-    /** Sala pedida con el parámetro `room` de la URL, o `undefined` si no hay ninguno. */
-    readonly roomId: string | undefined;
-    /** Petición del handshake, reescrita sobre el origen público. */
-    readonly request: Request;
-    /** Abre la sesión del canal sobre el transporte ya aceptado; el adaptador le entrega los mensajes. */
-    open(peer: SocketPeer): SocketSession;
-  };
+	/** No es una petición de canal Socket; el host la atiende como HTTP normal. */
+	| {
+			/** Discriminante: la petición no se trata como Socket. */
+			readonly action: 'pass'
+	  }
+	/**
+	 * Responder con este estado HTTP en lugar de hacer el upgrade, salvo que haya `close`.
+	 */
+	| {
+			/** Discriminante: la política rechazó el handshake. */
+			readonly action: 'reject'
+			/** Estado HTTP del rechazo: `400` si el handshake está mal formado; si no, el del error de la comprobación previa del canal. */
+			readonly status: number
+			/**
+			 * Desde `1.1`, presente sólo cuando el hub rechaza la sesión (`401`) o la autorización del
+			 * canal (`403`), nunca en un Origin no permitido. El adaptador acepta el upgrade y cierra en
+			 * seguida con este código (`4401` o `4403`) y motivo, sin abrir sesión ni entregar mensajes:
+			 * el `WebSocket` del navegador no expone el estado HTTP de un handshake rechazado, pero sí el
+			 * código de cierre. Un adaptador que no lo conoce responde `status`, como en `1.0`.
+			 */
+			readonly close?: { readonly code: 4401 | 4403; readonly reason: string }
+	  }
+	/** Hacer el upgrade del transporte y llamar a `open` cuando la conexión esté lista. */
+	| {
+			/** Discriminante: la política aceptó el handshake. */
+			readonly action: 'upgrade'
+			/** Nombre del canal, tomado de la ruta tras el prefijo de Socket. */
+			readonly channel: string
+			/** Sala pedida con el parámetro `room` de la URL, o `undefined` si no hay ninguno. */
+			readonly roomId: string | undefined
+			/** Petición del handshake, reescrita sobre el origen público. */
+			readonly request: Request
+			/** Abre la sesión del canal sobre el transporte ya aceptado; el adaptador le entrega los mensajes. */
+			open(peer: SocketPeer): SocketSession
+	  }
 
 /**
  * Aplica la política de Socket a una petición de handshake; el framing del protocolo es cosa del
@@ -112,16 +112,16 @@ export type SocketUpgrade =
  * }
  * ```
  */
-export type SocketUpgradeHandler = (request: Request) => Promise<SocketUpgrade>;
+export type SocketUpgradeHandler = (request: Request) => Promise<SocketUpgrade>
 
 /** The close that replaces an HTTP 401/403 handshake refusal. */
-export type SocketUpgradeClose = NonNullable<Extract<SocketUpgrade, { action: "reject" }>["close"]>;
+export type SocketUpgradeClose = NonNullable<Extract<SocketUpgrade, { action: 'reject' }>['close']>
 
-const channelName = /^[A-Za-z_$][\w$-]*$/;
-const encoder = new TextEncoder();
-const loopbackHosts = new Set(["localhost", "127.0.0.1", "[::1]"]);
+const channelName = /^[A-Za-z_$][\w$-]*$/
+const encoder = new TextEncoder()
+const loopbackHosts = new Set(['localhost', '127.0.0.1', '[::1]'])
 /** Request-level security policies stay HTTP refusals: a foreign page never completes an upgrade. */
-const requestPolicyCodes = new Set(["INVALID_ORIGIN", "INVALID_CSRF"]);
+const requestPolicyCodes = new Set(['INVALID_ORIGIN', 'INVALID_CSRF'])
 
 /**
  * The close for a handshake that the hub refused for authentication (`401`) or for the channel's
@@ -129,9 +129,9 @@ const requestPolicyCodes = new Set(["INVALID_ORIGIN", "INVALID_CSRF"]);
  * status. The reason is fixed, so it never carries session data.
  */
 function refusalClose(error: { readonly code: string; readonly status: number }): SocketUpgradeClose | undefined {
-  if (error.status === 401) return { code: 4401, reason: "Autenticación requerida" };
-  if (error.status === 403 && !requestPolicyCodes.has(error.code)) return { code: 4403, reason: "Acceso denegado" };
-  return undefined;
+	if (error.status === 401) return { code: 4401, reason: 'Autenticación requerida' }
+	if (error.status === 403 && !requestPolicyCodes.has(error.code)) return { code: 4403, reason: 'Acceso denegado' }
+	return undefined
 }
 
 /**
@@ -140,26 +140,29 @@ function refusalClose(error: { readonly code: string; readonly status: number })
  * `127.0.0.1`. Non-loopback origins never take their identity from a header.
  */
 function loopbackAlias(origin: URL, header: string | null): URL | undefined {
-  if (!header || !loopbackHosts.has(origin.hostname)) return undefined;
-  let candidate: URL;
-  try { candidate = new URL(header); }
-  catch { return undefined; }
-  // Rebuild from the serialized origin so credentials in the header never reach the request URL.
-  return candidate.protocol === origin.protocol && candidate.port === origin.port && loopbackHosts.has(candidate.hostname) ? new URL(candidate.origin) : undefined;
+	if (!header || !loopbackHosts.has(origin.hostname)) return undefined
+	let candidate: URL
+	try {
+		candidate = new URL(header)
+	} catch {
+		return undefined
+	}
+	// Rebuild from the serialized origin so credentials in the header never reach the request URL.
+	return candidate.protocol === origin.protocol && candidate.port === origin.port && loopbackHosts.has(candidate.hostname) ? new URL(candidate.origin) : undefined
 }
 
 /** Validates a Socket pathname prefix and returns it. */
 export function socketPathnamePrefix(value: string | undefined): string {
-  const prefix = value ?? "/_meeko/socket";
-  if (!prefix.startsWith("/") || prefix.endsWith("/")) throw new TypeError("Invalid socket pathname prefix");
-  return prefix;
+	const prefix = value ?? '/_meeko/socket'
+	if (!prefix.startsWith('/') || prefix.endsWith('/')) throw new TypeError('Invalid socket pathname prefix')
+	return prefix
 }
 
 /** Normalizes a Socket public origin, which must use HTTP or HTTPS. */
 export function socketPublicOrigin(value: string): URL {
-  const origin = new URL(value);
-  if (origin.protocol !== "http:" && origin.protocol !== "https:") throw new TypeError("Socket publicOrigin must use HTTP or HTTPS");
-  return origin;
+	const origin = new URL(value)
+	if (origin.protocol !== 'http:' && origin.protocol !== 'https:') throw new TypeError('Socket publicOrigin must use HTTP or HTTPS')
+	return origin
 }
 
 /**
@@ -173,20 +176,20 @@ export function socketPublicOrigin(value: string): URL {
  * ```
  */
 export interface OpenSocketSessionOptions {
-  /** Hub de la aplicación. */
-  readonly hub: SocketHub;
-  /** Nombre del canal. */
-  readonly name: string;
-  /** Petición del handshake sobre el origen público; el hub la vuelve a autorizar. */
-  readonly request: Request;
-  /** Sala, si la hay. */
-  readonly roomId: string | undefined;
-  /** Conexión ya aceptada por el transporte. */
-  readonly peer: SocketPeer;
-  /** Bytes entrantes retenidos mientras el hub autoriza la conexión. */
-  readonly maxPendingBytes: number;
-  /** Observador de los fallos de la sesión. */
-  onError?(error: unknown): void;
+	/** Hub de la aplicación. */
+	readonly hub: SocketHub
+	/** Nombre del canal. */
+	readonly name: string
+	/** Petición del handshake sobre el origen público; el hub la vuelve a autorizar. */
+	readonly request: Request
+	/** Sala, si la hay. */
+	readonly roomId: string | undefined
+	/** Conexión ya aceptada por el transporte. */
+	readonly peer: SocketPeer
+	/** Bytes entrantes retenidos mientras el hub autoriza la conexión. */
+	readonly maxPendingBytes: number
+	/** Observador de los fallos de la sesión. */
+	onError?(error: unknown): void
 }
 
 /**
@@ -201,10 +204,10 @@ export interface OpenSocketSessionOptions {
  * ```
  */
 export interface OpenedSocketSession extends SocketSession {
-  /** Se resuelve con `true` cuando el hub acepta el peer y con `false` si lo rechaza; nunca rechaza. */
-  readonly ready: Promise<boolean>;
-  /** Se resuelve cuando se han procesado todos los mensajes recibidos hasta ahora; nunca rechaza. */
-  settled(): Promise<void>;
+	/** Se resuelve con `true` cuando el hub acepta el peer y con `false` si lo rechaza; nunca rechaza. */
+	readonly ready: Promise<boolean>
+	/** Se resuelve cuando se han procesado todos los mensajes recibidos hasta ahora; nunca rechaza. */
+	settled(): Promise<void>
 }
 
 /**
@@ -225,59 +228,76 @@ export interface OpenedSocketSession extends SocketSession {
  * ```
  */
 export function openSocketSession(options: OpenSocketSessionOptions): OpenedSocketSession {
-  const { hub, name, request, roomId, peer, maxPendingBytes } = options;
-  const observeError = (error: unknown): void => observeErrorCallback(error, options.onError);
-  let connection: SocketConnection | undefined;
-  let ended = false;
-  let refused = false;
-  let pendingBytes = 0;
-  const closeConnection = (target: SocketConnection): void => {
-    try { target.close(); }
-    catch (error) { observeError(error); }
-  };
-  // Messages that arrive while the hub authorizes the connection wait on
-  // this chain, then run in arrival order like every later message.
-  const ready = hub.accept(name, request, peer, roomId).then((accepted) => {
-    connection = accepted;
-    pendingBytes = 0;
-    if (ended) closeConnection(accepted);
-    return true;
-  }, (error: unknown) => {
-    refused = true;
-    // The same 4401/4403 as a refused handshake, e.g. when a woken Durable Object authorizes again.
-    const close = refusalClose(normalizeServerError(error)) ?? { code: 1008, reason: "Unauthorized" };
-    try { peer.close(close.code, close.reason); }
-    catch (closeError) { observeError(closeError); }
-    observeError(error);
-    return false;
-  });
-  let delivery: Promise<unknown> = ready;
-  return {
-    ready,
-    settled: () => delivery.then(() => undefined),
-    receive(message) {
-      if (refused || ended) return;
-      if (!connection) {
-        pendingBytes += typeof message === "string" ? encoder.encode(message).byteLength : message.byteLength;
-        if (pendingBytes > maxPendingBytes) {
-          refused = true;
-          try { peer.close(1009, "Message buffer exceeded"); }
-          catch (error) { observeError(error); }
-          return;
-        }
-      }
-      delivery = delivery.then(() => connection?.receive(message)).catch((error: unknown) => {
-        observeError(error);
-        try { connection?.close(normalizeServerError(error).status < 500 ? 1008 : 1011); }
-        catch (closeError) { observeError(closeError); }
-      });
-    },
-    closed() {
-      if (ended) return;
-      ended = true;
-      if (connection) closeConnection(connection);
-    },
-  };
+	const { hub, name, request, roomId, peer, maxPendingBytes } = options
+	const observeError = (error: unknown): void => observeErrorCallback(error, options.onError)
+	let connection: SocketConnection | undefined
+	let ended = false
+	let refused = false
+	let pendingBytes = 0
+	const closeConnection = (target: SocketConnection): void => {
+		try {
+			target.close()
+		} catch (error) {
+			observeError(error)
+		}
+	}
+	// Messages that arrive while the hub authorizes the connection wait on
+	// this chain, then run in arrival order like every later message.
+	const ready = hub.accept(name, request, peer, roomId).then(
+		(accepted) => {
+			connection = accepted
+			pendingBytes = 0
+			if (ended) closeConnection(accepted)
+			return true
+		},
+		(error: unknown) => {
+			refused = true
+			// The same 4401/4403 as a refused handshake, e.g. when a woken Durable Object authorizes again.
+			const close = refusalClose(normalizeServerError(error)) ?? { code: 1008, reason: 'Unauthorized' }
+			try {
+				peer.close(close.code, close.reason)
+			} catch (closeError) {
+				observeError(closeError)
+			}
+			observeError(error)
+			return false
+		},
+	)
+	let delivery: Promise<unknown> = ready
+	return {
+		ready,
+		settled: () => delivery.then(() => undefined),
+		receive(message) {
+			if (refused || ended) return
+			if (!connection) {
+				pendingBytes += typeof message === 'string' ? encoder.encode(message).byteLength : message.byteLength
+				if (pendingBytes > maxPendingBytes) {
+					refused = true
+					try {
+						peer.close(1009, 'Message buffer exceeded')
+					} catch (error) {
+						observeError(error)
+					}
+					return
+				}
+			}
+			delivery = delivery
+				.then(() => connection?.receive(message))
+				.catch((error: unknown) => {
+					observeError(error)
+					try {
+						connection?.close(normalizeServerError(error).status < 500 ? 1008 : 1011)
+					} catch (closeError) {
+						observeError(closeError)
+					}
+				})
+		},
+		closed() {
+			if (ended) return
+			ended = true
+			if (connection) closeConnection(connection)
+		},
+	}
 }
 
 /**
@@ -315,32 +335,32 @@ export function openSocketSession(options: OpenSocketSessionOptions): OpenedSock
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#websocket
  */
 export function createSocketUpgradeHandler(options: SocketUpgradeOptions): SocketUpgradeHandler {
-  const origin = socketPublicOrigin(options.publicOrigin);
-  const prefix = socketPathnamePrefix(options.pathnamePrefix);
-  const maxPendingBytes = options.maxPendingBytes ?? 64 * 1024;
-  if (!Number.isSafeInteger(maxPendingBytes) || maxPendingBytes <= 0) throw new RangeError("Invalid socket pending buffer limit");
-  const hub = options.hub;
-  const observeError = (error: unknown): void => observeErrorCallback(error, options.onError);
-  const open = (name: string, request: Request, roomId: string | undefined, peer: SocketPeer): SocketSession =>
-    openSocketSession({ hub, name, request, roomId, peer, maxPendingBytes, onError: observeError });
+	const origin = socketPublicOrigin(options.publicOrigin)
+	const prefix = socketPathnamePrefix(options.pathnamePrefix)
+	const maxPendingBytes = options.maxPendingBytes ?? 64 * 1024
+	if (!Number.isSafeInteger(maxPendingBytes) || maxPendingBytes <= 0) throw new RangeError('Invalid socket pending buffer limit')
+	const hub = options.hub
+	const observeError = (error: unknown): void => observeErrorCallback(error, options.onError)
+	const open = (name: string, request: Request, roomId: string | undefined, peer: SocketPeer): SocketSession => openSocketSession({ hub, name, request, roomId, peer, maxPendingBytes, onError: observeError })
 
-  return async (incoming) => {
-    const url = new URL(incoming.url);
-    if (!url.pathname.startsWith(`${prefix}/`)) return { action: "pass" };
-    const name = url.pathname.slice(prefix.length + 1);
-    if (!channelName.test(name)) return { action: "reject", status: 400 };
-    if (incoming.method !== "GET" || incoming.headers.get("upgrade")?.toLowerCase() !== "websocket") return { action: "reject", status: 400 };
-    // Origin checks compare against the request URL, so it carries the public origin.
-    const base = loopbackAlias(origin, incoming.headers.get("origin")) ?? origin;
-    const request = copySocketAddress(incoming, new Request(new URL(url.pathname + url.search, base), { headers: incoming.headers }));
-    const roomId = url.searchParams.get("room") ?? undefined;
-    try { await hub.preflight(name, request, roomId); }
-    catch (error) {
-      observeError(error);
-      const refusal = normalizeServerError(error);
-      const close = refusalClose(refusal);
-      return close ? { action: "reject", status: refusal.status, close } : { action: "reject", status: refusal.status };
-    }
-    return { action: "upgrade", channel: name, roomId, request, open: (peer) => open(name, request, roomId, peer) };
-  };
+	return async (incoming) => {
+		const url = new URL(incoming.url)
+		if (!url.pathname.startsWith(`${prefix}/`)) return { action: 'pass' }
+		const name = url.pathname.slice(prefix.length + 1)
+		if (!channelName.test(name)) return { action: 'reject', status: 400 }
+		if (incoming.method !== 'GET' || incoming.headers.get('upgrade')?.toLowerCase() !== 'websocket') return { action: 'reject', status: 400 }
+		// Origin checks compare against the request URL, so it carries the public origin.
+		const base = loopbackAlias(origin, incoming.headers.get('origin')) ?? origin
+		const request = copySocketAddress(incoming, new Request(new URL(url.pathname + url.search, base), { headers: incoming.headers }))
+		const roomId = url.searchParams.get('room') ?? undefined
+		try {
+			await hub.preflight(name, request, roomId)
+		} catch (error) {
+			observeError(error)
+			const refusal = normalizeServerError(error)
+			const close = refusalClose(refusal)
+			return close ? { action: 'reject', status: refusal.status, close } : { action: 'reject', status: refusal.status }
+		}
+		return { action: 'upgrade', channel: name, roomId, request, open: (peer) => open(name, request, roomId, peer) }
+	}
 }

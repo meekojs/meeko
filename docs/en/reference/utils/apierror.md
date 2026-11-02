@@ -13,7 +13,7 @@ related:
   - "@meekojs/meeko/framework#useForm"
   - docs/framework.md#errores-de-un-campo-apierror-con-issues
   - docs/framework.md#errores
-source-hash: 8df131d571dde46cba316d9eb71cf3f78139535f47b25720d9b09923cecf3f28
+source-hash: 72fe1432b320283f15357c6be3797364c5ea01117e9101be176af29f8015dda1
 ---
 
 `new ApiError(code, status, mensaje?)` is the error the server **can disclose** to the client. When thrown from an endpoint, RPC procedure, Socket channel, loader or `defer`, the response carries its `code` and `status`, plus the request's `requestId`. Any other error is returned as `INTERNAL_ERROR`/`500` without exposing its message.

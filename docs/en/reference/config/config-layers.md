@@ -13,7 +13,7 @@ related:
   - docs/framework.md#layers
   - docs/framework.md#layouts-de-layers-y-módulos
   - docs/framework.md#aliases-en-los-layers
-source-hash: 47edd72b5df6585e7b23236fd3697e1709f718b8c531a3ce53a7960334fad4ba
+source-hash: 9c7a54dd6704d17ece51c6e8d9ec33bdd139ff579e5e74ec1397df567fc1e36d
 ---
 
 `layers` lists project folders with the same structure as the application: their `app/pages`, components and auto-imports (`app/components`, `app/composables`, `app/utils`, `app/stores`, `app/types`, `shared/` and `server/utils`), named layouts and `app/plugins` plugins. Meeko combines them with the application into a single manifest: use them for a shared base (design, common pages) or to divide a large application by area.

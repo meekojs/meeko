@@ -33,9 +33,9 @@ console.log(`build ${adapter} en ${output}`);
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `projectRoot` | ruta | obligatorio | Carpeta del proyecto. |
+| Parámetro         | Tipo                                                            | Por defecto                  | Descripción                                 |
+| ----------------- | --------------------------------------------------------------- | ---------------------------- | ------------------------------------------- |
+| `projectRoot`     | ruta                                                            | obligatorio                  | Carpeta del proyecto.                       |
 | `options.adapter` | `"node"` \| `"bun"` \| `"deno"` \| `"cloudflare"` \| `"static"` | `server.adapter`, o `"node"` | Sustituye al adaptador de la configuración. |
 
 ## Valor devuelto
@@ -62,6 +62,7 @@ Cada build escribe su propia carpeta; el segundo no borra el primero.
 ### Comprobar y construir, como la CLI
 
 <!-- no-check -->
+
 ```ts
 import { execFileSync } from "node:child_process";
 import { buildProject } from "@meekojs/meeko/build";
@@ -75,6 +76,7 @@ await buildProject(process.cwd());
 ### Una prueba de integración
 
 <!-- no-check -->
+
 ```ts
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -100,6 +102,7 @@ await buildProject(process.cwd()); // el proyecto tiene un error TS2322 en serve
 Vite elimina los tipos sin comprobarlos: el build termina y el error llega a producción. `meeko build` ejecuta antes `meeko check`; `buildProject`, no.
 
 <!-- no-check -->
+
 ```ts good
 await checkProjectWithCli();
 await buildProject(process.cwd());
@@ -129,6 +132,7 @@ await buildProject(process.cwd());
 `buildProject` no lee el `.env` (lo lee la CLI): `sitemap necesita la URL pública del sitio: declara site en meeko.config.ts (site: "https://example.com") o define MEEKO_PUBLIC_ORIGIN al construir`.
 
 <!-- no-check -->
+
 ```ts good
 process.env.MEEKO_PUBLIC_ORIGIN ??= "https://example.com";
 await buildProject(process.cwd());

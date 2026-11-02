@@ -13,7 +13,7 @@ related:
   - "@meekojs/meeko/framework#documentHtml"
   - docs/api.md#html-de-confianza-trustedhtml-y-trusthtml
   - docs/api.md#html-sin-escapar-con-html
-source-hash: 0eae3075fb7114fba32af98e1cc670bed9e8c60c691d314c6524332ad36d673d
+source-hash: e3df74bb54afaa8b98d99329413ac4c0dbccb3ea2eca46afcdf001f4dce26715
 ---
 
 `trustHtml(html)` declares an HTML `string` trusted and returns it with the `TrustedHtml` type, which the `html="expresión"` directive accepts without the `MEEK107` warning. At runtime it returns the same `string`, without copying or checking it: it has no cost.

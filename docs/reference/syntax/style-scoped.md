@@ -43,9 +43,9 @@ const props = defineProps<{ title: string; body: TrustedHtml }>();
 
 ## Atributos
 
-| Atributo | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `scoped` | sin valor | ausente | Activa el ámbito. Sin él, el bloque es global (véase `<style>`). |
+| Atributo | Tipo      | Por defecto | Descripción                                                      |
+| -------- | --------- | ----------- | ---------------------------------------------------------------- |
+| `scoped` | sin valor | ausente     | Activa el ámbito. Sin él, el bloque es global (véase `<style>`). |
 
 La opción `css.scopeAttribute` de `meeko.config.ts` decide qué elementos reciben el atributo: `"all"` (por defecto en `1.x`) o, desde `1.2`, `"matched"`.
 
@@ -53,15 +53,15 @@ La opción `css.scopeAttribute` de `meeko.config.ts` decide qué elementos recib
 
 El compilador añade `[data-meeko-s-<hash>]` al **último compuesto** de cada selector, antes de un pseudoelemento si lo hay. `:global(…)` emite su selector interno sin el atributo:
 
-| Fuente | CSS generado |
-| --- | --- |
-| `.a { … }` | `.a[data-meeko-s-…] { … }` |
-| `.card .title` | `.card .title[data-meeko-s-…]` |
-| `.a::before` | `.a[data-meeko-s-…]::before` |
-| `.card :global(.icon)` | `.card[data-meeko-s-…] .icon` |
+| Fuente                  | CSS generado                   |
+| ----------------------- | ------------------------------ |
+| `.a { … }`              | `.a[data-meeko-s-…] { … }`     |
+| `.card .title`          | `.card .title[data-meeko-s-…]` |
+| `.a::before`            | `.a[data-meeko-s-…]::before`   |
+| `.card :global(.icon)`  | `.card[data-meeko-s-…] .icon`  |
 | `:global(html.dark) .a` | `html.dark .a[data-meeko-s-…]` |
-| `:global(body)` | `body`, sin atributo |
-| `@keyframes spin { … }` | sin cambios |
+| `:global(body)`         | `body`, sin atributo           |
+| `@keyframes spin { … }` | sin cambios                    |
 
 El hash sale de la ruta del archivo, así que es el mismo en el servidor y en el navegador, y cambia si mueves o renombras el componente. El atributo va en los elementos de la plantilla del componente; el contenido de un snippet recibe el del componente que lo escribe.
 

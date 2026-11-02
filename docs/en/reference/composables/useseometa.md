@@ -14,7 +14,7 @@ related:
   - "config:site"
   - docs/framework.md#head-del-documento-document-usehead-y-useseometa
   - docs/framework.md#canónica-y-open-graph-por-página
-source-hash: a5d83eabed354fb3b118618f46e33a0e788cfc8c748ceb6b3629c8b760bb85f1
+source-hash: 9f9667ff4bfe0fd2f4f74abceb218f87733cdadf3827aeb0fae8b16e9af6739f
 ---
 
 SEO tags have rules that are easy to confuse: `description` and Twitter tags use `<meta name>`, Open Graph tags use `<meta property>`, and the canonical URL is a `<link rel="canonical">`. `useSeoMeta(input)` takes a plain object with one field per tag and produces the correct one for each. Underneath it is [`useHead`](/en/docs/reference/usehead): you call it in the same places, it follows the same priority and deduplication rules, and it accepts a getter or signal so tags follow the data.

@@ -44,13 +44,13 @@ Cambiar `tab` vuelve a llamar al procedimiento; mientras tanto, la lista anterio
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `procedimiento` | ID de un procedimiento | obligatorio | Como `"users.activity"`. El editor completa los de la aplicación. |
-| `input` | la entrada del procedimiento, con campos que pueden ser señales, o `() => input` | `{}` si el schema lo acepta | Se valida con el schema `input` del procedimiento. Si el schema acepta `{}`, se puede omitir y se envía `{}`. |
-| `recarga.keepPrevious` | `boolean` | `true` | Desde `1.5`. Con `false`, un cambio de la entrada vacía `data`. |
-| `recarga.debounceMs` | `number` | `0` | Desde `1.7`. Espera a que la entrada se quede quieta antes de pedir; no retrasa la primera carga, `refresh()` ni el SSR. |
-| `recarga.enabled` | `boolean`, señal o `() => boolean` | `true` | Desde `1.7`. Mientras vale `false` no hay petición, y la que estaba en curso se cancela. Un recurso con `await` no puede empezar desactivado. |
+| Parámetro              | Tipo                                                                             | Por defecto                 | Descripción                                                                                                                                   |
+| ---------------------- | -------------------------------------------------------------------------------- | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `procedimiento`        | ID de un procedimiento                                                           | obligatorio                 | Como `"users.activity"`. El editor completa los de la aplicación.                                                                             |
+| `input`                | la entrada del procedimiento, con campos que pueden ser señales, o `() => input` | `{}` si el schema lo acepta | Se valida con el schema `input` del procedimiento. Si el schema acepta `{}`, se puede omitir y se envía `{}`.                                 |
+| `recarga.keepPrevious` | `boolean`                                                                        | `true`                      | Desde `1.5`. Con `false`, un cambio de la entrada vacía `data`.                                                                               |
+| `recarga.debounceMs`   | `number`                                                                         | `0`                         | Desde `1.7`. Espera a que la entrada se quede quieta antes de pedir; no retrasa la primera carga, `refresh()` ni el SSR.                      |
+| `recarga.enabled`      | `boolean`, señal o `() => boolean`                                               | `true`                      | Desde `1.7`. Mientras vale `false` no hay petición, y la que estaba en curso se cancela. Un recurso con `await` no puede empezar desactivado. |
 
 ## Valor devuelto
 
@@ -82,6 +82,7 @@ Cada cambio cancela la petición en curso; con menos de dos letras no se pide na
 ### Un resumen sin entrada
 
 <!-- no-check -->
+
 ```ts
 // En el <script> de app/components/Stats.meeko
 const stats = await useRpcQuery("stats.summary"); // el schema acepta {}: envía {}
@@ -129,6 +130,7 @@ const activity = useRpcQuery("users.activiti", { id: "1", tab: "a" });
 `meeko check` da `TS2345: Argument of type '"users.activiti"' is not assignable to parameter of type '"docs.search" | "users.activity" | "users.rename"'`, con la lista de procedimientos.
 
 <!-- no-check -->
+
 ```ts good
 const activity = useRpcQuery("users.activity", { id: "1", tab: "a" });
 ```
@@ -142,6 +144,7 @@ const activity = useRpcQuery("users.activity", { id: "1" });
 `meeko check` da `TS2345: Argument of type '{ id: string; }' is not assignable to parameter of type 'RpcQueryInput<{ id: string; tab: string; }>'`, con `Property 'tab' is missing`.
 
 <!-- no-check -->
+
 ```ts good
 const activity = useRpcQuery("users.activity", { id: "1", tab: "all" });
 ```
@@ -157,6 +160,7 @@ effect(() => {
 `meeko check` da `MEEK054: useRpcQuery() debe llamarse en el nivel superior de <script>, no dentro de una función, un handler, un effect ni onMounted`. La recarga ya es reactiva: pasa una función que lee la señal.
 
 <!-- no-check -->
+
 ```ts good
 const activity = useRpcQuery("users.activity", () => ({ id: "1", tab: tab.value }));
 ```
@@ -170,6 +174,7 @@ const feed = await useRpcQuery("feed.latest", { since: Date.now() });
 El servidor pide los datos con su `Date.now()` y el navegador, al hidratar, con otro: la clave no coincide y la hidratación falla con `MEEKO_RESOURCE_MISSING: useRpcQuery("feed.latest") (…) is not in the page payload; the server and the browser requested different data…`. Haz que la entrada dependa sólo de props, datos de la ruta o estado:
 
 <!-- no-check -->
+
 ```ts good
 const feed = await useRpcQuery("feed.latest", { since: props.data.since });
 ```

@@ -1,4 +1,4 @@
-import type { ComponentWithProps } from "../runtime/resolved-component";
+import type { ComponentWithProps } from '../runtime/resolved-component'
 
 /**
  * Project component modules registered by Meeko. The generated declaration augments this interface.
@@ -16,7 +16,7 @@ export interface ComponentRegistry {}
  * const name: ComponentName = "Button";
  * ```
  */
-export type ComponentName = Extract<keyof ComponentRegistry, string>;
+export type ComponentName = Extract<keyof ComponentRegistry, string>
 
 /**
  * The original renderable module for a registered component, including its public exports.
@@ -25,7 +25,7 @@ export type ComponentName = Extract<keyof ComponentRegistry, string>;
  * type ButtonModule = ComponentOf<"Button">;
  * ```
  */
-export type ComponentOf<Name extends ComponentName> = ComponentRegistry[Name];
+export type ComponentOf<Name extends ComponentName> = ComponentRegistry[Name]
 
 /**
  * Input props of the module's actual `renderToString` contract.
@@ -34,9 +34,12 @@ export type ComponentOf<Name extends ComponentName> = ComponentRegistry[Name];
  * type ButtonInput = ComponentProps<"Button">;
  * ```
  */
-export type ComponentProps<Name extends ComponentName> = ComponentOf<Name> extends {
-  renderToString: (props: infer Props, ...args: never[]) => string;
-} ? Props : never;
+export type ComponentProps<Name extends ComponentName> =
+	ComponentOf<Name> extends {
+		renderToString: (props: infer Props, ...args: never[]) => string
+	}
+		? Props
+		: never
 
 /**
  * A registered component with its props already supplied to `resolveComponent(name, props)`.
@@ -46,8 +49,7 @@ export type ComponentProps<Name extends ComponentName> = ComponentOf<Name> exten
  * const form = signal<ResolvedComponent<"FormUserCreate"> | undefined>(undefined);
  * ```
  */
-export type ResolvedComponent<Name extends ComponentName = ComponentName> = Name extends ComponentName
-  ? ComponentWithProps<ComponentOf<Name>> : never;
+export type ResolvedComponent<Name extends ComponentName = ComponentName> = Name extends ComponentName ? ComponentWithProps<ComponentOf<Name>> : never
 
 /**
  * Correlated name and props pairs for dynamic APIs. Use a rest parameter of this type when the
@@ -60,5 +62,5 @@ export type ResolvedComponent<Name extends ComponentName = ComponentName> = Name
  * ```
  */
 export type ComponentArgs = {
-  [Name in ComponentName]: [name: Name, props: ComponentProps<Name>];
-}[ComponentName];
+	[Name in ComponentName]: [name: Name, props: ComponentProps<Name>]
+}[ComponentName]

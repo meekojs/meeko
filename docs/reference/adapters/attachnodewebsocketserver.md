@@ -24,6 +24,7 @@ related:
 ## Uso
 
 <!-- no-check -->
+
 ```ts
 import { createServer } from "node:http";
 import { attachNodeWebSocketServer, toNodeListener } from "@meekojs/meeko/node";
@@ -40,15 +41,15 @@ server.listen(3000);
 
 `attachNodeWebSocketServer(options)`:
 
-| Opción | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `server` | `http.Server` | obligatorio | El mismo servidor que atiende el handler Fetch. |
-| `hub` | `SocketHub` | obligatorio | El hub de la aplicación, `app.socket.hub`. |
-| `publicOrigin` | `string` | obligatorio | Origen público fijo, `http:` o `https:`. Se compara con el `Origin` del upgrade; nunca se deduce de `Host`. |
-| `pathnamePrefix` | `string` | `"/_meeko/socket"` | Prefijo de los canales, el de `app.socket.pathnamePrefix`. Empieza por `/` y no termina en `/`. |
-| `maxMessageBytes` | `number` | `65536` | Payload máximo de un frame, que `ws` aplica antes de decodificarlo; también el búfer de mensajes que llegan mientras el hub autoriza. |
-| `heartbeatMs` | `number` | `30000` | Intervalo de ping. Un peer que no responde con `pong` antes del siguiente se termina. |
-| `onError` | `(error: unknown) => void` | la consola | Fallos del upgrade, de los peers y de las sesiones. |
+| Opción            | Tipo                       | Por defecto        | Descripción                                                                                                                           |
+| ----------------- | -------------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `server`          | `http.Server`              | obligatorio        | El mismo servidor que atiende el handler Fetch.                                                                                       |
+| `hub`             | `SocketHub`                | obligatorio        | El hub de la aplicación, `app.socket.hub`.                                                                                            |
+| `publicOrigin`    | `string`                   | obligatorio        | Origen público fijo, `http:` o `https:`. Se compara con el `Origin` del upgrade; nunca se deduce de `Host`.                           |
+| `pathnamePrefix`  | `string`                   | `"/_meeko/socket"` | Prefijo de los canales, el de `app.socket.pathnamePrefix`. Empieza por `/` y no termina en `/`.                                       |
+| `maxMessageBytes` | `number`                   | `65536`            | Payload máximo de un frame, que `ws` aplica antes de decodificarlo; también el búfer de mensajes que llegan mientras el hub autoriza. |
+| `heartbeatMs`     | `number`                   | `30000`            | Intervalo de ping. Un peer que no responde con `pong` antes del siguiente se termina.                                                 |
+| `onError`         | `(error: unknown) => void` | la consola         | Fallos del upgrade, de los peers y de las sesiones.                                                                                   |
 
 ## Valor devuelto
 
@@ -56,20 +57,21 @@ Un `NodeWebSocketServer` con `close()`: quita el listener de `upgrade`, termina 
 
 Cada upgrade termina así:
 
-| Caso | Resultado |
-| --- | --- |
-| Ruta fuera del prefijo | Se ignora: otro listener de `upgrade` puede atenderla. |
-| Nombre de canal inválido o método distinto de `GET` | `400` por HTTP. |
-| Canal inexistente | `404` por HTTP. |
-| `Origin` no permitido | `403` por HTTP. |
+| Caso                                                                    | Resultado                                                                       |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Ruta fuera del prefijo                                                  | Se ignora: otro listener de `upgrade` puede atenderla.                          |
+| Nombre de canal inválido o método distinto de `GET`                     | `400` por HTTP.                                                                 |
+| Canal inexistente                                                       | `404` por HTTP.                                                                 |
+| `Origin` no permitido                                                   | `403` por HTTP.                                                                 |
 | Canal `auth: "required"` sin sesión, o `authorize` que devuelve `false` | Upgrade y cierre inmediato con `4401` o `4403`, que el navegador sí puede leer. |
-| Aceptado | Conexión abierta en el hub. |
+| Aceptado                                                                | Conexión abierta en el hub.                                                     |
 
 ## Ejemplos
 
 ### Cierre ordenado de un host propio
 
 <!-- no-check -->
+
 ```ts
 process.once("SIGTERM", async () => {
   await sockets?.close();                                   // 1. Socket
@@ -81,6 +83,7 @@ process.once("SIGTERM", async () => {
 ### Un límite menor para un chat
 
 <!-- no-check -->
+
 ```ts
 attachNodeWebSocketServer({ server, hub: app.socket!.hub, publicOrigin, pathnamePrefix: app.socket!.pathnamePrefix, maxMessageBytes: 4 * 1024, heartbeatMs: 15_000 });
 ```
@@ -111,6 +114,7 @@ attachNodeWebSocketServer({ server, hub, publicOrigin, maxMessageBytes: 0 });
 `RangeError: Invalid socket message limit`; con `heartbeatMs`, `Invalid socket heartbeat interval`.
 
 <!-- no-check -->
+
 ```ts good
 attachNodeWebSocketServer({ server, hub, publicOrigin, maxMessageBytes: 16 * 1024 });
 ```
@@ -124,6 +128,7 @@ attachNodeWebSocketServer({ server, hub, publicOrigin: "wss://example.com" });
 `TypeError: Socket publicOrigin must use HTTP or HTTPS`: el navegador envía como `Origin` el de la página, `https://example.com`.
 
 <!-- no-check -->
+
 ```ts good
 attachNodeWebSocketServer({ server, hub, publicOrigin: "https://example.com" });
 ```
@@ -137,6 +142,7 @@ attachNodeWebSocketServer({ server, hub, publicOrigin, pathnamePrefix: "/ws/" })
 `TypeError: Invalid socket pathname prefix`: el prefijo empieza por `/` y no termina en `/`. Pase el de la aplicación, `app.socket.pathnamePrefix`, para que coincida con la URL que usan los clientes generados.
 
 <!-- no-check -->
+
 ```ts good
 attachNodeWebSocketServer({ server, hub: app.socket!.hub, publicOrigin, pathnamePrefix: app.socket!.pathnamePrefix });
 ```
@@ -145,6 +151,6 @@ attachNodeWebSocketServer({ server, hub: app.socket!.hub, publicOrigin, pathname
 
 - **`ws`.** Es una dependencia de `@meekojs/meeko` y se carga al llamar a la función, no al importar el adaptador.
 - **Mensajes.** Sólo texto JSON: un mensaje binario cierra el peer con `1003`. La compresión por mensaje está desactivada.
-- **Origin.** Es la defensa frente al *cross-site WebSocket hijacking*: un origen ajeno nunca completa el upgrade, ni siquiera hacia un canal que después lo rechazaría.
+- **Origin.** Es la defensa frente al _cross-site WebSocket hijacking_: un origen ajeno nunca completa el upgrade, ni siquiera hacia un canal que después lo rechazaría.
 - **IP.** El upgrade registra la IP del socket, que el canal ve en `context.clientAddress`.
 - **Varias instancias.** El servidor sólo conoce sus peers; los broadcasts entre instancias necesitan `RedisSocketPubSub`.

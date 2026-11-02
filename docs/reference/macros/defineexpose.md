@@ -49,10 +49,10 @@ const box = useElementRef("box");
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `exposed` | `T` | obligatorio | El valor que recibe el padre: normalmente un objeto con funciones y señales. Sin argumento es `MEEK051`. |
-| `T` (argumento de tipo) | cualquier tipo | inferido | Opcional, para anotar el tipo expuesto. Como mucho uno (`MEEK051`). |
+| Parámetro               | Tipo           | Por defecto | Descripción                                                                                              |
+| ----------------------- | -------------- | ----------- | -------------------------------------------------------------------------------------------------------- |
+| `exposed`               | `T`            | obligatorio | El valor que recibe el padre: normalmente un objeto con funciones y señales. Sin argumento es `MEEK051`. |
+| `T` (argumento de tipo) | cualquier tipo | inferido    | Opcional, para anotar el tipo expuesto. Como mucho uno (`MEEK051`).                                      |
 
 ## Valor devuelto
 

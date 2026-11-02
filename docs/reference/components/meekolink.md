@@ -38,13 +38,13 @@ Con `/users/[id]` y `id: "7"`, el segundo enlace es `<a href="/users/7">`; en `/
 
 ## Props
 
-| Atributo | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `to` o `bind:to` | `RouteId` | obligatorio | ID de la ruta de destino, como `to="/users/[id]"`: la ruta de su archivo en `app/pages`, sin query ni fragmento. `bind:to` admite una expresión cuyo tipo sea una ruta o una unión de rutas; con una unión, `bind:params` acepta los parámetros de alguna de ellas (desde `1.8`). |
-| `bind:params` | `RouteParams<K>` | ninguno | Los segmentos dinámicos de la ruta, como `bind:params="{ id: user.id }"`. Obligatorio en una ruta con segmentos dinámicos y prohibido en las demás. Los valores son `string`. Sin rutas generadas (`RouteId` es `string`: una librería como `@meekojs/ui` o un proyecto antes de `meeko check`), ninguna ruta dice qué parámetros tiene: `bind:params` es opcional y acepta `Record<string, string>` o `undefined` (desde `1.8`; antes exigía `params ?? {}`). |
-| `bind:search` | `Readonly<Record<string, string \| number \| boolean \| null \| undefined>>` | ninguno | Query string, como `bind:search="{ tab: 'perfil' }"`. Omite las claves con `null` o `undefined`. |
-| `match` o `bind:match` | `"exact" \| "prefix"` | `"exact"` | Desde `1.5`. `"exact"` marca el enlace sólo en su ruta; `"prefix"` también en las rutas que están por debajo. |
-| cualquier otro | atributos de `<a>` | | `class`, `target`, `rel`, `aria-*`, `data-*`, `on:click` y los hijos pasan al `<a>` tal cual. |
+| Atributo               | Tipo                                                                         | Por defecto | Descripción                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ---------------------- | ---------------------------------------------------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `to` o `bind:to`       | `RouteId`                                                                    | obligatorio | ID de la ruta de destino, como `to="/users/[id]"`: la ruta de su archivo en `app/pages`, sin query ni fragmento. `bind:to` admite una expresión cuyo tipo sea una ruta o una unión de rutas; con una unión, `bind:params` acepta los parámetros de alguna de ellas (desde `1.8`).                                                                                                                                                                              |
+| `bind:params`          | `RouteParams<K>`                                                             | ninguno     | Los segmentos dinámicos de la ruta, como `bind:params="{ id: user.id }"`. Obligatorio en una ruta con segmentos dinámicos y prohibido en las demás. Los valores son `string`. Sin rutas generadas (`RouteId` es `string`: una librería como `@meekojs/ui` o un proyecto antes de `meeko check`), ninguna ruta dice qué parámetros tiene: `bind:params` es opcional y acepta `Record<string, string>` o `undefined` (desde `1.8`; antes exigía `params ?? {}`). |
+| `bind:search`          | `Readonly<Record<string, string \| number \| boolean \| null \| undefined>>` | ninguno     | Query string, como `bind:search="{ tab: 'perfil' }"`. Omite las claves con `null` o `undefined`.                                                                                                                                                                                                                                                                                                                                                               |
+| `match` o `bind:match` | `"exact" \| "prefix"`                                                        | `"exact"`   | Desde `1.5`. `"exact"` marca el enlace sólo en su ruta; `"prefix"` también en las rutas que están por debajo.                                                                                                                                                                                                                                                                                                                                                  |
+| cualquier otro         | atributos de `<a>`                                                           |             | `class`, `target`, `rel`, `aria-*`, `data-*`, `on:click` y los hijos pasan al `<a>` tal cual.                                                                                                                                                                                                                                                                                                                                                                  |
 
 `href`, `bind:href` y las formas estáticas `params="…"` y `search="…"` no se admiten (`MEEK105`).
 
@@ -52,21 +52,21 @@ Con `/users/[id]` y `id: "7"`, el segundo enlace es `<a href="/users/7">`; en `/
 
 Un `<a>` con el `href` construido. `aria-current` dice dónde está el usuario:
 
-| Ruta actual | `match="exact"` | `match="prefix"` |
-| --- | --- | --- |
+| Ruta actual                                  | `match="exact"`       | `match="prefix"`      |
+| -------------------------------------------- | --------------------- | --------------------- |
 | La misma ruta, sin contar query ni fragmento | `aria-current="page"` | `aria-current="page"` |
-| Una ruta por debajo, por segmentos completos | sin atributo | `aria-current="true"` |
-| Cualquier otra | sin atributo | sin atributo |
+| Una ruta por debajo, por segmentos completos | sin atributo          | `aria-current="true"` |
+| Cualquier otra                               | sin atributo          | sin atributo          |
 
 `aria-current="true"` significa «el elemento actual de un conjunto»: la sección en la que está la página. `to="/"` sólo coincide exacta, también con `match="prefix"`, porque si no marcaría todas las páginas. La comparación se hace sobre las rutas codificadas como las escribe `href()`, así que `/categorías` y `/categor%C3%ADas` son la misma.
 
 Desde `1.8`, un `aria-current` propio gana a la ruta, en el servidor, en la hidratación y en cada actualización, tanto escrito como con `bind:aria-current` o en `bind`:
 
-| Valor propio | Resultado |
-| --- | --- |
-| Un texto, como `aria-current="step"` | Ese valor, sea cual sea la ruta |
-| `false` | Sin atributo, aunque sea la ruta activa |
-| `null` o `undefined` | Decide la ruta, como sin atributo |
+| Valor propio                         | Resultado                               |
+| ------------------------------------ | --------------------------------------- |
+| Un texto, como `aria-current="step"` | Ese valor, sea cual sea la ruta         |
+| `false`                              | Sin atributo, aunque sea la ruta activa |
+| `null` o `undefined`                 | Decide la ruta, como sin atributo       |
 
 `aria-current` y `bind:aria-current` ganan a la clave `aria-current` de `bind`. Escribir los dos en el mismo enlace es `MEEK105`.
 

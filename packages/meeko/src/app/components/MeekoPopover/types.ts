@@ -1,5 +1,5 @@
 /** Lado del disparador en el que se abre el contenido. */
-export type PopoverSide = "top" | "bottom" | "left" | "right";
+export type PopoverSide = 'top' | 'bottom' | 'left' | 'right'
 
 /**
  * Posición del contenido respecto al disparador: un lado y, opcionalmente, la alineación con su
@@ -10,7 +10,7 @@ export type PopoverSide = "top" | "bottom" | "left" | "right";
  * <MeekoPopover placement="right-start"><snippet name="trigger">Más</snippet>…</MeekoPopover>
  * ```
  */
-export type PopoverPlacement = PopoverSide | `${PopoverSide}-start` | `${PopoverSide}-end`;
+export type PopoverPlacement = PopoverSide | `${PopoverSide}-start` | `${PopoverSide}-end`
 
 /**
  * Comportamiento del contenido, el valor de su atributo `popover`: `"auto"` se cierra al pulsar
@@ -22,7 +22,7 @@ export type PopoverPlacement = PopoverSide | `${PopoverSide}-start` | `${Popover
  * <MeekoPopover mode="hint"><snippet name="trigger">?</snippet>Ayuda contextual</MeekoPopover>
  * ```
  */
-export type PopoverMode = "auto" | "manual" | "hint";
+export type PopoverMode = 'auto' | 'manual' | 'hint'
 
 /**
  * Patrón ARIA del contenido: `"menu"` (con `menuitem`, flechas y búsqueda por letras),
@@ -33,7 +33,7 @@ export type PopoverMode = "auto" | "manual" | "hint";
  * <MeekoPopover role="dialog" label="Filtros"><snippet name="trigger">Filtrar</snippet>…</MeekoPopover>
  * ```
  */
-export type PopoverRole = "menu" | "dialog" | "tooltip";
+export type PopoverRole = 'menu' | 'dialog' | 'tooltip'
 
 /**
  * Atributos del disparador propio de `<MeekoPopover>`, el parámetro `trigger` del snippet `anchor`.
@@ -53,18 +53,18 @@ export type PopoverRole = "menu" | "dialog" | "tooltip";
  * ```
  */
 export interface PopoverTrigger {
-  /** `id` del disparador: `<MeekoPopover>` lo busca con él para anclar el contenido. */
-  readonly id: string;
-  /** `popovertarget` para un `<button>`: abre y cierra el contenido sin JavaScript. Sin valor con `mode="hint"`. */
-  readonly popovertarget: string | undefined;
-  /** `aria-controls`: el `id` del contenido. Sin valor con `mode="hint"`. */
-  readonly "aria-controls": string | undefined;
-  /** `aria-expanded`: `"true"` mientras el contenido está abierto. Sin valor con `mode="hint"`. */
-  readonly "aria-expanded": "true" | "false" | undefined;
-  /** `aria-haspopup` según `role`: `"menu"` o `"dialog"`. */
-  readonly "aria-haspopup": "menu" | "dialog" | undefined;
-  /** `aria-describedby` de un tooltip (`mode="hint"`): el `id` del contenido. */
-  readonly "aria-describedby": string | undefined;
+	/** `id` del disparador: `<MeekoPopover>` lo busca con él para anclar el contenido. */
+	readonly id: string
+	/** `popovertarget` para un `<button>`: abre y cierra el contenido sin JavaScript. Sin valor con `mode="hint"`. */
+	readonly popovertarget: string | undefined
+	/** `aria-controls`: el `id` del contenido. Sin valor con `mode="hint"`. */
+	readonly 'aria-controls': string | undefined
+	/** `aria-expanded`: `"true"` mientras el contenido está abierto. Sin valor con `mode="hint"`. */
+	readonly 'aria-expanded': 'true' | 'false' | undefined
+	/** `aria-haspopup` según `role`: `"menu"` o `"dialog"`. */
+	readonly 'aria-haspopup': 'menu' | 'dialog' | undefined
+	/** `aria-describedby` de un tooltip (`mode="hint"`): el `id` del contenido. */
+	readonly 'aria-describedby': string | undefined
 }
 
 /**
@@ -77,8 +77,8 @@ export interface PopoverTrigger {
  * ```
  */
 export interface PopoverToggleEvent {
-  /** `true` si el contenido acaba de abrirse. */
-  readonly open: boolean;
+	/** `true` si el contenido acaba de abrirse. */
+	readonly open: boolean
 }
 
 /**
@@ -92,12 +92,12 @@ export interface PopoverToggleEvent {
  * ```
  */
 export interface PopoverSnippets {
-  /** El contenido del popover. */
-  default?: [];
-  /** El contenido del `<button>` disparador que pinta Meeko. */
-  trigger?: [];
-  /** Un disparador propio, en lugar del botón: recibe sus atributos en {@link PopoverTrigger}. */
-  anchor?: [trigger: PopoverTrigger];
+	/** El contenido del popover. */
+	default?: []
+	/** El contenido del `<button>` disparador que pinta Meeko. */
+	trigger?: []
+	/** Un disparador propio, en lugar del botón: recibe sus atributos en {@link PopoverTrigger}. */
+	anchor?: [trigger: PopoverTrigger]
 }
 
 /**
@@ -116,28 +116,28 @@ export interface PopoverSnippets {
  * ```
  */
 export interface MeekoPopoverProps {
-  /** `"auto"` (por defecto), `"manual"` o `"hint"`; véase {@link PopoverMode}. */
-  readonly mode?: PopoverMode;
-  /** Dónde se abre respecto al disparador; `"bottom-start"` por defecto. */
-  readonly placement?: PopoverPlacement;
-  /** Separación en píxeles entre el disparador y el contenido; `0` por defecto. */
-  readonly offset?: number;
-  /** Patrón ARIA del contenido; con `mode="hint"`, `"tooltip"` por defecto. */
-  readonly role?: PopoverRole;
-  /** `aria-label` del contenido. Sin ella, un menú o un diálogo se nombran con el disparador. */
-  readonly label?: string;
-  /** Clases del contenido, el elemento con `popover`. */
-  readonly class?: string;
-  /** Clases del `<button>` disparador que pinta Meeko. */
-  readonly triggerClass?: string;
-  /** `id` del disparador; por defecto, uno de `useId`. Con un disparador propio, el `id` que lleva. */
-  readonly triggerId?: string;
-  /** Con `true`, el contenido mide al menos lo que el disparador (`anchor-size(width)`). */
-  readonly matchWidth?: boolean;
-  /** Con `mode="hint"`, milisegundos que el puntero espera sobre el disparador antes de abrir; `300` por defecto. */
-  readonly delay?: number;
-  /** Con `mode="hint"`, milisegundos antes de cerrar al salir el puntero; `150` por defecto. */
-  readonly closeDelay?: number;
+	/** `"auto"` (por defecto), `"manual"` o `"hint"`; véase {@link PopoverMode}. */
+	readonly mode?: PopoverMode
+	/** Dónde se abre respecto al disparador; `"bottom-start"` por defecto. */
+	readonly placement?: PopoverPlacement
+	/** Separación en píxeles entre el disparador y el contenido; `0` por defecto. */
+	readonly offset?: number
+	/** Patrón ARIA del contenido; con `mode="hint"`, `"tooltip"` por defecto. */
+	readonly role?: PopoverRole
+	/** `aria-label` del contenido. Sin ella, un menú o un diálogo se nombran con el disparador. */
+	readonly label?: string
+	/** Clases del contenido, el elemento con `popover`. */
+	readonly class?: string
+	/** Clases del `<button>` disparador que pinta Meeko. */
+	readonly triggerClass?: string
+	/** `id` del disparador; por defecto, uno de `useId`. Con un disparador propio, el `id` que lleva. */
+	readonly triggerId?: string
+	/** Con `true`, el contenido mide al menos lo que el disparador (`anchor-size(width)`). */
+	readonly matchWidth?: boolean
+	/** Con `mode="hint"`, milisegundos que el puntero espera sobre el disparador antes de abrir; `300` por defecto. */
+	readonly delay?: number
+	/** Con `mode="hint"`, milisegundos antes de cerrar al salir el puntero; `150` por defecto. */
+	readonly closeDelay?: number
 }
 
 /**
@@ -150,11 +150,10 @@ export interface MeekoPopoverProps {
  * ```
  */
 export interface PopoverExposed {
-  /** Abre el contenido. */
-  show(): void;
-  /** Cierra el contenido. */
-  hide(): void;
-  /** Abre el contenido si está cerrado y lo cierra si está abierto. */
-  toggle(): void;
+	/** Abre el contenido. */
+	show(): void
+	/** Cierra el contenido. */
+	hide(): void
+	/** Abre el contenido si está cerrado y lo cierra si está abierto. */
+	toggle(): void
 }
-

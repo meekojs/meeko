@@ -1,5 +1,5 @@
 ---
-source-hash: 8e2abd33dca839838b26612bf690b0dcd1449cc71f0aad71c1ad9b762c1923f6
+source-hash: 13cd63eba660c06e55b6b58a7555069620f102f803e1b86610848ab908d39ee6
 ---
 
 # Meeko API
@@ -1396,11 +1396,11 @@ Since `1.4`, each auto-imported component also has those types with its tag name
 
 <a id="wrapping-another-component"></a>**Wrapping another component.** Since `1.8`, an auto-imported component has three types for this:
 
-| Type | What it is |
-| --- | --- |
-| `BaseButtonProps` | Its props, without the callbacks of `defineEmits`. |
-| `BaseButtonEmits` | The `defineEmits` map, to write `defineEmits<BaseButtonEmits>()`. |
-| `ComponentProps<"BaseButton">` | Everything the parent can pass, including `onClick`. |
+| Type                           | What it is                                                        |
+| ------------------------------ | ----------------------------------------------------------------- |
+| `BaseButtonProps`              | Its props, without the callbacks of `defineEmits`.                |
+| `BaseButtonEmits`              | The `defineEmits` map, to write `defineEmits<BaseButtonEmits>()`. |
+| `ComponentProps<"BaseButton">` | Everything the parent can pass, including `onClick`.              |
 
 A wrapper extends the props, declares the events and forwards the rest. If the other component's props are a union, such as a route, a link or a button, the variants are kept: passing `to` and `href` together is still an error in the wrapper's parent.
 

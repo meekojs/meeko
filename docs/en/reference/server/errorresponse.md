@@ -13,7 +13,7 @@ related:
   - docs/framework.md#errores
   - docs/framework.md#api-y-rpc
   - docs/framework.md#errores-de-validación-en-formularios
-source-hash: aa9cdfd1289a5d6bf38f6738df0cfed4842d34a5f1f4f477c9c084dcd5981fb7
+source-hash: 749c259e8ec9bb77700a5f8f1b3a3d83a60ef9fe3eac43716947c98058f01e9b
 ---
 
 `errorResponse(error, requestId)` is the single format Meeko uses to respond to API, RPC, local dispatch or adapter failures: a JSON `Response` with `{ code, status, requestId }` and the `x-request-id` header. An `ApiError` keeps its code and status; any other error becomes `500 INTERNAL_ERROR`, without its message or stack trace, which only server observers see.

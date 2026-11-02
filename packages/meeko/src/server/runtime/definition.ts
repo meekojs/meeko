@@ -1,8 +1,8 @@
-import type { ServerErrorObserver } from "../errors";
-import type { PlatformName, ServerPlatform } from "../runtime/platform";
-import type { ProcessErrorPolicy } from "../runtime/process-errors";
-import type { SessionManager } from "../runtime/sessions";
-import type { SocketDeliveryErrorContext, SocketPubSub } from "../socket/runtime";
+import type { ServerErrorObserver } from '../errors'
+import type { PlatformName, ServerPlatform } from '../runtime/platform'
+import type { ProcessErrorPolicy } from '../runtime/process-errors'
+import type { SessionManager } from '../runtime/sessions'
+import type { SocketDeliveryErrorContext, SocketPubSub } from '../socket/runtime'
 
 /**
  * Lo que recibe la fábrica de `server/runtime.ts` al crear el runtime de la aplicación.
@@ -20,35 +20,35 @@ import type { SocketDeliveryErrorContext, SocketPubSub } from "../socket/runtime
  * ```
  */
 export interface ServerRuntimeContext<Env = Readonly<Record<string, string | undefined>>> {
-  /** Variables de entorno (Node, Deno, Bun) o bindings (Workers). */
-  readonly env: Env;
-  /** `true` en producción. */
-  readonly production: boolean;
-  /** Runtime que ejecuta la aplicación. */
-  readonly platform: PlatformName;
-  /** `true` mientras `meeko build` prerenderiza páginas; no se sirve tráfico de clientes. */
-  readonly prerendering: boolean;
-  /**
-   * Ruta absoluta de la raíz del proyecto, para leer sus archivos desde el servidor sin depender de
-   * `import.meta.url`, que el build mueve a `.meeko/output/…`, ni de `process.cwd()`. En `meeko dev`
-   * es la raíz del proyecto; en las salidas de Node, Bun y Deno (también en `meeko start` y en el
-   * prerender), la carpeta tres niveles por encima de la salida, o `MEEKO_ROOT` si está definida
-   * (relativa al directorio de trabajo), para una salida que se despliega fuera del proyecto. En
-   * Cloudflare Workers, sin sistema de archivos, es `undefined`, como en un `createServerApp`
-   * propio que no la pasa.
-   *
-   * @since 1.8.0
-   * @example
-   * ```ts
-   * import { join } from "node:path";
-   * import { defineServerRuntime } from "@meekojs/meeko/server";
-   *
-   * export default defineServerRuntime(({ root }) => ({
-   *   services: { docs: join(root ?? process.cwd(), "docs") },
-   * }));
-   * ```
-   */
-  readonly root?: string | undefined;
+	/** Variables de entorno (Node, Deno, Bun) o bindings (Workers). */
+	readonly env: Env
+	/** `true` en producción. */
+	readonly production: boolean
+	/** Runtime que ejecuta la aplicación. */
+	readonly platform: PlatformName
+	/** `true` mientras `meeko build` prerenderiza páginas; no se sirve tráfico de clientes. */
+	readonly prerendering: boolean
+	/**
+	 * Ruta absoluta de la raíz del proyecto, para leer sus archivos desde el servidor sin depender de
+	 * `import.meta.url`, que el build mueve a `.meeko/output/…`, ni de `process.cwd()`. En `meeko dev`
+	 * es la raíz del proyecto; en las salidas de Node, Bun y Deno (también en `meeko start` y en el
+	 * prerender), la carpeta tres niveles por encima de la salida, o `MEEKO_ROOT` si está definida
+	 * (relativa al directorio de trabajo), para una salida que se despliega fuera del proyecto. En
+	 * Cloudflare Workers, sin sistema de archivos, es `undefined`, como en un `createServerApp`
+	 * propio que no la pasa.
+	 *
+	 * @since 1.8.0
+	 * @example
+	 * ```ts
+	 * import { join } from "node:path";
+	 * import { defineServerRuntime } from "@meekojs/meeko/server";
+	 *
+	 * export default defineServerRuntime(({ root }) => ({
+	 *   services: { docs: join(root ?? process.cwd(), "docs") },
+	 * }));
+	 * ```
+	 */
+	readonly root?: string | undefined
 }
 
 /**
@@ -68,9 +68,7 @@ export interface ServerRuntimeContext<Env = Readonly<Record<string, string | und
  * });
  * ```
  */
-export type ServerServices<Services, Env = unknown> =
-  | Services
-  | ((request: Request, context: { readonly platform: ServerPlatform<Env> }) => Services | Promise<Services>);
+export type ServerServices<Services, Env = unknown> = Services | ((request: Request, context: { readonly platform: ServerPlatform<Env> }) => Services | Promise<Services>)
 
 /**
  * Recursos de servidor de la aplicación, creados una vez por proceso o aislado: sesiones,
@@ -94,53 +92,53 @@ export type ServerServices<Services, Env = unknown> =
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#runtime-de-servidor
  */
 export interface ServerRuntime<Services = unknown, Env = unknown> {
-  /**
-   * Gestor de sesiones. En producción necesita un store persistente. Desde `1.2` es opcional: sin
-   * él, Meeko usa memoria en desarrollo y, en producción, Redis con `MEEKO_REDIS_URL` (véase
-   * [Autenticación](https://github.com/meekojs/meeko/blob/main/docs/framework.md#autenticación)).
-   */
-  readonly sessions?: SessionManager<any>;
-  /** Se expone como `RequestContext.services` a páginas, API, RPC y canales Socket. */
-  readonly services?: ServerServices<Services, Env>;
-  /** Política de Socket. */
-  readonly socket?: {
-    /** Broker entre instancias, como `RedisSocketPubSub`. Por defecto, `LocalSocketPubSub`. */
-    readonly pubsub?: SocketPubSub;
-    /** Entregas fallidas a peers locales. Por defecto, `onError` con un ID de petición nuevo. */
-    readonly onDeliveryError?: (error: unknown, context: SocketDeliveryErrorContext) => void;
-    /** Orígenes adicionales aceptados en el handshake. */
-    readonly allowedOrigins?: readonly string[];
-    /** Tamaño máximo de un mensaje entrante y saliente. Por defecto, 64 KiB. */
-    readonly maxMessageBytes?: number;
-    /** Bytes salientes pendientes por peer antes de cerrarlo. */
-    readonly maxBufferBytes?: number;
-    /** Entregas del broker que un peer puede tener en espera antes de cerrarse con `1013`. Por defecto, 256. */
-    readonly maxPendingDeliveries?: number;
-    /** Milisegundos durante los que una entrega reutiliza la última lectura de sesión del peer. Por defecto, 1000. */
-    readonly sessionRefreshMs?: number;
-  };
-  /**
-   * Origen público de la aplicación, como `https://example.com` tras un proxy TLS. Las
-   * comprobaciones de `Origin` de HTTP y de Socket se comparan con él.
-   */
-  readonly publicOrigin?: string;
-  /**
-   * Recibe los fallos internos con su ID de petición; nunca se envían a los clientes. Desde `1.3`,
-   * también los fallos del proceso (promesas rechazadas sin manejar y excepciones no capturadas),
-   * con un tercer argumento que los identifica.
-   */
-  readonly onError?: ServerErrorObserver;
-  /**
-   * Qué hacer con las promesas rechazadas sin manejar y las excepciones no capturadas del proceso.
-   * Por defecto, un rechazo se informa a `onError` y el servidor sigue atendiendo, y una excepción
-   * se informa y cierra el servidor de forma ordenada con código 1. `false` deja los dos casos al
-   * runtime. Se aplica en `meeko dev`, en las salidas de `meeko build` y en `serveNode` y
-   * `serveDeno` con `handleSignals`.
-   * @since 1.3.0
-   */
-  readonly processErrors?: ProcessErrorPolicy | false;
-  /** Libera los recursos del runtime después de cerrar sus sesiones. */
-  readonly close?: () => void | Promise<void>;
+	/**
+	 * Gestor de sesiones. En producción necesita un store persistente. Desde `1.2` es opcional: sin
+	 * él, Meeko usa memoria en desarrollo y, en producción, Redis con `MEEKO_REDIS_URL` (véase
+	 * [Autenticación](https://github.com/meekojs/meeko/blob/main/docs/framework.md#autenticación)).
+	 */
+	readonly sessions?: SessionManager<any>
+	/** Se expone como `RequestContext.services` a páginas, API, RPC y canales Socket. */
+	readonly services?: ServerServices<Services, Env>
+	/** Política de Socket. */
+	readonly socket?: {
+		/** Broker entre instancias, como `RedisSocketPubSub`. Por defecto, `LocalSocketPubSub`. */
+		readonly pubsub?: SocketPubSub
+		/** Entregas fallidas a peers locales. Por defecto, `onError` con un ID de petición nuevo. */
+		readonly onDeliveryError?: (error: unknown, context: SocketDeliveryErrorContext) => void
+		/** Orígenes adicionales aceptados en el handshake. */
+		readonly allowedOrigins?: readonly string[]
+		/** Tamaño máximo de un mensaje entrante y saliente. Por defecto, 64 KiB. */
+		readonly maxMessageBytes?: number
+		/** Bytes salientes pendientes por peer antes de cerrarlo. */
+		readonly maxBufferBytes?: number
+		/** Entregas del broker que un peer puede tener en espera antes de cerrarse con `1013`. Por defecto, 256. */
+		readonly maxPendingDeliveries?: number
+		/** Milisegundos durante los que una entrega reutiliza la última lectura de sesión del peer. Por defecto, 1000. */
+		readonly sessionRefreshMs?: number
+	}
+	/**
+	 * Origen público de la aplicación, como `https://example.com` tras un proxy TLS. Las
+	 * comprobaciones de `Origin` de HTTP y de Socket se comparan con él.
+	 */
+	readonly publicOrigin?: string
+	/**
+	 * Recibe los fallos internos con su ID de petición; nunca se envían a los clientes. Desde `1.3`,
+	 * también los fallos del proceso (promesas rechazadas sin manejar y excepciones no capturadas),
+	 * con un tercer argumento que los identifica.
+	 */
+	readonly onError?: ServerErrorObserver
+	/**
+	 * Qué hacer con las promesas rechazadas sin manejar y las excepciones no capturadas del proceso.
+	 * Por defecto, un rechazo se informa a `onError` y el servidor sigue atendiendo, y una excepción
+	 * se informa y cierra el servidor de forma ordenada con código 1. `false` deja los dos casos al
+	 * runtime. Se aplica en `meeko dev`, en las salidas de `meeko build` y en `serveNode` y
+	 * `serveDeno` con `handleSignals`.
+	 * @since 1.3.0
+	 */
+	readonly processErrors?: ProcessErrorPolicy | false
+	/** Libera los recursos del runtime después de cerrar sus sesiones. */
+	readonly close?: () => void | Promise<void>
 }
 
 /**
@@ -160,8 +158,7 @@ export interface ServerRuntime<Services = unknown, Env = unknown> {
  * export default runtime;
  * ```
  */
-export type ServerRuntimeDefinition<Env = Readonly<Record<string, string | undefined>>, Services = unknown> =
-  (context: ServerRuntimeContext<Env>) => ServerRuntime<Services, Env> | Promise<ServerRuntime<Services, Env>>;
+export type ServerRuntimeDefinition<Env = Readonly<Record<string, string | undefined>>, Services = unknown> = (context: ServerRuntimeContext<Env>) => ServerRuntime<Services, Env> | Promise<ServerRuntime<Services, Env>>
 
 /**
  * Tipo de los servicios que devuelve una definición de runtime: el `services` del objeto que crea la
@@ -182,12 +179,10 @@ export type ServerRuntimeDefinition<Env = Readonly<Record<string, string | undef
  * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#tipos-de-los-servicios
  */
-export type ServerRuntimeServices<Definition> = Definition extends (...args: never[]) => infer Result
-  ? Awaited<Result> extends { readonly services?: infer Services } ? ServicesValue<Exclude<Services, undefined>> : unknown
-  : unknown;
+export type ServerRuntimeServices<Definition> = Definition extends (...args: never[]) => infer Result ? (Awaited<Result> extends { readonly services?: infer Services } ? ServicesValue<Exclude<Services, undefined>> : unknown) : unknown
 
 /** The services a `services` option gives: a per-request factory resolves to what it returns. */
-type ServicesValue<Services> = Services extends (...args: never[]) => infer Value ? Awaited<Value> : Services;
+type ServicesValue<Services> = Services extends (...args: never[]) => infer Value ? Awaited<Value> : Services
 
 /**
  * Registro de los servicios de la aplicación. Está vacío: `meeko check`, `meeko dev` y el editor lo
@@ -227,13 +222,13 @@ export interface GeneratedServices {}
  * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#tipos-de-los-servicios
  */
-export type AppServices = GeneratedServices extends { readonly services: infer Services } ? Services : unknown;
+export type AppServices = GeneratedServices extends { readonly services: infer Services } ? Services : unknown
 
 /**
  * `services` of a request context: the written type, or {@link AppServices} for `unknown`, the
  * default of every `services` type parameter. `any` stays `any`.
  */
-export type ContextServices<TServices> = 0 extends 1 & TServices ? TServices : unknown extends TServices ? AppServices : TServices;
+export type ContextServices<TServices> = 0 extends 1 & TServices ? TServices : unknown extends TServices ? AppServices : TServices
 
 /**
  * Declara en `server/runtime.ts` las sesiones, los servicios y la política de Socket de la
@@ -261,9 +256,7 @@ export type ContextServices<TServices> = 0 extends 1 & TServices ? TServices : u
  * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#runtime-de-servidor
  */
-export function defineServerRuntime<Env = Readonly<Record<string, string | undefined>>, Services = unknown>(
-  factory: ServerRuntimeDefinition<Env, Services>,
-): ServerRuntimeDefinition<Env, Services> {
-  if (typeof factory !== "function") throw new TypeError("defineServerRuntime requires a factory function");
-  return factory;
+export function defineServerRuntime<Env = Readonly<Record<string, string | undefined>>, Services = unknown>(factory: ServerRuntimeDefinition<Env, Services>): ServerRuntimeDefinition<Env, Services> {
+	if (typeof factory !== 'function') throw new TypeError('defineServerRuntime requires a factory function')
+	return factory
 }

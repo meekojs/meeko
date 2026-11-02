@@ -1,15 +1,15 @@
-import type { ContextKey } from "../../core/reactivity";
-import type { HeadInput } from "../../shared/head";
-import type { LinkResolver } from "../../shared/link";
-import type { ErrorSource } from "../runtime/component-errors";
-import type { RouteState } from "../runtime/navigation";
+import type { ContextKey } from '../../core/reactivity'
+import type { HeadInput } from '../../shared/head'
+import type { LinkResolver } from '../../shared/link'
+import type { ErrorSource } from '../runtime/component-errors'
+import type { RouteState } from '../runtime/navigation'
 
-import { provide } from "../../core/reactivity";
-import { linkResolverKey } from "../../shared/link";
-import { useHead } from "../composables/use-head";
+import { provide } from '../../core/reactivity'
+import { linkResolverKey } from '../../shared/link'
+import { useHead } from '../composables/use-head'
 
 /** Brand of the objects `definePlugin` returns; `Symbol.for` so two copies of Meeko agree. */
-const pluginBrand: unique symbol = Symbol.for("meeko.app-plugin") as never;
+const pluginBrand: unique symbol = Symbol.for('meeko.app-plugin') as never
 
 /**
  * Dónde se observó un fallo que recibe un {@link PluginErrorHandler}: en el navegador, con su
@@ -27,18 +27,18 @@ const pluginBrand: unique symbol = Symbol.for("meeko.app-plugin") as never;
  * ```
  */
 export type PluginErrorInfo =
-  | {
-    /** Discriminante: el fallo se observó en el navegador. */
-    readonly side: "client";
-    /** Origen del fallo en el navegador: navegación, Socket, eventos, efectos… */
-    readonly source: ErrorSource;
-  }
-  | {
-    /** Discriminante: el fallo se observó en el servidor. */
-    readonly side: "server";
-    /** ID de la petición cuyo render falló, el mismo de la cabecera `x-request-id`. */
-    readonly requestId: string;
-  };
+	| {
+			/** Discriminante: el fallo se observó en el navegador. */
+			readonly side: 'client'
+			/** Origen del fallo en el navegador: navegación, Socket, eventos, efectos… */
+			readonly source: ErrorSource
+	  }
+	| {
+			/** Discriminante: el fallo se observó en el servidor. */
+			readonly side: 'server'
+			/** ID de la petición cuyo render falló, el mismo de la cabecera `x-request-id`. */
+			readonly requestId: string
+	  }
 
 /**
  * Observador de errores que registra un plugin con {@link PluginApp.onError}. `error` es `unknown`:
@@ -55,7 +55,7 @@ export type PluginErrorInfo =
  * };
  * ```
  */
-export type PluginErrorHandler = (error: unknown, info: PluginErrorInfo) => void;
+export type PluginErrorHandler = (error: unknown, info: PluginErrorInfo) => void
 
 /**
  * Aplicación que recibe un plugin de `app/plugins` (o de un módulo) al arrancar. En el navegador
@@ -75,42 +75,42 @@ export type PluginErrorHandler = (error: unknown, info: PluginErrorInfo) => void
  * ```
  */
 export interface PluginApp {
-  /** `"client"` en el navegador y `"server"` durante el render de una petición. */
-  readonly side: "client" | "server";
-  /**
-   * Ruta de la aplicación, como la de `useRoute()`. En el servidor es la de la petición; en el
-   * navegador sigue a la ruta confirmada, así que un `effect` que la lee se repite al navegar.
-   */
-  readonly route: RouteState;
-  /** Petición HTTP que se renderiza; `undefined` en el navegador. */
-  readonly request: Request | undefined;
-  /**
-   * Publica un valor para todos los componentes de la aplicación, que lo leen con `inject(key)`.
-   * En el servidor el valor es de esta petición; no comparta en él estado mutable entre peticiones.
-   */
-  provide<T>(key: ContextKey<T>, value: T): void;
-  /** Adds document attributes and tags to every render root of this plugin. */
-  addHead(input: () => HeadInput): void;
-  /** Runs before a client navigation; return false after taking over navigation. */
-  beforeNavigate(handler: (url: URL, routeId: string | null) => boolean | void | Promise<boolean | void>): void;
-  /**
-   * Registra un resolvedor del `href` de cada `<MeekoLink>` de la aplicación (desde 1.8.0), por
-   * ejemplo para añadir el prefijo del idioma. Varios resolvedores se encadenan en el orden de
-   * registro: cada uno recibe el `href` del anterior. Un enlace con `bind:resolve="false"` no pasa
-   * por ellos. Véase {@link LinkResolver}.
-   *
-   * @example
-   * ```ts
-   * app.resolveLink(({ href, hreflang }) => hreflang === "en" ? `/en${href}` : href);
-   * ```
-   */
-  resolveLink(resolver: LinkResolver): void;
-  /**
-   * Registra un observador de errores de la aplicación. En el navegador recibe lo mismo que
-   * `mountClientApp({ onError })`; en el servidor, los fallos del render de esta petición, además
-   * del `onError` de `server/runtime.ts`.
-   */
-  onError(handler: PluginErrorHandler): void;
+	/** `"client"` en el navegador y `"server"` durante el render de una petición. */
+	readonly side: 'client' | 'server'
+	/**
+	 * Ruta de la aplicación, como la de `useRoute()`. En el servidor es la de la petición; en el
+	 * navegador sigue a la ruta confirmada, así que un `effect` que la lee se repite al navegar.
+	 */
+	readonly route: RouteState
+	/** Petición HTTP que se renderiza; `undefined` en el navegador. */
+	readonly request: Request | undefined
+	/**
+	 * Publica un valor para todos los componentes de la aplicación, que lo leen con `inject(key)`.
+	 * En el servidor el valor es de esta petición; no comparta en él estado mutable entre peticiones.
+	 */
+	provide<T>(key: ContextKey<T>, value: T): void
+	/** Adds document attributes and tags to every render root of this plugin. */
+	addHead(input: () => HeadInput): void
+	/** Runs before a client navigation; return false after taking over navigation. */
+	beforeNavigate(handler: (url: URL, routeId: string | null) => boolean | void | Promise<boolean | void>): void
+	/**
+	 * Registra un resolvedor del `href` de cada `<MeekoLink>` de la aplicación (desde 1.8.0), por
+	 * ejemplo para añadir el prefijo del idioma. Varios resolvedores se encadenan en el orden de
+	 * registro: cada uno recibe el `href` del anterior. Un enlace con `bind:resolve="false"` no pasa
+	 * por ellos. Véase {@link LinkResolver}.
+	 *
+	 * @example
+	 * ```ts
+	 * app.resolveLink(({ href, hreflang }) => hreflang === "en" ? `/en${href}` : href);
+	 * ```
+	 */
+	resolveLink(resolver: LinkResolver): void
+	/**
+	 * Registra un observador de errores de la aplicación. En el navegador recibe lo mismo que
+	 * `mountClientApp({ onError })`; en el servidor, los fallos del render de esta petición, además
+	 * del `onError` de `server/runtime.ts`.
+	 */
+	onError(handler: PluginErrorHandler): void
 }
 
 /**
@@ -129,8 +129,8 @@ export interface PluginApp {
  * ```
  */
 export interface MeekoPlugin<Options = undefined> {
-  /** Función que se ejecuta al arrancar la aplicación; puede ser asíncrona. */
-  readonly setup: (app: PluginApp, options: Options) => void | Promise<void>;
+	/** Función que se ejecuta al arrancar la aplicación; puede ser asíncrona. */
+	readonly setup: (app: PluginApp, options: Options) => void | Promise<void>
 }
 
 /**
@@ -149,12 +149,12 @@ export interface MeekoPlugin<Options = undefined> {
  * ```
  */
 export interface PluginRegistration {
-  /** Export por defecto del archivo del plugin; se comprueba al arrancar. */
-  readonly plugin: unknown;
-  /** Opciones que recibe `setup` como segundo argumento. */
-  readonly options?: unknown;
-  /** Nombre en los mensajes de error, como el archivo del plugin. */
-  readonly name?: string;
+	/** Export por defecto del archivo del plugin; se comprueba al arrancar. */
+	readonly plugin: unknown
+	/** Opciones que recibe `setup` como segundo argumento. */
+	readonly options?: unknown
+	/** Nombre en los mensajes de error, como el archivo del plugin. */
+	readonly name?: string
 }
 
 /**
@@ -183,97 +183,102 @@ export interface PluginRegistration {
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#plugins-de-aplicación
  */
 export function definePlugin<Options = undefined>(setup: (app: PluginApp, options: Options) => void | Promise<void>): MeekoPlugin<Options> {
-  if (typeof setup !== "function") throw new TypeError("definePlugin requires a setup function");
-  return Object.freeze({ setup, [pluginBrand]: true }) as MeekoPlugin<Options>;
+	if (typeof setup !== 'function') throw new TypeError('definePlugin requires a setup function')
+	return Object.freeze({ setup, [pluginBrand]: true }) as MeekoPlugin<Options>
 }
 
 function isPlugin(value: unknown): value is MeekoPlugin<unknown> {
-  return typeof value === "object" && value !== null && (value as Record<symbol, unknown>)[pluginBrand] === true
-    && typeof (value as { setup?: unknown }).setup === "function";
+	return typeof value === 'object' && value !== null && (value as Record<symbol, unknown>)[pluginBrand] === true && typeof (value as { setup?: unknown }).setup === 'function'
 }
 
 /** What the plugins of one application start published. */
 export interface PluginState {
-  /** Publishes the plugins' values in the active root; call it in every render root of the app. */
-  apply(): void;
-  beforeNavigate(url: URL, routeId: string | null): Promise<boolean>;
-  /** Error observers the plugins registered, in registration order. */
-  readonly errorHandlers: readonly PluginErrorHandler[];
+	/** Publishes the plugins' values in the active root; call it in every render root of the app. */
+	apply(): void
+	beforeNavigate(url: URL, routeId: string | null): Promise<boolean>
+	/** Error observers the plugins registered, in registration order. */
+	readonly errorHandlers: readonly PluginErrorHandler[]
 }
 
 /** The state of an application without plugins. */
-export const emptyPluginState: PluginState = Object.freeze({ apply() {}, async beforeNavigate() { return true; }, errorHandlers: Object.freeze([]) });
+export const emptyPluginState: PluginState = Object.freeze({
+	apply() {},
+	async beforeNavigate() {
+		return true
+	},
+	errorHandlers: Object.freeze([]),
+})
 
 /**
  * Runs `registrations` in order (each awaited before the next) and collects what they publish.
  * A default export that is not a `definePlugin(...)` result fails with the plugin's name.
  */
-export async function runPlugins(
-  registrations: readonly PluginRegistration[] | undefined,
-  context: { readonly side: "client" | "server"; readonly route: RouteState; readonly request?: Request | undefined },
-): Promise<PluginState> {
-  if (!registrations?.length) return emptyPluginState;
-  const provided: Array<readonly [ContextKey<unknown>, unknown]> = [];
-  const headInputs: Array<() => HeadInput> = [];
-  const navigationHandlers: Array<(url: URL, routeId: string | null) => boolean | void | Promise<boolean | void>> = [];
-  const errorHandlers: PluginErrorHandler[] = [];
-  const linkResolvers: LinkResolver[] = [];
-  for (const [index, registration] of registrations.entries()) {
-    const name = registration.name ?? `plugin ${index + 1}`;
-    if (!isPlugin(registration.plugin)) throw new TypeError(`${name} must default-export definePlugin(...)`);
-    const app: PluginApp = Object.freeze({
-      side: context.side,
-      route: context.route,
-      request: context.request,
-      provide<T>(key: ContextKey<T>, value: T): void { provided.push([key as ContextKey<unknown>, value]); },
-      addHead(input: () => HeadInput): void {
-        if (typeof input !== "function") throw new TypeError(`${name}: addHead requires a function`);
-        headInputs.push(input);
-      },
-      beforeNavigate(handler: (url: URL, routeId: string | null) => boolean | void | Promise<boolean | void>): void {
-        if (typeof handler !== "function") throw new TypeError(`${name}: beforeNavigate requires a function`);
-        navigationHandlers.push(handler);
-      },
-      resolveLink(resolver: LinkResolver): void {
-        if (typeof resolver !== "function") throw new TypeError(`${name}: resolveLink requires a function`);
-        linkResolvers.push(resolver);
-      },
-      onError(handler: PluginErrorHandler): void {
-        if (typeof handler !== "function") throw new TypeError(`${name}: onError requires a function`);
-        errorHandlers.push(handler);
-      },
-    });
-    await registration.plugin.setup(app, registration.options);
-  }
-  // One function for every link: each resolver gets the href of the one before it.
-  const resolveLink: LinkResolver | undefined = linkResolvers.length === 0 ? undefined
-    : linkResolvers.length === 1 ? linkResolvers[0]
-    : (link) => linkResolvers.reduce((href, resolver) => resolver({ ...link, href }), link.href);
-  return {
-    apply() {
-      for (const [key, value] of provided) provide(key, value);
-      if (resolveLink) provide(linkResolverKey, resolveLink);
-      for (const input of headInputs) useHead(input);
-    },
-    async beforeNavigate(url, routeId) {
-      for (const handler of navigationHandlers) if (await handler(url, routeId) === false) return false;
-      return true;
-    },
-    errorHandlers,
-  };
+export async function runPlugins(registrations: readonly PluginRegistration[] | undefined, context: { readonly side: 'client' | 'server'; readonly route: RouteState; readonly request?: Request | undefined }): Promise<PluginState> {
+	if (!registrations?.length) return emptyPluginState
+	const provided: Array<readonly [ContextKey<unknown>, unknown]> = []
+	const headInputs: Array<() => HeadInput> = []
+	const navigationHandlers: Array<(url: URL, routeId: string | null) => boolean | void | Promise<boolean | void>> = []
+	const errorHandlers: PluginErrorHandler[] = []
+	const linkResolvers: LinkResolver[] = []
+	for (const [index, registration] of registrations.entries()) {
+		const name = registration.name ?? `plugin ${index + 1}`
+		if (!isPlugin(registration.plugin)) throw new TypeError(`${name} must default-export definePlugin(...)`)
+		const app: PluginApp = Object.freeze({
+			side: context.side,
+			route: context.route,
+			request: context.request,
+			provide<T>(key: ContextKey<T>, value: T): void {
+				provided.push([key as ContextKey<unknown>, value])
+			},
+			addHead(input: () => HeadInput): void {
+				if (typeof input !== 'function') throw new TypeError(`${name}: addHead requires a function`)
+				headInputs.push(input)
+			},
+			beforeNavigate(handler: (url: URL, routeId: string | null) => boolean | void | Promise<boolean | void>): void {
+				if (typeof handler !== 'function') throw new TypeError(`${name}: beforeNavigate requires a function`)
+				navigationHandlers.push(handler)
+			},
+			resolveLink(resolver: LinkResolver): void {
+				if (typeof resolver !== 'function') throw new TypeError(`${name}: resolveLink requires a function`)
+				linkResolvers.push(resolver)
+			},
+			onError(handler: PluginErrorHandler): void {
+				if (typeof handler !== 'function') throw new TypeError(`${name}: onError requires a function`)
+				errorHandlers.push(handler)
+			},
+		})
+		await registration.plugin.setup(app, registration.options)
+	}
+	// One function for every link: each resolver gets the href of the one before it.
+	const resolveLink: LinkResolver | undefined = linkResolvers.length === 0 ? undefined : linkResolvers.length === 1 ? linkResolvers[0] : (link) => linkResolvers.reduce((href, resolver) => resolver({ ...link, href }), link.href)
+	return {
+		apply() {
+			for (const [key, value] of provided) provide(key, value)
+			if (resolveLink) provide(linkResolverKey, resolveLink)
+			for (const input of headInputs) useHead(input)
+		},
+		async beforeNavigate(url, routeId) {
+			for (const handler of navigationHandlers) if ((await handler(url, routeId)) === false) return false
+			return true
+		},
+		errorHandlers,
+	}
 }
 
 /** Calls every observer; a failing observer is logged with the original error and never escapes. */
 export function notifyPluginErrorHandlers(handlers: readonly PluginErrorHandler[], error: unknown, info: PluginErrorInfo): void {
-  for (const handler of handlers) {
-    try {
-      const result = handler(error, info) as unknown;
-      if (result && typeof (result as { then?: unknown }).then === "function") {
-        void Promise.resolve(result).catch((observerError: unknown) => console.error("Meeko plugin error observer failed", observerError, error));
-      }
-    } catch (observerError) {
-      try { console.error("Meeko plugin error observer failed", observerError, error); }
-      catch { /* A broken console cannot escape an error observer. */ }
-    }
-  }
+	for (const handler of handlers) {
+		try {
+			const result = handler(error, info) as unknown
+			if (result && typeof (result as { then?: unknown }).then === 'function') {
+				void Promise.resolve(result).catch((observerError: unknown) => console.error('Meeko plugin error observer failed', observerError, error))
+			}
+		} catch (observerError) {
+			try {
+				console.error('Meeko plugin error observer failed', observerError, error)
+			} catch {
+				/* A broken console cannot escape an error observer. */
+			}
+		}
+	}
 }

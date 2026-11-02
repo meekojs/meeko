@@ -60,11 +60,11 @@ El job `publish` es el único con `id-token: write` y con el environment `npm`, 
 
 ## Etiquetas y destinos
 
-| Etiqueta | Workflow | Comprueba | Publica |
-| --- | --- | --- | --- |
-| `v<versión>` | `publish.yml` | Los seis manifiestos públicos | npm (los seis paquetes públicos) y la release de GitHub con los seis VSIX y el ZIP de Chrome |
-| `vscode-v<versión>` | `publish-vscode.yml` | `packages/vscode/package.json` | Visual Studio Marketplace y Open VSX |
-| `devtools-v<versión>` | `publish-devtools.yml` | `packages/devtools/manifest.json` | Chrome Web Store |
+| Etiqueta              | Workflow               | Comprueba                         | Publica                                                                                      |
+| --------------------- | ---------------------- | --------------------------------- | -------------------------------------------------------------------------------------------- |
+| `v<versión>`          | `publish.yml`          | Los seis manifiestos públicos     | npm (los seis paquetes públicos) y la release de GitHub con los seis VSIX y el ZIP de Chrome |
+| `vscode-v<versión>`   | `publish-vscode.yml`   | `packages/vscode/package.json`    | Visual Studio Marketplace y Open VSX                                                         |
+| `devtools-v<versión>` | `publish-devtools.yml` | `packages/devtools/manifest.json` | Chrome Web Store                                                                             |
 
 `publish.yml` sólo se dispara con etiquetas que empiezan por `v` y un dígito (`v[0-9]*`): con `v*` también lo disparaba `vscode-v<versión>`. Cada workflow falla antes de publicar si la etiqueta no coincide exactamente con la versión de su archivo. Las extensiones conservan así un número de versión independiente del paquete npm: una corrección de la extensión no obliga a publicar Meeko, y una versión de Meeko no sube las extensiones a las tiendas.
 
@@ -88,12 +88,12 @@ Los secretos se guardan en **Settings → Secrets and variables → Actions → 
 
 `publish-vscode.yml` comprueba que `vscode-v<versión>` coincide con `packages/vscode/package.json` y que la versión es `major.minor.patch`; ninguna de las dos tiendas acepta sufijos de prerelease en la versión de la extensión. Después ejecuta en Windows, Ubuntu y macOS las pruebas unitarias de la extensión, el VSIX de la plataforma y la prueba en un host aislado de VS Code. Sólo si todo pasa, empaqueta los seis VSIX y los publica con `@vscode/vsce@4.0.0` y `ovsx@1.3.0`, ambas versiones fijadas. Para Marketplace, `vsce publish --azure-credential` toma el acceso de la sesión que abre `azure/login` con Entra ID; con el PAT transitorio y en Open VSX, cada herramienta lee su token de la variable de entorno. Ningún token aparece en la línea de órdenes. `--skip-duplicate` permite repetir la ejecución si una tienda falló después de que la otra publicara.
 
-| Secreto | Uso |
-| --- | --- |
-| `AZURE_CLIENT_ID` | ID de aplicación (cliente) del registro de Microsoft Entra ID que publica en Marketplace. No es una contraseña. |
-| `AZURE_TENANT_ID` | ID del directorio (tenant) de ese registro. No es una contraseña. |
-| `VSCE_PAT` | Respaldo opcional para Marketplace si faltan los dos ID de Entra. El secreto anterior se eliminó y su PAT se revocó. |
-| `OVSX_PAT` | Token de Open VSX limitado a publicar `meekojs.meeko-language`. |
+| Secreto           | Uso                                                                                                                  |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `AZURE_CLIENT_ID` | ID de aplicación (cliente) del registro de Microsoft Entra ID que publica en Marketplace. No es una contraseña.      |
+| `AZURE_TENANT_ID` | ID del directorio (tenant) de ese registro. No es una contraseña.                                                    |
+| `VSCE_PAT`        | Respaldo opcional para Marketplace si faltan los dos ID de Entra. El secreto anterior se eliminó y su PAT se revocó. |
+| `OVSX_PAT`        | Token de Open VSX limitado a publicar `meekojs.meeko-language`.                                                      |
 
 Visual Studio Marketplace se publica con **Microsoft Entra ID** y OIDC: GitHub emite en cada ejecución un token de corta duración para el environment `vscode-marketplace`, Entra lo cambia por un acceso a Azure DevOps y no se guarda ningún token. Los PAT globales de Azure DevOps (los de **All accessible organizations**, el único ámbito que admite Marketplace) [se retiran el 1 de diciembre de 2026](https://code.visualstudio.com/api/working-with-extensions/publishing-extension). El workflow conserva la ruta de respaldo con `VSCE_PAT` si faltan los dos ID de Entra, pero ese secreto ya no está configurado.
 
@@ -118,12 +118,12 @@ Alta en Open VSX:
 
 `publish-devtools.yml` comprueba que `devtools-v<versión>` coincide con `packages/devtools/manifest.json`. En Windows ejecuta `pnpm run devtools:check` y la prueba de la extensión instalada en Chrome for Testing. Después empaqueta un ZIP con `manifest.json` en la raíz, como exige la tienda (`package-zip.ps1 -RootLayout`), lo sube y lo envía a revisión mediante la [API v2 de Chrome Web Store](https://developer.chrome.com/docs/webstore/using-api). La versión 1.1 de la API está obsoleta; la v2 identifica cada elemento por publisher, por lo que hace falta `CHROME_PUBLISHER_ID`. La publicación sólo ocurre si existen los cinco secretos; con una configuración incompleta el job avisa qué nombres faltan y no publica.
 
-| Secreto | Uso |
-| --- | --- |
-| `CHROME_EXTENSION_ID` | ID del elemento Meeko DevTools en la tienda. |
-| `CHROME_PUBLISHER_ID` | ID del publisher, visible en **Publisher → Settings** del panel de desarrollador. |
-| `CHROME_CLIENT_ID` | ID del cliente OAuth de Google Cloud. |
-| `CHROME_CLIENT_SECRET` | Secreto de ese cliente OAuth. |
+| Secreto                | Uso                                                                                                    |
+| ---------------------- | ------------------------------------------------------------------------------------------------------ |
+| `CHROME_EXTENSION_ID`  | ID del elemento Meeko DevTools en la tienda.                                                           |
+| `CHROME_PUBLISHER_ID`  | ID del publisher, visible en **Publisher → Settings** del panel de desarrollador.                      |
+| `CHROME_CLIENT_ID`     | ID del cliente OAuth de Google Cloud.                                                                  |
+| `CHROME_CLIENT_SECRET` | Secreto de ese cliente OAuth.                                                                          |
 | `CHROME_REFRESH_TOKEN` | Refresh token de la cuenta propietaria con el ámbito `https://www.googleapis.com/auth/chromewebstore`. |
 
 Alta:
@@ -165,7 +165,6 @@ El paquete [npm `0.0.4`](https://www.npmjs.com/package/@meekojs/meeko/v/0.0.4) s
 El paquete [npm `0.1.0`](https://www.npmjs.com/package/@meekojs/meeko/v/0.1.0) salió del commit `b492cf1` y coincide con la etiqueta [`v0.1.0`](https://github.com/meekojs/meeko/releases/tag/v0.1.0). Contiene cambios incompatibles respecto de `0.0.4`, documentados con su migración en el [CHANGELOG](../packages/meeko/CHANGELOG.md). La [CI de `main`](https://github.com/meekojs/meeko/actions/runs/40168927109) pasó antes de etiquetar. El [workflow de publicación](https://github.com/meekojs/meeko/actions/runs/40169193614) repitió los gates y publicó mediante OIDC con procedencia SLSA firmada. Se instaló después desde npm en un proyecto vacío, donde la reactividad, las subrutas `framework` y `server` y los comandos `dev`, `check`, `build` y `start` de la CLI respondieron.
 
 ## Versión 1.0.0-rc.1
-
 
 El paquete [npm `1.0.0-rc.1`](https://www.npmjs.com/package/@meekojs/meeko/v/1.0.0-rc.1) salió del commit `d8d7910` y coincide con la etiqueta [`v1.0.0-rc.1`](https://github.com/meekojs/meeko/releases/tag/v1.0.0-rc.1). Se publicó en el dist-tag `next`; `latest` sigue en `0.1.0`.
 
@@ -209,7 +208,7 @@ El paquete [npm `1.1.0`](https://www.npmjs.com/package/@meekojs/meeko/v/1.1.0) s
 
 ## Versión 1.2.0
 
-El paquete [npm `1.2.0`](https://www.npmjs.com/package/@meekojs/meeko/v/1.2.0) salió del commit `1580cd9` y coincide con la etiqueta [`v1.2.0`](https://github.com/meekojs/meeko/releases/tag/v1.2.0). Es un minor con las funciones y cambios recogidos en el [CHANGELOG](../packages/meeko/CHANGELOG.md) y la [guía de actualización](migration-1.2.md). Sus cambios aceptados como excepción (las props reactivas, el `Origin` que exige `session.create()` contra el *login CSRF* y los eventos tipados por elemento) están en [stability.md](stability.md#excepciones-aprobadas). La extensión de VS Code sube a `1.2.0`. Meeko DevTools sigue en `1.0.0`: desde `1.1.0` sólo cambió de carpeta (`packages/devtools`) y ganó descripciones en sus tipos generados, sin cambios en los archivos que empaqueta. Ninguna de las dos se ha publicado en las tiendas.
+El paquete [npm `1.2.0`](https://www.npmjs.com/package/@meekojs/meeko/v/1.2.0) salió del commit `1580cd9` y coincide con la etiqueta [`v1.2.0`](https://github.com/meekojs/meeko/releases/tag/v1.2.0). Es un minor con las funciones y cambios recogidos en el [CHANGELOG](../packages/meeko/CHANGELOG.md) y la [guía de actualización](migration-1.2.md). Sus cambios aceptados como excepción (las props reactivas, el `Origin` que exige `session.create()` contra el _login CSRF_ y los eventos tipados por elemento) están en [stability.md](stability.md#excepciones-aprobadas). La extensión de VS Code sube a `1.2.0`. Meeko DevTools sigue en `1.0.0`: desde `1.1.0` sólo cambió de carpeta (`packages/devtools`) y ganó descripciones en sus tipos generados, sin cambios en los archivos que empaqueta. Ninguna de las dos se ha publicado en las tiendas.
 
 - **Validación previa.** `diegootayza` consumió el checkout mediante `link:` y adoptó la autenticación integrada, `MeekoOutlet`, `MeekoLink` y `@utilities`. Una revisión independiente del diff desde `1f412ba` no encontró P0 ni P1. Su P2 (un middleware que sustituía la `Request` perdía la IP del cliente y `rateLimit` caía en un contador común) y sus P3 (`href` estático no ASCII en `MeekoLink`, `X-Forwarded-For` con puerto, `MEEKO_TRUST_PROXY` validada al arrancar en cada adaptador, secuencias de escape en `meeko auth hash`, componentes propios llamados `MeekoLink` o `MeekoOutlet` con `MEEK106`, la excepción de los eventos tipados y la hoja de estilos con hash desconocido) se corrigieron antes de publicar.
 - **Gates locales** sobre el árbol del commit de la versión (salvo esta sección): instalación congelada, `verify` (1004/1004 y 10/10 de DevTools), conformidad en Node 24.21.0, Bun 1.4.4, Deno 2.9.8 y workerd 1.20261019.1 (74/74), `e2e` (5/5), `pilot:e2e` en Chromium, Firefox y WebKit (8/8), `package:smoke`, el consumidor full-stack, el VSIX de VS Code (281 archivos), el host aislado, `npm pack --dry-run` (480 archivos, sólo `dist/`, `README.md`, `LICENSE` y `package.json`), `site:build` (420 páginas) y `git diff --check`. El host aislado falló primero porque su prueba seguía esperando sólo los dos comandos de valores en vivo, sin los tres de creación de archivos; se corrigió en el propio test (`53c97d7`).

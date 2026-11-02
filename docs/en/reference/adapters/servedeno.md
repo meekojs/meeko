@@ -16,7 +16,7 @@ related:
   - "config:server"
   - docs/framework.md#deno
   - docs/framework.md#conformidad-entre-adaptadores
-source-hash: 5271fba8ded85c7abed7df0c347b05bf658b8185f50c49919e68b52b8c53e057
+source-hash: d1e55a87d63f71546c31513d7278710d79c665f5028bc1a77a650c6dca912e8f
 ---
 
 `serveDeno(app, options)` starts `Deno.serve` for a `createServerApp` application: it handles HTTP through `app.fetch`, upgrades Socket channels through `Deno.upgradeWebSocket` and records each connection's IP (`remoteAddr`). With `handleSignals`, it shuts down gracefully on `SIGINT` and `SIGTERM` (`SIGINT` and `SIGBREAK` on Windows) and, since `1.3`, applies `processErrors`.

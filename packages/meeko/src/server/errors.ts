@@ -1,6 +1,5 @@
-
 /** Marks the ApiErrors of every copy of Meeko: only theirs carry public `issues` through {@link normalizeServerError}. */
-const apiErrorMark = Symbol.for("meeko.apiError");
+const apiErrorMark = Symbol.for('meeko.apiError')
 
 /**
  * Error público de API, RPC, Socket y loaders: conserva `code` y `status` en la respuesta, que
@@ -37,26 +36,30 @@ const apiErrorMark = Symbol.for("meeko.apiError");
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#api-y-rpc
  */
 export class ApiError extends Error {
-  /**
-   * Mensajes públicos por campo (desde `1.5`), o `undefined`. Se envían con un estado `4xx`.
-   * @since 1.5.0
-   */
-  declare public readonly issues?: readonly ApiErrorIssue[];
+	/**
+	 * Mensajes públicos por campo (desde `1.5`), o `undefined`. Se envían con un estado `4xx`.
+	 * @since 1.5.0
+	 */
+	declare public readonly issues?: readonly ApiErrorIssue[]
 
-  /**
-   * @param code Código público, como `USER_NOT_FOUND`.
-   * @param status Estado HTTP entre 400 y 599.
-   * @param message Mensaje interno; no se envía al cliente. Por defecto, el código. Desde `1.5`,
-   * también `{ message, issues }`, con los mensajes públicos por campo.
-   * @throws {TypeError} Si un issue no tiene `path` y `message` de texto.
-   */
-  constructor(public readonly code: string, public readonly status: number, message: string | ApiErrorOptions = code) {
-    const options = typeof message === "string" ? { message } : message;
-    super(options.message ?? code);
-    this.name = "ApiError";
-    Object.defineProperty(this, apiErrorMark, { value: true });
-    if (options.issues !== undefined) this.issues = checkedIssues(options.issues);
-  }
+	/**
+	 * @param code Código público, como `USER_NOT_FOUND`.
+	 * @param status Estado HTTP entre 400 y 599.
+	 * @param message Mensaje interno; no se envía al cliente. Por defecto, el código. Desde `1.5`,
+	 * también `{ message, issues }`, con los mensajes públicos por campo.
+	 * @throws {TypeError} Si un issue no tiene `path` y `message` de texto.
+	 */
+	constructor(
+		public readonly code: string,
+		public readonly status: number,
+		message: string | ApiErrorOptions = code,
+	) {
+		const options = typeof message === 'string' ? { message } : message
+		super(options.message ?? code)
+		this.name = 'ApiError'
+		Object.defineProperty(this, apiErrorMark, { value: true })
+		if (options.issues !== undefined) this.issues = checkedIssues(options.issues)
+	}
 }
 
 /**
@@ -71,10 +74,10 @@ export class ApiError extends Error {
  * ```
  */
 export interface ApiErrorIssue {
-  /** Ruta del campo, con las claves unidas con `.`, o `""` para el formulario completo. */
-  readonly path: string;
-  /** Mensaje público para el usuario. */
-  readonly message: string;
+	/** Ruta del campo, con las claves unidas con `.`, o `""` para el formulario completo. */
+	readonly path: string
+	/** Mensaje público para el usuario. */
+	readonly message: string
 }
 
 /**
@@ -90,25 +93,27 @@ export interface ApiErrorIssue {
  * ```
  */
 export interface ApiErrorOptions {
-  /** Mensaje interno; no se envía al cliente. Por defecto, el código. */
-  readonly message?: string;
-  /** Mensajes públicos por campo, que el cliente recibe en `ClientError.issues`. */
-  readonly issues?: readonly ApiErrorIssue[];
+	/** Mensaje interno; no se envía al cliente. Por defecto, el código. */
+	readonly message?: string
+	/** Mensajes públicos por campo, que el cliente recibe en `ClientError.issues`. */
+	readonly issues?: readonly ApiErrorIssue[]
 }
 
 function checkedIssues(issues: unknown): readonly ApiErrorIssue[] {
-  if (!Array.isArray(issues)) throw new TypeError("ApiError issues must be an array of { path, message }");
-  return Object.freeze(issues.map((issue: unknown) => {
-    const { path, message } = (issue ?? {}) as { path?: unknown; message?: unknown };
-    if (typeof path !== "string" || typeof message !== "string" || !message) throw new TypeError("Each ApiError issue needs a string path and a nonempty string message");
-    return Object.freeze({ path, message });
-  }));
+	if (!Array.isArray(issues)) throw new TypeError('ApiError issues must be an array of { path, message }')
+	return Object.freeze(
+		issues.map((issue: unknown) => {
+			const { path, message } = (issue ?? {}) as { path?: unknown; message?: unknown }
+			if (typeof path !== 'string' || typeof message !== 'string' || !message) throw new TypeError('Each ApiError issue needs a string path and a nonempty string message')
+			return Object.freeze({ path, message })
+		}),
+	)
 }
 
 /** The issues of an `ApiError` that reach the client: only with a 4xx status, at most 20. */
 export function sentIssues(error: ApiError): readonly ApiErrorIssue[] | undefined {
-  if (error.status >= 500 || !error.issues?.length) return undefined;
-  return error.issues.slice(0, maxPublicIssues);
+	if (error.status >= 500 || !error.issues?.length) return undefined
+	return error.issues.slice(0, maxPublicIssues)
 }
 
 /**
@@ -130,65 +135,68 @@ export function sentIssues(error: ApiError): readonly ApiErrorIssue[] | undefine
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#revocación-durante-una-petición
  */
 export class SessionRevokedError extends ApiError {
-  constructor() {
-    super("SESSION_REVOKED", 401, "Session revoked");
-    this.name = "SessionRevokedError";
-  }
+	constructor() {
+		super('SESSION_REVOKED', 401, 'Session revoked')
+		this.name = 'SessionRevokedError'
+	}
 }
 
 /** At most this many schema issues reach the client. */
-export const maxPublicIssues = 20;
+export const maxPublicIssues = 20
 
 /** Invalid input: a `400` whose schema messages reach the client as `issues`. */
 export class InvalidInputError extends ApiError {
-  constructor(code: string, issues: readonly ApiErrorIssue[]) {
-    super(code, 400, { issues });
-  }
+	constructor(code: string, issues: readonly ApiErrorIssue[]) {
+		super(code, 400, { issues })
+	}
 }
 
 export function issuePath(path: unknown): string {
-  if (!Array.isArray(path)) return "";
-  return path.map((segment: unknown) => {
-    const key = segment !== null && typeof segment === "object" && "key" in segment ? (segment as { key: unknown }).key : segment;
-    return typeof key === "symbol" ? key.description ?? "" : String(key);
-  }).join(".");
+	if (!Array.isArray(path)) return ''
+	return path
+		.map((segment: unknown) => {
+			const key = segment !== null && typeof segment === 'object' && 'key' in segment ? (segment as { key: unknown }).key : segment
+			return typeof key === 'symbol' ? (key.description ?? '') : String(key)
+		})
+		.join('.')
 }
 
 /** Only each issue's path keys and schema message are public; inputs and expectations are not. */
 export function publicIssues(issues: readonly unknown[]): { path: string; message: string }[] {
-  const result: { path: string; message: string }[] = [];
-  for (const issue of issues) {
-    if (result.length >= maxPublicIssues) break;
-    if (issue === null || typeof issue !== "object") continue;
-    const { message, path } = issue as { message?: unknown; path?: unknown };
-    if (typeof message === "string" && message) result.push({ path: issuePath(path), message });
-  }
-  return result;
+	const result: { path: string; message: string }[] = []
+	for (const issue of issues) {
+		if (result.length >= maxPublicIssues) break
+		if (issue === null || typeof issue !== 'object') continue
+		const { message, path } = issue as { message?: unknown; path?: unknown }
+		if (typeof message === 'string' && message) result.push({ path: issuePath(path), message })
+	}
+	return result
 }
 
 /** Preserve public errors loaded through separate Vite module graphs; hide all others. */
 export function normalizeServerError(error: unknown): ApiError {
-  if (error instanceof SessionSecurityError) return new ApiError(error.code, 403);
-  if (error instanceof Error && (error.name === "SessionSecurityError" || error.constructor.name === "SessionSecurityError")) {
-    const code = (error as Error & { code?: unknown }).code;
-    if (code === "INVALID_ORIGIN" || code === "INVALID_CSRF") return new ApiError(code, 403);
-  }
-  if (error instanceof Error && (error instanceof ApiError || error.name === "ApiError" || error.constructor.name === "ApiError" || error.name === "SessionRevokedError")) {
-    const candidate = error as Error & { code?: unknown; status?: unknown };
-    if (typeof candidate.code === "string" && candidate.code.length > 0
-      && typeof candidate.status === "number" && Number.isInteger(candidate.status)
-      && candidate.status >= 400 && candidate.status <= 599) {
-      if (error instanceof ApiError) return error;
-      // An ApiError of another module graph keeps its public issues, checked again here. Another
-      // error with its name (an SDK's, or a service's issues) keeps only its code and status.
-      const own = (candidate as unknown as Record<symbol, unknown>)[apiErrorMark] === true;
-      let issues: readonly ApiErrorIssue[] | undefined;
-      try { issues = !own || (candidate as { issues?: unknown }).issues === undefined ? undefined : checkedIssues((candidate as { issues?: unknown }).issues); }
-      catch { issues = undefined; }
-      return new ApiError(candidate.code, candidate.status, issues ? { issues } : candidate.code);
-    }
-  }
-  return new ApiError("INTERNAL_ERROR", 500);
+	if (error instanceof SessionSecurityError) return new ApiError(error.code, 403)
+	if (error instanceof Error && (error.name === 'SessionSecurityError' || error.constructor.name === 'SessionSecurityError')) {
+		const code = (error as Error & { code?: unknown }).code
+		if (code === 'INVALID_ORIGIN' || code === 'INVALID_CSRF') return new ApiError(code, 403)
+	}
+	if (error instanceof Error && (error instanceof ApiError || error.name === 'ApiError' || error.constructor.name === 'ApiError' || error.name === 'SessionRevokedError')) {
+		const candidate = error as Error & { code?: unknown; status?: unknown }
+		if (typeof candidate.code === 'string' && candidate.code.length > 0 && typeof candidate.status === 'number' && Number.isInteger(candidate.status) && candidate.status >= 400 && candidate.status <= 599) {
+			if (error instanceof ApiError) return error
+			// An ApiError of another module graph keeps its public issues, checked again here. Another
+			// error with its name (an SDK's, or a service's issues) keeps only its code and status.
+			const own = (candidate as unknown as Record<symbol, unknown>)[apiErrorMark] === true
+			let issues: readonly ApiErrorIssue[] | undefined
+			try {
+				issues = !own || (candidate as { issues?: unknown }).issues === undefined ? undefined : checkedIssues((candidate as { issues?: unknown }).issues)
+			} catch {
+				issues = undefined
+			}
+			return new ApiError(candidate.code, candidate.status, issues ? { issues } : candidate.code)
+		}
+	}
+	return new ApiError('INTERNAL_ERROR', 500)
 }
 
 /**
@@ -208,14 +216,14 @@ export function normalizeServerError(error: unknown): ApiError {
  * ```
  */
 export interface ServerErrorInfo {
-  /** `"unhandledRejection"`: una promesa rechazada sin manejar; `"uncaughtException"`: una excepción no capturada. */
-  readonly kind: "unhandledRejection" | "uncaughtException";
-  /**
-   * `true` si el fallo se produjo dentro del trabajo asíncrono de una petición y `requestId` es el
-   * de esa petición; `false` si el ID es nuevo. Depende de que el runtime conserve el contexto
-   * asíncrono hasta el evento (véase la documentación de errores).
-   */
-  readonly inRequest: boolean;
+	/** `"unhandledRejection"`: una promesa rechazada sin manejar; `"uncaughtException"`: una excepción no capturada. */
+	readonly kind: 'unhandledRejection' | 'uncaughtException'
+	/**
+	 * `true` si el fallo se produjo dentro del trabajo asíncrono de una petición y `requestId` es el
+	 * de esa petición; `false` si el ID es nuevo. Depende de que el runtime conserve el contexto
+	 * asíncrono hasta el evento (véase la documentación de errores).
+	 */
+	readonly inRequest: boolean
 }
 
 /**
@@ -233,31 +241,36 @@ export interface ServerErrorInfo {
  * };
  * ```
  */
-export type ServerErrorObserver = (error: unknown, requestId: string, info?: ServerErrorInfo) => void;
+export type ServerErrorObserver = (error: unknown, requestId: string, info?: ServerErrorInfo) => void
 
 function reportObserverFailure(error: unknown, observerError: unknown, requestId?: string): void {
-  try {
-    const label = requestId ? `Meeko server error observer failed (${requestId})` : "Meeko server error observer failed";
-    // Error messages and custom properties may contain private server data.
-    console.error(label, { original: error instanceof Error ? "Error" : typeof error, observer: observerError instanceof Error ? "Error" : typeof observerError });
-  } catch { /* The fallback logger cannot change the original response. */ }
+	try {
+		const label = requestId ? `Meeko server error observer failed (${requestId})` : 'Meeko server error observer failed'
+		// Error messages and custom properties may contain private server data.
+		console.error(label, { original: error instanceof Error ? 'Error' : typeof error, observer: observerError instanceof Error ? 'Error' : typeof observerError })
+	} catch {
+		/* The fallback logger cannot change the original response. */
+	}
 }
 
 /** Observer failures cannot replace a response or escape as unhandled rejections. */
 export function observeErrorCallback(error: unknown, observer?: (error: unknown) => void, requestId?: string): void {
-  try { void Promise.resolve(observer?.(error)).catch((observerError: unknown) => reportObserverFailure(error, observerError, requestId)); }
-  catch (observerError) { reportObserverFailure(error, observerError, requestId); }
+	try {
+		void Promise.resolve(observer?.(error)).catch((observerError: unknown) => reportObserverFailure(error, observerError, requestId))
+	} catch (observerError) {
+		reportObserverFailure(error, observerError, requestId)
+	}
 }
 
 /** Apply the same isolation to observers that also receive a request ID. */
 export function observeServerError(error: unknown, requestId: string, observer?: ServerErrorObserver, info?: ServerErrorInfo): void {
-  observeErrorCallback(error, observer ? (failure) => info ? observer(failure, requestId, info) : observer(failure, requestId) : undefined, requestId);
+	observeErrorCallback(error, observer ? (failure) => (info ? observer(failure, requestId, info) : observer(failure, requestId)) : undefined, requestId)
 }
 
 /** Surface internal failures to the host while keeping observers out of the response path. */
 export function reportServerError(error: unknown, requestId: string, observer?: ServerErrorObserver): void {
-  if (normalizeServerError(error).status < 500) return;
-  observeServerError(error, requestId, observer);
+	if (normalizeServerError(error).status < 500) return
+	observeServerError(error, requestId, observer)
 }
 
 /**
@@ -277,6 +290,8 @@ export function reportServerError(error: unknown, requestId: string, observer?: 
  * ```
  */
 export class SessionSecurityError extends Error {
-  /** @param code `INVALID_ORIGIN` o `INVALID_CSRF`. */
-  constructor(public readonly code: "INVALID_ORIGIN" | "INVALID_CSRF") { super(code); }
+	/** @param code `INVALID_ORIGIN` o `INVALID_CSRF`. */
+	constructor(public readonly code: 'INVALID_ORIGIN' | 'INVALID_CSRF') {
+		super(code)
+	}
 }

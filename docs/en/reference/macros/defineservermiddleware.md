@@ -14,7 +14,7 @@ related:
   - "@meekojs/meeko/server#contentSecurityPolicy"
   - docs/framework.md#middleware-de-servidor
   - docs/framework.md#ip-del-cliente-tras-un-proxy
-source-hash: dd56762ab051b0c8b8079b2e001f34afeda81b694fd94898ea5ca06fdc8c564b
+source-hash: 45bd0dd924bdb1f9fc4e28059e8acde91104c2610c393f85b614e7d7c1a9288e
 ---
 
 `defineServerMiddleware` declares the middleware exported by default from a `server/middleware/` file. It receives the `Request` and `next(request?)`, and returns a `Response`: it can continue, modify the rest of the chain's response or short-circuit with its own.

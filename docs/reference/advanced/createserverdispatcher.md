@@ -50,33 +50,34 @@ console.log(response.status, await response.json()); // 200 [ { id: '1' } ]
 
 ## Opciones
 
-| Opción | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `manifest` | `ServerManifest` | obligatorio | Los endpoints (`api`), procedimientos (`rpc`) y canales (`socket`), como los escribe `discoverServerManifest`. |
-| `sessions` | `SessionManager` | obligatorio | El gestor de sesiones: carga la sesión de cada petición y comprueba Origin y CSRF. |
-| `services` | `S` o `(request) => S` | obligatorio | Los servicios de `context.services`, compartidos o creados por petición. |
-| `load` | `(file) => Promise<unknown>` | obligatorio | Devuelve el módulo de cada archivo del manifiesto; su `default` es la definición. Sin él, `TypeError: Server dispatch requires a module loader`. |
-| `platform` | `ServerPlatform` | `{ name: "node", env: {} }` | Lo que ven los handlers en `context.platform`. |
-| `onError` | `(error, requestId) => void` | consola | Fallos internos; el cliente sólo recibe `{ code, status, requestId }`. |
+| Opción     | Tipo                         | Por defecto                 | Descripción                                                                                                                                      |
+| ---------- | ---------------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `manifest` | `ServerManifest`             | obligatorio                 | Los endpoints (`api`), procedimientos (`rpc`) y canales (`socket`), como los escribe `discoverServerManifest`.                                   |
+| `sessions` | `SessionManager`             | obligatorio                 | El gestor de sesiones: carga la sesión de cada petición y comprueba Origin y CSRF.                                                               |
+| `services` | `S` o `(request) => S`       | obligatorio                 | Los servicios de `context.services`, compartidos o creados por petición.                                                                         |
+| `load`     | `(file) => Promise<unknown>` | obligatorio                 | Devuelve el módulo de cada archivo del manifiesto; su `default` es la definición. Sin él, `TypeError: Server dispatch requires a module loader`. |
+| `platform` | `ServerPlatform`             | `{ name: "node", env: {} }` | Lo que ven los handlers en `context.platform`.                                                                                                   |
+| `onError`  | `(error, requestId) => void` | consola                     | Fallos internos; el cliente sólo recibe `{ code, status, requestId }`.                                                                           |
 
 ## Valor devuelto
 
 `(request: Request) => Promise<Response>`, que nunca rechaza:
 
-| Petición | Respuesta |
-| --- | --- |
-| Un endpoint y método que existen | La respuesta del handler, validada contra `response`. |
-| Un endpoint con otro método | `405` `{"code":"METHOD_NOT_ALLOWED",…}` con `Allow` y los métodos de esa ruta. |
+| Petición                                              | Respuesta                                                                                    |
+| ----------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Un endpoint y método que existen                      | La respuesta del handler, validada contra `response`.                                        |
+| Un endpoint con otro método                           | `405` `{"code":"METHOD_NOT_ALLOWED",…}` con `Allow` y los métodos de esa ruta.               |
 | Un procedimiento RPC con un método distinto de `POST` | `405` `{"code":"METHOD_NOT_ALLOWED",…}` con `Allow: POST` (desde `1.7`; antes, sin `Allow`). |
-| Cualquier otra ruta | `404` `{"code":"NOT_FOUND","status":404,"requestId":"…"}`. |
-| Un `ApiError` del handler | Su estado y su código, con `issues` si los tiene. |
-| Cualquier otro error | `500` `INTERNAL_ERROR`, y el error a `onError`. |
+| Cualquier otra ruta                                   | `404` `{"code":"NOT_FOUND","status":404,"requestId":"…"}`.                                   |
+| Un `ApiError` del handler                             | Su estado y su código, con `issues` si los tiene.                                            |
+| Cualquier otro error                                  | `500` `INTERNAL_ERROR`, y el error a `onError`.                                              |
 
 ## Ejemplos
 
 ### Dentro de un servidor de Node existente
 
 <!-- no-check -->
+
 ```ts
 import { createServer } from "node:http";
 import { toNodeListener } from "@meekojs/meeko/node";
@@ -124,6 +125,7 @@ createServerDispatcher({ manifest, sessions, services: {} });
 `TypeError: Server dispatch requires a module loader`. El despachador nunca importa archivos por su cuenta: así no puede cargar algo que el manifiesto no declara.
 
 <!-- no-check -->
+
 ```ts good
 createServerDispatcher({ manifest, sessions, services: {}, load: (file) => import(pathToFileURL(file).href) });
 ```
@@ -137,6 +139,7 @@ await dispatch(new Request("http://localhost/_meeko/rpc/math/sum"));
 `405` `{"code":"METHOD_NOT_ALLOWED","status":405,…}` con `Allow: POST`: un procedimiento RPC sólo acepta `POST` con JSON. Hasta `1.6`, la respuesta no llevaba `Allow`, aunque el JSDoc lo prometía.
 
 <!-- no-check -->
+
 ```ts good
 await dispatch(new Request("http://localhost/_meeko/rpc/math/sum", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }));
 ```
@@ -150,6 +153,7 @@ new SessionManager({ store: new MemorySessionStore(), production: true });
 `Persistent session storage with atomic rotation and family revocation is required in production`. En producción, las sesiones deben sobrevivir a un reinicio y compartirse entre instancias.
 
 <!-- no-check -->
+
 ```ts good
 new SessionManager({ store: new RedisSessionStore(redis, { prefix: "tienda:prod:session:" }), production: true });
 ```

@@ -25,6 +25,7 @@ Desde `1.7`, el tipo de `services` se infiere de este archivo: `context.services
 ## Uso
 
 <!-- no-check -->
+
 ```ts
 // server/runtime.ts
 import { defineServerRuntime, SessionManager } from "@meekojs/meeko/server";
@@ -49,21 +50,21 @@ export default defineServerRuntime(async ({ env, production, prerendering }) => 
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
+| Parámetro | Tipo                                                   | Por defecto | Descripción                                                                                                                                                                                                                                                                                    |
+| --------- | ------------------------------------------------------ | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `factory` | `(context) => ServerRuntime \| Promise<ServerRuntime>` | obligatorio | Crea los recursos. Recibe `env` (las variables de entorno), `production`, `platform` (`{ name, env, waitUntil }`) `prerendering`, `true` cuando `meeko build` prerenderiza sin tráfico de clientes, y, desde `1.8`, `root`, la ruta absoluta de la raíz del proyecto (`undefined` en Workers). |
 
 Lo que devuelve la fábrica:
 
-| Campo | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `sessions` | `SessionManager` | en memoria en desarrollo, Redis con `MEEKO_REDIS_URL` en producción | Desde `1.2`, opcional. Las sesiones de la aplicación. Unas explícitas siempre ganan. |
-| `services` | objeto, o `(request, { platform }) => objeto` | ninguno | Llegan a cada petición como `RequestContext.services`: un objeto compartido o una función por petición. |
-| `socket` | `{ allowedOrigins?, maxMessageBytes?, pubsub?, … }` | ninguno | Política de Socket: orígenes, límites y el broker de broadcast. |
-| `publicOrigin` | URL | la dirección del servidor | El origen público tras un proxy, para comprobar `Origin` en HTTP y Socket. `MEEKO_PUBLIC_ORIGIN` lo sustituye. |
-| `onError` | `(error, requestId, info?) => void` | registro mínimo | Los fallos internos, con su ID de petición; desde `1.3`, también los del proceso. |
-| `processErrors` | política | informar y, ante una excepción, cerrar | Desde `1.3`. Qué hacer con las promesas rechazadas y las excepciones del proceso. |
-| `close` | `() => void \| Promise<void>` | ninguno | Se ejecuta al detener el servidor, después de cerrar las sesiones. |
+| Campo           | Tipo                                                | Por defecto                                                         | Descripción                                                                                                    |
+| --------------- | --------------------------------------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `sessions`      | `SessionManager`                                    | en memoria en desarrollo, Redis con `MEEKO_REDIS_URL` en producción | Desde `1.2`, opcional. Las sesiones de la aplicación. Unas explícitas siempre ganan.                           |
+| `services`      | objeto, o `(request, { platform }) => objeto`       | ninguno                                                             | Llegan a cada petición como `RequestContext.services`: un objeto compartido o una función por petición.        |
+| `socket`        | `{ allowedOrigins?, maxMessageBytes?, pubsub?, … }` | ninguno                                                             | Política de Socket: orígenes, límites y el broker de broadcast.                                                |
+| `publicOrigin`  | URL                                                 | la dirección del servidor                                           | El origen público tras un proxy, para comprobar `Origin` en HTTP y Socket. `MEEKO_PUBLIC_ORIGIN` lo sustituye. |
+| `onError`       | `(error, requestId, info?) => void`                 | registro mínimo                                                     | Los fallos internos, con su ID de petición; desde `1.3`, también los del proceso.                              |
+| `processErrors` | política                                            | informar y, ante una excepción, cerrar                              | Desde `1.3`. Qué hacer con las promesas rechazadas y las excepciones del proceso.                              |
+| `close`         | `() => void \| Promise<void>`                       | ninguno                                                             | Se ejecuta al detener el servidor, después de cerrar las sesiones.                                             |
 
 ## Valor devuelto
 
@@ -76,6 +77,7 @@ La misma fábrica, para exportarla por defecto. Sin función lanza `TypeError: d
 Una función crea los servicios de cada petición, con la plataforma (por ejemplo, las variables de un Worker):
 
 <!-- no-check -->
+
 ```ts
 // server/runtime.ts
 import { defineServerRuntime } from "@meekojs/meeko/server";
@@ -93,6 +95,7 @@ export default defineServerRuntime(async ({ env }) => {
 ### Sesiones en Redis y Socket entre instancias
 
 <!-- no-check -->
+
 ```ts
 // server/runtime.ts
 import { defineServerRuntime, RedisSessionStore, RedisSocketPubSub, SessionManager } from "@meekojs/meeko/server";
@@ -133,6 +136,7 @@ Véase [Runtime de servidor](../../framework.md#runtime-de-servidor).
 ### Un servicio que usa una página
 
 <!-- no-check -->
+
 ```html
 <!-- app/pages/users/[id].meeko -->
 <script server lang="ts">
@@ -158,6 +162,7 @@ const cache = context.services as { cache: Map<string, string> };
 `meeko check` da `TS2352: Conversion of type '{ db: …; region: string; }' to type '{ cache: Map<string, string>; }' may be a mistake because neither type sufficiently overlaps with the other.` Quita la conversión y lee los servicios tal cual.
 
 <!-- no-check -->
+
 ```ts good
 const user = await context.services.db.users.find(params.id);
 ```
@@ -171,6 +176,7 @@ export default defineServerRuntime(() => ({ services: { currentUser: null as str
 ```
 
 <!-- no-check -->
+
 ```ts good
 export default defineServerRuntime(() => ({
   services: (request) => ({ locale: request.headers.get("accept-language") ?? "es" }),
@@ -188,6 +194,7 @@ export default defineServerRuntime({ services: {} });
 `defineServerRuntime` lanza al cargar el módulo `TypeError: defineServerRuntime requires a factory function`.
 
 <!-- no-check -->
+
 ```ts good
 export default defineServerRuntime(() => ({ services: {} }));
 ```

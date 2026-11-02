@@ -1,1 +1,1 @@
-exports.run = () => require("./host-virtual.cjs").run();
+exports.run = () => require('./host-virtual.cjs').run()

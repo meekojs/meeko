@@ -19,6 +19,7 @@ Sirve a un Worker propio que necesita hablar con una sala concreta: inspeccionar
 ## Uso
 
 <!-- no-check -->
+
 ```ts
 import { socketRoomName } from "@meekojs/meeko/cloudflare";
 
@@ -27,10 +28,10 @@ const stub = env.MEEKO_SOCKET.get(env.MEEKO_SOCKET.idFromName(socketRoomName("ch
 
 ## Parámetros
 
-| Parámetro | Tipo | Descripción |
-| --- | --- | --- |
-| `channel` | `string` | El canal, el nombre del archivo de `server/socket/`. |
-| `room` | `string` | La sala de `?room=`; las conexiones sin sala usan `""`. |
+| Parámetro | Tipo     | Descripción                                             |
+| --------- | -------- | ------------------------------------------------------- |
+| `channel` | `string` | El canal, el nombre del archivo de `server/socket/`.    |
+| `room`    | `string` | La sala de `?room=`; las conexiones sin sala usan `""`. |
 
 ## Valor devuelto
 
@@ -50,6 +51,7 @@ console.log(JSON.stringify(socketRoomName("operations", "")));  // "operations\u
 ### Publicar en una sala desde un Cron Trigger
 
 <!-- no-check -->
+
 ```ts
 // worker.ts: un evento programado que no es una petición HTTP.
 import { DurableObjectSocketPubSub } from "@meekojs/meeko/cloudflare";
@@ -76,6 +78,7 @@ env.MEEKO_SOCKET.idFromName(`${channel}:${room}`);
 No hay error, pero es otro objeto: vacío, sin los peers de la sala. Las publicaciones no llegan a nadie.
 
 <!-- no-check -->
+
 ```ts good
 env.MEEKO_SOCKET.idFromName(socketRoomName(channel, room));
 ```

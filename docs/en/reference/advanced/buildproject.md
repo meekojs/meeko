@@ -15,7 +15,7 @@ related:
   - "@meekojs/meeko/framework#defineMeekoModule"
   - docs/framework.md#build-despliegue-y-verificación
   - docs/framework.md#hooks
-source-hash: 36c6ebdcac534d462c1d7a575f88acbe3e0e12348a2b18890e87292134c7b730
+source-hash: 993f9f2996d068db1f28da1735152f1be203984bd1c6381a09142607f19b5b61
 ---
 
 `buildProject` is [`meeko build`](/en/docs/reference/meeko-build) as a function: it compiles the client with Vite, the adapter's server and prerendered pages, writes `sitemap.xml` and `robots.txt` if enabled and returns `{ adapter, output }`. The adapter comes from `options.adapter`, `server.adapter` in `meeko.config.ts` or, by default, `node`.

@@ -10,7 +10,7 @@ related:
   - "config:layers"
   - docs/framework.md#autoimports-y-typescript
   - docs/framework.md#configuración
-source-hash: 557fb001be086425e51acff1d6d7e96e1143839396642982cf49167e3c4afc8d
+source-hash: 96ea7cbdda165615e1fbd77b464648f81c897814b3e51df9ce8730eb628d9bfc
 ---
 
 `imports` adds folders whose exports are auto-imported, in addition to the defaults (`app/components`, `app/composables`, `app/utils`, `app/stores`, `app/types`, `shared/{types,schemas,utils,constants,enums}` and `server/utils`). Each option only accepts folders within its root, and each folder inherits that root's scope, so a `server/` service never reaches a component.

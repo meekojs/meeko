@@ -25,4 +25,33 @@
 </script>
 
 <!-- No whitespace between the tags of this template: it would be text inside the button and the content. Prettier keeps it that way; tests/templates-without-whitespace.test.mjs guards it. -->
-<template><button if:when="!snippets.anchor && snippets.trigger" type="button" data-meeko-popover-trigger bind:id="popover.trigger.value.id" bind:class="props.triggerClass" bind:popovertarget="popover.trigger.value.popovertarget" bind:aria-controls="popover.trigger.value['aria-controls']" bind:aria-expanded="popover.trigger.value['aria-expanded']" bind:aria-haspopup="popover.trigger.value['aria-haspopup']" bind:aria-describedby="popover.trigger.value['aria-describedby']"><render snippet="snippets.trigger" /></button><render if:when="snippets.anchor" snippet="snippets.anchor" args="popover.trigger.value" /><div ref:content data-meeko-popover bind:id="popover.contentId" bind:popover="popover.mode.value" bind:role="popover.role.value" bind:aria-label="props.label" bind:aria-labelledby="popover.labelledBy.value" bind:tabindex="popover.role.value === 'dialog' ? '-1' : undefined" bind:class="props.class" bind:data-placement="popover.placement.value" bind:data-match-width="props.matchWidth ? '' : undefined"><render snippet="snippets.default" /></div></template>
+<template><button
+		if:when="!snippets.anchor && snippets.trigger"
+		type="button"
+		data-meeko-popover-trigger
+		bind:id="popover.trigger.value.id"
+		bind:class="props.triggerClass"
+		bind:popovertarget="popover.trigger.value.popovertarget"
+		bind:aria-controls="popover.trigger.value['aria-controls']"
+		bind:aria-expanded="popover.trigger.value['aria-expanded']"
+		bind:aria-haspopup="popover.trigger.value['aria-haspopup']"
+		bind:aria-describedby="popover.trigger.value['aria-describedby']"
+		><render snippet="snippets.trigger" /></button
+	><render
+		if:when="snippets.anchor"
+		snippet="snippets.anchor"
+		args="popover.trigger.value"
+	/><div
+		ref:content
+		data-meeko-popover
+		bind:id="popover.contentId"
+		bind:popover="popover.mode.value"
+		bind:role="popover.role.value"
+		bind:aria-label="props.label"
+		bind:aria-labelledby="popover.labelledBy.value"
+		bind:tabindex="popover.role.value === 'dialog' ? '-1' : undefined"
+		bind:class="props.class"
+		bind:data-placement="popover.placement.value"
+		bind:data-match-width="props.matchWidth ? '' : undefined"
+		><render snippet="snippets.default"
+	/></div></template>

@@ -13,7 +13,7 @@ related:
   - docs/api.md#html-sin-escapar-con-html
   - docs/api.md#html-de-confianza-trustedhtml-y-trusthtml
   - "@meekojs/meeko/framework#documentHtml"
-source-hash: 08c97b4a03ec785a5303c5bc2dbc0b35f6bc9c4a43ad4347a5293ce33c20d7be
+source-hash: a81888ec8f71b92621c3ef251b5c1bd3646c4cc66d071945bae3759b21bc1421
 ---
 
 `html="expresión"` fills an element with the expression's HTML, **without escaping**: use it to render processed Markdown, code highlighter output or an SVG icon. The expression is a `string`; `null` and `undefined` leave the element empty.

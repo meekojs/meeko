@@ -13,7 +13,7 @@ related:
   - "@meekojs/meeko#createRoot"
   - "@meekojs/meeko/framework#useState"
   - docs/api.md#ciclo-de-vida
-source-hash: 7d76a40e227c2d4537a2038ed527a061fce490d171d0f537213e482df7eb1aea
+source-hash: 1f990aac561cacd6235f894cf3b46feb88c2f3778332e92b7413cb9251277e9b
 ---
 
 `createContext<T>(description?)` creates the key a component uses to provide a value ([`provide`](/en/docs/reference/provide)) and its descendants use to read it ([`inject`](/en/docs/reference/inject)). The key is a new `Symbol`, so two contexts never collide even with the same description, and it carries the value's type `T`: `inject(clave)` returns `T` without conversions.

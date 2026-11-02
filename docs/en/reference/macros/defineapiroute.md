@@ -21,7 +21,7 @@ related:
   - docs/framework.md#estado-de-la-respuesta-status
   - docs/framework.md#valores-por-petición-locals
   - docs/framework.md#origin-en-mutaciones-anónimas
-source-hash: 91be95820c94c7ff7317c32fd73fbc7803a619b89e11bffca5e17f67b628c55d
+source-hash: 2b8be9928374d20f3e739aa98dcf5377d1f968fcc97cff52a3bba2d6207f9685
 ---
 
 `defineApiRoute` declares an HTTP endpoint: the default export of `server/api/<ruta>.<método>.ts`. `server/api/users/[id].get.ts` handles `GET /api/users/:id`. The server validates input with schemas (`params`, `query`, `body`), the session, authorization, `Origin` and CSRF token, runs the handler and validates its result with `response`.

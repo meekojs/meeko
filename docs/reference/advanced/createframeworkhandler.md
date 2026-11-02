@@ -44,33 +44,33 @@ console.log(response.status, response.headers.get("content-type")); // 200 text/
 
 ## Opciones
 
-| Opción | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `routes` | `RouteRecord[]` | obligatorio | El manifiesto de rutas, el mismo que recibe `mountClientApp`. |
-| `loadPage` | `(file) => Promise<PageModule>` | obligatorio | Carga el módulo compilado de una página, un layout o una página de error por su archivo. |
-| `loadRoute` | `(file) => Promise<PageRoute>` | ninguno | Carga las opciones de ruta (`definePage`) de un sidecar o de un `<script server>`. |
-| `errorPage` | `ErrorPageRecord` | ninguno | Desde `1.1`. `app/error.meeko` y sus layouts: una URL sin ruta se renderiza con estado `404`, y una ruta sin `+error.meeko` que falla la usa. |
-| `loadMiddleware` | `() => Promise<RouteMiddleware[]>` | ninguno | Middleware de ruta global, antes del loader en todas las rutas. |
-| `loadNamedMiddleware` | `(file) => Promise<RouteMiddleware>` | ninguno | Desde `1.6`. Middleware con nombre de `RouteRecord.middleware`. Una ruta que lo declara y no tiene cargador falla. |
-| `loadServerMiddleware` | `(file) => Promise<ServerRouteMiddleware>` | ninguno | Desde `1.6`. Middleware de ruta de servidor de `RouteRecord.serverMiddleware`. Igual: sin cargador, la ruta falla. |
-| `createContext` | `(request) => RequestContext` | ninguno | Contexto de cada petición (sesión, servicios, plataforma) para `usePage().context` y los loaders. |
-| `serverFetch` | `ServerFetch` | ninguno | Despachador local de las llamadas `api.*` y `rpc.*` durante el SSR, como `createLocalServerFetch`. |
-| `clientEntry` | URL | ninguna | Entrada del cliente que enlaza el documento. Sin ella, la página no hidrata. |
-| `document` | `DocumentOptions` | ninguno | HTML de confianza para `<head>` y `</body>`, el nonce y el `document` de la configuración. |
-| `plugins` | `PluginRegistration[]` | ninguno | Desde `1.2`. Plugins de aplicación, una vez por petición de página antes del render. |
-| `onError` | `(error, requestId) => void` | consola | Fallos internos de las páginas; nunca llegan al navegador. |
+| Opción                 | Tipo                                       | Por defecto | Descripción                                                                                                                                   |
+| ---------------------- | ------------------------------------------ | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `routes`               | `RouteRecord[]`                            | obligatorio | El manifiesto de rutas, el mismo que recibe `mountClientApp`.                                                                                 |
+| `loadPage`             | `(file) => Promise<PageModule>`            | obligatorio | Carga el módulo compilado de una página, un layout o una página de error por su archivo.                                                      |
+| `loadRoute`            | `(file) => Promise<PageRoute>`             | ninguno     | Carga las opciones de ruta (`definePage`) de un sidecar o de un `<script server>`.                                                            |
+| `errorPage`            | `ErrorPageRecord`                          | ninguno     | Desde `1.1`. `app/error.meeko` y sus layouts: una URL sin ruta se renderiza con estado `404`, y una ruta sin `+error.meeko` que falla la usa. |
+| `loadMiddleware`       | `() => Promise<RouteMiddleware[]>`         | ninguno     | Middleware de ruta global, antes del loader en todas las rutas.                                                                               |
+| `loadNamedMiddleware`  | `(file) => Promise<RouteMiddleware>`       | ninguno     | Desde `1.6`. Middleware con nombre de `RouteRecord.middleware`. Una ruta que lo declara y no tiene cargador falla.                            |
+| `loadServerMiddleware` | `(file) => Promise<ServerRouteMiddleware>` | ninguno     | Desde `1.6`. Middleware de ruta de servidor de `RouteRecord.serverMiddleware`. Igual: sin cargador, la ruta falla.                            |
+| `createContext`        | `(request) => RequestContext`              | ninguno     | Contexto de cada petición (sesión, servicios, plataforma) para `usePage().context` y los loaders.                                             |
+| `serverFetch`          | `ServerFetch`                              | ninguno     | Despachador local de las llamadas `api.*` y `rpc.*` durante el SSR, como `createLocalServerFetch`.                                            |
+| `clientEntry`          | URL                                        | ninguna     | Entrada del cliente que enlaza el documento. Sin ella, la página no hidrata.                                                                  |
+| `document`             | `DocumentOptions`                          | ninguno     | HTML de confianza para `<head>` y `</body>`, el nonce y el `document` de la configuración.                                                    |
+| `plugins`              | `PluginRegistration[]`                     | ninguno     | Desde `1.2`. Plugins de aplicación, una vez por petición de página antes del render.                                                          |
+| `onError`              | `(error, requestId) => void`               | consola     | Fallos internos de las páginas; nunca llegan al navegador.                                                                                    |
 
 ## Valor devuelto
 
 `(request: Request) => Promise<Response>`. Según la petición y la ruta:
 
-| Petición | Respuesta |
-| --- | --- |
-| `Accept: text/html` a una ruta | `200` con el documento: `<head>`, `#app` con el HTML y `#meeko-payload` con el JSON de hidratación. |
-| `Accept: application/meeko+json` a una ruta | `200` con el payload de navegación en `application/meeko+json` (con `"stream"`, un stream NDJSON). |
-| Una URL sin ruta | `404 Not Found` en texto, o la página de `errorPage` con estado `404` si se pasó. |
-| `params` o `search` inválidos | `400`, antes del loader. |
-| Un loader que lanza `ApiError`, `notFound()` o `redirect()` | La página de error más cercana con su estado, o la redirección. |
+| Petición                                                    | Respuesta                                                                                           |
+| ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `Accept: text/html` a una ruta                              | `200` con el documento: `<head>`, `#app` con el HTML y `#meeko-payload` con el JSON de hidratación. |
+| `Accept: application/meeko+json` a una ruta                 | `200` con el payload de navegación en `application/meeko+json` (con `"stream"`, un stream NDJSON).  |
+| Una URL sin ruta                                            | `404 Not Found` en texto, o la página de `errorPage` con estado `404` si se pasó.                   |
+| `params` o `search` inválidos                               | `400`, antes del loader.                                                                            |
+| Un loader que lanza `ApiError`, `notFound()` o `redirect()` | La página de error más cercana con su estado, o la redirección.                                     |
 
 ## Ejemplos
 
@@ -98,6 +98,7 @@ console.log(data.headers.get("content-type")); // application/meeko+json; charse
 ### Con sesión y servicios
 
 <!-- no-check -->
+
 ```ts
 import { createFrameworkHandler, createLocalServerFetch, createRequestContext } from "@meekojs/meeko/server";
 
@@ -122,6 +123,7 @@ createFrameworkHandler({ routes, loadPage });   // una ruta declara middleware: 
 La petición a esa ruta falla en lugar de saltarse el middleware, porque un middleware que protege una ruta nunca se ignora en silencio: responde `500 Internal Server Error` y `onError` recibe `Route / has named middleware (/app/middleware/auth.ts) but no loadNamedMiddleware to load it`.
 
 <!-- no-check -->
+
 ```ts good
 createFrameworkHandler({ routes, loadPage, loadNamedMiddleware: async (file) => (await import(file)).default });
 ```
@@ -135,6 +137,7 @@ const response = await handlePage(new Request("http://localhost/api/users"));
 `/api/users` no es una ruta de página: la respuesta es `404 Not Found`. La API y el RPC los atiende `createServerDispatcher` (o `createServerApp`, que lo combina todo).
 
 <!-- no-check -->
+
 ```ts good
 const url = new URL(request.url);
 const response = url.pathname.startsWith("/api/") || url.pathname.startsWith("/_meeko/rpc/") ? await dispatch(request) : await handlePage(request);
@@ -149,6 +152,7 @@ createFrameworkHandler({ routes, loadPage });
 El HTML se renderiza, pero el documento no enlaza ningún script: la página no hidrata y los enlaces hacen navegaciones completas.
 
 <!-- no-check -->
+
 ```ts good
 createFrameworkHandler({ routes, loadPage, clientEntry: "/assets/entry-client.js" });
 ```

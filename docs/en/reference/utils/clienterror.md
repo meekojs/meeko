@@ -15,7 +15,7 @@ related:
   - "@meekojs/meeko/framework#useForm"
   - docs/framework.md#errores-de-validación-en-formularios
   - docs/framework.md#errores
-source-hash: 84be13e1ea72df8a0cc57f5eef0256130dc57f929ca27da4066a5f7450c00caa
+source-hash: 6f1f3843008b81917aa23e3bbc7df26a0d21553d9bba11139e8e2604e838e02c
 ---
 
 `ClientError` is what the browser and server code receive when an `api.*`, `rpc.*`, `useApi`, `useRpcQuery`, `useApiMutation` or `useRpcMutation` call ends in an error response. It is the other side of `ApiError`: it carries the public `code` and `status`, the request's `requestId` and, if present, per-field `issues`. A Socket channel rejected due to session or authorization also delivers a `ClientError` (`401 UNAUTHENTICATED` or `403 FORBIDDEN`).

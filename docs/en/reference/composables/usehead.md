@@ -14,7 +14,7 @@ related:
   - "config:document"
   - docs/framework.md#head-del-documento-document-usehead-y-useseometa
   - docs/framework.md#canónica-y-open-graph-por-página
-source-hash: 63109dfdc6c972e8ced04e2cb6d0393da7b57a77ccbe1548a1ca2342506ccf59
+source-hash: d09b03d2768b8231bc6f831503fbfa4bb91c4e1a0fbeca8f8f1d9f4e39f0f4e2
 ---
 
 `useHead(input)` declares a component's contribution to `<head>`: the title, `<meta>`, `<link>`, `<script>` and `<style>` tags, and `<html>` and `<body>` attributes. Meeko combines entries from `document` in `meeko.config.ts`, `app/app.meeko`, layouts, the page and its components, and the route's `head` under one priority rule, and removes a component's entries when it unmounts.

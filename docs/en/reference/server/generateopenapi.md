@@ -13,7 +13,7 @@ related:
   - "@meekojs/meeko/build#discoverServerManifest"
   - docs/framework.md#api-y-rpc
   - docs/framework.md#build-despliegue-y-verificación
-source-hash: a82e7fcd5bff6ad8a980eb19e1070800fab2c71b5b1291d1908f2f57c82881ad
+source-hash: 380b0bd75b386ae161a3226b4e63d38220fab4ed6e201c6e56012e0ae82a8410
 ---
 
 `generateOpenApi(options)` traverses the server manifest, loads each `server/api` endpoint and `server/rpc` procedure, and writes an [OpenAPI 3.1](https://spec.openapis.org/oas/v3.1.0) document with their paths, parameters, bodies, responses and security. It only publishes schemas registered by the caller in `publicSchemas`: a contract using a schema outside the registry is an error, so no internal schema leaks accidentally.

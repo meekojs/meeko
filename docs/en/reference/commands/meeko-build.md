@@ -15,7 +15,7 @@ related:
   - docs/framework.md#build-despliegue-y-verificación
   - docs/framework.md#sitio-estático
   - docs/framework.md#csp-y-cabeceras-en-los-adaptadores-con-servidor
-source-hash: 1d8b29c3b97022463dbfe31636d6b04410045513fa704d079ebcb8bd7a608c54
+source-hash: 2e6fc28f3d312c53c40da777919cc6c86f75ffeb1492e8a7b8ebd1bcc7661473
 ---
 
 `meeko build` builds the application for production. First it does everything [`meeko check`](/en/docs/reference/meeko-check) does (and stops with the same errors); then it builds the client with Vite, the adapter's server and `render: "prerender"` pages, and writes a folder that runs without the application's sources: `.meeko/output/node/`, `bun/`, `deno/`, `cloudflare/` or `static/`.

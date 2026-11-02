@@ -14,7 +14,7 @@ related:
   - "@meekojs/meeko/framework#definePage"
   - docs/framework.md#cloudflare-workers
   - docs/framework.md#modos-de-render
-source-hash: 61012673873d34d2c8a8ab0044a86550edbfadd136cac932d30f6e4ca2edc2b3
+source-hash: 19ecab564ffd76d8c390872fd3f188a8f611be86e3115942a6f3bfc326d2d865
 ---
 
 `createCloudflarePrerenderSource({ binding, directory })` is the Workers `PrerenderSource`: when a request asks for a page with `render: "prerender"`, the application queries it by `pathname` and the source reads the HTML, CSRF meta insertion offset, `ETag`, navigation payload and, since `1.3` and `1.4`, script and style hashes from the assets binding. The index (`manifest.json`) and each page are read once per isolate.

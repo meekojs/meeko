@@ -12,7 +12,7 @@ related:
   - "cli:dev"
   - docs/devtools.md#panel-dentro-de-la-página
   - docs/framework.md#configuración
-source-hash: 72c20553d75896004050003d5d90384ed19652d43d86ac131187c6cd960cf44b
+source-hash: 134c0ba7190aee12da5b5efd9695925d372081c5516c04cc410d417e55891853
 ---
 
 `devtools` enables Meeko DevTools in `meeko dev`: with `true`, `meeko dev` mounts the panel inside the page in every document, without `import()` or `mountDevtoolsPanel()` in the application. This is the recommended approach since `1.8`, like `devtools: true` in Nuxt. The default is `false`: upgrading within `1.x` does not show the panel until you request it.

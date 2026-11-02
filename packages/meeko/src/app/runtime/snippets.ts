@@ -1,4 +1,4 @@
-import type { ReadonlySignal } from "../../core/reactivity";
+import type { ReadonlySignal } from '../../core/reactivity'
 /**
  * Runtime and types behind `defineSnippets<T>()`, `<snippet name params>` and
  * `<render snippet args>`.
@@ -7,11 +7,11 @@ import type { ReadonlySignal } from "../../core/reactivity";
  * places with `<render>`. Its content belongs to the parent: it reads the parent's scope, and its
  * bindings live in the parent's reactive root although its nodes sit in the child's DOM.
  */
-import type { DomScope } from "./renderer";
+import type { DomScope } from './renderer'
 
-import { currentEffectOwner } from "../../core/reactivity";
+import { currentEffectOwner } from '../../core/reactivity'
 
-declare const snippetArguments: unique symbol;
+declare const snippetArguments: unique symbol
 
 /**
  * Contenido de plantilla que un padre pasa a un hijo y que el hijo coloca con `<render>`. `Args`
@@ -33,18 +33,18 @@ declare const snippetArguments: unique symbol;
  * ```
  */
 export interface Snippet<Args extends readonly unknown[] = []> {
-  /** Sólo de tipo: los parámetros del snippet. */
-  readonly [snippetArguments]?: (...args: Args) => void;
+	/** Sólo de tipo: los parámetros del snippet. */
+	readonly [snippetArguments]?: (...args: Args) => void
 }
 
-const snippetData = Symbol("meeko.snippet");
+const snippetData = Symbol('meeko.snippet')
 
 /** What a compiled snippet carries at runtime. */
 export interface SnippetData {
-  readonly render: (...args: readonly unknown[]) => string;
-  readonly hydrate: ((args: ReadonlySignal<readonly unknown[]>, scope: DomScope) => () => void) | undefined;
-  /** Reactive root of the parent where the snippet was written. */
-  readonly owner: object | undefined;
+	readonly render: (...args: readonly unknown[]) => string
+	readonly hydrate: ((args: ReadonlySignal<readonly unknown[]>, scope: DomScope) => () => void) | undefined
+	/** Reactive root of the parent where the snippet was written. */
+	readonly owner: object | undefined
 }
 
 /**
@@ -53,17 +53,17 @@ export interface SnippetData {
  * nombre que el hijo no declara recibe `any[]` además de su propio error.
  */
 export function snippet<Args extends readonly unknown[] = any[]>(render: NoInfer<(...args: Args) => string>, hydrate?: NoInfer<(args: ReadonlySignal<Args>, scope: DomScope) => () => void>): Snippet<Args> {
-  const data: SnippetData = {
-    render: render as unknown as SnippetData["render"],
-    hydrate: hydrate as SnippetData["hydrate"],
-    owner: currentEffectOwner(),
-  };
-  return { [snippetData]: data } as unknown as Snippet<Args>;
+	const data: SnippetData = {
+		render: render as unknown as SnippetData['render'],
+		hydrate: hydrate as SnippetData['hydrate'],
+		owner: currentEffectOwner(),
+	}
+	return { [snippetData]: data } as unknown as Snippet<Args>
 }
 
 /** Runtime data of a snippet, or `undefined` for anything else. */
 export function snippetOf(value: unknown): SnippetData | undefined {
-  return typeof value === "object" && value !== null ? (value as { [snippetData]?: SnippetData })[snippetData] : undefined;
+	return typeof value === 'object' && value !== null ? (value as { [snippetData]?: SnippetData })[snippetData] : undefined
 }
 
-export type { SnippetArgs, SnippetMap, SnippetTypes } from "../definitions/define-snippets";
+export type { SnippetArgs, SnippetMap, SnippetTypes } from '../definitions/define-snippets'

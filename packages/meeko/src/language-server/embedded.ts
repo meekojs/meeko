@@ -1,30 +1,29 @@
-import type { Color, ColorInformation, ColorPresentation } from "vscode-css-languageservice";
-import type { IAttributeData, IHTMLDataProvider, IValueData } from "vscode-html-languageservice";
-import type { CompletionItem, CompletionList, Diagnostic, Hover, MarkupContent, Position, Range } from "vscode-languageserver/node";
+import type { Color, ColorInformation, ColorPresentation } from 'vscode-css-languageservice'
+import type { IAttributeData, IHTMLDataProvider, IValueData } from 'vscode-html-languageservice'
+import type { CompletionItem, CompletionList, Diagnostic, Hover, MarkupContent, Position, Range } from 'vscode-languageserver/node'
 
-import { getCSSLanguageService } from "vscode-css-languageservice";
-import { getDefaultHTMLDataProvider, getLanguageService as getHtmlLanguageService } from "vscode-html-languageservice";
-import { TextDocument } from "vscode-languageserver-textdocument";
-import { CompletionItemKind, CompletionItemTag, DiagnosticSeverity, DiagnosticTag, InsertTextFormat, MarkupKind } from "vscode-languageserver/node";
+import { getCSSLanguageService } from 'vscode-css-languageservice'
+import { getDefaultHTMLDataProvider, getLanguageService as getHtmlLanguageService } from 'vscode-html-languageservice'
+import { TextDocument } from 'vscode-languageserver-textdocument'
+import { CompletionItemKind, CompletionItemTag, DiagnosticSeverity, DiagnosticTag, InsertTextFormat, MarkupKind } from 'vscode-languageserver/node'
 
-import type { HtmlAttributeInfo } from "./html-data-source";
+import type { HtmlAttributeInfo } from './html-data-source'
 
-import { isCandidates } from "../compiler/transforms/dynamic-tag";
-import { elementAccepts } from "../shared/html-attributes";
-import { ariaRoles } from "../shared/html-data/aria";
-import { builtinTag } from "./builtin-tags";
-import { cssClassRules } from "./class-rules";
-import { attributeValueType, htmlAttributeSource } from "./html-data-source";
+import { isCandidates } from '../compiler/transforms/dynamic-tag'
+import { elementAccepts } from '../shared/html-attributes'
+import { ariaRoles } from '../shared/html-data/aria'
+import { builtinTag } from './builtin-tags'
+import { cssClassRules } from './class-rules'
+import { attributeValueType, htmlAttributeSource } from './html-data-source'
 
 // HTML of the template and CSS of `<style>`, outside the TypeScript model: what the editor offers
 // while writing markup and styles. Every function reads the text, so it works while a tag or a
 // rule is still being typed and the component does not compile.
 
-const htmlData = getDefaultHTMLDataProvider();
-const cssService = getCSSLanguageService();
+const htmlData = getDefaultHTMLDataProvider()
+const cssService = getCSSLanguageService()
 
-const markup = (description: string | MarkupContent | undefined): string | undefined =>
-  typeof description === "string" ? description : description?.value;
+const markup = (description: string | MarkupContent | undefined): string | undefined => (typeof description === 'string' ? description : description?.value)
 
 /**
  * The HTML data of the template's markup service, from {@link htmlAttributeSource}: the attribute
@@ -33,185 +32,200 @@ const markup = (description: string | MarkupContent | undefined): string | undef
  * standard's link and status otherwise. Tags stay those of VS Code's data.
  */
 const meekoHtmlData: IHTMLDataProvider = {
-  getId: () => "meeko",
-  isApplicable: () => true,
-  provideTags: () => htmlData.provideTags(),
-  provideAttributes(tag) {
-    const known = new Map(htmlData.provideAttributes(tag.toLowerCase()).map((attribute) => [attribute.name, attribute]));
-    return htmlAttributeSource().attributes(tag).map((info): IAttributeData => {
-      const mdn = known.get(info.name);
-      const status = [info.deprecated ? "**Obsoleto.**" : undefined, info.experimental ? "**Experimental.**" : undefined].filter(Boolean).join(" ");
-      const description = [status, markup(mdn?.description) ?? info.description, info.spec && `[Especificación](${info.spec})`].filter(Boolean).join("\n\n");
-      return {
-        name: info.name,
-        ...(description ? { description: { kind: MarkupKind.Markdown, value: description } } : {}),
-        ...(info.boolean ? { valueSet: "v" } : info.values?.length ? { valueSet: "meeko" } : {}),
-        ...(mdn?.references ? { references: mdn.references } : {}),
-        ...(mdn?.browsers ? { browsers: mdn.browsers } : {}),
-        ...(mdn?.status ? { status: mdn.status } : {}),
-      };
-    });
-  },
-  provideValues(tag, attribute) {
-    const info = htmlAttributeSource().attributes(tag).find((candidate) => candidate.name === attribute.toLowerCase());
-    const known = new Map(htmlData.provideValues(tag.toLowerCase(), attribute.toLowerCase()).map((value) => [value.name, value]));
-    return (info?.values ?? []).filter((value) => value !== "").map((name): IValueData => known.get(name) ?? { name });
-  },
-};
+	getId: () => 'meeko',
+	isApplicable: () => true,
+	provideTags: () => htmlData.provideTags(),
+	provideAttributes(tag) {
+		const known = new Map(htmlData.provideAttributes(tag.toLowerCase()).map((attribute) => [attribute.name, attribute]))
+		return htmlAttributeSource()
+			.attributes(tag)
+			.map((info): IAttributeData => {
+				const mdn = known.get(info.name)
+				const status = [info.deprecated ? '**Obsoleto.**' : undefined, info.experimental ? '**Experimental.**' : undefined].filter(Boolean).join(' ')
+				const description = [status, markup(mdn?.description) ?? info.description, info.spec && `[Especificación](${info.spec})`].filter(Boolean).join('\n\n')
+				return {
+					name: info.name,
+					...(description ? { description: { kind: MarkupKind.Markdown, value: description } } : {}),
+					...(info.boolean ? { valueSet: 'v' } : info.values?.length ? { valueSet: 'meeko' } : {}),
+					...(mdn?.references ? { references: mdn.references } : {}),
+					...(mdn?.browsers ? { browsers: mdn.browsers } : {}),
+					...(mdn?.status ? { status: mdn.status } : {}),
+				}
+			})
+	},
+	provideValues(tag, attribute) {
+		const info = htmlAttributeSource()
+			.attributes(tag)
+			.find((candidate) => candidate.name === attribute.toLowerCase())
+		const known = new Map(htmlData.provideValues(tag.toLowerCase(), attribute.toLowerCase()).map((value) => [value.name, value]))
+		return (info?.values ?? []).filter((value) => value !== '').map((name): IValueData => known.get(name) ?? { name })
+	},
+}
 
-const htmlService = getHtmlLanguageService({ useDefaultDataProvider: false, customDataProviders: [meekoHtmlData] });
+const htmlService = getHtmlLanguageService({ useDefaultDataProvider: false, customDataProviders: [meekoHtmlData] })
 
 /** The deprecated attributes of `tag` struck through, as `bind:` marks them. */
 function markDeprecated(items: CompletionItem[], tag: string): CompletionItem[] {
-  const deprecated = new Set(htmlAttributeSource().attributes(tag).filter((info) => info.deprecated).map((info) => info.name));
-  return items.map((item) => (deprecated.has(item.label) ? { ...item, tags: [CompletionItemTag.Deprecated] } : item));
+	const deprecated = new Set(
+		htmlAttributeSource()
+			.attributes(tag)
+			.filter((info) => info.deprecated)
+			.map((info) => info.name),
+	)
+	return items.map((item) => (deprecated.has(item.label) ? { ...item, tags: [CompletionItemTag.Deprecated] } : item))
 }
 // `@layer` and nesting are standard; an unknown at-rule (a PostCSS plugin's) is not an error here.
-cssService.configure({ validate: true, lint: { unknownAtRules: "ignore" } });
+cssService.configure({ validate: true, lint: { unknownAtRules: 'ignore' } })
 
 const specialTagDocumentation = {
-  render: [
-    "```html",
-    '<render snippet="snippets.name" args="value, action" />',
-    "```",
-    "Pinta un snippet que recibió este componente. `snippet` es una expresión, normalmente una clave de `defineSnippets`; `args` pasa valores al contenido del padre. Un snippet opcional ausente no pinta nada. No admite contenido dentro de `<render>`.",
-  ].join("\n\n"),
-  snippet: [
-    "```html",
-    '<snippet name="title" params="item, index">…</snippet>',
-    "```",
-    "Llena un snippet declarado por el componente hijo. Debe ser hijo directo de su etiqueta. El contenido pertenece al padre; `params` nombra los argumentos que el hijo envía desde `<render>`.",
-  ].join("\n\n"),
-} as const;
+	render: [
+		'```html',
+		'<render snippet="snippets.name" args="value, action" />',
+		'```',
+		'Pinta un snippet que recibió este componente. `snippet` es una expresión, normalmente una clave de `defineSnippets`; `args` pasa valores al contenido del padre. Un snippet opcional ausente no pinta nada. No admite contenido dentro de `<render>`.',
+	].join('\n\n'),
+	snippet: [
+		'```html',
+		'<snippet name="title" params="item, index">…</snippet>',
+		'```',
+		'Llena un snippet declarado por el componente hijo. Debe ser hijo directo de su etiqueta. El contenido pertenece al padre; `params` nombra los argumentos que el hijo envía desde `<render>`.',
+	].join('\n\n'),
+} as const
 
 const specialAttributeDocumentation = {
-  render: {
-    snippet: "**`snippet`** · Expresión de tipo `Snippet<Args> | undefined` que se pinta. Normalmente `snippets.name`, declarado con `defineSnippets`. Es obligatorio; si es `undefined`, no pinta contenido.",
-    args: "**`args`** · Expresiones separadas por comas que recibe el snippet, en el orden y con los tipos de la tupla declarada en `defineSnippets`.",
-    "if:when": "**`if:when`** · Pinta este `<render>` sólo cuando la expresión es verdadera.",
-  },
-  snippet: {
-    name: "**`name`** · Nombre del snippet que llena en el componente hijo; debe coincidir con una clave de su `defineSnippets`.",
-    params: "**`params`** · Nombres de los argumentos que el hijo pasa desde `<render args=\"…\">`, separados por comas. Sus tipos se infieren de `defineSnippets`.",
-    "if:when": "**`if:when`** · Pasa el snippet al hijo sólo cuando la expresión es verdadera. El hijo debe haberlo declarado como opcional.",
-  },
-} as const;
+	render: {
+		snippet: '**`snippet`** · Expresión de tipo `Snippet<Args> | undefined` que se pinta. Normalmente `snippets.name`, declarado con `defineSnippets`. Es obligatorio; si es `undefined`, no pinta contenido.',
+		args: '**`args`** · Expresiones separadas por comas que recibe el snippet, en el orden y con los tipos de la tupla declarada en `defineSnippets`.',
+		'if:when': '**`if:when`** · Pinta este `<render>` sólo cuando la expresión es verdadera.',
+	},
+	snippet: {
+		name: '**`name`** · Nombre del snippet que llena en el componente hijo; debe coincidir con una clave de su `defineSnippets`.',
+		params: '**`params`** · Nombres de los argumentos que el hijo pasa desde `<render args="…">`, separados por comas. Sus tipos se infieren de `defineSnippets`.',
+		'if:when': '**`if:when`** · Pasa el snippet al hijo sólo cuando la expresión es verdadera. El hijo debe haberlo declarado como opcional.',
+	},
+} as const
 
-export function specialTemplateDocumentation(tag: "render" | "snippet", attribute?: string): string | undefined {
-  return attribute === undefined ? specialTagDocumentation[tag]
-    : (specialAttributeDocumentation[tag] as Record<string, string>)[attribute];
+export function specialTemplateDocumentation(tag: 'render' | 'snippet', attribute?: string): string | undefined {
+	return attribute === undefined ? specialTagDocumentation[tag] : (specialAttributeDocumentation[tag] as Record<string, string>)[attribute]
 }
 
 interface Region {
-  readonly contentStart: number;
-  readonly contentEnd: number;
-  /** Attributes of the opening tag, such as `scoped` in `<style scoped>`. */
-  readonly attributes: string;
+	readonly contentStart: number
+	readonly contentEnd: number
+	/** Attributes of the opening tag, such as `scoped` in `<style scoped>`. */
+	readonly attributes: string
 }
 
 /** `<template>` content: from its opening tag to the last `</template>`, as in the compiler. */
 export function templateRegion(source: string): Region | undefined {
-  const open = /<template(?=[\s>])([^>]*)>/.exec(source);
-  if (!open) return undefined;
-  const contentStart = open.index + open[0].length;
-  const close = source.lastIndexOf("</template>");
-  return { contentStart, contentEnd: close > contentStart ? close : source.length, attributes: open[1] ?? "" };
+	const open = /<template(?=[\s>])([^>]*)>/.exec(source)
+	if (!open) return undefined
+	const contentStart = open.index + open[0].length
+	const close = source.lastIndexOf('</template>')
+	return { contentStart, contentEnd: close > contentStart ? close : source.length, attributes: open[1] ?? '' }
 }
 
 /** `<style>` content, outside the template. */
 export function styleRegion(source: string): Region | undefined {
-  const template = templateRegion(source);
-  const pattern = /<style(?=[\s>])([^>]*)>/g;
-  for (const open of source.matchAll(pattern)) {
-    if (template && open.index >= template.contentStart && open.index < template.contentEnd) continue;
-    const contentStart = open.index + open[0].length;
-    const close = source.indexOf("</style>", contentStart);
-    return { contentStart, contentEnd: close < 0 ? source.length : close, attributes: open[1] ?? "" };
-  }
-  return undefined;
+	const template = templateRegion(source)
+	const pattern = /<style(?=[\s>])([^>]*)>/g
+	for (const open of source.matchAll(pattern)) {
+		if (template && open.index >= template.contentStart && open.index < template.contentEnd) continue
+		const contentStart = open.index + open[0].length
+		const close = source.indexOf('</style>', contentStart)
+		return { contentStart, contentEnd: close < 0 ? source.length : close, attributes: open[1] ?? '' }
+	}
+	return undefined
 }
 
 /** The document with only `region` kept: positions and offsets stay those of the `.meeko`. */
 function masked(document: TextDocument, region: Region, language: string): TextDocument {
-  const source = document.getText();
-  const blank = (text: string): string => text.replace(/[^\r\n]/g, " ");
-  const text = blank(source.slice(0, region.contentStart)) + source.slice(region.contentStart, region.contentEnd) + blank(source.slice(region.contentEnd));
-  return TextDocument.create(`${document.uri}#${language}`, language, document.version, text);
+	const source = document.getText()
+	const blank = (text: string): string => text.replace(/[^\r\n]/g, ' ')
+	const text = blank(source.slice(0, region.contentStart)) + source.slice(region.contentStart, region.contentEnd) + blank(source.slice(region.contentEnd))
+	return TextDocument.create(`${document.uri}#${language}`, language, document.version, text)
 }
 
-const inside = (region: Region | undefined, offset: number): region is Region =>
-  region !== undefined && offset >= region.contentStart && offset <= region.contentEnd;
+const inside = (region: Region | undefined, offset: number): region is Region => region !== undefined && offset >= region.contentStart && offset <= region.contentEnd
 
 /** Start tag around `offset` in the template, and the attribute value it is in, if any. */
 export interface TagContext {
-  readonly tag: string;
-  readonly tagStart: number;
-  /** End of the tag: its `>`, or where the next tag starts while it is unfinished. */
-  readonly tagEnd: number;
-  readonly component: boolean;
-  /** The quoted value containing `offset`, with the name of its attribute. */
-  readonly value?: { readonly attribute: string; readonly start: number };
+	readonly tag: string
+	readonly tagStart: number
+	/** End of the tag: its `>`, or where the next tag starts while it is unfinished. */
+	readonly tagEnd: number
+	readonly component: boolean
+	/** The quoted value containing `offset`, with the name of its attribute. */
+	readonly value?: { readonly attribute: string; readonly start: number }
 }
 
 export function tagAt(source: string, offset: number): TagContext | undefined {
-  const template = templateRegion(source);
-  if (!template || offset <= template.contentStart || offset > template.contentEnd) return undefined;
-  const tagStart = source.lastIndexOf("<", offset - 1);
-  if (tagStart < template.contentStart) return undefined;
-  const tag = /^<([A-Za-z][\w$.-]*)/.exec(source.slice(tagStart, offset))?.[1];
-  if (!tag) return undefined;
-  let quote: string | undefined;
-  let valueStart = 0;
-  let attribute = "";
-  let lastName = "";
-  for (let index = tagStart + 1 + tag.length; index < offset; index++) {
-    const char = source[index]!;
-    if (quote) {
-      if (char === quote) quote = undefined;
-      continue;
-    }
-    if (char === '"' || char === "'") {
-      quote = char;
-      valueStart = index + 1;
-      attribute = lastName;
-    } else if (char === ">") return undefined;
-    else if (/[^\s=]/.test(char)) {
-      const name = /^[^\s=>"'/]+/.exec(source.slice(index))?.[0];
-      if (name) {
-        lastName = name;
-        index += name.length - 1;
-      }
-    }
-  }
-  let tagEnd = source.length;
-  let inner: string | undefined = quote;
-  for (let index = offset; index < source.length; index++) {
-    const char = source[index]!;
-    if (inner) { if (char === inner) inner = undefined; }
-    else if (char === '"' || char === "'") inner = char;
-    else if (char === ">" || char === "<") { tagEnd = index; break; }
-  }
-  return {
-    tag, tagStart, tagEnd, component: /^[A-Z]/.test(tag) || tag === "component",
-    ...(quote ? { value: { attribute, start: valueStart } } : {}),
-  };
+	const template = templateRegion(source)
+	if (!template || offset <= template.contentStart || offset > template.contentEnd) return undefined
+	const tagStart = source.lastIndexOf('<', offset - 1)
+	if (tagStart < template.contentStart) return undefined
+	const tag = /^<([A-Za-z][\w$.-]*)/.exec(source.slice(tagStart, offset))?.[1]
+	if (!tag) return undefined
+	let quote: string | undefined
+	let valueStart = 0
+	let attribute = ''
+	let lastName = ''
+	for (let index = tagStart + 1 + tag.length; index < offset; index++) {
+		const char = source[index]!
+		if (quote) {
+			if (char === quote) quote = undefined
+			continue
+		}
+		if (char === '"' || char === "'") {
+			quote = char
+			valueStart = index + 1
+			attribute = lastName
+		} else if (char === '>') return undefined
+		else if (/[^\s=]/.test(char)) {
+			const name = /^[^\s=>"'/]+/.exec(source.slice(index))?.[0]
+			if (name) {
+				lastName = name
+				index += name.length - 1
+			}
+		}
+	}
+	let tagEnd = source.length
+	let inner: string | undefined = quote
+	for (let index = offset; index < source.length; index++) {
+		const char = source[index]!
+		if (inner) {
+			if (char === inner) inner = undefined
+		} else if (char === '"' || char === "'") inner = char
+		else if (char === '>' || char === '<') {
+			tagEnd = index
+			break
+		}
+	}
+	return {
+		tag,
+		tagStart,
+		tagEnd,
+		component: /^[A-Z]/.test(tag) || tag === 'component',
+		...(quote ? { value: { attribute, start: valueStart } } : {}),
+	}
 }
 
 /** `on:event` names of an HTML element, from the HTML data of VS Code (MDN descriptions). */
 export function domEventCompletion(document: TextDocument, position: Position, context: TagContext, word: string, element = context.tag): CompletionItem[] {
-  const start = document.positionAt(document.offsetAt(position) - word.length);
-  return htmlData.provideAttributes(element.toLowerCase())
-    .filter((attribute) => /^on[a-z]/.test(attribute.name))
-    .map((attribute): CompletionItem => {
-      const event = attribute.name.slice(2);
-      return {
-        label: `on:${event}`,
-        kind: CompletionItemKind.Event,
-        ...(attribute.description ? { documentation: attribute.description } : {}),
-        insertTextFormat: InsertTextFormat.Snippet,
-        textEdit: { range: { start, end: position }, newText: `on:${event}="$1"` },
-      };
-    });
+	const start = document.positionAt(document.offsetAt(position) - word.length)
+	return htmlData
+		.provideAttributes(element.toLowerCase())
+		.filter((attribute) => /^on[a-z]/.test(attribute.name))
+		.map((attribute): CompletionItem => {
+			const event = attribute.name.slice(2)
+			return {
+				label: `on:${event}`,
+				kind: CompletionItemKind.Event,
+				...(attribute.description ? { documentation: attribute.description } : {}),
+				insertTextFormat: InsertTextFormat.Snippet,
+				textEdit: { range: { start, end: position }, newText: `on:${event}="$1"` },
+			}
+		})
 }
 
 /**
@@ -220,13 +234,13 @@ export function domEventCompletion(document: TextDocument, position: Position, c
  * component, or a tag without `is`.
  */
 export function dynamicTags(source: string, context: TagContext): string[] | undefined {
-  // The whole name: `context.tag` ends at the cursor when it is on the name.
-  if (/^<([A-Za-z][\w$.-]*)/.exec(source.slice(context.tagStart, context.tagEnd))?.[1] !== "component") return undefined;
-  const value = /(?:^|\s)is\s*=\s*(?:"([^"]*)"|'([^']*)')/.exec(source.slice(context.tagStart, context.tagEnd));
-  const expression = value?.[1] ?? value?.[2];
-  if (!expression?.trim()) return undefined;
-  const candidates = isCandidates(expression);
-  return candidates.others.length === 0 && candidates.tags.length > 0 ? [...new Set(candidates.tags.map((literal) => literal.tag))] : undefined;
+	// The whole name: `context.tag` ends at the cursor when it is on the name.
+	if (/^<([A-Za-z][\w$.-]*)/.exec(source.slice(context.tagStart, context.tagEnd))?.[1] !== 'component') return undefined
+	const value = /(?:^|\s)is\s*=\s*(?:"([^"]*)"|'([^']*)')/.exec(source.slice(context.tagStart, context.tagEnd))
+	const expression = value?.[1] ?? value?.[2]
+	if (!expression?.trim()) return undefined
+	const candidates = isCandidates(expression)
+	return candidates.others.length === 0 && candidates.tags.length > 0 ? [...new Set(candidates.tags.map((literal) => literal.tag))] : undefined
 }
 
 /**
@@ -234,30 +248,30 @@ export function dynamicTags(source: string, context: TagContext): string[] | und
  * them, as Meeko only writes each one while the current tag accepts it. Handlers are left out.
  */
 export function dynamicTagAttributeCompletion(document: TextDocument, position: Position, word: string, tags: readonly string[], present: ReadonlySet<string>): CompletionItem[] {
-  const start = document.positionAt(document.offsetAt(position) - word.length);
-  const seen = new Map<string, { tags: string[]; description?: string | MarkupContent }>();
-  for (const tag of tags) {
-    for (const attribute of meekoHtmlData.provideAttributes(tag)) {
-      if (/^on[a-z]/.test(attribute.name) || present.has(attribute.name) || seen.has(attribute.name)) continue;
-      // Which tags write it, by the same data as the compiler (no `type` on `<a>`, for example).
-      const accepting = tags.filter((candidate) => elementAccepts(candidate, attribute.name));
-      if (accepting.length) seen.set(attribute.name, { tags: accepting, ...(attribute.description ? { description: attribute.description } : {}) });
-    }
-  }
-  return [...seen].map(([name, entry]): CompletionItem => ({
-    label: name,
-    kind: CompletionItemKind.Property,
-    // Global attributes apply to every tag; the others say which ones they apply to.
-    ...(entry.tags.length < tags.length ? { detail: `Sólo en ${entry.tags.map((tag) => `<${tag}>`).join(", ")}` } : {}),
-    ...(entry.description ? { documentation: entry.description } : {}),
-    sortText: `1${entry.tags.length < tags.length ? "0" : "1"}${name}`,
-    insertTextFormat: InsertTextFormat.Snippet,
-    textEdit: { range: { start, end: position }, newText: `${name}="$1"` },
-  }));
+	const start = document.positionAt(document.offsetAt(position) - word.length)
+	const seen = new Map<string, { tags: string[]; description?: string | MarkupContent }>()
+	for (const tag of tags) {
+		for (const attribute of meekoHtmlData.provideAttributes(tag)) {
+			if (/^on[a-z]/.test(attribute.name) || present.has(attribute.name) || seen.has(attribute.name)) continue
+			// Which tags write it, by the same data as the compiler (no `type` on `<a>`, for example).
+			const accepting = tags.filter((candidate) => elementAccepts(candidate, attribute.name))
+			if (accepting.length) seen.set(attribute.name, { tags: accepting, ...(attribute.description ? { description: attribute.description } : {}) })
+		}
+	}
+	return [...seen].map(([name, entry]): CompletionItem => ({
+		label: name,
+		kind: CompletionItemKind.Property,
+		// Global attributes apply to every tag; the others say which ones they apply to.
+		...(entry.tags.length < tags.length ? { detail: `Sólo en ${entry.tags.map((tag) => `<${tag}>`).join(', ')}` } : {}),
+		...(entry.description ? { documentation: entry.description } : {}),
+		sortText: `1${entry.tags.length < tags.length ? '0' : '1'}${name}`,
+		insertTextFormat: InsertTextFormat.Snippet,
+		textEdit: { range: { start, end: position }, newText: `${name}="$1"` },
+	}))
 }
 
 /** Global attributes that a template binds most often: right after the element's own ones. */
-const commonGlobalAttributes: ReadonlySet<string> = new Set(["class", "style", "id", "title", "hidden", "role", "tabindex", "lang", "dir", "inert", "popover"]);
+const commonGlobalAttributes: ReadonlySet<string> = new Set(['class', 'style', 'id', 'title', 'hidden', 'role', 'tabindex', 'lang', 'dir', 'inert', 'popover'])
 
 /**
  * `bind:attr` for the HTML attributes of `tags` (the element, or the tags of `<component is>`), from
@@ -266,59 +280,59 @@ const commonGlobalAttributes: ReadonlySet<string> = new Set(["class", "style", "
  * then the usual global ones (`class`, `style`, `id`…), the other global ones and `aria-*`; last,
  * `bind:data-*`. `order` goes before each `sortText`, to place the list among other items.
  */
-export function bindAttributeCompletion(document: TextDocument, position: Position, word: string, tags: readonly string[], present: ReadonlySet<string>, order = ""): CompletionItem[] {
-  const range = { start: document.positionAt(document.offsetAt(position) - word.length), end: position };
-  const seen = new Map<string, { info: HtmlAttributeInfo; tags: string[] }>();
-  for (const tag of tags) {
-    for (const info of htmlAttributeSource().attributes(tag)) {
-      const entry = seen.get(info.name);
-      if (entry) entry.tags.push(tag);
-      else seen.set(info.name, { info, tags: [tag] });
-    }
-  }
-  const items = [...seen.values()].filter(({ info }) => !present.has(`bind:${info.name}`)).map(({ info, tags: accepting }): CompletionItem => {
-    const label = `bind:${info.name}`;
-    const signature = `${label}: ${attributeValueType(info)}`;
-    const description = info.description;
-    const only = accepting.length < tags.length ? `Sólo en ${accepting.map((tag) => `<${tag}>`).join(", ")}.` : undefined;
-    // Values that the type does not list: many, suggestions only (`autocomplete`) or a token list (`role`).
-    const listed = info.values?.length && (info.values.length > 8 || info.freeform || info.tokens)
-      ? `${info.tokens ? "Valores, separados por espacios" : info.freeform ? "Valores sugeridos" : "Valores"}: ${info.values.map((value) => `\`${value}\``).join(", ")}.`
-      : undefined;
-    const status = [info.deprecated ? "**Obsoleto.**" : undefined, info.experimental ? "**Experimental.**" : undefined].filter(Boolean).join(" ") || undefined;
-    const rank = !info.global ? 0 : commonGlobalAttributes.has(info.name) ? 1 : info.name.startsWith("aria-") ? 3 : 2;
-    return {
-      label,
-      kind: CompletionItemKind.Property,
-      detail: signature,
-      documentation: { kind: MarkupKind.Markdown, value: bindDocumentation(signature, [status, only, description, listed, info.spec && `[Especificación](${info.spec})`]) },
-      ...(info.deprecated ? { tags: [CompletionItemTag.Deprecated] } : {}),
-      sortText: `${order}${rank}${info.name}`,
-      filterText: label,
-      insertTextFormat: InsertTextFormat.Snippet,
-      textEdit: { range, newText: `${label}="$1"` },
-      // Enumerated values open inside the quotes, before the expressions.
-      ...(info.values?.length ? { command: { title: "Valores", command: "editor.action.triggerSuggest" } } : {}),
-    };
-  });
-  if (!present.has("bind:data-")) {
-    items.push({
-      label: "bind:data-",
-      kind: CompletionItemKind.Property,
-      detail: "bind:data-*: string",
-      documentation: { kind: MarkupKind.Markdown, value: bindDocumentation("bind:data-*: string", ["Atributo `data-*` propio, que se lee con `dataset`."]) },
-      sortText: `${order}4data-`,
-      filterText: "bind:data-",
-      insertTextFormat: InsertTextFormat.Snippet,
-      textEdit: { range, newText: 'bind:data-$1="$2"' },
-    });
-  }
-  return items;
+export function bindAttributeCompletion(document: TextDocument, position: Position, word: string, tags: readonly string[], present: ReadonlySet<string>, order = ''): CompletionItem[] {
+	const range = { start: document.positionAt(document.offsetAt(position) - word.length), end: position }
+	const seen = new Map<string, { info: HtmlAttributeInfo; tags: string[] }>()
+	for (const tag of tags) {
+		for (const info of htmlAttributeSource().attributes(tag)) {
+			const entry = seen.get(info.name)
+			if (entry) entry.tags.push(tag)
+			else seen.set(info.name, { info, tags: [tag] })
+		}
+	}
+	const items = [...seen.values()]
+		.filter(({ info }) => !present.has(`bind:${info.name}`))
+		.map(({ info, tags: accepting }): CompletionItem => {
+			const label = `bind:${info.name}`
+			const signature = `${label}: ${attributeValueType(info)}`
+			const description = info.description
+			const only = accepting.length < tags.length ? `Sólo en ${accepting.map((tag) => `<${tag}>`).join(', ')}.` : undefined
+			// Values that the type does not list: many, suggestions only (`autocomplete`) or a token list (`role`).
+			const listed = info.values?.length && (info.values.length > 8 || info.freeform || info.tokens) ? `${info.tokens ? 'Valores, separados por espacios' : info.freeform ? 'Valores sugeridos' : 'Valores'}: ${info.values.map((value) => `\`${value}\``).join(', ')}.` : undefined
+			const status = [info.deprecated ? '**Obsoleto.**' : undefined, info.experimental ? '**Experimental.**' : undefined].filter(Boolean).join(' ') || undefined
+			const rank = !info.global ? 0 : commonGlobalAttributes.has(info.name) ? 1 : info.name.startsWith('aria-') ? 3 : 2
+			return {
+				label,
+				kind: CompletionItemKind.Property,
+				detail: signature,
+				documentation: { kind: MarkupKind.Markdown, value: bindDocumentation(signature, [status, only, description, listed, info.spec && `[Especificación](${info.spec})`]) },
+				...(info.deprecated ? { tags: [CompletionItemTag.Deprecated] } : {}),
+				sortText: `${order}${rank}${info.name}`,
+				filterText: label,
+				insertTextFormat: InsertTextFormat.Snippet,
+				textEdit: { range, newText: `${label}="$1"` },
+				// Enumerated values open inside the quotes, before the expressions.
+				...(info.values?.length ? { command: { title: 'Valores', command: 'editor.action.triggerSuggest' } } : {}),
+			}
+		})
+	if (!present.has('bind:data-')) {
+		items.push({
+			label: 'bind:data-',
+			kind: CompletionItemKind.Property,
+			detail: 'bind:data-*: string',
+			documentation: { kind: MarkupKind.Markdown, value: bindDocumentation('bind:data-*: string', ['Atributo `data-*` propio, que se lee con `dataset`.']) },
+			sortText: `${order}4data-`,
+			filterText: 'bind:data-',
+			insertTextFormat: InsertTextFormat.Snippet,
+			textEdit: { range, newText: 'bind:data-$1="$2"' },
+		})
+	}
+	return items
 }
 
 /** The documentation of `bind:attr`: its signature, notes and the rule of empty values. */
 function bindDocumentation(signature: string, notes: ReadonlyArray<string | undefined>): string {
-  return ["```ts", signature, "```", ...notes.filter((note): note is string => Boolean(note)).flatMap((note) => ["", note]), "", "`null`, `undefined` o `false` no escriben el atributo."].join("\n");
+	return ['```ts', signature, '```', ...notes.filter((note): note is string => Boolean(note)).flatMap((note) => ['', note]), '', '`null`, `undefined` o `false` no escriben el atributo.'].join('\n')
 }
 
 /**
@@ -326,33 +340,33 @@ function bindDocumentation(signature: string, notes: ReadonlyArray<string | unde
  * its attributes, with the MDN description of each tag.
  */
 export function dynamicTagHover(document: TextDocument, position: Position): Hover | undefined {
-  const source = document.getText();
-  const offset = document.offsetAt(position);
-  const context = tagAt(source, offset);
-  if (!context || offset > context.tagStart + 1 + "component".length) return undefined;
-  const tags = dynamicTags(source, context);
-  if (!tags) return undefined;
-  const descriptions = htmlData.provideTags();
-  const lines = tags.map((tag) => {
-    const description = descriptions.find((item) => item.name === tag)?.description;
-    const text = typeof description === "string" ? description : description?.value;
-    return `- \`<${tag}>\`${text ? `: ${text.split("\n")[0]}` : ""}`;
-  });
-  return {
-    contents: {
-      kind: MarkupKind.Markdown,
-      value: [
-        "```typescript",
-        `(elemento) ${tags.map((tag) => `<${tag}>`).join(" | ")}`,
-        "```",
-        "",
-        "`<component is>` renderiza una de estas etiquetas según `is`. Un atributo que la etiqueta del momento no admite no se escribe; los globales (`class`, `id`, `aria-*`, `data-*`…) y los eventos, siempre. Al cambiar la etiqueta, el contenido pasa al elemento nuevo con su estado.",
-        "",
-        ...lines,
-      ].join("\n"),
-    },
-    range: { start: document.positionAt(context.tagStart + 1), end: document.positionAt(context.tagStart + 1 + "component".length) },
-  };
+	const source = document.getText()
+	const offset = document.offsetAt(position)
+	const context = tagAt(source, offset)
+	if (!context || offset > context.tagStart + 1 + 'component'.length) return undefined
+	const tags = dynamicTags(source, context)
+	if (!tags) return undefined
+	const descriptions = htmlData.provideTags()
+	const lines = tags.map((tag) => {
+		const description = descriptions.find((item) => item.name === tag)?.description
+		const text = typeof description === 'string' ? description : description?.value
+		return `- \`<${tag}>\`${text ? `: ${text.split('\n')[0]}` : ''}`
+	})
+	return {
+		contents: {
+			kind: MarkupKind.Markdown,
+			value: [
+				'```typescript',
+				`(elemento) ${tags.map((tag) => `<${tag}>`).join(' | ')}`,
+				'```',
+				'',
+				'`<component is>` renderiza una de estas etiquetas según `is`. Un atributo que la etiqueta del momento no admite no se escribe; los globales (`class`, `id`, `aria-*`, `data-*`…) y los eventos, siempre. Al cambiar la etiqueta, el contenido pasa al elemento nuevo con su estado.',
+				'',
+				...lines,
+			].join('\n'),
+		},
+		range: { start: document.positionAt(context.tagStart + 1), end: document.positionAt(context.tagStart + 1 + 'component'.length) },
+	}
 }
 
 /**
@@ -361,20 +375,19 @@ export function dynamicTagHover(document: TextDocument, position: Position): Hov
  * is the element a built-in tag renders: `<MeekoLink>` completes the attributes of an `<a>`.
  */
 export function htmlAttributeCompletion(document: TextDocument, position: Position, present: ReadonlySet<string>, element?: string): CompletionItem[] {
-  const template = templateRegion(document.getText());
-  if (!template) return [];
-  let html = masked(document, template, "html");
-  const tagStart = html.getText().lastIndexOf("<", document.offsetAt(position) - 1);
-  const tag = element === undefined ? undefined : /^<([A-Za-z][\w$.-]*)/.exec(html.getText().slice(tagStart))?.[1];
-  if (element !== undefined && tag && tag.length >= element.length) {
-    // Same length, so positions do not move: `<MeekoLink` reads as `<a        `.
-    const text = html.getText();
-    html = TextDocument.create(html.uri, "html", html.version, `${text.slice(0, tagStart + 1)}${element.padEnd(tag.length)}${text.slice(tagStart + 1 + tag.length)}`);
-  }
-  const list = htmlService.doComplete(html, position, htmlService.parseHTMLDocument(html));
-  const items = list.items.filter((item) => item.kind !== CompletionItemKind.Snippet && !/^on[a-z]/.test(item.label) && !present.has(item.label))
-    .map((item) => ({ ...item, sortText: `1${item.sortText ?? item.label}` }));
-  return markDeprecated(items, element ?? /^<([A-Za-z][\w$.-]*)/.exec(html.getText().slice(tagStart))?.[1] ?? "");
+	const template = templateRegion(document.getText())
+	if (!template) return []
+	let html = masked(document, template, 'html')
+	const tagStart = html.getText().lastIndexOf('<', document.offsetAt(position) - 1)
+	const tag = element === undefined ? undefined : /^<([A-Za-z][\w$.-]*)/.exec(html.getText().slice(tagStart))?.[1]
+	if (element !== undefined && tag && tag.length >= element.length) {
+		// Same length, so positions do not move: `<MeekoLink` reads as `<a        `.
+		const text = html.getText()
+		html = TextDocument.create(html.uri, 'html', html.version, `${text.slice(0, tagStart + 1)}${element.padEnd(tag.length)}${text.slice(tagStart + 1 + tag.length)}`)
+	}
+	const list = htmlService.doComplete(html, position, htmlService.parseHTMLDocument(html))
+	const items = list.items.filter((item) => item.kind !== CompletionItemKind.Snippet && !/^on[a-z]/.test(item.label) && !present.has(item.label)).map((item) => ({ ...item, sortText: `1${item.sortText ?? item.label}` }))
+	return markDeprecated(items, element ?? /^<([A-Za-z][\w$.-]*)/.exec(html.getText().slice(tagStart))?.[1] ?? '')
 }
 
 /**
@@ -383,40 +396,43 @@ export function htmlAttributeCompletion(document: TextDocument, position: Positi
  * holds an expression.
  */
 export function htmlCompletion(document: TextDocument, position: Position): CompletionList | undefined {
-  const source = document.getText();
-  const offset = document.offsetAt(position);
-  const template = templateRegion(source);
-  if (!inside(template, offset)) return undefined;
-  const context = tagAt(source, offset);
-  if (context?.component) return undefined;
-  // Directive values and `{…}` interpolations are TypeScript.
-  if (context?.value && /^(?:bind|on|if|each|model|ref|html)\b/.test(context.value.attribute)) return undefined;
-  const open = source.lastIndexOf("{", offset - 1);
-  if (!context && open > source.lastIndexOf("}", offset - 1) && open >= template.contentStart) return undefined;
-  // `type="…"`, `role="…"`, `aria-pressed="…"`: the values of Meeko's HTML data.
-  const values = context?.value ? staticValueCompletion(document, position, context) : undefined;
-  if (values?.length) return { isIncomplete: false, items: values };
-  const html = masked(document, template, "html");
-  const parsed = htmlService.parseHTMLDocument(html);
-  const list = htmlService.doComplete(html, position, parsed);
-  // A lowercase tag only: components come from their own completion.
-  const items = markDeprecated(list.items.filter((item) => item.kind !== CompletionItemKind.Snippet && !/^on[a-z]/.test(item.label)), context?.tag ?? "");
-  const snippet = snippetTagCompletion(document, position, parsed);
-  if (snippet) items.unshift(snippet);
-  const typed = /<([a-z]*)$/.exec(source.slice(Math.max(0, offset - 64), offset));
-  if (typed && "render".startsWith(typed[1]!)) {
-    const tagStart = offset - typed[0].length;
-    items.unshift({
-      label: "render",
-      kind: CompletionItemKind.Property,
-      detail: "Renderiza un snippet con sus argumentos",
-      documentation: { kind: MarkupKind.Markdown, value: specialTagDocumentation.render },
-      sortText: "0",
-      insertTextFormat: InsertTextFormat.Snippet,
-      textEdit: { range: { start: document.positionAt(tagStart + 1), end: position }, newText: 'render snippet="$1" />' },
-    });
-  }
-  return items.length ? { isIncomplete: list.isIncomplete, items } : undefined;
+	const source = document.getText()
+	const offset = document.offsetAt(position)
+	const template = templateRegion(source)
+	if (!inside(template, offset)) return undefined
+	const context = tagAt(source, offset)
+	if (context?.component) return undefined
+	// Directive values and `{…}` interpolations are TypeScript.
+	if (context?.value && /^(?:bind|on|if|each|model|ref|html)\b/.test(context.value.attribute)) return undefined
+	const open = source.lastIndexOf('{', offset - 1)
+	if (!context && open > source.lastIndexOf('}', offset - 1) && open >= template.contentStart) return undefined
+	// `type="…"`, `role="…"`, `aria-pressed="…"`: the values of Meeko's HTML data.
+	const values = context?.value ? staticValueCompletion(document, position, context) : undefined
+	if (values?.length) return { isIncomplete: false, items: values }
+	const html = masked(document, template, 'html')
+	const parsed = htmlService.parseHTMLDocument(html)
+	const list = htmlService.doComplete(html, position, parsed)
+	// A lowercase tag only: components come from their own completion.
+	const items = markDeprecated(
+		list.items.filter((item) => item.kind !== CompletionItemKind.Snippet && !/^on[a-z]/.test(item.label)),
+		context?.tag ?? '',
+	)
+	const snippet = snippetTagCompletion(document, position, parsed)
+	if (snippet) items.unshift(snippet)
+	const typed = /<([a-z]*)$/.exec(source.slice(Math.max(0, offset - 64), offset))
+	if (typed && 'render'.startsWith(typed[1]!)) {
+		const tagStart = offset - typed[0].length
+		items.unshift({
+			label: 'render',
+			kind: CompletionItemKind.Property,
+			detail: 'Renderiza un snippet con sus argumentos',
+			documentation: { kind: MarkupKind.Markdown, value: specialTagDocumentation.render },
+			sortText: '0',
+			insertTextFormat: InsertTextFormat.Snippet,
+			textEdit: { range: { start: document.positionAt(tagStart + 1), end: position }, newText: 'render snippet="$1" />' },
+		})
+	}
+	return items.length ? { isIncomplete: list.isIncomplete, items } : undefined
 }
 
 /**
@@ -425,30 +441,34 @@ export function htmlCompletion(document: TextDocument, position: Position): Comp
  * of `role` are marked.
  */
 function staticValueCompletion(document: TextDocument, position: Position, context: TagContext): CompletionItem[] | undefined {
-  const value = context.value!;
-  const info = htmlAttributeSource().attributes(context.tag).find((attribute) => attribute.name === value.attribute.toLowerCase());
-  if (!info?.values?.length) return undefined;
-  const source = document.getText();
-  const offset = document.offsetAt(position);
-  const quote = source[value.start - 1];
-  const close = quote === '"' || quote === "'" ? source.indexOf(quote, offset) : -1;
-  const end = close < 0 ? offset : close;
-  const token = info.tokens ? /\S*$/.exec(source.slice(value.start, offset))![0] : source.slice(value.start, offset);
-  const tokenEnd = info.tokens ? offset + /^\S*/.exec(source.slice(offset, end))![0].length : end;
-  const range = { start: document.positionAt(offset - token.length), end: document.positionAt(tokenEnd) };
-  const type = attributeValueType(info);
-  return info.values.filter((candidate) => candidate !== "").map((candidate, index): CompletionItem => {
-    const role = info.name === "role" ? (ariaRoles as Readonly<Record<string, { readonly description: string; readonly deprecated?: true }>>)[candidate] : undefined;
-    return {
-      label: candidate,
-      kind: CompletionItemKind.EnumMember,
-      detail: `${info.name}: ${type}`,
-      ...(role?.description ? { documentation: role.description } : {}),
-      ...(role?.deprecated ? { tags: [CompletionItemTag.Deprecated] } : {}),
-      sortText: String(index).padStart(3, "0"),
-      textEdit: { range, newText: candidate },
-    };
-  });
+	const value = context.value!
+	const info = htmlAttributeSource()
+		.attributes(context.tag)
+		.find((attribute) => attribute.name === value.attribute.toLowerCase())
+	if (!info?.values?.length) return undefined
+	const source = document.getText()
+	const offset = document.offsetAt(position)
+	const quote = source[value.start - 1]
+	const close = quote === '"' || quote === "'" ? source.indexOf(quote, offset) : -1
+	const end = close < 0 ? offset : close
+	const token = info.tokens ? /\S*$/.exec(source.slice(value.start, offset))![0] : source.slice(value.start, offset)
+	const tokenEnd = info.tokens ? offset + /^\S*/.exec(source.slice(offset, end))![0].length : end
+	const range = { start: document.positionAt(offset - token.length), end: document.positionAt(tokenEnd) }
+	const type = attributeValueType(info)
+	return info.values
+		.filter((candidate) => candidate !== '')
+		.map((candidate, index): CompletionItem => {
+			const role = info.name === 'role' ? (ariaRoles as Readonly<Record<string, { readonly description: string; readonly deprecated?: true }>>)[candidate] : undefined
+			return {
+				label: candidate,
+				kind: CompletionItemKind.EnumMember,
+				detail: `${info.name}: ${type}`,
+				...(role?.description ? { documentation: role.description } : {}),
+				...(role?.deprecated ? { tags: [CompletionItemTag.Deprecated] } : {}),
+				sortText: String(index).padStart(3, '0'),
+				textEdit: { range, newText: candidate },
+			}
+		})
 }
 
 /**
@@ -458,85 +478,91 @@ function staticValueCompletion(document: TextDocument, position: Position, conte
  * (`MEEK061`), nor in an element.
  */
 function snippetTagCompletion(document: TextDocument, position: Position, parsed: ReturnType<typeof htmlService.parseHTMLDocument>): CompletionItem | undefined {
-  const source = document.getText();
-  const offset = document.offsetAt(position);
-  const typed = /<([a-z]*)$/.exec(source.slice(Math.max(0, offset - 64), offset));
-  if (!typed || !"snippet".startsWith(typed[1]!)) return undefined;
-  const tagStart = offset - typed[0].length;
-  // The node that contains the `<` is the parent of the tag being typed.
-  const parent = parsed.findNodeAt(tagStart).tag;
-  if (!parent || !/^[A-Z]/.test(parent)) return undefined;
-  const builtin = builtinTag(parent);
-  if (builtin && !builtin.component) return undefined;
-  return {
-    label: "snippet",
-    kind: CompletionItemKind.Property,
-    detail: `Snippet de <${parent}>: <snippet name="…">`,
-    documentation: { kind: MarkupKind.Markdown, value: specialTagDocumentation.snippet },
-    sortText: "0",
-    insertTextFormat: InsertTextFormat.Snippet,
-    textEdit: { range: { start: document.positionAt(tagStart + 1), end: position }, newText: 'snippet name="$1">$0</snippet>' },
-    command: { title: "Snippets", command: "editor.action.triggerSuggest" },
-  };
+	const source = document.getText()
+	const offset = document.offsetAt(position)
+	const typed = /<([a-z]*)$/.exec(source.slice(Math.max(0, offset - 64), offset))
+	if (!typed || !'snippet'.startsWith(typed[1]!)) return undefined
+	const tagStart = offset - typed[0].length
+	// The node that contains the `<` is the parent of the tag being typed.
+	const parent = parsed.findNodeAt(tagStart).tag
+	if (!parent || !/^[A-Z]/.test(parent)) return undefined
+	const builtin = builtinTag(parent)
+	if (builtin && !builtin.component) return undefined
+	return {
+		label: 'snippet',
+		kind: CompletionItemKind.Property,
+		detail: `Snippet de <${parent}>: <snippet name="…">`,
+		documentation: { kind: MarkupKind.Markdown, value: specialTagDocumentation.snippet },
+		sortText: '0',
+		insertTextFormat: InsertTextFormat.Snippet,
+		textEdit: { range: { start: document.positionAt(tagStart + 1), end: position }, newText: 'snippet name="$1">$0</snippet>' },
+		command: { title: 'Snippets', command: 'editor.action.triggerSuggest' },
+	}
 }
 
 /** MDN documentation of an HTML tag or attribute of the template. */
 export function htmlHover(document: TextDocument, position: Position): Hover | undefined {
-  const source = document.getText();
-  const offset = document.offsetAt(position);
-  const template = templateRegion(source);
-  if (!inside(template, offset)) return undefined;
-  const context = tagAt(source, offset);
-  if (context?.component) return undefined;
-  const html = masked(document, template, "html");
-  return htmlService.doHover(html, position, htmlService.parseHTMLDocument(html)) ?? undefined;
+	const source = document.getText()
+	const offset = document.offsetAt(position)
+	const template = templateRegion(source)
+	if (!inside(template, offset)) return undefined
+	const context = tagAt(source, offset)
+	if (context?.component) return undefined
+	const html = masked(document, template, 'html')
+	return htmlService.doHover(html, position, htmlService.parseHTMLDocument(html)) ?? undefined
 }
 
 /** Hover of Meeko's snippet syntax; leave quoted values to the typed component model. */
 export function specialTemplateHover(document: TextDocument, position: Position): Hover | undefined {
-  const source = document.getText();
-  const offset = document.offsetAt(position);
-  const template = templateRegion(source);
-  if (!inside(template, offset)) return undefined;
-  const tagStart = source.lastIndexOf("<", offset);
-  if (tagStart < template.contentStart) return undefined;
-  const opening = /^<(render|snippet)(?=[\s/>])/.exec(source.slice(tagStart));
-  const closing = /^<\/(render|snippet)\s*>/.exec(source.slice(tagStart));
-  const tag = (opening?.[1] ?? closing?.[1]) as "render" | "snippet" | undefined;
-  if (!tag) return undefined;
-  const nameStart = tagStart + (closing ? 2 : 1);
-  const nameEnd = nameStart + tag.length;
-  const makeHover = (start: number, end: number, markdown: string): Hover => ({
-    contents: { kind: MarkupKind.Markdown, value: markdown },
-    range: { start: document.positionAt(start), end: document.positionAt(end) },
-  });
-  if (offset >= nameStart && offset < nameEnd) return makeHover(nameStart, nameEnd, specialTagDocumentation[tag]);
-  if (!opening) return undefined;
-  const context = tagAt(source, offset);
-  if (!context || context.tag !== tag || context.tagStart !== tagStart || context.value) return undefined;
-  let quote: string | undefined;
-  for (let index = nameEnd; index < context.tagEnd; index++) {
-    const char = source[index]!;
-    if (quote) { if (char === quote) quote = undefined; continue; }
-    if (char === '"' || char === "'") { quote = char; continue; }
-    if (!/\s/.test(char)) continue;
-    const match = /^([A-Za-z_:][\w:-]*)/.exec(source.slice(index + 1));
-    if (!match) continue;
-    const start = index + 1;
-    const end = start + match[1]!.length;
-    const markdown = specialTemplateDocumentation(tag, match[1]!);
-    if (markdown && offset >= start && offset < end) return makeHover(start, end, markdown);
-    index = end - 1;
-  }
-  return undefined;
+	const source = document.getText()
+	const offset = document.offsetAt(position)
+	const template = templateRegion(source)
+	if (!inside(template, offset)) return undefined
+	const tagStart = source.lastIndexOf('<', offset)
+	if (tagStart < template.contentStart) return undefined
+	const opening = /^<(render|snippet)(?=[\s/>])/.exec(source.slice(tagStart))
+	const closing = /^<\/(render|snippet)\s*>/.exec(source.slice(tagStart))
+	const tag = (opening?.[1] ?? closing?.[1]) as 'render' | 'snippet' | undefined
+	if (!tag) return undefined
+	const nameStart = tagStart + (closing ? 2 : 1)
+	const nameEnd = nameStart + tag.length
+	const makeHover = (start: number, end: number, markdown: string): Hover => ({
+		contents: { kind: MarkupKind.Markdown, value: markdown },
+		range: { start: document.positionAt(start), end: document.positionAt(end) },
+	})
+	if (offset >= nameStart && offset < nameEnd) return makeHover(nameStart, nameEnd, specialTagDocumentation[tag])
+	if (!opening) return undefined
+	const context = tagAt(source, offset)
+	if (!context || context.tag !== tag || context.tagStart !== tagStart || context.value) return undefined
+	let quote: string | undefined
+	for (let index = nameEnd; index < context.tagEnd; index++) {
+		const char = source[index]!
+		if (quote) {
+			if (char === quote) quote = undefined
+			continue
+		}
+		if (char === '"' || char === "'") {
+			quote = char
+			continue
+		}
+		if (!/\s/.test(char)) continue
+		const match = /^([A-Za-z_:][\w:-]*)/.exec(source.slice(index + 1))
+		if (!match) continue
+		const start = index + 1
+		const end = start + match[1]!.length
+		const markdown = specialTemplateDocumentation(tag, match[1]!)
+		if (markdown && offset >= start && offset < end) return makeHover(start, end, markdown)
+		index = end - 1
+	}
+	return undefined
 }
 
 /** `<div>` and `</div>` edited together, also in the tags of components. */
 export function linkedEditingRanges(document: TextDocument, position: Position): Range[] | undefined {
-  const template = templateRegion(document.getText());
-  if (!inside(template, document.offsetAt(position))) return undefined;
-  const html = masked(document, template, "html");
-  return htmlService.findLinkedEditingRanges(html, position, htmlService.parseHTMLDocument(html)) ?? undefined;
+	const template = templateRegion(document.getText())
+	if (!inside(template, document.offsetAt(position))) return undefined
+	const html = masked(document, template, 'html')
+	return htmlService.findLinkedEditingRanges(html, position, htmlService.parseHTMLDocument(html)) ?? undefined
 }
 
 /**
@@ -544,61 +570,59 @@ export function linkedEditingRanges(document: TextDocument, position: Position):
  * VS Code inserts it: a snippet such as `$0</div>`, or `undefined`.
  */
 export function tagCompletion(document: TextDocument, position: Position): string | undefined {
-  const template = templateRegion(document.getText());
-  if (!inside(template, document.offsetAt(position))) return undefined;
-  const html = masked(document, template, "html");
-  return htmlService.doTagComplete(html, position, htmlService.parseHTMLDocument(html)) ?? undefined;
+	const template = templateRegion(document.getText())
+	if (!inside(template, document.offsetAt(position))) return undefined
+	const html = masked(document, template, 'html')
+	return htmlService.doTagComplete(html, position, htmlService.parseHTMLDocument(html)) ?? undefined
 }
 
 function styleDocument(document: TextDocument): TextDocument | undefined {
-  const style = styleRegion(document.getText());
-  return style ? masked(document, style, "css") : undefined;
+	const style = styleRegion(document.getText())
+	return style ? masked(document, style, 'css') : undefined
 }
 
 /** CSS completion inside `<style>`. */
 export function cssCompletion(document: TextDocument, position: Position): CompletionList | undefined {
-  const style = styleRegion(document.getText());
-  if (!inside(style, document.offsetAt(position))) return undefined;
-  const css = masked(document, style, "css");
-  return cssService.doComplete(css, position, cssService.parseStylesheet(css));
+	const style = styleRegion(document.getText())
+	if (!inside(style, document.offsetAt(position))) return undefined
+	const css = masked(document, style, 'css')
+	return cssService.doComplete(css, position, cssService.parseStylesheet(css))
 }
 
 /** CSS documentation of a property, value or selector inside `<style>`. */
 export function cssHover(document: TextDocument, position: Position): Hover | undefined {
-  const style = styleRegion(document.getText());
-  if (!inside(style, document.offsetAt(position))) return undefined;
-  const css = masked(document, style, "css");
-  return cssService.doHover(css, position, cssService.parseStylesheet(css)) ?? undefined;
+	const style = styleRegion(document.getText())
+	if (!inside(style, document.offsetAt(position))) return undefined
+	const css = masked(document, style, 'css')
+	return cssService.doHover(css, position, cssService.parseStylesheet(css)) ?? undefined
 }
 
 /** Colors of `<style>`, for the color decorators and picker. */
 export function documentColors(document: TextDocument): ColorInformation[] {
-  const css = styleDocument(document);
-  return css ? cssService.findDocumentColors(css, cssService.parseStylesheet(css)) : [];
+	const css = styleDocument(document)
+	return css ? cssService.findDocumentColors(css, cssService.parseStylesheet(css)) : []
 }
 
 export function colorPresentations(document: TextDocument, color: Color, range: Range): ColorPresentation[] {
-  const css = styleDocument(document);
-  return css ? cssService.getColorPresentations(css, cssService.parseStylesheet(css), color, range) : [];
+	const css = styleDocument(document)
+	return css ? cssService.getColorPresentations(css, cssService.parseStylesheet(css), color, range) : []
 }
 
 /** A class selector of `<style>`: `.card` in `.card:hover > p`. */
 export interface StyleClass {
-  readonly name: string;
-  /** Offset of the `.` in the `.meeko`. */
-  readonly start: number;
-  readonly end: number;
-  /** Inside `:global(…)`, so it may style markup of other components. */
-  readonly global: boolean;
+	readonly name: string
+	/** Offset of the `.` in the `.meeko`. */
+	readonly start: number
+	readonly end: number
+	/** Inside `:global(…)`, so it may style markup of other components. */
+	readonly global: boolean
 }
 
 /** Class selectors of `<style>`; none while its CSS does not parse. */
 export function styleClasses(source: string): StyleClass[] {
-  const style = styleRegion(source);
-  if (!style) return [];
-  return (cssClassRules(source.slice(style.contentStart, style.contentEnd), style.contentStart) ?? [])
-    .filter((rule) => source[rule.start] === "." && !rule.context.some((context) => context.startsWith("@utility ")))
-    .map((rule) => ({ name: rule.name, start: rule.start, end: rule.end, global: rule.global }));
+	const style = styleRegion(source)
+	if (!style) return []
+	return (cssClassRules(source.slice(style.contentStart, style.contentEnd), style.contentStart) ?? []).filter((rule) => source[rule.start] === '.' && !rule.context.some((context) => context.startsWith('@utility '))).map((rule) => ({ name: rule.name, start: rule.start, end: rule.end, global: rule.global }))
 }
 
 /**
@@ -609,37 +633,39 @@ export function styleClasses(source: string): StyleClass[] {
  * reported: they may style other components.
  */
 export function styleDiagnostics(document: TextDocument): Diagnostic[] {
-  const source = document.getText();
-  const style = styleRegion(source);
-  if (!style) return [];
-  const css = masked(document, style, "css");
-  const diagnostics: Diagnostic[] = cssService.doValidation(css, cssService.parseStylesheet(css))
-    // `:global(…)` is Meeko's way out of the scope, not an unknown pseudo-class.
-    .filter((item) => !/:global/.test(css.getText(item.range)) && !/global/.test(String(item.message)))
-    .map((item) => ({ ...item, source: "Meeko" }));
-  if (!/\bscoped\b/.test(style.attributes)) return diagnostics;
-  const code = source.slice(0, style.contentStart) + source.slice(style.contentEnd);
-  const prefixes = [...code.matchAll(/([\w-]+)\$\{/g)].map((match) => match[1]!);
-  const used = (name: string): boolean =>
-    new RegExp(`(^|[^\\w-])${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}($|[^\\w-])`).test(code)
-    || prefixes.some((prefix) => name.startsWith(prefix));
-  const classes = styleClasses(source);
-  for (const entry of classes) {
-    if (entry.global || used(entry.name)) continue;
-    diagnostics.push({
-      range: { start: document.positionAt(entry.start), end: document.positionAt(entry.end) },
-      message: `Ni la plantilla ni el script usan la clase .${entry.name}: <style scoped> sólo alcanza a las etiquetas de este componente`,
-      code: "MEEK_UNUSED_CLASS", source: "Meeko", severity: DiagnosticSeverity.Hint, tags: [DiagnosticTag.Unnecessary],
-    });
-  }
-  return diagnostics;
+	const source = document.getText()
+	const style = styleRegion(source)
+	if (!style) return []
+	const css = masked(document, style, 'css')
+	const diagnostics: Diagnostic[] = cssService
+		.doValidation(css, cssService.parseStylesheet(css))
+		// `:global(…)` is Meeko's way out of the scope, not an unknown pseudo-class.
+		.filter((item) => !/:global/.test(css.getText(item.range)) && !/global/.test(String(item.message)))
+		.map((item) => ({ ...item, source: 'Meeko' }))
+	if (!/\bscoped\b/.test(style.attributes)) return diagnostics
+	const code = source.slice(0, style.contentStart) + source.slice(style.contentEnd)
+	const prefixes = [...code.matchAll(/([\w-]+)\$\{/g)].map((match) => match[1]!)
+	const used = (name: string): boolean => new RegExp(`(^|[^\\w-])${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^\\w-])`).test(code) || prefixes.some((prefix) => name.startsWith(prefix))
+	const classes = styleClasses(source)
+	for (const entry of classes) {
+		if (entry.global || used(entry.name)) continue
+		diagnostics.push({
+			range: { start: document.positionAt(entry.start), end: document.positionAt(entry.end) },
+			message: `Ni la plantilla ni el script usan la clase .${entry.name}: <style scoped> sólo alcanza a las etiquetas de este componente`,
+			code: 'MEEK_UNUSED_CLASS',
+			source: 'Meeko',
+			severity: DiagnosticSeverity.Hint,
+			tags: [DiagnosticTag.Unnecessary],
+		})
+	}
+	return diagnostics
 }
 
 /** The text of a hover's contents, for tests and logs. */
 export function hoverText(hover: Hover | undefined): string {
-  const contents = hover?.contents;
-  if (!contents) return "";
-  if (typeof contents === "string") return contents;
-  if (Array.isArray(contents)) return contents.map((part) => typeof part === "string" ? part : part.value).join("\n");
-  return (contents as MarkupContent).value;
+	const contents = hover?.contents
+	if (!contents) return ''
+	if (typeof contents === 'string') return contents
+	if (Array.isArray(contents)) return contents.map((part) => (typeof part === 'string' ? part : part.value)).join('\n')
+	return (contents as MarkupContent).value
 }

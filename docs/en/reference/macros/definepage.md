@@ -26,7 +26,7 @@ related:
   - docs/framework.md#caché-de-páginas-ssr
   - docs/framework.md#rutas-dinámicas-en-el-sitemap-sitemapentries
   - docs/framework.md#dónde-se-usa-cada-api
-source-hash: e6b365daf159cf789e26450cbcf53e87603c90c236735169bcebe7e516f72518
+source-hash: 60f376114116dcd9e5b119b895c6a060b2a79ea6624c278ecd8165b04be4444b
 ---
 
 `definePage` declares route options for an `app/pages` page: schemas validating `params` and `search`, how it reaches the browser (`render`), prerendered URLs, the loader, `<head>`, named layout and its props, named middleware and, since `1.7`, page HTTP cache (`cache`) and URLs in `sitemap.xml` (`sitemapEntries`). It returns the same definition with types flowing through it: `params` comes from the schema, `load` receives it and `head` receives what `load` returns.

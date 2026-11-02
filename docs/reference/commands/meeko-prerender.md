@@ -29,8 +29,8 @@ C:\proyectos\tienda\.meeko\output\node\prerender\index.html
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
+| Parámetro      | Tipo | Por defecto | Descripción                                                                                                   |
+| -------------- | ---- | ----------- | ------------------------------------------------------------------------------------------------------------- |
 | `<directorio>` | ruta | obligatorio | Raíz del proyecto, con un build de Node en `.meeko/output/node/`. Sin él, `Falta el directorio de prerender`. |
 
 Los loaders se ejecutan en este proceso: leen `process.env` tal como esté al ejecutar el comando (la CLI no lee el `.env` del proyecto en `prerender`).

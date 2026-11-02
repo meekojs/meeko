@@ -15,7 +15,7 @@ related:
   - "@meekojs/meeko/deno#serveDeno"
   - "@meekojs/meeko/framework#createSocketClient"
   - docs/framework.md#websocket
-source-hash: f3357054e1480bf9e1be301148780ab5cae2571594d3dc2b914239792b16660a
+source-hash: c113cf3e1b94319c56b6dbb110d9538466dc21bad446e526207544bb6ca7907a
 ---
 
 `createSocketUpgradeHandler` separates the Socket handshake from transport: it receives the upgrade `Request` and decides what to do without touching any socket. If the path is not a channel, it returns `"pass"`; if it is not a valid upgrade or the hub rejects it, `"reject"` with the status; if everything is valid, `"upgrade"` with an `open(peer)` function the adapter calls once its runtime has opened the WebSocket. From there, client messages pass to the hub sequentially.

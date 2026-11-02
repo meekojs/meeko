@@ -1,6 +1,6 @@
-import type { ClientOptions } from "../../shared/clients";
+import type { ClientOptions } from '../../shared/clients'
 
-import { currentRequest } from "./request-context";
+import { currentRequest } from './request-context'
 
 /**
  * Opciones de cliente para el servidor: leen la URL, las cookies, `authorization`, el token CSRF y
@@ -19,24 +19,24 @@ import { currentRequest } from "./request-context";
  * ```
  */
 export function createServerClientOptions(): ClientOptions {
-  return {
-    baseUrl: () => currentRequest().context.request.url,
-    headers: () => {
-      const request = currentRequest().context.request;
-      const headers = new Headers();
-      for (const name of ["cookie", "authorization"]) {
-        const value = request.headers.get(name);
-        if (value !== null) headers.set(name, value);
-      }
-      headers.set("origin", new URL(request.url).origin);
-      return headers;
-    },
-    csrfToken: () => currentRequest().context.session.current?.csrfToken,
-    fetch: async (input, init) => {
-      const active = currentRequest();
-      const request = new Request(input, init);
-      if (active.serverFetch) return active.serverFetch(request, active.context);
-      return fetch(request);
-    },
-  };
+	return {
+		baseUrl: () => currentRequest().context.request.url,
+		headers: () => {
+			const request = currentRequest().context.request
+			const headers = new Headers()
+			for (const name of ['cookie', 'authorization']) {
+				const value = request.headers.get(name)
+				if (value !== null) headers.set(name, value)
+			}
+			headers.set('origin', new URL(request.url).origin)
+			return headers
+		},
+		csrfToken: () => currentRequest().context.session.current?.csrfToken,
+		fetch: async (input, init) => {
+			const active = currentRequest()
+			const request = new Request(input, init)
+			if (active.serverFetch) return active.serverFetch(request, active.context)
+			return fetch(request)
+		},
+	}
 }

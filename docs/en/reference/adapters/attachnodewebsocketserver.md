@@ -15,7 +15,7 @@ related:
   - "@meekojs/meeko/server#defineSocketChannel"
   - docs/framework.md#websocket
   - docs/framework.md#broadcast-y-varias-instancias
-source-hash: 2f9bff5d1b64fab9e15ad866298cae3d7af6b35d1790cfeba4537b989351fea6
+source-hash: 1b674dc97ba1236a8206bcae1b848b66d1c322941206dc3afb426aed1e96bb54
 ---
 
 `attachNodeWebSocketServer(options)` listens for a Node HTTP server's `upgrade` event and handles upgrades to `/_meeko/socket/<canal>` through the [`ws`](https://github.com/websockets/ws) package. Before accepting, the hub checks the path, `Origin`, session and channel authorization; afterwards, the adapter delivers each text message to the hub, pings peers and closes unresponsive ones.

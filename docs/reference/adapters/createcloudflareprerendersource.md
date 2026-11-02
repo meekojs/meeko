@@ -23,6 +23,7 @@ Las páginas viven en `assets/_meeko/prerender/` pero nunca se sirven como archi
 ## Uso
 
 <!-- no-check -->
+
 ```ts
 import { createCloudflareAssetReader, createCloudflarePrerenderSource, createWorker } from "@meekojs/meeko/cloudflare";
 
@@ -36,10 +37,10 @@ export default createWorker(({ env, platform }) => createApp({
 
 ## Parámetros
 
-| Opción | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `binding` | `CloudflareAssetsBinding` | obligatorio | El binding de Static Assets. |
-| `directory` | `string` | `"/_meeko/prerender/"` | Carpeta de los assets con `manifest.json` y las páginas; empieza y termina en `/`. |
+| Opción      | Tipo                      | Por defecto            | Descripción                                                                        |
+| ----------- | ------------------------- | ---------------------- | ---------------------------------------------------------------------------------- |
+| `binding`   | `CloudflareAssetsBinding` | obligatorio            | El binding de Static Assets.                                                       |
+| `directory` | `string`                  | `"/_meeko/prerender/"` | Carpeta de los assets con `manifest.json` y las páginas; empieza y termina en `/`. |
 
 ## Valor devuelto
 
@@ -92,6 +93,7 @@ createCloudflarePrerenderSource({ binding: env.ASSETS, directory: "/_meeko/prere
 `TypeError: Prerender directory must start and end with /`, al crear la aplicación.
 
 <!-- no-check -->
+
 ```ts good
 createCloudflarePrerenderSource({ binding: env.ASSETS, directory: "/_meeko/prerender/" });
 ```

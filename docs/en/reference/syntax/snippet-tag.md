@@ -11,7 +11,7 @@ related:
   - "syntax:component-tag"
   - "@meekojs/meeko#Snippet"
   - docs/api.md#snippets-con-definesnippets
-source-hash: a32f85f9ab6e821a09739bf5ba8ea406e4f3e702aeab35b993a9893f3019377e
+source-hash: 2d8a9576c66b56377de16dc42ce52eb3ffd4cdff6b3936eb747d37343b4f4fc8
 ---
 
 `<snippet name="x">` goes inside a component tag and fills its `x` snippet: a piece of the parent's template the child renders wherever it chooses with `<render>`, optionally passing arguments. It is equivalent to Vue's named _slots_ or Svelte's _snippets_.

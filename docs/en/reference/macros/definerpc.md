@@ -16,7 +16,7 @@ related:
   - "autoimport:useRpcMutation"
   - docs/framework.md#api-y-rpc
   - docs/framework.md#valores-por-petición-locals
-source-hash: 0b4712873756597ca1c48f308be0b9c0eb27f56c56af09613a708fd05a0fd3ac
+source-hash: d0c3520b1d291da6bad2a04059054bda417aca56d2900351c3f2368d3effd402
 ---
 
 `defineRpc` declares an RPC procedure: the default export of `server/rpc/<ruta>.ts`. `server/rpc/orders/create.ts` is the `orders.create` procedure, called with `POST /_meeko/rpc/orders/create` and, from the application, with `rpc.orders.create(input)`, `useRpcQuery` or `useRpcMutation`, with its schemas' types.

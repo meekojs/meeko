@@ -16,7 +16,7 @@ related:
   - docs/framework.md#runtime-de-servidor
   - docs/framework.md#tipos-de-los-servicios
   - docs/framework.md#sesiones-sin-configuración
-source-hash: ec9e5d01d3679f5887ffb327862f8580c1f326cf78aac4201c52550ac29a54ed
+source-hash: 115618f207386d4cd7be411904e3f432e8ed4e22d3b68d6e82ae9e2bb4576415
 ---
 
 `defineServerRuntime(factory)` is the default export of `server/runtime.ts`: it declares application resources that live for the process's lifetime. Meeko calls the factory **once per process** with `{ env, production, platform, prerendering, root }` and uses its result: sessions, services available to each request as `context.services`, Socket policy, public origin, error observer and shutdown.

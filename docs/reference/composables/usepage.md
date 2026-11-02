@@ -47,14 +47,14 @@ Sin schema, `params.id` es `string` porque el archivo es `[id].meeko`. `db` es u
 
 Una `PageRequest`:
 
-| Propiedad | Tipo | Descripción |
-| --- | --- | --- |
-| `url` | `URL` | URL completa de la petición. |
-| `params` | salida del schema de `params`, o `Readonly<Record<string, string>>` | Segmentos dinámicos, validados antes de ejecutar el bloque. Sin schema, una clave por cada `[segmento]` del archivo. |
-| `search` | salida del schema de `search`, o `Readonly<Record<string, string \| string[]>>` | Query string validada; sin schema, una clave repetida es un array. |
-| `request` | `Request` | Petición HTTP original: cabeceras, cookies, método. |
-| `context` | `RequestContext` | Contexto de la petición: `session`, `services`, `platform`, `state`, `requestId`, `clientAddress`. |
-| `signal` | `AbortSignal` | Se aborta si el cliente se desconecta, se revoca la sesión o se cancela la respuesta. Pásala a `fetch` y a las consultas largas. |
+| Propiedad | Tipo                                                                            | Descripción                                                                                                                      |
+| --------- | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `url`     | `URL`                                                                           | URL completa de la petición.                                                                                                     |
+| `params`  | salida del schema de `params`, o `Readonly<Record<string, string>>`             | Segmentos dinámicos, validados antes de ejecutar el bloque. Sin schema, una clave por cada `[segmento]` del archivo.             |
+| `search`  | salida del schema de `search`, o `Readonly<Record<string, string \| string[]>>` | Query string validada; sin schema, una clave repetida es un array.                                                               |
+| `request` | `Request`                                                                       | Petición HTTP original: cabeceras, cookies, método.                                                                              |
+| `context` | `RequestContext`                                                                | Contexto de la petición: `session`, `services`, `platform`, `state`, `requestId`, `clientAddress`.                               |
+| `signal`  | `AbortSignal`                                                                   | Se aborta si el cliente se desconecta, se revoca la sesión o se cancela la respuesta. Pásala a `fetch` y a las consultas largas. |
 
 Fuera del código de nivel superior de un `<script server>` (o, desde `1.6`, de un middleware de ruta de servidor) lanza `Error: MEEK073: usePage() sólo está disponible mientras se ejecuta el código de nivel superior del <script server> de una página…`.
 

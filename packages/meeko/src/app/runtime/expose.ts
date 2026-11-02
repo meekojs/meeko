@@ -7,7 +7,7 @@
  */
 
 /** Key of the exposed value in the object that a component setup returns. */
-export const exposedKey: unique symbol = Symbol("meeko.exposed");
+export const exposedKey: unique symbol = Symbol('meeko.exposed')
 
 /**
  * Implementación de la macro `defineExpose(value)`: en tiempo de ejecución es la identidad, y
@@ -25,7 +25,7 @@ export const exposedKey: unique symbol = Symbol("meeko.exposed");
  * ```
  */
 export function defineExpose<T>(value: T): T {
-  return value;
+	return value
 }
 
-export type { ExposedOf } from "../definitions/define-expose";
+export type { ExposedOf } from '../definitions/define-expose'

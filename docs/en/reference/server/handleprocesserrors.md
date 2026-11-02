@@ -15,7 +15,7 @@ related:
   - "@meekojs/meeko/bun#createBunServer"
   - docs/framework.md#fallos-fuera-de-una-petición
   - docs/framework.md#errores
-source-hash: 82bd0e59a12bed872f5d5545695b5cda5fc3be60c1941603aea58b6bea719023
+source-hash: ddc6a3c9a811952c506cd3347d5ebf4ac360c179fccc1aa964bd8985d56183c8
 ---
 
 An unawaited promise, a throwing `setTimeout` or a library callback lies outside the request's `try`. Without a policy, Node, Bun and Deno terminate the process on the first such failure, without going through `onError` or shutting down gracefully. `handleProcessErrors(app, options)` installs listeners applying the `processErrors` policy from `server/runtime.ts`:

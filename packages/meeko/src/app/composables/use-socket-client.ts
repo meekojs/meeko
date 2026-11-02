@@ -1,10 +1,10 @@
-import type { SocketClient, SocketClientOptions, SocketContract } from "../runtime/socket";
-import type { useSocketChannel } from "./use-socket-channel";
+import type { SocketClient, SocketClientOptions, SocketContract } from '../runtime/socket'
+import type { useSocketChannel } from './use-socket-channel'
 
-import { createRoot, effect, onCleanup } from "../../core/reactivity";
-import { browserReady } from "../runtime/element-refs";
-import { setupPhase } from "../runtime/lifecycle";
-import { contextualSocketObserver, createSocketClient, renderOnlyClient } from "../runtime/socket";
+import { createRoot, effect, onCleanup } from '../../core/reactivity'
+import { browserReady } from '../runtime/element-refs'
+import { setupPhase } from '../runtime/lifecycle'
+import { contextualSocketObserver, createSocketClient, renderOnlyClient } from '../runtime/socket'
 
 /**
  * Crea un cliente Socket ligado a la raíz del componente actual, que se cierra al desmontarlo.
@@ -32,15 +32,19 @@ import { contextualSocketObserver, createSocketClient, renderOnlyClient } from "
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#websocket
  */
 export function useSocketClient<C extends SocketContract>(url: string, contract: C, options: SocketClientOptions = {}): SocketClient<C> {
-  // SSR renders the HTML with the initial state; the browser's mount opens the connection.
-  if (typeof window === "undefined" || setupPhase() === "render") return renderOnlyClient<C>();
-  const onError = options.onError ?? contextualSocketObserver();
-  const client = createSocketClient(url, contract, onError ? { ...options, onError } : options);
-  try { onCleanup(() => client.close()); }
-  catch (error) { client.close(); throw error; }
-  // `await useSocketClient(...)` in a component script continues once the socket is open.
-  Object.defineProperty(client, browserReady, { value: () => socketOpen(client) });
-  return client;
+	// SSR renders the HTML with the initial state; the browser's mount opens the connection.
+	if (typeof window === 'undefined' || setupPhase() === 'render') return renderOnlyClient<C>()
+	const onError = options.onError ?? contextualSocketObserver()
+	const client = createSocketClient(url, contract, onError ? { ...options, onError } : options)
+	try {
+		onCleanup(() => client.close())
+	} catch (error) {
+		client.close()
+		throw error
+	}
+	// `await useSocketClient(...)` in a component script continues once the socket is open.
+	Object.defineProperty(client, browserReady, { value: () => socketOpen(client) })
+	return client
 }
 
 /**
@@ -61,18 +65,17 @@ export function useSocketClient<C extends SocketContract>(url: string, contract:
  * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#websocket
  */
-export const useSocket: typeof useSocketClient = useSocketClient;
+export const useSocket: typeof useSocketClient = useSocketClient
 
 /** Resolves with `client` once its state is `"open"`; a client that never opens keeps it pending. */
 function socketOpen<C extends SocketContract>(client: SocketClient<C>): Promise<SocketClient<C>> {
-  return new Promise((resolve) => {
-    createRoot((dispose) => {
-      effect(() => {
-        if (client.state.value !== "open") return;
-        resolve(client);
-        queueMicrotask(dispose);
-      });
-    });
-  });
+	return new Promise((resolve) => {
+		createRoot((dispose) => {
+			effect(() => {
+				if (client.state.value !== 'open') return
+				resolve(client)
+				queueMicrotask(dispose)
+			})
+		})
+	})
 }
-

@@ -41,10 +41,10 @@ La primera ejecución ocurre al crear el efecto; cada letra que escribe el usuar
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `fn` | `() => unknown` | obligatorio | Callback **síncrono** que lee señales. Un callback que devuelve una promesa (`async`) es un error de tipos y, en ejecución, un `TypeError`. |
-| `source` | `EffectSource` | ninguno | Ubicación de la expresión para DevTools. La añade el compilador en desarrollo; no la escribas. |
+| Parámetro | Tipo            | Por defecto | Descripción                                                                                                                                 |
+| --------- | --------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fn`      | `() => unknown` | obligatorio | Callback **síncrono** que lee señales. Un callback que devuelve una promesa (`async`) es un error de tipos y, en ejecución, un `TypeError`. |
+| `source`  | `EffectSource`  | ninguno     | Ubicación de la expresión para DevTools. La añade el compilador en desarrollo; no la escribas.                                              |
 
 ## Valor devuelto
 
@@ -140,6 +140,7 @@ effect(async () => {
 `meeko check` da `TS2345: Argument of type '() => Promise<void>' is not assignable to parameter of type 'never'` y, en ejecución, el efecto lanza `TypeError: Meeko effect callbacks must be synchronous`. Las lecturas posteriores a un `await` no se registrarían. Lee las señales primero y lanza la promesa sin devolverla:
 
 <!-- no-check -->
+
 ```ts good
 effect(() => {
   const q = query.value;
@@ -158,6 +159,7 @@ effect(() => {
 Cada escritura vuelve a disparar el efecto, y Meeko lo corta con `Error: Reactive update cycle exceeded 1000 iterations`. Si el valor depende de otro, es un `computed`:
 
 <!-- no-check -->
+
 ```ts good
 const next = computed(() => count.value + 1);
 ```
@@ -172,6 +174,7 @@ effect(() => { total.value = price.value * quantity.value; });
 Funciona, pero `total` es una señal editable más: viaja en el estado del componente, alguien puede escribirla y queda un instante desincronizada. Un valor derivado es un `computed`:
 
 <!-- no-check -->
+
 ```ts good
 const total = computed(() => price.value * quantity.value);
 ```
@@ -187,6 +190,7 @@ effect(() => { window.scrollTo(0, offset.value); });
 En SSR lanza `ReferenceError: window is not defined` y la página falla. Comprueba el entorno, o crea el efecto en `onMounted`, que sólo se ejecuta en el navegador:
 
 <!-- no-check -->
+
 ```ts good
 onMounted(() => {
   effect(() => { window.scrollTo(0, offset.value); });

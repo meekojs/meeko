@@ -12,7 +12,7 @@ related:
   - "syntax:meekothemetoggle"
   - "config:document"
   - docs/framework.md#tema-clarooscuro-sin-parpadeo
-source-hash: 322e038fda98759c9f7119bfed47654de2681a94bf83323dfb0f27cfa5660041
+source-hash: cf2795dc954559f4e0f1a91c04e395d1c7ea01173218488e9b5943c74c1e8f9c
 ---
 
 `theme` enables Meeko's light/dark theme (and custom themes). The user's choice is stored in a cookie; the server writes the theme to `<html>` from the first byte, and when it cannot know it (a prerendered page, the `static` adapter, `"system"` mode without a client hint), a minimal blocking script in `<head>` applies it before the first render. Components read and change the theme with `useTheme()` and `<MeekoThemeToggle>`.

@@ -36,28 +36,28 @@ console.log(context.services.db.name); // "test"
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `request` | `Request` | obligatorio | La petición. Su `signal` se combina con el del contexto. |
-| `services` | `TServices` | obligatorio | Los servicios de `context.services`, ya creados. |
-| `session` | `SessionHandle` | obligatorio | El resultado de `sessions.load(request)`. |
+| Parámetro  | Tipo                   | Por defecto                 | Descripción                                                                 |
+| ---------- | ---------------------- | --------------------------- | --------------------------------------------------------------------------- |
+| `request`  | `Request`              | obligatorio                 | La petición. Su `signal` se combina con el del contexto.                    |
+| `services` | `TServices`            | obligatorio                 | Los servicios de `context.services`, ya creados.                            |
+| `session`  | `SessionHandle`        | obligatorio                 | El resultado de `sessions.load(request)`.                                   |
 | `platform` | `ServerPlatform<TEnv>` | `{ name: "node", env: {} }` | Nombre, entorno y `waitUntil` del adaptador. Sin él, el entorno está vacío. |
 
 ## Valor devuelto
 
 Un `RequestContext<TServices, TEnv>`:
 
-| Miembro | Descripción |
-| --- | --- |
-| `request` | La petición original. |
-| `requestId` | Un ID nuevo, el que va en `x-request-id` y llega a `onError`. |
-| `signal` | Se aborta si el cliente se desconecta o, con `SessionRevokedError`, si se revoca la familia de la sesión. Se combina en el primer acceso. |
-| `services` | Los servicios recibidos. Desde `1.7`, sin argumento de tipo es `AppServices`, el tipo que `meeko check` infiere de `server/runtime.ts`. |
-| `session` | La sesión: `current`, `create`, `rotate`, `revoke`… |
-| `state` | Un `Map` vacío para valores de esta petición (`useRequestState`). |
-| `platform` | La plataforma recibida. |
-| `idempotencyKey` | La cabecera `Idempotency-Key` si es un UUID, en minúsculas; si no, `undefined`. |
-| `clientAddress` | La IP del cliente. `undefined` con un contexto creado a mano: la entregan los adaptadores. |
+| Miembro          | Descripción                                                                                                                               |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `request`        | La petición original.                                                                                                                     |
+| `requestId`      | Un ID nuevo, el que va en `x-request-id` y llega a `onError`.                                                                             |
+| `signal`         | Se aborta si el cliente se desconecta o, con `SessionRevokedError`, si se revoca la familia de la sesión. Se combina en el primer acceso. |
+| `services`       | Los servicios recibidos. Desde `1.7`, sin argumento de tipo es `AppServices`, el tipo que `meeko check` infiere de `server/runtime.ts`.   |
+| `session`        | La sesión: `current`, `create`, `rotate`, `revoke`…                                                                                       |
+| `state`          | Un `Map` vacío para valores de esta petición (`useRequestState`).                                                                         |
+| `platform`       | La plataforma recibida.                                                                                                                   |
+| `idempotencyKey` | La cabecera `Idempotency-Key` si es un UUID, en minúsculas; si no, `undefined`.                                                           |
+| `clientAddress`  | La IP del cliente. `undefined` con un contexto creado a mano: la entregan los adaptadores.                                                |
 
 ## Ejemplos
 
@@ -108,6 +108,7 @@ console.log(context.platform.env.FEATURE_FLAGS); // "beta"
 ### Cancelar trabajo cuando el cliente se va
 
 <!-- no-check -->
+
 ```ts
 export default defineApiRoute({
   response: Report,
@@ -131,6 +132,7 @@ const context = createRequestContext(request, services, sessions);
 `TS2345`: el tercer argumento es el `SessionHandle` de esta petición, no el gestor. En ejecución, `context.session.current` sería `undefined` y las guardas de sesión fallarían.
 
 <!-- no-check -->
+
 ```ts good
 const context = createRequestContext(request, services, await sessions.load(request));
 ```
@@ -146,6 +148,7 @@ await dispatchApiRoute(otherRoute, shared, sessions); // otra petición
 El contexto es de una petición: `context.request` (con su cuerpo), el `requestId`, el `signal`, la sesión y el `state` son los de la primera. El segundo endpoint no ve su propia petición, y los dos comparten el `requestId` en los logs.
 
 <!-- no-check -->
+
 ```ts good
 for (const request of requests) {
   const context = createRequestContext(request, services, await sessions.load(request));

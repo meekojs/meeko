@@ -17,7 +17,7 @@ related:
   - "@meekojs/meeko/framework#useState"
   - docs/api.md#reactividad
   - docs/api.md#módulo-generado
-source-hash: 00423b8ab61981fb64427a253e4c31aad6805e1e0ad0b7a604d0da67fc1ee00c
+source-hash: d14ff5ee5b6c8257309aca59d70595dfd38c6ccda71a779433f3c31cb9403621
 ---
 
 `signal(initial)` creates Meeko's most basic state: an object with a `value` property. Reading `value` in a template, [`computed`](/en/docs/reference/computed) or [`effect`](/en/docs/reference/effect) registers the dependency; assigning a different value notifies only those that read it. There is no virtual DOM: the compiled template updates exactly the node or attribute depending on the signal.

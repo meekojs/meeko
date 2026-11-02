@@ -37,18 +37,18 @@ onMounted(() => {
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `name` | literal de texto | obligatorio | El nombre de una `ref:` de la plantilla, como `"input"`. Una variable, una plantilla literal o un nombre que la plantilla no tiene dan `MEEK056`. |
+| Parámetro | Tipo             | Por defecto | Descripción                                                                                                                                       |
+| --------- | ---------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`    | literal de texto | obligatorio | El nombre de una `ref:` de la plantilla, como `"input"`. Una variable, una plantilla literal o un nombre que la plantilla no tiene dan `MEEK056`. |
 
 ## Valor devuelto
 
-| Forma | Destino | Devuelve |
-| --- | --- | --- |
-| `useElementRef("x")` | un elemento | `ReadonlySignal<Elemento \| null>`: `null` en SSR, antes de hidratar, mientras un `if:when` lo oculta y después de liberarlo |
-| `useElementRef("x")` | un componente | `ReadonlySignal<Expuesto \| null>`, con el valor de su `defineExpose` (`null` sin él) |
-| `useElementRef("x")` | dentro de `each:of` | `ReadonlySignal<readonly Elemento[]>`, en orden de documento |
-| `await useElementRef("x")` | un elemento o un componente | El elemento o el valor expuesto, nunca `null`. Espera a que exista, también bajo un `if:when` todavía falso |
+| Forma                      | Destino                     | Devuelve                                                                                                                     |
+| -------------------------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `useElementRef("x")`       | un elemento                 | `ReadonlySignal<Elemento \| null>`: `null` en SSR, antes de hidratar, mientras un `if:when` lo oculta y después de liberarlo |
+| `useElementRef("x")`       | un componente               | `ReadonlySignal<Expuesto \| null>`, con el valor de su `defineExpose` (`null` sin él)                                        |
+| `useElementRef("x")`       | dentro de `each:of`         | `ReadonlySignal<readonly Elemento[]>`, en orden de documento                                                                 |
+| `await useElementRef("x")` | un elemento o un componente | El elemento o el valor expuesto, nunca `null`. Espera a que exista, también bajo un `if:when` todavía falso                  |
 
 ## Ejemplos
 

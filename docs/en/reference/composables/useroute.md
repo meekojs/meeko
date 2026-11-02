@@ -14,7 +14,7 @@ related:
   - "@meekojs/meeko/framework#usePage"
   - docs/framework.md#ruta-actual
   - docs/framework.md#enlaces-anclas-y-scroll
-source-hash: 0a888f9788182eceac38f576cc29608a08f8514ddd05281873ebd344aa078630
+source-hash: c97ac0c1dbde72db275a3a0c04b38beee9a995c43acca35ebdec6e888c55bf04
 ---
 
 `useRoute()` gives the component the route it is rendering: the request's route in SSR and the last **committed** navigation's route in the browser. Each value is a read-only signal, so a template, `computed` or `effect` reading it updates on navigation, including in a layout retained between pages. `isActive(to, options)` applies the same rule as [`<MeekoLink match>`](/en/docs/reference/meekolink) to custom links and components.

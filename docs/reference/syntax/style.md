@@ -39,9 +39,9 @@ const props = defineProps<{ content: TrustedHtml }>();
 
 ## Atributos
 
-| Atributo | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `scoped` | sin valor | ausente | Con `scoped`, los estilos se limitan al componente (véase `<style scoped>`). Sin él, son globales. |
+| Atributo | Tipo      | Por defecto | Descripción                                                                                        |
+| -------- | --------- | ----------- | -------------------------------------------------------------------------------------------------- |
+| `scoped` | sin valor | ausente     | Con `scoped`, los estilos se limitan al componente (véase `<style scoped>`). Sin él, son globales. |
 
 Un componente admite **un** bloque de estilos: dos `<style>`, aunque uno sea `scoped`, dan `MEEK004: Sección <style> duplicada`.
 

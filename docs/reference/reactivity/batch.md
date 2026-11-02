@@ -36,9 +36,9 @@ batch(() => {
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `fn` | `() => T` | obligatorio | Función que escribe señales. Se ejecuta en el momento; las notificaciones esperan a que termine. |
+| Parámetro | Tipo      | Por defecto | Descripción                                                                                      |
+| --------- | --------- | ----------- | ------------------------------------------------------------------------------------------------ |
+| `fn`      | `() => T` | obligatorio | Función que escribe señales. Se ejecuta en el momento; las notificaciones esperan a que termine. |
 
 ## Valor devuelto
 
@@ -125,6 +125,7 @@ batch(async () => {
 No hay error de tipos ni de ejecución, pero la escritura posterior al `await` queda fuera del lote: un efecto que lee `a` y `b` se ejecuta dos veces. Haz el trabajo asíncrono antes y agrupa sólo las escrituras:
 
 <!-- no-check -->
+
 ```ts good
 const saved = await save();
 batch(() => {
@@ -148,6 +149,7 @@ batch(() => {
 Lee el `computed` después del lote, o calcula a partir de lo que acabas de escribir:
 
 <!-- no-check -->
+
 ```ts good
 batch(() => { count.value = 5; });
 send(double.value); // 10

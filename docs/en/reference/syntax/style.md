@@ -10,7 +10,7 @@ related:
   - "syntax:html"
   - "config:css"
   - docs/api.md#estilos-del-componente-style-y-style-scoped
-source-hash: 27ec225e92e105c8a4bc4875ebbfc30a935ca21abe3f9761ebb84814962e21ab
+source-hash: f6556a2111afeb20d3330ca08fb11bd56e80a22d4a1950920f3e357dd287b5fd
 ---
 
 `<style>` without `scoped` is **global** CSS in the `.meeko` file of the component that needs it. It passes through the same PostCSS as `app/styles/main.css` (`postcss.config.*`, Tailwind, Meeko utilities) and Vite bundles it with the component, but its rules apply to **the entire page**: children, `html="…"` content and any other component with the same class.

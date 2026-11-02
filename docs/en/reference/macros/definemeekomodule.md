@@ -16,7 +16,7 @@ related:
   - docs/framework.md#módulos
   - docs/framework.md#escribir-un-módulo
   - docs/framework.md#hooks
-source-hash: 2534e1e6ad4f6d97834eed1713cad955746af583e4650e3473a598d984013cb3
+source-hash: ac1c8d81c10f84e86624757817acc630aee4709bcdbb3723ba886bed5f4a0022
 ---
 
 `defineMeekoModule` declares a module: code configuring the project, like Nuxt modules. Its `setup` adds components, auto-imports, layouts, application plugins, server middleware and handlers, `<head>` entries, public files and Vite plugins, and responds to build hooks. The project registers it by name in `modules` in `meeko.config.ts` (`modules: ["@acme/hello"]` or `["./modules/hello"]`) and passes options in its `meta.configKey` key. A package default-exports it in its `./module` subpath or root, and declares `"keywords": ["meeko-module"]` in `package.json` so the editor completes its name.

@@ -25,6 +25,7 @@ Cada respuesta lleva `content-type`, `ETag`, `content-length` y la política de 
 ## Uso
 
 <!-- no-check -->
+
 ```ts
 // .meeko/output/node/index.mjs (lo que genera meeko build, simplificado)
 import { fileURLToPath } from "node:url";
@@ -40,10 +41,10 @@ const app = await createServerApp({
 
 ## Parámetros
 
-| Opción | Tipo | Descripción |
-| --- | --- | --- |
-| `root` | `string` | Carpeta con los archivos del manifiesto: la salida del build cliente, `client/`. |
-| `assets` | `AssetManifest` | Las rutas de URL públicas con su `type`, `etag`, `size` e `immutable`. |
+| Opción   | Tipo            | Descripción                                                                      |
+| -------- | --------------- | -------------------------------------------------------------------------------- |
+| `root`   | `string`        | Carpeta con los archivos del manifiesto: la salida del build cliente, `client/`. |
+| `assets` | `AssetManifest` | Las rutas de URL públicas con su `type`, `etag`, `size` e `immutable`.           |
 
 Las claves de `assets` son rutas tal como las serializa la URL WHATWG: `public/logo@2x.png` es `/logo@2x.png`, `a b.txt` es `/a%20b.txt`.
 
@@ -51,13 +52,13 @@ Las claves de `assets` son rutas tal como las serializa la URL WHATWG: `public/l
 
 Un `AssetReader` con `get(pathname, request)`:
 
-| Petición | Respuesta |
-| --- | --- |
-| Ruta que no está en `assets`, o método distinto de `GET` y `HEAD` | `null`: la petición sigue a la aplicación. |
-| `HEAD` | `200` sin cuerpo, con las cabeceras. |
-| `If-None-Match` igual al `ETag` | `304` sin cuerpo. |
-| Archivo con hash de Vite (`immutable`) | `200` con `cache-control: public, max-age=31536000, immutable`. |
-| El resto (`public/`, también `public/assets/`) | `200` con `cache-control: public, max-age=0, must-revalidate`. |
+| Petición                                                          | Respuesta                                                       |
+| ----------------------------------------------------------------- | --------------------------------------------------------------- |
+| Ruta que no está en `assets`, o método distinto de `GET` y `HEAD` | `null`: la petición sigue a la aplicación.                      |
+| `HEAD`                                                            | `200` sin cuerpo, con las cabeceras.                            |
+| `If-None-Match` igual al `ETag`                                   | `304` sin cuerpo.                                               |
+| Archivo con hash de Vite (`immutable`)                            | `200` con `cache-control: public, max-age=31536000, immutable`. |
+| El resto (`public/`, también `public/assets/`)                    | `200` con `cache-control: public, max-age=0, must-revalidate`.  |
 
 ## Ejemplos
 
@@ -78,6 +79,7 @@ curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:4173/../package.json  
 `createServerApp` acepta cualquier `AssetReader`. Para servir un archivo que no está en el build, componga uno:
 
 <!-- no-check -->
+
 ```ts
 import type { AssetReader } from "@meekojs/meeko/server";
 
@@ -121,6 +123,7 @@ handler: async ({ params }) => new Response(await readFile(`./uploads/${params.n
 `params.name` puede ser `..%2f.env`: un traversal. El lector de assets sólo sirve claves del manifiesto; para archivos de usuarios, valide el nombre con un schema y resuelva la ruta dentro de su carpeta.
 
 <!-- no-check -->
+
 ```ts good
 params: v.object({ name: v.pipe(v.string(), v.regex(/^[\w-]+\.pdf$/)) }),
 handler: async ({ params }) => new Response(await readFile(join(uploads, params.name))),

@@ -9,7 +9,7 @@ related:
   - "cli:dev"
   - "cli:build"
   - docs/framework.md#limpiar-el-proyecto
-source-hash: 5c9e74ef09f67bee0437721604f9a91dbc1090a8d60da04ce64ae8489984ce77
+source-hash: d43c742274711fd9d9afdcf7314689fb57724b9a5ff704af2b74e843260afcc2
 ---
 
 `meeko clean` returns a project to its original state: it deletes `.meeko/` (types, entry points, manifests, builds and generated `tsconfig.*` files) and Vite's cache in `node_modules/.vite`. With `--all`, it also deletes the entire `node_modules` folder. Nothing else: application files, `.env`, `package.json` and lockfiles are never touched.

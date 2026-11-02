@@ -40,17 +40,17 @@ Cada clic asigna un número nuevo a `count.value` y Meeko actualiza sólo el tex
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `initial` | `T` | obligatorio | Valor inicial. `T` se infiere de él: `signal(0)` es `Signal<number>`. Para una unión o un valor vacío, escribe el tipo: `signal<User \| null>(null)`, `signal<string[]>([])`. |
+| Parámetro | Tipo | Por defecto | Descripción                                                                                                                                                                   |
+| --------- | ---- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `initial` | `T`  | obligatorio | Valor inicial. `T` se infiere de él: `signal(0)` es `Signal<number>`. Para una unión o un valor vacío, escribe el tipo: `signal<User \| null>(null)`, `signal<string[]>([])`. |
 
 ## Valor devuelto
 
 Un `Signal<T>`, un objeto con una sola propiedad:
 
-| Propiedad | Tipo | Descripción |
-| --- | --- | --- |
-| `value` | `T` | Lectura: devuelve el valor actual y, si hay un observador activo (la plantilla, un `computed`, un `effect`), lo suscribe. Escritura: si el valor nuevo es distinto según `Object.is`, lo guarda y ejecuta en ese momento los observadores que lo leyeron. |
+| Propiedad | Tipo | Descripción                                                                                                                                                                                                                                               |
+| --------- | ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `value`   | `T`  | Lectura: devuelve el valor actual y, si hay un observador activo (la plantilla, un `computed`, un `effect`), lo suscribe. Escritura: si el valor nuevo es distinto según `Object.is`, lo guarda y ejecuta en ese momento los observadores que lo leyeron. |
 
 `Signal<T>` es asignable a `ReadonlySignal<T>`, el tipo de sólo lectura que devuelven `computed` y los composables: úsalo para exponer una señal sin permitir que otros la escriban.
 
@@ -133,6 +133,7 @@ user.value.name = "Grace";
 Asignar el mismo objeto después tampoco avisa, porque `Object.is(objeto, objeto)` es `true`. Asigna siempre un valor nuevo:
 
 <!-- no-check -->
+
 ```ts good
 items.value = [...items.value, item];
 user.value = { ...user.value, name: "Grace" };
@@ -162,6 +163,7 @@ double.value = 4;
 `meeko check` da `TS2540: Cannot assign to 'value' because it is a read-only property`, y desde `1.7` la asignación lanza `TypeError` en ejecución. Escribe en la señal de origen:
 
 <!-- no-check -->
+
 ```ts good
 count.value = 2; // double.value pasa a 4
 ```
@@ -177,6 +179,7 @@ const when = signal(new Date());
 El render falla con el nombre del componente y de la señal, como `app/pages/agenda.meeko: the signal "when" cannot be sent to the browser with the SSR state (Non-plain object at $.when)`. Guarda un valor serializable y deriva el objeto:
 
 <!-- no-check -->
+
 ```ts good
 const when = signal(new Date().toISOString());
 const date = computed(() => new Date(when.value));

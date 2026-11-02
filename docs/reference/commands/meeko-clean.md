@@ -39,23 +39,23 @@ Liberados 942.1 KiB en C:\proyectos\tienda
 
 ## Opciones
 
-| Opción | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `[directorio]` | ruta | `.` | Raíz del proyecto. Debe tener `meeko.config.*` o `@meekojs/meeko` en `dependencies` o `devDependencies`. |
-| `--all` | bandera | no | Borra `node_modules` entero en lugar de sólo `node_modules/.vite`. |
-| `--dry-run` | bandera | no | Mide lo que se borraría, sin borrar nada. |
+| Opción         | Tipo    | Por defecto | Descripción                                                                                              |
+| -------------- | ------- | ----------- | -------------------------------------------------------------------------------------------------------- |
+| `[directorio]` | ruta    | `.`         | Raíz del proyecto. Debe tener `meeko.config.*` o `@meekojs/meeko` en `dependencies` o `devDependencies`. |
+| `--all`        | bandera | no          | Borra `node_modules` entero en lugar de sólo `node_modules/.vite`.                                       |
+| `--dry-run`    | bandera | no          | Mide lo que se borraría, sin borrar nada.                                                                |
 
 Las dos banderas pueden ir en cualquier orden y posición después de `clean`: `meeko clean --all --dry-run .` es válido. No hay más: `--force` da `Opción desconocida para clean: --force`.
 
 ## Resultado
 
-| Línea | Salida | Cuándo |
-| --- | --- | --- |
-| `Borrado <ruta> (N archivos, M enlaces (sin seguir), tamaño)` | estándar | Cada ruta borrada. `Se borraría …` con `--dry-run`; `Borrado en parte …` si algo falló dentro. |
-| `Liberados <tamaño> en <proyecto>` | estándar | Al terminar. Con `--dry-run`, `Se liberarían … (simulación: no se ha borrado nada)`. |
-| `Nada que limpiar en <proyecto>` | estándar | Si ninguna de las rutas existe. |
-| `Omitido <ruta>: <motivo>` | errores | Una ruta cuya carpeta padre es un enlace, como `node_modules/.vite` con `node_modules` enlazado. |
-| `No se puede borrar <ruta>: <mensaje>` | errores | Un archivo que sigue bloqueado tras los reintentos. |
+| Línea                                                         | Salida   | Cuándo                                                                                           |
+| ------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------ |
+| `Borrado <ruta> (N archivos, M enlaces (sin seguir), tamaño)` | estándar | Cada ruta borrada. `Se borraría …` con `--dry-run`; `Borrado en parte …` si algo falló dentro.   |
+| `Liberados <tamaño> en <proyecto>`                            | estándar | Al terminar. Con `--dry-run`, `Se liberarían … (simulación: no se ha borrado nada)`.             |
+| `Nada que limpiar en <proyecto>`                              | estándar | Si ninguna de las rutas existe.                                                                  |
+| `Omitido <ruta>: <motivo>`                                    | errores  | Una ruta cuya carpeta padre es un enlace, como `node_modules/.vite` con `node_modules` enlazado. |
+| `No se puede borrar <ruta>: <mensaje>`                        | errores  | Un archivo que sigue bloqueado tras los reintentos.                                              |
 
 El código de salida es `0` salvo que algo no se pudiera borrar o el directorio no se admita, que es `1`.
 

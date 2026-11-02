@@ -25,6 +25,7 @@ Es lo que usa la salida de `meeko build --adapter bun` (`.meeko/output/bun/index
 ## Uso
 
 <!-- no-check -->
+
 ```ts
 import { createServerApp, handleProcessErrors } from "@meekojs/meeko/server";
 import { createBunAssetReader, createBunServer } from "@meekojs/meeko/bun";
@@ -41,24 +42,24 @@ handleProcessErrors(app, { close: async () => { await server.stop(); await app.c
 
 `createBunServer(app, options?)`:
 
-| Opción | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `publicOrigin` | `string` | el de la aplicación, o la URL en la que escucha Bun | Origen público de las URL y de la comprobación de `Origin` en HTTP y Socket. Nunca se usa `Host`. |
-| `platform` | `ServerPlatform` | Bun con `Bun.env` | La plataforma de cada petición. |
-| `onError` | `(error, requestId) => void` | el de la aplicación | Observador de los fallos del transporte. |
-| `maxPayloadLength` | `number` | `socket.maxMessageBytes` de la aplicación, o `65536` | Frame entrante más grande; Bun cierra los mayores. |
-| `backpressureLimit` | `number` | `1048576` (1 MiB) | Bytes salientes en cola por peer. Un envío que lo supera cierra ese peer con `1011`, sin bloquear al resto de la sala. |
-| `idleTimeout` | `number` | `60` | Segundos sin tráfico antes de cerrar un peer. |
-| `sendPings` | `boolean` | `true` | Envía pings a los peers inactivos para que las conexiones vivas no caduquen. |
+| Opción              | Tipo                         | Por defecto                                          | Descripción                                                                                                            |
+| ------------------- | ---------------------------- | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `publicOrigin`      | `string`                     | el de la aplicación, o la URL en la que escucha Bun  | Origen público de las URL y de la comprobación de `Origin` en HTTP y Socket. Nunca se usa `Host`.                      |
+| `platform`          | `ServerPlatform`             | Bun con `Bun.env`                                    | La plataforma de cada petición.                                                                                        |
+| `onError`           | `(error, requestId) => void` | el de la aplicación                                  | Observador de los fallos del transporte.                                                                               |
+| `maxPayloadLength`  | `number`                     | `socket.maxMessageBytes` de la aplicación, o `65536` | Frame entrante más grande; Bun cierra los mayores.                                                                     |
+| `backpressureLimit` | `number`                     | `1048576` (1 MiB)                                    | Bytes salientes en cola por peer. Un envío que lo supera cierra ese peer con `1011`, sin bloquear al resto de la sala. |
+| `idleTimeout`       | `number`                     | `60`                                                 | Segundos sin tráfico antes de cerrar un peer.                                                                          |
+| `sendPings`         | `boolean`                    | `true`                                               | Envía pings a los peers inactivos para que las conexiones vivas no caduquen.                                           |
 
 ## Valor devuelto
 
 Un `BunServeHandlers`:
 
-| Miembro | Descripción |
-| --- | --- |
-| `fetch(request, server)` | Atiende HTTP con `app.fetch` y los upgrades de Socket. Devuelve `undefined` tras un upgrade, como espera Bun. |
-| `websocket` | `open`, `message` y `close`, con `maxPayloadLength`, `backpressureLimit`, `closeOnBackpressureLimit: false`, `idleTimeout`, `sendPings` y `perMessageDeflate: false` ya resueltos. |
+| Miembro                  | Descripción                                                                                                                                                                        |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fetch(request, server)` | Atiende HTTP con `app.fetch` y los upgrades de Socket. Devuelve `undefined` tras un upgrade, como espera Bun.                                                                      |
+| `websocket`              | `open`, `message` y `close`, con `maxPayloadLength`, `backpressureLimit`, `closeOnBackpressureLimit: false`, `idleTimeout`, `sendPings` y `perMessageDeflate: false` ya resueltos. |
 
 ## Ejemplos
 
@@ -88,6 +89,7 @@ CMD ["bun", "index.js"]
 ### Junto a otras rutas de `Bun.serve`
 
 <!-- no-check -->
+
 ```ts
 const meeko = createBunServer(app);
 Bun.serve({
@@ -126,6 +128,7 @@ Bun.serve({ port: 3000, ...createBunServer(app, { maxPayloadLength: 0 }) });
 `RangeError: Invalid maxPayloadLength` (o `Invalid backpressureLimit`, `Invalid idleTimeout`).
 
 <!-- no-check -->
+
 ```ts good
 Bun.serve({ port: 3000, ...createBunServer(app, { maxPayloadLength: 16 * 1024 }) });
 ```
@@ -140,6 +143,7 @@ setTimeout(() => { throw new Error("tarea programada"); }, 1000);
 El proceso termina con el error sin pasar por `onError` ni cerrar las conexiones: `createBunServer` no instala la política `processErrors`.
 
 <!-- no-check -->
+
 ```ts good
 const server = Bun.serve({ port: 3000, ...createBunServer(app) });
 handleProcessErrors(app, { close: async () => { await server.stop(); await app.close(); } });

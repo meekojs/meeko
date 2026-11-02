@@ -1,10 +1,10 @@
-import { resolve } from "node:path";
+import { resolve } from 'node:path'
 
-import type { RouteRecord } from "../app/runtime/router";
+import type { RouteRecord } from '../app/runtime/router'
 
-import { createRouteManifest } from "../app/runtime/router";
-import { discoverRouteMiddleware } from "./route-middleware-discovery";
-import { discoverLayouts, discoverRoutes } from "./routes-discovery";
+import { createRouteManifest } from '../app/runtime/router'
+import { discoverRouteMiddleware } from './route-middleware-discovery'
+import { discoverLayouts, discoverRoutes } from './routes-discovery'
 
 /**
  * Un layer de rutas: una carpeta con su propio árbol `app/pages`, cuyas páginas se muestran dentro
@@ -18,10 +18,10 @@ import { discoverLayouts, discoverRoutes } from "./routes-discovery";
  * ```
  */
 export interface RouteLayer {
-  /** Identificador estable para diagnósticos y manifiestos: minúsculas, dígitos y guiones. */
-  readonly name: string;
-  /** Carpeta que contiene el árbol `app/pages` del layer. */
-  readonly root: string;
+	/** Identificador estable para diagnósticos y manifiestos: minúsculas, dígitos y guiones. */
+	readonly name: string
+	/** Carpeta que contiene el árbol `app/pages` del layer. */
+	readonly root: string
 }
 
 /**
@@ -39,10 +39,10 @@ export interface RouteLayer {
  * ```
  */
 export interface RouteModule {
-  /** Identificador estable del módulo: minúsculas, dígitos y guiones. */
-  readonly name: string;
-  /** Devuelve las rutas del módulo. */
-  routes(): readonly RouteRecord[] | Promise<readonly RouteRecord[]>;
+	/** Identificador estable del módulo: minúsculas, dígitos y guiones. */
+	readonly name: string
+	/** Devuelve las rutas del módulo. */
+	routes(): readonly RouteRecord[] | Promise<readonly RouteRecord[]>
 }
 
 /**
@@ -58,18 +58,18 @@ export interface RouteModule {
  * ```
  */
 export interface ComposeRoutesOptions {
-  /** Carpeta del proyecto, cuyas páginas van primero y cuyo shell envuelve a los layers. */
-  readonly projectRoot: string;
-  /** Layers con árbol `app/pages`, en orden. */
-  readonly layers?: readonly RouteLayer[];
-  /** Módulos programáticos, después de los layers. */
-  readonly modules?: readonly RouteModule[];
-  /**
-   * Layouts con nombre que añaden los módulos de Meeko (`meeko.addLayout`), por nombre. Los del
-   * proyecto y los de los layers ganan a estos.
-   * @since 1.5.0
-   */
-  readonly layouts?: Readonly<Record<string, string>>;
+	/** Carpeta del proyecto, cuyas páginas van primero y cuyo shell envuelve a los layers. */
+	readonly projectRoot: string
+	/** Layers con árbol `app/pages`, en orden. */
+	readonly layers?: readonly RouteLayer[]
+	/** Módulos programáticos, después de los layers. */
+	readonly modules?: readonly RouteModule[]
+	/**
+	 * Layouts con nombre que añaden los módulos de Meeko (`meeko.addLayout`), por nombre. Los del
+	 * proyecto y los de los layers ganan a estos.
+	 * @since 1.5.0
+	 */
+	readonly layouts?: Readonly<Record<string, string>>
 }
 
 /**
@@ -92,37 +92,37 @@ export interface ComposeRoutesOptions {
  * ```
  */
 export async function composeFrameworkRoutes(options: ComposeRoutesOptions): Promise<readonly RouteRecord[]> {
-  const names = new Set(["app"]);
-  const roots = new Set([resolve(options.projectRoot).toLowerCase()]);
-  for (const source of [...options.layers ?? [], ...options.modules ?? []]) {
-    if (!/^[a-z][a-z0-9-]*$/.test(source.name) || names.has(source.name)) {
-      throw new Error(`Invalid or duplicate route source name: ${source.name}`);
-    }
-    names.add(source.name);
-  }
-  // Named layouts of the layers (each layer's `default` only serves its own pages), then the modules'.
-  const layouts: Record<string, string> = {};
-  for (const layer of options.layers ?? []) {
-    for (const [name, file] of Object.entries(await discoverLayouts(resolve(layer.root)))) {
-      if (name !== "default" && !Object.hasOwn(layouts, name)) layouts[name] = file;
-    }
-  }
-  for (const [name, file] of Object.entries(options.layouts ?? {})) if (!Object.hasOwn(layouts, name)) layouts[name] = file;
-  const routes: RouteRecord[] = [...await discoverRoutes(options.projectRoot, { layouts })];
-  for (const layer of options.layers ?? []) {
-    const root = resolve(layer.root);
-    if (roots.has(root.toLowerCase())) throw new Error(`Duplicate route root: ${root}`);
-    roots.add(root.toLowerCase());
-    // Layer pages render inside the project's shell and fall back to its error page.
-    routes.push(...await discoverRoutes(root, { shell: options.projectRoot, layouts }));
-  }
-  // The routes of a module run the project's global server route middleware too, like its pages.
-  const { serverGlobal } = await discoverRouteMiddleware(options.projectRoot);
-  for (const module of options.modules ?? []) {
-    for (const route of await module.routes()) {
-      const serverMiddleware = [...new Set([...serverGlobal, ...route.serverMiddleware ?? []])];
-      routes.push(serverMiddleware.length && route.render !== "client" && route.render !== "prerender" ? { ...route, serverMiddleware } : route);
-    }
-  }
-  return createRouteManifest(routes);
+	const names = new Set(['app'])
+	const roots = new Set([resolve(options.projectRoot).toLowerCase()])
+	for (const source of [...(options.layers ?? []), ...(options.modules ?? [])]) {
+		if (!/^[a-z][a-z0-9-]*$/.test(source.name) || names.has(source.name)) {
+			throw new Error(`Invalid or duplicate route source name: ${source.name}`)
+		}
+		names.add(source.name)
+	}
+	// Named layouts of the layers (each layer's `default` only serves its own pages), then the modules'.
+	const layouts: Record<string, string> = {}
+	for (const layer of options.layers ?? []) {
+		for (const [name, file] of Object.entries(await discoverLayouts(resolve(layer.root)))) {
+			if (name !== 'default' && !Object.hasOwn(layouts, name)) layouts[name] = file
+		}
+	}
+	for (const [name, file] of Object.entries(options.layouts ?? {})) if (!Object.hasOwn(layouts, name)) layouts[name] = file
+	const routes: RouteRecord[] = [...(await discoverRoutes(options.projectRoot, { layouts }))]
+	for (const layer of options.layers ?? []) {
+		const root = resolve(layer.root)
+		if (roots.has(root.toLowerCase())) throw new Error(`Duplicate route root: ${root}`)
+		roots.add(root.toLowerCase())
+		// Layer pages render inside the project's shell and fall back to its error page.
+		routes.push(...(await discoverRoutes(root, { shell: options.projectRoot, layouts })))
+	}
+	// The routes of a module run the project's global server route middleware too, like its pages.
+	const { serverGlobal } = await discoverRouteMiddleware(options.projectRoot)
+	for (const module of options.modules ?? []) {
+		for (const route of await module.routes()) {
+			const serverMiddleware = [...new Set([...serverGlobal, ...(route.serverMiddleware ?? [])])]
+			routes.push(serverMiddleware.length && route.render !== 'client' && route.render !== 'prerender' ? { ...route, serverMiddleware } : route)
+		}
+	}
+	return createRouteManifest(routes)
 }

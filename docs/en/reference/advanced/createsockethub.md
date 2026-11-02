@@ -18,7 +18,7 @@ related:
   - "@meekojs/meeko/server#createServerApp"
   - docs/framework.md#websocket
   - docs/framework.md#broadcast-y-varias-instancias
-source-hash: 21fe1699e21bf0039706fd7e4558eba7f9ce9b18a8b7689a69d93e7d7d174ac2
+source-hash: e38c0260e600369b4905bc0da7293e257158e38d4db90b075222daa000fa863e
 ---
 
 `createSocketHub` is Meeko's transport-independent Socket core. It receives channel definitions (`defineSocketChannel`), the session manager and services, and validates everything coming in and going out: `Origin`, session and channel authorization at handshake, and the event and its payload against schemas on every message. It applies per-peer size, buffer and queue limits, and distributes broadcasts through a broker (`LocalSocketPubSub` on one instance, `RedisSocketPubSub` or Durable Objects on multiple instances).

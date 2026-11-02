@@ -17,7 +17,7 @@ related:
   - "@meekojs/meeko/server#createSocketUpgradeHandler"
   - docs/framework.md#websocket
   - docs/framework.md#clientes-con-url-y-contrato-explícitos
-source-hash: ce5471a34dccb1c3b7899ca68d9d70739c95b57658f18019bad3a3ace2443fd5
+source-hash: d4a53b1bde339e3c11cf6277333f317ecbf4346981b116c5a3e0423cd3ac17dd
 ---
 
 `createSocketClient` opens a `WebSocket` to a Socket channel with an explicit URL and contract. It validates every outgoing and incoming event against the contract schemas, automatically reconnects with exponential backoff and exposes its state as a signal. Delivery is at most once: `emit` rejects when disconnected, without a queue or resend.

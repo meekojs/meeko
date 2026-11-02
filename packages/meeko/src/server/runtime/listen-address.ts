@@ -14,12 +14,12 @@
  * ```
  */
 export interface NetworkInterfaceAddress {
-  /** Dirección IPv4 o IPv6. */
-  readonly address: string;
-  /** `"IPv4"` o `"IPv6"`; Node 18.0–18.3 usaba `4` y `6`. */
-  readonly family: string | number;
-  /** Si es una interfaz interna (loopback). Deno no lo informa; las de loopback se descartan igualmente. */
-  readonly internal?: boolean;
+	/** Dirección IPv4 o IPv6. */
+	readonly address: string
+	/** `"IPv4"` o `"IPv6"`; Node 18.0–18.3 usaba `4` y `6`. */
+	readonly family: string | number
+	/** Si es una interfaz interna (loopback). Deno no lo informa; las de loopback se descartan igualmente. */
+	readonly internal?: boolean
 }
 
 /**
@@ -32,9 +32,7 @@ export interface NetworkInterfaceAddress {
  * const interfaces: NetworkInterfaces = networkInterfaces();
  * ```
  */
-export type NetworkInterfaces =
-  | Readonly<Record<string, readonly NetworkInterfaceAddress[] | undefined>>
-  | readonly NetworkInterfaceAddress[];
+export type NetworkInterfaces = Readonly<Record<string, readonly NetworkInterfaceAddress[] | undefined>> | readonly NetworkInterfaceAddress[]
 
 /**
  * URL que muestra un servidor local al arrancar.
@@ -45,22 +43,22 @@ export type NetworkInterfaces =
  * ```
  */
 export interface ServerUrls {
-  /** URL para abrir desde este equipo, p. ej. `http://localhost:4173`. */
-  readonly local: string;
-  /** URL de las interfaces de red cuando el servidor escucha en todas (`0.0.0.0` o `::`); vacía en otro caso. */
-  readonly network: readonly string[];
+	/** URL para abrir desde este equipo, p. ej. `http://localhost:4173`. */
+	readonly local: string
+	/** URL de las interfaces de red cuando el servidor escucha en todas (`0.0.0.0` o `::`); vacía en otro caso. */
+	readonly network: readonly string[]
 }
 
-const loopbackNames = new Set(["localhost", "127.0.0.1", "::1", "::ffff:127.0.0.1"]);
-const wildcards = new Set(["0.0.0.0", "::", "::ffff:0.0.0.0"]);
+const loopbackNames = new Set(['localhost', '127.0.0.1', '::1', '::ffff:127.0.0.1'])
+const wildcards = new Set(['0.0.0.0', '::', '::ffff:0.0.0.0'])
 
 function bare(host: string): string {
-  const unbracketed = host.startsWith("[") && host.endsWith("]") ? host.slice(1, -1) : host;
-  return unbracketed.toLowerCase();
+	const unbracketed = host.startsWith('[') && host.endsWith(']') ? host.slice(1, -1) : host
+	return unbracketed.toLowerCase()
 }
 
 function authority(host: string): string {
-  return host.includes(":") ? `[${host}]` : host;
+	return host.includes(':') ? `[${host}]` : host
 }
 
 /**
@@ -78,23 +76,23 @@ function authority(host: string): string {
  * ```
  */
 export function displayHost(host: string): string {
-  const name = bare(host);
-  return loopbackNames.has(name) || wildcards.has(name) ? "localhost" : authority(name);
+	const name = bare(host)
+	return loopbackNames.has(name) || wildcards.has(name) ? 'localhost' : authority(name)
 }
 
 function familyOf(entry: NetworkInterfaceAddress): 4 | 6 | undefined {
-  if (entry.family === "IPv4" || entry.family === 4) return 4;
-  if (entry.family === "IPv6" || entry.family === 6) return 6;
-  return undefined;
+	if (entry.family === 'IPv4' || entry.family === 4) return 4
+	if (entry.family === 'IPv6' || entry.family === 6) return 6
+	return undefined
 }
 
 function isLoopbackAddress(address: string, family: 4 | 6): boolean {
-  return family === 4 ? address.startsWith("127.") : address === "::1";
+	return family === 4 ? address.startsWith('127.') : address === '::1'
 }
 
 /** IPv6 link-local addresses (`fe80::/10`) need a zone identifier that a browser URL cannot carry. */
 function isLinkLocal(address: string): boolean {
-  return /^fe[89ab]/i.test(address);
+	return /^fe[89ab]/i.test(address)
 }
 
 /**
@@ -116,22 +114,25 @@ function isLinkLocal(address: string): boolean {
  * ```
  */
 export function serverUrls(host: string, port: number, interfaces?: () => NetworkInterfaces): ServerUrls {
-  const local = `http://${displayHost(host)}:${port}`;
-  const name = bare(host);
-  if (!wildcards.has(name) || !interfaces) return { local, network: [] };
-  let found: NetworkInterfaces;
-  try { found = interfaces(); }
-  catch { return { local, network: [] }; }
-  const entries = Array.isArray(found) ? found as readonly NetworkInterfaceAddress[] : Object.values(found).flatMap((list) => list ?? []);
-  const families = name === "::" ? new Set([4, 6]) : new Set([4]);
-  const network = new Set<string>();
-  for (const entry of entries) {
-    const family = familyOf(entry);
-    if (!family || !families.has(family) || entry.internal || isLoopbackAddress(entry.address, family)) continue;
-    if (family === 6 && isLinkLocal(entry.address)) continue;
-    network.add(`http://${authority(entry.address)}:${port}`);
-  }
-  return { local, network: [...network] };
+	const local = `http://${displayHost(host)}:${port}`
+	const name = bare(host)
+	if (!wildcards.has(name) || !interfaces) return { local, network: [] }
+	let found: NetworkInterfaces
+	try {
+		found = interfaces()
+	} catch {
+		return { local, network: [] }
+	}
+	const entries = Array.isArray(found) ? (found as readonly NetworkInterfaceAddress[]) : Object.values(found).flatMap((list) => list ?? [])
+	const families = name === '::' ? new Set([4, 6]) : new Set([4])
+	const network = new Set<string>()
+	for (const entry of entries) {
+		const family = familyOf(entry)
+		if (!family || !families.has(family) || entry.internal || isLoopbackAddress(entry.address, family)) continue
+		if (family === 6 && isLinkLocal(entry.address)) continue
+		network.add(`http://${authority(entry.address)}:${port}`)
+	}
+	return { local, network: [...network] }
 }
 
 /**
@@ -153,6 +154,6 @@ export function serverUrls(host: string, port: number, interfaces?: () => Networ
  * ```
  */
 export function listeningMessage(host: string, port: number, interfaces?: () => NetworkInterfaces): string {
-  const urls = serverUrls(host, port, interfaces);
-  return [urls.local, ...urls.network.map((url) => `Red: ${url}`)].map((line) => `${line}\n`).join("");
+	const urls = serverUrls(host, port, interfaces)
+	return [urls.local, ...urls.network.map((url) => `Red: ${url}`)].map((line) => `${line}\n`).join('')
 }

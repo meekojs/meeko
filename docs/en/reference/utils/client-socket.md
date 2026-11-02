@@ -16,7 +16,7 @@ related:
   - "@meekojs/meeko/server#RedisSocketPubSub"
   - docs/framework.md#websocket
   - docs/framework.md#broadcast-desde-el-servidor
-source-hash: 7a9261212aa5c2c648d5f06cc1ed735ae28097c13668fe16661b4d1a84fd3b6c
+source-hash: fa3156c16460b9622cbaa31a4486efb75228f636596515e08a58063344c52734
 ---
 
 `socket` is the registry Meeko generates from `server/socket` channels: `server/socket/chat.ts` becomes `socket.chat`. Events and their payloads have the types of the channel's `clientToServer` and `serverToClient` schemas.

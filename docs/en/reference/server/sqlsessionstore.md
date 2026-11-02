@@ -17,7 +17,7 @@ related:
   - docs/framework.md#sesiones-y-seguridad
   - docs/framework.md#rate-limit-en-sql
   - docs/framework.md#límite-de-peticiones-ratelimit
-source-hash: ce7b6e58c0a2699cfbf62ee6e3ffb2d87c8343c232b5a4a75159faa5211aadf7
+source-hash: 71f5fdd602393efafcc2f4bc2d9d8142515bcba370dc8ecc19c38956d3bbe771
 ---
 
 `SqlSessionStore` stores sessions in a SQL table without depending on any library or engine: the application supplies a `SqlSessionDriver` with its statements and Meeko handles the rest (serializing data, checking expiration, deriving each session's own lifetime as `expiresAt - createdAt`). `replace` and `revokeFamily` must be atomic; the constructor rejects a driver without them.

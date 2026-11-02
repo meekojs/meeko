@@ -38,10 +38,10 @@ matchRoute(routes, "/nope");             // undefined
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `routes` | `RouteRecord[]` | obligatorio | El manifiesto de rutas. Con `createRouteManifest` queda ordenado (estáticas, después dinámicas y al final catch-all) y sin colisiones. |
-| `pathname` | texto | obligatorio | La ruta de la URL, que empieza por `/`, sin query ni fragmento (`new URL(request.url).pathname`). |
+| Parámetro  | Tipo            | Por defecto | Descripción                                                                                                                            |
+| ---------- | --------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `routes`   | `RouteRecord[]` | obligatorio | El manifiesto de rutas. Con `createRouteManifest` queda ordenado (estáticas, después dinámicas y al final catch-all) y sin colisiones. |
+| `pathname` | texto           | obligatorio | La ruta de la URL, que empieza por `/`, sin query ni fragmento (`new URL(request.url).pathname`).                                      |
 
 ## Valor devuelto
 
@@ -71,6 +71,7 @@ matchRoute(routes, "/docs");               // undefined: el catch-all necesita a
 ### Un host propio que sabe a qué página va cada petición
 
 <!-- no-check -->
+
 ```ts
 // server.mjs, junto al build de Node
 import { createServer } from "node:http";
@@ -101,6 +102,7 @@ matchRoute(routes, request.url);
 `"http://localhost/users/42"` no empieza por `/`: ninguna ruta coincide y el resultado es `undefined`.
 
 <!-- no-check -->
+
 ```ts good
 matchRoute(routes, new URL(request.url).pathname);
 ```
@@ -118,6 +120,7 @@ matchRoute(routes, "/users/new"); // puede devolver /users/[id]
 `matchRoute` recorre la lista en orden. `createRouteManifest` ordena las estáticas antes que las dinámicas y detecta colisiones (`Route collision: a and b both resolve to …`).
 
 <!-- no-check -->
+
 ```ts good
 const routes = createRouteManifest([
   { id: "/users/[id]", file: "a", layouts: [] },
@@ -134,6 +137,7 @@ createRouteManifest([{ id: "users", file: "app/pages/users.meeko", layouts: [] }
 `TypeError: Route must start with /: users`.
 
 <!-- no-check -->
+
 ```ts good
 createRouteManifest([{ id: "/users", file: "app/pages/users.meeko", layouts: [] }]);
 ```

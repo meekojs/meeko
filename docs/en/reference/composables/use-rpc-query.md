@@ -18,7 +18,7 @@ related:
   - "@meekojs/meeko/framework#createUseRpcQuery"
   - docs/framework.md#datos-en-componentes-useapi-userpcquery-y-userpcmutation
   - docs/framework.md#búsqueda-mientras-se-escribe-debouncems-y-enabled
-source-hash: 0ea38a5954270396f8efc0390695349aa531ead674ece5bd97eb044062323e88
+source-hash: 3866f13d5c029f7432cd4cc274a541f4c3ef9950ee844eb052d0d7ad47fb1075
 ---
 
 `useRpcQuery(procedimiento, input?, recarga?)` is [`useApi`](/en/docs/reference/use-api) for `server/rpc` procedures: it calls the procedure with `input` and returns the same resource, with `data`, `error`, `pending`, `refreshing` and `refresh`. Name the procedure by its dotted ID (`server/rpc/users/activity.ts` is `"users.activity"`) and TypeScript checks `input` and the shape of `data` against its contract.

@@ -1,10 +1,10 @@
-import type { ClientOptions, PublicServerManifest, RpcOperation } from "../../../shared/clients";
-import type { MutationOptions } from "../../runtime/mutations";
-import type { RpcMutation, UseRpcMutation } from "./engine";
+import type { ClientOptions, PublicServerManifest, RpcOperation } from '../../../shared/clients'
+import type { MutationOptions } from '../../runtime/mutations'
+import type { RpcMutation, UseRpcMutation } from './engine'
 
-import { requestRpc } from "../../../shared/clients";
-import { createMutation } from "../../runtime/mutations";
-import { requireSetup, rpcEndpoint } from "./engine";
+import { requestRpc } from '../../../shared/clients'
+import { createMutation } from '../../runtime/mutations'
+import { requireSetup, rpcEndpoint } from './engine'
 
 /**
  * Crea `useRpcMutation` para los procedimientos de un manifiesto público, como hacen los clientes
@@ -25,17 +25,19 @@ import { requireSetup, rpcEndpoint } from "./engine";
  * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#mutaciones
  */
-export function createUseRpcMutation<Contract extends Record<string, RpcOperation>>(manifest: Pick<PublicServerManifest, "rpc">, options: ClientOptions = {}): UseRpcMutation<Contract> {
-  const useRpcMutation = (procedure: string, mutationOptions?: MutationOptions): RpcMutation<unknown, unknown> => {
-    const label = `useRpcMutation("${procedure}")`;
-    requireSetup(label);
-    const endpoint = rpcEndpoint(manifest, procedure, "useRpcMutation");
-    return createMutation({
-      label,
-      target: `RPC ${procedure}`,
-      send: (input, headers) => requestRpc(endpoint, input, {}, options, headers),
-    }, mutationOptions) as RpcMutation<unknown, unknown>;
-  };
-  return useRpcMutation as never;
+export function createUseRpcMutation<Contract extends Record<string, RpcOperation>>(manifest: Pick<PublicServerManifest, 'rpc'>, options: ClientOptions = {}): UseRpcMutation<Contract> {
+	const useRpcMutation = (procedure: string, mutationOptions?: MutationOptions): RpcMutation<unknown, unknown> => {
+		const label = `useRpcMutation("${procedure}")`
+		requireSetup(label)
+		const endpoint = rpcEndpoint(manifest, procedure, 'useRpcMutation')
+		return createMutation(
+			{
+				label,
+				target: `RPC ${procedure}`,
+				send: (input, headers) => requestRpc(endpoint, input, {}, options, headers),
+			},
+			mutationOptions,
+		) as RpcMutation<unknown, unknown>
+	}
+	return useRpcMutation as never
 }
-

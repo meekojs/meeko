@@ -8,4 +8,8 @@
 </script>
 
 <!-- Sin elementos ni espacios propios: el texto queda dentro de la frase. Una etiqueta sin snippet muestra su texto. -->
-<template><render if:when="props.snippet" snippet="props.snippet" args="props.text" />{props.snippet ? '' : props.text}</template>
+<template><render
+		if:when="props.snippet"
+		snippet="props.snippet"
+		args="props.text"
+	/>{props.snippet ? '' : props.text}</template>

@@ -267,21 +267,21 @@ i18n: {
 
 `useI18n()` devuelve:
 
-| Miembro                                           | Descripción                                                                           |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `locale`, `defaultLocale`, `locales`, `dir`       | Idioma del documento, idioma sin prefijo, idiomas configurados y dirección.           |
-| `t(key, values?, { locale }?)`                    | Mensaje con clave y parámetros tipados desde los catálogos; en otro idioma, con `multilingual`. |
-| `rich(key, values?, { locale }?)`                 | El mensaje partido por sus etiquetas (`{ text, tag? }`), la base de `<I18nT>`.        |
-| `has(key, { locale }?)`                           | Si la clave tiene mensaje en los catálogos cargados, para una clave que llega de un dato. |
-| `number(value, options?)`, `date(value, options?)` | `Intl.NumberFormat` y `Intl.DateTimeFormat` del idioma, cacheados por opciones.       |
-| `localePath(path, locale?)`                       | Ruta interna en un idioma (por defecto, el actual).                                   |
-| `switchLocalePath(locale)`                        | Ruta equivalente de la página actual en otro idioma. Reactiva.                        |
-| `pageLocales()`                                   | Idiomas con versión de la página actual. Reactiva.                                    |
-| `localeName(locale, displayLocale?)`              | Nombre del idioma (`English`, `Español`), por defecto en ese idioma.                  |
-| `directionOf(locale)`                             | `ltr` o `rtl`.                                                                        |
-| `suggestedLocale()`                               | Idioma preferido por el lector si no es el actual; sólo en el navegador.              |
-| `rememberLocale(locale)`                          | Guarda el idioma en la cookie.                                                        |
-| `switchLocale(locale)`                            | Guarda el idioma y navega a la ruta equivalente (documento nuevo).                    |
+| Miembro                                            | Descripción                                                                                     |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `locale`, `defaultLocale`, `locales`, `dir`        | Idioma del documento, idioma sin prefijo, idiomas configurados y dirección.                     |
+| `t(key, values?, { locale }?)`                     | Mensaje con clave y parámetros tipados desde los catálogos; en otro idioma, con `multilingual`. |
+| `rich(key, values?, { locale }?)`                  | El mensaje partido por sus etiquetas (`{ text, tag? }`), la base de `<I18nT>`.                  |
+| `has(key, { locale }?)`                            | Si la clave tiene mensaje en los catálogos cargados, para una clave que llega de un dato.       |
+| `number(value, options?)`, `date(value, options?)` | `Intl.NumberFormat` y `Intl.DateTimeFormat` del idioma, cacheados por opciones.                 |
+| `localePath(path, locale?)`                        | Ruta interna en un idioma (por defecto, el actual).                                             |
+| `switchLocalePath(locale)`                         | Ruta equivalente de la página actual en otro idioma. Reactiva.                                  |
+| `pageLocales()`                                    | Idiomas con versión de la página actual. Reactiva.                                              |
+| `localeName(locale, displayLocale?)`               | Nombre del idioma (`English`, `Español`), por defecto en ese idioma.                            |
+| `directionOf(locale)`                              | `ltr` o `rtl`.                                                                                  |
+| `suggestedLocale()`                                | Idioma preferido por el lector si no es el actual; sólo en el navegador.                        |
+| `rememberLocale(locale)`                           | Guarda el idioma en la cookie.                                                                  |
+| `switchLocale(locale)`                             | Guarda el idioma y navega a la ruta equivalente (documento nuevo).                              |
 
 `<I18nT key values? locale?>` pinta un mensaje con marcado, con un snippet por etiqueta. `usePageI18n()`, de `@meekojs/i18n/server`, da el idioma y el traductor en un `<script server>`. Los dos se autoimportan.
 

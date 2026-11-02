@@ -9,7 +9,7 @@ related:
   - "@meekojs/meeko/password#hashPassword"
   - "@meekojs/meeko/password#verifyPassword"
   - docs/framework.md#contraseñas
-source-hash: 0bb52b12accae9fe935a3ad32f6f5fd33fc541c4d66f7c776b67d5115e46424c
+source-hash: a1fde3bc6704f3f5f1dd90dc6759b12bae7b3147b8d9e0c9be608aeab1ab4849
 ---
 
 `needsRehash(hash)` tells you whether a stored hash needs recalculating with the current `hashPassword` parameters: its cost (N, r, p), salt or key is smaller than the current values, or its format is invalid. It is synchronous and does not calculate any hash.

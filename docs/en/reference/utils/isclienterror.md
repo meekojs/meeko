@@ -11,7 +11,7 @@ related:
   - "@meekojs/meeko#provideErrorHandler"
   - "@meekojs/meeko/framework#mountClientApp"
   - docs/framework.md#errores
-source-hash: 64b370457c501d6c3a1f569bf0d3e0c451f7110c35bc0782ce1d11ecd8a29237
+source-hash: 3245110a1cefe3fa46b9978f8f66ea460cdaed54172b89f9a996883a8a817946
 ---
 
 `isClientError(error, code?)` checks whether `error` is a [`ClientError`](/en/docs/reference/clienterror) and, with `code`, whether it has that code. It is a _type guard_: in the true branch, TypeScript knows that `error` is a `ClientError` (and, with `code`, that `error.code` is that literal).

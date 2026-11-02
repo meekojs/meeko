@@ -38,10 +38,10 @@ const response = await handle(new Request("http://localhost/"));
 
 ## Parámetros
 
-| Parámetro | Tipo | Descripción |
-| --- | --- | --- |
-| `middlewares` | `readonly ServerMiddleware[]` | En orden de ejecución: el primero es el más externo. |
-| `handler` | `(request: Request) => Promise<Response>` | El handler final, como `app.fetch`. |
+| Parámetro     | Tipo                                      | Descripción                                          |
+| ------------- | ----------------------------------------- | ---------------------------------------------------- |
+| `middlewares` | `readonly ServerMiddleware[]`             | En orden de ejecución: el primero es el más externo. |
+| `handler`     | `(request: Request) => Promise<Response>` | El handler final, como `app.fetch`.                  |
 
 Un `ServerMiddleware` es `(request, next) => Response | Promise<Response>`; `next(request?)` continúa con la misma petición o con otra.
 
@@ -96,6 +96,7 @@ export const tagRequests: ServerMiddleware = (request, next) => {
 ### Un host propio que envuelve la aplicación
 
 <!-- no-check -->
+
 ```ts
 import { createServer } from "node:http";
 import { composeServerMiddleware } from "@meekojs/meeko/server";
@@ -119,6 +120,7 @@ const retry: ServerMiddleware = async (request, next) => {
 La segunda llamada lanza `Error: Server middleware called next() more than once` y la petición responde `500`. El cuerpo de la petición ya se consumió: un reintento necesita un `Request` nuevo y otra composición.
 
 <!-- no-check -->
+
 ```ts good
 const retry: ServerMiddleware = async (request, next) => next(request);
 ```
@@ -135,6 +137,7 @@ const log: ServerMiddleware = async (request, next) => {
 `TypeError: Server middleware must return a Response` en ejecución; `meeko check` ya lo marca como error de tipos.
 
 <!-- no-check -->
+
 ```ts good
 const log: ServerMiddleware = async (request, next) => {
   const response = await next();

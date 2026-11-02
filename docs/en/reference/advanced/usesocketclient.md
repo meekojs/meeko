@@ -15,7 +15,7 @@ related:
   - "@meekojs/meeko#provideErrorHandler"
   - docs/framework.md#clientes-con-url-y-contrato-explícitos
   - docs/framework.md#websocket
-source-hash: 9c928390f873a16e79eac9577b945836ff388b639bcd1e9b01517d104c35770d
+source-hash: cc6360106637ac22403ac282cc0d8d6728c7627d2e8c2ffb1cb14ffe9bf1baef
 ---
 
 `useSocketClient` is [`createSocketClient`](/en/docs/reference/createsocketclient) tied to a component: it creates the client with the URL and contract you pass, closes it with `onCleanup` when the component unmounts (also on page changes) and, without its own `onError`, reports failures to the nearest `provideErrorHandler` or the application's `onError`.

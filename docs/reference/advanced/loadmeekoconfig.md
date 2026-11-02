@@ -31,23 +31,23 @@ console.log(`adaptador: ${adapter}, sitio: ${config.site ?? "(sin site)"}`);
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
+| Parámetro     | Tipo | Por defecto | Descripción                                        |
+| ------------- | ---- | ----------- | -------------------------------------------------- |
 | `projectRoot` | ruta | obligatorio | Carpeta del proyecto, donde está `meeko.config.*`. |
 
 ## Valor devuelto
 
 Una promesa de `MeekoConfig`: el objeto exportado por defecto, tal cual (con `defineMeekoConfig` o sin él). No resuelve los módulos ni los layers, no aplica valores por defecto y no ejecuta los `setup` de los módulos: devuelve lo que escribiste.
 
-| Caso | Resultado |
-| --- | --- |
-| Sin archivo de configuración | `{}` |
-| Un archivo válido | El export por defecto. |
-| Varios archivos (`meeko.config.ts` y `.mjs`) | Rechaza con `Error: Hay varios archivos de configuración de Meeko: …` |
-| Un campo con un valor no válido | Rechaza con `TypeError: <archivo>: server.adapter debe ser "node", "cloudflare", "deno", "bun" o "static"` y similares. |
-| El archivo no se puede importar | Rechaza con `Error: No se puede cargar <archivo>: <error de Node>`, con el original en `cause`. |
+| Caso                                                   | Resultado                                                                                                                                                              |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sin archivo de configuración                           | `{}`                                                                                                                                                                   |
+| Un archivo válido                                      | El export por defecto.                                                                                                                                                 |
+| Varios archivos (`meeko.config.ts` y `.mjs`)           | Rechaza con `Error: Hay varios archivos de configuración de Meeko: …`                                                                                                  |
+| Un campo con un valor no válido                        | Rechaza con `TypeError: <archivo>: server.adapter debe ser "node", "cloudflare", "deno", "bun" o "static"` y similares.                                                |
+| El archivo no se puede importar                        | Rechaza con `Error: No se puede cargar <archivo>: <error de Node>`, con el original en `cause`.                                                                        |
 | Una clave que ni Meeko ni un módulo leen (desde `1.7`) | Avisa en la salida de errores y la devuelve igual: `[meeko] Aviso: meeko.config.ts tiene la clave desconocida "sitmap", que Meeko ignora. ¿Quisiste decir "sitemap"?`. |
-| El export por defecto no es un objeto | Rechaza con `TypeError: <archivo> debe exportar por defecto un objeto de configuración de Meeko`. |
+| El export por defecto no es un objeto                  | Rechaza con `TypeError: <archivo> debe exportar por defecto un objeto de configuración de Meeko`.                                                                      |
 
 ## Ejemplos
 

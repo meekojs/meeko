@@ -1,29 +1,29 @@
-import { isAbsolute, relative } from "node:path";
+import { isAbsolute, relative } from 'node:path'
 
-import { builtinComponentModules } from "../compiler";
+import { builtinComponentModules } from '../compiler'
 
 /**
  * Files whose addition or removal changes what Meeko discovers: routes,
  * layouts, error pages, route middleware, app plugins and the server API, RPC,
  * Socket and middleware modules. Paths are relative to a source root, with `/`.
  */
-const discoveryPath = /^(?:app\/(?:pages|layouts|middleware|plugins)\/|app\/(?:app|error)\.meeko$|server\/(?:api|rpc|socket|middleware)\/)/;
+const discoveryPath = /^(?:app\/(?:pages|layouts|middleware|plugins)\/|app\/(?:app|error)\.meeko$|server\/(?:api|rpc|socket|middleware)\/)/
 
 /** Whether `file` is a discovery input of one of `sourceRoots` (the project and its layers or modules). */
 export function isDiscoverySource(file: string, sourceRoots: readonly string[]): boolean {
-  return sourceRoots.some((root) => {
-    const path = relative(root, file).replaceAll("\\", "/");
-    return !path.startsWith("../") && path !== ".." && discoveryPath.test(path);
-  });
+	return sourceRoots.some((root) => {
+		const path = relative(root, file).replaceAll('\\', '/')
+		return !path.startsWith('../') && path !== '..' && discoveryPath.test(path)
+	})
 }
 
 /** Whether a `.meeko` file belongs to a configured component directory (including external module dirs). */
 export function isComponentSource(file: string, directories: readonly string[]): boolean {
-  if (!file.endsWith(".meeko")) return false;
-  return directories.some((directory) => {
-    const path = relative(directory, file);
-    return path !== "" && path !== ".." && !path.startsWith("../") && !path.startsWith("..\\") && !isAbsolute(path);
-  });
+	if (!file.endsWith('.meeko')) return false
+	return directories.some((directory) => {
+		const path = relative(directory, file)
+		return path !== '' && path !== '..' && !path.startsWith('../') && !path.startsWith('..\\') && !isAbsolute(path)
+	})
 }
 
 /**
@@ -33,25 +33,25 @@ export function isComponentSource(file: string, directories: readonly string[]):
  * one may change `render`, the layout or the middleware of routes.
  */
 export function isRouteOptionsSource(file: string, sourceRoots: readonly string[]): boolean {
-  return sourceRoots.some((root) => {
-    const path = relative(root, file).replaceAll("\\", "/");
-    if (path.startsWith("app/middleware/")) return path.endsWith(".ts");
-    return path.startsWith("app/pages/") && (path.endsWith(".meeko") || path.endsWith(".route.ts") || path.endsWith("/+group.ts"));
-  });
+	return sourceRoots.some((root) => {
+		const path = relative(root, file).replaceAll('\\', '/')
+		if (path.startsWith('app/middleware/')) return path.endsWith('.ts')
+		return path.startsWith('app/pages/') && (path.endsWith('.meeko') || path.endsWith('.route.ts') || path.endsWith('/+group.ts'))
+	})
 }
 
 /** What {@link reachesEagerModule} reads of a Vite module node. */
 export interface HotModuleNode {
-  readonly file: string | null;
-  readonly isSelfAccepting?: boolean | undefined;
-  readonly importers: ReadonlySet<HotModuleNode>;
-  readonly acceptedHmrDeps: ReadonlySet<HotModuleNode>;
+	readonly file: string | null
+	readonly isSelfAccepting?: boolean | undefined
+	readonly importers: ReadonlySet<HotModuleNode>
+	readonly acceptedHmrDeps: ReadonlySet<HotModuleNode>
 }
 
 /** Comparable form of a file path: `/` separators, and no case on Windows. */
 export function hotFileKey(file: string): string {
-  const path = file.replaceAll("\\", "/");
-  return process.platform === "win32" ? path.toLowerCase() : path;
+	const path = file.replaceAll('\\', '/')
+	return process.platform === 'win32' ? path.toLowerCase() : path
 }
 
 /**
@@ -64,17 +64,17 @@ export function hotFileKey(file: string): string {
  * again, no longer read: `Missing Meeko context`.
  */
 export function reachesEagerModule(modules: Iterable<HotModuleNode>, eager: ReadonlySet<string>): boolean {
-  if (!eager.size) return false;
-  const seen = new Set<HotModuleNode>();
-  const pending = [...modules];
-  for (let node = pending.pop(); node; node = pending.pop()) {
-    if (seen.has(node)) continue;
-    seen.add(node);
-    if (node.file && eager.has(hotFileKey(node.file))) return true;
-    if (node.isSelfAccepting) continue;
-    for (const importer of node.importers) if (!importer.acceptedHmrDeps.has(node)) pending.push(importer);
-  }
-  return false;
+	if (!eager.size) return false
+	const seen = new Set<HotModuleNode>()
+	const pending = [...modules]
+	for (let node = pending.pop(); node; node = pending.pop()) {
+		if (seen.has(node)) continue
+		seen.add(node)
+		if (node.file && eager.has(hotFileKey(node.file))) return true
+		if (node.isSelfAccepting) continue
+		for (const importer of node.importers) if (!importer.acceptedHmrDeps.has(node)) pending.push(importer)
+	}
+	return false
 }
 
 /**
@@ -86,29 +86,29 @@ export function reachesEagerModule(modules: Iterable<HotModuleNode>, eager: Read
  * plugin had already read (a `createContext` key: `Missing Meeko context`).
  */
 export function isModuleScript(file: string, directories: readonly string[]): boolean {
-  if (!/\.[cm]?[jt]sx?$/.test(file) || /\.d\.[cm]?ts$/.test(file)) return false;
-  const key = hotFileKey(file);
-  return directories.some((directory) => key.startsWith(`${hotFileKey(directory).replace(/\/$/, "")}/`));
+	if (!/\.[cm]?[jt]sx?$/.test(file) || /\.d\.[cm]?ts$/.test(file)) return false
+	const key = hotFileKey(file)
+	return directories.some((directory) => key.startsWith(`${hotFileKey(directory).replace(/\/$/, '')}/`))
 }
 
 /** What {@link invalidateDevModules} reads of a Vite module node. */
 export interface DevModuleNode {
-  readonly file: string | null;
-  readonly importedModules: ReadonlySet<DevModuleNode>;
+	readonly file: string | null
+	readonly importedModules: ReadonlySet<DevModuleNode>
 }
 
 /** What {@link invalidateDevModules} uses of a Vite module graph. */
 export interface DevModuleGraph<Node extends DevModuleNode = DevModuleNode> {
-  readonly idToModuleMap: ReadonlyMap<string, Node>;
-  invalidateModule(module: Node, seen?: Set<Node>, timestamp?: number): void;
-  invalidateAll(): void;
+	readonly idToModuleMap: ReadonlyMap<string, Node>
+	invalidateModule(module: Node, seen?: Set<Node>, timestamp?: number): void
+	invalidateAll(): void
 }
 
 /** What {@link invalidateDevModules} uses of a Vite development server. */
 export interface DevModuleServer {
-  /** The graph of every environment, which `invalidateAll` invalidates at once. */
-  readonly moduleGraph: { invalidateAll(): void };
-  readonly environments?: { readonly client: { readonly moduleGraph: DevModuleGraph }; readonly ssr?: { readonly moduleGraph: DevModuleGraph } };
+	/** The graph of every environment, which `invalidateAll` invalidates at once. */
+	readonly moduleGraph: { invalidateAll(): void }
+	readonly environments?: { readonly client: { readonly moduleGraph: DevModuleGraph }; readonly ssr?: { readonly moduleGraph: DevModuleGraph } }
 }
 
 /**
@@ -116,7 +116,7 @@ export interface DevModuleServer {
  * development app keeps. Keyed by the graph, not the server: Vite hands its plugins a proxy of the
  * server, and a restart replaces the graph, after which the app is built again and registers anew.
  */
-const keptServerModules = new WeakMap<object, ReadonlySet<string>>();
+const keptServerModules = new WeakMap<object, ReadonlySet<string>>()
 
 /**
  * Tells {@link invalidateDevModules} which files the development app imported when it was created
@@ -124,7 +124,7 @@ const keptServerModules = new WeakMap<object, ReadonlySet<string>>();
  * {@link hotFileKey}s). Each new app registers its own.
  */
 export function keepServerModules(graph: object, files: ReadonlySet<string>): void {
-  keptServerModules.set(graph, files);
+	keptServerModules.set(graph, files)
 }
 
 /**
@@ -136,24 +136,27 @@ export function keepServerModules(graph: object, files: ReadonlySet<string>): vo
  * of them rebuilds the app instead ({@link reachesEagerModule}), which starts from a clean graph.
  */
 export function invalidateDevModules(server: DevModuleServer): void {
-  const { environments } = server;
-  const graph = environments?.ssr?.moduleGraph;
-  const eager = graph && keptServerModules.get(graph);
-  // Without a development app (a Vite project that uses the Meeko plugin alone), everything goes.
-  if (!environments || !graph || !eager?.size) { server.moduleGraph.invalidateAll(); return; }
-  environments.client.moduleGraph.invalidateAll();
-  // What an eager module imports is kept too: a module outside this set is imported by none of them,
-  // so invalidating it, and its importers with it, never reaches the set.
-  const kept = new Set<DevModuleNode>();
-  const pending = [...graph.idToModuleMap.values()].filter((node) => node.file && eager.has(hotFileKey(node.file)));
-  for (let node = pending.pop(); node; node = pending.pop()) {
-    if (kept.has(node)) continue;
-    kept.add(node);
-    pending.push(...node.importedModules);
-  }
-  const seen = new Set<DevModuleNode>();
-  const timestamp = Date.now();
-  for (const node of graph.idToModuleMap.values()) if (!kept.has(node)) graph.invalidateModule(node, seen, timestamp);
+	const { environments } = server
+	const graph = environments?.ssr?.moduleGraph
+	const eager = graph && keptServerModules.get(graph)
+	// Without a development app (a Vite project that uses the Meeko plugin alone), everything goes.
+	if (!environments || !graph || !eager?.size) {
+		server.moduleGraph.invalidateAll()
+		return
+	}
+	environments.client.moduleGraph.invalidateAll()
+	// What an eager module imports is kept too: a module outside this set is imported by none of them,
+	// so invalidating it, and its importers with it, never reaches the set.
+	const kept = new Set<DevModuleNode>()
+	const pending = [...graph.idToModuleMap.values()].filter((node) => node.file && eager.has(hotFileKey(node.file)))
+	for (let node = pending.pop(); node; node = pending.pop()) {
+		if (kept.has(node)) continue
+		kept.add(node)
+		pending.push(...node.importedModules)
+	}
+	const seen = new Set<DevModuleNode>()
+	const timestamp = Date.now()
+	for (const node of graph.idToModuleMap.values()) if (!kept.has(node)) graph.invalidateModule(node, seen, timestamp)
 }
 
 /**
@@ -161,13 +164,17 @@ export function invalidateDevModules(server: DevModuleServer): void {
  * and server), and which route middleware is global, to compare two discoveries.
  */
 export function routeOptionsKey(
-  routes: readonly {
-    readonly id: string; readonly layouts: readonly string[]; readonly render?: string; readonly layout?: unknown;
-    readonly middleware?: readonly string[]; readonly serverMiddleware?: readonly string[];
-  }[],
-  globalMiddleware: readonly string[] = [],
+	routes: readonly {
+		readonly id: string
+		readonly layouts: readonly string[]
+		readonly render?: string
+		readonly layout?: unknown
+		readonly middleware?: readonly string[]
+		readonly serverMiddleware?: readonly string[]
+	}[],
+	globalMiddleware: readonly string[] = [],
 ): string {
-  return JSON.stringify([routes.map((route) => [route.id, route.layouts, route.render ?? null, route.layout ?? null, route.middleware ?? null, route.serverMiddleware ?? null]), globalMiddleware]);
+	return JSON.stringify([routes.map((route) => [route.id, route.layouts, route.render ?? null, route.layout ?? null, route.middleware ?? null, route.serverMiddleware ?? null]), globalMiddleware])
 }
 
 /**
@@ -182,33 +189,33 @@ export function routeOptionsKey(
  * outside `root` are never skipped.
  */
 export function isDevWatchIgnored(file: string, root: string): boolean {
-  const path = relative(root, file).replaceAll("\\", "/");
-  if (path === ".." || path.startsWith("../") || isAbsolute(path)) return false;
-  const segments = path.split("/").filter(Boolean);
-  for (let index = 0; index < segments.length - 1; index++) {
-    if (segments[index] === ".meeko" && segments[index + 1] !== "generated") return true;
-  }
-  return false;
+	const path = relative(root, file).replaceAll('\\', '/')
+	if (path === '..' || path.startsWith('../') || isAbsolute(path)) return false
+	const segments = path.split('/').filter(Boolean)
+	for (let index = 0; index < segments.length - 1; index++) {
+		if (segments[index] === '.meeko' && segments[index + 1] !== 'generated') return true
+	}
+	return false
 }
 
 /** The app `meeko dev` serves and the triggers that replace it; see {@link createDevAppReloader}. */
 export interface DevAppReloader<T> {
-  /** The app that answers the next request; pending while its replacement is built. */
-  readonly current: Promise<T>;
-  /**
-   * Runs `run` with the app once no replacement is pending, and counts it as in flight until it
-   * settles: a restart lets it finish on the module runner it started on before closing that runner.
-   */
-  use<R>(run: (app: T) => Promise<R>): Promise<R>;
-  /** Replaces the app after a discovery change. Changes within the coalescing delay make one replacement. */
-  rebuild(): void;
-  /**
-   * Runs the Vite restart `start` once the requests and the replacement in flight have finished
-   * (or after the drain timeout), and replaces the app once the restart settles, resolved or
-   * rejected. Requests wait from this call on: the restart closes the module runner the current
-   * app loads its modules through. Resolves or rejects as `start` does.
-   */
-  restart<R>(start: () => Promise<R>): Promise<R>;
+	/** The app that answers the next request; pending while its replacement is built. */
+	readonly current: Promise<T>
+	/**
+	 * Runs `run` with the app once no replacement is pending, and counts it as in flight until it
+	 * settles: a restart lets it finish on the module runner it started on before closing that runner.
+	 */
+	use<R>(run: (app: T) => Promise<R>): Promise<R>
+	/** Replaces the app after a discovery change. Changes within the coalescing delay make one replacement. */
+	rebuild(): void
+	/**
+	 * Runs the Vite restart `start` once the requests and the replacement in flight have finished
+	 * (or after the drain timeout), and replaces the app once the restart settles, resolved or
+	 * rejected. Requests wait from this call on: the restart closes the module runner the current
+	 * app loads its modules through. Resolves or rejects as `start` does.
+	 */
+	restart<R>(start: () => Promise<R>): Promise<R>
 }
 
 /**
@@ -224,77 +231,89 @@ export interface DevAppReloader<T> {
  * "module runner has been closed"), so the restart waits for them, up to `drainTimeout`
  * milliseconds; requests that arrive meanwhile wait for the app built after the restart.
  */
-export function createDevAppReloader<T>(
-  initial: T,
-  replace: (prior: T, superseded: () => boolean) => Promise<T>,
-  delay = 25,
-  drainTimeout = 5_000,
-): DevAppReloader<T> {
-  let current: Promise<T> = Promise.resolve(initial);
-  let queued = false;
-  /** Every Vite restart in flight, settled together. */
-  let restarting: Promise<unknown> | undefined;
-  /** Restarts begun so far, to tell a replacement that one began while it was building. */
-  let restarts = 0;
-  /** Requests and the replacement running on the module runner of the current Vite server. */
-  let active = 0;
-  const idle = new Set<() => void>();
-  const release = (): void => {
-    active--;
-    if (active === 0) for (const done of [...idle]) done();
-  };
-  const drained = (): Promise<void> => active === 0 ? Promise.resolve() : new Promise((done) => {
-    const finish = (): void => { clearTimeout(timer); idle.delete(finish); done(); };
-    const timer = setTimeout(finish, drainTimeout);
-    idle.add(finish);
-  });
-  const schedule = (): void => {
-    if (queued) return;
-    queued = true;
-    const previous = current;
-    current = (async () => {
-      const prior = await previous;
-      // Coalesces the events of a file tree created or removed at once.
-      await new Promise((done) => setTimeout(done, delay));
-      // The app must load through the module runner of the server that results from the restart.
-      while (restarting) {
-        const waiting = restarting;
-        await waiting;
-        if (restarting === waiting) restarting = undefined;
-      }
-      queued = false;
-      const begun = restarts;
-      active++;
-      try { return await replace(prior, () => restarts !== begun); }
-      finally { release(); }
-    })();
-  };
-  return {
-    get current() { return current; },
-    async use(run) {
-      // A replacement scheduled while this request waited (a restart, a discovery change) is waited for too.
-      let pending: Promise<T>;
-      let app: T;
-      do {
-        pending = current;
-        app = await pending;
-      } while (pending !== current);
-      active++;
-      try { return await run(app); }
-      finally { release(); }
-    },
-    rebuild: schedule,
-    restart(start) {
-      restarts++;
-      let settle!: () => void;
-      const settled = new Promise<void>((done) => { settle = done; });
-      restarting = restarting ? Promise.all([restarting, settled]) : settled;
-      schedule();
-      const running = drained().then(start);
-      void running.then(settle, settle);
-      return running;
-    },
-  };
+export function createDevAppReloader<T>(initial: T, replace: (prior: T, superseded: () => boolean) => Promise<T>, delay = 25, drainTimeout = 5_000): DevAppReloader<T> {
+	let current: Promise<T> = Promise.resolve(initial)
+	let queued = false
+	/** Every Vite restart in flight, settled together. */
+	let restarting: Promise<unknown> | undefined
+	/** Restarts begun so far, to tell a replacement that one began while it was building. */
+	let restarts = 0
+	/** Requests and the replacement running on the module runner of the current Vite server. */
+	let active = 0
+	const idle = new Set<() => void>()
+	const release = (): void => {
+		active--
+		if (active === 0) for (const done of [...idle]) done()
+	}
+	const drained = (): Promise<void> =>
+		active === 0
+			? Promise.resolve()
+			: new Promise((done) => {
+					const finish = (): void => {
+						clearTimeout(timer)
+						idle.delete(finish)
+						done()
+					}
+					const timer = setTimeout(finish, drainTimeout)
+					idle.add(finish)
+				})
+	const schedule = (): void => {
+		if (queued) return
+		queued = true
+		const previous = current
+		current = (async () => {
+			const prior = await previous
+			// Coalesces the events of a file tree created or removed at once.
+			await new Promise((done) => setTimeout(done, delay))
+			// The app must load through the module runner of the server that results from the restart.
+			while (restarting) {
+				const waiting = restarting
+				await waiting
+				if (restarting === waiting) restarting = undefined
+			}
+			queued = false
+			const begun = restarts
+			active++
+			try {
+				return await replace(prior, () => restarts !== begun)
+			} finally {
+				release()
+			}
+		})()
+	}
+	return {
+		get current() {
+			return current
+		},
+		async use(run) {
+			// A replacement scheduled while this request waited (a restart, a discovery change) is waited for too.
+			let pending: Promise<T>
+			let app: T
+			do {
+				pending = current
+				app = await pending
+			} while (pending !== current)
+			active++
+			try {
+				return await run(app)
+			} finally {
+				release()
+			}
+		},
+		rebuild: schedule,
+		restart(start) {
+			restarts++
+			let settle!: () => void
+			const settled = new Promise<void>((done) => {
+				settle = done
+			})
+			restarting = restarting ? Promise.all([restarting, settled]) : settled
+			schedule()
+			const running = drained().then(start)
+			void running.then(settle, settle)
+			return running
+		},
+	}
 }
 
 /**
@@ -302,7 +321,7 @@ export function createDevAppReloader<T>(
  * previous build leaves prerendered HTML. They are negated `optimizeDeps.entries`
  * patterns, relative to the Vite root.
  */
-export const devScanIgnored: readonly string[] = ["!**/.meeko/**"];
+export const devScanIgnored: readonly string[] = ['!**/.meeko/**']
 
 /**
  * `optimizeDeps.include` of the browser in `meeko dev`: the modules of Meeko's own components
@@ -313,7 +332,7 @@ export const devScanIgnored: readonly string[] = ["!**/.meeko/**"];
  * bundle a second runtime.
  */
 export function builtinOptimizeInclude(runtime: string, exclude: readonly string[] | undefined): string[] {
-  if (!runtime.replaceAll("\\", "/").includes("/node_modules/")) return [];
-  if (exclude?.some((entry) => entry === "@meekojs/meeko" || entry.startsWith("@meekojs/meeko/"))) return [];
-  return Object.values(builtinComponentModules).map((module) => module.specifier);
+	if (!runtime.replaceAll('\\', '/').includes('/node_modules/')) return []
+	if (exclude?.some((entry) => entry === '@meekojs/meeko' || entry.startsWith('@meekojs/meeko/'))) return []
+	return Object.values(builtinComponentModules).map((module) => module.specifier)
 }

@@ -1,11 +1,11 @@
 {
-  "extends": "../../tsconfig.json",
-  "compilerOptions": {
-    "noEmit": true,
-    "rootDir": ".",
-    "rootDirs": ["../..", "../../.meeko/types"],
-    "allowImportingTsExtensions": true,
-    "allowArbitraryExtensions": true
-  },
-  "include": ["client.ts", "server.ts", "production-server.ts", "build.ts", "page.ts", "model.ts"]
+	"extends": "../../tsconfig.json",
+	"compilerOptions": {
+		"noEmit": true,
+		"rootDir": ".",
+		"rootDirs": ["../..", "../../.meeko/types"],
+		"allowImportingTsExtensions": true,
+		"allowArbitraryExtensions": true
+	},
+	"include": ["client.ts", "server.ts", "production-server.ts", "build.ts", "page.ts", "model.ts"]
 }

@@ -1,11 +1,11 @@
-import type { ReadonlySignal } from "../../core/reactivity";
+import type { ReadonlySignal } from '../../core/reactivity'
 
-import { logClientError, observeCallback } from "../../core/error-observer";
-import { currentEffectOwner, onCleanup, signal } from "../../core/reactivity";
-import { serializeJson } from "../../core/server";
-import { ClientError } from "../../shared/clients";
-import { currentAppErrorChannel, currentComponentErrorHandler } from "./component-errors";
-import { setupPhase } from "./lifecycle";
+import { logClientError, observeCallback } from '../../core/error-observer'
+import { currentEffectOwner, onCleanup, signal } from '../../core/reactivity'
+import { serializeJson } from '../../core/server'
+import { ClientError } from '../../shared/clients'
+import { currentAppErrorChannel, currentComponentErrorHandler } from './component-errors'
+import { setupPhase } from './lifecycle'
 
 /**
  * Subconjunto de Standard Schema v1 que valida los payloads de un evento Socket, como los schemas
@@ -22,21 +22,17 @@ import { setupPhase } from "./lifecycle";
  * ```
  */
 export interface SocketSchema<I = unknown, O = I> {
-  /** Interfaz Standard Schema v1: `validate` devuelve el valor de salida o la lista de `issues`. */
-  readonly "~standard": {
-    readonly version: 1;
-    readonly validate: (value: unknown) => { value: O; issues?: undefined } | { issues: readonly unknown[] } | Promise<{ value: O; issues?: undefined } | { issues: readonly unknown[] }>;
-    readonly types?: { readonly input: I; readonly output: O } | undefined;
-  };
+	/** Interfaz Standard Schema v1: `validate` devuelve el valor de salida o la lista de `issues`. */
+	readonly '~standard': {
+		readonly version: 1
+		readonly validate: (value: unknown) => { value: O; issues?: undefined } | { issues: readonly unknown[] } | Promise<{ value: O; issues?: undefined } | { issues: readonly unknown[] }>
+		readonly types?: { readonly input: I; readonly output: O } | undefined
+	}
 }
 
-type SchemaInput<T> = T extends { readonly "~standard": { readonly types?: infer U } }
-  ? NonNullable<U> extends { readonly input: infer I } ? I : never
-  : T extends SocketSchema<infer I, unknown> ? I : never;
-type SchemaOutput<T> = T extends { readonly "~standard": { readonly types?: infer U } }
-  ? NonNullable<U> extends { readonly output: infer O } ? O : never
-  : T extends SocketSchema<unknown, infer O> ? O : never;
-type Events = Record<string, SocketSchema>;
+type SchemaInput<T> = T extends { readonly '~standard': { readonly types?: infer U } } ? (NonNullable<U> extends { readonly input: infer I } ? I : never) : T extends SocketSchema<infer I, unknown> ? I : never
+type SchemaOutput<T> = T extends { readonly '~standard': { readonly types?: infer U } } ? (NonNullable<U> extends { readonly output: infer O } ? O : never) : T extends SocketSchema<unknown, infer O> ? O : never
+type Events = Record<string, SocketSchema>
 
 /**
  * Contrato público de un canal Socket: los schemas de cada evento en cada dirección. Meeko lo
@@ -54,19 +50,19 @@ type Events = Record<string, SocketSchema>;
  * ```
  */
 export interface SocketContract<ClientToServer extends Events = Events, ServerToClient extends Events = Events> {
-  /** Eventos que envía el cliente, con su schema. */
-  readonly clientToServer: ClientToServer;
-  /** Eventos que envía el servidor, con su schema. */
-  readonly serverToClient: ServerToClient;
+	/** Eventos que envía el cliente, con su schema. */
+	readonly clientToServer: ClientToServer
+	/** Eventos que envía el servidor, con su schema. */
+	readonly serverToClient: ServerToClient
 }
 
-type SocketClientState = "connecting" | "open" | "closed" | "unauthorized";
+type SocketClientState = 'connecting' | 'open' | 'closed' | 'unauthorized'
 
 /** Auth refusals that a client can observe: an HTTP status of the handshake or a close of the hub. */
-const authCloseReasons = new Set(["Unauthorized", "Session expired", "Session revoked"]);
+const authCloseReasons = new Set(['Unauthorized', 'Session expired', 'Session revoked'])
 
 function authError(status: 401 | 403): ClientError {
-  return new ClientError(status === 401 ? "UNAUTHENTICATED" : "FORBIDDEN", status);
+	return new ClientError(status === 401 ? 'UNAUTHENTICATED' : 'FORBIDDEN', status)
 }
 
 /**
@@ -74,22 +70,22 @@ function authError(status: 401 | 403): ClientError {
  * `ws` package does in its error. A browser never exposes the status of a failed handshake.
  */
 function handshakeRefusal(event: Event): 401 | 403 | undefined {
-  const details = event as Event & { status?: unknown; statusCode?: unknown; message?: unknown; error?: { status?: unknown; statusCode?: unknown; message?: unknown } };
-  const values: unknown[] = [details.status, details.statusCode, details.error?.status, details.error?.statusCode];
-  for (const text of [details.message, details.error?.message]) {
-    const match = typeof text === "string" ? /Unexpected server response: (\d{3})\b/.exec(text) : null;
-    if (match) values.push(Number(match[1]));
-  }
-  const status = values.find((value) => value === 401 || value === 403);
-  return status as 401 | 403 | undefined;
+	const details = event as Event & { status?: unknown; statusCode?: unknown; message?: unknown; error?: { status?: unknown; statusCode?: unknown; message?: unknown } }
+	const values: unknown[] = [details.status, details.statusCode, details.error?.status, details.error?.statusCode]
+	for (const text of [details.message, details.error?.message]) {
+		const match = typeof text === 'string' ? /Unexpected server response: (\d{3})\b/.exec(text) : null
+		if (match) values.push(Number(match[1]))
+	}
+	const status = values.find((value) => value === 401 || value === 403)
+	return status as 401 | 403 | undefined
 }
 
 /** The refusal that a close carries: the hub's policy close (`1008`) for auth, or `4401`/`4403`. */
 function closeRefusal(event: Event): 401 | 403 | undefined {
-  const { code, reason } = event as Partial<CloseEvent>;
-  if (code === 4401) return 401;
-  if (code === 4403) return 403;
-  return code === 1008 && typeof reason === "string" && authCloseReasons.has(reason) ? 401 : undefined;
+	const { code, reason } = event as Partial<CloseEvent>
+	if (code === 4401) return 401
+	if (code === 4403) return 403
+	return code === 1008 && typeof reason === 'string' && authCloseReasons.has(reason) ? 401 : undefined
 }
 
 /**
@@ -107,17 +103,17 @@ function closeRefusal(event: Event): 401 | 403 | undefined {
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#websocket
  */
 export interface SocketClient<C extends SocketContract> {
-  /**
-   * Estado de la conexión. `"unauthorized"` (desde 1.1.0) es terminal: el servidor rechazó la
-   * autenticación o la autorización y el cliente no reintenta; `close()` lo pasa a `"closed"`.
-   */
-  readonly state: ReadonlySignal<SocketClientState>;
-  /** Valida y envía un evento; rechaza si el socket no está abierto o el payload no es válido. */
-  emit<K extends keyof C["clientToServer"] & string>(event: K, data: SchemaInput<C["clientToServer"][K]>): Promise<void>;
-  /** Escucha un evento del servidor ya validado; devuelve la función que deja de escucharlo. */
-  on<K extends keyof C["serverToClient"] & string>(event: K, listener: (data: SchemaOutput<C["serverToClient"][K]>) => void): () => void;
-  /** Cierra la conexión y deja de reconectar. */
-  close(): void;
+	/**
+	 * Estado de la conexión. `"unauthorized"` (desde 1.1.0) es terminal: el servidor rechazó la
+	 * autenticación o la autorización y el cliente no reintenta; `close()` lo pasa a `"closed"`.
+	 */
+	readonly state: ReadonlySignal<SocketClientState>
+	/** Valida y envía un evento; rechaza si el socket no está abierto o el payload no es válido. */
+	emit<K extends keyof C['clientToServer'] & string>(event: K, data: SchemaInput<C['clientToServer'][K]>): Promise<void>
+	/** Escucha un evento del servidor ya validado; devuelve la función que deja de escucharlo. */
+	on<K extends keyof C['serverToClient'] & string>(event: K, listener: (data: SchemaOutput<C['serverToClient'][K]>) => void): () => void
+	/** Cierra la conexión y deja de reconectar. */
+	close(): void
 }
 
 /**
@@ -131,16 +127,16 @@ export interface SocketClient<C extends SocketContract> {
  * ```
  */
 export interface SocketClientOptions {
-  /** Primer retraso de reconexión en milisegundos, que se duplica en cada intento; 500 por defecto. */
-  readonly retryMs?: number;
-  /** Retraso máximo de reconexión; 30 000 por defecto. */
-  readonly maxRetryMs?: number;
-  /** Tamaño máximo de un mensaje entrante en bytes; 64 KiB por defecto. */
-  readonly maxMessageBytes?: number;
-  /** Crea el `WebSocket`; útil en pruebas o fuera del navegador. */
-  readonly webSocketFactory?: (url: string) => WebSocket;
-  /** Recibe los mensajes entrantes inválidos y los fallos de los listeners; sin él, la consola. */
-  readonly onError?: (error: unknown) => void;
+	/** Primer retraso de reconexión en milisegundos, que se duplica en cada intento; 500 por defecto. */
+	readonly retryMs?: number
+	/** Retraso máximo de reconexión; 30 000 por defecto. */
+	readonly maxRetryMs?: number
+	/** Tamaño máximo de un mensaje entrante en bytes; 64 KiB por defecto. */
+	readonly maxMessageBytes?: number
+	/** Crea el `WebSocket`; útil en pruebas o fuera del navegador. */
+	readonly webSocketFactory?: (url: string) => WebSocket
+	/** Recibe los mensajes entrantes inválidos y los fallos de los listeners; sin él, la consola. */
+	readonly onError?: (error: unknown) => void
 }
 
 /**
@@ -154,12 +150,12 @@ export interface SocketClientOptions {
  * ```
  */
 export interface SocketRegistryOptions extends SocketClientOptions {
-  /** URL base HTTP(S) o WS(S). Por defecto, el origen actual del navegador. */
-  readonly baseUrl?: string;
-  /** Prefijo de las rutas de los canales; por defecto, `/_meeko/socket`. */
-  readonly pathnamePrefix?: string;
-  /** Sala a la que se une el cliente (`?room=`). */
-  readonly roomId?: string;
+	/** URL base HTTP(S) o WS(S). Por defecto, el origen actual del navegador. */
+	readonly baseUrl?: string
+	/** Prefijo de las rutas de los canales; por defecto, `/_meeko/socket`. */
+	readonly pathnamePrefix?: string
+	/** Sala a la que se une el cliente (`?room=`). */
+	readonly roomId?: string
 }
 
 /**
@@ -176,25 +172,25 @@ export interface SocketRegistryOptions extends SocketClientOptions {
  * ```
  */
 export type SocketRegistry<C extends Record<string, SocketContract>> = {
-  readonly [K in keyof C]: SocketClient<C[K]>;
-};
+	readonly [K in keyof C]: SocketClient<C[K]>
+}
 
 export function socketUrl(name: string, options: SocketRegistryOptions): string {
-  if (typeof window === "undefined") throw new Error("Socket connections are unavailable during SSR");
-  const prefix = options.pathnamePrefix ?? "/_meeko/socket";
-  if (!prefix.startsWith("/") || prefix.endsWith("/")) throw new TypeError("Invalid socket pathname prefix");
-  const url = new URL(`${prefix}/${encodeURIComponent(name)}`, options.baseUrl ?? window.location.href);
-  if (url.protocol === "http:") url.protocol = "ws:";
-  else if (url.protocol === "https:") url.protocol = "wss:";
-  else if (url.protocol !== "ws:" && url.protocol !== "wss:") throw new TypeError("Invalid socket URL protocol");
-  if (options.roomId !== undefined) url.searchParams.set("room", options.roomId);
-  return url.href;
+	if (typeof window === 'undefined') throw new Error('Socket connections are unavailable during SSR')
+	const prefix = options.pathnamePrefix ?? '/_meeko/socket'
+	if (!prefix.startsWith('/') || prefix.endsWith('/')) throw new TypeError('Invalid socket pathname prefix')
+	const url = new URL(`${prefix}/${encodeURIComponent(name)}`, options.baseUrl ?? window.location.href)
+	if (url.protocol === 'http:') url.protocol = 'ws:'
+	else if (url.protocol === 'https:') url.protocol = 'wss:'
+	else if (url.protocol !== 'ws:' && url.protocol !== 'wss:') throw new TypeError('Invalid socket URL protocol')
+	if (options.roomId !== undefined) url.searchParams.set('room', options.roomId)
+	return url.href
 }
 
 async function validate<T extends SocketSchema>(schema: T, value: unknown): Promise<SchemaOutput<T>> {
-  const result = await schema["~standard"].validate(value);
-  if ("issues" in result && result.issues) throw new TypeError("Invalid socket event payload");
-  return (result as { value: SchemaOutput<T> }).value;
+	const result = await schema['~standard'].validate(value)
+	if ('issues' in result && result.issues) throw new TypeError('Invalid socket event payload')
+	return (result as { value: SchemaOutput<T> }).value
 }
 
 /**
@@ -218,164 +214,194 @@ async function validate<T extends SocketSchema>(schema: T, value: unknown): Prom
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#websocket
  */
 export function createSocketClient<C extends SocketContract>(url: string, contract: C, options: SocketClientOptions = {}): SocketClient<C> {
-  const state = signal<SocketClientState>("connecting");
-  const listeners = new Map<string, Set<(value: unknown) => void>>();
-  const factory = options.webSocketFactory ?? ((address: string) => new WebSocket(address));
-  const maxBytes = options.maxMessageBytes ?? 64 * 1024;
-  let socket: WebSocket | undefined;
-  let retry: ReturnType<typeof setTimeout> | undefined;
-  let attempts = 0;
-  let closed = false;
-  /** The server refused the session; the state stays `"unauthorized"` until `close()`. */
-  let refused = false;
-  const reportError = (error: unknown) => {
-    if (!options.onError) { logClientError("Meeko socket client error", error); return; }
-    observeCallback(() => options.onError!(error),
-      (observerError) => logClientError("Meeko socket error observer failed", error, observerError));
-  };
-  const setState = (next: SocketClientState) => {
-    try { state.value = next; }
-    catch (error) { reportError(error); }
-  };
-  const closePeer = (peer: WebSocket | undefined, code: number, reason: string) => {
-    try { peer?.close(code, reason); }
-    catch (error) { reportError(error); }
-  };
-  const scheduleRetry = () => {
-    if (closed) return;
-    const delay = Math.min((options.retryMs ?? 500) * 2 ** attempts++, options.maxRetryMs ?? 30_000);
-    retry = setTimeout(() => {
-      retry = undefined;
-      try { connect(); }
-      catch (error) {
-        reportError(error);
-        setState("closed");
-        scheduleRetry();
-      }
-    }, delay);
-  };
+	const state = signal<SocketClientState>('connecting')
+	const listeners = new Map<string, Set<(value: unknown) => void>>()
+	const factory = options.webSocketFactory ?? ((address: string) => new WebSocket(address))
+	const maxBytes = options.maxMessageBytes ?? 64 * 1024
+	let socket: WebSocket | undefined
+	let retry: ReturnType<typeof setTimeout> | undefined
+	let attempts = 0
+	let closed = false
+	/** The server refused the session; the state stays `"unauthorized"` until `close()`. */
+	let refused = false
+	const reportError = (error: unknown) => {
+		if (!options.onError) {
+			logClientError('Meeko socket client error', error)
+			return
+		}
+		observeCallback(
+			() => options.onError!(error),
+			(observerError) => logClientError('Meeko socket error observer failed', error, observerError),
+		)
+	}
+	const setState = (next: SocketClientState) => {
+		try {
+			state.value = next
+		} catch (error) {
+			reportError(error)
+		}
+	}
+	const closePeer = (peer: WebSocket | undefined, code: number, reason: string) => {
+		try {
+			peer?.close(code, reason)
+		} catch (error) {
+			reportError(error)
+		}
+	}
+	const scheduleRetry = () => {
+		if (closed) return
+		const delay = Math.min((options.retryMs ?? 500) * 2 ** attempts++, options.maxRetryMs ?? 30_000)
+		retry = setTimeout(() => {
+			retry = undefined
+			try {
+				connect()
+			} catch (error) {
+				reportError(error)
+				setState('closed')
+				scheduleRetry()
+			}
+		}, delay)
+	}
 
-  const connect = () => {
-    if (closed) return;
-    setState("connecting");
-    const peer = factory(url);
-    socket = peer;
-    let transportErrorReported = false;
-    // The server refused the session: retrying cannot succeed, so the client stops for good.
-    const refuse = (status: 401 | 403) => {
-      closed = true;
-      refused = true;
-      if (retry) clearTimeout(retry);
-      listeners.clear();
-      setState("unauthorized");
-      reportError(authError(status));
-      closePeer(peer, 1000, "Unauthorized");
-    };
-    peer.addEventListener("open", () => { if (peer === socket) { attempts = 0; setState("open"); } });
-    peer.addEventListener("error", (event) => {
-      if (peer !== socket || closed || transportErrorReported) return;
-      const refusal = handshakeRefusal(event);
-      if (refusal) { refuse(refusal); return; }
-      transportErrorReported = true;
-      reportError(new Error("Socket transport error"));
-    });
-    peer.addEventListener("message", (message) => {
-      if (peer !== socket || closed) return;
-      if (typeof message.data !== "string" || new TextEncoder().encode(message.data).byteLength > maxBytes) {
-        reportError(new RangeError("Socket message too large or not text"));
-        closed = true;
-        setState("closed");
-        listeners.clear();
-        closePeer(peer, 1009, "Message too large");
-        return;
-      }
-      void (async () => {
-        const decoded: unknown = JSON.parse(message.data as string);
-        if (typeof decoded !== "object" || decoded === null || !("event" in decoded) || !("payload" in decoded) || typeof decoded.event !== "string") throw new TypeError("Invalid socket message");
-        const schema = contract.serverToClient[decoded.event];
-        if (!schema) throw new TypeError("Unknown socket event");
-        const value = await validate(schema, decoded.payload);
-        if (peer !== socket || closed) return;
-        for (const listener of listeners.get(decoded.event) ?? []) {
-          if (peer !== socket || closed) return;
-          observeCallback(() => listener(value), reportError);
-        }
-      })().catch((error: unknown) => {
-        if (peer !== socket || closed) return;
-        reportError(error);
-        closed = true;
-        setState("closed");
-        listeners.clear();
-        closePeer(peer, 1008, "Invalid event");
-      });
-    });
-    peer.addEventListener("close", (event) => {
-      if (peer !== socket || closed) return;
-      const refusal = closeRefusal(event);
-      if (refusal) { refuse(refusal); return; }
-      setState("closed");
-      if ([1008, 1009].includes((event as CloseEvent).code)) { closed = true; listeners.clear(); return; }
-      scheduleRetry();
-    });
-  };
-  connect();
-  return {
-    state,
-    async emit(event, data) {
-      if (closed || socket?.readyState !== WebSocket.OPEN) throw new Error("Socket is disconnected");
-      const schema = contract.clientToServer[event];
-      if (!schema) throw new TypeError(`Unknown socket event: ${event}`);
-      const value = await validate(schema, data);
-      if (closed || socket.readyState !== WebSocket.OPEN) throw new Error("Socket is disconnected");
-      const message = serializeJson({ event, payload: value });
-      if (new TextEncoder().encode(message).byteLength > maxBytes) throw new RangeError("Socket message too large");
-      socket.send(message);
-    },
-    on(event, listener) {
-      const set = listeners.get(event) ?? new Set();
-      set.add(listener as (value: unknown) => void);
-      listeners.set(event, set);
-      const unsubscribe = () => { set.delete(listener as (value: unknown) => void); if (set.size === 0) listeners.delete(event); };
-      if (currentEffectOwner()) onCleanup(unsubscribe);
-      return unsubscribe;
-    },
-    close() {
-      if (closed) {
-        listeners.clear();
-        if (refused) {
-          refused = false;
-          setState("closed");
-        }
-        return;
-      }
-      closed = true;
-      if (retry) clearTimeout(retry);
-      closePeer(socket, 1000, "Client closed");
-      listeners.clear();
-      setState("closed");
-    },
-  };
+	const connect = () => {
+		if (closed) return
+		setState('connecting')
+		const peer = factory(url)
+		socket = peer
+		let transportErrorReported = false
+		// The server refused the session: retrying cannot succeed, so the client stops for good.
+		const refuse = (status: 401 | 403) => {
+			closed = true
+			refused = true
+			if (retry) clearTimeout(retry)
+			listeners.clear()
+			setState('unauthorized')
+			reportError(authError(status))
+			closePeer(peer, 1000, 'Unauthorized')
+		}
+		peer.addEventListener('open', () => {
+			if (peer === socket) {
+				attempts = 0
+				setState('open')
+			}
+		})
+		peer.addEventListener('error', (event) => {
+			if (peer !== socket || closed || transportErrorReported) return
+			const refusal = handshakeRefusal(event)
+			if (refusal) {
+				refuse(refusal)
+				return
+			}
+			transportErrorReported = true
+			reportError(new Error('Socket transport error'))
+		})
+		peer.addEventListener('message', (message) => {
+			if (peer !== socket || closed) return
+			if (typeof message.data !== 'string' || new TextEncoder().encode(message.data).byteLength > maxBytes) {
+				reportError(new RangeError('Socket message too large or not text'))
+				closed = true
+				setState('closed')
+				listeners.clear()
+				closePeer(peer, 1009, 'Message too large')
+				return
+			}
+			void (async () => {
+				const decoded: unknown = JSON.parse(message.data as string)
+				if (typeof decoded !== 'object' || decoded === null || !('event' in decoded) || !('payload' in decoded) || typeof decoded.event !== 'string') throw new TypeError('Invalid socket message')
+				const schema = contract.serverToClient[decoded.event]
+				if (!schema) throw new TypeError('Unknown socket event')
+				const value = await validate(schema, decoded.payload)
+				if (peer !== socket || closed) return
+				for (const listener of listeners.get(decoded.event) ?? []) {
+					if (peer !== socket || closed) return
+					observeCallback(() => listener(value), reportError)
+				}
+			})().catch((error: unknown) => {
+				if (peer !== socket || closed) return
+				reportError(error)
+				closed = true
+				setState('closed')
+				listeners.clear()
+				closePeer(peer, 1008, 'Invalid event')
+			})
+		})
+		peer.addEventListener('close', (event) => {
+			if (peer !== socket || closed) return
+			const refusal = closeRefusal(event)
+			if (refusal) {
+				refuse(refusal)
+				return
+			}
+			setState('closed')
+			if ([1008, 1009].includes((event as CloseEvent).code)) {
+				closed = true
+				listeners.clear()
+				return
+			}
+			scheduleRetry()
+		})
+	}
+	connect()
+	return {
+		state,
+		async emit(event, data) {
+			if (closed || socket?.readyState !== WebSocket.OPEN) throw new Error('Socket is disconnected')
+			const schema = contract.clientToServer[event]
+			if (!schema) throw new TypeError(`Unknown socket event: ${event}`)
+			const value = await validate(schema, data)
+			if (closed || socket.readyState !== WebSocket.OPEN) throw new Error('Socket is disconnected')
+			const message = serializeJson({ event, payload: value })
+			if (new TextEncoder().encode(message).byteLength > maxBytes) throw new RangeError('Socket message too large')
+			socket.send(message)
+		},
+		on(event, listener) {
+			const set = listeners.get(event) ?? new Set()
+			set.add(listener as (value: unknown) => void)
+			listeners.set(event, set)
+			const unsubscribe = () => {
+				set.delete(listener as (value: unknown) => void)
+				if (set.size === 0) listeners.delete(event)
+			}
+			if (currentEffectOwner()) onCleanup(unsubscribe)
+			return unsubscribe
+		},
+		close() {
+			if (closed) {
+				listeners.clear()
+				if (refused) {
+					refused = false
+					setState('closed')
+				}
+				return
+			}
+			closed = true
+			if (retry) clearTimeout(retry)
+			closePeer(socket, 1000, 'Client closed')
+			listeners.clear()
+			setState('closed')
+		},
+	}
 }
 
 function appSocketObserver(channel: NonNullable<ReturnType<typeof currentAppErrorChannel>>): (error: unknown) => void {
-  return (error) => {
-    const handler = channel.current();
-    if (handler) return handler(error, "socket");
-    logClientError("Meeko socket client error", error);
-  };
+	return (error) => {
+		const handler = channel.current()
+		if (handler) return handler(error, 'socket')
+		logClientError('Meeko socket client error', error)
+	}
 }
 
 /** The nearest component observer, else the mounted application's own observer. */
 export function contextualSocketObserver(): ((error: unknown) => void) | undefined {
-  const nearest = currentComponentErrorHandler();
-  if (nearest) return (error) => nearest(error, "socket");
-  const channel = currentAppErrorChannel();
-  if (!channel) return undefined;
-  return (error) => {
-    const handler = channel.application();
-    if (handler) return handler(error, "socket");
-    logClientError("Meeko socket client error", error);
-  };
+	const nearest = currentComponentErrorHandler()
+	if (nearest) return (error) => nearest(error, 'socket')
+	const channel = currentAppErrorChannel()
+	if (!channel) return undefined
+	return (error) => {
+		const handler = channel.application()
+		if (handler) return handler(error, 'socket')
+		logClientError('Meeko socket client error', error)
+	}
 }
 
 /**
@@ -384,13 +410,13 @@ export function contextualSocketObserver(): ((error: unknown) => void) | undefin
  * the mount that follows starts.
  */
 export function renderOnlyClient<C extends SocketContract>(): SocketClient<C> {
-  const state = signal<SocketClientState>("connecting");
-  return {
-    state,
-    emit: () => Promise.reject(new Error("Socket is disconnected")),
-    on: () => () => {},
-    close: () => {},
-  };
+	const state = signal<SocketClientState>('connecting')
+	return {
+		state,
+		emit: () => Promise.reject(new Error('Socket is disconnected')),
+		on: () => () => {},
+		close: () => {},
+	}
 }
 
 /**
@@ -413,45 +439,50 @@ export function renderOnlyClient<C extends SocketContract>(): SocketClient<C> {
  * ```
  */
 export function createSocketRegistry<C extends Record<string, SocketContract>>(contracts: C, options: SocketRegistryOptions = {}): SocketRegistry<C> {
-  const result: Record<string, unknown> = Object.create(null);
-  for (const name of Object.keys(contracts)) {
-    let client: SocketClient<SocketContract> | undefined;
-    const appClients = new WeakMap<NonNullable<ReturnType<typeof currentAppErrorChannel>>, SocketClient<SocketContract>>();
-    const rootClients = new WeakMap<object, SocketClient<SocketContract>>();
-    Object.defineProperty(result, name, {
-      enumerable: true,
-      get() {
-        // A component script that only renders HTML in the browser never connects.
-        if (typeof window !== "undefined" && setupPhase() === "render") return renderOnlyClient();
-        const channel = currentAppErrorChannel();
-        if (channel) {
-          let scoped = appClients.get(channel);
-          if (!scoped) {
-            const onError = options.onError ?? appSocketObserver(channel);
-            scoped = createSocketClient(socketUrl(name, options), contracts[name]!, { ...options, onError });
-            appClients.set(channel, scoped);
-            const owned = scoped;
-            channel.track(() => { owned.close(); appClients.delete(channel); });
-          }
-          return scoped;
-        }
-        const owner = currentEffectOwner();
-        if (owner) {
-          let scoped = rootClients.get(owner);
-          if (!scoped) {
-            const onError = options.onError ?? contextualSocketObserver();
-            scoped = createSocketClient(socketUrl(name, options), contracts[name]!, onError ? { ...options, onError } : options);
-            rootClients.set(owner, scoped);
-            const owned = scoped;
-            onCleanup(() => { owned.close(); rootClients.delete(owner); });
-          }
-          return scoped;
-        }
-        if (!client) client = createSocketClient(socketUrl(name, options), contracts[name]!, options);
-        return client;
-      },
-    });
-  }
-  return result as SocketRegistry<C>;
+	const result: Record<string, unknown> = Object.create(null)
+	for (const name of Object.keys(contracts)) {
+		let client: SocketClient<SocketContract> | undefined
+		const appClients = new WeakMap<NonNullable<ReturnType<typeof currentAppErrorChannel>>, SocketClient<SocketContract>>()
+		const rootClients = new WeakMap<object, SocketClient<SocketContract>>()
+		Object.defineProperty(result, name, {
+			enumerable: true,
+			get() {
+				// A component script that only renders HTML in the browser never connects.
+				if (typeof window !== 'undefined' && setupPhase() === 'render') return renderOnlyClient()
+				const channel = currentAppErrorChannel()
+				if (channel) {
+					let scoped = appClients.get(channel)
+					if (!scoped) {
+						const onError = options.onError ?? appSocketObserver(channel)
+						scoped = createSocketClient(socketUrl(name, options), contracts[name]!, { ...options, onError })
+						appClients.set(channel, scoped)
+						const owned = scoped
+						channel.track(() => {
+							owned.close()
+							appClients.delete(channel)
+						})
+					}
+					return scoped
+				}
+				const owner = currentEffectOwner()
+				if (owner) {
+					let scoped = rootClients.get(owner)
+					if (!scoped) {
+						const onError = options.onError ?? contextualSocketObserver()
+						scoped = createSocketClient(socketUrl(name, options), contracts[name]!, onError ? { ...options, onError } : options)
+						rootClients.set(owner, scoped)
+						const owned = scoped
+						onCleanup(() => {
+							owned.close()
+							rootClients.delete(owner)
+						})
+					}
+					return scoped
+				}
+				if (!client) client = createSocketClient(socketUrl(name, options), contracts[name]!, options)
+				return client
+			},
+		})
+	}
+	return result as SocketRegistry<C>
 }
-

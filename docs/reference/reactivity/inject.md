@@ -34,9 +34,9 @@ Como el layout publicó una señal, el badge se actualiza cuando el tema cambia.
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `key` | `ContextKey<T>` | obligatorio | Clave creada con [`createContext`](/docs/reference/createcontext). La misma instancia que usó `provide`, no otra con la misma descripción. |
+| Parámetro | Tipo            | Por defecto | Descripción                                                                                                                                |
+| --------- | --------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `key`     | `ContextKey<T>` | obligatorio | Clave creada con [`createContext`](/docs/reference/createcontext). La misma instancia que usó `provide`, no otra con la misma descripción. |
 
 ## Valor devuelto
 
@@ -128,6 +128,7 @@ async function save(): Promise<void> {
 Fuera del script no hay raíz activa y lanza `Missing Meeko context: toasts`. Haz el `inject` en el nivel superior del script y guarda el valor:
 
 <!-- no-check -->
+
 ```ts good
 const toasts = inject(toastsKey);
 async function save(): Promise<void> {
@@ -145,6 +146,7 @@ const theme = inject(themeKey).value;
 `theme` es el texto del momento: la plantilla no se actualiza al cambiar el tema. Guarda la señal y lee `.value` donde se usa:
 
 <!-- no-check -->
+
 ```ts good
 const theme = inject(themeKey);
 // <span>{theme.value}</span>

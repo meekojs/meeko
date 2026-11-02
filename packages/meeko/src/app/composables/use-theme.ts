@@ -1,8 +1,8 @@
-import type { ThemeState } from "../../shared/theme";
+import type { ThemeState } from '../../shared/theme'
 
-import { browserTheme } from "../runtime/theme-browser";
-import { currentServerTheme, useServerTheme } from "../runtime/theme-context";
-export type { ThemeChoice, ThemeConfig, ThemeName, ThemeState, ThemeToggleMessages, ThemeToggleSnippets } from "../../shared/theme";
+import { browserTheme } from '../runtime/theme-browser'
+import { currentServerTheme, useServerTheme } from '../runtime/theme-context'
+export type { ThemeChoice, ThemeConfig, ThemeName, ThemeState, ThemeToggleMessages, ThemeToggleSnippets } from '../../shared/theme'
 
 /**
  * Devuelve el tema de la aplicación: `theme`, la elección (editable, `"system"` incluido),
@@ -38,9 +38,9 @@ export type { ThemeChoice, ThemeConfig, ThemeName, ThemeState, ThemeToggleMessag
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#tema-clarooscuro-sin-parpadeo
  */
 export function useTheme(): ThemeState {
-  const server = currentServerTheme();
-  if (server) return useServerTheme(server).state as unknown as ThemeState;
-  const theme = browserTheme();
-  if (!theme) throw new Error('useTheme() needs theme in meeko.config.ts (theme: true) and a running Meeko application');
-  return theme.use() as unknown as ThemeState;
+	const server = currentServerTheme()
+	if (server) return useServerTheme(server).state as unknown as ThemeState
+	const theme = browserTheme()
+	if (!theme) throw new Error('useTheme() needs theme in meeko.config.ts (theme: true) and a running Meeko application')
+	return theme.use() as unknown as ThemeState
 }

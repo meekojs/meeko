@@ -11,7 +11,7 @@ related:
   - "@meekojs/meeko/server#SessionSecurityError"
   - "@meekojs/meeko/framework#isClientError"
   - docs/framework.md#revocación-durante-una-petición
-source-hash: f248b6ea96f1f311cb61b6ed7d083468a3842d26397a2fa44d49d7583dd7c736
+source-hash: c4039d2d245fb0e4e9c0b6d360ae09bac5176e8e3badc119a4fde8cbe5c87d13
 ---
 
 `SessionRevokedError` is an `ApiError` with code `SESSION_REVOKED` and status `401`. Meeko uses it in two places:

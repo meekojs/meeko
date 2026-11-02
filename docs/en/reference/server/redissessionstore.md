@@ -17,7 +17,7 @@ related:
   - docs/framework.md#sesiones-sin-configuración
   - docs/framework.md#redis-mediante-la-api-rest-de-upstash
   - docs/framework.md#límite-de-peticiones-ratelimit
-source-hash: b43d1961ef7251851d34b9aa6ba86a0afce999aa52aabead4638eabad92e12a7
+source-hash: cb6fed49081aa3237666082ab844054399fc117a9dc6e510fb711671286c6ece
 ---
 
 `RedisSessionStore` stores each session in Redis with its expiration (`PX`) and a per-family index locating the active session. `set`, `replace`, `revokeFamily` and `rateLimit` are atomic Lua scripts, so multiple instances share sessions, revocations and limits without races. With a `subscriber`, it receives revocations published by any instance and immediately aborts that family's requests and sockets.

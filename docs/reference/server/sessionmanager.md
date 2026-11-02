@@ -28,6 +28,7 @@ Se declara en `sessions` de `server/runtime.ts`. Desde `1.2` es opcional: sin é
 ## Uso
 
 <!-- no-check -->
+
 ```ts
 // server/runtime.ts
 import { createClient } from "redis";
@@ -52,31 +53,31 @@ export default defineServerRuntime(async ({ env, production, prerendering }) => 
 
 `new SessionManager(options)` recibe un objeto `SessionOptions<T>`:
 
-| Opción | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `store` | `SessionStore<T>` | obligatorio | Dónde viven las sesiones: `MemorySessionStore`, `RedisSessionStore`, `SqlSessionStore` o uno propio. |
-| `production` | `boolean` | `false` | Exige un store con `persistent: true`, `replace` y `revokeFamily`; si no, el constructor lanza. Desactiva además los avisos de desarrollo. |
-| `ttlMs` | `number` | `604800000` (7 días) | Duración por defecto de cada sesión, un entero positivo de milisegundos. `session.create(data, { ttlMs })` la sustituye para una sesión. |
-| `secure` | `boolean` | `true` | Atributo `Secure` de la cookie. Sin él, el nombre por defecto pasa a `meeko.sid`. |
-| `sameSite` | `"Lax" \| "Strict" \| "None"` | `"Lax"` | Atributo `SameSite`. `"None"` exige `secure`. |
-| `cookieName` | `string` | `"__Host-meeko.sid"`, o `"meeko.sid"` sin `secure` | Nombre de la cookie: letras, dígitos, `_`, `.` y `-`. Un nombre `__Host-…` exige `secure`. |
-| `allowedOrigins` | `readonly string[]` | `[]` | Orígenes, además del propio, aceptados en las mutaciones de API y RPC (desde `1.8`, también sin sesión), en los formularios nativos y en `session.create()`. |
+| Opción           | Tipo                          | Por defecto                                        | Descripción                                                                                                                                                  |
+| ---------------- | ----------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `store`          | `SessionStore<T>`             | obligatorio                                        | Dónde viven las sesiones: `MemorySessionStore`, `RedisSessionStore`, `SqlSessionStore` o uno propio.                                                         |
+| `production`     | `boolean`                     | `false`                                            | Exige un store con `persistent: true`, `replace` y `revokeFamily`; si no, el constructor lanza. Desactiva además los avisos de desarrollo.                   |
+| `ttlMs`          | `number`                      | `604800000` (7 días)                               | Duración por defecto de cada sesión, un entero positivo de milisegundos. `session.create(data, { ttlMs })` la sustituye para una sesión.                     |
+| `secure`         | `boolean`                     | `true`                                             | Atributo `Secure` de la cookie. Sin él, el nombre por defecto pasa a `meeko.sid`.                                                                            |
+| `sameSite`       | `"Lax" \| "Strict" \| "None"` | `"Lax"`                                            | Atributo `SameSite`. `"None"` exige `secure`.                                                                                                                |
+| `cookieName`     | `string`                      | `"__Host-meeko.sid"`, o `"meeko.sid"` sin `secure` | Nombre de la cookie: letras, dígitos, `_`, `.` y `-`. Un nombre `__Host-…` exige `secure`.                                                                   |
+| `allowedOrigins` | `readonly string[]`           | `[]`                                               | Orígenes, además del propio, aceptados en las mutaciones de API y RPC (desde `1.8`, también sin sesión), en los formularios nativos y en `session.create()`. |
 
 ## Valor devuelto
 
 Una instancia con estos miembros:
 
-| Miembro | Tipo | Descripción |
-| --- | --- | --- |
-| `store` | `SessionStore<T>` | El store de las opciones. |
-| `ttlMs` | `number` | La duración por defecto. |
-| `cookieName` | `string` | El nombre de la cookie. |
-| `allowedOrigins` | `readonly string[]` | Los orígenes adicionales. |
-| `load(request)` | `Promise<SessionHandle<T>>` | Lee la cookie de la petición y devuelve su handle, sin sesión si falta, no es válida o caducó. La primera llamada se suscribe a las revocaciones del store y espera la confirmación; si falla, rechaza y la siguiente lo reintenta. |
-| `assertMutationAllowed(request, session, mutating?)` | `void` | En una mutación con sesión, comprueba que `Origin` sea el propio o uno de `allowedOrigins` y que `x-meeko-csrf` sea el token de la sesión. Lanza `SessionSecurityError` con `INVALID_ORIGIN` o `INVALID_CSRF`. Sin sesión, o en `GET`, `HEAD` y `OPTIONS`, no hace nada. |
-| `serializeCookie(value, ttlMs)` | `string` | La cabecera `Set-Cookie` con la política del gestor; `ttlMs` `0` la borra. |
-| `rateLimit(key, windowMs)` | `Promise<RateLimitHit>` | Desde `1.2`. Cuenta una petición en la ventana fija `key` con `store.rateLimit`, o en la memoria de la instancia si el store no lo tiene. |
-| `close()` | `Promise<void>` | Cancela la suscripción a revocaciones y cierra el store; no cierra clientes externos como el de Redis. |
+| Miembro                                              | Tipo                        | Descripción                                                                                                                                                                                                                                                              |
+| ---------------------------------------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `store`                                              | `SessionStore<T>`           | El store de las opciones.                                                                                                                                                                                                                                                |
+| `ttlMs`                                              | `number`                    | La duración por defecto.                                                                                                                                                                                                                                                 |
+| `cookieName`                                         | `string`                    | El nombre de la cookie.                                                                                                                                                                                                                                                  |
+| `allowedOrigins`                                     | `readonly string[]`         | Los orígenes adicionales.                                                                                                                                                                                                                                                |
+| `load(request)`                                      | `Promise<SessionHandle<T>>` | Lee la cookie de la petición y devuelve su handle, sin sesión si falta, no es válida o caducó. La primera llamada se suscribe a las revocaciones del store y espera la confirmación; si falla, rechaza y la siguiente lo reintenta.                                      |
+| `assertMutationAllowed(request, session, mutating?)` | `void`                      | En una mutación con sesión, comprueba que `Origin` sea el propio o uno de `allowedOrigins` y que `x-meeko-csrf` sea el token de la sesión. Lanza `SessionSecurityError` con `INVALID_ORIGIN` o `INVALID_CSRF`. Sin sesión, o en `GET`, `HEAD` y `OPTIONS`, no hace nada. |
+| `serializeCookie(value, ttlMs)`                      | `string`                    | La cabecera `Set-Cookie` con la política del gestor; `ttlMs` `0` la borra.                                                                                                                                                                                               |
+| `rateLimit(key, windowMs)`                           | `Promise<RateLimitHit>`     | Desde `1.2`. Cuenta una petición en la ventana fija `key` con `store.rateLimit`, o en la memoria de la instancia si el store no lo tiene.                                                                                                                                |
+| `close()`                                            | `Promise<void>`             | Cancela la suscripción a revocaciones y cierra el store; no cierra clientes externos como el de Redis.                                                                                                                                                                   |
 
 Con las opciones por defecto, la cookie es `__Host-meeko.sid=<id>; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800; Secure`.
 
@@ -85,6 +86,7 @@ Con las opciones por defecto, la cookie es `__Host-meeko.sid=<id>; Path=/; HttpO
 ### Sesiones en SQL con duración y orígenes propios
 
 <!-- no-check -->
+
 ```ts
 // server/runtime.ts
 import { defineServerRuntime, SessionManager, SqlSessionStore } from "@meekojs/meeko/server";
@@ -162,6 +164,7 @@ new SessionManager({ store: new MemorySessionStore(), production: true });
 El constructor lanza `Error: Persistent session storage with atomic rotation and family revocation is required in production` y la aplicación no arranca. Un store en memoria pierde las sesiones al reiniciar y no se comparte entre instancias.
 
 <!-- no-check -->
+
 ```ts good
 new SessionManager({ store: new RedisSessionStore(redis, { prefix: "app:prod:session:" }), production: production && !prerendering });
 ```
@@ -187,6 +190,7 @@ new SessionManager({ store, sameSite: "None", secure: false });
 El constructor lanza `Error: SameSite=None requires Secure`. Con `cookieName: "__Host-sid"` y `secure: false`, `Error: __Host- cookies require Secure`. Los navegadores rechazan esas cookies.
 
 <!-- no-check -->
+
 ```ts good
 new SessionManager({ store, sameSite: "None", secure: true });
 ```
@@ -200,6 +204,7 @@ new SessionManager({ store, ttlMs: 1.5 * 24 * 60 * 60 * 1000 + 0.5 });
 `RangeError: Invalid session TTL`. Use un entero positivo de milisegundos.
 
 <!-- no-check -->
+
 ```ts good
 new SessionManager({ store, ttlMs: 36 * 60 * 60 * 1000 });
 ```

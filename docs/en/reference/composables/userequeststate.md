@@ -15,7 +15,7 @@ related:
   - "@meekojs/meeko/server#defineApiRoute"
   - docs/framework.md#valores-por-petición-locals
   - docs/framework.md#runtime-de-servidor
-source-hash: 29c82706137641be5b639256a9408d9d90a70a23137df11ce8ee0554bb231dcd
+source-hash: d274f49af1bf7ff9fb0d55f0c22e780be71c22cd08c185936bfd446eece9fe63
 ---
 
 A request passes through several server pieces: route middleware, `<script server>` code or the page's `load`, and the `api.*` and `rpc.*` calls made by SSR, which dispatch locally with the same context. `useRequestState(context, key, factory)` stores a value in `context.state`, that request's `Map`: the first piece to request `key` creates it with `factory()`, and the others receive the same value. Use it for a per-request cache (avoiding querying the same user twice), a batch loader or a counter.

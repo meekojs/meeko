@@ -46,23 +46,23 @@ async function save(): Promise<void> {
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `procedimiento` | ID de un procedimiento | obligatorio | Como `"users.rename"`. |
-| `opciones.retrySafe` | `{ key, storage? }` | ninguno | Desde `1.2`. Guarda la intención con una clave de idempotencia y la reintenta con la misma clave si no hay respuesta. |
-| `opciones.onSuccess` | `(output, attempt) => unknown` | ninguno | Desde `1.2`. Una vez por cada intento que termina bien, también los reintentos automáticos. |
-| `opciones.onError` | `(error, attempt) => unknown` | ninguno | Desde `1.2`. Una vez por cada intento que falla; `attempt.uncertain` dice si no hubo respuesta. |
+| Parámetro            | Tipo                           | Por defecto | Descripción                                                                                                           |
+| -------------------- | ------------------------------ | ----------- | --------------------------------------------------------------------------------------------------------------------- |
+| `procedimiento`      | ID de un procedimiento         | obligatorio | Como `"users.rename"`.                                                                                                |
+| `opciones.retrySafe` | `{ key, storage? }`            | ninguno     | Desde `1.2`. Guarda la intención con una clave de idempotencia y la reintenta con la misma clave si no hay respuesta. |
+| `opciones.onSuccess` | `(output, attempt) => unknown` | ninguno     | Desde `1.2`. Una vez por cada intento que termina bien, también los reintentos automáticos.                           |
+| `opciones.onError`   | `(error, attempt) => unknown`  | ninguno     | Desde `1.2`. Una vez por cada intento que falla; `attempt.uncertain` dice si no hubo respuesta.                       |
 
 ## Valor devuelto
 
 Una `RpcMutation<Input, Output>`:
 
-| Propiedad | Tipo | Descripción |
-| --- | --- | --- |
-| `mutate(input)` | `Promise<Output>` | Llama al procedimiento. Resuelve con su salida o rechaza con su error (un `ClientError` si el servidor respondió). |
-| `pending` | `ReadonlySignal<boolean>` | `true` mientras una llamada está en curso. |
-| `data` | `ReadonlySignal<Output \| null>` | Salida de la última llamada correcta, o `null`. |
-| `error` | `ReadonlySignal<Error \| null>` | Fallo de la última llamada, o `null`. |
+| Propiedad       | Tipo                             | Descripción                                                                                                        |
+| --------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `mutate(input)` | `Promise<Output>`                | Llama al procedimiento. Resuelve con su salida o rechaza con su error (un `ClientError` si el servidor respondió). |
+| `pending`       | `ReadonlySignal<boolean>`        | `true` mientras una llamada está en curso.                                                                         |
+| `data`          | `ReadonlySignal<Output \| null>` | Salida de la última llamada correcta, o `null`.                                                                    |
+| `error`         | `ReadonlySignal<Error \| null>`  | Fallo de la última llamada, o `null`.                                                                              |
 
 Con `retrySafe` añade `uncertain`, `retry()` y `discard()` (`RetrySafeMutation`).
 
@@ -136,6 +136,7 @@ const rename = await useRpcMutation("users.rename");
 `meeko check` da `MEEK055: useRpcMutation no se puede esperar con await; llámalo sin await y espera su mutate(input) en un handler`.
 
 <!-- no-check -->
+
 ```ts good
 const rename = useRpcMutation("users.rename");
 ```
@@ -151,6 +152,7 @@ async function save(): Promise<void> {
 `meeko check` da `MEEK054: useRpcMutation() debe llamarse en el nivel superior de <script>, no dentro de una función, un handler, un effect ni onMounted`.
 
 <!-- no-check -->
+
 ```ts good
 const rename = useRpcMutation("users.rename");
 async function save(): Promise<void> { await rename.mutate({ id: "1", name: "Ada" }); }
@@ -165,6 +167,7 @@ const save = () => rename.mutate({ id: 1, name: "Ada" });
 `meeko check` da `TS2322: Type 'number' is not assignable to type 'string'`: la entrada se comprueba contra el schema `input` del procedimiento.
 
 <!-- no-check -->
+
 ```ts good
 const save = () => rename.mutate({ id: String(user.id), name: "Ada" });
 ```

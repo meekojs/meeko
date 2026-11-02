@@ -15,7 +15,7 @@ related:
   - "@meekojs/meeko/framework#createRpcClient"
   - "autoimport:api"
   - docs/framework.md#api-y-rpc
-source-hash: 9a5a140e37c1093f1fb859558352eeea8e5ee4bc6a548ca8c953c75e127ec1e1
+source-hash: 3c139eb1258797c535e1f4cb2bec8a49bf387ffafccf853cbee6b6c7f382c607
 ---
 
 `rpc` is the client Meeko generates from `server/rpc` procedures: `server/rpc/orders/create.ts` becomes `rpc.orders.create(input)`. The input and result have the types from the procedure's `input` and `output` schemas.

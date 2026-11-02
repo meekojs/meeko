@@ -16,7 +16,7 @@ related:
   - "@meekojs/meeko#provideErrorHandler"
   - docs/framework.md#websocket
   - docs/api.md#composables-de-nivel-superior-y-await
-source-hash: ce904a3699392b65fdb3af3c1106703cef914b95a6a4e2d8a6a806c4eb20cc47
+source-hash: 0bc1e9c2c1dbbabb830b994e9a75c654a48d703dbfac125bdc2d38d92681e08d
 ---
 
 `useSocket(canal, opciones?)` opens a client for the `server/socket` channel `canal`, tied to the component: `emit` and `on` events are typed by channel schemas and the connection closes when the component unmounts. With `await` at the script's top level, the rest of setup continues in the browser once the socket opens.

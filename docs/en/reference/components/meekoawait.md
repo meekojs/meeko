@@ -18,7 +18,7 @@ related:
   - docs/framework.md#meekoawait
   - docs/framework.md#evitar-saltos-de-altura-cls
   - docs/framework.md#datos-anteriores-durante-una-recarga-keepprevious
-source-hash: 7d108291f1a2b6803ad0e18155c448743a07646b0dfd3a631d2d3bf07c692f1c
+source-hash: 33028289e8999cbbff7f08b985f0b255318b219113b65af6c2667c079373d223
 ---
 
 A `useApi` or `useRpcQuery` **without** `await` lets the component render immediately and requests data in the browser on mount. `<MeekoAwait for="recurso">` wraps that data region and handles its states: the `pending` snippet on initial load, the `error` snippet (with a retry button) on failure, and its content when data exists. A refresh keeps content mounted. With `reserve`, while waiting it occupies the height it last had with data, so the page does not jump.

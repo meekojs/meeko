@@ -1,27 +1,36 @@
 <script lang="ts">
-// <MeekoLink> as a component of its own, for resolveComponent("MeekoLink") and the component
-// registry (since 1.8). The tag <MeekoLink> and 'MeekoLink' in <component is> compile inline and
-// never import it. `pnpm run builtins` compiles this file into link.compiled.ts, which the package
-// ships as @meekojs/meeko/builtins/link; edit this file, not that one.
-import type { MeekoLinkProps, RouteId } from "../../../framework";
-import type { ElementAttributes } from "../../runtime/dynamic-tag";
+	// <MeekoLink> as a component of its own, for resolveComponent("MeekoLink") and the component
+	// registry (since 1.8). The tag <MeekoLink> and 'MeekoLink' in <component is> compile inline and
+	// never import it. `pnpm run builtins` compiles this file into link.compiled.ts, which the package
+	// ships as @meekojs/meeko/builtins/link; edit this file, not that one.
+	import type { MeekoLinkProps, RouteId } from '../../../framework'
+	import type { ElementAttributes } from '../../runtime/dynamic-tag'
 
-/** Los params de la ruta K: `{ id: string }` en `/users/[id]`, `{}` en una ruta estática. */
-type RouteParamsOf<K extends RouteId> = NonNullable<MeekoLinkProps<K>["params"]>;
+	/** Los params de la ruta K: `{ id: string }` en `/users/[id]`, `{}` en una ruta estática. */
+	type RouteParamsOf<K extends RouteId> = NonNullable<MeekoLinkProps<K>['params']>
 
-/** Una variante por ruta, para que cada `to` exija o prohíba sus propios `params`. */
-type LinkTarget = {
-  [K in RouteId]: Omit<MeekoLinkProps<K>, "params"> & (keyof RouteParamsOf<K> extends never ? { readonly params?: RouteParamsOf<K> } : { readonly params: RouteParamsOf<K> })
-}[RouteId];
+	/** Una variante por ruta, para que cada `to` exija o prohíba sus propios `params`. */
+	type LinkTarget = {
+		[K in RouteId]: Omit<MeekoLinkProps<K>, 'params'> & (keyof RouteParamsOf<K> extends never ? { readonly params?: RouteParamsOf<K> } : { readonly params: RouteParamsOf<K> })
+	}[RouteId]
 
-/** Props de `<MeekoLink>` como componente: las de la etiqueta y los atributos de su `<a>`, salvo `href`. */
-type Props = LinkTarget & Omit<ElementAttributes<"a">, "href">;
+	/** Props de `<MeekoLink>` como componente: las de la etiqueta y los atributos de su `<a>`, salvo `href`. */
+	type Props = LinkTarget & Omit<ElementAttributes<'a'>, 'href'>
 
-const { to, params, search, match, resolve, ...rest } = defineProps<Props>();
+	const { to, params, search, match, resolve, ...rest } = defineProps<Props>()
 
-const emit = defineEmits<{ click: [event: MouseEvent] }>();
+	const emit = defineEmits<{ click: [event: MouseEvent] }>()
 
-const snippets = defineSnippets<{ default?: [] }>();
+	const snippets = defineSnippets<{ default?: [] }>()
 </script>
 
-<template><MeekoLink bind:to="to" bind:params="params" bind:search="search" bind:match="match ?? 'exact'" bind:resolve="resolve" bind="rest" on:click="(event) => emit('click', event)"><render snippet="snippets.default" /></MeekoLink></template>
+<template><MeekoLink
+		bind:to="to"
+		bind:params="params"
+		bind:search="search"
+		bind:match="match ?? 'exact'"
+		bind:resolve="resolve"
+		bind="rest"
+		on:click="(event) => emit('click', event)"
+		><render snippet="snippets.default"
+	/></MeekoLink></template>

@@ -12,7 +12,7 @@ related:
   - "syntax:script-server"
   - docs/framework.md#código-de-nivel-superior-y-datos-exportados
   - docs/framework.md#página-de-error-de-la-aplicación-apperrormeeko
-source-hash: a05514ef88e3e3e1be9c30e204c51b21bf0f63e20facd7a31ac672fb1e1dc506
+source-hash: 8d7a366f24e854f3048245b2636b63b1ef9880e861746b593230ac9d79eb055f
 ---
 
 `notFound()` stops the top-level code in a page's `<script server>` and responds with `404` and the nearest error page (the folder's `+error.meeko`, or `app/error.meeko`), which receives `{ status: 404, message: "NOT_FOUND" }`. Since `1.6`, it also stops server route middleware.

@@ -1,24 +1,24 @@
-import type { SitemapResolvedUrl } from "../modules/define-meeko-module";
+import type { SitemapResolvedUrl } from '../modules/define-meeko-module'
 
 // No Node imports: `@meekojs/meeko/framework` also loads in the browser and in Workers.
 
 function xmlText(value: string): string {
-  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+	return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
 }
 
-const hreflangPattern = /^(?:x-default|[A-Za-z]{2,3}(?:-[A-Za-z0-9]{1,8})*)$/;
+const hreflangPattern = /^(?:x-default|[A-Za-z]{2,3}(?:-[A-Za-z0-9]{1,8})*)$/
 
 /** `<xhtml:link rel="alternate">` of each language version of a URL, validated. */
 function alternateLinks(origin: string, url: SitemapResolvedUrl): string[] {
-  return (url.alternates ?? []).map((alternate) => {
-    if (typeof alternate?.hreflang !== "string" || !hreflangPattern.test(alternate.hreflang)) {
-      throw new Error(`sitemap: ${url.pathname} has an invalid hreflang ${String(alternate?.hreflang)}`);
-    }
-    if (typeof alternate.pathname !== "string" || !alternate.pathname.startsWith("/")) {
-      throw new Error(`sitemap: the ${alternate.hreflang} alternate of ${url.pathname} must be a pathname that starts with /`);
-    }
-    return `<xhtml:link rel="alternate" hreflang="${alternate.hreflang}" href="${xmlText(new URL(alternate.pathname, origin).href).replaceAll('"', "&quot;")}"/>`;
-  });
+	return (url.alternates ?? []).map((alternate) => {
+		if (typeof alternate?.hreflang !== 'string' || !hreflangPattern.test(alternate.hreflang)) {
+			throw new Error(`sitemap: ${url.pathname} has an invalid hreflang ${String(alternate?.hreflang)}`)
+		}
+		if (typeof alternate.pathname !== 'string' || !alternate.pathname.startsWith('/')) {
+			throw new Error(`sitemap: the ${alternate.hreflang} alternate of ${url.pathname} must be a pathname that starts with /`)
+		}
+		return `<xhtml:link rel="alternate" hreflang="${alternate.hreflang}" href="${xmlText(new URL(alternate.pathname, origin).href).replaceAll('"', '&quot;')}"/>`
+	})
 }
 
 /**
@@ -57,20 +57,20 @@ function alternateLinks(origin: string, url: SitemapResolvedUrl): string[] {
  * ```
  */
 export function sitemapXml(origin: string, urls: readonly (string | SitemapResolvedUrl)[]): string {
-  let localized = false;
-  const lines = urls.map((value) => {
-    const url: SitemapResolvedUrl = typeof value === "string" ? { pathname: value } : value;
-    const links = alternateLinks(origin, url);
-    if (links.length) localized = true;
-    const fields = [
-      `<loc>${xmlText(new URL(url.pathname, origin).href)}</loc>`,
-      ...url.lastmod === undefined ? [] : [`<lastmod>${xmlText(url.lastmod)}</lastmod>`],
-      ...url.changefreq === undefined ? [] : [`<changefreq>${url.changefreq}</changefreq>`],
-      ...url.priority === undefined ? [] : [`<priority>${url.priority}</priority>`],
-      ...links,
-    ];
-    return `  <url>${fields.join("")}</url>`;
-  });
-  const namespaces = `xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"${localized ? ' xmlns:xhtml="http://www.w3.org/1999/xhtml"' : ""}`;
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset ${namespaces}>\n${lines.join("\n")}${lines.length ? "\n" : ""}</urlset>\n`;
+	let localized = false
+	const lines = urls.map((value) => {
+		const url: SitemapResolvedUrl = typeof value === 'string' ? { pathname: value } : value
+		const links = alternateLinks(origin, url)
+		if (links.length) localized = true
+		const fields = [
+			`<loc>${xmlText(new URL(url.pathname, origin).href)}</loc>`,
+			...(url.lastmod === undefined ? [] : [`<lastmod>${xmlText(url.lastmod)}</lastmod>`]),
+			...(url.changefreq === undefined ? [] : [`<changefreq>${url.changefreq}</changefreq>`]),
+			...(url.priority === undefined ? [] : [`<priority>${url.priority}</priority>`]),
+			...links,
+		]
+		return `  <url>${fields.join('')}</url>`
+	})
+	const namespaces = `xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"${localized ? ' xmlns:xhtml="http://www.w3.org/1999/xhtml"' : ''}`
+	return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset ${namespaces}>\n${lines.join('\n')}${lines.length ? '\n' : ''}</urlset>\n`
 }

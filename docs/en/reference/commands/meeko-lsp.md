@@ -10,7 +10,7 @@ related:
   - docs/editors.md#arrancar-el-servidor
   - docs/editors.md#opciones-de-inicialización
   - docs/editors.md#comprobación-del-proyecto
-source-hash: 172c59da22d5dcd1f600d8f1ffb5bcb2818ad9db7abdc652da964d099c2ad481
+source-hash: cf7fc9c75568b94470181d1bbb3e0ee298590ceef6f24c10758888e739f27c71
 ---
 
 `meeko lsp` starts Meeko's language server (LSP): diagnostics, completion, hover, go to definition, quick fixes, CodeLens, Prettier formatting, semantic reactivity tokens and page and layout contract checking for `.meeko` files. It speaks JSON-RPC over the specified transport, usually standard input and output. You do not run it manually: the editor launches it.

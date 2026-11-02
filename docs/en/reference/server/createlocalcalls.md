@@ -16,7 +16,7 @@ related:
   - "autoimport:rpc"
   - docs/framework.md#api-y-rpc
   - docs/framework.md#límite-de-peticiones-ratelimit
-source-hash: 77bb2c76494df03ffe07a426c2c6c73d83fd83c955111feec0ff5e381984c881
+source-hash: 8dc4fbab051e792827d87a7b7f0e2a9970f8e9eb48d18aa918e45f4edc9c9445
 ---
 
 `createLocalCalls(options)` returns two functions, `api` and `rpc`, that handle an application endpoint or procedure without leaving the process: they construct an in-memory `Request` with the original request's credential headers (`cookie`, `x-meeko-csrf` and `authorization`) and the application's origin as `Origin` (since `1.8`; previously it forwarded the original `Origin`), and pass it through `dispatchApiRoute` or `dispatchRpc`. The response is the same as over HTTP: Origin, CSRF, `rateLimit`, `auth`, `authorize`, schemas, `locals` and error normalization.

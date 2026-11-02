@@ -1,6 +1,6 @@
-import type { ContextKey } from "../core/reactivity";
+import type { ContextKey } from '../core/reactivity'
 
-import { findContext } from "../core/reactivity";
+import { findContext } from '../core/reactivity'
 
 /**
  * Enlace que recibe un {@link LinkResolver}: la ruta de `to`, el `href` que construyó `href()` (o
@@ -15,12 +15,12 @@ import { findContext } from "../core/reactivity";
  * ```
  */
 export interface LinkResolveInput {
-  /** ID de la ruta de `to`, sin sustituir los parámetros: `"/users/[id]"`. */
-  readonly to: string;
-  /** `href` del enlace, con parámetros, búsqueda y fragmento: `"/users/7?tab=perfil"`. */
-  readonly href: string;
-  /** Atributo `hreflang` del enlace (escrito, con `bind:hreflang` o en `bind`); `undefined` sin él. */
-  readonly hreflang: string | undefined;
+	/** ID de la ruta de `to`, sin sustituir los parámetros: `"/users/[id]"`. */
+	readonly to: string
+	/** `href` del enlace, con parámetros, búsqueda y fragmento: `"/users/7?tab=perfil"`. */
+	readonly href: string
+	/** Atributo `hreflang` del enlace (escrito, con `bind:hreflang` o en `bind`); `undefined` sin él. */
+	readonly hreflang: string | undefined
 }
 
 /**
@@ -40,17 +40,17 @@ export interface LinkResolveInput {
  * export default definePlugin((app) => app.resolveLink(withBase));
  * ```
  */
-export type LinkResolver = (link: LinkResolveInput) => string;
+export type LinkResolver = (link: LinkResolveInput) => string
 
 /** Where the plugins publish their composed resolver; `Symbol.for` so two copies of Meeko agree. */
-export const linkResolverKey = Symbol.for("meeko.link-resolver") as ContextKey<LinkResolver>;
+export const linkResolverKey = Symbol.for('meeko.link-resolver') as ContextKey<LinkResolver>
 
 /**
  * @internal The resolver of the links of a component, read once in its setup: the one the plugins
  * published, or `undefined` outside an application or without resolvers.
  */
 export function linkResolver(): LinkResolver | undefined {
-  return findContext(linkResolverKey);
+	return findContext(linkResolverKey)
 }
 
 /**
@@ -58,23 +58,29 @@ export function linkResolver(): LinkResolver | undefined {
  * resolver unless the link opts out with `bind:resolve="false"`. An empty `hreflang` is no hreflang.
  */
 export function linkHref(resolver: LinkResolver | undefined, to: string, href: string, hreflang?: string | null, resolve?: boolean | null): string {
-  if (!resolver || resolve === false) return href;
-  return resolver({ to, href, hreflang: typeof hreflang === "string" && hreflang !== "" ? hreflang : undefined });
+	if (!resolver || resolve === false) return href
+	return resolver({ to, href, hreflang: typeof hreflang === 'string' && hreflang !== '' ? hreflang : undefined })
 }
 
 /** @internal The `hreflang` key of a `bind` spread on a `<MeekoLink>`, for its resolver. */
 export function linkHreflang(spread: unknown): string | undefined {
-  if (typeof spread !== "object" || spread === null) return undefined;
-  const value = (spread as { readonly hreflang?: unknown }).hreflang;
-  return typeof value === "string" && value !== "" ? value : undefined;
+	if (typeof spread !== 'object' || spread === null) return undefined
+	const value = (spread as { readonly hreflang?: unknown }).hreflang
+	return typeof value === 'string' && value !== '' ? value : undefined
 }
 
 /** A path with each segment in the encoding of `href()`, whether it arrives encoded or not. */
 function encodedPath(path: string): string {
-  return path.split("/").map((segment) => {
-    try { return encodeURIComponent(decodeURIComponent(segment)); }
-    catch { return segment; }
-  }).join("/");
+	return path
+		.split('/')
+		.map((segment) => {
+			try {
+				return encodeURIComponent(decodeURIComponent(segment))
+			} catch {
+				return segment
+			}
+		})
+		.join('/')
 }
 
 /**
@@ -84,13 +90,13 @@ function encodedPath(path: string): string {
  * cover every page. Both paths are compared in the encoding of `href()`, so `/categorías` and
  * `/categor%C3%ADas` are the same route.
  */
-export function routeCurrent(path: string, href: string, prefix: boolean): "page" | "true" | false {
-  const target = encodedPath(href.split(/[?#]/, 1)[0]!);
-  const current = encodedPath(path);
-  if (target === current) return "page";
-  if (!prefix) return false;
-  const base = target.replace(/\/+$/, "");
-  return base !== "" && current.startsWith(`${base}/`) ? "true" : false;
+export function routeCurrent(path: string, href: string, prefix: boolean): 'page' | 'true' | false {
+	const target = encodedPath(href.split(/[?#]/, 1)[0]!)
+	const current = encodedPath(path)
+	if (target === current) return 'page'
+	if (!prefix) return false
+	const base = target.replace(/\/+$/, '')
+	return base !== '' && current.startsWith(`${base}/`) ? 'true' : false
 }
 
 /**
@@ -98,9 +104,9 @@ export function routeCurrent(path: string, href: string, prefix: boolean): "page
  * spread writes attributes: the link's only binding of this attribute reads it through {@link linkCurrent}.
  */
 export function linkSpreadCurrent(spread: unknown): unknown {
-  if (typeof spread !== "object" || spread === null) return undefined;
-  const key = Object.keys(spread).find((candidate) => candidate.toLowerCase() === "aria-current");
-  return key === undefined ? undefined : (spread as Record<string, unknown>)[key];
+	if (typeof spread !== 'object' || spread === null) return undefined
+	const key = Object.keys(spread).find((candidate) => candidate.toLowerCase() === 'aria-current')
+	return key === undefined ? undefined : (spread as Record<string, unknown>)[key]
 }
 
 /**
@@ -109,6 +115,6 @@ export function linkSpreadCurrent(spread: unknown): unknown {
  * href is the path of the committed route and, with `match="prefix"`, `"true"` when the route is
  * below it (see {@link routeCurrent}); no attribute otherwise.
  */
-export function linkCurrent(route: { readonly path: { readonly value: string } }, href: string, match?: "exact" | "prefix", explicit?: unknown): unknown {
-  return explicit ?? (routeCurrent(route.path.value, href, match === "prefix") || undefined);
+export function linkCurrent(route: { readonly path: { readonly value: string } }, href: string, match?: 'exact' | 'prefix', explicit?: unknown): unknown {
+	return explicit ?? (routeCurrent(route.path.value, href, match === 'prefix') || undefined)
 }

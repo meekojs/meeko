@@ -51,12 +51,12 @@ El botón aparece en la barra del layout, y al navegar a otra página desaparece
 
 ## Props
 
-| Atributo | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `to` | `"body"` o `"#id"` | obligatorio | `"body"` añade el contenido al final de `<body>`; `"#id"`, dentro del elemento con ese `id`, tras lo que ya tiene. El `id` es una letra y luego letras ASCII, dígitos, `-` o `_`; se busca con `getElementById`, nunca como selector CSS. |
-| `bind:to` | `MeekoTeleportTarget` | | Destino calculado, `"body"` o una cadena que empieza por `#`; se valida al renderizar. |
-| `disabled` o `bind:disabled` | `boolean` | `false` | Mientras es verdadero, el contenido se pinta en su sitio. Cambiarlo mueve los mismos nodos, que conservan su estado. |
-| `if:when`, `each:of` | | | Funcionan como en cualquier etiqueta. |
+| Atributo                     | Tipo                  | Por defecto | Descripción                                                                                                                                                                                                                               |
+| ---------------------------- | --------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `to`                         | `"body"` o `"#id"`    | obligatorio | `"body"` añade el contenido al final de `<body>`; `"#id"`, dentro del elemento con ese `id`, tras lo que ya tiene. El `id` es una letra y luego letras ASCII, dígitos, `-` o `_`; se busca con `getElementById`, nunca como selector CSS. |
+| `bind:to`                    | `MeekoTeleportTarget` |             | Destino calculado, `"body"` o una cadena que empieza por `#`; se valida al renderizar.                                                                                                                                                    |
+| `disabled` o `bind:disabled` | `boolean`             | `false`     | Mientras es verdadero, el contenido se pinta en su sitio. Cambiarlo mueve los mismos nodos, que conservan su estado.                                                                                                                      |
+| `if:when`, `each:of`         |                       |             | Funcionan como en cualquier etiqueta.                                                                                                                                                                                                     |
 
 Cualquier otro atributo es `MEEK114`.
 
@@ -177,7 +177,7 @@ const target = signal<MeekoTeleportTarget>("#toolbar");
 
 ## Notas
 
-- **Modales y menús.** No hace falta teleport: `<dialog>` con `showModal()` y el atributo `popover` (o [`<MeekoPopover>`](/docs/reference/meekopopover)) ya van en la *top layer* del navegador, sin problemas de `z-index` ni de `overflow`.
+- **Modales y menús.** No hace falta teleport: `<dialog>` con `showModal()` y el atributo `popover` (o [`<MeekoPopover>`](/docs/reference/meekopopover)) ya van en la _top layer_ del navegador, sin problemas de `z-index` ni de `overflow`.
 - **Navegador.** Lo que el navegador renderiza después (una navegación, un `if:when` que aparece, una fila nueva) se pinta primero en su sitio y pasa al destino al terminar ese montaje, antes del siguiente pintado.
 - **Foco.** Cambiar `disabled` mueve los nodos: el elemento que tenía el foco lo pierde, como en cualquier movimiento del DOM.
 - **Seguridad.** `to` nunca se interpreta como HTML ni como selector: sólo `"body"` o un `id` con caracteres seguros.

@@ -11,7 +11,7 @@ related:
   - "@meekojs/meeko#provide"
   - "@meekojs/meeko#inject"
   - docs/api.md#reactividad
-source-hash: 1de333dac820f76c11adfd9d3dcc014bf6eccae1a64d656ab2a097f929aa4681
+source-hash: 706e7a976789cb316262c864aab369dfff32bbf4c40d62771124a6372d808dd7
 ---
 
 Everything reactive belongs to a root: `effect`, `computed`, `onCleanup` cleanups and `provide` values. Meeko creates one for each component and disposes of it on unmount, so a component script almost never needs another. `createRoot(fn)` creates a root manually for code outside a component (a test, a custom host, a manually mounted widget) or a group of effects that must be disposable before the component.

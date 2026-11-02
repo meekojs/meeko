@@ -20,7 +20,7 @@ related:
   - docs/framework.md#datos-en-componentes-useapi-userpcquery-y-userpcmutation
   - docs/framework.md#búsqueda-mientras-se-escribe-debouncems-y-enabled
   - docs/api.md#composables-de-nivel-superior-y-await
-source-hash: 729d2b2096dfd3a9bf56c8aae3ffd8e323b7419da42cd344ea442326ad302738
+source-hash: c8ab5cd520367323f186fcb7f2bb27c15fd6eafb2fe25b863dbb719cd4984348
 ---
 
 `useApi(ruta, opciones?, recarga?)` requests data from a `server/api` `GET` endpoint and returns a resource with `data`, `error`, `pending`, `refreshing` and `refresh`. Write the route as described by `server/api`, with dynamic segments in brackets (`"/api/users/[id]"`), and TypeScript checks `params`, `query` and the shape of `data` against the endpoint contract. It uses the same session, CSRF and validation as `api.*`.

@@ -15,7 +15,7 @@ related:
   - "@meekojs/meeko/framework#definePage"
   - docs/framework.md#sitemapxml-y-robotstxt
   - docs/framework.md#rutas-dinámicas-en-el-sitemap-sitemapentries
-source-hash: 620db12310f4c4451787b0da962336c73b43c80c1bb5f00441e93f07972ab3a0
+source-hash: e1e3b15c6f8802da85be4656050efdf1c366b2f492904e532cfd3848c9a3e10c
 ---
 
 `sitemap` makes `meeko build` write `sitemap.xml` (sitemaps.org protocol 0.9) with the absolute URL of each prerendered page and each route without parameters, whether `"ssr"`, `"stream"` or `"client"`. Routes in `exclude` and prerendered pages with `<meta name="robots" content="noindex">` (or `none`) are omitted.

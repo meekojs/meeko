@@ -1,11 +1,11 @@
-import type { IncomingMessage } from "node:http";
-import type { Duplex } from "node:stream";
+import type { IncomingMessage } from 'node:http'
+import type { Duplex } from 'node:stream'
 
-import type { SocketHub, SocketPeer } from "../socket/runtime";
+import type { SocketHub, SocketPeer } from '../socket/runtime'
 
-import { observeErrorCallback } from "../errors";
-import { setSocketAddress } from "./env";
-import { createSocketUpgradeHandler, socketPathnamePrefix, socketPublicOrigin } from "./upgrade";
+import { observeErrorCallback } from '../errors'
+import { setSocketAddress } from './env'
+import { createSocketUpgradeHandler, socketPathnamePrefix, socketPublicOrigin } from './upgrade'
 
 /**
  * Conexión que devuelve la librería WebSocket del host tras el upgrade; la librería se encarga del
@@ -24,12 +24,12 @@ import { createSocketUpgradeHandler, socketPathnamePrefix, socketPublicOrigin } 
  * ```
  */
 export interface NodeAcceptedSocket {
-  /** Peer que recibe los envíos del hub. */
-  peer: SocketPeer;
-  /** Registra el listener de los mensajes entrantes. */
-  onMessage(listener: (message: string | Uint8Array) => void): void;
-  /** Registra el listener del cierre. */
-  onClose(listener: () => void): void;
+	/** Peer que recibe los envíos del hub. */
+	peer: SocketPeer
+	/** Registra el listener de los mensajes entrantes. */
+	onMessage(listener: (message: string | Uint8Array) => void): void
+	/** Registra el listener del cierre. */
+	onClose(listener: () => void): void
 }
 
 /**
@@ -47,25 +47,25 @@ export interface NodeAcceptedSocket {
  * ```
  */
 export interface NodeSocketUpgradeOptions {
-  /** Hub de la aplicación. */
-  hub: SocketHub;
-  /** Origen público fijo; la política de seguridad nunca se deduce de una cabecera `Host` no confiable. */
-  publicOrigin: string;
-  /** Prefijo de los canales; por defecto, `/_meeko/socket`. */
-  pathnamePrefix?: string;
-  /** Bytes entrantes retenidos mientras el hub autoriza una conexión nueva. Por defecto, 64 KiB. */
-  maxPendingBytes?: number;
-  /** Hace el upgrade con la librería WebSocket del host. */
-  upgrade(incoming: IncomingMessage, socket: Duplex, head: Buffer): Promise<NodeAcceptedSocket> | NodeAcceptedSocket;
-  /**
-   * Responde a un handshake rechazado; por defecto, destruye el socket. Desde `1.1` no recibe los
-   * rechazos de sesión (`401`) ni de autorización del canal (`403`): esos hacen el upgrade con
-   * `upgrade` y cierran en seguida con `4401` o `4403`. Un Origin no permitido sigue llegando aquí
-   * con `403`.
-   */
-  reject?(incoming: IncomingMessage, socket: Duplex, status: number): void;
-  /** Observador de los fallos del upgrade y de las sesiones. */
-  onError?(error: unknown): void;
+	/** Hub de la aplicación. */
+	hub: SocketHub
+	/** Origen público fijo; la política de seguridad nunca se deduce de una cabecera `Host` no confiable. */
+	publicOrigin: string
+	/** Prefijo de los canales; por defecto, `/_meeko/socket`. */
+	pathnamePrefix?: string
+	/** Bytes entrantes retenidos mientras el hub autoriza una conexión nueva. Por defecto, 64 KiB. */
+	maxPendingBytes?: number
+	/** Hace el upgrade con la librería WebSocket del host. */
+	upgrade(incoming: IncomingMessage, socket: Duplex, head: Buffer): Promise<NodeAcceptedSocket> | NodeAcceptedSocket
+	/**
+	 * Responde a un handshake rechazado; por defecto, destruye el socket. Desde `1.1` no recibe los
+	 * rechazos de sesión (`401`) ni de autorización del canal (`403`): esos hacen el upgrade con
+	 * `upgrade` y cierran en seguida con `4401` o `4403`. Un Origin no permitido sigue llegando aquí
+	 * con `403`.
+	 */
+	reject?(incoming: IncomingMessage, socket: Duplex, status: number): void
+	/** Observador de los fallos del upgrade y de las sesiones. */
+	onError?(error: unknown): void
 }
 
 /**
@@ -93,51 +93,76 @@ export interface NodeSocketUpgradeOptions {
  * ```
  */
 export function createNodeSocketUpgradeHandler(options: NodeSocketUpgradeOptions): (incoming: IncomingMessage, socket: Duplex, head: Buffer) => Promise<boolean> {
-  const origin = socketPublicOrigin(options.publicOrigin);
-  const prefix = socketPathnamePrefix(options.pathnamePrefix);
-  const observeError = (error: unknown): void => observeErrorCallback(error, options.onError);
-  const handshake = createSocketUpgradeHandler({
-    hub: options.hub,
-    publicOrigin: origin.href,
-    pathnamePrefix: prefix,
-    ...(options.maxPendingBytes === undefined ? {} : { maxPendingBytes: options.maxPendingBytes }),
-    ...(options.onError ? { onError: options.onError } : {}),
-  });
-  return async (incoming, socket, head) => {
-    let url: URL;
-    try { url = new URL(incoming.url ?? "", origin); }
-    catch { return false; }
-    if (!url.pathname.startsWith(`${prefix}/`)) return false;
-    const reject = (status: number) => { if (options.reject) options.reject(incoming, socket, status); else socket.destroy(); };
-    // An absolute-form request target cannot name another origin.
-    if (url.origin !== origin.origin || incoming.method !== "GET") { reject(400); return true; }
-    const headers = new Headers();
-    for (const [key, value] of Object.entries(incoming.headers)) {
-      if (value !== undefined) headers.set(key, Array.isArray(value) ? value.join(", ") : value);
-    }
-    const decision = await handshake(setSocketAddress(new Request(url, { headers }), incoming.socket?.remoteAddress));
-    if (decision.action === "pass") return false;
-    const upgradeSocket = async (): Promise<NodeAcceptedSocket | undefined> => {
-      try { return await options.upgrade(incoming, socket, head); }
-      catch (error) { socket.destroy(); observeError(error); return undefined; }
-    };
-    if (decision.action === "reject") {
-      const denial = decision.close;
-      if (!denial) { reject(decision.status); return true; }
-      // An auth refusal completes the upgrade only to close with 4401/4403, which a browser can read.
-      const denied = await upgradeSocket();
-      if (!denied) return true;
-      denied.onMessage(() => { /* A refused connection never reaches the hub. */ });
-      denied.onClose(() => { /* Nothing was opened. */ });
-      try { denied.peer.close(denial.code, denial.reason); }
-      catch (error) { socket.destroy(); observeError(error); }
-      return true;
-    }
-    const accepted = await upgradeSocket();
-    if (!accepted) return true;
-    const session = decision.open(accepted.peer);
-    accepted.onMessage((message) => session.receive(message));
-    accepted.onClose(() => session.closed());
-    return true;
-  };
+	const origin = socketPublicOrigin(options.publicOrigin)
+	const prefix = socketPathnamePrefix(options.pathnamePrefix)
+	const observeError = (error: unknown): void => observeErrorCallback(error, options.onError)
+	const handshake = createSocketUpgradeHandler({
+		hub: options.hub,
+		publicOrigin: origin.href,
+		pathnamePrefix: prefix,
+		...(options.maxPendingBytes === undefined ? {} : { maxPendingBytes: options.maxPendingBytes }),
+		...(options.onError ? { onError: options.onError } : {}),
+	})
+	return async (incoming, socket, head) => {
+		let url: URL
+		try {
+			url = new URL(incoming.url ?? '', origin)
+		} catch {
+			return false
+		}
+		if (!url.pathname.startsWith(`${prefix}/`)) return false
+		const reject = (status: number) => {
+			if (options.reject) options.reject(incoming, socket, status)
+			else socket.destroy()
+		}
+		// An absolute-form request target cannot name another origin.
+		if (url.origin !== origin.origin || incoming.method !== 'GET') {
+			reject(400)
+			return true
+		}
+		const headers = new Headers()
+		for (const [key, value] of Object.entries(incoming.headers)) {
+			if (value !== undefined) headers.set(key, Array.isArray(value) ? value.join(', ') : value)
+		}
+		const decision = await handshake(setSocketAddress(new Request(url, { headers }), incoming.socket?.remoteAddress))
+		if (decision.action === 'pass') return false
+		const upgradeSocket = async (): Promise<NodeAcceptedSocket | undefined> => {
+			try {
+				return await options.upgrade(incoming, socket, head)
+			} catch (error) {
+				socket.destroy()
+				observeError(error)
+				return undefined
+			}
+		}
+		if (decision.action === 'reject') {
+			const denial = decision.close
+			if (!denial) {
+				reject(decision.status)
+				return true
+			}
+			// An auth refusal completes the upgrade only to close with 4401/4403, which a browser can read.
+			const denied = await upgradeSocket()
+			if (!denied) return true
+			denied.onMessage(() => {
+				/* A refused connection never reaches the hub. */
+			})
+			denied.onClose(() => {
+				/* Nothing was opened. */
+			})
+			try {
+				denied.peer.close(denial.code, denial.reason)
+			} catch (error) {
+				socket.destroy()
+				observeError(error)
+			}
+			return true
+		}
+		const accepted = await upgradeSocket()
+		if (!accepted) return true
+		const session = decision.open(accepted.peer)
+		accepted.onMessage((message) => session.receive(message))
+		accepted.onClose(() => session.closed())
+		return true
+	}
 }

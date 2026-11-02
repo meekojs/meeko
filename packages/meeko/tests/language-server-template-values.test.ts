@@ -350,7 +350,10 @@ describe('language server: completion from the script, by directive', () => {
 
 	test('a static value of a component prop offers its literal union (the icon names of <UIIcon name="…">)', async () => {
 		const offered = await complete(`<Card title="x" variant="pr^" />`)
-		assert.ok(offered.some((item) => item.label === 'primary'), JSON.stringify(offered.map((item) => item.label)))
+		assert.ok(
+			offered.some((item) => item.label === 'primary'),
+			JSON.stringify(offered.map((item) => item.label)),
+		)
 		assert.equal(find(offered, 'primary').applied, `<Card title="x" variant="primary" />`)
 		assert.equal(find(await complete(`<Card title="x" variant="^" />`), 'secondary').applied, `<Card title="x" variant="secondary" />`)
 	})

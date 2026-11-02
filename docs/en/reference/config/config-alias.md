@@ -12,7 +12,7 @@ related:
   - docs/framework.md#aliases-propios-alias
   - docs/framework.md#ámbitos-de-los-aliases
   - docs/framework.md#prioridad-y-conflictos-de-los-aliases
-source-hash: c6882fd46c71db619e25d421f37186775c2a6ab844dda059899e68996fe6277e
+source-hash: 0ce36edbc60791882c13fbff2b38e6c52264506025a3aad9e140d620cd3db9fb
 ---
 
 Without configuration, Meeko defines four path aliases: `~/` (the project root), `@/` (`app/`), `#shared/` (`shared/`) and `#server/` (`server/`, only in server code). `alias` adds your own or changes these: each key is a prefix ending in `/` and each value is a project folder or `false` to remove the alias.

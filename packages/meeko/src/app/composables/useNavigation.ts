@@ -1,9 +1,9 @@
-import type { NavigationState } from "../runtime/navigation";
+import type { NavigationState } from '../runtime/navigation'
 
-import { findContext } from "../../core/reactivity";
-import { navigationKey } from "../runtime/navigation";
+import { findContext } from '../../core/reactivity'
+import { navigationKey } from '../runtime/navigation'
 
-const idle: NavigationState = /*#__PURE__*/ Object.freeze({ pending: /*#__PURE__*/ Object.freeze({ value: false }) });
+const idle: NavigationState = /*#__PURE__*/ Object.freeze({ pending: /*#__PURE__*/ Object.freeze({ value: false }) })
 
 /**
  * Lee el estado de navegación de la aplicación actual. `pending` vale `true` mientras se carga una
@@ -22,6 +22,5 @@ const idle: NavigationState = /*#__PURE__*/ Object.freeze({ pending: /*#__PURE__
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#estado-de-navegación
  */
 export function useNavigation(): NavigationState {
-  return findContext(navigationKey) ?? idle;
+	return findContext(navigationKey) ?? idle
 }
-

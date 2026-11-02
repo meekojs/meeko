@@ -15,7 +15,7 @@ related:
   - docs/framework.md#sesiones-en-d1
   - docs/framework.md#rate-limit-en-sql
   - docs/framework.md#cloudflare-workers
-source-hash: ff49fd8f0c0b802770812a3c1a85d8d2751140b4c070eaa0dcc88ec9e23b98d6
+source-hash: 2b811eba5da9f09198546849156e20c28e6435182d485b461ecb995cdb619b42
 ---
 
 `D1SessionDriver(db, options)` implements `SqlSessionDriver` over a D1 binding, for use with `SqlSessionStore`. Each operation is a single statement: `replace` is an `UPDATE … WHERE id = ? AND family_id = ? AND expires_at > ?` requiring exactly one changed row, `revokeFamily` is a `DELETE … WHERE family_id = ?`, and `UNIQUE(family_id)` prevents a second active ID in a family.

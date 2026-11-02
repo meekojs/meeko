@@ -10,7 +10,7 @@ related:
   - "@meekojs/meeko#computed"
   - "@meekojs/meeko#batch"
   - docs/api.md#reactividad
-source-hash: 82d9419a9b02f7bed661b4a6a1fbd4255fdea6008f80cc98a2110bf263b47997
+source-hash: de96ff91418c87f69791f789c309bb6a88a33f656185b66e35eb5ff4ea1807b2
 ---
 
 Inside an `effect`, a `computed` or the template, reading `signal.value` subscribes the observer: it runs again when the signal changes. `untrack(fn)` runs `fn` with no active observer, so the signals read inside it are not tracked. Use it to read a contextual value (the user, the current page, an option) without changes to that value triggering the work.

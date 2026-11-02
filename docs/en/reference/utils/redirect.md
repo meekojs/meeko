@@ -13,7 +13,7 @@ related:
   - "syntax:script-server"
   - docs/framework.md#código-de-nivel-superior-y-datos-exportados
   - docs/framework.md#middleware-de-ruta-de-servidor
-source-hash: 219ff50c70f93782a8645bc7f3dfd87e039550203de1a218ca9a4dec46299218
+source-hash: 3a5439344af59175fd56c7afa991301e181b16a3760e5a4ac2b389d16310018c
 ---
 
 `redirect(url, status?)` stops the top-level code in a page's `<script server>` and responds with a redirect. Since `1.6`, it also stops server route middleware (`app/middleware/*.server.ts`). In SSR it is a `302` response (by default) with `Location`; during client navigation, the browser follows it just like a loader's redirect.

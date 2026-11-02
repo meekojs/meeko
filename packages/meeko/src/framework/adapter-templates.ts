@@ -36,7 +36,7 @@ async function prerenderSource(): Promise<PrerenderSource | undefined> {
     },
   };
 }
-`;
+`
 
 /** Bun adapter entry; \`meeko build --adapter bun\` bundles it to .meeko/output/bun/index.js. */
 export const bunEntrySource = `import { networkInterfaces } from "node:os";
@@ -109,7 +109,7 @@ export async function start() {
 }
 
 if (import.meta.main) await start();
-`;
+`
 
 /** Deno adapter entry; \`meeko build --adapter deno\` bundles it to .meeko/output/deno/main.js. */
 export const denoEntrySource = `import { resolve } from "node:path";
@@ -174,14 +174,14 @@ export async function start() {
 }
 
 if (import.meta.main) await start();
-`;
+`
 
 /**
  * Cloudflare Workers entry; `meeko build --adapter cloudflare` bundles it to
  * .meeko/output/cloudflare/worker.js. Only Worker entrypoints are exported.
  */
 export function cloudflareEntrySource(socketClassName: string): string {
-  return `import { DurableObject } from "cloudflare:workers";
+	return `import { DurableObject } from "cloudflare:workers";
 import {
   createCloudflareAssetReader, createCloudflarePrerenderSource, createSocketRoomClass, createWorker, DurableObjectSocketPubSub,
 } from "@meekojs/meeko/cloudflare";
@@ -215,5 +215,5 @@ export default createWorker(createCloudflareApp);
 
 /** Durable Object hosting the WebSockets of one Socket room. */
 export const ${socketClassName} = createSocketRoomClass(createCloudflareApp, DurableObject);
-`;
+`
 }

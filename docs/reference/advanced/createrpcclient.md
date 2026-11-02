@@ -45,10 +45,10 @@ const { total } = await rpc.math.sum({ a: 1, b: 2 }); // POST https://example.co
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
+| Parámetro  | Tipo                          | Por defecto | Descripción                                                                                                                                   |
+| ---------- | ----------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | `manifest` | `{ rpc: { id, pathname }[] }` | obligatorio | Los procedimientos públicos. El `id` con puntos es el camino del método; `pathname`, su ruta, normalmente `/_meeko/rpc/<carpetas>/<archivo>`. |
-| `options` | `ClientOptions` | `{}` | `baseUrl`, `fetch`, `csrfToken` y `headers`, como en `createApiClient`. |
+| `options`  | `ClientOptions`               | `{}`        | `baseUrl`, `fetch`, `csrfToken` y `headers`, como en `createApiClient`.                                                                       |
 
 `Contract` describe cada procedimiento con `RpcOperation<Input, Output>`; en una aplicación sale de `.meeko/types/server-contracts.d.ts`.
 
@@ -56,11 +56,11 @@ const { total } = await rpc.math.sum({ a: 1, b: 2 }); // POST https://example.co
 
 Un objeto anidado por ID. Cada método recibe la entrada y, opcionalmente, `{ signal, idempotencyKey }`, y devuelve una promesa de la salida:
 
-| Respuesta | Resultado |
-| --- | --- |
-| `2xx` con JSON | La salida parseada. |
-| Un error del servidor `{ code, status, requestId, issues? }` | Rechaza con `ClientError`. |
-| Un cuerpo que no es JSON | Rechaza con `ClientError` `INVALID_RESPONSE`. |
+| Respuesta                                                    | Resultado                                     |
+| ------------------------------------------------------------ | --------------------------------------------- |
+| `2xx` con JSON                                               | La salida parseada.                           |
+| Un error del servidor `{ code, status, requestId, issues? }` | Rechaza con `ClientError`.                    |
+| Un cuerpo que no es JSON                                     | Rechaza con `ClientError` `INVALID_RESPONSE`. |
 
 Lanza `TypeError` al crearse si dos procedimientos colisionan (`Client key collision: users.get`, por ejemplo con `users` y `users.get`, porque `rpc.users` no puede ser a la vez una función y un objeto) o un ID no es válido.
 
@@ -82,6 +82,7 @@ console.log(report.url);
 ### Reintentos seguros con una clave de idempotencia
 
 <!-- no-check -->
+
 ```ts
 const key = crypto.randomUUID();
 await retry(() => rpc.orders.create({ items }, { idempotencyKey: key }));
@@ -92,6 +93,7 @@ El servidor recibe la misma `Idempotency-Key` en cada intento (`context.idempote
 ### En una prueba, contra la aplicación sin red
 
 <!-- no-check -->
+
 ```ts
 const rpc = createRpcClient<Contract>(manifest, {
   baseUrl: "http://localhost",
@@ -115,6 +117,7 @@ createRpcClient({ rpc: [
 `TypeError: Client key collision: users.get`. En una aplicación, el descubrimiento de servidor ya lo rechaza al generar el manifiesto, con los dos archivos.
 
 <!-- no-check -->
+
 ```ts good
 createRpcClient({ rpc: [
   { id: "users.list", pathname: "/_meeko/rpc/users/list" },
@@ -131,6 +134,7 @@ await createRpcClient<Contract>(manifest).math.sum({ a: 1, b: 2 });
 `TypeError: Failed to parse URL from /_meeko/rpc/math/sum`: en Node, `fetch` no resuelve rutas relativas.
 
 <!-- no-check -->
+
 ```ts good
 await createRpcClient<Contract>(manifest, { baseUrl: "http://127.0.0.1:4173" }).math.sum({ a: 1, b: 2 });
 ```
@@ -145,6 +149,7 @@ await rpc.cart.add({ sku: "A1" });
 Con una cookie de sesión, el servidor exige `x-meeko-csrf` en cada `POST`: sin él, `ClientError` con estado `403`. El token llega en la cabecera `x-meeko-csrf-token` de las respuestas y en la meta `meeko-csrf-token` del documento.
 
 <!-- no-check -->
+
 ```ts good
 const rpc = createRpcClient<Contract>(manifest, { baseUrl, headers: { cookie }, csrfToken: () => token });
 ```

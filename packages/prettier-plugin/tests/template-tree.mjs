@@ -4,7 +4,11 @@ import { parseSfc, parseTemplate, scanInterpolations } from '@meekojs/meeko/pars
 // counts as one space, and an expression or a class list counts by its content. A text node that
 // appears, disappears or gains a space at an edge is a difference.
 const collapse = (text) => text.replace(/[\t\n\f\r ]+/g, ' ')
-const code = (text) => text.replace(/[\s;()]/g, '').replaceAll('"', "'").replace(/,(?=[\]}])/g, '')
+const code = (text) =>
+	text
+		.replace(/[\s;()]/g, '')
+		.replaceAll('"', "'")
+		.replace(/,(?=[\]}])/g, '')
 
 function text(raw) {
 	let result = ''

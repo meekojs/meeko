@@ -11,7 +11,7 @@ related:
   - "@meekojs/meeko/framework#RouteId"
   - docs/framework.md#configuración
   - docs/framework.md#autoimports-y-typescript
-source-hash: 4f041d6d2cd3b2af8a92352a7508e747898e105287f2f7d6580d7323bca5afe3
+source-hash: b6a2bcf3786393f4ce5da9d8539cc6c2ecd052eafafdb1189091bbb84ad155c4
 ---
 
 `meeko routes` performs the discovery step of [`meeko check`](/en/docs/reference/meeko-check) without checking anything: it reads `app/pages`, `server/api`, `server/rpc`, `server/socket`, components and auto-import folders from the project and its layers, then writes the manifests and declarations used by the editor, `href()` and the `api`, `rpc` and `socket` clients. Since `1.7`, it prepares `.meeko/` like `meeko check`: it also writes Vite entry points, `.meeko/types/services.d.ts`, page contracts and `tsconfig.*.json`, so `tsc -p .meeko/tsconfig.server.json` works afterward. It prints the path of each file written.

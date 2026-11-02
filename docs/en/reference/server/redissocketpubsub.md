@@ -16,7 +16,7 @@ related:
   - "@meekojs/meeko/server#defineSocketChannel"
   - docs/framework.md#broadcast-y-varias-instancias
   - docs/framework.md#websocket
-source-hash: 7d96019c0a0e8843428f35c6d5bb6200bd6f9c358a6bf059b56d66a0aabb09e5
+source-hash: b7c4f072cd694692771031e383069957494c04d6e13552911c87864c32c119e5
 ---
 
 `RedisSocketPubSub` is the Socket broker for multiple instances: each channel/room pair is a Redis channel (`<prefix>socket:<canal>:<sala>`, with channel and room encoded using `encodeURIComponent`), to which each instance subscribes once while it has local peers in that room. A `broadcast` in any instance reaches peers in all instances.

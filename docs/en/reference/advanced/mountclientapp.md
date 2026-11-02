@@ -16,7 +16,7 @@ related:
   - "@meekojs/meeko/framework#definePlugin"
   - docs/framework.md#routing-layouts-y-ssr
   - docs/framework.md#errores
-source-hash: c47800b3f06b9609cc3fe02aec89c7d4412c450ddc9f5efc2b74eea5bed43df5
+source-hash: 1c0e728a84f11fb377f8ff297c533ac38ff3ef60406be51c0752033d26bc7199
 ---
 
 `mountClientApp` starts a Meeko application in the browser. It reads the payload left by the server in `#meeko-payload`, checks that the route and parameters match SSR, runs plugins and route middleware, and **hydrates** existing HTML (does not render it again). It then intercepts same-origin link clicks and history: on each navigation it requests page data from the server (`Accept: application/meeko+json`) or runs a `render: "client"` route's loader, replacing only the first changed outlet and retaining shared layouts with their state.

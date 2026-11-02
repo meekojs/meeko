@@ -1,6 +1,6 @@
 # Actualizar de 1.1 a 1.2
 
-`1.2` es un minor: lo nuevo (módulos, `document` y `useHead`, `<MeekoLink>` y `<MeekoOutlet />`, sesiones sin configuración, contraseñas, `rateLimit`, `useForm`, `useStorage`, utilidades de PostCSS…) es opcional. Dos cambios de comportamiento se publican como [excepciones aprobadas](stability.md#excepciones-aprobadas) a la política de estabilidad: las props reactivas y la protección contra el *login CSRF* en `session.create()`. Además, algunos cambios se notan al actualizar. Esta guía los reúne con lo que conviene revisar en cada uno. La lista completa, con lo añadido y corregido, está en el [CHANGELOG](../packages/meeko/CHANGELOG.md); los compromisos de compatibilidad, en la [política de estabilidad](stability.md).
+`1.2` es un minor: lo nuevo (módulos, `document` y `useHead`, `<MeekoLink>` y `<MeekoOutlet />`, sesiones sin configuración, contraseñas, `rateLimit`, `useForm`, `useStorage`, utilidades de PostCSS…) es opcional. Dos cambios de comportamiento se publican como [excepciones aprobadas](stability.md#excepciones-aprobadas) a la política de estabilidad: las props reactivas y la protección contra el _login CSRF_ en `session.create()`. Además, algunos cambios se notan al actualizar. Esta guía los reúne con lo que conviene revisar en cada uno. La lista completa, con lo añadido y corregido, está en el [CHANGELOG](../packages/meeko/CHANGELOG.md); los compromisos de compatibilidad, en la [política de estabilidad](stability.md).
 
 ## Orden recomendado
 
@@ -44,7 +44,7 @@ En una petición `POST`, `PUT`, `PATCH` o `DELETE`, `context.session.create()` s
 Los navegadores envían `Origin` en toda petición `POST`, así que un inicio de sesión desde la propia aplicación no cambia. Qué revisar:
 
 - **Scripts, pruebas y apps nativas** que inician sesión sin la cabecera `Origin`, por ejemplo una prueba que hace `fetch` o `request.post` contra `/api/auth/login`: reciben `403`. Envíe el `Origin` de la aplicación (el de la petición, `MEEKO_PUBLIC_ORIGIN` o uno de `SessionManager({ allowedOrigins })`).
-- **`origin: "none"`** en la ruta desactiva la comprobación. Es **inseguro**: deja la ruta expuesta al *login CSRF*, así que úselo sólo si la petición prueba de otra forma que no viene de otra web (por ejemplo, con un secreto de la app que el navegador no tiene). En desarrollo, el primer rechazo escribe un aviso con las dos salidas.
+- **`origin: "none"`** en la ruta desactiva la comprobación. Es **inseguro**: deja la ruta expuesta al _login CSRF_, así que úselo sólo si la petición prueba de otra forma que no viene de otra web (por ejemplo, con un secreto de la app que el navegador no tiene). En desarrollo, el primer rechazo escribe un aviso con las dos salidas.
 - `GET`, `HEAD` y `OPTIONS` no se comprueban: los callbacks de OAuth y los enlaces mágicos siguen funcionando y deben validar su propio `state` o token de un solo uso.
 - Un `SessionHandle` construido a mano, sin `SessionManager.load`, crea la sesión como antes.
 
@@ -72,11 +72,11 @@ Véase [Origin en mutaciones anónimas](framework.md#origin-en-mutaciones-anóni
 
 Todas las variables que lee Meeko empiezan por `MEEKO_`. `MEEKO_HOST`, `MEEKO_PORT` y `MEEKO_PUBLIC_ORIGIN` sustituyen a `HOST`, `PORT` y `PUBLIC_ORIGIN` en `meeko dev`, `start` y `preview`, en las salidas de Node, Bun y Deno y en el Worker de Cloudflare:
 
-| Antes | Desde `1.2` | Estado del nombre anterior |
-| --- | --- | --- |
-| `HOST` | `MEEKO_HOST` | Obsoleto: se lee si falta `MEEKO_HOST`, con un aviso por proceso, y dejará de leerse en `2.0`. |
-| `PUBLIC_ORIGIN` | `MEEKO_PUBLIC_ORIGIN` | Obsoleto, igual que `HOST`. |
-| `PORT` | `MEEKO_PORT` | No está obsoleto: es el respaldo permanente de `MEEKO_PORT`, porque lo inyectan plataformas como Coolify, Railway o Cloud Run. |
+| Antes           | Desde `1.2`           | Estado del nombre anterior                                                                                                     |
+| --------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `HOST`          | `MEEKO_HOST`          | Obsoleto: se lee si falta `MEEKO_HOST`, con un aviso por proceso, y dejará de leerse en `2.0`.                                 |
+| `PUBLIC_ORIGIN` | `MEEKO_PUBLIC_ORIGIN` | Obsoleto, igual que `HOST`.                                                                                                    |
+| `PORT`          | `MEEKO_PORT`          | No está obsoleto: es el respaldo permanente de `MEEKO_PORT`, porque lo inyectan plataformas como Coolify, Railway o Cloud Run. |
 
 Cambie el nombre en el entorno del despliegue, en los Dockerfile y en `vars` de `wrangler.jsonc`:
 

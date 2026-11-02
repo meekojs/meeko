@@ -9,7 +9,7 @@ related:
   - "config:layers"
   - "config:modules"
   - docs/framework.md#layers
-source-hash: 88e21b83f7f325d925630b8fb8fde07802abab1ab1780fc85fff55b58f08c87f
+source-hash: a84b86e48065ba5c0b8064b396c923665db5305580b0ee65f15ca0a6fdf87d95
 ---
 
 `extends` was the name of `layers` through `1.1`. It accepts the same values (project folders with `app/pages`) and applies the same rules, and continues to work throughout `1.x` without a warning. The only difference is the order: its folders come before those in `layers`.

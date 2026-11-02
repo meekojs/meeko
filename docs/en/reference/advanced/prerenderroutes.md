@@ -15,7 +15,7 @@ related:
   - "@meekojs/meeko/framework#definePage"
   - docs/framework.md#modos-de-render
   - docs/framework.md#csp-con-hashes
-source-hash: 7ff536d936ff62cf2eee66c676ae28891d913ed0452f61a7d527c51c69fd2336
+source-hash: 0c839898a014a4e0771e263e448f9924686621dc0c860201634086d094fbd2e1
 ---
 
 `prerenderRoutes` is the prerendering engine of `meeko build`, without the build: it iterates over `render: "prerender"` routes, generates their URLs (one per static route and one per `prerenderEntries` entry for dynamic routes), requests each from your `handler` and writes the HTML of `200` responses, their navigation payloads (`index.meeko.json`) and a `manifest.json` with each page's file, `ETag` and inline script and style hashes to `outputRoot`.

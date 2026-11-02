@@ -1,5 +1,5 @@
-import type { Schema } from "../schema";
-import type { RpcDefinition } from "./contracts";
+import type { Schema } from '../schema'
+import type { RpcDefinition } from './contracts'
 
 /**
  * Declara un procedimiento RPC, el export por defecto de `server/rpc/<ruta>.ts`, que se llama con
@@ -43,5 +43,5 @@ import type { RpcDefinition } from "./contracts";
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#api-y-rpc
  */
 export function defineRpc<I extends Schema, O extends Schema, S = unknown, L = undefined>(definition: RpcDefinition<I, O, S, L>): RpcDefinition<I, O, S, L> {
-  return definition;
+	return definition
 }

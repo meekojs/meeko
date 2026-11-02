@@ -4,15 +4,15 @@
  * see them. A compiled module declares their types in `__meekoChannels`, a declaration without
  * runtime value that the parent's type checks read from the imported module.
  */
-import type { ExposedOf } from "./expose";
+import type { ExposedOf } from './expose'
 
 /** Key of the models and snippets that a parent passes next to the props of a child. */
-export const channelsKey: unique symbol = Symbol("meeko.channels");
+export const channelsKey: unique symbol = Symbol('meeko.channels')
 
 /** Models and snippets that a parent passes to one child instance. */
 export interface ComponentChannels {
-  readonly models: Readonly<Record<string, unknown>>;
-  readonly snippets: Readonly<Record<string, unknown>>;
+	readonly models: Readonly<Record<string, unknown>>
+	readonly snippets: Readonly<Record<string, unknown>>
 }
 
 /**
@@ -20,14 +20,14 @@ export interface ComponentChannels {
  * generated code. The key is enumerable so `{ ...defaults, ...props }` keeps it.
  */
 export function withChannels<Props extends object>(props: Props, models: Record<string, unknown> | undefined, snippets: Record<string, unknown> | undefined): Props {
-  if (!models && !snippets) return props;
-  const channels: ComponentChannels = { models: models ?? {}, snippets: snippets ?? {} };
-  return Object.assign(props, { [channelsKey]: channels });
+	if (!models && !snippets) return props
+	const channels: ComponentChannels = { models: models ?? {}, snippets: snippets ?? {} }
+	return Object.assign(props, { [channelsKey]: channels })
 }
 
 /** Channels of a props object, if its parent passed any. */
 export function readChannels(props: object): ComponentChannels | undefined {
-  return (props as { [channelsKey]?: ComponentChannels })[channelsKey];
+	return (props as { [channelsKey]?: ComponentChannels })[channelsKey]
 }
 
 /**
@@ -38,43 +38,37 @@ export function readChannels(props: object): ComponentChannels | undefined {
  * delivers the passed snippets itself, only the names count.
  */
 export function sameChannels(first: object, second: object, snippetsInPlace = false): boolean {
-  const before = readChannels(first);
-  const after = readChannels(second);
-  if (!before || !after) return before === after;
-  const models = Object.keys(before.models);
-  if (models.length !== Object.keys(after.models).length || models.some((name) => !Object.hasOwn(after.models, name) || !Object.is(before.models[name], after.models[name]))) return false;
-  const snippets = Object.keys(before.snippets);
-  return snippets.length === Object.keys(after.snippets).length
-    && snippets.every((name) => Object.hasOwn(after.snippets, name) && (snippetsInPlace || (before.snippets[name] === undefined) === (after.snippets[name] === undefined)));
+	const before = readChannels(first)
+	const after = readChannels(second)
+	if (!before || !after) return before === after
+	const models = Object.keys(before.models)
+	if (models.length !== Object.keys(after.models).length || models.some((name) => !Object.hasOwn(after.models, name) || !Object.is(before.models[name], after.models[name]))) return false
+	const snippets = Object.keys(before.snippets)
+	return snippets.length === Object.keys(after.snippets).length && snippets.every((name) => Object.hasOwn(after.snippets, name) && (snippetsInPlace || (before.snippets[name] === undefined) === (after.snippets[name] === undefined)))
 }
 
 /** Any props or channels, for a component whose type is `any` or `never`. */
-type LooseChannel = { readonly [name: string]: unknown };
+type LooseChannel = { readonly [name: string]: unknown }
 
 /** `__meekoChannels` of a compiled module; `null` channels for a module without one. */
-export type ChannelsOf<Module> = Module extends { readonly __meekoChannels: infer Channels }
-  ? Channels
-  : { readonly models: null; readonly snippets: null };
+export type ChannelsOf<Module> = Module extends { readonly __meekoChannels: infer Channels } ? Channels : { readonly models: null; readonly snippets: null }
 
 /** Models that a component tag may pass: `Signal<T>` by name, optional when the child has a default. */
-export type ModelInputs<Module> = 0 extends 1 & Module ? LooseChannel : [Module] extends [never] ? LooseChannel
-  : ChannelsOf<Module> extends { readonly models: infer Models } ? ([Models] extends [null] ? NoModels : Models) : never;
+export type ModelInputs<Module> = 0 extends 1 & Module ? LooseChannel : [Module] extends [never] ? LooseChannel : ChannelsOf<Module> extends { readonly models: infer Models } ? ([Models] extends [null] ? NoModels : Models) : never
 
 /** Snippets that a component tag may pass, by name, with the child's optionality. */
-export type SnippetPresence<Module> = 0 extends 1 & Module ? LooseChannel : [Module] extends [never] ? LooseChannel
-  : ChannelsOf<Module> extends { readonly snippets: infer Snippets } ? ([Snippets] extends [null] ? NoSnippets : { [K in keyof Snippets]: true }) : never;
+export type SnippetPresence<Module> = 0 extends 1 & Module ? LooseChannel : [Module] extends [never] ? LooseChannel : ChannelsOf<Module> extends { readonly snippets: infer Snippets } ? ([Snippets] extends [null] ? NoSnippets : { [K in keyof Snippets]: true }) : never
 
 /** Modelos de un componente sin defineModel: cualquier nombre falla con este mensaje. */
-export type NoModels = { readonly [name: string]: "this component declares no defineModel" };
+export type NoModels = { readonly [name: string]: 'this component declares no defineModel' }
 /** Snippets de un componente sin defineSnippets: cualquier nombre falla con este mensaje. */
-export type NoSnippets = { readonly [name: string]: "this component declares no defineSnippets, so it accepts no children or <snippet>" };
+export type NoSnippets = { readonly [name: string]: 'this component declares no defineSnippets, so it accepts no children or <snippet>' }
 
 /** Snippets que puede pasar una etiqueta de componente, como valores `Snippet` y con la opcionalidad del hijo. */
-export type SnippetInputs<Module> = 0 extends 1 & Module ? LooseChannel : [Module] extends [never] ? LooseChannel
-  : ChannelsOf<Module> extends { readonly snippets: infer Snippets } ? ([Snippets] extends [null] ? NoSnippets : Snippets) : never;
+export type SnippetInputs<Module> = 0 extends 1 & Module ? LooseChannel : [Module] extends [never] ? LooseChannel : ChannelsOf<Module> extends { readonly snippets: infer Snippets } ? ([Snippets] extends [null] ? NoSnippets : Snippets) : never
 
 /** Cualquier valor de prop; el tipo función da `any` a los parámetros de un manejador sin tipo propio. */
-type AnyPropValue = ((...args: any[]) => unknown) | {} | null | undefined;
+type AnyPropValue = ((...args: any[]) => unknown) | {} | null | undefined
 
 /**
  * Props cuyo nombre empieza por `on` que una etiqueta de componente puede pasar además de las
@@ -83,7 +77,7 @@ type AnyPropValue = ((...args: any[]) => unknown) | {} | null | undefined;
  * aparte, con `EventNames`, así que un `on:evento` desconocido da un único error y su manejador
  * recibe parámetros `any` en lugar de un segundo error por `any` implícito.
  */
-export type ExtraProps = { readonly [name: `on${string}`]: AnyPropValue };
+export type ExtraProps = { readonly [name: `on${string}`]: AnyPropValue }
 
 /**
  * Props que acepta una etiqueta de componente: una prop opcional admite también `undefined`, que
@@ -91,43 +85,41 @@ export type ExtraProps = { readonly [name: `on${string}`]: AnyPropValue };
  * admitiría en `bind:label="cond ? 'x' : undefined"`). Las props obligatorias y las firmas de índice
  * no cambian, así que una prop desconocida sigue siendo una propiedad sobrante.
  */
-export type TagProps<Props> = Props extends unknown
-  ? { [K in keyof Props]: {} extends Record<K, unknown> ? Props[K] : {} extends Pick<Props, K> ? Props[K] | undefined : Props[K] }
-  : never;
+export type TagProps<Props> = Props extends unknown ? { [K in keyof Props]: {} extends Record<K, unknown> ? Props[K] : {} extends Pick<Props, K> ? Props[K] | undefined : Props[K] } : never
 
 /** Todos los nombres de prop de un tipo de props, también de cada miembro de una unión. */
-type PropNames<Props> = Props extends unknown ? keyof Props : never;
+type PropNames<Props> = Props extends unknown ? keyof Props : never
 
 /**
  * Nombres que empiezan por `on` de una etiqueta de componente, como `on:evento`: uno que el
  * componente no declara es una propiedad sobrante.
  */
-export type EventNames<Props> = { readonly [K in PropNames<Props>]?: unknown };
+export type EventNames<Props> = { readonly [K in PropNames<Props>]?: unknown }
 
-declare const tagExposed: unique symbol;
+declare const tagExposed: unique symbol
 
 /**
  * Props de una etiqueta de componente, con sus modelos y snippets, ya comprobadas contra el
  * componente. Su tipo sólo lleva el valor que la instancia expone a un `ref:` del padre.
  */
 export interface TagInput<Exposed> {
-  readonly [tagExposed]?: Exposed;
+	readonly [tagExposed]?: Exposed
 }
 
 /** Valor que expone la instancia de una etiqueta de componente comprobada, a partir de su `TagInput`. */
-export type TagExposed<Input> = Input extends TagInput<infer Exposed> ? Exposed : null;
+export type TagExposed<Input> = Input extends TagInput<infer Exposed> ? Exposed : null
 
 /** `true` cuando `T` es una unión de dos o más miembros. */
-type IsUnion<T, Whole = T> = T extends unknown ? ([Whole] extends [T] ? false : true) : never;
+type IsUnion<T, Whole = T> = T extends unknown ? ([Whole] extends [T] ? false : true) : never
 
 /** Props de un módulo de componente; en una unión, la intersección de las de sus miembros. */
-type PropsOf<Module> = [Module] extends [{ readonly renderToString: (props: infer Props, ...rest: never[]) => unknown }] ? Props : LooseChannel;
+type PropsOf<Module> = [Module] extends [{ readonly renderToString: (props: infer Props, ...rest: never[]) => unknown }] ? Props : LooseChannel
 
 /** Comprobación de etiqueta de un módulo tipado sólo como componente: props, canales y valor expuesto. */
-type ModuleTag<Module> = (props: TagProps<PropsOf<Module>> & ExtraProps, events: NoInfer<EventNames<PropsOf<Module>>>, models: NoInfer<ModelInputs<Module>>, snippets: NoInfer<SnippetInputs<Module>>) => TagInput<ExposedOf<Module>>;
+type ModuleTag<Module> = (props: TagProps<PropsOf<Module>> & ExtraProps, events: NoInfer<EventNames<PropsOf<Module>>>, models: NoInfer<ModelInputs<Module>>, snippets: NoInfer<SnippetInputs<Module>>) => TagInput<ExposedOf<Module>>
 
 /** Comprobación de etiqueta de un componente `any`: todo pasa y los manejadores reciben parámetros `any`. */
-type LooseTag = (props: { readonly [name: string]: AnyPropValue }, events: any, models: any, snippets: any) => TagInput<any>;
+type LooseTag = (props: { readonly [name: string]: AnyPropValue }, events: any, models: any, snippets: any) => TagInput<any>
 
 /**
  * Comprobación de una etiqueta de componente. Un módulo compilado declara la suya en `__meekoTag`,
@@ -136,12 +128,10 @@ type LooseTag = (props: { readonly [name: string]: AnyPropValue }, events: any, 
  * Una unión de componentes, un valor tipado como `Component<Props>` o `any` reciben una construida
  * a partir de la forma del módulo.
  */
-export type ComponentTag<Module> = 0 extends 1 & Module ? LooseTag : [Module] extends [never] ? LooseTag
-  : true extends IsUnion<Module> ? ModuleTag<Module>
-  : Module extends { readonly __meekoTag: infer Tag } ? Tag : ModuleTag<Module>;
+export type ComponentTag<Module> = 0 extends 1 & Module ? LooseTag : [Module] extends [never] ? LooseTag : true extends IsUnion<Module> ? ModuleTag<Module> : Module extends { readonly __meekoTag: infer Tag } ? Tag : ModuleTag<Module>
 
 /** Channels of a branch: those of the module, plus any other name, which belongs to another branch. */
-type BranchChannel<Channel> = [Channel] extends [null] ? LooseChannel : Channel & LooseChannel;
+type BranchChannel<Channel> = [Channel] extends [null] ? LooseChannel : Channel & LooseChannel
 
 /**
  * Comprobación de la rama de un componente en `<component is>` con nombres (desde 1.8), como
@@ -149,18 +139,13 @@ type BranchChannel<Channel> = [Channel] extends [null] ? LooseChannel : Channel 
  * su tipo, pero un nombre que no declara no es una propiedad sobrante, porque puede ser de otra
  * rama. Que alguna rama lo admita lo comprueba aparte `checkBranchAttribute`.
  */
-export type BranchTag<Module> = (
-  props: TagProps<PropsOf<Module>> & ExtraProps & LooseChannel,
-  events: LooseChannel,
-  models: NoInfer<BranchChannel<ChannelsOf<Module> extends { readonly models: infer Models } ? Models : null>>,
-  snippets: NoInfer<BranchChannel<ChannelsOf<Module> extends { readonly snippets: infer Snippets } ? Snippets : null>>,
-) => TagInput<ExposedOf<Module>>;
+export type BranchTag<Module> = (props: TagProps<PropsOf<Module>> & ExtraProps & LooseChannel, events: LooseChannel, models: NoInfer<BranchChannel<ChannelsOf<Module> extends { readonly models: infer Models } ? Models : null>>, snippets: NoInfer<BranchChannel<ChannelsOf<Module> extends { readonly snippets: infer Snippets } ? Snippets : null>>) => TagInput<ExposedOf<Module>>
 
 /** Modelos, snippets o nombres de evento vacíos de una etiqueta; entonces la etiqueta no pasa canales. */
-export const noChannels: {} = Object.freeze({});
+export const noChannels: {} = Object.freeze({})
 
 function tagInput(props: object, _events: object, models: Record<string, unknown>, snippets: Record<string, unknown>): object {
-  return withChannels(props, models === noChannels ? undefined : models, snippets === noChannels ? undefined : snippets);
+	return withChannels(props, models === noChannels ? undefined : models, snippets === noChannels ? undefined : snippets)
 }
 
 /**
@@ -169,14 +154,14 @@ function tagInput(props: object, _events: object, models: Record<string, unknown
  * lee el componente; sólo tipa la llamada. Sólo para el código generado.
  */
 export function componentTag<Module>(component: () => Module): ComponentTag<Module> {
-  void component;
-  return tagInput as unknown as ComponentTag<Module>;
+	void component
+	return tagInput as unknown as ComponentTag<Module>
 }
 
 /** `componentTag` of a component branch of `<component is>` with names; see {@link BranchTag}. Only for generated code. */
 export function branchTag<Module>(component: () => Module): BranchTag<Module> {
-  void component;
-  return tagInput as unknown as BranchTag<Module>;
+	void component
+	return tagInput as unknown as BranchTag<Module>
 }
 
 /**
@@ -184,37 +169,34 @@ export function branchTag<Module>(component: () => Module): BranchTag<Module> {
  * name is an excess property; a missing required model fails on the tag.
  */
 export function checkComponentModels<Module>(component: Module, models: NoInfer<ModelInputs<Module>>): void {
-  void component;
-  void models;
+	void component
+	void models
 }
 
 /**
  * Type text of `MEEK110`: `if:when` on a `<snippet>` that fills a required snippet of the child.
  * Short, so that TypeScript never truncates it; `meeko check` reports the long message.
  */
-export type RequiredSnippetMessage<Name extends string> = `MEEK110: ${Name} es obligatorio en el hijo`;
+export type RequiredSnippetMessage<Name extends string> = `MEEK110: ${Name} es obligatorio en el hijo`
 
 /**
  * `unknown` when `<snippet name="Name" if:when>` may stop passing that snippet: the child declares it
  * optional (`Name?:`), or it is not a snippet of the child, which the tag check already reports.
  */
-export type SnippetConditionCheck<Module, Name extends string> = 0 extends 1 & Module ? unknown : [Module] extends [never] ? unknown
-  : ChannelsOf<Module> extends { readonly snippets: infer Snippets }
-    ? Snippets extends object ? (Name extends keyof Snippets ? ({} extends Pick<Snippets, Name> ? unknown : RequiredSnippetMessage<Name>) : unknown) : unknown
-    : unknown;
+export type SnippetConditionCheck<Module, Name extends string> = 0 extends 1 & Module ? unknown : [Module] extends [never] ? unknown : ChannelsOf<Module> extends { readonly snippets: infer Snippets } ? (Snippets extends object ? (Name extends keyof Snippets ? ({} extends Pick<Snippets, Name> ? unknown : RequiredSnippetMessage<Name>) : unknown) : unknown) : unknown
 
 /**
  * Type-only check of a conditional `<snippet name if:when>`; generated code never calls it. `true`
  * is not assignable to `RequiredSnippetMessage` when the child requires that snippet (MEEK110).
  */
 export function checkSnippetCondition<Module, const Name extends string>(component: () => Module, name: Name, optional: SnippetConditionCheck<Module, Name>): void {
-  void component;
-  void name;
-  void optional;
+	void component
+	void name
+	void optional
 }
 
 /** Type-only check of the snippets of a component tag, like `checkComponentModels`. */
 export function checkComponentSnippets<Module>(component: Module, snippets: NoInfer<SnippetPresence<Module>>): void {
-  void component;
-  void snippets;
+	void component
+	void snippets
 }

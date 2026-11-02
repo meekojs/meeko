@@ -1,26 +1,26 @@
-import { observeCallback } from "../../core/error-observer";
-import { currentEffectOwner, onCleanup, switchOwner, untrack } from "../../core/reactivity";
-import { componentErrorReporter } from "./component-errors";
-import { enterIdInstance } from "./ids";
+import { observeCallback } from '../../core/error-observer'
+import { currentEffectOwner, onCleanup, switchOwner, untrack } from '../../core/reactivity'
+import { componentErrorReporter } from './component-errors'
+import { enterIdInstance } from './ids'
 
 /**
  * What an `onMounted` callback may return: nothing, a synchronous cleanup that runs when the
  * component is released, or a promise whose rejection reaches the component error observer.
  * An asynchronous callback cannot return a cleanup; call `onCleanup` before its first `await`.
  */
-export type MountedResult = void | (() => void) | PromiseLike<void>;
+export type MountedResult = void | (() => void) | PromiseLike<void>
 
-type MountedCallback = () => MountedResult;
+type MountedCallback = () => MountedResult
 
 /** The component is already mounted: a browser continuation of its script runs. */
-const mountedNow = "now";
+const mountedNow = 'now'
 
 /**
  * `onMounted` callbacks of the component whose setup is running. `null` while a component only
  * renders HTML (SSR, or the render that precedes a client mount); `"now"` inside the browser
  * continuation of a mounted component; `undefined` outside setup.
  */
-let activeQueue: MountedCallback[] | null | typeof mountedNow | undefined;
+let activeQueue: MountedCallback[] | null | typeof mountedNow | undefined
 
 /**
  * Ejecuta `fn` una vez en el navegador, después de que el componente se hidrate o se monte, con sus
@@ -53,11 +53,11 @@ let activeQueue: MountedCallback[] | null | typeof mountedNow | undefined;
  * @see https://github.com/meekojs/meeko/blob/main/docs/api.md#ciclo-de-vida
  */
 export function onMounted(fn: () => MountedResult): void {
-  if (activeQueue === null) return;
-  if (activeQueue === undefined) throw new Error("onMounted() must be called while a component script runs");
-  if (typeof fn !== "function") throw new TypeError("onMounted() expects a function");
-  if (activeQueue === mountedNow) runMounted([fn]);
-  else activeQueue.push(fn);
+	if (activeQueue === null) return
+	if (activeQueue === undefined) throw new Error('onMounted() must be called while a component script runs')
+	if (typeof fn !== 'function') throw new TypeError('onMounted() expects a function')
+	if (activeQueue === mountedNow) runMounted([fn])
+	else activeQueue.push(fn)
 }
 
 /**
@@ -65,9 +65,9 @@ export function onMounted(fn: () => MountedResult): void {
  * that precedes a client mount), `"mount"` hydrates or mounts it in the browser, or continues it
  * after a browser `await`. `undefined` outside a component script.
  */
-export function setupPhase(): "render" | "mount" | undefined {
-  if (activeQueue === undefined) return undefined;
-  return activeQueue === null ? "render" : "mount";
+export function setupPhase(): 'render' | 'mount' | undefined {
+	if (activeQueue === undefined) return undefined
+	return activeQueue === null ? 'render' : 'mount'
 }
 
 /**
@@ -75,14 +75,16 @@ export function setupPhase(): "render" | "mount" | undefined {
  * browser continuation and skipped in a render that only produces HTML.
  */
 export function whenMounted(fn: () => MountedResult): void {
-  onMounted(fn);
+	onMounted(fn)
 }
 
 /** Marks the code that runs until the returned function as a browser continuation. */
 export function enterMountedScope(): () => void {
-  const previous = activeQueue;
-  activeQueue = mountedNow;
-  return () => { activeQueue = previous; };
+	const previous = activeQueue
+	activeQueue = mountedNow
+	return () => {
+		activeQueue = previous
+	}
 }
 
 /**
@@ -91,30 +93,31 @@ export function enterMountedScope(): () => void {
  * not part of the public API.
  */
 export function collectMounted<T>(queue: MountedCallback[] | null, setup: () => T): T {
-  const previous = activeQueue;
-  activeQueue = queue;
-  // Each run of a component script is one instance: its `useId` calls count from zero.
-  const restoreIds = enterIdInstance();
-  try { return setup(); }
-  finally {
-    activeQueue = previous;
-    restoreIds();
-  }
+	const previous = activeQueue
+	activeQueue = queue
+	// Each run of a component script is one instance: its `useId` calls count from zero.
+	const restoreIds = enterIdInstance()
+	try {
+		return setup()
+	} finally {
+		activeQueue = previous
+		restoreIds()
+	}
 }
 
 /** `onMounted` callbacks of one hydrated component, waiting for the end of its mount batch. */
 interface MountedEntry {
-  readonly callbacks: MountedCallback[];
-  readonly owner: object | undefined;
-  readonly report: (error: unknown) => void;
-  released: boolean;
+	readonly callbacks: MountedCallback[]
+	readonly owner: object | undefined
+	readonly report: (error: unknown) => void
+	released: boolean
 }
 
 /** The mount batch in progress: every component that hydrates inside it queues its callbacks here. */
-let batch: MountedEntry[] | undefined;
+let batch: MountedEntry[] | undefined
 
 /** Bindings' work that waits for the end of the mount batch in progress, before its callbacks. */
-let settling: Array<() => void> | undefined;
+let settling: Array<() => void> | undefined
 
 /**
  * Runs `fn` once the mount batch in progress has finished hydrating every binding, before the
@@ -124,13 +127,17 @@ let settling: Array<() => void> | undefined;
  * `fn` runs untracked and must handle its own errors. The returned function cancels it.
  */
 export function afterMountBatch(fn: () => void): () => void {
-  if (!settling) {
-    untrack(fn);
-    return () => {};
-  }
-  let cancelled = false;
-  settling.push(() => { if (!cancelled) untrack(fn); });
-  return () => { cancelled = true; };
+	if (!settling) {
+		untrack(fn)
+		return () => {}
+	}
+	let cancelled = false
+	settling.push(() => {
+		if (!cancelled) untrack(fn)
+	})
+	return () => {
+		cancelled = true
+	}
 }
 
 /**
@@ -143,25 +150,29 @@ export function afterMountBatch(fn: () => void): () => void {
  * its batch skips them. The generated `hydrateScope` and the bindings that mount regions use it.
  */
 export function mountBatch<T>(work: () => T): T {
-  if (batch) return work();
-  const queue: MountedEntry[] = [];
-  const pending: Array<() => void> = [];
-  batch = queue;
-  settling = pending;
-  let result: T;
-  try { result = work(); }
-  finally {
-    batch = undefined;
-    settling = undefined;
-  }
-  for (const run of pending) run();
-  for (const entry of queue) {
-    if (entry.released) continue;
-    const restore = switchOwner(entry.owner);
-    try { runCallbacks(entry.callbacks, entry.report); }
-    finally { restore(); }
-  }
-  return result;
+	if (batch) return work()
+	const queue: MountedEntry[] = []
+	const pending: Array<() => void> = []
+	batch = queue
+	settling = pending
+	let result: T
+	try {
+		result = work()
+	} finally {
+		batch = undefined
+		settling = undefined
+	}
+	for (const run of pending) run()
+	for (const entry of queue) {
+		if (entry.released) continue
+		const restore = switchOwner(entry.owner)
+		try {
+			runCallbacks(entry.callbacks, entry.report)
+		} finally {
+			restore()
+		}
+	}
+	return result
 }
 
 /**
@@ -171,26 +182,31 @@ export function mountBatch<T>(work: () => T): T {
  * not stop the remaining callbacks or undo the hydration.
  */
 export function runMounted(queue: MountedCallback[]): void {
-  const callbacks = queue.splice(0);
-  if (callbacks.length === 0) return;
-  const report = componentErrorReporter("mounted");
-  if (batch) {
-    const owner = currentEffectOwner();
-    const entry: MountedEntry = { callbacks, owner, report, released: false };
-    if (owner) onCleanup(() => { entry.released = true; });
-    batch.push(entry);
-    return;
-  }
-  runCallbacks(callbacks, report);
+	const callbacks = queue.splice(0)
+	if (callbacks.length === 0) return
+	const report = componentErrorReporter('mounted')
+	if (batch) {
+		const owner = currentEffectOwner()
+		const entry: MountedEntry = { callbacks, owner, report, released: false }
+		if (owner)
+			onCleanup(() => {
+				entry.released = true
+			})
+		batch.push(entry)
+		return
+	}
+	runCallbacks(callbacks, report)
 }
 
 function runCallbacks(callbacks: readonly MountedCallback[], report: (error: unknown) => void): void {
-  for (const callback of callbacks) {
-    untrack(() => observeCallback(() => {
-      const result = callback();
-      if (typeof result !== "function") return result;
-      onCleanup(result);
-      return undefined;
-    }, report));
-  }
+	for (const callback of callbacks) {
+		untrack(() =>
+			observeCallback(() => {
+				const result = callback()
+				if (typeof result !== 'function') return result
+				onCleanup(result)
+				return undefined
+			}, report),
+		)
+	}
 }

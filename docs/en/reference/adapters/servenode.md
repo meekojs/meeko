@@ -18,7 +18,7 @@ related:
   - "cli:start"
   - docs/framework.md#build-despliegue-y-verificación
   - docs/framework.md#ip-del-cliente-tras-un-proxy
-source-hash: 384b5e31823d71ef1c674c980d08bcb1d904393f0d495ab2ff6775822bb21e14
+source-hash: 4b2bcd7a41f95854c3403ab88cc1c8ac3a534b73d3c9559bb71f0887088ae80d
 ---
 
 `serveNode(app, options)` starts a `node:http` server for a `createServerApp` application: it converts each request with `toNodeListener`, connects Socket channels to the same server with `attachNodeWebSocketServer` (if the application has them) and, with `handleSignals`, shuts down gracefully on `SIGINT` and `SIGTERM` and applies `processErrors`. This is what the Node output of `meeko build` runs (`.meeko/output/node/index.mjs`, started by `meeko start`).

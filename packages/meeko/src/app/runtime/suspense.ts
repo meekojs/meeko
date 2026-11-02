@@ -8,50 +8,56 @@
  * pass completes. A plain `renderToString` has no such loop and fails with `SuspendedRenderError`.
  */
 
-import { runDry, switchOwner } from "../../core/reactivity";
+import { runDry, switchOwner } from '../../core/reactivity'
 
 /**
  * Thrown through a render pass while data it needs is loading. Never an `Error`. `late` marks a
  * component that mounts after its page (see `lateRender`): it waits outside any pass.
  */
 export class Suspension {
-  constructor(readonly promise: PromiseLike<unknown>, readonly label: string, readonly late = false) {}
-  toString(): string { return `Meeko suspension (${this.label})`; }
+	constructor(
+		readonly promise: PromiseLike<unknown>,
+		readonly label: string,
+		readonly late = false,
+	) {}
+	toString(): string {
+		return `Meeko suspension (${this.label})`
+	}
 }
 
 /** A component suspended where no framework render can wait for it. */
 export class SuspendedRenderError extends Error {
-  readonly code = "MEEKO_SUSPENDED";
-  constructor(label: string) {
-    super(`MEEKO_SUSPENDED: ${label} is not loaded and this render cannot wait for it. A top-level await of data resolves only in the framework's page render (SSR, hydration and client navigation) and in regions that mount later in the browser; renderToString needs the data already loaded, or useApi/useRpcQuery without await`);
-    this.name = "SuspendedRenderError";
-  }
+	readonly code = 'MEEKO_SUSPENDED'
+	constructor(label: string) {
+		super(`MEEKO_SUSPENDED: ${label} is not loaded and this render cannot wait for it. A top-level await of data resolves only in the framework's page render (SSR, hydration and client navigation) and in regions that mount later in the browser; renderToString needs the data already loaded, or useApi/useRpcQuery without await`)
+		this.name = 'SuspendedRenderError'
+	}
 }
 
 /** Key of the synchronous read that `awaitData` performs. */
-export const awaitSync: unique symbol = Symbol("meeko.awaitSync");
+export const awaitSync: unique symbol = Symbol('meeko.awaitSync')
 
 /** A thenable that a synchronous setup can also read at once: the value, a rejection, or a suspension. */
 export interface SyncAwaitable<T> extends PromiseLike<T> {
-  [awaitSync](): T;
+	[awaitSync](): T
 }
 
 /** The compiled form of a top-level data `await` in the synchronous part of a setup. */
 export function awaitData<T>(value: PromiseLike<T>): T {
-  const read = (value as Partial<SyncAwaitable<T>> | null | undefined)?.[awaitSync];
-  if (typeof read !== "function") throw new TypeError("A top-level await in a .meeko script needs a Meeko data composable such as useApi or useRpcQuery");
-  return read.call(value);
+	const read = (value as Partial<SyncAwaitable<T>> | null | undefined)?.[awaitSync]
+	if (typeof read !== 'function') throw new TypeError('A top-level await in a .meeko script needs a Meeko data composable such as useApi or useRpcQuery')
+	return read.call(value)
 }
 
 interface PassCollector {
-  readonly promises: Set<PromiseLike<unknown>>;
+	readonly promises: Set<PromiseLike<unknown>>
 }
 
-let collector: PassCollector | undefined;
+let collector: PassCollector | undefined
 
 /** True while a render pass of `renderWithSuspense` runs and can wait for data. */
 export function canSuspend(): boolean {
-  return collector !== undefined;
+	return collector !== undefined
 }
 
 /**
@@ -60,18 +66,18 @@ export function canSuspend(): boolean {
  * `SuspendedRenderError`.
  */
 export function suspend(promise: PromiseLike<unknown>, label: string): never {
-  if (!collector) suspendLate(label);
-  collector.promises.add(promise);
-  throw new Suspension(promise, label);
+	if (!collector) suspendLate(label)
+	collector.promises.add(promise)
+	throw new Suspension(promise, label)
 }
 
 /** Whether a failure is a suspension that the current pass records and retries. */
 export function isPassSuspension(error: unknown): boolean {
-  return collector !== undefined && error instanceof Suspension;
+	return collector !== undefined && error instanceof Suspension
 }
 
 /** Depth of browser renders whose HTML a binding inserts and hydrates right away. */
-let lateDepth = 0;
+let lateDepth = 0
 
 /**
  * Runs the render of a region that appears after its page hydrated or committed: an `if:` that
@@ -80,14 +86,17 @@ let lateDepth = 0;
  * leaves its region empty and `bindComponent` mounts it once the data has loaded.
  */
 export function lateRender<T>(work: () => T): T {
-  lateDepth++;
-  try { return work(); }
-  finally { lateDepth--; }
+	lateDepth++
+	try {
+		return work()
+	} finally {
+		lateDepth--
+	}
 }
 
 /** True inside `lateRender` and outside a pass of `renderWithSuspense`. */
 export function canSuspendLate(): boolean {
-  return lateDepth > 0 && collector === undefined;
+	return lateDepth > 0 && collector === undefined
 }
 
 /**
@@ -95,13 +104,13 @@ export function canSuspendLate(): boolean {
  * `lateRender`, else `SuspendedRenderError` (a plain `renderToString`).
  */
 export function suspendLate(label: string): never {
-  if (canSuspendLate()) throw new Suspension(Promise.resolve(), label, true);
-  throw new SuspendedRenderError(label);
+	if (canSuspendLate()) throw new Suspension(Promise.resolve(), label, true)
+	throw new SuspendedRenderError(label)
 }
 
 /** Whether a failure is the late suspension of a component that mounts after its page. */
 export function isLateSuspension(error: unknown): error is Suspension {
-  return error instanceof Suspension && error.late;
+	return error instanceof Suspension && error.late
 }
 
 /**
@@ -109,26 +118,29 @@ export function isLateSuspension(error: unknown): error is Suspension {
  * hydration. The framework's data composables provide it (`provideDeferredData`).
  */
 export interface DeferredData {
-  /** Runs one pass: missing data starts loading and suspends the pass. */
-  collect<T>(work: () => T): T;
-  /** Runs the final render or the hydration with the loaded data. */
-  read<T>(work: () => T): T;
-  /** Keeps the loaded data for later renders of the application. */
-  keep(): void;
+	/** Runs one pass: missing data starts loading and suspends the pass. */
+	collect<T>(work: () => T): T
+	/** Runs the final render or the hydration with the loaded data. */
+	read<T>(work: () => T): T
+	/** Keeps the loaded data for later renders of the application. */
+	keep(): void
 }
 
-const noDeferredData: DeferredData = { collect: (work) => work(), read: (work) => work(), keep: () => {} };
-let deferredData: ((signal: AbortSignal) => DeferredData) | undefined;
+const noDeferredData: DeferredData = { collect: (work) => work(), read: (work) => work(), keep: () => {} }
+let deferredData: ((signal: AbortSignal) => DeferredData) | undefined
 
 /** Registers how a deferred mount loads data; called once by the framework's data composables. */
 export function provideDeferredData(factory: (signal: AbortSignal) => DeferredData): void {
-  deferredData = factory;
+	deferredData = factory
 }
 
 function withOwner<T>(owner: object | undefined, work: () => T): T {
-  const restore = switchOwner(owner);
-  try { return work(); }
-  finally { restore(); }
+	const restore = switchOwner(owner)
+	try {
+		return work()
+	} finally {
+		restore()
+	}
 }
 
 /**
@@ -138,13 +150,13 @@ function withOwner<T>(owner: object | undefined, work: () => T): T {
  * completes; `signal` cancels it.
  */
 export async function loadDeferred(owner: object | undefined, render: () => unknown, signal: AbortSignal): Promise<DeferredData> {
-  // Out of the binding that found the suspension: the passes never run inside an update.
-  await Promise.resolve();
-  signal.throwIfAborted();
-  const data = withOwner(owner, () => deferredData?.(signal) ?? noDeferredData);
-  await renderWithSuspense(() => withOwner(owner, () => data.collect(() => runDry(render))), { signal });
-  signal.throwIfAborted();
-  return data;
+	// Out of the binding that found the suspension: the passes never run inside an update.
+	await Promise.resolve()
+	signal.throwIfAborted()
+	const data = withOwner(owner, () => deferredData?.(signal) ?? noDeferredData)
+	await renderWithSuspense(() => withOwner(owner, () => data.collect(() => runDry(render))), { signal })
+	signal.throwIfAborted()
+	return data
 }
 
 /**
@@ -153,8 +165,8 @@ export async function loadDeferred(owner: object | undefined, render: () => unkn
  * them is chosen at run time). A layout's `<component is="props.outlet">` is not counted.
  */
 interface DataAwaitMarks {
-  readonly hasDataAwait?: unknown;
-  readonly __meekoChildren?: unknown;
+	readonly hasDataAwait?: unknown
+	readonly __meekoChildren?: unknown
 }
 
 /**
@@ -162,26 +174,29 @@ interface DataAwaitMarks {
  * marks (hand-written, or compiled by an older Meeko) or with a dynamic child may.
  */
 export function mayAwaitData(module: unknown, seen: Set<unknown> = new Set()): boolean {
-  if (seen.has(module)) return false;
-  seen.add(module);
-  const marks = (module ?? {}) as DataAwaitMarks;
-  if (typeof marks.hasDataAwait !== "boolean" || typeof marks.__meekoChildren !== "function") return true;
-  if (marks.hasDataAwait) return true;
-  let children: unknown;
-  try { children = (marks.__meekoChildren as () => unknown)(); }
-  catch { return true; }
-  if (!Array.isArray(children)) return true;
-  return children.some((child) => mayAwaitData(child, seen));
+	if (seen.has(module)) return false
+	seen.add(module)
+	const marks = (module ?? {}) as DataAwaitMarks
+	if (typeof marks.hasDataAwait !== 'boolean' || typeof marks.__meekoChildren !== 'function') return true
+	if (marks.hasDataAwait) return true
+	let children: unknown
+	try {
+		children = (marks.__meekoChildren as () => unknown)()
+	} catch {
+		return true
+	}
+	if (!Array.isArray(children)) return true
+	return children.some((child) => mayAwaitData(child, seen))
 }
 
 /** Default bound of `renderWithSuspense`. */
-export const maxSuspensePasses = 10;
+export const maxSuspensePasses = 10
 
 export interface SuspenseRenderOptions {
-  /** Most passes before failing; each pass waits for the requests the previous one started. */
-  readonly maxPasses?: number;
-  /** Stops waiting between passes. */
-  readonly signal?: AbortSignal;
+	/** Most passes before failing; each pass waits for the requests the previous one started. */
+	readonly maxPasses?: number
+	/** Stops waiting between passes. */
+	readonly signal?: AbortSignal
 }
 
 /**
@@ -190,25 +205,25 @@ export interface SuspenseRenderOptions {
  * also complete while children suspended inside it (see `renderComponent`): it is discarded too.
  */
 export async function renderWithSuspense<T>(render: (pass: number) => T, options: SuspenseRenderOptions = {}): Promise<T> {
-  const maxPasses = options.maxPasses ?? maxSuspensePasses;
-  for (let pass = 1; ; pass++) {
-    const current: PassCollector = { promises: new Set() };
-    const previous = collector;
-    collector = current;
-    let result: T | undefined;
-    try {
-      result = render(pass);
-    } catch (error) {
-      if (!(error instanceof Suspension)) throw error;
-    } finally {
-      collector = previous;
-    }
-    if (current.promises.size === 0) return result as T;
-    if (pass >= maxPasses) {
-      throw new Error(`Meeko render still suspended after ${pass} passes; a data await keeps requesting new data`);
-    }
-    // A rejection is read again by the next pass, which throws it from the awaiting component.
-    await Promise.allSettled([...current.promises]);
-    options.signal?.throwIfAborted();
-  }
+	const maxPasses = options.maxPasses ?? maxSuspensePasses
+	for (let pass = 1; ; pass++) {
+		const current: PassCollector = { promises: new Set() }
+		const previous = collector
+		collector = current
+		let result: T | undefined
+		try {
+			result = render(pass)
+		} catch (error) {
+			if (!(error instanceof Suspension)) throw error
+		} finally {
+			collector = previous
+		}
+		if (current.promises.size === 0) return result as T
+		if (pass >= maxPasses) {
+			throw new Error(`Meeko render still suspended after ${pass} passes; a data await keeps requesting new data`)
+		}
+		// A rejection is read again by the next pass, which throws it from the awaiting component.
+		await Promise.allSettled([...current.promises])
+		options.signal?.throwIfAborted()
+	}
 }

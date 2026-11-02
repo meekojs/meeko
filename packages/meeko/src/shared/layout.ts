@@ -1,6 +1,6 @@
-import type { GeneratedLayouts, GeneratedPageLayouts, GeneratedRouteMiddleware } from "../framework";
+import type { GeneratedLayouts, GeneratedPageLayouts, GeneratedRouteMiddleware } from '../framework'
 
-type RouteMiddlewareName = keyof GeneratedRouteMiddleware extends never ? string : Exclude<keyof GeneratedRouteMiddleware, "#none"> & string;
+type RouteMiddlewareName = keyof GeneratedRouteMiddleware extends never ? string : Exclude<keyof GeneratedRouteMiddleware, '#none'> & string
 
 /**
  * Nombre de un layout con nombre de la aplicación (`app/layouts/<nombre>.meeko`, los de los layers y
@@ -16,9 +16,9 @@ type RouteMiddlewareName = keyof GeneratedRouteMiddleware extends never ? string
  * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#layouts-con-nombre
  */
-export type LayoutName = keyof GeneratedLayouts extends never ? string : keyof GeneratedLayouts & string;
+export type LayoutName = keyof GeneratedLayouts extends never ? string : keyof GeneratedLayouts & string
 
-type OwnProps<P> = P extends object ? { [K in keyof P as K extends "outlet" ? never : K]: P[K] } : Record<string, unknown>;
+type OwnProps<P> = P extends object ? { [K in keyof P as K extends 'outlet' ? never : K]: P[K] } : Record<string, unknown>
 
 /**
  * Props que una página puede pasar al layout `L`: las `Props` que declara el layout, sin `outlet`.
@@ -36,8 +36,7 @@ type OwnProps<P> = P extends object ? { [K in keyof P as K extends "outlet" ? ne
  * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#props-del-layout-desde-la-página
  */
-export type LayoutProps<L extends string | false = LayoutName> = [L] extends [false] ? Record<string, never>
-  : L extends keyof GeneratedLayouts ? OwnProps<GeneratedLayouts[L]> : Record<string, unknown>;
+export type LayoutProps<L extends string | false = LayoutName> = [L] extends [false] ? Record<string, never> : L extends keyof GeneratedLayouts ? OwnProps<GeneratedLayouts[L]> : Record<string, unknown>
 
 /**
  * Layout con nombre de la página cuyo ID de ruta es `Id`, tal como lo resuelven su `definePage` y
@@ -53,7 +52,7 @@ export type LayoutProps<L extends string | false = LayoutName> = [L] extends [fa
  * type DashboardLayout = PageLayout<"/dashboard">; // "dashboard"
  * ```
  */
-export type PageLayout<Id extends string> = Id extends keyof GeneratedPageLayouts ? GeneratedPageLayouts[Id] : LayoutName;
+export type PageLayout<Id extends string> = Id extends keyof GeneratedPageLayouts ? GeneratedPageLayouts[Id] : LayoutName
 
 /**
  * Lo que devuelve {@link useLayout}: las props del layout con nombre de la página, para leerlas y
@@ -72,19 +71,19 @@ export type PageLayout<Id extends string> = Id extends keyof GeneratedPageLayout
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#props-del-layout-desde-la-página
  */
 export interface LayoutHandle<P extends object = Record<string, unknown>> {
-  /** Nombre del layout con nombre de la página, o `undefined` si no tiene (`layout: false`). */
-  readonly name: string | undefined;
-  /**
-   * Las props que recibe ahora el layout (sin `outlet`): las de `layoutProps` y los `+group.ts` con
-   * lo que haya escrito la página encima. La lectura es reactiva.
-   */
-  readonly props: Readonly<Partial<P>>;
-  /**
-   * Cambia props del layout; las que no nombra se conservan. El layout no se vuelve a montar: sólo
-   * cambia lo que lee esas props. Al navegar a otra página, el layout recibe las de la página nueva.
-   * Sin layout con nombre, no hace nada.
-   */
-  set<const Q extends Partial<P>>(patch: Q & { readonly [K in Exclude<keyof Q, keyof P>]: never }): void;
+	/** Nombre del layout con nombre de la página, o `undefined` si no tiene (`layout: false`). */
+	readonly name: string | undefined
+	/**
+	 * Las props que recibe ahora el layout (sin `outlet`): las de `layoutProps` y los `+group.ts` con
+	 * lo que haya escrito la página encima. La lectura es reactiva.
+	 */
+	readonly props: Readonly<Partial<P>>
+	/**
+	 * Cambia props del layout; las que no nombra se conservan. El layout no se vuelve a montar: sólo
+	 * cambia lo que lee esas props. Al navegar a otra página, el layout recibe las de la página nueva.
+	 * Sin layout con nombre, no hace nada.
+	 */
+	set<const Q extends Partial<P>>(patch: Q & { readonly [K in Exclude<keyof Q, keyof P>]: never }): void
 }
 
 /**
@@ -102,7 +101,7 @@ export interface LayoutHandle<P extends object = Record<string, unknown>> {
  * const input: LayoutPropsInput<"dashboard", { data: { name: string } }> = ({ data }) => ({ title: data.name });
  * ```
  */
-export type LayoutPropsInput<L extends string | false, C> = Partial<LayoutProps<L>> | ((context: C) => Partial<LayoutProps<L>>);
+export type LayoutPropsInput<L extends string | false, C> = Partial<LayoutProps<L>> | ((context: C) => Partial<LayoutProps<L>>)
 
 /**
  * Comprobación de `export const layoutProps` en el código de nivel superior de un `<script server>`,
@@ -122,9 +121,7 @@ export type LayoutPropsInput<L extends string | false, C> = Partial<LayoutProps<
  * </script>
  * ```
  */
-export type PageBodyLayoutProps<Route, Written> = Route extends { readonly layout: infer L extends string | false }
-  ? { readonly [K in keyof Written]: K extends keyof LayoutProps<L> ? LayoutProps<L>[K] : never }
-  : unknown;
+export type PageBodyLayoutProps<Route, Written> = Route extends { readonly layout: infer L extends string | false } ? { readonly [K in keyof Written]: K extends keyof LayoutProps<L> ? LayoutProps<L>[K] : never } : unknown
 
 /**
  * Opciones de layout de las opciones de ruta (`definePage`): `layout` elige el layout con nombre y
@@ -141,24 +138,26 @@ export type PageBodyLayoutProps<Route, Written> = Route extends { readonly layou
  * ```
  */
 export type PageLayoutOptions<C> =
-  | {
-    /** Sin `layout`, el de los `+group.ts` de la página o `default`. */
-    readonly layout?: undefined;
-    /** Props para el layout heredado; `meeko check` las compara con las suyas. */
-    readonly layoutProps?: LayoutPropsInput<LayoutName, C>;
-  }
-  | {
-    /** Sin layout con nombre: quedan `app/app.meeko` y los `+layout.meeko`. */
-    readonly layout: false;
-    /** Sin layout con nombre no hay props que pasar. */
-    readonly layoutProps?: never;
-  }
-  | { [L in LayoutName]: {
-    /** Layout con nombre de la página. */
-    readonly layout: L;
-    /** Props del layout `L`: un objeto o una función del contexto de la página. */
-    readonly layoutProps?: LayoutPropsInput<L, C>;
-  } }[LayoutName];
+	| {
+			/** Sin `layout`, el de los `+group.ts` de la página o `default`. */
+			readonly layout?: undefined
+			/** Props para el layout heredado; `meeko check` las compara con las suyas. */
+			readonly layoutProps?: LayoutPropsInput<LayoutName, C>
+	  }
+	| {
+			/** Sin layout con nombre: quedan `app/app.meeko` y los `+layout.meeko`. */
+			readonly layout: false
+			/** Sin layout con nombre no hay props que pasar. */
+			readonly layoutProps?: never
+	  }
+	| {
+			[L in LayoutName]: {
+				/** Layout con nombre de la página. */
+				readonly layout: L
+				/** Props del layout `L`: un objeto o una función del contexto de la página. */
+				readonly layoutProps?: LayoutPropsInput<L, C>
+			}
+	  }[LayoutName]
 
 /**
  * Opciones de un `+group.ts`, que heredan las páginas de su carpeta y de sus subcarpetas. Meeko las
@@ -174,22 +173,19 @@ export type PageLayoutOptions<C> =
  * ```
  */
 export interface GroupDefinition<L extends LayoutName | false = LayoutName> {
-  /** Layout con nombre de las páginas del grupo, o `false` para quitarlo. Una página puede elegir otro. */
-  readonly layout?: L;
-  /**
-   * Props del layout para las páginas del grupo. Se combinan por clave con las de los grupos
-   * exteriores y con las de la página, que gana. Un grupo o una página que elige otro layout empieza
-   * sin las props heredadas.
-   */
-  readonly layoutProps?: Partial<LayoutProps<L>>;
-  /**
-   * Middleware con nombre de `app/middleware` para las páginas del grupo, que se ejecutan después de
-   * los globales y de los de los grupos exteriores, o `false` para quitar los heredados. Una página
-   * puede añadir los suyos.
-   * @since 1.6.0
-   */
-  readonly middleware?: readonly RouteMiddlewareName[] | false;
+	/** Layout con nombre de las páginas del grupo, o `false` para quitarlo. Una página puede elegir otro. */
+	readonly layout?: L
+	/**
+	 * Props del layout para las páginas del grupo. Se combinan por clave con las de los grupos
+	 * exteriores y con las de la página, que gana. Un grupo o una página que elige otro layout empieza
+	 * sin las props heredadas.
+	 */
+	readonly layoutProps?: Partial<LayoutProps<L>>
+	/**
+	 * Middleware con nombre de `app/middleware` para las páginas del grupo, que se ejecutan después de
+	 * los globales y de los de los grupos exteriores, o `false` para quitar los heredados. Una página
+	 * puede añadir los suyos.
+	 * @since 1.6.0
+	 */
+	readonly middleware?: readonly RouteMiddlewareName[] | false
 }
-
-
-

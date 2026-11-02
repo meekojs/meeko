@@ -16,7 +16,7 @@ related:
   - "@meekojs/meeko/server#defineApiRoute"
   - "@meekojs/meeko/server#defineRpc"
   - docs/framework.md#api-y-rpc
-source-hash: d6c68fe2df93f22aa5d718fe11825b021db833219617ca7c4de781c7df3916d6
+source-hash: a30047f5066f75fd6e50f061391d3bba588627e5821a15ce03c5d63e37a44c52
 ---
 
 `createServerDispatcher` dispatches endpoints from `server/api` and procedures from `server/rpc` using their manifest: it finds the endpoint by route and method, loads the session, creates the `RequestContext` and executes the `defineApiRoute` or `defineRpc` definition with all its guards (Origin, CSRF, `rateLimit`, `auth`, `authorize`), input and response validation, and normalization of errors to JSON. It returns a handler `(request) => Promise<Response>` that never rejects.

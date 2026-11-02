@@ -37,26 +37,26 @@ related:
 ---
 ```
 
-| Clave | Obligatoria | Valor |
-| --- | --- | --- |
-| `title` | sí | Nombre del símbolo tal como se escribe: `useForm`, `<MeekoLink>`, `meeko dev`. |
-| `group` | sí | El id del grupo, que es también la carpeta. |
-| `since` | sí | Versión en que apareció, como `1.2.0`. Si el JSDoc tiene `@since`, debe coincidir. |
-| `description` | sí | Una línea, sin enlaces: el subtítulo de la página, la `<meta name="description">`, el índice y `llms.txt`. |
-| `symbols` | sí | Los símbolos que documenta, por id (véase abajo). El primero es el de la página y debe ser el de su entrada en `taxonomy.json`. |
-| `types` | no | Más declaraciones para la sección «Tipo», como las interfaces de las opciones o del valor devuelto. |
-| `signature` | no | `first`: «Tipo» muestra sólo la primera sobrecarga del primer símbolo, para funciones con sobrecargas internas, como `definePage`. |
-| `related` | no | Símbolos (por id) y secciones de las guías (`docs/framework.md#ancla`) para «Relacionado». |
+| Clave         | Obligatoria | Valor                                                                                                                              |
+| ------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `title`       | sí          | Nombre del símbolo tal como se escribe: `useForm`, `<MeekoLink>`, `meeko dev`.                                                     |
+| `group`       | sí          | El id del grupo, que es también la carpeta.                                                                                        |
+| `since`       | sí          | Versión en que apareció, como `1.2.0`. Si el JSDoc tiene `@since`, debe coincidir.                                                 |
+| `description` | sí          | Una línea, sin enlaces: el subtítulo de la página, la `<meta name="description">`, el índice y `llms.txt`.                         |
+| `symbols`     | sí          | Los símbolos que documenta, por id (véase abajo). El primero es el de la página y debe ser el de su entrada en `taxonomy.json`.    |
+| `types`       | no          | Más declaraciones para la sección «Tipo», como las interfaces de las opciones o del valor devuelto.                                |
+| `signature`   | no          | `first`: «Tipo» muestra sólo la primera sobrecarga del primer símbolo, para funciones con sobrecargas internas, como `definePage`. |
+| `related`     | no          | Símbolos (por id) y secciones de las guías (`docs/framework.md#ancla`) para «Relacionado».                                         |
 
 ### Ids de los símbolos
 
-| Id | Qué es | Se comprueba contra |
-| --- | --- | --- |
-| `@meekojs/meeko/framework#useForm` | Un export de una subruta pública | Los exports de `packages/meeko/package.json#exports`, con TypeScript |
-| `syntax:meekolink` | Sintaxis de `.meeko`: etiquetas, macros del script, directivas y bloques, por el slug de su página generada | `packages/docs-content/src/content/api-builtins.ts` |
-| `autoimport:useApi` | Un cliente generado que se autoimporta: `api`, `rpc`, `socket`, `useApi`… | `packages/meeko/src/autoimports.ts` |
-| `cli:dev`, `cli:auth hash` | Un comando de la CLI | El texto de ayuda de `packages/meeko/src/cli.ts` |
-| `config:server` | Una clave de `meeko.config.ts` | Los miembros de `MeekoConfig` |
+| Id                                 | Qué es                                                                                                      | Se comprueba contra                                                  |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `@meekojs/meeko/framework#useForm` | Un export de una subruta pública                                                                            | Los exports de `packages/meeko/package.json#exports`, con TypeScript |
+| `syntax:meekolink`                 | Sintaxis de `.meeko`: etiquetas, macros del script, directivas y bloques, por el slug de su página generada | `packages/docs-content/src/content/api-builtins.ts`                  |
+| `autoimport:useApi`                | Un cliente generado que se autoimporta: `api`, `rpc`, `socket`, `useApi`…                                   | `packages/meeko/src/autoimports.ts`                                  |
+| `cli:dev`, `cli:auth hash`         | Un comando de la CLI                                                                                        | El texto de ayuda de `packages/meeko/src/cli.ts`                     |
+| `config:server`                    | Una clave de `meeko.config.ts`                                                                              | Los miembros de `MeekoConfig`                                        |
 
 ## Estructura de la página
 

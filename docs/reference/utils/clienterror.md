@@ -42,12 +42,12 @@ export async function rename(call: () => Promise<unknown>): Promise<string | nul
 
 `new ClientError(code, status, requestId?, issues?)`. Normalmente no se crea a mano: lo crean los clientes de Meeko.
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `code` | `string` | obligatorio | El código público, que también es el `message`. |
-| `status` | `number` | obligatorio | El estado HTTP. |
-| `requestId` | `string` | ninguno | El ID de la petición, el mismo que la cabecera `x-request-id` y los registros del servidor. |
-| `issues` | `readonly { path, message }[]` | ninguno | Los mensajes por campo de un `400` de validación o de un `ApiError` con `issues`. |
+| Parámetro   | Tipo                           | Por defecto | Descripción                                                                                 |
+| ----------- | ------------------------------ | ----------- | ------------------------------------------------------------------------------------------- |
+| `code`      | `string`                       | obligatorio | El código público, que también es el `message`.                                             |
+| `status`    | `number`                       | obligatorio | El estado HTTP.                                                                             |
+| `requestId` | `string`                       | ninguno     | El ID de la petición, el mismo que la cabecera `x-request-id` y los registros del servidor. |
+| `issues`    | `readonly { path, message }[]` | ninguno     | Los mensajes por campo de un `400` de validación o de un `ApiError` con `issues`.           |
 
 ## Valor devuelto
 
@@ -94,6 +94,7 @@ alert(error.message); // "EMAIL_TAKEN"
 ```
 
 <!-- no-check -->
+
 ```ts good
 alert(error.issues?.[0]?.message ?? "No se pudo crear la cuenta.");
 ```
@@ -109,6 +110,7 @@ try { await save(); } catch (error) { console.log(error.code); }
 `TS18046: 'error' is of type 'unknown'.`
 
 <!-- no-check -->
+
 ```ts good
 try { await save(); } catch (error) { if (isClientError(error)) console.log(error.code); else throw error; }
 ```
@@ -122,6 +124,7 @@ if (error instanceof ClientError && error.code === "UNAUTHENTICATED") location.a
 ```
 
 <!-- no-check -->
+
 ```ts good
 if (isClientError(error, "UNAUTHENTICATED")) location.assign("/login");
 ```

@@ -16,7 +16,7 @@ related:
   - "@meekojs/meeko#provideErrorHandler"
   - docs/api.md#reactividad
   - docs/api.md#ciclo-de-vida
-source-hash: c457d685c719858247b2ab736a922ad409793a98bb4886cd7ee4b1f2b2713f0d
+source-hash: d8a9ae4ed064a343cf63fc76b1e28614e597b9c6ef83d9cb97266e6b570e943d
 ---
 
 `effect(fn)` bridges signals and the outside world: it runs `fn` immediately, records the signals it reads and reruns it when any changes. Use it to synchronize something Meeko does not render (the document title, a third-party library, `localStorage`, a connection) with state. To calculate a value, use [`computed`](/en/docs/reference/computed); to render, use the template.

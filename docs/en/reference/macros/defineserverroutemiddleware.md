@@ -14,7 +14,7 @@ related:
   - "@meekojs/meeko/framework#notFound"
   - "@meekojs/meeko/server#defineServerMiddleware"
   - docs/framework.md#middleware-de-ruta-de-servidor
-source-hash: 562b8f440e59fc2ed28870609a427702c4746e3a89b6601e26c9d3110ae73ab2
+source-hash: bd5c7fdd7ba0e8703bb93e896aa320d3ee29637e24659264e829e73dd31a70fe
 ---
 
 `defineServerRouteMiddleware` declares the route middleware exported by default from an `app/middleware/*.server.ts` file. It only runs on the server, with the request's session, and never reaches the browser bundle: it can import `server/`, read secrets and query the database.

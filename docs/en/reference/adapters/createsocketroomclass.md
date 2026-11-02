@@ -15,7 +15,7 @@ related:
   - "@meekojs/meeko/server#defineSocketChannel"
   - docs/framework.md#socket-y-durable-objects
   - docs/framework.md#cloudflare-workers
-source-hash: d705a33ce104be7a921d14b0986a2e9abb629f10a2ad9e063532aa44a5b2eb22
+source-hash: c87b9b10f967120403213530979769293ad979488b0dcbd1125428cbd4e79501
 ---
 
 `createSocketRoomClass(app, DurableObject, options)` returns the class exported from the Worker for Socket rooms: one Durable Object per channel/room pair. The room accepts WebSockets with the hibernation API (`ctx.acceptWebSocket`), so idle connections do not keep the object in memory; on wake, it reconstructs each connection from its _attachment_ and the hub authorizes it again. It distributes publications to its peers in order.

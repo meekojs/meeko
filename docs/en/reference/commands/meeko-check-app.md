@@ -9,7 +9,7 @@ related:
   - "cli:check"
   - "cli:types"
   - docs/framework.md#aliases-de-ruta
-source-hash: 1ba2f5f3a690fe8ef648d8bdcad02233f7dabacdedaebc93d3d1855b538cafe8
+source-hash: f814b14734efb2419b8d2c2a21af6844a787fbd7023647c5b81bcdce6a3879dc
 ---
 
 `meeko check-app` scans the `.meeko` files in `app/`, `server/` and `shared/` in the project and its layers and checks each one like `meeko check <componente>`: syntax, directives, types and placement of `<script server>` blocks. It also warns about misplaced `+group.ts` files and imports using aliases from an inappropriate scope (`#server/` in `app/` or `shared/`, `@/` in `shared/`).

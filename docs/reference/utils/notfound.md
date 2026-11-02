@@ -83,6 +83,7 @@ const props = defineProps<{ status: number; message: string }>();
 `notFound()` no funciona dentro de `load`. Allí se lanza un `ApiError` con el mismo efecto:
 
 <!-- no-check -->
+
 ```ts
 // app/pages/products/[slug].route.ts
 import { definePage } from "@meekojs/meeko/framework";
@@ -108,6 +109,7 @@ export const route = definePage({ load: ({ params }) => { if (!params.id) notFou
 `MEEK073: notFound() sólo funciona en el código de nivel superior de <script server>, que se ejecuta en cada petición; llámala fuera de cualquier función y fuera de las opciones de ruta`.
 
 <!-- no-check -->
+
 ```ts good
 export const route = definePage({ load: ({ params }) => { if (!params.id) throw new ApiError("NOT_FOUND", 404); return { id: 1 }; } });
 ```

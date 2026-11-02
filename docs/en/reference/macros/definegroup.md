@@ -15,7 +15,7 @@ related:
   - docs/framework.md#opciones-por-carpeta-groupts
   - docs/framework.md#layouts-con-nombre
   - docs/framework.md#middleware-con-nombre
-source-hash: 0b661a49915b5ec4e992f757c1447132cb87aa191cf87f96fe7d4a60140e3a95
+source-hash: 02ec54fb58895c946260b844a59d1fc93a54b3678dd13759bda51067c9c79bd3
 ---
 
 `defineGroup` declares an `app/pages` directory's options in its `+group.ts` file: the named layout, its props and, since `1.6`, named middleware. All pages in the directory and its subdirectories inherit them, so you do not have to repeat `layout` or `middleware` in each `definePage`.

@@ -28,6 +28,7 @@ Se autoimporta, con dos caras:
 ## Uso
 
 <!-- no-check -->
+
 ```ts
 // server/api/orders/[id]/ready.post.ts: avisa a la sala de la cocina
 import { defineApiRoute } from "@meekojs/meeko/server";
@@ -46,6 +47,7 @@ export default defineApiRoute({
 ```
 
 <!-- no-check -->
+
 ```ts
 // app/plugins/kitchen.client.ts: escucha en el navegador
 import { definePlugin } from "@meekojs/meeko/framework";
@@ -57,22 +59,22 @@ export default definePlugin(() => {
 
 ## Parámetros
 
-| Llamada | Parámetros | Descripción |
-| --- | --- | --- |
-| `socket.<canal>.on(evento, listener)` | un evento de `serverToClient` y `(payload) => void` | En el navegador. El payload llega validado con su schema. |
-| `socket.<canal>.emit(evento, payload)` | un evento de `clientToServer` y su entrada | En el navegador. El servidor vuelve a validarlo. |
-| `socket.<canal>.broadcast(roomId, evento, payload)` | la sala, un evento de `serverToClient` y su entrada | En el servidor, desde `1.2`. |
+| Llamada                                             | Parámetros                                          | Descripción                                               |
+| --------------------------------------------------- | --------------------------------------------------- | --------------------------------------------------------- |
+| `socket.<canal>.on(evento, listener)`               | un evento de `serverToClient` y `(payload) => void` | En el navegador. El payload llega validado con su schema. |
+| `socket.<canal>.emit(evento, payload)`              | un evento de `clientToServer` y su entrada          | En el navegador. El servidor vuelve a validarlo.          |
+| `socket.<canal>.broadcast(roomId, evento, payload)` | la sala, un evento de `serverToClient` y su entrada | En el servidor, desde `1.2`.                              |
 
 ## Valor devuelto
 
 En el navegador, cada canal es un `SocketClient`:
 
-| Miembro | Tipo | Descripción |
-| --- | --- | --- |
-| `on(evento, listener)` | `() => void` | Escucha un evento de `serverToClient`, con su payload validado. Devuelve la función que deja de escuchar. |
-| `emit(evento, payload)` | `Promise<void>` | Envía un evento de `clientToServer`. Rechaza si el canal no está abierto: no hay cola ni reenvío. |
-| `state` | `ReadonlySignal<"connecting" \| "open" \| "closed" \| "unauthorized" \| …>` | El estado de la conexión. `"unauthorized"` es terminal: el servidor rechazó la sesión. |
-| `close()` | `void` | Cierra el canal. |
+| Miembro                 | Tipo                                                                        | Descripción                                                                                               |
+| ----------------------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `on(evento, listener)`  | `() => void`                                                                | Escucha un evento de `serverToClient`, con su payload validado. Devuelve la función que deja de escuchar. |
+| `emit(evento, payload)` | `Promise<void>`                                                             | Envía un evento de `clientToServer`. Rechaza si el canal no está abierto: no hay cola ni reenvío.         |
+| `state`                 | `ReadonlySignal<"connecting" \| "open" \| "closed" \| "unauthorized" \| …>` | El estado de la conexión. `"unauthorized"` es terminal: el servidor rechazó la sesión.                    |
+| `close()`               | `void`                                                                      | Cierra el canal.                                                                                          |
 
 En el servidor, cada canal tiene `broadcast(roomId, evento, payload): Promise<void>`.
 
@@ -97,6 +99,7 @@ const state = typeof window === "undefined" ? undefined : socket.chat.state;
 `socket` es de alcance de aplicación: un listener registrado fuera de un componente se cancela con la función que devuelve `on`.
 
 <!-- no-check -->
+
 ```ts
 const off = socket.chat.on("message", (message) => console.log(message.author, message.text));
 // …
@@ -116,6 +119,7 @@ await socket.chat.emit("message", { body: "Hola" });
 `meeko check` da `TS2353: Object literal may only specify known properties, and 'body' does not exist in type '{ text: string; }'.`
 
 <!-- no-check -->
+
 ```ts good
 await socket.chat.emit("message", { text: "Hola" });
 ```
@@ -130,6 +134,7 @@ socket.chat.on("typing", () => {});
 `meeko check` da `TS2339: Property 'lobby' does not exist on type 'SocketRegistry<…>'.` y `TS2345: Argument of type '"typing"' is not assignable to parameter of type '"message"'.`
 
 <!-- no-check -->
+
 ```ts good
 socket.chat.on("message", (message) => console.log(message.text));
 ```

@@ -13,7 +13,7 @@ related:
   - "@meekojs/meeko/node#createNodeAssetReader"
   - "@meekojs/meeko/bun#createBunAssetReader"
   - docs/framework.md#deno
-source-hash: 327d73292f7692830fbba234e999177f045e8ce1eba0992077d1a432a8fa913b
+source-hash: baccc90e9581537c148ca48942e726b9c06dc14092d0ded8f5b573ca8e996db6
 ---
 
 `createDenoAssetReader({ root, assets })` is Deno's public file reader: it responds only to paths in the build's asset manifest, opening the file with `Deno.open` and streaming it, and returns `null` for all others, which are never looked up on disk. Headers, `HEAD`, `304` and the cache policy are shared by all adapters.

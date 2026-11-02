@@ -29,17 +29,17 @@ La línea `OK` repite el directorio tal como se escribió, no la ruta absoluta.
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
+| Parámetro      | Tipo | Por defecto | Descripción                                                    |
+| -------------- | ---- | ----------- | -------------------------------------------------------------- |
 | `<directorio>` | ruta | obligatorio | Raíz del proyecto. Sin él, `Falta el directorio de check-app`. |
 
 ## Resultado
 
-| Caso | Salida | Código |
-| --- | --- | --- |
-| Sin errores | Los avisos en la salida de errores y `<directorio>: OK` en la estándar | `0` |
-| Con errores | Todos los diagnósticos (errores y avisos) en la salida de errores, uno por línea | `1` |
-| El directorio no existe (desde `1.7`) | `No existe el directorio <directorio>` en la salida de errores | `1` |
+| Caso                                  | Salida                                                                           | Código |
+| ------------------------------------- | -------------------------------------------------------------------------------- | ------ |
+| Sin errores                           | Los avisos en la salida de errores y `<directorio>: OK` en la estándar           | `0`    |
+| Con errores                           | Todos los diagnósticos (errores y avisos) en la salida de errores, uno por línea | `1`    |
+| El directorio no existe (desde `1.7`) | `No existe el directorio <directorio>` en la salida de errores                   | `1`    |
 
 ```text
 C:\proyectos\tienda\app\components\Greeting.meeko:3:7 TS2322: Type 'string' is not assignable to type 'number'.

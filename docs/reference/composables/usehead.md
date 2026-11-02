@@ -39,20 +39,20 @@ Al pulsar el botón, el título del documento cambia sin recargar.
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `input` | `HeadInput`, `ReadonlySignal<HeadInput>` o `() => HeadInput` | obligatorio | Lo que aporta el componente. Con un getter o una señal, el navegador vuelve a aplicarlo cuando cambian las señales que lee. |
+| Parámetro | Tipo                                                         | Por defecto | Descripción                                                                                                                 |
+| --------- | ------------------------------------------------------------ | ----------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `input`   | `HeadInput`, `ReadonlySignal<HeadInput>` o `() => HeadInput` | obligatorio | Lo que aporta el componente. Con un getter o una señal, el navegador vuelve a aplicarlo cuando cambian las señales que lee. |
 
 `HeadInput` admite:
 
-| Campo | Tipo | Descripción |
-| --- | --- | --- |
-| `title` | `string` | Título del documento. Gana el de más prioridad. |
-| `titleTemplate` | `string` o `(title) => string` | Plantilla del título: `"%s · Mi sitio"`. En `document.head`, `meeko.addHead` y el `head` de la ruta sólo una cadena. |
-| `meta` | `HeadMeta[]` | `{ name?, property?, httpEquiv?, content, media?, key? }`. |
-| `link` | `HeadLink[]` | `{ rel, href, hreflang?, type?, media?, sizes?, as?, crossorigin?, key? }`. |
-| `script` | `HeadScript[]` | Externo con `src` o en línea con `children`; `async`, `defer`, `module`, `type`. |
-| `style` | `HeadStyle[]` | `{ children, media?, key? }`. |
+| Campo                    | Tipo                                  | Descripción                                                                                                                                                                                                                 |
+| ------------------------ | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `title`                  | `string`                              | Título del documento. Gana el de más prioridad.                                                                                                                                                                             |
+| `titleTemplate`          | `string` o `(title) => string`        | Plantilla del título: `"%s · Mi sitio"`. En `document.head`, `meeko.addHead` y el `head` de la ruta sólo una cadena.                                                                                                        |
+| `meta`                   | `HeadMeta[]`                          | `{ name?, property?, httpEquiv?, content, media?, key? }`.                                                                                                                                                                  |
+| `link`                   | `HeadLink[]`                          | `{ rel, href, hreflang?, type?, media?, sizes?, as?, crossorigin?, key? }`.                                                                                                                                                 |
+| `script`                 | `HeadScript[]`                        | Externo con `src` o en línea con `children`; `async`, `defer`, `module`, `type`.                                                                                                                                            |
+| `style`                  | `HeadStyle[]`                         | `{ children, media?, key? }`.                                                                                                                                                                                               |
 | `htmlAttrs`, `bodyAttrs` | `Record<string, string \| undefined>` | Atributos de `<html>` y `<body>` (`lang`, `dir`, `class`, `data-*`). `undefined` no aporta nada; los `on*` se rechazan en ejecución y, desde `1.7`, los de los eventos del DOM (`onclick`, `onload`…) también en los tipos. |
 
 ## Valor devuelto
@@ -145,6 +145,7 @@ useHead({ title: `${count.value} elementos` });
 `meeko check` lo acepta, pero el título se calcula una vez, al ejecutar el script: cambiar `count` no lo actualiza. Pasa un getter para que el título siga a la señal:
 
 <!-- no-check -->
+
 ```ts good
 useHead(() => ({ title: `${count.value} elementos` }));
 ```
@@ -158,6 +159,7 @@ useHead({ meta: [{ name: "description" }] });
 `meeko check` da `TS2741: Property 'content' is missing in type '{ name: string; }' but required in type 'HeadMeta'`. Una descripción se escribe más corto con [`useSeoMeta`](/docs/reference/useseometa):
 
 <!-- no-check -->
+
 ```ts good
 useHead({ meta: [{ name: "description", content: "Planes y precios" }] });
 ```
@@ -171,6 +173,7 @@ useHead({ bodyAttrs: { onload: "init()" } });
 Desde `1.7`, `meeko check` da `TS2322: Type 'string' is not assignable to type 'never'.` en los manejadores de los eventos del DOM (`onload`, `onclick`…). Cualquier otro atributo `on*` (`onLoad`, `onmievento`) pasa los tipos, pero Meeko lo rechaza en ejecución: `TypeError: useHead.bodyAttrs: event handler attribute onLoad is not allowed`. El código va en el script del componente:
 
 <!-- no-check -->
+
 ```ts good
 onMounted(() => init());
 ```
@@ -186,6 +189,7 @@ export default defineMeekoConfig({ document: { head: { titleTemplate: (title) =>
 `meeko check` da `TS2322: Type '(title: string) => string' is not assignable to type 'string'` en `meeko.config.ts`, porque `DocumentHead` sólo admite una cadena. Usa `%s`, o la función en un `useHead` de `app/app.meeko`:
 
 <!-- no-check -->
+
 ```ts good
 export default defineMeekoConfig({ document: { head: { titleTemplate: "%s · Mi sitio" } } });
 ```

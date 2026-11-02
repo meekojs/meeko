@@ -13,7 +13,7 @@ related:
   - "@meekojs/meeko/framework#redirect"
   - docs/framework.md#configuración
   - docs/framework.md#meekooutlet--y-meekolink
-source-hash: 33d4c91f992c32b78211273eecc6d5e7adf5a14934eaeb37e0bc6c2d6489ac2f
+source-hash: 459a112404a14abdd79b88dd5eedcfed80e1e8ea8e3ffe92336805c74faa7546
 ---
 
 `href(id, { params, search })` builds the URL of an `app/pages` page from its ID, such as `"/users/[id]"`. TypeScript only accepts existing route IDs, requires `params` for a dynamic route (with its exact keys) and forbids it for a static route: a renamed route or forgotten parameter becomes a `meeko check` error, rather than a broken link.

@@ -12,14 +12,14 @@
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#rutas-dinámicas-en-el-sitemap-sitemapentries
  */
 export interface SitemapEntry {
-  /** Parámetros de la ruta (los segmentos `[slug]`), como en `prerenderEntries`. Una ruta sin parámetros no los necesita. */
-  readonly params?: Readonly<Record<string, string>>;
-  /** Fecha de la última modificación (`<lastmod>`): un `Date` o un texto W3C Datetime, como `"2026-10-01"`. */
-  readonly lastmod?: Date | string;
-  /** Frecuencia de cambio orientativa (`<changefreq>`). */
-  readonly changefreq?: "always" | "hourly" | "daily" | "weekly" | "monthly" | "yearly" | "never";
-  /** Prioridad relativa dentro del sitio (`<priority>`), de `0` a `1`. */
-  readonly priority?: number;
+	/** Parámetros de la ruta (los segmentos `[slug]`), como en `prerenderEntries`. Una ruta sin parámetros no los necesita. */
+	readonly params?: Readonly<Record<string, string>>
+	/** Fecha de la última modificación (`<lastmod>`): un `Date` o un texto W3C Datetime, como `"2026-10-01"`. */
+	readonly lastmod?: Date | string
+	/** Frecuencia de cambio orientativa (`<changefreq>`). */
+	readonly changefreq?: 'always' | 'hourly' | 'daily' | 'weekly' | 'monthly' | 'yearly' | 'never'
+	/** Prioridad relativa dentro del sitio (`<priority>`), de `0` a `1`. */
+	readonly priority?: number
 }
 
 /**
@@ -39,9 +39,8 @@ export interface SitemapEntry {
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#rutas-dinámicas-en-el-sitemap-sitemapentries
  */
 export interface SitemapEntriesContext {
-  /** Variables de entorno del proceso de `meeko build` (`process.env`). */
-  readonly env: Readonly<Record<string, string | undefined>>;
-  /** Siempre `true`: el runtime de `server/runtime.ts` se creó con `prerendering`, sin tráfico de clientes. */
-  readonly prerendering: true;
+	/** Variables de entorno del proceso de `meeko build` (`process.env`). */
+	readonly env: Readonly<Record<string, string | undefined>>
+	/** Siempre `true`: el runtime de `server/runtime.ts` se creó con `prerendering`, sin tráfico de clientes. */
+	readonly prerendering: true
 }
-

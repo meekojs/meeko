@@ -64,11 +64,11 @@ The `publish` job is the only one with `id-token: write` and the `npm` environme
 
 ## Tags and targets
 
-| Tag                   | Workflow               | Checks                            | Publishes                                                                                |
-| --------------------- | ---------------------- | --------------------------------- | ---------------------------------------------------------------------------------------- |
+| Tag                   | Workflow               | Checks                            | Publishes                                                                                       |
+| --------------------- | ---------------------- | --------------------------------- | ----------------------------------------------------------------------------------------------- |
 | `v<versión>`          | `publish.yml`          | The six public manifests          | npm (all six public packages) and the GitHub release with the six VSIX files and the Chrome ZIP |
-| `vscode-v<versión>`   | `publish-vscode.yml`   | `packages/vscode/package.json`    | Visual Studio Marketplace and Open VSX                                                   |
-| `devtools-v<versión>` | `publish-devtools.yml` | `packages/devtools/manifest.json` | Chrome Web Store                                                                         |
+| `vscode-v<versión>`   | `publish-vscode.yml`   | `packages/vscode/package.json`    | Visual Studio Marketplace and Open VSX                                                          |
+| `devtools-v<versión>` | `publish-devtools.yml` | `packages/devtools/manifest.json` | Chrome Web Store                                                                                |
 
 `publish.yml` only triggers for tags starting with `v` and a digit (`v[0-9]*`): with `v*`, `vscode-v<versión>` also triggered it. Each workflow fails before publishing if the tag does not exactly match the version in its file. Extensions thus keep a version number independent of the npm package: an extension fix does not require publishing Meeko, and a Meeko version does not upload extensions to stores.
 

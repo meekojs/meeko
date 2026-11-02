@@ -12,6 +12,7 @@ Meeko 1.0 completa el alcance previsto para la primera versión estable. Desde a
   - plugin de Vite con HMR.
 
   La raíz del paquete sólo expone la API pública documentada.
+
 - **Editor.** El servidor de lenguaje (`meeko lsp --stdio`, `meeko-language-server`) ofrece los mismos diagnósticos que `meeko check`, además de completado, navegación, renombrado entre archivos, formato y acciones rápidas. La extensión de VS Code 1.0.0 es su cliente, y [editors.md](editors.md) documenta Neovim, Helix, Zed, JetBrains y Sublime Text.
 - **DevTools.** El protocolo 1 lo comparten el panel integrado y la extensión de Chrome 1.0.0. Permite editar señales y muestra en la línea de tiempo dónde se lee y se escribe cada una ([devtools.md](devtools.md)).
 - **Framework full-stack**:

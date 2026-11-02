@@ -33,11 +33,11 @@ export default defineMeekoConfig({
 
 ## Opciones
 
-| Opción | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `appDirs` | `readonly string[]` | `[]` | Desde `1.3`. Carpetas dentro de `app/`, con el ámbito de `app/`: componentes y `.ts` de `app/`, en el navegador y en SSR; también el código de servidor. No `shared/`. |
-| `sharedDirs` | `readonly string[]` | `[]` | Desde `1.3`. Carpetas dentro de `shared/`, con el ámbito de `shared/`: todo el proyecto. |
-| `serverDirs` | `readonly string[]` | `[]` | Carpetas dentro de `server/`, sólo para el código de servidor: `server/`, `<script server>`, sidecars `*.route.ts` y `*.server.ts`. |
+| Opción       | Tipo                | Por defecto | Descripción                                                                                                                                                            |
+| ------------ | ------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `appDirs`    | `readonly string[]` | `[]`        | Desde `1.3`. Carpetas dentro de `app/`, con el ámbito de `app/`: componentes y `.ts` de `app/`, en el navegador y en SSR; también el código de servidor. No `shared/`. |
+| `sharedDirs` | `readonly string[]` | `[]`        | Desde `1.3`. Carpetas dentro de `shared/`, con el ámbito de `shared/`: todo el proyecto.                                                                               |
+| `serverDirs` | `readonly string[]` | `[]`        | Carpetas dentro de `server/`, sólo para el código de servidor: `server/`, `<script server>`, sidecars `*.route.ts` y `*.server.ts`.                                    |
 
 Cada entrada es una ruta relativa que empieza por su raíz (`app/…`, `shared/…`, `server/…`), con `/` o `\` y sin segmentos `.` ni `..`.
 
@@ -63,6 +63,7 @@ export async function markReady(id: string): Promise<{ id: string; status: "read
 ```
 
 <!-- no-check -->
+
 ```ts
 // server/api/orders/[id]/ready.post.ts: markReady llega por autoimport
 export default defineApiRoute({ params: orderParams, handler: ({ params }) => markReady(params.id) });

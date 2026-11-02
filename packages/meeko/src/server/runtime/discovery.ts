@@ -1,16 +1,16 @@
-import type { ApiRouteDefinition } from "../api/contracts";
-import type { ServerErrorObserver } from "../errors";
-import type { RpcDefinition } from "../rpc/contracts";
-import type { Schema } from "../schema";
-import type { ServerPlatform } from "./platform";
-import type { RequestContext, ServerFetch } from "./request-context";
-import type { SessionManager } from "./sessions";
+import type { ApiRouteDefinition } from '../api/contracts'
+import type { ServerErrorObserver } from '../errors'
+import type { RpcDefinition } from '../rpc/contracts'
+import type { Schema } from '../schema'
+import type { ServerPlatform } from './platform'
+import type { RequestContext, ServerFetch } from './request-context'
+import type { SessionManager } from './sessions'
 
-import { dispatchApiRoute } from "../api/runtime";
-import { errorResponse, setRateLimitRoute } from "../contract-runtime";
-import { ApiError, reportServerError } from "../errors";
-import { dispatchRpc } from "../rpc/runtime";
-import { createRequestContext, idempotencyKeyOf } from "./request-context";
+import { dispatchApiRoute } from '../api/runtime'
+import { errorResponse, setRateLimitRoute } from '../contract-runtime'
+import { ApiError, reportServerError } from '../errors'
+import { dispatchRpc } from '../rpc/runtime'
+import { createRequestContext, idempotencyKeyOf } from './request-context'
 
 /**
  * Método HTTP de un endpoint de API, el sufijo de `server/api/<ruta>.<método>.ts`.
@@ -22,7 +22,7 @@ import { createRequestContext, idempotencyKeyOf } from "./request-context";
  * const safe = (method: ApiMethod): boolean => method === "GET";
  * ```
  */
-export type ApiMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+export type ApiMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 /**
  * Endpoint de API descubierto en `server/api`.
  *
@@ -34,16 +34,16 @@ export type ApiMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
  * ```
  */
 export interface ApiEndpoint {
-  /** Tipo de entrada. */
-  readonly kind: "api";
-  /** Clave del módulo del handler para el cargador. */
-  readonly file: string;
-  /** Ruta HTTP con los segmentos dinámicos entre corchetes. */
-  readonly pathname: string;
-  /** Método HTTP. */
-  readonly method: ApiMethod;
-  /** Ruta del método en el cliente `api`, separada por puntos. */
-  readonly clientKey: string;
+	/** Tipo de entrada. */
+	readonly kind: 'api'
+	/** Clave del módulo del handler para el cargador. */
+	readonly file: string
+	/** Ruta HTTP con los segmentos dinámicos entre corchetes. */
+	readonly pathname: string
+	/** Método HTTP. */
+	readonly method: ApiMethod
+	/** Ruta del método en el cliente `api`, separada por puntos. */
+	readonly clientKey: string
 }
 /**
  * Procedimiento RPC descubierto en `server/rpc`.
@@ -56,14 +56,14 @@ export interface ApiEndpoint {
  * ```
  */
 export interface RpcEndpoint {
-  /** Tipo de entrada. */
-  readonly kind: "rpc";
-  /** Clave del módulo del handler para el cargador. */
-  readonly file: string;
-  /** Ruta HTTP bajo `/_meeko/rpc`. */
-  readonly pathname: string;
-  /** ID del procedimiento con puntos. */
-  readonly id: string;
+	/** Tipo de entrada. */
+	readonly kind: 'rpc'
+	/** Clave del módulo del handler para el cargador. */
+	readonly file: string
+	/** Ruta HTTP bajo `/_meeko/rpc`. */
+	readonly pathname: string
+	/** ID del procedimiento con puntos. */
+	readonly id: string
 }
 /**
  * Canal Socket descubierto en `server/socket`.
@@ -76,14 +76,14 @@ export interface RpcEndpoint {
  * ```
  */
 export interface SocketEndpoint {
-  /** Tipo de entrada. */
-  readonly kind: "socket";
-  /** Clave del módulo del canal para el cargador. */
-  readonly file: string;
-  /** Nombre del canal. */
-  readonly name: string;
-  /** Ruta del upgrade WebSocket bajo `/_meeko/socket`. */
-  readonly pathname: string;
+	/** Tipo de entrada. */
+	readonly kind: 'socket'
+	/** Clave del módulo del canal para el cargador. */
+	readonly file: string
+	/** Nombre del canal. */
+	readonly name: string
+	/** Ruta del upgrade WebSocket bajo `/_meeko/socket`. */
+	readonly pathname: string
 }
 /**
  * Endpoints del servidor: API, RPC y Socket. Los archivos son claves opacas que se pasan al cargador
@@ -101,12 +101,12 @@ export interface SocketEndpoint {
  * ```
  */
 export interface ServerManifest {
-  /** Endpoints de API. */
-  readonly api: readonly ApiEndpoint[];
-  /** Procedimientos RPC. */
-  readonly rpc: readonly RpcEndpoint[];
-  /** Canales Socket. */
-  readonly socket?: readonly SocketEndpoint[];
+	/** Endpoints de API. */
+	readonly api: readonly ApiEndpoint[]
+	/** Procedimientos RPC. */
+	readonly rpc: readonly RpcEndpoint[]
+	/** Canales Socket. */
+	readonly socket?: readonly SocketEndpoint[]
 }
 /**
  * Resuelve una clave del manifiesto a su módulo. Los bundlers lo proporcionan desde un mapa estático
@@ -120,72 +120,79 @@ export interface ServerManifest {
  * const load: ServerModuleLoader = (file) => import(pathToFileURL(file).href);
  * ```
  */
-export type ServerModuleLoader = (file: string) => Promise<unknown>;
-type PatternPart = { kind: "static" | "param" | "rest"; value: string };
+export type ServerModuleLoader = (file: string) => Promise<unknown>
+type PatternPart = { kind: 'static' | 'param' | 'rest'; value: string }
 
 export function parts(pathname: string): PatternPart[] {
-  return pathname.split("/").filter(Boolean).map((part, index, all) => {
-    if (/^\[\.\.\.[A-Za-z_$][\w$]*\]$/.test(part)) {
-      if (index !== all.length - 1) throw new Error(`El segmento catch-all debe ser el último: ${pathname}`);
-      return { kind: "rest", value: part.slice(4, -1) };
-    }
-    if (/^\[[A-Za-z_$][\w$]*\]$/.test(part)) return { kind: "param", value: part.slice(1, -1) };
-    if (!/^[A-Za-z0-9_-]+$/.test(part)) throw new Error(`Segmento de ruta del servidor no válido: ${part}`);
-    return { kind: "static", value: part };
-  });
+	return pathname
+		.split('/')
+		.filter(Boolean)
+		.map((part, index, all) => {
+			if (/^\[\.\.\.[A-Za-z_$][\w$]*\]$/.test(part)) {
+				if (index !== all.length - 1) throw new Error(`El segmento catch-all debe ser el último: ${pathname}`)
+				return { kind: 'rest', value: part.slice(4, -1) }
+			}
+			if (/^\[[A-Za-z_$][\w$]*\]$/.test(part)) return { kind: 'param', value: part.slice(1, -1) }
+			if (!/^[A-Za-z0-9_-]+$/.test(part)) throw new Error(`Segmento de ruta del servidor no válido: ${part}`)
+			return { kind: 'static', value: part }
+		})
 }
 
 export function collisionKey(pathname: string): string {
-  return parts(pathname).map((part) => part.kind === "static" ? part.value : part.kind === "param" ? "[]" : "[...]").join("/");
+	return parts(pathname)
+		.map((part) => (part.kind === 'static' ? part.value : part.kind === 'param' ? '[]' : '[...]'))
+		.join('/')
 }
 
 /** `byId`: the client segment of the dynamic segment `[id]` or `[...id]`. */
 export function clientSegment(param: string): string {
-  return `by${param[0]!.toUpperCase()}${param.slice(1)}`;
+	return `by${param[0]!.toUpperCase()}${param.slice(1)}`
 }
 
 export function clientKey(pathname: string): string {
-  return parts(pathname).map((part) => part.kind === "static" ? part.value : clientSegment(part.value)).join(".");
+	return parts(pathname)
+		.map((part) => (part.kind === 'static' ? part.value : clientSegment(part.value)))
+		.join('.')
 }
 
 /**
  * The generated client reads `byId` as the dynamic segment of `[id]` (`api.users({ id })`), so each
  * client segment must be either static or the segment of one route parameter, in every route.
  */
-export function assertClientSegments(api: readonly Pick<ApiEndpoint, "file" | "pathname">[]): void {
-  const seen = new Map<string, { file: string; segment: string }>();
-  for (const endpoint of api) {
-    const routeParts = parts(endpoint.pathname).slice(1);
-    const params = routeParts.filter((part) => part.kind !== "static").map((part) => part.value);
-    let path = "";
-    for (const part of routeParts) {
-      const name = part.kind === "static" ? part.value : clientSegment(part.value);
-      const describe = (value: string) => value === "" ? `el segmento estático ${name}` : `el segmento [${value}]`;
-      const matches = params.filter((param) => clientSegment(param) === name);
-      if (part.kind === "static" ? matches.length > 0 : matches.length > 1) {
-        throw new Error(`Colisión de nombres del cliente de API: en ${endpoint.file}, ${describe(part.kind === "static" ? "" : part.value)} y el segmento [${matches.find((param) => param !== part.value)}] resuelven los dos a ${name}`);
-      }
-      path = path ? `${path}.${name}` : name;
-      const segment = part.kind === "static" ? "" : part.value;
-      const previous = seen.get(path);
-      if (previous && previous.segment !== segment) {
-        throw new Error(`Colisión de nombres del cliente de API: ${previous.file} (${describe(previous.segment)}) y ${endpoint.file} (${describe(segment)}) resuelven los dos a ${path}`);
-      }
-      if (!previous) seen.set(path, { file: endpoint.file, segment });
-    }
-  }
+export function assertClientSegments(api: readonly Pick<ApiEndpoint, 'file' | 'pathname'>[]): void {
+	const seen = new Map<string, { file: string; segment: string }>()
+	for (const endpoint of api) {
+		const routeParts = parts(endpoint.pathname).slice(1)
+		const params = routeParts.filter((part) => part.kind !== 'static').map((part) => part.value)
+		let path = ''
+		for (const part of routeParts) {
+			const name = part.kind === 'static' ? part.value : clientSegment(part.value)
+			const describe = (value: string) => (value === '' ? `el segmento estático ${name}` : `el segmento [${value}]`)
+			const matches = params.filter((param) => clientSegment(param) === name)
+			if (part.kind === 'static' ? matches.length > 0 : matches.length > 1) {
+				throw new Error(`Colisión de nombres del cliente de API: en ${endpoint.file}, ${describe(part.kind === 'static' ? '' : part.value)} y el segmento [${matches.find((param) => param !== part.value)}] resuelven los dos a ${name}`)
+			}
+			path = path ? `${path}.${name}` : name
+			const segment = part.kind === 'static' ? '' : part.value
+			const previous = seen.get(path)
+			if (previous && previous.segment !== segment) {
+				throw new Error(`Colisión de nombres del cliente de API: ${previous.file} (${describe(previous.segment)}) y ${endpoint.file} (${describe(segment)}) resuelven los dos a ${path}`)
+			}
+			if (!previous) seen.set(path, { file: endpoint.file, segment })
+		}
+	}
 }
 
 /** A callable cannot also be the parent object of another generated client member. */
 export function assertCallablePaths(entries: readonly { readonly file: string; readonly path: string }[], label: string): void {
-  const seen = new Map<string, string>();
-  for (const entry of entries) {
-    for (const [previousPath, previousFile] of seen) {
-      if (entry.path !== previousPath && !entry.path.startsWith(`${previousPath}.`) && !previousPath.startsWith(`${entry.path}.`)) continue;
-      throw new Error(`${label}: ${previousFile} (${previousPath}) y ${entry.file} (${entry.path}) no pueden ser a la vez rutas invocables del cliente`);
-    }
-    seen.set(entry.path, entry.file);
-  }
+	const seen = new Map<string, string>()
+	for (const entry of entries) {
+		for (const [previousPath, previousFile] of seen) {
+			if (entry.path !== previousPath && !entry.path.startsWith(`${previousPath}.`) && !previousPath.startsWith(`${entry.path}.`)) continue
+			throw new Error(`${label}: ${previousFile} (${previousPath}) y ${entry.file} (${entry.path}) no pueden ser a la vez rutas invocables del cliente`)
+		}
+		seen.set(entry.path, entry.file)
+	}
 }
 
 /**
@@ -206,57 +213,59 @@ export function assertCallablePaths(entries: readonly { readonly file: string; r
  * const hub = createSocketHub({ channels, sessions, services: {} });
  * ```
  */
-export async function loadSocketChannels(manifest: Pick<ServerManifest, "socket">, load: ServerModuleLoader): Promise<Readonly<Record<string, unknown>>> {
-  if (typeof load !== "function") throw new TypeError("loadSocketChannels requires a module loader");
-  const channels: Record<string, unknown> = Object.create(null);
-  for (const endpoint of manifest.socket ?? []) {
-    const module = await load(endpoint.file);
-    if (!module || typeof module !== "object" || !("default" in module)) throw new Error(`${endpoint.file}: el canal Socket requiere un export por defecto`);
-    channels[endpoint.name] = (module as { default: unknown }).default;
-  }
-  return channels;
+export async function loadSocketChannels(manifest: Pick<ServerManifest, 'socket'>, load: ServerModuleLoader): Promise<Readonly<Record<string, unknown>>> {
+	if (typeof load !== 'function') throw new TypeError('loadSocketChannels requires a module loader')
+	const channels: Record<string, unknown> = Object.create(null)
+	for (const endpoint of manifest.socket ?? []) {
+		const module = await load(endpoint.file)
+		if (!module || typeof module !== 'object' || !('default' in module)) throw new Error(`${endpoint.file}: el canal Socket requiere un export por defecto`)
+		channels[endpoint.name] = (module as { default: unknown }).default
+	}
+	return channels
 }
 
 function decode(part: string): string | undefined {
-  try {
-    const value = decodeURIComponent(part);
-    return value && value !== "." && value !== ".." && !value.includes("/") && !value.includes("\\") ? value : undefined;
-  } catch { return undefined; }
+	try {
+		const value = decodeURIComponent(part)
+		return value && value !== '.' && value !== '..' && !value.includes('/') && !value.includes('\\') ? value : undefined
+	} catch {
+		return undefined
+	}
 }
 
 function match(pathname: string, pattern: string): Record<string, string> | undefined {
-  const raw = pathname.split("/").filter(Boolean);
-  const path = raw.map(decode);
-  if (path.some((part) => part === undefined)) return undefined;
-  const patternParts = parts(pattern);
-  const params: Record<string, string> = Object.create(null);
-  let index = 0;
-  for (const part of patternParts) {
-    if (part.kind === "rest") {
-      if (index >= path.length) return undefined;
-      params[part.value] = path.slice(index).join("/");
-      index = path.length;
-      break;
-    }
-    const value = path[index++];
-    if (value === undefined || (part.kind === "static" && part.value !== value)) return undefined;
-    if (part.kind === "param") params[part.value] = value;
-  }
-  return index === path.length ? params : undefined;
+	const raw = pathname.split('/').filter(Boolean)
+	const path = raw.map(decode)
+	if (path.some((part) => part === undefined)) return undefined
+	const patternParts = parts(pattern)
+	const params: Record<string, string> = Object.create(null)
+	let index = 0
+	for (const part of patternParts) {
+		if (part.kind === 'rest') {
+			if (index >= path.length) return undefined
+			params[part.value] = path.slice(index).join('/')
+			index = path.length
+			break
+		}
+		const value = path[index++]
+		if (value === undefined || (part.kind === 'static' && part.value !== value)) return undefined
+		if (part.kind === 'param') params[part.value] = value
+	}
+	return index === path.length ? params : undefined
 }
 
 function rank(endpoint: ApiEndpoint): number[] {
-  return parts(endpoint.pathname).map((part) => part.kind === "static" ? 3 : part.kind === "param" ? 2 : 1);
+	return parts(endpoint.pathname).map((part) => (part.kind === 'static' ? 3 : part.kind === 'param' ? 2 : 1))
 }
 
 function compareApi(a: ApiEndpoint, b: ApiEndpoint): number {
-  const left = rank(a);
-  const right = rank(b);
-  for (let index = 0; index < Math.max(left.length, right.length); index++) {
-    const score = (right[index] ?? 0) - (left[index] ?? 0);
-    if (score) return score;
-  }
-  return a.pathname.localeCompare(b.pathname);
+	const left = rank(a)
+	const right = rank(b)
+	for (let index = 0; index < Math.max(left.length, right.length); index++) {
+		const score = (right[index] ?? 0) - (left[index] ?? 0)
+		if (score) return score
+	}
+	return a.pathname.localeCompare(b.pathname)
 }
 
 /**
@@ -278,62 +287,68 @@ function compareApi(a: ApiEndpoint, b: ApiEndpoint): number {
  * ```
  */
 export interface ServerDispatcherOptions<S = unknown> {
-  /** Manifiesto con los endpoints. */
-  manifest: ServerManifest;
-  /** Gestor de sesiones. */
-  sessions: SessionManager;
-  /** Servicios compartidos o una función que los crea en cada petición. */
-  services: S | ((request: Request) => S | Promise<S>);
-  /** Resuelve cada clave del manifiesto; obligatorio para que el despachador nunca lea el disco. */
-  load: ServerModuleLoader;
-  /** Runtime que se expone en `RequestContext.platform`. */
-  platform?: ServerPlatform;
-  /** Observa los fallos internos sin exponer sus detalles a los clientes. */
-  onError?: ServerErrorObserver;
+	/** Manifiesto con los endpoints. */
+	manifest: ServerManifest
+	/** Gestor de sesiones. */
+	sessions: SessionManager
+	/** Servicios compartidos o una función que los crea en cada petición. */
+	services: S | ((request: Request) => S | Promise<S>)
+	/** Resuelve cada clave del manifiesto; obligatorio para que el despachador nunca lea el disco. */
+	load: ServerModuleLoader
+	/** Runtime que se expone en `RequestContext.platform`. */
+	platform?: ServerPlatform
+	/** Observa los fallos internos sin exponer sus detalles a los clientes. */
+	onError?: ServerErrorObserver
 }
 
 function exportedDefinition(module: unknown): unknown {
-  if (module && typeof module === "object" && "default" in module) return (module as { default: unknown }).default;
-  throw new ApiError("INVALID_HANDLER", 500);
+	if (module && typeof module === 'object' && 'default' in module) return (module as { default: unknown }).default
+	throw new ApiError('INVALID_HANDLER', 500)
 }
 
 /** `405 METHOD_NOT_ALLOWED` with the methods the path accepts in `Allow`. */
 function methodNotAllowed(requestId: string, allowed: readonly string[]): Response {
-  const response = errorResponse(new ApiError("METHOD_NOT_ALLOWED", 405), requestId);
-  response.headers.set("allow", [...new Set(allowed)].join(", "));
-  return response;
+	const response = errorResponse(new ApiError('METHOD_NOT_ALLOWED', 405), requestId)
+	response.headers.set('allow', [...new Set(allowed)].join(', '))
+	return response
 }
 
 /** Dispatches API and RPC through the same request context and security pipeline. */
-export function createContextDispatcher<S>(options: Pick<ServerDispatcherOptions<S>, "manifest" | "sessions" | "load" | "onError">): (context: RequestContext<S>) => Promise<Response> {
-  if (typeof options.load !== "function") throw new TypeError("Server dispatch requires a module loader");
-  const api = [...options.manifest.api].sort(compareApi);
-  const load = options.load;
-  return async (context) => {
-    const request = context.request;
-    try {
-      const pathname = new URL(request.url).pathname;
-      if (pathname.startsWith("/_meeko/rpc/")) {
-        const endpoint = options.manifest.rpc.find((record) => record.pathname === pathname);
-        if (!endpoint) throw new ApiError("NOT_FOUND", 404);
-        if (request.method !== "POST") return methodNotAllowed(context.requestId, ["POST"]);
-        const definition = exportedDefinition(await load(endpoint.file)) as RpcDefinition<Schema, Schema, S>;
-        setRateLimitRoute(context, `rpc ${endpoint.id}`);
-        return dispatchRpc(definition, context, options.sessions, options.onError);
-      }
-      const allowed: ApiMethod[] = [];
-      for (const endpoint of api) {
-        const params = match(pathname, endpoint.pathname);
-        if (!params) continue;
-        if (request.method !== endpoint.method) { allowed.push(endpoint.method); continue; }
-        const definition = exportedDefinition(await load(endpoint.file)) as ApiRouteDefinition<Schema | undefined, Schema | undefined, Schema | undefined, Schema | undefined, S>;
-        setRateLimitRoute(context, `api ${endpoint.method} ${endpoint.pathname}`);
-        return dispatchApiRoute(definition, context, options.sessions, params, options.onError);
-      }
-      if (allowed.length) return methodNotAllowed(context.requestId, allowed);
-      throw new ApiError("NOT_FOUND", 404);
-    } catch (error) { reportServerError(error, context.requestId, options.onError); return errorResponse(error, context.requestId); }
-  };
+export function createContextDispatcher<S>(options: Pick<ServerDispatcherOptions<S>, 'manifest' | 'sessions' | 'load' | 'onError'>): (context: RequestContext<S>) => Promise<Response> {
+	if (typeof options.load !== 'function') throw new TypeError('Server dispatch requires a module loader')
+	const api = [...options.manifest.api].sort(compareApi)
+	const load = options.load
+	return async (context) => {
+		const request = context.request
+		try {
+			const pathname = new URL(request.url).pathname
+			if (pathname.startsWith('/_meeko/rpc/')) {
+				const endpoint = options.manifest.rpc.find((record) => record.pathname === pathname)
+				if (!endpoint) throw new ApiError('NOT_FOUND', 404)
+				if (request.method !== 'POST') return methodNotAllowed(context.requestId, ['POST'])
+				const definition = exportedDefinition(await load(endpoint.file)) as RpcDefinition<Schema, Schema, S>
+				setRateLimitRoute(context, `rpc ${endpoint.id}`)
+				return dispatchRpc(definition, context, options.sessions, options.onError)
+			}
+			const allowed: ApiMethod[] = []
+			for (const endpoint of api) {
+				const params = match(pathname, endpoint.pathname)
+				if (!params) continue
+				if (request.method !== endpoint.method) {
+					allowed.push(endpoint.method)
+					continue
+				}
+				const definition = exportedDefinition(await load(endpoint.file)) as ApiRouteDefinition<Schema | undefined, Schema | undefined, Schema | undefined, Schema | undefined, S>
+				setRateLimitRoute(context, `api ${endpoint.method} ${endpoint.pathname}`)
+				return dispatchApiRoute(definition, context, options.sessions, params, options.onError)
+			}
+			if (allowed.length) return methodNotAllowed(context.requestId, allowed)
+			throw new ApiError('NOT_FOUND', 404)
+		} catch (error) {
+			reportServerError(error, context.requestId, options.onError)
+			return errorResponse(error, context.requestId)
+		}
+	}
 }
 
 /**
@@ -354,17 +369,20 @@ export function createContextDispatcher<S>(options: Pick<ServerDispatcherOptions
  * ```
  */
 export function createServerDispatcher<S>(options: ServerDispatcherOptions<S>): (request: Request) => Promise<Response> {
-  const dispatch = createContextDispatcher(options);
-  return async (request) => {
-    let requestId: string = crypto.randomUUID();
-    try {
-      const session = await options.sessions.load(request);
-      const services = typeof options.services === "function" ? await (options.services as (request: Request) => S | Promise<S>)(request) : options.services;
-      const context = createRequestContext(request, services, session, options.platform);
-      requestId = context.requestId;
-      return dispatch(context);
-    } catch (error) { reportServerError(error, requestId, options.onError); return errorResponse(error, requestId); }
-  };
+	const dispatch = createContextDispatcher(options)
+	return async (request) => {
+		let requestId: string = crypto.randomUUID()
+		try {
+			const session = await options.sessions.load(request)
+			const services = typeof options.services === 'function' ? await (options.services as (request: Request) => S | Promise<S>)(request) : options.services
+			const context = createRequestContext(request, services, session, options.platform)
+			requestId = context.requestId
+			return dispatch(context)
+		} catch (error) {
+			reportServerError(error, requestId, options.onError)
+			return errorResponse(error, requestId)
+		}
+	}
 }
 
 /**
@@ -387,20 +405,20 @@ export function createServerDispatcher<S>(options: ServerDispatcherOptions<S>): 
  * const response = await serverFetch(request, context);
  * ```
  */
-export function createLocalServerFetch<S>(options: Pick<ServerDispatcherOptions<S>, "manifest" | "sessions" | "load" | "onError">): ServerFetch {
-  const dispatch = createContextDispatcher(options);
-  return async (request, active) => {
-    const source = active.request;
-    if (new URL(request.url).origin !== new URL(source.url).origin) {
-      return errorResponse(new ApiError("INVALID_ORIGIN", 403), active.requestId);
-    }
-    for (const name of ["cookie", "authorization"]) {
-      if (request.headers.get(name) !== source.headers.get(name)) {
-        return errorResponse(new ApiError("INVALID_CREDENTIALS", 403), active.requestId);
-      }
-    }
-    // The key belongs to the request it came with, not to the one that dispatches this call.
-    const context: RequestContext<S> = { ...active, request, signal: request.signal, idempotencyKey: idempotencyKeyOf(request) } as RequestContext<S>;
-    return dispatch(context);
-  };
+export function createLocalServerFetch<S>(options: Pick<ServerDispatcherOptions<S>, 'manifest' | 'sessions' | 'load' | 'onError'>): ServerFetch {
+	const dispatch = createContextDispatcher(options)
+	return async (request, active) => {
+		const source = active.request
+		if (new URL(request.url).origin !== new URL(source.url).origin) {
+			return errorResponse(new ApiError('INVALID_ORIGIN', 403), active.requestId)
+		}
+		for (const name of ['cookie', 'authorization']) {
+			if (request.headers.get(name) !== source.headers.get(name)) {
+				return errorResponse(new ApiError('INVALID_CREDENTIALS', 403), active.requestId)
+			}
+		}
+		// The key belongs to the request it came with, not to the one that dispatches this call.
+		const context: RequestContext<S> = { ...active, request, signal: request.signal, idempotencyKey: idempotencyKeyOf(request) } as RequestContext<S>
+		return dispatch(context)
+	}
 }

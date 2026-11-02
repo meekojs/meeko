@@ -14,7 +14,7 @@ related:
   - "@meekojs/meeko#provideErrorHandler"
   - docs/api.md#ciclo-de-vida
   - docs/api.md#composables-de-nivel-superior-y-await
-source-hash: f426d2c5e37397f9d4792c4184b94883ed363970d15a4e11ebcd082e91112a8d
+source-hash: 63cb4590dce379d9a45d90d4897bf17519d1a7c5f3cd8a15041de8a60f05942c
 ---
 
 `onMounted(fn)` registers work that only makes sense in the browser with the DOM ready: measuring an element, focusing a field, subscribing to `window`, starting a library. `fn` runs once when component hydration or mounting finishes, with bindings and `ref:` values already assigned. It never runs on the server, so code inside can use `window` and `document` without checking.

@@ -11,7 +11,7 @@ related:
   - "syntax:each"
   - "@meekojs/meeko#onMounted"
   - docs/api.md#referencias-a-elementos-ref-y-useelementref
-source-hash: b703f0aace628f93f5c217576c3c17ab954be99c6f1c68d51abad2a9b81d6f8a
+source-hash: 33f38d6cefbf9902cadc1d290290aa9a7a34ee11be2d8ff6e0d0b18d61e215b3
 ---
 
 `ref:nombre`, without a value, names a template element or component. The script reads it with [`useElementRef("nombre")`](/en/docs/reference/useelementref), whose type comes from the tag: `HTMLInputElement` for an `<input>`, `SVGSVGElement` for an `<svg>` and, for a component, its `defineExpose` value.

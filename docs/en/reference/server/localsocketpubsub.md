@@ -16,7 +16,7 @@ related:
   - "@meekojs/meeko/server#createSocketHub"
   - docs/framework.md#broadcast-y-varias-instancias
   - docs/framework.md#broadcast-desde-el-servidor
-source-hash: 9134a574ee6717e32b4538b6eb93171a32b25335d9491cb1bc680c12d8628ec3
+source-hash: f4f4445ec0605daee20dd168f7a6925acdee4afaf0bf2b779ef8eab3fb84d9ff
 ---
 
 `LocalSocketPubSub` distributes Socket broadcasts among peers connected to **this** process: each channel/room pair is a set of in-memory listeners, and `publish` calls them and waits for their local delivery attempts. It is the hub's default broker in Node, Bun and Deno when `server/runtime.ts` does not declare `socket.pubsub`.

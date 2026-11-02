@@ -17,7 +17,7 @@ related:
   - "config:devtools"
   - docs/framework.md#configuración
   - docs/framework.md#layers
-source-hash: 7e21fb3923c215c7eda057e7d59fa428892da76145da32da568aef4cf646538b
+source-hash: b65471eea9c9ce6d7611542e945bd252d76f3b1e9ecdb8a917c79164e0fefaae
 ---
 
 `defineMeekoConfig(config)` declares project configuration in `meeko.config.ts`. At runtime it returns the same object; its role is to provide types, completion and documentation for each key and preserve literals (`const T`), so `server.adapter` stays discriminated and each adapter's options are checked. Since `1.8`, it also types and documents each module key in `modules` without importing anything (see [`modules`](../config/config-modules.md)).

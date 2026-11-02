@@ -1,10 +1,10 @@
-import type { Unsubscribe } from "../socket/runtime";
-import type { RateLimitHit } from "./rate-limit";
-import type { RedisSubscriberClient } from "./redis-pubsub";
-import type { SessionRecord, SessionStore } from "./sessions";
+import type { Unsubscribe } from '../socket/runtime'
+import type { RateLimitHit } from './rate-limit'
+import type { RedisSubscriberClient } from './redis-pubsub'
+import type { SessionRecord, SessionStore } from './sessions'
 
-import { serializeJson } from "../../core/server";
-import { RedisChannelSubscriptions } from "./redis-pubsub";
+import { serializeJson } from '../../core/server'
+import { RedisChannelSubscriptions } from './redis-pubsub'
 
 /**
  * Interfaz mínima de un cliente Redis para {@link RedisSessionStore}: `get`, `set` con `PX`, `del` y
@@ -30,16 +30,16 @@ import { RedisChannelSubscriptions } from "./redis-pubsub";
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#redis-mediante-la-api-rest-de-upstash
  */
 export interface RedisSessionClient {
-  /** Lee una clave, o `null` si no existe. */
-  get(key: string): Promise<string | null>;
-  /** Escribe una clave con caducidad en milisegundos. */
-  set(key: string, value: string, options: { PX: number }): Promise<unknown>;
-  /** Borra una clave. */
-  del(key: string): Promise<unknown>;
-  /** Ejecuta un script Lua de forma atómica. */
-  eval(script: string, options: { keys: string[]; arguments: string[] }): Promise<unknown>;
-  /** Cierra la conexión; sólo se usa con `closeClient`. */
-  quit?(): Promise<unknown>;
+	/** Lee una clave, o `null` si no existe. */
+	get(key: string): Promise<string | null>
+	/** Escribe una clave con caducidad en milisegundos. */
+	set(key: string, value: string, options: { PX: number }): Promise<unknown>
+	/** Borra una clave. */
+	del(key: string): Promise<unknown>
+	/** Ejecuta un script Lua de forma atómica. */
+	eval(script: string, options: { keys: string[]; arguments: string[] }): Promise<unknown>
+	/** Cierra la conexión; sólo se usa con `closeClient`. */
+	quit?(): Promise<unknown>
 }
 
 /**
@@ -53,30 +53,30 @@ export interface RedisSessionClient {
  * ```
  */
 export interface RedisSessionStoreOptions {
-  /** Prefijo de las claves, único por aplicación y entorno; termina en `:` y no tiene espacios. */
-  prefix: string;
-  /** Cierra el cliente Redis al cerrar el store, cuando el store es dueño de la conexión. */
-  closeClient?: boolean;
-  /**
-   * Conexión suscriptora dedicada (por ejemplo, `client.duplicate()`). Con ella el store recibe las
-   * revocaciones que cualquier instancia publica en `<prefix>revoked`. La aplicación la abre y la cierra.
-   */
-  subscriber?: RedisSubscriberClient;
+	/** Prefijo de las claves, único por aplicación y entorno; termina en `:` y no tiene espacios. */
+	prefix: string
+	/** Cierra el cliente Redis al cerrar el store, cuando el store es dueño de la conexión. */
+	closeClient?: boolean
+	/**
+	 * Conexión suscriptora dedicada (por ejemplo, `client.duplicate()`). Con ella el store recibe las
+	 * revocaciones que cualquier instancia publica en `<prefix>revoked`. La aplicación la abre y la cierra.
+	 */
+	subscriber?: RedisSubscriberClient
 }
 
 function decodeRecord<T>(value: string, id: string): SessionRecord<T> {
-  let record: unknown;
-  try { record = JSON.parse(value) as unknown; }
-  catch { throw new Error("Corrupt session record"); }
-  if (!record || typeof record !== "object") throw new Error("Corrupt session record");
-  const candidate = record as Partial<SessionRecord<T>>;
-  if (candidate.id !== id || typeof candidate.csrfToken !== "string" || !Object.hasOwn(candidate, "data") ||
-      typeof candidate.createdAt !== "number" || typeof candidate.expiresAt !== "number" ||
-      !Number.isFinite(candidate.createdAt) || !Number.isFinite(candidate.expiresAt) ||
-      (candidate.familyId !== undefined && (typeof candidate.familyId !== "string" || candidate.familyId.length === 0))) {
-    throw new Error("Corrupt session record");
-  }
-  return candidate as SessionRecord<T>;
+	let record: unknown
+	try {
+		record = JSON.parse(value) as unknown
+	} catch {
+		throw new Error('Corrupt session record')
+	}
+	if (!record || typeof record !== 'object') throw new Error('Corrupt session record')
+	const candidate = record as Partial<SessionRecord<T>>
+	if (candidate.id !== id || typeof candidate.csrfToken !== 'string' || !Object.hasOwn(candidate, 'data') || typeof candidate.createdAt !== 'number' || typeof candidate.expiresAt !== 'number' || !Number.isFinite(candidate.createdAt) || !Number.isFinite(candidate.expiresAt) || (candidate.familyId !== undefined && (typeof candidate.familyId !== 'string' || candidate.familyId.length === 0))) {
+		throw new Error('Corrupt session record')
+	}
+	return candidate as SessionRecord<T>
 }
 
 /**
@@ -106,99 +106,98 @@ function decodeRecord<T>(value: string, id: string): SessionRecord<T> {
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#sesiones-y-seguridad
  */
 export class RedisSessionStore<T = unknown> implements SessionStore<T> {
-  readonly persistent = true;
-  /** Sólo existe con un cliente `subscriber`. */
-  readonly subscribeRevocations?: (listener: (familyId: string) => void) => Promise<Unsubscribe>;
-  /**
-   * @param client Cliente Redis conectado.
-   * @param options Prefijo, propiedad del cliente y suscriptor.
-   * @throws {TypeError} Si el prefijo está vacío, tiene espacios o no termina en `:`.
-   */
-  constructor(private readonly client: RedisSessionClient, private readonly options: RedisSessionStoreOptions) {
-    if (!options.prefix || !options.prefix.endsWith(":") || /\s/.test(options.prefix)) throw new TypeError("Session Redis prefix must be nonempty, contain no whitespace, and end with ':'");
-    const subscriber = options.subscriber;
-    if (subscriber) {
-      const subscriptions = new RedisChannelSubscriptions<(familyId: string) => void>(
-        (channel, listener) => subscriber.subscribe(channel, listener),
-        (channel, listener) => subscriber.unsubscribe(channel, listener),
-        (familyId, listeners) => {
-          if (!familyId) return;
-          for (const listener of listeners) {
-            try { listener(familyId); }
-            catch (error) { console.error("[meeko] Session revocation listener failed", error); }
-          }
-        },
-      );
-      this.subscribeRevocations = (listener) => subscriptions.add(this.revocationChannel(), listener);
-    }
-  }
-  private revocationChannel(): string { return `${this.options.prefix}revoked`; }
-  private key(id: string): string { return `${this.options.prefix}${id}`; }
-  private familyKey(id: string): string { return `${this.options.prefix}family:${id}`; }
-  async get(id: string): Promise<SessionRecord<T> | undefined> {
-    const value = await this.client.get(this.key(id));
-    if (value === null) return undefined;
-    const record = decodeRecord<T>(value, id);
-    if (record.expiresAt > Date.now()) {
-      // Older records without a family id are migrated by the first rotation.
-      if (!record.familyId || await this.client.get(this.familyKey(record.familyId)) === id) return record;
-      await this.delete(id);
-      return undefined;
-    }
-    await this.delete(id);
-    return undefined;
-  }
-  async set(record: SessionRecord<T>): Promise<void> {
-    const ttlMs = record.expiresAt - Date.now();
-    if (!Number.isSafeInteger(ttlMs) || ttlMs <= 0) throw new RangeError("Session must have a future expiration");
-    const familyId = record.familyId ?? record.id;
-    const result = await this.client.eval(
-      "-- meeko:session:set\nlocal prior = redis.call('GET', KEYS[1]) if prior then local old = cjson.decode(prior) if (old.familyId or old.id) ~= ARGV[4] then return 0 end end local active = redis.call('GET', KEYS[2]) if active and active ~= ARGV[2] then return 0 end redis.call('SET', KEYS[1], ARGV[1], 'PX', ARGV[3]) redis.call('SET', KEYS[2], ARGV[2], 'PX', ARGV[3]) return 1",
-      { keys: [this.key(record.id), this.familyKey(familyId)], arguments: [serializeJson({ ...record, familyId }), record.id, String(ttlMs), familyId] },
-    );
-    if (result !== 1) throw new Error("Session family already has an active id");
-  }
-  async delete(id: string): Promise<void> {
-    const value = await this.client.get(this.key(id));
-    if (value === null) return;
-    const record = decodeRecord<T>(value, id);
-    await this.client.eval(
-      "-- meeko:session:delete\nlocal raw = redis.call('GET', KEYS[1]) if not raw then return 0 end local active = redis.call('GET', KEYS[2]) redis.call('DEL', KEYS[1]) if active == ARGV[1] then redis.call('DEL', KEYS[2]) end return 1",
-      { keys: [this.key(id), this.familyKey(record.familyId ?? id)], arguments: [id] },
-    );
-  }
-  async replace(previousId: string, record: SessionRecord<T>): Promise<boolean> {
-    const ttlMs = record.expiresAt - Date.now();
-    if (!Number.isSafeInteger(ttlMs) || ttlMs <= 0) throw new RangeError("Session must have a future expiration");
-    if (!record.familyId) throw new Error("Rotated session requires a family id");
-    const result = await this.client.eval(
-      "-- meeko:session:replace\nlocal raw = redis.call('GET', KEYS[1]) if not raw then return 0 end local previous = cjson.decode(raw) local family = previous.familyId or previous.id if family ~= ARGV[3] or previous.expiresAt <= tonumber(ARGV[4]) then return 0 end local active = redis.call('GET', KEYS[3]) if active and active ~= ARGV[2] then return 0 end redis.call('SET', KEYS[2], ARGV[1], 'PX', ARGV[5]) redis.call('SET', KEYS[3], ARGV[6], 'PX', ARGV[5]) redis.call('DEL', KEYS[1]) return 1",
-      { keys: [this.key(previousId), this.key(record.id), this.familyKey(record.familyId)], arguments: [serializeJson(record), previousId, record.familyId, String(Date.now()), String(ttlMs), record.id] },
-    );
-    if (result !== 0 && result !== 1) throw new Error("Unexpected Redis rotation result");
-    return result === 1;
-  }
-  async revokeFamily(familyId: string): Promise<void> {
-    await this.client.eval(
-      "-- meeko:session:revoke-family\nlocal active = redis.call('GET', KEYS[1]) if active then redis.call('DEL', ARGV[1] .. active) redis.call('DEL', KEYS[1]) else redis.call('DEL', ARGV[1] .. ARGV[2]) end redis.call('PUBLISH', ARGV[3], ARGV[2]) return 1",
-      { keys: [this.familyKey(familyId)], arguments: [this.options.prefix, familyId, this.revocationChannel()] },
-    );
-  }
-  /**
-   * Cuenta una petición en la ventana fija `<prefix>ratelimit:<key>` con un script atómico
-   * (`INCR` y `PEXPIRE` en la primera petición de la ventana), compartido por todas las instancias.
-   */
-  async rateLimit(key: string, windowMs: number): Promise<RateLimitHit> {
-    if (!Number.isSafeInteger(windowMs) || windowMs <= 0) throw new RangeError("Rate limit window must be a positive integer of milliseconds");
-    const result = await this.client.eval(
-      "-- meeko:rate-limit\nlocal count = redis.call('INCR', KEYS[1]) local ttl = redis.call('PTTL', KEYS[1]) if count == 1 or ttl < 0 then redis.call('PEXPIRE', KEYS[1], ARGV[1]) ttl = tonumber(ARGV[1]) end return {count, ttl}",
-      { keys: [`${this.options.prefix}ratelimit:${key}`], arguments: [String(windowMs)] },
-    );
-    const [count, resetInMs] = Array.isArray(result) ? result.map(Number) : [];
-    if (!Number.isSafeInteger(count) || count! < 1 || !Number.isFinite(resetInMs)) throw new Error("Unexpected Redis rate limit result");
-    return { count: count!, resetInMs: Math.max(0, resetInMs!) };
-  }
-  async close(): Promise<void> { if (this.options.closeClient) await this.client.quit?.(); }
+	readonly persistent = true
+	/** Sólo existe con un cliente `subscriber`. */
+	readonly subscribeRevocations?: (listener: (familyId: string) => void) => Promise<Unsubscribe>
+	/**
+	 * @param client Cliente Redis conectado.
+	 * @param options Prefijo, propiedad del cliente y suscriptor.
+	 * @throws {TypeError} Si el prefijo está vacío, tiene espacios o no termina en `:`.
+	 */
+	constructor(
+		private readonly client: RedisSessionClient,
+		private readonly options: RedisSessionStoreOptions,
+	) {
+		if (!options.prefix || !options.prefix.endsWith(':') || /\s/.test(options.prefix)) throw new TypeError("Session Redis prefix must be nonempty, contain no whitespace, and end with ':'")
+		const subscriber = options.subscriber
+		if (subscriber) {
+			const subscriptions = new RedisChannelSubscriptions<(familyId: string) => void>(
+				(channel, listener) => subscriber.subscribe(channel, listener),
+				(channel, listener) => subscriber.unsubscribe(channel, listener),
+				(familyId, listeners) => {
+					if (!familyId) return
+					for (const listener of listeners) {
+						try {
+							listener(familyId)
+						} catch (error) {
+							console.error('[meeko] Session revocation listener failed', error)
+						}
+					}
+				},
+			)
+			this.subscribeRevocations = (listener) => subscriptions.add(this.revocationChannel(), listener)
+		}
+	}
+	private revocationChannel(): string {
+		return `${this.options.prefix}revoked`
+	}
+	private key(id: string): string {
+		return `${this.options.prefix}${id}`
+	}
+	private familyKey(id: string): string {
+		return `${this.options.prefix}family:${id}`
+	}
+	async get(id: string): Promise<SessionRecord<T> | undefined> {
+		const value = await this.client.get(this.key(id))
+		if (value === null) return undefined
+		const record = decodeRecord<T>(value, id)
+		if (record.expiresAt > Date.now()) {
+			// Older records without a family id are migrated by the first rotation.
+			if (!record.familyId || (await this.client.get(this.familyKey(record.familyId))) === id) return record
+			await this.delete(id)
+			return undefined
+		}
+		await this.delete(id)
+		return undefined
+	}
+	async set(record: SessionRecord<T>): Promise<void> {
+		const ttlMs = record.expiresAt - Date.now()
+		if (!Number.isSafeInteger(ttlMs) || ttlMs <= 0) throw new RangeError('Session must have a future expiration')
+		const familyId = record.familyId ?? record.id
+		const result = await this.client.eval("-- meeko:session:set\nlocal prior = redis.call('GET', KEYS[1]) if prior then local old = cjson.decode(prior) if (old.familyId or old.id) ~= ARGV[4] then return 0 end end local active = redis.call('GET', KEYS[2]) if active and active ~= ARGV[2] then return 0 end redis.call('SET', KEYS[1], ARGV[1], 'PX', ARGV[3]) redis.call('SET', KEYS[2], ARGV[2], 'PX', ARGV[3]) return 1", { keys: [this.key(record.id), this.familyKey(familyId)], arguments: [serializeJson({ ...record, familyId }), record.id, String(ttlMs), familyId] })
+		if (result !== 1) throw new Error('Session family already has an active id')
+	}
+	async delete(id: string): Promise<void> {
+		const value = await this.client.get(this.key(id))
+		if (value === null) return
+		const record = decodeRecord<T>(value, id)
+		await this.client.eval("-- meeko:session:delete\nlocal raw = redis.call('GET', KEYS[1]) if not raw then return 0 end local active = redis.call('GET', KEYS[2]) redis.call('DEL', KEYS[1]) if active == ARGV[1] then redis.call('DEL', KEYS[2]) end return 1", { keys: [this.key(id), this.familyKey(record.familyId ?? id)], arguments: [id] })
+	}
+	async replace(previousId: string, record: SessionRecord<T>): Promise<boolean> {
+		const ttlMs = record.expiresAt - Date.now()
+		if (!Number.isSafeInteger(ttlMs) || ttlMs <= 0) throw new RangeError('Session must have a future expiration')
+		if (!record.familyId) throw new Error('Rotated session requires a family id')
+		const result = await this.client.eval("-- meeko:session:replace\nlocal raw = redis.call('GET', KEYS[1]) if not raw then return 0 end local previous = cjson.decode(raw) local family = previous.familyId or previous.id if family ~= ARGV[3] or previous.expiresAt <= tonumber(ARGV[4]) then return 0 end local active = redis.call('GET', KEYS[3]) if active and active ~= ARGV[2] then return 0 end redis.call('SET', KEYS[2], ARGV[1], 'PX', ARGV[5]) redis.call('SET', KEYS[3], ARGV[6], 'PX', ARGV[5]) redis.call('DEL', KEYS[1]) return 1", { keys: [this.key(previousId), this.key(record.id), this.familyKey(record.familyId)], arguments: [serializeJson(record), previousId, record.familyId, String(Date.now()), String(ttlMs), record.id] })
+		if (result !== 0 && result !== 1) throw new Error('Unexpected Redis rotation result')
+		return result === 1
+	}
+	async revokeFamily(familyId: string): Promise<void> {
+		await this.client.eval("-- meeko:session:revoke-family\nlocal active = redis.call('GET', KEYS[1]) if active then redis.call('DEL', ARGV[1] .. active) redis.call('DEL', KEYS[1]) else redis.call('DEL', ARGV[1] .. ARGV[2]) end redis.call('PUBLISH', ARGV[3], ARGV[2]) return 1", { keys: [this.familyKey(familyId)], arguments: [this.options.prefix, familyId, this.revocationChannel()] })
+	}
+	/**
+	 * Cuenta una petición en la ventana fija `<prefix>ratelimit:<key>` con un script atómico
+	 * (`INCR` y `PEXPIRE` en la primera petición de la ventana), compartido por todas las instancias.
+	 */
+	async rateLimit(key: string, windowMs: number): Promise<RateLimitHit> {
+		if (!Number.isSafeInteger(windowMs) || windowMs <= 0) throw new RangeError('Rate limit window must be a positive integer of milliseconds')
+		const result = await this.client.eval("-- meeko:rate-limit\nlocal count = redis.call('INCR', KEYS[1]) local ttl = redis.call('PTTL', KEYS[1]) if count == 1 or ttl < 0 then redis.call('PEXPIRE', KEYS[1], ARGV[1]) ttl = tonumber(ARGV[1]) end return {count, ttl}", { keys: [`${this.options.prefix}ratelimit:${key}`], arguments: [String(windowMs)] })
+		const [count, resetInMs] = Array.isArray(result) ? result.map(Number) : []
+		if (!Number.isSafeInteger(count) || count! < 1 || !Number.isFinite(resetInMs)) throw new Error('Unexpected Redis rate limit result')
+		return { count: count!, resetInMs: Math.max(0, resetInMs!) }
+	}
+	async close(): Promise<void> {
+		if (this.options.closeClient) await this.client.quit?.()
+	}
 }
 
 /**
@@ -216,18 +215,18 @@ export class RedisSessionStore<T = unknown> implements SessionStore<T> {
  * ```
  */
 export interface SqlSessionRow {
-  /** ID opaco de la sesión, clave primaria. */
-  id: string;
-  /** Familia de la sesión, con índice único. Migre las filas existentes con `family_id = id`. */
-  familyId: string;
-  /** Token CSRF. */
-  csrfToken: string;
-  /** Datos de la sesión serializados en JSON. */
-  dataJson: string;
-  /** Creación, en milisegundos desde la época. */
-  createdAt: number;
-  /** Caducidad, en milisegundos desde la época. */
-  expiresAt: number;
+	/** ID opaco de la sesión, clave primaria. */
+	id: string
+	/** Familia de la sesión, con índice único. Migre las filas existentes con `family_id = id`. */
+	familyId: string
+	/** Token CSRF. */
+	csrfToken: string
+	/** Datos de la sesión serializados en JSON. */
+	dataJson: string
+	/** Creación, en milisegundos desde la época. */
+	createdAt: number
+	/** Caducidad, en milisegundos desde la época. */
+	expiresAt: number
 }
 
 /**
@@ -250,56 +249,56 @@ export interface SqlSessionRow {
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#sesiones-y-seguridad
  */
 export interface SqlSessionDriver {
-  /** Lee la fila con ese ID, o `undefined`. */
-  read(id: string): Promise<SqlSessionRow | undefined>;
-  /** Inserta o actualiza una fila por su ID opaco; debe imponer un único ID activo por familia. */
-  write(row: SqlSessionRow): Promise<void>;
-  /** Borra la fila con ese ID. */
-  remove(id: string): Promise<void>;
-  /** Sustituye en una transacción una fila no caducada de la misma familia; `false` si no existe. */
-  replace(previousId: string, row: SqlSessionRow, now: number): Promise<boolean>;
-  /** Borra en una operación atómica la fila activa de la familia, también desde un handle anterior. */
-  revokeFamily(familyId: string): Promise<void>;
-  /**
-   * Cuenta una petición en la ventana fija de `key` con una sola sentencia atómica y devuelve la
-   * fila resultante (desde `1.7`). Opcional: con él, {@link SqlSessionStore} implementa
-   * `SessionStore.rateLimit` y los límites de `rateLimit` se comparten entre instancias; sin él,
-   * se cuentan en la memoria de cada instancia, con un aviso en producción.
-   *
-   * `key` son los 32 bytes del SHA-256 de la clave del contador, que Meeko ya calcula como un
-   * resumen de la ruta y el sujeto: nunca llega una IP en claro y la columna tiene ancho fijo
-   * (`bytea` en PostgreSQL, `BLOB` en SQLite). Si no existe una fila para `key`, o su ventana
-   * terminó (`window_ends_at <= now`), la sentencia escribe `count = 1` y
-   * `window_ends_at = now + windowMs`; si no, suma uno y conserva el final de la ventana. Debe ser
-   * atómica frente a peticiones concurrentes, como `INSERT … ON CONFLICT DO UPDATE … RETURNING`.
-   * Si falla, la petición limitada se rechaza.
-   *
-   * @param key SHA-256 de la clave del contador.
-   * @param windowMs Duración de la ventana, un entero positivo de milisegundos.
-   * @param now Instante de la petición, en milisegundos desde la época.
-   * @returns La fila tras contar la petición.
-   * @since 1.7.0
-   * @example
-   * ```ts
-   * import type { SqlSessionDriver } from "@meekojs/meeko/server";
-   *
-   * const rateLimit: SqlSessionDriver["rateLimit"] = async (key, windowMs, now) => {
-   *   const { rows } = await pool.query<{ count: number; window_ends_at: string }>(
-   *     `INSERT INTO meeko_rate_limits AS r (key, window_ends_at, count) VALUES ($1, $2::bigint + $3::bigint, 1)
-   *      ON CONFLICT (key) DO UPDATE SET
-   *        count = CASE WHEN r.window_ends_at <= $2 THEN 1 ELSE r.count + 1 END,
-   *        window_ends_at = CASE WHEN r.window_ends_at <= $2 THEN EXCLUDED.window_ends_at ELSE r.window_ends_at END
-   *      RETURNING count, window_ends_at`,
-   *     [Buffer.from(key), now, windowMs],
-   *   );
-   *   return { count: rows[0]!.count, windowEndsAt: Number(rows[0]!.window_ends_at) };
-   * };
-   * ```
-   * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#rate-limit-en-sql
-   */
-  rateLimit?(key: Uint8Array, windowMs: number, now: number): Promise<SqlRateLimitRow>;
-  /** Cierra la conexión; sólo se usa con `closeDriver`. */
-  close?(): Promise<void>;
+	/** Lee la fila con ese ID, o `undefined`. */
+	read(id: string): Promise<SqlSessionRow | undefined>
+	/** Inserta o actualiza una fila por su ID opaco; debe imponer un único ID activo por familia. */
+	write(row: SqlSessionRow): Promise<void>
+	/** Borra la fila con ese ID. */
+	remove(id: string): Promise<void>
+	/** Sustituye en una transacción una fila no caducada de la misma familia; `false` si no existe. */
+	replace(previousId: string, row: SqlSessionRow, now: number): Promise<boolean>
+	/** Borra en una operación atómica la fila activa de la familia, también desde un handle anterior. */
+	revokeFamily(familyId: string): Promise<void>
+	/**
+	 * Cuenta una petición en la ventana fija de `key` con una sola sentencia atómica y devuelve la
+	 * fila resultante (desde `1.7`). Opcional: con él, {@link SqlSessionStore} implementa
+	 * `SessionStore.rateLimit` y los límites de `rateLimit` se comparten entre instancias; sin él,
+	 * se cuentan en la memoria de cada instancia, con un aviso en producción.
+	 *
+	 * `key` son los 32 bytes del SHA-256 de la clave del contador, que Meeko ya calcula como un
+	 * resumen de la ruta y el sujeto: nunca llega una IP en claro y la columna tiene ancho fijo
+	 * (`bytea` en PostgreSQL, `BLOB` en SQLite). Si no existe una fila para `key`, o su ventana
+	 * terminó (`window_ends_at <= now`), la sentencia escribe `count = 1` y
+	 * `window_ends_at = now + windowMs`; si no, suma uno y conserva el final de la ventana. Debe ser
+	 * atómica frente a peticiones concurrentes, como `INSERT … ON CONFLICT DO UPDATE … RETURNING`.
+	 * Si falla, la petición limitada se rechaza.
+	 *
+	 * @param key SHA-256 de la clave del contador.
+	 * @param windowMs Duración de la ventana, un entero positivo de milisegundos.
+	 * @param now Instante de la petición, en milisegundos desde la época.
+	 * @returns La fila tras contar la petición.
+	 * @since 1.7.0
+	 * @example
+	 * ```ts
+	 * import type { SqlSessionDriver } from "@meekojs/meeko/server";
+	 *
+	 * const rateLimit: SqlSessionDriver["rateLimit"] = async (key, windowMs, now) => {
+	 *   const { rows } = await pool.query<{ count: number; window_ends_at: string }>(
+	 *     `INSERT INTO meeko_rate_limits AS r (key, window_ends_at, count) VALUES ($1, $2::bigint + $3::bigint, 1)
+	 *      ON CONFLICT (key) DO UPDATE SET
+	 *        count = CASE WHEN r.window_ends_at <= $2 THEN 1 ELSE r.count + 1 END,
+	 *        window_ends_at = CASE WHEN r.window_ends_at <= $2 THEN EXCLUDED.window_ends_at ELSE r.window_ends_at END
+	 *      RETURNING count, window_ends_at`,
+	 *     [Buffer.from(key), now, windowMs],
+	 *   );
+	 *   return { count: rows[0]!.count, windowEndsAt: Number(rows[0]!.window_ends_at) };
+	 * };
+	 * ```
+	 * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#rate-limit-en-sql
+	 */
+	rateLimit?(key: Uint8Array, windowMs: number, now: number): Promise<SqlRateLimitRow>
+	/** Cierra la conexión; sólo se usa con `closeDriver`. */
+	close?(): Promise<void>
 }
 
 /**
@@ -318,10 +317,10 @@ export interface SqlSessionDriver {
  * ```
  */
 export interface SqlRateLimitRow {
-  /** Peticiones contadas en la ventana, incluida esta; un entero positivo. */
-  count: number;
-  /** Final de la ventana, en milisegundos desde la época. */
-  windowEndsAt: number;
+	/** Peticiones contadas en la ventana, incluida esta; un entero positivo. */
+	count: number
+	/** Final de la ventana, en milisegundos desde la época. */
+	windowEndsAt: number
 }
 
 /**
@@ -335,8 +334,8 @@ export interface SqlRateLimitRow {
  * ```
  */
 export interface SqlSessionStoreOptions {
-  /** Cierra el driver al cerrar el store, cuando el store es dueño de la conexión. */
-  closeDriver?: boolean;
+	/** Cierra el driver al cerrar el store, cuando el store es dueño de la conexión. */
+	closeDriver?: boolean
 }
 
 /**
@@ -359,63 +358,80 @@ export interface SqlSessionStoreOptions {
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#sesiones-y-seguridad
  */
 export class SqlSessionStore<T = unknown> implements SessionStore<T> {
-  readonly persistent = true;
-  /**
-   * Cuenta una petición en la ventana fija `key` con `SqlSessionDriver.rateLimit` (desde `1.7`).
-   * Sólo existe si el driver lo implementa; sin él, `rateLimit` cuenta en la memoria de cada
-   * instancia y Meeko lo avisa una vez en producción.
-   */
-  readonly rateLimit?: (key: string, windowMs: number) => Promise<RateLimitHit>;
-  /**
-   * @param driver Driver con `replace` y `revokeFamily` atómicos, y `rateLimit` opcional.
-   * @param options Propiedad de la conexión.
-   * @throws {TypeError} Si el driver no implementa `replace` o `revokeFamily`, o si su `rateLimit`
-   * no es una función.
-   */
-  constructor(private readonly driver: SqlSessionDriver, private readonly options: SqlSessionStoreOptions = {}) {
-    if (typeof driver.replace !== "function" || typeof driver.revokeFamily !== "function") throw new TypeError("SQL session driver requires atomic replace and family revocation");
-    if (driver.rateLimit !== undefined) {
-      if (typeof driver.rateLimit !== "function") throw new TypeError("SQL session driver rateLimit must be a function");
-      this.rateLimit = (key, windowMs) => this.countRateLimit(key, windowMs);
-    }
-  }
-  private async countRateLimit(key: string, windowMs: number): Promise<RateLimitHit> {
-    if (!Number.isSafeInteger(windowMs) || windowMs <= 0) throw new RangeError("Rate limit window must be a positive integer of milliseconds");
-    // A fixed-width digest of the key: neither addresses nor app keys reach the table in clear.
-    const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(key)));
-    const now = Date.now();
-    const row = await this.driver.rateLimit!(digest, windowMs, now) as Partial<Record<keyof SqlRateLimitRow, unknown>> | undefined;
-    // SQL clients may return bigint columns as strings or BigInt.
-    const count = Number(row?.count);
-    const windowEndsAt = Number(row?.windowEndsAt);
-    if (!Number.isSafeInteger(count) || count < 1 || !Number.isSafeInteger(windowEndsAt) || windowEndsAt <= 0) throw new TypeError("SqlSessionDriver.rateLimit must resolve { count, windowEndsAt }");
-    return { count, resetInMs: Math.max(0, windowEndsAt - now) };
-  }
-  async get(id: string): Promise<SessionRecord<T> | undefined> {
-    const row = await this.driver.read(id);
-    if (!row) return undefined;
-    if (row.id !== id || typeof row.dataJson !== "string" || typeof row.familyId !== "string" || !row.familyId) throw new Error("Session SQL schema requires a nonempty family_id column");
-    // Rows have no TTL column: Meeko writes `expiresAt = createdAt + ttl`, so the session's own TTL
-    // survives rotation without a schema change.
-    const ttlMs = row.expiresAt - row.createdAt;
-    const record = decodeRecord<T>(serializeJson({
-      id: row.id, familyId: row.familyId, csrfToken: row.csrfToken, data: JSON.parse(row.dataJson) as unknown, createdAt: row.createdAt, expiresAt: row.expiresAt,
-      ...(Number.isSafeInteger(ttlMs) && ttlMs > 0 ? { ttlMs } : {}),
-    }), id);
-    if (record.expiresAt > Date.now()) return record;
-    await this.delete(id);
-    return undefined;
-  }
-  async set(record: SessionRecord<T>): Promise<void> {
-    if (!Number.isSafeInteger(record.expiresAt) || record.expiresAt <= Date.now()) throw new RangeError("Session must have a future expiration");
-    await this.driver.write({ id: record.id, familyId: record.familyId ?? record.id, csrfToken: record.csrfToken, dataJson: serializeJson(record.data), createdAt: record.createdAt, expiresAt: record.expiresAt });
-  }
-  async delete(id: string): Promise<void> { await this.driver.remove(id); }
-  async replace(previousId: string, record: SessionRecord<T>): Promise<boolean> {
-    if (!Number.isSafeInteger(record.expiresAt) || record.expiresAt <= Date.now()) throw new RangeError("Session must have a future expiration");
-    if (!record.familyId) throw new Error("Rotated session requires a family id");
-    return this.driver.replace(previousId, { id: record.id, familyId: record.familyId, csrfToken: record.csrfToken, dataJson: serializeJson(record.data), createdAt: record.createdAt, expiresAt: record.expiresAt }, Date.now());
-  }
-  async revokeFamily(familyId: string): Promise<void> { await this.driver.revokeFamily(familyId); }
-  async close(): Promise<void> { if (this.options.closeDriver) await this.driver.close?.(); }
+	readonly persistent = true
+	/**
+	 * Cuenta una petición en la ventana fija `key` con `SqlSessionDriver.rateLimit` (desde `1.7`).
+	 * Sólo existe si el driver lo implementa; sin él, `rateLimit` cuenta en la memoria de cada
+	 * instancia y Meeko lo avisa una vez en producción.
+	 */
+	readonly rateLimit?: (key: string, windowMs: number) => Promise<RateLimitHit>
+	/**
+	 * @param driver Driver con `replace` y `revokeFamily` atómicos, y `rateLimit` opcional.
+	 * @param options Propiedad de la conexión.
+	 * @throws {TypeError} Si el driver no implementa `replace` o `revokeFamily`, o si su `rateLimit`
+	 * no es una función.
+	 */
+	constructor(
+		private readonly driver: SqlSessionDriver,
+		private readonly options: SqlSessionStoreOptions = {},
+	) {
+		if (typeof driver.replace !== 'function' || typeof driver.revokeFamily !== 'function') throw new TypeError('SQL session driver requires atomic replace and family revocation')
+		if (driver.rateLimit !== undefined) {
+			if (typeof driver.rateLimit !== 'function') throw new TypeError('SQL session driver rateLimit must be a function')
+			this.rateLimit = (key, windowMs) => this.countRateLimit(key, windowMs)
+		}
+	}
+	private async countRateLimit(key: string, windowMs: number): Promise<RateLimitHit> {
+		if (!Number.isSafeInteger(windowMs) || windowMs <= 0) throw new RangeError('Rate limit window must be a positive integer of milliseconds')
+		// A fixed-width digest of the key: neither addresses nor app keys reach the table in clear.
+		const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(key)))
+		const now = Date.now()
+		const row = (await this.driver.rateLimit!(digest, windowMs, now)) as Partial<Record<keyof SqlRateLimitRow, unknown>> | undefined
+		// SQL clients may return bigint columns as strings or BigInt.
+		const count = Number(row?.count)
+		const windowEndsAt = Number(row?.windowEndsAt)
+		if (!Number.isSafeInteger(count) || count < 1 || !Number.isSafeInteger(windowEndsAt) || windowEndsAt <= 0) throw new TypeError('SqlSessionDriver.rateLimit must resolve { count, windowEndsAt }')
+		return { count, resetInMs: Math.max(0, windowEndsAt - now) }
+	}
+	async get(id: string): Promise<SessionRecord<T> | undefined> {
+		const row = await this.driver.read(id)
+		if (!row) return undefined
+		if (row.id !== id || typeof row.dataJson !== 'string' || typeof row.familyId !== 'string' || !row.familyId) throw new Error('Session SQL schema requires a nonempty family_id column')
+		// Rows have no TTL column: Meeko writes `expiresAt = createdAt + ttl`, so the session's own TTL
+		// survives rotation without a schema change.
+		const ttlMs = row.expiresAt - row.createdAt
+		const record = decodeRecord<T>(
+			serializeJson({
+				id: row.id,
+				familyId: row.familyId,
+				csrfToken: row.csrfToken,
+				data: JSON.parse(row.dataJson) as unknown,
+				createdAt: row.createdAt,
+				expiresAt: row.expiresAt,
+				...(Number.isSafeInteger(ttlMs) && ttlMs > 0 ? { ttlMs } : {}),
+			}),
+			id,
+		)
+		if (record.expiresAt > Date.now()) return record
+		await this.delete(id)
+		return undefined
+	}
+	async set(record: SessionRecord<T>): Promise<void> {
+		if (!Number.isSafeInteger(record.expiresAt) || record.expiresAt <= Date.now()) throw new RangeError('Session must have a future expiration')
+		await this.driver.write({ id: record.id, familyId: record.familyId ?? record.id, csrfToken: record.csrfToken, dataJson: serializeJson(record.data), createdAt: record.createdAt, expiresAt: record.expiresAt })
+	}
+	async delete(id: string): Promise<void> {
+		await this.driver.remove(id)
+	}
+	async replace(previousId: string, record: SessionRecord<T>): Promise<boolean> {
+		if (!Number.isSafeInteger(record.expiresAt) || record.expiresAt <= Date.now()) throw new RangeError('Session must have a future expiration')
+		if (!record.familyId) throw new Error('Rotated session requires a family id')
+		return this.driver.replace(previousId, { id: record.id, familyId: record.familyId, csrfToken: record.csrfToken, dataJson: serializeJson(record.data), createdAt: record.createdAt, expiresAt: record.expiresAt }, Date.now())
+	}
+	async revokeFamily(familyId: string): Promise<void> {
+		await this.driver.revokeFamily(familyId)
+	}
+	async close(): Promise<void> {
+		if (this.options.closeDriver) await this.driver.close?.()
+	}
 }

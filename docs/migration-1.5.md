@@ -46,11 +46,11 @@ Un import de valores de un componente que llega al `server/` de un layer ya fall
 
 Algunas interfaces de objetos que Meeko entrega a la aplicación tienen miembros nuevos y obligatorios:
 
-| Interfaz | Miembros nuevos |
-| --- | --- |
-| `RouteState` (de `useRoute()`) | `isActive(to, { params, prefix })` |
-| `DataResource` y `LoadedResource` (de `useApi`, `useRpcQuery` y los recursos) | `refreshing` |
-| `Form` (de `useForm`) | `trySubmit`, `commit` y `field` |
+| Interfaz                                                                      | Miembros nuevos                    |
+| ----------------------------------------------------------------------------- | ---------------------------------- |
+| `RouteState` (de `useRoute()`)                                                | `isActive(to, { params, prefix })` |
+| `DataResource` y `LoadedResource` (de `useApi`, `useRpcQuery` y los recursos) | `refreshing`                       |
+| `Form` (de `useForm`)                                                         | `trySubmit`, `commit` y `field`    |
 
 [stability.md](stability.md#entradas-del-paquete) recoge desde `1.5` la regla: una interfaz que Meeko **entrega** puede ganar miembros en un minor, como una unión que Meeko entrega puede ganar miembros. Leerlas y desestructurarlas no cambia. Lo que deja de compilar es implementarlas a mano, por ejemplo en una prueba:
 
@@ -183,7 +183,7 @@ Para marcar la sección de la navegación, `<MeekoLink to="/dashboard" match="pr
 
 ### `<MeekoPopover>` y `<MeekoSelect>`
 
-`<MeekoPopover>` es un popover accesible sobre la API nativa `popover` y *CSS anchor positioning* (menús, diálogos no modales y tooltips con `mode="hint"`), y `<MeekoSelect>` un select accesible construido sobre él, cuyo `model` toma el tipo de `options`, con búsqueda, grupos, selección múltiple y `bind:field` de `useForm`. Ninguno trae estilos visuales y ambos funcionan con una CSP sin `'unsafe-inline'`. El snippet `anchor` de `<MeekoPopover>` acepta un disparador propio con `bind="trigger"`. Véase [Popover](api.md#popover-meekopopover) y [Select](api.md#select-meekoselect).
+`<MeekoPopover>` es un popover accesible sobre la API nativa `popover` y _CSS anchor positioning_ (menús, diálogos no modales y tooltips con `mode="hint"`), y `<MeekoSelect>` un select accesible construido sobre él, cuyo `model` toma el tipo de `options`, con búsqueda, grupos, selección múltiple y `bind:field` de `useForm`. Ninguno trae estilos visuales y ambos funcionan con una CSP sin `'unsafe-inline'`. El snippet `anchor` de `<MeekoPopover>` acepta un disparador propio con `bind="trigger"`. Véase [Popover](api.md#popover-meekopopover) y [Select](api.md#select-meekoselect).
 
 ### Aliases de ruta
 
@@ -203,15 +203,15 @@ Véase [Aliases de ruta](framework.md#aliases-de-ruta).
 
 ## Códigos nuevos
 
-| Código | Dónde | Qué señala |
-| --- | --- | --- |
+| Código    | Dónde                                         | Qué señala                                                                                                                                                                                                                                       |
+| --------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `MEEK112` | Compilador, `meeko check`, editor y ejecución | Una etiqueta que `<component is>` no puede renderizar (`script`, `style`, `iframe`…: error de compilación con un literal, de tipos con una expresión y `TypeError` en ejecución), o un atributo que no admite ninguna de sus etiquetas posibles. |
-| `MEEK113` | `meeko check`, editor y ejecución | El valor de `bind="…"` que no es un objeto, una clave `on*` o `data-meeko*`, o una clave que no es una prop del componente. |
-| `MEEK114` | Compilador | Un `to` estático de `<MeekoTeleport>` que no es `"body"` ni `"#id"`. |
-| `MEEK115` | `meeko check` | Un `+group.ts` fuera de `app/pages`. |
-| `MEEK116` | Compilador | `<MeekoAwait>` sin `for`. |
-| `MEEK117` | `meeko check`, `meeko build` y editor (pista) | Una página o un layout que pinta en un `each:of` los datos de un `useApi` o un `useRpcQuery` sin `await` sin ocuparse de su carga. No hace fallar la comprobación. |
-| `MEEK118` | `meeko check`, `meeko dev` y build | `@/` (o un alias de `app/`) en `shared/`, que no ve `app/`. |
+| `MEEK113` | `meeko check`, editor y ejecución             | El valor de `bind="…"` que no es un objeto, una clave `on*` o `data-meeko*`, o una clave que no es una prop del componente.                                                                                                                      |
+| `MEEK114` | Compilador                                    | Un `to` estático de `<MeekoTeleport>` que no es `"body"` ni `"#id"`.                                                                                                                                                                             |
+| `MEEK115` | `meeko check`                                 | Un `+group.ts` fuera de `app/pages`.                                                                                                                                                                                                             |
+| `MEEK116` | Compilador                                    | `<MeekoAwait>` sin `for`.                                                                                                                                                                                                                        |
+| `MEEK117` | `meeko check`, `meeko build` y editor (pista) | Una página o un layout que pinta en un `each:of` los datos de un `useApi` o un `useRpcQuery` sin `await` sin ocuparse de su carga. No hace fallar la comprobación.                                                                               |
+| `MEEK118` | `meeko check`, `meeko dev` y build            | `@/` (o un alias de `app/`) en `shared/`, que no ve `app/`.                                                                                                                                                                                      |
 
 ## Editor
 

@@ -1,1 +1,1 @@
-exports.run = () => require("./host-untrusted.cjs").run();
+exports.run = () => require('./host-untrusted.cjs').run()

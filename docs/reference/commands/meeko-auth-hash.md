@@ -31,10 +31,10 @@ scrypt$131072$8$1$5jmbLtw9yk7j9cKXvoj1Cw$MycUbPu8gwqzW2hpMac0eTDbEnanlwS4rw-uc4M
 
 ## Parámetros
 
-| Entrada | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| Terminal (stdin es un TTY) | texto, sin eco | | Pide `Contraseña:` y `Repite la contraseña:`. Retroceso borra; `Ctrl+C`, o `Ctrl+D` con la línea vacía, cancela. Se ignoran los caracteres de control y las secuencias de escape (flechas, pegado entre corchetes). |
-| Tubería (stdin no es un TTY) | texto | | Lee toda la entrada y quita un único salto de línea final (`\n` o `\r\n`). Debe ser una sola línea. |
+| Entrada                      | Tipo           | Por defecto | Descripción                                                                                                                                                                                                         |
+| ---------------------------- | -------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Terminal (stdin es un TTY)   | texto, sin eco |             | Pide `Contraseña:` y `Repite la contraseña:`. Retroceso borra; `Ctrl+C`, o `Ctrl+D` con la línea vacía, cancela. Se ignoran los caracteres de control y las secuencias de escape (flechas, pegado entre corchetes). |
+| Tubería (stdin no es un TTY) | texto          |             | Lee toda la entrada y quita un único salto de línea final (`\n` o `\r\n`). Debe ser una sola línea.                                                                                                                 |
 
 El comando no admite opciones: `meeko auth` sin `hash` da `Falta el subcomando de auth: meeko auth hash`, y otro subcomando, `Subcomando desconocido de auth: …`.
 
@@ -42,14 +42,14 @@ El comando no admite opciones: `meeko auth` sin `hash` da `Falta el subcomando d
 
 Una línea `scrypt$<N>$<r>$<p>$<sal>$<hash>` en la salida estándar y código `0`. Los parámetros son los actuales de `hashPassword`: N = 2^17, r = 8 y p = 1, una sal aleatoria de 16 bytes y una clave de 32, en base64url. Cada ejecución da un hash distinto para la misma contraseña, por la sal.
 
-| Error | Mensaje | Código |
-| --- | --- | --- |
-| Las dos entradas no coinciden | `Las contraseñas no coinciden` | `1` |
-| Contraseña vacía en la terminal | `La contraseña está vacía` | `1` |
-| Contraseña vacía por tubería | `La contraseña está vacía` (hasta `1.6`, `The password is empty`) | `1` |
-| Más de una línea por tubería | `La entrada debe tener una sola línea con la contraseña` | `1` |
-| Más de 4096 bytes | `La contraseña supera 4096 bytes` (hasta `1.6`, `The password exceeds 4096 bytes`) | `1` |
-| Cancelado | `Cancelado` | `1` |
+| Error                           | Mensaje                                                                            | Código |
+| ------------------------------- | ---------------------------------------------------------------------------------- | ------ |
+| Las dos entradas no coinciden   | `Las contraseñas no coinciden`                                                     | `1`    |
+| Contraseña vacía en la terminal | `La contraseña está vacía`                                                         | `1`    |
+| Contraseña vacía por tubería    | `La contraseña está vacía` (hasta `1.6`, `The password is empty`)                  | `1`    |
+| Más de una línea por tubería    | `La entrada debe tener una sola línea con la contraseña`                           | `1`    |
+| Más de 4096 bytes               | `La contraseña supera 4096 bytes` (hasta `1.6`, `The password exceeds 4096 bytes`) | `1`    |
+| Cancelado                       | `Cancelado`                                                                        | `1`    |
 
 ## Ejemplos
 
@@ -79,6 +79,7 @@ $env:ADMIN_PASSWORD | npx meeko auth hash
 ### Comprobarlo en el inicio de sesión
 
 <!-- no-check -->
+
 ```ts
 // server/api/login.post.ts
 import { verifyPassword } from "@meekojs/meeko/password";

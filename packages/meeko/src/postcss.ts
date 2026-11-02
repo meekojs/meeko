@@ -9,17 +9,5 @@
  * export default { plugins: [meekoUtilities()] };
  * ```
  */
-export { defineUtilities, meekoUtilities, meekoUtilities as default } from "./compiler/css/utilities";
-export type {
-  MeekoUtilitiesOptions,
-  UtilityAtRule,
-  UtilityAtRuleDeclarations,
-  UtilityCss,
-  UtilityDeclarations,
-  UtilityFunction,
-  UtilityHelpers,
-  UtilityNode,
-  UtilityOutput,
-  UtilityRule,
-  UtilityValue,
-} from "./compiler/css/utilities";
+export { defineUtilities, meekoUtilities, meekoUtilities as default } from './compiler/css/utilities'
+export type { MeekoUtilitiesOptions, UtilityAtRule, UtilityAtRuleDeclarations, UtilityCss, UtilityDeclarations, UtilityFunction, UtilityHelpers, UtilityNode, UtilityOutput, UtilityRule, UtilityValue } from './compiler/css/utilities'

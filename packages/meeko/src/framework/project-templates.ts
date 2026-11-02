@@ -50,14 +50,14 @@ await mountClientApp({
   },
 });
 performance.measure("meeko-hydration", { start: hydrationStart, end: performance.now() });
-`;
+`
 
 /**
  * The client entry of the static adapter: navigation reads each page's payload file,
  * `<path>/index.meeko.json`, because a static host does not negotiate `Accept`.
  */
-export const staticClientEntrySource = clientEntrySource.replace("serverData: true,", 'serverData: "static",');
-if (staticClientEntrySource === clientEntrySource) throw new Error("The static client entry template lost its serverData option");
+export const staticClientEntrySource = clientEntrySource.replace('serverData: true,', 'serverData: "static",')
+if (staticClientEntrySource === clientEntrySource) throw new Error('The static client entry template lost its serverData option')
 
 /** Adapter-neutral application entry: the baked manifest plus its module map. */
 export const serverEntrySource = `import { createServerApp, type ServerApp, type ServerAppOptions } from "@meekojs/meeko/server";
@@ -70,7 +70,7 @@ export type AppHostOptions = Omit<ServerAppOptions, "manifest" | "load" | "runti
 export function createApp(options: AppHostOptions): Promise<ServerApp> {
   return createServerApp({ ...options, manifest, load, runtime, plugins, appName, loadRedis });
 }
-`;
+`
 
 /** Node adapter entry; \`meeko build\` bundles it to .meeko/output/node/index.mjs. */
 export const nodeEntrySource = `import { readFile } from "node:fs/promises";
@@ -157,4 +157,4 @@ export async function start() {
 }
 
 if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) await start();
-`;
+`

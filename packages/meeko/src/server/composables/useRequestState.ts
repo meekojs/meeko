@@ -1,4 +1,4 @@
-import type { RequestContext } from "../runtime/request-context";
+import type { RequestContext } from '../runtime/request-context'
 
 /**
  * Devuelve el valor de `key` en el estado de la petición y lo crea con `factory()` la primera vez.
@@ -24,6 +24,6 @@ import type { RequestContext } from "../runtime/request-context";
  * ```
  */
 export function useRequestState<T>(context: RequestContext, key: string, factory: () => T): T {
-  if (!context.state.has(key)) context.state.set(key, factory());
-  return context.state.get(key) as T;
+	if (!context.state.has(key)) context.state.set(key, factory())
+	return context.state.get(key) as T
 }

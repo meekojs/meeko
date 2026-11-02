@@ -1,7 +1,7 @@
-import type { LayoutHandle, LayoutName, LayoutProps } from "../../shared/layout";
+import type { LayoutHandle, LayoutName, LayoutProps } from '../../shared/layout'
 
-import { findContext } from "../../core/reactivity";
-import { layoutKey } from "../runtime/layout";
+import { findContext } from '../../core/reactivity'
+import { layoutKey } from '../runtime/layout'
 
 /**
  * Da acceso a las props del layout con nombre de la página desde su `<script>` (y desde sus
@@ -32,17 +32,18 @@ import { layoutKey } from "../runtime/layout";
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#props-del-layout-desde-la-página
  */
 export function useLayout<L extends LayoutName | false = LayoutName>(): LayoutHandle<LayoutProps<L>> {
-  const writer = findContext(layoutKey);
-  if (!writer) {
-    throw new Error("useLayout() necesita una página que renderiza Meeko: sólo funciona en las páginas, en sus componentes y en sus +layout.meeko. En una prueba unitaria, pasa los valores al componente como props.");
-  }
-  return Object.freeze({
-    name: writer.name,
-    get props() { return writer.read() as Readonly<Partial<LayoutProps<L>>>; },
-    set(patch: object) {
-      if (typeof patch !== "object" || patch === null || Array.isArray(patch)) throw new TypeError("useLayout().set() necesita un objeto con las props del layout");
-      writer.write({ ...patch } as Record<string, unknown>);
-    },
-  });
+	const writer = findContext(layoutKey)
+	if (!writer) {
+		throw new Error('useLayout() necesita una página que renderiza Meeko: sólo funciona en las páginas, en sus componentes y en sus +layout.meeko. En una prueba unitaria, pasa los valores al componente como props.')
+	}
+	return Object.freeze({
+		name: writer.name,
+		get props() {
+			return writer.read() as Readonly<Partial<LayoutProps<L>>>
+		},
+		set(patch: object) {
+			if (typeof patch !== 'object' || patch === null || Array.isArray(patch)) throw new TypeError('useLayout().set() necesita un objeto con las props del layout')
+			writer.write({ ...patch } as Record<string, unknown>)
+		},
+	})
 }
-

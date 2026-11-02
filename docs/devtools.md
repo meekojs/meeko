@@ -50,11 +50,11 @@ Cada evento conserva el nombre y el archivo `.meeko` del componente y una copia 
 
 El filtro **Navegación y datos** de ambos paneles muestra las operaciones de la aplicación, separadas de las señales y del ciclo de vida de componentes:
 
-| Evento | Fases | Qué mide |
-| --- | --- | --- |
-| `navigation` | `start` → `commit`, `cancel` o `error` | Desde que comienza una navegación cliente hasta confirmar su vista, cancelarla o fallar. |
-| `data` | `start` → `ready`, `cancel` o `error` | Preparación de módulos y datos antes del commit de la vista. |
-| `data` con `source: "cache"` | `ready` | Lectura satisfecha por la caché local de recursos, sin repetir la petición. |
+| Evento                       | Fases                                  | Qué mide                                                                                 |
+| ---------------------------- | -------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `navigation`                 | `start` → `commit`, `cancel` o `error` | Desde que comienza una navegación cliente hasta confirmar su vista, cancelarla o fallar. |
+| `data`                       | `start` → `ready`, `cancel` o `error`  | Preparación de módulos y datos antes del commit de la vista.                             |
+| `data` con `source: "cache"` | `ready`                                | Lectura satisfecha por la caché local de recursos, sin repetir la petición.              |
 
 Cada operación tiene un `operationId` que enlaza inicio y final, el patrón declarado de la ruta (por ejemplo, `/users/[id]`) y `durationMs` al finalizar. El origen de datos es `server`, `client` o `static` según el transporte de la ruta; las lecturas de recursos locales se identifican como `cache`. La duración de una navegación no espera al final visual de una View Transition.
 
@@ -88,12 +88,12 @@ Desde `1.1`, cada `DevtoolsInstance` de la captura puede llevar el campo opciona
 
 El hook expone:
 
-| Método | Efecto |
-| --- | --- |
-| `snapshot()` | Captura serializable de instancias, eventos recientes y selección. |
-| `subscribe(listener)` | Avisa de cada cambio; devuelve la función para cancelar la suscripción. |
-| `select(id)` / `highlight(id)` | Selecciona o resalta una instancia; `null` las retira. |
-| `setBreakpoint(id, enabled)` | Activa o desactiva el punto de parada de una instancia. |
+| Método                               | Efecto                                                                                       |
+| ------------------------------------ | -------------------------------------------------------------------------------------------- |
+| `snapshot()`                         | Captura serializable de instancias, eventos recientes y selección.                           |
+| `subscribe(listener)`                | Avisa de cada cambio; devuelve la función para cancelar la suscripción.                      |
+| `select(id)` / `highlight(id)`       | Selecciona o resalta una instancia; `null` las retira.                                       |
+| `setBreakpoint(id, enabled)`         | Activa o desactiva el punto de parada de una instancia.                                      |
 | `setSignal(instanceId, name, value)` | Sustituye el valor de una señal editable y devuelve `{ ok: true }` o `{ ok: false, error }`. |
 
 La versión sólo cambia con incompatibilidades y, según la [política de estabilidad](stability.md#devtools-y-editor), sólo en una versión major de Meeko. Dentro del protocolo 1 pueden aparecer campos o tipos de evento nuevos. Los dos paneles rechazan un hook o una captura con otra versión, o sin ella (runtimes anteriores a 1.0), y muestran un mensaje que indica la versión encontrada y la admitida. Nunca leen datos de un protocolo que no conocen. El panel integrado viaja en el mismo paquete que el runtime. La extensión de Chrome necesita un `@meekojs/meeko` que implemente el protocolo 1.
@@ -138,6 +138,7 @@ Desde `1.1`, `meeko dev` publica los valores de las señales de las páginas abi
    ```
 
    Varios `meeko dev` del mismo proyecto, en puertos distintos, conviven sin sustituirse el descriptor, y el editor se conecta a todos. Al cerrarse, cada servidor borra el suyo si sigue siendo de su sesión. Al arrancar, borra los descriptores huérfanos de procesos que ya no existen (por ejemplo, de un `meeko dev` terminado a la fuerza), incluido el `.meeko/dev/editor-bridge.json` único de las versiones de desarrollo anteriores. El puerto es el que `meeko dev` usa de verdad: si `4173` estaba ocupado y tomó `4174`, el descriptor es `editor-bridge-4174.json`. Cuando `meeko dev` se reinicia porque cambió un `@meekojs/meeko` enlazado, el servidor nuevo escucha en el mismo puerto y escribe un descriptor con otra sesión y otro token; el editor vuelve a conectarse con él.
+
 2. El editor lee los descriptores y abre `GET <url>/events` en cada uno, un stream SSE con los eventos `hello` (`protocol`, `session`, `root`), `snapshot` (todas las señales) y `update` (señales nuevas o cambiadas y las que desaparecen en `removed`). Si no había otro editor conectado, las pestañas abiertas no estaban enviando valores: el servidor les pide su estado y espera a que todas respondan, o como mucho unos 300 ms, antes de enviar `snapshot`; sin pestañas lo envía al momento. Lo que llega durante esa espera va en la propia instantánea, no en un `update`.
 3. Para editar una señal, el editor envía `POST <url>/command` con `{ "type": "setSignal", "id", "value" }`. El servidor reenvía la orden a la pestaña que tiene la instancia y responde con su resultado, `{ ok: true }` o `{ ok: false, error }`, como `setSignal` del hook.
 4. Entre el navegador y `meeko dev` los mensajes viajan por el WebSocket de HMR de Vite. El navegador sólo envía valores mientras hay al menos un editor conectado.
@@ -169,14 +170,14 @@ Las ubicaciones sólo se generan en desarrollo, cuando el compilador trabaja con
 
 Cada evento de señal se puede desplegar para ver las expresiones que dependían de ella en esa instancia, con archivo, línea, columna y tipo de lectura:
 
-| Tipo | Origen |
-| --- | --- |
-| `text` | Interpolación `{...}` de la plantilla. |
-| `attribute` | Atributo enlazado (`bind:`). |
-| `computed` | Función pasada a `computed(...)` en el script `.meeko`. |
-| `if` | Condición `if:when`. |
-| `each` | Lista `each:of`. |
-| `prop` | Prop pasada a un componente hijo (`name` indica la prop). |
+| Tipo        | Origen                                                    |
+| ----------- | --------------------------------------------------------- |
+| `text`      | Interpolación `{...}` de la plantilla.                    |
+| `attribute` | Atributo enlazado (`bind:`).                              |
+| `computed`  | Función pasada a `computed(...)` en el script `.meeko`.   |
+| `if`        | Condición `if:when`.                                      |
+| `each`      | Lista `each:of`.                                          |
+| `prop`      | Prop pasada a un componente hijo (`name` indica la prop). |
 
 El seguimiento usa las dependencias activas de cada instancia, así que una rama que ya no lee la señal deja de aparecer. Una lectura indica **dónde se usa** la señal, no quién la escribió.
 

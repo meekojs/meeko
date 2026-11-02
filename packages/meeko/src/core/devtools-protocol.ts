@@ -19,7 +19,7 @@
  * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/devtools.md#protocolo
  */
-export type DevtoolsProtocolVersion = 1;
+export type DevtoolsProtocolVersion = 1
 
 /**
  * Valor serializable que transporta una captura al panel: los valores no representables en JSON
@@ -33,7 +33,7 @@ export type DevtoolsProtocolVersion = 1;
  * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/devtools.md#protocolo
  */
-export type DevtoolsValue = null | boolean | number | string | DevtoolsValue[] | { [key: string]: DevtoolsValue };
+export type DevtoolsValue = null | boolean | number | string | DevtoolsValue[] | { [key: string]: DevtoolsValue }
 
 /**
  * Construcción de la plantilla o del script que lee una señal. Puede ganar miembros en un minor.
@@ -46,7 +46,7 @@ export type DevtoolsValue = null | boolean | number | string | DevtoolsValue[] |
  * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/devtools.md#protocolo
  */
-export type DevtoolsReadKind = "text" | "attribute" | "computed" | "if" | "each" | "prop";
+export type DevtoolsReadKind = 'text' | 'attribute' | 'computed' | 'if' | 'each' | 'prop'
 
 /**
  * Ubicación de una expresión que lee una señal durante desarrollo; línea y columna empiezan en 1.
@@ -60,18 +60,18 @@ export type DevtoolsReadKind = "text" | "attribute" | "computed" | "if" | "each"
  * @see https://github.com/meekojs/meeko/blob/main/docs/devtools.md#protocolo
  */
 export interface DevtoolsReadSite {
-  /** Archivo `.meeko`. */
-  file: string;
-  /** Línea, desde 1. */
-  line: number;
-  /** Columna, desde 1. */
-  column: number;
-  /** Texto de la expresión. */
-  expression: string;
-  /** Construcción que lee la señal. */
-  kind: DevtoolsReadKind;
-  /** Nombre de la prop del componente hijo cuando `kind` es `"prop"`. */
-  name?: string;
+	/** Archivo `.meeko`. */
+	file: string
+	/** Línea, desde 1. */
+	line: number
+	/** Columna, desde 1. */
+	column: number
+	/** Texto de la expresión. */
+	expression: string
+	/** Construcción que lee la señal. */
+	kind: DevtoolsReadKind
+	/** Nombre de la prop del componente hijo cuando `kind` es `"prop"`. */
+	name?: string
 }
 
 /**
@@ -86,16 +86,16 @@ export interface DevtoolsReadSite {
  * @see https://github.com/meekojs/meeko/blob/main/docs/devtools.md#protocolo
  */
 export interface DevtoolsAssignmentSite {
-  /** Discriminante: una asignación del código del componente. */
-  kind: "assignment";
-  /** Archivo `.meeko`. */
-  file: string;
-  /** Línea donde empieza la asignación, desde 1. */
-  line: number;
-  /** Columna donde empieza la asignación, desde 1. */
-  column: number;
-  /** Texto de la asignación, compactado y recortado a 200 caracteres. */
-  expression: string;
+	/** Discriminante: una asignación del código del componente. */
+	kind: 'assignment'
+	/** Archivo `.meeko`. */
+	file: string
+	/** Línea donde empieza la asignación, desde 1. */
+	line: number
+	/** Columna donde empieza la asignación, desde 1. */
+	column: number
+	/** Texto de la asignación, compactado y recortado a 200 caracteres. */
+	expression: string
 }
 
 /**
@@ -110,8 +110,8 @@ export interface DevtoolsAssignmentSite {
  * @see https://github.com/meekojs/meeko/blob/main/docs/devtools.md#protocolo
  */
 export interface DevtoolsEditSite {
-  /** Discriminante: una edición desde un panel con `setSignal`. */
-  kind: "devtools";
+	/** Discriminante: una edición desde un panel con `setSignal`. */
+	kind: 'devtools'
 }
 
 /**
@@ -126,7 +126,7 @@ export interface DevtoolsEditSite {
  * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/devtools.md#protocolo
  */
-export type DevtoolsWriteSite = DevtoolsAssignmentSite | DevtoolsEditSite;
+export type DevtoolsWriteSite = DevtoolsAssignmentSite | DevtoolsEditSite
 
 /**
  * Declaración de una señal en su archivo `.meeko`; línea y columna empiezan en 1.
@@ -141,12 +141,12 @@ export type DevtoolsWriteSite = DevtoolsAssignmentSite | DevtoolsEditSite;
  * @see https://github.com/meekojs/meeko/blob/main/docs/devtools.md#protocolo
  */
 export interface DevtoolsSignalSite {
-  /** Archivo `.meeko` que declara la señal. */
-  file: string;
-  /** Línea de la declaración, desde 1. */
-  line: number;
-  /** Columna de la declaración, desde 1. */
-  column: number;
+	/** Archivo `.meeko` que declara la señal. */
+	file: string
+	/** Línea de la declaración, desde 1. */
+	line: number
+	/** Columna de la declaración, desde 1. */
+	column: number
 }
 
 /**
@@ -162,31 +162,31 @@ export interface DevtoolsSignalSite {
  * @see https://github.com/meekojs/meeko/blob/main/docs/devtools.md#protocolo
  */
 export interface DevtoolsInstance {
-  /** ID de la instancia (`meeko-N`), estable mientras vive. */
-  id: string;
-  /** Identificador del componente compilado. */
-  componentId: string;
-  /** Nombre del componente. */
-  name: string;
-  /** Archivo `.meeko` de origen. */
-  file: string;
-  /** Copia serializable de las props. */
-  props: DevtoolsValue;
-  /** Valores de las señales editables por nombre. */
-  signals: Record<string, DevtoolsValue>;
-  /**
-   * Declaración de cada señal de `signals`, cuando la compilación de desarrollo la conoce.
-   * @since 1.1.0
-   */
-  signalSites?: Record<string, DevtoolsSignalSite>;
-  /** Instancia padre, o `null` en una raíz. */
-  parentId: string | null;
-  /** Instancias hijas en orden. */
-  childIds: string[];
-  /** Estado de la instancia. */
-  status: "hydrated";
-  /** Si los cambios de sus señales detienen el depurador. */
-  breakpoint: boolean;
+	/** ID de la instancia (`meeko-N`), estable mientras vive. */
+	id: string
+	/** Identificador del componente compilado. */
+	componentId: string
+	/** Nombre del componente. */
+	name: string
+	/** Archivo `.meeko` de origen. */
+	file: string
+	/** Copia serializable de las props. */
+	props: DevtoolsValue
+	/** Valores de las señales editables por nombre. */
+	signals: Record<string, DevtoolsValue>
+	/**
+	 * Declaración de cada señal de `signals`, cuando la compilación de desarrollo la conoce.
+	 * @since 1.1.0
+	 */
+	signalSites?: Record<string, DevtoolsSignalSite>
+	/** Instancia padre, o `null` en una raíz. */
+	parentId: string | null
+	/** Instancias hijas en orden. */
+	childIds: string[]
+	/** Estado de la instancia. */
+	status: 'hydrated'
+	/** Si los cambios de sus señales detienen el depurador. */
+	breakpoint: boolean
 }
 
 /**
@@ -201,7 +201,7 @@ export interface DevtoolsInstance {
  * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/devtools.md#protocolo
  */
-export type DevtoolsEventKind = "mount" | "unmount" | "signal" | "breakpoint" | "select" | "hmr" | "navigation" | "data";
+export type DevtoolsEventKind = 'mount' | 'unmount' | 'signal' | 'breakpoint' | 'select' | 'hmr' | 'navigation' | 'data'
 
 /**
  * Metadatos de navegación o carga; no contienen URLs, parámetros, cabeceras ni valores del usuario.
@@ -214,16 +214,16 @@ export type DevtoolsEventKind = "mount" | "unmount" | "signal" | "breakpoint" | 
  * @see https://github.com/meekojs/meeko/blob/main/docs/devtools.md#navegación-y-datos
  */
 export interface DevtoolsActivity {
-  /** Identidad de la operación, compartida entre su inicio y final. */
-  operationId: number;
-  /** Patrón de ruta del manifiesto, o null para operaciones sin ruta conocida. */
-  route: string | null;
-  /** Fase de la operación. */
-  phase: "start" | "ready" | "commit" | "cancel" | "error";
-  /** Duración medida en el navegador, presente al finalizar la operación. */
-  durationMs?: number;
-  /** Transporte de datos o uso de la caché local de recursos. */
-  source?: "server" | "client" | "static" | "cache";
+	/** Identidad de la operación, compartida entre su inicio y final. */
+	operationId: number
+	/** Patrón de ruta del manifiesto, o null para operaciones sin ruta conocida. */
+	route: string | null
+	/** Fase de la operación. */
+	phase: 'start' | 'ready' | 'commit' | 'cancel' | 'error'
+	/** Duración medida en el navegador, presente al finalizar la operación. */
+	durationMs?: number
+	/** Transporte de datos o uso de la caché local de recursos. */
+	source?: 'server' | 'client' | 'static' | 'cache'
 }
 
 /**
@@ -239,28 +239,28 @@ export interface DevtoolsActivity {
  * @see https://github.com/meekojs/meeko/blob/main/docs/devtools.md#protocolo
  */
 export interface DevtoolsEvent {
-  /** Número de secuencia del evento. */
-  id: number;
-  /** Momento del evento, en milisegundos desde la época. */
-  at: number;
-  /** Tipo de evento. */
-  kind: DevtoolsEventKind;
-  /** Instancia afectada. */
-  instanceId: string;
-  /** Detalle legible, como el nombre de la señal. */
-  detail?: string;
-  /** Identidad del componente conservada incluso después del desmontaje. */
-  componentName?: string;
-  /** Archivo fuente `.meeko` proporcionado por la compilación de desarrollo. */
-  file?: string;
-  /** Valor posterior de una señal, copiado con los mismos límites que una captura. */
-  value?: DevtoolsValue;
-  /** Expresiones que dependían de la señal en esta instancia cuando cambió. No son el origen de la escritura. */
-  reads?: DevtoolsReadSite[];
-  /** Asignación instrumentada o edición desde un panel que escribió el nuevo valor, si se conoce. */
-  write?: DevtoolsWriteSite;
-  /** Operación de navegación o datos; los clientes antiguos pueden omitirla. */
-  activity?: DevtoolsActivity;
+	/** Número de secuencia del evento. */
+	id: number
+	/** Momento del evento, en milisegundos desde la época. */
+	at: number
+	/** Tipo de evento. */
+	kind: DevtoolsEventKind
+	/** Instancia afectada. */
+	instanceId: string
+	/** Detalle legible, como el nombre de la señal. */
+	detail?: string
+	/** Identidad del componente conservada incluso después del desmontaje. */
+	componentName?: string
+	/** Archivo fuente `.meeko` proporcionado por la compilación de desarrollo. */
+	file?: string
+	/** Valor posterior de una señal, copiado con los mismos límites que una captura. */
+	value?: DevtoolsValue
+	/** Expresiones que dependían de la señal en esta instancia cuando cambió. No son el origen de la escritura. */
+	reads?: DevtoolsReadSite[]
+	/** Asignación instrumentada o edición desde un panel que escribió el nuevo valor, si se conoce. */
+	write?: DevtoolsWriteSite
+	/** Operación de navegación o datos; los clientes antiguos pueden omitirla. */
+	activity?: DevtoolsActivity
 }
 
 /**
@@ -276,14 +276,14 @@ export interface DevtoolsEvent {
  * @see https://github.com/meekojs/meeko/blob/main/docs/devtools.md#protocolo
  */
 export interface DevtoolsSnapshot {
-  /** Versión del protocolo que implementa el runtime. */
-  protocolVersion: DevtoolsProtocolVersion;
-  /** Instancias hidratadas activas; cada una enlaza a su padre y a sus hijas por ID. */
-  instances: DevtoolsInstance[];
-  /** Copia de los eventos recientes de la línea de tiempo, del más antiguo al más nuevo; guarda hasta 100. */
-  events: DevtoolsEvent[];
-  /** Instancia seleccionada con `select`, o `null` si no hay ninguna. */
-  selectedId: string | null;
+	/** Versión del protocolo que implementa el runtime. */
+	protocolVersion: DevtoolsProtocolVersion
+	/** Instancias hidratadas activas; cada una enlaza a su padre y a sus hijas por ID. */
+	instances: DevtoolsInstance[]
+	/** Copia de los eventos recientes de la línea de tiempo, del más antiguo al más nuevo; guarda hasta 100. */
+	events: DevtoolsEvent[]
+	/** Instancia seleccionada con `select`, o `null` si no hay ninguna. */
+	selectedId: string | null
 }
 
 /**
@@ -297,16 +297,16 @@ export interface DevtoolsSnapshot {
  * @see https://github.com/meekojs/meeko/blob/main/docs/devtools.md#protocolo
  */
 export type DevtoolsCommandResult =
-  | {
-    /** La orden se aplicó. */
-    ok: true;
-  }
-  | {
-    /** La orden se rechazó o falló durante su aplicación. */
-    ok: false;
-    /** Motivo legible del fallo. */
-    error: string;
-  };
+	| {
+			/** La orden se aplicó. */
+			ok: true
+	  }
+	| {
+			/** La orden se rechazó o falló durante su aplicación. */
+			ok: false
+			/** Motivo legible del fallo. */
+			error: string
+	  }
 
 /**
  * Interfaz pública que consume una extensión o un panel de desarrollo, disponible en desarrollo
@@ -325,18 +325,18 @@ export type DevtoolsCommandResult =
  * @see https://github.com/meekojs/meeko/blob/main/docs/devtools.md#protocolo
  */
 export interface DevtoolsHook {
-  /** Versión del protocolo que implementa el runtime. */
-  readonly protocolVersion: DevtoolsProtocolVersion;
-  /** Devuelve una captura nueva del estado. */
-  snapshot(): DevtoolsSnapshot;
-  /** Avisa de cada cambio; devuelve la función que cancela la suscripción. */
-  subscribe(listener: () => void): () => void;
-  /** Selecciona una instancia, o ninguna con `null`. */
-  select(id: string | null): void;
-  /** Resalta en la página los nodos de una instancia, o ninguno con `null`. */
-  highlight(id: string | null): void;
-  /** Activa o desactiva una pausa (`debugger`) en los cambios de señal de una instancia. */
-  setBreakpoint(id: string, enabled: boolean): void;
-  /** Sustituye el valor de una señal editable de una instancia activa. Sólo existe en desarrollo. */
-  setSignal(instanceId: string, name: string, value: DevtoolsValue): DevtoolsCommandResult;
+	/** Versión del protocolo que implementa el runtime. */
+	readonly protocolVersion: DevtoolsProtocolVersion
+	/** Devuelve una captura nueva del estado. */
+	snapshot(): DevtoolsSnapshot
+	/** Avisa de cada cambio; devuelve la función que cancela la suscripción. */
+	subscribe(listener: () => void): () => void
+	/** Selecciona una instancia, o ninguna con `null`. */
+	select(id: string | null): void
+	/** Resalta en la página los nodos de una instancia, o ninguno con `null`. */
+	highlight(id: string | null): void
+	/** Activa o desactiva una pausa (`debugger`) en los cambios de señal de una instancia. */
+	setBreakpoint(id: string, enabled: boolean): void
+	/** Sustituye el valor de una señal editable de una instancia activa. Sólo existe en desarrollo. */
+	setSignal(instanceId: string, name: string, value: DevtoolsValue): DevtoolsCommandResult
 }

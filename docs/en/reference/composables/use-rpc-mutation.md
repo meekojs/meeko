@@ -18,7 +18,7 @@ related:
   - "autoimport:rpc"
   - docs/framework.md#mutaciones
   - docs/framework.md#mutaciones-seguras-ante-reintentos
-source-hash: a2b565c8aadff80f0d2e57910e6d6e63a30b0e614ddcd3ce0e66445e70be21da
+source-hash: c3cc0d8d732674f9efa38aca9cc51da464f8622538bd8370179a2cb07c77570d
 ---
 
 `useRpcMutation(procedimiento, opciones?)` prepares a call to a data-changing `server/rpc` procedure. It does nothing until you call `mutate(input)`, never in SSR; it then sends the CSRF token like `rpc.*`, updates `pending`, `data` and `error` and returns the procedure's output, or rejects with its error. It is the write counterpart to [`useRpcQuery`](/en/docs/reference/use-rpc-query), and the RPC counterpart to [`useApiMutation`](/en/docs/reference/use-api-mutation).

@@ -40,11 +40,11 @@ const touched = defineModel<boolean>("touched", { default: false }); // modelo c
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `T` (argumento de tipo) | cualquier tipo | obligatorio | El tipo del valor. Sin él es `MEEK064`. |
-| `name` | literal de texto | `"default"` | Nombre del modelo, un identificador que el padre usa en `model:nombre`. Debe ser un literal (`MEEK064`). |
-| `options` | `{ default: T }` | ninguno | `default` hace el modelo opcional: si el padre no lo pasa, el hijo usa una señal local con ese valor. Sólo admite `default` (`MEEK064`). |
+| Parámetro               | Tipo             | Por defecto | Descripción                                                                                                                              |
+| ----------------------- | ---------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `T` (argumento de tipo) | cualquier tipo   | obligatorio | El tipo del valor. Sin él es `MEEK064`.                                                                                                  |
+| `name`                  | literal de texto | `"default"` | Nombre del modelo, un identificador que el padre usa en `model:nombre`. Debe ser un literal (`MEEK064`).                                 |
+| `options`               | `{ default: T }` | ninguno     | `default` hace el modelo opcional: si el padre no lo pasa, el hijo usa una señal local con ese valor. Sólo admite `default` (`MEEK064`). |
 
 Las formas válidas son `defineModel<T>()`, `defineModel<T>({ default })`, `defineModel<T>("nombre")` y `defineModel<T>("nombre", { default })`.
 

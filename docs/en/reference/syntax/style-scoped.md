@@ -11,7 +11,7 @@ related:
   - "config:css"
   - docs/api.md#estilos-con-ámbito-y-global
   - docs/api.md#qué-elementos-reciben-el-atributo
-source-hash: 3a71a48e31ca3ad15760d6c284d2fe34252d49a62b5cba32ba8b53eafb9ae465
+source-hash: f71fad96880e439b03be506e1e3db2068d4d2bdb0fd4d1db9bc728d65bf8283d
 ---
 
 `<style scoped>` limits styles to the component: the compiler adds the `data-meeko-s-<hash>` attribute to its template elements and requires it in every selector. This component's `.card` does not affect another's `.card`.

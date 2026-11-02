@@ -27,4 +27,80 @@
 </script>
 
 <!-- No whitespace between the tags of this template: it would be text inside the trigger and the options. Prettier keeps it that way; tests/templates-without-whitespace.test.mjs guards it. -->
-<template><div ref:root data-meeko-select bind:class="props.class" bind:data-disabled="props.disabled ? '' : undefined" bind:data-clearable="props.clearable ? '' : undefined"><select data-meeko-select-trigger bind="select.attributes.value" on:change="select.change" on:invalid="select.reportInvalid"><button type="button"><span if:when="snippets.value && select.chosen.value" data-meeko-select-value><render snippet="snippets.value" args="select.value.value" /></span><span if:when="!snippets.value && snippets.option && select.chosen.value" data-meeko-select-value>{select.label.value}</span><selectedcontent if:when="(!snippets.value && !snippets.option) || !select.chosen.value" /></button><option if:when="select.nativeIndex.value === 0" hidden selected bind:value="select.blankValue.value" data-meeko-select-placeholder>{select.blankLabel.value}</option><template each:of="select.groups.value" each:as="group" each:key="group.key"><template if:when="group.name === undefined"><option each:of="group.entries" each:as="entry" each:key="entry.key" bind="select.option(entry)"><render if:when="snippets.option" snippet="snippets.option" args="entry.option, select.stateOf(entry)" /><template if:when="!snippets.option">{entry.label}</template></option></template><optgroup if:when="group.name !== undefined" bind:label="group.name"><legend data-meeko-select-group-label><render if:when="snippets.group" snippet="snippets.group" args="group.name ?? ''" /><template if:when="!snippets.group">{group.name}</template></legend><option each:of="group.entries" each:as="entry" each:key="entry.key" bind="select.option(entry)"><render if:when="snippets.option" snippet="snippets.option" args="entry.option, select.stateOf(entry)" /><template if:when="!snippets.option">{entry.label}</template></option></optgroup></template></select><button if:when="select.showClear.value" type="button" data-meeko-select-clear bind:aria-label="props.clearLabel ?? text.clear" on:click="select.clear">×</button></div></template>
+<template><div
+		ref:root
+		data-meeko-select
+		bind:class="props.class"
+		bind:data-disabled="props.disabled ? '' : undefined"
+		bind:data-clearable="props.clearable ? '' : undefined"
+		><select
+			data-meeko-select-trigger
+			bind="select.attributes.value"
+			on:change="select.change"
+			on:invalid="select.reportInvalid"
+			><button type="button"
+				><span
+					if:when="snippets.value && select.chosen.value"
+					data-meeko-select-value
+					><render
+						snippet="snippets.value"
+						args="select.value.value" /></span
+				><span
+					if:when="!snippets.value && snippets.option && select.chosen.value"
+					data-meeko-select-value
+					>{select.label.value}</span
+				><selectedcontent if:when="(!snippets.value && !snippets.option) || !select.chosen.value" /></button
+			><option
+				if:when="select.nativeIndex.value === 0"
+				hidden
+				selected
+				bind:value="select.blankValue.value"
+				data-meeko-select-placeholder
+				>{select.blankLabel.value}</option
+			><template
+				each:of="select.groups.value"
+				each:as="group"
+				each:key="group.key"
+				><template if:when="group.name === undefined"
+					><option
+						each:of="group.entries"
+						each:as="entry"
+						each:key="entry.key"
+						bind="select.option(entry)"
+						><render
+							if:when="snippets.option"
+							snippet="snippets.option"
+							args="entry.option, select.stateOf(entry)"
+						/><template if:when="!snippets.option">{entry.label}</template></option
+					></template
+				><optgroup
+					if:when="group.name !== undefined"
+					bind:label="group.name"
+					><legend data-meeko-select-group-label
+						><render
+							if:when="snippets.group"
+							snippet="snippets.group"
+							args="group.name ?? ''"
+						/><template if:when="!snippets.group">{group.name}</template></legend
+					><option
+						each:of="group.entries"
+						each:as="entry"
+						each:key="entry.key"
+						bind="select.option(entry)"
+						><render
+							if:when="snippets.option"
+							snippet="snippets.option"
+							args="entry.option, select.stateOf(entry)"
+						/><template if:when="!snippets.option">{entry.label}</template></option
+					></optgroup
+				></template
+			></select
+		><button
+			if:when="select.showClear.value"
+			type="button"
+			data-meeko-select-clear
+			bind:aria-label="props.clearLabel ?? text.clear"
+			on:click="select.clear"
+			>×</button
+		></div
+	></template>

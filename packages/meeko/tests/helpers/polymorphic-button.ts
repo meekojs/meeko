@@ -42,4 +42,4 @@ const attributes = computed((): ForwardedAttributes => {
 		<render snippet="snippets.default" />{props.label ?? ''}
 	</component>
 </template>
-`;
+`

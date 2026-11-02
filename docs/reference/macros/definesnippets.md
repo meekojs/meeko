@@ -50,8 +50,8 @@ function close(): void {
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
+| Parámetro               | Tipo                                         | Por defecto | Descripción                                                                                                                                                                                                                                                                                                                                                        |
+| ----------------------- | -------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `T` (argumento de tipo) | `{ [nombre]: [...params] \| Snippet<Args> }` | obligatorio | Cada clave es un snippet y su valor, la tupla de parámetros (`[]` sin parámetros). Desde `1.4`, el valor también puede ser un `Snippet<Args>`, que cuenta como `Args`. Desde `1.8`, las claves pueden salir de un tipo mapeado sobre un genérico (`` `cell-${K}` ``). Una clave opcional (`title?:`) hace opcional el snippet. Sin argumento de tipo es `MEEK060`. |
 
 No admite argumentos en ejecución (`MEEK060`).

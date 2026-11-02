@@ -12,7 +12,7 @@ related:
   - "syntax:bind"
   - docs/api.md#ids-estables-useid
   - docs/framework.md#componentes-de-campo-formfield
-source-hash: d010c02ab146ed80676609fe2f0e371e0edd96fe644ce0523f09c5047a3b0e94
+source-hash: dd27c06e68b90823e5cc91906ae597a3ff968bb3519b9c6bc470df59645b8e29
 ---
 
 Attributes that link elements (`id` with `for`, `aria-describedby`, `aria-controls`, `aria-labelledby`) need an ID that is not repeated on the page. A fixed one does not work in a reusable component, and a random one would change between server and browser and break hydration. `useId()` returns an ID derived from the **instance's position** in the tree and the order of the call in its script: different for every instance, identical in SSR and hydration, without being transferred in the payload.

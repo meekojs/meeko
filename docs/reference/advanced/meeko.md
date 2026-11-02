@@ -39,18 +39,19 @@ export default defineConfig({
 
 Un `Plugin` de Vite. Con él:
 
-| Import | Resultado |
-| --- | --- |
+| Import                                                        | Resultado                                                                                                        |
+| ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | `import { renderWithState, hydrate, css } from "./App.meeko"` | El módulo compilado, con sus exports con nombre: `renderWithState`, `renderToString`, `hydrate`, `css`, `Props`… |
-| El CSS de `<style>` y `<style scoped>` | Un módulo CSS que Vite inyecta en desarrollo y extrae en el build. |
-| Un `.meeko` o `.ts` que usa un autoimport | El import añadido, con el ámbito de su carpeta (`app/`, `shared/`, `server/`). |
-| `virtual:meeko-*` | Sólo en una aplicación del framework: el manifiesto, las páginas, el servidor y el cliente. |
+| El CSS de `<style>` y `<style scoped>`                        | Un módulo CSS que Vite inyecta en desarrollo y extrae en el build.                                               |
+| Un `.meeko` o `.ts` que usa un autoimport                     | El import añadido, con el ámbito de su carpeta (`app/`, `shared/`, `server/`).                                   |
+| `virtual:meeko-*`                                             | Sólo en una aplicación del framework: el manifiesto, las páginas, el servidor y el cliente.                      |
 
 ## Ejemplos
 
 ### El SSR y la hidratación del starter de `meeko init`
 
 <!-- no-check -->
+
 ```ts
 // src/entry-server.ts
 import { serializeJson } from "@meekojs/meeko";
@@ -66,6 +67,7 @@ export function renderPage(clientSource: string, initial = 1): string {
 ```
 
 <!-- no-check -->
+
 ```ts
 // src/entry-client.ts
 import { hydrate } from "./App.meeko";
@@ -80,6 +82,7 @@ El navegador debe hidratar con las mismas props que el servidor; Meeko comprueba
 ### Un plugin de Vite en una aplicación del framework
 
 <!-- no-check -->
+
 ```ts
 // modules/svg/index.ts
 import { defineMeekoModule } from "@meekojs/meeko/framework";

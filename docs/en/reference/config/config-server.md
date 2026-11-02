@@ -20,7 +20,7 @@ related:
   - docs/framework.md#csp-y-cabeceras-en-los-adaptadores-con-servidor
   - docs/framework.md#sitio-estático
   - docs/framework.md#cloudflare-workers
-source-hash: 156b6077c4e198efed4b7cf9bf8880f2d23c91e67c3ca6b8ee63d1b8609acf9f
+source-hash: 21e66391c6a5a74c090f5e9f5eca36998f80558a587be68008f1227295a2f00e
 ---
 
 `server` chooses where the built application runs: a discriminated union keyed by `adapter`. `meeko build` writes output to `.meeko/output/<adapter>/`; the CLI's `--adapter` takes precedence over configuration. Without `server`, the adapter is `node`.

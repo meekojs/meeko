@@ -16,7 +16,7 @@ related:
   - "@meekojs/meeko/build#prerenderRoutes"
   - docs/framework.md#routing-layouts-y-ssr
   - docs/framework.md#plugins-de-aplicación
-source-hash: d443b996b3886d4673358658f70eeaeb7044ba07598b3b8ddbe9a7f66d60808c
+source-hash: 47ff8295f865ab23bcdd78556667c09a61549a2620c9a47a563661faeb11f84b
 ---
 
 `createFrameworkHandler` is the page part of [`createServerApp`](/en/docs/reference/createserverapp), separated for custom hosts: it takes the route manifest and module loaders and returns a `(request) => Promise<Response>` handler doing everything a page needs: route middleware (isomorphic and server), `params` and `search` validation, the loader or `<script server>`, SSR rendering (including `"stream"` and `"client"`), the navigation payload (`Accept: application/meeko+json`), layouts and error pages.

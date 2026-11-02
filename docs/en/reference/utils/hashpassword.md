@@ -12,7 +12,7 @@ related:
   - "@meekojs/meeko/server#SessionManager"
   - docs/framework.md#contraseñas
   - docs/framework.md#autenticación
-source-hash: 519f1ce0890b52fb8ed9e2a719feec1272d30328d4128fb4fcaa9dc920116e43
+source-hash: c2fa1df195a1b9c80b29d26d9cbe2a571ac237a2678f44f8a79c0e1ddaa14780
 ---
 
 `hashPassword(password)` hashes a password with scrypt (N = 2^17, r = 8, p = 1, a random 16-byte salt and a 32-byte key) and returns it in the self-describing format `scrypt$<N>$<r>$<p>$<sal>$<hash>`, with the salt and hash in base64url. Store the result as is: in a column, or in `.env` for an administration account.

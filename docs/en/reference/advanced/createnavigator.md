@@ -14,7 +14,7 @@ related:
   - "@meekojs/meeko/framework#createRouteManifest"
   - "@meekojs/meeko/framework#useNavigation"
   - docs/framework.md#estado-de-navegación
-source-hash: 3b3887f1f220ff81accaf3efd313af01245e058dc434e29fb24bad39644f71e7
+source-hash: f434e379d0f40d1a4e7ace24f014d50c630df9a6c51e46f0cec4ed2ee8a59901
 ---
 
 `createNavigator` is the history layer used by [`mountClientApp`](/en/docs/reference/mountclientapp), without anything else: it resolves the target URL against the route manifest, calls your render callback with the route, its parameters, an `AbortSignal` and the number of retained layouts, and updates history if rendering succeeds. It also handles `popstate` (back and forward). It does not intercept links, request data or hydrate: the host decides how to render.

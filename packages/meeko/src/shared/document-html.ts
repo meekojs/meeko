@@ -4,15 +4,15 @@
  * the `documentHtml` list of that payload, which only the server writes: a value that imitates the
  * placeholder can at most name a value that the server declares marked in its next response.
  */
-const placeholder = /^<!--meeko:document-html:(\d+)-->$/;
+const placeholder = /^<!--meeko:document-html:(\d+)-->$/
 
 /** The placeholder of the value at `index` of the `documentHtml` list of a payload. */
 export function documentHtmlPlaceholder(index: number): string {
-  return `<!--meeko:document-html:${index}-->`;
+	return `<!--meeko:document-html:${index}-->`
 }
 
 /** The position that `html` names when it is a placeholder. */
 export function documentHtmlIndex(html: string): number | undefined {
-  const match = placeholder.exec(html);
-  return match ? Number(match[1]) : undefined;
+	const match = placeholder.exec(html)
+	return match ? Number(match[1]) : undefined
 }

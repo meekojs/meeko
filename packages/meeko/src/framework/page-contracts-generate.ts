@@ -1,193 +1,198 @@
-import ts from "@typescript/typescript6";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, join, relative, resolve, sep } from "node:path";
+import ts from '@typescript/typescript6'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { dirname, join, relative, resolve, sep } from 'node:path'
 
-import type { ServerScript } from "../compiler/transforms/server-script";
-import type { StaticGroupOptions } from "./routes-discovery";
+import type { ServerScript } from '../compiler/transforms/server-script'
+import type { StaticGroupOptions } from './routes-discovery'
 
-import { routeBlockTypeFile } from "../compiler/codegen/route-block-types";
-import { readServerScript } from "../compiler/codegen/server-script";
-import { MeekoCompileError } from "../compiler/parser/sfc";
-import { routeBlockFile, routeBlockSource } from "../compiler/transforms/route-block";
-import { configuredModuleLayouts, discoverConfiguredRoutes } from "./config";
-import { discoverErrorPage, extractGroupOptions, extractRouteOptions } from "./routes-discovery";
+import { routeBlockTypeFile } from '../compiler/codegen/route-block-types'
+import { readServerScript } from '../compiler/codegen/server-script'
+import { MeekoCompileError } from '../compiler/parser/sfc'
+import { routeBlockFile, routeBlockSource } from '../compiler/transforms/route-block'
+import { configuredModuleLayouts, discoverConfiguredRoutes } from './config'
+import { discoverErrorPage, extractGroupOptions, extractRouteOptions } from './routes-discovery'
 
 function importPath(from: string, target: string): string {
-  const path = relative(dirname(from), target).replaceAll("\\", "/");
-  return path.startsWith(".") ? path : `./${path}`;
+	const path = relative(dirname(from), target).replaceAll('\\', '/')
+	return path.startsWith('.') ? path : `./${path}`
 }
 
 function displayPath(root: string, target: string): string {
-  return relative(root, target).replaceAll("\\", "/");
+	return relative(root, target).replaceAll('\\', '/')
 }
 
 async function declaresLoader(file: string | undefined): Promise<boolean> {
-  if (!file) return false;
-  const source = ts.createSourceFile(file, await readFile(file, "utf8"), ts.ScriptTarget.Latest, true);
-  const hasLoad = (call: ts.Expression | undefined): boolean | undefined => {
-    if (!call || !ts.isCallExpression(call) || !call.arguments[0] || !ts.isObjectLiteralExpression(call.arguments[0])) return undefined;
-    return call.arguments[0].properties.some((property) => {
-      if (!ts.isMethodDeclaration(property) && !ts.isPropertyAssignment(property)) return false;
-      return ts.isIdentifier(property.name) || ts.isStringLiteral(property.name)
-        ? property.name.text === "load"
-        : false;
-    });
-  };
-  // `export default definePage({ ... })` counts when there is no `route`, as the runtime reads it.
-  let fallback: boolean | undefined;
-  for (const statement of source.statements) {
-    if (ts.isExportAssignment(statement) && !statement.isExportEquals) {
-      fallback ??= hasLoad(statement.expression);
-      continue;
-    }
-    if (!ts.isVariableStatement(statement)) continue;
-    for (const declaration of statement.declarationList.declarations) {
-      if (!ts.isIdentifier(declaration.name) || declaration.name.text !== "route") continue;
-      const declared = hasLoad(declaration.initializer);
-      if (declared !== undefined) return declared;
-    }
-  }
-  return fallback ?? false;
+	if (!file) return false
+	const source = ts.createSourceFile(file, await readFile(file, 'utf8'), ts.ScriptTarget.Latest, true)
+	const hasLoad = (call: ts.Expression | undefined): boolean | undefined => {
+		if (!call || !ts.isCallExpression(call) || !call.arguments[0] || !ts.isObjectLiteralExpression(call.arguments[0])) return undefined
+		return call.arguments[0].properties.some((property) => {
+			if (!ts.isMethodDeclaration(property) && !ts.isPropertyAssignment(property)) return false
+			return ts.isIdentifier(property.name) || ts.isStringLiteral(property.name) ? property.name.text === 'load' : false
+		})
+	}
+	// `export default definePage({ ... })` counts when there is no `route`, as the runtime reads it.
+	let fallback: boolean | undefined
+	for (const statement of source.statements) {
+		if (ts.isExportAssignment(statement) && !statement.isExportEquals) {
+			fallback ??= hasLoad(statement.expression)
+			continue
+		}
+		if (!ts.isVariableStatement(statement)) continue
+		for (const declaration of statement.declarationList.declarations) {
+			if (!ts.isIdentifier(declaration.name) || declaration.name.text !== 'route') continue
+			const declared = hasLoad(declaration.initializer)
+			if (declared !== undefined) return declared
+		}
+	}
+	return fallback ?? false
 }
 
 /** What the page's top-level `<script server>` code declares, if it has any and compiles. */
 async function serverBody(page: string): Promise<ServerScript | undefined> {
-  try {
-    const script = readServerScript(await readFile(page, "utf8"), page)?.script;
-    return script?.body ? script : undefined;
-  } catch (error) {
-    if (error instanceof MeekoCompileError) return undefined;
-    throw error;
-  }
+	try {
+		const script = readServerScript(await readFile(page, 'utf8'), page)?.script
+		return script?.body ? script : undefined
+	} catch (error) {
+		if (error instanceof MeekoCompileError) return undefined
+		throw error
+	}
 }
 
 /** Checks that each page accepts its route params, search and loader data. */
 export async function generatePageContracts(projectRoot: string): Promise<string> {
-  const root = resolve(projectRoot);
-  const output = join(root, ".meeko", "generated", "page-contracts.server.ts");
-  const routes = await discoverConfiguredRoutes(root);
-  const lines = [
-    "// Generated by Meeko. Page props must accept the values delivered by the route runtime.",
-    "// Route options come from `export const route` or, as the runtime reads them, `export default`.",
-    "type __RouteOf<M> = M extends { readonly route: infer R } ? R : M extends { readonly default: infer D } ? D : undefined;",
-    'type __Output<S> = S extends { readonly "~standard": { readonly types?: infer T } } ? NonNullable<T> extends { readonly output: infer O } ? O : never : never;',
-    'type __Schema<Route, Key extends "params" | "search", Fallback> = [Route] extends [undefined] ? Fallback : Route extends { readonly [K in Key]?: infer S } ? [__Output<NonNullable<S>>] extends [never] ? Fallback : __Output<NonNullable<S>> : Fallback;',
-    'type __Data<Route> = Route extends { readonly load: (...args: never[]) => infer D } ? Exclude<Awaited<D>, Response> : Route extends import("@meekojs/meeko/framework").PageDefinition<infer P extends import("@meekojs/meeko/framework").PageSchema | undefined, infer S extends import("@meekojs/meeko/framework").PageSchema | undefined, infer D, infer C> ? Exclude<D, Response> : Route extends import("@meekojs/meeko/framework").ClientPageDefinition<infer P extends import("@meekojs/meeko/framework").PageSchema | undefined, infer S extends import("@meekojs/meeko/framework").PageSchema | undefined, infer D> ? D : never;',
-    'type __HasLoad<Route, Declared extends boolean> = Declared extends true ? true : Route extends { readonly load: (...args: never[]) => unknown } ? true : false;',
-    'type __PageProps<Route, Params, HasLoad extends boolean> = { params: __Schema<Route, "params", Params>; search: __Schema<Route, "search", Record<string, string | string[]>> } & (HasLoad extends false ? {} : [__Data<Route>] extends [never] ? {} : undefined extends __Data<Route> ? { data?: Exclude<__Data<Route>, undefined> } : { data: __Data<Route> });',
-    '// Pages with top-level <script server> code receive its exports, awaited, as data.',
-    'type __BodyData<M> = { [K in Exclude<keyof M, "route" | "head">]: Awaited<M[K]> };',
-    'type __BodyProps<Route, Params, Data> = { params: __Schema<Route, "params", Params>; search: __Schema<Route, "search", Record<string, string | string[]>>; data: Data };',
-    'type __UnsafeProps<T> = [T] extends [never] ? true : 0 extends (1 & T) ? true : unknown extends T ? true : false;',
-    'type __Check<Actual, Expected, Page extends string, Sidecar extends string> = __UnsafeProps<Actual> extends true ? `Las props de la página ${Page} no pueden ser any, never ni unknown` : Actual extends Record<string, never> ? true : Expected extends Actual ? true : `Las props de la página ${Page} no coinciden con el loader ${Sidecar}`;',
-    '// Owner is the whole subject ("Las props del layout"), so each kind keeps its article.',
-    'type __CheckShell<Actual, Expected, File extends string, Owner extends string> = __UnsafeProps<Actual> extends true ? `${Owner} ${File} no pueden ser any, never ni unknown` : Actual extends Record<string, never> ? true : Expected extends Actual ? true : `${Owner} ${File} no coinciden con los valores que aporta Meeko`;',
-    'type __RequireTrue<Result extends true> = Result;',
-    '// layoutProps of +group.ts files and of pages that inherit their layout, against the props of that layout.',
-    'type __LayoutOwn<P> = { [K in keyof P as K extends "outlet" ? never : K]: P[K] };',
-    'type __WrittenLayoutProps<Route> = Route extends { readonly layoutProps: infer L } ? L extends (...args: never[]) => infer R ? R : L : never;',
-    'type __CheckLayoutProps<Actual, Layout, File extends string, Name extends string> = [Actual] extends [never] ? true : [Actual] extends [undefined] ? true : Actual extends Partial<__LayoutOwn<Layout>> ? [Exclude<keyof Actual, keyof __LayoutOwn<Layout>>] extends [never] ? true : `Las layoutProps de ${File} no coinciden con las props del layout ${Name}` : `Las layoutProps de ${File} no coinciden con las props del layout ${Name}`;',
-  ];
-  // Layouts of installed packages have no generated declaration to check against.
-  const declared = (file: string): boolean => {
-    const path = relative(root, file).replaceAll("\\", "/");
-    return !path.startsWith("../") && !path.split("/").includes("node_modules");
-  };
-  const groupOptions = new Map<string, StaticGroupOptions | undefined>();
-  const readGroup = async (file: string): Promise<StaticGroupOptions | undefined> => {
-    if (!groupOptions.has(file)) {
-      let source: string | undefined;
-      try { source = await readFile(file, "utf8"); }
-      catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
-      groupOptions.set(file, source === undefined ? undefined : extractGroupOptions(file, source));
-    }
-    return groupOptions.get(file);
-  };
-  const layoutChecks = new Set<string>();
-  const layouts = new Set<string>();
-  const errors = new Set<string>();
-  for (const [index, route] of routes.entries()) {
-    const page = JSON.stringify(displayPath(root, route.file));
-    const blockPage = route.sidecar ? routeBlockFile(route.sidecar) : undefined;
-    // A `<script server>` block is checked through its generated TypeScript copy.
-    const routeModule = blockPage ? routeBlockTypeFile(root, blockPage) : route.sidecar;
-    const sidecar = JSON.stringify(blockPage ? `${displayPath(root, blockPage)} <script server>` : route.sidecar ? displayPath(root, route.sidecar) : "(no sidecar)");
-    const pageType = `import(${JSON.stringify(importPath(output, route.file))}).ComponentProps`;
-    const paramsType = `import("@meekojs/meeko/framework").GeneratedRoutes[${JSON.stringify(route.id)}]`;
-    const body = blockPage ? await serverBody(blockPage) : undefined;
-    if (body && routeModule) {
-      const module = `typeof import(${JSON.stringify(importPath(output, routeModule))})`;
-      const routeType = body.route ? `${module}["route"]` : "undefined";
-      lines.push(`type __check${index} = __RequireTrue<__Check<${pageType}, __BodyProps<${routeType}, ${paramsType}, __BodyData<${module}>>, ${page}, ${sidecar}>>;`);
-    } else {
-      const routeType = routeModule ? `__RouteOf<typeof import(${JSON.stringify(importPath(output, routeModule))})>` : "undefined";
-      const hasLoad = await declaresLoader(routeModule);
-      lines.push(`type __check${index} = __RequireTrue<__Check<${pageType}, __PageProps<${routeType}, ${paramsType}, __HasLoad<${routeType}, ${hasLoad}>>, ${page}, ${sidecar}>>;`);
-    }
-    for (const layout of route.layouts) layouts.add(layout);
-    if (route.error) errors.add(route.error);
-    const named = route.layout;
-    if (!named || !declared(named.file)) continue;
-    const layoutProps = `import(${JSON.stringify(importPath(output, named.file))}).ComponentProps`;
-    const name = JSON.stringify(named.name);
-    // The +group.ts files whose props reach the page: those after the last change of layout.
-    const marker = `${sep}app${sep}pages${sep}`;
-    const pagesRoot = route.file.slice(0, route.file.lastIndexOf(marker) + marker.length - 1);
-    const folders = [pagesRoot];
-    for (const segment of relative(pagesRoot, dirname(route.file)).split(sep).filter(Boolean)) folders.push(join(folders.at(-1)!, segment));
-    let current: string | false = "default";
-    let contributing: Array<{ file: string; props: Readonly<Record<string, unknown>> }> = [];
-    for (const folder of folders) {
-      const groupFile = join(folder, "+group.ts");
-      const group = await readGroup(groupFile);
-      if (!group) continue;
-      if (group.layout !== undefined && group.layout !== current) { current = group.layout; contributing = []; }
-      if (group.layoutProps) contributing.push({ file: groupFile, props: group.layoutProps });
-    }
-    const pageOptions = blockPage ? extractRouteOptions(blockPage, routeBlockSource(await readFile(blockPage, "utf8"), blockPage) ?? "")
-      : route.sidecar ? extractRouteOptions(route.sidecar, await readFile(route.sidecar, "utf8")) : {};
-    if (pageOptions.layout !== undefined && pageOptions.layout !== current) contributing = [];
-    for (const group of contributing) {
-      const key = `${group.file}\0${named.name}`;
-      if (layoutChecks.has(key)) continue;
-      layoutChecks.add(key);
-      lines.push(`type __layoutprops${layoutChecks.size} = __RequireTrue<__CheckLayoutProps<${JSON.stringify(group.props)}, ${layoutProps}, ${JSON.stringify(displayPath(root, group.file))}, ${name}>>;`);
-    }
-    // A page that chooses its layout in definePage is checked there; one that inherits it, here.
-    if (pageOptions.layout === undefined && routeModule) {
-      const routeType = body ? (body.layoutProps ? `{ readonly layoutProps: typeof import(${JSON.stringify(importPath(output, routeModule))})["layoutProps"] }` : body.route ? `typeof import(${JSON.stringify(importPath(output, routeModule))})["route"]` : undefined)
-        : `__RouteOf<typeof import(${JSON.stringify(importPath(output, routeModule))})>`;
-      // Routes added by extendRoutes share the page file: its layoutProps are checked once per file.
-      const key = `${route.file}\0page`;
-      if (routeType && !layoutChecks.has(key)) {
-        layoutChecks.add(key);
-        lines.push(`type __layoutprops${layoutChecks.size} = __RequireTrue<__CheckLayoutProps<__WrittenLayoutProps<${routeType}>, ${layoutProps}, ${page}, ${name}>>;`);
-      }
-    }
-  }
-  // app/error.meeko also renders URLs without a route, inside the root layouts.
-  const appError = await discoverErrorPage(root, { layouts: await configuredModuleLayouts(root) });
-  if (appError) {
-    errors.add(appError.file);
-    for (const layout of appError.layouts) layouts.add(layout);
-  }
-  for (const [index, layout] of [...layouts].filter(declared).entries()) {
-    const file = JSON.stringify(displayPath(root, layout));
-    const props = `import(${JSON.stringify(importPath(output, layout))}).ComponentProps`;
-    const supplied = '{ outlet: import("@meekojs/meeko").Component<Record<string, unknown>> }';
-    lines.push(`type __layout${index} = __RequireTrue<__CheckShell<${props}, ${supplied}, ${file}, "Las props del layout">>;`);
-  }
-  for (const [index, error] of [...errors].entries()) {
-    const file = JSON.stringify(displayPath(root, error));
-    const props = `import(${JSON.stringify(importPath(output, error))}).ComponentProps`;
-    lines.push(`type __error${index} = __RequireTrue<__CheckShell<${props}, { status: number; message: string }, ${file}, "Las props de la página de error">>;`);
-  }
-  lines.push("export {};", "");
-  const source = lines.join("\n");
-  await mkdir(dirname(output), { recursive: true });
-  let previous: string | undefined;
-  try { previous = await readFile(output, "utf8"); }
-  catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
-  if (previous !== source) await writeFile(output, source, "utf8");
-  return output;
+	const root = resolve(projectRoot)
+	const output = join(root, '.meeko', 'generated', 'page-contracts.server.ts')
+	const routes = await discoverConfiguredRoutes(root)
+	const lines = [
+		'// Generated by Meeko. Page props must accept the values delivered by the route runtime.',
+		'// Route options come from `export const route` or, as the runtime reads them, `export default`.',
+		'type __RouteOf<M> = M extends { readonly route: infer R } ? R : M extends { readonly default: infer D } ? D : undefined;',
+		'type __Output<S> = S extends { readonly "~standard": { readonly types?: infer T } } ? NonNullable<T> extends { readonly output: infer O } ? O : never : never;',
+		'type __Schema<Route, Key extends "params" | "search", Fallback> = [Route] extends [undefined] ? Fallback : Route extends { readonly [K in Key]?: infer S } ? [__Output<NonNullable<S>>] extends [never] ? Fallback : __Output<NonNullable<S>> : Fallback;',
+		'type __Data<Route> = Route extends { readonly load: (...args: never[]) => infer D } ? Exclude<Awaited<D>, Response> : Route extends import("@meekojs/meeko/framework").PageDefinition<infer P extends import("@meekojs/meeko/framework").PageSchema | undefined, infer S extends import("@meekojs/meeko/framework").PageSchema | undefined, infer D, infer C> ? Exclude<D, Response> : Route extends import("@meekojs/meeko/framework").ClientPageDefinition<infer P extends import("@meekojs/meeko/framework").PageSchema | undefined, infer S extends import("@meekojs/meeko/framework").PageSchema | undefined, infer D> ? D : never;',
+		'type __HasLoad<Route, Declared extends boolean> = Declared extends true ? true : Route extends { readonly load: (...args: never[]) => unknown } ? true : false;',
+		'type __PageProps<Route, Params, HasLoad extends boolean> = { params: __Schema<Route, "params", Params>; search: __Schema<Route, "search", Record<string, string | string[]>> } & (HasLoad extends false ? {} : [__Data<Route>] extends [never] ? {} : undefined extends __Data<Route> ? { data?: Exclude<__Data<Route>, undefined> } : { data: __Data<Route> });',
+		'// Pages with top-level <script server> code receive its exports, awaited, as data.',
+		'type __BodyData<M> = { [K in Exclude<keyof M, "route" | "head">]: Awaited<M[K]> };',
+		'type __BodyProps<Route, Params, Data> = { params: __Schema<Route, "params", Params>; search: __Schema<Route, "search", Record<string, string | string[]>>; data: Data };',
+		'type __UnsafeProps<T> = [T] extends [never] ? true : 0 extends (1 & T) ? true : unknown extends T ? true : false;',
+		'type __Check<Actual, Expected, Page extends string, Sidecar extends string> = __UnsafeProps<Actual> extends true ? `Las props de la página ${Page} no pueden ser any, never ni unknown` : Actual extends Record<string, never> ? true : Expected extends Actual ? true : `Las props de la página ${Page} no coinciden con el loader ${Sidecar}`;',
+		'// Owner is the whole subject ("Las props del layout"), so each kind keeps its article.',
+		'type __CheckShell<Actual, Expected, File extends string, Owner extends string> = __UnsafeProps<Actual> extends true ? `${Owner} ${File} no pueden ser any, never ni unknown` : Actual extends Record<string, never> ? true : Expected extends Actual ? true : `${Owner} ${File} no coinciden con los valores que aporta Meeko`;',
+		'type __RequireTrue<Result extends true> = Result;',
+		'// layoutProps of +group.ts files and of pages that inherit their layout, against the props of that layout.',
+		'type __LayoutOwn<P> = { [K in keyof P as K extends "outlet" ? never : K]: P[K] };',
+		'type __WrittenLayoutProps<Route> = Route extends { readonly layoutProps: infer L } ? L extends (...args: never[]) => infer R ? R : L : never;',
+		'type __CheckLayoutProps<Actual, Layout, File extends string, Name extends string> = [Actual] extends [never] ? true : [Actual] extends [undefined] ? true : Actual extends Partial<__LayoutOwn<Layout>> ? [Exclude<keyof Actual, keyof __LayoutOwn<Layout>>] extends [never] ? true : `Las layoutProps de ${File} no coinciden con las props del layout ${Name}` : `Las layoutProps de ${File} no coinciden con las props del layout ${Name}`;',
+	]
+	// Layouts of installed packages have no generated declaration to check against.
+	const declared = (file: string): boolean => {
+		const path = relative(root, file).replaceAll('\\', '/')
+		return !path.startsWith('../') && !path.split('/').includes('node_modules')
+	}
+	const groupOptions = new Map<string, StaticGroupOptions | undefined>()
+	const readGroup = async (file: string): Promise<StaticGroupOptions | undefined> => {
+		if (!groupOptions.has(file)) {
+			let source: string | undefined
+			try {
+				source = await readFile(file, 'utf8')
+			} catch (error) {
+				if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+			}
+			groupOptions.set(file, source === undefined ? undefined : extractGroupOptions(file, source))
+		}
+		return groupOptions.get(file)
+	}
+	const layoutChecks = new Set<string>()
+	const layouts = new Set<string>()
+	const errors = new Set<string>()
+	for (const [index, route] of routes.entries()) {
+		const page = JSON.stringify(displayPath(root, route.file))
+		const blockPage = route.sidecar ? routeBlockFile(route.sidecar) : undefined
+		// A `<script server>` block is checked through its generated TypeScript copy.
+		const routeModule = blockPage ? routeBlockTypeFile(root, blockPage) : route.sidecar
+		const sidecar = JSON.stringify(blockPage ? `${displayPath(root, blockPage)} <script server>` : route.sidecar ? displayPath(root, route.sidecar) : '(no sidecar)')
+		const pageType = `import(${JSON.stringify(importPath(output, route.file))}).ComponentProps`
+		const paramsType = `import("@meekojs/meeko/framework").GeneratedRoutes[${JSON.stringify(route.id)}]`
+		const body = blockPage ? await serverBody(blockPage) : undefined
+		if (body && routeModule) {
+			const module = `typeof import(${JSON.stringify(importPath(output, routeModule))})`
+			const routeType = body.route ? `${module}["route"]` : 'undefined'
+			lines.push(`type __check${index} = __RequireTrue<__Check<${pageType}, __BodyProps<${routeType}, ${paramsType}, __BodyData<${module}>>, ${page}, ${sidecar}>>;`)
+		} else {
+			const routeType = routeModule ? `__RouteOf<typeof import(${JSON.stringify(importPath(output, routeModule))})>` : 'undefined'
+			const hasLoad = await declaresLoader(routeModule)
+			lines.push(`type __check${index} = __RequireTrue<__Check<${pageType}, __PageProps<${routeType}, ${paramsType}, __HasLoad<${routeType}, ${hasLoad}>>, ${page}, ${sidecar}>>;`)
+		}
+		for (const layout of route.layouts) layouts.add(layout)
+		if (route.error) errors.add(route.error)
+		const named = route.layout
+		if (!named || !declared(named.file)) continue
+		const layoutProps = `import(${JSON.stringify(importPath(output, named.file))}).ComponentProps`
+		const name = JSON.stringify(named.name)
+		// The +group.ts files whose props reach the page: those after the last change of layout.
+		const marker = `${sep}app${sep}pages${sep}`
+		const pagesRoot = route.file.slice(0, route.file.lastIndexOf(marker) + marker.length - 1)
+		const folders = [pagesRoot]
+		for (const segment of relative(pagesRoot, dirname(route.file)).split(sep).filter(Boolean)) folders.push(join(folders.at(-1)!, segment))
+		let current: string | false = 'default'
+		let contributing: Array<{ file: string; props: Readonly<Record<string, unknown>> }> = []
+		for (const folder of folders) {
+			const groupFile = join(folder, '+group.ts')
+			const group = await readGroup(groupFile)
+			if (!group) continue
+			if (group.layout !== undefined && group.layout !== current) {
+				current = group.layout
+				contributing = []
+			}
+			if (group.layoutProps) contributing.push({ file: groupFile, props: group.layoutProps })
+		}
+		const pageOptions = blockPage ? extractRouteOptions(blockPage, routeBlockSource(await readFile(blockPage, 'utf8'), blockPage) ?? '') : route.sidecar ? extractRouteOptions(route.sidecar, await readFile(route.sidecar, 'utf8')) : {}
+		if (pageOptions.layout !== undefined && pageOptions.layout !== current) contributing = []
+		for (const group of contributing) {
+			const key = `${group.file}\0${named.name}`
+			if (layoutChecks.has(key)) continue
+			layoutChecks.add(key)
+			lines.push(`type __layoutprops${layoutChecks.size} = __RequireTrue<__CheckLayoutProps<${JSON.stringify(group.props)}, ${layoutProps}, ${JSON.stringify(displayPath(root, group.file))}, ${name}>>;`)
+		}
+		// A page that chooses its layout in definePage is checked there; one that inherits it, here.
+		if (pageOptions.layout === undefined && routeModule) {
+			const routeType = body ? (body.layoutProps ? `{ readonly layoutProps: typeof import(${JSON.stringify(importPath(output, routeModule))})["layoutProps"] }` : body.route ? `typeof import(${JSON.stringify(importPath(output, routeModule))})["route"]` : undefined) : `__RouteOf<typeof import(${JSON.stringify(importPath(output, routeModule))})>`
+			// Routes added by extendRoutes share the page file: its layoutProps are checked once per file.
+			const key = `${route.file}\0page`
+			if (routeType && !layoutChecks.has(key)) {
+				layoutChecks.add(key)
+				lines.push(`type __layoutprops${layoutChecks.size} = __RequireTrue<__CheckLayoutProps<__WrittenLayoutProps<${routeType}>, ${layoutProps}, ${page}, ${name}>>;`)
+			}
+		}
+	}
+	// app/error.meeko also renders URLs without a route, inside the root layouts.
+	const appError = await discoverErrorPage(root, { layouts: await configuredModuleLayouts(root) })
+	if (appError) {
+		errors.add(appError.file)
+		for (const layout of appError.layouts) layouts.add(layout)
+	}
+	for (const [index, layout] of [...layouts].filter(declared).entries()) {
+		const file = JSON.stringify(displayPath(root, layout))
+		const props = `import(${JSON.stringify(importPath(output, layout))}).ComponentProps`
+		const supplied = '{ outlet: import("@meekojs/meeko").Component<Record<string, unknown>> }'
+		lines.push(`type __layout${index} = __RequireTrue<__CheckShell<${props}, ${supplied}, ${file}, "Las props del layout">>;`)
+	}
+	for (const [index, error] of [...errors].entries()) {
+		const file = JSON.stringify(displayPath(root, error))
+		const props = `import(${JSON.stringify(importPath(output, error))}).ComponentProps`
+		lines.push(`type __error${index} = __RequireTrue<__CheckShell<${props}, { status: number; message: string }, ${file}, "Las props de la página de error">>;`)
+	}
+	lines.push('export {};', '')
+	const source = lines.join('\n')
+	await mkdir(dirname(output), { recursive: true })
+	let previous: string | undefined
+	try {
+		previous = await readFile(output, 'utf8')
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+	}
+	if (previous !== source) await writeFile(output, source, 'utf8')
+	return output
 }

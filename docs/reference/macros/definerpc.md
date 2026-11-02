@@ -25,6 +25,7 @@ Frente a `defineApiRoute`, un RPC no modela recursos HTTP: recibe un `input`, de
 ## Uso
 
 <!-- no-check -->
+
 ```ts
 // shared/schemas/orders.ts
 import * as v from "valibot";
@@ -34,6 +35,7 @@ export const orderSchema = v.object({ id: v.string(), item: v.string(), qty: v.n
 ```
 
 <!-- no-check -->
+
 ```ts
 // server/rpc/orders/create.ts
 import { defineRpc } from "@meekojs/meeko/server";
@@ -51,16 +53,16 @@ En la aplicación, `await rpc.orders.create({ item: "té", qty: 2 })` devuelve `
 
 ## Opciones
 
-| Opción | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `input` | Standard Schema de `shared/` o composición simple de ellos | obligatorio | La entrada. Una que no lo supera responde `400 INVALID_INPUT` con `issues`. |
-| `output` | Standard Schema de `shared/` o composición simple de ellos (`v.array(itemSchema)`, desde 1.8) | obligatorio | El resultado del handler. Uno que no lo supera responde `500` sin detalle. |
-| `auth` | `"required" \| "optional"` | `"optional"` | Con `"required"`, una llamada sin sesión responde `401`. |
-| `authorize` | `(context) => boolean \| Promise<boolean>` | ninguno | Con `false`, `403 FORBIDDEN`. |
-| `origin` | `"required" \| "none"` | `Origin` obligatorio (desde `1.8`) | Desde `1.8`, toda llamada exige un `Origin` permitido, haya o no sesión; `"required"` lo deja explícito. `"none"` (**inseguro**) lo desactiva en las llamadas sin sesión, para un servicio o una app sin `Origin`; con sesión siguen `Origin` y CSRF. |
-| `rateLimit` | `{ limit, window, key? }` | ninguno | Desde `1.2`. Límite de llamadas por ventana; por encima, `429` con `Retry-After`. Sin `key`, cuenta por IP del cliente (`context.clientAddress`; tras Cloudflare Tunnel, `MEEKO_TRUST_PROXY=cloudflare`). |
-| `locals` | `(context) => L \| Promise<L>` | ninguno | Desde `1.2`. Un valor por llamada que el handler recibe tipado. Decláralo antes de `handler`. |
-| `handler` | `({ input, context, locals }) => output` | obligatorio | La lógica. `context` es el `RequestContext`. |
+| Opción      | Tipo                                                                                          | Por defecto                        | Descripción                                                                                                                                                                                                                                           |
+| ----------- | --------------------------------------------------------------------------------------------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `input`     | Standard Schema de `shared/` o composición simple de ellos                                    | obligatorio                        | La entrada. Una que no lo supera responde `400 INVALID_INPUT` con `issues`.                                                                                                                                                                           |
+| `output`    | Standard Schema de `shared/` o composición simple de ellos (`v.array(itemSchema)`, desde 1.8) | obligatorio                        | El resultado del handler. Uno que no lo supera responde `500` sin detalle.                                                                                                                                                                            |
+| `auth`      | `"required" \| "optional"`                                                                    | `"optional"`                       | Con `"required"`, una llamada sin sesión responde `401`.                                                                                                                                                                                              |
+| `authorize` | `(context) => boolean \| Promise<boolean>`                                                    | ninguno                            | Con `false`, `403 FORBIDDEN`.                                                                                                                                                                                                                         |
+| `origin`    | `"required" \| "none"`                                                                        | `Origin` obligatorio (desde `1.8`) | Desde `1.8`, toda llamada exige un `Origin` permitido, haya o no sesión; `"required"` lo deja explícito. `"none"` (**inseguro**) lo desactiva en las llamadas sin sesión, para un servicio o una app sin `Origin`; con sesión siguen `Origin` y CSRF. |
+| `rateLimit` | `{ limit, window, key? }`                                                                     | ninguno                            | Desde `1.2`. Límite de llamadas por ventana; por encima, `429` con `Retry-After`. Sin `key`, cuenta por IP del cliente (`context.clientAddress`; tras Cloudflare Tunnel, `MEEKO_TRUST_PROXY=cloudflare`).                                             |
+| `locals`    | `(context) => L \| Promise<L>`                                                                | ninguno                            | Desde `1.2`. Un valor por llamada que el handler recibe tipado. Decláralo antes de `handler`.                                                                                                                                                         |
+| `handler`   | `({ input, context, locals }) => output`                                                      | obligatorio                        | La lógica. `context` es el `RequestContext`.                                                                                                                                                                                                          |
 
 ## Valor devuelto
 
@@ -73,6 +75,7 @@ La misma definición, con sus tipos inferidos. Las respuestas siguen las de la A
 Desde `1.8`, toda llamada exige un `Origin` permitido aunque todavía no haya sesión; `origin: "required"` lo deja explícito en el inicio de sesión, y `rateLimit` frena los intentos:
 
 <!-- no-check -->
+
 ```ts
 // server/rpc/auth/login.ts
 import { ApiError, defineRpc } from "@meekojs/meeko/server";
@@ -96,6 +99,7 @@ export default defineRpc({
 ### Datos en un componente
 
 <!-- no-check -->
+
 ```ts
 // server/rpc/orders/list.ts
 import { defineRpc } from "@meekojs/meeko/server";
@@ -126,6 +130,7 @@ const create = useRpcMutation("orders.create");
 ### Un usuario cargado con `locals`
 
 <!-- no-check -->
+
 ```ts
 // server/rpc/profile/update.ts
 import { ApiError, defineRpc } from "@meekojs/meeko/server";
@@ -155,6 +160,7 @@ export default defineRpc({ input: newOrder, handler: ({ input }) => ({ id: "1", 
 `meeko check` se detiene con `server/rpc/orders/create.ts: el RPC requiere schemas públicos input y output`.
 
 <!-- no-check -->
+
 ```ts good
 export default defineRpc({ input: newOrder, output: orderSchema, handler: ({ input }) => ({ id: "1", ...input }) });
 ```
@@ -168,6 +174,7 @@ export default defineRpc({ input: newOrder, output: orderSchema, status: 201, ha
 `meeko check` da `TS2353: Object literal may only specify known properties, and 'status' does not exist in type 'RpcDefinition<…>'.` Para elegir el estado, usa `defineApiRoute`.
 
 <!-- no-check -->
+
 ```ts good
 export default defineRpc({ input: newOrder, output: orderSchema, handler: ({ input }) => ({ id: "1", ...input }) });
 ```

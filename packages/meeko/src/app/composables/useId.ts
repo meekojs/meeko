@@ -1,4 +1,4 @@
-import { nextId } from "../runtime/ids";
+import { nextId } from '../runtime/ids'
 
 /**
  * Devuelve un ID único para atributos como `id`, `for`, `aria-describedby` o `aria-controls`, el
@@ -31,4 +31,6 @@ import { nextId } from "../runtime/ids";
  * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/api.md#ids-estables-useid
  */
-export function useId(): string { return nextId(); }
+export function useId(): string {
+	return nextId()
+}

@@ -25,6 +25,7 @@ En una aplicación del framework no hace falta: los clientes `api.*` y `rpc.*` y
 ## Uso
 
 <!-- no-check -->
+
 ```ts
 import { pathToFileURL } from "node:url";
 import { createLocalCalls } from "@meekojs/meeko/server";
@@ -38,22 +39,22 @@ const result = await (await calls.rpc("users.get", { id: "123" })).json();
 
 `createLocalCalls(options)` recibe un objeto `LocalCallOptions<S>`:
 
-| Opción | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `manifest` | `ServerManifest` | obligatorio | Los endpoints de `server/api` y `server/rpc`. |
-| `context` | `RequestContext<S>` | obligatorio | El contexto de la petición original: sus credenciales, su sesión, sus servicios, su señal, su IP y su `requestId`. |
-| `sessions` | `SessionManager` | obligatorio | El gestor que comprueba Origin y CSRF. |
-| `load` | `(file: string) => Promise<unknown>` | obligatorio | Carga el módulo de cada archivo del manifiesto. |
-| `onError` | `(error, requestId) => void` | ninguno | Observador de los fallos `5xx`. |
+| Opción     | Tipo                                 | Por defecto | Descripción                                                                                                        |
+| ---------- | ------------------------------------ | ----------- | ------------------------------------------------------------------------------------------------------------------ |
+| `manifest` | `ServerManifest`                     | obligatorio | Los endpoints de `server/api` y `server/rpc`.                                                                      |
+| `context`  | `RequestContext<S>`                  | obligatorio | El contexto de la petición original: sus credenciales, su sesión, sus servicios, su señal, su IP y su `requestId`. |
+| `sessions` | `SessionManager`                     | obligatorio | El gestor que comprueba Origin y CSRF.                                                                             |
+| `load`     | `(file: string) => Promise<unknown>` | obligatorio | Carga el módulo de cada archivo del manifiesto.                                                                    |
+| `onError`  | `(error, requestId) => void`         | ninguno     | Observador de los fallos `5xx`.                                                                                    |
 
 ## Valor devuelto
 
 `{ api, rpc }`:
 
-| Función | Descripción |
-| --- | --- |
+| Función                          | Descripción                                                                                                                                                                                        |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `api(clientKey, method, input?)` | Atiende el endpoint con esa clave del cliente (`"users.byId"`, la de `api.users.byId`) y ese método. `input` es `{ params?, query?, body? }`; `body` se serializa en JSON y no se admite en `GET`. |
-| `rpc(id, input)` | Atiende el procedimiento `id` (`"users.get"`) con `input` como cuerpo. |
+| `rpc(id, input)`                 | Atiende el procedimiento `id` (`"users.get"`) con `input` como cuerpo.                                                                                                                             |
 
 Ambas devuelven `Promise<Response>` y **nunca rechazan**: un endpoint que no existe es `404 NOT_FOUND`, unos `params` que no forman la ruta son `400 INVALID_PARAMS` y un fallo del handler es la respuesta de error de siempre, con el `requestId` de la petición original.
 
@@ -62,6 +63,7 @@ Ambas devuelven `Promise<Response>` y **nunca rechazan**: un endpoint que no exi
 ### Un handler de módulo que reutiliza un endpoint
 
 <!-- no-check -->
+
 ```ts
 // Un handler propio que ya tiene el contexto de la petición.
 const calls = createLocalCalls({ manifest: app.manifest.server, context, sessions, load });
@@ -73,6 +75,7 @@ return Response.json(await response.json(), { status: response.status });
 ### Query string con listas
 
 <!-- no-check -->
+
 ```ts
 await calls.api("products", "GET", { query: { tag: ["oferta", "nuevo"], page: 2, draft: undefined } });
 // GET /api/products?tag=oferta&tag=nuevo&page=2 (null y undefined se omiten)
@@ -81,6 +84,7 @@ await calls.api("products", "GET", { query: { tag: ["oferta", "nuevo"], page: 2,
 ### Una prueba de un endpoint protegido
 
 <!-- no-check -->
+
 ```ts
 const context = createRequestContext(new Request("http://localhost/", { headers: { cookie, origin: "http://localhost", "x-meeko-csrf": csrf } }), services, await sessions.load(request));
 const response = await createLocalCalls({ manifest, context, sessions, load }).api("profile", "PUT", { body: { name: "Ada" } });
@@ -102,6 +106,7 @@ try {
 `api` y `rpc` resuelven siempre con un `Response`. Un `404 {"code":"NOT_FOUND"}` llega como respuesta, y `.json()` lo devuelve como si fuera el usuario.
 
 <!-- no-check -->
+
 ```ts good
 const response = await calls.api("users.byId", "GET", { params: { id } });
 if (!response.ok) throw new Error(`users.byId ${response.status}`);
@@ -117,6 +122,7 @@ await calls.api("search", "GET", { body: { q: "zapatillas" } });
 Responde `400 INVALID_BODY`. Use `query`.
 
 <!-- no-check -->
+
 ```ts good
 await calls.api("search", "GET", { query: { q: "zapatillas" } });
 ```
@@ -130,6 +136,7 @@ createLocalCalls({ manifest, context, sessions });
 `TypeError: Local calls require a module loader`, al crearlo.
 
 <!-- no-check -->
+
 ```ts good
 createLocalCalls({ manifest, context, sessions, load: (file) => import(pathToFileURL(file).href) });
 ```

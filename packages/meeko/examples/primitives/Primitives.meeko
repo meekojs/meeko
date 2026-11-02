@@ -1,14 +1,21 @@
 <script lang="ts">
-import { signal } from "@meekojs/meeko";
+	import { signal } from '@meekojs/meeko'
 
-const labels = signal(["Alpha", "Beta"]);
+	const labels = signal(['Alpha', 'Beta'])
 
-function update(): void {
-  labels.value = ["Gamma", "Beta"];
-}
+	function update(): void {
+		labels.value = ['Gamma', 'Beta']
+	}
 </script>
 
 <template>
-  <button on:click="update">Update</button>
-  <ul><li each:of="labels.value" each:as="label" each:key="index">{label}</li></ul>
+	<button on:click="update">Update</button>
+	<ul
+		><li
+			each:of="labels.value"
+			each:as="label"
+			each:key="index"
+			>{label}</li
+		></ul
+	>
 </template>

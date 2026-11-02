@@ -17,7 +17,7 @@ related:
   - docs/api.md#desestructurar-las-props
   - docs/api.md#constantes-en-los-valores-por-defecto
   - docs/api.md#props-estáticas
-source-hash: 61717eda1f3878b026c87f88f7cc38f4252a5819f70cf486aae304c492bd9b5b
+source-hash: e9b90db58689212256fba80d9bdc2da9b7cd66038b0cda09ef7e9b1f4fa7e215
 ---
 
 `defineProps<Props>()` declares the props received by the component and returns the `props` object. It is a compile-time macro: it is neither imported nor present at runtime; the compiler reads `Props` and generates `ComponentProps`, checked by `meeko check` and the editor on each parent tag.

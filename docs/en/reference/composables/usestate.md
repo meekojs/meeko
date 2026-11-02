@@ -14,7 +14,7 @@ related:
   - "@meekojs/meeko#serializeJson"
   - docs/framework.md#autoimports-y-typescript
   - docs/framework.md#estado-persistente-usestorage
-source-hash: 7fd982ebbfac114188da2cebf41d800cc058843f2812ecc50a3f71612a914b1d
+source-hash: 7440434610600f32715dc865579b034fcf8fce700bb1dcd55751455def8bef57
 ---
 
 A [`signal`](/en/docs/reference/signal) created in a component belongs to it: another component cannot see it. `useState(key, factory)` gives you an **application** signal, one per key: the first component requesting `"cart:items"` creates it with `factory()`, and all others requesting the same key receive the same signal. It is the basis of stores in `app/stores`.

@@ -18,7 +18,7 @@ related:
   - "config:server"
   - docs/framework.md#cloudflare-workers
   - docs/framework.md#socket-y-durable-objects
-source-hash: 4a17d1010f37574440c0545407b4c82e57b3aabb8fed5a11aa8601656c081293
+source-hash: f26a1d9818fccb7f528a9783644d5cb53d29e89acfde518d9d143dd19f7e7f03
 ---
 
 `createWorker(app, options)` returns the `{ fetch }` handler for a module Worker (`export default createWorker(…)`). `app` can be an existing application or, usually, a factory `({ env, platform }) => ServerApp` that runs on each isolate's first event with the Worker's bindings; if it fails, the next event retries it. Each request receives `platform.waitUntil` backed by `ctx.waitUntil` and the IP from `CF-Connecting-IP`.

@@ -27,6 +27,7 @@ Los datos tienen el tipo de `MeekoSession` cuando la aplicación lo declara (des
 ## Uso
 
 <!-- no-check -->
+
 ```ts
 // server/api/auth/login.post.ts
 import { verifyPassword } from "@meekojs/meeko/password";
@@ -52,15 +53,15 @@ export default defineApiRoute({
 
 No se construye en las aplicaciones. Sus miembros:
 
-| Miembro | Tipo | Descripción |
-| --- | --- | --- |
-| `current` | `SessionRecord<T> \| undefined` | La sesión activa: `id`, `familyId`, `csrfToken`, `data`, `createdAt`, `expiresAt` y, si se fijó, `ttlMs`. `undefined` sin sesión. |
-| `create(data, options?)` | `Promise<SessionRecord<T>>` | Crea una sesión con ID, familia y token CSRF aleatorios. Si ya había una, la sustituye de forma atómica conservando su familia. `options.ttlMs` (desde `1.2`) fija su duración. |
-| `rotate()` | `Promise<SessionRecord<T>>` | Cambia el ID y el token CSRF conservando datos, familia y duración. La caducidad se cuenta desde la rotación. |
-| `revoke()` | `Promise<void>` | Revoca toda la familia, también en las demás peticiones e instancias, y vacía la cookie. La petición que llama no se aborta. |
-| `verify()` | `Promise<void>` | Relee el store y lanza `SessionRevokedError` si la sesión fue revocada, sustituida por una rotación o caducó. Sin sesión no hace nada. |
-| `signal` | `AbortSignal` | Se aborta con `SessionRevokedError` cuando otra petición u otra instancia revoca la familia. `context.signal` la incluye. |
-| `cookieHeader` | `string \| undefined` | La cabecera `Set-Cookie` pendiente tras crear, rotar o revocar. |
+| Miembro                  | Tipo                            | Descripción                                                                                                                                                                     |
+| ------------------------ | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `current`                | `SessionRecord<T> \| undefined` | La sesión activa: `id`, `familyId`, `csrfToken`, `data`, `createdAt`, `expiresAt` y, si se fijó, `ttlMs`. `undefined` sin sesión.                                               |
+| `create(data, options?)` | `Promise<SessionRecord<T>>`     | Crea una sesión con ID, familia y token CSRF aleatorios. Si ya había una, la sustituye de forma atómica conservando su familia. `options.ttlMs` (desde `1.2`) fija su duración. |
+| `rotate()`               | `Promise<SessionRecord<T>>`     | Cambia el ID y el token CSRF conservando datos, familia y duración. La caducidad se cuenta desde la rotación.                                                                   |
+| `revoke()`               | `Promise<void>`                 | Revoca toda la familia, también en las demás peticiones e instancias, y vacía la cookie. La petición que llama no se aborta.                                                    |
+| `verify()`               | `Promise<void>`                 | Relee el store y lanza `SessionRevokedError` si la sesión fue revocada, sustituida por una rotación o caducó. Sin sesión no hace nada.                                          |
+| `signal`                 | `AbortSignal`                   | Se aborta con `SessionRevokedError` cuando otra petición u otra instancia revoca la familia. `context.signal` la incluye.                                                       |
+| `cookieHeader`           | `string \| undefined`           | La cabecera `Set-Cookie` pendiente tras crear, rotar o revocar.                                                                                                                 |
 
 ## Valor devuelto
 
@@ -86,6 +87,7 @@ export default defineApiRoute({
 ### Duración distinta por rol
 
 <!-- no-check -->
+
 ```ts
 const ttlMs = user.role === "staff" ? 12 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
 await context.session.create({ userId: user.id, role: user.role }, { ttlMs });
@@ -96,6 +98,7 @@ La duración fija el `Max-Age` de la cookie y `expiresAt` en el store, y `rotate
 ### Rotar tras elevar privilegios
 
 <!-- no-check -->
+
 ```ts
 // server/rpc/account/confirm-password.ts
 export default defineRpc({
@@ -113,6 +116,7 @@ export default defineRpc({
 ### Verificar antes de cobrar
 
 <!-- no-check -->
+
 ```ts
 handler: async ({ body, context }) => {
   await context.session.verify();                 // 401 SESSION_REVOKED si ya no vale
@@ -151,7 +155,7 @@ Desde `1.2`, `create()` en un `POST`, `PUT`, `PATCH` o `DELETE` exige un `Origin
 curl -X POST https://app.example.com/api/auth/login -H 'origin: https://app.example.com' -H 'content-type: application/json' -d '{"email":"…","password":"…"}'
 ```
 
-`origin: "none"` en la ruta desactiva la comprobación, pero deja el inicio de sesión expuesto al *login CSRF*.
+`origin: "none"` en la ruta desactiva la comprobación, pero deja el inicio de sesión expuesto al _login CSRF_.
 
 ### Crear la sesión después del primer byte de un stream
 
@@ -165,6 +169,7 @@ load: async ({ context }) => ({
 Las cabeceras ya salieron: `create`, `rotate` y `revoke` rechazan con `500 SESSION_LOCKED: the session cookie was already sent with the response headers; create, rotate or revoke the session in the loader, before any deferred work`.
 
 <!-- no-check -->
+
 ```ts good
 // En el loader o en la parte crítica, antes del primer byte; mejor aún, en una API.
 await context.session.create({ userId });
@@ -179,6 +184,7 @@ await context.session.rotate(); // en una petición anónima
 Lanza `Error: No active session to rotate`, que la respuesta convierte en `500 INTERNAL_ERROR`. Si la sesión caducó o se revocó entre la lectura y la rotación, el error es `Session has expired or been revoked`.
 
 <!-- no-check -->
+
 ```ts good
 if (context.session.current) await context.session.rotate();
 ```
@@ -192,6 +198,7 @@ await context.session.create(data, { ttlMs: 0 });
 Rechaza con `RangeError: Invalid session TTL` sin tocar el store.
 
 <!-- no-check -->
+
 ```ts good
 await context.session.create(data, { ttlMs: 60 * 60 * 1000 });
 ```

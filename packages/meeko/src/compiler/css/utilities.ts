@@ -1,14 +1,14 @@
-import type * as CSS from "csstype";
-import type { AtRule, ChildNode, Container, Helpers, Plugin, Result, Root } from "postcss";
+import type * as CSS from 'csstype'
+import type { AtRule, ChildNode, Container, Helpers, Plugin, Result, Root } from 'postcss'
 
-import { existsSync, statSync } from "node:fs";
-import { dirname, extname, resolve } from "node:path";
-import selectorParser from "postcss-selector-parser";
+import { existsSync, statSync } from 'node:fs'
+import { dirname, extname, resolve } from 'node:path'
+import selectorParser from 'postcss-selector-parser'
 
-import type { UtilityAutoImports } from "./autoimports";
+import type { UtilityAutoImports } from './autoimports'
 
-import { meekoProjectRoot, utilityAutoImports } from "./autoimports";
-import { canBundleUtilities, loadUtilityModule } from "./module-loader";
+import { meekoProjectRoot, utilityAutoImports } from './autoimports'
+import { canBundleUtilities, loadUtilityModule } from './module-loader'
 
 /**
  * Valor de una declaración generada: una cadena se escribe tal cual (puede llevar
@@ -24,23 +24,19 @@ import { canBundleUtilities, loadUtilityModule } from "./module-loader";
  * const padding: UtilityValue = "0.5rem 1rem";
  * ```
  */
-export type UtilityValue = string | number;
+export type UtilityValue = string | number
 
 /** Longitud de csstype: una cadena con unidad (`"4px"`, `"1rem"`) o el `0` sin unidad. */
-type CssLength = (string & {}) | 0;
+type CssLength = (string & {}) | 0
 
 /** Un valor con `!important`; también para las propiedades que csstype limita a palabras clave. */
-type ImportantValue = `${string}!important`;
+type ImportantValue = `${string}!important`
 
 /** Un valor de csstype, con `!important`, un array de valores de respaldo o `undefined` para omitirlo. */
-type DeclaredValue<Value> =
-  | Exclude<Value, undefined>
-  | ImportantValue
-  | readonly (Exclude<Value, undefined> | ImportantValue)[]
-  | undefined;
+type DeclaredValue<Value> = Exclude<Value, undefined> | ImportantValue | readonly (Exclude<Value, undefined> | ImportantValue)[] | undefined
 
 /** Las propiedades de csstype con sus valores declarables; conserva su documentación en el editor. */
-type DeclaredProperties<Properties> = { readonly [Property in keyof Properties]?: DeclaredValue<Properties[Property]> };
+type DeclaredProperties<Properties> = { readonly [Property in keyof Properties]?: DeclaredValue<Properties[Property]> }
 
 /**
  * Declaraciones de una regla como objeto, tipadas con
@@ -70,19 +66,12 @@ type DeclaredProperties<Properties> = { readonly [Property in keyof Properties]?
  * };
  * ```
  */
-export interface UtilityDeclarations
-  extends DeclaredProperties<CSS.Properties<CssLength>>, DeclaredProperties<CSS.PropertiesHyphen<CssLength>> {
-  readonly [property: `--${string}`]: UtilityValue | readonly UtilityValue[] | undefined;
+export interface UtilityDeclarations extends DeclaredProperties<CSS.Properties<CssLength>>, DeclaredProperties<CSS.PropertiesHyphen<CssLength>> {
+	readonly [property: `--${string}`]: UtilityValue | readonly UtilityValue[] | undefined
 }
 
 /** Los descriptores de `@counter-style`, `@font-face`, `@font-palette-values`, `@page`, `@property` y `@view-transition`. */
-type AtRuleDescriptors =
-  & CSS.AtRule.CounterStyle<CssLength> & CSS.AtRule.CounterStyleHyphen<CssLength>
-  & CSS.AtRule.FontFace<CssLength> & CSS.AtRule.FontFaceHyphen<CssLength>
-  & CSS.AtRule.FontPaletteValues<CssLength> & CSS.AtRule.FontPaletteValuesHyphen<CssLength>
-  & CSS.AtRule.Page<CssLength> & CSS.AtRule.PageHyphen<CssLength>
-  & CSS.AtRule.Property<CssLength> & CSS.AtRule.PropertyHyphen<CssLength>
-  & CSS.AtRule.ViewTransition<CssLength> & CSS.AtRule.ViewTransitionHyphen<CssLength>;
+type AtRuleDescriptors = CSS.AtRule.CounterStyle<CssLength> & CSS.AtRule.CounterStyleHyphen<CssLength> & CSS.AtRule.FontFace<CssLength> & CSS.AtRule.FontFaceHyphen<CssLength> & CSS.AtRule.FontPaletteValues<CssLength> & CSS.AtRule.FontPaletteValuesHyphen<CssLength> & CSS.AtRule.Page<CssLength> & CSS.AtRule.PageHyphen<CssLength> & CSS.AtRule.Property<CssLength> & CSS.AtRule.PropertyHyphen<CssLength> & CSS.AtRule.ViewTransition<CssLength> & CSS.AtRule.ViewTransitionHyphen<CssLength>
 
 /**
  * Declaraciones del cuerpo de una at-rule creada con {@link UtilityHelpers.atRule}: las
@@ -107,8 +96,7 @@ type AtRuleDescriptors =
  * ]);
  * ```
  */
-export interface UtilityAtRuleDeclarations
-  extends UtilityDeclarations, DeclaredProperties<Omit<AtRuleDescriptors, keyof UtilityDeclarations>> {}
+export interface UtilityAtRuleDeclarations extends UtilityDeclarations, DeclaredProperties<Omit<AtRuleDescriptors, keyof UtilityDeclarations>> {}
 
 /**
  * Una regla creada con {@link UtilityHelpers.rule}: un selector, sus declaraciones y sus
@@ -126,14 +114,14 @@ export interface UtilityAtRuleDeclarations
  * ```
  */
 export interface UtilityRule {
-  /** Discriminante: una regla con selector. */
-  readonly kind: "rule";
-  /** Selector de la regla; dentro de otra regla puede usar `&`. */
-  readonly selector: string;
-  /** Declaraciones de la regla, antes de sus hijas. */
-  readonly declarations: UtilityDeclarations;
-  /** Reglas, at-rules y CSS anidados en la regla. */
-  readonly children: readonly UtilityOutput[];
+	/** Discriminante: una regla con selector. */
+	readonly kind: 'rule'
+	/** Selector de la regla; dentro de otra regla puede usar `&`. */
+	readonly selector: string
+	/** Declaraciones de la regla, antes de sus hijas. */
+	readonly declarations: UtilityDeclarations
+	/** Reglas, at-rules y CSS anidados en la regla. */
+	readonly children: readonly UtilityOutput[]
 }
 
 /**
@@ -152,18 +140,18 @@ export interface UtilityRule {
  * ```
  */
 export interface UtilityAtRule {
-  /** Discriminante: una at-rule como `@media` o `@supports`. */
-  readonly kind: "atrule";
-  /** Nombre sin `@`: `media`, `supports`, `container`… */
-  readonly name: string;
-  /** Parámetros tras el nombre, por ejemplo `(min-width: 48rem)`. */
-  readonly params: string;
-  /** Declaraciones del cuerpo, para `@font-face` o `@property`. */
-  readonly declarations: UtilityAtRuleDeclarations;
-  /** Reglas, at-rules y CSS del cuerpo. */
-  readonly children: readonly UtilityOutput[];
-  /** `false` cuando la at-rule es una sentencia sin `{ }`. */
-  readonly block: boolean;
+	/** Discriminante: una at-rule como `@media` o `@supports`. */
+	readonly kind: 'atrule'
+	/** Nombre sin `@`: `media`, `supports`, `container`… */
+	readonly name: string
+	/** Parámetros tras el nombre, por ejemplo `(min-width: 48rem)`. */
+	readonly params: string
+	/** Declaraciones del cuerpo, para `@font-face` o `@property`. */
+	readonly declarations: UtilityAtRuleDeclarations
+	/** Reglas, at-rules y CSS del cuerpo. */
+	readonly children: readonly UtilityOutput[]
+	/** `false` cuando la at-rule es una sentencia sin `{ }`. */
+	readonly block: boolean
 }
 
 /**
@@ -181,10 +169,10 @@ export interface UtilityAtRule {
  * ```
  */
 export interface UtilityCss {
-  /** Discriminante: CSS literal que se analiza con PostCSS. */
-  readonly kind: "css";
-  /** El texto CSS. */
-  readonly css: string;
+	/** Discriminante: CSS literal que se analiza con PostCSS. */
+	readonly kind: 'css'
+	/** El texto CSS. */
+	readonly css: string
 }
 
 /**
@@ -202,7 +190,7 @@ export interface UtilityCss {
  * });
  * ```
  */
-export type UtilityNode = UtilityRule | UtilityAtRule | UtilityCss;
+export type UtilityNode = UtilityRule | UtilityAtRule | UtilityCss
 
 /**
  * Lo que devuelve una función de utilidades: un nodo, un array de salidas (anidado a
@@ -220,7 +208,7 @@ export type UtilityNode = UtilityRule | UtilityAtRule | UtilityCss;
  * });
  * ```
  */
-export type UtilityOutput = UtilityNode | readonly UtilityOutput[] | null | false | undefined;
+export type UtilityOutput = UtilityNode | readonly UtilityOutput[] | null | false | undefined
 
 /**
  * Helpers que recibe la función de utilidades. Crean nodos que el plugin valida y convierte
@@ -240,23 +228,23 @@ export type UtilityOutput = UtilityNode | readonly UtilityOutput[] | null | fals
  * ```
  */
 export interface UtilityHelpers {
-  /**
-   * Crea una regla. El segundo argumento es un objeto de declaraciones o la primera hija;
-   * las demás hijas (reglas con `&`, `atRule`, `css`, arrays) se anidan dentro.
-   */
-  rule(selector: string, declarations: UtilityDeclarations, ...children: UtilityOutput[]): UtilityRule;
-  rule(selector: string, ...children: UtilityOutput[]): UtilityRule;
-  /**
-   * Crea una at-rule, como `@media`, `@supports`, `@container`, `@font-face` o `@property`.
-   * `name` va sin `@`. Sin cuerpo (sólo `name` y `params`) se emite como sentencia.
-   */
-  atRule(name: string, params: string, declarations: UtilityAtRuleDeclarations, ...children: UtilityOutput[]): UtilityAtRule;
-  atRule(name: string, params: string, ...children: UtilityOutput[]): UtilityAtRule;
-  /**
-   * CSS literal, como cadena o plantilla etiquetada; se analiza con PostCSS. Las barras
-   * invertidas se conservan (`content: "\201C"`).
-   */
-  css(strings: TemplateStringsArray | string, ...values: readonly unknown[]): UtilityCss;
+	/**
+	 * Crea una regla. El segundo argumento es un objeto de declaraciones o la primera hija;
+	 * las demás hijas (reglas con `&`, `atRule`, `css`, arrays) se anidan dentro.
+	 */
+	rule(selector: string, declarations: UtilityDeclarations, ...children: UtilityOutput[]): UtilityRule
+	rule(selector: string, ...children: UtilityOutput[]): UtilityRule
+	/**
+	 * Crea una at-rule, como `@media`, `@supports`, `@container`, `@font-face` o `@property`.
+	 * `name` va sin `@`. Sin cuerpo (sólo `name` y `params`) se emite como sentencia.
+	 */
+	atRule(name: string, params: string, declarations: UtilityAtRuleDeclarations, ...children: UtilityOutput[]): UtilityAtRule
+	atRule(name: string, params: string, ...children: UtilityOutput[]): UtilityAtRule
+	/**
+	 * CSS literal, como cadena o plantilla etiquetada; se analiza con PostCSS. Las barras
+	 * invertidas se conservan (`content: "\201C"`).
+	 */
+	css(strings: TemplateStringsArray | string, ...values: readonly unknown[]): UtilityCss
 }
 
 /**
@@ -275,7 +263,7 @@ export interface UtilityHelpers {
  * export default utilities;
  * ```
  */
-export type UtilityFunction = (helpers: UtilityHelpers) => UtilityOutput | Promise<UtilityOutput>;
+export type UtilityFunction = (helpers: UtilityHelpers) => UtilityOutput | Promise<UtilityOutput>
 
 /**
  * Declara el export por defecto de un módulo de `@utilities` con tipos para los helpers.
@@ -294,7 +282,7 @@ export type UtilityFunction = (helpers: UtilityHelpers) => UtilityOutput | Promi
  * ```
  */
 export function defineUtilities(utilities: UtilityFunction): UtilityFunction {
-  return utilities;
+	return utilities
 }
 
 /**
@@ -310,41 +298,41 @@ export function defineUtilities(utilities: UtilityFunction): UtilityFunction {
  * ```
  */
 export interface MeekoUtilitiesOptions {
-  /**
-   * Carpeta desde la que se resuelven las rutas de `@utilities` cuando la hoja no tiene
-   * archivo (CSS procesado sin la opción `from` de PostCSS). Por defecto, `process.cwd()`.
-   * Con archivo, la ruta siempre es relativa a la hoja que contiene la at-rule.
-   */
-  readonly root?: string;
-  /**
-   * Aplica los autoimports de Meeko a los módulos de `@utilities` y a los módulos locales que
-   * importan, como el plugin de Vite al resto del proyecto: los valores exportados en `app/` y
-   * `shared/` (con `imports.appDirs`, `imports.sharedDirs`, los layers y los módulos), sin los
-   * de `server/`, los `.client.ts`, los componentes, los clientes generados ni las API del
-   * framework. Por defecto, `true`; sólo actúa cuando el módulo pertenece a un proyecto Meeko
-   * (una carpeta con `meeko.config.*` o un `package.json` que depende de `@meekojs/meeko`) y
-   * rolldown (Vite 8) está disponible; entonces ejecuta `meeko.config.*` y los `setup` de sus
-   * módulos una vez por hoja, y si eso falla genera la hoja sin autoimports, con un aviso.
-   * `false` empaqueta los módulos tal cual, como en `1.3`, sin ejecutar la configuración.
-   *
-   * @since 1.4.0
-   * @example
-   * ```ts
-   * import { meekoUtilities } from "@meekojs/meeko/postcss";
-   *
-   * export default { plugins: [meekoUtilities({ autoImports: false })] };
-   * ```
-   */
-  readonly autoImports?: boolean;
+	/**
+	 * Carpeta desde la que se resuelven las rutas de `@utilities` cuando la hoja no tiene
+	 * archivo (CSS procesado sin la opción `from` de PostCSS). Por defecto, `process.cwd()`.
+	 * Con archivo, la ruta siempre es relativa a la hoja que contiene la at-rule.
+	 */
+	readonly root?: string
+	/**
+	 * Aplica los autoimports de Meeko a los módulos de `@utilities` y a los módulos locales que
+	 * importan, como el plugin de Vite al resto del proyecto: los valores exportados en `app/` y
+	 * `shared/` (con `imports.appDirs`, `imports.sharedDirs`, los layers y los módulos), sin los
+	 * de `server/`, los `.client.ts`, los componentes, los clientes generados ni las API del
+	 * framework. Por defecto, `true`; sólo actúa cuando el módulo pertenece a un proyecto Meeko
+	 * (una carpeta con `meeko.config.*` o un `package.json` que depende de `@meekojs/meeko`) y
+	 * rolldown (Vite 8) está disponible; entonces ejecuta `meeko.config.*` y los `setup` de sus
+	 * módulos una vez por hoja, y si eso falla genera la hoja sin autoimports, con un aviso.
+	 * `false` empaqueta los módulos tal cual, como en `1.3`, sin ejecutar la configuración.
+	 *
+	 * @since 1.4.0
+	 * @example
+	 * ```ts
+	 * import { meekoUtilities } from "@meekojs/meeko/postcss";
+	 *
+	 * export default { plugins: [meekoUtilities({ autoImports: false })] };
+	 * ```
+	 */
+	readonly autoImports?: boolean
 }
 
-const pluginName = "meeko-utilities";
-const moduleExtensions = new Set([".ts", ".mts", ".js", ".mjs"]);
-const usage = `@utilities "./utilidades.ts" layer(utilities);`;
+const pluginName = 'meeko-utilities'
+const moduleExtensions = new Set(['.ts', '.mts', '.js', '.mjs'])
+const usage = `@utilities "./utilidades.ts" layer(utilities);`
 /** Nodes the helpers created; anything else in the output is rejected. */
-const createdNodes = new WeakSet<object>();
+const createdNodes = new WeakSet<object>()
 /** Modules already warned about loading without rolldown, once per process. */
-const nativeWarnings = new Set<string>();
+const nativeWarnings = new Set<string>()
 
 /**
  * Plugin de PostCSS que expande `@utilities "<ruta>" [layer(<nombre>)];` con las reglas que
@@ -375,24 +363,26 @@ const nativeWarnings = new Set<string>();
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#utilidades-generadas-con-typescript
  */
 export function meekoUtilities(options: MeekoUtilitiesOptions = {}): Plugin {
-  const plugin: Plugin = {
-    postcssPlugin: pluginName,
-    // `Once`, not an `AtRule` listener: plugins run in the configured order, so a plugin after
-    // this one (Tailwind) sees the generated rules.
-    async Once(root, { result, postcss }) {
-      warnTailwindFirst(plugin, root, result);
-      const atRules: AtRule[] = [];
-      root.walkAtRules(/^utilities$/i, (atRule) => { atRules.push(atRule); });
-      // The registry is read once per stylesheet, so an export added since the last one is seen.
-      const projects = new Map<string, Promise<UtilityAutoImports | undefined>>();
-      for (const atRule of atRules) await expandUtilities(atRule, result, postcss, options, projects);
-    },
-  };
-  return plugin;
+	const plugin: Plugin = {
+		postcssPlugin: pluginName,
+		// `Once`, not an `AtRule` listener: plugins run in the configured order, so a plugin after
+		// this one (Tailwind) sees the generated rules.
+		async Once(root, { result, postcss }) {
+			warnTailwindFirst(plugin, root, result)
+			const atRules: AtRule[] = []
+			root.walkAtRules(/^utilities$/i, (atRule) => {
+				atRules.push(atRule)
+			})
+			// The registry is read once per stylesheet, so an export added since the last one is seen.
+			const projects = new Map<string, Promise<UtilityAutoImports | undefined>>()
+			for (const atRule of atRules) await expandUtilities(atRule, result, postcss, options, projects)
+		},
+	}
+	return plugin
 }
-meekoUtilities.postcss = true as const;
+meekoUtilities.postcss = true as const
 
-let tailwindOrderWarned = false;
+let tailwindOrderWarned = false
 
 /**
  * Tailwind 4 compiles a stylesheet that imports it into a new tree without the at-rules it does
@@ -400,279 +390,284 @@ let tailwindOrderWarned = false;
  * Warned once per process, since the at-rules are gone by the time this plugin runs.
  */
 function warnTailwindFirst(plugin: Plugin, root: Root, result: Result): void {
-  if (tailwindOrderWarned) return;
-  const plugins = result.processor.plugins;
-  const own = plugins.indexOf(plugin);
-  const tailwind = plugins.findIndex((item) => "postcssPlugin" in item && /tailwindcss/.test(String(item.postcssPlugin)));
-  if (own < 0 || tailwind < 0 || tailwind > own) return;
-  tailwindOrderWarned = true;
-  result.warn("meekoUtilities() se ejecuta después de Tailwind, que elimina los @utilities de las hojas que compila; "
-    + "colóquelo antes de @tailwindcss/postcss en postcss.config", { plugin: pluginName, ...(root.first ? { node: root.first } : {}) });
+	if (tailwindOrderWarned) return
+	const plugins = result.processor.plugins
+	const own = plugins.indexOf(plugin)
+	const tailwind = plugins.findIndex((item) => 'postcssPlugin' in item && /tailwindcss/.test(String(item.postcssPlugin)))
+	if (own < 0 || tailwind < 0 || tailwind > own) return
+	tailwindOrderWarned = true
+	result.warn('meekoUtilities() se ejecuta después de Tailwind, que elimina los @utilities de las hojas que compila; ' + 'colóquelo antes de @tailwindcss/postcss en postcss.config', { plugin: pluginName, ...(root.first ? { node: root.first } : {}) })
 }
 
-interface UtilitiesParams { readonly path: string; readonly layer: string | undefined }
+interface UtilitiesParams {
+	readonly path: string
+	readonly layer: string | undefined
+}
 
 /** `"<path>"` or `'<path>'`, then an optional `layer` or `layer(<name>)`. */
 function parseParams(params: string): UtilitiesParams | undefined {
-  const match = /^\s*(["'])((?:(?!\1).)+)\1\s*(?:(layer)(?:\(\s*([^()]*?)\s*\))?)?\s*$/is.exec(params);
-  if (!match) return undefined;
-  return { path: match[2]!, layer: match[3] ? match[4] ?? "" : undefined };
+	const match = /^\s*(["'])((?:(?!\1).)+)\1\s*(?:(layer)(?:\(\s*([^()]*?)\s*\))?)?\s*$/is.exec(params)
+	if (!match) return undefined
+	return { path: match[2]!, layer: match[3] ? (match[4] ?? '') : undefined }
 }
 
 /** The file of the stylesheet that contains `node`, without Vite's query (`Card.meeko?meeko-style=…`). */
 function stylesheetFile(node: AtRule, result: Result): string | undefined {
-  const file = node.source?.input.file ?? result.opts.from;
-  return file ? file.replace(/\?.*$/s, "") : undefined;
+	const file = node.source?.input.file ?? result.opts.from
+	return file ? file.replace(/\?.*$/s, '') : undefined
 }
 
-async function expandUtilities(
-  atRule: AtRule, result: Result, postcss: Helpers["postcss"], options: MeekoUtilitiesOptions, projects: Map<string, Promise<UtilityAutoImports | undefined>>,
-): Promise<void> {
-  if (atRule.nodes !== undefined) throw atRule.error(`@utilities no lleva bloque { }; escríbalo como ${usage}`);
-  const params = parseParams(atRule.params);
-  if (!params) throw atRule.error(`@utilities espera una ruta entre comillas y, opcionalmente, layer(<nombre>): ${usage}`);
-  if (params.layer && !/^-?[_a-z][\w-]*(?:\.-?[_a-z][\w-]*)*$/i.test(params.layer)) {
-    throw atRule.error(`@utilities: nombre de capa no válido "${params.layer}"`, { word: params.layer });
-  }
-  const stylesheet = stylesheetFile(atRule, result);
-  const file = resolve(stylesheet ? dirname(stylesheet) : resolve(options.root ?? process.cwd()), params.path);
-  if (!moduleExtensions.has(extname(file).toLowerCase())) {
-    throw atRule.error(`@utilities carga módulos .ts, .mts, .js o .mjs, no "${params.path}"`, { word: params.path });
-  }
-  if (!existsSync(file) || !statSync(file).isFile()) {
-    throw atRule.error(`@utilities no encuentra "${params.path}" (${file})`, { word: params.path });
-  }
-  const project = options.autoImports === false ? undefined : meekoProjectRoot(file);
-  let autoImports: UtilityAutoImports | undefined;
-  // Only a bundled module receives autoimports: without rolldown, `meeko.config.*` is not run.
-  if (project !== undefined && await canBundleUtilities()) {
-    let loading = projects.get(project);
-    if (!loading) {
-      // A registry that cannot be read (a configuration or module `setup` that throws) leaves the
-      // module without autoimports, warned once per stylesheet, instead of breaking the stylesheet.
-      projects.set(project, loading = utilityAutoImports(project).catch((error: unknown) => {
-        result.warn(`@utilities no pudo leer los autoimports del proyecto ${project} y carga "${params.path}" sin ellos: ${errorMessage(error)}`, { node: atRule, plugin: pluginName });
-        return undefined;
-      }));
-    }
-    autoImports = await loading;
-  }
-  let loaded: Awaited<ReturnType<typeof loadUtilityModule>>;
-  try {
-    loaded = await loadUtilityModule(file, autoImports);
-  } catch (error) {
-    throw atRule.error(`@utilities no pudo cargar "${params.path}": ${errorMessage(error)}`, { word: params.path });
-  }
-  for (const dependency of loaded.files) {
-    result.messages.push({ type: "dependency", plugin: pluginName, file: dependency, parent: stylesheet ?? "" });
-  }
-  if (!loaded.bundled && !nativeWarnings.has(file)) {
-    nativeWarnings.add(file);
-    result.warn(`@utilities cargó "${params.path}" con import() nativo porque no encontró rolldown (Vite 8): `
-      + "los cambios en los módulos que importa no se recargan hasta reiniciar el proceso"
-      + (project !== undefined ? " y no recibe los autoimports de Meeko; impórtelos explícitamente" : ""), { node: atRule, plugin: pluginName });
-  }
-  const utilities = loaded.exports.default;
-  if (typeof utilities !== "function") {
-    throw atRule.error(`"${params.path}" debe exportar por defecto una función: export default defineUtilities(({ rule }) => [...])`, { word: params.path });
-  }
-  let output: unknown;
-  try {
-    output = await (utilities as UtilityFunction)(helpers);
-  } catch (error) {
-    throw atRule.error(`"${params.path}" lanzó un error al generar las utilidades: ${errorMessage(error)}`, { word: params.path });
-  }
-  let nodes: ChildNode[];
-  try {
-    nodes = new Expander(postcss, atRule).expand(output, "la salida");
-  } catch (error) {
-    // Also an error of a value of the output, such as an unavailable autoimport the module passed along.
-    throw atRule.error(`"${params.path}": ${errorMessage(error)}`, { word: params.path });
-  }
-  if (params.layer !== undefined && nodes.length) {
-    nodes = [postcss.atRule({ name: "layer", params: params.layer, nodes, raws: blockRaws(params.layer), ...(atRule.source ? { source: atRule.source } : {}) })];
-  }
-  if (nodes.length) atRule.replaceWith(nodes);
-  else atRule.remove();
+async function expandUtilities(atRule: AtRule, result: Result, postcss: Helpers['postcss'], options: MeekoUtilitiesOptions, projects: Map<string, Promise<UtilityAutoImports | undefined>>): Promise<void> {
+	if (atRule.nodes !== undefined) throw atRule.error(`@utilities no lleva bloque { }; escríbalo como ${usage}`)
+	const params = parseParams(atRule.params)
+	if (!params) throw atRule.error(`@utilities espera una ruta entre comillas y, opcionalmente, layer(<nombre>): ${usage}`)
+	if (params.layer && !/^-?[_a-z][\w-]*(?:\.-?[_a-z][\w-]*)*$/i.test(params.layer)) {
+		throw atRule.error(`@utilities: nombre de capa no válido "${params.layer}"`, { word: params.layer })
+	}
+	const stylesheet = stylesheetFile(atRule, result)
+	const file = resolve(stylesheet ? dirname(stylesheet) : resolve(options.root ?? process.cwd()), params.path)
+	if (!moduleExtensions.has(extname(file).toLowerCase())) {
+		throw atRule.error(`@utilities carga módulos .ts, .mts, .js o .mjs, no "${params.path}"`, { word: params.path })
+	}
+	if (!existsSync(file) || !statSync(file).isFile()) {
+		throw atRule.error(`@utilities no encuentra "${params.path}" (${file})`, { word: params.path })
+	}
+	const project = options.autoImports === false ? undefined : meekoProjectRoot(file)
+	let autoImports: UtilityAutoImports | undefined
+	// Only a bundled module receives autoimports: without rolldown, `meeko.config.*` is not run.
+	if (project !== undefined && (await canBundleUtilities())) {
+		let loading = projects.get(project)
+		if (!loading) {
+			// A registry that cannot be read (a configuration or module `setup` that throws) leaves the
+			// module without autoimports, warned once per stylesheet, instead of breaking the stylesheet.
+			projects.set(
+				project,
+				(loading = utilityAutoImports(project).catch((error: unknown) => {
+					result.warn(`@utilities no pudo leer los autoimports del proyecto ${project} y carga "${params.path}" sin ellos: ${errorMessage(error)}`, { node: atRule, plugin: pluginName })
+					return undefined
+				})),
+			)
+		}
+		autoImports = await loading
+	}
+	let loaded: Awaited<ReturnType<typeof loadUtilityModule>>
+	try {
+		loaded = await loadUtilityModule(file, autoImports)
+	} catch (error) {
+		throw atRule.error(`@utilities no pudo cargar "${params.path}": ${errorMessage(error)}`, { word: params.path })
+	}
+	for (const dependency of loaded.files) {
+		result.messages.push({ type: 'dependency', plugin: pluginName, file: dependency, parent: stylesheet ?? '' })
+	}
+	if (!loaded.bundled && !nativeWarnings.has(file)) {
+		nativeWarnings.add(file)
+		result.warn(`@utilities cargó "${params.path}" con import() nativo porque no encontró rolldown (Vite 8): ` + 'los cambios en los módulos que importa no se recargan hasta reiniciar el proceso' + (project !== undefined ? ' y no recibe los autoimports de Meeko; impórtelos explícitamente' : ''), { node: atRule, plugin: pluginName })
+	}
+	const utilities = loaded.exports.default
+	if (typeof utilities !== 'function') {
+		throw atRule.error(`"${params.path}" debe exportar por defecto una función: export default defineUtilities(({ rule }) => [...])`, { word: params.path })
+	}
+	let output: unknown
+	try {
+		output = await (utilities as UtilityFunction)(helpers)
+	} catch (error) {
+		throw atRule.error(`"${params.path}" lanzó un error al generar las utilidades: ${errorMessage(error)}`, { word: params.path })
+	}
+	let nodes: ChildNode[]
+	try {
+		nodes = new Expander(postcss, atRule).expand(output, 'la salida')
+	} catch (error) {
+		// Also an error of a value of the output, such as an unavailable autoimport the module passed along.
+		throw atRule.error(`"${params.path}": ${errorMessage(error)}`, { word: params.path })
+	}
+	if (params.layer !== undefined && nodes.length) {
+		nodes = [postcss.atRule({ name: 'layer', params: params.layer, nodes, raws: blockRaws(params.layer), ...(atRule.source ? { source: atRule.source } : {}) })]
+	}
+	if (nodes.length) atRule.replaceWith(nodes)
+	else atRule.remove()
 }
 
 /** A space before `{` and a `;` after the last declaration; the indentation follows the stylesheet. */
 function blockRaws(params: string): { afterName: string; between: string; semicolon: boolean } {
-  return { afterName: params ? " " : "", between: " ", semicolon: true };
+	return { afterName: params ? ' ' : '', between: ' ', semicolon: true }
 }
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+	return error instanceof Error ? error.message : String(error)
 }
 
 function isUtilityNode(value: unknown): value is UtilityNode {
-  return typeof value === "object" && value !== null && createdNodes.has(value);
+	return typeof value === 'object' && value !== null && createdNodes.has(value)
 }
 
 /** Splits `rule`/`atRule` arguments: a plain object first is the declarations, the rest are children. */
 function body(args: readonly unknown[]): { declarations: UtilityAtRuleDeclarations; children: UtilityOutput[] } {
-  const [first, ...rest] = args;
-  if (typeof first === "object" && first !== null && !Array.isArray(first) && !isUtilityNode(first)) {
-    return { declarations: first as UtilityAtRuleDeclarations, children: rest as UtilityOutput[] };
-  }
-  return { declarations: {}, children: args as UtilityOutput[] };
+	const [first, ...rest] = args
+	if (typeof first === 'object' && first !== null && !Array.isArray(first) && !isUtilityNode(first)) {
+		return { declarations: first as UtilityAtRuleDeclarations, children: rest as UtilityOutput[] }
+	}
+	return { declarations: {}, children: args as UtilityOutput[] }
 }
 
 function created<T extends UtilityNode>(node: T): T {
-  createdNodes.add(node);
-  return Object.freeze(node);
+	createdNodes.add(node)
+	return Object.freeze(node)
 }
 
 const helpers: UtilityHelpers = {
-  rule(selector: string, ...args: unknown[]): UtilityRule {
-    return created({ kind: "rule", selector, ...body(args) });
-  },
-  atRule(name: string, params: string, ...args: unknown[]): UtilityAtRule {
-    return created({ kind: "atrule", name, params, ...body(args), block: args.length > 0 });
-  },
-  css(strings: TemplateStringsArray | string, ...values: readonly unknown[]): UtilityCss {
-    const text = typeof strings === "string"
-      ? strings
-      : strings.raw.reduce((css, part, index) => css + part + (index < values.length ? String(values[index]) : ""), "");
-    return created({ kind: "css", css: text });
-  },
-};
+	rule(selector: string, ...args: unknown[]): UtilityRule {
+		return created({ kind: 'rule', selector, ...body(args) })
+	},
+	atRule(name: string, params: string, ...args: unknown[]): UtilityAtRule {
+		return created({ kind: 'atrule', name, params, ...body(args), block: args.length > 0 })
+	},
+	css(strings: TemplateStringsArray | string, ...values: readonly unknown[]): UtilityCss {
+		const text = typeof strings === 'string' ? strings : strings.raw.reduce((css, part, index) => css + part + (index < values.length ? String(values[index]) : ''), '')
+		return created({ kind: 'css', css: text })
+	},
+}
 
 /** An invalid node in the output; the plugin reports it at the `@utilities` line. */
 class UtilityError extends Error {}
 
 /** Turns the output of a utility function into PostCSS nodes, validating each part. */
 class Expander {
-  constructor(private readonly postcss: Helpers["postcss"], private readonly origin: AtRule) {}
+	constructor(
+		private readonly postcss: Helpers['postcss'],
+		private readonly origin: AtRule,
+	) {}
 
-  expand(output: unknown, where: string): ChildNode[] {
-    if (output === null || output === undefined || output === false) return [];
-    if (Array.isArray(output)) return output.flatMap((item: unknown) => this.expand(item, where));
-    if (!isUtilityNode(output)) {
-      const hint = typeof output === "string" ? "; envuelva el CSS literal con css`…`" : "; use rule(), atRule() o css`…`";
-      throw new UtilityError(`${where} contiene ${describe(output)}, que no es un nodo de utilidades${hint}`);
-    }
-    if (output.kind === "css") return this.raw(output.css);
-    if (output.kind === "rule") {
-      const selector = this.selector(output.selector);
-      const rule = this.postcss.rule({ selector, raws: { between: " ", semicolon: true }, ...this.sourceProps });
-      this.fill(rule, output.declarations, output.children, `la regla "${selector}"`);
-      return [rule];
-    }
-    const name = this.atRuleName(output.name);
-    const params = this.atRuleParams(name, output.params);
-    const atRule = this.postcss.atRule({ name, params, raws: output.block ? blockRaws(params) : { afterName: params ? " " : "" }, ...this.sourceProps });
-    if (output.block) {
-      atRule.nodes = [];
-      this.fill(atRule, output.declarations, output.children, `@${name}${params ? ` ${params}` : ""}`);
-    }
-    return [atRule];
-  }
+	expand(output: unknown, where: string): ChildNode[] {
+		if (output === null || output === undefined || output === false) return []
+		if (Array.isArray(output)) return output.flatMap((item: unknown) => this.expand(item, where))
+		if (!isUtilityNode(output)) {
+			const hint = typeof output === 'string' ? '; envuelva el CSS literal con css`…`' : '; use rule(), atRule() o css`…`'
+			throw new UtilityError(`${where} contiene ${describe(output)}, que no es un nodo de utilidades${hint}`)
+		}
+		if (output.kind === 'css') return this.raw(output.css)
+		if (output.kind === 'rule') {
+			const selector = this.selector(output.selector)
+			const rule = this.postcss.rule({ selector, raws: { between: ' ', semicolon: true }, ...this.sourceProps })
+			this.fill(rule, output.declarations, output.children, `la regla "${selector}"`)
+			return [rule]
+		}
+		const name = this.atRuleName(output.name)
+		const params = this.atRuleParams(name, output.params)
+		const atRule = this.postcss.atRule({ name, params, raws: output.block ? blockRaws(params) : { afterName: params ? ' ' : '' }, ...this.sourceProps })
+		if (output.block) {
+			atRule.nodes = []
+			this.fill(atRule, output.declarations, output.children, `@${name}${params ? ` ${params}` : ''}`)
+		}
+		return [atRule]
+	}
 
-  private fill(container: Container, declarations: UtilityDeclarations, children: readonly UtilityOutput[], where: string): void {
-    if (typeof declarations !== "object" || declarations === null) throw new UtilityError(`${where}: las declaraciones deben ser un objeto`);
-    for (const [key, value] of Object.entries(declarations)) {
-      if (value === undefined) continue;
-      const property = this.property(key, where);
-      for (const item of Array.isArray(value) ? value as readonly unknown[] : [value]) container.append(this.declaration(property, item, where));
-    }
-    container.append(this.expand(children, where));
-  }
+	private fill(container: Container, declarations: UtilityDeclarations, children: readonly UtilityOutput[], where: string): void {
+		if (typeof declarations !== 'object' || declarations === null) throw new UtilityError(`${where}: las declaraciones deben ser un objeto`)
+		for (const [key, value] of Object.entries(declarations)) {
+			if (value === undefined) continue
+			const property = this.property(key, where)
+			for (const item of Array.isArray(value) ? (value as readonly unknown[]) : [value]) container.append(this.declaration(property, item, where))
+		}
+		container.append(this.expand(children, where))
+	}
 
-  private property(key: string, where: string): string {
-    const property = key.startsWith("--") ? key : key.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`).replace(/^ms-/, "-ms-");
-    const valid = key.startsWith("--") ? /^--[^\s:;{}()!'"]+$/.test(property) : /^-?[a-z_][a-z0-9_-]*$/.test(property);
-    if (!valid) throw new UtilityError(`${where}: nombre de propiedad no válido "${key}"`);
-    return property;
-  }
+	private property(key: string, where: string): string {
+		const property = key.startsWith('--') ? key : key.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`).replace(/^ms-/, '-ms-')
+		const valid = key.startsWith('--') ? /^--[^\s:;{}()!'"]+$/.test(property) : /^-?[a-z_][a-z0-9_-]*$/.test(property)
+		if (!valid) throw new UtilityError(`${where}: nombre de propiedad no válido "${key}"`)
+		return property
+	}
 
-  private declaration(property: string, value: unknown, where: string): ChildNode {
-    let text: string;
-    if (typeof value === "number") {
-      if (!Number.isFinite(value)) throw new UtilityError(`${where}: ${property} tiene el valor ${value}, que no es un número finito`);
-      text = String(value);
-    } else if (typeof value === "string") {
-      text = value;
-    } else {
-      throw new UtilityError(`${where}: ${property} tiene un valor ${describe(value)}; use una cadena, un número o undefined para omitirla`);
-    }
-    if (!text.trim() && !property.startsWith("--")) throw new UtilityError(`${where}: ${property} tiene un valor vacío`);
-    // Parsed alone, a valid value is one declaration of the same property: this rejects `;`, braces
-    // and unterminated strings that would leak into the next declaration.
-    let parsed: ChildNode | undefined;
-    try {
-      const probe = this.postcss.parse(`a{${property}:${text}}`).first;
-      if (probe?.type === "rule" && probe.nodes.length === 1) parsed = probe.first;
-    } catch {
-      parsed = undefined;
-    }
-    if (parsed?.type !== "decl" || parsed.prop !== property) {
-      throw new UtilityError(`${where}: valor no válido para ${property}: ${JSON.stringify(text)}`);
-    }
-    return this.postcss.decl({ prop: property, value: parsed.value, important: parsed.important ?? false, ...this.sourceProps });
-  }
+	private declaration(property: string, value: unknown, where: string): ChildNode {
+		let text: string
+		if (typeof value === 'number') {
+			if (!Number.isFinite(value)) throw new UtilityError(`${where}: ${property} tiene el valor ${value}, que no es un número finito`)
+			text = String(value)
+		} else if (typeof value === 'string') {
+			text = value
+		} else {
+			throw new UtilityError(`${where}: ${property} tiene un valor ${describe(value)}; use una cadena, un número o undefined para omitirla`)
+		}
+		if (!text.trim() && !property.startsWith('--')) throw new UtilityError(`${where}: ${property} tiene un valor vacío`)
+		// Parsed alone, a valid value is one declaration of the same property: this rejects `;`, braces
+		// and unterminated strings that would leak into the next declaration.
+		let parsed: ChildNode | undefined
+		try {
+			const probe = this.postcss.parse(`a{${property}:${text}}`).first
+			if (probe?.type === 'rule' && probe.nodes.length === 1) parsed = probe.first
+		} catch {
+			parsed = undefined
+		}
+		if (parsed?.type !== 'decl' || parsed.prop !== property) {
+			throw new UtilityError(`${where}: valor no válido para ${property}: ${JSON.stringify(text)}`)
+		}
+		return this.postcss.decl({ prop: property, value: parsed.value, important: parsed.important ?? false, ...this.sourceProps })
+	}
 
-  private selector(selector: unknown): string {
-    if (typeof selector !== "string" || !selector.trim()) throw new UtilityError(`una regla tiene el selector ${describe(selector)}; use una cadena no vacía`);
-    const trimmed = selector.trim();
-    let valid = false;
-    try {
-      selectorParser().astSync(trimmed);
-      const probe = this.postcss.parse(`${trimmed}{}`);
-      valid = probe.nodes.length === 1 && probe.first?.type === "rule" && probe.first.selector === trimmed;
-    } catch {
-      valid = false;
-    }
-    if (!valid) throw new UtilityError(`selector no válido ${JSON.stringify(selector)}`);
-    return trimmed;
-  }
+	private selector(selector: unknown): string {
+		if (typeof selector !== 'string' || !selector.trim()) throw new UtilityError(`una regla tiene el selector ${describe(selector)}; use una cadena no vacía`)
+		const trimmed = selector.trim()
+		let valid = false
+		try {
+			selectorParser().astSync(trimmed)
+			const probe = this.postcss.parse(`${trimmed}{}`)
+			valid = probe.nodes.length === 1 && probe.first?.type === 'rule' && probe.first.selector === trimmed
+		} catch {
+			valid = false
+		}
+		if (!valid) throw new UtilityError(`selector no válido ${JSON.stringify(selector)}`)
+		return trimmed
+	}
 
-  private atRuleName(name: unknown): string {
-    const bare = typeof name === "string" ? name.replace(/^@/, "") : "";
-    if (!/^-?[a-z][\w-]*$/i.test(bare)) throw new UtilityError(`nombre de at-rule no válido ${describe(name)}`);
-    return bare;
-  }
+	private atRuleName(name: unknown): string {
+		const bare = typeof name === 'string' ? name.replace(/^@/, '') : ''
+		if (!/^-?[a-z][\w-]*$/i.test(bare)) throw new UtilityError(`nombre de at-rule no válido ${describe(name)}`)
+		return bare
+	}
 
-  private atRuleParams(name: string, params: unknown): string {
-    if (typeof params !== "string") throw new UtilityError(`@${name} tiene los parámetros ${describe(params)}; use una cadena`);
-    const trimmed = params.trim();
-    let valid = false;
-    try {
-      const probe = this.postcss.parse(`@${name} ${trimmed}{}`);
-      valid = probe.nodes.length === 1 && probe.first?.type === "atrule" && probe.first.params === trimmed;
-    } catch {
-      valid = false;
-    }
-    if (!valid) throw new UtilityError(`parámetros no válidos para @${name}: ${JSON.stringify(params)}`);
-    return trimmed;
-  }
+	private atRuleParams(name: string, params: unknown): string {
+		if (typeof params !== 'string') throw new UtilityError(`@${name} tiene los parámetros ${describe(params)}; use una cadena`)
+		const trimmed = params.trim()
+		let valid = false
+		try {
+			const probe = this.postcss.parse(`@${name} ${trimmed}{}`)
+			valid = probe.nodes.length === 1 && probe.first?.type === 'atrule' && probe.first.params === trimmed
+		} catch {
+			valid = false
+		}
+		if (!valid) throw new UtilityError(`parámetros no válidos para @${name}: ${JSON.stringify(params)}`)
+		return trimmed
+	}
 
-  private raw(text: unknown): ChildNode[] {
-    if (typeof text !== "string") throw new UtilityError(`css recibió ${describe(text)}; use una cadena o una plantilla`);
-    let parsed: ReturnType<Helpers["postcss"]["parse"]>;
-    try {
-      parsed = this.postcss.parse(text);
-    } catch (error) {
-      const reason = error instanceof Error && "reason" in error ? String((error as { reason: unknown }).reason) : errorMessage(error);
-      const line = typeof (error as { line?: unknown }).line === "number" ? ` (línea ${(error as { line: number }).line} del css)` : "";
-      throw new UtilityError(`css\`…\` no es CSS válido: ${reason}${line}`);
-    }
-    // Errors and source maps of the generated CSS point to the `@utilities` line.
-    const source = this.origin.source;
-    if (source) parsed.walk((node) => { node.source = source; });
-    return [...parsed.nodes].map((node) => node.remove());
-  }
+	private raw(text: unknown): ChildNode[] {
+		if (typeof text !== 'string') throw new UtilityError(`css recibió ${describe(text)}; use una cadena o una plantilla`)
+		let parsed: ReturnType<Helpers['postcss']['parse']>
+		try {
+			parsed = this.postcss.parse(text)
+		} catch (error) {
+			const reason = error instanceof Error && 'reason' in error ? String((error as { reason: unknown }).reason) : errorMessage(error)
+			const line = typeof (error as { line?: unknown }).line === 'number' ? ` (línea ${(error as { line: number }).line} del css)` : ''
+			throw new UtilityError(`css\`…\` no es CSS válido: ${reason}${line}`)
+		}
+		// Errors and source maps of the generated CSS point to the `@utilities` line.
+		const source = this.origin.source
+		if (source)
+			parsed.walk((node) => {
+				node.source = source
+			})
+		return [...parsed.nodes].map((node) => node.remove())
+	}
 
-  /** The `source` of every generated node: the `@utilities` at-rule. */
-  private get sourceProps(): { source?: NonNullable<AtRule["source"]> } {
-    return this.origin.source ? { source: this.origin.source } : {};
-  }
+	/** The `source` of every generated node: the `@utilities` at-rule. */
+	private get sourceProps(): { source?: NonNullable<AtRule['source']> } {
+		return this.origin.source ? { source: this.origin.source } : {}
+	}
 }
 
 function describe(value: unknown): string {
-  if (value === null) return "null";
-  if (Array.isArray(value)) return "un array";
-  if (typeof value === "string") return JSON.stringify(value.length > 40 ? `${value.slice(0, 40)}…` : value);
-  if (typeof value === "object") return "un objeto";
-  return `${typeof value} ${String(value)}`;
+	if (value === null) return 'null'
+	if (Array.isArray(value)) return 'un array'
+	if (typeof value === 'string') return JSON.stringify(value.length > 40 ? `${value.slice(0, 40)}…` : value)
+	if (typeof value === 'object') return 'un objeto'
+	return `${typeof value} ${String(value)}`
 }

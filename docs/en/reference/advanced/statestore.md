@@ -11,7 +11,7 @@ related:
   - "@meekojs/meeko/framework#definePage"
   - "@meekojs/meeko#serializeJson"
   - docs/framework.md#streaming-ssr-render-stream
-source-hash: 4ddd11c1f772f191fa2525a09f35c18e66fbaf1f38c0b5e3dd842293a939af62
+source-hash: e65aafd28b15ab8856744a237517f59ed0ed46b8b865af8697d5cf48c452bf5f
 ---
 
 `StateStore` holds an application's shared state: one signal per key, created the first time someone requests it. It underlies [`useState`](/en/docs/reference/usestate): on the server there is one store per request, **sealed** once the HTML has been sent and transferred to the browser in the payload; in the browser there is one per mounted application (`ClientApp.state`), which survives navigation.

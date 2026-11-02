@@ -15,7 +15,7 @@ related:
   - "@meekojs/meeko/framework#useNavigation"
   - docs/framework.md#meekooutlet--y-meekolink
   - docs/framework.md#enlaces-anclas-y-scroll
-source-hash: 1bdd5482678a802f871df74b4f635367bd3756e68984ad5c31e77ae1d5db2962
+source-hash: f694d8e12feccb2b774614de84115398e2a8b8472ac490b5413797766f4db0c0
 ---
 
 `<MeekoLink>` renders an `<a>` whose `href` is built by [`href()`](/en/docs/reference/href) from the ID of an `app/pages` route. `to` only accepts existing routes, a dynamic route requires its parameters, and `meeko check` flags errors on the attribute itself. On the current page it adds `aria-current="page"`, and client navigation keeps it up to date, including in layouts the browser preserves between pages.

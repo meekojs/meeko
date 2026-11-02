@@ -40,20 +40,21 @@ Este runtime arranca en `meeko dev` y en el prerender, y falla a propósito en `
 
 Un `SessionStore<T>` con:
 
-| Miembro | Valor |
-| --- | --- |
-| `persistent` | `false` |
-| `developmentOnly` | `true` |
-| `get`, `set`, `delete` | Lectura y escritura en memoria. `get` borra y omite una sesión caducada o que ya no es la activa de su familia. |
-| `replace`, `revokeFamily` | Atómicos dentro del proceso. `revokeFamily` avisa a los `SessionManager` del mismo proceso suscritos con `subscribeRevocations`. |
-| `rateLimit(key, windowMs)` | Ventana fija en memoria; las ventanas caducadas se liberan solas. |
-| `close()` | Vacía sesiones, familias y contadores. |
+| Miembro                    | Valor                                                                                                                            |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `persistent`               | `false`                                                                                                                          |
+| `developmentOnly`          | `true`                                                                                                                           |
+| `get`, `set`, `delete`     | Lectura y escritura en memoria. `get` borra y omite una sesión caducada o que ya no es la activa de su familia.                  |
+| `replace`, `revokeFamily`  | Atómicos dentro del proceso. `revokeFamily` avisa a los `SessionManager` del mismo proceso suscritos con `subscribeRevocations`. |
+| `rateLimit(key, windowMs)` | Ventana fija en memoria; las ventanas caducadas se liberan solas.                                                                |
+| `close()`                  | Vacía sesiones, familias y contadores.                                                                                           |
 
 ## Ejemplos
 
 ### Memoria en desarrollo, Redis en producción
 
 <!-- no-check -->
+
 ```ts
 // server/runtime.ts
 import { createClient } from "redis";
@@ -119,6 +120,7 @@ new SessionManager({ store: new MemorySessionStore(), production });
 Con `production` en `true` (`meeko start`, Bun, Deno, Workers), el constructor lanza `Error: Persistent session storage with atomic rotation and family revocation is required in production` y la aplicación no arranca.
 
 <!-- no-check -->
+
 ```ts good
 new SessionManager({ store: production && !prerendering ? persistentStore : new MemorySessionStore(), production: production && !prerendering });
 ```

@@ -12,7 +12,7 @@ related:
   - "@meekojs/meeko/framework#defineMeekoConfig"
   - docs/framework.md#crear-una-aplicación
   - docs/framework.md#configuración
-source-hash: aacddbd438c996eaa4df65161bb3d168b2f74dd48a99529042379a65853ddafc
+source-hash: e28acb9c7f2f07712c54f9cb1f535b0ca3528b0d9ed74e4592bb3315844c2caa
 ---
 
 `meeko init-framework` creates the framework starter: file-based routes in `app/pages`, a layout preserving the shell during navigation, global styles and minimal configuration. You do not need `server/runtime.ts` or Redis to get started: in development, sessions live in memory. It neither installs dependencies nor overwrites files.

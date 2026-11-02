@@ -38,10 +38,10 @@ Todas las páginas que pinta este layout pueden leer `inject(themeKey)` y, como 
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `key` | `ContextKey<T>` | obligatorio | Clave creada con [`createContext`](/docs/reference/createcontext). |
-| `value` | `T` | obligatorio | Valor que reciben los `inject` de los descendientes. Para que lo lean de forma reactiva, publica una señal o un objeto con señales. |
+| Parámetro | Tipo            | Por defecto | Descripción                                                                                                                         |
+| --------- | --------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `key`     | `ContextKey<T>` | obligatorio | Clave creada con [`createContext`](/docs/reference/createcontext).                                                                  |
+| `value`   | `T`             | obligatorio | Valor que reciben los `inject` de los descendientes. Para que lo lean de forma reactiva, publica una señal o un objeto con señales. |
 
 ## Valor devuelto
 
@@ -144,6 +144,7 @@ provide(themeKey, theme.value);
 Los descendientes reciben el texto `"light"` y no se enteran de los cambios (además es un error de tipos si la clave es de `Signal`). Publica la señal:
 
 <!-- no-check -->
+
 ```ts good
 provide(themeKey, theme);
 ```

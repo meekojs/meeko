@@ -41,11 +41,11 @@ Con `saving.value` en `false`, el botón no lleva `disabled` ni `aria-busy`; al 
 
 ## Atributos
 
-| Atributo | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `bind:<atributo>` en un elemento | cualquier valor | ninguno | El atributo con `String(valor)`. `null`, `undefined` y `false` lo quitan. En los atributos booleanos de HTML (`disabled`, `checked`, `hidden`, `required`, `open`…), cualquier valor verdadero lo pone vacío y uno falso lo quita. |
-| `bind:<prop>` en un componente | el tipo de la prop | ninguno | La prop del hijo, comprobada contra su `defineProps`. Una prop opcional acepta `undefined`, que equivale a no pasarla. |
-| `bind="objeto"` | `ElementAttributes<Tag>` o las props | ninguno | Desde `1.5`. Varios atributos, o varias props, desde un objeto. Las claves explícitas ganan; `class` y `style` se combinan. |
+| Atributo                         | Tipo                                 | Por defecto | Descripción                                                                                                                                                                                                                        |
+| -------------------------------- | ------------------------------------ | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bind:<atributo>` en un elemento | cualquier valor                      | ninguno     | El atributo con `String(valor)`. `null`, `undefined` y `false` lo quitan. En los atributos booleanos de HTML (`disabled`, `checked`, `hidden`, `required`, `open`…), cualquier valor verdadero lo pone vacío y uno falso lo quita. |
+| `bind:<prop>` en un componente   | el tipo de la prop                   | ninguno     | La prop del hijo, comprobada contra su `defineProps`. Una prop opcional acepta `undefined`, que equivale a no pasarla.                                                                                                             |
+| `bind="objeto"`                  | `ElementAttributes<Tag>` o las props | ninguno     | Desde `1.5`. Varios atributos, o varias props, desde un objeto. Las claves explícitas ganan; `class` y `style` se combinan.                                                                                                        |
 
 ## Resultado
 

@@ -1,41 +1,41 @@
-import { existsSync } from "node:fs";
-import { readdir, readFile } from "node:fs/promises";
-import { createRequire } from "node:module";
-import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { existsSync } from 'node:fs'
+import { readdir, readFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 
-import type { ErrorPageRecord, NamedLayoutRecord, RouteRecord } from "../app/runtime/router";
-import type { AppManifest, ClientAssets } from "../server/runtime/app";
-import type { AssetManifest } from "../server/runtime/assets";
-import type { DocumentConfig } from "../shared/head";
+import type { ErrorPageRecord, NamedLayoutRecord, RouteRecord } from '../app/runtime/router'
+import type { AppManifest, ClientAssets } from '../server/runtime/app'
+import type { AssetManifest } from '../server/runtime/assets'
+import type { DocumentConfig } from '../shared/head'
 
-import { serializeJson } from "../core/server";
-import { discoverServerManifest } from "../server/api/manifest-discovery";
-import { assetKey } from "./asset-key";
-import { configuredModuleLayouts, discoverConfiguredRoutes, loadConfiguredModules, resolveConfigSources } from "./config";
-import { importSpecifier, pluginMode, pluginName, resolvedDocument } from "./module-loader";
-import { discoverRouteMiddleware } from "./route-middleware-discovery";
-import { discoverErrorPage } from "./routes-discovery";
+import { serializeJson } from '../core/server'
+import { discoverServerManifest } from '../server/api/manifest-discovery'
+import { assetKey } from './asset-key'
+import { configuredModuleLayouts, discoverConfiguredRoutes, loadConfiguredModules, resolveConfigSources } from './config'
+import { importSpecifier, pluginMode, pluginName, resolvedDocument } from './module-loader'
+import { discoverRouteMiddleware } from './route-middleware-discovery'
+import { discoverErrorPage } from './routes-discovery'
 
-export const frameworkClientEntry = ".meeko/generated/entry-client.ts";
-export const frameworkServerEntry = ".meeko/generated/entry-server.ts";
-export const frameworkNodeEntry = ".meeko/generated/entry-node.ts";
+export const frameworkClientEntry = '.meeko/generated/entry-client.ts'
+export const frameworkServerEntry = '.meeko/generated/entry-server.ts'
+export const frameworkNodeEntry = '.meeko/generated/entry-node.ts'
 /** Written by `meeko build` between the client and server builds. */
-export const buildDataFile = ".meeko/build/app-data.json";
+export const buildDataFile = '.meeko/build/app-data.json'
 
 /** Values only known after the client build; baked into the server bundle. */
 export interface BuildAppData {
-  readonly client: ClientAssets;
-  readonly assets: AssetManifest;
-  readonly node: { readonly host: string; readonly port: number };
-  /** Unique per `meeko build`; part of the ETag of cached pages. Missing in a build before 1.7. */
-  readonly buildId?: string;
+	readonly client: ClientAssets
+	readonly assets: AssetManifest
+	readonly node: { readonly host: string; readonly port: number }
+	/** Unique per `meeko build`; part of the ETag of cached pages. Missing in a build before 1.7. */
+	readonly buildId?: string
 }
 
 /** Converts an absolute source file into the project-relative key used by bundles. */
 export function moduleKey(root: string, file: string): string {
-  const path = relative(root, file).replaceAll("\\", "/");
-  if (!path || path === ".." || path.startsWith("../") || isAbsolute(path)) throw new Error(`Module outside Meeko project: ${file}`);
-  return `/${path}`;
+	const path = relative(root, file).replaceAll('\\', '/')
+	if (!path || path === '..' || path.startsWith('../') || isAbsolute(path)) throw new Error(`Module outside Meeko project: ${file}`)
+	return `/${path}`
 }
 
 /**
@@ -43,68 +43,74 @@ export function moduleKey(root: string, file: string): string {
  * `sidecars: "client"` keeps only the sidecars of `render: "client"` routes,
  * which are the only ones the browser may import, and leaves out the server route middleware.
  */
-export function portableRoutes(root: string, routes: readonly RouteRecord[], options: { sidecars: boolean | "client" }): RouteRecord[] {
-  const keepSidecar = (route: RouteRecord): boolean => options.sidecars === "client" ? route.render === "client" : options.sidecars;
-  return routes.map((route) => ({
-    id: route.id,
-    file: moduleKey(root, route.file),
-    layouts: route.layouts.map((layout) => moduleKey(root, layout)),
-    ...(route.error ? { error: moduleKey(root, route.error) } : {}),
-    ...(route.sidecar && keepSidecar(route) ? { sidecar: moduleKey(root, route.sidecar) } : {}),
-    ...(route.render ? { render: route.render } : {}),
-    ...(route.layout ? { layout: portableLayout(root, route.layout) } : {}),
-    ...(route.middleware?.length ? { middleware: route.middleware.map((file) => moduleKey(root, file)) } : {}),
-    ...(route.serverMiddleware?.length && options.sidecars !== "client" ? { serverMiddleware: route.serverMiddleware.map((file) => moduleKey(root, file)) } : {}),
-  }));
+export function portableRoutes(root: string, routes: readonly RouteRecord[], options: { sidecars: boolean | 'client' }): RouteRecord[] {
+	const keepSidecar = (route: RouteRecord): boolean => (options.sidecars === 'client' ? route.render === 'client' : options.sidecars)
+	return routes.map((route) => ({
+		id: route.id,
+		file: moduleKey(root, route.file),
+		layouts: route.layouts.map((layout) => moduleKey(root, layout)),
+		...(route.error ? { error: moduleKey(root, route.error) } : {}),
+		...(route.sidecar && keepSidecar(route) ? { sidecar: moduleKey(root, route.sidecar) } : {}),
+		...(route.render ? { render: route.render } : {}),
+		...(route.layout ? { layout: portableLayout(root, route.layout) } : {}),
+		...(route.middleware?.length ? { middleware: route.middleware.map((file) => moduleKey(root, file)) } : {}),
+		...(route.serverMiddleware?.length && options.sidecars !== 'client' ? { serverMiddleware: route.serverMiddleware.map((file) => moduleKey(root, file)) } : {}),
+	}))
 }
 
 function portableLayout(root: string, layout: NamedLayoutRecord): NamedLayoutRecord {
-  return { name: layout.name, file: moduleKey(root, layout.file), ...(layout.props ? { props: layout.props } : {}) };
+	return { name: layout.name, file: moduleKey(root, layout.file), ...(layout.props ? { props: layout.props } : {}) }
 }
 
 /** `app/error.meeko` of the project with module keys, or undefined without one. */
 export async function portableErrorPage(projectRoot: string): Promise<ErrorPageRecord | undefined> {
-  const root = resolve(projectRoot);
-  const page = await discoverErrorPage(root, { layouts: await configuredModuleLayouts(root) });
-  return page && {
-    file: moduleKey(root, page.file),
-    layouts: page.layouts.map((layout) => moduleKey(root, layout)),
-    ...(page.layout ? { layout: portableLayout(root, page.layout) } : {}),
-  };
+	const root = resolve(projectRoot)
+	const page = await discoverErrorPage(root, { layouts: await configuredModuleLayouts(root) })
+	return (
+		page && {
+			file: moduleKey(root, page.file),
+			layouts: page.layouts.map((layout) => moduleKey(root, layout)),
+			...(page.layout ? { layout: portableLayout(root, page.layout) } : {}),
+		}
+	)
 }
 
 async function scripts(directory: string, exclude: RegExp): Promise<string[]> {
-  let entries;
-  try { entries = await readdir(directory, { withFileTypes: true }); }
-  catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return []; throw error; }
-  const found: string[] = [];
-  for (const entry of entries) {
-    const file = join(directory, entry.name);
-    if (entry.isDirectory()) found.push(...await scripts(file, exclude));
-    else if (entry.isFile() && entry.name.endsWith(".ts") && !exclude.test(entry.name)) found.push(file);
-  }
-  return found;
+	let entries
+	try {
+		entries = await readdir(directory, { withFileTypes: true })
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []
+		throw error
+	}
+	const found: string[] = []
+	for (const entry of entries) {
+		const file = join(directory, entry.name)
+		if (entry.isDirectory()) found.push(...(await scripts(file, exclude)))
+		else if (entry.isFile() && entry.name.endsWith('.ts') && !exclude.test(entry.name)) found.push(file)
+	}
+	return found
 }
 
-const runtimeFiles = ["server/runtime.ts", "server/runtime.mts", "server/runtime.js", "server/runtime.mjs"];
+const runtimeFiles = ['server/runtime.ts', 'server/runtime.mts', 'server/runtime.js', 'server/runtime.mjs']
 
 /** Locates the optional application runtime module. */
 export function findRuntimeFile(root: string): string | undefined {
-  const found = runtimeFiles.map((file) => resolve(root, file)).filter((file) => existsSync(file));
-  if (found.length > 1) throw new Error(`Multiple server runtime files: ${found.join(", ")}`);
-  return found[0];
+	const found = runtimeFiles.map((file) => resolve(root, file)).filter((file) => existsSync(file))
+	if (found.length > 1) throw new Error(`Multiple server runtime files: ${found.join(', ')}`)
+	return found[0]
 }
 
 /** An app plugin in start order, with where it runs. */
 export interface AppPluginRecord {
-  readonly file: string;
-  readonly mode: "client" | "server" | "universal";
-  readonly options?: unknown;
-  readonly name: string;
+	readonly file: string
+	readonly mode: 'client' | 'server' | 'universal'
+	readonly options?: unknown
+	readonly name: string
 }
 
-const pluginScript = /\.[cm]?[jt]s$/;
-const excludedPluginScript = /\.(?:test|spec|d)\.[cm]?[jt]s$/;
+const pluginScript = /\.[cm]?[jt]s$/
+const excludedPluginScript = /\.(?:test|spec|d)\.[cm]?[jt]s$/
 
 /**
  * The app plugins in start order: those the modules add (in the order they add them), then the
@@ -112,114 +118,124 @@ const excludedPluginScript = /\.(?:test|spec|d)\.[cm]?[jt]s$/;
  * inside `app/plugins` are plugins; subdirectories can hold their helpers.
  */
 export async function discoverAppPlugins(projectRoot: string): Promise<AppPluginRecord[]> {
-  const root = resolve(projectRoot);
-  const { config, modules } = await loadConfiguredModules(root);
-  const sources = await resolveConfigSources(root, config);
-  const result: AppPluginRecord[] = modules.plugins.map((plugin) => ({
-    file: plugin.file, mode: plugin.mode, name: `${plugin.module}: ${pluginName(root, plugin.file)}`,
-    ...(plugin.options === undefined ? {} : { options: plugin.options }),
-  }));
-  for (const source of [...sources.slice(1), sources[0]!]) {
-    const directory = join(source.root, "app", "plugins");
-    let entries;
-    try { entries = await readdir(directory, { withFileTypes: true }); }
-    catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") continue; throw error; }
-    const files = entries.filter((entry) => entry.isFile() && pluginScript.test(entry.name) && !excludedPluginScript.test(entry.name))
-      .map((entry) => entry.name).sort((left, right) => left.localeCompare(right));
-    for (const name of files) {
-      const file = join(directory, name);
-      result.push({ file, mode: pluginMode(file, undefined), name: pluginName(root, file) });
-    }
-  }
-  return result;
+	const root = resolve(projectRoot)
+	const { config, modules } = await loadConfiguredModules(root)
+	const sources = await resolveConfigSources(root, config)
+	const result: AppPluginRecord[] = modules.plugins.map((plugin) => ({
+		file: plugin.file,
+		mode: plugin.mode,
+		name: `${plugin.module}: ${pluginName(root, plugin.file)}`,
+		...(plugin.options === undefined ? {} : { options: plugin.options }),
+	}))
+	for (const source of [...sources.slice(1), sources[0]!]) {
+		const directory = join(source.root, 'app', 'plugins')
+		let entries
+		try {
+			entries = await readdir(directory, { withFileTypes: true })
+		} catch (error) {
+			if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue
+			throw error
+		}
+		const files = entries
+			.filter((entry) => entry.isFile() && pluginScript.test(entry.name) && !excludedPluginScript.test(entry.name))
+			.map((entry) => entry.name)
+			.sort((left, right) => left.localeCompare(right))
+		for (const name of files) {
+			const file = join(directory, name)
+			result.push({ file, mode: pluginMode(file, undefined), name: pluginName(root, file) })
+		}
+	}
+	return result
 }
 
 /** Module source that imports `plugins` statically and exports them as `PluginRegistration`s. */
 function pluginRegistrations(root: string, plugins: readonly AppPluginRecord[]): { imports: string[]; list: string } {
-  const imports = plugins.map((plugin, index) => `import plugin${index} from ${JSON.stringify(importSpecifier(root, plugin.file))};`);
-  const entries = plugins.map((plugin, index) => `{ plugin: plugin${index}, name: ${JSON.stringify(plugin.name)}${plugin.options === undefined ? "" : `, options: ${serializeJson(plugin.options)}`} }`);
-  return { imports, list: `[${entries.join(", ")}]` };
+	const imports = plugins.map((plugin, index) => `import plugin${index} from ${JSON.stringify(importSpecifier(root, plugin.file))};`)
+	const entries = plugins.map((plugin, index) => `{ plugin: plugin${index}, name: ${JSON.stringify(plugin.name)}${plugin.options === undefined ? '' : `, options: ${serializeJson(plugin.options)}`} }`)
+	return { imports, list: `[${entries.join(', ')}]` }
 }
 
 /** Source of `virtual:meeko-plugins/client`: the plugins that run in the browser, in start order. */
 export async function clientPluginsSource(projectRoot: string): Promise<string> {
-  const root = resolve(projectRoot);
-  const plugins = (await discoverAppPlugins(root)).filter((plugin) => plugin.mode !== "server");
-  const { imports, list } = pluginRegistrations(root, plugins);
-  return [...imports, `export const plugins = ${list};`, ""].join("\n");
+	const root = resolve(projectRoot)
+	const plugins = (await discoverAppPlugins(root)).filter((plugin) => plugin.mode !== 'server')
+	const { imports, list } = pluginRegistrations(root, plugins)
+	return [...imports, `export const plugins = ${list};`, ''].join('\n')
 }
 
 /** Discovers every module the server may load and returns the manifest with module keys. */
 export async function discoverAppManifest(projectRoot: string, client: ClientAssets, assets?: AssetManifest): Promise<{ manifest: AppManifest; modules: string[]; runtime?: string }> {
-  const root = resolve(projectRoot);
-  const routes = portableRoutes(root, await discoverConfiguredRoutes(root), { sidecars: true });
-  const server = await discoverServerManifest(root);
-  const { config, modules: projectModules } = await loadConfiguredModules(root);
-  // Global isomorphic route middleware; each route lists its named middleware and its whole
-  // server route middleware chain (global and named).
-  const routeMiddleware = (await discoverRouteMiddleware(root)).global.map((file) => moduleKey(root, file));
-  // Module middleware runs first, in the order the modules add it.
-  const serverMiddleware = [
-    ...projectModules.serverMiddleware.map((file) => importSpecifier(root, file)),
-    ...(await scripts(resolve(root, "server", "middleware"), /\.(?:test|spec|d|client)\.ts$/)).map((file) => moduleKey(root, file)).sort(),
-  ];
-  const serverHandlers = projectModules.serverHandlers.map(({ route, file }) => ({ route, file: importSpecifier(root, file) }));
-  const errorPage = await portableErrorPage(root);
-  const document = resolvedDocument(config, projectModules);
-  // The response headers of the adapters with a server; the static adapter writes its own files.
-  const response = config.server && config.server.adapter !== "static" ? config.server : undefined;
-  // The headers of a module's public file, by the pathname a request for it has.
-  const publicFileHeaders = config.server?.adapter === "static" ? [] : [...projectModules.publicFileHeaders].map(([path, headers]) => [assetKey(path.split("/")), headers] as const);
-  const manifest: AppManifest = {
-    version: 1,
-    routes,
-    ...(errorPage ? { errorPage } : {}),
-    ...(document ? { document } : {}),
-    ...(response?.contentSecurityPolicy ? { contentSecurityPolicy: response.contentSecurityPolicy } : {}),
-    ...(response?.headers ? { headers: response.headers } : {}),
-    ...(publicFileHeaders.length ? { publicFileHeaders: Object.fromEntries(publicFileHeaders) } : {}),
-    server: {
-      api: server.api.map((endpoint) => ({ ...endpoint, file: moduleKey(root, endpoint.file) })),
-      rpc: server.rpc.map((endpoint) => ({ ...endpoint, file: moduleKey(root, endpoint.file) })),
-      socket: (server.socket ?? []).map((endpoint) => ({ ...endpoint, file: moduleKey(root, endpoint.file) })),
-    },
-    routeMiddleware,
-    serverMiddleware,
-    ...(serverHandlers.length ? { serverHandlers } : {}),
-    client,
-    ...(assets ? { assets } : {}),
-  };
-  const modules = new Set<string>();
-  for (const route of routes) {
-    for (const key of [route.file, ...route.layouts, ...(route.error ? [route.error] : []), ...(route.sidecar ? [route.sidecar] : []), ...route.middleware ?? [], ...route.serverMiddleware ?? []]) modules.add(key);
-  }
-  if (errorPage) for (const key of [errorPage.file, ...errorPage.layouts]) modules.add(key);
-  for (const endpoint of [...manifest.server.api, ...manifest.server.rpc, ...manifest.server.socket ?? []]) modules.add(endpoint.file);
-  for (const key of [...routeMiddleware, ...serverMiddleware, ...serverHandlers.map((handler) => handler.file)]) modules.add(key);
-  const runtimeFile = findRuntimeFile(root);
-  return { manifest, modules: [...modules].sort(), ...(runtimeFile ? { runtime: moduleKey(root, runtimeFile) } : {}) };
+	const root = resolve(projectRoot)
+	const routes = portableRoutes(root, await discoverConfiguredRoutes(root), { sidecars: true })
+	const server = await discoverServerManifest(root)
+	const { config, modules: projectModules } = await loadConfiguredModules(root)
+	// Global isomorphic route middleware; each route lists its named middleware and its whole
+	// server route middleware chain (global and named).
+	const routeMiddleware = (await discoverRouteMiddleware(root)).global.map((file) => moduleKey(root, file))
+	// Module middleware runs first, in the order the modules add it.
+	const serverMiddleware = [
+		...projectModules.serverMiddleware.map((file) => importSpecifier(root, file)),
+		...(await scripts(resolve(root, 'server', 'middleware'), /\.(?:test|spec|d|client)\.ts$/)).map((file) => moduleKey(root, file)).sort(),
+	]
+	const serverHandlers = projectModules.serverHandlers.map(({ route, file }) => ({ route, file: importSpecifier(root, file) }))
+	const errorPage = await portableErrorPage(root)
+	const document = resolvedDocument(config, projectModules)
+	// The response headers of the adapters with a server; the static adapter writes its own files.
+	const response = config.server && config.server.adapter !== 'static' ? config.server : undefined
+	// The headers of a module's public file, by the pathname a request for it has.
+	const publicFileHeaders = config.server?.adapter === 'static' ? [] : [...projectModules.publicFileHeaders].map(([path, headers]) => [assetKey(path.split('/')), headers] as const)
+	const manifest: AppManifest = {
+		version: 1,
+		routes,
+		...(errorPage ? { errorPage } : {}),
+		...(document ? { document } : {}),
+		...(response?.contentSecurityPolicy ? { contentSecurityPolicy: response.contentSecurityPolicy } : {}),
+		...(response?.headers ? { headers: response.headers } : {}),
+		...(publicFileHeaders.length ? { publicFileHeaders: Object.fromEntries(publicFileHeaders) } : {}),
+		server: {
+			api: server.api.map((endpoint) => ({ ...endpoint, file: moduleKey(root, endpoint.file) })),
+			rpc: server.rpc.map((endpoint) => ({ ...endpoint, file: moduleKey(root, endpoint.file) })),
+			socket: (server.socket ?? []).map((endpoint) => ({ ...endpoint, file: moduleKey(root, endpoint.file) })),
+		},
+		routeMiddleware,
+		serverMiddleware,
+		...(serverHandlers.length ? { serverHandlers } : {}),
+		client,
+		...(assets ? { assets } : {}),
+	}
+	const modules = new Set<string>()
+	for (const route of routes) {
+		for (const key of [route.file, ...route.layouts, ...(route.error ? [route.error] : []), ...(route.sidecar ? [route.sidecar] : []), ...(route.middleware ?? []), ...(route.serverMiddleware ?? [])]) modules.add(key)
+	}
+	if (errorPage) for (const key of [errorPage.file, ...errorPage.layouts]) modules.add(key)
+	for (const endpoint of [...manifest.server.api, ...manifest.server.rpc, ...(manifest.server.socket ?? [])]) modules.add(endpoint.file)
+	for (const key of [...routeMiddleware, ...serverMiddleware, ...serverHandlers.map((handler) => handler.file)]) modules.add(key)
+	const runtimeFile = findRuntimeFile(root)
+	return { manifest, modules: [...modules].sort(), ...(runtimeFile ? { runtime: moduleKey(root, runtimeFile) } : {}) }
 }
 
 /** `name` of the project's package.json, for the default Redis prefix of the sessions. */
 async function packageName(root: string): Promise<string | undefined> {
-  try {
-    const metadata = JSON.parse(await readFile(join(root, "package.json"), "utf8")) as { name?: unknown };
-    return typeof metadata.name === "string" && metadata.name ? metadata.name : undefined;
-  } catch { return undefined; }
+	try {
+		const metadata = JSON.parse(await readFile(join(root, 'package.json'), 'utf8')) as { name?: unknown }
+		return typeof metadata.name === 'string' && metadata.name ? metadata.name : undefined
+	} catch {
+		return undefined
+	}
 }
 
 /** Whether the project can import the `redis` package, so the server bundle may load it. */
 export function projectHasRedis(root: string): boolean {
-  try {
-    createRequire(join(root, "package.json")).resolve("redis");
-    return true;
-  } catch {
-    // A package without a require entry still installs its package.json.
-    for (let directory = resolve(root); ; directory = dirname(directory)) {
-      if (existsSync(join(directory, "node_modules", "redis", "package.json"))) return true;
-      if (dirname(directory) === directory) return false;
-    }
-  }
+	try {
+		createRequire(join(root, 'package.json')).resolve('redis')
+		return true
+	} catch {
+		// A package without a require entry still installs its package.json.
+		for (let directory = resolve(root); ; directory = dirname(directory)) {
+			if (existsSync(join(directory, 'node_modules', 'redis', 'package.json'))) return true
+			if (dirname(directory) === directory) return false
+		}
+	}
 }
 
 /**
@@ -227,32 +243,35 @@ export function projectHasRedis(root: string): boolean {
  * leaves the `redis` package out, as in Workers, which cannot open TCP connections.
  */
 export async function serverAppSource(projectRoot: string, build: BuildAppData | undefined, options: { readonly redis?: boolean } = {}): Promise<string> {
-  const client: ClientAssets = build?.client ?? { entry: `/${frameworkClientEntry}`, css: [], preload: [] };
-  const discovered = await discoverAppManifest(projectRoot, client, build?.assets);
-  const { modules, runtime } = discovered;
-  const manifest: AppManifest = build?.buildId ? { ...discovered.manifest, buildId: build.buildId } : discovered.manifest;
-  const entries = modules.map((key) => `  ${JSON.stringify(key)}: () => import(${JSON.stringify(key)})`).join(",\n");
-  const root = resolve(projectRoot);
-  const plugins = pluginRegistrations(root, (await discoverAppPlugins(root)).filter((plugin) => plugin.mode !== "client"));
-  const name = await packageName(root);
-  // Only an installed redis joins the bundle: without it, MEEKO_REDIS_URL fails with a clear error.
-  const redis = options.redis !== false && projectHasRedis(root);
-  return [
-    runtime ? `import runtimeModule from ${JSON.stringify(runtime)};` : "const runtimeModule = undefined;",
-    ...plugins.imports,
-    `export const manifest = ${serializeJson(manifest)};`,
-    `export const runtime = runtimeModule;`,
-    `export const plugins = ${plugins.list};`,
-    `export const appName = ${name === undefined ? "undefined" : JSON.stringify(name)};`,
-    redis ? `export const loadRedis = () => import("redis");` : "export const loadRedis = undefined;",
-    `export const nodeServer = ${JSON.stringify(build?.node ?? { host: "127.0.0.1", port: 4173 })};`,
-    `const modules = {\n${entries}\n};`,
-    "export async function load(key) {",
-    "  if (!Object.hasOwn(modules, key)) throw new Error(\"Meeko module missing from the build: \" + key);",
-    "  return modules[key]();",
-    "}",
-    "",
-  ].join("\n");
+	const client: ClientAssets = build?.client ?? { entry: `/${frameworkClientEntry}`, css: [], preload: [] }
+	const discovered = await discoverAppManifest(projectRoot, client, build?.assets)
+	const { modules, runtime } = discovered
+	const manifest: AppManifest = build?.buildId ? { ...discovered.manifest, buildId: build.buildId } : discovered.manifest
+	const entries = modules.map((key) => `  ${JSON.stringify(key)}: () => import(${JSON.stringify(key)})`).join(',\n')
+	const root = resolve(projectRoot)
+	const plugins = pluginRegistrations(
+		root,
+		(await discoverAppPlugins(root)).filter((plugin) => plugin.mode !== 'client'),
+	)
+	const name = await packageName(root)
+	// Only an installed redis joins the bundle: without it, MEEKO_REDIS_URL fails with a clear error.
+	const redis = options.redis !== false && projectHasRedis(root)
+	return [
+		runtime ? `import runtimeModule from ${JSON.stringify(runtime)};` : 'const runtimeModule = undefined;',
+		...plugins.imports,
+		`export const manifest = ${serializeJson(manifest)};`,
+		`export const runtime = runtimeModule;`,
+		`export const plugins = ${plugins.list};`,
+		`export const appName = ${name === undefined ? 'undefined' : JSON.stringify(name)};`,
+		redis ? `export const loadRedis = () => import("redis");` : 'export const loadRedis = undefined;',
+		`export const nodeServer = ${JSON.stringify(build?.node ?? { host: '127.0.0.1', port: 4173 })};`,
+		`const modules = {\n${entries}\n};`,
+		'export async function load(key) {',
+		'  if (!Object.hasOwn(modules, key)) throw new Error("Meeko module missing from the build: " + key);',
+		'  return modules[key]();',
+		'}',
+		'',
+	].join('\n')
 }
 
 /**
@@ -260,8 +279,8 @@ export async function serverAppSource(projectRoot: string, build: BuildAppData |
  * browser bundle may carry it too.
  */
 export async function documentManifest(projectRoot: string): Promise<DocumentConfig | undefined> {
-  const { config, modules } = await loadConfiguredModules(projectRoot);
-  return resolvedDocument(config, modules);
+	const { config, modules } = await loadConfiguredModules(projectRoot)
+	return resolvedDocument(config, modules)
 }
 
 /**
@@ -269,12 +288,12 @@ export async function documentManifest(projectRoot: string): Promise<DocumentCon
  * configuration for client navigation.
  */
 export async function clientRoutesSource(projectRoot: string): Promise<string> {
-  const root = resolve(projectRoot);
-  const routes = portableRoutes(root, await discoverConfiguredRoutes(root), { sidecars: "client" });
-  const errorPage = await portableErrorPage(root);
-  const { config, modules } = await loadConfiguredModules(root);
-  const document = resolvedDocument(config, modules);
-  return `export const routes = ${serializeJson(routes)};\nexport const errorPage = ${errorPage ? serializeJson(errorPage) : "undefined"};\nexport const documentConfig = ${document ? serializeJson(document) : "undefined"};\nexport const viewTransitions = ${config.viewTransitions === true};\n`;
+	const root = resolve(projectRoot)
+	const routes = portableRoutes(root, await discoverConfiguredRoutes(root), { sidecars: 'client' })
+	const errorPage = await portableErrorPage(root)
+	const { config, modules } = await loadConfiguredModules(root)
+	const document = resolvedDocument(config, modules)
+	return `export const routes = ${serializeJson(routes)};\nexport const errorPage = ${errorPage ? serializeJson(errorPage) : 'undefined'};\nexport const documentConfig = ${document ? serializeJson(document) : 'undefined'};\nexport const viewTransitions = ${config.viewTransitions === true};\n`
 }
 
 /**
@@ -283,11 +302,11 @@ export async function clientRoutesSource(projectRoot: string): Promise<string> {
  * rejects server-only imports.
  */
 export async function clientSidecarsSource(projectRoot: string): Promise<string> {
-  const root = resolve(projectRoot);
-  const routes = portableRoutes(root, await discoverConfiguredRoutes(root), { sidecars: "client" });
-  const keys = [...new Set(routes.flatMap((route) => route.sidecar ? [route.sidecar] : []))].sort();
-  const entries = keys.map((key) => `${JSON.stringify(key)}: () => import(${JSON.stringify(key)})`);
-  return `export const modules = {${entries.join(",")}};\n`;
+	const root = resolve(projectRoot)
+	const routes = portableRoutes(root, await discoverConfiguredRoutes(root), { sidecars: 'client' })
+	const keys = [...new Set(routes.flatMap((route) => (route.sidecar ? [route.sidecar] : [])))].sort()
+	const entries = keys.map((key) => `${JSON.stringify(key)}: () => import(${JSON.stringify(key)})`)
+	return `export const modules = {${entries.join(',')}};\n`
 }
 
 /**
@@ -297,23 +316,24 @@ export async function clientSidecarsSource(projectRoot: string): Promise<string>
  * (`*.server.ts`) never joins it.
  */
 export async function clientMiddlewareSource(projectRoot: string): Promise<string> {
-  const root = resolve(projectRoot);
-  const global = (await discoverRouteMiddleware(root)).global.map((file) => moduleKey(root, file));
-  const routes = portableRoutes(root, await discoverConfiguredRoutes(root), { sidecars: false });
-  const named = [...new Set(routes.flatMap((route) => route.middleware ?? []))].sort();
-  return [
-    ...global.map((key, index) => `import * as middleware${index} from ${JSON.stringify(key)};`),
-    `export const middleware = [${global.map((key, index) => `[${JSON.stringify(key)}, middleware${index}]`).join(", ")}];`,
-    `export const namedMiddleware = {${named.map((key) => `${JSON.stringify(key)}: () => import(${JSON.stringify(key)})`).join(", ")}};`,
-    "",
-  ].join("\n");
+	const root = resolve(projectRoot)
+	const global = (await discoverRouteMiddleware(root)).global.map((file) => moduleKey(root, file))
+	const routes = portableRoutes(root, await discoverConfiguredRoutes(root), { sidecars: false })
+	const named = [...new Set(routes.flatMap((route) => route.middleware ?? []))].sort()
+	return [
+		...global.map((key, index) => `import * as middleware${index} from ${JSON.stringify(key)};`),
+		`export const middleware = [${global.map((key, index) => `[${JSON.stringify(key)}, middleware${index}]`).join(', ')}];`,
+		`export const namedMiddleware = {${named.map((key) => `${JSON.stringify(key)}: () => import(${JSON.stringify(key)})`).join(', ')}};`,
+		'',
+	].join('\n')
 }
 
 /** Reads the client build data written by `meeko build`. */
 export async function readBuildAppData(projectRoot: string): Promise<BuildAppData> {
-  try { return JSON.parse(await readFile(resolve(projectRoot, buildDataFile), "utf8")) as BuildAppData; }
-  catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") throw new Error("Client build data is missing; run meeko build");
-    throw error;
-  }
+	try {
+		return JSON.parse(await readFile(resolve(projectRoot, buildDataFile), 'utf8')) as BuildAppData
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code === 'ENOENT') throw new Error('Client build data is missing; run meeko build')
+		throw error
+	}
 }

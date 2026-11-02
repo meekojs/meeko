@@ -12,7 +12,7 @@ related:
   - "@meekojs/meeko#provide"
   - "@meekojs/meeko#createRoot"
   - docs/api.md#ciclo-de-vida
-source-hash: f15a6ae489573ccb3d6f9f87be3762825f6cb1b99deedb3596a764b11f2e3336
+source-hash: 36401ae24d5480da99567934ec270b7234ab6a755de3d2bb1af9394bfb2d3516
 ---
 
 `inject(key)` walks up the active component's roots (the component itself, its parent, its parent's parent…) and returns the value from the first one that provided `key` with [`provide`](/en/docs/reference/provide). If none did, it throws an error with the key's description instead of returning `undefined`: a missing context is a structural failure, not a case the template should handle.

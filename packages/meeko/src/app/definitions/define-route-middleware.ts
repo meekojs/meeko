@@ -1,4 +1,4 @@
-import type { RouteMiddleware, RouteMiddlewareOptions } from "../middleware/runtime";
+import type { RouteMiddleware, RouteMiddlewareOptions } from '../middleware/runtime'
 
 /**
  * Declara el middleware de ruta que exporta por defecto un archivo de `app/middleware/`. Meeko
@@ -40,6 +40,6 @@ import type { RouteMiddleware, RouteMiddlewareOptions } from "../middleware/runt
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#middleware-de-rutas-y-servidor
  */
 export function defineRouteMiddleware(middleware: RouteMiddleware, options?: RouteMiddlewareOptions): RouteMiddleware {
-  void options;
-  return middleware;
+	void options
+	return middleware
 }

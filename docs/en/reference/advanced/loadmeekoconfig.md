@@ -13,7 +13,7 @@ related:
   - "config:server"
   - "config:layers"
   - docs/framework.md#configuración
-source-hash: f3daccc8b2675eeb2ecf3bb41b753c5d5ed90d08c474e101d40e5429c19dbb08
+source-hash: 59dca33dee089452ac0982009f272f055bebe6fd5a6f5fdf072fbb6f6200bfc1
 ---
 
 `loadMeekoConfig` imports a project's configuration like `meeko dev`, `meeko check` and `meeko build`: it looks for `meeko.config.ts`, `.mts`, `.js` or `.mjs` in the folder, imports it using Node 24's TypeScript support (without compiling or bundling) and validates fields Meeko knows. It returns the default export, or `{}` if the project has no configuration.

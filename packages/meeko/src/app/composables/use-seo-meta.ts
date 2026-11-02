@@ -1,8 +1,8 @@
-import type { HeadSource, SeoMetaInput } from "../../shared/head";
+import type { HeadSource, SeoMetaInput } from '../../shared/head'
 
-import { seoMetaHead } from "../../shared/head";
-import { reader } from "../runtime/head";
-import { useHead } from "./use-head";
+import { seoMetaHead } from '../../shared/head'
+import { reader } from '../runtime/head'
+import { useHead } from './use-head'
 
 /**
  * Atajo tipado de {@link useHead} para SEO: cada campo produce la etiqueta correcta, `name` en
@@ -28,7 +28,6 @@ import { useHead } from "./use-head";
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#head-del-documento-document-usehead-y-useseometa
  */
 export function useSeoMeta(input: HeadSource<SeoMetaInput>): void {
-  const read = reader(input);
-  useHead(() => seoMetaHead(read()));
+	const read = reader(input)
+	useHead(() => seoMetaHead(read()))
 }
-

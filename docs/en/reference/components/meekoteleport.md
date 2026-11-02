@@ -14,7 +14,7 @@ related:
   - "@meekojs/meeko/framework#useLayout"
   - "@meekojs/meeko#provide"
   - docs/framework.md#meekoteleport
-source-hash: 592595f23aaf526b833ae42a542ea5f09c22f2fab2c6a76a490e81081e75de91
+source-hash: 5a671ab1748afea981fcb232d56005e30e5ddb9ef0c7ab6fb1a9eb2dd659590a
 ---
 
 Sometimes a component's markup must appear elsewhere on the page: a page's buttons in its layout's toolbar, breadcrumbs in the header, an alert at the end of `<body>`. `<MeekoTeleport to="…">` renders its content at that target, but the content **still belongs to the declaring component**: it reads its signals, its events call its functions, it receives its `provide`/`inject` and error handlers, and keeps its `<style scoped>` attribute. It is disposed of with the component, leaving no nodes in the target.

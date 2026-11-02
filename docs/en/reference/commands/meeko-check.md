@@ -14,7 +14,7 @@ related:
   - docs/framework.md#autoimports-y-typescript
   - docs/framework.md#tipos-de-los-servicios
   - docs/editors.md#comprobación-del-proyecto
-source-hash: 6c54613ebbb6671a8e6fa53c9869eb4b61d47218e0b92d56fd93762b8b968d65
+source-hash: 9d977d58789ef0e48252b5cd3f7a15e38fb27fe618f7aa4e21954cc59eb7b23f
 ---
 
 `meeko check` is the complete application check: the one that must pass in CI before `meeko build`. With a directory (the current one by default), it generates the same files as `meeko dev` in `.meeko/` (entry points, manifests, declarations for routes, contracts, auto-imports, components and, since `1.7`, `.meeko/types/services.d.ts`), checks each application `.meeko` and its prop contracts, then runs TypeScript on the three generated projects: `app`, `server` and `shared`.

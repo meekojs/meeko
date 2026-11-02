@@ -38,12 +38,12 @@ Al recargar, la vista elegida vuelve; en otra pestaña abierta cambia a la vez.
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `key` | `string` | obligatorio | Clave del almacenamiento, como `"pos:ticket"`. Incluye lo que la distinga entre usuarios o cuentas si comparten navegador. Vacía lanza `TypeError`. |
-| `initial` | `T` | obligatorio | Valor en SSR, durante la hidratación, cuando no hay nada guardado y cuando lo guardado no es válido. Fija `T`. |
-| `options.storage` | `"local" \| "session"` | `"local"` | `"local"` persiste entre sesiones y pestañas; `"session"`, sólo en la pestaña actual. |
-| `options.schema` | Standard Schema síncrono | ninguno | Valida lo que se lee, también lo que llega de otra pestaña. Con él, el tipo de la señal sale del schema. |
+| Parámetro         | Tipo                     | Por defecto | Descripción                                                                                                                                         |
+| ----------------- | ------------------------ | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `key`             | `string`                 | obligatorio | Clave del almacenamiento, como `"pos:ticket"`. Incluye lo que la distinga entre usuarios o cuentas si comparten navegador. Vacía lanza `TypeError`. |
+| `initial`         | `T`                      | obligatorio | Valor en SSR, durante la hidratación, cuando no hay nada guardado y cuando lo guardado no es válido. Fija `T`.                                      |
+| `options.storage` | `"local" \| "session"`   | `"local"`   | `"local"` persiste entre sesiones y pestañas; `"session"`, sólo en la pestaña actual.                                                               |
+| `options.schema`  | Standard Schema síncrono | ninguno     | Valida lo que se lee, también lo que llega de otra pestaña. Con él, el tipo de la señal sale del schema.                                            |
 
 ## Valor devuelto
 
@@ -75,6 +75,7 @@ const clear = (): void => { lines.value = []; };
 Otro script, una versión anterior de la aplicación o el propio usuario pueden dejar en el almacenamiento algo inesperado. Con `schema`, un valor inválido se ignora y la señal vale `initial`:
 
 <!-- no-check -->
+
 ```ts
 import * as v from "valibot";
 
@@ -107,6 +108,7 @@ lines.value.push(line);
 No hay error, pero la señal no avisa y el almacenamiento no se escribe: tras recargar, la línea no está. Asigna un valor nuevo:
 
 <!-- no-check -->
+
 ```ts good
 lines.value = [...lines.value, line];
 ```
@@ -121,6 +123,7 @@ theme.value = 1;
 `meeko check` da `TS2322: Type 'number' is not assignable to type 'string'`: `initial` fija el tipo. Para una unión, escríbela: `useStorage<"light" | "dark">("theme", "light")`.
 
 <!-- no-check -->
+
 ```ts good
 theme.value = "dark";
 ```
@@ -136,6 +139,7 @@ function remember(id: string): void {
 En ejecución lanza `Error: useStorage("last:item") must be called while a component script runs`. Crea la señal en el script y escríbela en el manejador:
 
 <!-- no-check -->
+
 ```ts good
 const lastItem = useStorage("last:item", "");
 function remember(id: string): void { lastItem.value = id; }
@@ -150,6 +154,7 @@ const token = useStorage("auth:token", "");
 Cualquier script de la página puede leer `localStorage`: un token guardado ahí está expuesto a cualquier XSS. La sesión de Meeko ya vive en una cookie `HttpOnly`; no guardes credenciales en el almacenamiento.
 
 <!-- no-check -->
+
 ```ts good
 const lastSearch = useStorage("search:last", ""); // sólo preferencias y estado no sensible
 ```

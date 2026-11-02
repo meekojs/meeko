@@ -16,7 +16,7 @@ related:
   - docs/framework.md#código-de-servidor-de-la-página
   - docs/framework.md#reglas-comunes
   - docs/framework.md#dónde-se-usa-cada-api
-source-hash: 75af6e589eae98673e688fce21768e69d981dcb4e932d1627d5b0f9a9f285d88
+source-hash: a40de7461157d0a74c351f2ce19bd9903f09f2b0415e16d91b9774f2df91d0af
 ---
 
 `<script server lang="ts">` is an `app/pages` page's server code, in its `.meeko` file. It never forms part of the component or reaches the browser (except with `render: "client"`): it runs on the server, with `server/utils` auto-imports, and can import `server/`, `*.server.*` modules and secrets.

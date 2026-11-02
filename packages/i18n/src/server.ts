@@ -1,10 +1,10 @@
-import { usePage } from "@meekojs/meeko/framework";
+import { usePage } from '@meekojs/meeko/framework'
 
-import type { I18n } from "./context";
-import type { GeneratedI18nLocales } from "./index";
-import type { Catalog, Message } from "./messages";
+import type { I18n } from './context'
+import type { GeneratedI18nLocales } from './index'
+import type { Catalog, Message } from './messages'
 
-import { createI18n, localeOf } from "./runtime";
+import { createI18n, localeOf } from './runtime'
 
 /**
  * Idioma configurado: los de los catálogos del proyecto, que genera el módulo, o cualquier texto sin
@@ -18,7 +18,7 @@ import { createI18n, localeOf } from "./runtime";
  * const locale: I18nLocale = "en";
  * ```
  */
-export type I18nLocale = keyof GeneratedI18nLocales extends never ? string : keyof GeneratedI18nLocales & string;
+export type I18nLocale = keyof GeneratedI18nLocales extends never ? string : keyof GeneratedI18nLocales & string
 
 /**
  * Traductor de la petición de una página, que devuelve {@link usePageI18n}. Es el de `useI18n()`,
@@ -34,22 +34,22 @@ export type I18nLocale = keyof GeneratedI18nLocales extends never ? string : key
  * }
  * ```
  */
-export type PageI18n = Omit<I18n, "locale"> & { readonly locale: I18nLocale };
+export type PageI18n = Omit<I18n, 'locale'> & { readonly locale: I18nLocale }
 
 /** Every namespace of a locale. A process keeps one copy: the messages never change between requests. */
-const loaded = new Map<string, Promise<Catalog>>();
+const loaded = new Map<string, Promise<Catalog>>()
 
 function catalogOf(locale: string, namespaces: Readonly<Record<string, () => Promise<{ readonly default: Catalog }>>>): Promise<Catalog> {
-  let catalog = loaded.get(locale);
-  if (!catalog) {
-    catalog = Promise.all(Object.values(namespaces).map((load) => load())).then((modules) => {
-      const messages: Record<string, Message> = Object.create(null);
-      for (const module of modules) Object.assign(messages, module.default);
-      return messages;
-    });
-    loaded.set(locale, catalog);
-  }
-  return catalog;
+	let catalog = loaded.get(locale)
+	if (!catalog) {
+		catalog = Promise.all(Object.values(namespaces).map((load) => load())).then((modules) => {
+			const messages: Record<string, Message> = Object.create(null)
+			for (const module of modules) Object.assign(messages, module.default)
+			return messages
+		})
+		loaded.set(locale, catalog)
+	}
+	return catalog
 }
 
 /**
@@ -73,21 +73,27 @@ function catalogOf(locale: string, namespaces: Readonly<Record<string, () => Pro
  * ```
  */
 export async function usePageI18n(): Promise<PageI18n> {
-  const { url } = usePage();
-  // Only a Meeko build resolves this module: imported statically, this public entry would not load in plain Node.
-  const { catalogs, settings } = await import("virtual:meeko-i18n");
-  const { locales, defaultLocale, directions } = settings;
-  const locale = localeOf(url.pathname, locales, defaultLocale);
-  const entries = await Promise.all(locales.map(async (target) => [target, await catalogOf(target, catalogs[target]!)] as const));
-  const all = Object.fromEntries(entries);
-  const reported = new Set<string>();
-  return createI18n({
-    locale, locales, defaultLocale, directions, catalog: all[locale]!, foreign: all, cookie: false,
-    path: () => `${url.pathname}${url.search}`,
-    missing: (key, target) => {
-      if (!reported.has(`${target}:${key}`)) console.warn(`[meeko:i18n] Missing message ${key} for ${target} in the <script server> of ${url.pathname}`);
-      reported.add(`${target}:${key}`);
-      return key;
-    },
-  }) as PageI18n;
+	const { url } = usePage()
+	// Only a Meeko build resolves this module: imported statically, this public entry would not load in plain Node.
+	const { catalogs, settings } = await import('virtual:meeko-i18n')
+	const { locales, defaultLocale, directions } = settings
+	const locale = localeOf(url.pathname, locales, defaultLocale)
+	const entries = await Promise.all(locales.map(async (target) => [target, await catalogOf(target, catalogs[target]!)] as const))
+	const all = Object.fromEntries(entries)
+	const reported = new Set<string>()
+	return createI18n({
+		locale,
+		locales,
+		defaultLocale,
+		directions,
+		catalog: all[locale]!,
+		foreign: all,
+		cookie: false,
+		path: () => `${url.pathname}${url.search}`,
+		missing: (key, target) => {
+			if (!reported.has(`${target}:${key}`)) console.warn(`[meeko:i18n] Missing message ${key} for ${target} in the <script server> of ${url.pathname}`)
+			reported.add(`${target}:${key}`)
+			return key
+		},
+	}) as PageI18n
 }

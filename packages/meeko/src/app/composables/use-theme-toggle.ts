@@ -1,12 +1,16 @@
-import type { ReadonlySignal } from "../../core/reactivity";
-import type { ThemeState, ThemeToggleContext, ThemeToggleState } from "../../shared/theme";
+import type { ReadonlySignal } from '../../core/reactivity'
+import type { ThemeState, ThemeToggleContext, ThemeToggleState } from '../../shared/theme'
 
-import { themeChoices } from "../../shared/theme";
-import { browserTheme } from "../runtime/theme-browser";
-import { currentServerTheme, useServerTheme } from "../runtime/theme-context";
+import { themeChoices } from '../../shared/theme'
+import { browserTheme } from '../runtime/theme-browser'
+import { currentServerTheme, useServerTheme } from '../runtime/theme-context'
 
 function constant<T>(value: T): ReadonlySignal<T> {
-  return Object.freeze({ get value() { return value; } });
+	return Object.freeze({
+		get value() {
+			return value
+		},
+	})
 }
 
 /**
@@ -14,15 +18,15 @@ function constant<T>(value: T): ReadonlySignal<T> {
  * Internal: the public API is {@link useThemeToggle}.
  */
 export function useThemeToggleContext(): ThemeToggleContext {
-  const server = currentServerTheme();
-  if (server) {
-    useServerTheme(server);
-    return { state: server.state, config: server.config, known: constant(server.known), interactive: constant(false) };
-  }
-  const theme = browserTheme();
-  if (!theme) throw new Error("MEEK111: <MeekoThemeToggle> necesita theme en meeko.config.ts (theme: true) y una aplicación de Meeko en marcha");
-  theme.use();
-  return theme.toggle;
+	const server = currentServerTheme()
+	if (server) {
+		useServerTheme(server)
+		return { state: server.state, config: server.config, known: constant(server.known), interactive: constant(false) }
+	}
+	const theme = browserTheme()
+	if (!theme) throw new Error('MEEK111: <MeekoThemeToggle> necesita theme en meeko.config.ts (theme: true) y una aplicación de Meeko en marcha')
+	theme.use()
+	return theme.toggle
 }
 
 /**
@@ -60,13 +64,13 @@ export function useThemeToggleContext(): ThemeToggleContext {
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#selector-de-tema-propio
  */
 export function useThemeToggle(): ThemeToggleState {
-  const context = useThemeToggleContext();
-  const { system } = context.config;
-  return Object.freeze({
-    theme: context.state as unknown as ThemeState,
-    choices: Object.freeze(themeChoices(context.config)) as ThemeToggleState["choices"],
-    system: system ? Object.freeze({ light: system.light, dark: system.dark }) as ThemeToggleState["system"] : undefined,
-    known: context.known,
-    interactive: context.interactive,
-  });
+	const context = useThemeToggleContext()
+	const { system } = context.config
+	return Object.freeze({
+		theme: context.state as unknown as ThemeState,
+		choices: Object.freeze(themeChoices(context.config)) as ThemeToggleState['choices'],
+		system: system ? (Object.freeze({ light: system.light, dark: system.dark }) as ThemeToggleState['system']) : undefined,
+		known: context.known,
+		interactive: context.interactive,
+	})
 }

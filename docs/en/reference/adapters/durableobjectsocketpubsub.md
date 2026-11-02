@@ -16,7 +16,7 @@ related:
   - "@meekojs/meeko/server#RedisSocketPubSub"
   - docs/framework.md#socket-y-durable-objects
   - docs/framework.md#broadcast-desde-el-servidor
-source-hash: 82f3d95d3d6f9df5f8a9d216b1f79013666d6408aac0035045fb0f8cba667db4
+source-hash: aba3abbcd9e46ea14da16e390207d3312289ce2c75d3eadaa056567b7b5b3cea
 ---
 
 On Workers, Socket connections do not live in the isolate handling the request, but in their room's Durable Object. `DurableObjectSocketPubSub` is the only broker that reaches them: `publish` delivers the message to the room over RPC (or directly, if already running inside that room) and resolves when the room accepts it; the room distributes it to its peers in publication order.

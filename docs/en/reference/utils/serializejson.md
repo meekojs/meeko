@@ -10,7 +10,7 @@ related:
   - "syntax:script-server"
   - "@meekojs/meeko/framework#useState"
   - docs/api.md#módulo-generado
-source-hash: 4c37cd45aa08a39e98a365c7be8155545a8d20f9ab9db541b0c04fd233365f0e
+source-hash: 456361517fcb7eff831e805f1be163ecdb3189a8da2950356888b6c95f68640e
 ---
 
 `serializeJson(valor)` converts a value to JSON to send it to the browser inside a `<script>` tag. It does two things that `JSON.stringify` does not:

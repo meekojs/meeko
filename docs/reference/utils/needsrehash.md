@@ -18,6 +18,7 @@ El momento de usarla es justo después de un inicio de sesión correcto: es la �
 ## Uso
 
 <!-- no-check -->
+
 ```ts
 import { hashPassword, needsRehash, verifyPassword } from "@meekojs/meeko/password";
 
@@ -28,25 +29,26 @@ if (await verifyPassword(input.password, user.passwordHash) && needsRehash(user.
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `hash` | `string` | obligatorio | El hash guardado. |
+| Parámetro | Tipo     | Por defecto | Descripción       |
+| --------- | -------- | ----------- | ----------------- |
+| `hash`    | `string` | obligatorio | El hash guardado. |
 
 ## Valor devuelto
 
 `true` si conviene guardar un hash nuevo; `false` si el hash ya usa los parámetros actuales (o unos mayores). Nunca lanza: un texto que no es un hash de Meeko devuelve `true`.
 
-| Hash | Resultado |
-| --- | --- |
-| El de `hashPassword` en esta versión (`scrypt$131072$8$1$…`) | `false` |
-| `scrypt$16384$8$1$…`, de un coste menor | `true` |
-| `bcrypt$…`, `$2b$10$…` o cualquier otro texto | `true` |
+| Hash                                                         | Resultado |
+| ------------------------------------------------------------ | --------- |
+| El de `hashPassword` en esta versión (`scrypt$131072$8$1$…`) | `false`   |
+| `scrypt$16384$8$1$…`, de un coste menor                      | `true`    |
+| `bcrypt$…`, `$2b$10$…` o cualquier otro texto                | `true`    |
 
 ## Ejemplos
 
 ### En el procedimiento de inicio de sesión
 
 <!-- no-check -->
+
 ```ts
 // server/rpc/auth/login.ts
 import { ApiError, defineRpc } from "@meekojs/meeko/server";
@@ -93,6 +95,7 @@ if (needsRehash(user.passwordHash)) await save(user.id, await hashPassword(input
 ```
 
 <!-- no-check -->
+
 ```ts good
 if (await verifyPassword(input.password, user.passwordHash) && needsRehash(user.passwordHash)) await save(user.id, await hashPassword(input.password));
 ```
@@ -108,6 +111,7 @@ needsRehash(hash).then((stale) => stale && rehash());
 `meeko check` da `TS2339: Property 'then' does not exist on type 'boolean'.`
 
 <!-- no-check -->
+
 ```ts good
 if (needsRehash(hash)) await rehash();
 ```

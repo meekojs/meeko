@@ -18,7 +18,7 @@ related:
   - "@meekojs/meeko/server#createFrameworkHandler"
   - docs/framework.md#runtime-de-servidor
   - docs/framework.md#build-despliegue-y-verificación
-source-hash: 6d9252fb2ac75d1e7e6ff80edccb94ebbc32535bda9feb3ecd5c03bfc4f28708
+source-hash: 410dcefdd08b2dd8ea40dae3a0bda03098f12cad873068806ecb5b0561d11ae3
 ---
 
 `createServerApp` is Meeko's server application: it takes the manifest fixed by the build (routes, endpoints, channels, middleware and assets), a loader that returns each module by its key and the runtime from `server/runtime.ts`, and returns an object with `fetch(request)` that handles everything: server middleware, public files, prerendered pages, SSR, navigation payloads, API, RPC and the Socket hub. It calls the runtime factory once and, if it does not declare `sessions`, creates the default sessions.

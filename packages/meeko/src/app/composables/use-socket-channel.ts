@@ -1,7 +1,7 @@
-import type { SocketClient, SocketContract, SocketRegistryOptions } from "../runtime/socket";
+import type { SocketClient, SocketContract, SocketRegistryOptions } from '../runtime/socket'
 
-import { socketUrl } from "../runtime/socket";
-import { useSocketClient } from "./use-socket-client";
+import { socketUrl } from '../runtime/socket'
+import { useSocketClient } from './use-socket-client'
 
 /**
  * Abre el canal `name` de un registro de contratos ligado a la raíz del componente actual, como
@@ -24,7 +24,7 @@ import { useSocketClient } from "./use-socket-client";
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#websocket
  */
 export function useSocketChannel<C extends Record<string, SocketContract>, K extends keyof C & string>(contracts: C, name: K, options: SocketRegistryOptions = {}): SocketClient<C[K]> {
-  const contract = contracts[name];
-  if (!contract) throw new TypeError(`Unknown socket channel: ${name}`);
-  return useSocketClient(socketUrl(name, options), contract, options);
+	const contract = contracts[name]
+	if (!contract) throw new TypeError(`Unknown socket channel: ${name}`)
+	return useSocketClient(socketUrl(name, options), contract, options)
 }

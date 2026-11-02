@@ -13,7 +13,7 @@ related:
   - "@meekojs/meeko/server#createServerApp"
   - docs/framework.md#middleware-de-servidor
   - docs/framework.md#middleware-de-rutas-y-servidor
-source-hash: fd094df03cbbf6f45b27b3502298ff7cab0cce9fda966d957ceaddd64e5d2cc0
+source-hash: 6d284993d8d94e5872f8e66de23477979ce005a754c0b49223964224b654c70c
 ---
 
 `composeServerMiddleware(middlewares, handler)` chains `(request, next) => Response` functions around a final handler and returns a `(request) => Promise<Response>` handler. This is what `createServerApp` does with `server/middleware/` files (by filename) and middleware added by modules: each middleware can continue with `next()`, change the request or response, or short-circuit by returning its own `Response`.

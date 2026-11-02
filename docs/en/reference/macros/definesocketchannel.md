@@ -15,7 +15,7 @@ related:
   - docs/framework.md#websocket
   - docs/framework.md#broadcast-desde-el-servidor
   - docs/framework.md#broadcast-y-varias-instancias
-source-hash: c86bc19fde8f894a54ab55c004235a94d73a832cf5e129d52768816410eafce3
+source-hash: e438817962a929450ea64b04f398b51b6de6fa9b58d9210d17ff27a5cf55121a
 ---
 
 `defineSocketChannel` declares a WebSocket channel: the default export of `server/socket/<nombre>.ts`. It declares, using schemas from `shared/`, events sent by the client (`clientToServer`) and server (`serverToClient`), guards for the connection, each room and each event, and handlers for incoming messages.

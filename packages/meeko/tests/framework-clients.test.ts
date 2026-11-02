@@ -1,355 +1,389 @@
-import assert from "node:assert/strict";
-import test from "node:test";
+import assert from 'node:assert/strict'
+import test from 'node:test'
 
-import type { ApiOperation, RpcOperation } from "../src/shared/clients.ts";
+import type { ApiOperation, RpcOperation } from '../src/shared/clients.ts'
 
-import { createUseApi } from "../src/app/composables/resources/use-api.ts";
-import { createUseRpcMutation } from "../src/app/composables/resources/use-rpc-mutation.ts";
-import { createUseRpcQuery } from "../src/app/composables/resources/use-rpc-query.ts";
-import { ClientError, createApiClient, createPublicServerManifest, createRpcClient } from "../src/shared/clients.ts";
+import { createUseApi } from '../src/app/composables/resources/use-api.ts'
+import { createUseRpcMutation } from '../src/app/composables/resources/use-rpc-mutation.ts'
+import { createUseRpcQuery } from '../src/app/composables/resources/use-rpc-query.ts'
+import { ClientError, createApiClient, createPublicServerManifest, createRpcClient } from '../src/shared/clients.ts'
 
 type ApiContract = {
-  "users.byId": { get: ApiOperation<{ id: string }, { tab?: string }, undefined, { id: string }> };
-  users: { post: ApiOperation<undefined, undefined, { name: string }, { id: string }> };
-};
-type RpcContract = { "users.get": RpcOperation<{ id: string }, { id: string }> };
+	'users.byId': { get: ApiOperation<{ id: string }, { tab?: string }, undefined, { id: string }> }
+	users: { post: ApiOperation<undefined, undefined, { name: string }, { id: string }> }
+}
+type RpcContract = { 'users.get': RpcOperation<{ id: string }, { id: string }> }
 
-test("API and RPC clients use only public paths and preserve params, query, body and CSRF", async () => {
-  const calls: Array<{ url: string; init: RequestInit }> = [];
-  const fetcher: typeof fetch = async (input, init) => {
-    calls.push({ url: String(input), init: init ?? {} });
-    return Response.json({ id: String(calls.length) });
-  };
-  const manifest = {
-    api: [
-      { clientKey: "users.byId", pathname: "/api/users/[id]", method: "GET" as const },
-      { clientKey: "users", pathname: "/api/users", method: "POST" as const },
-    ],
-    rpc: [{ id: "users.get", pathname: "/_meeko/rpc/users/get" }],
-  };
-  const publicManifest = createPublicServerManifest({
-    api: manifest.api.map((endpoint) => ({ ...endpoint, file: "server/api/private.ts" })),
-    rpc: manifest.rpc.map((endpoint) => ({ ...endpoint, file: "server/rpc/private.ts" })),
-  });
-  assert.doesNotMatch(JSON.stringify(publicManifest), /private\.ts|"file"/);
-  const options = { baseUrl: "https://example.test", fetch: fetcher, csrfToken: () => "token" };
-  const api = createApiClient<ApiContract>(publicManifest, options);
-  const rpc = createRpcClient<RpcContract>(publicManifest, options);
-  if (false) {
-    // @ts-expect-error dynamic endpoint requires params
-    void api.users.byId.get({ query: {} });
-    // @ts-expect-error body follows the public contract
-    void api.users.post({ body: { invalid: true } });
-    // @ts-expect-error RPC input follows the public contract
-    void rpc.users.get({ id: 42 });
-  }
-  assert.deepEqual(await api.users.byId.get({ params: { id: "a b" }, query: { tab: "profile" } }), { id: "1" });
-  assert.deepEqual(await api.users.post({ body: { name: "Ada" } }), { id: "2" });
-  assert.deepEqual(await rpc.users.get({ id: "123" }), { id: "3" });
-  assert.equal(calls[0]?.url, "https://example.test/api/users/a%20b?tab=profile");
-  assert.equal(calls[1]?.url, "https://example.test/api/users");
-  assert.equal(calls[2]?.url, "https://example.test/_meeko/rpc/users/get");
-  assert.equal(calls[0]?.init.method, "GET");
-  assert.equal(calls[1]?.init.method, "POST");
-  assert.equal(calls[1]?.init.body, JSON.stringify({ name: "Ada" }));
-  assert.equal(calls[2]?.init.body, JSON.stringify({ id: "123" }));
-  assert.equal(new Headers(calls[0]?.init.headers).has("x-meeko-csrf"), false);
-  assert.equal(new Headers(calls[1]?.init.headers).get("x-meeko-csrf"), "token");
-  assert.equal(new Headers(calls[2]?.init.headers).get("x-meeko-csrf"), "token");
-  await assert.rejects(api.users.byId.get({ params: { id: "a/b" }, query: {} }), /Invalid route parameter/);
-  assert.equal(calls.length, 3);
-});
+test('API and RPC clients use only public paths and preserve params, query, body and CSRF', async () => {
+	const calls: Array<{ url: string; init: RequestInit }> = []
+	const fetcher: typeof fetch = async (input, init) => {
+		calls.push({ url: String(input), init: init ?? {} })
+		return Response.json({ id: String(calls.length) })
+	}
+	const manifest = {
+		api: [
+			{ clientKey: 'users.byId', pathname: '/api/users/[id]', method: 'GET' as const },
+			{ clientKey: 'users', pathname: '/api/users', method: 'POST' as const },
+		],
+		rpc: [{ id: 'users.get', pathname: '/_meeko/rpc/users/get' }],
+	}
+	const publicManifest = createPublicServerManifest({
+		api: manifest.api.map((endpoint) => ({ ...endpoint, file: 'server/api/private.ts' })),
+		rpc: manifest.rpc.map((endpoint) => ({ ...endpoint, file: 'server/rpc/private.ts' })),
+	})
+	assert.doesNotMatch(JSON.stringify(publicManifest), /private\.ts|"file"/)
+	const options = { baseUrl: 'https://example.test', fetch: fetcher, csrfToken: () => 'token' }
+	const api = createApiClient<ApiContract>(publicManifest, options)
+	const rpc = createRpcClient<RpcContract>(publicManifest, options)
+	if (false) {
+		// @ts-expect-error dynamic endpoint requires params
+		void api.users.byId.get({ query: {} })
+		// @ts-expect-error body follows the public contract
+		void api.users.post({ body: { invalid: true } })
+		// @ts-expect-error RPC input follows the public contract
+		void rpc.users.get({ id: 42 })
+	}
+	assert.deepEqual(await api.users.byId.get({ params: { id: 'a b' }, query: { tab: 'profile' } }), { id: '1' })
+	assert.deepEqual(await api.users.post({ body: { name: 'Ada' } }), { id: '2' })
+	assert.deepEqual(await rpc.users.get({ id: '123' }), { id: '3' })
+	assert.equal(calls[0]?.url, 'https://example.test/api/users/a%20b?tab=profile')
+	assert.equal(calls[1]?.url, 'https://example.test/api/users')
+	assert.equal(calls[2]?.url, 'https://example.test/_meeko/rpc/users/get')
+	assert.equal(calls[0]?.init.method, 'GET')
+	assert.equal(calls[1]?.init.method, 'POST')
+	assert.equal(calls[1]?.init.body, JSON.stringify({ name: 'Ada' }))
+	assert.equal(calls[2]?.init.body, JSON.stringify({ id: '123' }))
+	assert.equal(new Headers(calls[0]?.init.headers).has('x-meeko-csrf'), false)
+	assert.equal(new Headers(calls[1]?.init.headers).get('x-meeko-csrf'), 'token')
+	assert.equal(new Headers(calls[2]?.init.headers).get('x-meeko-csrf'), 'token')
+	await assert.rejects(api.users.byId.get({ params: { id: 'a/b' }, query: {} }), /Invalid route parameter/)
+	assert.equal(calls.length, 3)
+})
 
-test("clients normalize server errors and malformed responses", async () => {
-  const manifest = { api: [{ clientKey: "users.byId", pathname: "/api/users/[id]", method: "GET" as const }] };
-  const api = createApiClient<ApiContract>(manifest, {
-    fetch: async () => Response.json({ code: "UNAUTHENTICATED", status: 401, requestId: "req-1" }, { status: 401 }),
-  });
-  await assert.rejects(api.users.byId.get({ params: { id: "1" }, query: {} }), (error: unknown) =>
-    error instanceof ClientError && error.code === "UNAUTHENTICATED" && error.status === 401 && error.requestId === "req-1");
-  assert.equal(await api.users.byId.get({ params: { id: "1" }, query: {} }).catch((error: unknown) => (error as ClientError).issues), undefined);
-  const malformed = createApiClient<ApiContract>(manifest, { fetch: async () => new Response("no json", { status: 200 }) });
-  await assert.rejects(malformed.users.byId.get({ params: { id: "1" }, query: {} }), (error: unknown) =>
-    error instanceof ClientError && error.code === "INVALID_RESPONSE");
-});
+test('clients normalize server errors and malformed responses', async () => {
+	const manifest = { api: [{ clientKey: 'users.byId', pathname: '/api/users/[id]', method: 'GET' as const }] }
+	const api = createApiClient<ApiContract>(manifest, {
+		fetch: async () => Response.json({ code: 'UNAUTHENTICATED', status: 401, requestId: 'req-1' }, { status: 401 }),
+	})
+	await assert.rejects(api.users.byId.get({ params: { id: '1' }, query: {} }), (error: unknown) => error instanceof ClientError && error.code === 'UNAUTHENTICATED' && error.status === 401 && error.requestId === 'req-1')
+	assert.equal(await api.users.byId.get({ params: { id: '1' }, query: {} }).catch((error: unknown) => (error as ClientError).issues), undefined)
+	const malformed = createApiClient<ApiContract>(manifest, { fetch: async () => new Response('no json', { status: 200 }) })
+	await assert.rejects(malformed.users.byId.get({ params: { id: '1' }, query: {} }), (error: unknown) => error instanceof ClientError && error.code === 'INVALID_RESPONSE')
+})
 
-type EmailLogin = { method: "email"; email: string; password: string };
-type StaffLogin = { method: "staff"; restaurant: string; username: string; password: string };
-type Login = EmailLogin | StaffLogin;
-type Search = { kind: "text"; text: string } | { kind: "tag"; tag: string };
+type EmailLogin = { method: 'email'; email: string; password: string }
+type StaffLogin = { method: 'staff'; restaurant: string; username: string; password: string }
+type Login = EmailLogin | StaffLogin
+type Search = { kind: 'text'; text: string } | { kind: 'tag'; tag: string }
 type UnionApiContract = {
-  session: { post: ApiOperation<undefined, undefined, Login, { ok: boolean }> };
-  search: { get: ApiOperation<undefined, Search, undefined, string[]> };
-  "items.byId": { get: ApiOperation<{ id: string }, Search, undefined, string[]> };
-  listing: { get: ApiOperation<undefined, { page?: string }, undefined, string[]> };
-  plain: { get: ApiOperation<undefined, undefined, undefined, string[]> };
-  note: { post: ApiOperation<undefined, undefined, { text: string } | undefined, { ok: boolean }> };
-  raw: { post: ApiOperation<undefined, undefined, unknown, { ok: boolean }> };
-};
+	session: { post: ApiOperation<undefined, undefined, Login, { ok: boolean }> }
+	search: { get: ApiOperation<undefined, Search, undefined, string[]> }
+	'items.byId': { get: ApiOperation<{ id: string }, Search, undefined, string[]> }
+	listing: { get: ApiOperation<undefined, { page?: string }, undefined, string[]> }
+	plain: { get: ApiOperation<undefined, undefined, undefined, string[]> }
+	note: { post: ApiOperation<undefined, undefined, { text: string } | undefined, { ok: boolean }> }
+	raw: { post: ApiOperation<undefined, undefined, unknown, { ok: boolean }> }
+}
 type UnionRpcContract = {
-  "session.start": RpcOperation<Login, { ok: boolean }>;
-  "stats.get": RpcOperation<{ range?: string }, number>;
-};
+	'session.start': RpcOperation<Login, { ok: boolean }>
+	'stats.get': RpcOperation<{ range?: string }, number>
+}
 
-test("clients and composables accept union-typed body, query and input values", async () => {
-  const calls: Array<{ url: string; init: RequestInit }> = [];
-  const fetcher: typeof fetch = async (input, init) => {
-    calls.push({ url: String(input), init: init ?? {} });
-    return Response.json({ ok: true });
-  };
-  const manifest = {
-    api: [
-      { clientKey: "session", pathname: "/api/session", method: "POST" },
-      { clientKey: "search", pathname: "/api/search", method: "GET" },
-      { clientKey: "items.byId", pathname: "/api/items/[id]", method: "GET" },
-      { clientKey: "listing", pathname: "/api/listing", method: "GET" },
-      { clientKey: "plain", pathname: "/api/plain", method: "GET" },
-      { clientKey: "note", pathname: "/api/note", method: "POST" },
-      { clientKey: "raw", pathname: "/api/raw", method: "POST" },
-    ],
-    rpc: [
-      { id: "session.start", pathname: "/_meeko/rpc/session/start" },
-      { id: "stats.get", pathname: "/_meeko/rpc/stats/get" },
-    ],
-  } as const;
-  const options = { baseUrl: "https://example.test", fetch: fetcher, csrfToken: () => "token" };
-  const api = createApiClient<UnionApiContract>(manifest, options);
-  const rpc = createRpcClient<UnionRpcContract>(manifest, options);
-  const useApi = createUseApi<UnionApiContract, typeof manifest>(manifest, options);
-  const useRpcQuery = createUseRpcQuery<UnionRpcContract>(manifest, options);
-  const useRpcMutation = createUseRpcMutation<UnionRpcContract>(manifest, options);
-  // Values typed as the whole union, as a form or a parsed payload produces them.
-  const body = JSON.parse('{"method":"staff","restaurant":"r1","username":"ada","password":"x"}') as Login;
-  const search = JSON.parse('{"kind":"tag","tag":"new"}') as Search;
-  if (false) {
-    void api.session.post({ body });
-    void api.session.post({ body: { method: "email", email: "a@b.c", password: "x" } });
-    void api.search.get({ query: search });
-    void api.items.byId.get({ params: { id: "1" }, query: search });
-    void api.items({ id: "1" }).get({ query: search });
-    void rpc.session.start(body);
-    void useApi("/api/search", { query: search });
-    void useApi("/api/search", () => ({ query: search }));
-    void useApi("/api/items/[id]", { params: { id: "1" }, query: search });
-    void useRpcQuery("session.start", body);
-    void useRpcQuery("session.start", () => body);
-    void useRpcMutation("session.start").mutate(body);
-    // Arguments stay optional when the contract requires nothing.
-    void api.listing.get();
-    void api.plain.get();
-    void api.listing.get({ query: { page: "2" } });
-    void useApi("/api/listing");
-    void useApi("/api/plain");
-    void useRpcQuery("stats.get");
-    // A body schema that accepts undefined may be left out; an unknown body is still a key.
-    void api.note.post({});
-    void api.note.post({ body: { text: "x" } });
-    void api.raw.post({ body: 1 });
-    // @ts-expect-error an optional body still follows the contract
-    void api.note.post({ body: { text: 1 } });
-    // @ts-expect-error an unknown body must be given
-    void api.raw.post({});
-    // @ts-expect-error a union body is still required
-    void api.session.post();
-    // @ts-expect-error the body must be a member of the union
-    void api.session.post({ body: { method: "staff", email: "a@b.c", password: "x" } });
-    // @ts-expect-error a union query is still required
-    void api.search.get();
-    // @ts-expect-error the query must be a member of the union
-    void api.search.get({ query: { kind: "text", tag: "new" } });
-    // @ts-expect-error params are still required next to a union query
-    void api.items.byId.get({ query: search });
-    // @ts-expect-error a union query is still required after a segment call
-    void api.items({ id: "1" }).get();
-    // @ts-expect-error the RPC input must be a member of the union
-    void rpc.session.start({ method: "email", username: "ada", password: "x" });
-    // @ts-expect-error a union query is still required by useApi
-    void useApi("/api/search");
-    // @ts-expect-error the useApi query must be a member of the union
-    void useApi("/api/search", { query: { kind: "tag", text: "new" } });
-    // @ts-expect-error a union input is still required by useRpcQuery
-    void useRpcQuery("session.start");
-    // @ts-expect-error the useRpcQuery input must be a member of the union
-    void useRpcQuery("session.start", { method: "staff", email: "a@b.c", password: "x" });
-    // @ts-expect-error the mutate input must be a member of the union
-    void useRpcMutation("session.start").mutate({ method: "staff", email: "a@b.c", password: "x" });
-    // @ts-expect-error a body is not accepted without a body contract
-    void api.plain.get({ body: {} });
-  }
-  assert.deepEqual(await api.session.post({ body }), { ok: true });
-  assert.deepEqual(await api.search.get({ query: search }), { ok: true });
-  assert.deepEqual(await rpc.session.start(body), { ok: true });
-  assert.equal(calls[0]?.init.body, JSON.stringify(body));
-  assert.equal(calls[1]?.url, "https://example.test/api/search?kind=tag&tag=new");
-  assert.equal(calls[2]?.init.body, JSON.stringify(body));
-});
+test('clients and composables accept union-typed body, query and input values', async () => {
+	const calls: Array<{ url: string; init: RequestInit }> = []
+	const fetcher: typeof fetch = async (input, init) => {
+		calls.push({ url: String(input), init: init ?? {} })
+		return Response.json({ ok: true })
+	}
+	const manifest = {
+		api: [
+			{ clientKey: 'session', pathname: '/api/session', method: 'POST' },
+			{ clientKey: 'search', pathname: '/api/search', method: 'GET' },
+			{ clientKey: 'items.byId', pathname: '/api/items/[id]', method: 'GET' },
+			{ clientKey: 'listing', pathname: '/api/listing', method: 'GET' },
+			{ clientKey: 'plain', pathname: '/api/plain', method: 'GET' },
+			{ clientKey: 'note', pathname: '/api/note', method: 'POST' },
+			{ clientKey: 'raw', pathname: '/api/raw', method: 'POST' },
+		],
+		rpc: [
+			{ id: 'session.start', pathname: '/_meeko/rpc/session/start' },
+			{ id: 'stats.get', pathname: '/_meeko/rpc/stats/get' },
+		],
+	} as const
+	const options = { baseUrl: 'https://example.test', fetch: fetcher, csrfToken: () => 'token' }
+	const api = createApiClient<UnionApiContract>(manifest, options)
+	const rpc = createRpcClient<UnionRpcContract>(manifest, options)
+	const useApi = createUseApi<UnionApiContract, typeof manifest>(manifest, options)
+	const useRpcQuery = createUseRpcQuery<UnionRpcContract>(manifest, options)
+	const useRpcMutation = createUseRpcMutation<UnionRpcContract>(manifest, options)
+	// Values typed as the whole union, as a form or a parsed payload produces them.
+	const body = JSON.parse('{"method":"staff","restaurant":"r1","username":"ada","password":"x"}') as Login
+	const search = JSON.parse('{"kind":"tag","tag":"new"}') as Search
+	if (false) {
+		void api.session.post({ body })
+		void api.session.post({ body: { method: 'email', email: 'a@b.c', password: 'x' } })
+		void api.search.get({ query: search })
+		void api.items.byId.get({ params: { id: '1' }, query: search })
+		void api.items({ id: '1' }).get({ query: search })
+		void rpc.session.start(body)
+		void useApi('/api/search', { query: search })
+		void useApi('/api/search', () => ({ query: search }))
+		void useApi('/api/items/[id]', { params: { id: '1' }, query: search })
+		void useRpcQuery('session.start', body)
+		void useRpcQuery('session.start', () => body)
+		void useRpcMutation('session.start').mutate(body)
+		// Arguments stay optional when the contract requires nothing.
+		void api.listing.get()
+		void api.plain.get()
+		void api.listing.get({ query: { page: '2' } })
+		void useApi('/api/listing')
+		void useApi('/api/plain')
+		void useRpcQuery('stats.get')
+		// A body schema that accepts undefined may be left out; an unknown body is still a key.
+		void api.note.post({})
+		void api.note.post({ body: { text: 'x' } })
+		void api.raw.post({ body: 1 })
+		// @ts-expect-error an optional body still follows the contract
+		void api.note.post({ body: { text: 1 } })
+		// @ts-expect-error an unknown body must be given
+		void api.raw.post({})
+		// @ts-expect-error a union body is still required
+		void api.session.post()
+		// @ts-expect-error the body must be a member of the union
+		void api.session.post({ body: { method: 'staff', email: 'a@b.c', password: 'x' } })
+		// @ts-expect-error a union query is still required
+		void api.search.get()
+		// @ts-expect-error the query must be a member of the union
+		void api.search.get({ query: { kind: 'text', tag: 'new' } })
+		// @ts-expect-error params are still required next to a union query
+		void api.items.byId.get({ query: search })
+		// @ts-expect-error a union query is still required after a segment call
+		void api.items({ id: '1' }).get()
+		// @ts-expect-error the RPC input must be a member of the union
+		void rpc.session.start({ method: 'email', username: 'ada', password: 'x' })
+		// @ts-expect-error a union query is still required by useApi
+		void useApi('/api/search')
+		// @ts-expect-error the useApi query must be a member of the union
+		void useApi('/api/search', { query: { kind: 'tag', text: 'new' } })
+		// @ts-expect-error a union input is still required by useRpcQuery
+		void useRpcQuery('session.start')
+		// @ts-expect-error the useRpcQuery input must be a member of the union
+		void useRpcQuery('session.start', { method: 'staff', email: 'a@b.c', password: 'x' })
+		// @ts-expect-error the mutate input must be a member of the union
+		void useRpcMutation('session.start').mutate({ method: 'staff', email: 'a@b.c', password: 'x' })
+		// @ts-expect-error a body is not accepted without a body contract
+		void api.plain.get({ body: {} })
+	}
+	assert.deepEqual(await api.session.post({ body }), { ok: true })
+	assert.deepEqual(await api.search.get({ query: search }), { ok: true })
+	assert.deepEqual(await rpc.session.start(body), { ok: true })
+	assert.equal(calls[0]?.init.body, JSON.stringify(body))
+	assert.equal(calls[1]?.url, 'https://example.test/api/search?kind=tag&tag=new')
+	assert.equal(calls[2]?.init.body, JSON.stringify(body))
+})
 
-test("clients expose the schema issues of a rejected input as readonly ClientError.issues", async () => {
-  const issues = [
-    { path: "name", message: "Escribe tu nombre." },
-    { path: "", message: "Entrada no válida." },
-    { path: 3, message: "not a string path" },
-    "not an issue",
-  ];
-  const fetcher: typeof fetch = async () => Response.json({ code: "INVALID_INPUT", status: 400, requestId: "req-2", issues }, { status: 400 });
-  const rpc = createRpcClient<RpcContract>({ rpc: [{ id: "users.get", pathname: "/_meeko/rpc/users/get" }] }, { fetch: fetcher });
-  const error = await rpc.users.get({ id: "" }).then(() => undefined, (failure: unknown) => failure);
-  assert.ok(error instanceof ClientError);
-  assert.equal(error.code, "INVALID_INPUT");
-  assert.equal(error.requestId, "req-2");
-  assert.deepEqual(error.issues, [{ path: "name", message: "Escribe tu nombre." }, { path: "", message: "Entrada no válida." }]);
-  assert.ok(Object.isFrozen(error.issues) && Object.isFrozen(error.issues?.[0]));
-  if (false) {
-    // @ts-expect-error issues are readonly
-    error.issues![0]!.message = "changed";
-  }
-  const api = createApiClient<ApiContract>({ api: [{ clientKey: "users", pathname: "/api/users", method: "POST" }] }, {
-    fetch: async () => Response.json({ code: "INVALID_BODY", status: 400, issues: "bad" }, { status: 400 }),
-  });
-  await assert.rejects(api.users.post({ body: { name: "" } }), (failure: unknown) =>
-    failure instanceof ClientError && failure.code === "INVALID_BODY" && failure.issues === undefined);
-});
+test('clients expose the schema issues of a rejected input as readonly ClientError.issues', async () => {
+	const issues = [
+		{ path: 'name', message: 'Escribe tu nombre.' },
+		{ path: '', message: 'Entrada no válida.' },
+		{ path: 3, message: 'not a string path' },
+		'not an issue',
+	]
+	const fetcher: typeof fetch = async () => Response.json({ code: 'INVALID_INPUT', status: 400, requestId: 'req-2', issues }, { status: 400 })
+	const rpc = createRpcClient<RpcContract>({ rpc: [{ id: 'users.get', pathname: '/_meeko/rpc/users/get' }] }, { fetch: fetcher })
+	const error = await rpc.users.get({ id: '' }).then(
+		() => undefined,
+		(failure: unknown) => failure,
+	)
+	assert.ok(error instanceof ClientError)
+	assert.equal(error.code, 'INVALID_INPUT')
+	assert.equal(error.requestId, 'req-2')
+	assert.deepEqual(error.issues, [
+		{ path: 'name', message: 'Escribe tu nombre.' },
+		{ path: '', message: 'Entrada no válida.' },
+	])
+	assert.ok(Object.isFrozen(error.issues) && Object.isFrozen(error.issues?.[0]))
+	if (false) {
+		// @ts-expect-error issues are readonly
+		error.issues![0]!.message = 'changed'
+	}
+	const api = createApiClient<ApiContract>(
+		{ api: [{ clientKey: 'users', pathname: '/api/users', method: 'POST' }] },
+		{
+			fetch: async () => Response.json({ code: 'INVALID_BODY', status: 400, issues: 'bad' }, { status: 400 }),
+		},
+	)
+	await assert.rejects(api.users.post({ body: { name: '' } }), (failure: unknown) => failure instanceof ClientError && failure.code === 'INVALID_BODY' && failure.issues === undefined)
+})
 
-type Category = { id: string; name: string };
+type Category = { id: string; name: string }
 type SegmentContract = {
-  "menu.categories": { get: ApiOperation<undefined, { page?: string }, undefined, Category[]>; post: ApiOperation<undefined, undefined, { name: string }, Category> };
-  "menu.categories.byId": { patch: ApiOperation<{ id: string }, undefined, { name: string }, Category>; delete: ApiOperation<{ id: string }, undefined, undefined, undefined> };
-  "menu.categories.byId.archive": { post: ApiOperation<{ id: string }, undefined, undefined, Category> };
-  "orgs.byOrg.users.byId": { get: ApiOperation<{ org: string; id: string }, { tab?: string }, undefined, string> };
-  "files.byPath": { get: ApiOperation<{ path: string }, undefined, undefined, string> };
-  "users.name": { get: ApiOperation<undefined, undefined, undefined, string> };
-  "users.byId": { get: ApiOperation<{ id: string }, undefined, undefined, string> };
-  "users.bySlug.posts": { get: ApiOperation<{ slug: string }, undefined, undefined, string[]> };
-};
+	'menu.categories': { get: ApiOperation<undefined, { page?: string }, undefined, Category[]>; post: ApiOperation<undefined, undefined, { name: string }, Category> }
+	'menu.categories.byId': { patch: ApiOperation<{ id: string }, undefined, { name: string }, Category>; delete: ApiOperation<{ id: string }, undefined, undefined, undefined> }
+	'menu.categories.byId.archive': { post: ApiOperation<{ id: string }, undefined, undefined, Category> }
+	'orgs.byOrg.users.byId': { get: ApiOperation<{ org: string; id: string }, { tab?: string }, undefined, string> }
+	'files.byPath': { get: ApiOperation<{ path: string }, undefined, undefined, string> }
+	'users.name': { get: ApiOperation<undefined, undefined, undefined, string> }
+	'users.byId': { get: ApiOperation<{ id: string }, undefined, undefined, string> }
+	'users.bySlug.posts': { get: ApiOperation<{ slug: string }, undefined, undefined, string[]> }
+}
 const segmentManifest = {
-  api: [
-    { clientKey: "menu.categories", pathname: "/api/menu/categories", method: "GET" },
-    { clientKey: "menu.categories", pathname: "/api/menu/categories", method: "POST" },
-    { clientKey: "menu.categories.byId", pathname: "/api/menu/categories/[id]", method: "PATCH" },
-    { clientKey: "menu.categories.byId", pathname: "/api/menu/categories/[id]", method: "DELETE" },
-    { clientKey: "menu.categories.byId.archive", pathname: "/api/menu/categories/[id]/archive", method: "POST" },
-    { clientKey: "orgs.byOrg.users.byId", pathname: "/api/orgs/[org]/users/[id]", method: "GET" },
-    { clientKey: "files.byPath", pathname: "/api/files/[...path]", method: "GET" },
-    { clientKey: "users.name", pathname: "/api/users/name", method: "GET" },
-    { clientKey: "users.byId", pathname: "/api/users/[id]", method: "GET" },
-    { clientKey: "users.bySlug.posts", pathname: "/api/users/[slug]/posts", method: "GET" },
-  ],
-} as const;
-type SegmentCall = (params: unknown) => unknown;
+	api: [
+		{ clientKey: 'menu.categories', pathname: '/api/menu/categories', method: 'GET' },
+		{ clientKey: 'menu.categories', pathname: '/api/menu/categories', method: 'POST' },
+		{ clientKey: 'menu.categories.byId', pathname: '/api/menu/categories/[id]', method: 'PATCH' },
+		{ clientKey: 'menu.categories.byId', pathname: '/api/menu/categories/[id]', method: 'DELETE' },
+		{ clientKey: 'menu.categories.byId.archive', pathname: '/api/menu/categories/[id]/archive', method: 'POST' },
+		{ clientKey: 'orgs.byOrg.users.byId', pathname: '/api/orgs/[org]/users/[id]', method: 'GET' },
+		{ clientKey: 'files.byPath', pathname: '/api/files/[...path]', method: 'GET' },
+		{ clientKey: 'users.name', pathname: '/api/users/name', method: 'GET' },
+		{ clientKey: 'users.byId', pathname: '/api/users/[id]', method: 'GET' },
+		{ clientKey: 'users.bySlug.posts', pathname: '/api/users/[slug]/posts', method: 'GET' },
+	],
+} as const
+type SegmentCall = (params: unknown) => unknown
 
-test("API client calls dynamic segments with named params and keeps the byId alias", async () => {
-  const calls: Array<{ url: string; init: RequestInit }> = [];
-  const fetcher: typeof fetch = async (input, init) => {
-    calls.push({ url: String(input), init: init ?? {} });
-    return init?.method === "DELETE" ? new Response(null, { status: 204 }) : Response.json("ok");
-  };
-  const api = createApiClient<SegmentContract>(segmentManifest, { baseUrl: "https://example.test", fetch: fetcher, csrfToken: "token" });
-  const id = "a b";
-  if (false) {
-    const archived: Promise<Category> = api.menu.categories({ id }).archive.post();
-    const renamed: Promise<Category> = api.menu.categories({ id }).patch({ body: { name: "Bebidas" } });
-    const removed: Promise<undefined> = api.menu.categories({ id }).delete();
-    const listing: Promise<Category[]> = api.menu.categories.get();
-    const created: Promise<Category> = api.menu.categories.post({ body: { name: "Postres" } });
-    const member: Promise<string> = api.orgs({ org: "acme" }).users({ id }).get({ query: { tab: "x" } });
-    const file: Promise<string> = api.files({ path: "docs/a.txt" }).get();
-    const named: Promise<string> = api.users.name.get();
-    const user: Promise<string> = api.users({ id }).get();
-    const posts: Promise<string[]> = api.users({ slug: "ada" }).posts.get();
-    const legacy: Promise<Category> = api.menu.categories.byId.archive.post({ params: { id } });
-    const legacyMember: Promise<string> = api.orgs.byOrg.users.byId.get({ params: { org: "acme", id } });
-    void [archived, renamed, removed, listing, created, member, file, named, user, posts, legacy, legacyMember];
-    // @ts-expect-error the segment params are required
-    void api.menu.categories({}).archive.post();
-    // @ts-expect-error a segment call rejects unknown params
-    void api.menu.categories({ id, extra: "x" }).archive.post();
-    // @ts-expect-error segment params are strings
-    void api.menu.categories({ id: 1 });
-    // @ts-expect-error params are not accepted once the segment call bound them
-    void api.menu.categories({ id }).archive.post({ params: { id } });
-    // @ts-expect-error each segment binds only its own param
-    void api.orgs({ org: "acme", id }).users({ id }).get();
-    // @ts-expect-error the byId alias exists only before the first segment call
-    void api.orgs({ org: "acme" }).users.byId;
-    // @ts-expect-error the byId alias still requires its params
-    void api.menu.categories.byId.archive.post();
-    // @ts-expect-error a node without dynamic children is not callable
-    void api.menu({ id });
-    // @ts-expect-error the body still follows the contract after a segment call
-    void api.menu.categories({ id }).patch({ body: { name: 1 } });
-  }
-  assert.equal(typeof api.menu.categories, "function");
-  assert.equal(await api.menu.categories({ id }).archive.post(), "ok");
-  assert.equal(await api.menu.categories({ id }).patch({ body: { name: "Bebidas" } }), "ok");
-  assert.equal(await api.menu.categories({ id }).delete(), undefined);
-  assert.equal(await api.menu.categories.get({ query: { page: "2" } }), "ok");
-  assert.equal(await api.orgs({ org: "ácme" }).users({ id: "7" }).get({ query: { tab: "x" } }), "ok");
-  assert.equal(await api.files({ path: "docs/a b.txt" }).get(), "ok");
-  assert.equal(await api.users.name.get(), "ok");
-  assert.equal(await api.users({ id: "1" }).get(), "ok");
-  assert.equal(await api.users({ slug: "ada" }).posts.get(), "ok");
-  assert.deepEqual(calls.map((call) => `${call.init.method} ${call.url}`), [
-    "POST https://example.test/api/menu/categories/a%20b/archive",
-    "PATCH https://example.test/api/menu/categories/a%20b",
-    "DELETE https://example.test/api/menu/categories/a%20b",
-    "GET https://example.test/api/menu/categories?page=2",
-    "GET https://example.test/api/orgs/%C3%A1cme/users/7?tab=x",
-    "GET https://example.test/api/files/docs/a%20b.txt",
-    "GET https://example.test/api/users/name",
-    "GET https://example.test/api/users/1",
-    "GET https://example.test/api/users/ada/posts",
-  ]);
-  assert.equal(calls[1]?.init.body, JSON.stringify({ name: "Bebidas" }));
-  assert.equal(new Headers(calls[0]?.init.headers).get("x-meeko-csrf"), "token");
+test('API client calls dynamic segments with named params and keeps the byId alias', async () => {
+	const calls: Array<{ url: string; init: RequestInit }> = []
+	const fetcher: typeof fetch = async (input, init) => {
+		calls.push({ url: String(input), init: init ?? {} })
+		return init?.method === 'DELETE' ? new Response(null, { status: 204 }) : Response.json('ok')
+	}
+	const api = createApiClient<SegmentContract>(segmentManifest, { baseUrl: 'https://example.test', fetch: fetcher, csrfToken: 'token' })
+	const id = 'a b'
+	if (false) {
+		const archived: Promise<Category> = api.menu.categories({ id }).archive.post()
+		const renamed: Promise<Category> = api.menu.categories({ id }).patch({ body: { name: 'Bebidas' } })
+		const removed: Promise<undefined> = api.menu.categories({ id }).delete()
+		const listing: Promise<Category[]> = api.menu.categories.get()
+		const created: Promise<Category> = api.menu.categories.post({ body: { name: 'Postres' } })
+		const member: Promise<string> = api
+			.orgs({ org: 'acme' })
+			.users({ id })
+			.get({ query: { tab: 'x' } })
+		const file: Promise<string> = api.files({ path: 'docs/a.txt' }).get()
+		const named: Promise<string> = api.users.name.get()
+		const user: Promise<string> = api.users({ id }).get()
+		const posts: Promise<string[]> = api.users({ slug: 'ada' }).posts.get()
+		const legacy: Promise<Category> = api.menu.categories.byId.archive.post({ params: { id } })
+		const legacyMember: Promise<string> = api.orgs.byOrg.users.byId.get({ params: { org: 'acme', id } })
+		void [archived, renamed, removed, listing, created, member, file, named, user, posts, legacy, legacyMember]
+		// @ts-expect-error the segment params are required
+		void api.menu.categories({}).archive.post()
+		// @ts-expect-error a segment call rejects unknown params
+		void api.menu.categories({ id, extra: 'x' }).archive.post()
+		// @ts-expect-error segment params are strings
+		void api.menu.categories({ id: 1 })
+		// @ts-expect-error params are not accepted once the segment call bound them
+		void api.menu.categories({ id }).archive.post({ params: { id } })
+		// @ts-expect-error each segment binds only its own param
+		void api.orgs({ org: 'acme', id }).users({ id }).get()
+		// @ts-expect-error the byId alias exists only before the first segment call
+		void api.orgs({ org: 'acme' }).users.byId
+		// @ts-expect-error the byId alias still requires its params
+		void api.menu.categories.byId.archive.post()
+		// @ts-expect-error a node without dynamic children is not callable
+		void api.menu({ id })
+		// @ts-expect-error the body still follows the contract after a segment call
+		void api.menu.categories({ id }).patch({ body: { name: 1 } })
+	}
+	assert.equal(typeof api.menu.categories, 'function')
+	assert.equal(await api.menu.categories({ id }).archive.post(), 'ok')
+	assert.equal(await api.menu.categories({ id }).patch({ body: { name: 'Bebidas' } }), 'ok')
+	assert.equal(await api.menu.categories({ id }).delete(), undefined)
+	assert.equal(await api.menu.categories.get({ query: { page: '2' } }), 'ok')
+	assert.equal(
+		await api
+			.orgs({ org: 'ácme' })
+			.users({ id: '7' })
+			.get({ query: { tab: 'x' } }),
+		'ok',
+	)
+	assert.equal(await api.files({ path: 'docs/a b.txt' }).get(), 'ok')
+	assert.equal(await api.users.name.get(), 'ok')
+	assert.equal(await api.users({ id: '1' }).get(), 'ok')
+	assert.equal(await api.users({ slug: 'ada' }).posts.get(), 'ok')
+	assert.deepEqual(
+		calls.map((call) => `${call.init.method} ${call.url}`),
+		[
+			'POST https://example.test/api/menu/categories/a%20b/archive',
+			'PATCH https://example.test/api/menu/categories/a%20b',
+			'DELETE https://example.test/api/menu/categories/a%20b',
+			'GET https://example.test/api/menu/categories?page=2',
+			'GET https://example.test/api/orgs/%C3%A1cme/users/7?tab=x',
+			'GET https://example.test/api/files/docs/a%20b.txt',
+			'GET https://example.test/api/users/name',
+			'GET https://example.test/api/users/1',
+			'GET https://example.test/api/users/ada/posts',
+		],
+	)
+	assert.equal(calls[1]?.init.body, JSON.stringify({ name: 'Bebidas' }))
+	assert.equal(new Headers(calls[0]?.init.headers).get('x-meeko-csrf'), 'token')
 
-  // The deprecated alias builds the same requests.
-  calls.length = 0;
-  assert.equal(await api.menu.categories.byId.archive.post({ params: { id } }), "ok");
-  assert.equal(await api.orgs.byOrg.users.byId.get({ params: { org: "ácme", id: "7" }, query: { tab: "x" } }), "ok");
-  assert.equal(await api.files.byPath.get({ params: { path: "docs/a b.txt" } }), "ok");
-  assert.deepEqual(calls.map((call) => `${call.init.method} ${call.url}`), [
-    "POST https://example.test/api/menu/categories/a%20b/archive",
-    "GET https://example.test/api/orgs/%C3%A1cme/users/7?tab=x",
-    "GET https://example.test/api/files/docs/a%20b.txt",
-  ]);
-  assert.equal(api.menu.categories.byId, api.menu.categories.byId);
-  assert.equal(Object.hasOwn(api.orgs({ org: "acme" }).users, "byId"), false);
+	// The deprecated alias builds the same requests.
+	calls.length = 0
+	assert.equal(await api.menu.categories.byId.archive.post({ params: { id } }), 'ok')
+	assert.equal(await api.orgs.byOrg.users.byId.get({ params: { org: 'ácme', id: '7' }, query: { tab: 'x' } }), 'ok')
+	assert.equal(await api.files.byPath.get({ params: { path: 'docs/a b.txt' } }), 'ok')
+	assert.deepEqual(
+		calls.map((call) => `${call.init.method} ${call.url}`),
+		[
+			'POST https://example.test/api/menu/categories/a%20b/archive',
+			'GET https://example.test/api/orgs/%C3%A1cme/users/7?tab=x',
+			'GET https://example.test/api/files/docs/a%20b.txt',
+		],
+	)
+	assert.equal(api.menu.categories.byId, api.menu.categories.byId)
+	assert.equal(Object.hasOwn(api.orgs({ org: 'acme' }).users, 'byId'), false)
 
-  // Values are checked when the request is built, as with params.
-  calls.length = 0;
-  await assert.rejects(api.users({ id: "a/b" }).get(), /Invalid route parameter: id/);
-  await assert.rejects(api.users({ id: "" }).get(), /Missing route parameter: id/);
-  await assert.rejects(api.files({ path: "a/../b" }).get(), /Invalid route parameter: path/);
-  await assert.rejects(api.users({ id: "1" }).get({ params: { slug: "x" } } as never), /Unknown route parameter: slug/);
-  assert.equal(calls.length, 0);
-  // The call itself takes exactly one param of a dynamic child.
-  assert.throws(() => (api.menu.categories as unknown as SegmentCall)({}), /Missing route parameter: id/);
-  assert.throws(() => (api.menu.categories as unknown as SegmentCall)(undefined), /Missing route parameter: id/);
-  assert.throws(() => (api.menu.categories as unknown as SegmentCall)({ slug: "x" }), /Unknown route parameter: slug/);
-  assert.throws(() => (api.users as unknown as SegmentCall)({ id: "1", slug: "x" }), /Unknown route parameter: slug/);
-});
+	// Values are checked when the request is built, as with params.
+	calls.length = 0
+	await assert.rejects(api.users({ id: 'a/b' }).get(), /Invalid route parameter: id/)
+	await assert.rejects(api.users({ id: '' }).get(), /Missing route parameter: id/)
+	await assert.rejects(api.files({ path: 'a/../b' }).get(), /Invalid route parameter: path/)
+	await assert.rejects(api.users({ id: '1' }).get({ params: { slug: 'x' } } as never), /Unknown route parameter: slug/)
+	assert.equal(calls.length, 0)
+	// The call itself takes exactly one param of a dynamic child.
+	assert.throws(() => (api.menu.categories as unknown as SegmentCall)({}), /Missing route parameter: id/)
+	assert.throws(() => (api.menu.categories as unknown as SegmentCall)(undefined), /Missing route parameter: id/)
+	assert.throws(() => (api.menu.categories as unknown as SegmentCall)({ slug: 'x' }), /Unknown route parameter: slug/)
+	assert.throws(() => (api.users as unknown as SegmentCall)({ id: '1', slug: 'x' }), /Unknown route parameter: slug/)
+})
 
-test("API client accepts a dynamic first segment and rejects ambiguous segment trees", async () => {
-  const urls: string[] = [];
-  const fetcher: typeof fetch = async (input) => { urls.push(String(input)); return Response.json("ok"); };
-  const api = createApiClient<{ byId: { get: ApiOperation<{ id: string }, undefined, undefined, string> } }>(
-    { api: [{ clientKey: "byId", pathname: "/api/[id]", method: "GET" }] }, { fetch: fetcher });
-  assert.equal(await api({ id: "x y" }).get(), "ok");
-  assert.equal(await api.byId.get({ params: { id: "x y" } }), "ok");
-  assert.deepEqual(urls, ["/api/x%20y", "/api/x%20y"]);
-  // A manual key without the `byId` convention keeps its params.
-  const manual = createApiClient<{ "users.item": { get: ApiOperation<{ id: string }, undefined, undefined, string> } }>(
-    { api: [{ clientKey: "users.item", pathname: "/api/users/[id]", method: "GET" }] }, { fetch: fetcher });
-  assert.equal(await manual.users.item.get({ params: { id: "1" } }), "ok");
-  assert.equal(urls.at(-1), "/api/users/1");
-  assert.throws(() => createApiClient({ api: [
-    { clientKey: "users.byId", pathname: "/api/users/byId", method: "GET" },
-    { clientKey: "users.byId", pathname: "/api/users/[id]", method: "POST" },
-  ] }), /Client key collision: users\.byId/);
-  assert.throws(() => createApiClient({ api: [{ clientKey: "byId.byId", pathname: "/api/[id]/byId", method: "GET" }] }), /Ambiguous client key: byId\.byId/);
-  assert.throws(() => createApiClient({ api: [
-    { clientKey: "users.get", pathname: "/api/users/get", method: "GET" },
-    { clientKey: "users", pathname: "/api/users", method: "GET" },
-  ] }), /Client key collision: users\.get/);
-  assert.throws(() => createApiClient({ api: [{ clientKey: "users.my-list", pathname: "/api/users/my-list", method: "GET" }] }), /Invalid client key/);
-});
+test('API client accepts a dynamic first segment and rejects ambiguous segment trees', async () => {
+	const urls: string[] = []
+	const fetcher: typeof fetch = async (input) => {
+		urls.push(String(input))
+		return Response.json('ok')
+	}
+	const api = createApiClient<{ byId: { get: ApiOperation<{ id: string }, undefined, undefined, string> } }>({ api: [{ clientKey: 'byId', pathname: '/api/[id]', method: 'GET' }] }, { fetch: fetcher })
+	assert.equal(await api({ id: 'x y' }).get(), 'ok')
+	assert.equal(await api.byId.get({ params: { id: 'x y' } }), 'ok')
+	assert.deepEqual(urls, ['/api/x%20y', '/api/x%20y'])
+	// A manual key without the `byId` convention keeps its params.
+	const manual = createApiClient<{ 'users.item': { get: ApiOperation<{ id: string }, undefined, undefined, string> } }>({ api: [{ clientKey: 'users.item', pathname: '/api/users/[id]', method: 'GET' }] }, { fetch: fetcher })
+	assert.equal(await manual.users.item.get({ params: { id: '1' } }), 'ok')
+	assert.equal(urls.at(-1), '/api/users/1')
+	assert.throws(
+		() =>
+			createApiClient({
+				api: [
+					{ clientKey: 'users.byId', pathname: '/api/users/byId', method: 'GET' },
+					{ clientKey: 'users.byId', pathname: '/api/users/[id]', method: 'POST' },
+				],
+			}),
+		/Client key collision: users\.byId/,
+	)
+	assert.throws(() => createApiClient({ api: [{ clientKey: 'byId.byId', pathname: '/api/[id]/byId', method: 'GET' }] }), /Ambiguous client key: byId\.byId/)
+	assert.throws(
+		() =>
+			createApiClient({
+				api: [
+					{ clientKey: 'users.get', pathname: '/api/users/get', method: 'GET' },
+					{ clientKey: 'users', pathname: '/api/users', method: 'GET' },
+				],
+			}),
+		/Client key collision: users\.get/,
+	)
+	assert.throws(() => createApiClient({ api: [{ clientKey: 'users.my-list', pathname: '/api/users/my-list', method: 'GET' }] }), /Invalid client key/)
+})

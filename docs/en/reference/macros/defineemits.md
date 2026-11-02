@@ -11,7 +11,7 @@ related:
   - "syntax:definemodel"
   - "syntax:generic"
   - docs/api.md#eventos-de-componente-defineemits-y-on
-source-hash: e0697bbd34ee9968ccba34b29d7c9de443d56f88929979e688358c9a78729219
+source-hash: 85523c50ae12b12956b3a9947dd6c75a2ba140a94cf9fc9fb3b12faf3db5cd8e
 ---
 
 `defineEmits<T>()` declares the component's events: each key of `T` is an event and its value is the argument tuple. It returns `emit(evento, ...args)`, typed with those tuples. It is a compile-time macro: you do not import it.

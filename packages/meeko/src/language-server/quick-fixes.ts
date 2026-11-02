@@ -1,29 +1,29 @@
-import type { TextDocument } from "vscode-languageserver-textdocument";
-import type { CodeAction, Diagnostic } from "vscode-languageserver/node";
+import type { TextDocument } from 'vscode-languageserver-textdocument'
+import type { CodeAction, Diagnostic } from 'vscode-languageserver/node'
 
-import ts from "@typescript/typescript6";
-import { existsSync } from "node:fs";
-import { join, relative } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
-import { CodeActionKind } from "vscode-languageserver/node";
+import ts from '@typescript/typescript6'
+import { existsSync } from 'node:fs'
+import { join, relative } from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+import { CodeActionKind } from 'vscode-languageserver/node'
 
-import type { SfcSection } from "../compiler/parser/sfc";
-import type { EditCapabilities } from "./actions";
-import type { FeatureContext } from "./features";
+import type { SfcSection } from '../compiler/parser/sfc'
+import type { EditCapabilities } from './actions'
+import type { FeatureContext } from './features'
 
-import { doubleBraces } from "../compiler/double-braces";
-import { interpolationClose, scanInterpolations } from "../compiler/parser/interpolation";
-import { parseSfc } from "../compiler/parser/sfc";
-import { cleanupFixes } from "./cleanup";
-import { tagAt, templateRegion } from "./embedded";
-import { usageEdits } from "./features";
-import { nodeAt } from "./reactivity";
+import { doubleBraces } from '../compiler/double-braces'
+import { interpolationClose, scanInterpolations } from '../compiler/parser/interpolation'
+import { parseSfc } from '../compiler/parser/sfc'
+import { cleanupFixes } from './cleanup'
+import { tagAt, templateRegion } from './embedded'
+import { usageEdits } from './features'
+import { nodeAt } from './reactivity'
 
 /** The top-level statement of the script that contains `node`. */
 function topStatement(node: ts.Node): ts.Statement | undefined {
-  let current: ts.Node = node;
-  while (current.parent && !ts.isSourceFile(current.parent)) current = current.parent;
-  return current.parent && ts.isSourceFile(current.parent) ? current as ts.Statement : undefined;
+	let current: ts.Node = node
+	while (current.parent && !ts.isSourceFile(current.parent)) current = current.parent
+	return current.parent && ts.isSourceFile(current.parent) ? (current as ts.Statement) : undefined
 }
 
 /**
@@ -32,87 +32,96 @@ function topStatement(node: ts.Node): ts.Statement | undefined {
  * value matters with `untrack(() => props.x)`.
  */
 export function propsReadActions(context: FeatureContext, diagnostics: readonly Diagnostic[]): CodeAction[] {
-  const { document } = context;
-  const source = document.getText();
-  let script: SfcSection;
-  try { script = parseSfc(source, context.component.filename).script; }
-  catch { return []; }
-  const file = ts.createSourceFile(context.component.filename, script.content, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-  const at = (local: number) => document.positionAt(script.contentStart + local);
-  const actions: CodeAction[] = [];
-  const handled = new Set<number>();
-  for (const diagnostic of diagnostics) {
-    if (diagnostic.code !== "MEEK101") continue;
-    const offset = document.offsetAt(diagnostic.range.start);
-    if (handled.has(offset)) continue;
-    handled.add(offset);
-    const node = nodeAt(file, offset - script.contentStart);
-    if (!node || !ts.isIdentifier(node)) continue;
-    const statement = topStatement(node);
-    const declaration = statement && ts.isVariableStatement(statement) && (statement.declarationList.flags & ts.NodeFlags.Const) !== 0
-      && statement.declarationList.declarations.length === 1 ? statement.declarationList.declarations[0]! : undefined;
-    const initializer = declaration?.initializer;
-    if (declaration && initializer && ts.isIdentifier(declaration.name) && node.getStart(file) >= initializer.getStart(file) && node.end <= initializer.end) {
-      const name = declaration.name.text;
-      const uses = usageEdits(context, at(declaration.name.getStart(file)), (used) => `${used}.value`);
-      if (uses) {
-        actions.push({
-          title: `Convertir ${name} en computed para que siga a la prop`,
-          kind: CodeActionKind.QuickFix,
-          diagnostics: [diagnostic],
-          isPreferred: true,
-          edit: { changes: { [document.uri]: [
-            { range: { start: at(initializer.getStart(file)), end: at(initializer.end) }, newText: `computed(() => ${initializer.getText(file)})` },
-            ...uses,
-          ] } },
-        });
-      }
-    }
-    // `const { label, title: heading } = props`: one computed per name.
-    const pattern = declaration && ts.isObjectBindingPattern(declaration.name) && initializer === node ? declaration.name : undefined;
-    if (statement && pattern && pattern.elements.every((element) => !element.dotDotDotToken && !element.initializer && ts.isIdentifier(element.name)
-      && (!element.propertyName || ts.isIdentifier(element.propertyName)))) {
-      const indent = /[ \t]*$/.exec(source.slice(0, script.contentStart + statement.getStart(file)))![0];
-      const newline = source.includes("\r\n") ? "\r\n" : "\n";
-      const lines = pattern.elements.map((element) => {
-        const local = (element.name as ts.Identifier).text;
-        const property = element.propertyName ? (element.propertyName as ts.Identifier).text : local;
-        return `const ${local} = computed(() => ${node.text}.${property});`;
-      });
-      const uses = pattern.elements.flatMap((element) => usageEdits(context, at(element.name.getStart(file)), (used) => `${used}.value`) ?? []);
-      actions.push({
-        title: `Convertir la desestructuración de ${node.text} en computed`,
-        kind: CodeActionKind.QuickFix,
-        diagnostics: [diagnostic],
-        isPreferred: true,
-        edit: { changes: { [document.uri]: [
-          { range: { start: at(statement.getStart(file)), end: at(statement.end) }, newText: lines.join(`${newline}${indent}`) },
-          ...uses,
-        ] } },
-      });
-    }
-    // A read in the setup (not in onMounted, not a destructuring): only the first value matters.
-    const parent = node.parent;
-    const access = parent && (ts.isPropertyAccessExpression(parent) || ts.isElementAccessExpression(parent)) && parent.expression === node ? parent : undefined;
-    if (access && /el setup se ejecuta/.test(String(diagnostic.message))) {
-      const text = access.getText(file);
-      actions.push({
-        title: `Leer ${text} sólo una vez con untrack`,
-        kind: CodeActionKind.QuickFix,
-        diagnostics: [diagnostic],
-        edit: { changes: { [document.uri]: [{ range: { start: at(access.getStart(file)), end: at(access.end) }, newText: `untrack(() => ${text})` }] } },
-      });
-    }
-  }
-  return actions;
+	const { document } = context
+	const source = document.getText()
+	let script: SfcSection
+	try {
+		script = parseSfc(source, context.component.filename).script
+	} catch {
+		return []
+	}
+	const file = ts.createSourceFile(context.component.filename, script.content, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+	const at = (local: number) => document.positionAt(script.contentStart + local)
+	const actions: CodeAction[] = []
+	const handled = new Set<number>()
+	for (const diagnostic of diagnostics) {
+		if (diagnostic.code !== 'MEEK101') continue
+		const offset = document.offsetAt(diagnostic.range.start)
+		if (handled.has(offset)) continue
+		handled.add(offset)
+		const node = nodeAt(file, offset - script.contentStart)
+		if (!node || !ts.isIdentifier(node)) continue
+		const statement = topStatement(node)
+		const declaration = statement && ts.isVariableStatement(statement) && (statement.declarationList.flags & ts.NodeFlags.Const) !== 0 && statement.declarationList.declarations.length === 1 ? statement.declarationList.declarations[0]! : undefined
+		const initializer = declaration?.initializer
+		if (declaration && initializer && ts.isIdentifier(declaration.name) && node.getStart(file) >= initializer.getStart(file) && node.end <= initializer.end) {
+			const name = declaration.name.text
+			const uses = usageEdits(context, at(declaration.name.getStart(file)), (used) => `${used}.value`)
+			if (uses) {
+				actions.push({
+					title: `Convertir ${name} en computed para que siga a la prop`,
+					kind: CodeActionKind.QuickFix,
+					diagnostics: [diagnostic],
+					isPreferred: true,
+					edit: {
+						changes: {
+							[document.uri]: [
+								{ range: { start: at(initializer.getStart(file)), end: at(initializer.end) }, newText: `computed(() => ${initializer.getText(file)})` },
+								...uses,
+							],
+						},
+					},
+				})
+			}
+		}
+		// `const { label, title: heading } = props`: one computed per name.
+		const pattern = declaration && ts.isObjectBindingPattern(declaration.name) && initializer === node ? declaration.name : undefined
+		if (statement && pattern && pattern.elements.every((element) => !element.dotDotDotToken && !element.initializer && ts.isIdentifier(element.name) && (!element.propertyName || ts.isIdentifier(element.propertyName)))) {
+			const indent = /[ \t]*$/.exec(source.slice(0, script.contentStart + statement.getStart(file)))![0]
+			const newline = source.includes('\r\n') ? '\r\n' : '\n'
+			const lines = pattern.elements.map((element) => {
+				const local = (element.name as ts.Identifier).text
+				const property = element.propertyName ? (element.propertyName as ts.Identifier).text : local
+				return `const ${local} = computed(() => ${node.text}.${property});`
+			})
+			const uses = pattern.elements.flatMap((element) => usageEdits(context, at(element.name.getStart(file)), (used) => `${used}.value`) ?? [])
+			actions.push({
+				title: `Convertir la desestructuración de ${node.text} en computed`,
+				kind: CodeActionKind.QuickFix,
+				diagnostics: [diagnostic],
+				isPreferred: true,
+				edit: {
+					changes: {
+						[document.uri]: [
+							{ range: { start: at(statement.getStart(file)), end: at(statement.end) }, newText: lines.join(`${newline}${indent}`) },
+							...uses,
+						],
+					},
+				},
+			})
+		}
+		// A read in the setup (not in onMounted, not a destructuring): only the first value matters.
+		const parent = node.parent
+		const access = parent && (ts.isPropertyAccessExpression(parent) || ts.isElementAccessExpression(parent)) && parent.expression === node ? parent : undefined
+		if (access && /el setup se ejecuta/.test(String(diagnostic.message))) {
+			const text = access.getText(file)
+			actions.push({
+				title: `Leer ${text} sólo una vez con untrack`,
+				kind: CodeActionKind.QuickFix,
+				diagnostics: [diagnostic],
+				edit: { changes: { [document.uri]: [{ range: { start: at(access.getStart(file)), end: at(access.end) }, newText: `untrack(() => ${text})` }] } },
+			})
+		}
+	}
+	return actions
 }
 
 /** The item name of a list: `variant` for `variants.value`, `entry` for `entries`, else `item`. */
 export function itemName(list: string): string {
-  const name = /([A-Za-z_$][\w$]*)(?:\.value)?\s*$/.exec(list)?.[1];
-  if (!name) return "item";
-  const singular = name.endsWith("ies") ? `${name.slice(0, -3)}y` : name.endsWith("s") && !name.endsWith("ss") ? name.slice(0, -1) : "";
-  return singular && /^[A-Za-z_$][\w$]*$/.test(singular) ? singular : "item";
+	const name = /([A-Za-z_$][\w$]*)(?:\.value)?\s*$/.exec(list)?.[1]
+	if (!name) return 'item'
+	const singular = name.endsWith('ies') ? `${name.slice(0, -3)}y` : name.endsWith('s') && !name.endsWith('ss') ? name.slice(0, -1) : ''
+	return singular && /^[A-Za-z_$][\w$]*$/.test(singular) ? singular : 'item'
 }
 
 /**
@@ -120,36 +129,36 @@ export function itemName(list: string): string {
  * that error does not compile.
  */
 export function listItemActions(document: TextDocument, diagnostics: readonly Diagnostic[]): CodeAction[] {
-  const source = document.getText();
-  const actions: CodeAction[] = [];
-  for (const diagnostic of diagnostics) {
-    if (diagnostic.code !== "MEEK022") continue;
-    // The diagnostic starts at the `<` of the tag; tagAt reads the tag from after its name.
-    const start = document.offsetAt(diagnostic.range.start);
-    const context = tagAt(source, start + (/^<[A-Za-z][\w$.-]*/.exec(source.slice(start))?.[0].length ?? 1));
-    if (!context) continue;
-    const tag = source.slice(context.tagStart, context.tagEnd);
-    if (/\seach:as\s*=/.test(tag)) continue;
-    const list = /\seach:of\s*=\s*("([^"]*)"|'([^']*)')/.exec(tag);
-    if (!list) continue;
-    const item = itemName(list[2] ?? list[3] ?? "");
-    const at = document.positionAt(context.tagStart + list.index + list[0].length);
-    actions.push({
-      title: `Añadir each:as="${item}"`,
-      kind: CodeActionKind.QuickFix,
-      diagnostics: [diagnostic],
-      isPreferred: true,
-      edit: { changes: { [document.uri]: [{ range: { start: at, end: at }, newText: ` each:as="${item}"` }] } },
-    });
-  }
-  return actions;
+	const source = document.getText()
+	const actions: CodeAction[] = []
+	for (const diagnostic of diagnostics) {
+		if (diagnostic.code !== 'MEEK022') continue
+		// The diagnostic starts at the `<` of the tag; tagAt reads the tag from after its name.
+		const start = document.offsetAt(diagnostic.range.start)
+		const context = tagAt(source, start + (/^<[A-Za-z][\w$.-]*/.exec(source.slice(start))?.[0].length ?? 1))
+		if (!context) continue
+		const tag = source.slice(context.tagStart, context.tagEnd)
+		if (/\seach:as\s*=/.test(tag)) continue
+		const list = /\seach:of\s*=\s*("([^"]*)"|'([^']*)')/.exec(tag)
+		if (!list) continue
+		const item = itemName(list[2] ?? list[3] ?? '')
+		const at = document.positionAt(context.tagStart + list.index + list[0].length)
+		actions.push({
+			title: `Añadir each:as="${item}"`,
+			kind: CodeActionKind.QuickFix,
+			diagnostics: [diagnostic],
+			isPreferred: true,
+			edit: { changes: { [document.uri]: [{ range: { start: at, end: at }, newText: ` each:as="${item}"` }] } },
+		})
+	}
+	return actions
 }
 
 /** A `{{ expr }}` of the template's text: its span and its fixes. */
 interface DoubleBraceSpan {
-  readonly start: number;
-  readonly end: number;
-  readonly fix: NonNullable<ReturnType<typeof doubleBraces>>;
+	readonly start: number
+	readonly end: number
+	readonly fix: NonNullable<ReturnType<typeof doubleBraces>>
 }
 
 /**
@@ -157,34 +166,35 @@ interface DoubleBraceSpan {
  * tags and comments: the same ones that the compiler reports, one at a time, as MEEK020.
  */
 export function doubleBraceSpans(source: string): DoubleBraceSpan[] {
-  const template = templateRegion(source);
-  if (!template) return [];
-  const spans: DoubleBraceSpan[] = [];
-  let index = template.contentStart;
-  while (index < template.contentEnd) {
-    if (source.startsWith("<!--", index)) {
-      const close = source.indexOf("-->", index + 4);
-      index = close < 0 ? template.contentEnd : close + 3;
-    } else if (source[index] === "<") {
-      // A tag: up to its `>`, skipping quoted values.
-      let quote: string | undefined;
-      for (index++; index < template.contentEnd; index++) {
-        const char = source[index];
-        if (quote) { if (char === quote) quote = undefined; }
-        else if (char === '"' || char === "'") quote = char;
-        else if (char === ">") break;
-      }
-      index++;
-    } else if (source[index] === "{") {
-      const close = interpolationClose(source, index);
-      if (close === undefined || close >= template.contentEnd) break;
-      const segment = scanInterpolations(source.slice(index, close + 1)).segments[0];
-      const fix = segment && doubleBraces(segment.expression);
-      if (fix) spans.push({ start: index, end: close + 1, fix });
-      index = close + 1;
-    } else index++;
-  }
-  return spans;
+	const template = templateRegion(source)
+	if (!template) return []
+	const spans: DoubleBraceSpan[] = []
+	let index = template.contentStart
+	while (index < template.contentEnd) {
+		if (source.startsWith('<!--', index)) {
+			const close = source.indexOf('-->', index + 4)
+			index = close < 0 ? template.contentEnd : close + 3
+		} else if (source[index] === '<') {
+			// A tag: up to its `>`, skipping quoted values.
+			let quote: string | undefined
+			for (index++; index < template.contentEnd; index++) {
+				const char = source[index]
+				if (quote) {
+					if (char === quote) quote = undefined
+				} else if (char === '"' || char === "'") quote = char
+				else if (char === '>') break
+			}
+			index++
+		} else if (source[index] === '{') {
+			const close = interpolationClose(source, index)
+			if (close === undefined || close >= template.contentEnd) break
+			const segment = scanInterpolations(source.slice(index, close + 1)).segments[0]
+			const fix = segment && doubleBraces(segment.expression)
+			if (fix) spans.push({ start: index, end: close + 1, fix })
+			index = close + 1
+		} else index++
+	}
+	return spans
 }
 
 /**
@@ -192,30 +202,30 @@ export function doubleBraceSpans(source: string): DoubleBraceSpan[] {
  * the braces as text (`{"{hola}"}`), or fixes every double-brace interpolation of the file.
  */
 export function doubleBraceActions(document: TextDocument, diagnostics: readonly Diagnostic[]): CodeAction[] {
-  const source = document.getText();
-  const actions: CodeAction[] = [];
-  let spans: DoubleBraceSpan[] | undefined;
-  const edit = (span: DoubleBraceSpan, newText: string) => ({ range: { start: document.positionAt(span.start), end: document.positionAt(span.end) }, newText });
-  for (const diagnostic of diagnostics) {
-    if (diagnostic.code !== "MEEK020" || typeof diagnostic.message !== "string" || !diagnostic.message.includes("{{expr}}")) continue;
-    spans ??= doubleBraceSpans(source);
-    const start = document.offsetAt(diagnostic.range.start);
-    const span = spans.find((candidate) => candidate.start === start);
-    if (!span) continue;
-    if (span.fix.interpolation) {
-      actions.push({ title: `Convertir a ${span.fix.interpolation}`, kind: CodeActionKind.QuickFix, diagnostics: [diagnostic], isPreferred: true, edit: { changes: { [document.uri]: [edit(span, span.fix.interpolation)] } } });
-    }
-    actions.push({ title: "Mostrar las llaves como texto", kind: CodeActionKind.QuickFix, diagnostics: [diagnostic], edit: { changes: { [document.uri]: [edit(span, span.fix.text)] } } });
-    if (spans.length > 1) {
-      actions.push({
-        title: "Corregir todas las del archivo",
-        kind: CodeActionKind.QuickFix,
-        diagnostics: [diagnostic],
-        edit: { changes: { [document.uri]: spans.map((each) => edit(each, each.fix.interpolation ?? each.fix.text)) } },
-      });
-    }
-  }
-  return actions;
+	const source = document.getText()
+	const actions: CodeAction[] = []
+	let spans: DoubleBraceSpan[] | undefined
+	const edit = (span: DoubleBraceSpan, newText: string) => ({ range: { start: document.positionAt(span.start), end: document.positionAt(span.end) }, newText })
+	for (const diagnostic of diagnostics) {
+		if (diagnostic.code !== 'MEEK020' || typeof diagnostic.message !== 'string' || !diagnostic.message.includes('{{expr}}')) continue
+		spans ??= doubleBraceSpans(source)
+		const start = document.offsetAt(diagnostic.range.start)
+		const span = spans.find((candidate) => candidate.start === start)
+		if (!span) continue
+		if (span.fix.interpolation) {
+			actions.push({ title: `Convertir a ${span.fix.interpolation}`, kind: CodeActionKind.QuickFix, diagnostics: [diagnostic], isPreferred: true, edit: { changes: { [document.uri]: [edit(span, span.fix.interpolation)] } } })
+		}
+		actions.push({ title: 'Mostrar las llaves como texto', kind: CodeActionKind.QuickFix, diagnostics: [diagnostic], edit: { changes: { [document.uri]: [edit(span, span.fix.text)] } } })
+		if (spans.length > 1) {
+			actions.push({
+				title: 'Corregir todas las del archivo',
+				kind: CodeActionKind.QuickFix,
+				diagnostics: [diagnostic],
+				edit: { changes: { [document.uri]: spans.map((each) => edit(each, each.fix.interpolation ?? each.fix.text)) } },
+			})
+		}
+	}
+	return actions
 }
 
 /**
@@ -224,25 +234,28 @@ export function doubleBraceActions(document: TextDocument, diagnostics: readonly
  * safe (see {@link cleanupFixes}). Otherwise the warning only explains.
  */
 export function cleanupActions(document: TextDocument, diagnostics: readonly Diagnostic[]): CodeAction[] {
-  const relevant = diagnostics.filter((diagnostic) => diagnostic.code === "MEEK128");
-  if (!relevant.length) return [];
-  let filename: string;
-  try { filename = fileURLToPath(document.uri); }
-  catch { filename = document.uri; }
-  const source = document.getText();
-  const actions: CodeAction[] = [];
-  for (const diagnostic of relevant) {
-    for (const [index, fix] of cleanupFixes(source, filename, document.offsetAt(diagnostic.range.start)).entries()) {
-      actions.push({
-        title: fix.title,
-        kind: CodeActionKind.QuickFix,
-        diagnostics: [diagnostic],
-        ...(index === 0 ? { isPreferred: true } : {}),
-        edit: { changes: { [document.uri]: fix.edits.map((edit) => ({ range: { start: document.positionAt(edit.start), end: document.positionAt(edit.end) }, newText: edit.text })) } },
-      });
-    }
-  }
-  return actions;
+	const relevant = diagnostics.filter((diagnostic) => diagnostic.code === 'MEEK128')
+	if (!relevant.length) return []
+	let filename: string
+	try {
+		filename = fileURLToPath(document.uri)
+	} catch {
+		filename = document.uri
+	}
+	const source = document.getText()
+	const actions: CodeAction[] = []
+	for (const diagnostic of relevant) {
+		for (const [index, fix] of cleanupFixes(source, filename, document.offsetAt(diagnostic.range.start)).entries()) {
+			actions.push({
+				title: fix.title,
+				kind: CodeActionKind.QuickFix,
+				diagnostics: [diagnostic],
+				...(index === 0 ? { isPreferred: true } : {}),
+				edit: { changes: { [document.uri]: fix.edits.map((edit) => ({ range: { start: document.positionAt(edit.start), end: document.positionAt(edit.end) }, newText: edit.text })) } },
+			})
+		}
+	}
+	return actions
 }
 
 /**
@@ -251,60 +264,65 @@ export function cleanupActions(document: TextDocument, diagnostics: readonly Dia
  * prop per `bind:` of the tag, typed like the value the tag passes.
  */
 export function createComponentActions(context: FeatureContext, diagnostics: readonly Diagnostic[], capabilities: EditCapabilities): CodeAction[] {
-  if (!capabilities.createFiles) return [];
-  const { document, component } = context;
-  const source = document.getText();
-  const actions: CodeAction[] = [];
-  const created = new Set<string>();
-  for (const diagnostic of diagnostics) {
-    const name = diagnostic.code === "TS2304" ? /Cannot find name '([A-Z][A-Za-z0-9]*)'/.exec(String(diagnostic.message))?.[1] : undefined;
-    const offset = document.offsetAt(diagnostic.range.start);
-    if (!name || source[offset - 1] !== "<" || created.has(name)) continue;
-    const root = context.project.sourceRoots().filter((entry) => component.filename.startsWith(entry)).sort((a, b) => b.length - a.length)[0];
-    if (!root) continue;
-    const words = name.match(/[A-Z][a-z0-9]*/g) ?? [name];
-    let directory = join(root, "app", "components");
-    let used = 0;
-    while (used < words.length - 1 && existsSync(join(directory, words[used]!))) directory = join(directory, words[used++]!);
-    const target = join(directory, `${words.slice(used).join("")}.meeko`);
-    if (existsSync(target)) continue;
-    created.add(name);
-    const tag = tagAt(source, offset + name.length);
-    const props = tag ? [...source.slice(tag.tagStart, tag.tagEnd).matchAll(/\sbind:([A-Za-z_$][\w$]*)\s*=\s*"/g)].map((match) => ({
-      name: match[1]!,
-      type: boundType(context, tag.tagStart + match.index + match[0].length) ?? "unknown",
-    })) : [];
-    const indent = /^\t/m.test(source) ? "\t" : "  ";
-    const script = props.length
-      ? `<script lang="ts">\nexport interface Props {\n${props.map((prop) => `${indent}${prop.name}: ${prop.type};`).join("\n")}\n}\n\nconst props = defineProps<Props>();\n</script>\n\n`
-      : "";
-    const content = `${script}<template>\n${indent}<div></div>\n</template>\n`;
-    const uri = pathToFileURL(target).href;
-    actions.push({
-      title: `Crear el componente ${name} en ${relative(root, target).replaceAll("\\", "/")}`,
-      kind: CodeActionKind.QuickFix,
-      diagnostics: [diagnostic],
-      edit: { documentChanges: [
-        { kind: "create", uri, options: { ignoreIfExists: true } },
-        { textDocument: { uri, version: null }, edits: [{ range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } }, newText: content }] },
-      ] },
-    });
-  }
-  return actions;
+	if (!capabilities.createFiles) return []
+	const { document, component } = context
+	const source = document.getText()
+	const actions: CodeAction[] = []
+	const created = new Set<string>()
+	for (const diagnostic of diagnostics) {
+		const name = diagnostic.code === 'TS2304' ? /Cannot find name '([A-Z][A-Za-z0-9]*)'/.exec(String(diagnostic.message))?.[1] : undefined
+		const offset = document.offsetAt(diagnostic.range.start)
+		if (!name || source[offset - 1] !== '<' || created.has(name)) continue
+		const root = context.project
+			.sourceRoots()
+			.filter((entry) => component.filename.startsWith(entry))
+			.sort((a, b) => b.length - a.length)[0]
+		if (!root) continue
+		const words = name.match(/[A-Z][a-z0-9]*/g) ?? [name]
+		let directory = join(root, 'app', 'components')
+		let used = 0
+		while (used < words.length - 1 && existsSync(join(directory, words[used]!))) directory = join(directory, words[used++]!)
+		const target = join(directory, `${words.slice(used).join('')}.meeko`)
+		if (existsSync(target)) continue
+		created.add(name)
+		const tag = tagAt(source, offset + name.length)
+		const props = tag
+			? [...source.slice(tag.tagStart, tag.tagEnd).matchAll(/\sbind:([A-Za-z_$][\w$]*)\s*=\s*"/g)].map((match) => ({
+					name: match[1]!,
+					type: boundType(context, tag.tagStart + match.index + match[0].length) ?? 'unknown',
+				}))
+			: []
+		const indent = /^\t/m.test(source) ? '\t' : '  '
+		const script = props.length ? `<script lang="ts">\nexport interface Props {\n${props.map((prop) => `${indent}${prop.name}: ${prop.type};`).join('\n')}\n}\n\nconst props = defineProps<Props>();\n</script>\n\n` : ''
+		const content = `${script}<template>\n${indent}<div></div>\n</template>\n`
+		const uri = pathToFileURL(target).href
+		actions.push({
+			title: `Crear el componente ${name} en ${relative(root, target).replaceAll('\\', '/')}`,
+			kind: CodeActionKind.QuickFix,
+			diagnostics: [diagnostic],
+			edit: {
+				documentChanges: [
+					{ kind: 'create', uri, options: { ignoreIfExists: true } },
+					{ textDocument: { uri, version: null }, edits: [{ range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } }, newText: content }] },
+				],
+			},
+		})
+	}
+	return actions
 }
 
 /** The type of the expression in a `bind:` value that starts at `valueStart`, widened (`"x"` → `string`). */
 function boundType(context: FeatureContext, valueStart: number): string | undefined {
-  const program = context.project.service.getProgram();
-  const file = program?.getSourceFile(context.component.virtualFilename);
-  const generated = context.component.toGenerated(valueStart);
-  if (!program || !file || generated === undefined) return undefined;
-  let node = nodeAt(file, generated);
-  // The whole expression: climb while the parent starts at the same place.
-  while (node?.parent && ts.isExpression(node.parent) && node.parent.getStart(file) === node.getStart(file)) node = node.parent;
-  if (!node) return undefined;
-  const checker = program.getTypeChecker();
-  const type = checker.getBaseTypeOfLiteralType(checker.getTypeAtLocation(node));
-  if (type.flags & ts.TypeFlags.Any) return undefined;
-  return checker.typeToString(type, undefined, ts.TypeFormatFlags.NoTruncation);
+	const program = context.project.service.getProgram()
+	const file = program?.getSourceFile(context.component.virtualFilename)
+	const generated = context.component.toGenerated(valueStart)
+	if (!program || !file || generated === undefined) return undefined
+	let node = nodeAt(file, generated)
+	// The whole expression: climb while the parent starts at the same place.
+	while (node?.parent && ts.isExpression(node.parent) && node.parent.getStart(file) === node.getStart(file)) node = node.parent
+	if (!node) return undefined
+	const checker = program.getTypeChecker()
+	const type = checker.getBaseTypeOfLiteralType(checker.getTypeAtLocation(node))
+	if (type.flags & ts.TypeFlags.Any) return undefined
+	return checker.typeToString(type, undefined, ts.TypeFormatFlags.NoTruncation)
 }

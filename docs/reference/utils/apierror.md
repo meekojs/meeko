@@ -24,6 +24,7 @@ Se autoimporta en el código de servidor.
 ## Uso
 
 <!-- no-check -->
+
 ```ts
 // server/rpc/users/get.ts
 import { ApiError, defineRpc } from "@meekojs/meeko/server";
@@ -44,11 +45,11 @@ La respuesta es `404` con `{ "code": "USER_NOT_FOUND", "status": 404, "requestId
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `code` | `string` | obligatorio | Código público, estable, que el cliente puede comparar: `"NOT_FOUND"`, `"EMAIL_TAKEN"`. |
-| `status` | `number` | obligatorio | Estado HTTP de la respuesta, normalmente un `4xx`. |
-| `message` | `string` o `{ message?, issues? }` | `code` | El mensaje interno, que nunca se envía. Desde `1.5`, `issues: [{ path, message }]` añade mensajes públicos por campo. |
+| Parámetro | Tipo                               | Por defecto | Descripción                                                                                                           |
+| --------- | ---------------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------- |
+| `code`    | `string`                           | obligatorio | Código público, estable, que el cliente puede comparar: `"NOT_FOUND"`, `"EMAIL_TAKEN"`.                               |
+| `status`  | `number`                           | obligatorio | Estado HTTP de la respuesta, normalmente un `4xx`.                                                                    |
+| `message` | `string` o `{ message?, issues? }` | `code`      | El mensaje interno, que nunca se envía. Desde `1.5`, `issues: [{ path, message }]` añade mensajes públicos por campo. |
 
 Cada issue necesita un `path` de texto (las claves unidas con `.`, o `""` para el formulario entero) y un `message` no vacío.
 
@@ -56,17 +57,18 @@ Cada issue necesita un `path` de texto (las claves unidas con `.`, o `""` para e
 
 Una instancia de `Error` con `name: "ApiError"`, `code`, `status`, `message` e `issues`. Lo que llega al cliente:
 
-| Campo | Viaja | Notas |
-| --- | --- | --- |
-| `code`, `status` | Sí | Más `requestId` y la cabecera `x-request-id`. |
-| `issues` | Sólo con un estado `4xx` | Como mucho 20. |
-| `message` | Nunca | Úsalo para los registros del servidor. |
+| Campo            | Viaja                    | Notas                                         |
+| ---------------- | ------------------------ | --------------------------------------------- |
+| `code`, `status` | Sí                       | Más `requestId` y la cabecera `x-request-id`. |
+| `issues`         | Sólo con un estado `4xx` | Como mucho 20.                                |
+| `message`        | Nunca                    | Úsalo para los registros del servidor.        |
 
 ## Ejemplos
 
 ### Un conflicto en un campo
 
 <!-- no-check -->
+
 ```ts
 // server/api/signup.post.ts
 import { ApiError, defineApiRoute } from "@meekojs/meeko/server";
@@ -95,6 +97,7 @@ En el cliente, `form.errors.value.email` de `useForm` es «Ese correo ya tiene u
 Un `ApiError` con estado `404` en un loader muestra la página de error más cercana con `{ status: 404, message: "NOT_FOUND" }`:
 
 <!-- no-check -->
+
 ```ts
 // app/pages/products/[slug].route.ts
 import { definePage } from "@meekojs/meeko/framework";
@@ -112,6 +115,7 @@ export const route = definePage({
 ### Errores de permisos desde `locals`
 
 <!-- no-check -->
+
 ```ts
 locals: async ({ session }) => {
   const user = await findUser((session.current!.data as { userId: string }).userId);
@@ -132,6 +136,7 @@ throw new ApiError(`USER_${user.email}_LOCKED`, 403);
 ```
 
 <!-- no-check -->
+
 ```ts good
 throw new ApiError("ACCOUNT_LOCKED", 403, { message: `locked: ${user.email}` });
 ```
@@ -145,6 +150,7 @@ throw new ApiError("INVALID", 409, { issues: [{ path: "email" }] });
 `meeko check` da `TS2741: Property 'message' is missing in type '{ path: string; }' but required in type 'ApiErrorIssue'.` Sin tipos, crear el error lanza `TypeError: Each ApiError issue needs a string path and a nonempty string message`.
 
 <!-- no-check -->
+
 ```ts good
 throw new ApiError("INVALID", 409, { issues: [{ path: "email", message: "Revisa el correo." }] });
 ```
@@ -158,6 +164,7 @@ throw new Error("Ese correo ya tiene una cuenta");
 La respuesta es `500` `INTERNAL_ERROR`, sin el mensaje, y el servidor lo registra como un fallo interno.
 
 <!-- no-check -->
+
 ```ts good
 throw new ApiError("EMAIL_TAKEN", 409, { issues: [{ path: "email", message: "Ese correo ya tiene una cuenta." }] });
 ```

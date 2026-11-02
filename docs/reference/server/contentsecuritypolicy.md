@@ -36,11 +36,11 @@ Sin `script-src`, los hashes van a una copia de `default-src`, para que la polí
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `policy` | `ContentSecurityPolicy` (`Record<string, readonly string[]>`) | obligatorio | Cada clave es una directiva en minúsculas (`"script-src"`) y su valor, la lista de fuentes tal como se escriben (`"'self'"`, `"https://cdn.example"`). Una lista vacía escribe la directiva sola, como `upgrade-insecure-requests`. |
-| `scriptHashes` | `readonly string[]` | `[]` | Fuentes `'sha256-…'`, `'sha384-…'` o `'sha512-…'`, con las comillas. Van a `script-src-elem` si existe (desde `1.7`), si no a `script-src` o a una copia de `default-src`; sin ninguna no se añaden. |
-| `styleHashes` | `readonly string[]` | `[]` | Desde `1.4`. Igual para los `<style>`: van a `style-src-elem` si existe, si no a `style-src` o a una copia de `default-src`. Nunca a una directiva con `'unsafe-inline'`. |
+| Parámetro      | Tipo                                                          | Por defecto | Descripción                                                                                                                                                                                                                         |
+| -------------- | ------------------------------------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `policy`       | `ContentSecurityPolicy` (`Record<string, readonly string[]>`) | obligatorio | Cada clave es una directiva en minúsculas (`"script-src"`) y su valor, la lista de fuentes tal como se escriben (`"'self'"`, `"https://cdn.example"`). Una lista vacía escribe la directiva sola, como `upgrade-insecure-requests`. |
+| `scriptHashes` | `readonly string[]`                                           | `[]`        | Fuentes `'sha256-…'`, `'sha384-…'` o `'sha512-…'`, con las comillas. Van a `script-src-elem` si existe (desde `1.7`), si no a `script-src` o a una copia de `default-src`; sin ninguna no se añaden.                                |
+| `styleHashes`  | `readonly string[]`                                           | `[]`        | Desde `1.4`. Igual para los `<style>`: van a `style-src-elem` si existe, si no a `style-src` o a una copia de `default-src`. Nunca a una directiva con `'unsafe-inline'`.                                                           |
 
 ## Valor devuelto
 
@@ -94,6 +94,7 @@ export const header = contentSecurityPolicy(
 ### Los hashes de cualquier documento
 
 <!-- no-check -->
+
 ```ts
 import { inlineScriptHashes, inlineStyleHashes } from "@meekojs/meeko/build";
 import { contentSecurityPolicy } from "@meekojs/meeko/server";
@@ -158,6 +159,7 @@ server: { adapter: "node", headers: { "Content-Security-Policy": "default-src 's
 `meeko.config.ts: server.headers no puede fijar Content-Security-Policy; use server.contentSecurityPolicy, que añade los hashes de los scripts`: escrita a mano, la política no llevaría los hashes ni el nonce y bloquearía los scripts de Meeko.
 
 <!-- no-check -->
+
 ```ts good
 server: { adapter: "node", contentSecurityPolicy: { "default-src": ["'self'"] } }
 ```
@@ -166,13 +168,13 @@ server: { adapter: "node", contentSecurityPolicy: { "default-src": ["'self'"] } 
 
 - **CSP por respuesta (desde 1.7).** Con `server.contentSecurityPolicy` en `node`, `bun`, `deno` o `cloudflare`, Meeko completa la política según lo que lleva cada respuesta:
 
-  | Respuesta | Qué se añade |
-  | --- | --- |
-  | Página prerenderizada | Los hashes de sus scripts y `<style>` (del índice de prerender). Se sigue sirviendo desde su archivo, con `ETag` y `304`. |
+  | Respuesta                           | Qué se añade                                                                                                                                                      |
+  | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | Página prerenderizada               | Los hashes de sus scripts y `<style>` (del índice de prerender). Se sigue sirviendo desde su archivo, con `ETag` y `304`.                                         |
   | Página SSR, `"stream"`, error y 404 | Un nonce nuevo por respuesta (128 bits), que Meeko pone en sus `<script>`, `<style>`, la entrada del cliente, el script del tema y los de `useHead` y `document`. |
-  | Página SSR con `cache` | Los hashes de su HTML, sin nonce: el documento es el mismo para todos y un nonce no sobrevive a un `304`. |
-  | JSON de API, RPC y navegación | La política se sustituye por `default-src 'none'; frame-ancestors 'none'`. |
-  | Archivos públicos y lo demás | La política tal cual. |
+  | Página SSR con `cache`              | Los hashes de su HTML, sin nonce: el documento es el mismo para todos y un nonce no sobrevive a un `304`.                                                         |
+  | JSON de API, RPC y navegación       | La política se sustituye por `default-src 'none'; frame-ancestors 'none'`.                                                                                        |
+  | Archivos públicos y lo demás        | La política tal cual.                                                                                                                                             |
 
 - **`'unsafe-inline'`.** Con un hash o un nonce, el navegador ignora `'unsafe-inline'` de esa directiva. Por eso Meeko nunca añade un nonce ni un hash a una directiva que lo tiene; la función pública sí añade los hashes de scripts (no los de estilos) a un `script-src` con `'unsafe-inline'`.
 - **Cuándo se aplica.** Sólo en producción: en `meeko dev`, Vite inyecta scripts sin nonce ni hash. Una respuesta que ya trae `Content-Security-Policy` (de un handler o un middleware) la conserva, y un `304` nunca la lleva.

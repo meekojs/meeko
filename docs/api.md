@@ -1201,7 +1201,7 @@ Desde `1.1`, un componente recibe contenido del padre en snippets con nombre, qu
   </AppGrid>
   ```
 
-  En el hijo, una intersección con un tipo mapeado se lee miembro a miembro: `snippets.cell` conserva su tupla junto a los snippets mapeados. Lo que TypeScript no puede tipar sobre un parámetro de tipo es un nombre calculado (`` snippets[`cell-${column.key}`] ``): en tiempo de ejecución funciona, pero el hijo lo lee de una vista con una conversión, como `byName` arriba. `UITable` usa este patrón para `cell-<clave>` y `header-<clave>`.
+  En el hijo, una intersección con un tipo mapeado se lee miembro a miembro: `snippets.cell` conserva su tupla junto a los snippets mapeados. Lo que TypeScript no puede tipar sobre un parámetro de tipo es un nombre calculado (``snippets[`cell-${column.key}`]``): en tiempo de ejecución funciona, pero el hijo lo lee de una vista con una conversión, como `byName` arriba. `UITable` usa este patrón para `cell-<clave>` y `header-<clave>`.
 
 `defineSnippets` aparece una sola vez, en su propia declaración `const` de nivel superior con un nombre simple (`MEEK059`), con un argumento de tipo y sin argumentos en tiempo de ejecución (`MEEK060`). `MEEK061` señala un `<snippet>` que no es hijo directo de una etiqueta de componente, sin `name` o con un nombre que no sigue la regla de nombres de snippet, con parámetros que no son identificadores, repetido, con atributos distintos de `name`, `params` e `if:when`, con un `if:when` vacío o sin valor, o un `<snippet name="default">` junto a contenido suelto. `MEEK110`, un error de tipos de `meeko check` y del editor, señala el `if:when` de un `<snippet>` que llena un snippet obligatorio del hijo. `MEEK062` señala un `<render>` sin `snippet`, con contenido o con atributos distintos de `snippet` y `args`. Una `ref:` dentro del contenido de un `<snippet>` da `MEEK052`, porque el hijo puede pintarlo varias veces. `<snippet>` y `<render>` pueden cerrarse solos.
 
@@ -1392,11 +1392,11 @@ Desde `1.4`, cada componente autoimportado también tiene esos tipos con su nomb
 
 <a id="envolver-otro-componente"></a>**Envolver otro componente.** Desde `1.8`, un componente autoimportado tiene tres tipos para esto:
 
-| Tipo | Qué es |
-| --- | --- |
-| `BaseButtonProps` | Sus props, sin los callbacks de `defineEmits`. |
-| `BaseButtonEmits` | El mapa de `defineEmits`, para escribir `defineEmits<BaseButtonEmits>()`. |
-| `ComponentProps<"BaseButton">` | Todo lo que puede pasar el padre, incluidos los `onClick`. |
+| Tipo                           | Qué es                                                                    |
+| ------------------------------ | ------------------------------------------------------------------------- |
+| `BaseButtonProps`              | Sus props, sin los callbacks de `defineEmits`.                            |
+| `BaseButtonEmits`              | El mapa de `defineEmits`, para escribir `defineEmits<BaseButtonEmits>()`. |
+| `ComponentProps<"BaseButton">` | Todo lo que puede pasar el padre, incluidos los `onClick`.                |
 
 Un envoltorio extiende las props, declara los eventos y reenvía el resto. Si las props del otro componente son una unión, como una ruta, un enlace o un botón, las variantes se conservan: pasar a la vez `to` y `href` sigue siendo un error en el padre del envoltorio.
 

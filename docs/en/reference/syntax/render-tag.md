@@ -11,7 +11,7 @@ related:
   - "syntax:if-when"
   - "@meekojs/meeko#Snippet"
   - docs/api.md#snippets-con-definesnippets
-source-hash: 96dc3f9de2221d3916f76df6770eb7d3169a395d31bb232ef38f47babe4fb866
+source-hash: a767e5c7bbf3aa5907184bf48e05b7c3326be3ce907f29ce8f15ba510732fcd4
 ---
 
 `<render snippet="snippets.x" args="a, b" />` renders snippet `x`, passed by the parent, in a component's template with those arguments. It is the other half of [`<snippet>`](/en/docs/reference/snippet-tag): the child decides where content goes and which data it receives, and the parent decides what renders.

@@ -15,7 +15,7 @@ related:
   - "@meekojs/meeko/server#defineServerMiddleware"
   - docs/framework.md#middleware-de-rutas-y-servidor
   - docs/framework.md#middleware-con-nombre
-source-hash: 2d4fa9c483a2e052b793cc7b0f59e3735b7f73ffe9511d00de003f6d96345c9d
+source-hash: 4742909c062b1f588ef2b533540c607010ce76bafaff1671c6013631382a610b
 ---
 
 `defineRouteMiddleware` declares the route middleware exported by default from a file in `app/middleware/`. It executes before route options and the page loader: on the server during SSR and in the browser on each navigation, with the same code. Returning `undefined` continues; returning a `Response` (usually a redirect) stops the route.

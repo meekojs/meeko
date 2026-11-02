@@ -19,7 +19,7 @@ related:
   - docs/framework.md#sesiones-y-seguridad
   - docs/framework.md#sesiones-sin-configuración
   - docs/framework.md#autenticación
-source-hash: f0c25b1ec292d1da953b5cfcab7abfde232e4d53eb3aca33f96c6a1096b075f8
+source-hash: 71f464a8a39ef6174a011122c7ba63fb13a466602cf629207bffc837a280e79e
 ---
 
 `SessionManager` is a Meeko application's session manager. It stores sessions in a `SessionStore` and identifies them through an opaque `HttpOnly`, host-only, `Secure`, `SameSite=Lax` cookie (`__Host-meeko.sid` by default). On each request, `load` reads the cookie and returns the `SessionHandle` passed to pages, API, RPC and Socket as `context.session`; on mutations with a cookie, `assertMutationAllowed` checks `Origin` and the `x-meeko-csrf` token.

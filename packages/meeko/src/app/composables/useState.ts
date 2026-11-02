@@ -1,7 +1,7 @@
-import type { Signal } from "../../core/reactivity";
+import type { Signal } from '../../core/reactivity'
 
-import { inject } from "../../core/reactivity";
-import { stateKey } from "../runtime/state";
+import { inject } from '../../core/reactivity'
+import { stateKey } from '../runtime/state'
 
 /**
  * Devuelve la señal de estado de la aplicación con clave `key`, creada con `factory()` la primera
@@ -28,6 +28,5 @@ import { stateKey } from "../runtime/state";
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#autoimports-y-typescript
  */
 export function useState<T>(key: string, factory: () => T): Signal<T> {
-  return inject(stateKey).get(key, factory);
+	return inject(stateKey).get(key, factory)
 }
-

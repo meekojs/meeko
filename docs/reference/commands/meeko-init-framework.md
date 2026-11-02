@@ -29,8 +29,8 @@ Siguiente paso: cd C:\proyectos\tienda && npm install && npm run dev
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
+| Parámetro      | Tipo | Por defecto | Descripción                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| -------------- | ---- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `<directorio>` | ruta | obligatorio | Carpeta de la aplicación. Se crea si no existe; si existe, sólo puede contener `.git` (una carpeta recién creada con `git init`) o un `package.json` con lockfiles (`package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `bun.lock`, `bun.lockb`), `pnpm-workspace.yaml`, `node_modules`, `.npmrc` y `.git`; las mismas que `meeko init`. Hasta `1.6`, una carpeta con sólo `.git` y los lockfiles de Bun se rechazaban. Su nombre normalizado es el `name` del `package.json` si éste no tiene uno. |
 
 ## Resultado
@@ -53,9 +53,9 @@ tienda/
 
 `package.json` recibe estos scripts y fija `@meekojs/meeko` a la versión exacta de la CLI que lo creó, con `@types/node`, `typescript` y `vite` como dependencias de desarrollo:
 
-| Script | Comando |
-| --- | --- |
-| `dev` | `meeko dev .` |
+| Script  | Comando         |
+| ------- | --------------- |
+| `dev`   | `meeko dev .`   |
 | `check` | `meeko check .` |
 | `build` | `meeko build .` |
 | `start` | `meeko start .` |

@@ -35,15 +35,15 @@ El starter de [`meeko init-framework`](/docs/reference/meeko-init-framework) lo 
 
 ## Opciones
 
-| Opción | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `[directorio]` | ruta | `.` | Raíz del proyecto. Es también la carpeta cuyo `.env` se lee. |
-| `MEEKO_PORT` (o `PORT`) | número | el primer libre desde `4173` | Puerto HTTP. Sustituye a `server.port` de `meeko.config.ts` (sólo con `adapter: "node"`). Un puerto con nombre se usa tal cual: si está ocupado, el arranque falla. |
-| `MEEKO_HOST` | texto | `127.0.0.1` | Dirección en la que escucha. Sustituye a `server.host`. Con `0.0.0.0` acepta conexiones de otras máquinas. `HOST` sigue valiendo, con un aviso, hasta `2.0`. |
-| `MEEKO_PUBLIC_ORIGIN` | origen | ninguno | Origen público para las comprobaciones de `Origin` de HTTP y Socket cuando hay un proxy o un túnel delante. |
-| `MEEKO_HMR_PORT` | número | derivado del puerto HTTP | Puerto del WebSocket de HMR de Vite, que sólo escucha en `127.0.0.1`. |
-| `MEEKO_EDITOR_BRIDGE=0` | `0` | activo | Desactiva el puente con el editor (los valores en vivo de la extensión). Desde `1.7.1`, `meeko dev` lo dice tras la URL y la extensión lo muestra en su barra de estado. |
-| `MEEKO_LINK_WATCH=0` | `0` | activo | Con un `@meekojs/meeko` enlazado (`link:`, `npm link`, un workspace), no reinicia el servidor cuando ese paquete se reconstruye: sólo avisa. |
+| Opción                  | Tipo   | Por defecto                  | Descripción                                                                                                                                                              |
+| ----------------------- | ------ | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `[directorio]`          | ruta   | `.`                          | Raíz del proyecto. Es también la carpeta cuyo `.env` se lee.                                                                                                             |
+| `MEEKO_PORT` (o `PORT`) | número | el primer libre desde `4173` | Puerto HTTP. Sustituye a `server.port` de `meeko.config.ts` (sólo con `adapter: "node"`). Un puerto con nombre se usa tal cual: si está ocupado, el arranque falla.      |
+| `MEEKO_HOST`            | texto  | `127.0.0.1`                  | Dirección en la que escucha. Sustituye a `server.host`. Con `0.0.0.0` acepta conexiones de otras máquinas. `HOST` sigue valiendo, con un aviso, hasta `2.0`.             |
+| `MEEKO_PUBLIC_ORIGIN`   | origen | ninguno                      | Origen público para las comprobaciones de `Origin` de HTTP y Socket cuando hay un proxy o un túnel delante.                                                              |
+| `MEEKO_HMR_PORT`        | número | derivado del puerto HTTP     | Puerto del WebSocket de HMR de Vite, que sólo escucha en `127.0.0.1`.                                                                                                    |
+| `MEEKO_EDITOR_BRIDGE=0` | `0`    | activo                       | Desactiva el puente con el editor (los valores en vivo de la extensión). Desde `1.7.1`, `meeko dev` lo dice tras la URL y la extensión lo muestra en su barra de estado. |
+| `MEEKO_LINK_WATCH=0`    | `0`    | activo                       | Con un `@meekojs/meeko` enlazado (`link:`, `npm link`, un workspace), no reinicia el servidor cuando ese paquete se reconstruye: sólo avisa.                             |
 
 No admite banderas: `meeko dev --port 3000` termina con `Opción desconocida para dev: --port`. Los puertos y la dirección se indican con variables de entorno, en la shell o en el `.env`.
 

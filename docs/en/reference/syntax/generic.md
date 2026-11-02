@@ -12,7 +12,7 @@ related:
   - "syntax:definemodel"
   - "syntax:defineexpose"
   - docs/api.md#componentes-genéricos-generic
-source-hash: 0e072f59abdf1acaaea4b6c65d7610f72c5465eb952d5cb8d6c01a189d091bf3
+source-hash: 0006fb8f79949d6e7871183a6fbf22598eb2628575be28f57a044a9ca14a9e94
 ---
 
 The `generic` attribute on `<script lang="ts">` declares component type parameters, like a generic TypeScript function. Its value is a parameter list with constraints (`extends`), defaults and parameters depending on others: `generic="T extends object, K extends keyof T"`.

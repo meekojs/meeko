@@ -16,7 +16,7 @@ related:
   - "config:theme"
   - docs/framework.md#head-del-documento-document-usehead-y-useseometa
   - docs/framework.md#canónica-y-open-graph-por-página
-source-hash: 99c61bb266c343f3d01746304d0d1e9f697bf4f5e7ed3d0f1c29a37c86f773bf
+source-hash: b47d0409c13cddae1a3b3a4c7b1e699fea41915a1ccea8978c99ddacbd18d4a2
 ---
 
 `document` declares what all application HTML documents share: `<html>`'s `lang` and a `head` with a title, title template, `meta`, `link`, `script`, `style` and `<html>` and `<body>` attributes. It renders in SSR, `"stream"`, `"prerender"`, error pages and the shell for `"client"` routes, with the lowest priority: `useHead`, `useSeoMeta` and each page's `head` override it.

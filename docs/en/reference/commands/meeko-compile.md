@@ -12,7 +12,7 @@ related:
   - "config:css"
   - docs/api.md#herramientas
   - docs/api.md#módulo-generado
-source-hash: 47c81e4756db14755e6a08fb3ca951559c14181f7813d83b364217dc77c22136
+source-hash: 72f26f341bd6683a07835f2db7f63250e01b64d34d396101ba3c001154486026
 ---
 
 `meeko compile` translates a `.meeko` component to the TypeScript module run by the server and browser: `renderWithState` and `renderToString` for SSR, `hydrate` for the browser, the component's CSS and the types for its props, events, models and snippets. It first checks it like [`meeko check`](/en/docs/reference/meeko-check) with a component; if there are errors, it writes nothing.

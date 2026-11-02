@@ -13,7 +13,7 @@ related:
   - "config:css"
   - docs/framework.md#autoimports-y-typescript
   - docs/migration-1.3.md
-source-hash: a2360632039517307e3cea0114c96d4027a51748bc26e284b6fc1ec1eb80f495
+source-hash: 087cab5c87e4619b13b5af0d92509f9f9d43f1aa80af021180a8bcf75e2ad514
 ---
 
 `meekoUtilities()` is a PostCSS plugin that generates CSS with TypeScript. Where a stylesheet contains `@utilities "./utilities/color.ts" layer(utilities);`, the plugin imports that module, calls its default export function (usually defined with `defineUtilities`) and replaces the at-rule with the returned rules, optionally inside `@layer`. It is the typed replacement for preprocessor loops (`@each`, `@for`): a TypeScript `map` over a palette or scale.

@@ -45,15 +45,15 @@ const props = defineProps<{ content: Component<{ label: string }>; label: string
 
 ## Atributos
 
-| Atributo | Tipo | Descripción |
-| --- | --- | --- |
-| `is` | `Component<Props>`, una etiqueta HTML o una unión de ambos | Sólo en `<component>`. Una etiqueta no permitida (`script`, `iframe`, `style`…) es `MEEK112`. Desde `1.8`, también literales en PascalCase con el nombre de un componente (`'MeekoLink'`, `'UICard'`); uno desconocido es `MEEK132`. |
-| `bind:prop` | el tipo de la prop | Una prop con el valor de una expresión. Una prop opcional acepta `undefined`, que equivale a no pasarla. |
-| `prop="texto"` | literal | Prop estática: el texto como literal (`variant="primary"`) o `true` sin valor. Los nombres con guiones no son props (`MEEK032`). |
-| `bind="objeto"` | props o atributos | Desde `1.5`, props (o atributos de la etiqueta) desde un objeto, sin claves `on*`; las explícitas ganan (`MEEK113`). |
-| `on:evento` | `(…args) => unknown` | La prop de callback `onEvento` de un evento de `defineEmits`. |
-| `model`, `model:nombre` | `Signal<T>` | Los modelos del hijo, de `defineModel`. |
-| `ref:nombre` | | Nombra la instancia para `useElementRef`; su tipo sale del `defineExpose` del hijo. |
+| Atributo                | Tipo                                                       | Descripción                                                                                                                                                                                                                          |
+| ----------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `is`                    | `Component<Props>`, una etiqueta HTML o una unión de ambos | Sólo en `<component>`. Una etiqueta no permitida (`script`, `iframe`, `style`…) es `MEEK112`. Desde `1.8`, también literales en PascalCase con el nombre de un componente (`'MeekoLink'`, `'UICard'`); uno desconocido es `MEEK132`. |
+| `bind:prop`             | el tipo de la prop                                         | Una prop con el valor de una expresión. Una prop opcional acepta `undefined`, que equivale a no pasarla.                                                                                                                             |
+| `prop="texto"`          | literal                                                    | Prop estática: el texto como literal (`variant="primary"`) o `true` sin valor. Los nombres con guiones no son props (`MEEK032`).                                                                                                     |
+| `bind="objeto"`         | props o atributos                                          | Desde `1.5`, props (o atributos de la etiqueta) desde un objeto, sin claves `on*`; las explícitas ganan (`MEEK113`).                                                                                                                 |
+| `on:evento`             | `(…args) => unknown`                                       | La prop de callback `onEvento` de un evento de `defineEmits`.                                                                                                                                                                        |
+| `model`, `model:nombre` | `Signal<T>`                                                | Los modelos del hijo, de `defineModel`.                                                                                                                                                                                              |
+| `ref:nombre`            |                                                            | Nombra la instancia para `useElementRef`; su tipo sale del `defineExpose` del hijo.                                                                                                                                                  |
 
 El contenido entre las etiquetas son los snippets del componente (`<snippet name="…">` y el contenido suelto, `default`) o, con una etiqueta HTML, sus hijos.
 

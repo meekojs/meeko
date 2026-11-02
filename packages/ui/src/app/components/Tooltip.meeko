@@ -14,4 +14,33 @@
 </script>
 
 <!-- No whitespace between the tags of this template: it would be text inside the tooltip and the trigger. Prettier keeps it that way; tests/templates-without-whitespace.test.mjs guards it. -->
-<template><Popover mode="hint" model="open" bind:placement="props.placement ?? 'top'" bind:offset="props.offset ?? 6" bind:delay="props.delay" bind:closeDelay="props.closeDelay" bind:triggerId="props.triggerId" bind:class="['meeko-ui-tooltip', props.class].filter(Boolean).join(' ')"><snippet name="anchor" params="trigger"><render if:when="snippets.anchor" snippet="snippets.anchor" args="trigger" /><button if:when="!snippets.anchor" type="button" bind:id="trigger.id" bind:aria-describedby="trigger['aria-describedby']" bind:class="['meeko-ui-tooltip-trigger', props.triggerClass].filter(Boolean).join(' ')"><render snippet="snippets.trigger" /></button></snippet><template if:when="props.text !== undefined">{props.text}</template><render if:when="snippets.default" snippet="snippets.default" /></Popover></template>
+<template><Popover
+		mode="hint"
+		model="open"
+		bind:placement="props.placement ?? 'top'"
+		bind:offset="props.offset ?? 6"
+		bind:delay="props.delay"
+		bind:closeDelay="props.closeDelay"
+		bind:triggerId="props.triggerId"
+		bind:class="['meeko-ui-tooltip', props.class].filter(Boolean).join(' ')"
+		><snippet
+			name="anchor"
+			params="trigger"
+		>
+			<render
+				if:when="snippets.anchor"
+				snippet="snippets.anchor"
+				args="trigger"
+			/><button
+				if:when="!snippets.anchor"
+				type="button"
+				bind:id="trigger.id"
+				bind:aria-describedby="trigger['aria-describedby']"
+				bind:class="['meeko-ui-tooltip-trigger', props.triggerClass].filter(Boolean).join(' ')"
+				><render snippet="snippets.trigger"
+			/></button></snippet
+		><template if:when="props.text !== undefined">{props.text}</template
+		><render
+			if:when="snippets.default"
+			snippet="snippets.default"
+	/></Popover></template>

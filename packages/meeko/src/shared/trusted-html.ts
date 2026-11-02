@@ -7,7 +7,7 @@
  */
 
 /** Marca de tipo de {@link TrustedHtml}. Sólo existe en los tipos; no hay ningún símbolo en ejecución. */
-declare const trustedHtmlBrand: unique symbol;
+declare const trustedHtmlBrand: unique symbol
 
 /**
  * Un `string` de HTML que el código declaró de confianza con {@link trustHtml}: el tipo que espera
@@ -39,7 +39,7 @@ declare const trustedHtmlBrand: unique symbol;
  * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/api.md#html-sin-escapar-con-html
  */
-export type TrustedHtml = string & { readonly [trustedHtmlBrand]: true };
+export type TrustedHtml = string & { readonly [trustedHtmlBrand]: true }
 
 /**
  * Declara que `html` es HTML de confianza y lo devuelve con el tipo {@link TrustedHtml}, que la
@@ -74,14 +74,14 @@ export type TrustedHtml = string & { readonly [trustedHtmlBrand]: true };
  * @see https://github.com/meekojs/meeko/blob/main/docs/api.md#html-sin-escapar-con-html
  */
 export function trustHtml(html: string): TrustedHtml {
-  return html as TrustedHtml;
+	return html as TrustedHtml
 }
 
 /**
  * The type text of the `MEEK107` warning, short so that TypeScript never truncates it. `meeko check`
  * reads the `MEEK107: ` prefix and reports the long message, as a warning.
  */
-export type UntrustedHtmlMessage = "MEEK107: html inserta un string sin escapar; márquelo con trustHtml(…) o use {expr}";
+export type UntrustedHtmlMessage = 'MEEK107: html inserta un string sin escapar; márquelo con trustHtml(…) o use {expr}'
 
 /**
  * Members of `T` that `html` warns about: strings that are neither `TrustedHtml` nor finite literal
@@ -90,18 +90,14 @@ export type UntrustedHtmlMessage = "MEEK107: html inserta un string sin escapar;
  * record has a required key. Other members (numbers, objects, `unknown`) are left to the `string`
  * type of `rawHtml`, which already reports them as errors.
  */
-type UntrustedHtmlMembers<T> = T extends TrustedHtml | null | undefined ? never
-  : T extends string ? ({} extends Record<T, 1> ? T : never)
-  : never;
+type UntrustedHtmlMembers<T> = T extends TrustedHtml | null | undefined ? never : T extends string ? ({} extends Record<T, 1> ? T : never) : never
 
 /**
  * `unknown` when the value of `html="expression"` may be inserted without a warning, and
  * `UntrustedHtmlMessage` otherwise: a `string` without the `TrustedHtml` brand, a template literal
  * pattern, or `any`, which says nothing about where the HTML comes from.
  */
-export type TrustedHtmlCheck<T> = 0 extends 1 & T ? UntrustedHtmlMessage
-  : [UntrustedHtmlMembers<T>] extends [never] ? unknown
-  : UntrustedHtmlMessage;
+export type TrustedHtmlCheck<T> = 0 extends 1 & T ? UntrustedHtmlMessage : [UntrustedHtmlMembers<T>] extends [never] ? unknown : UntrustedHtmlMessage
 
 /**
  * Type check that `meeko check` wraps around the value of `html="expression"` (never in the
@@ -110,6 +106,6 @@ export type TrustedHtmlCheck<T> = 0 extends 1 & T ? UntrustedHtmlMessage
  * literal written in the template, such as `html="'<br>'"`, as a literal type.
  */
 export function checkTrustedHtml<const T>(value: T, trust: TrustedHtmlCheck<T>): T {
-  void trust;
-  return value;
+	void trust
+	return value
 }

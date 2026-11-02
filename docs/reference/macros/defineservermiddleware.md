@@ -36,8 +36,8 @@ export default defineServerMiddleware(async (request, next) => {
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
+| Parámetro    | Tipo                                                                                                  | Por defecto | Descripción                                                                                                                                           |
+| ------------ | ----------------------------------------------------------------------------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `middleware` | `(request: Request, next: (request?: Request) => Promise<Response>) => Response \| Promise<Response>` | obligatorio | La función. `next()` continúa con el siguiente middleware y el handler; `next(otraRequest)` continúa con otra petición. Sólo se puede llamar una vez. |
 
 ## Valor devuelto
@@ -113,6 +113,7 @@ export default defineServerMiddleware(async (request, next) => {
 `meeko check` da `TS2345` con `Type 'Promise<void>' is not assignable to type 'Promise<Response> | Response'.` En ejecución, `TypeError: Server middleware must return a Response`.
 
 <!-- no-check -->
+
 ```ts good
 export default defineServerMiddleware(async (request, next) => {
   const response = await next();
@@ -132,6 +133,7 @@ export default defineServerMiddleware(async (request, next) => {
 En ejecución, `Error: Server middleware called next() more than once`. Para reintentar, hazlo en el handler, o construye la respuesta tú.
 
 <!-- no-check -->
+
 ```ts good
 export default defineServerMiddleware(async (request, next) => {
   const response = await next();
@@ -148,6 +150,7 @@ const ip = request.headers.get("x-forwarded-for")?.split(",")[0];
 ```
 
 <!-- no-check -->
+
 ```ts good
 const ip = clientAddress(request); // aplica MEEKO_TRUST_PROXY
 ```

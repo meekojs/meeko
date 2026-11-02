@@ -14,7 +14,7 @@ related:
   - "@meekojs/meeko/server#useRequestState"
   - docs/framework.md#revocación-durante-una-petición
   - docs/framework.md#tipos-de-los-servicios
-source-hash: 36b0662cd29b9441548c3d4ca880309ab18e52d5fc04ba7984ba8ed966e9fc41
+source-hash: cdb47b57317f3ebc336d46db720d184546d9f0cbde2797918f3e7155cfdb4f80
 ---
 
 `createRequestContext` builds the context received as `context` by API and RPC handlers, loaders and `<script server>`: the request, a new `requestId`, the already-loaded session, services, platform, a request-specific state `Map` and a `signal` aborted when the client disconnects or the session is revoked.

@@ -35,10 +35,10 @@ export default defineMeekoConfig({
 
 ## Opciones
 
-| Valor | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `sitemap` | `boolean \| { exclude? }` | sin sitemap | `true` o un objeto lo activan. |
-| `exclude` | `readonly string[]` | `[]` | Rutas (`pathname`) que no se listan. Empiezan por `/`, sin espacios, `?` ni `#`; `*` sustituye a cualquier secuencia, `/` incluida: `"/admin/*"` excluye lo que hay bajo `/admin/`, no `/admin`. |
+| Valor     | Tipo                      | Por defecto | Descripción                                                                                                                                                                                      |
+| --------- | ------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `sitemap` | `boolean \| { exclude? }` | sin sitemap | `true` o un objeto lo activan.                                                                                                                                                                   |
+| `exclude` | `readonly string[]`       | `[]`        | Rutas (`pathname`) que no se listan. Empiezan por `/`, sin espacios, `?` ni `#`; `*` sustituye a cualquier secuencia, `/` incluida: `"/admin/*"` excluye lo que hay bajo `/admin/`, no `/admin`. |
 
 `sitemapEntries` de `definePage` (desde `1.7`): una lista de `{ params?, lastmod?, changefreq?, priority? }`, o una función, síncrona o asíncrona, que recibe `{ env, prerendering: true }` y la devuelve.
 
@@ -150,6 +150,7 @@ export const route = definePage({
 `meeko build` se detiene con `sitemapEntries of route /blog/[slug] lists /blog/b, which is not prerendered: add it to prerenderEntries or remove it`: el sitemap nunca anuncia una URL que el adaptador `static` no tiene.
 
 <!-- no-check -->
+
 ```ts good
 export const route = definePage({ render: "prerender", prerenderEntries: [{ slug: "a" }, { slug: "b" }], sitemapEntries: [{ params: { slug: "b" } }] });
 ```
@@ -163,6 +164,7 @@ sitemapEntries: [{ params: { slug: "a" }, priority: 2, changefreq: "sometimes" a
 El build se detiene con la ruta y `priority must be a number from 0 to 1` o `changefreq must be always, hourly, daily, weekly, monthly, yearly or never`. Un `lastmod` que no es un `Date` válido ni un texto W3C Datetime da `lastmod must be a Date or a W3C Datetime text, such as "2026-10-01" or "2026-10-01T12:00:00Z"`, y una URL repetida, `duplicate sitemap URL`.
 
 <!-- no-check -->
+
 ```ts good
 sitemapEntries: [{ params: { slug: "a" }, priority: 0.8, changefreq: "monthly", lastmod: "2026-10-01" }],
 ```

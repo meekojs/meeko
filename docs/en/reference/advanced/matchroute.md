@@ -14,7 +14,7 @@ related:
   - "@meekojs/meeko/framework#href"
   - "@meekojs/meeko/framework#useRoute"
   - docs/framework.md#routing-layouts-y-ssr
-source-hash: dda81eedd5feb99e634e094c9583661ff6a3bc4093d7650fe804fcac5fddebc4
+source-hash: 9f49da22cd303fb9f45b7458420eba9e1b0602690f210e46889cd62a5f4bd539
 ---
 
 `matchRoute` is Meeko's router as a pure function: it takes the route manifest and a URL's `pathname` and returns the route that handles it with its parameters, or `undefined`. It uses the same resolution as `createFrameworkHandler` on the server and `mountClientApp` when navigating, so you can determine which page would handle a URL outside them: in your own middleware, a service worker, a link migration script or a test.

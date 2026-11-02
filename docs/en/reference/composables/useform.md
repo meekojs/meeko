@@ -18,7 +18,7 @@ related:
   - docs/framework.md#formularios-useform
   - docs/framework.md#errores-de-validación-en-formularios
   - docs/framework.md#formularios-sin-javascript-form
-source-hash: ff0e7694bcb8b9d54c57b7ca1a2e7b25f3717f9011e224bfe7916915e0038601
+source-hash: bef8a6c80d33b15a7c15e5fb3445fec263174683426f5bd77852744d33a3a09b
 ---
 
 `useForm` brings together recurring form needs: a writable signal per field for `model`, validation with a [Standard Schema](https://standardschema.dev) (such as Valibot's) on submission, `issues` from a server `400` distributed by field, a whole-form message, `pending`, `submitted`, `dirty`, `reset`, `load` and `commit`. Call it at the top level of a component's `<script>`; it is auto-imported in framework applications.

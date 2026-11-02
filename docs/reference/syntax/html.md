@@ -38,9 +38,9 @@ El módulo de servidor que produce el HTML lo sanea, si viene de usuarios, y lo 
 
 ## Atributos
 
-| Atributo | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `html` | `TrustedHtml \| null \| undefined` | obligatorio | El contenido del elemento. Un `string` sin marcar compila con el aviso `MEEK107`; un número u otro tipo es un error de tipos. |
+| Atributo | Tipo                               | Por defecto | Descripción                                                                                                                   |
+| -------- | ---------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `html`   | `TrustedHtml \| null \| undefined` | obligatorio | El contenido del elemento. Un `string` sin marcar compila con el aviso `MEEK107`; un número u otro tipo es un error de tipos. |
 
 El elemento debe estar vacío en la plantilla y ser un elemento HTML estándar que admita contenido: no `<img>`, `<input>` ni otros vacíos, ni `<textarea>`, `<title>`, `<script>` o `<style>`, ni `<template>`.
 
@@ -89,6 +89,7 @@ export const article = { title: params.slug, body: articleHtml(`<p>Entrada <stro
 Un comentario de un usuario puede traer `<img onerror>`. Sanéalo con una biblioteca como DOMPurify y márcalo después:
 
 <!-- no-check -->
+
 ```ts
 // server/content/comments.ts
 import DOMPurify from "isomorphic-dompurify";

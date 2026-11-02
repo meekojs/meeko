@@ -13,7 +13,7 @@ related:
   - docs/api.md#snippets-con-definesnippets
 ---
 
-`<snippet name="x">` va dentro de la etiqueta de un componente y llena su snippet `x`: un trozo de plantilla del padre que el hijo pinta donde quiere, con `<render>`, y al que puede pasar argumentos. Es el equivalente de los *slots* con nombre de Vue o de los *snippets* de Svelte.
+`<snippet name="x">` va dentro de la etiqueta de un componente y llena su snippet `x`: un trozo de plantilla del padre que el hijo pinta donde quiere, con `<render>`, y al que puede pasar argumentos. Es el equivalente de los _slots_ con nombre de Vue o de los _snippets_ de Svelte.
 
 El contenido suelto de la etiqueta (lo que no está en un `<snippet>`) llena el snippet `default`. El contenido pertenece al padre: lee sus señales y funciones y sigue siendo reactivo.
 
@@ -42,11 +42,11 @@ const message = signal("¿Borrar la cuenta?");
 
 ## Atributos
 
-| Atributo | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `name` | identificador o segmentos con guion | obligatorio | El snippet que llena, una clave del `defineSnippets` del hijo. Desde `1.8` admite segmentos unidos por guiones (`cell-email`, `header-created-at`), sin guion final ni doble: `/^[A-Za-z_$][\w$]*(?:-[\w$]+)*$/`. |
-| `params` | lista de identificadores | sin parámetros | Nombres de los argumentos, separados por comas, con los tipos de la tupla del hijo: `params="item, index"`. |
-| `if:when` | expresión | siempre | Desde `1.4`. Pasa el snippet sólo mientras la expresión es verdadera; el hijo debe declararlo opcional. |
+| Atributo  | Tipo                                | Por defecto    | Descripción                                                                                                                                                                                                       |
+| --------- | ----------------------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`    | identificador o segmentos con guion | obligatorio    | El snippet que llena, una clave del `defineSnippets` del hijo. Desde `1.8` admite segmentos unidos por guiones (`cell-email`, `header-created-at`), sin guion final ni doble: `/^[A-Za-z_$][\w$]*(?:-[\w$]+)*$/`. |
+| `params`  | lista de identificadores            | sin parámetros | Nombres de los argumentos, separados por comas, con los tipos de la tupla del hijo: `params="item, index"`.                                                                                                       |
+| `if:when` | expresión                           | siempre        | Desde `1.4`. Pasa el snippet sólo mientras la expresión es verdadera; el hijo debe declararlo opcional.                                                                                                           |
 
 ## Resultado
 

@@ -1,6 +1,6 @@
-import type { PageSchema } from "../../app/definitions/define-page";
-import type { GeneratedRoutes } from "../../framework";
-import type { RequestContext } from "../runtime/request-context";
+import type { PageSchema } from '../../app/definitions/define-page'
+import type { GeneratedRoutes } from '../../framework'
+import type { RequestContext } from '../runtime/request-context'
 
 /**
  * PeticiÃ³n para la que se ejecuta el cÃ³digo de nivel superior del `<script server>` de una pÃ¡gina,
@@ -20,27 +20,26 @@ import type { RequestContext } from "../runtime/request-context";
  * ```
  */
 export interface PageRequest<P = Readonly<Record<string, string>>, S = Readonly<Record<string, string | string[]>>> {
-  /** URL de la peticiÃ³n. */
-  readonly url: URL;
-  /** ParÃ¡metros de la ruta. */
-  readonly params: P;
-  /** ParÃ¡metros de bÃºsqueda. */
-  readonly search: S;
-  /** PeticiÃ³n HTTP original. */
-  readonly request: Request;
-  /**
-   * Contexto de la peticiÃ³n de `createServerApp`: sesiÃ³n, servicios y plataforma. Con
-   * `createFrameworkHandler` sin `createContext`, leerlo lanza un error.
-   */
-  readonly context: RequestContext;
-  /** Se aborta si el cliente se desconecta, se revoca la sesiÃ³n o se cancela la respuesta. */
-  readonly signal: AbortSignal;
+	/** URL de la peticiÃ³n. */
+	readonly url: URL
+	/** ParÃ¡metros de la ruta. */
+	readonly params: P
+	/** ParÃ¡metros de bÃºsqueda. */
+	readonly search: S
+	/** PeticiÃ³n HTTP original. */
+	readonly request: Request
+	/**
+	 * Contexto de la peticiÃ³n de `createServerApp`: sesiÃ³n, servicios y plataforma. Con
+	 * `createFrameworkHandler` sin `createContext`, leerlo lanza un error.
+	 */
+	readonly context: RequestContext
+	/** Se aborta si el cliente se desconecta, se revoca la sesiÃ³n o se cancela la respuesta. */
+	readonly signal: AbortSignal
 }
 
-type SchemaOutput<S> = S extends PageSchema<unknown, infer O> ? O : never;
-type RouteSchema<Route, Key extends "params" | "search", Fallback> = [Route] extends [undefined] ? Fallback
-  : Route extends { readonly [K in Key]?: infer S } ? [SchemaOutput<NonNullable<S>>] extends [never] ? Fallback : SchemaOutput<NonNullable<S>> : Fallback;
-type IdParams<Id extends string> = Id extends keyof GeneratedRoutes ? GeneratedRoutes[Id] : Readonly<Record<string, string>>;
+type SchemaOutput<S> = S extends PageSchema<unknown, infer O> ? O : never
+type RouteSchema<Route, Key extends 'params' | 'search', Fallback> = [Route] extends [undefined] ? Fallback : Route extends { readonly [K in Key]?: infer S } ? ([SchemaOutput<NonNullable<S>>] extends [never] ? Fallback : SchemaOutput<NonNullable<S>>) : Fallback
+type IdParams<Id extends string> = Id extends keyof GeneratedRoutes ? GeneratedRoutes[Id] : Readonly<Record<string, string>>
 
 /**
  * Tipo de `usePage()` en una pÃ¡gina cuyas opciones de ruta son `Route` y cuyo ID de ruta es `Id`:
@@ -60,38 +59,35 @@ type IdParams<Id extends string> = Id extends keyof GeneratedRoutes ? GeneratedR
  * const id: string = page.params.id;
  * ```
  */
-export type PageRequestOf<Route, Id extends string = string> = PageRequest<
-  RouteSchema<Route, "params", IdParams<Id>>,
-  RouteSchema<Route, "search", Readonly<Record<string, string | string[]>>>
->;
+export type PageRequestOf<Route, Id extends string = string> = PageRequest<RouteSchema<Route, 'params', IdParams<Id>>, RouteSchema<Route, 'search', Readonly<Record<string, string | string[]>>>>
 
 interface PageScope {
-  run<T>(page: PageRequest<unknown, unknown>, body: () => T): T;
-  current(): PageRequest<unknown, unknown> | undefined;
+	run<T>(page: PageRequest<unknown, unknown>, body: () => T): T
+	current(): PageRequest<unknown, unknown> | undefined
 }
 
-let scope: PageScope | undefined;
+let scope: PageScope | undefined
 
 /** @internal Bind `usePage()` to the active request. */
 export function providePageScope(provider: PageScope): void {
-  scope = provider;
+	scope = provider
 }
 
 /** @internal Read the request without requiring one. */
 export function currentPage(): PageRequest<unknown, unknown> | undefined {
-  return scope?.current();
+	return scope?.current()
 }
 
 /** @internal Run compiled page code with its request scope. */
 export function runPage<T>(page: PageRequest<unknown, unknown>, body: () => T): T {
-  return scope ? scope.run(page, body) : body();
+	return scope ? scope.run(page, body) : body()
 }
 
 /** @internal Read the request or throw the existing server-script scope diagnostic. */
 export function activePage(name: string): PageRequest<unknown, unknown> {
-  const page = currentPage();
-  if (!page) throw new Error(`MEEK073: ${name}() sólo está disponible mientras se ejecuta el código de nivel superior del <script server> de una página o, desde 1.6, un middleware de ruta de servidor`);
-  return page;
+	const page = currentPage()
+	if (!page) throw new Error(`MEEK073: ${name}() sólo está disponible mientras se ejecuta el código de nivel superior del <script server> de una página o, desde 1.6, un middleware de ruta de servidor`)
+	return page
 }
 
 /**
@@ -117,5 +113,5 @@ export function activePage(name: string): PageRequest<unknown, unknown> {
  * ```
  */
 export function usePage(): PageRequest {
-  return activePage("usePage") as PageRequest;
+	return activePage('usePage') as PageRequest
 }

@@ -21,6 +21,7 @@ related:
 `useSocketChannel(contratos, nombre, opciones?)` construye la URL del canal `nombre` (`/_meeko/socket/<nombre>`, con `?room=` si hay `roomId`) y abre un cliente ligado al componente con el contrato de ese canal, como [`useSocketClient`](/docs/reference/usesocketclient). Es la pieza con la que los clientes generados definen el autoimport [`useSocket`](/docs/reference/use-socket):
 
 <!-- no-check -->
+
 ```ts
 export const useSocket = (name, options) => useSocketChannel(socketContracts, name, options);
 ```
@@ -30,6 +31,7 @@ En una aplicación del framework usa `useSocket`. `useSocketChannel` sirve para 
 ## Uso
 
 <!-- no-check -->
+
 ```ts
 // src/socket.ts, en un host propio
 import { useSocketChannel } from "@meekojs/meeko/framework";
@@ -50,11 +52,11 @@ prices.on("price", (price) => console.log(price.symbol, price.value));
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `contracts` | `Record<string, SocketContract>` | obligatorio | Contratos públicos por nombre de canal, como el `socketContracts` que genera Meeko en `.meeko/generated/socket-contracts.ts`. |
-| `name` | clave de `contracts` | obligatorio | Canal que se abre. Un nombre que no está en el registro es un error de tipos y, en ejecución, `TypeError: Unknown socket channel: <nombre>`. |
-| `options` | `SocketRegistryOptions` | `{}` | `roomId`, `baseUrl` (por defecto, el origen del navegador), `pathnamePrefix` (`"/_meeko/socket"`), `retryMs`, `maxRetryMs`, `maxMessageBytes`, `webSocketFactory` y `onError`. |
+| Parámetro   | Tipo                             | Por defecto | Descripción                                                                                                                                                                    |
+| ----------- | -------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `contracts` | `Record<string, SocketContract>` | obligatorio | Contratos públicos por nombre de canal, como el `socketContracts` que genera Meeko en `.meeko/generated/socket-contracts.ts`.                                                  |
+| `name`      | clave de `contracts`             | obligatorio | Canal que se abre. Un nombre que no está en el registro es un error de tipos y, en ejecución, `TypeError: Unknown socket channel: <nombre>`.                                   |
+| `options`   | `SocketRegistryOptions`          | `{}`        | `roomId`, `baseUrl` (por defecto, el origen del navegador), `pathnamePrefix` (`"/_meeko/socket"`), `retryMs`, `maxRetryMs`, `maxMessageBytes`, `webSocketFactory` y `onError`. |
 
 ## Valor devuelto
 
@@ -65,6 +67,7 @@ El `SocketClient` del contrato `contracts[name]`: `state`, `emit`, `on` y `close
 ### Un registro de canales de un paquete
 
 <!-- no-check -->
+
 ```ts
 // packages/live/src/index.ts
 import { useSocketChannel } from "@meekojs/meeko/framework";
@@ -82,6 +85,7 @@ export function useLive<K extends keyof typeof liveContracts & string>(name: K, 
 Con un nombre que llega como texto, compruébalo antes: TypeScript ya no puede.
 
 <!-- no-check -->
+
 ```ts
 import { useSocketChannel } from "@meekojs/meeko/framework";
 
@@ -108,6 +112,7 @@ const feed = useSocketChannel(socketContracts, "feeds" as never);
 En ejecución lanza `TypeError: Unknown socket channel: feeds`. Con un nombre literal, el error es de tipos; no lo tapes con una conversión:
 
 <!-- no-check -->
+
 ```ts good
 const feed = useSocketChannel(socketContracts, "feed");
 ```
@@ -122,6 +127,7 @@ const chat = await useSocketChannel(socketContracts, "chat");
 El compilador sólo divide el setup en el `await` de `useElementRef`, `useSocket` o `useSocketClient`: éste es `MEEK055`. Sin `await`, la llamada vale también en SSR (desde `1.7`, allí devuelve un cliente inerte; hasta `1.6`, lanzaba `useSocketClient() is only available in the browser`). Para continuar el setup con el socket abierto, use el autoimport `useSocket` con `await`:
 
 <!-- no-check -->
+
 ```ts good
 const chat = await useSocket("chat");
 ```
@@ -136,6 +142,7 @@ export const chat = useSocketChannel(socketContracts, "chat");
 El cliente necesita la raíz de un componente para cerrarse al desmontarlo: fuera de ella lo cierra en seguida y lanza `Error: onCleanup() requires an active component root`. Para un cliente independiente, que cierras tú, usa `createSocketClient`, o el registro `socket` de la aplicación:
 
 <!-- no-check -->
+
 ```ts good
 import { createSocketClient } from "@meekojs/meeko/framework";
 export const chat = createSocketClient("wss://example.com/_meeko/socket/chat", socketContracts.chat);
@@ -150,6 +157,7 @@ const chat = await useSocketChannel(socketContracts, "chat");
 `meeko check` da `MEEK055: El await de nivel superior sólo se admite sobre useElementRef, useSocket, useSocketClient, useApi, useRpcQuery; mueve el resto del trabajo asíncrono a una función o a onMounted`. En una aplicación, usa el autoimport `useSocket`, que sí admite `await`:
 
 <!-- no-check -->
+
 ```ts good
 const chat = await useSocket("chat");
 ```

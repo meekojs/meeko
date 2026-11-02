@@ -38,7 +38,10 @@ test('los paquetes que importan fuentes generadas las generan en build y check',
 				const generator = Object.entries(scripts).find(([, command]) => /node\s+(\S+\.mjs)/.test(command) && readFileSync(join(directory, command.match(/node\s+(\S+\.mjs)/)[1]), 'utf8').includes(base))
 				assert.ok(generator, `${group}/${name}: ningún script genera ${base}`)
 				for (const phase of ['build', 'check']) {
-					assert.ok(scripts[phase]?.split('&&').some((step) => step.trim() === `pnpm run ${generator[0]}`),`${group}/${name}: "${phase}" debe ejecutar "${generator[0]}" antes de usar ${base}`)
+					assert.ok(
+						scripts[phase]?.split('&&').some((step) => step.trim() === `pnpm run ${generator[0]}`),
+						`${group}/${name}: "${phase}" debe ejecutar "${generator[0]}" antes de usar ${base}`,
+					)
 				}
 			}
 		}

@@ -42,10 +42,10 @@ Un layout llama a `provideTheme("light")` en su script; cualquier componente den
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `T` | parámetro de tipo | `unknown` | Tipo del valor que se publica con la clave. Escríbelo siempre: no se infiere de ningún valor. |
-| `description` | `string` | ninguna | Texto del `Symbol`. Aparece en el error de `inject` cuando falta el proveedor: `Missing Meeko context: theme`. |
+| Parámetro     | Tipo              | Por defecto | Descripción                                                                                                    |
+| ------------- | ----------------- | ----------- | -------------------------------------------------------------------------------------------------------------- |
+| `T`           | parámetro de tipo | `unknown`   | Tipo del valor que se publica con la clave. Escríbelo siempre: no se infiere de ningún valor.                  |
+| `description` | `string`          | ninguna     | Texto del `Symbol`. Aparece en el error de `inject` cuando falta el proveedor: `Missing Meeko context: theme`. |
 
 ## Valor devuelto
 
@@ -146,6 +146,7 @@ export const modalKey = Symbol.for("modal") as ContextKey<ModalContext>;
 `Symbol.for` devuelve el mismo símbolo a todo el proceso: dos librerías, o una librería y la aplicación, que usen `"modal"` comparten la clave sin saberlo, y una lee el valor de la otra. Usa `createContext` y deja que Meeko garantice que el módulo de la clave se evalúa una sola vez (véase [Notas](#notas)):
 
 <!-- no-check -->
+
 ```ts good
 export const modalKey = createContext<ModalContext>("modal");
 ```
@@ -161,6 +162,7 @@ user.name; // TS18046: 'user' is of type 'unknown'
 Sin parámetro de tipo, la clave es `ContextKey<unknown>` y todo lo que lee `inject` es `unknown`. Declara el tipo en la clave:
 
 <!-- no-check -->
+
 ```ts good
 const userKey = createContext<{ id: string; name: string }>("user");
 ```
@@ -175,6 +177,7 @@ provide(localeKey, 1);
 `meeko check` da `TS2345: Argument of type 'number' is not assignable to parameter of type 'string'`.
 
 <!-- no-check -->
+
 ```ts good
 provide(localeKey, "es");
 ```
@@ -187,6 +190,7 @@ provide(localeKey, "es");
   - con un módulo de Meeko instalado en `node_modules`: su runtime llega por el nombre del paquete (sus autoimports) y por la ruta de sus archivos (`addPlugin`, `addComponentsDir`), y Meeko compila esos paquetes como código fuente (`ssr.noExternal` y `optimizeDeps.exclude`), así que el plugin del módulo y las páginas comparten la clave en `meeko dev` y tras `meeko build`.
 
   Cada copia del módulo crea su propia clave: si la clave se crea dentro del `<script>` de un componente (véase [Crear la clave dentro del componente](#crear-la-clave-dentro-del-componente)), o si una librería se instala dos veces, en versiones distintas, y cada parte del árbol importa una.
+
 - **Servidor y navegador.** La clave es un valor normal de módulo, igual en los dos. Lo que se publica con ella vive en la raíz de cada componente: en SSR es por petición, y no se mezcla entre usuarios.
 - **Descripción.** Úsala siempre: es lo único que nombra el contexto en el error de `inject`.
 - **Contexto o estado.** El contexto sigue el árbol de componentes y no viaja en el payload. Para estado que debe ser el mismo en todo el árbol y transferirse del servidor al navegador, usa [`useState`](/docs/reference/usestate).

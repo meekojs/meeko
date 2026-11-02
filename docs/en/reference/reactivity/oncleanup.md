@@ -12,7 +12,7 @@ related:
   - "@meekojs/meeko#provideErrorHandler"
   - docs/api.md#reactividad
   - docs/api.md#ciclo-de-vida
-source-hash: a2e73b12628a1a0c60fbe5293a6087e78fa9e3928ba1297704e3482618535168
+source-hash: a675e822dd7324f02255b30bd22a023c456837ff27f09ec56a74d3538c2db59b
 ---
 
 `onCleanup(release)` tells Meeko what to do when the component ceases to exist: stop a timer, remove a `window` listener, close a connection, destroy a library instance. The function is registered in the active root (the component whose script is running, or a [`createRoot`](/en/docs/reference/createroot) root) and runs when that root is disposed of: when the component unmounts, on page changes, when its `if:when` or `each:of` row disappears, and also if rendering or hydration fails.

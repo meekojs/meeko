@@ -22,6 +22,7 @@ Como reutiliza la sesión de `context`, sólo acepta peticiones de su mismo orig
 ## Uso
 
 <!-- no-check -->
+
 ```ts
 import { pathToFileURL } from "node:url";
 import { createLocalServerFetch } from "@meekojs/meeko/server";
@@ -36,22 +37,22 @@ const response = await serverFetch(request, context);
 
 `createLocalServerFetch(options)`:
 
-| Opción | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `manifest` | `ServerManifest` | obligatorio | Los endpoints de API y RPC. |
-| `sessions` | `SessionManager` | obligatorio | El gestor de la aplicación. |
-| `load` | `(file: string) => Promise<unknown>` | obligatorio | Carga el módulo de cada archivo del manifiesto. |
-| `onError` | `(error, requestId) => void` | ninguno | Observador de los fallos `5xx`. |
+| Opción     | Tipo                                 | Por defecto | Descripción                                     |
+| ---------- | ------------------------------------ | ----------- | ----------------------------------------------- |
+| `manifest` | `ServerManifest`                     | obligatorio | Los endpoints de API y RPC.                     |
+| `sessions` | `SessionManager`                     | obligatorio | El gestor de la aplicación.                     |
+| `load`     | `(file: string) => Promise<unknown>` | obligatorio | Carga el módulo de cada archivo del manifiesto. |
+| `onError`  | `(error, requestId) => void`         | ninguno     | Observador de los fallos `5xx`.                 |
 
 ## Valor devuelto
 
 Una `ServerFetch`: `(request: Request, context: RequestContext) => Promise<Response>`.
 
-| Petición | Respuesta |
-| --- | --- |
-| Otro origen que el de `context.request` | `403 INVALID_ORIGIN` |
-| `cookie` o `authorization` distintas de las de `context.request` | `403 INVALID_CREDENTIALS` |
-| Una ruta de API o RPC | La respuesta del endpoint, con las guardas de siempre y la `Idempotency-Key` de esta petición. |
+| Petición                                                         | Respuesta                                                                                      |
+| ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Otro origen que el de `context.request`                          | `403 INVALID_ORIGIN`                                                                           |
+| `cookie` o `authorization` distintas de las de `context.request` | `403 INVALID_CREDENTIALS`                                                                      |
+| Una ruta de API o RPC                                            | La respuesta del endpoint, con las guardas de siempre y la `Idempotency-Key` de esta petición. |
 
 ## Ejemplos
 
@@ -71,6 +72,7 @@ export const logged = (inner: ServerFetch): ServerFetch => async (request, conte
 ### Un cliente tipado de servidor a nivel de módulo
 
 <!-- no-check -->
+
 ```ts
 import { createApiClient } from "@meekojs/meeko/framework";
 import { createServerClientOptions } from "@meekojs/meeko/server";
@@ -94,6 +96,7 @@ await serverFetch(request, context);
 Responde `403 {"code":"INVALID_CREDENTIALS"}`: el despacho local comparte la sesión de `context` y no puede cambiarla. Para actuar como otro usuario, haga una petición HTTP real.
 
 <!-- no-check -->
+
 ```ts good
 const request = new Request(new URL("/api/admin/users", context.request.url), { headers: context.request.headers });
 await serverFetch(request, context);
@@ -108,6 +111,7 @@ await serverFetch(new Request("https://api.otro.example/users", { headers: conte
 Responde `403 {"code":"INVALID_ORIGIN"}`. Para un servicio externo, use `fetch` con `context.signal`.
 
 <!-- no-check -->
+
 ```ts good
 await fetch("https://api.otro.example/users", { signal: context.signal });
 ```

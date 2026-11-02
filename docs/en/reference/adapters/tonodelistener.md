@@ -13,7 +13,7 @@ related:
   - "@meekojs/meeko/server#composeServerMiddleware"
   - "@meekojs/meeko/server#clientAddress"
   - docs/framework.md#build-despliegue-y-verificación
-source-hash: f632e82b023e285f89efcdde2f30e0acf0c88b841b5e22569af0a96873b49100
+source-hash: c8cbe7de01f1af5c0a25ea4ae51f5987bcf691feb19685785533b723723fa435
 ---
 
 `toNodeListener(handler, options)` converts a Fetch handler (`(request) => Response`, such as `app.fetch`) to the `(req, res)` listener for `http.createServer` or `https.createServer`. It builds the `Request` with the public origin's URL, streams the response body, sends each `Set-Cookie` separately and cancels the body if the client disconnects. It also records the remote socket's IP, read by `context.clientAddress`, `clientAddress(request)` and `rateLimit`.

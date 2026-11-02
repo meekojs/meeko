@@ -27,6 +27,7 @@ Lee el hook `window.__MEEKO_DEVTOOLS__`, que instala el código de desarrollo de
 ## Uso
 
 <!-- no-check -->
+
 ```ts
 // app/plugins/devtools.client.ts
 import { definePlugin } from "@meekojs/meeko/framework";
@@ -42,10 +43,10 @@ El plugin `.client.ts` se ejecuta sólo en el navegador, antes de hidratar; el p
 
 ## Opciones
 
-| Opción | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `container` | `Element` | `document.body` | Elemento que recibe el host del Shadow DOM. |
-| `position` | `"bottom-right" \| "bottom-left" \| "top-right" \| "top-left"` | `"bottom-right"` | Desde `1.8`, esquina de la ventana en la que se fija el panel. Otro valor lanza `TypeError`. |
+| Opción      | Tipo                                                           | Por defecto      | Descripción                                                                                  |
+| ----------- | -------------------------------------------------------------- | ---------------- | -------------------------------------------------------------------------------------------- |
+| `container` | `Element`                                                      | `document.body`  | Elemento que recibe el host del Shadow DOM.                                                  |
+| `position`  | `"bottom-right" \| "bottom-left" \| "top-right" \| "top-left"` | `"bottom-right"` | Desde `1.8`, esquina de la ventana en la que se fija el panel. Otro valor lanza `TypeError`. |
 
 Desde `1.8`, el panel se minimiza a una pastilla con el número de eventos nuevos (su botón o `Alt+Mayús+M`) y se lleva a otra esquina con su asa (arrastrando o con las flechas). Recuerda el estado plegado y la esquina en `localStorage` (`meeko:devtools-panel`); una `position` distinta en la llamada manda sobre la esquina recordada. Véase [Aspecto, minimizar y mover](../../devtools.md#aspecto-minimizar-y-mover).
 
@@ -53,9 +54,9 @@ Desde `1.8`, el panel se minimiza a una pastilla con el número de eventos nuevo
 
 Un `DevtoolsPanel`:
 
-| Miembro | Descripción |
-| --- | --- |
-| `refresh()` | Vuelve a buscar el hook y actualiza los datos. Es lo que hace el botón «Actualizar». |
+| Miembro     | Descripción                                                                                              |
+| ----------- | -------------------------------------------------------------------------------------------------------- |
+| `refresh()` | Vuelve a buscar el hook y actualiza los datos. Es lo que hace el botón «Actualizar».                     |
 | `unmount()` | Quita el panel y libera sus suscripciones, sus eventos y el resaltado. El botón de cerrar hace lo mismo. |
 
 Lanza `Error: Meeko DevTools requires a browser document` si el contenedor no pertenece a un documento con ventana, y `TypeError: Meeko DevTools: position must be one of bottom-right, bottom-left, top-right, top-left` con otra `position`.
@@ -65,6 +66,7 @@ Lanza `Error: Meeko DevTools requires a browser document` si el contenedor no pe
 ### En un host de Vite propio
 
 <!-- no-check -->
+
 ```ts
 // src/entry-client.ts
 import { hydrate } from "./App.meeko";
@@ -83,6 +85,7 @@ if (import.meta.env.DEV) {
 ### En un contenedor propio
 
 <!-- no-check -->
+
 ```ts
 const panel = mountDevtoolsPanel({ container: document.querySelector("#devtools") ?? document.body });
 ```
@@ -90,6 +93,7 @@ const panel = mountDevtoolsPanel({ container: document.querySelector("#devtools"
 ### Mostrarlo con un atajo de teclado
 
 <!-- no-check -->
+
 ```ts
 let panel: { unmount(): void } | undefined;
 window.addEventListener("keydown", async (event) => {
@@ -112,6 +116,7 @@ mountDevtoolsPanel();
 En producción el compilador no instala el hook: el panel sólo muestra `Hook no disponible. Abre una página Meeko con Vite en desarrollo y pulsa Actualizar.`, y el import estático mete su código en el bundle de producción.
 
 <!-- no-check -->
+
 ```ts good
 if (import.meta.env.DEV) {
   const { mountDevtoolsPanel } = await import("@meekojs/meeko/devtools-ui");
@@ -132,6 +137,7 @@ export default definePlugin(async () => {
 En el servidor no hay `document`: la llamada lanza `ReferenceError: document is not defined` y la petición falla.
 
 <!-- no-check -->
+
 ```ts good
 // app/plugins/devtools.client.ts
 export default definePlugin(async () => {
@@ -151,6 +157,7 @@ if (import.meta.env.DEV) mountDevtoolsPanel();
 Cada vez que HMR vuelve a ejecutar la entrada se añade otro panel encima del anterior.
 
 <!-- no-check -->
+
 ```ts good
 if (import.meta.env.DEV) {
   const panel = mountDevtoolsPanel();

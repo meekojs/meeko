@@ -1,146 +1,146 @@
-import { parseFragment } from "parse5";
+import { parseFragment } from 'parse5'
 
-import { htmlTagNames, voidTagNames } from "../../shared/html-data/tags";
-import { interpolationClose } from "./interpolation";
+import { htmlTagNames, voidTagNames } from '../../shared/html-data/tags'
+import { interpolationClose } from './interpolation'
 
 /** Ubicación de un diagnóstico en el archivo .meeko original. */
 export interface SourceLocation {
-  offset: number;
-  line: number;
-  column: number;
+	offset: number
+	line: number
+	column: number
 }
 
 /** Error de compilación con ubicación y código estable para herramientas. */
 export interface CompileDiagnostic {
-  code: string;
-  message: string;
-  filename: string;
-  location: SourceLocation;
-  /**
-   * `"warning"` en un aviso, que no hace fallar `meeko check`; sin el campo, es un error.
-   * @since 1.2.0
-   */
-  severity?: "warning";
+	code: string
+	message: string
+	filename: string
+	location: SourceLocation
+	/**
+	 * `"warning"` en un aviso, que no hace fallar `meeko check`; sin el campo, es un error.
+	 * @since 1.2.0
+	 */
+	severity?: 'warning'
 }
 
 /** Line of a diagnostic in the terminal: `file:line:column CODE: message`, with `aviso` before a warning's code. */
 export function formatDiagnostic(diagnostic: CompileDiagnostic): string {
-  const { line, column } = diagnostic.location;
-  return `${diagnostic.filename}:${line}:${column} ${diagnostic.severity === "warning" ? "aviso " : ""}${diagnostic.code}: ${diagnostic.message}`;
+	const { line, column } = diagnostic.location
+	return `${diagnostic.filename}:${line}:${column} ${diagnostic.severity === 'warning' ? 'aviso ' : ''}${diagnostic.code}: ${diagnostic.message}`
 }
 
 /** Whether any diagnostic is an error; warnings alone do not fail a check. */
 export function hasErrors(diagnostics: readonly CompileDiagnostic[]): boolean {
-  return diagnostics.some((diagnostic) => diagnostic.severity !== "warning");
+	return diagnostics.some((diagnostic) => diagnostic.severity !== 'warning')
 }
 
 /** Error que conserva el diagnóstico estructurado para CLI y editor. */
 export class MeekoCompileError extends Error {
-  readonly diagnostic: CompileDiagnostic;
+	readonly diagnostic: CompileDiagnostic
 
-  constructor(diagnostic: CompileDiagnostic) {
-    super(`${diagnostic.filename}:${diagnostic.location.line}:${diagnostic.location.column} ${diagnostic.code}: ${diagnostic.message}`);
-    this.name = "MeekoCompileError";
-    this.diagnostic = diagnostic;
-  }
+	constructor(diagnostic: CompileDiagnostic) {
+		super(`${diagnostic.filename}:${diagnostic.location.line}:${diagnostic.location.column} ${diagnostic.code}: ${diagnostic.message}`)
+		this.name = 'MeekoCompileError'
+		this.diagnostic = diagnostic
+	}
 }
 
 interface ParseLocation {
-  startOffset: number;
-  endOffset: number;
-  startTag?: { endOffset: number };
-  endTag?: { startOffset: number };
+	startOffset: number
+	endOffset: number
+	startTag?: { endOffset: number }
+	endTag?: { startOffset: number }
 }
 
 interface ParsedNode {
-  nodeName: string;
-  tagName?: string;
-  value?: string;
-  attrs?: Array<{ name: string; value: string }>;
-  sourceCodeLocation?: ParseLocation;
-  childNodes?: ParsedNode[];
+	nodeName: string
+	tagName?: string
+	value?: string
+	attrs?: Array<{ name: string; value: string }>
+	sourceCodeLocation?: ParseLocation
+	childNodes?: ParsedNode[]
 }
 
 /** Una sección SFC con posiciones conservadas en el archivo fuente. */
 export interface SfcSection {
-  name: "script" | "server" | "template" | "style";
-  start: number;
-  end: number;
-  content: string;
-  contentStart: number;
-  contentEnd: number;
-  attributes: ReadonlyArray<{ name: string; value: string }>;
-  /**
-   * The file has no such section: an empty `<script lang="ts">` stands in for it, at the
-   * start of the `<template>`, with no source text. Tools that edit or print sections skip it.
-   */
-  implicit?: true;
+	name: 'script' | 'server' | 'template' | 'style'
+	start: number
+	end: number
+	content: string
+	contentStart: number
+	contentEnd: number
+	attributes: ReadonlyArray<{ name: string; value: string }>
+	/**
+	 * The file has no such section: an empty `<script lang="ts">` stands in for it, at the
+	 * start of the `<template>`, with no source text. Tools that edit or print sections skip it.
+	 */
+	implicit?: true
 }
 
 /** Estructura validada de las secciones de un componente. */
 export interface SfcDocument {
-  /** `<script lang="ts">`; optional in the file, where its absence is an empty, `implicit` setup. */
-  script: SfcSection;
-  /** `<script server lang="ts">` de una página: opciones de ruta que nunca entran al componente. */
-  server?: SfcSection;
-  template: SfcSection;
-  style?: SfcSection;
+	/** `<script lang="ts">`; optional in the file, where its absence is an empty, `implicit` setup. */
+	script: SfcSection
+	/** `<script server lang="ts">` de una página: opciones de ruta que nunca entran al componente. */
+	server?: SfcSection
+	template: SfcSection
+	style?: SfcSection
 }
 
 /** Convierte un desplazamiento UTF-16 en línea y columna, empezando en uno. */
 export function locate(source: string, offset: number): SourceLocation {
-  const before = source.slice(0, offset);
-  const lines = before.split(/\r\n|\r|\n/);
-  return { offset, line: lines.length, column: (lines.at(-1)?.length ?? 0) + 1 };
+	const before = source.slice(0, offset)
+	const lines = before.split(/\r\n|\r|\n/)
+	return { offset, line: lines.length, column: (lines.at(-1)?.length ?? 0) + 1 }
 }
 
 /** Crea un error de compilación asociado al archivo original. */
 export function compileError(source: string, filename: string, code: string, message: string, offset: number): MeekoCompileError {
-  return new MeekoCompileError({ code, message, filename, location: locate(source, offset) });
+	return new MeekoCompileError({ code, message, filename, location: locate(source, offset) })
 }
 
 /** HTML que el parser lee en lugar del original, con las mismas posiciones. */
 export interface MaskedHtml {
-  readonly text: string;
-  /** Inicio de cada etiqueta de componente escrita como `<Name />`. */
-  readonly selfClosing: ReadonlySet<number>;
-  /** Inicio de cada etiqueta de componente, de apertura o de cierre. */
-  readonly tags: readonly number[];
-  /** Cada `<` de una interpolación del texto (`{a < b}`), que el parser lee como `_`. */
-  readonly interpolated: readonly number[];
-  /**
-   * Inicio de cada elemento HTML no vacío escrito como `<div />`, que equivale a `<div></div>`.
-   * También está en `selfClosing`.
-   * @since 1.8.0
-   */
-  readonly elements: ReadonlySet<number>;
+	readonly text: string
+	/** Inicio de cada etiqueta de componente escrita como `<Name />`. */
+	readonly selfClosing: ReadonlySet<number>
+	/** Inicio de cada etiqueta de componente, de apertura o de cierre. */
+	readonly tags: readonly number[]
+	/** Cada `<` de una interpolación del texto (`{a < b}`), que el parser lee como `_`. */
+	readonly interpolated: readonly number[]
+	/**
+	 * Inicio de cada elemento HTML no vacío escrito como `<div />`, que equivale a `<div></div>`.
+	 * También está en `selfClosing`.
+	 * @since 1.8.0
+	 */
+	readonly elements: ReadonlySet<number>
 }
 
-const rawTextElement = /<(?:script|style|textarea|title|xmp|iframe|noembed|noframes|noscript|plaintext)(?=[\s/>])/iy;
-const componentTag = /<(\/?)[A-Z][\w$]*(?=[\s/>])/y;
+const rawTextElement = /<(?:script|style|textarea|title|xmp|iframe|noembed|noframes|noscript|plaintext)(?=[\s/>])/iy
+const componentTag = /<(\/?)[A-Z][\w$]*(?=[\s/>])/y
 // A capital first letter makes `<Form>` or `<Select>` a component tag, so only a lowercase first letter is the element.
-const maskedElementTag = /<(\/?)(?:f[Oo][Rr][Mm]|s[Ee][Ll][Ee][Cc][Tt])(?=[\s/>])/y;
+const maskedElementTag = /<(\/?)(?:f[Oo][Rr][Mm]|s[Ee][Ll][Ee][Cc][Tt])(?=[\s/>])/y
 /** The name a masked `<form>` has while parse5 reads the template; see `maskComponentTags`. */
-export const maskedFormTag = "jorm";
+export const maskedFormTag = 'jorm'
 /** The name a masked `<select>` has while parse5 reads the template; see `maskComponentTags`. */
-export const maskedSelectTag = "jelect";
+export const maskedSelectTag = 'jelect'
 /** Table tags whose structure must survive when supplied through component snippets. */
-export const snippetTableTags: ReadonlySet<string> = new Set(["table", "caption", "colgroup", "col", "thead", "tbody", "tfoot", "tr", "th", "td"]);
+export const snippetTableTags: ReadonlySet<string> = new Set(['table', 'caption', 'colgroup', 'col', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td'])
 
 /** SVG and MathML elements whose names have a hyphen; the HTML standard reserves them. */
-export const hyphenatedStandardElements: ReadonlySet<string> = new Set(["annotation-xml", "color-profile", "font-face", "font-face-src", "font-face-uri", "font-face-format", "font-face-name", "missing-glyph"]);
+export const hyphenatedStandardElements: ReadonlySet<string> = new Set(['annotation-xml', 'color-profile', 'font-face', 'font-face-src', 'font-face-uri', 'font-face-format', 'font-face-name', 'missing-glyph'])
 
 /**
  * HTML elements that keep their end tag when written `<tag />`: the void ones already end in their
  * start tag, and the sections, raw-text scripts and document structure have no empty form.
  */
-const keepsEndTag = new Set([...voidTagNames.split(" "), "param", "html", "head", "body", "template", "script", "style"]);
-const selfClosableHtml = new Set(htmlTagNames.split(" ").filter((name) => !keepsEndTag.has(name)));
+const keepsEndTag = new Set([...voidTagNames.split(' '), 'param', 'html', 'head', 'body', 'template', 'script', 'style'])
+const selfClosableHtml = new Set(htmlTagNames.split(' ').filter((name) => !keepsEndTag.has(name)))
 /**
  * Self-closing elements that keep their name for the parser: the table and select insertion modes
  * would move a renamed one out of its row or list. The next sibling or the end tag closes them.
  */
-const keepsNameWhenSelfClosing = new Set(["caption", "colgroup", "thead", "tbody", "tfoot", "tr", "th", "td", "option", "optgroup"]);
+const keepsNameWhenSelfClosing = new Set(['caption', 'colgroup', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td', 'option', 'optgroup'])
 
 /**
  * Indica si `<name />`, en minúsculas, es desde 1.8 un elemento HTML sin contenido equivalente a
@@ -156,33 +156,36 @@ const keepsNameWhenSelfClosing = new Set(["caption", "colgroup", "thead", "tbody
  * @since 1.8.0
  */
 export function isSelfClosableElement(name: string): boolean {
-  return name.includes("-") ? !hyphenatedStandardElements.has(name) : selfClosableHtml.has(name);
+	return name.includes('-') ? !hyphenatedStandardElements.has(name) : selfClosableHtml.has(name)
 }
 
 /** What a `<` inside a text interpolation becomes for the HTML parser, at the same position. */
-const maskedLessThan = "_";
+const maskedLessThan = '_'
 
 /** Final `>` of a start tag whose attributes begin at `from`, and whether it ends in `/>`. */
 function startTagEnd(html: string, from: number): { end: number; selfClosing: boolean } | undefined {
-  let unquotedEnd = -1;
-  for (let index = from; index < html.length;) {
-    const char = html[index]!;
-    if (char === ">") return { end: index, selfClosing: html[index - 1] === "/" && unquotedEnd !== index };
-    if (char !== "=") { index++; continue; }
-    index++;
-    while (index < html.length && /\s/.test(html[index]!)) index++;
-    const quote = html[index];
-    if (quote === '"' || quote === "'") {
-      const close = html.indexOf(quote, index + 1);
-      if (close < 0) return undefined;
-      index = close + 1;
-    } else {
-      // An unquoted value keeps its `/`: `x=a/>` is not self-closing in HTML.
-      while (index < html.length && !/[\s>]/.test(html[index]!)) index++;
-      unquotedEnd = index;
-    }
-  }
-  return undefined;
+	let unquotedEnd = -1
+	for (let index = from; index < html.length;) {
+		const char = html[index]!
+		if (char === '>') return { end: index, selfClosing: html[index - 1] === '/' && unquotedEnd !== index }
+		if (char !== '=') {
+			index++
+			continue
+		}
+		index++
+		while (index < html.length && /\s/.test(html[index]!)) index++
+		const quote = html[index]
+		if (quote === '"' || quote === "'") {
+			const close = html.indexOf(quote, index + 1)
+			if (close < 0) return undefined
+			index = close + 1
+		} else {
+			// An unquoted value keeps its `/`: `x=a/>` is not self-closing in HTML.
+			while (index < html.length && !/[\s>]/.test(html[index]!)) index++
+			unquotedEnd = index
+		}
+	}
+	return undefined
 }
 
 /**
@@ -197,249 +200,251 @@ function startTagEnd(html: string, from: number): { end: number; selfClosing: bo
  * para que no abra una etiqueta; el compilador lee la expresión del texto original.
  */
 export function maskComponentTags(html: string, options: { blankComponents?: boolean; tableSnippets?: boolean } = {}): MaskedHtml {
-  const chars = html.split("");
-  const lower = html.toLowerCase();
-  const selfClosing = new Set<number>();
-  const elements = new Set<number>();
-  const tags: number[] = [];
-  let changed = false;
-  type TableTag = { name: string; at: number; offset: number; end: number; selfClosing: boolean };
-  const tables: Array<{ tags: TableTag[]; template: boolean; cells: number; componentDepth: number }> = [];
-  const preserve: TableTag[] = [];
-  let componentDepth = 0;
-  const interpolated: number[] = [];
-  let brace = -1;
-  // A `{...}` of the text is an expression: its `<` (`{a < b}`, `{"<b>"}`) never opens a tag.
-  const nextTag = (from: number): number => {
-    for (let at = from; ;) {
-      const tag = html.indexOf("<", at);
-      if (brace < at) brace = html.indexOf("{", at);
-      if (tag < 0 || brace < 0 || tag < brace) return tag;
-      const close = interpolationClose(html, brace);
-      if (close === undefined) return tag;
-      for (let lessThan = html.indexOf("<", brace); lessThan >= 0 && lessThan < close; lessThan = html.indexOf("<", lessThan + 1)) {
-        chars[lessThan] = maskedLessThan;
-        interpolated.push(lessThan);
-        changed = true;
-      }
-      at = close + 1;
-    }
-  };
-  for (let index = nextTag(0); index >= 0 && index < html.length; index = nextTag(index)) {
-    if (html.startsWith("<!--", index)) {
-      const close = html.indexOf("-->", index + 4);
-      if (close < 0) break;
-      index = close + 3;
-      continue;
-    }
-    rawTextElement.lastIndex = index;
-    const raw = /[a-z]/.test(html[index + 1] ?? "") ? rawTextElement.exec(html) : null;
-    // `<textarea />` has no text to skip: it is an empty element like `<div />`.
-    if (raw && !(isSelfClosableElement(raw[0].slice(1).toLowerCase()) && startTagEnd(html, index + raw[0].length)?.selfClosing)) {
-      const close = lower.indexOf(`</${raw[0].slice(1).toLowerCase()}`, index + raw[0].length);
-      if (close < 0) break;
-      index = close + 2;
-      continue;
-    }
-    // `</form>` only drops the form from the open elements, so a `<Name />` the parser kept open
-    // inside it would swallow the rest of the template. Masked as `jorm`, it closes like a `<div>`.
-    // parse5 still has the old select insertion mode, which drops `<button>`, `<selectedcontent>`,
-    // `<span>` or `<svg>` from a `<select>`; browsers keep them. Masked as `jelect`, it keeps them too.
-    maskedElementTag.lastIndex = index;
-    const masked = maskedElementTag.exec(html);
-    if (masked) {
-      chars[index + masked[1]!.length + 1] = "j";
-      changed = true;
-    }
-    componentTag.lastIndex = index;
-    const tag = componentTag.exec(html);
-    if (!tag) {
-      // Skip the attributes of an HTML start tag: a value may contain `<Name`.
-      const element = /^<(\/?)([a-z][^\s/>]*)/i.exec(html.slice(index, index + 256));
-      const end = element ? startTagEnd(html, index + element[0].length) : undefined;
-      // Since 1.8 `<div />` is `<div></div>`: an empty element, open and closed at once.
-      const empty = element !== null && end !== undefined && element[1] === "" && end.selfClosing && isSelfClosableElement(element[2]!.toLowerCase());
-      if (options.tableSnippets && element && end && !(empty && options.blankComponents)) {
-        const closing = element[1] === "/";
-        const name = element[2]!.toLowerCase();
-        const token: TableTag = { name, at: index + (closing ? 2 : 1), offset: index, end: end.end, selfClosing: end.selfClosing };
-        if (name === "table" && empty) {
-          // Renamed below, an empty table has no rows to track.
-        } else if (name === "table" && !closing) tables.push({ tags: [token], template: false, cells: 0, componentDepth });
-        else if (name === "table" && closing) {
-          const table = tables.pop();
-          if (table) { table.tags.push(token); if (table.template) preserve.push(...table.tags); }
-        } else if (snippetTableTags.has(name)) {
-          const table = tables.at(-1);
-          if (table && componentDepth <= table.componentDepth) {
-            table.tags.push(token);
-            if ((name === "th" || name === "td") && !empty) table.cells = Math.max(0, table.cells + (closing ? -1 : 1));
-          }
-          else if (componentDepth > 0) preserve.push(token);
-        } else if (!closing && (name === "render" || name === "snippet" || name === "component")) {
-          const table = tables.at(-1);
-          if (table && table.cells === 0) table.template = true;
-        }
-        if (name === "component" && !end.selfClosing) componentDepth = Math.max(0, componentDepth + (closing ? -1 : 1));
-      }
-      // `<render ... />`, `<snippet ... />` and `<component is="..." />` close themselves like a component tag.
-      if (end?.selfClosing && (element![0] === "<render" || element![0] === "<snippet" || element![0] === "<component")) {
-        chars[end.end - 1] = " ";
-        changed = true;
-        selfClosing.add(index);
-        if (options.blankComponents) chars.fill(" ", index, end.end + 1);
-      } else if (empty) {
-        // The parser keeps it open and normalize closes it, as with `<Name />`. Renamed with a `j`,
-        // `<textarea />` reads no raw text and `<table />` moves no sibling out of it.
-        chars[end.end - 1] = " ";
-        if (!keepsNameWhenSelfClosing.has(element[2]!.toLowerCase())) chars[index + 1] = "j";
-        changed = true;
-        selfClosing.add(index);
-        elements.add(index);
-        if (options.blankComponents) chars.fill(" ", index, end.end + 1);
-      }
-      index = element ? (end?.end ?? html.length) + 1 : index + 1;
-      continue;
-    }
-    chars[index + 1 + tag[1]!.length] = "j";
-    changed = true;
-    tags.push(index);
-    const end = tag[1] ? { end: html.indexOf(">", componentTag.lastIndex), selfClosing: false } : startTagEnd(html, componentTag.lastIndex);
-    if (!end || end.end < 0) break;
-    if (end.selfClosing) {
-      chars[end.end - 1] = " ";
-      selfClosing.add(index);
-    }
-    if (options.tableSnippets) {
-      const table = tables.at(-1);
-      if (table && table.cells === 0) table.template = true;
-      if (!end.selfClosing) componentDepth = Math.max(0, componentDepth + (tag[1] ? -1 : 1));
-    }
-    // Section parsing does not need the element; a blank keeps `</template>` from closing it.
-    if (options.blankComponents) chars.fill(" ", index, end.end + 1);
-    index = end.end + 1;
-  }
-  if (options.tableSnippets) {
-    for (const table of tables) if (table.template) preserve.push(...table.tags);
-    for (const token of preserve) {
-      chars[token.at] = "j";
-      if (token.name === "col" && html[token.offset + 1] !== "/") {
-        selfClosing.add(token.offset);
-        if (token.selfClosing) chars[token.end - 1] = " ";
-      }
-      changed = true;
-    }
-  }
-  return { text: changed ? chars.join("") : html, selfClosing, tags, interpolated, elements };
+	const chars = html.split('')
+	const lower = html.toLowerCase()
+	const selfClosing = new Set<number>()
+	const elements = new Set<number>()
+	const tags: number[] = []
+	let changed = false
+	type TableTag = { name: string; at: number; offset: number; end: number; selfClosing: boolean }
+	const tables: Array<{ tags: TableTag[]; template: boolean; cells: number; componentDepth: number }> = []
+	const preserve: TableTag[] = []
+	let componentDepth = 0
+	const interpolated: number[] = []
+	let brace = -1
+	// A `{...}` of the text is an expression: its `<` (`{a < b}`, `{"<b>"}`) never opens a tag.
+	const nextTag = (from: number): number => {
+		for (let at = from; ;) {
+			const tag = html.indexOf('<', at)
+			if (brace < at) brace = html.indexOf('{', at)
+			if (tag < 0 || brace < 0 || tag < brace) return tag
+			const close = interpolationClose(html, brace)
+			if (close === undefined) return tag
+			for (let lessThan = html.indexOf('<', brace); lessThan >= 0 && lessThan < close; lessThan = html.indexOf('<', lessThan + 1)) {
+				chars[lessThan] = maskedLessThan
+				interpolated.push(lessThan)
+				changed = true
+			}
+			at = close + 1
+		}
+	}
+	for (let index = nextTag(0); index >= 0 && index < html.length; index = nextTag(index)) {
+		if (html.startsWith('<!--', index)) {
+			const close = html.indexOf('-->', index + 4)
+			if (close < 0) break
+			index = close + 3
+			continue
+		}
+		rawTextElement.lastIndex = index
+		const raw = /[a-z]/.test(html[index + 1] ?? '') ? rawTextElement.exec(html) : null
+		// `<textarea />` has no text to skip: it is an empty element like `<div />`.
+		if (raw && !(isSelfClosableElement(raw[0].slice(1).toLowerCase()) && startTagEnd(html, index + raw[0].length)?.selfClosing)) {
+			const close = lower.indexOf(`</${raw[0].slice(1).toLowerCase()}`, index + raw[0].length)
+			if (close < 0) break
+			index = close + 2
+			continue
+		}
+		// `</form>` only drops the form from the open elements, so a `<Name />` the parser kept open
+		// inside it would swallow the rest of the template. Masked as `jorm`, it closes like a `<div>`.
+		// parse5 still has the old select insertion mode, which drops `<button>`, `<selectedcontent>`,
+		// `<span>` or `<svg>` from a `<select>`; browsers keep them. Masked as `jelect`, it keeps them too.
+		maskedElementTag.lastIndex = index
+		const masked = maskedElementTag.exec(html)
+		if (masked) {
+			chars[index + masked[1]!.length + 1] = 'j'
+			changed = true
+		}
+		componentTag.lastIndex = index
+		const tag = componentTag.exec(html)
+		if (!tag) {
+			// Skip the attributes of an HTML start tag: a value may contain `<Name`.
+			const element = /^<(\/?)([a-z][^\s/>]*)/i.exec(html.slice(index, index + 256))
+			const end = element ? startTagEnd(html, index + element[0].length) : undefined
+			// Since 1.8 `<div />` is `<div></div>`: an empty element, open and closed at once.
+			const empty = element !== null && end !== undefined && element[1] === '' && end.selfClosing && isSelfClosableElement(element[2]!.toLowerCase())
+			if (options.tableSnippets && element && end && !(empty && options.blankComponents)) {
+				const closing = element[1] === '/'
+				const name = element[2]!.toLowerCase()
+				const token: TableTag = { name, at: index + (closing ? 2 : 1), offset: index, end: end.end, selfClosing: end.selfClosing }
+				if (name === 'table' && empty) {
+					// Renamed below, an empty table has no rows to track.
+				} else if (name === 'table' && !closing) tables.push({ tags: [token], template: false, cells: 0, componentDepth })
+				else if (name === 'table' && closing) {
+					const table = tables.pop()
+					if (table) {
+						table.tags.push(token)
+						if (table.template) preserve.push(...table.tags)
+					}
+				} else if (snippetTableTags.has(name)) {
+					const table = tables.at(-1)
+					if (table && componentDepth <= table.componentDepth) {
+						table.tags.push(token)
+						if ((name === 'th' || name === 'td') && !empty) table.cells = Math.max(0, table.cells + (closing ? -1 : 1))
+					} else if (componentDepth > 0) preserve.push(token)
+				} else if (!closing && (name === 'render' || name === 'snippet' || name === 'component')) {
+					const table = tables.at(-1)
+					if (table && table.cells === 0) table.template = true
+				}
+				if (name === 'component' && !end.selfClosing) componentDepth = Math.max(0, componentDepth + (closing ? -1 : 1))
+			}
+			// `<render ... />`, `<snippet ... />` and `<component is="..." />` close themselves like a component tag.
+			if (end?.selfClosing && (element![0] === '<render' || element![0] === '<snippet' || element![0] === '<component')) {
+				chars[end.end - 1] = ' '
+				changed = true
+				selfClosing.add(index)
+				if (options.blankComponents) chars.fill(' ', index, end.end + 1)
+			} else if (empty) {
+				// The parser keeps it open and normalize closes it, as with `<Name />`. Renamed with a `j`,
+				// `<textarea />` reads no raw text and `<table />` moves no sibling out of it.
+				chars[end.end - 1] = ' '
+				if (!keepsNameWhenSelfClosing.has(element[2]!.toLowerCase())) chars[index + 1] = 'j'
+				changed = true
+				selfClosing.add(index)
+				elements.add(index)
+				if (options.blankComponents) chars.fill(' ', index, end.end + 1)
+			}
+			index = element ? (end?.end ?? html.length) + 1 : index + 1
+			continue
+		}
+		chars[index + 1 + tag[1]!.length] = 'j'
+		changed = true
+		tags.push(index)
+		const end = tag[1] ? { end: html.indexOf('>', componentTag.lastIndex), selfClosing: false } : startTagEnd(html, componentTag.lastIndex)
+		if (!end || end.end < 0) break
+		if (end.selfClosing) {
+			chars[end.end - 1] = ' '
+			selfClosing.add(index)
+		}
+		if (options.tableSnippets) {
+			const table = tables.at(-1)
+			if (table && table.cells === 0) table.template = true
+			if (!end.selfClosing) componentDepth = Math.max(0, componentDepth + (tag[1] ? -1 : 1))
+		}
+		// Section parsing does not need the element; a blank keeps `</template>` from closing it.
+		if (options.blankComponents) chars.fill(' ', index, end.end + 1)
+		index = end.end + 1
+	}
+	if (options.tableSnippets) {
+		for (const table of tables) if (table.template) preserve.push(...table.tags)
+		for (const token of preserve) {
+			chars[token.at] = 'j'
+			if (token.name === 'col' && html[token.offset + 1] !== '/') {
+				selfClosing.add(token.offset)
+				if (token.selfClosing) chars[token.end - 1] = ' '
+			}
+			changed = true
+		}
+	}
+	return { text: changed ? chars.join('') : html, selfClosing, tags, interpolated, elements }
 }
 
 /** Spanish descriptions of the parse5 error codes that a .meeko file can reach. */
 const parseErrorMessages: Readonly<Record<string, string>> = {
-  "non-void-html-element-start-tag-with-trailing-solidus": "<template>, <script>, <style>, <html>, <head>, <body> y los elementos desconocidos no pueden cerrarse con />; escribe la etiqueta de cierre",
-  "end-tag-with-attributes": "una etiqueta de cierre no lleva atributos",
-  "end-tag-with-trailing-solidus": "una etiqueta de cierre no termina en />",
-  "unexpected-solidus-in-tag": "hay una / suelta dentro de la etiqueta",
-  "unexpected-null-character": "el texto contiene un carácter nulo",
-  "unexpected-question-mark-instead-of-tag-name": "<? no abre ninguna etiqueta",
-  "invalid-first-character-of-tag-name": "un nombre de etiqueta debe empezar por una letra; escribe &lt; para un < literal",
-  "unexpected-equals-sign-before-attribute-name": "hay un = antes del nombre del atributo",
-  "missing-end-tag-name": "</> no cierra ninguna etiqueta",
-  "unexpected-character-in-attribute-name": "el nombre del atributo contiene un carácter no permitido (\", ' o <)",
-  "unexpected-character-in-unquoted-attribute-value": "un valor de atributo sin comillas contiene \", ', <, = o `; ponlo entre comillas",
-  "eof-before-tag-name": "el archivo termina dentro de una etiqueta",
-  "eof-in-tag": "el archivo termina antes de cerrar la etiqueta con >",
-  "missing-attribute-value": "falta el valor del atributo después de =",
-  "missing-whitespace-between-attributes": "falta un espacio entre dos atributos",
-  "cdata-in-html-content": "<![CDATA[ sólo es válido dentro de SVG o MathML",
-  "incorrectly-opened-comment": "un comentario empieza por <!--",
-  "eof-in-script-html-comment-like-text": "el archivo termina dentro de un comentario de un <script>",
-  "nested-comment": "un comentario no puede contener <!--",
-  "abrupt-closing-of-empty-comment": "un comentario vacío se escribe <!---->",
-  "eof-in-comment": "el archivo termina dentro de un comentario sin -->",
-  "incorrectly-closed-comment": "un comentario termina en --> y no en --!>",
-  "eof-in-cdata": "el archivo termina dentro de un bloque CDATA",
-  "duplicate-attribute": "el atributo está repetido en la misma etiqueta",
-  "misplaced-doctype": "un .meeko no lleva <!DOCTYPE>",
-  "end-tag-without-matching-open-element": "la etiqueta de cierre no corresponde a ninguna etiqueta abierta",
-  "closing-of-element-with-open-child-elements": "la etiqueta se cierra con elementos hijos todavía abiertos",
-  "open-elements-left-after-eof": "quedan etiquetas sin cerrar al final",
-  "eof-in-element-that-can-contain-only-text": "el archivo termina dentro de un elemento de sólo texto sin su etiqueta de cierre",
-};
+	'non-void-html-element-start-tag-with-trailing-solidus': '<template>, <script>, <style>, <html>, <head>, <body> y los elementos desconocidos no pueden cerrarse con />; escribe la etiqueta de cierre',
+	'end-tag-with-attributes': 'una etiqueta de cierre no lleva atributos',
+	'end-tag-with-trailing-solidus': 'una etiqueta de cierre no termina en />',
+	'unexpected-solidus-in-tag': 'hay una / suelta dentro de la etiqueta',
+	'unexpected-null-character': 'el texto contiene un carácter nulo',
+	'unexpected-question-mark-instead-of-tag-name': '<? no abre ninguna etiqueta',
+	'invalid-first-character-of-tag-name': 'un nombre de etiqueta debe empezar por una letra; escribe &lt; para un < literal',
+	'unexpected-equals-sign-before-attribute-name': 'hay un = antes del nombre del atributo',
+	'missing-end-tag-name': '</> no cierra ninguna etiqueta',
+	'unexpected-character-in-attribute-name': 'el nombre del atributo contiene un carácter no permitido (", \' o <)',
+	'unexpected-character-in-unquoted-attribute-value': 'un valor de atributo sin comillas contiene ", \', <, = o `; ponlo entre comillas',
+	'eof-before-tag-name': 'el archivo termina dentro de una etiqueta',
+	'eof-in-tag': 'el archivo termina antes de cerrar la etiqueta con >',
+	'missing-attribute-value': 'falta el valor del atributo después de =',
+	'missing-whitespace-between-attributes': 'falta un espacio entre dos atributos',
+	'cdata-in-html-content': '<![CDATA[ sólo es válido dentro de SVG o MathML',
+	'incorrectly-opened-comment': 'un comentario empieza por <!--',
+	'eof-in-script-html-comment-like-text': 'el archivo termina dentro de un comentario de un <script>',
+	'nested-comment': 'un comentario no puede contener <!--',
+	'abrupt-closing-of-empty-comment': 'un comentario vacío se escribe <!---->',
+	'eof-in-comment': 'el archivo termina dentro de un comentario sin -->',
+	'incorrectly-closed-comment': 'un comentario termina en --> y no en --!>',
+	'eof-in-cdata': 'el archivo termina dentro de un bloque CDATA',
+	'duplicate-attribute': 'el atributo está repetido en la misma etiqueta',
+	'misplaced-doctype': 'un .meeko no lleva <!DOCTYPE>',
+	'end-tag-without-matching-open-element': 'la etiqueta de cierre no corresponde a ninguna etiqueta abierta',
+	'closing-of-element-with-open-child-elements': 'la etiqueta se cierra con elementos hijos todavía abiertos',
+	'open-elements-left-after-eof': 'quedan etiquetas sin cerrar al final',
+	'eof-in-element-that-can-contain-only-text': 'el archivo termina dentro de un elemento de sólo texto sin su etiqueta de cierre',
+}
 
 /**
  * The Spanish message of a parse5 error code, with the code in parentheses to search for it; an
  * unknown code keeps a generic message.
  */
 export function parseErrorMessage(code: string): string {
-  return `${parseErrorMessages[code] ?? "el parser HTML rechaza esta construcción"} (${code})`;
+	return `${parseErrorMessages[code] ?? 'el parser HTML rechaza esta construcción'} (${code})`
 }
 
 /** Empty client script of a file without `<script lang="ts">`, placed where its template starts. */
 function implicitScript(offset: number): SfcSection {
-  return { name: "script", start: offset, end: offset, content: "", contentStart: offset, contentEnd: offset, attributes: [{ name: "lang", value: "ts" }], implicit: true };
+	return { name: 'script', start: offset, end: offset, content: '', contentStart: offset, contentEnd: offset, attributes: [{ name: 'lang', value: 'ts' }], implicit: true }
 }
 
 /** Analiza y valida las secciones superiores de un archivo .meeko. */
-export function parseSfc(source: string, filename = "anonymous.meeko"): SfcDocument {
-  const parseErrors: Array<{ code: string; startOffset: number }> = [];
-  const masked = maskComponentTags(source, { blankComponents: true, tableSnippets: true });
-  const root = parseFragment(masked.text, {
-    sourceCodeLocationInfo: true,
-    onParseError(error) {
-      parseErrors.push({ code: error.code, startOffset: error.startOffset });
-    },
-  }) as unknown as ParsedNode;
-  if (parseErrors[0]) {
-    const error = parseErrors[0];
-    throw compileError(source, filename, "MEEK001", `HTML de componente no válido: ${parseErrorMessage(error.code)}`, error.startOffset);
-  }
+export function parseSfc(source: string, filename = 'anonymous.meeko'): SfcDocument {
+	const parseErrors: Array<{ code: string; startOffset: number }> = []
+	const masked = maskComponentTags(source, { blankComponents: true, tableSnippets: true })
+	const root = parseFragment(masked.text, {
+		sourceCodeLocationInfo: true,
+		onParseError(error) {
+			parseErrors.push({ code: error.code, startOffset: error.startOffset })
+		},
+	}) as unknown as ParsedNode
+	if (parseErrors[0]) {
+		const error = parseErrors[0]
+		throw compileError(source, filename, 'MEEK001', `HTML de componente no válido: ${parseErrorMessage(error.code)}`, error.startOffset)
+	}
 
-  const sections = new Map<SfcSection["name"], SfcSection>();
-  for (const node of root.childNodes ?? []) {
-    if (node.nodeName === "#comment" || (node.nodeName === "#text" && !(node.value ?? "").trim())) continue;
-    const tag = node.tagName;
-    const location = node.sourceCodeLocation;
-    if (tag !== "script" && tag !== "template" && tag !== "style") {
-      throw compileError(source, filename, "MEEK002", "En el nivel superior sólo se admiten las secciones script, template y style", location?.startOffset ?? 0);
-    }
-    if (!location?.startTag || !location.endTag) {
-      throw compileError(source, filename, "MEEK003", `La sección <${tag}> necesita etiqueta de cierre`, location?.startOffset ?? 0);
-    }
-    const name: SfcSection["name"] = tag === "script" && node.attrs?.some((attribute) => attribute.name === "server") ? "server" : tag;
-    if (sections.has(name)) {
-      throw compileError(source, filename, "MEEK004", name === "server" ? "Sección <script server> duplicada" : `Sección <${tag}> duplicada`, location.startOffset);
-    }
-    sections.set(name, {
-      name,
-      start: location.startOffset,
-      end: location.endOffset,
-      content: source.slice(location.startTag.endOffset, location.endTag.startOffset),
-      contentStart: location.startTag.endOffset,
-      contentEnd: location.endTag.startOffset,
-      attributes: node.attrs ?? [],
-    });
-  }
+	const sections = new Map<SfcSection['name'], SfcSection>()
+	for (const node of root.childNodes ?? []) {
+		if (node.nodeName === '#comment' || (node.nodeName === '#text' && !(node.value ?? '').trim())) continue
+		const tag = node.tagName
+		const location = node.sourceCodeLocation
+		if (tag !== 'script' && tag !== 'template' && tag !== 'style') {
+			throw compileError(source, filename, 'MEEK002', 'En el nivel superior sólo se admiten las secciones script, template y style', location?.startOffset ?? 0)
+		}
+		if (!location?.startTag || !location.endTag) {
+			throw compileError(source, filename, 'MEEK003', `La sección <${tag}> necesita etiqueta de cierre`, location?.startOffset ?? 0)
+		}
+		const name: SfcSection['name'] = tag === 'script' && node.attrs?.some((attribute) => attribute.name === 'server') ? 'server' : tag
+		if (sections.has(name)) {
+			throw compileError(source, filename, 'MEEK004', name === 'server' ? 'Sección <script server> duplicada' : `Sección <${tag}> duplicada`, location.startOffset)
+		}
+		sections.set(name, {
+			name,
+			start: location.startOffset,
+			end: location.endOffset,
+			content: source.slice(location.startTag.endOffset, location.endTag.startOffset),
+			contentStart: location.startTag.endOffset,
+			contentEnd: location.endTag.startOffset,
+			attributes: node.attrs ?? [],
+		})
+	}
 
-  // A blanked component tag outside every section would otherwise vanish silently.
-  const stray = masked.tags.find((offset) => ![...sections.values()].some((section) => offset >= section.contentStart && offset < section.contentEnd));
-  if (stray !== undefined) {
-    throw compileError(source, filename, "MEEK002", "En el nivel superior sólo se admiten las secciones script, template y style", stray);
-  }
-  const template = sections.get("template");
-  if (!template) throw compileError(source, filename, "MEEK007", "Falta la sección <template>, que es obligatoria", source.length);
-  // Since 1.1 `<script lang="ts">` is optional (MEEK005 is no longer reported): without it the
-  // setup is empty and the props are `Record<string, never>`, as with an empty script.
-  const script = sections.get("script") ?? implicitScript(template.start);
-  if (!script.attributes.some((attribute) => attribute.name === "lang" && attribute.value === "ts")) {
-    throw compileError(source, filename, "MEEK006", "La sección script debe usar lang=\"ts\"", script.contentStart);
-  }
-  const server = sections.get("server");
-  if (server && !server.attributes.some((attribute) => attribute.name === "lang" && attribute.value === "ts")) {
-    throw compileError(source, filename, "MEEK006", "La sección script server debe usar lang=\"ts\"", server.contentStart);
-  }
-  if (server?.attributes.some((attribute) => attribute.name === "server" && attribute.value !== "")) {
-    throw compileError(source, filename, "MEEK043", "El atributo server no lleva valor; escribe <script server lang=\"ts\">", server.start);
-  }
-  const style = sections.get("style");
-  return { script, template, ...(server ? { server } : {}), ...(style ? { style } : {}) };
+	// A blanked component tag outside every section would otherwise vanish silently.
+	const stray = masked.tags.find((offset) => ![...sections.values()].some((section) => offset >= section.contentStart && offset < section.contentEnd))
+	if (stray !== undefined) {
+		throw compileError(source, filename, 'MEEK002', 'En el nivel superior sólo se admiten las secciones script, template y style', stray)
+	}
+	const template = sections.get('template')
+	if (!template) throw compileError(source, filename, 'MEEK007', 'Falta la sección <template>, que es obligatoria', source.length)
+	// Since 1.1 `<script lang="ts">` is optional (MEEK005 is no longer reported): without it the
+	// setup is empty and the props are `Record<string, never>`, as with an empty script.
+	const script = sections.get('script') ?? implicitScript(template.start)
+	if (!script.attributes.some((attribute) => attribute.name === 'lang' && attribute.value === 'ts')) {
+		throw compileError(source, filename, 'MEEK006', 'La sección script debe usar lang="ts"', script.contentStart)
+	}
+	const server = sections.get('server')
+	if (server && !server.attributes.some((attribute) => attribute.name === 'lang' && attribute.value === 'ts')) {
+		throw compileError(source, filename, 'MEEK006', 'La sección script server debe usar lang="ts"', server.contentStart)
+	}
+	if (server?.attributes.some((attribute) => attribute.name === 'server' && attribute.value !== '')) {
+		throw compileError(source, filename, 'MEEK043', 'El atributo server no lleva valor; escribe <script server lang="ts">', server.start)
+	}
+	const style = sections.get('style')
+	return { script, template, ...(server ? { server } : {}), ...(style ? { style } : {}) }
 }

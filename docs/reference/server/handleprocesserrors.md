@@ -19,16 +19,17 @@ related:
 
 Una promesa que nadie espera, un `setTimeout` que lanza o el callback de una librería quedan fuera del `try` de la petición. Sin una política, Node, Bun y Deno terminan el proceso con el primer fallo así, sin pasar por `onError` ni cerrar el servidor de forma ordenada. `handleProcessErrors(app, options)` instala los listeners que aplican la política `processErrors` de `server/runtime.ts`:
 
-| Fallo | Por defecto | Otras opciones |
-| --- | --- | --- |
-| `unhandledRejection` | `"report"`: llega a `onError` y el servidor sigue atendiendo. | `"shutdown"`: además, cierre ordenado con código 1. `"off"`: decide el runtime. |
-| `uncaughtException` | `"shutdown"`: llega a `onError`, el servidor deja de aceptar conexiones, espera las respuestas y las tareas de `waitUntil`, cierra la aplicación y sale con código 1. | `"off"`: decide el runtime. |
+| Fallo                | Por defecto                                                                                                                                                           | Otras opciones                                                                  |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `unhandledRejection` | `"report"`: llega a `onError` y el servidor sigue atendiendo.                                                                                                         | `"shutdown"`: además, cierre ordenado con código 1. `"off"`: decide el runtime. |
+| `uncaughtException`  | `"shutdown"`: llega a `onError`, el servidor deja de aceptar conexiones, espera las respuestas y las tareas de `waitUntil`, cierra la aplicación y sale con código 1. | `"off"`: decide el runtime.                                                     |
 
 `meeko dev`, las salidas de `meeko build` y `serveNode` y `serveDeno` con `handleSignals` ya la aplican. Llámela en un host propio, como `Bun.serve` con `createBunServer`.
 
 ## Uso
 
 <!-- no-check -->
+
 ```ts
 // server.ts de un host propio en Bun
 import { createServerApp, handleProcessErrors } from "@meekojs/meeko/server";
@@ -43,12 +44,12 @@ handleProcessErrors(app, { close: async () => { await server.stop(); await app.c
 
 `handleProcessErrors(app, options?)`:
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `app` | `ServerApp` | obligatorio | La aplicación de `createServerApp`; de ella sale la política `processErrors`. |
-| `options.close` | `() => Promise<void>` | `app.close()` | El cierre ordenado del host: dejar de aceptar conexiones, esperar las respuestas y cerrar la aplicación. Después, Meeko sale con código 1. |
-| `options.onError` | `(error, requestId, info?) => void` | el `onError` de `server/runtime.ts` | El observador. Sin ninguno, Meeko escribe el error completo en la consola. |
-| `options.shutdownTimeout` | `number` | `15000` | Milisegundos que puede durar `close` antes de salir igualmente con código 1. |
+| Parámetro                 | Tipo                                | Por defecto                         | Descripción                                                                                                                                |
+| ------------------------- | ----------------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `app`                     | `ServerApp`                         | obligatorio                         | La aplicación de `createServerApp`; de ella sale la política `processErrors`.                                                              |
+| `options.close`           | `() => Promise<void>`               | `app.close()`                       | El cierre ordenado del host: dejar de aceptar conexiones, esperar las respuestas y cerrar la aplicación. Después, Meeko sale con código 1. |
+| `options.onError`         | `(error, requestId, info?) => void` | el `onError` de `server/runtime.ts` | El observador. Sin ninguno, Meeko escribe el error completo en la consola.                                                                 |
+| `options.shutdownTimeout` | `number`                            | `15000`                             | Milisegundos que puede durar `close` antes de salir igualmente con código 1.                                                               |
 
 La política se declara en `server/runtime.ts` (`processErrors: { unhandledRejection?, uncaughtException? }`, o `false` para desactivar los dos casos).
 
@@ -80,6 +81,7 @@ Con un orquestador que reinicia el proceso (Docker con `restart: unless-stopped`
 ### Un host Node propio con su servidor HTTP
 
 <!-- no-check -->
+
 ```ts
 import { createServer } from "node:http";
 import { handleProcessErrors } from "@meekojs/meeko/server";
@@ -97,6 +99,7 @@ const release = handleProcessErrors(app, {
 ### Dejar la decisión a la aplicación
 
 <!-- no-check -->
+
 ```ts
 process.on("unhandledRejection", (reason) => metrics.increment("unhandled_rejection"));
 handleProcessErrors(app);
@@ -115,6 +118,7 @@ handleProcessErrors(app, { shutdownTimeout: -1 });
 `RangeError: Invalid shutdownTimeout: -1`. Use milisegundos entre `0` y `2147483647`.
 
 <!-- no-check -->
+
 ```ts good
 handleProcessErrors(app, { shutdownTimeout: 15_000 });
 ```
@@ -129,6 +133,7 @@ handleProcessErrors(app, { close: node.close });
 `serveNode` y `serveDeno` con `handleSignals` ya instalan la política. Desde `1.7` se instala una sola vez por aplicación: la segunda llamada no añade listeners ni otro cierre, así que su `close`, su `onError` y su `shutdownTimeout` se ignoran y valen los de `serveNode`; si son distintos, Meeko lo avisa en la consola. Hasta `1.6`, cada fallo se informaba dos veces y dos cierres competían. Use una de las dos.
 
 <!-- no-check -->
+
 ```ts good
 await serveNode(app, { handleSignals: true });
 ```
@@ -142,6 +147,7 @@ handleProcessErrors(app, { close: () => app.close() }); // Bun.serve sigue acept
 No hay error, pero el cierre no es ordenado: el servidor acepta peticiones mientras la aplicación se cierra. Detenga primero el servidor.
 
 <!-- no-check -->
+
 ```ts good
 handleProcessErrors(app, { close: async () => { await server.stop(); await app.close(); } });
 ```

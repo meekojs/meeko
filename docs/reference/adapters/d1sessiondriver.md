@@ -43,11 +43,11 @@ export default defineServerRuntime<Env>(({ env, production, prerendering }) => {
 
 `new D1SessionDriver(db, options?)`:
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `db` | `D1DatabaseLike` | obligatorio | El binding de D1 (`env.DB`). |
-| `options.table` | `string` | `"meeko_sessions"` | La tabla de las sesiones, creada con `D1SessionDriver.schema(table)`. |
-| `options.rateLimitTable` | `string` | ninguna | Desde `1.7`. La tabla de los contadores, creada con `D1SessionDriver.rateLimitSchema(table)`. Sin ella, el driver no tiene `rateLimit`. |
+| Parámetro                | Tipo             | Por defecto        | Descripción                                                                                                                             |
+| ------------------------ | ---------------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `db`                     | `D1DatabaseLike` | obligatorio        | El binding de D1 (`env.DB`).                                                                                                            |
+| `options.table`          | `string`         | `"meeko_sessions"` | La tabla de las sesiones, creada con `D1SessionDriver.schema(table)`.                                                                   |
+| `options.rateLimitTable` | `string`         | ninguna            | Desde `1.7`. La tabla de los contadores, creada con `D1SessionDriver.rateLimitSchema(table)`. Sin ella, el driver no tiene `rateLimit`. |
 
 Los nombres de tabla son identificadores SQL: letra o `_` seguidos de letras, dígitos o `_`, hasta 63 caracteres.
 
@@ -55,11 +55,11 @@ Los nombres de tabla son identificadores SQL: letra o `_` seguidos de letras, d�
 
 Un `SqlSessionDriver` con `read`, `write`, `remove`, `replace`, `revokeFamily`, `rateLimit` (con `rateLimitTable`) y:
 
-| Miembro | Descripción |
-| --- | --- |
-| `deleteExpired(now?)` | Borra las sesiones caducadas y, desde `1.7`, los contadores cuya ventana terminó; devuelve el total de filas borradas. |
-| `D1SessionDriver.schema(table?)` | El `CREATE TABLE` y el índice de las sesiones. |
-| `D1SessionDriver.rateLimitSchema(table?)` | Desde `1.7`. El `CREATE TABLE … WITHOUT ROWID` y el índice de los contadores. |
+| Miembro                                   | Descripción                                                                                                            |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `deleteExpired(now?)`                     | Borra las sesiones caducadas y, desde `1.7`, los contadores cuya ventana terminó; devuelve el total de filas borradas. |
+| `D1SessionDriver.schema(table?)`          | El `CREATE TABLE` y el índice de las sesiones.                                                                         |
+| `D1SessionDriver.rateLimitSchema(table?)` | Desde `1.7`. El `CREATE TABLE … WITHOUT ROWID` y el índice de los contadores.                                          |
 
 ```sql
 CREATE TABLE IF NOT EXISTS "meeko_sessions" (
@@ -108,6 +108,7 @@ export default defineMeekoConfig({
 ### Limpieza con un Cron Trigger
 
 <!-- no-check -->
+
 ```ts
 // worker.ts propio, junto a createWorker
 export default {
@@ -124,6 +125,7 @@ El Worker que genera `meeko build` sólo exporta `fetch`: un `scheduled` necesit
 ### Limitar el inicio de sesión en Workers
 
 <!-- no-check -->
+
 ```ts
 // server/api/auth/login.post.ts
 export default defineApiRoute({
@@ -146,6 +148,7 @@ new D1SessionDriver(env.DB, { table: "app-sessions" });
 `TypeError: Invalid D1 session table name: app-sessions`, al crear el runtime. Lo mismo con `rateLimitTable`.
 
 <!-- no-check -->
+
 ```ts good
 new D1SessionDriver(env.DB, { table: "app_sessions" });
 ```
@@ -159,6 +162,7 @@ new SqlSessionStore(new D1SessionDriver(env.DB!)); // también durante meeko bui
 El prerender se ejecuta en Node sin bindings: la fábrica lanza `TypeError: D1SessionDriver requires a D1 database binding` y el prerender de `meeko build` falla. En producción, compruebe también que `wrangler.jsonc` declara el binding.
 
 <!-- no-check -->
+
 ```ts good
 const store = prerendering || !env.DB ? new MemorySessionStore() : new SqlSessionStore(new D1SessionDriver(env.DB));
 ```

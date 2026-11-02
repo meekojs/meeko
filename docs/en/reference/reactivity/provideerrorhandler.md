@@ -16,7 +16,7 @@ related:
   - "@meekojs/meeko/framework#mountClientApp"
   - docs/framework.md#errores
   - docs/framework.md#fallos-globales-del-navegador
-source-hash: e490df7b38e406283c58cc020af3317e96d4775173cfbe194f3aa5389dbbca2e
+source-hash: 558165a432ab5a2ed17b0d2aae8052e552f8be8e1dbda083228582c6487a3f26
 ---
 
 In the browser, many failures happen outside any `try`: an asynchronous `on:click` handler rejects, `onMounted` throws, a late-mounted component reloads, a Socket channel drops. `provideErrorHandler(handler)` registers who receives these failures: the calling component and all its descendants, except those registering their own observer. `handler` receives the error and its source (`ErrorSource`), to show an alert, send it to a monitoring service or both.

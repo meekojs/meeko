@@ -1,173 +1,200 @@
 {
-  "name": "@meekojs/meeko",
-  "version": "1.8.0",
-  "packageManager": "pnpm@12.14.0",
-  "description": "Typed .meeko component engine with SSR, hydration, signals, Vite, and DevTools.",
-  "license": "MIT",
-  "sideEffects": true,
-  "type": "module",
-  "files": ["dist/", "README.md", "LICENSE", "CHANGELOG.md"],
-  "types": "./dist/index.d.ts",
-  "repository": { "type": "git", "url": "git+https://github.com/meekojs/meeko.git", "directory": "packages/meeko" },
-  "homepage": "https://meekojs.com",
-  "bugs": { "url": "https://github.com/meekojs/meeko/issues" },
-  "keywords": ["meeko", "components", "ssr", "hydration", "reactivity", "vite", "typescript", "devtools"],
-  "publishConfig": { "access": "public", "provenance": true },
-  "exports": {
-    "./compiler": {
-      "types": "./dist/compiler.d.ts",
-      "default": "./dist/compiler.js"
-    },
-    "./parse": {
-      "types": "./dist/parse.d.ts",
-      "default": "./dist/parse.js"
-    },
-    ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
-    },
-    "./vite": {
-      "types": "./dist/vite.d.ts",
-      "default": "./dist/vite.js"
-    },
-    "./framework": {
-      "types": "./dist/framework.d.ts",
-      "default": "./dist/framework.js"
-    },
-    "./i18n": {
-      "types": "./dist/i18n.d.ts",
-      "default": "./dist/i18n.js"
-    },
-    "./i18n/module": {
-      "types": "./dist/i18n/module.d.ts",
-      "default": "./dist/i18n/module.js"
-    },
-    "./server": {
-      "types": "./dist/framework-server.d.ts",
-      "default": "./dist/framework-server.js"
-    },
-    "./node": {
-      "types": "./dist/node.d.ts",
-      "default": "./dist/node.js"
-    },
-    "./password": {
-      "types": "./dist/password.d.ts",
-      "default": "./dist/password.js"
-    },
-    "./bun": {
-      "types": "./dist/bun.d.ts",
-      "default": "./dist/bun.js"
-    },
-    "./deno": {
-      "types": "./dist/deno.d.ts",
-      "default": "./dist/deno.js"
-    },
-    "./cloudflare": {
-      "types": "./dist/cloudflare.d.ts",
-      "default": "./dist/cloudflare.js"
-    },
-    "./build": {
-      "types": "./dist/build.d.ts",
-      "default": "./dist/build.js"
-    },
-    "./prettier": {
-      "types": "./dist/prettier.d.ts",
-      "default": "./dist/prettier.js"
-    },
-    "./postcss": {
-      "types": "./dist/postcss.d.ts",
-      "default": "./dist/postcss.js"
-    },
-    "./internal": {
-      "types": "./dist/internal.d.ts",
-      "default": "./dist/internal.js"
-    },
-    "./builtins/*": {
-      "types": "./dist/builtins/*.compiled.d.ts",
-      "default": "./dist/builtins/*.compiled.js"
-    },
-    "./devtools-ui": {
-      "types": "./dist/devtools-ui/index.d.ts",
-      "default": "./dist/devtools-ui/index.js"
-    }
-  },
-  "bin": {
-    "meeko": "dist/cli.js",
-    "meeko-language-server": "dist/language-server/main.js"
-  },
-  "scripts": {
-    "prepack": "pnpm run build",
-    "build": "node ../../scripts/build-package.mjs",
-    "check": "tsc -p tsconfig.json --noEmit",
-    "builtins": "tsx scripts/builtin-components.ts",
-    "html-data": "tsx scripts/html-data.ts",
-    "test": "node scripts/clean-test-tmp.mjs && pnpm run build && pnpm run example:compile && tsx --test --test-concurrency=1 tests/*.test.ts",
-    "example:compile": "node dist/cli.js compile examples/counter/Counter.meeko examples/counter/Counter.generated.ts && node dist/cli.js compile examples/attributes/Attributes.meeko examples/attributes/Attributes.generated.ts && node dist/cli.js compile examples/regions/Regions.meeko examples/regions/Regions.generated.ts && node dist/cli.js compile examples/primitives/Primitives.meeko examples/primitives/Primitives.generated.ts",
-    "example:bundle": "pnpm run build && pnpm run example:compile && esbuild examples/counter/client.ts --bundle --format=esm --platform=browser --target=es2022 --outfile=examples/counter/client.bundle.js",
-    "example:check": "tsc -p examples/counter/tsconfig.json --noEmit",
-    "example:serve": "pnpm run example:bundle && tsx examples/counter/server.ts",
-    "vite:dev": "vite examples/vite --config examples/vite/vite.config.ts",
-    "vite:types": "pnpm run build && node dist/cli.js types examples/counter/Counter.meeko && node dist/cli.js types examples/regions/Regions.meeko && node dist/cli.js types examples/vite/Hot.meeko && node dist/cli.js types examples/nested/Parent.meeko && tsc -p examples/vite/tsconfig.json --noEmit",
-    "vite:build": "vite build examples/vite --config examples/vite/vite.config.ts",
-    "pilot:dev": "tsx examples/pilot/server.ts",
-    "pilot:check": "pnpm run build && node dist/cli.js check examples/pilot/App.meeko && node dist/cli.js types examples/pilot/App.meeko && tsc -p examples/pilot/tsconfig.json --noEmit",
-    "pilot:build": "tsx examples/pilot/build.ts",
-    "pilot:serve": "node examples/pilot/.output/server/http.js",
-    "pilot:e2e": "node --import tsx --test --test-force-exit tests/pilot.e2e.ts",
-    "conformance": "pnpm run build && tsx --test --test-concurrency=1 tests/conformance/*.test.ts",
-    "conformance:node": "pnpm run build && tsx --test tests/conformance/node.test.ts",
-    "conformance:bun": "pnpm run build && tsx --test tests/conformance/bun.test.ts",
-    "conformance:deno": "pnpm run build && tsx --test tests/conformance/deno.test.ts",
-    "conformance:workerd": "pnpm run build && tsx --test tests/conformance/workerd.test.ts",
-    "e2e": "pnpm run example:bundle && pnpm run vite:build && tsx --test tests/browser.e2e.ts tests/editor-bridge.e2e.ts tests/devtools-config.e2e.ts tests/teleport.e2e.ts tests/popover-select.e2e.ts tests/scoped-styles.e2e.ts tests/document-html.e2e.ts",
-    "benchmark:check": "pnpm run example:compile && node dist/cli.js compile benchmarks/cases/TreeLeaf.meeko benchmarks/cases/TreeLeaf.generated.ts && node dist/cli.js compile benchmarks/cases/TreeBranch.meeko benchmarks/cases/TreeBranch.generated.ts && node dist/cli.js compile benchmarks/cases/Tree.meeko benchmarks/cases/Tree.generated.ts && node dist/cli.js compile benchmarks/cases/List.meeko benchmarks/cases/List.generated.ts && node dist/cli.js compile benchmarks/cases/Navigation.meeko benchmarks/cases/Navigation.generated.ts && tsc -p tsconfig.benchmark.json --noEmit",
-    "benchmark": "pnpm run build && pnpm run benchmark:check && node --expose-gc --import tsx benchmarks/run.ts",
-    "benchmark:scenarios": "pnpm run build && pnpm run benchmark:check && node --expose-gc --import tsx benchmarks/scenarios.ts",
-    "benchmark:measure": "pnpm run build && node --expose-gc --import tsx benchmarks/measure.ts",
-    "benchmark:compare": "node --import tsx benchmarks/compare.ts",
-    "benchmark:budget": "pnpm run benchmark:measure && node --import tsx benchmarks/compare.ts --fail-on-regression",
-    "package:smoke": "pwsh -NoProfile -File tests/package-consumer.ps1",
-    "verify": "pnpm run check && pnpm run test && pnpm run example:check && tsc -p tsconfig.test.json --noEmit && pnpm run vite:types && pnpm run benchmark:check && pnpm run vite:build && pnpm run pilot:check"
-  },
-  "dependencies": {
-    "@typescript/typescript6": "6.0.2",
-    "csstype": "^3.2.3",
-    "parse5": "^8.0.0",
-    "postcss": "^8.5.31",
-    "postcss-selector-parser": "^7.1.7",
-    "prettier": "^3.9.10",
-    "typescript": "7.0.2",
-    "vscode-css-languageservice": "6.3.10",
-    "vscode-html-languageservice": "5.6.2",
-    "vscode-languageserver": "11.0.0",
-    "vscode-languageserver-textdocument": "1.0.16",
-    "ws": "8.22.0"
-  },
-  "peerDependencies": {
-    "tailwindcss": "^4.0.0",
-    "vite": "^8.3.5"
-  },
-  "peerDependenciesMeta": {
-    "tailwindcss": { "optional": true },
-    "vite": { "optional": true }
-  },
-  "devDependencies": {
-    "@mdn/browser-compat-data": "8.1.7",
-    "@tailwindcss/postcss": "4.3.3",
-    "@tailwindcss/vite": "4.3.3",
-    "@types/node": "^24.0.0",
-    "@types/ws": "8.18.2",
-    "esbuild": "0.28.2",
-    "happy-dom": "^20.0.0",
-    "playwright-core": "1.64.1",
-    "redis": "6.3.0",
-    "tailwindcss": "4.3.3",
-    "tsx": "^4.20.0",
-    "vite": "8.3.5",
-    "vue": "3.5.44",
-    "wrangler": "4.152.0"
-  },
-  "engines": {
-    "node": ">=24"
-  }
+	"name": "@meekojs/meeko",
+	"version": "1.8.0",
+	"description": "Typed .meeko component engine with SSR, hydration, signals, Vite, and DevTools.",
+	"keywords": [
+		"meeko",
+		"components",
+		"ssr",
+		"hydration",
+		"reactivity",
+		"vite",
+		"typescript",
+		"devtools"
+	],
+	"homepage": "https://meekojs.com",
+	"bugs": {
+		"url": "https://github.com/meekojs/meeko/issues"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/meekojs/meeko.git",
+		"directory": "packages/meeko"
+	},
+	"license": "MIT",
+	"sideEffects": true,
+	"type": "module",
+	"exports": {
+		"./compiler": {
+			"types": "./dist/compiler.d.ts",
+			"default": "./dist/compiler.js"
+		},
+		"./parse": {
+			"types": "./dist/parse.d.ts",
+			"default": "./dist/parse.js"
+		},
+		".": {
+			"types": "./dist/index.d.ts",
+			"default": "./dist/index.js"
+		},
+		"./vite": {
+			"types": "./dist/vite.d.ts",
+			"default": "./dist/vite.js"
+		},
+		"./framework": {
+			"types": "./dist/framework.d.ts",
+			"default": "./dist/framework.js"
+		},
+		"./i18n": {
+			"types": "./dist/i18n.d.ts",
+			"default": "./dist/i18n.js"
+		},
+		"./i18n/module": {
+			"types": "./dist/i18n/module.d.ts",
+			"default": "./dist/i18n/module.js"
+		},
+		"./server": {
+			"types": "./dist/framework-server.d.ts",
+			"default": "./dist/framework-server.js"
+		},
+		"./node": {
+			"types": "./dist/node.d.ts",
+			"default": "./dist/node.js"
+		},
+		"./password": {
+			"types": "./dist/password.d.ts",
+			"default": "./dist/password.js"
+		},
+		"./bun": {
+			"types": "./dist/bun.d.ts",
+			"default": "./dist/bun.js"
+		},
+		"./deno": {
+			"types": "./dist/deno.d.ts",
+			"default": "./dist/deno.js"
+		},
+		"./cloudflare": {
+			"types": "./dist/cloudflare.d.ts",
+			"default": "./dist/cloudflare.js"
+		},
+		"./build": {
+			"types": "./dist/build.d.ts",
+			"default": "./dist/build.js"
+		},
+		"./prettier": {
+			"types": "./dist/prettier.d.ts",
+			"default": "./dist/prettier.js"
+		},
+		"./postcss": {
+			"types": "./dist/postcss.d.ts",
+			"default": "./dist/postcss.js"
+		},
+		"./internal": {
+			"types": "./dist/internal.d.ts",
+			"default": "./dist/internal.js"
+		},
+		"./builtins/*": {
+			"types": "./dist/builtins/*.compiled.d.ts",
+			"default": "./dist/builtins/*.compiled.js"
+		},
+		"./devtools-ui": {
+			"types": "./dist/devtools-ui/index.d.ts",
+			"default": "./dist/devtools-ui/index.js"
+		}
+	},
+	"types": "./dist/index.d.ts",
+	"bin": {
+		"meeko": "dist/cli.js",
+		"meeko-language-server": "dist/language-server/main.js"
+	},
+	"files": [
+		"dist/",
+		"README.md",
+		"LICENSE",
+		"CHANGELOG.md"
+	],
+	"scripts": {
+		"benchmark": "pnpm run build && pnpm run benchmark:check && node --expose-gc --import tsx benchmarks/run.ts",
+		"benchmark:budget": "pnpm run benchmark:measure && node --import tsx benchmarks/compare.ts --fail-on-regression",
+		"benchmark:check": "pnpm run example:compile && node dist/cli.js compile benchmarks/cases/TreeLeaf.meeko benchmarks/cases/TreeLeaf.generated.ts && node dist/cli.js compile benchmarks/cases/TreeBranch.meeko benchmarks/cases/TreeBranch.generated.ts && node dist/cli.js compile benchmarks/cases/Tree.meeko benchmarks/cases/Tree.generated.ts && node dist/cli.js compile benchmarks/cases/List.meeko benchmarks/cases/List.generated.ts && node dist/cli.js compile benchmarks/cases/Navigation.meeko benchmarks/cases/Navigation.generated.ts && tsc -p tsconfig.benchmark.json --noEmit",
+		"benchmark:compare": "node --import tsx benchmarks/compare.ts",
+		"benchmark:measure": "pnpm run build && node --expose-gc --import tsx benchmarks/measure.ts",
+		"benchmark:scenarios": "pnpm run build && pnpm run benchmark:check && node --expose-gc --import tsx benchmarks/scenarios.ts",
+		"build": "node ../../scripts/build-package.mjs",
+		"builtins": "tsx scripts/builtin-components.ts",
+		"check": "tsc -p tsconfig.json --noEmit",
+		"conformance": "pnpm run build && tsx --test --test-concurrency=1 tests/conformance/*.test.ts",
+		"conformance:bun": "pnpm run build && tsx --test tests/conformance/bun.test.ts",
+		"conformance:deno": "pnpm run build && tsx --test tests/conformance/deno.test.ts",
+		"conformance:node": "pnpm run build && tsx --test tests/conformance/node.test.ts",
+		"conformance:workerd": "pnpm run build && tsx --test tests/conformance/workerd.test.ts",
+		"e2e": "pnpm run example:bundle && pnpm run vite:build && tsx --test tests/browser.e2e.ts tests/editor-bridge.e2e.ts tests/devtools-config.e2e.ts tests/teleport.e2e.ts tests/popover-select.e2e.ts tests/scoped-styles.e2e.ts tests/document-html.e2e.ts",
+		"example:bundle": "pnpm run build && pnpm run example:compile && esbuild examples/counter/client.ts --bundle --format=esm --platform=browser --target=es2022 --outfile=examples/counter/client.bundle.js",
+		"example:check": "tsc -p examples/counter/tsconfig.json --noEmit",
+		"example:compile": "node dist/cli.js compile examples/counter/Counter.meeko examples/counter/Counter.generated.ts && node dist/cli.js compile examples/attributes/Attributes.meeko examples/attributes/Attributes.generated.ts && node dist/cli.js compile examples/regions/Regions.meeko examples/regions/Regions.generated.ts && node dist/cli.js compile examples/primitives/Primitives.meeko examples/primitives/Primitives.generated.ts",
+		"example:serve": "pnpm run example:bundle && tsx examples/counter/server.ts",
+		"html-data": "tsx scripts/html-data.ts",
+		"prepack": "pnpm run build",
+		"package:smoke": "pwsh -NoProfile -File tests/package-consumer.ps1",
+		"pilot:build": "tsx examples/pilot/build.ts",
+		"pilot:check": "pnpm run build && node dist/cli.js check examples/pilot/App.meeko && node dist/cli.js types examples/pilot/App.meeko && tsc -p examples/pilot/tsconfig.json --noEmit",
+		"pilot:dev": "tsx examples/pilot/server.ts",
+		"pilot:e2e": "node --import tsx --test --test-force-exit tests/pilot.e2e.ts",
+		"pilot:serve": "node examples/pilot/.output/server/http.js",
+		"test": "node scripts/clean-test-tmp.mjs && pnpm run build && pnpm run example:compile && tsx --test --test-concurrency=1 tests/*.test.ts",
+		"verify": "pnpm run check && pnpm run test && pnpm run example:check && tsc -p tsconfig.test.json --noEmit && pnpm run vite:types && pnpm run benchmark:check && pnpm run vite:build && pnpm run pilot:check",
+		"vite:build": "vite build examples/vite --config examples/vite/vite.config.ts",
+		"vite:dev": "vite examples/vite --config examples/vite/vite.config.ts",
+		"vite:types": "pnpm run build && node dist/cli.js types examples/counter/Counter.meeko && node dist/cli.js types examples/regions/Regions.meeko && node dist/cli.js types examples/vite/Hot.meeko && node dist/cli.js types examples/nested/Parent.meeko && tsc -p examples/vite/tsconfig.json --noEmit"
+	},
+	"dependencies": {
+		"@typescript/typescript6": "6.0.2",
+		"csstype": "^3.2.3",
+		"parse5": "^8.0.0",
+		"postcss": "^8.5.31",
+		"postcss-selector-parser": "^7.1.7",
+		"prettier": "^3.9.10",
+		"typescript": "7.0.2",
+		"vscode-css-languageservice": "6.3.10",
+		"vscode-html-languageservice": "5.6.2",
+		"vscode-languageserver": "11.0.0",
+		"vscode-languageserver-textdocument": "1.0.16",
+		"ws": "8.22.0"
+	},
+	"devDependencies": {
+		"@mdn/browser-compat-data": "8.1.7",
+		"@tailwindcss/postcss": "4.3.3",
+		"@tailwindcss/vite": "4.3.3",
+		"@types/node": "^24.0.0",
+		"@types/ws": "8.18.2",
+		"esbuild": "0.28.2",
+		"happy-dom": "^20.0.0",
+		"playwright-core": "1.64.1",
+		"redis": "6.3.0",
+		"tailwindcss": "4.3.3",
+		"tsx": "^4.20.0",
+		"vite": "8.3.5",
+		"vue": "3.5.44",
+		"wrangler": "4.152.0"
+	},
+	"peerDependencies": {
+		"tailwindcss": "^4.0.0",
+		"vite": "^8.3.5"
+	},
+	"peerDependenciesMeta": {
+		"tailwindcss": {
+			"optional": true
+		},
+		"vite": {
+			"optional": true
+		}
+	},
+	"packageManager": "pnpm@12.14.0",
+	"engines": {
+		"node": ">=24"
+	},
+	"publishConfig": {
+		"access": "public",
+		"provenance": true
+	}
 }

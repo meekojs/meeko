@@ -12,7 +12,7 @@ related:
   - "@meekojs/meeko#Signal"
   - "@meekojs/meeko/framework#useForm"
   - docs/api.md#modelos-de-componente-definemodel-y-model
-source-hash: afadc2b44a97845ef3cdaa5e47b6db66d8c553c8b1a6eeee9278ad050b31df97
+source-hash: 9aade298be72a4521c0726fe394959159bf18eb3350b39a95d30a877a9cea2d7
 ---
 
 `defineModel<T>()` declares a value shared bidirectionally between the parent and component, and returns a writable `Signal<T>`. The parent passes its signal with `model="señal"` (the default model) or `model:nombre="señal"`; reading and writing in the child reads and writes the parent's signal. It is a compiler macro: you do not import it.

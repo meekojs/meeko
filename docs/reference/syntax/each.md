@@ -39,12 +39,12 @@ const todos = signal([
 
 ## Atributos
 
-| Atributo | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `each:of` | `Iterable<T>` | obligatorio | La lista. Se vuelve a leer cuando cambian sus señales; con una señal, escribe `.value`. |
-| `each:as` | identificador | obligatorio | Nombre del elemento de cada fila, de tipo `T`, visible en la etiqueta y su contenido. |
-| `each:index` | identificador | `index` | Nombre del índice de la fila, de tipo `number`. |
-| `each:key` | expresión `string \| number` | el índice | Clave de la fila, única entre sus hermanas. Desde `1.1` es opcional. |
+| Atributo     | Tipo                         | Por defecto | Descripción                                                                             |
+| ------------ | ---------------------------- | ----------- | --------------------------------------------------------------------------------------- |
+| `each:of`    | `Iterable<T>`                | obligatorio | La lista. Se vuelve a leer cuando cambian sus señales; con una señal, escribe `.value`. |
+| `each:as`    | identificador                | obligatorio | Nombre del elemento de cada fila, de tipo `T`, visible en la etiqueta y su contenido.   |
+| `each:index` | identificador                | `index`     | Nombre del índice de la fila, de tipo `number`.                                         |
+| `each:key`   | expresión `string \| number` | el índice   | Clave de la fila, única entre sus hermanas. Desde `1.1` es opcional.                    |
 
 `each:as` y `each:index` deben ser identificadores válidos y distintos (`MEEK022`).
 
@@ -196,6 +196,7 @@ todos.value.push({ id: "c3", title: "Nueva", done: false });
 ```
 
 <!-- no-check -->
+
 ```ts good
 todos.value = [...todos.value, { id: "c3", title: "Nueva", done: false }];
 ```

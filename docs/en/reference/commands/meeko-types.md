@@ -11,7 +11,7 @@ related:
   - "cli:routes"
   - "cli:init"
   - docs/api.md#herramientas
-source-hash: 9760afff6c56becd5e2c48f256b12b0730fb4e397875910a3cdf7e6ae036b6bc
+source-hash: b600219314dcbac04a9c9353aacd9c8a259e7a9f83d9eecf80cc80df8e83f082
 ---
 
 `meeko types` writes the type declaration of a `.meeko` component (its props, events, models, snippets and exposed values) and recursively of each `.meeko` it imports through relative imports or path aliases. Declarations go in `.meeko/types/`, with the same project-relative path and the `.d.meeko.ts` extension; never alongside sources. It prints the path of each declaration written.

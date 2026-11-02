@@ -43,24 +43,25 @@ export default defineServerRuntime<Env>(({ env }) => ({
 
 `new DurableObjectSocketPubSub(namespace)`:
 
-| Parámetro | Tipo | Descripción |
-| --- | --- | --- |
+| Parámetro   | Tipo                         | Descripción                                                                                                            |
+| ----------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | `namespace` | `DurableObjectNamespaceLike` | El binding del namespace de las salas, normalmente `env.MEEKO_SOCKET`, cuya clase se creó con `createSocketRoomClass`. |
 
 ## Valor devuelto
 
 Un `SocketPubSub`:
 
-| Método | Descripción |
-| --- | --- |
-| `publish(channel, room, message)` | Entrega el mensaje al Durable Object de `socketRoomName(channel, room)` y se resuelve cuando lo acepta. Rechaza con `SOCKET_BACKLOG_EXCEEDED` (`503`) si la sala ya tiene `maxPendingPublications` sin entregar. |
-| `subscribe(channel, room, listener)` | Sólo dentro del Durable Object de la sala, donde el hub suscribe a sus peers. |
+| Método                               | Descripción                                                                                                                                                                                                      |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `publish(channel, room, message)`    | Entrega el mensaje al Durable Object de `socketRoomName(channel, room)` y se resuelve cuando lo acepta. Rechaza con `SOCKET_BACKLOG_EXCEEDED` (`503`) si la sala ya tiene `maxPendingPublications` sin entregar. |
+| `subscribe(channel, room, listener)` | Sólo dentro del Durable Object de la sala, donde el hub suscribe a sus peers.                                                                                                                                    |
 
 ## Ejemplos
 
 ### Broadcast desde una API
 
 <!-- no-check -->
+
 ```ts
 // server/api/documents/[id]/publish.post.ts
 export default defineApiRoute({
@@ -97,6 +98,7 @@ new DurableObjectSocketPubSub(env.DB as never);
 `TypeError: DurableObjectSocketPubSub requires a Durable Object namespace binding`.
 
 <!-- no-check -->
+
 ```ts good
 new DurableObjectSocketPubSub(env.MEEKO_SOCKET);
 ```
@@ -110,6 +112,7 @@ new DurableObjectSocketPubSub(env.MEEKO_SOCKET).subscribe("chat", "general", (me
 `Error: DurableObjectSocketPubSub subscribes only inside the Socket room Durable Object; forward upgrades with createWorker`. Las suscripciones sólo existen dentro de la sala; todo upgrade debe pasar por `createWorker`.
 
 <!-- no-check -->
+
 ```ts good
 export default createWorker(createCloudflareApp); // reenvía cada upgrade a su sala
 ```
@@ -135,6 +138,7 @@ socket: { pubsub: new LocalSocketPubSub() }
 El Worker y la sala rechazan la aplicación al crearla: `Socket channels on Cloudflare Workers require DurableObjectSocketPubSub: leave runtime.socket.pubsub unset and bind MEEKO_SOCKET, or set it to new DurableObjectSocketPubSub(env.MEEKO_SOCKET)…`.
 
 <!-- no-check -->
+
 ```ts good
 socket: {} // el Worker usa DurableObjectSocketPubSub(env.MEEKO_SOCKET)
 ```

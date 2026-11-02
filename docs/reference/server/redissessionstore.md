@@ -26,6 +26,7 @@ Es el store que Meeko crea sin configuración en producción con `MEEKO_REDIS_UR
 ## Uso
 
 <!-- no-check -->
+
 ```ts
 // server/runtime.ts
 import { createClient } from "redis";
@@ -48,29 +49,30 @@ export default defineServerRuntime(async ({ env, production, prerendering }) => 
 
 `new RedisSessionStore(client, options)`:
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `client` | `RedisSessionClient` | obligatorio | Un cliente conectado con `get`, `set(key, value, { PX })`, `del` y `eval(script, { keys, arguments })`. node-redis 4 o posterior lo cumple tal cual. |
-| `options.prefix` | `string` | obligatorio | Prefijo de todas las claves, único por aplicación y entorno: no vacío, sin espacios y terminado en `:`. |
-| `options.subscriber` | `RedisSubscriberClient` | ninguno | Conexión dedicada (`client.duplicate()`) para recibir las revocaciones de `<prefix>revoked`. La aplicación la abre y la cierra. |
-| `options.closeClient` | `boolean` | `false` | Cierra `client` con `quit()` al cerrar el store, cuando el store es dueño de la conexión. |
+| Parámetro             | Tipo                    | Por defecto | Descripción                                                                                                                                          |
+| --------------------- | ----------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `client`              | `RedisSessionClient`    | obligatorio | Un cliente conectado con `get`, `set(key, value, { PX })`, `del` y `eval(script, { keys, arguments })`. node-redis 4 o posterior lo cumple tal cual. |
+| `options.prefix`      | `string`                | obligatorio | Prefijo de todas las claves, único por aplicación y entorno: no vacío, sin espacios y terminado en `:`.                                              |
+| `options.subscriber`  | `RedisSubscriberClient` | ninguno     | Conexión dedicada (`client.duplicate()`) para recibir las revocaciones de `<prefix>revoked`. La aplicación la abre y la cierra.                      |
+| `options.closeClient` | `boolean`               | `false`     | Cierra `client` con `quit()` al cerrar el store, cuando el store es dueño de la conexión.                                                            |
 
 ## Valor devuelto
 
 Un `SessionStore` persistente (`persistent: true`) con `replace`, `revokeFamily` y `rateLimit`, y `subscribeRevocations` sólo si recibe `subscriber`. Las claves que escribe:
 
-| Clave | Contenido |
-| --- | --- |
-| `<prefix><id>` | El registro de la sesión en JSON, con `PX` igual a lo que le queda de vida. |
-| `<prefix>family:<familyId>` | El ID activo de la familia, con el mismo `PX`. |
+| Clave                         | Contenido                                                                                                       |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `<prefix><id>`                | El registro de la sesión en JSON, con `PX` igual a lo que le queda de vida.                                     |
+| `<prefix>family:<familyId>`   | El ID activo de la familia, con el mismo `PX`.                                                                  |
 | `<prefix>ratelimit:<resumen>` | El contador de una ventana de `rateLimit`; la clave es un SHA-256 de la ruta y el sujeto, nunca la IP en claro. |
-| `<prefix>revoked` | Canal pub/sub en el que `revokeFamily` publica el `familyId` en la misma operación atómica que borra la sesión. |
+| `<prefix>revoked`             | Canal pub/sub en el que `revokeFamily` publica el `familyId` en la misma operación atómica que borra la sesión. |
 
 ## Ejemplos
 
 ### Sesiones y Socket entre instancias con un solo Redis
 
 <!-- no-check -->
+
 ```ts
 // server/runtime.ts
 import { createClient } from "redis";
@@ -144,6 +146,7 @@ new RedisSessionStore(redis, { prefix: "app" });
 `TypeError: Session Redis prefix must be nonempty, contain no whitespace, and end with ':'`.
 
 <!-- no-check -->
+
 ```ts good
 new RedisSessionStore(redis, { prefix: "app:prod:session:" });
 ```
@@ -169,6 +172,7 @@ new RedisSessionStore(redis, { prefix: "app:prod:session:", subscriber: redis })
 Una conexión de node-redis en modo suscriptor no admite otros comandos: las lecturas de sesión fallan. Cree una conexión aparte.
 
 <!-- no-check -->
+
 ```ts good
 const subscriber = redis.duplicate();
 await subscriber.connect();

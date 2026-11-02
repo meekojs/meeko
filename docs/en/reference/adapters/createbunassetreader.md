@@ -13,7 +13,7 @@ related:
   - "@meekojs/meeko/node#createNodeAssetReader"
   - "@meekojs/meeko/deno#createDenoAssetReader"
   - docs/framework.md#bun
-source-hash: 24a28683314d0669d43e1cb33352c51edc26dbd15a27eac4525113aba7d8f3c3
+source-hash: 22725a7b10264089f762a83449b4f4e7fad0bf217a4f8f8179b867f9f5370186
 ---
 
 `createBunAssetReader({ root, assets })` is Bun's public file reader. Like the Node reader, it only responds to paths in the build's asset manifest and returns `null` for all others, which are never looked up on disk; the difference is that it reads with `Bun.file`, which Bun sends without going through JavaScript.

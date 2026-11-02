@@ -42,26 +42,26 @@ export default defineMeekoConfig({
 
 `theme` acepta `true` (los valores por defecto) o un objeto:
 
-| Opción | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `themes` | `readonly string[]` | `["light", "dark"]` | Los temas: letras, dígitos, `-` o `_`, y no `"system"`. |
-| `default` | `string` | `"system"`, o el primer tema con `system: false` | La elección de quien todavía no eligió. |
-| `system` | `boolean \| { light, dark }` | `true` | El modo `"system"`, que sigue a `prefers-color-scheme`. `true` usa `light` y `dark`; un objeto elige otros temas; `false` lo desactiva. |
-| `darkThemes` | `readonly string[]` | el oscuro de `system`, o `dark` | Temas que reciben `color-scheme: dark`. |
-| `attribute` | `"class" \| "data-…"` | `"data-theme"` | Dónde va el tema en `<html>`: un atributo `data-*` o el nombre como clase. |
-| `colorScheme` | `boolean` | `true` | Aplica `color-scheme` a `<html>` por CSSOM. |
-| `cookie` | `string` | `"meeko-theme"` | La cookie de la elección. |
-| `storageKey` | `string \| false` | el valor de `cookie` | La clave de `localStorage`, que avisa a las otras pestañas; `false` usa sólo la cookie. |
-| `clientHints` | `boolean` | `true` | Pide y lee `Sec-CH-Prefers-Color-Scheme` para resolver `"system"` en el servidor. |
+| Opción        | Tipo                         | Por defecto                                      | Descripción                                                                                                                             |
+| ------------- | ---------------------------- | ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `themes`      | `readonly string[]`          | `["light", "dark"]`                              | Los temas: letras, dígitos, `-` o `_`, y no `"system"`.                                                                                 |
+| `default`     | `string`                     | `"system"`, o el primer tema con `system: false` | La elección de quien todavía no eligió.                                                                                                 |
+| `system`      | `boolean \| { light, dark }` | `true`                                           | El modo `"system"`, que sigue a `prefers-color-scheme`. `true` usa `light` y `dark`; un objeto elige otros temas; `false` lo desactiva. |
+| `darkThemes`  | `readonly string[]`          | el oscuro de `system`, o `dark`                  | Temas que reciben `color-scheme: dark`.                                                                                                 |
+| `attribute`   | `"class" \| "data-…"`        | `"data-theme"`                                   | Dónde va el tema en `<html>`: un atributo `data-*` o el nombre como clase.                                                              |
+| `colorScheme` | `boolean`                    | `true`                                           | Aplica `color-scheme` a `<html>` por CSSOM.                                                                                             |
+| `cookie`      | `string`                     | `"meeko-theme"`                                  | La cookie de la elección.                                                                                                               |
+| `storageKey`  | `string \| false`            | el valor de `cookie`                             | La clave de `localStorage`, que avisa a las otras pestañas; `false` usa sólo la cookie.                                                 |
+| `clientHints` | `boolean`                    | `true`                                           | Pide y lee `Sec-CH-Prefers-Color-Scheme` para resolver `"system"` en el servidor.                                                       |
 
 ## Resultado
 
-| Caso | Quién pone el tema en `<html>` |
-| --- | --- |
-| SSR con la cookie | El servidor, desde el primer byte. |
-| SSR en `"system"` con el client hint (Chromium) | El servidor. |
-| SSR en `"system"` sin el hint (Firefox, Safari) | El script de `<head>`, antes del primer pintado. |
-| Página prerenderizada o adaptador `static` | El script de `<head>`, con la cookie o `localStorage`. |
+| Caso                                            | Quién pone el tema en `<html>`                         |
+| ----------------------------------------------- | ------------------------------------------------------ |
+| SSR con la cookie                               | El servidor, desde el primer byte.                     |
+| SSR en `"system"` con el client hint (Chromium) | El servidor.                                           |
+| SSR en `"system"` sin el hint (Firefox, Safari) | El script de `<head>`, antes del primer pintado.       |
+| Página prerenderizada o adaptador `static`      | El script de `<head>`, con la cookie o `localStorage`. |
 
 Las respuestas SSR llevan `Accept-CH: Sec-CH-Prefers-Color-Scheme` (y `Critical-CH` en `"system"`) y `Vary: Cookie, Sec-CH-Prefers-Color-Scheme`.
 

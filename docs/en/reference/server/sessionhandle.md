@@ -18,7 +18,7 @@ related:
   - docs/framework.md#duración-de-cada-sesión
   - docs/framework.md#origin-en-mutaciones-anónimas
   - docs/framework.md#revocación-durante-una-petición
-source-hash: 32c60a04e0a809c646f058d1c32869041bfab4ed0a050e8d8c6289590a2752c5
+source-hash: 82cede0e6d88693244aeb0583d79db66dfab1f320ac9bd43d2cf97382516231f
 ---
 
 `SessionHandle` is a request's session. Do not construct it manually: `SessionManager.load` creates it for each request and it reaches API and RPC handlers as `context.session`, pages' `<script server>` (`usePage().context.session`), server route middleware (`session`) and Socket channels. `current` is the active session if the request carries a valid one; `create`, `rotate` and `revoke` change it and prepare the response cookie.

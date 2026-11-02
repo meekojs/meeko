@@ -16,7 +16,7 @@ related:
   - docs/framework.md#módulos
   - docs/framework.md#escribir-un-módulo
   - docs/framework.md#carpetas-en-modules-deprecado
-source-hash: af4ba578f76003f71ca05b261ecfd75207f7e4d6d0c02875e35fc75462591302
+source-hash: 28e80dc57980b4d978d4b82475b17f17815fb35b14f4108fa33b669728c83ffb
 ---
 
 `modules` lists the project's Meeko modules by name, applied in order. A module is created with `defineMeekoModule` and, when configuration loads, adds components, auto-imports, plugins, server middleware and handlers, `<head>` entries, public files and Vite plugins, and responds to build hooks, like Nuxt modules. Its options go under their own key in `meeko.config.ts`, specified by `meta.configKey`, typed without any imports.

@@ -9,7 +9,7 @@ related:
   - "cli:dev"
   - docs/framework.md#logs-del-servidor-en-la-consola-del-navegador
   - docs/framework.md#configuración
-source-hash: 4b5f31d51d792cc49243c5b4009f32ec3112b0aab88588771937ad008a310c4b
+source-hash: 3e6a934159cffae6ecf76c15931eeac216dd821848dfb65c4bddf626878f1d99
 ---
 
 `dev` groups the options for `meeko dev`; they do not affect `meeko build`, `meeko start` or any production output. It currently has one: `serverLogs`, which enables or disables server logs in the browser console.

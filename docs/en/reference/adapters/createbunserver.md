@@ -16,7 +16,7 @@ related:
   - "config:server"
   - docs/framework.md#bun
   - docs/framework.md#conformidad-entre-adaptadores
-source-hash: 8c09d7054d96a9f10e8145aa46c842aa34c965b61a81b2cc7bf65e9dd0afdac5
+source-hash: 75ccc930c3bde699a8dc7b92347c09912d6f5e7b1d0b580da5915d3e19d0440f
 ---
 
 `createBunServer(app, options)` returns `{ fetch, websocket }` to spread into `Bun.serve`: `fetch` handles HTTP and upgrades Socket channels with `server.upgrade`, and `websocket` connects each peer to the hub using Bun's native WebSocket. It also records each connection's IP (`server.requestIP()`), read by `context.clientAddress` and `rateLimit`.

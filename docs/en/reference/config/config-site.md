@@ -11,7 +11,7 @@ related:
   - "config:document"
   - docs/framework.md#sitemapxml-y-robotstxt
   - docs/framework.md#canónica-y-open-graph-por-página
-source-hash: 0fac5e4ff226102aa0662ce8d84478c85c702d975870da1e402c3e99701e8242
+source-hash: fe3ca4e7be84105e463dc92623c1868224451e93925b1aa6b10e10b4c3dffa22
 ---
 
 `site` is the site's public origin (`"https://example.com"`, without a path). It is the origin for absolute URLs Meeko writes during the build: those in `sitemap.xml`, the `Sitemap:` line in `robots.txt` and, with `document.seo`, `<link rel="canonical">` and `og:url`. Without `site`, the build uses `MEEKO_PUBLIC_ORIGIN` from its environment.

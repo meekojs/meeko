@@ -45,21 +45,21 @@ export default defineMeekoConfig({
 
 ## Opciones
 
-| Opción | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `lang` | `string` | ninguno | Atributo `lang` de `<html>`; `head.htmlAttrs.lang` tiene prioridad. |
-| `head` | `DocumentHead` | ninguno | `title`, `titleTemplate` (una cadena con `%s`), `meta`, `link`, `script`, `style`, `htmlAttrs` y `bodyAttrs`. Debe ser serializable. |
-| `seo` | `boolean \| DocumentSeo` | ninguno | Desde `1.3`. `true` activa `canonical`, `ogUrl`, `ogTitle` y `ogDescription`; un objeto desactiva las que valen `false` y puede fijar `origin`. |
-| `idPrefix` | `string` | `"m"` | Desde `1.5`. Prefijo de `useId` y `form.field`: una letra seguida de letras, números, `-` o `_`, hasta 32 caracteres. |
+| Opción     | Tipo                     | Por defecto | Descripción                                                                                                                                     |
+| ---------- | ------------------------ | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lang`     | `string`                 | ninguno     | Atributo `lang` de `<html>`; `head.htmlAttrs.lang` tiene prioridad.                                                                             |
+| `head`     | `DocumentHead`           | ninguno     | `title`, `titleTemplate` (una cadena con `%s`), `meta`, `link`, `script`, `style`, `htmlAttrs` y `bodyAttrs`. Debe ser serializable.            |
+| `seo`      | `boolean \| DocumentSeo` | ninguno     | Desde `1.3`. `true` activa `canonical`, `ogUrl`, `ogTitle` y `ogDescription`; un objeto desactiva las que valen `false` y puede fijar `origin`. |
+| `idPrefix` | `string`                 | `"m"`       | Desde `1.5`. Prefijo de `useId` y `form.field`: una letra seguida de letras, números, `-` o `_`, hasta 32 caracteres.                           |
 
 ## Resultado
 
-| Fuente | Prioridad |
-| --- | --- |
-| `document.head` de los módulos (`meeko.addHead`) | La menor |
-| `document.head` de `meeko.config.ts` | Gana a los módulos |
-| `document.seo` | Etiquetas derivadas de cada página, con la misma prioridad |
-| `useHead`, `useSeoMeta` y el `head` de la ruta | Ganan a todo lo anterior |
+| Fuente                                           | Prioridad                                                  |
+| ------------------------------------------------ | ---------------------------------------------------------- |
+| `document.head` de los módulos (`meeko.addHead`) | La menor                                                   |
+| `document.head` de `meeko.config.ts`             | Gana a los módulos                                         |
+| `document.seo`                                   | Etiquetas derivadas de cada página, con la misma prioridad |
+| `useHead`, `useSeoMeta` y el `head` de la ruta   | Ganan a todo lo anterior                                   |
 
 Con `seo: true` y `site: "https://example.com"`, una página `/docs/api` titulada «API» recibe:
 

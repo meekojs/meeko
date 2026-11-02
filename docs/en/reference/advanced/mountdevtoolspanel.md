@@ -16,7 +16,7 @@ related:
   - docs/devtools.md#panel-dentro-de-la-página
   - docs/devtools.md#editar-señales
   - docs/devtools.md#alcance-y-límites
-source-hash: 4821ef160f5e6d91c817773db544f1cb340e29f8f93160eac266c6b10f2a9f90
+source-hash: 103129c04196a7327fcfb53459b3ba914dead749dc0fde6f6db6eca8638f35e9
 ---
 
 `mountDevtoolsPanel` adds the Meeko DevTools panel to the page: a tree of live component instances, details of their props and signals (with an editor to change them), a filterable timeline of reads and writes with their file and line, highlighting of each instance's element in the page and a breakpoint per instance. It lives in a Shadow DOM, so it neither inherits nor changes application styles.

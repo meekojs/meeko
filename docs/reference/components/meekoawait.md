@@ -48,18 +48,18 @@ const items = useApi("/api/items");
 
 ## Props
 
-| Atributo | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `for` o `bind:for` | `AwaitResource \| readonly AwaitResource[]` | obligatorio | El recurso, como expresión (igual que `each:of`): `for="items"` o una lista, `for="[items, stats]"`. Sin él es `MEEK116`. |
-| `reserve` o `bind:reserve` | `boolean \| string` | sin reserva | `reserve` recuerda la altura que tuvo la zona con datos y la aplica mientras espera otra vez; `reserve="320px"` (cualquier longitud CSS) fija además un mínimo, también en la primera visita. |
-| `bind:messages` | `{ error?: string; retry?: string }` | «No se pudieron cargar los datos.», «Reintentar» | Textos del aviso de error por defecto, sin snippet `error`. |
-| `class`, `id` | `string` | ninguno | Del contenedor, un `<div>`. |
+| Atributo                   | Tipo                                        | Por defecto                                      | Descripción                                                                                                                                                                                   |
+| -------------------------- | ------------------------------------------- | ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `for` o `bind:for`         | `AwaitResource \| readonly AwaitResource[]` | obligatorio                                      | El recurso, como expresión (igual que `each:of`): `for="items"` o una lista, `for="[items, stats]"`. Sin él es `MEEK116`.                                                                     |
+| `reserve` o `bind:reserve` | `boolean \| string`                         | sin reserva                                      | `reserve` recuerda la altura que tuvo la zona con datos y la aplica mientras espera otra vez; `reserve="320px"` (cualquier longitud CSS) fija además un mínimo, también en la primera visita. |
+| `bind:messages`            | `{ error?: string; retry?: string }`        | «No se pudieron cargar los datos.», «Reintentar» | Textos del aviso de error por defecto, sin snippet `error`.                                                                                                                                   |
+| `class`, `id`              | `string`                                    | ninguno                                          | Del contenedor, un `<div>`.                                                                                                                                                                   |
 
-| Snippet | Parámetros | Cuándo se pinta |
-| --- | --- | --- |
-| `default` (el contenido) | `[refreshing: boolean]` | Cuando todos los recursos tienen datos; `refreshing` es `true` durante una recarga. |
-| `pending` | ninguno | En la primera carga: un recurso sin datos que carga o aún no empezó. |
-| `error` | `[error: Error, retry: () => void]` | Cuando un recurso sin datos falló. `retry` vuelve a pedir los que fallaron. Sin él, un `<p role="alert">` con un botón «Reintentar». |
+| Snippet                  | Parámetros                          | Cuándo se pinta                                                                                                                      |
+| ------------------------ | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `default` (el contenido) | `[refreshing: boolean]`             | Cuando todos los recursos tienen datos; `refreshing` es `true` durante una recarga.                                                  |
+| `pending`                | ninguno                             | En la primera carga: un recurso sin datos que carga o aún no empezó.                                                                 |
+| `error`                  | `[error: Error, retry: () => void]` | Cuando un recurso sin datos falló. `retry` vuelve a pedir los que fallaron. Sin él, un `<p role="alert">` con un botón «Reintentar». |
 
 ## Resultado
 

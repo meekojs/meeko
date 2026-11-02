@@ -42,10 +42,10 @@ Cada página de `(dashboard)` redirige a `/login` sin sesión, en la carga del d
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
+| Parámetro    | Tipo                                                                                       | Por defecto | Descripción                                                                                                                                                                    |
+| ------------ | ------------------------------------------------------------------------------------------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `middleware` | `(context: ServerRouteMiddlewareContext) => void \| Response \| Promise<void \| Response>` | obligatorio | La función. Recibe el contexto de `usePage()` (`url`, `params`, `search`, `request`, `signal`, `context`) y, a mano, `session`, `services`, `platform`, `requestId` y `match`. |
-| `options` | `{ global?: boolean }` | global | `{ global: false }` lo hace con nombre. **Debe ser un objeto literal.** |
+| `options`    | `{ global?: boolean }`                                                                     | global      | `{ global: false }` lo hace con nombre. **Debe ser un objeto literal.**                                                                                                        |
 
 `params` y `search` son los de la URL, todavía sin validar con los schemas de la página. `defineServerRouteMiddleware<Services>` tipa `services`; desde `1.7`, sin argumento de tipo, `services` toma el tipo que Meeko infiere de `server/runtime.ts`.
 
@@ -117,6 +117,7 @@ export default defineServerRouteMiddleware(({ session }) => {
 `meeko check` da `TS2304: Cannot find name 'redirect'.`
 
 <!-- no-check -->
+
 ```ts good
 // app/middleware/auth.server.ts
 import { redirect } from "@meekojs/meeko/framework";
@@ -136,6 +137,7 @@ export default defineServerRouteMiddleware(() => {}, { global: false });
 `defineServerRouteMiddleware sólo se admite en un archivo *.server.ts de app/middleware, que nunca llega al navegador; renombra el archivo a auth.server.ts`.
 
 <!-- no-check -->
+
 ```ts good
 // app/middleware/auth.server.ts
 export default defineServerRouteMiddleware(() => {}, { global: false });
@@ -168,6 +170,7 @@ export const route = definePage({ render: "prerender", middleware: ["auth"] });
 `el middleware de servidor "auth" (…/auth.server.ts) necesita una página con datos del servidor, pero …/reports.meeko usa render: "prerender" y se renderiza al hacer el build, sin la petición ni la sesión de cada visitante. Usa render: "ssr" o "stream", o quítalo de esa página con middleware: false`.
 
 <!-- no-check -->
+
 ```ts good
 export const route = definePage({ render: "ssr", middleware: ["auth"] });
 ```

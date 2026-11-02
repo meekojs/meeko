@@ -12,7 +12,7 @@ related:
   - "@meekojs/meeko/vite#meeko"
   - docs/api.md#herramientas
   - docs/framework.md#crear-una-aplicación
-source-hash: 004f151bbc75c555cbcf422bc42a66ac440b5dc6765a10448f1b8f7c8a22882a
+source-hash: 4d96c29dc076e42e97fdec9af0de558095cd0d764fc8e456de796391310045ee
 ---
 
 `meeko init` creates the component engine starter: a server-rendered page hydrated in the browser, without file-based routing, `meeko.config.ts`, `app/` or `server/`. It is the starting point for using `.meeko` components inside your own server or learning how SSR and hydration work without the framework. For a complete application, use [`meeko init-framework`](/en/docs/reference/meeko-init-framework).

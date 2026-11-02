@@ -25,6 +25,7 @@ La navegación es transaccional: si falla, la página anterior sigue visible. Lo
 ## Uso
 
 <!-- no-check -->
+
 ```ts
 // entry-client.ts, empaquetado con Vite y meeko()
 import { mountClientApp } from "@meekojs/meeko/framework";
@@ -48,32 +49,32 @@ const app = await mountClientApp({
 
 ## Opciones
 
-| Opción | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `routes` | `RouteRecord[]` | obligatorio | El manifiesto de rutas, el mismo del servidor. |
-| `root` | `Element` | obligatorio | El elemento con el HTML del SSR (`#app`). |
-| `payload` | texto JSON u objeto | obligatorio | El contenido de `#meeko-payload`. |
-| `loadPage` | `(file) => Promise<ClientComponent>` | obligatorio | Carga el módulo compilado de una página o un layout. |
-| `serverData` | `boolean` \| `"static"` | `false` | `true`: al navegar, pide los datos a la misma URL con `Accept: application/meeko+json`. `"static"` (desde `1.3`): lee `<ruta>/index.meeko.json`, para un hosting estático. Sólo actúa sin `loadRoute`: con `loadRoute`, los datos de las rutas salen de los loaders del navegador. Las rutas `render: "client"` siempre usan su sidecar. |
-| `errorPage` | `ErrorPageRecord` | ninguno | Desde `1.1`. `app/error.meeko`: hidrata una página `404` del servidor y respalda las rutas `"client"` sin `+error.meeko`. |
-| `loadRoute`, `loadClientRoute` | `(file) => Promise<ClientRoute>` | ninguno | Cargan las opciones de ruta públicas de un sidecar; `loadClientRoute` las de las rutas `render: "client"`. |
-| `loadMiddleware` | `() => Promise<RouteMiddleware[]>` | ninguno | Middleware de ruta global, antes de cada navegación. |
-| `loadNamedMiddleware` | `(file) => Promise<RouteMiddleware>` | ninguno | Desde `1.6`. Middleware con nombre, la primera vez que se navega a una ruta que lo declara. |
-| `plugins` | `PluginRegistration[]` | ninguno | Desde `1.2`. Plugins de aplicación, antes de hidratar. |
-| `document` | `DocumentConfig` | ninguno | Desde `1.2`. El `document` de `meeko.config.ts`, el mismo que usó el servidor, para `titleTemplate` y las etiquetas de `<head>`. |
-| `onError` | `(error, source) => void` | consola | Fallos de navegación, de Socket, de efectos y, desde `1.3`, las excepciones y rechazos globales de la página. |
-| `onNavigationError` | `(error) => void` | `onError` | Sólo los fallos de navegación por clic o historial. |
-| `fetch`, `browser` | | globales | El `fetch` de las navegaciones y la ventana; para pruebas. |
+| Opción                         | Tipo                                 | Por defecto | Descripción                                                                                                                                                                                                                                                                                                                              |
+| ------------------------------ | ------------------------------------ | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `routes`                       | `RouteRecord[]`                      | obligatorio | El manifiesto de rutas, el mismo del servidor.                                                                                                                                                                                                                                                                                           |
+| `root`                         | `Element`                            | obligatorio | El elemento con el HTML del SSR (`#app`).                                                                                                                                                                                                                                                                                                |
+| `payload`                      | texto JSON u objeto                  | obligatorio | El contenido de `#meeko-payload`.                                                                                                                                                                                                                                                                                                        |
+| `loadPage`                     | `(file) => Promise<ClientComponent>` | obligatorio | Carga el módulo compilado de una página o un layout.                                                                                                                                                                                                                                                                                     |
+| `serverData`                   | `boolean` \| `"static"`              | `false`     | `true`: al navegar, pide los datos a la misma URL con `Accept: application/meeko+json`. `"static"` (desde `1.3`): lee `<ruta>/index.meeko.json`, para un hosting estático. Sólo actúa sin `loadRoute`: con `loadRoute`, los datos de las rutas salen de los loaders del navegador. Las rutas `render: "client"` siempre usan su sidecar. |
+| `errorPage`                    | `ErrorPageRecord`                    | ninguno     | Desde `1.1`. `app/error.meeko`: hidrata una página `404` del servidor y respalda las rutas `"client"` sin `+error.meeko`.                                                                                                                                                                                                                |
+| `loadRoute`, `loadClientRoute` | `(file) => Promise<ClientRoute>`     | ninguno     | Cargan las opciones de ruta públicas de un sidecar; `loadClientRoute` las de las rutas `render: "client"`.                                                                                                                                                                                                                               |
+| `loadMiddleware`               | `() => Promise<RouteMiddleware[]>`   | ninguno     | Middleware de ruta global, antes de cada navegación.                                                                                                                                                                                                                                                                                     |
+| `loadNamedMiddleware`          | `(file) => Promise<RouteMiddleware>` | ninguno     | Desde `1.6`. Middleware con nombre, la primera vez que se navega a una ruta que lo declara.                                                                                                                                                                                                                                              |
+| `plugins`                      | `PluginRegistration[]`               | ninguno     | Desde `1.2`. Plugins de aplicación, antes de hidratar.                                                                                                                                                                                                                                                                                   |
+| `document`                     | `DocumentConfig`                     | ninguno     | Desde `1.2`. El `document` de `meeko.config.ts`, el mismo que usó el servidor, para `titleTemplate` y las etiquetas de `<head>`.                                                                                                                                                                                                         |
+| `onError`                      | `(error, source) => void`            | consola     | Fallos de navegación, de Socket, de efectos y, desde `1.3`, las excepciones y rechazos globales de la página.                                                                                                                                                                                                                            |
+| `onNavigationError`            | `(error) => void`                    | `onError`   | Sólo los fallos de navegación por clic o historial.                                                                                                                                                                                                                                                                                      |
+| `fetch`, `browser`             |                                      | globales    | El `fetch` de las navegaciones y la ventana; para pruebas.                                                                                                                                                                                                                                                                               |
 
 ## Valor devuelto
 
 Una promesa de `ClientApp`, cuando la página ya está hidratada:
 
-| Miembro | Descripción |
-| --- | --- |
+| Miembro                      | Descripción                                                                                                                      |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
 | `navigate(to, { replace? })` | Navega dentro de la aplicación. Resuelve `false` si la URL no tiene ruta o se canceló, y rechaza con el error original si falla. |
-| `state` | El `StateStore` de `useState`, compartido por toda la aplicación. |
-| `dispose()` | Libera páginas, layouts, listeners del historial y conexiones Socket. |
+| `state`                      | El `StateStore` de `useState`, compartido por toda la aplicación.                                                                |
+| `dispose()`                  | Libera páginas, layouts, listeners del historial y conexiones Socket.                                                            |
 
 Rechaza con `TypeError` si el payload no es válido (`Invalid Meeko hydration payload`) o viene de otro build (`Unsupported Meeko payload version …; the server and browser bundles must come from the same build`), y con `Error` si la ruta no coincide con la del SSR (`Meeko route hydration mismatch`) o sus parámetros tampoco (`Meeko route parameters do not match SSR`).
 
@@ -82,6 +83,7 @@ Rechaza con `TypeError` si el payload no es válido (`Invalid Meeko hydration pa
 ### Navegar desde código
 
 <!-- no-check -->
+
 ```ts
 const app = await mountClientApp(options);
 await app.navigate("/users/42");
@@ -93,6 +95,7 @@ En un componente, la forma habitual es `useNavigation().navigate(…)` o un `<Me
 ### Un sitio estático
 
 <!-- no-check -->
+
 ```ts
 await mountClientApp({ root, payload, routes, errorPage, serverData: "static", loadPage });
 ```
@@ -102,6 +105,7 @@ Es lo que genera `meeko build --adapter static`: la navegación lee `/docs/api/i
 ### Observar los fallos de la aplicación
 
 <!-- no-check -->
+
 ```ts
 await mountClientApp({
   ...options,
@@ -113,6 +117,7 @@ await mountClientApp({
 ### Una prueba con happy-dom
 
 <!-- no-check -->
+
 ```ts
 const html = await (await handlePage(new Request("https://example.test/a"))).text();
 const browser = new Window({ url: "https://example.test/a" });
@@ -135,6 +140,7 @@ await mountClientApp({ root, payload, routes: [{ id: "/", file: "app/pages/index
 Si el servidor renderizó `/users/[id]` y el navegador no tiene esa ruta, `mountClientApp` rechaza con `Meeko route hydration mismatch` y la página se queda con el HTML del servidor, sin interactividad.
 
 <!-- no-check -->
+
 ```ts good
 import { routes } from "virtual:meeko-manifest/client";
 await mountClientApp({ root, payload, routes, loadPage });
@@ -161,6 +167,7 @@ await mountClientApp({ root, payload, routes, loadPage });
 La hidratación funciona, pero al navegar a una página con loader de servidor o `<script server>` no se piden sus datos al servidor: la página se renderiza en el navegador sin ellos. Lo mismo pasa si se pasa `loadRoute` junto a `serverData`, que entonces no se usa.
 
 <!-- no-check -->
+
 ```ts good
 await mountClientApp({ root, payload, routes, loadPage, serverData: true });
 ```

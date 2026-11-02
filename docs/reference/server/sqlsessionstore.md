@@ -26,6 +26,7 @@ Desde `1.7`, si el driver implementa `rateLimit(key, windowMs, now)`, los contad
 ## Uso
 
 <!-- no-check -->
+
 ```ts
 // server/runtime.ts
 import { defineServerRuntime, SessionManager, SqlSessionStore } from "@meekojs/meeko/server";
@@ -41,16 +42,16 @@ export default defineServerRuntime(({ production, prerendering }) => ({
 
 `new SqlSessionStore(driver, options?)`:
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `driver.read(id)` | `Promise<SqlSessionRow \| undefined>` | obligatorio | La fila con ese ID. |
-| `driver.write(row)` | `Promise<void>` | obligatorio | Inserta o actualiza por ID; debe imponer un único ID activo por familia (índice único en `family_id`). |
-| `driver.remove(id)` | `Promise<void>` | obligatorio | Borra la fila. |
-| `driver.replace(previousId, row, now)` | `Promise<boolean>` | obligatorio | En una transacción, sustituye una fila no caducada (`expires_at > now`) de la misma familia; `false` si no existe. |
-| `driver.revokeFamily(familyId)` | `Promise<void>` | obligatorio | Borra la fila activa de la familia en una operación atómica. |
-| `driver.rateLimit(key, windowMs, now)` | `Promise<SqlRateLimitRow>` | ninguno | Desde `1.7`. Cuenta una petición en la ventana fija de `key` con una sola sentencia atómica y devuelve `{ count, windowEndsAt }`. |
-| `driver.close()` | `Promise<void>` | ninguno | Cierra la conexión; sólo se llama con `closeDriver`. |
-| `options.closeDriver` | `boolean` | `false` | Cierra el driver al cerrar el store. |
+| Parámetro                              | Tipo                                  | Por defecto | Descripción                                                                                                                       |
+| -------------------------------------- | ------------------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `driver.read(id)`                      | `Promise<SqlSessionRow \| undefined>` | obligatorio | La fila con ese ID.                                                                                                               |
+| `driver.write(row)`                    | `Promise<void>`                       | obligatorio | Inserta o actualiza por ID; debe imponer un único ID activo por familia (índice único en `family_id`).                            |
+| `driver.remove(id)`                    | `Promise<void>`                       | obligatorio | Borra la fila.                                                                                                                    |
+| `driver.replace(previousId, row, now)` | `Promise<boolean>`                    | obligatorio | En una transacción, sustituye una fila no caducada (`expires_at > now`) de la misma familia; `false` si no existe.                |
+| `driver.revokeFamily(familyId)`        | `Promise<void>`                       | obligatorio | Borra la fila activa de la familia en una operación atómica.                                                                      |
+| `driver.rateLimit(key, windowMs, now)` | `Promise<SqlRateLimitRow>`            | ninguno     | Desde `1.7`. Cuenta una petición en la ventana fija de `key` con una sola sentencia atómica y devuelve `{ count, windowEndsAt }`. |
+| `driver.close()`                       | `Promise<void>`                       | ninguno     | Cierra la conexión; sólo se llama con `closeDriver`.                                                                              |
+| `options.closeDriver`                  | `boolean`                             | `false`     | Cierra el driver al cerrar el store.                                                                                              |
 
 Una fila (`SqlSessionRow`) tiene `id`, `familyId`, `csrfToken`, `dataJson`, `createdAt` y `expiresAt` (milisegundos desde la época).
 
@@ -76,6 +77,7 @@ CREATE INDEX IF NOT EXISTS meeko_sessions_expires_at ON meeko_sessions (expires_
 ```
 
 <!-- no-check -->
+
 ```ts
 // server/utils/database.ts
 import pg from "pg";
@@ -127,6 +129,7 @@ CREATE INDEX IF NOT EXISTS meeko_rate_limits_window_ends_at ON meeko_rate_limits
 ```
 
 <!-- no-check -->
+
 ```ts
 const rateLimitSql = `INSERT INTO meeko_rate_limits AS r (key, window_ends_at, count) VALUES ($1, $2::bigint + $3::bigint, 1)
 ON CONFLICT (key) DO UPDATE SET
@@ -148,6 +151,7 @@ const driver: SqlSessionDriver = {
 ### Limitar el inicio de sesión con esos contadores
 
 <!-- no-check -->
+
 ```ts
 // server/api/auth/login.post.ts
 export default defineApiRoute({
@@ -170,6 +174,7 @@ new SqlSessionStore({ read, write, remove });
 `TypeError: SQL session driver requires atomic replace and family revocation`. Un driver anterior a la revocación por familia debe migrar su esquema: añada `family_id`, rellénelo con `family_id = id`, cree un índice único y añada las dos operaciones.
 
 <!-- no-check -->
+
 ```ts good
 new SqlSessionStore({ read, write, remove, replace, revokeFamily });
 ```
@@ -183,6 +188,7 @@ read: async (id) => db.get("SELECT id, csrf_token, data_json, created_at, expire
 Cada lectura de una sesión falla con `Error: Session SQL schema requires a nonempty family_id column` y la petición responde `500`.
 
 <!-- no-check -->
+
 ```ts good
 read: async (id) => toRow(await db.get("SELECT * FROM sessions WHERE id = ?", id)),
 ```
@@ -196,9 +202,10 @@ async rateLimit(key, windowMs, now) {
 },
 ```
 
-La petición limitada responde `500`: Meeko espera `{ count, windowEndsAt }` y rechaza con `TypeError: SqlSessionDriver.rateLimit must resolve { count, windowEndsAt }` (*fail closed*).
+La petición limitada responde `500`: Meeko espera `{ count, windowEndsAt }` y rechaza con `TypeError: SqlSessionDriver.rateLimit must resolve { count, windowEndsAt }` (_fail closed_).
 
 <!-- no-check -->
+
 ```ts good
 async rateLimit(key, windowMs, now) {
   const { rows } = await pool.query(rateLimitSql, [Buffer.from(key), now, windowMs]);

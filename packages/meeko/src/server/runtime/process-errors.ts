@@ -1,9 +1,9 @@
-import { AsyncLocalStorage } from "node:async_hooks";
+import { AsyncLocalStorage } from 'node:async_hooks'
 
-import type { ServerErrorInfo, ServerErrorObserver } from "../errors";
-import type { ServerApp } from "./app";
+import type { ServerErrorInfo, ServerErrorObserver } from '../errors'
+import type { ServerApp } from './app'
 
-import { observeServerError } from "../errors";
+import { observeServerError } from '../errors'
 
 /**
  * Qué hace Meeko con los fallos que ocurren fuera del flujo de una petición: una promesa rechazada
@@ -33,10 +33,10 @@ import { observeServerError } from "../errors";
  * ```
  */
 export interface ProcessErrorPolicy {
-  /** Una promesa rechazada sin manejar: `"report"` (por defecto), `"shutdown"` u `"off"`. */
-  readonly unhandledRejection?: "report" | "shutdown" | "off";
-  /** Una excepción no capturada: `"shutdown"` (por defecto) u `"off"`. */
-  readonly uncaughtException?: "shutdown" | "off";
+	/** Una promesa rechazada sin manejar: `"report"` (por defecto), `"shutdown"` u `"off"`. */
+	readonly unhandledRejection?: 'report' | 'shutdown' | 'off'
+	/** Una excepción no capturada: `"shutdown"` (por defecto) u `"off"`. */
+	readonly uncaughtException?: 'shutdown' | 'off'
 }
 
 /**
@@ -54,45 +54,45 @@ export interface ProcessErrorPolicy {
  * ```
  */
 export interface ProcessErrorOptions {
-  /**
-   * Cierre ordenado del host ante un fallo que lo exige: dejar de aceptar conexiones, esperar las
-   * respuestas abiertas y cerrar la aplicación. Por defecto, sólo `app.close()`. Después, Meeko
-   * sale con código 1.
-   */
-  readonly close?: () => Promise<void>;
-  /**
-   * Observador de los fallos. Por defecto, el `onError` de `server/runtime.ts`; sin él, Meeko
-   * escribe en la consola el error completo, como haría el runtime.
-   */
-  readonly onError?: ServerErrorObserver;
-  /** Milisegundos que puede durar `close` antes de salir igualmente con código 1. Por defecto, 15 000. */
-  readonly shutdownTimeout?: number;
+	/**
+	 * Cierre ordenado del host ante un fallo que lo exige: dejar de aceptar conexiones, esperar las
+	 * respuestas abiertas y cerrar la aplicación. Por defecto, sólo `app.close()`. Después, Meeko
+	 * sale con código 1.
+	 */
+	readonly close?: () => Promise<void>
+	/**
+	 * Observador de los fallos. Por defecto, el `onError` de `server/runtime.ts`; sin él, Meeko
+	 * escribe en la consola el error completo, como haría el runtime.
+	 */
+	readonly onError?: ServerErrorObserver
+	/** Milisegundos que puede durar `close` antes de salir igualmente con código 1. Por defecto, 15 000. */
+	readonly shutdownTimeout?: number
 }
 
 /** The request whose asynchronous work is running, with the ID its context takes. */
 interface RequestScope {
-  readonly requestId: string;
-  taken: boolean;
+	readonly requestId: string
+	taken: boolean
 }
 
 interface SharedState {
-  readonly requestScope: AsyncLocalStorage<RequestScope>;
-  readonly applications: WeakMap<object, AppProcessErrors>;
+	readonly requestScope: AsyncLocalStorage<RequestScope>
+	readonly applications: WeakMap<object, AppProcessErrors>
 }
 
 /**
  * One scope and one registry per process, also with two copies of Meeko loaded (the `meeko dev`
  * host and the application it loads through Vite may resolve the package separately).
  */
-const shared: SharedState = ((globalThis as { [key: symbol]: SharedState | undefined })[Symbol.for("meeko.process-errors")] ??= {
-  requestScope: new AsyncLocalStorage<RequestScope>(),
-  applications: new WeakMap<object, AppProcessErrors>(),
-});
-const requestScope = shared.requestScope;
+const shared: SharedState = ((globalThis as { [key: symbol]: SharedState | undefined })[Symbol.for('meeko.process-errors')] ??= {
+	requestScope: new AsyncLocalStorage<RequestScope>(),
+	applications: new WeakMap<object, AppProcessErrors>(),
+})
+const requestScope = shared.requestScope
 
 /** Runs a request of a `ServerApp` in its own scope, so process failures can name it. */
 export function withRequestScope<T>(run: () => T): T {
-  return requestScope.run({ requestId: crypto.randomUUID(), taken: false }, run);
+	return requestScope.run({ requestId: crypto.randomUUID(), taken: false }, run)
 }
 
 /**
@@ -100,173 +100,191 @@ export function withRequestScope<T>(run: () => T): T {
  * of that request carries the ID of its response; `undefined` outside a scope or once taken.
  */
 export function takeScopedRequestId(): string | undefined {
-  const scope = requestScope.getStore();
-  if (!scope || scope.taken) return undefined;
-  scope.taken = true;
-  return scope.requestId;
+	const scope = requestScope.getStore()
+	if (!scope || scope.taken) return undefined
+	scope.taken = true
+	return scope.requestId
 }
 
 interface AppProcessErrors {
-  readonly policy: ProcessErrorPolicy | false | undefined;
-  /** The application's own observer (`onError` of `server/runtime.ts`), if any. */
-  readonly observer: ServerErrorObserver | undefined;
+	readonly policy: ProcessErrorPolicy | false | undefined
+	/** The application's own observer (`onError` of `server/runtime.ts`), if any. */
+	readonly observer: ServerErrorObserver | undefined
 }
 
-const applications = shared.applications;
+const applications = shared.applications
 
-const rejectionActions: readonly string[] = ["report", "shutdown", "off"];
-const exceptionActions: readonly string[] = ["shutdown", "off"];
+const rejectionActions: readonly string[] = ['report', 'shutdown', 'off']
+const exceptionActions: readonly string[] = ['shutdown', 'off']
 
 /** Checks `processErrors` of `server/runtime.ts`; an unknown value fails at startup. */
 function checkedPolicy(policy: unknown): ProcessErrorPolicy | false | undefined {
-  if (policy === undefined || policy === false) return policy;
-  if (!policy || typeof policy !== "object") throw new TypeError("server/runtime.ts: processErrors must be false or { unhandledRejection?, uncaughtException? }");
-  const { unhandledRejection, uncaughtException } = policy as Record<string, unknown>;
-  if (unhandledRejection !== undefined && !rejectionActions.includes(unhandledRejection as string)) {
-    throw new TypeError(`server/runtime.ts: processErrors.unhandledRejection must be "report", "shutdown" or "off"`);
-  }
-  if (uncaughtException !== undefined && !exceptionActions.includes(uncaughtException as string)) {
-    throw new TypeError(`server/runtime.ts: processErrors.uncaughtException must be "shutdown" or "off"`);
-  }
-  return policy as ProcessErrorPolicy;
+	if (policy === undefined || policy === false) return policy
+	if (!policy || typeof policy !== 'object') throw new TypeError('server/runtime.ts: processErrors must be false or { unhandledRejection?, uncaughtException? }')
+	const { unhandledRejection, uncaughtException } = policy as Record<string, unknown>
+	if (unhandledRejection !== undefined && !rejectionActions.includes(unhandledRejection as string)) {
+		throw new TypeError(`server/runtime.ts: processErrors.unhandledRejection must be "report", "shutdown" or "off"`)
+	}
+	if (uncaughtException !== undefined && !exceptionActions.includes(uncaughtException as string)) {
+		throw new TypeError(`server/runtime.ts: processErrors.uncaughtException must be "shutdown" or "off"`)
+	}
+	return policy as ProcessErrorPolicy
 }
 
 /** Records the policy and the observer of an application created by `createServerApp`. */
 export function registerProcessErrors(app: object, policy: unknown, observer: ServerErrorObserver | undefined): void {
-  applications.set(app, { policy: checkedPolicy(policy), observer });
+	applications.set(app, { policy: checkedPolicy(policy), observer })
 }
 
 /** What the runtime prints for these failures: the full error. */
 const consoleObserver: ServerErrorObserver = (error, requestId, info) => {
-  try {
-    console.error(`[meeko] ${info?.kind ?? "error"} ${requestId}${info?.inRequest ? " (during a request)" : ""}`);
-    console.error(error);
-  } catch { /* A broken console cannot escape a process listener. */ }
-};
+	try {
+		console.error(`[meeko] ${info?.kind ?? 'error'} ${requestId}${info?.inRequest ? ' (during a request)' : ''}`)
+		console.error(error)
+	} catch {
+		/* A broken console cannot escape a process listener. */
+	}
+}
 
 /** The observer of an application's process failures: its own `onError`, or else the console. */
 export function processErrorObserver(app: object | undefined): ServerErrorObserver {
-  return (app && applications.get(app)?.observer) || consoleObserver;
+	return (app && applications.get(app)?.observer) || consoleObserver
 }
 
-type ProcessHost = "node" | "deno" | "worker";
+type ProcessHost = 'node' | 'deno' | 'worker'
 
 interface NodeProcess {
-  on(event: string, listener: (...args: unknown[]) => void): unknown;
-  removeListener(event: string, listener: (...args: unknown[]) => void): unknown;
-  listeners(event: string): unknown[];
-  exit(code?: number): never;
-  exitCode?: number | string | undefined;
+	on(event: string, listener: (...args: unknown[]) => void): unknown
+	removeListener(event: string, listener: (...args: unknown[]) => void): unknown
+	listeners(event: string): unknown[]
+	exit(code?: number): never
+	exitCode?: number | string | undefined
 }
 
-interface DenoProcess { exit(code?: number): never; exitCode?: number }
+interface DenoProcess {
+	exit(code?: number): never
+	exitCode?: number
+}
 
 interface GlobalEvents {
-  addEventListener(type: string, listener: (event: Event) => void): void;
-  removeEventListener(type: string, listener: (event: Event) => void): void;
+	addEventListener(type: string, listener: (event: Event) => void): void
+	removeEventListener(type: string, listener: (event: Event) => void): void
 }
 
 function nodeProcess(): NodeProcess | undefined {
-  const candidate = (globalThis as unknown as { process?: Partial<NodeProcess> }).process;
-  return candidate && typeof candidate.on === "function" && typeof candidate.removeListener === "function"
-    && typeof candidate.listeners === "function" && typeof candidate.exit === "function" ? candidate as NodeProcess : undefined;
+	const candidate = (globalThis as unknown as { process?: Partial<NodeProcess> }).process
+	return candidate && typeof candidate.on === 'function' && typeof candidate.removeListener === 'function' && typeof candidate.listeners === 'function' && typeof candidate.exit === 'function' ? (candidate as NodeProcess) : undefined
 }
 
 function denoProcess(): DenoProcess | undefined {
-  const candidate = (globalThis as unknown as { Deno?: Partial<DenoProcess> }).Deno;
-  return candidate && typeof candidate.exit === "function" ? candidate as DenoProcess : undefined;
+	const candidate = (globalThis as unknown as { Deno?: Partial<DenoProcess> }).Deno
+	return candidate && typeof candidate.exit === 'function' ? (candidate as DenoProcess) : undefined
 }
 
 /** Deno through its global events, Node and Bun through `process`, anything else as a Worker isolate. */
 function detectHost(): ProcessHost {
-  if (denoProcess()) return "deno";
-  const workers = (globalThis as { navigator?: { userAgent?: unknown } }).navigator?.userAgent === "Cloudflare-Workers";
-  if (!workers && nodeProcess()) return "node";
-  return "worker";
+	if (denoProcess()) return 'deno'
+	const workers = (globalThis as { navigator?: { userAgent?: unknown } }).navigator?.userAgent === 'Cloudflare-Workers'
+	if (!workers && nodeProcess()) return 'node'
+	return 'worker'
 }
 
 /** Marks Meeko's own process listeners: two Meeko servers in one process do not count as the app's. */
-const ownListener: unique symbol = Symbol.for("meeko.process-error-listener") as never;
+const ownListener: unique symbol = Symbol.for('meeko.process-error-listener') as never
 
 interface InstallSettings {
-  readonly host: ProcessHost;
-  readonly policy: ProcessErrorPolicy | false | undefined;
-  readonly report: (error: unknown, requestId: string, info: ServerErrorInfo) => void;
-  readonly close: () => Promise<void>;
-  readonly shutdownTimeout: number;
+	readonly host: ProcessHost
+	readonly policy: ProcessErrorPolicy | false | undefined
+	readonly report: (error: unknown, requestId: string, info: ServerErrorInfo) => void
+	readonly close: () => Promise<void>
+	readonly shutdownTimeout: number
 }
 
 /** Listens for the process failures of `settings.host` and applies the policy; returns the release. */
 function installProcessErrorHandlers(settings: InstallSettings): () => void {
-  const policy = settings.policy;
-  if (policy === false) return () => {};
-  const rejection = policy?.unhandledRejection ?? "report";
-  const exception = policy?.uncaughtException ?? "shutdown";
-  const node = settings.host === "node" ? nodeProcess() : undefined;
-  const deno = settings.host === "deno" ? denoProcess() : undefined;
-  let shuttingDown = false;
-  const exit = (code: number): void => {
-    if (node) node.exit(code);
-    else deno?.exit(code);
-  };
-  const shutdown = (): void => {
-    // A Worker isolate has no process to stop; a second failure joins the shutdown in progress.
-    if (shuttingDown || (!node && !deno)) return;
-    shuttingDown = true;
-    if (node) node.exitCode = 1;
-    else if (deno) { try { deno.exitCode = 1; } catch { /* Older Deno: exit(1) below sets it. */ } }
-    setTimeout(() => exit(1), settings.shutdownTimeout);
-    void (async () => {
-      try { await settings.close(); }
-      catch { /* The host's close reports its own failures. */ }
-    })().finally(() => exit(1));
-  };
-  const handle = (kind: ServerErrorInfo["kind"], error: unknown, action: string, ownedByApp: boolean): void => {
-    const scope = requestScope.getStore();
-    settings.report(error, scope?.requestId ?? crypto.randomUUID(), { kind, inRequest: scope !== undefined });
-    // The application's own listener decides what happens to the process.
-    if (action === "shutdown" && !ownedByApp) shutdown();
-  };
-  if (node) {
-    const foreign = (event: string): boolean =>
-      node.listeners(event).some((listener) => (listener as { [ownListener]?: unknown })[ownListener] !== true);
-    const onRejection = Object.assign((reason: unknown) => {
-      handle("unhandledRejection", reason, rejection, foreign("unhandledRejection"));
-    }, { [ownListener]: true });
-    // `origin` is "unhandledRejection" when the runtime raised a rejection as an exception
-    // (`--unhandled-rejections=strict`, or no rejection listener): it follows the exception policy.
-    const onException = Object.assign((error: unknown, origin?: unknown) => {
-      handle(origin === "unhandledRejection" ? "unhandledRejection" : "uncaughtException", error, exception, foreign("uncaughtException"));
-    }, { [ownListener]: true });
-    if (rejection !== "off") node.on("unhandledRejection", onRejection);
-    if (exception !== "off") node.on("uncaughtException", onException);
-    return () => {
-      node.removeListener("unhandledRejection", onRejection);
-      node.removeListener("uncaughtException", onException);
-    };
-  }
-  const target = globalThis as unknown as Partial<GlobalEvents>;
-  if (typeof target.addEventListener !== "function" || typeof target.removeEventListener !== "function") return () => {};
-  const events = target as GlobalEvents;
-  // An event that another listener already prevented belongs to the application: it is only reported.
-  const onRejection = (event: Event): void => {
-    const ownedByApp = event.defaultPrevented;
-    event.preventDefault();
-    handle("unhandledRejection", (event as Event & { reason?: unknown }).reason, rejection, ownedByApp);
-  };
-  const onError = (event: Event): void => {
-    const ownedByApp = event.defaultPrevented;
-    event.preventDefault();
-    const uncaught = event as Event & { error?: unknown; message?: string };
-    handle("uncaughtException", uncaught.error ?? new Error(uncaught.message || "Uncaught error"), exception, ownedByApp);
-  };
-  if (rejection !== "off") events.addEventListener("unhandledrejection", onRejection);
-  // Workers report an exception through the request or the `waitUntil` task that raised it.
-  if (exception !== "off" && settings.host === "deno") events.addEventListener("error", onError);
-  return () => {
-    events.removeEventListener("unhandledrejection", onRejection);
-    events.removeEventListener("error", onError);
-  };
+	const policy = settings.policy
+	if (policy === false) return () => {}
+	const rejection = policy?.unhandledRejection ?? 'report'
+	const exception = policy?.uncaughtException ?? 'shutdown'
+	const node = settings.host === 'node' ? nodeProcess() : undefined
+	const deno = settings.host === 'deno' ? denoProcess() : undefined
+	let shuttingDown = false
+	const exit = (code: number): void => {
+		if (node) node.exit(code)
+		else deno?.exit(code)
+	}
+	const shutdown = (): void => {
+		// A Worker isolate has no process to stop; a second failure joins the shutdown in progress.
+		if (shuttingDown || (!node && !deno)) return
+		shuttingDown = true
+		if (node) node.exitCode = 1
+		else if (deno) {
+			try {
+				deno.exitCode = 1
+			} catch {
+				/* Older Deno: exit(1) below sets it. */
+			}
+		}
+		setTimeout(() => exit(1), settings.shutdownTimeout)
+		void (async () => {
+			try {
+				await settings.close()
+			} catch {
+				/* The host's close reports its own failures. */
+			}
+		})().finally(() => exit(1))
+	}
+	const handle = (kind: ServerErrorInfo['kind'], error: unknown, action: string, ownedByApp: boolean): void => {
+		const scope = requestScope.getStore()
+		settings.report(error, scope?.requestId ?? crypto.randomUUID(), { kind, inRequest: scope !== undefined })
+		// The application's own listener decides what happens to the process.
+		if (action === 'shutdown' && !ownedByApp) shutdown()
+	}
+	if (node) {
+		const foreign = (event: string): boolean => node.listeners(event).some((listener) => (listener as { [ownListener]?: unknown })[ownListener] !== true)
+		const onRejection = Object.assign(
+			(reason: unknown) => {
+				handle('unhandledRejection', reason, rejection, foreign('unhandledRejection'))
+			},
+			{ [ownListener]: true },
+		)
+		// `origin` is "unhandledRejection" when the runtime raised a rejection as an exception
+		// (`--unhandled-rejections=strict`, or no rejection listener): it follows the exception policy.
+		const onException = Object.assign(
+			(error: unknown, origin?: unknown) => {
+				handle(origin === 'unhandledRejection' ? 'unhandledRejection' : 'uncaughtException', error, exception, foreign('uncaughtException'))
+			},
+			{ [ownListener]: true },
+		)
+		if (rejection !== 'off') node.on('unhandledRejection', onRejection)
+		if (exception !== 'off') node.on('uncaughtException', onException)
+		return () => {
+			node.removeListener('unhandledRejection', onRejection)
+			node.removeListener('uncaughtException', onException)
+		}
+	}
+	const target = globalThis as unknown as Partial<GlobalEvents>
+	if (typeof target.addEventListener !== 'function' || typeof target.removeEventListener !== 'function') return () => {}
+	const events = target as GlobalEvents
+	// An event that another listener already prevented belongs to the application: it is only reported.
+	const onRejection = (event: Event): void => {
+		const ownedByApp = event.defaultPrevented
+		event.preventDefault()
+		handle('unhandledRejection', (event as Event & { reason?: unknown }).reason, rejection, ownedByApp)
+	}
+	const onError = (event: Event): void => {
+		const ownedByApp = event.defaultPrevented
+		event.preventDefault()
+		const uncaught = event as Event & { error?: unknown; message?: string }
+		handle('uncaughtException', uncaught.error ?? new Error(uncaught.message || 'Uncaught error'), exception, ownedByApp)
+	}
+	if (rejection !== 'off') events.addEventListener('unhandledrejection', onRejection)
+	// Workers report an exception through the request or the `waitUntil` task that raised it.
+	if (exception !== 'off' && settings.host === 'deno') events.addEventListener('error', onError)
+	return () => {
+		events.removeEventListener('unhandledrejection', onRejection)
+		events.removeEventListener('error', onError)
+	}
 }
 
 /**
@@ -299,75 +317,80 @@ function installProcessErrorHandlers(settings: InstallSettings): () => void {
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#errores
  */
 export function handleProcessErrors(app: ServerApp, options: ProcessErrorOptions = {}): () => void {
-  const shutdownTimeout = options.shutdownTimeout ?? 15_000;
-  if (!Number.isFinite(shutdownTimeout) || shutdownTimeout < 0 || shutdownTimeout > 2_147_483_647) {
-    throw new RangeError(`Invalid shutdownTimeout: ${shutdownTimeout}`);
-  }
-  // One installation per application: a second call (a host's own next to `serveNode` with
-  // `handleSignals`) would report each failure twice and start two competing shutdowns.
-  const existing = installations.get(app);
-  if (existing) {
-    // The listeners of the first call stay: options that differ from them are ignored, and said so.
-    const first = existing.options;
-    if (first.onError !== options.onError || first.close !== options.close || first.shutdownTimeout !== shutdownTimeout) {
-      console.warn("[meeko] handleProcessErrors ya estaba instalado para esta aplicación con otras opciones (onError, close o shutdownTimeout); se mantienen las de la primera llamada. Instálelo una sola vez, por ejemplo sólo con serveNode({ handleSignals }) o sólo con su propia llamada.");
-    }
-    return existing.retain();
-  }
-  const observer = options.onError ?? processErrorObserver(app);
-  const release = installProcessErrorHandlers({
-    host: detectHost(),
-    policy: applications.get(app)?.policy,
-    report: (error, requestId, info) => observeServerError(error, requestId, observer, info),
-    close: options.close ?? (async () => {
-      try { await app.close(); }
-      catch (error) { observeServerError(error, crypto.randomUUID(), observer); }
-    }),
-    shutdownTimeout,
-  });
-  let holders = 0;
-  const installation: Installation = {
-    options: { onError: options.onError, close: options.close, shutdownTimeout },
-    retain() {
-      holders++;
-      let released = false;
-      return () => {
-        if (released) return;
-        released = true;
-        if (--holders > 0) return;
-        installations.delete(app);
-        release();
-      };
-    },
-  };
-  installations.set(app, installation);
-  return installation.retain();
+	const shutdownTimeout = options.shutdownTimeout ?? 15_000
+	if (!Number.isFinite(shutdownTimeout) || shutdownTimeout < 0 || shutdownTimeout > 2_147_483_647) {
+		throw new RangeError(`Invalid shutdownTimeout: ${shutdownTimeout}`)
+	}
+	// One installation per application: a second call (a host's own next to `serveNode` with
+	// `handleSignals`) would report each failure twice and start two competing shutdowns.
+	const existing = installations.get(app)
+	if (existing) {
+		// The listeners of the first call stay: options that differ from them are ignored, and said so.
+		const first = existing.options
+		if (first.onError !== options.onError || first.close !== options.close || first.shutdownTimeout !== shutdownTimeout) {
+			console.warn('[meeko] handleProcessErrors ya estaba instalado para esta aplicación con otras opciones (onError, close o shutdownTimeout); se mantienen las de la primera llamada. Instálelo una sola vez, por ejemplo sólo con serveNode({ handleSignals }) o sólo con su propia llamada.')
+		}
+		return existing.retain()
+	}
+	const observer = options.onError ?? processErrorObserver(app)
+	const release = installProcessErrorHandlers({
+		host: detectHost(),
+		policy: applications.get(app)?.policy,
+		report: (error, requestId, info) => observeServerError(error, requestId, observer, info),
+		close:
+			options.close ??
+			(async () => {
+				try {
+					await app.close()
+				} catch (error) {
+					observeServerError(error, crypto.randomUUID(), observer)
+				}
+			}),
+		shutdownTimeout,
+	})
+	let holders = 0
+	const installation: Installation = {
+		options: { onError: options.onError, close: options.close, shutdownTimeout },
+		retain() {
+			holders++
+			let released = false
+			return () => {
+				if (released) return
+				released = true
+				if (--holders > 0) return
+				installations.delete(app)
+				release()
+			}
+		},
+	}
+	installations.set(app, installation)
+	return installation.retain()
 }
 
 /** The process listeners of an application, shared by every call that installed them. */
 interface Installation {
-  /** The options of the call that installed the listeners, to tell a later call that differs. */
-  readonly options: { readonly onError: ProcessErrorOptions["onError"]; readonly close: ProcessErrorOptions["close"]; readonly shutdownTimeout: number };
-  /** Another holder of the listeners; its release removes them once no holder is left. */
-  retain(): () => void;
+	/** The options of the call that installed the listeners, to tell a later call that differs. */
+	readonly options: { readonly onError: ProcessErrorOptions['onError']; readonly close: ProcessErrorOptions['close']; readonly shutdownTimeout: number }
+	/** Another holder of the listeners; its release removes them once no holder is left. */
+	retain(): () => void
 }
 
 /** Installations by application, one registry per process like the policies. */
-const installations: WeakMap<object, Installation> = (globalThis as { [key: symbol]: WeakMap<object, Installation> | undefined })[Symbol.for("meeko.process-error-installations")] ??= new WeakMap();
+const installations: WeakMap<object, Installation> = ((globalThis as { [key: symbol]: WeakMap<object, Installation> | undefined })[Symbol.for('meeko.process-error-installations')] ??= new WeakMap())
 
 /** Isolates whose process failures already reach an application. */
-const watchedIsolates = new WeakSet<object>();
+const watchedIsolates = new WeakSet<object>()
 
 /** Reports the unhandled rejections of a Worker isolate to `app`, once per application. */
 export function watchIsolateErrors(app: ServerApp, onError?: ServerErrorObserver): void {
-  if (watchedIsolates.has(app)) return;
-  watchedIsolates.add(app);
-  const observer = onError ?? processErrorObserver(app);
-  installProcessErrorHandlers({
-    host: "worker",
-    policy: applications.get(app)?.policy,
-    report: (error, requestId, info) => observeServerError(error, requestId, observer, info),
-    close: async () => {},
-    shutdownTimeout: 0,
-  });
+	if (watchedIsolates.has(app)) return
+	watchedIsolates.add(app)
+	const observer = onError ?? processErrorObserver(app)
+	installProcessErrorHandlers({
+		host: 'worker',
+		policy: applications.get(app)?.policy,
+		report: (error, requestId, info) => observeServerError(error, requestId, observer, info),
+		close: async () => {},
+		shutdownTimeout: 0,
+	})
 }

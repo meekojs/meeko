@@ -13,7 +13,7 @@ related:
   - "@meekojs/meeko/server#createServerClientOptions"
   - "autoimport:api"
   - docs/framework.md#api-y-rpc
-source-hash: 16d02a2428d2043c06fb1987ef4e1c64202ef8a99ae162f726de7fdf77d48790
+source-hash: 1b00fcb4fff1750378a199832570c82aa9e53996e18b3a2da6c222fa952fd428
 ---
 
 `createLocalServerFetch(options)` creates a `ServerFetch`: a `(request, context) => Promise<Response>` function that handles a request to `/api` or `/_meeko/rpc` through the application's pipeline, inside the process, reusing the current request's session, services, state and `requestId`. It underlies `api.*` and `rpc.*` while the server renders a page: the page calls its own API without a network or second session.

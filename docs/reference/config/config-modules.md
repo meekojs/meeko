@@ -37,10 +37,10 @@ export default defineMeekoConfig({
 
 ## Opciones
 
-| Valor | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `modules` | `readonly MeekoModuleEntry[]` | `[]` | El nombre de un paquete instalado (con o sin subruta) o una ruta relativa al proyecto. |
-| `<configKey>` | lo que declare el módulo | ninguno | Las opciones de cada módulo, en la clave que declara su `meta.configKey` (`i18n`, `ui`). |
+| Valor         | Tipo                          | Por defecto | Descripción                                                                              |
+| ------------- | ----------------------------- | ----------- | ---------------------------------------------------------------------------------------- |
+| `modules`     | `readonly MeekoModuleEntry[]` | `[]`        | El nombre de un paquete instalado (con o sin subruta) o una ruta relativa al proyecto.   |
+| `<configKey>` | lo que declare el módulo      | ninguno     | Las opciones de cada módulo, en la clave que declara su `meta.configKey` (`i18n`, `ui`). |
 
 - **Un paquete** se resuelve desde el proyecto. Si exporta el subpath `./module` (como `@meekojs/i18n`, cuya raíz es su runtime), el módulo es el export por defecto de `<paquete>/module`; si no, el de su raíz (como `@meekojs/ui`).
 - **Una ruta** es un archivo o una carpeta con `package.json` (su export `import`/`default`) o con `index.ts`, `index.mts`, `index.js` o `index.mjs`.
@@ -75,6 +75,7 @@ export default defineMeekoConfig({
 El módulo declara la clave con una ampliación de `MeekoConfig`, que Meeko carga en `.meeko/types/config.d.ts`:
 
 <!-- no-check -->
+
 ```ts
 // modules/accent/index.ts
 declare module "@meekojs/meeko/framework" {
@@ -144,6 +145,7 @@ export default defineMeekoConfig({ i18n: { defaultLocale: "es", catalogs: { es: 
 `[meeko] Aviso MEEK127: meeko.config.ts tiene la clave "i18n", que es la configKey del módulo @meekojs/i18n, pero @meekojs/i18n no está en modules, así que Meeko ignora sus opciones. Añádalo: modules: ["@meekojs/i18n"].` Es un aviso durante `1.x`; la clave se ignora, como hasta `1.7`.
 
 <!-- no-check -->
+
 ```ts good
 export default defineMeekoConfig({ modules: ["@meekojs/i18n"], i18n: { defaultLocale: "es", catalogs: { es: "app/locales/es.json" } } });
 ```
@@ -151,6 +153,7 @@ export default defineMeekoConfig({ modules: ["@meekojs/i18n"], i18n: { defaultLo
 ### Una opción mal tipada
 
 <!-- no-check -->
+
 ```ts bad
 export default defineMeekoConfig({ modules: ["@meekojs/i18n"], i18n: { defaultLocale: 1, catalogs: {} } });
 ```
@@ -158,6 +161,7 @@ export default defineMeekoConfig({ modules: ["@meekojs/i18n"], i18n: { defaultLo
 `meeko check` da `meeko.config.ts:1:… TS2322: Type 'number' is not assignable to type 'string'.`, y el editor lo marca, con los tipos de `.meeko/types/config.d.ts`.
 
 <!-- no-check -->
+
 ```ts good
 export default defineMeekoConfig({ modules: ["@meekojs/i18n"], i18n: { defaultLocale: "es", catalogs: { es: "app/locales/es.json" } } });
 ```

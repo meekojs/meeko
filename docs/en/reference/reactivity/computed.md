@@ -13,7 +13,7 @@ related:
   - "@meekojs/meeko#batch"
   - "@meekojs/meeko#untrack"
   - docs/api.md#reactividad
-source-hash: 4e6698a55272f560539583f342defc18766a8b60f1299327224f7877a6f62768
+source-hash: f988f0070f3c60539f17636b85f4c7f16c34e1d4133099a57c947010870dd7d8
 ---
 
 `computed(fn)` returns a read-only signal whose value is the result of `fn`. Meeko runs `fn` on creation, tracks the signals it reads and runs it again whenever one of them changes; readers of the `computed` (the template, another `computed`, an `effect`) update in turn. Use it for anything calculated from state: totals, filters, formatted text, conditions.

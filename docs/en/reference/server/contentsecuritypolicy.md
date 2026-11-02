@@ -14,7 +14,7 @@ related:
   - docs/framework.md#csp-con-hashes
   - docs/framework.md#csp-y-cabeceras-en-los-adaptadores-con-servidor
   - docs/framework.md#sitio-estático
-source-hash: fbe7e100f51d0dfc653587b44fa6b2acbfd41259b8b226012de550bbf9b51e1b
+source-hash: 3b52b585893cf20fe7042f527e09d7062dd900febabd5fadc3abd49838315fae
 ---
 
 `contentSecurityPolicy(policy, scriptHashes?, styleHashes?)` writes the `Content-Security-Policy` header value from a directives object, adding SHA-256 hashes of inline `<script>` elements and, since `1.4`, inline `<style>` elements used by a page to the correct directive. It validates every directive name, source and hash, so a malformed policy fails when you build it, not in the browser.

@@ -1,12 +1,12 @@
-import type { ServerErrorObserver } from "../errors";
-import type { RequestContext } from "../runtime/request-context";
-import type { SessionManager } from "../runtime/sessions";
-import type { Output, Schema } from "../schema";
-import type { RpcDefinition } from "./contracts";
+import type { ServerErrorObserver } from '../errors'
+import type { RequestContext } from '../runtime/request-context'
+import type { SessionManager } from '../runtime/sessions'
+import type { Output, Schema } from '../schema'
+import type { RpcDefinition } from './contracts'
 
-import { serializeJson } from "../../core/server";
-import { errorResponse, finish, guard, readJson, validate } from "../contract-runtime";
-import { ApiError, reportServerError } from "../errors";
+import { serializeJson } from '../../core/server'
+import { errorResponse, finish, guard, readJson, validate } from '../contract-runtime'
+import { ApiError, reportServerError } from '../errors'
 
 /**
  * Ejecuta un procedimiento RPC con sus guardas y validaciones y devuelve su salida validada. Es la
@@ -29,13 +29,13 @@ import { ApiError, reportServerError } from "../errors";
  * ```
  */
 export async function executeRpc<I extends Schema, O extends Schema, S, L = undefined>(definition: RpcDefinition<I, O, S, L>, rawInput: unknown, context: RequestContext<S>, sessions: SessionManager): Promise<Output<O>> {
-  await guard(definition, context, sessions, true);
-  const input = await validate(definition.input, rawInput, "input");
-  const locals = definition.locals ? await definition.locals(context) : undefined;
-  const result = await definition.handler({ input, context, locals: locals as L });
-  const output = await validate(definition.output, result, "output");
-  serializeJson(output);
-  return output;
+	await guard(definition, context, sessions, true)
+	const input = await validate(definition.input, rawInput, 'input')
+	const locals = definition.locals ? await definition.locals(context) : undefined
+	const result = await definition.handler({ input, context, locals: locals as L })
+	const output = await validate(definition.output, result, 'output')
+	serializeJson(output)
+	return output
 }
 /**
  * Atiende una petición RPC para un host propio: exige `POST` con JSON (otro método responde `405`
@@ -56,13 +56,16 @@ export async function executeRpc<I extends Schema, O extends Schema, S, L = unde
  * ```
  */
 export async function dispatchRpc<I extends Schema, O extends Schema, S, L = undefined>(definition: RpcDefinition<I, O, S, L>, context: RequestContext<S>, sessions: SessionManager, onError?: ServerErrorObserver): Promise<Response> {
-  try {
-    if (context.request.method !== "POST") {
-      const response = errorResponse(new ApiError("METHOD_NOT_ALLOWED", 405), context.requestId);
-      response.headers.set("allow", "POST");
-      return finish(response, context);
-    }
-    const output = await executeRpc(definition, await readJson(context.request), context, sessions);
-    return finish(new Response(serializeJson(output), { headers: { "content-type": "application/json; charset=utf-8" } }), context);
-  } catch (error) { reportServerError(error, context.requestId, onError); return finish(errorResponse(error, context.requestId), context); }
+	try {
+		if (context.request.method !== 'POST') {
+			const response = errorResponse(new ApiError('METHOD_NOT_ALLOWED', 405), context.requestId)
+			response.headers.set('allow', 'POST')
+			return finish(response, context)
+		}
+		const output = await executeRpc(definition, await readJson(context.request), context, sessions)
+		return finish(new Response(serializeJson(output), { headers: { 'content-type': 'application/json; charset=utf-8' } }), context)
+	} catch (error) {
+		reportServerError(error, context.requestId, onError)
+		return finish(errorResponse(error, context.requestId), context)
+	}
 }

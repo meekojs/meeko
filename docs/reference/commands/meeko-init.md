@@ -31,8 +31,8 @@ Siguiente paso: cd C:\proyectos\mi-app && npm install && npm run dev
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
+| Parámetro      | Tipo | Por defecto | Descripción                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| -------------- | ---- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `<directorio>` | ruta | obligatorio | Carpeta del proyecto. Se crea si no existe; si existe, sólo puede contener `.git` (una carpeta recién creada con `git init`) o un `package.json` con lockfiles (`package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `bun.lock`, `bun.lockb`), `pnpm-workspace.yaml`, `node_modules`, `.npmrc` y `.git`; las mismas que `meeko init-framework`. Hasta `1.6`, una carpeta con sólo `.git` se rechazaba. Su nombre, en minúsculas y con `-`, es el `name` del `package.json` nuevo. |
 
 ## Resultado
@@ -54,12 +54,12 @@ mi-app/
 
 `package.json` fija `@meekojs/meeko` a la versión exacta que creó el proyecto (el código compilado y el runtime deben coincidir), añade `@types/node`, `typescript` y `vite` y declara estos scripts:
 
-| Script | Comando |
-| --- | --- |
-| `dev` | `node server.mjs` |
-| `check` | `meeko types src/App.meeko && tsc --noEmit` |
+| Script  | Comando                                                                                                                    |
+| ------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `dev`   | `node server.mjs`                                                                                                          |
+| `check` | `meeko types src/App.meeko && tsc --noEmit`                                                                                |
 | `build` | `npm run check && vite build --outDir dist/client --manifest && vite build --ssr src/entry-server.ts --outDir dist/server` |
-| `start` | `node server.mjs --production` |
+| `start` | `node server.mjs --production`                                                                                             |
 
 El mensaje dice `pnpm` en lugar de `npm` si la carpeta ya tenía `pnpm-lock.yaml`. Si el directorio es el actual, omite el `cd`.
 

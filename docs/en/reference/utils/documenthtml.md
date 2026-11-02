@@ -10,7 +10,7 @@ related:
   - "syntax:html"
   - "syntax:script-server"
   - docs/api.md#html-que-viaja-una-vez-documenthtml
-source-hash: e74a6aa75b76b69a9800cbf6126389bd0ea751b528f97fc6566f63ba18a2c7b4
+source-hash: 661503fd930c7809d5c5bad5ec97a1fa3780ed05ecbd66f45b26bbb26addf21e
 ---
 
 `documentHtml(html)` declares that a `TrustedHtml` only needs to travel once. Without this mark, page data painted with `html="..."` arrives twice on the first load: in the document's HTML and in the hydration payload. In a large article, that is half the weight.
@@ -36,9 +36,9 @@ export const guide = { body: documentHtml(trustHtml(`<h2>Guide</h2><p>${params.s
 
 ## Parameters
 
-| Parameter | Type | Default | Description |
-| --- | --- | --- | --- |
-| `html` | `TrustedHtml` | required | HTML already declared trusted with [`trustHtml`](/docs/reference/trusthtml). An unmarked `string` is a type error. |
+| Parameter | Type          | Default  | Description                                                                                                        |
+| --------- | ------------- | -------- | ------------------------------------------------------------------------------------------------------------------ |
+| `html`    | `TrustedHtml` | required | HTML already declared trusted with [`trustHtml`](/docs/reference/trusthtml). An unmarked `string` is a type error. |
 
 ## Return value
 

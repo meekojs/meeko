@@ -1,4 +1,4 @@
-import type { ServerMiddleware } from "./index";
+import type { ServerMiddleware } from './index'
 
 /**
  * Declara el middleware de servidor que exporta por defecto un archivo de `server/middleware/`.
@@ -22,10 +22,10 @@ import type { ServerMiddleware } from "./index";
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#middleware-de-rutas-y-servidor
  */
 export function defineServerMiddleware(middleware: ServerMiddleware): ServerMiddleware {
-  return middleware;
+	return middleware
 }
-import type { RouteMiddlewareOptions } from "../../app/middleware/runtime";
-import type { ServerRouteMiddleware } from "./runtime";
+import type { RouteMiddlewareOptions } from '../../app/middleware/runtime'
+import type { ServerRouteMiddleware } from './runtime'
 
 /**
  * Declara el middleware de ruta de servidor que exporta por defecto un archivo
@@ -55,9 +55,7 @@ import type { ServerRouteMiddleware } from "./runtime";
  * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#middleware-de-ruta-de-servidor
  */
-export function defineServerRouteMiddleware<TServices = unknown, TEnv = unknown>(
-  middleware: ServerRouteMiddleware<TServices, TEnv>, options?: RouteMiddlewareOptions,
-): ServerRouteMiddleware<TServices, TEnv> {
-  void options;
-  return middleware;
+export function defineServerRouteMiddleware<TServices = unknown, TEnv = unknown>(middleware: ServerRouteMiddleware<TServices, TEnv>, options?: RouteMiddlewareOptions): ServerRouteMiddleware<TServices, TEnv> {
+	void options
+	return middleware
 }

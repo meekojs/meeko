@@ -37,8 +37,8 @@ Cualquier componente que llame a `useNow()` en su script tiene un reloj que se d
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
+| Parámetro | Tipo         | Por defecto | Descripción                                                                                                                  |
+| --------- | ------------ | ----------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | `release` | `() => void` | obligatorio | Función **síncrona** que libera el recurso. Una que devuelve una promesa es un error de tipos y, al liberar, un `TypeError`. |
 
 ## Valor devuelto
@@ -120,6 +120,7 @@ onCleanup(() => {
 El script de un componente también se ejecuta en el servidor y, en SSR, la raíz se libera al terminar el render: la limpieza se ejecuta en Node, donde `window` y `cancelAnimationFrame` no existen, y lanza `ReferenceError`. `meeko check` y el editor dan el aviso [`MEEK128`](/docs/stability) (un error en `2.0`) cuando un `onCleanup` del nivel superior del script, de un `effect` o de una función que el setup llama (un composable) usa una API que sólo existe en el navegador sin comprobarlo antes. El editor ofrece «Mover a `onMounted`». Crea el recurso y su limpieza en `onMounted`, que sólo se ejecuta en el navegador:
 
 <!-- no-check -->
+
 ```ts good
 let frame = 0;
 let observer: ResizeObserver | undefined;
@@ -146,6 +147,7 @@ onCleanup(async () => {
 `meeko check` da `TS2345: Argument of type '() => Promise<void>' is not assignable to parameter of type 'never'`. En JavaScript, la liberación entrega `TypeError: Meeko cleanup callbacks must be synchronous` y el componente no espera a la promesa. Inicia el cierre y observa su error tú mismo:
 
 <!-- no-check -->
+
 ```ts good
 onCleanup(() => {
   connection.close().catch((error: unknown) => console.error("No se pudo cerrar", error));
@@ -163,6 +165,7 @@ onCleanup(() => clearInterval(timer));
 Al importar el módulo lanza `Error: onCleanup() requires an active component root`: un módulo no se desmonta. `meeko check` de un proyecto da el aviso `MEEK130` en los módulos de `app/`, `shared/` y `server/`. Llama a `onCleanup` dentro de una función que el script del componente invoca (un composable), o crea una raíz con [`createRoot`](/docs/reference/createroot):
 
 <!-- no-check -->
+
 ```ts good
 export function useClock(): void {
   const timer = setInterval(tick, 1000);
@@ -184,6 +187,7 @@ onMounted(async () => {
 Si el componente se desmonta mientras espera, el socket queda abierto, y tras el `await` ya no hay raíz activa. `meeko check` y el editor dan el aviso `MEEK129`. Registra la limpieza antes del primer `await` y deja que compruebe lo que haya:
 
 <!-- no-check -->
+
 ```ts good
 onMounted(async () => {
   let socket: Socket | undefined;

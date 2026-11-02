@@ -1,4 +1,4 @@
-import type { GroupDefinition, LayoutName } from "../layout";
+import type { GroupDefinition, LayoutName } from '../layout'
 
 /**
  * Declara las opciones de una carpeta de `app/pages` en su `+group.ts`: el layout con nombre y sus
@@ -18,5 +18,5 @@ import type { GroupDefinition, LayoutName } from "../layout";
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#opciones-por-carpeta-groupts
  */
 export function defineGroup<const L extends LayoutName | false = LayoutName>(definition: GroupDefinition<L>): GroupDefinition<L> {
-  return definition;
+	return definition
 }

@@ -13,7 +13,7 @@ related:
   - "@meekojs/meeko#createRoot"
   - "@meekojs/meeko#provideErrorHandler"
   - docs/api.md#ciclo-de-vida
-source-hash: 052385050e75bf85909d78c9cd7a276ab4e0d02af293bfd358dc3598b3b46ad3
+source-hash: 1a1f2d5e6a5640f1333af62e4cebf9d474facc72e6f5757d90d279a1b941878e
 ---
 
 `provide(key, value)` stores `value` under `key` in the root of the component whose script is running. Any descendant (its children, their children, its snippet content and `<MeekoTeleport>` content) reads it with [`inject(key)`](/en/docs/reference/inject), which searches upward for the nearest provider. You can share something with a subtree without passing props at every level: a layout's theme, a compound component's state, a service.

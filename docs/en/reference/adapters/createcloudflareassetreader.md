@@ -14,7 +14,7 @@ related:
   - "@meekojs/meeko/cloudflare#createCloudflarePrerenderSource"
   - "@meekojs/meeko/node#createNodeAssetReader"
   - docs/framework.md#cloudflare-workers
-source-hash: 0858c25b08c17bcdf99c98f84bf04e9a30b50db8ad32243f1328de1771beeaa1
+source-hash: e597d719df3fcfe4124508863aa4ebc086eacc51d4768a525856d4caf0538fd6
 ---
 
 `createCloudflareAssetReader({ binding, assets })` is the public file reader for Workers. Meeko's generated `wrangler.jsonc` declares assets with `run_worker_first: true` and `html_handling`/`not_found_handling` set to `"none"`, so **all** requests reach the Worker; this reader only responds to paths in the build's asset manifest, reading them from the `ASSETS` binding, and returns `null` for all others.

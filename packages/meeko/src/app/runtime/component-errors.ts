@@ -1,5 +1,5 @@
-import { logClientError, markingObserver, observeCallback } from "../../core/error-observer";
-import { createContext, findContext, onCleanup, provide, provideAsyncFailureReporter } from "../../core/reactivity";
+import { logClientError, markingObserver, observeCallback } from '../../core/error-observer'
+import { createContext, findContext, onCleanup, provide, provideAsyncFailureReporter } from '../../core/reactivity'
 
 /**
  * Dónde se observó un fallo del navegador: un handler `on:` (`"event"`), un `effect`, una
@@ -24,7 +24,7 @@ import { createContext, findContext, onCleanup, provide, provideAsyncFailureRepo
  * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/api.md#componentes-meeko
  */
-export type ErrorSource = "event" | "effect" | "cleanup" | "mounted" | "navigation" | "socket" | "uncaught" | "rejection";
+export type ErrorSource = 'event' | 'effect' | 'cleanup' | 'mounted' | 'navigation' | 'socket' | 'uncaught' | 'rejection'
 
 /**
  * Observador de fallos de la raíz actual y sus descendientes. `error` es `unknown`: refínelo antes
@@ -40,64 +40,73 @@ export type ErrorSource = "event" | "effect" | "cleanup" | "mounted" | "navigati
  * };
  * ```
  */
-export type ComponentErrorHandler = (error: unknown, source: ErrorSource) => void;
+export type ComponentErrorHandler = (error: unknown, source: ErrorSource) => void
 
-const errorHandlerKey = createContext<ComponentErrorHandler>("component error handler");
-const appErrorChannelKey = createContext<AppErrorChannel>("application error channel");
+const errorHandlerKey = createContext<ComponentErrorHandler>('component error handler')
+const appErrorChannelKey = createContext<AppErrorChannel>('application error channel')
 
 export interface AppErrorChannel {
-  register(handler: ComponentErrorHandler): () => void;
-  /** For application-level sources: the application observer, or else the first component provider. */
-  current(): ComponentErrorHandler | undefined;
-  /** For component sources: only the application observer, never an unrelated component's provider. */
-  application(): ComponentErrorHandler | undefined;
-  track(release: () => void): void;
-  clear(): void;
+	register(handler: ComponentErrorHandler): () => void
+	/** For application-level sources: the application observer, or else the first component provider. */
+	current(): ComponentErrorHandler | undefined
+	/** For component sources: only the application observer, never an unrelated component's provider. */
+	application(): ComponentErrorHandler | undefined
+	track(release: () => void): void
+	clear(): void
 }
 
 /** A private observer registry owned by one mounted browser application. */
 export function createAppErrorChannel(observer?: ComponentErrorHandler): AppErrorChannel {
-  // What reaches the application observer is not reported again if it escapes to `window`.
-  const onError = observer && markingObserver(observer);
-  const handlers: Array<{ handler: ComponentErrorHandler }> = [];
-  const resources = new Set<() => void>();
-  return {
-    register(handler) {
-      const entry = { handler };
-      handlers.push(entry);
-      return () => {
-        const index = handlers.indexOf(entry);
-        if (index >= 0) handlers.splice(index, 1);
-      };
-    },
-    current() { return onError ?? handlers[0]?.handler; },
-    application() { return onError; },
-    track(release) { resources.add(release); },
-    clear() {
-      handlers.length = 0;
-      const failures: unknown[] = [];
-      for (const release of resources) {
-        try { release(); }
-        catch (error) { failures.push(error); }
-      }
-      resources.clear();
-      if (failures.length === 1) throw failures[0];
-      if (failures.length > 1) throw new AggregateError(failures, "Meeko application resources failed to close");
-    },
-  };
+	// What reaches the application observer is not reported again if it escapes to `window`.
+	const onError = observer && markingObserver(observer)
+	const handlers: Array<{ handler: ComponentErrorHandler }> = []
+	const resources = new Set<() => void>()
+	return {
+		register(handler) {
+			const entry = { handler }
+			handlers.push(entry)
+			return () => {
+				const index = handlers.indexOf(entry)
+				if (index >= 0) handlers.splice(index, 1)
+			}
+		},
+		current() {
+			return onError ?? handlers[0]?.handler
+		},
+		application() {
+			return onError
+		},
+		track(release) {
+			resources.add(release)
+		},
+		clear() {
+			handlers.length = 0
+			const failures: unknown[] = []
+			for (const release of resources) {
+				try {
+					release()
+				} catch (error) {
+					failures.push(error)
+				}
+			}
+			resources.clear()
+			if (failures.length === 1) throw failures[0]
+			if (failures.length > 1) throw new AggregateError(failures, 'Meeko application resources failed to close')
+		},
+	}
 }
 
 export function provideAppErrorChannel(channel: AppErrorChannel): void {
-  provide(appErrorChannelKey, channel);
-  provideAsyncFailureReporter((error, source) => {
-    const handler = channel.application();
-    if (handler) handler(error, source);
-    else logClientError(`Meeko asynchronous ${source} rejected`, error);
-  });
+	provide(appErrorChannelKey, channel)
+	provideAsyncFailureReporter((error, source) => {
+		const handler = channel.application()
+		if (handler) handler(error, source)
+		else logClientError(`Meeko asynchronous ${source} rejected`, error)
+	})
 }
 
 export function currentAppErrorChannel(): AppErrorChannel | undefined {
-  return findContext(appErrorChannelKey);
+	return findContext(appErrorChannelKey)
 }
 
 /**
@@ -123,33 +132,33 @@ export function currentAppErrorChannel(): AppErrorChannel | undefined {
  * @see https://github.com/meekojs/meeko/blob/main/docs/api.md#componentes-meeko
  */
 export function provideErrorHandler(handler: ComponentErrorHandler): void {
-  // What reaches this observer is not reported again if it escapes to `window`.
-  const observer = markingObserver(handler);
-  provide(errorHandlerKey, observer);
-  provideAsyncFailureReporter(observer);
-  const channel = findContext(appErrorChannelKey);
-  if (channel) {
-    onCleanup(channel.register(observer));
-  }
+	// What reaches this observer is not reported again if it escapes to `window`.
+	const observer = markingObserver(handler)
+	provide(errorHandlerKey, observer)
+	provideAsyncFailureReporter(observer)
+	const channel = findContext(appErrorChannelKey)
+	if (channel) {
+		onCleanup(channel.register(observer))
+	}
 }
 
 /** Captures the nearest observer while a component binding or `onMounted` queue is created. */
-export function componentErrorReporter(source: "event" | "mounted" = "event"): (error: unknown) => void {
-  const nearest = currentComponentErrorHandler();
-  // The application observer is resolved per failure because providers can
-  // register after this binding was created.
-  const channel = nearest ? undefined : currentAppErrorChannel();
-  return (error) => {
-    const handler = nearest ?? channel?.application();
-    if (!handler) return logClientError(source === "event" ? "Meeko component event failed" : "Meeko onMounted callback failed", error);
-    observeCallback(
-      () => handler(error, source),
-      (observerError) => logClientError("Meeko component error observer failed", observerError, error),
-    );
-  };
+export function componentErrorReporter(source: 'event' | 'mounted' = 'event'): (error: unknown) => void {
+	const nearest = currentComponentErrorHandler()
+	// The application observer is resolved per failure because providers can
+	// register after this binding was created.
+	const channel = nearest ? undefined : currentAppErrorChannel()
+	return (error) => {
+		const handler = nearest ?? channel?.application()
+		if (!handler) return logClientError(source === 'event' ? 'Meeko component event failed' : 'Meeko onMounted callback failed', error)
+		observeCallback(
+			() => handler(error, source),
+			(observerError) => logClientError('Meeko component error observer failed', observerError, error),
+		)
+	}
 }
 
 /** Returns the nearest handler for a resource created inside a component root. */
 export function currentComponentErrorHandler(): ComponentErrorHandler | undefined {
-  return findContext(errorHandlerKey);
+	return findContext(errorHandlerKey)
 }

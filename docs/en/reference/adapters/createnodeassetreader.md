@@ -16,7 +16,7 @@ related:
   - "@meekojs/meeko/cloudflare#createCloudflareAssetReader"
   - "@meekojs/meeko/server#createServerApp"
   - docs/framework.md#build-despliegue-y-verificación
-source-hash: 2e5bfb664b8975c474643bcf25b25cb6d33d4e0fdabb1fa16288b3a3abfc4a7e
+source-hash: 18d55d0b8c5395ee434f3c26eda9be006a9c9bae88e9ab447cc717219fe99889
 ---
 
 `createNodeAssetReader({ root, assets })` is the Node adapter's public file reader: the application asks it about each `pathname` and, if it is listed in `assets` (the manifest written by `meeko build`), it responds by streaming the file from `root`. Any other path returns `null` and **is never read from disk**: there is no way to request `../package.json`, `%2e%2e/…` or build files that are not public.

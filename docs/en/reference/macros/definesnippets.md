@@ -13,7 +13,7 @@ related:
   - "@meekojs/meeko#Snippet"
   - docs/api.md#snippets-con-definesnippets
   - docs/framework.md#tipos-de-cada-componente
-source-hash: 6904eed70430d233385333cedac6c446b6b65848d8ca2c5d40607624b7147d1a
+source-hash: 701c0a0e017b9e270fa5b6778e1e6eed01b4ce95689922a8ee69b8a63a658f47
 ---
 
 `defineSnippets<T>()` declares the component's snippets: pieces of template the parent writes between child tags and the child renders wherever it chooses with `<render>`. Each key of `T` is a snippet and its value is the parameter tuple passed by the child; `?` makes it optional. It is a compile-time macro: you do not import it.

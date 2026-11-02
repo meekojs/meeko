@@ -12,7 +12,7 @@ related:
   - "cli:auth hash"
   - docs/framework.md#contraseñas
   - docs/framework.md#autenticación
-source-hash: 2eb7e918bb8e411fab88824cc029ad113a7132b3aac2ae9748a3a1bd3dd91519
+source-hash: f354960b564d7bcb5320852f280e9ee012ab29cc55ed8a1376525d56f82dc463
 ---
 
 `verifyPassword(password, hash)` checks a password against a `scrypt$<N>$<r>$<p>$<sal>$<hash>` hash: one from `hashPassword` or an older one with parameters within Meeko's limits. It recomputes the hash with the stored parameters and compares it in constant time.

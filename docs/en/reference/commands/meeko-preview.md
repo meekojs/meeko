@@ -15,7 +15,7 @@ related:
   - docs/framework.md#bun
   - docs/framework.md#deno
   - docs/framework.md#cloudflare-workers
-source-hash: 3fedd4e10b753b521f15a58b8128068f674ed3271942da8cbcf7fe7f54ac591e
+source-hash: 23803c3c66f93f410f5da84531f276d383e150ca57fe61c0fe1154d7ce395f4d
 ---
 
 `meeko preview` starts the production build with its adapter's runtime to check that what you will deploy works: it compiles nothing, so first run [`meeko build`](/en/docs/reference/meeko-build) with the same adapter.

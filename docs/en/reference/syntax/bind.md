@@ -15,7 +15,7 @@ related:
   - docs/api.md#componentes-meeko
   - docs/api.md#atributos-en-bloque-con-bind
   - docs/api.md#props-estáticas
-source-hash: 462f7a37510d0741fee76b85519d7c470c19aa4529a3442bafb61dca51723ad3
+source-hash: 425c3d2bc6b6f50357cbdafc6d180acd49e1a56b32bf2a6102855e9110485fad
 ---
 
 `bind:nombre="expresión"` sets attribute `nombre` to a TypeScript expression's value and keeps it up to date when the signals it reads change. On a component tag or `<component is>`, `bind:prop` passes a typed prop to the child.

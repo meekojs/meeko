@@ -1,7 +1,7 @@
-import type { RouteState } from "../runtime/navigation";
+import type { RouteState } from '../runtime/navigation'
 
-import { findContext } from "../../core/reactivity";
-import { routeKey } from "../runtime/navigation";
+import { findContext } from '../../core/reactivity'
+import { routeKey } from '../runtime/navigation'
 
 /**
  * Lee la ruta confirmada de la aplicación actual: `url`, `path`, `id`, `params` y `search`. En SSR
@@ -33,10 +33,9 @@ import { routeKey } from "../runtime/navigation";
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#ruta-actual
  */
 export function useRoute(): RouteState {
-  const route = findContext(routeKey);
-  if (!route) {
-    throw new Error("useRoute() necesita una aplicación de Meeko en ejecución: sólo funciona en componentes que renderiza el servidor del framework o que monta mountClientApp. En una prueba unitaria, pasa la ruta al componente como prop.");
-  }
-  return route;
+	const route = findContext(routeKey)
+	if (!route) {
+		throw new Error('useRoute() necesita una aplicación de Meeko en ejecución: sólo funciona en componentes que renderiza el servidor del framework o que monta mountClientApp. En una prueba unitaria, pasa la ruta al componente como prop.')
+	}
+	return route
 }
-

@@ -9,7 +9,7 @@ related:
   - "syntax:style-scoped"
   - "syntax:style"
   - docs/framework.md#configuración
-source-hash: bd7b0e853568e123919c74a4ee960c816fa49af6a05566b05504c2d7d9c340ec
+source-hash: b44c05f0ba9fb545583ca74ec1ee039ba997ff25eb255c5628fc9fa0036f3f8d
 ---
 
 `css` groups component style options. Currently it has one: `scopeAttribute`, which decides which template elements receive the scope attribute of `<style scoped>`.

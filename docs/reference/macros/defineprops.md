@@ -53,10 +53,10 @@ const count = signal(props.initial ?? 0); // sólo el valor inicial
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `Props` (argumento de tipo) | un tipo de objeto | obligatorio | Las props: una interfaz, un alias, una intersección o una unión. Sin argumento de tipo es `MEEK017`. |
-| `defaults` | objeto literal | ninguno | Valores por defecto. Cada clave debe existir en `Props` y su valor, tener su tipo. Esas props pasan a ser opcionales para el padre y nunca son `undefined` dentro. |
+| Parámetro                   | Tipo              | Por defecto | Descripción                                                                                                                                                        |
+| --------------------------- | ----------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Props` (argumento de tipo) | un tipo de objeto | obligatorio | Las props: una interfaz, un alias, una intersección o una unión. Sin argumento de tipo es `MEEK017`.                                                               |
+| `defaults`                  | objeto literal    | ninguno     | Valores por defecto. Cada clave debe existir en `Props` y su valor, tener su tipo. Esas props pasan a ser opcionales para el padre y nunca son `undefined` dentro. |
 
 El argumento de defaults debe ser un **objeto literal con propiedades con nombre**: sin spreads ni claves calculadas (`MEEK041`), sin claves repetidas (`MEEK042`) y sin valores `undefined`. Sus valores pueden usar literales, imports y, desde `1.8`, constantes de nivel superior del script que sólo usan literales e imports; otra variable del setup es `MEEK123`. Las variables que el propio valor declara (una variable local, un bloque, un `catch`, un parámetro o el nombre de un accessor) no cuentan; `arguments`, `new.target` y `super` de la función del setup, sí (`MEEK123`).
 
