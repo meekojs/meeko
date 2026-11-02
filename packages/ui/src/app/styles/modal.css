@@ -72,8 +72,8 @@
 	border-radius: var(--ui-radius-md);
 	background: transparent;
 	padding: 0;
-	width: var(--ui-control-height-lg);
-	height: var(--ui-control-height-lg);
+	width: var(--ui-control-height-md);
+	height: var(--ui-control-height-md);
 	color: var(--ui-color-text-soft);
 }
 .meeko-ui-modal-close:hover {

@@ -241,6 +241,11 @@ ${server.logs().slice(-2000)}`,
 	await open(`/en/translations/${ids.testing}`)
 	await page.getByText('+Nuevo parrafo del original.').waitFor({ timeout: 30_000 })
 	assert.equal(await page.locator('.meeko-ui-badge').filter({ hasText: 'Outdated' }).count(), 1)
+	// The three actions of its header wrap on a phone instead of widening the page.
+	const viewport = page.viewportSize()
+	await page.setViewportSize({ width: 390, height: 844 })
+	assert.equal(await page.evaluate(() => globalThis.document.documentElement.scrollWidth <= globalThis.innerWidth), true, 'the actions stay inside a 390 px page')
+	await page.setViewportSize(viewport)
 	assert.equal(await page.locator('pre[lang="es"]').count(), 1)
 	assert.equal(await page.locator('pre[lang="en"]').count(), 1)
 

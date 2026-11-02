@@ -197,9 +197,10 @@
 	line-height: var(--ui-line-height-relaxed);
 	text-wrap: pretty;
 }
+/* It may shrink: with `flex: none` the row of actions keeps its whole width and widens a narrow page. */
 .meeko-ui-page-header-actions {
 	display: flex;
-	flex: none;
+	flex: 0 1 auto;
 	flex-wrap: wrap;
 	align-items: center;
 	gap: var(--ui-space-2);
