@@ -7,7 +7,11 @@
 
 	import { readPage } from '../../../server/content/db'
 
-	export const route = definePage({ render: 'ssr' })
+	export const route = definePage({
+		render: 'ssr',
+		layout: 'docs',
+		layoutProps: ({ data }: { data: GuidePage }) => ({ nav: data.nav, current: data.current, toc: data.doc.toc, pager: data.pages, editUrl: data.doc.editUrl, source: data.doc.source, i18n: data.i18n }),
+	})
 
 	// /en/docs/x reads the English page of the snapshot (the Spanish text and `i18n.fallback` when it is not translated).
 	const { params } = usePage()
@@ -32,25 +36,12 @@
 		params: { slug: string }
 		search: Record<string, string | string[]>
 	}
-
-	const copyCode = useCodeCopy()
 </script>
 
 <template>
-	<DocsLayout
-		bind:nav="nav"
-		bind:current="current"
-		bind:toc="doc.toc"
-		bind:pager="pages"
-		bind:editUrl="doc.editUrl"
-		bind:source="doc.source"
-		bind:i18n="i18n"
-	>
-		<article
-			class="prose"
-			data-pagefind-body
-			on:click="copyCode"
-			html="doc.html"
-		/>
-	</DocsLayout>
+	<UIProse
+		as="article"
+		data-pagefind-body
+		bind:html="doc.html"
+	/>
 </template>

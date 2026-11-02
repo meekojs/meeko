@@ -1,0 +1,51 @@
+<script lang="ts">
+	const { localePath, t } = useI18n()
+
+	// The links in the language of the document: /docs/api in Spanish, /en/docs/api in English.
+	const doc = (slug: string): string => localePath(href('/docs/[slug]', { params: { slug } }))
+	const brand = { name: 'Meeko', href: localePath(href('/')), image: { src: '/brand/meeko-logo.webp', width: 24, height: 24 }, ariaLabel: t('a11y.home') }
+	const groups = [
+		{
+			title: t('footer.docs'),
+			items: [
+				{ label: t('footer.quickStart'), href: doc('inicio-rapido') },
+				{ label: t('footer.frameworkGuide'), href: doc('framework') },
+				{ label: t('footer.componentsApi'), href: doc('api') },
+				{ label: t('footer.reference'), href: localePath(href('/docs/reference')) },
+				{ label: t('footer.devtools'), href: doc('devtools') },
+			],
+		},
+		{
+			title: t('footer.project'),
+			items: [
+				{ label: t('footer.changes'), href: doc('changelog') },
+				{ label: t('footer.stability'), href: doc('stability') },
+				{ label: 'GitHub', href: 'https://github.com/meekojs/meeko', rel: 'noopener' },
+				{ label: 'npm', href: 'https://www.npmjs.com/package/@meekojs/meeko', rel: 'noopener' },
+				{ label: t('footer.license'), href: 'https://github.com/meekojs/meeko/blob/main/LICENSE', rel: 'noopener' },
+			],
+		},
+	]
+</script>
+
+<template>
+	<UIFooter
+		bind:brand="brand"
+		bind:groups="groups"
+		bind:label="t('a11y.footerNav')"
+	>
+		<snippet name="about">
+			<p>
+				<I18nT key="footer.built">
+					<snippet
+						name="code"
+						params="text"
+					>
+						<code>{text}</code>
+					</snippet>
+				</I18nT>
+			</p>
+			<p>{t('footer.dedication')}</p>
+		</snippet>
+	</UIFooter>
+</template>

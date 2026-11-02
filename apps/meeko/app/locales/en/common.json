@@ -1,10 +1,8 @@
 {
 	"a11y": {
-		"skip": "Skip to content",
 		"home": "Meeko, home",
 		"primaryNav": "Main",
 		"footerNav": "Footer",
-		"menu": "Menu",
 		"github": "Meeko on GitHub"
 	},
 	"nav": {
@@ -27,15 +25,6 @@
 		"stability": "1.x stability",
 		"license": "MIT license"
 	},
-	"locale": {
-		"label": "Language"
-	},
-	"theme": {
-		"dark": "dark",
-		"light": "light",
-		"system": "system",
-		"label": "Theme: {current}. Switch to {next}"
-	},
 	"search": {
 		"open": "Search the documentation",
 		"trigger": "Search…",
@@ -45,9 +34,6 @@
 		"loading": "Searching…",
 		"empty": "No results for “{query}”.",
 		"unavailable": "Search is not available right now. Try again in a moment."
-	},
-	"announcements": {
-		"close": "Close notice"
 	},
 	"actions": {
 		"copy": "Copy",

@@ -134,26 +134,26 @@
 <style scoped>
 	.cat-figure {
 		display: grid;
-		gap: 1.25rem;
+		gap: var(--ui-space-5);
 		margin: 0;
 	}
 	svg {
 		margin-inline: auto;
 		max-width: 26rem;
 	}
-	/* About 11px at full size, like the labels of the other figures. */
+	/* The labels of the drawing, about 11px at full size, in the units of its viewBox. */
 	.cat-figure svg {
 		--fig-text: 6.6px;
 	}
 	/* The mask and muzzle sit between the figure line and its soft tint, readable in both themes. */
 	.iso .l.mid {
-		stroke: color-mix(in oklab, var(--figure) 58%, transparent);
+		stroke: color-mix(in oklab, var(--ui-color-surface-9) 58%, transparent);
 	}
-	/* The eyes carry the one blue; the nose stays a neutral line (The Nose Rule). */
+	/* The eyes carry the accent; the nose stays a neutral line. */
 	.pupil {
-		fill: var(--accent);
+		fill: var(--ui-color-primary);
 	}
 	.glint {
-		fill: var(--fig-ground, var(--bg));
+		fill: var(--fig-ground, var(--ui-color-bg));
 	}
 </style>

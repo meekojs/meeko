@@ -15,49 +15,53 @@
 </script>
 
 <template>
-	<section class="error">
-		<div class="copy">
-			<h1 if:when="props.status === 404">
-				{t('error.notFoundTitle')}
-				<span class="tone-soft">{t('error.notFoundDetail')}</span>
-			</h1>
-			<h1 if:when="props.status !== 404">
-				{t('error.failedTitle')}
-				<span class="tone-soft">{t('error.failedDetail', { message: props.message })}</span>
-			</h1>
-			<p class="hint">
-				<I18nT key="error.hint">
-					<snippet
-						name="kbd"
-						params="text"
+	<UIContainer
+		size="2xl"
+		class="site-error"
+	>
+		<section class="error">
+			<div class="copy">
+				<UIPageHeader
+					layout="landing"
+					bind:title="props.status === 404 ? t('error.notFoundTitle') : t('error.failedTitle')"
+					bind:description="props.status === 404 ? t('error.notFoundDetail') : t('error.failedDetail', { message: props.message })"
+				/>
+				<UIProse>
+					<p>
+						<I18nT key="error.hint">
+							<snippet
+								name="kbd"
+								params="text"
+							>
+								<kbd>{text}</kbd>
+							</snippet>
+						</I18nT>
+					</p>
+				</UIProse>
+				<p class="actions">
+					<UILink bind:href="home">{t('error.home')}</UILink>
+					<UILink
+						variant="outline"
+						bind:href="guide"
 					>
-						<kbd>{text}</kbd>
-					</snippet>
-				</I18nT>
-			</p>
-			<p class="actions">
-				<UILink bind:href="home">{t('error.home')}</UILink>
-				<UILink
-					variant="outline"
-					bind:href="guide"
-				>
-					{t('error.guide')}
-				</UILink>
-				<UILink
-					variant="outline"
-					bind:href="reference"
-				>
-					{t('error.reference')}
-				</UILink>
-			</p>
-		</div>
-		<div class="figure">
-			<CatFigure
-				bind:label="'FIG. ' + props.status"
-				bind:caption="props.status === 404 ? t('error.notFoundCaption') : t('error.failedCaption')"
-			/>
-		</div>
-	</section>
+						{t('error.guide')}
+					</UILink>
+					<UILink
+						variant="outline"
+						bind:href="reference"
+					>
+						{t('error.reference')}
+					</UILink>
+				</p>
+			</div>
+			<div class="figure">
+				<CatFigure
+					bind:label="'FIG. ' + props.status"
+					bind:caption="props.status === 404 ? t('error.notFoundCaption') : t('error.failedCaption')"
+				/>
+			</div>
+		</section>
+	</UIContainer>
 </template>
 
 <style scoped>
@@ -65,40 +69,28 @@
 		display: grid;
 		grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
 		align-items: center;
-		gap: 4rem;
-		margin: 0 auto;
-		padding: clamp(4rem, 12vh, 8rem) var(--gutter) clamp(4rem, 10vh, 7rem);
-		max-width: var(--container);
+		gap: var(--ui-space-16);
+		padding-block: var(--ui-space-20);
 	}
-	h1 {
-		margin: 0;
-		max-width: 40rem;
-		font-weight: var(--weight-display);
-		font-size: clamp(2rem, 4.2vw, 3.25rem);
-		line-height: 1.1;
-		letter-spacing: -0.03em;
-		text-wrap: balance;
-	}
-	.hint {
-		margin: 1.5rem 0 0;
-		color: var(--muted);
+	.copy {
+		display: grid;
+		gap: var(--ui-space-6);
 	}
 	.actions {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 0.6rem;
-		margin: 2rem 0 0;
+		gap: var(--ui-space-2);
+		margin: 0;
 	}
-	@media (max-width: 860px) {
+	@media (max-width: 54rem) {
 		.error {
 			grid-template-columns: minmax(0, 1fr);
-			gap: 3rem;
-			padding-right: 1rem;
-			padding-left: 1rem;
+			gap: var(--ui-space-10);
+			padding-block: var(--ui-space-10);
 		}
 		.figure {
 			order: -1;
-			max-width: 18rem;
+			max-width: var(--ui-floating-panel-width);
 		}
 	}
 </style>

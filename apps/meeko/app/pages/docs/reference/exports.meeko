@@ -8,7 +8,11 @@
 
 	import { readPage } from '../../../../server/content/db'
 
-	export const route = definePage({ render: 'ssr' })
+	export const route = definePage({
+		render: 'ssr',
+		layout: 'docs',
+		layoutProps: ({ data }: { data: ExportsPage }) => ({ nav: data.nav, current: data.current, toc: data.toc, pager: data.pages, editUrl: data.editUrl, source: data.source, i18n: data.i18n }),
+	})
 
 	type ExportsPage = {
 		readonly groups: readonly ApiIndexGroup[]
@@ -64,88 +68,78 @@
 </script>
 
 <template>
-	<DocsLayout
-		bind:nav="nav"
-		bind:current="current"
-		bind:toc="toc"
-		bind:pager="pages"
-		bind:editUrl="editUrl"
-		bind:source="source"
-		bind:i18n="i18n"
-	>
-		<article class="prose reference">
-			<h1>{t('docs.reference.allExports')}</h1>
-			<p class="lead">{t('docs.exports.lead', { total })}</p>
-			<p>
-				<I18nT key="docs.exports.index">
-					<snippet
-						name="a"
-						params="text"
-					>
-						<a bind:href="index">{text}</a>
-					</snippet>
-				</I18nT>
-			</p>
-			<div
-				class="filters"
-				role="search"
-				data-pagefind-ignore
-			>
-				<label
-					class="field"
-					for="api-filter"
+	<UIProse as="article">
+		<h1>{t('docs.reference.allExports')}</h1>
+		<p>{t('docs.exports.lead', { total })}</p>
+		<p>
+			<I18nT key="docs.exports.index">
+				<snippet
+					name="a"
+					params="text"
 				>
-					<svg
-						viewBox="0 0 24 24"
-						aria-hidden="true"
-					>
-						<path d="M4 6h16M7 12h10M10 18h4" />
-					</svg>
-					<span class="sr-only">{t('docs.exports.filter')}</span>
-					<input
-						id="api-filter"
+					<a bind:href="index">{text}</a>
+				</snippet>
+			</I18nT>
+		</p>
+		<div
+			class="filters"
+			role="search"
+			data-pagefind-ignore
+		>
+			<UIField
+				id="api-filter"
+				bind:label="t('docs.exports.filter')"
+			>
+				<snippet
+					name="default"
+					params="id, describedBy"
+				>
+					<UIInput
 						type="search"
 						autocomplete="off"
-						spellcheck="false"
 						model="query"
+						bind:spellcheck="false"
+						bind:id="id"
+						bind:describedBy="describedBy"
 						bind:placeholder="t('docs.exports.placeholder')"
 					/>
-				</label>
-				<div
-					class="kinds"
-					role="group"
-					bind:aria-label="t('docs.exports.kinds')"
+				</snippet>
+			</UIField>
+			<div
+				class="kinds"
+				role="group"
+				bind:aria-label="t('docs.exports.kinds')"
+			>
+				<UIButton
+					size="sm"
+					bind:variant="kind.value === 'all' ? 'secondary' : 'outline'"
+					bind:aria-pressed="String(kind.value === 'all')"
+					on:click="() => choose('all')"
 				>
-					<button
-						type="button"
-						bind:aria-pressed="String(kind.value === 'all')"
-						on:click="() => choose('all')"
-					>
-						{t('docs.exports.all')}
-					</button>
-					<button
-						each:of="kinds"
-						each:as="entry"
-						each:key="entry.kind"
-						type="button"
-						bind:aria-pressed="String(kind.value === entry.kind)"
-						on:click="() => choose(entry.kind)"
-					>
-						{entry.label}
-						<span class="tally">{entry.count}</span>
-					</button>
-				</div>
-				<p
-					class="count"
-					aria-live="polite"
+					{t('docs.exports.all')}
+				</UIButton>
+				<UIButton
+					each:of="kinds"
+					each:as="entry"
+					each:key="entry.kind"
+					size="sm"
+					bind:variant="kind.value === entry.kind ? 'secondary' : 'outline'"
+					bind:aria-pressed="String(kind.value === entry.kind)"
+					on:click="() => choose(entry.kind)"
 				>
-					{count.value === total ? t('docs.exports.total', { total }) : t('docs.exports.partial', { count: count.value, total })}
-				</p>
+					{entry.label}
+					<UIBadge>{entry.count}</UIBadge>
+				</UIButton>
 			</div>
 			<p
-				if:when="count.value === 0"
-				class="empty"
+				class="count"
+				aria-live="polite"
 			>
+				{count.value === total ? t('docs.exports.total', { total }) : t('docs.exports.partial', { count: count.value, total })}
+			</p>
+		</div>
+		<UIEmpty if:when="count.value === 0">
+			<snippet name="title">
 				<I18nT
 					key="docs.exports.empty"
 					bind:values="{ query: query.value.trim() }"
@@ -157,184 +151,65 @@
 						<kbd>{text}</kbd>
 					</snippet>
 				</I18nT>
-			</p>
-			<section
-				each:of="visible.value"
-				each:as="group"
-				each:key="group.id"
-				class="group"
+			</snippet>
+		</UIEmpty>
+		<section
+			each:of="visible.value"
+			each:as="group"
+			each:key="group.id"
+		>
+			<h2 bind:id="group.id">
+				<code if:when="group.specifier">{group.specifier}</code>
+				<span if:when="!group.specifier">{group.title}</span>
+			</h2>
+			<p html="group.description" />
+			<div
+				each:of="group.sections"
+				each:as="section"
+				each:key="section.kind"
 			>
-				<h2 bind:id="group.id">
-					<code if:when="group.specifier">{group.specifier}</code>
-					<span if:when="!group.specifier">{group.title}</span>
-				</h2>
-				<p
-					class="group-description"
-					html="group.description"
-				/>
-				<div
-					each:of="group.sections"
-					each:as="section"
-					each:key="section.kind"
-					class="kind"
-				>
-					<h3>{section.title}</h3>
-					<ul class="entries">
-						<li
-							each:of="section.items"
-							each:as="item"
-							each:key="item.href"
-						>
-							<a
-								class="name"
-								bind:href="item.href"
-							>
-								<code>{item.name}</code>
-							</a>
-							<span
-								if:when="item.deprecated"
-								class="deprecated"
-							>
-								{t('docs.reference.deprecatedLower')}
-							</span>
-							<span
-								class="summary"
-								html="item.summary"
-							/>
-						</li>
-					</ul>
-				</div>
-			</section>
-		</article>
-	</DocsLayout>
+				<h3>{section.title}</h3>
+				<ul class="entries">
+					<li
+						each:of="section.items"
+						each:as="item"
+						each:key="item.href"
+					>
+						<a bind:href="item.href">
+							<code>{item.name}</code>
+						</a>
+						<UIBadge if:when="item.deprecated">{t('docs.reference.deprecatedLower')}</UIBadge>
+						<span
+							class="summary"
+							html="item.summary"
+						/>
+					</li>
+				</ul>
+			</div>
+		</section>
+	</UIProse>
 </template>
 
 <style scoped>
-	.reference {
-		max-width: 56rem;
-	}
-	.lead {
-		color: var(--ink-soft);
-		font-size: 1.05rem;
-	}
 	.filters {
 		display: grid;
-		gap: 0.75rem;
-		margin: 1.75rem 0 0.5rem;
-	}
-	.field {
-		display: flex;
-		align-items: center;
-		gap: 0.6rem;
-		transition: border-color 0.15s;
-		border: 1px solid var(--line);
-		border-radius: var(--radius);
-		background: var(--surface);
-		padding: 0 0.9rem;
-		height: 42px;
-		color: var(--muted);
-	}
-	.field:focus-within {
-		border-color: var(--accent);
-	}
-	.field input {
-		flex: 1;
-		outline: 0;
-		border: 0;
-		background: transparent;
-		min-width: 0;
-		color: var(--ink);
-		font: inherit;
-		font-size: 1rem;
-	}
-	.field input::placeholder {
-		color: var(--muted);
-	}
-	svg {
-		flex: none;
-		fill: none;
-		stroke: currentColor;
-		stroke-linecap: round;
-		stroke-width: 2;
-		width: 18px;
-		height: 18px;
+		gap: var(--ui-space-3);
+		margin-block: var(--ui-space-6) var(--ui-space-2);
+		max-width: var(--ui-prose-measure);
 	}
 	.kinds {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 0.4rem;
-	}
-	.kinds button {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.4rem;
-		transition:
-			border-color 0.15s,
-			background-color 0.15s;
-		cursor: pointer;
-		border: 1px solid var(--line);
-		border-radius: 999px;
-		background: var(--bg);
-		padding: 0.28rem 0.75rem;
-		color: var(--ink-soft);
-		font: 500 0.84rem/1.4 var(--font-ui);
-	}
-	.kinds button:hover {
-		border-color: var(--accent);
-		color: var(--ink);
-	}
-	.kinds button[aria-pressed='true'] {
-		border-color: var(--accent);
-		background: var(--accent-soft);
-		color: var(--accent-ink);
-	}
-	.tally {
-		color: var(--muted);
-		font: 500 0.75rem var(--font-mono);
-		font-variant-numeric: tabular-nums;
-	}
-	.kinds button[aria-pressed='true'] .tally {
-		color: inherit;
+		gap: var(--ui-space-1-5);
 	}
 	.count {
 		margin: 0;
-		color: var(--muted);
-		font-size: 0.88rem;
+		font-size: var(--ui-font-size-md);
 		font-variant-numeric: tabular-nums;
-	}
-	.empty {
-		border: 1px dashed var(--line);
-		border-radius: var(--radius);
-		padding: 1rem 1.2rem;
-		color: var(--ink-soft);
-	}
-	.empty kbd {
-		border: 1px solid var(--line);
-		border-bottom-width: 2px;
-		border-radius: 5px;
-		background: var(--surface);
-		padding: 0.05rem 0.4rem;
-		font: 500 0.8rem var(--font-mono);
-	}
-	.group h2 code {
-		border: 0;
-		background: none;
-		padding: 0;
-		font-size: 0.82em;
-		letter-spacing: 0;
-	}
-	.group-description {
-		max-width: 46rem;
-		color: var(--ink-soft);
-	}
-	.kind h3 {
-		margin: 1.6rem 0 0.4rem;
-		color: var(--ink);
-		font: 500 0.85rem/1.4 var(--font-ui);
 	}
 	.entries {
 		margin: 0;
-		border-top: 1px solid var(--line);
+		border-block-start: var(--ui-border-width) solid var(--ui-color-border);
 		padding: 0;
 		list-style: none;
 	}
@@ -342,47 +217,20 @@
 		display: grid;
 		grid-template-columns: minmax(11rem, 17rem) minmax(0, 1fr);
 		align-items: baseline;
-		gap: 0.25rem 1.25rem;
+		gap: var(--ui-space-1) var(--ui-space-5);
 		margin: 0;
-		border-bottom: 1px solid var(--line);
-		padding: 0.55rem 0;
+		border-block-end: var(--ui-border-width) solid var(--ui-color-border);
+		padding: var(--ui-space-2) 0;
 	}
-	.name {
-		text-decoration: none;
+	.entries a {
 		overflow-wrap: anywhere;
-	}
-	.name code {
-		border: 0;
-		background: none;
-		padding: 0;
-		color: var(--accent-ink);
-		font-weight: 600;
-		font-size: 0.9rem;
-	}
-	.name:hover code {
-		text-decoration: underline;
-		text-underline-offset: 0.18em;
-	}
-	.deprecated {
-		grid-column: 1;
-		justify-self: start;
-		border: 1px solid var(--line-strong);
-		border-radius: 999px;
-		padding: 0 0.45rem;
-		color: var(--ink-soft);
-		font: 500 0.7rem/1.5 var(--font-ui);
 	}
 	.summary {
 		grid-row: 1;
 		grid-column: 2;
-		color: var(--ink-soft);
-		font-size: 0.92rem;
-		line-height: 1.5;
+		font-size: var(--ui-font-size-md);
 	}
-	.summary :global(code) {
-		font-size: 0.84em;
-	}
-	@media (max-width: 640px) {
+	@media (max-width: 40rem) {
 		.entries li {
 			grid-template-columns: minmax(0, 1fr);
 		}

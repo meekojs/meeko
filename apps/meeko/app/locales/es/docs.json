@@ -1,21 +1,7 @@
 {
 	"docs": {
 		"layout": {
-			"contents": "Índice",
-			"sidebar": "Documentación",
-			"featured": "Destacado",
-			"onThisPage": "En esta página",
-			"pager": "Páginas anterior y siguiente",
-			"previous": "Anterior",
-			"next": "Siguiente",
-			"edit": "Editar en GitHub"
-		},
-		"notice": {
-			"untranslatedTitle": "Esta página aún no está traducida.",
-			"untranslatedBody": "Se muestra el original en español mientras llega la traducción.",
-			"outdatedTitle": "La traducción puede estar desactualizada.",
-			"outdatedBody": "El original en español cambió después de traducirse esta página.",
-			"original": "Ver la versión en español"
+			"featured": "Destacado"
 		},
 		"index": {
 			"title": "Documentación",

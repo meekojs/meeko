@@ -27,10 +27,13 @@ const permissions = [
 ].join(', ')
 
 export default defineMeekoConfig({
-	modules: ['@meekojs/ui', '@meekojs/i18n'],
+	// meeko-docs without `docs.site`: only its components. The moderation and the sitemap of this site come
+	// from the snapshot.
+	modules: ['@meekojs/ui', 'meeko-docs', '@meekojs/i18n'],
+	viewTransitions: true,
 	// Spanish keeps the URLs of always, without prefix; English is served under /en/… from the same
-	// pages. Nothing redirects by Accept-Language or cookie: the layout only suggests the reader's
-	// language (app/components/LocaleSuggestion.meeko). The documentation comes from the snapshot in
+	// pages. Nothing redirects by Accept-Language or cookie: the shell only suggests the reader's
+	// language (app/components/SiteShell.meeko). The documentation comes from the snapshot in
 	// the language of the URL, with the Spanish page and a notice when its translation is missing.
 	i18n: {
 		defaultLocale: 'es',
@@ -39,22 +42,17 @@ export default defineMeekoConfig({
 				common: 'app/locales/es/common.json',
 				docs: 'app/locales/es/docs.json',
 				home: 'app/locales/es/home.json',
-				suggestion: 'app/locales/es/suggestion.json',
 				shell: 'node_modules/meeko-docs/locales/es/shell.json',
 			},
 			en: {
 				common: 'app/locales/en/common.json',
 				docs: 'app/locales/en/docs.json',
 				home: 'app/locales/en/home.json',
-				suggestion: 'app/locales/en/suggestion.json',
 				shell: 'node_modules/meeko-docs/locales/en/shell.json',
 			},
 		},
-		// The namespace of the shared shell (meeko-docs): its components (the «¿Te sirvió?» widget)
-		// read it on every route, the error page included.
+		// The namespace of the shared shell (meeko-docs), painted on every route, the error page included.
 		global: ['shell'],
-		// The suggestion is written in the language it offers, so its few messages load in both.
-		multilingual: ['suggestion'],
 		// Shared with the other sites of meekojs.com; on another host (localhost) it stays on that host.
 		cookie: { name: 'meeko-locale', domain: 'meekojs.com' },
 		routes: {
@@ -66,34 +64,6 @@ export default defineMeekoConfig({
 			'/docs/reference/[symbol]': ['docs'],
 		},
 	},
-	ui: {
-		tokens: {
-			accent: 'var(--accent)',
-			accentHover: 'var(--accent-ink)',
-			onAccent: 'var(--on-accent)',
-			primary: 'var(--pill)',
-			primaryHover: 'var(--pill-hover)',
-			onPrimary: 'var(--on-pill)',
-			surface: 'var(--surface)',
-			surfaceHover: 'var(--surface-2)',
-			text: 'var(--ink)',
-			textSoft: 'var(--ink-soft)',
-			muted: 'var(--muted)',
-			border: 'var(--line)',
-			borderStrong: 'var(--line-strong)',
-			danger: 'var(--danger)',
-			focus: 'var(--accent)',
-			radius: 'var(--radius)',
-			font: 'var(--font-ui)',
-			controlHeight: '2.6rem',
-			controlPadding: '0 1.25rem',
-			controlWeight: '520',
-			controlFontSize: '0.95rem',
-			accentSoft: 'var(--accent-soft)',
-			accentText: 'var(--accent-ink)',
-		},
-		defaults: { button: { shape: 'pill' }, link: { shape: 'pill' } },
-	},
 	// Canonical URLs, og:url, sitemap.xml and robots.txt use this origin.
 	site: 'https://meekojs.com',
 	// Both documents are served from the active documentation snapshot.
@@ -102,7 +72,7 @@ export default defineMeekoConfig({
 	// Light, dark or the system's, in the cookie and localStorage "meeko-theme" (the key the site
 	// used before, so earlier choices still apply). Dark until the visitor chooses. Every page is
 	// prerendered, so Meeko's inline script in <head> applies the stored theme before the first
-	// paint, and the ThemeToggle of the layout (useTheme) follows it.
+	// paint, and the UIThemeToggle of the shell follows it.
 	theme: { default: 'dark' },
 	// Documentation is rendered from PostgreSQL on each request.
 	server: {
@@ -148,13 +118,11 @@ export default defineMeekoConfig({
 		seo: true,
 		head: {
 			link: [
-				// Inter, self-hosted (app/styles/tokens.css): preloaded so the first paint already uses it.
-				{ rel: 'preload', href: '/fonts/inter-latin-opsz-normal.woff2', as: 'font', type: 'font/woff2', crossorigin: 'anonymous' },
 				{ rel: 'icon', type: 'image/png', sizes: '64x64', href: '/brand/favicon-64.png' },
 				{ rel: 'apple-touch-icon', href: '/brand/apple-touch-icon.png' },
 			],
 			meta: [
-				{ name: 'theme-color', content: '#0a0b0d' },
+				{ name: 'theme-color', content: '#000000' },
 				{ property: 'og:type', content: 'website' },
 				{ property: 'og:site_name', content: 'Meeko' },
 				{ property: 'og:image', content: 'https://meekojs.com/brand/apple-touch-icon.png' },

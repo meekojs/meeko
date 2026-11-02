@@ -59,7 +59,7 @@ export interface TaxonomyGroup {
 
 /**
  * The 16 px stroke icon of each group, as the `d` of a `<path>` drawn with a 1.4 px round stroke
- * (DocsLayout and the index of the reference).
+ * (the sidebar of the site and the index of the reference).
  */
 export const groupIcons: Readonly<Record<string, string>> = {
 	// A box: the tags that render a piece of interface.

@@ -62,6 +62,8 @@ async function seed(load, schema) {
 			await admin.query(`INSERT INTO ${schema}.docs_pages (snapshot_id, locale, path, payload, searchable_text, translation) SELECT $1, locale, path, payload, searchable_text, translation FROM ${source}.docs_pages WHERE snapshot_id = $2`, [snapshot, active.id])
 			const paths = (await db.query("SELECT path FROM docs_pages WHERE locale = 'es' AND path = ANY($1)", [[hidden, featured, exportsIndex, hiddenInEnglish, hiddenEverywhere]])).rows.map((row) => row.path)
 			assert.deepEqual(paths.sort(), [hidden, featured, exportsIndex, hiddenInEnglish, hiddenEverywhere].sort(), 'the snapshot has the pages the test moderates')
+			// A translation older than its original, whatever the state of the development snapshot.
+			await db.query(`UPDATE docs_pages SET payload = jsonb_set(payload, '{i18n,status}', '"outdated"') WHERE locale = 'en' AND path = $1`, [featured])
 			await saveModerationRule(db, { site: 'site', path: hidden, action: 'hide', reason: 'e2e', author: 'e2e' })
 			await saveModerationRule(db, { site: 'site', path: featured, action: 'feature', author: 'e2e' })
 			const warning = await createAnnouncement(db, { site: 'site', message: 'Aviso de prueba: mantenimiento el sábado.', tone: 'warning', active: true, author: 'e2e' })
@@ -219,6 +221,14 @@ test('the site hides, features and announces what the dashboard moderates', { sk
 		const errors = []
 		page.on('pageerror', (error) => errors.push(error.message))
 
+		// A translation older than its original stays published, with a warning and a link to the original.
+		await page.goto(base + '/en' + featured, { waitUntil: 'networkidle' })
+		const outdated = page.locator('.docs-untranslated')
+		assert.equal((await outdated.locator('.meeko-ui-alert-title').textContent())?.trim(), 'This translation may be out of date')
+		assert.equal(await outdated.locator('a').getAttribute('href'), featured)
+		assert.equal(await outdated.locator('a').getAttribute('hreflang'), 'es')
+		assert.equal(await page.locator('main article').evaluate((element) => element.closest('[lang]')?.getAttribute('lang')), 'en', 'its text is the translation')
+
 		// The hidden page answers 404 with the error page.
 		const missing = await page.goto(base + hidden)
 		assert.equal(missing.status(), 404)
@@ -226,9 +236,9 @@ test('the site hides, features and announces what the dashboard moderates', { sk
 		// The sidebar and the index: no hidden page, one featured badge.
 		const guide = await page.goto(base + '/docs/framework', { waitUntil: 'networkidle' })
 		assert.equal(guide.status(), 200)
-		const sidebar = page.locator('#docs-nav')
+		const sidebar = page.locator('#docs-navigation')
 		assert.equal(await sidebar.locator(`a[href="${hidden}"]`).count(), 0, 'not in the sidebar')
-		assert.equal((await sidebar.locator(`a[href="${featured}"] .featured`).textContent())?.trim(), 'Destacado')
+		assert.equal((await sidebar.locator(`a[href="${featured}"] .meeko-ui-badge`).textContent())?.trim(), 'Destacado')
 		await page.goto(base + '/docs', { waitUntil: 'networkidle' })
 		assert.equal(await page.locator(`main a[href="${hidden}"]`).count(), 0, 'not in /docs')
 		assert.equal(await page.locator(`main a[href="${featured}"] .featured`).count(), 1)
@@ -255,14 +265,14 @@ test('the site hides, features and announces what the dashboard moderates', { sk
 		const fresh = await moderate(load, schema, async (db, { createAnnouncement }) => createAnnouncement(db, { site: 'site', message: 'Aviso nuevo durante la sesión.', tone: 'success', active: true, author: 'e2e' }))
 		await cacheWait()
 		assert.equal(await page.getByRole('status').filter({ hasText: fresh.message }).count(), 0, 'not before a navigation')
-		await page.locator(`#docs-nav a[href="${featured}"]`).first().click()
+		await page.locator(`#docs-navigation a[href="${featured}"]`).first().click()
 		await page.waitForURL(base + featured)
 		await page.getByRole('status').filter({ hasText: fresh.message }).waitFor({ timeout: 10_000 })
 		assert.equal(await page.evaluate(() => globalThis.__e2eSession), 'same document', 'it arrived without a reload')
 		// And it leaves on the next navigation once the dashboard deletes it.
 		await moderate(load, schema, async (db, { deleteAnnouncement }) => deleteAnnouncement(db, fresh.id))
 		await cacheWait()
-		await page.locator('#docs-nav a[href="/docs/framework"]').first().click()
+		await page.locator('#docs-navigation a[href="/docs/framework"]').first().click()
 		await page.waitForURL(base + '/docs/framework')
 		await page.getByRole('status').filter({ hasText: fresh.message }).waitFor({ state: 'detached', timeout: 10_000 })
 		assert.equal(await page.evaluate(() => globalThis.__e2eSession), 'same document')

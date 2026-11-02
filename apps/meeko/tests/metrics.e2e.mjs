@@ -138,7 +138,7 @@ test('the site counts views, confirmed searches and «¿Te sirvió?» without co
 		await page.evaluate(() => {
 			globalThis.__e2eDocument = 'same'
 		})
-		await page.locator(`#docs-nav a[href="${second}"]`).first().click()
+		await page.locator(`#docs-navigation a[href="${second}"]`).first().click()
 		await page.waitForURL(base + second)
 		await until(async () => (await views(second)) === 1, `one view of ${second} after a client navigation`)
 		assert.equal(await page.evaluate(() => globalThis.__e2eDocument), 'same', 'it was a client navigation')
@@ -161,8 +161,8 @@ test('the site counts views, confirmed searches and «¿Te sirvió?» without co
 		await new Promise((done) => setTimeout(done, 1500))
 		assert.deepEqual((await db.query('SELECT query, results FROM docs_searches ORDER BY id')).rows, [{ query: nothing, results: 0 }], 'one row, without its prefixes')
 		assert.deepEqual(searches, [{ query: nothing, results: 0 }])
-		await page.locator('dialog.search').getByRole('button', { name: 'Esc' }).click()
-		await page.locator('dialog.search').waitFor({ state: 'hidden' })
+		await page.locator('dialog.meeko-ui-command').getByRole('button', { name: 'Cerrar la búsqueda' }).click()
+		await page.locator('dialog.meeko-ui-command').waitFor({ state: 'hidden' })
 
 		// «¿Te sirvió?» with JavaScript: «No» with a comment, then thanks.
 		const widget = page.locator('#docs-feedback')

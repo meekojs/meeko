@@ -31,106 +31,85 @@
 </script>
 
 <template>
-	<section
-		class="index"
-		data-pagefind-ignore
+	<UIContainer
+		size="2xl"
+		class="docs-index"
 	>
-		<h1>{t('docs.index.title')}</h1>
-		<p class="lead">
-			<I18nT key="docs.index.lead">
-				<snippet
-					name="code"
-					params="text"
-				>
-					<code>{text}</code>
-				</snippet>
-			</I18nT>
-		</p>
-		<section
-			each:of="sections"
-			each:as="section"
-			each:key="section.title"
-		>
-			<h2>{section.title}</h2>
-			<ul>
-				<li
-					each:of="section.docs"
-					each:as="doc"
-					each:key="doc.href"
-				>
-					<UILinkCard
-						to="/docs/[slug]"
-						bind:params="{ slug: slugOf(doc.href) }"
-						bind:title="doc.title"
-						bind:description="doc.description"
+		<section data-pagefind-ignore>
+			<UIPageHeader bind:title="t('docs.index.title')">
+				<UIProse>
+					<p>
+						<I18nT key="docs.index.lead">
+							<snippet
+								name="code"
+								params="text"
+							>
+								<code>{text}</code>
+							</snippet>
+						</I18nT>
+					</p>
+				</UIProse>
+			</UIPageHeader>
+			<section
+				each:of="sections"
+				each:as="section"
+				each:key="section.title"
+			>
+				<h2>{section.title}</h2>
+				<ul>
+					<li
+						each:of="section.docs"
+						each:as="doc"
+						each:key="doc.href"
 					>
-						<UIBadge
-							if:when="doc.featured"
-							tone="accent"
-							class="featured"
+						<UILinkCard
+							to="/docs/[slug]"
+							bind:params="{ slug: slugOf(doc.href) }"
+							bind:title="doc.title"
+							bind:description="doc.description"
 						>
-							{t('docs.layout.featured')}
-						</UIBadge>
-					</UILinkCard>
-				</li>
-			</ul>
+							<UIBadge
+								if:when="doc.featured"
+								tone="accent"
+								class="featured"
+							>
+								{t('docs.layout.featured')}
+							</UIBadge>
+						</UILinkCard>
+					</li>
+				</ul>
+			</section>
 		</section>
-	</section>
+	</UIContainer>
 </template>
 
 <style scoped>
-	.index {
-		margin: 0 auto;
-		padding: clamp(3rem, 8vh, 5rem) var(--gutter) 5rem;
-		max-width: var(--container);
-	}
-	h1 {
-		margin: 0;
-		font-weight: var(--weight-display);
-		font-size: clamp(2.2rem, 4.5vw, 3.25rem);
-		line-height: 1.08;
-		letter-spacing: var(--tracking-display);
-	}
-	.lead {
-		margin: 1rem 0 3rem;
-		max-width: 38rem;
-		color: var(--muted);
-		font-size: 1.1rem;
-		line-height: 1.55;
-	}
-	.lead code {
-		color: var(--ink-soft);
-		font-size: 0.9em;
-	}
-	section + section {
-		margin-top: 2.75rem;
+	section > section {
+		margin-block-start: var(--ui-space-10);
 	}
 	h2 {
-		margin: 0 0 1rem;
-		border-bottom: 1px solid var(--line);
-		padding-bottom: 0.75rem;
-		color: var(--ink);
-		font-weight: 500;
-		font-size: 0.95rem;
-		letter-spacing: -0.01em;
+		margin: 0 0 var(--ui-space-4);
+		color: var(--ui-color-text);
+		font-weight: var(--ui-font-weight-semibold);
+		font-size: var(--ui-font-size-xl);
+		line-height: var(--ui-line-height-snug);
+		letter-spacing: var(--ui-tracking-tight);
 	}
 	ul {
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(16.5rem, 1fr));
-		gap: 0.75rem;
+		grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--ui-floating-panel-width)), 1fr));
+		gap: var(--ui-space-3);
 		margin: 0;
 		padding: 0;
 		list-style: none;
 	}
-	/* Under the description of a card the dashboard features. */
-	ul :global(.featured) {
-		align-self: flex-start;
-		margin-top: 0.6rem;
-		font-size: 0.72rem;
+	li {
+		display: grid;
 	}
-	@media (max-width: 640px) {
-		.index {
-			padding: 2.5rem var(--gutter) 3.5rem;
-		}
+	li :global(.featured) {
+		align-self: flex-start;
+	}
+	:global(.docs-index) {
+		padding-block: var(--ui-space-12) var(--ui-space-20);
 	}
 </style>
