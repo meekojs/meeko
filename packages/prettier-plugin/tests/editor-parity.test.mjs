@@ -79,6 +79,12 @@ test('the core and the plugin keep the same adjacent inline content with htmlWhi
 	assert.doesNotMatch(cli, /<\/code>\s+\./)
 })
 
+test('the core and the plugin keep the same whitespace with htmlWhitespaceSensitivity "ignore"', async () => {
+	for (const template of ['<ul><li each:of="a" each:as="b">{b}</li></ul>', '<div><button class="a" id="b">x</button><button>y</button></div>', '\n<p>\ntext\n</p>\n', ' <p>Hi<b> you</b></p>', '<span> </span>', ' ']) {
+		await assertSameEverywhere(`<template>${template}</template>\n`, { filepath: 'Component.meeko', htmlWhitespaceSensitivity: 'ignore', singleAttributePerLine: true, meekoIndentSections: true })
+	}
+})
+
 test('the core and the plugin give the same result with the design system of the project', async () => {
 	const source = `<script lang="ts">\nconst a = tv({ base: "text-white custom bg-brand flex" });\n</script>\n\n<template>\n<Card class="text-white flex" />\n<p bind:class="on ? 'text-white flex' : ''"></p>\n</template>\n`
 	const cli = await assertSameEverywhere(source, { filepath: `${fixture}app/components/Probe.meeko`, meekoClassFunctions: classFunctions, meekoSortClasses: 'tailwind', printWidth: 200 })

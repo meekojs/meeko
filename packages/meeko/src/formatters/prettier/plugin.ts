@@ -283,12 +283,16 @@ const meekoPrinter: Printer<MeekoNode> = {
       const open = verbatim(options, node.start, node.contentStart);
       const close = verbatim(options, node.contentEnd, node.end);
       const content = text.slice(node.contentStart, node.contentEnd);
-      if (!content.trim()) return [open, close];
+      // The compiler renders this whitespace as text nodes: `<template><p></p></template>` has none.
+      const keepsEdges = parser === templateParserName && options.htmlWhitespaceSensitivity === "ignore";
+      if (!content.trim()) return keepsEdges && content ? [open, " ", close] : [open, close];
       // The script needs it too: its class functions know the classes of the component's `<style>`.
       const classOrder = parser === templateParserName || parser === "typescript" ? (path.root as MeekoRootNode).classOrder : undefined;
       const body = await textToDoc(content, { parser, __embeddedInHtml: true, ...(classOrder ? { [classOrderOption]: classOrder } : {}) });
       const indented = (options as MeekoPrettierOptions).meekoIndentSections === true;
-      return [open, indented ? indent([hardline, body]) : [hardline, body], hardline, close];
+      const before = !keepsEdges || /^[\t\n\f\r ]/.test(content) ? hardline : "";
+      const after = !keepsEdges || /[\t\n\f\r ]$/.test(content) ? hardline : "";
+      return [open, indented ? indent([before, body]) : [before, body], after, close];
     };
   },
 };

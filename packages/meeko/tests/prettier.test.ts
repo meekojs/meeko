@@ -1,3 +1,4 @@
+import { Window } from "happy-dom";
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -531,18 +532,50 @@ describe("Prettier in the language server", () => {
       assert.equal(await lspFormat(root, messy, {}, join(root, "packages", "app", "src", "Frozen.meeko")), messy);
     });
 
-    test("the single-line templates of Popover, Select and ThemeToggle are not reformatted", async () => {
-      const components = resolve("../ui/src/app/components");
-      for (const name of ["Popover", "Select", "ThemeToggle"]) {
-        const filename = join(components, `${name}.meeko`);
-        const text = await readFile(filename, "utf8");
-        const direct = await formatWithPrettier({ text, filename, tabSize: 4, insertSpaces: false, trusted: true });
-        assert.equal(direct?.ignored, true, `${name}.meeko must stay in .prettierignore`);
-        assert.equal(await lspFormat(resolve("../.."), text, {}, filename), text, `${name}.meeko must keep its template on one line`);
-      }
-      const regular = join(components, "Card.meeko");
-      assert.equal((await formatWithPrettier({ text: await readFile(regular, "utf8"), filename: regular, tabSize: 4, insertSpaces: false, trusted: true }))?.ignored, undefined);
-    });
+  });
+
+  test("saving a component keeps what it renders: no text node appears or disappears", async () => {
+    const script = `<script lang="ts">\nimport { signal } from "@meekojs/meeko";\nconst items = signal(["a", "b"]);\nconst on = signal(true);\nconst label = "x";\n</script>\n`;
+    const template = `<template><ul class="u" id="l"><li each:of="items.value" each:as="item" each:key="item" class="i">{item}</li></ul><div class="d" id="e"><button type="button" class="b" on:click="() => on.value = !on.value">{label}</button><button type="button">y</button><span if:when="on.value" class="s" id="t">Hi<b> you</b>!</span></div></template>`;
+    const options = { filepath: "Whitespace.meeko", plugins: [plugin], htmlWhitespaceSensitivity: "ignore", singleAttributePerLine: true, printWidth: 800, useTabs: true, meekoIndentSections: true } as const;
+    const source = `${script}${template}\n`;
+    const formatted = await format(source, options);
+    assert.notEqual(formatted, source, "the attributes go on their own lines");
+    await mkdir(resolve(".meeko"), { recursive: true });
+    const directory = await mkdtemp(join(resolve(".meeko"), "whitespace-"));
+    const window = new Window();
+    try {
+      const load = async (text: string, name: string) => {
+        const code = compile(text, join(directory, `${name}.meeko`)).code
+          .replace(`from "@meekojs/meeko/internal"`, `from ${JSON.stringify(pathToFileURL(resolve("src/internal.ts")).href)}`)
+          .replaceAll(`from "@meekojs/meeko"`, `from ${JSON.stringify(pathToFileURL(resolve("src/index.ts")).href)}`);
+        await writeFile(join(directory, `${name}.ts`), code);
+        return await import(pathToFileURL(join(directory, `${name}.ts`)).href) as { renderWithState(props: object): { html: string; state: Record<string, unknown> }; hydrate(root: unknown, props: object, state: Record<string, unknown>): () => void };
+      };
+      const texts = (node: { childNodes: ArrayLike<unknown> }): string[] => Array.from(node.childNodes as ArrayLike<{ nodeType: number; nodeValue: string; childNodes: ArrayLike<unknown> }>).flatMap((child) => child.nodeType === 3 ? [child.nodeValue] : texts(child));
+      const [before, after] = await Promise.all([load(source, "Source"), load(formatted, "Formatted")]);
+      const rendered = [before.renderWithState({}), after.renderWithState({})] as const;
+      assert.equal(rendered[1].html, rendered[0].html, "the HTML of the server");
+      const roots = rendered.map((result) => {
+        const root = window.document.createElement("main");
+        root.innerHTML = result.html;
+        return root;
+      });
+      assert.deepEqual(texts(roots[1]!), texts(roots[0]!), "the text nodes of the server");
+      assert.deepEqual(texts(roots[0]!), ["a", "b", "x", "y", "Hi", " you", "!"]);
+      const releases = [before.hydrate(roots[0], {}, rendered[0].state), after.hydrate(roots[1], {}, rendered[1].state)];
+      assert.equal(roots[1]!.innerHTML, roots[0]!.innerHTML, "the DOM after hydrating");
+      assert.deepEqual(texts(roots[1]!), texts(roots[0]!), "the text nodes after hydrating");
+      (roots[0]!.querySelector("button") as unknown as { click(): void }).click();
+      (roots[1]!.querySelector("button") as unknown as { click(): void }).click();
+      assert.equal(roots[1]!.innerHTML, roots[0]!.innerHTML, "the DOM after an update");
+      assert.equal(roots[1]!.querySelector("span"), null);
+      for (const release of releases) release();
+      assert.deepEqual(texts(roots[1]!), texts(roots[0]!), "the text nodes after releasing");
+    } finally {
+      await window.happyDOM.close();
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 
   test("a component that does not compile gets no edits", async () => {

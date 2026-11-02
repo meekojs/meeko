@@ -61,8 +61,8 @@ test('htmlWhitespaceSensitivity: "ignore" still splits the nodes that have a spa
 	const formatted = await format(source, ignoreWhitespace)
 	assert.match(formatted, /Uno\n\s*<code>a<\/code>\n\s*dos/)
 	assert.match(formatted, /<span>b<\/span>\n\s*<span>c<\/span>/)
-	// A component is not a phrasing element: its content can go on its own line.
-	assert.match(formatted, /size="y"\n>\n\s*Texto\n<\/UIButton>/)
+	// Its text has no whitespace in the source, and the component would render it inside the button.
+	assert.match(formatted, /size="y"\n\s*>Texto<\/UIButton\n>/)
 	assert.equal(await format(formatted, ignoreWhitespace), formatted)
 })
 

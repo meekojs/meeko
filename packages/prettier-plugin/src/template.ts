@@ -11,7 +11,7 @@ import { classExpressionOption } from './class-literals'
 import { classOrderOption, classTokens, sortClassTokens } from './classes'
 
 const { group, indent, label, softline } = builders
-const { mapDoc } = utils
+const { mapDoc, replaceEndOfLine } = utils
 
 /** Parser interno de la plantilla de un `.meeko`; sólo lo usa el parser `meeko` mediante `embed`. */
 export const templateParserName = 'meeko-template'
@@ -23,6 +23,7 @@ const wrapperEnd = '</template>'
 
 interface SourceLocation {
 	readonly offset: number
+	readonly line: number
 	moveBy(delta: number): SourceLocation
 }
 
@@ -41,6 +42,8 @@ interface HtmlNode {
 	children?: HtmlNode[]
 	attrs?: HtmlNode[]
 	sourceSpan: SourceSpan
+	startSourceSpan?: SourceSpan | null
+	endSourceSpan?: SourceSpan | null
 	valueSpan?: SourceSpan
 	readonly parent?: HtmlNode
 	readonly prev?: HtmlNode
@@ -49,6 +52,9 @@ interface HtmlNode {
 	hasLeadingSpaces?: boolean
 	isTrailingSpaceSensitive?: boolean
 	hasTrailingSpaces?: boolean
+	hasDanglingSpaces?: boolean
+	isDanglingSpaceSensitive?: boolean
+	isWhitespaceSensitive?: boolean
 	/** Expresión sin espacios exteriores de una interpolación `{expr}`. */
 	meekoExpression?: string
 	setProperty(property: string, value: unknown): void
@@ -293,43 +299,88 @@ function nextBorrowsClosingMarker(node: HtmlNode | undefined): boolean {
 	return Boolean(node?.prev && node.prev.kind !== 'text' && node.prev.kind !== 'comment' && node.isLeadingSpaceSensitive && !node.hasLeadingSpaces)
 }
 
-/** HTML elements that flow inside a line of text, where a space between or inside them is visible. */
-const phrasingElements = new Set(['a', 'abbr', 'b', 'bdi', 'bdo', 'cite', 'code', 'data', 'dfn', 'em', 'i', 'kbd', 'mark', 'q', 's', 'samp', 'small', 'span', 'strong', 'sub', 'sup', 'time', 'u', 'var'])
-
+/** Text and interpolations: the whitespace at their edges is part of a text node in the compiler. */
 function isTextLike(node: HtmlNode): boolean {
 	return node.kind === 'text' || node.kind === 'interpolation'
 }
 
-function isPhrasing(node: HtmlNode): boolean {
-	return node.kind === 'element' && node.name !== undefined && phrasingElements.has(node.name)
+/** What Prettier's printer joins with a soft line, which would drop the whitespace between them. */
+function isTextOrComment(node: HtmlNode): boolean {
+	return node.kind === 'text' || node.kind === 'comment'
+}
+
+function startsOnItsOwnLine(child: HtmlNode, parent: HtmlNode): boolean {
+	return Boolean(child.hasLeadingSpaces && parent.startSourceSpan && parent.startSourceSpan.end.line < child.sourceSpan.start.line)
+}
+
+function endsOnItsOwnLine(child: HtmlNode, parent: HtmlNode): boolean {
+	return Boolean(child.hasTrailingSpaces && parent.endSourceSpan && child.sourceSpan.end.line < parent.endSourceSpan.start.line)
+}
+
+function contentSpansLines(node: HtmlNode): boolean {
+	return Boolean(node.startSourceSpan && node.endSourceSpan && node.startSourceSpan.end.line < node.endSourceSpan.start.line)
 }
 
 /**
- * `htmlWhitespaceSensitivity: "ignore"` lets Prettier put every node on its own line, but the compiler
- * keeps the text of a template as written: `<code>x</code>.` would render as `x .`. Where the source
- * has no space between text and an element, between two phrasing elements or at the inner edge of a
- * phrasing element, the printer must not add one. The rest of that option stays as Prettier defines it.
+ * `<snippet name="a"> <b>x</b> </snippet>`: for the compiler that space is content, and with a line
+ * break it would be formatting. No line can break there, so the snippet is printed as written, unless
+ * a neighbor without whitespace prints part of its tags.
  */
-function keepAdjacentInlineContent(ast: HtmlNode): void {
+function isPrintedAsWritten(node: HtmlNode): boolean {
+	if (node.kind !== 'element' || node.name !== 'snippet') return false
+	if ((node.prev && node.isLeadingSpaceSensitive && !node.hasLeadingSpaces) || (node.next && node.isTrailingSpaceSensitive && !node.hasTrailingSpaces)) return false
+	const first = node.children?.[0]
+	const last = node.children?.[node.children.length - 1]
+	if (!first || !last) return Boolean(node.hasDanglingSpaces && !contentSpansLines(node))
+	return (!isTextLike(first) && Boolean(first.hasLeadingSpaces) && !startsOnItsOwnLine(first, node)) || (!isTextLike(last) && Boolean(last.hasTrailingSpaces) && !endsOnItsOwnLine(last, node))
+}
+
+/** A component with `<snippet>` blocks and nothing else: the compiler reads no text among them. */
+function holdsOnlySnippets(node: HtmlNode): boolean {
+	return /^[A-Z]/.test(node.name ?? '') && (node.children ?? []).every((child) => child.kind === 'comment' || (child.kind === 'element' && child.name === 'snippet'))
+}
+
+/**
+ * The compiler renders the whitespace of a template as text nodes, so saving a file must not add or
+ * remove any: `<li each:of="a" each:as="b">{b}</li>` keeps its text node without whitespace, and
+ * `Hi<b> you</b>` keeps its space. `htmlWhitespaceSensitivity: "ignore"` alone would do both.
+ * Formatting may still turn one whitespace into another (a space into a line break and indentation),
+ * which renders the same outside `white-space: pre`. The compiler itself drops whitespace in two
+ * places, which stay free: among the blocks of a component with only `<snippet>` content, and between
+ * an element and the edge of a `<snippet>` when that whitespace has a line break.
+ */
+function keepWhitespace(ast: HtmlNode): void {
 	ast.walk((node) => {
 		const children = node.children
-		if (!children?.length) return
-		if (isPhrasing(node)) {
-			const first = children[0]!
-			const last = children[children.length - 1]!
-			if (!first.hasLeadingSpaces) first.isLeadingSpaceSensitive = true
-			if (!last.hasTrailingSpaces) last.isTrailingSpaceSensitive = true
+		if (!children || (node.kind !== 'element' && node.kind !== 'root') || node.isWhitespaceSensitive || holdsOnlySnippets(node)) return
+		const snippet = node.name === 'snippet'
+		const first = children[0]
+		const last = children[children.length - 1]
+		if (!first || !last) {
+			if (node.hasDanglingSpaces && !(snippet && contentSpansLines(node))) node.isDanglingSpaceSensitive = true
+			return
+		}
+		// The whitespace at the edges of the root belongs to the `<template>` section: the `meeko` printer keeps it.
+		if (node.kind === 'element') {
+			if (!snippet || isTextLike(first) || (first.hasLeadingSpaces && !startsOnItsOwnLine(first, node))) first.isLeadingSpaceSensitive = true
+			if (!snippet || isTextLike(last) || (last.hasTrailingSpaces && !endsOnItsOwnLine(last, node))) last.isTrailingSpaceSensitive = true
 		}
 		for (let index = 1; index < children.length; index++) {
 			const previous = children[index - 1]!
 			const next = children[index]!
-			if (next.hasLeadingSpaces || previous.name === 'br' || next.name === 'br') continue
-			if (isTextLike(previous) || isTextLike(next) || (isPhrasing(previous) && isPhrasing(next))) {
-				previous.isTrailingSpaceSensitive = true
-				next.isLeadingSpaceSensitive = true
-			}
+			if (next.hasLeadingSpaces && !(isTextOrComment(previous) && isTextOrComment(next))) continue
+			previous.isTrailingSpaceSensitive = true
+			next.isLeadingSpaceSensitive = true
 		}
 	})
+}
+
+/** Content on its own lines stays there: `<p> text </p>` would render the same, but reads worse. */
+function keepsLineBreaks(node: HtmlNode): boolean {
+	if (node.kind !== 'element' || node.isWhitespaceSensitive) return false
+	const first = node.children?.[0]
+	const last = node.children?.[node.children.length - 1]
+	return Boolean(first && last && (startsOnItsOwnLine(first, node) || endsOnItsOwnLine(last, node)))
 }
 
 const visitorKeys: Record<string, readonly string[]> = {
@@ -349,15 +400,20 @@ const templatePrinter: Printer<HtmlNode> = {
 		options.parser = 'html'
 		try {
 			const processed = host(options).printer.preprocess(ast, options) as HtmlNode
-			if (options.htmlWhitespaceSensitivity === 'ignore') keepAdjacentInlineContent(processed)
+			if (options.htmlWhitespaceSensitivity === 'ignore') keepWhitespace(processed)
 			return processed
 		} finally {
 			options.parser = parser
 		}
 	},
 	print(path, options, print) {
+		const ignoresWhitespace = options.htmlWhitespaceSensitivity === 'ignore'
+		const { node } = path
+		if (ignoresWhitespace && isPrintedAsWritten(node)) return replaceEndOfLine(options.originalText.slice(node.sourceSpan.start.offset, node.sourceSpan.end.offset))
 		const printed = host(options).printer.print(path, options, print)
-		return path.node.kind === 'root' ? meekoBraces(printed) : printed
+		if (node.kind === 'root') return meekoBraces(printed)
+		const breaks = ignoresWhitespace && keepsLineBreaks(node) && typeof printed === 'object' && !Array.isArray(printed) && printed.type === 'group'
+		return breaks ? { ...printed, break: true } : printed
 	},
 	embed(path: AstPath<HtmlNode>, options: Options) {
 		const node = path.node
