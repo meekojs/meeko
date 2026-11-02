@@ -4,6 +4,7 @@ Paquete privado, sin versiones publicadas. Cada entrada describe un cambio del c
 
 ## Búsqueda
 
+- **`content/code-tags`: el código de una etiqueta se resalta al compilar.** `transformCodeTags` sustituye el `code` de un componente por el HTML de Shiki antes de que Meeko lo compile, y `codeLanguage` deduce el lenguaje de un bloque que no lo declara. `meeko-docs` lo usa con `<DocsCode>`: los ejemplos de ui e i18n tienen los colores de la documentación sin que Shiki llegue a un bundle.
 - **Los extractos de la búsqueda ya no llevan basura.** `searchable_text` indexaba cualquier texto del payload, también rutas, archivos y trazos de iconos (`/docs/reference/signal M9 1.75…`), y dejaba sin decodificar las entidades numéricas de Shiki (`&#x3C;`), que el cliente volvía a escapar. Ahora omite esos campos y valores y decodifica todas las entidades una vez. El esquema no cambia, pero los snapshots ya publicados conservan su texto: surte efecto al volver a publicar.
 
 ## Idiomas (i18n, fase 1B)

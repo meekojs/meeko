@@ -48,6 +48,7 @@ test('production i18n documentation renders guides, translates, switches locale 
 		assert.equal(response.status(), 200, route)
 		assert.equal(await page.locator('main h1').count(), 1, route)
 		assert.match(await page.title(), / · Meeko i18n$/, route)
+		assert.equal(await page.locator('.meeko-ui-code-block:has(pre:not(.shiki))').count(), 0, route)
 		assert.ok(await page.locator('meta[name="description"]').getAttribute('content'), route)
 	}
 	await page.goto(origin + '/installation')
@@ -175,6 +176,15 @@ test('production i18n documentation renders guides, translates, switches locale 
 	assert.equal(await page.title(), 'Esta página no existe · Meeko i18n')
 	await page.getByRole('link', { name: 'Ir a la instalación', exact: true }).click()
 	await page.getByRole('heading', { name: 'Instalación', level: 1 }).waitFor()
+	// A client navigation brings the highlighted code too, with the colors of the documentation of the site in each theme.
+	const keyword = page.locator('.meeko-ui-code-block .shiki span', { hasText: /^import$/ }).first()
+	const keywordColor = (theme) =>
+		keyword.evaluate((span, value) => {
+			globalThis.document.documentElement.dataset.theme = value
+			return globalThis.getComputedStyle(span).color
+		}, theme)
+	assert.equal(await keywordColor('dark'), 'rgb(195, 171, 245)')
+	assert.equal(await keywordColor('light'), 'rgb(106, 63, 196)')
 	assert.deepEqual(errors, [])
 })
 

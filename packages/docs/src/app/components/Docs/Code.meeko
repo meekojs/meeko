@@ -1,7 +1,10 @@
 <script lang="ts">
 	import { useI18n } from '@meekojs/i18n'
+	import { trustHtml } from '@meekojs/meeko'
 
-	const props = defineProps<{ code: string; label?: string }>()
+	// `code` is what a page writes; the `meeko-docs:code` plugin of the module replaces it, at build time,
+	// with `highlighted` and `lang` when it can read the text. The copy button then reads the `<pre>`.
+	const props = defineProps<{ code: string; label?: string; lang?: string; highlighted?: string }>()
 
 	const { t } = useI18n()
 </script>
@@ -9,7 +12,9 @@
 <template>
 	<UICodeBlock
 		bind:code="props.code"
-		bind:label="props.label ?? t('shell.code.label')"
+		bind:html="props.highlighted === undefined ? undefined : trustHtml(props.highlighted)"
+		bind:lang="props.lang"
+		bind:label="props.label ?? (props.lang === undefined ? t('shell.code.label') : undefined)"
 		bind:labelLang="props.label === undefined ? t('shell.meta.lang') : undefined"
 		bind:uiLang="t('shell.meta.lang')"
 		bind:copyLabel="t('shell.code.copy')"

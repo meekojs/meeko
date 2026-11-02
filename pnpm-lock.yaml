@@ -432,6 +432,10 @@ importers:
       meeko-docs-content:
         specifier: workspace:*
         version: link:../docs-content
+    devDependencies:
+      tsx:
+        specifier: ^4.20.0
+        version: 4.23.15
 
   packages/docs-content:
     dependencies:

@@ -24,5 +24,8 @@
 		"@meekojs/meeko": "workspace:*",
 		"@meekojs/ui": "workspace:*",
 		"meeko-docs-content": "workspace:*"
+	},
+	"devDependencies": {
+		"tsx": "^4.20.0"
 	}
 }
