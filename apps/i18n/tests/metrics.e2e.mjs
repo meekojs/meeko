@@ -55,7 +55,7 @@ async function start(context, env) {
 		}
 		await new Promise((done) => setTimeout(done, 100))
 	}
-	// `meeko dev` rewrites its generated entries right after it starts, which reloads open pages.
+	// `meeko dev` writes the generated entries it finds missing right after it starts, which reloads open pages.
 	for (let previous = '', quietSince = Date.now(); Date.now() - started < 120_000; await new Promise((done) => setTimeout(done, 250))) {
 		if (state.logs !== previous) [previous, quietSince] = [state.logs, Date.now()]
 		else if (Date.now() - quietSince >= 3000) break

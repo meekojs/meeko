@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { type ChildProcess, spawn } from "node:child_process";
 import { once } from "node:events";
-import { appendFile, mkdir, readFile, stat, symlink, unlink, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, stat, symlink, unlink, utimes, writeFile } from "node:fs/promises";
 import { createServer as createNetServer } from "node:net";
 import { join, resolve } from "node:path";
 import test from "node:test";
@@ -10,6 +10,7 @@ import { createServer, type InlineConfig, normalizePath, type Plugin, resolveCon
 
 import { createDevAppReloader, isComponentSource, isDevWatchIgnored, isDiscoverySource } from "../src/framework/dev-watch.ts";
 import { initFrameworkProject } from "../src/framework/init.ts";
+import { prepareProject } from "../src/framework/project.ts";
 import { meeko } from "../src/vite.ts";
 import { createTempProject, repositoryRoot, stopChild, tempProject } from "./helpers/temp-project.ts";
 
@@ -38,6 +39,23 @@ test("the dev watcher skips .meeko except the generated entries Vite serves", ()
   const nested = resolve(".meeko", "tmp", "project");
   assert.ok(!isDevWatchIgnored(join(nested, "app", "pages", "index.meeko"), nested));
   assert.ok(isDevWatchIgnored(join(nested, ".meeko", "check", "x.ts"), nested));
+});
+
+test("preparing a project writes only the generated entries that do not have their source", async (context) => {
+  const root = await tempProject(context, "dev-entries");
+  await prepareProject(root);
+  const entries = ["entry-client.ts", "entry-server.ts", "entry-node.ts"].map((name) => join(root, ".meeko", "generated", name));
+  const sources = await Promise.all(entries.map((entry) => readFile(entry, "utf8")));
+  // Vite watches them: another `meeko dev` that starts must not reload the pages open on this one.
+  const before = new Date(Date.now() - 3_600_000);
+  for (const entry of entries) await utimes(entry, before, before);
+  await prepareProject(root);
+  for (const entry of entries) assert.equal(Math.round((await stat(entry)).mtimeMs), before.getTime(), entry);
+  // A stale entry and a missing one are written again.
+  await writeFile(entries[0]!, "// Stale.\n");
+  await unlink(entries[1]!);
+  await prepareProject(root);
+  assert.deepEqual(await Promise.all(entries.map((entry) => readFile(entry, "utf8"))), sources);
 });
 
 test("the plugin adds its watch and scan exclusions to the user's Vite config", async () => {

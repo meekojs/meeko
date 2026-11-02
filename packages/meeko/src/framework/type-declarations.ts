@@ -45,7 +45,7 @@ const generatedIncludes: Record<(typeof projectNames)[number], string[]> = {
   shared: ["types/autoimports/shared.d.ts", "types/modules/**/*.d.ts"],
 };
 
-async function writeIfChanged(file: string, source: string): Promise<void> {
+export async function writeIfChanged(file: string, source: string): Promise<void> {
   try { if (await readFile(file, "utf8") === source) return; }
   catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
   await writeFile(file, source, "utf8");

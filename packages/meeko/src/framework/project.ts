@@ -47,7 +47,7 @@ import { assertNoLegacySessionFile } from "./runtime-migration";
 import { robotsTxt, siteFilesOptions, sitemapEntryRoutes, sitemapUrls, sitemapXml } from "./site-files";
 import { assertStaticApp, previewStatic, writeStaticOutput } from "./static-adapter";
 import { createGlobalStylesheetSnapshot, devStylesheetLink, frameworkStylesheets, stylesheetUrl } from "./styles";
-import { hasFrameworkTsconfigs, prepareFrameworkTypeDeclarations } from "./type-declarations";
+import { hasFrameworkTsconfigs, prepareFrameworkTypeDeclarations, writeIfChanged } from "./type-declarations";
 
 export { frameworkClientEntry, frameworkServerEntry } from "./app-manifest";
 
@@ -106,15 +106,19 @@ export function adapterEntry(adapter: MeekoAdapterName): string {
   return `${adapterOutput(adapter)}/${file}`;
 }
 
-/** Writes framework-owned Vite entries; no application file is overwritten. */
+/**
+ * Writes framework-owned Vite entries; no application file is overwritten. An entry that already has
+ * its source is left alone: Vite watches them, and rewriting one reloads every page open on every
+ * `meeko dev` of the project, with the state it had.
+ */
 export async function prepareProject(projectRoot: string): Promise<void> {
   const root = resolve(projectRoot);
   const generated = resolve(root, ".meeko/generated");
   await mkdir(generated, { recursive: true });
   await Promise.all([
-    writeFile(resolve(root, frameworkClientEntry), clientEntrySource, "utf8"),
-    writeFile(resolve(root, frameworkServerEntry), serverEntrySource, "utf8"),
-    writeFile(resolve(root, frameworkNodeEntry), nodeEntrySource, "utf8"),
+    writeIfChanged(resolve(root, frameworkClientEntry), clientEntrySource),
+    writeIfChanged(resolve(root, frameworkServerEntry), serverEntrySource),
+    writeIfChanged(resolve(root, frameworkNodeEntry), nodeEntrySource),
   ]);
 }
 
