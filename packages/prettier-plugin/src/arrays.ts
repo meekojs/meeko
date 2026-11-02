@@ -2,6 +2,8 @@ import type { AstPath, Doc, ParserOptions, Printer } from "prettier";
 
 import { printers as estreePrinters } from "prettier/plugins/estree";
 
+import { sortClassLiterals } from "./class-literals";
+
 /** Nodo ESTree con lo que necesita la regla: posiciones, decoradores y elementos. */
 interface ArrayLikeNode {
   readonly type: string;
@@ -131,8 +133,14 @@ interface EstreePrinter {
   readonly getVisitorKeys?: (node: unknown, nonTraversableKeys: unknown) => readonly string[];
 }
 
-/** Marca del printer de Meeko, para no delegar en sí mismo ni en otra copia de Meeko cargada. */
-const ownMarker = Symbol.for("meeko.prettier.estree");
+/** Marca del printer de `@meekojs/meeko/prettier`, en el que este nunca delega. */
+const coreMarker = Symbol.for("meeko.prettier.estree");
+/**
+ * Marca del printer de este paquete, para no delegar en sí mismo. Es otra que la del núcleo a
+ * propósito: el servidor de lenguaje pone el plugin del núcleo el último, y así este lo trata como
+ * el printer del host y delega en él, de modo que `meekoClassFunctions` también se aplica allí.
+ */
+const ownMarker = Symbol.for("meeko.prettier-plugin.estree");
 /** Printer `estree` del Prettier del que depende Meeko: sólo se usa si el Prettier que ejecuta el plugin no trae otro. */
 const bundledPrinter = estreePrinters.estree as unknown as EstreePrinter;
 
@@ -152,7 +160,8 @@ const hostByRoot = new WeakMap<object, EstreePrinter>();
 let recentHost: EstreePrinter | undefined;
 
 function isOwn(entry: PrinterEntry): boolean {
-  return (entry as { [ownMarker]?: boolean })[ownMarker] === true;
+  const marks = entry as { [coreMarker]?: boolean; [ownMarker]?: boolean };
+  return marks[ownMarker] === true || marks[coreMarker] === true;
 }
 
 /**
@@ -216,7 +225,8 @@ function commentHandler(placement: "ownLine" | "endOfLine" | "remaining", args: 
  * `options.plugins` que lo define, sin contar el de Meeko) y sólo rompe el grupo de corchetes de un
  * array cuyo código fuente salta de línea tras `[`. Así un proyecto con otra versión 3.x de
  * Prettier imprime con la suya, y con `meekoPreserveArrayBreaks: false` la salida es la de su
- * Prettier. Sólo un Prettier sin printer `estree` propio usa el del Prettier de Meeko.
+ * Prettier. Sólo un Prettier sin printer `estree` propio usa el del Prettier de Meeko. Antes de
+ * imprimir, ordena las cadenas de `meekoClassFunctions` y de `bind:class`.
  */
 export const preserveArrayBreaksPrinter = {
   [ownMarker]: true,
@@ -224,6 +234,7 @@ export const preserveArrayBreaksPrinter = {
   ...(bundledPrinter.features ? { features: bundledPrinter.features } : {}),
   async preprocess(ast: unknown, options: ParserOptions) {
     const host = await loadHost(options);
+    await sortClassLiterals(ast, options);
     const result = host.preprocess ? await host.preprocess(ast, options) : ast;
     if (result && typeof result === "object") hostByRoot.set(result, host);
     return result;

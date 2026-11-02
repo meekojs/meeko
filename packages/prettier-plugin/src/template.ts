@@ -6,6 +6,7 @@ import { builders, utils } from "prettier/doc";
 
 import type { ClassOrder, ClassSortMode } from "./classes";
 
+import { classExpressionOption } from "./class-literals";
 import { classOrderOption, classTokens, sortClassTokens } from "./classes";
 
 const { group, indent, label, softline } = builders;
@@ -201,6 +202,21 @@ function isElementClass(node: HtmlNode, element: HtmlNode | undefined): boolean 
   return node.fullName?.toLowerCase() === "class" && element?.kind === "element" && tag !== undefined && !/^[A-Z]/.test(tag) && !notElementClass.has(tag);
 }
 
+/** Whether `meekoSortClasses` asks for an order, which is what reaches beyond a static element `class`. */
+function sortsClasses(options: Options): boolean {
+  const mode = (options as { meekoSortClasses?: ClassSortMode }).meekoSortClasses;
+  return mode !== undefined && mode !== "off";
+}
+
+/**
+ * A static `class` of a component tag or `<component is>`: a text prop, which the component usually
+ * forwards to its root. It is only rewritten when an order is asked for.
+ */
+function isComponentClass(node: HtmlNode, element: HtmlNode | undefined): boolean {
+  const tag = element?.name;
+  return node.fullName?.toLowerCase() === "class" && element?.kind === "element" && tag !== undefined && (/^[A-Z]/.test(tag) || tag === "component");
+}
+
 /**
  * The normalized, optionally sorted, value of a static `class`; `undefined` keeps it verbatim. A
  * value with a character reference or a `"` is left alone: its tokens are not the source text.
@@ -281,14 +297,16 @@ const templatePrinter: Printer<HtmlNode> = {
     }
     if (node.kind === "attribute" && node.value != null && node.fullName && isExpressionAttribute(node.fullName, path.parent as HtmlNode | undefined)) {
       return async (textToDoc: TextToDoc) => {
-        const printed = await expressionDoc(textToDoc, unescapedValue(node), { __isInHtmlAttribute: true });
+        const isClassExpression = node.fullName === "bind:class" && sortsClasses(options);
+        const printed = await expressionDoc(textToDoc, unescapedValue(node), { __isInHtmlAttribute: true, ...(isClassExpression ? { [classExpressionOption]: true } : {}) });
         if (!printed) return undefined;
         const value = mapDoc(printed.hug ? group(printed.doc) : [indent([softline, printed.doc]), softline], (item) =>
           typeof item === "string" ? item.replaceAll('"', "&quot;") : item);
         return [node.rawName ?? node.fullName!, '="', label(expressionLabel, group(value)), '"'];
       };
     }
-    if (node.kind === "attribute" && node.value != null && isElementClass(node, path.parent as HtmlNode | undefined)) {
+    const element = path.parent as HtmlNode | undefined;
+    if (node.kind === "attribute" && node.value != null && (isElementClass(node, element) || (sortsClasses(options) && isComponentClass(node, element)))) {
       const value = classValue(node.value, options);
       if (value !== undefined) return [node.rawName ?? node.fullName!, '="', value, '"'];
     }
