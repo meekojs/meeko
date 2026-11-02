@@ -221,15 +221,15 @@ test('Crepe with the recipe: documents without an edit, real keys in the hard bl
 	await table.locator('.selectedCell').first().waitFor({ timeout: 5000 })
 	assert.equal(await table.locator('.selectedCell').count(), rows + 1, 'the handle still selects the whole column')
 
-	// A block of a terminal has color too, with the tokens of the design and no other highlighter: the
-	// comment, the command, its flag and its string.
-	const terminalColors = await page.evaluate(async () => {
+	// A block of a terminal is highlighted too, with no other highlighter: the comment, the command, its
+	// flag and its string each get a class of the theme. This page has no tokens, so colors would not differ.
+	const terminalClasses = await page.evaluate(async () => {
 		await globalThis.openEditor('```sh\n# Instala\npnpm install --frozen-lockfile "x"\n```\n')
 		const spans = () => [...globalThis.document.querySelectorAll('#host .cm-line span')]
 		for (let tries = 0; tries < 100 && spans().length < 4; tries++) await new Promise((resolve) => setTimeout(resolve, 50))
-		return new Set(spans().map((span) => globalThis.getComputedStyle(span).color)).size
+		return new Set(spans().map((span) => span.className)).size
 	})
-	assert.ok(terminalColors >= 3, `a terminal block has ${terminalColors} colors`)
+	assert.ok(terminalClasses >= 3, `a terminal block has ${terminalClasses} kinds of token`)
 
 	// Copying a code block keeps its meta in the HTML of the clipboard, and pasting it brings it back.
 	const clipboard = await page.evaluate(async () => {
