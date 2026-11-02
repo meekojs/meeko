@@ -33,6 +33,13 @@
 	// The language of the browser is only a suggestion: the address decides the language and nothing
 	// redirects. It is read after hydration, so the server HTML and the first paint match.
 	const suggestion = signal<string | undefined>(undefined)
+	// The same words as the public webs, in the language it offers and not in the reader's: they belong
+	// to neither catalog, and the English one must stay free of Spanish.
+	const offers: Readonly<Record<string, { readonly message: string; readonly go: string }>> = {
+		es: { message: 'Esta página también está en español.', go: 'Leer esta página en español' },
+		en: { message: 'This page is also available in English.', go: 'Read this page in English' },
+	}
+	const offer = computed(() => offers[suggestion.value ?? ''])
 	onMounted(() => {
 		suggestion.value = i18n.suggestedLocale()
 	})
@@ -85,8 +92,8 @@
 			bind:items="locales.value"
 			bind:suggested="suggestion.value"
 			bind:label="t('locale.label')"
-			bind:message="t('locale.message')"
-			bind:goLabel="t('locale.offer')"
+			bind:message="offer.value?.message"
+			bind:goLabel="offer.value?.go"
 			bind:stayLabel="t('locale.stay')"
 			on:stay="stay"
 		/>

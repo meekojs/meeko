@@ -25,8 +25,6 @@
 	"locale": {
 		"label": "Language",
 		"stay": "Stay in English",
-		"message": "Esta página también está en español.",
-		"offer": "Leer esta página en español",
 		"es": "Spanish",
 		"en": "English",
 		"all": "All languages",
