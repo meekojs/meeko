@@ -178,6 +178,15 @@ test('edit a source with its preview, save the draft and publish it; rejections,
 
 	// The preview is dressed like the site: the prose of @meekojs/ui, on the tokens of the dashboard.
 	assert.equal(await preview.getAttribute('class'), 'dash-preview meeko-ui-prose')
+	// Inter reaches the opaque origin of the iframe, under the font-src 'self' that it inherits.
+	const inter = await preview.evaluate(async (body) => {
+		const fonts = body.ownerDocument.fonts
+		await fonts.load('1rem "Inter Variable"')
+		return { origin: body.ownerDocument.defaultView.origin, faces: [...fonts].filter((face) => face.family.includes('Inter')).map((face) => face.status), family: globalThis.getComputedStyle(body).fontFamily }
+	})
+	assert.deepEqual(inter.faces, ['loaded'], JSON.stringify(inter))
+	assert.equal(inter.origin, 'null')
+	assert.match(inter.family, /^"?Inter Variable/)
 	const dressed = await preview.evaluate((body) => {
 		const heading = body.querySelector('h1')
 		return { text: globalThis.getComputedStyle(body).color, heading: globalThis.getComputedStyle(heading).color, background: globalThis.getComputedStyle(body).backgroundColor, weight: globalThis.getComputedStyle(heading).fontWeight }

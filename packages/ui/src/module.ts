@@ -36,7 +36,8 @@ export default defineMeekoModule<UIOptions>({
 		// Registered first so that its layer goes before any layer of the app, and loses to it.
 		if (options.base !== false) meeko.addStylesheet(new URL('../src/app/styles/base.css', import.meta.url))
 		meeko.addStylesheet(new URL('../src/app/styles/main.css', import.meta.url))
-		meeko.addPublicFile(fontPath, () => readFile(new URL(`../src/app/styles/fonts/${fontFile}`, import.meta.url)))
+		// With CORS: fonts always load with it, and a document with an opaque origin, such as a sandboxed preview, is another origin.
+		meeko.addPublicFile(fontPath, () => readFile(new URL(`../src/app/styles/fonts/${fontFile}`, import.meta.url)), { headers: { 'Access-Control-Allow-Origin': '*' } })
 		meeko.addHead({ link: [{ rel: 'preload', href: `/${fontPath}`, as: 'font', type: 'font/woff2', crossorigin: 'anonymous' }] })
 		const tokensFile = fileURLToPath(new URL('../src/app/styles/main.css', import.meta.url))
 			.replaceAll('\\', '/')

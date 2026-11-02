@@ -3,8 +3,9 @@
 // <iframe sandbox srcdoc> without allow-scripts or allow-same-origin, an opaque origin that cannot
 // run anything nor reach the dashboard's document. It is dressed with the sheets of @meekojs/ui that the
 // site uses (app/utils/preview-styles.ts), on the values of the --ui-* tokens that the dashboard reads
-// from its own root when it builds the document, so both themes stay faithful. Inter is not loaded
-// inside it (a font from an opaque origin needs CORS): the next font of --ui-font-sans stands in.
+// from its own root when it builds the document, so both themes stay faithful. Inter loads inside it:
+// @meekojs/ui serves the font with CORS, which an opaque origin needs, and the font-src 'self' that the
+// iframe inherits names the origin of the dashboard.
 
 /** The root size of the page, with its fluid scale: the rem of the tokens measure the same inside. */
 const rootSize = '--dash-preview-root-size'

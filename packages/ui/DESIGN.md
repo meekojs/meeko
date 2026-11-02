@@ -150,7 +150,7 @@ El módulo lo hace todo con `modules: ['@meekojs/ui']`:
 
 - **`main.css`:** paleta, tokens, `@font-face` y componentes.
 - **`base.css`:** reset, `body`, `color-scheme`, `::selection`, barras de desplazamiento y foco, en la capa `@layer ui-base`. Cualquier regla sin capa de la app gana, y también cualquier capa que declare, porque ésta se registra primero. Se omite con `ui: { base: false }`.
-- **La fuente:** se sirve en `/_meeko-ui/fonts/inter-latin-opsz-normal.woff2`, con su `preload`. La app no copia archivos ni escribe `@font-face`. La CSP sólo necesita `font-src 'self'`.
+- **La fuente:** se sirve en `/_meeko-ui/fonts/inter-latin-opsz-normal.woff2`, con su `preload`. La app no copia archivos ni escribe `@font-face`. La CSP sólo necesita `font-src 'self'`, y se sirve con CORS, así que también la carga un `<iframe sandbox srcdoc>` que lea `@meekojs/ui/styles/fonts.css`.
 
 Una app no debe escribir su propio reset ni su `body`: borra los suyos al migrar.
 
