@@ -183,7 +183,7 @@ function extractInterpolations(ast: HtmlNode): void {
   });
 }
 
-/** Lo que lee el printer HTML en lugar de un `}}` de un texto, que `meekoBraces` tomaría por un marcador. */
+/** What the HTML printer reads for a `}}` of the source, which `meekoBraces` would take for a marker. */
 const textBraces = "\uE002\uE002";
 
 /** Sustituye los marcadores `{{`/`}}` que imprime Prettier para una interpolación por `{`/`}`. */
@@ -384,11 +384,11 @@ function isPrintedAsWritten(node: HtmlNode): boolean {
 /**
  * Prettier prints an element as written as `[prefix, opening tag, content, ...closing tag, suffix]`,
  * but the tags already have the prefix and the suffix, which is what it borrows from its neighbors:
- * `<i>a</i><pre><b>x</b></pre>` would get a second `>`. The content is the source, not markers.
+ * `<i>a</i><pre><b>x</b></pre>` would get a second `>`.
  */
 function writtenElement(printed: Doc): Doc {
   if (!Array.isArray(printed) || printed.length < 4 || typeof printed[0] !== "string" || typeof printed[printed.length - 1] !== "string") return printed;
-  return [printed[1]!, label(expressionLabel, printed[2]!), ...printed.slice(3, -1)];
+  return printed.slice(1, -1);
 }
 
 /** A component with `<snippet>` blocks and nothing else: the compiler reads no text among them. */
@@ -408,7 +408,6 @@ function holdsOnlySnippets(node: HtmlNode): boolean {
  */
 function keepWhitespace(ast: HtmlNode): void {
   ast.walk((node) => {
-    if (node.kind === "text" && node.value?.includes("}}") && node.parent?.kind !== "interpolation" && node.parent?.name !== "script" && node.parent?.name !== "style") node.value = node.value.replaceAll("}}", textBraces);
     const children = node.children;
     if (children && hasOnlyItsWrittenForm(node)) children.push(node.createChild({ kind: "comment", value: "", sourceSpan: node.sourceSpan }));
     if (!children || (node.kind !== "element" && node.kind !== "root") || node.isWhitespaceSensitive) return;
@@ -441,6 +440,21 @@ function keepWhitespace(ast: HtmlNode): void {
   });
 }
 
+/**
+ * A `}}` in a text, a comment, an ignored or preformatted element or a plain attribute is content, and
+ * `meekoBraces` would take a line or a word with only that for the end of an interpolation. Everything
+ * the printer can read it from hides it, with the same length; `meekoBraces` restores it. An expression
+ * is printed from its own text, under a label that `meekoBraces` skips.
+ */
+function hideTextBraces(ast: HtmlNode, options: ParserOptions<HtmlNode>): void {
+  options.originalText = options.originalText.replaceAll("}}", textBraces);
+  ast.walk((node) => {
+    const parent = node.parent;
+    const written = node.kind === "text" ? parent?.kind !== "interpolation" && parent?.name !== "script" && parent?.name !== "style" : node.kind === "attribute" && !(node.fullName && isExpressionAttribute(node.fullName, parent));
+    if (written && node.value?.includes("}}")) node.value = node.value.replaceAll("}}", textBraces);
+  });
+}
+
 /** Content on its own lines stays there: `<p> text </p>` would render the same, but reads worse. */
 function keepsLineBreaks(node: HtmlNode): boolean {
   if (node.kind !== "element" || node.isWhitespaceSensitive) return false;
@@ -467,6 +481,7 @@ const templatePrinter: Printer<HtmlNode> = {
     try {
       const processed = host(options).printer.preprocess(ast, options) as HtmlNode;
       keepWhitespace(processed);
+      hideTextBraces(processed, options);
       return processed;
     } finally { options.parser = parser; }
   },

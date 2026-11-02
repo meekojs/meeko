@@ -678,6 +678,7 @@ describe("What a component renders after saving it", () => {
       ["<pre>a\n}}\n<b>x</b></pre>", "pre", "a\n}}\nx"],
       ["<pre>\n&#10;x</pre>", "pre", "\nx"],
       ["<p>a }} b</p>", "p", "a }} b"],
+      ["<!-- prettier-ignore -->\n<p>\n}}\n</p>", "p", " }} "],
     ] as const) {
       const source = `${script}<template>${template}</template>\n`;
       for (const htmlWhitespaceSensitivity of ["ignore", "css", "strict"] as const) {
