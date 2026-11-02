@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import test from 'node:test'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
@@ -72,3 +72,19 @@ for (const [name, template, patterns] of cases) {
 		for (const pattern of patterns) assert.match(html, pattern)
 	})
 }
+
+test('no native control links its value by hand: model is what takes what was edited before hydration', async () => {
+	const handmade = []
+	for (const folder of ['../src/app/components/', '../src/editor/components/']) {
+		const directory = new URL(folder, import.meta.url)
+		for (const file of await readdir(directory)) {
+			if (!file.endsWith('.meeko')) continue
+			const source = await readFile(new URL(file, directory), 'utf8')
+			for (const [tag] of source.matchAll(/<(?:input|textarea|select)\b(?:[^"'>]|"[^"]*"|'[^']*')*>/g)) {
+				if (/\sbind:(?:value|checked)=/.test(tag) && /\son:(?:input|change)=/.test(tag)) handmade.push(file)
+			}
+		}
+	}
+	// The search of UICombobox is no model: its text is a query, and its mount adopts what was typed early.
+	assert.deepEqual(handmade, ['Combobox.meeko'])
+})

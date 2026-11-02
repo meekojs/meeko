@@ -193,13 +193,12 @@
 				class="ui-markdown-editor-code"
 				spellcheck="false"
 				autocapitalize="off"
+				model="value"
 				bind:id="props.id"
 				bind:aria-labelledby="labelId"
 				bind:aria-describedby="props.describedBy"
 				bind:readonly="props.readonly"
 				bind:disabled="props.disabled"
-				bind:value="value.value"
-				on:input="(event) => (value.value = event.currentTarget.value)"
 			/>
 		</div>
 	</div>
