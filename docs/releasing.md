@@ -26,27 +26,43 @@ npm pack ./packages/meeko --dry-run --json
 
 Las órdenes `pnpm run …` de la raíz reenvían al paquete `packages/meeko` (`pnpm -F @meekojs/meeko run …`); `verify` además comprueba la extensión de Chrome (`pnpm -F meeko-devtools-extension run check`).
 
-`pilot:e2e` comprueba SSR e hidratación en Chromium, Firefox y WebKit durante desarrollo y desde el build de producción. `package:smoke` instala el tarball en un proyecto temporal fuera del monorepo y comprueba CLI, SSR, declaraciones de TypeScript, Vite y un proyecto generado con `meeko init`. El paquete npm sólo incluye `dist`, `README.md`, `LICENSE` y `package.json`; no incluye ejemplos, pruebas, variantes del logo ni archivos locales. Antes de subir una versión, se revisa el resultado de `npm pack --dry-run --json` para confirmar esa lista.
+`pilot:e2e` comprueba SSR e hidratación en Chromium, Firefox y WebKit durante desarrollo y desde el build de producción. `package:smoke` instala el tarball en un proyecto temporal fuera del monorepo y comprueba CLI, SSR, declaraciones de TypeScript, Vite y un proyecto generado con `meeko init`. El paquete npm sólo incluye `dist`, `README.md`, `LICENSE`, `CHANGELOG.md` y `package.json`; no incluye ejemplos, pruebas, variantes del logo ni archivos locales. Antes de subir una versión, se revisa el resultado de `npm pack --dry-run --json` para confirmar esa lista.
 
-## Publicar una actualización
+## Publicar los paquetes de Meeko
 
-Actualiza la versión de `packages/meeko/package.json` y [CHANGELOG.md](../packages/meeko/CHANGELOG.md), ejecuta las verificaciones y sube el commit a `main`. Tras comprobar que CI pasó y que el commit remoto coincide con el probado localmente, comprueba el tarball. Una versión publicada no se sobrescribe; las correcciones requieren un número nuevo.
+La release propuesta `1.8.0` está **sin publicar**. Los seis paquetes públicos son `@meekojs/meeko`, `@meekojs/i18n`, `@meekojs/icon`, `@meekojs/ui`, `@meekojs/eslint-plugin` y `@meekojs/prettier-plugin`, en ese orden. `meeko-docs`, `meeko-docs-content`, `meeko-language` y `meeko-devtools-extension` son privados y no se publican en npm. Las extensiones mantienen su propia versión.
 
-`0.0.2` se publicó manualmente con `npm publish --access public` desde el commit verificado, tras completar la autenticación de npm. El registro confirmó la versión y el checksum antes de crear la etiqueta. No guardes códigos ni tokens en el repositorio.
+Se propone alinear los seis en `1.8.0`: permite comprobar una sola etiqueta para toda la entrega y evita mezclar UI nueva con core 1.7. El número no constituye una auditoría de estabilidad nueva; se aplica la política de estabilidad. El usuario debe aprobar esta decisión. Si prefiere mantener los nuevos en `0.1.0`, cambia sus cinco manifiestos y encabezados de changelog, esta guía y la migración, y adapta la comprobación de versiones de `publish.yml` y `scripts/publish-packages.ps1` a un mapa explícito antes de etiquetar. Conserva core 1.8 y los rangos `>=1.8 <2`.
 
-## Publicación confiable para versiones posteriores
+Antes de publicar, termina e integra el programa de diseño y resuelve la pregunta abierta sobre el hash scrypt de `docs/reference/commands/meeko-auth-hash.md`. Repite todos los gates sobre el commit final: `pnpm build`, `pnpm check`, `pnpm test:packages`, `pnpm -F @meekojs/ui test`, `pnpm -F @meekojs/i18n test`, `pnpm package:smoke`, `pnpm package:workspace-smoke` y las verificaciones anteriores. `pnpm package:workspace-smoke -Offline` permite ensayar sin red si el store contiene las dependencias. Revisa los tarballs reales, incluyendo declaraciones `.d.meeko.ts`, Inter y su OFL, y ausencia de datos de prueba o rutas locales.
 
-El workflow [`.github/workflows/publish.yml`](../.github/workflows/publish.yml) ejecuta las verificaciones, comprueba que `v<versión>` coincida con `packages/meeko/package.json` y publica desde un runner de GitHub mediante OIDC, con `npm publish --provenance` dentro de `packages/meeko`. npm asocia el Trusted Publisher al repositorio y al nombre del workflow (`publish.yml`), no a la carpeta del paquete, así que el paso a workspace no lo cambia; `repository.directory` del manifiesto indica la carpeta. El **Trusted Publisher** para `meekojs/meeko` y `publish.yml` se registró en npm con permiso de publicación. Su primera ejecución publicó `0.0.3` con procedencia firmada. No añadas un token de publicación a GitHub.
+`pnpm format:check` tiene deuda de formato conocida, pero **no está invocado por `ci.yml` ni `publish.yml`**. No bloquea directamente esos workflows; CI sí ejecuta `pnpm lint`. `.woodpecker/web.yml` sí ejecuta `pnpm format:check` en `gates`, y `images`/`release` dependen de ese gate: la deuda bloquea ese pipeline web. Corrige el formato en una entrega separada y validada antes de desplegar; no retires el gate. No silencies gates ni apliques un autofix global: formatea sólo los archivos de release y trata el saneamiento global en un cambio separado. Comprueba también las reglas de protección de rama y checks requeridos en GitHub.
 
-Antes de cada versión, comprueba `npm trust list @meekojs/meeko`. Crea `v<versión>` sobre el commit aprobado y súbela. La etiqueta activa el workflow; comprueba que éste terminó correctamente y que la versión pública de npm corresponde a la etiqueta. npm genera procedencia automáticamente cuando publica desde este flujo confiable. Si falla la publicación, conserva la etiqueta y corrige el flujo; no reutilices la misma versión después de una publicación exitosa.
+### Primera publicación de los paquetes nuevos
 
-Nada se publica por un push a `main` ni por un pull request: npm, la release de GitHub y las tiendas sólo reciben una versión cuando el mantenedor sube la etiqueta correspondiente.
+Un paquete debe existir en npm para configurar su publicador confiable, así que `@meekojs/i18n`, `@meekojs/icon`, `@meekojs/ui`, `@meekojs/eslint-plugin` y `@meekojs/prettier-plugin` se publican una vez desde la sesión interactiva del mantenedor. **`@meekojs/meeko` no pasa por aquí:** sus versiones llevan procedencia firmada y publicar una a mano la perdería. `publish-first.ps1` deja al workflow cualquier paquete que ya exista en npm. No guardes tokens ni OTP en archivos o argumentos. Usa Node 24+ y npm **11.5.1 o superior** (el workflow fija 11.19.0).
+
+1. Autoriza el contenido y las versiones; comprueba la propiedad o el permiso de publicación del scope `@meekojs` y ejecuta `npm login` tú mismo.
+2. Integra el commit de release en `main` con `test` y `redis-integration` en verde sobre ese SHA, según su ruleset, y actualiza tu checkout con `git fetch origin`.
+3. Ejecuta `pwsh -NoProfile -File scripts/publish-first.ps1` desde un checkout limpio. Sólo prepara tarballs con `pnpm pack` y ejecuta `npm publish --dry-run`; comprueba la sesión y el estado de las seis versiones en el registro. Un error de red o de autenticación detiene el proceso: nunca equivale a una versión ausente.
+4. Sólo tras autorizar expresamente la publicación, ejecuta `pwsh -NoProfile -File scripts/publish-first.ps1 -Execute`, que exige que el commit esté en `origin/main`. npm pide la autenticación u OTP en la consola, una vez por paquete si hace falta. Se detiene al primer error y muestra qué versiones llegaron a npm.
+5. Si se detuvo a mitad, corrige la causa y ejecuta `scripts/publish-first.ps1 -Execute -Resume`, que omite lo ya publicado. El workflow no sirve para reanudar: rechaza los paquetes que aún no existen en npm, porque no tienen publicador confiable.
+6. En npm, configura **para cada uno de los seis paquetes** el Trusted Publisher de GitHub Actions: owner `meekojs`, repository `meeko`, workflow `publish.yml`, environment `npm`. Confirma que el de `@meekojs/meeko` usa exactamente ese environment. Comprueba `npm trust list <paquete>` desde tu sesión. No añadas tokens de publicación a GitHub.
+7. Verifica versiones, `dist-tags`, integridad y metadatos públicos de los cinco. Su versión inicial no tiene procedencia OIDC; las siguientes, sí.
+8. Sólo con autorización, crea y sube `v1.8.0` sobre el mismo SHA, sin demora: hasta entonces los cinco piden un core `>=1.8` que aún no está en npm. El workflow publica `@meekojs/meeko` con procedencia, omite los cinco y crea la release de GitHub. Omitir no demuestra que un tarball publicado sea idéntico ni cambia sus dist-tags.
+9. Comprueba los seis con una instalación limpia fuera del repositorio.
+
+### Publicación confiable posterior
+
+Actualiza juntos los seis manifiestos, changelogs y rangos de compatibilidad. La etiqueta debe apuntar a un commit de `main`. El job `package-gates` lo comprueba, compara `v<versión>` con **cada** manifiesto, ejecuta los gates, instala los tarballs en un consumidor externo y guarda los seis tarballs que publicará, tras comprobar su nombre, su versión y que `pnpm pack` resolvió `workspace:*`. Una versión con sufijo usa `next`; una estable usa `latest`.
+
+El job `publish` es el único con `id-token: write` y con el environment `npm`, así que su aprobación llega con los gates en verde. Sólo recibe esos tarballs: no instala dependencias ni ejecuta código del proyecto. `scripts/publish-packages.ps1 -Trusted` consulta las seis versiones antes de publicar la primera; sólo un HTTP 404 significa que falta una, y no empieza si algún paquete aún no existe en npm. Si una versión ya existe, la omite para permitir reanudar. Una versión publicada es inmutable: una corrección exige otra versión. Si hay un fallo parcial, conserva la etiqueta, revisa el estado real y reejecuta el workflow tras corregir la causa. No se publica nada por un push a `main` o una PR.
 
 ## Etiquetas y destinos
 
 | Etiqueta | Workflow | Comprueba | Publica |
 | --- | --- | --- | --- |
-| `v<versión>` | `publish.yml` | `packages/meeko/package.json` | npm (`@meekojs/meeko`) y la release de GitHub con los seis VSIX y el ZIP de Chrome |
+| `v<versión>` | `publish.yml` | Los seis manifiestos públicos | npm (los seis paquetes públicos) y la release de GitHub con los seis VSIX y el ZIP de Chrome |
 | `vscode-v<versión>` | `publish-vscode.yml` | `packages/vscode/package.json` | Visual Studio Marketplace y Open VSX |
 | `devtools-v<versión>` | `publish-devtools.yml` | `packages/devtools/manifest.json` | Chrome Web Store |
 

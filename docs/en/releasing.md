@@ -1,5 +1,5 @@
 ---
-source-hash: 95ceed3a1166f25951330a644476025f9ab80a527a2c66e586c820000e6ad879
+source-hash: 23165c84191cc41e2f06f1fe7e00b0887bd0764f2871f267d5d7540af42353f0
 ---
 
 # Releasing Meeko
@@ -30,27 +30,43 @@ npm pack ./packages/meeko --dry-run --json
 
 The root `pnpm run …` commands forward to `packages/meeko` (`pnpm -F @meekojs/meeko run …`); `verify` also checks the Chrome extension (`pnpm -F meeko-devtools-extension run check`).
 
-`pilot:e2e` checks SSR and hydration in Chromium, Firefox and WebKit during development and from the production build. `package:smoke` installs the tarball in a temporary project outside the monorepo and checks the CLI, SSR, TypeScript declarations, Vite and a project generated with `meeko init`. The npm package includes only `dist`, `README.md`, `LICENSE` and `package.json`; it excludes examples, tests, logo variants and local files. Before uploading a version, review the output of `npm pack --dry-run --json` to confirm that list.
+`pilot:e2e` checks SSR and hydration in Chromium, Firefox and WebKit during development and from the production build. `package:smoke` installs the tarball in a temporary project outside the monorepo and checks the CLI, SSR, TypeScript declarations, Vite and a project generated with `meeko init`. The npm package includes only `dist`, `README.md`, `LICENSE`, `CHANGELOG.md` and `package.json`; it excludes examples, tests, logo variants and local files. Before uploading a version, review the output of `npm pack --dry-run --json` to confirm that list.
 
-## Publish an update
+## Publish the Meeko packages
 
-Update the version in `packages/meeko/package.json` and [CHANGELOG.md](../../packages/meeko/CHANGELOG.md), run the checks and push the commit to `main`. After checking that CI passed and the remote commit matches the one tested locally, check the tarball. A published version cannot be overwritten; fixes require a new number.
+The proposed `1.8.0` release is **unpublished**. The six public packages are `@meekojs/meeko`, `@meekojs/i18n`, `@meekojs/icon`, `@meekojs/ui`, `@meekojs/eslint-plugin` and `@meekojs/prettier-plugin`, in that order. `meeko-docs`, `meeko-docs-content`, `meeko-language` and `meeko-devtools-extension` are private and are not published to npm. Extensions retain their own versions.
 
-`0.0.2` was published manually with `npm publish --access public` from the verified commit, after completing npm authentication. The registry confirmed the version and checksum before the tag was created. Do not store codes or tokens in the repository.
+Aligning all six at `1.8.0` allows one tag check for the whole release and avoids using new UI with core 1.7. The number does not constitute a new stability audit; the stability policy applies. The user must approve this decision. To keep the five new packages at `0.1.0`, change their manifests and changelog headings, this guide and the migration, and replace the version checks in `publish.yml` and `scripts/publish-packages.ps1` with an explicit version map before tagging. Keep core 1.8 and the `>=1.8 <2` ranges.
 
-## Trusted Publishing for later versions
+Finish and integrate the design program and resolve the open scrypt hash question in `docs/reference/commands/meeko-auth-hash.md` before publishing. Repeat all gates on the final commit: `pnpm build`, `pnpm check`, `pnpm test:packages`, `pnpm -F @meekojs/ui test`, `pnpm -F @meekojs/i18n test`, `pnpm package:smoke`, `pnpm package:workspace-smoke`, and the earlier verification steps. `pnpm package:workspace-smoke -Offline` works without network if the store contains all dependencies. Inspect real tarballs, including `.d.meeko.ts` declarations, Inter and its OFL, and the absence of test data or local paths.
 
-The [`.github/workflows/publish.yml`](../../.github/workflows/publish.yml) workflow runs the checks, verifies that `v<versión>` matches `packages/meeko/package.json` and publishes from a GitHub runner through OIDC, using `npm publish --provenance` inside `packages/meeko`. npm associates the Trusted Publisher with the repository and workflow name (`publish.yml`), not the package folder, so moving to a workspace does not change it; the manifest's `repository.directory` specifies the folder. The **Trusted Publisher** for `meekojs/meeko` and `publish.yml` was registered in npm with publishing permission. Its first run published `0.0.3` with signed provenance. Do not add a publishing token to GitHub.
+`pnpm format:check` has known formatting debt, but **neither `ci.yml` nor `publish.yml` invokes it**. It does not directly block these workflows; CI does run `pnpm lint`. `.woodpecker/web.yml` does run `pnpm format:check` in `gates`, and `images`/`release` depend on it: formatting debt blocks that web pipeline. Fix formatting in a separate validated change before deployment; retain the gate. Do not silence gates or run a global autofix: format release files only and address global cleanup separately. Also check branch protection and required checks on GitHub.
 
-Before each version, check `npm trust list @meekojs/meeko`. Create `v<versión>` on the approved commit and push it. The tag triggers the workflow; check that it completed successfully and the public npm version corresponds to the tag. npm generates provenance automatically when publishing from this trusted workflow. If publishing fails, keep the tag and fix the workflow; do not reuse the same version after a successful publication.
+### First publication of new packages
 
-Nothing is published by a push to `main` or a pull request: npm, the GitHub release and the stores receive a version only when the maintainer pushes the corresponding tag.
+A package must exist on npm before configuring its trusted publisher, so `@meekojs/i18n`, `@meekojs/icon`, `@meekojs/ui`, `@meekojs/eslint-plugin` and `@meekojs/prettier-plugin` are published once from the maintainer's interactive session. **`@meekojs/meeko` does not go through this:** its versions carry signed provenance and publishing one by hand would lose it. `publish-first.ps1` leaves any package that already exists on npm to the workflow. Never save tokens or OTPs in files or arguments. Use Node 24+ and npm **11.5.1 or later** (the workflow pins 11.19.0).
+
+1. Approve contents and versions; confirm ownership or publication rights for the `@meekojs` scope and run `npm login` yourself.
+2. Integrate the release commit into `main` with green `test` and `redis-integration` on that SHA, under its ruleset, and update your checkout with `git fetch origin`.
+3. Run `pwsh -NoProfile -File scripts/publish-first.ps1` from a clean checkout. It only prepares tarballs with `pnpm pack` and runs `npm publish --dry-run`; it checks the session and the state of all six versions on the registry. A network or authentication error stops the process: it never means a version is absent.
+4. Only after explicit publication authorization, run `pwsh -NoProfile -File scripts/publish-first.ps1 -Execute`, which requires the commit to be on `origin/main`. npm asks for authentication or an OTP on the console, once per package if needed. It stops at the first error and shows which versions reached npm.
+5. If it stopped halfway, fix the cause and run `scripts/publish-first.ps1 -Execute -Resume`, which skips what is already published. The workflow cannot resume this: it rejects packages that do not exist on npm yet, because they have no trusted publisher.
+6. On npm, configure a GitHub Actions Trusted Publisher **for each of the six packages**: owner `meekojs`, repository `meeko`, workflow `publish.yml`, environment `npm`. Confirm that the one for `@meekojs/meeko` uses exactly that environment. Check `npm trust list <package>` from your session. Do not add publication tokens to GitHub.
+7. Check versions, `dist-tags`, integrity and public metadata of the five. Their initial version has no OIDC provenance; later ones do.
+8. Only with authorization, create and push `v1.8.0` on the same SHA, without delay: until then the five require a core `>=1.8` that is not on npm yet. The workflow publishes `@meekojs/meeko` with provenance, skips the five and creates the GitHub release. Skipping does not prove that a published tarball is identical, nor does it change its dist-tags.
+9. Check all six with a clean installation outside the repository.
+
+### Subsequent trusted publication
+
+Update all six manifests, changelogs and compatibility ranges together. The tag must point to a commit on `main`. The `package-gates` job checks that, compares `v<version>` with **every** manifest, runs the gates, installs the tarballs in an external consumer and stores the six tarballs it will publish, after checking their name, their version and that `pnpm pack` resolved `workspace:*`. A version with a suffix uses `next`; a stable one uses `latest`.
+
+The `publish` job is the only one with `id-token: write` and the `npm` environment, so its approval comes with the gates already green. It only receives those tarballs: it installs no dependencies and runs no project code. `scripts/publish-packages.ps1 -Trusted` checks all six versions before publishing the first one; only an HTTP 404 means one is missing, and it does not start if any package does not exist on npm yet. If a version already exists, it skips it to allow resuming. A published version is immutable: a fix requires another version. After a partial failure, keep the tag, review the real state and rerun the workflow once the cause is fixed. Nothing is published by a push to `main` or a pull request.
 
 ## Tags and targets
 
 | Tag                   | Workflow               | Checks                            | Publishes                                                                                |
 | --------------------- | ---------------------- | --------------------------------- | ---------------------------------------------------------------------------------------- |
-| `v<versión>`          | `publish.yml`          | `packages/meeko/package.json`     | npm (`@meekojs/meeko`) and the GitHub release with the six VSIX files and the Chrome ZIP |
+| `v<versión>`          | `publish.yml`          | The six public manifests          | npm (all six public packages) and the GitHub release with the six VSIX files and the Chrome ZIP |
 | `vscode-v<versión>`   | `publish-vscode.yml`   | `packages/vscode/package.json`    | Visual Studio Marketplace and Open VSX                                                   |
 | `devtools-v<versión>` | `publish-devtools.yml` | `packages/devtools/manifest.json` | Chrome Web Store                                                                         |
 
