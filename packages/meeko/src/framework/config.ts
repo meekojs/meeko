@@ -16,6 +16,7 @@ import { contentSecurityPolicy } from "../server/runtime/csp";
 import { normalizeDocumentConfig, siteOrigin } from "../shared/head";
 import { resolveThemeConfig } from "../shared/theme";
 import { resolveDevtoolsConfig } from "./dev-devtools";
+import { validateHeaderValues } from "./header-values";
 import { classifyModuleEntry, resolvedDocument, resolveMeekoModules } from "./module-loader";
 import { composeFrameworkRoutes } from "./modules";
 import { discoverLayouts } from "./routes-discovery";
@@ -309,8 +310,6 @@ function validateSiteFiles(config: MeekoConfig, file: string): void {
 }
 
 /** Header names of RFC 9110 (a token), and values without line breaks or controls. */
-const headerName = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
-const headerValue = /^[^\u0000-\u0008\u000a-\u001f\u007f]*$/;
 
 /** Checks `server.contentSecurityPolicy` with the same checks as the header itself, with the file in the message. */
 function validatePolicy(server: Record<string, unknown>, file: string): void {
@@ -322,14 +321,6 @@ function validatePolicy(server: Record<string, unknown>, file: string): void {
 }
 
 /** Checks an object of header names and values, `label` naming it in the messages. */
-function validateHeaderValues(headers: Record<string, unknown>, label: string, file: string): void {
-  for (const [name, value] of Object.entries(headers)) {
-    if (!headerName.test(name)) throw new TypeError(`${file}: ${label} tiene un nombre de cabecera no válido ${JSON.stringify(name)}`);
-    if (name.toLowerCase() === "content-security-policy") throw new TypeError(`${file}: ${label} no puede fijar Content-Security-Policy; use server.contentSecurityPolicy, que añade los hashes de los scripts`);
-    if (typeof value !== "string" || !headerValue.test(value)) throw new TypeError(`${file}: ${label}.${name} debe ser una cadena sin saltos de línea`);
-  }
-}
-
 /**
  * Checks `server.headers`: header values and, with `patterns` (the adapters with a server), path
  * patterns that start with `/` and hold their own header values.

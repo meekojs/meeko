@@ -12,7 +12,7 @@ export { createNavigator, createRouteManifest, matchRoute } from "./app/runtime/
 export { defineMeekoConfig } from "./modules/define-meeko-config";
 export type { MeekoConfig, MeekoDevtoolsConfig, RobotsConfig,ServerHeaders, ServerResponseConfig, SitemapConfig, SitemapEntriesContext, SitemapEntry, StaticHeaderFile } from "./modules/define-meeko-config";
 export { defineMeekoModule } from "./modules/define-meeko-module";
-export type { MeekoHookable, MeekoHooks, MeekoModule, MeekoModuleContext, MeekoModuleDefinition, MeekoModuleEntry, MeekoModuleMeta, MeekoModuleName, MeekoModuleNames, ModuleAutoImport, ModulePlugin, ModuleServerHandler, SitemapAlternate, SitemapResolvedUrl } from "./modules/define-meeko-module";
+export type { MeekoHookable, MeekoHooks, MeekoModule, MeekoModuleContext, MeekoModuleDefinition, MeekoModuleEntry, MeekoModuleMeta, MeekoModuleName, MeekoModuleNames, ModulePublicFileOptions, ModuleAutoImport, ModulePlugin, ModuleServerHandler, SitemapAlternate, SitemapResolvedUrl } from "./modules/define-meeko-module";
 export { sitemapXml } from "./framework/sitemap-xml";
 export { definePlugin } from "./app/definitions/define-plugin";
 export type { MeekoPlugin, PluginApp, PluginErrorHandler, PluginErrorInfo, PluginRegistration } from "./app/definitions/define-plugin";

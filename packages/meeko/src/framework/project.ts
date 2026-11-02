@@ -719,11 +719,12 @@ async function startDevelopment(root: string): Promise<Server> {
       try { pathname = new URL(request.url || "/", "http://localhost").pathname; }
       catch { listener(request, response); return; }
       // Public files of the modules, as the build writes them into the client output.
+      const publicPath = safeDecode(pathname).replace(/^\/+/, "");
       const publicFile = modules.publicFiles.size && (request.method === "GET" || request.method === "HEAD")
-        ? modules.publicFiles.get(safeDecode(pathname).replace(/^\/+/, "")) : undefined;
+        ? modules.publicFiles.get(publicPath) : undefined;
       if (publicFile !== undefined) {
         void publicFileContents(publicFile).then((body) => {
-          response.writeHead(200, { "content-type": contentTypes[extname(pathname).toLowerCase()] ?? "application/octet-stream", "cache-control": "no-cache" });
+          response.writeHead(200, { "content-type": contentTypes[extname(pathname).toLowerCase()] ?? "application/octet-stream", "cache-control": "no-cache", ...modules.publicFileHeaders.get(publicPath) });
           response.end(request.method === "HEAD" ? undefined : body);
         }, (error: unknown) => {
           reportError(error, randomUUID());

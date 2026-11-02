@@ -101,6 +101,22 @@ export interface ModulePlugin {
 }
 
 /**
+ * Opciones de `addPublicFile`.
+ *
+ * @since 1.8.0
+ * @example
+ * ```ts
+ * import type { ModulePublicFileOptions } from "@meekojs/meeko/framework";
+ *
+ * const options: ModulePublicFileOptions = { headers: { "Access-Control-Allow-Origin": "*" } };
+ * ```
+ */
+export interface ModulePublicFileOptions {
+  /** Cabeceras de la respuesta del archivo. No admite `Content-Security-Policy`. */
+  readonly headers?: Readonly<Record<string, string>>;
+}
+
+/**
  * Handler HTTP de servidor que añade un módulo con `meeko.addServerHandler`.
  *
  * @since 1.2.0
@@ -322,9 +338,17 @@ export interface MeekoModuleContext {
   /**
    * Añade un archivo público, como si estuviera en `public/`: `meeko build` lo escribe en la salida
    * del cliente y `meeko dev` lo sirve. Una función se evalúa al escribirlo (en dev, en cada
-   * petición), por ejemplo con las rutas de `routes:resolved`.
+   * petición), por ejemplo con las rutas de `routes:resolved`. Desde `1.8`, `options.headers` añade
+   * cabeceras a su respuesta en `meeko dev` y en los adaptadores con servidor, como `server.headers`
+   * para esa ruta, que gana si fija la misma. El adaptador `static` no las escribe.
+   *
+   * @example
+   * ```ts
+   * // Una fuente que también puede usar un documento de origen opaco, como un <iframe sandbox srcdoc>.
+   * meeko.addPublicFile('_my-module/font.woff2', () => readFile(font), { headers: { 'Access-Control-Allow-Origin': '*' } })
+   * ```
    */
-  addPublicFile(path: string, contents: string | Uint8Array | (() => string | Uint8Array | Promise<string | Uint8Array>)): void;
+  addPublicFile(path: string, contents: string | Uint8Array | (() => string | Uint8Array | Promise<string | Uint8Array>), options?: ModulePublicFileOptions): void;
   /**
    * Registers a CSS file in Vite's client graph, processed with the project's PostCSS config.
    * Relative paths resolve from rootDir; use a file URL for a stylesheet shipped by a module.

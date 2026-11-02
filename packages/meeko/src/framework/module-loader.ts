@@ -5,13 +5,14 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import type { RouteRecord } from "../app/runtime/router";
 import type { MeekoConfig } from "../modules/define-meeko-config";
-import type { MeekoHooks, MeekoModule, MeekoModuleContext, ModuleAutoImport, ModulePlugin } from "../modules/define-meeko-module";
+import type { MeekoHooks, MeekoModule, MeekoModuleContext, ModuleAutoImport, ModulePlugin, ModulePublicFileOptions } from "../modules/define-meeko-module";
 import type { DocumentConfig, DocumentHead, HeadInput } from "../shared/head";
 
 import { isMeekoModule } from "../modules/define-meeko-module";
 import { meekoEnv } from "../server/runtime/env";
 import { normalizeHeadInput, resolveDocumentConfig, siteOrigin } from "../shared/head";
 import { normalizeComponentExcludes } from "./component-exclusions";
+import { validateHeaderValues } from "./header-values";
 
 /**
  * Build-time half of the module system: it runs `defineMeekoModule` setups in Node and records
@@ -296,6 +297,8 @@ export interface ResolvedModules {
   readonly serverMiddleware: readonly string[];
   readonly serverHandlers: readonly { readonly route: string; readonly file: string }[];
   readonly publicFiles: ReadonlyMap<string, PublicFileContents>;
+  /** The response headers of the public files that `addPublicFile` gives some, by path. */
+  readonly publicFileHeaders: ReadonlyMap<string, Readonly<Record<string, string>>>;
   readonly stylesheets: readonly string[];
   readonly typeTemplates: ReadonlyMap<string, string>;
   /** `<head>` entries of the modules, before `document.head` of the configuration. */
@@ -309,7 +312,7 @@ export interface ResolvedModules {
 
 const emptyModules: ResolvedModules = Object.freeze({
   names: [], entryFiles: [], layers: [], componentsDirs: [], layouts: [], routeExtenders: [], autoImports: [], autoImportsDirs: [], plugins: [],
-  serverMiddleware: [], serverHandlers: [], publicFiles: new Map(), stylesheets: [], typeTemplates: new Map(), head: undefined, vitePlugins: [], viteExtenders: [], ownedDirectories: [],
+  serverMiddleware: [], serverHandlers: [], publicFiles: new Map(), publicFileHeaders: new Map(), stylesheets: [], typeTemplates: new Map(), head: undefined, vitePlugins: [], viteExtenders: [], ownedDirectories: [],
   callHook: async () => {},
 });
 
@@ -516,6 +519,7 @@ async function runModules(root: string, config: MeekoConfig, dev: boolean): Prom
   const serverMiddleware: string[] = [];
   const serverHandlers: Array<{ route: string; file: string }> = [];
   const publicFiles = new Map<string, PublicFileContents>();
+  const publicFileHeaders = new Map<string, Readonly<Record<string, string>>>();
   const stylesheets: string[] = [];
   const typeTemplates = new Map<string, string>();
   let head: HeadInput | undefined;
@@ -632,11 +636,18 @@ async function runModules(root: string, config: MeekoConfig, dev: boolean): Prom
         if (serverHandlers.some((existing) => existing.route === handler.route)) throw new Error(`Módulo de Meeko ${name}: handler de servidor repetido para ${handler.route}`);
         serverHandlers.push({ route: handler.route, file: existingFile(handler.handler, `server handler ${handler.route}`) });
       },
-      addPublicFile(publicPath: string, contents: PublicFileContents) {
+      addPublicFile(publicPath: string, contents: PublicFileContents, options?: ModulePublicFileOptions) {
         const key = normalizePublicPath(publicPath, name);
         if (publicFiles.has(key)) throw new Error(`Módulo de Meeko ${name}: el archivo público ${key} ya está añadido`);
         if (typeof contents !== "string" && typeof contents !== "function" && !(contents instanceof Uint8Array)) throw new TypeError(`Módulo de Meeko ${name}: el archivo público ${key} necesita una cadena, bytes o una función`);
         publicFiles.set(key, contents);
+        if (options?.headers !== undefined) {
+          // `server.headers` reads `*` in a path as a wildcard: it would reach other files.
+          if (key.includes("*")) throw new TypeError(`Módulo de Meeko ${name}: el archivo público ${key} no puede llevar cabeceras: su ruta contiene *`);
+          if (!isPlainObject(options.headers)) throw new TypeError(`Módulo de Meeko ${name}: headers del archivo público ${key} debe ser un objeto de valores de cabecera`);
+          validateHeaderValues(options.headers, `headers del archivo público ${key}`, `Módulo de Meeko ${name}`);
+          publicFileHeaders.set(key, options.headers);
+        }
       },
       addTypeTemplate(filename: string, contents: string) {
         if (!/^[A-Za-z0-9_-]+\.d\.ts$/.test(filename) || typeof contents !== "string") throw new TypeError(`Módulo ${name}: declaración de tipos no válida`);
@@ -669,7 +680,7 @@ async function runModules(root: string, config: MeekoConfig, dev: boolean): Prom
   }
   const resolved: ResolvedModules = {
     names, entryFiles, layers, componentsDirs, layouts, routeExtenders, autoImports, autoImportsDirs, plugins, serverMiddleware, serverHandlers,
-    publicFiles, stylesheets, typeTemplates, head, vitePlugins, viteExtenders, ownedDirectories: [...ownedDirectories],
+    publicFiles, publicFileHeaders, stylesheets, typeTemplates, head, vitePlugins, viteExtenders, ownedDirectories: [...ownedDirectories],
     async callHook(hookName, ...args) {
       for (const handler of [...hooks.get(hookName) ?? []]) await (handler as (...values: unknown[]) => unknown)(...args);
     },

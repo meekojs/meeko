@@ -167,13 +167,16 @@ export async function discoverAppManifest(projectRoot: string, client: ClientAss
   const document = resolvedDocument(config, projectModules);
   // The response headers of the adapters with a server; the static adapter writes its own files.
   const response = config.server && config.server.adapter !== "static" ? config.server : undefined;
+  // The headers of a module's public file, which a pattern of `server.headers` for that path replaces.
+  const fileHeaders = config.server?.adapter === "static" ? [] : [...projectModules.publicFileHeaders].map(([path, headers]) => [`/${path}`, headers] as const);
+  const headers = fileHeaders.length ? { ...Object.fromEntries(fileHeaders), ...response?.headers } : response?.headers;
   const manifest: AppManifest = {
     version: 1,
     routes,
     ...(errorPage ? { errorPage } : {}),
     ...(document ? { document } : {}),
     ...(response?.contentSecurityPolicy ? { contentSecurityPolicy: response.contentSecurityPolicy } : {}),
-    ...(response?.headers ? { headers: response.headers } : {}),
+    ...(headers ? { headers } : {}),
     server: {
       api: server.api.map((endpoint) => ({ ...endpoint, file: moduleKey(root, endpoint.file) })),
       rpc: server.rpc.map((endpoint) => ({ ...endpoint, file: moduleKey(root, endpoint.file) })),

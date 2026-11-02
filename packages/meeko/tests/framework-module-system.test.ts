@@ -113,7 +113,7 @@ export default defineMeekoConfig({
   assert.deepEqual(modules.plugins.map((plugin) => [plugin.mode, plugin.options]), [
     ["universal", { greeting: "From config" }], ["client", { mark: "inline" }], ["server", undefined],
   ]);
-  assert.deepEqual([...modules.publicFiles.keys()], ["robots.txt", "sitemap.xml"]);
+  assert.deepEqual([...modules.publicFiles.keys()], ["__hello/shared.txt", "robots.txt", "sitemap.xml"]);
   const sources = await resolveConfigSources(root);
   assert.deepEqual(sources.map((source) => [source.kind, source.name]), [["app", "app"], ["layer", "base"], ["module", "legacy"], ["module", "layer"]]);
   const routes = await discoverConfiguredRoutes(root);
@@ -319,6 +319,11 @@ async function assertModuleApp(origin: string, logs: () => string, browser: Awai
   assert.ok(stats.runs >= 1, JSON.stringify(stats));
   assert.deepEqual({ ...stats, runs: 0 }, { runs: 0, lastRoute: "/uses-module", side: "server", request: true, method: "GET" });
   assert.equal(await (await fetch(`${origin}/robots.txt`)).text(), "User-agent: *\nAllow: /\nSitemap: https://hello.test/sitemap.xml\n");
+  // A public file with its own headers has them, and only that one.
+  const shared = await fetch(`${origin}/__hello/shared.txt`);
+  assert.equal(await shared.text(), "shared");
+  assert.equal(shared.headers.get("access-control-allow-origin"), "*");
+  assert.equal((await fetch(`${origin}/robots.txt`)).headers.get("access-control-allow-origin"), null);
   const sitemap = await fetch(`${origin}/sitemap.xml`);
   assert.match(sitemap.headers.get("content-type") ?? "", /xml/);
   const sitemapText = await sitemap.text();

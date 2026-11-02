@@ -42,6 +42,7 @@ export default defineMeekoModule<HelloOptions>({
     meeko.addServerMiddleware(here("./runtime/header.ts"));
     meeko.addServerHandler({ route: "/__hello/stats", handler: here("./runtime/stats-handler.ts") });
 
+    meeko.addPublicFile("__hello/shared.txt", "shared", { headers: { "Access-Control-Allow-Origin": "*" } });
     meeko.addPublicFile("robots.txt", `User-agent: *\nAllow: /\nSitemap: ${options.siteUrl}/sitemap.xml\n`);
     meeko.addPublicFile("sitemap.xml", () => [
       '<?xml version="1.0" encoding="UTF-8"?>',
