@@ -125,8 +125,8 @@ test('the administrator logs in, navigates and logs out', { skip: url ? false : 
 		const held = new Promise((resolve) => {
 			release = resolve
 		})
-		await slow.route('**/*', async (route) => {
-			if (route.request().resourceType() === 'script') await held
+		await slow.route('**/entry-client.ts*', async (route) => {
+			await held
 			await route.continue()
 		})
 		await slow.goto(`${origin}/login?next=%2Fhealth`, { waitUntil: 'commit' })
