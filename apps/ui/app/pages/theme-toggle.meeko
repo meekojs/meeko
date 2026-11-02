@@ -74,6 +74,7 @@
 				{ name: 'mode', type: 'cycle | select', default: 'cycle', description: 'Un botón que alterna o un grupo de radios.' },
 				{ name: 'themes', type: 'ThemeChoice[]', description: 'Elecciones y su orden. Por defecto, los temas de la configuración y system si está activo.' },
 				{ name: 'labels', type: 'Partial<Record<ThemeChoice, string>>', default: 'Claro, Oscuro, Sistema', description: 'Nombre visible de cada elección. El valor por defecto sigue el idioma del documento.' },
+				{ name: 'icons', type: 'boolean', default: 'false', description: 'Con cycle, pinta un icono de light, dark y system en lugar de su nombre, que sigue en el aria-label.' },
 				{ name: 'messages', type: 'ThemeToggleMessages', description: 'Textos accesibles: cycle, unknown y group.' },
 				{ name: 'class / id', type: 'string', description: 'Clases e id del formulario raíz.' },
 			]"

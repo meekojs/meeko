@@ -11,6 +11,7 @@
 	:root {
 		background: var(--ui-color-bg);
 		scrollbar-color: var(--ui-color-border-strong) transparent;
+		scrollbar-gutter: stable;
 		accent-color: var(--ui-color-primary);
 		color-scheme: light;
 		caret-color: var(--ui-color-primary-text);

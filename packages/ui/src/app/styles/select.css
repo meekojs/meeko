@@ -24,11 +24,19 @@ select[data-meeko-select-trigger] optgroup {
 		color: var(--ui-color-text-soft);
 	}
 	select[data-meeko-select-trigger]::picker-icon {
+		rotate: 45deg;
 		transition: rotate var(--ui-duration-base) var(--ui-ease-out);
-		color: var(--ui-color-text-soft);
+		margin-inline-end: var(--ui-space-0-5);
+		margin-block-start: calc(var(--ui-space-1) * -1);
+		border-inline-end: calc(var(--ui-border-width) * 1.5) solid var(--ui-color-text-soft);
+		border-block-end: calc(var(--ui-border-width) * 1.5) solid var(--ui-color-text-soft);
+		width: var(--ui-space-2);
+		height: var(--ui-space-2);
+		content: '';
 	}
 	select[data-meeko-select-trigger]:open::picker-icon {
-		rotate: 180deg;
+		rotate: 225deg;
+		margin-block-start: var(--ui-space-1);
 	}
 	select[data-meeko-select-trigger] selectedcontent,
 	select[data-meeko-select-trigger] option:not([hidden]) {

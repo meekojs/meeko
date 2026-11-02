@@ -208,6 +208,19 @@ test('nothing mentions the removed --meeko-ui-* variables', async () => {
 	assert.doesNotMatch(source, /--meeko-ui-/)
 })
 
+test('the frame of the page does not depend on how long the page is', async () => {
+	assert.match(await read('base.css'), /:root \{[^}]*scrollbar-gutter: stable/, 'a short page and a long one keep the header in place')
+	const page = await read('page.css')
+	assert.match(page, /\.meeko-ui-page-sidebar,\s*\.meeko-ui-page-aside \{[^}]*scrollbar-gutter: stable/, 'the sidebar is as wide with a long navigation as with a short one')
+	assert.doesNotMatch(/\.meeko-ui-skip-link \{[^}]*\}/.exec(page)[0], /box-shadow/, 'the shadow of the hidden skip link would show above the header')
+})
+
+test('inline code reads as a chip, so that its padding is not taken for a space before the punctuation', async () => {
+	assert.match(await read('prose.css'), /:not\(pre\) > code, kbd\) \{[^}]*background: var\(--ui-color-control-hover\)/)
+	const [, inline] = /--ui-prose-code-padding: \S+ (\d*\.?\d+)em/.exec(tokensCss)
+	assert.ok(Number(inline) <= 0.2, `${inline}em on each side`)
+})
+
 test('every --ui-* variable a component sheet reads is declared', async () => {
 	const declared = new Set([...Object.keys(palette.light), ...Object.keys(palette.dark), ...Object.keys(declarations(tokensCss))])
 	// Hooks a consumer can set: they always go with a fallback in the sheets.

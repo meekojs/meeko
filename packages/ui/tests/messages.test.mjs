@@ -204,6 +204,7 @@ const page = `<script lang="ts">
 	<UIModal title="Dialog" model="opened"><p>Body</p></UIModal>
 	<UIModal title="Dialog" model="opened" closeLabel="Close from the prop"><p>Body</p></UIModal>
 	<UIThemeToggle />
+	<UIThemeToggle icons />
 	<UIThemeToggle mode="select" bind:labels="{ dark: 'Night' }" />
 	<UILinkCard to="/about" title="To" />
 	<UILinkCard to="/about" hreflang="es" title="Other language" />
@@ -264,6 +265,7 @@ function assertOverrides(html) {
 	assert.ok(ariaLabels(html).includes('Clear from the prop'), 'clearLabel')
 	assert.ok(ariaLabels(html).includes('Close from the prop'), 'closeLabel')
 	assert.ok(html.includes('Night'), 'the labels of UIThemeToggle')
+	assert.match(html, /data-meeko-theme-icon="dark"[^>]*>\s*<svg[^>]*class="meeko-ui-icon"/, 'UIThemeToggle icons paints the icon')
 }
 
 function assertApp(html, { empty, clear, close, unknown, group, light }) {

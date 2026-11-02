@@ -23,7 +23,7 @@
 	>
 		<h2 id="usage">A complete field</h2>
 		<p>The example validates a name locally. It does not send information or store data on a server.</p>
-		<DocsPreview>
+		<DocsPreview layout="stack">
 			<form
 				class="docs-stack"
 				novalidate

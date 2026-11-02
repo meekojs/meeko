@@ -949,6 +949,8 @@ Tipos públicos de `@meekojs/ui/runtime`.
 
 Desde UI `0.2`, con el módulo UI activo y `theme` en `meeko.config.ts`, `UIThemeToggle` permite cambiar el tema. Requiere core `1.8` y usa su API pública `useThemeToggle()`.
 
+Con `icons`, el botón pinta un icono de `light`, `dark` y `system` en lugar de su nombre, que sigue en el `aria-label`: `<UIThemeToggle icons />`. Un snippet con el nombre de la elección gana sobre el icono, y otro tema muestra su nombre. Es lo que usan las cabeceras de las webs de Meeko.
+
 ```html
 <UIThemeToggle>
 	<snippet name="light"><IconSun /></snippet>

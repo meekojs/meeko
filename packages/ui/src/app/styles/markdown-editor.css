@@ -17,7 +17,7 @@
 	--crepe-color-on-secondary: var(--ui-color-primary-text);
 	--crepe-color-inverse: var(--ui-color-text);
 	--crepe-color-on-inverse: var(--ui-color-bg);
-	--crepe-color-inline-code: var(--ui-color-primary-text);
+	--crepe-color-inline-code: var(--ui-color-text);
 	--crepe-color-error: var(--ui-color-danger-text);
 	--crepe-color-hover: var(--ui-color-control-hover);
 	--crepe-color-selected: var(--ui-color-selection);
@@ -47,7 +47,7 @@
 	flex-wrap: wrap;
 	align-items: center;
 	gap: var(--ui-space-2) var(--ui-space-3);
-	min-height: var(--ui-control-height-sm);
+	min-height: var(--ui-control-height-md);
 }
 .ui-markdown-editor-label {
 	font-weight: var(--ui-font-weight-medium);

@@ -194,7 +194,7 @@
 	--ui-prose-width: var(--ui-container-lg);
 	--ui-prose-measure: 75ch;
 	--ui-prose-code-size: 0.86em;
-	--ui-prose-code-padding: 0.1em 0.32em;
+	--ui-prose-code-padding: 0.1em 0.2em;
 	--ui-toc-max-height: 50dvh;
 	--ui-code-max-height: 36rem;
 	--ui-log-max-height: 20rem;

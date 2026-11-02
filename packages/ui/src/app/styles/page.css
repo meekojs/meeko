@@ -17,7 +17,6 @@
 	z-index: var(--ui-z-floating);
 	transition: translate var(--ui-duration-fast) var(--ui-ease-out);
 	inset-inline-start: var(--ui-space-2);
-	box-shadow: var(--ui-shadow-md);
 	border-radius: var(--ui-radius-md);
 	background: var(--ui-color-primary);
 	padding: var(--ui-space-2) var(--ui-space-3);
@@ -30,6 +29,7 @@
 	translate: 0 0;
 	outline: var(--ui-focus-ring);
 	outline-offset: var(--ui-focus-ring-offset);
+	box-shadow: var(--ui-shadow-md);
 }
 /* Notices under the header, on the width of the page; without any, it takes no room. */
 .meeko-ui-page-notices {
@@ -77,6 +77,7 @@
 	overflow-y: auto;
 	overscroll-behavior: contain;
 	scrollbar-color: transparent transparent;
+	scrollbar-gutter: stable;
 	scrollbar-width: thin;
 }
 .meeko-ui-page-sidebar:is(:hover, :focus-within),

@@ -22,7 +22,7 @@
 	>
 		<h2 id="usage">Un campo completo</h2>
 		<p>El ejemplo valida un nombre localmente. No envía información ni guarda datos en un servidor.</p>
-		<DocsPreview>
+		<DocsPreview layout="stack">
 			<form
 				class="docs-stack"
 				novalidate

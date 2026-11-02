@@ -64,7 +64,7 @@
 							bind:items="locales.value"
 							bind:label="t('locale.label')"
 						/>
-						<UIThemeToggle />
+						<UIThemeToggle icons />
 					</snippet>
 					<!-- On a phone the account leaves the bar for the menu of the sections. -->
 					<snippet

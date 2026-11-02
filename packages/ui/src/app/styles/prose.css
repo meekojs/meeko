@@ -138,7 +138,7 @@
 	}
 	:scope :is(:not(pre) > code, kbd) {
 		border-radius: var(--ui-radius-sm);
-		background: var(--ui-color-control);
+		background: var(--ui-color-control-hover);
 		padding: var(--ui-prose-code-padding);
 		color: var(--ui-color-text);
 		font-size: var(--ui-prose-code-size);

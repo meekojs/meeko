@@ -21,6 +21,17 @@ export interface UIThemeToggleProps {
 	readonly labels?: Partial<Record<ThemeChoice, string>>
 	/** Textos accesibles del botón y del grupo; ganan sobre los de `themeToggle` en `ui.messages`. */
 	readonly messages?: ThemeToggleMessages
+	/**
+	 * Con `mode="cycle"`, pinta un icono de `light`, `dark` y `system` en lugar de su nombre, que sigue en el
+	 * `aria-label`. Un snippet con el nombre de la elección gana sobre el icono, y otro tema muestra su nombre.
+	 *
+	 * @since 0.2.0
+	 * @example
+	 * ```html
+	 * <UIThemeToggle icons />
+	 * ```
+	 */
+	readonly icons?: boolean
 	/** Clases del elemento raíz, el `<form>`. */
 	readonly class?: string
 	/** `id` del elemento raíz, el `<form>`. */

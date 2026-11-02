@@ -552,7 +552,7 @@
 				</section>
 
 				<section
-					class="dash-tight"
+					class="dash-tight editor-preview-pane"
 					aria-labelledby="preview-heading"
 					bind:aria-busy="previewing.value ? 'true' : undefined"
 				>
@@ -563,6 +563,15 @@
 						>
 							{t('editor.preview.title')}
 						</h2>
+						<p
+							class="dash-meta dash-status"
+							role="status"
+							aria-live="polite"
+						>
+							<span if:when="previewing.value">{t('editor.preview.real')}</span>
+							<span if:when="!previewing.value && stale.value">{t('editor.preview.stale')}</span>
+							<span if:when="!previewing.value && !stale.value && preview.value">{preview.value?.complete ? t('editor.preview.done', { ms: formatNumber(preview.value?.durationMs ?? 0) }) : t('editor.preview.donePartial', { ms: formatNumber(preview.value?.durationMs ?? 0) })}</span>
+						</p>
 						<div class="dash-actions">
 							<UICheckbox
 								model="auto"
@@ -578,15 +587,6 @@
 							</UIButton>
 						</div>
 					</div>
-					<p
-						class="dash-meta dash-status"
-						role="status"
-						aria-live="polite"
-					>
-						<span if:when="previewing.value">{t('editor.preview.real')}</span>
-						<span if:when="!previewing.value && stale.value">{t('editor.preview.stale')}</span>
-						<span if:when="!previewing.value && !stale.value && preview.value">{preview.value?.complete ? t('editor.preview.done', { ms: formatNumber(preview.value?.durationMs ?? 0) }) : t('editor.preview.donePartial', { ms: formatNumber(preview.value?.durationMs ?? 0) })}</span>
-					</p>
 					<DashFailure
 						if:when="previewFailure.value"
 						bind:title="t('editor.preview.failed')"
@@ -673,14 +673,16 @@
 	.editor-frontmatter > .editor-wide {
 		grid-column: 1 / -1;
 	}
+	/* The two panes start and end at the same height: same header, same gap under it, same frame. */
 	.editor-panes {
+		--ui-markdown-editor-height: max(30.625rem, calc(100dvh - 15.375rem));
 		display: grid;
 		grid-template-columns: repeat(2, minmax(0, 1fr));
 		align-items: start;
 		gap: var(--ui-space-4);
 	}
-	.editor-markdown {
-		--ui-markdown-editor-height: max(30.625rem, calc(100dvh - 15.375rem));
+	.editor-preview-pane {
+		gap: var(--ui-space-2);
 	}
 	.editor-issues {
 		display: grid;
@@ -708,8 +710,7 @@
 		border-radius: var(--ui-radius-lg);
 		background: var(--ui-color-bg);
 		width: 100%;
-		height: calc(100dvh - 18rem);
-		min-height: 28rem;
+		height: var(--ui-markdown-editor-height);
 	}
 	.editor-preview[data-stale] {
 		opacity: var(--ui-opacity-subtle);
@@ -718,7 +719,7 @@
 		.editor-panes {
 			grid-template-columns: minmax(0, 1fr);
 		}
-		.editor-markdown {
+		.editor-panes {
 			--ui-markdown-editor-height: 28rem;
 		}
 		.editor-preview {
