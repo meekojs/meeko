@@ -73,6 +73,12 @@ test('the core and the plugin agree on a < inside an interpolation, which only t
 	}
 })
 
+test('the core and the plugin keep the same adjacent inline content with htmlWhitespaceSensitivity "ignore"', async () => {
+	const source = '<template>\n<p>Usa <code>x</code>. Texto <strong>fuerte</strong><em>junto</em> y {valor}<a href="/x">enlace</a>.</p>\n</template>\n'
+	const cli = await assertSameEverywhere(source, { filepath: 'Component.meeko', htmlWhitespaceSensitivity: 'ignore', printWidth: 30 })
+	assert.doesNotMatch(cli, /<\/code>\s+\./)
+})
+
 test('the core and the plugin give the same result with the design system of the project', async () => {
 	const source = `<script lang="ts">\nconst a = tv({ base: "text-white custom bg-brand flex" });\n</script>\n\n<template>\n<Card class="text-white flex" />\n<p bind:class="on ? 'text-white flex' : ''"></p>\n</template>\n`
 	const cli = await assertSameEverywhere(source, { filepath: `${fixture}app/components/Probe.meeko`, meekoClassFunctions: classFunctions, meekoSortClasses: 'tailwind', printWidth: 200 })
