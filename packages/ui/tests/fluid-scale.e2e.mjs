@@ -27,6 +27,8 @@ const measure = (page) =>
 		const link = visible('.meeko-ui-nav-link')
 		return {
 			root,
+			// Without the gutter that the base keeps for a classic scrollbar, which is not page.
+			available: globalThis.document.body.getBoundingClientRect().width,
 			overflow: globalThis.document.documentElement.scrollWidth > globalThis.innerWidth,
 			body: globalThis.document.querySelector('.meeko-ui-page-body').getBoundingClientRect().width,
 			header: globalThis.document.querySelector('.meeko-ui-header-bar').getBoundingClientRect().width,
@@ -50,7 +52,7 @@ test('the root grows with the screen, and everything in rem with it, without a h
 		// Reading text at 1rem, in a measure of 75ch; the page, on its token, or the whole screen.
 		assert.ok(Math.abs(sizes.prose - sizes.root) < 0.05, `the prose at ${width}: ${sizes.prose}`)
 		assert.ok(sizes.textWidth <= sizes.measure75 + 1, `the measure at ${width}: ${sizes.textWidth} of ${sizes.measure75}`)
-		assert.ok(Math.abs(sizes.body - Math.min(96 * sizes.root, width)) < 1, `the page at ${width}: ${sizes.body}`)
+		assert.ok(Math.abs(sizes.body - Math.min(96 * sizes.root, sizes.available)) < 1, `the page at ${width}: ${sizes.body}`)
 		assert.ok(Math.abs(sizes.header - sizes.body) < 1, `the header follows the page at ${width}: ${sizes.header} and ${sizes.body}`)
 		if (sizes.navigation !== undefined) assert.ok(sizes.navigation >= 0.875 * sizes.root - 0.05, `the navigation at ${width}: ${sizes.navigation}`)
 		await page.screenshot({ path: `${output}/fluid-scale-${width}.png` })

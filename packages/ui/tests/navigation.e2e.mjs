@@ -160,7 +160,8 @@ test('the navigation components work in a browser, with and without JavaScript',
 		assert.equal(await nav.getByRole('link', { name: 'Dos más largo' }).getAttribute('aria-current'), 'page')
 		await until(() => aligned('Dos más largo'), 'the indicator did not follow')
 		// In a row too narrow for its links, the current one is brought into view, and the page stays put.
-		await page.setViewportSize({ width: 200, height: 900 })
+		// 15px of this width are the gutter that the base keeps for the scrollbar.
+		await page.setViewportSize({ width: 215, height: 900 })
 		await nav.evaluate((element) => (element.scrollLeft = 0))
 		await page.evaluate(() => globalThis.scrollTo(0, 0))
 		await page.locator('#tab-four').evaluate((element) => element.click())
