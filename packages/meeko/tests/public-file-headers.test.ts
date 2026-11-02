@@ -32,7 +32,7 @@ export default defineMeekoModule({
     await writeFile(join(root, path), source);
   }
   const { manifest } = await discoverAppManifest(root, { entry: "/entry.js", css: [], preload: [] });
-  const app = await createServerApp({ manifest, load: async () => ({}), assets: { get: async () => new Response("x") } });
+  const app = await createServerApp({ manifest, production: false, load: async () => ({}), assets: { get: async () => new Response("x") } });
   context.after(() => app.close());
   return app;
 }
