@@ -453,6 +453,111 @@ test("class and style beside bind:class and bind:style write one attribute in SS
   }
 });
 
+/** The six orders of a static attribute, its `bind:` directive and `bind="obj"`, on any tag. */
+const everyOrder = (first: string, second: string, third: string): string[][] => [[first, second, third], [first, third, second], [second, first, third], [second, third, first], [third, first, second], [third, second, first]];
+
+test("class and style join with bind:class, bind:style and bind=\"obj\" in any order, in SSR, hydration, updates and release", async () => {
+  // Before 1.8, with a spread the last of `class` and `bind:class` replaced the other one.
+  const classes = everyOrder(`class="base"`, `bind:class="on.value ? 'lit' : undefined"`, `bind="attrs.value"`);
+  const styles = everyOrder(`style="margin: 0;"`, `bind:style="on.value ? 'color: red' : undefined"`, `bind="attrs.value"`);
+  const elements = classes.map((order, index) => `<p k="${index}" ${order.join(" ")}>x</p>`).join("");
+  const tags = classes.map((order, index) => `<component is="on.value ? 'em' : 'span'" k="${index}" ${order.join(" ")}>x</component>`).join("");
+  const styled = styles.map((order, index) => `<b k="${index}" ${order.join(" ")}>x</b>`).join("");
+  const source = `<script lang="ts">
+import { signal } from "@meekojs/meeko";
+const on = signal(true);
+const attrs = signal<{ class?: string; style?: string; title: string }>({ class: "own", style: "padding: 0", title: "a" });
+</script>
+<template><div>${elements}${tags}${styled}<button on:click="() => on.value = !on.value">t</button><i on:click="() => attrs.value = { title: 'b' }">o</i></div></template>`;
+  const { component, cleanup } = await load({ Orders: source }, "Orders");
+  const window = new Window();
+  try {
+    const rendered = component.renderWithState({});
+    assert.deepEqual([...rendered.html.matchAll(/<(?:p|em)\b[^>]*? class="([^"]*)"/g)].map((match) => match[1]), Array<string>(12).fill("base lit own"), rendered.html);
+    assert.deepEqual([...rendered.html.matchAll(/<b\b[^>]*? style="([^"]*)"/g)].map((match) => match[1]), Array<string>(6).fill("padding: 0; margin: 0; color: red"), rendered.html);
+    assert.doesNotMatch(rendered.html, /class="[^"]*"[^>]*class=|style="[^"]*"[^>]*style=/);
+    const root = window.document.createElement("main");
+    root.innerHTML = rendered.html;
+    const release = component.hydrate(root as unknown as Element, {}, rendered.state);
+    const classOf = (selector: string): Array<string | null> => [...root.querySelectorAll(selector)].map((item) => item.getAttribute("class"));
+    const styleOf = (): Array<string | null> => [...root.querySelectorAll("b")].map((item) => item.getAttribute("style"));
+    const toggle = root.querySelector("button") as unknown as HTMLElement;
+    toggle.click();
+    assert.deepEqual(classOf("p, span"), Array<string>(12).fill("base own"));
+    assert.deepEqual(styleOf(), Array<string>(6).fill("padding: 0; margin: 0"));
+    (root.querySelector("i") as unknown as HTMLElement).click();
+    assert.deepEqual(classOf("p, span"), Array<string>(12).fill("base"));
+    assert.deepEqual(styleOf(), Array<string>(6).fill("margin: 0"));
+    toggle.click();
+    assert.deepEqual(classOf("p, em"), Array<string>(12).fill("base lit"));
+    assert.deepEqual(styleOf(), Array<string>(6).fill("margin: 0; color: red"));
+    release();
+    // Released: the single binding no longer follows the signals.
+    toggle.click();
+    assert.deepEqual(classOf("p"), Array<string>(6).fill("base lit"));
+  } finally {
+    window.happyDOM.abort();
+    await cleanup();
+  }
+});
+
+test("a static attribute beside its bind: directive is MEEK133: the directive wins in any order, with no hydration mismatch", async () => {
+  // Before 1.8, SSR wrote both and the browser kept the first: `id="a" bind:id="b"` failed to hydrate.
+  const source = `<script lang="ts">
+import { signal } from "@meekojs/meeko";
+const on = signal(true);
+const id = signal("dynamic");
+</script>
+<template><div>
+<p k="1" id="fixed" bind:id="id.value">x</p>
+<p k="2" bind:title="id.value" title="fixed">x</p>
+<input k="3" disabled bind:disabled="!on.value" />
+<input k="4" value="fixed" bind:value="id.value" />
+<svg k="5" viewBox="0 0 1 1" bind:viewBox="on.value ? '0 0 2 2' : '0 0 3 3'"></svg>
+<a k="6" data-x="fixed" bind:data-x="id.value" bind="{ title: 'spread' }">x</a>
+<component is="on.value ? 'em' : 'span'" k="7" id="fixed" bind:id="id.value">x</component>
+<button on:click="() => { on.value = !on.value; id.value = 'changed'; }">t</button>
+</div></template>`;
+  const warnings = compile(source, "Replaced.meeko").warnings ?? [];
+  assert.deepEqual(warnings.map((warning) => [warning.code, warning.severity, source.slice(warning.location.offset).split(/[= ]/, 1)[0]]), [
+    ["MEEK133", "warning", "id"],
+    ["MEEK133", "warning", "title"],
+    ["MEEK133", "warning", "disabled"],
+    ["MEEK133", "warning", "value"],
+    ["MEEK133", "warning", "viewBox"],
+    ["MEEK133", "warning", "data-x"],
+    ["MEEK133", "warning", "id"],
+  ]);
+  assert.match(warnings[0]!.message, /id está escrito como texto y con bind:id: sólo vale bind:id/);
+  const { component, cleanup } = await load({ Replaced: source }, "Replaced");
+  const window = new Window();
+  try {
+    const rendered = component.renderWithState({});
+    assert.equal((rendered.html.match(/ id="/g) ?? []).length, 2, rendered.html);
+    assert.doesNotMatch(rendered.html, /="fixed"/);
+    assert.match(rendered.html, /<p k="1" id="dynamic"/);
+    assert.match(rendered.html, /<p k="2" title="dynamic"/);
+    assert.doesNotMatch(rendered.html, /<input k="3" disabled/);
+    const root = window.document.createElement("main");
+    root.innerHTML = rendered.html;
+    const release = component.hydrate(root as unknown as Element, {}, rendered.state);
+    (root.querySelector("button") as unknown as HTMLElement).click();
+    assert.equal(root.querySelector("p[k='1']")!.getAttribute("id"), "changed");
+    assert.equal(root.querySelector("input[k='3']")!.hasAttribute("disabled"), true);
+    assert.equal(root.querySelector("a")!.getAttribute("data-x"), "changed");
+    assert.equal(root.querySelector("span")!.getAttribute("id"), "changed");
+    release();
+  } finally {
+    window.happyDOM.abort();
+    await cleanup();
+  }
+  // `class` and `style` join and a component's props are MEEK090: neither is this warning.
+  assert.deepEqual(compile(`<template><p class="a" bind:class="'b'" style="color: red" bind:style="'margin: 0'">x</p></template>`, "Joined.meeko").warnings ?? [], []);
+  // `meeko check`, which the editor shares, reports it too.
+  const checked = await checkAll({ "Check.meeko": `<template><p id="a" bind:id="'b'">x</p></template>` }, ["Check"]);
+  assert.ok(checked.Check!.some((item) => item.startsWith("MEEK133@")), checked.Check!.join("\n"));
+});
+
 test("bind=\"obj\" rejects handler keys in SSR and in the type check", async () => {
   const handler = `<script lang="ts">const attrs = { onClick: "alert(1)", title: "x" };</script><template><p bind="attrs">x</p></template>`;
   const { component, cleanup } = await load({ Handler: handler }, "Handler");

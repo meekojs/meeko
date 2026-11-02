@@ -105,7 +105,8 @@ function normalize(node: ParsedNode, context: NormalizeContext): TemplateNode {
   const { template } = context;
   const location = node.sourceCodeLocation;
   const attrs = node.attrs?.map((attribute) => {
-    const span = location?.attrs?.[attribute.name];
+    // parse5 restores the case of foreign attributes (`viewBox`), but its locations keep the lowercase name.
+    const span = location?.attrs?.[attribute.name] ?? location?.attrs?.[attribute.name.toLowerCase()];
     return {
       name: attribute.name,
       value: attribute.value,

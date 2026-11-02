@@ -157,8 +157,11 @@ interface SpreadBinding {
   filtered: boolean;
 }
 
-/** An explicit `class` or `style` combined with a spread: static code, or an expression at its offset. */
-type SpreadPart = { code: string } | { expression: string; offset: number };
+/**
+ * An explicit `class` or `style` combined with a spread: static code, or an expression at its offset.
+ * `fixed` is the code of the static text written beside that expression, which join into one value.
+ */
+type SpreadPart = { code: string } | { expression: string; offset: number; fixed?: string };
 
 /**
  * `<component is>` whose expression is always an HTML tag: an element whose tag changes. Its
@@ -326,6 +329,8 @@ interface TemplateContext {
   deprecatedUses: Map<string, number>;
   /** Offset of each `each:*` or `if:*` attribute that no directive reads, for its MEEK119 warning. */
   strayDirectives: Map<number, { readonly name: string; readonly directive: "if:when" | "each:of" }>;
+  /** Offset of each static attribute that its own `bind:` directive replaces, for its MEEK133 warning. */
+  replacedAttributes: Map<number, string>;
   /** `theme` of the project, when the caller knows it; see {@link CompileOptions.theme}. */
   theme: boolean | undefined;
   /**
@@ -752,6 +757,20 @@ function joinedAttributes(node: TemplateNode): Map<string, string> {
   return joined;
 }
 
+/**
+ * Names of the attributes a tag writes with `bind:`, as `attributeName` spells them. The same name as
+ * static text is MEEK133, except `class` and `style`, which are never in conflict: they join.
+ */
+function boundAttributeNames(node: TemplateNode, attributeName: (name: string) => string): ReadonlySet<string> {
+  const names = new Set<string>();
+  for (const attribute of node.attrs ?? []) {
+    if (!attribute.name.startsWith("bind:")) continue;
+    const name = attributeName(attribute.name.slice(5));
+    if (name !== "class" && name !== "style") names.add(name);
+  }
+  return names;
+}
+
 /** Whether an attribute is a `ref:name` directive. */
 function isRefDirective(attribute: { name: string }): boolean {
   return attribute.name.startsWith("ref:");
@@ -1138,6 +1157,7 @@ function renderNodeContent(node: TemplateNode, bindings: TemplateBindings, conte
   const checksValue = (name: string): boolean => context.narrow && htmlTag && closedAttributeValues(tag, name) !== undefined;
   const checkedValue = (code: string, name: string): string => checksValue(name) ? `__meeko.checkAttributeValue<${quote(tag)}, ${quote(name)}>()(${code})` : code;
   const joined = spread ? new Map<string, string>() : joinedAttributes(node);
+  const bound = boundAttributeNames(node, (name) => foreignAttributeName(name, node.namespaceURI));
   for (const attr of node.attrs ?? []) {
     if (attr === spreadDirective) spreadIndex ??= attrs.length;
     if (isRefDirective(attr) || attr === modelAttribute || attr === htmlAttribute || attr === spreadDirective) continue;
@@ -1148,8 +1168,8 @@ function renderNodeContent(node: TemplateNode, bindings: TemplateBindings, conte
       if (attr.name.startsWith("bind:")) {
         const offset = attributeValueOffset(node, attr.name, context);
         validateExpression(attr.value, context.source, context.filename, offset);
-        explicit[name] = { expression: attr.value, offset };
-      } else explicit[name] = { code: quote(attr.value) };
+        addSpreadPart(explicit, name, { expression: attr.value, offset });
+      } else addSpreadPart(explicit, name, { code: quote(attr.value) });
       continue;
     }
     if (attr.name.startsWith("on:")) {
@@ -1188,6 +1208,10 @@ function renderNodeContent(node: TemplateNode, bindings: TemplateBindings, conte
     } else if (joined.has(attr.name)) {
       // Written by its `bind:` directive, joined with the dynamic value.
       excluded.add(attr.name);
+    } else if (bound.has(attr.name)) {
+      // Written by its `bind:` directive alone, in any order: with both, the browser keeps the first.
+      excluded.add(attr.name);
+      context.replacedAttributes.set(attr.start, attr.name);
     } else {
       excluded.add(attr.name);
       const valueStart = attributeValueStart(context.source, attr);
@@ -1366,6 +1390,7 @@ function renderDynamicTag(node: TemplateNode, bindings: TemplateBindings, contex
   };
   // With a tag only, the static class or style and its `bind:` directive write one attribute, as on an element.
   const joined = spread || mixed ? new Map<string, string>() : joinedAttributes(node);
+  const bound = boundAttributeNames(node, (name) => name);
   for (const attribute of node.attrs ?? []) {
     if (attribute === spreadDirective || (spread && /^(?:bind:)?(?:class|style)$/.test(attribute.name))) spreadIndex ??= parts.length;
     if (attribute.name === "is" || isRefDirective(attribute) || attribute === spreadDirective) continue;
@@ -1415,7 +1440,7 @@ function renderDynamicTag(node: TemplateNode, bindings: TemplateBindings, contex
       const offset = attributeValueOffset(node, attribute.name, context);
       validateExpression(attribute.value, context.source, context.filename, offset);
       if (!domAttribute) only("component", rawName, attribute, rawName.length);
-      else if (spread && (attributeName === "class" || attributeName === "style")) explicit[attributeName] = { expression: attribute.value, offset };
+      else if (spread && (attributeName === "class" || attributeName === "style")) addSpreadPart(explicit, attributeName, { expression: attribute.value, offset });
       else {
         excluded.add(attributeName);
         const accepts = accepting(attributeName, attribute, rawName.length);
@@ -1437,9 +1462,13 @@ function renderDynamicTag(node: TemplateNode, bindings: TemplateBindings, contex
       continue;
     }
     if (name.startsWith(":")) fail("MEEK012", `Directiva de plantilla no admitida: ${name}`, attribute.start);
-    if (spread && (name === "class" || name === "style")) explicit[name] = { code: quote(attribute.value) };
+    if (spread && (name === "class" || name === "style")) addSpreadPart(explicit, name, { code: quote(attribute.value) });
     else if (joined.has(name)) excluded.add(name);
-    else {
+    else if (bound.has(name)) {
+      // Written by its `bind:` directive alone, as on an element. With a component it is MEEK090 below.
+      excluded.add(name);
+      context.replacedAttributes.set(attribute.start, name);
+    } else {
       excluded.add(name);
       const accepts = accepting(name, attribute, rawName.length);
       let text = quote(` ${name}="${escapeAttribute(attribute.value)}"`);
@@ -1646,12 +1675,27 @@ function spreadPropsCode(reference: string, value: string): string {
   return `...__meeko.spreadProps(() => ${reference}, ${value})`;
 }
 
+/**
+ * Adds the static `class` or `style`, or its `bind:` directive, to what `bind="obj"` combines. Written
+ * together, in either order, they are one value, as they are on an element without a spread.
+ */
+function addSpreadPart(explicit: SpreadBinding["explicit"], name: "class" | "style", part: SpreadPart): void {
+  const previous = explicit[name];
+  if (!previous) explicit[name] = part;
+  else if ("code" in part && "expression" in previous) explicit[name] = { ...previous, fixed: part.code };
+  else if ("expression" in part && "code" in previous) explicit[name] = { ...part, fixed: previous.code };
+}
+
 /** SSR code of `bind="obj"` on an element, or the read of its hydration with `map` for its expressions. */
 function spreadCode(spread: SpreadBinding, map: (expression: string, offset: number) => string): string {
-  const part = (value: SpreadPart): string => "code" in value ? value.code : map(value.expression, value.offset);
+  const part = (name: "class" | "style", value: SpreadPart): string => {
+    if ("code" in value) return value.code;
+    const dynamic = map(value.expression, value.offset);
+    return value.fixed === undefined ? dynamic : `__meeko.joinAttribute(${quote(name)}, ${value.fixed}, ${dynamic})`;
+  };
   const explicit = [
-    ...(spread.explicit.class ? [`class: ${part(spread.explicit.class)}`] : []),
-    ...(spread.explicit.style ? [`style: ${part(spread.explicit.style)}`] : []),
+    ...(spread.explicit.class ? [`class: ${part("class", spread.explicit.class)}`] : []),
+    ...(spread.explicit.style ? [`style: ${part("style", spread.explicit.style)}`] : []),
   ];
   const extra = spread.filtered ? `, ${explicit.length ? `{ ${explicit.join(", ")} }` : "undefined"}, __meeko.tagAccepts` : explicit.length ? `, { ${explicit.join(", ")} }` : "";
   return `__meeko.spreadEntries(${spread.tag}, ${map(spread.expression, spread.offset)}, ${JSON.stringify(spread.excluded)}${extra})`;
@@ -2792,7 +2836,7 @@ export function compile(source: string, filename = "anonymous.meeko", options: C
   const projectComponents = [...options.projectComponents ?? []];
   const knownComponents = new Set([...importedComponents(script.content), ...projectComponents.filter((name) => /^[A-Z]/.test(name))]);
   const componentNames = { names: new Set([...knownComponents, ...scriptValueNames(script.content)]), complete: options.projectComponents !== undefined };
-  const context: TemplateContext = { componentNames, branchComponents: new WeakSet(), source, filename, templateOffset: template.contentStart, scopeAttribute, scopeTargets: targets, nextText: 0, nextRegion: 0, nextRef: 0, nextHtml: 0, nextElement: 0, listDepth: 0, refs: new Map(), usedRefs: new Set(), nextSnippet: 0, snippetDepth: 0, selectModel: undefined, narrow: options.typeCheck === true, guards: [], shadowedTags: shadowedBuiltinTags(script.content, projectComponents), shadowedUses: new Map(), deprecatedUses: new Map(), strayDirectives: new Map(), theme: options.theme, knownComponents, builtinModules: new Set(), decodedRegions: [] };
+  const context: TemplateContext = { componentNames, branchComponents: new WeakSet(), source, filename, templateOffset: template.contentStart, scopeAttribute, scopeTargets: targets, nextText: 0, nextRegion: 0, nextRef: 0, nextHtml: 0, nextElement: 0, listDepth: 0, refs: new Map(), usedRefs: new Set(), nextSnippet: 0, snippetDepth: 0, selectModel: undefined, narrow: options.typeCheck === true, guards: [], shadowedTags: shadowedBuiltinTags(script.content, projectComponents), shadowedUses: new Map(), deprecatedUses: new Map(), strayDirectives: new Map(), replacedAttributes: new Map(), theme: options.theme, knownComponents, builtinModules: new Set(), decodedRegions: [] };
   const html = renderNode(parsed, bindingsForTemplate, context);
   const hot = options.hot === true;
   const scriptParts = compileScript(script, source, filename, hot, context.refs, generic);
@@ -2950,6 +2994,10 @@ export function compile(source: string, filename = "anonymous.meeko", options: C
     message: directive === "each:of"
       ? `${name} no es una directiva de each:of (each:as, each:key, each:index) y se escribe como atributo HTML literal; quítalo o corrige su nombre`
       : `${name} no es una directiva de if:when y se escribe como atributo HTML literal; quítalo o corrige su nombre`,
+  })), ...[...context.replacedAttributes].map(([offset, name]): CompileDiagnostic => ({
+    // MEEK133: since 1.8 the directive wins in any order, and SSR and hydration agree on it.
+    code: "MEEK133", filename, location: locate(source, offset), severity: "warning",
+    message: `${name} está escrito como texto y con bind:${name}: sólo vale bind:${name} y el texto se ignora; deja uno de los dos, con el texto como alternativa dentro de la expresión si lo necesitas`,
   })), ...layoutShiftHints(source, filename, script.content, script.contentStart, parsed)];
   return { code, css, mappings, ...(warnings.length ? { warnings } : {}) };
 }

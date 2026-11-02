@@ -1,5 +1,5 @@
 ---
-source-hash: 6b277a9ce109193f95020bb45bab02ece9e0027055dac587fe0c7937d3acee2f
+source-hash: b0c2402a0e4425c46abe25c065161cbe37b9ad05859c1b73b64ab9dd96bf9dcc
 ---
 
 # Meeko API
@@ -930,7 +930,8 @@ Since `1.5`, `bind="obj"` writes an object's keys as attributes of an element, o
 
 - **Types.** The object is checked against the tag's attributes (or those of any `<component is>` tag), or the component's props: a key that is not one produces `MEEK113`. `ElementAttributes<Tag>` types the object. On a custom element (`<x-card bind="...">`), `bind` remains an HTML attribute, like `html` and `model`.
 - **Values.** Keys with `undefined`, `null` or `false` are not written, as with `bind:x`; `true` writes the empty attribute. On a component, an `undefined` key is an absent prop.
-- **Order.** An explicit `bind:x` or static attribute wins over the same object key. `class` and `style` are **combined**: explicit and object classes are joined, and the object's `style` declarations precede explicit ones, which win. On a component they are not combined: the explicit prop wins.
+- **Order.** An explicit `bind:x` or static attribute wins over the same object key. `class` and `style` are **combined** in any order, including `class`, `bind:class` and `bind` together: explicit and object classes are joined, and the object's `style` declarations precede explicit ones, which win. On a component they are not combined: the explicit prop wins.
+- **The same attribute as text and with `bind:`.** Except for `class` and `style`, `id="a" bind:id="b"` produces the `MEEK133` warning: only `bind:id` applies, in any order, and the text is ignored. Keep one of the two.
 - **No handlers.** A key starting with `on` is a type error (`MEEK113`) and a runtime `TypeError`: event handlers are not created from data; use `on:evento`. `data-meeko*` keys, reserved for Meeko, are not allowed either. As in HTML, names are compared case-insensitively: `Data-Meeko` is also rejected, and an `ID` key alongside `bind:id` does not write a second `id`.
 - **Reactive.** If the object changes, Meeko writes the new attributes and removes those no longer present; a component receives new props in place. `bind=""` or valueless `bind` produces `MEEK113`, as does using it on `<template>`.
 
