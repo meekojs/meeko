@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
-import { createModalManager, installModalPlugin, modalExitRegistration, useModalHost } from '../dist/app/composables/useModal.js'
+import { createModalManager, installModalPlugin, modalExitRegistration, provideModal, useModalHost } from '../dist/app/composables/useModal.js'
 import { useModal, useModalInstance } from '../dist/runtime.js'
 
 const component = { renderToString: () => '' }
@@ -228,6 +228,95 @@ test('without HMR a second host in the same provider is an error', () => {
 	release()
 	assert.equal(manager.hosted, false)
 	manager.attachHost()()
+})
+
+/** A tree of the application: its own root, with what the plugin provides, and one UIApp. */
+function hostTree(values) {
+	return createRoot((dispose) => {
+		for (const [key, value] of values) provide(key, value)
+		return { host: useModalHost(), dispose }
+	})
+}
+
+async function capturedErrors(work) {
+	const errors = []
+	const consoleError = console.error
+	console.error = (error) => errors.push(error)
+	try {
+		await work()
+		await tick()
+	} finally {
+		console.error = consoleError
+	}
+	return errors
+}
+
+test('a navigation between root layouts relays the host of the browser and keeps the open modals', async () => {
+	const values = new Map()
+	installModalPlugin({ side: 'client', provide: (key, value) => values.set(key, value) }, async () => component)
+	const errors = await capturedErrors(async () => {
+		const previous = hostTree(values)
+		const result = previous.host.open('ModalConfirm', {})
+		await tick()
+		// Meeko hydrates the new tree before it releases the committed one, in the same task.
+		const next = hostTree(values)
+		previous.dispose()
+		await tick()
+		assert.deepEqual([...next.host.instances.value.keys()], [1], 'the open modal survives the handover')
+		next.host.dismissAll()
+		assert.equal(await result, undefined)
+		const pending = next.host.open('ModalConfirm', {})
+		await tick()
+		next.dispose()
+		assert.equal(await pending, undefined, 'releasing the last host still clears the modals')
+	})
+	assert.deepEqual(errors, [])
+})
+
+test('a real second host is still detected: reported in the browser, and an error on the server or nested', async () => {
+	const browserValues = new Map()
+	installModalPlugin({ side: 'client', provide: (key, value) => browserValues.set(key, value) }, async () => component)
+	const errors = await capturedErrors(() => {
+		// Two trees alive after the task: nothing relays, it is a duplicate.
+		hostTree(browserValues)
+		hostTree(browserValues)
+	})
+	assert.equal(errors.length, 1)
+	assert.match(errors[0].message, /Only one UIApp/)
+
+	const serverValues = new Map()
+	installModalPlugin({ side: 'server', provide: (key, value) => serverValues.set(key, value) }, async () => component)
+	const first = hostTree(serverValues)
+	assert.throws(() => hostTree(serverValues), /Only one UIApp/)
+	first.dispose()
+
+	// Inside another of the same provider, wherever it runs.
+	const nestedValues = new Map()
+	installModalPlugin({ side: 'client', provide: (key, value) => nestedValues.set(key, value) }, async () => component)
+	const outer = hostTree(nestedValues)
+	createRoot((dispose) => {
+		for (const [key, value] of nestedValues) provide(key, value)
+		useModalHost()
+		const inner = createRoot((disposeInner) => {
+			assert.throws(() => useModalHost(), /Only one UIApp/)
+			return disposeInner
+		})
+		inner()
+		dispose()
+	})
+	outer.dispose()
+})
+
+test('a local provider gets its own host inside the UIApp of the application', () => {
+	const values = new Map()
+	installModalPlugin({ side: 'client', provide: (key, value) => values.set(key, value) }, async () => component)
+	createRoot((dispose) => {
+		for (const [key, value] of values) provide(key, value)
+		useModalHost()
+		provideModal(async () => component)
+		assert.doesNotThrow(() => useModalHost())
+		dispose()
+	})
 })
 
 test('an HMR host takes over from the previous one keeping the open modals', async () => {

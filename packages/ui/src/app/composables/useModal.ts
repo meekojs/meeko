@@ -25,11 +25,17 @@ interface ModalManagerOptions {
 	 * el cliente de desarrollo y sustituye por `undefined` en producción, SSR y Node.
 	 */
 	hot?: boolean
+	/**
+	 * Admite el relevo de una navegación: al cambiar de layout raíz, Meeko hidrata el árbol nuevo antes de
+	 * soltar el anterior para que un fallo deje intacta la ruta visible, y cada árbol puede traer su `UIApp`.
+	 */
+	relay?: boolean
 }
 
 /** Estado por proveedor; las promesas y los resolvers no forman parte del estado reactivo. */
 export function createModalManager(load: ModalResolver, options: ModalManagerOptions = {}) {
 	const hot = options.hot ?? (import.meta as { hot?: unknown }).hot !== undefined
+	const relay = options.relay === true
 	const instances = signal<ReadonlyMap<number, ModalInstance>>(new Map())
 	const pending = new Map<number, PendingModal>()
 	const exits = new Map<number, () => Promise<void>>()
@@ -131,10 +137,10 @@ export function createModalManager(load: ModalResolver, options: ModalManagerOpt
 			return hosts.size > 0
 		},
 		attachHost() {
-			if (hosts.size > 0 && !hot) throw new Error(duplicateHost)
+			if (hosts.size > 0 && !hot && !relay) throw new Error(duplicateHost)
 			const host = {}
 			hosts.add(host)
-			// En HMR el host anterior se libera justo después, en la misma tarea; si sigue ahí es un duplicado real.
+			// En un relevo el host anterior se libera justo después, en la misma tarea; si sigue ahí es un duplicado real.
 			if (hosts.size > 1) queueMicrotask(() => hosts.size > 1 && console.error(new Error(duplicateHost)))
 			return () => {
 				if (!hosts.delete(host) || hosts.size > 0) return
@@ -176,10 +182,20 @@ export function provideModal(resolve: ModalResolver): ModalContext {
 }
 
 const managerKey = createContext<ReturnType<typeof createModalManager>>('@meekojs/ui/modal.manager')
+const hostKey = createContext<ReturnType<typeof createModalManager>>('@meekojs/ui/modal.host')
+
+/** El gestor del `UIApp` que envuelve este setup, si lo hay; `inject` lanza cuando no existe. */
+function enclosingHost(): ReturnType<typeof createModalManager> | undefined {
+	try {
+		return inject(hostKey)
+	} catch {
+		return undefined
+	}
+}
 
 /** Registro del módulo: estado nuevo por aplicación y por petición SSR. */
 export function installModalPlugin(app: Pick<PluginApp, 'provide' | 'side'>, resolve: ModalResolver): void {
-	const manager = createModalManager(resolve)
+	const manager = createModalManager(resolve, { relay: app.side === 'client' })
 	app.provide(
 		modalKey,
 		modalContext(manager, () => app.side === 'client'),
@@ -190,6 +206,9 @@ export function installModalPlugin(app: Pick<PluginApp, 'provide' | 'side'>, res
 /** Vincula la vida del host con sus instancias y sus cargas pendientes. */
 export function useModalHost(): ModalContext {
 	const manager = inject(managerKey)
+	// Un relevo llega de otro árbol: un UIApp dentro de otro del mismo gestor sigue siendo un error.
+	if (enclosingHost() === manager) throw new Error(duplicateHost)
+	provide(hostKey, manager)
 	onCleanup(manager.attachHost())
 	return useModal()
 }

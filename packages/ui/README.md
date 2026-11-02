@@ -290,7 +290,7 @@ El módulo carga además la base global en la capa `ui-base`: la [escala fluida]
 
 ## Modales
 
-El módulo instala un gestor independiente por aplicación (y por petición SSR). Monta un único `UIApp`, preferiblemente en `app/app.meeko`, para mantener el host durante las navegaciones:
+El módulo instala un gestor independiente por aplicación (y por petición SSR). Monta un único `UIApp`, preferiblemente en `app/app.meeko`, para mantener el host durante las navegaciones. También puede ir en cada layout raíz: al navegar de uno a otro, el `UIApp` nuevo releva al anterior y los modales abiertos pasan a él, pero el contenido de los layouts se vuelve a crear. Dos `UIApp` a la vez son un error en SSR o anidados, y un `console.error` en el navegador:
 
 ```html
 <template>
