@@ -150,11 +150,11 @@ pre.meeko-ui-code-content,
 .meeko-ui-prose .shiki code {
 	font-variant-ligatures: none;
 }
-.meeko-ui-code-block .shiki span,
-.meeko-ui-prose .shiki span {
+/* Any highlighted code, also a <pre class="shiki"> that a page draws on its own. */
+.shiki span {
 	color: var(--shiki-light);
 }
-:root[data-theme='dark'] :is(.meeko-ui-code-block, .meeko-ui-prose) .shiki span {
+:root[data-theme='dark'] .shiki span {
 	color: var(--shiki-dark);
 }
 .meeko-ui-code-block[data-mode='log'] pre.meeko-ui-code-content {

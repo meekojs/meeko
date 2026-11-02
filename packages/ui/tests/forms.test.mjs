@@ -46,6 +46,7 @@ const cases = [
 	['Disclosure', '<Component summary="More" bind:open="true"><p>Inside</p></Component>', [/<details[^>]*class="meeko-ui-disclosure"/, /<details[^>]*open/, /<summary>[\s\S]*More/, /<p>Inside<\/p>/]],
 	['Disclosure', '<Component summary="More"><p>Inside</p></Component>', [/<details(?![^>]*open)/, /<p>Inside<\/p>/]],
 	['Table', `<Component rowKey="id" bind:rows="[{ id: 1 }]" bind:columns="[{ key: 'id', label: 'Id' }]"><snippet name="caption"><span lang="es">Título</span></snippet></Component>`, [/role="region"/, /aria-labelledby="[^"]*-caption"/, /<caption[^>]*>\s*<span lang="es">Título<\/span>/]],
+	['Empty', '<Component><snippet name="title">Nothing for <kbd>x</kbd></snippet></Component>', [/meeko-ui-empty-title[^>]*>[\s\S]*Nothing for[\s\S]*<kbd[^>]*>x<\/kbd>/, /^(?![\s\S]*No hay resultados)/]],
 	['Empty', '<Component description="Add an item" variant="panel"><snippet name="actions"><button>Add</button></snippet></Component>', [/No hay resultados\./, /data-variant="panel"/, /Add an item/, /<button>Add<\/button>/]],
 	['Skeleton', '<Component bind:lines="2" bind:widths="[\'long\', \'short\']" />', [/role="status"/, /aria-label="Cargando"/, /data-width="long"/, /data-width="short"/]],
 	['Stat', '<Component label="Visits" bind:value="1200" detail="This week" />', [/<dl/, /<dt>Visits<\/dt>/, />1200<\/dd>/, /This week/]],

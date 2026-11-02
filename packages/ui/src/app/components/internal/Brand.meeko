@@ -20,7 +20,7 @@
 			bind:width="props.brand.image?.width"
 			bind:height="props.brand.image?.height"
 		/>
-		<span bind:class="props.brand.product ? 'meeko-ui-brand-name' : undefined">{props.brand.name}</span>
+		<span bind:class="props.brand.product || props.brand.compact ? 'meeko-ui-brand-name' : undefined">{props.brand.name}</span>
 		<strong
 			if:when="props.brand.product"
 			class="meeko-ui-brand-product"

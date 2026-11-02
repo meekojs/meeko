@@ -228,3 +228,10 @@ test('the font and its licence ship with the package', async () => {
 	assert.deepEqual(fonts.sort(), ['Inter-OFL.txt', 'inter-latin-opsz-normal.woff2'])
 	assert.match(await read('fonts.css'), /\/_meeko-ui\/fonts\/inter-latin-opsz-normal\.woff2/)
 })
+
+test('a kbd and highlighted code look the same anywhere in an application', async () => {
+	assert.match(await read('base.css'), /:where\(kbd\) \{[^}]*var\(--ui-color-border\)/)
+	const code = await read('code.css')
+	assert.match(code, /^\.shiki span \{\s*color: var\(--shiki-light\);/m)
+	assert.match(code, /:root\[data-theme='dark'\] \.shiki span \{\s*color: var\(--shiki-dark\);/)
+})

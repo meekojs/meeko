@@ -25,7 +25,8 @@
 	margin-bottom: 0;
 }
 @scope (.meeko-ui-prose) to ([class*='meeko-ui-'], [data-meeko-popover], [data-meeko-select], [data-meeko-theme-toggle]) {
-	:scope > :is(p, ul, ol, dl, blockquote, h1, h2, h3, h4) {
+	:scope > :is(p, ul, ol, dl, blockquote, h1, h2, h3, h4),
+	:scope > :is(section, div) > :is(p, ul, ol, dl, blockquote, h2, h3, h4) {
 		max-width: var(--ui-prose-measure);
 	}
 	:scope :is(h1, h2, h3, h4) {

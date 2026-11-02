@@ -5,7 +5,7 @@
 
 	const props = defineProps<UIEmptyProps>()
 
-	const snippets = defineSnippets<{ default?: []; actions?: [] }>()
+	const snippets = defineSnippets<{ default?: []; title?: []; actions?: [] }>()
 
 	const text = uiMessages().feedback
 </script>
@@ -15,7 +15,13 @@
 		bind:class="['meeko-ui-empty', props.class].filter(Boolean).join(' ')"
 		bind:data-variant="props.variant ?? 'inline'"
 	>
-		<p class="meeko-ui-empty-title">{props.title ?? text.empty}</p>
+		<p class="meeko-ui-empty-title">
+			<render
+				if:when="snippets.title"
+				snippet="snippets.title"
+			/>
+			<template if:when="!snippets.title">{props.title ?? text.empty}</template>
+		</p>
 		<p
 			if:when="props.description"
 			class="meeko-ui-empty-description"

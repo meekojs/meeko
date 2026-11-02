@@ -1,7 +1,16 @@
 /** How long the button of a code block shows the result of a copy, in milliseconds. */
 export const copyFeedbackTime = 1600
 
-/** Writes `text` to the clipboard, with a selection fallback where the Clipboard API is missing. */
+/**
+ * Copia `text` al portapapeles; donde falta la API del portapapeles, recurre a una selección. La promesa
+ * se rechaza si el navegador no lo permite.
+ *
+ * @since 0.2.0
+ * @example
+ * ```ts
+ * await copyText('pnpm add @meekojs/meeko')
+ * ```
+ */
 export async function copyText(text: string): Promise<void> {
 	if (navigator.clipboard?.writeText) {
 		await navigator.clipboard.writeText(text)

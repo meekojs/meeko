@@ -74,6 +74,8 @@ export type UIBrand = UILinkTarget & {
 	readonly name: string
 	/** Producto, tras el nombre. */
 	readonly product?: string
+	/** Sin producto, oculta también el nombre en un móvil estrecho, para dar sitio a las acciones; requiere `image` y `ariaLabel`. */
+	readonly compact?: boolean
 	/** Logotipo decorativo: el nombre del enlace lo da el texto o `ariaLabel`. */
 	readonly image?: { readonly src: string; readonly width: number; readonly height: number }
 	/** Nombre accesible del enlace, si el texto visible no basta. */

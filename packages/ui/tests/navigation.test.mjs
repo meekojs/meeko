@@ -83,6 +83,13 @@ test('the navigation components render on the server with their semantics', { ti
 		assert.equal(attribute(tag(dashboard, /meeko-ui-page-header/), 'data-layout'), 'dashboard')
 	})
 
+	await t.test('UIHeader: a compact brand hides its name on a narrow phone, without a product', () => {
+		const header = block(landing, '<header', '</header>')
+		assert.equal(attribute(tag(header, /meeko-ui-brand"/), 'aria-label'), 'Meeko, inicio')
+		assert.match(header, /<span class="meeko-ui-brand-name"[^>]*>Meeko<\/span>/)
+		assert.doesNotMatch(block(es, '<header', '</header>'), /<span(?![^>]*meeko-ui-brand-name)[^>]*>Meeko<\/span>\s*<strong/, 'a product still has its hidden name')
+	})
+
 	await t.test('UIHeader: brand, links with to and href, current page and a native menu', () => {
 		const header = block(es, '<header', '</header>')
 		const brand = tag(header, /meeko-ui-brand"/)

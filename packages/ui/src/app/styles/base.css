@@ -42,6 +42,16 @@
 	:where(code, kbd, pre, samp) {
 		font-family: var(--ui-font-mono);
 	}
+	:where(kbd) {
+		border: var(--ui-border-width) solid var(--ui-color-border);
+		border-radius: var(--ui-radius-xs);
+		background: var(--ui-color-bg-subtle);
+		padding: 0 var(--ui-space-1);
+		color: var(--ui-color-text-soft);
+		font-weight: var(--ui-font-weight-medium);
+		font-size: var(--ui-font-size-xs);
+		line-height: var(--ui-line-height-normal);
+	}
 	:where(img, video) {
 		max-inline-size: 100%;
 		block-size: auto;

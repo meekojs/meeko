@@ -37,6 +37,7 @@
 	display: inline-flex;
 	justify-content: center;
 	align-items: center;
+	gap: var(--ui-space-1-5);
 	transition:
 		background-color var(--ui-duration-fast),
 		border-color var(--ui-duration-fast);
