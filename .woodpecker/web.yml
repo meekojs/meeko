@@ -61,6 +61,7 @@ steps:
     commands:
       - corepack enable
       - pnpm format:check
+      - pnpm design:check
       - pnpm lint
       - pnpm check:apps
       - pnpm -F meeko-dashboard run check
