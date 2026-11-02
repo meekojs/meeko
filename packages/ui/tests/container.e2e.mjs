@@ -19,7 +19,7 @@ test('Container preserves semantics and fits mobile, 4K, wider and nested layout
 	await ssr.goto(origin + '/container')
 	const html = await ssr.locator('.container-example').evaluate((element) => element.outerHTML)
 	assert.match(html, /data-size="xl"/)
-	const sheets = await Promise.all(['tokens.css', 'deprecated.css', 'container.css'].map((name) => readFile(new URL(`../src/app/styles/${name}`, import.meta.url), 'utf8')))
+	const sheets = await Promise.all(['tokens.css', 'container.css'].map((name) => readFile(new URL(`../src/app/styles/${name}`, import.meta.url), 'utf8')))
 	const stylesheet = sheets.join('\n')
 	// Exercise the shipped SSR markup and stylesheet outside the documentation's constrained column.
 	const isolated = await browser.newPage()
@@ -78,11 +78,7 @@ test('Container preserves semantics and fits mobile, 4K, wider and nested layout
 	await isolated.locator('.meeko-ui-container').evaluate((element) => {
 		element.style.removeProperty('--ui-container-max-width')
 		element.style.removeProperty('--ui-container-gutter')
-		element.style.setProperty('--meeko-ui-container-max-width', '500px')
-		element.style.setProperty('--meeko-ui-container-gutter', '20px')
 	})
-	assert.equal((await measure()).width, 500, 'the deprecated maximum still works')
-	assert.equal((await measure()).start, 20, 'the deprecated gutter still works')
 	await page.setViewportSize({ width: 3840, height: 2160 })
 	// 96rem, the width of UIPage, on the fluid root of 20.8px at this size.
 	assert.ok(Math.abs((await page.locator('.meeko-ui-page-body').evaluate((element) => element.getBoundingClientRect().width)) - 96 * 20.8) < 1, 'the public site uses the width of UIPage, centered')

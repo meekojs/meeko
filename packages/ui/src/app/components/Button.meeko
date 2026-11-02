@@ -20,12 +20,6 @@
 	const nativeDisabled = computed(() => (to === undefined && href === undefined ? disabled : undefined))
 	const classes = computed(() => ['meeko-ui-button', className].filter(Boolean).join(' '))
 	const linkRel = computed(() => rel ?? (target === '_blank' ? 'noopener noreferrer' : undefined))
-
-	// Template comments cannot carry ESLint directives, so this one covers the template below. The
-	// spread `bind="rest"` stays before `bind:href` and `bind:class`: the compiler places and evaluates
-	// the spread at `bind` or at an explicit class or style written before it, so sorting `bind:class`
-	// ahead of it would change where its attributes render.
-	/* eslint-disable meeko/attributes-order */
 </script>
 
 <template>
@@ -35,7 +29,6 @@
 		bind:params="params"
 		bind:search="search"
 		bind:resolve="resolve"
-		bind="rest"
 		bind:href="href"
 		bind:target="target"
 		bind:rel="linkRel.value"
@@ -51,6 +44,7 @@
 		bind:data-variant="variant ?? defaults?.variant ?? 'primary'"
 		bind:data-size="size ?? defaults?.size ?? 'md'"
 		bind:data-shape="shape ?? defaults?.shape ?? 'rounded'"
+		bind="rest"
 		on:click="
 			(event) => {
 				if (loading) {

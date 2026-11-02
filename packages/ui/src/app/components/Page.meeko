@@ -12,16 +12,13 @@
 
 	const text = uiMessages().page
 	const classes = computed(() => ['meeko-ui-page', className].filter(Boolean).join(' '))
-
-	// The spread stays before the class, as in <UILink>: see the note there.
-	/* eslint-disable meeko/attributes-order */
 </script>
 
 <template>
 	<div
-		bind="rest"
 		bind:class="classes.value"
 		bind:data-layout="layout"
+		bind="rest"
 	>
 		<a
 			class="meeko-ui-skip-link"

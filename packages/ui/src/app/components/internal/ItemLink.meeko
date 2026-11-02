@@ -22,9 +22,6 @@
 		if (link.current !== undefined) return link.current ? (current ?? 'page') : false
 		return link.to === undefined ? current : undefined
 	})
-
-	// The spread stays before the attributes of the link, as in <UILink>: see the note there.
-	/* eslint-disable meeko/attributes-order */
 </script>
 
 <template>
@@ -35,7 +32,6 @@
 		bind:search="link.search"
 		bind:resolve="link.resolve"
 		bind:match="link.match"
-		bind="rest"
 		bind:href="link.href"
 		bind:target="link.target"
 		bind:rel="linkRel.value"
@@ -45,6 +41,7 @@
 		bind:title="link.title"
 		bind:aria-current="ariaCurrent.value"
 		bind:class="className"
+		bind="rest"
 	>
 		<render snippet="snippets.default" />
 	</component>

@@ -57,7 +57,7 @@ Registra todos estos componentes, salvo `UIMarkdownEditor`, y añade su CSS medi
 
 `UIButton` admite `type`, `disabled`, `class`, `variant="primary|secondary"` y el evento `click`; su tipo por defecto es `button`. `UIInput` comparte un modelo de texto y admite `id`, `name`, `type`, `placeholder`, `required`, `disabled`, `invalid`, `describedBy` y `class`. `UIField` exige `id` y `label`, admite `description`, `error`, `required` y `class`, y entrega el ID del control y su descripción al snippet. El control debe recibir también `invalid` cuando tenga un error y `required` si es obligatorio.
 
-Personaliza los tokens `--ui-*` desde el CSS de la aplicación: `--ui-color-primary-9`, `--ui-radius-md`, `--ui-font-sans`… El [contrato visual](../packages/ui/DESIGN.md) dice qué token usar para cada cosa. El tema oscuro usa `data-theme="dark"` y los tokens cambian solos. Las variables `--meeko-ui-*` están deprecadas: se pueden leer, pero asignarlas ya no llega a los componentes. La base global (`ui: { base: false }` la omite) pone el reset, el `body`, la escala fluida y el foco; la aplicación define su disposición.
+Personaliza los tokens `--ui-*` desde el CSS de la aplicación: `--ui-color-primary-9`, `--ui-radius-md`, `--ui-font-sans`… El [contrato visual](../packages/ui/DESIGN.md) dice qué token usar para cada cosa. El tema oscuro usa `data-theme="dark"` y los tokens cambian solos. La base global (`ui: { base: false }` la omite) pone el reset, el `body`, la escala fluida y el foco; la aplicación define su disposición.
 
 ## Textos e idiomas
 

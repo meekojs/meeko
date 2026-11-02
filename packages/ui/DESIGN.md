@@ -148,7 +148,7 @@ Con `pointer: coarse` los altos crecen solos, y los inputs usan `--ui-input-font
 
 El módulo lo hace todo con `modules: ['@meekojs/ui']`:
 
-- **`main.css`:** paleta, tokens, alias deprecados, `@font-face` y componentes.
+- **`main.css`:** paleta, tokens, `@font-face` y componentes.
 - **`base.css`:** reset, `body`, `color-scheme`, `::selection`, barras de desplazamiento y foco, en la capa `@layer ui-base`. Cualquier regla sin capa de la app gana, y también cualquier capa que declare, porque ésta se registra primero. Se omite con `ui: { base: false }`.
 - **La fuente:** se sirve en `/_meeko-ui/fonts/inter-latin-opsz-normal.woff2`, con su `preload`. La app no copia archivos ni escribe `@font-face`. La CSP sólo necesita `font-src 'self'`.
 
@@ -172,7 +172,3 @@ Para una marca propia, `ui.tokens` o una hoja de la app:
 	--ui-radius-md: 0.5rem;
 }
 ```
-
-## Alias deprecados
-
-`src/app/styles/deprecated.css` mantiene `--meeko-ui-*` sólo para leerlos, mientras terminan de migrar las webs. Asignar uno ya no llega a los componentes, salvo `--meeko-ui-container-max-width` y `--meeko-ui-container-gutter`. El paquete nunca se publicó, así que el archivo se borra cuando las apps migren. No escribas `--meeko-ui-*` en código nuevo.

@@ -71,7 +71,7 @@ export default defineMeekoConfig({
 
 `UIOptions`, `UITokens` y `UIDefaults` se exportan como tipos de `@meekojs/ui`. Los defaults son por aplicación y petición SSR; no hay estado mutable global. Las props explícitas ganan sobre `ui.defaults`, y éstos sobre los valores de base. Los defaults disponibles son `button` y `link` (`variant`, `size`, `shape`), y `card` (`variant`). Sin opciones se conserva la configuración original y no se instala el plugin de defaults.
 
-`tokens` admite `accent`, `accentHover`, `onAccent`, `primary`, `primaryHover`, `onPrimary`, `accentSoft`, `accentText`, `surface`, `surfaceHover`, `text`, `textSoft`, `muted`, `border`, `borderStrong`, `danger`, `focus`, `radius`, `font`, `controlHeight`, `controlPadding`, `controlWeight` y `controlFontSize`. Cada clave asigna tokens `--ui-*`: `primary` es `--ui-color-primary`, `text` es `--ui-color-text`, y `surface`, a la vez, las superficies y los controles. `accent`, `accentHover` y `onAccent` están deprecados: sólo llegan a sus alias `--meeko-ui-*`. Las referencias `var(...)` siguen los temas de la aplicación sin duplicar sus colores.
+`tokens` admite `primary`, `primaryHover`, `onPrimary`, `accentSoft`, `accentText`, `surface`, `surfaceHover`, `text`, `textSoft`, `muted`, `border`, `borderStrong`, `danger`, `focus`, `radius`, `font`, `controlHeight`, `controlPadding`, `controlWeight` y `controlFontSize`. Cada clave asigna tokens `--ui-*`: `primary` es `--ui-color-primary`, `text` es `--ui-color-text`, y `surface`, a la vez, las superficies y los controles. Las referencias `var(...)` siguen los temas de la aplicación sin duplicar sus colores.
 
 `base: false` omite la base global de UI (véase [Personalización](#personalización)).
 
@@ -284,7 +284,7 @@ Desde UI 0.2, `UIPopover`, `UISelect` y `UIThemeToggle` son componentes del mód
 }
 ```
 
-El tema oscuro usa `data-theme="dark"` en el elemento raíz. Las variables `--meeko-ui-*` están deprecadas: se pueden leer, pero asignarlas ya no llega a los componentes.
+El tema oscuro usa `data-theme="dark"` en el elemento raíz.
 
 El módulo carga además la base global en la capa `ui-base`: la [escala fluida](DESIGN.md#escala-fluida) de la raíz, reset, `body` con fondo, texto y fuente, `color-scheme`, `::selection`, barras de desplazamiento y foco. Sirve también Inter en `/_meeko-ui/fonts/`, con su `preload`, de modo que la aplicación no necesita copiar la fuente. Cualquier regla de la aplicación gana a esa capa; `ui: { base: false }` la omite por completo.
 

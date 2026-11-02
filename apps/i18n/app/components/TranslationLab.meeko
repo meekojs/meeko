@@ -63,7 +63,7 @@
 					name="default"
 					params="id, describedBy"
 				>
-					<UICombobox
+					<UISelect
 						by="value"
 						labelBy="label"
 						model="role"
@@ -81,7 +81,7 @@
 					name="default"
 					params="id, describedBy"
 				>
-					<UICombobox
+					<UISelect
 						model="currency"
 						bind:options="currencies"
 						bind:id="id"

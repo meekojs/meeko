@@ -13,17 +13,16 @@
 		const max = Number(rest.max ?? 100)
 		return max > min ? Math.min(100, Math.max(0, ((value.value - min) / (max - min)) * 100)) : 0
 	})
-	/* eslint-disable meeko/attributes-order */
 </script>
 
 <template>
 	<label bind:class="['meeko-ui-slider', className].filter(Boolean).join(' ')">
 		<span>{label}</span>
 		<input
-			bind="rest"
 			type="range"
 			bind:style="[style, '--slider-fill: ' + fill.value + '%'].filter(Boolean).join('; ')"
 			bind:value="value.value"
+			bind="rest"
 			on:input="(event) => (value.value = event.currentTarget.valueAsNumber)"
 		/>
 	</label>

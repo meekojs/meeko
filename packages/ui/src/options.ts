@@ -5,12 +5,9 @@ import { builtinMessages, canonicalLocale } from './app/utils/messages'
 
 /**
  * The variables each option sets. `surface` and `surfaceHover` predate the split into surfaces and
- * controls, so they set every one of them; `accent` only reaches its deprecated alias.
+ * controls, so they set every one of them.
  */
 const tokenNames = {
-	accent: ['--meeko-ui-accent'],
-	accentHover: ['--meeko-ui-accent-hover'],
-	onAccent: ['--meeko-ui-on-accent'],
 	primary: ['--ui-color-primary'],
 	primaryHover: ['--ui-color-primary-hover'],
 	onPrimary: ['--ui-color-primary-contrast'],

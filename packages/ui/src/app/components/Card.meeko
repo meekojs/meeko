@@ -10,19 +10,16 @@
 	const id = useId()
 	const defaults = uiDefaults().card
 	const titleId = headingId ?? id + '-title'
-
-	// The spread stays before the class, as in <UILink>: see the note there.
-	/* eslint-disable meeko/attributes-order */
 </script>
 
 <template>
 	<section
-		bind="rest"
 		bind:class="['meeko-ui-card', className].filter(Boolean).join(' ')"
 		bind:data-density="density ?? 'normal'"
 		bind:data-padding="padding"
 		bind:data-variant="variant ?? defaults?.variant ?? 'outline'"
 		bind:aria-labelledby="title && !snippets.header ? titleId : rest['aria-labelledby']"
+		bind="rest"
 	>
 		<header
 			if:when="snippets.header || snippets.actions || title || description"

@@ -8,14 +8,13 @@
 	const value = defineModel<string>({ default: '' })
 
 	const id = useId()
-	/* eslint-disable meeko/attributes-order */
 </script>
 
 <template>
 	<fieldset
-		bind="rest"
 		bind:class="['meeko-ui-radio-group', className].filter(Boolean).join(' ')"
 		bind:data-variant="variant"
+		bind="rest"
 	>
 		<legend>{legend}</legend>
 		<div class="meeko-ui-radio-options">

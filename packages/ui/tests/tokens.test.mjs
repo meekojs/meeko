@@ -175,7 +175,7 @@ test('text, soft text and focus tokens stay readable on every background', () =>
 const strip = (css) => css.replace(/\/\*[\s\S]*?\*\//g, '').replace(/@media[^{]+\{/g, '{')
 
 async function componentSheets() {
-	const names = (await readdir(styles)).filter((name) => name.endsWith('.css') && !['palette.css', 'tokens.css', 'deprecated.css', 'fonts.css'].includes(name))
+	const names = (await readdir(styles)).filter((name) => name.endsWith('.css') && !['palette.css', 'tokens.css', 'fonts.css'].includes(name))
 	return Promise.all(names.map(async (name) => [name, strip(await read(name))]))
 }
 
@@ -201,7 +201,7 @@ test('what must differ from a surface does not rest on --ui-color-control, which
 	assert.match(table, /--table-hover: var\(--ui-color-control-hover\)/)
 })
 
-test('only the deprecated block mentions --meeko-ui-*', async () => {
+test('nothing mentions the removed --meeko-ui-* variables', async () => {
 	for (const [name, css] of await componentSheets()) assert.doesNotMatch(css, /--meeko-ui-/, name)
 	assert.doesNotMatch(paletteCss + tokensCss, /--meeko-ui-/)
 	const source = await readFile(new URL('../src/app/utils/modal-dialog.ts', import.meta.url), 'utf8')

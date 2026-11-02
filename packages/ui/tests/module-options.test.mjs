@@ -18,7 +18,7 @@ test('UI validates finite token and default options and keeps CSS values within 
 	assert.match(tokenStyles({ primary: 'var(--pill)' }), /:root, :root\[data-theme\]/)
 	assert.match(tokenStyles({ primary: 'var(--pill)' }), /--ui-color-primary: var\(--pill\);/)
 	assert.match(tokenStyles({ surface: 'var(--panel)' }), /--ui-color-control: var\(--panel\);/, 'an option that predates controls also paints them')
-	assert.match(tokenStyles({ accent: 'red' }), /--meeko-ui-accent: red;/, 'a deprecated option still reaches its alias')
+	for (const removed of ['accent', 'accentHover', 'onAccent']) assert.throws(() => validateOptions({ tokens: { [removed]: 'red' } }), /ui: unknown token/, 'the options of the removed aliases are gone')
 	assert.doesNotThrow(() => validateOptions({ base: false }))
 	assert.throws(() => validateOptions({ base: 'no' }), /ui: base must be a boolean/)
 })

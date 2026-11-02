@@ -15,16 +15,15 @@
 
 	const visible = signal(true)
 	const text = uiMessages().feedback
-	/* eslint-disable meeko/attributes-order */
 </script>
 
 <template>
 	<section
 		if:when="visible.value"
-		bind="rest"
 		bind:class="['meeko-ui-alert', className].filter(Boolean).join(' ')"
 		bind:data-tone="tone"
 		bind:role="role ?? (tone === 'danger' ? 'alert' : 'note')"
+		bind="rest"
 	>
 		<span
 			if:when="icon || snippets.icon"

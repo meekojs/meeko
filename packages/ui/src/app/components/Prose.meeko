@@ -14,25 +14,22 @@
 
 	const text = uiMessages().code
 	const classes = computed(() => ['meeko-ui-prose', className].filter(Boolean).join(' '))
-
-	// The spread stays before the class, as in <UILink>: see the note there.
-	/* eslint-disable meeko/attributes-order */
 </script>
 
 <template>
 	<component
-		is="as"
 		if:when="html"
-		bind="rest"
+		is="as"
 		bind:class="classes.value"
-		html="html"
+		bind="rest"
 		on:click="(event) => copyFromMarkup(event, text)"
+		html="html"
 	/>
 	<component
-		is="as"
 		if:when="!html"
-		bind="rest"
+		is="as"
 		bind:class="classes.value"
+		bind="rest"
 		on:click="(event) => copyFromMarkup(event, text)"
 	>
 		<render

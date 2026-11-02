@@ -4,16 +4,15 @@
 	const { invalid, describedBy, spellcheck, class: className, ...rest } = defineProps<UITextareaProps>()
 
 	const value = defineModel<string>({ default: '' })
-	/* eslint-disable meeko/attributes-order */
 </script>
 
 <template>
 	<textarea
-		bind="rest"
+		model="value"
 		bind:spellcheck="spellcheck === undefined ? undefined : String(spellcheck)"
 		bind:aria-invalid="invalid ? 'true' : undefined"
 		bind:aria-describedby="describedBy ?? rest['aria-describedby']"
 		bind:class="['meeko-ui-input', 'meeko-ui-textarea', className].filter(Boolean).join(' ')"
-		model="value"
+		bind="rest"
 	/>
 </template>

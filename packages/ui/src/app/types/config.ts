@@ -26,12 +26,6 @@ export interface UIDefaults {
  * ```
  */
 export interface UITokens {
-	/** @deprecated Sólo llega al alias `--meeko-ui-accent`; las acciones y las cards usan `primary`. */
-	readonly accent?: string
-	/** @deprecated Sólo llega al alias `--meeko-ui-accent-hover`; usa `primaryHover`. */
-	readonly accentHover?: string
-	/** @deprecated Sólo llega al alias `--meeko-ui-on-accent`; usa `onPrimary`. */
-	readonly onAccent?: string
 	readonly primary?: string
 	readonly primaryHover?: string
 	readonly onPrimary?: string
