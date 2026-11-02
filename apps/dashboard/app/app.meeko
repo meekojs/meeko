@@ -85,6 +85,8 @@
 			bind:items="locales.value"
 			bind:suggested="suggestion.value"
 			bind:label="t('locale.label')"
+			bind:message="t('locale.message')"
+			bind:goLabel="t('locale.offer')"
 			bind:stayLabel="t('locale.stay')"
 			on:stay="stay"
 		/>
