@@ -3,27 +3,41 @@ import type { HydrationPayload } from "./client-payload";
 import { ndjsonLines } from "./client-deferred";
 import { readPayload } from "./client-payload";
 
-/** Where, in `sessionStorage`, a tab remembers its last recovery reload: `<time> <url>`. */
+/** Where, in `sessionStorage`, a tab remembers its recovery reloads: a JSON list of `[url, time]`. */
 const RELOAD_KEY = "meeko:document-html-reload";
 
 /** A reload this recent for the same URL did not help: another one would only repeat it. */
 const RELOAD_WINDOW_MS = 60_000;
 
+/** How many URLs a tab may have reloaded within `RELOAD_WINDOW_MS`, which bounds what it stores. */
+const RELOAD_LIMIT = 32;
+
 /** The URL no longer answers this document: only a new document can show what it should have. */
 class StaleDocument extends Error {}
 
+/** The reloads stored by this tab. Anything else in that key, damaged or not, counts as none. */
+function storedReloads(stored: string | null): ReadonlyArray<readonly [string, number]> {
+  try {
+    const reloads: unknown = JSON.parse(stored ?? "[]");
+    const valid = Array.isArray(reloads) && reloads.every((reload: unknown) => Array.isArray(reload) && typeof reload[0] === "string" && Number.isFinite(reload[1]));
+    return valid ? reloads as Array<[string, number]> : [];
+  } catch { return []; }
+}
+
 /**
  * Claims the only reload a URL may have in `RELOAD_WINDOW_MS`, which keeps a page whose value differs
- * in every response from reloading forever. A failed attempt does not renew it. Without storage the
- * reload cannot be counted, so it is refused.
+ * in every response from reloading forever, also when the tab visits other URLs in between. A failed
+ * attempt does not renew it. Without storage the reload cannot be counted, so it is refused; with
+ * `RELOAD_LIMIT` URLs in the window too, since forgetting one would give it another reload.
  */
 function claimReload(browser: Window): boolean {
   const url = browser.location.href;
   try {
-    const last = browser.sessionStorage.getItem(RELOAD_KEY);
-    const space = last?.indexOf(" ") ?? -1;
-    if (last && space > 0 && last.slice(space + 1) === url && Date.now() - Number(last.slice(0, space)) < RELOAD_WINDOW_MS) return false;
-    browser.sessionStorage.setItem(RELOAD_KEY, `${Date.now()} ${url}`);
+    const now = Date.now();
+    // A time ahead of the clock says nothing about this window: the clock went back.
+    const recent = storedReloads(browser.sessionStorage.getItem(RELOAD_KEY)).filter(([, time]) => time <= now && now - time < RELOAD_WINDOW_MS);
+    if (recent.length >= RELOAD_LIMIT || recent.some(([claimed]) => claimed === url)) return false;
+    browser.sessionStorage.setItem(RELOAD_KEY, JSON.stringify([...recent, [url, now]]));
     return true;
   } catch { return false; }
 }

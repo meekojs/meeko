@@ -9,6 +9,8 @@ import type { ClientComponent } from "../src/app/runtime/client.ts";
 import type { TrustedHtml } from "../src/index.ts";
 
 import { PAYLOAD_VERSION } from "../src/app/definitions/define-page.ts";
+import { documentHtmlRecovery } from "../src/app/runtime/client-document-html.ts";
+import { readPayload } from "../src/app/runtime/client-payload.ts";
 import { mountClientApp } from "../src/app/runtime/client.ts";
 import { defer } from "../src/app/runtime/deferred.ts";
 import { createRouteManifest } from "../src/app/runtime/router.ts";
@@ -450,12 +452,100 @@ test("republished content is not painted over the old page, and a reload that di
     assert.match(String(reloaded.errors[0]), /Document HTML could not be recovered/);
   } finally { reloaded.close(); }
   // Long after that reload, this is a new publication.
-  const later = await mountDocument(toggling, await handle(requestDocument()), answerWith(handle), { storedClaim: `${Date.now() - 120_000} http://local/guide` });
+  const later = await mountDocument(toggling, await handle(requestDocument()), answerWith(handle), { storedClaim: JSON.stringify([["http://local/guide", Date.now() - 120_000]]) });
   try {
     await later.repaint();
     assert.equal(later.reloads(), 1);
+    assert.deepEqual(JSON.parse(later.browser.sessionStorage.getItem("meeko:document-html-reload")!).map(([url]: [string]) => url), ["http://local/guide"], "what expired is removed");
   } finally { later.close(); }
 }));
+
+/** One document of a page whose value differs in every response, in a tab with `storage`, recovering at `url`. */
+function staleRecovery(url: string, storage: Storage): { reloads: () => number; errors: unknown[]; read: () => Promise<string | undefined> } {
+  let reloads = 0;
+  const errors: unknown[] = [];
+  const browser = { location: { href: url, reload: () => { reloads++; } }, sessionStorage: storage } as unknown as globalThis.Window;
+  const payload = { v: PAYLOAD_VERSION, route: "/guide", props: { params: {}, search: {} }, state: {} };
+  const recovery = documentHtmlRecovery({
+    browser,
+    payload: readPayload({ ...payload, documentHtml: ["identity"] }),
+    url: new URL(url),
+    request: async () => jsonResponse(payload),
+    report: (error) => errors.push(error),
+  });
+  return { errors, reloads: () => reloads, read: () => recovery.read(0) };
+}
+
+/** A `sessionStorage` that the tests can look into. */
+function tabStorage(initial?: string): Storage {
+  const values = new Map<string, string>(initial === undefined ? [] : [["meeko:document-html-reload", initial]]);
+  return { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => { values.set(key, value); } } as unknown as Storage;
+}
+
+test("a tab that goes from A to B and back to A reloads A only once in the window", async () => {
+  const storage = tabStorage();
+  const visit = async (url: string): Promise<number> => {
+    const visited = staleRecovery(url, storage);
+    await visited.read();
+    return visited.reloads();
+  };
+  assert.equal(await visit("http://local/a"), 1);
+  assert.equal(await visit("http://local/b"), 1);
+  assert.equal(await visit("http://local/a"), 0, "A already had its reload");
+  assert.equal(await visit("http://local/b"), 0, "and B too");
+  const claims = JSON.parse(storage.getItem("meeko:document-html-reload")!) as Array<[string, number]>;
+  assert.deepEqual(claims.map(([url]) => url), ["http://local/a", "http://local/b"], "a refused attempt renews nothing");
+});
+
+test("a reload that was refused does not move the window of its URL", async () => {
+  const time = Date.now() - 30_000;
+  const storage = tabStorage(JSON.stringify([["http://local/a", time]]));
+  const refused = staleRecovery("http://local/a", storage);
+  await refused.read();
+  assert.equal(refused.reloads(), 0);
+  assert.equal(refused.errors.length, 1);
+  assert.deepEqual(JSON.parse(storage.getItem("meeko:document-html-reload")!), [["http://local/a", time]]);
+});
+
+test("the reloads of a tab are bounded, and a full list refuses instead of forgetting a URL", async () => {
+  const now = Date.now();
+  const stored = (count: number, time: number): string => JSON.stringify(Array.from({ length: count }, (_, index) => [`http://local/${index}`, time]));
+  const full = staleRecovery("http://local/new", tabStorage(stored(32, now - 1000)));
+  await full.read();
+  assert.equal(full.reloads(), 0);
+  assert.equal(full.errors.length, 1);
+  // Once they expire, there is room again and nothing old stays.
+  const storage = tabStorage(stored(32, now - 120_000));
+  const expired = staleRecovery("http://local/new", storage);
+  await expired.read();
+  assert.equal(expired.reloads(), 1);
+  assert.equal((JSON.parse(storage.getItem("meeko:document-html-reload")!) as unknown[]).length, 1);
+});
+
+test("what a tab stored in another format counts as no reload, without throwing", async () => {
+  for (const damaged of [`${Date.now()} http://local/a`, "{", "null", "1", "\"text\"", "{}", "[1]", "[[1,2]]", "[[\"http://local/a\"]]", "[[\"http://local/a\",\"soon\"]]", "[[\"http://local/a\",null]]", "[[\"http://local/a\",1],2]"]) {
+    const storage = tabStorage(damaged);
+    const recovering = staleRecovery("http://local/a", storage);
+    await recovering.read();
+    assert.equal(recovering.reloads(), 1, damaged);
+    assert.deepEqual(recovering.errors, [], damaged);
+    assert.equal((JSON.parse(storage.getItem("meeko:document-html-reload")!) as unknown[]).length, 1, damaged);
+  }
+});
+
+test("a reload stored ahead of the clock does not block its URL", async () => {
+  const recovering = staleRecovery("http://local/a", tabStorage(JSON.stringify([["http://local/a", Date.now() + 3_600_000]])));
+  await recovering.read();
+  assert.equal(recovering.reloads(), 1);
+});
+
+test("a storage that refuses to write refuses the reload", async () => {
+  const storage = { getItem: () => null, setItem: () => { throw new Error("QuotaExceededError"); } } as unknown as Storage;
+  const recovering = staleRecovery("http://local/a", storage);
+  await recovering.read();
+  assert.equal(recovering.reloads(), 0);
+  assert.equal(recovering.errors.length, 1);
+});
 
 test("without storage a reload cannot be counted, so it does not happen", () => withPages(async (page) => {
   const toggling = await page(togglingData, "NoStorage");
