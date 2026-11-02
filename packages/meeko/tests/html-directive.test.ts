@@ -272,9 +272,12 @@ test("html and model on a custom element stay HTML attributes, as in 1.0", async
   }
   // Content and other attributes of a custom element are not restricted by MEEK095 or MEEK065.
   assert.doesNotThrow(() => compile(`<script lang="ts">const a = 1;</script><template><my-input model="a" html="b"><span>{a}</span></my-input></template>`, "Html.meeko"));
-  const formatted = await prettier.format(`<script lang="ts">\nconst a = 1;\n</script>\n<template><x-markdown html="Hola  mundo" model="a+  b"></x-markdown><div html="a+  'b'"></div></template>\n`, { filepath: "Html.meeko", plugins: [plugin] });
-  assert.match(formatted, /<x-markdown html="Hola {2}mundo" model="a\+ {2}b"><\/x-markdown>/);
-  assert.match(formatted, /<div html="a \+ 'b'"><\/div>/);
+  // The formatter leaves their values alone, whatever the sensitivity and wherever it breaks a closing tag to keep the whitespace.
+  for (const sensitivity of [{}, { htmlWhitespaceSensitivity: "ignore" }] as const) {
+    const formatted = await prettier.format(`<script lang="ts">\nconst a = 1;\n</script>\n<template><x-markdown html="Hola  mundo" model="a+  b"></x-markdown><div html="a+  'b'"></div></template>\n`, { filepath: "Html.meeko", plugins: [plugin], ...sensitivity });
+    assert.match(formatted, /<x-markdown html="Hola {2}mundo" model="a\+ {2}b"><\/x-markdown\s*>/);
+    assert.match(formatted, /<div html="a \+ 'b'"><\/div>/);
+  }
 });
 
 test("html reports MEEK095 for children, contentless elements, <template>, model and an empty value", () => {
