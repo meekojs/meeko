@@ -2,6 +2,7 @@ import type { AstPath, Doc, Options, Parser, ParserOptions, Plugin, Printer } fr
 
 import { scanInterpolations } from '@meekojs/meeko/parse'
 import { isCustomElementTag } from '@meekojs/meeko/parse'
+import * as meekoParse from '@meekojs/meeko/parse'
 import { builders, utils } from 'prettier/doc'
 
 import type { ClassOrder, ClassSortMode } from './classes'
@@ -107,7 +108,8 @@ const templateParser: Parser<HtmlNode> = {
 	async parse(text, options) {
 		const html = await hostHtml(options)
 		;(options as HostOptions)[hostKey] = html
-		const root = await html.parser.parse(text, options)
+		const root = await html.parser.parse(maskInterpolatedLessThan(text), options)
+		restoreInterpolatedLessThan(root)
 		const template = root.children?.find((child) => child.kind === 'element' && child.name === 'template')
 		if (!template) throw new Error('The template wrapper was not parsed')
 		// The template's children become the root's: they are printed without the wrapper.
@@ -116,6 +118,31 @@ const templateParser: Parser<HtmlNode> = {
 	},
 	locStart: (node) => node.sourceSpan.start.offset,
 	locEnd: (node) => node.sourceSpan.end.offset,
+}
+
+/** Lo que lee el parser HTML en lugar de un `<` de una interpolación; nunca está en la fuente. */
+const interpolatedLessThan = ''
+
+/**
+ * Oculta al parser HTML cada `<` de una interpolación del texto (`{a < b}`, `{"<b>"}`) con las
+ * mismas posiciones que el compilador, para que no abra una etiqueta, como el plugin del núcleo. Un
+ * Meeko anterior a 1.8 no exporta `maskComponentTags`: el texto queda como antes.
+ */
+function maskInterpolatedLessThan(text: string): string {
+	const mask = (meekoParse as Partial<typeof meekoParse>).maskComponentTags
+	if (!mask || text.includes(interpolatedLessThan)) return text
+	const { interpolated } = mask(text)
+	if (!interpolated.length) return text
+	const chars = text.split('')
+	for (const offset of interpolated) chars[offset] = interpolatedLessThan
+	return chars.join('')
+}
+
+/** Devuelve su `<` a los textos que leyó el parser HTML. */
+function restoreInterpolatedLessThan(ast: HtmlNode): void {
+	ast.walk((node) => {
+		if (node.kind === 'text' && node.value?.includes(interpolatedLessThan)) node.setProperty('value', node.value.replaceAll(interpolatedLessThan, '<'))
+	})
 }
 
 /** Convierte cada `{expr}` de los textos en un nodo `interpolation`, como `{{ }}` en Vue. */

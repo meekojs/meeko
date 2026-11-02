@@ -91,7 +91,7 @@ const header: NonNullable<AppModalSnippets["header"]> | undefined = undefined;
   const registry = await discoverAutoImports(root);
   const entry = (name: string) => registry.filter((item) => item.name === name);
   const cardFile = join(root, "app", "components", "App", "Card.meeko");
-  for (const [suffix, imported] of [["Props", "ComponentProps"], ["Snippets", "ComponentSnippets"], ["Models", "ComponentModels"], ["Exposed", "ComponentExposed"]] as const) {
+  for (const [suffix, imported] of [["Props", "__MeekoPropsOnly"], ["Emits", "ComponentEmits"], ["Snippets", "ComponentSnippets"], ["Models", "ComponentModels"], ["Exposed", "ComponentExposed"]] as const) {
     assert.deepEqual(entry(`AppCard${suffix}`), [{ name: `AppCard${suffix}`, imported, file: cardFile, scope: "app", typeOnly: true, component: false, componentType: true }]);
   }
   assert.deepEqual(entry("UiButtonProps").map((item) => item.file), [join(root, "modules", "ui", "components", "Button.meeko")]);
@@ -111,7 +111,7 @@ const header: NonNullable<AppModalSnippets["header"]> | undefined = undefined;
   assert.match(client, /export import AppCardSnippets = (__meeko_type_\d+)\.ComponentSnippets;/);
   const namespace = /export import AppCardSnippets = (__meeko_type_\d+)\./.exec(client)![1]!;
   assert.match(client, new RegExp(`^import \\* as ${namespace} from "\\.\\./\\.\\./\\.\\./app/components/App/Card\\.meeko";$`, "m"));
-  assert.match(client, /export import UiButtonProps = __meeko_type_\d+\.ComponentProps;/);
+  assert.match(client, /export import UiButtonProps = __meeko_type_\d+\.__MeekoPropsOnly;/);
   assert.match(client, /export import PlainProps = __meeko_type_\d+\.PlainProps;/);
   assert.doesNotMatch(await readFile(declarations.shared, "utf8"), /AppCard/);
 
@@ -195,13 +195,13 @@ const props = defineProps<{ link: MeekoLinkProps }>();
   });
   const component = join(root, "app", "components", "MeekoLink.meeko");
   const registry = await discoverAutoImports(root);
-  assert.deepEqual(registry.filter((item) => item.name === "MeekoLinkProps").map((item) => [item.file, item.imported]), [[component, "ComponentProps"]]);
+  assert.deepEqual(registry.filter((item) => item.name === "MeekoLinkProps").map((item) => [item.file, item.imported]), [[component, "__MeekoPropsOnly"]]);
   // The other built-in tags keep their types.
   assert.deepEqual(registry.filter((item) => item.name === "MeekoOutletProps").map((item) => item.file), ["@meekojs/meeko/framework"]);
   assert.deepEqual(discoverAutoImportsSync(root).filter((item) => item.name === "MeekoLinkProps").map((item) => item.file), [component]);
   const declarations = await generateAutoImportTypes(root);
   const client = await readFile(declarations.client, "utf8");
-  assert.match(client, /export import MeekoLinkProps = __meeko_type_\d+\.ComponentProps;/);
+  assert.match(client, /export import MeekoLinkProps = __meeko_type_\d+\.__MeekoPropsOnly;/);
   assert.match(client, /export import MeekoOutletProps = __meeko_type_\d+\.MeekoOutletProps;/);
   assert.deepEqual((await checkFrameworkProject(root)).filter((item) => (item.severity ?? "error") === "error").map((item) => `${item.code}: ${item.message}`), []);
 });

@@ -148,9 +148,9 @@ const emit = defineEmits<${emits}>();
 </script><template><button on:click="() => emit('save', props.id)">x</button></template>`;
   assert.match(compile(local("interface Events { save: [id: number]; \"close\": [] }", "Events"), "Local.meeko").code, wrapped);
   assert.match(compile(local("type Events = { save: [id: number]; close: [] };", "Events"), "Alias.meeko").code, wrapped);
-  // A type from elsewhere cannot be listed: props stay as they were.
+  // A type from elsewhere cannot be listed: every `onX` key leaves the keys, read at run time.
   for (const [declaration, emits] of [["import type { Events } from './events';", "Events"], ["interface Base { close: [] }\ninterface Events extends Base { save: [id: number] }", "Events"], ["", "Record<'save', [id: number]>"]] as const) {
-    assert.match(compile(local(declaration, emits), "Other.meeko").code, /const props = __props as Readonly</, declaration || emits);
+    assert.match(compile(local(declaration, emits), "Other.meeko").code, /const props = __meeko\.withoutEventProps\(__props, null\) as Readonly</, declaration || emits);
   }
   // Without defineEmits nothing changes.
   assert.match(compile(`<script lang="ts">const props = defineProps<{ id: number }>();</script><template>{props.id}</template>`, "Plain.meeko").code, /const props = __props as Readonly</);
