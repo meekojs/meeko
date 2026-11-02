@@ -25,18 +25,29 @@ export interface HydrationPayload {
    */
   url: string | undefined;
   /**
-   * Where the navigation payload of this URL has each `documentHtml` value that this document's
-   * payload replaced by a placeholder, by the position the placeholder names.
+   * The identity of each `documentHtml` value that this document's payload replaced by a
+   * placeholder, by the position the placeholder names.
    */
-  documentHtml: readonly (readonly (string | number)[])[];
+  documentHtml: readonly string[];
+  /**
+   * The values of a navigation response that the server declares marked with `documentHtml`: where
+   * this payload has each one, by identity. Nothing else may be inserted in place of a placeholder.
+   */
+  markedHtml: Readonly<Record<string, readonly (string | number)[]>>;
 }
 
-function readDocumentHtmlPaths(value: unknown): readonly (readonly (string | number)[])[] {
+function readDocumentHtmlIdentities(value: unknown): readonly string[] {
   if (value === undefined) return [];
-  if (!Array.isArray(value) || !value.every((path) => Array.isArray(path) && path.every((key) => typeof key === "string" || typeof key === "number"))) {
-    throw new TypeError("Invalid Meeko document HTML paths");
+  if (!Array.isArray(value) || !value.every((identity) => typeof identity === "string")) throw new TypeError("Invalid Meeko document HTML identities");
+  return value as string[];
+}
+
+function readMarkedHtml(value: unknown): HydrationPayload["markedHtml"] {
+  if (value === undefined) return {};
+  if (!isRecord(value) || !Object.values(value).every((path) => Array.isArray(path) && path.every((key) => typeof key === "string" || typeof key === "number"))) {
+    throw new TypeError("Invalid Meeko marked HTML paths");
   }
-  return value as (string | number)[][];
+  return value as HydrationPayload["markedHtml"];
 }
 
 const pageRenders: readonly string[] = ["ssr", "stream", "prerender", "client"] satisfies readonly PageRender[];
@@ -74,7 +85,8 @@ export function readPayload(value: unknown): HydrationPayload {
     resources: (parsed.resources as Record<string, unknown> | undefined) ?? {},
     layoutProps: parsed.layoutProps as Record<string, unknown> | undefined,
     url: parsed.url as string | undefined,
-    documentHtml: readDocumentHtmlPaths(parsed.documentHtml),
+    documentHtml: readDocumentHtmlIdentities(parsed.documentHtml),
+    markedHtml: readMarkedHtml(parsed.markedHtml),
   };
 }
 

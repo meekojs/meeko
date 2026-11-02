@@ -23,6 +23,7 @@ import { ERROR_PAGE_TITLE, PageInputError, pageSearchObject, validatePageInputs 
 import { notifyPluginErrorHandlers, runPlugins } from "../definitions/define-plugin";
 import { hasRouteMiddleware, routeMiddlewareChain, runRouteMiddleware } from "../middleware/runtime";
 import { deferredReceiver, driveClientDeferred, ndjsonLines, placePayloadDeferred, readDeferredLine, watchDeferredChunks } from "./client-deferred";
+import { documentHtmlRecovery } from "./client-document-html";
 import { readPayload } from "./client-payload";
 import { createAppErrorChannel, provideAppErrorChannel } from "./component-errors";
 import { traceNavigation, traceResourceCacheHit } from "./devtools-activity";
@@ -445,37 +446,10 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
       ? (options.fetch ?? fetch)(staticPayloadUrl(url), init)
       : (options.fetch ?? fetch)(url.href, { ...init, headers: { accept: "application/meeko+json" } });
   };
-  /** The navigation payload of the first document, once one of its `documentHtml` values must paint again. */
-  let firstPayload: Promise<unknown> | undefined;
-  const loadFirstPayload = async (): Promise<unknown> => {
-    const response = await requestPayload(serverUrl);
-    // A server that does not speak Meeko's protocol has the value only in its document.
-    if ((response.headers.get("content-type") ?? "").toLowerCase().startsWith("text/html")) {
-      void response.body?.cancel().catch(() => {});
-      browser.location.reload();
-      return undefined;
-    }
-    if (!response.ok) throw new Error(`Document HTML request failed: HTTP ${response.status}`);
-    // A stream route answers ndjson, whose first line is the payload.
-    const parsed: unknown = JSON.parse((await response.text()).split("\n", 1)[0]!);
-    readPayload(parsed);
-    return parsed;
-  };
-  // Only the server provides the value, at a path that the server listed in the document.
-  const readDocumentHtml = async (index: number): Promise<string | undefined> => {
-    const path = payload.documentHtml[index];
-    if (!path) return undefined;
-    try {
-      let value = await (firstPayload ??= loadFirstPayload());
-      for (const key of path) value = typeof value === "object" && value !== null ? (value as Record<string | number, unknown>)[key] : undefined;
-      return typeof value === "string" ? value : undefined;
-    } catch (error) {
-      // The next render of the element tries again.
-      firstPayload = undefined;
-      reportNavigationError(browser, error, observeNavigationError);
-      return undefined;
-    }
-  };
+  const recovery = documentHtmlRecovery({
+    browser, payload, url: serverUrl, request: requestPayload,
+    report: (error) => reportNavigationError(browser, error, observeNavigationError),
+  });
   const hydrateApp = (routeState: RouteState, hydrate: () => () => void) => hydrateWithStateStore(stateStore, () => {
     provideAppErrorChannel(errorChannel);
     provideNavigation(navigationState);
@@ -483,7 +457,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
     provideResourceCache(resourceCache);
     provideBrowserWindow(browser);
     provideHead(documentHead);
-    provideDocumentHtmlReader(readDocumentHtml);
+    provideDocumentHtmlReader(recovery.read);
     plugins.apply();
     return hydrate();
   });
@@ -990,6 +964,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
       navigator.dispose();
       stopChunks();
       activeStream?.abort();
+      recovery.dispose();
       browser.document.removeEventListener("click", onClick);
       releaseManifest();
       releaseGlobalErrors();

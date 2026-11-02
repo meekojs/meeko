@@ -57,7 +57,7 @@ test("a marked value travels once in the document and whole in a navigation", as
   assert.ok(first.html.includes(`<article data-meeko-h="0">${article}</article>`), "the document has the HTML");
   assert.equal(first.payload.props.data.doc.html, documentHtmlPlaceholder(0));
   assert.equal(first.payload.props.data.doc.other, "texto");
-  assert.deepEqual(first.payload.documentHtml, [["props", "data", "doc", "html"]]);
+  assert.equal((first.payload.documentHtml as string[]).length, 1);
   assert.equal(first.html.split("Un párrafo").length - 1, 1, "only the HTML of the page has the text");
   const navigation = JSON.parse(await (await handle(requestNavigation())).text()) as { props: { data: PageData }; documentHtml?: unknown };
   assert.equal(navigation.props.data.doc.html, article);
@@ -71,7 +71,7 @@ test("every copy of a marked value is a placeholder of the same position", async
   });
   const { payload } = await documentPayload(await handle(requestDocument()));
   assert.equal(payload.props.data.copy, documentHtmlPlaceholder(0));
-  assert.deepEqual(payload.documentHtml, [["props", "data", "doc", "html"]]);
+  assert.equal((payload.documentHtml as string[]).length, 1);
 });
 
 test("a marked value the HTML does not show keeps travelling in the payload", async () => {
@@ -264,7 +264,7 @@ import { signal } from "@meekojs/meeko";
 const props = defineProps<{ data: { items: { id: number; kind: string; body: string }[] } }>();
 const open = signal(true);
 </script>
-<template><section if:when="open.value"><article each:of="props.data.items" each:as="item" each:key="item.id" data-id="{item.id}"><div if:when="item.kind === 'html'" class="trusted" html="item.body"></div><p if:when="item.kind === 'text'">{item.body}</p></article></section><button type="button" class="toggle" on:click="() => open.value = !open.value">t</button></template>`;
+<template><section if:when="open.value"><article each:of="props.data.items" each:as="item" each:key="item.id" bind:data-id="item.id"><div if:when="item.kind === 'html'" class="trusted" html="item.body"></div><p if:when="item.kind === 'text'">{item.body}</p></article></section><button type="button" class="toggle" on:click="() => open.value = !open.value">t</button></template>`;
 const togglingData = `<script lang="ts">
 import { signal } from "@meekojs/meeko";
 const props = defineProps<{ data: { html: string } }>();
@@ -311,13 +311,15 @@ async function withPages<T>(body: (page: (source: string, name: string) => Promi
  * The document that `documentResponse` answers, hydrated in a new window, with `recover` answering
  * what the browser asks the server afterwards.
  */
-async function mountDocument(page: ClientComponent, documentResponse: Response, recover: (input: string, init?: RequestInit) => Promise<Response>, options: { serverData?: boolean | "static" } = {}): Promise<MountedDocument> {
+async function mountDocument(page: ClientComponent, documentResponse: Response, recover: (input: string, init?: RequestInit) => Promise<Response>, options: { serverData?: boolean | "static"; storedClaim?: string | null; noStorage?: boolean } = {}): Promise<MountedDocument> {
   const browser = new Window({ url: "http://local/guide" });
   browser.document.write(await documentResponse.text());
   await browser.happyDOM.waitUntilComplete();
   let reloads = 0;
   let requests = 0;
   Object.defineProperty(browser.location, "reload", { value: () => { reloads++; } });
+  if (options.storedClaim) browser.sessionStorage.setItem("meeko:document-html-reload", options.storedClaim);
+  if (options.noStorage) Object.defineProperty(browser, "sessionStorage", { get() { throw new Error("Storage is blocked"); } });
   const errors: unknown[] = [];
   const payload = JSON.parse(browser.document.getElementById("meeko-payload")!.textContent!) as MountedDocument["payload"];
   const app = await mountClientApp({
@@ -367,6 +369,227 @@ const listHandler = (load: () => unknown, page: ClientComponent): ((request: Req
   loadRoute: async () => ({ load }),
 });
 
+test("a reordered list never paints unmarked text as HTML, and the value follows its identity", () => withPages(async (page) => {
+  const list = await page(trustedList, "List");
+  let reorder = false;
+  const handle = listHandler(() => {
+    const trusted = { id: 1, kind: "html", body: documentHtml(trustHtml("<h2>trusted article</h2>")) };
+    const text = { id: 2, kind: "text", body: plainText };
+    return { items: reorder ? [text, trusted] : [trusted, text] };
+  }, list);
+  const mounted = await mountDocument(list, await handle(requestDocument()), answerWith(handle));
+  try {
+    reorder = true;
+    await mounted.repaint();
+    assert.equal(mounted.browser.document.querySelector("div.trusted")!.innerHTML, "<h2>trusted article</h2>");
+    assert.ok(!mounted.browser.document.querySelector("div.trusted b"));
+    assert.equal(mounted.browser.document.querySelector("article p")!.textContent, plainText, "the text stays text");
+    assert.equal(mounted.reloads(), 0);
+  } finally { mounted.close(); }
+}));
+
+test("two marked values that swap keep their own article", () => withPages(async (page) => {
+  const list = await page(trustedList, "Swap");
+  let swap = false;
+  const handle = listHandler(() => {
+    const one = { id: 1, kind: "html", body: documentHtml(trustHtml("<h2>one</h2>")) };
+    const two = { id: 2, kind: "html", body: documentHtml(trustHtml("<h2>two</h2>")) };
+    return { items: swap ? [two, one] : [one, two] };
+  }, list);
+  const mounted = await mountDocument(list, await handle(requestDocument()), answerWith(handle));
+  try {
+    swap = true;
+    await mounted.repaint();
+    assert.equal(mounted.browser.document.querySelector(`article[data-id="1"] div`)!.innerHTML, "<h2>one</h2>");
+    assert.equal(mounted.browser.document.querySelector(`article[data-id="2"] div`)!.innerHTML, "<h2>two</h2>");
+    assert.equal(mounted.reloads(), 0);
+  } finally { mounted.close(); }
+}));
+
+test("a position that is no longer marked inserts nothing and loads the document once", () => withPages(async (page) => {
+  const list = await page(trustedList, "Gone");
+  let removed = false;
+  const handle = listHandler(() => ({
+    items: removed
+      ? [{ id: 2, kind: "text", body: plainText }]
+      : [{ id: 1, kind: "html", body: documentHtml(trustHtml("<h2>trusted article</h2>")) }, { id: 2, kind: "text", body: plainText }],
+  }), list);
+  const mounted = await mountDocument(list, await handle(requestDocument()), answerWith(handle));
+  try {
+    removed = true;
+    await mounted.repaint();
+    assert.ok(!mounted.browser.document.querySelector("div.trusted b"));
+    assert.equal(mounted.browser.document.querySelector("div.trusted")!.textContent, "");
+    assert.equal(mounted.reloads(), 1);
+    assert.deepEqual(mounted.errors, []);
+  } finally { mounted.close(); }
+}));
+
+test("republished content is not painted over the old page, and a reload that did not help is not repeated", () => withPages(async (page) => {
+  const toggling = await page(togglingData, "Republished");
+  // As with a value that differs in every response: no document ever matches.
+  let version = 1;
+  const handle = listHandler(() => ({ html: documentHtml(trustHtml(`<h2>version ${version++}</h2>`)) }), toggling);
+  const mounted = await mountDocument(toggling, await handle(requestDocument()), answerWith(handle));
+  let claim: string | null;
+  try {
+    await mounted.repaint();
+    assert.equal(mounted.browser.document.querySelector("article")!.textContent, "");
+    assert.equal(mounted.reloads(), 1);
+    assert.deepEqual(mounted.errors, []);
+    claim = mounted.browser.sessionStorage.getItem("meeko:document-html-reload");
+    assert.ok(claim);
+  } finally { mounted.close(); }
+  // What that reload loads: the storage of the tab survives it.
+  const reloaded = await mountDocument(toggling, await handle(requestDocument()), answerWith(handle), { storedClaim: claim });
+  try {
+    await reloaded.repaint();
+    assert.equal(reloaded.reloads(), 0, "no loop");
+    assert.equal(reloaded.browser.document.querySelector("article")!.textContent, "");
+    assert.equal(reloaded.errors.length, 1, "the observer hears about it");
+    assert.match(String(reloaded.errors[0]), /Document HTML could not be recovered/);
+  } finally { reloaded.close(); }
+  // Long after that reload, this is a new publication.
+  const later = await mountDocument(toggling, await handle(requestDocument()), answerWith(handle), { storedClaim: `${Date.now() - 120_000} http://local/guide` });
+  try {
+    await later.repaint();
+    assert.equal(later.reloads(), 1);
+  } finally { later.close(); }
+}));
+
+test("without storage a reload cannot be counted, so it does not happen", () => withPages(async (page) => {
+  const toggling = await page(togglingData, "NoStorage");
+  let version = 1;
+  const handle = listHandler(() => ({ html: documentHtml(trustHtml(`<h2>version ${version++}</h2>`)) }), toggling);
+  const mounted = await mountDocument(toggling, await handle(requestDocument()), answerWith(handle), { noStorage: true });
+  try {
+    await mounted.repaint();
+    assert.equal(mounted.reloads(), 0);
+    assert.equal(mounted.errors.length, 1);
+    assert.equal(mounted.browser.document.querySelector("article")!.textContent, "");
+  } finally { mounted.close(); }
+}));
+
+test("several elements that wait for one stale response reload once", () => withPages(async (page) => {
+  const two = await page(`<script lang="ts">
+import { signal } from "@meekojs/meeko";
+const props = defineProps<{ data: { a: string; b: string } }>();
+const open = signal(true);
+</script>
+<template><section if:when="open.value"><article html="props.data.a"></article><aside html="props.data.b"></aside></section><button type="button" class="toggle" on:click="() => open.value = !open.value">t</button></template>`, "TwoValues");
+  let version = 1;
+  const handle = listHandler(() => {
+    const current = version++;
+    return { a: documentHtml(trustHtml(`<h2>a ${current}</h2>`)), b: documentHtml(trustHtml(`<h2>b ${current}</h2>`)) };
+  }, two);
+  const mounted = await mountDocument(two, await handle(requestDocument()), answerWith(handle));
+  try {
+    await mounted.repaint();
+    assert.equal(mounted.requests(), 1);
+    assert.equal(mounted.reloads(), 1);
+    assert.deepEqual(mounted.errors, []);
+  } finally { mounted.close(); }
+}));
+
+test("a response of another route inserts nothing", () => withPages(async (page) => {
+  const toggling = await page(togglingData, "Foreign");
+  const handle = listHandler(() => ({ html: documentHtml(trustHtml("<h2>guide</h2>")) }), toggling);
+  const foreign = { v: PAYLOAD_VERSION, route: "/signin", url: "/signin", props: { params: {}, search: {}, data: { html: plainText } }, state: {} };
+  const mounted = await mountDocument(toggling, await handle(requestDocument()), async () => jsonResponse(foreign));
+  try {
+    await mounted.repaint();
+    assert.ok(!mounted.browser.document.querySelector("article b"));
+    assert.equal(mounted.browser.document.querySelector("article")!.textContent, "");
+    assert.equal(mounted.reloads(), 1);
+  } finally { mounted.close(); }
+}));
+
+test("a redirect inserts nothing, also when its target declares the same value", () => withPages(async (page) => {
+  const toggling = await page(togglingData, "Redirected");
+  const handle = listHandler(() => ({ html: documentHtml(trustHtml("<h2>guide</h2>")) }), toggling);
+  const first = await handle(requestDocument());
+  const whole = await (await handle(requestNavigation())).text();
+  const followed = (): Response => {
+    const response = new Response(whole, { headers: { "content-type": "application/meeko+json" } });
+    Object.defineProperty(response, "redirected", { value: true });
+    Object.defineProperty(response, "url", { value: "http://local/signin" });
+    return response;
+  };
+  const mounted = await mountDocument(toggling, first, async () => followed());
+  try {
+    await mounted.repaint();
+    assert.equal(mounted.browser.document.querySelector("article")!.textContent, "");
+    assert.equal(mounted.reloads(), 1);
+  } finally { mounted.close(); }
+  // A custom fetch may hand back the 3xx itself.
+  const manual = await mountDocument(toggling, await handle(requestDocument()), async () => new Response(null, { status: 302, headers: { location: "/signin" } }));
+  try {
+    await manual.repaint();
+    assert.equal(manual.browser.document.querySelector("article")!.textContent, "");
+    assert.equal(manual.reloads(), 1);
+  } finally { manual.close(); }
+}));
+
+test("a failed request leaves the element empty, reports it and the next render tries again", () => withPages(async (page) => {
+  const toggling = await page(togglingData, "Transient");
+  const handle = listHandler(() => ({ html: documentHtml(trustHtml("<h2>guide</h2>")) }), toggling);
+  let failing = true;
+  const mounted = await mountDocument(toggling, await handle(requestDocument()), async (input, init) => failing ? new Response("", { status: 503 }) : await handle(new Request(input, init)));
+  try {
+    await mounted.repaint();
+    assert.equal(mounted.browser.document.querySelector("article")!.textContent, "");
+    assert.equal(mounted.reloads(), 0, "a server that is down has no document to load either");
+    assert.equal(mounted.errors.length, 1);
+    failing = false;
+    await mounted.repaint();
+    assert.equal(mounted.browser.document.querySelector("article")!.innerHTML, "<h2>guide</h2>");
+    assert.equal(mounted.errors.length, 1);
+  } finally { mounted.close(); }
+}));
+
+test("a prerendered site recovers the value from its stored file, and only what the file declares", () => withPages(async (page, directory) => {
+  const toggling = await page(togglingData, "Stored");
+  const handle = listHandler(() => ({ html: documentHtml(trustHtml("<h2>stored</h2>")) }), toggling);
+  const output = join(directory, "site");
+  await prerenderRoutes({ routes: createRouteManifest([{ id: "/guide", file: "/guide.meeko", layouts: [], render: "prerender" }]), handler: handle, outputRoot: output });
+  const stored = (): Response => new Response(storedDocument, { headers: { "content-type": "text/html" } });
+  const storedDocument = await readFile(join(output, "guide", "index.html"), "utf8");
+  const file = await readFile(join(output, "guide", "index.meeko.json"), "utf8");
+  const asked: string[] = [];
+  const mounted = await mountDocument(toggling, stored(), async (input) => {
+    asked.push(input);
+    return new Response(file, { headers: { "content-type": "application/json" } });
+  }, { serverData: "static" });
+  try {
+    await mounted.repaint();
+    assert.deepEqual(asked, ["http://local/guide/index.meeko.json"]);
+    assert.equal(mounted.browser.document.querySelector("article")!.innerHTML, "<h2>stored</h2>");
+    assert.equal(mounted.reloads(), 0);
+  } finally { mounted.close(); }
+  // The same file without the declaration has a string at that position and nothing that marks it.
+  const parsed = JSON.parse(file) as { markedHtml?: unknown };
+  delete parsed.markedHtml;
+  const undeclared = await mountDocument(toggling, stored(), async () => new Response(JSON.stringify(parsed), { headers: { "content-type": "application/json" } }), { serverData: "static" });
+  try {
+    await undeclared.repaint();
+    assert.equal(undeclared.browser.document.querySelector("article")!.textContent, "");
+    assert.equal(undeclared.reloads(), 1);
+  } finally { undeclared.close(); }
+}));
+
+test("a navigation declares its marked values by identity, and costs nothing without them", async () => {
+  const handle = handler(() => {
+    const html = documentHtml(article);
+    return { doc: { html, other: "texto" }, copy: html };
+  });
+  const { payload } = await documentPayload(await handle(requestDocument()));
+  const navigation = JSON.parse(await (await handle(requestNavigation())).text()) as { markedHtml: Record<string, unknown>; documentHtml?: unknown };
+  assert.deepEqual(navigation.markedHtml, { [(payload.documentHtml as string[])[0]!]: ["props", "data", "doc", "html"] });
+  assert.equal(navigation.documentHtml, undefined, "prerender reads this field as a payload that leaves out values");
+  const plain = await (await handler(() => ({ doc: { html: article } }))(requestNavigation())).text();
+  assert.equal(plain.includes("markedHtml"), false);
+});
+
 test("a value that one element left empty travels whole, as without the mark", () => withPages(async (page) => {
   const two = await page(twoContainers, "Two");
   const block = "<div>safe</div>";
@@ -385,6 +608,26 @@ test("a value that one element left empty travels whole, as without the mark", (
   assert.equal(marked.requests, 0);
   assert.equal(marked.payload.documentHtml, undefined);
   assert.deepEqual({ article: marked.article, paragraph: marked.paragraph, requests: marked.requests }, { article: plain.article, paragraph: plain.paragraph, requests: plain.requests });
+}));
+
+test("an element that is gone when the stream was already cancelled reports nothing", () => withPages(async (page) => {
+  const toggling = await page(togglingData, "Disposed");
+  const handle = listHandler(() => ({ html: documentHtml(trustHtml("<h2>guide</h2>")) }), toggling);
+  let aborted: AbortSignal | undefined;
+  const mounted = await mountDocument(toggling, await handle(requestDocument()), (_input, init) => {
+    aborted = init?.signal ?? undefined;
+    return new Promise(() => {});
+  });
+  const toggle = mounted.browser.document.querySelector("button.toggle") as unknown as HTMLButtonElement;
+  toggle.click();
+  toggle.click();
+  await settle();
+  const { errors, reloads } = mounted;
+  mounted.close();
+  await settle();
+  assert.equal(aborted?.aborted, true, "dispose aborts the request");
+  assert.deepEqual(errors, []);
+  assert.equal(reloads(), 0);
 }));
 
 test("an imitated placeholder that names nothing stays an inert comment", async () => {

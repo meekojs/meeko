@@ -1,6 +1,7 @@
 import type { TrustedHtml } from "../../shared/trusted-html";
 
 import { documentHtmlPlaceholder } from "../../shared/document-html";
+import { encodeBase64Url } from "./base64url";
 
 /** The values of the current request marked with `documentHtml`, when a page is rendering. */
 let marks: (() => Set<string> | undefined) | undefined;
@@ -55,31 +56,63 @@ export function documentHtml(html: TrustedHtml): TrustedHtml {
 /** The parts of a payload that carry data of the page, the only ones that hold a value of `html`. */
 const dataParts = ["props", "state", "sharedState", "resources", "layoutProps", "deferred"] as const;
 
+type PayloadPath = readonly (string | number)[];
+
+/** The data parts of `payload`, with `visit` applied to each of their strings. */
+function mapDataStrings(payload: Readonly<Record<string, unknown>>, visit: (value: string, path: PayloadPath) => string): Record<string, unknown> {
+  const map = (value: unknown, path: PayloadPath): unknown => {
+    if (typeof value === "string") return visit(value, path);
+    if (Array.isArray(value)) return value.map((item, index) => map(item, [...path, index]));
+    if (value === null || typeof value !== "object") return value;
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, map(item, [...path, key])]));
+  };
+  return Object.fromEntries(dataParts.filter((part) => payload[part] !== undefined).map((part) => [part, map(payload[part], [part])]));
+}
+
 /**
- * The payload of a document without the values that are marked and that its HTML already shows: each
- * becomes a placeholder, and `documentHtml` lists where the navigation payload of that URL has it.
+ * What identifies a marked value between a document and a later response: a hash of its content,
+ * written by the server in both, so the browser needs no secure context to compare them.
+ */
+async function htmlIdentity(html: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(html));
+  return encodeBase64Url(new Uint8Array(digest).subarray(0, 16));
+}
+
+/**
+ * The payload of a document without the values that are marked and that all their elements show in
+ * its HTML: each becomes a placeholder, and `documentHtml` lists the identity of each, by position.
  * `undefined` when no value qualifies, so a page that does not use the mark costs nothing.
  */
-export function withoutDocumentHtml(payload: Readonly<Record<string, unknown>>, rendered: ReadonlyMap<string, boolean>): Record<string, unknown> | undefined {
+export async function withoutDocumentHtml(payload: Readonly<Record<string, unknown>>, rendered: ReadonlyMap<string, boolean>): Promise<Record<string, unknown> | undefined> {
   const marked = marks?.();
   if (!marked?.size) return undefined;
   const positions = new Map<string, number>();
-  const paths: (readonly (string | number)[])[] = [];
-  const replace = (value: unknown, path: readonly (string | number)[]): unknown => {
-    if (typeof value === "string") {
-      if (!marked.has(value) || rendered.get(value) !== true) return value;
-      let position = positions.get(value);
-      if (position === undefined) {
-        position = paths.length;
-        positions.set(value, position);
-        paths.push(path);
-      }
-      return documentHtmlPlaceholder(position);
+  const parts = mapDataStrings(payload, (value) => {
+    if (!marked.has(value) || rendered.get(value) !== true) return value;
+    let position = positions.get(value);
+    if (position === undefined) {
+      position = positions.size;
+      positions.set(value, position);
     }
-    if (Array.isArray(value)) return value.map((item, index) => replace(item, [...path, index]));
-    if (value === null || typeof value !== "object") return value;
-    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, replace(item, [...path, key])]));
-  };
-  const parts = dataParts.filter((part) => payload[part] !== undefined).map((part) => [part, replace(payload[part], [part])]);
-  return paths.length ? { ...payload, ...Object.fromEntries(parts), documentHtml: paths } : undefined;
+    return documentHtmlPlaceholder(position);
+  });
+  if (!positions.size) return undefined;
+  return { ...payload, ...parts, documentHtml: await Promise.all([...positions.keys()].map(htmlIdentity)) };
+}
+
+/**
+ * The payload of a navigation, with `markedHtml` declaring where it has each value marked in this
+ * very request, by identity: the only strings the browser may insert in place of a placeholder.
+ * `undefined` when it has none, so a page that does not use the mark costs nothing.
+ */
+export async function withMarkedHtml(payload: Readonly<Record<string, unknown>>): Promise<Record<string, unknown> | undefined> {
+  const marked = marks?.();
+  if (!marked?.size) return undefined;
+  const paths = new Map<string, PayloadPath>();
+  mapDataStrings(payload, (value, path) => {
+    if (marked.has(value) && !paths.has(value)) paths.set(value, path);
+    return value;
+  });
+  if (!paths.size) return undefined;
+  return { ...payload, markedHtml: Object.fromEntries(await Promise.all([...paths].map(async ([value, path]) => [await htmlIdentity(value), path]))) };
 }

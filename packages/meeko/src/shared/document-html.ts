@@ -2,7 +2,7 @@
  * The placeholder of a `documentHtml` value in the payload of its document. It is a comment, so a
  * read that reaches the page by mistake shows nothing and runs nothing. Its number is a position in
  * the `documentHtml` list of that payload, which only the server writes: a value that imitates the
- * placeholder can at most name HTML the server already declared.
+ * placeholder can at most name a value that the server declares marked in its next response.
  */
 const placeholder = /^<!--meeko:document-html:(\d+)-->$/;
 

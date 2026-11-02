@@ -218,9 +218,11 @@ test('production: the HTML travels once and every feature of a guide still works
 	const documentHtml = await response.text()
 	const payload = payloadScript.exec(documentHtml)[1]
 	assert.ok(payload.length < documentHtml.length / 20, `the payload (${payload.length}) is a small part of the document (${documentHtml.length})`)
-	assert.deepEqual(JSON.parse(payload).documentHtml, [['props', 'data', 'doc', 'html']])
+	const identities = JSON.parse(payload).documentHtml
+	assert.equal(identities.length, 1, 'the document names the value it left out')
 	const navigation = await (await fetch(base + guide, { headers: { accept: 'application/meeko+json' } })).json()
 	assert.ok(navigation.props.data.doc.html.length > 1000, 'a navigation receives the whole HTML')
+	assert.deepEqual(navigation.markedHtml, { [identities[0]]: ['props', 'data', 'doc', 'html'] }, 'and declares where it has that value')
 	assert.ok(documentHtml.includes(navigation.props.data.doc.html.slice(0, 2000)), 'the document has the HTML, for readers and crawlers without JavaScript')
 	// Nothing new in the policy: the payload is a data block, and scripts stay without unsafe-inline.
 	const scripts = response.headers

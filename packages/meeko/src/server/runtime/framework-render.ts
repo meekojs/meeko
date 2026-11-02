@@ -45,7 +45,7 @@ import { etagMatches } from "./assets";
 import { encodeBase64Url } from "./base64url";
 import { cookieNamed } from "./cookies";
 import { createCspNonce, documentContentSecurityPolicy } from "./csp";
-import { provideDocumentHtmlMarks, withoutDocumentHtml } from "./document-html";
+import { provideDocumentHtmlMarks, withMarkedHtml, withoutDocumentHtml } from "./document-html";
 import { documentHeadEntries, HeadCollector, renderHeadDocument } from "./head";
 import { withRequestContext } from "./request-context";
 import { lockSessionCookie } from "./sessions";
@@ -1263,9 +1263,10 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
     };
     // Always serialized: it also checks that the data can travel, whatever the document leaves out.
     const payload = serializeJson(payloadValue);
-    // A navigation has no HTML of its own, so only a document can leave out what its HTML shows.
-    const lightPayload = wantsPayload(request) ? undefined : withoutDocumentHtml(payloadValue, tree.renderedHtml);
-    const documentPayload = lightPayload ? serializeJson(lightPayload) : payload;
+    // A navigation has no HTML of its own, so only a document can leave out what its HTML shows; a
+    // navigation declares instead which of its values are marked.
+    const adjusted = wantsPayload(request) ? await withMarkedHtml(payloadValue) : await withoutDocumentHtml(payloadValue, tree.renderedHtml);
+    const sentPayload = adjusted ? serializeJson(adjusted) : payload;
     // Status, headers and cookies are final from here on: session changes still
     // in flight finish first and later ones fail with SESSION_LOCKED. A session
     // revoked while the loader ran must not receive a 200 stream.
@@ -1317,7 +1318,7 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
         return cached === headers ? headers : { ...cached, "cache-control": `${cached["cache-control"]}, no-transform` };
       };
       if (wantsPayload(request)) {
-        return finish(new Response(body(`${payload}\n`, (text) => `${text}\n`, ""), {
+        return finish(new Response(body(`${sentPayload}\n`, (text) => `${text}\n`, ""), {
           status: 200, headers: streamCache({ "content-type": "application/meeko+ndjson; charset=utf-8", ...streamHeaders }),
         }), caching);
       }
@@ -1325,7 +1326,7 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
       const csrfMeta = requestContext?.session.current ? `<meta name="meeko-csrf-token" content="${escapeHtml(requestContext.session.current.csrfToken)}">` : "";
       const parts = documentHead();
       const shellStart = `${parts.prefix}${csrfMeta}${parts.head}${host.head}${styleTags}</head>${parts.bodyOpen}<div id="app">`;
-      const shellEnd = `<script id="meeko-payload" type="application/json">${documentPayload}</script>${script}`;
+      const shellEnd = `<script id="meeko-payload" type="application/json">${sentPayload}</script>${script}`;
       const opening = `${shellStart}${placed.app}</div>${placed.body}${shellEnd}`;
       const closing = `${host.bodyEnd}</body></html>`;
       // The deferred chunks are JSON data blocks, which script-src does not check. The page and its
@@ -1336,15 +1337,15 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
       }), true, csp);
     }
     if (wantsPayload(request)) {
-      return finish(new Response(headRequest ? null : payload, {
-        status: 200, headers: cacheResult(payload, { "content-type": "application/meeko+json; charset=utf-8", "cache-control": "no-store" }),
+      return finish(new Response(headRequest ? null : sentPayload, {
+        status: 200, headers: cacheResult(sentPayload, { "content-type": "application/meeko+json; charset=utf-8", "cache-control": "no-store" }),
       }), caching);
     }
     const script = options.clientEntry ? `<script type="module"${nonceAttribute} src="${escapeHtml(options.clientEntry)}"></script>` : "";
     const csrfMeta = requestContext?.session.current ? `<meta name="meeko-csrf-token" content="${escapeHtml(requestContext.session.current.csrfToken)}">` : "";
     const parts = documentHead();
     const shellStart = `${parts.prefix}${csrfMeta}${parts.head}${host.head}${styleTags}</head>${parts.bodyOpen}<div id="app">`;
-    const shellEnd = `<script id="meeko-payload" type="application/json">${documentPayload}</script>${script}${host.bodyEnd}</body></html>`;
+    const shellEnd = `<script id="meeko-payload" type="application/json">${sentPayload}</script>${script}${host.bodyEnd}</body></html>`;
     const document = `${shellStart}${placed.app}</div>${placed.body}${shellEnd}`;
     // The page and its teleports may carry user content: only what Meeko writes around them is hashed.
     const csp = await documentPolicy(`${shellStart}</div>${shellEnd}`);
