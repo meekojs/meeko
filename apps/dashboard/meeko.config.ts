@@ -1,5 +1,4 @@
 import { defineMeekoConfig } from '@meekojs/meeko/framework'
-import { docsTheme } from 'meeko-docs/theme'
 
 const namespaces = ['common', 'overview', 'login', 'sources', 'source', 'editor', 'translations', 'moderation', 'metrics', 'health', 'snapshots'] as const
 
@@ -11,10 +10,9 @@ function catalogs(locale: 'en' | 'es'): Record<string, string> {
 }
 
 export default defineMeekoConfig({
-	// The identity of Meeko's documentation webs: the tokens of packages/docs and the same themes.
+	// The identity of Meeko's documentation webs: the tokens of @meekojs/ui and the same themes.
 	theme: { default: 'dark' },
 	modules: ['@meekojs/ui', '@meekojs/ui/editor', 'meeko-docs', '@meekojs/i18n'],
-	ui: docsTheme,
 	// Bilingual interface: Spanish without a prefix (the usual URLs) and English under /en/…, from
 	// the same pages. `shell` is the catalog of meeko-docs, whose components the moderation preview
 	// renders. Each page loads its own namespace; `common` holds the header, errors and labels.

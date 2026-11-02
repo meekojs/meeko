@@ -1,6 +1,7 @@
+@import './legacy-tokens.css';
+
 /*
- * The dashboard on the tokens of Meeko's documentation webs (packages/docs/src/app/styles/tokens.css,
- * loaded with docs.css by the meeko-docs module). Product density: one sans, a tight scale, tabular
+ * The dashboard on the tokens of Meeko's documentation webs. Product density: one sans, a tight scale, tabular
  * numerals, and the accent only for the current section, the primary action and states that need
  * a decision.
  */

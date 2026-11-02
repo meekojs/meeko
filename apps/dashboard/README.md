@@ -1,6 +1,6 @@
 # Meeko Dashboard
 
-Herramienta de administración de la documentación pública de las tres webs del monorepo: el framework (`apps/meeko`), UI (`apps/ui`) e i18n (`apps/i18n`). Es una aplicación Meeko full-stack con el adaptador Node y `@meekojs/ui`, con la misma identidad que las webs documentales: el módulo `meeko-docs` aporta los tokens y `docsTheme`.
+Herramienta de administración de la documentación pública de las tres webs del monorepo: el framework (`apps/meeko`), UI (`apps/ui`) e i18n (`apps/i18n`). Es una aplicación Meeko full-stack con el adaptador Node y `@meekojs/ui`, con la misma identidad que las webs documentales: los tokens son los de `@meekojs/ui`.
 
 Lee y escribe la misma base de datos que el site, a través de `meeko-docs-content`. El site sirve siempre el snapshot activo; el dashboard decide cuál es.
 

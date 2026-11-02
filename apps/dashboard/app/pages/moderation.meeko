@@ -792,7 +792,7 @@
 							class="dash-announcement-frame"
 							inert
 						>
-							<DocsAnnouncements bind:preview="preview.value" />
+							<DocsAnnouncements bind:items="preview.value" />
 							<div
 								class="dash-announcement-page"
 								aria-hidden="true"
