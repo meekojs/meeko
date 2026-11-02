@@ -136,14 +136,17 @@ async function assertAdopted(page, label) {
 /** What the article of the page shows is what a navigation payload of `path` says. */
 async function assertArticleOf(page, path, label) {
 	await page.waitForFunction((target) => globalThis.location.pathname === target, path)
-	const same = await page.evaluate(async ({ path, selector }) => {
-		const response = await fetch(path, { headers: { accept: 'application/meeko+json' } })
-		const payload = await response.json()
-		const holder = globalThis.document.createElement('template')
-		holder.innerHTML = payload.props.data.doc.html
-		const shown = globalThis.document.querySelector(selector)
-		return holder.innerHTML === shown.innerHTML ? true : { expected: holder.innerHTML.length, shown: shown.innerHTML.length }
-	}, { path, selector: article })
+	const same = await page.evaluate(
+		async ({ path, selector }) => {
+			const response = await fetch(path, { headers: { accept: 'application/meeko+json' } })
+			const payload = await response.json()
+			const holder = globalThis.document.createElement('template')
+			holder.innerHTML = payload.props.data.doc.html
+			const shown = globalThis.document.querySelector(selector)
+			return holder.innerHTML === shown.innerHTML ? true : { expected: holder.innerHTML.length, shown: shown.innerHTML.length }
+		},
+		{ path, selector: article },
+	)
 	assert.equal(same, true, `${label}: the article of ${path}`)
 }
 
@@ -220,7 +223,10 @@ test('production: the HTML travels once and every feature of a guide still works
 	assert.ok(navigation.props.data.doc.html.length > 1000, 'a navigation receives the whole HTML')
 	assert.ok(documentHtml.includes(navigation.props.data.doc.html.slice(0, 2000)), 'the document has the HTML, for readers and crawlers without JavaScript')
 	// Nothing new in the policy: the payload is a data block, and scripts stay without unsafe-inline.
-	const scripts = response.headers.get('content-security-policy').split(';').find((directive) => directive.trim().startsWith('script-src'))
+	const scripts = response.headers
+		.get('content-security-policy')
+		.split(';')
+		.find((directive) => directive.trim().startsWith('script-src'))
 	assert.ok(!scripts.includes("'unsafe-inline'"), scripts)
 
 	const browser = await chromium.launch({ ...(process.env.MEEKO_CHROME_PATH ? { executablePath: process.env.MEEKO_CHROME_PATH } : { channel: 'chrome' }), headless: true })
@@ -238,19 +244,24 @@ test('production: the HTML travels once and every feature of a guide still works
 	await openTab.page.goto(base + guide, { waitUntil: 'networkidle' })
 	await assertAdopted(openTab.page, 'an open tab')
 
-	const { rows: [{ id: published }] } = await db.query("INSERT INTO docs_snapshots (active, published_by) VALUES (false, 'e2e') RETURNING id")
-	await db.query(`INSERT INTO docs_pages (snapshot_id, locale, path, payload, searchable_text, translation)
+	const {
+		rows: [{ id: published }],
+	} = await db.query("INSERT INTO docs_snapshots (active, published_by) VALUES (false, 'e2e') RETURNING id")
+	await db.query(
+		`INSERT INTO docs_pages (snapshot_id, locale, path, payload, searchable_text, translation)
 		SELECT $1, locale, path,
 			CASE WHEN path = $2 THEN jsonb_set(payload, '{doc,html}', to_jsonb('<p id="' || $3 || '">' || $3 || '</p>' || (payload->'doc'->>'html'))) ELSE payload END,
 			searchable_text, translation
-		FROM docs_pages WHERE snapshot_id = (SELECT id FROM docs_snapshots WHERE active)`, [published, guide, marker])
+		FROM docs_pages WHERE snapshot_id = (SELECT id FROM docs_snapshots WHERE active)`,
+		[published, guide, marker],
+	)
 	await db.query('UPDATE docs_snapshots SET active = (id = $1)', [published])
 
 	const fresh = await fetch(base + guide, { headers: { accept: 'text/html' } })
 	assert.ok((await fresh.text()).includes(`<p id="${marker}">`), 'a new document shows what was published')
 
 	const cached = await watchedPage(browser, context)
-	await cached.page.route(base + guide, (route) => route.request().resourceType() === 'document' ? route.fulfill({ status: 200, headers: staleHeaders, body: staleBody }) : route.continue())
+	await cached.page.route(base + guide, (route) => (route.request().resourceType() === 'document' ? route.fulfill({ status: 200, headers: staleHeaders, body: staleBody }) : route.continue()))
 	await cached.page.goto(base + guide, { waitUntil: 'networkidle' })
 	await assertAdopted(cached.page, 'a cached document')
 	assert.equal(await cached.page.locator(`[id="${marker}"]`).count(), 0, 'the cached document keeps its content')
@@ -299,12 +310,15 @@ test('meeko dev: hydration, every feature of a guide and a hot update that reads
 		await page.waitForFunction((selector) => (globalThis.document.querySelector(selector)?.innerHTML.length ?? 0) > 1000, body)
 		assert.equal(await page.evaluate(() => globalThis.__e2eDocument), 'same', 'a hot update, not a reload')
 		assert.deepEqual(requests, [reference], 'the value comes from the server')
-		const same = await page.evaluate(async ({ path, selector }) => {
-			const payload = await (await fetch(path, { headers: { accept: 'application/meeko+json' } })).json()
-			const holder = globalThis.document.createElement('template')
-			holder.innerHTML = payload.props.data.written.body
-			return holder.innerHTML === globalThis.document.querySelector(selector).innerHTML
-		}, { path: reference, selector: body })
+		const same = await page.evaluate(
+			async ({ path, selector }) => {
+				const payload = await (await fetch(path, { headers: { accept: 'application/meeko+json' } })).json()
+				const holder = globalThis.document.createElement('template')
+				holder.innerHTML = payload.props.data.written.body
+				return holder.innerHTML === globalThis.document.querySelector(selector).innerHTML
+			},
+			{ path: reference, selector: body },
+		)
 		assert.equal(same, true, 'the HTML the server declared, whole')
 	} finally {
 		writeFileSync(file, original)
