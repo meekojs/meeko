@@ -14,7 +14,7 @@ related:
   - "@meekojs/meeko/framework#useForm"
   - docs/api.md#controles-de-formulario-con-model
   - docs/api.md#modelos-de-componente-definemodel-y-model
-source-hash: 2d556cd671f6494b192bfd7faf3bcfebacda343a567c18f62d7070cd7ba6b0e7
+source-hash: 47346146f7ceea1e9a6018744f761537bd60dbfe0b1edce228af137a23e8ff1e
 ---
 
 `model="señal"` binds a form control to a signal in both directions: the control displays the signal's value and every user edit writes to it. It replaces the `bind:value` + `on:input` pair.
@@ -45,6 +45,7 @@ const plan = signal<string | null>("free");
 | Control                                                                         | Property and event                                                   | Signal type                                                                                                                             |
 | ------------------------------------------------------------------------------- | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | Text `<input>` (any `type` except those below, or `bind:type`) and `<textarea>` | `value`, on `input`                                                  | `Signal<string>`                                                                                                                        |
+| `<input type="range">` (since `1.8`)                                            | `value`, on `input`                                                  | `Signal<number>`, which gets numbers, or `Signal<string>`                                                                               |
 | `<input type="checkbox">`                                                       | `checked`, on `change`                                               | `Signal<boolean>` or, since `1.7.1`, `Signal<boolean \| undefined>`: `undefined` renders unchecked and `change` always writes a boolean |
 | `<input type="radio">`                                                          | checked if the signal equals its `value`; `change` writes that value | `Signal<string \| null \| undefined>`                                                                                                   |
 | `<select>`                                                                      | `value`, on `change`                                                 | `Signal<string>`                                                                                                                        |
@@ -102,6 +103,8 @@ const total = computed(() => {
   <p>Total: {total.value.toFixed(2)} €</p>
 </template>
 ```
+
+An `<input type="range">` always has a number: since `1.8`, a signal that holds a number receives it as a number, with no conversion.
 
 ### Show the password with `bind:type`
 

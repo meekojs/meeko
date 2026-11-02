@@ -168,6 +168,8 @@ Los defaults pueden leer ahora constantes de nivel superior de literales e impor
 
 Sólo cambian los tipos, y `meeko check` señala cada caso con `TS2353` o `TS2339`. `BaseButtonEmits`, nuevo, es el mapa de `defineEmits`. Con esto se puede escribir un envoltorio; véase [Envolver otro componente](api.md#envolver-otro-componente).
 
+Un paquete de componentes publicado antes de `1.8` sigue funcionando sin republicarlo y sin que hagas nada. Meeko lee lo que exporta su `.d.meeko.ts`: su `<Nombre>Props` es su `ComponentProps`, con los callbacks, como hasta ahora; `<Nombre>Emits` no existe para él, porque su declaración no trae el mapa de eventos, y usarlo da `TS2304`. Sus `Snippets`, `Models` y `Exposed` no cambian. Al republicarlo con `1.8` tendrá los dos tipos separados, igual que los `.meeko` de tu proyecto.
+
 ## Otros cambios visibles
 
 - **`css` de un componente.** Con el plugin de Vite de Meeko, el export `css` es el CSS ya procesado por PostCSS en el grafo SSR y en `meeko dev`, y sigue siendo la cadena del compilador en el bundle de cliente de producción (véase [stability.md](stability.md#formato-meeko-y-módulo-generado)). Un test de Vitest que lea `Componente.css` o haga SSR de un componente sigue recibiendo un CSS no vacío: sin `test.css: true`, Vitest no procesa CSS y `css` es la cadena del compilador; con `css: true`, el CSS procesado.

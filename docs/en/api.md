@@ -1,5 +1,5 @@
 ---
-source-hash: 15d9532f8e5e46429fb4ed3d287e7b404e7f07301a87642bbce2af939d9a7a30
+source-hash: 99114d8d8b82aac1da70e5fb8626000c5f12e267a7d5a6f1767bcefa5323911e
 ---
 
 # Meeko API
@@ -266,7 +266,7 @@ Since `1.1`, `model="signal"` binds a form control to a signal in both direction
 | `<select>`                                                                        | `value`, on `change`                                                 | `string`                      |
 | `<select multiple>`                                                               | selected options, on `change`                                        | `string[]`                    |
 
-- **Numbers.** An `<input type="number">` also delivers text: store a `string` and convert it where used.
+- **Numbers.** An `<input type="number">` also delivers text: store a `string` and convert it where used. An `<input type="range">`, since `1.8`, gets numbers if the signal holds a number.
 - **Writable signal.** The expression must be a writable signal of the type in the table. A `computed`, a read-only signal or a plain value is a type error, and throws a `TypeError` at runtime.
 - **Synchronization.** Assigning the signal from code updates the control's live property, like `bind:value` since `1.0.1`. In SSR, the HTML carries the signal's value (`value`, `checked`, `<textarea>` content or each `<option>`'s `selected`). If the user edits the control before the page hydrates (or the browser restores its value), what they typed is preserved and copied to the signal when hydration ends, before `onMounted` callbacks: `if:`, `each:`, `<render>` regions and parents reading the signal hydrate first with the SSR value and then react to the restored value.
 - **Radio.** Requires `value="..."` or `bind:value="expression"`.

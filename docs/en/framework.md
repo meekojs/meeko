@@ -1,5 +1,5 @@
 ---
-source-hash: ca926b013392a8de9ea25e152da9a409824a0905b06e407cd398b8c28aaef2b6
+source-hash: 26fe52f222f7c992e52d3ffb2e24d9f1c2fb406a8b897e63dabc1437c400eda4
 ---
 
 # Meeko as a full-stack framework
@@ -1868,7 +1868,9 @@ Each option only accepts relative paths within its folder (`appDirs` within `app
 
 If `Button.meeko` and `Button/Index.meeko` both exist, also in different sources, nothing changes file: `Button.meeko` keeps `<Button>` and `Button/Index.meeko` keeps `<ButtonIndex>`, not marked as deprecated because it is its only name, with its types and in `resolveComponent` and `is`. The `MEEK135` warning, on that `Index.meeko`, explains the conflict. In `2.0` it will be an error.
 
-<a id="component-types"></a>**Types for each component.** Since `1.4`, each auto-imported component (`.meeko` files in the project's and its layers' `app/components`, and in module component folders) also contributes several types named after its tag, without an import: the component name, following the same rule as the tag and including the module prefix, followed by `Props` (since `1.8`, without the callbacks of `defineEmits`), `Emits` (since `1.8`), `Snippets`, `Models` or `Exposed`.
+A name that already existed does not change file with a nested `Index` either. With `Button/Index.meeko` and `Button/Index/Index.meeko`, the first is `<Button>` and keeps `<ButtonIndex>` with `MEEK134`, and the second remains `<ButtonIndexIndex>`, not marked as deprecated, because `<ButtonIndex>` belonged to the first. The `MEEK135` warning, on the inner file, says which file keeps each name. In `2.0`, when that old name is removed, the inner file becomes `<ButtonIndex>`.
+
+<a id="component-types"></a>**Types for each component.** Since `1.4`, each auto-imported component (`.meeko` files in the project's and its layers' `app/components`, and in module component folders) also contributes several types named after its tag, without an import: the component name, following the same rule as the tag and including the module prefix, followed by `Props` (since `1.8`, without the callbacks of `defineEmits`), `Emits` (since `1.8`), `Snippets`, `Models` or `Exposed`. A component from a package published before `1.8` gives the ones its `.d.meeko.ts` exports: its `Props` is its `ComponentProps`, with the callbacks, and it has no `Emits`.
 
 | Component                                                       | Tag              | Types                                                                    |
 | --------------------------------------------------------------- | ---------------- | ------------------------------------------------------------------------ |

@@ -262,7 +262,7 @@ Desde `1.1`, `model="signal"` enlaza un control de formulario con una señal en 
 | `<select>`                                                                               | `value`, en `change`                                            | `string`                      |
 | `<select multiple>`                                                                      | las opciones seleccionadas, en `change`                         | `string[]`                    |
 
-- **Números.** Un `<input type="number">` también entrega texto: guarde un `string` y conviértalo donde se use.
+- **Números.** Un `<input type="number">` también entrega texto: guarde un `string` y conviértalo donde se use. Un `<input type="range">`, desde `1.8`, recibe números si la señal guarda un número.
 - **Señal escribible.** La expresión debe ser una señal escribible del tipo de la tabla. Un `computed`, una señal de sólo lectura o un valor normal es un error de tipos, y en ejecución lanza un `TypeError`.
 - **Sincronización.** Asignar la señal desde código actualiza la propiedad viva del control, como `bind:value` desde `1.0.1`. En SSR, el HTML lleva el valor de la señal (`value`, `checked`, el contenido del `<textarea>` o el `selected` de cada `<option>`). Si el usuario edita el control antes de que la página se hidrate (o el navegador restaura su valor), se conserva lo que escribió y se copia a la señal al terminar la hidratación, antes de los `onMounted`: las regiones `if:`, `each:`, `<render>` y los padres que leen la señal se hidratan primero con el valor del SSR y después reaccionan al valor restaurado.
 - **Radio.** Necesita `value="..."` o `bind:value="expression"`.

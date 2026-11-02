@@ -44,6 +44,7 @@ const plan = signal<string | null>("free");
 | Control | Propiedad y evento | Tipo de la señal |
 | --- | --- | --- |
 | `<input>` de texto (cualquier `type` salvo los siguientes, o `bind:type`) y `<textarea>` | `value`, en `input` | `Signal<string>` |
+| `<input type="range">` (desde `1.8`) | `value`, en `input` | `Signal<number>`, que recibe números, o `Signal<string>` |
 | `<input type="checkbox">` | `checked`, en `change` | `Signal<boolean>` o, desde `1.7.1`, `Signal<boolean \| undefined>`: `undefined` se pinta desmarcado y `change` escribe siempre un booleano |
 | `<input type="radio">` | marcado si la señal vale su `value`; `change` escribe ese valor | `Signal<string \| null \| undefined>` |
 | `<select>` | `value`, en `change` | `Signal<string>` |
@@ -101,6 +102,8 @@ const total = computed(() => {
   <p>Total: {total.value.toFixed(2)} €</p>
 </template>
 ```
+
+Un `<input type="range">` siempre tiene un número: desde `1.8`, una señal que guarda un número lo recibe como número, sin convertirlo.
 
 ### Mostrar la contraseña con `bind:type`
 

@@ -1,5 +1,5 @@
 ---
-source-hash: 82e416ae5898f3f8961d1c97f9aadef07d804033c494662a3392f00ff7c1228e
+source-hash: a89f47361bd57afc3cd3b008b49385ad5fe072dac7e6478284c4cfc72345f842
 ---
 
 # Upgrade from 1.7 to 1.8
@@ -171,6 +171,8 @@ Defaults can now read top-level literal constants and imports; a setup variable 
 ```
 
 Only types change, and `meeko check` flags each case with `TS2353` or `TS2339`. `BaseButtonEmits`, new, is the `defineEmits` map. This makes a wrapper possible; see [Wrapping another component](api.md#wrapping-another-component).
+
+A component package published before `1.8` keeps working without republishing it and without you doing anything. Meeko reads what its `.d.meeko.ts` exports: its `<Name>Props` is its `ComponentProps`, with the callbacks, as before; `<Name>Emits` does not exist for it, because its declaration has no event map, and using it gives `TS2304`. Its `Snippets`, `Models` and `Exposed` do not change. Once republished with `1.8` it has both types separated, like the `.meeko` files of your project.
 
 ## Other visible changes
 
