@@ -27,21 +27,21 @@ En Node, ESLint carga `eslint.config.ts` con `jiti` 2.2 o superior instalado en 
 
 Las tres opciones de lenguaje están activadas por defecto:
 
-| Opción          | Efecto                                                                                                     |
-| --------------- | ---------------------------------------------------------------------------------------------------------- |
-| `javascript`    | Activa el preset recomendado de ESLint para `.js`, `.mjs` y `.cjs`.                                        |
-| `typescript`    | Activa el preset recomendado de TypeScript-ESLint, sin tipos, para `.ts`, `.tsx`, `.mts` y `.cts`.         |
-| `meeko`         | Activa el parser y las reglas recomendadas del plugin para `.meeko`. Es independiente de `typescript`.     |
-| `perfectionist` | Por defecto `true`. Ordena imports y miembros con orden natural ascendente; `warn` en 1.x, `error` en 2.0. |
-| `unusedImports` | Optativo, por defecto `false`. Elimina imports sin uso y centraliza el aviso de variables sin uso.         |
-| `ignores`       | Añade patrones globales de exclusión.                                                                      |
-| `rules`         | Personaliza reglas conocidas del núcleo, TypeScript-ESLint y Meeko con opciones tipadas.                   |
+| Opción          | Efecto                                                                                                            |
+| --------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `javascript`    | Activa el preset recomendado de ESLint para `.js`, `.mjs` y `.cjs`.                                               |
+| `typescript`    | Activa el preset recomendado de TypeScript-ESLint, sin tipos, para `.ts`, `.tsx`, `.mts` y `.cts`.                |
+| `meeko`         | Activa el parser y las reglas recomendadas del plugin para `.meeko`. Es independiente de `typescript`.            |
+| `perfectionist` | Por defecto `true`. Activa el conjunto `recommended-natural` de Perfectionist con nivel `warn`. `false` lo apaga. |
+| `unusedImports` | Optativo, por defecto `false`. Elimina imports sin uso y centraliza el aviso de variables sin uso.                |
+| `ignores`       | Añade patrones globales de exclusión.                                                                             |
+| `rules`         | Personaliza reglas conocidas del núcleo, TypeScript-ESLint y Meeko con opciones tipadas.                          |
 
 La base recomendada de JavaScript también se aplica a los scripts de los lenguajes habilitados: por ejemplo, detecta `debugger` dentro de `.meeko`. Después se aplican las excepciones de cada lenguaje. Los globals de Node o navegador se configuran explícitamente en los overrides; el helper no presupone el runtime de la aplicación.
 
 Se excluyen por defecto `**/node_modules/**`, `**/dist/**`, `**/.meeko/**`, `**/*.d.meeko.ts` y `**/*.generated.ts`. `ignores` añade patrones a esa lista. No se ignoran los componentes `*.meeko`.
 
-Las reglas personalizadas se aplican por ámbito: las del núcleo a los lenguajes habilitados, las `@typescript-eslint/*` a TS y/o Meeko, y las `meeko/*` a los componentes. Los namespaces `perfectionist/*` y `unused-imports/*` requieren activar su opción y se aplican a los lenguajes habilitados. Seleccionar una regla de un namespace desactivado produce un error; desactivar todos los lenguajes también produce un error. `typescript: false` permite incorporar tu propio preset TypeScript mientras mantienes Meeko.
+Las reglas personalizadas se aplican por ámbito: las del núcleo a los lenguajes habilitados, las `@typescript-eslint/*` a TS y/o Meeko, y las `meeko/*` a los componentes. Los namespaces `perfectionist/*` y `unused-imports/*` requieren que su opción esté activa (`perfectionist` lo está por defecto) y se aplican a los lenguajes habilitados. Seleccionar una regla de un namespace desactivado produce un error; desactivar todos los lenguajes también produce un error. `typescript: false` permite incorporar tu propio preset TypeScript mientras mantienes Meeko.
 
 Los nombres y las opciones de reglas están tipados: una regla desconocida, un nivel inválido o `['error', { allow: true }]` en una regla Meeko sin opciones fallan al comprobar `eslint.config.ts`. Los tipos del núcleo vienen de la API pública de ESLint. Los tipos TypeScript-ESLint son un snapshot reproducible de los `meta.schema` públicos de la versión fijada, generado mediante `pnpm types:generate`. Representan la forma, claves y enums del esquema; límites numéricos, expresiones regulares y combinaciones semánticas se validan por ESLint en ejecución. Perfectionist publica tipos de opciones precisos desde su entrada pública y el helper los reutiliza directamente. Las opciones de unused-imports reutilizan el snapshot de `no-unused-vars`; las pruebas comprueban que ambos esquemas públicos siguen siendo idénticos. El generador no forma parte del código que carga el consumidor.
 
@@ -55,7 +55,7 @@ Configura plugins adicionales y sus reglas dentro de esos overrides, donde se co
 
 ## Ordenar y limpiar imports
 
-Los dos plugins vienen como dependencias del helper y se activan explícitamente:
+Los dos plugins vienen como dependencias del helper. Perfectionist se activa por defecto y unused-imports, con su opción:
 
 ```ts
 import { defineEslint } from '@meekojs/eslint-plugin'
@@ -77,20 +77,37 @@ export default defineEslint({
 })
 ```
 
-`perfectionist: true` activa únicamente `perfectionist/sort-imports` y `perfectionist/sort-named-imports`, como avisos (`warn`) en 1.x, con `type: 'natural'` y `order: 'asc'`. El preset fija además `settings.perfectionist` con `{ type: 'natural', order: 'asc' }`, de modo que otras reglas `perfectionist/*` que añadas heredan el mismo orden. No activa el preset completo ni ordena arrays, objetos o clases. En declaraciones de import se fija `sortSideEffects: false` y se desactiva la detección experimental de dependencias. No se activa resolución de tsconfig. Los imports de efectos secundarios sin bindings se conservan en su orden; los imports con bindings sí pueden cambiar de posición por el orden elegido. Para personalizar un orden utiliza las opciones públicas de las reglas: como en Flat Config, sustituir una regla sustituye sus opciones, no las combina en profundidad.
+`perfectionist: true`, que es el valor por defecto, activa el conjunto completo `recommended-natural` que publica Perfectionist, sin copiar su lista: imports, exports, objetos, clases, módulos, interfaces, tipos, uniones e intersecciones, enums, `switch`, `Set`, `Map`, `includes`, variables, decoradores, cláusulas `implements` y atributos de import. Todas sus reglas emiten `warn`, con `type: 'natural'` y `order: 'asc'`, y se aplican a `.js`, `.ts` y al `<script>` de un `.meeko`, incluidas las expresiones de su plantilla. En un `<script server>` no avisan `sort-modules`, `sort-exports` y `sort-named-exports`, porque el parser convierte ese bloque en un ámbito de función y sus exports no forman parte del árbol; las demás sí. `sort-jsx-props` sólo tiene efecto en `.tsx`, porque una plantilla Meeko no es JSX. `sort-arrays` y `sort-constructor-parameters` no forman parte del conjunto, porque Perfectionist les exige `useConfigurationIf` para decir a qué aplican; si las activas con esa opción, `settings.perfectionist` les da el mismo orden. En declaraciones de import se fija `sortSideEffects: false` y se desactiva la detección experimental de dependencias. No se activa resolución de tsconfig. Los imports de efectos secundarios sin bindings se conservan en su orden; los imports con bindings sí pueden cambiar de posición por el orden elegido. Para personalizar un orden utiliza las opciones públicas de las reglas: como en Flat Config, sustituir una regla sustituye sus opciones, no las combina en profundidad.
 
-Para desactivar el ordenamiento usa `defineEslint({ perfectionist: false })`. Para exigirlo como error antes de 2.0, sobrescribe sólo la severidad; así se conservan las opciones naturales del preset:
+Para desactivar todo el ordenamiento usa `defineEslint({ perfectionist: false })`. Para apagar una regla concreta, ponla a `off` en `rules` o en un override; para eximir un solo caso en un script, usa un comentario `// eslint-disable-next-line perfectionist/sort-objects`, que una plantilla no admite. `sort-imports` y `sort-named-imports` pasarán a `error` en 2.0; para exigirlas antes, sobrescribe sólo la severidad, y así se conservan las opciones naturales del preset:
 
 ```ts
 export default defineEslint({
 	rules: {
+		'perfectionist/sort-objects': 'off',
 		'perfectionist/sort-imports': 'error',
 		'perfectionist/sort-named-imports': 'error',
 	},
 })
 ```
 
-El monorepo mantiene `perfectionist: true` explícito y adopta el nivel `warn` de 1.x. Por ejemplo, el orden natural coloca `item2` antes que `item10`. `eslint --fix` corrige estos avisos; una ejecución con `--max-warnings 0` también falla si quedan avisos.
+**Revisa el diff de `--fix`.** Ordenar es seguro cuando el orden no se observa, y estas reglas no pueden saber cuándo se observa. Respetan las dependencias directas (`a = this.z + 1`), los `case` que caen en el siguiente, `switch (true)`, los enums con valores implícitos y los límites de un spread, pero estos casos cambian de comportamiento al corregirlos:
+
+| Regla                                                                   | Antes del arreglo                                                                                                                                | Después del arreglo                                                                                                                         |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sort-objects`                                                          | `Object.keys({ z: 1, a: 2 })` da `z, a`, y un `each:of` pinta en ese orden                                                                       | Da `a, z`, y `JSON.stringify` también cambia                                                                                                |
+| `sort-objects`                                                          | `{ z: next(), a: next() }` evalúa `z` primero                                                                                                    | Evalúa `a` primero; pasa lo mismo con claves calculadas y con valores por defecto al desestructurar                                         |
+| `sort-objects`                                                          | `{ [key]: 'calculada', a: 'literal' }`, con `key === 'a'`, se queda con `'literal'`                                                              | Se queda con `'calculada'`                                                                                                                  |
+| `sort-maps`, `sort-sets`                                                | La iteración sigue el orden escrito: una tabla `new Map([['/z/x', 1], ['/a', 2], ['/z', 3]])` que busca la primera coincidencia encuentra `/z/x` | Encuentra `/z`                                                                                                                              |
+| `sort-classes`                                                          | `class K { z = 1; a = this.calc(); calc() { return this.z + 1 } }` da `a === 2`: la dependencia pasa por un método                               | Da `NaN`; los campos con efectos también cambian de orden                                                                                   |
+| `sort-modules`                                                          | `class Z {}`, `function getZ() { return Z }`, `class A { static v = getZ() }` funciona                                                           | Lanza `ReferenceError`, porque `A` se evalúa antes que `Z`; los decoradores de registro y los `static` con efectos también cambian de orden |
+| `sort-exports`                                                          | `export { z } from './z'` evalúa `./z` antes que `./a`                                                                                           | Evalúa `./a` primero                                                                                                                        |
+| `sort-decorators`                                                       | `@z @a class K {}` aplica `a` y después `z`                                                                                                      | Aplica `z` y después `a`                                                                                                                    |
+| `sort-variable-declarations`, `sort-array-includes`, `sort-switch-case` | `let z = next(), a = next()` evalúa `z` primero; igual los elementos de un array y los `case` con llamadas                                       | Evalúa `a` primero                                                                                                                          |
+
+Sólo cambian tipos, sin efecto en ejecución, `sort-interfaces`, `sort-object-types`, `sort-union-types`, `sort-intersection-types` y `sort-heritage-clauses`. Si un orden importa, exímelo con el comentario o apaga la regla.
+
+El monorepo mantiene `perfectionist: true` explícito, exige como `error` las dos reglas de imports y apaga el resto del conjunto en `rules`: activarlo daba 21766 avisos, y cada regla necesita su propia revisión antes de un arreglo. Por ejemplo, el orden natural coloca `item2` antes que `item10`. `eslint --fix` corrige estos avisos; una ejecución con `--max-warnings 0` también falla si quedan avisos.
 
 `unusedImports: true` activa `unused-imports/no-unused-imports: 'error'` y `unused-imports/no-unused-vars: 'error'`. La segunda permite variables y argumentos con prefijo `_`. Los avisos originales `no-unused-vars` y `@typescript-eslint/no-unused-vars` quedan desactivados para evitar duplicados. Reactivarlos en `options.rules` produce un error explícito que indica usar `unused-imports/no-unused-vars`; los overrides finales siguen conservando el control normal de Flat Config.
 
@@ -216,7 +233,7 @@ La infraestructura sintética sólo se usa para construir ámbitos. No se ejecut
 
 - Es análisis sintáctico. `parserOptions.project`, `projectService` y `programs` se rechazan explícitamente; usa `meeko check` para tipos, props, modelos, rutas y errores del compilador.
 - No sustituye a Prettier ni implementa un AST de formato HTML/CSS. Las reglas de formato diseñadas para un archivo JavaScript completo pueden asumir delimitadores que una plantilla no tiene; usa el plugin Prettier de Meeko para el formato.
-- No promete compatibilidad con cualquier regla de terceros que suponga un AST exclusivamente JavaScript. Las reglas propias, `no-unused-vars`, `prefer-const`, `no-unneeded-ternary`, `consistent-type-imports`, los dos ordenamientos de imports de Perfectionist y las dos reglas de unused-imports tienen pruebas específicas. Las demás reglas Perfectionist tienen opciones tipadas y se pueden configurar explícitamente, pero no forman parte de los defaults ni de esta matriz de validación.
+- No promete compatibilidad con cualquier regla de terceros que suponga un AST exclusivamente JavaScript. Las reglas propias, `no-unused-vars`, `prefer-const`, `no-unneeded-ternary`, `consistent-type-imports`, el conjunto `recommended-natural` de Perfectionist y las dos reglas de unused-imports tienen pruebas específicas. `sort-arrays` y `sort-constructor-parameters` tienen opciones tipadas y se pueden configurar explícitamente, pero no forman parte de los defaults ni de esta matriz de validación.
 - Los exports por defecto y reexports del bloque servidor se rechazan con un error de parsing explícito. Los exports de declaraciones nombradas y listas de nombres locales están cubiertos.
 - Las comprobaciones de accesibilidad son parciales: `no-autofocus` cubre atributos estáticos en HTML y omite componentes y custom elements. No equivale a una auditoría completa de accesibilidad.
 - Antes de publicar, la versión mínima del peer Meeko debe ser la primera versión publicada que incluya `@meekojs/meeko/parse`. Esta entrega se valida con el workspace actual.

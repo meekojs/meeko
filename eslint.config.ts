@@ -17,6 +17,28 @@ export default defineEslint(
 			// errors (the 2.0 default).
 			'perfectionist/sort-imports': 'error',
 			'perfectionist/sort-named-imports': 'error',
+			// The rest of the preset is not adopted here: 21766 warnings when it was enabled, and reordering
+			// objects, classes or modules can change behaviour, so each rule needs its own review before a fix.
+			'perfectionist/sort-array-includes': 'off',
+			'perfectionist/sort-classes': 'off',
+			'perfectionist/sort-decorators': 'off',
+			'perfectionist/sort-enums': 'off',
+			'perfectionist/sort-export-attributes': 'off',
+			'perfectionist/sort-exports': 'off',
+			'perfectionist/sort-heritage-clauses': 'off',
+			'perfectionist/sort-import-attributes': 'off',
+			'perfectionist/sort-interfaces': 'off',
+			'perfectionist/sort-intersection-types': 'off',
+			'perfectionist/sort-jsx-props': 'off',
+			'perfectionist/sort-maps': 'off',
+			'perfectionist/sort-modules': 'off',
+			'perfectionist/sort-named-exports': 'off',
+			'perfectionist/sort-object-types': 'off',
+			'perfectionist/sort-objects': 'off',
+			'perfectionist/sort-sets': 'off',
+			'perfectionist/sort-switch-case': 'off',
+			'perfectionist/sort-union-types': 'off',
+			'perfectionist/sort-variable-declarations': 'off',
 			'@typescript-eslint/consistent-type-imports': ['error', { prefer: 'type-imports', fixStyle: 'separate-type-imports' }],
 		},
 		ignores: [

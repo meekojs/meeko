@@ -43,7 +43,19 @@ export interface DefineEslintOptions {
 	typescript?: boolean
 	/** Lint .meeko scripts and templates with their own parser. Default true. */
 	meeko?: boolean
-	/** Ordena imports y miembros nombrados con orden natural ascendente. Por defecto true; warn en 1.x, error en 2.0. */
+	/**
+	 * Activa el conjunto completo `recommended-natural` de Perfectionist (imports, exports, objetos, clases,
+	 * interfaces, tipos, enums, `switch`, etc.) en orden natural ascendente y con nivel `warn`. Por defecto `true`.
+	 *
+	 * `false` apaga todas sus reglas; para apagar sólo una, usa `rules`. `sort-imports` y `sort-named-imports`
+	 * pasarán a `error` en 2.0. `--fix` puede cambiar el comportamiento del código que depende del orden de
+	 * evaluación o de iteración: revisa el diff antes de aceptarlo.
+	 *
+	 * @example
+	 * ```ts
+	 * export default defineEslint({ rules: { 'perfectionist/sort-objects': 'off' } })
+	 * ```
+	 */
 	perfectionist?: boolean
 	/** Remove unused imports and report other unused variables once. Default false. */
 	unusedImports?: boolean
@@ -57,6 +69,13 @@ const javascriptFiles = ['**/*.{js,mjs,cjs}']
 const typeScriptFiles = ['**/*.{ts,tsx,mts,cts}']
 const meekoFiles = ['**/*.meeko']
 const defaults = ['**/node_modules/**', '**/dist/**', '**/.meeko/**', '**/*.d.meeko.ts', '**/*.generated.ts']
+
+/** The published natural preset, at warn level, so that a new Perfectionist rule arrives with its version. */
+function naturalSortRules(): Linter.RulesRecord {
+	const rules: Linter.RulesRecord = {}
+	for (const [name, entry] of Object.entries(perfectionist.configs['recommended-natural'].rules ?? {})) rules[name] = Array.isArray(entry) ? ['warn', ...entry.slice(1)] : 'warn'
+	return rules
+}
 
 /**
  * Create a standard Flat Config array. No config files are generated and no project is loaded.
@@ -90,11 +109,12 @@ export function defineEslint<const Rules extends DefineEslintRules = DefineEslin
 			name: 'meeko/perfectionist',
 			files,
 			plugins: { perfectionist },
-			// Shared defaults for any other perfectionist/* rule the user enables in options.rules or an override.
+			// Shared defaults for the rules outside the preset (sort-arrays, sort-constructor-parameters) that the
+			// user enables in options.rules or an override.
 			settings: { perfectionist: { type: 'natural', order: 'asc' } },
 			rules: {
+				...naturalSortRules(),
 				'perfectionist/sort-imports': ['warn', { type: 'natural', order: 'asc', sortSideEffects: false, useExperimentalDependencyDetection: false }],
-				'perfectionist/sort-named-imports': ['warn', { type: 'natural', order: 'asc' }],
 			},
 		})
 	if (options.unusedImports)

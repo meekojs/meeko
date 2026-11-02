@@ -1,5 +1,5 @@
 ---
-source-hash: 8d4a697a33433195568f5327a972385d8e9a1859438b7118a6fd64f05d3eb825
+source-hash: 77e33043d6f9a6d2fbef5f5a7674bf6463284f03f4aabc1a56d940519fc544cc
 ---
 
 # Workspace packages
@@ -47,4 +47,4 @@ export default defineEslint({
 
 The helper includes the JavaScript, TypeScript and Meeko base configurations. Install `eslint`, `jiti` and `@meekojs/eslint-plugin` as development dependencies; `jiti` lets ESLint load the TypeScript configuration. The plugin includes `@eslint/js` and the TypeScript 6 API required by TypeScript-ESLint. The application can continue to be checked with TypeScript 7.
 
-`perfectionist` and `unusedImports` are additional options, disabled by default. The demo enables them to sort imports and detect unused imports. Their dependencies are included in the plugin; consumers do not need to import them in their configuration.
+`perfectionist` is enabled by default and sorts imports, objects, classes, types and more in natural order, with warnings; `unusedImports` is optional and disabled by default. The demo declares them to sort and detect unused imports. Their dependencies are included in the plugin; consumers do not need to import them in their configuration.

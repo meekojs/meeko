@@ -43,4 +43,4 @@ export default defineEslint({
 
 El helper incluye las bases de JavaScript, TypeScript y Meeko. Instala `eslint`, `jiti` y `@meekojs/eslint-plugin` como dependencias de desarrollo; `jiti` permite que ESLint cargue la configuración TypeScript. El plugin incluye `@eslint/js` y la API TypeScript 6 que necesita TypeScript-ESLint. La aplicación puede seguir comprobándose con TypeScript 7.
 
-`perfectionist` y `unusedImports` son opciones adicionales, desactivadas por defecto. La demo las activa para ordenar imports y detectar imports sin usar. Sus dependencias se incluyen en el plugin; el consumidor no necesita importarlas en su configuración.
+`perfectionist` está activa por defecto y ordena imports, objetos, clases, tipos y demás en orden natural, con avisos; `unusedImports` es opcional y está desactivada por defecto. La demo las declara para ordenar y detectar imports sin usar. Sus dependencias se incluyen en el plugin; el consumidor no necesita importarlas en su configuración.

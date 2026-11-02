@@ -1,5 +1,5 @@
 ---
-source-hash: a89f47361bd57afc3cd3b008b49385ad5fe072dac7e6478284c4cfc72345f842
+source-hash: d56d9c25ee3952b60513e9495f4f9cd04f8fa3b11296a17536227a68c3216fa3
 ---
 
 # Upgrade from 1.7 to 1.8
@@ -181,8 +181,8 @@ A component package published before `1.8` keeps working without republishing it
 - **Component `<style>` order.** SSR and prerendering write them at the end of `<head>`, after `app/styles/main.css`, module stylesheets and `document`'s `head`, as the client does on hydration. Previously they came first, and a global rule with the same specificity as a scoped rule won until JavaScript loaded. If a `main.css` rule was meant to override a component's, increase its specificity: after hydration, the component's already won.
 - **`<input>` or another `<select>` inside a `<select>`.** It is now `MEEK008`. It used to compile to an empty `<select>` followed by its loose options, which is what the browser does with that HTML. Move that tag out of the `<select>`.
 
-## ESLint: natural import ordering by default
+## ESLint: natural order by default
 
-When updating `@meekojs/eslint-plugin`, `defineEslint()` enables `perfectionist/sort-imports` and `perfectionist/sort-named-imports` with ascending natural order (`item2` before `item10`). You may see new unsorted-import warnings; in Meeko 1.x they are `warn` and in 2.0 they become `error`. `eslint --fix` resolves them. If your CI uses `--max-warnings 0`, these warnings also fail its execution.
+When updating `@meekojs/eslint-plugin`, `defineEslint()` enables Perfectionist's complete `recommended-natural` set with ascending natural order (`item2` before `item10`): imports, exports, objects, classes, modules, interfaces, types, enums, `switch`, `Set`, `Map` and more, also in the `<script>` of a `.meeko`. You may see many new warnings; in Meeko 1.x they are `warn`, and `perfectionist/sort-imports` and `perfectionist/sort-named-imports` become `error` in 2.0. `eslint --fix` resolves them, but it also reorders where the order is observable, such as `Object.keys`, a `Map` or the fields of a class with side effects: review the diff before accepting it. If your CI uses `--max-warnings 0`, these warnings also fail its execution.
 
-To disable them, use `defineEslint({ perfectionist: false })`. To require them as errors, use `defineEslint({ rules: { 'perfectionist/sort-imports': 'error', 'perfectionist/sort-named-imports': 'error' } })`; the severity override preserves natural order. `perfectionist/*` rules no longer require declaring `perfectionist: true`, but are still rejected if you explicitly disable it. Consult the [plugin options](../../packages/eslint-plugin/README.md#ordenar-y-limpiar-imports).
+To disable them all, use `defineEslint({ perfectionist: false })`. To turn off one rule, use `defineEslint({ rules: { 'perfectionist/sort-objects': 'off' } })`. To require imports as errors, use `defineEslint({ rules: { 'perfectionist/sort-imports': 'error', 'perfectionist/sort-named-imports': 'error' } })`; the severity override preserves natural order. `perfectionist/*` rules no longer require declaring `perfectionist: true`, but are still rejected if you explicitly disable it. Consult the [plugin options](../../packages/eslint-plugin/README.md#ordenar-y-limpiar-imports).
