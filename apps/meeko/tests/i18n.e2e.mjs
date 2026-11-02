@@ -170,6 +170,7 @@ test('the English site: language, hreflang, interface, selector, links, fallback
 			assert.deepEqual(found, [], `Spanish interface text in ${path}`)
 			assert.equal(await page.getAttribute('html', 'lang'), 'en', path)
 		}
+		assert.equal(await page.title(), 'This page does not exist · Meeko', 'the title of the error page, the last one of the list')
 
 		// The cards of the documentation index open their guide in the language of the index, with or
 		// without JavaScript: every link answers, and a click reaches the page of the catalog.

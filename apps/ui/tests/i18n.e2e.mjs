@@ -128,6 +128,7 @@ test('the English UI documentation has an English interface, hreflang, a switche
 	assert.equal(missing.status(), 404)
 	assert.equal(await page.locator('html').getAttribute('lang'), 'en')
 	assert.equal(await page.getByRole('heading', { name: 'This page does not exist', level: 1 }).count(), 1)
+	assert.equal(await page.title(), 'This page does not exist · Meeko UI')
 	assert.equal(await page.getByRole('link', { name: 'See components', exact: true }).getAttribute('href'), '/en/components')
 	// The components bring their own texts: English pages pass none of them, also in dynamic states.
 	await page.goto(origin + '/en/tables', { waitUntil: 'networkidle' })

@@ -12,6 +12,11 @@
 	const home = localePath(href('/'))
 	const guide = localePath(href('/docs/[slug]', { params: { slug: 'framework' } }))
 	const reference = localePath(href('/docs/reference'))
+
+	const title = computed(() => (props.status === 404 ? t('error.notFoundTitle') : t('error.failedTitle')))
+	const description = computed(() => (props.status === 404 ? t('error.notFoundDetail') : t('error.failedDetail', { message: props.message })))
+
+	useHead(() => ({ title: title.value + ' · Meeko', meta: [{ name: 'description', content: description.value }] }))
 </script>
 
 <template>
@@ -23,8 +28,8 @@
 			<div class="copy">
 				<UIPageHeader
 					layout="landing"
-					bind:title="props.status === 404 ? t('error.notFoundTitle') : t('error.failedTitle')"
-					bind:description="props.status === 404 ? t('error.notFoundDetail') : t('error.failedDetail', { message: props.message })"
+					bind:title="title.value"
+					bind:description="description.value"
 				/>
 				<UIProse>
 					<p>

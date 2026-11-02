@@ -196,6 +196,7 @@ ${server.logs().slice(-2000)}`,
 	assert.equal((await fetch(`${origin}/es/sources`, { headers: { cookie: headers.cookie }, redirect: 'manual' })).status, 404)
 	await page.goto(`${origin}/en/nope`, { waitUntil: 'networkidle' })
 	await page.getByRole('heading', { level: 1, name: 'This page does not exist' }).waitFor({ timeout: 30_000 })
+	assert.equal(await page.title(), 'This page does not exist · Meeko Dashboard')
 	assert.equal(await page.getAttribute('html', 'lang'), 'en')
 
 	// The language switch keeps the page and its query --------------------------------------------

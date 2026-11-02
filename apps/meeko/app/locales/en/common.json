@@ -41,9 +41,9 @@
 		"copyFailed": "Error"
 	},
 	"error": {
-		"notFoundTitle": "This page does not exist.",
+		"notFoundTitle": "This page does not exist",
 		"notFoundDetail": "The link may be old, or the page may have been renamed.",
-		"failedTitle": "Something went wrong.",
+		"failedTitle": "Something went wrong",
 		"failedDetail": "The page could not be shown ({message}).",
 		"hint": "Search the documentation with <kbd>/</kbd> or go back to a familiar place.",
 		"home": "Back to home",

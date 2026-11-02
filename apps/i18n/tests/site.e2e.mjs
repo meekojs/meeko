@@ -172,6 +172,7 @@ test('production i18n documentation renders guides, translates, switches locale 
 	const missing = await page.goto(origin + '/fr/playground')
 	assert.equal(missing.status(), 404)
 	assert.equal(await page.getByRole('heading', { name: 'Esta página no existe', level: 1 }).count(), 1)
+	assert.equal(await page.title(), 'Esta página no existe · Meeko i18n')
 	await page.getByRole('link', { name: 'Ir a la instalación', exact: true }).click()
 	await page.getByRole('heading', { name: 'Instalación', level: 1 }).waitFor()
 	assert.deepEqual(errors, [])
@@ -265,6 +266,7 @@ test('the English site has an English interface, hreflang, a switcher, /en links
 	assert.equal(missing.status(), 404)
 	assert.equal(await page.locator('html').getAttribute('lang'), 'en')
 	assert.equal(await page.getByRole('heading', { name: 'This page does not exist', level: 1 }).count(), 1)
+	assert.equal(await page.title(), 'This page does not exist · Meeko i18n')
 	assert.equal(await page.getByRole('link', { name: 'Go to installation', exact: true }).getAttribute('href'), '/en/installation')
 	// Mobile: the switcher stays in the header without horizontal scroll.
 	await page.setViewportSize({ width: 360, height: 780 })
