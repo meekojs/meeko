@@ -1,0 +1,183 @@
+<script lang="ts">
+	import { examples } from '../utils/examples'
+</script>
+
+<template>
+	<DocsPage
+		title="Estructura de página"
+		description="Page, PageHeader, Header y Footer: el armazón de una web, con HTML nativo y un único main."
+	>
+		<h2 id="page">UIPage</h2>
+		<p>
+			Pinta un único
+			<code>main</code>
+			enfocable y el enlace para saltar a él, y coloca
+			<code>sidebar</code>
+			y
+			<code>aside</code>
+			en columnas fijas al desplazarse. A 75rem oculta
+			<code>aside</code>
+			y a 54rem oculta
+			<code>sidebar</code>
+			y muestra
+			<code>bar</code>
+			, donde va el
+			<a href="/overlays">UIDrawer</a>
+			. Esta misma guía es su ejemplo: un
+			<code>UIPage</code>
+			no se puede anidar, porque una página sólo tiene un
+			<code>main</code>
+			.
+		</p>
+		<DocsCode bind:code="examples.page" />
+		<DocsApi
+			caption="Propiedades de UIPage"
+			bind:rows="[
+				{ name: 'layout', type: 'docs | dashboard | landing', default: 'docs', description: 'Reparto de las columnas.' },
+				{ name: 'mainId', type: 'string', default: 'contenido', description: 'id del main, destino del enlace de salto.' },
+				{ name: 'mainLang', type: 'string', description: 'lang del main, si su contenido está en otro idioma.' },
+				{ name: 'skipLabel', type: 'string', description: 'Texto del enlace de salto. El valor por defecto sigue el idioma del documento.' },
+				{ name: 'class / lang / dir', type: 'atributos HTML', description: 'Llegan a la raíz.' },
+			]"
+		/>
+		<p>
+			Sus snippets son
+			<code>default</code>
+			,
+			<code>header</code>
+			,
+			<code>notices</code>
+			,
+			<code>bar</code>
+			,
+			<code>sidebar</code>
+			,
+			<code>aside</code>
+			y
+			<code>footer</code>
+			.
+			<code>notices</code>
+			va bajo la cabecera, con el ancho de la página, y no ocupa sitio si su contenido no pinta nada.
+		</p>
+		<h2 id="page-header">UIPageHeader</h2>
+		<p>
+			El título de una página, con su descripción, sus migas y sus acciones. Es el único
+			<code>h1</code>
+			: el de esta guía es uno.
+		</p>
+		<DocsApi
+			caption="Propiedades de UIPageHeader"
+			bind:rows="[
+				{ name: 'title', type: 'string', description: 'Obligatoria. El h1.' },
+				{ name: 'description', type: 'string', description: 'Texto bajo el título.' },
+				{ name: 'layout', type: 'docs | dashboard | landing', default: 'docs', description: 'Tamaño del título.' },
+				{ name: 'class', type: 'string', description: 'Clases adicionales.' },
+			]"
+		/>
+		<p>
+			Admite los snippets
+			<code>breadcrumb</code>
+			,
+			<code>actions</code>
+			y
+			<code>default</code>
+			.
+		</p>
+		<h2 id="header">UIHeader y UIFooter</h2>
+		<p>
+			La cabecera tiene una altura fija,
+			<code>--ui-header-height</code>
+			. En pantallas estrechas sus enlaces pasan a un menú con
+			<code>popover</code>
+			, que flota y no mueve la página. Una imagen de
+			<code>brand</code>
+			declara
+			<code>width</code>
+			y
+			<code>height</code>
+			para reservar su espacio.
+		</p>
+		<div class="docs-grid">
+			<UIHeader
+				label="Cabecera de ejemplo"
+				menuLabel="Menú de ejemplo"
+				current="#header"
+				bind:sticky="false"
+				bind:brand="{ name: 'Meeko', href: '#header' }"
+				bind:items="[
+					{ label: 'Guía', href: '#header' },
+					{ label: 'API', href: '#page' },
+				]"
+			>
+				<snippet name="actions"><UIButton size="sm">Entrar</UIButton></snippet>
+			</UIHeader>
+			<UIFooter
+				label="Pie de ejemplo"
+				description="Componentes tipados para Meeko."
+				bind:brand="{ name: 'Meeko', href: '#header' }"
+				bind:groups="[
+					{ title: 'Producto', items: [{ label: 'Guía', href: '#header' }] },
+					{ title: 'Comunidad', items: [{ label: 'GitHub', href: 'https://github.com/meekojs/meeko' }] },
+				]"
+			/>
+		</div>
+		<DocsCode bind:code="examples.header" />
+		<DocsApi
+			caption="Propiedades de UIHeader"
+			bind:rows="[
+				{ name: 'brand', type: 'UIBrand', description: 'name, product, image y destino de la marca.' },
+				{ name: 'items', type: 'readonly UINavigationLink[]', description: 'Los enlaces: label y href o to.' },
+				{ name: 'current', type: 'string', description: 'El enlace actual, cuando van con href.' },
+				{ name: 'label / menuLabel', type: 'string', description: 'Nombre de la navegación y del botón del menú.' },
+				{ name: 'sticky', type: 'boolean', default: 'true', description: 'Fija la cabecera al desplazarse.' },
+				{ name: 'size', type: 'UIContainerSize', default: '2xl', description: 'Ancho máximo.' },
+				{ name: 'class', type: 'string', description: 'Clases adicionales.' },
+			]"
+		/>
+		<p>
+			Admite los snippets
+			<code>brand</code>
+			,
+			<code>nav</code>
+			,
+			<code>actions</code>
+			y
+			<code>menu</code>
+			.
+		</p>
+		<DocsApi
+			caption="Propiedades de UIFooter"
+			bind:rows="[
+				{ name: 'brand / description', type: 'UIBrand / string', description: 'La marca y su texto.' },
+				{ name: 'groups', type: 'readonly UIFooterGroup[]', description: 'Columnas de enlaces: title e items.' },
+				{ name: 'items', type: 'readonly UINavigationLink[]', description: 'Enlaces sueltos.' },
+				{ name: 'label', type: 'string', description: 'Nombre de la navegación.' },
+				{ name: 'size', type: 'UIContainerSize', default: '2xl', description: 'Ancho máximo.' },
+				{ name: 'class', type: 'string', description: 'Clases adicionales.' },
+			]"
+		/>
+		<p>
+			Admite los snippets
+			<code>brand</code>
+			,
+			<code>about</code>
+			,
+			<code>actions</code>
+			y
+			<code>legal</code>
+			. Los tipos
+			<code>UIPageProps</code>
+			,
+			<code>UIPageHeaderProps</code>
+			,
+			<code>UIHeaderProps</code>
+			,
+			<code>UIFooterProps</code>
+			y
+			<code>UIBrand</code>
+			se exportan desde
+			<code>@meekojs/ui/runtime</code>
+			.
+		</p>
+	</DocsPage>
+</template>

@@ -4,7 +4,7 @@
 	import { examples } from '../../utils/examples'
 
 	const sizes = ['sm', 'md', 'lg', 'xl', '2xl', '3xl', '4k', 'full'] as const
-	const size = signal<UIContainerSize>('xl')
+	const size = signal<UIContainerSize | null>('xl')
 </script>
 
 <template>
@@ -15,39 +15,37 @@
 	>
 		<h2 id="usage">A width for each kind of content</h2>
 		<p>Container takes the available width of its parent up to the chosen limit. It does not scale the typography or stretch the columns: it controls the space of the composition.</p>
-		<div class="container-controls">
-			<label for="container-size">Maximum width</label>
-			<select
+		<div class="docs-actions">
+			<UIField
 				id="container-size"
-				bind:value="size.value"
-				on:change="
-					(event) => {
-						const selected = sizes.find((value) => value === event.currentTarget.value)
-						if (selected) size.value = selected
-					}
-				"
+				label="Maximum width"
 			>
-				<option
-					each:of="sizes"
-					each:as="item"
-					each:key="item"
-					bind:value="item"
+				<snippet
+					name="default"
+					params="id, describedBy"
 				>
-					{item}
-				</option>
-			</select>
+					<UISelect
+						model="size"
+						bind:options="sizes"
+						bind:id="id"
+						bind:describedBy="describedBy"
+					/>
+				</snippet>
+			</UIField>
 		</div>
-		<div class="container-preview">
+		<div class="docs-grid">
 			<UIContainer
 				as="section"
 				ariaLabel="Container preview"
 				class="container-example"
-				bind:size="size.value"
+				bind:size="size.value ?? 'xl'"
 			>
-				<div class="container-content">
-					<strong>A space for your interface</strong>
-					<p>The container uses size={size.value} and gutter=md.</p>
-				</div>
+				<UICard
+					title="A space for your interface"
+					variant="soft"
+				>
+					<p>The container uses size={size.value ?? 'xl'} and gutter=md.</p>
+				</UICard>
 			</UIContainer>
 		</div>
 		<p>
@@ -87,7 +85,7 @@
 			when the parent already provides that space.
 		</p>
 		<DocsCode bind:code="examples.containerNested" />
-		<div class="doc-note">A 4K container does not make all the text 3840px wide. Combine a wide surface with smaller containers for reading, forms and details.</div>
+		<UIAlert tone="info">A 4K container does not make all the text 3840px wide. Combine a wide surface with smaller containers for reading, forms and details.</UIAlert>
 		<h2 id="api">API</h2>
 		<DocsApi
 			bind:rows="[
@@ -109,9 +107,9 @@
 		<h2 id="customize">Customization</h2>
 		<p>
 			Use a class to override
-			<code>--meeko-ui-container-max-width</code>
+			<code>--ui-container-max-width</code>
 			or
-			<code>--meeko-ui-container-gutter</code>
+			<code>--ui-container-gutter</code>
 			. The container does not hide overflowing content: tables and code blocks must manage their own scroll.
 		</p>
 		<DocsCode
@@ -120,36 +118,3 @@
 		/>
 	</DocsPage>
 </template>
-
-<style>
-	.container-controls {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: 0.75rem;
-		margin: 1.5rem 0;
-		font-size: 0.875rem;
-	}
-	.container-controls select {
-		border: 1px solid var(--ui-color-border-strong);
-		border-radius: var(--ui-radius-md);
-		background: var(--ui-color-surface);
-		padding: 0.6rem 0.8rem;
-		color: var(--ui-color-text);
-		font: inherit;
-	}
-	.container-preview {
-		border-block: 1px solid var(--ui-color-border);
-		padding-block: 2rem;
-	}
-	.container-example {
-		border-inline: 1px dashed var(--ui-color-primary);
-		background: var(--ui-color-primary-soft);
-	}
-	.container-content {
-		padding-block: 2rem;
-	}
-	.container-content p {
-		margin-bottom: 0;
-	}
-</style>

@@ -12,15 +12,14 @@ export const examples = {
   </UIContainer>
 </UIContainer>`,
 	containerCss: `.workspace {
-  --meeko-ui-container-max-width: 110rem;
-  --meeko-ui-container-gutter: clamp(1rem, 3vw, 5rem);
+  --ui-container-max-width: 110rem;
+  --ui-container-gutter: clamp(1rem, 3vw, 5rem);
 }`,
 	install: 'pnpm add @meekojs/ui',
 	config: `import { defineMeekoConfig } from '@meekojs/meeko/framework'
-import ui from '@meekojs/ui'
 
 export default defineMeekoConfig({
-  modules: [ui],
+  modules: ['@meekojs/ui'],
   theme: { default: 'dark' },
 })`,
 	button: `<script lang="ts">
@@ -159,9 +158,9 @@ export default defineMeekoConfig({
 <template>
   <UIPopover role="menu" placement="bottom-start" bind:offset="6">
     <snippet name="trigger">Acciones del proyecto</snippet>
-    <button role="menuitem" on:click="() => (action.value = 'renombrar')">Renombrar</button>
-    <button role="menuitem" on:click="() => (action.value = 'duplicar')">Duplicar</button>
-    <button role="menuitem" on:click="() => (action.value = 'archivar')">Archivar</button>
+    <UIButton variant="ghost" role="menuitem" on:click="() => (action.value = 'renombrar')">Renombrar</UIButton>
+    <UIButton variant="ghost" role="menuitem" on:click="() => (action.value = 'duplicar')">Duplicar</UIButton>
+    <UIButton variant="ghost" role="menuitem" on:click="() => (action.value = 'archivar')">Archivar</UIButton>
   </UIPopover>
 </template>`,
 	popoverDialog: `<script lang="ts">
@@ -171,14 +170,14 @@ export default defineMeekoConfig({
 <template>
   <UIPopover role="dialog" label="Filtrar proyectos" model="opened">
     <snippet name="trigger">Filtrar</snippet>
-    <label><input type="checkbox"> Publicados</label>
+    <UICheckbox label="Publicados" model="published" />
     <UIButton on:click="() => (opened.value = false)">Aplicar filtros</UIButton>
   </UIPopover>
 </template>`,
-	popoverTooltip: `<UIPopover mode="hint" placement="top" bind:delay="300">
+	popoverTooltip: `<UITooltip bind:offset="6">
   <snippet name="trigger">Estado: borrador</snippet>
   Sólo tu equipo puede verlo hasta que lo publiques.
-</UIPopover>`,
+</UITooltip>`,
 	popoverAnchor: `<UIPopover role="menu">
   <snippet name="anchor" params="trigger">
     <button type="button" class="avatar" bind="trigger">
@@ -190,7 +189,7 @@ export default defineMeekoConfig({
 </UIPopover>`,
 	themeToggle: `// meeko.config.ts
 export default defineMeekoConfig({
-  modules: [ui],
+  modules: ['@meekojs/ui'],
   theme: { default: 'dark' },
 })
 
@@ -253,18 +252,17 @@ async function confirm() {
   </UIApp>
 </template>`,
 	theme: `import { defineMeekoConfig } from '@meekojs/meeko/framework'
-import ui from '@meekojs/ui'
 
 export default defineMeekoConfig({
-  modules: [ui],
+  modules: ['@meekojs/ui'],
   theme: { default: 'dark' },
   ui: {
+    // Cada clave asigna tokens --ui-*; una referencia var() sigue los temas de tu web.
     tokens: {
       primary: 'var(--brand-action)',
       primaryHover: 'var(--brand-action-hover)',
       onPrimary: 'var(--brand-on-action)',
-      accent: 'var(--brand-accent)',
-      focus: 'var(--brand-accent)',
+      focus: 'var(--brand-focus)',
       surface: 'var(--brand-surface)',
       text: 'var(--brand-text)',
       border: 'var(--brand-border)',
@@ -298,30 +296,178 @@ export default defineMeekoConfig({
     },
   },
 })`,
-	themeCss: `/* app/styles/main.css */
+	themeCss: `/* app/styles/main.css: tu marca, sobre los pasos de cada escala */
 :root {
-  --brand-action: #eef0f3;
-  --brand-action-hover: #ffffff;
-  --brand-on-action: #0a0b0d;
-  --brand-accent: #8fb4ff;
-  --brand-surface: #101115;
-  --brand-text: #eef0f3;
-  --brand-border: rgb(255 255 255 / 0.14);
+  --ui-color-primary-9: #0a7cff;
+  --ui-color-primary-10: #0067d6;
+  --ui-radius-md: 0.5rem;
 }
-:root[data-theme='light'] {
-  --brand-action: #0d0e10;
-  --brand-action-hover: #26292f;
-  --brand-on-action: #fbfbfc;
-  --brand-accent: #2f63d6;
-  --brand-surface: #f4f5f7;
-  --brand-text: #0d0e10;
-  --brand-border: rgb(0 0 0 / 0.14);
+:root[data-theme='dark'] {
+  --ui-color-primary-9: #3b96ff;
+  --ui-color-primary-10: #66adff;
 }`,
+	themeUse: `.release-note {
+  border: var(--ui-border-width) solid var(--ui-color-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-color-surface);
+  padding: var(--ui-space-4);
+  color: var(--ui-color-text-soft);
+  font-size: var(--ui-font-size-md);
+}`,
+	buttonStates: `<UIButton tone="danger">Eliminar</UIButton>
+<UIButton tone="danger" variant="outline">Revocar</UIButton>
+<UIButton bind:loading="saving.value">Guardar</UIButton>
+<UIButton iconOnly ariaLabel="Eliminar" variant="outline">
+  <UIIcon name="lucide:trash-2" />
+</UIButton>`,
+	textarea: `<UIField id="comment" label="Comentario" bind:counter="comment.value.length + '/200'">
+  <snippet name="default" params="id, describedBy">
+    <UITextarea model="comment" bind:id="id" bind:describedBy="describedBy"
+      name="comment" bind:rows="4" bind:maxlength="200" />
+  </snippet>
+</UIField>`,
+	checkbox: `<UICheckbox model="accepted" label="Acepto las condiciones"
+  description="Puedes retirarlo más tarde." name="accepted" value="yes" required />
+<UISwitch model="notifications" label="Notificaciones" name="notifications" />`,
+	radio: `<script lang="ts">
+  const period = signal('week')
+  const periods = [
+    { value: 'day', label: 'Día' },
+    { value: 'week', label: 'Semana' },
+    { value: 'year', label: 'Año', disabled: true },
+  ]
+</script>
+
+<template>
+  <UIRadioGroup model="period" legend="Periodo" name="period" bind:options="periods" />
+  <UIRadioGroup model="period" legend="Periodo" variant="segmented" bind:options="periods" />
+</template>`,
+	slider: `<UISlider model="volume" label="Volumen" name="volume" bind:min="0" bind:max="100" bind:step="5" />`,
+	alert: `<UIAlert tone="success" title="Cambios guardados" description="Ya están publicados." />
+<UIAlert tone="danger" title="No se pudo publicar" dismiss on:dismiss="clear">
+  <p>La base de datos no responde.</p>
+  <snippet name="actions"><UIButton size="sm" on:click="retry">Reintentar</UIButton></snippet>
+</UIAlert>`,
+	toast: `<script lang="ts">
+  const toast = useToast()
+</script>
+
+<template>
+  <UIButton on:click="() => toast.add({ text: 'Cambios guardados', tone: 'success', duration: 5000 })">
+    Guardar
+  </UIButton>
+</template>`,
+	empty: `<UIEmpty variant="panel" title="Sin proyectos" description="Crea el primero para empezar.">
+  <snippet name="actions"><UIButton>Crear proyecto</UIButton></snippet>
+</UIEmpty>
+<UISkeleton bind:lines="3" bind:widths="['full', 'long', 'short']" />`,
+	stat: `<UIStat label="Visitas" bind:value="1280" detail="Últimos 7 días" />
+<UIDescriptionList bind:columns="2" bind:items="[
+  { label: 'Estado', value: 'Publicado', detail: 'Hoy' },
+  { label: 'Autor', value: 'Equipo Meeko' },
+]" />
+<UIDisclosure summary="Detalles técnicos"><p>Se abre sin JavaScript.</p></UIDisclosure>`,
+	diff: `<UIDiff label="Cambios en la guía" bind:diff="patch" />`,
+	diffSample: `--- a/guide.md
++++ b/guide.md
+@@ -1,3 +1,3 @@
+ # Guía
+-Instala con npm.
++Instala con pnpm.
+ Después, registra el módulo.`,
+	codeBlock: `<UICodeBlock label="Terminal" code="pnpm add @meekojs/ui" />
+<UICodeBlock verdict="good" verdictLabel="Bien" lang="ts" bind:code="good" />
+<UICodeBlock mode="log" label="Registro" bind:code="log" />
+<UIProse as="article" bind:html="doc.html" />`,
+	page: `<UIPage layout="docs">
+  <snippet name="header">
+    <UIHeader bind:brand="brand" bind:items="items">
+      <snippet name="actions"><UIThemeToggle /></snippet>
+    </UIHeader>
+  </snippet>
+  <snippet name="bar">
+    <UIDrawer title="Contenidos" triggerLabel="Contenidos">
+      <UINavigationTree bind:groups="groups" />
+    </UIDrawer>
+  </snippet>
+  <snippet name="sidebar"><UINavigationTree bind:groups="groups" /></snippet>
+  <snippet name="aside"><UITableOfContents bind:entries="toc" /></snippet>
+  <UIPageHeader title="Instalación" description="Añade el paquete a tu aplicación." />
+  <UIProse as="article" bind:html="doc.html" />
+  <UIPageNavigation bind:next="{ label: 'Rutas', to: '/routes' }" />
+  <snippet name="footer"><UIFooter bind:brand="brand" /></snippet>
+</UIPage>`,
+	header: `<UIHeader bind:sticky="false" bind:brand="{ name: 'Meeko', href: '/' }"
+  bind:items="[{ label: 'Guía', href: '/guide' }, { label: 'API', href: '/api' }]" current="/guide">
+  <snippet name="actions"><UIButton size="sm">Entrar</UIButton></snippet>
+</UIHeader>
+<UIFooter bind:brand="{ name: 'Meeko', href: '/' }" description="Componentes tipados."
+  bind:groups="[{ title: 'Producto', items: [{ label: 'Guía', href: '/guide' }] }]" />`,
+	navigationTree: `<UINavigationTree label="Guía" current="/install" bind:groups="[
+  { title: 'Primeros pasos', items: [
+    { label: 'Instalación', href: '/install' },
+    { label: 'UIButton', href: '/buttons', code: true, featured: true },
+  ] },
+]" />`,
+	tabs: `<!-- Enlaces entre páginas -->
+<UINavigationTabs label="Secciones" current="/metrics"
+  bind:items="[{ label: 'Métricas', href: '/metrics' }, { label: 'Moderación', href: '/moderation' }]" />
+
+<!-- Paneles de una misma página -->
+<UITabs model="tab" label="Ajustes"
+  bind:items="[{ value: 'account', label: 'Cuenta' }, { value: 'team', label: 'Equipo' }]">
+  <snippet name="panel-account">Tu cuenta</snippet>
+  <snippet name="panel-team">Tu equipo</snippet>
+</UITabs>`,
+	pagers: `<UIBreadcrumb bind:items="[{ label: 'Inicio', href: '/' }, { label: 'Guías', href: '/guides' }, { label: 'Tablas' }]" />
+<UIPageNavigation bind:previous="{ label: 'Modal', to: '/modals' }" bind:next="{ label: 'Popover', to: '/popover' }" />
+<UIPagination bind:shown="rows.value.length" bind:total="total" bind:hasMore="more.value"
+  bind:busy="loading.value" on:loadMore="load" />`,
+	toc: `<UITableOfContents variant="collapsible"
+  bind:entries="[{ id: 'usage', text: 'Uso', level: 2 }, { id: 'api', text: 'API', level: 2 }]" />`,
+	locale: `<UILocaleSwitcher bind:items="[
+  { code: 'es', label: 'Español', href: '/guide', current: true },
+  { code: 'en', label: 'English', href: '/en/guide' },
+]" />
+<UILocaleSuggestion bind:items="items" suggested="en" on:stay="remember" />`,
+	drawer: `<UIDrawer title="Filtros" triggerLabel="Abrir filtros" side="end" model="open">
+  <UICheckbox model="drafts" label="Incluir borradores" />
+  <snippet name="footer"><UIButton on:click="() => (open.value = false)">Aplicar</UIButton></snippet>
+</UIDrawer>`,
+	tooltip: `<UITooltip text="Se publica al guardar" placement="top">
+  <snippet name="trigger">¿Cuándo se publica?</snippet>
+</UITooltip>`,
+	commandPalette: `<script lang="ts">
+  const query = signal('')
+  const pages = [{ title: 'Instalación', url: '/installation' }, { title: 'Temas', url: '/theming' }]
+  const results = computed(() => pages.filter((page) => page.title.toLowerCase().includes(query.value.toLowerCase())))
+</script>
+
+<template>
+  <UICommandPalette model:query="query" bind:results="results.value"
+    bind:status="results.value.length ? 'ready' : 'empty'" hrefBy="url" labelBy="title" />
+</template>`,
+	editorConfig: `// pnpm add @milkdown/crepe @milkdown/kit @codemirror/language @codemirror/view \\
+//   @codemirror/lang-javascript @codemirror/lang-html @codemirror/lang-css @codemirror/lang-json @lezer/highlight
+// meeko.config.ts
+export default defineMeekoConfig({
+  modules: ['@meekojs/ui', '@meekojs/ui/editor'],
+})`,
+	editor: `<script lang="ts">
+  const markdown = signal('# Título')
+  const mode = signal<'visual' | 'code'>('visual')
+</script>
+
+<template>
+  <UIMarkdownEditor label="Contenido" model="markdown" model:mode="mode" />
+</template>`,
+	combobox: `<UICombobox id="topics" model="chosen" bind:options="topics"
+  name="topics" multiple searchable bind:max="2" placeholder="Busca un tema" />`,
 	transitions: `// meeko.config.ts
 export default defineMeekoConfig({ viewTransitions: true })
 
-/* app/styles/main.css: un único elemento por nombre y vista */
-.project-card { view-transition-name: project; }
+/* app/styles/main.css: el nombre, sólo durante la navegación, y un único elemento por vista */
+html:active-view-transition-type(meeko-route) .project-card { view-transition-name: project; }
 
 <!-- Enlace con navegación normal si prefieres omitir la transición -->
 <MeekoLink to="/transitions/project"

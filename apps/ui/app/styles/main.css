@@ -1,50 +1,11 @@
-
-.view-transition-demo {
-	margin: auto;
-	padding: 0;
-	max-width: none;
-}
-.view-transition-demo h1 {
-	margin: 2rem 0 1rem;
-	font-size: clamp(2rem, 5vw, 3.5rem);
-	line-height: 1.1;
-}
-.view-transition-demo > p {
-	max-width: 65ch;
-	color: var(--meeko-ui-muted);
-	line-height: 1.6;
-}
-.view-transition-demo-list {
-	margin: 2rem 0;
-	max-width: 26rem;
-}
-.view-transition-demo-project {
+/*
+ * The only thing this site adds to UI: the choreography of the /transitions demo, an effect. The name
+ * exists only during a navigation, so that no other transition of the page repeats it.
+ */
+html:active-view-transition-type(meeko-route) .view-transition-demo-project {
 	view-transition-name: ui-demo-project;
 }
-.view-transition-demo-details {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 2rem;
-	margin: 2rem 0 0;
-}
-.view-transition-demo-details dt {
-	color: var(--meeko-ui-muted);
-	font-size: 0.875rem;
-}
-.view-transition-demo-details dd {
-	margin: 0.25rem 0 0;
-	font-weight: 600;
-}
 ::view-transition-group(ui-demo-project) {
-	animation-duration: 320ms;
-	animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
-}
-::view-transition-old(root),
-::view-transition-new(root) {
-	animation-duration: 180ms;
-}
-@media (prefers-reduced-motion: reduce) {
-	::view-transition-group(*) {
-		animation-duration: 0s;
-	}
+	animation-duration: var(--ui-duration-slow);
+	animation-timing-function: var(--ui-ease-out);
 }

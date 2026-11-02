@@ -39,79 +39,82 @@
 <template>
 	<DocsPage
 		title="Select"
-		description="Elige una o varias opciones tipadas con teclado, ratón y búsqueda, y envíalas con un formulario."
+		description="Elige una opción con el select nativo o, para buscar o elegir varias, con UICombobox."
 	>
 		<p>
 			<code>UISelect</code>
-			es un combobox accesible sobre
-			<a href="/popover">UIPopover</a>
-			. El foco permanece en el disparador mientras
-			<code>aria-activedescendant</code>
-			recorre la lista. El tipo del modelo se infiere de
+			es un
+			<code>select</code>
+			nativo con
+			<code>appearance: base-select</code>
+			: el navegador trae la lista, el teclado y el valor de formulario, y UI la pinta con sus tokens.
+			<code>UICombobox</code>
+			cubre lo que el nativo no puede: buscar, filtrar en un servidor y elegir varias opciones. El tipo del modelo se infiere de
 			<code>options</code>
-			y de
-			<code>multiple</code>
 			.
 		</p>
 		<h2 id="usage">Una opción en un formulario</h2>
 		<p>
 			Con
 			<code>name</code>
-			, el componente añade un
-			<code>input</code>
-			oculto por valor, así que un formulario nativo lo envía sin código adicional. Abre la lista con las flechas,
+			, el valor se envía con un formulario nativo sin código adicional. Abre la lista con
 			<code>Intro</code>
-			o un clic; escribe una letra para saltar a la opción que empieza por ella.
+			,
+			<code>Espacio</code>
+			o un clic y escribe una letra para saltar a la opción que empieza por ella: es el teclado del navegador.
 		</p>
-		<div class="preview">
+		<DocsPreview>
 			<form
 				id="select-form"
-				class="form-example"
+				class="docs-stack"
 				on:submit="send"
 			>
-				<div class="select-field">
-					<label for="plan">Plan</label>
-					<UISelect
-						id="plan"
-						name="plan"
-						placeholder="Elige un plan"
-						required
-						model="plan"
-						bind:options="plans"
-						bind:describedBy="planError.value ? 'plan-error' : undefined"
-						bind:invalid="Boolean(planError.value)"
-						on:change="validate"
-					/>
-					<p
-						if:when="planError.value"
-						id="plan-error"
-						class="select-error"
-						role="alert"
+				<UIField
+					id="plan"
+					label="Plan"
+					required
+					bind:error="planError.value"
+				>
+					<snippet
+						name="default"
+						params="id, describedBy"
 					>
-						{planError.value}
-					</p>
-				</div>
-				<div class="select-field">
-					<label for="topics">Temas</label>
-					<UICombobox
-						id="topics"
-						name="topics"
-						multiple
-						searchable
-						placeholder="Busca un tema"
-						describedBy="topics-help"
-						model="chosen"
-						bind:options="topics"
-						bind:max="2"
-					/>
-					<p
-						id="topics-help"
-						class="select-help"
+						<UISelect
+							name="plan"
+							placeholder="Elige un plan"
+							required
+							model="plan"
+							bind:options="plans"
+							bind:id="id"
+							bind:describedBy="describedBy"
+							bind:invalid="Boolean(planError.value)"
+							on:change="validate"
+						/>
+					</snippet>
+				</UIField>
+				<UIField
+					id="topics"
+					label="Temas"
+					description="Hasta dos temas. La búsqueda ignora acentos y mayúsculas."
+				>
+					<snippet
+						name="default"
+						params="id, describedBy"
 					>
-						Hasta dos temas. La búsqueda ignora acentos y mayúsculas.
-					</p>
-				</div>
-				<div class="example-actions">
+						<UICombobox
+							name="topics"
+							multiple
+							searchable
+							placeholder="Busca un tema"
+							model="chosen"
+							bind:options="topics"
+							bind:max="2"
+							bind:id="id"
+							bind:describedBy="describedBy"
+						/>
+					</snippet>
+				</UIField>
+				<div class="docs-actions">
 					<UIButton
 						type="submit"
 						on:click="validate"
@@ -121,39 +124,42 @@
 				</div>
 				<p
 					id="select-sent"
-					class="status"
+					class="docs-status"
 					role="status"
 				>
 					{sent.value}
 				</p>
 			</form>
-		</div>
+		</DocsPreview>
 		<DocsCode bind:code="examples.select" />
-		<div class="doc-note">
+		<UIAlert tone="info">
 			Con
 			<code>required</code>
-			, un formulario sin valor no se envía: el disparador recibe el foco y
+			, un formulario sin valor no se envía: el
+			<code>select</code>
+			recibe el foco y
 			<code>aria-invalid</code>
-			. Escribe además un mensaje visible y asócialo con
-			<code>describedBy</code>
+			, sin el aviso del navegador. Escribe además un mensaje visible con
+			<code>UIField</code>
 			, como en el ejemplo. Con
 			<code>useForm</code>
 			, pasa
 			<code>bind:field="form.field('plan')"</code>
 			y el campo aporta el id, el nombre, el valor y el estado de error.
-		</div>
-		<h2 id="multiple">Búsqueda y selección múltiple</h2>
+		</UIAlert>
+		<h2 id="browsers">Navegadores</h2>
 		<p>
-			<code>searchable</code>
-			convierte el disparador en un campo de texto que filtra las opciones. Con
-			<code>multiple</code>
-			, cada opción se alterna, la lista sigue abierta y el modelo es un array.
-			<code>max</code>
-			deshabilita el resto de opciones cuando se alcanza el límite. Para buscar en un servidor, pasa una función
-			<code>filter</code>
-			que devuelva una promesa y use su
-			<code>AbortSignal</code>
-			.
+			Chrome, Edge y Safari 27 pintan la lista con los tokens de UI, con entrada animada. Firefox y los navegadores antiguos muestran su lista propia: funcionan igual, y en ellos
+			<code>value</code>
+			,
+			<code>group</code>
+			y el contenido rico de
+			<code>option</code>
+			quedan en su texto. Una opción oculta al principio representa el
+			<code>placeholder</code>
+			, o un valor que ya no está en
+			<code>options</code>
+			: el modelo lo conserva y el formulario lo sigue enviando.
 		</p>
 		<h2 id="objects">Objetos, grupos y opciones propias</h2>
 		<p>
@@ -171,58 +177,61 @@
 			<code>value</code>
 			reciben la opción con su tipo.
 		</p>
-		<div class="preview">
-			<div class="form-example">
-				<div class="select-field">
-					<label for="owner">Responsable</label>
-					<UISelect
-						id="owner"
-						by="id"
-						labelBy="name"
-						groupBy="team"
-						placeholder="Asigna una persona"
-						clearable
-						model="owner"
-						bind:options="members"
+		<DocsPreview>
+			<div class="docs-stack">
+				<UIField
+					id="owner"
+					label="Responsable"
+				>
+					<snippet
+						name="default"
+						params="id, describedBy"
 					>
-						<snippet
-							name="option"
-							params="member"
+						<UISelect
+							by="id"
+							labelBy="name"
+							groupBy="team"
+							placeholder="Asigna una persona"
+							clearable
+							model="owner"
+							bind:options="members"
+							bind:id="id"
+							bind:describedBy="describedBy"
 						>
-							<span class="select-member">
-								<strong>{member.name}</strong>
-								<small>{member.role}</small>
-							</span>
-						</snippet>
-					</UISelect>
-				</div>
+							<snippet
+								name="option"
+								params="member"
+							>
+								{member.name}
+								<UIBadge>{member.role}</UIBadge>
+							</snippet>
+						</UISelect>
+					</snippet>
+				</UIField>
 				<p
 					id="owner-status"
-					class="status"
+					class="docs-status"
 					role="status"
 				>
 					{owner.value ? owner.value.name + ' es responsable de ' + owner.value.team.toLowerCase() + '.' : 'Sin responsable asignado.'}
 				</p>
 			</div>
-		</div>
+		</DocsPreview>
 		<DocsCode bind:code="examples.selectObjects" />
-		<h2 id="api">API</h2>
+		<h2 id="api">API de UISelect</h2>
 		<DocsApi
 			caption="Propiedades de UISelect"
 			bind:rows="[
-				{ name: 'options', type: 'readonly T[]', description: 'Obligatoria. Primitivos u objetos; una lista nueva actualiza la abierta.' },
-				{ name: 'model', type: 'Signal<T | null> o Signal<T[]>', default: 'null', description: 'Valor elegido; un array con multiple.' },
-				{ name: 'multiple', type: 'boolean', default: 'false', description: 'Permite elegir varias opciones.' },
+				{ name: 'options', type: 'readonly T[]', description: 'Obligatoria. Primitivos u objetos.' },
+				{ name: 'model', type: 'Signal<T | null>', default: 'null', description: 'Valor elegido.' },
 				{ name: 'by / labelBy / disabledBy / groupBy', type: 'clave o función', description: 'Comparación, etiqueta, deshabilitado y grupo de cada opción.' },
-				{ name: 'searchable / filter', type: 'boolean / ComboboxFilter<T>', description: 'Búsqueda en la lista, síncrona o asíncrona.' },
-				{ name: 'max', type: 'number', description: 'Con multiple, número máximo de opciones elegidas.' },
-				{ name: 'clearable / clearLabel', type: 'boolean / string', default: 'false / Quitar selección', description: 'Botón accesible que quita la selección y devuelve el foco al disparador. La etiqueta por defecto sigue el idioma del documento (véase Temas).' },
+				{ name: 'clearable / clearLabel', type: 'boolean / string', default: 'false / Quitar selección', description: 'Botón accesible que quita la selección y devuelve el foco al select. La etiqueta por defecto sigue el idioma del documento (véase Temas).' },
 				{ name: 'name / required / disabled', type: 'string / boolean', description: 'Envío y validación del formulario.' },
 				{ name: 'field', type: 'SelectField', description: 'Un campo de useForm: id, name, valor, aria-invalid y aria-describedby.' },
-				{ name: 'id / label / describedBy / invalid', type: 'string / boolean', description: 'Identidad y estado accesible del disparador.' },
-				{ name: 'placeholder', type: 'string', description: 'Texto del disparador sin valor.' },
-				{ name: 'placement / offset', type: 'PopoverPlacement / number', default: 'bottom-start / 0', description: 'Posición de la lista respecto al disparador.' },
-				{ name: 'class / listClass', type: 'string', description: 'Clases del elemento raíz y de la lista.' },
+				{ name: 'id / label / describedBy / invalid', type: 'string / boolean', description: 'Identidad y estado accesible del select.' },
+				{ name: 'placeholder', type: 'string', description: 'Texto sin valor.' },
+				{ name: 'placement / offset', type: 'PopoverPlacement / number', default: 'bottom-start', description: 'Posición de la lista, donde el navegador la pinta con los tokens.' },
+				{ name: 'class / listClass', type: 'string', description: 'Clases de la raíz y del select; dale estilo a la lista con .mi-clase::picker(select).' },
 			]"
 		/>
 		<p>
@@ -230,16 +239,76 @@
 			<code>option</code>
 			,
 			<code>value</code>
-			,
+			y
 			<code>group</code>
+			, y el evento
+			<code>change</code>
+			.
+			<code>multiple</code>
 			,
+			<code>searchable</code>
+			,
+			<code>filter</code>
+			y
+			<code>max</code>
+			son un error de tipos que indica
+			<code>UICombobox</code>
+			.
+		</p>
+		<h2 id="combobox">UICombobox</h2>
+		<p>
+			Una lista propia sobre
+			<a href="/popover">UIPopover</a>
+			, con más JavaScript: úsala sólo si necesitas
+			<code>searchable</code>
+			,
+			<code>filter</code>
+			,
+			<code>multiple</code>
+			o
+			<code>max</code>
+			. El foco permanece en el disparador mientras
+			<code>aria-activedescendant</code>
+			recorre la lista. El campo Temas del primer ejemplo es un
+			<code>UICombobox</code>
+			. Con
+			<code>multiple</code>
+			, cada opción se alterna, la lista sigue abierta y el modelo es un array;
+			<code>max</code>
+			deshabilita el resto al llegar al límite.
+		</p>
+		<DocsCode bind:code="examples.combobox" />
+		<p>
+			Para buscar en un servidor, pasa una función
+			<code>filter</code>
+			que devuelva una promesa y use su
+			<code>AbortSignal</code>
+			. Sin resultados, muestra
+			<code>empty</code>
+			: por defecto,
+			<code>Sin resultados</code>
+			.
+		</p>
+		<DocsApi
+			caption="Propiedades propias de UICombobox"
+			bind:rows="[
+				{ name: 'model', type: 'Signal<T | null> o Signal<T[]>', default: 'null', description: 'Valor elegido; un array con multiple.' },
+				{ name: 'multiple', type: 'boolean', default: 'false', description: 'Permite elegir varias opciones.' },
+				{ name: 'searchable / filter', type: 'boolean / ComboboxFilter<T>', description: 'Búsqueda en la lista, síncrona o asíncrona.' },
+				{ name: 'max', type: 'number', description: 'Con multiple, número máximo de opciones elegidas.' },
+			]"
+		/>
+		<p>
+			El resto de propiedades son las de
+			<code>UISelect</code>
+			. Admite además los snippets
 			<code>empty</code>
 			y
 			<code>loading</code>
-			. El evento
-			<code>change</code>
-			recibe el nuevo valor. Los tipos
+			. Los tipos
 			<code>UISelectProps</code>
+			,
+			<code>UIComboboxProps</code>
 			,
 			<code>SelectModel</code>
 			y
@@ -250,33 +319,3 @@
 		</p>
 	</DocsPage>
 </template>
-
-<style>
-	.select-field {
-		display: grid;
-		gap: 0.4rem;
-	}
-	.select-field > label {
-		font-weight: 600;
-		font-size: 0.875rem;
-	}
-	.select-field .select-help,
-	.select-field .select-error {
-		margin: 0;
-		font-size: 0.8125rem;
-	}
-	.select-field .select-help {
-		color: var(--meeko-ui-muted);
-	}
-	.select-field .select-error {
-		color: var(--meeko-ui-danger);
-	}
-	.select-member {
-		display: grid;
-		gap: 0.1rem;
-	}
-	.select-member small {
-		color: var(--meeko-ui-muted);
-		font-size: 0.75rem;
-	}
-</style>

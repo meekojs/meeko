@@ -10,7 +10,7 @@
 		<h2 id="requirements">Antes de empezar</h2>
 		<p>
 			Necesitas una aplicación Meeko, Node.js 24 o superior y Meeko compatible con el rango
-			<code>&gt;=1.7 &lt;2</code>
+			<code>&gt;=1.8 &lt;2</code>
 			. UI pertenece al ecosistema de Meeko y se distribuye como paquete independiente.
 		</p>
 		<h2 id="install">Instala el paquete</h2>
@@ -20,9 +20,9 @@
 		/>
 		<h2 id="module">Registra el módulo</h2>
 		<p>
-			Importa el módulo para disponer del tipado de
+			Regístralo por su nombre: sus opciones van en la clave
 			<code>ui</code>
-			en la configuración. Los componentes se registran con el prefijo
+			, tipada sin importar nada. Los componentes se registran con el prefijo
 			<code>UI</code>
 			.
 		</p>
@@ -30,7 +30,7 @@
 			label="meeko.config.ts"
 			bind:code="examples.config"
 		/>
-		<p>El módulo registra su CSS y Vite lo procesa con el PostCSS de tu proyecto. No tienes que importar una hoja CSS manualmente ni añadir otro procesador.</p>
+		<p>El módulo registra su CSS y Vite lo procesa con el PostCSS de tu proyecto. No tienes que importar una hoja CSS manualmente, ni añadir otro procesador, ni copiar la fuente: el módulo sirve Inter.</p>
 		<h2 id="host">Añade UIApp</h2>
 		<p>
 			Envuelve tu aplicación para alojar los modales abiertos mediante
@@ -44,12 +44,12 @@
 			bind:code="examples.app"
 		/>
 		<h2 id="first-component">Usa un componente</h2>
-		<div class="preview">
+		<DocsPreview>
 			<UIButton>Guardar cambios</UIButton>
 			<UIButton variant="outline">Cancelar</UIButton>
-		</div>
+		</DocsPreview>
 		<DocsCode bind:code="examples.button" />
-		<div class="doc-note">Las señales, los macros y los componentes UI se descubren en tu aplicación. Los tipos que necesites explícitamente se importan desde los exports públicos del paquete.</div>
+		<UIAlert tone="info">Las señales, los macros y los componentes UI se descubren en tu aplicación. Los tipos que necesites explícitamente se importan desde los exports públicos del paquete.</UIAlert>
 		<p>
 			Continúa con
 			<a href="/theming">temas y personalización</a>

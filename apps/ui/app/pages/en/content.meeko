@@ -1,0 +1,218 @@
+<script lang="ts">
+	import { examples } from '../../utils/examples'
+
+	const details = [
+		{ label: 'Status', value: 'Published', detail: 'Today' },
+		{ label: 'Author', value: 'Meeko team' },
+		{ label: 'Languages', value: 2, detail: 'es, en' },
+	]
+</script>
+
+<template>
+	<DocsPage
+		locale="en"
+		title="Data and content"
+		description="Stat, DescriptionList, Disclosure, Diff, CodeBlock and Prose: figures, details, changes, code and long text."
+	>
+		<h2 id="stat">UIStat and UIDescriptionList</h2>
+		<p>
+			A figure with its label, or several label and value pairs. Both are a description list (
+			<code>dl</code>
+			).
+			<code>UIDescriptionList</code>
+			stays in one column on mobile.
+		</p>
+		<DocsPreview layout="stack">
+			<div class="docs-grid">
+				<UIStat
+					label="Views"
+					detail="Last 7 days"
+					bind:value="1280"
+				/>
+				<UIStat
+					label="Searches"
+					bind:value="96"
+				/>
+				<UIStat
+					label="Helpful answers"
+					value="92 %"
+				/>
+			</div>
+			<UIDescriptionList
+				bind:columns="3"
+				bind:items="details"
+			/>
+		</DocsPreview>
+		<DocsCode bind:code="examples.stat" />
+		<DocsApi
+			caption="UIStat props"
+			bind:rows="[
+				{ name: 'label', type: 'string', description: 'Required. What is measured.' },
+				{ name: 'value', type: 'string | number', description: 'Required. The figure.' },
+				{ name: 'detail', type: 'string', description: 'A period or a comparison.' },
+				{ name: 'class', type: 'string', description: 'Additional classes.' },
+			]"
+		/>
+		<DocsApi
+			caption="UIDescriptionList props"
+			bind:rows="[
+				{ name: 'items', type: 'readonly UIDescriptionItem[]', description: 'Required. label, value and detail.' },
+				{ name: 'columns', type: '1 | 2 | 3', default: '1', description: 'Columns above the mobile width.' },
+				{ name: 'class', type: 'string', description: 'Additional classes.' },
+			]"
+		/>
+		<h2 id="disclosure">UIDisclosure</h2>
+		<p>
+			A native
+			<code>details</code>
+			: it opens with the keyboard and without JavaScript.
+		</p>
+		<DocsPreview layout="stack">
+			<UIDisclosure summary="Technical details">
+				<p>The content is already in the HTML, so the find feature of the browser reaches it.</p>
+			</UIDisclosure>
+		</DocsPreview>
+		<DocsApi
+			caption="UIDisclosure props"
+			bind:rows="[
+				{ name: 'summary', type: 'string', description: 'Required. The text that opens and closes.' },
+				{ name: 'open', type: 'boolean', default: 'false', description: 'Open from the start.' },
+				{ name: 'class', type: 'string', description: 'Additional classes.' },
+			]"
+		/>
+		<h2 id="diff">UIDiff</h2>
+		<p>
+			It receives a unified diff and marks each line with
+			<code>data-kind</code>
+			(
+			<code>add</code>
+			,
+			<code>remove</code>
+			,
+			<code>hunk</code>
+			,
+			<code>file</code>
+			,
+			<code>context</code>
+			) and a text for screen readers: color is not the only meaning.
+		</p>
+		<UIDiff
+			label="Changes in the guide"
+			bind:diff="examples.diffSample"
+		/>
+		<DocsCode bind:code="examples.diff" />
+		<DocsApi
+			caption="UIDiff props"
+			bind:rows="[
+				{ name: 'diff', type: 'string', description: 'Required. The unified diff.' },
+				{ name: 'label', type: 'string', description: 'Required. Name of the region.' },
+				{ name: 'emptyText', type: 'string', description: 'What shows without changes.' },
+				{ name: 'lineLabels', type: 'Partial<Record<UIDiffLineKind, string>>', description: 'The text that announces each kind of line.' },
+				{ name: 'class', type: 'string', description: 'Additional classes.' },
+			]"
+		/>
+		<h2 id="code-block">UICodeBlock</h2>
+		<p>
+			Code with its copy button, hidden until hydration because it is the only script. In
+			<code>html</code>
+			it receives an already highlighted
+			<code>pre</code>
+			(Shiki with
+			<code>--shiki-light</code>
+			and
+			<code>--shiki-dark</code>
+			) and in
+			<code>code</code>
+			, what is copied.
+			<code>mode="log"</code>
+			uses
+			<code>role="log"</code>
+			and wraps the lines.
+		</p>
+		<UICodeBlock
+			label="Terminal"
+			code="pnpm add @meekojs/ui"
+		/>
+		<UICodeBlock
+			verdict="good"
+			verdictLabel="Good"
+			lang="ts"
+			code="const count = signal(0)"
+		/>
+		<UICodeBlock
+			verdict="bad"
+			verdictLabel="Bad"
+			lang="ts"
+			code="let count = 0"
+		/>
+		<UICodeBlock
+			mode="log"
+			label="Log"
+			code="build: 47 modules
+build: done in 1.2 s"
+		/>
+		<DocsApi
+			caption="UICodeBlock props"
+			bind:rows="[
+				{ name: 'code / html', type: 'string / TrustedHtml', description: 'What is copied and, if any, its highlighted version.' },
+				{ name: 'label / lang', type: 'string', description: 'Name of the block and language.' },
+				{ name: 'verdict / verdictLabel', type: 'good | bad / string', description: 'Marks an example as good or bad, with a text.' },
+				{ name: 'mode', type: 'code | log', default: 'code', description: 'With log, role=log and no copy button unless copy is set.' },
+				{ name: 'copy', type: 'boolean', default: 'true with code', description: 'Shows the copy button.' },
+				{ name: 'copyLabel / copyAriaLabel / copiedLabel / copyFailedLabel', type: 'string', description: 'Texts of the button.' },
+				{ name: 'uiLang / labelLang', type: 'string', description: 'Language of the interface texts and of the label.' },
+				{ name: 'class', type: 'string', description: 'Additional classes.' },
+			]"
+		/>
+		<h2 id="prose">UIProse</h2>
+		<p>
+			It dresses rendered Markdown or your own HTML. Text keeps a reading measure, while code and tables may take the whole column. A UI component inside the text keeps its look. All these guides are inside a
+			<code>UIProse</code>
+			.
+		</p>
+		<DocsPreview layout="stack">
+			<UIProse as="section">
+				<h3>A section title</h3>
+				<p>
+					A paragraph with
+					<a href="#prose">a link</a>
+					,
+					<strong>emphasis</strong>
+					and
+					<code>code</code>
+					.
+				</p>
+				<ul>
+					<li>A list</li>
+					<li>with two items</li>
+				</ul>
+			</UIProse>
+		</DocsPreview>
+		<DocsApi
+			caption="UIProse props"
+			bind:rows="[
+				{ name: 'as', type: 'div | article | section', default: 'div', description: 'Tag of the root.' },
+				{ name: 'html', type: 'TrustedHtml', description: 'Trusted, already rendered HTML; without it, the default snippet.' },
+				{ name: 'class', type: 'string', description: 'Additional classes. The meeko-ui-prose class also works on any element.' },
+			]"
+		/>
+		<DocsCode bind:code="examples.codeBlock" />
+		<p>
+			The types
+			<code>UIStatProps</code>
+			,
+			<code>UIDescriptionListProps</code>
+			,
+			<code>UIDisclosureProps</code>
+			,
+			<code>UIDiffProps</code>
+			,
+			<code>UICodeBlockProps</code>
+			and
+			<code>UIProseProps</code>
+			are exported from
+			<code>@meekojs/ui/runtime</code>
+			.
+		</p>
+	</DocsPage>
+</template>

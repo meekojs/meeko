@@ -2,7 +2,7 @@
 
 ## Dirección
 
-Modo de lectura: documentación técnica con ejemplos interactivos. El usuario eligió conservar la identidad de Meeko. La autoridad visual es `apps/meeko/app/styles/tokens.css`: Inter autoalojada, superficies neutras, acento azul, acciones principales neutras y temas claro/oscuro. No se introduce una marca independiente.
+Modo de lectura: documentación técnica con ejemplos interactivos. **Esta web no escribe diseño:** la autoridad visual es [`packages/ui/DESIGN.md`](../../packages/ui/DESIGN.md), con Inter, neutros limpios, bordes finos, violeta eléctrico con moderación, fondo blanco o negro puros y temas claro y oscuro.
 
 ## Estructura
 
@@ -14,4 +14,4 @@ La portada muestra un componente vivo. Las guías reúnen uso, ejemplo, código 
 
 Usa `@meekojs/ui` en las acciones, formularios, metadatos y ejemplos. Las superficies editoriales no necesitan convertirse en cards. Mantén un único encabezado principal, nombres accesibles, foco visible y texto para errores y estados. Los modales y View Transitions conservan el soporte de movimiento reducido del runtime.
 
-Los tokens viven en `packages/ui` ([contrato visual](../../packages/ui/DESIGN.md)); esta web no define los suyos. Al cambiar la identidad central, actualiza esta copia y comprueba ambos temas. Los ejemplos son datos locales; no sugieren persistencia ni peticiones que no existan.
+Los tokens viven en `packages/ui` y esta web no define los suyos. Su único CSS es un efecto, la coreografía de la demo de View Transitions en `app/styles/main.css`. La disposición de las demos (`DocsPreview`, `.docs-grid`, `.docs-stack`) está en `packages/docs`. Si falta algo, se añade a UI. Los ejemplos son datos locales; no sugieren persistencia ni peticiones que no existan.

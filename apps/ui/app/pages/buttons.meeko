@@ -10,12 +10,12 @@
 		description="Ejecuta una acción, abre una URL o navega a una ruta con una sola API visual."
 	>
 		<h2 id="usage">Uso</h2>
-		<div class="preview">
+		<DocsPreview>
 			<UIButton on:click="() => count.value++">Guardar cambio</UIButton>
 			<UIButton variant="secondary">Secundario</UIButton>
 			<UIButton variant="outline">Outline</UIButton>
 			<UIButton variant="ghost">Ghost</UIButton>
-		</div>
+		</DocsPreview>
 		<p role="status">Cambios en este ejemplo: {count.value}</p>
 		<DocsCode bind:code="examples.button" />
 		<h2 id="kinds">Ruta, enlace o botón</h2>
@@ -31,10 +31,7 @@
 			<code>&lt;button type="button"&gt;</code>
 			.
 		</p>
-		<div
-			id="button-kinds"
-			class="preview"
-		>
+		<DocsPreview id="button-kinds">
 			<UIButton
 				id="button-kind-route"
 				to="/links"
@@ -56,7 +53,7 @@
 			>
 				Acción
 			</UIButton>
-		</div>
+		</DocsPreview>
 		<p
 			id="button-kinds-status"
 			role="status"
@@ -88,7 +85,7 @@
 			.
 		</p>
 		<h2 id="sizes">Tamaños y estados</h2>
-		<div class="preview">
+		<DocsPreview>
 			<UIButton size="sm">Pequeño</UIButton>
 			<UIButton size="md">Mediano</UIButton>
 			<UIButton size="lg">Grande</UIButton>
@@ -99,7 +96,38 @@
 				Pill
 			</UIButton>
 			<UIButton disabled>No disponible</UIButton>
-		</div>
+		</DocsPreview>
+		<h2 id="tone">Peligro, carga e icono</h2>
+		<p>
+			<code>tone="danger"</code>
+			marca una acción destructiva.
+			<code>loading</code>
+			conserva el texto, añade el spinner, anuncia
+			<code>aria-busy</code>
+			e impide activarla sin quitarle el foco. Con
+			<code>iconOnly</code>
+			, el botón es cuadrado: da siempre su nombre con
+			<code>ariaLabel</code>
+			.
+		</p>
+		<DocsPreview>
+			<UIButton tone="danger">Eliminar</UIButton>
+			<UIButton
+				tone="danger"
+				variant="outline"
+			>
+				Revocar
+			</UIButton>
+			<UIButton bind:loading="true">Guardando</UIButton>
+			<UIButton
+				iconOnly
+				ariaLabel="Eliminar"
+				variant="outline"
+			>
+				<UIIcon name="lucide:trash-2" />
+			</UIButton>
+		</DocsPreview>
+		<DocsCode bind:code="examples.buttonStates" />
 		<DocsApi
 			bind:rows="[
 				{ name: 'to', type: 'RouteId', description: 'Ruta de la aplicación. Pinta un enlace que navega sin recargar. Excluye href, type y disabled.' },
@@ -111,6 +139,10 @@
 				{ name: 'variant', type: 'primary | secondary | outline | ghost', default: 'primary', description: 'Jerarquía visual de la acción.' },
 				{ name: 'size', type: 'sm | md | lg', default: 'md', description: 'Tamaño del control.' },
 				{ name: 'shape', type: 'rounded | pill', default: 'rounded', description: 'Forma del contorno.' },
+				{ name: 'tone', type: 'danger', description: 'Marca una acción destructiva, con cualquier variante.' },
+				{ name: 'loading', type: 'boolean', default: 'false', description: 'Añade el spinner, anuncia aria-busy e impide activarla sin quitarle el foco.' },
+				{ name: 'iconOnly / ariaLabel', type: 'boolean / string', default: 'false', description: 'Botón cuadrado con un icono; ariaLabel le da su nombre accesible.' },
+				{ name: 'name / value / form', type: 'string', description: 'Sin to ni href. Los atributos nativos de un botón de envío.' },
 				{ name: 'class', type: 'string', description: 'Clases adicionales.' },
 				{ name: 'id / title / aria-* / data-*', type: 'atributos HTML', description: 'Llegan tal cual al elemento.' },
 			]"
@@ -122,11 +154,9 @@
 			<code>event.preventDefault()</code>
 			cancela la navegación. El snippet
 			<code>default</code>
-			es obligatorio. Para estados asíncronos controla
-			<code>disabled</code>
-			y el texto con tus señales; no hay una prop
+			es obligatorio. Para una acción asíncrona, enlaza
 			<code>loading</code>
-			.
+			a tu señal.
 		</p>
 		<p>
 			Para un enlace con su propia jerarquía visual y los defaults de

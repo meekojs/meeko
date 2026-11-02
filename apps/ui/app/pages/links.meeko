@@ -8,7 +8,7 @@
 		description="Navega con enlaces reales y comparte la jerarquía visual de tus acciones."
 	>
 		<h2 id="link">UILink</h2>
-		<div class="preview">
+		<DocsPreview>
 			<UILink
 				id="link-route"
 				to="/installation"
@@ -22,7 +22,7 @@
 			>
 				Personalización
 			</UILink>
-		</div>
+		</DocsPreview>
 		<DocsCode bind:code="examples.link" />
 		<DocsApi
 			caption="Propiedades de UILink"
@@ -38,13 +38,13 @@
 			]"
 		/>
 		<h2 id="link-card">UILinkCard</h2>
-		<div class="preview preview-stack">
+		<DocsPreview layout="stack">
 			<UILinkCard
 				to="/theming"
 				title="Personaliza tu interfaz"
 				description="Conecta tus colores, radios y tipografía con los tokens de UI."
 			/>
-		</div>
+		</DocsPreview>
 		<DocsApi
 			caption="Propiedades de UILinkCard"
 			bind:rows="[

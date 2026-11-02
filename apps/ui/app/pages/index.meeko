@@ -10,18 +10,16 @@
 		description="Componentes tipados para pasar de las señales a una interfaz completa. Renderizada en el servidor y adaptada a tu marca."
 		landing
 	>
-		<div class="home-heading">
-			<div class="home-actions">
-				<UILink href="/installation">Empezar a construir</UILink>
-				<UILink
-					href="/components"
-					variant="outline"
-				>
-					Ver componentes
-				</UILink>
-			</div>
+		<div class="docs-actions">
+			<UILink href="/installation">Empezar a construir</UILink>
+			<UILink
+				href="/components"
+				variant="outline"
+			>
+				Ver componentes
+			</UILink>
 		</div>
-		<div class="home-showcase">
+		<div class="docs-showcase">
 			<div>
 				<h2>Componentes reales. Desde el primer render.</h2>
 				<p>Esta web usa el mismo paquete que instalas en tu aplicación. Prueba un control, cambia el tema y lleva el ejemplo a tu proyecto.</p>
@@ -55,37 +53,17 @@
 		</div>
 		<h2>Una base, tu propia identidad</h2>
 		<p>Usa tokens semánticos para conectar colores, superficies y foco con tus variables CSS. Los valores por defecto se configuran por aplicación; cada componente puede sobrescribirlos con sus props.</p>
-		<div class="directory meeko-ui-not-prose">
-			<a href="/theming">
-				<strong>Temas y personalización</strong>
-				<span>Claro, oscuro y los colores que ya tiene tu web.</span>
-				<svg
-					width="18"
-					height="18"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="1.5"
-					aria-hidden="true"
-				>
-					<path d="M5 12h14m-6-6 6 6-6 6" />
-				</svg>
-			</a>
-			<a href="/modals">
-				<strong>Interacciones completas</strong>
-				<span>Modales con resultados, foco y pilas anidadas.</span>
-				<svg
-					width="18"
-					height="18"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="1.5"
-					aria-hidden="true"
-				>
-					<path d="M5 12h14m-6-6 6 6-6 6" />
-				</svg>
-			</a>
+		<div class="docs-grid">
+			<UILinkCard
+				to="/theming"
+				title="Temas y personalización"
+				description="Claro, oscuro y los colores que ya tiene tu web."
+			/>
+			<UILinkCard
+				to="/modals"
+				title="Interacciones completas"
+				description="Modales con resultados, foco y pilas anidadas."
+			/>
 		</div>
 	</DocsPage>
 </template>

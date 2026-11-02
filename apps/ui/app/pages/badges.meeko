@@ -8,15 +8,24 @@
 		description="Describe estados y metadatos con etiquetas de texto."
 	>
 		<h2 id="usage">Uso</h2>
-		<div class="preview">
+		<DocsPreview>
 			<UIBadge>Información</UIBadge>
 			<UIBadge tone="accent">Publicado</UIBadge>
+			<UIBadge tone="info">Beta</UIBadge>
+			<UIBadge tone="success">Activo</UIBadge>
+			<UIBadge
+				tone="warning"
+				dot
+			>
+				Pendiente
+			</UIBadge>
 			<UIBadge tone="danger">Revisar</UIBadge>
-		</div>
+		</DocsPreview>
 		<DocsCode bind:code="examples.badge" />
 		<DocsApi
 			bind:rows="[
-				{ name: 'tone', type: 'neutral | accent | danger', default: 'neutral', description: 'Tratamiento visual de la etiqueta.' },
+				{ name: 'tone', type: 'neutral | accent | info | success | warning | danger', default: 'neutral', description: 'Tratamiento visual de la etiqueta.' },
+				{ name: 'dot', type: 'boolean', default: 'false', description: 'Añade un punto del color del tono, decorativo.' },
 				{ name: 'class', type: 'string', description: 'Clases adicionales.' },
 			]"
 		/>

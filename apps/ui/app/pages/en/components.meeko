@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { isFeaturedPath, isHiddenPath, useDocsModeration } from 'meeko-docs/state'
 
-	const i18n = useI18n()
 	const directory = [
 		{
 			title: 'Actions and navigation',
@@ -10,17 +9,33 @@
 				{ href: '/links', name: 'Link and LinkCard', description: 'Real links and navigation surfaces.' },
 				{ href: '/badges', name: 'Badge', description: 'Metadata and states without interaction.' },
 				{ href: '/theme-toggle', name: 'ThemeToggle', description: 'Light, dark or system theme, also without JavaScript.' },
+				{ href: '/navigation', name: 'Navigation', description: 'NavigationTree, NavigationTabs, Tabs, Breadcrumb, PageNavigation, Pagination, TableOfContents and language switcher.' },
 			],
 		},
-		{ title: 'Structure', items: [{ href: '/container', name: 'Container', description: 'Fluid widths, side spacing and surfaces up to 4K.' }] },
 		{
-			title: 'Input and presentation',
+			title: 'Structure',
+			items: [
+				{ href: '/container', name: 'Container', description: 'Fluid widths, side spacing and surfaces up to 4K.' },
+				{ href: '/page', name: 'Page structure', description: 'Page, PageHeader, Header and Footer.' },
+			],
+		},
+		{
+			title: 'Forms',
 			items: [
 				{ href: '/forms', name: 'Field and Input', description: 'Labels, text models and error messages.' },
-				{ href: '/select', name: 'Select', description: 'One or several typed options, with search and form submission.' },
-				{ href: '/icons', name: 'Icon', description: 'Iconify icons and your own SVGs, inlined at build time.' },
+				{ href: '/controls', name: 'Form controls', description: 'Textarea, Checkbox, RadioGroup, Switch and Slider.' },
+				{ href: '/select', name: 'Select and Combobox', description: 'One or several typed options, with search and form submission.' },
+				{ href: '/editor', name: 'Markdown editor', description: 'Visual and code editing, with block-level saving.' },
+			],
+		},
+		{
+			title: 'Data and feedback',
+			items: [
 				{ href: '/cards', name: 'Card', description: 'Content with a header, body and actions.' },
 				{ href: '/tables', name: 'Table', description: 'Rows and columns correlated by TypeScript.' },
+				{ href: '/content', name: 'Data and content', description: 'Stat, DescriptionList, Disclosure, Diff, CodeBlock and Prose.' },
+				{ href: '/feedback', name: 'Feedback', description: 'Alert, Toast, Empty and Skeleton.' },
+				{ href: '/icons', name: 'Icon', description: 'Iconify icons and your own SVGs, inlined at build time.' },
 			],
 		},
 		{
@@ -28,25 +43,15 @@
 			items: [
 				{ href: '/modals', name: 'Modal', description: 'Declarative or programmatic, with nesting support.' },
 				{ href: '/popover', name: 'Popover', description: 'Menus, lightweight dialogs and tooltips anchored to their trigger.' },
+				{ href: '/overlays', name: 'Overlays', description: 'Drawer, Tooltip and CommandPalette.' },
 				{ href: '/app', name: 'App', description: 'The host of programmatic modals.' },
 			],
 		},
-	]
+	] as const
 
-	// The pages the dashboard hides leave the index and the featured ones get their badge. The
-	// English moderation uses the public URLs (/en/…), so the links are localized first.
+	// The pages the dashboard hides leave the index and the featured ones carry their badge.
 	const moderation = useDocsModeration()
-	const groups = computed(() =>
-		directory
-			.map((group) => ({
-				title: group.title,
-				items: group.items
-					.map((item) => ({ ...item, href: i18n.localePath(item.href) }))
-					.filter((item) => !isHiddenPath(moderation.value, item.href))
-					.map((item) => ({ ...item, featured: isFeaturedPath(moderation.value, item.href) })),
-			}))
-			.filter((group) => group.items.length > 0),
-	)
+	const groups = computed(() => directory.map((group) => ({ title: group.title, items: group.items.filter((item) => !isHiddenPath(moderation.value, item.href)).map((item) => ({ ...item, featured: isFeaturedPath(moderation.value, item.href) })) })).filter((group) => group.items.length > 0))
 </script>
 
 <template>
@@ -61,28 +66,25 @@
 			each:key="group.title"
 		>
 			<h2>{group.title}</h2>
-			<div class="directory meeko-ui-not-prose">
-				<a
+			<div class="docs-grid">
+				<UILinkCard
 					each:of="group.items"
 					each:as="item"
 					each:key="item.href"
-					bind:href="item.href"
+					bind:to="item.href"
+					bind:title="item.name"
+					bind:description="item.description"
 				>
-					<strong>
-						{item.name}
-						<UIBadge
-							if:when="item.featured"
-							tone="accent"
-							class="directory-featured"
-						>
-							{i18n.t('shell.nav.featured')}
-						</UIBadge>
-					</strong>
-					<span>{item.description}</span>
-				</a>
+					<UIBadge
+						if:when="item.featured"
+						tone="accent"
+					>
+						Featured
+					</UIBadge>
+				</UILinkCard>
 			</div>
 		</section>
-		<div class="doc-note">
+		<UIAlert tone="info">
 			The core tags
 			<code>MeekoSelect</code>
 			,
@@ -91,11 +93,13 @@
 			<code>MeekoThemeToggle</code>
 			are deprecated since Meeko 1.8 and will be removed in 2.0. Replace them with
 			<code>UISelect</code>
+			or
+			<code>UICombobox</code>
 			,
 			<code>UIPopover</code>
 			and
 			<code>UIThemeToggle</code>
-			: they keep the same props, snippets and markup.
-		</div>
+			.
+		</UIAlert>
 	</DocsPage>
 </template>

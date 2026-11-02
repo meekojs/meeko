@@ -21,34 +21,42 @@
 		title="Modal"
 		description="Declarative or programmatic dialogs with results and nesting support."
 	>
-		<div class="modal-demo">
-			<div class="modal-demo-actions">
-				<UIButton on:click="ask">Open confirmation</UIButton>
-				<UIButton
-					variant="secondary"
-					on:click="() => (opened.value = true)"
-				>
-					Declarative modal
-				</UIButton>
-				<UIButton
-					variant="secondary"
-					on:click="() => (locked.value = true)"
-				>
-					Protected close
-				</UIButton>
-			</div>
-			<p role="status">{result.value}</p>
+		<div class="docs-actions">
+			<UIButton on:click="ask">Open confirmation</UIButton>
+			<UIButton
+				variant="secondary"
+				on:click="() => (opened.value = true)"
+			>
+				Declarative modal
+			</UIButton>
+			<UIButton
+				variant="secondary"
+				on:click="() => (locked.value = true)"
+			>
+				Protected close
+			</UIButton>
 		</div>
+		<p role="status">{result.value}</p>
 		<UIModal
 			title="A declarative modal"
 			description="Controlled with a signal and model."
 			model="opened"
 		>
-			<label for="modal-name">Name</label>
-			<UIInput
+			<UIField
 				id="modal-name"
-				placeholder="Type your name"
-			/>
+				label="Name"
+			>
+				<snippet
+					name="default"
+					params="id, describedBy"
+				>
+					<UIInput
+						placeholder="Type your name"
+						bind:id="id"
+						bind:describedBy="describedBy"
+					/>
+				</snippet>
+			</UIField>
 			<snippet name="footer"><UIButton on:click="() => (opened.value = false)">Done</UIButton></snippet>
 		</UIModal>
 		<UIModal

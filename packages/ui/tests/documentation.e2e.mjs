@@ -8,7 +8,7 @@ test('public UI documentation renders every guide, navigates, copies code and va
 	const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } })
 	const errors = []
 	page.on('pageerror', (error) => errors.push(error.message))
-	for (const route of ['/', '/installation', '/theming', '/components', '/container', '/buttons', '/links', '/badges', '/forms', '/select', '/cards', '/tables', '/modals', '/popover', '/app', '/theme-toggle', '/transitions', '/transitions/project']) {
+	for (const route of ['/', '/installation', '/theming', '/components', '/container', '/buttons', '/links', '/badges', '/forms', '/controls', '/select', '/editor', '/cards', '/tables', '/content', '/feedback', '/page', '/navigation', '/modals', '/popover', '/overlays', '/app', '/theme-toggle', '/transitions', '/transitions/project']) {
 		const response = await page.goto(origin + route)
 		assert.equal(response.status(), 200, route)
 		assert.equal(await page.locator('main h1').count(), 1, route)

@@ -1,0 +1,176 @@
+<script lang="ts">
+	import { examples } from '../../utils/examples'
+
+	const drawer = signal(false)
+	const drafts = signal(false)
+	const query = signal('')
+	const pages = [
+		{ title: 'UIDrawer', url: '#drawer' },
+		{ title: 'UITooltip', url: '#tooltip' },
+		{ title: 'UICommandPalette', url: '#command-palette' },
+	]
+	const results = computed(() => pages.filter((page) => page.title.toLowerCase().includes(query.value.trim().toLowerCase())))
+</script>
+
+<template>
+	<DocsPage
+		locale="en"
+		title="Overlays"
+		description="Drawer, Tooltip and CommandPalette, on top of native dialog and popover."
+	>
+		<p>
+			For a dialog with a result, use
+			<MeekoLink to="/modals">Modal</MeekoLink>
+			; for a menu or a lightweight dialog,
+			<MeekoLink to="/popover">Popover</MeekoLink>
+			. They all use the top layer of the browser, and leave with a View Transition where it exists.
+		</p>
+		<h2 id="drawer">UIDrawer</h2>
+		<p>
+			A side panel. It is a modal
+			<code>dialog</code>
+			with
+			<code>command</code>
+			,
+			<code>commandfor</code>
+			and
+			<code>closedby</code>
+			: it opens, closes and returns the focus without JavaScript in the browsers that support them; elsewhere, on hydration. Following a link inside closes it at once, because the navigation already is the transition.
+		</p>
+		<DocsPreview>
+			<UIDrawer
+				title="Filters"
+				triggerLabel="Open filters"
+				side="end"
+				model="drawer"
+			>
+				<UICheckbox
+					label="Include drafts"
+					model="drafts"
+				/>
+				<snippet name="footer">
+					<UIButton on:click="() => (drawer.value = false)">Apply</UIButton>
+				</snippet>
+			</UIDrawer>
+		</DocsPreview>
+		<DocsCode bind:code="examples.drawer" />
+		<DocsApi
+			caption="UIDrawer props"
+			bind:rows="[
+				{ name: 'title', type: 'string', description: 'Required. Name of the dialog.' },
+				{ name: 'model', type: 'Signal<boolean>', default: 'false', description: 'Open state, two-way.' },
+				{ name: 'side', type: 'start | end', default: 'start', description: 'The side it enters from.' },
+				{ name: 'triggerLabel / closeLabel', type: 'string', description: 'Text of the trigger and accessible name of the close button.' },
+				{ name: 'closedBy', type: 'any | closerequest | none', default: 'any', description: 'What closes it besides its button: the backdrop and Esc, only Esc or nothing.' },
+				{ name: 'closeOnNavigate', type: 'boolean', default: 'true', description: 'It closes when following a link.' },
+				{ name: 'id / class', type: 'string', description: 'Identity and classes.' },
+			]"
+		/>
+		<p>
+			It accepts the
+			<code>default</code>
+			,
+			<code>footer</code>
+			and
+			<code>trigger(id)</code>
+			snippets, and the
+			<code>close</code>
+			event.
+		</p>
+		<h2 id="tooltip">UITooltip</h2>
+		<p>
+			A
+			<MeekoLink to="/popover">UIPopover</MeekoLink>
+			with
+			<code>mode="hint"</code>
+			and the look of a tooltip: it opens with the pointer or the focus, never takes the focus, and the trigger references it with
+			<code>aria-describedby</code>
+			. Write complementary information in it.
+		</p>
+		<DocsPreview>
+			<UITooltip text="It is published when saved">
+				<snippet name="trigger">When is it published?</snippet>
+			</UITooltip>
+		</DocsPreview>
+		<DocsCode bind:code="examples.tooltip" />
+		<DocsApi
+			caption="UITooltip props"
+			bind:rows="[
+				{ name: 'text', type: 'string', description: 'The text; for anything else, the default snippet.' },
+				{ name: 'placement', type: 'PopoverPlacement', default: 'top', description: 'Side and alignment.' },
+				{ name: 'offset', type: 'number', default: '6', description: 'Separation in pixels.' },
+				{ name: 'delay / closeDelay', type: 'number', default: '300 / 150', description: 'Milliseconds before opening and closing.' },
+				{ name: 'class / triggerClass / triggerId', type: 'string', description: 'Classes of the content and the trigger, and id of the trigger.' },
+			]"
+		/>
+		<p>
+			It accepts the
+			<code>default</code>
+			,
+			<code>trigger</code>
+			and
+			<code>anchor(trigger)</code>
+			snippets, for a trigger of your own.
+		</p>
+		<h2 id="command-palette">UICommandPalette</h2>
+		<p>
+			It does not search: read
+			<code>query</code>
+			in your code, search wherever you want (Pagefind, a server or a local list) and pass it
+			<code>results</code>
+			and
+			<code>status</code>
+			. It opens with its button or with
+			<code>Ctrl</code>
+			and
+			<code>K</code>
+			, and the arrows walk the results without taking the focus out of the field.
+		</p>
+		<DocsPreview>
+			<UICommandPalette
+				label="Search this page"
+				hrefBy="url"
+				labelBy="title"
+				model:query="query"
+				bind:results="results.value"
+				bind:status="results.value.length ? 'ready' : 'empty'"
+			/>
+		</DocsPreview>
+		<DocsCode bind:code="examples.commandPalette" />
+		<DocsApi
+			caption="UICommandPalette props"
+			bind:rows="[
+				{ name: 'results', type: 'readonly T[]', description: 'Required. What shows.' },
+				{ name: 'status', type: 'idle | loading | ready | empty | unavailable', default: 'ready', description: 'What the status region announces.' },
+				{ name: 'model / model:query / model:active', type: 'Signal', description: 'Open state, searched text and active result.' },
+				{ name: 'labelBy / hrefBy / childrenBy', type: 'key or function', description: 'Label, target and nested results.' },
+				{ name: 'label / inputLabel / placeholder / closeLabel', type: 'string', description: 'Texts. The default values follow the language of the document.' },
+				{ name: 'trigger / shortcut', type: 'boolean', default: 'true', description: 'Paints its button and listens to the shortcut.' },
+				{ name: 'inputId / inputName / class / triggerClass', type: 'string', description: 'Identity of the field and classes.' },
+			]"
+		/>
+		<p>
+			It accepts the
+			<code>item(item, state)</code>
+			,
+			<code>trigger(modifier)</code>
+			and
+			<code>status(status, query)</code>
+			snippets, and the
+			<code>open</code>
+			,
+			<code>close</code>
+			and
+			<code>choose</code>
+			events. The types
+			<code>UIDrawerProps</code>
+			,
+			<code>UITooltipProps</code>
+			and
+			<code>UICommandPaletteProps</code>
+			are exported from
+			<code>@meekojs/ui/runtime</code>
+			.
+		</p>
+	</DocsPage>
+</template>

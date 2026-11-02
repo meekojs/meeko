@@ -4,37 +4,45 @@
 		title="One project, two views"
 		description="The same card keeps its identity when navigating to the detail."
 	>
-		<div class="view-transition-demo">
-			<MeekoLink to="/transitions">Back to projects</MeekoLink>
-			<UICard
-				title="Project Aurora"
-				description="The team's website"
-				class="view-transition-demo-project"
+		<div class="docs-actions">
+			<UILink
+				to="/transitions"
+				variant="ghost"
 			>
-				<p>This card shares its transition name with the one in the list. The browser interpolates its position and size when the page changes.</p>
-				<dl class="view-transition-demo-details">
-					<div>
-						<dt>Type</dt>
-						<dd>Website</dd>
-					</div>
-					<div>
-						<dt>Status</dt>
-						<dd>In development</dd>
-					</div>
-					<div>
-						<dt>Team</dt>
-						<dd>Meeko</dd>
-					</div>
-				</dl>
-				<snippet name="footer"><MeekoLink to="/transitions">See all projects</MeekoLink></snippet>
-			</UICard>
-			<p>Without browser support or with reduced motion, navigation works as usual.</p>
+				Back to projects
+			</UILink>
+		</div>
+		<UICard
+			title="Project Aurora"
+			description="The team's website"
+			class="view-transition-demo-project"
+		>
+			<p>This card shares its transition name with the one in the list. The browser interpolates its position and size when the page changes.</p>
+			<UIDescriptionList
+				bind:columns="3"
+				bind:items="[
+					{ label: 'Type', value: 'Website' },
+					{ label: 'Status', value: 'In development' },
+					{ label: 'Team', value: 'Meeko' },
+				]"
+			/>
+			<snippet name="footer">
+				<UILink
+					to="/transitions"
+					variant="outline"
+				>
+					See all projects
+				</UILink>
+			</snippet>
+		</UICard>
+		<p>Without browser support or with reduced motion, navigation works as usual.</p>
+		<p>
 			<MeekoLink
 				to="/transitions"
 				data-meeko-view-transition="false"
 			>
 				Back without a transition
 			</MeekoLink>
-		</div>
+		</p>
 	</DocsPage>
 </template>

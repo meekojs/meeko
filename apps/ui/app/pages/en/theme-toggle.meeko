@@ -33,15 +33,15 @@
 			<code>mode="cycle"</code>
 			, the default, each press moves to the next choice. Its accessible name states the current theme and the next one.
 		</p>
-		<div class="preview preview-stack theme-toggle-preview">
+		<DocsPreview>
 			<UIThemeToggle id="theme-cycle" />
 			<p
-				class="theme-toggle-status"
+				class="docs-status"
 				role="status"
 			>
 				{summary.value}
 			</p>
-		</div>
+		</DocsPreview>
 		<DocsCode bind:code="examples.themeToggle" />
 		<h2 id="select">A group of options</h2>
 		<p>
@@ -53,12 +53,12 @@
 			<code>End</code>
 			move focus and the choice, as in a native radio group.
 		</p>
-		<div class="preview">
+		<DocsPreview>
 			<UIThemeToggle
 				id="theme-select"
 				mode="select"
 			/>
-		</div>
+		</DocsPreview>
 		<DocsCode bind:code="examples.themeToggleSelect" />
 		<h2 id="custom">Choices, texts and icons</h2>
 		<p>
@@ -100,14 +100,3 @@
 		</p>
 	</DocsPage>
 </template>
-
-<style>
-	.theme-toggle-preview {
-		align-items: center;
-	}
-	.theme-toggle-preview .theme-toggle-status {
-		margin: 0;
-		color: var(--ui-color-text-soft);
-		font-size: 0.875rem;
-	}
-</style>

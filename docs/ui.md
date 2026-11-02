@@ -17,15 +17,17 @@ export default defineMeekoConfig({
 
 ## Componentes por categoría
 
-- **Estructura:** `UIContainer`, con anchos fluidos hasta 4K.
-- **Controles:** `UIButton`, `UIInput`, `UIField`.
-- **Navegación:** `UILink` para acciones con semántica de enlace y `UILinkCard` para tarjetas de navegación.
-- **Datos y metadatos:** `UITable` y `UIBadge`.
-- **Superficies y modales:** `UICard`, `UIModal` y el host `UIApp`.
+- **Estructura:** `UIContainer`, `UIPage`, `UIPageHeader`, `UIHeader` y `UIFooter`.
+- **Acciones:** `UIButton`, `UILink`, `UILinkCard`, `UIBadge` y `UIThemeToggle`.
+- **Formularios:** `UIField`, `UIInput`, `UITextarea`, `UICheckbox`, `UIRadioGroup`, `UISwitch`, `UISlider`, `UISelect` y `UICombobox`. `UIMarkdownEditor`, en su propio módulo `@meekojs/ui/editor`.
+- **Navegación:** `UINavigationTree`, `UINavigationTabs`, `UITabs`, `UIBreadcrumb`, `UIPageNavigation`, `UIPagination`, `UITableOfContents`, `UILocaleSwitcher` y `UILocaleSuggestion`.
+- **Datos y contenido:** `UICard`, `UITable`, `UIStat`, `UIDescriptionList`, `UIDisclosure`, `UIDiff`, `UICodeBlock` y `UIProse`.
+- **Avisos:** `UIAlert`, `UIToast`, `UIEmpty` y `UISkeleton`.
+- **Superposiciones:** `UIModal`, `UIDrawer`, `UIPopover`, `UITooltip`, `UICommandPalette` y el host `UIApp`.
 
-`UILink` comparte las variantes `primary`, `secondary`, `outline` y `ghost`, los tamaños `sm`, `md`, `lg` y las formas `rounded`, `pill` con `UIButton`. Requiere `href`; no simula un botón. `UILinkCard` requiere `to` o `href`, y `title`, con descripción y contenido opcionales. `UIBadge` tiene tonos `neutral`, `accent` y `danger`, sin añadir interacción o anuncios.
+`UILink` comparte las variantes `primary`, `secondary`, `outline` y `ghost`, los tamaños `sm`, `md`, `lg` y las formas `rounded`, `pill` con `UIButton`. Requiere `href`; no simula un botón. `UILinkCard` requiere `to` o `href`, y `title`, con descripción y contenido opcionales. `UIBadge` tiene tonos `neutral`, `accent`, `info`, `success`, `warning` y `danger`, y `dot`, sin añadir interacción o anuncios.
 
-Registra `UIContainer`, `UIApp`, `UIModal`, `UITable`, `UICard`, `UIButton`, `UIInput`, `UIField` y, desde UI 0.2, `UIPopover`, `UISelect` y `UIThemeToggle`, y añade su CSS mediante `meeko.addStylesheet`. La hoja pasa por Vite y la configuración PostCSS del proyecto, con imports, assets, HMR en desarrollo y nombres de assets con hash en producción. Se carga antes de `app/styles/main.css`, donde la aplicación puede sobrescribir los estilos. Desde core 1.8, `MeekoSelect`, `MeekoPopover` y `MeekoThemeToggle` están obsoletos (`MEEK121`, retirada en 2.0). UI 0.2 registra `UISelect`, `UIPopover` y `UIThemeToggle`, con las mismas props, snippets y atributos `data-meeko-*`. `useTheme`, `useThemeToggle`, la configuración del tema y `POST /_meeko/theme` permanecen en el framework. UI 0.2 necesita Meeko `>=1.8 <2`. Véase [Migración a 1.8](migration-1.8.md).
+Registra todos estos componentes, salvo `UIMarkdownEditor`, y añade su CSS mediante `meeko.addStylesheet`, además de la base global y la fuente Inter. La hoja pasa por Vite y la configuración PostCSS del proyecto, con imports, assets, HMR en desarrollo y nombres de assets con hash en producción. Se carga antes de `app/styles/main.css`, donde la aplicación puede sobrescribir los estilos. Desde core 1.8, `MeekoSelect`, `MeekoPopover` y `MeekoThemeToggle` están obsoletos (`MEEK121`, retirada en 2.0): UI 0.2 registra `UISelect`, `UICombobox`, `UIPopover` y `UIThemeToggle`. `UISelect` es un `<select>` nativo; para buscar o elegir varias opciones, `UICombobox`. `useTheme`, `useThemeToggle`, la configuración del tema y `POST /_meeko/theme` permanecen en el framework. UI 0.2 necesita Meeko `>=1.8 <2`. Véase [Migración a 1.8](migration-1.8.md).
 
 ```html
 <script lang="ts">
@@ -55,7 +57,7 @@ Registra `UIContainer`, `UIApp`, `UIModal`, `UITable`, `UICard`, `UIButton`, `UI
 
 `UIButton` admite `type`, `disabled`, `class`, `variant="primary|secondary"` y el evento `click`; su tipo por defecto es `button`. `UIInput` comparte un modelo de texto y admite `id`, `name`, `type`, `placeholder`, `required`, `disabled`, `invalid`, `describedBy` y `class`. `UIField` exige `id` y `label`, admite `description`, `error`, `required` y `class`, y entrega el ID del control y su descripción al snippet. El control debe recibir también `invalid` cuando tenga un error y `required` si es obligatorio.
 
-Personaliza las variables `--meeko-ui-*` desde el CSS de la aplicación: `accent`, `accent-hover`, `on-accent`, `surface`, `surface-hover`, `text`, `muted`, `border`, `danger`, `focus`, `radius` y `font`. El tema oscuro usa `data-theme="dark"`; los temas propios pueden definir los mismos tokens con su selector. La hoja sólo estiliza controles UI y las tres etiquetas mencionadas; la aplicación define su layout y tipografía general.
+Personaliza los tokens `--ui-*` desde el CSS de la aplicación: `--ui-color-primary-9`, `--ui-radius-md`, `--ui-font-sans`… El [contrato visual](../packages/ui/DESIGN.md) dice qué token usar para cada cosa. El tema oscuro usa `data-theme="dark"` y los tokens cambian solos. Las variables `--meeko-ui-*` están deprecadas: se pueden leer, pero asignarlas ya no llega a los componentes. La base global (`ui: { base: false }` la omite) pone el reset, el `body`, la escala fluida y el foco; la aplicación define su disposición.
 
 ## Textos e idiomas
 
@@ -126,7 +128,7 @@ export default defineMeekoConfig({
 
 Define esas variables en los estilos de tu aplicación. Las referencias CSS siguen sus temas claro/oscuro sin copiar la paleta. `primary` permite que las acciones tengan un color distinto de `accent`; si no se configura, sigue usando el acento. La precedencia es props explícitas, defaults del módulo y valores de base. Los defaults se proporcionan por aplicación y petición SSR. Los tokens se procesan en la hoja de UI mediante Vite/PostCSS, sin generar estilos inline ni escribir en `node_modules`. Consulta la [lista completa de opciones](../packages/ui/README.md#opciones-tipadas-y-marca-existente).
 
-La web pública `apps/meeko` consume UI en los enlaces de acción de portada, cabecera y errores, en las tarjetas del índice documental y en los badges de referencia. Su configuración conserva la paleta existente: píldoras neutras, superficies de grises y azul para foco/acento.
+Las webs `apps/meeko`, `apps/ui`, `apps/i18n` y `apps/dashboard` usan estos componentes y tokens, sin diseño propio: mismos colores, tamaños y fuentes. Sólo pueden diferir en imágenes y efectos.
 
 Para modales, monta `<UIApp><MeekoOutlet /></UIApp>` en `app/app.meeko`. `useModal().open<R>(nombre, props)` carga un componente `Modal…` y devuelve su resultado o `undefined` al cancelar. El componente utiliza `UIModal` y `useModalInstance<R>().close(resultado)` o `.dismiss()`. Nombres y props se comprueban contra el registro generado; `R` es el contrato declarado por el consumidor. También puedes controlar `UIModal` directamente con un modelo booleano. Consulta la [API de modales](../packages/ui/README.md#modales).
 
@@ -134,6 +136,6 @@ Para modales, monta `<UIApp><MeekoOutlet /></UIApp>` en `app/app.meeko`. `useMod
 
 `UICard` ofrece las variantes `outline`, `soft`, `solid` y `elevated`, con título y descripción por props, y snippets de cabecera, cuerpo y pie. Consulta la [API de cards](../packages/ui/README.md#cards).
 
-La web pública de Meeko UI se publica en <https://ui.meekojs.com> y vive en `apps/ui`. Incluye instalación, temas, catálogo por categorías y guías con API, código copiable y ejemplos interactivos. Conserva `/modals`, `/tables`, `/cards` y `/transitions`. Desde la raíz, ejecuta `pnpm ui:dev`; para generar el sitio de producción usa `pnpm ui:build`. No requiere una base de datos.
+La web pública de Meeko UI se publica en <https://ui.meekojs.com> y vive en `apps/ui`. Incluye instalación, temas, catálogo por categorías y, en español e inglés, una guía con demo, API y código copiable para cada componente: `/forms`, `/controls`, `/select` (también `UICombobox`), `/editor`, `/cards`, `/tables`, `/content`, `/feedback`, `/page`, `/navigation`, `/modals`, `/popover`, `/overlays`, `/container`, `/buttons`, `/links`, `/badges`, `/icons`, `/theme-toggle`, `/app` y `/transitions`. Desde la raíz, ejecuta `pnpm ui:dev`; para generar el sitio de producción usa `pnpm ui:build`. No requiere una base de datos.
 
 Las fuentes de UI están en `src/app/components` y `src/app/styles`. Sus componentes y declaraciones se incluyen en `dist/app/components` al construir `@meekojs/ui`, y los CSS se distribuyen desde `src/app/styles` para procesarlos con Vite/PostCSS. El plugin de integración vive en `src/app/plugins/modal.ts`: el módulo registra su archivo compilado y conecta un alias privado con el registro de componentes del consumidor. UI no genera código de plugin en el proyecto ni escribe dentro de la instalación de Meeko.

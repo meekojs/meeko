@@ -19,7 +19,8 @@
 		{ key: 'value', label: 'Valor' },
 	] satisfies TableColumn<{ name: string; value: string }>[]
 	const environment = [{ name: 'Entorno', value: 'Desarrollo' }]
-	const layout = signal<'native' | 'grid'>('native')
+	const layouts = ['native', 'grid'] as const
+	const layout = signal<(typeof layouts)[number] | null>('native')
 	const projects = signal<Project[]>([
 		{ id: 1, name: 'Sitio principal', category: 'Sitio web', status: 'Publicado' },
 		{ id: 2, name: 'Panel de clientes', category: 'Aplicación', status: 'En desarrollo' },
@@ -36,52 +37,55 @@
 		title="Table"
 		description="Presenta filas y columnas tipadas con distribución nativa o CSS Grid."
 	>
-		<div class="table-demo">
-			<div class="table-demo-controls">
-				<label for="table-layout">Distribución</label>
-				<select
-					id="table-layout"
-					bind:value="layout.value"
-					on:change="(event) => (layout.value = event.currentTarget.value === 'grid' ? 'grid' : 'native')"
-				>
-					<option value="native">Nativa</option>
-					<option value="grid">Grid</option>
-				</select>
-				<UIButton on:click="addProject">Añadir proyecto</UIButton>
-			</div>
-			<UITable
-				caption="Proyectos del equipo"
-				rowKey="id"
-				gridColumns="minmax(180px, 2fr) minmax(180px, 3fr) 160px"
-				bind:columns="columns"
-				bind:rows="projects.value"
-				bind:layout="layout.value"
-			/>
-			<UITable
-				caption="Tabla sin cabecera ni pie"
-				class="table-demo-secondary"
-				rowKey="name"
-				hideHeader
-				bind:columns="environmentColumns"
-				bind:rows="environment"
+		<div class="docs-actions">
+			<UIField
+				id="table-layout"
+				label="Distribución"
 			>
 				<snippet
-					name="cell"
-					params="row, column, value"
+					name="default"
+					params="id, describedBy"
 				>
-					<strong if:when="column.key === 'name'">{row.name}</strong>
-					<span if:when="column.key !== 'name'">{String(value)}</span>
+					<UISelect
+						model="layout"
+						bind:options="layouts"
+						bind:id="id"
+						bind:describedBy="describedBy"
+					/>
 				</snippet>
-			</UITable>
-			<UITable
-				caption="Tabla vacía"
-				class="table-demo-secondary"
-				rowKey="name"
-				layout="grid"
-				bind:columns="environmentColumns"
-				bind:rows="[]"
-			/>
+			</UIField>
+			<UIButton on:click="addProject">Añadir proyecto</UIButton>
 		</div>
+		<UITable
+			caption="Proyectos del equipo"
+			rowKey="id"
+			gridColumns="minmax(180px, 2fr) minmax(180px, 3fr) 160px"
+			bind:columns="columns"
+			bind:rows="projects.value"
+			bind:layout="layout.value ?? 'native'"
+		/>
+		<UITable
+			caption="Tabla sin cabecera ni pie"
+			rowKey="name"
+			hideHeader
+			bind:columns="environmentColumns"
+			bind:rows="environment"
+		>
+			<snippet
+				name="cell"
+				params="row, column, value"
+			>
+				<strong if:when="column.key === 'name'">{row.name}</strong>
+				<span if:when="column.key !== 'name'">{String(value)}</span>
+			</snippet>
+		</UITable>
+		<UITable
+			caption="Tabla vacía"
+			rowKey="name"
+			layout="grid"
+			bind:columns="environmentColumns"
+			bind:rows="[]"
+		/>
 		<h2 id="typed-data">Columnas y filas tipadas</h2>
 		<DocsCode bind:code="examples.table" />
 		<p>
@@ -143,7 +147,6 @@
 		</p>
 		<UITable
 			caption="Estado por proyecto"
-			class="table-demo-secondary"
 			rowKey="id"
 			bind:columns="columns"
 			bind:rows="projects.value"

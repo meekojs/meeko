@@ -11,7 +11,7 @@
 		description="Navigate with real links that share the visual hierarchy of your actions."
 	>
 		<h2 id="link">UILink</h2>
-		<div class="preview">
+		<DocsPreview>
 			<UILink
 				id="link-route"
 				to="/installation"
@@ -25,7 +25,7 @@
 			>
 				Customization
 			</UILink>
-		</div>
+		</DocsPreview>
 		<DocsCode bind:code="examples.link" />
 		<DocsApi
 			caption="UILink props"
@@ -41,13 +41,13 @@
 			]"
 		/>
 		<h2 id="link-card">UILinkCard</h2>
-		<div class="preview preview-stack">
+		<DocsPreview layout="stack">
 			<UILinkCard
 				title="Customize your interface"
 				description="Connect your colors, radii and typography with the UI tokens."
 				to="/theming"
 			/>
-		</div>
+		</DocsPreview>
 		<DocsApi
 			caption="UILinkCard props"
 			bind:rows="[

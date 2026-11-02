@@ -6,7 +6,7 @@
 	<DocsPage
 		locale="en"
 		title="Theming and customization"
-		description="Connect the components with your brand without duplicating your application's palette."
+		description="One source of design: --ui-* tokens for color, size and shape, which you can connect to your brand."
 	>
 		<h2 id="theme">Light, dark and system</h2>
 		<p>
@@ -15,56 +15,201 @@
 			<code>data-theme</code>
 			before the first paint.
 			<MeekoLink to="/theme-toggle">UIThemeToggle</MeekoLink>
-			lets readers change it, also without JavaScript. It replaces the deprecated core tag
-			<code>MeekoThemeToggle</code>
+			lets readers change it, also without JavaScript. Tokens change by themselves: do not write rules per theme.
+		</p>
+		<h2 id="palette">The palette</h2>
+		<p>Each scale has 12 steps: 1 and 2 for backgrounds, 3 to 5 for controls, 6 to 8 for borders, 9 and 10 for solids, 11 and 12 for text. The background is pure white in light and pure black in dark. Violet is for the main action, the focus, the selection and what is active: if everything is violet, nothing stands out.</p>
+		<h3 id="scale-primary"><code>--ui-color-primary-*</code></h3>
+		<div
+			class="docs-scale"
+			role="img"
+			aria-label="Primary scale, from step 1 to 12"
+		>
+			<span style="background: var(--ui-color-primary-1)" />
+			<span style="background: var(--ui-color-primary-2)" />
+			<span style="background: var(--ui-color-primary-3)" />
+			<span style="background: var(--ui-color-primary-4)" />
+			<span style="background: var(--ui-color-primary-5)" />
+			<span style="background: var(--ui-color-primary-6)" />
+			<span style="background: var(--ui-color-primary-7)" />
+			<span style="background: var(--ui-color-primary-8)" />
+			<span style="background: var(--ui-color-primary-9)" />
+			<span style="background: var(--ui-color-primary-10)" />
+			<span style="background: var(--ui-color-primary-11)" />
+			<span style="background: var(--ui-color-primary-12)" />
+		</div>
+		<h3 id="scale-surface"><code>--ui-color-surface-*</code></h3>
+		<div
+			class="docs-scale"
+			role="img"
+			aria-label="Surface scale, from step 1 to 12"
+		>
+			<span style="background: var(--ui-color-surface-1)" />
+			<span style="background: var(--ui-color-surface-2)" />
+			<span style="background: var(--ui-color-surface-3)" />
+			<span style="background: var(--ui-color-surface-4)" />
+			<span style="background: var(--ui-color-surface-5)" />
+			<span style="background: var(--ui-color-surface-6)" />
+			<span style="background: var(--ui-color-surface-7)" />
+			<span style="background: var(--ui-color-surface-8)" />
+			<span style="background: var(--ui-color-surface-9)" />
+			<span style="background: var(--ui-color-surface-10)" />
+			<span style="background: var(--ui-color-surface-11)" />
+			<span style="background: var(--ui-color-surface-12)" />
+		</div>
+		<h3 id="scale-info"><code>--ui-color-info-*</code></h3>
+		<div
+			class="docs-scale"
+			role="img"
+			aria-label="Info scale, from step 1 to 12"
+		>
+			<span style="background: var(--ui-color-info-1)" />
+			<span style="background: var(--ui-color-info-2)" />
+			<span style="background: var(--ui-color-info-3)" />
+			<span style="background: var(--ui-color-info-4)" />
+			<span style="background: var(--ui-color-info-5)" />
+			<span style="background: var(--ui-color-info-6)" />
+			<span style="background: var(--ui-color-info-7)" />
+			<span style="background: var(--ui-color-info-8)" />
+			<span style="background: var(--ui-color-info-9)" />
+			<span style="background: var(--ui-color-info-10)" />
+			<span style="background: var(--ui-color-info-11)" />
+			<span style="background: var(--ui-color-info-12)" />
+		</div>
+		<h3 id="scale-success"><code>--ui-color-success-*</code></h3>
+		<div
+			class="docs-scale"
+			role="img"
+			aria-label="Success scale, from step 1 to 12"
+		>
+			<span style="background: var(--ui-color-success-1)" />
+			<span style="background: var(--ui-color-success-2)" />
+			<span style="background: var(--ui-color-success-3)" />
+			<span style="background: var(--ui-color-success-4)" />
+			<span style="background: var(--ui-color-success-5)" />
+			<span style="background: var(--ui-color-success-6)" />
+			<span style="background: var(--ui-color-success-7)" />
+			<span style="background: var(--ui-color-success-8)" />
+			<span style="background: var(--ui-color-success-9)" />
+			<span style="background: var(--ui-color-success-10)" />
+			<span style="background: var(--ui-color-success-11)" />
+			<span style="background: var(--ui-color-success-12)" />
+		</div>
+		<h3 id="scale-warning"><code>--ui-color-warning-*</code></h3>
+		<div
+			class="docs-scale"
+			role="img"
+			aria-label="Warning scale, from step 1 to 12"
+		>
+			<span style="background: var(--ui-color-warning-1)" />
+			<span style="background: var(--ui-color-warning-2)" />
+			<span style="background: var(--ui-color-warning-3)" />
+			<span style="background: var(--ui-color-warning-4)" />
+			<span style="background: var(--ui-color-warning-5)" />
+			<span style="background: var(--ui-color-warning-6)" />
+			<span style="background: var(--ui-color-warning-7)" />
+			<span style="background: var(--ui-color-warning-8)" />
+			<span style="background: var(--ui-color-warning-9)" />
+			<span style="background: var(--ui-color-warning-10)" />
+			<span style="background: var(--ui-color-warning-11)" />
+			<span style="background: var(--ui-color-warning-12)" />
+		</div>
+		<h3 id="scale-danger"><code>--ui-color-danger-*</code></h3>
+		<div
+			class="docs-scale"
+			role="img"
+			aria-label="Danger scale, from step 1 to 12"
+		>
+			<span style="background: var(--ui-color-danger-1)" />
+			<span style="background: var(--ui-color-danger-2)" />
+			<span style="background: var(--ui-color-danger-3)" />
+			<span style="background: var(--ui-color-danger-4)" />
+			<span style="background: var(--ui-color-danger-5)" />
+			<span style="background: var(--ui-color-danger-6)" />
+			<span style="background: var(--ui-color-danger-7)" />
+			<span style="background: var(--ui-color-danger-8)" />
+			<span style="background: var(--ui-color-danger-9)" />
+			<span style="background: var(--ui-color-danger-10)" />
+			<span style="background: var(--ui-color-danger-11)" />
+			<span style="background: var(--ui-color-danger-12)" />
+		</div>
+		<h2 id="tokens">Usage tokens</h2>
+		<p>
+			Read the usage token, not the step:
+			<code>--ui-color-border</code>
+			, not
+			<code>--ui-color-surface-6</code>
+			. No loose hex, size or font: if you miss something, it is added to UI. The whole contract is in
+			<code>packages/ui/DESIGN.md</code>
 			.
 		</p>
-		<div class="token-list">
-			<div class="token-swatch">
-				<i style="background: var(--ui-color-primary)" />
-				<strong>Accent</strong>
-				<code>--meeko-ui-accent</code>
-			</div>
-			<div class="token-swatch">
-				<i style="background: var(--ui-color-primary-hover)" />
-				<strong>Primary action</strong>
-				<code>--meeko-ui-primary</code>
-			</div>
-			<div class="token-swatch">
-				<i style="background: var(--ui-color-surface)" />
-				<strong>Surface</strong>
-				<code>--meeko-ui-surface</code>
-			</div>
-		</div>
-		<h2 id="tokens">Semantic tokens</h2>
+		<DocsCode
+			label="app/styles/main.css"
+			bind:code="examples.themeUse"
+		/>
+		<DocsApi
+			caption="Main tokens"
+			bind:rows="[
+				{ name: '--ui-color-bg / -bg-subtle', type: 'color', description: 'Background of the page and quiet bands.' },
+				{ name: '--ui-color-surface / -surface-raised', type: 'color', description: 'Card, panel and table; popover and modal.' },
+				{ name: '--ui-color-control / -hover / -active', type: 'color', description: 'Background of a control and its states.' },
+				{ name: '--ui-color-text / -text-soft', type: 'color', description: 'Text and secondary text.' },
+				{ name: '--ui-color-border / -border-strong / -control-border', type: 'color', description: 'Separators, quiet borders and the border of a field at 3:1 or more.' },
+				{ name: '--ui-color-primary / -hover / -contrast', type: 'color', description: 'Main action and the text on it.' },
+				{ name: '--ui-color-primary-soft / -text / -border', type: 'color', description: 'A label or a quiet active background, with its text and its border.' },
+				{ name: '--ui-color-danger / -soft / -border / -text', type: 'color', description: 'Info, success and warning have the same shape.' },
+				{ name: '--ui-font-size-xs … -6xl', type: 'rem', description: 'Text sizes: reading at lg, controls at md, titles from 2xl up.' },
+				{ name: '--ui-space-* / --ui-radius-*', type: 'rem', description: 'Space in steps of 0.25rem and radii from xs to xl.' },
+				{ name: '--ui-control-height-sm / -md / -lg', type: 'rem', description: 'Heights of the controls, which grow by themselves with a touch pointer.' },
+				{ name: '--ui-duration-* / --ui-ease-*', type: 'time', description: 'Motion: fast for color, base and slow for a panel.' },
+			]"
+		/>
+		<h2 id="scale">Fluid scale</h2>
 		<p>
-			The
+			The interface grows with the screen in one place, the global base: 16 px up to 1440, 18 px at 2560 and 21 px at 3840, always from the font size of the browser. Every token is in
+			<code>rem</code>
+			, so they grow together. What is written in
+			<code>px</code>
+			does not grow.
+			<code>{'ui: { base: false }'}</code>
+			removes the base, and the scale with it.
+		</p>
+		<h2 id="brand">Your brand</h2>
+		<p>
+			The sheets of
+			<code>app/styles</code>
+			load after the module: override the steps of a scale and everything that reads them changes with them.
+		</p>
+		<DocsCode
+			label="app/styles/main.css"
+			bind:code="examples.themeCss"
+		/>
+		<p>
+			If your site already has its variables,
 			<code>ui.tokens</code>
-			options accept CSS values or references to existing variables. The accent can be blue and the primary action neutral, as in the Meeko identity.
+			accepts CSS values or references to them, and each key assigns its
+			<code>--ui-*</code>
+			tokens.
 		</p>
 		<DocsCode
 			label="meeko.config.ts"
 			bind:code="examples.theme"
 		/>
-		<DocsCode
-			label="app/styles/main.css"
-			bind:code="examples.themeCss"
-		/>
 		<DocsApi
-			caption="Token families"
+			caption="Keys of ui.tokens"
 			bind:rows="[
-				{ name: 'accent / primary', type: 'string', description: 'Color, hover and contrast: accentHover, onAccent, primaryHover and onPrimary.' },
-				{ name: 'surface / surfaceHover', type: 'string', description: 'Component backgrounds and interactive states.' },
-				{ name: 'text / textSoft / muted', type: 'string', description: 'Primary, secondary and auxiliary text.' },
+				{ name: 'primary / primaryHover / onPrimary', type: 'string', description: '--ui-color-primary, its hover and the text on it.' },
+				{ name: 'accentSoft / accentText', type: 'string', description: 'Backgrounds and text of active states: --ui-color-primary-soft and -text.' },
+				{ name: 'surface / surfaceHover', type: 'string', description: 'Surfaces and controls, and their states.' },
+				{ name: 'text / textSoft / muted', type: 'string', description: 'Main and secondary text.' },
 				{ name: 'border / borderStrong', type: 'string', description: 'Separators and outlines.' },
 				{ name: 'focus / danger', type: 'string', description: 'Keyboard focus and errors.' },
-				{ name: 'accentSoft / accentText', type: 'string', description: 'Backgrounds and text of accent states.' },
 				{ name: 'font / radius', type: 'string', description: 'Font family and base radius.' },
 				{ name: 'controlHeight / controlPadding', type: 'string', description: 'Dimensions of the actions.' },
-				{ name: 'controlWeight / controlFontSize', type: 'string', description: 'Text weight and size of the actions.' },
+				{ name: 'controlWeight / controlFontSize', type: 'string', description: 'Weight and text size of the actions.' },
 			]"
 		/>
-		<h2 id="defaults">Defaults</h2>
+		<h2 id="defaults">Default values</h2>
 		<p>
 			<code>ui.defaults</code>
 			accepts
@@ -73,21 +218,21 @@
 			<code>link</code>
 			and
 			<code>card</code>
-			. The priority is: explicit props, application defaults and base values. Defaults are isolated per application and per SSR request.
+			. The priority is: explicit props, application defaults and base values. Defaults are isolated per application and SSR request.
 		</p>
 		<h2 id="messages">Texts and languages</h2>
 		<p>
-			The few texts that components paint on their own (the close button of
+			The few texts components paint on their own (the close button of
 			<code>UIModal</code>
 			, the empty state of
 			<code>UITable</code>
 			and
-			<code>UISelect</code>
-			, and the names of
+			<code>UICombobox</code>
+			, the names of
 			<code>UIThemeToggle</code>
 			) come in Spanish and English. With
 			<code>@meekojs/i18n</code>
-			they follow the language of the document, with no configuration. Without that module,
+			they follow the language of the document, without any configuration. Without that module,
 			<code>ui.locale</code>
 			chooses the language; Spanish by default.
 			<code>ui.messages</code>
@@ -95,7 +240,7 @@
 		</p>
 		<DocsCode bind:code="examples.messages" />
 		<p>
-			A prop or a snippet of the component always wins over these texts. What a language lacks comes from its base language (
+			A prop or a snippet of the component always win over these texts. What a language lacks comes from its base language (
 			<code>pt</code>
 			for
 			<code>pt-BR</code>
@@ -104,17 +249,13 @@
 			and, last, from Spanish. The server and the client choose the same text, so hydration changes nothing.
 		</p>
 		<p>
-			The stylesheets in
-			<code>app/styles</code>
-			load after the module. You can also override the
-			<code>--meeko-ui-*</code>
-			variables directly. The
+			The types
 			<code>UIOptions</code>
 			,
 			<code>UITokens</code>
 			and
 			<code>UIDefaults</code>
-			types are exported from
+			are exported from
 			<code>@meekojs/ui</code>
 			.
 		</p>

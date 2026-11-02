@@ -9,15 +9,24 @@
 		description="Describe states and metadata with text labels."
 	>
 		<h2 id="usage">Usage</h2>
-		<div class="preview">
+		<DocsPreview>
 			<UIBadge>Information</UIBadge>
 			<UIBadge tone="accent">Published</UIBadge>
+			<UIBadge tone="info">Beta</UIBadge>
+			<UIBadge tone="success">Active</UIBadge>
+			<UIBadge
+				tone="warning"
+				dot
+			>
+				Pending
+			</UIBadge>
 			<UIBadge tone="danger">Review</UIBadge>
-		</div>
+		</DocsPreview>
 		<DocsCode bind:code="examples.badge" />
 		<DocsApi
 			bind:rows="[
-				{ name: 'tone', type: 'neutral | accent | danger', default: 'neutral', description: 'Visual treatment of the label.' },
+				{ name: 'tone', type: 'neutral | accent | info | success | warning | danger', default: 'neutral', description: 'Visual treatment of the label.' },
+				{ name: 'dot', type: 'boolean', default: 'false', description: 'Adds a decorative dot in the color of the tone.' },
 				{ name: 'class', type: 'string', description: 'Additional classes.' },
 			]"
 		/>

@@ -442,11 +442,21 @@ async function filesIn(directory) {
 	return (await Promise.all(entries.map((entry) => (entry.isDirectory() ? filesIn(join(directory, entry.name)) : [join(directory, entry.name)])))).flat()
 }
 
-// `pnpm test:e2e` builds apps/ui first.
-test('the client bundle of apps/ui has no Crepe, CodeMirror or Vue, and its server bundle neither', async () => {
-	const output = fileURLToPath(new URL('../../../apps/ui/.meeko/output/', import.meta.url))
-	assert.ok((await stat(output)).isDirectory(), 'apps/ui was built')
+async function builtFiles(directory) {
+	const output = fileURLToPath(new URL(directory, import.meta.url))
+	assert.ok((await stat(output)).isDirectory(), directory + ' was built')
 	const files = (await filesIn(output)).filter((file) => /\.(?:m?js|css)$/.test(file))
-	assert.ok(files.length > 10, 'the files of a build')
-	for (const file of files) assert.doesNotMatch(await readFile(file, 'utf8'), /milkdown|ProseMirror|cm-editor|__VUE_|markdown-editor/, file)
+	assert.ok(files.length > 3, 'the files of a build')
+	return files
+}
+
+// `pnpm test:e2e` builds apps/i18n and apps/ui first.
+test('an app with UI but without the editor module has no Crepe, CodeMirror or Vue, on the client or on the server', async () => {
+	for (const file of await builtFiles('../../../apps/i18n/.meeko/output/')) assert.doesNotMatch(await readFile(file, 'utf8'), /milkdown|ProseMirror|cm-editor|__VUE_|markdown-editor/, file)
+})
+
+test('the server bundle of an app with the editor module has no Crepe, CodeMirror or Vue', async () => {
+	// node/client is a copy of the assets for the browser. The guide names @milkdown/crepe in its install command.
+	const server = (await builtFiles('../../../apps/ui/.meeko/output/node/')).filter((file) => !file.replaceAll('\\', '/').includes('/node/client/'))
+	for (const file of server) assert.doesNotMatch(await readFile(file, 'utf8'), /ProseMirror|cm-editor|__VUE_/, file)
 })

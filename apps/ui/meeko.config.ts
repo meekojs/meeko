@@ -5,7 +5,7 @@ export default defineMeekoConfig({
 	viewTransitions: true,
 	// URL absolutas de hreflang y del sitemap, también fuera de producción: tiene prioridad sobre MEEKO_PUBLIC_ORIGIN.
 	site: 'https://ui.meekojs.com',
-	modules: ['@meekojs/ui', '@meekojs/icon', 'meeko-docs', '@meekojs/i18n'],
+	modules: ['@meekojs/ui', '@meekojs/ui/editor', '@meekojs/icon', 'meeko-docs', '@meekojs/i18n'],
 	// Iconos de Lucide resueltos al compilar; include, los que la guía de /icons alterna con bind:name.
 	icon: { collections: ['lucide'], include: ['lucide:sun', 'lucide:moon'] },
 	// site: la moderación y los avisos del dashboard (DATABASE_URL, opcional).

@@ -1,0 +1,200 @@
+<script lang="ts">
+	import { examples } from '../../utils/examples'
+
+	const comment = signal('')
+	const accepted = signal(false)
+	const notifications = signal(true)
+	const period = signal('week')
+	const volume = signal(40)
+	const periods = [
+		{ value: 'day', label: 'Day' },
+		{ value: 'week', label: 'Week' },
+		{ value: 'month', label: 'Month' },
+		{ value: 'year', label: 'Year', disabled: true },
+	]
+</script>
+
+<template>
+	<DocsPage
+		locale="en"
+		title="Form controls"
+		description="Textarea, Checkbox, RadioGroup, Switch and Slider: native HTML, with its keyboard and submission, and the look of UI."
+	>
+		<p>
+			They all keep the native control, so the keyboard, the focus and form submission are those of the browser, also without JavaScript. Their models bind to a signal:
+			<code>model="field"</code>
+			.
+		</p>
+		<h2 id="textarea">UITextarea</h2>
+		<p>
+			Inside
+			<MeekoLink to="/forms">UIField</MeekoLink>
+			it receives the id and the description, and the field paints the counter.
+		</p>
+		<DocsPreview layout="stack">
+			<UIField
+				id="comment"
+				label="Comment"
+				hint="Optional"
+				bind:counter="comment.value.length + '/200'"
+			>
+				<snippet
+					name="default"
+					params="id, describedBy"
+				>
+					<UITextarea
+						name="comment"
+						placeholder="What would you like to tell us"
+						model="comment"
+						bind:rows="4"
+						bind:maxlength="200"
+						bind:id="id"
+						bind:describedBy="describedBy"
+					/>
+				</snippet>
+			</UIField>
+		</DocsPreview>
+		<DocsCode bind:code="examples.textarea" />
+		<DocsApi
+			caption="UITextarea props"
+			bind:rows="[
+				{ name: 'model', type: 'Signal<string>', default: 'Empty string', description: 'Text, two-way.' },
+				{ name: 'rows / name / maxlength / placeholder', type: 'HTML attributes', description: 'They reach the textarea as they are.' },
+				{ name: 'required / disabled', type: 'boolean', default: 'false', description: 'Native state.' },
+				{ name: 'invalid / describedBy', type: 'boolean / string', description: 'aria-invalid and aria-describedby.' },
+				{ name: 'class', type: 'string', description: 'Additional classes.' },
+			]"
+		/>
+		<h2 id="checkbox">UICheckbox and UISwitch</h2>
+		<p>
+			<code>UISwitch</code>
+			has the same contract as
+			<code>UICheckbox</code>
+			, with
+			<code>role="switch"</code>
+			: use it for something that applies at once.
+		</p>
+		<DocsPreview layout="stack">
+			<UICheckbox
+				label="I accept the terms"
+				description="You can withdraw it later."
+				name="accepted"
+				value="yes"
+				model="accepted"
+			/>
+			<UISwitch
+				label="Notifications"
+				name="notifications"
+				model="notifications"
+			/>
+			<p
+				id="controls-status"
+				class="docs-status"
+				role="status"
+			>
+				{accepted.value ? 'Terms accepted.' : 'Terms not accepted.'} {notifications.value ? 'Notifications on.' : 'Notifications off.'}
+			</p>
+		</DocsPreview>
+		<DocsCode bind:code="examples.checkbox" />
+		<DocsApi
+			caption="UICheckbox and UISwitch props"
+			bind:rows="[
+				{ name: 'model', type: 'Signal<boolean>', default: 'false', description: 'Checked state, two-way.' },
+				{ name: 'label', type: 'string', description: 'Required. Visible label.' },
+				{ name: 'description', type: 'string', description: 'Supporting text under the label.' },
+				{ name: 'name / value', type: 'string', description: 'What the form sends.' },
+				{ name: 'required / disabled', type: 'boolean', default: 'false', description: 'Native state.' },
+				{ name: 'invalid / describedBy', type: 'boolean / string', description: 'aria-invalid and aria-describedby.' },
+				{ name: 'class', type: 'string', description: 'Additional classes.' },
+			]"
+		/>
+		<h2 id="radio">UIRadioGroup</h2>
+		<p>
+			A
+			<code>fieldset</code>
+			with its
+			<code>legend</code>
+			and a native radio per option: the arrows move the selection.
+			<code>variant="segmented"</code>
+			paints it as a compact switcher.
+		</p>
+		<DocsPreview layout="stack">
+			<UIRadioGroup
+				legend="Period"
+				name="period"
+				model="period"
+				bind:options="periods"
+			/>
+			<UIRadioGroup
+				legend="Period, segmented"
+				name="period-segmented"
+				variant="segmented"
+				model="period"
+				bind:options="periods"
+			/>
+		</DocsPreview>
+		<DocsCode bind:code="examples.radio" />
+		<DocsApi
+			caption="UIRadioGroup props"
+			bind:rows="[
+				{ name: 'model', type: 'Signal<string>', description: 'Chosen value, two-way.' },
+				{ name: 'legend', type: 'string', description: 'Required. Name of the group.' },
+				{ name: 'options', type: 'readonly UIRadioOption[]', description: 'Required. value, label and disabled.' },
+				{ name: 'name / required / disabled', type: 'string / boolean', description: 'Native submission and state.' },
+				{ name: 'variant', type: 'default | segmented', default: 'default', description: 'A list of radios or a compact switcher.' },
+				{ name: 'class', type: 'string', description: 'Additional classes.' },
+			]"
+		/>
+		<h2 id="slider">UISlider</h2>
+		<p>
+			An
+			<code>input type="range"</code>
+			with the label inside its
+			<code>label</code>
+			. The filled part of the track follows the value.
+		</p>
+		<DocsPreview layout="stack">
+			<UISlider
+				label="Volume"
+				name="volume"
+				model="volume"
+				bind:min="0"
+				bind:max="100"
+				bind:step="5"
+			/>
+			<p
+				id="slider-status"
+				class="docs-status"
+				role="status"
+			>
+				Volume: {volume.value}
+			</p>
+		</DocsPreview>
+		<DocsCode bind:code="examples.slider" />
+		<DocsApi
+			caption="UISlider props"
+			bind:rows="[
+				{ name: 'model', type: 'Signal<number>', default: '50', description: 'Value, two-way.' },
+				{ name: 'label', type: 'string', description: 'Required. Visible label.' },
+				{ name: 'min / max / step', type: 'number', default: '0 / 100 / 1', description: 'Native limits and step.' },
+				{ name: 'name / disabled', type: 'string / boolean', description: 'Native submission and state.' },
+				{ name: 'class', type: 'string', description: 'Additional classes.' },
+			]"
+		/>
+		<p>
+			The types
+			<code>UITextareaProps</code>
+			,
+			<code>UICheckboxProps</code>
+			,
+			<code>UISwitchProps</code>
+			,
+			<code>UIRadioGroupProps</code>
+			and
+			<code>UISliderProps</code>
+			are exported from
+			<code>@meekojs/ui/runtime</code>
+			.
+		</p>
+	</DocsPage>
+</template>

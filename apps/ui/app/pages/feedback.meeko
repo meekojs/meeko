@@ -1,0 +1,223 @@
+<script lang="ts">
+	import { examples } from '../utils/examples'
+
+	const toast = useToast()
+	const dismissed = signal(false)
+	const loading = signal(true)
+</script>
+
+<template>
+	<DocsPage
+		title="Avisos"
+		description="Alert, Toast, Empty y Skeleton: lo que la interfaz dice cuando algo pasa, falta o aún no ha llegado."
+	>
+		<h2 id="alert">UIAlert</h2>
+		<p>
+			Un aviso dentro de la página, en cuatro tonos además del neutro.
+			<code>danger</code>
+			usa
+			<code>role="alert"</code>
+			; los demás,
+			<code>note</code>
+			. Elige
+			<code>status</code>
+			para anunciar un cambio, o
+			<code>none</code>
+			si ya está dentro de una región viva.
+		</p>
+		<DocsPreview layout="stack">
+			<UIAlert
+				tone="info"
+				title="Versión nueva"
+				description="UI 0.2 usa los tokens --ui-*."
+			/>
+			<UIAlert
+				tone="success"
+				title="Cambios guardados"
+				description="Ya están publicados."
+			/>
+			<UIAlert
+				tone="warning"
+				title="Traducción pendiente"
+				description="Esta página aún no está en inglés."
+			/>
+			<UIAlert
+				if:when="!dismissed.value"
+				tone="danger"
+				title="No se pudo publicar"
+				description="La base de datos no responde."
+				dismiss
+				on:dismiss="() => (dismissed.value = true)"
+			>
+				<snippet name="actions">
+					<UIButton
+						size="sm"
+						variant="outline"
+					>
+						Reintentar
+					</UIButton>
+				</snippet>
+			</UIAlert>
+			<UIButton
+				if:when="dismissed.value"
+				variant="outline"
+				on:click="() => (dismissed.value = false)"
+			>
+				Volver a mostrar el aviso
+			</UIButton>
+		</DocsPreview>
+		<DocsCode bind:code="examples.alert" />
+		<DocsApi
+			caption="Propiedades de UIAlert"
+			bind:rows="[
+				{ name: 'tone', type: 'neutral | info | success | warning | danger', default: 'neutral', description: 'Significado del aviso.' },
+				{ name: 'title / description', type: 'string', description: 'Título y texto.' },
+				{ name: 'role', type: 'alert | status | note | none', default: 'alert con danger; note', description: 'Cómo lo anuncia un lector de pantalla.' },
+				{ name: 'dismiss / closeLabel', type: 'boolean / string', default: 'false', description: 'Botón de cierre, con su nombre accesible.' },
+				{ name: 'icon', type: 'Snippet', description: 'Icono, como prop o como snippet.' },
+				{ name: 'class', type: 'string', description: 'Clases adicionales.' },
+			]"
+		/>
+		<p>
+			Admite los snippets
+			<code>default</code>
+			,
+			<code>icon</code>
+			y
+			<code>actions</code>
+			, y el evento
+			<code>dismiss</code>
+			.
+		</p>
+		<h2 id="toast">UIToast</h2>
+		<p>
+			Un aviso breve que flota sobre la página. Es un
+			<code>popover</code>
+			manual: no toma el foco.
+			<code>useToast()</code>
+			se autoimporta y añade avisos desde una acción del cliente, nunca durante SSR. Hace falta
+			<a href="/app">UIApp</a>
+			en la raíz.
+		</p>
+		<DocsPreview>
+			<UIButton on:click="() => toast.add({ text: 'Cambios guardados', tone: 'success', duration: 5000 })">Avisar del guardado</UIButton>
+			<UIButton
+				variant="outline"
+				on:click="() => toast.add({ text: 'No se pudo publicar', tone: 'danger', duration: 0 })"
+			>
+				Avisar de un error
+			</UIButton>
+			<UIButton
+				variant="ghost"
+				on:click="() => toast.clear()"
+			>
+				Cerrar todos
+			</UIButton>
+		</DocsPreview>
+		<DocsCode bind:code="examples.toast" />
+		<DocsApi
+			caption="Opciones de toast.add y propiedades de UIToast"
+			bind:rows="[
+				{ name: 'text', type: 'string', description: 'Obligatoria. El aviso.' },
+				{ name: 'tone', type: 'neutral | info | success | warning | danger', default: 'neutral', description: 'Significado del aviso.' },
+				{ name: 'duration', type: 'number', default: '5000', description: 'Milisegundos antes de cerrarse; 0 lo conserva hasta cerrarlo. La cuenta se pausa con el cursor o el foco dentro.' },
+				{ name: 'closeLabel', type: 'string', description: 'Nombre accesible del botón de cierre.' },
+				{ name: 'actions', type: 'Snippet', description: 'Acciones del aviso.' },
+			]"
+		/>
+		<p>
+			<code>add</code>
+			devuelve un id para
+			<code>remove(id)</code>
+			;
+			<code>clear()</code>
+			cierra todos. También puede usarse
+			<code>UIToast</code>
+			de forma declarativa, con el evento
+			<code>dismiss</code>
+			.
+		</p>
+		<h2 id="empty">UIEmpty</h2>
+		<p>
+			Lo que se muestra cuando no hay nada.
+			<code>inline</code>
+			para una lista,
+			<code>panel</code>
+			para una vista entera.
+		</p>
+		<DocsPreview layout="stack">
+			<UIEmpty
+				variant="panel"
+				title="Sin proyectos"
+				description="Crea el primero para empezar."
+			>
+				<snippet name="actions"><UIButton>Crear proyecto</UIButton></snippet>
+			</UIEmpty>
+			<UIEmpty description="Ningún filtro coincide." />
+		</DocsPreview>
+		<DocsApi
+			caption="Propiedades de UIEmpty"
+			bind:rows="[
+				{ name: 'title', type: 'string', default: 'No hay resultados.', description: 'Título. El valor por defecto sigue el idioma del documento.' },
+				{ name: 'description', type: 'string', description: 'Qué hacer a continuación.' },
+				{ name: 'variant', type: 'inline | panel', default: 'inline', description: 'Tamaño del espacio vacío.' },
+				{ name: 'class', type: 'string', description: 'Clases adicionales.' },
+			]"
+		/>
+		<p>
+			Admite los snippets
+			<code>default</code>
+			y
+			<code>actions</code>
+			.
+		</p>
+		<h2 id="skeleton">UISkeleton</h2>
+		<p>La forma del contenido mientras llega. Anuncia la carga una sola vez y respeta el movimiento reducido.</p>
+		<DocsPreview layout="stack">
+			<UISwitch
+				label="Cargando"
+				model="loading"
+			/>
+			<UISkeleton
+				if:when="loading.value"
+				bind:lines="3"
+				bind:widths="['full', 'long', 'short']"
+			/>
+			<p
+				if:when="!loading.value"
+				class="docs-status"
+			>
+				Ya ha llegado el contenido.
+			</p>
+		</DocsPreview>
+		<DocsCode bind:code="examples.empty" />
+		<DocsApi
+			caption="Propiedades de UISkeleton"
+			bind:rows="[
+				{ name: 'lines', type: 'number', default: '3', description: 'Número de líneas.' },
+				{ name: 'widths', type: 'readonly (full | long | short)[]', description: 'Ancho de cada línea.' },
+				{ name: 'label', type: 'string', default: 'Cargando', description: 'Lo que anuncia. El valor por defecto sigue el idioma del documento.' },
+				{ name: 'class', type: 'string', description: 'Clases adicionales.' },
+			]"
+		/>
+		<p>
+			Los textos por defecto están en
+			<code>ui.messages.&lt;idioma&gt;.feedback</code>
+			(véase
+			<a href="/theming">Temas</a>
+			). Los tipos
+			<code>UIAlertProps</code>
+			,
+			<code>UIToastProps</code>
+			,
+			<code>UIToastContext</code>
+			,
+			<code>UIEmptyProps</code>
+			y
+			<code>UISkeletonProps</code>
+			se exportan desde
+			<code>@meekojs/ui/runtime</code>
+			.
+		</p>
+	</DocsPage>
+</template>

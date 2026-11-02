@@ -31,15 +31,15 @@
 			<code>mode="cycle"</code>
 			, el valor por defecto, cada pulsación pasa a la siguiente elección. Su nombre accesible indica el tema actual y el siguiente.
 		</p>
-		<div class="preview preview-stack theme-toggle-preview">
+		<DocsPreview>
 			<UIThemeToggle id="theme-cycle" />
 			<p
-				class="theme-toggle-status"
+				class="docs-status"
 				role="status"
 			>
 				{summary.value}
 			</p>
-		</div>
+		</DocsPreview>
 		<DocsCode bind:code="examples.themeToggle" />
 		<h2 id="select">Un grupo de opciones</h2>
 		<p>
@@ -51,12 +51,12 @@
 			<code>Fin</code>
 			mueven el foco y la elección, como en un grupo de radios nativo.
 		</p>
-		<div class="preview">
+		<DocsPreview>
 			<UIThemeToggle
 				id="theme-select"
 				mode="select"
 			/>
-		</div>
+		</DocsPreview>
 		<DocsCode bind:code="examples.themeToggleSelect" />
 		<h2 id="custom">Elecciones, textos e iconos</h2>
 		<p>
@@ -98,14 +98,3 @@
 		</p>
 	</DocsPage>
 </template>
-
-<style>
-	.theme-toggle-preview {
-		align-items: center;
-	}
-	.theme-toggle-preview .theme-toggle-status {
-		margin: 0;
-		color: var(--ui-color-text-soft);
-		font-size: 0.875rem;
-	}
-</style>

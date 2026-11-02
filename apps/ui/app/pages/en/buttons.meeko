@@ -11,12 +11,12 @@
 		description="Run an action, open a URL or navigate to a route with a single visual API."
 	>
 		<h2 id="usage">Usage</h2>
-		<div class="preview">
+		<DocsPreview>
 			<UIButton on:click="() => count.value++">Save change</UIButton>
 			<UIButton variant="secondary">Secondary</UIButton>
 			<UIButton variant="outline">Outline</UIButton>
 			<UIButton variant="ghost">Ghost</UIButton>
-		</div>
+		</DocsPreview>
 		<p role="status">Changes in this example: {count.value}</p>
 		<DocsCode bind:code="examples.button" />
 		<h2 id="kinds">Route, link or button</h2>
@@ -32,10 +32,7 @@
 			<code>&lt;button type="button"&gt;</code>
 			.
 		</p>
-		<div
-			id="button-kinds"
-			class="preview"
-		>
+		<DocsPreview id="button-kinds">
 			<UIButton
 				id="button-kind-route"
 				to="/links"
@@ -57,7 +54,7 @@
 			>
 				Action
 			</UIButton>
-		</div>
+		</DocsPreview>
 		<p
 			id="button-kinds-status"
 			role="status"
@@ -89,7 +86,7 @@
 			.
 		</p>
 		<h2 id="sizes">Sizes and states</h2>
-		<div class="preview">
+		<DocsPreview>
 			<UIButton size="sm">Small</UIButton>
 			<UIButton size="md">Medium</UIButton>
 			<UIButton size="lg">Large</UIButton>
@@ -100,7 +97,38 @@
 				Pill
 			</UIButton>
 			<UIButton disabled>Unavailable</UIButton>
-		</div>
+		</DocsPreview>
+		<h2 id="tone">Danger, loading and icon</h2>
+		<p>
+			<code>tone="danger"</code>
+			marks a destructive action.
+			<code>loading</code>
+			keeps the text, adds the spinner, announces
+			<code>aria-busy</code>
+			and blocks the action without taking its focus. With
+			<code>iconOnly</code>
+			, the button is square: always name it with
+			<code>ariaLabel</code>
+			.
+		</p>
+		<DocsPreview>
+			<UIButton tone="danger">Delete</UIButton>
+			<UIButton
+				tone="danger"
+				variant="outline"
+			>
+				Revoke
+			</UIButton>
+			<UIButton bind:loading="true">Saving</UIButton>
+			<UIButton
+				iconOnly
+				ariaLabel="Delete"
+				variant="outline"
+			>
+				<UIIcon name="lucide:trash-2" />
+			</UIButton>
+		</DocsPreview>
+		<DocsCode bind:code="examples.buttonStates" />
 		<DocsApi
 			bind:rows="[
 				{ name: 'to', type: 'RouteId', description: 'A route of the application. Renders a link that navigates without reloading. Excludes href, type and disabled.' },
@@ -112,6 +140,10 @@
 				{ name: 'variant', type: 'primary | secondary | outline | ghost', default: 'primary', description: 'Visual hierarchy of the action.' },
 				{ name: 'size', type: 'sm | md | lg', default: 'md', description: 'Size of the control.' },
 				{ name: 'shape', type: 'rounded | pill', default: 'rounded', description: 'Shape of the outline.' },
+				{ name: 'tone', type: 'danger', description: 'Marks a destructive action, with any variant.' },
+				{ name: 'loading', type: 'boolean', default: 'false', description: 'Adds the spinner, announces aria-busy and blocks the action without taking its focus.' },
+				{ name: 'iconOnly / ariaLabel', type: 'boolean / string', default: 'false', description: 'A square button with an icon; ariaLabel gives its accessible name.' },
+				{ name: 'name / value / form', type: 'string', description: 'Without to or href. The native attributes of a submit button.' },
 				{ name: 'class', type: 'string', description: 'Additional classes.' },
 				{ name: 'id / title / aria-* / data-*', type: 'HTML attributes', description: 'Reach the element as they are.' },
 			]"
@@ -123,11 +155,9 @@
 			<code>event.preventDefault()</code>
 			cancels the navigation. The
 			<code>default</code>
-			snippet is required. For asynchronous states, control
-			<code>disabled</code>
-			and the text with your signals; there is no
+			snippet is required. For an asynchronous action, bind
 			<code>loading</code>
-			prop.
+			to your signal.
 		</p>
 		<p>
 			For a link with its own visual hierarchy and the defaults of

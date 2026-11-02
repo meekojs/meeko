@@ -10,7 +10,7 @@ import { chromium } from 'playwright-core'
 /** Spanish interface texts of the shell and of this site that an /en/ page must never contain. */
 const spanishInterface = ['Saltar al contenido', 'Buscar en la guía', 'Filtrar documentación', 'Ecosistema', 'Documentación', 'Menú', 'Paquete de Meeko', 'Licencia MIT', 'Destacado', 'No hay coincidencias', 'Copiar', 'Ejemplo .meeko', 'Propiedades', 'Tipo / valor inicial', 'Descripción', '¿Te sirvió', 'Añadir un comentario', 'Cerrar aviso', 'Cerrar modal', 'Cambiar tema', 'Tema:', 'Claro', 'Oscuro', 'Sistema', 'Idioma', 'Seguir en', 'Primeros pasos', 'Componentes', 'Integración con Meeko', 'Esta página no existe', 'Ver componentes', 'Quitar selección', 'Sin resultados', 'No hay datos']
 
-const guides = ['/', '/installation', '/theming', '/components', '/container', '/buttons', '/links', '/badges', '/icons', '/forms', '/select', '/cards', '/tables', '/modals', '/popover', '/app', '/theme-toggle', '/transitions', '/transitions/project']
+const guides = ['/', '/installation', '/theming', '/components', '/container', '/buttons', '/links', '/badges', '/icons', '/forms', '/controls', '/select', '/editor', '/cards', '/tables', '/content', '/feedback', '/page', '/navigation', '/modals', '/popover', '/overlays', '/app', '/theme-toggle', '/transitions', '/transitions/project']
 
 async function freePort() {
 	const socket = createServer().listen(0, '127.0.0.1')
@@ -56,6 +56,11 @@ test('the English UI documentation has an English interface, hreflang, a switche
 	})
 	const errors = []
 	page.on('pageerror', (error) => errors.push(error.message))
+	// Crepe weighs 347 KB: only the guide of the editor may download it.
+	const editorAssets = []
+	page.on('request', (request) => {
+		if (/\/(?:crepe|MarkdownEditor)-[^/]*$/.test(new URL(request.url()).pathname)) editorAssets.push(request.url())
+	})
 	// Visible text without code blocks, documented default values or content in another language, plus
 	// accessible and placeholder texts.
 	const interfaceTexts = () =>
@@ -164,6 +169,53 @@ test('the English UI documentation has an English interface, hreflang, a switche
 	assert.equal(await page.getByRole('table', { name: 'Tabla vacía', exact: true }).locator('.meeko-ui-table-empty').innerText(), 'No hay datos.')
 	await page.goto(origin + '/links', { waitUntil: 'networkidle' })
 	assert.equal(await page.locator('a.meeko-ui-link-card').getAttribute('href'), '/theming')
+	// The guides of the new components: their demos work, in English, in both directions of each control.
+	await page.goto(origin + '/en/controls', { waitUntil: 'networkidle' })
+	await page.getByRole('checkbox', { name: /I accept the terms/ }).check()
+	await page.getByRole('switch', { name: 'Notifications', exact: true }).uncheck()
+	await page.locator('#controls-status', { hasText: 'Terms accepted. Notifications off.' }).waitFor()
+	await page.getByRole('slider', { name: 'Volume', exact: true }).press('End')
+	await page.locator('#slider-status', { hasText: 'Volume: 100' }).waitFor()
+	await page.goto(origin + '/en/feedback', { waitUntil: 'networkidle' })
+	await page.getByRole('button', { name: 'Notify the save', exact: true }).click()
+	await page.locator('.meeko-ui-toast', { hasText: 'Changes saved' }).waitFor()
+	assert.equal(await page.locator('.meeko-ui-toast-host').getAttribute('aria-live'), 'polite')
+	await page.getByRole('button', { name: 'Close all', exact: true }).click()
+	await page.getByRole('button', { name: 'Dismiss notification', exact: true }).first().click()
+	await page.getByRole('button', { name: 'Show the notice again', exact: true }).waitFor()
+	await page.goto(origin + '/en/overlays', { waitUntil: 'networkidle' })
+	await page.getByRole('button', { name: 'Open filters', exact: true }).click()
+	const drawer = page.getByRole('dialog', { name: 'Filters', exact: true })
+	await drawer.waitFor()
+	await drawer.getByRole('button', { name: 'Apply', exact: true }).click()
+	await drawer.waitFor({ state: 'hidden' })
+	await page.getByRole('button', { name: 'Search this page', exact: true }).click()
+	await page.getByRole('dialog', { name: 'Search this page', exact: true }).getByRole('combobox').fill('tooltip')
+	assert.equal(
+		await page
+			.getByRole('option')
+			.allInnerTexts()
+			.then((rows) => rows.join()),
+		'UITooltip',
+	)
+	await page.keyboard.press('Escape')
+	await page.goto(origin + '/en/navigation', { waitUntil: 'networkidle' })
+	await page.getByRole('tab', { name: 'Team', exact: true }).click()
+	await page.getByRole('tabpanel', { name: 'Team', exact: true }).waitFor()
+	// The suggestion of the shell floats in the same place as the sample: close it first.
+	const shellSuggestion = page.getByRole('complementary', { name: 'Language suggestion', exact: true })
+	await shellSuggestion.getByRole('button', { name: 'Stay in English', exact: true }).click()
+	await shellSuggestion.waitFor({ state: 'detached' })
+	await page.getByRole('button', { name: 'Show the suggestion', exact: true }).click()
+	const sample = page.getByRole('complementary', { name: 'Sample suggestion', exact: true })
+	await sample.getByRole('button', { name: 'Stay in English', exact: true }).click()
+	await sample.waitFor({ state: 'detached' })
+	editorAssets.length = 0
+	await page.goto(origin + '/en/buttons', { waitUntil: 'networkidle' })
+	assert.deepEqual(editorAssets, [], 'a page without the editor downloads none of it')
+	await page.goto(origin + '/en/editor', { waitUntil: 'networkidle' })
+	await page.locator('.milkdown').first().waitFor()
+	assert.ok(editorAssets.length > 0, 'the guide of the editor downloads it')
 	// Mobile: the switcher stays in the header without horizontal scroll; the menu is English.
 	await page.setViewportSize({ width: 360, height: 780 })
 	await page.goto(origin + '/en/modals', { waitUntil: 'networkidle' })

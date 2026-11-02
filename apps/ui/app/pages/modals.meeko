@@ -20,34 +20,42 @@
 		title="Modal"
 		description="Diálogos declarativos o programáticos con resultados y soporte de anidación."
 	>
-		<div class="modal-demo">
-			<div class="modal-demo-actions">
-				<UIButton on:click="ask">Abrir confirmación</UIButton>
-				<UIButton
-					variant="secondary"
-					on:click="() => (opened.value = true)"
-				>
-					Modal declarativo
-				</UIButton>
-				<UIButton
-					variant="secondary"
-					on:click="() => (locked.value = true)"
-				>
-					Cierre protegido
-				</UIButton>
-			</div>
-			<p role="status">{result.value}</p>
+		<div class="docs-actions">
+			<UIButton on:click="ask">Abrir confirmación</UIButton>
+			<UIButton
+				variant="secondary"
+				on:click="() => (opened.value = true)"
+			>
+				Modal declarativo
+			</UIButton>
+			<UIButton
+				variant="secondary"
+				on:click="() => (locked.value = true)"
+			>
+				Cierre protegido
+			</UIButton>
 		</div>
+		<p role="status">{result.value}</p>
 		<UIModal
 			title="Un modal declarativo"
 			description="Controlado con una señal y model."
 			model="opened"
 		>
-			<label for="modal-name">Nombre</label>
-			<UIInput
+			<UIField
 				id="modal-name"
-				placeholder="Escribe tu nombre"
-			/>
+				label="Nombre"
+			>
+				<snippet
+					name="default"
+					params="id, describedBy"
+				>
+					<UIInput
+						placeholder="Escribe tu nombre"
+						bind:id="id"
+						bind:describedBy="describedBy"
+					/>
+				</snippet>
+			</UIField>
 			<snippet name="footer"><UIButton on:click="() => (opened.value = false)">Listo</UIButton></snippet>
 		</UIModal>
 		<UIModal

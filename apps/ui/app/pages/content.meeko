@@ -1,0 +1,217 @@
+<script lang="ts">
+	import { examples } from '../utils/examples'
+
+	const details = [
+		{ label: 'Estado', value: 'Publicado', detail: 'Hoy' },
+		{ label: 'Autor', value: 'Equipo Meeko' },
+		{ label: 'Idiomas', value: 2, detail: 'es, en' },
+	]
+</script>
+
+<template>
+	<DocsPage
+		title="Datos y contenido"
+		description="Stat, DescriptionList, Disclosure, Diff, CodeBlock y Prose: cifras, detalles, cambios, código y texto largo."
+	>
+		<h2 id="stat">UIStat y UIDescriptionList</h2>
+		<p>
+			Una cifra con su etiqueta, o varios pares etiqueta y valor. Las dos son una lista de definición (
+			<code>dl</code>
+			).
+			<code>UIDescriptionList</code>
+			se queda en una columna en móvil.
+		</p>
+		<DocsPreview layout="stack">
+			<div class="docs-grid">
+				<UIStat
+					label="Visitas"
+					detail="Últimos 7 días"
+					bind:value="1280"
+				/>
+				<UIStat
+					label="Búsquedas"
+					bind:value="96"
+				/>
+				<UIStat
+					label="Respuestas útiles"
+					value="92 %"
+				/>
+			</div>
+			<UIDescriptionList
+				bind:columns="3"
+				bind:items="details"
+			/>
+		</DocsPreview>
+		<DocsCode bind:code="examples.stat" />
+		<DocsApi
+			caption="Propiedades de UIStat"
+			bind:rows="[
+				{ name: 'label', type: 'string', description: 'Obligatoria. Qué se mide.' },
+				{ name: 'value', type: 'string | number', description: 'Obligatoria. La cifra.' },
+				{ name: 'detail', type: 'string', description: 'Periodo o comparación.' },
+				{ name: 'class', type: 'string', description: 'Clases adicionales.' },
+			]"
+		/>
+		<DocsApi
+			caption="Propiedades de UIDescriptionList"
+			bind:rows="[
+				{ name: 'items', type: 'readonly UIDescriptionItem[]', description: 'Obligatoria. label, value y detail.' },
+				{ name: 'columns', type: '1 | 2 | 3', default: '1', description: 'Columnas a partir del ancho de móvil.' },
+				{ name: 'class', type: 'string', description: 'Clases adicionales.' },
+			]"
+		/>
+		<h2 id="disclosure">UIDisclosure</h2>
+		<p>
+			Un
+			<code>details</code>
+			nativo: se abre con el teclado y sin JavaScript.
+		</p>
+		<DocsPreview layout="stack">
+			<UIDisclosure summary="Detalles técnicos">
+				<p>El contenido ya está en el HTML, así que el buscador de la página lo encuentra.</p>
+			</UIDisclosure>
+		</DocsPreview>
+		<DocsApi
+			caption="Propiedades de UIDisclosure"
+			bind:rows="[
+				{ name: 'summary', type: 'string', description: 'Obligatoria. El texto que abre y cierra.' },
+				{ name: 'open', type: 'boolean', default: 'false', description: 'Abierto desde el principio.' },
+				{ name: 'class', type: 'string', description: 'Clases adicionales.' },
+			]"
+		/>
+		<h2 id="diff">UIDiff</h2>
+		<p>
+			Recibe un diff unificado y marca cada línea con
+			<code>data-kind</code>
+			(
+			<code>add</code>
+			,
+			<code>remove</code>
+			,
+			<code>hunk</code>
+			,
+			<code>file</code>
+			,
+			<code>context</code>
+			) y un texto para lectores de pantalla: el color no es el único significado.
+		</p>
+		<UIDiff
+			label="Cambios en la guía"
+			bind:diff="examples.diffSample"
+		/>
+		<DocsCode bind:code="examples.diff" />
+		<DocsApi
+			caption="Propiedades de UIDiff"
+			bind:rows="[
+				{ name: 'diff', type: 'string', description: 'Obligatoria. El diff unificado.' },
+				{ name: 'label', type: 'string', description: 'Obligatoria. Nombre de la región.' },
+				{ name: 'emptyText', type: 'string', description: 'Lo que se muestra sin cambios.' },
+				{ name: 'lineLabels', type: 'Partial<Record<UIDiffLineKind, string>>', description: 'El texto que anuncia cada tipo de línea.' },
+				{ name: 'class', type: 'string', description: 'Clases adicionales.' },
+			]"
+		/>
+		<h2 id="code-block">UICodeBlock</h2>
+		<p>
+			Código con su botón de copiar, oculto hasta hidratar porque es el único script. En
+			<code>html</code>
+			recibe un
+			<code>pre</code>
+			ya resaltado (Shiki con
+			<code>--shiki-light</code>
+			y
+			<code>--shiki-dark</code>
+			) y en
+			<code>code</code>
+			, lo que se copia.
+			<code>mode="log"</code>
+			usa
+			<code>role="log"</code>
+			y parte las líneas.
+		</p>
+		<UICodeBlock
+			label="Terminal"
+			code="pnpm add @meekojs/ui"
+		/>
+		<UICodeBlock
+			verdict="good"
+			verdictLabel="Bien"
+			lang="ts"
+			code="const count = signal(0)"
+		/>
+		<UICodeBlock
+			verdict="bad"
+			verdictLabel="Mal"
+			lang="ts"
+			code="let count = 0"
+		/>
+		<UICodeBlock
+			mode="log"
+			label="Registro"
+			code="build: 47 módulos
+build: listo en 1,2 s"
+		/>
+		<DocsApi
+			caption="Propiedades de UICodeBlock"
+			bind:rows="[
+				{ name: 'code / html', type: 'string / TrustedHtml', description: 'Lo que se copia y, si lo hay, su versión resaltada.' },
+				{ name: 'label / lang', type: 'string', description: 'Nombre del bloque y lenguaje.' },
+				{ name: 'verdict / verdictLabel', type: 'good | bad / string', description: 'Marca un ejemplo como bueno o malo, con texto.' },
+				{ name: 'mode', type: 'code | log', default: 'code', description: 'Con log, role=log y sin botón de copiar salvo con copy.' },
+				{ name: 'copy', type: 'boolean', default: 'true con code', description: 'Muestra el botón de copiar.' },
+				{ name: 'copyLabel / copyAriaLabel / copiedLabel / copyFailedLabel', type: 'string', description: 'Textos del botón.' },
+				{ name: 'uiLang / labelLang', type: 'string', description: 'Idioma de los textos de la interfaz y de la etiqueta.' },
+				{ name: 'class', type: 'string', description: 'Clases adicionales.' },
+			]"
+		/>
+		<h2 id="prose">UIProse</h2>
+		<p>
+			Viste Markdown renderizado o tu propio HTML. El texto mantiene una medida de lectura, mientras el código y las tablas pueden ocupar toda la columna. Un componente de UI dentro del texto conserva su aspecto. Todas estas guías van dentro de un
+			<code>UIProse</code>
+			.
+		</p>
+		<DocsPreview layout="stack">
+			<UIProse as="section">
+				<h3>Un título de sección</h3>
+				<p>
+					Un párrafo con
+					<a href="#prose">un enlace</a>
+					,
+					<strong>énfasis</strong>
+					y
+					<code>código</code>
+					.
+				</p>
+				<ul>
+					<li>Una lista</li>
+					<li>con dos elementos</li>
+				</ul>
+			</UIProse>
+		</DocsPreview>
+		<DocsApi
+			caption="Propiedades de UIProse"
+			bind:rows="[
+				{ name: 'as', type: 'div | article | section', default: 'div', description: 'Etiqueta de la raíz.' },
+				{ name: 'html', type: 'TrustedHtml', description: 'HTML ya renderizado y de confianza; sin él, el snippet default.' },
+				{ name: 'class', type: 'string', description: 'Clases adicionales. La clase meeko-ui-prose también sirve en cualquier elemento.' },
+			]"
+		/>
+		<DocsCode bind:code="examples.codeBlock" />
+		<p>
+			Los tipos
+			<code>UIStatProps</code>
+			,
+			<code>UIDescriptionListProps</code>
+			,
+			<code>UIDisclosureProps</code>
+			,
+			<code>UIDiffProps</code>
+			,
+			<code>UICodeBlockProps</code>
+			y
+			<code>UIProseProps</code>
+			se exportan desde
+			<code>@meekojs/ui/runtime</code>
+			.
+		</p>
+	</DocsPage>
+</template>

@@ -11,7 +11,7 @@
 		<h2 id="requirements">Before you start</h2>
 		<p>
 			You need a Meeko application, Node.js 24 or later and a Meeko version in the range
-			<code>&gt;=1.7 &lt;2</code>
+			<code>&gt;=1.8 &lt;2</code>
 			. UI belongs to the Meeko ecosystem and ships as a separate package.
 		</p>
 		<h2 id="install">Install the package</h2>
@@ -21,9 +21,9 @@
 		/>
 		<h2 id="module">Register the module</h2>
 		<p>
-			Import the module to get the types of
+			Register it by name: its options go under the
 			<code>ui</code>
-			in the configuration. Components are registered with the
+			key, typed without importing anything. Components are registered with the
 			<code>UI</code>
 			prefix.
 		</p>
@@ -45,12 +45,12 @@
 			bind:code="examples.app"
 		/>
 		<h2 id="first-component">Use a component</h2>
-		<div class="preview">
+		<DocsPreview>
 			<UIButton>Save changes</UIButton>
 			<UIButton variant="outline">Cancel</UIButton>
-		</div>
+		</DocsPreview>
 		<DocsCode bind:code="examples.button" />
-		<div class="doc-note">Signals, macros and UI components are discovered in your application. The types you need explicitly are imported from the package's public exports.</div>
+		<UIAlert tone="info">Signals, macros and UI components are discovered in your application. The types you need explicitly are imported from the package's public exports.</UIAlert>
 		<p>
 			Continue with
 			<MeekoLink to="/theming">theming and customization</MeekoLink>

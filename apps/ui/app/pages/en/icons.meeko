@@ -15,7 +15,7 @@
 		description="Iconify icons and your own SVGs, typed and inlined in the HTML at build time."
 	>
 		<h2 id="usage">Usage</h2>
-		<div class="preview">
+		<DocsPreview>
 			<p>
 				<UIIcon name="lucide:search" />
 				Search the project
@@ -26,7 +26,7 @@
 					label="Delete"
 				/>
 			</UIButton>
-		</div>
+		</DocsPreview>
 		<DocsCode bind:code="examples.icon" />
 		<p>
 			<code>UIIcon</code>
@@ -70,7 +70,7 @@
 			<code>meeko dev</code>
 			warns in the console.
 		</p>
-		<div class="preview">
+		<DocsPreview>
 			<UIButton
 				variant="secondary"
 				on:click="() => (open.value = !open.value)"
@@ -89,7 +89,7 @@
 					bind:label="mode.value === 'lucide:sun' ? 'Light mode' : 'Dark mode'"
 				/>
 			</UIButton>
-		</div>
+		</DocsPreview>
 		<DocsCode bind:code="examples.iconDynamic" />
 
 		<h2 id="local">Your own SVGs</h2>
@@ -108,13 +108,13 @@
 			<code>currentColor</code>
 			.
 		</p>
-		<div class="preview">
+		<DocsPreview>
 			<UIIcon
 				name="local:paw"
 				label="Meeko"
 				size="1.5em"
 			/>
-		</div>
+		</DocsPreview>
 		<DocsCode bind:code="examples.iconLocal" />
 
 		<h2 id="accessibility">Accessibility, size and color</h2>
@@ -142,7 +142,7 @@
 			<code>currentColor</code>
 			. Width, height and fill are attributes, never inline styles: it works with a strict Content Security Policy.
 		</p>
-		<div class="preview">
+		<DocsPreview>
 			<UIIcon
 				name="lucide:star"
 				size="16px"
@@ -155,7 +155,7 @@
 				name="lucide:star"
 				size="2.5em"
 			/>
-		</div>
+		</DocsPreview>
 
 		<h2 id="api">API</h2>
 		<DocsApi

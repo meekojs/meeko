@@ -1,0 +1,175 @@
+<script lang="ts">
+	import { examples } from '../utils/examples'
+
+	const drawer = signal(false)
+	const drafts = signal(false)
+	const query = signal('')
+	const pages = [
+		{ title: 'UIDrawer', url: '#drawer' },
+		{ title: 'UITooltip', url: '#tooltip' },
+		{ title: 'UICommandPalette', url: '#command-palette' },
+	]
+	const results = computed(() => pages.filter((page) => page.title.toLowerCase().includes(query.value.trim().toLowerCase())))
+</script>
+
+<template>
+	<DocsPage
+		title="Superposiciones"
+		description="Drawer, Tooltip y CommandPalette, sobre dialog y popover nativos."
+	>
+		<p>
+			Para un diálogo con resultado, usa
+			<a href="/modals">Modal</a>
+			; para un menú o un diálogo ligero,
+			<a href="/popover">Popover</a>
+			. Todos usan la capa superior del navegador, y salen con una View Transition donde existe.
+		</p>
+		<h2 id="drawer">UIDrawer</h2>
+		<p>
+			Un panel lateral. Es un
+			<code>dialog</code>
+			modal con
+			<code>command</code>
+			,
+			<code>commandfor</code>
+			y
+			<code>closedby</code>
+			: abre, cierra y devuelve el foco sin JavaScript en los navegadores que los admiten; donde no, lo hace al hidratar. Al seguir un enlace de dentro se cierra al instante, porque la navegación ya es la transición.
+		</p>
+		<DocsPreview>
+			<UIDrawer
+				title="Filtros"
+				triggerLabel="Abrir filtros"
+				side="end"
+				model="drawer"
+			>
+				<UICheckbox
+					label="Incluir borradores"
+					model="drafts"
+				/>
+				<snippet name="footer">
+					<UIButton on:click="() => (drawer.value = false)">Aplicar</UIButton>
+				</snippet>
+			</UIDrawer>
+		</DocsPreview>
+		<DocsCode bind:code="examples.drawer" />
+		<DocsApi
+			caption="Propiedades de UIDrawer"
+			bind:rows="[
+				{ name: 'title', type: 'string', description: 'Obligatoria. Nombre del diálogo.' },
+				{ name: 'model', type: 'Signal<boolean>', default: 'false', description: 'Apertura, de doble vía.' },
+				{ name: 'side', type: 'start | end', default: 'start', description: 'Lado por el que entra.' },
+				{ name: 'triggerLabel / closeLabel', type: 'string', description: 'Texto del disparador y nombre accesible del cierre.' },
+				{ name: 'closedBy', type: 'any | closerequest | none', default: 'any', description: 'Qué lo cierra, además de su botón: el fondo y Esc, sólo Esc o nada.' },
+				{ name: 'closeOnNavigate', type: 'boolean', default: 'true', description: 'Se cierra al seguir un enlace.' },
+				{ name: 'id / class', type: 'string', description: 'Identidad y clases.' },
+			]"
+		/>
+		<p>
+			Admite los snippets
+			<code>default</code>
+			,
+			<code>footer</code>
+			y
+			<code>trigger(id)</code>
+			, y el evento
+			<code>close</code>
+			.
+		</p>
+		<h2 id="tooltip">UITooltip</h2>
+		<p>
+			Un
+			<a href="/popover">UIPopover</a>
+			con
+			<code>mode="hint"</code>
+			y el aspecto de un tooltip: se abre con el puntero o el foco, nunca toma el foco, y el disparador lo referencia con
+			<code>aria-describedby</code>
+			. Escribe en él información complementaria.
+		</p>
+		<DocsPreview>
+			<UITooltip text="Se publica al guardar">
+				<snippet name="trigger">¿Cuándo se publica?</snippet>
+			</UITooltip>
+		</DocsPreview>
+		<DocsCode bind:code="examples.tooltip" />
+		<DocsApi
+			caption="Propiedades de UITooltip"
+			bind:rows="[
+				{ name: 'text', type: 'string', description: 'El texto; para algo más, el snippet default.' },
+				{ name: 'placement', type: 'PopoverPlacement', default: 'top', description: 'Lado y alineación.' },
+				{ name: 'offset', type: 'number', default: '6', description: 'Separación en píxeles.' },
+				{ name: 'delay / closeDelay', type: 'number', default: '300 / 150', description: 'Milisegundos antes de abrir y de cerrar.' },
+				{ name: 'class / triggerClass / triggerId', type: 'string', description: 'Clases del contenido y del disparador, e id del disparador.' },
+			]"
+		/>
+		<p>
+			Admite los snippets
+			<code>default</code>
+			,
+			<code>trigger</code>
+			y
+			<code>anchor(trigger)</code>
+			, para un disparador propio.
+		</p>
+		<h2 id="command-palette">UICommandPalette</h2>
+		<p>
+			No busca: lee
+			<code>query</code>
+			en tu código, busca donde quieras (Pagefind, un servidor o una lista local) y pásale
+			<code>results</code>
+			y
+			<code>status</code>
+			. Se abre con su botón o con
+			<code>Ctrl</code>
+			y
+			<code>K</code>
+			, y las flechas recorren los resultados sin sacar el foco del campo.
+		</p>
+		<DocsPreview>
+			<UICommandPalette
+				label="Buscar en esta página"
+				hrefBy="url"
+				labelBy="title"
+				model:query="query"
+				bind:results="results.value"
+				bind:status="results.value.length ? 'ready' : 'empty'"
+			/>
+		</DocsPreview>
+		<DocsCode bind:code="examples.commandPalette" />
+		<DocsApi
+			caption="Propiedades de UICommandPalette"
+			bind:rows="[
+				{ name: 'results', type: 'readonly T[]', description: 'Obligatoria. Lo que se muestra.' },
+				{ name: 'status', type: 'idle | loading | ready | empty | unavailable', default: 'ready', description: 'Lo que anuncia la región de estado.' },
+				{ name: 'model / model:query / model:active', type: 'Signal', description: 'Apertura, texto buscado y resultado activo.' },
+				{ name: 'labelBy / hrefBy / childrenBy', type: 'clave o función', description: 'Etiqueta, destino y resultados anidados.' },
+				{ name: 'label / inputLabel / placeholder / closeLabel', type: 'string', description: 'Textos. Los valores por defecto siguen el idioma del documento.' },
+				{ name: 'trigger / shortcut', type: 'boolean', default: 'true', description: 'Pinta su botón y atiende el atajo.' },
+				{ name: 'inputId / inputName / class / triggerClass', type: 'string', description: 'Identidad del campo y clases.' },
+			]"
+		/>
+		<p>
+			Admite los snippets
+			<code>item(item, state)</code>
+			,
+			<code>trigger(modifier)</code>
+			y
+			<code>status(status, query)</code>
+			, y los eventos
+			<code>open</code>
+			,
+			<code>close</code>
+			y
+			<code>choose</code>
+			. Los tipos
+			<code>UIDrawerProps</code>
+			,
+			<code>UITooltipProps</code>
+			y
+			<code>UICommandPaletteProps</code>
+			se exportan desde
+			<code>@meekojs/ui/runtime</code>
+			.
+		</p>
+	</DocsPage>
+</template>

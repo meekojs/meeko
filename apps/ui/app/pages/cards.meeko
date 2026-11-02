@@ -2,7 +2,8 @@
 	import { examples } from '../utils/examples'
 
 	const count = signal(0)
-	const variant = signal<'outline' | 'soft' | 'solid' | 'elevated'>('outline')
+	const variants = ['outline', 'soft', 'solid', 'elevated'] as const
+	const variant = signal<(typeof variants)[number] | null>('outline')
 </script>
 
 <template>
@@ -10,71 +11,70 @@
 		title="Card"
 		description="Agrupa contenido con variantes, cabecera y acciones opcionales."
 	>
-		<div class="card-demo">
-			<div class="card-demo-controls">
-				<label for="card-variant">Variante</label>
-				<select
-					id="card-variant"
-					bind:value="variant.value"
-					on:change="
-						(event) => {
-							const value = event.currentTarget.value
-							if (value === 'outline' || value === 'soft' || value === 'solid' || value === 'elevated') variant.value = value
-						}
-					"
-				>
-					<option value="outline">Outline</option>
-					<option value="soft">Soft</option>
-					<option value="solid">Solid</option>
-					<option value="elevated">Elevated</option>
-				</select>
-			</div>
-			<UICard
-				title="Tu espacio de trabajo"
-				description="Una card controlada por props, con contenido reactivo."
-				class="card-demo-preview"
-				bind:variant="variant.value"
+		<div class="docs-actions">
+			<UIField
+				id="card-variant"
+				label="Variante"
 			>
-				<p role="status">Cambios guardados: {count.value}</p>
-				<snippet name="footer">
-					<UIButton
-						variant="secondary"
-						on:click="() => count.value++"
-					>
-						Guardar cambio
-					</UIButton>
+				<snippet
+					name="default"
+					params="id, describedBy"
+				>
+					<UISelect
+						model="variant"
+						bind:options="variants"
+						bind:id="id"
+						bind:describedBy="describedBy"
+					/>
 				</snippet>
+			</UIField>
+		</div>
+		<UICard
+			title="Tu espacio de trabajo"
+			description="Una card controlada por props, con contenido reactivo."
+			bind:variant="variant.value ?? 'outline'"
+		>
+			<p role="status">Cambios guardados: {count.value}</p>
+			<snippet name="footer">
+				<UIButton
+					variant="secondary"
+					on:click="() => count.value++"
+				>
+					Guardar cambio
+				</UIButton>
+			</snippet>
+		</UICard>
+		<div class="docs-grid">
+			<UICard
+				title="Outline"
+				description="Borde definido para separar contenido."
+				variant="outline"
+			>
+				<p>Detalles del proyecto y contenido relacionado.</p>
 			</UICard>
-			<div class="card-demo-variants">
-				<UICard
-					title="Outline"
-					description="Borde definido para separar contenido."
-					variant="outline"
-				>
-					<p>Detalles del proyecto y contenido relacionado.</p>
-				</UICard>
-				<UICard
-					title="Soft"
-					description="Un fondo tenue, sin borde visible."
-					variant="soft"
-				>
-					<p>Información complementaria dentro de una vista.</p>
-				</UICard>
-				<UICard
-					title="Solid"
-					description="El color de acento para destacar contenido."
-					variant="solid"
-				>
-					<p>Un mensaje relevante para el equipo.</p>
-				</UICard>
-				<UICard
-					title="Elevated"
-					description="Una superficie elevada mediante sombra."
-					variant="elevated"
-				>
-					<p>Contenido que necesita distinguirse del fondo.</p>
-				</UICard>
-			</div>
+			<UICard
+				title="Soft"
+				description="Un fondo tenue, sin borde visible."
+				variant="soft"
+			>
+				<p>Información complementaria dentro de una vista.</p>
+			</UICard>
+			<UICard
+				title="Solid"
+				description="El color de acento para destacar contenido."
+				variant="solid"
+			>
+				<p>Un mensaje relevante para el equipo.</p>
+			</UICard>
+			<UICard
+				title="Elevated"
+				description="Una superficie elevada mediante sombra."
+				variant="elevated"
+			>
+				<p>Contenido que necesita distinguirse del fondo.</p>
+			</UICard>
+		</div>
+		<div class="docs-grid">
 			<UICard class="card-demo-custom">
 				<snippet name="header"><h2>Cabecera personalizada</h2></snippet>
 				<p>Los snippets conservan el contenido y las acciones de tu aplicación.</p>

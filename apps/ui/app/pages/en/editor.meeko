@@ -1,0 +1,88 @@
+<script lang="ts">
+	import { examples } from '../../utils/examples'
+
+	const markdown = signal('## Release notes\n\nWrite **here** or switch to code mode.\n\n- Without editing, the text does not change.\n- Only the block you touch is rewritten.\n')
+	const mode = signal<'visual' | 'code'>('visual')
+</script>
+
+<template>
+	<DocsPage
+		locale="en"
+		title="Markdown editor"
+		description="UIMarkdownEditor edits Markdown with Crepe and a code mode, and keeps the bytes of what you do not touch."
+	>
+		<p>
+			<code>UIMarkdownEditor</code>
+			lives in its own module,
+			<code>@meekojs/ui/editor</code>
+			, because Crepe weighs 347 KB of gzipped JS: inside the main module it would be a chunk of every site. The JavaScript of Crepe loads in the browser, when the component mounts, and never enters the server bundle. Until then, the HTML of the server paints a placeholder with the final height.
+		</p>
+		<h2 id="setup">Setup</h2>
+		<p>
+			Crepe and CodeMirror are optional dependencies of
+			<code>@meekojs/ui</code>
+			: an application without the module does not install them.
+		</p>
+		<DocsCode
+			label="meeko.config.ts"
+			bind:code="examples.editorConfig"
+		/>
+		<h2 id="usage">Usage</h2>
+		<UIMarkdownEditor
+			label="Content"
+			model="markdown"
+			model:mode="mode"
+		/>
+		<p
+			id="editor-status"
+			class="docs-status"
+			role="status"
+		>
+			{mode.value === 'code' ? 'Code' : 'Visual'} mode: {markdown.value.length} characters.
+		</p>
+		<DocsCode bind:code="examples.editor" />
+		<h2 id="saving">Block-level saving</h2>
+		<p>Crepe serializes a document in its own format, so saving its output would rewrite tables and blank lines nobody touched. That is why the model only changes with a real edit, and then it keeps the bytes of the original outside the edited blocks.</p>
+		<ul>
+			<li>
+				Without editing,
+				<code>model</code>
+				stays the received text, byte by byte. Typing and undoing too.
+			</li>
+			<li>An edited block comes out of Crepe. A list is one block.</li>
+			<li>The frontmatter never reaches Crepe: it is kept as it is.</li>
+			<li>The event waits for a pause while typing, and comes early when leaving the editor, before a click on «save» reads the model.</li>
+			<li>If a document does not match its serialization block by block, it opens in code mode with a notice.</li>
+		</ul>
+		<h2 id="api">API</h2>
+		<DocsApi
+			caption="UIMarkdownEditor props"
+			bind:rows="[
+				{ name: 'model', type: 'Signal<string>', description: 'The text. If the parent writes another one, the editor starts over with it.' },
+				{ name: 'model:mode', type: 'Signal<visual | code>', default: 'visual', description: 'The mode.' },
+				{ name: 'label', type: 'string', description: 'Required. Visible label and accessible name.' },
+				{ name: 'id', type: 'string', description: 'id of the text area of the code mode.' },
+				{ name: 'readonly', type: 'boolean', default: 'false', description: 'It can be read and selected, but not changed.' },
+				{ name: 'disabled', type: 'boolean', default: 'false', description: 'Like readonly, and it also looks disabled.' },
+				{ name: 'describedBy', type: 'string', description: 'id of the text that describes it.' },
+				{ name: 'placeholder', type: 'string', description: 'Text of the empty document.' },
+				{ name: 'class', type: 'string', description: 'Class of the root.' },
+			]"
+		/>
+		<p>
+			The
+			<code>tools</code>
+			snippet goes in the bar, between the label and the switcher. The height is set with
+			<code>--ui-markdown-editor-height</code>
+			and the content scrolls inside. Its texts, also those of the menus of Crepe, are in
+			<code>ui.messages.&lt;language&gt;.markdownEditor</code>
+			.
+			<code>splitMarkdownSource</code>
+			and
+			<code>createMarkdownSplicer</code>
+			are exported from
+			<code>@meekojs/ui/editor</code>
+			, without Crepe.
+		</p>
+	</DocsPage>
+</template>

@@ -103,7 +103,8 @@ test('undoing an edit gives the original back, and a document without blocks in 
 })
 
 test('UIMarkdownEditor belongs to its own module: the main one does not register it', async () => {
-	const site = fileURLToPath(new URL('../../../apps/ui', import.meta.url))
+	// apps/i18n uses UI without the editor; apps/ui adds the module for its guide.
+	const site = fileURLToPath(new URL('../../../apps/i18n', import.meta.url))
 	const components = await discoverComponents(site)
 	assert.ok(components.some(({ name }) => name === 'UIButton'))
 	assert.ok(!components.some(({ name }) => name === 'UIMarkdownEditor'), 'the registry generates an import() for each component')

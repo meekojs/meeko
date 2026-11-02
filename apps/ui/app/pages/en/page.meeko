@@ -1,0 +1,184 @@
+<script lang="ts">
+	import { examples } from '../../utils/examples'
+</script>
+
+<template>
+	<DocsPage
+		locale="en"
+		title="Page structure"
+		description="Page, PageHeader, Header and Footer: the frame of a site, with native HTML and a single main."
+	>
+		<h2 id="page">UIPage</h2>
+		<p>
+			It paints a single focusable
+			<code>main</code>
+			and the link that skips to it, and keeps
+			<code>sidebar</code>
+			and
+			<code>aside</code>
+			in fixed columns while scrolling. At 75rem it hides
+			<code>aside</code>
+			and at 54rem it hides
+			<code>sidebar</code>
+			and shows
+			<code>bar</code>
+			, where the
+			<MeekoLink to="/overlays">UIDrawer</MeekoLink>
+			goes. This very guide is its example: a
+			<code>UIPage</code>
+			cannot be nested, because a page has only one
+			<code>main</code>
+			.
+		</p>
+		<DocsCode bind:code="examples.page" />
+		<DocsApi
+			caption="UIPage props"
+			bind:rows="[
+				{ name: 'layout', type: 'docs | dashboard | landing', default: 'docs', description: 'Distribution of the columns.' },
+				{ name: 'mainId', type: 'string', default: 'contenido', description: 'id of the main, target of the skip link.' },
+				{ name: 'mainLang', type: 'string', description: 'lang of the main, if its content is in another language.' },
+				{ name: 'skipLabel', type: 'string', description: 'Text of the skip link. The default value follows the language of the document.' },
+				{ name: 'class / lang / dir', type: 'HTML attributes', description: 'They reach the root.' },
+			]"
+		/>
+		<p>
+			Its snippets are
+			<code>default</code>
+			,
+			<code>header</code>
+			,
+			<code>notices</code>
+			,
+			<code>bar</code>
+			,
+			<code>sidebar</code>
+			,
+			<code>aside</code>
+			and
+			<code>footer</code>
+			.
+			<code>notices</code>
+			goes under the header, with the width of the page, and takes no room when its content paints nothing.
+		</p>
+		<h2 id="page-header">UIPageHeader</h2>
+		<p>
+			The title of a page, with its description, breadcrumb and actions. It is the only
+			<code>h1</code>
+			: the one of this guide is one.
+		</p>
+		<DocsApi
+			caption="UIPageHeader props"
+			bind:rows="[
+				{ name: 'title', type: 'string', description: 'Required. The h1.' },
+				{ name: 'description', type: 'string', description: 'Text under the title.' },
+				{ name: 'layout', type: 'docs | dashboard | landing', default: 'docs', description: 'Size of the title.' },
+				{ name: 'class', type: 'string', description: 'Additional classes.' },
+			]"
+		/>
+		<p>
+			It accepts the
+			<code>breadcrumb</code>
+			,
+			<code>actions</code>
+			and
+			<code>default</code>
+			snippets.
+		</p>
+		<h2 id="header">UIHeader and UIFooter</h2>
+		<p>
+			The header has a fixed height,
+			<code>--ui-header-height</code>
+			. On narrow screens its links move to a menu with
+			<code>popover</code>
+			, which floats and does not move the page. A
+			<code>brand</code>
+			image declares
+			<code>width</code>
+			and
+			<code>height</code>
+			to reserve its space.
+		</p>
+		<div class="docs-grid">
+			<UIHeader
+				label="Sample header"
+				menuLabel="Sample menu"
+				current="#header"
+				bind:sticky="false"
+				bind:brand="{ name: 'Meeko', href: '#header' }"
+				bind:items="[
+					{ label: 'Guide', href: '#header' },
+					{ label: 'API', href: '#page' },
+				]"
+			>
+				<snippet name="actions"><UIButton size="sm">Sign in</UIButton></snippet>
+			</UIHeader>
+			<UIFooter
+				label="Sample footer"
+				description="Typed components for Meeko."
+				bind:brand="{ name: 'Meeko', href: '#header' }"
+				bind:groups="[
+					{ title: 'Product', items: [{ label: 'Guide', href: '#header' }] },
+					{ title: 'Community', items: [{ label: 'GitHub', href: 'https://github.com/meekojs/meeko' }] },
+				]"
+			/>
+		</div>
+		<DocsCode bind:code="examples.header" />
+		<DocsApi
+			caption="UIHeader props"
+			bind:rows="[
+				{ name: 'brand', type: 'UIBrand', description: 'name, product, image and target of the brand.' },
+				{ name: 'items', type: 'readonly UINavigationLink[]', description: 'The links: label and href or to.' },
+				{ name: 'current', type: 'string', description: 'The current link, when they use href.' },
+				{ name: 'label / menuLabel', type: 'string', description: 'Name of the navigation and of the menu button.' },
+				{ name: 'sticky', type: 'boolean', default: 'true', description: 'Keeps the header fixed while scrolling.' },
+				{ name: 'size', type: 'UIContainerSize', default: '2xl', description: 'Maximum width.' },
+				{ name: 'class', type: 'string', description: 'Additional classes.' },
+			]"
+		/>
+		<p>
+			It accepts the
+			<code>brand</code>
+			,
+			<code>nav</code>
+			,
+			<code>actions</code>
+			and
+			<code>menu</code>
+			snippets.
+		</p>
+		<DocsApi
+			caption="UIFooter props"
+			bind:rows="[
+				{ name: 'brand / description', type: 'UIBrand / string', description: 'The brand and its text.' },
+				{ name: 'groups', type: 'readonly UIFooterGroup[]', description: 'Columns of links: title and items.' },
+				{ name: 'items', type: 'readonly UINavigationLink[]', description: 'Loose links.' },
+				{ name: 'label', type: 'string', description: 'Name of the navigation.' },
+				{ name: 'size', type: 'UIContainerSize', default: '2xl', description: 'Maximum width.' },
+				{ name: 'class', type: 'string', description: 'Additional classes.' },
+			]"
+		/>
+		<p>
+			It accepts the
+			<code>brand</code>
+			,
+			<code>about</code>
+			,
+			<code>actions</code>
+			and
+			<code>legal</code>
+			snippets. The types
+			<code>UIPageProps</code>
+			,
+			<code>UIPageHeaderProps</code>
+			,
+			<code>UIHeaderProps</code>
+			,
+			<code>UIFooterProps</code>
+			and
+			<code>UIBrand</code>
+			are exported from
+			<code>@meekojs/ui/runtime</code>
+			.
+		</p>
+	</DocsPage>
+</template>
