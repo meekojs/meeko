@@ -39,6 +39,21 @@ function declaredValues(response: unknown, declared: HydrationPayload["markedHtm
   return values;
 }
 
+/**
+ * The payload of a response. A stream route answers ndjson, whose first line is the payload and has
+ * every value that does not wait: that line is enough, and the rest of the stream is cancelled, so
+ * a slow deferred value neither delays the element nor keeps the connection open.
+ */
+async function payloadText(response: Response, type: string, signal: AbortSignal): Promise<string> {
+  if (!type.startsWith("application/meeko+ndjson")) return await response.text();
+  if (!response.body) throw new StaleDocument("the stream is empty");
+  const lines = ndjsonLines(response.body, signal);
+  const line = await lines.next();
+  await lines.return(undefined);
+  if (line.done) throw new StaleDocument("the stream is empty");
+  return line.value;
+}
+
 export interface DocumentHtmlRecovery {
   /** The HTML of the value at `index` of the document's list; `undefined` when there is none to insert. */
   read(index: number): Promise<string | undefined>;
@@ -87,8 +102,7 @@ export function documentHtmlRecovery(options: {
       void response.body?.cancel().catch(() => {});
       throw new Error(`Document HTML request failed: HTTP ${response.status}`);
     }
-    // A stream route answers ndjson, whose first line is the payload.
-    const text = (await response.text()).split("\n", 1)[0]!;
+    const text = await payloadText(response, type, work.signal);
     let parsed: unknown;
     let read: HydrationPayload;
     try {

@@ -610,7 +610,31 @@ test("a value that one element left empty travels whole, as without the mark", (
   assert.deepEqual({ article: marked.article, paragraph: marked.paragraph, requests: marked.requests }, { article: plain.article, paragraph: plain.paragraph, requests: plain.requests });
 }));
 
-test("an element that is gone when the stream was already cancelled reports nothing", () => withPages(async (page) => {
+test("recovering a value does not wait for the stream, and closes it", () => withPages(async (page) => {
+  const toggling = await page(togglingData, "Streamed");
+  const signals: AbortSignal[] = [];
+  const handle = createFrameworkHandler({
+    routes: createRouteManifest([{ id: "/guide", file: "/guide.meeko", layouts: [], sidecar: "/guide.route.ts", render: "stream" }]),
+    loadPage: async () => toggling,
+    loadRoute: async () => ({
+      render: "stream",
+      load: () => ({ html: documentHtml(trustHtml("<h2>streamed</h2>")), never: defer((signal) => {
+        signals.push(signal);
+        return new Promise<void>(() => {});
+      }, { timeoutMs: 60_000 }) }),
+    }),
+  });
+  const opening = await handle(requestDocument());
+  const head = await readDocumentUntilPayload(opening);
+  const mounted = await mountDocument(toggling, new Response(head, { headers: { "content-type": "text/html" } }), answerWith(handle));
+  try {
+    await mounted.repaint();
+    assert.equal(mounted.browser.document.querySelector("article")!.innerHTML, "<h2>streamed</h2>", "the first line has the value");
+    assert.equal(signals.at(-1)!.aborted, true, "the rest of the stream was cancelled");
+  } finally { mounted.close(); }
+}));
+
+test("dispose abandons a request in flight, without reloading or reporting", () => withPages(async (page) => {
   const toggling = await page(togglingData, "Disposed");
   const handle = listHandler(() => ({ html: documentHtml(trustHtml("<h2>guide</h2>")) }), toggling);
   let aborted: AbortSignal | undefined;
