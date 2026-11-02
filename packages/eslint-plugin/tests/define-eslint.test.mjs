@@ -19,6 +19,13 @@ test('defineEslint enables JS, syntax-only TS and Meeko defaults with separate s
   assert.deepEqual(messages('<script lang="ts">const title = "Hi";</script><template>{title}</template>', 'App.meeko'), []);
 });
 
+test('prefer-ui-components is off for consumers until a project turns it on, because using UI is a choice', () => {
+  const source = '<template><table></table></template>';
+  const rule = 'meeko/prefer-ui-components';
+  assert.ok(!messages(source, 'App.meeko').some((message) => message.ruleId === rule));
+  assert.ok(messages(source, 'App.meeko', defineEslint({rules: {[rule]: 'error'}})).some((message) => message.ruleId === rule));
+});
+
 test('rule namespaces are applied only to languages with registered plugins', () => {
   const config = defineEslint({rules:{'meeko/button-has-type':'error','@typescript-eslint/no-explicit-any':'off','no-debugger':'off'}});
   assert.deepEqual(messages('debugger;', 'app.js', config), []);

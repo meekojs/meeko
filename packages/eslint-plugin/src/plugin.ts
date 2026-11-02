@@ -11,6 +11,7 @@ import orderMacros from './rules/order-macros'
 import orderSections from './rules/order-sections'
 import paddingLineBetweenMacros from './rules/padding-line-between-macros'
 import preferStaticBindings from './rules/prefer-static-bindings'
+import preferUiComponents from './rules/prefer-ui-components'
 import scriptTypeImports from './script-type-imports'
 
 const componentTypeScript = {
@@ -30,6 +31,7 @@ const plugin: ESLint.Plugin & { configs: Record<string, Linter.Config[]> } = {
 		'order-sections': orderSections,
 		'padding-line-between-macros': paddingLineBetweenMacros,
 		'prefer-static-bindings': preferStaticBindings,
+		'prefer-ui-components': preferUiComponents,
 	} as unknown as ESLint.Plugin['rules'],
 	configs: {},
 }

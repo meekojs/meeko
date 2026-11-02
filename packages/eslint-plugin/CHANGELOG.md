@@ -2,6 +2,8 @@
 
 ## Sin publicar
 
+- Añade la regla optativa `meeko/prefer-ui-components`: avisa de `<button>`, `<input>` (salvo `type="hidden"`), `<textarea>`, `<select>`, `<dialog>` y `<table>` escritos a mano donde hay un componente de `@meekojs/ui`, y dice cuál. No se activa en `recommended` ni en `defineEslint`, porque usar UI no es obligatorio. `allow` lista las etiquetas que un proyecto admite.
+
 - Activa Perfectionist por defecto en `defineEslint`: sólo `sort-imports` y `sort-named-imports`, con orden natural ascendente y autofix. Durante Meeko 1.x emite `warn`; desde 2.0 emitirá `error`. `perfectionist: false` lo desactiva y `rules` permite subir la severidad a `error` sin activar explícitamente la opción.
 
 - Añade la regla optativa `meeko/attributes-order`, con `ref:` y `each:*` al principio, atributos planos separados de los `bind:` y eventos al final antes del contenido. Incluye grupos configurables y orden alfabético. No se activa en la configuración recomendada.

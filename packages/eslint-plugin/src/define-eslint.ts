@@ -32,6 +32,7 @@ export type DefineEslintRules = Partial<
 			'meeko/order-sections': Linter.RuleEntry<[{ order?: SectionName[] }]>
 			'meeko/padding-line-between-macros': Linter.RuleEntry<[]>
 			'meeko/prefer-static-bindings': Linter.RuleEntry<[]>
+			'meeko/prefer-ui-components': Linter.RuleEntry<[{ allow?: Array<'button' | 'dialog' | 'input' | 'select' | 'table' | 'textarea'> }]>
 		}
 >
 

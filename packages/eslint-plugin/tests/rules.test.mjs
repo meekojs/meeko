@@ -20,6 +20,34 @@ tester.run('button-has-type', plugin.rules['button-has-type'], {
   }],
 });
 
+tester.run('prefer-ui-components', plugin.rules['prefer-ui-components'], {
+  valid: [
+    { code: '<template><UIButton>Save</UIButton><Button /><UITable /></template>' },
+    { code: '<template><input type="hidden" name="token" /></template>' },
+    { code: '<template><input type="HIDDEN" name="token" /></template>' },
+    { code: '<template><x-select></x-select><label>Name</label><form></form></template>' },
+    { code: '<template><pre>&lt;button&gt;</pre><code>button</code></template>', name: 'the name of a tag in a text is not a tag' },
+    { code: '<template><table></table><button type="button">a</button></template>', options: [{ allow: ['table', 'button'] }] },
+    { code: '<script lang="ts">const html = "<button>";</script><template><p>{html}</p></template>' },
+    { code: '<template><UIModal><snippet name="default"><p /></snippet></UIModal></template>' },
+  ],
+  invalid: [
+    { code: '<template><button type="button">Save</button></template>', errors: [{ messageId: 'prefer', line: 1, column: 12, data: { tag: 'button', component: 'UIButton' } }], output: null },
+    { code: '<template><input /></template>', errors: [{ messageId: 'prefer', data: { tag: 'input', component: 'UIInput' } }], output: null },
+    { code: '<template><input type="email" /></template>', errors: [{ messageId: 'prefer', data: { tag: 'input', component: 'UIInput' } }], output: null },
+    { code: '<template><input type="checkbox" /></template>', errors: [{ messageId: 'prefer', data: { tag: 'input', component: 'UICheckbox' } }], output: null },
+    { code: '<template><input type="radio" /></template>', errors: [{ messageId: 'prefer', data: { tag: 'input', component: 'UIRadioGroup' } }], output: null },
+    { code: '<template><input type="range" /></template>', errors: [{ messageId: 'prefer', data: { tag: 'input', component: 'UISlider' } }], output: null },
+    { code: '<script lang="ts">const kind = "hidden";</script><template><input bind:type="kind" /></template>', errors: [{ messageId: 'prefer', data: { tag: 'input', component: 'UIInput' } }], output: null },
+    { code: '<template><textarea></textarea></template>', errors: [{ messageId: 'prefer', data: { tag: 'textarea', component: 'UITextarea' } }], output: null },
+    { code: '<template><select></select></template>', errors: [{ messageId: 'prefer', data: { tag: 'select', component: 'UISelect' } }], output: null },
+    { code: '<template><dialog></dialog></template>', errors: [{ messageId: 'prefer', data: { tag: 'dialog', component: 'UIModal' } }], output: null },
+    { code: '<template><table></table></template>', errors: [{ messageId: 'prefer', data: { tag: 'table', component: 'UITable' } }], output: null },
+    { code: '<template><UICard><snippet name="default"><div><button type="button">a</button></div></snippet></UICard></template>', errors: [{ messageId: 'prefer', data: { tag: 'button', component: 'UIButton' } }], output: null },
+    { code: '<template><table></table><button type="button">a</button></template>', options: [{ allow: ['table'] }], errors: [{ messageId: 'prefer', data: { tag: 'button', component: 'UIButton' } }], output: null },
+  ],
+});
+
 tester.run('no-autofocus', plugin.rules['no-autofocus'], {
   valid: [
     { code: '<template><input /></template>' },

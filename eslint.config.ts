@@ -146,6 +146,14 @@ export default defineEslint(
 		rules: { 'meeko/attributes-order': 'off' },
 	},
 	{
+		// packages/ui is the only source of design: an application writes its controls with it. Outside
+		// this repository using UI is a choice, so the rule stays off by default. An exception names the
+		// file and the reason: template comments cannot carry ESLint directives.
+		name: 'meeko/design-components',
+		files: ['apps/**/*.meeko', 'packages/docs/**/*.meeko'],
+		rules: { 'meeko/prefer-ui-components': 'error' },
+	},
+	{
 		name: 'meeko/ui-tests',
 		files: ['packages/ui/tests/**/*.ts'],
 		rules: { '@typescript-eslint/no-explicit-any': 'off' },

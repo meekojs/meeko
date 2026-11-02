@@ -191,6 +191,7 @@ Los imports y locales del bloque servidor permanecen en su ámbito. Una referenc
 | [`meeko/order-macros`](docs/rules/order-macros.md)                     | optativo          | Autofix conservador de macros consecutivas.  |
 | [`meeko/order-sections`](docs/rules/order-sections.md)                 | optativo          | Orden de secciones del componente.           |
 | [`meeko/prefer-static-bindings`](docs/rules/prefer-static-bindings.md) | optativo          | Simplifica bindings literales equivalentes.  |
+| [`meeko/prefer-ui-components`](docs/rules/prefer-ui-components.md)     | optativo          | Sin corrección: indica el componente de UI.  |
 
 Las suggestions de `button-has-type` y `no-autofocus` requieren una elección explícita: no cambian el comportamiento de un formulario o el foco mediante `eslint --fix`.
 
