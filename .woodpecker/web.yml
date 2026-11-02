@@ -68,6 +68,7 @@ steps:
       # Sin DATABASE_URL las pruebas de integración se saltan; nunca apuntan a producción.
       - pnpm -F meeko-site run test
       - pnpm -F meeko-docs-content run test
+      - pnpm -F meeko-docs run test
 
   # `failure: ignore`: el veredicto del Quality Gate queda a la vista sin retener la entrega, como en
   # Vuno. Proyecto `meekojs-web` en el SonarQube oficial (sonarqube-dev).

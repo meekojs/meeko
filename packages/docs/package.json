@@ -17,7 +17,8 @@
 		"./state": "./src/runtime/state.ts"
 	},
 	"scripts": {
-		"build": "node scripts/build.mjs"
+		"build": "node scripts/build.mjs",
+		"test": "tsx --test tests/*.test.ts"
 	},
 	"dependencies": {
 		"@meekojs/i18n": "workspace:*",

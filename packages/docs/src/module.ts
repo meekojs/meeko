@@ -6,9 +6,8 @@ import type * as Highlight from 'meeko-docs-content/content/highlight'
 import { defineMeekoModule } from '@meekojs/meeko/framework'
 import { docsLocales } from 'meeko-docs-content/locale'
 import { moderationEndpoint } from 'meeko-docs-content/moderation/shared'
-import { existsSync, statSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { pathToFileURL } from 'node:url'
+
+import type * as ImportedValues from './imported-values'
 
 /** Opciones del módulo en `meeko.config.ts`: `modules: ['meeko-docs']` y `docs: { site: 'ui' }`. */
 export interface DocsModuleOptions {
@@ -67,7 +66,7 @@ function addCodeHighlighting(meeko: MeekoModuleContext): void {
 			async handler(this: { addWatchFile(file: string): void }, code: string, id: string) {
 				const file = id.split('?')[0]!
 				if (!file.endsWith('.meeko') || !code.includes('<DocsCode')) return undefined
-				const { blockLanguage, codeLanguage, createHighlight, transformCodeTags, tsImport } = await (tools ??= loadCodeTools())
+				const { blockLanguage, codeLanguage, createHighlight, importedValues, transformCodeTags, tsImport } = await (tools ??= loadCodeTools())
 				const highlight = await createHighlight()
 				const values = await importedValues(
 					code,
@@ -100,41 +99,16 @@ function addCodeHighlighting(meeko: MeekoModuleContext): void {
 }
 
 /**
- * The highlighter and the tag transform of `meeko-docs-content`, whose TypeScript sources Node cannot
- * load by itself because their relative imports have no extension. Only a build or `meeko dev` get
- * here, where the workspace has `tsx`; `meeko start` never transforms a component.
+ * The highlighter and the tag transform of `meeko-docs-content` and the values of `./imported-values`,
+ * whose TypeScript sources Node cannot load by itself because their relative imports have no
+ * extension. Only a build or `meeko dev` get here, where the workspace has `tsx`; `meeko start` never
+ * transforms a component.
  */
 async function loadCodeTools() {
 	const { tsImport } = await import('tsx/esm/api')
 	const parent = import.meta.url
-	const [{ blockLanguage, createHighlight }, { codeLanguage, transformCodeTags }] = (await Promise.all([tsImport('meeko-docs-content/content/highlight', parent), tsImport('meeko-docs-content/content/code-tags', parent)])) as [typeof Highlight, typeof CodeTags]
-	return { blockLanguage, codeLanguage, createHighlight, transformCodeTags, tsImport }
-}
-
-/** The named exports of a data module, again only when the file changes. */
-const dataModules = new Map<string, { readonly version: number; readonly exports: Promise<Record<string, unknown>> }>()
-
-/**
- * The values of the named relative imports of a component, such as `examples`, read from their
- * modules: plain data that the template passes to `bind:code`. A change of the file invalidates the
- * component, so `meeko dev` shows the new text.
- */
-async function importedValues(source: string, file: string, load: (module: string) => Promise<unknown>, watch: (source: string) => void): Promise<Map<string, unknown>> {
-	const values = new Map<string, unknown>()
-	for (const [, names, specifier] of source.matchAll(/^\s*import\s*\{([^}]+)\}\s*from\s*['"](\.[^'"]+)['"]/gm)) {
-		const module = join(dirname(file), `${specifier}.ts`)
-		if (!existsSync(module)) continue
-		watch(module)
-		const version = statSync(module).mtimeMs
-		let cached = dataModules.get(module)
-		if (cached?.version !== version) dataModules.set(module, (cached = { version, exports: load(pathToFileURL(module).href) as Promise<Record<string, unknown>> }))
-		const loaded = await cached.exports
-		for (const part of names!.split(',')) {
-			const [name, alias] = part.trim().split(/\s+as\s+/)
-			if (name && name in loaded) values.set(alias ?? name, loaded[name])
-		}
-	}
-	return values
+	const [{ blockLanguage, createHighlight }, { codeLanguage, transformCodeTags }, { importedValues }] = (await Promise.all([tsImport('meeko-docs-content/content/highlight', parent), tsImport('meeko-docs-content/content/code-tags', parent), tsImport(new URL('./imported-values.ts', parent).href, parent)])) as [typeof Highlight, typeof CodeTags, typeof ImportedValues]
+	return { blockLanguage, codeLanguage, createHighlight, importedValues, transformCodeTags, tsImport }
 }
 
 const sitemapModule = 'virtual:meeko-docs-sitemap'
