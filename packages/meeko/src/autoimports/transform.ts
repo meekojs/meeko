@@ -8,7 +8,8 @@ import type { ProjectAliases } from "../framework/aliases";
 import type { AutoImport, ImportScope } from "./registry";
 
 import { compile } from "../compiler";
-import { parseSfc } from "../compiler/parser/sfc";
+import { originalOffset } from "../compiler/mapping";
+import { locate, parseSfc } from "../compiler/parser/sfc";
 import { projectRoot } from "../compiler/project-root";
 import { checkClientBoundary } from "../compiler/transforms/client-boundary";
 import { resolveProjectAliases, resolveProjectAliasesSync } from "../framework/aliases";
@@ -203,6 +204,36 @@ export function checkComponentBoundary(
 }
 
 /**
+ * `MEEK134`: the old name of a `Carpeta/Index.meeko` (`<ButtonIndex>`, `ButtonIndexProps` or
+ * `resolveComponent("ButtonIndex")`), which still works through 1.x. One warning per name, where it
+ * is first used.
+ */
+function deprecatedComponentNames(source: string, filename: string, compiled: Pick<CompileResult, "code" | "mappings">, registry: readonly AutoImport[]): CompileDiagnostic[] {
+  const deprecated = new Map(registry.flatMap((entry) => entry.deprecatedFor ? [[entry.name, entry] as const] : []));
+  if (!deprecated.size) return [];
+  const found = new Map<string, number>();
+  for (const { name, start } of freeReferences(compiled.code, filename)) {
+    if (!deprecated.has(name)) continue;
+    const offset = originalOffset(compiled.mappings, start);
+    const previous = found.get(name);
+    if (offset !== undefined && (previous === undefined || offset < previous)) found.set(name, offset);
+    else if (previous === undefined) found.set(name, Math.max(0, source.indexOf(name)));
+  }
+  // A string that only names the component, which the type check sees as a key of the registry.
+  for (const match of source.matchAll(/\bresolveComponent\s*(?:<[^>]*>\s*)?\(\s*(["'`])([A-Z]\w*)\1/g)) {
+    if (deprecated.get(match[2]!)?.component && !found.has(match[2]!)) found.set(match[2]!, match.index + match[0].indexOf(match[2]!));
+  }
+  return [...found].sort(([, left], [, right]) => left - right).map(([name, offset]) => {
+    const entry = deprecated.get(name)!;
+    const [old, next] = entry.component ? [`<${name}>`, `<${entry.deprecatedFor}>`] : [name, entry.deprecatedFor!];
+    return {
+      code: "MEEK134", filename, location: locate(source, offset), severity: "warning",
+      message: `${old} está obsoleto desde Meeko 1.8 y se retira en 2.0: ${relative(projectRoot(filename), entry.file).replaceAll("\\", "/")} se llama ahora ${next}, como su carpeta`,
+    } satisfies CompileDiagnostic;
+  });
+}
+
+/**
  * Compile result shared by Vite, CLI checks and declaration generation. `knownAliases` are the
  * project's path aliases; without them, the configuration is loaded as `meeko check` does, or read
  * without running it when `knownRegistry` is given.
@@ -226,7 +257,7 @@ export async function compileWithAutoImports(
   }
   const code = transformAutoImports(source, filename, compiled.code, registry, target);
   const offset = code.length - compiled.code.length;
-  const warnings = [...compiled.warnings ?? [], ...boundary];
+  const warnings = [...compiled.warnings ?? [], ...boundary, ...deprecatedComponentNames(source, filename, compiled, registry)];
   return {
     ...compiled,
     code,

@@ -30,6 +30,11 @@ export interface AutoImport {
    */
   componentType?: boolean;
   /**
+   * The name that replaces this one, which still works through 1.x with the `MEEK134` warning:
+   * `Button` for `ButtonIndex`, the old name of `Button/Index.meeko` (since 1.8).
+   */
+  deprecatedFor?: string;
+  /**
    * Only for code that may run in the browser: components and modules of `app/`, but not the
    * sources of `server/`, `*.server.ts` or the route files, even though the scope is `app`.
    */
@@ -246,6 +251,8 @@ export interface DiscoveredComponent {
   readonly name: string;
   readonly file: string;
   readonly source: string;
+  /** The name that replaces this one, which is a deprecated alias: `Button` for `ButtonIndex` (since 1.8). */
+  readonly deprecatedFor?: string;
 }
 
 interface ComponentDirectory {
@@ -257,11 +264,18 @@ interface ComponentDirectory {
   readonly exclude?: readonly string[];
 }
 
-function componentName(file: string, directory: ComponentDirectory): string {
-  const path = relative(directory.dir, file).replace(/\.meeko$/, "");
-  const name = directory.prefix + path.split(/[\\/]/).map((part) => part.replace(/(^|[-_])(\w)/g, (_, _dash: string, letter: string) => letter.toUpperCase())).join("");
+/**
+ * The name of a component from its path under its directory. Since 1.8, `Button/Index.meeko` is
+ * `Button`; `legacy` is the name it had, `ButtonIndex`, which stays as a deprecated alias through 1.x.
+ * An `Index.meeko` at the root of the directory has no folder to take the name from: it stays `Index`.
+ */
+function componentName(file: string, directory: ComponentDirectory): { readonly name: string; readonly legacy?: string } {
+  const parts = relative(directory.dir, file).replace(/\.meeko$/, "").split(/[\\/]/);
+  const pascal = (list: readonly string[]): string => directory.prefix + list.map((part) => part.replace(/(^|[-_])(\w)/g, (_, _dash: string, letter: string) => letter.toUpperCase())).join("");
+  const collapses = parts.length > 1 && /^[iI]ndex$/.test(parts.at(-1)!);
+  const name = pascal(collapses ? parts.slice(0, -1) : parts);
   if (!/^[A-Z][A-Za-z0-9]*$/.test(name)) throw new Error(`Nombre de componente no válido ${name}: ${file}`);
-  return name;
+  return collapses ? { name, legacy: pascal(parts) } : { name };
 }
 
 function componentDirectoriesForSources(sources: readonly { root: string; name: string }[], config: MeekoConfig, modules: readonly { dir: string; prefix: string; exclude?: readonly string[] }[] = []): ComponentDirectory[] {
@@ -283,8 +297,13 @@ function catalog(files: readonly { directory: ComponentDirectory; file: string; 
     }
   }
   const names = new Map<string, { component: DiscoveredComponent; priority: number }>();
+  const legacies = new Map<string, { component: DiscoveredComponent; priority: number }>();
   for (const { directory, file } of chosen.values()) {
-    const name = componentName(file, directory);
+    const { name, legacy } = componentName(file, directory);
+    if (legacy !== undefined) {
+      const previous = legacies.get(legacy);
+      if (!previous || directory.priority < previous.priority) legacies.set(legacy, { component: { name: legacy, file, source: directory.source, deprecatedFor: name }, priority: directory.priority });
+    }
     const previous = names.get(name);
     if (previous) {
       if (previous.priority === directory.priority && previous.component.file !== file) throw new Error(`Nombre de componente duplicado ${name}: ${previous.component.file}, ${file}`);
@@ -292,6 +311,8 @@ function catalog(files: readonly { directory: ComponentDirectory; file: string; 
     }
     names.set(name, { component: { name, file, source: directory.source }, priority: directory.priority });
   }
+  // A component that really has the old name keeps it: the alias is only there for what it replaced.
+  for (const [legacy, entry] of legacies) if (!names.has(legacy)) names.set(legacy, entry);
   return [...names.values()].map(({ component }) => component).sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
 }
 
@@ -349,9 +370,9 @@ function staticComponentSources(root: string, config: MeekoConfig): readonly { r
 }
 
 function addComponentImports(result: AutoImport[], components: readonly DiscoveredComponent[]): void {
-  for (const { name, file } of components) {
-    addAutoImport(result, { name, imported: "*", file, scope: "app", typeOnly: false, component: true });
-    for (const [suffix, imported] of componentTypes) addAutoImport(result, { name: `${name}${suffix}`, imported, file, scope: "app", typeOnly: true, component: false, componentType: true });
+  for (const { name, file, deprecatedFor } of components) {
+    addAutoImport(result, { name, imported: "*", file, scope: "app", typeOnly: false, component: true, ...(deprecatedFor ? { deprecatedFor } : {}) });
+    for (const [suffix, imported] of componentTypes) addAutoImport(result, { name: `${name}${suffix}`, imported, file, scope: "app", typeOnly: true, component: false, componentType: true, ...(deprecatedFor ? { deprecatedFor: `${deprecatedFor}${suffix}` } : {}) });
   }
 }
 

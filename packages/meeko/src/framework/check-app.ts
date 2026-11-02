@@ -169,7 +169,8 @@ async function appMeekoFiles(projectRoot: string): Promise<string[]> {
   // Generate declarations only for sources owned by this project; installed modules must ship
   // their own adjacent declarations instead of being written to by the consuming project.
   for (const { file } of await discoverComponents(root)) {
-    if (inside(root, file) && !relative(root, file).split(sep).includes("node_modules")) files.push(file);
+    // The deprecated alias of a `Carpeta/Index.meeko` has the same file as its name.
+    if (inside(root, file) && !relative(root, file).split(sep).includes("node_modules") && !files.includes(file)) files.push(file);
   }
   // Components of a module inside the project (not an installed package) are project sources too.
   for (const { dir } of modules.componentsDirs) {

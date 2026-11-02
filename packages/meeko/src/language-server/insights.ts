@@ -135,7 +135,7 @@ export function componentTypeAt(context: FeatureContext, generatedOffset: number
 /** Tag name of a component: its autoimport (`AppCard` for `app/components/App/Card.meeko`) or its file name. */
 export function componentTagName(context: FeatureContext, child: VirtualComponent): string {
   const key = child.filename.replaceAll("\\", "/").toLowerCase();
-  const entry = context.project.autoImports().find((candidate) => candidate.component && candidate.file.replaceAll("\\", "/").toLowerCase() === key);
+  const entry = context.project.autoImports().find((candidate) => candidate.component && !candidate.deprecatedFor && candidate.file.replaceAll("\\", "/").toLowerCase() === key);
   return entry?.name ?? basename(child.filename, ".meeko");
 }
 

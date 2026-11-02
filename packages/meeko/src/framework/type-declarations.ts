@@ -56,6 +56,7 @@ export async function generateComponentRegistryTypes(projectRoot: string): Promi
   const root = resolve(projectRoot);
   const output = join(root, ".meeko", "types", "components.d.ts");
   const names = new Map<string, string>();
+  const deprecated = new Map<string, string>();
   for (const entry of await discoverComponents(root)) {
     const location = relative(root, entry.file);
     const external = location === ".." || location.startsWith(`..${sep}`) || isAbsolute(location) || location.split(sep).includes("node_modules");
@@ -67,11 +68,13 @@ export async function generateComponentRegistryTypes(projectRoot: string): Promi
       throw new Error(`Componente ${entry.name} ambiguo: ${previous}, ${entry.file}. Cambia el prefijo o el nombre de uno de ellos.`);
     }
     names.set(entry.name, entry.file);
+    if (entry.deprecatedFor) deprecated.set(entry.name, entry.deprecatedFor);
   }
   const entries = [...names].sort(([left], [right]) => left.localeCompare(right)).map(([name, file]) => {
     const path = relative(join(root, ".meeko", "types"), file).replaceAll("\\", "/");
     const specifier = path.startsWith(".") ? path : `./${path}`;
-    return `    readonly ${JSON.stringify(name)}: typeof import(${JSON.stringify(specifier)});`;
+    const replacement = deprecated.get(name);
+    return `${replacement ? `    /** @deprecated Usa ${replacement}: este nombre se retira en Meeko 2.0 (MEEK134). */\n` : ""}    readonly ${JSON.stringify(name)}: typeof import(${JSON.stringify(specifier)});`;
   });
   // Since 1.8, `<MeekoLink>` is registered too, unless the project has a component called MeekoLink.
   if (!names.has(linkComponentName)) entries.push(`    readonly ${JSON.stringify(linkComponentName)}: typeof import(${JSON.stringify(linkComponentSpecifier)});`);

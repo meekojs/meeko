@@ -1,5 +1,5 @@
 ---
-source-hash: 29f390e7ef57fa97d3aa90921e6428946015712f9a2751c655d36f3302647809
+source-hash: 15d9532f8e5e46429fb4ed3d287e7b404e7f07301a87642bbce2af939d9a7a30
 ---
 
 # Meeko API
@@ -1371,7 +1371,7 @@ const release = hydrate(document.querySelector('#counter')!, props, state)
 // Llamar release() cuando la raíz deje de usarse.
 ```
 
-Since `1.4`, each auto-imported component also has those types with its tag name, without an import: `<AppCard>` (`app/components/App/Card.meeko`) gives `AppCardProps`, its props without callbacks (since `1.8`; see [Wrapping another component](#wrapping-another-component)), `AppCardEmits` (since `1.8`), `AppCardSnippets`, `AppCardModels` and `AppCardExposed`, which are exactly its `ComponentEmits`, `ComponentSnippets`, `ComponentModels` and `ComponentExposed`, including `null` (see [Types for each component](framework.md#component-types)). The `.meeko` module does not export them with that name, because the name depends on where the project auto-imports it (folder and module prefix), not the component: from an explicit import they remain `import type { ComponentSnippets as CardSnippets } from "./Card.meeko"`.
+Since `1.4`, each auto-imported component also has those types with its tag name, without an import: `<AppCard>` (`app/components/App/Card.meeko`; since `1.8`, `Button/Index.meeko` is `<Button>`, see [A folder with `Index.meeko`](framework.md#folder-with-index)) gives `AppCardProps`, its props without callbacks (since `1.8`; see [Wrapping another component](#wrapping-another-component)), `AppCardEmits` (since `1.8`), `AppCardSnippets`, `AppCardModels` and `AppCardExposed`, which are exactly its `ComponentEmits`, `ComponentSnippets`, `ComponentModels` and `ComponentExposed`, including `null` (see [Types for each component](framework.md#component-types)). The `.meeko` module does not export them with that name, because the name depends on where the project auto-imports it (folder and module prefix), not the component: from an explicit import they remain `import type { ComponentSnippets as CardSnippets } from "./Card.meeko"`.
 
 <a id="wrapping-another-component"></a>**Wrapping another component.** Since `1.8`, an auto-imported component has three types for this:
 

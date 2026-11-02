@@ -170,7 +170,7 @@ export async function generateAutoImportTypes(projectRoot: string): Promise<{ cl
       }
       return namespace;
     };
-    const declarations = entries.sort((a, b) => a.name.localeCompare(b.name)).map((entry) => {
+    const declarationOf = (entry: AutoImport): string => {
       const specifier = JSON.stringify(publicSpecifier(outputDirectory, entry));
       if (entry.typeOnly) {
         const publicParameters = entry.specifier && publicTypeParameters[entry.specifier]?.[entry.imported];
@@ -189,7 +189,11 @@ export async function generateAutoImportTypes(projectRoot: string): Promise<{ cl
       if (entry.alsoType && !entry.component) return `  export import ${entry.name} = ${namespaceFor(specifier)}.${entry.imported};`;
       const value = entry.component ? `typeof import(${specifier})` : `typeof import(${specifier})[${JSON.stringify(entry.imported)}]`;
       return `  const ${entry.name}: ${value};`;
-    });
+    };
+    const declarations = entries.sort((a, b) => a.name.localeCompare(b.name)).flatMap((entry) => [
+      ...entry.deprecatedFor ? [`  /** @deprecated Usa ${entry.deprecatedFor}: desde Meeko 1.8, Carpeta/Index.meeko se llama como su carpeta. Este nombre se retira en 2.0 (MEEK134). */`] : [],
+      declarationOf(entry),
+    ]);
     const path = join(outputDirectory, `${scope}.d.ts`);
     if (scope !== "shared") {
       // These aliases are type-only and require no runtime global. The local `ComponentProps`

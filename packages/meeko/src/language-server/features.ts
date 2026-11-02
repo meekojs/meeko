@@ -539,6 +539,8 @@ export function componentNameCompletion(project: MeekoProject, document: TextDoc
   if (!open || offset - typed.length <= open.index + open[0].length || (close >= 0 && offset > close)) return undefined;
   const script = /<script(?![^>]*\bserver\b)[^>]*>([\s\S]*?)<\/script>/.exec(source)?.[1] ?? "";
   const files = componentFiles(ts.createSourceFile(filename, script, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS), filename, project.autoImports());
+  // The old name of a `Carpeta/Index.meeko` still resolves, but it is no longer offered.
+  for (const entry of project.autoImports()) if (entry.component && entry.deprecatedFor) files.delete(entry.name);
   const start = document.positionAt(offset - typed.length);
   // Meeko's own tags where they are valid: MeekoLink anywhere, MeekoOutlet in app.meeko and the layouts,
   // and MeekoThemeToggle with `theme` in meeko.config.ts (or a configuration that only running it tells).
@@ -1087,7 +1089,7 @@ function autoImportedType(entry: AutoImport): boolean {
 function componentTypeCompletion(context: FeatureContext, result: ts.CompletionInfo): CompletionItem[] {
   if (!result.entries.some((entry) => entry.kind === ts.ScriptElementKind.interfaceElement || entry.kind === ts.ScriptElementKind.typeElement)) return [];
   const listed = new Set(result.entries.filter((entry) => !entry.hasAction).map((entry) => entry.name));
-  return context.project.autoImports().filter((entry) => autoImportedType(entry) && !listed.has(entry.name)).map((entry): CompletionItem => {
+  return context.project.autoImports().filter((entry) => autoImportedType(entry) && !entry.deprecatedFor && !listed.has(entry.name)).map((entry): CompletionItem => {
     const path = entry.specifier ?? relative(context.project.root, entry.file).replaceAll("\\", "/");
     return {
       label: entry.name,

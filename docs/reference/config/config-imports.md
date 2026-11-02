@@ -43,7 +43,7 @@ Cada entrada es una ruta relativa que empieza por su raíz (`app/…`, `shared/�
 
 ## Resultado
 
-Cada carpeta se lee de forma recursiva, en el proyecto y en cada layer. Sólo sus `.ts` aportan exports (sin `*.test.ts`, `*.spec.ts` ni `*.d.ts`); los `.meeko` de estas carpetas no son componentes. Los sufijos `.client.ts`, `.server.ts` y `.shared.ts` mandan sobre el ámbito de la carpeta.
+Cada carpeta se lee de forma recursiva, en el proyecto y en cada layer. Sólo sus `.ts` aportan exports (sin `*.test.ts`, `*.spec.ts` ni `*.d.ts`); los `.meeko` de estas carpetas no son componentes. Los sufijos `.client.ts`, `.server.ts` y `.shared.ts` mandan sobre el ámbito de la carpeta. Los nombres de los exports son planos: la subcarpeta no se añade al nombre, a diferencia de los componentes (`App/Card.meeko` es `AppCard`). `export function total()` en `app/utils/cart/total.ts` es `total`, no `CartTotal`, y dos archivos que exportan `total` en un ámbito son el error de nombre repetido, aunque estén en carpetas distintas. `.mts` y `.cts` no sirven aquí: se leen y sus nombres se declaran, pero al usarlos `meeko check` y `meeko build` dan `TS2307`, porque el import que genera Meeko apunta a `.js`, y la página responde `500` en `meeko dev`; un `.cts` con `export` da además `TS1287`. Escribe estos archivos en `.ts`.
 
 - Un `type` o una `interface` llegan con `import type`.
 - Un export del proyecto con el nombre de un autoimport del framework (`useRoute`, `useForm`…) tiene prioridad.
