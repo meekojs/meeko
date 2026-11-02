@@ -230,12 +230,25 @@ export function cliCommands(): ReadonlyMap<string, string> {
 	return sourceCache('reference:commands', readCliCommands)
 }
 
+/**
+ * The help text of a `cli.ts`: the value of `const usage = …`, or `null`. The source may have either
+ * kind of quotes, and a literal wider than `printWidth` goes on the line after the `=`.
+ */
+export function cliUsageText(source: string): null | string {
+	const literal = /const usage =\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/.exec(source)?.[1]
+	if (!literal) return null
+	if (literal.startsWith('"')) return JSON.parse(literal) as string
+	// JSON only knows double quotes, so a single-quoted literal is rewritten as one.
+	const body = literal.slice(1, -1).replace(/\\.|"/g, (match) => (match === "\\'" ? "'" : match === '"' ? '\\"' : match))
+	return JSON.parse(`"${body}"`) as string
+}
+
 function readCliCommands(): ReadonlyMap<string, string> {
 	const path = `${packageFolder}/src/cli.ts`
-	const literal = /const usage = ("(?:[^"\\]|\\.)*")/.exec(readRepositoryFile(path))
-	if (!literal) throw new Error(`${path}: the usage text was not found; update packages/docs-content/src/content/reference.ts`)
+	const usageText = cliUsageText(readRepositoryFile(path))
+	if (usageText === null) throw new Error(`${path}: the usage text was not found; update packages/docs-content/src/content/reference.ts`)
 	const commands = new Map<string, string>()
-	for (const line of (JSON.parse(literal[1]!) as string).split('\n')) {
+	for (const line of usageText.split('\n')) {
 		const usage = /meeko\s+(.*)$/.exec(line.replace(/^Uso:\s*/, '').trim())
 		if (!usage) continue
 		const words: string[] = []
