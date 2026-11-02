@@ -399,6 +399,11 @@ export type UnmatchedNavigationContext = Omit<NavigationContext, "match">;
 /** Renders URLs without a route, such as the application error page, inside `layouts`. */
 export interface UnmatchedNavigation {
   readonly layouts: readonly string[];
+  /**
+   * The hydrated document is this error page, whatever the URL matches: a page that called
+   * `notFound()`, or a static 404.html at a dynamic route. The first navigation then compares with `layouts`.
+   */
+  readonly hydrated?: boolean;
   render(context: UnmatchedNavigationContext): Promise<void | boolean> | void | boolean;
 }
 
@@ -431,7 +436,7 @@ function scrollToFragment(browser: Window, url: URL, toTop: boolean): void {
  */
 export function createAppNavigator(routes: readonly RouteRecord[], render: (context: NavigationContext) => Promise<void | boolean> | void | boolean, browser: Window = window, onError?: (error: unknown) => void, unmatched?: UnmatchedNavigation, onSameDocument?: (url: URL) => void): Navigator {
   const initial = matchRoute(routes, browser.location.pathname);
-  let currentLayouts: readonly string[] | undefined = initial ? initial.route.layouts : unmatched?.layouts;
+  let currentLayouts: readonly string[] | undefined = initial && !unmatched?.hydrated ? initial.route.layouts : unmatched?.layouts;
   let currentUrl = browser.location.href;
   let pending: AbortController | undefined;
   let disposed = false;

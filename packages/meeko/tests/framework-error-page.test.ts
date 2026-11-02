@@ -271,6 +271,56 @@ test("the browser hydrates a 404 page, keeps its layouts into a route and loads 
   browser.happyDOM.abort();
 });
 
+test("a 404 at a URL that matches a route starts its first navigation from the layouts of the error page", async () => {
+  const modules: Record<string, ClientComponent> = {
+    "landing.meeko": layout("landing"),
+    "docs.meeko": layout("docs"),
+    "home.meeko": page(() => '<p id="home">home</p>'),
+    "guide.meeko": page((props) => `<p id="guide">${(props.params as Record<string, string>).slug}</p>`),
+    "error.meeko": page((props) => `<p id="error">${String(props.status)}</p>`),
+  };
+  const landingError: ErrorPageRecord = { file: "error.meeko", layouts: ["landing.meeko"] };
+  const routes = createRouteManifest([
+    { id: "/", file: "home.meeko", layouts: ["landing.meeko"], error: "error.meeko" },
+    { id: "/guides/[slug]", file: "guide.meeko", layouts: ["docs.meeko"], error: "error.meeko" },
+  ]);
+  const server = createFrameworkHandler({ routes, errorPage: landingError, loadPage: async (file) => modules[file]!, clientEntry: "/client.js" });
+  const mount = async () => {
+    // The document of the error page at /guides/missing, whose route has another layout.
+    const browser = new HappyWindow({ url: "https://example.test/guides/missing" });
+    browser.document.write(await (await server(new Request("https://example.test/missing", { headers: { accept: "text/html" } }))).text());
+    const root = browser.document.getElementById("app")!;
+    const app = await mountClientApp({
+      routes, errorPage: landingError,
+      root: root as unknown as Element,
+      payload: browser.document.getElementById("meeko-payload")!.textContent!,
+      loadPage: async (file) => modules[file]!,
+      serverData: true,
+      fetch: ((input: RequestInfo | URL, init?: RequestInit) => server(new Request(input, init))) as typeof fetch,
+      browser: browser as unknown as Window,
+    });
+    assert.equal(root.querySelector("#error")?.textContent, "404");
+    return { app, browser, root };
+  };
+
+  // Into the route of the URL: its own layout, not the page inside the layout of the error page.
+  const guide = await mount();
+  assert.equal(await guide.app.navigate("/guides/intro"), true);
+  assert.equal(guide.root.querySelector('[data-layout="docs"] #guide')?.textContent, "intro");
+  assert.equal(guide.root.querySelector('[data-layout="landing"]'), null);
+  guide.app.dispose();
+  guide.browser.happyDOM.abort();
+
+  // Into a route with the layout of the error page: that layout stays.
+  const home = await mount();
+  const shell = home.root.querySelector('[data-layout="landing"]');
+  assert.equal(await home.app.navigate("/"), true);
+  assert.equal(home.root.querySelector("#home")?.textContent, "home");
+  assert.equal(home.root.querySelector('[data-layout="landing"]'), shell);
+  home.app.dispose();
+  home.browser.happyDOM.abort();
+});
+
 test("a static host's 404.html hydrates at any missing URL and navigates in the client with payload files", async () => {
   const { modules, routes, server } = fixture();
   // A static host answers 404.html, rendered once at build, for every missing file: here a URL

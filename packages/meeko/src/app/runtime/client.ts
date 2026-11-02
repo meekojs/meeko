@@ -917,7 +917,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
     }
     finally { if (token === navigationCount) pending.value = false; }
   };
-  const navigator = createAppNavigator(options.routes, run, browser, observeNavigationError, appError ? { layouts: appError.layouts, render: run } : undefined, syncFragment);
+  const navigator = createAppNavigator(options.routes, run, browser, observeNavigationError, appError ? { layouts: appError.layouts, hydrated: Boolean(payload.error), render: run } : undefined, syncFragment);
   const onClick = (event: MouseEvent) => {
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     const target = event.target;
