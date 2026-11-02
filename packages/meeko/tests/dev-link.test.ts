@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { appendFile, mkdir, mkdtemp, readdir, readFile, realpath, rm, stat, symlink, utimes, writeFile } from "node:fs/promises";
+import { EventEmitter } from "node:events";
+import { type watch as fsWatch, type FSWatcher } from "node:fs";
+import { appendFile, mkdir, mkdtemp, readdir, readFile, realpath, rename, rm, stat, symlink, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test, { mock } from "node:test";
@@ -158,7 +160,7 @@ test("an unsupervised dev warns once per settled rebuild of the linked Meeko", {
     else process.env.MEEKO_LINK_WATCH = previous;
   });
   const lines: string[] = [];
-  const warning = warnLinkedMeekoRebuilds({ directory: checkout, dist: join(checkout, "dist") }, (text) => { lines.push(text); }, 150);
+  const warning = warnLinkedMeekoRebuilds({ directory: checkout, dist: join(checkout, "dist") }, (text) => { lines.push(text); }, 150, { loadedAt: Date.now() });
   context.after(() => warning.close());
   await pause(300);
   // A build writes in bursts: one warning once it settles.
@@ -305,4 +307,144 @@ test("the starts of a server that keeps failing while its packages are written a
   const starts = await count("start");
   await new Promise((resolved) => setTimeout(resolved, 2000));
   assert.equal(await count("start"), starts, output());
+});
+
+/** A `fs.watch` whose events the test fires by hand: the platform does not produce them on demand. */
+function fakeWatch() {
+  const listeners = new Map<string, (event: string, name: string | null) => void>();
+  const watchers = new Map<string, EventEmitter>();
+  const watch = ((path: string, _options: unknown, listener: (event: string, name: string | null) => void) => {
+    const watcher = Object.assign(new EventEmitter(), { close() {} });
+    listeners.set(path, listener);
+    watchers.set(path, watcher);
+    return watcher as unknown as FSWatcher;
+  }) as unknown as typeof fsWatch;
+  return {
+    watch,
+    emit: (path: string, event: string, name: string | null) => listeners.get(path)?.(event, name),
+    fail: (path: string) => watchers.get(path)?.emit("error", new Error("EPERM")),
+  };
+}
+
+test("events that are not writes do not report the linked build; real builds do", { timeout: 30_000 }, async (context) => {
+  const root = await sandbox(context);
+  const checkout = join(root, "meeko");
+  await fakeMeeko(checkout);
+  const dist = join(checkout, "dist");
+  const fake = fakeWatch();
+  let changes = 0;
+  const watcher = watchLinkedMeeko({ directory: checkout, dist }, () => { changes++; }, { watch: fake.watch, verifyDelay: 50 });
+  context.after(() => watcher.close());
+  // Renames, events without a name, a missing file and watcher errors, with nothing written.
+  fake.emit(dist, "rename", "index.js");
+  fake.emit(dist, "change", null);
+  fake.emit(dist, "change", "gone.js");
+  fake.emit(checkout, "change", null);
+  fake.emit(checkout, "rename", "package.json");
+  fake.emit(checkout, "rename", "dist");
+  fake.fail(dist);
+  await pause(300);
+  assert.equal(changes, 0, "Events without a write are not a rebuild");
+  // A real write is reported even when it comes with a bare event.
+  await appendFile(join(dist, "index.js"), "\n");
+  fake.emit(dist, "change", null);
+  await until(() => changes === 1, () => "The write was not reported");
+  await pause(200);
+  assert.equal(changes, 1, "One write, one report");
+  // A build that rewrites nothing is quiet again.
+  fake.emit(dist, "rename", "index.js");
+  await pause(200);
+  assert.equal(changes, 1);
+  // dist removed and created again with other content.
+  await rm(dist, { recursive: true });
+  fake.emit(checkout, "rename", "dist");
+  await pause(20);
+  await mkdir(dist);
+  await writeFile(join(dist, "index.js"), "export const x = 1;\n");
+  fake.emit(checkout, "rename", "dist");
+  await until(() => changes === 2, () => "dist recreated was not reported");
+  // package.json written.
+  await writeFile(join(checkout, "package.json"), `${await readFile(join(checkout, "package.json"), "utf8")}\n`);
+  fake.emit(checkout, "change", "package.json");
+  await until(() => changes === 3, () => "package.json was not reported");
+  // A file renamed in dist: the paths differ.
+  await rename(join(dist, "index.js"), join(dist, "main.js"));
+  fake.emit(dist, "rename", "main.js");
+  await until(() => changes === 4, () => "A renamed file was not reported");
+});
+
+test("a write after the comparison is reported by its own event", { timeout: 30_000 }, async (context) => {
+  const root = await sandbox(context);
+  const checkout = join(root, "meeko");
+  await fakeMeeko(checkout);
+  const dist = join(checkout, "dist");
+  const fake = fakeWatch();
+  let changes = 0;
+  const watcher = watchLinkedMeeko({ directory: checkout, dist }, () => {
+    changes++;
+    // The build keeps writing right after the comparison.
+    if (changes === 1) void appendFile(join(dist, "late.js"), "x").then(() => fake.emit(dist, "change", "late.js"));
+  }, { watch: fake.watch, verifyDelay: 30 });
+  context.after(() => watcher.close());
+  await appendFile(join(dist, "index.js"), "\n");
+  fake.emit(dist, "change", "index.js");
+  await until(() => changes === 2, () => `The second write was lost (${changes})`);
+});
+
+test("a build written after the process loaded it, before the watch, is reported once", { timeout: 30_000 }, async (context) => {
+  const root = await sandbox(context);
+  const checkout = join(root, "meeko");
+  await fakeMeeko(checkout);
+  const linked = { directory: checkout, dist: join(checkout, "dist") };
+  const fake = fakeWatch();
+  let changes = 0;
+  const loaded = watchLinkedMeeko(linked, () => { changes++; }, { watch: fake.watch, verifyDelay: 30, loadedAt: Date.now() - 60_000 });
+  context.after(() => loaded.close());
+  await until(() => changes === 1, () => "The build written before the watch was not reported");
+  await pause(200);
+  assert.equal(changes, 1);
+  let later = 0;
+  const current = watchLinkedMeeko(linked, () => { later++; }, { watch: fake.watch, verifyDelay: 30, loadedAt: Date.now() + 60_000 });
+  context.after(() => current.close());
+  await pause(200);
+  assert.equal(later, 0);
+});
+
+test("an unsupervised dev stays quiet for events that wrote nothing", { timeout: 30_000 }, async (context) => {
+  const root = await sandbox(context);
+  const checkout = join(root, "meeko");
+  await fakeMeeko(checkout);
+  const dist = join(checkout, "dist");
+  const fake = fakeWatch();
+  const lines: string[] = [];
+  const warning = warnLinkedMeekoRebuilds({ directory: checkout, dist }, (text) => { lines.push(text); }, 50, { watch: fake.watch, verifyDelay: 30, loadedAt: Date.now() });
+  context.after(() => warning.close());
+  fake.emit(dist, "change", null);
+  fake.emit(dist, "rename", "index.js");
+  fake.fail(dist);
+  fake.emit(checkout, "rename", "dist");
+  await pause(400);
+  assert.deepEqual(lines, []);
+  await appendFile(join(dist, "index.js"), "\n");
+  fake.emit(dist, "change", null);
+  await until(() => lines.length === 1, () => "The rebuild was not reported");
+});
+
+test("a build of 1000 files is read once when the watch starts and compared per event", { timeout: 30_000 }, async (context) => {
+  const root = await sandbox(context);
+  const checkout = join(root, "meeko");
+  await fakeMeeko(checkout);
+  const dist = join(checkout, "dist");
+  for (let index = 0; index < 1000; index++) await writeFile(join(dist, `file-${index}.js`), "export {};\n");
+  const fake = fakeWatch();
+  let changes = 0;
+  const started = performance.now();
+  const watcher = watchLinkedMeeko({ directory: checkout, dist }, () => { changes++; }, { watch: fake.watch, verifyDelay: 20 });
+  context.after(() => watcher.close());
+  const initial = performance.now() - started;
+  fake.emit(dist, "change", null);
+  await pause(200);
+  assert.equal(changes, 0);
+  assert.ok(initial < 1000, `The first scan took ${initial} ms`);
+  process.stdout.write(`# 1000 files: first scan ${initial.toFixed(1)} ms\n`);
 });

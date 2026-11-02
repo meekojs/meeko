@@ -2,7 +2,8 @@ import type { ChildProcess } from "node:child_process";
 import type { FSWatcher, Stats } from "node:fs";
 
 import { spawn } from "node:child_process";
-import { existsSync, readFileSync, realpathSync, statSync, watch } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, readdirSync, readFileSync, realpathSync, statSync, watch } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join, sep } from "node:path";
 
@@ -150,10 +151,59 @@ export function createSettleDebounce(delay: number, run: () => void): SettleDebo
   };
 }
 
+/** Quiet time after the last event of the linked build before its files are compared with the last known state. */
+const linkVerifyDelay = 100;
+/** Margin for file times that run ahead of `Date.now()`: a file stamped within it of the load is not newer than it. */
+const clockTolerance = 250;
+
+/**
+ * State of the files that make a build of `linked`: a digest of the path, modification time and
+ * size of each file under `dist` and of `package.json`, and the newest modification or change time
+ * among them. `fs.watch` also wakes up for events that are not writes (reads that update the access
+ * time, a watcher that ends, an event without a name): comparing two digests tells whether the
+ * build really changed. A missing `dist` has its own digest, and an entry that disappears while it
+ * is read is left out.
+ */
+function scanBuild(linked: LinkedMeeko): { digest: string; newest: number } {
+  const hash = createHash("sha1");
+  let newest = 0;
+  const add = (file: string): void => {
+    try {
+      const stats = statSync(file);
+      newest = Math.max(newest, stats.mtimeMs, stats.ctimeMs);
+      hash.update(`${file}\0${stats.mtimeMs}\0${stats.size}\n`);
+    } catch {
+      // Removed meanwhile: absent from the digest.
+    }
+  };
+  add(join(linked.directory, "package.json"));
+  try {
+    const files = readdirSync(linked.dist, { recursive: true, withFileTypes: true })
+      .filter((entry) => !entry.isDirectory())
+      .map((entry) => join(entry.parentPath, entry.name))
+      .sort();
+    hash.update(`dist ${files.length}\n`);
+    for (const file of files) add(file);
+  } catch {
+    hash.update("no dist\n");
+  }
+  return { digest: hash.digest("hex"), newest };
+}
+
 /** Options of {@link watchLinkedMeeko}. */
 export interface WatchLinkedMeekoOptions {
   /** Whether the watchers keep the process alive, as `fs.watch`'s option; `true` by default. */
   persistent?: boolean;
+  /** Quiet time after the last event before the build is compared with its last known state; 100 ms by default. */
+  verifyDelay?: number;
+  /**
+   * Time, in milliseconds since the epoch, at which the process loaded the build. A file written
+   * clearly after it (a quarter of a second) and before the watch started is reported as a change; without it the build
+   * found when the watch starts is taken as the one in use.
+   */
+  loadedAt?: number;
+  /** Replaces `fs.watch`; for tests that inject events the platform does not produce on demand. */
+  watch?: typeof watch;
 }
 
 /**
@@ -162,7 +212,7 @@ export interface WatchLinkedMeekoOptions {
  * per file, while that update is on, its default on many systems): a server loading `dist`, or
  * Vite serving one of its modules, would restart the server it belongs to. A file whose
  * modification or change time, or size, differs from the last event's changed; the first event of
- * a file counts when those times are not older than the watch.
+ * a file counts when those times are not older than the watch (less the clock tolerance: a write right after the watch starts can be stamped a few milliseconds before it).
  */
 function createWriteFilter(): (file: string) => boolean {
   const since = Date.now();
@@ -181,34 +231,57 @@ function createWriteFilter(): (file: string) => boolean {
     const signature = `${stats.mtimeMs}:${stats.ctimeMs}:${stats.size}`;
     const previous = seen.get(file);
     seen.set(file, signature);
-    return previous === undefined ? Math.max(stats.mtimeMs, stats.ctimeMs) >= since : previous !== signature;
+    return previous === undefined ? Math.max(stats.mtimeMs, stats.ctimeMs) >= since - clockTolerance : previous !== signature;
   };
 }
 
 /**
  * Watches the build of a linked Meeko: `dist` recursively and the package root for its
- * `package.json` and for `dist` being removed or created again. Calls `change` for every
- * event that writes, creates or removes a file (not for one that only reads it); the caller
- * debounces them.
+ * `package.json` and for `dist` being removed or created again. Calls `change` once the build
+ * differs from the last one reported (its files, modification times and sizes, compared after a
+ * quiet period): a read, a watcher error or an event without a name that leaves it equal calls
+ * nothing. The first state is read when the watch starts and no disk is touched while no event
+ * arrives; the caller debounces the calls.
  */
 export function watchLinkedMeeko(linked: LinkedMeeko, change: () => void, options: WatchLinkedMeekoOptions = {}): { close(): void } {
   const persistent = options.persistent ?? true;
+  const watchPath = options.watch ?? watch;
   const written = createWriteFilter();
   let closed = false;
+  // First, before any event: a build that starts right after this still emits events to compare.
+  const initial = scanBuild(linked);
+  let known = initial.digest;
+  /**
+   * Every event that may be a write ends here, after the quiet period: the build counts as changed
+   * only if its files differ from the last state, whatever event woke the watcher. The scan is one
+   * synchronous pass; a write after it emits its own event and is compared again.
+   */
+  const verify = createSettleDebounce(options.verifyDelay ?? linkVerifyDelay, () => {
+    if (closed) return;
+    const current = scanBuild(linked).digest;
+    if (current === known) return;
+    known = current;
+    change();
+  });
+  // Written after the process loaded the build but before this watch: no event will tell.
+  if (options.loadedAt !== undefined && initial.newest > options.loadedAt + clockTolerance) {
+    known = "";
+    verify.trigger();
+  }
   let dist: FSWatcher | undefined;
   const watchDist = (): void => {
     dist?.close();
     dist = undefined;
     if (closed || !existsSync(linked.dist)) return;
     try {
-      const watcher = watch(linked.dist, { recursive: true, persistent }, (event, name) => {
-        if (event === "rename" || name === null || written(join(linked.dist, name))) change();
+      const watcher = watchPath(linked.dist, { recursive: true, persistent }, (event, name) => {
+        if (event === "rename" || name === null || written(join(linked.dist, name))) verify.trigger();
       });
       // Removing the watched directory ends this watcher; the root watcher sees it come back.
       watcher.on("error", () => {
         watcher.close();
         if (dist === watcher) dist = undefined;
-        change();
+        verify.trigger();
       });
       dist = watcher;
     } catch {
@@ -217,16 +290,16 @@ export function watchLinkedMeeko(linked: LinkedMeeko, change: () => void, option
   };
   let root: FSWatcher | undefined;
   try {
-    root = watch(linked.directory, { persistent }, (event, name) => {
+    root = watchPath(linked.directory, { persistent }, (event, name) => {
       if (name === null || name === "dist") {
         // A rename is `dist` removed or created again. A change is its contents on some
         // platforms, which the `dist` watcher already reports, or `dist` being listed.
         if (event === "rename" || !dist) {
           watchDist();
-          change();
+          verify.trigger();
         }
       } else if (name === "package.json" && (event === "rename" || written(join(linked.directory, name)))) {
-        change();
+        verify.trigger();
       }
     });
     root.on("error", () => { root?.close(); root = undefined; });
@@ -237,6 +310,7 @@ export function watchLinkedMeeko(linked: LinkedMeeko, change: () => void, option
   return {
     close() {
       closed = true;
+      verify.cancel();
       root?.close();
       dist?.close();
     },
@@ -440,12 +514,15 @@ export async function superviseDevelopment(linked: LinkedMeeko, options: Supervi
  * Vite's module runner, and Node keeps those modules for the life of the process: the server side
  * stays on the build this process loaded while Vite serves the browser the new files of `dist`,
  * so pages render with the old code and hydrate with the new one until the server is restarted.
- * One line per build, once it settles. The watchers do not keep the process alive.
+ * One line per build, once it settles, and only if the files of the build changed; a build written
+ * after this process started but before the watch is reported once. The watchers do not keep the
+ * process alive; `watchOptions` adjusts them.
  */
 export function warnLinkedMeekoRebuilds(
   linked: LinkedMeeko,
   write: (text: string) => void = (text) => { process.stderr.write(text); },
   delay = linkSettleDelay,
+  watchOptions: WatchLinkedMeekoOptions = {},
 ): { close(): void } {
   // A `MEEKO_DEV_SUPERVISED=1` inherited without a supervisor also leaves the server alone.
   const reason = process.env[linkWatchEnv] === "0" ? `${linkWatchEnv}=0` : `${supervisedDevelopmentEnv}=1 sin supervisor`;
@@ -453,7 +530,7 @@ export function warnLinkedMeekoRebuilds(
     write(`[meeko] Meeko enlazado cambió (${linked.dist}), pero este meeko dev no se reinicia solo (${reason}): `
       + "el servidor sigue con el código anterior y el navegador recibe el nuevo. Reinicia meeko dev.\n");
   });
-  const watcher = watchLinkedMeeko(linked, () => debounce.trigger(), { persistent: false });
+  const watcher = watchLinkedMeeko(linked, () => debounce.trigger(), { loadedAt: Date.now() - process.uptime() * 1000, ...watchOptions, persistent: false });
   return {
     close() {
       debounce.cancel();
