@@ -1,5 +1,5 @@
 ---
-source-hash: 23165c84191cc41e2f06f1fe7e00b0887bd0764f2871f267d5d7540af42353f0
+source-hash: 5a1fbe57034e739a6fac3bc1de7544881363b32ebdafd5451698bfe31ff1daf5
 ---
 
 # Releasing Meeko
@@ -44,7 +44,7 @@ Finish and integrate the design program and resolve the open scrypt hash questio
 
 ### First publication of new packages
 
-A package must exist on npm before configuring its trusted publisher, so `@meekojs/i18n`, `@meekojs/icon`, `@meekojs/ui`, `@meekojs/eslint-plugin` and `@meekojs/prettier-plugin` are published once from the maintainer's interactive session. **`@meekojs/meeko` does not go through this:** its versions carry signed provenance and publishing one by hand would lose it. `publish-first.ps1` leaves any package that already exists on npm to the workflow. Never save tokens or OTPs in files or arguments. Use Node 24+ and npm **11.5.1 or later** (the workflow pins 11.19.0).
+A package must exist on npm before configuring its trusted publisher, so `@meekojs/i18n`, `@meekojs/icon`, `@meekojs/ui`, `@meekojs/eslint-plugin` and `@meekojs/prettier-plugin` are published once from the maintainer's interactive session. **`@meekojs/meeko` does not go through this:** its versions carry signed provenance and publishing one by hand would lose it. `publish-first.ps1` leaves any package that already exists on npm to the workflow, even if it only has versions under `next`: what counts is its root document, not a dist-tag. Never save tokens or OTPs in files or arguments. Use Node 24+ and npm **11.5.1 or later** (the workflow pins 11.19.0).
 
 1. Approve contents and versions; confirm ownership or publication rights for the `@meekojs` scope and run `npm login` yourself.
 2. Integrate the release commit into `main` with green `test` and `redis-integration` on that SHA, under its ruleset, and update your checkout with `git fetch origin`.
