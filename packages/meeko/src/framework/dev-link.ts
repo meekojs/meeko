@@ -242,8 +242,13 @@ function createWriteFilter(): (file: string) => boolean {
  * quiet period): a read, a watcher error or an event without a name that leaves it equal calls
  * nothing. The first state is read when the watch starts and no disk is touched while no event
  * arrives; the caller debounces the calls.
+ *
+ * `written()` answers at once whether the build differs from the last time this watch read it. A
+ * burst of writes keeps extending the quiet period, so `change` says nothing until it ends: this
+ * compares the files as well, so an event that wrote nothing still does not count. It leaves the
+ * report to `change`, which comes when the burst ends.
  */
-export function watchLinkedMeeko(linked: LinkedMeeko, change: () => void, options: WatchLinkedMeekoOptions = {}): { close(): void } {
+export function watchLinkedMeeko(linked: LinkedMeeko, change: () => void, options: WatchLinkedMeekoOptions = {}): { close(): void; written(): boolean } {
   const persistent = options.persistent ?? true;
   const watchPath = options.watch ?? watch;
   const written = createWriteFilter();
@@ -251,6 +256,8 @@ export function watchLinkedMeeko(linked: LinkedMeeko, change: () => void, option
   // First, before any event: a build that starts right after this still emits events to compare.
   const initial = scanBuild(linked);
   let known = initial.digest;
+  /** The last state read, reported or not. */
+  let seen = initial.digest;
   /**
    * Every event that may be a write ends here, after the quiet period: the build counts as changed
    * only if its files differ from the last state, whatever event woke the watcher. The scan is one
@@ -259,6 +266,7 @@ export function watchLinkedMeeko(linked: LinkedMeeko, change: () => void, option
   const verify = createSettleDebounce(options.verifyDelay ?? linkVerifyDelay, () => {
     if (closed) return;
     const current = scanBuild(linked).digest;
+    seen = current;
     if (current === known) return;
     known = current;
     change();
@@ -308,6 +316,12 @@ export function watchLinkedMeeko(linked: LinkedMeeko, change: () => void, option
   }
   watchDist();
   return {
+    written() {
+      const current = scanBuild(linked).digest;
+      const differs = current !== seen;
+      seen = current;
+      return differs;
+    },
     close() {
       closed = true;
       verify.cancel();
@@ -329,6 +343,8 @@ export interface SuperviseOptions {
   stopTimeout?: number;
   /** The other linked packages, see {@link findLinkedPackages}. Their builds do not restart a healthy server. */
   related?: readonly LinkedMeeko[];
+  /** Replaces `fs.watch`; for tests that inject events the platform does not produce on demand. */
+  watch?: typeof watch;
 }
 
 /** Starts of a failed server, each after twice the wait of the last, before waiting for the next change. */
@@ -344,9 +360,10 @@ const maxLinkRetryDelay = 10_000;
  * bridge descriptor) before the next one listens on the same port.
  *
  * A pending restart also waits for the `related` packages to settle. A child that fails after some
- * linked package was written since it started read a build halfway: it starts again, waiting twice
- * as long each time and never while they are still being written. One that fails with nothing
- * written is a real failure: the first child behaves as an unsupervised `meeko dev`, and the
+ * linked package was written since it started read a build halfway, also when the watch has not
+ * reported that write yet: it starts again, waiting twice as long each time and never while they
+ * are still being written. One that fails with nothing written, whatever events the watch received,
+ * is a real failure: the first child behaves as an unsupervised `meeko dev`, and the
  * supervisor exits with its code; a later one is reported and starts again on the next change of
  * any linked package. SIGINT and SIGTERM stop the child and then the supervisor; a second signal
  * kills it. Resolves to the exit code.
@@ -403,7 +420,7 @@ export async function superviseDevelopment(linked: LinkedMeeko, options: Supervi
       child = undefined;
       if (stopping) finish(code);
       else if (debounce.pending || restarting) return;
-      else if (code !== 0 && lastWrite >= launchedAt && retries < maxLinkRetries) scheduleRetry(code);
+      else if (code !== 0 && writtenSinceLaunch() && retries < maxLinkRetries) scheduleRetry(code);
       else if (first) finish(code);
       else {
         process.stderr.write(`[meeko] meeko dev ${ready ? "terminó" : "no pudo arrancar"} con el Meeko enlazado (código ${code}); `
@@ -435,12 +452,30 @@ export async function superviseDevelopment(linked: LinkedMeeko, options: Supervi
     finally { clearTimeout(timer); }
   };
 
+  /**
+   * Brings `lastWrite` up to date with the disk. A burst of writes is reported when it ends, so the
+   * watchers cannot tell yet; the files can, and a read that only woke them leaves those equal.
+   */
+  const noteWrites = (): void => {
+    if ([watcher, ...relatedWatchers].filter((item) => item.written()).length) lastWrite = Date.now();
+  };
+  const writtenSinceLaunch = (): boolean => {
+    noteWrites();
+    return lastWrite >= launchedAt;
+  };
+
   /** Starts a child that read a build halfway again, once the linked packages have been quiet for `delay`. */
   const scheduleRetry = (code: number): void => {
     const wait = Math.min(delay * 2 ** retries, maxLinkRetryDelay);
     retries++;
     process.stderr.write(`[meeko] meeko dev no pudo arrancar mientras se escribía un paquete enlazado (código ${code}); reintento ${retries} de ${maxLinkRetries} en ${wait} ms\n`);
     const attempt = (): void => {
+      noteWrites();
+      // A build of Meeko that settled restarts the server by itself.
+      if (debounce.pending) {
+        retryTimer = undefined;
+        return;
+      }
       const quiet = Date.now() - lastWrite;
       retryTimer = quiet < delay ? setTimeout(attempt, delay - quiet) : undefined;
       if (!retryTimer) void restart();
@@ -470,14 +505,14 @@ export async function superviseDevelopment(linked: LinkedMeeko, options: Supervi
     if (stopping) return;
     lastWrite = Date.now();
     debounce.trigger();
-  });
+  }, options.watch ? { watch: options.watch } : {});
   // A build of another package extends a pending restart and revives a server that failed, but
   // leaves a healthy one running: Vite follows those files.
   const relatedWatchers = related.map((item) => watchLinkedMeeko(item, () => {
     if (stopping) return;
     lastWrite = Date.now();
     if (debounce.pending || (!child && !restarting && !retryTimer)) debounce.trigger();
-  }));
+  }, options.watch ? { watch: options.watch } : {}));
 
   const stop = (): void => {
     if (stopping) {

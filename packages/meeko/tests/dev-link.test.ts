@@ -210,7 +210,7 @@ test("findLinkedPackages finds the linked packages built for Meeko, also through
 });
 
 /** A supervisor whose server fails while `ready` is missing, as one that reads a `dist` halfway. */
-async function supervisor(context: { after(fn: () => Promise<void>): void }, options: { failAfter?: number; ready?: boolean } = {}) {
+async function supervisor(context: { after(fn: () => Promise<void>): void }, options: { failAfter?: number; falseEvents?: boolean; ready?: boolean } = {}) {
   const root = await sandbox(context);
   const meeko = join(root, "meeko");
   const ui = join(root, "ui");
@@ -222,9 +222,16 @@ async function supervisor(context: { after(fn: () => Promise<void>): void }, opt
   await writeFile(log, "");
   const script = join(root, "supervisor.mts");
   const module = pathToFileURL(resolve("src/framework/dev-link.ts")).href;
-  await writeFile(script, `import { appendFileSync, existsSync } from "node:fs";
+  await writeFile(script, `import { EventEmitter } from "node:events";
+import { appendFileSync, existsSync } from "node:fs";
 import { isSupervisedDevelopment, runSupervisedDevelopment, superviseDevelopment } from ${JSON.stringify(module)};
 const log = ${JSON.stringify(log)};
+// What a read looks like on Windows: an event without a name, with nothing written. The events keep
+// coming, so their quiet period never ends.
+const falseEvents = (_path, _options, listener) => {
+  const timer = setInterval(() => listener("change", null), 40);
+  return Object.assign(new EventEmitter(), { close() { clearInterval(timer); } });
+};
 if (isSupervisedDevelopment()) {
   appendFileSync(log, "start\\n");
   await new Promise((done) => setTimeout(done, ${options.failAfter ?? 0}));
@@ -235,7 +242,7 @@ if (isSupervisedDevelopment()) {
   }, async () => {}).catch(() => { appendFileSync(log, "fail\\n"); process.exit(1); });
 } else {
   const dir = (directory) => ({ directory, dist: directory + "/dist" });
-  process.exitCode = await superviseDevelopment(dir(${JSON.stringify(meeko)}), { delay: 100, stopTimeout: 1000, related: [dir(${JSON.stringify(ui)})] });
+  process.exitCode = await superviseDevelopment(dir(${JSON.stringify(meeko)}), { delay: 100, stopTimeout: 1000, related: [dir(${JSON.stringify(ui)})]${options.falseEvents ? ", watch: falseEvents" : ""} });
 }
 `);
   const running = spawn(process.execPath, ["--import", "tsx", script], { cwd: resolve("."), stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
@@ -292,6 +299,46 @@ test("a first server that fails with nothing written ends the supervisor with it
   const { count, exited } = await supervisor(context);
   assert.equal(await exited, 1);
   assert.equal(await count("start"), 1);
+});
+
+/** Writes `file` every 40 ms, less than the quiet period of the watch, until the function it returns is called. */
+function burst(context: { after(fn: () => Promise<void>): void }, file: string): () => Promise<void> {
+  let writing = true;
+  const done = (async () => {
+    while (writing) {
+      await writeFile(file, `export const at = ${Date.now()};\n`);
+      await pause(40);
+    }
+  })();
+  const stop = async () => {
+    writing = false;
+    await done;
+  };
+  context.after(stop);
+  return stop;
+}
+
+for (const [name, directory] of [["a related package", "ui"], ["the linked Meeko", "meeko"]] as const) {
+  test(`a first server that fails during a burst of writes of ${name} starts again once it settles`, { timeout: 90_000 }, async (context) => {
+    const running = await supervisor(context, { failAfter: 1000 });
+    let code: number | null | undefined;
+    void running.exited.then((value) => { code = value; });
+    const stop = burst(context, join(running[directory], "dist", "index.js"));
+    await running.until("fail", 1);
+    await pause(600);
+    assert.equal(code, undefined, `A burst whose quiet period has not ended counts as written\n${running.output()}`);
+    assert.equal(await running.count("start"), 1, `Nothing starts while the package is written\n${running.output()}`);
+    await stop();
+    await writeFile(running.ready, "");
+    await running.until("ready", 1);
+    assert.equal(await running.count("start"), 2, running.output());
+  });
+}
+
+test("a first server that fails among events that wrote nothing ends the supervisor with its code", { timeout: 90_000 }, async (context) => {
+  const { count, exited, output } = await supervisor(context, { failAfter: 500, falseEvents: true });
+  assert.equal(await exited, 1, output());
+  assert.equal(await count("start"), 1, output());
 });
 
 test("the starts of a server that keeps failing while its packages are written are bounded", { timeout: 90_000 }, async (context) => {
@@ -387,6 +434,31 @@ test("events that are not writes do not report the linked build; real builds do"
   await rename(join(dist, "index.js"), join(dist, "main.js"));
   fake.emit(dist, "rename", "main.js");
   await until(() => changes === 4, () => "A renamed file was not reported");
+});
+
+test("written() compares the build at once, without taking the change from its report", { timeout: 30_000 }, async (context) => {
+  const root = await sandbox(context);
+  const checkout = join(root, "meeko");
+  await fakeMeeko(checkout);
+  const dist = join(checkout, "dist");
+  const fake = fakeWatch();
+  let changes = 0;
+  const watcher = watchLinkedMeeko({ directory: checkout, dist }, () => { changes++; }, { watch: fake.watch, verifyDelay: 100 });
+  context.after(() => watcher.close());
+  assert.equal(watcher.written(), false, "Nothing was written since the watch started");
+  // An event that wrote nothing, still in its quiet period, is not a write.
+  fake.emit(dist, "change", null);
+  assert.equal(watcher.written(), false);
+  await pause(200);
+  assert.equal(changes, 0);
+  // A write without any event yet, and then one still in its quiet period.
+  await appendFile(join(dist, "index.js"), "\n");
+  assert.equal(watcher.written(), true);
+  assert.equal(watcher.written(), false, "Each write counts once");
+  fake.emit(dist, "change", "index.js");
+  assert.equal(changes, 0, "The event still waits for its quiet period");
+  await until(() => changes === 1, () => "The write seen by written() was not reported");
+  assert.equal(watcher.written(), false, "The report saw the same build");
 });
 
 test("a write after the comparison is reported by its own event", { timeout: 30_000 }, async (context) => {
