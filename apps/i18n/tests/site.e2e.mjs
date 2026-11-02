@@ -73,7 +73,7 @@ test('production i18n documentation renders guides, translates, switches locale 
 	assert.equal(new URL(page.url()).pathname, '/playground')
 	assert.deepEqual(await alternates(), ['es /playground', 'en /en/playground', 'ar /ar/playground', 'x-default /playground'])
 	// The shell offers it in the suggested language, floating over the page (no layout shift).
-	const suggestion = page.getByRole('complementary', { name: 'Sugerencia de idioma', exact: true })
+	const suggestion = page.getByRole('complementary', { name: 'Language suggestion', exact: true })
 	await suggestion.waitFor()
 	assert.equal(await suggestion.getByRole('link', { name: 'Read this page in English', exact: true }).getAttribute('href'), '/en/playground?tab=demo#messages')
 	assert.equal(await suggestion.evaluate((element) => globalThis.getComputedStyle(element).position), 'fixed')

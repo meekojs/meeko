@@ -92,7 +92,7 @@ test('the English UI documentation has an English interface, hreflang, a switche
 		['/en/buttons', 'en', 'en', 'page'],
 	])
 	// The suggestion floats over the page and speaks the suggested language.
-	const suggestion = page.getByRole('complementary', { name: 'Language suggestion', exact: true })
+	const suggestion = page.getByRole('complementary', { name: 'Sugerencia de idioma', exact: true })
 	await suggestion.waitFor()
 	assert.equal(await suggestion.getByRole('status').innerText(), 'Esta página también está en español.')
 	assert.equal(await suggestion.getByRole('link', { name: 'Leer esta página en español', exact: true }).getAttribute('href'), '/buttons')
