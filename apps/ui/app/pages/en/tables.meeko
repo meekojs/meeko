@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { TableColumn } from '@meekojs/ui/runtime'
 
-	import { examples } from '../../utils/examples'
+	import { englishExamples as examples } from '../../utils/examples.en'
 
 	interface Project {
 		id: number

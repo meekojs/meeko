@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { examples } from '../../utils/examples'
+	import { englishExamples as examples } from '../../utils/examples.en'
 
 	const markdown = signal('## Release notes\n\nWrite **here** or switch to code mode.\n\n- Without editing, the text does not change.\n- Only the block you touch is rewritten.\n')
 	const mode = signal<'visual' | 'code'>('visual')

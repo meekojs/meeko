@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { examples } from '../../utils/examples'
+	import { englishExamples as examples } from '../../utils/examples.en'
 
 	const i18n = useI18n()
 </script>

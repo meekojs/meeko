@@ -51,7 +51,7 @@ Con `DATABASE_URL`, la web cuenta vistas, registra las búsquedas del filtro de 
 - `app/pages/`: portada, instalación, temas, índice y guías de componentes, en español y, en `app/pages/en/`, en inglés. Cada componente de `packages/ui` tiene su guía; varios comparten una por familia (`/controls`, `/feedback`, `/content`, `/page`, `/navigation`, `/overlays`, `/editor`).
 - `packages/docs/`: módulo privado compartido con i18n: shell, navegación, página documental, bloques de código copiables y tablas de API. Las declaraciones de sus componentes se preparan antes de dev, build y check.
 - `app/utils/navigation.ts`: catálogo de navegación y filtro local por nombre o descripción; no es búsqueda de texto completo.
-- `app/utils/examples.ts`: código copiable de las guías.
+- `app/utils/examples.ts` y `examples.en.ts`: código copiable de las guías, en cada idioma: sus textos y comentarios se traducen, y los identificadores no cambian.
 - `app/styles/main.css`: sólo la coreografía de la demo de View Transitions, un efecto. Todo lo demás viene de `packages/ui`, y la disposición de las demos, de `packages/docs/src/app/styles/docs.css`.
 - `public/`: logo copiado desde `packages/docs/assets` por los scripts de dev/build; se ignora en Git. La fuente la sirve el módulo de UI.
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { examples } from '../../utils/examples'
+	import { englishExamples as examples } from '../../utils/examples.en'
 
 	const action = signal('No action yet.')
 	const filtersOpen = signal(false)

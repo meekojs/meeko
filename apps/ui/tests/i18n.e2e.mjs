@@ -77,8 +77,13 @@ test('the English UI documentation has an English interface, hreflang, a switche
 		assert.equal(await page.locator('html').getAttribute('lang'), 'en', route)
 		assert.equal(await page.locator('main h1').count(), 1, route)
 		assert.match(await page.title(), / · Meeko UI$/, route)
+		// The examples are highlighted at build time; only the demos of UICodeBlock itself stay in plain text.
+		assert.equal(await page.locator('.meeko-ui-code-block:has(pre:not(.shiki))').count(), guide === '/content' ? 4 : 0, route)
 		const texts = await interfaceTexts()
 		for (const spanish of spanishInterface) assert.ok(!texts.includes(spanish), `${route} shows the Spanish interface text «${spanish}»`)
+		// The copiable examples speak English too: no accents of Spanish, nor its usual words. Español names a language, and the other one a person.
+		const code = (await page.locator('.meeko-ui-code-block pre').allInnerTexts()).join('\n').replaceAll('Español', '').replaceAll('Lucía Martín', '')
+		assert.doesNotMatch(code, /[áíóúñ¿¡]|\b(?:Guardar|Cambios|Cancelar|Eliminar|Abrir|Cerrar|Proyectos?|Tu|Sin|Con|Para|Enlace|Contenido|Guía)\b/, route)
 		// Every page has its English prose: no untranslated notice and no Spanish prose marked as such.
 		assert.equal(await page.locator('.docs-untranslated').count(), 0, route)
 		assert.equal(await page.locator('.docs-page[lang]').count(), 0, route)

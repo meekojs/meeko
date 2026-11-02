@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { UIContainerSize } from '@meekojs/ui'
 
-	import { examples } from '../../utils/examples'
+	import { englishExamples as examples } from '../../utils/examples.en'
 
 	const sizes = ['sm', 'md', 'lg', 'xl', '2xl', '3xl', '4k', 'full'] as const
 	const size = signal<UIContainerSize | null>('xl')
