@@ -37,8 +37,9 @@ RUN corepack enable && corepack prepare --activate && pnpm --version
 COPY . .
 RUN --mount=type=cache,id=meekojs-pnpm-store,target=/pnpm/store \
 	pnpm install --frozen-lockfile --store-dir /pnpm/store
-# El núcleo, UI, i18n y la base documental, en orden topológico.
-RUN pnpm -r --filter @meekojs/meeko --filter @meekojs/ui --filter @meekojs/i18n --filter meeko-docs run build
+# El núcleo, UI, i18n, icon y la base documental, en orden topológico. Cada módulo que carga una app
+# debe estar aquí: `meeko build` lo lee de su dist (scripts/deploy-dockerfile.test.mjs lo comprueba).
+RUN pnpm -r --filter @meekojs/meeko --filter @meekojs/ui --filter @meekojs/i18n --filter @meekojs/icon --filter meeko-docs run build
 
 # ---------------------------------------------------------------------------------------------------
 # Build de una web pública y sus dependencias de producción en /out.

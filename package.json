@@ -40,7 +40,7 @@
 		"test": "pnpm -F @meekojs/meeko run test",
 		"test:build": "node --test scripts/build-package.test.mjs",
 		"test:packages": "node --test --test-concurrency=1 packages/ui/tests/*.test.mjs packages/i18n/tests/*.test.mjs packages/icon/tests/*.test.mjs packages/eslint-plugin/tests/*.test.mjs packages/prettier-plugin/tests/*.test.mjs",
-		"test:scripts": "node --test scripts/build-package.test.mjs scripts/design-tokens-check.test.mjs scripts/generated-sources.test.mjs scripts/git-guard.test.mjs scripts/publish-packages.test.mjs scripts/sync-agents.test.mjs",
+		"test:scripts": "node --test scripts/build-package.test.mjs scripts/deploy-dockerfile.test.mjs scripts/design-tokens-check.test.mjs scripts/generated-sources.test.mjs scripts/git-guard.test.mjs scripts/publish-packages.test.mjs scripts/sync-agents.test.mjs",
 		"tooling:build": "pnpm -F @meekojs/meeko run build && pnpm -F @meekojs/eslint-plugin run build && pnpm -F @meekojs/prettier-plugin run build",
 		"ui:build": "pnpm -F @meekojs/meeko run build && pnpm -F @meekojs/ui run build && pnpm -F meeko-ui-site run build",
 		"ui:dev": "pnpm -F meeko-ui-site run dev",
