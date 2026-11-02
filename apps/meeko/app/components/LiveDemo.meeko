@@ -354,8 +354,11 @@
 		min-height: 15rem;
 		font-variant-numeric: tabular-nums;
 	}
+	/* The ground of the page behind the text, so the dots never cross a line. */
 	.hint {
 		margin: 0;
+		background: var(--ui-color-bg);
+		padding-inline: var(--ui-space-1);
 		max-width: var(--ui-container-sm);
 		color: var(--ui-color-text-soft);
 		font-size: var(--ui-font-size-sm);
