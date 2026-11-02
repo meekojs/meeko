@@ -10,9 +10,23 @@ import { fileURLToPath } from 'node:url'
 // Prettier adds none with `htmlWhitespaceSensitivity: "ignore"`, whatever the width of the template.
 const components = ['Popover', 'Select', 'ThemeToggle', 'Tabs', 'Tooltip', 'CommandPalette', 'Combobox']
 
+const isLineBreak = (node) => node.nodeName === '#text' && /^[\t\n\f\r ]*\n[\t\n\f\r ]*$/.test(node.value ?? '')
+const isContent = (node) => node.nodeName !== '#comment' && (node.nodeName !== '#text' || Boolean(node.value?.trim()))
+
+/** The children that render: the compiler drops line breaks at the edges of a snippet, and the text among the snippets of a component. */
+function renderedChildren(node) {
+	let children = [...(node.childNodes ?? []), ...(node.content?.childNodes ?? [])]
+	if (node.tagName === 'snippet') {
+		while (children.length && isLineBreak(children[0])) children = children.slice(1)
+		while (children.length && isLineBreak(children.at(-1))) children = children.slice(0, -1)
+	}
+	if (node.componentName && !children.some((child) => child.tagName !== 'snippet' && isContent(child))) return children.filter((child) => child.tagName === 'snippet')
+	return children
+}
+
 /** The text nodes of a template, with the element that holds them. */
 function* textNodes(node, parent = 'template') {
-	for (const child of [...(node.childNodes ?? []), ...(node.content?.childNodes ?? [])]) {
+	for (const child of renderedChildren(node)) {
 		if (child.nodeName === '#text') yield { node: child, parent }
 		else yield* textNodes(child, child.componentName ?? child.tagName ?? parent)
 	}
