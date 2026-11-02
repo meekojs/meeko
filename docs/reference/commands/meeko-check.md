@@ -60,6 +60,8 @@ C:\proyectos\tienda\app\components\Greeting.meeko:3:23 aviso MEEK101: props.name
 
 El orden de un proyecto es: la configuración, la migración de `server/session.ts`, los archivos generados, los `.meeko` (si alguno tiene errores se detiene ahí) y, por último, TypeScript con `.meeko/tsconfig.app.json`, `tsconfig.server.json` y `tsconfig.shared.json`, uno tras otro.
 
+Un módulo normal de `app/` se comprueba con `tsconfig.app.json`, y por eso puede usar los autoimports sólo para código de navegador (`useHead`, `useForm`, `resolveComponent`…), que no existen en `server/`. Como sus exports también llegan al servidor, ese módulo entra además en el programa de `tsconfig.server.json`: desde `1.8`, `meeko check` omite ahí sus diagnósticos, ya comprobados en `tsconfig.app.json`. **`tsc -p .meeko/tsconfig.server.json` a mano no los omite** y da `TS2304` en esos nombres: use `meeko check`.
+
 ## Ejemplos
 
 ### En CI

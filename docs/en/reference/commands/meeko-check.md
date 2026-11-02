@@ -14,7 +14,7 @@ related:
   - docs/framework.md#autoimports-y-typescript
   - docs/framework.md#tipos-de-los-servicios
   - docs/editors.md#comprobación-del-proyecto
-source-hash: e93575c834a34e423dd0418b2b5364a42042d214016a12f7cfe0a774ae4aae51
+source-hash: 6c54613ebbb6671a8e6fa53c9869eb4b61d47218e0b92d56fd93762b8b968d65
 ---
 
 `meeko check` is the complete application check: the one that must pass in CI before `meeko build`. With a directory (the current one by default), it generates the same files as `meeko dev` in `.meeko/` (entry points, manifests, declarations for routes, contracts, auto-imports, components and, since `1.7`, `.meeko/types/services.d.ts`), checks each application `.meeko` and its prop contracts, then runs TypeScript on the three generated projects: `app`, `server` and `shared`.
@@ -60,6 +60,8 @@ C:\proyectos\tienda\app\components\Greeting.meeko:3:23 aviso MEEK101: props.name
 ```
 
 The order for a project is: configuration, migration of `server/session.ts`, generated files, `.meeko` files (stopping there if any have errors) and finally TypeScript with `.meeko/tsconfig.app.json`, `tsconfig.server.json` and `tsconfig.shared.json`, sequentially.
+
+A plain `app/` module is checked with `tsconfig.app.json`, so it can use the auto-imports reserved for browser code (`useHead`, `useForm`, `resolveComponent`…), which do not exist in `server/`. Since its exports also reach the server, that module also enters the `tsconfig.server.json` program: since `1.8`, `meeko check` skips its diagnostics there, already checked in `tsconfig.app.json`. **Running `tsc -p .meeko/tsconfig.server.json` by hand does not skip them** and gives `TS2304` on those names: use `meeko check`.
 
 ## Examples
 

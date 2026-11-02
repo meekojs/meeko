@@ -7,11 +7,12 @@ import { promisify } from "node:util";
 import type { CompileDiagnostic } from "../compiler/parser/sfc";
 import type { MeekoConfig } from "./config";
 
+import { typeScriptScope } from "../autoimports/typescript";
 import { mapRouteBlockPaths, routeBlockTypeFiles } from "../compiler/codegen/route-block-types";
 import { formatDiagnostic, hasErrors } from "../compiler/parser/sfc";
 import { tscCommand } from "../typescript-cli";
 import { checkApp } from "./check-app";
-import { discoverConfiguredRoutes, loadMeekoConfig } from "./config";
+import { discoverConfiguredRoutes, loadMeekoConfig, resolveConfigSources } from "./config";
 import { configTypesPath, moduleTemplatesIndexPath, writeConfigTypesSync } from "./config-types";
 import { prepareProject } from "./project";
 import { assertNoLegacySessionFile } from "./runtime-migration";
@@ -19,14 +20,45 @@ import { prepareFrameworkTypeDeclarations, projectNames } from "./type-declarati
 
 const execute = promisify(execFile);
 
-async function checkTypeScript(configs: readonly string[], routeBlocks: ReadonlyMap<string, string>): Promise<void> {
-  for (const config of configs) {
-    const tsc = tscCommand(["-p", config, "--noEmit"]);
-    try { await execute(tsc.file, tsc.args, { windowsHide: true }); }
+/**
+ * The output of the server project without the diagnostics of plain `app/` modules. Those modules
+ * reach that program only because `server.d.ts` declares their exports with `typeof import(...)`, and
+ * there the names only for browser code (`useHead`, `useForm`, `resolveComponent`…) do not exist. They
+ * belong to the app project, which has already passed by then: only these lines are skipped here.
+ */
+function withoutAppModules(output: string, root: string, sourceRoots: readonly string[]): string {
+  const kept: string[] = [];
+  let skipping = false;
+  for (const line of output.split(/\r?\n/)) {
+    // The indented lines detail the diagnostic above them.
+    if (/^\s+\S/.test(line)) {
+      if (!skipping) kept.push(line);
+      continue;
+    }
+    if (!line.trim() || /^Found \d+ errors?/.test(line)) continue;
+    const file = /^(.+?)\(\d+,\d+\): /.exec(line)?.[1];
+    skipping = file !== undefined && typeScriptScope(root, resolve(file), sourceRoots) === "client" && !/\.client\.[cm]?tsx?$/.test(file);
+    if (!skipping) kept.push(line);
+  }
+  return kept.join("\n");
+}
+
+async function checkTypeScript(root: string, routeBlocks: ReadonlyMap<string, string>): Promise<void> {
+  const sourceRoots = (await resolveConfigSources(root)).map((source) => source.root);
+  for (const name of projectNames) {
+    const config = join(root, ".meeko", `tsconfig.${name}.json`);
+    const tsc = tscCommand(["-p", config, "--noEmit", "--pretty", "false"]);
+    try { await execute(tsc.file, tsc.args, { windowsHide: true, maxBuffer: 64 * 1024 * 1024 }); }
     catch (error) {
-      const failure = error as Error & { stdout?: string; stderr?: string };
+      const failure = error as Error & { code?: unknown; stdout?: string; stderr?: string };
+      let output = `${failure.stdout ?? ""}${failure.stderr ?? ""}`;
+      // A numeric code is tsc reporting diagnostics; anything else (it did not run) always fails.
+      if (name === "server" && typeof failure.code === "number") {
+        output = withoutAppModules(output, root, sourceRoots);
+        if (!output) continue;
+      }
       // Diagnostics in a `<script server>` copy point at the page, on the same line and column.
-      throw new Error(mapRouteBlockPaths(`Falló la comprobación con TypeScript (${config}):\n${failure.stdout ?? ""}${failure.stderr ?? ""}`, routeBlocks));
+      throw new Error(mapRouteBlockPaths(`Falló la comprobación con TypeScript (${config}):\n${output}`, routeBlocks), { cause: error });
     }
   }
 }
@@ -122,7 +154,6 @@ export async function checkFrameworkProject(projectRoot: string): Promise<Compil
   const sourceDiagnostics = await checkApp(root);
   // The error lists the warnings too, so none is lost behind the errors.
   if (hasErrors(sourceDiagnostics)) throw new Error(sourceDiagnostics.map(formatDiagnostic).join("\n"));
-  const configs = projectNames.map((name) => join(root, ".meeko", `tsconfig.${name}.json`));
-  await checkTypeScript(configs, await routeBlockTypeFiles(root, await discoverConfiguredRoutes(root)));
+  await checkTypeScript(root, await routeBlockTypeFiles(root, await discoverConfiguredRoutes(root)));
   return sourceDiagnostics;
 }
