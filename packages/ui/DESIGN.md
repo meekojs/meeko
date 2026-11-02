@@ -71,7 +71,7 @@ La interfaz crece con la pantalla en un solo sitio, la base global: `html { font
 
 ## Tipografía
 
-`--ui-font-sans` es Inter Variable y `--ui-font-mono`, la mono del sistema. La mono es para código y datos, no un adorno «técnico».
+`--ui-font-sans` es Inter Variable y `--ui-font-mono`, la mono del sistema. La mono es para código y datos, no un adorno «técnico», y va sin ligaduras: el código enseña los caracteres escritos. En una tabla, un nombre no se corta: un tipo largo se parte por sus espacios y, si aun así no cabe, la tabla se desplaza dentro de su contenedor.
 
 | Tamaño                               | rem        | Para                                | Interlineado | Tracking  |
 | ------------------------------------ | ---------- | ----------------------------------- | ------------ | --------- |
@@ -161,6 +161,7 @@ Una app no debe escribir su propio reset ni su `body`: borra los suyos al migrar
 - **Títulos:** los tamaños de esta guía, no los de Crepe, que son de una página entera.
 - **Lo que flota** (barra de formato, menú `/`, enlaces, lenguajes): `--ui-color-surface-raised`, con borde `--ui-color-border`.
 - **Altura:** fija desde el primer pintado, con `--ui-markdown-editor-height`, para que no salte nada al llegar Crepe.
+- **Código:** colorea con tokens TypeScript, JavaScript, HTML, CSS, JSON y los bloques de terminal (`sh`, `powershell`), cada uno cargado aparte. Cualquier otro lenguaje se ve sin color.
 
 ## Personalizar
 
