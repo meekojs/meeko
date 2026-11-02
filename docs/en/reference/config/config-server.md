@@ -20,7 +20,7 @@ related:
   - docs/framework.md#csp-y-cabeceras-en-los-adaptadores-con-servidor
   - docs/framework.md#sitio-estático
   - docs/framework.md#cloudflare-workers
-source-hash: f1e46fa3180e18d0f02f0d073a6dbb24541c02b22bdfc6d16e850491a4dabd31
+source-hash: 156b6077c4e198efed4b7cf9bf8880f2d23c91e67c3ca6b8ee63d1b8609acf9f
 ---
 
 `server` chooses where the built application runs: a discriminated union keyed by `adapter`. `meeko build` writes output to `.meeko/output/<adapter>/`; the CLI's `--adapter` takes precedence over configuration. Without `server`, the adapter is `node`.
@@ -236,4 +236,4 @@ server: { adapter: "node", port: 3000 }
 - **Development.** CSP only applies in production (`meeko start`, `meeko preview` and output builds); in `meeko dev`, Vite injects scripts without a nonce. `headers` does apply in `meeko dev` to responses handled by the application.
 - **Cookies and caches.** A response with `Set-Cookie` and a `public` `Cache-Control` is sent as `private, no-store` without `ETag`, with or without these options.
 - **Environment variables.** `MEEKO_HOST`, `MEEKO_PORT` and `MEEKO_PUBLIC_ORIGIN` are read at runtime, not at build time; `server.host` and `server.port` only apply to Node.
-- **Custom host.** Options are transferred in the manifest (`AppManifest.contentSecurityPolicy` and `AppManifest.headers`); a host that creates its `AppManifest` manually passes them there. Since `1.8`, the headers of `addPublicFile` travel separately, in `AppManifest.publicFileHeaders`, by the exact `pathname` of the file: the patterns of `headers` replace only the headers they set.
+- **Custom host.** Options are transferred in the manifest (`AppManifest.contentSecurityPolicy` and `AppManifest.headers`); a host that creates its `AppManifest` manually passes them there. Since `1.8`, the headers of `addPublicFile` travel separately, in `AppManifest.publicFileHeaders`, by the exact `pathname` of the file: the patterns of `headers` replace only the headers they set. This applies in production: in `meeko dev`, public files do not go through the application, so they carry only the headers of `addPublicFile`, and `headers` does not affect them.
