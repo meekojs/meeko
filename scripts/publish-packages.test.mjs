@@ -67,8 +67,9 @@ function writeShim(bin, name) {
 
 /** Registro npm mínimo: 404 real para lo que no existe y respuestas forzadas para simular fallos. */
 function startRegistry() {
-	const versions = new Map([['@meekojs/meeko', new Set(['1.7.1'])]])
-	const state = { forcedStatus: 0 }
+	const versions = new Map()
+	const distTags = new Map()
+	const state = { forcedStatus: 0, rootName: undefined }
 	const server = createServer((request, response) => {
 		const parts = request.url.split('/').filter(Boolean).map(decodeURIComponent)
 		if (parts[0] === '__mock') {
@@ -83,19 +84,22 @@ function startRegistry() {
 		}
 		const [name, version] = parts
 		const known = versions.get(name)
-		const resolved = version === 'latest' ? [...(known ?? [])].at(-1) : version
-		if (!known || !known.has(resolved)) {
+		// As in npm, a dist-tag exists only once a publication created it: a prerelease creates `next`.
+		const resolved = distTags.get(name)?.[version] ?? version
+		if (!known || (version !== undefined && !known.has(resolved))) {
 			response.statusCode = 404
 			response.end('{"error":"not found"}')
 			return
 		}
 		response.setHeader('content-type', 'application/json')
-		response.end(JSON.stringify({ name, version: resolved }))
+		response.end(JSON.stringify(version === undefined ? { name: state.rootName ?? name, 'dist-tags': distTags.get(name), versions: Object.fromEntries([...known].map((item) => [item, { name, version: item }])) } : { name, version: resolved }))
 	})
 	function add(name, version) {
 		if (!versions.has(name)) versions.set(name, new Set())
 		versions.get(name).add(version)
+		distTags.set(name, { ...distTags.get(name), [version.includes('-') ? 'next' : 'latest']: version })
 	}
+	add('@meekojs/meeko', '1.7.1')
 	return new Promise((resolve) => {
 		server.listen(0, '127.0.0.1', () => resolve({ add, has: (name, version) => versions.get(name)?.has(version) ?? false, server, state, url: `http://127.0.0.1:${server.address().port}/` }))
 	})
@@ -419,6 +423,36 @@ describe('scripts de publicación', { skip: !hasPwsh && 'requiere pwsh' }, () =>
 		assert.equal(result.status, 0, result.output)
 		assert.deepEqual(result.published, order)
 		for (const call of result.publishes) assert.equal(call[call.indexOf('--tag') + 1], 'next')
+	})
+
+	scenario('un paquete publicado sólo bajo next existe: la vía interactiva lo deja al flujo confiable, sin perder la procedencia', async () => {
+		registry.add('@meekojs/ui', '1.9.0-rc.1')
+		assert.equal((await fetch(`${registry.url}@meekojs%2fui/latest`)).status, 404, 'no latest')
+		const result = await run(createRepo('1.9.0-rc.2'), 'publish-first.ps1', ['-Execute', ...registryArgs()])
+		assert.equal(result.status, 0, result.output)
+		assert.deepEqual(
+			result.published,
+			newPackages.filter((short) => short !== 'ui'),
+		)
+		assert.match(result.output, /Left to the trusted workflow.*@meekojs\/ui@1\.9\.0-rc\.2/)
+		assert.equal(registry.has('@meekojs/ui', '1.9.0-rc.2'), false)
+	})
+
+	scenario('-Trusted publica con procedencia un paquete que sólo existe bajo next', async () => {
+		for (const short of order) registry.add(`@meekojs/${short}`, '1.9.0-rc.1')
+		const { repo, trusted } = await packForWorkflow('1.9.0-rc.2')
+		const result = await run(repo, 'publish-packages.ps1', trusted, actions('v1.9.0-rc.2'))
+		assert.equal(result.status, 0, result.output)
+		assert.deepEqual(result.published, order)
+		for (const call of result.publishes) assert.ok(call.includes('--provenance'), call.join(' '))
+	})
+
+	scenario('un documento raíz de otro paquete no equivale a que exista', async () => {
+		registry.state.rootName = '@someone/else'
+		const result = await run(createRepo(), 'publish-first.ps1', ['-Execute', ...registryArgs()])
+		assert.notEqual(result.status, 0)
+		assert.match(result.output, /Unexpected registry response for @meekojs\/meeko/)
+		assert.deepEqual(result.publishes, [])
 	})
 })
 

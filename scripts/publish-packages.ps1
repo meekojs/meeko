@@ -47,9 +47,10 @@ function Get-RegistryState([string]$Name, [string]$Version) {
     if ($metadata.version -ne $Version) { throw "Unexpected registry response for $Name@$Version" }
     return 'published'
   }
-  $latest = Get-RegistryDocument "$escapedName/latest"
-  if ($null -eq $latest) { return 'new-package' }
-  if ($latest.name -ne $Name) { throw "Unexpected registry response for $Name" }
+  # The root document, not a dist-tag: a package published only under `next` has no `latest` and still exists.
+  $package = Get-RegistryDocument $escapedName
+  if ($null -eq $package) { return 'new-package' }
+  if ($package.name -ne $Name) { throw "Unexpected registry response for $Name" }
   return 'missing-version'
 }
 

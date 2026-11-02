@@ -40,7 +40,7 @@ Antes de publicar, termina e integra el programa de diseño y resuelve la pregun
 
 ### Primera publicación de los paquetes nuevos
 
-Un paquete debe existir en npm para configurar su publicador confiable, así que `@meekojs/i18n`, `@meekojs/icon`, `@meekojs/ui`, `@meekojs/eslint-plugin` y `@meekojs/prettier-plugin` se publican una vez desde la sesión interactiva del mantenedor. **`@meekojs/meeko` no pasa por aquí:** sus versiones llevan procedencia firmada y publicar una a mano la perdería. `publish-first.ps1` deja al workflow cualquier paquete que ya exista en npm. No guardes tokens ni OTP en archivos o argumentos. Usa Node 24+ y npm **11.5.1 o superior** (el workflow fija 11.19.0).
+Un paquete debe existir en npm para configurar su publicador confiable, así que `@meekojs/i18n`, `@meekojs/icon`, `@meekojs/ui`, `@meekojs/eslint-plugin` y `@meekojs/prettier-plugin` se publican una vez desde la sesión interactiva del mantenedor. **`@meekojs/meeko` no pasa por aquí:** sus versiones llevan procedencia firmada y publicar una a mano la perdería. `publish-first.ps1` deja al workflow cualquier paquete que ya exista en npm, aunque sólo tenga versiones bajo `next`: lo que cuenta es su documento raíz, no una etiqueta. No guardes tokens ni OTP en archivos o argumentos. Usa Node 24+ y npm **11.5.1 o superior** (el workflow fija 11.19.0).
 
 1. Autoriza el contenido y las versiones; comprueba la propiedad o el permiso de publicación del scope `@meekojs` y ejecuta `npm login` tú mismo.
 2. Integra el commit de release en `main` con `test` y `redis-integration` en verde sobre ese SHA, según su ruleset, y actualiza tu checkout con `git fetch origin`.
