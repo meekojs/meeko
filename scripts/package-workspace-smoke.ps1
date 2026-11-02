@@ -1,4 +1,6 @@
+param([switch]$Offline)
 $ErrorActionPreference = 'Stop'
+$env:NODE_OPTIONS = '--max-old-space-size=8192'
 $workspace = Split-Path -Parent $PSScriptRoot
 # Outside the workspace: an undeclared dependency cannot leak through an ancestor node_modules.
 $consumerRoot = Join-Path ([IO.Path]::GetTempPath()) ('meeko-build-consumer-' + [guid]::NewGuid().ToString('N'))
@@ -14,13 +16,18 @@ try {
     vite = '8.3.5'
     typescript = '7.0.2'
     '@types/node' = '24.19.2'
+    '@iconify-json/lucide' = '1.2.149'
   }
-  foreach ($name in @('meeko', 'ui', 'i18n', 'prettier-plugin', 'eslint-plugin')) {
+  foreach ($name in @('meeko', 'ui', 'i18n', 'icon', 'prettier-plugin', 'eslint-plugin')) {
     & pnpm --dir (Join-Path $workspace "packages/$name") pack --pack-destination $tarballs
     if ($LASTEXITCODE -ne 0) { throw "Packing failed: $name" }
     $manifest = Get-Content -Raw -LiteralPath (Join-Path $workspace "packages/$name/package.json") | ConvertFrom-Json
     $filename = ($manifest.name -replace '^@', '' -replace '/', '-') + '-' + $manifest.version + '.tgz'
     $dependencies[$manifest.name] = "file:../tarballs/$filename"
+  }
+  $ui = Get-Content -Raw packages/ui/package.json | ConvertFrom-Json
+  foreach ($peer in $ui.peerDependenciesMeta.PSObject.Properties) {
+    $dependencies[$peer.Name] = $ui.peerDependencies.($peer.Name)
   }
   @{ name = 'meeko-build-consumer'; private = $true; type = 'module'; dependencies = $dependencies } |
     ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Join-Path $consumer 'package.json') -Encoding utf8
@@ -37,7 +44,7 @@ import { defineEslint } from '@meekojs/eslint-plugin';
 import prettier from 'prettier';
 import { Linter } from 'eslint';
 const require = createRequire(import.meta.url);
-for (const name of ['meeko', 'ui', 'i18n', 'prettier-plugin', 'eslint-plugin']) {
+for (const name of ['meeko', 'ui', 'i18n', 'icon', 'prettier-plugin', 'eslint-plugin']) {
   const entry = require.resolve('@meekojs/' + name);
   const metadata = JSON.parse(await readFile(new URL('../package.json', pathToFileURL(entry)), 'utf8'));
   for (const key of Object.keys(metadata.exports)) {
@@ -48,6 +55,8 @@ for (const name of ['meeko', 'ui', 'i18n', 'prettier-plugin', 'eslint-plugin']) 
     else await import(specifier);
   }
 }
+const { default: icon } = await import('@meekojs/icon/module');
+assert.equal(icon.meta.name, '@meekojs/icon');
 assert.equal(signal(3).value, 3);
 assert.equal(typeof compile, 'function');
 assert.deepEqual(new Linter().verify('<script lang="ts">const name = "Meeko";</script><template><button type="button">{name}</button></template>', defineEslint({ perfectionist: true, unusedImports: true }), { filename: 'App.meeko' }), []);
@@ -79,15 +88,21 @@ const formatting: MeekoPrettierOptions = { meekoIndentSections: true };
 export const smoke = { state: signal(1), ui, i18n, useModal, formatting, lint: defineEslint({ perfectionist: true, unusedImports: true }), module: defineMeekoModule({ meta: { name: 'smoke' }, setup() {} }) };
 '@ | Set-Content -LiteralPath (Join-Path $consumer 'main.ts') -Encoding utf8
   New-Item -ItemType Directory -Path (Join-Path $consumer 'app/pages') -Force | Out-Null
-  'export default { modules: ["@meekojs/ui"], viewTransitions: true, ui: { tokens: { primary: "var(--consumer-primary)" }, defaults: { link: { shape: "pill" } } } };' | Set-Content -LiteralPath (Join-Path $consumer 'meeko.config.mjs') -Encoding utf8
+  New-Item -ItemType Directory -Path (Join-Path $consumer 'app/locales') -Force | Out-Null
+  '{"hello":"Hello"}' | Set-Content -LiteralPath (Join-Path $consumer 'app/locales/en.json') -Encoding utf8
+  'export default { modules: ["@meekojs/ui", "@meekojs/i18n", "@meekojs/ui/editor", "@meekojs/icon"], viewTransitions: true, icon: { collections: ["lucide"] }, i18n: { defaultLocale: "en", catalogs: { en: "app/locales/en.json" } }, ui: { tokens: { primary: "var(--consumer-primary)" }, defaults: { link: { shape: "pill" } } } };' | Set-Content -LiteralPath (Join-Path $consumer 'meeko.config.mjs') -Encoding utf8
   @'
 <script lang="ts">
+  import { signal } from '@meekojs/meeko';
+  const markdown = signal('# Installed editor');
   import type { TableColumn } from '@meekojs/ui/runtime';
   const rows = [{ id: 1, name: 'Packaged component' }];
   const columns = [{ key: 'name', label: 'Name', footer: (rows) => rows.length }] satisfies TableColumn<typeof rows[number]>[];
 </script>
 <template>
   <UICard title="Installed card" variant="soft"><UIButton>Styled package</UIButton></UICard>
+  <UIIcon name="lucide:house" />
+  <UIMarkdownEditor model="markdown" label="Installed editor" />
   <UILink href="/#packaged">Packaged link defaults</UILink>
   <UILinkCard to="/" title="Packaged link card" />
   <UITable caption="Installed table" layout="grid" bind:columns="columns" bind:rows="rows" rowKey="id" />
@@ -113,28 +128,53 @@ assert.match(css, /--ui-color-primary:\s*var\(--consumer-primary\)/);
 assert.doesNotMatch(css, /@import/);
 console.log('Installed UI CSS uses consumer PostCSS and ships as a production asset.');
 '@ | Set-Content -LiteralPath (Join-Path $consumer 'styles-smoke.mjs') -Encoding utf8
+  @'
+import assert from 'node:assert/strict';
+import { readdir, readFile } from 'node:fs/promises';
+const files = (await readdir('.meeko/output/node', { recursive: true, withFileTypes: true })).filter((entry) => entry.isFile() && /\.(js|mjs|html)$/.test(entry.name));
+const contents = await Promise.all(files.map((entry) => readFile(entry.parentPath + '/' + entry.name, 'utf8')));
+assert.ok(contents.some((content) => content.includes('M15 21v-8')), 'UIIcon inlines lucide:house at build time');
+console.log('Installed icon module inlines the icon in the build.');
+'@ | Set-Content -LiteralPath (Join-Path $consumer 'icon-smoke.mjs') -Encoding utf8
+  # User code stays strict: `meeko check` reads this configuration.
+  '{"compilerOptions":{"strict":true,"exactOptionalPropertyTypes":true,"target":"ES2022","module":"NodeNext","moduleResolution":"NodeNext","skipLibCheck":true}}' | Set-Content -LiteralPath (Join-Path $consumer 'tsconfig.json') -Encoding utf8
+  @'
+import { defineEslint } from '@meekojs/eslint-plugin';
+export default defineEslint({ perfectionist: true, unusedImports: true });
+'@ | Set-Content -LiteralPath (Join-Path $consumer 'eslint.config.mjs') -Encoding utf8
+  '{"plugins":["@meekojs/prettier-plugin"],"useTabs":true}' | Set-Content -LiteralPath (Join-Path $consumer '.prettierrc.json') -Encoding utf8
   Push-Location $consumer
   try {
     # A genuinely external consumer cannot rely on workspace resolution or cached registry metadata.
-    & pnpm install --prefer-offline --ignore-scripts
+    $installArguments = @('install', '--prefer-offline', '--ignore-scripts')
+    if ($Offline) { $installArguments += '--offline' }
+    & pnpm @installArguments
     if ($LASTEXITCODE -ne 0) { throw 'Consumer installation failed' }
     & node smoke.mjs
     if ($LASTEXITCODE -ne 0) { throw 'Installed exports smoke failed' }
     & node component-declarations.mjs
     if ($LASTEXITCODE -ne 0) { throw 'Installed component declaration inventory failed' }
     # These are the actual adjacent declarations from the tarball, not regenerated app stubs.
-    & pnpm exec tsc --ignoreConfig --noEmit --strict --allowImportingTsExtensions --allowArbitraryExtensions --target ES2022 --module NodeNext --moduleResolution NodeNext component-declarations.ts
+    & pnpm exec tsc --ignoreConfig --noEmit --strict --exactOptionalPropertyTypes --allowImportingTsExtensions --allowArbitraryExtensions --target ES2022 --module NodeNext --moduleResolution NodeNext component-declarations.ts
     if ($LASTEXITCODE -ne 0) { throw 'Installed UI component declarations do not resolve in strict NodeNext' }
     # TypeScript-ESLint's declarations reference the TS 6 compiler API; TS 7 consumers
     # use skipLibCheck, as in Meeko's generated app configuration. User code stays strict.
-    & pnpm exec tsc --ignoreConfig --noEmit --strict --skipLibCheck --target ES2022 --module NodeNext --moduleResolution NodeNext main.ts
+    & pnpm exec tsc --ignoreConfig --noEmit --strict --exactOptionalPropertyTypes --skipLibCheck --target ES2022 --module NodeNext --moduleResolution NodeNext main.ts
     if ($LASTEXITCODE -ne 0) { throw 'NodeNext consumer type check failed' }
     & pnpm exec meeko check .
     if ($LASTEXITCODE -ne 0) { throw 'Installed UI check failed' }
+    & pnpm exec eslint app/pages/index.meeko
+    if ($LASTEXITCODE -ne 0) { throw 'Installed ESLint plugin failed from its CLI' }
+    & pnpm exec prettier --write app/pages/index.meeko
+    if ($LASTEXITCODE -ne 0) { throw 'Installed Prettier plugin failed from its CLI' }
+    & pnpm exec meeko check .
+    if ($LASTEXITCODE -ne 0) { throw 'A page formatted by the installed Prettier plugin no longer checks' }
     & pnpm exec meeko build .
     if ($LASTEXITCODE -ne 0) { throw 'Installed UI build failed' }
     & node styles-smoke.mjs
     if ($LASTEXITCODE -ne 0) { throw 'Installed UI stylesheet smoke failed' }
+    & node icon-smoke.mjs
+    if ($LASTEXITCODE -ne 0) { throw 'Installed icon smoke failed' }
   } finally { Pop-Location }
   Write-Host "Workspace package smoke passed: $consumer"
 } finally { Pop-Location }
