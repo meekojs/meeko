@@ -235,3 +235,9 @@ test('a kbd and highlighted code look the same anywhere in an application', asyn
 	assert.match(code, /^\.shiki span \{\s*color: var\(--shiki-light\);/m)
 	assert.match(code, /:root\[data-theme='dark'\] \.shiki span \{\s*color: var\(--shiki-dark\);/)
 })
+
+test('a plain link of an application reads the tokens, in the base layer so that any rule wins', async () => {
+	const base = await read('base.css')
+	assert.match(base, /:where\(a\) \{[^}]*color: var\(--ui-color-primary-text\);/)
+	assert.match(base, /:where\(a\):hover \{[^}]*text-decoration-color: currentColor;/)
+})

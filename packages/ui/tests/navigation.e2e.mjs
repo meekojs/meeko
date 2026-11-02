@@ -134,6 +134,18 @@ test('the navigation components work in a browser, with and without JavaScript',
 		await page.close()
 	})
 
+	await t.test('UINavigationTabs: select can filter without navigating', async () => {
+		const { page, errors } = await open()
+		const nav = page.getByRole('navigation', { name: 'Filtro' })
+		const url = page.url()
+		await nav.getByRole('link', { name: /^Activas/ }).click()
+		assert.equal(await nav.getByRole('link', { name: /^Activas/ }).getAttribute('aria-current'), 'page')
+		assert.equal(await nav.getByRole('link', { name: /^Todas/ }).getAttribute('aria-current'), null)
+		assert.equal(page.url(), url, 'event.preventDefault() cancels the link')
+		assert.deepEqual(errors, [])
+		await page.close()
+	})
+
 	await t.test('UINavigationTabs: the indicator follows the current link, and a narrow row scrolls to it', async () => {
 		const { page, errors } = await open()
 		const nav = page.getByRole('navigation', { name: 'Vistas', exact: true })

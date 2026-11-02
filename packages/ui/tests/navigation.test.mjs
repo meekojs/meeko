@@ -180,6 +180,12 @@ test('the navigation components render on the server with their semantics', { ti
 		assert.equal(count(section, /aria-current="/g), 1, 'match: prefix marks the section of a child route')
 		assert.ok(attribute(tag(section, /href="\/dashboard"/), 'aria-current'))
 		assert.equal(attribute(tag(tabs, /users\/7/), 'aria-current'), undefined, 'match: prefix does not mark a route outside it')
+		assert.equal(attribute(tag(es, /meeko-ui-nav-tabs"/), 'data-variant'), 'underline')
+		const filter = block(es, 'data-variant="segmented"', '</nav>')
+		assert.ok(!filter.includes('meeko-ui-nav-tabs-indicator'), 'a segmented row has no indicator: its View Transition name never repeats')
+		assert.equal(attribute(tag(filter, /aria-current/), 'href'), '#todas')
+		assert.match(filter, /Activas<span[^>]*class="meeko-ui-badge"[^>]*data-tone="success"/, 'the counter is a badge next to the text')
+		assert.match(filter, /meeko-ui-badge-dot/)
 	})
 
 	await t.test('a link with to: its own current wins over the route, and without it the route decides', () => {

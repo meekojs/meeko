@@ -40,12 +40,17 @@
 	gap: var(--ui-space-6);
 	height: var(--ui-header-height);
 }
+/* When the links do not fit next to the actions they scroll sideways, and never overlap them. The
+   padding keeps the focus ring inside the scroll box. */
 .meeko-ui-header-nav {
 	display: flex;
 	flex: 1;
 	align-items: center;
 	gap: var(--ui-space-1);
+	padding-block: var(--ui-space-1);
 	min-width: 0;
+	overflow-x: auto;
+	scrollbar-width: none;
 }
 .meeko-ui-header-nav a,
 .meeko-ui-header-menu a {
@@ -490,6 +495,7 @@ html:active-view-transition-type(ui-modal-close)::view-transition-old(ui-drawer-
 	display: flex;
 	flex: none;
 	align-items: center;
+	gap: var(--ui-space-2);
 	transition: color var(--ui-duration-fast);
 	border-radius: var(--ui-radius-md) var(--ui-radius-md) 0 0;
 	padding: var(--ui-control-padding-md);
@@ -540,6 +546,35 @@ html:active-view-transition-type(ui-modal-close)::view-transition-old(ui-drawer-
 		animation-duration: var(--ui-duration-slow);
 		animation-timing-function: var(--ui-ease-out);
 	}
+}
+
+/* The same row as a filter: the look of a segmented <UIRadioGroup>, without the indicator or its name. */
+.meeko-ui-nav-tabs[data-variant='segmented'] {
+	display: inline-flex;
+	gap: var(--ui-space-0-5);
+	border: var(--ui-border-width) solid var(--ui-color-control-border);
+	border-radius: var(--ui-radius-lg);
+	background: var(--ui-color-control);
+	padding: var(--ui-space-0-5);
+	max-width: 100%;
+}
+.meeko-ui-nav-tabs[data-variant='segmented'] a {
+	transition:
+		background-color var(--ui-duration-fast),
+		color var(--ui-duration-fast);
+	border-radius: var(--ui-radius-md);
+	padding-inline: var(--ui-space-3);
+	padding-block: 0;
+	min-height: var(--ui-control-height-sm);
+}
+.meeko-ui-nav-tabs[data-variant='segmented'] a:hover:not([aria-current]) {
+	background: var(--ui-color-control-hover);
+}
+.meeko-ui-nav-tabs[data-variant='segmented'] a[aria-current] {
+	box-shadow: none;
+	background: var(--ui-color-primary-soft);
+	color: var(--ui-color-primary-text);
+	font-weight: var(--ui-font-weight-semibold);
 }
 
 /* Breadcrumb */

@@ -1,4 +1,6 @@
+/* `position`: what a cell hides for a screen reader stays inside this box, and never widens the page. */
 .meeko-ui-table-scroll {
+	position: relative;
 	max-width: 100%;
 	overflow-x: auto;
 	overscroll-behavior-inline: contain;
@@ -22,7 +24,13 @@
 	font-family: var(--ui-font-sans);
 	font-variant-numeric: tabular-nums;
 	text-align: left;
+	/* A table scrolls before a word breaks, also inside a card, whose text may break anywhere. */
+	overflow-wrap: normal;
 
+	& > thead > tr > th,
+	& .meeko-ui-badge {
+		white-space: nowrap;
+	}
 	& > caption {
 		padding: var(--ui-space-2) var(--ui-space-3);
 		color: var(--ui-color-text-soft);
@@ -38,11 +46,27 @@
 		color: var(--ui-color-text-soft);
 		font-weight: var(--ui-font-weight-medium);
 	}
+	&[data-caption='hidden'] > caption {
+		position: absolute;
+		clip-path: inset(50%);
+		padding: 0;
+		width: var(--ui-border-width);
+		height: var(--ui-border-width);
+		overflow: hidden;
+		white-space: nowrap;
+	}
 	& > tbody > tr:hover {
 		background: var(--table-hover);
 	}
 	& > tbody > tr > th {
 		color: var(--ui-color-text);
+	}
+	/* A row is scanned: a link marks itself when the pointer reaches it. */
+	& a:not(.meeko-ui-button) {
+		text-decoration: none;
+	}
+	& a:not(.meeko-ui-button):hover {
+		text-decoration: underline;
 	}
 	/* A long type breaks inside its cell before the table scrolls. */
 	& code {

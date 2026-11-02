@@ -18,6 +18,7 @@ const route = (options = '') => `import { definePage } from '@meekojs/meeko/fram
 const showcase = `<script lang="ts">
 	import { signal, trustHtml } from '@meekojs/meeko'
 
+	const filter = signal('Todas')
 	const brand = { name: 'Meeko', product: 'UI', to: '/', image: { src: '/logo.svg', width: 24, height: 24 }, ariaLabel: 'Meeko UI: inicio' } as const
 	const items = [
 		{ label: 'Inicio', to: '/' },
@@ -93,6 +94,7 @@ const showcase = `<script lang="ts">
 		<button type="button" id="tab-two" on:click="() => (tabsCurrent.value = '/two')">Tab dos</button>
 		<button type="button" id="tab-four" on:click="() => (tabsCurrent.value = '/four')">Tab cuatro</button>
 		<UINavigationTabs bind:items="[{ label: 'Forzado', to: '/about', current: forced.value }, { label: 'Quitado', to: '/', current: false }, { label: 'Según la ruta', to: '/' }, { label: 'Otra ruta', to: '/about' }]" label="Estados" />
+		<UINavigationTabs variant="segmented" label="Filtro" bind:items="[{ label: 'Todas', href: '#todas', current: filter.value === 'Todas', badge: '3' }, { label: 'Activas', href: '#activas', current: filter.value === 'Activas', badge: '2', badgeTone: 'success', badgeDot: true }]" on:select="(event, item) => { event.preventDefault(); filter.value = item.label }" />
 		<button type="button" id="toggle-forced" on:click="() => (forced.value = !forced.value)">Forzar</button>
 		<button type="button" id="open-drawer" on:click="() => (drawerOpen.value = true)">Abrir panel</button>
 		<output id="drawer-state">{drawerOpen.value ? 'abierto' : 'cerrado'}:{closes.value}</output>
@@ -102,7 +104,7 @@ const showcase = `<script lang="ts">
 		<UICodeBlock code="pnpm add @meekojs/ui" lang="sh" label="Instalación" labelLang="es" uiLang="es" copyAriaLabel="Copiar el comando" />
 		<UICodeBlock code="const a = 1" bind:html="highlighted" lang="ts" verdict="good" />
 		<UICodeBlock code="const a = b" lang="ts" verdict="bad" />
-		<UICodeBlock bind:code="'[info] build\\n[warn] lento'" mode="log" label="Salida" />
+		<UICodeBlock bind:code="'[info] build\\n[warn] lento'" mode="log" label="Salida" textLang="en" />
 		<UIDiff bind:diff="diff" label="Cambios en la guía" />
 		<UIDiff diff="" label="Sin cambios" />
 		<UIProse as="article" id="snapshot" bind:html="snapshot" />

@@ -25,7 +25,9 @@
 		"./editor/module": {
 			"types": "./dist/editor/module.d.ts",
 			"default": "./dist/editor/module.js"
-		}
+		},
+		"./styles/code.css": "./src/app/styles/code.css",
+		"./styles/prose.css": "./src/app/styles/prose.css"
 	},
 	"files": [
 		"dist/",

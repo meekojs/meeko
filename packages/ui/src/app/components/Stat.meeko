@@ -2,14 +2,30 @@
 	import type { UIStatProps } from '../types/feedback'
 
 	const props = defineProps<UIStatProps>()
+
+	const snippets = defineSnippets<{ value?: []; detail?: [] }>()
 </script>
 
 <template>
 	<dl bind:class="['meeko-ui-stat', props.class].filter(Boolean).join(' ')">
 		<dt>{props.label}</dt>
-		<dd class="meeko-ui-stat-value">{props.value}</dd>
 		<dd
-			if:when="props.detail"
+			if:when="snippets.value"
+			class="meeko-ui-stat-value"
+		>
+			<render snippet="snippets.value" />
+		</dd>
+		<template if:when="!snippets.value">
+			<dd class="meeko-ui-stat-value">{props.value}</dd>
+		</template>
+		<dd
+			if:when="snippets.detail"
+			class="meeko-ui-stat-detail"
+		>
+			<render snippet="snippets.detail" />
+		</dd>
+		<dd
+			if:when="!snippets.detail && props.detail"
 			class="meeko-ui-stat-detail"
 		>
 			{props.detail}

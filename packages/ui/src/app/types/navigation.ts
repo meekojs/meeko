@@ -2,6 +2,7 @@ import type { ElementAttributes, TrustedHtml } from '@meekojs/meeko'
 
 import type { UIRouteTarget } from './button'
 import type { UIContainerSize } from './container'
+import type { UITone } from './forms'
 
 /** `href` o `to`, excluyentes. */
 type UILinkDestination = { readonly href: string; readonly to?: undefined; readonly params?: undefined; readonly search?: undefined; readonly resolve?: undefined; readonly match?: undefined } | (UIRouteTarget & { readonly href?: undefined; readonly resolve?: boolean; readonly match?: 'exact' | 'prefix' })
@@ -348,18 +349,42 @@ export interface UIDrawerProps {
 }
 
 /**
+ * Una pestaña de `<UINavigationTabs>`: un enlace con un contador opcional junto al texto.
+ *
+ * @since 0.2.0
+ * @example
+ * ```ts
+ * const item: UINavigationTabsItem = { label: 'Traducidas', href: '/translations?status=translated', badge: '12', badgeTone: 'success', badgeDot: true }
+ * ```
+ */
+export type UINavigationTabsItem = UINavigationLink & {
+	/** Contador o dato breve, en un `<UIBadge>` junto al texto. */
+	readonly badge?: string
+	/** Tono del contador; `"neutral"` por defecto. */
+	readonly badgeTone?: UITone
+	/** Añade el punto de color al contador. */
+	readonly badgeDot?: boolean
+}
+
+/**
  * Props de `<UINavigationTabs>`: enlaces entre páginas con aspecto de pestañas, con `aria-current` y un
  * indicador que se desplaza con CSS. Son navegación, no un `tablist`: cada uno lleva a otra URL.
+ * `variant="segmented"` da a la fila la forma de un `<UIRadioGroup variant="segmented">`, para filtros en
+ * la URL, sin indicador: varias filas conviven en una página sin repetir su View Transition. El evento
+ * `select` recibe el clic y la pestaña; `event.preventDefault()` cancela la navegación.
  *
  * @since 0.2.0
  * @example
  * ```html
  * <UINavigationTabs bind:items="[{ label: 'Hoy', to: '/metrics' }, { label: 'Mes', to: '/metrics/month' }]" current="/metrics" />
+ * <UINavigationTabs variant="segmented" label="Rango" bind:items="[{ label: '7 días', href: '?days=7', current: true }]" />
  * ```
  */
 export interface UINavigationTabsProps {
 	/** Enlaces. */
-	readonly items: readonly UINavigationLink[]
+	readonly items: readonly UINavigationTabsItem[]
+	/** Aspecto; `"underline"` por defecto. */
+	readonly variant?: 'underline' | 'segmented'
 	/** Ruta actual, para marcar el enlace con `aria-current="page"`. */
 	readonly current?: string
 	/** `aria-label` de la navegación. */
@@ -641,6 +666,8 @@ export interface UICodeBlockProps {
 	readonly uiLang?: string
 	/** Idioma del título, si no es el del documento. */
 	readonly labelLang?: string
+	/** Idioma del texto de `code`, si es lenguaje natural, como un log o un Markdown. */
+	readonly textLang?: string
 	/** Clases adicionales, tras la del componente. */
 	readonly class?: string
 }

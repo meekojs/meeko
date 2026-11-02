@@ -57,6 +57,11 @@ const cases = [
 	['Badge', '<Component tone="warning" bind:dot="true">Pending</Component>', [/data-tone="warning"/, /class="meeko-ui-badge-dot" aria-hidden="true"/, /Pending/]],
 	['Button', '<Component type="submit" name="intent" value="save" form="editor" tone="danger" bind:loading="true" ariaLabel="Save" bind:iconOnly="true">Save</Component>', [/type="submit"/, /name="intent"/, /value="save"/, /form="editor"/, /aria-busy="true"/, /aria-disabled="true"/, /aria-label="Save"/, /data-icon-only/]],
 	['Card', '<Component title="Summary" density="compact" padding="none">Details</Component>', [/data-density="compact"/, /data-padding="none"/, /Summary/, /Details/]],
+	['Card', '<Component id="box" title="Summary" headingId="summary-title" description="Why"><snippet name="actions"><button>Go</button></snippet>Details</Component>', [/<section[^>]*id="box"/, /<section[^>]*aria-labelledby="summary-title"/, /<h2[^>]*id="summary-title"[^>]*tabindex="-1"/, /<header[^>]*data-actions/, /class="meeko-ui-card-actions"[^>]*>\s*<button>Go<\/button>/]],
+	['Card', '<Component aria-label="Totals">Details</Component>', [/<section[^>]*aria-label="Totals"/, /^(?![\s\S]*aria-labelledby)/, /^(?![\s\S]*<header)/]],
+	['Stat', '<Component label="Snapshot"><snippet name="value"><a href="/snapshots">#7</a></snippet><snippet name="detail"><em>Today</em></snippet></Component>', [/class="meeko-ui-stat-value"[^>]*>\s*<a href="\/snapshots">#7<\/a>/, /class="meeko-ui-stat-detail"[^>]*>\s*<em>Today<\/em>/]],
+	['DescriptionList', "<Component bind:items=\"[{ label: 'Hash', value: 'abc123', code: true, title: 'abc123def456' }, { label: 'Note', value: 'Plain' }]\" />", [/<code[^>]*title="abc123def456"[^>]*>\s*abc123\s*<\/code>/, /<dd>Plain<\/dd>/]],
+	['Table', '<Component caption="Results" bind:hideCaption="true" rowKey="id" bind:rows="[{ id: 1 }]" bind:columns="[{ key: \'id\', label: \'Id\' }]" />', [/data-caption="hidden"/, /<caption[^>]*>\s*Results/, /role="region"/]],
 	['Table', '<Component caption="Results" density="compact" rowKey="id" bind:rows="[{ id: 1, name: \'Ana\', count: 5 }]" bind:columns="[{ key: \'name\', label: \'Name\', rowHeader: true }, { key: \'count\', label: \'Count\', numeric: true }]" />', [/data-density="compact"/, /<th[^>]*role="rowheader"[^>]*scope="row"/, /data-numeric/, /Ana/, />5<\/span>/]],
 ]
 

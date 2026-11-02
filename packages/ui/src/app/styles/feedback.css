@@ -148,6 +148,11 @@
 .meeko-ui-description-list {
 	gap: var(--ui-space-5);
 }
+.meeko-ui-description-list code {
+	font-size: var(--ui-prose-code-size);
+	font-family: var(--ui-font-mono);
+	overflow-wrap: anywhere;
+}
 .meeko-ui-description-list > div {
 	display: grid;
 	align-content: start;

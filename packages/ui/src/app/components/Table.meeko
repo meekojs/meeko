@@ -62,6 +62,7 @@
 			bind:class="['meeko-ui-table', props.class].filter(Boolean).join(' ')"
 			bind:data-layout="props.layout"
 			bind:data-density="props.density ?? 'normal'"
+			bind:data-caption="props.hideCaption ? 'hidden' : undefined"
 			bind:style="'--table-columns: ' + (props.gridColumns ?? 'repeat(' + Math.max(1, props.columns.length) + ', minmax(var(--ui-table-column-min), 1fr))')"
 		>
 			<caption

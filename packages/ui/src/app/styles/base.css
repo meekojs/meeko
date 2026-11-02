@@ -57,7 +57,13 @@
 		block-size: auto;
 	}
 	:where(a) {
+		border-radius: var(--ui-radius-xs);
+		color: var(--ui-color-primary-text);
+		text-decoration-color: var(--ui-color-primary-border);
 		text-underline-offset: var(--ui-underline-offset);
+	}
+	:where(a):hover {
+		text-decoration-color: currentColor;
 	}
 	::selection {
 		background: var(--ui-color-selection);

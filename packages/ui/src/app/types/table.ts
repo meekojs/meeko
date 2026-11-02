@@ -16,6 +16,8 @@ export interface UITableProps<T extends object> {
 	gridColumns?: string
 	/** Nombre visible y accesible de la tabla. */
 	caption?: string
+	/** Oculta el título a la vista, cuando un encabezado ya lo dice; sigue nombrando la tabla y su región. */
+	hideCaption?: boolean
 	/** Oculta la fila de cabeceras. */
 	hideHeader?: boolean
 	/** Texto sin filas. */

@@ -67,13 +67,17 @@ export interface UISkeletonProps {
 	class?: string
 }
 
-/** Dato con etiqueta y detalle opcional. @example `<UIStat label="Visitas" bind:value="1400" detail="Esta semana" />` */
+/**
+ * Dato con etiqueta y detalle opcional. Los snippets `value` y `detail` admiten marcado, como un enlace.
+ *
+ * @example `<UIStat label="Visitas" bind:value="1400" detail="Esta semana" />`
+ */
 export interface UIStatProps {
 	/** Nombre del dato. */
 	label: string
-	/** Valor presentado por la aplicación. */
-	value: string | number
-	/** Contexto del valor. */
+	/** Valor presentado por la aplicación; el snippet `value` lo sustituye. */
+	value?: string | number
+	/** Contexto del valor; el snippet `detail` lo sustituye. */
 	detail?: string
 	/** Clases adicionales. */
 	class?: string
@@ -87,6 +91,10 @@ export interface UIDescriptionItem {
 	value: string | number
 	/** Contexto del valor. */
 	detail?: string
+	/** El valor es código o una ruta: se pinta en `<code>`, en monoespaciada. */
+	code?: boolean
+	/** Con `code`, texto de ayuda del valor, como un hash completo tras uno abreviado. */
+	title?: string
 }
 
 /** Lista semántica de datos. @example `<UIDescriptionList bind:items="facts" bind:columns="2" />` */

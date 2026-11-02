@@ -15,7 +15,12 @@
 			each:key="item.label"
 		>
 			<dt>{item.label}</dt>
-			<dd>{item.value}</dd>
+			<dd if:when="item.code">
+				<code bind:title="item.title">{item.value}</code>
+			</dd>
+			<template if:when="!item.code">
+				<dd>{item.value}</dd>
+			</template>
 			<dd
 				if:when="item.detail"
 				class="meeko-ui-stat-detail"

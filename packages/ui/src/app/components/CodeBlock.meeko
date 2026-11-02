@@ -115,6 +115,7 @@
 			if:when="!props.html && !snippets.default"
 			class="meeko-ui-code-content"
 			tabindex="0"
+			bind:lang="props.textLang"
 			bind:role="props.mode === 'log' ? 'log' : undefined"
 			bind:aria-label="name.value"
 		><code>{props.code ?? ''}</code></pre>

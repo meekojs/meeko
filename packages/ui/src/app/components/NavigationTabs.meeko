@@ -3,13 +3,16 @@
 	// positioning; where that is missing, the link marks itself. A narrow screen scrolls the row sideways.
 	import { effect } from '@meekojs/meeko'
 
-	import type { UINavigationTabsProps } from '../types/navigation'
+	import type { UINavigationTabsItem, UINavigationTabsProps } from '../types/navigation'
 
 	import { uiMessages } from '../utils/messages'
 	import { isCurrentLink, linkTarget, revealInScroller } from '../utils/navigation'
+	import * as Badge from './Badge.meeko'
 	import * as ItemLink from './internal/ItemLink.meeko'
 
 	const props = defineProps<UINavigationTabsProps>()
+
+	const emit = defineEmits<{ select: [event: MouseEvent, item: UINavigationTabsItem] }>()
 
 	const text = uiMessages().navigationTabs
 	const root = useElementRef('root')
@@ -24,6 +27,13 @@
 			})
 		}),
 	)
+
+	/** A delegated listener: a page that filters without navigating cancels the link from `select`. */
+	function select(event: MouseEvent): void {
+		const link = (event.target as Element).closest('a')
+		const item = link ? props.items[[...(root.value?.querySelectorAll('a') ?? [])].indexOf(link)] : undefined
+		if (item) emit('select', event, item)
+	}
 </script>
 
 <template>
@@ -31,6 +41,8 @@
 		ref:root
 		bind:class="['meeko-ui-nav-tabs', props.class].filter(Boolean).join(' ')"
 		bind:aria-label="props.label ?? text.label"
+		bind:data-variant="props.variant ?? 'underline'"
+		on:click="select"
 	>
 		<ItemLink
 			each:of="props.items"
@@ -40,8 +52,16 @@
 			bind:current="isCurrentLink(item, props.current) ? 'page' : undefined"
 		>
 			{item.label}
+			<Badge
+				if:when="item.badge !== undefined"
+				bind:tone="item.badgeTone ?? 'neutral'"
+				bind:dot="item.badgeDot"
+			>
+				{item.badge}
+			</Badge>
 		</ItemLink>
 		<span
+			if:when="props.variant !== 'segmented'"
 			class="meeko-ui-nav-tabs-indicator"
 			aria-hidden="true"
 		/>
