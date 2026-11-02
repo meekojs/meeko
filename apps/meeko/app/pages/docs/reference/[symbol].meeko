@@ -1,7 +1,7 @@
 <script server lang="ts">
 	import type { PageLocale } from 'meeko-docs-content/locale'
 
-	import { definePage } from '@meekojs/meeko/framework'
+	import { definePage, documentHtml } from '@meekojs/meeko/framework'
 
 	import type { ApiPage } from '../../../../shared/types/api'
 	import type { NavSection, Pager, TocEntry } from '../../../../shared/types/docs'
@@ -32,7 +32,9 @@
 	}
 	const snapshot = await readPage<SymbolPage>(`/docs/reference/${params.symbol}`, locale)
 	if (!snapshot) notFound()
-	export const { written, page, index, searchTitle, head } = snapshot
+	export const { page, index, searchTitle, head } = snapshot
+	// Only `html` reads the body of a written page, so the first load carries it once, in the page's HTML.
+	export const written = snapshot.written && { ...snapshot.written, body: documentHtml(snapshot.written.body) }
 	// Without it in the payload (a snapshot older than the languages), the page is the original.
 	export const layoutProps = { nav: snapshot.nav, current: snapshot.current, toc: snapshot.toc, pager: snapshot.pages, editUrl: snapshot.editUrl, source: snapshot.editPath, i18n: snapshot.i18n ?? null }
 </script>
