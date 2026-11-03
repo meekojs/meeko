@@ -491,6 +491,12 @@
 					]
 				},
 				{
+					"name": "isTooLargeToAnimate",
+					"symbols": [
+						"@meekojs/meeko#isTooLargeToAnimate"
+					]
+				},
+				{
 					"name": "documentHtml",
 					"symbols": [
 						"@meekojs/meeko/framework#documentHtml"

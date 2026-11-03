@@ -4,11 +4,15 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
-import { createViewTransitionController } from '../src/app/runtime/view-transitions.ts'
+import { createViewTransitionController, isTooLargeToAnimate } from '../src/app/runtime/view-transitions.ts'
 import { clientRoutesSource } from '../src/framework/app-manifest.ts'
 import { loadMeekoConfig } from '../src/framework/config.ts'
 
-function fakeBrowser(options: { reduced?: boolean; hidden?: boolean; supported?: boolean; throws?: boolean; rejectedAnimation?: boolean; pendingAnimation?: boolean; types?: boolean } = {}) {
+/** The limit the runtime applies; a test states it so that changing it is a decision. */
+const LIMIT = 4000
+
+function fakeBrowser(options: { reduced?: boolean; hidden?: boolean; supported?: boolean; throws?: boolean; rejectedAnimation?: boolean; pendingAnimation?: boolean; types?: boolean; elements?: number } = {}) {
+	const size = { elements: options.elements ?? 100 }
 	const callbacks: Array<() => void> = []
 	const transitions: ViewTransition[] = []
 	const started: unknown[] = []
@@ -18,6 +22,7 @@ function fakeBrowser(options: { reduced?: boolean; hidden?: boolean; supported?:
 		matchMedia: () => ({ matches: options.reduced ?? false }),
 		document: {
 			visibilityState: options.hidden ? 'hidden' : 'visible',
+			getElementsByTagName: () => ({ length: size.elements }),
 			startViewTransition:
 				options.supported === false
 					? undefined
@@ -60,6 +65,7 @@ function fakeBrowser(options: { reduced?: boolean; hidden?: boolean; supported?:
 		callbacks,
 		transitions,
 		started,
+		size,
 		get skips() {
 			return skips
 		},
@@ -202,6 +208,84 @@ test('navigation waits for its update, not for the animation, and disposal can s
 	aborted.abort()
 	assert.equal(await controller.commit(() => assert.fail('aborted update'), aborted.signal, true), false)
 	assert.equal(fake.callbacks.length, 1)
+})
+
+test('a document above the limit does not start a transition, and one at the limit does', async () => {
+	assert.equal(isTooLargeToAnimate(fakeBrowser({ elements: LIMIT }).browser.document), false)
+	assert.equal(isTooLargeToAnimate(fakeBrowser({ elements: LIMIT + 1 }).browser.document), true)
+
+	const large = fakeBrowser({ elements: LIMIT + 1 })
+	let updates = 0
+	const applied = await createViewTransitionController(large.browser).commit(
+		() => {
+			updates++
+		},
+		new AbortController().signal,
+		true,
+	)
+	assert.equal(applied, true)
+	assert.equal(updates, 1, 'the update runs at once, without waiting for a transition')
+	assert.equal(large.started.length, 0)
+
+	const small = fakeBrowser({ elements: LIMIT })
+	const animated = createViewTransitionController(small.browser).commit(() => {}, new AbortController().signal, true)
+	assert.equal(small.started.length, 1)
+	small.callbacks[0]!()
+	assert.equal(await animated, true)
+	assert.equal(small.skips, 0, 'a page that stays small keeps its animation')
+})
+
+test('the size only stops a transition that could run: reduced motion and a missing API decide the same', async () => {
+	for (const options of [{ reduced: true }, { supported: false }, { hidden: true }]) {
+		for (const elements of [10, LIMIT + 1]) {
+			const fake = fakeBrowser({ ...options, elements })
+			let updates = 0
+			const result = createViewTransitionController(fake.browser).commit(
+				() => {
+					updates++
+				},
+				new AbortController().signal,
+				true,
+			)
+			assert.equal(await result, true)
+			assert.equal(updates, 1)
+			assert.equal(fake.started.length, 0)
+		}
+	}
+})
+
+test('a navigation to a large page skips the animation once its update has run, and only then', async () => {
+	const fake = fakeBrowser({ elements: 100 })
+	let skipsDuringUpdate = -1
+	const result = createViewTransitionController(fake.browser).commit(
+		() => {
+			skipsDuringUpdate = fake.skips
+			fake.size.elements = LIMIT + 1
+		},
+		new AbortController().signal,
+		true,
+	)
+	assert.equal(fake.started.length, 1, 'the short page starts the transition')
+	fake.callbacks[0]!()
+	assert.equal(await result, true)
+	assert.equal(skipsDuringUpdate, 0)
+	assert.equal(fake.skips, 1)
+})
+
+test('an update that fails on a large page propagates without asking to skip', async () => {
+	const fake = fakeBrowser({ elements: 100 })
+	const result = createViewTransitionController(fake.browser).commit(
+		() => {
+			fake.size.elements = LIMIT + 1
+			throw new Error('hydrate failed')
+		},
+		new AbortController().signal,
+		true,
+	)
+	const rejected = assert.rejects(result, /hydrate failed/)
+	fake.callbacks[0]!()
+	await rejected
+	assert.equal(fake.skips, 0)
 })
 
 test('viewTransitions is validated and emitted to the client manifest without executing browser code', async () => {

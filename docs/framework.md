@@ -1357,6 +1357,8 @@ export default defineMeekoConfig({
 
 La opción es booleana y está desactivada por defecto. Meeko carga la página, sus módulos y sus datos antes de iniciar `document.startViewTransition()`, y coloca dentro del callback el cambio de DOM y de head. No anima SSR, la hidratación inicial ni los cambios de fragmento de la página actual. Funciona con enlaces internos y atrás/adelante. Sin la API, con la pestaña oculta o con `prefers-reduced-motion: reduce`, navega normalmente.
 
+Tampoco anima una página demasiado grande: por encima de 4.000 elementos, en la página de origen o en la de destino, navega sin transición. En un documento así, con una pantalla de alta densidad o en un teléfono, cada frame de la transición bloquea la página durante segundos. Si la grande es la de destino, Meeko captura la página de origen y salta la animación al aplicar el cambio. Si llamas a `document.startViewTransition()` por tu cuenta, comprueba lo mismo con [`isTooLargeToAnimate`](reference/utils/istoolargetoanimate.md).
+
 El navegador proporciona una transición básica; personaliza la animación desde `app/styles/main.css` con CSS nativo:
 
 ```css

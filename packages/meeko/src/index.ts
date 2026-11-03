@@ -2,6 +2,7 @@ export { batch, computed, createContext, createRoot, effect, inject, onCleanup, 
 export type { ContextKey, ReadonlySignal, Signal } from './core/reactivity'
 export { provideErrorHandler } from './app/runtime/component-errors'
 export { onMounted } from './app/runtime/lifecycle'
+export { isTooLargeToAnimate } from './app/runtime/view-transitions'
 export { useId } from './app/composables/useId'
 export type { ComponentErrorHandler, ErrorSource } from './app/runtime/component-errors'
 export { serializeJson } from './core/server'
