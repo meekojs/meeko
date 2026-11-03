@@ -95,6 +95,9 @@ select[data-meeko-select-trigger] optgroup {
 		outline: 0;
 		background: var(--ui-color-control-active);
 	}
+	select[data-meeko-select-trigger] option:focus-visible {
+		box-shadow: var(--ui-option-active-ring);
+	}
 	select[data-meeko-select-trigger] option:checked {
 		font-weight: var(--ui-font-weight-semibold);
 	}

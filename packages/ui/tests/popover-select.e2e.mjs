@@ -159,6 +159,44 @@ test('UIPopover documents a keyboard menu, a light dialog and a tooltip that nev
 	assert.deepEqual(errors, [])
 })
 
+test('the active row looks the same in UISelect, UICombobox and UICommandPalette, in both themes', { timeout: 180_000 }, async (context) => {
+	const { browser, origin } = await startDemo(context)
+	const look = (row) =>
+		row.evaluate((element) => {
+			const style = globalThis.getComputedStyle(element)
+			return { background: style.backgroundColor, ring: style.boxShadow }
+		})
+	const setTheme = (page, theme) => page.evaluate((value) => globalThis.document.documentElement.setAttribute('data-theme', value), theme)
+	for (const theme of ['light', 'dark']) {
+		const { errors, page } = await open(browser, origin, '/select')
+		await setTheme(page, theme)
+		await page.locator('#plan').focus()
+		await page.keyboard.press('Enter')
+		await page.waitForFunction(() => globalThis.document.getElementById('plan').matches(':open'))
+		await page.keyboard.press('ArrowDown')
+		const select = await look(page.locator('#plan option:focus'))
+		await page.keyboard.press('Escape')
+
+		await page.getByRole('combobox', { name: 'Temas', exact: true }).click()
+		await page.keyboard.press('ArrowDown')
+		const combobox = await look(page.locator('[data-meeko-select-list] [role="option"][data-active]'))
+		await page.keyboard.press('Escape')
+
+		await page.goto(origin + '/overlays', { waitUntil: 'networkidle' })
+		await page.waitForFunction(() => globalThis.performance.getEntriesByName('meeko-hydration').length > 0)
+		await setTheme(page, theme)
+		await page.locator('.meeko-ui-command-trigger').first().click()
+		await page.locator('dialog.meeko-ui-command[open] input').fill('a')
+		const palette = await look(page.locator('.meeko-ui-command-row[data-active]'))
+
+		assert.notEqual(palette.ring, 'none', theme)
+		assert.deepEqual(select, palette, `UISelect, ${theme}`)
+		assert.deepEqual(combobox, palette, `UICombobox, ${theme}`)
+		assert.deepEqual(errors, [])
+		await page.close()
+	}
+})
+
 test('UISelect documents keyboard and mouse choice, search, multiple with max and native form submission', { timeout: 120_000 }, async (context) => {
 	const { browser, origin, output } = await startDemo(context)
 	const { errors, page } = await open(browser, origin, '/select')

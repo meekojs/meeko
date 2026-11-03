@@ -312,6 +312,7 @@
 	padding: var(--ui-space-1-5) var(--ui-space-2);
 }
 [data-meeko-select-list] [role='option'][data-active] {
+	box-shadow: var(--ui-option-active-ring);
 	background: var(--ui-color-control-active);
 }
 [data-meeko-select-list] [role='option'][data-selected] {

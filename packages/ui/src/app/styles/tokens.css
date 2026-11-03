@@ -201,6 +201,9 @@
 	--ui-floating-panel-width: 23rem;
 	--ui-tabs-indicator-height: 2px;
 	--ui-landing-title-size: clamp(var(--ui-font-size-4xl), 6vw, var(--ui-font-size-6xl));
+	--ui-page-title-size: var(--ui-font-size-3xl);
+	--ui-page-title-tracking: var(--ui-tracking-tight);
+	--ui-option-active-ring: inset 0 0 0 var(--ui-border-width) var(--ui-color-primary-border);
 	--ui-brand-image-height: 1.75rem;
 	--ui-icon-size: 1rem;
 	--ui-icon-size-sm: 0.8125rem;

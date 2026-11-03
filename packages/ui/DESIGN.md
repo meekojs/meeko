@@ -84,6 +84,7 @@ La interfaz crece con la pantalla en un solo sitio, la base global: `html { font
 | `--ui-font-size-3xl`                 | 1,75       | Título de página                    | `tight`      | `tight`   |
 | `--ui-font-size-4xl`, `-5xl`, `-6xl` | 2,25, 3, 4 | Portadas                            | `tight`      | `display` |
 
+- **Título de página:** `--ui-page-title-size` y `--ui-page-title-tracking` son el único sitio de este tamaño: los leen `UIPageHeader`, el `h1` de `UIProse` y el del editor. Una portada usa `--ui-landing-title-size`.
 - **Interlineado** (`--ui-line-height-*`): `none` 1, `tight` 1,2, `snug` 1,35, `normal` 1,5, `relaxed` 1,65.
 - **Peso** (`--ui-font-weight-*`): `regular` 400, `medium` 500 en etiquetas y controles, `semibold` 600 en títulos y `bold` 700 sólo en portadas.
 - **Tracking** (`--ui-tracking-*`): `normal` 0, `snug` -0,006em, `tight` -0,014em, `display` -0,025em.
@@ -109,14 +110,15 @@ Con `pointer: coarse` los altos crecen solos, y los inputs usan `--ui-input-font
 
 ## Estados
 
-| Estado        | Cómo                                                                                                    |
-| ------------- | ------------------------------------------------------------------------------------------------------- |
-| Hover         | Fondo un paso más: `-hover`. Con `--ui-duration-fast`.                                                  |
-| Pulsado       | `-active`.                                                                                              |
-| Foco          | Siempre `:focus-visible` con `--ui-focus-ring`. No lo quites sin dar otro igual de claro.               |
-| Deshabilitado | `opacity: var(--ui-opacity-disabled)` y `cursor: not-allowed`.                                          |
-| Inválido      | `aria-invalid="true"`, borde `--ui-color-danger` y mensaje en `--ui-color-danger-text`.                 |
-| Seleccionado  | `--ui-color-control-active` y peso `semibold`, o `--ui-color-primary-soft` si es el acento de la vista. |
+| Estado        | Cómo                                                                                                             |
+| ------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Hover         | Fondo un paso más: `-hover`. Con `--ui-duration-fast`.                                                           |
+| Pulsado       | `-active`.                                                                                                       |
+| Foco          | Siempre `:focus-visible` con `--ui-focus-ring`. No lo quites sin dar otro igual de claro.                        |
+| Deshabilitado | `opacity: var(--ui-opacity-disabled)` y `cursor: not-allowed`.                                                   |
+| Inválido      | `aria-invalid="true"`, borde `--ui-color-danger` y mensaje en `--ui-color-danger-text`.                          |
+| Seleccionado  | `--ui-color-control-active` y peso `semibold`, o `--ui-color-primary-soft` si es el acento de la vista.          |
+| Fila activa   | `--ui-color-control-active` y `--ui-option-active-ring`, igual en `UISelect`, `UICombobox` y `UICommandPalette`. |
 
 ## Movimiento
 

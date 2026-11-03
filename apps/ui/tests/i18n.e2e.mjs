@@ -108,6 +108,26 @@ test('the English UI documentation has an English interface, hreflang, a switche
 	assert.equal(await suggestion.getByRole('link', { name: 'Leer esta página en español', exact: true }).getAttribute('href'), '/buttons')
 	assert.equal(await suggestion.evaluate((element) => globalThis.getComputedStyle(element).position), 'fixed')
 	await page.screenshot({ path: output + '/en-buttons-desktop.png' })
+	// On a phone it covers one row, with both choices at hand and the message for a screen reader.
+	await page.setViewportSize({ width: 390, height: 844 })
+	const phone = await suggestion.evaluate((element) => {
+		const inside = (node) => {
+			const box = node.getBoundingClientRect()
+			return box.top >= 0 && box.bottom <= globalThis.innerHeight && box.left >= 0 && box.right <= globalThis.innerWidth
+		}
+		const box = element.getBoundingClientRect()
+		return { height: box.height, actions: [...element.querySelectorAll('a, button')].map((action) => [inside(action), action.getBoundingClientRect().top]) }
+	})
+	assert.ok(phone.height <= 72, `the suggestion is ${phone.height}px tall on a phone`)
+	assert.equal(phone.actions.length, 2)
+	assert.ok(
+		phone.actions.every(([inside]) => inside),
+		'both choices are on the screen',
+	)
+	assert.equal(phone.actions[0][1], phone.actions[1][1], 'both choices are in one row')
+	assert.equal(await suggestion.getByRole('status').textContent(), 'Esta página también está en español.')
+	await page.screenshot({ path: output + '/en-buttons-phone.png' })
+	await page.setViewportSize({ width: 1440, height: 1000 })
 	await suggestion.getByRole('button', { name: 'Stay in English', exact: true }).click()
 	await suggestion.waitFor({ state: 'detached' })
 	await page.reload({ waitUntil: 'networkidle' })

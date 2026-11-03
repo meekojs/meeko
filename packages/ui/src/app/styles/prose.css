@@ -36,9 +36,9 @@
 	}
 	:scope h1 {
 		margin: 0 0 var(--ui-space-4);
-		font-size: var(--ui-font-size-4xl);
+		font-size: var(--ui-page-title-size);
 		line-height: var(--ui-line-height-tight);
-		letter-spacing: var(--ui-tracking-display);
+		letter-spacing: var(--ui-page-title-tracking);
 	}
 	:scope h2 {
 		margin: var(--ui-space-12) 0 var(--ui-space-3);
@@ -250,11 +250,6 @@
 	}
 	:scope .callout .code-block {
 		margin: var(--ui-space-2) 0 var(--ui-space-1);
-	}
-	@media (max-width: 30rem) {
-		:scope h1 {
-			font-size: var(--ui-font-size-3xl);
-		}
 	}
 	@media (prefers-reduced-motion: reduce) {
 		:scope .heading-anchor {
