@@ -98,6 +98,6 @@
 		interest-delay-end: var(--popover-close-delay);
 	}
 	[data-meeko-popover-interest]:focus-visible {
-		interest-delay-start: 0s;
+		interest-delay-start: calc(var(--popover-delay) * 0);
 	}
 }

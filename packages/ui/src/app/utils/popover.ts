@@ -232,8 +232,9 @@ export function createPopover(props: UIPopoverProps, open: Signal<boolean>, id: 
 		else show()
 	}
 
-	const mount = (content: HTMLElement | null): (() => void) => {
-		if (!content) return () => {}
+	const mount = (root: HTMLElement | null): (() => void) => {
+		if (!root) return () => {}
+		const content: HTMLElement = root
 		element = content
 		const document = content.ownerDocument
 		const releases: Array<() => void> = []
@@ -313,16 +314,29 @@ export function createPopover(props: UIPopoverProps, open: Signal<boolean>, id: 
 			if (open.value !== now) open.value = now
 			if (now !== last) apply(now)
 		}
-		listen(content, 'beforetoggle', () => {
+		const hinting = (): boolean => untrack(() => mode.value) === 'hint'
+		// Nothing else closes a hint whose trigger left the document: no pointer leaves it, and the browser
+		// loses the interest without closing the content. From `beforetoggle`, because `toggle` comes too late
+		// for a trigger that leaves right after the opening.
+		let triggerWatch: MutationObserver | undefined
+		function watchTrigger(opening: boolean): void {
+			triggerWatch?.disconnect()
+			const target = opening && hinting() ? triggerElement() : null
+			if (!target || typeof MutationObserver === 'undefined') return
+			triggerWatch = new MutationObserver(() => {
+				if (!target.isConnected) hide()
+			})
+			triggerWatch.observe(document, { childList: true, subtree: true })
+		}
+		releases.push(() => triggerWatch?.disconnect())
+		listen(content, 'beforetoggle', (event) => {
 			started++
+			watchTrigger((event as ToggleEvent).newState === 'open')
 		})
-		listen(content, 'toggle', (event) => {
-			synced((event as ToggleEvent).newState ? (event as ToggleEvent).newState === 'open' : popoverOpen(content))
-			watchTrigger()
-		})
+		listen(content, 'toggle', (event) => synced((event as ToggleEvent).newState ? (event as ToggleEvent).newState === 'open' : popoverOpen(content)))
 
 		// `interestfor` needs no script, so a hint can be open already: the model follows it, not the reverse.
-		const openedBefore = untrack(() => mode.value) === 'hint' && popoverOpen(content) && !untrack(() => open.value)
+		const openedBefore = hinting() && popoverOpen(content) && !untrack(() => open.value)
 		if (openedBefore) open.value = true
 
 		// The model opens and closes the content.
@@ -400,7 +414,6 @@ export function createPopover(props: UIPopoverProps, open: Signal<boolean>, id: 
 		releases.push(() => {
 			if (hintTimer !== undefined) clearTimeout(hintTimer)
 		})
-		const hinting = (): boolean => untrack(() => mode.value) === 'hint'
 		/** Whether this script opens and closes the hint of `target`. */
 		const scripted = (target: HTMLElement | null = anchor): boolean => hinting() && !(target && interestSource(target, content))
 		listen(content, 'pointerenter', () => {
@@ -430,21 +443,8 @@ export function createPopover(props: UIPopoverProps, open: Signal<boolean>, id: 
 			if (hinting()) hide()
 		})
 
-		// Nothing else closes a hint whose trigger left the document: no pointer leaves it, and the browser
-		// loses the interest without closing the content.
-		let triggerWatch: MutationObserver | undefined
-		const watchTrigger = (): void => {
-			triggerWatch?.disconnect()
-			const target = hinting() && popoverOpen(content) ? triggerElement() : null
-			if (!target || typeof MutationObserver === 'undefined') return
-			triggerWatch = new MutationObserver(() => {
-				if (!target.isConnected) hide()
-			})
-			triggerWatch.observe(document, { childList: true, subtree: true })
-		}
-		releases.push(() => triggerWatch?.disconnect())
-
-		const attachTrigger = (target: HTMLElement): void => {
+		// A declaration, because a model that starts open reaches it from the effect above, before this line.
+		function attachTrigger(target: HTMLElement): void {
 			const own: Array<() => void> = []
 			const on = (type: string, listener: (event: Event) => void): void => {
 				target.addEventListener(type, listener)
@@ -531,7 +531,7 @@ export function createPopover(props: UIPopoverProps, open: Signal<boolean>, id: 
 		if (untrack(() => open.value) && !popoverOpen(content)) show()
 		if (openedBefore) {
 			apply(true)
-			watchTrigger()
+			watchTrigger(true)
 		}
 		// A model that starts open shows the content while mounting: not a change to report.
 		started = 0

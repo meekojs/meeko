@@ -72,7 +72,23 @@ const page = `<script lang="ts">
 </template>
 `
 
+/** On a page of its own: opening a hint closes any other, so it would disturb the rest. */
+const startsOpen = `<script lang="ts">
+	import { signal } from '@meekojs/meeko'
+
+	const open = signal(true)
+</script>
+
+<template>
+	<main style="padding: 96px 48px;">
+		<UITooltip triggerId="initial" text="De partida" class="tip-initial" model="open" bind:delay="${openDelay}" bind:closeDelay="${closeDelay}"><snippet name="trigger">De partida</snippet></UITooltip>
+		<p id="initial-state">{String(open.value)}</p>
+	</main>
+</template>
+`
+
 const route = "import { definePage } from '@meekojs/meeko/framework'\nexport const route = definePage({ render: 'prerender' })\n"
+const pages = { 'app/pages/tips.meeko': page, 'app/pages/tips.route.ts': route, 'app/pages/starts-open.meeko': startsOpen, 'app/pages/starts-open.route.ts': route }
 
 /** Records the timers of the tooltip's delays, and with `force` turns the browser into one without Interest Invokers. */
 function instrument({ force, delays }) {
@@ -111,7 +127,7 @@ const until = async (tip, wanted, act, limit = 2500) => {
 	throw new Error(`the tooltip did not become ${wanted ? 'open' : 'closed'} in ${limit} ms`)
 }
 
-async function visit(browser, origin, { force = false, contextOptions = {} } = {}) {
+async function visit(browser, origin, { force = false, contextOptions = {}, path = '/tips' } = {}) {
 	const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, ...contextOptions })
 	const tab = await context.newPage()
 	const errors = []
@@ -120,7 +136,7 @@ async function visit(browser, origin, { force = false, contextOptions = {} } = {
 		if ((message.type() === 'error' && !message.text().includes('404')) || /hydrat/i.test(message.text())) errors.push(message.text())
 	})
 	await tab.addInitScript(instrument, { force, delays: [openDelay, closeDelay, 900] })
-	await tab.goto(origin + '/tips', { waitUntil: 'networkidle' })
+	await tab.goto(origin + path, { waitUntil: 'networkidle' })
 	await tab.waitForFunction(() => globalThis.performance.getEntriesByName('meeko-hydration').length > 0)
 	return { context, errors, tab }
 }
@@ -290,6 +306,22 @@ async function sameBehavior(tab, errors) {
 	assert.deepEqual(errors, [])
 }
 
+/** A model that starts open: it shows, and its trigger has its listeners like any other. */
+async function startsOpenBehavior(browser, origin, force) {
+	const { context, errors, tab } = await visit(browser, origin, { force, path: '/starts-open' })
+	const tip = tab.locator('.tip-initial')
+	await tip.waitFor({ state: 'visible' })
+	await tab.locator('#initial-state', { hasText: 'true' }).waitFor()
+	await hover(tab, tab.locator('#initial'))
+	await sleep(openDelay + 80)
+	assert.equal(await openTip(tip), true)
+	await until(tip, false, () => away(tab))
+	await tab.locator('#initial-state', { hasText: 'false' }).waitFor()
+	await until(tip, true, () => hover(tab, tab.locator('#initial')))
+	assert.deepEqual(errors, [])
+	await context.close()
+}
+
 for (const [engine, name, force] of [
 	['chrome', 'Chrome, with Interest Invokers', false],
 	['chrome', 'Chrome, with the script forced', true],
@@ -306,9 +338,10 @@ for (const [engine, name, force] of [
 			return
 		}
 		t.after(() => browser.close())
-		const { origin } = await createNativeApp(t, { 'app/pages/tips.meeko': page, 'app/pages/tips.route.ts': route })
+		const { origin } = await createNativeApp(t, pages)
 		const { context, errors, tab } = await visit(browser, origin, { force })
 		await sameBehavior(tab, errors)
+		await startsOpenBehavior(browser, origin, force)
 		const supported = await tab.evaluate(() => 'interestForElement' in globalThis.HTMLButtonElement.prototype)
 		if (engine === 'chrome') assert.equal(supported, !force)
 		else if (supported) t.diagnostic(`${engine} now has Interest Invokers`)
@@ -319,7 +352,7 @@ for (const [engine, name, force] of [
 test('with Interest Invokers the browser opens the tooltip: no timer, no second mechanism', { timeout: 180_000 }, async (t) => {
 	const browser = await launchers.chrome()
 	t.after(() => browser.close())
-	const { origin } = await createNativeApp(t, { 'app/pages/tips.meeko': page, 'app/pages/tips.route.ts': route })
+	const { origin } = await createNativeApp(t, pages)
 
 	const timers = (tab) => tab.evaluate(() => globalThis.tipTimers)
 	const logged = (tab, selector) =>
