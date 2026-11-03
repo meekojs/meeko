@@ -49,6 +49,10 @@
 	gap: var(--ui-space-4);
 	margin-block: var(--ui-space-5) var(--ui-space-8);
 }
+/* Four cards: two rows of two or one column, never three and one alone. */
+.docs-grid:has(> :nth-child(4):last-child) {
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, max(var(--ui-floating-panel-width), calc(50% - var(--ui-space-4)))), 1fr));
+}
 .docs-showcase {
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--ui-floating-panel-width)), 1fr));

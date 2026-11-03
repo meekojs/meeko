@@ -60,6 +60,20 @@ test('production i18n documentation renders guides, translates, switches locale 
 	await page.getByRole('textbox', { name: 'Tu nombre', exact: true }).fill('Ada')
 	await page.waitForFunction(() => globalThis.document.querySelector('[data-output="greeting"]')?.textContent?.trim() === 'Hola Ada')
 	await page.screenshot({ path: output + '/home-desktop.png', fullPage: true })
+	// The four cards of the home: no card alone in its row, at any width.
+	for (const width of [390, 1024, 1440, 1920, 2560, 3840]) {
+		await page.setViewportSize({ width, height: 1000 })
+		const rows = await page.locator('.docs-grid').evaluate((grid) => {
+			const tops = {}
+			for (const card of grid.children) {
+				const top = Math.round(card.getBoundingClientRect().top)
+				tops[top] = (tops[top] ?? 0) + 1
+			}
+			return Object.values(tops)
+		})
+		assert.ok(['1,1,1,1', '2,2'].includes(rows.join()), `the cards at ${width}: ${rows.join('+')}`)
+	}
+	await page.setViewportSize({ width: 1440, height: 1000 })
 	// The generated /en and /ar routes reuse the pages; each localized page declares its versions.
 	const alternates = async () => page.locator('link[rel="alternate"][hreflang]').evaluateAll((links) => links.map((link) => `${link.getAttribute('hreflang')} ${new URL(link.href).pathname}`))
 	await page.goto(origin + '/routing')
