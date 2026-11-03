@@ -242,7 +242,7 @@
 			"patterns": [{ "include": "#customElementExpressionAttribute" }, { "name": "string.quoted.double.html", "begin": "\"", "end": "\"" }, { "name": "string.quoted.single.html", "begin": "'", "end": "'" }, { "name": "entity.other.attribute-name.directive.meeko", "match": "\\bref:[A-Za-z_$][\\w$]*" }, { "name": "entity.other.attribute-name.html", "match": "\\b[\\w:-]+\\b" }]
 		},
 		"customElementExpressionAttribute": {
-			"begin": "(?<![\\w:-])((?:bind|on|if|each):[\\w-]+)(\\s*=\\s*)([\"'])",
+			"begin": "(?<![\\w:-])(on:[\\w-]+(?::[\\w-]+)?|(?:bind|if|each):[\\w-]+)(\\s*=\\s*)([\"'])",
 			"end": "\\3",
 			"beginCaptures": {
 				"1": { "name": "entity.other.attribute-name.directive.meeko", "patterns": [{ "include": "#directiveName" }] },
@@ -300,7 +300,7 @@
 			"patterns": [{ "include": "source.ts" }]
 		},
 		"expressionAttribute": {
-			"begin": "(?<![\\w:-])((?:bind|on|if|each|model):[\\w-]+|model|bind|is)(\\s*=\\s*)([\"'])",
+			"begin": "(?<![\\w:-])(on:[\\w-]+(?::[\\w-]+)?|(?:bind|if|each|model):[\\w-]+|model|bind|is)(\\s*=\\s*)([\"'])",
 			"end": "\\3",
 			"beginCaptures": {
 				"1": { "name": "entity.other.attribute-name.directive.meeko", "patterns": [{ "include": "#directiveName" }] },

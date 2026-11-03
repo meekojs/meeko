@@ -150,6 +150,11 @@ test('Meeko tokens distinguish section attributes, HTML and TypeScript expressio
 	// Colors: control flow reads as a keyword, events as functions, Meeko's tags as built-ins.
 	assert.ok(hasScope('on:click', 'entity.name.function.event.meeko') && hasScope('on:save', 'entity.name.function.event.meeko'), 'events')
 	assert.ok(hasScope('on:update:modelValue', 'entity.name.function.event.meeko'), 'the whole event of a model')
+	// Its value is TypeScript, like that of any event.
+	assert.ok(
+		tokens.some((token) => token.text.includes('(next)') && token.scopes.includes('meta.embedded.inline.typescript')),
+		'the handler of a model is an expression',
+	)
 	assert.ok(
 		['if:when', 'each:of', 'each:as'].every((name) => hasScope(name, 'keyword.control.flow.meeko')),
 		'control flow directives',
