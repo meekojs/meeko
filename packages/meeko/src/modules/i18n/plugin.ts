@@ -1,3 +1,6 @@
+// The file declares an ambient module, so it cannot be imported: this is how a program that reaches this file gets it.
+// eslint-disable-next-line @typescript-eslint/triple-slash-reference
+/// <reference path="./virtual.d.ts" />
 import { catalogs } from 'virtual:meeko-i18n'
 
 import type { Message } from './messages'
