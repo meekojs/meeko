@@ -1,5 +1,5 @@
 ---
-source-hash: f66494e01bf8951d58a4eb1d8fba14f64015867a9ba8eb2ff30da07a3fb01793
+source-hash: 18694d980cd8d0f203a723a98a6f88f5a6f62b28a8dc61153e5fa7962f9e388f
 ---
 
 # Meeko UI API
@@ -664,6 +664,8 @@ Meeko renders a `<button>` with `popovertarget`, `aria-expanded`, `aria-controls
 
 **Tooltip.** `mode="hint"` uses `popover="hint"`: it opens when the pointer hovers (after `delay`) or when the trigger gets focus, stays open while the pointer is over it or over the content, closes with `Esc` or on losing focus, and never takes focus. The trigger carries `aria-describedby` with the content, which is `role="tooltip"`.
 
+An enabled `<button>` or a link with `href` also carries `interestfor`: where the browser has Interest Invokers (Chromium 142 or later; not yet Firefox or Safari, as of November 2026), the browser itself opens and closes the tooltip, without JavaScript timers and also before hydration. In any other case `<UIPopover>` does it. `delay`, `closeDelay`, the model, `Esc`, touch and `aria-describedby` work the same on both paths, with two differences on the native one: on losing focus it closes after `closeDelay`, not at once, and a click before `delay` does not open it sooner.
+
 ```html
 <UIPopover mode="hint">
 	<snippet name="trigger">?</snippet>
@@ -702,6 +704,8 @@ Meeko renders a `<button>` with `popovertarget`, `aria-expanded`, `aria-controls
 ```
 
 With a component of your own, `<AppButton bind="trigger">` passes it those keys as props: the component must declare them (for example, `defineProps<Partial<PopoverTrigger> & { variant?: "ghost" }>()`) and put them on its `<button>`, which is the element that carries the `id`.
+
+With `mode="hint"`, a trigger without `interestfor`, such as a `<span>` or a component that does not forward it, keeps working with the JavaScript of `<UIPopover>`. An SVG `<a>` cannot be the trigger of a tooltip: `showPopover` does not accept it as a source, and it does not open.
 
 A trigger that is not a `<button>` (without `popovertarget`) opens the content with the model: `on:click="() => open.value = !open.value"`.
 

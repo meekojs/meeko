@@ -660,6 +660,8 @@ Meeko pinta un `<button>` con `popovertarget`, `aria-expanded`, `aria-controls` 
 
 **Tooltip.** `mode="hint"` usa `popover="hint"`: se abre al pasar el puntero (tras `delay`) o al enfocar el disparador, se queda abierto mientras el puntero está sobre él o sobre el contenido, se cierra con `Esc` o al perder el foco y nunca toma el foco. El disparador lleva `aria-describedby` con el contenido, que es `role="tooltip"`.
 
+Un `<button>` activo o un enlace con `href` llevan además `interestfor`: donde el navegador tiene Interest Invokers (Chromium 142 o posterior; Firefox y Safari aún no, en noviembre de 2026), es él quien abre y cierra el tooltip, sin temporizadores de JavaScript y también antes de hidratar. En cualquier otro caso lo hace `<UIPopover>`. `delay`, `closeDelay`, el modelo, `Esc`, el toque y `aria-describedby` funcionan igual en los dos caminos, con dos diferencias en el nativo: al perder el foco se cierra tras `closeDelay`, no al instante, y un clic antes de `delay` no adelanta la apertura.
+
 ```html
 <UIPopover mode="hint">
 	<snippet name="trigger">?</snippet>
@@ -698,6 +700,8 @@ Meeko pinta un `<button>` con `popovertarget`, `aria-expanded`, `aria-controls` 
 ```
 
 Con un componente propio, `<AppButton bind="trigger">` le pasa esas claves como props: el componente debe declararlas (por ejemplo, `defineProps<Partial<PopoverTrigger> & { variant?: "ghost" }>()`) y ponerlas en su `<button>`, que es el elemento que lleva el `id`.
+
+Con `mode="hint"`, un disparador sin `interestfor`, como un `<span>` o un componente que no lo reenvía, sigue funcionando con el JavaScript de `<UIPopover>`. Un `<a>` de SVG no sirve como disparador de un tooltip: `showPopover` no lo admite como origen, y no se abre.
 
 Un disparador que no es un `<button>` (sin `popovertarget`) abre el contenido con el modelo: `on:click="() => open.value = !open.value"`.
 

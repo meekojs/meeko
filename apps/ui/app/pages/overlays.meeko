@@ -76,7 +76,7 @@
 			con
 			<code>mode="hint"</code>
 			y el aspecto de un tooltip: se abre con el puntero o el foco, nunca toma el foco, y el disparador lo referencia con
-			<code>aria-describedby</code>. Escribe en él información complementaria.
+			<code>aria-describedby</code>. Escribe en él información complementaria. Donde el navegador tiene Interest Invokers, es él quien lo abre y lo cierra, sin temporizadores de JavaScript.
 		</p>
 		<DocsPreview>
 			<UITooltip text="Se publica al guardar">
