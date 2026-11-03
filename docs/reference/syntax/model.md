@@ -233,7 +233,7 @@ Con `const ageText = signal("0")` y `const accepted = signal(false)`.
 <AppSearch model="search" model:open="panelOpen" bind:open="panelOpen.value" />
 ```
 
-`MEEK066: model:open y bind:open pasan los dos open; un modelo no es una prop, deja sólo model:open`.
+`MEEK066: model:open y bind:open pasan los dos el modelo open; deja model:open, que comparte la señal, o bind:open, que pasa el valor`. Lo mismo ocurre con `on:update:open` junto a `model:open`: con `model:open` el hijo escribe en la señal y no emite el evento.
 
 ```html good
 <AppSearch model="search" model:open="panelOpen" />
@@ -244,5 +244,6 @@ Con `const ageText = signal("0")` y `const accepted = signal(false)`.
 - **Hidratación.** `model` no rompe la hidratación cuando el usuario escribe pronto: las regiones `if:`, `each:` y `<render>` que leen la señal se hidratan con el valor del SSR y reaccionan después al valor restaurado.
 - **Números y fechas.** Los controles entregan texto. Guarda texto en la señal y conviértelo donde se use, o deja que lo haga el schema de `useForm` (`v.transform(Number)`).
 - **Estado del componente.** Una señal de nivel superior del script viaja en el estado SSR y se restaura al hidratar; la que el padre pasa por `model` pertenece al padre y no forma parte del estado del hijo.
+- **Prop y evento.** Desde `1.8`, un componente también acepta su modelo con `bind:modelValue` y `on:update:modelValue`. `<input model="value">` dentro del hijo funciona igual con cualquier forma. Véase [`defineModel`](../macros/definemodel.md#por-prop-y-evento). En un control nativo, `model` no cambia.
 - **Elementos personalizados.** En una etiqueta con guion (`<my-input model="query">`), `model` es un atributo HTML literal, no la directiva.
 - **Accesibilidad.** `model` no da nombre al control: envuélvelo en un `<label>` o usa `aria-label`.

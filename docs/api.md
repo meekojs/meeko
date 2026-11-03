@@ -1035,12 +1035,23 @@ El padre pasa sus señales con `model` (el modelo por defecto) y `model:nombre`,
 ```
 
 - **La señal del padre.** Si el padre pasa una señal, `defineModel` devuelve esa misma señal: leer y escribir en el hijo lee y escribe la del padre. El padre es su dueño, así que la señal no forma parte del estado que el hijo transfiere en SSR ni del que conserva en HMR.
-- **Obligatorio u opcional.** Un modelo sin `default` es obligatorio: omitirlo en el padre es un error de tipos y, en ejecución, lanza un `TypeError`. Con `{ default: valor }` es opcional; si el padre no lo pasa, el hijo usa una señal local con ese valor inicial.
+- **Obligatorio u opcional.** Un modelo sin `default` es obligatorio: el padre pasa `model` o `bind:modelValue`, y omitir los dos es un error de tipos y, en ejecución, lanza un `TypeError`. Con `{ default: valor }` es opcional; si el padre no lo pasa, el hijo usa una señal local con ese valor inicial.
 - **Modelo por defecto opcional.** Las opciones van sin nombre para el modelo por defecto: `defineModel<string>({ default: "" })` lo hace opcional, igual que `defineModel<string>("default", { default: "" })`, que es la misma declaración con el nombre escrito. Con `defineModel<string>()`, en cambio, un padre que no pasa `model` (por ejemplo, porque el campo recibe un `FormField` en `bind:field`) da `TS2741` («Property '"default"' is missing in type '{}' but required in type 'ComponentModels'»). No hay ambigüedad entre las dos formas: el nombre es siempre un literal de texto y las opciones, un objeto literal.
 - **Señal escribible.** La expresión del padre debe ser una `Signal<T>` escribible. Un `computed`, una señal de sólo lectura o un valor normal es un error de tipos y, en ejecución, un `TypeError`.
-- **No son props.** Los modelos no aparecen en `ComponentProps`; el módulo compilado exporta su tipo en `ComponentModels`. El SSR lee el valor de la señal y la hidratación conecta la misma señal.
+- **La señal no es una prop.** La señal va en `ComponentModels`. El SSR lee su valor y la hidratación conecta la misma señal.
+- **También por prop y evento.** Desde `1.8`, el padre puede pasar el valor con `bind:modelValue` (`bind:nombre` en un modelo con nombre), también dentro de `bind="objeto"`, y escuchar `on:update:modelValue` (`on:update:nombre`). `ComponentProps`, `<Nombre>Props` y `<Nombre>Emits` los conocen, y `next` tiene el tipo del modelo.
 
-`defineModel` va en su propia declaración `const` de nivel superior, con un nombre simple, y cada nombre de modelo aparece una vez (`MEEK063`). Recibe un argumento de tipo, un nombre opcional como literal de texto y unas opciones que sólo admiten `default` (`MEEK064`). En el padre, un nombre de modelo que no es un identificador, el mismo modelo dos veces, un `model` sin valor o `model:x` junto a `bind:x` dan `MEEK066`.
+| El padre pasa                              | El valor del hijo                | Cuando el hijo escribe                                                                   |
+| ------------------------------------------ | -------------------------------- | ---------------------------------------------------------------------------------------- |
+| `model="señal"`                            | La señal del padre               | Escribe en esa señal                                                                     |
+| `bind:modelValue` y `on:update:modelValue` | Sigue a la prop                  | Llama al evento; el valor sólo cambia si el padre cambia la prop, y si no, vuelve a ella |
+| Sólo `bind:modelValue`, o dentro de `bind` | Valor inicial, y sigue a la prop | Se queda en el hijo hasta que la prop cambie                                             |
+| Sólo `on:update:modelValue`                | `default`, en una señal local    | Se queda en el hijo y llama al evento                                                    |
+| Nada                                       | `default`, en una señal local    | Se queda en el hijo                                                                      |
+
+Con esas formas el hijo sigue recibiendo una `Signal<T>`, y no sabe cuál usó el padre. El HTML del servidor sale con el valor de la prop, que no viaja en el estado del hijo. La prop y el evento no aparecen en `Object.keys(props)` ni en `...rest`. Véase [`defineModel`](reference/macros/definemodel.md#por-prop-y-evento).
+
+`defineModel` va en su propia declaración `const` de nivel superior, con un nombre simple, y cada nombre de modelo aparece una vez (`MEEK063`); su prop y su evento no se declaran también en el script (`MEEK063`). Recibe un argumento de tipo, un nombre opcional como literal de texto y unas opciones que sólo admiten `default` (`MEEK064`). En el padre, un nombre de modelo que no es un identificador, el mismo modelo dos veces, un `model` sin valor o `model:x` junto a `bind:x` u `on:update:x` dan `MEEK066`.
 
 ### Snippets con `defineSnippets`
 

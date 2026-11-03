@@ -2,7 +2,7 @@
 title: defineModel
 group: macros
 since: 1.1.0
-description: Declara un modelo del componente, una señal escribible que el padre comparte con model o model:nombre, con un valor por defecto opcional.
+description: Declara un modelo del componente, una señal escribible que el padre comparte con model o model:nombre, o pasa como prop y evento, con un valor por defecto opcional.
 symbols:
   - "syntax:definemodel"
 related:
@@ -16,7 +16,7 @@ related:
 
 `defineModel<T>()` declara un valor que el padre comparte con el componente en los dos sentidos, y devuelve una `Signal<T>` escribible. El padre pasa su señal con `model="señal"` (el modelo por defecto) o `model:nombre="señal"`; leer y escribir en el hijo lee y escribe la señal del padre. Es una macro de compilación: no se importa.
 
-Es la forma de escribir un campo de formulario propio, un interruptor o un diálogo con `open` sin la pareja prop + evento.
+Es la forma de escribir un campo de formulario propio, un interruptor o un diálogo con `open` sin escribir a mano la pareja prop + evento. Desde `1.8` el padre también puede usar esa pareja, sin que el hijo cambie nada: `bind:modelValue` y `on:update:modelValue`. Véase [Por prop y evento](#por-prop-y-evento).
 
 ## Uso
 
@@ -52,8 +52,41 @@ Las formas válidas son `defineModel<T>()`, `defineModel<T>({ default })`, `defi
 
 `Signal<T>`: la señal que pasa el padre o, si no la pasa y hay `default`, una señal local con ese valor inicial.
 
-- Sin `default`, el modelo es obligatorio: omitirlo en el padre es un error de tipos y, en ejecución, un `TypeError`.
-- Los modelos no son props: no aparecen en `ComponentProps`; el módulo compilado exporta su tipo en `ComponentModels`.
+- Sin `default`, el modelo es obligatorio: el padre pasa `model` o `bind:modelValue`. Omitir los dos es un error de tipos y, en ejecución, un `TypeError`; `on:update:modelValue` solo no basta.
+- El hijo siempre recibe una `Signal<T>` y no sabe qué forma usó el padre. La señal va en `ComponentModels`; la prop y el evento, en `ComponentProps`, y `<Nombre>Props` y `<Nombre>Emits` los conocen.
+
+## Por prop y evento
+
+Desde `1.8`, un componente con `defineModel` acepta el valor como prop, también dentro de `bind="objeto"`, y su cambio como evento. El modelo sin nombre se llama `modelValue`; uno con nombre, por ese nombre:
+
+```html
+<AppInput model="name" />
+<AppInput bind:modelValue="name.value" on:update:modelValue="(next) => (name.value = next)" />
+<AppInput bind:modelValue="'hola'" />
+<AppInput bind="option.props" />
+<!-- option.props = { modelValue: "hola", placeholder: "…" } -->
+<AppInput model="name" bind:touched="touched.value" on:update:touched="(next) => (touched.value = next)" />
+```
+
+| El padre pasa                              | El valor del hijo                | Cuando el hijo escribe                                                                   |
+| ------------------------------------------ | -------------------------------- | ---------------------------------------------------------------------------------------- |
+| `model="señal"`                            | La señal del padre               | Escribe en esa señal                                                                     |
+| `bind:modelValue` y `on:update:modelValue` | Sigue a la prop                  | Llama al evento; el valor sólo cambia si el padre cambia la prop, y si no, vuelve a ella |
+| Sólo `bind:modelValue`, o dentro de `bind` | Valor inicial, y sigue a la prop | Se queda en el hijo hasta que la prop cambie                                             |
+| Sólo `on:update:modelValue`                | `default`, en una señal local    | Se queda en el hijo y llama al evento                                                    |
+| Nada                                       | `default`, en una señal local    | Se queda en el hijo                                                                      |
+
+- **Prop `undefined`.** Una prop `undefined` toma el `default`, como en `defineProps`; con `bind:modelValue` y el evento escritos, el padre sigue decidiendo cada escritura.
+- **Escribir el mismo valor** no llama al evento.
+- **SSR.** El HTML sale con el valor de la prop, y la señal que la sigue no viaja en el estado del hijo: el padre ya la tiene. Tampoco la conserva HMR, ni una reconstrucción de un hijo con `await` de datos: una escritura local de la tercera fila vuelve entonces al valor de la prop.
+- **`model` y la prop a la vez** son `MEEK066`. Con `model`, el hijo escribe en la señal y nunca emitiría el evento: para observar los cambios, usa un `effect` sobre la señal. En ejecución, si un `bind="objeto"` trae `modelValue` junto a `model`, gana `model`.
+- **`bind:default` y `on:update:default` no existen:** `default` es el nombre interno del modelo sin nombre.
+- **La prop y el evento son del modelo.** No aparecen en `Object.keys(props)` ni en `...rest`, así que `bind="rest"` no los lleva a un elemento. Declararlos también en `defineProps` o `defineEmits` es `MEEK063`, salvo con un tipo importado: un envoltorio puede usar `defineProps<UIInputProps>()` y declarar su propio modelo.
+- **En un `bind` no va el evento:** `onUpdate:modelValue` es una clave `on*` (`MEEK113`). Escribe `on:update:modelValue`.
+
+### Si vienes de Vue
+
+`defineModel` se comporta como el de Vue con `bind:modelValue` y `on:update:modelValue`, que corresponden a `:modelValue` y `@update:modelValue`. `model="señal"` corresponde a `v-model`, con una diferencia: recibe la señal, no su valor, así que se escribe `model="name"` y no `model="name.value"`, y el hijo escribe directamente en ella en lugar de emitir. Por eso `model` no se combina con `on:update:modelValue`, que en Vue sí se puede escribir junto a `v-model`. Otra diferencia: si el padre no acepta el valor, el control vuelve al de la prop, también en un `<input>`.
 
 ## Ejemplos
 
@@ -159,10 +192,11 @@ const open = defineModel<boolean>("open", { default: false });
 <AppInput label="Nombre" />
 ```
 
-`meeko check` da `TS2741: Property '"default"' is missing in type '{}' but required in type 'ComponentModels'.` Pasa la señal, o haz el modelo opcional con `defineModel<string>({ default: "" })`.
+`meeko check` da `TS2741: Property '"default"' is missing in type '{}' but required in type 'ComponentModels'.` Pasa la señal o el valor, o haz el modelo opcional con `defineModel<string>({ default: "" })`.
 
 ```html good
 <AppInput label="Nombre" model="name" />
+<AppInput label="Nombre" bind:modelValue="name.value" />
 ```
 
 ### Pasar un valor o un `computed`
@@ -178,22 +212,40 @@ const open = defineModel<boolean>("open", { default: false });
 <AppInput label="Nombre" model="name" />
 ```
 
-### Un modelo que el hijo no declara, o pasado como prop
+### Un modelo que el hijo no declara, o pasado de las dos formas
 
 ```html bad
 <AppInput label="Nombre" model="name" model:opened="open" />
 <AppInput label="Nombre" model="name" model:touched="touched" bind:touched="touched.value" />
 ```
 
-`meeko check` da `TS2353: Object literal may only specify known properties, and '"opened"' does not exist in type 'ComponentModels'.` y `MEEK066: model:touched y bind:touched pasan los dos touched; un modelo no es una prop, deja sólo model:touched`.
+`meeko check` da `TS2353: Object literal may only specify known properties, and '"opened"' does not exist in type 'ComponentModels'.` y `MEEK066: model:touched y bind:touched pasan los dos el modelo touched; deja model:touched, que comparte la señal, o bind:touched, que pasa el valor`.
 
 ```html good
 <AppInput label="Nombre" model="name" model:touched="touched" />
 ```
 
+### Declarar también su prop
+
+```html bad
+<script lang="ts">
+const props = defineProps<{ modelValue: string }>();
+const value = defineModel<string>();
+</script>
+```
+
+`MEEK063: modelValue ya es de defineModel<T>(): el padre pasa bind:modelValue y on:update:modelValue, y el hijo lee y escribe el modelo; quítalo de defineProps`.
+
+```html good
+<script lang="ts">
+const value = defineModel<string>();
+</script>
+```
+
 ## Notas
 
-- **Estado y SSR.** La señal del padre pertenece al padre: no forma parte del estado que el hijo transfiere en SSR ni del que conserva HMR. El SSR lee su valor y la hidratación conecta la misma señal. Una señal local creada con `default` sí es estado del hijo.
+- **Estado y SSR.** La señal del padre pertenece al padre: no forma parte del estado que el hijo transfiere en SSR ni del que conserva HMR. El SSR lee su valor y la hidratación conecta la misma señal. Una señal local creada con `default` sí es estado del hijo; la que sigue a una prop, no.
 - **Al cambiar de señal.** Si el padre pasa otra señal en un `model`, el hijo se vuelve a montar, conservando sus señales editables por nombre.
 - **Dónde va.** En su propia declaración `const` de nivel superior con un nombre simple, una vez por nombre de modelo (`MEEK063`), antes del primer `await` de navegador (`MEEK058`).
+- **Leer una prop en `default`.** `defineModel<string>({ default: props.initial ?? "" })` lee la prop una vez a propósito, así que no da `MEEK101`.
 - **Formularios.** Dentro del hijo, el modelo se enlaza a un control con `model="value"`; el padre no necesita escuchar ningún evento.

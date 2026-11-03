@@ -14,7 +14,7 @@ related:
   - "@meekojs/meeko/framework#useForm"
   - docs/api.md#controles-de-formulario-con-model
   - docs/api.md#modelos-de-componente-definemodel-y-model
-source-hash: b18fa30e85f4f787d0ec951bf31b2675a83dcb7240d150cbecc073872920d4a6
+source-hash: 1f5c51ea1ed6bd1ea2b453e182b1d0a53458ab92634ce14f06c74a4d8f943a3d
 ---
 
 `model="señal"` binds a form control to a signal in both directions: the control displays the signal's value and every user edit writes to it. It replaces the `bind:value` + `on:input` pair.
@@ -234,7 +234,7 @@ With `const ageText = signal("0")` and `const accepted = signal(false)`.
 <AppSearch model="search" model:open="panelOpen" bind:open="panelOpen.value" />
 ```
 
-`MEEK066: model:open y bind:open pasan los dos open; un modelo no es una prop, deja sólo model:open`.
+`MEEK066: model:open y bind:open pasan los dos el modelo open; deja model:open, que comparte la señal, o bind:open, que pasa el valor`. The same goes for `on:update:open` next to `model:open`: with `model:open` the child writes the signal and does not emit the event.
 
 ```html good
 <AppSearch model="search" model:open="panelOpen" />
@@ -245,5 +245,6 @@ With `const ageText = signal("0")` and `const accepted = signal(false)`.
 - **Hydration.** `model` does not break hydration when the user types early: `if:`, `each:` and `<render>` regions reading the signal hydrate with its SSR value and then react to the restored value.
 - **Numbers and dates.** Controls provide text. Store text in the signal and convert it where used, or let the `useForm` schema do it (`v.transform(Number)`).
 - **Component state.** A top-level script signal travels in SSR state and is restored during hydration; a signal passed by the parent through `model` belongs to the parent and is not part of the child's state.
+- **Prop and event.** Since `1.8`, a component also accepts its model with `bind:modelValue` and `on:update:modelValue`. `<input model="value">` inside the child works the same with either form. See [`defineModel`](../macros/definemodel.md#by-prop-and-event). On a native control, `model` does not change.
 - **Custom elements.** On a hyphenated tag (`<my-input model="query">`), `model` is a literal HTML attribute, not the directive.
 - **Accessibility.** `model` does not name the control: wrap it in a `<label>` or use `aria-label`.

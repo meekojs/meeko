@@ -1,5 +1,5 @@
 ---
-source-hash: d6dad4bfc51a3fb5bfcd2cebb272d157d0f656d10c389e9326db16db5dc6b681
+source-hash: 7f474d0c9ddb03d099601e412c13771099bfc44ad4b2d1edfd182446a5edde86
 ---
 
 # Meeko API
@@ -1039,12 +1039,23 @@ The parent passes its signals with `model` (the default model) and `model:nombre
 ```
 
 - **The parent's signal.** If the parent passes a signal, `defineModel` returns that same signal: reading and writing in the child reads and writes the parent's signal. The parent owns it, so the signal is not part of the child's SSR-transferred or HMR-preserved state.
-- **Required or optional.** A model without `default` is required: omitting it in the parent is a type error and throws a `TypeError` at runtime. With `{ default: valor }`, it is optional; if the parent does not pass it, the child uses a local signal with that initial value.
+- **Required or optional.** A model without `default` is required: the parent passes `model` or `bind:modelValue`, and omitting both is a type error and throws a `TypeError` at runtime. With `{ default: valor }`, it is optional; if the parent does not pass it, the child uses a local signal with that initial value.
 - **Optional default model.** Options go without a name for the default model: `defineModel<string>({ default: "" })` makes it optional, like `defineModel<string>("default", { default: "" })`, the same declaration with the name written out. With `defineModel<string>()`, however, a parent that does not pass `model` (for example, because the field receives a `FormField` in `bind:field`) produces `TS2741` (“Property '"default"' is missing in type '{}' but required in type 'ComponentModels'”). There is no ambiguity between the two forms: the name is always a text literal and options an object literal.
 - **Writable signal.** The parent's expression must be a writable `Signal<T>`. A `computed`, read-only signal or plain value is a type error and a runtime `TypeError`.
-- **Not props.** Models do not appear in `ComponentProps`; the compiled module exports their type in `ComponentModels`. SSR reads the signal's value and hydration connects the same signal.
+- **The signal is not a prop.** The signal goes in `ComponentModels`. SSR reads its value and hydration connects the same signal.
+- **Also by prop and event.** Since `1.8`, the parent can pass the value with `bind:modelValue` (`bind:name` on a named model), also inside `bind="object"`, and listen to `on:update:modelValue` (`on:update:name`). `ComponentProps`, `<Name>Props` and `<Name>Emits` know them, and `next` has the model's type.
 
-`defineModel` goes in its own top-level `const` declaration, with a simple name, and each model name appears once (`MEEK063`). It receives a type argument, an optional name as a text literal and options accepting only `default` (`MEEK064`). In the parent, a model name that is not an identifier, the same model twice, a valueless `model` or `model:x` alongside `bind:x` produce `MEEK066`.
+| The parent passes                            | The child's value                   | When the child writes                                                                     |
+| -------------------------------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------- |
+| `model="signal"`                             | The parent's signal                 | Writes that signal                                                                        |
+| `bind:modelValue` and `on:update:modelValue` | Follows the prop                    | Calls the event; the value only changes if the parent changes the prop, else it goes back |
+| Only `bind:modelValue`, or inside `bind`     | Initial value, and follows the prop | Stays in the child until the prop changes                                                 |
+| Only `on:update:modelValue`                  | `default`, in a local signal        | Stays in the child and calls the event                                                    |
+| Nothing                                      | `default`, in a local signal        | Stays in the child                                                                        |
+
+With these forms the child still receives a `Signal<T>` and does not know which one the parent used. The server's HTML carries the value of the prop, which does not travel in the child's state. The prop and the event do not appear in `Object.keys(props)` or `...rest`. See [`defineModel`](reference/macros/definemodel.md#by-prop-and-event).
+
+`defineModel` goes in its own top-level `const` declaration, with a simple name, and each model name appears once (`MEEK063`); its prop and its event are not also declared in the script (`MEEK063`). It receives a type argument, an optional name as a text literal and options accepting only `default` (`MEEK064`). In the parent, a model name that is not an identifier, the same model twice, a valueless `model` or `model:x` alongside `bind:x` or `on:update:x` produce `MEEK066`.
 
 ### Snippets with `defineSnippets`
 

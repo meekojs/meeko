@@ -1,5 +1,5 @@
 ---
-source-hash: 9b6bfa3ea8940cb87be879cdbce2ec527012b74a59e20b428cf9ca43bcbf6ac6
+source-hash: cb1ade171f1345698f7b6f0ebca295dc2160fb86912441fea521e13526e85097
 ---
 
 # Upgrade from 1.7 to 1.8
@@ -173,6 +173,15 @@ Defaults can now read top-level literal constants and imports; a setup variable 
 Only types change, and `meeko check` flags each case with `TS2353` or `TS2339`. `BaseButtonEmits`, new, is the `defineEmits` map. This makes a wrapper possible; see [Wrapping another component](api.md#wrapping-another-component).
 
 A component package published before `1.8` keeps working without republishing it and without you doing anything. Meeko reads what its `.d.meeko.ts` exports: its `<Name>Props` is its `ComponentProps`, with the callbacks, as before; `<Name>Emits` does not exist for it, because its declaration has no event map, and using it gives `TS2304`. Its `Snippets`, `Models` and `Exposed` do not change. Once republished with `1.8` it has both types separated, like the `.meeko` files of your project.
+
+## defineModel also as a prop and an event (optional)
+
+There is nothing to change: `model="signal"` stays the same and `defineModel<T>()` still returns `Signal<T>`. Now a parent can also pass the value with `bind:modelValue`, inside `bind="object"`, and listen to `on:update:modelValue`, as in Vue. Named models use `bind:touched` and `on:update:touched`. See [`defineModel`](reference/macros/definemodel.md#by-prop-and-event).
+
+- `<Name>Props` includes `modelValue?` and `ComponentProps` also `onUpdate:modelValue?`; `<Name>Emits` includes `update:modelValue`, optional.
+- A `.meeko` that declares in its script a prop or an event with the name of its model (`defineProps<{ modelValue: string }>()` next to `defineModel<string>()`) gives `MEEK063`: remove it from `defineProps`. Before, the child received it as a separate prop, unrelated to the model.
+- `model` next to `on:update:modelValue` is `MEEK066`.
+- Reading a prop in the `default` option of `defineModel` no longer gives `MEEK101`.
 
 ## Other visible changes
 

@@ -170,6 +170,15 @@ Sólo cambian los tipos, y `meeko check` señala cada caso con `TS2353` o `TS233
 
 Un paquete de componentes publicado antes de `1.8` sigue funcionando sin republicarlo y sin que hagas nada. Meeko lee lo que exporta su `.d.meeko.ts`: su `<Nombre>Props` es su `ComponentProps`, con los callbacks, como hasta ahora; `<Nombre>Emits` no existe para él, porque su declaración no trae el mapa de eventos, y usarlo da `TS2304`. Sus `Snippets`, `Models` y `Exposed` no cambian. Al republicarlo con `1.8` tendrá los dos tipos separados, igual que los `.meeko` de tu proyecto.
 
+## defineModel también como prop y evento (opcional)
+
+No hay que cambiar nada: `model="señal"` sigue igual y `defineModel<T>()` sigue devolviendo `Signal<T>`. Ahora un padre también puede pasar el valor con `bind:modelValue`, dentro de `bind="objeto"`, y escuchar `on:update:modelValue`, como en Vue. Los modelos con nombre usan `bind:touched` y `on:update:touched`. Véase [`defineModel`](reference/macros/definemodel.md#por-prop-y-evento).
+
+- `<Nombre>Props` incluye `modelValue?` y `ComponentProps` también `onUpdate:modelValue?`; `<Nombre>Emits` incluye `update:modelValue`, opcional.
+- Un `.meeko` que declare en su script una prop o un evento con el nombre de su modelo (`defineProps<{ modelValue: string }>()` junto a `defineModel<string>()`) da `MEEK063`: quítala de `defineProps`. Antes el hijo la recibía como una prop aparte, sin relación con el modelo.
+- `model` junto a `on:update:modelValue` es `MEEK066`.
+- Leer una prop en la opción `default` de `defineModel` ya no da `MEEK101`.
+
 ## Otros cambios visibles
 
 - **`css` de un componente.** Con el plugin de Vite de Meeko, el export `css` es el CSS ya procesado por PostCSS en el grafo SSR y en `meeko dev`, y sigue siendo la cadena del compilador en el bundle de cliente de producción (véase [stability.md](stability.md#formato-meeko-y-módulo-generado)). Un test de Vitest que lea `Componente.css` o haga SSR de un componente sigue recibiendo un CSS no vacío: sin `test.css: true`, Vitest no procesa CSS y `css` es la cadena del compilador; con `css: true`, el CSS procesado.
