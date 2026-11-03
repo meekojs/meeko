@@ -129,7 +129,6 @@ async function visit(browser, origin, { force = false, contextOptions = {} } = {
 async function sameBehavior(tab, errors) {
 	const trigger = tab.locator('#plain')
 	const tip = tab.locator('.tip-plain')
-	const state = tab.locator('#state')
 	// SSR: the same attributes with or without support, no matter what the browser does with them.
 	assert.equal(await trigger.getAttribute('interestfor'), await tip.getAttribute('id'))
 	assert.equal(await trigger.getAttribute('aria-describedby'), await tip.getAttribute('id'))
