@@ -1,5 +1,5 @@
 ---
-source-hash: aa0d0305f4335ac4c50099f666c35d63e73ec5a0d3c43c19d1ba62dfd9b293c4
+source-hash: f66494e01bf8951d58a4eb1d8fba14f64015867a9ba8eb2ff30da07a3fb01793
 ---
 
 # Meeko UI API
@@ -1083,6 +1083,8 @@ import { withViewTransition } from '@meekojs/ui/runtime'
 
 withViewTransition(() => (section.value = 'team'), { types: ['app-section'] })
 ```
+
+Above 4,000 elements in the document, before or after the change, neither these components nor `withViewTransition()` animate: the change is applied without a transition, because on such a page, on a high-density screen or a phone, each frame blocks the page for seconds.
 
 The rules and reserved names are in [`DESIGN.md`](../../packages/ui/DESIGN.md#movimiento).
 

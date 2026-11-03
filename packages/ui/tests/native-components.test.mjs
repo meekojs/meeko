@@ -13,7 +13,7 @@ import { createTabs, selectedTab, tabsKeyTarget } from '../dist/app/utils/tabs.j
 import { withViewTransition } from '../dist/app/utils/view-transition.js'
 
 /** A browser with what withViewTransition reads; `prototype` is the one of ViewTransition. */
-function fakeBrowser(t, { start, prototype = { types: null }, hidden = false, reduced = false } = {}) {
+function fakeBrowser(t, { start, prototype = { types: null }, hidden = false, reduced = false, elements = 100 } = {}) {
 	const names = ['document', 'matchMedia', 'ViewTransition']
 	const before = names.map((name) => Object.getOwnPropertyDescriptor(globalThis, name))
 	t.after(() => {
@@ -22,10 +22,12 @@ function fakeBrowser(t, { start, prototype = { types: null }, hidden = false, re
 			else delete globalThis[name]
 		})
 	})
-	globalThis.document = { startViewTransition: start, visibilityState: hidden ? 'hidden' : 'visible' }
+	const size = { elements }
+	globalThis.document = { startViewTransition: start, visibilityState: hidden ? 'hidden' : 'visible', getElementsByTagName: () => ({ length: size.elements }) }
 	globalThis.matchMedia = () => ({ matches: reduced })
 	globalThis.ViewTransition = prototype ? function ViewTransition() {} : undefined
 	if (prototype) Object.assign(globalThis.ViewTransition.prototype, prototype)
+	return size
 }
 
 const transition = (extra = {}) => ({ ready: Promise.resolve(), finished: Promise.resolve(), ...extra })
@@ -45,12 +47,53 @@ test('withViewTransition applies the update without animating when it cannot ani
 	fakeBrowser(t, { start: () => assert.fail('no types'), prototype: {} })
 	assert.equal(withViewTransition(update, { types: ['x'] }), undefined)
 	assert.equal(calls, 5)
+	// A page above the limit, also with reduced motion or without the API.
+	for (const options of [{ start: () => assert.fail('large') }, { start: () => assert.fail('large and reduced'), reduced: true }, { start: undefined }]) {
+		fakeBrowser(t, { ...options, elements: 4001 })
+		assert.equal(withViewTransition(update), undefined)
+	}
+	assert.equal(calls, 8)
+})
+
+test('withViewTransition animates up to the limit, and skips when the update brings the page over it', (t) => {
+	let skips = 0
+	let captured
+	const start = (argument) => {
+		captured = typeof argument === 'function' ? argument : argument.update
+		return transition({ skipTransition: () => skips++ })
+	}
+	const size = fakeBrowser(t, { start, elements: 4000 })
+	assert.ok(withViewTransition(() => {}))
+	captured()
+	assert.equal(skips, 0, 'a page at the limit keeps its animation')
+
+	let calls = 0
+	assert.ok(
+		withViewTransition(
+			() => {
+				calls++
+				size.elements = 4001
+			},
+			{ types: ['ui-tab'] },
+		),
+	)
+	assert.equal(calls, 0, 'the update waits for the capture')
+	captured()
+	assert.equal(calls, 1)
+	assert.equal(skips, 1)
+
+	// The promise of an asynchronous update still reaches the browser, which waits for it.
+	size.elements = 100
+	const pending = Promise.resolve()
+	withViewTransition(() => pending)
+	assert.equal(captured(), pending)
 })
 
 test('withViewTransition passes the types and swallows the rejection of a skipped animation', async (t) => {
 	const seen = []
 	const running = transition({ ready: Promise.reject(new DOMException('Skipped', 'AbortError')) })
-	const update = () => {}
+	let calls = 0
+	const update = () => calls++
 	fakeBrowser(t, {
 		start(argument) {
 			seen.push(argument)
@@ -59,7 +102,11 @@ test('withViewTransition passes the types and swallows the rejection of a skippe
 	})
 	assert.equal(withViewTransition(update, { types: ['ui-tab'] }), running)
 	assert.equal(withViewTransition(update), running)
-	assert.deepEqual(seen, [{ update, types: ['ui-tab'] }, update])
+	// The browser gets a wrapper of `update`, which then checks the size of the page.
+	assert.deepEqual(seen[0].types, ['ui-tab'])
+	seen[0].update()
+	seen[1]()
+	assert.equal(calls, 2)
 	// An unhandled rejection would fail this test.
 	await new Promise((done) => setImmediate(done))
 })

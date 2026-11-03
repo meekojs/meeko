@@ -1080,6 +1080,8 @@ import { withViewTransition } from '@meekojs/ui/runtime'
 withViewTransition(() => (section.value = 'team'), { types: ['app-section'] })
 ```
 
+Por encima de 4.000 elementos en el documento, antes o después del cambio, ni estos componentes ni `withViewTransition()` animan: el cambio se aplica sin transición, porque en una página así, con una pantalla de alta densidad o en un teléfono, cada frame bloquea la página durante segundos.
+
 Las reglas y los nombres reservados están en [`DESIGN.md`](../packages/ui/DESIGN.md#movimiento).
 
 ## Pestañas, tooltips y paleta
