@@ -43,7 +43,10 @@
 		>
 			<render snippet="snippets.bar" />
 		</div>
-		<div class="meeko-ui-page-body">
+		<div
+			class="meeko-ui-page-body"
+			bind:data-ui-page-aside="snippets.aside ? '' : undefined"
+		>
 			<div
 				if:when="snippets.sidebar"
 				class="meeko-ui-page-sidebar"

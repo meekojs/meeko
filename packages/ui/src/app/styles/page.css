@@ -87,10 +87,14 @@
 .meeko-ui-page-body:has(> .meeko-ui-page-sidebar) {
 	grid-template-columns: var(--ui-page-sidebar-width) minmax(0, 1fr);
 }
-.meeko-ui-page-body:has(> .meeko-ui-page-aside) {
+/*
+ * The aside comes after <main> in the document: on a slow page it arrives much later. So its column does
+ * not depend on the element being there, or the text would be laid out again when it appears.
+ */
+.meeko-ui-page-body[data-ui-page-aside] {
 	grid-template-columns: minmax(0, 1fr) var(--ui-page-aside-width);
 }
-.meeko-ui-page-body:has(> .meeko-ui-page-sidebar):has(> .meeko-ui-page-aside) {
+.meeko-ui-page-body:has(> .meeko-ui-page-sidebar)[data-ui-page-aside] {
 	grid-template-columns: var(--ui-page-sidebar-width) minmax(0, 1fr) var(--ui-page-aside-width);
 }
 .meeko-ui-page[data-layout='dashboard'] .meeko-ui-page-body {
@@ -120,10 +124,10 @@
 	.meeko-ui-page-aside {
 		display: none;
 	}
-	.meeko-ui-page-body:has(> .meeko-ui-page-aside) {
+	.meeko-ui-page-body[data-ui-page-aside] {
 		grid-template-columns: minmax(0, 1fr);
 	}
-	.meeko-ui-page-body:has(> .meeko-ui-page-sidebar):has(> .meeko-ui-page-aside) {
+	.meeko-ui-page-body:has(> .meeko-ui-page-sidebar)[data-ui-page-aside] {
 		grid-template-columns: var(--ui-page-sidebar-width) minmax(0, 1fr);
 	}
 	.meeko-ui-page .meeko-ui-toc-collapsible {
@@ -147,7 +151,7 @@
 		display: none;
 	}
 	.meeko-ui-page-body:has(> .meeko-ui-page-sidebar),
-	.meeko-ui-page-body:has(> .meeko-ui-page-sidebar):has(> .meeko-ui-page-aside) {
+	.meeko-ui-page-body:has(> .meeko-ui-page-sidebar)[data-ui-page-aside] {
 		grid-template-columns: minmax(0, 1fr);
 	}
 	.meeko-ui-page-main {

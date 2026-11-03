@@ -177,6 +177,29 @@ export async function createNavigationApp(context) {
 		'app/pages/dashboard/child.meeko': `<template><UINavigationTabs bind:items="[{ label: 'Panel', to: '/dashboard', match: 'prefix' }, { label: 'Otro', to: '/about' }]" /></template>
 `,
 		'app/pages/dashboard/child.route.ts': route(),
+		'app/pages/aside.meeko': `<script lang="ts">
+	const shown = signal(true)
+	const text = 'Un párrafo largo que ocupa varias líneas para que su corte cambie si cambia el ancho de la columna. '.repeat(40)
+</script>
+<template>
+	<UIPage>
+		<snippet
+			if:when="shown.value"
+			name="aside"
+		>
+			<p id="aside-content">Índice</p>
+		</snippet>
+		<p id="long-text">{text}</p>
+		<button
+			id="toggle-aside"
+			on:click="() => (shown.value = !shown.value)"
+		>
+			Alternar
+		</button>
+	</UIPage>
+</template>
+`,
+		'app/pages/aside.route.ts': route(),
 		'app/pages/about.meeko': '<template><p id="about">About</p></template>\n',
 		'app/pages/about.route.ts': route(),
 		'app/pages/users/[id].meeko': '<template><p>User</p></template>\n',

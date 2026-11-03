@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { createServer } from 'node:http'
 import test from 'node:test'
 import { chromium } from 'playwright-core'
 
@@ -214,6 +215,82 @@ test('the navigation components work in a browser, with and without JavaScript',
 		assert.ok(link.y >= panel.y && link.y + link.height <= panel.y + panel.height, 'the current link is inside the panel')
 		assert.equal(await short.evaluate(() => globalThis.scrollY), 0, 'the document stays put')
 		await short.close()
+	})
+
+	await t.test('UIPage: the column of the aside is there before the aside, so the text does not move when it arrives', async () => {
+		const html = await (await globalThis.fetch(origin + '/aside')).text()
+		const mark = html.search(/<div[^>]*class="meeko-ui-page-body"[^>]*data-ui-page-aside|<div[^>]*data-ui-page-aside[^>]*class="meeko-ui-page-body"/)
+		assert.ok(mark >= 0, 'the opening tag carries the mark')
+		assert.ok(mark < html.indexOf('<main'), 'before the text')
+		const dashboard = await (await globalThis.fetch(origin + '/dashboard')).text()
+		assert.equal(dashboard.includes('data-ui-page-aside'), false, 'a page without an aside has no mark')
+
+		// The document stops right before <aside>, as a long guide does on a slow network.
+		const split = html.indexOf('<aside')
+		assert.ok(split > mark)
+		let release
+		const held = new Promise((done) => (release = done))
+		const slow = createServer(async (request, response) => {
+			if (request.url === '/aside') {
+				response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
+				response.write(html.slice(0, split))
+				await held
+				response.end(html.slice(split))
+				return
+			}
+			const answer = await globalThis.fetch(origin + request.url)
+			response.writeHead(answer.status, { 'content-type': answer.headers.get('content-type') ?? 'application/octet-stream' })
+			response.end(Buffer.from(await answer.arrayBuffer()))
+		})
+		await new Promise((done) => slow.listen(0, '127.0.0.1', done))
+		t.after(() => slow.close())
+		const page = await context.newPage()
+		await page.addInitScript(() => {
+			globalThis.shifted = 0
+			new globalThis.PerformanceObserver((list) => {
+				for (const entry of list.getEntries()) globalThis.shifted += entry.value
+			}).observe({ type: 'layout-shift', buffered: true })
+		})
+		const navigation = page.goto(`http://127.0.0.1:${slow.address().port}/aside`, { waitUntil: 'load' })
+		await page.waitForFunction(() => globalThis.document.getElementById('long-text')?.getBoundingClientRect().width > 0 && !globalThis.document.querySelector('.meeko-ui-page-aside'))
+		await page.evaluate(() => new Promise((done) => globalThis.requestAnimationFrame(() => globalThis.requestAnimationFrame(done))))
+		const box = () => page.locator('#long-text').evaluate((element) => [element.getBoundingClientRect().width, element.getBoundingClientRect().height])
+		const before = await box()
+		release()
+		await navigation
+		await page.locator('.meeko-ui-page-aside').waitFor()
+		await page.evaluate(() => new Promise((done) => globalThis.requestAnimationFrame(() => globalThis.requestAnimationFrame(done))))
+		assert.deepEqual(await box(), before, 'the text keeps its width and its lines')
+		assert.equal(await page.evaluate(() => globalThis.shifted), 0, 'and nothing moves')
+		await page.close()
+	})
+
+	await t.test('UIPage: the mark follows an aside that appears and disappears, without a hydration mismatch', async () => {
+		const page = await context.newPage()
+		const errors = []
+		page.on('pageerror', (error) => errors.push(error.message))
+		page.on('console', (message) => {
+			if ((message.type() === 'error' && !message.text().includes('404')) || /hydrat/i.test(message.text())) errors.push(message.text())
+		})
+		await page.goto(origin + '/aside', { waitUntil: 'networkidle' })
+		await page.waitForFunction(() => globalThis.performance.getEntriesByName('meeko-hydration').length > 0)
+		const state = () =>
+			page.evaluate(() => {
+				const body = globalThis.document.querySelector('.meeko-ui-page-body')
+				return { mark: body.hasAttribute('data-ui-page-aside'), aside: Boolean(body.querySelector(':scope > .meeko-ui-page-aside')), columns: globalThis.getComputedStyle(body).gridTemplateColumns.split(' ').length, main: Math.round(body.querySelector('main').getBoundingClientRect().width) }
+			})
+		const shown = await state()
+		assert.deepEqual([shown.mark, shown.aside, shown.columns], [true, true, 2])
+		await page.locator('#toggle-aside').click()
+		await page.waitForFunction(() => !globalThis.document.querySelector('.meeko-ui-page-aside'))
+		const hidden = await state()
+		assert.deepEqual([hidden.mark, hidden.aside, hidden.columns], [false, false, 1], 'the column goes with the aside')
+		assert.ok(hidden.main > shown.main, 'and the text takes its place')
+		await page.locator('#toggle-aside').click()
+		await page.locator('.meeko-ui-page-aside').waitFor()
+		assert.deepEqual(await state(), shown, 'and comes back')
+		assert.deepEqual(errors, [])
+		await page.close()
 	})
 
 	await t.test('UITableOfContents: follows the scroll with aria-current and, where it exists, scroll-target-group', async () => {
