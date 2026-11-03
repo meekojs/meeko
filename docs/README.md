@@ -19,7 +19,7 @@ La documentación se organiza por tareas. Las guías existentes mantienen sus ru
 ## Componentes y módulos
 
 - [Componentes y API](api.md).
-- [Meeko UI](ui.md) y [API del paquete UI](../packages/ui/README.md).
+- [Meeko UI](ui.md) y [API de Meeko UI](ui-api.md).
 - [Internacionalización](i18n.md).
 - [Módulos](framework.md#módulos) y [layers](framework.md#layers).
 

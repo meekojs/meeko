@@ -1,10 +1,10 @@
 ---
-source-hash: 977de25046cadba878c8c8d011180b03773f5a25f8f7cdd756e6136d87fa80b4
+source-hash: 1762234c774148eaafa7036d523a255dbbb14952a5661d91c1ff27a711a2a527
 ---
 
 # Meeko UI
 
-The `@meekojs/ui` module belongs to the Meeko ecosystem and is distributed as a package with its own version. Its installation and API are described in the [package README](../../packages/ui/README.md). Enable it in the configuration:
+The `@meekojs/ui` module belongs to the Meeko ecosystem and is distributed as a package with its own version. Its installation and API are described in the [Meeko UI API](ui-api.md). Enable it in the configuration:
 
 ```ts
 import { defineMeekoConfig } from '@meekojs/meeko/framework'
@@ -17,7 +17,7 @@ export default defineMeekoConfig({
 
 ## Container
 
-`UIContainer` centers content with sizes from `sm` to `4k` (240rem, 3840 CSS pixels with a 16px root), plus `full`. Its fluid gutters support RTL, and `as` lets you choose the semantic tag. The default width is `xl`; you can combine wide surfaces with smaller containers for reading. See the [Container API](../../packages/ui/README.md#container) and the interactive `/container` guide on the UI site.
+`UIContainer` centers content with sizes from `sm` to `4k` (240rem, 3840 CSS pixels with a 16px root), plus `full`. Its fluid gutters support RTL, and `as` lets you choose the semantic tag. The default width is `xl`; you can combine wide surfaces with smaller containers for reading. See the [Container API](ui-api.md#container) and the interactive `/container` guide on the UI site.
 
 ## Components by category
 
@@ -130,15 +130,15 @@ export default defineMeekoConfig({
 })
 ```
 
-Define those variables in your application's styles. CSS references follow its light/dark themes without copying the palette. `primary` lets actions have a different color from `accent`; if not configured, it still uses the accent. Precedence is explicit props, module defaults and base values. Defaults are provided per application and SSR request. Tokens are processed in the UI stylesheet through Vite/PostCSS, without generating inline styles or writing to `node_modules`. See the [full list of options](../../packages/ui/README.md#opciones-tipadas-y-marca-existente).
+Define those variables in your application's styles. CSS references follow its light/dark themes without copying the palette. `primary` lets actions have a different color from `accent`; if not configured, it still uses the accent. Precedence is explicit props, module defaults and base values. Defaults are provided per application and SSR request. Tokens are processed in the UI stylesheet through Vite/PostCSS, without generating inline styles or writing to `node_modules`. See the [full list of options](ui-api.md#typed-options-and-an-existing-brand).
 
 The `apps/meeko`, `apps/ui`, `apps/i18n` and `apps/dashboard` sites use these components and tokens, with no design of their own: the same colors, sizes and fonts. They may only differ in images and effects.
 
-For modals, mount `<UIApp><MeekoOutlet /></UIApp>` in `app/app.meeko`. `useModal().open<R>(nombre, props)` loads a `Modal…` component and returns its result or `undefined` on cancellation. The component uses `UIModal` and `useModalInstance<R>().close(resultado)` or `.dismiss()`. Names and props are checked against the generated registry; `R` is the contract declared by the consumer. You can also control `UIModal` directly with a boolean model. See the [modal API](../../packages/ui/README.md#modales).
+For modals, mount `<UIApp><MeekoOutlet /></UIApp>` in `app/app.meeko`. `useModal().open<R>(nombre, props)` loads a `Modal…` component and returns its result or `undefined` on cancellation. The component uses `UIModal` and `useModalInstance<R>().close(resultado)` or `.dismiss()`. Names and props are checked against the generated registry; `R` is the contract declared by the consumer. You can also control `UIModal` directly with a boolean model. See the [modal API](ui-api.md#modals).
 
-`UITable` generates rows from the required `rows`, `columns` and `rowKey`. The generic is inferred from the rows; `TableColumn<T>`, imported from `@meekojs/ui/runtime`, checks each column's keys and formatters. It supports per-column footers, an empty state, optional snippets for cell content and `layout="native|grid"` (native by default), with horizontal scrolling. See the [table API](../../packages/ui/README.md#tablas).
+`UITable` generates rows from the required `rows`, `columns` and `rowKey`. The generic is inferred from the rows; `TableColumn<T>`, imported from `@meekojs/ui/runtime`, checks each column's keys and formatters. It supports per-column footers, an empty state, optional snippets for cell content and `layout="native|grid"` (native by default), with horizontal scrolling. See the [table API](ui-api.md#tables).
 
-`UICard` offers `outline`, `soft`, `solid` and `elevated` variants, with title and description props, and header, body and footer snippets. See the [card API](../../packages/ui/README.md#cards).
+`UICard` offers `outline`, `soft`, `solid` and `elevated` variants, with title and description props, and header, body and footer snippets. See the [card API](ui-api.md#cards).
 
 The public Meeko UI site is published at <https://ui.meekojs.com> and lives in `apps/ui`. It includes installation, themes, a catalog by category and, in Spanish and English, a guide with a demo, API and copyable code for each component: `/forms`, `/controls`, `/select` (also `UICombobox`), `/editor`, `/cards`, `/tables`, `/content`, `/feedback`, `/page`, `/navigation`, `/modals`, `/popover`, `/overlays`, `/container`, `/buttons`, `/links`, `/badges`, `/icons`, `/theme-toggle`, `/app` and `/transitions`. From the root, run `pnpm ui:dev`; to generate the production site use `pnpm ui:build`. It does not require a database.
 

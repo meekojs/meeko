@@ -1,5 +1,5 @@
 ---
-source-hash: 3104170185f43d54a976a1c76aa7437b12768a8054ffe1a2a3a5ff2adc040b0d
+source-hash: 25a8623535a6b337c4dce471fc0048d392ee8c6cb47101ac7548e3697954fecf
 ---
 
 # Documentation guide
@@ -23,7 +23,7 @@ The documentation is organized by task. Existing guides keep their paths and anc
 ## Components and modules
 
 - [Components and API](api.md).
-- [Meeko UI](ui.md) and [UI package API](../../packages/ui/README.md).
+- [Meeko UI](ui.md) and [Meeko UI API](ui-api.md).
 - [Internationalization](i18n.md).
 - [Modules](framework.md#modules) and [layers](framework.md#layers).
 
