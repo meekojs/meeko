@@ -2,6 +2,12 @@
 
 Paquete privado, sin versiones publicadas. Cada entrada describe un cambio del contenido, del render o del esquema de la documentación.
 
+## Fuentes
+
+- **El inicio rápido vive en `docs/inicio-rapido.md`.** Ya no se lee del README del paquete, que queda como portada de npm. Una fuente se identifica por sitio, idioma y ruta, así que reimportar actualiza `source_file` y conserva su `id`, sus revisiones y el estado de su traducción. Hay que reimportar antes de publicar: hasta entonces, una revisión publicada de esa página sigue apuntando al archivo anterior y el render no la aplica.
+- **Nueva página `/docs/ui-api`**, con la API de `@meekojs/ui`, en español e inglés.
+- **`findGitVersion` sigue los renombrados.** Una revisión escrita antes de mover el archivo de su fuente conserva su base, y con ella la fusión de `revisionConflict`.
+
 ## Búsqueda
 
 - **`content/code-tags`: el código de una etiqueta se resalta al compilar.** `transformCodeTags` sustituye el `code` de un componente por el HTML de Shiki antes de que Meeko lo compile, y `codeLanguage` deduce el lenguaje de un bloque que no lo declara. `meeko-docs` lo usa con `<DocsCode>`: los ejemplos de ui e i18n tienen los colores de la documentación sin que Shiki llegue a un bundle.
