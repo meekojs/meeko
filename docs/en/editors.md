@@ -1,5 +1,5 @@
 ---
-source-hash: a7167d419a46c0d95fba3202900ddd8d41703bdce31cb0e3b9dba29069beed2c
+source-hash: c969ed83b9d1e4ed7f69048e12aa1b733094a0d7d76690d9b2d15a0107100eef
 ---
 
 # Editors
@@ -306,6 +306,84 @@ With `"meekoSortClasses": "stylesheet"` (on the CLI, `--plugin @meekojs/meeko/pr
 - **Without a stylesheet.** If the project cannot be found, `app/styles/main.css` is missing or processing fails, classes are not ordered (only normalized) and formatting continues. A warning appears once per project on stderr (`[meeko] Aviso: meekoSortClasses "stylesheet" no ordena las clases: …`), never on stdout where the CLI writes code. A failed stylesheet is retried when one of its files changes or, at most, two seconds later.
 - **Untrusted workspaces.** Processing the stylesheet executes project code (PostCSS configuration and `@utilities` modules). The Prettier CLI already executes project code when loading configuration; in VS Code, in an untrusted workspace the server does not read that configuration and forces `"off"`: normalization only.
 - **Performance.** In a real project with two `@utilities` modules and eight `@import` statements, the first stylesheet processing takes about 220–260 ms (loading Vite and included modules); each subsequent format only checks file dates, around 1.5–2 ms.
+
+### The `@meekojs/prettier-plugin` package
+
+Prettier plugin for the TypeScript, template and CSS sections of `.meeko` components.
+
+```js
+export default {
+	plugins: ['@meekojs/prettier-plugin'],
+	meekoIndentSections: true,
+}
+```
+
+It requires Prettier 3 and Meeko. It keeps the formatting contract of the previous `@meekojs/meeko/prettier` entry, which remains available for compatibility in Meeko 1.x. The package's implementation uses the public `/compiler` and `/parse` entries; it imports no private Meeko files.
+
+### Class order
+
+`meekoSortClasses` sorts the classes of each static `class="…"` attribute of the template. On an element, the value is always normalized: spaces collapsed and no repeated classes. With a chosen order (any value except `"off"`), it also sorts and normalizes the `class` of a component tag, which is the `class` prop, and the strings of `bind:class` (see [Strings in expressions](#strings-in-expressions)); with `"off"`, those values stay as they are.
+
+| Value            | Order                                                                                                                                      |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `"off"`          | That of the code (the default).                                                                                                            |
+| `"stylesheet"`   | First appearance in `app/styles/main.css`, processed as in `meeko dev`, and then in the component's `<style>`; unknown classes come first. |
+| `"tailwind"`     | The official Tailwind CSS 4 order, the same as `prettier-plugin-tailwindcss`; classes Tailwind does not know come first, in their order.   |
+| `"alphabetical"` | By character code.                                                                                                                         |
+
+```js
+export default {
+	plugins: ['@meekojs/prettier-plugin'],
+	meekoSortClasses: 'tailwind',
+	// Opcional; relativa a la raíz del proyecto Meeko. Por defecto, app/styles/main.css.
+	meekoTailwindStylesheet: 'app/styles/main.css',
+}
+```
+
+With `"tailwind"`, the plugin loads the design system of the `meekoTailwindStylesheet` stylesheet with its `@import`, `@theme`, `@plugin`, `@utility` and `@custom-variant`, using the `tailwindcss` 4 installed in the project (it is an optional dependency: it is not installed with the plugin). `@plugin` modules are loaded with `@tailwindcss/node` (TypeScript too) if the project has `@tailwindcss/postcss` or `@tailwindcss/vite`; without them, only JavaScript modules. The design system is reused between files and reloaded when the stylesheet or something it imports changes. If `tailwindcss` is missing, the stylesheet does not exist or Tailwind rejects it, the classes are not sorted and a warning is given once. In an untrusted editor workspace, `"stylesheet"` and `"tailwind"` behave like `"off"`, because they would run project code.
+
+`prettier-plugin-tailwindcss` does not recognize the `meeko` parser; with `"tailwind"` it is not needed.
+
+### Strings in expressions
+
+`meekoClassFunctions` names the functions whose strings are lists of classes, like `tailwindFunctions` of `prettier-plugin-tailwindcss`. It is `[]` by default, and without a `meekoSortClasses` other than `"off"` it does nothing.
+
+```js
+export default {
+	plugins: ['@meekojs/prettier-plugin'],
+	meekoSortClasses: 'tailwind',
+	meekoClassFunctions: ['tv', 'clsx', 'cn'],
+}
+```
+
+```ts
+const button = tv({
+	base: 'flex text-white', // antes: 'text-white flex'
+	variants: { size: { sm: 'p-1 text-sm', lg: on ? 'block p-4' : 'flex p-2' } },
+	compoundVariants: [{ size: 'sm', class: 'mt-1 block' }],
+})
+```
+
+- **Where.** In all the JavaScript and TypeScript that Prettier formats with the plugin loaded: `<script>`, `<script server>`, the template's expressions and `.ts`, `.tsx`, `.js` and `.mjs` files. No other parser is needed: the plugin already replaces Prettier's `estree` printer and sorts the AST before printing. In a `.ts` file, the order comes from the Meeko project that contains the file; with `"stylesheet"`, only from the global stylesheet.
+- **What is sorted.** String literals and template strings in the arguments, at any depth, through objects, arrays, spreads, ternaries, `&&`, `||`, `??`, `+` and `as`. It works for `base`, `slots`, `variants`, `compoundVariants` and `compoundSlots` of `tv()`.
+- **What is not sorted.** Object keys, comparisons and the condition of a ternary, a function's body, the arguments of an unnamed call (`cn(t('page title'))`), tagged templates, strings outside a named function and values with an escape sequence (`\t`, ` `), whose tokens are not the text of the code.
+- **Names.** They are compared literally, without following `import`s: `tv` does not cover an alias or `styles.tv(…)`, and a member is written in full (`styles.cn`).
+- **Template strings.** Spaces next to `${…}` do not change, and a token attached to `${…}` (`p-${size}`) does not move because it is only part of a class: `` `text-white flex p-${size} block` `` becomes `` `flex text-white p-${size} block` ``. The same goes for the ends of a concatenation with `+`. A template without `${…}` is treated as a string.
+- **Unknown and repeated classes.** The rules of `class`: unknown ones first; no repeats and spaces collapsed. If the order cannot be loaded, a warning is given once and the strings are only normalized.
+
+Every literal in those arguments is treated as a list of classes. A string with spaces that is not one, such as a variant's name (`defaultVariants: { size: 'x large' }`), is reordered too; in that case, use a name without spaces or `// prettier-ignore`.
+
+`bind:class` follows the same rules without needing to name a function: `bind:class="on ? 'text-white flex' : ''"` becomes `bind:class="on ? 'flex text-white' : ''"`. It depends only on `meekoSortClasses`, as does the static `class`.
+
+#### Language server
+
+The language server formats with the core plugin (`@meekojs/meeko/prettier`), which since `1.8` knows these options and gives the same result as this package: `prettier --check` passes after saving. In an untrusted workspace it sorts nothing, because sorting can run project code.
+
+#### Alongside `prettier-plugin-tailwindcss`
+
+They can coexist in a project, in any order of `plugins`. The Tailwind one sorts on parsing and this one on printing, so if both see the same string, `meekoSortClasses` wins. Do not repeat a function in `tailwindFunctions` and `meekoClassFunctions`: with `"tailwind"` the order is the same, but that plugin also sorts object keys and does not remove repeated unknown classes, while this one does.
+
+`pnpm -F @meekojs/prettier-plugin test` checks the expected result, idempotence and the compilation of real components.
 
 ### Editor settings
 
