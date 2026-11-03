@@ -19,6 +19,7 @@ import type { HoverSection } from './insights'
 import type { ComponentTag, SnippetTag, VirtualComponent } from './model'
 import type { MeekoProject } from './project'
 
+import { modelEventName, modelPropName } from '../app/runtime/emits'
 import { autoImportedValues } from '../autoimports/transform'
 import { deprecatedBuiltinTags, shadowedBuiltinTags } from '../compiler'
 import { parseSfc } from '../compiler/parser/sfc'
@@ -607,7 +608,9 @@ function memberDocumentationOf(signature: string, documentation: string | undefi
  * `on:save="$1"`, `model:open="$1"`) y el cursor entre las comillas, o sólo el nombre si le sigue
  * un `=`. Una prop de texto va como texto; una booleana, sin valor y con `bind:`; una que admite
  * texto y otros tipos, de las dos formas, y las demás con `bind:`. Las obligatorias van primero y
- * se omiten las ya escritas. Tras `bind:`, `on:` o `model:`, sólo ese canal.
+ * se omiten las ya escritas. Tras `bind:`, `on:` o `model:`, sólo ese canal. Un modelo se ofrece como
+ * `model`, y también por su prop y su evento (`bind:modelValue`, `on:update:modelValue`), salvo que
+ * ya esté escrita la otra forma.
  *
  * @example
  * componentMemberCompletion(summary, "it", new Set(), range, false)
@@ -663,12 +666,23 @@ export function componentMemberCompletion(summary: ComponentSummary, word: strin
 			items.push(item(`on:${event}`, CompletionItemKind.Event, `02${event}`, signature, documented.get(event), 'quoted'))
 		}
 	}
-	if (prefix === undefined || prefix === 'model') {
-		for (const model of summary.models) {
-			const label = model.name === 'default' ? 'model' : `model:${model.name}`
-			// `model:` completes the named models; `model` is the default one.
-			if (present.has(label) || (prefix === 'model' && model.name === 'default')) continue
+	for (const model of summary.models) {
+		const label = model.name === 'default' ? 'model' : `model:${model.name}`
+		const prop = modelPropName(model.name)
+		const event = modelEventName(model.name)
+		// A model goes by its signal or by its prop and event (`MEEK066`): once one is written, the other is not offered.
+		const bySignal = present.has(label)
+		const byProp = present.has(`bind:${prop}`) || present.has(`on:${event}`)
+		// `model:` completes the named models; `model` is the default one.
+		if ((prefix === undefined || prefix === 'model') && !bySignal && !byProp && !(prefix === 'model' && model.name === 'default')) {
 			items.push(item(label, CompletionItemKind.Field, `03${model.name === 'default' ? '' : model.name}`, `${label}${model.optional ? '?' : ''}: Signal<${model.type}>`, model.documentation, 'quoted'))
+		}
+		if (bySignal) continue
+		if ((prefix === undefined || prefix === 'bind') && !present.has(`bind:${prop}`)) {
+			items.push(item(`bind:${prop}`, CompletionItemKind.Property, `04${prop}`, `${prop}${model.optional ? '?' : ''}: ${model.type}`, model.documentation, 'quoted'))
+		}
+		if ((prefix === undefined || prefix === 'on') && !present.has(`on:${event}`)) {
+			items.push(item(`on:${event}`, CompletionItemKind.Event, `05${prop}`, `on:${event}(next: ${model.type})`, model.documentation, 'quoted'))
 		}
 	}
 	return items

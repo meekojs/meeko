@@ -38,11 +38,16 @@ export function propsReadsOnce(file: ts.SourceFile, propsName: string): PropsRea
 	return found
 }
 
-/** `node` is part of the first argument of a `signal(...)` call, outside any nested function. */
+/**
+ * `node` is part of the first argument of a `signal(...)` call or of the options of a
+ * `defineModel(...)`, whose only option is its `default`, outside any nested function.
+ */
 function signalInitialValue(node: ts.Node): boolean {
 	let child = node
 	for (let parent = node.parent; parent && !ts.isFunctionLike(parent) && !ts.isStatement(parent); child = parent, parent = parent.parent) {
-		if (ts.isCallExpression(parent) && ts.isIdentifier(parent.expression) && parent.expression.text === 'signal' && parent.arguments[0] === child) return true
+		if (!ts.isCallExpression(parent) || !ts.isIdentifier(parent.expression)) continue
+		if (parent.expression.text === 'signal' && parent.arguments[0] === child) return true
+		if (parent.expression.text === 'defineModel' && parent.arguments.includes(child as ts.Expression)) return true
 	}
 	return false
 }

@@ -26,7 +26,7 @@ import { analyzePropsDeclaration, analyzePropsPattern, componentDefaultsType, de
 import { analyzeSnippets, SnippetsError, snippetTypeParts } from './app/definitions/define-snippets'
 import { ElementRefError, resolveElementRef, validateElementRefBinding } from './app/definitions/use-element-ref'
 import { isTagName, isVoidTag } from './app/runtime/dynamic-tag'
-import { emitPropName } from './app/runtime/emits'
+import { emitPropName, modelEventName, modelPropName } from './app/runtime/emits'
 import { closedAttributeValues, closedAttributeValuesOf } from './compiler/attribute-values'
 import { emitComponentChannels } from './compiler/codegen/channels'
 import { emitComponentProps } from './compiler/codegen/props'
@@ -1040,7 +1040,7 @@ function renderNodeContent(node: TemplateNode, bindings: TemplateBindings, conte
 			if (rawName.startsWith('on:')) {
 				// `on:save` sets the callback prop `onSave` declared by the child's defineEmits.
 				const event = rawName.slice(3)
-				if (!/^[a-zA-Z_$][\w$]*$/.test(event)) throw compileError(context.source, context.filename, 'MEEK011', `Nombre de evento de componente no válido: ${event}`, attribute.start)
+				if (!isComponentEvent(event)) throw compileError(context.source, context.filename, 'MEEK011', `Nombre de evento de componente no válido: ${event}`, attribute.start)
 				name = emitPropName(event)
 				nameOffset = attribute.start
 			} else if (rawName.startsWith('bind:') && (/^[a-zA-Z_$][\w$]*$/.test(rawName.slice(5)) || attributePropName(rawName.slice(5), attribute.start + 5, context))) {
@@ -1083,13 +1083,7 @@ function renderNodeContent(node: TemplateNode, bindings: TemplateBindings, conte
 			validateExpression(attribute.value, context.source, context.filename, offset)
 			props.push({ name, nameOffset, nameLength: rawName.startsWith('on:') ? rawName.length : name.length, attribute: rawName, expression: attribute.value, offset })
 		}
-		for (const model of models) {
-			const prop = props.find((candidate) => candidate.name === model.name)
-			if (!prop) continue
-			const spelling = model.name === 'default' ? 'model' : `model:${model.name}`
-			const later = Math.max(model.nameOffset, prop.nameOffset - (prop.attribute.startsWith('bind:') ? 5 : 0))
-			throw compileError(context.source, context.filename, 'MEEK066', `${spelling} y ${prop.attribute} pasan los dos ${model.name}; un modelo no es una prop, deja sólo ${spelling}`, later)
-		}
+		rejectModelProps(models, props, (message, offset) => compileError(context.source, context.filename, 'MEEK066', message, offset))
 		if (awaitZone && !props.some((prop) => prop.name === 'for')) {
 			throw compileError(context.source, context.filename, 'MEEK116', '<MeekoAwait> necesita for="recurso": el resultado de useApi o useRpcQuery sin await, o una lista, como for="[items, stats]"', position)
 		}
@@ -1441,7 +1435,7 @@ function renderDynamicTag(node: TemplateNode, bindings: TemplateBindings, contex
 		if (name.startsWith('on:')) {
 			const event = rawName.slice(3)
 			const domEvent = /^[a-z]+$/.test(event)
-			const prop = mixed && isPropName(event)
+			const prop = mixed && isComponentEvent(event)
 			if (!domEvent && !prop) fail('MEEK011', `Nombre de evento no válido: ${event}`, attribute.start)
 			const offset = attributeValueOffset(node, attribute.name, context)
 			validateExpression(attribute.value, context.source, context.filename, offset)
@@ -1533,6 +1527,7 @@ function renderDynamicTag(node: TemplateNode, bindings: TemplateBindings, contex
 	const fallback = snippets.find((snippet) => snippet.name === 'default')
 	const contentRegion = fallback ? context.nextRegion++ : undefined
 	const id = context.nextRegion++
+	rejectModelProps(models, props, (message, offset) => fail('MEEK066', message, offset))
 	const component: ComponentBinding = { id, reference, referenceOffset, props, models, snippets, offset: node.start, tagLength: '<component'.length, ...(ref ? { ref } : {}), ...(spread ? { spread } : {}), ...(dynamicSpread ? { dynamicSpread } : {}) }
 	bindings.dynamics.push({ id, element, reference, referenceOffset, tagVariable, content, open, bindings: own, offset: node.start, svg: foreign, component, ...(contentRegion !== undefined ? { contentRegion } : {}), checks })
 	const componentVariable = `__meeko_component_${id}`
@@ -1716,6 +1711,28 @@ function spreadAttribute(node: TemplateNode, attribute: { name: string; value: s
 function spreadPropsCode(reference: string, value: string, dynamic?: DynamicSpread, isCode?: string): string {
 	if (dynamic && isCode) return `...__meeko.${dynamic.correlated ? 'correlatedProps' : 'dynamicProps'}(() => ${isCode}, ${value})`
 	return `...__meeko.spreadProps(() => ${reference}, ${value})`
+}
+
+/** An event of a component tag: `save`, or the `update:name` of a model. */
+function isComponentEvent(event: string): boolean {
+	return /^(?:update:)?[a-zA-Z_$][\w$]*$/.test(event)
+}
+
+/**
+ * `MEEK066`: a model goes either by its signal or by its prop and event. The prop would lose to the
+ * signal, and the child writes the signal, so it would never call the event.
+ */
+function rejectModelProps(models: ComponentBinding['models'], props: ComponentBinding['props'], error: (message: string, offset: number) => Error): void {
+	for (const model of models) {
+		const propName = modelPropName(model.name)
+		const handler = emitPropName(modelEventName(model.name))
+		const prop = props.find((candidate) => candidate.name === model.name || candidate.name === propName || candidate.name === handler)
+		if (!prop) continue
+		const spelling = model.name === 'default' ? 'model' : `model:${model.name}`
+		const later = Math.max(model.nameOffset, prop.nameOffset - (prop.attribute.startsWith('bind:') ? 5 : 0))
+		if (prop.name === handler) throw error(`${spelling} y ${prop.attribute} no se combinan: con ${spelling} el hijo escribe en la señal y no emite el evento; deja ${spelling} y observa la señal con un effect, o pasa bind:${propName} y ${prop.attribute}`, later)
+		throw error(`${spelling} y ${prop.attribute} pasan los dos el modelo ${propName}; deja ${spelling}, que comparte la señal, o bind:${propName}, que pasa el valor`, later)
+	}
 }
 
 /**
@@ -2342,7 +2359,10 @@ function compileScript(section: SfcSection, source: string, filename: string, ho
 		// type does not declare them, and `const { a, ...rest } = props` must not carry them.
 		const events = emitsDeclaration ? emitNames(emitsDeclaration.typeArgument, file) : undefined
 		// A map that the script does not spell (`defineEmits<ButtonEmits>()`) is only known at run time.
-		const propsSource = emitsDeclaration && !events ? '__meeko.withoutEventProps(__props, null)' : events?.length ? `__meeko.withoutEventProps(__props, ${JSON.stringify(events.map(emitPropName))})` : '__props'
+		// The props and events of `defineModel` (`modelValue`, `onUpdate:modelValue`) are not there either.
+		const modelProps = modelDeclarations.flatMap((model) => [modelPropName(model.name), emitPropName(modelEventName(model.name))])
+		const hiddenProps = [...(events ?? []).map(emitPropName), ...modelProps]
+		const propsSource = emitsDeclaration && !events ? `__meeko.withoutEventProps(__props, null${modelProps.length ? `, ${JSON.stringify(modelProps)}` : ''})` : hiddenProps.length ? `__meeko.withoutEventProps(__props, ${JSON.stringify(hiddenProps)})` : '__props'
 		// Each destructured prop must exist in every member of the props, as in a TypeScript
 		// destructuring (`TS2344` on its name); the check is `unknown`, so the type stays the same.
 		const keysCheck = pattern?.bindings.length ? ` & __meeko.PropKeysCheck<[${pattern.bindings.map((binding) => `__meeko.PropKey<${propsType}, ${markSource(quote(binding.key), at(binding.keyNode), binding.keyNode.getWidth(file))}>`).join(', ')}]>` : ''

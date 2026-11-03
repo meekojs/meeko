@@ -2,6 +2,8 @@ import ts from '@typescript/typescript6'
 
 import type { VirtualComponent } from './model'
 
+import { emitPropName, modelEventName, modelPropName } from '../app/runtime/emits'
+
 /** A member of a component channel with its display type. */
 export interface ComponentMember {
 	readonly name: string
@@ -148,7 +150,15 @@ function summarize(checker: ts.TypeChecker, channel: ChannelTypes, typeParameter
 			return { ...member, attribute, ...(values.length ? { values } : {}) }
 		})
 	}
-	const events = members('events') ?? []
+	// A model is a Signal<T>: the parent binds a signal of T.
+	const models =
+		members('models', (type, at) => {
+			const value = type.getProperty('value')
+			return value ? checker.getTypeOfSymbolAtLocation(value, at) : type
+		}) ?? []
+	// The prop and the event of a model belong to it: the tag shows it once, as its model.
+	const modelMembers = new Set(models.flatMap((model) => [modelPropName(model.name), modelEventName(model.name), emitPropName(modelEventName(model.name))]))
+	const events = (members('events') ?? []).filter((event) => !modelMembers.has(event.name))
 	const callbacks = new Set(events.map((event) => `on${event.name.charAt(0).toUpperCase()}${event.name.slice(1)}`))
 	// `ComponentDefaults`: each default as written, as a string literal type.
 	const defaults = new Map<string, string>()
@@ -157,13 +167,7 @@ function summarize(checker: ts.TypeChecker, channel: ChannelTypes, typeParameter
 		const type = checker.getTypeOfSymbol(symbol)
 		if (type.isStringLiteral()) defaults.set(symbol.name, type.value)
 	}
-	const props = (members('props') ?? []).filter((prop) => !callbacks.has(prop.name)).map((prop) => (defaults.has(prop.name) ? { ...prop, default: defaults.get(prop.name)! } : prop))
-	// A model is a Signal<T>: the parent binds a signal of T.
-	const models =
-		members('models', (type, at) => {
-			const value = type.getProperty('value')
-			return value ? checker.getTypeOfSymbolAtLocation(value, at) : type
-		}) ?? []
+	const props = (members('props') ?? []).filter((prop) => !callbacks.has(prop.name) && !modelMembers.has(prop.name)).map((prop) => (defaults.has(prop.name) ? { ...prop, default: defaults.get(prop.name)! } : prop))
 	// A snippet is Snippet<A>: show the parameters A.
 	const snippets =
 		members('snippets', (type) => {

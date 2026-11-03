@@ -1,5 +1,7 @@
 import ts from '@typescript/typescript6'
 
+import { modelEventName, modelPropName } from '../runtime/emits'
+
 /** `const name = defineModel<T>(modelName?, options?)` accepted by the compiler. */
 export interface ModelDeclaration {
 	readonly declaration: ts.VariableDeclaration & { readonly name: ts.Identifier }
@@ -41,6 +43,49 @@ function defaultOnly(options: ts.ObjectLiteralExpression): ts.Node | undefined {
 	return names.has('default') ? undefined : options
 }
 
+/** The members that a type of this script spells: a literal, an intersection, or a local `type` or `interface`; not an imported one. */
+function spelledMembers(type: ts.TypeNode, file: ts.SourceFile, seen = new Set<ts.Node>()): ts.TypeElement[] {
+	if (ts.isTypeLiteralNode(type)) return [...type.members]
+	if (ts.isParenthesizedTypeNode(type)) return spelledMembers(type.type, file, seen)
+	if (ts.isIntersectionTypeNode(type) || ts.isUnionTypeNode(type)) return type.types.flatMap((member) => spelledMembers(member, file, seen))
+	if (!ts.isTypeReferenceNode(type) || !ts.isIdentifier(type.typeName)) return []
+	const name = type.typeName.text
+	return file.statements.flatMap((statement) => {
+		if ((!ts.isInterfaceDeclaration(statement) && !ts.isTypeAliasDeclaration(statement)) || statement.name.text !== name || seen.has(statement)) return []
+		seen.add(statement)
+		return ts.isInterfaceDeclaration(statement) ? [...statement.members] : spelledMembers(statement.type, file, seen)
+	})
+}
+
+/** The name of a type member, when it is written as a name or a string. */
+function memberName(member: ts.TypeElement): string | undefined {
+	return member.name && (ts.isIdentifier(member.name) || ts.isStringLiteral(member.name)) ? member.name.text : undefined
+}
+
+/** The type argument of the `defineProps<T>()` or `defineEmits<T>()` of a statement. */
+function macroType(statement: ts.Statement, macro: string): ts.TypeNode | undefined {
+	const call = ts.isVariableStatement(statement) ? statement.declarationList.declarations[0]?.initializer : ts.isExpressionStatement(statement) ? statement.expression : undefined
+	return call && ts.isCallExpression(call) && ts.isIdentifier(call.expression) && call.expression.text === macro ? call.typeArguments?.[0] : undefined
+}
+
+/**
+ * `MEEK063`: a model owns its prop and its event, so the script cannot also declare them. Only what
+ * the script spells: a wrapper can take the props of the component it wraps (`defineProps<UIInputProps>()`),
+ * which know its `modelValue`, and declare its own model.
+ */
+function rejectModelMembers(models: readonly ModelDeclaration[], file: ts.SourceFile): void {
+	if (!models.length) return
+	const spelling = (name: string): string => (name === 'default' ? 'defineModel<T>()' : `defineModel<T>("${name}")`)
+	for (const statement of file.statements) {
+		for (const member of spelledMembers(macroType(statement, 'defineProps') ?? macroType(statement, 'defineEmits') ?? ts.factory.createTypeLiteralNode([]), file)) {
+			const name = memberName(member)
+			const model = models.find((candidate) => modelPropName(candidate.name) === name || modelEventName(candidate.name) === name)
+			if (!model) continue
+			throw new ModelError('MEEK063', `${name} ya es de ${spelling(model.name)}: el padre pasa bind:${modelPropName(model.name)} y on:${modelEventName(model.name)}, y el hijo lee y escribe el modelo; quítalo de ${macroType(statement, 'defineProps') ? 'defineProps' : 'defineEmits'}`, member)
+		}
+	}
+}
+
 /**
  * Finds the `defineModel` calls of a script. Each one is its own top-level `const` with a simple
  * name, one type argument, an optional literal model name and optional `{ default }` options;
@@ -76,9 +121,9 @@ export function analyzeModels(file: ts.SourceFile): ModelDeclaration[] {
 				const invalid = defaultOnly(options)
 				if (invalid) throw new ModelError('MEEK064', 'Las opciones de defineModel sólo admiten default: { default: value }', invalid)
 			}
-			const previous = found.find((model) => model.name === name)
+			const previous = found.find((model) => modelPropName(model.name) === modelPropName(name))
 			if (previous) {
-				throw new ModelError('MEEK063', name === 'default' ? 'El modelo default ya está declarado; da nombre a los demás modelos: defineModel<T>("name")' : `El modelo "${name}" ya está declarado`, nameNode ?? typed)
+				throw new ModelError('MEEK063', modelPropName(name) === 'modelValue' ? 'El modelo default, cuya prop es modelValue, ya está declarado; da otro nombre a los demás modelos: defineModel<T>("name")' : `El modelo "${name}" ya está declarado`, nameNode ?? typed)
 			}
 			found.push({
 				declaration: declaration as ModelDeclaration['declaration'],
@@ -91,6 +136,7 @@ export function analyzeModels(file: ts.SourceFile): ModelDeclaration[] {
 		ts.forEachChild(node, visit)
 	}
 	visit(file)
+	rejectModelMembers(found, file)
 	return found
 }
 
@@ -103,7 +149,13 @@ export const defineModelDocs = jsdoc(
 	'`default` es obligatorio para el padre. El modelo sin nombre recibe las opciones solas:',
 	'`defineModel<string>({ default: "" })` lo hace opcional.',
 	'',
-	'Va en su propia declaración `const` de nivel superior y cada nombre se declara una sola vez (`MEEK063`).',
+	'Desde 1.8 el padre también puede pasar el valor como prop, con `bind:modelValue` (o `bind:nombre`) o',
+	'dentro de `bind="objeto"`, y escuchar `on:update:modelValue` (u `on:update:nombre`). El hijo sigue a la',
+	'prop; con prop y evento a la vez, una escritura sólo llama al evento y el valor cambia si el padre',
+	'cambia la prop; sin evento, la escritura se queda en el hijo. El hijo no distingue las formas.',
+	'',
+	'Va en su propia declaración `const` de nivel superior y cada nombre se declara una sola vez. Su prop',
+	'y su evento son del modelo: `defineProps` y `defineEmits` no pueden declararlos (`MEEK063`).',
 	'',
 	'@since 1.1.0',
 	'@example',
@@ -116,6 +168,8 @@ export const defineModelDocs = jsdoc(
 	'',
 	'<!-- En el padre, con const visible = signal(true) -->',
 	'<Toggle model:open="visible" />',
+	'<!-- O por prop y evento -->',
+	'<Toggle bind:open="visible.value" on:update:open="(next) => (visible.value = next)" />',
 	'```',
 )
 /** Options of `defineModel`: a `default` makes the model optional. */

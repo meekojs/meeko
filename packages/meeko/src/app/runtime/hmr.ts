@@ -1,6 +1,6 @@
 import type { DomScope } from './renderer'
 
-import { captureParentOwner, isExternalSignal, isWritableSignal } from '../../core/reactivity'
+import { captureParentOwner, isExternalSignal, isWritableSignal, restoreSignal } from '../../core/reactivity'
 import { serializeJson } from '../../core/server'
 import { borrowedKey } from './models'
 import { parseRegionHtml } from './renderer'
@@ -98,7 +98,7 @@ export function restoreSignals(bindings: Record<string, unknown>, state?: HotSta
 	const borrowed = (bindings as { [borrowedKey]?: ReadonlySet<unknown> })[borrowedKey]
 	const restore = (name: string, value: unknown): void => {
 		const target = bindings[name]
-		if (isWritableSignal(target) && !isExternalSignal(target) && !borrowed?.has(target)) target.value = value
+		if (isWritableSignal(target) && !isExternalSignal(target) && !borrowed?.has(target)) restoreSignal(target, value)
 	}
 	for (const [name, value] of Object.entries(state)) {
 		if (name === undefinedKey) continue

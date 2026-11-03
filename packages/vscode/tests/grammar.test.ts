@@ -70,6 +70,7 @@ test('Meeko tokens distinguish section attributes, HTML and TypeScript expressio
 		'<button class="plain" on:click="() => count.value++">{count.value}</button>',
 		'<component is="props.outlet"></component>',
 		'<AppButton bind:id="count" on:save="() => count.value++" />',
+		'<AppInput bind:modelValue="count" on:update:modelValue="(next) => count = next" />',
 		'<FormsField></FormsField><my-widget></my-widget>',
 		'<input ref:search class="plain"><AppButton ref:save />',
 		'<input model="value" data-model="plain"><AppDialog model:open="count"><snippet name="plain" params="plain">x</snippet></AppDialog>',
@@ -148,6 +149,7 @@ test('Meeko tokens distinguish section attributes, HTML and TypeScript expressio
 	assert.ok(hasScope('component', 'entity.name.tag.html'), '<component> stays an HTML-style tag')
 	// Colors: control flow reads as a keyword, events as functions, Meeko's tags as built-ins.
 	assert.ok(hasScope('on:click', 'entity.name.function.event.meeko') && hasScope('on:save', 'entity.name.function.event.meeko'), 'events')
+	assert.ok(hasScope('on:update:modelValue', 'entity.name.function.event.meeko'), 'the whole event of a model')
 	assert.ok(
 		['if:when', 'each:of', 'each:as'].every((name) => hasScope(name, 'keyword.control.flow.meeko')),
 		'control flow directives',

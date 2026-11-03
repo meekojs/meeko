@@ -393,6 +393,54 @@ export function signal<T>(initial: T): Signal<T> {
 	return result
 }
 
+/** Local writers of the signals of {@link interceptedSignal}, for {@link restoreSignal}. */
+const localWriters = new WeakMap<object, (next: never) => void>()
+
+/**
+ * A writable signal whose writes go to `write` instead of changing its value, and the means to
+ * change it: `commit` sets the value and `refresh` notifies its readers without changing it, so a
+ * control that shows something else goes back to the value. A write of the same value does nothing.
+ * A `defineModel` that follows a prop uses it. Internal.
+ */
+export function interceptedSignal<T>(initial: T, write: (next: T) => void): { readonly signal: Signal<T>; commit(next: T): void; refresh(): void } {
+	let current = initial
+	const refresh = (): void => {
+		if (result.subscribers) for (const observer of result.subscribers) pending.add(observer)
+		flush()
+	}
+	const commit = (next: T): void => {
+		if (Object.is(current, next)) return
+		current = next
+		refresh()
+	}
+	const result: InternalSignal<T> = {
+		subscribers: undefined,
+		get value() {
+			if (activeObserver) {
+				;(result.subscribers ??= new Set()).add(activeObserver)
+				activeObserver.dependencies.add(result as InternalSignal<unknown>)
+			}
+			return current
+		},
+		set value(next: T) {
+			if (!Object.is(current, next)) write(next)
+		},
+	}
+	writableSignals.add(result)
+	localWriters.set(result, commit as (next: never) => void)
+	return { signal: result, commit, refresh }
+}
+
+/**
+ * Restores the value of a signal from a state snapshot. On an {@link interceptedSignal} it only
+ * changes its value: restoring is not a write of the component, so nobody hears about it. Internal.
+ */
+export function restoreSignal(target: Signal<unknown>, value: unknown): void {
+	const local = localWriters.get(target) as ((next: unknown) => void) | undefined
+	if (local) local(value)
+	else target.value = value
+}
+
 type SyncEffectCallback<F extends () => unknown> = [Extract<ReturnType<F>, PromiseLike<unknown>>] extends [never] ? F : never
 
 /**

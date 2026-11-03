@@ -64,6 +64,22 @@ export type NoModels = { readonly [name: string]: 'this component declares no de
 /** Snippets de un componente sin defineSnippets: cualquier nombre falla con este mensaje. */
 export type NoSnippets = { readonly [name: string]: 'this component declares no defineSnippets, so it accepts no children or <snippet>' }
 
+declare const modelUnbound: unique symbol
+
+/** Tipo de la prop de un modelo que la etiqueta no pasa, en la comprobación de esa etiqueta. */
+export interface ModelUnbound {
+	readonly [modelUnbound]: true
+}
+
+/**
+ * `Name` cuando la etiqueta pasa la prop de ese modelo obligatorio con un valor de su tipo, porque
+ * entonces no necesita la señal; `never` si no la pasa o el valor admite `undefined`.
+ */
+export type BoundModel<Bound, Value, Name extends string> = 0 extends 1 & Bound ? Name : [Bound] extends [ModelUnbound] ? never : [Bound] extends [Value] ? Name : never
+
+/** Modelos que acepta una etiqueta: los que ya recibe por su prop (`Bound`) dejan de ser obligatorios. */
+export type TagModels<Models, Bound extends PropertyKey> = [Bound] extends [never] ? Models : Omit<Models, Bound> & Partial<Pick<Models, Bound & keyof Models>>
+
 /** Snippets que puede pasar una etiqueta de componente, como valores `Snippet` y con la opcionalidad del hijo. */
 export type SnippetInputs<Module> = 0 extends 1 & Module ? LooseChannel : [Module] extends [never] ? LooseChannel : ChannelsOf<Module> extends { readonly snippets: infer Snippets } ? ([Snippets] extends [null] ? NoSnippets : Snippets) : never
 
@@ -115,8 +131,14 @@ export type IsUnion<T, Whole = T> = T extends unknown ? ([Whole] extends [T] ? f
 /** Props de un módulo de componente; en una unión, la intersección de las de sus miembros. */
 export type PropsOf<Module> = [Module] extends [{ readonly renderToString: (props: infer Props, ...rest: never[]) => unknown }] ? Props : LooseChannel
 
+/** Tipo del modelo sin nombre de un módulo; `never` sin él. */
+type DefaultModelValue<Module> = ChannelsOf<Module> extends { readonly models: { readonly default?: { value: infer Value } } } ? Value : never
+
+/** La prop del modelo sin nombre de un módulo, de la que se infiere `Bound`; nada si el módulo no la tiene. */
+type DefaultModelProp<Module, Bound> = [DefaultModelValue<Module>] extends [never] ? unknown : { readonly modelValue?: Bound }
+
 /** Comprobación de etiqueta de un módulo tipado sólo como componente: props, canales y valor expuesto. */
-type ModuleTag<Module> = (props: TagProps<PropsOf<Module>> & ExtraProps, events: NoInfer<EventNames<PropsOf<Module>>>, models: NoInfer<ModelInputs<Module>>, snippets: NoInfer<SnippetInputs<Module>>) => TagInput<ExposedOf<Module>>
+type ModuleTag<Module> = <Bound = ModelUnbound>(props: TagProps<PropsOf<Module>> & ExtraProps & DefaultModelProp<Module, Bound>, events: NoInfer<EventNames<PropsOf<Module>>>, models: NoInfer<TagModels<ModelInputs<Module>, BoundModel<Bound, DefaultModelValue<Module>, 'default'>>>, snippets: NoInfer<SnippetInputs<Module>>) => TagInput<ExposedOf<Module>>
 
 /** Comprobación de etiqueta de un componente `any`: todo pasa y los manejadores reciben parámetros `any`. */
 type LooseTag = (props: { readonly [name: string]: AnyPropValue }, events: any, models: any, snippets: any) => TagInput<any>
@@ -139,7 +161,7 @@ type BranchChannel<Channel> = [Channel] extends [null] ? LooseChannel : Channel 
  * su tipo, pero un nombre que no declara no es una propiedad sobrante, porque puede ser de otra
  * rama. Que alguna rama lo admita lo comprueba aparte `checkBranchAttribute`.
  */
-export type BranchTag<Module> = (props: TagProps<PropsOf<Module>> & ExtraProps & LooseChannel, events: LooseChannel, models: NoInfer<BranchChannel<ChannelsOf<Module> extends { readonly models: infer Models } ? Models : null>>, snippets: NoInfer<BranchChannel<ChannelsOf<Module> extends { readonly snippets: infer Snippets } ? Snippets : null>>) => TagInput<ExposedOf<Module>>
+export type BranchTag<Module> = <Bound = ModelUnbound>(props: TagProps<PropsOf<Module>> & ExtraProps & LooseChannel & DefaultModelProp<Module, Bound>, events: LooseChannel, models: NoInfer<BranchChannel<ChannelsOf<Module> extends { readonly models: infer Models } ? (Models extends object ? TagModels<Models, BoundModel<Bound, DefaultModelValue<Module>, 'default'>> : Models) : null>>, snippets: NoInfer<BranchChannel<ChannelsOf<Module> extends { readonly snippets: infer Snippets } ? Snippets : null>>) => TagInput<ExposedOf<Module>>
 
 /** Props written next to `bind` when each entry of a list gives its own: any of them may come from the object. */
 type WrittenProps<Props> = { [K in keyof Props]?: Props[K] | undefined }

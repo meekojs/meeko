@@ -112,7 +112,8 @@ function assertCompileError(source: string, code: string, offset: number): void 
 test('generic gives the compiled module generic types and functions', () => {
 	const { code } = compile(dataTable, 'DataTable.meeko')
 	const parameters = 'T extends { id: string }'
-	assert.ok(code.includes(`type __MeekoComponentProps<${parameters}> = __MeekoDeclaredProps<T> & __MeekoEmitProps<T>;`), code)
+	// Since 1.8 what the parent passes includes the prop and the event of its model.
+	assert.ok(code.includes(`type __MeekoComponentProps<${parameters}> = __MeekoDeclaredProps<T> & __MeekoEmitProps<T> & __MeekoModelValues<T> & __meeko.EmitProps<__MeekoModelEmits<T>>;`), code)
 	assert.ok(code.includes('export type { __MeekoComponentProps as ComponentProps };'))
 	assert.ok(code.includes(`type __MeekoEmits<${parameters}> = __meeko.Emits<{ select: [row: T] }>;`))
 	assert.ok(code.includes(`export type ComponentModels<${parameters}> = { "current": __meeko.Signal<__MeekoModels<T>["current"]> };`))
@@ -126,7 +127,9 @@ test('generic gives the compiled module generic types and functions', () => {
 	assert.ok(code.includes('return hydrateScope<T>(__scope, __inputProps, __state);'))
 	assert.ok(code.includes('() => __setup<T>(__inputProps)'))
 	// The tag check that a parent calls: T comes from the props, the rest only uses it.
-	assert.ok(code.includes(`export declare const __meekoTag: <${parameters}>(props: __MeekoTagProps<__MeekoComponentProps<T>> & __meeko.ExtraProps, events: NoInfer<__meeko.EventNames<__MeekoComponentProps<T>>>, models: NoInfer<ComponentModels<T>>, snippets: NoInfer<ComponentSnippets<T>>) => __meeko.TagInput<ComponentExposed<T>>;`))
+	// Since 1.8 a required model also takes a parameter, from its prop: with it the tag needs no signal.
+	const bound = `__MeekoBound0 extends __MeekoModels<T>["current"] | __meeko.ModelUnbound | undefined = __meeko.ModelUnbound`
+	assert.ok(code.includes(`export declare const __meekoTag: <${parameters}, ${bound}>(props: __MeekoTagProps<__MeekoComponentProps<T>> & __meeko.ExtraProps & { readonly current?: __MeekoBound0 }, events: NoInfer<__meeko.EventNames<__MeekoComponentProps<T>>>, models: NoInfer<__meeko.TagModels<ComponentModels<T>, __meeko.BoundModel<__MeekoBound0, __MeekoModels<T>["current"], "current">>>, snippets: NoInfer<ComponentSnippets<T>>) => __meeko.TagInput<ComponentExposed<T>>;`))
 	assert.ok(code.includes(`declare function __meeko_channels<${parameters}>(): { readonly models: ComponentModels<T>; readonly snippets: ComponentSnippets<T> };`))
 	// Inside the setup, the macros use the parameters of __setup.
 	assert.match(code, /const current: __meeko\.Signal<__MeekoModels<T>\["current"\]> = __meeko\.useModel<__MeekoModels<T>\["current"\]>/)

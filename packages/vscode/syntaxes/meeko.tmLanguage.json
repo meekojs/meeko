@@ -274,7 +274,7 @@
 					"match": "(?<![\\w:-])(?:if|each):[\\w-]+",
 					"name": "keyword.control.flow.meeko"
 				},
-				{ "match": "(?<![\\w:-])on:[\\w-]+", "name": "entity.name.function.event.meeko" }
+				{ "match": "(?<![\\w:-])on:[\\w-]+(?::[\\w-]+)?", "name": "entity.name.function.event.meeko" }
 			]
 		},
 		"htmlTag": {

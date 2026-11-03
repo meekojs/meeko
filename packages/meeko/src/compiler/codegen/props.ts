@@ -1,6 +1,7 @@
 import type { GenericParameters } from '../generic'
 
 import { markSource } from '../mapping'
+import { modelMemberTypes } from './channels'
 
 /** The defaults of `defineProps`: the argument, or the defaults of a destructuring. */
 export interface PropsDefaultsCode {
@@ -25,6 +26,7 @@ interface PropsSource {
 	propsTypeOffset: number | undefined
 	defaults?: PropsDefaultsCode
 	emits?: { type: string; offset: number }
+	models: readonly { name: string; optional: boolean }[]
 }
 
 /**
@@ -48,8 +50,21 @@ export function emitComponentProps(scriptParts: PropsSource, generic: GenericPar
 	const defaultKeys = defaults?.keys.map((key) => JSON.stringify(key)).join(' | ') || 'never'
 	const emitsDeclaration = emits ? `type __MeekoEmits${G} = __meeko.Emits<${markSource(emits.type, emits.offset)}>;\ntype __MeekoEmitProps${G} = __meeko.EmitProps<__MeekoEmits${A}>;\n` : ''
 	const emitProps = emits ? ` & __MeekoEmitProps${A}` : ''
-	const setupPropsType = defaults ? `__MeekoResolvedProps${A}${emitProps}` : emits ? `__MeekoComponentProps${A}` : propsType
-	const plainPropsDeclaration = !emits ? `type __MeekoComponentProps${G} = ${propsType};` : scriptParts.propsTypeOffset === undefined ? `type __MeekoComponentProps${G} = __MeekoEmitProps${A};` : `type __MeekoDeclaredProps${G} = ${propsType};\ntype __MeekoComponentProps${G} = __MeekoDeclaredProps${A} & __MeekoEmitProps${A};`
+	const declared = scriptParts.propsTypeOffset !== undefined
+	// `defineModel` adds its prop and its event to what the parent passes: `modelValue` and `onUpdate:modelValue`.
+	const hasModels = scriptParts.models.length > 0
+	const modelTypes = hasModels ? modelMemberTypes(scriptParts.models, (name) => `__MeekoModels${A}[${JSON.stringify(name)}]`) : undefined
+	const modelDeclarations = modelTypes ? `type __MeekoModelValues${G} = ${modelTypes.values};\ntype __MeekoModelEmits${G} = ${modelTypes.emits};\n` : ''
+	const modelMembers = `__MeekoModelValues${A} & __meeko.EmitProps<__MeekoModelEmits${A}>`
+	const modelProps = hasModels ? ` & ${modelMembers}` : ''
+	// A component without `defineProps` declares `Record<string, never>`, which no prop fits.
+	const setupPropsType = defaults ? `__MeekoResolvedProps${A}${emitProps}` : emits || (hasModels && !declared) ? `__MeekoComponentProps${A}` : propsType
+	const plainProps = (): string => {
+		if (!emits && !hasModels) return `type __MeekoComponentProps${G} = ${propsType};`
+		if (!declared) return `type __MeekoComponentProps${G} = ${[...(emits ? [`__MeekoEmitProps${A}`] : []), ...(hasModels ? [modelMembers] : [])].join(' & ')};`
+		return `type __MeekoDeclaredProps${G} = ${propsType};\ntype __MeekoComponentProps${G} = __MeekoDeclaredProps${A}${emitProps}${modelProps};`
+	}
+	const plainPropsDeclaration = plainProps()
 	// A default that is not a literal is optional in every member that declares its prop; in a
 	// union, each member that requires the prop must admit it (`MEEK131`, on the prop's name).
 	// Not for a generic component, whose members are only known for each instantiation.
@@ -70,11 +85,19 @@ export function emitComponentProps(scriptParts: PropsSource, generic: GenericPar
 type __MeekoFittingDefaultKeys${ofParameters} = { [${K} in __MeekoDefaultKeys${A} & keyof ${P}]: ${K} extends ${literalKeys.map((key) => JSON.stringify(key)).join(' | ')} ? Exclude<${P}[${K}], undefined> extends infer __V ? [__MeekoDefaultLiteral<${P}, ${K}>] extends [__V] ? ${K} : never : never : ${K} }[__MeekoDefaultKeys${A} & keyof ${P}];`
 		: `type __MeekoFittingDefaultKeys${ofParameters} = __MeekoDefaultKeys${A} & keyof ${P};`
 	const ofArguments = (props: string): string => (generic ? `<${props}, ${generic.names.join(', ')}>` : `<${props}>`)
+	// `<Name>Props`: with the props of its models, not their events, since `bind` admits no `on*` key.
+	const propsOnly = (): string => {
+		if (!emits && !hasModels) return `__MeekoComponentProps${A}`
+		const own = !declared ? undefined : defaults ? `__MeekoInputPropsOf${ofArguments(`__MeekoDeclaredProps${A}`)}` : `__MeekoDeclaredProps${A}`
+		if (hasModels) return own ? `${own} & __MeekoModelValues${A}` : `__MeekoModelValues${A}`
+		return own ?? 'Record<string, never>'
+	}
 	// Each member of a union of props on its own: a default makes its prop optional for the parent
 	// only in the members whose type admits the default's value, so `kind = "a"` does not let the
 	// parent omit `kind: "b"` of another member (`__MeekoFittingDefaultKeys`).
 	const propsDeclaration =
 		emitsDeclaration +
+		modelDeclarations +
 		(defaults
 			? `type __MeekoDeclaredProps${G} = ${propsType};
 type __MeekoDefaultKeys${G} = Extract<${defaultKeys}, keyof __MeekoDeclaredProps${A}>;
@@ -84,7 +107,7 @@ type __MeekoResolvedPropsOf${ofParameters} = ${P} extends unknown ? Omit<${P}, _
 type __MeekoResolvedProps${G} = __MeekoResolvedPropsOf${ofArguments(`__MeekoDeclaredProps${A}`)};
 ${fittingDeclaration}
 ${fitDeclarations}type __MeekoInputPropsOf${ofParameters} = ${P} extends unknown ? Omit<${P}, __MeekoFittingDefaultKeys${ofArguments(P)}> & { [${K} in keyof Pick<${P}, __MeekoFittingDefaultKeys${ofArguments(P)}>]?: ${P}[${K}] | undefined } : never;
-type __MeekoComponentProps${G} = __MeekoInputPropsOf${ofArguments(`__MeekoDeclaredProps${A}`)}${emitProps};
+type __MeekoComponentProps${G} = __MeekoInputPropsOf${ofArguments(`__MeekoDeclaredProps${A}`)}${emitProps}${modelProps};
 function __meeko_defaultProps${G}() {
 ${defaults.constants?.map((constant) => `${constant}\n`).join('') ?? ''}  return ${fitChecks.map(() => '(').join('')}(${defaults.marked ? defaults.expression : markSource(defaults.expression, defaults.offset)} satisfies Partial<__MeekoDeclaredProps${A}> & __MeekoDefaultValues${A} & Record<Exclude<${defaultKeys}, keyof __MeekoDeclaredProps${A}>, never>)${fitChecks.join('')};
 }
@@ -96,8 +119,8 @@ function __meeko_resolveProps${G}(input: __MeekoComponentProps${A}): ${setupProp
 		// What `<Name>Props` names: the same props without the callbacks of `defineEmits`, for a wrapper,
 		// which can extend them, send the rest through `bind`, which admits no `on*` key, and declare
 		// those events itself with `<Name>Emits`, the map of `defineEmits` that `ComponentEmits` exports.
-		`type __MeekoPropsOnly${G} = ${!emits ? `__MeekoComponentProps${A}` : scriptParts.propsTypeOffset === undefined ? 'Record<string, never>' : defaults ? `__MeekoInputPropsOf${ofArguments(`__MeekoDeclaredProps${A}`)}` : `__MeekoDeclaredProps${A}`};\nexport type { __MeekoPropsOnly };\n` +
+		`type __MeekoPropsOnly${G} = ${propsOnly()};\nexport type { __MeekoPropsOnly };\n` +
 		(emits ? '' : `type __MeekoEmits${G} = {};\n`) +
-		'export type { __MeekoEmits as ComponentEmits };'
+		(hasModels ? `type __MeekoPublicEmits${G} = __MeekoEmits${A} & Partial<__MeekoModelEmits${A}>;\nexport type { __MeekoPublicEmits as ComponentEmits };` : 'export type { __MeekoEmits as ComponentEmits };')
 	return { setupPropsType, propsDeclaration }
 }

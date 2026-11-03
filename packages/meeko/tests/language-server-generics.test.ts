@@ -95,7 +95,7 @@ describe('language server: generic components', () => {
 		assert.deepEqual(virtualErrors(child), [])
 		assert.match(child.component.code, /type __MeekoComponentProps<T extends \{ id: string \}> = /)
 		assert.match(child.component.code, /export type \{ __MeekoComponentProps as ComponentProps \};/)
-		assert.match(child.component.code, /export declare const __meekoTag: <T extends \{ id: string \}>\(props: __MeekoTagProps<__MeekoComponentProps<T>> & __MeekoExtraProps/)
+		assert.match(child.component.code, /export declare const __meekoTag: <T extends \{ id: string \}, __MeekoBound0 extends [^=]+ = __MeekoModelUnbound>\(props: __MeekoTagProps<__MeekoComponentProps<T>> & __MeekoExtraProps/)
 		assert.match(hoverText(child, child.at('row.id', 1)), /const row: T/)
 		// The parameter in the attribute is the alias the script uses.
 		assert.match(hoverText(child, child.at('T extends')), /type T = \{\s+id: string;\s+\}/)

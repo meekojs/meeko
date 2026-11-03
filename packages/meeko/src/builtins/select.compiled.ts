@@ -8,16 +8,19 @@ import * as __meeko_MeekoPopover from "./popover.compiled.js";
 
 type __MeekoEmits<T, Multiple extends boolean = false> = __meeko.Emits<{ change: [value: SelectModel<T, Multiple>] }>;
 type __MeekoEmitProps<T, Multiple extends boolean = false> = __meeko.EmitProps<__MeekoEmits<T, Multiple>>;
+type __MeekoModelValues<T, Multiple extends boolean = false> = { modelValue?: __MeekoModels<T, Multiple>["default"] | undefined };
+type __MeekoModelEmits<T, Multiple extends boolean = false> = { "update:modelValue": [next: __MeekoModels<T, Multiple>["default"]] };
 type __MeekoDeclaredProps<T, Multiple extends boolean = false> = MeekoSelectProps<T, Multiple>;
-type __MeekoComponentProps<T, Multiple extends boolean = false> = __MeekoDeclaredProps<T, Multiple> & __MeekoEmitProps<T, Multiple>;
+type __MeekoComponentProps<T, Multiple extends boolean = false> = __MeekoDeclaredProps<T, Multiple> & __MeekoEmitProps<T, Multiple> & __MeekoModelValues<T, Multiple> & __meeko.EmitProps<__MeekoModelEmits<T, Multiple>>;
 export type { __MeekoComponentProps as ComponentProps };
-type __MeekoPropsOnly<T, Multiple extends boolean = false> = __MeekoDeclaredProps<T, Multiple>;
+type __MeekoPropsOnly<T, Multiple extends boolean = false> = __MeekoDeclaredProps<T, Multiple> & __MeekoModelValues<T, Multiple>;
 export type { __MeekoPropsOnly };
-export type { __MeekoEmits as ComponentEmits };
+type __MeekoPublicEmits<T, Multiple extends boolean = false> = __MeekoEmits<T, Multiple> & Partial<__MeekoModelEmits<T, Multiple>>;
+export type { __MeekoPublicEmits as ComponentEmits };
 function __setup<T, Multiple extends boolean = false>(__props: __MeekoComponentProps<T, Multiple>, __meeko_refs: __meeko.ElementRefs) {
 type __MeekoRefs = { "root": __meeko.ElementOf<"div", false> };
 const __meeko_borrowed = new Set<unknown>();
-const props = __meeko.withoutEventProps(__props, ["onChange"]) as Readonly<MeekoSelectProps<T, Multiple>>;
+const props = __meeko.withoutEventProps(__props, ["onChange","modelValue","onUpdate:modelValue"]) as Readonly<MeekoSelectProps<T, Multiple>>;
 const emit: __meeko.Emit<__MeekoEmits<T, Multiple>> = __meeko.createEmit<__MeekoEmits<T, Multiple>, __meeko.NoEmitConflict<__MeekoDeclaredProps<T, Multiple>, __MeekoEmits<T, Multiple>>>(__props);
 const model: __meeko.Signal<__MeekoModels<T, Multiple>["default"]> = __meeko.useModel<__MeekoModels<T, Multiple>["default"]>(__props, "default", __meeko_borrowed, { default: null as unknown as SelectModel<T, Multiple> });
 const snippets: __meeko.SnippetMap<__MeekoSnippets<T, Multiple>> = __meeko.useSnippets<__MeekoSnippets<T, Multiple>>(__props);
@@ -35,7 +38,7 @@ declare function __meeko_channels<T, Multiple extends boolean = false>(): { read
 export declare const __meekoChannels: ReturnType<typeof __meeko_channels>;
 export declare const __meekoGeneric: true;
 type __MeekoTagProps<P> = P extends unknown ? { [K in keyof P]: {} extends Record<K, unknown> ? P[K] : {} extends Pick<P, K> ? P[K] | undefined : P[K] } : never;
-export declare const __meekoTag: <T, Multiple extends boolean = false>(props: __MeekoTagProps<__MeekoComponentProps<T, Multiple>> & __meeko.ExtraProps, events: NoInfer<__meeko.EventNames<__MeekoComponentProps<T, Multiple>>>, models: NoInfer<ComponentModels<T, Multiple>>, snippets: NoInfer<ComponentSnippets<T, Multiple>>) => __meeko.TagInput<ComponentExposed<T, Multiple>>;
+export declare const __meekoTag: <T, Multiple extends boolean = false>(props: __MeekoTagProps<__MeekoComponentProps<T, Multiple>> & __meeko.ExtraProps, events: NoInfer<__meeko.EventNames<__MeekoComponentProps<T, Multiple>>>, models: NoInfer<__meeko.TagModels<ComponentModels<T, Multiple>, never>>, snippets: NoInfer<ComponentSnippets<T, Multiple>>) => __meeko.TagInput<ComponentExposed<T, Multiple>>;
 export const css = "";
 export const hasDataAwait: boolean = false;
 export const __meekoChildren: (() => readonly unknown[]) | null = () => [__meeko_MeekoPopover];

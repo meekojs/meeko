@@ -23,6 +23,7 @@ import { discoverAutoImportsSync } from '../autoimports/registry'
 import { applyAutoImports, autoImportedValues } from '../autoimports/transform'
 import { awaitForReferences, shadowedBuiltinTags } from '../compiler'
 import { aliasCandidates, aliasTsconfigPaths } from '../compiler/aliases'
+import { modelMemberTypes, modelTagTypes } from '../compiler/codegen/channels'
 import { defaultLiteralType } from '../compiler/codegen/props'
 import { pageRouteId, serverScriptTypes } from '../compiler/codegen/server-script'
 import { freeIdentifiers } from '../compiler/composables'
@@ -198,9 +199,11 @@ const channelDeclarations = [
 	'type __MeekoNativeModels = { text: string; range: number | string; checkbox: boolean | undefined; radio: string | null | undefined; select: string; multiple: string[] };',
 	'type __MeekoChannelsOf<M> = M extends { readonly __meekoChannels: infer C } ? C : { readonly models: null; readonly snippets: null };',
 	'type __MeekoLoose = { readonly [name: string]: unknown };',
-	'type __MeekoTagModels<Models> = [Models] extends [null] ? { readonly [name: string]: "this component declares no defineModel" } : Models;',
+	'interface __MeekoModelUnbound { readonly __meekoModelUnbound: true }',
+	'type __MeekoBoundModel<Bound, Value, Name extends string> = 0 extends 1 & Bound ? Name : [Bound] extends [__MeekoModelUnbound] ? never : [Bound] extends [Value] ? Name : never;',
+	'type __MeekoTagModels<Models, Bound extends PropertyKey = never> = [Models] extends [null] ? { readonly [name: string]: "this component declares no defineModel" } : [Bound] extends [never] ? Models : Omit<Models, Bound> & Partial<Pick<Models, Bound & keyof Models>>;',
 	'type __MeekoTagSnippets<S> = [S] extends [null] ? { readonly [name: string]: "this component declares no defineSnippets, so it accepts no children or <snippet>" } : S;',
-	'type __MeekoModelInputs<M> = 0 extends 1 & M ? __MeekoLoose : [M] extends [never] ? __MeekoLoose : __MeekoChannelsOf<M> extends { readonly models: infer Models } ? __MeekoTagModels<Models> : never;',
+	'type __MeekoModelInputs<M, Bound extends PropertyKey = never> = 0 extends 1 & M ? __MeekoLoose : [M] extends [never] ? __MeekoLoose : __MeekoChannelsOf<M> extends { readonly models: infer Models } ? __MeekoTagModels<Models, Bound> : never;',
 	'type __MeekoSnippetInputs<M> = 0 extends 1 & M ? __MeekoLoose : [M] extends [never] ? __MeekoLoose : __MeekoChannelsOf<M> extends { readonly snippets: infer S } ? __MeekoTagSnippets<S> : never;',
 	// Like `ExtraProps` and `EventNames` of the package: props are exact, except names that start
 	// with `on`, which the event names check, so an unknown `on:` is a single error.
@@ -211,7 +214,9 @@ const channelDeclarations = [
 	'type __MeekoEventNames<P> = { readonly [K in (P extends unknown ? keyof P : never)]?: unknown };',
 	'type __MeekoIsUnion<T, W = T> = T extends unknown ? ([W] extends [T] ? false : true) : never;',
 	'type __MeekoPropsOf<M> = [M] extends [{ readonly renderToString: (props: infer P, ...rest: never[]) => unknown }] ? P : __MeekoLoose;',
-	'type __MeekoModuleTag<M> = (props: __MeekoTagProps<__MeekoPropsOf<M>> & __MeekoExtraProps, events: NoInfer<__MeekoEventNames<__MeekoPropsOf<M>>>, models: NoInfer<__MeekoModelInputs<M>>, snippets: NoInfer<__MeekoSnippetInputs<M>>) => { readonly typeArguments: {}; readonly props: __MeekoPropsOf<M>; readonly events: {}; readonly models: __MeekoChannelsOf<M> extends { readonly models: infer X } ? X : null; readonly snippets: __MeekoChannelsOf<M> extends { readonly snippets: infer X } ? X : null; readonly exposed: __MeekoExposedOf<M> };',
+	'type __MeekoDefaultModelValue<M> = __MeekoChannelsOf<M> extends { readonly models: { readonly default?: { value: infer V } } } ? V : never;',
+	'type __MeekoDefaultModelProp<M, B> = [__MeekoDefaultModelValue<M>] extends [never] ? unknown : { readonly modelValue?: B };',
+	'type __MeekoModuleTag<M> = <B = __MeekoModelUnbound>(props: __MeekoTagProps<__MeekoPropsOf<M>> & __MeekoExtraProps & __MeekoDefaultModelProp<M, B>, events: NoInfer<__MeekoEventNames<__MeekoPropsOf<M>>>, models: NoInfer<__MeekoModelInputs<M, __MeekoBoundModel<B, __MeekoDefaultModelValue<M>, "default">>>, snippets: NoInfer<__MeekoSnippetInputs<M>>) => { readonly typeArguments: {}; readonly props: __MeekoPropsOf<M>; readonly events: {}; readonly models: __MeekoChannelsOf<M> extends { readonly models: infer X } ? X : null; readonly snippets: __MeekoChannelsOf<M> extends { readonly snippets: infer X } ? X : null; readonly exposed: __MeekoExposedOf<M> };',
 	'type __MeekoLooseTag = (props: { readonly [name: string]: __MeekoAnyProp }, events: any, models: any, snippets: any) => { readonly typeArguments: {}; readonly exposed: any };',
 	// A child module declares its own tag, generic for a generic component; other values get one from their shape.
 	'type __MeekoTagOf<M> = 0 extends 1 & M ? __MeekoLooseTag : [M] extends [never] ? __MeekoLooseTag : true extends __MeekoIsUnion<M> ? __MeekoModuleTag<M> : M extends { readonly __meekoTag: infer F } ? F : __MeekoModuleTag<M>;',
@@ -343,6 +348,9 @@ export const htmlDirectiveDocs = [
 
 /** Type check of `html="..."`, declared only where the template has one. */
 /** Attributes of a component tag that are no static prop: `is`, `ref` and `html` (MEEK032), the model `model` and `bind="obj"`. */
+/** The callback prop of a model: `onUpdate:modelValue`. */
+const modelEventProp = /^onUpdate:[a-zA-Z_$][\w$]*$/
+
 const reservedTagAttributes = new Set(['is', 'ref', 'html', 'model', 'bind'])
 
 /** Helpers of `<component is>` with an HTML tag and of `bind="obj"`, declared where the template has them. */
@@ -536,10 +544,23 @@ export function createVirtualComponent(source: string, filename: string, options
 				continue
 			}
 			const name = rawName.startsWith('bind:') ? rawName.slice(5) : rawName.startsWith('on:') && rawName.length > 3 ? `on${rawName.charAt(3).toUpperCase()}${rawName.slice(4)}` : undefined
-			if (name === undefined || !validIdentifier(name)) continue
-			entries.push(`${name}: ${attribute.value.trim() ? `(${attribute.value})` : 'undefined'}`)
+			if (name === undefined || (!validIdentifier(name) && !modelEventProp.test(name))) continue
+			entries.push(`${validIdentifier(name) ? name : JSON.stringify(name)}: ${attribute.value.trim() ? `(${attribute.value})` : 'undefined'}`)
 		}
 		return `{ ${entries.join(', ')} }`
+	}
+
+	/**
+	 * The key that `on:event` sets on a tag: `onEvent`, with the event name on its own span. A key with
+	 * a `:`, `onUpdate:modelValue`, is written as a string.
+	 */
+	const eventKey = (rawName: string, start: number): void => {
+		const event = rawName.slice(3)
+		const quote = event.includes(':') ? '"' : ''
+		code += quote
+		mapped('on', start)
+		mapped(`${event.charAt(0).toUpperCase()}${event.slice(1)}`, start + 3)
+		code += quote
 	}
 
 	/** Raw name of an attribute as written: `bind:params`, `on:click`. */
@@ -818,9 +839,7 @@ export function createVirtualComponent(source: string, filename: string, options
 				else if (rawName === 'for' && meekoTag?.name === 'MeekoAwait') mapped(rawName, attribute.start)
 				else if (rawName.startsWith('on:') && rawName.length > 3) {
 					// `on:save` sets the callback prop `onSave`; the event name keeps its own span.
-					const event = rawName.slice(3)
-					mapped('on', attribute.start)
-					mapped(`${event.charAt(0).toUpperCase()}${event.slice(1)}`, attribute.start + 3)
+					eventKey(rawName, attribute.start)
 					componentEvents.push({ start: attribute.start + 3, end: attribute.start + rawName.length })
 				} else if (staticProp(rawName)) {
 					// `variant="primary"` is a string literal prop; a bare `disabled` passes `true`.
@@ -846,11 +865,8 @@ export function createVirtualComponent(source: string, filename: string, options
 			code += '}, { '
 			for (const attribute of attrs) {
 				const rawName = /^[^\s=]+/.exec(source.slice(attribute.start, attribute.end))?.[0] ?? attribute.name
-				if (rawName.startsWith('on:') && rawName.length > 3) {
-					const event = rawName.slice(3)
-					mapped('on', attribute.start)
-					mapped(`${event.charAt(0).toUpperCase()}${event.slice(1)}`, attribute.start + 3)
-				} else if (rawName.startsWith('bind:on') && validIdentifier(rawName.slice(5))) mapped(rawName.slice(5), attribute.start + 5)
+				if (rawName.startsWith('on:') && rawName.length > 3) eventKey(rawName, attribute.start)
+				else if (rawName.startsWith('bind:on') && validIdentifier(rawName.slice(5))) mapped(rawName.slice(5), attribute.start + 5)
 				else if (rawName.startsWith('on') && staticProp(rawName)) mapped(rawName, attribute.start)
 				else continue
 				code += ': true, '
@@ -1138,7 +1154,12 @@ export function createVirtualComponent(source: string, filename: string, options
 	code += `${useElementRefEditorDeclaration}\n`
 	// The module shape of the compiled component, so another component that imports this one
 	// in the shared editor project sees its props, including the `onEvent` callbacks.
-	const declaredProps = propsTypeText ?? 'Record<string, never>'
+	// Like the compiled component: `defineModel` adds its prop and its event to what the parent passes.
+	const modelList = [...models].map(([name, model]) => ({ name, optional: model.optional }))
+	const modelType = (name: string): string => models.get(name)!.type
+	const modelTypes = modelList.length ? modelMemberTypes(modelList, modelType) : undefined
+	const tagTypes = modelTagTypes(modelList, modelType, { unbound: '__MeekoModelUnbound', bound: '__MeekoBoundModel' })
+	const declaredProps = propsTypeText ?? (modelTypes ? '{}' : 'Record<string, never>')
 	// A generic component declares its parameters on each type (G) and passes them on (A).
 	const G = generic ? `<${generic.declaration}>` : ''
 	const A = generic ? `<${generic.names.join(', ')}>` : ''
@@ -1157,11 +1178,12 @@ export function createVirtualComponent(source: string, filename: string, options
 	code += `export type ComponentDefaults = ${componentDefaultsType(defaultTexts)};\n`
 	code += `type __MeekoDeclaredProps${G} = ${declaredProps};\n`
 	// Named so the editor can list the events of this component on a parent's tag.
-	if (emitsTypeText) code += `type __MeekoEmits${G} = ${emitsTypeText};\n`
-	code += 'type __MeekoEmitPropsOf<T> = { [K in keyof T & string as `on${Capitalize<K>}`]?: ((...args: T[K] extends readonly unknown[] ? T[K] : never) => void) | undefined };\n'
-	code += `type __MeekoComponentProps${G} = (${inputProps})${emitsTypeText ? ` & __MeekoEmitPropsOf<__MeekoEmits${A}>` : ''};\nexport type { __MeekoComponentProps as ComponentProps };\n`
-	code += `type __MeekoPropsOnly${G} = (${inputProps});\nexport type { __MeekoPropsOnly };\n`
-	code += `${emitsTypeText ? '' : `type __MeekoEmits${G} = {};\n`}export type { __MeekoEmits as ComponentEmits };\n`
+	if (emitsTypeText || modelTypes) code += `type __MeekoEmits${G} = ${[...(emitsTypeText ? [`(${emitsTypeText})`] : []), ...(modelTypes ? [`Partial<${modelTypes.emits}>`] : [])].join(' & ')};\n`
+	code += 'type __MeekoEmitPropsOf<T> = { [K in keyof T & string as `on${Capitalize<K>}`]?: ((...args: Exclude<T[K], undefined> extends readonly unknown[] ? Exclude<T[K], undefined> : never) => void) | undefined };\n'
+	const modelValues = modelTypes ? ` & ${modelTypes.values}` : ''
+	code += `type __MeekoComponentProps${G} = (${inputProps})${modelValues}${emitsTypeText || modelTypes ? ` & __MeekoEmitPropsOf<__MeekoEmits${A}>` : ''};\nexport type { __MeekoComponentProps as ComponentProps };\n`
+	code += `type __MeekoPropsOnly${G} = (${inputProps})${modelValues};\nexport type { __MeekoPropsOnly };\n`
+	code += `${emitsTypeText || modelTypes ? '' : `type __MeekoEmits${G} = {};\n`}export type { __MeekoEmits as ComponentEmits };\n`
 	// Structural, without importing the package: it satisfies `Component<ComponentProps>`.
 	code += `export declare function renderToString${G}(props: __MeekoComponentProps${A}, state?: Record<string, unknown>): string;\n`
 	code += `export declare function renderWithState${G}(props: __MeekoComponentProps${A}): { html: string; state: Record<string, unknown> };\n`
@@ -1184,7 +1206,8 @@ export function createVirtualComponent(source: string, filename: string, options
 	// The check of a parent's tag, like the compiled component's: the parameters come from the props
 	// alone. Its result lets the editor show the child with them resolved.
 	const typeArguments = generic ? generic.names.map((name) => `${name}: ${name}`).join('; ') : ''
-	code += `export declare const __meekoTag: ${G}(props: __MeekoTagProps<__MeekoComponentProps${A}> & __MeekoExtraProps, events: NoInfer<__MeekoEventNames<__MeekoComponentProps${A}>>, models: NoInfer<__MeekoTagModels<ComponentModels${A}>>, snippets: NoInfer<__MeekoTagSnippets<ComponentSnippets${A}>>) => { readonly typeArguments: { ${typeArguments} }; readonly props: __MeekoComponentProps${A}; readonly events: ${emitsTypeText ? `__MeekoEmits${A}` : '{}'}; readonly models: ComponentModels${A}; readonly snippets: ComponentSnippets${A}; readonly exposed: ComponentExposed${A}; readonly defaults: ComponentDefaults };\n`
+	const tagParameters = [...(generic ? [generic.declaration] : []), ...tagTypes.parameters]
+	code += `export declare const __meekoTag: ${tagParameters.length ? `<${tagParameters.join(', ')}>` : ''}(props: __MeekoTagProps<__MeekoComponentProps${A}> & __MeekoExtraProps${tagTypes.props}, events: NoInfer<__MeekoEventNames<__MeekoComponentProps${A}>>, models: NoInfer<__MeekoTagModels<ComponentModels${A}, ${tagTypes.bound}>>, snippets: NoInfer<__MeekoTagSnippets<ComponentSnippets${A}>>) => { readonly typeArguments: { ${typeArguments} }; readonly props: __MeekoComponentProps${A}; readonly events: ${emitsTypeText || modelTypes ? `__MeekoEmits${A}` : '{}'}; readonly models: ComponentModels${A}; readonly snippets: ComponentSnippets${A}; readonly exposed: ComponentExposed${A}; readonly defaults: ComponentDefaults };\n`
 	code += `export declare function hydrateScope${G}(scope: object, props: __MeekoComponentProps${A}, state?: Record<string, unknown>): { (): void; readonly exposed?: ComponentExposed${A} };\n`
 	code += `export declare function hydrate${G}(root: object, props: __MeekoComponentProps${A}, state?: Record<string, unknown>): () => void;\n`
 	code += 'export declare const css: string;\n'

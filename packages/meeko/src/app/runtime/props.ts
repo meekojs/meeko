@@ -235,12 +235,14 @@ export function resolveProps(input: object, defaults: object): object {
 /** State of a view of {@link withoutEventProps}, kept in its proxy target. */
 interface EventsState {
 	readonly props: object
-	/** Callback props of the events that the component declares, such as `onClick`; `null` when the compiler cannot list them. */
-	readonly hidden: ReadonlySet<string> | null
+	/** Props that the enumeration leaves out: the callbacks of the declared events, such as `onClick`, and the props of the models. */
+	readonly hidden: ReadonlySet<string>
+	/** The compiler cannot list the events: any `onX` key may be one. */
+	readonly anyEvent: boolean
 }
 
 function hiddenKey(state: EventsState, key: string | symbol): boolean {
-	return typeof key === 'string' && (state.hidden ? state.hidden.has(key) : /^on[A-Z]/.test(key))
+	return typeof key === 'string' && (state.hidden.has(key) || (state.anyEvent && /^on[A-Z]/.test(key)))
 }
 
 const eventsTraps: ProxyHandler<EventsState> = {
@@ -263,11 +265,12 @@ const eventsTraps: ProxyHandler<EventsState> = {
  * `const { a, ...rest } = props`, so that the object matches the type of `defineProps`, which does
  * not declare them, and `bind="rest"` does not receive them. `emit` reads them from the original
  * props. `null` is a map of events that the script does not spell, such as `defineEmits<ButtonEmits>()`:
- * any `onX` key may be one, so all of them leave the enumeration. Internal to compiled components.
+ * any `onX` key may be one, so all of them leave the enumeration. `models` are the props of the
+ * component's `defineModel`, which are not its props either. Internal to compiled components.
  */
-export function withoutEventProps(props: object, names: readonly string[] | null): object {
-	if (names?.length === 0) return props
-	const view = new Proxy<EventsState>({ props, hidden: names && new Set(names) }, eventsTraps)
+export function withoutEventProps(props: object, names: readonly string[] | null, models: readonly string[] = []): object {
+	if (names?.length === 0 && models.length === 0) return props
+	const view = new Proxy<EventsState>({ props, hidden: new Set([...(names ?? []), ...models]), anyEvent: names === null }, eventsTraps)
 	if (isReactiveProps(props)) reactiveViews.add(view)
 	return view
 }
@@ -294,7 +297,7 @@ const restTraps: ProxyHandler<EventsState> = {
  * `props` (see {@link withoutEventProps}). Internal to compiled components.
  */
 export function restProps(props: object, names: readonly string[]): object {
-	const view = new Proxy<EventsState>({ props, hidden: new Set(names) }, restTraps)
+	const view = new Proxy<EventsState>({ props, hidden: new Set(names), anyEvent: false }, restTraps)
 	if (isReactiveProps(props)) reactiveViews.add(view)
 	return view
 }

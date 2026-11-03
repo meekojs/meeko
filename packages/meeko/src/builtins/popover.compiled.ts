@@ -7,16 +7,19 @@ import { createPopover } from '../app/components/MeekoPopover/popover'
 
 type __MeekoEmits = __meeko.Emits<{ toggle: [event: PopoverToggleEvent] }>;
 type __MeekoEmitProps = __meeko.EmitProps<__MeekoEmits>;
+type __MeekoModelValues = { modelValue?: __MeekoModels["default"] | undefined };
+type __MeekoModelEmits = { "update:modelValue": [next: __MeekoModels["default"]] };
 type __MeekoDeclaredProps = MeekoPopoverProps;
-type __MeekoComponentProps = __MeekoDeclaredProps & __MeekoEmitProps;
+type __MeekoComponentProps = __MeekoDeclaredProps & __MeekoEmitProps & __MeekoModelValues & __meeko.EmitProps<__MeekoModelEmits>;
 export type { __MeekoComponentProps as ComponentProps };
-type __MeekoPropsOnly = __MeekoDeclaredProps;
+type __MeekoPropsOnly = __MeekoDeclaredProps & __MeekoModelValues;
 export type { __MeekoPropsOnly };
-export type { __MeekoEmits as ComponentEmits };
+type __MeekoPublicEmits = __MeekoEmits & Partial<__MeekoModelEmits>;
+export type { __MeekoPublicEmits as ComponentEmits };
 function __setup(__props: __MeekoComponentProps, __meeko_refs: __meeko.ElementRefs) {
 type __MeekoRefs = { "content": __meeko.ElementOf<"div", false> };
 const __meeko_borrowed = new Set<unknown>();
-const props = __meeko.withoutEventProps(__props, ["onToggle"]) as Readonly<MeekoPopoverProps>;
+const props = __meeko.withoutEventProps(__props, ["onToggle","modelValue","onUpdate:modelValue"]) as Readonly<MeekoPopoverProps>;
 const emit: __meeko.Emit<__MeekoEmits> = __meeko.createEmit<__MeekoEmits, __meeko.NoEmitConflict<__MeekoDeclaredProps, __MeekoEmits>>(__props);
 const open: __meeko.Signal<__MeekoModels["default"]> = __meeko.useModel<__MeekoModels["default"]>(__props, "default", __meeko_borrowed, { default: false });
 const snippets: __meeko.SnippetMap<__MeekoSnippets> = __meeko.useSnippets<__MeekoSnippets>(__props);
@@ -33,7 +36,7 @@ type __MeekoSnippets = __meeko.SnippetTypes<PopoverSnippets>;
 export type ComponentSnippets = __meeko.SnippetMap<__MeekoSnippets>;
 export declare const __meekoChannels: { readonly models: ComponentModels; readonly snippets: ComponentSnippets };
 type __MeekoTagProps<P> = P extends unknown ? { [K in keyof P]: {} extends Record<K, unknown> ? P[K] : {} extends Pick<P, K> ? P[K] | undefined : P[K] } : never;
-export declare const __meekoTag: (props: __MeekoTagProps<__MeekoComponentProps> & __meeko.ExtraProps, events: NoInfer<__meeko.EventNames<__MeekoComponentProps>>, models: NoInfer<ComponentModels>, snippets: NoInfer<ComponentSnippets>) => __meeko.TagInput<ComponentExposed>;
+export declare const __meekoTag: (props: __MeekoTagProps<__MeekoComponentProps> & __meeko.ExtraProps, events: NoInfer<__meeko.EventNames<__MeekoComponentProps>>, models: NoInfer<__meeko.TagModels<ComponentModels, never>>, snippets: NoInfer<ComponentSnippets>) => __meeko.TagInput<ComponentExposed>;
 export const css = "";
 export const hasDataAwait: boolean = false;
 export const __meekoChildren: (() => readonly unknown[]) | null = () => [];
