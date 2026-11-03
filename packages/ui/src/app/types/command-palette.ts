@@ -1,7 +1,7 @@
 /**
  * En qué punto está la búsqueda de `<UICommandPalette>`. El componente no busca: quien lo usa cambia
  * `status` y `results` según su fuente, ya sea un índice local, Pagefind o un servidor.
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```ts
  * const status = signal<CommandPaletteStatus>('idle')
@@ -11,7 +11,7 @@ export type CommandPaletteStatus = 'idle' | 'loading' | 'ready' | 'empty' | 'una
 
 /**
  * Estado de una fila, el segundo parámetro del snippet `item`.
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```html
  * <snippet name="item" params="item, state"><strong if:when="state.depth === 0">{item.title}</strong></snippet>
@@ -28,7 +28,7 @@ export interface CommandPaletteItemState {
 
 /**
  * Snippets de `<UICommandPalette>`.
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```html
  * <UICommandPalette bind:results="found.value">
@@ -53,7 +53,7 @@ type CommandPaletteKey<T> = T extends object ? keyof T & string : never
  * Props de `<UICommandPalette>`, un diálogo de búsqueda con teclado. No sabe de dónde salen los
  * resultados: el padre lee el modelo `query`, busca donde quiera y le pasa `results` y `status`.
  * El modelo por defecto es la apertura; `query` y `active` son modelos con nombre.
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```html
  * <UICommandPalette

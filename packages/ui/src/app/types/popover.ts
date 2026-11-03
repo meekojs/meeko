@@ -4,7 +4,7 @@ export type PopoverSide = 'top' | 'bottom' | 'left' | 'right'
 /**
  * Posición del contenido respecto al disparador: un lado y, opcionalmente, la alineación con su
  * borde inicial (`-start`) o final (`-end`). `"bottom-start"` abre debajo, alineado a la izquierda.
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```html
  * <UIPopover placement="right-start"><snippet name="trigger">Más</snippet>…</UIPopover>
@@ -16,7 +16,7 @@ export type PopoverPlacement = PopoverSide | `${PopoverSide}-start` | `${Popover
  * Comportamiento del contenido, el valor de su atributo `popover`: `"auto"` se cierra al pulsar
  * fuera y con `Esc`; `"manual"` sólo se cierra desde el disparador, `Esc` o el modelo; `"hint"` es
  * un tooltip que se abre al pasar el puntero o al enfocar el disparador, sin robar el foco.
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```html
  * <UIPopover mode="hint"><snippet name="trigger">?</snippet>Ayuda contextual</UIPopover>
@@ -27,7 +27,7 @@ export type PopoverMode = 'auto' | 'manual' | 'hint'
 /**
  * Patrón ARIA del contenido: `"menu"` (con `menuitem`, flechas y búsqueda por letras),
  * `"dialog"` (el foco entra en el contenido) o `"tooltip"` (por defecto con `mode="hint"`).
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```html
  * <UIPopover role="dialog" label="Filtros"><snippet name="trigger">Filtrar</snippet>…</UIPopover>
@@ -41,7 +41,7 @@ export type PopoverRole = 'menu' | 'dialog' | 'tooltip'
  * elemento o en un componente propio como `<AppButton bind="trigger">` que declare esas props y las
  * ponga en su botón. `<UIPopover>` encuentra el elemento por su `id` al montarse y le añade el
  * teclado y el anclaje.
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```html
  * <UIPopover role="menu">
@@ -70,7 +70,7 @@ export interface PopoverTrigger {
 /**
  * Detalle del evento `toggle` de `<UIPopover>`, que se emite cada vez que el contenido se abre
  * o se cierra, por el usuario o por el modelo.
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```html
  * <UIPopover on:toggle="(event) => opened.value = event.open">…</UIPopover>
@@ -85,7 +85,7 @@ export interface PopoverToggleEvent {
  * Snippets de `<UIPopover>`: el contenido suelto (`default`) va dentro del elemento con
  * `popover`; `trigger` es el contenido del `<button>` disparador que pinta Meeko, y `anchor`
  * sustituye ese botón por un disparador propio, con sus atributos en el parámetro.
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```html
  * <UIPopover><snippet name="trigger">Opciones ▾</snippet><p>Contenido</p></UIPopover>
@@ -105,7 +105,7 @@ export interface PopoverSnippets {
  * anclado a su disparador con *CSS anchor positioning*; un navegador que no lo tenga lo abre sin
  * anclar. El modelo por defecto (`model="open"`) es la señal de apertura. Se
  * autoimporta en `app/` como el resto de tipos de las etiquetas.
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```html
  * <UIPopover placement="bottom-start" bind:offset="8" model="open" role="menu">
@@ -142,7 +142,7 @@ export interface UIPopoverProps {
 
 /**
  * Lo que `<UIPopover>` expone a una `ref:` del padre: abrir, cerrar y alternar desde código.
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```ts
  * const menu = useElementRef("menu");

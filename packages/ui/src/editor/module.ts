@@ -31,7 +31,7 @@ const browserDependencies = [
  * principal, Crepe sería un chunk del build de cualquier web, y fallaría sin sus dependencias
  * opcionales.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```ts
  * import { defineMeekoConfig } from '@meekojs/meeko/framework'

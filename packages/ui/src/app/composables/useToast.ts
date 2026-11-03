@@ -8,7 +8,7 @@ const toastKey = createContext<UIToastContext>('@meekojs/ui/toast')
 
 /**
  * Notificaciones de la aplicación con un host UIApp. El estado se aísla por petición SSR.
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```ts
  * import { useToast } from '@meekojs/ui/runtime'

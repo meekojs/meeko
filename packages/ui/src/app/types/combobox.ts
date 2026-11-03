@@ -3,7 +3,7 @@ import type { SelectBaseProps, SelectField } from './select'
 /**
  * Valor del modelo de `<UICombobox>`: la opción elegida o `null` y, con `multiple`, un array de
  * opciones. Se infiere del tipo de `options` y de `multiple`.
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```ts
  * const color = signal<ComboboxModel<string, false>>(null); // string | null
@@ -14,7 +14,7 @@ export type ComboboxModel<T, Multiple extends boolean = false> = Multiple extend
 
 /**
  * Estado de una opción de `<UICombobox>`, el segundo parámetro del snippet `option`.
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```html
  * <snippet name="option" params="user, state">{user.name} <span if:when="state.selected">✓</span></snippet>
@@ -31,7 +31,7 @@ export interface ComboboxOptionState {
 
 /**
  * Lo que recibe una función `filter` de `<UICombobox>` además del texto buscado.
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```ts
  * const search: ComboboxFilter<User> = (query, { signal }) => api.users.get({ query: { q: query }, signal });
@@ -49,7 +49,7 @@ export interface ComboboxFilterContext<T> {
  * vacía se muestran `options`) y devuelve las opciones que se muestran, o una promesa de ellas para
  * buscar en el servidor. Mientras la promesa no resuelve, el componente está cargando
  * (`data-loading`, `aria-busy` y el snippet `loading`).
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```ts
  * const byPrefix: ComboboxFilter<string> = (query, { options }) => options.filter((option) => option.startsWith(query));
@@ -59,7 +59,7 @@ export type ComboboxFilter<T> = (query: string, context: ComboboxFilterContext<T
 
 /**
  * Snippets de `<UICombobox>`, tipados con el tipo de sus opciones.
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```html
  * <UICombobox model="user" searchable bind:options="users.value" by="id">
@@ -87,7 +87,7 @@ export interface ComboboxSnippets<T> {
  * `<select>` nativo de `<UISelect>` no cubre: buscar, filtrar en un servidor y elegir varias opciones.
  * `T` es el tipo de cada opción y `Multiple`, si se eligen varias; los dos se infieren de la etiqueta.
  * Se autoimporta en `app/`.
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```html
  * <UICombobox model="tags" multiple searchable bind:options="tags" groupBy="category" bind:max="3" />

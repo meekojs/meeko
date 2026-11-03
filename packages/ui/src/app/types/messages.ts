@@ -3,7 +3,7 @@
  * El paquete los trae en español e inglés; `ui.messages` los sobrescribe o añade otros idiomas, y
  * una prop o un snippet del componente siempre ganan sobre ellos.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```ts
  * import type { UIMessages } from '@meekojs/ui'
@@ -221,7 +221,7 @@ export interface UIMessages {
  * Lo que `ui.messages` sobrescribe en un idioma: cualquier sección y cualquiera de sus textos. Lo que
  * falta se toma del idioma base (`pt` para `pt-BR`), de `ui.locale` y, por último, del español.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```ts
  * import type { UIMessageOverrides } from '@meekojs/ui'

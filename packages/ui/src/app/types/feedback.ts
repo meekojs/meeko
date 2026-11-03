@@ -26,7 +26,7 @@ export type UIAlertProps = Omit<ElementAttributes<'section'>, 'title' | 'role' |
  * Contenido plegable con `<details>` nativo: se abre con el teclado y sin JavaScript. Su contenido se
  * conserva en el documento, así que un formulario envía sus campos aunque esté plegado.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```html
  * <UIDisclosure summary="Añadir un comentario" bind:open="Boolean(comment.value)">

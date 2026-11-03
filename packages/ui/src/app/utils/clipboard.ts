@@ -5,7 +5,7 @@ export const copyFeedbackTime = 1600
  * Copia `text` al portapapeles; donde falta la API del portapapeles, recurre a una selección. La promesa
  * se rechaza si el navegador no lo permite.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```ts
  * await copyText('pnpm add @meekojs/meeko')

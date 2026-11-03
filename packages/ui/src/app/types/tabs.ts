@@ -1,6 +1,6 @@
 /**
  * Una pestaña de `<UITabs>`.
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```ts
  * const items: UITabsItem<'account' | 'team'>[] = [{ value: 'account', label: 'Cuenta' }, { value: 'team', label: 'Equipo', disabled: true }]
@@ -18,7 +18,7 @@ export interface UITabsItem<Value extends string = string> {
 /**
  * Snippets de `<UITabs>`: `panel-<value>` es el contenido de una pestaña y `panel`, el de las que no
  * tienen el suyo. `tab` sustituye el texto de cada pestaña.
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```html
  * <UITabs bind:items="items"><snippet name="panel-account">Tu cuenta</snippet></UITabs>
@@ -37,7 +37,7 @@ export interface TabsSnippets<Value extends string = string> {
  * Props de `<UITabs>`, pestañas que cambian un panel de la misma página: `tablist`, `tab` y `tabpanel`,
  * con flechas, `Inicio` y `Fin`. El modelo por defecto es el `value` elegido; sin él, la primera pestaña
  * habilitada. Para pestañas que cambian de ruta, usa `<UINavigationTabs>`, que son enlaces.
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```html
  * <UITabs model="tab" label="Ajustes" bind:items="[{ value: 'account', label: 'Cuenta' }, { value: 'team', label: 'Equipo' }]">

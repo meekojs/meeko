@@ -12,7 +12,7 @@ export interface MarkdownBlockNode {
  * Lo que `createMarkdownSplicer` necesita de un parser de Markdown: los bloques de primer nivel y sus
  * posiciones en el texto. Es la forma que devuelve `remark.parse`.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```ts
  * import type { MarkdownBlockParser } from '@meekojs/ui/editor'
@@ -27,7 +27,7 @@ export type MarkdownBlockParser = (markdown: string) => { readonly children: rea
 /**
  * Un archivo Markdown separado en su frontmatter y su cuerpo, con los saltos de línea ya en LF.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```ts
  * import type { MarkdownSource } from '@meekojs/ui/editor'
@@ -48,7 +48,7 @@ const frontmatter = /^---\n[\s\S]*?\n---\n\s*/
  * Separa el frontmatter de un archivo Markdown, tal como lo escribe `head + body`, y normaliza los
  * saltos de línea a LF, igual que el hash de las revisiones.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```ts
  * import { splitMarkdownSource } from '@meekojs/ui/editor'
@@ -121,7 +121,7 @@ function alignBlocks(baseline: readonly Block[], edited: readonly Block[]): (rea
  * El empalme de un documento: conserva analizados el original y su primera serialización, y sólo
  * analiza el texto editado en cada llamada.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```ts
  * import type { MarkdownSplicer } from '@meekojs/ui/editor'
@@ -141,7 +141,7 @@ export interface MarkdownSplicer {
  * cargar `original`: los bloques que siguen iguales que en él salen del original con sus bytes, y
  * sólo los cambiados salen del editor.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```ts
  * import { createMarkdownSplicer } from '@meekojs/ui/editor'

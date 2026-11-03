@@ -6,7 +6,7 @@ import type { ThemeChoice, ThemeToggleMessages } from '@meekojs/meeko/framework'
  * cambia el tema sin JavaScript con el formulario de `POST /_meeko/theme`. Sustituye a la etiqueta
  * obsoleta `<MeekoThemeToggle>` del núcleo, con las mismas props, snippets y marcado.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```html
  * <UIThemeToggle mode="select" bind:labels="{ light: 'Light', dark: 'Dark', system: 'System' }" />
@@ -25,7 +25,7 @@ export interface UIThemeToggleProps {
 	 * Con `mode="cycle"`, pinta un icono de `light`, `dark` y `system` en lugar de su nombre, que sigue en el
 	 * `aria-label`. Un snippet con el nombre de la elección gana sobre el icono, y otro tema muestra su nombre.
 	 *
-	 * @since 0.2.0
+	 * @since 1.8.0
 	 * @example
 	 * ```html
 	 * <UIThemeToggle icons />

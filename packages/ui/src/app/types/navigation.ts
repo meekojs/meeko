@@ -15,7 +15,7 @@ type UILinkDestination = { readonly href: string; readonly to?: undefined; reado
  * activa y sigue a la navegación del cliente, salvo que el enlace lleve su propio `current`;
  * `match: 'prefix'` marca también sus rutas hijas.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```ts
  * const guide: UILinkTarget = { to: '/docs/[slug]', params: { slug: 'inicio' } }
@@ -43,7 +43,7 @@ export type UILinkTarget = UILinkDestination & {
  * Sin `current`, uno con `to` se marca solo con la ruta activa, y uno con `href` es el actual si
  * coincide con la prop `current` del componente.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```ts
  * const items: UINavigationLink[] = [
@@ -64,7 +64,7 @@ export type UINavigationLink = UILinkTarget & {
  * La marca de `<UIHeader>` y `<UIFooter>`: un enlace a la portada con imagen, nombre y producto.
  * `width` y `height` de la imagen reservan su espacio, así que su carga no mueve nada.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```ts
  * const brand: UIBrand = { name: 'Meeko', product: 'UI', to: '/', image: { src: '/brand/logo.png', width: 24, height: 24 }, ariaLabel: 'Meeko UI: inicio' }
@@ -88,7 +88,7 @@ export type UIBrand = UILinkTarget & {
  * acciones. En una pantalla estrecha los enlaces pasan a un menú nativo con `popover`, sin JavaScript
  * y sin mover la página. Sus snippets son `brand`, `nav`, `actions` y `menu`.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```html
  * <UIHeader bind:brand="brand" bind:items="items" bind:current="route.path.value">
@@ -118,7 +118,7 @@ export interface UIHeaderProps {
 /**
  * Una columna de enlaces de `<UIFooter>`.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```ts
  * const group: UIFooterGroup = { title: 'Recursos', items: [{ label: 'Guía', to: '/docs' }] }
@@ -135,7 +135,7 @@ export interface UIFooterGroup {
  * Props de `<UIFooter>`: marca y descripción, columnas de enlaces (`groups`), una fila de enlaces
  * (`items`) y una línea legal. Sus snippets son `brand`, `about`, `actions` y `legal`.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```html
  * <UIFooter bind:brand="brand" description="Un framework con SSR." bind:groups="groups">
@@ -164,7 +164,7 @@ export interface UIFooterProps {
  * Disposición de `<UIPage>` y `<UIPageHeader>`: `docs` tiene navegación, artículo e índice; `dashboard`,
  * navegación opcional y un área ancha; `landing` deja el ancho a cada sección.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```ts
  * const layout: UIPageLayout = 'dashboard'
@@ -178,7 +178,7 @@ export type UIPageLayout = 'docs' | 'dashboard' | 'landing'
  * `footer` como snippets. `sidebar` y `aside` se ocultan en pantallas estrechas: `bar` es la barra que
  * entonces lleva el `<UIDrawer>`. Los demás atributos, como `lang` y `dir`, llegan a la raíz.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```html
  * <UIPage layout="docs">
@@ -205,7 +205,7 @@ export type UIPageProps = Omit<ElementAttributes<'div'>, 'class'> & {
  * Props de `<UIPageHeader>`, el encabezado con el único `<h1>` de una página. Sus snippets son
  * `breadcrumb`, `actions` y `default`, éste bajo la descripción.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```html
  * <UIPageHeader title="Fuentes" description="Lo que se publica en la documentación." layout="dashboard">
@@ -227,7 +227,7 @@ export interface UIPageHeaderProps {
 /**
  * Un enlace de `<UINavigationTree>`.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```ts
  * const item: UINavigationTreeItem = { label: 'useSignal', to: '/docs/reference', code: true, featured: true }
@@ -247,7 +247,7 @@ export type UINavigationTreeItem = UINavigationLink & {
 /**
  * Un grupo de `<UINavigationTree>`.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```ts
  * const group: UINavigationTreeGroup = { title: 'Empezar', open: true, items: [{ label: 'Instalación', href: '/installation' }] }
@@ -268,7 +268,7 @@ export interface UINavigationTreeGroup {
  * Props de `<UINavigationTree>`, la navegación lateral: grupos que se pliegan con `<details>` nativo,
  * enlace actual, iconos, código y destacados. Sus snippets son `item`, `icon` y `empty`.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```html
  * <UINavigationTree bind:groups="groups" bind:current="route.path.value" label="Documentación" />
@@ -295,7 +295,7 @@ export interface UINavigationTreeProps {
  * Cómo se cierra un `<UIDrawer>`: `any` con Escape o al pulsar fuera, `closerequest` sólo con Escape
  * y `none` sólo desde el propio panel. Es el atributo nativo `closedby` de `<dialog>`.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```ts
  * const closedBy: UIDrawerClosedBy = 'closerequest'
@@ -307,7 +307,7 @@ export type UIDrawerClosedBy = 'any' | 'closerequest' | 'none'
  * Lado de un `<UIDrawer>`, en orden lógico: `start` es la izquierda en un documento LTR y la derecha
  * en uno RTL.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```ts
  * const side: UIDrawerSide = 'end'
@@ -321,7 +321,7 @@ export type UIDrawerSide = 'start' | 'end'
  * Su modelo es `open`, y sus snippets son `default`, `footer` y `trigger`, que recibe el `id` del panel
  * para usar `commandfor`. Sin `triggerLabel` ni `trigger`, no pinta botón: ábrelo con el modelo.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```html
  * <UIDrawer title="Contenidos" triggerLabel="Contenidos" model="menuOpen">
@@ -351,7 +351,7 @@ export interface UIDrawerProps {
 /**
  * Una pestaña de `<UINavigationTabs>`: un enlace con un contador opcional junto al texto.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```ts
  * const item: UINavigationTabsItem = { label: 'Traducidas', href: '/translations?status=translated', badge: '12', badgeTone: 'success', badgeDot: true }
@@ -373,7 +373,7 @@ export type UINavigationTabsItem = UINavigationLink & {
  * la URL, sin indicador: varias filas conviven en una página sin repetir su View Transition. El evento
  * `select` recibe el clic y la pestaña; `event.preventDefault()` cancela la navegación.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```html
  * <UINavigationTabs bind:items="[{ label: 'Hoy', to: '/metrics' }, { label: 'Mes', to: '/metrics/month' }]" current="/metrics" />
@@ -396,7 +396,7 @@ export interface UINavigationTabsProps {
 /**
  * Un paso de `<UIBreadcrumb>`. Sin destino, es sólo texto.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```ts
  * const items: UIBreadcrumbItem[] = [{ label: 'Inicio', to: '/' }, { label: 'useSignal' }]
@@ -417,7 +417,7 @@ export type UIBreadcrumbItem =
  * Props de `<UIBreadcrumb>`: una lista ordenada dentro de un `<nav>`, con el último paso como página
  * actual.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```html
  * <UIBreadcrumb bind:items="[{ label: 'Referencia', to: '/docs/reference' }, { label: 'useSignal' }]" />
@@ -436,7 +436,7 @@ export interface UIBreadcrumbProps {
  * Props de `<UIPageNavigation>`: los enlaces a la página anterior y a la siguiente de un documento.
  * Para una lista larga, `<UIPagination>`.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```html
  * <UIPageNavigation bind:previous="{ label: 'Inicio', to: '/' }" bind:next="{ label: 'Rutas', to: '/routes' }" />
@@ -461,7 +461,7 @@ export interface UIPageNavigationProps {
  * Props de `<UIPagination>`: recuento de una lista y acción de cargar más, con estado ocupado. Sin
  * `moreLink` emite `loadMore`; con él es un enlace, que funciona sin JavaScript (un cursor en la URL).
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```html
  * <UIPagination bind:shown="rows.value.length" bind:total="total" bind:busy="loading.value" on:loadMore="load" />
@@ -493,7 +493,7 @@ export interface UIPaginationProps {
 /**
  * Una entrada de `<UITableOfContents>`: el `id` de un encabezado de la página.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```ts
  * const entry: UITableOfContentsEntry = { id: 'instalacion', text: 'Instalación', level: 2 }
@@ -512,7 +512,7 @@ export interface UITableOfContentsEntry {
  * Vista de `<UITableOfContents>`: `aside` para la columna lateral de `<UIPage>` y `collapsible`, un
  * `<details>` para la columna de contenido, que `<UIPage>` sólo muestra cuando el lateral se oculta.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```ts
  * const variant: UITableOfContentsVariant = 'collapsible'
@@ -525,7 +525,7 @@ export type UITableOfContentsVariant = 'aside' | 'collapsible'
  * entrada activa la pinta `scroll-target-group` donde exista; en todos los navegadores, un
  * `IntersectionObserver` mínimo mantiene `aria-current="location"`. `active` lo sustituye.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```html
  * <UITableOfContents bind:entries="toc" />
@@ -549,7 +549,7 @@ export interface UITableOfContentsProps {
  * Un idioma de `<UILocaleSwitcher>` y `<UILocaleSuggestion>`. Es sólo presentación: la aplicación
  * calcula `href` (o `to`) y guarda la elección.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```ts
  * const items: UILocaleItem[] = [
@@ -571,7 +571,7 @@ export type UILocaleItem = UILinkTarget & {
  * Props de `<UILocaleSwitcher>`: enlaces reales a esta página en cada idioma, sin enrutado ni cookie.
  * Con menos de dos idiomas no pinta nada.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```html
  * <UILocaleSwitcher bind:items="i18n.pageLocales().map(toItem)" />
@@ -591,7 +591,7 @@ export interface UILocaleSwitcherProps {
  * mover la página. La aplicación decide cuándo pintarlo (tras montar, para no desajustar la hidratación)
  * y atiende el evento `stay`, porque recordar la elección no es cosa de UI.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```html
  * <UILocaleSuggestion if:when="suggestion.value" bind:items="items" bind:suggested="suggestion.value" on:stay="stay" />
@@ -617,7 +617,7 @@ export interface UILocaleSuggestionProps {
 /**
  * Veredicto de un `<UICodeBlock>`: la forma correcta o el error que corrige.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```ts
  * const verdict: UICodeBlockVerdict = 'good'
@@ -630,7 +630,7 @@ export type UICodeBlockVerdict = 'bad' | 'good'
  * un `<pre>` ya resaltado (Shiki, por ejemplo) y el snippet `default`, marcado propio; `code` es lo que
  * se copia. `mode="log"` es una salida de texto: `role="log"`, líneas partidas y sin botón por defecto.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```html
  * <UICodeBlock code="pnpm add @meekojs/ui" lang="sh" label="Instalación" />
@@ -678,7 +678,7 @@ export interface UICodeBlockProps {
  * `.code-block`, `.callout`, `.table-wrap` y `.heading-anchor` también se visten; el snippet `default`
  * recibe marcado propio. La clase pública `meeko-ui-prose` sirve en cualquier elemento.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```html
  * <UIProse as="article" bind:html="doc.html" />
@@ -697,7 +697,7 @@ export type UIProseProps = Omit<ElementAttributes<'div' | 'article' | 'section'>
 /**
  * Tipo de línea de un `<UIDiff>`.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```ts
  * const kind: UIDiffLineKind = 'hunk'
@@ -709,7 +709,7 @@ export type UIDiffLineKind = 'add' | 'context' | 'file' | 'hunk' | 'remove'
  * Props de `<UIDiff>`: un diff unificado, con cada línea marcada por su tipo en color y para los
  * lectores de pantalla.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```html
  * <UIDiff bind:diff="patch" label="Cambios en la guía" />

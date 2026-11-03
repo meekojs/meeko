@@ -27,7 +27,7 @@
 			<UIAlert
 				tone="info"
 				title="Versión nueva"
-				description="UI 0.2 usa los tokens --ui-*."
+				description="UI 1.8 usa los tokens --ui-*."
 			/>
 			<UIAlert
 				tone="success"

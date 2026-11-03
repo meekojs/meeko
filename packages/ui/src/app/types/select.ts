@@ -4,7 +4,7 @@ import type { PopoverPlacement } from './popover'
 
 /**
  * Valor del modelo de `<UISelect>`: la opción elegida o `null`. Se infiere del tipo de `options`.
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```ts
  * const color = signal<SelectModel<string>>(null); // string | null
@@ -14,7 +14,7 @@ export type SelectModel<T> = T | null
 
 /**
  * Estado de una opción de `<UISelect>`, el segundo parámetro del snippet `option`.
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```html
  * <snippet name="option" params="user, state">{user.name} <span if:when="state.selected">✓</span></snippet>
@@ -29,7 +29,7 @@ export interface SelectOptionState {
 
 /**
  * Snippets de `<UISelect>`, tipados con el tipo de sus opciones.
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```html
  * <UISelect model="user" bind:options="users.value" by="id">
@@ -50,7 +50,7 @@ export interface SelectSnippets<T> {
 /**
  * Lo que `<UISelect>` y `<UICombobox>` leen de `form.field('x')` de `useForm`: el `id`, el `name`, la señal del
  * valor, `invalid` y `describedBy`. Un `FormField` lo cumple.
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```html
  * <UISelect bind:field="form.field('color')" bind:options="colors" />
@@ -74,7 +74,7 @@ export type SelectKey<T> = T extends object ? keyof T & string : never
 
 /**
  * Lo que `<UISelect>` y `<UICombobox>` tienen en común.
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```ts
  * const shared: SelectBaseProps<string> = { options: ['a', 'b'], placeholder: 'Elige', clearable: true }
@@ -132,7 +132,7 @@ type OnlyInCombobox<Prop extends string> = `UISelect es un <select> nativo y no 
  * navegador trae su lista, su teclado y su valor de formulario. `T` es el tipo de cada opción y se infiere
  * de la etiqueta. Para buscar, filtrar en un servidor o elegir varias opciones, usa `<UICombobox>`: esas
  * props aquí son un error de tipos. Se autoimporta en `app/`.
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```html
  * <UISelect model="color" bind:options="colors" placeholder="Elige un color" name="color" />

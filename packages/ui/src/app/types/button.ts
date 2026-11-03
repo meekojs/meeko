@@ -11,7 +11,7 @@ type RouteParamsOf<K extends RouteId> = NonNullable<MeekoLinkProps<K>['params']>
  * `params` correlacionados (obligatorios si la ruta tiene segmentos dinámicos, prohibidos si no) y
  * un `search` opcional. Una ruta que no existe es un error de tipos en `to`.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```ts
  * const profile: UIRouteTarget = { to: '/users/[id]', params: { id: '7' }, search: { tab: 'actividad' } }
@@ -30,7 +30,7 @@ type SharedAttributes = Pick<ElementAttributes<'a'>, keyof ElementAttributes<'a'
  * comunes a `<a>` y `<button>`, como `id`, `title`, `tabindex`, `aria-*` y `data-*`. `class` es una
  * prop propia, que se suma a la clase del componente.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```html
  * <UIButton id="save" title="Guardar" aria-describedby="hint" data-testid="save">Guardar</UIButton>
@@ -45,7 +45,7 @@ export type UIForwardedAttributes = Omit<SharedAttributes, 'class' | 'type'>
  * {@link UIForwardedAttributes}. Con `to`, `hreflang` también elige el idioma del enlace cuando la
  * aplicación usa `@meekojs/i18n`.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```html
  * <UILink href="https://example.com/en" hreflang="en" lang="en">English</UILink>
@@ -74,7 +74,7 @@ interface UIRouteResolveProps {
 	 * de `@meekojs/i18n`. `true` por defecto; `bind:resolve="false"` deja el `href` de la ruta tal
 	 * cual, como `<MeekoLink bind:resolve="false">`.
 	 *
-	 * @since 0.2.0
+	 * @since 1.8.0
 	 */
 	readonly resolve?: boolean
 }
@@ -83,7 +83,7 @@ interface UIRouteResolveProps {
  * Aspecto compartido por `<UIButton>` y `<UILink>`: variante, tamaño, forma y clases. Sin ellas, se
  * usan los valores de `ui.defaults` en `meeko.config.ts` y, después, `primary`, `md` y `rounded`.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```html
  * <UIButton variant="outline" size="sm" shape="pill" class="toolbar-action">Filtrar</UIButton>
@@ -155,7 +155,7 @@ interface UIButtonNativeProps extends NoAnchorAttributes {
  * {@link UIAnchorAttributes} (`hreflang`…), a un enlace. Con `to`, el `href` pasa por los
  * resolvedores de enlaces de la aplicación, como en `<MeekoLink>` (`bind:resolve="false"` lo evita).
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```html
  * <UIButton to="/users/[id]" bind:params="{ id: user.id }">Perfil</UIButton>
@@ -199,7 +199,7 @@ interface UILinkAnchorProps {
  * de la aplicación, así que con `@meekojs/i18n` apunta al idioma del documento o al de `hreflang`.
  * `title` es el texto principal de la card, no el atributo HTML; los demás atributos llegan al `<a>`.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```html
  * <UILinkCard to="/theming" title="Personalización" description="Conecta los tokens con tu marca." />
@@ -228,7 +228,7 @@ export type UILinkCardProps = (UILinkAnchorProps | UILinkRouteProps) &
  * con `to` o con `href`. Con `to`, el `href` pasa por los resolvedores de enlaces de la aplicación
  * como en `<MeekoLink>`: con `@meekojs/i18n` apunta al idioma del documento o al de `hreflang`.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```html
  * <UILink to="/installation">Instalación</UILink>

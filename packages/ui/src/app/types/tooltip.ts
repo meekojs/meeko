@@ -4,7 +4,7 @@ import type { PopoverPlacement, PopoverTrigger } from './popover'
  * Snippets de `<UITooltip>`: `trigger` es el contenido del botón que pinta Meeko, `anchor` lo sustituye
  * por un elemento propio, que debe poder recibir el foco, y `default` es un contenido con formato en
  * lugar de `text`.
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```html
  * <UITooltip text="Guardar los cambios">
@@ -25,7 +25,7 @@ export interface TooltipSnippets {
  * Props de `<UITooltip>`, un texto breve que describe a su disparador: se abre con el puntero y con el
  * foco, `Esc` lo cierra, no roba el foco y se asocia con `aria-describedby`. No pongas en él nada
  * imprescindible ni interactivo: en táctil sólo aparece al enfocar.
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```html
  * <UITooltip text="Se publica al guardar" placement="right"><snippet name="trigger">?</snippet></UITooltip>

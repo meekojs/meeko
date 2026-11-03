@@ -1,7 +1,7 @@
 /**
  * Cómo se edita el Markdown en `<UIMarkdownEditor>`: `visual` es Crepe y `code`, el texto tal cual.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```ts
  * import type { UIMarkdownEditorMode } from '@meekojs/ui/editor'
@@ -14,7 +14,7 @@ export type UIMarkdownEditorMode = 'code' | 'visual'
 /**
  * Props de `<UIMarkdownEditor>`. El texto va en `model` y el modo en `model:mode`.
  *
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```ts
  * import type { UIMarkdownEditorProps } from '@meekojs/ui/editor'
