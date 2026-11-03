@@ -12,7 +12,7 @@ related:
   - "@meekojs/meeko#Signal"
   - "@meekojs/meeko/framework#useForm"
   - docs/api.md#modelos-de-componente-definemodel-y-model
-source-hash: 8936b25da7ad5162b9fa49089e67ad4a164d902e27b40e0f0160a907569ea3db
+source-hash: 925c9f322892fd147a6da46cee8ba9c888271386cd7673936f7ce0765fea3724
 ---
 
 `defineModel<T>()` declares a value shared bidirectionally between the parent and component, and returns a writable `Signal<T>`. The parent passes its signal with `model="señal"` (the default model) or `model:nombre="señal"`; reading and writing in the child reads and writes the parent's signal. It is a compiler macro: you do not import it.
@@ -84,6 +84,20 @@ Since `1.8`, a component with `defineModel` accepts the value as a prop, also in
 - **`bind:default` and `on:update:default` do not exist:** `default` is the internal name of the unnamed model.
 - **The prop and the event belong to the model.** They do not appear in `Object.keys(props)` or `...rest`, so `bind="rest"` does not carry them to an element. Also declaring them in `defineProps` or `defineEmits` is `MEEK063`, except through an imported type: a wrapper can use `defineProps<UIInputProps>()` and declare its own model.
 - **The event does not go in a `bind`:** `onUpdate:modelValue` is an `on*` key (`MEEK113`). Write `on:update:modelValue`.
+
+### A parent that saves with `await`
+
+With a prop and an event, the value only changes when the prop does. If the parent waits before changing it, the control goes back to the previous value meanwhile: the caret jumps to the end and what is typed before it finishes is lost.
+
+```html bad
+<AppInput bind:modelValue="name.value" on:update:modelValue="async (next) => { await save(next); name.value = next; }" />
+```
+
+Change the signal first and save afterwards, without waiting. If saving can reject the value, undo the change when it fails.
+
+```html good
+<AppInput bind:modelValue="name.value" on:update:modelValue="(next) => { name.value = next; void save(next); }" />
+```
 
 ### Coming from Vue
 
@@ -193,7 +207,7 @@ const open = defineModel<boolean>("open", { default: false });
 <AppInput label="Name" />
 ```
 
-`meeko check` reports `TS2741: Property '"default"' is missing in type '{}' but required in type 'ComponentModels'.` Pass the signal or the value, or make the model optional with `defineModel<string>({ default: "" })`.
+`meeko check` and the editor report `TS2741: Falta el modelo obligatorio de este componente: pásalo con model="señal" o bind:modelValue="valor"`. Pass the signal or the value, or make the model optional with `defineModel<string>({ default: "" })`. A value that admits `undefined` is not enough for a required model.
 
 ```html good
 <AppInput label="Name" model="name" />

@@ -84,6 +84,20 @@ Desde `1.8`, un componente con `defineModel` acepta el valor como prop, también
 - **La prop y el evento son del modelo.** No aparecen en `Object.keys(props)` ni en `...rest`, así que `bind="rest"` no los lleva a un elemento. Declararlos también en `defineProps` o `defineEmits` es `MEEK063`, salvo con un tipo importado: un envoltorio puede usar `defineProps<UIInputProps>()` y declarar su propio modelo.
 - **En un `bind` no va el evento:** `onUpdate:modelValue` es una clave `on*` (`MEEK113`). Escribe `on:update:modelValue`.
 
+### Un padre que guarda con `await`
+
+Con prop y evento, el valor sólo cambia cuando cambia la prop. Si el padre espera antes de cambiarla, el control vuelve mientras tanto al valor anterior: el cursor salta al final y se pierde lo que se escribe antes de que termine.
+
+```html bad
+<AppInput bind:modelValue="name.value" on:update:modelValue="async (next) => { await save(next); name.value = next; }" />
+```
+
+Cambia primero la señal y guarda después, sin esperar. Si el guardado debe poder rechazar el valor, deshaz el cambio al fallar.
+
+```html good
+<AppInput bind:modelValue="name.value" on:update:modelValue="(next) => { name.value = next; void save(next); }" />
+```
+
 ### Si vienes de Vue
 
 `defineModel` se comporta como el de Vue con `bind:modelValue` y `on:update:modelValue`, que corresponden a `:modelValue` y `@update:modelValue`. `model="señal"` corresponde a `v-model`, con una diferencia: recibe la señal, no su valor, así que se escribe `model="name"` y no `model="name.value"`, y el hijo escribe directamente en ella en lugar de emitir. Por eso `model` no se combina con `on:update:modelValue`, que en Vue sí se puede escribir junto a `v-model`. Otra diferencia: si el padre no acepta el valor, el control vuelve al de la prop, también en un `<input>`.
@@ -192,7 +206,7 @@ const open = defineModel<boolean>("open", { default: false });
 <AppInput label="Nombre" />
 ```
 
-`meeko check` da `TS2741: Property '"default"' is missing in type '{}' but required in type 'ComponentModels'.` Pasa la señal o el valor, o haz el modelo opcional con `defineModel<string>({ default: "" })`.
+`meeko check` y el editor dan `TS2741: Falta el modelo obligatorio de este componente: pásalo con model="señal" o bind:modelValue="valor"`. Pasa la señal o el valor, o haz el modelo opcional con `defineModel<string>({ default: "" })`. Un valor que admite `undefined` no basta para un modelo obligatorio.
 
 ```html good
 <AppInput label="Nombre" model="name" />
