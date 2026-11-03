@@ -38,7 +38,7 @@ Cada archivo de `app/pages` es una ruta. Sustituye `app/pages/index.meeko` por e
 		type="button"
 		on:click="() => count.value++"
 	>
-		Pulsado {count.value} veces
+		Pulsaciones: {count.value}
 	</button>
 </template>
 ```
