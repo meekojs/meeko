@@ -39,6 +39,14 @@ function readStored(browser: Window): Map<string, Position> {
 	return entries
 }
 
+/** Whether a state can carry the name of its entry: only `null` or a plain object keep their meaning when spread. */
+function acceptsEntry(state: unknown): state is Record<string, unknown> | null | undefined {
+	if (state === null || state === undefined) return true
+	if (typeof state !== 'object') return false
+	const prototype: unknown = Object.getPrototypeOf(state)
+	return prototype === null || Object.getPrototypeOf(prototype) === null
+}
+
 /**
  * Keeps a position per history entry: the name of the entry goes in `history.state`, next to whatever
  * other code keeps there, and the positions in `sessionStorage`, because an entry that is being left
@@ -63,10 +71,13 @@ export function createScrollMemory(browser: Window, navigating: () => boolean): 
 		const value = (history.state as Record<string, unknown> | null | undefined)?.[ENTRY]
 		return typeof value === 'string' ? value : undefined
 	}
-	/** The name of the current entry, given now if it has none. A state that is not an object is left alone. */
+	/**
+	 * The name of the current entry, given now if it has none. A state that is not a plain object is
+	 * the application's and is left alone: its entry has no name, so it returns to its fragment or the top.
+	 */
 	const name = (): string | undefined => {
 		const state: unknown = history.state
-		if (state !== null && state !== undefined && typeof state !== 'object') return undefined
+		if (!acceptsEntry(state)) return undefined
 		const existing = known()
 		if (existing) return existing
 		const created = Math.random().toString(36).slice(2, 10)
@@ -161,7 +172,8 @@ export function createScrollMemory(browser: Window, navigating: () => boolean): 
 			return { [ENTRY]: current }
 		},
 		keep() {
-			return current === undefined ? (history.state ?? null) : { ...history.state, [ENTRY]: current }
+			const state: unknown = history.state
+			return current === undefined || !acceptsEntry(state) ? (state ?? null) : { ...state, [ENTRY]: current }
 		},
 		arrive() {
 			remember()

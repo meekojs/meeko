@@ -97,6 +97,60 @@ function fakeBrowser(start: string, storage = new Map<string, string>()) {
 
 const settle = () => new Promise<void>((done) => setImmediate(done))
 
+test('a history.state that is not a plain object stays as it is: its entry has no name and returns to the top', async () => {
+	class Custom {
+		kept = 7
+	}
+	const url = 'https://example.test/docs/long'
+	for (const state of [['kept', 7], new Custom(), new Date(0), new Map([['kept', 7]])]) {
+		const fake = fakeBrowser(url)
+		fake.browser.history.replaceState(state, '', url)
+		const navigator = createNavigator(routes, () => {}, fake.window)
+		assert.equal(fake.state(), state, 'creating the memory leaves it alone')
+		fake.userScroll(500)
+		assert.equal(fake.state(), state, 'a scroll leaves it alone')
+		await navigator.navigate('/docs/short')
+		assert.equal(fake.browser.scrollY, 0)
+		fake.traverse(-1)
+		await settle()
+		assert.equal(fake.browser.location.pathname, '/docs/long')
+		assert.equal(fake.state(), state, 'still the same value of the application')
+		assert.equal(fake.browser.scrollY, 0, 'no name, no position')
+		navigator.dispose()
+	}
+})
+
+test('a replacing navigation does not spread a state that is not a plain object', async () => {
+	const url = 'https://example.test/docs/long'
+	const fake = fakeBrowser(url)
+	const navigator = createNavigator(routes, () => {}, fake.window)
+	fake.userScroll(500)
+	// The entry already has a name, and the application then gives it another kind of state.
+	const state = ['kept', 7]
+	fake.browser.history.replaceState(state, '', url)
+	await navigator.navigate('/docs/long#part', { replace: true })
+	assert.equal(fake.state(), state)
+	navigator.dispose()
+})
+
+test('a plain object or null gets the name of its entry, and keeps the rest of the state', async () => {
+	const url = 'https://example.test/docs/long'
+	const bare = Object.assign(Object.create(null) as Record<string, unknown>, { kept: 7 })
+	for (const state of [null, { kept: 7 }, bare]) {
+		const fake = fakeBrowser(url)
+		fake.browser.history.replaceState(state, '', url)
+		const navigator = createNavigator(routes, () => {}, fake.window)
+		fake.userScroll(500)
+		assert.equal(typeof fake.state()?.meekoEntry, 'string')
+		if (state) assert.equal(fake.state()?.kept, 7)
+		await navigator.navigate('/docs/short')
+		fake.traverse(-1)
+		await settle()
+		assert.equal(fake.browser.scrollY, 500)
+		navigator.dispose()
+	}
+})
+
 test('back and forward return to the position of each entry, in both directions', async () => {
 	const fake = fakeBrowser('https://example.test/docs/long')
 	const navigator = createNavigator(routes, () => {}, fake.window)
