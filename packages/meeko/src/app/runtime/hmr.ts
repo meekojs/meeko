@@ -4,6 +4,7 @@ import { captureParentOwner, isExternalSignal, isWritableSignal } from '../../co
 import { serializeJson } from '../../core/server'
 import { borrowedKey } from './models'
 import { parseRegionHtml } from './renderer'
+import { componentModulePath, stateModuleMessage } from './state-check'
 
 /**
  * Valores de las señales editables de un componente, por nombre, que HMR transfiere en memoria
@@ -80,6 +81,8 @@ export function transferState(bindings: Record<string, unknown>, component: stri
 		try {
 			serializeJson({ [name]: value })
 		} catch (error) {
+			const module = componentModulePath(value, name)
+			if (module) throw new TypeError(`${component}: ${stateModuleMessage(`la señal "${name}"`, module)}`, { cause: error })
 			const reason = error instanceof Error ? error.message : String(error)
 			throw new TypeError(`${component}: the signal "${name}" cannot be sent to the browser with the SSR state (${reason}). ` + 'The signals of a component script travel as JSON: keep strings, finite numbers, booleans, null, arrays and plain objects in them, or undefined as the whole value ' + '(a Date as an ISO string, a Map as an object), or keep the value out of the state: only the writable signals declared at the top level of the script travel, not a constant, a computed or a signal kept inside an object.', { cause: error })
 		}

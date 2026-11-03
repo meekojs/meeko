@@ -2,6 +2,7 @@ import type { Signal } from '../../core/reactivity'
 
 import { createContext, createRoot, findContext, finishWithCleanup, provide, signal } from '../../core/reactivity'
 import { serializeJson } from '../../core/server'
+import { componentModulePath, stateModuleMessage } from './state-check'
 
 export const stateKey = /*#__PURE__*/ createContext<StateStore>('Meeko framework state')
 
@@ -180,7 +181,15 @@ export class StateStore {
 	snapshot(): Record<string, unknown> {
 		const result: Record<string, unknown> = Object.create(null)
 		for (const [key, value] of this.values) result[key] = value.value
-		serializeJson(result)
+		try {
+			serializeJson(result)
+		} catch (error) {
+			for (const [key, value] of Object.entries(result)) {
+				const module = componentModulePath(value, key)
+				if (module) throw new TypeError(stateModuleMessage(`useState("${key}")`, module), { cause: error })
+			}
+			throw error
+		}
 		return result
 	}
 }

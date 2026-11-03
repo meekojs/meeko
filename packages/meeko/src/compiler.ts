@@ -47,6 +47,7 @@ import { PropAliasWriteError, rewritePropAliases } from './compiler/transforms/p
 import { propAliasReadsOnce, propsReadsOnce } from './compiler/transforms/props-reactivity'
 import { scopeCss } from './compiler/transforms/scoped-css'
 import { analyzeServerScript, bindingIdentifiers, checkClientScript } from './compiler/transforms/server-script'
+import { setupTypeQuery, setupValueNames, transferredStates } from './compiler/transforms/transferred-state'
 import { elementAttributeNames, tagsAccepting } from './shared/html-attributes'
 
 interface DynamicText {
@@ -2106,21 +2107,24 @@ function refType(ref: RefBinding): string {
 	return /^[A-Za-z_$][\w$]*(?:\s*\.\s*[A-Za-z_$][\w$]*)*$/.test(reference) ? `__meeko.ExposedOf<typeof ${reference}>` : 'unknown'
 }
 
-function compileScript(section: SfcSection, source: string, filename: string, hot: boolean, refs: ReadonlyMap<string, RefBinding>, generic: GenericParameters | undefined): ScriptParts {
+function compileScript(section: SfcSection, source: string, filename: string, hot: boolean, refs: ReadonlyMap<string, RefBinding>, generic: GenericParameters | undefined, narrow: boolean): ScriptParts {
 	/** Argumentos de tipo de los tipos de módulo de un componente genérico, como `<T>`. */
 	const typeArgs = generic ? `<${generic.names.join(', ')}>` : ''
 	const genericNames = new Set(generic?.names ?? [])
-	/** MEEK100: una declaración de tipo pasa al nivel de módulo, donde no existen los parámetros de `generic`. */
-	const hoisted = (statement: ts.Statement): void => {
-		const reference = genericNames.size ? genericReference(statement, genericNames) : undefined
-		if (!reference) return
-		throw compileError(source, filename, 'MEEK100', `Esta declaración de tipo usa ${reference.text}, un parámetro de generic, pero los tipos del script se declaran a nivel de módulo, donde ${reference.text} no existe; escríbela en el argumento de la macro (defineProps<{ rows: ${reference.text}[] }>()) o hazla genérica (type Rows<${reference.text}> = ...) y pásale ${reference.text}`, section.contentStart + reference.getStart(file))
-	}
 	const file = ts.createSourceFile(filename, section.content, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS) as ts.SourceFile & { parseDiagnostics: readonly ts.DiagnosticWithLocation[] }
 	const syntaxError = file.parseDiagnostics[0]
 	if (syntaxError) {
 		const message = ts.flattenDiagnosticMessageText(syntaxError.messageText, '\n')
 		throw compileError(source, filename, 'MEEK013', message, section.contentStart + (syntaxError.start ?? 0))
+	}
+	const setupNames = narrow ? setupValueNames(file) : undefined
+	/** MEEK100: una declaración de tipo pasa al nivel de módulo, donde no existen los parámetros de `generic`. */
+	const hoisted = (statement: ts.Statement): void => {
+		const reference = genericNames.size ? genericReference(statement, genericNames) : undefined
+		if (reference) throw compileError(source, filename, 'MEEK100', `Esta declaración de tipo usa ${reference.text}, un parámetro de generic, pero los tipos del script se declaran a nivel de módulo, donde ${reference.text} no existe; escríbela en el argumento de la macro (defineProps<{ rows: ${reference.text}[] }>()) o hazla genérica (type Rows<${reference.text}> = ...) y pásale ${reference.text}`, section.contentStart + reference.getStart(file))
+		// Only in `meeko check`: types are erased, so this builds and runs; only TypeScript fails on it, with TS2304 and an `any` behind.
+		const query = setupNames ? setupTypeQuery(statement, setupNames) : undefined
+		if (query) throw compileError(source, filename, 'MEEK137', `Esta declaración de tipo usa typeof ${query.text}, pero los tipos del script se declaran a nivel de módulo, y ${query.text} sólo existe dentro del setup; mueve ${query.text} a un módulo .ts e impórtalo, o escribe el tipo a mano`, section.contentStart + query.getStart(file))
 	}
 	let composables: ScriptComposables
 	try {
@@ -2143,6 +2147,16 @@ function compileScript(section: SfcSection, source: string, filename: string, ho
 		const list = editsFor.get(statement) ?? []
 		list.push(change)
 		editsFor.set(statement, list)
+	}
+	// MEEK136, in `meeko check` only: the initial value of what travels with the SSR state, wrapped where it is written.
+	if (narrow) {
+		for (const state of transferredStates(file)) {
+			const start = state.value.getStart(file)
+			const length = state.value.getEnd() - start
+			const depth = nodeDepth(state.value, statementOf(state.value)) * 2 + 1
+			edit(state.value, { kind: 'insert', at: start, text: `__meeko.${state.check}(`, depth, closing: false })
+			edit(state.value, { kind: 'insert', at: state.value.getEnd(), text: `, ${markSource('true', section.contentStart + start, length)})`, depth, closing: true })
+		}
 	}
 	const usedRefs = new Set<string>()
 	for (const call of composables.elementRefs) {
@@ -2894,7 +2908,7 @@ export function compile(source: string, filename = 'anonymous.meeko', options: C
 	const context: TemplateContext = { componentNames, branchComponents: new WeakSet(), source, filename, templateOffset: template.contentStart, scopeAttribute, scopeTargets: targets, nextText: 0, nextRegion: 0, nextRef: 0, nextHtml: 0, nextElement: 0, listDepth: 0, refs: new Map(), usedRefs: new Set(), nextSnippet: 0, snippetDepth: 0, selectModel: undefined, narrow: options.typeCheck === true, guards: [], shadowedTags: shadowedBuiltinTags(script.content, projectComponents), shadowedUses: new Map(), deprecatedUses: new Map(), strayDirectives: new Map(), replacedAttributes: new Map(), theme: options.theme, knownComponents, builtinModules: new Set(), decodedRegions: [] }
 	const html = renderNode(parsed, bindingsForTemplate, context)
 	const hot = options.hot === true
-	const scriptParts = compileScript(script, source, filename, hot, context.refs, generic)
+	const scriptParts = compileScript(script, source, filename, hot, context.refs, generic, context.narrow)
 	// Every <MeekoLink> reads `__meeko_links`; one with a written aria-current never reads the route.
 	if (html.includes('__meeko_links')) {
 		// `<MeekoLink>` builds its href with the typed `href()` and reads the committed route for aria-current.

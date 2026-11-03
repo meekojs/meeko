@@ -313,7 +313,7 @@ export function attributeValueMessage(name: string, tags: readonly string[], val
  * of `bind="obj"` (MEEK113): the type text carries the code and the message, which the diagnostic
  * keeps without TypeScript's wrapping.
  */
-const meekTypeText = /"(MEEK(?:031|112|113|131)): ([^"]+)"/
+const meekTypeText = /"(MEEK(?:031|112|113|131|136)): ([^"]+)"/
 
 /** Message of a MEEK112, MEEK113, MEEK031 or MEEK131 type error, with what to do about it. */
 /**
@@ -331,6 +331,7 @@ function meekTypeMessage(code: string, text: string, source: string): string {
 	if (code === 'MEEK112' && text.endsWith('no se aplica a ninguna etiqueta posible de is')) {
 		return `${text}: Meeko no lo escribiría nunca; quítalo o añade a is una etiqueta que lo admita`
 	}
+	if (code === 'MEEK136') return `${text}: un módulo es código, y este valor se enviaría al navegador en cada render de servidor. Guarda en el estado qué entradas se pintan y léelas con un computed (const options = computed(() => visible.value.map((id) => entries[id]))), o empieza con undefined y asígnalo sólo en el navegador`
 	// `is` never turns a text into a component: a name that only exists at run time needs one of these.
 	const name = code === 'MEEK112' ? /^<([A-Z][\w$]*)> no es una etiqueta/.exec(text)?.[1] : undefined
 	if (name) return `${text}: is nunca convierte un texto en un componente. Escribe el literal en la plantilla (is="cond ? '${name}' : 'section'"), pon en los datos el módulo importado (import * as ${name} from "./${name}.meeko") o cárgalo en ejecución con await resolveComponent('${name}') dentro de una función`

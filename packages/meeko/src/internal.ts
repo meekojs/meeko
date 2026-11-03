@@ -30,6 +30,7 @@ export type { ElementListRef, ElementOf, ElementRef, ElementRefOf, ElementRefs, 
 export { continueInBrowser } from './app/runtime/continuation'
 export type { BrowserContinuation } from './app/runtime/continuation'
 export { awaitData } from './app/runtime/suspense'
+export { checkSignalState, checkStateFactory } from './app/runtime/state-check'
 export { branchTag, checkComponentModels, checkComponentSnippets, checkSnippetCondition, componentTag, correlatedTag, noChannels, withChannels } from './app/runtime/channels'
 export type { BranchTag, ChannelsOf, ComponentTag, EventNames, ExtraProps, ModelInputs, NoModels, NoSnippets, RequiredSnippetMessage, SnippetConditionCheck, SnippetInputs, SnippetPresence, TagExposed, TagInput } from './app/runtime/channels'
 export { borrowedKey, checkWritableSignal, modelSelected, modelText, modelValue } from './app/runtime/models'
