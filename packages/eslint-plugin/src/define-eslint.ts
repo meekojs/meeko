@@ -44,16 +44,20 @@ export interface DefineEslintOptions {
 	/** Lint .meeko scripts and templates with their own parser. Default true. */
 	meeko?: boolean
 	/**
-	 * Activa el conjunto completo `recommended-natural` de Perfectionist (imports, exports, objetos, clases,
-	 * interfaces, tipos, enums, `switch`, etc.) en orden natural ascendente y con nivel `warn`. Por defecto `true`.
+	 * Decide qué ordena Perfectionist, siempre en orden natural ascendente y con nivel `warn`.
 	 *
-	 * `false` apaga todas sus reglas; para apagar sólo una, usa `rules`. `sort-imports` y `sort-named-imports`
-	 * pasarán a `error` en 2.0. `--fix` puede cambiar el comportamiento del código que depende del orden de
-	 * evaluación o de iteración: revisa el diff antes de aceptarlo.
+	 * - Sin la opción, sólo los imports: `sort-imports` y `sort-named-imports`, que pasarán a `error` en 2.0.
+	 * - `true` activa además el resto del conjunto `recommended-natural` (exports, objetos, interfaces, tipos, enums,
+	 *   `switch`, etc.), salvo `sort-classes` y `sort-modules`, cuyo `--fix` rompe código que funcionaba. Se activan
+	 *   una a una en `rules`, con el mismo orden natural.
+	 * - `false` no registra Perfectionist, y declarar en `rules` una de sus reglas produce un error.
+	 *
+	 * Con `true`, `--fix` aún puede cambiar el comportamiento del código que depende del orden de las claves o de la
+	 * evaluación, como `sort-objects` o `sort-maps`: revisa el diff antes de aceptarlo.
 	 *
 	 * @example
 	 * ```ts
-	 * export default defineEslint({ rules: { 'perfectionist/sort-objects': 'off' } })
+	 * export default defineEslint({ perfectionist: true, rules: { 'perfectionist/sort-objects': 'off', 'perfectionist/sort-classes': 'warn' } })
 	 * ```
 	 */
 	perfectionist?: boolean
@@ -70,11 +74,28 @@ const typeScriptFiles = ['**/*.{ts,tsx,mts,cts}']
 const meekoFiles = ['**/*.meeko']
 const defaults = ['**/node_modules/**', '**/dist/**', '**/.meeko/**', '**/*.d.meeko.ts', '**/*.generated.ts']
 
+/**
+ * Their fix moves code across an evaluation order the rule cannot see: sort-modules gives a ReferenceError when a
+ * static initializer reaches a later class through a function, and sort-classes gives NaN when a field reads another
+ * one through a method. Either one can be enabled by hand, and then inherits the natural order from the settings.
+ */
+const unsafeNaturalRules = new Set(['perfectionist/sort-classes', 'perfectionist/sort-modules'])
+
+/** What is sorted without the option. The options of sort-imports also apply when the whole preset is on. */
+function importSortRules(): Linter.RulesRecord {
+	return {
+		'perfectionist/sort-imports': ['warn', { type: 'natural', order: 'asc', sortSideEffects: false, useExperimentalDependencyDetection: false }],
+		'perfectionist/sort-named-imports': ['warn', { type: 'natural', order: 'asc' }],
+	}
+}
+
 /** The published natural preset, at warn level, so that a new Perfectionist rule arrives with its version. */
 function naturalSortRules(): Linter.RulesRecord {
 	const rules: Linter.RulesRecord = {}
-	for (const [name, entry] of Object.entries(perfectionist.configs['recommended-natural'].rules ?? {})) rules[name] = Array.isArray(entry) ? ['warn', ...entry.slice(1)] : 'warn'
-	return rules
+	for (const [name, entry] of Object.entries(perfectionist.configs['recommended-natural'].rules ?? {})) {
+		if (!unsafeNaturalRules.has(name)) rules[name] = Array.isArray(entry) ? ['warn', ...entry.slice(1)] : 'warn'
+	}
+	return { ...rules, ...importSortRules() }
 }
 
 /**
@@ -88,7 +109,7 @@ export function defineEslint<const Rules extends DefineEslintRules = DefineEslin
 	const javascript = options.javascript ?? true
 	const ts = options.typescript ?? true
 	const meeko = options.meeko ?? true
-	const sortImports = options.perfectionist ?? true
+	const sorting = options.perfectionist
 	if (!javascript && !ts && !meeko) throw new TypeError('defineEslint: enable at least one language')
 	if (options.ignores !== undefined && (!Array.isArray(options.ignores) || options.ignores.some((ignore) => typeof ignore !== 'string'))) throw new TypeError('defineEslint: ignores must be an array of strings')
 	if (options.rules !== undefined && (!options.rules || typeof options.rules !== 'object' || Array.isArray(options.rules))) throw new TypeError('defineEslint: rules must be an object')
@@ -104,18 +125,14 @@ export function defineEslint<const Rules extends DefineEslintRules = DefineEslin
 		config.push(...recommended.map((entry) => ({ ...entry, files: typeScriptFiles })))
 	}
 	if (meeko) config.push(...plugin.configs.recommended)
-	if (sortImports)
+	if (sorting !== false)
 		config.push({
 			name: 'meeko/perfectionist',
 			files,
 			plugins: { perfectionist },
-			// Shared defaults for the rules outside the preset (sort-arrays, sort-constructor-parameters) that the
-			// user enables in options.rules or an override.
+			// Shared defaults for every other perfectionist/* rule that the user enables in options.rules or an override.
 			settings: { perfectionist: { type: 'natural', order: 'asc' } },
-			rules: {
-				...naturalSortRules(),
-				'perfectionist/sort-imports': ['warn', { type: 'natural', order: 'asc', sortSideEffects: false, useExperimentalDependencyDetection: false }],
-			},
+			rules: sorting ? naturalSortRules() : importSortRules(),
 		})
 	if (options.unusedImports)
 		config.push({
@@ -151,7 +168,7 @@ export function defineEslint<const Rules extends DefineEslintRules = DefineEslin
 			}
 			tsRules[name] = value
 		} else if (name.startsWith('perfectionist/')) {
-			if (!sortImports) throw new TypeError(`defineEslint: ${name} requires perfectionist`)
+			if (sorting === false) throw new TypeError(`defineEslint: ${name} requires perfectionist`)
 			if (!Object.hasOwn(perfectionist.rules ?? {}, name.slice('perfectionist/'.length))) throw new TypeError(`defineEslint: unknown rule ${name}`)
 			optionalRules[name] = value
 		} else if (name.startsWith('unused-imports/')) {

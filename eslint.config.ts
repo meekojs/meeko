@@ -4,7 +4,6 @@ import globals from 'globals'
 
 export default defineEslint(
 	{
-		perfectionist: true,
 		unusedImports: true,
 		rules: {
 			'meeko/order-macros': 'error',
@@ -13,32 +12,11 @@ export default defineEslint(
 			'meeko/prefer-static-bindings': 'warn',
 			'meeko/attributes-order': 'error',
 			'meeko/html-self-closing': 'error',
-			// In 1.x defineEslint reports unsorted imports as warnings; this repository already treats them as
-			// errors (the 2.0 default).
+			// Only imports are kept in order: without the option defineEslint sorts them and nothing else, because
+			// the rest of the preset gave 21766 warnings here and its fixes can change behaviour. They warn in 1.x
+			// and this repository already treats them as errors (the 2.0 default).
 			'perfectionist/sort-imports': 'error',
 			'perfectionist/sort-named-imports': 'error',
-			// The rest of the preset is not adopted here: 21766 warnings when it was enabled, and reordering
-			// objects, classes or modules can change behaviour, so each rule needs its own review before a fix.
-			'perfectionist/sort-array-includes': 'off',
-			'perfectionist/sort-classes': 'off',
-			'perfectionist/sort-decorators': 'off',
-			'perfectionist/sort-enums': 'off',
-			'perfectionist/sort-export-attributes': 'off',
-			'perfectionist/sort-exports': 'off',
-			'perfectionist/sort-heritage-clauses': 'off',
-			'perfectionist/sort-import-attributes': 'off',
-			'perfectionist/sort-interfaces': 'off',
-			'perfectionist/sort-intersection-types': 'off',
-			'perfectionist/sort-jsx-props': 'off',
-			'perfectionist/sort-maps': 'off',
-			'perfectionist/sort-modules': 'off',
-			'perfectionist/sort-named-exports': 'off',
-			'perfectionist/sort-object-types': 'off',
-			'perfectionist/sort-objects': 'off',
-			'perfectionist/sort-sets': 'off',
-			'perfectionist/sort-switch-case': 'off',
-			'perfectionist/sort-union-types': 'off',
-			'perfectionist/sort-variable-declarations': 'off',
 			'@typescript-eslint/consistent-type-imports': ['error', { prefer: 'type-imports', fixStyle: 'separate-type-imports' }],
 		},
 		ignores: [

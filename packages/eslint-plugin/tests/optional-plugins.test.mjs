@@ -5,6 +5,7 @@ import perfectionist from 'eslint-plugin-perfectionist'
 import unusedImports from 'eslint-plugin-unused-imports'
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import vm from 'node:vm'
 
 import { defineEslint } from '../dist/index.js'
 
@@ -160,7 +161,7 @@ test('unused import option types track the reproducible public TS no-unused-vars
 	)
 })
 
-test('Perfectionist defaults warn and autofix imports in natural ascending order', () => {
+test('without the option, imports warn and autofix in natural ascending order', () => {
 	const source = "import { item10, item2 } from './item10';\nimport item from './item2';\nexport { item, item2, item10 };"
 	const selected = defineEslint()
 	const preset = selected.find(({ name }) => name === 'meeko/perfectionist')
@@ -191,8 +192,13 @@ test('Perfectionist defaults warn and autofix imports in natural ascending order
 	)
 })
 
-const presetRules = Object.keys(perfectionist.configs['recommended-natural'].rules).sort()
+const excludedRules = ['perfectionist/sort-classes', 'perfectionist/sort-modules']
+const importRules = ['perfectionist/sort-imports', 'perfectionist/sort-named-imports']
+const presetRules = Object.keys(perfectionist.configs['recommended-natural'].rules)
+	.filter((name) => !excludedRules.includes(name))
+	.sort()
 const presetOf = (selected) => selected.find(({ name }) => name === 'meeko/perfectionist').rules
+const allRules = defineEslint({ perfectionist: true })
 
 /** One breach of each preset rule that has syntax in a script; sort-jsx-props needs JSX. */
 const everyRule = `import { zed2, alpha2 } from './m'
@@ -220,7 +226,7 @@ const set = new Set(['z', 'a'])
 const map = new Map([['z', 1], ['a', 2]])
 function sw(x) { switch (x) { case 'z': return 1; case 'a': return 2 } }
 `
-const fired = (source, filename, selected = defineEslint()) => {
+const fired = (source, filename, selected = allRules) => {
 	const messages = new Linter().verify(source, selected, { filename })
 	assert.deepEqual(
 		messages.filter(({ fatal }) => fatal),
@@ -229,10 +235,10 @@ const fired = (source, filename, selected = defineEslint()) => {
 	return [...new Set(messages.filter(({ ruleId }) => ruleId?.startsWith('perfectionist/')).map(({ ruleId }) => ruleId))].sort()
 }
 
-test('perfectionist activates the whole published natural preset at warn level, and false activates nothing', () => {
-	for (const selected of [defineEslint(), defineEslint({ perfectionist: true })]) {
+test('without the option only the two import rules are active, in natural order and at warn level', () => {
+	for (const selected of [defineEslint(), defineEslint({ perfectionist: undefined })]) {
 		const rules = presetOf(selected)
-		assert.deepEqual(Object.keys(rules).sort(), presetRules)
+		assert.deepEqual(Object.keys(rules).sort(), importRules)
 		for (const [name, entry] of Object.entries(rules)) {
 			assert.equal(entry[0], 'warn', name)
 			assert.equal(entry[1].type, 'natural', name)
@@ -240,21 +246,40 @@ test('perfectionist activates the whole published natural preset at warn level, 
 		}
 		assert.equal(rules['perfectionist/sort-imports'][1].sortSideEffects, false)
 		assert.equal(rules['perfectionist/sort-imports'][1].useExperimentalDependencyDetection, false)
+		assert.deepEqual(selected.find(({ name }) => name === 'meeko/perfectionist').settings.perfectionist, { type: 'natural', order: 'asc' })
 	}
+	assert.deepEqual(fired(everyRule, 'app.ts', defineEslint()), importRules)
+	assert.deepEqual(fired(`<script lang="ts">\n${everyRule}</script>\n<template>{1}</template>`, 'App.meeko', defineEslint()), importRules)
+	const server = everyRule.replace(/^export \{ .* from .*\n/gm, '')
+	assert.deepEqual(fired(`<script server lang="ts">\n${server}</script>\n<template>{JSON.stringify({ z: 1, a: 2 })}</template>`, 'App.meeko', defineEslint()), importRules)
+})
+
+test('true activates the natural preset at warn level without sort-classes or sort-modules, and false activates nothing', () => {
+	const rules = presetOf(allRules)
+	assert.deepEqual(Object.keys(rules).sort(), presetRules)
+	assert.equal(presetRules.length, Object.keys(perfectionist.configs['recommended-natural'].rules).length - 2)
+	for (const name of excludedRules) assert.equal(rules[name], undefined, name)
+	for (const [name, entry] of Object.entries(rules)) {
+		assert.equal(entry[0], 'warn', name)
+		assert.equal(entry[1].type, 'natural', name)
+		assert.equal(entry[1].order, 'asc', name)
+	}
+	assert.equal(rules['perfectionist/sort-imports'][1].sortSideEffects, false)
+	assert.equal(rules['perfectionist/sort-imports'][1].useExperimentalDependencyDetection, false)
 	assert.ok(presetRules.includes('perfectionist/sort-objects'))
 	assert.deepEqual(fired(everyRule, 'app.ts', defineEslint({ perfectionist: false })), [])
 	assert.deepEqual(fired(`<script lang="ts">\n${everyRule}</script><template>{1}</template>`, 'App.meeko', defineEslint({ perfectionist: false })), [])
 })
 
-test('every preset rule reports in TypeScript and in the script of a component', () => {
+test('every active rule reports in TypeScript and in the script of a component', () => {
 	const scriptRules = presetRules.filter((name) => name !== 'perfectionist/sort-jsx-props')
 	assert.deepEqual(fired(everyRule, 'app.ts'), scriptRules)
 	assert.deepEqual(fired(`<script lang="ts">\n${everyRule}</script>\n<template>{1}</template>`, 'App.meeko'), scriptRules)
 	assert.deepEqual(fired('export const view = <Item z="1" a="2" />', 'app.tsx'), ['perfectionist/sort-jsx-props'])
 })
 
-test('a server block sorts what stays in its scope; its modules and exports do not report', () => {
-	const unsupported = new Set(['perfectionist/sort-export-attributes', 'perfectionist/sort-exports', 'perfectionist/sort-jsx-props', 'perfectionist/sort-modules', 'perfectionist/sort-named-exports'])
+test('a server block sorts what stays in its scope; its exports do not report', () => {
+	const unsupported = new Set(['perfectionist/sort-export-attributes', 'perfectionist/sort-exports', 'perfectionist/sort-jsx-props', 'perfectionist/sort-named-exports'])
 	const server = everyRule.replace(/^export \{ .* from .*\n/gm, '')
 	assert.deepEqual(
 		fired(`<script server lang="ts">\n${server}</script>\n<template>{1}</template>`, 'App.meeko'),
@@ -265,26 +290,26 @@ test('a server block sorts what stays in its scope; its modules and exports do n
 test('options.rules and overrides turn one rule off or replace its options, and a comment exempts one object', () => {
 	const source = 'export const value = { z: 1, a: 2 }\nexport const list = new Set([2, 1])\n'
 	const left = ['perfectionist/sort-sets']
-	assert.deepEqual(fired(source, 'app.ts', defineEslint({ rules: { 'perfectionist/sort-objects': 'off' } })), left)
-	assert.deepEqual(fired(source, 'app.ts', defineEslint({}, { files: ['**/*.ts'], rules: { 'perfectionist/sort-objects': 'off' } })), left)
-	const descending = defineEslint({ rules: { 'perfectionist/sort-objects': ['warn', { type: 'natural', order: 'desc' }] } })
+	assert.deepEqual(fired(source, 'app.ts', defineEslint({ perfectionist: true, rules: { 'perfectionist/sort-objects': 'off' } })), left)
+	assert.deepEqual(fired(source, 'app.ts', defineEslint({ perfectionist: true }, { files: ['**/*.ts'], rules: { 'perfectionist/sort-objects': 'off' } })), left)
+	const descending = defineEslint({ perfectionist: true, rules: { 'perfectionist/sort-objects': ['warn', { type: 'natural', order: 'desc' }] } })
 	assert.deepEqual(fired('export const value = { a: 1, z: 2 }', 'app.ts', descending), ['perfectionist/sort-objects'])
 	assert.deepEqual(fired('export const value = { z: 1, a: 2 }', 'app.ts', descending), [])
-	const strict = new Linter().verify(source, defineEslint({ rules: { 'perfectionist/sort-objects': 'error' } }), { filename: 'app.ts' })
+	const strict = new Linter().verify(source, defineEslint({ perfectionist: true, rules: { 'perfectionist/sort-objects': 'error' } }), { filename: 'app.ts' })
 	assert.equal(strict.find(({ ruleId }) => ruleId === 'perfectionist/sort-objects').severity, 2)
 	const exempted = `<script lang="ts">\n// eslint-disable-next-line perfectionist/sort-objects\nconst value = { z: 1, a: 2 }\n</script>\n<template>{value}</template>`
 	assert.deepEqual(fired(exempted, 'App.meeko'), [])
 })
 
 test('the rules outside the preset stay off and inherit the natural order when they are enabled', () => {
-	const rules = presetOf(defineEslint())
+	const rules = presetOf(allRules)
 	assert.equal(rules['perfectionist/sort-arrays'], undefined)
 	assert.equal(rules['perfectionist/sort-constructor-parameters'], undefined)
 	const source = 'export class Item { constructor(item10, item2) { this.value = [item10, item2] } }\n'
 	assert.deepEqual(fired(source, 'app.ts'), [])
 	// Perfectionist requires useConfigurationIf for these two, which is why they are outside its preset.
-	assert.throws(() => fired(source, 'app.ts', defineEslint({ rules: { 'perfectionist/sort-constructor-parameters': 'warn' } })), /fewer than 1 items/)
-	const enabled = defineEslint({ rules: { 'perfectionist/sort-constructor-parameters': ['warn', { useConfigurationIf: { allNamesMatchPattern: '^item' } }] } })
+	assert.throws(() => fired(source, 'app.ts', defineEslint({ perfectionist: true, rules: { 'perfectionist/sort-constructor-parameters': 'warn' } })), /fewer than 1 items/)
+	const enabled = defineEslint({ perfectionist: true, rules: { 'perfectionist/sort-constructor-parameters': ['warn', { useConfigurationIf: { allNamesMatchPattern: '^item' } }] } })
 	assert.deepEqual(fired(source, 'app.ts', enabled), ['perfectionist/sort-constructor-parameters'])
 	assert.match(new Linter().verifyAndFix(source, enabled, { filename: 'app.ts' }).output, /constructor\(item2, item10\)/)
 })
@@ -310,7 +335,7 @@ function alpha() { return zed() }
 	<div bind:title="JSON.stringify({ z: 'a&amp;b', a: 1 })">{props.a}{alpha()}{JSON.stringify({ z: data, a: 2 })}</div>
 </template>
 `
-	const selected = defineEslint()
+	const selected = allRules
 	for (const text of [source, source.replaceAll('\n', '\r\n')]) {
 		const result = new Linter().verifyAndFix(text, selected, { filename: 'App.meeko' })
 		assert.deepEqual(result.messages, [])
@@ -320,7 +345,7 @@ function alpha() { return zed() }
 		assert.ok(output.indexOf('<script server') < output.indexOf('<script lang'))
 		assert.match(output, /const loaded = \{ a: 2, z: 1 \}/)
 		assert.match(output, /interface Props \{ a\?: string; z\?: string/)
-		assert.ok(output.indexOf('function alpha') < output.indexOf('function zed'))
+		assert.ok(output.indexOf('function zed') < output.indexOf('function alpha'), 'sort-modules is not active')
 		assert.ok(output.indexOf('// Explains a') < output.indexOf('// Explains z'))
 		assert.match(output, /\{ a: 1, z: 'a&amp;b' \}/)
 		assert.match(output, /\{ a: 2, z: data \}/)
@@ -330,6 +355,7 @@ function alpha() { return zed() }
 })
 
 test('sorting respects direct dependencies, fallthrough, implicit enums and spread boundaries', () => {
+	const selected = defineEslint({ perfectionist: true, rules: { 'perfectionist/sort-classes': 'warn' } })
 	for (const source of [
 		'class Item { z = 1; a = this.z + 1 }\nexport { Item }\n',
 		'enum Level { Z, A }\nexport { Level }\n',
@@ -337,15 +363,53 @@ test('sorting respects direct dependencies, fallthrough, implicit enums and spre
 		"export const pick = (x) => { switch (true) { case x > 5: return 'big'; case x > 1: return 'mid'; default: return 'small' } }\n",
 		"export const order = (v) => { let r = ''; switch (v) { case 'z': r += 'z'; break; default: r += 'd'; case 'a': r += 'a'; break } return r }\n",
 	]) {
-		assert.equal(new Linter().verifyAndFix(source, defineEslint(), { filename: 'app.ts' }).output, source)
+		assert.equal(new Linter().verifyAndFix(source, selected, { filename: 'app.ts' }).output, source)
 	}
 })
 
 test('a fix follows the sort order even where the order is observable, which is why it needs a review', () => {
-	const output = (source) => new Linter().verifyAndFix(source, defineEslint(), { filename: 'app.ts' }).output
+	const output = (source) => new Linter().verifyAndFix(source, allRules, { filename: 'app.ts' }).output
 	assert.match(output('export const keys = Object.keys({ z: 1, a: 2 })\n'), /\{ a: 2, z: 1 \}/)
 	assert.match(output("export const routes = new Map([['/z/x', 1], ['/a', 2], ['/z', 3]])\n"), /\['\/a', 2\], \['\/z', 3\], \['\/z\/x', 1\]/)
-	assert.match(output('export class Item { z = 1; a = this.calc(); calc() { return this.z + 1 } }\n'), /a = this\.calc\(\); z = 1/)
-	const modules = output('class Z { static make() { return 1 } }\nfunction getZ() { return Z }\nclass A { static v = getZ().make() }\nexport const value = A.v\n')
-	assert.ok(modules.indexOf('class A') < modules.indexOf('class Z'))
+})
+
+test('a fix of a component changes the rendered order where the template depends on it', () => {
+	const output = (source) => new Linter().verifyAndFix(source, allRules, { filename: 'App.meeko' }).output
+	assert.match(output('<script lang="ts">\nconst attrs = { title: "x", id: "y" }\n</script>\n<template><div bind="attrs"></div></template>'), /\{ id: "y", title: "x" \}/)
+	assert.match(output('<script server lang="ts">\nexport const data = { z: 1, a: 2 }\n</script>\n<template><p each:of="Object.keys(data)" each:as="k" each:key="k">{k}</p></template>'), /\{ a: 2, z: 1 \}/)
+	assert.match(output(`<template><p each:of="Object.keys({ z: 1, a: 2 })" each:as="k" each:key="k">{k}</p></template>`), /Object\.keys\(\{ a: 2, z: 1 \}\)/)
+	const attributes = '<template><div title="x" id="y" data-z="1" data-a="2"></div></template>'
+	assert.equal(output(attributes), attributes, 'attributes belong to meeko/attributes-order')
+})
+
+/** Valid code that sort-modules and sort-classes used to break, with the value it computes. */
+const brokenByTheirFix = {
+	'perfectionist/sort-modules': { source: 'class Z { static make() { return 1 } }\nfunction getZ() { return Z }\nclass A { static v = getZ().make() }\nglobalThis.result = A.v\n', result: 1 },
+	'perfectionist/sort-classes': { source: 'class K { z = 1; a = this.calc(); calc() { return this.z + 1 } }\nglobalThis.result = new K().a\n', result: 2 },
+}
+const evaluate = (code) => vm.runInNewContext(`${code};globalThis.result`)
+
+test('--fix with true leaves the code that sort-modules and sort-classes break untouched', () => {
+	for (const { source, result } of Object.values(brokenByTheirFix)) {
+		assert.equal(evaluate(source), result)
+		assert.deepEqual(fired(source, 'app.ts'), [])
+		assert.equal(new Linter().verifyAndFix(source, allRules, { filename: 'app.ts' }).output, source)
+		const component = `<script lang="ts">\n${source}</script>\n<template>{1}</template>`
+		assert.equal(new Linter().verifyAndFix(component, allRules, { filename: 'App.meeko' }).output, component)
+	}
+})
+
+test('sort-modules and sort-classes can be enabled by hand, in natural order, and their fix breaks that code', () => {
+	const source = { 'perfectionist/sort-modules': 'class Item10 {}\nclass Item2 {}\nexport { Item10, Item2 }\n', 'perfectionist/sort-classes': 'export class K { item10 = 1; item2 = 2 }\n' }
+	for (const [name, broken] of Object.entries(brokenByTheirFix)) {
+		for (const selected of [defineEslint({ perfectionist: true, rules: { [name]: 'warn' } }), defineEslint({ rules: { [name]: 'warn' } }), defineEslint({ perfectionist: true }, { files: ['**/*.ts'], rules: { [name]: 'warn' } })]) {
+			assert.ok(fired(source[name], 'app.ts', selected).includes(name), name)
+			const { output } = new Linter().verifyAndFix(source[name], selected, { filename: 'app.ts' })
+			assert.ok(output.indexOf('tem2') < output.indexOf('tem10'), `${name} sorts item2 before item10`)
+		}
+		const { output } = new Linter().verifyAndFix(broken.source, defineEslint({ perfectionist: true, rules: { [name]: 'warn' } }), { filename: 'app.js' })
+		assert.notEqual(output, broken.source)
+		if (name === 'perfectionist/sort-modules') assert.throws(() => evaluate(output), /Z/)
+		else assert.ok(Number.isNaN(evaluate(output)))
+	}
 })

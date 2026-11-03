@@ -80,7 +80,7 @@ defineEslint({ unusedImports: true, rules: { 'unused-imports/unknown-rule': 'err
 // @ts-expect-error Unused imports options match its public schema.
 defineEslint({ unusedImports: true, rules: { 'unused-imports/no-unused-vars': ['error', { args: 'sometimes' }] } })
 
-// Perfectionist is enabled without an explicit option and accepts severity-only overrides.
+// Without the option imports are sorted, and any Perfectionist rule accepts severity-only overrides.
 defineEslint({ rules: { 'perfectionist/sort-imports': 'error', 'perfectionist/sort-named-imports': ['warn', { type: 'natural', order: 'asc' }] } })
 defineEslint({ perfectionist: false })
 // @ts-expect-error Perfectionist activation must be boolean.
