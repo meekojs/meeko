@@ -516,6 +516,18 @@ export function createPopover(props: UIPopoverProps, open: Signal<boolean>, id: 
 			})
 		}
 		triggerElement()
+		// A trigger replaced under the same `id` (an `if:when` in the anchor snippet) is found when it is
+		// reached: in the capture phase, so that its own listeners get this very event.
+		for (const type of ['pointerover', 'focusin']) {
+			listen(
+				document,
+				type,
+				() => {
+					if (hinting() && !anchor?.isConnected) triggerElement()
+				},
+				{ capture: true },
+			)
+		}
 		// Another `triggerId` moves the listeners and closes the hint. The template writes the new `id` in
 		// the same flush, so the search waits for it.
 		releases.push(

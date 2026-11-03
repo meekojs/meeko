@@ -26,6 +26,7 @@ const page = `<script lang="ts">
 	})
 	const external = signal('external-a')
 	const shown = signal(true)
+	const firstTrigger = signal(true)
 	const mounted = signal(true)
 	const start = signal(${openDelay})
 </script>
@@ -61,6 +62,8 @@ const page = `<script lang="ts">
 		<button id="external-b" type="button">Externo B</button>
 		<UIPopover mode="hint" bind:triggerId="external.value" class="tip-external" bind:delay="${openDelay}">Externo</UIPopover>
 		<UITooltip text="Se va" class="tip-gone" bind:delay="${openDelay}"><snippet name="anchor" params="trigger"><button if:when="shown.value" type="button" bind="trigger">Se va</button></snippet></UITooltip>
+		<UITooltip text="Cambia" class="tip-swap" bind:delay="${openDelay}" bind:closeDelay="${closeDelay}"><snippet name="anchor" params="trigger"><button if:when="firstTrigger.value" type="button" bind="trigger">Uno</button><button if:when="!firstTrigger.value" type="button" bind="trigger">Dos</button></snippet></UITooltip>
+		<button id="swap" type="button" on:click="() => (firstTrigger.value = !firstTrigger.value)">Sustituir</button>
 		<p id="state">{String(open.value)}|{toggles.value.join()}</p>
 		<button id="write-open" type="button" on:click="() => (open.value = true)">Abrir</button>
 		<button id="write-close" type="button" on:click="() => (open.value = false)">Cerrar</button>
@@ -281,6 +284,22 @@ async function sameBehavior(tab, errors) {
 	assert.equal(await openTip(external), false, 'the old trigger keeps no listener')
 	await until(external, true, () => hover(tab, tab.locator('#external-b')))
 	await until(external, false, () => away(tab))
+
+	// A trigger replaced under the same `id`: the new one opens it at the first pass, after `delay`, and the old one is forgotten.
+	const swapped = tab.locator('.tip-swap')
+	await until(swapped, true, () => hover(tab, tab.getByRole('button', { name: 'Uno', exact: true })))
+	await until(swapped, false, () => away(tab))
+	await tab.locator('#swap').evaluate((button) => button.click())
+	const second = tab.getByRole('button', { name: 'Dos', exact: true })
+	await second.waitFor()
+	const swappedTime = await until(swapped, true, () => hover(tab, second))
+	assert.ok(swappedTime >= openDelay - 20, `the new trigger waits for its delay, not ${swappedTime} ms`)
+	await until(swapped, false, () => away(tab))
+	// Replaced while open, it closes.
+	await until(swapped, true, () => hover(tab, second))
+	await until(swapped, false, () => tab.locator('#swap').evaluate((button) => button.click()))
+	await away(tab)
+	await sleep(closeDelay + 40)
 
 	// A trigger that leaves the document does not leave its tooltip open.
 	const gone = tab.locator('.tip-gone')
