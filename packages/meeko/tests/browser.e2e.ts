@@ -1511,6 +1511,8 @@ async function withServedApp(name: string, files: Record<string, string>, run: (
 			await writeFile(join(root, file), contents)
 		}
 		await linkRepositoryPackages(root, ['@meekojs/meeko', 'vite'])
+		// The generated clients autoimport useApi, as meeko build and meeko check prepare them.
+		if (Object.keys(files).some((file) => file.startsWith('server/'))) await prepareFrameworkTypes(root)
 		const built = await buildProject(root)
 		const { createServerApp } = (await import(pathToFileURL(resolve('dist/framework-server.js')).href)) as ServerModule
 		const { createNodeAssetReader, toNodeListener } = (await import(pathToFileURL(resolve('dist/node.js')).href)) as NodeModule
@@ -1689,6 +1691,118 @@ test('un each: con un módulo distinto por fila hidrata, reordena, cambia is y l
 		assert.deepEqual((await log()).sort(), ['mount input', 'mount select'])
 		assert.deepEqual(errors, [])
 	})
+})
+
+test('un módulo en un signal da 500 en SSR; empezar con undefined y asignarlo en el navegador funciona', { timeout: 240_000 }, async () => {
+	await withServedApp(
+		'module-in-signal-e2e',
+		{
+			'package.json': '{"name":"module-in-signal-app","private":true,"type":"module"}\n',
+			'meeko.config.mjs': 'export default {};\n',
+			'app/components/AppCard.meeko': '<script lang="ts">\nconst props = defineProps<{ title: string }>();\n</script>\n<template><h2 id="card">{props.title}</h2></template>\n',
+			'app/pages/broken.meeko': '<script lang="ts">\nimport * as AppCard from "../components/AppCard.meeko";\nconst options = signal([{ id: "a", component: AppCard }]);\n</script>\n<template><p>{options.value.length}</p></template>\n',
+			'app/pages/chooser.meeko': `<script lang="ts">
+const selected = signal<ResolvedComponent<"AppCard"> | undefined>(undefined);
+async function choose(): Promise<void> {
+	selected.value = await resolveComponent("AppCard", { title: "Hola" });
+}
+</script>
+<template><button type="button" id="choose" on:click="choose">Elegir</button><component if:when="selected.value" is="selected.value!" /></template>
+`,
+		},
+		async (origin, browser) => {
+			assert.equal((await fetch(`${origin}/broken`)).status, 500)
+			const response = await fetch(`${origin}/chooser`)
+			assert.equal(response.status, 200)
+			assert.doesNotMatch(await response.text(), /id="card"/)
+			const page = await browser.newPage()
+			const errors: string[] = []
+			page.on('pageerror', (error) => errors.push(error.message))
+			page.on('console', (message) => {
+				if (message.type() === 'error') errors.push(message.text())
+			})
+			await page.goto(`${origin}/chooser`)
+			await page.waitForFunction(() => performance.getEntriesByName('meeko-hydration').length > 0)
+			await page.locator('#choose').click()
+			assert.equal(await page.locator('#card').textContent(), 'Hola')
+			assert.deepEqual(errors, [])
+		},
+	)
+})
+
+test('al navegar a un módulo elegido en ejecución, la pasada previa espera su await useApi y no pinta la fila sin datos', { timeout: 240_000 }, async () => {
+	await withServedApp(
+		'is-prepass-e2e',
+		{
+			'package.json': '{"name":"is-prepass-app","private":true,"type":"module"}\n',
+			'meeko.config.mjs': 'export default {};\n',
+			'shared/schemas/items.ts': `export type Item = string;
+export const items = { "~standard": { version: 1 as const, vendor: "e2e", types: undefined as unknown as { input: Item[]; output: Item[] }, validate: (value: unknown) => ({ value: value as Item[] }) } };
+`,
+			'server/api/items/index.get.ts': `import { items } from "../../../shared/schemas/items.js";
+export default defineApiRoute({
+  response: items,
+  handler: async () => {
+    await new Promise((done) => setTimeout(done, 400));
+    return ["uno", "dos"];
+  },
+});
+`,
+			'app/components/AppData.meeko': `<script lang="ts">
+const props = defineProps<{ label: string }>();
+const items = await useApi("/api/items");
+</script>
+<template><div class="row"><b>{props.label}</b><span class="loaded">{items.data.value.join(",")}</span></div></template>
+`,
+			'app/components/AppPlain.meeko': '<script lang="ts">\nconst props = defineProps<{ note: string }>();\n</script>\n<template><div class="row"><i>{props.note}</i></div></template>\n',
+			'app/pages/index.meeko': '<template><h1 id="home">Inicio</h1><MeekoLink id="to-list" to="/list">Lista</MeekoLink></template>\n',
+			'app/pages/list.meeko': `<script lang="ts">
+import * as AppData from "../components/AppData.meeko";
+import * as AppPlain from "../components/AppPlain.meeko";
+const options = [{ id: "plain", component: AppPlain, props: { note: "nota" } }, { id: "data", component: AppData, props: { label: "datos" } }];
+</script>
+<template><h1 id="list">Lista</h1><component each:of="options" each:as="option" each:key="option.id" is="option.component" bind="option.props" /><MeekoLink id="to-home" to="/">Inicio</MeekoLink></template>
+`,
+		},
+		async (origin, browser) => {
+			// The document itself: the data is in the HTML of SSR.
+			const html = (await (await fetch(`${origin}/list`)).text()).replace(/<!--[^>]*-->/g, '')
+			assert.match(html, /<span class="loaded"[^>]*>uno,dos<\/span>/)
+
+			const page = await browser.newPage()
+			const errors: string[] = []
+			const requests: string[] = []
+			page.on('pageerror', (error) => errors.push(error.message))
+			page.on('console', (message) => {
+				if (message.type() === 'error') errors.push(message.text())
+			})
+			page.on('request', (request) => {
+				if (request.resourceType() === 'fetch') requests.push(new URL(request.url()).pathname)
+			})
+			await page.goto(`${origin}/`)
+			await page.waitForFunction(() => performance.getEntriesByName('meeko-hydration').length > 0)
+			// Every state of the page while it navigates, read as soon as the DOM changes.
+			await page.evaluate(() => {
+				const seen: string[] = []
+				;(window as unknown as { seen: string[] }).seen = seen
+				new MutationObserver(() => {
+					if (document.querySelector('#list')) seen.push(document.querySelector('.loaded')?.textContent ?? 'sin datos')
+				}).observe(document.documentElement, { childList: true, subtree: true, characterData: true })
+			})
+			await page.locator('#to-list').click()
+			// The old page stays until the data is there: the navigation waits for the row of the list.
+			assert.equal(await page.locator('#home').count(), 1)
+			await page.locator('#list').waitFor()
+			assert.equal(await page.locator('.loaded').textContent(), 'uno,dos')
+			const seen = await page.evaluate(() => (window as unknown as { seen: string[] }).seen)
+			assert.ok(seen.length > 0)
+			assert.deepEqual([...new Set(seen)], ['uno,dos'], 'the row never appears without its data')
+			// One request: the data of the page brings that of the row, and the commit does not ask for it again.
+			assert.deepEqual(requests, ['/list'])
+			assert.equal(await page.locator('.row i').textContent(), 'nota')
+			assert.deepEqual(errors, [])
+		},
+	)
 })
 
 const richSelectPage = `<script lang="ts">
