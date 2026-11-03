@@ -1,6 +1,6 @@
 import type { GenericParameters } from '../generic'
 
-import { modelEventName, modelPropName } from '../../app/runtime/emits'
+import { modelEventName, modelPropName } from '../../shared/model-names'
 import { markSource } from '../mapping'
 
 interface ChannelSource {

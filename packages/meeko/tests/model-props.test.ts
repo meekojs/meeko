@@ -299,6 +299,32 @@ const name = signal("Ada");
 	}
 })
 
+test('a generic component in a list of modules takes the value of its model from bind, and follows it', async () => {
+	const generic = `<script lang="ts" generic="T">
+const props = defineProps<{ format: (item: T) => string }>();
+const value = defineModel<T>();
+</script>
+<template><span class="generic">{props.format(value.value)}</span></template>`
+	const script = `import * as Generic from "./Generic.meeko";\nconst count = signal(1);\nconst options = computed(() => [{ id: "a", component: Generic, props: { format: (item: number) => \`#\${item}\`, modelValue: count.value } }, { id: "b", component: Child, props: { modelValue: \`texto \${count.value}\` } }]);`
+	const tag = `<component each:of="options.value" each:as="option" each:key="option.id" is="option.component" bind="option.props" /><button type="button" class="more" on:click="() => count.value++">m</button>`
+	const parent = parentOf(script, tag).replace('import { signal } from "@meekojs/meeko";', 'import { computed, signal } from "@meekojs/meeko";')
+	const { component, cleanup } = await load({ Child: child, Generic: generic, Parent: parent }, 'Parent')
+	const window = new Window()
+	try {
+		const { html, text, input, click, release } = mount(window, component)
+		assert.match(html, />#1</)
+		assert.match(html, /value="texto 1"/)
+		assert.equal(text('.generic'), '#1')
+		click('.more')
+		assert.equal(text('.generic'), '#2')
+		assert.equal(input().value, 'texto 2')
+		release()
+	} finally {
+		window.happyDOM.abort()
+		await cleanup()
+	}
+})
+
 test('an unmounted child stops following the prop and calling the event', async () => {
 	const counted = `<script lang="ts">
 import { effect } from "@meekojs/meeko";
@@ -557,6 +583,12 @@ const props = defineProps<{ placeholder?: string }>();
 </script>
 <template><input model="value" bind:placeholder="props.placeholder" /><b>{touched.value}</b></template>`
 
+const genericField = `<script lang="ts" generic="T">
+const props = defineProps<{ format: (item: T) => string; hint?: string }>();
+const value = defineModel<T>();
+</script>
+<template><button type="button" class="generic" bind:title="props.hint" on:click="() => value.value = value.value">{props.format(value.value)}</button></template>`
+
 const typedOptional = `<script lang="ts">
 const value = defineModel<string>({ default: "" });
 </script>
@@ -571,6 +603,8 @@ test('meeko check knows the prop and the event of a model, and that a required o
 	await writeFile(join(root, 'Typed.meeko'), typed)
 	await writeFile(join(root, 'Optional.meeko'), typedOptional)
 	await writeFile(join(root, 'TypedTwo.meeko'), typed)
+	await writeFile(join(root, 'GenericField.meeko'), genericField)
+	await writeFile(join(root, 'GenericOnly.meeko'), `<script lang="ts" generic="T">\nconst value = defineModel<T>();\n</script>\n<template><b>{String(value.value)}</b></template>`)
 	const parent = (template: string, extra = ''): string => `<script lang="ts">
 import { signal } from "@meekojs/meeko";
 import type { Component } from "@meekojs/meeko";
@@ -640,6 +674,36 @@ void [props, only, events, viaRender, asComponent];`,
 		{
 			name: 'CorrelatedSignalNextToBind',
 			source: parent(`<template each:of="options" each:as="option"><component is="option.component" bind="option.props" model="name" /></template>`, `import * as TypedTwo from "./TypedTwo.meeko";\nconst options = [{ component: Typed, props: { placeholder: "x" } }, { component: TypedTwo, props: {} }];`),
+			codes: [],
+		},
+		{
+			name: 'GenericInList',
+			source: parent(`<template each:of="options" each:as="option"><component is="option.component" bind="option.props" /></template>`, `import * as GenericField from "./GenericField.meeko";\nconst options = [{ component: GenericField, props: { format: (item: number) => String(item), modelValue: 1 } }, { component: Typed, props: { modelValue: "hola" } }];`),
+			codes: [],
+		},
+		{
+			name: 'GenericInListWithoutItsModel',
+			source: parent(`<template each:of="options" each:as="option"><component is="option.component" bind="option.props" /></template>`, `import * as GenericField from "./GenericField.meeko";\nconst options = [{ component: GenericField, props: { format: (item: number) => String(item) } }, { component: Typed, props: { modelValue: "hola" } }];`),
+			codes: ['MEEK113'],
+		},
+		{
+			name: 'GenericInListWithAnUnknownKey',
+			source: parent(`<template each:of="options" each:as="option"><component is="option.component" bind="option.props" /></template>`, `import * as GenericField from "./GenericField.meeko";\nconst options = [{ component: GenericField, props: { format: (item: number) => String(item), modelValue: 1, nope: 1 } }, { component: Typed, props: { modelValue: "hola" } }];`),
+			codes: ['MEEK113'],
+		},
+		{
+			name: 'GenericTag',
+			source: parent(`<GenericField bind:format="(item: number) => String(item)" bind:modelValue="1" on:update:modelValue="(next) => { const count: number = next; void count; }" />`, `import * as GenericField from "./GenericField.meeko";`),
+			codes: [],
+		},
+		{
+			name: 'GenericTagWrongValue',
+			source: parent(`<GenericField bind:format="(item: number) => String(item)" bind:modelValue="'x'" />`, `import * as GenericField from "./GenericField.meeko";`),
+			codes: ['TS2322'],
+		},
+		{
+			name: 'GenericFromTheModelAlone',
+			source: parent(`<GenericOnly bind:modelValue="1" on:update:modelValue="(next) => { const count: number = next; void count; }" />`, `import * as GenericOnly from "./GenericOnly.meeko";`),
 			codes: [],
 		},
 		{ name: 'SingleModuleInBind', source: parent(`<component is="option.component" bind="option.props" />`, `const option = { component: Typed, props: { modelValue: "hola", placeholder: "x" } };`), codes: [] },

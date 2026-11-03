@@ -1,6 +1,6 @@
 import ts from '@typescript/typescript6'
 
-import { modelEventName, modelPropName } from '../runtime/emits'
+import { modelEventName, modelPropName } from '../../shared/model-names'
 
 /** `const name = defineModel<T>(modelName?, options?)` accepted by the compiler. */
 export interface ModelDeclaration {

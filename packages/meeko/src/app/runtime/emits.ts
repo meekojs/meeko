@@ -26,16 +26,6 @@ export function emitPropName(name: string): string {
 	return `on${name.charAt(0).toUpperCase()}${name.slice(1)}`
 }
 
-/** Prop name of a model: the unnamed one, `default`, is `modelValue`; `touched` is `touched`. */
-export function modelPropName(name: string): string {
-	return name === 'default' ? 'modelValue' : name
-}
-
-/** Event of a model: `update:modelValue` for the unnamed one, `update:touched` for `touched`. */
-export function modelEventName(name: string): string {
-	return `update:${modelPropName(name)}`
-}
-
 /**
  * Creates the `emit` of a component instance. The prop is read on each call, so the callback
  * that the parent currently passes is the one that runs. The callback result is returned at

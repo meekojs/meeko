@@ -1178,7 +1178,7 @@ export function createVirtualComponent(source: string, filename: string, options
 	code += `export type ComponentDefaults = ${componentDefaultsType(defaultTexts)};\n`
 	code += `type __MeekoDeclaredProps${G} = ${declaredProps};\n`
 	// Named so the editor can list the events of this component on a parent's tag.
-	if (emitsTypeText || modelTypes) code += `type __MeekoEmits${G} = ${[...(emitsTypeText ? [`(${emitsTypeText})`] : []), ...(modelTypes ? [`Partial<${modelTypes.emits}>`] : [])].join(' & ')};\n`
+	if (emitsTypeText || modelTypes) code += `type __MeekoEmits${G} = ${modelTypes ? `${emitsTypeText ? `(${emitsTypeText}) & ` : ''}Partial<${modelTypes.emits}>` : emitsTypeText};\n`
 	code += 'type __MeekoEmitPropsOf<T> = { [K in keyof T & string as `on${Capitalize<K>}`]?: ((...args: Exclude<T[K], undefined> extends readonly unknown[] ? Exclude<T[K], undefined> : never) => void) | undefined };\n'
 	const modelValues = modelTypes ? ` & ${modelTypes.values}` : ''
 	code += `type __MeekoComponentProps${G} = (${inputProps})${modelValues}${emitsTypeText || modelTypes ? ` & __MeekoEmitPropsOf<__MeekoEmits${A}>` : ''};\nexport type { __MeekoComponentProps as ComponentProps };\n`

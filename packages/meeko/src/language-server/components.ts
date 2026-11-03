@@ -2,7 +2,8 @@ import ts from '@typescript/typescript6'
 
 import type { VirtualComponent } from './model'
 
-import { emitPropName, modelEventName, modelPropName } from '../app/runtime/emits'
+import { emitPropName } from '../app/runtime/emits'
+import { modelEventName, modelPropName } from '../shared/model-names'
 
 /** A member of a component channel with its display type. */
 export interface ComponentMember {

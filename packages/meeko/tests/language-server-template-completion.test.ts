@@ -190,6 +190,9 @@ describe('language server: what template completion inserts', () => {
 			[
 				['on:save', 'on:save="$1"', 'on:s'],
 				['on:select', 'on:select="$1"', 'on:s'],
+				// Since 1.8 each model of Card also has its event.
+				['on:update:modelValue', 'on:update:modelValue="$1"', 'on:s'],
+				['on:update:open', 'on:update:open="$1"', 'on:s'],
 			],
 		)
 		const models = (await complete('<Card model:| />')).inserted

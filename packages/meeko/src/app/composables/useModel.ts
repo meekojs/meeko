@@ -2,8 +2,9 @@ import type { ModelOptions } from '../../app/definitions/define-model'
 import type { Signal } from '../../core/reactivity'
 
 import { effect, interceptedSignal, isWritableSignal, signal, untrack } from '../../core/reactivity'
+import { modelEventName, modelPropName } from '../../shared/model-names'
 import { readChannels } from '../runtime/channels'
-import { createEmit, emitPropName, modelEventName, modelPropName } from '../runtime/emits'
+import { createEmit, emitPropName } from '../runtime/emits'
 import { isReactiveProps } from '../runtime/props'
 
 function attributeOf(name: string): string {

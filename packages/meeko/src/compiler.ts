@@ -26,7 +26,7 @@ import { analyzePropsDeclaration, analyzePropsPattern, componentDefaultsType, de
 import { analyzeSnippets, SnippetsError, snippetTypeParts } from './app/definitions/define-snippets'
 import { ElementRefError, resolveElementRef, validateElementRefBinding } from './app/definitions/use-element-ref'
 import { isTagName, isVoidTag } from './app/runtime/dynamic-tag'
-import { emitPropName, modelEventName, modelPropName } from './app/runtime/emits'
+import { emitPropName } from './app/runtime/emits'
 import { closedAttributeValues, closedAttributeValuesOf } from './compiler/attribute-values'
 import { emitComponentChannels } from './compiler/codegen/channels'
 import { emitComponentProps } from './compiler/codegen/props'
@@ -48,6 +48,7 @@ import { propAliasReadsOnce, propsReadsOnce } from './compiler/transforms/props-
 import { scopeCss } from './compiler/transforms/scoped-css'
 import { analyzeServerScript, bindingIdentifiers, checkClientScript } from './compiler/transforms/server-script'
 import { setupTypeQuery, setupValueNames, transferredStates } from './compiler/transforms/transferred-state'
+import { modelEventName, modelPropName } from './shared/model-names'
 import { elementAttributeNames, tagsAccepting } from './shared/html-attributes'
 
 interface DynamicText {
