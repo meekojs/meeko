@@ -522,7 +522,7 @@ export function createAppNavigator(routes: readonly RouteRecord[], render: (cont
 		const settleScroll = (): void => {
 			if (scrollSettled) return
 			scrollSettled = true
-			if (!memory.arrive()) scrollToFragment(browser, url, false)
+			if (!memory.arrive()) scrollToFragment(browser, url, true)
 		}
 		const shared = { url, signal: controller.signal, retainedLayouts, ...(traversal ? { settleScroll } : {}), ...(options.viewTransition === undefined ? {} : { viewTransition: options.viewTransition }) }
 		let result: void | boolean
@@ -580,8 +580,8 @@ export function createAppNavigator(routes: readonly RouteRecord[], render: (cont
 		currentUrl = url.href
 		pending = undefined
 		// A new entry starts at the top or at its fragment, and a replaced one keeps the scroll unless a
-		// fragment names an element. A traversal goes back to its position, or to its fragment if it has
-		// none, here if its renderer did not ask for it with the DOM.
+		// fragment names an element. A traversal goes back to its position or, without one, to its fragment
+		// or the top, here if its renderer did not ask for it with the DOM.
 		if (traversal) settleScroll()
 		else scrollToFragment(browser, url, !options.replace)
 		memory.note()
@@ -598,7 +598,8 @@ export function createAppNavigator(routes: readonly RouteRecord[], render: (cont
 		if (url && sameDocument(url, new URL(currentUrl))) {
 			currentUrl = url.href
 			onSameDocument?.(url)
-			if (!memory.arrive()) scrollToFragment(browser, url, false)
+			// With a fragment that names nothing the page stays, as after following a link to it.
+			if (!memory.arrive()) scrollToFragment(browser, url, !url.hash)
 			return
 		}
 		void go(browser.location.href, { replace: true }, true).catch((error: unknown) => reportNavigationError(browser, error, onError))

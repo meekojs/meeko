@@ -219,6 +219,16 @@ test('back and forward return to the position of each entry, with no frame elsew
 		await bothWays(browser, origin, {}, `${engine} animated`)
 		await bothWays(browser, origin, { reducedMotion: 'reduce' }, `${engine} reduced motion`)
 
+		// An entry never scrolled writes nothing on load, and returns to the top.
+		const fresh = await open(browser, origin, '/short')
+		assert.equal(await fresh.page.evaluate(() => history.state), null, `${engine}: a load writes nothing in the history`)
+		await follow(fresh.page, 'to-long', 'long')
+		await scrollPage(fresh.page, 9000)
+		await fresh.page.goBack()
+		await settled(fresh.page, 'short')
+		assert.equal(await scrollPosition(fresh.page), 0, `${engine}: back to an entry never scrolled`)
+		await fresh.close()
+
 		const { page, close } = await open(browser, origin, '/long')
 		const animates = await page.evaluate(() => typeof document.startViewTransition === 'function')
 		await scrollPage(page, 9000)

@@ -17,7 +17,7 @@ export interface ScrollMemory {
 	leave(): unknown
 	/** Returns the state of the current entry with its name kept, for `replaceState`. */
 	keep(): unknown
-	/** After a traversal has painted its page, goes back to the entry's position. `false` if it has none. */
+	/** After a traversal has painted its page, goes back to the entry's position. `false` if it has none, as one never scrolled. */
 	arrive(): boolean
 	dispose(): void
 }
@@ -44,7 +44,8 @@ function readStored(browser: Window): Map<string, Position> {
  * other code keeps there, and the positions in `sessionStorage`, because an entry that is being left
  * can no longer be written to. Between entries of a document Meeko scrolls by itself. On a reload or
  * a return from another document the browser does, and much earlier than hydration, so the entry on
- * screen goes back to `auto` when the page hides.
+ * screen goes back to `auto` when the page hides. An entry only gets its name when it has a position
+ * to remember: loading a page writes nothing in the history, which others can observe as a navigation.
  *
  * @param browser The window. A host without a document or `scrollTo` gets an inert memory.
  * @param navigating Whether a navigation is in flight: the page on screen is not the current entry's.
@@ -58,17 +59,21 @@ export function createScrollMemory(browser: Window, navigating: () => boolean): 
 	let frame: number | undefined
 	let position: Position = [browser.scrollX, browser.scrollY]
 
+	const known = (): string | undefined => {
+		const value = (history.state as Record<string, unknown> | null | undefined)?.[ENTRY]
+		return typeof value === 'string' ? value : undefined
+	}
 	/** The name of the current entry, given now if it has none. A state that is not an object is left alone. */
 	const name = (): string | undefined => {
 		const state: unknown = history.state
 		if (state !== null && state !== undefined && typeof state !== 'object') return undefined
-		const known = (state as Record<string, unknown> | null)?.[ENTRY]
-		if (typeof known === 'string') return known
+		const existing = known()
+		if (existing) return existing
 		const created = Math.random().toString(36).slice(2, 10)
 		history.replaceState({ ...state, [ENTRY]: created }, '', browser.location.href)
 		return created
 	}
-	let current = name()
+	let current = position[0] || position[1] ? name() : known()
 
 	const note = (): void => {
 		position = [browser.scrollX, browser.scrollY]
@@ -145,6 +150,7 @@ export function createScrollMemory(browser: Window, navigating: () => boolean): 
 			if (frame === undefined) note()
 		},
 		leave() {
+			if (current === undefined && (position[0] || position[1])) current = name()
 			remember()
 			cancel()
 			current = Math.random().toString(36).slice(2, 10)
@@ -152,13 +158,12 @@ export function createScrollMemory(browser: Window, navigating: () => boolean): 
 			return { [ENTRY]: current }
 		},
 		keep() {
-			const state: unknown = history.state
-			return state !== null && state !== undefined && typeof state !== 'object' ? state : { ...state, [ENTRY]: current }
+			return current === undefined ? (history.state ?? null) : { ...history.state, [ENTRY]: current }
 		},
 		arrive() {
 			remember()
 			cancel()
-			current = name()
+			current = known()
 			history.scrollRestoration = 'manual'
 			const target = current === undefined ? undefined : entries.get(current)
 			if (target) restore(target)

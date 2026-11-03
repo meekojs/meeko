@@ -276,7 +276,9 @@ test('other code keeps its data in history.state, through new navigations, trave
 	const fake = fakeBrowser('https://example.test/docs/a')
 	const navigator = createNavigator(routes, () => {}, fake.window)
 	fake.browser.history.replaceState({ ...fake.state(), mine: 1 }, '', fake.browser.location.href)
+	fake.userScroll(10)
 	const name = fake.state()!.meekoEntry
+	assert.equal(typeof name, 'string')
 	await navigator.navigate('/docs/b')
 	fake.traverse(-1)
 	await settle()
@@ -333,6 +335,37 @@ test('a page that hides leaves the entry to the browser, and the next document f
 	empty.runFrame()
 	assert.equal(empty.browser.scrollY, 5500)
 	fourth.dispose()
+})
+
+test('loading a page writes nothing in the history, and an entry never scrolled returns to the top', async () => {
+	const fake = fakeBrowser('https://example.test/docs/a')
+	let writes = 0
+	const replaceState = fake.browser.history.replaceState.bind(fake.browser.history)
+	fake.browser.history.replaceState = (...args) => {
+		writes++
+		replaceState(...args)
+	}
+	const navigator = createNavigator(routes, () => {}, fake.window)
+	assert.equal(writes, 0, 'a replaceState is a same-document navigation for whoever observes them')
+	assert.equal(fake.state(), null)
+	await navigator.navigate('/docs/b')
+	assert.equal(writes, 0)
+	fake.userScroll(4000)
+	fake.traverse(-1)
+	await settle()
+	assert.equal(fake.browser.location.pathname, '/docs/a')
+	assert.equal(fake.browser.scrollY, 0, 'it was at the top')
+	fake.traverse(1)
+	await settle()
+	assert.equal(fake.browser.scrollY, 4000)
+	navigator.dispose()
+
+	// A page that loads already scrolled, as on a reload, has a position to remember from the start.
+	const scrolled = fakeBrowser('https://example.test/docs/a')
+	scrolled.browser.scrollY = 300
+	const other = createNavigator(routes, () => {}, scrolled.window)
+	assert.equal(typeof scrolled.state()?.meekoEntry, 'string')
+	other.dispose()
 })
 
 test('storage that fails only costs the return from another document', async () => {
