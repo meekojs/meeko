@@ -1,5 +1,5 @@
 ---
-source-hash: 13cd63eba660c06e55b6b58a7555069620f102f803e1b86610848ab908d39ee6
+source-hash: d6dad4bfc51a3fb5bfcd2cebb272d157d0f656d10c389e9326db16db5dc6b681
 ---
 
 # Meeko API
@@ -949,7 +949,8 @@ Since `1.5`, `bind="obj"` writes an object's keys as attributes of an element, o
 </template>
 ```
 
-- **Types.** The object is checked against the tag's attributes (or those of any `<component is>` tag), or the component's props: a key that is not one produces `MEEK113`. `ElementAttributes<Tag>` types the object. On a custom element (`<x-card bind="...">`), `bind` remains an HTML attribute, like `html` and `model`.
+- **Types.** The object is checked against the tag's attributes (or those of any `<component is>` tag), or the component's props: a key that is not one produces `MEEK113`. If `is` can be both, a key that either of them accepts is valid. `ElementAttributes<Tag>` types the object. On a custom element (`<x-card bind="...">`), `bind` remains an HTML attribute, like `html` and `model`.
+- **A list with one component per row.** If `is` and `bind` read the same object (`is="option.component" bind="option.props"`), each entry is checked against its own component, and wrong props produce `MEEK113` on `bind`. With other expressions, TypeScript cannot relate them and the object must be valid for every possible component. See [the `<component is>` list](reference/components/component-tag.md#a-list-with-one-component-per-row).
 - **Values.** Keys with `undefined`, `null` or `false` are not written, as with `bind:x`; `true` writes the empty attribute. On a component, an `undefined` key is an absent prop.
 - **Order.** An explicit `bind:x` or static attribute wins over the same object key. `class` and `style` are **combined** in any order, including `class`, `bind:class` and `bind` together: explicit and object classes are joined, and the object's `style` declarations precede explicit ones, which win. On a component they are not combined: the explicit prop wins.
 - **The same attribute as text and with `bind:`.** Except for `class` and `style`, `id="a" bind:id="b"` produces the `MEEK133` warning: only `bind:id` applies, in any order, and the text is ignored. Keep one of the two.

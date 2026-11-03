@@ -50,7 +50,7 @@ const props = defineProps<{ content: Component<{ label: string }>; label: string
 | `is`                    | `Component<Props>`, una etiqueta HTML o una unión de ambos | Sólo en `<component>`. Una etiqueta no permitida (`script`, `iframe`, `style`…) es `MEEK112`. Desde `1.8`, también literales en PascalCase con el nombre de un componente (`'MeekoLink'`, `'UICard'`); uno desconocido es `MEEK132`. |
 | `bind:prop`             | el tipo de la prop                                         | Una prop con el valor de una expresión. Una prop opcional acepta `undefined`, que equivale a no pasarla.                                                                                                                             |
 | `prop="texto"`          | literal                                                    | Prop estática: el texto como literal (`variant="primary"`) o `true` sin valor. Los nombres con guiones no son props (`MEEK032`).                                                                                                     |
-| `bind="objeto"`         | props o atributos                                          | Desde `1.5`, props (o atributos de la etiqueta) desde un objeto, sin claves `on*`; las explícitas ganan (`MEEK113`).                                                                                                                 |
+| `bind="objeto"`         | props o atributos                                          | Desde `1.5`, props o atributos de lo que `is` pueda ser, desde un objeto, sin claves `on*`; las explícitas ganan (`MEEK113`).                                                                                                        |
 | `on:evento`             | `(…args) => unknown`                                       | La prop de callback `onEvento` de un evento de `defineEmits`.                                                                                                                                                                        |
 | `model`, `model:nombre` | `Signal<T>`                                                | Los modelos del hijo, de `defineModel`.                                                                                                                                                                                              |
 | `ref:nombre`            |                                                            | Nombra la instancia para `useElementRef`; su tipo sale del `defineExpose` del hijo.                                                                                                                                                  |
@@ -143,6 +143,56 @@ const snippets = defineSnippets<{ default: [] }>();
 </component>
 ```
 
+### Una lista con un componente por fila
+
+```html
+<script lang="ts">
+import * as AppInput from "./AppInput.meeko";
+import * as AppSelect from "./AppSelect.meeko";
+
+type Option =
+  | { id: string; component: typeof AppSelect; props: AppSelectProps }
+  | { id: string; component: typeof AppInput; props: AppInputProps };
+
+const options: Option[] = [
+  { id: "role", component: AppSelect, props: { label: "Rol", options: ["admin", "user"] } },
+  { id: "name", component: AppInput, props: { placeholder: "Nombre" } },
+];
+</script>
+
+<template>
+  <component each:of="options" each:as="option" each:key="option.id" is="option.component" bind="option.props" />
+</template>
+```
+
+`is` y `bind` leen el mismo objeto, así que `meeko check` comprueba cada entrada contra su propio componente. Con el tipo escrito, unas props equivocadas fallan en la propia lista. Sin él, como en `const options = [{ … }]`, TypeScript también conserva la relación entre `component` y `props` de cada entrada, y el error sale en `bind`: `{ component: AppInput, props: { label: "Nombre" } }` da `MEEK113: label no es una prop del componente de esa entrada`. Vale con cualquier camino de propiedades que empiece igual en los dos, como `current.value.component` y `current.value.props`, y también con una etiqueta HTML en una de las entradas.
+
+Si `is` y `bind` no leen el mismo objeto (`is="views[mode.value]" bind="attrs"`), TypeScript no puede relacionarlos: el objeto debe valer para todos los componentes posibles.
+
+Usa `AppSelectProps`, no `ComponentProps<"AppSelect">`: este último incluye los eventos de `defineEmits`, y `bind` no admite claves `on*` (`MEEK113`). Los eventos se pasan con `on:`, y el contenido entre las etiquetas es el snippet `default` de cada fila.
+
+Un módulo no es un dato que se pueda enviar al navegador, así que no va en un `signal`: al renderizar en el servidor lanzaría un `TypeError`, porque no se puede serializar. Si la lista cambia, guarda en la señal qué entradas se pintan y léelas con un `computed`:
+
+```html
+<script lang="ts">
+import * as AppInput from "./AppInput.meeko";
+import * as AppSelect from "./AppSelect.meeko";
+
+const entries = {
+  role: { component: AppSelect, props: { label: "Rol", options: ["admin", "user"] } },
+  name: { component: AppInput, props: { placeholder: "Nombre" } },
+};
+const visible = signal<("role" | "name")[]>(["role", "name"]);
+const options = computed(() => visible.value.map((id) => ({ id, ...entries[id] })));
+</script>
+
+<template>
+  <component each:of="options.value" each:as="option" each:key="option.id" is="option.component" bind="option.props" />
+</template>
+```
+
+Cada fila conserva su instancia al reordenar. Si cambia el componente de una fila, Meeko libera el anterior y monta el nuevo en su sitio; si sólo cambian sus props, las recibe la misma instancia.
+
 ## Errores comunes
 
 ### Una etiqueta que no se puede renderizar
@@ -173,6 +223,26 @@ const tag = signal<"a" | "button">("a");
 
 ```html good
 <component is="internal ? 'MeekoLink' : 'a'" to="/about" href="https://example.com">Acerca</component>
+```
+
+### El nombre de un componente como texto en los datos
+
+```html bad
+<script lang="ts">
+const options = [{ id: "role", component: "AppSelect", props: { label: "Rol", options: ["admin"] } }] as const;
+</script>
+<template><component each:of="options" each:as="option" each:key="option.id" is="option.component" bind="option.props" /></template>
+```
+
+`meeko check` da `MEEK112: <AppSelect> no es una etiqueta que <component is> pueda renderizar: is nunca convierte un texto en un componente`, y dice qué hacer. Sin `as const`, el valor es un `string` y el mensaje empieza por `is es un string cualquiera`. Hay tres salidas: el literal en la plantilla (`is="kind === 'select' ? 'AppSelect' : 'AppInput'"`), el módulo importado en los datos, o [`resolveComponent`](componentregistry.md) para cargarlo en ejecución.
+
+```html good
+<script lang="ts">
+import * as AppSelect from "./AppSelect.meeko";
+
+const options = [{ id: "role", component: AppSelect, props: { label: "Rol", options: ["admin"] } }];
+</script>
+<template><component each:of="options" each:as="option" each:key="option.id" is="option.component" bind="option.props" /></template>
 ```
 
 ### Olvidar una prop obligatoria
