@@ -95,7 +95,7 @@ Options are validated when the module loads. Tokens are added to the UI styleshe
 export default defineMeekoConfig({
 	modules: ['@meekojs/ui'],
 	ui: {
-		// Sin @meekojs/i18n, el idioma de los textos; con él, el respaldo de un idioma sin textos.
+		// Without @meekojs/i18n, the text language; with it, the fallback for a language without texts.
 		locale: 'en',
 		messages: {
 			en: { table: { empty: 'Nothing here yet.' } },
@@ -142,15 +142,15 @@ The types `UIMessages` and `UIMessageOverrides` are exported from `@meekojs/ui`.
 	const error = signal<string | undefined>(undefined)
 
 	function save() {
-		error.value = name.value.trim() ? undefined : 'Escribe tu nombre.'
+		error.value = name.value.trim() ? undefined : 'Enter your name.'
 	}
 </script>
 
 <template>
 	<UIField
 		id="user-name"
-		label="Nombre"
-		description="Como aparecerá en tu perfil."
+		label="Name"
+		description="How it will appear in your profile."
 		bind:error="error.value"
 		required
 	>
@@ -168,7 +168,7 @@ The types `UIMessages` and `UIMessageOverrides` are exported from `@meekojs/ui`.
 		</snippet>
 	</UIField>
 
-	<UIButton on:click="save">Guardar</UIButton>
+	<UIButton on:click="save">Save</UIButton>
 </template>
 ```
 
@@ -187,7 +187,7 @@ The types `UIMessages` and `UIMessageOverrides` are exported from `@meekojs/ui`.
 	gutter="md"
 	ariaLabel="Proyectos"
 >
-	<h2>Proyectos del equipo</h2>
+	<h2>Team projects</h2>
 </UIContainer>
 ```
 
@@ -224,7 +224,7 @@ It also includes `UIApp` and `UIModal` for [modals](#modals), `UITable` for [tab
 	bind:params="{ id: user.id }"
 	bind:search="{ tab: 'actividad' }"
 >
-	Perfil
+	Profile
 </UIButton>
 <UIButton
 	href="https://github.com/meekojs/meeko"
@@ -238,7 +238,7 @@ It also includes `UIApp` and `UIModal` for [modals](#modals), `UITable` for [tab
 	bind:disabled="saving.value"
 	on:click="save"
 >
-	Guardar
+	Save
 </UIButton>
 ```
 
@@ -259,14 +259,14 @@ It also includes `UIApp` and `UIModal` for [modals](#modals), `UITable` for [tab
 	to="/docs"
 	variant="primary"
 >
-	Empezar
+	Get started
 </UILink>
 <UILinkCard
 	to="/docs/framework"
 	title="Framework"
-	description="Rutas, SSR y datos."
+	description="Routes, SSR and data."
 />
-<UIBadge tone="accent">Función</UIBadge>
+<UIBadge tone="accent">Feature</UIBadge>
 ```
 
 The public site `apps/meeko` uses these actions in its home page, header and errors; `UILinkCard` makes up the documentation index and `UIBadge` the reference metadata. Its `meeko.config.ts` links the tokens to the current palette, including the neutral actions and the blue focus.
@@ -325,18 +325,18 @@ Inside the modal component, use `UIModal` and the context of its instance:
 
 <template>
 	<UIModal
-		title="Crear usuario"
-		description="Confirma la creación en esta organización."
+		title="Create user"
+		description="Confirm creation in this organization."
 	>
-		<p>Organización {props.organizationId}</p>
+		<p>Organization {props.organizationId}</p>
 		<snippet name="footer">
 			<UIButton
 				variant="secondary"
 				on:click="() => modal.dismiss()"
 			>
-				Cancelar
+				Cancel
 			</UIButton>
-			<UIButton on:click="() => modal.close(true)">Confirmar</UIButton>
+			<UIButton on:click="() => modal.close(true)">Confirm</UIButton>
 		</snippet>
 	</UIModal>
 </template>
@@ -383,7 +383,7 @@ The `default` snippet is required and `footer` is optional. The `dismiss` event 
 
 	const users = signal<User[]>([{ id: 1, name: 'Ana', age: 28 }])
 	const columns = [
-		{ key: 'name', label: 'Nombre', footer: 'Total' },
+		{ key: 'name', label: 'Name', footer: 'Total' },
 		{
 			key: 'age',
 			label: 'Edad',
@@ -395,7 +395,7 @@ The `default` snippet is required and `footer` is optional. The `dismiss` event 
 
 <template>
 	<UITable
-		caption="Usuarios"
+		caption="Users"
 		bind:columns="columns"
 		bind:rows="users.value"
 		rowKey="id"
@@ -439,7 +439,7 @@ Each key of the row has its own snippets, `cell-<clave>` and `header-<clave>`. A
 	bind:rows="projects.value"
 	rowKey="id"
 >
-	<!-- value es string: el tipo de Project['status']. -->
+	<!-- value is string: the type of Project['status']. -->
 	<snippet
 		name="cell-status"
 		params="row, value"
@@ -450,7 +450,7 @@ Each key of the row has its own snippets, `cell-<clave>` and `header-<clave>`. A
 		name="header-name"
 		params="column"
 	>
-		<abbr title="Nombre del proyecto">{column.label}</abbr>
+		<abbr title="Project name">{column.label}</abbr>
 	</snippet>
 </UITable>
 ```
@@ -483,13 +483,13 @@ The styles are processed with Meeko's PostCSS. The container supports focus and 
 
 ```html
 <UICard
-	title="Datos del proyecto"
-	description="Información compartida con tu equipo."
+	title="Project details"
+	description="Information shared with your team."
 	variant="outline"
 >
-	<p>Contenido de la card.</p>
+	<p>Card content.</p>
 	<snippet name="footer">
-		<UIButton on:click="save">Guardar</UIButton>
+		<UIButton on:click="save">Save</UIButton>
 	</snippet>
 </UICard>
 ```
@@ -525,7 +525,7 @@ export default defineMeekoConfig({
 
 ```html
 <UIMarkdownEditor
-	label="Contenido"
+	label="Content"
 	model="markdown"
 	model:mode="mode"
 />
@@ -617,24 +617,24 @@ Content in the browser's top layer (the `popover` API), anchored to its trigger 
 		role="menu"
 		on:toggle="(event) => console.log(event.open)"
 	>
-		<snippet name="trigger">Opciones ▾</snippet>
+		<snippet name="trigger">Options ▾</snippet>
 		<button
 			role="menuitem"
 			on:click="rename"
 		>
-			Renombrar
+			Rename
 		</button>
 		<button
 			role="menuitem"
 			on:click="duplicate"
 		>
-			Duplicar
+			Duplicate
 		</button>
 		<button
 			role="menuitem"
 			on:click="remove"
 		>
-			Eliminar
+			Delete
 		</button>
 	</UIPopover>
 </template>
@@ -667,7 +667,7 @@ Meeko renders a `<button>` with `popovertarget`, `aria-expanded`, `aria-controls
 ```html
 <UIPopover mode="hint">
 	<snippet name="trigger">?</snippet>
-	El código está en el reverso de la tarjeta.
+	The code is on the back of the card.
 </UIPopover>
 ```
 
@@ -688,7 +688,7 @@ Meeko renders a `<button>` with `popovertarget`, `aria-expanded`, `aria-controls
 		>
 			<img
 				src="/me.png"
-				alt="Mi cuenta"
+				alt="My account"
 			/>
 		</button>
 	</snippet>
@@ -696,7 +696,7 @@ Meeko renders a `<button>` with `popovertarget`, `aria-expanded`, `aria-controls
 		role="menuitem"
 		href="/perfil"
 	>
-		Perfil
+		Profile
 	</a>
 </UIPopover>
 ```
@@ -734,7 +734,7 @@ A native `<select>` with `appearance: base-select`: the browser brings the list,
 	by="id"
 	labelBy="name"
 	groupBy="team"
-	placeholder="Asigna una persona"
+	placeholder="Assign a person"
 	clearable
 	model="owner"
 	bind:options="members"
@@ -744,7 +744,7 @@ A native `<select>` with `appearance: base-select`: the browser brings the list,
 		params="member, state"
 	>
 		{member.name}
-		<em if:when="state.selected">(elegida)</em>
+		<em if:when="state.selected">(selected)</em>
 	</snippet>
 </UISelect>
 ```
@@ -781,7 +781,7 @@ What the native `<select>` of `UISelect` does not cover: searching, filtering on
 		id="color"
 		model="color"
 		bind:options="colors"
-		placeholder="Elige un color"
+		placeholder="Choose a color"
 		name="color"
 	/>
 
@@ -789,7 +789,7 @@ What the native `<select>` of `UISelect` does not cover: searching, filtering on
 		model="user"
 		bind:options="users.value"
 		by="id"
-		label="Responsable"
+		label="Assignee"
 	>
 		<snippet
 			name="option"
@@ -880,10 +880,10 @@ With `max`, as soon as `max` options are chosen the rest become `aria-disabled="
 		by="code"
 		searchable
 		bind:filter="search"
-		placeholder="Busca una ciudad"
+		placeholder="Search for a city"
 	>
-		<snippet name="loading">Buscando…</snippet>
-		<snippet name="empty">Ninguna ciudad con ese nombre</snippet>
+		<snippet name="loading">Searching…</snippet>
+		<snippet name="empty">No city with that name</snippet>
 	</UICombobox>
 </template>
 ```
@@ -895,11 +895,11 @@ With `max`, as soon as `max` options are chosen the rest become `aria-disabled="
 	on:submit="form.submit"
 	novalidate
 >
-	<label bind:for="form.field('country').id">País</label>
+	<label bind:for="form.field('country').id">Country</label>
 	<UICombobox
 		bind:field="form.field('country')"
 		bind:options="countries"
-		placeholder="Elige un país"
+		placeholder="Choose a country"
 	/>
 	<p
 		if:when="form.errors.value.country"
@@ -907,7 +907,7 @@ With `max`, as soon as `max` options are chosen the rest become `aria-disabled="
 	>
 		{form.errors.value.country}
 	</p>
-	<button>Guardar</button>
+	<button>Save</button>
 </form>
 ```
 
@@ -966,7 +966,7 @@ With `icons`, the button renders an icon for `light`, `dark` and `system` instea
 <UIThemeToggle mode="select" />
 <UIThemeToggle
 	bind:themes="['light', 'dark']"
-	bind:labels="{ light: 'Claro', dark: 'Oscuro', system: 'Sistema' }"
+	bind:labels="{ light: 'Light', dark: 'Dark', system: 'System' }"
 	class="toggle"
 />
 ```
@@ -1029,8 +1029,8 @@ Every link in a list accepts `href` (any URL) or `to` (a route with typed `param
 		variant="collapsible"
 	/>
 	<UIPageHeader
-		title="Instalación"
-		description="Añade el paquete a tu aplicación."
+		title="Installation"
+		description="Add the package to your application."
 	/>
 	<UIProse
 		as="article"
@@ -1093,14 +1093,14 @@ The rules and reserved names are in [`DESIGN.md`](../../packages/ui/DESIGN.md#mo
 ```html
 <UITabs
 	model="tab"
-	label="Ajustes"
+	label="Settings"
 	bind:items="[{ value: 'account', label: 'Cuenta' }, { value: 'team', label: 'Equipo' }]"
 >
-	<snippet name="panel-account">Tu cuenta</snippet>
-	<snippet name="panel-team">Tu equipo</snippet>
+	<snippet name="panel-account">Your account</snippet>
+	<snippet name="panel-team">Your team</snippet>
 </UITabs>
 
-<UITooltip text="Se publica al guardar"><snippet name="trigger">?</snippet></UITooltip>
+<UITooltip text="Published when saved"><snippet name="trigger">?</snippet></UITooltip>
 
 <UICommandPalette
 	model:query="query"
@@ -1154,7 +1154,7 @@ The module installs one provider per application; `<UIApp>` hosts the notificati
 	const toast = useToast()
 </script>
 <template>
-	<UIButton on:click="() => toast.add({ text: 'Cambios guardados', tone: 'success', duration: 5000 })">Guardar</UIButton>
+	<UIButton on:click="() => toast.add({ text: 'Changes saved', tone: 'success', duration: 5000 })">Save</UIButton>
 </template>
 ```
 

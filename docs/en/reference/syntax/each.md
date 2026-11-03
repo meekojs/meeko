@@ -24,8 +24,8 @@ When the list changes, Meeko adds, removes and moves only the necessary rows: it
 <!-- app/components/TodoList.meeko -->
 <script lang="ts">
 const todos = signal([
-  { id: "a1", title: "Comprar té", done: false },
-  { id: "b2", title: "Escribir la guía", done: true },
+  { id: "a1", title: "Buy tea", done: false },
+  { id: "b2", title: "Write the guide", done: true },
 ]);
 </script>
 
@@ -79,17 +79,17 @@ When each row has a component with signals or a control the user edits, the key 
 
 ```html
 <script lang="ts">
-const todos = signal([{ id: "a1", title: "Comprar té" }, { id: "b2", title: "Escribir la guía" }]);
+const todos = signal([{ id: "a1", title: "Buy tea" }, { id: "b2", title: "Write the guide" }]);
 function reverse(): void {
   todos.value = [...todos.value].reverse();
 }
 </script>
 
 <template>
-  <button type="button" on:click="reverse">Invertir</button>
+  <button type="button" on:click="reverse">Reverse</button>
   <ul>
     <li each:of="todos.value" each:as="todo" each:key="todo.id">
-      <label>{todo.title} <input placeholder="Nota"></label>
+      <label>{todo.title} <input placeholder="Note"></label>
     </li>
   </ul>
 </template>
@@ -112,11 +112,11 @@ const visible = computed(() => {
 </script>
 
 <template>
-  <input type="search" model="query" aria-label="Buscar">
+  <input type="search" model="query" aria-label="Search">
   <ul>
     <li each:of="visible.value" each:as="user" each:key="user.id">{user.name}</li>
   </ul>
-  <p if:when="visible.value.length === 0">Sin resultados.</p>
+  <p if:when="visible.value.length === 0">No results.</p>
 </template>
 ```
 
@@ -126,7 +126,7 @@ Any iterable works: a `Map` yields `[clave, valor]` pairs, read by position. Eac
 
 ```html
 <script lang="ts">
-const groups = signal(new Map([["Bebidas", ["Té", "Café"]], ["Postres", ["Flan"]]]));
+const groups = signal(new Map([["Drinks", ["Tea", "Coffee"]], ["Desserts", ["Flan"]]]));
 </script>
 
 <template>

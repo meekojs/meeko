@@ -19,7 +19,7 @@ In a new project, use `layers`.
 ## Usage
 
 ```ts
-// meeko.config.ts de un proyecto de 1.0 o 1.1
+// meeko.config.ts for a 1.0 or 1.1 project
 import { defineMeekoConfig } from "@meekojs/meeko/framework";
 
 export default defineMeekoConfig({
@@ -42,10 +42,10 @@ The `extends` folders are added as layers immediately after the application and 
 ### Migrating to `layers`
 
 ```ts
-// Antes (1.1)
+// Before (1.1)
 // export default defineMeekoConfig({ extends: ["./layers/base", "./layers/admin"] });
 
-// Después (1.2 o posterior): el mismo orden.
+// After (1.2 or later): the same order.
 import { defineMeekoConfig } from "@meekojs/meeko/framework";
 export default defineMeekoConfig({ layers: ["./layers/base", "./layers/admin"] });
 ```
@@ -56,8 +56,8 @@ export default defineMeekoConfig({ layers: ["./layers/base", "./layers/admin"] }
 import { defineMeekoConfig } from "@meekojs/meeko/framework";
 
 export default defineMeekoConfig({
-  extends: ["./layers/legacy"], // primero
-  layers: ["./layers/base"],    // después
+  extends: ["./layers/legacy"], // first
+  layers: ["./layers/base"],    // after
 });
 ```
 

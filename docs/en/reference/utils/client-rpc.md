@@ -29,13 +29,13 @@ It is auto-imported in application and server code. In the browser it makes a sa
 <script lang="ts">
 const status = signal<string | null>(null);
 async function order(): Promise<void> {
-  const created = await rpc.orders.create({ item: "té", qty: 1 });
+  const created = await rpc.orders.create({ item: "tea", qty: 1 });
   status.value = `Pedido ${created.id}`;
 }
 </script>
 
 <template>
-  <button type="button" on:click="order">Pedir té</button>
+  <button type="button" on:click="order">Order tea</button>
   <p if:when="status.value" role="status">{status.value}</p>
 </template>
 ```
@@ -98,7 +98,7 @@ const create = useRpcMutation("orders.create");
 
 <template>
   <ul><li each:of="orders.data.value" each:as="order" each:key="order.id">{order.item}</li></ul>
-  <button type="button" bind:disabled="create.pending.value" on:click="() => create.mutate({ item: 'té', qty: 1 })">Pedir</button>
+  <button type="button" bind:disabled="create.pending.value" on:click="() => create.mutate({ item: 'tea', qty: 1 })">Order</button>
 </template>
 ```
 
@@ -107,7 +107,7 @@ const create = useRpcMutation("orders.create");
 ### Incomplete input
 
 ```ts bad
-await rpc.orders.create({ item: "té" });
+await rpc.orders.create({ item: "tea" });
 ```
 
 `meeko check` reports `TS2741: Property 'qty' is missing in type '{ item: string; }' but required in type '{ item: string; qty: number; }'.` If untyped input arrives and fails the schema, the server responds with `400 INVALID_INPUT` and `issues`.
@@ -115,7 +115,7 @@ await rpc.orders.create({ item: "té" });
 <!-- no-check -->
 
 ```ts good
-await rpc.orders.create({ item: "té", qty: 1 });
+await rpc.orders.create({ item: "tea", qty: 1 });
 ```
 
 ### A procedure that does not exist
@@ -129,7 +129,7 @@ await rpc.orders.remove({ id: "1" });
 <!-- no-check -->
 
 ```ts good
-// server/rpc/orders/remove.ts existe
+// server/rpc/orders/remove.ts exists
 await rpc.orders.remove({ id: "1" });
 ```
 

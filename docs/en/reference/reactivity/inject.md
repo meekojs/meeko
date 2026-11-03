@@ -28,7 +28,7 @@ import { themeKey } from "../composables/theme";
 const theme = inject(themeKey); // Signal<"light" | "dark">
 </script>
 
-<template><span class="badge" bind:data-theme="theme.value">Tema {theme.value}</span></template>
+<template><span class="badge" bind:data-theme="theme.value">Theme {theme.value}</span></template>
 ```
 
 Because the layout provided a signal, the badge updates when the theme changes.
@@ -63,7 +63,7 @@ export const useSessionUser = (): ReadonlySignal<{ name: string } | null> => inj
 const user = useSessionUser();
 </script>
 
-<template><p if:when="user.value">Hola, {user.value.name}</p></template>
+<template><p if:when="user.value">Hello, {user.value.name}</p></template>
 ```
 
 ### The nearest provider wins
@@ -101,7 +101,7 @@ export function injectOr<T>(key: ContextKey<T>, fallback: T): T {
 ### A component outside the provider
 
 ```html bad
-<!-- app/pages/index.meeko: el layout no llama a provide(themeKey, …) -->
+<!-- app/pages/index.meeko: the layout does not call provide(themeKey, …) -->
 <ThemeBadge />
 ```
 
@@ -122,7 +122,7 @@ provide(themeKey, signal<"light" | "dark">("light"));
 ```ts bad
 async function save(): Promise<void> {
   await persist();
-  inject(toastsKey).show("Guardado");
+  inject(toastsKey).show("Saved");
 }
 ```
 
@@ -134,7 +134,7 @@ Outside the script there is no active root, and it throws `Missing Meeko context
 const toasts = inject(toastsKey);
 async function save(): Promise<void> {
   await persist();
-  toasts.show("Guardado");
+  toasts.show("Saved");
 }
 ```
 

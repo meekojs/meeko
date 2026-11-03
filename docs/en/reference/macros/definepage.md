@@ -42,10 +42,10 @@ import * as v from "valibot";
 
 export const route = definePage({
   params: v.object({ id: v.pipe(v.string(), v.regex(/^\d+$/)) }),
-  head: () => ({ title: "Perfil" }),
+  head: () => ({ title: "Profile" }),
 });
 
-const { params } = usePage();               // params.id: string, ya validado
+const { params } = usePage();               // params.id: string, already validated
 const user = await db.users.find(params.id);
 if (!user) notFound();
 export const profile = { id: user.id, name: user.name };
@@ -156,7 +156,7 @@ With `"client"`, the block is public: included in the browser bundle and unable 
 <script server lang="ts">
 export const route = definePage({
   layout: "dashboard",
-  layoutProps: { title: "Informes", showAlert: true },
+  layoutProps: { title: "Reports", showAlert: true },
   middleware: ["auth"],
 });
 </script>
@@ -284,7 +284,7 @@ Block exports are already page data; a loader would be a second source.
 ```html bad
 <script server lang="ts">
 export const route = definePage({ load: () => ({ total: 1 }) });
-export const greeting = "Hola";
+export const greeting = "Hello";
 </script>
 ```
 
@@ -294,7 +294,7 @@ export const greeting = "Hola";
 <script server lang="ts">
 export const route = definePage({ render: "ssr" });
 export const total = 1;
-export const greeting = "Hola";
+export const greeting = "Hello";
 </script>
 ```
 
@@ -321,7 +321,7 @@ Route options are evaluated once on module loading; top-level code runs afterwar
 
 ```html bad
 <script server lang="ts">
-const title = "Hola";
+const title = "Hello";
 export const route = definePage({ head: () => ({ title }) });
 export const greeting = title;
 </script>
@@ -340,14 +340,14 @@ export const greeting = siteTitle;
 ### Options in both block and sidecar
 
 ```text bad
-app/pages/about.meeko      ← <script server> con export const route = definePage(…)
+app/pages/about.meeko      ← <script server> with export const route = definePage(…)
 app/pages/about.route.ts   ← export const route = definePage(…)
 ```
 
 Route discovery stops with `las opciones de ruta están declaradas dos veces; deja <script server> o about.route.ts`.
 
 ```text good
-app/pages/about.meeko      ← <script server> con export const route = definePage(…)
+app/pages/about.meeko      ← <script server> with export const route = definePage(…)
 ```
 
 ### `cache.memory` without `etag`
@@ -393,7 +393,7 @@ export const route = definePage({ layout: "admin", middleware: ["auth"] });
 <!-- no-check -->
 
 ```ts good
-// con app/layouts/admin.meeko y app/middleware/auth.ts
+// with app/layouts/admin.meeko and app/middleware/auth.ts
 export const route = definePage({ layout: "admin", middleware: ["auth"] });
 ```
 

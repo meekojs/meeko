@@ -129,13 +129,13 @@ new SessionManager({ store: production && !prerendering ? persistentStore : new 
 ### Multiple instances with memory
 
 ```text bad
-2 réplicas de la aplicación, cada una con su MemorySessionStore (y production: false para que arranque)
+2 application replicas, each with its own MemorySessionStore (and production: false to allow startup)
 ```
 
 There is no error: each replica only knows the sessions it created. Behind the load balancer, users lose their session when switching replicas, logout does not reach the other replica and `rateLimit` counts per replica.
 
 ```text good
-Un store compartido: RedisSessionStore, SqlSessionStore o D1SessionDriver
+A shared store: RedisSessionStore, SqlSessionStore or D1SessionDriver
 ```
 
 ## Notes

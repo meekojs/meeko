@@ -33,13 +33,13 @@ What to change:
 - **In the module**, use another key in `meta.configKey` and its `MeekoConfig` augmentation:
 
   ```ts
-  // Antes
+  // Before
   declare module "@meekojs/meeko/framework" {
     interface MeekoConfig { readonly theme?: Partial<ThemeOptions> }
   }
   export default defineMeekoModule<ThemeOptions>({ meta: { name: "@acme/meeko-theme", configKey: "theme" }, /* … */ });
 
-  // Después
+  // After
   declare module "@meekojs/meeko/framework" {
     interface MeekoConfig { readonly acmeTheme?: Partial<ThemeOptions> }
   }

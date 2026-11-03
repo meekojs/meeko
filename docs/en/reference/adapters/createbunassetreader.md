@@ -54,7 +54,7 @@ An `AssetReader` with `get(pathname, request)`: `null` for a path not in `assets
 import { expect, test } from "bun:test";
 import { createBunAssetReader } from "@meekojs/meeko/bun";
 
-test("sólo sirve lo que está en el manifiesto", async () => {
+test("only serves what is in the manifest", async () => {
   const assets = createBunAssetReader({ root: new URL("./fixtures/client/", import.meta.url), assets: { "/robots.txt": { type: "text/plain", etag: '"r1"', size: 25 } } });
   expect((await assets.get("/robots.txt", new Request("http://x/robots.txt")))?.status).toBe(200);
   expect(await assets.get("/../package.json", new Request("http://x/../package.json"))).toBeNull();
@@ -65,7 +65,7 @@ test("sólo sirve lo que está en el manifiesto", async () => {
 
 ```text
 GET /assets/entry-4f2a.js  → 200, cache-control: public, max-age=31536000, immutable
-GET /assets/entry-4f2a.js  If-None-Match: "…" → 304 sin leer el archivo
+GET /assets/entry-4f2a.js  If-None-Match: "…" → 304 without reading the file
 ```
 
 ## Common mistakes
@@ -89,13 +89,13 @@ const assets = createNodeAssetReader({ root: fileURLToPath(new URL("./client/", 
 ### A manifest file missing from the folder
 
 ```text bad
-.meeko/output/bun/ copiada sin client/assets/
+.meeko/output/bun/ copied without client/assets/
 ```
 
 A request for a listed file rejects with `Error: Missing build asset /assets/entry-4f2a.js`, which the application converts to `500` and sends to `onError`. Copy the complete output folder.
 
 ```text good
-.meeko/output/bun/ completa: index.js, chunks/, client/ y prerender/
+.meeko/output/bun/ complete: index.js, chunks/, client/ and prerender/
 ```
 
 ## Notes

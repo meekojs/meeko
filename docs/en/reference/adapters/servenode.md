@@ -35,7 +35,7 @@ import { serveNode } from "@meekojs/meeko/node";
 
 const app = await createServerApp({ manifest, load, runtime, production: true });
 const server = await serveNode(app, { host: "0.0.0.0", port: 3000, publicOrigin: "https://example.com", handleSignals: true });
-console.log(`Escuchando en ${server.url}`);
+console.log(`Listening on ${server.url}`);
 ```
 
 ## Parameters
@@ -116,7 +116,7 @@ try {
 ### Listening on `127.0.0.1` inside a container
 
 ```sh bad
-docker run -p 3000:4173 tienda   # sin MEEKO_HOST
+docker run -p 3000:4173 tienda   # without MEEKO_HOST
 ```
 
 There is no error: the server listens on the container's loopback, and the published port cannot reach it. The client sees a refused or closed connection.
@@ -154,7 +154,7 @@ await serveNode(app, { port: Number(process.env.MEEKO_PORT ?? 4173) });
 ### Behind a proxy without `publicOrigin`
 
 ```sh bad
-# Caddy termina TLS en https://tienda.example.com y reenvía a http://127.0.0.1:4173
+# Caddy terminates TLS at https://tienda.example.com and forwards to http://127.0.0.1:4173
 node .meeko/output/node/index.mjs
 ```
 

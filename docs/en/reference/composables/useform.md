@@ -35,7 +35,7 @@ The form is component state: it does not travel in the payload. The server rende
 import * as v from "valibot";
 
 const categoryInput = v.object({
-  name: v.pipe(v.string(), v.trim(), v.minLength(1, "Escribe un nombre.")),
+  name: v.pipe(v.string(), v.trim(), v.minLength(1, "Enter a name.")),
 });
 
 const form = useForm({
@@ -48,9 +48,9 @@ const form = useForm({
 <template>
   <form on:submit="form.submit" novalidate>
     <p if:when="form.error.value" role="alert">{form.error.value}</p>
-    <label>Nombre <input model="form.fields.name"></label>
+    <label>Name <input model="form.fields.name"></label>
     <p if:when="form.errors.value.name">{form.errors.value.name}</p>
-    <button bind:disabled="form.pending.value">Guardar</button>
+    <button bind:disabled="form.pending.value">Save</button>
   </form>
 </template>
 ```
@@ -111,7 +111,7 @@ export default defineApiRoute({
   status: 201,
   handler: async ({ body }) => {
     if (await emailTaken(body.email)) {
-      throw new ApiError("EMAIL_TAKEN", 409, { issues: [{ path: "email", message: "Ese correo ya tiene una cuenta." }] });
+      throw new ApiError("EMAIL_TAKEN", 409, { issues: [{ path: "email", message: "That email already has an account." }] });
     }
     return createUser(body);
   },
@@ -124,23 +124,23 @@ export default defineApiRoute({
 const form = useForm({
   initial: { email: "", password: "" },
   submit: (values) => api.signup.post({ body: values }),
-  errorMessage: (failure) => isClientError(failure) ? "No se pudo crear la cuenta." : "No se pudo conectar. Inténtalo de nuevo.",
+  errorMessage: (failure) => isClientError(failure) ? "Could not create the account." : "Could not connect. Try again.",
 });
 </script>
 
 <template>
   <form on:submit="form.submit" novalidate>
     <p if:when="form.error.value" role="alert">{form.error.value}</p>
-    <label>Correo <input type="email" model="form.fields.email"></label>
+    <label>Email <input type="email" model="form.fields.email"></label>
     <p if:when="form.errors.value.email">{form.errors.value.email}</p>
-    <label>Contraseña <input type="password" model="form.fields.password"></label>
+    <label>Password <input type="password" model="form.fields.password"></label>
     <p if:when="form.errors.value.password">{form.errors.value.password}</p>
-    <button bind:disabled="form.pending.value">Crear cuenta</button>
+    <button bind:disabled="form.pending.value">Create account</button>
   </form>
 </template>
 ```
 
-With the `409`, `form.errors.value.email` is “Ese correo ya tiene una cuenta.”, `form.error.value` is `null` and `form.failure.value` is the `ClientError`. Without a schema, changing the field clears its server message.
+With the `409`, `form.errors.value.email` is “That email already has an account.”, `form.error.value` is `null` and `form.failure.value` is the `ClientError`. Without a schema, changing the field clears its server message.
 
 ### Edit a record and save as a new baseline
 
@@ -167,8 +167,8 @@ const form = useForm({
   <form on:submit="form.submit">
     <input model="form.fields.name">
     <textarea model="form.fields.bio"></textarea>
-    <button bind:disabled="!form.dirty.value || form.pending.value">Guardar</button>
-    <p if:when="form.submitted.value && !form.dirty.value">Guardado.</p>
+    <button bind:disabled="!form.dirty.value || form.pending.value">Save</button>
+    <p if:when="form.submitted.value && !form.dirty.value">Saved.</p>
   </form>
 </template>
 ```
@@ -196,7 +196,7 @@ async function save(event: SubmitEvent): Promise<void> {
   const outcome = await form.trySubmit(event);
   if (outcome.ok) lastSaved.value = outcome.result.updatedAt;
   else if (outcome.reason === "error") console.warn(outcome.failure);
-  // "invalid": los mensajes ya están en form.errors; "skipped": había otro envío en curso.
+  // "invalid": messages are already in form.errors; "skipped": another submission was in progress.
 }
 ```
 
@@ -222,8 +222,8 @@ const props = defineProps<{ field: FormField<string>; label: string; type?: stri
 
 ```html
 <form on:submit="form.submit" novalidate>
-  <AppField bind:field="form.field('email')" label="Correo" type="email" />
-  <AppField bind:field="form.field('password')" label="Contraseña" type="password" />
+  <AppField bind:field="form.field('email')" label="Email" type="email" />
+  <AppField bind:field="form.field('password')" label="Password" type="password" />
 </form>
 ```
 
@@ -278,9 +278,9 @@ const form = useForm({
     <input type="hidden" name="return" bind:value="route.url.value">
     <input type="hidden" name="_csrf" bind:value="form.csrfToken ?? ''">
     <input type="hidden" name="page" bind:value="form.fields.page.value">
-    <p if:when="form.submitted.value">¡Gracias!</p>
+    <p if:when="form.submitted.value">Thank you!</p>
     <p if:when="form.error.value" role="alert">{form.error.value}</p>
-    <button name="helpful" value="true" on:click="() => { form.fields.helpful.value = true; }">Sí</button>
+    <button name="helpful" value="true" on:click="() => { form.fields.helpful.value = true; }">Yes</button>
     <button name="helpful" value="false" on:click="() => { form.fields.helpful.value = false; }">No</button>
     <textarea name="comment" model="form.fields.comment"></textarea>
     <p if:when="form.errors.value.comment">{form.errors.value.comment}</p>
@@ -292,7 +292,7 @@ Without JavaScript, the server validates with the same `body` schema, responds w
 
 ### Confirmation depending on another field
 
-Since `1.5`, each change also revalidates fields already showing a schema error. With a Valibot rule placing the error on `confirm`, correcting the password removes “Las contraseñas no coinciden” without touching confirmation:
+Since `1.5`, each change also revalidates fields already showing a schema error. With a Valibot rule placing the error on `confirm`, correcting the password removes “Passwords do not match” without touching confirmation:
 
 <!-- no-check -->
 
@@ -300,9 +300,9 @@ Since `1.5`, each change also revalidates fields already showing a schema error.
 import * as v from "valibot";
 
 export const passwordInput = v.pipe(
-  v.object({ password: v.pipe(v.string(), v.minLength(10, "Usa al menos 10 caracteres.")), confirm: v.string() }),
+  v.object({ password: v.pipe(v.string(), v.minLength(10, "Use at least 10 characters.")), confirm: v.string() }),
   v.forward(
-    v.partialCheck([["password"], ["confirm"]], (input) => input.password === input.confirm, "Las contraseñas no coinciden."),
+    v.partialCheck([["password"], ["confirm"]], (input) => input.password === input.confirm, "Passwords do not match."),
     ["confirm"],
   ),
 );
@@ -347,7 +347,7 @@ Fields come from `initial` (or schema input), so a misspelled name is a type err
 ```html bad
 <input model="form.fields.nmae">
 <p>{form.errors.value.nmae}</p>
-<AppField bind:field="form.field('nmae')" label="Nombre" />
+<AppField bind:field="form.field('nmae')" label="Name" />
 ```
 
 `meeko check` reports `TS2339: Property 'nmae' does not exist on type '{ readonly name: Signal<string>; }'` in `fields` and `errors`, and `TS2345: Argument of type '"nmae"' is not assignable to parameter of type '"name"'` in `field`. If the name arrives untyped, `form.field` throws `TypeError: useForm(): the form has no field "nmae"` at runtime.
@@ -355,7 +355,7 @@ Fields come from `initial` (or schema input), so a misspelled name is a type err
 ```html good
 <input model="form.fields.name">
 <p>{form.errors.value.name}</p>
-<AppField bind:field="form.field('name')" label="Nombre" />
+<AppField bind:field="form.field('name')" label="Name" />
 ```
 
 ### A numeric field in an `<input type="number">`
@@ -372,8 +372,8 @@ const form = useForm({ initial: { age: 0 }, submit: save });
 <!-- no-check -->
 
 ```ts good
-const ageInput = v.object({ age: v.pipe(v.string(), v.transform(Number), v.integer("Escribe un número entero.")) });
-const form = useForm({ schema: ageInput, initial: { age: "" }, submit: (values) => save(values) }); // values.age es number
+const ageInput = v.object({ age: v.pipe(v.string(), v.transform(Number), v.integer("Enter an integer.")) });
+const form = useForm({ schema: ageInput, initial: { age: "" }, submit: (values) => save(values) }); // values.age is number
 // <input type="number" model="form.fields.age">
 ```
 

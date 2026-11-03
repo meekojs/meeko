@@ -73,7 +73,7 @@ layers/base/
 ```
 
 ```html
-<!-- app/pages/index.meeko del proyecto: AppButton y formatPrice llegan del layer, sin import -->
+<!-- project's app/pages/index.meeko: AppButton and formatPrice come from the layer, without imports -->
 <template><AppButton>{formatPrice(19.9)}</AppButton></template>
 ```
 
@@ -85,7 +85,7 @@ import { defineMeekoConfig } from "@meekojs/meeko/framework";
 
 export default defineMeekoConfig({
   layers: ["./layers/shop", "./layers/account", "./layers/backoffice"],
-  imports: { serverDirs: ["server/services"] }, // también layers/*/server/services
+  imports: { serverDirs: ["server/services"] }, // also layers/*/server/services
 });
 ```
 
@@ -111,13 +111,13 @@ export default defineMeekoConfig({ layers: ["./layers/base"] });
 ### A folder without `app/pages`
 
 ```text bad
-layers/ui/app/components/…   (sin app/pages)
+layers/ui/app/components/…   (without app/pages)
 ```
 
 `layer ./layers/ui no tiene carpeta app/pages: <ruta>`. A layer needs `app/pages`, even if it is empty.
 
 ```text good
-layers/ui/app/pages/   (vacía)
+layers/ui/app/pages/   (empty)
 layers/ui/app/components/…
 ```
 
@@ -149,7 +149,7 @@ export default defineMeekoConfig({ layers: ["./layers/shared-ui"] });
 ### A nonexistent folder
 
 ```text bad
-layers: ["./layers/base"]   sin layers/base/
+layers: ["./layers/base"]   without layers/base/
 ```
 
 `layer ./layers/base no existe: <ruta>`.

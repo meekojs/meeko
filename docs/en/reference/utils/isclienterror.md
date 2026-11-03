@@ -24,9 +24,9 @@ Use it where an error arrives as `unknown`: a `catch`, `provideErrorHandler`, `m
 import { isClientError } from "@meekojs/meeko/framework";
 
 export function describe(error: unknown): string {
-  if (isClientError(error, "UNAUTHENTICATED")) return "Tu sesión ha caducado.";
-  if (isClientError(error)) return `Error ${error.status} (${error.code}), petición ${error.requestId ?? "desconocida"}`;
-  return "Error inesperado";
+  if (isClientError(error, "UNAUTHENTICATED")) return "Your session has expired.";
+  if (isClientError(error)) return `Error ${error.status} (${error.code}), request ${error.requestId ?? "unknown"}`;
+  return "Unexpected error";
 }
 ```
 
@@ -68,14 +68,14 @@ const form = useForm({
   initial: { name: "" },
   submit: (values) => api.users({ id: "me" }).patch({ body: values }),
   errorMessage: (failure) => isClientError(failure, "RATE_LIMITED")
-    ? "Demasiados intentos. Espera un momento."
-    : isClientError(failure) ? "No se pudo enviar." : "No se pudo conectar.",
+    ? "Too many attempts. Wait a moment."
+    : isClientError(failure) ? "Could not send." : "Could not connect.",
 });
 </script>
 
 <template>
   <form on:submit="form.submit">
-    <input model="form.fields.name" aria-label="Nombre">
+    <input model="form.fields.name" aria-label="Name">
     <p if:when="form.error.value" role="alert">{form.error.value}</p>
   </form>
 </template>
@@ -94,7 +94,7 @@ const missing = computed(() => isClientError(user.error.value, "NOT_FOUND"));
   <MeekoAwait for="user">
     <p if:when="user.data.value">{user.data.value?.name}</p>
   </MeekoAwait>
-  <p if:when="missing.value">Ese usuario no existe.</p>
+  <p if:when="missing.value">That user does not exist.</p>
 </template>
 ```
 

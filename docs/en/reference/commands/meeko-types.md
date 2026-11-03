@@ -118,7 +118,7 @@ const count = signal(0);
 ### Different casing on Windows
 
 ```sh bad
-meeko types src/app.meeko   # el archivo es src/App.meeko
+meeko types src/app.meeko   # the file is src/App.meeko
 ```
 
 This works on Windows and macOS because the filesystem is case-insensitive, and since `1.7` the declaration uses the file's actual name (`.meeko\types\src\App.d.meeko.ts`; through `1.6` it was written as `app.d.meeko.ts`). On Linux and in CI the same command fails with `No existe el archivo src/app.meeko (…)`: write the name as it appears on disk.

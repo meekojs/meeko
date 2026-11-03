@@ -83,7 +83,7 @@ export default defineApiRoute({
     if (await emailTaken(body.email)) {
       throw new ApiError("EMAIL_TAKEN", 409, {
         message: `duplicate key for ${body.email}`, // interno
-        issues: [{ path: "email", message: "Ese correo ya tiene una cuenta." }],
+        issues: [{ path: "email", message: "That email already has an account." }],
       });
     }
     return createUser(body);
@@ -91,7 +91,7 @@ export default defineApiRoute({
 });
 ```
 
-On the client, `useForm`'s `form.errors.value.email` is “Ese correo ya tiene una cuenta.”.
+On the client, `useForm`'s `form.errors.value.email` is “That email already has an account.”.
 
 ### A `404` from a loader
 
@@ -153,13 +153,13 @@ throw new ApiError("INVALID", 409, { issues: [{ path: "email" }] });
 <!-- no-check -->
 
 ```ts good
-throw new ApiError("INVALID", 409, { issues: [{ path: "email", message: "Revisa el correo." }] });
+throw new ApiError("INVALID", 409, { issues: [{ path: "email", message: "Check the email address." }] });
 ```
 
 ### Throwing a regular `Error` expecting it to reach the client
 
 ```ts bad
-throw new Error("Ese correo ya tiene una cuenta");
+throw new Error("That email already has an account");
 ```
 
 The response is `500` `INTERNAL_ERROR`, without the message, and the server logs it as an internal failure.
@@ -167,7 +167,7 @@ The response is `500` `INTERNAL_ERROR`, without the message, and the server logs
 <!-- no-check -->
 
 ```ts good
-throw new ApiError("EMAIL_TAKEN", 409, { issues: [{ path: "email", message: "Ese correo ya tiene una cuenta." }] });
+throw new ApiError("EMAIL_TAKEN", 409, { issues: [{ path: "email", message: "That email already has an account." }] });
 ```
 
 ## Notes

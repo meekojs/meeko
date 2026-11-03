@@ -45,7 +45,7 @@ export default defineServerRuntime(async ({ env, production, prerendering }) => 
 ```
 
 ```ts
-// server/api/users/[id].get.ts: services tipado, sin `as`
+// server/api/users/[id].get.ts: typed services, without `as`
 // const user = await context.services.db.users.find(params.id);
 ```
 
@@ -127,7 +127,7 @@ import { join } from 'node:path'
 import { defineServerRuntime } from '@meekojs/meeko/server'
 
 export default defineServerRuntime(({ root }) => {
-	if (!root) throw new Error('Este servidor necesita el sistema de archivos del proyecto')
+	if (!root) throw new Error('This server requires the project filesystem')
 	return { services: { content: join(root, 'content') } }
 })
 ```
@@ -142,7 +142,7 @@ See [Server runtime](../../framework.md#server-runtime).
 <!-- app/pages/users/[id].meeko -->
 <script server lang="ts">
 const { params, context } = usePage();
-const row = await context.services.db.users.find(params.id); // tipado desde server/runtime.ts
+const row = await context.services.db.users.find(params.id); // typed from server/runtime.ts
 if (!row) notFound();
 export const user = { id: row.id, name: row.name };
 </script>

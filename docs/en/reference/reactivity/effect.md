@@ -31,7 +31,7 @@ In a component script, the effect belongs to the component and stops on unmount.
 const query = signal("");
 effect(() => {
   if (typeof document === "undefined") return;
-  document.title = query.value ? `Buscar: ${query.value}` : "Buscar";
+  document.title = query.value ? `Search: ${query.value}` : "Search";
 });
 </script>
 
@@ -64,7 +64,7 @@ const stop = effect(() => { seen.push(count.value); });
 
 count.value = 1;
 stop();
-count.value = 2; // seen sigue siendo [0, 1]
+count.value = 2; // seen remains [0, 1]
 ```
 
 ### Synchronize an external library and dispose of it
@@ -102,7 +102,7 @@ const results = signal<string[]>([]);
 let controller: AbortController | undefined;
 
 effect(() => {
-  const q = query.value.trim(); // la dependencia se registra aquí, antes de cualquier await
+  const q = query.value.trim(); // the dependency is tracked here, before any await
   controller?.abort();
   if (!q) { results.value = []; return; }
   const current = new AbortController();

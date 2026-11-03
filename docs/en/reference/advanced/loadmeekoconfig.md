@@ -27,7 +27,7 @@ import { loadMeekoConfig } from "@meekojs/meeko/build";
 
 const config = await loadMeekoConfig(process.cwd());
 const adapter = config.server?.adapter ?? "node";
-console.log(`adaptador: ${adapter}, sitio: ${config.site ?? "(sin site)"}`);
+console.log(`adapter: ${adapter}, site: ${config.site ?? "(no site)"}`);
 ```
 
 ## Parameters
@@ -72,7 +72,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { loadMeekoConfig } from "@meekojs/meeko/build";
 
-test("producción declara el sitio público", async () => {
+test("production declares the public site", async () => {
   const config = await loadMeekoConfig(process.cwd());
   assert.match(String(config.site), /^https:\/\//);
 });

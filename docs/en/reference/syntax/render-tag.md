@@ -98,7 +98,7 @@ const snippets = defineSnippets<{ item: [item: T, remove: () => void] }>();
 ```html
 <AppList bind:items="notes.value" on:remove="(id) => removeNote(id)">
   <snippet name="item" params="note, remove">
-    {note.title} <button type="button" on:click="remove">Borrar</button>
+    {note.title} <button type="button" on:click="remove">Delete</button>
   </snippet>
 </AppList>
 ```
@@ -138,14 +138,14 @@ This is why a `ref:` inside snippet content is not allowed (`MEEK052`).
 ### Content inside `<render>`
 
 ```html bad
-<render snippet="snippets.title">Sin título</render>
+<render snippet="snippets.title">Untitled</render>
 ```
 
 `MEEK062: <render> no admite contenido; escribe <render snippet="..." />`.
 
 ```html good
 <render snippet="snippets.title" />
-<span if:when="!snippets.title">Sin título</span>
+<span if:when="!snippets.title">Untitled</span>
 ```
 
 ### `bind:args` or other attributes

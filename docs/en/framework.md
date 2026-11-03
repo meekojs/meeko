@@ -54,17 +54,17 @@ If you want the current layout convention, move the root layout to `app/layouts/
 Meeko no longer loads `server/session.ts`. If the file exists, `meeko check`, `meeko dev` and `meeko build` stop with migration instructions rather than ignoring it. Move the `SessionManager` returned by `createSessionManager(production)` to the default export of `server/runtime.ts` and remove `server/session.ts`:
 
 ```ts
-// Antes: server/session.ts
+// Before: server/session.ts
 export function createSessionManager(production: boolean) {
 	return new SessionManager({ store: createStore(production), production })
 }
 
-// Después: server/runtime.ts
+// After: server/runtime.ts
 import { defineServerRuntime, SessionManager } from '@meekojs/meeko/server'
 
 export default defineServerRuntime(({ production, prerendering }) => ({
 	sessions: new SessionManager({ store: createStore(production && !prerendering), production: production && !prerendering }),
-	services: (request) => ({/* servicios por petición */}),
+	services: (request) => ({/* per-request services */}),
 }))
 ```
 
@@ -89,7 +89,7 @@ In a `<style scoped>`, `@apply` requires `@reference "tailwindcss";` (or the sty
 ```html
 <!-- app/components/Card.meeko -->
 <style scoped>
-	@reference '../styles/main.css'; /* con el @theme del proyecto */
+	@reference '../styles/main.css'; /* with the project's @theme */
 
 	.card {
 		@apply rounded-lg bg-brand p-4;
@@ -132,9 +132,9 @@ A custom Vite host that only uses the `meeko()` plugin does not receive `addVite
 ```
 
 ```html
-<!-- antes -->
+<!-- before -->
 <div class="text-white custom p-4 bg-brand flex hover:bg-brand/80"></div>
-<!-- después -->
+<!-- after -->
 <div class="custom flex bg-brand p-4 text-white hover:bg-brand/80"></div>
 ```
 
@@ -147,7 +147,7 @@ If `tailwindcss` 4 is not installed, the stylesheet does not exist or Tailwind r
 import { meekoUtilities } from '@meekojs/meeko/postcss'
 
 export default { plugins: [meekoUtilities()] }
-// O, con la forma de objeto: { plugins: { "@meekojs/meeko/postcss": {} } }
+// Or, with the object form: { plugins: { "@meekojs/meeko/postcss": {} } }
 ```
 
 ```css
@@ -464,7 +464,7 @@ export interface AccentOptions {
 	storageKey: string
 }
 
-// Tipa la clave `accent` de meeko.config.ts.
+// Types the `accent` key in meeko.config.ts.
 declare module '@meekojs/meeko/framework' {
 	interface MeekoConfig {
 		readonly accent?: Partial<AccentOptions>
@@ -476,13 +476,13 @@ export default defineMeekoModule<AccentOptions>({
 	defaults: { initial: 'teal', storageKey: 'accent' },
 	setup(options, meeko) {
 		const here = (path: string) => new URL(path, import.meta.url)
-		// <AccentPicker /> en cualquier componente, sin import.
+		// <AccentPicker /> in any component, without an import.
 		meeko.addComponentsDir(here('./components'), { prefix: 'Accent' })
-		// useAccent() sin import, en componentes y en app/.
+		// useAccent() without an import, in components and app/.
 		meeko.addAutoImports({ name: 'useAccent', from: here('./runtime/use-accent.ts') })
-		// Publica la señal del acento antes de hidratar; las opciones llegan al plugin.
+		// Expose the accent signal before hydration; options are passed to the plugin.
 		meeko.addPlugin({ src: here('./runtime/accent.plugin.ts'), options: { initial: options.initial, storageKey: options.storageKey } })
-		// Aplica el acento guardado antes de pintar, sin parpadeo.
+		// Apply the saved accent before painting, without flicker.
 		meeko.addHead({
 			script: [{ key: 'accent', children: `document.documentElement.dataset.accent = localStorage.getItem(${JSON.stringify(options.storageKey)}) ?? ${JSON.stringify(options.initial)};` }],
 		})
@@ -511,14 +511,14 @@ import type { Accent } from '../index.ts'
 import { accentKey } from './use-accent.ts'
 
 export default definePlugin<{ initial: Accent; storageKey: string }>((app, options) => {
-	// El mismo valor inicial en el servidor y en el navegador, para que la hidratación coincida.
+	// The same initial value on the server and in the browser, so hydration matches.
 	const accent = signal(options.initial)
 	app.provide(accentKey, accent)
 	if (app.side === 'client') {
 		let first = true
 		effect(() => {
 			const value = accent.value
-			// El script de <head> ya aplicó el acento guardado; después, cada cambio se aplica y se guarda.
+			// The <head> script has already applied the saved accent; each subsequent change is applied and saved.
 			if (first) {
 				first = false
 				return
@@ -543,7 +543,7 @@ export default defineMeekoModule<{ siteUrl: string }>({
 			routes = context.routes
 		})
 		meeko.addPublicFile('robots.txt', `User-agent: *\nAllow: /\nSitemap: ${options.siteUrl}/sitemap.xml\n`)
-		// Una función se evalúa al escribir el build (y en cada petición en dev), con las rutas ya descubiertas.
+		// A function is evaluated when writing the build (and on each request in dev), with routes already discovered.
 		meeko.addPublicFile('sitemap.xml', () =>
 			[
 				'<?xml version="1.0" encoding="UTF-8"?>',
@@ -637,7 +637,7 @@ There are two kinds of route middleware:
 Both also have server-only versions in `app/middleware/*.server.ts` with `defineServerRouteMiddleware` (since `1.6`): see [Server route middleware](#server-route-middleware).
 
 ```ts
-// app/middleware/10-locale.ts: global, en todas las rutas
+// app/middleware/10-locale.ts: global, on all routes
 export default defineRouteMiddleware(({ url, match }) => {
 	if (match.route.id !== '/dashboard') return
 	if (!url.searchParams.has('locale')) {
@@ -656,7 +656,7 @@ Declare a guard affecting only part of the application as named middleware, requ
 // app/middleware/auth.ts
 export default defineRouteMiddleware(
 	({ url, phase, request }) => {
-		// Una cookie pública que indica la sesión: la cookie de sesión de Meeko es HttpOnly.
+		// A public cookie indicating the session: Meeko's session cookie is HttpOnly.
 		const cookies = phase === 'server' ? (request.headers.get('cookie') ?? '') : document.cookie
 		if (!cookies.includes('signed-in=1')) {
 			const login = new URL('/login', url)
@@ -669,19 +669,19 @@ export default defineRouteMiddleware(
 ```
 
 ```ts
-// app/pages/(dashboard)/+group.ts: todas las páginas del grupo
+// app/pages/(dashboard)/+group.ts: all pages in the group
 export default defineGroup({ layout: 'dashboard', middleware: ['auth'] })
 ```
 
 ```html
-<!-- app/pages/(dashboard)/admin/users.meeko: la página añade el suyo -->
+<!-- app/pages/(dashboard)/admin/users.meeko: the page adds its own -->
 <script
 	server
 	lang="ts"
 >
 	export const route = definePage({ middleware: ['admin'] })
 </script>
-<template><h1>Usuarios</h1></template>
+<template><h1>Users</h1></template>
 ```
 
 - **Name.** The file path inside `app/middleware`, without `.ts` or each part's numeric ordering prefix: `auth.ts` and `10-auth.ts` are `"auth"`, and `admin/20-role.ts` is `"admin/role"`. Letters, digits, `-` and `_`, and `/` between folders. Two files producing the same name, if either is named middleware, stop discovery.
@@ -714,7 +714,7 @@ export default defineServerRouteMiddleware(
 ```
 
 ```ts
-// app/pages/(dashboard)/+group.ts: todas las páginas del grupo exigen sesión
+// app/pages/(dashboard)/+group.ts: all pages in the group require a session
 export default defineGroup({ layout: 'dashboard', middleware: ['auth'] })
 ```
 
@@ -781,20 +781,20 @@ Since `1.2`, two built-in Meeko tags replace these patterns. You do not import t
 - **Link resolvers: language and other prefixes.** Since `1.8`, the `href` passes through the resolvers that plugins and modules register with [`app.resolveLink`](#application-plugins). With `@meekojs/i18n`, `<MeekoLink to="/guide">` points to `/en/guide` on an `/en/…` page and to `/guide` in the default language, without writing the prefix; `hreflang="es"` (or `bind:hreflang`, or the `hreflang` key of `bind`) forces another language and is also kept on the `<a>`. `bind:resolve="false"` leaves the `href` from `href()` as is, for a link that must not change; a static `resolve="false"` is `MEEK105`. The typing of `to`, `params` and `search`, `aria-current` (with the resolved `href`, so `/guide` is active on `/en/guide`) and client navigation do not change. Without resolvers, the `href` is the one from `href()`.
 
 ```html
-<!-- /en/guide en una página /en/…, /guide en el idioma por defecto -->
-<MeekoLink to="/guide">Guía</MeekoLink>
-<!-- /guide en cualquier idioma -->
+<!-- /en/guide on an /en/… page, /guide in the default language -->
+<MeekoLink to="/guide">Guide</MeekoLink>
+<!-- /guide in any language -->
 <MeekoLink
 	to="/guide"
 	hreflang="es"
 >
-	Versión en español
+	Spanish version
 </MeekoLink>
 <MeekoLink
 	to="/admin"
 	bind:resolve="false"
 >
-	Administración
+	Administration
 </MeekoLink>
 ```
 
@@ -818,13 +818,13 @@ Since `1.2`, two built-in Meeko tags replace these patterns. You do not import t
 			to="/"
 			class="brand"
 		>
-			Inicio
+			Home
 		</MeekoLink>
 		<MeekoLink
 			to="/users/[id]"
 			bind:params="{ id: session.userId }"
 		>
-			Mi perfil
+			My profile
 		</MeekoLink>
 	</header>
 	<main><MeekoOutlet /></main>
@@ -847,36 +847,36 @@ A section menu marks the section on all its pages and marks the exact page diffe
 			to="/"
 			match="prefix"
 		>
-			Inicio
+			Home
 		</MeekoLink>
 		<MeekoLink
 			to="/dashboard"
 			match="prefix"
 		>
-			Panel
+			Dashboard
 		</MeekoLink>
 		<MeekoLink
 			to="/users"
 			match="prefix"
 		>
-			Usuarios
+			Users
 		</MeekoLink>
 		<MeekoLink
 			to="/settings"
 			match="prefix"
 		>
-			Ajustes
+			Settings
 		</MeekoLink>
 	</nav>
 	<main><MeekoOutlet /></main>
 </template>
 
 <style scoped>
-	/* La sección de la página actual: /dashboard/stats marca «Panel». */
+	/* The current page section: /dashboard/stats marks “Dashboard”. */
 	nav a[aria-current='true'] {
 		border-bottom: 2px solid currentColor;
 	}
-	/* La página exacta: /dashboard marca «Panel» con más peso. */
+	/* The exact page: /dashboard marks “Dashboard” with a heavier weight. */
 	nav a[aria-current='page'] {
 		border-bottom: 2px solid currentColor;
 		font-weight: 700;
@@ -898,7 +898,7 @@ Since `1.5`, `<MeekoTeleport to="…">` renders its content elsewhere in the doc
 <!-- app/layouts/default.meeko -->
 <template>
 	<header class="bar">
-		<MeekoLink to="/">Inicio</MeekoLink>
+		<MeekoLink to="/">Home</MeekoLink>
 		<div id="toolbar"></div>
 	</header>
 	<main><MeekoOutlet /></main>
@@ -916,7 +916,7 @@ Since `1.5`, `<MeekoTeleport to="…">` renders its content elsewhere in the doc
 		to="#toolbar"
 		bind:disabled="isMobile.value"
 	>
-		<AppButton on:click="save">Guardar</AppButton>
+		<AppButton on:click="save">Save</AppButton>
 	</MeekoTeleport>
 	<article>…</article>
 </template>
@@ -949,7 +949,7 @@ The page selects its layout in its route options, in `<script server>` or the `*
 >
 	export const route = definePage({ layout: 'dashboard' })
 </script>
-<template><h1>Conexiones</h1></template>
+<template><h1>Connections</h1></template>
 ```
 
 - **Without `layout`**, the page uses the layout inherited from its folders' [`+group.ts`](#per-folder-options-groupts) files or, if none, `default`, as up to `1.4`.
@@ -1015,8 +1015,8 @@ Because Meeko renders the layout without props a page does not pass, named layou
 **1. With route options (`layoutProps`).** Static or calculated from server data, like `head`: they reach the SSR HTML from the first byte.
 
 ```ts
-// app/pages/connections.route.ts (o export const route en <script server>)
-export const route = definePage({ layout: 'dashboard', layoutProps: { title: 'Conexiones', showAlert: true } })
+// app/pages/connections.route.ts (or export const route in <script server>)
+export const route = definePage({ layout: 'dashboard', layoutProps: { title: 'Connections', showAlert: true } })
 ```
 
 ```ts
@@ -1049,13 +1049,13 @@ The function receives the same context as `head` (`params`, `search`, `request`,
 ```html
 <!-- app/pages/connections.meeko -->
 <script lang="ts">
-	const layout = useLayout() // LayoutHandle de "dashboard"
+	const layout = useLayout() // LayoutHandle for "dashboard"
 	const failing = signal(false)
 	effect(() => layout.set({ showAlert: failing.value }))
 </script>
 <template>
-	<p>Título actual: {layout.props.title}</p>
-	<button on:click="() => failing.value = !failing.value">Probar conexión</button>
+	<p>Current title: {layout.props.title}</p>
+	<button on:click="() => failing.value = !failing.value">Test connection</button>
 </template>
 ```
 
@@ -1100,16 +1100,16 @@ A page declares its server code in a `<script server lang="ts">` block inside th
 
 	export const route = definePage({ params: v.object({ id: v.string() }) })
 
-	const { params, context } = usePage() // la petición en curso, tipada por route.params
+	const { params, context } = usePage() // the current request, typed by route.params
 	if (!context.session.current) redirect('/login')
-	const row = await db.users.findById(params.id) // db: un autoimport de server/utils; row no sale del servidor
+	const row = await db.users.findById(params.id) // db: an auto-import from server/utils; row stays on the server
 	if (!row) notFound()
-	export const user = { id: row.id, name: row.name } // se envía a la página
-	export const head = { title: `Perfil de ${user.name}` }
+	export const user = { id: row.id, name: row.name } // sent to the page
+	export const head = { title: `Profile of ${user.name}` }
 </script>
 
 <script lang="ts">
-	const name = signal(user.name) // `user` está en ámbito y tipado
+	const name = signal(user.name) // `user` is in scope and typed
 </script>
 
 <template>
@@ -1221,7 +1221,7 @@ The sidecar's `render` selects how each page reaches the browser:
 Top-level `<script server>` code follows the mode like a loader: with `"ssr"` and `"stream"` it runs on each request, and with `"prerender"` once per entry during `meeko build`. In `"stream"`, an export created with `defer(...)` arrives after the page, like a deferred loader value (see [Streaming SSR](#streaming-ssr-render-stream)). It is not supported with `"client"` (`MEEK074`), because the block runs in the browser.
 
 ```html
-<!-- app/pages/notes/index.meeko: el bloque se ejecuta en el navegador -->
+<!-- app/pages/notes/index.meeko: the block runs in the browser -->
 <script
 	server
 	lang="ts"
@@ -1262,7 +1262,7 @@ import { defer, definePage } from '@meekojs/meeko/framework'
 export const route = definePage({
 	render: 'stream',
 	load: async ({ params }) => ({
-		post: await api.posts.get({ params }), // crítico: entra en el HTML inicial
+		post: await api.posts.get({ params }), // critical: included in the initial HTML
 		comments: defer((signal) => api.comments.list({ params, signal }), { timeoutMs: 5_000 }),
 	}),
 	head: ({ data }) => ({ title: data.post.title }),
@@ -1270,11 +1270,11 @@ export const route = definePage({
 ```
 
 ```html
-<p if:when="props.data.comments.status === 'pending'">Cargando comentarios…</p>
+<p if:when="props.data.comments.status === 'pending'">Loading comments…</p>
 <ul if:when="props.data.comments.status === 'resolved'">
 	…
 </ul>
-<p if:when="props.data.comments.status === 'rejected'">No se pudieron cargar ({props.data.comments.error?.code}).</p>
+<p if:when="props.data.comments.status === 'rejected'">Could not load ({props.data.comments.error?.code}).</p>
 ```
 
 **Phase 0, before the first byte.** The server resolves the route, creates context and session, runs middleware, validates `params` and `search`, awaits the critical loader (everything outside `defer`), synchronously renders the page and all its layouts with deferred values in `pending`, and calculates `head`, which sees state written during rendering. It then seals state (`StateStore.seal()`: a later write throws `STATE_SEALED` and the deferred value causing it is rejected with `500`), awaits ongoing session changes (`create`, `rotate` or `revoke` started by the loader), and calls `context.session.verify()`; a session revoked while the loader ran responds `401` instead of a partial `200`. State, headers, cookies, CSRF token and `<title>` are fixed at that point: deferred work cannot redirect or change the session. From then on, `create`, `rotate` and `revoke` fail with `SESSION_LOCKED`/`500` before touching the store, so the browser session remains valid: only the deferred value attempting it is rejected, the failure reaches `onError`, and other values keep arriving.
@@ -1309,7 +1309,7 @@ Since `1.7`, `definePage`'s `cache` lets you revalidate and cache an `"ssr"` or 
 
 	export const route = definePage({
 		cache: {
-			// Barato: una consulta de la fecha de modificación, no del documento.
+			// Cheap: query the modification date, rather than the document.
 			etag: async ({ params }) => (await docs.updatedAt(params.slug))?.toISOString(),
 			maxAge: 60,
 			staleWhileRevalidate: 600,
@@ -1395,7 +1395,7 @@ To disable or enable a particular navigation, use `app.navigate('/projects', { v
 	to="/projects"
 	data-meeko-view-transition="false"
 >
-	Abrir sin transición
+	Open without a transition
 </MeekoLink>
 ```
 
@@ -1411,7 +1411,7 @@ This option controls changes within the same document. Navigation to new documen
 import { useNavigation } from '@meekojs/meeko/framework'
 
 const nav = useNavigation()
-// <p if:when="nav.pending.value">Cargando…</p>
+// <p if:when="nav.pending.value">Loading…</p>
 ```
 
 ### Current route
@@ -1443,9 +1443,9 @@ A layout with a sidebar marks the active section this way, both in server HTML a
 <script lang="ts">
 	const route = useRoute()
 	const links = [
-		{ to: '/', label: 'Inicio' },
-		{ to: '/users', label: 'Usuarios' },
-		{ to: '/settings', label: 'Ajustes' },
+		{ to: '/', label: 'Home' },
+		{ to: '/users', label: 'Users' },
+		{ to: '/settings', label: 'Settings' },
 	] as const
 	const inSettings = computed(() => route.isActive('/settings', { prefix: true }) !== false)
 </script>
@@ -1463,7 +1463,7 @@ A layout with a sidebar marks the active section this way, both in server HTML a
 				{link.label}
 			</a>
 		</nav>
-		<p if:when="inSettings.value">Los cambios se guardan al salir.</p>
+		<p if:when="inSettings.value">Changes are saved when you leave.</p>
 	</aside>
 	<main><MeekoOutlet /></main>
 </template>
@@ -1487,12 +1487,12 @@ export default defineMeekoConfig({
 	document: {
 		lang: 'es',
 		head: {
-			// «Zapatillas · Mi tienda» en una página titulada; «Mi tienda» en una sin título.
-			title: 'Mi tienda',
-			titleTemplate: '%s · Mi tienda',
+			// “Shoes · My store” on a titled page; “My store” on an untitled one.
+			title: 'My store',
+			titleTemplate: '%s · My store',
 			link: [{ rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' }],
-			// Se ejecuta mientras el navegador lee <head>, antes de pintar; la hidratación no lo repite.
-			// (Para un tema claro/oscuro, use theme: Meeko trae el script, la cookie y useTheme().)
+			// Runs while the browser reads <head>, before painting; hydration does not repeat it.
+			// (For a light/dark theme, use theme: Meeko provides the script, cookie and useTheme().)
 			script: [{ children: 'document.documentElement.dataset.theme = localStorage.getItem("theme") ?? "light"' }],
 		},
 	},
@@ -1528,11 +1528,11 @@ export default defineMeekoConfig({
 
 **Title.** `titleTemplate` comes from the highest-priority entry declaring it, and applies to the highest-priority title from `app/app.meeko`, layouts, page and route `head`, including error pages: `"Error"` or, above it, the title the error page itself (`app/error.meeko` or `+error.meeko`) declares with `useHead`, which its layouts' titles do not override. The `title` in `document.head` (or added by a module with `meeko.addHead`) is different: it is the site title and never passes through the template. A page without its own title shows that title unchanged, as does one whose winning title is an empty string, instead of a template around nothing. Without a site title, a page without a title has no managed `<title>` (the host's remains, if any), and an empty title is written empty. The rule is the same in SSR, hydration and client navigation. With the example configuration:
 
-| Page title     | `<title>`                |
-| -------------- | ------------------------ |
-| `"Zapatillas"` | `Zapatillas · Mi tienda` |
-| none           | `Mi tienda`              |
-| `""`           | `Mi tienda`              |
+| Page title | `<title>`          |
+| ---------- | ------------------ |
+| `"Shoes"`  | `Shoes · My store` |
+| none       | `My store`         |
+| `""`       | `My store`         |
 
 **Deduplication.** Each tag has a key: `key` if declared, otherwise its natural key. For `meta`, `name` (case-insensitive), `property` or `httpEquiv`, together with its `media` if present (two `theme-color` tags for light and dark coexist); for `link`, `rel` and `href`, except `rel: "canonical"` and `rel: "icon"`, which are unique even if `href` changes; for `script`, `src` or the code; for `style`, the CSS. With the same key, only the highest-priority tag remains, in the position where the first appeared. Thus a `document` `icon` replaces the `<link rel="icon" href="data:,">` Meeko writes by default, and a `meta name="viewport"` replaces the default viewport.
 
@@ -1576,12 +1576,12 @@ Since `1.4`, Meeko includes light/dark themes (and custom themes): the choice is
 import { defineMeekoConfig } from '@meekojs/meeko/framework'
 
 export default defineMeekoConfig({
-	theme: true, // light y dark, "system" por defecto, data-theme y la cookie meeko-theme
+	theme: true, // light and dark, "system" by default, data-theme and the meeko-theme cookie
 })
 ```
 
 ```css
-/* app/styles/main.css: los colores de cada tema, con color-scheme también sin JavaScript. */
+/* app/styles/main.css: each theme's colors, with color-scheme even without JavaScript. */
 :root {
 	color-scheme: light;
 	--bg: #fff;
@@ -1592,7 +1592,7 @@ export default defineMeekoConfig({
 	--bg: #111;
 	--ink: #eee;
 }
-/* Sin atributo (modo "system" que el servidor no pudo resolver y sin JavaScript), manda el sistema. */
+/* Without the attribute (unresolved "system" mode and no JavaScript), the system takes precedence. */
 @media (prefers-color-scheme: dark) {
 	:root:not([data-theme]) {
 		color-scheme: dark;
@@ -1649,7 +1649,7 @@ The shortest approach is [`<MeekoThemeToggle>`](#meekothemetoggle), which alread
 	<button
 		type="button"
 		class="theme-toggle"
-		aria-label="Tema oscuro"
+		aria-label="Theme oscuro"
 		bind:aria-pressed="String(resolved.value === 'dark')"
 		on:click="toggle"
 	>
@@ -1695,12 +1695,12 @@ The shortest approach is [`<MeekoThemeToggle>`](#meekothemetoggle), which alread
 </script>
 <template>
 	<select
-		aria-label="Tema"
+		aria-label="Theme"
 		model="theme"
 	>
-		<option value="system">Sistema</option>
-		<option value="light">Claro</option>
-		<option value="dark">Oscuro</option>
+		<option value="system">System</option>
+		<option value="light">Light</option>
+		<option value="dark">Dark</option>
 	</select>
 </template>
 ```
@@ -1786,7 +1786,7 @@ Since `1.4`, with `theme` in `meeko.config.ts`, Meeko includes its own theme sel
 <MeekoThemeToggle mode="select" />
 <MeekoThemeToggle
 	bind:themes="['light', 'dark']"
-	bind:labels="{ light: 'Claro', dark: 'Oscuro', system: 'Sistema' }"
+	bind:labels="{ light: 'Light', dark: 'Dark', system: 'System' }"
 	class="toggle"
 />
 ```
@@ -2055,7 +2055,7 @@ export default defineRpc({
 ```
 
 ```ts
-// app/pages/users/index.meeko, sin imports manuales
+// app/pages/users/index.meeko, without manual imports
 const loadUsers = async () => {
 	const users = await api.users.get()
 	const user = await api.users({ id: '123' }).get()
@@ -2132,13 +2132,13 @@ Since `1.2`, when `params`, `query`, `body` or an RPC's `input` fails its schema
 // shared/schemas/auth.ts
 import * as v from 'valibot'
 export const loginInput = v.object({
-	email: v.pipe(v.string(), v.email('Escribe un correo válido.')),
-	password: v.pipe(v.string(), v.minLength(1, 'Escribe tu contraseña.')),
+	email: v.pipe(v.string(), v.email('Enter a valid email address.')),
+	password: v.pipe(v.string(), v.minLength(1, 'Enter your password.')),
 })
 ```
 
 ```json
-{ "code": "INVALID_INPUT", "status": 400, "requestId": "…", "issues": [{ "path": "password", "message": "Escribe tu contraseña." }] }
+{ "code": "INVALID_INPUT", "status": 400, "requestId": "…", "issues": [{ "path": "password", "message": "Enter your password." }] }
 ```
 
 On the client, `ClientError.issues` is this read-only list (type `ValidationIssue`), or `undefined` if the response does not include it. It arrives the same way from `api.*`, `rpc.*` and the `error` of `useApi`, `useRpcQuery` and `useRpcMutation`:
@@ -2163,13 +2163,13 @@ Since `1.5`, an error that is not a validation error but belongs to a field, suc
 
 ```ts
 throw new ApiError('EMAIL_TAKEN', 409, {
-	message: `duplicate key for ${body.email}`, // interno: nunca se envía
-	issues: [{ path: 'email', message: 'Ese correo ya tiene una cuenta.' }],
+	message: `duplicate key for ${body.email}`, // internal: never sent
+	issues: [{ path: 'email', message: 'That email already has an account.' }],
 })
 ```
 
 ```json
-{ "code": "EMAIL_TAKEN", "status": 409, "requestId": "…", "issues": [{ "path": "email", "message": "Ese correo ya tiene una cuenta." }] }
+{ "code": "EMAIL_TAKEN", "status": 409, "requestId": "…", "issues": [{ "path": "email", "message": "That email already has an account." }] }
 ```
 
 - `issues` have the same shape as those of a `400` (`{ path, message }`, with `path` joined by `.` or `""` for the whole form) and are sent the same way: at most 20, in API and RPC responses, including local SSR dispatch. They are public messages written for the user; the error's `message` remains internal.
@@ -2262,8 +2262,8 @@ Since `1.7`, an API endpoint can also handle a native `<form method="post">`, wh
 import * as v from 'valibot'
 export const feedbackInput = v.object({
 	page: v.pipe(v.string(), v.startsWith('/')),
-	helpful: v.boolean('Elige sí o no.'),
-	comment: v.optional(v.pipe(v.string(), v.maxLength(500, 'Usa como mucho 500 caracteres.')), ''),
+	helpful: v.boolean('Choose yes or no.'),
+	comment: v.optional(v.pipe(v.string(), v.maxLength(500, 'Use at most 500 characters.')), ''),
 })
 export const feedbackSaved = v.object({ id: v.string() })
 ```
@@ -2277,7 +2277,7 @@ import { saveFeedback } from '../utils/feedback.js'
 export default defineApiRoute({
 	body: feedbackInput,
 	response: feedbackSaved,
-	// O { redirect: (saved) => `/graciasíid=${saved.id}` }. `echo` devuelve tras un error el texto de esos campos.
+	// Or { redirect: (saved) => `/graciasíid=${saved.id}` }. `echo` returns those fields' text after an error.
 	form: { echo: ['comment'] },
 	handler: ({ body }) => saveFeedback(body),
 })
@@ -2316,7 +2316,7 @@ export default defineApiRoute({
 			name="page"
 			bind:value="form.fields.page.value"
 		/>
-		<p if:when="form.submitted.value">¡Gracias!</p>
+		<p if:when="form.submitted.value">Thank you!</p>
 		<p
 			if:when="form.error.value"
 			role="alert"
@@ -2328,7 +2328,7 @@ export default defineApiRoute({
 			value="true"
 			on:click="() => { form.fields.helpful.value = true; }"
 		>
-			Sí
+			Yes
 		</button>
 		<button
 			name="helpful"
@@ -2407,7 +2407,7 @@ Since `1.1`, a component can request its own data with composables auto-imported
 </script>
 <template>
 	<h1>{user.data.value.name}</h1>
-	<p>{activity.data.value.length} eventos</p>
+	<p>{activity.data.value.length} events</p>
 </template>
 ```
 
@@ -2421,8 +2421,8 @@ Since `1.1`, a component can request its own data with composables auto-imported
 	const users = useApi('/api/users')
 </script>
 <template>
-	<p if:when="users.pending.value">Cargando…</p>
-	<p if:when="users.error.value">No se pudieron cargar los usuarios.</p>
+	<p if:when="users.pending.value">Loading…</p>
+	<p if:when="users.error.value">Could not load users.</p>
 	<ul if:when="users.data.value">
 		<li
 			each:of="users.data.value ?? []"
@@ -2440,9 +2440,9 @@ The options for `useApi` and the `input` for `useRpcQuery` can contain signals i
 Options are optional when the contract requires nothing. `useApi(ruta)` allows omitting them if the endpoint has no `params` and its `query` is absent or has only optional fields. `useRpcQuery(procedimiento)` allows omitting `input` if the schema accepts `{}`, and then sends `{}`. The same applies to generated clients: `api.users.get()` is called without arguments when the endpoint has no `params`, required `query` or body. The `rpc.x(input)` signature is unchanged.
 
 ```ts
-const stats = await useRpcQuery('stats.summary') // input opcional: envía {}
-const users = await useApi('/api/users') // query opcional
-const page = await api.users.get({ query: { page: '2' } }) // la query sigue disponible
+const stats = await useRpcQuery('stats.summary') // optional input: sends {}
+const users = await useApi('/api/users') // optional query
+const page = await api.users.get({ query: { page: '2' } }) // the query is still available
 ```
 
 #### SSR and hydration
@@ -2488,9 +2488,9 @@ Since `1.1`, a reload does not clear `data`: both `refresh()` and changes to inp
 <script lang="ts">
 	const props = defineProps<{ params: { id: string }; search: Record<string, string | string[]> }>()
 	const page = signal('1')
-	// Por defecto: la página anterior sigue en pantalla mientras llega la siguiente.
+	// By default: the previous page remains on screen while the next one loads.
 	const orders = useApi('/api/orders', { query: { page } })
-	// Otro usuario: mejor el esqueleto que la ficha del anterior.
+	// A different user: show a skeleton instead of the previous user's card.
 	const user = useApi('/api/users/[id]', () => ({ params: { id: props.params.id } }), { keepPrevious: false })
 </script>
 <template>
@@ -2577,8 +2577,8 @@ Since `1.5`, `<MeekoAwait>` is a built-in Meeko tag, like `<MeekoLink>`: it is n
 				params="error, retry"
 			>
 				<p role="alert">
-					No se pudo cargar.
-					<button on:click="retry">Reintentar</button>
+					Could not load.
+					<button on:click="retry">Retry</button>
 				</p>
 			</snippet>
 			<ItemsList bind:items="items.data.value" />
@@ -2723,12 +2723,12 @@ Since `1.2`, `useApiMutation(ruta, método)` does the same with a non-`GET` API 
 	}
 </script>
 <template>
-	<p if:when="save.error.value">No se pudo guardar.</p>
+	<p if:when="save.error.value">Could not save.</p>
 	<button
 		bind:disabled="remove.pending.value"
 		on:click="() => remove.mutate({ params: { id: props.params.id } })"
 	>
-		Borrar
+		Delete
 	</button>
 </template>
 ```
@@ -2763,12 +2763,12 @@ Use one storage key per mutation, including what distinguishes users or accounts
 			const receipt = await charge.mutate(input)
 			notify(`Venta #${receipt.number} cobrada.`)
 		} catch (error) {
-			// Sin respuesta: queda en verificación y se reintentará con la misma clave.
+			// No response: remains uncertain and will retry with the same key.
 			if (!charge.uncertain.value) failure.value = errorMessage(error)
 		}
 	}
 	function discard(): void {
-		if (window.confirm('Descarta esta venta sólo si comprobaste que no se registró.')) charge.discard()
+		if (window.confirm('Discard this sale only if you have confirmed it was not recorded.')) charge.discard()
 	}
 </script>
 <template>
@@ -2776,14 +2776,14 @@ Use one storage key per mutation, including what distinguishes users or accounts
 		role="alert"
 		if:when="charge.uncertain.value"
 	>
-		<p>Venta en verificación: no tuvo respuesta. Se reintentará con la misma clave, así que no se cobrará dos veces.</p>
+		<p>Sale pending verification: no response was received. It will retry with the same key, so it will not charge twice.</p>
 		<button
 			bind:disabled="charge.pending.value"
 			on:click="() => charge.retry().catch(() => {})"
 		>
-			Reintentar ahora
+			Retry now
 		</button>
-		<button on:click="discard">Descartar</button>
+		<button on:click="discard">Discard</button>
 	</div>
 	<p if:when="failure.value">{failure.value}</p>
 </template>
@@ -2797,13 +2797,13 @@ An automatic retry (when the connection returns or the component mounts) has no 
 const charge = useRpcMutation('sales.checkout', {
 	retrySafe: { key: 'pos:sale' },
 	onSuccess(receipt, attempt) {
-		// También tras un reintento en segundo plano: la venta en verificación se confirmó.
+		// Also after a background retry: the sale pending verification was confirmed.
 		if (attempt.trigger !== 'mutate') notify(`Venta #${receipt.number} cobrada.`)
 		ticket.clear()
 	},
 	onError(error, attempt) {
-		// Sólo los rechazos con respuesta: sin respuesta, la venta sigue en verificación.
-		if (!attempt.uncertain) notify(`La venta no se registró: ${errorMessage(error)}`)
+		// Only rejections with a response: without a response, the sale remains pending verification.
+		if (!attempt.uncertain) notify(`The sale was not recorded: ${errorMessage(error)}`)
 	},
 })
 ```
@@ -2829,11 +2829,11 @@ export default defineRpc({
 		const key = context.idempotencyKey
 		if (!key) throw new ApiError('IDEMPOTENCY_KEY_REQUIRED', 400)
 		const { db, restaurantId } = context.services
-		// Un reintento de una venta ya registrada devuelve el mismo recibo, sin cobrar otra vez.
+		// Retrying an already recorded sale returns the same receipt without charging again.
 		const existing = await db.sales.findByKey(restaurantId, key)
 		if (existing) return existing.receipt
-		// La restricción única cubre también dos reintentos simultáneos: el segundo INSERT falla
-		// y vuelve a leer la venta del primero.
+		// The unique constraint also covers two simultaneous retries: the second INSERT fails
+		// and reads the first one's sale again.
 		return db.sales.insertOrGet(restaurantId, key, input)
 	},
 })
@@ -2887,7 +2887,7 @@ Since `1.2`, `useStorage(clave, inicial, opciones?)` returns a writable signal w
 		lines.value = [...lines.value, line]
 	}
 </script>
-<template><p>{lines.value.length} productos en el ticket</p></template>
+<template><p>{lines.value.length} items on the receipt</p></template>
 ```
 
 - **SSR and hydration without mismatches.** The server never reads storage: the HTML uses `inicial`, as does hydration. The stored value is applied just after page hydration finishes, before `onMounted`, like `model` with a control the user edited before hydration. A component mounting later (an `if:` opening, a page reached by browser navigation) already renders the stored value on its first render. The signal does not travel in payload state: its source is storage.
@@ -2920,8 +2920,8 @@ Since `1.2`, `useForm` brings together what each form repeats: a signal per fiel
 import * as v from 'valibot'
 
 export const categoryInput = v.object({
-	name: v.pipe(v.string(), v.trim(), v.minLength(1, 'Escribe un nombre.'), v.maxLength(60, 'Usa como mucho 60 caracteres.')),
-	description: v.pipe(v.string(), v.trim(), v.maxLength(200, 'Usa como mucho 200 caracteres.')),
+	name: v.pipe(v.string(), v.trim(), v.minLength(1, 'Enter a name.'), v.maxLength(60, 'Use at most 60 characters.')),
+	description: v.pipe(v.string(), v.trim(), v.maxLength(200, 'Use at most 200 characters.')),
 })
 export const categorySchema = v.object({ id: v.string(), name: v.string(), description: v.string() })
 ```
@@ -2976,7 +2976,7 @@ export default defineApiRoute({
 		schema: categoryInput,
 		initial: { name: '', description: '' },
 		submit: (values) => api.menu.categories.post({ body: values }),
-		errorMessage: (failure) => (failure instanceof ClientError && failure.code === 'CATEGORY_EXISTS' ? 'Ya existe una categoría con ese nombre.' : 'No se pudo guardar. Revisa la conexión e inténtalo de nuevo.'),
+		errorMessage: (failure) => (failure instanceof ClientError && failure.code === 'CATEGORY_EXISTS' ? 'A category with that name already exists.' : 'Could not save. Check your connection and try again.'),
 	})
 </script>
 <template>
@@ -2992,7 +2992,7 @@ export default defineApiRoute({
 			{form.error.value}
 		</p>
 		<label>
-			Nombre
+			Name
 			<input
 				model="form.fields.name"
 				bind:aria-invalid="form.errors.value.name ? 'true' : null"
@@ -3005,12 +3005,12 @@ export default defineApiRoute({
 			{form.errors.value.name}
 		</p>
 		<TextField
-			label="Descripción"
+			label="Description"
 			model:value="form.fields.description"
 			bind:error="form.errors.value.description"
 		/>
-		<button bind:disabled="form.pending.value">{form.pending.value ? "Guardando…" : "Guardar"}</button>
-		<p if:when="form.submitted.value">Categoría guardada.</p>
+		<button bind:disabled="form.pending.value">{form.pending.value ? "Saving…" : "Save"}</button>
+		<p if:when="form.submitted.value">Category saved.</p>
 	</form>
 </template>
 ```
@@ -3091,11 +3091,11 @@ const form = useForm({ schema: signupInput, initial: { email: '', password: '' }
 **Server errors.** A `ClientError` with `issues` (the `400` response for input failing the server schema) is distributed the same way: each message in its field and the rest in `error`. This is useful without a browser schema, or when the server has rules the form does not check. Without a schema, changing a field clears its server messages:
 
 ```ts
-// app/pages/ingresar.meeko: sin schema, valida sólo el servidor
+// app/pages/ingresar.meeko: without a schema, only the server validates
 const form = useForm({
 	initial: { email: '', password: '' },
 	submit: (values) => api.session.post({ body: values }),
-	errorMessage: (failure) => (failure instanceof ClientError && failure.code === 'INVALID_CREDENTIALS' ? 'Los datos no coinciden con ninguna cuenta.' : 'No se pudo conectar con el servidor.'),
+	errorMessage: (failure) => (failure instanceof ClientError && failure.code === 'INVALID_CREDENTIALS' ? 'The details do not match any account.' : 'Could not connect to the server.'),
 })
 ```
 
@@ -3105,13 +3105,13 @@ const form = useForm({
 	"status": 400,
 	"requestId": "…",
 	"issues": [
-		{ "path": "email", "message": "Escribe un correo válido." },
-		{ "path": "password", "message": "Escribe tu contraseña." }
+		{ "path": "email", "message": "Enter a valid email address." },
+		{ "path": "password", "message": "Enter your password." }
 	]
 }
 ```
 
-With that response, `form.errors.value` is `{ email: "Escribe un correo válido.", password: "Escribe tu contraseña." }`, `form.error.value` is `null` and `form.failure.value` is the `ClientError`. A `401` `INVALID_CREDENTIALS` leaves `errors` empty and `error` with the text from `errorMessage`. To mark a field from `submit` itself (for example, after checking something in the browser), throw a `ClientError` with `issues`: `throw new ClientError("EMAIL_TAKEN", 409, undefined, [{ path: "email", message: "Ese correo ya tiene cuenta." }])`.
+With that response, `form.errors.value` is `{ email: "Enter a valid email address.", password: "Enter your password." }`, `form.error.value` is `null` and `form.failure.value` is the `ClientError`. A `401` `INVALID_CREDENTIALS` leaves `errors` empty and `error` with the text from `errorMessage`. To mark a field from `submit` itself (for example, after checking something in the browser), throw a `ClientError` with `issues`: `throw new ClientError("EMAIL_TAKEN", 409, undefined, [{ path: "email", message: "Ese correo ya tiene cuenta." }])`.
 
 Since `1.5`, the server can also assign a non-validation error to a field, such as a `409` for an email that already exists: `new ApiError(code, status, { issues })` sends those `issues` with the same shape as those of a `400` (see [Field errors: `ApiError` with `issues`](#field-errors-apierror-with-issues)), and `useForm` distributes them the same way: the message in `errors.value.email`, `error` set to `null` and the `409`'s `ClientError` in `failure`.
 
@@ -3122,7 +3122,7 @@ export default defineApiRoute({
 	response: signupResult,
 	status: 201,
 	handler: async ({ body }) => {
-		if (await emailTaken(body.email)) throw new ApiError('EMAIL_TAKEN', 409, { issues: [{ path: 'email', message: 'Ese correo ya tiene una cuenta.' }] })
+		if (await emailTaken(body.email)) throw new ApiError('EMAIL_TAKEN', 409, { issues: [{ path: 'email', message: 'That email already has an account.' }] })
 		return createUser(body)
 	},
 })
@@ -3146,7 +3146,7 @@ const profile = useForm({
 ```
 
 ```html
-<p if:when="profile.submitted.value && !profile.dirty.value">Guardado.</p>
+<p if:when="profile.submitted.value && !profile.dirty.value">Saved.</p>
 ```
 
 **Types.** With `schema`, fields have the schema input's type and `submit` receives its output: with a `v.transform`, the field can be text (`price: Signal<string>`) and `submit` receive a number. Without a schema, fields and values have the type of `initial`. `meeko check` checks `initial` against the schema input, rejects a nonexistent field (`form.fields.nmae`) or a nonexistent `errors` path, and requires a `model` field to have the control's type (a `number` field does not work for a text `<input>`). The `Form<Values, Result>` type describes the result, for example to pass the form to a component.
@@ -3206,12 +3206,12 @@ Since `1.5`, `form.field(name)` returns what a field component needs, without re
 >
 	<AppField
 		bind:field="form.field('email')"
-		label="Correo"
+		label="Email"
 	/>
 	<AppField
 		bind:field="form.field('password')"
-		label="Contraseña"
-		hint="Al menos 10 caracteres."
+		label="Password"
+		hint="At least 10 characters."
 	/>
 </form>
 ```
@@ -3223,7 +3223,7 @@ Since `1.5`, `form.field(name)` returns what a field component needs, without re
 <script lang="ts">
 	import type { FormField } from '@meekojs/meeko/framework'
 	const props = defineProps<{ field?: FormField<string>; label: string; hint?: string; error?: string }>()
-	// Sin field, el valor es el modelo: la señal del padre (model="señal") o una propia.
+	// Without field, the value is the model: the parent's signal (model="señal") or its own.
 	const model = defineModel<string>({ default: '' })
 	const ownId = useId()
 	const id = computed(() => props.field?.id ?? ownId)
@@ -3268,15 +3268,15 @@ Since `1.5`, `form.field(name)` returns what a field component needs, without re
 >
 	<AppTextField
 		bind:field="form.field('email')"
-		label="Correo"
+		label="Email"
 	/>
 </form>
 <AppTextField
 	model="query"
-	label="Buscar"
-	hint="Por nombre o correo."
+	label="Search"
+	hint="By name or email."
 />
-<AppTextField label="Notas" />
+<AppTextField label="Notes" />
 ```
 
 `model="value.value"` binds the signal chosen by the `computed`: the field's or the model's. Field IDs come from `form.field` and, without it, from `useId`, with the same `-hint` and `-error` suffixes as `hintId` and `errorId`. `const value = props.field?.value ?? model` in setup would produce warning `MEEK101`, correctly: setup runs once and, with reactive props, the parent can change fields without remounting the child (`bind:field="editing.value ? form.field('email') : form.field('phone')"`). `form.field` returns the same object for the same field, but the prop can switch to another; within a `computed`, the value and IDs follow that change. Use `untrack(() => props.field)` only if that instance's field never changes.
@@ -3306,10 +3306,10 @@ export default defineSocketChannel({
 ```
 
 ```ts
-// Dentro de <script lang="ts"> de app/pages/chat/index.meeko
+// Inside <script lang="ts"> in app/pages/chat/index.meeko
 const chat = typeof window === 'undefined' ? undefined : useSocket('chat', { roomId: 'general' })
 const unsubscribe = chat?.on('message', (message) => console.log(message.text))
-const send = async () => chat?.emit('message', { text: 'Hola', roomId: 'general' })
+const send = async () => chat?.emit('message', { text: 'Hello', roomId: 'general' })
 ```
 
 Through `1.6`, `useSocket` without `await` could only be called in the browser (it threw during SSR), hence the `window` check; since `1.7`, during SSR it returns an inert client that stays in `"connecting"` (its `on` registers nothing and its `emit` rejects), so the check is no longer needed. Since `1.1`, top-level `await useSocket(...)` goes further: setup splits at that point and the rest runs only in the browser, after the component mounts and with the socket already open (`"open"` state). The template can only use names declared before the `await` (`MEEK057`), and if the socket never opens, the continuation keeps waiting (see [api.md](api.md#top-level-composables-and-await)):
@@ -3353,7 +3353,7 @@ The `useSocket("canal", opciones)` auto-import covers the application's own chan
 ```ts
 import { useSocketClient } from '@meekojs/meeko/framework'
 
-// Dentro de <script lang="ts"> de un componente
+// Inside <script lang="ts"> in a component
 const feed = await useSocketClient('wss://feed.example.com/_meeko/socket/prices', pricesContract)
 feed.on('price', (price) => console.log(price.symbol, price.value))
 ```
@@ -3420,7 +3420,7 @@ import { defineServerRuntime, RedisSessionStore, RedisSocketPubSub, SessionManag
 export default defineServerRuntime(async ({ env, production, prerendering }) => {
 	const redis = createClient({ url: env.MEEKO_REDIS_URL })
 	await redis.connect()
-	const subscriber = redis.duplicate() // conexión dedicada en modo suscriptor
+	const subscriber = redis.duplicate() // dedicated connection in subscriber mode
 	await subscriber.connect()
 	return {
 		sessions: new SessionManager({ store: new RedisSessionStore(redis, { prefix: 'app:prod:session:', subscriber }), production: production && !prerendering }),
@@ -3490,7 +3490,7 @@ export default defineServerRuntime(async ({ env }) => {
 
 // server/utils/docs.ts
 import type { RequestContext } from '@meekojs/meeko/server'
-export const findDoc = (context: RequestContext, slug: string) => context.services.db.docs.find(slug) // tipado
+export const findDoc = (context: RequestContext, slug: string) => context.services.db.docs.find(slug) // typed
 ```
 
 - **Where.** In `usePage().context` in `<script server>`, in the handlers, `authorize`, `locals` and `rateLimit.key` of `defineApiRoute` and `defineRpc`, in `defineSocketChannel`, in `defineServerRouteMiddleware` (`services` and `context.services`) and in any `RequestContext` written without a type argument. `defineServerMiddleware` receives no context: it runs before one exists. The optional `context` in `definePage`'s `load` remains the type `C` from its type arguments.
@@ -3569,9 +3569,9 @@ Since `1.2`, Meeko handles the delicate parts of login: an opaque `HttpOnly`, `S
 **1. Variables** (`.env` in development, ignored by git; environment variables in production):
 
 ```sh
-MEEKO_PUBLIC_ORIGIN=https://example.com       # el origen exacto tras el proxy HTTPS
+MEEKO_PUBLIC_ORIGIN=https://example.com       # the exact origin behind the HTTPS proxy
 MEEKO_REDIS_URL=rediss://default:…@redis.example.com:6380
-MEEKO_TRUST_PROXY=1                           # un proxy (Traefik, Caddy, nginx) delante
+MEEKO_TRUST_PROXY=1                           # a proxy (Traefik, Caddy, nginx) in front
 ADMIN_USERNAME=ada
 ADMIN_PASSWORD_HASH=scrypt$131072$8$1$…       # npx meeko auth hash
 ```
@@ -3640,7 +3640,7 @@ export default defineApiRoute({
 </script>
 
 <template>
-	<h1>Hola, {user}</h1>
+	<h1>Hello, {user}</h1>
 </template>
 ```
 
@@ -3670,8 +3670,8 @@ At most two hashes are calculated concurrently per process, to bound memory (256
 To obtain a hash without writing code:
 
 ```sh
-npx meeko auth hash                       # pide la contraseña dos veces, sin mostrarla
-printf '%s' "$PASSWORD" | npx meeko auth hash   # o la lee de stdin
+npx meeko auth hash                       # prompts for the password twice, without displaying it
+printf '%s' "$PASSWORD" | npx meeko auth hash   # or reads it from stdin
 ```
 
 The command writes only the hash line to stdout, ready for `.env` (`ADMIN_PASSWORD_HASH=…`); warnings go to stderr.
@@ -3708,8 +3708,8 @@ The semantics match Redis and memory: a **fixed window** per key. The first requ
 `key` arrives as the 32 bytes of the SHA-256 of the counter key, which Meeko already calculates as a SHA-256 digest of the route and subject: the table never stores a plaintext IP or key (including those from manually calling `SessionManager.rateLimit`) and the column has fixed width. The statement must be atomic against concurrent requests from all instances; in PostgreSQL, a single `INSERT … ON CONFLICT DO UPDATE … RETURNING` suffices:
 
 ```sql
--- Una vez, en una migración. UNLOGGED: sin WAL, más rápida; tras una caída del servidor
--- la tabla se vacía y los contadores vuelven a empezar, lo que es aceptable para un límite.
+-- Once, in a migration. UNLOGGED: no WAL, faster; after a server crash
+-- the table is emptied and counters restart, which is acceptable for a limit.
 CREATE UNLOGGED TABLE IF NOT EXISTS meeko_rate_limits (
   key bytea PRIMARY KEY,
   window_ends_at bigint NOT NULL,
@@ -3717,29 +3717,29 @@ CREATE UNLOGGED TABLE IF NOT EXISTS meeko_rate_limits (
 );
 CREATE INDEX IF NOT EXISTS meeko_rate_limits_window_ends_at ON meeko_rate_limits (window_ends_at);
 
--- Cada petición limitada: $1 = key, $2 = now, $3 = windowMs.
+-- Each rate-limited request: $1 = key, $2 = now, $3 = windowMs.
 INSERT INTO meeko_rate_limits AS r (key, window_ends_at, count) VALUES ($1, $2::bigint + $3::bigint, 1)
 ON CONFLICT (key) DO UPDATE SET
   count = CASE WHEN r.window_ends_at <= $2 THEN 1 ELSE r.count + 1 END,
   window_ends_at = CASE WHEN r.window_ends_at <= $2 THEN EXCLUDED.window_ends_at ELSE r.window_ends_at END
 RETURNING count, window_ends_at;
 
--- Limpieza periódica (cron, pg_cron o una tarea de la aplicación): $1 = now.
+-- Periodic cleanup (cron, pg_cron or an application task): $1 = now.
 DELETE FROM meeko_rate_limits WHERE window_ends_at <= $1;
 ```
 
 Both `UPDATE` assignments read the previous row, so resetting `count` and `window_ends_at` happens together. A driver with `node-postgres`:
 
 ```ts
-// server/runtime.ts (fragmento)
+// server/runtime.ts (excerpt)
 import pg from 'pg'
 import type { SqlSessionDriver } from '@meekojs/meeko/server'
 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL })
-const rateLimitSql = `INSERT INTO meeko_rate_limits AS r …` // la sentencia de arriba
+const rateLimitSql = `INSERT INTO meeko_rate_limits AS r …` // the statement above
 
 const driver: SqlSessionDriver = {
-	// read, write, remove, replace y revokeFamily, como siempre.
+	// read, write, remove, replace and revokeFamily, as usual.
 	...sessionStatements(pool),
 	async rateLimit(key, windowMs, now) {
 		const { rows } = await pool.query<{ count: number; window_ends_at: string }>(rateLimitSql, [Buffer.from(key), now, windowMs])
@@ -3762,8 +3762,8 @@ The client IP has two access paths, with the same policy as `rateLimit`:
 import { clientAddress, defineServerMiddleware } from '@meekojs/meeko/server'
 
 export default defineServerMiddleware(async (request, next) => {
-	// Tras Traefik con MEEKO_TRUST_PROXY=1, la del visitante y no la del proxy.
-	const ip = clientAddress(request) ?? 'desconocida'
+	// Behind Traefik with MEEKO_TRUST_PROXY=1, the visitor's address rather than the proxy's.
+	const ip = clientAddress(request) ?? 'unknown'
 	const response = await next()
 	console.log(`${request.method} ${new URL(request.url).pathname} ${response.status} ${ip}`)
 	return response
@@ -3785,7 +3785,7 @@ With Cloudflare Tunnel, the request arrives as follows: Cloudflare → `cloudfla
 
 ```dotenv
 MEEKO_TRUST_PROXY=cloudflare
-# Opcional. Por defecto, loopback y redes privadas:
+# Optional. Defaults to loopback and private networks:
 # MEEKO_TRUSTED_PROXIES=127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, ::1/128, fc00::/7
 ```
 
@@ -3917,9 +3917,9 @@ The command only operates on a Meeko project (with `meeko.config.*` or `@meekojs
 ## Build, deployment and verification
 
 ```sh
-npm run check   # manifiestos, tipos, componentes y proyectos TypeScript separados
-npm run build   # cliente, servidor Node y prerender bajo .meeko/output/node/
-npm start       # Node 24, con store persistente configurado
+npm run check   # manifests, types, components and separate TypeScript projects
+npm run build   # client, Node server and prerendering under .meeko/output/node/
+npm start       # Node 24, with a persistent store configured
 ```
 
 `meeko build [directorio] [--adapter <nombre>]` takes the adapter from `--adapter` or `server.adapter` in `meeko.config.ts`, defaulting to `node`. `MeekoConfig.server` is a discriminated union; for Node it accepts `{ adapter: "node", host?, port? }`. The Node build writes `.meeko/output/node/` with `index.mjs`, `chunks/`, `client/` and `prerender/`. This folder contains the already resolved route, endpoint and asset manifest: it does not read `app/`, `server/` or `meeko.config.ts`, or load TypeScript or Vite. It only needs `node_modules` dependencies, including `@meekojs/meeko`. `meeko start` and `meeko preview` execute `index.mjs`; you can also run it with `node .meeko/output/node/index.mjs`. For Bun and Deno, `meeko build --adapter bun` or `--adapter deno` (or `server: { adapter: "bun" }` / `{ adapter: "deno" }`) produces the standalone output described under [Bun](#bun) and [Deno](#deno), and `--adapter cloudflare` produces the Worker described under [Cloudflare Workers](#cloudflare-workers). Since `1.3`, `--adapter static` (or `server: { adapter: "static" }`) generates a file-based site for static hosting; see [Static site](#static-site).
@@ -3940,7 +3940,7 @@ The Node adapter delivers multiple `Set-Cookie` headers separately and stops tra
 
 ```sh
 npx meeko build --adapter static     # .meeko/output/static/
-npx meeko preview --adapter static   # la sirve como un hosting estático
+npx meeko preview --adapter static   # serves it as static hosting would
 ```
 
 Since `1.3`, the `static` adapter writes a site without a server to `.meeko/output/static/`, ready to upload as is to nginx, Netlify, Cloudflare Pages, GitHub Pages or a bucket:
@@ -3970,7 +3970,7 @@ export default defineMeekoConfig({
 		headerFiles: ['_headers', 'nginx'],
 		contentSecurityPolicy: {
 			'default-src': ["'self'"],
-			// data: para el <link rel="icon" href="data:,"> que Meeko pone si la aplicación no tiene icono.
+			// data: for the <link rel="icon" href="data:,"> Meeko adds when the application has no icon.
 			'img-src': ["'self'", 'data:'],
 			'script-src': ["'self'"],
 			'style-src': ["'self'", "'unsafe-inline'"],
@@ -3991,7 +3991,7 @@ export default defineMeekoConfig({
 
 ```nginx
 server {
-  root /usr/share/nginx/html;   # el contenido de .meeko/output/static
+  root /usr/share/nginx/html;   # the contents of .meeko/output/static
   location / {
     include /usr/share/nginx/html/_meeko/headers.conf;
     try_files $uri $uri/index.html =404;
@@ -4008,8 +4008,8 @@ These options are only read when `server.adapter` is `"static"`; using `meeko bu
 ```ts
 export default defineMeekoConfig({
 	site: 'https://example.com',
-	sitemap: { exclude: ['/admin', '/admin/*'] }, // o sitemap: true
-	robots: { disallow: ['/admin/'] }, // o robots: true
+	sitemap: { exclude: ['/admin', '/admin/*'] }, // or sitemap: true
+	robots: { disallow: ['/admin/'] }, // or robots: true
 })
 ```
 
@@ -4022,7 +4022,7 @@ URLs need the public origin: `site` or, without it, the build's `MEEKO_PUBLIC_OR
 Since `1.7`, a server-rendered page declares its sitemap URLs with `sitemapEntries` in `definePage`: a list of `{ params, lastmod?, changefreq?, priority? }` (type `SitemapEntry`) or a synchronous or asynchronous function returning it. This is the way to handle dynamic routes with `"ssr"` or `"stream"`, whose URLs the build cannot guess:
 
 ```ts
-// app/pages/docs/[slug].route.ts (o el <script server> de la página)
+// app/pages/docs/[slug].route.ts (or the page's <script server>)
 import { definePage } from '@meekojs/meeko/framework'
 import { docs } from '../../../server/content/bundle.js'
 
@@ -4081,7 +4081,7 @@ A `Content-Security-Policy` without `'unsafe-inline'` blocks a document's inline
 The `static` adapter does all this with `server.contentSecurityPolicy`: it calculates script hashes and, since `1.4`, `<style>` hashes for every `.html` in its output (including `404.html` and those in `public/`; since `1.7`, in Meeko documents only those outside `#app` and teleports, while custom `.html` files are read in full), adds them to the policy and writes the header to `headerFiles`. If a page has an `on*` attribute or a `javascript:` URL, the build fails with the file list: use a script or the component's `on:`. Changing a script changes its hash on the next build, without touching the policy.
 
 ```ts
-// Un host propio que sirve el build de Node con CSP para sus páginas prerenderizadas.
+// A custom host serving the Node build with CSP for its prerendered pages.
 import { readFile } from 'node:fs/promises'
 import { contentSecurityPolicy } from '@meekojs/meeko/server'
 import type { PrerenderIndex } from '@meekojs/meeko/build'
@@ -4106,10 +4106,10 @@ export default defineMeekoConfig({
 		adapter: 'node',
 		contentSecurityPolicy: {
 			'default-src': ["'self'"],
-			// data: para el <link rel="icon" href="data:,"> que Meeko pone si la aplicación no tiene icono.
+			// data: for the <link rel="icon" href="data:,"> Meeko adds when the application has no icon.
 			'img-src': ["'self'", 'data:'],
 			'script-src': ["'self'"],
-			// Shiki y otros resaltadores escriben atributos style="…": esta directiva se queda como está.
+			// Shiki and other highlighters write style="…" attributes: this directive stays unchanged.
 			'style-src': ["'self'", "'unsafe-inline'"],
 			'object-src': ["'none'"],
 			'base-uri': ["'none'"],
@@ -4154,8 +4154,8 @@ With an `on*` attribute or a `javascript:` URL in HTML, the browser blocks them 
 
 ```sh
 npx meeko build --adapter bun
-npx meeko preview --adapter bun      # ejecuta la salida con `bun`
-bun .meeko/output/bun/index.js       # en producción
+npx meeko preview --adapter bun      # runs the output with `bun`
+bun .meeko/output/bun/index.js       # in production
 ```
 
 The Bun build writes `.meeko/output/bun/` with `index.js`, `chunks/`, `client/` and `prerender/`. Unlike the Node build, `index.js` includes `@meekojs/meeko` and the remaining server dependencies: the folder needs neither `node_modules`, application sources, TypeScript nor Vite. Copy the complete folder to the server. Build and prerendering still run with Node; Meeko builds an intermediate Node server in `.meeko/build/node/` for this purpose, which is not part of the output.
@@ -4206,11 +4206,11 @@ Declare the configuration in `meeko.config.ts`:
 export default defineMeekoConfig({
 	server: {
 		adapter: 'cloudflare',
-		name: 'mi-app', // por defecto, el nombre del package.json
-		socketClassName: 'MeekoSocketRoom', // clase Durable Object de las salas
-		compatibilityDate: '2026-10-19', // por defecto, la fecha con la que Meeko se prueba
+		name: 'mi-app', // defaults to the name in package.json
+		socketClassName: 'MeekoSocketRoom', // Durable Object class for rooms
+		compatibilityDate: '2026-10-19', // defaults to the date Meeko is tested against
 		wrangler: {
-			// campos adicionales de wrangler.jsonc
+			// additional wrangler.jsonc fields
 			d1_databases: [{ binding: 'DB', database_name: 'mi-app', database_id: '<id>' }],
 			vars: { MEEKO_PUBLIC_ORIGIN: 'https://mi-app.example' },
 		},
@@ -4250,8 +4250,8 @@ export default defineServerRuntime<Env>(({ env, production, prerendering }) => {
 	return {
 		sessions: new SessionManager({ production: production && !prerendering, store }),
 		services: { pubsub },
-		// Sin pubsub, el Worker usa DurableObjectSocketPubSub(env.MEEKO_SOCKET) por defecto;
-		// cualquier otro broker se rechaza al crear la aplicación.
+		// Without pubsub, the Worker uses DurableObjectSocketPubSub(env.MEEKO_SOCKET) by default;
+		// any other broker is rejected when creating the application.
 		socket: { maxMessageBytes: 16 * 1024 },
 	}
 })
@@ -4296,7 +4296,7 @@ Workers does not open Redis TCP connections with the `redis` client. `RedisSessi
 import { RedisSessionStore } from '@meekojs/meeko/server'
 import type { RedisSessionClient } from '@meekojs/meeko/server'
 
-/** Cliente mínimo de la API REST de Upstash para RedisSessionStore. */
+/** Minimal Upstash REST API client for RedisSessionStore. */
 function upstashClient(url: string, token: string): RedisSessionClient {
 	const command = async (...args: Array<string | number>): Promise<unknown> => {
 		const response = await fetch(url, {
@@ -4316,7 +4316,7 @@ function upstashClient(url: string, token: string): RedisSessionClient {
 	}
 }
 
-// En la fábrica de server/runtime.ts:
+// In the server/runtime.ts factory:
 const store = new RedisSessionStore(upstashClient(env.UPSTASH_REDIS_REST_URL, env.UPSTASH_REDIS_REST_TOKEN), { prefix: 'mi-app:prod:' })
 ```
 
@@ -4368,8 +4368,8 @@ For a custom Worker, `@meekojs/meeko/cloudflare` exports the pieces used by the 
 The `workerd` variant adds D1 sessions (also read from a private channel's Durable Object), forced room hibernation (`evictDurableObject` with `webSockets: "hibernate"`) followed by messages in both directions, `ping`/`pong` auto-response and a broadcast from the API, room-to-room publication through RPC without leaking to third-party rooms, a connection with a `Cookie` header exceeding the attachment limit, a room whose name exceeds 1,024 bytes, and output as a single `worker.js` module. The streaming test requests `accept-encoding: identity`: Wrangler's local runtime (Miniflare) emulates Cloudflare compression for `text/html` without respecting `no-transform`, and its gzip encoder only writes when the body closes, so with `wrangler dev` or `meeko preview --adapter cloudflare`, a browser accepting gzip receives complete `"stream"` pages at the end. This is a local environment limitation: in production, Cloudflare compression respects `no-transform`.
 
 ```sh
-pnpm run conformance          # node, bun, deno y workerd
-pnpm run conformance:bun      # o :node / :deno / :workerd
+pnpm run conformance          # node, bun, deno and workerd
+pnpm run conformance:bun      # or :node / :deno / :workerd
 ```
 
 Node always runs. Bun and Deno are looked up in `MEEKO_BUN`/`MEEKO_DENO`, then in `PATH` and finally in a version installed with `mise` (`mise where bun`). If not found, the suite is skipped with an explicit message. workerd comes with the `wrangler` devDependency; without it, its suite is also skipped. `MEEKO_CONFORMANCE_REQUIRE=bun,deno,workerd` turns that skip into a failure; CI uses it in its Bun, Deno and workerd jobs.

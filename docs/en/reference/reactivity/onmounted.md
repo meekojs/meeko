@@ -60,7 +60,7 @@ const field = useElementRef("search");
 onMounted(() => field.value?.focus());
 </script>
 
-<template><input ref:search type="search" placeholder="Buscar"></template>
+<template><input ref:search type="search" placeholder="Search"></template>
 ```
 
 ### A library that needs the element
@@ -99,7 +99,7 @@ onMounted(async () => {
 });
 </script>
 
-<template><p if:when="stats.value">{stats.value.visits} visitas</p></template>
+<template><p if:when="stats.value">{stats.value.visits} visits</p></template>
 ```
 
 If the request fails, the error reaches the error observer with source `"mounted"`.

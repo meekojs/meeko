@@ -33,7 +33,7 @@ const timing: ServerMiddleware = async (request, next) => {
   return response;
 };
 
-const handle = composeServerMiddleware([timing], async () => new Response("hola"));
+const handle = composeServerMiddleware([timing], async () => new Response("hello"));
 const response = await handle(new Request("http://localhost/"));
 ```
 
@@ -75,7 +75,7 @@ Meeko sorts files by name (`10-…`, `20-…`) and composes them with this same 
 import { clientAddress, defineServerMiddleware } from "@meekojs/meeko/server";
 
 export default defineServerMiddleware(async (request, next) => {
-  const ip = clientAddress(request) ?? "desconocida"; // aplica MEEKO_TRUST_PROXY
+  const ip = clientAddress(request) ?? "unknown"; // applies MEEKO_TRUST_PROXY
   const response = await next();
   console.log(`${request.method} ${new URL(request.url).pathname} ${response.status} ${ip}`);
   return response;
@@ -90,7 +90,7 @@ import type { ServerMiddleware } from "@meekojs/meeko/server";
 export const tagRequests: ServerMiddleware = (request, next) => {
   const headers = new Headers(request.headers);
   headers.set("x-request-start", String(Date.now()));
-  return next(new Request(request, { headers })); // conserva la IP de la conexión
+  return next(new Request(request, { headers })); // preserves the connection IP
 };
 ```
 

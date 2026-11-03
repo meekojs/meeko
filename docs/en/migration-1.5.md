@@ -59,10 +59,10 @@ Some interfaces for objects Meeko delivers to the application have new required 
 Since `1.5`, [stability.md](stability.md#package-entry-points) records the rule: an interface Meeko **delivers** can gain members in a minor release, just as a union Meeko delivers can gain members. Reading and destructuring them is unchanged. Manually implementing them stops compiling, for example in a test:
 
 ```ts
-// Antes: falta isActive desde 1.5
+// Before: missing isActive since 1.5
 const route: RouteState = { url, path, id, params, search };
 
-// Después: un doble parcial, que sigue compilando cuando la interfaz crece
+// After: a partial test double that still compiles as the interface grows
 const route = { url, path, id, params, search } as Partial<RouteState> as RouteState;
 ```
 
@@ -99,7 +99,7 @@ Every field change also revalidates other fields with a schema error (and the fo
 Each `app/layouts/<nombre>.meeko` is a named layout chosen by the page in its route options; without `layout`, its `+group.ts` layout or `default` is used, as before:
 
 ```ts
-// app/pages/connections.route.ts (o export const route en <script server>)
+// app/pages/connections.route.ts (or export const route in <script server>)
 export const route = definePage({ layout: "dashboard" });
 ```
 
@@ -146,7 +146,7 @@ See [Forms: `useForm`](framework.md#forms-useform).
 An error belonging to a field, such as an email already registered, carries `issues` through `ApiError`'s third argument:
 
 ```ts
-throw new ApiError("EMAIL_TAKEN", 409, { issues: [{ path: "email", message: "Ese correo ya tiene una cuenta." }] });
+throw new ApiError("EMAIL_TAKEN", 409, { issues: [{ path: "email", message: "That email already has an account." }] });
 ```
 
 They are sent in the same shape as those from a `400` (at most 20, only with a `4xx` status), arrive in `ClientError.issues` and are placed in the field by `useForm`. A string third argument remains the internal message. Only `issues` from a Meeko `ApiError` are transferred: those from another error with the same shape (an SDK's `ApiError`, a `ClientError` from another service escaping the handler) are not exposed. See [Field errors](framework.md#field-errors-apierror-with-issues).
@@ -174,7 +174,7 @@ For data from a `useApi` or `useRpcQuery` without `await`, `<MeekoAwait>` render
 
 ```html
 <MeekoAwait for="items" reserve>
-  <snippet name="pending"><p class="skeleton">Cargando…</p></snippet>
+  <snippet name="pending"><p class="skeleton">Loading…</p></snippet>
   <ul><li each:of="items.data.value" each:as="item">{item.name}</li></ul>
 </MeekoAwait>
 ```

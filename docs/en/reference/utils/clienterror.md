@@ -32,7 +32,7 @@ export async function rename(call: () => Promise<unknown>): Promise<string | nul
     await call();
     return null;
   } catch (error) {
-    if (error instanceof ClientError && error.status === 409) return "Ese nombre ya existe.";
+    if (error instanceof ClientError && error.status === 409) return "That name already exists.";
     if (error instanceof ClientError) console.warn(error.code, error.requestId);
     throw error;
   }
@@ -76,9 +76,9 @@ With `useRpcMutation`, `fieldMessage(login.error.value, "password")` returns the
 import { isClientError } from "@meekojs/meeko/framework";
 
 export function errorText(failure: unknown): string {
-  if (isClientError(failure, "RATE_LIMITED")) return "Demasiados intentos. Espera un momento.";
-  if (isClientError(failure)) return `No se pudo guardar (${failure.code}).`;
-  return "No se pudo conectar. Inténtalo de nuevo.";
+  if (isClientError(failure, "RATE_LIMITED")) return "Too many attempts. Wait a moment.";
+  if (isClientError(failure)) return `Could not save (${failure.code}).`;
+  return "Could not connect. Try again.";
 }
 ```
 
@@ -97,7 +97,7 @@ alert(error.message); // "EMAIL_TAKEN"
 <!-- no-check -->
 
 ```ts good
-alert(error.issues?.[0]?.message ?? "No se pudo crear la cuenta.");
+alert(error.issues?.[0]?.message ?? "Could not create the account.");
 ```
 
 ### Read properties of an `unknown` without checking

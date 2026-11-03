@@ -30,7 +30,7 @@ const sessions = new SessionManager({ store: new MemorySessionStore() });
 const request = new Request("http://localhost/api/report");
 const context = createRequestContext(request, { db: { name: "test" } }, await sessions.load(request));
 
-console.log(context.requestId);        // un UUID nuevo
+console.log(context.requestId);        // a new UUID
 console.log(context.platform.name);    // "node"
 console.log(context.services.db.name); // "test"
 ```
@@ -73,13 +73,13 @@ import type { Schema } from "@meekojs/meeko/server";
 const report: Schema<{ region: string }> = { "~standard": { version: 1, validate: (value) => ({ value: value as { region: string } }) } };
 interface Services { readonly region: string }
 
-// En una aplicación, .meeko/types/services.d.ts da el tipo de context.services; aquí se indica a mano.
+// In an application, .meeko/types/services.d.ts provides the context.services type; here it is specified manually.
 const route = defineApiRoute<undefined, undefined, undefined, typeof report, Services>({
   response: report,
   handler: ({ context }) => ({ region: context.services.region }),
 });
 
-test("el informe usa la región de los servicios", async () => {
+test("the report uses the services' region", async () => {
   const sessions = new SessionManager({ store: new MemorySessionStore() });
   const request = new Request("http://localhost/api/report");
   const context = createRequestContext(request, { region: "eu" }, await sessions.load(request));
@@ -143,7 +143,7 @@ const context = createRequestContext(request, services, await sessions.load(requ
 ```ts bad
 const shared = createRequestContext(firstRequest, services, session);
 await dispatchApiRoute(route, shared, sessions);
-await dispatchApiRoute(otherRoute, shared, sessions); // otra petición
+await dispatchApiRoute(otherRoute, shared, sessions); // another request
 ```
 
 A context belongs to one request: `context.request` (with its body), `requestId`, `signal`, session and `state` belong to the first one. The second endpoint does not see its own request, and both share `requestId` in logs.

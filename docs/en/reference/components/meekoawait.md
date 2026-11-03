@@ -38,7 +38,7 @@ const items = useApi("/api/items");
     <h2>Items</h2>
     <MeekoAwait for="items" reserve>
       <snippet name="pending"><ItemsSkeleton /></snippet>
-      <snippet name="error" params="error, retry"><p role="alert">No se pudo cargar. <button on:click="retry">Reintentar</button></p></snippet>
+      <snippet name="error" params="error, retry"><p role="alert">Could not load. <button on:click="retry">Retry</button></p></snippet>
       <ItemsList bind:items="items.data.value" />
     </MeekoAwait>
   </section>
@@ -85,8 +85,8 @@ const stats = useRpcQuery("stats.summary");
 
 <template>
   <MeekoAwait for="[users, stats]">
-    <snippet name="pending"><p>Cargando…</p></snippet>
-    <p>{users.data.value.length} usuarios · {stats.data.value.orders} pedidos</p>
+    <snippet name="pending"><p>Loading…</p></snippet>
+    <p>{users.data.value.length} users · {stats.data.value.orders} orders</p>
   </MeekoAwait>
 </template>
 ```
@@ -109,7 +109,7 @@ const orders = useApi("/api/orders", { query: { page } });
       </ul>
     </snippet>
   </MeekoAwait>
-  <button type="button" on:click="() => page.value = String(Number(page.value) + 1)">Siguiente</button>
+  <button type="button" on:click="() => page.value = String(Number(page.value) + 1)">Next</button>
 </template>
 ```
 

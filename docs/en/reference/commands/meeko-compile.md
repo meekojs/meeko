@@ -123,14 +123,14 @@ meeko compile app/components/Greeting.meeko Greeting.generated.ts
 ### A standalone component outside a project
 
 ```sh bad
-# Card.meeko en una carpeta sin node_modules ni tsconfig.json
+# Card.meeko in a directory without node_modules or tsconfig.json
 meeko compile Card.meeko Card.ts
 ```
 
 `Falló la comprobación con TypeScript 7: error TS2688: Cannot find type definition file for 'node'.` Without a `tsconfig.json`, the initial check uses default options that include Node types, and requires `@types/node` (and `@meekojs/meeko`) installed in the component's project.
 
 ```sh good
-# dentro de un proyecto con @meekojs/meeko y @types/node instalados
+# inside a project with @meekojs/meeko and @types/node installed
 meeko compile app/components/Card.meeko Card.ts
 ```
 

@@ -26,7 +26,7 @@ Use it in a custom host or server middleware so your errors have the same shape 
 import { ApiError, errorResponse } from "@meekojs/meeko/server";
 
 const response = errorResponse(new ApiError("NOT_FOUND", 404), crypto.randomUUID());
-// 404 {"code":"NOT_FOUND","status":404,"requestId":"…"} con x-request-id
+// 404 {"code":"NOT_FOUND","status":404,"requestId":"…"} with x-request-id
 ```
 
 ## Parameters
@@ -75,10 +75,10 @@ In the browser, `api.partners.*` rejects with a `ClientError` whose `code` is `I
 import { ApiError, errorResponse } from "@meekojs/meeko/server";
 
 export const conflict = errorResponse(
-  new ApiError("EMAIL_TAKEN", 409, { issues: [{ path: "email", message: "Ese correo ya tiene una cuenta." }] }),
+  new ApiError("EMAIL_TAKEN", 409, { issues: [{ path: "email", message: "That email already has an account." }] }),
   crypto.randomUUID(),
 );
-// 409 {"code":"EMAIL_TAKEN","status":409,"requestId":"…","issues":[{"path":"email","message":"Ese correo ya tiene una cuenta."}]}
+// 409 {"code":"EMAIL_TAKEN","status":409,"requestId":"…","issues":[{"path":"email","message":"That email already has an account."}]}
 ```
 
 ### A custom host handler that never rejects
@@ -91,7 +91,7 @@ async function handle(request: Request): Promise<Response> {
   try {
     return await route(request);
   } catch (error) {
-    logger.error({ requestId, error }); // el mensaje privado, sólo en el servidor
+    logger.error({ requestId, error }); // the private message, only on the server
     return errorResponse(error, requestId);
   }
 }
@@ -130,7 +130,7 @@ throw new ApiError("NOT_FOUND", 404);
 ### `issues` in a `5xx`
 
 ```ts bad
-throw new ApiError("BROKEN", 503, { issues: [{ path: "email", message: "El servicio de correo falló." }] });
+throw new ApiError("BROKEN", 503, { issues: [{ path: "email", message: "The email service failed." }] });
 ```
 
 The response is `503 {"code":"BROKEN",…}` without `issues`: field messages only travel with a `4xx` status.

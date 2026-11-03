@@ -90,11 +90,11 @@ chat.on("message", (data) => { messages.value = [...messages.value, data.text]; 
 </script>
 
 <template>
-  <p if:when="status.value !== 'open'">Conectando…</p>
+  <p if:when="status.value !== 'open'">Connecting…</p>
   <ul><li each:of="messages.value" each:as="text">{text}</li></ul>
   <form on:submit="(event) => { event.preventDefault(); void send(); }">
-    <input model="draft" aria-label="Mensaje">
-    <button type="submit">Enviar</button>
+    <input model="draft" aria-label="Message">
+    <button type="submit">Send</button>
   </form>
 </template>
 ```
@@ -116,7 +116,7 @@ import { feedContract } from "../../shared/feed";
 const feed = useSocketClient("wss://feed.example.com/_meeko/socket/feed", feedContract);
 </script>
 
-<template><p>Estado: {feed.state.value}</p></template>
+<template><p>State: {feed.state.value}</p></template>
 ```
 
 With `render: "client"`, setup never runs on the server, so `await` is unnecessary.
@@ -129,7 +129,7 @@ With `render: "client"`, setup never runs on the server, so `await` is unnecessa
 <script lang="ts">
 import { useSocketClient } from "@meekojs/meeko/framework";
 const chat = useSocketClient("wss://example.com/_meeko/socket/chat", chatContract);
-void chat.emit("message", { text: "hola" });
+void chat.emit("message", { text: "hello" });
 </script>
 ```
 
@@ -139,7 +139,7 @@ Setup also runs on the server, where there are no sockets. Since `1.7`, `useSock
 <script lang="ts">
 import { useSocketClient } from "@meekojs/meeko/framework";
 const chat = await useSocketClient("wss://example.com/_meeko/socket/chat", chatContract);
-void chat.emit("message", { text: "hola" });
+void chat.emit("message", { text: "hello" });
 </script>
 ```
 

@@ -34,7 +34,7 @@ In a framework application, use `useSocket`. `useSocketChannel` is for a custom 
 <!-- no-check -->
 
 ```ts
-// src/socket.ts, en un host propio
+// src/socket.ts, in a custom host
 import { useSocketChannel } from "@meekojs/meeko/framework";
 import type { SocketRegistryOptions } from "@meekojs/meeko/framework";
 import { socketContracts } from "./socket-contracts.js";
@@ -75,7 +75,7 @@ import { useSocketChannel } from "@meekojs/meeko/framework";
 import type { SocketRegistryOptions } from "@meekojs/meeko/framework";
 import { liveContracts } from "./contracts.js";
 
-/** Abre un canal en vivo del servicio, con la URL de su servidor. */
+/** Open a live service channel with its server URL. */
 export function useLive<K extends keyof typeof liveContracts & string>(name: K, options: SocketRegistryOptions = {}) {
   return useSocketChannel(liveContracts, name, { baseUrl: "wss://live.example.com", ...options });
 }
@@ -121,7 +121,7 @@ const feed = useSocketChannel(socketContracts, "feed");
 ### Waiting for the connection with `await`
 
 ```ts bad
-// En el <script> de un componente
+// In the <script> of a component
 const chat = await useSocketChannel(socketContracts, "chat");
 ```
 
@@ -136,7 +136,7 @@ const chat = await useSocket("chat");
 ### Using it outside a component
 
 ```ts bad
-// app/utils/live.ts, evaluado al importar
+// app/utils/live.ts, evaluated on import
 export const chat = useSocketChannel(socketContracts, "chat");
 ```
 

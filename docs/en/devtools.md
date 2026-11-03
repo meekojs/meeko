@@ -25,7 +25,7 @@ Alternatively, an application can mount it itself, for example in another contai
 if (import.meta.env.DEV) {
   const { mountDevtoolsPanel } = await import("@meekojs/meeko/devtools-ui");
   const panel = mountDevtoolsPanel({ position: "top-right" });
-  // panel.unmount() libera la interfaz cuando deje de usarse.
+  // panel.unmount() releases the interface when it is no longer used.
 }
 ```
 

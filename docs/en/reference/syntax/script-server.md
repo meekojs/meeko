@@ -31,7 +31,7 @@ The block supports two forms, which can coexist except for `load` alongside top-
 ```html
 <!-- app/pages/users/[id].meeko -->
 <script server lang="ts">
-export const route = definePage({ head: () => ({ title: "Perfil" }) });
+export const route = definePage({ head: () => ({ title: "Profile" }) });
 
 const { params } = usePage();
 const row = await findUser(params.id);
@@ -45,7 +45,7 @@ const name = signal(user.name);
 
 <template>
   <h1>{user.name}</h1>
-  <input model="name" aria-label="Nombre">
+  <input model="name" aria-label="Name">
 </template>
 ```
 
@@ -84,10 +84,10 @@ const { context, url } = usePage();
 const session = context.session.current;
 if (!session) redirect(`/login?next=${encodeURIComponent(url.pathname)}`);
 export const account = { id: session.id };
-export const head = { title: "Tu cuenta", description: "Ajustes de la cuenta." };
+export const head = { title: "Your account", description: "Account settings." };
 </script>
 
-<template><h1>Cuenta {account.id}</h1></template>
+<template><h1>Account {account.id}</h1></template>
 ```
 
 To avoid repeating the guard in every page, server route middleware (`app/middleware/auth.server.ts`) applies it to a group of routes.
@@ -110,7 +110,7 @@ const { params, search } = usePage();       // params.id: string, search.tab: "i
 export const order = { id: Number(params.id), tab: search.tab };
 </script>
 
-<template><h1>Pedido {order.id}</h1></template>
+<template><h1>Order {order.id}</h1></template>
 ```
 
 A URL with `id=abc` responds with `400` before running the block.
@@ -129,9 +129,9 @@ export const stats = defer(async () => ({ visits: 1200 }));
 </script>
 
 <template>
-  <h1>Hola, {user.name}</h1>
-  <p if:when="stats.status === 'pending'">Cargando estadísticas…</p>
-  <p if:when="stats.status === 'resolved'">{stats.value?.visits} visitas</p>
+  <h1>Hello, {user.name}</h1>
+  <p if:when="stats.status === 'pending'">Loading statistics…</p>
+  <p if:when="stats.status === 'resolved'">{stats.value?.visits} visits</p>
 </template>
 ```
 
@@ -144,7 +144,7 @@ A block without top-level code is evaluated once, like a sidecar, and can use a 
 <script server lang="ts">
 export const route = definePage({
   render: "prerender",
-  load: async () => ({ posts: [{ slug: "hola", title: "Hola, Meeko" }] }),
+  load: async () => ({ posts: [{ slug: "hola", title: "Hello, Meeko" }] }),
   head: ({ data }) => ({ title: `Blog (${data.posts.length})` }),
 });
 </script>
@@ -229,7 +229,7 @@ import { articleHtml } from "../../server/content/articles";
 ```html good
 <script server lang="ts">
 import { articleHtml } from "../../server/content/articles";
-export const body = articleHtml("<p>Hola</p>");
+export const body = articleHtml("<p>Hello</p>");
 </script>
 ```
 

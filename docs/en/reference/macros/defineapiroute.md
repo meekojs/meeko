@@ -155,7 +155,7 @@ export default defineApiRoute({
   status: 201,
   handler: async ({ body }) => {
     if (await emailTaken(body.email)) {
-      throw new ApiError("EMAIL_TAKEN", 409, { message: `duplicate ${body.email}`, issues: [{ path: "email", message: "Ese correo ya tiene una cuenta." }] });
+      throw new ApiError("EMAIL_TAKEN", 409, { message: `duplicate ${body.email}`, issues: [{ path: "email", message: "That email already has an account." }] });
     }
     return createUser(body);
   },
@@ -178,7 +178,7 @@ import { feedbackInput, feedbackSaved } from "../../shared/schemas/feedback";
 export default defineApiRoute({
   body: feedbackInput,
   response: feedbackSaved,
-  // Tras un error, el comentario vuelve a la página; ningún otro valor.
+  // After an error, the comment returns to the page; no other value does.
   form: { redirect: (saved) => `/gracias?id=${saved.id}`, echo: ["comment"] },
   handler: ({ body }) => saveFeedback(body),
 });
@@ -204,8 +204,8 @@ const form = useForm({
     <p if:when="form.error.value" role="alert">{form.error.value}</p>
     <textarea name="comment" model="form.fields.comment" aria-label="Comentario"></textarea>
     <p if:when="form.errors.value.comment">{form.errors.value.comment}</p>
-    <button name="helpful" value="true" on:click="() => { form.fields.helpful.value = true; }">Me ha servido</button>
-    <button name="helpful" value="false" on:click="() => { form.fields.helpful.value = false; }">No me ha servido</button>
+    <button name="helpful" value="true" on:click="() => { form.fields.helpful.value = true; }">This was helpful</button>
+    <button name="helpful" value="false" on:click="() => { form.fields.helpful.value = false; }">This was not helpful</button>
   </form>
 </template>
 ```

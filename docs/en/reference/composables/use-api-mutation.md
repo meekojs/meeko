@@ -40,8 +40,8 @@ async function save(): Promise<void> {
 
 <template>
   <textarea model="text"></textarea>
-  <button type="button" bind:disabled="create.pending.value" on:click="save">Guardar</button>
-  <p if:when="create.error.value" role="alert">No se pudo guardar.</p>
+  <button type="button" bind:disabled="create.pending.value" on:click="save">Save</button>
+  <p if:when="create.error.value" role="alert">Could not save.</p>
 </template>
 ```
 
@@ -85,7 +85,7 @@ async function erase(id: string): Promise<void> {
 <template>
   <li each:of="notes.data.value" each:as="note" each:key="note.id">
     {note.text}
-    <button type="button" bind:disabled="remove.pending.value" on:click="() => erase(note.id)">Borrar</button>
+    <button type="button" bind:disabled="remove.pending.value" on:click="() => erase(note.id)">Delete</button>
   </li>
 </template>
 ```
@@ -107,7 +107,7 @@ const form = useForm({
   <form on:submit="form.submit" novalidate>
     <textarea model="form.fields.text"></textarea>
     <p if:when="form.errors.value.text">{form.errors.value.text}</p>
-    <button bind:disabled="form.pending.value">Guardar</button>
+    <button bind:disabled="form.pending.value">Save</button>
   </form>
 </template>
 ```
@@ -126,8 +126,8 @@ const sale = useApiMutation("/api/sales", "POST", {
 
 <template>
   <div role="alert" if:when="sale.uncertain.value">
-    <p>Venta en verificación: se reintentará con la misma clave, sin cobrar dos veces.</p>
-    <button bind:disabled="sale.pending.value" on:click="() => sale.retry().catch(() => {})">Reintentar ahora</button>
+    <p>Sale pending verification: it will retry with the same key, without charging twice.</p>
+    <button bind:disabled="sale.pending.value" on:click="() => sale.retry().catch(() => {})">Retry now</button>
   </div>
 </template>
 ```
@@ -170,7 +170,7 @@ const users = useApi("/api/users");
 `mutate` receives operation input (`params`, `query`, `body`), not the body directly.
 
 ```ts bad
-await create.mutate({ text: "hola" });
+await create.mutate({ text: "hello" });
 ```
 
 `meeko check` reports `TS2353: Object literal may only specify known properties, and 'text' does not exist in type 'ApiMutationInput<…>'`.
@@ -178,7 +178,7 @@ await create.mutate({ text: "hola" });
 <!-- no-check -->
 
 ```ts good
-await create.mutate({ body: { text: "hola" } });
+await create.mutate({ body: { text: "hello" } });
 ```
 
 ### Create it in the handler

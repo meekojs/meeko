@@ -38,18 +38,18 @@ Siguiente paso: cd C:\proyectos\tienda && npm install && npm run dev
 
 ```text
 tienda/
-├── .env.example            las variables MEEKO_* comentadas
+├── .env.example            commented MEEKO_* variables
 ├── .gitignore              node_modules/, .meeko/, .env
 ├── README.md
 ├── meeko.config.ts         defineMeekoConfig({ layers: [], modules: [], imports: { serverDirs: [] } })
 ├── package.json
-├── tsconfig.json           referencia .meeko/tsconfig.app.json, server y shared
+├── tsconfig.json           references .meeko/tsconfig.app.json, server and shared
 ├── public/.gitkeep
 └── app/
-    ├── app.meeko           el documento raíz
+    ├── app.meeko           the root document
     ├── layouts/default.meeko
-    ├── pages/index.meeko   render: "prerender", con un contador
-    └── styles/main.css     estilos globales, que se cargan solos
+    ├── pages/index.meeko   render: "prerender", with a counter
+    └── styles/main.css     global styles, loaded automatically
 ```
 
 `package.json` receives these scripts and pins `@meekojs/meeko` to the exact version of the CLI that created it, with `@types/node`, `typescript` and `vite` as development dependencies:
@@ -72,7 +72,7 @@ npx @meekojs/meeko init-framework tienda
 cd tienda
 npm install
 npm run dev      # http://localhost:4173
-npm run check    # tipos y contratos
+npm run check    # types and contracts
 npm run build    # .meeko/output/node
 ```
 
@@ -130,7 +130,7 @@ Scripts use `.` as the directory, so they work with `pnpm -F` or from the applic
 ### A nonempty folder
 
 ```sh bad
-meeko init-framework tienda   # tienda ya tiene app/ o un README.md
+meeko init-framework tienda   # tienda already has app/ or a README.md
 ```
 
 `El destino no está vacío: C:\proyectos\tienda (app, README.md)`. Since `1.7`, as with `meeko init`, the message lists the blocking entries.
@@ -142,7 +142,7 @@ meeko init-framework tienda-nueva
 ### Lockfiles without their `package.json`
 
 ```sh bad
-# tienda tiene bun.lock o node_modules, pero no package.json
+# tienda has bun.lock or node_modules, but no package.json
 meeko init-framework tienda
 ```
 
@@ -155,14 +155,14 @@ cd tienda && npm init -y && meeko init-framework .
 ### A `package.json` already defining `dev`, `check`, `build` or `start`
 
 ```sh bad
-# package.json con "scripts": { "dev": "vite" }
+# package.json with "scripts": { "dev": "vite" }
 meeko init-framework .
 ```
 
 `El destino ya define el script dev: C:\proyectos\tienda`. Nothing is written.
 
 ```sh good
-# renombra o quita el script y vuelve a ejecutarlo
+# rename or remove the script and run again
 meeko init-framework .
 ```
 

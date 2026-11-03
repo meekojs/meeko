@@ -117,7 +117,7 @@ meeko lsp --stdio
 ### Use the global server instead of the project's server
 
 ```lua bad
-cmd = { "meeko-language-server", "--stdio" },  -- instalado con npm i -g
+cmd = { "meeko-language-server", "--stdio" },  -- installed with npm i -g
 ```
 
 A global `@meekojs/meeko` of another version compiles components using a different compiler and types than `meeko check` and `meeko build`: editor diagnostics do not match CI diagnostics.

@@ -27,7 +27,7 @@ For a ready-made selector, use `<UIThemeToggle>` from `@meekojs/ui` 0.2; for a c
 // meeko.config.ts
 import { defineMeekoConfig } from '@meekojs/meeko/framework'
 
-export default defineMeekoConfig({ theme: true }) // light y dark, "system" por defecto
+export default defineMeekoConfig({ theme: true }) // light and dark, "system" by default
 ```
 
 ```html
@@ -38,12 +38,12 @@ export default defineMeekoConfig({ theme: true }) // light y dark, "system" por 
 
 <template>
 	<select
-		aria-label="Tema"
+		aria-label="Theme"
 		model="theme"
 	>
-		<option value="system">Sistema</option>
-		<option value="light">Claro</option>
-		<option value="dark">Oscuro</option>
+		<option value="system">System</option>
+		<option value="light">Light</option>
+		<option value="dark">Dark</option>
 	</select>
 </template>
 ```
@@ -84,7 +84,7 @@ Render both icons and let CSS display one according to the `<html>` attribute, w
 	<button
 		type="button"
 		class="theme-button"
-		aria-label="Tema oscuro"
+		aria-label="Theme oscuro"
 		bind:aria-pressed="String(resolved.value === 'dark')"
 		on:click="toggle"
 	>
@@ -140,7 +140,7 @@ export default defineMeekoConfig({
 
 <template>
 	<fieldset>
-		<legend>Tema</legend>
+		<legend>Theme</legend>
 		<label
 			each:of="themes"
 			each:as="name"
@@ -180,7 +180,7 @@ A chart needing different dark-mode colors tracks `resolved` with an `effect`:
 ### Use it without `theme` in configuration
 
 ```ts bad
-// meeko.config.ts sin theme
+// meeko.config.ts without theme
 const { resolved } = useTheme()
 ```
 

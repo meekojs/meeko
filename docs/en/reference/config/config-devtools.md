@@ -85,7 +85,7 @@ export default defineMeekoConfig({ devtools: { position: "top-left" } });
 ### Mount it twice
 
 ```ts bad
-// app/plugins/devtools.client.ts, con devtools: true en meeko.config.ts
+// app/plugins/devtools.client.ts, with devtools: true in meeko.config.ts
 if (import.meta.env.DEV) {
   const { mountDevtoolsPanel } = await import("@meekojs/meeko/devtools-ui");
   mountDevtoolsPanel();

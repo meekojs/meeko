@@ -25,8 +25,8 @@ Use it to write your own form field, toggle or dialog with `open` without a prop
 <!-- app/components/AppInput.meeko -->
 <script lang="ts">
 const props = defineProps<{ label: string }>();
-const value = defineModel<string>();                              // modelo por defecto, obligatorio
-const touched = defineModel<boolean>("touched", { default: false }); // modelo con nombre, opcional
+const value = defineModel<string>();                              // required default model
+const touched = defineModel<boolean>("touched", { default: false }); // optional named model
 </script>
 
 <template>
@@ -35,8 +35,8 @@ const touched = defineModel<boolean>("touched", { default: false }); // modelo c
 ```
 
 ```html
-<!-- en el padre, con const name = signal("") y const nameTouched = signal(false) -->
-<AppInput label="Nombre" model="name" model:touched="nameTouched" />
+<!-- in the parent, with const name = signal("") and const nameTouched = signal(false) -->
+<AppInput label="Name" model="name" model:touched="nameTouched" />
 ```
 
 ## Parameters
@@ -93,14 +93,14 @@ const snippets = defineSnippets<{ default: [] }>();
 <template>
   <div if:when="open.value" role="dialog" aria-modal="true">
     <render snippet="snippets.default" />
-    <button type="button" on:click="() => open.value = false">Cerrar</button>
+    <button type="button" on:click="() => open.value = false">Close</button>
   </div>
 </template>
 ```
 
 ```html
-<button type="button" on:click="() => dialogOpen.value = true">Abrir</button>
-<AppDialog model:open="dialogOpen"><p>¿Seguro?</p></AppDialog>
+<button type="button" on:click="() => dialogOpen.value = true">Open</button>
+<AppDialog model:open="dialogOpen"><p>Are you sure?</p></AppDialog>
 ```
 
 ### A `useForm` field
@@ -114,7 +114,7 @@ const form = useForm({ initial: { name: "" }, submit: async (values) => values }
 
 <template>
   <form on:submit="form.submit">
-    <AppInput label="Nombre" model="form.fields.name" />
+    <AppInput label="Name" model="form.fields.name" />
   </form>
 </template>
 ```
@@ -157,39 +157,39 @@ const open = defineModel<boolean>("open", { default: false });
 ### Not passing a required model
 
 ```html bad
-<AppInput label="Nombre" />
+<AppInput label="Name" />
 ```
 
 `meeko check` reports `TS2741: Property '"default"' is missing in type '{}' but required in type 'ComponentModels'.` Pass the signal, or make the model optional with `defineModel<string>({ default: "" })`.
 
 ```html good
-<AppInput label="Nombre" model="name" />
+<AppInput label="Name" model="name" />
 ```
 
 ### Passing a value or a `computed`
 
 ```html bad
-<AppInput label="Nombre" model="name.value" />
-<AppInput label="Nombre" model="upper" />
+<AppInput label="Name" model="name.value" />
+<AppInput label="Name" model="upper" />
 ```
 
 `meeko check` reports `TS2322: Type 'string' is not assignable to type 'Signal<string>'.` and, with `const upper = computed(…)`, `TS2345` with `"a model needs a writable signal; computed and readonly signals cannot be written"`. A signal of another type reports `TS2322: Type 'Signal<number>' is not assignable to type 'Signal<string>'.`
 
 ```html good
-<AppInput label="Nombre" model="name" />
+<AppInput label="Name" model="name" />
 ```
 
 ### An undeclared model, or one passed as a prop
 
 ```html bad
-<AppInput label="Nombre" model="name" model:opened="open" />
-<AppInput label="Nombre" model="name" model:touched="touched" bind:touched="touched.value" />
+<AppInput label="Name" model="name" model:opened="open" />
+<AppInput label="Name" model="name" model:touched="touched" bind:touched="touched.value" />
 ```
 
 `meeko check` reports `TS2353: Object literal may only specify known properties, and '"opened"' does not exist in type 'ComponentModels'.` and `MEEK066: model:touched y bind:touched pasan los dos touched; un modelo no es una prop, deja sólo model:touched`.
 
 ```html good
-<AppInput label="Nombre" model="name" model:touched="touched" />
+<AppInput label="Name" model="name" model:touched="touched" />
 ```
 
 ## Notes

@@ -63,10 +63,10 @@ const routes = createRouteManifest([
   { id: "/docs/[...path]", file: "app/pages/docs/[...path].meeko", layouts: [] },
 ]);
 
-matchRoute(routes, "/users/42/")?.params;  // { id: "42" }: la barra final no cuenta
-matchRoute(routes, "/users/a%2Fb");        // undefined: un segmento no puede contener "/"
-matchRoute(routes, "/users/..");           // undefined: ni "." ni ".."
-matchRoute(routes, "/docs");               // undefined: el catch-all necesita al menos un segmento
+matchRoute(routes, "/users/42/")?.params;  // { id: "42" }: the trailing slash does not count
+matchRoute(routes, "/users/a%2Fb");        // undefined: a segment cannot contain "/"
+matchRoute(routes, "/users/..");           // undefined: neither "." nor ".."
+matchRoute(routes, "/docs");               // undefined: the catch-all requires at least one segment
 ```
 
 ### Your own host that knows which page each request targets
@@ -74,7 +74,7 @@ matchRoute(routes, "/docs");               // undefined: el catch-all necesita a
 <!-- no-check -->
 
 ```ts
-// server.mjs, junto al build de Node
+// server.mjs, next to the Node build
 import { createServer } from "node:http";
 import { matchRoute } from "@meekojs/meeko/framework";
 import { toNodeListener } from "@meekojs/meeko/node";
@@ -85,7 +85,7 @@ createServer(toNodeListener(async (request) => {
   const match = matchRoute(manifest.routes, new URL(request.url).pathname);
   const started = performance.now();
   const response = await app.fetch(request);
-  console.log(match?.route.id ?? "(sin ruta)", response.status, `${Math.round(performance.now() - started)} ms`);
+  console.log(match?.route.id ?? "(no route)", response.status, `${Math.round(performance.now() - started)} ms`);
   return response;
 })).listen(3000);
 ```
@@ -115,7 +115,7 @@ const routes = [
   { id: "/users/[id]", file: "a", layouts: [] },
   { id: "/users/new", file: "b", layouts: [] },
 ];
-matchRoute(routes, "/users/new"); // puede devolver /users/[id]
+matchRoute(routes, "/users/new"); // may return /users/[id]
 ```
 
 `matchRoute` traverses the list in order. `createRouteManifest` sorts static routes before dynamic ones and detects collisions (`Route collision: a and b both resolve to …`).

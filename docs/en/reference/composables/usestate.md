@@ -84,7 +84,7 @@ const visits = useState("app:renderedAt", () => new Date().toISOString());
 
 <template>
   <div class="site-root"><MeekoOutlet /></div>
-  <footer>Renderizado: {visits.value}</footer>
+  <footer>Rendered: {visits.value}</footer>
 </template>
 ```
 
@@ -151,7 +151,7 @@ items.value = [...items.value, id];
 On the server, the store is sealed after rendering: the payload has already been written.
 
 ```ts bad
-// En el script de un componente: una promesa suelta que escribe después del render.
+// In a component script: an unawaited promise that writes after rendering.
 const stats = useState<Stats | null>("stats", () => null);
 fetchStats().then((value) => { stats.value = value; });
 ```

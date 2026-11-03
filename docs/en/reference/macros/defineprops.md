@@ -38,7 +38,7 @@ interface Props {
 }
 
 const props = defineProps<Props>({ step: 1 });
-const count = signal(props.initial ?? 0); // sólo el valor inicial
+const count = signal(props.initial ?? 0); // only the initial value
 </script>
 
 <template>

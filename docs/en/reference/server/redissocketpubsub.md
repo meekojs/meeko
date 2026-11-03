@@ -35,7 +35,7 @@ import { defineServerRuntime, RedisSocketPubSub } from "@meekojs/meeko/server";
 export default defineServerRuntime(async ({ env }) => {
   const redis = createClient({ url: env.MEEKO_REDIS_URL });
   await redis.connect();
-  const subscriber = redis.duplicate(); // el suscriptor necesita su propia conexión
+  const subscriber = redis.duplicate(); // the subscriber needs its own connection
   await subscriber.connect();
   return {
     socket: { pubsub: new RedisSocketPubSub({ publisher: redis, subscriber, prefix: "chat:prod:" }) },
@@ -76,7 +76,7 @@ A `SocketPubSub`:
 <!-- no-check -->
 
 ```ts
-// publisher ofrece sPublish; subscriber, sSubscribe y sUnsubscribe (Redis 7 o posterior).
+// publisher provides sPublish; subscriber provides sSubscribe and sUnsubscribe (Redis 7 or later).
 const pubsub = new RedisSocketPubSub({ publisher, subscriber, prefix: "chat:prod:", sharded: true });
 ```
 
@@ -98,7 +98,7 @@ A message from another format version or malformed (another process publishing t
 ### Deploy with multiple replicas
 
 ```yaml
-# docker-compose.yml (fragmento): dos réplicas detrás del proxy, un Redis compartido
+# docker-compose.yml (excerpt): two replicas behind the proxy, one shared Redis
 services:
   app:
     image: tienda:1.7.0
@@ -139,7 +139,7 @@ new RedisSocketPubSub({ publisher: oldClient, subscriber: oldSubscriber, prefix:
 <!-- no-check -->
 
 ```ts good
-new RedisSocketPubSub({ publisher: redis, subscriber, prefix: "chat:prod:" }); // sin sharded fuera de un clúster
+new RedisSocketPubSub({ publisher: redis, subscriber, prefix: "chat:prod:" }); // without sharded outside a cluster
 ```
 
 ### Use the normal connection as subscriber

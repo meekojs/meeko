@@ -69,7 +69,7 @@ Response: `403 {"code":"INVALID_ORIGIN",…}`, before validating input or execut
 ### A script calling the API with the cookie
 
 ```js
-// Desde el navegador, en la misma aplicación: el cliente api.* ya lo hace.
+// From the browser, in the same application: the api.* client already does this.
 const token = document.querySelector('meta[name="meeko-csrf-token"]').content;
 await fetch("/api/profile", {
   method: "PUT",
@@ -107,7 +107,7 @@ await api.profile.put({ body: { name: "Ada" } });
 ### A proxy without `MEEKO_PUBLIC_ORIGIN`
 
 ```text bad
-Navegador → https://app.example.com → proxy TLS → http://127.0.0.1:4173 (sin MEEKO_PUBLIC_ORIGIN)
+Browser → https://app.example.com → TLS proxy → http://127.0.0.1:4173 (without MEEKO_PUBLIC_ORIGIN)
 ```
 
 The application sees its own origin as `http://127.0.0.1:4173`; the browser's `Origin` (`https://app.example.com`) does not match and every authenticated mutation returns `403 INVALID_ORIGIN`.

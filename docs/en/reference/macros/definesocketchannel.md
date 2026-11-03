@@ -59,7 +59,7 @@ export default defineSocketChannel({
 <script lang="ts">
 const messages = signal<{ text: string; author: string }[]>([]);
 const draft = signal("");
-// useSocket sin await sólo existe en el navegador: en SSR no hay conexión.
+// useSocket without await only exists in the browser: there is no connection in SSR.
 const chat = typeof window === "undefined" ? undefined : useSocket("chat", { roomId: "general" });
 chat?.on("message", (message) => {
   messages.value = [...messages.value, message];
@@ -73,7 +73,7 @@ async function send(event: SubmitEvent): Promise<void> {
 
 <template>
   <ul aria-live="polite"><li each:of="messages.value" each:as="message">{message.author}: {message.text}</li></ul>
-  <form on:submit="send"><input model="draft" aria-label="Mensaje"><button>Enviar</button></form>
+  <form on:submit="send"><input model="draft" aria-label="Message"><button>Send</button></form>
 </template>
 ```
 

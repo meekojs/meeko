@@ -158,7 +158,7 @@ createSocketRoomClass(createCloudflareApp, DurableObject, { maxPendingPublicatio
 ### A cookie too large for the _attachment_
 
 ```ts bad
-createSocketRoomClass(createCloudflareApp, DurableObject, { keepHeaders: ["cookie"] }); // cookies de analítica de 20 KB
+createSocketRoomClass(createCloudflareApp, DurableObject, { keepHeaders: ["cookie"] }); // 20 KB analytics cookies
 ```
 
 Cloudflare limits a WebSocket's _attachment_ to 16,384 bytes. Meeko estimates size before accepting: the upgrade responds with `431` and `onError` receives the error, rather than opening a connection that would close with `1011`.
@@ -166,7 +166,7 @@ Cloudflare limits a WebSocket's _attachment_ to 16,384 bytes. Meeko estimates si
 <!-- no-check -->
 
 ```ts good
-createSocketRoomClass(createCloudflareApp, DurableObject); // sólo la cookie de sesión de Meeko
+createSocketRoomClass(createCloudflareApp, DurableObject); // only Meeko's session cookie
 ```
 
 ## Notes

@@ -29,7 +29,7 @@ Unlike the command, it **does not check** the project first (neither components 
 import { buildProject } from "@meekojs/meeko/build";
 
 const { adapter, output } = await buildProject(process.cwd());
-console.log(`build ${adapter} en ${output}`);
+console.log(`build ${adapter} in ${output}`);
 ```
 
 ## Parameters
@@ -83,7 +83,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildProject } from "@meekojs/meeko/build";
 
-test("el build de Node sirve la portada", async () => {
+test("the Node build serves the home page", async () => {
   const { output } = await buildProject("tests/fixtures/app", { adapter: "node" });
   const { createNodeApp } = await import(`${output}/index.mjs`);
   const app = await createNodeApp();
@@ -97,7 +97,7 @@ test("el build de Node sirve la portada", async () => {
 ### Expect the `meeko build` check
 
 ```ts bad
-await buildProject(process.cwd()); // el proyecto tiene un error TS2322 en server/api
+await buildProject(process.cwd()); // the project has a TS2322 error in server/api
 ```
 
 Vite strips types without checking them: the build completes and the error reaches production. `meeko build` runs `meeko check` first; `buildProject` does not.
@@ -126,7 +126,7 @@ await buildProject(process.cwd(), { adapter: "node" });
 ### Environment variables the build needs from `.env`
 
 ```ts bad
-// .env: MEEKO_PUBLIC_ORIGIN=https://example.com, y sitemap: true sin site
+// .env: MEEKO_PUBLIC_ORIGIN=https://example.com, and sitemap: true without site
 await buildProject(process.cwd());
 ```
 

@@ -73,8 +73,8 @@ const users = useApi("/api/users");
 </script>
 
 <template>
-  <p if:when="users.pending.value">Cargando…</p>
-  <p if:when="users.error.value" role="alert">No se pudieron cargar los usuarios.</p>
+  <p if:when="users.pending.value">Loading…</p>
+  <p if:when="users.error.value" role="alert">Could not load users.</p>
   <ul if:when="users.data.value">
     <li each:of="users.data.value" each:as="user" each:key="user.id">{user.name}</li>
   </ul>
@@ -95,7 +95,7 @@ const orders = useApi("/api/orders", { query: { page } });
   <ul bind:class="orders.refreshing.value ? 'dimmed' : undefined">
     <li each:of="orders.data.value ?? []" each:as="order" each:key="order.id">{order.total}</li>
   </ul>
-  <button type="button" on:click="() => page.value = String(Number(page.value) + 1)">Siguiente</button>
+  <button type="button" on:click="() => page.value = String(Number(page.value) + 1)">Next</button>
 </template>
 ```
 

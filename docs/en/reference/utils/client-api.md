@@ -47,9 +47,9 @@ async function save(event: SubmitEvent): Promise<void> {
 
 <template>
   <form on:submit="save">
-    <input model="name" aria-label="Nombre">
-    <button>Guardar</button>
-    <p if:when="saved.value" role="status">Guardado como {saved.value}</p>
+    <input model="name" aria-label="Name">
+    <button>Save</button>
+    <p if:when="saved.value" role="status">Saved as {saved.value}</p>
   </form>
 </template>
 ```

@@ -87,7 +87,7 @@ With JavaScript, submission is intercepted and the change is immediate with `use
 .theme-radios [role='radio'][aria-checked='true'] {
 	font-weight: 700;
 }
-/* Antes de hidratar, sin aria-checked, el CSS lee la elección de <html>: */
+/* Before hydration, without aria-checked, CSS reads the choice from <html>: */
 [data-theme-choice='dark'] .theme-radios [data-meeko-theme-option='dark'] {
 	font-weight: 700;
 }
@@ -98,7 +98,7 @@ With JavaScript, submission is intercepted and the change is immediate with `use
 ```html
 <MeekoThemeToggle
 	bind:themes="['light', 'dark']"
-	bind:labels="{ light: 'Día', dark: 'Noche' }"
+	bind:labels="{ light: 'Day', dark: 'Night' }"
 >
 	<snippet name="light">☀️</snippet>
 	<snippet name="dark">🌙</snippet>
@@ -139,7 +139,7 @@ export default defineMeekoConfig({ theme: { themes: ['light', 'dark', 'sepia'] }
 ### Use it without `theme` in the configuration
 
 ```html bad
-<!-- meeko.config.ts no declara theme -->
+<!-- meeko.config.ts does not declare theme -->
 <MeekoThemeToggle />
 ```
 

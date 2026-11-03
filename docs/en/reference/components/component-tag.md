@@ -77,7 +77,7 @@ const views = { grid: GridView, list: ListView };
 </script>
 
 <template>
-  <button type="button" on:click="() => mode.value = mode.value === 'grid' ? 'list' : 'grid'">Cambiar vista</button>
+  <button type="button" on:click="() => mode.value = mode.value === 'grid' ? 'list' : 'grid'">Change view</button>
   <component is="views[mode.value]" bind:items="props.items"></component>
 </template>
 ```
@@ -138,9 +138,9 @@ const snippets = defineSnippets<{ default: [] }>();
 ### Snippets in a dynamic component
 
 ```html
-<component is="props.dialog" bind:title="'Confirmar'">
-  <p>¿Seguro que quieres borrar «{item.name}»?</p>
-  <snippet name="actions" params="close"><button on:click="close">Cancelar</button></snippet>
+<component is="props.dialog" bind:title="'Confirm'">
+  <p>Are you sure you want to delete “{item.name}”?</p>
+  <snippet name="actions" params="close"><button on:click="close">Cancel</button></snippet>
 </component>
 ```
 
@@ -167,13 +167,13 @@ const tag = signal<"a" | "button">("a");
 ### `MeekoLink` as an `is` value
 
 ```html bad
-<component is="internal ? MeekoLink : 'a'" to="/about">Acerca</component>
+<component is="internal ? MeekoLink : 'a'" to="/about">About</component>
 ```
 
 `meeko check` reports `TS2304: Cannot find name 'MeekoLink'`: `<MeekoLink>` is a compiler tag, not a script value. Since `1.8`, name it with a literal like any component:
 
 ```html good
-<component is="internal ? 'MeekoLink' : 'a'" to="/about" href="https://example.com">Acerca</component>
+<component is="internal ? 'MeekoLink' : 'a'" to="/about" href="https://example.com">About</component>
 ```
 
 ### Omit a required prop
@@ -185,43 +185,43 @@ const tag = signal<"a" | "button">("a");
 With `defineProps<{ title: string; count?: number }>()` in `Card`, `meeko check` reports `TS2345: Argument of type '{}' is not assignable to parameter of type '{ title: string; count?: number | undefined; } & ExtraProps'`, with `Property 'title' is missing`.
 
 ```html good
-<Card title="Hola" />
+<Card title="Hello" />
 ```
 
 ### A static prop where another type is expected
 
 ```html bad
-<Card title="Hola" count="3" />
+<Card title="Hello" count="3" />
 ```
 
 `meeko check` reports `TS2322: Type 'string' is not assignable to type 'number'`: an unprefixed attribute passes text `"3"`. For a number, use `bind:`:
 
 ```html good
-<Card title="Hola" bind:count="3" />
+<Card title="Hello" bind:count="3" />
 ```
 
 ### The same prop statically and with `bind:`
 
 ```html bad
-<Card title="Hola" bind:title="'Adiós'" />
+<Card title="Hello" bind:title="'Goodbye'" />
 ```
 
 `meeko check` reports `MEEK090: title y bind:title pasan los dos la prop title; deja sólo el texto estático o sólo bind:title`.
 
 ```html good
-<Card bind:title="'Adiós'" />
+<Card bind:title="'Goodbye'" />
 ```
 
 ### A hyphenated attribute on a component
 
 ```html bad
-<Card title="Hola" data-test="card" />
+<Card title="Hello" data-test="card" />
 ```
 
 `meeko check` reports `MEEK032: Las props de un componente se pasan con prop="texto", bind:prop="expresión" u on:evento="manejador"; is, ref, html y los nombres con guiones no son props`. A component has no root element to pass attributes to: declare it as a prop or put it on a wrapping element.
 
 ```html good
-<div data-test="card"><Card title="Hola" /></div>
+<div data-test="card"><Card title="Hello" /></div>
 ```
 
 ## Notes

@@ -25,7 +25,7 @@ import { defineMeekoConfig } from "@meekojs/meeko/framework";
 export default defineMeekoConfig({
   site: "https://example.com",
   sitemap: true,
-  robots: { disallow: ["/admin/"] }, // o robots: true
+  robots: { disallow: ["/admin/"] }, // or robots: true
 });
 ```
 
@@ -105,13 +105,13 @@ export default defineMeekoConfig({ robots: { disallow: ["/admin"] } });
 ### A `public/robots.txt`
 
 ```text bad
-public/robots.txt   y   robots: true
+public/robots.txt   and   robots: true
 ```
 
 `meeko build` stops with `El archivo público robots.txt (de public/ o de un módulo) choca con el que genera la opción robots de meeko.config.ts; quita uno de los dos`.
 
 ```text good
-Borre public/robots.txt y declare sus reglas en robots
+Delete public/robots.txt and declare its rules in robots
 ```
 
 ## Notes

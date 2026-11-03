@@ -48,7 +48,7 @@ The running server reads the index at startup and caches each page in memory the
 ### Regenerate the blog every night
 
 ```sh
-# cron, en el servidor
+# cron, on the server
 cd /srv/blog && npx meeko prerender . && systemctl restart blog
 ```
 
@@ -104,7 +104,7 @@ meeko prerender .
 `No hay build de producción en …\.meeko\output\node\index.mjs; ejecuta meeko build`.
 
 ```sh good
-# vuelve a construir: prerenderiza y copia las páginas a la salida del adaptador
+# rebuild: prerenders and copies pages to the adapter output
 meeko build .
 ```
 

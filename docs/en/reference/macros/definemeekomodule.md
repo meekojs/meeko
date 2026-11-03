@@ -31,14 +31,14 @@ import { defineMeekoModule } from "@meekojs/meeko/framework";
 
 export interface HelloOptions { greeting: string }
 
-// Tipa la clave `hello` de meeko.config.ts; Meeko carga esta ampliación sola.
+// Types the `hello` key in meeko.config.ts; Meeko loads this augmentation automatically.
 declare module "@meekojs/meeko/framework" {
   interface MeekoConfig { readonly hello?: Partial<HelloOptions> }
 }
 
 export default defineMeekoModule<HelloOptions>({
   meta: { name: "hello", configKey: "hello", compatibility: { meeko: ">=1.2" } },
-  defaults: { greeting: "Hola" },
+  defaults: { greeting: "Hello" },
   setup(options, meeko) {
     meeko.addComponentsDir(new URL("./components", import.meta.url), { prefix: "Hello" });
     meeko.addPlugin({ src: new URL("./runtime/greeting.ts", import.meta.url), options: { greeting: options.greeting } });
@@ -127,7 +127,7 @@ export default defineMeekoModule({
   meta: { name: "mailer" },
   setup(_options, meeko) {
     meeko.addAutoImports([{ name: "sendMail", from: new URL("./runtime/send.server.ts", import.meta.url), scope: "server" }]);
-    if (meeko.dev) meeko.warn("los correos se capturan en Mailpit durante el desarrollo");
+    if (meeko.dev) meeko.warn("emails are captured in Mailpit during development");
   },
 });
 ```

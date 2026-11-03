@@ -160,7 +160,7 @@ Or declare `sessions` in `server/runtime.ts` with `RedisSessionStore`, `SqlSessi
 ### Using it with the `static` adapter
 
 ```sh bad
-# server: { adapter: "static" } en meeko.config.ts
+# server: { adapter: "static" } in meeko.config.ts
 meeko build && meeko start
 ```
 
@@ -173,7 +173,7 @@ meeko build && meeko preview
 ### The path of another directory
 
 ```sh bad
-# desde la raíz del monorepo
+# from the monorepo root
 meeko start
 ```
 

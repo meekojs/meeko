@@ -78,7 +78,7 @@ const open = signal(false);
 </script>
 
 <template>
-  <button type="button" class="toggle" bind:aria-expanded="open.value ? 'true' : 'false'" on:click="() => open.value = !open.value">Menú</button>
+  <button type="button" class="toggle" bind:aria-expanded="open.value ? 'true' : 'false'" on:click="() => open.value = !open.value">Menu</button>
 </template>
 
 <style scoped>
@@ -91,7 +91,7 @@ const open = signal(false);
 `:global(…)` on an ancestor reads a class or attribute on `<html>` without losing scope for the rest:
 
 ```html
-<template><div class="panel">Contenido</div></template>
+<template><div class="panel">Content</div></template>
 
 <style scoped>
 .panel { background: white; color: black; }
@@ -105,7 +105,7 @@ A child's elements do not receive the parent's attribute. To adjust one from out
 
 ```html
 <template>
-  <div class="toolbar"><AppButton label="Guardar" /></div>
+  <div class="toolbar"><AppButton label="Save" /></div>
 </template>
 
 <style scoped>

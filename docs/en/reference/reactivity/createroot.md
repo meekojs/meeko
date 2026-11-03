@@ -33,7 +33,7 @@ const dispose = createRoot((dispose) => {
 
 count.value = 1; // seen: [0, 1]
 dispose();
-count.value = 2; // seen sigue siendo [0, 1]
+count.value = 2; // seen remains [0, 1]
 ```
 
 ## Parameters
@@ -80,15 +80,15 @@ const log: string[] = [];
 const nameKey = createContext<string>("name");
 
 const disposeOuter = createRoot((dispose) => {
-  provide(nameKey, "exterior");
+  provide(nameKey, "outer");
   createRoot(() => {
     log.push(inject(nameKey));
-    onCleanup(() => log.push("interior liberada"));
+    onCleanup(() => log.push("inner released"));
   });
   return dispose;
 });
 
-disposeOuter(); // log: ["exterior", "interior liberada"]
+disposeOuter(); // log: ["outer", "inner released"]
 ```
 
 ### Effects disposed of before the component
@@ -102,7 +102,7 @@ import { createRoot } from "@meekojs/meeko";
 const tracking = signal(false);
 const position = signal(0);
 let stopTracking: (() => void) | undefined;
-// La raíz se crea en un manejador, sin raíz activa: el componente la libera al desmontarse.
+// The root is created in a handler without an active root: the component releases it on unmount.
 onCleanup(() => stopTracking?.());
 
 function toggle(): void {
@@ -117,7 +117,7 @@ function toggle(): void {
 }
 </script>
 
-<template><button type="button" on:click="toggle">{tracking.value ? `Scroll: ${position.value}` : "Seguir el scroll"}</button></template>
+<template><button type="button" on:click="toggle">{tracking.value ? `Scroll: ${position.value}` : "Track scrolling"}</button></template>
 ```
 
 ## Common mistakes

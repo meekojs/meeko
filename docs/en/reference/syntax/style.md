@@ -32,7 +32,7 @@ const props = defineProps<{ content: TrustedHtml }>();
 </template>
 
 <style>
-/* Global a propósito: el prefijo .markdown-view evita afectar al resto de la página. */
+/* Global by design: the .markdown-view prefix avoids affecting the rest of the page. */
 .markdown-view p { margin-block: 0.75em; }
 .markdown-view pre { overflow-x: auto; }
 </style>

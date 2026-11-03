@@ -25,13 +25,13 @@ import { effect, signal, untrack } from "@meekojs/meeko";
 const query = signal("");
 const page = signal(1);
 
-// Se repite al cambiar query; page se lee sin suscribirse.
+// Reruns when query changes; page is read without subscribing.
 effect(() => {
-  console.log(`Buscar "${query.value}" desde la página ${untrack(() => page.value)}`);
+  console.log(`Search "${query.value}" from page ${untrack(() => page.value)}`);
 });
 
-page.value = 2;     // sin log
-query.value = "a";  // log: Buscar "a" desde la página 2
+page.value = 2;     // no log
+query.value = "a";  // log: Search "a" from page 2
 ```
 
 ## Parameters
@@ -55,7 +55,7 @@ const route = signal("/");
 const userId = signal("anon");
 
 effect(() => {
-  const path = route.value; // la dependencia
+  const path = route.value; // the dependency
   void fetch("/api/analytics", {
     method: "POST",
     body: JSON.stringify({ path, user: untrack(() => userId.value) }),
@@ -73,13 +73,13 @@ In a `computed`, `untrack` determines what should not cause recalculation:
 <!-- app/components/Draft.meeko -->
 <script lang="ts">
 const props = defineProps<{ text: string; locale: string }>();
-const draft = signal(untrack(() => props.text)); // copia inicial, a propósito
+const draft = signal(untrack(() => props.text)); // initial copy, by design
 const words = computed(() => draft.value.trim().split(/\s+/).filter(Boolean).length);
 </script>
 
 <template>
   <textarea model="draft"></textarea>
-  <p>{words.value} palabras</p>
+  <p>{words.value} words</p>
 </template>
 ```
 
@@ -92,11 +92,11 @@ A library function can read signals you do not control. `untrack` prevents the e
 ```ts
 import { effect, signal, untrack } from "@meekojs/meeko";
 
-declare function notify(message: string): void; // puede leer señales internas
+declare function notify(message: string): void; // may read internal signals
 
 const saved = signal(0);
 effect(() => {
-  if (saved.value > 0) untrack(() => notify(`Guardado ${saved.value}`));
+  if (saved.value > 0) untrack(() => notify(`Saved ${saved.value}`));
 });
 ```
 

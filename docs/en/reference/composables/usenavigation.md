@@ -30,7 +30,7 @@ const navigation = useNavigation();
 </script>
 
 <template>
-  <div class="progress" if:when="navigation.pending.value" role="progressbar" aria-label="Cargando página"></div>
+  <div class="progress" if:when="navigation.pending.value" role="progressbar" aria-label="Loading page"></div>
   <main bind:aria-busy="navigation.pending.value ? 'true' : null"><MeekoOutlet /></main>
 </template>
 ```
@@ -80,7 +80,7 @@ import { useNavigation } from "@meekojs/meeko/framework";
 
 const navigation = useNavigation();
 const disabled = computed(() => navigation.pending.value);
-// <button bind:disabled="disabled.value">Guardar</button>
+// <button bind:disabled="disabled.value">Save</button>
 ```
 
 ### A component aware of navigation
@@ -94,7 +94,7 @@ const route = useRoute();
 </script>
 
 <template>
-  <p class="status">{route.path.value}{navigation.pending.value ? " · cargando…" : ""}</p>
+  <p class="status">{route.path.value}{navigation.pending.value ? " · loading…" : ""}</p>
 </template>
 ```
 
@@ -141,14 +141,14 @@ const saving = signal(false);
 ### Expecting `pending` in SSR or on the first load
 
 ```html bad
-<p if:when="navigation.pending.value">Cargando la aplicación…</p>
+<p if:when="navigation.pending.value">Loading the application…</p>
 ```
 
 Server HTML and a full page load never display this text: `pending` only activates during client navigations. For data arriving after the first render, wrap the area in [`<MeekoAwait>`](/en/docs/reference/meekoawait) or read `pending` from the `useApi` resource:
 
 ```html good
 <MeekoAwait for="items">
-  <snippet name="pending"><p>Cargando…</p></snippet>
+  <snippet name="pending"><p>Loading…</p></snippet>
   <ItemsList bind:items="items.data.value" />
 </MeekoAwait>
 ```

@@ -37,7 +37,7 @@ export default defineMeekoConfig({
 <!-- no-check -->
 
 ```ts
-// un .ts de app/
+// a .ts file in app/
 import { Button } from "ui/Button";
 ```
 
@@ -81,7 +81,7 @@ import * as Dialog from "ui/Dialog.meeko";
 ```ts
 import { defineMeekoConfig } from "@meekojs/meeko/framework";
 
-// package.json declara "imports": { "#shared/*": "./lib/shared/*.js" }
+// package.json declares "imports": { "#shared/*": "./lib/shared/*.js" }
 export default defineMeekoConfig({ alias: { "#shared/": false } });
 ```
 

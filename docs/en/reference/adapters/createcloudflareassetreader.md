@@ -57,10 +57,10 @@ An `AssetReader` with `get(pathname, request)`: `null` for a path not in `assets
 
 ```text
 .meeko/output/cloudflare/
-  worker.js            ← createWorker y la clase de salas, un solo módulo
+  worker.js            ← createWorker and the room class, a single module
   wrangler.jsonc       ← assets: { directory: "./assets", binding: "ASSETS", run_worker_first: true }
-  assets/              ← build cliente y public/
-  assets/_meeko/prerender/  ← páginas prerenderizadas, que el Worker lee y nunca sirve como archivos
+  assets/              ← client build and public/
+  assets/_meeko/prerender/  ← prerendered pages, which the Worker reads and never serves as files
 ```
 
 ### Checking that a build file is not public
@@ -75,7 +75,7 @@ curl -s -o /dev/null -w "%{http_code}\n" https://mi-app.example/worker.js       
 ### A listed file missing from assets
 
 ```text bad
-assets/ subido sin la carpeta assets/assets/ (un despliegue parcial)
+assets/ uploaded without the assets/assets/ directory (a partial deployment)
 ```
 
 `get` rejects with `Error: Missing build asset /assets/entry-4f2a.js`; the application responds with `500` and sends it to `onError`. Deploy the complete output folder with `wrangler deploy --config .meeko/output/cloudflare/wrangler.jsonc`.

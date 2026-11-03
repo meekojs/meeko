@@ -99,9 +99,9 @@ export default defineServerRuntime(async ({ env, production, prerendering }) => 
     sessions: new SessionManager({
       store: new SqlSessionStore(sessionDriver(pool)),
       production: production && !prerendering,
-      ttlMs: 12 * 60 * 60 * 1000,                  // 12 horas
+      ttlMs: 12 * 60 * 60 * 1000,                  // 12 hours
       sameSite: "Strict",
-      allowedOrigins: ["https://admin.example.com"], // el panel, en otro subdominio
+      allowedOrigins: ["https://admin.example.com"], // the dashboard, on another subdomain
     }),
     close: () => pool.end(),
   };
@@ -139,17 +139,17 @@ export async function handle(request: Request): Promise<Response> {
   }
   const headers = new Headers();
   if (session.cookieHeader) headers.append("set-cookie", session.cookieHeader);
-  return new Response(session.current ? "con sesión" : "anónimo", { headers });
+  return new Response(session.current ? "authenticated" : "anonymous", { headers });
 }
 ```
 
 ### Deployment behind an HTTPS proxy
 
 ```sh
-MEEKO_PUBLIC_ORIGIN=https://tienda.example.com   # el origen que ve el navegador
+MEEKO_PUBLIC_ORIGIN=https://tienda.example.com   # the origin seen by the browser
 MEEKO_REDIS_URL=rediss://default:…@redis.example.com:6380
-MEEKO_TRUST_PROXY=1                              # Traefik, Caddy o nginx delante
-# MEEKO_TRUST_PROXY=cloudflare                   # desde 1.8, tras Cloudflare Tunnel: CF-Connecting-IP
+MEEKO_TRUST_PROXY=1                              # Traefik, Caddy or nginx in front
+# MEEKO_TRUST_PROXY=cloudflare                   # since 1.8, behind Cloudflare Tunnel: CF-Connecting-IP
 ```
 
 The browser sends `Origin: https://tienda.example.com`; `createServerApp` constructs the request URL with `MEEKO_PUBLIC_ORIGIN`, so `assertMutationAllowed` accepts it even if the proxy talks HTTP to the application.
@@ -173,13 +173,13 @@ new SessionManager({ store: new RedisSessionStore(redis, { prefix: "app:prod:ses
 ### Production without `sessions` or `MEEKO_REDIS_URL`
 
 ```text bad
-server/runtime.ts sin sessions, y el servidor arranca sin MEEKO_REDIS_URL
+server/runtime.ts without sessions, and the server starts without MEEKO_REDIS_URL
 ```
 
 `meeko start` (and each adapter) stops with `Production requires a persistent session store: set MEEKO_REDIS_URL (with the redis package installed), or return { sessions } with a persistent SessionStore from server/runtime.ts`. On Workers, `MEEKO_REDIS_URL` is not valid either: `MEEKO_REDIS_URL needs TCP connections, which Cloudflare Workers do not offer…`.
 
 ```text good
-MEEKO_REDIS_URL=rediss://…  y  npm install redis
+MEEKO_REDIS_URL=rediss://…  and  npm install redis
 ```
 
 ### `SameSite=None` or `__Host-` without `Secure`

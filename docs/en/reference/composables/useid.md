@@ -117,7 +117,7 @@ Outside the script, the ID is not derived from the instance's position.
 <script lang="ts">
 const fieldId = (): string => useId();
 </script>
-<template><label bind:for="fieldId()">Nombre</label><input bind:id="fieldId()"></template>
+<template><label bind:for="fieldId()">Name</label><input bind:id="fieldId()"></template>
 ```
 
 There is no compilation error, but every call produces a different ID (the label and field are no longer linked), and because it runs during rendering, the server and browser IDs do not match. Call it once at the top level of the script:
@@ -126,19 +126,19 @@ There is no compilation error, but every call produces a different ID (the label
 <script lang="ts">
 const fieldId = useId();
 </script>
-<template><label bind:for="fieldId">Nombre</label><input bind:id="fieldId"></template>
+<template><label bind:for="fieldId">Name</label><input bind:id="fieldId"></template>
 ```
 
 ### Writing `for` without `bind:`
 
 ```html bad
-<label for="id">Nombre</label>
+<label for="id">Name</label>
 ```
 
 `meeko check` accepts it, but the attribute is the literal text `"id"`, not the variable's value: the label is not linked.
 
 ```html good
-<label bind:for="id">Nombre</label>
+<label bind:for="id">Name</label>
 ```
 
 ### Calling it after a browser `await`

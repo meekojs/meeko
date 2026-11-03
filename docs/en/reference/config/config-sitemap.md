@@ -30,7 +30,7 @@ import { defineMeekoConfig } from "@meekojs/meeko/framework";
 
 export default defineMeekoConfig({
   site: "https://example.com",
-  sitemap: { exclude: ["/admin", "/admin/*"] }, // o sitemap: true
+  sitemap: { exclude: ["/admin", "/admin/*"] }, // or sitemap: true
 });
 ```
 
@@ -95,7 +95,7 @@ With `"prerender"`, `sitemapEntries` only adds `lastmod`, `changefreq` and `prio
 import { defineMeekoConfig } from "@meekojs/meeko/framework";
 
 export default defineMeekoConfig({ site: "https://example.com", sitemap: true, robots: { disallow: ["/admin/"] } });
-// robots.txt termina con «Sitemap: https://example.com/sitemap.xml»
+// robots.txt ends with “Sitemap: https://example.com/sitemap.xml”
 ```
 
 ## Common mistakes
@@ -103,7 +103,7 @@ export default defineMeekoConfig({ site: "https://example.com", sitemap: true, r
 ### No public origin
 
 ```text bad
-sitemap: true, sin site ni MEEKO_PUBLIC_ORIGIN al construir
+sitemap: true, without site or MEEKO_PUBLIC_ORIGIN at build time
 ```
 
 `meeko build` stops before compilation with `sitemap necesita la URL pública del sitio: declara site en meeko.config.ts (site: "https://example.com") o define MEEKO_PUBLIC_ORIGIN al construir`.
@@ -129,13 +129,13 @@ export default defineMeekoConfig({ site: "https://example.com", sitemap: { exclu
 ### A `public/sitemap.xml` (or one from a module)
 
 ```text bad
-public/sitemap.xml   y   sitemap: true
+public/sitemap.xml   and   sitemap: true
 ```
 
 `meeko build` stops with `El archivo público sitemap.xml (de public/ o de un módulo) choca con el que genera la opción sitemap de meeko.config.ts; quita uno de los dos`.
 
 ```text good
-Borre public/sitemap.xml, o quite sitemap de meeko.config.ts
+Delete public/sitemap.xml, or remove sitemap from meeko.config.ts
 ```
 
 ### An entry that is not prerendered

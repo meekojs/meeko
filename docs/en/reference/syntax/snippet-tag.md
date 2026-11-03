@@ -25,15 +25,15 @@ You can also provide table rows and cells to a custom component, for example `<A
 ```html
 <!-- app/pages/settings.meeko -->
 <script lang="ts">
-const message = signal("¿Borrar la cuenta?");
+const message = signal("Delete the account?");
 </script>
 
 <template>
   <AppDialog>
     <p>{message.value}</p>
-    <snippet name="title">Confirmar</snippet>
+    <snippet name="title">Confirm</snippet>
     <snippet name="actions" params="close">
-      <button type="button" on:click="close">Cancelar</button>
+      <button type="button" on:click="close">Cancel</button>
     </snippet>
   </AppDialog>
 </template>
@@ -85,7 +85,7 @@ const users = signal([{ id: "1", email: "ana@example.com" }]);
 <template>
   <DataTable bind:rows="users.value">
     <snippet name="row" params="user, index">{index + 1}. {user.email}</snippet>
-    <snippet name="empty">Todavía no hay usuarios.</snippet>
+    <snippet name="empty">No users yet.</snippet>
   </DataTable>
 </template>
 ```
@@ -99,7 +99,7 @@ Since `1.8`, a generic child can declare snippets whose names come from row keys
 ```html
 <UITable bind:rows="users.value" bind:columns="columns" rowKey="id">
   <snippet name="cell-email" params="row, value"><a bind:href="'mailto:' + value">{value}</a></snippet>
-  <snippet name="header-status">Estado</snippet>
+  <snippet name="header-status">State</snippet>
 </UITable>
 ```
 
@@ -134,7 +134,7 @@ The condition is evaluated in the parent's scope, identically on server and hydr
 Loose content cannot have a condition. To make it conditional, write it in `<snippet name="default">`, provided the child declares it optional:
 
 ```html
-<!-- app/components/AppCard.meeko declara defineSnippets<{ default?: []; footer?: [] }>() -->
+<!-- app/components/AppCard.meeko declares defineSnippets<{ default?: []; footer?: [] }>() -->
 <AppCard>
   <snippet name="default" if:when="details.value"><p>{details.value}</p></snippet>
 </AppCard>
@@ -146,7 +146,7 @@ Loose content cannot have a condition. To make it conditional, write it in `<sni
 
 ```html bad
 <div>
-  <snippet name="title">Confirmar</snippet>
+  <snippet name="title">Confirm</snippet>
 </div>
 ```
 
@@ -154,7 +154,7 @@ Loose content cannot have a condition. To make it conditional, write it in `<sni
 
 ```html good
 <AppDialog>
-  <snippet name="title">Confirmar</snippet>
+  <snippet name="title">Confirm</snippet>
 </AppDialog>
 ```
 
@@ -178,7 +178,7 @@ Loose content cannot have a condition. To make it conditional, write it in `<sni
 
 ```html bad
 <AppDialog>
-  <snippet name="footer">Pie</snippet>
+  <snippet name="footer">Footer</snippet>
 </AppDialog>
 ```
 
@@ -186,28 +186,28 @@ Loose content cannot have a condition. To make it conditional, write it in `<sni
 
 ```html good
 <AppDialog>
-  <p>Texto</p>
-  <snippet name="title">Confirmar</snippet>
+  <p>Text</p>
+  <snippet name="title">Confirm</snippet>
 </AppDialog>
 ```
 
 ### Parameters that do not match the tuple
 
 ```html bad
-<snippet name="actions" params="close, extra"><button on:click="close">Cerrar</button></snippet>
+<snippet name="actions" params="close, extra"><button on:click="close">Close</button></snippet>
 ```
 
 `meeko check` reports `TS2345` with `Target signature provides too few arguments. Expected 2 or more, but got 1.`
 
 ```html good
-<snippet name="actions" params="close"><button on:click="close">Cerrar</button></snippet>
+<snippet name="actions" params="close"><button on:click="close">Close</button></snippet>
 ```
 
 ### `if:when` on a required snippet
 
 ```html bad
 <AppDialog>
-  <snippet name="default" if:when="show.value"><p>Hola</p></snippet>
+  <snippet name="default" if:when="show.value"><p>Hello</p></snippet>
 </AppDialog>
 ```
 
@@ -215,7 +215,7 @@ Loose content cannot have a condition. To make it conditional, write it in `<sni
 
 ```html good
 <AppDialog>
-  <p if:when="show.value">Hola</p>
+  <p if:when="show.value">Hello</p>
 </AppDialog>
 ```
 
@@ -223,8 +223,8 @@ Loose content cannot have a condition. To make it conditional, write it in `<sni
 
 ```html bad
 <AppDialog>
-  <p>Hola</p>
-  <snippet name="default"><p>Otra</p></snippet>
+  <p>Hello</p>
+  <snippet name="default"><p>Another</p></snippet>
 </AppDialog>
 ```
 
@@ -232,7 +232,7 @@ Loose content cannot have a condition. To make it conditional, write it in `<sni
 
 ```html good
 <AppDialog>
-  <snippet name="default"><p>Hola</p><p>Otra</p></snippet>
+  <snippet name="default"><p>Hello</p><p>Another</p></snippet>
 </AppDialog>
 ```
 

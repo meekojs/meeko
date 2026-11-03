@@ -50,7 +50,7 @@ import { computed } from '@meekojs/meeko'
 import { useThemeToggle } from '@meekojs/meeko/framework'
 
 const toggle = useThemeToggle()
-const label = computed(() => (toggle.known.value ? `Tema: ${toggle.theme.theme.value}` : 'Cambiar tema'))
+const label = computed(() => (toggle.known.value ? `Theme: ${toggle.theme.theme.value}` : 'Cambiar tema'))
 ```
 
 The [custom theme selector](../../framework.md#custom-theme-selector) includes a complete form with `POST /_meeko/theme`, `theme` and `return`, which switches through `theme.set(choice)` when `interactive.value` is `true`.
@@ -79,7 +79,7 @@ Without `theme` in `meeko.config.ts`, or outside a Meeko application, it throws 
 
 ```ts bad
 const toggle = useThemeToggle()
-toggle.theme.set('dark') // el setup también corre en el servidor
+toggle.theme.set('dark') // setup also runs on the server
 ```
 
 ```ts good

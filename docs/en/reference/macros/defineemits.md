@@ -29,13 +29,13 @@ const emit = defineEmits<{ save: [id: number]; close: [] }>();
 
 <template>
   <p>{props.title}</p>
-  <button type="button" on:click="() => emit('save', props.id)">Guardar</button>
-  <button type="button" on:click="() => emit('close')">Cerrar</button>
+  <button type="button" on:click="() => emit('save', props.id)">Save</button>
+  <button type="button" on:click="() => emit('close')">Close</button>
 </template>
 ```
 
 ```html
-<!-- en el padre -->
+<!-- in the parent -->
 <TodoItem bind:id="todo.id" bind:title="todo.title" on:save="(id) => save(id)" on:close="() => open.value = false" />
 ```
 
@@ -151,13 +151,13 @@ const emit = defineEmits<{ save: [id: number] }>();
 ### Arguments that do not match the tuple
 
 ```html bad
-<button on:click="() => emit('save', String(props.id))">Guardar</button>
+<button on:click="() => emit('save', String(props.id))">Save</button>
 ```
 
 `meeko check` reports `TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.`
 
 ```html good
-<button on:click="() => emit('save', props.id)">Guardar</button>
+<button on:click="() => emit('save', props.id)">Save</button>
 ```
 
 ### The same callback in `defineProps`
@@ -181,13 +181,13 @@ const emit = defineEmits<{ save: [id: number] }>();
 ### A parent handler with different arguments
 
 ```html bad
-<TodoItem bind:id="1" bind:title="'Té'" on:save="(id: string) => save(id)" />
+<TodoItem bind:id="1" bind:title="'Tea'" on:save="(id: string) => save(id)" />
 ```
 
 `meeko check` reports `TS2322: Type '(id: string) => void' is not assignable to type '(id: number) => void'.` An undeclared child event (`on:remove`) produces `TS2353`, and a hyphenated name (`on:save-draft`) produces `MEEK011`.
 
 ```html good
-<TodoItem bind:id="1" bind:title="'Té'" on:save="(id) => save(String(id))" />
+<TodoItem bind:id="1" bind:title="'Tea'" on:save="(id) => save(String(id))" />
 ```
 
 ## Notes

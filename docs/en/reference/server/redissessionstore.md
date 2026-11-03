@@ -36,7 +36,7 @@ import { defineServerRuntime, RedisSessionStore, SessionManager } from "@meekojs
 export default defineServerRuntime(async ({ env, production, prerendering }) => {
   const redis = createClient({ url: env.MEEKO_REDIS_URL });
   await redis.connect();
-  const subscriber = redis.duplicate(); // conexión dedicada en modo suscriptor
+  const subscriber = redis.duplicate(); // dedicated connection in subscriber mode
   await subscriber.connect();
   const store = new RedisSessionStore(redis, { prefix: "tienda:prod:session:", subscriber });
   return {
@@ -131,7 +131,7 @@ The REST API does not maintain a subscription: without `subscriber`, other insta
 
 ```sh
 MEEKO_REDIS_URL=rediss://default:…@redis.example.com:6380
-MEEKO_REDIS_PREFIX=tienda:prod:   # por defecto, meeko:<name de package.json>:prod:
+MEEKO_REDIS_PREFIX=tienda:prod:   # defaults to meeko:<package.json name>:prod:
 ```
 
 With `npm install redis` in the project, `meeko start` connects a client and a subscriber before serving traffic and closes both on shutdown.
@@ -155,13 +155,13 @@ new RedisSessionStore(redis, { prefix: "app:prod:session:" });
 ### The same prefix in two applications or environments
 
 ```text bad
-staging y producción con prefix: "app:" en el mismo Redis
+staging and production with prefix: "app:" in the same Redis
 ```
 
 There is no error: both applications read each other's sessions, a `revokeFamily` published on `app:revoked` reaches both, and they share `rateLimit` counters. Use one prefix per application and environment, and never `FLUSHALL` or `FLUSHDB` on shared Redis.
 
 ```text good
-prefix: "app:staging:session:" y prefix: "app:prod:session:"
+prefix: "app:staging:session:" and prefix: "app:prod:session:"
 ```
 
 ### Using the normal connection as `subscriber`
@@ -183,7 +183,7 @@ new RedisSessionStore(redis, { prefix: "app:prod:session:", subscriber });
 ### `MEEKO_REDIS_URL` without the `redis` package
 
 ```sh bad
-MEEKO_REDIS_URL=redis://127.0.0.1:6379 npm start   # sin npm install redis
+MEEKO_REDIS_URL=redis://127.0.0.1:6379 npm start   # without npm install redis
 ```
 
 Startup stops with `MEEKO_REDIS_URL is set but the project does not install the redis package: add it with npm install redis (or pnpm add redis) and build again`. A URL other than `redis://` or `rediss://` reports `MEEKO_REDIS_URL must be a redis:// or rediss:// URL`, and an unreachable server reports `Could not connect to the Redis server of MEEKO_REDIS_URL`. Messages never include the URL, which contains the password.

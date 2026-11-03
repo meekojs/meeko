@@ -36,7 +36,7 @@ provideErrorHandler((error, source) => {
 </script>
 
 <template>
-  <p if:when="failure.value" role="alert">Algo falló: {failure.value}</p>
+  <p if:when="failure.value" role="alert">Something went wrong: {failure.value}</p>
   <div class="site-root"><MeekoOutlet /></div>
 </template>
 ```
@@ -77,7 +77,7 @@ A branch can have its own observer; failures inside no longer propagate to the a
 const snippets = defineSnippets<{ default: [] }>();
 const problem = signal("");
 provideErrorHandler((error) => {
-  problem.value = isClientError(error) ? "El servidor rechazó el pago." : "No se pudo conectar. Inténtalo de nuevo.";
+  problem.value = isClientError(error) ? "The server rejected the payment." : "Could not connect. Try again.";
 });
 </script>
 
@@ -121,9 +121,9 @@ import type { ErrorSource } from "@meekojs/meeko";
 
 function label(source: ErrorSource): string {
   switch (source) {
-    case "navigation": return "No se pudo abrir la página";
-    case "socket": return "Conexión perdida";
-    default: return "Algo falló";
+    case "navigation": return "Could not open the page";
+    case "socket": return "Connection lost";
+    default: return "Something went wrong";
   }
 }
 ```
@@ -151,8 +151,8 @@ The observer receives failures **after** mounting: events, `onMounted`, navigati
 ```html bad
 <script lang="ts">
 const props = defineProps<{ items: { name: string }[] }>();
-provideErrorHandler(() => { /* no se llama */ });
-const first = props.items[0]!.name; // con una lista vacía: TypeError en el render
+provideErrorHandler(() => { /* not called */ });
+const first = props.items[0]!.name; // with an empty list: TypeError during rendering
 </script>
 ```
 
@@ -167,7 +167,7 @@ const first = computed(() => props.items[0]?.name ?? "Sin elementos");
 ### Call it outside a component
 
 ```ts bad
-// app/utils/errors.ts, evaluado al importar
+// app/utils/errors.ts, evaluated on import
 provideErrorHandler(reportError);
 ```
 

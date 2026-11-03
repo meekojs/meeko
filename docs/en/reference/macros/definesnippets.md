@@ -43,9 +43,9 @@ function close(): void {
 
 ```html
 <AppDialog>
-  <p>¿Borrar la nota?</p>
-  <snippet name="title">Confirmar</snippet>
-  <snippet name="actions" params="close"><button type="button" on:click="close">Cancelar</button></snippet>
+  <p>Delete the note?</p>
+  <snippet name="title">Confirm</snippet>
+  <snippet name="actions" params="close"><button type="button" on:click="close">Cancel</button></snippet>
 </AppDialog>
 ```
 
@@ -88,7 +88,7 @@ const snippets = defineSnippets<{ item: [item: T, index: number]; empty?: [] }>(
 ```html
 <AppList bind:items="notes.value">
   <snippet name="item" params="note, index">{index + 1}. {note.title}</snippet>
-  <snippet name="empty">No hay notas.</snippet>
+  <snippet name="empty">No notes yet.</snippet>
 </AppList>
 ```
 
@@ -131,7 +131,7 @@ const snippets = defineSnippets<
   { [K in Extract<keyof Row, string> as `header-${K}`]?: [column: Column<Row>] } &
   { cell?: [row: Row, column: Column<Row>, value: unknown] }
 >();
-// Sobre Row, TypeScript no lee un nombre calculado: el hijo lo lee de una vista.
+// For Row, TypeScript cannot read a computed name: the child reads it through a view.
 const byName = snippets as { readonly [name: string]: Snippet<never> | undefined };
 function cellOf(column: Column<Row>): Snippet<[row: Row, value: unknown]> | undefined {
   return byName[`cell-${column.key}`] as Snippet<[row: Row, value: unknown]> | undefined;
@@ -151,7 +151,7 @@ function cellOf(column: Column<Row>): Snippet<[row: Row, value: unknown]> | unde
 ```html
 <AppGrid bind:rows="users.value" bind:columns="columns">
   <snippet name="cell-email" params="row, value"><a bind:href="'mailto:' + value">{value}</a></snippet>
-  <snippet name="header-email">Correo</snippet>
+  <snippet name="header-email">Email</snippet>
 </AppGrid>
 ```
 
@@ -208,7 +208,7 @@ With `actions: [close: () => void]`, `meeko check` reports `TS2345: Argument of 
 
 ```html bad
 <AppDialog>
-  <snippet name="footer">Pie</snippet>
+  <snippet name="footer">Footer</snippet>
 </AppDialog>
 ```
 
@@ -216,8 +216,8 @@ With `actions: [close: () => void]`, `meeko check` reports `TS2345: Argument of 
 
 ```html good
 <AppDialog>
-  <p>Texto</p>
-  <snippet name="title">Pie</snippet>
+  <p>Text</p>
+  <snippet name="title">Footer</snippet>
 </AppDialog>
 ```
 
@@ -226,8 +226,8 @@ With `actions: [close: () => void]`, `meeko check` reports `TS2345: Argument of 
 A component without `defineSnippets` does not accept content.
 
 ```html bad
-<!-- app/components/AppBox.meeko, sin defineSnippets -->
-<AppBox><p>Hola</p></AppBox>
+<!-- app/components/AppBox.meeko, without defineSnippets -->
+<AppBox><p>Hello</p></AppBox>
 ```
 
 `meeko check` reports `TS2322: Type 'Snippet<any[]>' is not assignable to type '"this component declares no defineSnippets, so it accepts no children or <snippet>"'.` Declare `default` in the child:

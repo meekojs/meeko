@@ -96,7 +96,7 @@ if (!session) redirect(`/login?next=${encodeURIComponent(url.pathname)}`);
 export const orders = await context.services.db.orders.forUser(session.data.userId);
 </script>
 
-<template><p>{orders.length} pedidos</p></template>
+<template><p>{orders.length} orders</p></template>
 ```
 
 `redirect` stops the block: the following code only runs with a session.

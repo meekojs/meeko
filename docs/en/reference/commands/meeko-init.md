@@ -44,13 +44,13 @@ mi-app/
 ├── README.md
 ├── index.html
 ├── package.json
-├── server.mjs          servidor de Node: Vite en desarrollo, dist/ con --production
-├── tsconfig.json       con allowArbitraryExtensions y rootDirs sobre .meeko/types
+├── server.mjs          Node server: Vite in development, dist/ with --production
+├── tsconfig.json       with allowArbitraryExtensions and rootDirs over .meeko/types
 ├── vite.config.ts      plugins: [meeko()]
 └── src/
-    ├── App.meeko       un contador con props y una señal
-    ├── entry-client.ts hidrata con las props y el estado del servidor
-    └── entry-server.ts renderiza con renderWithState
+    ├── App.meeko       a counter with props and a signal
+    ├── entry-client.ts hydrates with props and server state
+    └── entry-server.ts renders with renderWithState
 ```
 
 `package.json` pins `@meekojs/meeko` to the exact version that created the project (compiled code and runtime must match), adds `@types/node`, `typescript` and `vite` and declares these scripts:
@@ -91,9 +91,9 @@ pnpm run dev
 ### Check and build
 
 ```sh
-npm run check   # genera .meeko/types/src/App.d.meeko.ts y ejecuta tsc
-npm run build   # dist/client y dist/server
-npm start       # sirve dist/ con SSR en 127.0.0.1:4173
+npm run check   # generates .meeko/types/src/App.d.meeko.ts and runs tsc
+npm run build   # dist/client and dist/server
+npm start       # serves dist/ with SSR at 127.0.0.1:4173
 ```
 
 `MEEKO_PORT` (or `PORT`) changes the port of `server.mjs`; the address is always `127.0.0.1`, and you change it by editing `server.mjs`, which is now project code.
@@ -103,7 +103,7 @@ npm start       # sirve dist/ con SSR en 127.0.0.1:4173
 ### A folder containing files
 
 ```sh bad
-meeko init mi-app   # mi-app ya tiene src/ e index.html
+meeko init mi-app   # mi-app ya has src/ e index.html
 ```
 
 ```text
@@ -119,7 +119,7 @@ meeko init mi-app-nueva
 ### A `package.json` with other scripts or dependencies
 
 ```sh bad
-# package.json con "scripts": { "dev": "vite" } o con "dependencies": { "react": "…" }
+# package.json with "scripts": { "dev": "vite" } or with "dependencies": { "react": "…" }
 meeko init .
 ```
 

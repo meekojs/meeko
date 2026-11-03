@@ -35,7 +35,7 @@ const message: Schema<{ text: string }> = {
     version: 1,
     validate: (value) => typeof value === "object" && value !== null && typeof (value as { text?: unknown }).text === "string"
       ? { value: value as { text: string } }
-      : { issues: [{ message: "Se esperaba { text }" }] },
+      : { issues: [{ message: "Expected { text }" }] },
   },
 };
 const chatContract = { clientToServer: { message }, serverToClient: { message } };
@@ -44,8 +44,8 @@ const chat = createSocketClient("wss://example.com/_meeko/socket/chat?room=gener
   onError: (error) => console.warn("socket", error),
 });
 const stop = chat.on("message", (data) => console.log(data.text));
-// Más tarde, con el socket abierto:
-await chat.emit("message", { text: "Hola" });
+// Later, with the socket open:
+await chat.emit("message", { text: "Hello" });
 stop();
 chat.close();
 ```
@@ -106,16 +106,16 @@ class FakeSocket extends EventTarget {
   open(): void { this.readyState = WebSocket.OPEN; this.dispatchEvent(new Event("open")); }
 }
 
-const text: Schema<string> = { "~standard": { version: 1, validate: (value) => typeof value === "string" ? { value } : { issues: [{ message: "texto" }] } } };
+const text: Schema<string> = { "~standard": { version: 1, validate: (value) => typeof value === "string" ? { value } : { issues: [{ message: "text" }] } } };
 const peer = new FakeSocket();
 const client = createSocketClient("ws://localhost/chat", { clientToServer: { message: text }, serverToClient: { message: text } }, {
   webSocketFactory: () => peer as unknown as WebSocket,
 });
 
-await client.emit("message", "pronto").catch((error: Error) => console.log(error.message)); // Socket is disconnected
+await client.emit("message", "early").catch((error: Error) => console.log(error.message)); // Socket is disconnected
 peer.open();
-await client.emit("message", "hola");
-console.log(peer.sent); // [ '{"event":"message","payload":"hola"}' ]
+await client.emit("message", "hello");
+console.log(peer.sent); // [ '{"event":"message","payload":"hello"}' ]
 client.close();
 ```
 
@@ -124,7 +124,7 @@ client.close();
 <!-- no-check -->
 
 ```ts
-// Un panel de administración que escucha los pedidos de la tienda
+// An admin dashboard listening for store orders
 const orders = createSocketClient(`wss://tienda.example.com/_meeko/socket/orders?room=${storeId}`, ordersContract);
 orders.on("created", (order) => addRow(order));
 window.addEventListener("pagehide", () => orders.close());
@@ -154,7 +154,7 @@ Inside an application, `useSocket("chat")` or `socket.chat` build the URL and kn
 
 ```ts bad
 const chat = createSocketClient(url, chatContract);
-await chat.emit("message", { text: "hola" });
+await chat.emit("message", { text: "hello" });
 ```
 
 Rejects with `Socket is disconnected`: the socket is still `"connecting"`, and the client does not queue messages.
@@ -163,7 +163,7 @@ Rejects with `Socket is disconnected`: the socket is still `"connecting"`, and t
 
 ```ts good
 const chat = createSocketClient(url, chatContract);
-effect(() => { if (chat.state.value === "open") void chat.emit("message", { text: "hola" }); });
+effect(() => { if (chat.state.value === "open") void chat.emit("message", { text: "hello" }); });
 ```
 
 ### Never close it

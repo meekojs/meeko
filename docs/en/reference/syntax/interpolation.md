@@ -30,7 +30,7 @@ const unread = signal(3);
 </script>
 
 <template>
-  <p>{props.name} tiene {unread.value} mensajes sin leer</p>
+  <p>{props.name} has {unread.value} unread messages</p>
 </template>
 ```
 
@@ -69,14 +69,14 @@ For a repeated calculation or one reading several signals, a `computed` avoids r
 
 ```html
 <script lang="ts">
-const items = signal([{ name: "Té", price: 3.5, qty: 2 }]);
+const items = signal([{ name: "Tea", price: 3.5, qty: 2 }]);
 const total = computed(() => items.value.reduce((sum, item) => sum + item.price * item.qty, 0));
 const money = new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" });
 </script>
 
 <template>
   <p>Total: {money.format(total.value)}</p>
-  <p>{items.value.length === 1 ? "1 artículo" : `${items.value.length} artículos`}</p>
+  <p>{items.value.length === 1 ? "1 item" : `${items.value.length} items`}</p>
 </template>
 ```
 
@@ -90,8 +90,8 @@ const user = signal<{ name: string; city?: string } | null>(null);
 </script>
 
 <template>
-  <p>Hola, {user.value?.name ?? "invitado"}</p>
-  <p if:when="user.value">{user.value.name} vive en {user.value.city ?? "algún sitio"}</p>
+  <p>Hello, {user.value?.name ?? "guest"}</p>
+  <p if:when="user.value">{user.value.name} lives in {user.value.city ?? "somewhere"}</p>
 </template>
 ```
 
@@ -126,26 +126,26 @@ const props = defineProps<{ comment: string }>(); // "<img src=x onerror=alert(1
 ### An unclosed brace
 
 ```html bad
-<p>Hola {user.value.name</p>
+<p>Hello {user.value.name</p>
 ```
 
 The compiler reports `MEEK010: Expresión de plantilla sin cerrar`, at the opening brace. To write a literal brace in text, interpolate it as a string.
 
 ```html good
-<p>Hola {user.value.name}</p>
-<p>Las llaves se escriben {"{"} y {"}"}</p>
+<p>Hello {user.value.name}</p>
+<p>Write braces as {"{"} and {"}"}</p>
 ```
 
 ### An empty interpolation
 
 ```html bad
-<p>Hola {}</p>
+<p>Hello {}</p>
 ```
 
 `MEEK009: Expresión de plantilla vacía`.
 
 ```html good
-<p>Hola {name.value}</p>
+<p>Hello {name.value}</p>
 ```
 
 ### Interpolate the signal instead of its value
@@ -177,11 +177,11 @@ The compiler reports `MEEK010: Expresión de plantilla sin cerrar`, at the openi
 Braces only interpolate in content. In an attribute they are literal text: `title="{name}"` writes `{name}`.
 
 ```html bad
-<a title="{user.value.name}">Perfil</a>
+<a title="{user.value.name}">Profile</a>
 ```
 
 ```html good
-<a bind:title="user.value.name">Perfil</a>
+<a bind:title="user.value.name">Profile</a>
 ```
 
 ## Notes

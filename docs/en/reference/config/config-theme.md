@@ -26,7 +26,7 @@ Without `theme`, nothing changes: no script, cookie, headers or `POST /_meeko/th
 import { defineMeekoConfig } from "@meekojs/meeko/framework";
 
 export default defineMeekoConfig({
-  theme: true, // light y dark, "system" por defecto, data-theme y la cookie meeko-theme
+  theme: true, // light and dark, "system" by default, data-theme and the meeko-theme cookie
 });
 ```
 
@@ -88,9 +88,9 @@ const { theme } = useTheme();
 
 <template>
   <select model="theme">
-    <option value="system">Sistema</option>
-    <option value="light">Claro</option>
-    <option value="dark">Oscuro</option>
+    <option value="system">System</option>
+    <option value="light">Light</option>
+    <option value="dark">Dark</option>
   </select>
 </template>
 ```
@@ -102,7 +102,7 @@ Or, without writing anything, `<MeekoThemeToggle />`, which also works without J
 ```ts
 import { defineMeekoConfig } from "@meekojs/meeko/framework";
 
-// Las cookies son por host, no por puerto: dos apps en localhost compartirían meeko-theme.
+// Cookies are per host, not per port: two apps on localhost would share meeko-theme.
 export default defineMeekoConfig({ theme: { cookie: "tienda-theme" } });
 ```
 
@@ -150,7 +150,7 @@ export default defineMeekoConfig({ theme: true });
 ### `<MeekoThemeToggle>` without `theme`
 
 ```html bad
-<!-- sin theme en meeko.config.ts -->
+<!-- without theme in meeko.config.ts -->
 <template><MeekoThemeToggle /></template>
 ```
 

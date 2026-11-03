@@ -24,7 +24,7 @@ It does not check types: that is [`meeko check`](/en/docs/reference/meeko-check)
 ## Usage
 
 ```sh
-# en la raíz del proyecto, la que tiene meeko.config.ts
+# at the project root, which contains meeko.config.ts
 meeko dev
 ```
 
@@ -79,11 +79,11 @@ A shell variable overrides `.env`: `MEEKO_PORT=3100 meeko dev` uses `3100` even 
 Without a specified port, the second `meeko dev` takes the next available one instead of failing, and its HMR uses another derived port:
 
 ```sh
-# terminal 1, en ./tienda
+# terminal 1, in ./tienda
 meeko dev
 # http://localhost:4173
 
-# terminal 2, en ./panel
+# terminal 2, in ./panel
 meeko dev
 # [meeko] El puerto 4173 está en uso; meeko dev usa el 4174
 # http://localhost:4174
@@ -140,7 +140,7 @@ MEEKO_PORT=3000 meeko dev
 With `MEEKO_PORT`, `PORT` or `server.port`, `meeko dev` does not look for another port: whoever sets it expects that URL.
 
 ```sh bad
-# otro meeko dev (u otro programa) ya escucha en el 4391
+# another meeko dev (or another program) already listens on 4391
 MEEKO_PORT=4391 meeko dev
 ```
 
@@ -152,7 +152,7 @@ The process exits with code `1`. If you specify no port and all 20 from `4173` a
 
 ```sh good
 MEEKO_PORT=4392 meeko dev
-# o, sin puerto con nombre, que elija el primero libre
+# or, without an explicit port, let it choose the first available one
 meeko dev
 ```
 
@@ -175,7 +175,7 @@ With `@meekojs/meeko` linked to its repository, `meeko dev` supervises itself an
 
 ```sh bad
 MEEKO_LINK_WATCH=0 meeko dev
-# después, pnpm -F @meekojs/meeko run build en el otro repositorio
+# then, pnpm -F @meekojs/meeko run build in the other repository
 ```
 
 ```text

@@ -32,7 +32,7 @@ import { defer } from "@meekojs/meeko/framework";
 export const route = definePage({
   render: "stream",
   load: ({ params }) => ({
-    post: { id: params.id ?? "", title: `Entrada ${params.id ?? ""}` },
+    post: { id: params.id ?? "", title: `Post ${params.id ?? ""}` },
     comments: defer(async (signal) => {
       const response = await fetch(`https://api.example.com/posts/${params.id ?? ""}/comments`, { signal });
       return (await response.json()) as { id: string; text: string }[];
@@ -55,8 +55,8 @@ const props = defineProps<Props>();
 
 <template>
   <h1>{props.data.post.title}</h1>
-  <p if:when="props.data.comments.status === 'pending'">Cargando comentarios…</p>
-  <p if:when="props.data.comments.status === 'rejected'" role="alert">No se pudieron cargar ({props.data.comments.error?.code}).</p>
+  <p if:when="props.data.comments.status === 'pending'">Loading comments…</p>
+  <p if:when="props.data.comments.status === 'rejected'" role="alert">Could not load ({props.data.comments.error?.code}).</p>
   <ul if:when="props.data.comments.status === 'resolved'">
     <li each:of="props.data.comments.value ?? []" each:as="comment" each:key="comment.id">{comment.text}</li>
   </ul>
@@ -117,13 +117,13 @@ An `export const` with `defer` in `<script server>` reaches the template under t
 <script server lang="ts">
 export const route = definePage({ render: "stream" });
 
-export const hero = { title: "Hola" };
+export const hero = { title: "Hello" };
 export const weather = defer(async () => ({ city: "Lima", celsius: 19 }), { timeoutMs: 2_000 });
 </script>
 
 <template>
   <h1>{hero.title}</h1>
-  <p if:when="weather.status === 'pending'">Consultando el tiempo…</p>
+  <p if:when="weather.status === 'pending'">Checking the weather…</p>
   <p if:when="weather.status === 'resolved'">{weather.value?.city}: {weather.value?.celsius} °C</p>
 </template>
 ```
@@ -145,7 +145,7 @@ The template receives `weather` as `Deferred<{ city: string; celsius: number }>`
 With `stats: Deferred<{ visits: number }>` in `Props`, `meeko check` reports `TS18048: 'props.data.stats.value' is possibly 'undefined'.` and `TS2339: Property 'value' does not exist on type '{ visits: number; }'.`
 
 ```html good
-<p if:when="props.data.stats.status === 'resolved'">{props.data.stats.value?.visits} visitas</p>
+<p if:when="props.data.stats.status === 'resolved'">{props.data.stats.value?.visits} visits</p>
 ```
 
 ### An invalid `timeoutMs`

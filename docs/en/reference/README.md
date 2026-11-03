@@ -29,7 +29,7 @@ Verify every claim in the `packages/meeko/src` code and its tests, not just in t
 title: useForm
 group: composables
 since: 1.2.0
-description: Estado de un formulario en un componente, con una señal por campo y validación con un Standard Schema.
+description: Form state in a component, with a signal per field and validation with a Standard Schema.
 symbols:
   - "@meekojs/meeko/framework#useForm"
 types:
@@ -101,7 +101,7 @@ Use GitHub syntax, which the site renders as an alert:
 
 ```markdown
 > [!NOTE]
-> `meeko check` comprueba `initial` contra la entrada del schema.
+> `meeko check` checks `initial` against the schema input.
 ```
 
 It supports `[!NOTE]` (note), `[!TIP]` (tip), `[!IMPORTANT]` (important), `[!WARNING]` (warning) and `[!CAUTION]` (caution). Reserve them for information the reader must not miss; everything else goes in “Notes”.

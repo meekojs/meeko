@@ -40,7 +40,7 @@ It has no visual styles: options have `data-active`, `data-selected` and `data-d
 </script>
 
 <template>
-	<label for="assignee">Responsable</label>
+	<label for="assignee">Assignee</label>
 	<MeekoSelect
 		id="assignee"
 		model="assignee"
@@ -144,10 +144,10 @@ Once 3 are selected, other options have `aria-disabled="true"` and `data-disable
 		by="code"
 		searchable
 		bind:filter="search"
-		placeholder="Busca una ciudad"
+		placeholder="Search for a city"
 	>
-		<snippet name="loading">Buscando…</snippet>
-		<snippet name="empty">Ninguna ciudad con ese nombre</snippet>
+		<snippet name="loading">Searching…</snippet>
+		<snippet name="empty">No city with that name</snippet>
 	</MeekoSelect>
 </template>
 ```
@@ -158,7 +158,7 @@ A new search aborts the previous one (`signal`) and discards its response. An em
 
 ```html
 <script lang="ts">
-	const countries = ['España', 'México', 'Argentina']
+	const countries = ['Spain', 'Mexico', 'Argentina']
 	const form = useForm({ initial: { country: '' }, submit: (values) => api.profile.put({ body: values }) })
 </script>
 
@@ -167,11 +167,11 @@ A new search aborts the previous one (`signal`) and discards its response. An em
 		on:submit="form.submit"
 		novalidate
 	>
-		<label bind:for="form.field('country').id">País</label>
+		<label bind:for="form.field('country').id">Country</label>
 		<MeekoSelect
 			bind:field="form.field('country')"
 			bind:options="countries"
-			placeholder="Elige un país"
+			placeholder="Choose a country"
 		/>
 		<p
 			if:when="form.errors.value.country"
@@ -179,7 +179,7 @@ A new search aborts the previous one (`signal`) and discards its response. An em
 		>
 			{form.errors.value.country}
 		</p>
-		<button>Guardar</button>
+		<button>Save</button>
 	</form>
 </template>
 ```

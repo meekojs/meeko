@@ -141,14 +141,14 @@ meeko clean ./tienda
 ### Cleaning while `meeko dev` is still running
 
 ```sh bad
-# con meeko dev corriendo en otra terminal
+# with meeko dev running in another terminal
 meeko clean
 ```
 
 Deletion does not fail, but `meeko dev` writes `.meeko/` only on startup: the server keeps responding with modules already in memory, without entry points on disk, and `.meeko/types/` remains empty for the editor and `tsc` until the next `meeko dev` or `meeko check`.
 
 ```sh good
-# Ctrl+C en meeko dev
+# Ctrl+C in meeko dev
 meeko clean
 meeko dev
 ```

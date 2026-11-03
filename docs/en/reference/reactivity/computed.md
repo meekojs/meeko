@@ -25,12 +25,12 @@ A `computed` is not state: it is neither transferred in the payload nor preserve
 ```html
 <!-- app/components/Cart.meeko -->
 <script lang="ts">
-const items = signal([{ name: "Café", price: 3 }, { name: "Té", price: 2 }]);
+const items = signal([{ name: "Coffee", price: 3 }, { name: "Tea", price: 2 }]);
 const total = computed(() => items.value.reduce((sum, item) => sum + item.price, 0));
 </script>
 
 <template>
-  <p>{items.value.length} productos, {total.value} €</p>
+  <p>{items.value.length} items, {total.value} €</p>
 </template>
 ```
 
@@ -61,7 +61,7 @@ const tasks = signal<Task[]>([{ title: "Escribir", done: true }, { title: "Revis
 const showDone = signal(false);
 const visible = computed(() => showDone.value ? tasks.value : tasks.value.filter((task) => !task.done));
 
-showDone.value = true; // visible.value vuelve a incluir las tareas hechas
+showDone.value = true; // visible.value includes completed tasks again
 ```
 
 ### A condition for the template
@@ -76,7 +76,7 @@ const mismatch = computed(() => confirm.value !== "" && password.value !== confi
 <template>
   <input type="password" model="password">
   <input type="password" model="confirm" bind:aria-invalid="mismatch.value ? 'true' : null">
-  <p if:when="mismatch.value" role="alert">Las contraseñas no coinciden.</p>
+  <p if:when="mismatch.value" role="alert">Passwords do not match.</p>
 </template>
 ```
 
@@ -164,7 +164,7 @@ Inside [`batch`](/en/docs/reference/batch), observers wait until the end, and a 
 ```ts bad
 batch(() => {
   count.value = 5;
-  console.log(double.value); // todavía el valor anterior
+  console.log(double.value); // still the previous value
 });
 ```
 

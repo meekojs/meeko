@@ -66,7 +66,7 @@ export async function markReady(id: string): Promise<{ id: string; status: "read
 <!-- no-check -->
 
 ```ts
-// server/api/orders/[id]/ready.post.ts: markReady llega por autoimport
+// server/api/orders/[id]/ready.post.ts: markReady is auto-imported
 export default defineApiRoute({ params: orderParams, handler: ({ params }) => markReady(params.id) });
 ```
 
@@ -82,8 +82,8 @@ export const isCorporateEmail = (value: string): boolean => value.endsWith("@acm
 ### A server-only service within `appDirs`
 
 ```text
-app/services/cart.ts          → app/ (navegador y SSR)
-app/services/payments.server.ts → sólo servidor: un componente que lo usa da MEEK108
+app/services/cart.ts          → app/ (browser and SSR)
+app/services/payments.server.ts → server only: a component using it produces MEEK108
 ```
 
 ## Common mistakes
@@ -106,7 +106,7 @@ export default defineMeekoConfig({ imports: { appDirs: ["app/services"] } });
 ```html bad
 <!-- app/pages/orders.meeko -->
 <script lang="ts">
-const orders = await listOrders(); // de server/services
+const orders = await listOrders(); // from server/services
 </script>
 ```
 

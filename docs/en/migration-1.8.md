@@ -42,8 +42,8 @@ Keep the rest of your configuration. `theme` is only needed for the theme select
 
 ```html
 <UIPopover role="menu">
-	<snippet name="trigger">Acciones</snippet>
-	<button role="menuitem">Editar</button>
+	<snippet name="trigger">Actions</snippet>
+	<button role="menuitem">Edit</button>
 </UIPopover>
 <UICombobox
 	model="color"
@@ -62,10 +62,10 @@ Rename closing tags too. Props, models, snippets, events, keyboard behavior, acc
 The three prop types change package and prefix:
 
 ```ts
-// Antes
+// Before
 import type { MeekoPopoverProps, MeekoSelectProps, MeekoThemeToggleProps, PopoverPlacement, SelectModel } from '@meekojs/meeko/framework'
 
-// Después
+// After
 import type { UIPopoverProps, UIComboboxProps, UIThemeToggleProps, PopoverPlacement, ComboboxModel } from '@meekojs/ui/runtime'
 ```
 
@@ -119,7 +119,7 @@ Since `1.8`, a module is registered only by name in `modules` and its options go
 <!-- no-check -->
 
 ```ts
-// Antes (1.7)
+// Before (1.7)
 import i18n from '@meekojs/i18n/module'
 import { defineMeekoConfig } from '@meekojs/meeko/framework'
 import ui from '@meekojs/ui'
@@ -131,7 +131,7 @@ export default defineMeekoConfig({
 ```
 
 ```ts
-// Después (1.8)
+// After (1.8)
 import { defineMeekoConfig } from '@meekojs/meeko/framework'
 
 export default defineMeekoConfig({

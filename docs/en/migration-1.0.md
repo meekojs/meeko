@@ -32,13 +32,13 @@ DOM, SSR, HMR and DevTools helpers are only available in `@meekojs/meeko/interna
 - `registerDevtoolsInstance`.
 
 ```ts
-// Antes
+// Before
 import { escapeHtml, signal } from "@meekojs/meeko";
 
-// Después
+// After
 import { signal } from "@meekojs/meeko";
-// escapeHtml ya no es público: use una función propia o, aceptando que sólo funciona
-// con la misma versión exacta del paquete, impórtela desde "@meekojs/meeko/internal".
+// escapeHtml is no longer public: use your own function or, accepting that it only works
+// with the exact same package version, import it from "@meekojs/meeko/internal".
 ```
 
 Compiler-generated modules have imported `@meekojs/meeko/internal` since `0.0.2`. Recompile any manually compiled and versioned `.meeko` modules (`meeko compile`) with the new version.
@@ -48,10 +48,10 @@ Compiler-generated modules have imported `@meekojs/meeko/internal` since `0.0.2`
 The `provideErrorHandler` observer receives a second argument `source: ErrorSource` (`"event"`, `"effect"`, `"cleanup"`, `"navigation"` or `"socket"`). Single-parameter handlers remain valid. Only code that **calls** a `ComponentErrorHandler` itself changes, for example in a test:
 
 ```ts
-// Antes
+// Before
 handler(new Error("boom"));
 
-// Después
+// After
 handler(new Error("boom"), "event");
 ```
 
@@ -65,10 +65,10 @@ handler(new Error("boom"), "event");
 | `toNodeListener`, `attachNodeWebSocketServer`, `createNodeSocketUpgradeHandler`                                                                                                                           | `@meekojs/meeko/server` | `@meekojs/meeko/node`  |
 
 ```ts
-// Antes
+// Before
 import { createServerDispatcher, discoverServerManifest, prerenderProject, toNodeListener } from "@meekojs/meeko/server";
 
-// Después
+// After
 import { createServerDispatcher } from "@meekojs/meeko/server";
 import { discoverServerManifest, prerenderProject } from "@meekojs/meeko/build";
 import { toNodeListener } from "@meekojs/meeko/node";
@@ -81,11 +81,11 @@ import { toNodeListener } from "@meekojs/meeko/node";
 `createServerDispatcher`, `createLocalCalls`, `generateOpenApi` and `loadSocketChannels` no longer import routes from disk: they require a `load` loader.
 
 ```ts
-// Antes
+// Before
 const dispatch = createServerDispatcher({ manifest, sessions, services });
 const channels = await loadSocketChannels(manifest);
 
-// Después (Node)
+// After (Node)
 import { pathToFileURL } from "node:url";
 
 const load = (file: string) => import(pathToFileURL(file).href);
@@ -100,7 +100,7 @@ const channels = await loadSocketChannels(manifest, load);
 Meeko no longer loads `server/session.ts`. Move the `SessionManager` to the default export of `server/runtime.ts` and delete the old file:
 
 ```ts
-// Antes: server/session.ts
+// Before: server/session.ts
 import { MemorySessionStore, SessionManager } from "@meekojs/meeko/server";
 
 export function createSessionManager(production: boolean) {
@@ -110,12 +110,12 @@ export function createSessionManager(production: boolean) {
 ```
 
 ```ts
-// Después: server/runtime.ts
+// After: server/runtime.ts
 import { defineServerRuntime, SessionManager } from "@meekojs/meeko/server";
 
 export default defineServerRuntime(({ env, production, prerendering }) => ({
   sessions: new SessionManager({ store: createStore(env, production && !prerendering), production: production && !prerendering }),
-  services: (request) => ({ /* servicios por petición */ }),
+  services: (request) => ({ /* per-request services */ }),
 }));
 ```
 
@@ -131,12 +131,12 @@ The factory receives `{ env, production, platform, prerendering }` and can also 
 | `.meeko/output/prerender/`      | `.meeko/output/node/prerender/`, with a `{ version: 1, pages }` index in `manifest.json` |
 
 ```sh
-# Antes: el despliegue dependía de la salida anterior y de las fuentes
+# Before: deployment depended on the previous output and sources
 meeko start
 
-# Después: la carpeta no lee app/, server/ ni meeko.config.ts
+# After: the directory does not read app/, server/ or meeko.config.ts
 meeko build
-node .meeko/output/node/index.mjs   # o meeko start
+node .meeko/output/node/index.mjs   # or meeko start
 ```
 
 The server listens on `MEEKO_HOST`/`MEEKO_PORT` (`HOST`/`PORT` before `1.2`; or `server.host`/`server.port` in `meeko.config.ts`), defaulting to `127.0.0.1:4173`. The Node build needs dependencies from `node_modules`. For Bun, Deno or Cloudflare Workers, use `meeko build --adapter <bun|deno|cloudflare>`; see [Build, deployment and verification](framework.md#build-deployment-and-verification).
@@ -162,12 +162,12 @@ These modules are not public API. A custom entry point importing them must pin t
 `FrameworkHandlerOptions.renderLayout` is removed. Layouts are always composed with the outlet:
 
 ```ts
-// Antes
+// Before
 createFrameworkHandler({ /* ... */ renderLayout: (file, children, context) => wrapInShell(children) });
 ```
 
 ```html
-<!-- Después: app/layouts/default.meeko -->
+<!-- After: app/layouts/default.meeko -->
 <script lang="ts">
 import type { Component } from "@meekojs/meeko";
 
@@ -188,11 +188,11 @@ const props = defineProps<Props>();
 `meeko build` reads `render` from the sidecar without executing it. It must be a string literal in `definePage({ ... })`, in an exported object or in a local constant in the same file. A computed value, computed key, spread without a subsequent explicit `render`, or re-export stops the build.
 
 ```ts
-// Antes
+// Before
 const mode = process.env.STATIC ? "prerender" : "ssr";
 export const route = definePage({ render: mode });
 
-// Después
+// After
 export const route = definePage({ render: "prerender" });
 ```
 
@@ -203,10 +203,10 @@ export const route = definePage({ render: "prerender" });
 - **Client pages.** Use `ClientPageDefinition`: its `load` receives `ClientPageLoadContext` (`url`, `params`, `search`, `signal`, `state`), without `request` or `context`.
 
 ```ts
-// Antes
+// Before
 switch (render) { case "ssr": /* ... */ break; case "prerender": /* ... */ break; }
 
-// Después
+// After
 switch (render) {
   case "ssr": case "stream": /* ... */ break;
   case "prerender": /* ... */ break;
@@ -223,7 +223,7 @@ The server compares the sidecar's `render` with the manifest's, even if the side
 Each request's `StateStore` is sealed after synchronous rendering and `head`, in every rendering mode. From then on, `useState` with a new key, `seed` or a write throws `STATE_SEALED`. A detached promise writing state rejects; if nobody catches it, Node terminates the process under its default configuration.
 
 ```ts
-// Antes: la promesa escribe estado después del render
+// Before: the promise writes state after rendering
 load: ({ state }) => {
   void loadStats().then((stats) => { state.get("stats", () => 0).value = stats; });
   return {};
@@ -231,13 +231,13 @@ load: ({ state }) => {
 ```
 
 ```ts
-// Después: espérela en el loader...
+// After: await it in the loader...
 load: async ({ state }) => {
   state.get("stats", () => 0).value = await loadStats();
   return {};
 },
 
-// ...o devuélvala como valor diferido
+// ...or return it as a deferred value
 load: () => ({ stats: defer(loadStats()) }),
 ```
 
@@ -276,7 +276,7 @@ In a `"stream"` response whose headers have already been sent, `SessionHandle.cr
 When a peer fails, Meeko closes it with `1008`, `1009`, `1011` or `1013` and sends the error to `onDeliveryError`. An `authorizeSend` returning `false` skips that peer without closing it. `LocalSocketPubSub.publish` sends listener errors to `onListenerError` instead of aggregating them.
 
 ```ts
-// Antes: el rechazo de broadcast informaba de peers fallidos
+// Before: broadcast rejection reported failed peers
 try {
   await hub.broadcast("chat", "general", "message", payload);
 } catch (error) {
@@ -285,7 +285,7 @@ try {
 ```
 
 ```ts
-// Después: server/runtime.ts observa las entregas
+// After: server/runtime.ts observes deliveries
 export default defineServerRuntime(() => ({
   sessions,
   socket: { onDeliveryError: (error, { channel, room, event }) => log(error, channel, room, event) },
@@ -299,11 +299,11 @@ Without `socket.onDeliveryError`, delivery failures reach the runtime's `onError
 `subscribe` can return `Unsubscribe | Promise<Unsubscribe>`, and `Unsubscribe` can return a promise. Your own broker can adopt that signature, and code calling `subscribe` directly must await the result:
 
 ```ts
-// Antes
+// Before
 const unsubscribe = pubsub.subscribe("chat", "general", listener);
 unsubscribe();
 
-// Después
+// After
 const unsubscribe = await pubsub.subscribe("chat", "general", listener);
 await unsubscribe();
 ```

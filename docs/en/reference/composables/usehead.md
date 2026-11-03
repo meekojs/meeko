@@ -28,12 +28,12 @@ On the server it writes them to HTML; in the browser, hydration adopts those sam
 <script lang="ts">
 const unread = signal(3);
 useHead(() => ({
-  title: unread.value ? `(${unread.value}) Bandeja de entrada` : "Bandeja de entrada",
+  title: unread.value ? `(${unread.value}) Inbox` : "Inbox",
   meta: [{ name: "robots", content: "noindex" }],
 }));
 </script>
 
-<template><button on:click="() => unread.value = 0">Marcar como leídos</button></template>
+<template><button on:click="() => unread.value = 0">Mark as read</button></template>
 ```
 
 Clicking the button changes the document title without reloading.
@@ -162,7 +162,7 @@ useHead({ meta: [{ name: "description" }] });
 <!-- no-check -->
 
 ```ts good
-useHead({ meta: [{ name: "description", content: "Planes y precios" }] });
+useHead({ meta: [{ name: "description", content: "Plans and pricing" }] });
 ```
 
 ### Event handlers in attributes

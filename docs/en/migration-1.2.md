@@ -29,11 +29,11 @@ As a result, anything setup copies from a prop keeps its initial value: `const {
 <script lang="ts">
 const props = defineProps<{ title: string; q: string }>();
 
-// Antes: se recalculaba porque el hijo se reconstruía con cada cambio
+// Before: recalculated because the child was rebuilt on each change
 const upper = props.title.toUpperCase();
 const results = useApi("/api/search", { query: { q: props.q } });
 
-// Después
+// After
 const upper = computed(() => props.title.toUpperCase());
 const results = useApi("/api/search", () => ({ query: { q: props.q } }));
 </script>
@@ -85,10 +85,10 @@ All variables read by Meeko start with `MEEKO_`. `MEEKO_HOST`, `MEEKO_PORT` and 
 Rename them in the deployment environment, Dockerfiles and `vars` in `wrangler.jsonc`:
 
 ```jsonc
-// Antes
+// Before
 "vars": { "PUBLIC_ORIGIN": "https://mi-app.example" }
 
-// Después
+// After
 "vars": { "MEEKO_PUBLIC_ORIGIN": "https://mi-app.example" }
 ```
 
@@ -110,8 +110,8 @@ Without `MEEKO_PORT`, `PORT` or `server.port`, `meeko dev` uses the first free p
 
 ```jsonc
 // tsconfig.json
-"module": "ESNext",           // antes "NodeNext"
-"moduleResolution": "Bundler" // antes "NodeNext"
+"module": "ESNext",           // before "NodeNext"
+"moduleResolution": "Bundler" // before "NodeNext"
 ```
 
 ### Warnings in `meeko check`
@@ -135,19 +135,19 @@ If the application exports a symbol with one of these names from an auto-import 
 Two built-in tags recognized by the compiler without imports. Adoption is optional: `<component is="props.outlet">` and `<a bind:href="href(...)">` keep working.
 
 ```html
-<!-- Antes: app/layouts/default.meeko -->
+<!-- Before: app/layouts/default.meeko -->
 <script lang="ts">
 import type { Component } from "@meekojs/meeko";
 const props = defineProps<{ outlet: Component<Record<string, unknown>> }>();
 </script>
 <template>
-  <a bind:href="href('/about')">Acerca de</a>
+  <a bind:href="href('/about')">About</a>
   <main><component is="props.outlet"></component></main>
 </template>
 
-<!-- Después -->
+<!-- After -->
 <template>
-  <MeekoLink to="/about">Acerca de</MeekoLink>
+  <MeekoLink to="/about">About</MeekoLink>
   <main><MeekoOutlet /></main>
 </template>
 ```
@@ -174,8 +174,8 @@ These changes do not affect an application hydrating its own HTML; only tests, s
 export default defineMeekoConfig({
   document: {
     head: {
-      title: "Mi tienda",            // una página sin título: «Mi tienda»
-      titleTemplate: "%s · Mi tienda", // una página titulada «Zapatillas»: «Zapatillas · Mi tienda»
+      title: "My store",            // an untitled page: “My store”
+      titleTemplate: "%s · My store", // a page titled “Shoes”: “Shoes · My store”
     },
   },
 });
@@ -217,10 +217,10 @@ These are optional and do not change anything by themselves; they replace code m
 `modules` is now for `defineMeekoModule` modules. A directory with `app/pages` listed in `modules` keeps working as a layer during `1.x`, with one warning per process in `meeko dev`, `meeko build` and `meeko check`. Move it to `layers` (`extends` remains an alias of `layers`, without warnings):
 
 ```ts
-// Antes
+// Before
 export default defineMeekoConfig({ modules: ["./modules/auth"] });
 
-// Después
+// After
 export default defineMeekoConfig({ layers: ["./modules/auth"] });
 ```
 

@@ -115,13 +115,13 @@ new DurableObjectSocketPubSub(env.MEEKO_SOCKET).subscribe("chat", "general", (me
 <!-- no-check -->
 
 ```ts good
-export default createWorker(createCloudflareApp); // reenvía cada upgrade a su sala
+export default createWorker(createCloudflareApp); // forwards each upgrade to its room
 ```
 
 ### A room class that is not Meeko's
 
 ```text bad
-MEEKO_SOCKET apunta a una clase Durable Object propia
+MEEKO_SOCKET points to a custom Durable Object class
 ```
 
 The first `publish` rejects with `TypeError: The Socket Durable Object must be created with createSocketRoomClass`: the room must expose the `meekoPublish` RPC.
@@ -141,7 +141,7 @@ The Worker and room reject the application on creation: `Socket channels on Clou
 <!-- no-check -->
 
 ```ts good
-socket: {} // el Worker usa DurableObjectSocketPubSub(env.MEEKO_SOCKET)
+socket: {} // the Worker uses DurableObjectSocketPubSub(env.MEEKO_SOCKET)
 ```
 
 ## Notes

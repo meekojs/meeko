@@ -27,7 +27,7 @@ The server HTML already contains the content at its target and hydration does no
 <!-- app/layouts/default.meeko -->
 <template>
   <header class="bar">
-    <MeekoLink to="/">Inicio</MeekoLink>
+    <MeekoLink to="/">Home</MeekoLink>
     <div id="toolbar"></div>
   </header>
   <main><MeekoOutlet /></main>
@@ -42,7 +42,7 @@ async function save(): Promise<void> { /* … */ }
 
 <template>
   <MeekoTeleport to="#toolbar">
-    <button type="button" on:click="save">Guardar</button>
+    <button type="button" on:click="save">Save</button>
   </MeekoTeleport>
   <article>…</article>
 </template>
@@ -75,9 +75,9 @@ const saved = signal(false);
 </script>
 
 <template>
-  <button type="button" on:click="() => saved.value = true">Guardar</button>
+  <button type="button" on:click="() => saved.value = true">Save</button>
   <MeekoTeleport to="body">
-    <div if:when="saved.value" class="toast" role="status">Guardado.</div>
+    <div if:when="saved.value" class="toast" role="status">Saved.</div>
   </MeekoTeleport>
 </template>
 ```
@@ -98,7 +98,7 @@ onMounted(() => {
 
 <template>
   <MeekoTeleport to="#toolbar" bind:disabled="narrow.value">
-    <AppButton on:click="save">Guardar</AppButton>
+    <AppButton on:click="save">Save</AppButton>
   </MeekoTeleport>
 </template>
 ```
@@ -111,7 +111,7 @@ When `narrow` changes, the same nodes move from the toolbar to their original lo
 <!-- app/pages/docs/[slug].meeko -->
 <template>
   <MeekoTeleport to="#breadcrumbs">
-    <MeekoLink to="/docs">Documentación</MeekoLink> › <span>{page.title}</span>
+    <MeekoLink to="/docs">Documentation</MeekoLink> › <span>{page.title}</span>
   </MeekoTeleport>
   <article html="page.body"></article>
 </template>
@@ -122,25 +122,25 @@ When `narrow` changes, the same nodes move from the toolbar to their original lo
 ### A CSS selector in `to`
 
 ```html bad
-<MeekoTeleport to="header .bar"><p>Hola</p></MeekoTeleport>
+<MeekoTeleport to="header .bar"><p>Hello</p></MeekoTeleport>
 ```
 
 `meeko check` reports `MEEK114: to de <MeekoTeleport> admite "body" o "#id" (una letra y luego letras, dígitos, - o _), como to="#toolbar", no "header .bar"`. Give the target an `id`:
 
 ```html good
-<MeekoTeleport to="#toolbar"><p>Hola</p></MeekoTeleport>
+<MeekoTeleport to="#toolbar"><p>Hello</p></MeekoTeleport>
 ```
 
 ### An unsupported attribute
 
 ```html bad
-<MeekoTeleport to="#toolbar" class="actions"><button>Guardar</button></MeekoTeleport>
+<MeekoTeleport to="#toolbar" class="actions"><button>Save</button></MeekoTeleport>
 ```
 
 `meeko check` reports `MEEK114: <MeekoTeleport> admite to, bind:to, disabled, bind:disabled, if:when y each:of; class no se admite`. The tag renders no element of its own: put the class on the content.
 
 ```html good
-<MeekoTeleport to="#toolbar"><div class="actions"><button>Guardar</button></div></MeekoTeleport>
+<MeekoTeleport to="#toolbar"><div class="actions"><button>Save</button></div></MeekoTeleport>
 ```
 
 ### A `bind:to` of type `string`
@@ -149,7 +149,7 @@ When `narrow` changes, the same nodes move from the toolbar to their original lo
 <script lang="ts">
 const target = signal("#toolbar");
 </script>
-<template><MeekoTeleport bind:to="target.value"><p>Hola</p></MeekoTeleport></template>
+<template><MeekoTeleport bind:to="target.value"><p>Hello</p></MeekoTeleport></template>
 ```
 
 `meeko check` reports `TS2322: Type 'string' is not assignable to type 'MeekoTeleportTarget'`. Declare the signal with the target type, imported from `@meekojs/meeko/framework`:
@@ -159,20 +159,20 @@ const target = signal("#toolbar");
 import type { MeekoTeleportTarget } from "@meekojs/meeko/framework";
 const target = signal<MeekoTeleportTarget>("#toolbar");
 </script>
-<template><MeekoTeleport bind:to="target.value"><p>Hola</p></MeekoTeleport></template>
+<template><MeekoTeleport bind:to="target.value"><p>Hello</p></MeekoTeleport></template>
 ```
 
 ### A nonexistent target
 
 ```html bad
-<!-- ningún layout ni componente pinta id="sidebar" -->
+<!-- no layout or component renders id="sidebar" -->
 <MeekoTeleport to="#sidebar"><nav>…</nav></MeekoTeleport>
 ```
 
 `meeko check` does not detect it. In development, rendering fails with `Error: <MeekoTeleport to="#sidebar">: the page renders no element with id "sidebar"; render it in the page, a layout or app.meeko, or use to="body"`; in production, content renders in place and the server warns once with the same text in `console.warn`. The target must live at least as long as the teleport: for a page, an element in the layout or `app/app.meeko`.
 
 ```html good
-<!-- app/layouts/default.meeko pinta <aside id="sidebar"></aside> -->
+<!-- app/layouts/default.meeko renders <aside id="sidebar"></aside> -->
 <MeekoTeleport to="#sidebar"><nav>…</nav></MeekoTeleport>
 ```
 

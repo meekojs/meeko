@@ -83,7 +83,7 @@ export default defineServerRouteMiddleware(async ({ context, url }) => {
 import { useRequestState } from "@meekojs/meeko/server";
 const { context } = usePage();
 const tenant = useRequestState(context, "tenant", () => null as { id: string; name: string } | null);
-export const brand = tenant?.name ?? "Mi tienda";
+export const brand = tenant?.name ?? "My store";
 </script>
 
 <template><h1>{brand}</h1></template>
@@ -133,7 +133,7 @@ import { useRequestState } from "@meekojs/meeko/server";
 <script server lang="ts">
 import { useRequestState } from "@meekojs/meeko/server";
 const { context } = usePage();
-export const tenantName = useRequestState(context, "tenant", () => ({ name: "Mi tienda" })).name;
+export const tenantName = useRequestState(context, "tenant", () => ({ name: "My store" })).name;
 </script>
 ```
 
@@ -158,7 +158,7 @@ export const findUser = (context: RequestContext, id: string) =>
 
 ```ts bad
 useRequestState(context, "user", () => session.userId);         // string
-const user = useRequestState(context, "user", () => loadUser()); // espera un User
+const user = useRequestState(context, "user", () => loadUser()); // expects a User
 ```
 
 `useRequestState` does not know the stored type: the second call receives the text stored by the first, typed as `User`, and fails later. Use different keys or a helper with a fixed key and type like the one above.

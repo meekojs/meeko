@@ -84,7 +84,7 @@ const selected = defineModel<T | null>({ default: null });
 </script>
 
 <template>
-  <ul role="listbox" aria-label="Opciones">
+  <ul role="listbox" aria-label="Options">
     <li each:of="props.items" each:as="item" role="option" on:click="() => selected.value = item">{String(item[props.labelKey])}</li>
   </ul>
 </template>
@@ -103,7 +103,7 @@ The script's `interface` and `type` declarations are declared at module level, w
 ```html
 <script lang="ts" generic="T">
 type Rows<U> = readonly U[];
-const props = defineProps<{ rows: Rows<T>; empty?: string }>({ empty: "Sin datos" });
+const props = defineProps<{ rows: Rows<T>; empty?: string }>({ empty: "No data" });
 </script>
 
 <template>
@@ -127,7 +127,7 @@ defineExpose({ first: (): T | undefined => props.items[0] });
 
 ```html
 <script lang="ts">
-const notes = signal([{ id: "n1", title: "Hola" }]);
+const notes = signal([{ id: "n1", title: "Hello" }]);
 const list = useElementRef("list");
 function firstTitle(): string | undefined {
   return list.value?.first()?.title;

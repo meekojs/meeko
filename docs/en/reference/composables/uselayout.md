@@ -33,7 +33,7 @@ const props = defineProps<Props>({ showAlert: false });
 
 <template>
   <header>{props.title}</header>
-  <p if:when="props.showAlert" role="alert">Hay un problema con la conexión.</p>
+  <p if:when="props.showAlert" role="alert">There is a connection problem.</p>
   <main><MeekoOutlet /></main>
 </template>
 ```
@@ -41,18 +41,18 @@ const props = defineProps<Props>({ showAlert: false });
 ```html
 <!-- app/pages/connections.meeko -->
 <script server lang="ts">
-export const route = definePage({ layout: "dashboard", layoutProps: { title: "Conexiones" } });
+export const route = definePage({ layout: "dashboard", layoutProps: { title: "Connections" } });
 </script>
 
 <script lang="ts">
-const layout = useLayout();                 // LayoutHandle de "dashboard"
+const layout = useLayout();                 // LayoutHandle for "dashboard"
 const failing = signal(false);
 effect(() => layout.set({ showAlert: failing.value }));
 </script>
 
 <template>
-  <p>Título actual: {layout.props.title}</p>
-  <button type="button" on:click="() => failing.value = !failing.value">Probar conexión</button>
+  <p>Current title: {layout.props.title}</p>
+  <button type="button" on:click="() => failing.value = !failing.value">Test connection</button>
 </template>
 ```
 
@@ -90,7 +90,7 @@ const draft = signal("");
 effect(() => layout.set({ title: draft.value ? `Editando: ${draft.value}` : "Nuevo documento" }));
 </script>
 
-<template><input model="draft" placeholder="Título"></template>
+<template><input model="draft" placeholder="Title"></template>
 ```
 
 ### From a page component
@@ -107,7 +107,7 @@ async function test(): Promise<void> {
 }
 </script>
 
-<template><button type="button" on:click="test">Probar</button></template>
+<template><button type="button" on:click="test">Try</button></template>
 ```
 
 ### Props per folder and page
@@ -125,7 +125,7 @@ export default defineGroup({ layout: "dashboard", layoutProps: { showAlert: fals
 
 ```ts
 // app/pages/(dashboard)/reports.route.ts
-export const route = definePage({ layoutProps: { title: "Informes" } });
+export const route = definePage({ layoutProps: { title: "Reports" } });
 ```
 
 ## Common mistakes
@@ -133,7 +133,7 @@ export const route = definePage({ layoutProps: { title: "Informes" } });
 ### A prop the layout does not declare, or with another type
 
 ```ts bad
-const layout = useLayout(); // la página usa layout: "dashboard"
+const layout = useLayout(); // the page uses layout: "dashboard"
 layout.set({ showAlert: "yes" });
 layout.set({ subtitle: "x" });
 ```
@@ -165,19 +165,19 @@ const props = defineProps<{ title?: string }>();
 ### Use props for markup
 
 ```ts bad
-layout.set({ actionsHtml: "<button>Guardar</button>" });
+layout.set({ actionsHtml: "<button>Save</button>" });
 ```
 
 Props are data: passing HTML as text forces the layout to render it with `html` and loses page events and scope. To put page content in a layout area, use [`<MeekoTeleport>`](/en/docs/reference/meekoteleport):
 
 ```html good
-<MeekoTeleport to="#toolbar"><button type="button" on:click="save">Guardar</button></MeekoTeleport>
+<MeekoTeleport to="#toolbar"><button type="button" on:click="save">Save</button></MeekoTeleport>
 ```
 
 ### Call it in a unit test
 
 ```ts bad
-renderToString({}); // la página llama a useLayout()
+renderToString({}); // the page calls useLayout()
 ```
 
 Throws `Error: useLayout() necesita una página que renderiza Meeko… En una prueba unitaria, pasa los valores al componente como props.`
@@ -185,7 +185,7 @@ Throws `Error: useLayout() necesita una página que renderiza Meeko… En una pr
 <!-- no-check -->
 
 ```ts good
-renderToString({ title: "Informes" }); // el componente recibe el valor como prop
+renderToString({ title: "Reports" }); // the component receives the value as a prop
 ```
 
 ## Notes

@@ -31,7 +31,7 @@ Unlike `defineApiRoute`, an RPC does not model HTTP resources: it receives an `i
 // shared/schemas/orders.ts
 import * as v from "valibot";
 
-export const newOrder = v.object({ item: v.pipe(v.string(), v.minLength(1, "Elige un producto.")), qty: v.number() });
+export const newOrder = v.object({ item: v.pipe(v.string(), v.minLength(1, "Choose a product.")), qty: v.number() });
 export const orderSchema = v.object({ id: v.string(), item: v.string(), qty: v.number() });
 ```
 
@@ -124,7 +124,7 @@ const create = useRpcMutation("orders.create");
 
 <template>
   <ul><li each:of="orders.data.value" each:as="order" each:key="order.id">{order.item} × {order.qty}</li></ul>
-  <button type="button" bind:disabled="create.pending.value" on:click="() => create.mutate({ item: 'té', qty: 1 })">Pedir té</button>
+  <button type="button" bind:disabled="create.pending.value" on:click="() => create.mutate({ item: 'tea', qty: 1 })">Order tea</button>
 </template>
 ```
 

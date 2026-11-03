@@ -68,7 +68,7 @@ export const route = definePage({
 ```
 
 ```html
-<!-- app/components/CartBadge.meeko, en el layout -->
+<!-- app/components/CartBadge.meeko, in the layout -->
 <script lang="ts">
 const count = useState("cart.count", () => 0);
 </script>
@@ -85,7 +85,7 @@ The layout reads `3` during SSR and the browser receives it in the payload: hydr
 ```ts
 const app = await mountClientApp(options);
 const theme = app.state.get("theme", () => "light");
-theme.value = "dark"; // todos los componentes que usan useState("theme") se actualizan
+theme.value = "dark"; // all components using useState("theme") update
 ```
 
 ### A custom render with state
@@ -122,7 +122,7 @@ When the timer fires, the store is already sealed: `StateSealedError: STATE_SEAL
 ```ts good
 export const route = definePage({
   load: async ({ state }) => {
-    state.get("count", () => 0).value = await computeCount(); // antes de que termine el load
+    state.get("count", () => 0).value = await computeCount(); // before load finishes
     return {};
   },
 });

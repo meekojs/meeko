@@ -32,8 +32,8 @@ const count = signal(3);
 </script>
 
 <template>
-  <button bind:disabled="saving.value" bind:title="`${count.value} cambios`" bind:aria-busy="saving.value ? 'true' : null">
-    Guardar
+  <button bind:disabled="saving.value" bind:title="`${count.value} changes`" bind:aria-busy="saving.value ? 'true' : null">
+    Save
   </button>
 </template>
 ```
@@ -67,7 +67,7 @@ const classes = computed(() => ["chip", `chip--${props.size}`, props.active ? "c
 </script>
 
 <template>
-  <span bind:class="classes.value" bind:style="props.active ? 'outline: 2px solid currentColor' : null">Etiqueta</span>
+  <span bind:class="classes.value" bind:style="props.active ? 'outline: 2px solid currentColor' : null">Label</span>
 </template>
 ```
 
@@ -81,9 +81,9 @@ const open = signal(false);
 </script>
 
 <template>
-  <button type="button" aria-controls="menu" bind:aria-expanded="open.value ? 'true' : 'false'" on:click="() => open.value = !open.value">Menú</button>
+  <button type="button" aria-controls="menu" bind:aria-expanded="open.value ? 'true' : 'false'" on:click="() => open.value = !open.value">Menu</button>
   <ul id="menu" bind:hidden="!open.value" bind:data-state="open.value ? 'open' : 'closed'">
-    <li>Perfil</li>
+    <li>Profile</li>
   </ul>
 </template>
 ```
@@ -140,11 +140,11 @@ This is not a compilation error: the attribute contains the literal text `{photo
 A signal is an object, and an object is truthy: `bind:disabled="saving"` always disables the button, without any error.
 
 ```html bad
-<button bind:disabled="saving">Guardar</button>
+<button bind:disabled="saving">Save</button>
 ```
 
 ```html good
-<button bind:disabled="saving.value">Guardar</button>
+<button bind:disabled="saving.value">Save</button>
 ```
 
 ### An object in `bind:class`
@@ -152,23 +152,23 @@ A signal is an object, and an object is truthy: `bind:disabled="saving"` always 
 `bind:class` does not interpret objects or arrays like Vue: it writes `String(valor)`, that is, `class="[object Object]"`, without any error.
 
 ```html bad
-<p bind:class="{ active: selected.value }">Opción</p>
+<p bind:class="{ active: selected.value }">Option</p>
 ```
 
 ```html good
-<p bind:class="selected.value ? 'active' : null">Opción</p>
+<p bind:class="selected.value ? 'active' : null">Option</p>
 ```
 
 ### An event handler as an attribute
 
 ```html bad
-<button bind:onclick="() => save()">Guardar</button>
+<button bind:onclick="() => save()">Save</button>
 ```
 
 `MEEK012: Atributo dinámico no válido: onclick`. Events use `on:`.
 
 ```html good
-<button on:click="save">Guardar</button>
+<button on:click="save">Save</button>
 ```
 
 ### A prop passed statically and with `bind:` at the same time

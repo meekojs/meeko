@@ -31,7 +31,7 @@ if (!session) redirect(`/login?next=${encodeURIComponent(url.pathname)}`);
 export const account = { id: session.id };
 </script>
 
-<template><h1>Cuenta {account.id}</h1></template>
+<template><h1>Account {account.id}</h1></template>
 ```
 
 After the `if`, `session` is no longer `undefined`.

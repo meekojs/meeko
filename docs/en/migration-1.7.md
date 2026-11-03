@@ -134,7 +134,7 @@ export default defineMeekoConfig({
     contentSecurityPolicy: {
       "default-src": ["'self'"],
       "script-src": ["'self'"],
-      "style-src": ["'self'", "'unsafe-inline'"], // atributos style="…" de un resaltador
+      "style-src": ["'self'", "'unsafe-inline'"], // style="…" attributes from a highlighter
       "object-src": ["'none'"],
       "base-uri": ["'none'"],
       "frame-ancestors": ["'none'"],

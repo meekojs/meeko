@@ -30,7 +30,7 @@ Application clients generate it from `server/socket` channels and it is auto-imp
 <script lang="ts">
 const messages = signal<string[]>([]);
 const chat = await useSocket("chat", { roomId: "general" });
-// Desde aquí, sólo en el navegador y con el socket abierto.
+// From here on, only in the browser with the socket open.
 chat.on("message", (message) => { messages.value = [...messages.value, message.text]; });
 </script>
 
@@ -99,7 +99,7 @@ const online = computed(() => chat.state.value === "open");
 const send = (text: string) => chat.emit("message", { text, roomId: "general" });
 </script>
 
-<template><span class="dot" bind:data-online="String(online.value)">{online.value ? "Conectado" : "Conectando…"}</span></template>
+<template><span class="dot" bind:data-online="String(online.value)">{online.value ? "Connected" : "Connecting…"}</span></template>
 ```
 
 ### A channel with authorization
@@ -164,7 +164,7 @@ const chat = await useSocket("chat", { roomId: "general" });
 
 ```ts bad
 const chat = useSocket("chat");
-void chat.emit("message", { text: "Hola", roomId: "general" }); // aún "connecting"
+void chat.emit("message", { text: "Hello", roomId: "general" }); // still "connecting"
 ```
 
 `emit` rejects with `Socket is disconnected` while the socket is not open: no queue or resend. Await connection with `await useSocket(...)` or check `state` before sending.
@@ -173,7 +173,7 @@ void chat.emit("message", { text: "Hola", roomId: "general" }); // aún "connect
 
 ```ts good
 const chat = await useSocket("chat");
-await chat.emit("message", { text: "Hola", roomId: "general" });
+await chat.emit("message", { text: "Hello", roomId: "general" });
 ```
 
 ## Notes

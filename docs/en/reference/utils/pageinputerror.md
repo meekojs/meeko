@@ -58,7 +58,7 @@ const { params } = usePage();
 export const order = { id: Number(params.id) };
 </script>
 
-<template><h1>Pedido {order.id}</h1></template>
+<template><h1>Order {order.id}</h1></template>
 ```
 
 `/orders/abc` responds with `400 INVALID_PARAMS` and `/orders/7?tab=x` with `400 INVALID_SEARCH`, without running the block.
@@ -72,9 +72,9 @@ const props = defineProps<{ status: number; message: string }>();
 </script>
 
 <template>
-  <h1 if:when="props.status === 400">Esa dirección no es válida</h1>
-  <p if:when="props.message === 'INVALID_SEARCH'">Revisa los filtros de la URL.</p>
-  <h1 if:when="props.status !== 400">Algo ha fallado</h1>
+  <h1 if:when="props.status === 400">That address is invalid</h1>
+  <p if:when="props.message === 'INVALID_SEARCH'">Check the URL filters.</p>
+  <h1 if:when="props.status !== 400">Something went wrong</h1>
 </template>
 ```
 
@@ -87,7 +87,7 @@ Without schemas, `params` is unchecked text and the page code must defend itself
 ```html bad
 <script server lang="ts">
 const { params } = usePage();
-export const order = await findOrder(Number(params.id)); // NaN con /orders/abc
+export const order = await findOrder(Number(params.id)); // NaN with /orders/abc
 </script>
 ```
 

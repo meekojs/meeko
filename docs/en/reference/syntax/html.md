@@ -74,7 +74,7 @@ export function articleHtml(renderedMarkdown: string): TrustedHtml {
 import { articleHtml } from "../../../server/content/articles";
 
 const { params } = usePage();
-export const article = { title: params.slug, body: articleHtml(`<p>Entrada <strong>${params.slug}</strong></p>`) };
+export const article = { title: params.slug, body: articleHtml(`<p>Post <strong>${params.slug}</strong></p>`) };
 </script>
 
 <template>
@@ -111,7 +111,7 @@ A literal written in code does not warn; a `<script>` constant needs `as const` 
 const check = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8l4 4 8-8"/></svg>' as const;
 </script>
 
-<template><span class="icon" html="check"></span> Guardado</template>
+<template><span class="icon" html="check"></span> Saved</template>
 ```
 
 ### Styles and events in content
@@ -151,7 +151,7 @@ With `const body = signal("<p>Hola</p>")`, `meeko check` warns with ``MEEK107: `
 <script lang="ts">
 import { trustHtml } from "@meekojs/meeko";
 
-const body = signal(trustHtml("<p>Hola</p>"));
+const body = signal(trustHtml("<p>Hello</p>"));
 </script>
 
 <template><article html="body.value"></article></template>
@@ -162,14 +162,14 @@ An unannotated constant also warns, because it reaches the template as `string`:
 ### Content inside the element
 
 ```html bad
-<article html="body"><p>Cargando…</p></article>
+<article html="body"><p>Loading…</p></article>
 ```
 
 `MEEK095: Un elemento con html no admite hijos: el HTML de la expresión es todo su contenido; deja <article html="..."></article> vacío`.
 
 ```html good
 <article html="body"></article>
-<p if:when="!body">Cargando…</p>
+<p if:when="!body">Loading…</p>
 ```
 
 ### An element that does not accept HTML content

@@ -138,9 +138,9 @@ export default defineMeekoConfig({
 ### The same project on multiple targets
 
 ```sh
-npx meeko build                     # server.adapter, o node
-npx meeko build --adapter bun       # sin tocar la configuración
-npx meeko build --adapter static    # falla si hay páginas SSR, API, RPC, Socket o middleware de servidor
+npx meeko build                     # server.adapter, or node
+npx meeko build --adapter bun       # without changing configuration
+npx meeko build --adapter static    # fails with SSR pages, API, RPC, Socket or server middleware
 ```
 
 With `--adapter`, options from another `server` adapter do not apply: `static` over a `node` configuration builds without `headerFiles`.

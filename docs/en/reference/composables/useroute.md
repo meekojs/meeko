@@ -31,10 +31,10 @@ const route = useRoute();
 
 <template>
   <nav>
-    <a href="/" bind:aria-current="route.isActive('/')">Inicio</a>
-    <a href="/about" bind:aria-current="route.isActive('/about')">Acerca de</a>
+    <a href="/" bind:aria-current="route.isActive('/')">Home</a>
+    <a href="/about" bind:aria-current="route.isActive('/about')">About</a>
   </nav>
-  <p class="path">Estás en {route.path.value}</p>
+  <p class="path">You are at {route.path.value}</p>
   <main><MeekoOutlet /></main>
 </template>
 ```
@@ -75,9 +75,9 @@ A `RouteState`, the same object throughout the application tree:
 <script lang="ts">
 const route = useRoute();
 const links = [
-  { to: "/", label: "Inicio" },
-  { to: "/users", label: "Usuarios" },
-  { to: "/settings", label: "Ajustes" },
+  { to: "/", label: "Home" },
+  { to: "/users", label: "Users" },
+  { to: "/settings", label: "Settings" },
 ] as const;
 const inSettings = computed(() => route.isActive("/settings", { prefix: true }) !== false);
 </script>
@@ -85,7 +85,7 @@ const inSettings = computed(() => route.isActive("/settings", { prefix: true }) 
 <template>
   <aside>
     <a each:of="links" each:as="link" each:key="link.to" bind:href="href(link.to)" bind:aria-current="route.isActive(link.to, { prefix: true })">{link.label}</a>
-    <p if:when="inSettings.value">Los cambios se guardan al salir.</p>
+    <p if:when="inSettings.value">Changes are saved when you leave.</p>
   </aside>
   <main><MeekoOutlet /></main>
 </template>
@@ -103,7 +103,7 @@ const props = defineProps<{ userId: string }>();
 
 <template>
   <a bind:href="href('/users/[id]', { params: { id: props.userId } })"
-     bind:aria-current="route.isActive('/users/[id]', { params: { id: props.userId } })">Perfil</a>
+     bind:aria-current="route.isActive('/users/[id]', { params: { id: props.userId } })">Profile</a>
 </template>
 ```
 
@@ -113,7 +113,7 @@ const props = defineProps<{ userId: string }>();
 import { effect } from "@meekojs/meeko";
 import { useRoute } from "@meekojs/meeko/framework";
 
-// En el <script> de app/app.meeko: una vista de página por navegación confirmada.
+// In the <script> of app/app.meeko: one page view per confirmed navigation.
 const route = useRoute();
 effect(() => {
   const url = route.url.value;
@@ -136,7 +136,7 @@ const tab = computed(() => {
 });
 </script>
 
-<template><p>Pestaña: {tab.value}</p></template>
+<template><p>Tab: {tab.value}</p></template>
 ```
 
 ## Common mistakes
@@ -144,26 +144,26 @@ const tab = computed(() => {
 ### Compare the signal instead of its value
 
 ```html bad
-<p if:when="route.path === '/about'">Acerca de</p>
+<p if:when="route.path === '/about'">About</p>
 ```
 
 `meeko check` reports `TS2367: This comparison appears to be unintentional because the types 'ReadonlySignal<string>' and 'string' have no overlap`.
 
 ```html good
-<p if:when="route.path.value === '/about'">Acerca de</p>
+<p if:when="route.path.value === '/about'">About</p>
 ```
 
 ### A nonexistent route, or one without its `params`
 
 ```html bad
-<a bind:aria-current="route.isActive('/nowhere')">Perdido</a>
-<a bind:aria-current="route.isActive('/users/[id]')">Perfil</a>
+<a bind:aria-current="route.isActive('/nowhere')">Lost</a>
+<a bind:aria-current="route.isActive('/users/[id]')">Profile</a>
 ```
 
 `meeko check` reports `TS2345: Argument of type '"/nowhere"' is not assignable to parameter of type '"/" | "/about" | "/users/[id]"'` for the first and `TS2554: Expected 2 arguments, but got 1` for the second, because the dynamic route requires `params`.
 
 ```html good
-<a bind:aria-current="route.isActive('/users/[id]', { params: { id: '7' } })">Perfil</a>
+<a bind:aria-current="route.isActive('/users/[id]', { params: { id: '7' } })">Profile</a>
 ```
 
 ### Use `params` without checking its type
@@ -186,7 +186,7 @@ const id = computed(() => {
 ### Call it in a unit test
 
 ```ts bad
-const html = renderToString({}); // el componente llama a useRoute()
+const html = renderToString({}); // the component calls useRoute()
 ```
 
 Throws `Error: useRoute() necesita una aplicación de Meeko en ejecución: sólo funciona en componentes que renderiza el servidor del framework o que monta mountClientApp. En una prueba unitaria, pasa la ruta al componente como prop.` Follow the message's advice:
@@ -194,7 +194,7 @@ Throws `Error: useRoute() necesita una aplicación de Meeko en ejecución: sólo
 <!-- no-check -->
 
 ```ts good
-const html = renderToString({ path: "/about" }); // el componente recibe la ruta como prop
+const html = renderToString({ path: "/about" }); // the component receives the route as a prop
 ```
 
 ## Notes

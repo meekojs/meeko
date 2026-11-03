@@ -70,7 +70,7 @@ Review components that add classes or attributes through the DOM API (see “Com
 
 ```html
 <template>
-  <button class="toggle" on:click="(event) => event.currentTarget.classList.toggle('open')">Menú</button>
+  <button class="toggle" on:click="(event) => event.currentTarget.classList.toggle('open')">Menu</button>
 </template>
 <style scoped>
 .toggle.open { outline: 2px solid; }
@@ -97,7 +97,7 @@ export default defineMeekoConfig({ css: { scopeAttribute: "matched" } });
 ### A class added through the DOM to an element without the attribute
 
 ```html bad
-<template><span id="badge">nuevo</span></template>
+<template><span id="badge">new</span></template>
 <script lang="ts">
 onMounted(() => document.getElementById("badge")?.classList.add("hot"));
 </script>
@@ -109,7 +109,7 @@ onMounted(() => document.getElementById("badge")?.classList.add("hot"));
 There is no error: with `"matched"`, no selector can match the `<span>` (it has neither the `hot` class in the template nor `ref:` nor `on:`), so it does not receive the attribute and `.hot` does not apply to it.
 
 ```html good
-<template><span bind:class="hot.value ? 'hot' : ''">nuevo</span></template>
+<template><span bind:class="hot.value ? 'hot' : ''">new</span></template>
 <script lang="ts">
 const hot = signal(false);
 onMounted(() => { hot.value = true; });

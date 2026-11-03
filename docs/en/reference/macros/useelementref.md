@@ -31,7 +31,7 @@ onMounted(() => {
 });
 </script>
 
-<template><input ref:input type="search" aria-label="Buscar"></template>
+<template><input ref:input type="search" aria-label="Search"></template>
 ```
 
 `input` is `ReadonlySignal<HTMLInputElement | null>`; in `onMounted`, each visible `ref:` already has its value.
@@ -80,7 +80,7 @@ onMounted(() => {
 
 ```html
 <script lang="ts">
-const items = signal(["Té", "Café", "Agua"]);
+const items = signal(["Tea", "Coffee", "Water"]);
 const rows = useElementRef("row");
 function focusFirst(): void {
   rows.value[0]?.focus();
@@ -89,7 +89,7 @@ function focusFirst(): void {
 
 <template>
   <ul><li each:of="items.value" each:as="item" ref:row tabindex="-1">{item}</li></ul>
-  <button type="button" on:click="focusFirst">Primera</button>
+  <button type="button" on:click="focusFirst">First</button>
 </template>
 ```
 
@@ -99,7 +99,7 @@ The first browser `await` splits setup: code before it runs in SSR and hydration
 
 ```html
 <script lang="ts">
-const status = signal("Preparando el gráfico…");
+const status = signal("Preparing the chart…");
 const canvas = await useElementRef("chart");
 const context = canvas.getContext("2d");
 context?.fillRect(0, 0, canvas.width / 2, canvas.height);
@@ -144,7 +144,7 @@ onMounted(() => {
 <script lang="ts">
 const title = useElementRef("tittle");
 </script>
-<template><h2 ref:title>Buscar</h2></template>
+<template><h2 ref:title>Search</h2></template>
 ```
 
 `MEEK056: La plantilla no tiene ref:tittle; sus refs son "title"`. With a variable: `MEEK056: useElementRef necesita un literal de texto con el nombre de una directiva ref: de la plantilla, como useElementRef("input")`.
@@ -153,7 +153,7 @@ const title = useElementRef("tittle");
 <script lang="ts">
 const title = useElementRef("title");
 </script>
-<template><h2 ref:title>Buscar</h2></template>
+<template><h2 ref:title>Search</h2></template>
 ```
 
 ### Read `.value` without checking `null`
@@ -179,7 +179,7 @@ onMounted(() => title.value?.focus());
 ```html bad
 <script lang="ts">
 const input = await useElementRef("input");
-const label = signal("Hola");
+const label = signal("Hello");
 </script>
 <template><input ref:input><p>{label.value}</p></template>
 ```
@@ -188,7 +188,7 @@ const label = signal("Hola");
 
 ```html good
 <script lang="ts">
-const label = signal("Hola");
+const label = signal("Hello");
 const input = await useElementRef("input");
 </script>
 <template><input ref:input><p>{label.value}</p></template>
@@ -225,7 +225,7 @@ const rows = await useElementRef("row");
 
 ```html good
 <script lang="ts">
-const items = ["Té", "Café"];
+const items = ["Tea", "Coffee"];
 const rows = useElementRef("row");
 </script>
 <template><li each:of="items" each:as="item" ref:row>{item}</li></template>

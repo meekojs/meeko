@@ -57,7 +57,7 @@ The reader only opens files under `root`, so allowing reads of the output folder
 ### Stream a large file
 
 ```text
-GET /downloads/catalogo.pdf → 200, content-length: 18874368, el cuerpo es file.readable
+GET /downloads/catalogo.pdf → 200, content-length: 18874368, the body is file.readable
 ```
 
 If the client leaves, the stream is canceled and the file is closed.
@@ -79,7 +79,7 @@ deno run --allow-net --allow-env --allow-read=.meeko/output/deno .meeko/output/d
 ### Run it in Node
 
 ```ts bad
-await createDenoAssetReader({ root, assets }).get("/robots.txt", request); // en Node
+await createDenoAssetReader({ root, assets }).get("/robots.txt", request); // in Node
 ```
 
 `Error: The Meeko Deno adapter requires the Deno runtime`. In Node, use `createNodeAssetReader`.

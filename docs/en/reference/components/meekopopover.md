@@ -40,18 +40,18 @@ It has no visual styles: it exposes state through `data-*` and ARIA attributes. 
 		bind:offset="4"
 		role="menu"
 	>
-		<snippet name="trigger">Acciones ▾</snippet>
+		<snippet name="trigger">Actions ▾</snippet>
 		<button
 			role="menuitem"
 			on:click="() => emit('rename')"
 		>
-			Renombrar
+			Rename
 		</button>
 		<button
 			role="menuitem"
 			on:click="() => emit('remove')"
 		>
-			Eliminar
+			Delete
 		</button>
 	</MeekoPopover>
 </template>
@@ -87,11 +87,11 @@ Snippets: `trigger` (button content), unwrapped content (`default`) and `anchor`
 ### A tooltip
 
 ```html
-<label for="code">Código</label>
+<label for="code">Code</label>
 <input id="code" />
 <MeekoPopover mode="hint">
 	<snippet name="trigger">?</snippet>
-	El código está en el reverso de la tarjeta.
+	The code is on the back of the card.
 </MeekoPopover>
 ```
 
@@ -108,22 +108,22 @@ It opens on pointer hover (after `delay`) or when focusing the `↑`, closes wit
 	<MeekoPopover
 		model="open"
 		role="dialog"
-		label="Filtros"
+		label="Filters"
 		mode="manual"
 		on:toggle="(event) => console.log(event.open)"
 	>
-		<snippet name="trigger">Filtros</snippet>
+		<snippet name="trigger">Filters</snippet>
 		<form>
 			<label>
 				<input type="checkbox" />
-				Sólo activos
+				Active only
 			</label>
 		</form>
 		<button
 			type="button"
 			on:click="() => open.value = false"
 		>
-			Aplicar
+			Apply
 		</button>
 	</MeekoPopover>
 </template>
@@ -146,7 +146,7 @@ With `role="dialog"`, focus enters the first control on opening.
 		>
 			<img
 				src="/me.png"
-				alt="Mi cuenta"
+				alt="My account"
 			/>
 		</button>
 	</snippet>
@@ -154,13 +154,13 @@ With `role="dialog"`, focus enters the first control on opening.
 		role="menuitem"
 		href="/perfil"
 	>
-		Perfil
+		Profile
 	</a>
 	<a
 		role="menuitem"
 		href="/salir"
 	>
-		Salir
+		Sign out
 	</a>
 </MeekoPopover>
 ```
@@ -189,7 +189,7 @@ Meeko's anchoring rules are in the `meeko` cascade layer, so any application rul
 
 ```html bad
 <MeekoPopover placement="bottom-left">
-	<snippet name="trigger">Abrir</snippet>
+	<snippet name="trigger">Open</snippet>
 	…
 </MeekoPopover>
 ```
@@ -198,7 +198,7 @@ Meeko's anchoring rules are in the `meeko` cascade layer, so any application rul
 
 ```html good
 <MeekoPopover placement="bottom-start">
-	<snippet name="trigger">Abrir</snippet>
+	<snippet name="trigger">Open</snippet>
 	…
 </MeekoPopover>
 ```
@@ -235,7 +235,7 @@ Meeko's anchoring rules are in the `meeko` cascade layer, so any application rul
 </script>
 <template>
 	<MeekoPopover model="open">
-		<snippet name="trigger">Abrir</snippet>
+		<snippet name="trigger">Open</snippet>
 		…
 	</MeekoPopover>
 </template>
@@ -249,7 +249,7 @@ Meeko's anchoring rules are in the `meeko` cascade layer, so any application rul
 </script>
 <template>
 	<MeekoPopover model="open">
-		<snippet name="trigger">Abrir</snippet>
+		<snippet name="trigger">Open</snippet>
 		…
 	</MeekoPopover>
 </template>
@@ -259,8 +259,8 @@ Meeko's anchoring rules are in the `meeko` cascade layer, so any application rul
 
 ```html bad
 <MeekoPopover role="menu">
-	<snippet name="trigger">Acciones</snippet>
-	<button>Borrar</button>
+	<snippet name="trigger">Actions</snippet>
+	<button>Delete</button>
 </MeekoPopover>
 ```
 
@@ -268,8 +268,8 @@ There is no error, but Meeko does not change the content's role: without `role="
 
 ```html good
 <MeekoPopover role="menu">
-	<snippet name="trigger">Acciones</snippet>
-	<button role="menuitem">Borrar</button>
+	<snippet name="trigger">Actions</snippet>
+	<button role="menuitem">Delete</button>
 </MeekoPopover>
 ```
 

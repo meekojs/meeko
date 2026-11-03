@@ -29,7 +29,7 @@ import { pathToFileURL } from "node:url";
 import { createLocalServerFetch } from "@meekojs/meeko/server";
 
 const serverFetch = createLocalServerFetch({ manifest, sessions, load: (file) => import(pathToFileURL(file).href) });
-// Mismo origen y mismas credenciales que la petición original.
+// Same origin and credentials as the original request.
 const request = new Request(new URL("/api/users", context.request.url), { headers: context.request.headers });
 const response = await serverFetch(request, context);
 ```
@@ -78,8 +78,8 @@ export const logged = (inner: ServerFetch): ServerFetch => async (request, conte
 import { createApiClient } from "@meekojs/meeko/framework";
 import { createServerClientOptions } from "@meekojs/meeko/server";
 
-// Cada llamada lee la URL, las credenciales y el despacho local de la petición en curso:
-// el cliente nunca retiene las credenciales de otro usuario.
+// Each call reads the URL, credentials and local dispatch from the current request:
+// the client never retains another user's credentials.
 export const api = createApiClient<ApiContract>(manifest, createServerClientOptions());
 ```
 

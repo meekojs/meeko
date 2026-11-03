@@ -36,7 +36,7 @@ import * as schemas from "../shared/schemas/public";
 
 const document = await generateOpenApi({
   manifest: await discoverServerManifest(process.cwd()),
-  info: { title: "API de la tienda", version: "1.4.0" },
+  info: { title: "Store API", version: "1.4.0" },
   publicSchemas: schemas,
   toJsonSchema: (schema: Schema) => toJsonSchema(schema as never),
   load: (file) => import(pathToFileURL(file).href),
@@ -66,7 +66,7 @@ A promise with the document as a JSON object:
 ```json
 {
   "openapi": "3.1.0",
-  "info": { "title": "API de la tienda", "version": "1.4.0" },
+  "info": { "title": "Store API", "version": "1.4.0" },
   "paths": {
     "/api/users/{id}": {
       "get": {
@@ -93,7 +93,7 @@ A promise with the document as a JSON object:
 <!-- no-check -->
 
 ```ts
-// shared/schemas/public.ts: sólo lo que el documento puede mostrar
+// shared/schemas/public.ts: only what the document can expose
 export { userParams, userSchema } from "./user";
 export { orderInput, orderSchema } from "./order";
 ```
@@ -104,7 +104,7 @@ Private schemas (for an internal webhook, for example) stay outside; if an endpo
 
 ```sh
 npx tsx scripts/openapi.ts && npx @redocly/cli lint openapi.json
-git diff --exit-code openapi.json   # el contrato publicado no cambia sin revisión
+git diff --exit-code openapi.json   # the published contract does not change without review
 ```
 
 ## Common mistakes
@@ -112,7 +112,7 @@ git diff --exit-code openapi.json   # el contrato publicado no cambia sin revisi
 ### A schema outside the registry
 
 ```ts bad
-// server/api/users/[id].get.ts usa userSchema, que no está en publicSchemas
+// server/api/users/[id].get.ts uses userSchema, which is not in publicSchemas
 await generateOpenApi({ ...options, publicSchemas: { orderSchema } });
 ```
 
@@ -128,13 +128,13 @@ await generateOpenApi({ ...options, publicSchemas: { orderSchema, userSchema, us
 
 ```text bad
 server/api/files/[...path].get.ts
-server/api/report.get.ts con contentType: "response"
+server/api/report.get.ts with contentType: "response"
 ```
 
 `Error: OpenAPI cannot represent catch-all route /api/files/[...path]` and `Error: OpenAPI non-JSON response requires an explicit representation: …`. Document these routes manually or leave them out of the manifest you pass.
 
 ```text good
-Rutas con segmentos [id] y respuestas JSON con schema
+Routes with [id] segments and JSON responses with schemas
 ```
 
 ### No `load`
@@ -162,7 +162,7 @@ toJsonSchema: (schema) => JSON.stringify(convert(schema)),
 <!-- no-check -->
 
 ```ts good
-toJsonSchema: (schema) => toJsonSchema(schema as never), // un objeto, no un texto
+toJsonSchema: (schema) => toJsonSchema(schema as never), // an object, not a string
 ```
 
 ## Notes

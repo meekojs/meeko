@@ -28,9 +28,9 @@ On navigation, the browser preserves layouts shared by the outgoing and incoming
 ```html
 <!-- app/layouts/default.meeko -->
 <template>
-  <header><MeekoLink to="/">Inicio</MeekoLink></header>
+  <header><MeekoLink to="/">Home</MeekoLink></header>
   <main><MeekoOutlet /></main>
-  <footer>© Mi sitio</footer>
+  <footer>© My site</footer>
 </template>
 ```
 
@@ -66,7 +66,7 @@ const props = defineProps<Props>({ showAlert: false });
   <aside><DashboardNav /></aside>
   <section>
     <h1>{props.title}</h1>
-    <p if:when="props.showAlert" role="alert">Hay un aviso pendiente.</p>
+    <p if:when="props.showAlert" role="alert">There is a pending notice.</p>
     <MeekoOutlet />
   </section>
 </template>
@@ -91,9 +91,9 @@ Props are for data. To place page markup in another layout area, provide a targe
 A `+layout.meeko` alongside pages nests inside the named layout, and its `<MeekoOutlet />` renders the page:
 
 ```text
-app/app.meeko                          → <MeekoOutlet /> pinta el layout con nombre
+app/app.meeko                          → <MeekoOutlet /> renders the named layout
 └─ app/layouts/dashboard.meeko         → <MeekoOutlet /> pinta +layout.meeko
-   └─ app/pages/(dashboard)/+layout.meeko  → <MeekoOutlet /> pinta la página
+   └─ app/pages/(dashboard)/+layout.meeko  → <MeekoOutlet /> renders the page
       └─ app/pages/(dashboard)/reports.meeko
 ```
 
@@ -131,7 +131,7 @@ const snippets = defineSnippets<{ default: [] }>();
 ### A custom component called `MeekoOutlet`
 
 ```html bad
-<!-- app/components/MeekoOutlet.meeko existe en el proyecto -->
+<!-- app/components/MeekoOutlet.meeko exists in the project -->
 <main><MeekoOutlet /></main>
 ```
 

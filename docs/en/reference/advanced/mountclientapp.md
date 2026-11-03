@@ -28,7 +28,7 @@ Navigation is transactional: if it fails, the previous page remains visible. It 
 <!-- no-check -->
 
 ```ts
-// entry-client.ts, empaquetado con Vite y meeko()
+// entry-client.ts, bundled with Vite and meeko()
 import { mountClientApp } from "@meekojs/meeko/framework";
 import type { ClientComponent } from "@meekojs/meeko/framework";
 import { modules as pages } from "virtual:meeko-client-pages";
@@ -111,7 +111,7 @@ This is what `meeko build --adapter static` generates: navigation reads `/docs/a
 await mountClientApp({
   ...options,
   onError: (error, source) => reportToMonitoring(error, { source }),
-  onNavigationError: (error) => showToast("No se pudo abrir la página"),
+  onNavigationError: (error) => showToast("Could not open the page"),
 });
 ```
 
@@ -150,13 +150,13 @@ await mountClientApp({ root, payload, routes, loadPage });
 ### A client bundle from another build
 
 ```text bad
-dist/ servido con el HTML de un build y el entry-client.js de otro
+dist/ served with HTML from one build and entry-client.js from another
 ```
 
 `TypeError: Unsupported Meeko payload version …; the server and browser bundles must come from the same build`. This happens when deploying the server and assets separately, or with a CDN serving an old `entry-client`.
 
 ```text good
-.meeko/output/node/ desplegado entero: index.mjs, chunks/ y client/ del mismo meeko build
+.meeko/output/node/ deployed in full: index.mjs, chunks/ and client/ from the same meeko build
 ```
 
 ### Forget `serverData`

@@ -67,7 +67,7 @@ app/pages/(dashboard)/settings/index.meeko
 // app/pages/(dashboard)/admin/+group.ts
 import { defineGroup } from "@meekojs/meeko/framework";
 
-// Hereda layout "dashboard" y middleware ["auth"]; añade "admin" y cambia una prop.
+// Inherits layout "dashboard" and middleware ["auth"]; adds "admin" and changes a prop.
 export default defineGroup({ layoutProps: { showAlert: true }, middleware: ["admin"] });
 ```
 
@@ -83,7 +83,7 @@ The page takes precedence over its groups. With `layout: false` and `middleware:
 export const route = definePage({ layout: false, middleware: false });
 </script>
 
-<template><h1>Entrar</h1></template>
+<template><h1>Sign in</h1></template>
 ```
 
 ## Common mistakes
@@ -99,7 +99,7 @@ Without `app/layouts/dashboard.meeko`, `meeko check`, `meeko dev` and `meeko bui
 <!-- no-check -->
 
 ```ts good
-// con app/layouts/dashboard.meeko
+// with app/layouts/dashboard.meeko
 export default defineGroup({ layout: "dashboard" });
 ```
 
@@ -137,7 +137,7 @@ export default defineGroup({ layout: "default", layoutProps: { sidebar: true } }
 ### `layoutProps` not declared by the layout
 
 ```ts bad
-export default defineGroup({ layout: "default", layoutProps: { title: "Panel" } });
+export default defineGroup({ layout: "default", layoutProps: { title: "Dashboard" } });
 ```
 
 If `app/layouts/default.meeko` does not declare `title`, `meeko check` reports `TS2344: Type '"Las layoutProps de app/pages/(dash)/+group.ts no coinciden con las props del layout default"' does not satisfy the constraint 'true'.`
@@ -145,8 +145,8 @@ If `app/layouts/default.meeko` does not declare `title`, `meeko check` reports `
 <!-- no-check -->
 
 ```ts good
-// app/layouts/default.meeko declara defineProps<{ title?: string }>()
-export default defineGroup({ layout: "default", layoutProps: { title: "Panel" } });
+// app/layouts/default.meeko declares defineProps<{ title?: string }>()
+export default defineGroup({ layout: "default", layoutProps: { title: "Dashboard" } });
 ```
 
 ### A missing or global middleware
@@ -160,7 +160,7 @@ export default defineGroup({ middleware: ["auth", "locale"] });
 <!-- no-check -->
 
 ```ts good
-// con app/middleware/auth.server.ts declarado con { global: false }
+// with app/middleware/auth.server.ts declared with { global: false }
 export default defineGroup({ middleware: ["auth"] });
 ```
 

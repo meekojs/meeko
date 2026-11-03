@@ -61,7 +61,7 @@ onMounted(() => {
 });
 </script>
 
-<template><aside if:when="open.value">Atajos de teclado…</aside></template>
+<template><aside if:when="open.value">Keyboard shortcuts…</aside></template>
 ```
 
 Returning the function from `onMounted` is equivalent; `onCleanup` also works from composables and code outside that callback.
@@ -151,14 +151,14 @@ onCleanup(async () => {
 
 ```ts good
 onCleanup(() => {
-  connection.close().catch((error: unknown) => console.error("No se pudo cerrar", error));
+  connection.close().catch((error: unknown) => console.error("Could not close", error));
 });
 ```
 
 ### Call it outside a root
 
 ```ts bad
-// app/utils/clock.ts, evaluado al importar el módulo
+// app/utils/clock.ts, evaluated when importing the module
 const timer = setInterval(tick, 1000);
 onCleanup(() => clearInterval(timer));
 ```

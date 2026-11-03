@@ -153,7 +153,7 @@ meeko check ..
 Outside a project with `tsconfig.json`, the component is checked with the default options, which include Node types:
 
 ```sh bad
-# Card.meeko en una carpeta sin node_modules
+# Card.meeko in a directory without node_modules
 meeko check Card.meeko
 ```
 
@@ -162,7 +162,7 @@ Falló la comprobación con TypeScript 7: error TS2688: Cannot find type definit
 ```
 
 ```sh good
-# dentro de un proyecto con @types/node instalado
+# inside a project with @types/node installed
 meeko check app/components/Card.meeko
 ```
 

@@ -56,7 +56,7 @@ Since `1.2`, a top-level declaration can destructure an object or array. Each na
 ```html
 <script lang="ts">
 	const { toasts, dismiss } = useToasts()
-	const { title = 'Sin título', ...rest } = props.options
+	const { title = 'Untitled', ...rest } = props.options
 	let [first, , ...others] = pair()
 </script>
 
@@ -105,7 +105,7 @@ Since `1.2`, when the parent changes a prop, the child stays mounted: Meeko deli
 ```html
 <UiTextField
 	model:value="form.fields.name"
-	bind:label="'Nombre'"
+	bind:label="'Name'"
 	bind:error="form.errors.value.name"
 />
 ```
@@ -287,7 +287,7 @@ Since `1.1`, `model="signal"` binds a form control to a signal in both direction
   		type="button"
   		on:click="() => revealed.value = !revealed.value"
   	>
-  		Mostrar
+  		Show
   	</button>
   </template>
   ```
@@ -337,7 +337,7 @@ Since `1.1`, `html="expression"` on an element fills it with the expression's HT
 ```html
 <script lang="ts">
 	import { trustHtml } from '@meekojs/meeko'
-	const article = signal(trustHtml('<p>Contenido <strong>generado</strong> en el servidor.</p>'))
+	const article = signal(trustHtml('<p>Content <strong>generated</strong> on the server.</p>'))
 </script>
 <template>
 	<article
@@ -370,12 +370,12 @@ import DOMPurify from 'isomorphic-dompurify'
 import { trustHtml } from '@meekojs/meeko'
 import type { TrustedHtml } from '@meekojs/meeko'
 
-// HTML de usuarios o de terceros: se sanea primero y después se declara de confianza.
+// User or third-party HTML: sanitize it first, then mark it as trusted.
 export function commentHtml(input: string): TrustedHtml {
 	return trustHtml(DOMPurify.sanitize(input))
 }
 
-// HTML propio, como el Markdown del repositorio renderizado en el build: basta con declararlo.
+// Your own HTML, such as repository Markdown rendered at build time: just mark it as trusted.
 export function articleHtml(markdownDeConfianza: string): TrustedHtml {
 	return trustHtml(markdownDeConfianza)
 }
@@ -460,7 +460,7 @@ A `<style>` without `scoped` is global CSS living alongside the component that n
 </template>
 
 <style>
-	/* Global a propósito: el prefijo .markdown-view evita afectar al resto de la página. */
+	/* Global by design: the .markdown-view prefix avoids affecting the rest of the page. */
 	.markdown-view p {
 		margin-block: 0.75em;
 	}
@@ -493,7 +493,7 @@ By default, `data-meeko-s-<hash>` goes on every element in the component's templ
 import { defineMeekoConfig } from '@meekojs/meeko/framework'
 
 export default defineMeekoConfig({
-	css: { scopeAttribute: 'matched' }, // "all" por defecto en 1.x
+	css: { scopeAttribute: 'matched' }, // "all" by default in 1.x
 })
 ```
 
@@ -517,23 +517,23 @@ An attribute that can change after rendering counts as present with any value:
 ```html
 <template>
 	<section class="card">
-		<h2 class="title">Título</h2>
-		<p>Texto</p>
-		<span bind:class="state.value">Estado</span>
-		<em>Nota</em>
+		<h2 class="title">Title</h2>
+		<p>Text</p>
+		<span bind:class="state.value">State</span>
+		<em>Note</em>
 	</section>
 </template>
 
 <style scoped>
 	.card .title {
 		font-weight: 700;
-	} /* el <h2>; .card es sólo un ancestro */
+	} /* the <h2>; .card is only an ancestor */
 	p:hover {
 		color: teal;
-	} /* el <p> */
+	} /* the <p> */
 	.active {
 		color: green;
-	} /* el <span>, por bind:class */
+	} /* the <span>, through bind:class */
 </style>
 ```
 
@@ -607,7 +607,7 @@ Since `1.8`, any non-void HTML element can close with `/>` when it has no conten
 		if:when="loading.value"
 		class="spinner"
 	/>
-	<p>Los nodos que siguen a <code>&lt;span /&gt;</code> son sus hermanos.</p>
+	<p>The nodes following <code>&lt;span /&gt;</code> are its siblings.</p>
 </template>
 ```
 
@@ -703,7 +703,7 @@ Since `1.8`, a **PascalCase** text literal inside `is` names a component known a
 	bind:type="type"
 	class="button"
 >
-	Abrir
+	Open
 </component>
 ```
 
@@ -724,9 +724,9 @@ A single component rendering `<MeekoLink>` if it receives `to`, an `<a>` if it r
 import { computed } from '@meekojs/meeko'
 import type { ElementAttributes } from '@meekojs/meeko'
 
-/** Los params de la ruta K: `{ id: string }` en `/users/[id]`, `{}` en una ruta estática. */
+/** Params for route K: `{ id: string }` in `/users/[id]`, `{}` in a static route. */
 type RouteParamsOf<K extends RouteId> = NonNullable<MeekoLinkProps<K>['params']>
-/** Una ruta con sus params correlacionados: obligatorios si la ruta los tiene, prohibidos si no. */
+/** A route with its correlated params: required if the route has them, forbidden otherwise. */
 type LinkTarget = {
 	[K in RouteId]: { to: K; search?: MeekoLinkProps['search'] } & (keyof RouteParamsOf<K> extends never ? { params?: never } : { params: RouteParamsOf<K> })
 }[RouteId]
@@ -753,7 +753,7 @@ type ButtonProps = {
 	rel?: never
 	download?: never
 }
-/** Atributos que se reenvían tal cual, comunes a `<a>` y `<button>`: `id`, `title`, `aria-*`, `data-*`… */
+/** Attributes forwarded unchanged, shared by `<a>` and `<button>`: `id`, `title`, `aria-*`, `data-*`… */
 type SharedAttributes = Pick<ElementAttributes<'a'>, keyof ElementAttributes<'a'> & keyof ElementAttributes<'button'>>
 type ForwardedAttributes = Omit<SharedAttributes, 'class' | 'type'>
 
@@ -762,7 +762,7 @@ const emit = defineEmits<{ click: [event: MouseEvent] }>()
 const snippets = defineSnippets<{ default?: [] }>()
 
 const linkRel = computed(() => props.rel ?? (props.target === '_blank' ? 'noopener noreferrer' : undefined))
-/** Las props propias van a su rama; el resto (`id`, `title`, `aria-*`, `data-*`…) se reenvía con `bind`. */
+/** Each branch receives its own props; the rest (`id`, `title`, `aria-*`, `data-*`…) are forwarded with `bind`. */
 const attributes = computed((): ForwardedAttributes => {
 	const { to, params, search, href, target, rel, download, type, disabled, label, class: className, ...rest } = props
 	return rest
@@ -825,12 +825,12 @@ const attributes = computed((): ForwardedAttributes => {
 The parent uses it with each branch's props; `aria-*`, `data-*`, `id` and `title` reach the element:
 
 ```html
-<AppButton to="/about" label="Acerca" />
-<AppButton to="/users/[id]" bind:params="{ id: user.id }" bind:search="{ tab: 'actividad' }" aria-label="Perfil">Perfil</AppButton>
-<AppButton href="https://example.com" target="_blank" label="Documentación" />
+<AppButton to="/about" label="About" />
+<AppButton to="/users/[id]" bind:params="{ id: user.id }" bind:search="{ tab: 'actividad' }" aria-label="Profile">Profile</AppButton>
+<AppButton href="https://example.com" target="_blank" label="Documentation" />
 <AppButton href="/informe.pdf" download="informe.pdf" label="Descargar" />
-<AppButton type="submit" bind:aria-busy="saving.value" label="Guardar" />
-<AppButton bind:disabled="!valid.value" on:click="reset" data-testid="reset">Reiniciar</AppButton>
+<AppButton type="submit" bind:aria-busy="saving.value" label="Save" />
+<AppButton bind:disabled="!valid.value" on:click="reset" data-testid="reset">Reset</AppButton>
 ```
 
 With `id: "7"`, SSR writes, in this order, an `<a>` with `href="/about"`; another with `aria-label="Perfil"` and `href="/users/7?tab=actividad"`; an `<a>` with `target="_blank"` and `rel="noopener noreferrer"`; one with `download="informe.pdf"`; a `<button type="submit">` and a `<button>` with `data-testid="reset"`, `type="button"` and `disabled`. Hydration preserves those elements, `on:click` reaches the parent through `emit` and forwarded attributes update when they change.
@@ -848,7 +848,7 @@ With destructured props (since `1.8`), the same component's script and template 
 
 ```html
 <script lang="ts">
-// …los mismos imports y tipos…
+// …the same imports and types…
 const { to, params, search, href, target, rel, download, type = 'button', disabled = false, label = '', class: className, ...rest } = defineProps<(LinkProps | AnchorProps | ButtonProps) & ForwardedAttributes & { label?: string; class?: string }>()
 const emit = defineEmits<{ click: [event: MouseEvent] }>()
 const snippets = defineSnippets<{ default?: [] }>()
@@ -908,7 +908,7 @@ Since `1.8`, Meeko knows the values the HTML standard allows for each attribute 
 	const props = defineProps<{ kind?: AttributeValues<'button', 'type'> }>()
 </script>
 <template>
-	<button bind:type="props.kind ?? 'button'">Enviar</button>
+	<button bind:type="props.kind ?? 'button'">Send</button>
 	<details hidden="until-found">…</details>
 </template>
 ```
@@ -985,8 +985,8 @@ A component declares its events with the `defineEmits<T>()` macro, where each ke
 </script>
 <template>
 	<p>{props.title}</p>
-	<button on:click="() => emit('save', props.id)">Guardar</button>
-	<button on:click="() => emit('close')">Cerrar</button>
+	<button on:click="() => emit('save', props.id)">Save</button>
+	<button on:click="() => emit('close')">Close</button>
 </template>
 ```
 
@@ -1018,13 +1018,13 @@ Since `1.1`, a component uses the `defineModel<T>()` macro to declare a value th
 ```html
 <!-- AppInput.meeko -->
 <script lang="ts">
-	const value = defineModel<string>() // modelo por defecto
-	const open = defineModel<boolean>('open', { default: false }) // modelo con nombre, opcional
-	// Para que el modelo por defecto sea opcional: defineModel<string>({ default: "" })
+	const value = defineModel<string>() // default model
+	const open = defineModel<boolean>('open', { default: false }) // optional named model
+	// To make the default model optional: defineModel<string>({ default: "" })
 </script>
 <template>
 	<input model="value" />
-	<button on:click="() => open.value = !open.value">Opciones</button>
+	<button on:click="() => open.value = !open.value">Options</button>
 </template>
 ```
 
@@ -1075,12 +1075,12 @@ Since `1.1`, a component receives parent content in named snippets, declared wit
 ```html
 <AppDialog>
 	<p>{message.value}</p>
-	<snippet name="title">Confirmar</snippet>
+	<snippet name="title">Confirm</snippet>
 	<snippet
 		name="actions"
 		params="close"
 	>
-		<button on:click="close">Cerrar</button>
+		<button on:click="close">Close</button>
 	</snippet>
 </AppDialog>
 ```
@@ -1168,7 +1168,7 @@ Since `1.1`, a component receives parent content in named snippets, declared wit
   			[K in Extract<keyof Row, string> as `header-${K}`]?: [column: Column<Row>]
   		} & { cell?: [row: Row, column: Column<Row>, value: unknown] }
   	>()
-  	// Sobre Row, TypeScript no lee un nombre calculado: el hijo lo lee de una vista.
+  	// For Row, TypeScript cannot read a computed name: the child reads it through a view.
   	const byName = snippets as { readonly [name: string]: Snippet<never> | undefined }
   	function cellOf(column: Column<Row>): Snippet<[row: Row, value: unknown]> | undefined {
   		return byName[`cell-${column.key}`] as Snippet<[row: Row, value: unknown]> | undefined
@@ -1191,7 +1191,7 @@ Since `1.1`, a component receives parent content in named snippets, declared wit
   	</p>
   </template>
 
-  <!-- En el padre: value es string, el tipo de User['email']. -->
+  <!-- In the parent: value is string, the type of User['email']. -->
   <AppGrid
   	bind:rows="users"
   	bind:columns="columns"
@@ -1250,9 +1250,9 @@ The valueless `ref:nombre` directive names an element or component in the templa
 	}
 </script>
 <template>
-	<h2 ref:title>Buscar</h2>
+	<h2 ref:title>Search</h2>
 	<SearchBox ref:box />
-	<button on:click="reset">Limpiar</button>
+	<button on:click="reset">Clear</button>
 </template>
 ```
 
@@ -1361,7 +1361,7 @@ The first browser `await` splits setup:
 <script lang="ts">
 	const messages = signal<string[]>([])
 	const chat = await useSocket('chat', { roomId: 'general' })
-	// Desde aquí, sólo en el navegador y con el socket abierto.
+	// From here on, only in the browser with the socket open.
 	chat.on('message', (message) => {
 		messages.value = [...messages.value, message.text]
 	})
@@ -1387,9 +1387,9 @@ import { serializeJson } from '@meekojs/meeko'
 const props = { initial: 1 }
 const { html, state } = renderWithState(props)
 const payload = serializeJson({ props, state })
-// El servidor inserta html en la raíz y payload en un script JSON seguro.
+// The server inserts html into the root and payload into a safe JSON script.
 const release = hydrate(document.querySelector('#counter')!, props, state)
-// Llamar release() cuando la raíz deje de usarse.
+// Call release() when the root is no longer used.
 ```
 
 Since `1.4`, each auto-imported component also has those types with its tag name, without an import: `<AppCard>` (`app/components/App/Card.meeko`; since `1.8`, `Button/Index.meeko` is `<Button>`, see [A folder with `Index.meeko`](framework.md#folder-with-index)) gives `AppCardProps`, its props without callbacks (since `1.8`; see [Wrapping another component](#wrapping-another-component)), `AppCardEmits` (since `1.8`), `AppCardSnippets`, `AppCardModels` and `AppCardExposed`, which are exactly its `ComponentEmits`, `ComponentSnippets`, `ComponentModels` and `ComponentExposed`, including `null` (see [Types for each component](framework.md#component-types)). The `.meeko` module does not export them with that name, because the name depends on where the project auto-imports it (folder and module prefix), not the component: from an explicit import they remain `import type { ComponentSnippets as CardSnippets } from "./Card.meeko"`.
@@ -1539,24 +1539,24 @@ Content in the browser's top layer (the `popover` API), anchored to its trigger 
 		role="menu"
 		on:toggle="(event) => console.log(event.open)"
 	>
-		<snippet name="trigger">Opciones ▾</snippet>
+		<snippet name="trigger">Options ▾</snippet>
 		<button
 			role="menuitem"
 			on:click="rename"
 		>
-			Renombrar
+			Rename
 		</button>
 		<button
 			role="menuitem"
 			on:click="duplicate"
 		>
-			Duplicar
+			Duplicate
 		</button>
 		<button
 			role="menuitem"
 			on:click="remove"
 		>
-			Eliminar
+			Delete
 		</button>
 	</MeekoPopover>
 </template>
@@ -1589,7 +1589,7 @@ Meeko renders a `<button>` with `popovertarget`, `aria-expanded`, `aria-controls
 ```html
 <MeekoPopover mode="hint">
 	<snippet name="trigger">?</snippet>
-	El código está en el reverso de la tarjeta.
+	The code is on the back of the card.
 </MeekoPopover>
 ```
 
@@ -1610,7 +1610,7 @@ Meeko renders a `<button>` with `popovertarget`, `aria-expanded`, `aria-controls
 		>
 			<img
 				src="/me.png"
-				alt="Mi cuenta"
+				alt="My account"
 			/>
 		</button>
 	</snippet>
@@ -1618,7 +1618,7 @@ Meeko renders a `<button>` with `popovertarget`, `aria-expanded`, `aria-controls
 		role="menuitem"
 		href="/perfil"
 	>
-		Perfil
+		Profile
 	</a>
 </MeekoPopover>
 ```
@@ -1652,7 +1652,7 @@ An accessible select built on `<MeekoPopover>`. `model` is the value and its typ
 		id="color"
 		model="color"
 		bind:options="colors"
-		placeholder="Elige un color"
+		placeholder="Choose a color"
 		name="color"
 	/>
 
@@ -1660,7 +1660,7 @@ An accessible select built on `<MeekoPopover>`. `model` is the value and its typ
 		model="user"
 		bind:options="users.value"
 		by="id"
-		label="Responsable"
+		label="Assignee"
 	>
 		<snippet
 			name="option"
@@ -1750,10 +1750,10 @@ With `max`, as soon as `max` options are selected, the others become `aria-disab
 		by="code"
 		searchable
 		bind:filter="search"
-		placeholder="Busca una ciudad"
+		placeholder="Search for a city"
 	>
-		<snippet name="loading">Buscando…</snippet>
-		<snippet name="empty">Ninguna ciudad con ese nombre</snippet>
+		<snippet name="loading">Searching…</snippet>
+		<snippet name="empty">No city with that name</snippet>
 	</MeekoSelect>
 </template>
 ```
@@ -1765,11 +1765,11 @@ With `max`, as soon as `max` options are selected, the others become `aria-disab
 	on:submit="form.submit"
 	novalidate
 >
-	<label bind:for="form.field('country').id">País</label>
+	<label bind:for="form.field('country').id">Country</label>
 	<MeekoSelect
 		bind:field="form.field('country')"
 		bind:options="countries"
-		placeholder="Elige un país"
+		placeholder="Choose a country"
 	/>
 	<p
 		if:when="form.errors.value.country"
@@ -1777,7 +1777,7 @@ With `max`, as soon as `max` options are selected, the others become `aria-disab
 	>
 		{form.errors.value.country}
 	</p>
-	<button>Guardar</button>
+	<button>Save</button>
 </form>
 ```
 

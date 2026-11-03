@@ -77,7 +77,7 @@ Each upgrade ends as follows:
 process.once("SIGTERM", async () => {
   await sockets?.close();                                   // 1. Socket
   await new Promise<void>((done) => server.close(() => done())); // 2. HTTP
-  await app.close();                                        // 3. aplicación y sesiones
+  await app.close();                                        // 3. application and sessions
 });
 ```
 
@@ -100,7 +100,7 @@ location /_meeko/socket/ {
   proxy_set_header Upgrade $http_upgrade;
   proxy_set_header Connection "upgrade";
   proxy_set_header Host $host;
-  proxy_read_timeout 120s;   # mayor que heartbeatMs
+  proxy_read_timeout 120s;   # greater than heartbeatMs
 }
 ```
 

@@ -33,7 +33,7 @@ const count = signal(0);
 </script>
 
 <template>
-  <button type="button" on:click="() => count.value++">Pulsado {count.value} veces</button>
+  <button type="button" on:click="() => count.value++">Clicked {count.value} times</button>
 </template>
 ```
 
@@ -68,7 +68,7 @@ const user = signal<User | null>(null);
 const tags = signal<string[]>([]);
 
 user.value = { id: "1", name: "Ada" };
-tags.value = [...tags.value, "admin"]; // un array nuevo: avisa a los observadores
+tags.value = [...tags.value, "admin"]; // a new array: notifies observers
 ```
 
 ### A form control with `model`
@@ -82,9 +82,9 @@ const accepted = signal(false);
 </script>
 
 <template>
-  <input model="name" placeholder="Tu nombre">
-  <label><input type="checkbox" model="accepted"> Acepto</label>
-  <button bind:disabled="!accepted.value || !name.value.trim()">Enviar</button>
+  <input model="name" placeholder="Your name">
+  <label><input type="checkbox" model="accepted"> I accept</label>
+  <button bind:disabled="!accepted.value || !name.value.trim()">Send</button>
 </template>
 ```
 
@@ -113,8 +113,8 @@ const tab = signal(props.initial);
 </script>
 
 <template>
-  <button type="button" on:click="() => tab.value = 'perfil'" bind:aria-pressed="String(tab.value === 'perfil')">Perfil</button>
-  <button type="button" on:click="() => tab.value = 'actividad'" bind:aria-pressed="String(tab.value === 'actividad')">Actividad</button>
+  <button type="button" on:click="() => tab.value = 'perfil'" bind:aria-pressed="String(tab.value === 'perfil')">Profile</button>
+  <button type="button" on:click="() => tab.value = 'actividad'" bind:aria-pressed="String(tab.value === 'actividad')">Activity</button>
 </template>
 ```
 

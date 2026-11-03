@@ -67,12 +67,12 @@ Throws:
 For a single account, without a database, the hash goes in an environment variable. `meeko auth hash` computes it without displaying the password:
 
 ```sh
-npx meeko auth hash                          # la pide dos veces, sin mostrarla
-printf '%s' "$PASSWORD" | npx meeko auth hash  # o la lee de stdin
+npx meeko auth hash                          # prompts for it twice, without displaying it
+printf '%s' "$PASSWORD" | npx meeko auth hash  # or reads it from stdin
 ```
 
 ```sh
-# .env (no versionado)
+# .env (unversioned)
 ADMIN_PASSWORD_HASH=scrypt$131072$8$1$…
 ```
 
@@ -122,7 +122,7 @@ import { hashPassword } from "@meekojs/meeko/password";
 ### Compare hashes with `===`
 
 ```ts bad
-const ok = (await hashPassword(input.password)) === user.passwordHash; // siempre false
+const ok = (await hashPassword(input.password)) === user.passwordHash; // always false
 ```
 
 The salt is random: two hashes of the same password never match, and the comparison is not constant-time.
@@ -144,7 +144,7 @@ await hashPassword("");
 <!-- no-check -->
 
 ```ts good
-const signupInput = v.object({ password: v.pipe(v.string(), v.minLength(12, "Usa al menos 12 caracteres."), v.maxLength(1024)) });
+const signupInput = v.object({ password: v.pipe(v.string(), v.minLength(12, "Use at least 12 characters."), v.maxLength(1024)) });
 ```
 
 ## Notes

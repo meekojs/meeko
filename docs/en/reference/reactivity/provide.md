@@ -95,7 +95,7 @@ import { createContext, createRoot, inject, provide } from "@meekojs/meeko";
 const localeKey = createContext<string>("locale");
 const value = createRoot(() => {
   provide(localeKey, "es");
-  return createRoot(() => inject(localeKey)); // una raíz hija lo encuentra
+  return createRoot(() => inject(localeKey)); // a child root finds it
 });
 // value === "es"
 ```
@@ -105,7 +105,7 @@ const value = createRoot(() => {
 ### Call it outside a component's script
 
 ```ts bad
-// app/utils/setup.ts, evaluado al importar
+// app/utils/setup.ts, evaluated on import
 provide(localeKey, "es");
 ```
 
@@ -130,7 +130,7 @@ provide(localeKey, "es");
 `<Content>` throws `Error: Missing Meeko context: panel`. Provide in the common ancestor:
 
 ```html good
-<!-- el componente que contiene a los dos llama a provide(panelKey, …) -->
+<!-- the component containing both calls provide(panelKey, …) -->
 <Sidebar />
 <Content />
 ```

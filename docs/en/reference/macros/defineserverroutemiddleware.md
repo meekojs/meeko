@@ -87,7 +87,7 @@ Without options, it runs on all routes with server data:
 import { defineServerRouteMiddleware } from "@meekojs/meeko/framework";
 
 export default defineServerRouteMiddleware(({ requestId, url, context }) => {
-  console.info(`[${requestId}] ${url.pathname} desde ${context.clientAddress ?? "desconocida"}`);
+  console.info(`[${requestId}] ${url.pathname} from ${context.clientAddress ?? "unknown"}`);
 });
 ```
 

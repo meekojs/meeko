@@ -27,10 +27,10 @@ source-hash: 4cfc4ecc6f3979f7d50632583f1323cc61dae12d82d91e987960520159d3acdc
 An extra prop did not fail at runtime, so this change is an [approved exception](stability.md#approved-exceptions) to stability policy. To fix it, remove the prop or declare it in the child's `defineProps`:
 
 ```html
-<!-- Antes: "size" no existe en las props de Card y 1.0 lo aceptaba -->
+<!-- Before: "size" is not in Card's props and 1.0 accepted it -->
 <component is="Card" bind:title="title" bind:size="'lg'"></component>
 
-<!-- Después -->
+<!-- After -->
 <component is="Card" bind:title="title"></component>
 ```
 
@@ -56,10 +56,10 @@ Failures in an `onMounted` callback and a setup's browser continuation after `aw
 If you need the literal attribute, write it with `bind:model` or `bind:html`, which still write the attribute:
 
 ```html
-<!-- Antes: atributo HTML model="draft" -->
+<!-- Before: atributo HTML model="draft" -->
 <div model="draft"></div>
 
-<!-- Después -->
+<!-- After -->
 <div bind:model="'draft'"></div>
 ```
 
@@ -81,10 +81,10 @@ Review top-level setup in those pages and layouts: an `api.*` request, external 
 
 ```html
 <script lang="ts">
-// Antes: se ejecuta también en el render previo de cada navegación
+// Before: also runs in the render before each navigation
 void api.analytics.post({ body: { page: "users" } });
 
-// Después: sólo en el navegador, una vez montada la página
+// After: only in the browser, once the page is mounted
 onMounted(() => {
   void api.analytics.post({ body: { page: "users" } });
 });
@@ -115,11 +115,11 @@ See [Navigation and `render: "client"`](framework.md#navigation-and-render-clien
 `useSocket(url, contract, options)` from `@meekojs/meeko/framework` is deprecated and will be removed in `2.0`. It is the same function as `useSocketClient`, with the same signature and types, so simply change the import:
 
 ```ts
-// Antes
+// Before
 import { useSocket } from "@meekojs/meeko/framework";
 const chat = useSocket("wss://example.com/_meeko/socket/chat", chatContract);
 
-// Después
+// After
 import { useSocketClient } from "@meekojs/meeko/framework";
 const chat = useSocketClient("wss://example.com/_meeko/socket/chat", chatContract);
 ```
@@ -143,7 +143,7 @@ if (upgrade.action === "pass") return app.fetch(request);
 if (upgrade.action === "reject" && !upgrade.close) return new Response(null, { status: upgrade.status });
 const { socket, response } = Deno.upgradeWebSocket(request);
 socket.onopen = () => {
-  // Deno corta la conexión sin el frame de cierre si lee un mensaje mientras cierra: se cierra tras un tick.
+  // Deno drops the connection without a close frame if it reads a message while closing: close after one tick.
   if (upgrade.action === "reject") { setTimeout(() => socket.close(upgrade.close?.code, upgrade.close?.reason), 0); return; }
   const session = upgrade.open({ send: (message) => socket.send(message), close: (code, reason) => socket.close(code, reason) });
   socket.onmessage = (event) => session.receive(event.data);

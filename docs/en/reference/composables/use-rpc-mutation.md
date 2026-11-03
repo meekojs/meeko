@@ -40,7 +40,7 @@ async function save(): Promise<void> {
 
 <template>
   <input model="name">
-  <button type="button" bind:disabled="rename.pending.value" on:click="save">Guardar</button>
+  <button type="button" bind:disabled="rename.pending.value" on:click="save">Save</button>
   <p if:when="rename.error.value" role="alert">{rename.error.value.message}</p>
 </template>
 ```
@@ -88,8 +88,8 @@ async function save(name: string): Promise<void> {
 ```html
 <script lang="ts">
 const rename = useRpcMutation("users.rename", {
-  onSuccess: (user) => notify(`Guardado como ${user.name}.`),
-  onError: (error) => notify(isClientError(error) ? "El nombre no es válido." : "No se pudo conectar."),
+  onSuccess: (user) => notify(`Saved como ${user.name}.`),
+  onError: (error) => notify(isClientError(error) ? "The name is invalid." : "Could not connect."),
 });
 </script>
 ```
@@ -107,20 +107,20 @@ async function pay(input: SaleInput): Promise<void> {
   try {
     await charge.mutate(input);
   } catch (error) {
-    // Sin respuesta: queda en verificación y se reintentará con la misma clave.
+    // No response: remains uncertain and will retry with the same key.
     if (!charge.uncertain.value) failure.value = error instanceof Error ? error.message : String(error);
   }
 }
 function discard(): void {
-  if (window.confirm("Descarta esta venta sólo si comprobaste que no se registró.")) charge.discard();
+  if (window.confirm("Discard this sale only if you have confirmed it was not recorded.")) charge.discard();
 }
 </script>
 
 <template>
   <div role="alert" if:when="charge.uncertain.value">
-    <p>Venta en verificación: se reintentará con la misma clave, así que no se cobrará dos veces.</p>
-    <button bind:disabled="charge.pending.value" on:click="() => charge.retry().catch(() => {})">Reintentar ahora</button>
-    <button on:click="discard">Descartar</button>
+    <p>Sale pending verification: it will retry with the same key, so it will not charge twice.</p>
+    <button bind:disabled="charge.pending.value" on:click="() => charge.retry().catch(() => {})">Retry now</button>
+    <button on:click="discard">Discard</button>
   </div>
   <p if:when="failure.value">{failure.value}</p>
 </template>
@@ -176,14 +176,14 @@ const save = () => rename.mutate({ id: String(user.id), name: "Ada" });
 ### An unhandled rejection
 
 ```html bad
-<button on:click="() => rename.mutate({ id, name: name.value })">Guardar</button>
+<button on:click="() => rename.mutate({ id, name: name.value })">Save</button>
 ```
 
 If the server responds with an error, the promise rejects; the handler delivers it to the nearest `provideErrorHandler` (source `"event"`) and `rename.error` reflects it. To handle the error there, catch it:
 
 ```html good
-<button on:click="() => rename.mutate({ id, name: name.value }).catch(() => {})">Guardar</button>
-<p if:when="rename.error.value" role="alert">No se pudo guardar.</p>
+<button on:click="() => rename.mutate({ id, name: name.value }).catch(() => {})">Save</button>
+<p if:when="rename.error.value" role="alert">Could not save.</p>
 ```
 
 ## Notes

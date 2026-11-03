@@ -50,7 +50,7 @@ import { accentKey } from "../plugins/theme";
 const accent = inject(accentKey);
 </script>
 
-<template><span bind:data-accent="accent.value">Acento</span></template>
+<template><span bind:data-accent="accent.value">Accent</span></template>
 ```
 
 ## Parameters

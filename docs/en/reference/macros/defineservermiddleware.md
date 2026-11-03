@@ -153,7 +153,7 @@ const ip = request.headers.get("x-forwarded-for")?.split(",")[0];
 <!-- no-check -->
 
 ```ts good
-const ip = clientAddress(request); // aplica MEEKO_TRUST_PROXY
+const ip = clientAddress(request); // applies MEEKO_TRUST_PROXY
 ```
 
 ## Notes

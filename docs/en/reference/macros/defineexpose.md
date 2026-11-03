@@ -32,7 +32,7 @@ function clear(): void {
 defineExpose({ query, clear });
 </script>
 
-<template><input ref:input type="search" model="query" aria-label="Buscar"></template>
+<template><input ref:input type="search" model="query" aria-label="Search"></template>
 ```
 
 ```html
@@ -43,8 +43,8 @@ const box = useElementRef("box");
 
 <template>
   <SearchBox ref:box />
-  <button type="button" on:click="() => box.value?.clear()">Limpiar</button>
-  <p>Buscando: {box.value?.query.value ?? ""}</p>
+  <button type="button" on:click="() => box.value?.clear()">Clear</button>
+  <p>Searching: {box.value?.query.value ?? ""}</p>
 </template>
 ```
 
@@ -82,7 +82,7 @@ defineExpose({
 <template>
   <dialog ref:dialog>
     <render snippet="snippets.default" />
-    <form method="dialog"><button>Cerrar</button></form>
+    <form method="dialog"><button>Close</button></form>
   </dialog>
 </template>
 ```
@@ -93,8 +93,8 @@ const confirm = useElementRef("confirm");
 </script>
 
 <template>
-  <button type="button" on:click="() => confirm.value?.open()">Borrar</button>
-  <ConfirmDialog ref:confirm><p>¿Borrar la nota?</p></ConfirmDialog>
+  <button type="button" on:click="() => confirm.value?.open()">Delete</button>
+  <ConfirmDialog ref:confirm><p>Delete the note?</p></ConfirmDialog>
 </template>
 ```
 

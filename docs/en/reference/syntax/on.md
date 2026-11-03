@@ -38,7 +38,7 @@ function increment(): void {
 
 <template>
   <button type="button" on:click="increment">{count.value}</button>
-  <input on:input="(event) => query.value = event.currentTarget.value" aria-label="Buscar">
+  <input on:input="(event) => query.value = event.currentTarget.value" aria-label="Search">
 </template>
 ```
 
@@ -65,7 +65,7 @@ There are no modifiers such as `.prevent` or `.once`: call `event.preventDefault
 
 ```html
 <script lang="ts">
-const items = signal(["Té", "Café", "Agua"]);
+const items = signal(["Tea", "Coffee", "Water"]);
 const active = signal(0);
 function onKey(event: KeyboardEvent): void {
   if (event.key === "ArrowDown") active.value = Math.min(active.value + 1, items.value.length - 1);
@@ -76,7 +76,7 @@ function onKey(event: KeyboardEvent): void {
 </script>
 
 <template>
-  <ul role="listbox" tabindex="0" aria-label="Bebidas" on:keydown="onKey">
+  <ul role="listbox" tabindex="0" aria-label="Drinks" on:keydown="onKey">
     <li each:of="items.value" each:as="item" each:index="i" role="option" bind:aria-selected="i === active.value ? 'true' : 'false'">{item}</li>
   </ul>
 </template>
@@ -90,7 +90,7 @@ An `async` handler can await; if it fails, the error reaches the component's obs
 <script lang="ts">
 const saving = signal(false);
 provideErrorHandler((error, source) => {
-  console.error(`Fallo en ${source}`, error);
+  console.error(`Failure in ${source}`, error);
 });
 async function save(event: SubmitEvent): Promise<void> {
   event.preventDefault();
@@ -106,8 +106,8 @@ async function save(event: SubmitEvent): Promise<void> {
 
 <template>
   <form on:submit="save">
-    <textarea name="text" aria-label="Nota"></textarea>
-    <button bind:disabled="saving.value">Guardar</button>
+    <textarea name="text" aria-label="Note"></textarea>
+    <button bind:disabled="saving.value">Save</button>
   </form>
 </template>
 ```
@@ -125,8 +125,8 @@ const emit = defineEmits<{ save: [id: number]; close: [] }>();
 
 <template>
   <p>{props.title}</p>
-  <button type="button" on:click="() => emit('save', props.id)">Guardar</button>
-  <button type="button" on:click="() => emit('close')">Cerrar</button>
+  <button type="button" on:click="() => emit('save', props.id)">Save</button>
+  <button type="button" on:click="() => emit('close')">Close</button>
 </template>
 ```
 

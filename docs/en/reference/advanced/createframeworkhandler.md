@@ -30,7 +30,7 @@ import { createFrameworkHandler } from "@meekojs/meeko/server";
 import type { PageModule } from "@meekojs/meeko/server";
 
 const hello: PageModule = {
-  renderWithState: (props) => ({ html: `<h1>Hola, ${String((props.params as Record<string, string>).name)}</h1>`, state: {} }),
+  renderWithState: (props) => ({ html: `<h1>Hello, ${String((props.params as Record<string, string>).name)}</h1>`, state: {} }),
 };
 
 const handlePage = createFrameworkHandler({
@@ -82,8 +82,8 @@ import { createFrameworkHandler } from "@meekojs/meeko/server";
 import type { PageModule, PageRoute } from "@meekojs/meeko/server";
 
 const page = (html: string): PageModule => ({ renderWithState: () => ({ html, state: {} }) });
-const pages: Record<string, PageModule> = { "app/pages/index.meeko": page("<h1>Inicio</h1>") };
-const sidecars: Record<string, PageRoute> = { "app/pages/index.route.ts": { head: () => ({ title: "Inicio" }) } };
+const pages: Record<string, PageModule> = { "app/pages/index.meeko": page("<h1>Home</h1>") };
+const sidecars: Record<string, PageRoute> = { "app/pages/index.route.ts": { head: () => ({ title: "Home" }) } };
 
 const handlePage = createFrameworkHandler({
   routes: [{ id: "/", file: "app/pages/index.meeko", layouts: [], sidecar: "app/pages/index.route.ts" }],
@@ -118,7 +118,7 @@ const handlePage = createFrameworkHandler({
 ### A route with named middleware but no loader
 
 ```ts bad
-createFrameworkHandler({ routes, loadPage });   // una ruta declara middleware: ["auth"]
+createFrameworkHandler({ routes, loadPage });   // a route declares middleware: ["auth"]
 ```
 
 The request to that route fails instead of skipping middleware, because middleware protecting a route is never silently ignored: it responds with `500 Internal Server Error` and `onError` receives `Route / has named middleware (/app/middleware/auth.ts) but no loadNamedMiddleware to load it`.

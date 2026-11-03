@@ -55,7 +55,7 @@ Sitemap: https://example.com/sitemap.xml
 ```
 
 ```html
-<!-- /docs/api con document.seo -->
+<!-- /docs/api with document.seo -->
 <link rel="canonical" href="https://example.com/docs/api">
 ```
 
@@ -115,13 +115,13 @@ export default defineMeekoConfig({ site: "https://example.com" });
 ### Expect `site` to fix `Origin` checks
 
 ```text bad
-site: "https://example.com" y la aplicación tras un proxy TLS, sin MEEKO_PUBLIC_ORIGIN al ejecutarse
+site: "https://example.com" and the application behind a TLS proxy, without MEEKO_PUBLIC_ORIGIN at runtime
 ```
 
 Mutations (with a session and, since `1.8`, also without one) respond with `403 INVALID_ORIGIN`: `site` is only used during the build. The origin for security checks is set at runtime.
 
 ```text good
-MEEKO_PUBLIC_ORIGIN=https://example.com al arrancar el servidor
+MEEKO_PUBLIC_ORIGIN=https://example.com when starting the server
 ```
 
 ## Notes

@@ -84,7 +84,7 @@ createServer((req, res) => {
 import { createServer } from "node:http";
 import { toNodeListener } from "@meekojs/meeko/node";
 
-export const server = createServer(toNodeListener((request) => new Response(`Hola desde ${new URL(request.url).pathname}`)));
+export const server = createServer(toNodeListener((request) => new Response(`Hello from ${new URL(request.url).pathname}`)));
 ```
 
 ## Common mistakes
@@ -106,7 +106,7 @@ toNodeListener(handler, { publicOrigin: "https://example.com" });
 ### Trust the `Host` header behind a proxy
 
 ```ts bad
-createServer(toNodeListener((request) => app.fetch(request))); // tras un proxy TLS
+createServer(toNodeListener((request) => app.fetch(request))); // behind a TLS proxy
 ```
 
 Without `publicOrigin`, the URL comes from `Host` and the socket (`http://`), so the application does not recognize the browser's `https://` `Origin` and responds to mutations with `403 INVALID_ORIGIN`. `createServerApp` also accepts `publicOrigin` or `MEEKO_PUBLIC_ORIGIN`.
@@ -120,7 +120,7 @@ createServer(toNodeListener((request) => app.fetch(request), { publicOrigin: pro
 ### Forget Socket
 
 ```ts bad
-createServer(toNodeListener((request) => app.fetch(request))).listen(3000); // la aplicación tiene server/socket
+createServer(toNodeListener((request) => app.fetch(request))).listen(3000); // the application has server/socket
 ```
 
 There is no startup error, but nothing handles upgrades and the client retries forever. `toNodeListener` only handles HTTP.

@@ -63,7 +63,7 @@ export default defineMeekoConfig({
     contentSecurityPolicy: {
       "default-src": ["'self'"],
       "script-src": ["'self'"],
-      "style-src": ["'self'", "'unsafe-inline'"], // atributos style="…" de un resaltador
+      "style-src": ["'self'", "'unsafe-inline'"], // style="…" attributes from a highlighter
       "object-src": ["'none'"],
       "base-uri": ["'none'"],
       "frame-ancestors": ["'none'"],
@@ -102,7 +102,7 @@ import { contentSecurityPolicy } from "@meekojs/meeko/server";
 
 const html = await (await fetch("http://127.0.0.1:4173/docs")).text();
 const { hashes, unhashable } = inlineScriptHashes(html);
-if (unhashable.length) throw new Error(`JavaScript que un hash no permite: ${unhashable.join(", ")}`);
+if (unhashable.length) throw new Error(`JavaScript that a hash cannot allow: ${unhashable.join(", ")}`);
 const header = contentSecurityPolicy({ "default-src": ["'self'"] }, hashes, inlineStyleHashes(html));
 ```
 

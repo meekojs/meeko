@@ -31,7 +31,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <input ref:input type="search" aria-label="Buscar">
+  <input ref:input type="search" aria-label="Search">
 </template>
 ```
 
@@ -69,7 +69,7 @@ function clear(): void {
 defineExpose({ query, clear });
 </script>
 
-<template><input type="search" model="query" aria-label="Buscar"></template>
+<template><input type="search" model="query" aria-label="Search"></template>
 ```
 
 ```html
@@ -83,7 +83,7 @@ function reset(): void {
 
 <template>
   <SearchBox ref:box />
-  <button type="button" on:click="reset">Limpiar</button>
+  <button type="button" on:click="reset">Clear</button>
 </template>
 ```
 
@@ -93,7 +93,7 @@ A single `ref:` inside `each:of` names all rows:
 
 ```html
 <script lang="ts">
-const items = signal(["Té", "Café", "Agua"]);
+const items = signal(["Tea", "Coffee", "Water"]);
 const rows = useElementRef("row");
 function focusLast(): void {
   rows.value.at(-1)?.focus();
@@ -104,7 +104,7 @@ function focusLast(): void {
   <ul>
     <li each:of="items.value" each:as="item" ref:row tabindex="-1">{item}</li>
   </ul>
-  <button type="button" on:click="focusLast">Ir al último</button>
+  <button type="button" on:click="focusLast">Go to last</button>
 </template>
 ```
 
@@ -133,13 +133,13 @@ The template cannot read `observer`, declared after `await`, but it can read `wi
 ### Give it a value
 
 ```html bad
-<h2 ref:title="heading">Buscar</h2>
+<h2 ref:title="heading">Search</h2>
 ```
 
 `MEEK052: ref:title no lleva valor; escribe ref:title`.
 
 ```html good
-<h2 ref:title>Buscar</h2>
+<h2 ref:title>Search</h2>
 ```
 
 ### Write `ref="x"` as in Vue
@@ -147,27 +147,27 @@ The template cannot read `observer`, declared after `await`, but it can read `wi
 `ref="x"` is a literal HTML attribute, not the directive.
 
 ```html bad
-<h2 ref="title">Buscar</h2>
+<h2 ref="title">Search</h2>
 ```
 
 With `useElementRef("title")` in the script, `meeko check` reports `MEEK056: La plantilla no tiene ref:title; añade ref:title a un elemento o a un componente`. On a component, `ref="x"` produces `MEEK032`.
 
 ```html good
-<h2 ref:title>Buscar</h2>
+<h2 ref:title>Search</h2>
 ```
 
 ### The same name in two places
 
 ```html bad
-<h2 ref:title>Buscar</h2>
-<p ref:title>Resultados</p>
+<h2 ref:title>Search</h2>
+<p ref:title>Results</p>
 ```
 
 `MEEK053: ref:title ya se usa en la línea 1; una ref nombra un solo lugar de la plantilla (las filas de each:of la comparten)`. Two `ref:` directives on the same element produce `MEEK052: Un elemento o componente admite una sola directiva ref:`.
 
 ```html good
-<h2 ref:title>Buscar</h2>
-<p ref:results>Resultados</p>
+<h2 ref:title>Search</h2>
+<p ref:results>Results</p>
 ```
 
 ### A `ref:` inside a component's content
@@ -175,13 +175,13 @@ With `useElementRef("title")` in the script, `meeko check` reports `MEEK056: La 
 A component tag's content is a snippet, which the child can render multiple times.
 
 ```html bad
-<AppDialog><p ref:body>Texto</p></AppDialog>
+<AppDialog><p ref:body>Text</p></AppDialog>
 ```
 
 `MEEK052: ref: no se admite dentro del contenido de <snippet>, que el hijo puede renderizar cualquier número de veces`.
 
 ```html good
-<AppDialog ref:dialog><p>Texto</p></AppDialog>
+<AppDialog ref:dialog><p>Text</p></AppDialog>
 ```
 
 Put `ref:` on the component and let it expose what you need, or on an element outside it.
@@ -189,13 +189,13 @@ Put `ref:` on the component and let it expose what you need, or on an element ou
 ### A name that is not an identifier
 
 ```html bad
-<h2 ref:main-title>Buscar</h2>
+<h2 ref:main-title>Search</h2>
 ```
 
 `MEEK052: Nombre de ref no válido: "main-title"; usa un identificador, como ref:input`.
 
 ```html good
-<h2 ref:mainTitle>Buscar</h2>
+<h2 ref:mainTitle>Search</h2>
 ```
 
 ## Notes

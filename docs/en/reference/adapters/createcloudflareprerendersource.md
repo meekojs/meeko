@@ -66,8 +66,8 @@ export const route = definePage({ render: "prerender", head: () => ({ title: "Pr
 `meeko build --adapter cloudflare` renders it in Node and writes it to `assets/_meeko/prerender/`. In production:
 
 ```text
-GET /precios (sin sesión) → el HTML del build, ETag, cache-control: public, max-age=0, must-revalidate
-GET /precios (con sesión) → el mismo HTML con <meta name="meeko-csrf-token">, cache-control: private, no-store
+GET /precios (without a session) → build HTML, ETag, cache-control: public, max-age=0, must-revalidate
+GET /precios (with a session) → the same HTML with <meta name="meeko-csrf-token">, cache-control: private, no-store
 ```
 
 ### CSP with hashes (since 1.7)
@@ -102,7 +102,7 @@ createCloudflarePrerenderSource({ binding: env.ASSETS, directory: "/_meeko/prere
 ### An index listing a page that was not uploaded
 
 ```text bad
-assets/_meeko/prerender/manifest.json desplegado sin assets/_meeko/prerender/precios/index.html
+assets/_meeko/prerender/manifest.json deployed without assets/_meeko/prerender/precios/index.html
 ```
 
 The `/precios` request responds with `500` and `onError` receives `Error: Missing prerendered file /_meeko/prerender/…`. Deploy the complete output.

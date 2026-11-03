@@ -94,7 +94,7 @@ This is what `attachNodeWebSocketServer` does.
 
 ```ts
 server.on("upgrade", async (incoming, socket, head) => {
-  if (await handleUpgrade(incoming, socket, head)) return; // un canal de Meeko
+  if (await handleUpgrade(incoming, socket, head)) return; // a Meeko channel
   if (incoming.url?.startsWith("/graphql")) return graphqlWs.handleUpgrade(incoming, socket, head);
   socket.destroy();
 });

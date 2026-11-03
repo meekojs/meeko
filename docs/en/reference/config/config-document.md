@@ -34,8 +34,8 @@ export default defineMeekoConfig({
   document: {
     lang: "es",
     head: {
-      title: "Mi tienda",            // páginas sin título propio
-      titleTemplate: "%s · Mi tienda",
+      title: "My store",            // pages without their own title
+      titleTemplate: "%s · My store",
       link: [{ rel: "icon", href: "/favicon.svg", type: "image/svg+xml" }],
       meta: [{ name: "theme-color", content: "#0f172a" }],
     },
@@ -65,10 +65,10 @@ export default defineMeekoConfig({
 With `seo: true` and `site: "https://example.com"`, a `/docs/api` page titled “API” receives:
 
 ```html
-<title>API · Mi tienda</title>
+<title>API · My store</title>
 <link rel="canonical" href="https://example.com/docs/api">
 <meta property="og:url" content="https://example.com/docs/api">
-<meta property="og:title" content="API · Mi tienda">
+<meta property="og:title" content="API · My store">
 ```
 
 `canonical` does not include the query string, and error pages receive neither `canonical` nor `og:url`.
@@ -113,14 +113,14 @@ export default defineMeekoConfig({ document: { idPrefix: "shop" } });
 ### A function in `titleTemplate`
 
 ```ts bad
-export default defineMeekoConfig({ document: { head: { titleTemplate: (title: string) => `${title} · Mi tienda` } } as never });
+export default defineMeekoConfig({ document: { head: { titleTemplate: (title: string) => `${title} · My store` } } as never });
 ```
 
 `document` is fixed at build time and ends up in HTML: `meeko check` reports a type error and `meeko dev`, `meeko build` and `meeko routes` stop with `…/meeko.config.ts: document.head: titleTemplate must be a string here, since it is serialized`.
 
 ```ts good
 import { defineMeekoConfig } from "@meekojs/meeko/framework";
-export default defineMeekoConfig({ document: { head: { titleTemplate: "%s · Mi tienda" } } });
+export default defineMeekoConfig({ document: { head: { titleTemplate: "%s · My store" } } });
 ```
 
 ### The theme inside `document`
@@ -139,7 +139,7 @@ export default defineMeekoConfig({ theme: { themes: ["light", "dark"] } });
 ### `seo` without an origin
 
 ```ts bad
-export default defineMeekoConfig({ document: { seo: true } }); // sin site ni MEEKO_PUBLIC_ORIGIN
+export default defineMeekoConfig({ document: { seo: true } }); // without site or MEEKO_PUBLIC_ORIGIN
 ```
 
 `meeko build` stops before compilation with `document.seo (canonical y og:url) necesita la URL pública del sitio: declara site en meeko.config.ts (site: "https://example.com") o define MEEKO_PUBLIC_ORIGIN al construir`. In `meeko dev` without an origin, those two tags are not written.

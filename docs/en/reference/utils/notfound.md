@@ -73,9 +73,9 @@ const props = defineProps<{ status: number; message: string }>();
 </script>
 
 <template>
-  <h1 if:when="props.status === 404">Ese usuario no existe</h1>
-  <h1 if:when="props.status !== 404">Algo ha fallado ({props.message})</h1>
-  <MeekoLink to="/">Volver al inicio</MeekoLink>
+  <h1 if:when="props.status === 404">That user does not exist</h1>
+  <h1 if:when="props.status !== 404">Something went wrong ({props.message})</h1>
+  <MeekoLink to="/">Back to home</MeekoLink>
 </template>
 ```
 

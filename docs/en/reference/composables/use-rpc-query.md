@@ -36,8 +36,8 @@ const activity = await useRpcQuery("users.activity", () => ({ id: props.params.i
 </script>
 
 <template>
-  <button type="button" on:click="() => tab.value = 'comments'">Comentarios</button>
-  <p>{activity.data.value.length} eventos</p>
+  <button type="button" on:click="() => tab.value = 'comments'">Comments</button>
+  <p>{activity.data.value.length} events</p>
 </template>
 ```
 
@@ -85,8 +85,8 @@ Each change cancels the in-flight request; with fewer than two letters, nothing 
 <!-- no-check -->
 
 ```ts
-// En el <script> de app/components/Stats.meeko
-const stats = await useRpcQuery("stats.summary"); // el schema acepta {}: envía {}
+// In the <script> of app/components/Stats.meeko
+const stats = await useRpcQuery("stats.summary"); // the schema accepts {}: sends {}
 ```
 
 ### Multiple resources in one region
@@ -99,8 +99,8 @@ const totals = useRpcQuery("stats.summary");
 
 <template>
   <MeekoAwait for="[users, totals]" reserve>
-    <snippet name="pending"><p>Cargando…</p></snippet>
-    <p>{users.data.value.length} usuarios, {totals.data.value.orders} pedidos</p>
+    <snippet name="pending"><p>Loading…</p></snippet>
+    <p>{users.data.value.length} users, {totals.data.value.orders} orders</p>
   </MeekoAwait>
 </template>
 ```
@@ -117,7 +117,7 @@ const page = signal(1);
 const list = useRpcQuery("users.page", { page });
 </script>
 
-<template><button type="button" on:click="() => page.value++">Más</button></template>
+<template><button type="button" on:click="() => page.value++">More</button></template>
 ```
 
 ## Common mistakes

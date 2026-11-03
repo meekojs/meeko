@@ -73,7 +73,7 @@ export default defineMeekoConfig({ dev: { serverLogs: false } });
 ### Exposing the HMR port through a tunnel
 
 ```sh bad
-cloudflared tunnel --url http://127.0.0.1:$MEEKO_HMR_PORT   # el WebSocket de HMR de Meeko
+cloudflared tunnel --url http://127.0.0.1:$MEEKO_HMR_PORT   # Meeko's HMR WebSocket
 ```
 
 Anyone who connects to the HMR WebSocket receives logs for all requests, like a local tab. Expose only the application port, or disable `serverLogs`.

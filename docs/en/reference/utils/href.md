@@ -68,7 +68,7 @@ if (!context.session.current) redirect(href("/login", { search: { next: "/orders
 export const ready = true;
 </script>
 
-<template><h1>Nuevo pedido</h1></template>
+<template><h1>New order</h1></template>
 ```
 
 ### Copy an absolute link
@@ -84,7 +84,7 @@ async function copyLink(): Promise<void> {
 }
 </script>
 
-<template><button type="button" on:click="copyLink">Copiar enlace</button></template>
+<template><button type="button" on:click="copyLink">Copy link</button></template>
 ```
 
 ### In a unit test, with the manifest
@@ -152,7 +152,7 @@ href("/docs/[...slug]", { params: { slug: "equipo/ana" } });
 ### Call it outside an application
 
 ```ts bad
-// scripts/sitemap.ts, ejecutado con node
+// scripts/sitemap.ts, run with node
 const url = href("/users/[id]", { params: { id: "1" } });
 ```
 

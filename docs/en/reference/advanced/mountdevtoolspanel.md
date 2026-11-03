@@ -128,7 +128,7 @@ if (import.meta.env.DEV) {
 ### Call it on the server
 
 ```ts bad
-// app/plugins/devtools.ts (sin .client), que también se ejecuta en el SSR
+// app/plugins/devtools.ts (without .client), which also runs during SSR
 export default definePlugin(async () => {
   const { mountDevtoolsPanel } = await import("@meekojs/meeko/devtools-ui");
   mountDevtoolsPanel();

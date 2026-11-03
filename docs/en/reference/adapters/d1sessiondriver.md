@@ -87,9 +87,9 @@ CREATE INDEX IF NOT EXISTS "meeko_rate_limits_window_ends_at" ON "meeko_rate_lim
 
 ```sh
 npx wrangler d1 migrations create mi-app meeko_sessions
-# copie D1SessionDriver.schema() y D1SessionDriver.rateLimitSchema() en el archivo creado
-npx wrangler d1 migrations apply mi-app --local    # para wrangler dev / meeko preview
-npx wrangler d1 migrations apply mi-app --remote   # antes de desplegar
+# copy D1SessionDriver.schema() and D1SessionDriver.rateLimitSchema() into the created file
+npx wrangler d1 migrations apply mi-app --local    # for wrangler dev / meeko preview
+npx wrangler d1 migrations apply mi-app --remote   # before deploying
 ```
 
 ```ts
@@ -133,7 +133,7 @@ export default defineApiRoute({
   body: loginInput,
   response: okResult,
   origin: "required",
-  rateLimit: { limit: 5, window: "5m" }, // contado en D1, igual en todos los aislados
+  rateLimit: { limit: 5, window: "5m" }, // counted in D1, the same across all isolates
   handler: async ({ body, context }) => { /* … */ },
 });
 ```
@@ -157,7 +157,7 @@ new D1SessionDriver(env.DB, { table: "app_sessions" });
 ### No binding (or during prerendering)
 
 ```ts bad
-new SqlSessionStore(new D1SessionDriver(env.DB!)); // también durante meeko build
+new SqlSessionStore(new D1SessionDriver(env.DB!)); // also during meeko build
 ```
 
 Prerendering runs in Node without bindings: the factory throws `TypeError: D1SessionDriver requires a D1 database binding` and `meeko build` prerendering fails. In production, also check that `wrangler.jsonc` declares the binding.
@@ -171,7 +171,7 @@ const store = prerendering || !env.DB ? new MemorySessionStore() : new SqlSessio
 ### Deploy without applying the migration
 
 ```text bad
-npx wrangler deploy sin npx wrangler d1 migrations apply --remote
+npx wrangler deploy without npx wrangler d1 migrations apply --remote
 ```
 
 Each session read fails with D1's `no such table: meeko_sessions` error and the request responds with `500`: the store never grants access without the table.
@@ -183,13 +183,13 @@ npx wrangler d1 migrations apply mi-app --remote && npx wrangler deploy --config
 ### Use Workers KV
 
 ```text bad
-Un SessionStore sobre Workers KV
+A SessionStore over Workers KV
 ```
 
 KV has neither atomic comparison operations nor family deletion, and is eventually consistent: it cannot guarantee `replace` or `revokeFamily`, and `SessionManager({ production: true })` rejects a store lacking them (`Persistent session storage with atomic rotation and family revocation is required in production`).
 
 ```text good
-SqlSessionStore(new D1SessionDriver(env.DB)) o RedisSessionStore sobre la API REST de Upstash
+SqlSessionStore(new D1SessionDriver(env.DB)) or RedisSessionStore over the Upstash REST API
 ```
 
 ## Notes

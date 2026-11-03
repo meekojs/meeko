@@ -32,7 +32,7 @@ An unawaited promise, a throwing `setTimeout` or a library callback lies outside
 <!-- no-check -->
 
 ```ts
-// server.ts de un host propio en Bun
+// server.ts for a custom Bun host
 import { createServerApp, handleProcessErrors } from "@meekojs/meeko/server";
 import { createBunServer } from "@meekojs/meeko/bun";
 
@@ -94,7 +94,7 @@ const release = handleProcessErrors(app, {
   close: () => new Promise<void>((done) => server.close(() => done())).then(() => app.close()),
   shutdownTimeout: 20_000,
 });
-// En las pruebas: release() retira los listeners.
+// In tests: release() removes the listeners.
 ```
 
 ### Leave the decision to the application
@@ -142,7 +142,7 @@ await serveNode(app, { handleSignals: true });
 ### A `close` that does not stop the server
 
 ```ts bad
-handleProcessErrors(app, { close: () => app.close() }); // Bun.serve sigue aceptando conexiones
+handleProcessErrors(app, { close: () => app.close() }); // Bun.serve keeps accepting connections
 ```
 
 There is no error, but shutdown is not graceful: the server accepts requests while the application closes. Stop the server first.

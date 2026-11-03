@@ -66,7 +66,7 @@ Both return `Promise<Response>` and **never reject**: a missing endpoint is `404
 <!-- no-check -->
 
 ```ts
-// Un handler propio que ya tiene el contexto de la petición.
+// A custom handler that already has the request context.
 const calls = createLocalCalls({ manifest: app.manifest.server, context, sessions, load });
 const response = await calls.api("orders", "POST", { body: { productId: "p_1", quantity: 2 } });
 if (response.status === 429) return new Response("Demasiados pedidos", { status: 429, headers: { "retry-after": response.headers.get("retry-after") ?? "60" } });
@@ -79,7 +79,7 @@ return Response.json(await response.json(), { status: response.status });
 
 ```ts
 await calls.api("products", "GET", { query: { tag: ["oferta", "nuevo"], page: 2, draft: undefined } });
-// GET /api/products?tag=oferta&tag=nuevo&page=2 (null y undefined se omiten)
+// GET /api/products?tag=oferta&tag=nuevo&page=2 (null and undefined are omitted)
 ```
 
 ### A test of a protected endpoint
@@ -100,7 +100,7 @@ assert.equal(response.status, 200);
 try {
   const user = await (await calls.api("users.byId", "GET", { params: { id } })).json();
 } catch {
-  // nunca llega aquí con un 404
+  // never reaches here with a 404
 }
 ```
 

@@ -36,7 +36,7 @@ const text: Schema<{ text: string }> = {
     version: 1,
     validate: (value) => typeof value === "object" && value !== null && typeof (value as { text?: unknown }).text === "string"
       ? { value: value as { text: string } }
-      : { issues: [{ message: "Se esperaba { text }" }] },
+      : { issues: [{ message: "Expected { text }" }] },
   },
 };
 const chat = defineSocketChannel({
@@ -51,8 +51,8 @@ const sent: string[] = [];
 const peer: SocketPeer = { send: (message) => { sent.push(message); }, close: () => {} };
 const request = new Request("http://localhost/_meeko/socket/chat?room=general", { headers: { origin: "http://localhost" } });
 const connection = await hub.accept("chat", request, peer, "general");
-await connection.receive(JSON.stringify({ event: "message", payload: { text: "hola" } }));
-console.log(sent); // [ '{"event":"message","payload":{"text":"HOLA"}}' ]
+await connection.receive(JSON.stringify({ event: "message", payload: { text: "hello" } }));
+console.log(sent); // [ '{"event":"message","payload":{"text":"HELLO"}}' ]
 ```
 
 ## Options
@@ -126,7 +126,7 @@ A `broadcast` on one instance reaches peers in the same room on all instances.
 ### A payload failing the server schema
 
 ```ts bad
-await hub.broadcast("chat", "general", "message", { body: "hola" });
+await hub.broadcast("chat", "general", "message", { body: "hello" });
 ```
 
 Rejects with `ApiError` `INVALID_SOCKET_PAYLOAD` (400) before publishing: outgoing data is validated too, so the client always receives what its contract specifies.
@@ -134,7 +134,7 @@ Rejects with `ApiError` `INVALID_SOCKET_PAYLOAD` (400) before publishing: outgoi
 <!-- no-check -->
 
 ```ts good
-await hub.broadcast("chat", "general", "message", { text: "hola" });
+await hub.broadcast("chat", "general", "message", { text: "hello" });
 ```
 
 ### A handshake from another origin

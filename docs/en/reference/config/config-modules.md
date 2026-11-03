@@ -69,7 +69,7 @@ import { defineMeekoConfig } from "@meekojs/meeko/framework";
 
 export default defineMeekoConfig({
   modules: ["./modules/accent"],
-  accent: { initial: "violet" }, // meta.configKey: "accent", tipada por el módulo
+  accent: { initial: "violet" }, // meta.configKey: "accent", typed by the module
 });
 ```
 
@@ -92,7 +92,7 @@ import { defineMeekoModule } from "@meekojs/meeko/framework";
 
 export default defineMeekoModule<{ greeting: string }>({
   meta: { name: "@acme/meeko-hello", configKey: "hello", compatibility: { meeko: ">=1.2" } },
-  defaults: { greeting: "Hola" },
+  defaults: { greeting: "Hello" },
   setup(options, meeko) {
     meeko.addHead({ meta: [{ name: "x-greeting", content: options.greeting }] });
   },
@@ -102,7 +102,7 @@ export default defineMeekoModule<{ greeting: string }>({
 ### Migrating a folder from `modules` to `layers`
 
 ```ts
-// Antes (1.1): una carpeta con app/pages en modules
+// Before (1.1): a directory with app/pages in modules
 // export default defineMeekoConfig({ modules: ["./modules/auth"] });
 
 import { defineMeekoConfig } from "@meekojs/meeko/framework";
@@ -122,7 +122,7 @@ modules: ["@meekojs/i18m", "./modules/missing"]
 `No se encuentra el módulo de Meeko @meekojs/i18m: no es un paquete instalado ni una ruta del proyecto. ¿Quisiste decir "@meekojs/i18n"?` (without a similar name, it explains how to install it) and `No se encuentra el módulo de Meeko ./modules/missing: …/modules/missing no existe`.
 
 ```text good
-pnpm add @meekojs/i18n   y   modules: ["@meekojs/i18n"]
+pnpm add @meekojs/i18n   and   modules: ["@meekojs/i18n"]
 ```
 
 ### A package that is not a module

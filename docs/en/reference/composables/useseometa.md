@@ -76,7 +76,7 @@ useSeoMeta(() => ({
   ogTitle: props.data.name,
   ogType: "product",
   ogImage: props.data.image,
-  ogImageAlt: `Foto de ${props.data.name}`,
+  ogImageAlt: `Photo of ${props.data.name}`,
   ogImageWidth: 1200,
   ogImageHeight: 630,
 }));
@@ -90,7 +90,7 @@ With a getter, tags change when navigating to another product even if the compon
 ```ts
 import { useSeoMeta } from "@meekojs/meeko/framework";
 
-// En el <script> de app/pages/account/settings.meeko
+// In the <script> of app/pages/account/settings.meeko
 useSeoMeta({ robots: "noindex, nofollow" });
 ```
 

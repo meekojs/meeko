@@ -20,9 +20,9 @@ Runbook for publishing the Meeko sites in Coolify on `voidcat-local`, behind the
 ## How it fits together
 
 ```text
-navegador ─TLS─ Cloudflare ── túnel voidcat-local (cloudflared) ── http://localhost:80 (Traefik, coolify-proxy)
-                                                                     └─ Host → contenedor de la app :3000 (red coolify)
-                                                                                └─ PostgreSQL de producción (red coolify, sin puerto publicado)
+browser ─TLS─ Cloudflare ── tunnel voidcat-local (cloudflared) ── http://localhost:80 (Traefik, coolify-proxy)
+                                                                     └─ Host → app container :3000 (coolify network)
+                                                                                └─ Production PostgreSQL (coolify network, no published port)
 ```
 
 - **Images** (`deploy/Dockerfile`, a single file with one target per image):
@@ -111,8 +111,8 @@ Decision: **option B**, without changing Traefik. Since Meeko 1.8, `MEEKO_TRUST_
 
 ```dotenv
 MEEKO_TRUST_PROXY=cloudflare
-# Opcional. Si se restringe, debe incluir la red de Traefik y la IP con la que cloudflared llega a Traefik:
-# MEEKO_TRUSTED_PROXIES=<subred de coolify>, <IP de cloudflared vista por Traefik>
+# Optional. If restricted, include the Traefik network and the IP cloudflared uses to reach Traefik:
+# MEEKO_TRUSTED_PROXIES=<coolify subnet>, <cloudflared IP as seen by Traefik>
 ```
 
 Rejected alternatives: **A**, trusting cloudflared on Traefik's `http` entrypoint (`forwardedHeaders.trustedIPs`) and `MEEKO_TRUST_PROXY=2`, which changes the proxy for all host apps; and **C**, `MEEKO_TRUST_PROXY=1` with global limits. The `www` `301` does not depend on this: Traefik preserves `Host`, and the `apps/meeko` redirect only reads `X-Forwarded-Host` with a number or `true`.
@@ -167,7 +167,7 @@ A dedicated database for the sites, on the `coolify` network, with no published 
 2. Create the database (PostgreSQL 17, like development; 1 GB memory) and record its `uuid`:
 
    ```sh
-   ssh voidcat-local '. /root/meekojs-produccion.secrets; T=$(cat /srv/development/shared-services/secrets/coolify_local_api_token); jq -n --arg pw "$POSTGRES_PASSWORD" "{server_uuid:\"<COOLIFY_SERVER_UUID>\", project_uuid:\"<COOLIFY_PROJECT_UUID>\", environment_name:\"production\", name:\"meekojs-postgres\", description:\"Base de meekojs.com (docs, moderación, métricas y sesiones del dashboard)\", image:\"postgres:17-alpine\", postgres_user:\"meekojs\", postgres_password:\$pw, postgres_db:\"meekojs\", is_public:false, limits_memory:\"1g\", instant_deploy:true}" | curl -fsS -X POST -H "Authorization: Bearer $T" -H "Content-Type: application/json" --data-binary @- http://127.0.0.1:8000/api/v1/databases/postgresql | jq "{uuid}"; unset T POSTGRES_PASSWORD APP_PASSWORD'
+   ssh voidcat-local '. /root/meekojs-produccion.secrets; T=$(cat /srv/development/shared-services/secrets/coolify_local_api_token); jq -n --arg pw "$POSTGRES_PASSWORD" "{server_uuid:\"<COOLIFY_SERVER_UUID>\", project_uuid:\"<COOLIFY_PROJECT_UUID>\", environment_name:\"production\", name:\"meekojs-postgres\", description:\"meekojs.com database (docs, moderation, metrics and dashboard sessions)\", image:\"postgres:17-alpine\", postgres_user:\"meekojs\", postgres_password:\$pw, postgres_db:\"meekojs\", is_public:false, limits_memory:\"1g\", instant_deploy:true}" | curl -fsS -X POST -H "Authorization: Bearer $T" -H "Content-Type: application/json" --data-binary @- http://127.0.0.1:8000/api/v1/databases/postgresql | jq "{uuid}"; unset T POSTGRES_PASSWORD APP_PASSWORD'
    ```
 
    If the project environment is not named `production`, query it first with `GET /api/v1/projects/<COOLIFY_PROJECT_UUID>`.
@@ -246,7 +246,7 @@ All five rules already exist in the `voidcat-local` tunnel's remote configuratio
 
 ```sh
 ssh voidcat-local 'journalctl -u cloudflared -o cat --no-pager | grep "Updated to new configuration" | tail -1 | grep -oE "meekojs\.com[^,]*,[^,]*service[^,]*"'
-curl -sI https://ui.meekojs.com/ | head -1    # antes del deploy: 404 de Traefik
+curl -sI https://ui.meekojs.com/ | head -1    # before deployment: Traefik 404
 ```
 
 ## Step 4. First deployment
@@ -291,28 +291,28 @@ ssh voidcat-local '. /root/meekojs-produccion.secrets; DATABASE_URL="$OWNER_DATA
 Read-only; no confirmation required.
 
 ```sh
-# Salud y base
+# Health and database
 for h in meekojs.com ui.meekojs.com i18n.meekojs.com; do printf '%s ' "$h"; curl -fsS "https://$h/healthz"; echo; done
 
-# www → apex con 301, misma ruta y query
+# www → apex with 301, same path and query
 curl -sI 'https://www.meekojs.com/docs?x=1' | grep -iE '^(HTTP|location)'   # 301, location: https://meekojs.com/docs?x=1
 
-# CSP y cabeceras
+# CSP and headers
 curl -sI https://meekojs.com/ | grep -iE '^(content-security-policy|x-content-type-options|referrer-policy|permissions-policy)'
 
-# Compresión: meeko start no comprime, la pone Cloudflare
-curl -s -o /dev/null -D - -H 'accept-encoding: br, gzip' https://meekojs.com/docs/framework | grep -i '^content-encoding'   # br o gzip
+# Compression: meeko start does not compress; Cloudflare handles it
+curl -s -o /dev/null -D - -H 'accept-encoding: br, gzip' https://meekojs.com/docs/framework | grep -i '^content-encoding'   # br or gzip
 
-# Páginas, sitemap, robots, llms y búsqueda
+# Pages, sitemap, robots, llms and search
 for p in / /docs /docs/reference /sitemap.xml /robots.txt /llms.txt '/api/docs/search?q=signal'; do printf '%s %s\n' "$(curl -s -o /dev/null -w '%{http_code}' "https://meekojs.com$p")" "$p"; done
 curl -s https://meekojs.com/sitemap.xml | grep -c '<loc>https://meekojs.com/'
 curl -s 'https://meekojs.com/api/docs/search?q=signal' | head -c 300
 
-# UI e i18n
+# UI and i18n
 for u in https://ui.meekojs.com/ https://ui.meekojs.com/buttons https://i18n.meekojs.com/ https://i18n.meekojs.com/plurals; do printf '%s %s\n' "$(curl -s -o /dev/null -w '%{http_code}' "$u")" "$u"; done
 
-# El dashboard sigue sin publicarse
-curl -s -o /dev/null -w '%{http_code}\n' https://dashboard.meekojs.com/   # 404 de Traefik
+# The dashboard is still unpublished
+curl -s -o /dev/null -w '%{http_code}\n' https://dashboard.meekojs.com/   # Traefik 404
 ```
 
 Expected: `{"status":"ok","database":"up"}` on all three; `301` with the exact `location`; the CSP from `apps/meeko/meeko.config.ts` (`default-src 'self'`, `frame-ancestors 'none'`…) with `nosniff` and `strict-origin-when-cross-origin`; `200` on every route; sitemap URLs under `https://meekojs.com/`. In the browser: navigate documentation, search for `signal` in the dialog and answer “¿Te sirvió?” on a page (a `204`/thank-you, not a `403`).
@@ -359,7 +359,7 @@ Without publishing ports, on `voidcat-local` Docker (first check `docker context
 
 ```sh
 docker build -f deploy/Dockerfile --target web --build-arg APP=meeko -t meekojs-test/meeko:local .
-docker run -d --name meekojs-test-meeko --network postgres17_default --env-file <archivo temporal con DATABASE_URL de meeko_site_dev> meekojs-test/meeko:local
+docker run -d --name meekojs-test-meeko --network postgres17_default --env-file <temporary file with DATABASE_URL for meeko_site_dev> meekojs-test/meeko:local
 docker exec meekojs-test-meeko node -e "fetch('http://127.0.0.1:3000/healthz').then(async (r) => console.log(r.status, await r.text()))"
 docker rm -f meekojs-test-meeko && docker image rm meekojs-test/meeko:local
 ```

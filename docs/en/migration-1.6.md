@@ -38,7 +38,7 @@ This affects files without a default export (`export const parse = …`), those 
 Meeko reads route options (`render`, `layout` and, since `1.6`, `middleware`) without executing the file. A spread potentially containing `middleware` did not reach the manifest, and the page was served without it even though types accepted it:
 
 ```ts
-// Antes: protegida trae middleware: ["auth"], pero el build no lo veía
+// Before: protegida carries middleware: ["auth"], but the build did not see it
 const protegida = { middleware: ["auth"] } as const;
 export const route = definePage({ ...protegida, render: "ssr", load });
 ```
@@ -94,14 +94,14 @@ An `app/middleware` middleware without options remains global. With `{ global: f
 ```ts
 // app/middleware/auth.ts
 export default defineRouteMiddleware(({ url, phase, request }) => {
-  // Una cookie pública que indica la sesión: la cookie de sesión de Meeko es HttpOnly.
+  // A public cookie indicating the session: Meeko's session cookie is HttpOnly.
   const cookies = phase === "server" ? request?.headers.get("cookie") ?? "" : document.cookie;
   if (!cookies.includes("signed-in=1")) return Response.redirect(new URL("/login", url));
 }, { global: false });
 ```
 
 ```ts
-// app/pages/(dashboard)/+group.ts: todas las páginas del grupo
+// app/pages/(dashboard)/+group.ts: all pages in the group
 export default defineGroup({ layout: "dashboard", middleware: ["auth"] });
 ```
 
@@ -122,7 +122,7 @@ export default defineServerRouteMiddleware(({ context }) => {
 ```
 
 ```ts
-// app/pages/(dashboard)/+group.ts: todas las páginas del grupo exigen sesión
+// app/pages/(dashboard)/+group.ts: all pages in the group require a session
 export default defineGroup({ layout: "dashboard", middleware: ["auth"] });
 ```
 

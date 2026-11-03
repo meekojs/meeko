@@ -106,7 +106,7 @@ meeko routes .
 ### Expecting `routes` to perform the checks of `meeko check`
 
 ```sh bad
-meeko routes . && echo "sin errores de tipos"
+meeko routes . && echo "no type errors"
 ```
 
 `meeko routes` only prepares `.meeko/`: it does not run TypeScript or check components, so it exits with `0` even with type errors. Since `1.7`, it prepares the same files as `meeko check`, and `npx tsc -p .meeko/tsconfig.server.json` works afterward; through `1.6`, it did not write `tsconfig.*.json` or `services.d.ts`, and `tsc` failed with `TS5058`. To check, use `meeko check` (or `meeko check-app` for components only).

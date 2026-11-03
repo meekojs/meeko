@@ -41,8 +41,8 @@ It registers all these components, except `UIMarkdownEditor`, and adds its CSS t
 <template>
 	<UIField
 		id="name"
-		label="Nombre"
-		description="Como aparecerá en tu perfil."
+		label="Name"
+		description="How it will appear in your profile."
 	>
 		<snippet
 			name="default"
@@ -55,7 +55,7 @@ It registers all these components, except `UIMarkdownEditor`, and adds its CSS t
 			/>
 		</snippet>
 	</UIField>
-	<UIButton on:click="() => console.log(name.value)">Guardar</UIButton>
+	<UIButton on:click="() => console.log(name.value)">Save</UIButton>
 </template>
 ```
 

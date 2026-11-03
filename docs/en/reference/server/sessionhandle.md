@@ -43,7 +43,7 @@ export default defineApiRoute({
     const user = await findUser(body.email);
     const valid = await verifyPassword(body.password, user?.passwordHash ?? DUMMY_HASH);
     if (!user || !valid) throw new ApiError("INVALID_CREDENTIALS", 401);
-    // Sustituye la sesión anónima, si la hay, con un ID y un token CSRF nuevos.
+    // Replaces the anonymous session, if any, with a new ID and CSRF token.
     await context.session.create({ userId: user.id, role: user.role });
     return { ok: true as const };
   },
@@ -108,7 +108,7 @@ export default defineRpc({
   auth: "required",
   handler: async ({ input, context }) => {
     await checkPassword(context.session.current!.data.userId, input.password);
-    await context.session.rotate(); // ID y token nuevos: un ID robado antes deja de valer
+    await context.session.rotate(); // new ID and token: a previously stolen ID becomes invalid
     return { ok: true };
   },
 });
@@ -139,7 +139,7 @@ if (!session) redirect("/login");
 export const userId = session.data.userId;
 </script>
 
-<template><h1>Hola, {userId}</h1></template>
+<template><h1>Hello, {userId}</h1></template>
 ```
 
 ## Common mistakes
@@ -161,7 +161,7 @@ curl -X POST https://app.example.com/api/auth/login -H 'origin: https://app.exam
 ### Creating the session after a stream's first byte
 
 ```ts bad
-// render: "stream": el valor diferido se resuelve cuando el documento ya empezó a enviarse
+// render: "stream": the deferred value resolves after the document has started sending
 load: async ({ context }) => ({
   user: defer(context.session.create({ userId }).then(() => userId)),
 }),
@@ -172,14 +172,14 @@ Headers have already been sent: `create`, `rotate` and `revoke` reject with `500
 <!-- no-check -->
 
 ```ts good
-// En el loader o en la parte crítica, antes del primer byte; mejor aún, en una API.
+// In the loader or critical part, before the first byte; better still, in an API.
 await context.session.create({ userId });
 ```
 
 ### Rotating without a session
 
 ```ts bad
-await context.session.rotate(); // en una petición anónima
+await context.session.rotate(); // in an anonymous request
 ```
 
 Throws `Error: No active session to rotate`, which the response converts to `500 INTERNAL_ERROR`. If the session expired or was revoked between reading and rotation, the error is `Session has expired or been revoked`.

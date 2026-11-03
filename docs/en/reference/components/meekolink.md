@@ -28,8 +28,8 @@ Do not import it: the compiler recognizes the tag in any application template.
 <!-- app/layouts/default.meeko -->
 <template>
   <header>
-    <MeekoLink to="/" class="brand">Inicio</MeekoLink>
-    <MeekoLink to="/users/[id]" bind:params="{ id: session.userId }">Mi perfil</MeekoLink>
+    <MeekoLink to="/" class="brand">Home</MeekoLink>
+    <MeekoLink to="/users/[id]" bind:params="{ id: session.userId }">My profile</MeekoLink>
   </header>
   <main><MeekoOutlet /></main>
 </template>
@@ -81,9 +81,9 @@ Each link marks its section on all its pages and marks the exact page differentl
 <!-- app/layouts/default.meeko -->
 <template>
   <nav aria-label="Secciones">
-    <MeekoLink to="/" match="prefix">Inicio</MeekoLink>
-    <MeekoLink to="/dashboard" match="prefix">Panel</MeekoLink>
-    <MeekoLink to="/settings" match="prefix">Ajustes</MeekoLink>
+    <MeekoLink to="/" match="prefix">Home</MeekoLink>
+    <MeekoLink to="/dashboard" match="prefix">Dashboard</MeekoLink>
+    <MeekoLink to="/settings" match="prefix">Settings</MeekoLink>
   </nav>
   <main><MeekoOutlet /></main>
 </template>
@@ -115,8 +115,8 @@ For user `"42"`, the link is `/users/42?tab=actividad&page=2`. On a dynamic rout
 ```html
 <script lang="ts">
 const links = [
-  { to: "/", label: "Inicio" },
-  { to: "/settings", label: "Ajustes" },
+  { to: "/", label: "Home" },
+  { to: "/settings", label: "Settings" },
 ] as const;
 </script>
 
@@ -171,7 +171,7 @@ const props = defineProps<LinkTarget & { label: string }>();
 `<MeekoLink>` is not a script value, but `is` names it with a literal, alongside HTML tags and other components:
 
 ```html
-<component is="props.to !== undefined ? 'MeekoLink' : 'button'" bind:to="props.to" bind:params="props.params" type="button">Abrir</component>
+<component is="props.to !== undefined ? 'MeekoLink' : 'button'" bind:to="props.to" bind:params="props.params" type="button">Open</component>
 ```
 
 The `'MeekoLink'` branch is this tag: it receives `to`, `params`, `search` and `match` and the other attributes of its `<a>`, but not `href`, and `meeko check` checks the route and parameters after the `?:` condition narrows `props.to`. See [Component names in `is`](../../api.md#component-names-in-is).
@@ -183,13 +183,13 @@ The `'MeekoLink'` branch is this tag: it receives `to`, `params`, `search` and `
 `<MeekoLink>` builds its own `href`. Passing it manually bypasses route checking.
 
 ```html bad
-<MeekoLink href="/about">Acerca de</MeekoLink>
+<MeekoLink href="/about">About</MeekoLink>
 ```
 
 The compiler rejects it with `MEEK105: <MeekoLink> construye su href: indica la ruta con to="/users/[id]" y sus parámetros con bind:params`. Without `to`, the error is `MEEK105: <MeekoLink> necesita to con la ruta`.
 
 ```html good
-<MeekoLink to="/about">Acerca de</MeekoLink>
+<MeekoLink to="/about">About</MeekoLink>
 ```
 
 ### A nonexistent route, or a query in `to`
@@ -197,14 +197,14 @@ The compiler rejects it with `MEEK105: <MeekoLink> construye su href: indica la 
 `to` is a route ID, not a URL: the query string goes in `bind:search`.
 
 ```html bad
-<MeekoLink to="/nowhere">Perdido</MeekoLink>
-<MeekoLink to="/about?tab=1">Acerca de</MeekoLink>
+<MeekoLink to="/nowhere">Lost</MeekoLink>
+<MeekoLink to="/about?tab=1">About</MeekoLink>
 ```
 
 `meeko check` reports `TS2345: Argument of type '"/about?tab=1"' is not assignable to parameter of type '"/" | "/about" | "/users/[id]"'` on the attribute, with the application's route list.
 
 ```html good
-<MeekoLink to="/about" bind:search="{ tab: '1' }">Acerca de</MeekoLink>
+<MeekoLink to="/about" bind:search="{ tab: '1' }">About</MeekoLink>
 ```
 
 For an external link, another origin or a file, use `<a href>`: it is not an application route.
@@ -212,13 +212,13 @@ For an external link, another origin or a file, use `<a href>`: it is not an app
 ### Forgetting a dynamic route's parameters
 
 ```html bad
-<MeekoLink to="/users/[id]">Perfil</MeekoLink>
+<MeekoLink to="/users/[id]">Profile</MeekoLink>
 ```
 
 `meeko check` reports `TS2345: Argument of type '{}' is not assignable to parameter of type '__MeekoLinkOptions<"/users/[id]">'`, with `Property 'params' is missing`. An incorrect key (`{ userId: '1' }`) gives `TS2353`, and a number (`{ id: 7 }`) gives `TS2322: Type 'number' is not assignable to type 'string'`.
 
 ```html good
-<MeekoLink to="/users/[id]" bind:params="{ id: String(user.id) }">Perfil</MeekoLink>
+<MeekoLink to="/users/[id]" bind:params="{ id: String(user.id) }">Profile</MeekoLink>
 ```
 
 ### `params` or `search` without `bind:`
@@ -226,25 +226,25 @@ For an external link, another origin or a file, use `<a href>`: it is not an app
 Without `bind:`, the attribute value would be text, not an object.
 
 ```html bad
-<MeekoLink to="/users/[id]" params="{ id: '1' }">Perfil</MeekoLink>
+<MeekoLink to="/users/[id]" params="{ id: '1' }">Profile</MeekoLink>
 ```
 
 The compiler reports `MEEK105: params de <MeekoLink> es un objeto: escríbelo como bind:params="{ … }"`.
 
 ```html good
-<MeekoLink to="/users/[id]" bind:params="{ id: '1' }">Perfil</MeekoLink>
+<MeekoLink to="/users/[id]" bind:params="{ id: '1' }">Profile</MeekoLink>
 ```
 
 ### A `match` that does not exist
 
 ```html bad
-<MeekoLink to="/dashboard" match="partial">Panel</MeekoLink>
+<MeekoLink to="/dashboard" match="partial">Dashboard</MeekoLink>
 ```
 
 `MEEK105: match de <MeekoLink> es "exact" (por defecto) o "prefix"`. With `bind:match`, a value other than `"exact" | "prefix"` is a type error.
 
 ```html good
-<MeekoLink to="/dashboard" match="prefix">Panel</MeekoLink>
+<MeekoLink to="/dashboard" match="prefix">Dashboard</MeekoLink>
 ```
 
 ### A custom component called `MeekoLink`
@@ -252,15 +252,15 @@ The compiler reports `MEEK105: params de <MeekoLink> es un objeto: escríbelo co
 A component at `app/components/MeekoLink.meeko` (or imported with that name) takes precedence over Meeko's tag, with its own props, to avoid breaking projects from before `1.2`.
 
 ```html bad
-<!-- app/components/MeekoLink.meeko existe en el proyecto -->
-<MeekoLink to="/about">Acerca de</MeekoLink>
+<!-- app/components/MeekoLink.meeko exists in the project -->
+<MeekoLink to="/about">About</MeekoLink>
 ```
 
 `meeko check`, `meeko build` and the editor warn with `MEEK106: <MeekoLink> es el componente MeekoLink del proyecto, no la etiqueta propia de Meeko`. Rename the component (for example, to `AppLink.meeko`), and the tag becomes Meeko's again.
 
 ```html good
 <!-- app/components/AppLink.meeko -->
-<MeekoLink to="/about">Acerca de</MeekoLink>
+<MeekoLink to="/about">About</MeekoLink>
 ```
 
 ## Notes

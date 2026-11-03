@@ -90,7 +90,7 @@ const api = createApiClient<Contract>(
 );
 
 const orders = await api.orders.get({ query: { since: "2026-10-01" } });
-console.log(`${orders.length} pedidos`);
+console.log(`${orders.length} orders`);
 ```
 
 ### Tests with a fake `fetch`

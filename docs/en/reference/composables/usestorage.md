@@ -30,8 +30,8 @@ const view = useStorage("products:view", "grid");
 </script>
 
 <template>
-  <button type="button" bind:aria-pressed="String(view.value === 'grid')" on:click="() => view.value = 'grid'">Cuadrícula</button>
-  <button type="button" bind:aria-pressed="String(view.value === 'list')" on:click="() => view.value = 'list'">Lista</button>
+  <button type="button" bind:aria-pressed="String(view.value === 'grid')" on:click="() => view.value = 'grid'">Grid</button>
+  <button type="button" bind:aria-pressed="String(view.value === 'list')" on:click="() => view.value = 'list'">List</button>
 </template>
 ```
 
@@ -66,8 +66,8 @@ const clear = (): void => { lines.value = []; };
 </script>
 
 <template>
-  <p>{lines.value.length} productos en el ticket</p>
-  <button type="button" on:click="clear">Vaciar</button>
+  <p>{lines.value.length} items on the receipt</p>
+  <button type="button" on:click="clear">Empty</button>
 </template>
 ```
 
@@ -89,12 +89,12 @@ const density = useStorage("table:density", "normal", { schema: v.picklist(["com
 ```html
 <script lang="ts">
 const draft = useStorage<string | undefined>("comment:draft", undefined, { storage: "session" });
-const discard = (): void => { draft.value = undefined; }; // borra la clave
+const discard = (): void => { draft.value = undefined; }; // deletes the key
 </script>
 
 <template>
   <textarea bind:value="draft.value ?? ''" on:input="(event) => draft.value = event.currentTarget.value"></textarea>
-  <button type="button" on:click="discard">Descartar</button>
+  <button type="button" on:click="discard">Discard</button>
 </template>
 ```
 
@@ -157,7 +157,7 @@ Any script on the page can read `localStorage`: a token stored there is exposed 
 <!-- no-check -->
 
 ```ts good
-const lastSearch = useStorage("search:last", ""); // sólo preferencias y estado no sensible
+const lastSearch = useStorage("search:last", ""); // only preferences and non-sensitive state
 ```
 
 ## Notes

@@ -27,7 +27,7 @@ Meeko's Node, Bun, Deno and Cloudflare adapters share it. Use it directly to con
 <!-- no-check -->
 
 ```ts
-// server.ts, en Deno
+// server.ts, in Deno
 import { createSocketUpgradeHandler } from "@meekojs/meeko/server";
 
 const handleUpgrade = createSocketUpgradeHandler({ hub: app.socket!.hub, publicOrigin: "https://example.com" });
@@ -84,7 +84,7 @@ const handleUpgrade = createSocketUpgradeHandler({ hub, publicOrigin: "http://lo
 
 const ws = { upgrade: "websocket", origin: "http://localhost" };
 console.log((await handleUpgrade(new Request("http://localhost/api"))).action);                                  // "pass"
-console.log((await handleUpgrade(new Request("http://localhost/_meeko/socket/chat"))).action);                   // "reject" (400: no es un upgrade)
+console.log((await handleUpgrade(new Request("http://localhost/_meeko/socket/chat"))).action);                   // "reject" (400: not an upgrade)
 console.log((await handleUpgrade(new Request("http://localhost/_meeko/socket/chat", { headers: ws }))).action);  // "upgrade"
 console.log(await handleUpgrade(new Request("http://localhost/_meeko/socket/nope", { headers: ws })));           // { action: "reject", status: 404 }
 ```
@@ -146,7 +146,7 @@ The browser does not expose the HTTP status of a rejected WebSocket: the client 
 
 ```ts good
 if (upgrade.action === "reject" && !upgrade.close) return new Response(null, { status: upgrade.status });
-// …hace el upgrade y cierra con upgrade.close.code y upgrade.close.reason
+// …upgrades and closes with upgrade.close.code and upgrade.close.reason
 ```
 
 ## Notes

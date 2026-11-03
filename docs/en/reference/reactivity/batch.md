@@ -32,7 +32,7 @@ batch(() => {
   first.value = "Grace";
   last.value = "Hopper";
 });
-// log: ["Ada Lovelace", "Grace Hopper"], sin el intermedio "Grace Lovelace"
+// log: ["Ada Lovelace", "Grace Hopper"], without the intermediate "Grace Lovelace"
 ```
 
 ## Parameters
@@ -66,7 +66,7 @@ function reset(): void {
 </script>
 
 <template>
-  <button type="button" on:click="reset">Quitar filtros</button>
+  <button type="button" on:click="reset">Clear filters</button>
 </template>
 ```
 
@@ -81,12 +81,12 @@ const status = signal<"idle" | "done" | "error">("idle");
 const message = signal("");
 
 effect(() => {
-  // Nunca ve status "error" con el mensaje vacío.
+  // Never sees status "error" with an empty message.
   if (status.value === "error") console.warn(message.value);
 });
 
 batch(() => {
-  message.value = "No se pudo guardar";
+  message.value = "Could not save";
   status.value = "error";
 });
 ```
@@ -104,9 +104,9 @@ const b = signal(0);
 function setA(value: number): void { batch(() => { a.value = value; }); }
 
 batch(() => {
-  setA(1);       // aún sin notificar
+  setA(1);       // not notified yet
   b.value = 1;
-}); // aquí se ejecutan los observadores de a y b, una vez
+}); // observers of a and b run here, once
 ```
 
 ## Common mistakes
@@ -143,7 +143,7 @@ A `computed` is also an observer: inside `batch` it keeps its previous value unt
 const double = computed(() => count.value * 2);
 batch(() => {
   count.value = 5;
-  send(double.value); // envía el doble del valor anterior
+  send(double.value); // sends twice the previous value
 });
 ```
 

@@ -31,7 +31,7 @@ It is auto-imported, with two sides:
 <!-- no-check -->
 
 ```ts
-// server/api/orders/[id]/ready.post.ts: avisa a la sala de la cocina
+// server/api/orders/[id]/ready.post.ts: notifies the kitchen room
 import { defineApiRoute } from "@meekojs/meeko/server";
 import { orderParams, orderSchema } from "../../../../shared/schemas/order";
 
@@ -50,7 +50,7 @@ export default defineApiRoute({
 <!-- no-check -->
 
 ```ts
-// app/plugins/kitchen.client.ts: escucha en el navegador
+// app/plugins/kitchen.client.ts: listens in the browser
 import { definePlugin } from "@meekojs/meeko/framework";
 
 export default definePlugin(() => {
@@ -114,7 +114,7 @@ In a component, `useSocket("chat", { roomId })` creates a dedicated connection t
 ### A payload that fails its schema
 
 ```ts bad
-await socket.chat.emit("message", { body: "Hola" });
+await socket.chat.emit("message", { body: "Hello" });
 ```
 
 `meeko check` reports `TS2353: Object literal may only specify known properties, and 'body' does not exist in type '{ text: string; }'.`
@@ -122,7 +122,7 @@ await socket.chat.emit("message", { body: "Hola" });
 <!-- no-check -->
 
 ```ts good
-await socket.chat.emit("message", { text: "Hola" });
+await socket.chat.emit("message", { text: "Hello" });
 ```
 
 ### A channel or event that does not exist

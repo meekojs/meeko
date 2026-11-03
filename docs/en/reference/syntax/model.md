@@ -32,11 +32,11 @@ const plan = signal<string | null>("free");
 </script>
 
 <template>
-  <label>Correo <input type="email" model="email"></label>
-  <label><input type="checkbox" model="accepted"> Acepto las condiciones</label>
-  <label><input type="radio" value="free" model="plan"> Gratis</label>
+  <label>Email <input type="email" model="email"></label>
+  <label><input type="checkbox" model="accepted"> I accept the terms</label>
+  <label><input type="radio" value="free" model="plan"> Free</label>
   <label><input type="radio" value="pro" model="plan"> Pro</label>
-  <p>{email.value} · {accepted.value ? "aceptado" : "pendiente"} · {plan.value}</p>
+  <p>{email.value} · {accepted.value ? "accepted" : "pending"} · {plan.value}</p>
 </template>
 ```
 
@@ -73,13 +73,13 @@ const tags = signal<string[]>([]);
 </script>
 
 <template>
-  <select model="country" aria-label="País">
-    <option value="es">España</option>
-    <option value="mx">México</option>
+  <select model="country" aria-label="Country">
+    <option value="es">Spain</option>
+    <option value="mx">Mexico</option>
   </select>
   <select multiple model="tags" aria-label="Etiquetas">
-    <option value="urgente">Urgente</option>
-    <option value="cliente">Cliente</option>
+    <option value="urgente">Urgent</option>
+    <option value="cliente">Client</option>
   </select>
   <p>{country.value}: {tags.value.join(", ")}</p>
 </template>
@@ -99,7 +99,7 @@ const total = computed(() => {
 </script>
 
 <template>
-  <label>Cantidad <input type="number" min="1" model="quantity"></label>
+  <label>Quantity <input type="number" min="1" model="quantity"></label>
   <p>Total: {total.value.toFixed(2)} €</p>
 </template>
 ```
@@ -117,8 +117,8 @@ const revealed = signal(false);
 </script>
 
 <template>
-  <input bind:type="revealed.value ? 'text' : 'password'" model="password" autocomplete="current-password" aria-label="Contraseña">
-  <button type="button" bind:aria-pressed="revealed.value ? 'true' : 'false'" on:click="() => revealed.value = !revealed.value">Mostrar</button>
+  <input bind:type="revealed.value ? 'text' : 'password'" model="password" autocomplete="current-password" aria-label="Password">
+  <button type="button" bind:aria-pressed="revealed.value ? 'true' : 'false'" on:click="() => revealed.value = !revealed.value">Show</button>
 </template>
 ```
 
@@ -134,7 +134,7 @@ const open = defineModel<boolean>("open", { default: false });
 </script>
 
 <template>
-  <input type="search" model="query" aria-label="Buscar" on:focus="() => open.value = true">
+  <input type="search" model="query" aria-label="Search" on:focus="() => open.value = true">
 </template>
 ```
 
@@ -153,8 +153,8 @@ const form = useForm({ initial: { name: "", newsletter: false }, submit: async (
 
 <template>
   <form on:submit="form.submit">
-    <input model="form.fields.name" aria-label="Nombre">
-    <label><input type="checkbox" model="form.fields.newsletter"> Boletín</label>
+    <input model="form.fields.name" aria-label="Name">
+    <label><input type="checkbox" model="form.fields.newsletter"> Newsletter</label>
   </form>
 </template>
 ```

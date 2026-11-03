@@ -123,9 +123,9 @@ The server indicates, in whole lines, where a `.meeko` file's code executes:
 The template (except those handlers) and styles do not form zones, and zones do not overlap: a more specific zone (a browser function, `onMounted`, a handler) replaces setup's zone on its lines. Analysis is syntactic and works on whole lines; if it cannot classify setup, functions stay in the shared zone. Other clients request them with the custom `meeko/executionZones` request:
 
 ```json
-// Petición
+// Request
 { "textDocument": { "uri": "file:///app/pages/index.meeko" } }
-// Respuesta
+// Response
 { "zones": [{ "kind": "server", "reason": "server-block", "label": "…", "detail": "…",
   "range": { "start": { "line": 0, "character": 0 }, "end": { "line": 6, "character": 9 } } }] }
 ```
@@ -211,8 +211,8 @@ Sources are WHATWG's [HTML Living Standard](https://html.spec.whatwg.org/) (elem
 To update them:
 
 ```sh
-pnpm -F @meekojs/meeko html-data            # descarga las especificaciones y regenera
-pnpm -F @meekojs/meeko html-data --offline  # sólo regenera desde las instantáneas
+pnpm -F @meekojs/meeko html-data            # downloads the specifications and regenerates
+pnpm -F @meekojs/meeko html-data --offline  # only regenerates from snapshots
 ```
 
 The download saves extracted data in `packages/meeko/scripts/html-data/*.json`, with the date and commit of each specification, so generation is reproducible without network access. For a new `@mdn/browser-compat-data`, just update the dependency and regenerate. `tests/html-data.test.ts`, included in `pnpm -F @meekojs/meeko test`, fails if a module differs from what the snapshots generate.
@@ -335,7 +335,7 @@ It requires Prettier 3 and Meeko. It keeps the formatting contract of the previo
 export default {
 	plugins: ['@meekojs/prettier-plugin'],
 	meekoSortClasses: 'tailwind',
-	// Opcional; relativa a la raíz del proyecto Meeko. Por defecto, app/styles/main.css.
+	// Optional; relative to the Meeko project root. Defaults to app/styles/main.css.
 	meekoTailwindStylesheet: 'app/styles/main.css',
 }
 ```
@@ -358,7 +358,7 @@ export default {
 
 ```ts
 const button = tv({
-	base: 'flex text-white', // antes: 'text-white flex'
+	base: 'flex text-white', // before: 'text-white flex'
 	variants: { size: { sm: 'p-1 text-sm', lg: on ? 'block p-4' : 'flex p-2' } },
 	compoundVariants: [{ size: 'sm', class: 'mt-1 block' }],
 })

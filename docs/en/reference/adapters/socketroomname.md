@@ -46,7 +46,7 @@ const stub = env.MEEKO_SOCKET.get(env.MEEKO_SOCKET.idFromName(socketRoomName("ch
 import { socketRoomName } from "@meekojs/meeko/cloudflare";
 
 console.log(JSON.stringify(socketRoomName("chat", "general"))); // "chat\u0000general"
-console.log(JSON.stringify(socketRoomName("operations", "")));  // "operations\u0000", la sala por defecto
+console.log(JSON.stringify(socketRoomName("operations", "")));  // "operations\u0000", the default room
 ```
 
 ### Publish to a room from a Cron Trigger
@@ -54,7 +54,7 @@ console.log(JSON.stringify(socketRoomName("operations", "")));  // "operations\u
 <!-- no-check -->
 
 ```ts
-// worker.ts: un evento programado que no es una petición HTTP.
+// worker.ts: a scheduled event rather than an HTTP request.
 import { DurableObjectSocketPubSub } from "@meekojs/meeko/cloudflare";
 
 export default {

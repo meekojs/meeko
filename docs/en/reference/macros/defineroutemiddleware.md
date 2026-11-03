@@ -34,7 +34,7 @@ It is auto-imported. It is **isomorphic**: it also reaches the browser bundle.
 import { defineRouteMiddleware } from "@meekojs/meeko/framework";
 
 export default defineRouteMiddleware(({ url, phase, request }) => {
-  // Una cookie pública que indica la sesión: la cookie de sesión de Meeko es HttpOnly.
+  // A public cookie indicating the session: Meeko's session cookie is HttpOnly.
   const cookies = phase === "server" ? request?.headers.get("cookie") ?? "" : document.cookie;
   if (!cookies.includes("signed-in=1")) {
     const login = new URL("/login", url);
@@ -98,7 +98,7 @@ export default defineGroup({ layout: "dashboard", middleware: ["auth"] });
 <script server lang="ts">
 export const route = definePage({ middleware: ["admin"] });
 </script>
-<template><h1>Usuarios</h1></template>
+<template><h1>Users</h1></template>
 ```
 
 `/admin/users` runs global middleware, then `auth` (from the group), then `admin` (from the page). `middleware: false` removes inherited middleware.
@@ -137,7 +137,7 @@ export const route = definePage({ middleware: ["auth", "admin"] });
 ### Requesting global middleware by name
 
 ```ts bad
-// app/middleware/10-locale.ts, sin opciones
+// app/middleware/10-locale.ts, without options
 export default defineRouteMiddleware(() => {});
 // app/pages/(dashboard)/+group.ts
 export default defineGroup({ middleware: ["locale"] });
@@ -176,7 +176,7 @@ export default defineServerRouteMiddleware(({ session }) => {
 Isomorphic route middleware travels to the browser and does not read the session (its cookie is HttpOnly). A user can bypass it by requesting data from the API: no error points this out.
 
 ```ts bad
-// app/middleware/admin.ts: la única comprobación del rol
+// app/middleware/admin.ts: the only role check
 export default defineRouteMiddleware(({ url }) => {
   if (!document.cookie.includes("role=admin")) return Response.redirect(new URL("/", url));
 }, { global: false });
@@ -185,7 +185,7 @@ export default defineRouteMiddleware(({ url }) => {
 <!-- no-check -->
 
 ```ts good
-// app/middleware/admin.server.ts: en el servidor, con la sesión
+// app/middleware/admin.server.ts: on the server, with the session
 export default defineServerRouteMiddleware(({ session, url }) => {
   if ((session.current?.data as { role?: string } | undefined)?.role !== "admin") return Response.redirect(new URL("/", url));
 }, { global: false });

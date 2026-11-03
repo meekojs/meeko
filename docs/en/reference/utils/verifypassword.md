@@ -29,7 +29,7 @@ import { ApiError, defineRpc } from "@meekojs/meeko/server";
 import { verifyPassword } from "@meekojs/meeko/password";
 import { loginInput, loginOutput } from "../../../shared/schemas/auth";
 
-const DUMMY_HASH = "scrypt$131072$8$1$…"; // un hash cualquiera, calculado una vez con meeko auth hash
+const DUMMY_HASH = "scrypt$131072$8$1$…"; // any hash, computed once with meeko auth hash
 
 export default defineRpc({
   input: loginInput,
@@ -106,7 +106,7 @@ if (await verifyPassword(input.password, user.passwordHash)) {
 ### A hash in another format
 
 ```ts bad
-await verifyPassword(input.password, "$2b$10$…"); // un hash de bcrypt
+await verifyPassword(input.password, "$2b$10$…"); // a bcrypt hash
 ```
 
 `TypeError: Invalid password hash: expected scrypt$<N>$<r>$<p>$<salt>$<hash> within Meeko's limits`. Migrate those accounts by verifying with their library and storing a new hash with `hashPassword` after the next login.

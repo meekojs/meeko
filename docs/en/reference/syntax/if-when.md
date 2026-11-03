@@ -32,7 +32,7 @@ const user = signal<{ name: string; email: string } | null>(null);
     <h2>{user.value.name}</h2>
     <a bind:href="`mailto:${user.value.email}`">{user.value.email}</a>
   </article>
-  <p if:when="!user.value">Sin sesión.</p>
+  <p if:when="!user.value">Not signed in.</p>
 </template>
 ```
 
@@ -65,8 +65,8 @@ const items = useApi("/api/items");
 </script>
 
 <template>
-  <p if:when="items.pending.value && !items.data.value">Cargando…</p>
-  <p if:when="items.error.value" role="alert">No se pudo cargar.</p>
+  <p if:when="items.pending.value && !items.data.value">Loading…</p>
+  <p if:when="items.error.value" role="alert">Could not load.</p>
   <ul if:when="items.data.value">
     <li each:of="items.data.value" each:as="item" each:key="item.id">{item.name}</li>
   </ul>
@@ -98,7 +98,7 @@ const draft = signal("");
 </script>
 
 <template>
-  <button type="button" bind:aria-expanded="open.value ? 'true' : 'false'" on:click="() => open.value = !open.value">Notas</button>
+  <button type="button" bind:aria-expanded="open.value ? 'true' : 'false'" on:click="() => open.value = !open.value">Notes</button>
   <section bind:hidden="!open.value">
     <textarea model="draft"></textarea>
   </section>
@@ -142,15 +142,15 @@ With `const visibleItems = computed(() => items.value.filter((item) => item.visi
 ### Expect an `else`
 
 ```html bad
-<p if:when="user.value">Hola, {user.value.name}</p>
-<p if:else>Sin sesión.</p>
+<p if:when="user.value">Hello, {user.value.name}</p>
+<p if:else>Not signed in.</p>
 ```
 
 `MEEK024: Directiva de plantilla incompleta`, on `if:else`.
 
 ```html good
-<p if:when="user.value">Hola, {user.value.name}</p>
-<p if:when="!user.value">Sin sesión.</p>
+<p if:when="user.value">Hello, {user.value.name}</p>
+<p if:when="!user.value">Not signed in.</p>
 ```
 
 ### Lose narrowing in an arrow function
@@ -159,7 +159,7 @@ TypeScript does not retain property narrowing inside a function that runs later.
 
 ```html bad
 <div if:when="user.value">
-  <button on:click="() => save(user.value.id)">Guardar</button>
+  <button on:click="() => save(user.value.id)">Save</button>
 </div>
 ```
 
@@ -167,7 +167,7 @@ TypeScript does not retain property narrowing inside a function that runs later.
 
 ```html good
 <div if:when="user.value">
-  <button on:click="saveCurrent">Guardar</button>
+  <button on:click="saveCurrent">Save</button>
 </div>
 ```
 
@@ -176,13 +176,13 @@ With `function saveCurrent(): void { if (user.value) save(user.value.id); }` in 
 ### An empty condition
 
 ```html bad
-<p if:when>Hola</p>
+<p if:when>Hello</p>
 ```
 
 `MEEK020: Expression expected.` The directive needs an expression; to hide an element statically, remove it from the template.
 
 ```html good
-<p if:when="visible.value">Hola</p>
+<p if:when="visible.value">Hello</p>
 ```
 
 ## Notes

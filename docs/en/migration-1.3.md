@@ -33,12 +33,12 @@ What to review when checking `@utilities` modules with TypeScript:
 import { defineUtilities } from "@meekojs/meeko/postcss";
 import type { UtilityDeclarations } from "@meekojs/meeko/postcss";
 
-// Antes: compilaba, pero el navegador descartaba «padding: 4»
+// Before: compiled, but the browser discarded “padding: 4”
 const base = { position: "absolute", padding: 4 };
 
-// Después
+// After
 const base: UtilityDeclarations = { position: "absolute", padding: "4px" };
-// o: const base = { position: "absolute", padding: "4px" } as const;
+// or: const base = { position: "absolute", padding: "4px" } as const;
 
 export default defineUtilities(({ rule }) => [rule(".surface", base)]);
 ```
@@ -81,12 +81,12 @@ A component's `<script>` and template run in SSR and in the browser; `<script se
 `import type` remains allowed in all cases, and a component inside `server/` (an email template, for example) can use everything. The build and `meeko dev` only apply `MEEK108` to the browser bundle, so a component outside `server/` importing only server code still compiles; `meeko check` and the editor, which do not know the import graph, check it as browser code: place it in `server/` for them to accept it.
 
 ```html
-<!-- Antes: app/pages/about.meeko. definePage no tenía efecto aquí (MEEK109) -->
+<!-- Before: app/pages/about.meeko. definePage had no effect here (MEEK109) -->
 <script lang="ts">
 const route = definePage({ render: "prerender" });
 </script>
 
-<!-- Después -->
+<!-- After -->
 <script server lang="ts">
 export const route = definePage({ render: "prerender" });
 </script>
@@ -167,7 +167,7 @@ What to review:
 ```ts
 // server/runtime.ts
 export default defineServerRuntime(() => ({
-  processErrors: { unhandledRejection: "shutdown" }, // o false para el comportamiento del runtime
+  processErrors: { unhandledRejection: "shutdown" }, // or false for the runtime's behavior
   onError(error, requestId, info) {
     if (info) logger.fatal({ kind: info.kind, inRequest: info.inRequest, requestId }, error);
     else logger.error({ requestId }, error);

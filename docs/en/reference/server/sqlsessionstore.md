@@ -65,7 +65,7 @@ A persistent `SessionStore` (`persistent: true`) with `replace` and `revokeFamil
 ### A driver with node-postgres
 
 ```sql
--- Migración, una vez.
+-- Migration, once.
 CREATE TABLE IF NOT EXISTS meeko_sessions (
   id text PRIMARY KEY,
   family_id text NOT NULL UNIQUE,
@@ -142,7 +142,7 @@ const driver: SqlSessionDriver = {
   ...sessionDriver(pool),
   async rateLimit(key, windowMs, now) {
     const { rows } = await pool.query<{ count: number; window_ends_at: string }>(rateLimitSql, [Buffer.from(key), now, windowMs]);
-    return { count: rows[0]!.count, windowEndsAt: Number(rows[0]!.window_ends_at) }; // bigint llega como texto
+    return { count: rows[0]!.count, windowEndsAt: Number(rows[0]!.window_ends_at) }; // bigint is returned as text
   },
 };
 ```
@@ -159,7 +159,7 @@ export default defineApiRoute({
   body: loginInput,
   response: okResult,
   origin: "required",
-  rateLimit: { limit: 5, window: "5m" }, // 5 intentos por IP y ventana, en todas las instancias
+  rateLimit: { limit: 5, window: "5m" }, // 5 attempts per IP and window, across all instances
   handler: async ({ body, context }) => { /* … */ },
 });
 ```
@@ -217,13 +217,13 @@ async rateLimit(key, windowMs, now) {
 ### Multiple instances without `rateLimit` in the driver
 
 ```text bad
-SqlSessionStore sin driver.rateLimit en 3 réplicas: rateLimit { limit: 5, window: "5m" }
+SqlSessionStore without driver.rateLimit across 3 replicas: rateLimit { limit: 5, window: "5m" }
 ```
 
 Each replica counts in its memory: the actual limit is 15. In production Meeko warns once: `[meeko] El store de sesiones no implementa rateLimit: los límites de rateLimit se cuentan en la memoria de cada instancia. Con SqlSessionStore, implemente SqlSessionDriver.rateLimit para compartirlos.`
 
 ```text good
-driver.rateLimit con INSERT … ON CONFLICT DO UPDATE … RETURNING (desde 1.7)
+driver.rateLimit with INSERT … ON CONFLICT DO UPDATE … RETURNING (since 1.7)
 ```
 
 ## Notes

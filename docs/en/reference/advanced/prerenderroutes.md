@@ -34,7 +34,7 @@ const routes = [
   { id: "/", file: "index.meeko", layouts: [], render: "prerender" as const },
   { id: "/blog/[slug]", file: "post.meeko", layouts: [], render: "prerender" as const, sidecar: "post.route.ts" },
 ];
-const pages: Record<string, PageModule> = { "index.meeko": page("Inicio"), "post.meeko": page("Artículo") };
+const pages: Record<string, PageModule> = { "index.meeko": page("Home"), "post.meeko": page("Article") };
 const sidecars: Record<string, PageRoute> = { "post.route.ts": { render: "prerender", prerenderEntries: [{ slug: "hola" }, { slug: "adios" }] } };
 const loadRoute = async (file: string) => sidecars[file]!;
 
@@ -78,7 +78,7 @@ Rejects if a dynamic route lacks `prerenderEntries` (`Dynamic prerender route /b
 ```ts
 await prerenderRoutes({
   routes, handler, loadRoute, outputRoot: "dist/prerender",
-  transformHtml: (html) => html.replace("</body>", `<!-- generado el ${new Date().toISOString()} --></body>`),
+  transformHtml: (html) => html.replace("</body>", `<!-- generated on ${new Date().toISOString()} --></body>`),
 });
 ```
 

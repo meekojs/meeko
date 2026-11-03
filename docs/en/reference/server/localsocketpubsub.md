@@ -68,7 +68,7 @@ export default defineApiRoute({
   response: orderSchema,
   handler: async ({ params }) => {
     const order = await markReady(params.id);
-    // Valida evento y payload con el contrato del canal y publica en el broker del hub.
+    // Validates the event and payload against the channel contract and publishes to the hub's broker.
     await socket.operations.broadcast(order.storeId, "kitchenChanged", { orderId: order.id, status: "ready" });
     return order;
   },
@@ -85,10 +85,10 @@ import { LocalSocketPubSub } from "@meekojs/meeko/server";
 const pubsub = new LocalSocketPubSub();
 const received: unknown[] = [];
 const stop = pubsub.subscribe("chat", "general", (message) => { received.push(message.payload); });
-await pubsub.publish("chat", "general", { event: "message", payload: { text: "Hola" } });
+await pubsub.publish("chat", "general", { event: "message", payload: { text: "Hello" } });
 await pubsub.publish("chat", "otra", { event: "message", payload: { text: "No llega" } });
 stop();
-console.log(received); // [{ text: "Hola" }]
+console.log(received); // [{ text: "Hello" }]
 ```
 
 ### Choose the broker according to the deployment
@@ -98,7 +98,7 @@ console.log(received); // [{ text: "Hola" }]
 ```ts
 // server/runtime.ts
 export default defineServerRuntime(async ({ env }) => {
-  if (!env.MEEKO_REDIS_URL) return { socket: { pubsub: new LocalSocketPubSub() } }; // una sola instancia
+  if (!env.MEEKO_REDIS_URL) return { socket: { pubsub: new LocalSocketPubSub() } }; // a single instance
   const { publisher, subscriber } = await connectRedis(env.MEEKO_REDIS_URL);
   return {
     socket: { pubsub: new RedisSocketPubSub({ publisher, subscriber, prefix: "app:prod:" }) },
@@ -112,7 +112,7 @@ export default defineServerRuntime(async ({ env }) => {
 ### Multiple instances with the local broker
 
 ```text bad
-2 réplicas tras un balanceador, sin socket.pubsub (LocalSocketPubSub por defecto)
+2 replicas behind a load balancer, without socket.pubsub (LocalSocketPubSub by default)
 ```
 
 `broadcast` resolves, but only peers connected to the replica that published it receive the message: users on the other replica do not see the change. Since `1.7`, a production application with channels and without `socket.pubsub` warns once per process at startup, like the in-memory `rateLimit` counter: `[meeko] Los canales de Socket usan LocalSocketPubSub, el broker en memoria de cada instancia: …`. Meeko cannot count replicas, so the warning also appears with a single instance; declare `new LocalSocketPubSub()` to remove it.
@@ -126,7 +126,7 @@ socket: { pubsub: new RedisSocketPubSub({ publisher: redis, subscriber, prefix: 
 ### Use it in Cloudflare Workers
 
 ```ts bad
-socket: { pubsub: new LocalSocketPubSub() } // en un Worker
+socket: { pubsub: new LocalSocketPubSub() } // in a Worker
 ```
 
 Connections live in each room's Durable Object, not in the isolate. The Worker rejects the application on creation: `Socket channels on Cloudflare Workers require DurableObjectSocketPubSub: leave runtime.socket.pubsub unset and bind MEEKO_SOCKET, or set it to new DurableObjectSocketPubSub(env.MEEKO_SOCKET)…`.

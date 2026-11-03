@@ -34,7 +34,7 @@ export interface Article {
   readonly body: TrustedHtml;
 }
 
-// `html` sale de nuestro propio renderizador de Markdown.
+// `html` comes from our own Markdown renderer.
 export function article(title: string, html: string): Article {
   return { title, body: trustHtml(html) };
 }
@@ -46,7 +46,7 @@ export function article(title: string, html: string): Article {
 import { article } from "../../../server/content/articles";
 
 const { params } = usePage();
-export const post = article(params.slug, `<p>Entrada <em>${params.slug}</em></p>`);
+export const post = article(params.slug, `<p>Post <em>${params.slug}</em></p>`);
 </script>
 
 <template>
@@ -93,7 +93,7 @@ import { trustHtml } from "@meekojs/meeko";
 const star = trustHtml('<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1l2 5h5l-4 3 2 6-5-4-5 4 2-6-4-3h5z"/></svg>');
 </script>
 
-<template><span class="icon" html="star"></span> Favorito</template>
+<template><span class="icon" html="star"></span> Favorite</template>
 ```
 
 ### Type a component's prop
@@ -125,7 +125,7 @@ With `const body = signal("<p>Hola</p>")`, `meeko check` warns with ``MEEK107: `
 <script lang="ts">
 import { trustHtml } from "@meekojs/meeko";
 
-const body = signal(trustHtml("<p>Hola</p>"));
+const body = signal(trustHtml("<p>Hello</p>"));
 </script>
 
 <template><article html="body.value"></article></template>
@@ -161,7 +161,7 @@ const safe = computed(() => trustHtml(props.comment));
 ```html good
 <script lang="ts">
 import type { TrustedHtml } from "@meekojs/meeko";
-const props = defineProps<{ comment: TrustedHtml }>(); // saneado en el servidor
+const props = defineProps<{ comment: TrustedHtml }>(); // sanitized on the server
 </script>
 ```
 

@@ -38,7 +38,7 @@ export default defineApiRoute({
       await context.session.verify();
       await payments.charge(params.id, { signal: context.signal });
     } catch (error) {
-      if (error instanceof SessionRevokedError) console.warn("sesión revocada antes del cobro", context.requestId);
+      if (error instanceof SessionRevokedError) console.warn("session revoked before charging", context.requestId);
       throw error; // 401 SESSION_REVOKED
     }
     return { ok: true as const };
@@ -69,7 +69,7 @@ An `Error` that is also an `ApiError`. `errorResponse` converts it into `401` wi
 
 ```ts
 handler: async ({ context }) => {
-  // context.signal se aborta si el cliente se va o si otra pestaña cierra la sesión.
+  // context.signal is aborted if the client leaves or another tab logs out.
   const report = await fetch("https://reports.internal/generate", { method: "POST", signal: context.signal });
   return report.json();
 },
@@ -91,7 +91,7 @@ export function abortReason(signal: AbortSignal): "revoked" | "client" | "none" 
 ### Send the browser to sign-in
 
 ```ts
-// El onError de mountClientApp, o el de un plugin de aplicación.
+// mountClientApp's onError, or an application plugin's.
 import { isClientError } from "@meekojs/meeko/framework";
 
 export function onError(error: unknown): void {
@@ -104,7 +104,7 @@ export function onError(error: unknown): void {
 ### Catch it and continue
 
 ```ts bad
-try { await context.session.verify(); } catch { /* seguimos */ }
+try { await context.session.verify(); } catch { /* continue */ }
 await payments.charge(order);
 ```
 
@@ -113,14 +113,14 @@ The charge is made using a session that is no longer valid. `verify()` exists to
 <!-- no-check -->
 
 ```ts good
-await context.session.verify(); // si lanza, la respuesta es 401 y no se cobra
+await context.session.verify(); // if it throws, the response is 401 and no charge is made
 await payments.charge(order);
 ```
 
 ### Ignore `context.signal`
 
 ```ts bad
-const rows = await db.query(longReportSql); // sin señal
+const rows = await db.query(longReportSql); // without a signal
 ```
 
 There is no error: revocation aborts the signal, but aborting is cooperative and code that does not observe it continues to completion.

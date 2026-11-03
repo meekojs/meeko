@@ -35,7 +35,7 @@ const navigator = createNavigator(routes, async ({ match, signal }) => {
   const html = await (await fetch(`/fragments${match.route.id}?id=${match.params.id ?? ""}`, { signal })).text();
   if (signal.aborted) return false;
   document.querySelector("#outlet")!.innerHTML = html;
-}, window, (error) => console.error("navegación fallida", error));
+}, window, (error) => console.error("navigation failed", error));
 
 await navigator.navigate("/users/42");
 ```
@@ -69,7 +69,7 @@ A `Navigator`:
 ```ts
 const mounted: Array<{ dispose(): void }> = [];
 const navigator = createNavigator(routes, async ({ match, retainedLayouts }) => {
-  // Libera los layouts que salen; los primeros `retainedLayouts` siguen en pantalla.
+  // Release departing layouts; the first `retainedLayouts` remain on screen.
   for (const layout of mounted.splice(retainedLayouts)) layout.dispose();
   for (const file of match.route.layouts.slice(retainedLayouts)) mounted.push(await mountLayout(file));
   await renderPage(match.route.file, match.params);
