@@ -45,7 +45,7 @@ try {
     Copy-Item -LiteralPath (Join-Path $extensionRoot $name) -Destination $stagingRoot
   }
   Copy-Item -LiteralPath (Join-Path $extensionRoot '../../LICENSE') -Destination $stagingRoot
-  foreach ($name in @('dist', 'syntaxes', 'icons')) {
+  foreach ($name in @('dist', 'syntaxes', 'icons', 'snippets')) {
     Copy-Item -LiteralPath (Join-Path $extensionRoot $name) -Destination $stagingRoot -Recurse
   }
 
@@ -83,6 +83,12 @@ try {
       })
       if ($nativeEntries.Count -ne 1) {
         throw "El VSIX contiene $($nativeEntries.Count) ejecutables nativos de TypeScript; se esperaba uno."
+      }
+      # vsce no comprueba las rutas que declara `contributes`: sin esto, un archivo olvidado sólo se nota en el editor.
+      $contributed = @($manifest.contributes.grammars.path) + @($manifest.contributes.snippets.path) + @($manifest.contributes.languages.configuration)
+      foreach ($path in @($contributed | Where-Object { $_ })) {
+        $entry = 'extension/' + ($path -replace '^\./', '')
+        if (!$archive.GetEntry($entry)) { throw "El VSIX no contiene $entry, que declara contributes." }
       }
     } finally {
       $archive.Dispose()
