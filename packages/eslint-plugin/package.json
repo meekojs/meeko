@@ -7,7 +7,7 @@
 		"typescript",
 		"eslint-plugin"
 	],
-	"homepage": "https://meekojs.com/docs/tooling",
+	"homepage": "https://meekojs.com/docs/eslint",
 	"bugs": {
 		"url": "https://github.com/meekojs/meeko/issues"
 	},

@@ -27,7 +27,7 @@ Runtime resource URLs, imports of actual JavaScript files, generated code and im
 - `pnpm format:check`: check formatting throughout the workspace.
 - `pnpm format`: format the workspace with Prettier.
 
-The root `eslint.config.ts` uses `defineEslint`, including Perfectionist and unused-imports. Runtime globals and test exceptions remain scoped to their corresponding files. Test fixtures, generated sources, build output and local tooling state are excluded.
+The root `eslint.config.ts` uses [`defineEslint`](eslint.md): Perfectionist sorts only imports, and unused-imports removes the unused ones. Runtime globals and test exceptions remain scoped to their corresponding files. Test fixtures, generated sources, build output and local tooling state are excluded.
 
 The root `prettier.config.ts` loads the Meeko, CSS order and package.json plugins. The site inherits it; UI adds stylesheet-based class sorting. Existing files are not reformatted automatically when adding or changing the shared configuration.
 

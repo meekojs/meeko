@@ -1,5 +1,5 @@
 ---
-source-hash: 3fe3914e29a25d16a74d556bf8e67fd822a0b5e92b26eeb1fbdbbfbe0fc73623
+source-hash: 3104170185f43d54a976a1c76aa7437b12768a8054ffe1a2a3a5ff2adc040b0d
 ---
 
 # Documentation guide
@@ -31,6 +31,7 @@ The documentation is organized by task. Existing guides keep their paths and anc
 
 - [Doctor](doctor.md): local diagnostics without running the project.
 - [Editors and LSP](editors.md).
+- [ESLint](eslint.md): `defineEslint`, Perfectionist, rules and parser.
 - [ESLint and Prettier](tooling.md).
 - [DevTools](devtools.md).
 - [Tests and CI](testing.md).

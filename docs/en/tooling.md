@@ -1,5 +1,5 @@
 ---
-source-hash: a66e59b4d2b69f8e8d4787789d5733713f54b94d7bf5b775c21bf475c2970db5
+source-hash: 2e4c683db79c7acc6fd8b3d9af29c4435b6588a2ae57b94876af3e9ff1a5723e
 ---
 
 # Workspace tooling
@@ -31,7 +31,7 @@ Runtime resource URLs, imports of actual JavaScript files, generated code and im
 - `pnpm format:check`: check formatting throughout the workspace.
 - `pnpm format`: format the workspace with Prettier.
 
-The root `eslint.config.ts` uses `defineEslint`, including Perfectionist and unused-imports. Runtime globals and test exceptions remain scoped to their corresponding files. Test fixtures, generated sources, build output and local tooling state are excluded.
+The root `eslint.config.ts` uses [`defineEslint`](eslint.md): Perfectionist sorts only imports, and unused-imports removes the unused ones. Runtime globals and test exceptions remain scoped to their corresponding files. Test fixtures, generated sources, build output and local tooling state are excluded.
 
 The root `prettier.config.ts` loads the Meeko, CSS order and package.json plugins. The site inherits it; UI adds stylesheet-based class sorting. Existing files are not reformatted automatically when adding or changing the shared configuration.
 

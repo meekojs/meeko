@@ -32,7 +32,6 @@ El consumidor usa `eslint.config.ts` y el helper tipado del plugin:
 import { defineEslint } from '@meekojs/eslint-plugin'
 
 export default defineEslint({
-	perfectionist: true,
 	unusedImports: true,
 	rules: {
 		'meeko/button-has-type': 'error',
@@ -43,4 +42,4 @@ export default defineEslint({
 
 El helper incluye las bases de JavaScript, TypeScript y Meeko. Instala `eslint`, `jiti` y `@meekojs/eslint-plugin` como dependencias de desarrollo; `jiti` permite que ESLint cargue la configuración TypeScript. El plugin incluye `@eslint/js` y la API TypeScript 6 que necesita TypeScript-ESLint. La aplicación puede seguir comprobándose con TypeScript 7.
 
-`perfectionist` está activa por defecto y ordena imports, objetos, clases, tipos y demás en orden natural, con avisos; `unusedImports` es opcional y está desactivada por defecto. La demo las declara para ordenar y detectar imports sin usar. Sus dependencias se incluyen en el plugin; el consumidor no necesita importarlas en su configuración.
+Sin la opción `perfectionist`, el helper ordena sólo los imports, en orden natural y con avisos; `true` ordena también objetos, tipos y demás, y `false` no ordena nada. `unusedImports` es opcional y está desactivada por defecto; la demo la declara para detectar imports sin usar. Sus dependencias se incluyen en el plugin; el consumidor no necesita importarlas en su configuración. Consulta la [guía de ESLint](eslint.md).

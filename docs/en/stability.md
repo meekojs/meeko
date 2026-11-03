@@ -1,5 +1,5 @@
 ---
-source-hash: 1be2268f1aa5affe4b1967a78053544275f82f333b62e055739b2ad7d9d83973
+source-hash: f46ea11de8999aedf0676f6cfc5fef31806e5367e4dca681f2a8d2b041125788
 ---
 
 # 1.x stability policy
@@ -419,4 +419,4 @@ Report vulnerabilities privately through the **Security** tab of [meekojs/meeko]
 
 ## ESLint
 
-During Meeko 1.x, `defineEslint` enables Perfectionist's complete `recommended-natural` set by default, at `warn` level, with autofix and ascending natural order; that list is decided by the Perfectionist version the plugin pins. In 2.0, `perfectionist/sort-imports` and `perfectionist/sort-named-imports` will become `error`. You can disable them all with `perfectionist: false`, turn one off with `off` or require `error` through `rules`; see the [plugin configuration](../../packages/eslint-plugin/README.md#ordenar-y-limpiar-imports), which also lists the cases where `--fix` changes behavior. Warnings can block CI using `--max-warnings 0`.
+During Meeko 1.x, `defineEslint` sorts only imports by default, with `perfectionist/sort-imports` and `perfectionist/sort-named-imports`, `warn` level, autofix and ascending natural order. In 2.0, those two rules will become `error`. `perfectionist: true` also enables the `recommended-natural` set except `sort-classes` and `sort-modules`; that list is decided by the Perfectionist version the plugin pins. You can disable them all with `perfectionist: false`, turn one off with `off` or require `error` through `rules`; see [Sort with Perfectionist](eslint.md#sort-with-perfectionist), which also lists the cases where `--fix` changes behavior. Warnings can block CI using `--max-warnings 0`.

@@ -27,6 +27,7 @@ La documentación se organiza por tareas. Las guías existentes mantienen sus ru
 
 - [Doctor](doctor.md): diagnóstico local sin ejecutar el proyecto.
 - [Editores y LSP](editors.md).
+- [ESLint](eslint.md): `defineEslint`, Perfectionist, reglas y parser.
 - [ESLint y Prettier](tooling.md).
 - [DevTools](devtools.md).
 - [Pruebas y CI](testing.md).
