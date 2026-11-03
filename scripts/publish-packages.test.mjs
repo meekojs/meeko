@@ -480,6 +480,10 @@ describe('workflow de publicación', () => {
 		assert.match(gates, /needs: \[redis-integration, bun, deno, workerd, vscode-extension\]/)
 		assert.match(gates, /fetch-depth: 0/)
 		assert.match(gates, /merge-base --is-ancestor \$env:GITHUB_SHA origin\/main/)
+		for (const check of ['pnpm lint', 'pnpm format:check', 'pnpm -F meeko-site run test', 'pnpm -F meeko-docs-content run test']) {
+			assert.ok(gates.includes(check), `release gate missing ${check}`)
+			assert.ok(gates.indexOf(check) < gates.indexOf('-PackOnly'), `${check} must run before packing`)
+		}
 		assert.ok(gates.indexOf('package:workspace-smoke') < gates.indexOf('-PackOnly'))
 		assert.ok(gates.indexOf('Browser E2E') < gates.indexOf('-PackOnly'))
 		assert.doesNotMatch(gates, /environment:|npm publish|-Trusted/)

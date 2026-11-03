@@ -209,7 +209,11 @@ jobs:
           }
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+      - run: pnpm lint
+      - run: pnpm format:check
       - run: pnpm check
+      - run: pnpm -F meeko-site run test
+      - run: pnpm -F meeko-docs-content run test
       - run: pnpm test:packages
       - run: pnpm package:workspace-smoke
       - name: Verify package and DevTools

@@ -81,6 +81,25 @@ function outline(body) {
 	return { intro, sections }
 }
 
+/** Keep the template headings in order while allowing a page to explain a topic between them. */
+function assertSectionOrder(titles, required, file) {
+	let next = 0
+	const seen = new Set()
+	const generated = new Set(reference.pageSections.filter((section) => 'generated' in section && section.generated).flatMap((section) => section.titles))
+	for (const title of titles) {
+		assert.ok(!seen.has(title), `${file}: section "${title}" is duplicated or out of order`)
+		seen.add(title)
+		assert.ok(!generated.has(title), `${file}: generated section "${title}" must not be written`)
+		if (required[next]?.titles.includes(title)) {
+			next++
+			continue
+		}
+		assert.ok(next > 0 && next < required.length, `${file}: "${title}" must be between template sections`)
+		assert.ok(!required.some((section) => section.titles.includes(title)), `${file}: template section "${title}" is duplicated or out of order`)
+	}
+	assert.equal(next, required.length, `${file}: the sections must include ${required.map((section) => section.titles.join(' | ')).join(', ')} in order; found ${titles.join(', ')}`)
+}
+
 /** Each written page with the entry of the taxonomy that owns it. */
 async function pagesWithEntries() {
 	const { entries } = await reference.resolvedTaxonomy()
@@ -161,8 +180,7 @@ test('every page has the sections of the template, in order', async () => {
 		const { intro, sections } = outline(page.body)
 		assert.ok(intro.trim(), `${page.file}: the page starts with its description, before "## Uso"`)
 		const titles = sections.map((section) => section.title)
-		assert.equal(titles.length, written.length, `${page.file}: the sections must be ${written.map((section) => section.titles.join(' | ')).join(', ')}; found ${titles.join(', ')}`)
-		titles.forEach((title, index) => assert.ok(written[index].titles.includes(title), `${page.file}: section ${index + 1} must be ${written[index].titles.join(' or ')}, not "${title}"`))
+		assertSectionOrder(titles, written, page.file)
 		const mistakes = sections.find((section) => section.title === 'Errores comunes')
 		assert.ok(mistakes.subsections.length, `${page.file}: "Errores comunes" needs at least one ### mistake`)
 		for (const mistake of mistakes.subsections) {
@@ -179,6 +197,18 @@ test('every page has the sections of the template, in order', async () => {
 		const examples = sections.find((section) => section.title === 'Ejemplos')
 		assert.ok(examples.fences.length, `${page.file}: "Ejemplos" needs code`)
 	}
+})
+
+test('topic sections cannot hide missing, repeated or reordered template sections', () => {
+	const required = reference.pageSections.filter((section) => !('generated' in section && section.generated))
+	const titles = required.map((section) => section.titles[0])
+	assert.doesNotThrow(() => assertSectionOrder([...titles.slice(0, 3), 'Por prop y evento', ...titles.slice(3)], required, 'example.md'))
+	assert.throws(() => assertSectionOrder([...titles.slice(0, 2), 'Por prop y evento', ...titles.slice(3)], required, 'example.md'), /duplicated or out of order/)
+	assert.throws(() => assertSectionOrder(titles.slice(0, -1), required, 'example.md'), /sections must include/)
+	assert.throws(() => assertSectionOrder([...titles.slice(0, 3), titles[1], ...titles.slice(3)], required, 'example.md'), /duplicated or out of order/)
+	assert.throws(() => assertSectionOrder([titles[0], 'Por prop y evento', titles[2], titles[1], ...titles.slice(3)], required, 'example.md'), /duplicated or out of order/)
+	assert.throws(() => assertSectionOrder([titles[0], 'Tipo', ...titles.slice(1)], required, 'example.md'), /generated section/)
+	assert.throws(() => assertSectionOrder([...titles.slice(0, 3), 'Por prop y evento', 'Por prop y evento', ...titles.slice(3)], required, 'example.md'), /duplicated or out of order/)
 })
 
 test('fallback links and related guide sections exist', async () => {
