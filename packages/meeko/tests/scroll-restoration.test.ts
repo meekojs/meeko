@@ -64,8 +64,8 @@ function fakeBrowser(start: string, storage = new Map<string, string>()) {
 			listeners.get(name)?.delete(listener)
 		},
 	}
-	const dispatch = (name: string): void => {
-		for (const listener of listeners.get(name) ?? []) listener(new Event(name))
+	const dispatch = (name: string, persisted = false): void => {
+		for (const listener of listeners.get(name) ?? []) listener(Object.assign(new Event(name), { persisted }))
 	}
 	return {
 		window: browser as unknown as Window,
@@ -327,8 +327,15 @@ test('a page that hides leaves the entry to the browser, and the next document f
 	fake.userScroll(6000)
 	fake.dispatch('pagehide')
 	assert.equal(fake.browser.history.scrollRestoration, 'auto', 'a reload restores early, before hydration')
-	fake.dispatch('pageshow')
+	fake.dispatch('pageshow', true)
 	assert.equal(fake.browser.history.scrollRestoration, 'manual', 'a page back from the bfcache takes over again')
+	assert.equal(fake.browser.scrollY, 6000, 'and keeps its position')
+	assert.deepEqual(fake.scrolls.slice(-1), [0], 'without a scroll of its own')
+	// The WebKit of Windows brings it back at the top.
+	fake.dispatch('pagehide')
+	fake.browser.scrollY = 0
+	fake.dispatch('pageshow', true)
+	assert.equal(fake.browser.scrollY, 6000)
 	fake.dispatch('pagehide')
 	navigator.dispose()
 	assert.match(storage.get('meeko:scroll')!, /\[0,4000\]/)

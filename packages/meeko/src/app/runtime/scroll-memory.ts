@@ -130,8 +130,11 @@ export function createScrollMemory(browser: Window, navigating: () => boolean): 
 		save()
 		history.scrollRestoration = 'auto'
 	}
-	const onPageShow = (): void => {
+	const onPageShow = (event: PageTransitionEvent): void => {
 		history.scrollRestoration = 'manual'
+		// A page back from the bfcache keeps its position, except in the WebKit of Windows.
+		const left = current === undefined ? undefined : entries.get(current)
+		if (event.persisted && left && browser.scrollY === 0) restore(left)
 	}
 
 	const stored = current === undefined ? undefined : entries.get(current)
