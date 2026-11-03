@@ -42,20 +42,29 @@ export default definePlugin<Options>(async (app, options) => {
 	const load = async (routeId: string | null): Promise<void> => {
 		// A localized route (`/en/guide`) loads the namespaces of the page it reuses (`/guide`); the
 		// error page (`routeId` null) still gets `common` and the global namespaces.
-		const names = ['common', ...options.global, ...options.multilingual, ...(options.routes[routeId === null ? '' : baseRouteId(routeId, options.locales)] ?? [])]
-		for (const name of names) {
-			if (loaded.has(name)) continue
-			const module = loaders[name]
-			if (!module) throw new RangeError(`i18n: missing ${locale}/${name}`)
-			Object.assign(catalog, (await module()).default)
-			loaded.add(name)
+		const names = new Set(['common', ...options.global, ...options.multilingual, ...(options.routes[routeId === null ? '' : baseRouteId(routeId, options.locales)] ?? [])])
+		const pending = [...names].filter((name) => !loaded.has(name))
+		// Requested at once: each one in turn costs the visitor a round trip per namespace. They are merged
+		// in the order of the list and up to the first failure, whichever arrives first; waiting for all of
+		// them leaves no rejection unhandled, which would stop a Node server.
+		const modules = await Promise.allSettled(
+			pending.map(async (name) => {
+				const module = loaders[name]
+				if (!module) throw new RangeError(`i18n: missing ${locale}/${name}`)
+				return await module()
+			}),
+		)
+		for (const [index, module] of modules.entries()) {
+			if (module.status === 'rejected') throw module.reason
+			Object.assign(catalog, module.value.default)
+			loaded.add(pending[index]!)
 		}
 	}
-	await load(app.route.id.value)
 	// Text written in another language (a suggestion in the suggested one) is known before rendering,
 	// so `t(key, values, { locale })` stays synchronous and SSR and hydration agree.
 	const foreign: Record<string, Record<string, Message>> = Object.create(null)
-	if (options.multilingual.length) {
+	const loadForeign = async (): Promise<void> => {
+		if (!options.multilingual.length) return
 		await Promise.all(
 			options.locales
 				.filter((target) => target !== locale)
@@ -67,6 +76,10 @@ export default definePlugin<Options>(async (app, options) => {
 				}),
 		)
 	}
+	// Both at once too; a failure of the document's own catalogs is the one reported.
+	const [own, others] = await Promise.allSettled([load(app.route.id.value), loadForeign()])
+	if (own.status === 'rejected') throw own.reason
+	if (others.status === 'rejected') throw others.reason
 	// A message outside the loaded namespaces renders its key instead of throwing: a throw would take
 	// down the whole document, including the error page that reports another failure. It is reported
 	// once per locale and key on the server (logs, prerender) and, in `meeko dev`, also in the browser.
