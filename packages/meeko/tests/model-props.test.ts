@@ -5,6 +5,9 @@ import { join, resolve } from 'node:path'
 import test from 'node:test'
 import { pathToFileURL } from 'node:url'
 
+import type { DevtoolsHook } from '../src/app/runtime/devtools.ts'
+
+import { enableHotModule, replaceHotModule } from '../src/app/runtime/hmr.ts'
 import { checkSource } from '../src/check.ts'
 import { compile } from '../src/compiler.ts'
 import { MeekoCompileError } from '../src/compiler/parser/sfc.ts'
@@ -18,19 +21,31 @@ interface RuntimeModule {
 const runtime = (path: string): string => JSON.stringify(pathToFileURL(resolve(path)).href)
 
 /** Compiles components against the source runtime, so the test and the components share one instance of it. */
-async function load(components: Record<string, string>, entry: string): Promise<{ component: RuntimeModule; cleanup: () => Promise<void> }> {
+async function load(components: Record<string, string>, entry: string, hot = false): Promise<{ component: RuntimeModule; modules: Record<string, RuntimeModule>; recompile: (name: string, source: string) => Promise<RuntimeModule>; cleanup: () => Promise<void> }> {
 	const parent = resolve('.meeko')
 	await mkdir(parent, { recursive: true })
 	const directory = await mkdtemp(join(parent, 'model-props-test-'))
-	for (const [name, source] of Object.entries(components)) {
-		let code = compile(source, join(directory, `${name}.meeko`))
+	const compiled = (name: string, source: string): string => {
+		let code = compile(source, join(directory, `${name}.meeko`), { hot })
 			.code.replace(`from "@meekojs/meeko/internal"`, `from ${runtime('src/internal.ts')}`)
 			.replaceAll(`from "@meekojs/meeko"`, `from ${runtime('src/index.ts')}`)
 		for (const other of Object.keys(components)) code = code.replace(`from "./${other}.meeko"`, `from "./${other}.ts"`)
-		await writeFile(join(directory, `${name}.ts`), code)
+		return code
 	}
-	const component = (await import(pathToFileURL(join(directory, `${entry}.ts`)).href)) as RuntimeModule
-	return { component, cleanup: () => rm(directory, { recursive: true, force: true }) }
+	for (const [name, source] of Object.entries(components)) await writeFile(join(directory, `${name}.ts`), compiled(name, source))
+	const modules: Record<string, RuntimeModule> = {}
+	for (const name of Object.keys(components)) modules[name] = (await import(pathToFileURL(join(directory, `${name}.ts`)).href)) as RuntimeModule
+	return {
+		component: modules[entry]!,
+		modules,
+		// A new version of a component: the same file, so the same hot id.
+		async recompile(name, source) {
+			const file = join(directory, `${name}.next.ts`)
+			await writeFile(file, compiled(name, source))
+			return (await import(pathToFileURL(file).href)) as RuntimeModule
+		},
+		cleanup: () => rm(directory, { recursive: true, force: true }),
+	}
 }
 
 /** The child of every row of the table: one model of each kind, shown and written from inside. */
@@ -385,6 +400,82 @@ const value = defineModel<string>();
 		assert.throws(() => component.renderToString({}), /model "default" is required: pass model="signal" or bind:modelValue="value"/)
 		assert.throws(() => component.renderToString({ 'onUpdate:modelValue': () => {} }), /model "default" is required/)
 	} finally {
+		await cleanup()
+	}
+})
+
+test('a hot replacement keeps the model: the prop for the one that follows it, the local value without an event for its own', async () => {
+	const script = `const name = signal("Ada");\nconst calls = signal(0);`
+	const tag = `<section id="bound"><Child bind:modelValue="name.value" on:update:modelValue="(next) => { calls.value++; name.value = next; }" /></section><section id="own"><Child on:update:modelValue="() => calls.value++" /></section><p class="calls">{calls.value}</p><button type="button" class="rename" on:click="() => name.value = 'Grace'">r</button>`
+	const { component, modules, recompile, cleanup } = await load({ Child: child, Parent: parentOf(script, tag) }, 'Parent', true)
+	const next = await recompile('Child', child.replace('class="state"', 'class="state next"'))
+	const window = new Window()
+	try {
+		const id = (modules.Child as unknown as { __hotId: string }).__hotId
+		enableHotModule(id)
+		const root = window.document.createElement('main')
+		const { html, state } = component.renderWithState({})
+		root.innerHTML = html
+		const release = component.hydrate(root as unknown as Element, {}, state)
+		const shown = (section: string): string => root.querySelector(`#${section} .state`)?.textContent ?? ''
+		const input = root.querySelector('#own input') as unknown as HTMLInputElement
+		input.value = 'mine'
+		input.dispatchEvent(new window.Event('input', { bubbles: true }) as unknown as Event)
+		assert.equal(root.querySelector('.calls')?.textContent, '1')
+
+		replaceHotModule(id, next)
+
+		assert.ok(root.querySelector('#bound .state.next'), 'the new version is mounted')
+		assert.equal(shown('bound'), 'Ada|false')
+		assert.equal(shown('own'), 'mine|false')
+		assert.equal(root.querySelector('.calls')?.textContent, '1', 'restoring is not a write')
+		// The new instance follows the prop and calls the event; the old one is gone.
+		;(root.querySelector('.rename') as unknown as HTMLElement).click()
+		assert.equal(shown('bound'), 'Grace|false')
+		const bound = root.querySelector('#bound input') as unknown as HTMLInputElement
+		bound.value = 'typed'
+		bound.dispatchEvent(new window.Event('input', { bubbles: true }) as unknown as Event)
+		assert.equal(shown('bound'), 'typed|false')
+		assert.equal(root.querySelector('.calls')?.textContent, '2')
+		release()
+	} finally {
+		window.happyDOM.abort()
+		await cleanup()
+	}
+})
+
+test('DevTools shows a model that follows a prop, its changes, and an edit reaches the parent as a write', async () => {
+	const script = `const name = signal("Ada");\nconst seen = signal("-");`
+	const tag = `<Child bind:modelValue="name.value" on:update:modelValue="(next) => seen.value = next" /><p class="seen">{seen.value}</p><button type="button" class="rename" on:click="() => name.value = 'Grace'">r</button>`
+	const { component, cleanup } = await load({ Child: child, Parent: parentOf(script, tag) }, 'Parent', true)
+	const window = new Window()
+	const names = ['window', 'Node'] as const
+	const previous = names.map((name) => ({ name, value: Reflect.get(globalThis, name), present: Reflect.has(globalThis, name) }))
+	Reflect.set(globalThis, 'window', window)
+	Reflect.set(globalThis, 'Node', window.Node)
+	try {
+		const root = window.document.createElement('main')
+		const { html, state } = component.renderWithState({})
+		root.innerHTML = html
+		const release = component.hydrate(root as unknown as Element, {}, state)
+		const hook = Reflect.get(window, '__MEEKO_DEVTOOLS__') as DevtoolsHook
+		const instance = (): DevtoolsHook extends { snapshot(): { instances: Array<infer I> } } ? I : never => hook.snapshot().instances.find((item) => item.name === 'Child')!
+		assert.equal(instance().signals.value, 'Ada')
+		;(root.querySelector('.rename') as unknown as HTMLElement).click()
+		assert.equal(instance().signals.value, 'Grace')
+		assert.ok(hook.snapshot().events.some((event) => event.kind === 'signal' && event.instanceId === instance().id && event.detail === 'value'))
+		// An edit in the panel is a write of the child: the parent decides, and the value stays.
+		assert.deepEqual(hook.setSignal(instance().id, 'value', 'edited'), { ok: true })
+		assert.equal(root.querySelector('.seen')?.textContent, 'edited')
+		assert.equal(instance().signals.value, 'Grace')
+		release()
+		assert.equal(hook.snapshot().instances.length, 0)
+	} finally {
+		for (const item of previous) {
+			if (item.present) Reflect.set(globalThis, item.name, item.value)
+			else Reflect.deleteProperty(globalThis, item.name)
+		}
+		window.happyDOM.abort()
 		await cleanup()
 	}
 })

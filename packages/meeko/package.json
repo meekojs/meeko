@@ -128,7 +128,7 @@
 		"conformance:deno": "pnpm run build && tsx --test tests/conformance/deno.test.ts",
 		"conformance:node": "pnpm run build && tsx --test tests/conformance/node.test.ts",
 		"conformance:workerd": "pnpm run build && tsx --test tests/conformance/workerd.test.ts",
-		"e2e": "pnpm run example:bundle && pnpm run vite:build && tsx --test tests/browser.e2e.ts tests/editor-bridge.e2e.ts tests/devtools-config.e2e.ts tests/teleport.e2e.ts tests/popover-select.e2e.ts tests/scoped-styles.e2e.ts tests/document-html.e2e.ts tests/scroll-restoration.e2e.ts",
+		"e2e": "pnpm run example:bundle && pnpm run vite:build && tsx --test tests/browser.e2e.ts tests/editor-bridge.e2e.ts tests/devtools-config.e2e.ts tests/teleport.e2e.ts tests/popover-select.e2e.ts tests/model-props.e2e.ts tests/scoped-styles.e2e.ts tests/document-html.e2e.ts tests/scroll-restoration.e2e.ts",
 		"example:bundle": "pnpm run build && pnpm run example:compile && esbuild examples/counter/client.ts --bundle --format=esm --platform=browser --target=es2022 --outfile=examples/counter/client.bundle.js",
 		"example:check": "tsc -p examples/counter/tsconfig.json --noEmit",
 		"example:compile": "node dist/cli.js compile examples/counter/Counter.meeko examples/counter/Counter.generated.ts && node dist/cli.js compile examples/attributes/Attributes.meeko examples/attributes/Attributes.generated.ts && node dist/cli.js compile examples/regions/Regions.meeko examples/regions/Regions.generated.ts && node dist/cli.js compile examples/primitives/Primitives.meeko examples/primitives/Primitives.generated.ts",

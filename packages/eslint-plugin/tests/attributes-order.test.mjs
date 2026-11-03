@@ -25,6 +25,7 @@ tester.run('attributes-order', rule, {
 	valid: [
 		wrap('id="a" title="b" class="c" on:click="save"'),
 		wrap('ref:card each:of="items" each:as="item" each:index="index" each:key="item.id" if:when="visible" is="Card" id="a" class="c" model="value" bind:title="title" bind="attrs" on:save="save" html="content"', 'component'),
+		wrap('id="a" bind:modelValue="title" on:update:modelValue="save"', 'AppInput'),
 		wrap('name="row" params="item"', 'snippet'),
 		wrap('snippet="row" args="item"', 'render'),
 		wrap('alt="a" bind:title="title"'),
@@ -41,6 +42,7 @@ tester.run('attributes-order', rule, {
 		{ code: wrap('model="value" title="t"'), output: wrap('title="t" model="value"'), errors: error },
 		{ code: wrap('model:value="value" title="t"', 'Card'), output: wrap('title="t" model:value="value"', 'Card'), errors: error },
 		{ code: wrap('on:click="save" class="c"'), output: wrap('class="c" on:click="save"'), errors: error },
+		{ code: wrap('on:update:modelValue="save" bind:modelValue="title"', 'AppInput'), output: wrap('bind:modelValue="title" on:update:modelValue="save"', 'AppInput'), errors: error },
 		{ code: wrap('html="content" class="c"'), output: wrap('class="c" html="content"'), errors: error },
 		{ code: wrap('params="item" name="row"', 'snippet'), output: wrap('name="row" params="item"', 'snippet'), errors: error },
 		{ code: wrap('args="item" snippet="row"', 'render'), output: wrap('snippet="row" args="item"', 'render'), errors: error },

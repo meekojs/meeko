@@ -20,6 +20,16 @@ for (const name of ['button', 'dashboard', 'error', 'login']) {
 	})
 }
 
+test('formats the event of a model, a name with two colons, as any event', async () => {
+	const source = `<script lang="ts">\nimport { signal } from "@meekojs/meeko"\nimport * as AppInput from "./AppInput.meeko"\nconst name = signal("")\n</script>\n\n<template>\n<AppInput   bind:modelValue="name.value" on:update:modelValue="(next)=>{name.value=next}" />\n</template>\n`
+	const options = { filepath: 'Component.meeko', plugins: [plugin] }
+	const formatted = await format(source, options)
+	assert.match(formatted, /bind:modelValue="name\.value"/)
+	assert.match(formatted, /on:update:modelValue="\s*\(next\) => \{\s*name\.value = next;?\s*\}\s*"/)
+	assert.equal(await format(formatted, options), formatted)
+	assert.match(compile(formatted, 'Component.meeko').code, /"onUpdate:modelValue":/)
+})
+
 test('keeps self-closing HTML elements and empty elements with end tags as written', async () => {
 	const source = `<script lang="ts">\nconst title = "t"\n</script>\n\n<template>\n<div class="a"   bind:title="title" /><span/><p>after</p><ul><li /><li>b</li></ul><svg><path d="M0" /></svg><em></em>\n</template>\n`
 	const options = { filepath: 'Component.meeko', plugins: [plugin] }
