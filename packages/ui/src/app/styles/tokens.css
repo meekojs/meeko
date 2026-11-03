@@ -11,6 +11,8 @@
 	--ui-color-surface: var(--ui-color-surface-2);
 	--ui-color-surface-raised: var(--ui-color-surface-1);
 	--ui-color-overlay: rgb(0 0 0 / 50%);
+	/* The overlay over the page, already opaque: the gutter of the scrollbar only takes a solid color. */
+	--ui-color-overlay-solid: color-mix(in srgb, var(--ui-color-bg) 50%, black);
 
 	/* Controls */
 	--ui-color-control: var(--ui-color-surface-3);
@@ -203,7 +205,7 @@
 	--ui-landing-title-size: clamp(var(--ui-font-size-4xl), 6vw, var(--ui-font-size-6xl));
 	--ui-page-title-size: var(--ui-font-size-3xl);
 	--ui-page-title-tracking: var(--ui-tracking-tight);
-	--ui-option-active-ring: inset 0 0 0 var(--ui-border-width) var(--ui-color-primary-border);
+	--ui-option-active-ring: inset 0 0 0 var(--ui-border-width) var(--ui-color-focus);
 	--ui-brand-image-height: 1.75rem;
 	--ui-icon-size: 1rem;
 	--ui-icon-size-sm: 0.8125rem;

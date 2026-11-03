@@ -159,12 +159,31 @@ test('UIPopover documents a keyboard menu, a light dialog and a tooltip that nev
 	assert.deepEqual(errors, [])
 })
 
-test('the active row looks the same in UISelect, UICombobox and UICommandPalette, in both themes', { timeout: 180_000 }, async (context) => {
+/** WCAG contrast between two computed `rgb()` colors; the second may start a longer value, such as a box-shadow. */
+function contrast(first, second) {
+	const luminance = (color) => {
+		const [red, green, blue] = color
+			.match(/[\d.]+/g)
+			.slice(0, 3)
+			.map((channel) => {
+				const value = Number(channel) / 255
+				return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4
+			})
+		return 0.2126 * red + 0.7152 * green + 0.0722 * blue
+	}
+	const [light, dark] = [luminance(first), luminance(second)].sort((a, b) => b - a)
+	return (light + 0.05) / (dark + 0.05)
+}
+
+test('the active row looks the same in UISelect, UICombobox and UICommandPalette, in both themes, with a ring of 3:1 or more', { timeout: 180_000 }, async (context) => {
 	const { browser, origin } = await startDemo(context)
 	const look = (row) =>
 		row.evaluate((element) => {
 			const style = globalThis.getComputedStyle(element)
-			return { background: style.backgroundColor, ring: style.boxShadow }
+			const select = element.closest('select')
+			let holder = element.parentElement
+			while (holder && /^(?:transparent|rgba\(.*, 0\))$/.test(globalThis.getComputedStyle(holder).backgroundColor)) holder = holder.parentElement
+			return { background: style.backgroundColor, ring: style.boxShadow, around: (select ? globalThis.getComputedStyle(select, '::picker(select)') : globalThis.getComputedStyle(holder)).backgroundColor }
 		})
 	const setTheme = (page, theme) => page.evaluate((value) => globalThis.document.documentElement.setAttribute('data-theme', value), theme)
 	for (const theme of ['light', 'dark']) {
@@ -192,6 +211,11 @@ test('the active row looks the same in UISelect, UICombobox and UICommandPalette
 		assert.notEqual(palette.ring, 'none', theme)
 		assert.deepEqual(select, palette, `UISelect, ${theme}`)
 		assert.deepEqual(combobox, palette, `UICombobox, ${theme}`)
+		// It tells where the keyboard is, so it must stand out from the row and from the list around it.
+		for (const surface of [palette.background, palette.around]) {
+			const ratio = contrast(palette.ring, surface)
+			assert.ok(ratio >= 3, `the ring against ${surface} in ${theme}: ${ratio.toFixed(2)}:1`)
+		}
 		assert.deepEqual(errors, [])
 		await page.close()
 	}

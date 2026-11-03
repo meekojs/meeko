@@ -108,17 +108,19 @@ La interfaz crece con la pantalla en un solo sitio, la base global: `html { font
 
 Con `pointer: coarse` los altos crecen solos, y los inputs usan `--ui-input-font-size` a 16px para que iOS no amplíe la página al enfocarlos.
 
+**Hueco de la barra de desplazamiento:** ni un `<dialog>` ni su `::backdrop` llegan a pintarlo, y sólo admite el color de fondo de la raíz. Con un modal abierto, la base le da `--ui-color-overlay-solid`, y `--ui-color-surface-raised` con un `UIDrawer` al final, que lo toca. Si cambias `--ui-color-overlay`, cambia también ese token.
+
 ## Estados
 
-| Estado        | Cómo                                                                                                             |
-| ------------- | ---------------------------------------------------------------------------------------------------------------- |
-| Hover         | Fondo un paso más: `-hover`. Con `--ui-duration-fast`.                                                           |
-| Pulsado       | `-active`.                                                                                                       |
-| Foco          | Siempre `:focus-visible` con `--ui-focus-ring`. No lo quites sin dar otro igual de claro.                        |
-| Deshabilitado | `opacity: var(--ui-opacity-disabled)` y `cursor: not-allowed`.                                                   |
-| Inválido      | `aria-invalid="true"`, borde `--ui-color-danger` y mensaje en `--ui-color-danger-text`.                          |
-| Seleccionado  | `--ui-color-control-active` y peso `semibold`, o `--ui-color-primary-soft` si es el acento de la vista.          |
-| Fila activa   | `--ui-color-control-active` y `--ui-option-active-ring`, igual en `UISelect`, `UICombobox` y `UICommandPalette`. |
+| Estado        | Cómo                                                                                                                                                 |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Hover         | Fondo un paso más: `-hover`. Con `--ui-duration-fast`.                                                                                               |
+| Pulsado       | `-active`.                                                                                                                                           |
+| Foco          | Siempre `:focus-visible` con `--ui-focus-ring`. No lo quites sin dar otro igual de claro.                                                            |
+| Deshabilitado | `opacity: var(--ui-opacity-disabled)` y `cursor: not-allowed`.                                                                                       |
+| Inválido      | `aria-invalid="true"`, borde `--ui-color-danger` y mensaje en `--ui-color-danger-text`.                                                              |
+| Seleccionado  | `--ui-color-control-active` y peso `semibold`, o `--ui-color-primary-soft` si es el acento de la vista.                                              |
+| Fila activa   | `--ui-color-control-active` y `--ui-option-active-ring`, con `--ui-color-focus` y 3:1 o más, igual en `UISelect`, `UICombobox` y `UICommandPalette`. |
 
 ## Movimiento
 
