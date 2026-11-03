@@ -233,6 +233,11 @@ test('back and forward return to the position of each entry, with no frame elsew
 		const animates = await page.evaluate(() => typeof document.startViewTransition === 'function')
 		await scrollPage(page, 9000)
 		await follow(page, 'to-other', 'other')
+		if (animates) {
+			// Firefox and WebKit capture the new state as soon as the update callback ends.
+			const atReady = await page.evaluate(() => (globalThis as unknown as Spy).spy.atReady)
+			near(atReady.at(-1)!, 0, `${engine}: a new navigation is at the top when the transition is ready`)
+		}
 		await scrollPage(page, 4000)
 		await page.evaluate(() => {
 			;(globalThis as unknown as Spy).spy.atReady.length = 0

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { createNavigator, createRouteManifest } from '../src/app/runtime/router.ts'
+import { createAppNavigator, createNavigator, createRouteManifest } from '../src/app/runtime/router.ts'
 
 const routes = createRouteManifest([{ id: '/docs/[slug]', file: 'doc.meeko', layouts: [] }])
 
@@ -132,6 +132,31 @@ test('the position is applied in the same turn as the commit of the traversal, w
 	assert.equal(positionAtCommit, 0, 'the old page is on screen while it renders')
 	assert.equal(fake.browser.scrollY, 5000)
 	assert.equal(fake.pendingFrames, 0, 'nothing is left for a later frame when the position is reachable')
+	navigator.dispose()
+})
+
+test('a renderer that settles the scroll with its DOM gets it there, for new entries and traversals, and once', async () => {
+	const fake = fakeBrowser('https://example.test/docs/a')
+	const seen: number[] = []
+	const navigator = createAppNavigator(
+		routes,
+		(context) => {
+			context.settleScroll?.()
+			seen.push(fake.browser.scrollY)
+		},
+		fake.window,
+	)
+	fake.userScroll(5000)
+	await navigator.navigate('/docs/b')
+	assert.deepEqual(seen, [0], 'a new entry is at the top before the update callback ends')
+	assert.deepEqual(fake.scrolls, [0], 'and scrolls once')
+	fake.userScroll(700)
+	fake.traverse(-1)
+	await settle()
+	assert.deepEqual(seen, [0, 5000], 'the entry left keeps the position it had before the scroll')
+	fake.traverse(1)
+	await settle()
+	assert.deepEqual(seen, [0, 5000, 700])
 	navigator.dispose()
 })
 

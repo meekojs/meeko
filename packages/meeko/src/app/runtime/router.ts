@@ -420,7 +420,7 @@ export function createNavigator(routes: readonly RouteRecord[], render: (context
 
 /**
  * What the router of an application tells its renderer. `settleScroll` goes right after the DOM of a
- * traversal changes: a browser may capture the new state of a View Transition as soon as the update
+ * navigation changes: a browser may capture the new state of a View Transition as soon as the update
  * callback ends, so afterwards is too late.
  */
 export type AppNavigationContext = NavigationContext & { readonly settleScroll?: () => void }
@@ -522,9 +522,13 @@ export function createAppNavigator(routes: readonly RouteRecord[], render: (cont
 		const settleScroll = (): void => {
 			if (scrollSettled) return
 			scrollSettled = true
-			if (!memory.arrive()) scrollToFragment(browser, url, true)
+			// A new entry starts at the top or at its fragment, and a replaced one keeps the scroll unless a
+			// fragment names an element. A traversal goes back to its position or, without one, to its
+			// fragment or the top. The entry being left remembers its position from before this.
+			if (!traversal) scrollToFragment(browser, url, !options.replace)
+			else if (!memory.arrive()) scrollToFragment(browser, url, true)
 		}
-		const shared = { url, signal: controller.signal, retainedLayouts, ...(traversal ? { settleScroll } : {}), ...(options.viewTransition === undefined ? {} : { viewTransition: options.viewTransition }) }
+		const shared = { url, signal: controller.signal, retainedLayouts, settleScroll, ...(options.viewTransition === undefined ? {} : { viewTransition: options.viewTransition }) }
 		let result: void | boolean
 		try {
 			result = match ? await render({ ...shared, match }) : await unmatched!.render(shared)
@@ -579,11 +583,8 @@ export function createAppNavigator(routes: readonly RouteRecord[], render: (cont
 		currentLayouts = layouts
 		currentUrl = url.href
 		pending = undefined
-		// A new entry starts at the top or at its fragment, and a replaced one keeps the scroll unless a
-		// fragment names an element. A traversal goes back to its position or, without one, to its fragment
-		// or the top, here if its renderer did not ask for it with the DOM.
-		if (traversal) settleScroll()
-		else scrollToFragment(browser, url, !options.replace)
+		// Here if the renderer did not ask for it with the DOM, as a host of `createNavigator`.
+		settleScroll()
 		memory.note()
 		return true
 	}
