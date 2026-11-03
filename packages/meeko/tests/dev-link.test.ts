@@ -233,7 +233,7 @@ test('findLinkedPackages finds the linked packages built for Meeko, also through
 })
 
 /** A supervisor whose server fails while `ready` is missing, as one that reads a `dist` halfway. */
-async function supervisor(context: { after(fn: () => Promise<void>): void }, options: { failAfter?: number; falseEvents?: boolean; ready?: boolean } = {}) {
+async function supervisor(context: { after(fn: () => Promise<void>): void }, options: { failAfter?: number; falseEvents?: boolean; gated?: boolean; ready?: boolean } = {}) {
 	const root = await sandbox(context)
 	const meeko = join(root, 'meeko')
 	const ui = join(root, 'ui')
@@ -241,6 +241,7 @@ async function supervisor(context: { after(fn: () => Promise<void>): void }, opt
 	await mkdir(join(ui, 'dist'), { recursive: true })
 	const ready = join(root, 'ready')
 	const log = join(root, 'log')
+	const gate = join(root, 'gate-')
 	if (options.ready) await writeFile(ready, '')
 	await writeFile(log, '')
 	const script = join(root, 'supervisor.mts')
@@ -248,9 +249,17 @@ async function supervisor(context: { after(fn: () => Promise<void>): void }, opt
 	await writeFile(
 		script,
 		`import { EventEmitter } from "node:events";
-import { appendFileSync, existsSync } from "node:fs";
-import { isSupervisedDevelopment, runSupervisedDevelopment, superviseDevelopment } from ${JSON.stringify(module)};
+import { appendFileSync, existsSync, readFileSync, watch } from "node:fs";
+import { isSupervisedDevelopment, linkVerifyDelay, runSupervisedDevelopment, superviseDevelopment } from ${JSON.stringify(module)};
 const log = ${JSON.stringify(log)};
+// The real watch, which logs "settled" once the supervisor has judged every event it got. Timers of one
+// duration run in the order they were set, so this one runs after the one each event set or extended.
+let judging = 0;
+const reporting = (path, options, listener) => watch(path, options, (event, name) => {
+  listener(event, name);
+  judging++;
+  setTimeout(() => { if (--judging === 0) appendFileSync(log, "settled\\n"); }, linkVerifyDelay);
+});
 // What a read looks like on Windows: an event without a name, with nothing written. The events keep
 // coming, so their quiet period never ends.
 const falseEvents = (_path, _options, listener) => {
@@ -260,6 +269,13 @@ const falseEvents = (_path, _options, listener) => {
 if (isSupervisedDevelopment()) {
   appendFileSync(log, "start\\n");
   await new Promise((done) => setTimeout(done, ${options.failAfter ?? 0}));
+  ${
+		options.gated
+			? `// Each server fails when the test opens the gate of its start.
+  const gate = ${JSON.stringify(gate)} + readFileSync(log, "utf8").split("\\n").filter((line) => line === "start").length;
+  while (!existsSync(gate)) await new Promise((done) => setTimeout(done, 10));`
+			: ''
+	}
   await runSupervisedDevelopment(async () => {
     if (!existsSync(${JSON.stringify(ready)})) throw new Error("halfway");
     appendFileSync(log, "ready\\n");
@@ -267,7 +283,7 @@ if (isSupervisedDevelopment()) {
   }, async () => {}).catch(() => { appendFileSync(log, "fail\\n"); process.exit(1); });
 } else {
   const dir = (directory) => ({ directory, dist: directory + "/dist" });
-  process.exitCode = await superviseDevelopment(dir(${JSON.stringify(meeko)}), { delay: 100, stopTimeout: 1000, related: [dir(${JSON.stringify(ui)})]${options.falseEvents ? ', watch: falseEvents' : ''} });
+  process.exitCode = await superviseDevelopment(dir(${JSON.stringify(meeko)}), { delay: 100, stopTimeout: 1000, related: [dir(${JSON.stringify(ui)})]${options.falseEvents ? ', watch: falseEvents' : options.gated ? ', watch: reporting' : ''} });
 }
 `,
 	)
@@ -295,7 +311,7 @@ if (isSupervisedDevelopment()) {
 			await new Promise((done) => setTimeout(done, 25))
 		}
 	}
-	return { meeko, ui, ready, count, until, exited, output: () => output }
+	return { meeko, ui, ready, count, until, exited, open: (start: number) => writeFile(`${gate}${start}`, ''), output: () => output }
 }
 
 test('a server that fails on a package being written comes back when that package settles', { timeout: 90_000 }, async (context) => {
@@ -378,35 +394,48 @@ test('a first server that fails among events that wrote nothing ends the supervi
 	assert.equal(await count('start'), 1, output())
 })
 
-test('the starts of a server that keeps failing while its packages are written are bounded', { timeout: 90_000 }, async (context) => {
-	const { ui, count, until, output } = await supervisor(context, { failAfter: 1500 })
-	const deadline = Date.now() + 60_000
+test('the starts of a server that keeps failing while its packages are written are bounded', { timeout: 120_000 }, async (context) => {
+	const { count, open, output, ui, until } = await supervisor(context, { gated: true })
 	const waits = () => output().match(/próximo cambio/g)?.length ?? 0
-	const write = () => writeFile(join(ui, 'dist', 'index.js'), `export const at = ${Date.now()};\n`)
-	while (!output().includes('reintento 6 de 6')) {
-		assert.ok(Date.now() < deadline, output())
-		await write()
-		await pause(150)
+	const waiting = async (times: number) => {
+		const start = Date.now()
+		while (waits() < times) {
+			assert.ok(Date.now() - start < 30_000, output())
+			await pause(25)
+		}
 	}
-	// The last server is written under as well, so only the limit stops the retries. The write comes
-	// long before it fails: one the watch reports after that (100 ms later) is the next change, which
-	// starts it again by design.
-	await until('start', 7)
-	await write()
-	while (waits() < 1) {
-		assert.ok(Date.now() < deadline, output())
-		await pause(25)
+	/** One write of a package, which the watch has already judged when this returns. */
+	const written = async () => {
+		const settled = await count('settled')
+		await writeFile(join(ui, 'dist', 'index.js'), `export const at = ${Date.now()};\n`)
+		await until('settled', settled + 1)
+	}
+	// Every server is written under, so only the limit stops the retries, and it fails after the watch
+	// has reported that write: a report after it fails would be the next change, which starts it again by
+	// design. No writes follow while it waits, because nothing starts while a package is being written.
+	for (let start = 1; start <= 7; start++) {
+		await until('start', start)
+		await written()
+		await open(start)
+		await until('fail', start)
 	}
 	// The first start, its six retries, and then it waits: without writes nothing starts it again.
+	await waiting(1)
+	for (let retry = 1; retry <= 6; retry++) assert.ok(output().includes(`reintento ${retry} de 6`), output())
 	assert.equal(await count('start'), 7, output())
 	await pause(2000)
 	assert.equal(await count('start'), 7, output())
+	assert.equal(waits(), 1, output())
 	// The next change starts it once more, and it waits again without retrying.
-	await write()
+	await written()
+	await until('start', 8)
+	await open(8)
 	await until('fail', 8)
+	await waiting(2)
 	await pause(2000)
 	assert.equal(await count('start'), 8, output())
 	assert.equal(waits(), 2, output())
+	assert.ok(!output().includes('reintento 7'), output())
 })
 
 /** A `fs.watch` whose events the test fires by hand: the platform does not produce them on demand. */

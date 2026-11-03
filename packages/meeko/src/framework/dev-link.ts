@@ -157,7 +157,7 @@ export function createSettleDebounce(delay: number, run: () => void): SettleDebo
 }
 
 /** Quiet time after the last event of the linked build before its files are compared with the last known state. */
-const linkVerifyDelay = 100
+export const linkVerifyDelay = 100
 /** Margin for file times that run ahead of `Date.now()`: a file stamped within it of the load is not newer than it. */
 const clockTolerance = 250
 
