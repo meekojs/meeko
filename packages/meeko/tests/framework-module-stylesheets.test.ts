@@ -170,8 +170,50 @@ test('linked module CSS has SSR links, CSS-only HMR and a processed editor snaps
 	const page = await browser.newPage()
 	const errors: string[] = []
 	page.on('pageerror', (error) => errors.push(error.message))
+	// Kept for the diagnostic of an intermittent failure (2 in about 100 runs, at different waits, with no
+	// confirmed cause): what reached the page, without reading any body until a wait fails.
+	const started = Date.now()
+	const events: string[] = []
+	const note = (event: string) => events.push(`${Date.now() - started} ${event.replaceAll(origin, '')}`)
+	page.on('response', (response) => {
+		if (/\.(?:css|ts)(?:\?|$)/.test(response.url())) note(`response ${response.status()} ${response.url()}`)
+	})
+	page.on('requestfailed', (request) => note(`failed ${request.url()} ${request.failure()?.errorText}`))
+	page.on('framenavigated', (frame) => note(`navigated ${frame.url()}`))
+	page.on('console', (message) => note(`console ${message.type()} ${message.text()}`))
+	page.on('websocket', (socket) => {
+		note(`websocket ${socket.url()}`)
+		socket.on('framereceived', (frame) => note(`frame ${String(frame.payload)}`))
+		socket.on('close', () => note('websocket closed'))
+	})
+	/** The state of the page, the server and the disk, as a text for the report of the test. */
+	const stylesheetState = async (): Promise<string> => {
+		const inPage = page.evaluate(async () => {
+			const probe = document.querySelector('.module-probe')
+			const style = probe && getComputedStyle(probe)
+			const sheets = await Promise.all(
+				[...document.querySelectorAll<HTMLLinkElement | HTMLStyleElement>('link[rel=stylesheet], style')].map(async (sheet) => {
+					const href = sheet.getAttribute('href')
+					const served = href ? await fetch(href, { cache: 'no-store' }).then((response) => response.text(), String) : undefined
+					return { tag: sheet.tagName, href, id: sheet.getAttribute('data-vite-dev-id'), rules: sheet.sheet?.cssRules.length, contents: (served ?? sheet.textContent ?? '').slice(0, 500) }
+				}),
+			)
+			return { probe: Boolean(probe), cascade: style?.getPropertyValue('--cascade'), padding: style?.paddingLeft, background: style?.backgroundColor, sameDocument: (window as unknown as { moduleStyleState?: number }).moduleStyleState === 123, sheets }
+		})
+		const unanswered = new Promise<string>((done) => setTimeout(() => done('the page does not answer'), 5000).unref())
+		const state = await Promise.race([inPage, unanswered]).catch(String)
+		const disk = await readFile(join(root, 'app/styles/main.css'), 'utf8').catch(String)
+		const snapshot = await readFile(join(root, globalStylesheetSnapshotFile), 'utf8').catch(String)
+		return `stylesheet state: ${JSON.stringify({ state, disk, snapshot: snapshot.slice(0, 800), errors, events, logs: logs.slice(-2000) }, null, 1)}`
+	}
+	/** `page.waitForFunction`, which reports that state if it times out. */
+	const styled = (check: () => unknown) =>
+		page.waitForFunction(check).catch(async (error: unknown) => {
+			context.diagnostic(await stylesheetState())
+			throw error
+		})
 	await page.goto(origin)
-	await page.waitForFunction(() => getComputedStyle(document.querySelector('.module-probe')!).paddingLeft === '17px')
+	await styled(() => getComputedStyle(document.querySelector('.module-probe')!).paddingLeft === '17px')
 	const probe = page.locator('.module-probe')
 	assert.equal(await probe.evaluate((element) => getComputedStyle(element).getPropertyValue('--cascade').trim()), 'app')
 	assert.equal(await probe.evaluate((element) => getComputedStyle(element).borderTopWidth), '3px')
@@ -182,7 +224,7 @@ test('linked module CSS has SSR links, CSS-only HMR and a processed editor snaps
 		;(window as unknown as { moduleStyleState: number }).moduleStyleState = 123
 	})
 	await put(provider, 'styles/tokens.css', '.module-probe { background-color: rgb(50, 60, 70); }')
-	await page.waitForFunction(() => getComputedStyle(document.querySelector('.module-probe')!).backgroundColor === 'rgb(50, 60, 70)')
+	await styled(() => getComputedStyle(document.querySelector('.module-probe')!).backgroundColor === 'rgb(50, 60, 70)')
 	assert.equal(await page.evaluate(() => (window as unknown as { moduleStyleState?: number }).moduleStyleState), 123, 'CSS updates without a document reload')
 	const snapshot = () => readFile(join(root, globalStylesheetSnapshotFile), 'utf8').catch(() => '')
 	await until(
@@ -192,7 +234,7 @@ test('linked module CSS has SSR links, CSS-only HMR and a processed editor snaps
 	assert.match(await snapshot(), /padding-left: 17px/)
 	assert.match(await snapshot(), /border-top-width: 3px/)
 	await put(provider, 'styles/utilities.ts', `import { defineUtilities } from "@meekojs/meeko/postcss"; export default defineUtilities(({ rule }) => rule(".utility-probe", { "border-top-width": "5px", "border-top-style": "solid" }));`)
-	await page.waitForFunction(() => getComputedStyle(document.querySelector('.module-probe')!).borderTopWidth === '5px')
+	await styled(() => getComputedStyle(document.querySelector('.module-probe')!).borderTopWidth === '5px')
 	await until(
 		async () => (await snapshot()).includes('border-top-width: 5px'),
 		() => logs,
@@ -200,7 +242,7 @@ test('linked module CSS has SSR links, CSS-only HMR and a processed editor snaps
 	assert.equal(await page.evaluate(() => (window as unknown as { moduleStyleState?: number }).moduleStyleState), 123, '@utilities updates without a document reload')
 	// Optional app CSS may disappear and return; module CSS and the snapshot stay available.
 	await rm(join(root, 'app/styles/main.css'))
-	await page.waitForFunction(() => {
+	await styled(() => {
 		const element = document.querySelector('.module-probe')
 		return element && getComputedStyle(element).getPropertyValue('--cascade').trim() === 'module'
 	})
@@ -209,7 +251,7 @@ test('linked module CSS has SSR links, CSS-only HMR and a processed editor snaps
 		() => logs,
 	)
 	await put(root, 'app/styles/main.css', '.module-probe { --cascade: restored; }')
-	await page.waitForFunction(() => {
+	await styled(() => {
 		const element = document.querySelector('.module-probe')
 		return element && getComputedStyle(element).getPropertyValue('--cascade').trim() === 'restored'
 	})
