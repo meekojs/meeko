@@ -958,6 +958,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
 				if (serverSharedState) stateStore.seedForNavigation(serverSharedState, commitWithToken)
 				else if (loaderDraft) loaderDraft.commit(commitWithToken)
 				else commitWithToken()
+				context.settleScroll?.()
 			},
 			context.signal,
 			!initialLoad && (context.viewTransition ?? options.viewTransitions ?? false),

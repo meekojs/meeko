@@ -1,6 +1,7 @@
 import type { PageRender } from '../definitions/define-page'
 
 import { observeCallback } from '../../core/error-observer'
+import { createScrollMemory } from './scroll-memory'
 
 /**
  * Una ruta del manifiesto que comparten el renderizador del servidor y el navegador. Lo produce
@@ -416,8 +417,15 @@ export function createNavigator(routes: readonly RouteRecord[], render: (context
 	return createAppNavigator(routes, render, browser, onError)
 }
 
+/**
+ * What the router of an application tells its renderer. `settleScroll` goes right after the DOM of a
+ * traversal changes: a browser may capture the new state of a View Transition as soon as the update
+ * callback ends, so afterwards is too late.
+ */
+export type AppNavigationContext = NavigationContext & { readonly settleScroll?: () => void }
+
 /** Context of a navigation to a URL without a route. */
-export type UnmatchedNavigationContext = Omit<NavigationContext, 'match'>
+export type UnmatchedNavigationContext = Omit<AppNavigationContext, 'match'>
 
 /** Renders URLs without a route, such as the application error page, inside `layouts`. */
 export interface UnmatchedNavigation {
@@ -460,21 +468,26 @@ function scrollToFragment(browser: Window, url: URL, toTop: boolean): void {
  * `createNavigator` plus an optional renderer for URLs without a route. Without
  * it such URLs are left to the browser, as `createNavigator` does.
  */
-export function createAppNavigator(routes: readonly RouteRecord[], render: (context: NavigationContext) => Promise<void | boolean> | void | boolean, browser: Window = window, onError?: (error: unknown) => void, unmatched?: UnmatchedNavigation, onSameDocument?: (url: URL) => void): Navigator {
+export function createAppNavigator(routes: readonly RouteRecord[], render: (context: AppNavigationContext) => Promise<void | boolean> | void | boolean, browser: Window = window, onError?: (error: unknown) => void, unmatched?: UnmatchedNavigation, onSameDocument?: (url: URL) => void): Navigator {
 	const initial = matchRoute(routes, browser.location.pathname)
 	let currentLayouts: readonly string[] | undefined = initial && !unmatched?.hydrated ? initial.route.layouts : unmatched?.layouts
 	let currentUrl = browser.location.href
 	let pending: AbortController | undefined
 	let disposed = false
-	const navigate = async (to: string, options: { replace?: boolean; viewTransition?: boolean } = {}): Promise<boolean> => {
+	const memory = createScrollMemory(browser, () => pending !== undefined)
+	/** Writes the URL back on an entry that stays where it was, with whatever other code keeps in its state. */
+	const restoreUrl = (): void => browser.history.replaceState(browser.history.state ?? null, '', currentUrl)
+	const go = async (to: string, options: { replace?: boolean; viewTransition?: boolean }, traversal: boolean): Promise<boolean> => {
 		if (disposed) throw new Error('Navigator disposed')
+		// In a traversal the entry has already changed, and a browser may have moved the page on its own.
+		if (!traversal) memory.note()
 		const url = new URL(to, browser.location.href)
 		if (url.origin !== browser.location.origin) throw new TypeError('External navigation is not a Meeko route')
 		// Only the fragment changes: the page stays as it is, like a fragment link in a document.
 		if (url.hash && !options.replace && sameDocument(url, new URL(currentUrl))) {
 			pending?.abort()
 			pending = undefined
-			browser.history.pushState(null, '', url)
+			browser.history.pushState(memory.leave(), '', url)
 			currentUrl = url.href
 			onSameDocument?.(url)
 			scrollToFragment(browser, url, false)
@@ -484,7 +497,7 @@ export function createAppNavigator(routes: readonly RouteRecord[], render: (cont
 		if (!match && !unmatched) {
 			if (options.replace && browser.location.href === url.href) {
 				try {
-					browser.history.replaceState(null, '', currentUrl)
+					restoreUrl()
 				} catch (historyError) {
 					try {
 						browser.location.replace(currentUrl)
@@ -504,14 +517,21 @@ export function createAppNavigator(routes: readonly RouteRecord[], render: (cont
 		if (currentLayouts) {
 			while (currentLayouts[retainedLayouts] === layouts[retainedLayouts] && retainedLayouts < currentLayouts.length && retainedLayouts < layouts.length) retainedLayouts++
 		}
+		let scrollSettled = false
+		const settleScroll = (): void => {
+			if (scrollSettled) return
+			scrollSettled = true
+			if (!memory.arrive()) scrollToFragment(browser, url, false)
+		}
+		const shared = { url, signal: controller.signal, retainedLayouts, ...(traversal ? { settleScroll } : {}), ...(options.viewTransition === undefined ? {} : { viewTransition: options.viewTransition }) }
 		let result: void | boolean
 		try {
-			result = match ? await render({ url, match, signal: controller.signal, retainedLayouts, ...(options.viewTransition === undefined ? {} : { viewTransition: options.viewTransition }) }) : await unmatched!.render({ url, signal: controller.signal, retainedLayouts, ...(options.viewTransition === undefined ? {} : { viewTransition: options.viewTransition }) })
+			result = match ? await render({ ...shared, match }) : await unmatched!.render(shared)
 		} catch (error) {
 			if (pending === controller) pending = undefined
 			if (options.replace && !controller.signal.aborted && !disposed && browser.location.href === url.href) {
 				try {
-					browser.history.replaceState(null, '', currentUrl)
+					restoreUrl()
 				} catch (historyError) {
 					try {
 						browser.location.replace(currentUrl)
@@ -527,7 +547,7 @@ export function createAppNavigator(routes: readonly RouteRecord[], render: (cont
 			if (pending === controller) pending = undefined
 			if (options.replace && !controller.signal.aborted && browser.location.href === url.href) {
 				try {
-					browser.history.replaceState(null, '', currentUrl)
+					restoreUrl()
 				} catch (historyError) {
 					try {
 						browser.location.replace(currentUrl)
@@ -541,8 +561,11 @@ export function createAppNavigator(routes: readonly RouteRecord[], render: (cont
 		}
 		if (controller.signal.aborted || disposed) return false
 		try {
-			if (options.replace) browser.history.replaceState(null, '', url)
-			else browser.history.pushState(null, '', url)
+			// A traversal is already on its entry, with its URL and its state.
+			if (!traversal) {
+				if (options.replace) browser.history.replaceState(memory.keep(), '', url)
+				else browser.history.pushState(memory.leave(), '', url)
+			}
 		} catch (error) {
 			if (pending === controller) pending = undefined
 			try {
@@ -555,13 +578,16 @@ export function createAppNavigator(routes: readonly RouteRecord[], render: (cont
 		currentLayouts = layouts
 		currentUrl = url.href
 		pending = undefined
-		// A new entry starts at the top or at its fragment; history and replaced entries keep the
-		// browser's scroll unless a fragment names an element.
-		scrollToFragment(browser, url, !options.replace)
+		// A new entry starts at the top or at its fragment, and a replaced one keeps the scroll unless a
+		// fragment names an element. A traversal goes back to its position, or to its fragment if it has
+		// none, here if its renderer did not ask for it with the DOM.
+		if (traversal) settleScroll()
+		else scrollToFragment(browser, url, !options.replace)
+		memory.note()
 		return true
 	}
+	const navigate = (to: string, options: { replace?: boolean; viewTransition?: boolean } = {}): Promise<boolean> => go(to, options, false)
 	const onPop = () => {
-		// Moving between fragments of the same document: the browser restores the scroll itself.
 		let url: URL | undefined
 		try {
 			url = new URL(browser.location.href)
@@ -571,9 +597,10 @@ export function createAppNavigator(routes: readonly RouteRecord[], render: (cont
 		if (url && sameDocument(url, new URL(currentUrl))) {
 			currentUrl = url.href
 			onSameDocument?.(url)
+			if (!memory.arrive()) scrollToFragment(browser, url, false)
 			return
 		}
-		void navigate(browser.location.href, { replace: true }).catch((error: unknown) => reportNavigationError(browser, error, onError))
+		void go(browser.location.href, { replace: true }, true).catch((error: unknown) => reportNavigationError(browser, error, onError))
 	}
 	browser.addEventListener('popstate', onPop)
 	return {
@@ -581,6 +608,7 @@ export function createAppNavigator(routes: readonly RouteRecord[], render: (cont
 		dispose() {
 			disposed = true
 			pending?.abort()
+			memory.dispose()
 			browser.removeEventListener('popstate', onPop)
 		},
 	}
