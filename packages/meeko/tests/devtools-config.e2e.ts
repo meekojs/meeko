@@ -141,14 +141,17 @@ export default defineMeekoConfig({ devtools: { position: "bottom-left" } });
 	await panel.locator('.panel').waitFor()
 
 	// Dragging the handle to the upper right moves the panel there, and a reload keeps it.
-	const handle = panel.locator('.handle')
-	const start = await handle.boundingBox()
-	assert.ok(start)
-	await tab.mouse.move(start.x + start.width / 2, start.y + start.height / 2)
+	// The panel has just opened: its animation moves the handle up to 22 px, more than half the
+	// handle. Reading the handle before it ends aims the press at where the handle no longer is, so
+	// wait for the end and let hover() check that the handle is what receives the pointer.
+	await panel.locator('.panel').evaluate(async (node) => {
+		await Promise.all(node.getAnimations().map((animation) => animation.finished))
+	})
+	await panel.locator('.handle').hover()
 	await tab.mouse.down()
 	await tab.mouse.move(1000, 100, { steps: 6 })
 	await tab.mouse.up()
-	assert.equal(await panel.getAttribute('data-position'), 'top-right')
+	await tab.locator('[data-meeko-devtools-panel][data-position="top-right"]').waitFor({ state: 'attached' })
 	await tab.reload({ waitUntil: 'networkidle' })
 	await panel.locator('.panel').waitFor()
 	assert.equal(await panel.getAttribute('data-position'), 'top-right')
