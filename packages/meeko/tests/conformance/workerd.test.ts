@@ -70,14 +70,15 @@ conformanceSuite('workerd', ({ server, session, track }) => {
 		const { origin, workerd } = server()
 		const first = await opened(track(connect(origin, 'room', { room: 'hibernate' })))
 		const second = await opened(track(connect(origin, 'room', { room: 'hibernate' })))
-		const warm = messages(second, 1)
+		const warm = [messages(first, 1), messages(second, 1)]
 		send(first, 'say', { text: 'before' })
-		assert.deepEqual(await warm, [said('before')])
+		assert.deepEqual(await Promise.all(warm), [[said('before')], [said('before')]])
 
 		await workerd!.hibernate('room', 'hibernate')
 		// The runtime answers the auto-response pair without waking the object.
+		const pong = nextText(first)
 		first.send('ping')
-		assert.equal(await nextText(first), 'pong')
+		assert.equal(await pong, 'pong')
 		let both = [messages(first, 1), messages(second, 1)]
 		send(first, 'say', { text: 'after first wake' })
 		assert.deepEqual(await Promise.all(both), [[said('after first wake')], [said('after first wake')]])
