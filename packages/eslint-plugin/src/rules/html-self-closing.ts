@@ -1,6 +1,6 @@
 import type { TemplateNode } from '@meekojs/meeko/parse'
 
-import * as meekoParse from '@meekojs/meeko/parse'
+import { isSelfClosableElement } from '@meekojs/meeko/parse'
 import { ESLintUtils } from '@typescript-eslint/utils'
 
 import { template, visit } from '../template'
@@ -29,8 +29,6 @@ const mathNamespace = 'http://www.w3.org/1998/Math/MathML'
 // The parser's void elements: they never have content or an end tag.
 const voidElements = new Set(['area', 'base', 'basefont', 'bgsound', 'br', 'col', 'embed', 'frame', 'hr', 'img', 'input', 'keygen', 'link', 'meta', 'param', 'source', 'track', 'wbr'])
 const meekoTags = new Set(['component', 'render', 'snippet'])
-// Meeko 1.7 (still in the peer range) neither exports it nor accepts `<div />`: no HTML element is then self-closable.
-const isSelfClosableElement: (name: string) => boolean = (meekoParse as Partial<typeof meekoParse>).isSelfClosableElement ?? (() => false)
 const mode = { type: 'string' as const, enum: ['always', 'never', 'any'] }
 
 function category(node: TemplateNode): Category | undefined {

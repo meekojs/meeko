@@ -1,6 +1,7 @@
 import { compile } from '@meekojs/meeko/compiler'
 import { Linter, RuleTester } from 'eslint'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import { format } from 'prettier'
 
@@ -13,6 +14,13 @@ const wrap = (content) => `<template>${content}</template>`
 const always = [{ messageId: 'always' }]
 const never = [{ messageId: 'never' }]
 const allNever = { html: { normal: 'never', void: 'never' }, component: 'never', svg: 'never', math: 'never' }
+
+test('the rule relies on the Meeko of its peer range, with no branch for a version that does not accept <div />', () => {
+	const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
+	assert.match(JSON.parse(read('../package.json')).peerDependencies['@meekojs/meeko'], /^>=1\.8 /)
+	assert.match(read('../src/rules/html-self-closing.ts'), /^import \{ isSelfClosableElement \} from '@meekojs\/meeko\/parse'$/m)
+	assert.doesNotMatch(read('../docs/rules/html-self-closing.md'), /1\.7/)
+})
 
 tester.run('html-self-closing', rule, {
 	valid: [

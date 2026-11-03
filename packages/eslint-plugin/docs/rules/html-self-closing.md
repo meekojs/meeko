@@ -2,7 +2,7 @@
 
 Exige cerrar con `/>` los elementos y componentes sin contenido de la plantilla, al estilo de `vue/html-self-closing`: `<div></div>` pasa a `<div />` y `<AppButton></AppButton>`, a `<AppButton />`. Es una regla **optativa**: ni `recommended` ni `defineEslint` la activan por defecto.
 
-`<div />` es una forma válida desde Meeko `1.8` y compila exactamente igual que `<div></div>` (véase [Elementos sin contenido](../../../../docs/api.md#elementos-sin-contenido-div-)). Con Meeko `1.7`, que no la admite, la regla no comprueba `html.normal`; las demás categorías funcionan igual.
+`<div />` es una forma válida desde Meeko `1.8` y compila exactamente igual que `<div></div>` (véase [Elementos sin contenido](../../../../docs/api.md#elementos-sin-contenido-div-)).
 
 ## Configuración
 
