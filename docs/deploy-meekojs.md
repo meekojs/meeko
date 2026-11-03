@@ -296,6 +296,9 @@ curl -sI 'https://www.meekojs.com/docs?x=1' | grep -iE '^(HTTP|location)'   # 30
 # CSP y cabeceras
 curl -sI https://meekojs.com/ | grep -iE '^(content-security-policy|x-content-type-options|referrer-policy|permissions-policy)'
 
+# Compresión: meeko start no comprime, la pone Cloudflare
+curl -s -o /dev/null -D - -H 'accept-encoding: br, gzip' https://meekojs.com/docs/framework | grep -i '^content-encoding'   # br o gzip
+
 # Páginas, sitemap, robots, llms y búsqueda
 for p in / /docs /docs/reference /sitemap.xml /robots.txt /llms.txt '/api/docs/search?q=signal'; do printf '%s %s\n' "$(curl -s -o /dev/null -w '%{http_code}' "https://meekojs.com$p")" "$p"; done
 curl -s https://meekojs.com/sitemap.xml | grep -c '<loc>https://meekojs.com/'
@@ -309,6 +312,8 @@ curl -s -o /dev/null -w '%{http_code}\n' https://dashboard.meekojs.com/   # 404 
 ```
 
 Esperado: `{"status":"ok","database":"up"}` en las tres; `301` con la `location` exacta; la CSP de `apps/meeko/meeko.config.ts` (`default-src 'self'`, `frame-ancestors 'none'`…) con `nosniff` y `strict-origin-when-cross-origin`; `200` en todas las rutas; el sitemap con URLs de `https://meekojs.com/`. En el navegador: navegar por la documentación, buscar `signal` en el diálogo y responder «¿Te sirvió?» en una página (un `204`/agradecimiento, no un `403`).
+
+Sin `content-encoding`, la web se sirve sin comprimir (`/docs/framework` y sus recursos pesan 2.220 KB en lugar de 419 KB): hay que activar la compresión en Cloudflare antes de dar el paso por bueno.
 
 ## Paso 7. Rollback
 

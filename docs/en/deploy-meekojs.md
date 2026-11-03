@@ -1,5 +1,5 @@
 ---
-source-hash: d66af7623151d834ec31e81d55334d7664767d3e2b5fc7f08a73876edf3b9067
+source-hash: 857281b6ef3a1ec8ad27f96797615a97180c99687080202f057298ee57a271f1
 ---
 
 # Deploy meekojs.com on voidcat-local
@@ -300,6 +300,9 @@ curl -sI 'https://www.meekojs.com/docs?x=1' | grep -iE '^(HTTP|location)'   # 30
 # CSP y cabeceras
 curl -sI https://meekojs.com/ | grep -iE '^(content-security-policy|x-content-type-options|referrer-policy|permissions-policy)'
 
+# Compresión: meeko start no comprime, la pone Cloudflare
+curl -s -o /dev/null -D - -H 'accept-encoding: br, gzip' https://meekojs.com/docs/framework | grep -i '^content-encoding'   # br o gzip
+
 # Páginas, sitemap, robots, llms y búsqueda
 for p in / /docs /docs/reference /sitemap.xml /robots.txt /llms.txt '/api/docs/search?q=signal'; do printf '%s %s\n' "$(curl -s -o /dev/null -w '%{http_code}' "https://meekojs.com$p")" "$p"; done
 curl -s https://meekojs.com/sitemap.xml | grep -c '<loc>https://meekojs.com/'
@@ -313,6 +316,8 @@ curl -s -o /dev/null -w '%{http_code}\n' https://dashboard.meekojs.com/   # 404 
 ```
 
 Expected: `{"status":"ok","database":"up"}` on all three; `301` with the exact `location`; the CSP from `apps/meeko/meeko.config.ts` (`default-src 'self'`, `frame-ancestors 'none'`…) with `nosniff` and `strict-origin-when-cross-origin`; `200` on every route; sitemap URLs under `https://meekojs.com/`. In the browser: navigate documentation, search for `signal` in the dialog and answer “¿Te sirvió?” on a page (a `204`/thank-you, not a `403`).
+
+Without `content-encoding`, the site is served uncompressed (`/docs/framework` and its resources weigh 2,220 KB instead of 419 KB): enable compression in Cloudflare before considering this step done.
 
 ## Step 7. Rollback
 

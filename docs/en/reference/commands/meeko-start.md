@@ -13,7 +13,7 @@ related:
   - docs/framework.md#build-despliegue-y-verificación
   - docs/framework.md#sesiones-sin-configuración
   - docs/framework.md#csp-y-cabeceras-en-los-adaptadores-con-servidor
-source-hash: 62e9ed4b952fbe6100297f1ab8e7316ed08d22a045be01fd3ee37c63af382033
+source-hash: eb7a059992b846304a24d1480d2bf3b0b24b0bf09c748102b72857285af0ba37
 ---
 
 `meeko start` imports `.meeko/output/node/index.mjs`, the server written by [`meeko build`](/en/docs/reference/meeko-build) with the `node` adapter, and starts it: SSR, API, RPC, Socket, files from `client/` and pages from `prerender/`, with sessions, graceful shutdown and, since `1.7`, the CSP and headers from `server`. It does not compile anything or read `app/`, `server/` or `meeko.config.ts`: it serves the build as written.
@@ -52,7 +52,7 @@ The starter declares it as `"start": "meeko start ."`, so `npm start` is enough 
 
 - **On stdout**, the URL to open, such as `http://localhost:4173`: since `1.7.1`, loopback (`127.0.0.1`, `::1`) and all interfaces (`0.0.0.0`, `::`) display as `localhost`, although the server listens on the configured address. With `0.0.0.0` or `::`, lines `Red: http://<IP>:4173` follow with network addresses. The first line is always the local URL alone, for scripts that read it.
 - **The process** keeps running until `SIGINT` or `SIGTERM`, which close Socket, HTTP, `waitUntil` tasks and the runtime, in that order. Open responses have `shutdownTimeout` milliseconds (10,000 by default) to finish.
-- **Responses** carry assets with `ETag` (and `immutable` for hashed ones), prerendered pages from their files and, since `1.7`, `Content-Security-Policy` and `server.headers` headers.
+- **Responses** carry assets with `ETag` (and `immutable` for hashed ones), prerendered pages from their files and, since `1.7`, `Content-Security-Policy` and `server.headers` headers. **They are not compressed:** see the next example.
 
 ## Examples
 
@@ -67,6 +67,8 @@ meeko start
 ```
 
 The proxy (nginx, Caddy) terminates TLS and forwards to `127.0.0.1:3000`. Without `MEEKO_PUBLIC_ORIGIN`, mutations arriving with `Origin: https://tienda.example.com` are rejected.
+
+`meeko start` does not compress: in production, that proxy or a CDN must do it. See [Build, deployment and verification](/en/docs/framework#build-deployment-and-verification).
 
 ### In a container
 
