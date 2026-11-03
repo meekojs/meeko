@@ -71,6 +71,7 @@ const page = `<script lang="ts">
 		<button id="remove" type="button" on:click="() => (shown.value = false)">Quitar</button>
 		<button id="slower" type="button" on:click="() => (start.value = 900)">Más lento</button>
 		<button id="unmount" type="button" on:click="() => (mounted.value = false)">Desmontar</button>
+		<MeekoLink id="leave" to="/other">Salir</MeekoLink>
 	</main>
 </template>
 `
@@ -95,6 +96,19 @@ const pages = { 'app/pages/tips.meeko': page, 'app/pages/tips.route.ts': route, 
 
 /** Records the timers of the tooltip's delays, and with `force` turns the browser into one without Interest Invokers. */
 function instrument({ force, delays }) {
+	// As the DOM counts them: removing a listener that is not there changes nothing.
+	const registered = { pointerover: new Set(), focusin: new Set(), keydown: new Set() }
+	globalThis.documentListeners = () => Object.fromEntries(Object.entries(registered).map(([type, listeners]) => [type, listeners.size]))
+	const add = globalThis.EventTarget.prototype.addEventListener
+	const remove = globalThis.EventTarget.prototype.removeEventListener
+	globalThis.EventTarget.prototype.addEventListener = function (type, listener, ...rest) {
+		if (this === globalThis.document && type in registered) registered[type].add(listener)
+		return add.call(this, type, listener, ...rest)
+	}
+	globalThis.EventTarget.prototype.removeEventListener = function (type, listener, ...rest) {
+		if (this === globalThis.document && type in registered) registered[type].delete(listener)
+		return remove.call(this, type, listener, ...rest)
+	}
 	globalThis.tipTimers = []
 	const native = globalThis.setTimeout
 	globalThis.setTimeout = function (work, delay, ...rest) {
@@ -514,6 +528,26 @@ test('with Interest Invokers the browser opens the tooltip: no timer, no second 
 		const expected = { name: 'Plano', description: 'Plano' }
 		assert.deepEqual(await describe(false), { closed: expected, opened: expected })
 		assert.deepEqual(await describe(true), { closed: expected, opened: expected })
+	})
+
+	await t.test('all the tooltips of a page share their document listeners, and none outlives them', async () => {
+		for (const force of [false, true]) {
+			const { context, tab } = await visit(browser, origin, { force })
+			const listeners = () => tab.evaluate(() => globalThis.documentListeners())
+			assert.ok((await tab.locator('[data-meeko-popover][popover=hint]').count()) > 10, 'a page with many of them')
+			assert.deepEqual(await listeners(), { pointerover: 1, focusin: 1, keydown: 0 }, 'a closed tooltip listens to no key')
+			const tip = tab.locator('.tip-plain')
+			await until(tip, true, () => hover(tab, tab.locator('#plain')))
+			assert.deepEqual(await listeners(), { pointerover: 1, focusin: 1, keydown: 1 }, 'only the open one does')
+			await until(tip, false, () => away(tab))
+			assert.deepEqual(await listeners(), { pointerover: 1, focusin: 1, keydown: 0 })
+			// Unmounting everything takes them away; and with a tooltip open, its key too.
+			await until(tip, true, () => hover(tab, tab.locator('#plain')))
+			await tab.locator('#leave').click()
+			await tab.locator('#other').waitFor()
+			assert.deepEqual(await listeners(), { pointerover: 0, focusin: 0, keydown: 0 })
+			await context.close()
+		}
 	})
 
 	await t.test('with reduced motion nothing slides, on both paths', async () => {

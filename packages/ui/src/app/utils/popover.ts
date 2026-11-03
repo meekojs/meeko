@@ -156,6 +156,57 @@ export function interestDelay(value: number | undefined, fallback: number): stri
 	return `${Number.isFinite(delay) && delay > 0 ? delay : 0}ms`
 }
 
+/** The hints of a document waiting for the pointer or the focus, by the `id` of their trigger. */
+interface TriggerWatches {
+	readonly byId: Map<string, Set<() => void>>
+	release(): void
+}
+
+/** Written only from the browser, when a hint mounts: the server never touches it. */
+const triggerWatches = new WeakMap<Document, TriggerWatches>()
+
+function triggerWatchesOf(document: Document): TriggerWatches {
+	const known = triggerWatches.get(document)
+	if (known) return known
+	const byId = new Map<string, Set<() => void>>()
+	const search = (event: Event): void => {
+		for (let node = event.target as Element | null; node; node = node.parentElement) {
+			const waiting = node.id ? byId.get(node.id) : undefined
+			if (waiting) for (const call of [...waiting]) call()
+		}
+	}
+	document.addEventListener('pointerover', search, true)
+	document.addEventListener('focusin', search, true)
+	const watches: TriggerWatches = {
+		byId,
+		release() {
+			document.removeEventListener('pointerover', search, true)
+			document.removeEventListener('focusin', search, true)
+			triggerWatches.delete(document)
+		},
+	}
+	triggerWatches.set(document, watches)
+	return watches
+}
+
+/**
+ * Calls `reached` when the pointer or the focus reaches the element with this `id`, or something inside it.
+ * The capture phase comes first, so `reached` can still give that element listeners for this same event.
+ * A page with a thousand tooltips has a single pair of listeners per document, the first call adds them and
+ * the last release removes them, and an event costs a lookup per ancestor, however many tooltips there are.
+ */
+export function watchTriggerId(document: Document, id: string, reached: () => void): () => void {
+	const watches = triggerWatchesOf(document)
+	const waiting = watches.byId.get(id) ?? new Set()
+	watches.byId.set(id, waiting)
+	waiting.add(reached)
+	return () => {
+		if (!waiting.delete(reached)) return
+		if (waiting.size === 0) watches.byId.delete(id)
+		if (watches.byId.size === 0) watches.release()
+	}
+}
+
 /** What the template of `<UIPopover>` reads and the component runs. */
 export interface PopoverController {
 	readonly triggerId: ReadonlySignal<string>
@@ -319,16 +370,23 @@ export function createPopover(props: UIPopoverProps, open: Signal<boolean>, id: 
 		// loses the interest without closing the content. From `beforetoggle`, because `toggle` comes too late
 		// for a trigger that leaves right after the opening.
 		let triggerWatch: MutationObserver | undefined
+		// Only while open, so that a closed tooltip costs nothing on every key of the page.
+		const closeOnEscape = (event: Event): void => {
+			if ((event as KeyboardEvent).key === 'Escape' && scripted() && popoverOpen(content)) hide()
+		}
 		function watchTrigger(opening: boolean): void {
 			triggerWatch?.disconnect()
-			const target = opening && hinting() ? triggerElement() : null
+			document.removeEventListener('keydown', closeOnEscape)
+			if (!opening || !hinting()) return
+			document.addEventListener('keydown', closeOnEscape)
+			const target = triggerElement()
 			if (!target || typeof MutationObserver === 'undefined') return
 			triggerWatch = new MutationObserver(() => {
 				if (!target.isConnected) hide()
 			})
 			triggerWatch.observe(document, { childList: true, subtree: true })
 		}
-		releases.push(() => triggerWatch?.disconnect())
+		releases.push(() => watchTrigger(false))
 		listen(content, 'beforetoggle', (event) => {
 			started++
 			watchTrigger((event as ToggleEvent).newState === 'open')
@@ -426,9 +484,6 @@ export function createPopover(props: UIPopoverProps, open: Signal<boolean>, id: 
 					untrack(() => props.closeDelay ?? 150),
 				)
 		})
-		listen(document, 'keydown', (event) => {
-			if (scripted() && (event as KeyboardEvent).key === 'Escape' && popoverOpen(content)) hide()
-		})
 		// The browser only closes what it opened: a hint that the model or a touch had opened closes here,
 		// and only that one, because the event comes first and this would take over every other closing.
 		let openedByOthers = false
@@ -516,23 +571,21 @@ export function createPopover(props: UIPopoverProps, open: Signal<boolean>, id: 
 			})
 		}
 		triggerElement()
-		// A trigger replaced under the same `id` (an `if:when` in the anchor snippet) is found when it is
-		// reached: in the capture phase, so that its own listeners get this very event.
-		for (const type of ['pointerover', 'focusin']) {
-			listen(
-				document,
-				type,
-				() => {
-					if (hinting() && !anchor?.isConnected) triggerElement()
-				},
-				{ capture: true },
-			)
+		// A trigger replaced under the same `id` (an `if:when` in the anchor snippet) is found when it is reached.
+		const reached = (): void => {
+			if (!anchor?.isConnected) triggerElement()
 		}
+		let stopWatchingId = (): void => {}
+		releases.push(() => stopWatchingId())
 		// Another `triggerId` moves the listeners and closes the hint. The template writes the new `id` in
 		// the same flush, so the search waits for it.
 		releases.push(
 			effect(() => {
-				if (triggerId.value === anchor?.id) return
+				const id = triggerId.value
+				const hint = mode.value === 'hint'
+				stopWatchingId()
+				stopWatchingId = hint ? watchTriggerId(document, id, reached) : () => {}
+				if (id === anchor?.id) return
 				queueMicrotask(() => {
 					if (element !== content) return
 					const before = anchor

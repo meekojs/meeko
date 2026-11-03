@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 
 import { createCombobox, defaultComboboxFilter, toggleSelection } from '../dist/app/utils/combobox.js'
-import { createPopover, interestDelay, interestSource, listKeyTarget, normalizeText, popoverPlacement, typeaheadIndex } from '../dist/app/utils/popover.js'
+import { createPopover, interestDelay, interestSource, listKeyTarget, normalizeText, popoverPlacement, typeaheadIndex, watchTriggerId } from '../dist/app/utils/popover.js'
 import { groupOptions, sameOption, selectDisabled, selectLabel, selectValue } from '../dist/app/utils/select-options.js'
 import { themeToggleItems, themeToggleKeyTarget, themeToggleMode, themeToggleStatus } from '../dist/app/utils/theme-toggle.js'
 
@@ -43,6 +43,70 @@ test('a delay becomes a valid CSS time, with the value that setTimeout would wai
 	assert.equal(interestDelay(-5, 300), '0ms', 'CSS rejects a negative time')
 	assert.equal(interestDelay(Number.NaN, 300), '0ms')
 	assert.equal(interestDelay(Number.POSITIVE_INFINITY, 300), '0ms')
+})
+
+/** A document that only knows its listeners, as many as `listen` would have added. */
+function listeningDocument() {
+	const listeners = new Map()
+	return {
+		addEventListener: (type, listener, capture) => {
+			assert.equal(capture, true, 'in the capture phase, before the listeners of the element')
+			listeners.set(type, [...(listeners.get(type) ?? []), listener])
+		},
+		removeEventListener: (type, listener) =>
+			listeners.set(
+				type,
+				(listeners.get(type) ?? []).filter((known) => known !== listener),
+			),
+		count: (type) => (listeners.get(type) ?? []).length,
+		fire: (type, target) => {
+			for (const listener of listeners.get(type) ?? []) listener({ target })
+		},
+	}
+}
+
+test('a thousand tooltips share one pair of document listeners, gone with the last of them', () => {
+	const document = listeningDocument()
+	const releases = Array.from({ length: 1000 }, (_, index) => watchTriggerId(document, `tip-${index}`, () => {}))
+	assert.equal(document.count('pointerover'), 1)
+	assert.equal(document.count('focusin'), 1)
+	for (const release of releases.slice(1)) release()
+	assert.equal(document.count('pointerover'), 1, 'while one remains')
+	releases[0]()
+	assert.equal(document.count('pointerover'), 0)
+	assert.equal(document.count('focusin'), 0)
+	releases[0]()
+	assert.equal(document.count('pointerover'), 0, 'releasing twice changes nothing')
+	const again = watchTriggerId(document, 'tip-0', () => {})
+	assert.equal(document.count('pointerover'), 1, 'and the next one starts over')
+	const stale = watchTriggerId(document, 'tip-1', () => {})
+	stale()
+	stale()
+	assert.equal(document.count('pointerover'), 1, 'a second release does not take the listeners of the others')
+	again()
+	assert.equal(document.count('pointerover'), 0)
+})
+
+test('the shared listener finds a trigger by the id of the target or of an ancestor, per document', () => {
+	const first = listeningDocument()
+	const second = listeningDocument()
+	const calls = []
+	const releases = [watchTriggerId(first, 'a', () => calls.push('a')), watchTriggerId(first, 'a', () => calls.push('a too')), watchTriggerId(first, 'b', () => calls.push('b')), watchTriggerId(second, 'a', () => calls.push('other document'))]
+	assert.equal(first.count('pointerover'), 1)
+	assert.equal(second.count('pointerover'), 1)
+	const trigger = { id: 'a', parentElement: null }
+	const inner = { id: '', parentElement: { id: 'unrelated', parentElement: trigger } }
+	first.fire('pointerover', inner)
+	assert.deepEqual(calls, ['a', 'a too'], 'from something inside it, both of the same trigger, only in that document')
+	calls.length = 0
+	first.fire('focusin', { id: 'b', parentElement: null })
+	assert.deepEqual(calls, ['b'])
+	calls.length = 0
+	first.fire('pointerover', { id: 'none', parentElement: { id: '', parentElement: null } })
+	assert.deepEqual(calls, [], 'nothing for an element without a tooltip')
+	for (const release of releases) release()
+	assert.equal(first.count('pointerover'), 0)
+	assert.equal(second.count('pointerover'), 0)
 })
 
 test('menu keys and typeahead skip disabled items, ignore accents and cycle a repeated letter', () => {
