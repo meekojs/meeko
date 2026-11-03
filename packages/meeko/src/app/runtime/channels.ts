@@ -110,10 +110,10 @@ export interface TagInput<Exposed> {
 export type TagExposed<Input> = Input extends TagInput<infer Exposed> ? Exposed : null
 
 /** `true` cuando `T` es una unión de dos o más miembros. */
-type IsUnion<T, Whole = T> = T extends unknown ? ([Whole] extends [T] ? false : true) : never
+export type IsUnion<T, Whole = T> = T extends unknown ? ([Whole] extends [T] ? false : true) : never
 
 /** Props de un módulo de componente; en una unión, la intersección de las de sus miembros. */
-type PropsOf<Module> = [Module] extends [{ readonly renderToString: (props: infer Props, ...rest: never[]) => unknown }] ? Props : LooseChannel
+export type PropsOf<Module> = [Module] extends [{ readonly renderToString: (props: infer Props, ...rest: never[]) => unknown }] ? Props : LooseChannel
 
 /** Comprobación de etiqueta de un módulo tipado sólo como componente: props, canales y valor expuesto. */
 type ModuleTag<Module> = (props: TagProps<PropsOf<Module>> & ExtraProps, events: NoInfer<EventNames<PropsOf<Module>>>, models: NoInfer<ModelInputs<Module>>, snippets: NoInfer<SnippetInputs<Module>>) => TagInput<ExposedOf<Module>>
@@ -140,6 +140,24 @@ type BranchChannel<Channel> = [Channel] extends [null] ? LooseChannel : Channel 
  * rama. Que alguna rama lo admita lo comprueba aparte `checkBranchAttribute`.
  */
 export type BranchTag<Module> = (props: TagProps<PropsOf<Module>> & ExtraProps & LooseChannel, events: LooseChannel, models: NoInfer<BranchChannel<ChannelsOf<Module> extends { readonly models: infer Models } ? Models : null>>, snippets: NoInfer<BranchChannel<ChannelsOf<Module> extends { readonly snippets: infer Snippets } ? Snippets : null>>) => TagInput<ExposedOf<Module>>
+
+/** Props written next to `bind` when each entry of a list gives its own: any of them may come from the object. */
+type WrittenProps<Props> = { [K in keyof Props]?: Props[K] | undefined }
+
+/**
+ * Check of the tag call of `is="option.component" bind="option.props"` (since 1.8). With several
+ * possible values, the object of each entry is checked against its own value by
+ * `checkCorrelatedBind`, so here only the explicit props, events, models and snippets are.
+ * With a single value, the check of any tag.
+ */
+export type CorrelatedTag<Module, Is> = 0 extends 1 & Module ? LooseTag : [Module] extends [never] ? LooseTag : true extends IsUnion<Is> ? (props: WrittenProps<PropsOf<Module>> & ExtraProps, events: NoInfer<EventNames<PropsOf<Module>>>, models: NoInfer<ModelInputs<Module>>, snippets: NoInfer<SnippetInputs<Module>>) => TagInput<ExposedOf<Module>> : ComponentTag<Module>
+
+/** `componentTag` for `is` and `bind` that read the same object; see {@link CorrelatedTag}. Only in the code of the type check. */
+export function correlatedTag<Module, const Is>(component: () => Module, is: () => Is): CorrelatedTag<Module, Is> {
+	void component
+	void is
+	return tagInput as unknown as CorrelatedTag<Module, Is>
+}
 
 /** Modelos, snippets o nombres de evento vacíos de una etiqueta; entonces la etiqueta no pasa canales. */
 export const noChannels: {} = Object.freeze({})

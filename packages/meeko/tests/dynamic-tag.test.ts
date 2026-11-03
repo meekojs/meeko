@@ -295,7 +295,7 @@ const props = defineProps<{ href?: string; tag: string; frame: "div" | "iframe";
 		},
 		Wide: {
 			template: `<component is="props.tag">x</component>`,
-			expected: (source) => [`MEEK112@${source.indexOf('props.tag')} is es un string cualquiera; usa una unión de etiquetas, como 'a' | 'button'`],
+			expected: (source) => [`MEEK112@${source.indexOf('props.tag')} is es un string cualquiera; usa una unión de etiquetas, como 'a' | 'button'. Si ese texto nombra un componente, is nunca lo convierte en uno: escribe el literal en la plantilla (is="cond ? 'AppCard' : 'section'"), pon en los datos el módulo importado o cárgalo en ejecución con await resolveComponent(nombre) dentro de una función`],
 		},
 		Forbidden: {
 			template: `<component is="props.frame">x</component>`,

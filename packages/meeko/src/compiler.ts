@@ -16,7 +16,7 @@ import type { GenericParameters } from './compiler/generic'
 import type { DecodedRegion, SourceMapping } from './compiler/mapping'
 import type { CompileDiagnostic, SfcSection } from './compiler/parser/sfc'
 import type { TemplateAttribute, TemplateNode } from './compiler/parser/template'
-import type { IsLeaf } from './compiler/transforms/dynamic-tag'
+import type { CorrelatedBind, IsLeaf } from './compiler/transforms/dynamic-tag'
 import type { ScopeCandidate, ScopeTargets } from './compiler/transforms/scope-targets'
 
 import { analyzeEmits, emitNames, EmitsError } from './app/definitions/define-emits'
@@ -40,7 +40,7 @@ import { extractSourceMappings, markSource, remapDecodedRegions } from './compil
 import { scanInterpolations } from './compiler/parser/interpolation'
 import { compileError, locate, parseSfc } from './compiler/parser/sfc'
 import { attributeValueStart, decodeTemplateExpression, decodeTemplateText, expressionSourceOffset, isCustomElementTag, parseTemplate } from './compiler/parser/template'
-import { branchTakes, importedComponents, isBranchCondition, isCandidates, isComponentName, isLeaves, scriptValueNames } from './compiler/transforms/dynamic-tag'
+import { branchTakes, correlatedBind, importedComponents, isBranchCondition, isCandidates, isComponentName, isLeaves, scriptValueNames } from './compiler/transforms/dynamic-tag'
 import { templateEventType } from './compiler/transforms/events'
 import { layoutShiftHints } from './compiler/transforms/layout-shift'
 import { PropAliasWriteError, rewritePropAliases } from './compiler/transforms/prop-aliases'
@@ -155,6 +155,16 @@ interface SpreadBinding {
 	explicit: { class?: SpreadPart; style?: SpreadPart }
 	/** `<component is>`: keys that the current tag does not accept are left out. */
 	filtered: boolean
+	/** `meeko check` of a `<component is>` that may be a tag or a component: its keys are checked against `is`. */
+	dynamic?: DynamicSpread
+}
+
+/** `meeko check` of `bind="obj"` on a `<component is>` whose value decides at run time. */
+interface DynamicSpread {
+	reference: string
+	referenceOffset: number
+	/** `is` and `bind` read the same object: each entry is checked against its own value of `is`. */
+	correlated?: CorrelatedBind
 }
 
 /**
@@ -219,6 +229,8 @@ interface ComponentBinding {
 	ref?: RefBinding
 	/** `bind="obj"`: props from an object, before the explicit ones. */
 	spread?: { expression: string; offset: number }
+	/** `meeko check` of the `bind` of a `<component is>` whose value decides at run time. */
+	dynamicSpread?: DynamicSpread
 	/** A branch of `<component is>` with names: a prop that the component lacks may be another branch's. */
 	branch?: true
 }
@@ -1085,7 +1097,9 @@ function renderNodeContent(node: TemplateNode, bindings: TemplateBindings, conte
 		const tagLength = componentTag ? referenceLength + 1 : '<component'.length
 		bindings.components.push({ id, reference, referenceOffset, ...(outlet || shipped ? { referenceLength } : {}), props, models, snippets, offset: position, tagLength, ...(ref ? { ref } : {}), ...(spread ? { spread } : {}), ...(context.branchComponents.has(node) ? { branch: true as const } : {}) })
 		const entry = bindings.components.at(-1)!
-		const tagReference = narrowed(markSource(reference, referenceOffset, referenceLength), context.guards)
+		// A branch names its module, whose type does not depend on the condition of `is`: behind it, that
+		// condition would be narrowed against itself (TS2367).
+		const tagReference = entry.branch ? markSource(reference, referenceOffset, referenceLength) : narrowed(markSource(reference, referenceOffset, referenceLength), context.guards)
 		const mappedProps = [
 			...(spread ? [spreadPropsCode(tagReference, markSource(spread.expression, spread.offset))] : []),
 			...props.map((prop) => `${markSource(quote(prop.name), prop.nameOffset, prop.nameLength)}: ${markSource(prop.expression, prop.offset)}`),
@@ -1366,6 +1380,8 @@ function renderDynamicTag(node: TemplateNode, bindings: TemplateBindings, contex
 	const explicit: SpreadBinding['explicit'] = {}
 	const spreadDirective = node.attrs?.find((attribute) => attribute.name === 'bind')
 	const spread = spreadDirective ? spreadAttribute(node, spreadDirective, context) : undefined
+	const correlated = spread && mixed ? correlatedBind(reference, spread.expression) : undefined
+	const dynamicSpread: DynamicSpread | undefined = spread && mixed && context.narrow ? { reference, referenceOffset, ...(correlated ? { correlated } : {}) } : undefined
 	const ref = templateRef(node, context, mixed ? { kind: 'dynamic', reference, referenceOffset } : { kind: 'element', tag: tags[0]!, svg: false, tagType: tags.map(quote).join(' | ') })
 	if (ref) {
 		ref.element = element
@@ -1492,7 +1508,7 @@ function renderDynamicTag(node: TemplateNode, bindings: TemplateBindings, contex
 		} else only('tag', rawName, attribute, rawName.length)
 	}
 	if (spread) {
-		const binding: SpreadBinding = { id: element, ...spread, tag: tagVariable, excluded: [...excluded], explicit, filtered: true }
+		const binding: SpreadBinding = { id: element, ...spread, tag: tagVariable, excluded: [...excluded], explicit, filtered: true, ...(dynamicSpread ? { dynamic: dynamicSpread } : {}) }
 		own.spreads.push(binding)
 		parts.splice(spreadIndex ?? parts.length, 0, `__meeko.renderSpread(${spreadCode(binding, markSource)})`)
 	}
@@ -1516,11 +1532,12 @@ function renderDynamicTag(node: TemplateNode, bindings: TemplateBindings, contex
 	const fallback = snippets.find((snippet) => snippet.name === 'default')
 	const contentRegion = fallback ? context.nextRegion++ : undefined
 	const id = context.nextRegion++
-	const component: ComponentBinding = { id, reference, referenceOffset, props, models, snippets, offset: node.start, tagLength: '<component'.length, ...(ref ? { ref } : {}), ...(spread ? { spread } : {}) }
+	const component: ComponentBinding = { id, reference, referenceOffset, props, models, snippets, offset: node.start, tagLength: '<component'.length, ...(ref ? { ref } : {}), ...(spread ? { spread } : {}), ...(dynamicSpread ? { dynamicSpread } : {}) }
 	bindings.dynamics.push({ id, element, reference, referenceOffset, tagVariable, content, open, bindings: own, offset: node.start, svg: foreign, component, ...(contentRegion !== undefined ? { contentRegion } : {}), checks })
 	const componentVariable = `__meeko_component_${id}`
+	const isCode = dynamicSpread ? markSource(reference, referenceOffset) : undefined
 	const mappedProps = [
-		...(spread ? [spreadPropsCode(componentVariable, markSource(spread.expression, spread.offset))] : []),
+		...(spread ? [spreadPropsCode(componentVariable, markSource(spread.expression, spread.offset), component.dynamicSpread, isCode)] : []),
 		...props.map((prop) => `${markSource(quote(prop.name), prop.nameOffset, prop.nameLength)}: ${markSource(prop.expression, prop.offset)}`),
 	]
 	const input = componentTagCall(
@@ -1529,6 +1546,7 @@ function renderDynamicTag(node: TemplateNode, bindings: TemplateBindings, contex
 		markSource(`{ ${mappedProps.join(', ')} }`, node.start, node.end - node.start),
 		models.map((model) => markSource(model.expression, model.offset)),
 		snippets.map((snippet) => conditionalSnippet(`__meeko.snippet(${snippetParameters(snippet)} => ${snippet.render})`, snippet.condition && markSource(snippet.condition.expression, snippet.condition.offset))),
+		isCode,
 	)
 	const elementContent = htmlContent.length ? htmlContent : fallback ? [`__meeko.renderSnippet(${contentRegion}, __meeko.snippet(() => ${fallback.render}), [])`] : []
 	return `__meeko.renderDynamic(${id}, ${value}, (${tagVariable}) => ${[open, ...elementContent, close].join(' + ')}, (${componentVariable}) => __meeko.renderComponent<any>(${id}, ${componentVariable}, ${input}, __meeko_transfer), ${content}, ${foreign})`
@@ -1690,8 +1708,12 @@ function spreadAttribute(node: TemplateNode, attribute: { name: string; value: s
 	return { expression: attribute.value, offset }
 }
 
-/** The props of `bind="obj"` in the props object of a component tag, before the explicit ones. */
-function spreadPropsCode(reference: string, value: string): string {
+/**
+ * The props of `bind="obj"` in the props object of a component tag, before the explicit ones. In
+ * `meeko check`, a `<component is>` whose value decides at run time checks them against `is`.
+ */
+function spreadPropsCode(reference: string, value: string, dynamic?: DynamicSpread, isCode?: string): string {
+	if (dynamic && isCode) return `...__meeko.${dynamic.correlated ? 'correlatedProps' : 'dynamicProps'}(() => ${isCode}, ${value})`
 	return `...__meeko.spreadProps(() => ${reference}, ${value})`
 }
 
@@ -1718,7 +1740,9 @@ function spreadCode(spread: SpreadBinding, map: (expression: string, offset: num
 		...(spread.explicit.style ? [`style: ${part('style', spread.explicit.style)}`] : []),
 	]
 	const extra = spread.filtered ? `, ${explicit.length ? `{ ${explicit.join(', ')} }` : 'undefined'}, __meeko.tagAccepts` : explicit.length ? `, { ${explicit.join(', ')} }` : ''
-	return `__meeko.spreadEntries(${spread.tag}, ${map(spread.expression, spread.offset)}, ${JSON.stringify(spread.excluded)}${extra})`
+	const value = map(spread.expression, spread.offset)
+	const checked = spread.dynamic ? `__meeko.dynamicSpread(() => ${map(spread.dynamic.reference, spread.dynamic.referenceOffset)}, ${value})` : value
+	return `__meeko.spreadEntries(${spread.tag}, ${checked}, ${JSON.stringify(spread.excluded)}${extra})`
 }
 
 /**
@@ -1843,12 +1867,13 @@ function htmlValue(html: HtmlBinding, context: TemplateContext): string {
  * snippets son objetos mapeados a la etiqueta, donde se informa de uno obligatorio que falta, con
  * cada nombre mapeado a su atributo.
  */
-function componentTagCall(entry: ComponentBinding, reference: string, props: string, models: readonly string[], snippets: readonly string[]): string {
+function componentTagCall(entry: ComponentBinding, reference: string, props: string, models: readonly string[], snippets: readonly string[], isCode?: string): string {
 	const channel = (entries: readonly string[]): string => markSource(entries.length ? `{ ${entries.join(', ')} }` : '__meeko.noChannels', entry.offset, entry.tagLength)
 	const events = entry.props.filter((prop) => prop.name.startsWith('on')).map((prop) => `${markSource(quote(prop.name), prop.nameOffset, prop.nameLength)}: true`)
 	const modelEntries = entry.models.map((model, index) => `${markSource(quote(model.name), model.nameOffset, model.nameLength)}: ${models[index]}`)
 	const snippetEntries = entry.snippets.map((snippet, index) => `${markSource(quote(snippet.name), snippet.nameOffset, snippet.nameLength)}: ${snippets[index]}`)
-	return `__meeko.${entry.branch ? 'branchTag' : 'componentTag'}(() => ${reference})(${props}, ${channel(events)}, ${channel(modelEntries)}, ${channel(snippetEntries)})`
+	const tag = entry.dynamicSpread?.correlated && isCode ? `correlatedTag(() => ${reference}, () => ${isCode})` : `${entry.branch ? 'branchTag' : 'componentTag'}(() => ${reference})`
+	return `__meeko.${tag}(${props}, ${channel(events)}, ${channel(modelEntries)}, ${channel(snippetEntries)})`
 }
 
 /** Parameter list of a snippet's render function, mapped to its `params` attribute. */
@@ -2554,7 +2579,8 @@ function hydrationBody(bindings: TemplateBindings, context: TemplateContext, hot
 	// Los paréntesis evitan que `() => { ... }.value` se lea como bloque; su tramo externo conserva la ubicación.
 	const arrowExpression = (expression: string, offset: number, expressionLocals = locals, within = guards): string => markSource(`(${mappedExpression(expression, offset, expressionLocals, within)})`, offset, expression.length)
 	// `<MeekoOutlet>` reads a generated expression that maps to the tag name, not to its own text.
-	const componentReference = (entry: ComponentBinding): string => (entry.referenceLength === undefined ? arrowExpression(entry.reference, entry.referenceOffset) : markSource(`(${entry.reference})`, entry.referenceOffset, entry.referenceLength))
+	// A branch of `is` with names reads its module without guards: see `renderNodeContent`.
+	const componentReference = (entry: ComponentBinding): string => (entry.referenceLength === undefined ? arrowExpression(entry.reference, entry.referenceOffset, locals, entry.branch ? [] : guards) : markSource(`(${entry.reference})`, entry.referenceOffset, entry.referenceLength))
 	for (const { id, expression, offset } of bindings.texts) {
 		const point = locate(context.source, offset)
 		const location = `${basename(context.filename)}:${point.line}:${point.column} (text ${id})`
@@ -2627,7 +2653,8 @@ function hydrationBody(bindings: TemplateBindings, context: TemplateContext, hot
 			// tag call infers for a generic child.
 			return `${markSource(quote(prop.name), prop.nameOffset, prop.nameLength)}: ${hot && !prop.literal && !isFunctionLiteral(prop.expression) ? trackedRead(context, prop.offset, prop.expression, 'prop', `(${value})`, prop.name) : value}`
 		})
-		if (entry.spread) props.unshift(spreadPropsCode(reference, mappedExpression(entry.spread.expression, entry.spread.offset)))
+		const isCode = entry.dynamicSpread ? mappedExpression(entry.dynamicSpread.reference, entry.dynamicSpread.referenceOffset) : undefined
+		if (entry.spread) props.unshift(spreadPropsCode(reference, mappedExpression(entry.spread.expression, entry.spread.offset), entry.dynamicSpread, isCode))
 		const snippets = entry.snippets.map((snippet) => conditionalSnippet(snippetValue(snippet), snippet.condition && mappedExpression(snippet.condition.expression, snippet.condition.offset)))
 		return componentTagCall(
 			entry,
@@ -2635,6 +2662,7 @@ function hydrationBody(bindings: TemplateBindings, context: TemplateContext, hot
 			markSource(`{ ${props.join(', ')} }`, entry.offset, 1),
 			entry.models.map((model) => mappedExpression(model.expression, model.offset)),
 			snippets,
+			isCode,
 		)
 	}
 	/** Type-only checks of a component tag, never called: a model needs a writable signal; a conditional snippet, an optional one. */
@@ -2679,6 +2707,12 @@ function hydrationBody(bindings: TemplateBindings, context: TemplateContext, hot
 			componentStatements.push(tagCheck(entry, mappedExpression(entry.reference, entry.referenceOffset), entry.svg))
 			for (const check of entry.checks) {
 				componentStatements.push(`void (() => __meeko.checkDynamicFeature(${mappedExpression(entry.reference, entry.referenceOffset)}, ${quote(check.feature)}, ${quote(check.kind)}, ${markSource('true', check.offset, check.length)}));`)
+			}
+			const correlated = entry.component.dynamicSpread?.correlated
+			const spread = entry.component.spread
+			if (correlated && spread) {
+				const given = entry.component.props.map((prop) => prop.name)
+				componentStatements.push(`void (() => __meeko.checkCorrelatedBind(${mappedExpression(correlated.root, entry.referenceOffset + correlated.offset)}, ${JSON.stringify(correlated.isPath)}, ${JSON.stringify(correlated.bindPath)}, ${JSON.stringify(given)}, ${markSource('true', spread.offset, spread.expression.length)}));`)
 			}
 		}
 	}

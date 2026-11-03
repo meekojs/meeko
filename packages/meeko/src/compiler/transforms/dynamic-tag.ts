@@ -107,6 +107,33 @@ export function isComponentName(literal: string): boolean {
 	return /^[A-Z][\w$]*$/.test(literal)
 }
 
+/** `is` and `bind` that read the same object: what they share and the rest of each path. */
+export interface CorrelatedBind {
+	/** The shared start of both paths, such as `option` or `current.value`. */
+	readonly root: string
+	/** Offset of `root` inside the expression of `is`. */
+	readonly offset: number
+	readonly isPath: readonly string[]
+	readonly bindPath: readonly string[]
+}
+
+const memberPath = /^\s*([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+)\s*$/
+
+/**
+ * Whether `is` and `bind` are property paths of the same object, such as `option.component` and
+ * `option.props`. TypeScript does not relate two reads of a union, but the type of that object does:
+ * each member has its value of `is` next to its `bind`. Any other expression has no such object.
+ */
+export function correlatedBind(is: string, bind: string): CorrelatedBind | undefined {
+	const left = memberPath.exec(is)?.[1]?.split('.')
+	const right = memberPath.exec(bind)?.[1]?.split('.')
+	if (!left || !right) return undefined
+	let shared = 0
+	while (shared < Math.min(left.length, right.length) - 1 && left[shared] === right[shared]) shared++
+	if (shared === 0) return undefined
+	return { root: left.slice(0, shared).join('.'), offset: is.indexOf(left[0]!), isPath: left.slice(shared), bindPath: right.slice(shared) }
+}
+
 /** Attributes of `<MeekoLink>` that build its href: only its branch of `is` takes them. `resolve` since 1.8. */
 const linkAttributes = new Set(['to', 'bind:to', 'bind:params', 'bind:search', 'match', 'bind:match', 'resolve', 'bind:resolve'])
 

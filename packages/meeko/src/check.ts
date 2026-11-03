@@ -327,9 +327,21 @@ export function interfaceExtendsMessage(source: string, offset: number): string 
 	return `Una interface no puede extender ${base} porque no tiene una forma única: suele ser una unión de props, y cada variante es distinta. Escribe un tipo, que conserva todas las variantes: type ${name} = ${base} & { … }`
 }
 
-function meekTypeMessage(code: string, text: string): string {
+function meekTypeMessage(code: string, text: string, source: string): string {
 	if (code === 'MEEK112' && text.endsWith('no se aplica a ninguna etiqueta posible de is')) {
 		return `${text}: Meeko no lo escribiría nunca; quítalo o añade a is una etiqueta que lo admita`
+	}
+	// `is` never turns a text into a component: a name that only exists at run time needs one of these.
+	const name = code === 'MEEK112' ? /^<([A-Z][\w$]*)> no es una etiqueta/.exec(text)?.[1] : undefined
+	if (name) return `${text}: is nunca convierte un texto en un componente. Escribe el literal en la plantilla (is="cond ? '${name}' : 'section'"), pon en los datos el módulo importado (import * as ${name} from "./${name}.meeko") o cárgalo en ejecución con await resolveComponent('${name}') dentro de una función`
+	if (code === 'MEEK112' && text.startsWith('is es un string cualquiera')) {
+		return `${text}. Si ese texto nombra un componente, is nunca lo convierte en uno: escribe el literal en la plantilla (is="cond ? 'AppCard' : 'section'"), pon en los datos el módulo importado o cárgalo en ejecución con await resolveComponent(nombre) dentro de una función`
+	}
+	// `ComponentProps<Name>` also has the callbacks of `defineEmits`, which `bind` does not admit. Its
+	// alias does not reach the type text, so the name comes from the component that writes it, if it does.
+	if (code === 'MEEK113' && text.startsWith('bind no admite claves on*')) {
+		const props = /\bComponentProps<["'`]([A-Z][\w$]*)["'`]>/.exec(source)?.[1]
+		if (props) return `${text}. ComponentProps<'${props}'> incluye los eventos de defineEmits: tipa el objeto con el alias ${props}Props, que sólo tiene las props`
 	}
 	return text
 }
@@ -468,7 +480,7 @@ export async function checkSource(source: string, filename: string, options: Che
 				}
 				const meekType = meekTypeText.exec(diagnostic.message)
 				if (meekType) {
-					return { code: meekType[1]!, message: meekTypeMessage(meekType[1]!, meekType[2]!), filename: entry.original, location: locate(entry.source, offset ?? 0) }
+					return { code: meekType[1]!, message: meekTypeMessage(meekType[1]!, meekType[2]!, entry.source), filename: entry.original, location: locate(entry.source, offset ?? 0) }
 				}
 				const result: CompileDiagnostic = {
 					code: diagnostic.code,

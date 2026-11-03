@@ -20,6 +20,7 @@ import { generateServerContracts } from '../src/framework/contracts-generate.ts'
 import { buildProject } from '../src/framework/project.ts'
 import { previewStatic } from '../src/framework/static-adapter.ts'
 import { startConformanceOutput } from './conformance/harness.ts'
+import { componentIsListFiles } from './helpers/component-is-list.ts'
 import { polymorphicButton } from './helpers/polymorphic-button.ts'
 import { staticAppConfig, writeStaticApp } from './helpers/static-app.ts'
 import { createTempProject, linkRepositoryPackages } from './helpers/temp-project.ts'
@@ -1605,6 +1606,89 @@ const route = useRoute();
 			assert.deepEqual(errors, [])
 		},
 	)
+})
+
+test('un each: con un módulo distinto por fila hidrata, reordena, cambia is y libera estado y escuchadores', { timeout: 240_000 }, async () => {
+	await withServedApp('component-is-list-e2e', { ...componentIsListFiles }, async (origin, browser) => {
+		// SSR: each row with its own component, its props and its snippet.
+		const html = (await (await fetch(`${origin}/`)).text()).replace(/<!--[^>]*-->/g, '')
+		assert.match(html, /<li[^>]*data-id="role"[^>]*>\s*<div class="select"><label>Rol<select><option[^>]*>admin<\/option>/)
+		assert.match(html, /<li[^>]*data-id="name"[^>]*>\s*<div class="input"><input placeholder="Nombre"/)
+		assert.match(html, /<b class="slot"[^>]*>role<\/b>/)
+
+		const page = await browser.newPage()
+		const errors: string[] = []
+		page.on('pageerror', (error) => errors.push(error.message))
+		page.on('console', (message) => {
+			if (message.type() === 'error' || /mismatch/i.test(message.text())) errors.push(message.text())
+		})
+		await page.addInitScript(() => {
+			;(window as unknown as { lifecycle: string[] }).lifecycle = []
+		})
+		await page.goto(`${origin}/`)
+		await page.waitForFunction(() => performance.getEntriesByName('meeko-hydration').length > 0)
+		const log = (): Promise<string[]> => page.evaluate(() => (window as unknown as { lifecycle: string[] }).lifecycle.splice(0))
+		const rows = (): Promise<string[]> => page.evaluate(() => [...document.querySelectorAll('li')].map((row) => `${row.dataset['id']}:${row.querySelector('.select') ? 'select' : 'input'}:${row.querySelector('.count')!.textContent}`))
+		const touched = (): Promise<string | null> => page.locator('#touched').textContent()
+		const row = (id: string) => page.locator(`li[data-id="${id}"]`)
+		assert.deepEqual((await log()).sort(), ['mount input', 'mount select'])
+		// Hydration claims the elements of SSR: the state and the on: of each row work.
+		await row('role').locator('.count').click()
+		await row('role').locator('.count').click()
+		await row('name').locator('.count').click()
+		assert.deepEqual(await rows(), ['role:select:2', 'name:input:1'])
+		assert.equal(await touched(), 'select,select,input')
+
+		// Reordering moves each row with its instance: no release, no mount, the state stays.
+		await page.evaluate(() => {
+			;(window as unknown as { kept: Element | null }).kept = document.querySelector('li[data-id="role"] .select')
+		})
+		await page.locator('#reverse').click()
+		assert.deepEqual(await rows(), ['name:input:1', 'role:select:2'])
+		assert.deepEqual(await log(), [])
+		assert.equal(await page.evaluate(() => (window as unknown as { kept: Element | null }).kept === document.querySelector('li[data-id="role"] .select')), true)
+
+		// New props reach the same instance.
+		await page.locator('#relabel').click()
+		assert.match((await row('role').locator('label').textContent()) ?? '', /^Cargo/)
+		assert.deepEqual(await rows(), ['name:input:1', 'role:select:2'])
+		assert.deepEqual(await log(), [])
+
+		// An added row mounts its component, with its snippet, and renders on the client.
+		await page.locator('#add').click()
+		assert.deepEqual(await rows(), ['name:input:1', 'role:select:2', 'more:input:0'])
+		assert.equal(await row('more').locator('input').getAttribute('placeholder'), 'Otro')
+		assert.equal(await row('more').locator('.slot').textContent(), 'more')
+		assert.deepEqual(await log(), ['mount input'])
+		await row('more').locator('.count').click()
+		assert.equal(await touched(), 'select,select,input,input')
+
+		// A row with another module: the previous instance is released and the new one starts in its place.
+		await page.locator('#swap').click()
+		assert.deepEqual(await rows(), ['name:select:0', 'role:select:2', 'more:input:1'])
+		assert.deepEqual(await log(), ['release input', 'mount select'])
+
+		// A removed row releases its instance and its listeners: a kept button no longer reaches the page.
+		await page.evaluate(() => {
+			;(window as unknown as { kept: Element | null }).kept = document.querySelector('li[data-id="role"] .count')
+		})
+		const before = await touched()
+		await page.locator('#remove').click()
+		assert.deepEqual(await rows(), ['name:select:0', 'more:input:1'])
+		assert.deepEqual(await log(), ['release select'])
+		await page.evaluate(() => (window as unknown as { kept: HTMLElement }).kept.click())
+		assert.equal(await touched(), before)
+
+		// A navigation releases every row; back on the client, the page renders them again.
+		await page.locator('#about').click()
+		await page.locator('#about-title').waitFor()
+		assert.deepEqual((await log()).sort(), ['release input', 'release select'])
+		await page.locator('#home').click()
+		await page.locator('li').first().waitFor()
+		assert.deepEqual(await rows(), ['role:select:0', 'name:input:0'])
+		assert.deepEqual((await log()).sort(), ['mount input', 'mount select'])
+		assert.deepEqual(errors, [])
+	})
 })
 
 const richSelectPage = `<script lang="ts">
