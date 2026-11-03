@@ -28,7 +28,8 @@ const tips = `<script lang="ts">
 		<button id="external-a" type="button">Externo A</button>
 		<button id="external-b" type="button">Externo B</button>
 		<UIPopover mode="hint" bind:triggerId="external.value" class="tip-external" bind:delay="${delay}" bind:closeDelay="${closeDelay}">Externo</UIPopover>
-		<UITooltip text="Se va" class="tip-gone" bind:delay="${delay}" bind:closeDelay="${closeDelay}"><snippet name="anchor" params="trigger"><button if:when="shown.value" type="button" bind="trigger">Se va</button></snippet></UITooltip>
+		<!-- A box of its own: if the row moved when the trigger leaves, another trigger would end under the pointer, and its tooltip would close this one. -->
+		<span style="display: inline-block; width: 96px; height: 32px;"><UITooltip text="Se va" class="tip-gone" bind:delay="${delay}" bind:closeDelay="${closeDelay}"><snippet name="anchor" params="trigger"><button if:when="shown.value" type="button" bind="trigger">Se va</button></snippet></UITooltip></span>
 		<UITooltip text="Cambia" class="tip-swap" bind:delay="${delay}" bind:closeDelay="${closeDelay}"><snippet name="anchor" params="trigger"><button if:when="firstTrigger.value" type="button" bind="trigger">Uno</button><button if:when="!firstTrigger.value" type="button" bind="trigger">Dos</button></snippet></UITooltip>
 		<UITooltip text="Plano" class="tip-plain" bind:delay="${delay}" bind:closeDelay="${closeDelay}"><snippet name="trigger">Plano</snippet></UITooltip>
 		<button id="unmount-trigger" type="button">Se desmonta</button>
@@ -151,6 +152,7 @@ for (const [engine, launch] of Object.entries(engines)) {
 			const tip = tab.locator('.tip-gone')
 			await until(tip, true, () => hover(tab, tab.getByRole('button', { name: 'Se va', exact: true })))
 			await until(tip, false, () => tab.locator('#remove').evaluate((button) => button.click()))
+			assert.equal(await tab.locator('[data-meeko-popover]:popover-open').count(), 0, 'closed by itself, and no other tooltip took its place')
 			assert.deepEqual(errors, [])
 			await context.close()
 		})
