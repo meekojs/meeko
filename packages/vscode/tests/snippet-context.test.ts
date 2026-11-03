@@ -29,6 +29,16 @@ test('strings, comments and members of a script accept none', () => {
 	}
 })
 
+test('a regular expression still open accepts none, and a division or a closed one does not count', () => {
+	for (const code of ['const re = /abc|', 'const re = /|', 'const re = /a[/|', 'const re = /a\\/|', 'if (/a|', 'return /a|', 'const a = [/x/, /y|', 'const a = 1 + /x|']) {
+		assert.equal(contextAt(`<script lang="ts">\n${code}\n</script>`), undefined, code)
+	}
+	assert.equal(contextAt('<script lang="ts">\nconst re = /abc|</script>'), undefined, 'right before the closing tag')
+	for (const code of ['const re = /abc/ |', 'const re = /abc/g\n|', 'const a = b / c |', 'const a = b /|', 'const a = (b) / 2 |', 'const a = items[0] / 2 |', 'const a = i++ / 2 |', 'const a = obj.return / 2 |', 'const a = 4 / 2 / 1 |', 'const re = /abc\n|', 'const a = 1 / 2\n|']) {
+		assert.equal(contextAt(`<script lang="ts">\n${code}\n</script>`), 'script', code)
+	}
+})
+
 test('the content of the template accepts template snippets', () => {
 	assert.equal(contextAt('<template>|</template>'), 'template')
 	assert.equal(contextAt('<template>\n\t|\n</template>'), 'template')

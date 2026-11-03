@@ -67,19 +67,23 @@ function segment(text: string, open: number, { close, lineCommentEnd }: CodeEnd)
 
 /**
  * Indica si el final de `code` queda dentro de una cadena, una plantilla literal (también en sus
- * sustituciones `${...}`) o un comentario, con las mismas reglas que `scanInterpolations`. Una
- * cadena que se corta en su línea termina ahí, como en TypeScript: escribir una no apaga el resto
- * del bloque.
+ * sustituciones `${...}`), una expresión regular o un comentario, con las mismas reglas que
+ * `scanInterpolations`. Una cadena o una expresión regular que se corta en su línea termina ahí,
+ * como en TypeScript: escribir una no apaga el resto del bloque.
  *
  * @example
  * endsInLiteralOrComment("const a = 'ho") // true
  * endsInLiteralOrComment("const a = 'hola'; ") // false
+ * endsInLiteralOrComment("const re = /ab") // true
+ * endsInLiteralOrComment("const a = b / c") // false
  */
 export function endsInLiteralOrComment(code: string): boolean {
 	let previous = ''
 	let index = 0
 	while (index < code.length) {
 		const step = codeStep(code, index, previous)
+		// Sólo aquí: para el lexer, una `/` sin cierre en su línea es un operador.
+		if (opensRegex(code, index, previous) && skipRegex(code, index) < 0 && findLineTerminator(code, index + 1) < 0) return true
 		if (step.end >= 0) {
 			index = step.end
 			previous = step.previous
@@ -188,6 +192,11 @@ function skipTemplate(text: string, start: number): number {
 		} else index++
 	}
 	return -1
+}
+
+/** Si la `/` de `index` abre una expresión regular: ni un comentario ni una división. */
+function opensRegex(text: string, index: number, previous: string): boolean {
+	return text[index] === '/' && text[index + 1] !== '/' && text[index + 1] !== '*' && regexAllowed(previous)
 }
 
 /** Devuelve la posición siguiente a una expresión regular literal, o -1 si no es válida en la línea. */
