@@ -279,7 +279,7 @@ test('the language server reports the same as meeko check', { timeout: 300_000 }
 			const document = TextDocument.create(opened.document.uri, 'meeko', 2, source)
 			const found = await componentDiagnostics(workspace.project, document, opened.component.filename, () => undefined)
 			const template = source.indexOf('<template>')
-			return found.map((item) => ({ code: item.code, message: item.message, start: document.offsetAt(item.range.start), end: document.offsetAt(item.range.end) })).filter((item) => item.start >= template)
+			return found.map((item) => ({ code: item.code, message: String(item.message), start: document.offsetAt(item.range.start), end: document.offsetAt(item.range.end) })).filter((item) => item.start >= template)
 		}
 		assert.deepEqual(await report('Good.meeko', good), [])
 		assert.deepEqual(await report('Branches.meeko', branches), [])
