@@ -79,7 +79,7 @@
 			with
 			<code>mode="hint"</code>
 			and the look of a tooltip: it opens with the pointer or the focus, never takes the focus, and the trigger references it with
-			<code>aria-describedby</code>. Write complementary information in it.
+			<code>aria-describedby</code>. Write complementary information in it: on touch it is not reliable, because depending on the browser it appears on a tap, only while pressed, or not at all.
 		</p>
 		<DocsPreview>
 			<UITooltip text="It is published when saved">

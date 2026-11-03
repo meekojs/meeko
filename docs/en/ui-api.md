@@ -1,5 +1,5 @@
 ---
-source-hash: f66494e01bf8951d58a4eb1d8fba14f64015867a9ba8eb2ff30da07a3fb01793
+source-hash: 98288c9ccdd6b96e48c28660b77a0cd3891519e1f2a4dd4d28a1c63fbc3ae8e2
 ---
 
 # Meeko UI API
@@ -662,7 +662,7 @@ Meeko renders a `<button>` with `popovertarget`, `aria-expanded`, `aria-controls
 - With `role="menu"`, the content follows the menu pattern: `Enter`, `Space` or `↓` on the trigger open the menu with focus on the first `menuitem` (`↑`, on the last); the arrows move it (wrapping around), `Home` and `End` go to the ends and the first letters search for an element. Elements with `disabled` or `aria-disabled="true"` are skipped. Choosing a `role="menuitem"` closes the menu and returns focus; a `menuitemcheckbox` or `menuitemradio` leaves it open. `Tab` closes the menu. Mark the elements with `role="menuitem"`: Meeko does not change the role of its content.
 - With `role="dialog"`, focus enters the first control (or the element with `autofocus`) on opening.
 
-**Tooltip.** `mode="hint"` uses `popover="hint"`: it opens when the pointer hovers (after `delay`) or when the trigger gets focus, stays open while the pointer is over it or over the content, closes with `Esc` or on losing focus, and never takes focus. The trigger carries `aria-describedby` with the content, which is `role="tooltip"`.
+**Tooltip.** `mode="hint"` uses `popover="hint"`: it opens when the pointer hovers (after `delay`) or when the trigger gets focus, stays open while the pointer is over it or over the content, closes with `Esc` or on losing focus, and never takes focus. The trigger carries `aria-describedby` with the content, which is `role="tooltip"`. On touch it is not reliable: depending on the browser, it appears on a tap, only while pressed, or not at all, so do not put anything essential in it.
 
 ```html
 <UIPopover mode="hint">

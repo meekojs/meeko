@@ -76,7 +76,7 @@
 			con
 			<code>mode="hint"</code>
 			y el aspecto de un tooltip: se abre con el puntero o el foco, nunca toma el foco, y el disparador lo referencia con
-			<code>aria-describedby</code>. Escribe en él información complementaria.
+			<code>aria-describedby</code>. Escribe en él información complementaria: en táctil no es fiable, porque según el navegador aparece al tocar, sólo mientras se mantiene pulsado o no aparece.
 		</p>
 		<DocsPreview>
 			<UITooltip text="Se publica al guardar">

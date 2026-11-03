@@ -24,7 +24,8 @@ export interface TooltipSnippets {
 /**
  * Props de `<UITooltip>`, un texto breve que describe a su disparador: se abre con el puntero y con el
  * foco, `Esc` lo cierra, no roba el foco y se asocia con `aria-describedby`. No pongas en él nada
- * imprescindible ni interactivo: en táctil sólo aparece al enfocar.
+ * imprescindible ni interactivo: en táctil no es fiable. Según el navegador, aparece al tocar, sólo
+ * mientras se mantiene pulsado o no aparece.
  * @since 1.8.0
  * @example
  * ```html

@@ -130,8 +130,8 @@ const showcase = `<script lang="ts">
 
 const route = "import { definePage } from '@meekojs/meeko/framework'\nexport const route = definePage({ render: 'prerender' })\n"
 
-/** A throwaway application of its own, removed afterwards, that uses the built package. */
-export async function createNativeApp(context) {
+/** A throwaway application of its own, removed afterwards, that uses the built package. `extraFiles` adds pages of a test. */
+export async function createNativeApp(context, extraFiles = {}) {
 	const parent = fileURLToPath(new URL('../../.meeko/', import.meta.url))
 	await mkdir(parent, { recursive: true })
 	const root = await mkdtemp(join(parent, 'native-'))
@@ -158,6 +158,7 @@ export async function createNativeApp(context) {
 		'app/pages/route-a.route.ts': route,
 		'app/pages/route-b.meeko': `<template><main><UINavigationTabs label="Rutas" bind:items="[{ label: 'Primera pestaña', to: '/route-a' }, { label: 'Segunda', to: '/route-b' }]" /><h1 id="route-b">B</h1></main></template>\n`,
 		'app/pages/route-b.route.ts': route,
+		...extraFiles,
 	}
 	for (const [file, source] of Object.entries(files)) {
 		await mkdir(dirname(join(root, file)), { recursive: true })

@@ -1,7 +1,8 @@
 <script lang="ts">
-	// <UITooltip>: a <UIPopover mode="hint"> with the look of a tooltip. `interestfor` would save the delays,
-	// but only Chrome and Edge have it, so the hover, the focus and Escape stay in <UIPopover>. Its template
-	// has no whitespace between the tags: it would be text in the tooltip.
+	// <UITooltip>: a <UIPopover mode="hint"> with the look of a tooltip. `interestfor` would save the delays, but
+	// only Chrome, Edge and Opera have it, neither Firefox nor Safari, and it is still experimental, so the hover,
+	// the focus and Escape stay in <UIPopover>. Its template has no whitespace between the tags: it would be text
+	// in the tooltip.
 	import type { TooltipSnippets, UITooltipProps } from '../types/tooltip'
 
 	import * as Popover from './Popover.meeko'
