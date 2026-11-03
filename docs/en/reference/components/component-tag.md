@@ -19,7 +19,7 @@ related:
   - docs/api.md#nombres-de-componente-en-is
   - docs/api.md#atributos-en-bloque-con-bind
   - docs/api.md#props-estáticas
-source-hash: f47ac65ec166903d8fba462b9a7343c13e21a4054f549c81316299fb84a3c76b
+source-hash: 054a54cbdcb8c7571df9ce6f2ad61f086788b72d0f7a442cfe66982c368d6e01
 ---
 
 `<component is="expresión">` renders the component returned by the expression: a prop receiving a component, one from a view table, one chosen by a condition. Each `bind:` passes a typed prop, each `on:` an event from its `defineEmits`, and `meeko check` checks required props, names and types. If `is` changes, Meeko disposes of the previous instance and renders and hydrates the new one in the same place.
@@ -172,7 +172,9 @@ If `is` and `bind` do not read the same object (`is="views[mode.value]" bind="at
 
 Use `AppSelectProps`, not `ComponentProps<"AppSelect">`: the latter includes the `defineEmits` events, and `bind` does not accept `on*` keys (`MEEK113`). Events are passed with `on:`, and the content between the tags is each row's `default` snippet.
 
-A module is not data that can be sent to the browser, so it does not go in a `signal`: rendering on the server would throw a `TypeError` because it cannot be serialized. If the list changes, store in the signal which entries are painted and read them with a `computed`:
+On a generic component, `meeko check` checks its names and required props, not the type of its values: only its tag can infer its type parameters, and a list of different modules cannot call it entry by entry. Alone in the list, they are checked.
+
+A module is not data that can be sent to the browser, so it does not go in a `signal` or in `useState`: `meeko check` gives `MEEK136`, and rendering on the server would be an error. If the list changes, store in the signal which entries are painted and read them with a `computed`:
 
 ```html
 <script lang="ts">

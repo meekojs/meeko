@@ -171,7 +171,9 @@ Si `is` y `bind` no leen el mismo objeto (`is="views[mode.value]" bind="attrs"`)
 
 Usa `AppSelectProps`, no `ComponentProps<"AppSelect">`: este último incluye los eventos de `defineEmits`, y `bind` no admite claves `on*` (`MEEK113`). Los eventos se pasan con `on:`, y el contenido entre las etiquetas es el snippet `default` de cada fila.
 
-Un módulo no es un dato que se pueda enviar al navegador, así que no va en un `signal`: al renderizar en el servidor lanzaría un `TypeError`, porque no se puede serializar. Si la lista cambia, guarda en la señal qué entradas se pintan y léelas con un `computed`:
+En un componente genérico, `meeko check` comprueba sus nombres y sus props obligatorias, no el tipo de sus valores: sólo su etiqueta puede inferir sus parámetros de tipo, y una lista de módulos distintos no puede llamarla entrada a entrada. Solo en la lista, sí se comprueban.
+
+Un módulo no es un dato que se pueda enviar al navegador, así que no va en un `signal` ni en `useState`: `meeko check` da `MEEK136`, y al renderizar en el servidor sería un error. Si la lista cambia, guarda en la señal qué entradas se pintan y léelas con un `computed`:
 
 ```html
 <script lang="ts">
