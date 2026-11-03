@@ -1,5 +1,5 @@
 ---
-source-hash: 53426fbbdda27199eecea811f23ae96ad3b8c2d31181f97bf3cc9af04fee3bac
+source-hash: aa0d0305f4335ac4c50099f666c35d63e73ec5a0d3c43c19d1ba62dfd9b293c4
 ---
 
 # Meeko UI API
@@ -27,7 +27,7 @@ Then run `pnpm install` from the root. To install a published version of the pac
 pnpm add @meekojs/ui
 ```
 
-The application needs `@meekojs/meeko` and Node.js 24 or later. UI 0.2 requires Meeko `>=1.8 <2` because `UIThemeToggle` uses `useThemeToggle()`. Before publishing 0.2.0, the module's declared compatibility must be updated; in this workspace it is validated against the local core.
+The application needs `@meekojs/meeko` and Node.js 24 or later. UI requires Meeko `>=1.8 <2` because `UIThemeToggle` uses `useThemeToggle()`.
 
 ## Configuration
 
@@ -271,7 +271,7 @@ It also includes `UIApp` and `UIModal` for [modals](#modals), `UITable` for [tab
 
 The public site `apps/meeko` uses these actions in its home page, header and errors; `UILinkCard` makes up the documentation index and `UIBadge` the reference metadata. Its `meeko.config.ts` links the tokens to the current palette, including the neutral actions and the blue focus.
 
-Since UI 0.2, `UIPopover`, `UISelect` and `UIThemeToggle` are components of the UI module. They replace `MeekoPopover`, `MeekoSelect` and `MeekoThemeToggle`, deprecated since core 1.8 and due for removal in 2.0. They keep the contract and the `data-meeko-*` markup; see [Migration to 1.8](migration-1.8.md).
+Since UI 1.8, `UIPopover`, `UISelect` and `UIThemeToggle` are components of the UI module. They replace `MeekoPopover`, `MeekoSelect` and `MeekoThemeToggle`, deprecated since core 1.8 and due for removal in 2.0. They keep the contract and the `data-meeko-*` markup; see [Migration to 1.8](migration-1.8.md).
 
 ## Customization
 
@@ -911,7 +911,7 @@ With `max`, as soon as `max` options are chosen the rest become `aria-disabled="
 </form>
 ```
 
-**Long lists.** `<UICombobox>` renders all the options (in the server's HTML too). For thousands of options, use `searchable` with a `filter` that returns only the first matches; a virtual list that only renders the visible ones (`virtual`) is not available in UI `0.2`.
+**Long lists.** `<UICombobox>` renders all the options (in the server's HTML too). For thousands of options, use `searchable` with a `filter` that returns only the first matches; a virtual list that only renders the visible ones (`virtual`) is not available in UI `1.8`.
 
 **Native alternative.** For a simple case, with no search or options with custom content, a native `<select>` with `model` remains the lightest option. In browsers that support it, `appearance: base-select` lets you style it completely and keeps the browser's keyboard, accessibility and form submission:
 
@@ -953,7 +953,7 @@ Public types from `@meekojs/ui/runtime`.
 
 ## UIThemeToggle
 
-Since UI `0.2`, with the UI module active and `theme` in `meeko.config.ts`, `UIThemeToggle` lets you change the theme. It requires core `1.8` and uses its public API `useThemeToggle()`.
+Since UI `1.8`, with the UI module active and `theme` in `meeko.config.ts`, `UIThemeToggle` lets you change the theme. It requires core `1.8` and uses its public API `useThemeToggle()`.
 
 With `icons`, the button renders an icon for `light`, `dark` and `system` instead of its name, which stays in the `aria-label`: `<UIThemeToggle icons />`. A snippet with the name of the choice wins over the icon, and another theme shows its name. It is what the headers of the Meeko sites use.
 

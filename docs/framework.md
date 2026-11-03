@@ -68,7 +68,7 @@ export default defineServerRuntime(({ production, prerendering }) => ({
 
 `app/styles/main.css` es opcional y se carga automáticamente como hoja global en desarrollo y en el build. Vite la incluye en el asset CSS de producción; Meeko enlaza ese asset en el HTML SSR y prerenderizado. Los bloques `<style>` de `.meeko` siguen disponibles para estilos locales.
 
-**PostCSS y Tailwind.** Vite procesa con PostCSS tanto `app/styles/main.css` como los `<style>` de los componentes, con el `postcss.config.*` de la raíz del proyecto. Para Tailwind 4, instale `tailwindcss` y `@tailwindcss/postcss`, declare el plugin y cargue Tailwind en la hoja global; Tailwind lee las clases de los `.meeko`:
+<a id="postcss-y-tailwind"></a>**PostCSS y Tailwind.** Vite procesa con PostCSS tanto `app/styles/main.css` como los `<style>` de los componentes, con el `postcss.config.*` de la raíz del proyecto. Para Tailwind 4, instale `tailwindcss` y `@tailwindcss/postcss`, declare el plugin y cargue Tailwind en la hoja global; Tailwind lee las clases de los `.meeko`:
 
 ```js
 // postcss.config.mjs

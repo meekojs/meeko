@@ -1,5 +1,5 @@
 ---
-source-hash: be9ee0f12d1f9ede8975398a9841dc00190cbcaada6efa5fcb818d0b76180b7f
+source-hash: 4ff05050b79cad6d23eb20c6d2a24f0296c07d2d416809813065fc88db95e1f1
 ---
 
 # ESLint
@@ -245,7 +245,7 @@ pnpm exec eslint app/components/Example.meeko --fix
 
 The optional [`meeko/attributes-order`](../../packages/eslint-plugin/docs/rules/attributes-order.md) rule sorts by groups: `ref:`, `each:*`, conditionals, definition, plain attributes, models, `bind:`, spread, events and content. It accepts `order` and `alphabetical`; its autofix only changes the order of expressions without effects and avoids collisions; if one can have effects, it offers a suggestion. It is not enabled by default in `defineEslint` or `recommended`.
 
-The optional [`meeko/html-self-closing`](../../packages/eslint-plugin/docs/rules/html-self-closing.md) rule closes elements and components with no child node with `/>` (`<div></div>` becomes `<div />`), with `'always'`, `'never'` or `'any'` options for `html.normal`, `html.void`, `component`, `svg` and `math`, and `ignoreWhitespace` to treat content made only of line breaks and indentation as empty. With Meeko `1.7`, which does not support `<div />`, it does not check non-void HTML elements. It is not enabled in `recommended` in `1.x` either, so as not to generate diffs in existing projects.
+The optional [`meeko/html-self-closing`](../../packages/eslint-plugin/docs/rules/html-self-closing.md) rule closes elements and components with no child node with `/>` (`<div></div>` becomes `<div />`), with `'always'`, `'never'` or `'any'` options for `html.normal`, `html.void`, `component`, `svg` and `math`, and `ignoreWhitespace` to treat content made only of line breaks and indentation as empty. It is not enabled in `recommended` in `1.x`, so as not to generate diffs in existing projects.
 
 The default export and the existing configurations remain available:
 

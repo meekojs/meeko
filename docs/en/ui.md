@@ -1,5 +1,5 @@
 ---
-source-hash: 1762234c774148eaafa7036d523a255dbbb14952a5661d91c1ff27a711a2a527
+source-hash: 7df211864da764f67ef983840a05a37487fc67a9c131383514856724b563feb8
 ---
 
 # Meeko UI
@@ -31,7 +31,7 @@ export default defineMeekoConfig({
 
 `UILink` shares the `primary`, `secondary`, `outline` and `ghost` variants, `sm`, `md`, `lg` sizes and `rounded`, `pill` shapes with `UIButton`. It requires `href`; it does not simulate a button. `UILinkCard` requires `to` or `href`, and `title`, with optional description and content. `UIBadge` has `neutral`, `accent`, `info`, `success`, `warning` and `danger` tones, and `dot`, without adding interaction or announcements.
 
-It registers all these components, except `UIMarkdownEditor`, and adds its CSS through `meeko.addStylesheet`, plus the global base and the Inter font. The stylesheet goes through Vite and the project's PostCSS configuration, with imports, assets, HMR in development and hashed asset names in production. It loads before `app/styles/main.css`, where the application can override the styles. Since core 1.8, `MeekoSelect`, `MeekoPopover` and `MeekoThemeToggle` are deprecated (`MEEK121`, removal in 2.0): UI 0.2 registers `UISelect`, `UICombobox`, `UIPopover` and `UIThemeToggle`. `UISelect` is a native `<select>`; to search or choose several options, `UICombobox`. `useTheme`, `useThemeToggle`, the theme configuration and `POST /_meeko/theme` remain in the framework. UI 0.2 needs Meeko `>=1.8 <2`. See [Migration to 1.8](migration-1.8.md).
+It registers all these components, except `UIMarkdownEditor`, and adds its CSS through `meeko.addStylesheet`, plus the global base and the Inter font. The stylesheet goes through Vite and the project's PostCSS configuration, with imports, assets, HMR in development and hashed asset names in production. It loads before `app/styles/main.css`, where the application can override the styles. Since core 1.8, `MeekoSelect`, `MeekoPopover` and `MeekoThemeToggle` are deprecated (`MEEK121`, removal in 2.0): UI 1.8 registers `UISelect`, `UICombobox`, `UIPopover` and `UIThemeToggle`. `UISelect` is a native `<select>`; to search or choose several options, `UICombobox`. `useTheme`, `useThemeToggle`, the theme configuration and `POST /_meeko/theme` remain in the framework. UI 1.8 needs Meeko `>=1.8 <2`. See [Migration to 1.8](migration-1.8.md).
 
 ```html
 <script lang="ts">

@@ -11,7 +11,7 @@
 		<h2 id="requirements">Before you start</h2>
 		<p>
 			You need a Meeko application, Node.js 24 or later and Meeko
-			<code>&gt;=1.7 &lt;2</code>. The i18n module ships separately; you can use it with your application's components.
+			<code>&gt;=1.8 &lt;2</code>. The i18n module ships separately; you can use it with your application's components.
 		</p>
 		<DocsCode
 			label="Terminal"

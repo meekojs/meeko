@@ -10,7 +10,7 @@
 		<h2 id="requirements">Antes de empezar</h2>
 		<p>
 			Necesitas una aplicación Meeko, Node.js 24 o superior y Meeko
-			<code>&gt;=1.7 &lt;2</code>. El módulo i18n se distribuye de forma independiente; puedes usarlo con los componentes de tu aplicación.
+			<code>&gt;=1.8 &lt;2</code>. El módulo i18n se distribuye de forma independiente; puedes usarlo con los componentes de tu aplicación.
 		</p>
 		<DocsCode
 			label="Terminal"
