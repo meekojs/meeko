@@ -158,8 +158,9 @@ describe('language server: a model by prop and event', () => {
 		const context = await workspace.open('RequiredMissing.meeko')
 		const found = await componentDiagnostics(workspace.project, context.document, workspace.file('RequiredMissing.meeko'), () => undefined)
 		const missing = found.find((diagnostic) => diagnostic.code === 'TS2741')
-		assert.match(missing?.message ?? '', /model="señal" o bind:modelValue="valor"/)
-		assert.doesNotMatch(missing?.message ?? '', /default/)
+		const message = typeof missing?.message === 'string' ? missing.message : ''
+		assert.match(message, /model="señal" o bind:modelValue="valor"/)
+		assert.doesNotMatch(message, /default/)
 	})
 
 	test('the editor agrees with meeko check', async () => {
