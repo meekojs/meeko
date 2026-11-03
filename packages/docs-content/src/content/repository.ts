@@ -51,7 +51,7 @@ export function repositoryRoot(): string {
 
 /**
  * Path from the repository root of a path the site uses. The site documents `@meekojs/meeko`, so a
- * path that exists in the package is the package's: `README.md` (the quick start), `CHANGELOG.md`,
+ * path that exists in the package is the package's: `README.md`, `CHANGELOG.md`,
  * `package.json` and `examples/…` resolve under `packages/meeko/`. Any other path, such as
  * `docs/api.md` or `packages/vscode/README.md`, is already relative to the repository root.
  */

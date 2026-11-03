@@ -43,10 +43,13 @@ test('URLs of a language: Spanish without prefix, English under /en', () => {
 test('a translation lives in docs/en and declares the hash of its original', () => {
 	assert.equal(translationFile('docs/api.md', 'en'), 'docs/en/api.md')
 	assert.equal(translationFile('docs/reference/reactivity/signal.md', 'en'), 'docs/en/reference/reactivity/signal.md')
-	assert.equal(translationFile('packages/meeko/README.md', 'en'), 'docs/en/inicio-rapido.md')
+	assert.equal(translationFile('docs/inicio-rapido.md', 'en'), 'docs/en/inicio-rapido.md')
+	assert.equal(translationFile('packages/meeko/CHANGELOG.md', 'en'), 'docs/en/changelog.md')
+	assert.equal(translationFile('packages/meeko/README.md', 'en'), null)
 	assert.equal(translationFile('docs/api.md', 'es'), null)
 	assert.equal(translationFile('docs/en/api.md', 'en'), null)
-	assert.equal(originalFile('docs/en/inicio-rapido.md'), 'packages/meeko/README.md')
+	assert.equal(originalFile('docs/en/inicio-rapido.md'), 'docs/inicio-rapido.md')
+	assert.equal(originalFile('docs/en/changelog.md'), 'packages/meeko/CHANGELOG.md')
 	assert.equal(originalFile('docs/en/reference/utils/x.md'), 'docs/reference/utils/x.md')
 	assert.equal(originalFile('docs/api.md'), null)
 

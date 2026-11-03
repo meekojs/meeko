@@ -11,12 +11,12 @@ export interface CatalogEntry {
 	/** Slug under `/docs/`. */
 	readonly slug: string
 	readonly href: string
-	/** Path of the Markdown file, as `readRepositoryFile` takes it: `README.md` and `CHANGELOG.md` are the package's. */
+	/** Path of the Markdown file, as `readRepositoryFile` takes it: `CHANGELOG.md` is the package's. */
 	readonly source: string
 	/** Short label of the sidebar; the page title is the document's own heading. */
 	readonly label: string
 	readonly section: string
-	/** Rewrites the Markdown before rendering, such as the README's title and logo for the site. */
+	/** Rewrites the Markdown before rendering, such as the quick start's title and logo for the site. */
 	readonly transform?: (text: string) => string
 }
 
@@ -25,12 +25,12 @@ export interface CatalogEntry {
  * to it, and to any other file of the repository, go to GitHub.
  */
 export const catalog: readonly CatalogEntry[] = [
-	// The package README, whose title and centered logo (an image from GitHub, which the CSP blocks)
+	// The quick start, whose title and centered logo (an image from GitHub, which the CSP blocks)
 	// become the page's own heading.
 	{
 		slug: 'inicio-rapido',
 		href: '/docs/inicio-rapido',
-		source: 'README.md',
+		source: 'docs/inicio-rapido.md',
 		label: 'Inicio rápido',
 		section: 'Empezar',
 		// The title comes from the messages of the language being rendered, so the English page does not get the Spanish one.

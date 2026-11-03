@@ -9,6 +9,8 @@ export interface FindGitVersionOptions {
 	readonly limit?: number
 	/** Milliseconds each `git` command may take; 10 s by default. */
 	readonly timeoutMs?: number
+	/** Folder of the repository to read; the repository of the documentation by default. */
+	readonly cwd?: string
 }
 
 /** A version of a file found in the history of Git. */
@@ -23,7 +25,8 @@ const commitPattern = /^[0-9a-f]{40}$/
 
 /**
  * The text of a repository file whose {@link contentHash} is `hash`, searched in the last commits
- * that changed the file (`git log`), or `null` when none has it. It reads the history only: a
+ * that changed the file, following its renames (`git log --follow`), or `null` when none has it. A
+ * revision keeps its base after the file of its source moves. It reads the history only: a
  * version that never reached a commit, such as an import of an uncommitted working tree, is not
  * found. It never writes to the repository: every command runs with `--no-optional-locks`.
  */
@@ -32,22 +35,25 @@ export function findGitVersion(file: string, hash: string, options: FindGitVersi
 	const path = repositoryPath(normalizeSourcePath(file))
 	const limit = options.limit ?? 100
 	if (!Number.isSafeInteger(limit) || limit < 1) throw new RangeError('The limit must be a positive integer')
-	const git = (args: readonly string[], input?: string) => spawnSync('git', ['--no-optional-locks', ...args], { cwd: repositoryRoot(), windowsHide: true, timeout: options.timeoutMs ?? 10_000, maxBuffer: 64 * 1024 * 1024, ...(input === undefined ? {} : { input }) })
-	const log = git(['log', `-n${limit}`, '--format=%H', '--', path])
+	const git = (args: readonly string[], input?: string) => spawnSync('git', ['--no-optional-locks', ...args], { cwd: options.cwd ?? repositoryRoot(), windowsHide: true, timeout: options.timeoutMs ?? 10_000, maxBuffer: 64 * 1024 * 1024, ...(input === undefined ? {} : { input }) })
+	const log = git(['-c', 'core.quotePath=false', 'log', `-n${limit}`, '--follow', '--format=%H', '--name-only', '--', path])
 	if (log.status !== 0) return null
-	const commits = log.stdout
-		.toString('utf8')
-		.split('\n')
-		.map((line) => line.trim())
-		.filter((line) => commitPattern.test(line))
-	if (!commits.length) return null
+	// Each commit is followed by the name the file had in it; a merge may name none and keeps the last one.
+	const versions: Array<{ commit: string; path: string }> = []
+	let current = path
+	for (const raw of log.stdout.toString('utf8').split('\n')) {
+		const line = raw.trim()
+		if (commitPattern.test(line)) versions.push({ commit: line, path: current })
+		else if (line && versions.length) current = versions[versions.length - 1]!.path = line
+	}
+	if (!versions.length) return null
 	// One process reads every version: `git cat-file --batch` answers each `<commit>:<path>` line
 	// with `<object> blob <size>\n<content>\n`, or `<name> missing\n`.
-	const batch = git(['cat-file', '--batch'], commits.map((commit) => `${commit}:${path}\n`).join(''))
+	const batch = git(['cat-file', '--batch'], versions.map((version) => `${version.commit}:${version.path}\n`).join(''))
 	if (batch.status !== 0) return null
 	const output = batch.stdout
 	let at = 0
-	for (const commit of commits) {
+	for (const { commit } of versions) {
 		const end = output.indexOf(0x0a, at)
 		if (end < 0) break
 		const header = output.subarray(at, end).toString('utf8').split(' ')

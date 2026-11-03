@@ -2,8 +2,8 @@ import type { DocsLocale } from '../locale'
 
 /*
  * Where the translations of the documentation live and what they declare. A translation of
- * `docs/<path>` is `docs/en/<path>`; the guides whose original is outside `docs/` (the quick start
- * and the changelog of the package) are `docs/en/<slug>.md`. A translation starts with a
+ * `docs/<path>` is `docs/en/<path>`; a guide whose original is outside `docs/` (the changelog of the
+ * package) is `docs/en/<slug>.md`. A translation starts with a
  * frontmatter whose `source-hash` is the SHA-256 of the Spanish original it was made from; the
  * guides have no other key, and the reference pages keep the keys of the original.
  */
@@ -13,7 +13,6 @@ export const translationsFolder = 'docs/en'
 
 /** The translation of an original outside `docs/`, by its path from the repository root. */
 const outsideDocs: Readonly<Record<string, string>> = {
-	'packages/meeko/README.md': 'docs/en/inicio-rapido.md',
 	'packages/meeko/CHANGELOG.md': 'docs/en/changelog.md',
 }
 
