@@ -6,7 +6,7 @@
 
 **Meeko** es un motor de componentes `.meeko` tipados para TypeScript y un framework full-stack con SSR, hidratación y señales. Este repositorio es un workspace de pnpm con el paquete npm, las extensiones de editor y navegador y el sitio de documentación.
 
-La guía de uso del paquete está en [`packages/meeko/README.md`](packages/meeko/README.md), que también es el README publicado en npm y la portada del sitio <https://meekojs.com>.
+La guía de uso del paquete está en [`docs/inicio-rapido.md`](docs/inicio-rapido.md), que también es la página de inicio rápido del sitio <https://meekojs.com>. [`packages/meeko/README.md`](packages/meeko/README.md) es el README corto que se publica en npm.
 
 El módulo de traducciones está documentado en [i18n](docs/i18n.md).
 La base de componentes visuales de `@meekojs/ui` está documentada en [UI](docs/ui.md); su web de documentación vive en `apps/ui`.
