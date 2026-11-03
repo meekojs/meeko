@@ -57,6 +57,9 @@ jobs:
           $env:MEEKO_CHROME_PATH = node -p "require('./packages/ui/node_modules/playwright-core').chromium.executablePath()"
           pnpm -F meeko-ui-site run build
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # markdown-editor.e2e.mjs reads the output of this app too, as `pnpm test:e2e` of packages/ui builds it.
+          pnpm -F meeko-i18n-site run build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node --test --test-concurrency=1 packages/ui/tests/*.e2e.mjs packages/icon/tests/*.e2e.mjs 2>&1 | Tee-Object -FilePath .meeko/ci-logs/ui-e2e.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: i18n public site E2E
