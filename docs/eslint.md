@@ -123,6 +123,25 @@ Con `perfectionist: true` no se excluyen las demás reglas, porque es una opció
 
 Sólo cambian tipos, sin efecto en ejecución, `sort-interfaces`, `sort-object-types`, `sort-union-types`, `sort-intersection-types` y `sort-heritage-clauses`. Si un orden importa, exímelo con el comentario o apaga la regla.
 
+#### Esquemas de validación
+
+`sort-objects` ordena también las claves de un esquema, y ese orden se observa. Valibot recorre las claves en el orden del esquema, así que los `issues` y las claves del JSON de la API salen en orden alfabético y no en el del formulario: un `v.object` escrito como `name, email, message, consent` queda `consent, email, message, name`. Un resumen de errores que recorra `errors` se vería en ese orden.
+
+[`useForm`](reference/composables/useform.md) no documenta ningún orden para `errors`, así que no cuentes con uno: si el resumen debe seguir al formulario, recorre tú los campos en ese orden. `focusInvalid` no se ve afectado, porque busca el primer control con error en el orden del documento.
+
+Para conservar el orden del esquema, `// eslint-disable-next-line perfectionist/sort-objects` sirve si el objeto ocupa una sola línea. En uno de varias líneas no basta: el aviso sale en cada clave, así que encima de `v.object({` no tiene efecto, y encima de cada clave `--fix` borra los comentarios sin uso y deja otro orden. Envuélvelo en un bloque:
+
+```ts
+/* eslint-disable perfectionist/sort-objects */
+export const contactInput = v.object({
+	name,
+	email,
+	message,
+	consent,
+})
+/* eslint-enable perfectionist/sort-objects */
+```
+
 ### Qué cambia en el HTML de un componente
 
 En un `.meeko`, esas reglas llegan al `<script>`, al `<script server>` y a las expresiones de la plantilla, y el arreglo se ve en el HTML que se pinta. Este componente:

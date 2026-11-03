@@ -1,5 +1,5 @@
 ---
-source-hash: 4ff05050b79cad6d23eb20c6d2a24f0296c07d2d416809813065fc88db95e1f1
+source-hash: a3294d815524ade9c76cecf56d7c19c527ff269166875c4bd92af47298300243
 ---
 
 # ESLint
@@ -126,6 +126,25 @@ With `perfectionist: true` the other rules are not excluded, because it is an ex
 | `sort-variable-declarations`, `sort-array-includes`, `sort-switch-case` | `let z = next(), a = next()` evaluates `z` first; likewise the elements of an array and `case` clauses with calls                       | Evaluates `a` first                                                                        |
 
 Only types change, with no effect at run time, for `sort-interfaces`, `sort-object-types`, `sort-union-types`, `sort-intersection-types` and `sort-heritage-clauses`. If an order matters, exempt it with the comment or turn the rule off.
+
+#### Validation schemas
+
+`sort-objects` also sorts the keys of a schema, and that order is observable. Valibot walks the keys in the schema's order, so `issues` and the keys of the API's JSON come out in alphabetical order instead of the form's: a `v.object` written as `name, email, message, consent` becomes `consent, email, message, name`. An error summary that walks `errors` would appear in that order.
+
+[`useForm`](reference/composables/useform.md) documents no order for `errors`, so do not rely on one: if the summary must follow the form, walk the fields in that order yourself. `focusInvalid` is not affected, because it looks for the first control with an error in document order.
+
+To keep the schema's order, `// eslint-disable-next-line perfectionist/sort-objects` works if the object takes a single line. On several lines it is not enough: the warning is reported on each key, so above `v.object({` it has no effect, and above each key `--fix` deletes the unused comments and leaves another order. Wrap it in a block:
+
+```ts
+/* eslint-disable perfectionist/sort-objects */
+export const contactInput = v.object({
+	name,
+	email,
+	message,
+	consent,
+})
+/* eslint-enable perfectionist/sort-objects */
+```
 
 ### What changes in a component's HTML
 
