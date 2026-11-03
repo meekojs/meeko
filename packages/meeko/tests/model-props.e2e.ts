@@ -31,6 +31,7 @@ const touched = defineModel<boolean>("touched", { default: false });
 `
 
 const page = `<script lang="ts">
+import { provideErrorHandler } from "@meekojs/meeko";
 const viaSignal = signal("señal");
 const controlled = signal("abcd");
 const ignored = signal("fijo");
@@ -44,6 +45,13 @@ const touchedCalls = signal(0);
 const show = signal(true);
 const released = signal(0);
 const asyncValue = signal("abcd");
+const failingValue = signal("fija");
+const failure = signal("-");
+provideErrorHandler((error) => { failure.value = error instanceof Error ? error.message : String(error); });
+const failingSave = async (): Promise<void> => {
+  await new Promise((done) => setTimeout(done, 40));
+  throw new Error("no se pudo guardar");
+};
 const syncValue = signal("abcd");
 const saved = signal("-");
 const save = (next: string): Promise<void> => new Promise((done) => setTimeout(() => { saved.value = next; done(); }, 40));
@@ -66,7 +74,8 @@ onMounted(async () => {
     <section id="named"><Field bind:touched="touched.value" on:update:touched="(next) => { touchedCalls.value++; touched.value = next; }" /><p class="outer">{touched.value}|{touchedCalls.value}</p></section>
     <section id="is"><component is="Field" bind:modelValue="controlled.value" on:update:modelValue="(next) => controlled.value = next" /></section>
     <section id="resolved"><component if:when="resolved.value" is="resolved.value!" /></section>
-    <section id="async-parent"><Field bind:modelValue="asyncValue.value" on:update:modelValue="async (next) => { await save(next); asyncValue.value = next; }" /></section>
+    <section id="async-parent"><Field bind:modelValue="asyncValue.value" on:update:modelValue="async (next) => { await save(next); asyncValue.value = next; }" /><p class="outer">{asyncValue.value}</p></section>
+    <section id="failing-parent"><Field bind:modelValue="failingValue.value" on:update:modelValue="failingSave" /><p class="outer">{failure.value}</p></section>
     <section id="sync-parent"><Field bind:modelValue="syncValue.value" on:update:modelValue="(next) => { syncValue.value = next; void save(next); }" /><p class="outer">{saved.value}</p></section>
     <section id="released">
       <template if:when="show.value"><Field bind:modelValue="controlled.value" on:update:modelValue="() => released.value++" /></template>
@@ -227,19 +236,27 @@ test('defineModel by prop and event in Chrome: every row of the table, in SSR, h
 		await input(tab, 'resolved').fill('tocado')
 		assert.equal(await output(tab, 'resolved'), 'tocado|false')
 
-		// A parent that awaits before changing its prop: the control goes back meanwhile, as the prop has
-		// not changed, so the caret goes to the end and what is typed before it arrives is lost.
+		// A parent that awaits before changing its prop, typing faster than it saves: nothing is lost and the caret stays.
 		await input(tab, 'async-parent').click()
 		await input(tab, 'async-parent').evaluate((element) => (element as HTMLInputElement).setSelectionRange(2, 2))
-		await tab.keyboard.type('X')
-		assert.equal(await input(tab, 'async-parent').inputValue(), 'abcd', 'it goes back until the prop changes')
-		await tab.waitForFunction(() => (document.querySelector('#async-parent input') as HTMLInputElement).value === 'abXcd')
-		assert.equal(await input(tab, 'async-parent').evaluate((element) => (element as HTMLInputElement).selectionStart), 5, 'the caret jumps to the end')
-		await input(tab, 'async-parent').evaluate((element) => (element as HTMLInputElement).setSelectionRange(0, 0))
-		await tab.keyboard.type('12')
-		await tab.waitForTimeout(150)
-		const typedFast = await input(tab, 'async-parent').inputValue()
-		assert.notEqual(typedFast, '12abXcd', 'typing faster than the parent saves loses text')
+		await tab.keyboard.type('XYZ')
+		assert.equal(await input(tab, 'async-parent').inputValue(), 'abXYZcd')
+		assert.equal(await input(tab, 'async-parent').evaluate((element) => (element as HTMLInputElement).selectionStart), 5)
+		await tab.waitForFunction(() => document.querySelector('#async-parent .outer')!.textContent === 'abXYZcd')
+		assert.equal(await input(tab, 'async-parent').inputValue(), 'abXYZcd')
+		assert.equal(await input(tab, 'async-parent').evaluate((element) => (element as HTMLInputElement).selectionStart), 5, 'the save does not move the caret')
+		// Slower than the keys, one by one, also in the middle of what was saved.
+		await tab.keyboard.type('12', { delay: 60 })
+		await tab.waitForFunction(() => document.querySelector('#async-parent .outer')!.textContent === 'abXYZ12cd')
+		assert.equal(await input(tab, 'async-parent').inputValue(), 'abXYZ12cd')
+		assert.equal(await input(tab, 'async-parent').evaluate((element) => (element as HTMLInputElement).selectionStart), 7)
+
+		// A save that fails: the error reaches the application, and the control goes back to the prop.
+		await input(tab, 'failing-parent').click()
+		await tab.keyboard.type('!')
+		assert.equal(await input(tab, 'failing-parent').inputValue(), 'fija!', 'it stays while the save is pending')
+		await tab.waitForFunction(() => document.querySelector('#failing-parent .outer')!.textContent === 'no se pudo guardar')
+		assert.equal(await input(tab, 'failing-parent').inputValue(), 'fija')
 
 		// The same parent, changing its signal first and saving after: nothing jumps and nothing is lost.
 		await input(tab, 'sync-parent').click()

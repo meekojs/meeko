@@ -177,6 +177,7 @@ No hay que cambiar nada: `model="señal"` sigue igual y `defineModel<T>()` sigue
 - `<Nombre>Props` incluye `modelValue?` y `ComponentProps` también `onUpdate:modelValue?`; `<Nombre>Emits` incluye `update:modelValue`, opcional.
 - Un `.meeko` que declare en su script una prop o un evento con el nombre de su modelo (`defineProps<{ modelValue: string }>()` junto a `defineModel<string>()`) da `MEEK063`: quítala de `defineProps`. Antes el hijo la recibía como una prop aparte, sin relación con el modelo.
 - `model` junto a `on:update:modelValue` es `MEEK066`.
+- Un manejador `async` funciona: lo escrito se mantiene mientras guarda, y un rechazo llega al manejador de errores.
 - Leer una prop en la opción `default` de `defineModel` ya no da `MEEK101`.
 
 ## Otros cambios visibles

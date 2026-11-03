@@ -430,6 +430,241 @@ const value = defineModel<string>();
 	}
 })
 
+/** Writes of an asynchronous parent, which the test settles in the order it wants. */
+interface PendingWrites {
+	readonly writes: Array<{ next: string; resolve: () => void; reject: (error: unknown) => void }>
+	readonly errors: unknown[]
+}
+
+/**
+ * A parent that awaits the test before changing its prop, as one that saves first. `after` is what it
+ * does with the value once saved. The handler and the error handler reach the test through a global.
+ */
+function asyncParent(after = 'name.value = next;'): string {
+	return parentOf(
+		`import { provideErrorHandler } from "@meekojs/meeko";
+const name = signal("Ada");
+const show = signal(true);
+const test = (globalThis as unknown as { __modelWrites: { writes: Array<unknown>; errors: unknown[] } }).__modelWrites;
+provideErrorHandler((error) => { test.errors.push(error); });
+const save = async (next: string): Promise<void> => {
+  await new Promise<void>((resolve, reject) => { test.writes.push({ next, resolve, reject }); });
+  ${after}
+};`,
+		`<template if:when="show.value"><Child bind:modelValue="name.value" on:update:modelValue="save" /></template><p class="outer">{name.value}</p><button type="button" class="rename" on:click="() => name.value = 'Grace'">r</button><button type="button" class="hide" on:click="() => show.value = false">h</button>`,
+	)
+}
+
+const settled = async (): Promise<void> => {
+	for (let turn = 0; turn < 5; turn++) await Promise.resolve()
+	await new Promise((resolve) => setTimeout(resolve, 0))
+}
+
+async function withAsyncParent(after: string | undefined, run: (mounted: Mounted, test: PendingWrites) => Promise<void>): Promise<void> {
+	const test: PendingWrites = { writes: [], errors: [] }
+	Reflect.set(globalThis, '__modelWrites', test)
+	const rejections: unknown[] = []
+	const onRejection = (error: unknown): void => {
+		rejections.push(error)
+	}
+	process.on('unhandledRejection', onRejection)
+	try {
+		const { component, cleanup } = await load({ Child: child, Parent: asyncParent(after) }, 'Parent')
+		const window = new Window()
+		try {
+			await run(mount(window, component), test)
+			await settled()
+			assert.deepEqual(rejections, [], 'no rejection goes uncaught')
+		} finally {
+			window.happyDOM.abort()
+			await cleanup()
+		}
+	} finally {
+		process.off('unhandledRejection', onRejection)
+		Reflect.deleteProperty(globalThis, '__modelWrites')
+	}
+}
+
+test('a parent that awaits keeps what is written until its last write settles, and calls the handler on each', async () => {
+	await withAsyncParent(undefined, async ({ text, input, type, release }, { writes }) => {
+		type('a')
+		assert.equal(input().value, 'a', 'it does not go back while the parent saves')
+		assert.equal(text(), 'a|false')
+		type('ab')
+		type('abc')
+		assert.deepEqual(
+			writes.map((write) => write.next),
+			['a', 'ab', 'abc'],
+		)
+		writes[0]!.resolve()
+		await settled()
+		assert.equal(text('.outer'), 'a')
+		assert.equal(input().value, 'abc', 'the save of an earlier write does not touch the text')
+		writes[1]!.resolve()
+		await settled()
+		assert.equal(input().value, 'abc')
+		writes[2]!.resolve()
+		await settled()
+		assert.equal(text('.outer'), 'abc')
+		assert.equal(input().value, 'abc')
+		release()
+	})
+})
+
+test('a parent that saves and keeps its prop gets the control back once its last write settles', async () => {
+	await withAsyncParent('', async ({ text, input, type, release }, { writes }) => {
+		type('a')
+		type('ab')
+		writes[0]!.resolve()
+		await settled()
+		assert.equal(input().value, 'ab')
+		writes[1]!.resolve()
+		await settled()
+		assert.equal(input().value, 'Ada')
+		assert.equal(text(), 'Ada|false')
+		release()
+	})
+})
+
+test('an earlier save that ends after the last one does not overwrite the value', async () => {
+	await withAsyncParent(undefined, async ({ text, input, type, release }, { writes }) => {
+		type('a')
+		type('ab')
+		writes[1]!.resolve()
+		await settled()
+		assert.equal(text('.outer'), 'ab')
+		assert.equal(input().value, 'ab')
+		writes[0]!.resolve()
+		await settled()
+		// The parent's own signal took the old value, as its code asks; the text is not lost.
+		assert.equal(text('.outer'), 'a')
+		assert.equal(input().value, 'ab')
+		release()
+	})
+})
+
+test('a rejected write reaches the error handler, without a rejection left uncaught, and the child goes back to the prop', async () => {
+	await withAsyncParent(undefined, async ({ text, input, type, release }, { writes, errors }) => {
+		type('a')
+		const failure = new Error('no se pudo guardar')
+		writes[0]!.reject(failure)
+		await settled()
+		assert.deepEqual(errors, [failure])
+		assert.equal(input().value, 'Ada')
+		assert.equal(text(), 'Ada|false')
+		// The first of two failing does not touch what comes after.
+		type('b')
+		type('bc')
+		writes[1]!.reject(new Error('primera'))
+		await settled()
+		assert.equal(errors.length, 2)
+		assert.equal(input().value, 'bc')
+		writes[2]!.resolve()
+		await settled()
+		assert.equal(input().value, 'bc')
+		release()
+	})
+})
+
+test('a prop that changes while a write is pending waits for it: the written text stays, then the prop decides', async () => {
+	await withAsyncParent('', async ({ text, input, type, click, release }, { writes }) => {
+		type('a')
+		click('.rename')
+		assert.equal(text('.outer'), 'Grace')
+		assert.equal(input().value, 'a', 'nothing written is lost while the parent has not answered')
+		writes[0]!.resolve()
+		await settled()
+		assert.equal(input().value, 'Grace')
+		// With no write pending, the prop is followed at once.
+		release()
+	})
+})
+
+test('a synchronous write after a pending one goes back to the prop at once', async () => {
+	const script = `const name = signal("Ada");\nlet resolve: () => void = () => {};\nconst pending = new Promise<void>((done) => { resolve = done; });\nlet first = true;\nconst handler = (next: string): Promise<void> | void => { if (first) { first = false; return pending; } };\nconst finish = (): void => resolve();`
+	const tag = `<Child bind:modelValue="name.value" on:update:modelValue="handler" /><button type="button" class="finish" on:click="finish">f</button>`
+	await withParent(script, tag, async ({ input, type, click, release }) => {
+		type('a')
+		assert.equal(input().value, 'a')
+		type('b')
+		assert.equal(input().value, 'Ada')
+		click('.finish')
+		await settled()
+		assert.equal(input().value, 'Ada')
+		release()
+	})
+})
+
+test('unmounted, a pending write neither writes nor notifies the handler, and its failure is only logged', async () => {
+	const logged: unknown[][] = []
+	const consoleError = console.error
+	console.error = (...args: unknown[]) => {
+		logged.push(args)
+	}
+	try {
+		await withAsyncParent(undefined, async ({ text, type, click, release }, { writes, errors }) => {
+			type('a')
+			type('ab')
+			click('.hide')
+			assert.equal(text('.state'), '')
+			const failure = new Error('tarde')
+			writes[0]!.reject(failure)
+			writes[1]!.resolve()
+			await settled()
+			assert.deepEqual(errors, [], 'the error handler of a gone component is not called')
+			assert.equal(logged.length, 1)
+			assert.equal(logged[0]?.[1], failure)
+			assert.equal(text('.outer'), 'ab', 'the promise of the parent still ends: it is its own code')
+			release()
+		})
+	} finally {
+		console.error = consoleError
+	}
+})
+
+test('without the prop, a rejected event of an own model is reported and its value stays', async () => {
+	const script = `import { provideErrorHandler } from "@meekojs/meeko";\nconst test = (globalThis as unknown as { __modelWrites: { errors: unknown[] } }).__modelWrites;\nprovideErrorHandler((error) => { test.errors.push(error); });\nconst fail = async (): Promise<void> => { throw new Error("sin prop"); };`
+	const test: PendingWrites = { writes: [], errors: [] }
+	Reflect.set(globalThis, '__modelWrites', test)
+	try {
+		await withParent(script, `<Child on:update:modelValue="fail" />`, async ({ input, type, release }) => {
+			type('mine')
+			await settled()
+			assert.equal(input().value, 'mine')
+			assert.match(String(test.errors[0]), /sin prop/)
+			release()
+		})
+	} finally {
+		Reflect.deleteProperty(globalThis, '__modelWrites')
+	}
+})
+
+test('a write that rejects during a server render does not bring the process down', async () => {
+	const writer = `<script lang="ts">
+const value = defineModel<string>({ default: "" });
+value.value = "desde el setup";
+</script>
+<template><b>{value.value}</b></template>`
+	const parent = parentOf(`import * as Writer from "./Writer.meeko";\nconst fail = async (): Promise<void> => { throw new Error("en el servidor"); };`, `<Writer bind:modelValue="'x'" on:update:modelValue="fail" />`)
+	const { component, cleanup } = await load({ Child: child, Writer: writer, Parent: parent }, 'Parent')
+	const rejections: unknown[] = []
+	const onRejection = (error: unknown): void => {
+		rejections.push(error)
+	}
+	process.on('unhandledRejection', onRejection)
+	const consoleError = console.error
+	console.error = () => {}
+	try {
+		assert.match(component.renderToString({}), /desde el setup/)
+		await settled()
+		assert.deepEqual(rejections, [])
+	} finally {
+		console.error = consoleError
+		process.off('unhandledRejection', onRejection)
+		await cleanup()
+	}
+})
+
 test('a hot replacement keeps the model: the prop for the one that follows it, the local value without an event for its own', async () => {
 	const script = `const name = signal("Ada");\nconst calls = signal(0);`
 	const tag = `<section id="bound"><Child bind:modelValue="name.value" on:update:modelValue="(next) => { calls.value++; name.value = next; }" /></section><section id="own"><Child on:update:modelValue="() => calls.value++" /></section><p class="calls">{calls.value}</p><button type="button" class="rename" on:click="() => name.value = 'Grace'">r</button>`

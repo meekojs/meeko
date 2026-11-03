@@ -1,5 +1,5 @@
 ---
-source-hash: 2ef1a8590c2d5223c40b116685fd7dab7f6cb3c40d024c7a4497c7d14dbedd33
+source-hash: bac0cfe2ebb5d0616cb0234beb5e44429922ee2d5b14025845f6a716a3581fd3
 ---
 
 # Meeko API
@@ -1053,7 +1053,7 @@ The parent passes its signals with `model` (the default model) and `model:nombre
 | Only `on:update:modelValue`                  | `default`, in a local signal        | Stays in the child and calls the event                                                    |
 | Nothing                                      | `default`, in a local signal        | Stays in the child                                                                        |
 
-With these forms the child still receives a `Signal<T>` and does not know which one the parent used. The server's HTML carries the value of the prop, which does not travel in the child's state. The prop and the event do not appear in `Object.keys(props)` or `...rest`. See [`defineModel`](reference/macros/definemodel.md#by-prop-and-event).
+If the handler returns a promise, what was written stays until the last one ends and its rejection reaches the error handler. With these forms the child still receives a `Signal<T>` and does not know which one the parent used. The server's HTML carries the value of the prop, which does not travel in the child's state. The prop and the event do not appear in `Object.keys(props)` or `...rest`. See [`defineModel`](reference/macros/definemodel.md#by-prop-and-event).
 
 `defineModel` goes in its own top-level `const` declaration, with a simple name, and each model name appears once (`MEEK063`); its prop and its event are not also declared in the script (`MEEK063`). It receives a type argument, an optional name as a text literal and options accepting only `default` (`MEEK064`). In the parent, a model name that is not an identifier, the same model twice, a valueless `model` or `model:x` alongside `bind:x` or `on:update:x` produce `MEEK066`.
 

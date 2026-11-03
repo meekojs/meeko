@@ -1,5 +1,5 @@
 ---
-source-hash: cb1ade171f1345698f7b6f0ebca295dc2160fb86912441fea521e13526e85097
+source-hash: c7cc1cba230ed3f1ac966d5c4bd7569f9a4f3bf72f8bc8daab07055bbc5f6e49
 ---
 
 # Upgrade from 1.7 to 1.8
@@ -181,6 +181,7 @@ There is nothing to change: `model="signal"` stays the same and `defineModel<T>(
 - `<Name>Props` includes `modelValue?` and `ComponentProps` also `onUpdate:modelValue?`; `<Name>Emits` includes `update:modelValue`, optional.
 - A `.meeko` that declares in its script a prop or an event with the name of its model (`defineProps<{ modelValue: string }>()` next to `defineModel<string>()`) gives `MEEK063`: remove it from `defineProps`. Before, the child received it as a separate prop, unrelated to the model.
 - `model` next to `on:update:modelValue` is `MEEK066`.
+- An `async` handler works: what was written stays while it saves, and a rejection reaches the error handler.
 - Reading a prop in the `default` option of `defineModel` no longer gives `MEEK101`.
 
 ## Other visible changes

@@ -86,21 +86,23 @@ Desde `1.8`, un componente con `defineModel` acepta el valor como prop, también
 
 ### Un padre que guarda con `await`
 
-Con prop y evento, el valor sólo cambia cuando cambia la prop. Si el padre espera antes de cambiarla, el control vuelve mientras tanto al valor anterior: el cursor salta al final y se pierde lo que se escribe antes de que termine.
+Si el manejador de `on:update:modelValue` devuelve una promesa, lo escrito se mantiene mientras esté pendiente: no se pierde texto y el cursor no salta. Cada escritura nueva vuelve a llamar al manejador.
 
-```html bad
+```html good
 <AppInput bind:modelValue="name.value" on:update:modelValue="async (next) => { await save(next); name.value = next; }" />
 ```
 
-Cambia primero la señal y guarda después, sin esperar. Si el guardado debe poder rechazar el valor, deshaz el cambio al fallar.
+- **Al terminar la última escritura**, el hijo vuelve a seguir a la prop. Si el padre no la cambió, el control vuelve a su valor.
+- **Si rechaza,** ocurre lo mismo, y el error llega al manejador de errores de la aplicación (`provideErrorHandler`), sin quedar como rechazo sin capturar.
+- **Si la prop cambia mientras hay una escritura pendiente,** lo escrito se queda hasta que esa escritura termine, y entonces decide la prop. No se aplica antes porque el hijo no distingue ese cambio del guardado de una escritura anterior, que borraría lo escrito después.
+- **Si una escritura anterior termina después de la última,** el hijo conserva el valor. La señal del padre sí toma lo que escriba su código, así que, si el orden importa, el padre debe descartar las respuestas antiguas.
+- **Al desmontar,** una escritura pendiente ya no cambia el modelo. Si rechaza entonces, el error sólo va a la consola: su componente ya no está.
 
-```html good
-<AppInput bind:modelValue="name.value" on:update:modelValue="(next) => { name.value = next; void save(next); }" />
-```
+Un manejador síncrono no cambia: el control vuelve a la prop en cuanto termina, si el padre no la actualizó.
 
 ### Si vienes de Vue
 
-`defineModel` se comporta como el de Vue con `bind:modelValue` y `on:update:modelValue`, que corresponden a `:modelValue` y `@update:modelValue`. `model="señal"` corresponde a `v-model`, con una diferencia: recibe la señal, no su valor, así que se escribe `model="name"` y no `model="name.value"`, y el hijo escribe directamente en ella en lugar de emitir. Por eso `model` no se combina con `on:update:modelValue`, que en Vue sí se puede escribir junto a `v-model`. Otra diferencia: si el padre no acepta el valor, el control vuelve al de la prop, también en un `<input>`.
+`defineModel` se comporta como el de Vue con `bind:modelValue` y `on:update:modelValue`, que corresponden a `:modelValue` y `@update:modelValue`. `model="señal"` corresponde a `v-model`, con una diferencia: recibe la señal, no su valor, así que se escribe `model="name"` y no `model="name.value"`, y el hijo escribe directamente en ella en lugar de emitir. Por eso `model` no se combina con `on:update:modelValue`, que en Vue sí se puede escribir junto a `v-model`. Otra diferencia: si un manejador síncrono no acepta el valor, el control vuelve al de la prop, también en un `<input>`. Un padre con `await` funciona como en Vue: el `<input>` conserva lo escrito mientras guarda. Además, aquí `value.value` también da lo escrito durante ese tiempo y el cursor no salta al terminar.
 
 ## Ejemplos
 

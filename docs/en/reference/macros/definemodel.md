@@ -12,7 +12,7 @@ related:
   - "@meekojs/meeko#Signal"
   - "@meekojs/meeko/framework#useForm"
   - docs/api.md#modelos-de-componente-definemodel-y-model
-source-hash: 925c9f322892fd147a6da46cee8ba9c888271386cd7673936f7ce0765fea3724
+source-hash: 62b423ecfa48547e291f3f88b64ab90a227fb8bfa179bbc00ecc8d5de1dde0d7
 ---
 
 `defineModel<T>()` declares a value shared bidirectionally between the parent and component, and returns a writable `Signal<T>`. The parent passes its signal with `model="señal"` (the default model) or `model:nombre="señal"`; reading and writing in the child reads and writes the parent's signal. It is a compiler macro: you do not import it.
@@ -87,21 +87,23 @@ Since `1.8`, a component with `defineModel` accepts the value as a prop, also in
 
 ### A parent that saves with `await`
 
-With a prop and an event, the value only changes when the prop does. If the parent waits before changing it, the control goes back to the previous value meanwhile: the caret jumps to the end and what is typed before it finishes is lost.
+If the handler of `on:update:modelValue` returns a promise, what was written stays while it is pending: no text is lost and the caret does not jump. Each new write calls the handler again.
 
-```html bad
+```html good
 <AppInput bind:modelValue="name.value" on:update:modelValue="async (next) => { await save(next); name.value = next; }" />
 ```
 
-Change the signal first and save afterwards, without waiting. If saving can reject the value, undo the change when it fails.
+- **When the last write ends,** the child follows the prop again. If the parent did not change it, the control goes back to its value.
+- **If it rejects,** the same happens, and the error reaches the application's error handler (`provideErrorHandler`) instead of staying as an uncaught rejection.
+- **If the prop changes while a write is pending,** what was written stays until that write ends, and then the prop decides. It is not applied earlier because the child cannot tell that change from the save of an earlier write, which would erase what was written afterwards.
+- **If an earlier write ends after the last one,** the child keeps the value. The parent's signal does take what its code writes, so if order matters, the parent must discard old responses.
+- **On unmount,** a pending write no longer changes the model. If it rejects then, the error only goes to the console: its component is gone.
 
-```html good
-<AppInput bind:modelValue="name.value" on:update:modelValue="(next) => { name.value = next; void save(next); }" />
-```
+A synchronous handler does not change: the control goes back to the prop as soon as it ends, if the parent did not update it.
 
 ### Coming from Vue
 
-`defineModel` behaves like Vue's with `bind:modelValue` and `on:update:modelValue`, which correspond to `:modelValue` and `@update:modelValue`. `model="signal"` corresponds to `v-model`, with one difference: it receives the signal, not its value, so you write `model="name"` and not `model="name.value"`, and the child writes it directly instead of emitting. That is why `model` does not combine with `on:update:modelValue`, which Vue does allow next to `v-model`. Another difference: if the parent does not accept the value, the control goes back to the prop's, also on an `<input>`.
+`defineModel` behaves like Vue's with `bind:modelValue` and `on:update:modelValue`, which correspond to `:modelValue` and `@update:modelValue`. `model="signal"` corresponds to `v-model`, with one difference: it receives the signal, not its value, so you write `model="name"` and not `model="name.value"`, and the child writes it directly instead of emitting. That is why `model` does not combine with `on:update:modelValue`, which Vue does allow next to `v-model`. Another difference: if a synchronous handler does not accept the value, the control goes back to the prop's, also on an `<input>`. A parent with `await` works as in Vue: the `<input>` keeps what was written while it saves. Besides, here `value.value` also gives what was written during that time and the caret does not jump when it ends.
 
 ## Examples
 

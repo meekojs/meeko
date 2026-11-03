@@ -1049,7 +1049,7 @@ El padre pasa sus señales con `model` (el modelo por defecto) y `model:nombre`,
 | Sólo `on:update:modelValue`                | `default`, en una señal local    | Se queda en el hijo y llama al evento                                                    |
 | Nada                                       | `default`, en una señal local    | Se queda en el hijo                                                                      |
 
-Con esas formas el hijo sigue recibiendo una `Signal<T>`, y no sabe cuál usó el padre. El HTML del servidor sale con el valor de la prop, que no viaja en el estado del hijo. La prop y el evento no aparecen en `Object.keys(props)` ni en `...rest`. Véase [`defineModel`](reference/macros/definemodel.md#por-prop-y-evento).
+Si el manejador devuelve una promesa, lo escrito se mantiene hasta que termine la última y su rechazo llega al manejador de errores. Con esas formas el hijo sigue recibiendo una `Signal<T>`, y no sabe cuál usó el padre. El HTML del servidor sale con el valor de la prop, que no viaja en el estado del hijo. La prop y el evento no aparecen en `Object.keys(props)` ni en `...rest`. Véase [`defineModel`](reference/macros/definemodel.md#por-prop-y-evento).
 
 `defineModel` va en su propia declaración `const` de nivel superior, con un nombre simple, y cada nombre de modelo aparece una vez (`MEEK063`); su prop y su evento no se declaran también en el script (`MEEK063`). Recibe un argumento de tipo, un nombre opcional como literal de texto y unas opciones que sólo admiten `default` (`MEEK064`). En el padre, un nombre de modelo que no es un identificador, el mismo modelo dos veces, un `model` sin valor o `model:x` junto a `bind:x` u `on:update:x` dan `MEEK066`.
 
