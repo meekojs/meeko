@@ -4,6 +4,7 @@ import { dirname, join, resolve } from 'node:path'
 import test from 'node:test'
 import { TextDocument } from 'vscode-languageserver-textdocument'
 
+import { dynamicTagName } from '../src/app/runtime/dynamic-tag.ts'
 import { checkSource } from '../src/check.ts'
 import { checkApp } from '../src/framework/check-app.ts'
 import { prepareFrameworkTypeDeclarations } from '../src/framework/type-declarations.ts'
@@ -205,6 +206,21 @@ test('a component name that only exists at run time says what to do, and keeps t
 		const typed = await check(`const options: { id: string; component: typeof AppSelect; props: { label: string; options: string[]; onChange?: (value: string) => void } }[] = [];`, row)
 		assert.ok(typed.includes('MEEK113: bind no admite claves on*; usa on:evento'), JSON.stringify(typed))
 	})
+})
+
+test('at run time, a text is never a component: the error names the way out only for a component name', () => {
+	assert.throws(() => dynamicTagName('AppSelect', false), /^TypeError: MEEK112: <component is> no puede renderizar "AppSelect".*await resolveComponent\("AppSelect"\)$/)
+	for (const value of ['script', '<img src=x onerror=alert(1)>', 'x-card']) {
+		assert.throws(
+			() => dynamicTagName(value, false),
+			(error: unknown) => {
+				assert.ok(error instanceof TypeError)
+				assert.match(error.message, /^MEEK112: /)
+				assert.doesNotMatch(error.message, /resolveComponent/)
+				return true
+			},
+		)
+	}
 })
 
 /** The application of the e2e in a temporary project, with the page replaced by `script` and `template` when given. */
