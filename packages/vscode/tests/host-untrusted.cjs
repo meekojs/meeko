@@ -32,5 +32,10 @@ exports.run = async function run() {
 	assert.equal(api.live.connections, 0)
 	assert.equal(api.live.status, undefined)
 	assert.deepEqual(api.live.decorations(uri), [])
+	const inScript = await vscode.commands.executeCommand('vscode.executeCompletionItemProvider', uri, document.positionAt(document.getText().indexOf('const count')))
+	assert.ok(
+		inScript.items.some((item) => item.kind === vscode.CompletionItemKind.Snippet && (item.label.label ?? item.label) === 'msignal'),
+		'Script snippets work in Restricted Mode',
+	)
 	process.stdout.write('Meeko untrusted host: Restricted Mode, bundled server and live disabled verified.\n')
 }

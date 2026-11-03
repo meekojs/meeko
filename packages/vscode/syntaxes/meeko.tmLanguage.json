@@ -2,6 +2,9 @@
 	"scopeName": "source.meeko",
 	"patterns": [
 		{
+			"include": "#rootComment"
+		},
+		{
 			"include": "#script"
 		},
 		{
@@ -12,6 +15,13 @@
 		}
 	],
 	"repository": {
+		"rootComment": {
+			"comment": "A comment between sections. The embedded scope, here and on the opening tags, takes these positions out of the language meeko: VS Code offers the snippets declared for meeko wherever the language at the cursor is meeko, and comments and attribute values must offer none.",
+			"name": "comment.block.html",
+			"begin": "<!--",
+			"end": "-->",
+			"contentName": "meta.embedded.block.html"
+		},
 		"sectionAttributes": {
 			"patterns": [
 				{
@@ -76,6 +86,7 @@
 					"name": "entity.name.tag.meeko"
 				},
 				"3": {
+					"name": "meta.embedded.block.html",
 					"patterns": [
 						{
 							"include": "#sectionAttributes"
@@ -97,6 +108,9 @@
 			"beginCaptures": {
 				"2": {
 					"name": "entity.name.tag.meeko"
+				},
+				"3": {
+					"name": "meta.embedded.block.html"
 				}
 			},
 			"endCaptures": {
@@ -155,7 +169,7 @@
 			"end": "(</)(style)(>)",
 			"beginCaptures": {
 				"2": { "name": "entity.name.tag.meeko" },
-				"3": { "patterns": [{ "include": "#sectionAttributes" }] }
+				"3": { "name": "meta.embedded.block.html", "patterns": [{ "include": "#sectionAttributes" }] }
 			},
 			"endCaptures": { "2": { "name": "entity.name.tag.meeko" } },
 			"contentName": "meta.embedded.block.css",

@@ -19,11 +19,20 @@ const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as
 	contributes: { snippets: { language: string; path: string }[] }
 }
 
+function read(path: string): Record<string, Snippet> {
+	return JSON.parse(readFileSync(join(root, path), 'utf8')) as Record<string, Snippet>
+}
+
 function snippets(language: string): Record<string, Snippet> {
 	const contribution = manifest.contributes.snippets.find((entry) => entry.language === language)
 	assert.ok(contribution, `Missing ${language} snippets contribution`)
-	return JSON.parse(readFileSync(join(root, contribution.path), 'utf8')) as Record<string, Snippet>
+	return read(contribution.path)
 }
+
+// What the completion provider offers in each block: declared for no language, one definition each.
+const scriptSnippets = read('snippets/meeko-script.json')
+const templateSnippets = read('snippets/meeko-template.json')
+const prefixesOf = (group: Record<string, Snippet>): string[] => Object.values(group).flatMap((snippet) => snippet.prefix)
 
 // These snippets deliberately use only tabstops, linked placeholders and filename variables.
 function expand(snippet: Snippet): string {
@@ -47,8 +56,8 @@ function expand(snippet: Snippet): string {
 test('snippet contributions contain valid JSON, unique m-prefixed shortcuts and descriptions', () => {
 	assert.deepEqual(manifest.contributes.snippets.map((entry) => entry.language).sort(), ['meeko', 'typescript'])
 	const prefixes = new Set<string>()
-	for (const language of ['meeko', 'typescript']) {
-		for (const snippet of Object.values(snippets(language))) {
+	for (const group of [snippets('meeko'), scriptSnippets, templateSnippets, snippets('typescript')]) {
+		for (const snippet of Object.values(group)) {
 			assert.ok(snippet.description.trim())
 			assert.ok(Array.isArray(snippet.body) && snippet.body.length > 0)
 			for (const prefix of [snippet.prefix].flat()) {
@@ -62,9 +71,16 @@ test('snippet contributions contain valid JSON, unique m-prefixed shortcuts and 
 	assert.equal(prefixes.size, 25)
 })
 
+test('only the skeletons of the file are declared for the language meeko', () => {
+	assert.deepEqual(prefixesOf(snippets('meeko')).sort(), ['mcomp', 'meeko', 'mform', 'mlayout', 'mpage'])
+	assert.deepEqual(prefixesOf(scriptSnippets).sort(), ['mcomputed', 'meffect', 'memits', 'mexpose', 'mmodel', 'mmounted', 'mprops', 'mpropsd', 'mref', 'msignal', 'msnippets'])
+	assert.deepEqual(prefixesOf(templateSnippets).sort(), ['meach', 'mif', 'mis', 'mrender', 'msnippet'])
+	for (const { path } of manifest.contributes.snippets) assert.ok(!/meeko-(script|template)/.test(path), `${path}: VS Code would offer it at the root`)
+})
+
 test('every expanded Meeko snippet compiles in its insertion context', () => {
-	const templatePrefixes = new Set(['mif', 'meach', 'mrender', 'msnippet', 'mis'])
-	for (const snippet of Object.values(snippets('meeko'))) {
+	const templatePrefixes = new Set(prefixesOf(templateSnippets))
+	for (const snippet of [...Object.values(snippets('meeko')), ...Object.values(scriptSnippets), ...Object.values(templateSnippets)]) {
 		const prefix = [snippet.prefix].flat()[0]!
 		const expanded = expand(snippet)
 		let source = expanded

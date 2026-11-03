@@ -10,13 +10,13 @@ Las páginas pueden declarar su código de servidor y sus opciones de ruta en un
 
 ## Fragmentos de código
 
-Escribe un prefijo y elige el fragmento en el completado, o usa **Insert Snippet**. `Tab` recorre los campos editables y mantiene sincronizados los nombres repetidos. Los esqueletos usan el nombre del archivo como título inicial.
+Escribe un prefijo y elige el fragmento en el completado. `Tab` recorre los campos editables y mantiene sincronizados los nombres repetidos. Los esqueletos usan el nombre del archivo como título inicial.
 
 | Prefijo          | Dónde                                | Contenido                                                                  |
 | ---------------- | ------------------------------------ | -------------------------------------------------------------------------- |
-| `meeko`, `mcomp` | Archivo `.meeko` vacío               | Componente con `<script lang="ts">` y `<template>`                         |
-| `mpage`          | Página `.meeko` vacía                | `definePage` en `<script server>` y plantilla                              |
-| `mlayout`        | Layout `.meeko` vacío                | Layout con `<MeekoOutlet />`                                               |
+| `meeko`, `mcomp` | Raíz de un `.meeko`                  | Componente con `<script lang="ts">` y `<template>`                         |
+| `mpage`          | Raíz de una página `.meeko`          | `definePage` en `<script server>` y plantilla                              |
+| `mlayout`        | Raíz de un layout `.meeko`           | Layout con `<MeekoOutlet />`                                               |
 | `mprops`         | `<script>`                           | Interfaz `Props` y `defineProps<Props>()`                                  |
 | `mpropsd`        | `<script>`                           | Props desestructuradas con defaults reactivos, desde Meeko 1.8             |
 | `memits`         | `<script>`                           | `defineEmits` con argumentos tipados                                       |
@@ -33,7 +33,7 @@ Escribe un prefijo y elige el fragmento en el completado, o usa **Insert Snippet
 | `mrender`        | `<template>`                         | `<render>` con `snippet` y `args`                                          |
 | `msnippet`       | Dentro de una etiqueta de componente | `<snippet>` con `name` y `params`                                          |
 | `mis`            | `<template>`                         | `<component is>` dinámico                                                  |
-| `mform`          | Archivo `.meeko` vacío               | Componente con `useForm` y formulario enlazado                             |
+| `mform`          | Raíz de un `.meeko`                  | Componente con `useForm` y formulario enlazado                             |
 | `mapi`           | `server/api/*.get.ts`                | `defineApiRoute` con una respuesta JSON                                    |
 | `mrpc`           | `server/rpc/*.ts`                    | `defineRpc` con imports de schemas de `shared/`                            |
 | `mmiddleware`    | `app/middleware/*.server.ts`         | `defineServerRouteMiddleware` con nombre                                   |
@@ -41,7 +41,13 @@ Escribe un prefijo y elige el fragmento en el completado, o usa **Insert Snippet
 
 Los fragmentos de script y plantilla se insertan en el bloque indicado: ajusta los nombres a los valores del componente y reúne los imports si ya existen. `mmounted` registra la limpieza dentro del callback para respetar `MEEK128`. Llama al composable de `mcomposable` durante el setup de un componente. En `mrpc`, crea o reutiliza los schemas reales en `shared/`, ajusta la ruta relativa a la profundidad del archivo y adapta el handler al schema de salida. `mmiddleware` crea middleware con nombre (`global: false`): decláralo en `middleware` de la página o del grupo para ejecutarlo.
 
-La contribución declarativa [`contributes.snippets`](https://code.visualstudio.com/api/references/contribution-points#contributes.snippets) sólo selecciona el lenguaje y el archivo de fragmentos; no admite una condición por proyecto. Por eso los cuatro fragmentos TypeScript aparecen también fuera de proyectos Meeko mientras la extensión está habilitada. Sus prefijos específicos (`mapi`, `mrpc`, `mmiddleware`, `mcomposable`) reducen las coincidencias accidentales.
+VS Code elige los fragmentos declarados en [`contributes.snippets`](https://code.visualstudio.com/api/references/contribution-points#contributes.snippets) por el lenguaje en la posición del cursor, y dentro de un bloque ese lenguaje es `typescript` o `html`, no `meeko`. Por eso la extensión sólo declara los esqueletos. Los de script y plantilla los ofrece su proveedor de completado en `<script>`, en `<script server>` y en el contenido de `<template>`, y no en `<style>`, en comentarios, en cadenas, en valores de atributo ni en expresiones `{…}`. De ahí salen tres límites:
+
+- **Insert Snippet** lista lo declarado para el lenguaje del cursor: los esqueletos en la raíz y lo declarado para `typescript` en `<script>`. Los fragmentos de script y plantilla no aparecen ahí: se eligen en el completado.
+- Con `"editor.tabCompletion": "on"`, `Tab` también los expande. Con `"onlySnippets"`, sólo expande los declarados, así que dentro de un bloque no los expande.
+- Un fragmento tuyo declarado para `meeko` sale en la raíz. Para usarlo en `<script>`, decláralo para `typescript`.
+
+La declaración sólo selecciona el lenguaje y el archivo de fragmentos; no admite una condición por proyecto ni por archivo. Por eso los cuatro fragmentos TypeScript aparecen también fuera de proyectos Meeko mientras la extensión está habilitada, y dentro de los bloques TypeScript de un `.meeko`, comentarios y cadenas incluidos. Sus prefijos específicos (`mapi`, `mrpc`, `mmiddleware`, `mcomposable`) reducen las coincidencias accidentales.
 
 ## Funciones de Meeko
 

@@ -35,6 +35,7 @@
 		"test": "tsx --test tests/*.test.ts",
 		"test:host": "node tests/run-host.mjs",
 		"test:host:isolated": "pwsh -NoProfile -File tests/prepare-host.ps1",
+		"test:host:snippets": "node tests/run-host-snippets.mjs",
 		"test:host:untrusted": "node tests/run-host-untrusted.mjs",
 		"test:host:virtual": "node tests/run-host-virtual.mjs"
 	},

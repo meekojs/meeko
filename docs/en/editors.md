@@ -1,5 +1,5 @@
 ---
-source-hash: c969ed83b9d1e4ed7f69048e12aa1b733094a0d7d76690d9b2d15a0107100eef
+source-hash: de85ecf8da996b1c5cde00a8cabef006f2983c7e8b5049e9c2a0b88cf6fdaa20
 ---
 
 # Editors
@@ -10,13 +10,13 @@ A page's `<script server lang="ts">` block is analyzed as its own TypeScript mod
 
 ## Code snippets
 
-Type a prefix and choose the snippet in completion, or use **Insert Snippet**. `Tab` moves through editable fields and keeps repeated names synchronized. Skeletons use the filename as the initial title.
+Type a prefix and choose the snippet in completion. `Tab` moves through editable fields and keeps repeated names synchronized. Skeletons use the filename as the initial title.
 
 | Prefix           | Where                        | Content                                                              |
 | ---------------- | ---------------------------- | -------------------------------------------------------------------- |
-| `meeko`, `mcomp` | Empty `.meeko` file          | Component with `<script lang="ts">` and `<template>`                 |
-| `mpage`          | Empty `.meeko` page          | `definePage` in `<script server>` and template                       |
-| `mlayout`        | Empty `.meeko` layout        | Layout with `<MeekoOutlet />`                                        |
+| `meeko`, `mcomp` | Root of a `.meeko` file      | Component with `<script lang="ts">` and `<template>`                 |
+| `mpage`          | Root of a `.meeko` page      | `definePage` in `<script server>` and template                       |
+| `mlayout`        | Root of a `.meeko` layout    | Layout with `<MeekoOutlet />`                                        |
 | `mprops`         | `<script>`                   | `Props` interface and `defineProps<Props>()`                         |
 | `mpropsd`        | `<script>`                   | Destructured props with reactive defaults, since Meeko 1.8           |
 | `memits`         | `<script>`                   | `defineEmits` with typed arguments                                   |
@@ -33,7 +33,7 @@ Type a prefix and choose the snippet in completion, or use **Insert Snippet**. `
 | `mrender`        | `<template>`                 | `<render>` with `snippet` and `args`                                 |
 | `msnippet`       | Inside a component tag       | `<snippet>` with `name` and `params`                                 |
 | `mis`            | `<template>`                 | Dynamic `<component is>`                                             |
-| `mform`          | Empty `.meeko` file          | Component with `useForm` and a bound form                            |
+| `mform`          | Root of a `.meeko` file      | Component with `useForm` and a bound form                            |
 | `mapi`           | `server/api/*.get.ts`        | `defineApiRoute` with a JSON response                                |
 | `mrpc`           | `server/rpc/*.ts`            | `defineRpc` with schema imports from `shared/`                       |
 | `mmiddleware`    | `app/middleware/*.server.ts` | Named `defineServerRouteMiddleware`                                  |
@@ -41,7 +41,13 @@ Type a prefix and choose the snippet in completion, or use **Insert Snippet**. `
 
 Script and template snippets are inserted into the indicated block: adapt names to the component's values and consolidate imports if they already exist. `mmounted` registers cleanup inside the callback to respect `MEEK128`. Call the `mcomposable` composable during component setup. In `mrpc`, create or reuse real schemas in `shared/`, adjust the relative path to the file's depth and adapt the handler to the output schema. `mmiddleware` creates named middleware (`global: false`): declare it in the page or group's `middleware` to execute it.
 
-The declarative [`contributes.snippets`](https://code.visualstudio.com/api/references/contribution-points#contributes.snippets) contribution only selects the language and snippet file; it does not support a per-project condition. That is why the four TypeScript snippets also appear outside Meeko projects while the extension is enabled. Their specific prefixes (`mapi`, `mrpc`, `mmiddleware`, `mcomposable`) reduce accidental matches.
+VS Code chooses the snippets declared in [`contributes.snippets`](https://code.visualstudio.com/api/references/contribution-points#contributes.snippets) by the language at the cursor position, and inside a block that language is `typescript` or `html`, not `meeko`. That is why the extension only declares the skeletons. Its completion provider offers the script and template snippets in `<script>`, in `<script server>` and in the content of `<template>`, and not in `<style>`, comments, strings, attribute values or `{…}` expressions. This leaves three limits:
+
+- **Insert Snippet** lists what is declared for the language at the cursor: the skeletons at the root and what is declared for `typescript` in `<script>`. Script and template snippets do not appear there: choose them in completion.
+- With `"editor.tabCompletion": "on"`, `Tab` expands them too. With `"onlySnippets"`, it only expands declared snippets, so it does not expand them inside a block.
+- A snippet of yours declared for `meeko` appears at the root. To use it in `<script>`, declare it for `typescript`.
+
+The declaration only selects the language and snippet file; it does not support a condition per project or per file. That is why the four TypeScript snippets also appear outside Meeko projects while the extension is enabled, and inside the TypeScript blocks of a `.meeko` file, comments and strings included. Their specific prefixes (`mapi`, `mrpc`, `mmiddleware`, `mcomposable`) reduce accidental matches.
 
 ## Meeko-specific features
 

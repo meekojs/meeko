@@ -71,6 +71,11 @@ exports.run = async function run() {
 			completion?.items.some((item) => item.label === 'length'),
 			'Local TypeScript completion must work',
 		)
+		const inScript = await vscode.commands.executeCommand('vscode.executeCompletionItemProvider', uri, document.positionAt(document.getText().indexOf('const count')))
+		assert.ok(
+			inScript?.items.some((item) => item.kind === vscode.CompletionItemKind.Snippet && (item.label.label ?? item.label) === 'msignal'),
+			'Script snippets do not depend on a file on disk',
+		)
 	} finally {
 		provider.dispose()
 		changes.dispose()

@@ -115,6 +115,8 @@ onMounted(() => {
   try {
     & pnpm run test:host
     if ($LASTEXITCODE -ne 0) { throw 'Falló la prueba en VS Code.' }
+    & pnpm run test:host:snippets
+    if ($LASTEXITCODE -ne 0) { throw 'Falló la prueba de fragmentos en VS Code.' }
   } finally {
     Pop-Location
   }

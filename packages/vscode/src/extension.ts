@@ -10,6 +10,7 @@ import { registerAutoClosingTags } from './auto-close'
 import { registerScaffoldCommands } from './commands'
 import { LanguageServers } from './language-servers'
 import { registerLiveValues } from './live/controller'
+import { registerSnippetCompletion } from './snippets'
 import { ExecutionZoneDecorations, executionZonesRequest } from './zones'
 
 /** API que devuelve la activación; las pruebas la usan para saber qué servidor se eligió. */
@@ -49,6 +50,8 @@ function referenceLens(lens: vscode.CodeLens, current: LanguageClient): vscode.C
 export async function activate(context: vscode.ExtensionContext): Promise<MeekoExtensionApi> {
 	const output = vscode.window.createOutputChannel('Meeko', { log: true })
 	context.subscriptions.push(output)
+	// Before the servers start: the snippets do not depend on them.
+	context.subscriptions.push(registerSnippetCompletion())
 	const api: MeekoExtensionApi = {
 		get server() {
 			return servers?.first
