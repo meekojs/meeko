@@ -24,7 +24,7 @@ function animates(types: readonly string[]): boolean {
  * @param update El cambio del DOM. Un error aquí rechaza `finished` de la transición devuelta.
  * @param options `types`: los tipos de la transición, para limitar con ellos su CSS.
  * @returns La transición, o `undefined` si `update` ya se aplicó sin animar.
- * @since 0.2.0
+ * @since 1.8.0
  * @example
  * ```ts
  * import { withViewTransition } from '@meekojs/ui/runtime'

@@ -6,13 +6,12 @@ import { fileURLToPath } from 'node:url'
 
 const root = fileURLToPath(new URL('../../../', import.meta.url))
 const source = join(root, 'packages/ui/src')
-// `@meekojs/ui` never shipped a 0.x. This file belongs to the View Transitions work, which is changing it.
-const pending = new Set([join(source, 'app/utils/view-transition.ts')])
 
+// `@meekojs/ui` never shipped a 0.x.
 test('no public declaration of UI says it arrived in a 0.x version that never shipped', () => {
 	const stale = readdirSync(source, { recursive: true })
 		.map((file) => join(source, String(file)))
-		.filter((file) => /\.(?:ts|meeko)$/.test(file) && !pending.has(file))
+		.filter((file) => /\.(?:ts|meeko)$/.test(file))
 		.filter((file) => /@since 0\./.test(readFileSync(file, 'utf8')))
 	assert.deepEqual(stale, [])
 })
