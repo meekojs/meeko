@@ -17,7 +17,7 @@ export interface TooltipSnippets {
 	default?: []
 	/** Contenido del `<button>` disparador que pinta Meeko. */
 	trigger?: []
-	/** Un disparador propio: recibe en {@link PopoverTrigger} su `id` y su `aria-describedby`. */
+	/** Un disparador propio: recibe en {@link PopoverTrigger} su `id`, su `aria-describedby` y su `interestfor`. */
 	anchor?: [trigger: PopoverTrigger]
 }
 

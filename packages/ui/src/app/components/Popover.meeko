@@ -36,6 +36,7 @@
 		bind:aria-expanded="popover.trigger.value['aria-expanded']"
 		bind:aria-haspopup="popover.trigger.value['aria-haspopup']"
 		bind:aria-describedby="popover.trigger.value['aria-describedby']"
+		bind:interestfor="popover.trigger.value.interestfor"
 		><render snippet="snippets.trigger" /></button
 	><render
 		if:when="snippets.anchor"

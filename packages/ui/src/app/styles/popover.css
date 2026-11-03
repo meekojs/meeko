@@ -90,4 +90,14 @@
 			transition: none;
 		}
 	}
+
+	/* The delays of a tooltip that the browser opens by itself, from `interestfor`: `delay` is for the
+	   pointer, and the focus does not wait. */
+	[data-meeko-popover-interest] {
+		interest-delay-start: var(--popover-delay);
+		interest-delay-end: var(--popover-close-delay);
+	}
+	[data-meeko-popover-interest]:focus-visible {
+		interest-delay-start: 0s;
+	}
 }

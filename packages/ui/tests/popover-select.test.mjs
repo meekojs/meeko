@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 
 import { createCombobox, defaultComboboxFilter, toggleSelection } from '../dist/app/utils/combobox.js'
-import { listKeyTarget, normalizeText, popoverPlacement, typeaheadIndex } from '../dist/app/utils/popover.js'
+import { createPopover, interestDelay, interestSource, listKeyTarget, normalizeText, popoverPlacement, typeaheadIndex } from '../dist/app/utils/popover.js'
 import { groupOptions, sameOption, selectDisabled, selectLabel, selectValue } from '../dist/app/utils/select-options.js'
 import { themeToggleItems, themeToggleKeyTarget, themeToggleMode, themeToggleStatus } from '../dist/app/utils/theme-toggle.js'
 
@@ -16,6 +16,33 @@ test('an unknown placement falls back to bottom-start, and popover.css places ea
 	for (const [placement, area] of Object.entries({ top: 'top', 'top-start': 'top span-right', 'top-end': 'top span-left', bottom: 'bottom', 'bottom-start': 'bottom span-right', 'bottom-end': 'bottom span-left', left: 'left', 'left-start': 'left span-bottom', 'left-end': 'left span-top', right: 'right', 'right-start': 'right span-bottom', 'right-end': 'right span-top' })) {
 		assert.match(css, new RegExp(`\\[data-placement='${placement}'\\] \\{\\s*position-area: ${area};`), placement)
 	}
+})
+
+test('only a hint carries interestfor, on the attributes of its trigger', () => {
+	const trigger = (mode) => createRoot(() => createPopover({ mode }, signal(false), 'tip', () => {})).trigger.value
+	assert.equal(trigger('hint').interestfor, 'tip-content')
+	assert.equal(trigger('hint')['aria-describedby'], 'tip-content')
+	assert.equal(trigger('auto').interestfor, undefined)
+	assert.equal(trigger('manual').interestfor, undefined)
+})
+
+test('a trigger is a source of interest only if the browser would act on it', () => {
+	const content = {}
+	const element = (interestForElement, matches = true) => ({ interestForElement, matches: () => matches })
+	assert.equal(interestSource(element(content), content), true)
+	assert.equal(interestSource(element(content, false), content), false, 'a disabled button, a link without href or an SVG link report their target too')
+	assert.equal(interestSource(element(null), content), false, 'a component that does not forward the attribute')
+	assert.equal(interestSource(element({}), content), false, 'another target')
+	assert.equal(interestSource(element(undefined), content), false, 'a <span>, or a browser without Interest Invokers')
+})
+
+test('a delay becomes a valid CSS time, with the value that setTimeout would wait', () => {
+	assert.equal(interestDelay(undefined, 300), '300ms')
+	assert.equal(interestDelay(0, 300), '0ms')
+	assert.equal(interestDelay(120, 300), '120ms')
+	assert.equal(interestDelay(-5, 300), '0ms', 'CSS rejects a negative time')
+	assert.equal(interestDelay(Number.NaN, 300), '0ms')
+	assert.equal(interestDelay(Number.POSITIVE_INFINITY, 300), '0ms')
 })
 
 test('menu keys and typeahead skip disabled items, ignore accents and cycle a repeated letter', () => {
