@@ -48,8 +48,8 @@ import { propAliasReadsOnce, propsReadsOnce } from './compiler/transforms/props-
 import { scopeCss } from './compiler/transforms/scoped-css'
 import { analyzeServerScript, bindingIdentifiers, checkClientScript } from './compiler/transforms/server-script'
 import { setupTypeQuery, setupValueNames, transferredStates } from './compiler/transforms/transferred-state'
-import { modelEventName, modelPropName } from './shared/model-names'
 import { elementAttributeNames, tagsAccepting } from './shared/html-attributes'
+import { modelEventName, modelPropName } from './shared/model-names'
 
 interface DynamicText {
 	id: number
