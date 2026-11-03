@@ -33,6 +33,7 @@ type __MeekoSnippets<T, Multiple extends boolean = false> = __meeko.SnippetTypes
 export type ComponentSnippets<T, Multiple extends boolean = false> = __meeko.SnippetMap<__MeekoSnippets<T, Multiple>>;
 declare function __meeko_channels<T, Multiple extends boolean = false>(): { readonly models: ComponentModels<T, Multiple>; readonly snippets: ComponentSnippets<T, Multiple> };
 export declare const __meekoChannels: ReturnType<typeof __meeko_channels>;
+export declare const __meekoGeneric: true;
 type __MeekoTagProps<P> = P extends unknown ? { [K in keyof P]: {} extends Record<K, unknown> ? P[K] : {} extends Pick<P, K> ? P[K] | undefined : P[K] } : never;
 export declare const __meekoTag: <T, Multiple extends boolean = false>(props: __MeekoTagProps<__MeekoComponentProps<T, Multiple>> & __meeko.ExtraProps, events: NoInfer<__meeko.EventNames<__MeekoComponentProps<T, Multiple>>>, models: NoInfer<ComponentModels<T, Multiple>>, snippets: NoInfer<ComponentSnippets<T, Multiple>>) => __meeko.TagInput<ComponentExposed<T, Multiple>>;
 export const css = "";

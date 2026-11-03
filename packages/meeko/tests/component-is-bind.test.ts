@@ -58,12 +58,14 @@ void AppSelect;
 const page = (script: string, template: string): string => `<script lang="ts">
 import { computed, signal } from "@meekojs/meeko";
 import * as AppInput from "./AppInput.meeko";
+import * as AppList from "./AppList.meeko";
 import * as AppSelect from "./AppSelect.meeko";
 import * as MixedRows from "./MixedRows.meeko";
 import * as Rows from "./Rows.meeko";
 void computed;
 void signal;
 void AppInput;
+void AppList;
 void AppSelect;
 void MixedRows;
 void Rows;
@@ -79,21 +81,31 @@ const input = `{ id: "name", component: AppInput, props: { placeholder: "Nombre"
 const literalOption = `type Option = { id: string; component: "AppSelect"; props: { label: string; options: string[] } } | { id: string; component: "AppInput"; props: { placeholder: string } };
 const options: Option[] = [{ id: "role", component: "AppSelect", props: { label: "Rol", options: ["admin"] } }, { id: "name", component: "AppInput", props: { placeholder: "Nombre" } }];`
 
-async function withProject(run: (check: (script: string, template: string) => Promise<string[]>) => Promise<void>): Promise<void> {
+/** A generic component whose props read its type parameter, also in a callback. */
+const appList = `<script lang="ts" generic="T">
+const props = defineProps<{ items: T[]; format?: (item: T) => string }>();
+</script>
+<template><ul><li each:of="props.items" each:as="item">{props.format ? props.format(item) : String(item)}</li></ul></template>`
+
+async function withProject(run: (check: (script: string, template: string) => Promise<string[]>, located: (source: string) => Promise<number[]>) => Promise<void>): Promise<void> {
 	const { root, cleanup } = await typeProject({
 		'AppInput.meeko': appInput,
+		'AppList.meeko': appList,
 		'AppSelect.meeko': appSelect,
 		'Rows.meeko': rows('{ component: typeof AppInput; props: { placeholder: string } }'),
 		'MixedRows.meeko': rows('{ component: typeof AppSelect; props: { label: string; options: string[] } } | { component: typeof AppInput; props: { placeholder: string } }'),
 	})
 	let count = 0
 	try {
-		await run(async (script, template) => {
-			const source = page(script, template)
+		const report = async (source: string) => {
 			const file = join(root, `Case${count++}.meeko`)
 			await writeFile(file, source)
-			return (await checkSource(source, file)).map((item) => `${item.code}: ${item.message}`)
-		})
+			return checkSource(source, file)
+		}
+		await run(
+			async (script, template) => (await report(page(script, template))).map((item) => `${item.code}: ${item.message}`),
+			async (source) => (await report(source)).map((item) => item.location.offset),
+		)
 	} finally {
 		await cleanup()
 	}
@@ -154,6 +166,50 @@ test('a list of different modules checks the props of each entry against its own
 		// Two values read from different objects cannot relate: the props of every possible component.
 		const apart = `const views = { a: AppInput, b: AppSelect };\nconst mode = signal<"a" | "b">("a");\nconst attrs = { placeholder: "x" };`
 		expectOne(await check(apart, '<component is="views[mode.value]" bind="attrs" />'), /^TS2345:/)
+	})
+})
+
+test('with the type written, wrong props fail in the list itself', { timeout: 300_000 }, async () => {
+	await withProject(async (_check, located) => {
+		const option = `type Option = { id: string; component: typeof AppSelect; props: { label: string; options: string[] } } | { id: string; component: typeof AppInput; props: { placeholder: string } };`
+		const wrong = `{ id: "name", component: AppInput, props: { label: "Nombre" } }`
+		const source = page(`${option}\nconst options: Option[] = [${select}, ${wrong}];`, row)
+		const found = await located(source)
+		assert.ok(found.length > 0, 'an entry with the props of another component fails')
+		// Every error falls on that entry, in the script, and none on the template.
+		const entry = source.indexOf(wrong)
+		for (const offset of found) assert.ok(offset >= entry && offset < entry + wrong.length, `${offset} in ${entry}: ${JSON.stringify(found)}`)
+	})
+})
+
+test('a generic component in a list of different modules', { timeout: 300_000 }, async () => {
+	await withProject(async (check) => {
+		const generic = (props: string): string => `const options = [{ id: "list", component: AppList, props: ${props} }, ${input}];`
+		assert.deepEqual(await check(generic(`{ items: [1, 2] }`), row), [])
+		// A callback of its own type parameter, written with the type of the list.
+		assert.deepEqual(await check(generic(`{ items: [1, 2], format: (item: number) => String(item + 1) }`), row), [])
+		// Alone in the list, the tag of the component infers its parameter: a callback of another type fails.
+		const alone = `const options = [{ id: "list", component: AppList, props: { items: [1, 2], format: (item: number) => String(item) } }];`
+		assert.deepEqual(await check(alone, row), [])
+		const mismatched = await check(`const options = [{ id: "list", component: AppList, props: { items: [1, 2], format: (item: string) => item } }];`, row)
+		assert.ok(mismatched.length > 0, 'the tag of a single generic component still checks its values')
+		// Next to a component that is not generic, its values are checked as always.
+		const plain = await check(generic(`{ items: [1, 2] }`).replace('placeholder: "Nombre"', 'placeholder: 1'), row)
+		assert.ok(
+			plain.some((item) => /^MEEK113: placeholder no tiene el tipo/.test(item)),
+			JSON.stringify(plain),
+		)
+		// A key that is no prop of the generic component, or one left out, is still an error.
+		const nope = await check(generic(`{ items: [1, 2], nope: 1 }`), row)
+		assert.ok(
+			nope.some((item) => /^MEEK113: nope no es una prop del componente de esa entrada/.test(item)),
+			JSON.stringify(nope),
+		)
+		const missing = await check(generic(`{ format: (item: number) => String(item) }`), row)
+		assert.ok(
+			missing.some((item) => /^MEEK113: falta la prop obligatoria items/.test(item)),
+			JSON.stringify(missing),
+		)
 	})
 })
 
@@ -270,6 +326,24 @@ const options = [{ id: "a", component: "AppSelect" as const, props: { label: "Ro
 `)
 		assert.equal(named.length, 1, JSON.stringify(named))
 		assert.match(named[0]!, /^MEEK112: <AppSelect> no es una etiqueta.*resolveComponent\('AppSelect'\)/)
+		// The example of resolveComponent: the browser fills the signal in an interaction.
+		assert.deepEqual(
+			await check(`<script lang="ts">
+const selected = signal<ResolvedComponent<"AppInput"> | undefined>(undefined);
+async function showForm(): Promise<void> {
+	selected.value = await resolveComponent("AppInput", { placeholder: "x" });
+}
+</script>
+<template><button type="button" on:click="showForm">Abrir</button><component if:when="selected.value" is="selected.value!" /></template>
+`),
+			[],
+		)
+		// With the autoimports of a project, a module in a signal or in useState.
+		for (const state of ['const options = signal([{ component: AppInput }]);', 'const options = useState("options", () => [{ component: AppInput }]);']) {
+			const held = await check(`<script lang="ts">\nimport * as AppInput from "../components/AppInput.meeko";\n${state}\n</script>\n<template><p>{options.value.length}</p></template>\n`)
+			assert.equal(held.length, 1, JSON.stringify(held))
+			assert.match(held[0]!, /^MEEK136: un módulo de componente no puede viajar con el estado/)
+		}
 		// One branch per component still passes, and the names of the project narrow with `ComponentProps` too.
 		assert.deepEqual(
 			await check(`<script lang="ts">
@@ -288,7 +362,7 @@ test('the language server reports the same as meeko check', { timeout: 300_000 }
 	const wrong = page(`const options = [${select}, { id: "name", component: AppInput, props: { label: "Nombre" } }];`, row)
 	const named = page(`const options = [{ id: "role", component: "AppSelect", props: { label: "Rol", options: ["admin"] } }] as const;`, row)
 	const branches = page(literalOption, `<component each:of="options" each:as="option" each:key="option.id" is="option.component === 'AppSelect' ? 'AppSelect' : 'AppInput'" bind="option.props" />`)
-	const workspace = await languageProject('lsp-is-bind-', { 'AppInput.meeko': appInput, 'AppSelect.meeko': appSelect, 'Rows.meeko': rows('{ component: typeof AppInput; props: { placeholder: string } }'), 'MixedRows.meeko': rows('{ component: typeof AppSelect; props: { label: string; options: string[] } } | { component: typeof AppInput; props: { placeholder: string } }'), 'Good.meeko': good, 'Wrong.meeko': wrong, 'Named.meeko': named, 'Branches.meeko': branches })
+	const workspace = await languageProject('lsp-is-bind-', { 'AppInput.meeko': appInput, 'AppList.meeko': appList, 'AppSelect.meeko': appSelect, 'Rows.meeko': rows('{ component: typeof AppInput; props: { placeholder: string } }'), 'MixedRows.meeko': rows('{ component: typeof AppSelect; props: { label: string; options: string[] } } | { component: typeof AppInput; props: { placeholder: string } }'), 'Good.meeko': good, 'Wrong.meeko': wrong, 'Named.meeko': named, 'Branches.meeko': branches })
 	try {
 		const report = async (name: string, source: string): Promise<{ code: unknown; message: string; start: number; end: number }[]> => {
 			const opened = await workspace.open(name)

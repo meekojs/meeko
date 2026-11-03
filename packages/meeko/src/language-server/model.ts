@@ -1180,7 +1180,7 @@ export function createVirtualComponent(source: string, filename: string, options
 	// Models and snippets are channels of their own, beside the props, like the compiled component.
 	code += `export type ComponentModels${G} = ${models.size ? `{ ${[...models].map(([name, model]) => `${JSON.stringify(name)}${model.optional ? '?' : ''}: import("@meekojs/meeko").Signal<${model.type}>`).join('; ')} }` : 'null'};\n`
 	code += `export type ComponentSnippets${G} = ${snippetsTypeText && usesSnippets ? `__MeekoSnippetMap<${snippetsTypeText}>` : 'null'};\n`
-	code += generic ? `declare function __meeko_channels${G}(): { readonly models: ComponentModels${A}; readonly snippets: ComponentSnippets${A} };\nexport declare const __meekoChannels: ReturnType<typeof __meeko_channels>;\n` : 'export declare const __meekoChannels: { readonly models: ComponentModels; readonly snippets: ComponentSnippets };\n'
+	code += generic ? `declare function __meeko_channels${G}(): { readonly models: ComponentModels${A}; readonly snippets: ComponentSnippets${A} };\nexport declare const __meekoChannels: ReturnType<typeof __meeko_channels>;\nexport declare const __meekoGeneric: true;\n` : 'export declare const __meekoChannels: { readonly models: ComponentModels; readonly snippets: ComponentSnippets };\n'
 	// The check of a parent's tag, like the compiled component's: the parameters come from the props
 	// alone. Its result lets the editor show the child with them resolved.
 	const typeArguments = generic ? generic.names.map((name) => `${name}: ${name}`).join('; ') : ''

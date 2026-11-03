@@ -408,16 +408,28 @@ type EntryKeyErrors<S, M, Tag extends string> = {
 	[K in keyof S]-?: K extends string ? (Lowercase<K> extends `on${string}` ? 'MEEK113: bind no admite claves on*; usa on:evento' : string extends K ? never : K extends DynamicPropName<M> | AttributeNameOf<Tag> ? never : `${DynamicKeyMessage<K, M, Tag>} de esa entrada`) : never
 }[keyof S]
 
-/** Text of MEEK113 for each prop of the component of one entry that its object leaves out or gets wrong. */
-type EntryPropMismatch<S, Props, Accepted> = {
-	[K in keyof Props]-?: K extends string ? (K extends keyof S ? ([S[K]] extends [Accepted[K & keyof Accepted]] ? never : `MEEK113: ${K} no tiene el tipo de esa prop en el componente de esa entrada`) : {} extends Pick<Props, K> ? never : `MEEK113: falta la prop obligatoria ${K} del componente de esa entrada`) : never
+/** Text of MEEK113 for each prop of the component of one entry that its object leaves out. */
+type EntryMissingProps<S, Props> = {
+	[K in keyof Props]-?: K extends string ? (K extends keyof S ? never : {} extends Pick<Props, K> ? never : `MEEK113: falta la prop obligatoria ${K} del componente de esa entrada`) : never
+}[keyof Props]
+
+/** Text of MEEK113 for each prop of the component of one entry that its object gets wrong. */
+type EntryWrongProps<S, Props, Accepted> = {
+	[K in keyof Props]-?: K extends string ? (K extends keyof S ? ([S[K]] extends [Accepted[K & keyof Accepted]] ? never : `MEEK113: ${K} no tiene el tipo de esa prop en el componente de esa entrada`) : never) : never
 }[keyof Props]
 
 /** Whether the object of one entry, with the explicit props `S` carries, gives the props of its component. */
-type EntryPropErrors<S, Props, Accepted = TagProps<Props>> = [S] extends [Accepted] ? never : [EntryPropMismatch<S, Props, Accepted>] extends [never] ? 'MEEK113: el objeto de bind no encaja con las props del componente de esa entrada' : EntryPropMismatch<S, Props, Accepted>
+type EntryPropErrors<S, Props, Accepted = TagProps<Props>> = [S] extends [Accepted] ? never : [EntryMissingProps<S, Props> | EntryWrongProps<S, Props, Accepted>] extends [never] ? 'MEEK113: el objeto de bind no encaja con las props del componente de esa entrada' : EntryMissingProps<S, Props> | EntryWrongProps<S, Props, Accepted>
+
+/**
+ * The props of one entry against its component. A generic component only has its props with its
+ * type parameters as `unknown`, since a union cannot call its `__meekoTag`: a `(item: number) => string`
+ * would fail against `(item: unknown) => string`. Of those, only the names are checked.
+ */
+type EntryComponentErrors<S, M> = [M] extends [{ readonly __meekoGeneric: true }] ? EntryMissingProps<S, PropsOf<M>> : EntryPropErrors<S, PropsOf<M>>
 
 /** Errors of the object `S` of one entry against its value of `is`, with the names of the explicit props. */
-type EntryBoundErrors<S, Is, Given extends string, M = ComponentPart<Is>, Tag extends string = RenderableTag<Is>> = [M | Tag] extends [never] ? never : EntryKeyErrors<S, M, Tag> | ([M] extends [never] ? never : [TagPart<Is>] extends [never] ? EntryPropErrors<S & Record<Given, never>, PropsOf<M>> : never)
+type EntryBoundErrors<S, Is, Given extends string, M = ComponentPart<Is>, Tag extends string = RenderableTag<Is>> = [M | Tag] extends [never] ? never : EntryKeyErrors<S, M, Tag> | ([M] extends [never] ? never : [TagPart<Is>] extends [never] ? EntryComponentErrors<S & Record<Given, never>, M> : never)
 
 /** Errors of one entry: `any` checks nothing, and an absent object passes no props. */
 type EntryErrors<Is, Bound, Given extends string> = 0 extends 1 & Is ? never : 0 extends 1 & Bound ? never : Bound extends object ? EntryBoundErrors<PresentKeys<Bound>, Is, Given> : EntryBoundErrors<{}, Is, Given>
