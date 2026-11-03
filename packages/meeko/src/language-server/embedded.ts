@@ -8,6 +8,7 @@ import { TextDocument } from 'vscode-languageserver-textdocument'
 import { CompletionItemKind, CompletionItemTag, DiagnosticSeverity, DiagnosticTag, InsertTextFormat, MarkupKind } from 'vscode-languageserver/node'
 
 import type { HtmlAttributeInfo } from './html-data-source'
+import type { Region, TagContext } from './regions'
 
 import { isCandidates } from '../compiler/transforms/dynamic-tag'
 import { elementAccepts } from '../shared/html-attributes'
@@ -15,6 +16,10 @@ import { ariaRoles } from '../shared/html-data/aria'
 import { builtinTag } from './builtin-tags'
 import { cssClassRules } from './class-rules'
 import { attributeValueType, htmlAttributeSource } from './html-data-source'
+import { styleRegion, tagAt, templateRegion } from './regions'
+
+export type { TagContext } from './regions'
+export { styleRegion, tagAt, templateRegion } from './regions'
 
 // HTML of the template and CSS of `<style>`, outside the TypeScript model: what the editor offers
 // while writing markup and styles. Every function reads the text, so it works while a tag or a
@@ -109,35 +114,6 @@ export function specialTemplateDocumentation(tag: 'render' | 'snippet', attribut
 	return attribute === undefined ? specialTagDocumentation[tag] : (specialAttributeDocumentation[tag] as Record<string, string>)[attribute]
 }
 
-interface Region {
-	readonly contentStart: number
-	readonly contentEnd: number
-	/** Attributes of the opening tag, such as `scoped` in `<style scoped>`. */
-	readonly attributes: string
-}
-
-/** `<template>` content: from its opening tag to the last `</template>`, as in the compiler. */
-export function templateRegion(source: string): Region | undefined {
-	const open = /<template(?=[\s>])([^>]*)>/.exec(source)
-	if (!open) return undefined
-	const contentStart = open.index + open[0].length
-	const close = source.lastIndexOf('</template>')
-	return { contentStart, contentEnd: close > contentStart ? close : source.length, attributes: open[1] ?? '' }
-}
-
-/** `<style>` content, outside the template. */
-export function styleRegion(source: string): Region | undefined {
-	const template = templateRegion(source)
-	const pattern = /<style(?=[\s>])([^>]*)>/g
-	for (const open of source.matchAll(pattern)) {
-		if (template && open.index >= template.contentStart && open.index < template.contentEnd) continue
-		const contentStart = open.index + open[0].length
-		const close = source.indexOf('</style>', contentStart)
-		return { contentStart, contentEnd: close < 0 ? source.length : close, attributes: open[1] ?? '' }
-	}
-	return undefined
-}
-
 /** The document with only `region` kept: positions and offsets stay those of the `.meeko`. */
 function masked(document: TextDocument, region: Region, language: string): TextDocument {
 	const source = document.getText()
@@ -147,68 +123,6 @@ function masked(document: TextDocument, region: Region, language: string): TextD
 }
 
 const inside = (region: Region | undefined, offset: number): region is Region => region !== undefined && offset >= region.contentStart && offset <= region.contentEnd
-
-/** Start tag around `offset` in the template, and the attribute value it is in, if any. */
-export interface TagContext {
-	readonly tag: string
-	readonly tagStart: number
-	/** End of the tag: its `>`, or where the next tag starts while it is unfinished. */
-	readonly tagEnd: number
-	readonly component: boolean
-	/** The quoted value containing `offset`, with the name of its attribute. */
-	readonly value?: { readonly attribute: string; readonly start: number }
-}
-
-export function tagAt(source: string, offset: number): TagContext | undefined {
-	const template = templateRegion(source)
-	if (!template || offset <= template.contentStart || offset > template.contentEnd) return undefined
-	const tagStart = source.lastIndexOf('<', offset - 1)
-	if (tagStart < template.contentStart) return undefined
-	const tag = /^<([A-Za-z][\w$.-]*)/.exec(source.slice(tagStart, offset))?.[1]
-	if (!tag) return undefined
-	let quote: string | undefined
-	let valueStart = 0
-	let attribute = ''
-	let lastName = ''
-	for (let index = tagStart + 1 + tag.length; index < offset; index++) {
-		const char = source[index]!
-		if (quote) {
-			if (char === quote) quote = undefined
-			continue
-		}
-		if (char === '"' || char === "'") {
-			quote = char
-			valueStart = index + 1
-			attribute = lastName
-		} else if (char === '>') return undefined
-		else if (/[^\s=]/.test(char)) {
-			const name = /^[^\s=>"'/]+/.exec(source.slice(index))?.[0]
-			if (name) {
-				lastName = name
-				index += name.length - 1
-			}
-		}
-	}
-	let tagEnd = source.length
-	let inner: string | undefined = quote
-	for (let index = offset; index < source.length; index++) {
-		const char = source[index]!
-		if (inner) {
-			if (char === inner) inner = undefined
-		} else if (char === '"' || char === "'") inner = char
-		else if (char === '>' || char === '<') {
-			tagEnd = index
-			break
-		}
-	}
-	return {
-		tag,
-		tagStart,
-		tagEnd,
-		component: /^[A-Z]/.test(tag) || tag === 'component',
-		...(quote ? { value: { attribute, start: valueStart } } : {}),
-	}
-}
 
 /** `on:event` names of an HTML element, from the HTML data of VS Code (MDN descriptions). */
 export function domEventCompletion(document: TextDocument, position: Position, context: TagContext, word: string, element = context.tag): CompletionItem[] {

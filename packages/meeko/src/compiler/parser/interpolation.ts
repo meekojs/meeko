@@ -65,6 +65,72 @@ function segment(text: string, open: number, { close, lineCommentEnd }: CodeEnd)
 	return { start: open, end: close + 1, expression, expressionStart }
 }
 
+/**
+ * Indica si el final de `code` queda dentro de una cadena, una plantilla literal (también en sus
+ * sustituciones `${...}`) o un comentario, con las mismas reglas que `scanInterpolations`. Una
+ * cadena que se corta en su línea termina ahí, como en TypeScript: escribir una no apaga el resto
+ * del bloque.
+ *
+ * @example
+ * endsInLiteralOrComment("const a = 'ho") // true
+ * endsInLiteralOrComment("const a = 'hola'; ") // false
+ */
+export function endsInLiteralOrComment(code: string): boolean {
+	let previous = ''
+	let index = 0
+	while (index < code.length) {
+		const step = codeStep(code, index, previous)
+		if (step.end >= 0) {
+			index = step.end
+			previous = step.previous
+			continue
+		}
+		const char = code[index]
+		const newline = char === "'" || char === '"' ? findLineTerminator(code, index + 1) : -1
+		if (newline < 0) return true
+		index = newline + 1
+		previous = 'value'
+	}
+	return false
+}
+
+interface CodeStep {
+	/** Posición siguiente al token; -1 si es una cadena, plantilla o comentario sin terminar. */
+	end: number
+	/** Lo que decide si una `/` posterior abre una expresión regular. */
+	previous: string
+	/** Salto de línea que cierra el comentario `//` de este token. */
+	lineCommentEnd?: number
+}
+
+/** Avanza un token de código. Las llaves son un token más: quien recorre lleva su profundidad. */
+function codeStep(text: string, index: number, previous: string): CodeStep {
+	const char = text[index]!
+	const next = text[index + 1]
+	if (char === '/' && next === '/') {
+		const newline = findLineTerminator(text, index + 2)
+		return newline < 0 ? { end: -1, previous } : { end: newline + 1, previous, lineCommentEnd: newline }
+	}
+	if (char === '/' && next === '*') {
+		const close = text.indexOf('*/', index + 2)
+		return { end: close < 0 ? -1 : close + 2, previous }
+	}
+	if (/\s/.test(char)) return { end: index + 1, previous }
+	if (char === "'" || char === '"') return { end: skipString(text, index, char), previous: 'value' }
+	if (char === '`') return { end: skipTemplate(text, index), previous: 'value' }
+	const regexEnd = char === '/' && regexAllowed(previous) ? skipRegex(text, index) : -1
+	if (regexEnd > 0) return { end: regexEnd, previous: 'value' }
+	if (wordCharacter.test(char)) {
+		let end = index + 1
+		while (end < text.length && wordCharacter.test(text[end]!)) end++
+		// `obj.return / 2` divides: a keyword used as a property name is a value.
+		return { end, previous: previous !== '.' && regexKeywords.has(text.slice(index, end)) ? 'keyword' : 'value' }
+	}
+	// `i++ / 2` divides after a postfix update; a prefix update is followed by its operand.
+	if ((char === '+' || char === '-') && next === char) return { end: index + 2, previous: 'value' }
+	return { end: index + 1, previous: char }
+}
+
 /** Recorre código hasta la llave que cierra el nivel inicial; `undefined` si el texto termina antes. */
 function scanCode(text: string, start: number): CodeEnd | undefined {
 	let depth = 0
@@ -73,55 +139,14 @@ function scanCode(text: string, start: number): CodeEnd | undefined {
 	let index = start
 	while (index < text.length) {
 		const char = text[index]!
-		const next = text[index + 1]
-		const regexEnd = char === '/' && next !== '/' && next !== '*' && regexAllowed(previous) ? skipRegex(text, index) : -1
-		if (char === '/' && next === '/') {
-			const newline = findLineTerminator(text, index + 2)
-			if (newline < 0) return undefined
-			lineCommentEnd = newline
-			index = newline + 1
-		} else if (char === '/' && next === '*') {
-			const close = text.indexOf('*/', index + 2)
-			if (close < 0) return undefined
-			index = close + 2
-		} else if (/\s/.test(char)) {
-			index++
-		} else if (char === "'" || char === '"') {
-			const end = skipString(text, index, char)
-			if (end < 0) return undefined
-			index = end
-			previous = 'value'
-		} else if (char === '`') {
-			const end = skipTemplate(text, index)
-			if (end < 0) return undefined
-			index = end
-			previous = 'value'
-		} else if (regexEnd > 0) {
-			index = regexEnd
-			previous = 'value'
-		} else if (char === '{') {
-			depth++
-			previous = char
-			index++
-		} else if (char === '}') {
-			if (depth === 0) return { close: index, lineCommentEnd }
-			depth--
-			previous = char
-			index++
-		} else if (wordCharacter.test(char)) {
-			let end = index + 1
-			while (end < text.length && wordCharacter.test(text[end]!)) end++
-			// `obj.return / 2` divides: a keyword used as a property name is a value.
-			previous = previous !== '.' && regexKeywords.has(text.slice(index, end)) ? 'keyword' : 'value'
-			index = end
-		} else if ((char === '+' || char === '-') && next === char) {
-			// `i++ / 2` divides after a postfix update; a prefix update is followed by its operand.
-			previous = 'value'
-			index += 2
-		} else {
-			previous = char
-			index++
-		}
+		if (char === '}' && depth === 0) return { close: index, lineCommentEnd }
+		if (char === '{') depth++
+		else if (char === '}') depth--
+		const step = codeStep(text, index, previous)
+		if (step.end < 0) return undefined
+		if (step.lineCommentEnd !== undefined) lineCommentEnd = step.lineCommentEnd
+		index = step.end
+		previous = step.previous
 	}
 	return undefined
 }

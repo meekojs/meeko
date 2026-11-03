@@ -1,8 +1,23 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { scanInterpolations } from '../src/compiler/parser/interpolation.ts'
+import { endsInLiteralOrComment, interpolationClose, scanInterpolations } from '../src/compiler/parser/interpolation.ts'
 import { decodeTemplateText } from '../src/compiler/parser/template.ts'
+
+test('the end of code is known to be inside a literal or a comment', () => {
+	for (const code of ["'a", '"a', '`a', '`${a', '`${ {', '// a', '/* a', "const a = 'b\\'", 'x = `a${`b', "a\n'b"]) assert.equal(endsInLiteralOrComment(code), true, code)
+	for (const code of ['', 'a', "'a'", '"a"', '`a`', '`${a}`', '// a\n', '/* a */', "'a\nb", '"a\r\nb', "/'/", 'a = /`/g; ', 'a / 2 / "b".length', 'if (a) {', '}', "'a\\\nb'"]) assert.equal(endsInLiteralOrComment(code), false, code)
+})
+
+test('the shared token walk keeps the positions of the closing brace', () => {
+	assert.equal(interpolationClose('{ a // } \n }', 0), 11)
+	assert.equal(interpolationClose("{ '}' }", 0), 6)
+	assert.equal(interpolationClose('{ { a: 1 }.a / 2 }', 0), 17)
+	assert.equal(interpolationClose('{ i++ / 2 }', 0), 10)
+	assert.equal(interpolationClose('{ /}/.test(a) }', 0), 14)
+	assert.equal(interpolationClose('{ a', 0), undefined)
+	assert.equal(interpolationClose("{ 'a\n' }", 0), undefined)
+})
 
 function expressions(text: string): string[] {
 	const scan = scanInterpolations(text)
