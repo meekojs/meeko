@@ -494,6 +494,9 @@ export default defineMeekoConfig({
 
 <!-- Un valor que llega de datos: el icono debe estar en icon.include -->
 <UIIcon bind:name="mode.value" />`,
+	iconTypes: `import type { IconName } from '@meekojs/icon'
+
+const close: IconName = 'lucide:x'`,
 	iconLocal: `<!-- app/icons/paw.svg -->
 <UIIcon name="local:paw" label="Meeko" size="1.5em" />`,
 } as const

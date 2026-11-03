@@ -36,7 +36,9 @@
 
 		<h2 id="setup">Installation and collections</h2>
 		<p>
-			Install the module and each Iconify collection you want to use as
+			You need
+			<code>@meekojs/meeko</code>
+			<code>&gt;=1.8 &lt;2</code>, with modules registered by name. Install the module and each Iconify collection you want to use as
 			<code>@iconify-json/&lt;collection&gt;</code>. The module is registered by its name and its options go in the
 			<code>icon</code>
 			key, typed in
@@ -48,7 +50,14 @@
 			<code>.meeko/types</code>: the editor completes
 			<code>name="lucide:…"</code>, and a name that does not exist is a
 			<code>meeko check</code>
-			error with the closest suggestion. If the package of a configured collection is missing, the build prints the command to install it.
+			error with the closest suggestion. If
+			<code>icon.collections</code>
+			names a collection that is not installed,
+			<code>meeko check</code>,
+			<code>meeko dev</code>
+			and
+			<code>meeko build</code>
+			fail with the command to install it.
 		</p>
 
 		<h2 id="dynamic">Dynamic names</h2>
@@ -85,15 +94,63 @@
 		</DocsPreview>
 		<DocsCode bind:code="examples.iconDynamic" />
 
+		<h2 id="resolution">How it is resolved</h2>
+		<ul>
+			<li
+				><strong>Literal names.</strong>
+				During the build, a Vite plugin resolves each
+				<code>name="…"</code>
+				of
+				<code>&lt;UIIcon&gt;</code>
+				with
+				<code>@iconify/utils</code>
+				and inlines it in the component that uses it, before Meeko compiles it. The bundle of each page only carries its icons; SSR and the browser see the same SVG, so hydration and navigation do not flicker.</li
+			>
+			<li
+				><strong>A name that does not exist.</strong>
+				It is a type error (<code>TS2820</code>, with the closest suggestion) in
+				<code>meeko check</code>,
+				<code>meeko build</code>
+				and the editor; the build also rejects it with the file and the position.</li
+			>
+		</ul>
+
+		<h2 id="types">Types</h2>
+		<p
+			>The module generates the union of the available names in
+			<code>.meeko/types/modules/%40meekojs%2Ficon/</code>, one declaration per collection plus that of the local SVGs.
+			<code>name</code>
+			of
+			<code>&lt;UIIcon&gt;</code>
+			and
+			<code>icon.include</code>
+			of
+			<code>meeko.config.ts</code>
+			use that union. With Lucide (2,302 names), Tabler and Material Design Icons at once (22,802), TypeScript 7 checking grows by about 35 ms.</p
+		>
+		<DocsCode bind:code="examples.iconTypes" />
+
 		<h2 id="local">Your own SVGs</h2>
 		<p>
 			Each file in
 			<code>app/icons</code>
 			(or in the folder of
 			<code>icon.local</code>) is
-			<code>local:&lt;name&gt;</code>. It is cleaned at build time:
+			<code>local:&lt;name&gt;</code>, in kebab-case. It is sanitized at build time with a list of allowed elements and attributes:
+			<code>&lt;foreignObject&gt;</code>,
+			<code>&lt;image&gt;</code>, links, animations,
+			<code>class</code>,
 			<code>&lt;script&gt;</code>,
-			<code>&lt;style&gt;</code>, event handlers, inline styles and external references are removed, and a single-color icon switches to
+			<code>&lt;style&gt;</code>,
+			<code>on*</code>
+			handlers,
+			<code>style</code>
+			and every reference outside the icon (<code>href</code>
+			and
+			<code>url(…)</code>
+			only to
+			<code>#id</code>) are removed. Internal
+			<code>id</code>s are prefixed per icon so two icons do not clash, and a single-color icon switches to
 			<code>currentColor</code>.
 		</p>
 		<DocsPreview>
@@ -123,7 +180,9 @@
 			It is
 			<code>1em</code>
 			tall by default, so it follows the surrounding text, and it takes its color from
-			<code>currentColor</code>. Width, height and fill are attributes, never inline styles: it works with a strict Content Security Policy.
+			<code>currentColor</code>. Width, height,
+			<code>viewBox</code>
+			and fill are attributes, never inline styles: it works with a strict Content Security Policy. The module's stylesheet only aligns the icon with the baseline (<code>.meeko-icon</code>).
 		</p>
 		<DocsPreview>
 			<UIIcon
@@ -146,13 +205,13 @@
 				{ name: 'name', type: 'IconName', description: 'Icon: collection:icon or local:name. A literal is resolved at build time.' },
 				{ name: 'label', type: 'string', description: 'Accessible text. Without it, the icon is decorative.' },
 				{ name: 'size', type: 'string', default: 'icon.size (1em)', description: 'Height, a CSS length. The width follows the proportion of the icon.' },
-				{ name: 'class', type: 'string', description: 'Additional classes of the svg.' },
+				{ name: 'class', type: 'string', description: 'Classes of the svg, which always carries meeko-icon.' },
 			]"
 		/>
 		<h3 id="options">Module options</h3>
 		<DocsApi
 			bind:rows="[
-				{ name: 'collections', type: 'string[]', default: '[]', description: 'Iconify collections; each one, the @iconify-json/<collection> package of the project.' },
+				{ name: 'collections', type: 'string[]', default: '[]', description: 'Iconify collections (lucide, mdi…); each one, the @iconify-json/<collection> package of the project. The editor completes the installed ones.' },
 				{ name: 'include', type: 'IconInclude[]', default: '[]', description: 'Icons for dynamic names, or collection:* for a whole one.' },
 				{ name: 'local', type: 'string | false', default: 'app/icons if it exists', description: 'Folder of your own SVGs.' },
 				{ name: 'size', type: 'string', default: '1em', description: 'Default height of the icons.' },
