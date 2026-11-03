@@ -1,5 +1,5 @@
 ---
-source-hash: 03ea5b2bc02cd487efde2eda05736ff03a80a786f736cff24977174fd447fe56
+source-hash: b3011a9c2020bc8dc003502526ade05f9d865a2db60ec82880320b45eeecd512
 ---
 
 # Meeko as a full-stack framework
@@ -1347,7 +1347,11 @@ The response has `Vary: Accept, Cookie` (and `Sec-CH-Prefers-Color-Scheme` with 
 
 `mountClientApp` turns clicks on same-origin links to application routes into client navigation, including links in HTML inserted with `html`. A link to a current-page fragment (`#seccion`, or `/docs#seccion` while on `/docs`) is not intercepted: the browser scrolls the page and adds the history entry without requesting or rendering the page again, and going back or forward between those fragments does not render it either. `app.navigate("#seccion")` does the same.
 
-A new navigation starts at the top of the page or, if its URL has a fragment naming an element (`id` or `name`), at that element, immediately even if the page uses `scroll-behavior: smooth`. History navigation or navigation with `replace` only scrolls to the fragment, if any. If a navigation data request receives HTML instead of a payload (static hosting serving the prerendered `index.html`, a proxy or CDN), Meeko loads that document instead of failing.
+A new navigation starts at the top of the page or, if its URL has a fragment naming an element (`id` or `name`), at that element, immediately even if the page uses `scroll-behavior: smooth`. Navigation with `replace` only scrolls to the fragment, if any. If a navigation data request receives HTML instead of a payload (static hosting serving the prerendered `index.html`, a proxy or CDN), Meeko loads that document instead of failing.
+
+Back and forward return the reader to the position they had in each history entry, even one with a fragment; an entry with no saved position goes to its fragment, if any. The position is applied together with the DOM of the page, before the first frame and inside the View Transition. If it does not fit yet because content is missing, such as a `defer` value, Meeko waits up to 10 s for it, and gives up if the reader or other code moves the page or if another navigation happens. On a reload or a return from another document, the browser restores it.
+
+To do this Meeko sets `history.scrollRestoration` to `manual`, adds `meekoEntry` to `history.state` and stores the positions in `sessionStorage`, and it keeps whatever else is in `history.state`. If you write to it, keep what is there: `history.replaceState({ ...history.state, own: 1 }, '')`. Only the scroll of the window is remembered, not that of your own container. There is no option to control this scrolling: if you need another position, scroll after `app.navigate()` finishes.
 
 ### Native View Transitions
 

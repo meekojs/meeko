@@ -396,7 +396,8 @@ export function reportNavigationError(browser: Window, error: unknown, observer?
  * Crea un navegador de cliente para un host propio: actualiza el historial y atiende `popstate`,
  * pero no intercepta enlaces. El host renderiza el outlet en el DOM; su callback recibe la ruta y
  * cuántos layouts se conservan, para mantener las instancias comunes y liberar las que salen.
- * Devolver `false` cancela la navegación.
+ * Devolver `false` cancela la navegación. Atrás y adelante devuelven a la posición de cada entrada
+ * cuando termina el callback, así que el DOM nuevo debe estar en su sitio para entonces.
  *
  * @param routes Manifiesto de rutas.
  * @param render Callback que renderiza cada navegación.
