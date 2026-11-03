@@ -169,10 +169,11 @@ type WrittenProps<Props> = { [K in keyof Props]?: Props[K] | undefined }
 /**
  * Check of the tag call of `is="option.component" bind="option.props"` (since 1.8). With several
  * possible values, the object of each entry is checked against its own value by
- * `checkCorrelatedBind`, so here only the explicit props, events, models and snippets are.
+ * `checkCorrelatedBind`, so here only the explicit props, events, models and snippets are; a
+ * required model may come in the object as its prop, which that check also looks for.
  * With a single value, the check of any tag.
  */
-export type CorrelatedTag<Module, Is> = 0 extends 1 & Module ? LooseTag : [Module] extends [never] ? LooseTag : true extends IsUnion<Is> ? (props: WrittenProps<PropsOf<Module>> & ExtraProps, events: NoInfer<EventNames<PropsOf<Module>>>, models: NoInfer<ModelInputs<Module>>, snippets: NoInfer<SnippetInputs<Module>>) => TagInput<ExposedOf<Module>> : ComponentTag<Module>
+export type CorrelatedTag<Module, Is> = 0 extends 1 & Module ? LooseTag : [Module] extends [never] ? LooseTag : true extends IsUnion<Is> ? (props: WrittenProps<PropsOf<Module>> & ExtraProps, events: NoInfer<EventNames<PropsOf<Module>>>, models: NoInfer<Partial<ModelInputs<Module>>>, snippets: NoInfer<SnippetInputs<Module>>) => TagInput<ExposedOf<Module>> : ComponentTag<Module>
 
 /** `componentTag` for `is` and `bind` that read the same object; see {@link CorrelatedTag}. Only in the code of the type check. */
 export function correlatedTag<Module, const Is>(component: () => Module, is: () => Is): CorrelatedTag<Module, Is> {

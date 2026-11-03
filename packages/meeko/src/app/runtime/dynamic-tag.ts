@@ -1,6 +1,6 @@
 import type { AttributeLiteralCheck, AttributeValueOf } from '../../shared/html-attribute-values'
 import type { AttributeNameOf, AttributeValue, HtmlTagName, Words } from '../../shared/html-attributes'
-import type { IsUnion, PropsOf, TagProps } from './channels'
+import type { ChannelsOf, IsUnion, PropsOf, TagProps } from './channels'
 import type { ElementOf } from './element-refs'
 import type { ExposedOf } from './expose'
 
@@ -428,8 +428,14 @@ type EntryPropErrors<S, Props, Accepted = TagProps<Props>> = [S] extends [Accept
  */
 type EntryComponentErrors<S, M> = [M] extends [{ readonly __meekoGeneric: true }] ? EntryMissingProps<S, PropsOf<M>> : EntryPropErrors<S, PropsOf<M>>
 
+/** Props of the required models of a component: `modelValue` for the unnamed one. */
+type RequiredModelProps<M> = ChannelsOf<M> extends { readonly models: infer Models } ? (Models extends object ? { [K in keyof Models]-?: {} extends Pick<Models, K> ? never : K extends 'default' ? 'modelValue' : K }[keyof Models] : never) : never
+
+/** Text of MEEK113 for each required model of the component of one entry that neither its object nor the tag passes. */
+type EntryModelErrors<S, M, Given extends string> = { [K in Exclude<RequiredModelProps<M>, keyof S | Given> & string]: `MEEK113: falta el modelo obligatorio ${K} del componente de esa entrada` }[Exclude<RequiredModelProps<M>, keyof S | Given> & string]
+
 /** Errors of the object `S` of one entry against its value of `is`, with the names of the explicit props. */
-type EntryBoundErrors<S, Is, Given extends string, M = ComponentPart<Is>, Tag extends string = RenderableTag<Is>> = [M | Tag] extends [never] ? never : EntryKeyErrors<S, M, Tag> | ([M] extends [never] ? never : [TagPart<Is>] extends [never] ? EntryComponentErrors<S & Record<Given, never>, M> : never)
+type EntryBoundErrors<S, Is, Given extends string, M = ComponentPart<Is>, Tag extends string = RenderableTag<Is>> = [M | Tag] extends [never] ? never : EntryKeyErrors<S, M, Tag> | ([M] extends [never] ? never : [TagPart<Is>] extends [never] ? EntryComponentErrors<S & Record<Given, never>, M> | EntryModelErrors<S, M, Given> : never)
 
 /** Errors of one entry: `any` checks nothing, and an absent object passes no props. */
 type EntryErrors<Is, Bound, Given extends string> = 0 extends 1 & Is ? never : 0 extends 1 & Bound ? never : Bound extends object ? EntryBoundErrors<PresentKeys<Bound>, Is, Given> : EntryBoundErrors<{}, Is, Given>

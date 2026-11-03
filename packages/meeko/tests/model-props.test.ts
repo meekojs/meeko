@@ -570,6 +570,7 @@ test('meeko check knows the prop and the event of a model, and that a required o
 	await writeFile(join(root, 'tsconfig.json'), `${JSON.stringify({ compilerOptions: { types: ['node'], paths: { '@meekojs/meeko/internal': ['../../src/internal.ts'], '@meekojs/meeko': ['../../src/index.ts'] } } })}\n`)
 	await writeFile(join(root, 'Typed.meeko'), typed)
 	await writeFile(join(root, 'Optional.meeko'), typedOptional)
+	await writeFile(join(root, 'TypedTwo.meeko'), typed)
 	const parent = (template: string, extra = ''): string => `<script lang="ts">
 import { signal } from "@meekojs/meeko";
 import type { Component } from "@meekojs/meeko";
@@ -621,6 +622,27 @@ void [props, only, events, viaRender, asComponent];`,
 		{ name: 'TypesNoHandlerInProps', source: parent(`<p>x</p>`, `const only: TypedOnly = { "onUpdate:modelValue": () => {} };\nvoid only;`), codes: ['TS2353'] },
 		{ name: 'ComponentValue', source: parent(`<component is="dynamic" bind:modelValue="name.value" on:update:modelValue="(next) => { const text: string = next; void text; }" />`, `const dynamic: Component<TypedProps> = Typed;`), codes: [] },
 		{ name: 'UnionOfModules', source: parent(`<component is="flag.value ? Typed : Optional" bind:modelValue="name.value" />`), codes: [] },
+		{
+			name: 'CorrelatedIsAndBind',
+			source: parent(`<template each:of="options" each:as="option"><component is="option.component" bind="option.props" /></template>`, `const options = [{ component: Typed, props: { modelValue: "hola", placeholder: "x" } }, { component: Optional, props: { modelValue: "adiós" } }];`),
+			codes: [],
+		},
+		{
+			name: 'CorrelatedRequiredInBoth',
+			source: parent(`<template each:of="options" each:as="option"><component is="option.component" bind="option.props" /></template>`, `import * as TypedTwo from "./TypedTwo.meeko";\nconst options = [{ component: Typed, props: { modelValue: "hola" } }, { component: TypedTwo, props: { modelValue: "adiós" } }];`),
+			codes: [],
+		},
+		{
+			name: 'CorrelatedRequiredMissing',
+			source: parent(`<template each:of="options" each:as="option"><component is="option.component" bind="option.props" /></template>`, `import * as TypedTwo from "./TypedTwo.meeko";\nconst options = [{ component: Typed, props: { placeholder: "x" } }, { component: TypedTwo, props: {} }];`),
+			codes: ['MEEK113'],
+		},
+		{
+			name: 'CorrelatedSignalNextToBind',
+			source: parent(`<template each:of="options" each:as="option"><component is="option.component" bind="option.props" model="name" /></template>`, `import * as TypedTwo from "./TypedTwo.meeko";\nconst options = [{ component: Typed, props: { placeholder: "x" } }, { component: TypedTwo, props: {} }];`),
+			codes: [],
+		},
+		{ name: 'SingleModuleInBind', source: parent(`<component is="option.component" bind="option.props" />`, `const option = { component: Typed, props: { modelValue: "hola", placeholder: "x" } };`), codes: [] },
 	]
 	try {
 		const failures: string[] = []

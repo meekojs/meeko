@@ -2745,7 +2745,7 @@ function hydrationBody(bindings: TemplateBindings, context: TemplateContext, hot
 			const correlated = entry.component.dynamicSpread?.correlated
 			const spread = entry.component.spread
 			if (correlated && spread) {
-				const given = entry.component.props.map((prop) => prop.name)
+				const given = [...entry.component.props.map((prop) => prop.name), ...entry.component.models.map((model) => modelPropName(model.name))]
 				componentStatements.push(`void (() => __meeko.checkCorrelatedBind(${mappedExpression(correlated.root, entry.referenceOffset + correlated.offset)}, ${JSON.stringify(correlated.isPath)}, ${JSON.stringify(correlated.bindPath)}, ${JSON.stringify(given)}, ${markSource('true', spread.offset, spread.expression.length)}));`)
 			}
 		}
