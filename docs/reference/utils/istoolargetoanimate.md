@@ -16,9 +16,10 @@ Las navegaciones con `viewTransitions` y `withViewTransition()` de `@meekojs/ui/
 ## Uso
 
 ```ts
+// app/utils/change.ts
 import { isTooLargeToAnimate } from "@meekojs/meeko";
 
-function change(update: () => void) {
+export function change(update: () => void) {
   if (isTooLargeToAnimate()) return update();
   const transition = document.startViewTransition(() => {
     update();
@@ -28,9 +29,58 @@ function change(update: () => void) {
 }
 ```
 
-## Detalles
+## Parámetros
 
-- Hoy el límite son 4.000 elementos en todo el documento. El valor exacto no es contrato: puede cambiar en cualquier versión.
-- Compruébalo antes de empezar y otra vez dentro del callback, porque el cambio puede traer el contenido grande. `skipTransition()` en ese momento evita los frames, y el cambio queda aplicado.
-- Contar es barato: menos de 1 ms en un documento de 24.000 elementos con la CPU limitada a ×4.
-- Solo existe en el navegador. Sin argumento lee el `document` global.
+| Parámetro | Tipo       | Por defecto | Descripción             |
+| --------- | ---------- | ----------- | ----------------------- |
+| `target`  | `Document` | `document`  | El documento que cuenta |
+
+## Valor devuelto
+
+`true` si el documento supera el límite y el cambio debe aplicarse sin animar; `false` si se puede animar.
+
+## Ejemplos
+
+### Comprobar otro documento
+
+```ts
+// app/utils/frame.ts
+import { isTooLargeToAnimate } from "@meekojs/meeko";
+
+export function canAnimateFrame(frame: HTMLIFrameElement) {
+  return frame.contentDocument !== null && !isTooLargeToAnimate(frame.contentDocument);
+}
+```
+
+## Errores comunes
+
+### Comprobar solo antes de empezar
+
+El cambio puede traer el contenido grande. La página corta empieza la transición y sus frames se pagan con la larga.
+
+```ts bad
+if (!isTooLargeToAnimate()) document.startViewTransition(showLongPanel);
+else showLongPanel();
+```
+
+Compruébalo también dentro del callback y salta la animación. El cambio queda aplicado.
+
+```ts good
+import { isTooLargeToAnimate } from "@meekojs/meeko";
+
+declare function showLongPanel(): void;
+
+if (isTooLargeToAnimate()) showLongPanel();
+else {
+  const transition = document.startViewTransition(() => {
+    showLongPanel();
+    if (isTooLargeToAnimate()) transition.skipTransition();
+  });
+}
+```
+
+## Notas
+
+- **Límite:** hoy son 4.000 elementos en todo el documento. El valor exacto no es contrato: puede cambiar en cualquier versión.
+- **Rendimiento:** contar es barato. Menos de 1 ms de mediana en un documento de 24.000 elementos con la CPU limitada a ×4.
+- **Servidor:** solo existe en el navegador. Sin argumento lee el `document` global, así que no lo llames durante el render del servidor.

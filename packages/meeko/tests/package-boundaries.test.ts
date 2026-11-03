@@ -93,6 +93,7 @@ test('the root entry exposes only the documented public runtime', async () => {
 		'createRoot',
 		'effect',
 		'inject',
+		'isTooLargeToAnimate',
 		'onCleanup',
 		'onMounted',
 		'provide',
