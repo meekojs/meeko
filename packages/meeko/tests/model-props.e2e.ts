@@ -43,6 +43,10 @@ const touched = signal(false);
 const touchedCalls = signal(0);
 const show = signal(true);
 const released = signal(0);
+const asyncValue = signal("abcd");
+const syncValue = signal("abcd");
+const saved = signal("-");
+const save = (next: string): Promise<void> => new Promise((done) => setTimeout(() => { saved.value = next; done(); }, 40));
 const resolved = signal<ResolvedComponent<"Field"> | undefined>(undefined);
 onMounted(async () => {
   resolved.value = await resolveComponent("Field", { modelValue: "diferido" });
@@ -62,6 +66,8 @@ onMounted(async () => {
     <section id="named"><Field bind:touched="touched.value" on:update:touched="(next) => { touchedCalls.value++; touched.value = next; }" /><p class="outer">{touched.value}|{touchedCalls.value}</p></section>
     <section id="is"><component is="Field" bind:modelValue="controlled.value" on:update:modelValue="(next) => controlled.value = next" /></section>
     <section id="resolved"><component if:when="resolved.value" is="resolved.value!" /></section>
+    <section id="async-parent"><Field bind:modelValue="asyncValue.value" on:update:modelValue="async (next) => { await save(next); asyncValue.value = next; }" /></section>
+    <section id="sync-parent"><Field bind:modelValue="syncValue.value" on:update:modelValue="(next) => { syncValue.value = next; void save(next); }" /><p class="outer">{saved.value}</p></section>
     <section id="released">
       <template if:when="show.value"><Field bind:modelValue="controlled.value" on:update:modelValue="() => released.value++" /></template>
       <button type="button" class="hide" on:click="() => show.value = false">h</button>
@@ -220,6 +226,29 @@ test('defineModel by prop and event in Chrome: every row of the table, in SSR, h
 		assert.equal(await input(tab, 'resolved').inputValue(), 'diferido')
 		await input(tab, 'resolved').fill('tocado')
 		assert.equal(await output(tab, 'resolved'), 'tocado|false')
+
+		// A parent that awaits before changing its prop: the control goes back meanwhile, as the prop has
+		// not changed, so the caret goes to the end and what is typed before it arrives is lost.
+		await input(tab, 'async-parent').click()
+		await input(tab, 'async-parent').evaluate((element) => (element as HTMLInputElement).setSelectionRange(2, 2))
+		await tab.keyboard.type('X')
+		assert.equal(await input(tab, 'async-parent').inputValue(), 'abcd', 'it goes back until the prop changes')
+		await tab.waitForFunction(() => (document.querySelector('#async-parent input') as HTMLInputElement).value === 'abXcd')
+		assert.equal(await input(tab, 'async-parent').evaluate((element) => (element as HTMLInputElement).selectionStart), 5, 'the caret jumps to the end')
+		await input(tab, 'async-parent').evaluate((element) => (element as HTMLInputElement).setSelectionRange(0, 0))
+		await tab.keyboard.type('12')
+		await tab.waitForTimeout(150)
+		const typedFast = await input(tab, 'async-parent').inputValue()
+		assert.notEqual(typedFast, '12abXcd', 'typing faster than the parent saves loses text')
+
+		// The same parent, changing its signal first and saving after: nothing jumps and nothing is lost.
+		await input(tab, 'sync-parent').click()
+		await input(tab, 'sync-parent').evaluate((element) => (element as HTMLInputElement).setSelectionRange(2, 2))
+		await tab.keyboard.type('XY')
+		assert.equal(await input(tab, 'sync-parent').inputValue(), 'abXYcd')
+		assert.equal(await input(tab, 'sync-parent').evaluate((element) => (element as HTMLInputElement).selectionStart), 4)
+		await tab.waitForFunction(() => document.querySelector('#sync-parent .outer')!.textContent === 'abXYcd')
+		assert.equal(await input(tab, 'sync-parent').inputValue(), 'abXYcd')
 
 		// Unmounted, it no longer calls the event.
 		await input(tab, 'released').fill('escrito')

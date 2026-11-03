@@ -364,7 +364,8 @@ const dynamicTagDeclarations = [
 ].join('\n')
 const spreadDeclarations = [
 	'declare function __meeko_spread<Tag extends string>(value: import("@meekojs/meeko").ElementAttributes<Tag> | null | undefined): void;',
-	'declare function __meeko_props_spread<M>(component: M, value: { readonly [K in keyof __MeekoPropsOf<M>]?: __MeekoPropsOf<M>[K] } | null | undefined): void;',
+	// Without the keys that `bind` rejects (MEEK113), so completion does not offer them.
+	'declare function __meeko_props_spread<M>(component: M, value: { readonly [K in keyof __MeekoPropsOf<M> as Lowercase<K & string> extends `on${string}` ? never : K]?: __MeekoPropsOf<M>[K] } | null | undefined): void;',
 	'',
 ].join('\n')
 

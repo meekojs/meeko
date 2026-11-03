@@ -23,6 +23,7 @@ import { compileError, locate, MeekoCompileError } from './compiler/parser/sfc'
 import { projectDeclarationFiles } from './compiler/project-declarations'
 import { projectRoot } from './compiler/project-root'
 import { resolveProjectAliases, resolveProjectAliasesSync } from './framework/aliases'
+import { modelPropName } from './shared/model-names'
 import { tscCommand } from './typescript-cli'
 
 const execFileAsync = promisify(execFile)
@@ -327,6 +328,31 @@ export function interfaceExtendsMessage(source: string, offset: number): string 
 	return `Una interface no puede extender ${base} porque no tiene una forma única: suele ser una unión de props, y cada variante es distinta. Escribe un tipo, que conserva todas las variantes: type ${name} = ${base} & { … }`
 }
 
+/** How a parent passes a model. */
+function modelForms(name: string): string {
+	return `${name === 'default' ? 'model' : `model:${name}`}="señal" o bind:${modelPropName(name)}="valor"`
+}
+
+/**
+ * Message of `TS2741` or `TS2739` when what a tag lacks is a required model: TypeScript names its
+ * internal key (`"default"`), and the parent writes `model` or `bind:modelValue`. `tag` is the source
+ * from the tag on. `undefined` for any other missing property.
+ */
+function missingModelMessage(message: string, tag: string): string | undefined {
+	const type = String.raw`'ComponentModels(?:<[\s\S]*>)?'`
+	const one = new RegExp(String.raw`^Property '"?([\w$]+)"?' is missing in type '[\s\S]*' but required in type ${type}\.$`).exec(message)?.[1]
+	if (one) {
+		const prop = modelPropName(one)
+		const written = tag.slice(0, Math.max(0, /\/>|<\//.exec(tag)?.index ?? 0))
+		if (new RegExp(String.raw`\bbind:${prop}\s*=`).test(written)) return `bind:${prop} admite undefined y este modelo es obligatorio: pasa un valor que no lo admita, o da a defineModel un default`
+		return `Falta el modelo obligatorio${one === 'default' ? '' : ` ${one}`} de este componente: pásalo con ${modelForms(one)}`
+	}
+	const many = new RegExp(String.raw`^Type '[\s\S]*' is missing the following properties from type ${type}: (.+)$`).exec(message)?.[1]
+	if (!many) return undefined
+	const names = many.split(', ').map((name) => name.replace(/^"|"$/g, ''))
+	return `Faltan modelos obligatorios de este componente: pásalos con ${names.map(modelForms).join(', y ')}`
+}
+
 function meekTypeMessage(code: string, text: string, source: string): string {
 	if (code === 'MEEK112' && text.endsWith('no se aplica a ninguna etiqueta posible de is')) {
 		return `${text}: Meeko no lo escribiría nunca; quítalo o añade a is una etiqueta que lo admita`
@@ -485,7 +511,7 @@ export async function checkSource(source: string, filename: string, options: Che
 				}
 				const result: CompileDiagnostic = {
 					code: diagnostic.code,
-					message: offset === undefined ? `TypeScript generado: ${diagnostic.message}` : diagnostic.code === 'TS2312' ? interfaceExtendsMessage(entry.source, offset) : diagnostic.message,
+					message: offset === undefined ? `TypeScript generado: ${diagnostic.message}` : diagnostic.code === 'TS2312' ? interfaceExtendsMessage(entry.source, offset) : ((diagnostic.code === 'TS2741' || diagnostic.code === 'TS2739' ? missingModelMessage(diagnostic.message, entry.source.slice(offset)) : undefined) ?? diagnostic.message),
 					filename: entry.original,
 					location: locate(entry.source, offset ?? 0),
 				}

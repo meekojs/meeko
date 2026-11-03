@@ -491,9 +491,20 @@ test('DevTools shows a model that follows a prop, its changes, and an edit reach
 		assert.equal(instance().signals.value, 'Grace')
 		assert.ok(hook.snapshot().events.some((event) => event.kind === 'signal' && event.instanceId === instance().id && event.detail === 'value'))
 		// An edit in the panel is a write of the child: the parent decides, and the value stays.
+		const valueEvents = (): number => hook.snapshot().events.filter((event) => event.kind === 'signal' && event.instanceId === instance().id && event.detail === 'value').length
+		const before = valueEvents()
 		assert.deepEqual(hook.setSignal(instance().id, 'value', 'edited'), { ok: true })
 		assert.equal(root.querySelector('.seen')?.textContent, 'edited')
 		assert.equal(instance().signals.value, 'Grace')
+		// The control goes back, and the value did not change: the timeline has nothing to show.
+		const typed = root.querySelector('input.inner') as unknown as HTMLInputElement
+		typed.value = 'rejected'
+		typed.dispatchEvent(new window.Event('input', { bubbles: true }) as unknown as Event)
+		assert.equal(typed.value, 'Grace')
+		assert.equal(root.querySelector('.seen')?.textContent, 'rejected')
+		assert.equal(valueEvents(), before)
+		;(root.querySelector('.rename') as unknown as HTMLElement).click()
+		assert.equal(valueEvents(), before, 'the same prop again')
 		release()
 		assert.equal(hook.snapshot().instances.length, 0)
 	} finally {
@@ -565,6 +576,45 @@ test('MEEK063: the script cannot declare the prop or the event of its model', ()
 	assert.doesNotThrow(() => compile(script(`const props = defineProps<{ touched: boolean; default: string }>();\nconst value = defineModel<string>();`), 'Models.meeko'))
 	// A wrapper with the props of what it wraps declares its own model: they are not spelled here.
 	assert.doesNotThrow(() => compile(script(`import type { InputProps } from "./types";\nconst props = defineProps<InputProps>();\nconst value = defineModel<string>({ default: "" });`), 'Models.meeko'))
+})
+
+test('a required model that is missing names how to pass it, not its internal name', { timeout: 120_000 }, async () => {
+	const parentDirectory = resolve('.meeko')
+	await mkdir(parentDirectory, { recursive: true })
+	const root = await mkdtemp(join(parentDirectory, 'model-props-message-'))
+	await writeFile(join(root, 'package.json'), '{"private":true,"type":"module"}\n')
+	await writeFile(join(root, 'tsconfig.json'), `${JSON.stringify({ compilerOptions: { types: ['node'], paths: { '@meekojs/meeko/internal': ['../../src/internal.ts'], '@meekojs/meeko': ['../../src/index.ts'] } } })}\n`)
+	await writeFile(join(root, 'One.meeko'), `<script lang="ts">\nconst value = defineModel<string>();\n</script><template><input model="value" /></template>`)
+	await writeFile(join(root, 'Named.meeko'), `<script lang="ts">\nconst open = defineModel<boolean>("open");\n</script><template><b>{open.value}</b></template>`)
+	await writeFile(join(root, 'Two.meeko'), `<script lang="ts">\nconst value = defineModel<string>();\nconst open = defineModel<boolean>("open");\n</script><template><b>{value.value}{open.value}</b></template>`)
+	await writeFile(join(root, 'Generic.meeko'), `<script lang="ts" generic="T">\nconst value = defineModel<T>();\n</script><template><b>{String(value.value)}</b></template>`)
+	const parent = (template: string): string => `<script lang="ts">\nimport * as One from "./One.meeko";\nimport * as Named from "./Named.meeko";\nimport * as Two from "./Two.meeko";\nimport * as Generic from "./Generic.meeko";\n</script><template>${template}</template>`
+	const only = async (name: string, template: string): Promise<{ code: string; message: string }> => {
+		const diagnostics = await checkSource(parent(template), join(root, `${name}.meeko`))
+		assert.equal(diagnostics.length, 1, JSON.stringify(diagnostics))
+		return { code: diagnostics[0]!.code, message: diagnostics[0]!.message }
+	}
+	try {
+		const unnamed = await only('MissingOne', `<One />`)
+		assert.equal(unnamed.code, 'TS2741')
+		assert.equal(unnamed.message, 'Falta el modelo obligatorio de este componente: pásalo con model="señal" o bind:modelValue="valor"')
+		const named = await only('MissingNamed', `<Named />`)
+		assert.equal(named.message, 'Falta el modelo obligatorio open de este componente: pásalo con model:open="señal" o bind:open="valor"')
+		const generic = await only('MissingGeneric', `<Generic />`)
+		assert.match(generic.message, /model="señal" o bind:modelValue="valor"/)
+		const both = await only('MissingTwo', `<Two />`)
+		assert.equal(both.code, 'TS2739')
+		assert.equal(both.message, 'Faltan modelos obligatorios de este componente: pásalos con model="señal" o bind:modelValue="valor", y model:open="señal" o bind:open="valor"')
+		const maybe = await only('MaybeUndefined', `<One bind:modelValue="(Math.random() > 2 ? 'x' : undefined)" />`)
+		assert.equal(maybe.code, 'TS2741')
+		assert.match(maybe.message, /^bind:modelValue admite undefined y este modelo es obligatorio/)
+		// Any other missing property keeps the words of TypeScript.
+		await writeFile(join(root, 'Prop.meeko'), `<script lang="ts">\nconst props = defineProps<{ label: string }>();\n</script><template><b>{props.label}</b></template>`)
+		const prop = (await checkSource(`<script lang="ts">\nimport * as Prop from "./Prop.meeko";\n</script><template><Prop /></template>`, join(root, 'MissingProp.meeko')))[0]
+		assert.match(prop?.message ?? '', /Property 'label' is missing/)
+	} finally {
+		await rm(root, { recursive: true, force: true })
+	}
 })
 
 test('MEEK101: reading a prop in the default of defineModel is on purpose; anywhere else it still warns', () => {

@@ -6,7 +6,7 @@ import { after, before, describe, test } from 'node:test'
 import type { LanguageProject } from './language-server-workspace.ts'
 
 import { componentDiagnostics } from '../src/language-server/diagnostics.ts'
-import { componentTagMembers, directiveNameCompletion, hover } from '../src/language-server/features.ts'
+import { completion, componentTagMembers, directiveNameCompletion, hover } from '../src/language-server/features.ts'
 import { languageProject } from './language-server-workspace.ts'
 
 const input = `<script lang="ts">
@@ -48,6 +48,23 @@ const files = {
 	'RequiredFine.meeko': parentOf(`<AppRequired bind:modelValue="name.value" /><AppRequired model="name" />`),
 	'RequiredMissing.meeko': parentOf(`<AppRequired on:update:modelValue="() => {}" />`),
 	'Unknown.meeko': parentOf(`<AppInput on:update:nope="() => {}" />`),
+	'AppEvents.meeko': `<script lang="ts">
+const value = defineModel<string>({ default: "" });
+const emit = defineEmits<{ save: [] }>();
+const props = defineProps<{ title?: string; onlyOnce?: boolean }>();
+</script>
+<template><button on:click="() => emit('save')">{props.title}{value.value}</button></template>
+`,
+	'SpreadObject.meeko': `<script lang="ts">
+import * as AppEvents from "./AppEvents.meeko";
+</script>
+<template><AppEvents bind="{  }" /></template>
+`,
+	'SpreadHandler.meeko': `<script lang="ts">
+import * as AppEvents from "./AppEvents.meeko";
+</script>
+<template><AppEvents bind="{ onSave: () => {} }" /></template>
+`,
 }
 
 describe('language server: a model by prop and event', () => {
@@ -116,6 +133,33 @@ describe('language server: a model by prop and event', () => {
 		// The parameter of an inline handler has the type of the model.
 		assert.match(shown('(next) => (name.value', 1), /next: string/)
 		assert.match(shown('(next) => (flag.value', 1), /next: boolean/)
+	})
+
+	test('inside bind="{ }" the props are offered, not the keys that bind rejects', async () => {
+		const context = await workspace.open('SpreadObject.meeko')
+		const offered = completion(context, context.at('bind="{  }"', 'bind="{ '.length))?.map((item) => item.label) ?? []
+		assert.ok(offered.includes('title') && offered.includes('modelValue'), offered.join())
+		assert.deepEqual(
+			offered.filter((label) => /^["']?on/i.test(label)),
+			[],
+		)
+	})
+
+	test('a handler written in bind="{ }" gives one error, MEEK113', async () => {
+		const context = await workspace.open('SpreadHandler.meeko')
+		const found = await componentDiagnostics(workspace.project, context.document, workspace.file('SpreadHandler.meeko'), () => undefined)
+		assert.deepEqual(
+			found.map((diagnostic) => diagnostic.code).filter((code) => code !== 'TS2591'),
+			['MEEK113'],
+		)
+	})
+
+	test('the editor names how to pass a required model', async () => {
+		const context = await workspace.open('RequiredMissing.meeko')
+		const found = await componentDiagnostics(workspace.project, context.document, workspace.file('RequiredMissing.meeko'), () => undefined)
+		const missing = found.find((diagnostic) => diagnostic.code === 'TS2741')
+		assert.match(missing?.message ?? '', /model="señal" o bind:modelValue="valor"/)
+		assert.doesNotMatch(missing?.message ?? '', /default/)
 	})
 
 	test('the editor agrees with meeko check', async () => {

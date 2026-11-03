@@ -479,13 +479,15 @@ export function registerDevtoolsInstance(input: DevtoolsRegistration): () => voi
 		if (shared) shared.push(binding)
 		else bindingsBySignal.set(signal, [binding])
 		let initial = true
+		let shown: unknown
 		entry.stopSignals.push(
 			effect(() => {
 				const current = signal.value
-				if (initial) {
-					initial = false
-					return
-				}
+				// A model whose write the parent rejected notifies its readers with the same value.
+				const changed = !initial && !Object.is(shown, current)
+				initial = false
+				shown = current
+				if (!changed) return
 				record('signal', entry.id, name, safeValue(current), entry, signalReadSites(signal, entry.owner), writeSiteFor(signal, current))
 				if (entry.breakpoint) {
 					// eslint-disable-next-line no-debugger -- DevTools signal breakpoints pause here on purpose.
