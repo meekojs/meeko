@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 
+import { createFixture } from '../../../scripts/test-support/fixture.ts'
 import { createI18n } from '../dist/index.js'
 import { compileCatalog, messageParameters } from '../dist/messages.js'
 
@@ -61,8 +62,8 @@ test('consumer types require the generated parameters and reject incorrect plura
 test('external module generates typed keys, builds SSR, and removes its types when disabled', async () => {
 	const packageRoot = fileURLToPath(new URL('..', import.meta.url))
 	const temporary = join(packageRoot, '.meeko', 'tests')
-	await mkdir(temporary, { recursive: true })
-	const root = await mkdtemp(join(temporary, 'consumer-'))
+	const fixture = await createFixture(null, temporary, 'consumer-', { links: { '@meekojs/i18n': packageRoot } })
+	const { root } = fixture
 	const cli = fileURLToPath(new URL('./cli.js', import.meta.resolve('@meekojs/meeko')))
 	async function put(path, contents) {
 		const file = join(root, path)
@@ -74,8 +75,6 @@ test('external module generates typed keys, builds SSR, and removes its types wh
 	}
 	try {
 		await put('package.json', '{"type":"module","private":true}')
-		await mkdir(join(root, 'node_modules', '@meekojs'), { recursive: true })
-		await symlink(packageRoot, join(root, 'node_modules', '@meekojs', 'i18n'), 'junction')
 		// The documented form since Meeko 1.8: the module by its name, its options in its configKey.
 		await put('meeko.config.mjs', 'export default { modules: ["@meekojs/i18n"], i18n: { defaultLocale: "es", catalogs: { es: "es.json" } } };')
 		await put('es.json', '{"hello":"Hola {name}"}')
@@ -109,15 +108,15 @@ test('external module generates typed keys, builds SSR, and removes its types wh
 		await run('check')
 		await assert.rejects(readFile(types), { code: 'ENOENT' })
 	} finally {
-		await rm(root, { recursive: true, force: true })
+		await fixture.cleanup()
 	}
 })
 
 test('<I18nT>, multilingual namespaces, usePageI18n and og:locale work in a real build, with their types checked', { timeout: 300_000 }, async () => {
 	const packageRoot = fileURLToPath(new URL('..', import.meta.url))
 	const temporary = join(packageRoot, '.meeko', 'tests')
-	await mkdir(temporary, { recursive: true })
-	const root = await mkdtemp(join(temporary, 'rich-app-'))
+	const fixture = await createFixture(null, temporary, 'rich-app-', { links: { '@meekojs/i18n': packageRoot } })
+	const { root } = fixture
 	const cli = fileURLToPath(new URL('./cli.js', import.meta.resolve('@meekojs/meeko')))
 	const env = { ...process.env, NODE_OPTIONS: '--max-old-space-size=8192' }
 	async function put(path, contents) {
@@ -132,8 +131,6 @@ test('<I18nT>, multilingual namespaces, usePageI18n and og:locale work in a real
 	const page = (template) => `<script lang="ts">const i18n = useI18n();</script><template>${template}</template>`
 	try {
 		await put('package.json', '{"type":"module","private":true}')
-		await mkdir(join(root, 'node_modules', '@meekojs'), { recursive: true })
-		await symlink(packageRoot, join(root, 'node_modules', '@meekojs', 'i18n'), 'junction')
 		await put('locales/es/common.json', '{"built":"Hecho con <code>.meeko</code> por {name}.","title":"Título de {name}","plain":"Texto"}')
 		await put('locales/en/common.json', '{"built":"Made by {name} with <code>.meeko</code>.","title":"Title of {name}","plain":"Text"}')
 		await put('locales/es/suggestion.json', '{"suggestion":{"go":"Leer en español"}}')
@@ -216,16 +213,17 @@ export const head = { title: i18n.t("plain") };
 		assert.match(without, /<html[^>]* lang="en"/)
 		assert.match(without, /hreflang="es"/)
 	} finally {
-		await rm(root, { recursive: true, force: true })
+		await fixture.cleanup()
 	}
 })
 
 test('prefix_except_default generates /en routes from the same pages, with lang, hreflang, lazy and global namespaces and a localized sitemap', { timeout: 240_000 }, async () => {
 	const packageRoot = fileURLToPath(new URL('..', import.meta.url))
 	const temporary = join(packageRoot, '.meeko', 'tests')
-	await mkdir(temporary, { recursive: true })
-	const root = await mkdtemp(join(temporary, 'localized-'))
-	const shell = await mkdtemp(join(temporary, 'shell-'))
+	const fixture = await createFixture(null, temporary, 'localized-', { links: { '@meekojs/i18n': packageRoot } })
+	const { root } = fixture
+	const shellFixture = await createFixture(null, temporary, 'shell-')
+	const { root: shell } = shellFixture
 	const cli = fileURLToPath(new URL('./cli.js', import.meta.resolve('@meekojs/meeko')))
 	async function put(path, contents) {
 		const file = join(root, path)
@@ -247,13 +245,11 @@ test('prefix_except_default generates /en routes from the same pages, with lang,
 	}
 	try {
 		await put('package.json', '{"type":"module","private":true}')
-		await mkdir(join(root, 'node_modules', '@meekojs'), { recursive: true })
-		await symlink(packageRoot, join(root, 'node_modules', '@meekojs', 'i18n'), 'junction')
 		// A shared shell linked by pnpm: its catalogs really live outside the project.
 		await mkdir(join(shell, 'locales'), { recursive: true })
 		await writeFile(join(shell, 'locales', 'es.json'), '{"shell":{"menu":"Menú"}}')
 		await writeFile(join(shell, 'locales', 'en.json'), '{"shell":{"menu":"Menu"}}')
-		await symlink(shell, join(root, 'node_modules', 'shared-shell'), 'junction')
+		await fixture.link('shared-shell', shell)
 		// A path written outside the project is still rejected.
 		await put('meeko.config.mjs', 'export default { modules: ["@meekojs/i18n"], i18n: { defaultLocale: "es", catalogs: { es: "../outside.json" } } };')
 		await writeFile(join(temporary, 'outside.json'), '{}')
@@ -362,8 +358,8 @@ test('prefix_except_default generates /en routes from the same pages, with lang,
 		assert.match(sitemap, /<url><loc>https:\/\/i18n\.test\/admin\/users<\/loc><\/url>/)
 		assert.match(sitemap, /<url><loc>https:\/\/i18n\.test\/en\/admin\/users<\/loc><\/url>/)
 	} finally {
-		await rm(root, { recursive: true, force: true })
-		await rm(shell, { recursive: true, force: true })
+		await fixture.cleanup()
+		await shellFixture.cleanup()
 		await rm(join(temporary, 'outside.json'), { force: true })
 	}
 })

@@ -1,6 +1,7 @@
 param(
   [ValidateSet('win32-x64', 'win32-arm64', 'linux-x64', 'linux-arm64', 'darwin-x64', 'darwin-arm64')]
-  [string] $Target
+  [string] $Target,
+  [switch] $SkipBuild
 )
 
 $ErrorActionPreference = 'Stop'
@@ -35,10 +36,17 @@ if ($typescriptManifest.optionalDependencies.PSObject.Properties.Name -notcontai
 
 try {
   Push-Location $extensionRoot
-  & pnpm run check
-  if ($LASTEXITCODE -ne 0) { throw 'Falló la comprobación de tipos.' }
-  & pnpm run build
-  if ($LASTEXITCODE -ne 0) { throw 'Falló la compilación de la extensión.' }
+  if (!$SkipBuild) {
+    & pnpm run check
+    if ($LASTEXITCODE -ne 0) { throw 'Falló la comprobación de tipos.' }
+    & pnpm run build
+    if ($LASTEXITCODE -ne 0) { throw 'Falló la compilación de la extensión.' }
+  }
+  foreach ($entry in @('dist/extension.js', 'dist/server.js')) {
+    if (!(Test-Path -LiteralPath (Join-Path $extensionRoot $entry) -PathType Leaf)) {
+      throw "Falta $entry; ejecuta check y build antes de usar -SkipBuild."
+    }
+  }
 
   New-Item -ItemType Directory -Path $stagingRoot -Force | Out-Null
   foreach ($name in @('package.json', 'README.md', 'CHANGELOG.md', 'language-configuration.json', '.vscodeignore')) {

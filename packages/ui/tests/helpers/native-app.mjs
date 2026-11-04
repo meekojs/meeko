@@ -1,8 +1,7 @@
-import { spawn } from 'node:child_process'
-import { mkdir, mkdtemp, rm, symlink, unlink, writeFile } from 'node:fs/promises'
-import { createServer } from 'node:net'
-import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+
+import { startDevServer } from '../../../../scripts/test-support/dev-server.ts'
+import { createFixture } from '../../../../scripts/test-support/fixture.ts'
 
 const packageRoot = fileURLToPath(new URL('../..', import.meta.url))
 const viteRoot = fileURLToPath(new URL('../../../meeko/node_modules/vite', import.meta.url))
@@ -133,17 +132,7 @@ const route = "import { definePage } from '@meekojs/meeko/framework'\nexport con
 /** A throwaway application of its own, removed afterwards, that uses the built package. `extraFiles` adds pages of a test. */
 export async function createNativeApp(context, extraFiles = {}) {
 	const parent = fileURLToPath(new URL('../../.meeko/', import.meta.url))
-	await mkdir(parent, { recursive: true })
-	const root = await mkdtemp(join(parent, 'native-'))
 	const links = { '@meekojs/ui': packageRoot, vite: viteRoot }
-	const linkPaths = Object.keys(links).map((target) => join(root, 'node_modules', target))
-	let stop = async () => {}
-	// The links go first, so removing the application never walks into the packages.
-	context.after(async () => {
-		await stop()
-		for (const link of linkPaths) await unlink(link).catch(() => undefined)
-		await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
-	})
 	const config = { modules: ['@meekojs/ui'], theme: true, viewTransitions: true, server: { adapter: 'static' } }
 	const files = {
 		'package.json': JSON.stringify({ name: 'native-fixture', private: true, type: 'module' }),
@@ -160,42 +149,9 @@ export async function createNativeApp(context, extraFiles = {}) {
 		'app/pages/route-b.route.ts': route,
 		...extraFiles,
 	}
-	for (const [file, source] of Object.entries(files)) {
-		await mkdir(dirname(join(root, file)), { recursive: true })
-		await writeFile(join(root, file), source)
-	}
-	for (const [target, source] of Object.entries(links)) {
-		await mkdir(dirname(join(root, 'node_modules', target)), { recursive: true })
-		await symlink(source, join(root, 'node_modules', target), 'junction')
-	}
-	const free = async () => {
-		const server = createServer().listen(0, '127.0.0.1')
-		await new Promise((done) => server.once('listening', done))
-		const { port } = server.address()
-		await new Promise((done) => server.close(done))
-		return port
-	}
-	const httpPort = process.env.MEEKO_FIXTURE_PORT ?? (await free())
-	const server = spawn(process.execPath, [cli, 'dev', root], { cwd: root, env: { ...process.env, NODE_OPTIONS: '--max-old-space-size=8192', PORT: String(httpPort), MEEKO_HMR_PORT: String(await free()), MEEKO_EDITOR_BRIDGE: '0' }, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
-	stop = async () => {
-		if (server.exitCode !== null) return
-		const exited = new Promise((done) => server.once('exit', done))
-		server.kill()
-		await exited
-	}
-	let logs = ''
-	server.stdout.on('data', (chunk) => (logs += chunk))
-	server.stderr.on('data', (chunk) => (logs += chunk))
-	const origin = `http://127.0.0.1:${httpPort}`
-	const started = Date.now()
-	while (true) {
-		if (server.exitCode !== null || Date.now() - started > 60_000) throw new Error(logs)
-		try {
-			if ((await fetch(origin)).ok) break
-		} catch {
-			/* Server is starting. */
-		}
-		await new Promise((done) => setTimeout(done, 100))
-	}
-	return { origin, root, logs: () => logs }
+	const fixture = await createFixture(context, parent, 'native-', { files, links })
+	const { root } = fixture
+	const { origin, logs, stop } = await startDevServer({ root, cli, port: process.env.MEEKO_FIXTURE_PORT ? Number(process.env.MEEKO_FIXTURE_PORT) : undefined })
+	fixture.setStop(stop)
+	return { origin, root, logs }
 }
