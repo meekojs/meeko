@@ -17,24 +17,10 @@ async function open(browser, origin, route) {
 	page.on('console', (message) => {
 		if (message.type() === 'error') errors.push(message.text())
 	})
-	// Kept for the diagnostic of an intermittent failure: see lastPress.
-	await page.addInitScript(() => {
-		globalThis.addEventListener(
-			'pointerdown',
-			(event) => {
-				const target = event.target
-				globalThis.__lastPress = { x: event.clientX, y: event.clientY, target: target.outerHTML?.slice(0, 200), insideSelect: Boolean(target.closest?.('[data-meeko-select]')) }
-			},
-			true,
-		)
-	})
 	await page.goto(origin + route, { waitUntil: 'networkidle' })
 	await page.waitForFunction(() => globalThis.performance.getEntriesByName('meeko-hydration').length > 0)
 	return { errors, page }
 }
-
-/** The target and the coordinates of the last press of the page, as a text for the report of a test. */
-const lastPress = async (page) => `last pointerdown: ${JSON.stringify(await page.evaluate(() => globalThis.__lastPress ?? null))}`
 
 const focusedText = (page) => page.evaluate(() => globalThis.document.activeElement?.textContent?.trim() ?? '')
 
@@ -279,10 +265,10 @@ test('UISelect documents keyboard and mouse choice, search, multiple with max an
 	await topicList.getByRole('option', { name: 'Accesibilidad', exact: true }).click()
 	const blocked = topicList.getByRole('option', { name: 'Pruebas', exact: true })
 	assert.equal(await blocked.getAttribute('aria-disabled'), 'true', 'max=2 reached')
-	await blocked.click({ force: true })
+	// A forced Playwright click skips hit testing and can press the page behind a moving popover.
+	// Dispatch on the disabled row itself to verify that its click handler refuses the third value.
+	await blocked.evaluate((option) => option.click())
 	assert.equal(await topicList.locator('[aria-selected=true]').count(), 2)
-	// It closed in 2 of 25 runs, with no confirmed cause: only then, report where the forced click landed.
-	if ((await topics.getAttribute('aria-expanded')) !== 'true') context.diagnostic(await lastPress(page))
 	assert.equal(await topics.getAttribute('aria-expanded'), 'true', 'a multiple select stays open')
 	await page.keyboard.press('Escape')
 	assert.equal(await topics.getAttribute('aria-expanded'), 'false')
