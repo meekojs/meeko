@@ -14,6 +14,7 @@ types:
   - "@meekojs/meeko/framework#PageCache"
   - "@meekojs/meeko/framework#SitemapEntry"
 related:
+  - docs/como-elegir.md
   - "syntax:script-server"
   - "@meekojs/meeko/framework#usePage"
   - "@meekojs/meeko/framework#defineGroup"
@@ -56,19 +57,19 @@ Una petición a `/users/abc` no supera el schema y responde `400` antes de ejecu
 
 ## Opciones
 
-| Opción | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `params` | `PageSchema` (Standard Schema) | segmentos como texto | Valida los segmentos dinámicos (`[id]`) antes de `load` y del código de nivel superior. Una entrada inválida responde `400`. Sin schema, `params` es `Readonly<Record<string, string>>`. |
-| `search` | `PageSchema` | claves como texto | Valida la query string igual. Sin schema, cada clave es un texto, o una lista si se repite. |
-| `render` | `"ssr" \| "stream" \| "prerender" \| "client"` | `"ssr"` | Cómo llega la página al navegador (véase [Modos de render](/docs/framework#modos-de-render)). **Debe ser un literal.** |
-| `prerenderEntries` | `Record<string, string>[]` o `() => Promise<…>` | ninguno | Los `params` de cada URL que `meeko build` prerenderiza en una ruta dinámica con `render: "prerender"`. Una ruta estática no lo necesita; `"ssr"` y `"stream"` lo ignoran; con `"client"` es un error. |
-| `load` | `(context: PageLoadContext) => D \| Promise<D>` | ninguno | Loader. Lo que devuelve llega a la página como `props.data`, que pasa a ser obligatorio. Puede devolver un `Response` para redirigir y valores `defer`. No se combina con código de nivel superior en el bloque. |
-| `head` | `(context & { data }) => PageHead` | ninguno | `title`, `description` y las etiquetas de `useHead`, con los datos del loader. Gana a `useHead` y al `document` de la configuración. |
-| `layout` | nombre de un layout, o `false` | el de `+group.ts`, o `default` | Desde `1.5`. Layout con nombre de `app/layouts/<nombre>.meeko`; `false` deja sólo `app/app.meeko`. **Debe ser un literal.** |
-| `layoutProps` | `Props` del layout, o una función que las calcula | ninguno | Desde `1.5`. Props para el layout, tipadas contra el que elige `layout`. Viajan en el payload: deben poder serializarse en JSON. |
-| `middleware` | nombres de `app/middleware`, o `false` | los heredados | Desde `1.6`. Middleware con nombre que la página añade a los globales y a los de sus `+group.ts`; `false` quita los heredados. **Debe ser un array literal.** |
-| `cache` | `PageCache`: `{ etag?, maxAge?, staleWhileRevalidate?, memory? }` | sin caché | Desde `1.7`. Caché HTTP de una página `"ssr"` o `"stream"`. `etag(ctx)` devuelve la versión del contenido antes del loader; si coincide con `If-None-Match`, la respuesta es `304` sin loader ni render. `maxAge` y `staleWhileRevalidate` (segundos) escriben `Cache-Control: public, …`. `memory` (`true` o `{ maxEntries, maxBytes }`, por defecto 1000 entradas y 32 MiB) guarda el HTML y el payload en una LRU por ruta y proceso, y necesita `etag`. Sólo en producción y sin sesión. No existe con `"client"`. |
-| `sitemapEntries` | `SitemapEntry[]` o `(context) => SitemapEntry[] \| Promise<…>` | ninguno | Desde `1.7`. Las URL de la ruta en `sitemap.xml`: `{ params, lastmod?, changefreq?, priority? }`. `meeko build` la evalúa una vez, después de prerenderizar, con `{ env, prerendering: true }`. Con `"prerender"` sólo añade campos a las páginas prerenderizadas. No existe con `"client"`. |
+| Opción             | Tipo                                                              | Por defecto                    | Descripción                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ------------------ | ----------------------------------------------------------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `params`           | `PageSchema` (Standard Schema)                                    | segmentos como texto           | Valida los segmentos dinámicos (`[id]`) antes de `load` y del código de nivel superior. Una entrada inválida responde `400`. Sin schema, `params` es `Readonly<Record<string, string>>`.                                                                                                                                                                                                                                                                                                                               |
+| `search`           | `PageSchema`                                                      | claves como texto              | Valida la query string igual. Sin schema, cada clave es un texto, o una lista si se repite.                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `render`           | `"ssr" \| "stream" \| "prerender" \| "client"`                    | `"ssr"`                        | Cómo llega la página al navegador (véase [Modos de render](/docs/framework#modos-de-render)). **Debe ser un literal.**                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `prerenderEntries` | `Record<string, string>[]` o `() => Promise<…>`                   | ninguno                        | Los `params` de cada URL que `meeko build` prerenderiza en una ruta dinámica con `render: "prerender"`. Una ruta estática no lo necesita; `"ssr"` y `"stream"` lo ignoran; con `"client"` es un error.                                                                                                                                                                                                                                                                                                                 |
+| `load`             | `(context: PageLoadContext) => D \| Promise<D>`                   | ninguno                        | Loader. Lo que devuelve llega a la página como `props.data`, que pasa a ser obligatorio. Puede devolver un `Response` para redirigir y valores `defer`. No se combina con código de nivel superior en el bloque.                                                                                                                                                                                                                                                                                                       |
+| `head`             | `(context & { data }) => PageHead`                                | ninguno                        | `title`, `description` y las etiquetas de `useHead`, con los datos del loader. Gana a `useHead` y al `document` de la configuración.                                                                                                                                                                                                                                                                                                                                                                                   |
+| `layout`           | nombre de un layout, o `false`                                    | el de `+group.ts`, o `default` | Desde `1.5`. Layout con nombre de `app/layouts/<nombre>.meeko`; `false` deja sólo `app/app.meeko`. **Debe ser un literal.**                                                                                                                                                                                                                                                                                                                                                                                            |
+| `layoutProps`      | `Props` del layout, o una función que las calcula                 | ninguno                        | Desde `1.5`. Props para el layout, tipadas contra el que elige `layout`. Viajan en el payload: deben poder serializarse en JSON.                                                                                                                                                                                                                                                                                                                                                                                       |
+| `middleware`       | nombres de `app/middleware`, o `false`                            | los heredados                  | Desde `1.6`. Middleware con nombre que la página añade a los globales y a los de sus `+group.ts`; `false` quita los heredados. **Debe ser un array literal.**                                                                                                                                                                                                                                                                                                                                                          |
+| `cache`            | `PageCache`: `{ etag?, maxAge?, staleWhileRevalidate?, memory? }` | sin caché                      | Desde `1.7`. Caché HTTP de una página `"ssr"` o `"stream"`. `etag(ctx)` devuelve la versión del contenido antes del loader; si coincide con `If-None-Match`, la respuesta es `304` sin loader ni render. `maxAge` y `staleWhileRevalidate` (segundos) escriben `Cache-Control: public, …`. `memory` (`true` o `{ maxEntries, maxBytes }`, por defecto 1000 entradas y 32 MiB) guarda el HTML y el payload en una LRU por ruta y proceso, y necesita `etag`. Sólo en producción y sin sesión. No existe con `"client"`. |
+| `sitemapEntries`   | `SitemapEntry[]` o `(context) => SitemapEntry[] \| Promise<…>`    | ninguno                        | Desde `1.7`. Las URL de la ruta en `sitemap.xml`: `{ params, lastmod?, changefreq?, priority? }`. `meeko build` la evalúa una vez, después de prerenderizar, con `{ env, prerendering: true }`. Con `"prerender"` sólo añade campos a las páginas prerenderizadas. No existe con `"client"`.                                                                                                                                                                                                                           |
 
 Con `render: "client"`, `load` y `head` se ejecutan en el navegador y reciben `ClientPageLoadContext` (sin `request` ni `context`).
 
@@ -239,6 +240,7 @@ export const route = definePage({ render: mode });
 `meeko check` y `meeko build` se detienen con `render debe ser un literal de texto para que Meeko pueda leerlo durante el build`, con el archivo. Lo mismo vale para `layout` y `middleware`.
 
 <!-- no-check -->
+
 ```ts good
 export const route = definePage({ render: "prerender" });
 ```
@@ -253,6 +255,7 @@ export const route = definePage({ render: "prerender" });
 `meeko check` no lo detecta, pero `meeko build` se detiene con `Dynamic prerender route /blog/[slug] requires prerenderEntries`: no sabe qué URL generar.
 
 <!-- no-check -->
+
 ```ts good
 export const route = definePage({ render: "prerender", prerenderEntries: async () => (await listPosts()).map((post) => ({ slug: post.slug })) });
 ```
@@ -268,6 +271,7 @@ export const route = definePage({ render: "client", prerenderEntries: [{ slug: "
 Es un error de tipos (`prerenderEntries?: never`), `meeko check` lo rechaza con `una página render: "client" no se puede prerenderizar; quita prerenderEntries o usa render: "prerender"` y, si llegara a ejecutarse, `definePage` lanza un `TypeError` con el mismo mensaje en inglés.
 
 <!-- no-check -->
+
 ```ts good
 export const route = definePage({ render: "prerender", prerenderEntries: [{ slug: "a" }] });
 ```
@@ -356,6 +360,7 @@ export const route = definePage({ cache: { memory: true, maxAge: 60 } });
 `meeko check` no lo detecta: al cargar el módulo, `definePage` lanza `TypeError: definePage: cache.memory needs cache.etag, which tells when a stored page changed`. Lo mismo pasa con un número de segundos negativo o decimal (`cache.maxAge must be a whole number of seconds`).
 
 <!-- no-check -->
+
 ```ts good
 export const route = definePage({ cache: { etag: () => contentVersion(), memory: true, maxAge: 60 } });
 ```
@@ -371,6 +376,7 @@ export const route = definePage({ render: "client", cache: { maxAge: 60 }, sitem
 `meeko check` da `TS2769: No overload matches this call` con `Type '{ maxAge: 60; }' is not assignable to type 'never'`. Con `sitemapEntries`, el descubrimiento de rutas se detiene además con `una página render: "client" no declara sitemapEntries, porque sus opciones llegan al navegador; quítalo o usa otro modo de render`, y `definePage` lanza en ejecución `TypeError: render: "client" has no server cache; remove cache or render the page on the server`.
 
 <!-- no-check -->
+
 ```ts good
 export const route = definePage({ render: "ssr", cache: { etag: () => contentVersion(), maxAge: 60 } });
 ```
@@ -384,6 +390,7 @@ export const route = definePage({ layout: "admin", middleware: ["auth"] });
 `meeko check`, `meeko dev` y `meeko build` se detienen con `el layout "admin" no existe; crea app/layouts/admin.meeko (layouts disponibles: "default")` o `el middleware "auth" no existe; crea app/middleware/auth.ts con defineRouteMiddleware(..., { global: false })…`.
 
 <!-- no-check -->
+
 ```ts good
 // con app/layouts/admin.meeko y app/middleware/auth.ts
 export const route = definePage({ layout: "admin", middleware: ["auth"] });

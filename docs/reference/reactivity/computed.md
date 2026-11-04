@@ -37,9 +37,9 @@ Al asignar `items.value`, `total` se recalcula y la plantilla muestra el nuevo i
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `fn` | `() => T` | obligatorio | Función pura que lee señales y devuelve el valor. Se ejecuta en cuanto se crea el `computed` y de nuevo con cada cambio de las señales que leyó en su última ejecución. |
+| Parámetro | Tipo      | Por defecto | Descripción                                                                                                                                                             |
+| --------- | --------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fn`      | `() => T` | obligatorio | Función pura que lee señales y devuelve el valor. Se ejecuta en cuanto se crea el `computed` y de nuevo con cada cambio de las señales que leyó en su última ejecución. |
 
 ## Valor devuelto
 
@@ -117,6 +117,7 @@ double.value = 10;
 `meeko check` da `TS2540: Cannot assign to 'value' because it is a read-only property`. En ejecución, desde `1.7`, la asignación lanza `TypeError: Meeko computed values are read-only: change the signals it reads, or use a signal`, también en JavaScript sin tipos (hasta `1.6` sobrescribía el valor hasta el siguiente recálculo). Escribe la señal de origen:
 
 <!-- no-check -->
+
 ```ts good
 count.value = 5; // double.value pasa a 10
 ```
@@ -135,6 +136,7 @@ const total = computed(() => {
 En el SSR con Node 24 lanza `ReferenceError: localStorage is not defined`, y en el navegador escribe en cada recálculo, también en pasadas que se descartan. Calcula en el `computed` y escribe fuera, en un [`effect`](/docs/reference/effect) o con [`useStorage`](/docs/reference/usestorage):
 
 <!-- no-check -->
+
 ```ts good
 const total = computed(() => price.value * quantity.value);
 effect(() => localStorage.setItem("total", String(total.value)));
@@ -149,6 +151,7 @@ const user = computed(async () => (await fetch(`/api/users/${id.value}`)).json()
 No da error, pero `user.value` es una `Promise`, no los datos, y las lecturas posteriores al `await` no se registran. Para datos del servidor usa [`useApi`](/docs/reference/use-api) o [`useRpcQuery`](/docs/reference/use-rpc-query), que se recargan al cambiar sus señales:
 
 <!-- no-check -->
+
 ```ts good
 const user = useApi("/api/users/[id]", () => ({ params: { id: id.value } }));
 ```
@@ -167,6 +170,7 @@ batch(() => {
 Lee el resultado después de `batch`, o calcula a partir de las señales que acabas de escribir:
 
 <!-- no-check -->
+
 ```ts good
 batch(() => { count.value = 5; });
 console.log(double.value); // 10

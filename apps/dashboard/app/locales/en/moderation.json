@@ -1,0 +1,146 @@
+{
+	"moderation": {
+		"title": "Moderation",
+		"description": "Hide or feature pages of each web and publish announcements in its header, in one language or in all of them. It applies without publishing a snapshot.",
+		"delay": "The webs apply it in less than 30 s, without publishing or restarting.",
+		"tabRules": {
+			"plural": "count",
+			"forms": {
+				"one": "{count} rule",
+				"other": "{count} rules"
+			}
+		},
+		"tabLive": {
+			"plural": "count",
+			"forms": {
+				"one": "{count} announcement",
+				"other": "{count} announcements"
+			}
+		},
+		"filterLabel": "Filter by language",
+		"filter": "Show what readers see in",
+		"filterHint": "Each language sees its own rules and announcements and those of every language.",
+		"pages": "Pages",
+		"known": {
+			"plural": "count",
+			"forms": {
+				"one": "{count} known page in {site}",
+				"other": "{count} known pages in {site}"
+			}
+		},
+		"groups": {
+			"sources": "Sources",
+			"snapshot": "Only in the snapshot (generated reference)"
+		},
+		"actions": {
+			"hide": "Hidden",
+			"feature": "Featured"
+		},
+		"tones": {
+			"info": "Information",
+			"success": "News",
+			"warning": "Warning",
+			"danger": "Incident"
+		},
+		"states": {
+			"live": "Live",
+			"scheduled": "Scheduled",
+			"ended": "Ended",
+			"inactive": "Inactive"
+		},
+		"columns": {
+			"site": "Web",
+			"page": "Page",
+			"locale": "Language",
+			"rule": "Rule",
+			"reason": "Reason",
+			"author": "Author",
+			"date": "Date",
+			"actions": "Actions",
+			"message": "Message",
+			"tone": "Tone",
+			"validity": "Validity",
+			"state": "Status"
+		},
+		"rule": {
+			"change": "Change the rule",
+			"hide": "Hide the page…",
+			"feature": "Feature the page",
+			"hideShort": "Hide",
+			"featureShort": "Feature",
+			"choosePage": "Choose a page.",
+			"reasonTooLong": "The reason has more than {max} characters.",
+			"everyLanguage": "{path} and {enPath}",
+			"hideTitle": "Hide {title}?",
+			"hideText": "{where} will answer 404 on {site} and leave the navigation. Removing the rule brings it back.",
+			"hideTextSite": "{where} will answer 404 on {site} and leave the navigation, the search, the sitemap and llms.txt. Removing the rule brings it back.",
+			"hideConfirm": "Hide the page",
+			"saved": "{action}: {title} ({locale}). {delay}",
+			"removeTitle": "Remove the rule of {title}?",
+			"removeHidden": "{path} exists again on {site}: its page, the navigation and the search.",
+			"removeFeatured": "{path} is no longer shown as featured.",
+			"removeConfirm": "Remove the rule",
+			"removed": "Rule removed: {title}. {delay}",
+			"pagePlaceholder": "Search by title or path…",
+			"reasonPlaceholder": "Optional: why, for the rest of the team",
+			"clear": "Clear",
+			"existing": "This page already has a rule in that language ({action}, by {author}): saving replaces it.",
+			"notSaved": "The rule was not saved",
+			"empty": "No rules: the web shows all its pages and features none.",
+			"caption": "Rules of {site}",
+			"gone": "Page that no longer exists",
+			"edit": "Change",
+			"remove": "Remove",
+			"ofPath": "the rule of {path}"
+		},
+		"announcements": "Announcements",
+		"announcementsHint": "In the header of {site}; each reader can close them.",
+		"announcement": {
+			"counter": "{length} of {max} characters",
+			"placeholder": "Write the message to see the announcement.",
+			"tooLong": "The message has more than {max} characters.",
+			"badDate": "One of the dates is not valid.",
+			"created": "Announcement #{id} created: {state}. {delay}",
+			"saved": "Announcement #{id} saved: {state}. {delay}",
+			"activated": "Announcement #{id} activated. {delay}",
+			"deactivated": "Announcement #{id} deactivated. {delay}",
+			"deleteTitle": "Delete announcement #{id}?",
+			"deleteText": "It disappears from the web and from the history. To stop showing it without losing it, deactivate it.",
+			"deleteConfirm": "Delete the announcement",
+			"deleted": "Announcement #{id} deleted. {delay}",
+			"new": "New announcement",
+			"editing": "Editing announcement #{id}",
+			"start": "Start",
+			"end": "End",
+			"datesHint": "Optional, in your local time. Without a start it shows now; without an end, until you deactivate it.",
+			"active": "Active",
+			"notSaved": "The announcement was not saved",
+			"create": "Create announcement",
+			"save": "Save changes",
+			"empty": "Clear",
+			"cancelEdit": "Cancel editing",
+			"none": "No announcements on this web.",
+			"caption": "Announcements of {site}, newest first",
+			"edit": "Edit",
+			"deactivate": "Deactivate",
+			"activate": "Activate",
+			"delete": "Delete",
+			"ofId": "announcement #{id}"
+		},
+		"validity": {
+			"now": "Now",
+			"noEnd": "no end",
+			"none": "No dates"
+		},
+		"preview": {
+			"title": "Preview",
+			"inactive": "Inactive: it will not show until you activate it.",
+			"ended": "Its end has passed: it will not show.",
+			"from": "It will show from {date}.",
+			"until": "It shows now, until {date}.",
+			"now": "It shows now, with no end date."
+		},
+		"notChanged": "The change was not made",
+		"applying": "Applying…"
+	}
+}

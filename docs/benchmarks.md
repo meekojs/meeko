@@ -29,15 +29,15 @@ Las columnas de tiempo expresan la **mediana** de nueve rondas y, entre parénte
 
 Windows 11 `10.0.26300`, Intel Core Ultra 9 285K, Node 24.21.0, Chrome 155.0.8059.85, Vue 3.5.44, esbuild 0.28.2. Revisión base `02096fc` con cambios locales aún sin commit; orden de esta corrida: Vue → Meeko. Se repitió con el compilador y la transferencia de estado finales. Una segunda corrida invirtió el orden: ambos motores registraron 5,00 ms de carga mediana, por lo que esa diferencia no es concluyente.
 
-| Métrica | Meeko | Vue |
-| --- | ---: | ---: |
-| JS minificado | 3.522 B | 80.359 B |
-| JS gzip | 1.586 B | 32.166 B |
-| SSR por instancia | 0,00306 ms (0,00266–0,02375) | 0,01040 ms (0,00717–0,03290) |
-| Carga HTTP local | 5,00 ms (4,30–5,30) | 5,00 ms (4,70–5,30) |
-| Hidratación | 0,10 ms (0,00–0,10) | 0,20 ms (0,10–0,40) |
-| Clic y actualización | 0,00250 ms (0,00250–0,00300) | 0,00275 ms (0,00250–0,00350) |
-| Heap JS tras hidratar | 1.287.168 B | 1.517.856 B |
+| Métrica               |                        Meeko |                          Vue |
+| --------------------- | ---------------------------: | ---------------------------: |
+| JS minificado         |                      3.522 B |                     80.359 B |
+| JS gzip               |                      1.586 B |                     32.166 B |
+| SSR por instancia     | 0,00306 ms (0,00266–0,02375) | 0,01040 ms (0,00717–0,03290) |
+| Carga HTTP local      |          5,00 ms (4,30–5,30) |          5,00 ms (4,70–5,30) |
+| Hidratación           |          0,10 ms (0,00–0,10) |          0,20 ms (0,10–0,40) |
+| Clic y actualización  | 0,00250 ms (0,00250–0,00300) | 0,00275 ms (0,00250–0,00350) |
+| Heap JS tras hidratar |                  1.287.168 B |                  1.517.856 B |
 
 En este contador, la diferencia de tamaño es clara. Las medidas de carga y actualización se solapan, y la hidratación está cerca de la resolución del temporizador: no permiten afirmar una ventaja práctica. El heap es orientativo por ser una sola instantánea. Vue incluye funciones maduras que Meeko todavía no ofrece, y una plantilla Vue compilada podría dar cifras distintas a su función `render`. Como explica la [guía de rendimiento de Vue](https://vuejs.org/guide/best-practices/performance), el coste depende de la arquitectura y del trabajo real de cada aplicación.
 
@@ -51,12 +51,12 @@ try { pnpm run benchmark:scenarios } finally { Remove-Item Env:MEEKO_BENCH_ORDER
 
 Para aislar una carga, define `MEEKO_BENCH_SCENARIO` como `tree`, `list`, `navigation` o `navigation-mount`. El runner de [escenarios](../packages/meeko/benchmarks/scenarios.ts) comprueba el HTML SSR, el contenido e identidad de los nodos tras cada paso y la URL de navegación. Las implementaciones de [Vue](../packages/meeko/benchmarks/vue-scenarios.ts) usan funciones `render` escritas a mano y su runtime de producción, sin compilador de plantillas en el navegador.
 
-| Caso | Operación verificada |
-| --- | --- |
-| Árbol | 16 ramas × 8 hojas interactivas (145 componentes con la raíz). Se incrementa la primera hoja y se comprueban las 128. |
-| Lista | 1.000 filas con claves estables. Se rota la última al inicio; se comprueban cardinalidad y claves. |
+| Caso                   | Operación verificada                                                                                                                          |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Árbol                  | 16 ramas × 8 hojas interactivas (145 componentes con la raíz). Se incrementa la primera hoja y se comprueban las 128.                         |
+| Lista                  | 1.000 filas con claves estables. Se rota la última al inicio; se comprueban cardinalidad y claves.                                            |
 | Navegación, reutilizar | Tres vistas de 40 filas. Cada cambio conserva el mismo `section` y las filas, y actualiza texto, atributo y URL mediante `history.pushState`. |
-| Navegación, montar | Las mismas vistas y URL; cada cambio sustituye el `section` y sus 40 filas en ambos motores. |
+| Navegación, montar     | Las mismas vistas y URL; cada cambio sustituye el `section` y sus 40 filas en ambos motores.                                                  |
 
 Hay dos rondas de calentamiento y siete medidas. SSR crea una instancia nueva por render: 30 renders por ronda para árbol y lista, 100 para cada navegación. El navegador hace siete cargas medidas por caso y motor con caché caliente; se mide `loadEventEnd - startTime`, hidratación con `performance.now()` y una instantánea de heap tras solicitar GC. La actualización promedia 100 pasos por ronda para árbol, 30 para lista y 60 para cada navegación. Incluye el clic, la reacción y `nextTick()` de Vue; la comprobación del DOM se hace después del temporizador. El bundle de cada motor incluye los cuatro casos y se mide una sola vez; excluye HTML, CSS y encabezados HTTP.
 
@@ -64,24 +64,24 @@ Hay dos rondas de calentamiento y siete medidas. SSR crea una instancia nueva po
 
 Windows 11 `10.0.26300`, Intel Core Ultra 9 285K, Node 24.21.0, Chrome 155.0.8059.85, Vue 3.5.44 y esbuild 0.28.2. Revisión base `8bb0da1` con cambios locales aún sin commit. Se ejecutó Meeko → Vue y luego Vue → Meeko, sin otros benchmarks concurrentes. La tabla contiene medianas de la primera corrida. Los tiempos están en milisegundos; actualización es por paso. El heap está en MiB y sólo es una instantánea.
 
-| Caso | Métrica | Meeko | Vue |
-| --- | --- | ---: | ---: |
-| Árbol | SSR | 0,505 | 1,058 |
-| Árbol | Carga HTTP local | 7,3 | 7,3 |
-| Árbol | Hidratación | 1,3 | 1,3 |
-| Árbol | Actualización | 0,003 | 0,003 |
-| Árbol | Heap JS | 1,80 MiB | 1,89 MiB |
-| Lista | SSR | 0,638 | 0,526 |
-| Lista | Carga HTTP local | 14,1 | 11,7 |
-| Lista | Hidratación | 3,3 | 1,9 |
-| Lista | Actualización | 0,263 | 0,437 |
-| Lista | Heap JS | 3,17 MiB | 2,15 MiB |
-| Navegación, reutilizar | SSR | 0,040 | 0,015 |
-| Navegación, reutilizar | Hidratación | 0,5 | 0,3 |
-| Navegación, reutilizar | Actualización | 0,055 | 0,067 |
-| Navegación, montar | SSR | 0,029 | 0,013 |
-| Navegación, montar | Hidratación | 0,5 | 0,3 |
-| Navegación, montar | Actualización | 0,283 | 0,075 |
+| Caso                   | Métrica          |    Meeko |      Vue |
+| ---------------------- | ---------------- | -------: | -------: |
+| Árbol                  | SSR              |    0,505 |    1,058 |
+| Árbol                  | Carga HTTP local |      7,3 |      7,3 |
+| Árbol                  | Hidratación      |      1,3 |      1,3 |
+| Árbol                  | Actualización    |    0,003 |    0,003 |
+| Árbol                  | Heap JS          | 1,80 MiB | 1,89 MiB |
+| Lista                  | SSR              |    0,638 |    0,526 |
+| Lista                  | Carga HTTP local |     14,1 |     11,7 |
+| Lista                  | Hidratación      |      3,3 |      1,9 |
+| Lista                  | Actualización    |    0,263 |    0,437 |
+| Lista                  | Heap JS          | 3,17 MiB | 2,15 MiB |
+| Navegación, reutilizar | SSR              |    0,040 |    0,015 |
+| Navegación, reutilizar | Hidratación      |      0,5 |      0,3 |
+| Navegación, reutilizar | Actualización    |    0,055 |    0,067 |
+| Navegación, montar     | SSR              |    0,029 |    0,013 |
+| Navegación, montar     | Hidratación      |      0,5 |      0,3 |
+| Navegación, montar     | Actualización    |    0,283 |    0,075 |
 
 Bundle conjunto: Meeko 19.617 B (6.254 B gzip); Vue 83.084 B (32.958 B gzip). Al invertir el orden, la actualización de lista fue 0,260 frente a 0,433 ms; la navegación que reutiliza nodos, 0,055 frente a 0,065 ms; y el montaje completo, 0,283 frente a 0,070 ms. El nuevo algoritmo de listas mejora la actualización, pero su hidratación y heap siguen por encima de Vue en este caso. El montaje completo de una vista también sigue siendo más lento. La comparación anterior de navegación mezclaba montaje en Meeko con reutilización en Vue; se sustituyó por las dos cargas equivalentes.
 
@@ -97,14 +97,14 @@ La hidratación de lista marcó 3,9 y 3,1 ms en Meeko frente a 1,8 y 1,9 ms en V
 
 El 23 de octubre de 2026 se instaló `@meekojs/meeko@0.0.2` dos veces desde el registro público, cada vez en un directorio temporal y con una caché npm vacía. Se compiló un contador `.meeko` con la CLI instalada y se midieron siete procesos Node separados que importan el componente generado y hacen un render SSR. El ensayo se reproduce con `pwsh -NoProfile -File packages/meeko/benchmarks/measure-published-consumer.ps1 -Version 0.0.2`. Máquina: Windows 11, Intel Core Ultra 9 285K, Node 24.21.0 y npm 11.19.0.
 
-| Métrica | Primera corrida | Segunda corrida |
-| --- | ---: | ---: |
-| Instalación con caché vacía | 7,98 s | 7,87 s |
-| Archivos instalados en `node_modules` | — | 56.675.717 B |
-| Archivos de `@meekojs/meeko` | — | 131.785 B |
-| Compilación del contador | 745 ms | 721 ms |
-| Arranque del proceso SSR, mediana | 65,42 ms | 65,26 ms |
-| Importación del componente, mediana | 27,24 ms | 27,11 ms |
-| Primer render, mediana | 0,155 ms | 0,156 ms |
+| Métrica                               | Primera corrida | Segunda corrida |
+| ------------------------------------- | --------------: | --------------: |
+| Instalación con caché vacía           |          7,98 s |          7,87 s |
+| Archivos instalados en `node_modules` |               — |    56.675.717 B |
+| Archivos de `@meekojs/meeko`          |               — |       131.785 B |
+| Compilación del contador              |          745 ms |          721 ms |
+| Arranque del proceso SSR, mediana     |        65,42 ms |        65,26 ms |
+| Importación del componente, mediana   |        27,24 ms |        27,11 ms |
+| Primer render, mediana                |        0,155 ms |        0,156 ms |
 
 La instalación incluye descarga, resolución y extracción de dependencias; la duración depende de la red y del registro. El tiempo de proceso incluye el arranque de Node y el import del módulo. Es un solo contador sin contraparte equivalente de Vue ni despliegue real. El tamaño instalado, muy superior al de los archivos de Meeko, justifica evaluar una separación de runtime y herramientas, pero estos datos no demuestran todavía que esa separación mejore un consumidor de producción.

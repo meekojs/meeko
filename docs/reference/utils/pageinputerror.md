@@ -31,9 +31,9 @@ export function statusOf(error: unknown): number {
 
 `new PageInputError(code)`:
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `code` | `"INVALID_PARAMS" \| "INVALID_SEARCH"` | obligatorio | La entrada que falló. También es el `message`. |
+| Parámetro | Tipo                                   | Por defecto | Descripción                                    |
+| --------- | -------------------------------------- | ----------- | ---------------------------------------------- |
+| `code`    | `"INVALID_PARAMS" \| "INVALID_SEARCH"` | obligatorio | La entrada que falló. También es el `message`. |
 
 ## Valor devuelto
 
@@ -110,6 +110,7 @@ throw new PageInputError("INVALID_DATE");
 `meeko check` da `TS2345: Argument of type '"INVALID_DATE"' is not assignable to parameter of type '"INVALID_PARAMS" | "INVALID_SEARCH"'.` Para otro `400`, lanza un `ApiError`.
 
 <!-- no-check -->
+
 ```ts good
 throw new ApiError("INVALID_DATE", 400);
 ```

@@ -8,6 +8,47 @@ Las páginas pueden declarar su código de servidor y sus opciones de ruta en un
 
 `defineProps<Props>({ count: 0 })` ofrece defaults tipados en el editor: la prop puede omitirse al usar el componente y se reconoce como definida dentro de su script y plantilla. El compilador y el modelo semántico del editor comparten el análisis AST de esas claves.
 
+## Fragmentos de código
+
+Escribe un prefijo y elige el fragmento en el completado. `Tab` recorre los campos editables y mantiene sincronizados los nombres repetidos. Los esqueletos usan el nombre del archivo como título inicial.
+
+| Prefijo          | Dónde                                | Contenido                                                                  |
+| ---------------- | ------------------------------------ | -------------------------------------------------------------------------- |
+| `meeko`, `mcomp` | Raíz de un `.meeko`                  | Componente con `<script lang="ts">` y `<template>`                         |
+| `mpage`          | Raíz de una página `.meeko`          | `definePage` en `<script server>` y plantilla                              |
+| `mlayout`        | Raíz de un layout `.meeko`           | Layout con `<MeekoOutlet />`                                               |
+| `mprops`         | `<script>`                           | Interfaz `Props` y `defineProps<Props>()`                                  |
+| `mpropsd`        | `<script>`                           | Props desestructuradas con defaults reactivos, desde Meeko 1.8             |
+| `memits`         | `<script>`                           | `defineEmits` con argumentos tipados                                       |
+| `mmodel`         | `<script>`                           | `defineModel` con valor por defecto                                        |
+| `msnippets`      | `<script>`                           | Contrato `defineSnippets`                                                  |
+| `mexpose`        | `<script>`                           | `defineExpose` de un valor del setup                                       |
+| `msignal`        | `<script>`                           | Señal con `signal`                                                         |
+| `mcomputed`      | `<script>`                           | Valor derivado con `computed`                                              |
+| `meffect`        | `<script>`                           | Efecto reactivo con `effect`                                               |
+| `mmounted`       | `<script>`                           | Temporizador de navegador con `onCleanup` dentro de `onMounted`            |
+| `mref`           | `<script>`                           | `useElementRef` y comentario con el `ref:` que debes añadir a la plantilla |
+| `mif`            | `<template>`                         | Elemento con `if:when`                                                     |
+| `meach`          | `<template>`                         | Lista con `each:of`, `each:as` y `each:key`                                |
+| `mrender`        | `<template>`                         | `<render>` con `snippet` y `args`                                          |
+| `msnippet`       | Dentro de una etiqueta de componente | `<snippet>` con `name` y `params`                                          |
+| `mis`            | `<template>`                         | `<component is>` dinámico                                                  |
+| `mform`          | Raíz de un `.meeko`                  | Componente con `useForm` y formulario enlazado                             |
+| `mapi`           | `server/api/*.get.ts`                | `defineApiRoute` con una respuesta JSON                                    |
+| `mrpc`           | `server/rpc/*.ts`                    | `defineRpc` con imports de schemas de `shared/`                            |
+| `mmiddleware`    | `app/middleware/*.server.ts`         | `defineServerRouteMiddleware` con nombre                                   |
+| `mcomposable`    | Composable `.ts`                     | `AbortController` con liberación mediante `onCleanup`                      |
+
+Los fragmentos de script y plantilla se insertan en el bloque indicado: ajusta los nombres a los valores del componente y reúne los imports si ya existen. `mmounted` registra la limpieza dentro del callback para respetar `MEEK128`. Llama al composable de `mcomposable` durante el setup de un componente. En `mrpc`, crea o reutiliza los schemas reales en `shared/`, ajusta la ruta relativa a la profundidad del archivo y adapta el handler al schema de salida. `mmiddleware` crea middleware con nombre (`global: false`): decláralo en `middleware` de la página o del grupo para ejecutarlo.
+
+VS Code elige los fragmentos declarados en [`contributes.snippets`](https://code.visualstudio.com/api/references/contribution-points#contributes.snippets) por el lenguaje en la posición del cursor, y dentro de un bloque ese lenguaje es `typescript` o `html`, no `meeko`. Por eso la extensión sólo declara los esqueletos. Los de script y plantilla los ofrece su proveedor de completado en `<script>`, en `<script server>` y en el contenido de `<template>`, y no en `<style>`, en comentarios, en cadenas, en valores de atributo ni en expresiones `{…}`. De ahí salen tres límites:
+
+- **Insert Snippet** lista lo declarado para el lenguaje del cursor: los esqueletos en la raíz y lo declarado para `typescript` en `<script>`. Los fragmentos de script y plantilla no aparecen ahí: se eligen en el completado.
+- Con `"editor.tabCompletion": "on"`, `Tab` también los expande. Con `"onlySnippets"`, sólo expande los declarados, así que dentro de un bloque no los expande.
+- Un fragmento tuyo declarado para `meeko` sale en la raíz. Para usarlo en `<script>`, decláralo para `typescript`.
+
+La declaración sólo selecciona el lenguaje y el archivo de fragmentos; no admite una condición por proyecto ni por archivo. Por eso los cuatro fragmentos TypeScript aparecen también fuera de proyectos Meeko mientras la extensión está habilitada, y dentro de los bloques TypeScript de un `.meeko`, comentarios y cadenas incluidos. Sus prefijos específicos (`mapi`, `mrpc`, `mmiddleware`, `mcomposable`) reducen las coincidencias accidentales.
+
 ## Funciones de Meeko
 
 El servidor de lenguaje entiende la reactividad, los componentes y la estructura de la aplicación (detalles en la [guía de editores](https://github.com/meekojs/meeko/blob/main/docs/editors.md#funciones-propias-de-meeko)):
@@ -18,6 +59,7 @@ El servidor de lenguaje entiende la reactividad, los componentes y la estructura
 - **CodeLens.** Sobre cada señal, `computed` o recurso, el número de lecturas y escrituras y si la plantilla lo usa; al pulsarlo se listan. En la primera línea de una página, su ruta, modo de render y layouts, y el tipo de los datos que envía su loader, con un aviso si no se pueden serializar.
 - **Zonas de ejecución.** Una barra en el margen y un color de línea tenue indican qué líneas se ejecutan sólo en el servidor (`<script server>`), en el servidor y el navegador (el setup) o sólo en el navegador: tras el primer `await` de navegador, dentro de `onMounted`, en las funciones del setup que sólo se usan desde `on:*`, `onMounted` u otro código de navegador, y en las flechas de varias líneas de un `on:*` de la plantilla. Una función que también se usa en el setup, en `effect` o `computed`, en una expresión de la plantilla o en `defineExpose` sigue en la zona compartida. El hover sobre la primera línea de una zona explica el motivo, por ejemplo «Sólo se usa como manejador de `on:click`».
 - **Clases CSS.** En `class="…"` y en las cadenas de `bind:class` se completan las clases del `<style>` del componente, de los `<style>` sin `scoped` de los demás componentes y de `app/styles/main.css` con sus `@import` locales, más las que genera `meeko dev` en `.meeko/styles/main.css` (`@utilities`, Tailwind). Cada sugerencia indica su origen y muestra la regla; el hover y la definición también funcionan sobre las clases. Sólo lee CSS, así que funciona también en modo restringido. No hace falta la extensión HTML CSS Support.
+- **Variables CSS.** Completa propiedades `--nombre` y referencias `var(--nombre)` en `<style>`, `style="…"` y cadenas de `bind:style`, con el valor declarado y su origen. El hover muestra sus declaraciones, incluidos temas y registros `@property`; ir a definición abre el CSS original cuando está disponible y usa la hoja procesada como respaldo. Comparte las fuentes y la caché de las clases, respeta los estilos `scoped` de otros componentes y sigue cambios sin guardar y CSS importado. No deduce el valor efectivo de la cascada ni marca una variable desconocida como error. Funciona sin ejecutar configuración ni plugins de CSS en workspaces restringidos.
 - **Diagnósticos de dónde se usa cada API.** `MEEK108` marca una API de servidor en el `<script>` o la plantilla (o una macro del componente en `<script server>`), `MEEK109` avisa de `definePage` o de un import de servidor que ahí no tiene efecto, y `MEEK107` avisa de un `html="..."` sin `trustHtml`. El completado del `<script>` y de la plantilla no ofrece APIs de servidor.
 - **Componentes genéricos.** La gramática resalta el atributo `generic` del `<script>` como una lista de parámetros de tipo de TypeScript.
 - **Acciones rápidas.** Añadir `each:key` a una lista y mover el sidecar `x.route.ts` de una página a un bloque `<script server>`.
@@ -31,13 +73,14 @@ Con `meeko dev` en marcha y la página abierta en el navegador, la extensión mu
 - **Barra de estado.** Un indicador **Meeko live** muestra si hay conexión con `meeko dev`; al pulsarlo, o con el comando de reconexión (`meeko.live.reconnect`), se vuelve a conectar. Sólo aparece cuando hay un servidor de desarrollo o un `.meeko` activo.
 - **Modelos compartidos.** Una señal que es la misma que otra, como el modelo que un hijo recibe con `defineModel`, se muestra con su señal principal (`open = true (= dialogOpen)`), su hover dice «alias de `dialogOpen`» con su archivo y línea, y editarla edita la principal.
 - **Conexión.** Cada `meeko dev` escribe su descriptor `.meeko/dev/editor-bridge-<puerto>.json`; la extensión se conecta a todos los que encuentra, con el token de cada sesión, así que funcionan varios `meeko dev` a la vez. Sólo acepta direcciones de loopback y se reconecta sola cuando `meeko dev` se reinicia. Al conectarse espera un instante el estado de las pestañas abiertas, de modo que los valores aparecen sin recargar la página.
+- **Varias carpetas.** Al añadir o quitar carpetas del workspace, la extensión descubre los servidores nuevos y cierra las conexiones de las carpetas retiradas.
 - **Confianza.** Sólo funciona en workspaces de confianza.
 
 `meeko dev` no publica valores si se arranca con `MEEKO_EDITOR_BRIDGE=0` o si escucha en una dirección que no es de loopback. Con Meeko 1.7.1 o posterior, mientras ese `meeko dev` sigue en marcha, el indicador muestra **Meeko live: desactivado en meeko dev**, con el motivo y cómo activarlo en el tooltip (por ejemplo, quitar `MEEKO_EDITOR_BRIDGE=0` del `.env` y reiniciar `meeko dev`). El protocolo y sus reglas de seguridad se describen en [docs/devtools.md](https://github.com/meekojs/meeko/blob/main/docs/devtools.md#puente-del-editor).
 
 ## Primeros pasos
 
-1. Instala **Meeko Language** en Visual Studio Code 1.140.0 o posterior.
+1. Instala **Meeko Language** en Visual Studio Code 1.144.0 o posterior.
 2. Abre tu proyecto Meeko y un archivo con extensión `.meeko`.
 3. Usa completado, hover, ir a definición, referencias, renombrado y **Format Document** desde el editor.
 
@@ -49,8 +92,13 @@ Al guardar un módulo TypeScript del mismo proyecto, el servidor vuelve a compro
 
 - Si el workspace es de confianza y el proyecto tiene `@meekojs/meeko` con el bin `meeko-language-server` en `node_modules` (se busca desde cada carpeta del workspace hacia arriba), la extensión arranca **ese** servidor. Así el editor usa la misma versión que el compilador del proyecto.
 - Si no existe, es una versión anterior sin servidor de lenguaje, el ajuste `meeko.languageServer.preferWorkspace` está desactivado o el workspace no es de confianza, usa el **servidor incluido** en la extensión.
+- En un workspace con varias carpetas, cada una elige su propio servidor; al cambiar carpetas, confianza o `meeko.languageServer.preferWorkspace`, la extensión vuelve a seleccionar y arrancar los servidores.
 
 El canal de salida **Meeko** indica al arrancar qué servidor se eligió, su versión y el motivo de la elección, y registra los fallos internos del servidor.
+
+## Workspaces virtuales
+
+En documentos `.meeko` de un proveedor virtual, el servidor incluido analiza el archivo abierto y ofrece completado, hover, símbolos y diagnósticos mientras se edita. Cada documento se analiza de forma aislada: la navegación, las referencias y la comprobación de contratos entre archivos requieren un proyecto en disco y no están disponibles allí. Meeko live también requiere un proyecto local.
 
 ## Modo restringido
 
@@ -58,24 +106,34 @@ En un workspace no confiable la extensión nunca ejecuta código del proyecto: u
 
 ## Ajustes
 
-| Ajuste | Por defecto | Descripción |
-| --- | --- | --- |
-| `meeko.languageServer.preferWorkspace` | `true` | Usa el servidor de `@meekojs/meeko` del proyecto cuando existe. Se ignora en modo restringido. |
-| `meeko.format.indentSections` | `false` | Al formatear, indenta un nivel el contenido de cada sección (`<script>`, `<script server>`, `<template>` y `<style>`), como `vueIndentScriptAndStyle` de Prettier más la plantilla. El contenido de `<pre>` y `<textarea>` no cambia. Con `false`, el formato quita esa indentación base. |
-| `meeko.editor.executionZones` | `true` | Muestra las zonas de ejecución: una barra en el margen y un color de línea tenue para el código que se ejecuta sólo en el servidor, en ambos lados o sólo en el navegador. |
-| `meeko.live.enabled` | `true` | Conecta con `meeko dev` para mostrar y editar los valores en vivo de las señales. Sólo en workspaces de confianza y con un servidor de desarrollo en loopback. |
-| `meeko.live.inlineValues` | `true` | Muestra el valor en vivo al final de la línea de cada señal. Con `false`, el valor sigue en el hover. |
-| `meeko.trace.server` | `off` | Registra la comunicación con el servidor (`messages` o `verbose`) en el canal **Meeko**. |
+| Ajuste                                 | Por defecto | Descripción                                                                                                                                                                                                                                                                               |
+| -------------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `meeko.languageServer.preferWorkspace` | `true`      | Usa el servidor de `@meekojs/meeko` del proyecto cuando existe. Se ignora en modo restringido.                                                                                                                                                                                            |
+| `meeko.format.indentSections`          | `false`     | Al formatear, indenta un nivel el contenido de cada sección (`<script>`, `<script server>`, `<template>` y `<style>`), como `vueIndentScriptAndStyle` de Prettier más la plantilla. El contenido de `<pre>` y `<textarea>` no cambia. Con `false`, el formato quita esa indentación base. |
+| `meeko.editor.executionZones`          | `true`      | Muestra las zonas de ejecución: una barra en el margen y un color de línea tenue para el código que se ejecuta sólo en el servidor, en ambos lados o sólo en el navegador.                                                                                                                |
+| `meeko.live.enabled`                   | `true`      | Conecta con `meeko dev` para mostrar y editar los valores en vivo de las señales. Sólo en workspaces de confianza y con un servidor de desarrollo en loopback.                                                                                                                            |
+| `meeko.live.inlineValues`              | `true`      | Muestra el valor en vivo al final de la línea de cada señal. Con `false`, el valor sigue en el hover.                                                                                                                                                                                     |
+| `meeko.trace.server`                   | `off`       | Activa el trace de cada servidor (`messages` o `verbose`). Para ver los mensajes, cambia el nivel del canal **Meeko** a **Trace**.                                                                                                                                                        |
+
+Si usas Fira Code y has activado `editor.bracketPairColorization.enabled: true` explícitamente, VS Code puede colorear por separado el `>` de `=>` dentro del TypeScript de un `.meeko` y romper la ligadura. La preferencia global prevalece sobre el valor predeterminado de la extensión. Añade esta excepción a tus ajustes de VS Code:
+
+```json
+"[meeko]": {
+  "editor.bracketPairColorization.enabled": false
+}
+```
+
+Esto quita los colores de pares de corchetes sólo en `.meeko`; el emparejamiento y la edición vinculada de etiquetas siguen disponibles.
 
 Cambiar un ajuste `meeko.languageServer.*` reinicia el servidor. Los ajustes `meeko.format.*` se leen en cada formateo y no requieren reinicio.
 
 Los colores de las zonas se pueden cambiar en `workbench.colorCustomizations`:
 
-| Color | Por defecto |
-| --- | --- |
-| `meeko.executionZone.serverBackground` | Violeta tenue en los temas claros y oscuros. |
-| `meeko.executionZone.sharedBackground` | Transparente: el setup compartido no se colorea. |
-| `meeko.executionZone.browserBackground` | Turquesa tenue en los temas claros y oscuros. |
+| Color                                   | Por defecto                                      |
+| --------------------------------------- | ------------------------------------------------ |
+| `meeko.executionZone.serverBackground`  | Violeta tenue en los temas claros y oscuros.     |
+| `meeko.executionZone.sharedBackground`  | Transparente: el setup compartido no se colorea. |
+| `meeko.executionZone.browserBackground` | Turquesa tenue en los temas claros y oscuros.    |
 
 En los temas de alto contraste los tres son transparentes y sólo queda la barra del margen.
 
@@ -101,6 +159,18 @@ code --new-window --extensionDevelopmentPath="$(Get-Location)" "$(Resolve-Path .
 
 ## Desarrollo: paquetes por plataforma
 
+Para compilar, empaquetar e instalar la extensión en el VS Code local, desde la raíz del repositorio:
+
+```powershell
+pnpm run vscode:install
+```
+
+También puedes ejecutar `pnpm run install:local` desde `packages/vscode`, o `pwsh -NoProfile -File packages/vscode/install-local.ps1` desde la raíz. El script detecta la plataforma y versión, comprueba tipos, construye el VSIX y lo instala con `code --install-extension --force`, también si ya está instalada esa versión. Después ejecuta **Developer: Reload Window** en VS Code.
+
+Para reinstalar el último VSIX sin compilar: `pnpm run install:local -- -UseExistingVsix` desde `packages/vscode`. Esta opción reutiliza el artefacto existente; no incorpora nuevos cambios de fuente. Si el CLI tiene otro nombre o ruta, usa `-CodeCommand`, por ejemplo `pwsh -NoProfile -File install-local.ps1 -CodeCommand code-insiders`.
+
+El empaquetado usa VSCE `4.1.0`. El instalador suprime exclusivamente el aviso `DEP0169` durante la ejecución del CLI de VS Code y restaura `NODE_OPTIONS` al terminar. Es una solución temporal al uso de `url.parse()` dentro de VS Code ([incidencia abierta](https://github.com/microsoft/vscode/issues/319867)), no un cambio en esa API. Para ver también ese aviso durante una investigación, ejecuta el script con `-ShowCliDeprecations`.
+
 ```powershell
 pnpm run package:vsix
 pwsh -NoProfile -File package-vsix.ps1 -Target linux-x64
@@ -119,3 +189,27 @@ pnpm run test:host:isolated
 - El modelo virtual requiere que las secciones estén sintácticamente cerradas. Mientras se escribe un archivo incompleto, los diagnósticos siguen disponibles, pero las funciones semánticas pueden pausarse hasta que vuelva a ser válido.
 - El formato usa Prettier con el plugin de Meeko, en memoria: el del proyecto con su configuración si existe y el workspace es de confianza, o el incluido en la extensión. Normaliza los `class="…"` estáticos, mantiene expandidos los arrays con un salto tras `[` (`meekoPreserveArrayBreaks`) y, si la configuración de Prettier del proyecto lo pide, ordena las clases (`meekoSortClasses`); el orden por la hoja global usa el Vite del proyecto, porque la extensión no lo incluye, y no se aplica en modo restringido. Sólo formatea el documento completo y no formatea un archivo que no compila (véase [docs/editors.md](../../docs/editors.md#formato-con-prettier)).
 - Generar un VSIX cruzado confirma su contenido, pero no sustituye la prueba del host de destino. La matriz de CI comprueba la extensión en Windows, Linux y macOS.
+
+## Tailwind CSS
+
+Instala la extensión oficial **Tailwind CSS IntelliSense** (`bradlc.vscode-tailwindcss`) y configura Tailwind en el proyecto. Esta extensión aporta las utilidades, variantes, valores y documentación de Tailwind; Meeko aporta el análisis de componentes y las clases CSS escritas en sus `<style>` y en `app/styles/main.css`, incluidos sus imports locales.
+
+Meeko Language registra automáticamente `tailwindCSS.includeLanguages: { "meeko": "html" }` y activa `editor.quickSuggestions.strings` para `[meeko]`. Son valores predeterminados de VS Code: respetan tus ajustes explícitos y no escriben en `settings.json`. [VS Code documenta `configurationDefaults` para otras configuraciones registradas](https://code.visualstudio.com/api/references/contribution-points#contributes.configurationDefaults).
+
+`meeko.classes.completion` controla el completado y hover de clases de Meeko:
+
+- `auto` (predeterminado): si Tailwind IntelliSense está activo y el proyecto declara `tailwindcss` como dependencia o lo importa desde sus hojas fuente, delega las clases de la hoja procesada `.meeko/styles/main.css` a Tailwind. Conserva las clases escritas en componentes y hojas fuente.
+- `on`: incluye también las clases de la hoja procesada.
+- `off`: desactiva el completado y hover de clases de Meeko. La navegación a definiciones y las variables CSS siguen disponibles.
+
+Las cadenas de `bind:class="active.value ? 'bg-blue-500' : 'bg-gray-500'"` reciben sugerencias de clases; no hace falta añadir `bind:class` a `tailwindCSS.classAttributes`, porque el atributo `class` predeterminado reconoce el prefijo `:`. Meeko conserva además el análisis TypeScript de la expresión.
+
+Para funciones como `clsx` y `cn` dentro del `<script>`, configura las funciones que realmente usa tu proyecto:
+
+```json
+{
+	"tailwindCSS.classFunctions": ["clsx", "cn"]
+}
+```
+
+La detección de Meeko lee el manifiesto del paquete del componente y las hojas fuente indexadas, sin ejecutar plugins CSS. No clasifica individualmente la hoja procesada: en `auto` también delega sus clases de terceros que no tienen una definición fuente indexada. En otros clientes LSP, comunica `meeko.classes` mediante `workspace/configuration` (o `initializationOptions.classes`), incluido `tailwindActive: true` si el cliente tiene un proveedor Tailwind activo.

@@ -1,0 +1,63 @@
+/* Two-tone titles of the home page: the statement in text, its continuation soft. */
+.tone-soft {
+	color: var(--ui-color-text-soft);
+}
+
+/* The caption of a figure: "FIG. 02 — …". */
+.fig-label {
+	display: flex;
+	align-items: baseline;
+	gap: var(--ui-space-2);
+	margin: 0;
+	color: var(--ui-color-text-soft);
+	font-size: var(--ui-font-size-sm);
+	line-height: var(--ui-line-height-normal);
+}
+.fig-label b {
+	flex: none;
+	color: var(--ui-color-text);
+	font-weight: var(--ui-font-weight-medium);
+}
+
+/*
+ * Isometric line figures (FIG. 0x), an image of this site: hairline strokes, faces filled with the ground
+ * they sit on, one step of a scale for each kind of line, and labels sized in the units of each drawing.
+ */
+.iso {
+	display: block;
+	width: 100%;
+	height: auto;
+	overflow: visible;
+}
+.iso .l {
+	vector-effect: non-scaling-stroke;
+	fill: none;
+	stroke: var(--ui-color-surface-9);
+	stroke-linecap: round;
+	stroke-linejoin: round;
+	stroke-width: 1;
+}
+.iso .f {
+	fill: var(--fig-ground, var(--ui-color-bg));
+}
+.iso .s {
+	stroke: var(--ui-color-surface-7);
+}
+.iso .d {
+	stroke-dasharray: 3 4;
+}
+.iso .a {
+	vector-effect: non-scaling-stroke;
+	fill: none;
+	stroke: var(--ui-color-primary);
+	stroke-linecap: round;
+	stroke-width: 1.25;
+}
+.iso circle.a {
+	fill: var(--ui-color-primary);
+	stroke: none;
+}
+.iso text {
+	fill: var(--ui-color-text-soft);
+	font: var(--ui-font-weight-medium) var(--fig-text, 9px) var(--ui-font-mono);
+}

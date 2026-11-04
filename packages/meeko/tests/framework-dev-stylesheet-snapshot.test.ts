@@ -1,202 +1,279 @@
-import assert from "node:assert/strict";
-import { spawn, type ChildProcess } from "node:child_process";
-import { once } from "node:events";
-import { mkdir, readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
-import { createServer } from "node:net";
-import { dirname, join } from "node:path";
-import test from "node:test";
-import { initFrameworkProject } from "../src/framework/init.ts";
-import type { Plugin, ViteDevServer } from "vite";
-import { createGlobalStylesheetSnapshot, globalStylesheetFile, globalStylesheetSnapshotFile } from "../src/framework/styles.ts";
-import { linkRepositoryPackages, repositoryRoot, stopChild, tempProject } from "./helpers/temp-project.ts";
+import type { Plugin, ViteDevServer } from 'vite'
+
+import assert from 'node:assert/strict'
+import { type ChildProcess, spawn } from 'node:child_process'
+import { once } from 'node:events'
+import { mkdir, readFile, rm, stat, utimes, writeFile } from 'node:fs/promises'
+import { createServer } from 'node:net'
+import { dirname, join } from 'node:path'
+import test from 'node:test'
+
+import { initFrameworkProject } from '../src/framework/init.ts'
+import { createGlobalStylesheetSnapshot, globalStylesheetFile, globalStylesheetSnapshotFile } from '../src/framework/styles.ts'
+import { linkRepositoryPackages, repositoryRoot, stopChild, tempProject } from './helpers/temp-project.ts'
 
 async function freePort(): Promise<number> {
-  const server = createServer();
-  server.listen(0, "127.0.0.1");
-  await once(server, "listening");
-  const address = server.address();
-  assert.ok(address && typeof address !== "string");
-  server.close();
-  await once(server, "close");
-  return address.port;
+	const server = createServer()
+	server.listen(0, '127.0.0.1')
+	await once(server, 'listening')
+	const address = server.address()
+	assert.ok(address && typeof address !== 'string')
+	server.close()
+	await once(server, 'close')
+	return address.port
 }
 
 async function until(condition: () => boolean | Promise<boolean>, message: () => string | Promise<string>, timeout = 20_000): Promise<void> {
-  const start = Date.now();
-  while (!(await condition())) {
-    if (Date.now() - start > timeout) throw new Error(await message());
-    await new Promise((done) => setTimeout(done, 25));
-  }
+	const start = Date.now()
+	while (!(await condition())) {
+		if (Date.now() - start > timeout) throw new Error(await message())
+		await new Promise((done) => setTimeout(done, 25))
+	}
 }
 
-const delay = (ms: number) => new Promise((done) => setTimeout(done, ms));
+const delay = (ms: number) => new Promise((done) => setTimeout(done, ms))
 
 const files: Record<string, string> = {
-  "postcss.config.mjs": `import { meekoUtilities } from "@meekojs/meeko/postcss";\nexport default { plugins: [meekoUtilities()] };\n`,
-  "app/styles/main.css": `@import "./tokens.css";\n@utilities "./utilities/sizes.ts" layer(utilities);\n.base { color: red; }\n`,
-  "app/styles/tokens.css": `.token-one { color: blue; }\n`,
-  "app/styles/utilities/list.ts": `export const sizes = ["sm", "md"];\n`,
-  "app/styles/utilities/sizes.ts": `import { defineUtilities } from "@meekojs/meeko/postcss";
+	'postcss.config.mjs': `import { meekoUtilities } from "@meekojs/meeko/postcss";\nexport default { plugins: [meekoUtilities()] };\n`,
+	'app/styles/main.css': `@import "./tokens.css";\n@utilities "./utilities/sizes.ts" layer(utilities);\n.base { color: red; }\n`,
+	'app/styles/tokens.css': `.token-one { color: blue; }\n`,
+	'app/styles/utilities/list.ts': `export const sizes = ["sm", "md"];\n`,
+	'app/styles/utilities/sizes.ts': `import { defineUtilities } from "@meekojs/meeko/postcss";
 import { sizes } from "./list";
 export default defineUtilities(({ rule }) => sizes.map((size) => rule(\`.box[data-size='\${size}']\`, { padding: "1rem" })));
 `,
-};
+}
 
 /** Writes `contents` with a later modification date, so the utilities bundle cache sees the change. */
 async function edit(root: string, path: string, contents: string): Promise<void> {
-  const file = join(root, path);
-  await writeFile(file, contents);
-  const later = new Date(Date.now() + 2_000);
-  await utimes(file, later, later);
+	const file = join(root, path)
+	await writeFile(file, contents)
+	const later = new Date(Date.now() + 2_000)
+	await utimes(file, later, later)
 }
 
-test("meeko dev keeps the processed global stylesheet in .meeko/styles/main.css", { timeout: 120_000 }, async (context) => {
-  let child: ChildProcess | undefined;
-  let socket: WebSocket | undefined;
-  const root = await tempProject(context, "dev-stylesheet-snapshot", async () => {
-    socket?.close();
-    await stopChild(child);
-  });
-  await initFrameworkProject(root);
-  for (const [path, contents] of Object.entries(files)) {
-    await mkdir(dirname(join(root, path)), { recursive: true });
-    await writeFile(join(root, path), contents);
-  }
-  // A snapshot left by an earlier run is replaced.
-  await mkdir(join(root, ".meeko", "styles"), { recursive: true });
-  await writeFile(join(root, globalStylesheetSnapshotFile), ".stale {}\n");
-  await linkRepositoryPackages(root, ["@meekojs/meeko", "vite"]);
-  const port = await freePort();
-  const hmrPort = await freePort();
-  const origin = `http://127.0.0.1:${port}`;
-  const running = spawn(process.execPath, [join(repositoryRoot, "dist", "cli.js"), "dev", root], {
-    cwd: root, env: { ...process.env, PORT: String(port), MEEKO_HMR_PORT: String(hmrPort), MEEKO_EDITOR_BRIDGE: "0" },
-    stdio: ["ignore", "pipe", "pipe"], windowsHide: true,
-  });
-  child = running;
-  let logs = "";
-  running.stdout?.on("data", (chunk: Buffer) => { logs += chunk.toString(); });
-  running.stderr?.on("data", (chunk: Buffer) => { logs += chunk.toString(); });
-  await until(() => logs.includes(`http://localhost:${port}\n`) || running.exitCode !== null, () => `meeko dev did not listen: ${logs}`, 30_000);
-  assert.equal(running.exitCode, null, logs);
+test('meeko dev keeps the processed global stylesheet in .meeko/styles/main.css', { timeout: 120_000 }, async (context) => {
+	let child: ChildProcess | undefined
+	let socket: WebSocket | undefined
+	const root = await tempProject(context, 'dev-stylesheet-snapshot', async () => {
+		socket?.close()
+		await stopChild(child)
+	})
+	await initFrameworkProject(root)
+	for (const [path, contents] of Object.entries(files)) {
+		await mkdir(dirname(join(root, path)), { recursive: true })
+		await writeFile(join(root, path), contents)
+	}
+	// A snapshot left by an earlier run is replaced.
+	await mkdir(join(root, '.meeko', 'styles'), { recursive: true })
+	await writeFile(join(root, globalStylesheetSnapshotFile), '.stale {}\n')
+	await linkRepositoryPackages(root, ['@meekojs/meeko', 'vite'])
+	const port = await freePort()
+	const hmrPort = await freePort()
+	const origin = `http://127.0.0.1:${port}`
+	const running = spawn(process.execPath, [join(repositoryRoot, 'dist', 'cli.js'), 'dev', root], {
+		cwd: root,
+		env: { ...process.env, PORT: String(port), MEEKO_HMR_PORT: String(hmrPort), MEEKO_EDITOR_BRIDGE: '0' },
+		stdio: ['ignore', 'pipe', 'pipe'],
+		windowsHide: true,
+	})
+	child = running
+	let logs = ''
+	running.stdout?.on('data', (chunk: Buffer) => {
+		logs += chunk.toString()
+	})
+	running.stderr?.on('data', (chunk: Buffer) => {
+		logs += chunk.toString()
+	})
+	await until(
+		() => logs.includes(`http://localhost:${port}\n`) || running.exitCode !== null,
+		() => `meeko dev did not listen: ${logs}`,
+		30_000,
+	)
+	assert.equal(running.exitCode, null, logs)
 
-  const snapshotFile = join(root, globalStylesheetSnapshotFile);
-  const snapshot = () => readFile(snapshotFile, "utf8").catch(() => "");
-  // Written once the server listens, without a browser asking for the stylesheet.
-  await until(async () => (await snapshot()).includes(".base"), () => `No snapshot: ${logs}`, 30_000);
-  const first = await snapshot();
-  assert.match(first, /^\/\* Generated by meeko dev from app\/styles\/main\.css/);
-  assert.match(first, /\.token-one \{/, "the imported file is inlined");
-  assert.match(first, /@layer utilities \{[^]*\.box\[data-size='sm'\][^]*\.box\[data-size='md'\]/, "@utilities is expanded");
-  assert.doesNotMatch(first, /@utilities|@import|\.stale/);
+	const snapshotFile = join(root, globalStylesheetSnapshotFile)
+	const snapshot = () => readFile(snapshotFile, 'utf8').catch(() => '')
+	// Written once the server listens, without a browser asking for the stylesheet.
+	await until(
+		async () => (await snapshot()).includes('.base'),
+		() => `No snapshot: ${logs}`,
+		30_000,
+	)
+	const first = await snapshot()
+	assert.match(first, /^\/\* Generated by meeko dev from app\/styles\/main\.css/)
+	assert.match(first, /\.token-one \{/, 'the imported file is inlined')
+	assert.match(first, /@layer utilities \{[^]*\.box\[data-size='sm'\][^]*\.box\[data-size='md'\]/, '@utilities is expanded')
+	assert.doesNotMatch(first, /@utilities|@import|\.stale/)
 
-  // A tab: the payloads Vite's client would receive.
-  const client = await (await fetch(`${origin}/@vite/client`)).text();
-  const wsToken = /const wsToken = "([^"]*)"/.exec(client)?.[1] ?? "";
-  const payloads: Array<{ type: string; updates?: Array<{ path: string }> }> = [];
-  socket = new WebSocket(`ws://127.0.0.1:${hmrPort}/?token=${encodeURIComponent(wsToken)}`, "vite-hmr");
-  socket.addEventListener("message", (event) => { payloads.push(JSON.parse(String(event.data)) as { type: string }); });
-  await new Promise<void>((done, fail) => {
-    socket!.addEventListener("open", () => done(), { once: true });
-    socket!.addEventListener("error", () => fail(new Error("HMR WebSocket unavailable")), { once: true });
-  });
-  const fullReloads = () => payloads.filter((payload) => payload.type === "full-reload");
+	// A tab: the payloads Vite's client would receive.
+	const client = await (await fetch(`${origin}/@vite/client`)).text()
+	const wsToken = /const wsToken = "([^"]*)"/.exec(client)?.[1] ?? ''
+	const payloads: Array<{ type: string; updates?: Array<{ path: string }> }> = []
+	socket = new WebSocket(`ws://127.0.0.1:${hmrPort}/?token=${encodeURIComponent(wsToken)}`, 'vite-hmr')
+	socket.addEventListener('message', (event) => {
+		payloads.push(JSON.parse(String(event.data)) as { type: string })
+	})
+	await new Promise<void>((done, fail) => {
+		socket!.addEventListener('open', () => done(), { once: true })
+		socket!.addEventListener('error', () => fail(new Error('HMR WebSocket unavailable')), { once: true })
+	})
+	const fullReloads = () => payloads.filter((payload) => payload.type === 'full-reload')
 
-  // A module of the @utilities graph changes: the snapshot follows, by a CSS update and no reload.
-  await edit(root, "app/styles/utilities/list.ts", `export const sizes = ["sm", "lg"];\n`);
-  await until(async () => (await snapshot()).includes("data-size='lg'"), async () => `The snapshot missed list.ts: ${await snapshot()} ${logs}`);
-  assert.doesNotMatch(await snapshot(), /data-size='md'/);
-  // An imported stylesheet changes.
-  await edit(root, "app/styles/tokens.css", `.token-two { color: green; }\n`);
-  await until(async () => (await snapshot()).includes(".token-two"), async () => `The snapshot missed tokens.css: ${await snapshot()} ${logs}`);
-  assert.doesNotMatch(await snapshot(), /\.token-one/);
-  // One CSS update per edit reaches the tab.
-  await until(() => payloads.filter((payload) => payload.type === "update").length >= 2, () => `No CSS updates: ${JSON.stringify(payloads)}`);
-  assert.deepEqual(fullReloads(), [], JSON.stringify(payloads));
+	// A module of the @utilities graph changes: the snapshot follows, by a CSS update and no reload.
+	await edit(root, 'app/styles/utilities/list.ts', `export const sizes = ["sm", "lg"];\n`)
+	await until(
+		async () => (await snapshot()).includes("data-size='lg'"),
+		async () => `The snapshot missed list.ts: ${await snapshot()} ${logs}`,
+	)
+	assert.doesNotMatch(await snapshot(), /data-size='md'/)
+	// An imported stylesheet changes.
+	await edit(root, 'app/styles/tokens.css', `.token-two { color: green; }\n`)
+	await until(
+		async () => (await snapshot()).includes('.token-two'),
+		async () => `The snapshot missed tokens.css: ${await snapshot()} ${logs}`,
+	)
+	assert.doesNotMatch(await snapshot(), /\.token-one/)
+	// One CSS update per edit reaches the tab.
+	await until(
+		() => payloads.filter((payload) => payload.type === 'update').length >= 2,
+		() => `No CSS updates: ${JSON.stringify(payloads)}`,
+	)
+	assert.deepEqual(fullReloads(), [], JSON.stringify(payloads))
 
-  // The snapshot does not trigger anything: no further write, no further payload.
-  const settled = (await stat(snapshotFile)).mtimeMs;
-  const seen = payloads.length;
-  await delay(1_500);
-  assert.equal((await stat(snapshotFile)).mtimeMs, settled, "the snapshot is not rewritten in a loop");
-  assert.equal(payloads.length, seen, JSON.stringify(payloads.slice(seen)));
+	// The snapshot does not trigger anything: no further write, no further payload.
+	const settled = (await stat(snapshotFile)).mtimeMs
+	const seen = payloads.length
+	await delay(1_500)
+	assert.equal((await stat(snapshotFile)).mtimeMs, settled, 'the snapshot is not rewritten in a loop')
+	assert.equal(payloads.length, seen, JSON.stringify(payloads.slice(seen)))
 
-  // A broken @utilities module keeps the last good snapshot and the server.
-  const good = await snapshot();
-  await edit(root, "app/styles/utilities/sizes.ts", `export default () => { throw new Error("broken utilities"); };\n`);
-  await until(() => logs.includes("conserva la versión anterior"), () => `No failure report: ${logs}`);
-  assert.match(logs, /broken utilities/);
-  assert.equal(await snapshot(), good);
-  assert.equal(running.exitCode, null, logs);
-  assert.equal((await fetch(`${origin}/`)).status, 200);
-  // Once fixed, the snapshot follows again.
-  await edit(root, "app/styles/utilities/sizes.ts", files["app/styles/utilities/sizes.ts"]!.replace("padding: \"1rem\"", "padding: \"2rem\""));
-  await until(async () => (await snapshot()).includes("padding: 2rem"), async () => `The snapshot did not recover: ${await snapshot()} ${logs}`);
-  assert.deepEqual(fullReloads(), [], JSON.stringify(payloads));
+	// A broken @utilities module keeps the last good snapshot and the server.
+	const good = await snapshot()
+	await edit(root, 'app/styles/utilities/sizes.ts', `export default () => { throw new Error("broken utilities"); };\n`)
+	await until(
+		() => logs.includes('conserva la versión anterior'),
+		() => `No failure report: ${logs}`,
+	)
+	assert.match(logs, /broken utilities/)
+	assert.equal(await snapshot(), good)
+	assert.equal(running.exitCode, null, logs)
+	assert.equal((await fetch(`${origin}/`)).status, 200)
+	// Once fixed, the snapshot follows again.
+	await edit(root, 'app/styles/utilities/sizes.ts', files['app/styles/utilities/sizes.ts']!.replace('padding: "1rem"', 'padding: "2rem"'))
+	await until(
+		async () => (await snapshot()).includes('padding: 2rem'),
+		async () => `The snapshot did not recover: ${await snapshot()} ${logs}`,
+	)
+	assert.deepEqual(fullReloads(), [], JSON.stringify(payloads))
 
-  // A changed `.env` restarts Vite, whose new module graph starts empty: the snapshot is
-  // transformed again, so the dependencies of the stylesheet still lead to it.
-  let closed = false;
-  socket.addEventListener("close", () => { closed = true; });
-  await writeFile(join(root, ".env"), "MEEKO_TEST_RESTART=1\n");
-  await until(() => closed, () => `Vite did not restart: ${logs}`);
-  await until(async () => (await fetch(`${origin}/`).catch(() => undefined))?.status === 200, () => `No app after the restart: ${logs}`);
-  // The edit is repeated until the restarted server has rebuilt the graph of the stylesheet.
-  let attempts = 0;
-  await until(async () => {
-    if ((await snapshot()).includes("data-size='xl'")) return true;
-    if (attempts++ % 40 === 0) await edit(root, "app/styles/utilities/list.ts", `export const sizes = ["xl"];\n`);
-    return false;
-  }, async () => `The snapshot missed an edit after the restart: ${await snapshot()} ${logs}`);
+	// A changed `.env` restarts Vite, whose new module graph starts empty: the snapshot is
+	// transformed again, so the dependencies of the stylesheet still lead to it.
+	let closed = false
+	socket.addEventListener('close', () => {
+		closed = true
+	})
+	await writeFile(join(root, '.env'), 'MEEKO_TEST_RESTART=1\n')
+	await until(
+		() => closed,
+		() => `Vite did not restart: ${logs}`,
+	)
+	await until(
+		async () => (await fetch(`${origin}/`).catch(() => undefined))?.status === 200,
+		() => `No app after the restart: ${logs}`,
+	)
+	// The edit is repeated until the restarted server has rebuilt the graph of the stylesheet.
+	let attempts = 0
+	await until(
+		async () => {
+			if ((await snapshot()).includes("data-size='xl'")) return true
+			if (attempts++ % 40 === 0) await edit(root, 'app/styles/utilities/list.ts', `export const sizes = ["xl"];\n`)
+			return false
+		},
+		async () => `The snapshot missed an edit after the restart: ${await snapshot()} ${logs}`,
+	)
 
-  // Without the global stylesheet there is no snapshot.
-  await rm(join(root, "app/styles/main.css"));
-  await until(async () => !await stat(snapshotFile).then(() => true, () => false), async () => `The snapshot outlived main.css: ${logs}`);
-  assert.equal(running.exitCode, null, logs);
-});
+	// Without the global stylesheet there is no snapshot.
+	await rm(join(root, 'app/styles/main.css'))
+	await until(
+		async () =>
+			!(await stat(snapshotFile).then(
+				() => true,
+				() => false,
+			)),
+		async () => `The snapshot outlived main.css: ${logs}`,
+	)
+	assert.equal(running.exitCode, null, logs)
+})
 
-test("the snapshot transforms the stylesheet once a changed file holds its contents", { timeout: 30_000 }, async (context) => {
-  // The watcher may report a file as soon as a writer truncates it and drop the change of the write
-  // that follows. The browser's request for the stylesheet reuses the transform the snapshot starts,
-  // so a transform of the truncated file would leave the page without its rules until the next edit.
-  const root = await tempProject(context, "stylesheet-snapshot-read");
-  const source = join(root, globalStylesheetFile);
-  await mkdir(dirname(source), { recursive: true });
-  await writeFile(source, "body { color: red; }\n");
-  const requests: string[] = [];
-  let code = "body { color: red; }\n";
-  const server = { environments: { client: { transformRequest: async (url: string) => {
-    requests.push(url);
-    return { code };
-  } } } } as unknown as ViteDevServer;
-  const reports: string[] = [];
-  const stylesheetSnapshot = createGlobalStylesheetSnapshot(root, (message) => reports.push(message));
-  context.after(() => stylesheetSnapshot.close());
-  const snapshot = () => readFile(join(root, globalStylesheetSnapshotFile), "utf8").catch(() => "");
-  stylesheetSnapshot.start(server);
-  await until(async () => (await snapshot()).includes("color: red"), async () => `No snapshot: ${await snapshot()}`);
-  assert.equal(requests.length, 1);
+test('the snapshot transforms the stylesheet once a changed file holds its contents', { timeout: 30_000 }, async (context) => {
+	// The watcher may report a file as soon as a writer truncates it and drop the change of the write
+	// that follows. The browser's request for the stylesheet reuses the transform the snapshot starts,
+	// so a transform of the truncated file would leave the page without its rules until the next edit.
+	const root = await tempProject(context, 'stylesheet-snapshot-read')
+	const source = join(root, globalStylesheetFile)
+	await mkdir(dirname(source), { recursive: true })
+	await writeFile(source, 'body { color: red; }\n')
+	const requests: string[] = []
+	let code = 'body { color: red; }\n'
+	const server = {
+		environments: {
+			client: {
+				transformRequest: async (url: string) => {
+					requests.push(url)
+					return { code }
+				},
+			},
+		},
+	} as unknown as ViteDevServer
+	const reports: string[] = []
+	const stylesheetSnapshot = createGlobalStylesheetSnapshot(root, (message) => reports.push(message))
+	context.after(() => stylesheetSnapshot.close())
+	const snapshot = () => readFile(join(root, globalStylesheetSnapshotFile), 'utf8').catch(() => '')
+	stylesheetSnapshot.start(server)
+	await until(
+		async () => (await snapshot()).includes('color: red'),
+		async () => `No snapshot: ${await snapshot()}`,
+	)
+	assert.equal(requests.length, 1)
 
-  type HotUpdate = (this: unknown, options: { type: "create" | "update" | "delete"; file: string; read: () => string | Promise<string> }) => unknown;
-  const hotUpdate = stylesheetSnapshot.plugin.hotUpdate as Plugin["hotUpdate"] & HotUpdate;
-  const environment = { environment: { name: "client", moduleGraph: { getModulesByFile: () => undefined } } };
-  const file = source.replaceAll("\\", "/");
-  let release!: (contents: string) => void;
-  const contents = new Promise<string>((done) => { release = done; });
-  hotUpdate.call(environment, { type: "update", file, read: () => contents });
-  await new Promise((done) => setImmediate(done));
-  assert.equal(requests.length, 1, "the stylesheet is not transformed while the changed file may be incomplete");
-  code = "body { color: blue; }\n";
-  release(code);
-  await until(async () => (await snapshot()).includes("color: blue"), async () => `The snapshot missed the edit: ${await snapshot()}`);
-  assert.equal(requests.length, 2);
+	type HotUpdate = (this: unknown, options: { type: 'create' | 'update' | 'delete'; file: string; read: () => string | Promise<string> }) => unknown
+	const hotUpdate = stylesheetSnapshot.plugin.hotUpdate as Plugin['hotUpdate'] & HotUpdate
+	const environment = { environment: { name: 'client', moduleGraph: { getModulesByFile: () => undefined } } }
+	const file = source.replaceAll('\\', '/')
+	let release!: (contents: string) => void
+	const contents = new Promise<string>((done) => {
+		release = done
+	})
+	hotUpdate.call(environment, { type: 'update', file, read: () => contents })
+	await new Promise((done) => setImmediate(done))
+	assert.equal(requests.length, 1, 'the stylesheet is not transformed while the changed file may be incomplete')
+	code = 'body { color: blue; }\n'
+	release(code)
+	await until(
+		async () => (await snapshot()).includes('color: blue'),
+		async () => `The snapshot missed the edit: ${await snapshot()}`,
+	)
+	assert.equal(requests.length, 2)
 
-  // A file that cannot be read, or was deleted, still refreshes the snapshot.
-  code = "body { color: green; }\n";
-  hotUpdate.call(environment, { type: "update", file, read: () => Promise.reject(new Error("ENOENT")) });
-  await until(async () => (await snapshot()).includes("color: green"), async () => `The snapshot missed a failed read: ${await snapshot()}`);
-  code = "body { color: black; }\n";
-  hotUpdate.call(environment, { type: "delete", file, read: () => { throw new Error("deleted"); } });
-  await until(async () => (await snapshot()).includes("color: black"), async () => `The snapshot missed a deletion: ${await snapshot()}`);
-  assert.deepEqual(reports, []);
-});
+	// A file that cannot be read, or was deleted, still refreshes the snapshot.
+	code = 'body { color: green; }\n'
+	hotUpdate.call(environment, { type: 'update', file, read: () => Promise.reject(new Error('ENOENT')) })
+	await until(
+		async () => (await snapshot()).includes('color: green'),
+		async () => `The snapshot missed a failed read: ${await snapshot()}`,
+	)
+	code = 'body { color: black; }\n'
+	hotUpdate.call(environment, {
+		type: 'delete',
+		file,
+		read: () => {
+			throw new Error('deleted')
+		},
+	})
+	await until(
+		async () => (await snapshot()).includes('color: black'),
+		async () => `The snapshot missed a deletion: ${await snapshot()}`,
+	)
+	assert.deepEqual(reports, [])
+})

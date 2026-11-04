@@ -6,6 +6,7 @@ description: El código de servidor de una página, dentro de su .meeko, con sus
 symbols:
   - "syntax:script-server"
 related:
+  - docs/como-elegir.md
   - "@meekojs/meeko/framework#definePage"
   - "@meekojs/meeko/framework#usePage"
   - "@meekojs/meeko/framework#redirect"
@@ -51,21 +52,21 @@ const name = signal(user.name);
 
 ## Atributos
 
-| Atributo | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
+| Atributo | Tipo      | Por defecto | Descripción                                                                           |
+| -------- | --------- | ----------- | ------------------------------------------------------------------------------------- |
 | `server` | sin valor | obligatorio | Marca el bloque como código de servidor. Con un valor (`server="true"`) es `MEEK043`. |
-| `lang` | `"ts"` | obligatorio | El bloque es TypeScript. Sin él es `MEEK006`. |
+| `lang`   | `"ts"`    | obligatorio | El bloque es TypeScript. Sin él es `MEEK006`.                                         |
 
 Una página tiene como mucho un `<script server>` (`MEEK004`), junto a su `<script lang="ts">` y su `<template>`.
 
 ## Resultado
 
-| Lo que declara el bloque | Cuándo se evalúa | A dónde llega |
-| --- | --- | --- |
-| `import`, tipos, `export const route` | Una vez, al cargar el módulo | `route` lo leen el servidor, `meeko build` y `meeko check` |
-| Sentencias de nivel superior | En cada petición (SSR y datos de cada navegación), después del middleware y de validar `params` y `search` | A ningún sitio: son privadas |
-| `export const x` / `export let x` (salvo `route` y `head`) | En cada petición | Al `<script>` y la plantilla, como `x`, de sólo lectura, en JSON |
-| `export const head` | En cada petición | Al `<head>` del documento, como `route.head` |
+| Lo que declara el bloque                                   | Cuándo se evalúa                                                                                           | A dónde llega                                                    |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `import`, tipos, `export const route`                      | Una vez, al cargar el módulo                                                                               | `route` lo leen el servidor, `meeko build` y `meeko check`       |
+| Sentencias de nivel superior                               | En cada petición (SSR y datos de cada navegación), después del middleware y de validar `params` y `search` | A ningún sitio: son privadas                                     |
+| `export const x` / `export let x` (salvo `route` y `head`) | En cada petición                                                                                           | Al `<script>` y la plantilla, como `x`, de sólo lectura, en JSON |
+| `export const head`                                        | En cada petición                                                                                           | Al `<head>` del documento, como `route.head`                     |
 
 Un export que es una promesa se espera antes de renderizar; con `render: "stream"`, un export con `defer` llega después del primer pintado.
 

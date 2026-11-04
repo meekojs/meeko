@@ -1,0 +1,20 @@
+<script lang="ts">
+const props = defineProps<{ tone: string; title: string }>()
+</script>
+
+<template>
+	<article
+		class="card"
+		bind:class="props.tone === 'strong' ? 'ring-4' : undefined"
+	>
+		<span>{props.title}</span>
+	</article>
+</template>
+
+<style scoped>
+@reference "../styles/main.css";
+
+.card {
+	@apply rounded-lg bg-brand p-gutter;
+}
+</style>

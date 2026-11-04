@@ -1,5 +1,6 @@
-import { createHash } from "node:crypto";
-import { inlineSources } from "./inline-sources.js";
+import { createHash } from 'node:crypto'
+
+import { inlineSources } from '../server/runtime/inline-sources'
 
 /**
  * Resultado de {@link inlineScriptHashes}.
@@ -16,19 +17,19 @@ import { inlineSources } from "./inline-sources.js";
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#csp-con-hashes
  */
 export interface InlineScriptReport {
-  /** Fuentes CSP `'sha256-<base64>'` de los scripts en línea ejecutables, ordenadas y sin repetir. */
-  readonly hashes: readonly string[];
-  /**
-   * JavaScript del documento que ningún hash puede permitir en `script-src`: atributos `on*`
-   * (`<button onclick>`) y URL `javascript:` (`<a href="javascript:…">`), descritos para un
-   * mensaje de error.
-   */
-  readonly unhashable: readonly string[];
+	/** Fuentes CSP `'sha256-<base64>'` de los scripts en línea ejecutables, ordenadas y sin repetir. */
+	readonly hashes: readonly string[]
+	/**
+	 * JavaScript del documento que ningún hash puede permitir en `script-src`: atributos `on*`
+	 * (`<button onclick>`) y URL `javascript:` (`<a href="javascript:…">`), descritos para un
+	 * mensaje de error.
+	 */
+	readonly unhashable: readonly string[]
 }
 
 /** The CSP source `'sha256-…'` of an inline text. */
 function sha256Source(text: string): string {
-  return `'sha256-${createHash("sha256").update(text, "utf8").digest("base64")}'`;
+	return `'sha256-${createHash('sha256').update(text, 'utf8').digest('base64')}'`
 }
 
 /**
@@ -54,8 +55,8 @@ function sha256Source(text: string): string {
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#csp-con-hashes
  */
 export function inlineScriptHashes(html: string): InlineScriptReport {
-  const { scripts, unhashable } = inlineSources(html);
-  return { hashes: [...new Set(scripts.map(sha256Source))].sort(), unhashable };
+	const { scripts, unhashable } = inlineSources(html)
+	return { hashes: [...new Set(scripts.map(sha256Source))].sort(), unhashable }
 }
 
 /**
@@ -80,5 +81,5 @@ export function inlineScriptHashes(html: string): InlineScriptReport {
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#csp-con-hashes
  */
 export function inlineStyleHashes(html: string): readonly string[] {
-  return [...new Set(inlineSources(html).styles.map(sha256Source))].sort();
+	return [...new Set(inlineSources(html).styles.map(sha256Source))].sort()
 }

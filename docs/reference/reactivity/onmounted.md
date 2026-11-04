@@ -41,9 +41,9 @@ El HTML del servidor muestra `0px`; al hidratar, `onMounted` mide la ventana y l
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `fn` | `() => void \| (() => void) \| PromiseLike<void>` | obligatorio | Se ejecuta una vez tras montar. Puede devolver una limpieza síncrona, o ser `async`; una función `async` no puede devolver limpieza. |
+| Parámetro | Tipo                                              | Por defecto | Descripción                                                                                                                          |
+| --------- | ------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `fn`      | `() => void \| (() => void) \| PromiseLike<void>` | obligatorio | Se ejecuta una vez tras montar. Puede devolver una limpieza síncrona, o ser `async`; una función `async` no puede devolver limpieza. |
 
 ## Valor devuelto
 
@@ -121,6 +121,7 @@ onMounted(async () => {
 `meeko check` da `TS2345: Argument of type '() => Promise<() => void>' is not assignable to parameter of type '() => MountedResult'`: la limpieza llegaría dentro de una promesa y Meeko no la ejecutaría. Usa `onCleanup` antes del primer `await`, o una función síncrona:
 
 <!-- no-check -->
+
 ```ts good
 onMounted(() => {
   const id = setInterval(tick, 1000);
@@ -140,6 +141,7 @@ async function open(): Promise<void> {
 En ejecución lanza `Error: onMounted() must be called while a component script runs`. Llámalo en el nivel superior del script, o haz el trabajo directamente en el manejador, donde el componente ya está montado:
 
 <!-- no-check -->
+
 ```ts good
 async function open(): Promise<void> {
   await loadPanel();

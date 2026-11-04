@@ -49,13 +49,13 @@ const ada = await api.users.byId.get({ params: { id: "42" }, query: { tab: "perf
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `manifest` | `{ api: { clientKey, pathname, method }[] }` | obligatorio | Los endpoints públicos. `clientKey` es el camino del método (`"users.byId"` → `api.users.byId`); `pathname` usa `[param]` para los segmentos dinámicos. En una aplicación, `meeko check` lo escribe en `.meeko/manifests/server.json`. |
-| `options.baseUrl` | URL o `() => string` | ninguna | Origen contra el que se resuelven las rutas. Sin él, rutas relativas: valen en el navegador, no en Node. |
-| `options.fetch` | `typeof fetch` | el global | Implementación de `fetch`, para pruebas o para añadir lógica. |
-| `options.csrfToken` | texto o `() => string \| undefined` | ninguno | Token que se envía en `x-meeko-csrf` en los métodos distintos de `GET` y `HEAD`. |
-| `options.headers` | `HeadersInit` o `() => HeadersInit` | ninguno | Cabeceras de cada petición. |
+| Parámetro           | Tipo                                         | Por defecto | Descripción                                                                                                                                                                                                                            |
+| ------------------- | -------------------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `manifest`          | `{ api: { clientKey, pathname, method }[] }` | obligatorio | Los endpoints públicos. `clientKey` es el camino del método (`"users.byId"` → `api.users.byId`); `pathname` usa `[param]` para los segmentos dinámicos. En una aplicación, `meeko check` lo escribe en `.meeko/manifests/server.json`. |
+| `options.baseUrl`   | URL o `() => string`                         | ninguna     | Origen contra el que se resuelven las rutas. Sin él, rutas relativas: valen en el navegador, no en Node.                                                                                                                               |
+| `options.fetch`     | `typeof fetch`                               | el global   | Implementación de `fetch`, para pruebas o para añadir lógica.                                                                                                                                                                          |
+| `options.csrfToken` | texto o `() => string \| undefined`          | ninguno     | Token que se envía en `x-meeko-csrf` en los métodos distintos de `GET` y `HEAD`.                                                                                                                                                       |
+| `options.headers`   | `HeadersInit` o `() => HeadersInit`          | ninguno     | Cabeceras de cada petición.                                                                                                                                                                                                            |
 
 `Contract` (el argumento de tipo) describe cada operación con `ApiOperation<Params, Query, Body, Output>`. En una aplicación sale de `.meeko/types/server-contracts.d.ts`.
 
@@ -63,13 +63,13 @@ const ada = await api.users.byId.get({ params: { id: "42" }, query: { tab: "perf
 
 Un objeto anidado por `clientKey`, con un método por verbo HTTP en minúsculas (`get`, `post`, `put`, `patch`, `delete`). Cada método recibe `{ params, query, body }` según su operación (lo que el contrato no declara está prohibido; una query cuyos campos son todos opcionales puede omitirse) y, además, `signal` e `idempotencyKey` (desde `1.2`, un UUID para la cabecera `Idempotency-Key`). Devuelve una promesa del `Output`:
 
-| Respuesta | Resultado |
-| --- | --- |
-| `2xx` con JSON | El valor parseado. |
-| `4xx` o `5xx` con `{ code, status, requestId, issues? }` | Rechaza con `ClientError` con esos campos. |
-| Un cuerpo que no es JSON | Rechaza con `ClientError` `INVALID_RESPONSE`. |
-| Un parámetro con `/` | Rechaza con `TypeError: Invalid route parameter: id`, sin hacer la petición. |
-| Un fallo de red | Rechaza con el error de `fetch` (en Node, `TypeError: fetch failed`). |
+| Respuesta                                                | Resultado                                                                    |
+| -------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `2xx` con JSON                                           | El valor parseado.                                                           |
+| `4xx` o `5xx` con `{ code, status, requestId, issues? }` | Rechaza con `ClientError` con esos campos.                                   |
+| Un cuerpo que no es JSON                                 | Rechaza con `ClientError` `INVALID_RESPONSE`.                                |
+| Un parámetro con `/`                                     | Rechaza con `TypeError: Invalid route parameter: id`, sin hacer la petición. |
+| Un fallo de red                                          | Rechaza con el error de `fetch` (en Node, `TypeError: fetch failed`).        |
 
 Lanza `TypeError` al crearse si dos endpoints producen el mismo método (`Duplicate API method: users.get`) o un segmento es a la vez estático y dinámico.
 
@@ -115,6 +115,7 @@ try {
 ### En el navegador, con el token CSRF de la página
 
 <!-- no-check -->
+
 ```ts
 import { createApiClient, createBrowserClientOptions } from "@meekojs/meeko/framework";
 import manifest from "./api-manifest.json";
@@ -136,6 +137,7 @@ await api.users.get();
 En Node, `fetch` no resuelve rutas relativas: `TypeError: Failed to parse URL from /api/users`.
 
 <!-- no-check -->
+
 ```ts good
 const api = createApiClient<Contract>(manifest, { baseUrl: "http://127.0.0.1:4173" });
 ```
@@ -152,6 +154,7 @@ createApiClient({ api: [
 `TypeError: Duplicate API method: users.get`, al crear el cliente.
 
 <!-- no-check -->
+
 ```ts good
 createApiClient({ api: [
   { clientKey: "users", pathname: "/api/users", method: "GET" },
@@ -168,6 +171,7 @@ await api.users.byId.get({ params: { id: "equipo/ana" } });
 `TypeError: Invalid route parameter: id`, sin petición: un parámetro es un único segmento de la URL. Un parámetro que la ruta no declara da `Unknown route parameter: …`.
 
 <!-- no-check -->
+
 ```ts good
 await api.users.byId.get({ params: { id: "ana" }, query: { team: "equipo" } });
 ```
@@ -182,6 +186,7 @@ catch (error) { if (isClientError(error)) showError(error.code); }
 Sin conexión, o con el servidor caído, no hay respuesta del servidor que convertir: el rechazo es el de `fetch` (`TypeError: fetch failed` en Node, `TypeError: Failed to fetch` en Chrome) y el `catch` de arriba lo traga en silencio.
 
 <!-- no-check -->
+
 ```ts good
 try { await api.users.get(); }
 catch (error) {

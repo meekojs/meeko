@@ -1,0 +1,101 @@
+<script lang="ts">
+	import { isFeaturedPath, isHiddenPath, useDocsModeration } from 'meeko-docs/state'
+
+	const directory = [
+		{
+			title: 'Acciones y navegación',
+			items: [
+				{ href: '/buttons', name: 'Button', description: 'Acciones con variantes, tamaños y estados.' },
+				{ href: '/links', name: 'Link y LinkCard', description: 'Enlaces reales y superficies de navegación.' },
+				{ href: '/badges', name: 'Badge', description: 'Metadatos y estados sin interacción.' },
+				{ href: '/theme-toggle', name: 'ThemeToggle', description: 'Tema claro, oscuro o del sistema, también sin JavaScript.' },
+				{ href: '/navigation', name: 'Navegación', description: 'NavigationTree, NavigationTabs, Tabs, Breadcrumb, PageNavigation, Pagination, TableOfContents y selector de idioma.' },
+			],
+		},
+		{
+			title: 'Estructura',
+			items: [
+				{ href: '/container', name: 'Container', description: 'Anchos fluidos, espaciado lateral y superficies hasta 4K.' },
+				{ href: '/page', name: 'Estructura de página', description: 'Page, PageHeader, Header y Footer.' },
+			],
+		},
+		{
+			title: 'Formularios',
+			items: [
+				{ href: '/forms', name: 'Field e Input', description: 'Etiquetas, modelos de texto y mensajes de error.' },
+				{ href: '/controls', name: 'Controles de formulario', description: 'Textarea, Checkbox, RadioGroup, Switch y Slider.' },
+				{ href: '/select', name: 'Select y Combobox', description: 'Una o varias opciones tipadas, con búsqueda y envío en formularios.' },
+				{ href: '/editor', name: 'Editor de Markdown', description: 'Edición visual y de código, con guardado por bloques.' },
+			],
+		},
+		{
+			title: 'Datos y avisos',
+			items: [
+				{ href: '/cards', name: 'Card', description: 'Contenido con cabecera, cuerpo y acciones.' },
+				{ href: '/tables', name: 'Table', description: 'Filas y columnas correlacionadas por TypeScript.' },
+				{ href: '/content', name: 'Datos y contenido', description: 'Stat, DescriptionList, Disclosure, Diff, CodeBlock y Prose.' },
+				{ href: '/feedback', name: 'Avisos', description: 'Alert, Toast, Empty y Skeleton.' },
+				{ href: '/icons', name: 'Icon', description: 'Iconos de Iconify y SVG propios, incrustados al compilar.' },
+			],
+		},
+		{
+			title: 'Superposiciones',
+			items: [
+				{ href: '/modals', name: 'Modal', description: 'Declarativo o programático, con soporte de anidación.' },
+				{ href: '/popover', name: 'Popover', description: 'Menús, diálogos ligeros y tooltips anclados a su disparador.' },
+				{ href: '/overlays', name: 'Superposiciones', description: 'Drawer, Tooltip y CommandPalette.' },
+				{ href: '/app', name: 'App', description: 'El host de los modales programáticos.' },
+			],
+		},
+	] as const
+
+	// Las páginas que el dashboard oculta salen del índice y las destacadas llevan su insignia.
+	const moderation = useDocsModeration()
+	const groups = computed(() => directory.map((group) => ({ title: group.title, items: group.items.filter((item) => !isHiddenPath(moderation.value, item.href)).map((item) => ({ ...item, featured: isFeaturedPath(moderation.value, item.href) })) })).filter((group) => group.items.length > 0))
+</script>
+
+<template>
+	<DocsPage
+		title="Componentes"
+		description="Encuentra cada componente por su tarea. Cada guía incluye ejemplos, código y referencia de API."
+	>
+		<section
+			each:of="groups.value"
+			each:as="group"
+			each:key="group.title"
+		>
+			<h2>{group.title}</h2>
+			<div class="docs-grid">
+				<UILinkCard
+					each:of="group.items"
+					each:as="item"
+					each:key="item.href"
+					bind:to="item.href"
+					bind:title="item.name"
+					bind:description="item.description"
+				>
+					<UIBadge
+						if:when="item.featured"
+						tone="accent"
+					>
+						Destacado
+					</UIBadge>
+				</UILinkCard>
+			</div>
+		</section>
+		<UIAlert tone="info">
+			Las etiquetas del núcleo
+			<code>MeekoSelect</code>,
+			<code>MeekoPopover</code>
+			y
+			<code>MeekoThemeToggle</code>
+			están obsoletas desde Meeko 1.8 y se retiran en 2.0. Sustitúyelas por
+			<code>UISelect</code>
+			o
+			<code>UICombobox</code>,
+			<code>UIPopover</code>
+			y
+			<code>UIThemeToggle</code>.
+		</UIAlert>
+	</DocsPage>
+</template>

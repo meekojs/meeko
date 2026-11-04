@@ -1,0 +1,53 @@
+<script lang="ts">
+	import { useI18n } from '@meekojs/i18n'
+
+	const props = defineProps<{ rows: readonly { name: string; type: string; description: string; default?: string }[]; caption?: string }>()
+
+	const { t } = useI18n()
+
+	const columns = computed(() => [
+		{ key: 'name' as const, label: t('shell.api.name'), rowHeader: true },
+		{ key: 'type' as const, label: t('shell.api.type') },
+		{ key: 'description' as const, label: t('shell.api.description') },
+	])
+</script>
+
+<template>
+	<UITable
+		rowKey="name"
+		bind:rows="props.rows"
+		bind:columns="columns.value"
+		bind:caption="props.caption"
+	>
+		<snippet
+			if:when="props.caption === undefined"
+			name="caption"
+		>
+			<span bind:lang="t('shell.meta.lang')">{t('shell.api.caption')}</span>
+		</snippet>
+		<snippet
+			name="header"
+			params="column"
+		>
+			<span bind:lang="t('shell.meta.lang')">{column.label}</span>
+		</snippet>
+		<snippet
+			name="cell-name"
+			params="_row, value"
+		>
+			<code>{value}</code>
+		</snippet>
+		<snippet
+			name="cell-type"
+			params="row, value"
+		>
+			<code>{value}</code>
+			<UIBadge
+				if:when="row.default"
+				class="api-default"
+			>
+				{row.default}
+			</UIBadge>
+		</snippet>
+	</UITable>
+</template>

@@ -44,24 +44,24 @@ const route = useRoute();
 
 `useRoute()` no recibe parámetros. El método `isActive(to, options)` del resultado recibe:
 
-| Opción | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `to` | `RouteId` | obligatorio | ID de una ruta que existe, como `"/users/[id]"`. Una ruta inexistente es un error de tipos. |
-| `params` | `RouteParams` de `to` | ninguno | Los segmentos dinámicos, como en `href()`. Obligatorio en una ruta dinámica, prohibido en las demás. |
-| `prefix` | `boolean` | `false` | Cuenta también las rutas por debajo de `to`, con `"true"`. `"/"` sólo coincide exacta. |
+| Opción   | Tipo                  | Por defecto | Descripción                                                                                          |
+| -------- | --------------------- | ----------- | ---------------------------------------------------------------------------------------------------- |
+| `to`     | `RouteId`             | obligatorio | ID de una ruta que existe, como `"/users/[id]"`. Una ruta inexistente es un error de tipos.          |
+| `params` | `RouteParams` de `to` | ninguno     | Los segmentos dinámicos, como en `href()`. Obligatorio en una ruta dinámica, prohibido en las demás. |
+| `prefix` | `boolean`             | `false`     | Cuenta también las rutas por debajo de `to`, con `"true"`. `"/"` sólo coincide exacta.               |
 
 ## Valor devuelto
 
 Un `RouteState`, el mismo objeto para todo el árbol de la aplicación:
 
-| Propiedad | Tipo | Descripción |
-| --- | --- | --- |
-| `url` | `ReadonlySignal<string>` | URL relativa al origen: `pathname`, `search` y, en el navegador, el fragmento (`/users/42?tab=a#bio`). En SSR nunca lleva fragmento, porque el navegador no lo envía. |
-| `path` | `ReadonlySignal<string>` | `pathname`, codificado como en `location.pathname` (`/users/42`). |
-| `id` | `ReadonlySignal<string \| null>` | ID de la ruta en el manifiesto (`"/users/[id]"`), o `null` en la página `404` de `app/error.meeko` para una URL sin ruta. |
-| `params` | `ReadonlySignal<Readonly<Record<string, unknown>>>` | Parámetros de la ruta, con la forma que recibe la página (validados por su schema). |
-| `search` | `ReadonlySignal<Readonly<Record<string, unknown>>>` | Parámetros de búsqueda, con la forma que recibe la página; en la `404`, la query string con las claves repetidas en arrays. |
-| `isActive(to, options?)` | `"page" \| "true" \| false` | Desde `1.5`. Una función, no una señal. `"page"` si la ruta confirmada es `to` (con sus `params`); con `prefix: true`, `"true"` si está por debajo por segmentos completos; si no, `false`. |
+| Propiedad                | Tipo                                                | Descripción                                                                                                                                                                                 |
+| ------------------------ | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `url`                    | `ReadonlySignal<string>`                            | URL relativa al origen: `pathname`, `search` y, en el navegador, el fragmento (`/users/42?tab=a#bio`). En SSR nunca lleva fragmento, porque el navegador no lo envía.                       |
+| `path`                   | `ReadonlySignal<string>`                            | `pathname`, codificado como en `location.pathname` (`/users/42`).                                                                                                                           |
+| `id`                     | `ReadonlySignal<string \| null>`                    | ID de la ruta en el manifiesto (`"/users/[id]"`), o `null` en la página `404` de `app/error.meeko` para una URL sin ruta.                                                                   |
+| `params`                 | `ReadonlySignal<Readonly<Record<string, unknown>>>` | Parámetros de la ruta, con la forma que recibe la página (validados por su schema).                                                                                                         |
+| `search`                 | `ReadonlySignal<Readonly<Record<string, unknown>>>` | Parámetros de búsqueda, con la forma que recibe la página; en la `404`, la query string con las claves repetidas en arrays.                                                                 |
+| `isActive(to, options?)` | `"page" \| "true" \| false`                         | Desde `1.5`. Una función, no una señal. `"page"` si la ruta confirmada es `to` (con sus `params`); con `prefix: true`, `"true"` si está por debajo por segmentos completos; si no, `false`. |
 
 `useRoute()` no recibe argumentos. Fuera de una aplicación de Meeko (un render del framework o `mountClientApp`) lanza `Error: useRoute() necesita una aplicación de Meeko en ejecución…`.
 
@@ -174,6 +174,7 @@ const id = route.params.value.id.toUpperCase();
 `meeko check` da `TS18046: 'route.params.value.id' is of type 'unknown'`: `useRoute` sirve para cualquier ruta, así que no conoce el schema de ésta. En la página, usa sus props `params`, tipadas por `definePage`; en un componente, comprueba el tipo:
 
 <!-- no-check -->
+
 ```ts good
 const id = computed(() => {
   const value = route.params.value.id;
@@ -190,6 +191,7 @@ const html = renderToString({}); // el componente llama a useRoute()
 Lanza `Error: useRoute() necesita una aplicación de Meeko en ejecución: sólo funciona en componentes que renderiza el servidor del framework o que monta mountClientApp. En una prueba unitaria, pasa la ruta al componente como prop.` Haz lo que dice el mensaje:
 
 <!-- no-check -->
+
 ```ts good
 const html = renderToString({ path: "/about" }); // el componente recibe la ruta como prop
 ```

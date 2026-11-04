@@ -46,24 +46,24 @@ async function save(): Promise<void> {
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `ruta` | ruta de un endpoint | obligatorio | Como `"/api/notes"` o `"/api/notes/[id]"`. |
-| `método` | `"POST" \| "PUT" \| "PATCH" \| "DELETE"` | obligatorio | Uno de los métodos que el endpoint declara para esa ruta. `"GET"` lanza `TypeError: useApiMutation: GET <ruta> is a read; use useApi`. |
-| `opciones.retrySafe` | `{ key, storage? }` | ninguno | Hace la escritura segura ante reintentos: guarda la intención con una clave de idempotencia y la reintenta con la misma clave si no hay respuesta. |
-| `opciones.onSuccess` | `(output, attempt) => unknown` | ninguno | Se llama una vez por cada intento que termina bien, también los reintentos automáticos, con el estado ya actualizado. |
-| `opciones.onError` | `(error, attempt) => unknown` | ninguno | Se llama una vez por cada intento que falla. `attempt.uncertain` es `true` si no hubo respuesta. |
+| Parámetro            | Tipo                                     | Por defecto | Descripción                                                                                                                                        |
+| -------------------- | ---------------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ruta`               | ruta de un endpoint                      | obligatorio | Como `"/api/notes"` o `"/api/notes/[id]"`.                                                                                                         |
+| `método`             | `"POST" \| "PUT" \| "PATCH" \| "DELETE"` | obligatorio | Uno de los métodos que el endpoint declara para esa ruta. `"GET"` lanza `TypeError: useApiMutation: GET <ruta> is a read; use useApi`.             |
+| `opciones.retrySafe` | `{ key, storage? }`                      | ninguno     | Hace la escritura segura ante reintentos: guarda la intención con una clave de idempotencia y la reintenta con la misma clave si no hay respuesta. |
+| `opciones.onSuccess` | `(output, attempt) => unknown`           | ninguno     | Se llama una vez por cada intento que termina bien, también los reintentos automáticos, con el estado ya actualizado.                              |
+| `opciones.onError`   | `(error, attempt) => unknown`            | ninguno     | Se llama una vez por cada intento que falla. `attempt.uncertain` es `true` si no hubo respuesta.                                                   |
 
 ## Valor devuelto
 
 Una `ApiMutation`:
 
-| Propiedad | Tipo | Descripción |
-| --- | --- | --- |
-| `mutate(input?)` | `Promise<Output>` | Envía `{ params, query, body }`, comprobados contra el contrato. Sin argumentos si la operación no exige nada. Un endpoint `204` resuelve con `undefined`. Rechaza con un `ClientError` si el servidor responde con error. |
-| `pending` | `ReadonlySignal<boolean>` | `true` mientras una llamada está en curso. |
-| `data` | `ReadonlySignal<Output \| null>` | Respuesta de la última llamada correcta, o `null`. |
-| `error` | `ReadonlySignal<Error \| null>` | Fallo de la última llamada, o `null`. |
+| Propiedad        | Tipo                             | Descripción                                                                                                                                                                                                                |
+| ---------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mutate(input?)` | `Promise<Output>`                | Envía `{ params, query, body }`, comprobados contra el contrato. Sin argumentos si la operación no exige nada. Un endpoint `204` resuelve con `undefined`. Rechaza con un `ClientError` si el servidor responde con error. |
+| `pending`        | `ReadonlySignal<boolean>`        | `true` mientras una llamada está en curso.                                                                                                                                                                                 |
+| `data`           | `ReadonlySignal<Output \| null>` | Respuesta de la última llamada correcta, o `null`.                                                                                                                                                                         |
+| `error`          | `ReadonlySignal<Error \| null>`  | Fallo de la última llamada, o `null`.                                                                                                                                                                                      |
 
 Con `retrySafe` añade `uncertain` (la intención enviada sin respuesta), `retry()` y `discard()`. Fuera del script de un componente lanza `Error: useApiMutation("<ruta>", "<método>") must be called while a component script runs, at the top level of <script>`.
 
@@ -144,6 +144,7 @@ const create = await useApiMutation("/api/notes", "POST");
 `meeko check` da `MEEK055: useApiMutation no se puede esperar con await; llámalo sin await y espera su mutate(input) en un handler`.
 
 <!-- no-check -->
+
 ```ts good
 const create = useApiMutation("/api/notes", "POST");
 async function save(text: string): Promise<void> { await create.mutate({ body: { text } }); }
@@ -158,6 +159,7 @@ const read = useApiMutation("/api/users", "GET");
 `meeko check` da `TS2345: Argument of type '"/api/users"' is not assignable to parameter of type '"/api/notes" | "/api/notes/[id]"'`: sólo admite rutas con métodos de escritura. Para leer, usa [`useApi`](/docs/reference/use-api).
 
 <!-- no-check -->
+
 ```ts good
 const users = useApi("/api/users");
 ```
@@ -173,6 +175,7 @@ await create.mutate({ text: "hola" });
 `meeko check` da `TS2353: Object literal may only specify known properties, and 'text' does not exist in type 'ApiMutationInput<…>'`.
 
 <!-- no-check -->
+
 ```ts good
 await create.mutate({ body: { text: "hola" } });
 ```
@@ -188,6 +191,7 @@ async function save(): Promise<void> {
 El compilador no lo marca (para no rechazar funciones propias con el mismo nombre), pero en ejecución lanza `Error: useApiMutation("/api/notes", "POST") must be called while a component script runs, at the top level of <script>`. Créalo en el nivel superior:
 
 <!-- no-check -->
+
 ```ts good
 const create = useApiMutation("/api/notes", "POST");
 async function save(): Promise<void> { await create.mutate({ body: { text: "x" } }); }

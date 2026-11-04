@@ -1,0 +1,5 @@
+<template>
+	<SiteShell layout="landing">
+		<MeekoOutlet />
+	</SiteShell>
+</template>

@@ -1,0 +1,31 @@
+<template>
+	<DocsPage
+		product="Meeko i18n"
+		title="Laboratorio"
+		description="Prueba traducciones, plurales, selectores, formatos y dirección RTL con el módulo real."
+	>
+		<TranslationLab />
+		<h2 id="how-it-works">El mismo contrato en tres idiomas</h2>
+		<p>
+			El laboratorio usa catálogos JSON de español, inglés y árabe registrados en
+			<code>meeko.config.ts</code>. Las señales actualizan los argumentos de
+			<code>t</code>; los enlaces de idioma apuntan a
+			<code>switchLocalePath</code>
+			y cargan el otro idioma en una navegación completa, conservando la búsqueda y el fragmento.
+		</p>
+		<p>
+			La documentación permanece en español y dirección LTR. El bloque traducido declara su propio
+			<code>lang</code>
+			y
+			<code>dir</code>
+			para que puedas comparar los resultados.
+		</p>
+		<p>
+			Consulta
+			<MeekoLink to="/routing">idiomas y rutas</MeekoLink>
+			para la navegación y
+			<MeekoLink to="/rtl">dirección RTL</MeekoLink>
+			para integrar el contenido de tu aplicación.
+		</p>
+	</DocsPage>
+</template>

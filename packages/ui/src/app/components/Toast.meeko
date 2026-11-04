@@ -1,0 +1,121 @@
+<script lang="ts">
+	import { onCleanup, onMounted, signal } from '@meekojs/meeko'
+
+	import type { UIToastProps } from '../types/feedback'
+
+	import { icons } from '../utils/icons'
+	import { uiMessages } from '../utils/messages'
+	import { withViewTransition } from '../utils/view-transition'
+	import * as Icon from './internal/Icon.meeko'
+
+	const props = defineProps<UIToastProps & { hosted?: boolean }>()
+
+	const emit = defineEmits<{ dismiss: [] }>()
+
+	const snippets = defineSnippets<{ actions?: [] }>()
+
+	const element = useElementRef('element')
+
+	const text = uiMessages().feedback
+	const visible = signal(true)
+	let timer: ReturnType<typeof setTimeout> | undefined
+	let remaining = 0
+	let started = 0
+	let hovered = false
+	let focused = false
+	let closing = false
+
+	function finish() {
+		visible.value = false
+		if (!props.hosted && element.value?.hasAttribute('popover')) element.value.hidePopover?.()
+		emit('dismiss')
+	}
+
+	function close() {
+		clearTimeout(timer)
+		if (closing) return
+		closing = true
+		// The timer does not ask: it must not cut short a transition the user started, such as a navigation.
+		if ((document as { activeViewTransition?: unknown }).activeViewTransition) return finish()
+		element.value?.setAttribute('data-meeko-ui-toast-state', 'closing')
+		withViewTransition(finish, { types: ['ui-toast-close'] })
+	}
+
+	function pause() {
+		if (timer === undefined) return
+		clearTimeout(timer)
+		timer = undefined
+		remaining = Math.max(0, remaining - (Date.now() - started))
+	}
+
+	function resume() {
+		if (hovered || focused || (props.duration ?? 5000) <= 0) return
+		clearTimeout(timer)
+		started = Date.now()
+		timer = setTimeout(close, remaining)
+	}
+
+	function enter() {
+		hovered = true
+		pause()
+	}
+	function leave() {
+		hovered = false
+		resume()
+	}
+	function focus() {
+		focused = true
+		pause()
+	}
+	function blur(event: FocusEvent) {
+		if (!element.value?.contains(event.relatedTarget as Node | null)) {
+			focused = false
+			resume()
+		}
+	}
+
+	onMounted(() => {
+		// Manual popovers do not steal focus or close one another.
+		if (!props.hosted) element.value?.showPopover?.()
+		remaining = Math.max(0, props.duration ?? 5000)
+		resume()
+	})
+	onCleanup(() => clearTimeout(timer))
+</script>
+
+<template>
+	<div
+		ref:element
+		if:when="visible.value"
+		class="meeko-ui-toast"
+		bind:popover="props.hosted ? undefined : 'manual'"
+		bind:data-tone="props.tone ?? 'neutral'"
+		on:mouseenter="enter"
+		on:mouseleave="leave"
+		on:focusin="focus"
+		on:focusout="blur"
+	>
+		<div class="meeko-ui-toast-content">
+			<p
+				class="meeko-ui-toast-message"
+				bind:role="props.tone === 'danger' ? 'alert' : props.hosted ? undefined : 'status'"
+			>
+				{props.text}
+			</p>
+			<div
+				if:when="snippets.actions || props.actions"
+				class="meeko-ui-feedback-actions"
+			>
+				<render snippet="snippets.actions ?? props.actions" />
+			</div>
+		</div>
+		<button
+			type="button"
+			class="meeko-ui-dismiss"
+			bind:aria-label="props.closeLabel ?? text.close"
+			on:click="close"
+		>
+			<Icon bind:path="icons.close" />
+		</button>
+	</div>
+</template>

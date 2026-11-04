@@ -42,25 +42,25 @@ Con `await`, `user.data.value` nunca es `null` en su tipo.
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `ruta` | ruta de un endpoint `GET` | obligatorio | Como `"/api/users"` o `"/api/users/[id]"`. Sólo las rutas `GET` de la aplicación; el editor las completa. |
-| `opciones` | `{ params?, query? }` o `() => { params?, query? }` | sin opciones si el contrato no exige nada | `params` es obligatorio en una ruta dinámica; `query`, si el contrato exige algún campo. Cada campo puede ser una señal, o todo una función que las lee: un cambio vuelve a pedir los datos. |
-| `recarga.keepPrevious` | `boolean` | `true` | Desde `1.5`. Con `false`, un cambio de la entrada vacía `data` y vuelve a ser una primera carga. |
-| `recarga.debounceMs` | `number` | `0` | Desde `1.7`. Milisegundos que la entrada debe quedarse quieta antes de pedir: una ráfaga de cambios hace una sola petición. No retrasa la primera carga, `refresh()` ni el SSR. |
-| `recarga.enabled` | `boolean`, señal o `() => boolean` | `true` | Desde `1.7`. Mientras vale `false` no hay petición, tampoco con `refresh()`, y la que estaba en curso se cancela. |
+| Parámetro              | Tipo                                                | Por defecto                               | Descripción                                                                                                                                                                                  |
+| ---------------------- | --------------------------------------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ruta`                 | ruta de un endpoint `GET`                           | obligatorio                               | Como `"/api/users"` o `"/api/users/[id]"`. Sólo las rutas `GET` de la aplicación; el editor las completa.                                                                                    |
+| `opciones`             | `{ params?, query? }` o `() => { params?, query? }` | sin opciones si el contrato no exige nada | `params` es obligatorio en una ruta dinámica; `query`, si el contrato exige algún campo. Cada campo puede ser una señal, o todo una función que las lee: un cambio vuelve a pedir los datos. |
+| `recarga.keepPrevious` | `boolean`                                           | `true`                                    | Desde `1.5`. Con `false`, un cambio de la entrada vacía `data` y vuelve a ser una primera carga.                                                                                             |
+| `recarga.debounceMs`   | `number`                                            | `0`                                       | Desde `1.7`. Milisegundos que la entrada debe quedarse quieta antes de pedir: una ráfaga de cambios hace una sola petición. No retrasa la primera carga, `refresh()` ni el SSR.              |
+| `recarga.enabled`      | `boolean`, señal o `() => boolean`                  | `true`                                    | Desde `1.7`. Mientras vale `false` no hay petición, tampoco con `refresh()`, y la que estaba en curso se cancela.                                                                            |
 
 ## Valor devuelto
 
 Un `DataResource<T>`, donde `T` es la respuesta del endpoint. Con `await`, un `LoadedResource<T>` cuyo `data` nunca es `null`.
 
-| Propiedad | Tipo | Descripción |
-| --- | --- | --- |
-| `data` | `ReadonlySignal<T \| null>` | Datos de la última carga correcta, o `null` antes de la primera. Una recarga los conserva hasta que llegan los nuevos. |
-| `error` | `ReadonlySignal<Error \| null>` | Fallo de la última carga, o `null`. Una respuesta de error del servidor es un `ClientError`. |
-| `pending` | `ReadonlySignal<boolean>` | `true` mientras hay una carga en curso (o esperando `debounceMs`). |
-| `refreshing` | `ReadonlySignal<boolean>` | Desde `1.5`. `true` durante una recarga con datos anteriores; la primera carga es `pending` sin `refreshing`. |
-| `refresh()` | `Promise<void>` | Vuelve a pedir con la entrada actual; un fallo sólo actualiza `error`. |
+| Propiedad    | Tipo                            | Descripción                                                                                                            |
+| ------------ | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `data`       | `ReadonlySignal<T \| null>`     | Datos de la última carga correcta, o `null` antes de la primera. Una recarga los conserva hasta que llegan los nuevos. |
+| `error`      | `ReadonlySignal<Error \| null>` | Fallo de la última carga, o `null`. Una respuesta de error del servidor es un `ClientError`.                           |
+| `pending`    | `ReadonlySignal<boolean>`       | `true` mientras hay una carga en curso (o esperando `debounceMs`).                                                     |
+| `refreshing` | `ReadonlySignal<boolean>`       | Desde `1.5`. `true` durante una recarga con datos anteriores; la primera carga es `pending` sin `refreshing`.          |
+| `refresh()`  | `Promise<void>`                 | Vuelve a pedir con la entrada actual; un fallo sólo actualiza `error`.                                                 |
 
 ## Ejemplos
 
@@ -175,6 +175,7 @@ const user = useApi("/api/users/[id]");
 `meeko check` da `TS2345: Argument of type '"/api/user"' is not assignable to parameter of type '"/api/users" | "/api/users/[id]"'` en la primera, con la lista de rutas `GET`, y `TS2554: Expected 2-3 arguments, but got 1` en la segunda, porque la ruta dinámica exige `params`. Una ruta inexistente sin opciones también da `TS2554`.
 
 <!-- no-check -->
+
 ```ts good
 const user = useApi("/api/users/[id]", { params: { id: props.params.id } });
 ```
@@ -201,6 +202,7 @@ const user = useApi("/api/users/[id]", { params: { id: id.value } });
 `meeko check` lo acepta, pero el valor se lee una vez: cambiar `id` no vuelve a pedir los datos. Pasa la señal, o una función que la lee:
 
 <!-- no-check -->
+
 ```ts good
 const user = useApi("/api/users/[id]", { params: { id } });
 const same = useApi("/api/users/[id]", () => ({ params: { id: id.value } }));
@@ -215,6 +217,7 @@ const count = (await useApi("/api/users")).data.value.length;
 `meeko check` da `MEEK055: await useApi(...) debe ser una sentencia completa o el inicializador completo de una declaración, como const value = await useApi(...)`.
 
 <!-- no-check -->
+
 ```ts good
 const users = await useApi("/api/users");
 const count = computed(() => users.data.value.length);
@@ -229,6 +232,7 @@ const results = await useApi("/api/users", { query: { q } }, { enabled: false })
 Lanza `useApi("/api/users") is disabled (enabled is false): an awaited resource needs its data. Leave out await, or enable it`, en el servidor y en el navegador. Quita el `await` para un recurso que puede empezar desactivado.
 
 <!-- no-check -->
+
 ```ts good
 const results = useApi("/api/users", { query: { q } }, { enabled: () => q.value.length >= 2 });
 ```

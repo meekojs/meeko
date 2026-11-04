@@ -1,0 +1,34 @@
+<script lang="ts">
+	// The pages of the snapshot: each one passes what it brings in `layoutProps`, and the shell stays mounted
+	// between them, with its sidebar and its search.
+	import type { PageLocale } from 'meeko-docs-content/locale'
+
+	import type { NavSection, Pager, TocEntry } from '../../shared/types/docs'
+
+	export interface Props {
+		nav?: readonly NavSection[]
+		current?: string
+		toc?: readonly TocEntry[]
+		pager?: Pager
+		editUrl?: string
+		source?: string
+		i18n?: PageLocale | null
+	}
+
+	const props = defineProps<Props>()
+</script>
+
+<template>
+	<SiteShell
+		layout="docs"
+		bind:nav="props.nav"
+		bind:current="props.current"
+		bind:toc="props.toc"
+		bind:pager="props.pager"
+		bind:editUrl="props.editUrl"
+		bind:source="props.source"
+		bind:i18n="props.i18n"
+	>
+		<MeekoOutlet />
+	</SiteShell>
+</template>

@@ -1,0 +1,24 @@
+{
+	"greeting": "مرحبًا {name}",
+	"ready": "جاهز للترجمة",
+	"cart": {
+		"items": {
+			"plural": "total",
+			"forms": {
+				"zero": "لا عناصر في السلة",
+				"one": "عنصر واحد في السلة",
+				"two": "عنصران في السلة",
+				"few": "{count} عناصر في السلة",
+				"many": "{count} عنصرًا في السلة",
+				"other": "{count} عنصر في السلة"
+			}
+		}
+	},
+	"invitation": {
+		"select": "role",
+		"forms": {
+			"owner": "{name}، يمكنك إدارة المشروع.",
+			"other": "{name}، يمكنك عرض المشروع."
+		}
+	}
+}

@@ -6,6 +6,7 @@ description: Escucha un evento del DOM en un elemento, o un evento de defineEmit
 symbols:
   - "syntax:on"
 related:
+  - docs/como-elegir.md
   - "syntax:defineemits"
   - "syntax:bind"
   - "syntax:model"
@@ -42,10 +43,10 @@ function increment(): void {
 
 ## Atributos
 
-| Atributo | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `on:<nombre>` en un elemento | `(event: Evento & { currentTarget: Elemento }) => unknown` | ninguno | Listener del evento `<nombre>` del DOM. El nombre se escribe como en `addEventListener`: `click`, `keydown`, `pointerdown`, `submit`, `toggle`. |
-| `on:<nombre>` en un componente | `(...args) => unknown` | ninguno | La prop `on<Nombre>` del hijo, con los argumentos de su `defineEmits`. El nombre es un identificador: `on:save`, `on:saveDraft`. |
+| Atributo                       | Tipo                                                       | Por defecto | Descripción                                                                                                                                     |
+| ------------------------------ | ---------------------------------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `on:<nombre>` en un elemento   | `(event: Evento & { currentTarget: Elemento }) => unknown` | ninguno     | Listener del evento `<nombre>` del DOM. El nombre se escribe como en `addEventListener`: `click`, `keydown`, `pointerdown`, `submit`, `toggle`. |
+| `on:<nombre>` en un componente | `(...args) => unknown`                                     | ninguno     | La prop `on<Nombre>` del hijo, con los argumentos de su `defineEmits`. El nombre es un identificador: `on:save`, `on:saveDraft`.                |
 
 No hay modificadores como `.prevent` o `.once`: llama a `event.preventDefault()` en el manejador.
 

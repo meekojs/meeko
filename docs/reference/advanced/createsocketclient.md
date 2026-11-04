@@ -51,26 +51,26 @@ chat.close();
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `url` | texto | obligatorio | URL `ws:` o `wss:` del canal: `<origen>/_meeko/socket/<canal>`, con `?room=` si el canal usa salas. |
-| `contract` | `SocketContract` | obligatorio | `{ clientToServer, serverToClient }`: los schemas de cada evento en cada dirección. |
-| `options.retryMs` | número | 500 | Primer retraso de reconexión; se duplica en cada intento. |
-| `options.maxRetryMs` | número | 30 000 | Retraso máximo de reconexión. |
-| `options.maxMessageBytes` | número | 65 536 | Mensaje entrante más grande; uno mayor (o binario) se descarta y se informa. |
-| `options.webSocketFactory` | `(url) => WebSocket` | `new WebSocket(url)` | Crea el socket; para pruebas o runtimes sin `WebSocket` global. |
-| `options.onError` | `(error) => void` | consola | Mensajes entrantes inválidos y fallos de los listeners. |
+| Parámetro                  | Tipo                 | Por defecto          | Descripción                                                                                         |
+| -------------------------- | -------------------- | -------------------- | --------------------------------------------------------------------------------------------------- |
+| `url`                      | texto                | obligatorio          | URL `ws:` o `wss:` del canal: `<origen>/_meeko/socket/<canal>`, con `?room=` si el canal usa salas. |
+| `contract`                 | `SocketContract`     | obligatorio          | `{ clientToServer, serverToClient }`: los schemas de cada evento en cada dirección.                 |
+| `options.retryMs`          | número               | 500                  | Primer retraso de reconexión; se duplica en cada intento.                                           |
+| `options.maxRetryMs`       | número               | 30 000               | Retraso máximo de reconexión.                                                                       |
+| `options.maxMessageBytes`  | número               | 65 536               | Mensaje entrante más grande; uno mayor (o binario) se descarta y se informa.                        |
+| `options.webSocketFactory` | `(url) => WebSocket` | `new WebSocket(url)` | Crea el socket; para pruebas o runtimes sin `WebSocket` global.                                     |
+| `options.onError`          | `(error) => void`    | consola              | Mensajes entrantes inválidos y fallos de los listeners.                                             |
 
 ## Valor devuelto
 
 Un `SocketClient` tipado por el contrato:
 
-| Miembro | Descripción |
-| --- | --- |
-| `state` | Señal de sólo lectura: `"connecting"`, `"open"`, `"closed"` o, desde `1.1`, `"unauthorized"`, terminal: el servidor rechazó la sesión o la autorización (cierre `4401`/`4403`) y el cliente no reintenta. |
-| `emit(event, data)` | Valida y envía. Rechaza con `Socket is disconnected` si no está abierto, `Invalid socket event payload` si no cumple el schema, `Unknown socket event: …` si el evento no existe y `Socket message too large` si supera el límite. |
-| `on(event, listener)` | Escucha un evento del servidor, ya validado. Devuelve la función que deja de escucharlo. |
-| `close()` | Cierra la conexión y deja de reconectar. |
+| Miembro               | Descripción                                                                                                                                                                                                                        |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `state`               | Señal de sólo lectura: `"connecting"`, `"open"`, `"closed"` o, desde `1.1`, `"unauthorized"`, terminal: el servidor rechazó la sesión o la autorización (cierre `4401`/`4403`) y el cliente no reintenta.                          |
+| `emit(event, data)`   | Valida y envía. Rechaza con `Socket is disconnected` si no está abierto, `Invalid socket event payload` si no cumple el schema, `Unknown socket event: …` si el evento no existe y `Socket message too large` si supera el límite. |
+| `on(event, listener)` | Escucha un evento del servidor, ya validado. Devuelve la función que deja de escucharlo.                                                                                                                                           |
+| `close()`             | Cierra la conexión y deja de reconectar.                                                                                                                                                                                           |
 
 La URL se pasa tal cual a `new WebSocket(url)`: una URL que el `WebSocket` del runtime no acepta lanza su error al crear el cliente.
 
@@ -79,6 +79,7 @@ La URL se pasa tal cual a `new WebSocket(url)`: una URL que el `WebSocket` del r
 ### Esperar a que abra antes de enviar
 
 <!-- no-check -->
+
 ```ts
 import { effect } from "@meekojs/meeko";
 
@@ -120,6 +121,7 @@ client.close();
 ### Fuera de una aplicación Meeko
 
 <!-- no-check -->
+
 ```ts
 // Un panel de administración que escucha los pedidos de la tienda
 const orders = createSocketClient(`wss://tienda.example.com/_meeko/socket/orders?room=${storeId}`, ordersContract);
@@ -140,6 +142,7 @@ createSocketClient("chat", chatContract);
 `createSocketClient` no conoce los canales de la aplicación: `"chat"` es una URL relativa. En Node, el `WebSocket` global lanza un `DOMException` con el mensaje `TypeError: Invalid URL`; con otro esquema, como `ftp:`, `expected a ws: or wss: url`.
 
 <!-- no-check -->
+
 ```ts good
 createSocketClient(`${location.origin.replace(/^http/, "ws")}/_meeko/socket/chat`, chatContract);
 ```
@@ -156,6 +159,7 @@ await chat.emit("message", { text: "hola" });
 Rechaza con `Socket is disconnected`: el socket todavía está en `"connecting"`, y el cliente no encola mensajes.
 
 <!-- no-check -->
+
 ```ts good
 const chat = createSocketClient(url, chatContract);
 effect(() => { if (chat.state.value === "open") void chat.emit("message", { text: "hola" }); });
@@ -173,6 +177,7 @@ function openChat() {
 Cada llamada deja un socket abierto que, además, se reconecta solo al caerse: las conexiones se acumulan hasta recargar la página.
 
 <!-- no-check -->
+
 ```ts good
 function openChat() {
   const chat = createSocketClient(url, chatContract);

@@ -1,0 +1,165 @@
+{
+	"source": {
+		"fallbackTitle": "Fuente {id}",
+		"fallbackDescription": "Detalle de una fuente de la documentación.",
+		"allSources": "Todas las fuentes",
+		"seeTranslation": "Ver la traducción",
+		"compareOriginal": "Comparar con el original",
+		"newDraft": "Nuevo borrador",
+		"edit": "Editar",
+		"heading": "Fuente",
+		"status": {
+			"draft": "Borrador",
+			"published": "Publicada",
+			"archived": "Archivada"
+		},
+		"pending": {
+			"one": "La revisión #{id} está publicada",
+			"many": {
+				"plural": "count",
+				"forms": {
+					"one": "{count} revisión publicada",
+					"other": "{count} revisiones publicadas"
+				}
+			},
+			"archived": "La revisión #{id} se archivó",
+			"notIncluded": "pero el snapshot activo aún no la incluye: el site sigue mostrando la versión anterior.",
+			"stillShown": "pero el snapshot activo aún la muestra: el site volverá al texto de Git con la próxima publicación."
+		},
+		"publishDocs": "Publicar la documentación",
+		"notice": {
+			"published": "Revisión #{id} publicada. El site la mostrará cuando publiques la documentación.",
+			"archivedPublished": "Revisión #{id} archivada. La próxima publicación vuelve a mostrar Git.",
+			"archived": "Revisión #{id} archivada.",
+			"exported": "Descargado {filename} con la revisión #{id}. Cópialo a {file} para llevarlo al repositorio.",
+			"merged": "Borrador #{id} creado con Git actual y los cambios de la revisión #{revision}."
+		},
+		"openDraft": "Abrir el borrador #{id}",
+		"mergeNote": "Git actual + cambios de la revisión #{id}",
+		"gitNow": "Git ahora",
+		"sideRevision": "Revisión #{id} · {status}",
+		"origin": {
+			"import": "la última importación",
+			"workingTree": "el working tree",
+			"commit": "un commit"
+		},
+		"facts": {
+			"path": "Ruta pública",
+			"locale": "Idioma",
+			"file": "Archivo",
+			"meekoFile": "Página .meeko: su texto vive en el repositorio",
+			"baseHash": "Hash base (importado)",
+			"gitHash": "Hash en Git ahora",
+			"imported": "Importada",
+			"removed": "Retirada",
+			"published": "Revisión publicada",
+			"noPublished": "Ninguna: se publica Git"
+		},
+		"actionFailed": "No se completó la acción",
+		"revisions": "Revisiones",
+		"revisionCount": {
+			"plural": "count",
+			"forms": {
+				"one": "{count} revisión",
+				"other": "{count} revisiones"
+			}
+		},
+		"noRevisions": {
+			"editable": "Sin revisiones: el site publica el archivo de Git. Edita la fuente para crear el primer borrador.",
+			"gone": "Sin revisiones. Git ya no tiene este archivo, así que no se puede editar.",
+			"meeko": "Las páginas .meeko no tienen revisiones: se cambian en el repositorio."
+		},
+		"revisionsCaption": "Revisiones de la fuente, de la más reciente a la más antigua",
+		"columns": {
+			"revision": "Revisión",
+			"status": "Estado",
+			"author": "Autor",
+			"created": "Creada",
+			"published": "Publicada",
+			"note": "Nota",
+			"actions": "Acciones"
+		},
+		"writtenOn": "Escrita sobre Git {hash}",
+		"badges": {
+			"archivedAfter": "Archivada después del snapshot activo, que aún la muestra: el site vuelve a Git con la próxima publicación.",
+			"publishedAfter": "Publicada después del snapshot activo: el site aún no la muestra.",
+			"noSnapshot": "Sin snapshot",
+			"conflictHelp": "Git cambió después de escribirla: su base no es el archivo de ahora.",
+			"conflict": "Conflicto con Git"
+		},
+		"row": {
+			"editDraft": "Editar el borrador #{id}",
+			"fromRevision": "Nuevo borrador desde la revisión #{id}",
+			"startHere": "Partir de aquí",
+			"publish": "Publicar",
+			"archive": "Archivar",
+			"theRevision": "la revisión #{id}",
+			"export": "Exportar la revisión #{id} a",
+			"loading": "Cargando…",
+			"seeConflict": "Ver conflicto",
+			"ofRevision": "de la revisión #{id}"
+		},
+		"conflict": {
+			"title": "Conflicto de la revisión #{id} con Git",
+			"failed": "No se completó",
+			"missing": "Git ya no tiene este archivo.",
+			"lead": "La revisión se escribió sobre una versión de Git ({base}, encontrada en {origin}) que ya no es la de ahora ({git}).",
+			"noBase": "No se encuentra el texto de Git sobre el que se escribió ({base}): solo se compara Git de ahora con la revisión, sin fusión.",
+			"trivial": "Fusión trivial.",
+			"trivialText": "Git y la revisión cambiaron partes distintas: puedes crear un borrador nuevo con Git de ahora y los cambios de la revisión, y revisarlo antes de publicar.",
+			"zones": {
+				"plural": "count",
+				"forms": {
+					"one": "{count} zona cambiada por los dos lados.",
+					"other": "{count} zonas cambiadas por los dos lados."
+				}
+			},
+			"manual": "No hay fusión automática: edita un borrador a mano a partir de Git o de la revisión.",
+			"creating": "Creando…",
+			"merge": "Crear borrador: Git actual + mis cambios",
+			"baseGit": "Base → Git ahora",
+			"baseGitHint": "Lo que cambió en Git desde que se escribió la revisión.",
+			"baseGitLabel": "Diff de la base a Git de ahora",
+			"baseRevision": "Base → revisión",
+			"baseRevisionHint": "Lo que cambió la revisión.",
+			"baseRevisionLabel": "Diff de la base a la revisión",
+			"gitRevision": "Git ahora → revisión",
+			"gitRevisionHint": "Lo que verá el site si se publica la revisión tal cual.",
+			"gitRevisionLabel": "Diff de Git de ahora a la revisión",
+			"noChanges": "Sin cambios.",
+			"noBaseDiff": "Sin base: no se puede mostrar."
+		},
+		"compare": {
+			"title": "Comparar",
+			"label": "Comparar dos versiones",
+			"from": "Desde",
+			"to": "Hasta",
+			"running": "Comparando…",
+			"submit": "Comparar",
+			"failed": "No se pudo comparar",
+			"tooLarge": "Los textos son demasiado distintos para compararlos línea a línea.",
+			"same": "Las dos versiones son iguales.",
+			"diffLabel": "Diff de {from} a {to}"
+		},
+		"gitDiff": {
+			"title": "Diff con Git",
+			"label": "Diff unificado de Git a la revisión publicada",
+			"same": "La revisión publicada coincide con Git.",
+			"none": "No hay revisión publicada: el site muestra exactamente Git."
+		},
+		"confirm": {
+			"publishTitle": "¿Publicar la revisión #{id}?",
+			"archiveTitle": "¿Archivar la revisión #{id}?",
+			"publishText": "Pasa a ser el texto publicado de esta fuente y archiva la publicada anterior. El site la muestra desde la próxima publicación de la documentación.",
+			"archivePublishedText": "Deja de ser el texto publicado: la próxima publicación de la documentación vuelve a mostrar Git.",
+			"archiveText": "Queda en el historial y ya no se puede editar; puedes partir de ella en un borrador nuevo.",
+			"replaces": "Sustituye a",
+			"conflictWarning": "Esta revisión se escribió sobre otra versión de Git: publicarla descarta lo que cambió en Git desde entonces. Revisa el conflicto antes.",
+			"notPublished": "No se publicó",
+			"notArchived": "No se archivó",
+			"working": "Un momento…",
+			"publish": "Publicar revisión",
+			"archive": "Archivar revisión"
+		}
+	}
+}

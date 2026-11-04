@@ -1,0 +1,70 @@
+<script lang="ts">
+	import { englishExamples as examples } from '../../utils/examples.en'
+	const project = signal('Project Aurora')
+	const saved = signal(false)
+</script>
+
+<template>
+	<DocsPage
+		locale="en"
+		title="Your interface. In the language of Meeko."
+		description="Typed components to go from signals to a complete interface. Rendered on the server and adapted to your brand."
+		landing
+	>
+		<div class="docs-actions">
+			<UILink to="/installation">Start building</UILink>
+			<UILink
+				to="/components"
+				variant="outline"
+			>
+				See components
+			</UILink>
+		</div>
+		<div class="docs-showcase">
+			<div>
+				<h2>Real components. From the first render.</h2>
+				<p>This site uses the same package you install in your application. Try a control, switch the theme and take the example to your project.</p>
+				<UICard
+					title="Your next project"
+					description="A small example with signals and snippets."
+				>
+					<UIField
+						id="project-name"
+						label="Project name"
+					>
+						<snippet
+							name="default"
+							params="id, describedBy"
+						>
+							<UIInput
+								model="project"
+								bind:id="id"
+								bind:describedBy="describedBy"
+							/>
+						</snippet>
+					</UIField>
+					<p role="status">{saved.value ? 'Changes saved in this example.' : 'Edit the name and save the change.'}</p>
+					<snippet name="footer">
+						<UIButton on:click="() => (saved.value = true)">Save project</UIButton>
+						<UIBadge bind:tone="saved.value ? 'accent' : 'neutral'">{saved.value ? 'Saved' : 'Draft'}</UIBadge>
+					</snippet>
+				</UICard>
+			</div>
+			<DocsCode bind:code="examples.card" />
+		</div>
+		<h2>One foundation, your own identity</h2>
+		<p>Use semantic tokens to connect colors, surfaces and focus with your CSS variables. Defaults are configured per application; each component can override them with its props.</p>
+		<div class="docs-grid">
+			<UILinkCard
+				to="/theming"
+				title="Theming and customization"
+				description="Light, dark and the colors your site already has."
+			/>
+			<UILinkCard
+				to="/modals"
+				title="Complete interactions"
+				description="Modals with results, focus and nested stacks."
+			/>
+		</div>
+	</DocsPage>
+</template>

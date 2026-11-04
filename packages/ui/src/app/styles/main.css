@@ -1,0 +1,412 @@
+@import './palette.css';
+@import './tokens.css';
+@import './fonts.css';
+@import './utilities.css';
+@import './container.css';
+@import './modal.css';
+@import './table.css';
+@import './card.css';
+@import './link-card.css';
+@import './badge.css';
+@import './navigation.css';
+@import './page.css';
+@import './code.css';
+@import './prose.css';
+@import './popover.css';
+@import './select.css';
+@import './tabs.css';
+@import './tooltip.css';
+@import './command-palette.css';
+@import './theme-toggle.css';
+@import './forms.css';
+@import './feedback.css';
+
+.meeko-ui-button,
+.meeko-ui-input,
+.meeko-ui-field,
+[data-meeko-select],
+[data-meeko-popover],
+[data-meeko-theme-toggle] {
+	font-family: var(--ui-font-sans);
+}
+/* <UIButton> and <UILink> paint an <a> or a <button> with the same look: the rules set what each
+   one takes from the user agent (text-align, letter-spacing, margin…) or from the app's link styles. */
+.meeko-ui-button {
+	--ui-button-color: var(--ui-color-primary-contrast);
+	display: inline-flex;
+	justify-content: center;
+	align-items: center;
+	gap: var(--ui-space-1-5);
+	transition:
+		background-color var(--ui-duration-fast),
+		border-color var(--ui-duration-fast);
+	cursor: pointer;
+	box-sizing: border-box;
+	margin: 0;
+	border: var(--ui-border-width) solid transparent;
+	border-radius: var(--ui-radius-md);
+	background: var(--ui-color-primary);
+	padding: var(--ui-control-padding-md);
+	min-height: var(--ui-control-height-md);
+	color: var(--ui-button-color);
+	font: var(--ui-control-font-weight) var(--ui-control-font-size) / var(--ui-line-height-tight) var(--ui-font-sans);
+	letter-spacing: var(--ui-tracking-snug);
+	text-align: center;
+	text-decoration: none;
+	text-indent: 0;
+	text-shadow: none;
+	text-transform: none;
+	white-space: nowrap;
+	word-spacing: normal;
+}
+/* An app rule such as "a:hover { color }" or "a { text-decoration: underline }" is more specific
+   than the class alone. */
+.meeko-ui-button:any-link {
+	color: var(--ui-button-color);
+	text-decoration: none;
+}
+.meeko-ui-button:hover:not(:disabled) {
+	background: var(--ui-color-primary-hover);
+}
+.meeko-ui-button:active:not(:disabled) {
+	background: var(--ui-color-primary-active);
+}
+.meeko-ui-button[data-size='sm'] {
+	padding: var(--ui-control-padding-sm);
+	min-height: var(--ui-control-height-sm);
+	font-size: var(--ui-control-font-size-sm);
+}
+.meeko-ui-button[data-size='lg'] {
+	padding: var(--ui-control-padding-lg);
+	min-height: var(--ui-control-height-lg);
+	font-size: var(--ui-control-font-size-lg);
+}
+.meeko-ui-button[data-shape='pill'] {
+	border-radius: var(--ui-radius-full);
+}
+.meeko-ui-button[data-variant='ghost'] {
+	--ui-button-color: var(--ui-color-text);
+	background: transparent;
+}
+.meeko-ui-button[data-variant='outline'] {
+	--ui-button-color: var(--ui-color-text);
+	border-color: var(--ui-color-control-border);
+	background: transparent;
+}
+.meeko-ui-button[data-variant='secondary'] {
+	--ui-button-color: var(--ui-color-text);
+	border-color: var(--ui-color-border);
+	background: var(--ui-color-control);
+}
+.meeko-ui-button:is([data-variant='ghost'], [data-variant='outline'], [data-variant='secondary']):hover:not(:disabled) {
+	background: var(--ui-color-control-hover);
+}
+.meeko-ui-button:is([data-variant='ghost'], [data-variant='outline'], [data-variant='secondary']):active:not(:disabled) {
+	background: var(--ui-color-control-active);
+}
+/* After the variants: a tone only changes the colours of the variant it is given to. */
+.meeko-ui-button[data-tone='danger'] {
+	--ui-button-color: var(--ui-color-danger-contrast);
+	background: var(--ui-color-danger);
+}
+.meeko-ui-button[data-tone='danger']:is(:hover, :active):not(:disabled) {
+	--ui-button-color: var(--ui-color-danger-contrast-hover);
+	background: var(--ui-color-danger-hover);
+}
+.meeko-ui-button[data-tone='danger']:is([data-variant='ghost'], [data-variant='outline']) {
+	--ui-button-color: var(--ui-color-danger-text);
+	background: transparent;
+}
+.meeko-ui-button[data-tone='danger'][data-variant='outline'] {
+	border-color: var(--ui-color-danger-border);
+}
+.meeko-ui-button[data-tone='danger'][data-variant='secondary'] {
+	--ui-button-color: var(--ui-color-danger-text);
+	border-color: var(--ui-color-danger-border);
+	background: var(--ui-color-danger-soft);
+}
+.meeko-ui-button[data-tone='danger']:is([data-variant='ghost'], [data-variant='outline'], [data-variant='secondary']):is(:hover, :active):not(:disabled) {
+	--ui-button-color: var(--ui-color-danger-text);
+	background: var(--ui-color-danger-soft);
+}
+.meeko-ui-button[data-icon-only] {
+	padding: var(--ui-space-0);
+	min-width: var(--ui-control-height-md);
+}
+.meeko-ui-button[data-icon-only] > svg {
+	flex: none;
+	width: var(--ui-icon-size);
+	height: var(--ui-icon-size);
+}
+.meeko-ui-button[data-icon-only][data-size='sm'] {
+	min-width: var(--ui-control-height-sm);
+}
+.meeko-ui-button[data-icon-only][data-size='lg'] {
+	min-width: var(--ui-control-height-lg);
+}
+/* While busy the action stays focusable, so the keyboard does not lose its place. */
+.meeko-ui-button[aria-busy='true'],
+.meeko-ui-pagination .meeko-ui-button[aria-disabled='true'] {
+	gap: var(--ui-space-1-5);
+	cursor: progress;
+}
+.meeko-ui-button[aria-busy='true']::before,
+.meeko-ui-pagination .meeko-ui-button[aria-disabled='true']::before {
+	flex: none;
+	animation: meeko-ui-spin var(--ui-duration-spin) linear infinite;
+	box-sizing: border-box;
+	border: var(--ui-focus-ring-width) solid currentColor;
+	border-radius: var(--ui-radius-full);
+	border-inline-end-color: transparent;
+	width: var(--ui-icon-size-sm);
+	height: var(--ui-icon-size-sm);
+	content: '';
+}
+.meeko-ui-button[data-icon-only][aria-busy='true'] > * {
+	display: none;
+}
+@keyframes meeko-ui-spin {
+	to {
+		rotate: 1turn;
+	}
+}
+.meeko-ui-button:disabled,
+.meeko-ui-input:disabled,
+[data-meeko-select][data-disabled] {
+	opacity: var(--ui-opacity-disabled);
+	cursor: not-allowed;
+}
+.meeko-ui-input,
+[data-meeko-select-trigger] {
+	display: block;
+	transition: background-color var(--ui-duration-fast);
+	box-sizing: border-box;
+	border: var(--ui-border-width) solid var(--ui-color-control-border);
+	border-radius: var(--ui-radius-md);
+	background: var(--ui-color-control);
+	padding: var(--ui-space-1-5) var(--ui-space-3);
+	width: 100%;
+	min-height: var(--ui-control-height-md);
+	color: var(--ui-color-text);
+	font: var(--ui-font-weight-regular) var(--ui-input-font-size) / var(--ui-line-height-snug) var(--ui-font-sans);
+}
+.meeko-ui-input:hover:not(:disabled),
+[data-meeko-select-trigger]:hover {
+	background: var(--ui-color-control-hover);
+}
+[data-meeko-select-trigger] {
+	cursor: pointer;
+	text-align: start;
+}
+.meeko-ui-input::placeholder,
+[data-meeko-select-placeholder] {
+	color: var(--ui-color-text-soft);
+}
+.meeko-ui-input[aria-invalid='true'],
+[data-meeko-select-trigger][aria-invalid='true'] {
+	border-color: var(--ui-color-danger);
+}
+.meeko-ui-button:focus-visible,
+.meeko-ui-input:focus-visible,
+[data-meeko-select-trigger]:focus-visible,
+[data-meeko-popover-trigger]:focus-visible,
+[data-meeko-theme-toggle] button:focus-visible {
+	outline: var(--ui-focus-ring);
+	outline-offset: var(--ui-focus-ring-offset);
+}
+@media (prefers-reduced-motion: reduce) {
+	.meeko-ui-button,
+	.meeko-ui-input,
+	[data-meeko-select-trigger],
+	[data-meeko-popover-trigger] {
+		transition: none;
+	}
+	.meeko-ui-button[aria-busy='true']::before,
+	.meeko-ui-pagination .meeko-ui-button[aria-disabled='true']::before {
+		animation: none;
+	}
+}
+.meeko-ui-field {
+	display: grid;
+	gap: var(--ui-space-1-5);
+	color: var(--ui-color-text);
+}
+.meeko-ui-field-label {
+	font-weight: var(--ui-font-weight-medium);
+	font-size: var(--ui-font-size-sm);
+}
+.meeko-ui-field-description {
+	margin: 0;
+	color: var(--ui-color-text-soft);
+	font-size: var(--ui-font-size-sm);
+}
+.meeko-ui-field-error {
+	margin: 0;
+	color: var(--ui-color-danger-text);
+	font-size: var(--ui-font-size-sm);
+}
+[data-meeko-popover] {
+	box-shadow: var(--ui-shadow-md);
+	border: var(--ui-border-width) solid var(--ui-color-border);
+	border-radius: var(--ui-radius-lg);
+	background: var(--ui-color-surface-raised);
+	padding: var(--ui-space-1);
+	max-height: var(--ui-popover-max-height);
+	overflow: auto;
+	color: var(--ui-color-text);
+	font-size: var(--ui-font-size-md);
+}
+[data-meeko-popover][role='dialog'] {
+	padding: var(--ui-space-4);
+	width: min(var(--ui-floating-panel-width), calc(100vw - var(--ui-space-8)));
+}
+[data-meeko-popover][role='menu'] {
+	min-width: var(--ui-page-aside-width);
+}
+/* The trigger <UIPopover> paints looks like a control; `triggerClass` or any rule of the app replaces it. */
+[data-meeko-popover-trigger] {
+	display: inline-flex;
+	align-items: center;
+	transition: background-color var(--ui-duration-fast);
+	cursor: pointer;
+	border: var(--ui-border-width) solid var(--ui-color-border-strong);
+	border-radius: var(--ui-radius-md);
+	background: var(--ui-color-control);
+	padding: var(--ui-control-padding-md);
+	min-height: var(--ui-control-height-md);
+	color: var(--ui-color-text);
+	font: var(--ui-control-font-weight) var(--ui-control-font-size) / var(--ui-line-height-tight) var(--ui-font-sans);
+	letter-spacing: var(--ui-tracking-snug);
+}
+[data-meeko-popover-trigger]:hover,
+[data-meeko-popover-trigger][aria-expanded='true'] {
+	background: var(--ui-color-control-hover);
+}
+/* The items of a menu: a native <button> or <a>, or a <UIButton variant="ghost">. */
+[data-meeko-popover] :is([role='menuitem'], [role='menuitemcheckbox'], [role='menuitemradio']) {
+	display: flex;
+	justify-content: flex-start;
+	cursor: pointer;
+	border: 0;
+	border-radius: var(--ui-radius-sm);
+	background: transparent;
+	padding: var(--ui-space-1-5) var(--ui-space-2);
+	width: 100%;
+	min-height: 0;
+	color: inherit;
+	font: inherit;
+	text-align: start;
+	text-decoration: none;
+}
+[data-meeko-popover] :is([role='menuitem'], [role='menuitemcheckbox'], [role='menuitemradio']):is(:hover, :focus) {
+	outline: none;
+	background: var(--ui-color-control-active);
+}
+[data-meeko-popover] :is([role='menuitem'], [role='menuitemcheckbox'], [role='menuitemradio']):focus-visible {
+	outline: var(--ui-focus-ring);
+	outline-offset: calc(var(--ui-focus-ring-offset) * -1);
+}
+[data-meeko-select-list] [role='option'] {
+	cursor: pointer;
+	border-radius: var(--ui-radius-sm);
+	padding: var(--ui-space-1-5) var(--ui-space-2);
+}
+[data-meeko-select-list] [role='option'][data-active] {
+	box-shadow: var(--ui-option-active-ring);
+	background: var(--ui-color-control-active);
+}
+[data-meeko-select-list] [role='option'][data-selected] {
+	font-weight: var(--ui-font-weight-semibold);
+}
+[data-meeko-select-list] [role='option'][data-disabled] {
+	opacity: var(--ui-opacity-disabled);
+	cursor: not-allowed;
+}
+[data-meeko-select-group-label],
+[data-meeko-select-empty],
+[data-meeko-select-loading] {
+	padding: var(--ui-space-1-5) var(--ui-space-2);
+	color: var(--ui-color-text-soft);
+	font-size: var(--ui-font-size-sm);
+}
+[data-meeko-theme-toggle] button {
+	display: inline-flex;
+	justify-content: center;
+	align-items: center;
+	cursor: pointer;
+	border: var(--ui-border-width) solid var(--ui-color-border);
+	border-radius: var(--ui-radius-md);
+	background: var(--ui-color-control);
+	padding: var(--ui-space-1) var(--ui-space-2);
+	min-height: var(--ui-control-height-md);
+	color: var(--ui-color-text);
+	font-size: var(--ui-font-size-sm);
+}
+/* An icon sits on the middle of the button, not on the baseline of a line of text. */
+[data-meeko-theme-icon] > svg {
+	display: block;
+}
+[data-meeko-theme-toggle] button:hover {
+	background: var(--ui-color-control-hover);
+}
+[data-meeko-select-values] {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--ui-space-1-5);
+}
+[data-meeko-select] > [data-meeko-select-values] {
+	margin-bottom: var(--ui-space-1-5);
+}
+[data-meeko-select][data-clearable] {
+	position: relative;
+}
+[data-meeko-select][data-clearable] [data-meeko-select-trigger] {
+	padding-inline-end: var(--ui-control-height-md);
+}
+[data-meeko-select-clear] {
+	display: inline-flex;
+	position: absolute;
+	justify-content: center;
+	align-items: center;
+	cursor: pointer;
+	inset-block-end: 0;
+	inset-inline-end: 0;
+	border: 0;
+	border-radius: var(--ui-radius-md);
+	background: transparent;
+	width: var(--ui-control-height-md);
+	height: var(--ui-control-height-md);
+	color: var(--ui-color-text-soft);
+	font: var(--ui-font-weight-regular) var(--ui-font-size-xl) / var(--ui-line-height-none) var(--ui-font-sans);
+}
+[data-meeko-select-clear]:hover {
+	color: var(--ui-color-text);
+}
+[data-meeko-select-clear]:focus-visible {
+	outline: var(--ui-focus-ring);
+	outline-offset: calc(var(--ui-focus-ring-offset) * -1);
+}
+[data-meeko-select] > [data-meeko-select-values] [data-meeko-select-value] {
+	border: var(--ui-border-width) solid var(--ui-color-border);
+	border-radius: var(--ui-radius-full);
+	background: var(--ui-color-control);
+	padding: var(--ui-space-0-5) var(--ui-space-2);
+	font-size: var(--ui-font-size-sm);
+}
+[data-meeko-theme-toggle='select'] [role='radiogroup'] {
+	display: inline-flex;
+	gap: var(--ui-space-1);
+	border: var(--ui-border-width) solid var(--ui-color-border);
+	border-radius: var(--ui-radius-lg);
+	padding: var(--ui-space-0-5);
+}
+[data-meeko-theme-toggle='select'] [role='radio'] {
+	border-color: transparent;
+	background: transparent;
+	min-height: var(--ui-control-height-sm);
+}
+[data-meeko-theme-toggle='select'] [role='radio'][aria-checked='true'] {
+	border-color: var(--ui-color-border-strong);
+	background: var(--ui-color-control-active);
+	font-weight: var(--ui-font-weight-semibold);
+}

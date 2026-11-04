@@ -14,11 +14,12 @@ related:
   - "config:modules"
   - "config:imports"
   - "config:theme"
+  - "config:devtools"
   - docs/framework.md#configuración
   - docs/framework.md#layers
 ---
 
-`defineMeekoConfig(config)` declara la configuración del proyecto en `meeko.config.ts`. En ejecución devuelve el mismo objeto; su papel es dar tipos y completado a cada clave y conservar los literales (`const T`), para que `server.adapter` siga discriminado y las opciones de cada adaptador se comprueben.
+`defineMeekoConfig(config)` declara la configuración del proyecto en `meeko.config.ts`. En ejecución devuelve el mismo objeto; su papel es dar tipos, completado y documentación a cada clave y conservar los literales (`const T`), para que `server.adapter` siga discriminado y las opciones de cada adaptador se comprueben. Desde `1.8` también tipa y documenta la clave de cada módulo de `modules` sin importar nada (véase [`modules`](../config/config-modules.md)).
 
 `meeko dev`, `meeko build`, `meeko check`, el plugin de Vite y el servidor de lenguaje leen el export por defecto de `meeko.config.ts`. Cada clave tiene su página en el grupo «Configuración» de esta referencia.
 
@@ -38,22 +39,23 @@ export default defineMeekoConfig({
 
 ## Parámetros
 
-| Clave | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `layers` | `string[]` | `[]` | Carpetas o paquetes que aportan páginas, componentes, layouts y autoimports. |
-| `extends` | `string[]` | `[]` | Alias obsoleto de `layers`. |
-| `modules` | módulos, rutas o `[módulo, opciones]` | `[]` | Módulos de Meeko (`defineMeekoModule`). |
-| `imports` | `{ appDirs?, sharedDirs?, serverDirs? }` | las carpetas estándar | Carpetas extra de autoimports por ámbito. |
-| `alias` | `Record<string, string \| false>` | ninguno | Aliases de ruta propios, además de `~/`, `@/`, `#shared/` y `#server/`. |
-| `server` | `{ adapter, … }` | `{ adapter: "node" }` | El adaptador (`"node"`, `"bun"`, `"deno"`, `"cloudflare"` o `"static"`) y sus opciones: `host`, `port`, `contentSecurityPolicy`, `headers`… **`adapter` es obligatorio si declaras `server`.** |
-| `css` | `{ scopeAttribute?: "all" \| "matched" }` | `"all"` | Qué elementos reciben el atributo de `<style scoped>`. |
-| `document` | `DocumentConfig` | ninguno | `<head>`, `lang` y atributos del documento de toda la aplicación. |
-| `dev` | `{ serverLogs? }` | ninguno | Opciones de `meeko dev`. |
-| `site` | URL | `MEEKO_PUBLIC_ORIGIN` | Origen público, para el sitemap y las URL absolutas. |
-| `sitemap` / `robots` | `boolean` u opciones | `false` | Escriben `sitemap.xml` y `robots.txt` en el build. |
-| `theme` | `boolean` u opciones | `false` | Tema claro/oscuro sin parpadeo y `<MeekoThemeToggle>`. |
+| Clave                | Tipo                                      | Por defecto           | Descripción                                                                                                                                                                                    |
+| -------------------- | ----------------------------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `layers`             | `string[]`                                | `[]`                  | Carpetas o paquetes que aportan páginas, componentes, layouts y autoimports.                                                                                                                   |
+| `extends`            | `string[]`                                | `[]`                  | Alias obsoleto de `layers`.                                                                                                                                                                    |
+| `modules`            | nombres de paquete o rutas                | `[]`                  | Módulos de Meeko (`defineMeekoModule`), por su nombre; sus opciones van en su clave.                                                                                                           |
+| `imports`            | `{ appDirs?, sharedDirs?, serverDirs? }`  | las carpetas estándar | Carpetas extra de autoimports por ámbito.                                                                                                                                                      |
+| `alias`              | `Record<string, string \| false>`         | ninguno               | Aliases de ruta propios, además de `~/`, `@/`, `#shared/` y `#server/`.                                                                                                                        |
+| `server`             | `{ adapter, … }`                          | `{ adapter: "node" }` | El adaptador (`"node"`, `"bun"`, `"deno"`, `"cloudflare"` o `"static"`) y sus opciones: `host`, `port`, `contentSecurityPolicy`, `headers`… **`adapter` es obligatorio si declaras `server`.** |
+| `css`                | `{ scopeAttribute?: "all" \| "matched" }` | `"all"`               | Qué elementos reciben el atributo de `<style scoped>`.                                                                                                                                         |
+| `document`           | `DocumentConfig`                          | ninguno               | `<head>`, `lang` y atributos del documento de toda la aplicación.                                                                                                                              |
+| `dev`                | `{ serverLogs? }`                         | ninguno               | Opciones de `meeko dev`.                                                                                                                                                                       |
+| `devtools`           | `boolean` o `{ panel?, position? }`       | `false`               | Desde `1.8`, `meeko dev` monta el panel de Meeko DevTools en la página.                                                                                                                        |
+| `site`               | URL                                       | `MEEKO_PUBLIC_ORIGIN` | Origen público, para el sitemap y las URL absolutas.                                                                                                                                           |
+| `sitemap` / `robots` | `boolean` u opciones                      | `false`               | Escriben `sitemap.xml` y `robots.txt` en el build.                                                                                                                                             |
+| `theme`              | `boolean` u opciones                      | `false`               | Tema claro/oscuro sin parpadeo y `<MeekoThemeToggle>`.                                                                                                                                         |
 
-Un módulo puede añadir su propia clave (su `meta.configKey`), con sus opciones.
+Cada módulo de `modules` añade su propia clave (su `meta.configKey`), con sus opciones: `i18n` para `@meekojs/i18n`, `ui` para `@meekojs/ui`. Meeko la tipa con `.meeko/types/config.d.ts`, que generan `meeko dev`, `meeko check` y el editor de un workspace de confianza; `meeko check` comprueba `meeko.config.ts` con esos tipos desde `1.8`.
 
 ## Valor devuelto
 
@@ -69,7 +71,8 @@ import { defineMeekoConfig } from "@meekojs/meeko/framework";
 
 export default defineMeekoConfig({
   layers: ["./layers/base"],
-  modules: ["@acme/seo", ["./modules/accent", { initial: "teal" }]],
+  modules: ["@acme/seo", "./modules/accent"],
+  accent: { initial: "teal" },
   imports: {
     appDirs: ["app/services"],
     sharedDirs: ["shared/validators"],
@@ -120,6 +123,7 @@ export default defineMeekoConfig({ server: { port: 3000 } });
 `meeko check` da `TS2322: Type '{ port: number; }' is not assignable to type 'MeekoServerConfig | undefined'.` con `Property 'adapter' is missing`, y la carga de la configuración falla con `meeko.config.ts: server.adapter debe ser "node", "cloudflare", "deno", "bun" o "static"`.
 
 <!-- no-check -->
+
 ```ts good
 export default defineMeekoConfig({ server: { adapter: "node", port: 3000 } });
 ```
@@ -133,19 +137,21 @@ export default defineMeekoConfig({ server: { adapter: "vercel" } });
 `meeko check` da `TS2322: Type '"vercel"' is not assignable to type '"bun" | "cloudflare" | "deno" | "node" | "static"'.` y la misma parada al cargar la configuración.
 
 <!-- no-check -->
+
 ```ts good
 export default defineMeekoConfig({ server: { adapter: "node" } });
 ```
 
 ### Una clave mal escrita
 
-`defineMeekoConfig` acepta claves que no conoce, porque los módulos añaden las suyas (`meta.configKey`), también sin aumentar `MeekoConfig`: rechazarlas en los tipos rompería configuraciones válidas de `1.x`. La opción mal escrita se ignora, y desde `1.7` la carga de la configuración lo avisa con la clave más parecida: `[meeko] Aviso: meeko.config.ts tiene la clave desconocida "sitmap", que Meeko ignora. ¿Quisiste decir "sitemap"?`. Hasta `1.6` no había ningún aviso.
+`defineMeekoConfig` acepta claves que no conoce, porque los módulos añaden las suyas (`meta.configKey`), también sin aumentar `MeekoConfig`: rechazarlas en los tipos rompería configuraciones válidas de `1.x`. La opción mal escrita se ignora, y desde `1.7` la carga de los módulos (`meeko dev`, `meeko build`, `meeko check`) lo avisa con la clave más parecida; desde `1.8`, la clave de un módulo instalado que falta en `modules` es el aviso `MEEK127`, que nombra la entrada que falta: `[meeko] Aviso: meeko.config.ts tiene la clave desconocida "sitmap", que Meeko ignora. ¿Quisiste decir "sitemap"?`. Hasta `1.6` no había ningún aviso.
 
 ```ts bad
 export default defineMeekoConfig({ sitmap: true });
 ```
 
 <!-- no-check -->
+
 ```ts good
 export default defineMeekoConfig({ site: "https://example.com", sitemap: true });
 ```

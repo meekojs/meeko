@@ -1,0 +1,58 @@
+{
+	"a11y": {
+		"home": "Meeko, home",
+		"primaryNav": "Main",
+		"footerNav": "Footer",
+		"github": "Meeko on GitHub"
+	},
+	"nav": {
+		"guide": "Guide",
+		"api": "API",
+		"changes": "Changelog",
+		"start": "Get started"
+	},
+	"footer": {
+		"built": "Built with Meeko: every page of this site is a prerendered <code>.meeko</code> component.",
+		"dedication": "Dedicated to Meeko, the author's kitten.",
+		"docs": "Documentation",
+		"quickStart": "Quick start",
+		"frameworkGuide": "Framework guide",
+		"componentsApi": "Components and API",
+		"reference": "API reference",
+		"devtools": "DevTools",
+		"project": "Project",
+		"changes": "Changelog",
+		"stability": "1.x stability",
+		"license": "MIT license"
+	},
+	"search": {
+		"open": "Search the documentation",
+		"trigger": "Search…",
+		"placeholder": "Search: signals, defineModel, prerender…",
+		"input": "Search text",
+		"hint": "Type to search the guides and the API reference. Open it from any page with <kbd>/</kbd> or <kbd>{modifier}</kbd> <kbd>K</kbd>; move with the arrow keys and open a result with <kbd>Enter</kbd>.",
+		"loading": "Searching…",
+		"empty": "No results for “{query}”.",
+		"unavailable": "Search is not available right now. Try again in a moment."
+	},
+	"actions": {
+		"copy": "Copy",
+		"copied": "Copied",
+		"copyFailed": "Error"
+	},
+	"error": {
+		"notFoundTitle": "This page does not exist",
+		"notFoundDetail": "The link may be old, or the page may have been renamed.",
+		"failedTitle": "Something went wrong",
+		"failedDetail": "The page could not be shown ({message}).",
+		"hint": "Search the documentation with <kbd>/</kbd> or go back to a familiar place.",
+		"home": "Back to home",
+		"guide": "Read the guide",
+		"reference": "API reference",
+		"notFoundCaption": "Meeko looked everywhere and could not find it",
+		"failedCaption": "Meeko is waiting for the server to answer"
+	},
+	"cat": {
+		"drawing": "Line drawing: Meeko, the ragdoll kitten of the logo, with her long-haired mane, big ears, the mask around her blue eyes and her white muzzle, peeking out from behind an editor in isometric perspective; a card floats over a highlighted line of code."
+	}
+}

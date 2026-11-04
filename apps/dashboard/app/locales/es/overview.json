@@ -1,0 +1,44 @@
+{
+	"overview": {
+		"title": "Resumen",
+		"description": "Estado de la documentación pública de las tres webs: fuentes importadas de Git, divergencia de las revisiones, traducciones al inglés y snapshot que sirve el site.",
+		"publication": "Publicación",
+		"activeSnapshot": "Snapshot activo",
+		"pages": {
+			"plural": "count",
+			"forms": {
+				"one": "{pages} página",
+				"other": "{pages} páginas"
+			}
+		},
+		"byLocale": "{es} en español · {en} en inglés",
+		"by": "por {user}",
+		"unknownUser": "desconocido",
+		"noSnapshot": "Ninguno: el site no tiene documentación que servir.",
+		"publishFirst": "Publica el primero",
+		"lastJob": "Último trabajo",
+		"noJob": "Ninguno desde que arrancó el dashboard.",
+		"savedSnapshots": "Snapshots guardados",
+		"translations": "Traducciones al inglés",
+		"seeTranslations": "Ver las traducciones",
+		"translationsLead": "Guías y referencia escrita del site. Lo que no está traducido se publica en /en en español, con el aviso «sin traducir».",
+		"translationsShare": "{share} traducido: {translated} de {total} páginas",
+		"sourcesBySite": "Fuentes por web",
+		"sourcesCaption": "Número de fuentes en español de cada web por tipo y su última importación",
+		"site": "Web",
+		"guides": "Guías",
+		"meekoPages": "Páginas .meeko",
+		"total": "Total",
+		"removed": "Retiradas",
+		"lastImport": "Último cambio importado",
+		"noSources": "No hay fuentes importadas. Pulsa «Importar desde Git» en",
+		"divergence": "Divergencia con Git",
+		"divergenceLead": "Solo las fuentes Markdown del site tienen revisiones; las páginas .meeko de UI e i18n se editan en el repositorio. Cada número abre las fuentes de ese estado.",
+		"divergenceCaption": "Fuentes Markdown de cada web por estado de divergencia",
+		"attention": "Atención",
+		"stateLink": "{count} fuentes de {site}: {state}",
+		"notApplicable": "No aplica",
+		"toReview": "{count} por revisar",
+		"upToDate": "Al día"
+	}
+}

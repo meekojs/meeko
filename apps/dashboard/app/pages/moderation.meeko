@@ -1,0 +1,973 @@
+<script
+	server
+	lang="ts"
+>
+	import { definePage } from '@meekojs/meeko/framework'
+	import * as v from 'valibot'
+
+	import { attempt } from '../utils/errors'
+
+	export const route = definePage({ search: v.object({ site: v.optional(v.picklist(['site', 'ui', 'i18n'])) }), render: 'ssr' })
+
+	const { search } = usePage()
+	export const initial = await attempt(() => rpc.moderation.get({ site: search.site ?? 'site' }))
+</script>
+
+<script lang="ts">
+	import type { AnnouncementRow, AnnouncementTone, KnownPageRow, ModerationAction, ModerationLocale, ModerationRuleRow } from '../../shared/schemas/moderation'
+	import type { Failure } from '../utils/errors'
+
+	import { maxMessageLength, maxReasonLength } from '../../shared/schemas/moderation'
+	import { describeError } from '../utils/errors'
+	import { siteLabels, sites } from '../utils/labels'
+	import { announcementStateTones, fromLocalInput, toLocalInput, tones } from '../utils/moderation'
+
+	export interface Props {
+		params: Record<string, string>
+		search: { site?: 'site' | 'ui' | 'i18n' | undefined }
+	}
+
+	const props = defineProps<Props>()
+
+	const i18n = useI18n()
+	const { t, localePath } = i18n
+	const format = useFormat()
+	const formatDate = format.date
+
+	// A rule or an announcement applies to one language or, with `null`, to all of them. The selects
+	// cannot hold `null`, so they use `all`.
+	type LocaleChoice = 'all' | 'en' | 'es'
+	const localeChoices: readonly LocaleChoice[] = ['all', 'es', 'en']
+	const toLocale = (choice: LocaleChoice | null): ModerationLocale => (choice === 'es' || choice === 'en' ? choice : null)
+	const toChoice = (locale: ModerationLocale): LocaleChoice => locale ?? 'all'
+	const localeLabel = (choice: LocaleChoice) => (choice === 'all' ? t('locale.all') : t(`locale.${choice}`))
+	const localeShort = (locale: ModerationLocale) => t(`locale.short.${locale ?? 'all'}`)
+	/** The page as the readers of a language reach it: /en/docs/api in English, /docs/api otherwise. */
+	const publicPath = (path: string, locale: ModerationLocale) => (locale === 'en' ? '/en' + (path === '/' ? '' : path) : path)
+	const actionLabel = (value: ModerationAction) => t(`moderation.actions.${value}`)
+	const toneLabel = (value: AnnouncementTone) => t(`moderation.tones.${value}`)
+	const stateLabel = (value: AnnouncementRow['state']) => t(`moderation.states.${value}`)
+
+	// The page remounts for another web (a link of the tabs): its initial value is enough.
+	const site = untrack(() => props.search.site ?? 'site')
+	const data = signal(initial.ok ? initial.data : null)
+	const loadFailure = signal<Failure | null>(initial.ok ? null : initial.failure)
+	const notice = signal('')
+
+	// The lists show the rules and announcements that reach the readers of one language: its own and the global ones.
+	const listLocale = signal<LocaleChoice | null>('all')
+	const reaches = (locale: ModerationLocale) => listLocale.value === 'all' || listLocale.value === null || locale === null || locale === listLocale.value
+	const rules = computed(() => (data.value?.rules ?? []).filter((rule) => reaches(rule.locale)))
+	const announcements = computed(() => (data.value?.announcements ?? []).filter((item) => reaches(item.locale)))
+
+	async function reload() {
+		try {
+			data.value = await rpc.moderation.get({ site })
+			loadFailure.value = null
+		} catch (error) {
+			loadFailure.value = describeError(error)
+		}
+	}
+
+	/**
+	 * Every write names the version of the row this tab read. When another tab changed the row
+	 * (`409 MODERATION_CONFLICT`) or deleted it (`404 MODERATION_NOT_FOUND`), nothing was written:
+	 * the lists reload with the current state and the failure says so. `true` for those refusals.
+	 */
+	async function reloadIfChanged(failure: Failure): Promise<boolean> {
+		if (failure.code !== 'MODERATION_CONFLICT' && failure.code !== 'MODERATION_NOT_FOUND') return false
+		await reload()
+		return true
+	}
+
+	const tabs = computed(() =>
+		sites.map((name) => {
+			const counts = data.value?.counts[name] ?? { rules: 0, live: 0 }
+			return {
+				label: siteLabels[name],
+				href: localePath(name === 'site' ? '/moderation' : `/moderation?site=${name}`),
+				current: name === site,
+				badge: t('moderation.tabRules', { count: counts.rules }) + (counts.live ? ' · ' + t('moderation.tabLive', { count: counts.live }) : ''),
+			}
+		}),
+	)
+	const pageCount = computed(() => data.value?.pages.length ?? 0)
+	const delay = t('moderation.delay')
+
+	// Rules ----------------------------------------------------------------------------------------
+
+	const page = signal<KnownPageRow | null>(null)
+	const action = signal<ModerationAction>('hide')
+	const ruleLocale = signal<LocaleChoice | null>('all')
+	const reason = signal('')
+	const ruleError = signal('')
+	const ruleFailure = signal<Failure | null>(null)
+	const savingRule = signal(false)
+	const pageLabel = (option: KnownPageRow) => `${option.title} · ${option.path}`
+	const pageGroup = (option: KnownPageRow) => (option.origin === 'source' ? t('moderation.groups.sources') : t('moderation.groups.snapshot'))
+	const existing = computed(() => (page.value ? (data.value?.rules.find((rule) => rule.path === page.value?.path && rule.locale === toLocale(ruleLocale.value)) ?? null) : null))
+
+	/**
+	 * The rule the form writes over: the one its page had when the page was chosen or its row was
+	 * edited (id and version, or none). A reload of the list (another action of this tab, such as
+	 * switching an announcement) does not move it, so a change that another tab made meanwhile is a
+	 * conflict instead of being overwritten. It is renewed only when a conflict is shown (saving
+	 * again then replaces the other change on purpose) or when the form is reset.
+	 */
+	const ruleBase = signal<{ readonly path: string; readonly locale: ModerationLocale; readonly id: number | null; readonly version: number | null } | null>(null)
+
+	/** Pins the rule that `path` has now in `locale` in the list as the base of the form; `undefined` clears it. */
+	function pinRule(path: string | undefined, locale: ModerationLocale) {
+		const rule = path === undefined ? undefined : untrack(() => data.value?.rules.find((item) => item.path === path && item.locale === locale))
+		ruleBase.value = path === undefined ? null : { path, locale, id: rule?.id ?? null, version: rule?.version ?? null }
+	}
+
+	// Choosing another page or language in the form pins the rule it has; reloading the list does
+	// not, because only the page and the language are tracked.
+	effect(() => {
+		const path = page.value?.path
+		const locale = toLocale(ruleLocale.value)
+		untrack(() => {
+			if (ruleBase.value?.path !== path || ruleBase.value?.locale !== locale) pinRule(path, locale)
+		})
+	})
+	const reasonTooLong = computed(() => reason.value.trim().length > maxReasonLength)
+	const ruleSubmit = computed(() => (savingRule.value ? t('actions.saving') : existing.value ? t('moderation.rule.change') : action.value === 'hide' ? t('moderation.rule.hide') : t('moderation.rule.feature')))
+
+	function editRule(rule: ModerationRuleRow) {
+		page.value = data.value?.pages.find((option) => option.path === rule.path) ?? { path: rule.path, title: rule.title ?? rule.path, origin: 'source' }
+		ruleLocale.value = toChoice(rule.locale)
+		ruleBase.value = { path: rule.path, locale: rule.locale, id: rule.id, version: rule.version }
+		action.value = rule.action
+		reason.value = rule.reason ?? ''
+		ruleError.value = ''
+		ruleFailure.value = null
+		document.getElementById('rule-page')?.focus()
+	}
+
+	function resetRule() {
+		page.value = null
+		ruleBase.value = null
+		action.value = 'hide'
+		ruleLocale.value = 'all'
+		reason.value = ''
+		ruleError.value = ''
+	}
+
+	/** Checks the form, and asks first when the page would disappear from its web. */
+	function submitRule() {
+		ruleFailure.value = null
+		ruleError.value = !page.value ? t('moderation.rule.choosePage') : reasonTooLong.value ? t('moderation.rule.reasonTooLong', { max: maxReasonLength }) : ''
+		if (ruleError.value) return
+		if (action.value === 'hide') {
+			const target = page.value!
+			const locale = toLocale(ruleLocale.value)
+			const where = locale === null ? t('moderation.rule.everyLanguage', { path: target.path, enPath: publicPath(target.path, 'en') }) : publicPath(target.path, locale)
+			ask({
+				title: t('moderation.rule.hideTitle', { title: target.title }),
+				description: site === 'site' ? t('moderation.rule.hideTextSite', { where, site: siteLabels[site] }) : t('moderation.rule.hideText', { where, site: siteLabels[site] }),
+				confirm: t('moderation.rule.hideConfirm'),
+				run: () => saveRule(true),
+			})
+		} else void saveRule()
+	}
+
+	/** Saves the rule; `rethrow` hands a failure to the confirmation, which shows it. */
+	async function saveRule(rethrow = false) {
+		const target = page.value
+		if (!target) return
+		savingRule.value = true
+		try {
+			// The rule this page had when the edit began (id and version), not the one of the last
+			// reload; none when it had no rule.
+			const locale = toLocale(ruleLocale.value)
+			const base = ruleBase.value?.path === target.path && ruleBase.value.locale === locale ? ruleBase.value : null
+			const rule = await rpc.moderation.rules.save({ site, locale, path: target.path, action: action.value, reason: reason.value, id: base?.id ?? null, version: base?.version ?? null })
+			resetRule()
+			await reload()
+			notice.value = t('moderation.rule.saved', { action: actionLabel(rule.action), title: rule.title ?? rule.path, locale: localeLabel(toChoice(rule.locale)).toLocaleLowerCase(i18n.locale), delay })
+		} catch (error) {
+			// A conflict closes the confirmation: the form keeps its values and the reloaded table shows the other change.
+			const failure = describeError(error)
+			if (await reloadIfChanged(failure)) {
+				// The conflict is shown and the form keeps its values, now over the rule the page has:
+				// saving again replaces the other change on purpose.
+				pinRule(target.path, toLocale(ruleLocale.value))
+				ruleFailure.value = failure
+				return
+			}
+			if (rethrow) throw error
+			ruleFailure.value = failure
+		} finally {
+			savingRule.value = false
+		}
+	}
+
+	function askRemoveRule(rule: ModerationRuleRow) {
+		ask({
+			title: t('moderation.rule.removeTitle', { title: rule.title ?? rule.path }),
+			description: rule.action === 'hide' ? t('moderation.rule.removeHidden', { path: publicPath(rule.path, rule.locale), site: siteLabels[site] }) : t('moderation.rule.removeFeatured', { path: publicPath(rule.path, rule.locale) }),
+			confirm: t('moderation.rule.removeConfirm'),
+			focus: 'rules-heading',
+			section: 'rules',
+			run: async () => {
+				await rpc.moderation.rules.delete({ id: rule.id, version: rule.version })
+				await reload()
+				notice.value = t('moderation.rule.removed', { title: rule.title ?? rule.path, delay })
+			},
+		})
+	}
+
+	const ruleColumns = [
+		{ key: 'path', label: t('moderation.columns.page') },
+		{ key: 'locale', label: t('moderation.columns.locale') },
+		{ key: 'action', label: t('moderation.columns.rule') },
+		{ key: 'reason', label: t('moderation.columns.reason') },
+		{ key: 'author', label: t('moderation.columns.author') },
+		{ key: 'createdAt', label: t('moderation.columns.date') },
+		{ key: 'id', label: t('moderation.columns.actions'), numeric: true },
+	] as const
+
+	// Announcements --------------------------------------------------------------------------------
+
+	const editing = signal<number | null>(null)
+	/** The version of the announcement being edited, as the list had it when the edit began. */
+	const editingVersion = signal<number | null>(null)
+	const message = signal('')
+	const tone = signal<AnnouncementTone | null>('info')
+	const announcementLocale = signal<LocaleChoice | null>('all')
+	const startsAt = signal('')
+	const endsAt = signal('')
+	const active = signal(true)
+	const announcementError = signal('')
+	const announcementFailure = signal<Failure | null>(null)
+	const savingAnnouncement = signal(false)
+	const messageLength = computed(() => message.value.trim().length)
+	const messageCounter = computed(() => t('moderation.announcement.counter', { length: messageLength.value, max: maxMessageLength }))
+	const messageTooLong = computed(() => messageLength.value > maxMessageLength)
+	// The message says its own errors next to it; the rest, such as the dates, go above the actions.
+	const messageError = computed(() => (messageTooLong.value ? t('moderation.announcement.tooLong', { max: maxMessageLength }) : !messageLength.value && announcementError.value === t('validation.message') ? announcementError.value : undefined))
+	const formError = computed(() => (announcementError.value && announcementError.value !== t('validation.message') && !messageTooLong.value ? announcementError.value : ''))
+	const preview = computed(() => [{ id: editing.value ?? 0, message: message.value.trim() || t('moderation.announcement.placeholder'), tone: tone.value ?? 'info' }])
+	const previewNote = computed(() => {
+		if (!active.value) return t('moderation.preview.inactive')
+		const start = fromLocalInput(startsAt.value)
+		const end = fromLocalInput(endsAt.value)
+		const now = Date.now()
+		if (end && Date.parse(end) <= now) return t('moderation.preview.ended')
+		if (start && Date.parse(start) > now) return t('moderation.preview.from', { date: formatDate(start) })
+		return end ? t('moderation.preview.until', { date: formatDate(end) }) : t('moderation.preview.now')
+	})
+
+	function editAnnouncement(item: AnnouncementRow) {
+		editing.value = item.id
+		editingVersion.value = item.version
+		message.value = item.message
+		tone.value = item.tone
+		announcementLocale.value = toChoice(item.locale)
+		startsAt.value = toLocalInput(item.startsAt)
+		endsAt.value = toLocalInput(item.endsAt)
+		active.value = item.active
+		announcementError.value = ''
+		announcementFailure.value = null
+		document.getElementById('announcement-message')?.focus()
+	}
+
+	function resetAnnouncement() {
+		editing.value = null
+		editingVersion.value = null
+		message.value = ''
+		tone.value = 'info'
+		announcementLocale.value = 'all'
+		startsAt.value = ''
+		endsAt.value = ''
+		active.value = true
+		announcementError.value = ''
+	}
+
+	function validateAnnouncement(): string {
+		if (!messageLength.value) return t('validation.message')
+		if (messageTooLong.value) return t('moderation.announcement.tooLong', { max: maxMessageLength })
+		const start = fromLocalInput(startsAt.value)
+		const end = fromLocalInput(endsAt.value)
+		if ((startsAt.value && !start) || (endsAt.value && !end)) return t('moderation.announcement.badDate')
+		if (start && end && Date.parse(end) <= Date.parse(start)) return t('validation.endAfterStart')
+		return ''
+	}
+
+	async function submitAnnouncement() {
+		announcementFailure.value = null
+		announcementError.value = validateAnnouncement()
+		if (announcementError.value) return
+		savingAnnouncement.value = true
+		try {
+			const item = await rpc.moderation.announcements.save({
+				...(editing.value === null ? {} : { id: editing.value, version: editingVersion.value ?? 1 }),
+				site,
+				locale: toLocale(announcementLocale.value),
+				message: message.value,
+				tone: tone.value ?? 'info',
+				startsAt: fromLocalInput(startsAt.value),
+				endsAt: fromLocalInput(endsAt.value),
+				active: active.value,
+			})
+			const created = editing.value === null
+			resetAnnouncement()
+			await reload()
+			notice.value = t(created ? 'moderation.announcement.created' : 'moderation.announcement.saved', { id: item.id, state: stateLabel(item.state).toLocaleLowerCase(i18n.locale), delay })
+		} catch (error) {
+			const failure = describeError(error)
+			if (await reloadIfChanged(failure)) {
+				// The form keeps what this tab wrote, now over the current version: saving again replaces
+				// the other change on purpose, and a deleted announcement is created again.
+				const current = data.value?.announcements.find((row) => row.id === editing.value)
+				if (current) editingVersion.value = current.version
+				else resetEditingTarget()
+			}
+			announcementFailure.value = failure
+		} finally {
+			savingAnnouncement.value = false
+		}
+	}
+
+	/** Turns the edit of a deleted announcement into a new one with the same fields. */
+	function resetEditingTarget() {
+		editing.value = null
+		editingVersion.value = null
+	}
+
+	/**
+	 * Switches an announcement on or off and changes nothing else: an old row of this table cannot
+	 * bring back a message or dates that another tab changed, and a change since it loaded is a conflict.
+	 */
+	async function toggleAnnouncement(item: AnnouncementRow) {
+		announcementFailure.value = null
+		try {
+			const saved = await rpc.moderation.announcements.active({ id: item.id, version: item.version, active: !item.active })
+			await reload()
+			notice.value = t(saved.active ? 'moderation.announcement.activated' : 'moderation.announcement.deactivated', { id: saved.id, delay })
+		} catch (error) {
+			const failure = describeError(error)
+			await reloadIfChanged(failure)
+			announcementFailure.value = failure
+		}
+	}
+
+	function askRemoveAnnouncement(item: AnnouncementRow) {
+		ask({
+			title: t('moderation.announcement.deleteTitle', { id: item.id }),
+			description: t('moderation.announcement.deleteText'),
+			confirm: t('moderation.announcement.deleteConfirm'),
+			focus: 'announcements-heading',
+			section: 'announcements',
+			run: async () => {
+				await rpc.moderation.announcements.delete({ id: item.id, version: item.version })
+				if (editing.value === item.id) resetAnnouncement()
+				await reload()
+				notice.value = t('moderation.announcement.deleted', { id: item.id, delay })
+			},
+		})
+	}
+
+	const announcementColumns = [
+		{ key: 'message', label: t('moderation.columns.message') },
+		{ key: 'locale', label: t('moderation.columns.locale') },
+		{ key: 'tone', label: t('moderation.columns.tone') },
+		{ key: 'startsAt', label: t('moderation.columns.validity') },
+		{ key: 'state', label: t('moderation.columns.state') },
+		{ key: 'author', label: t('moderation.columns.author') },
+		{ key: 'id', label: t('moderation.columns.actions'), numeric: true },
+	] as const
+	const validity = (item: AnnouncementRow) => (item.startsAt || item.endsAt ? `${item.startsAt ? formatDate(item.startsAt) : t('moderation.validity.now')} → ${item.endsAt ? formatDate(item.endsAt) : t('moderation.validity.noEnd')}` : t('moderation.validity.none'))
+
+	// Confirmation -----------------------------------------------------------------------------------
+
+	interface Question {
+		readonly title: string
+		readonly description: string
+		readonly confirm: string
+		readonly run: () => Promise<void>
+		/** Where the focus goes once the dialog closes, when its trigger may be gone (a deleted row). */
+		readonly focus?: string
+		/** The section that shows a conflict: the dialog closes over the reloaded list. */
+		readonly section?: 'announcements' | 'rules'
+	}
+	const question = signal<Question | null>(null)
+	const confirming = signal(false)
+	const answering = signal(false)
+	const questionFailure = signal<Failure | null>(null)
+
+	function ask(next: Question) {
+		question.value = next
+		questionFailure.value = null
+		confirming.value = true
+	}
+
+	async function answer() {
+		const current = question.value
+		if (!current) return
+		answering.value = true
+		try {
+			await current.run()
+			// The native dialog gives the focus back to its trigger when it closes, after its exit
+			// animation; that trigger may have left with the row, so the focus moves after it.
+			const dialog = document.querySelector('dialog[open]')
+			if (current.focus && dialog) dialog.addEventListener('close', () => requestAnimationFrame(() => document.getElementById(current.focus!)?.focus()), { once: true })
+			confirming.value = false
+		} catch (error) {
+			const failure = describeError(error)
+			if (current.section && (await reloadIfChanged(failure))) {
+				// What the question named changed or left: asking again about it makes no sense.
+				if (current.section === 'rules') ruleFailure.value = failure
+				else announcementFailure.value = failure
+				const dialog = document.querySelector('dialog[open]')
+				if (current.focus && dialog) dialog.addEventListener('close', () => requestAnimationFrame(() => document.getElementById(current.focus!)?.focus()), { once: true })
+				confirming.value = false
+				return
+			}
+			questionFailure.value = failure
+		} finally {
+			answering.value = false
+		}
+	}
+</script>
+
+<template>
+	<DashPage
+		bind:title="t('moderation.title')"
+		bind:description="t('moderation.description')"
+	>
+		<div class="dash-stack">
+			<UINavigationTabs
+				bind:items="tabs.value"
+				bind:label="t('moderation.columns.site')"
+			/>
+			<DashFailure
+				if:when="loadFailure.value"
+				bind:failure="loadFailure.value"
+			/>
+			<DashNotice bind:text="notice.value" />
+			<form
+				if:when="data.value"
+				class="dash-filters"
+				bind:aria-label="t('moderation.filterLabel')"
+				on:submit="(event) => event.preventDefault()"
+			>
+				<UIField
+					id="moderation-locale"
+					bind:label="t('moderation.filter')"
+					bind:description="t('moderation.filterHint')"
+				>
+					<snippet
+						name="default"
+						params="id, describedBy"
+					>
+						<UISelect
+							model="listLocale"
+							bind:id="id"
+							bind:describedBy="describedBy"
+							bind:options="localeChoices"
+							bind:labelBy="localeLabel"
+						/>
+					</snippet>
+				</UIField>
+			</form>
+			<UICard
+				if:when="data.value"
+				headingId="rules-heading"
+				bind:title="t('moderation.pages')"
+				bind:description="t('moderation.known', { count: pageCount.value, site: siteLabels[site] })"
+			>
+				<div class="dash-tight">
+					<form
+						class="moderation-rule"
+						novalidate
+						on:submit="
+							(event) => {
+								event.preventDefault()
+								submitRule()
+							}
+						"
+					>
+						<div class="moderation-rule-page">
+							<UIField
+								id="rule-page"
+								bind:label="t('moderation.columns.page')"
+							>
+								<snippet
+									name="default"
+									params="id, describedBy"
+								>
+									<UICombobox
+										searchable
+										by="path"
+										model="page"
+										bind:id="id"
+										bind:describedBy="describedBy"
+										bind:placeholder="t('moderation.rule.pagePlaceholder')"
+										bind:options="data.value?.pages ?? []"
+										bind:labelBy="pageLabel"
+										bind:groupBy="site === 'site' ? pageGroup : undefined"
+										bind:invalid="ruleError.value === t('moderation.rule.choosePage')"
+									/>
+								</snippet>
+							</UIField>
+						</div>
+						<UIField
+							id="rule-locale"
+							bind:label="t('moderation.columns.locale')"
+						>
+							<snippet
+								name="default"
+								params="id, describedBy"
+							>
+								<UISelect
+									model="ruleLocale"
+									bind:id="id"
+									bind:describedBy="describedBy"
+									bind:options="localeChoices"
+									bind:labelBy="localeLabel"
+								/>
+							</snippet>
+						</UIField>
+						<UIRadioGroup
+							name="rule-action"
+							variant="segmented"
+							model="action"
+							bind:legend="t('moderation.columns.rule')"
+							bind:options="[
+								{ value: 'hide', label: t('moderation.rule.hideShort') },
+								{ value: 'feature', label: t('moderation.rule.featureShort') },
+							]"
+						/>
+						<UIField
+							id="rule-reason"
+							bind:label="t('moderation.columns.reason')"
+						>
+							<snippet
+								name="default"
+								params="id, describedBy"
+							>
+								<UIInput
+									model="reason"
+									bind:id="id"
+									bind:describedBy="describedBy"
+									bind:placeholder="t('moderation.rule.reasonPlaceholder')"
+									bind:invalid="reasonTooLong.value"
+								/>
+							</snippet>
+						</UIField>
+						<div class="dash-actions">
+							<UIButton
+								type="submit"
+								bind:disabled="savingRule.value"
+							>
+								{ruleSubmit.value}
+							</UIButton>
+							<UIButton
+								if:when="page.value || reason.value"
+								variant="ghost"
+								on:click="resetRule"
+							>
+								{t('moderation.rule.clear')}
+							</UIButton>
+						</div>
+					</form>
+					<p
+						if:when="existing.value"
+						class="dash-meta"
+					>
+						{t('moderation.rule.existing', { action: actionLabel(existing.value?.action ?? 'hide').toLocaleLowerCase(i18n.locale), author: existing.value?.author ?? '' })}
+					</p>
+					<UIAlert
+						if:when="ruleError.value"
+						tone="danger"
+						bind:description="ruleError.value"
+					/>
+					<DashFailure
+						if:when="ruleFailure.value"
+						bind:title="t('moderation.rule.notSaved')"
+						bind:failure="ruleFailure.value"
+					/>
+					<UITable
+						rowKey="id"
+						bind:hideCaption="true"
+						bind:emptyText="t('moderation.rule.empty')"
+						bind:caption="t('moderation.rule.caption', { site: siteLabels[site] })"
+						bind:columns="ruleColumns"
+						bind:rows="rules.value"
+					>
+						<snippet
+							name="cell"
+							params="row, column"
+						>
+							<span
+								if:when="column.key === 'path'"
+								class="dash-cell"
+							>
+								<strong>{row.title ?? t('moderation.rule.gone')}</strong>
+								<code>{row.path}</code>
+							</span>
+							<DashLocaleTag
+								if:when="column.key === 'locale'"
+								bind:locale="row.locale ?? 'all'"
+								bind:name="localeLabel(toChoice(row.locale))"
+								bind:short="localeShort(row.locale)"
+							/>
+							<UIBadge
+								if:when="column.key === 'action'"
+								bind:tone="row.action === 'hide' ? 'danger' : 'accent'"
+							>
+								{actionLabel(row.action)}
+							</UIBadge>
+							<span if:when="column.key === 'reason'">{row.reason ?? '—'}</span>
+							<span if:when="column.key === 'author'">{row.author}</span>
+							<span
+								if:when="column.key === 'createdAt'"
+								class="dash-nowrap"
+							>
+								{formatDate(row.createdAt)}
+							</span>
+							<span
+								if:when="column.key === 'id'"
+								class="dash-row-actions"
+							>
+								<UIButton
+									size="sm"
+									variant="outline"
+									on:click="() => editRule(row)"
+								>
+									{t('moderation.rule.edit')}
+									<span class="meeko-ui-sr-only">{t('moderation.rule.ofPath', { path: publicPath(row.path, row.locale) })}</span>
+								</UIButton>
+								<UIButton
+									size="sm"
+									variant="ghost"
+									on:click="() => askRemoveRule(row)"
+								>
+									{t('moderation.rule.remove')}
+									<span class="meeko-ui-sr-only">{t('moderation.rule.ofPath', { path: publicPath(row.path, row.locale) })}</span>
+								</UIButton>
+							</span>
+						</snippet>
+					</UITable>
+				</div>
+			</UICard>
+
+			<UICard
+				if:when="data.value"
+				headingId="announcements-heading"
+				bind:title="t('moderation.announcements')"
+				bind:description="t('moderation.announcementsHint', { site: siteLabels[site] })"
+			>
+				<div class="dash-stack">
+					<div class="dash-columns">
+						<form
+							id="announcement-form"
+							class="dash-form"
+							novalidate
+							on:submit="
+								(event) => {
+									event.preventDefault()
+									void submitAnnouncement()
+								}
+							"
+						>
+							<h3 class="dash-heading">{editing.value === null ? t('moderation.announcement.new') : t('moderation.announcement.editing', { id: editing.value })}</h3>
+							<UIField
+								id="announcement-message"
+								bind:label="t('moderation.columns.message')"
+								bind:counter="messageCounter.value"
+								bind:error="messageError.value"
+							>
+								<snippet
+									name="default"
+									params="id, describedBy"
+								>
+									<UITextarea
+										model="message"
+										bind:rows="3"
+										bind:id="id"
+										bind:describedBy="describedBy"
+										bind:invalid="Boolean(messageError.value)"
+									/>
+								</snippet>
+							</UIField>
+							<div class="moderation-announcement-row">
+								<UIField
+									id="announcement-tone"
+									bind:label="t('moderation.columns.tone')"
+								>
+									<snippet
+										name="default"
+										params="id, describedBy"
+									>
+										<UISelect
+											model="tone"
+											bind:id="id"
+											bind:describedBy="describedBy"
+											bind:options="tones"
+											bind:labelBy="toneLabel"
+										/>
+									</snippet>
+								</UIField>
+								<UIField
+									id="announcement-locale"
+									bind:label="t('moderation.columns.locale')"
+								>
+									<snippet
+										name="default"
+										params="id, describedBy"
+									>
+										<UISelect
+											model="announcementLocale"
+											bind:id="id"
+											bind:describedBy="describedBy"
+											bind:options="localeChoices"
+											bind:labelBy="localeLabel"
+										/>
+									</snippet>
+								</UIField>
+								<UIField
+									id="announcement-start"
+									bind:label="t('moderation.announcement.start')"
+								>
+									<snippet
+										name="default"
+										params="id"
+									>
+										<UIInput
+											type="datetime-local"
+											describedBy="announcement-dates"
+											model="startsAt"
+											bind:id="id"
+										/>
+									</snippet>
+								</UIField>
+								<UIField
+									id="announcement-end"
+									bind:label="t('moderation.announcement.end')"
+								>
+									<snippet
+										name="default"
+										params="id"
+									>
+										<UIInput
+											type="datetime-local"
+											describedBy="announcement-dates"
+											model="endsAt"
+											bind:id="id"
+										/>
+									</snippet>
+								</UIField>
+							</div>
+							<p
+								id="announcement-dates"
+								class="dash-meta"
+							>
+								{t('moderation.announcement.datesHint')}
+							</p>
+							<UICheckbox
+								model="active"
+								bind:label="t('moderation.announcement.active')"
+							/>
+							<UIAlert
+								if:when="formError.value"
+								tone="danger"
+								bind:description="formError.value"
+							/>
+							<DashFailure
+								if:when="announcementFailure.value"
+								bind:title="t('moderation.announcement.notSaved')"
+								bind:failure="announcementFailure.value"
+							/>
+							<div class="dash-actions">
+								<UIButton
+									type="submit"
+									bind:disabled="savingAnnouncement.value"
+								>
+									{savingAnnouncement.value ? t('actions.saving') : editing.value === null ? t('moderation.announcement.create') : t('moderation.announcement.save')}
+								</UIButton>
+								<UIButton
+									if:when="editing.value !== null || message.value"
+									variant="ghost"
+									on:click="resetAnnouncement"
+								>
+									{editing.value === null ? t('moderation.announcement.empty') : t('moderation.announcement.cancelEdit')}
+								</UIButton>
+							</div>
+						</form>
+						<figure class="moderation-preview">
+							<figcaption class="dash-cell">
+								<span class="dash-heading">{t('moderation.preview.title')}</span>
+								<span class="dash-meta">{previewNote.value}</span>
+							</figcaption>
+							<div
+								class="moderation-preview-frame"
+								inert
+							>
+								<DocsAnnouncements bind:items="preview.value" />
+								<div aria-hidden="true">
+									<UISkeleton
+										bind:lines="3"
+										bind:widths="['short', 'full', 'long']"
+									/>
+								</div>
+							</div>
+						</figure>
+					</div>
+					<UITable
+						rowKey="id"
+						bind:hideCaption="true"
+						bind:emptyText="t('moderation.announcement.none')"
+						bind:caption="t('moderation.announcement.caption', { site: siteLabels[site] })"
+						bind:columns="announcementColumns"
+						bind:rows="announcements.value"
+					>
+						<snippet
+							name="cell"
+							params="row, column"
+						>
+							<span
+								if:when="column.key === 'message'"
+								class="dash-cell"
+							>
+								{row.message}
+							</span>
+							<DashLocaleTag
+								if:when="column.key === 'locale'"
+								bind:locale="row.locale ?? 'all'"
+								bind:name="localeLabel(toChoice(row.locale))"
+								bind:short="localeShort(row.locale)"
+							/>
+							<UIBadge
+								if:when="column.key === 'tone'"
+								bind:dot="true"
+								bind:tone="row.tone"
+							>
+								{toneLabel(row.tone)}
+							</UIBadge>
+							<span
+								if:when="column.key === 'startsAt'"
+								class="dash-nowrap"
+							>
+								{validity(row)}
+							</span>
+							<UIBadge
+								if:when="column.key === 'state'"
+								bind:tone="announcementStateTones[row.state]"
+							>
+								{stateLabel(row.state)}
+							</UIBadge>
+							<span if:when="column.key === 'author'">{row.author}</span>
+							<span
+								if:when="column.key === 'id'"
+								class="dash-row-actions"
+							>
+								<UIButton
+									size="sm"
+									variant="outline"
+									on:click="() => editAnnouncement(row)"
+								>
+									{t('moderation.announcement.edit')}
+									<span class="meeko-ui-sr-only">{t('moderation.announcement.ofId', { id: row.id })}</span>
+								</UIButton>
+								<UIButton
+									size="sm"
+									variant="ghost"
+									on:click="() => void toggleAnnouncement(row)"
+								>
+									{row.active ? t('moderation.announcement.deactivate') : t('moderation.announcement.activate')}
+									<span class="meeko-ui-sr-only">{t('moderation.announcement.ofId', { id: row.id })}</span>
+								</UIButton>
+								<UIButton
+									size="sm"
+									variant="ghost"
+									on:click="() => askRemoveAnnouncement(row)"
+								>
+									{t('moderation.announcement.delete')}
+									<span class="meeko-ui-sr-only">{t('moderation.announcement.ofId', { id: row.id })}</span>
+								</UIButton>
+							</span>
+						</snippet>
+					</UITable>
+				</div>
+			</UICard>
+		</div>
+
+		<UIModal
+			model="confirming"
+			bind:title="question.value?.title ?? ''"
+			bind:description="question.value?.description ?? ''"
+		>
+			<DashFailure
+				if:when="questionFailure.value"
+				bind:title="t('moderation.notChanged')"
+				bind:failure="questionFailure.value"
+			/>
+			<snippet name="footer">
+				<UIButton
+					variant="ghost"
+					on:click="() => (confirming.value = false)"
+				>
+					{t('actions.cancel')}
+				</UIButton>
+				<UIButton
+					tone="danger"
+					bind:disabled="answering.value"
+					on:click="answer"
+				>
+					{answering.value ? t('moderation.applying') : (question.value?.confirm ?? t('actions.confirm'))}
+				</UIButton>
+			</snippet>
+		</UIModal>
+	</DashPage>
+</template>
+
+<style scoped>
+	.moderation-rule {
+		display: grid;
+		grid-template-columns: minmax(var(--ui-floating-panel-width), 2fr) minmax(var(--ui-table-column-min), 1fr) auto minmax(var(--ui-table-column-min), 2fr) auto;
+		align-items: end;
+		gap: var(--ui-space-3) var(--ui-space-4);
+	}
+	.moderation-announcement-row {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: var(--ui-space-3);
+	}
+	.moderation-preview {
+		display: grid;
+		align-content: start;
+		gap: var(--ui-space-3);
+		margin: 0;
+		min-width: 0;
+	}
+	/* The rest of a documentation page, drawn as quiet bars under the real banner: nothing is loading. */
+	.moderation-preview-frame {
+		display: grid;
+		gap: var(--ui-space-4);
+		border: var(--ui-border-width) solid var(--ui-color-border);
+		border-radius: var(--ui-radius-lg);
+		background: var(--ui-color-bg);
+		padding: var(--ui-space-4);
+		overflow: hidden;
+	}
+	.moderation-preview-frame :global(.meeko-ui-skeleton > span) {
+		animation: none;
+	}
+	@media (max-width: 75rem) {
+		.moderation-rule {
+			grid-template-columns: minmax(0, 1fr) auto;
+		}
+		.moderation-rule-page {
+			grid-column: 1 / -1;
+		}
+	}
+	@media (max-width: 40rem) {
+		.moderation-rule,
+		.moderation-announcement-row {
+			grid-template-columns: minmax(0, 1fr);
+		}
+	}
+</style>

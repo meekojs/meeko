@@ -1,0 +1,19 @@
+{
+	"login": {
+		"title": "Sign in",
+		"description": "Administration access to the dashboard of Meeko's documentation.",
+		"lead": "Administration of Meeko's documentation: sources, translations, snapshots, moderation and metrics.",
+		"username": "User name",
+		"password": "Password",
+		"submit": "Sign in",
+		"submitting": "Signing in…",
+		"lifetime": "The session lasts {ttl} and closes after {idle} without activity.",
+		"errors": {
+			"INVALID_CREDENTIALS": "The user name or the password is not correct.",
+			"RATE_LIMITED": "Too many attempts. Wait a few minutes before trying again.",
+			"LOGIN_NOT_CONFIGURED": "This server has no administrator account. Set ADMIN_USERNAME and ADMIN_PASSWORD_HASH in apps/dashboard/.env and restart it.",
+			"INVALID_ORIGIN": "The server refused the submission because of its origin. Open the dashboard from its usual address.",
+			"generic": "Could not sign in. Try again; if it keeps failing, check the server console."
+		}
+	}
+}

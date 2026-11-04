@@ -1,0 +1,84 @@
+{
+	"Componente Meeko con TypeScript": {
+		"prefix": [
+			"meeko",
+			"mcomp"
+		],
+		"body": [
+			"<!-- ${TM_FILENAME_BASE} -->",
+			"<script lang=\"ts\">",
+			"$0",
+			"</script>",
+			"",
+			"<template>",
+			"\t<h1>${1:$TM_FILENAME_BASE}</h1>",
+			"</template>"
+		],
+		"description": "Componente Meeko con TypeScript"
+	},
+	"Página con opciones de ruta en el servidor": {
+		"prefix": "mpage",
+		"body": [
+			"<script",
+			"\tserver",
+			"\tlang=\"ts\"",
+			">",
+			"import { definePage } from '@meekojs/meeko/framework'",
+			"",
+			"export const route = definePage({ render: '${1:ssr}' })",
+			"</script>",
+			"",
+			"<script lang=\"ts\">",
+			"$0",
+			"</script>",
+			"",
+			"<template>",
+			"\t<h1>${2:$TM_FILENAME_BASE}</h1>",
+			"</template>"
+		],
+		"description": "Página con opciones de ruta en el servidor"
+	},
+	"Layout con la salida de la página": {
+		"prefix": "mlayout",
+		"body": [
+			"<script lang=\"ts\">",
+			"$0",
+			"</script>",
+			"",
+			"<template>",
+			"\t<${1:main}>",
+			"\t\t<MeekoOutlet />",
+			"\t</${1}>",
+			"</template>"
+		],
+		"description": "Layout con la salida de la página"
+	},
+	"Componente con formulario reactivo": {
+		"prefix": "mform",
+		"body": [
+			"<script lang=\"ts\">",
+			"const form = useForm({",
+			"\tinitial: { ${1:name}: '' },",
+			"\tsubmit: async (values) => {",
+			"\t\t${2:console.log(values)}",
+			"\t},",
+			"})",
+			"</script>",
+			"",
+			"<template>",
+			"\t<form",
+			"\t\ton:submit=\"form.submit\"",
+			"\t\tnovalidate",
+			"\t>",
+			"\t\t<label>",
+			"\t\t\t${3:Nombre}",
+			"\t\t\t<input model=\"form.fields.${1}\" />",
+			"\t\t</label>",
+			"\t\t<button bind:disabled=\"form.pending.value\">${4:Guardar}</button>",
+			"\t\t$0",
+			"\t</form>",
+			"</template>"
+		],
+		"description": "Componente con formulario reactivo"
+	}
+}

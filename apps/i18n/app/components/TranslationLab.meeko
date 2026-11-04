@@ -1,0 +1,119 @@
+<script lang="ts">
+	const i18n = useI18n()
+	const { t } = i18n
+	// The lab's controls speak the site's language (`site` and `shell`: Spanish for the Arabic demo);
+	// only the result block uses the document's locale and direction.
+	const uiLocale = t('shell.meta.lang')
+	const name = signal('Meeko')
+	const total = signal(2)
+	const roles = [
+		{ value: 'owner', label: t('lab.owner') },
+		{ value: 'viewer', label: t('lab.viewer') },
+	]
+	const role = signal<(typeof roles)[number] | null>(roles[0] ?? null)
+	const currencies = ['USD', 'EUR']
+	const currency = signal<string | null>('USD')
+	const date = Date.UTC(2026, 0, 15, 12)
+	const languages = computed(() => i18n.pageLocales().map((code) => ({ code, label: i18n.localeName(code), href: i18n.switchLocalePath(code), current: code === i18n.locale })))
+	const formats = computed(() => [
+		{ label: t('lab.currency'), labelLang: uiLocale, value: i18n.number(12345.67, { style: 'currency', currency: currency.value ?? 'USD' }) },
+		{ label: t('lab.date'), labelLang: uiLocale, value: i18n.date(date, { dateStyle: 'long', timeZone: 'UTC' }) },
+	])
+</script>
+
+<template>
+	<div class="docs-stack">
+		<UILocaleSwitcher
+			bind:label="t('lab.languages')"
+			bind:items="languages.value"
+		/>
+		<div
+			class="docs-stack"
+			dir="ltr"
+			bind:lang="uiLocale"
+		>
+			<UIField
+				id="translation-name"
+				bind:label="t('lab.name')"
+			>
+				<snippet
+					name="default"
+					params="id, describedBy"
+				>
+					<UIInput
+						model="name"
+						bind:id="id"
+						bind:describedBy="describedBy"
+					/>
+				</snippet>
+			</UIField>
+			<UISlider
+				id="translation-total"
+				model="total"
+				bind:label="t('lab.total', { total: total.value })"
+				bind:min="0"
+				bind:max="12"
+				bind:step="1"
+			/>
+			<UIField
+				id="translation-role"
+				bind:label="t('lab.role')"
+			>
+				<snippet
+					name="default"
+					params="id, describedBy"
+				>
+					<UISelect
+						by="value"
+						labelBy="label"
+						model="role"
+						bind:options="roles"
+						bind:id="id"
+						bind:describedBy="describedBy"
+					/>
+				</snippet>
+			</UIField>
+			<UIField
+				id="translation-currency"
+				bind:label="t('lab.currency')"
+			>
+				<snippet
+					name="default"
+					params="id, describedBy"
+				>
+					<UISelect
+						model="currency"
+						bind:options="currencies"
+						bind:id="id"
+						bind:describedBy="describedBy"
+					/>
+				</snippet>
+			</UIField>
+		</div>
+		<section
+			aria-live="polite"
+			aria-atomic="true"
+			bind:aria-label="t('lab.result')"
+			bind:lang="i18n.locale"
+			bind:dir="i18n.dir"
+		>
+			<UICard>
+				<div class="docs-stack">
+					<p data-output="greeting">
+						<strong>{i18n.t('greeting', { name: name.value })}</strong>
+					</p>
+					<p data-output="plural">{i18n.t('cart.items', { total: total.value })}</p>
+					<p data-output="select">{i18n.t('invitation', { role: role.value?.value ?? 'owner', name: name.value })}</p>
+					<UIDescriptionList
+						bind:columns="2"
+						bind:items="formats.value"
+					/>
+				</div>
+			</UICard>
+		</section>
+		<p bind:lang="uiLocale">
+			{t('lab.active')}
+			<code>{i18n.locale}</code>{t('lab.note')}
+		</p>
+	</div>
+</template>

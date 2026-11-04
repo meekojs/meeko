@@ -1,0 +1,60 @@
+<script lang="ts">
+	// <UIButton>: a route with <MeekoLink> when it gets `to`, an <a> with `href`, otherwise a
+	// <button>. The three share the class and data-* attributes, so they look the same. The types
+	// (UIButtonProps) forbid the props of the other branches.
+	import { computed } from '@meekojs/meeko'
+
+	import type { UIButtonProps } from '../types/button'
+
+	import { uiDefaults } from '../utils/defaults'
+
+	const { to, params, search, resolve, href, target, rel, download, type = 'button', disabled = false, tone, loading, iconOnly, ariaLabel, variant, size, shape, class: className, ...rest } = defineProps<UIButtonProps>()
+
+	const emit = defineEmits<{ click: [event: MouseEvent] }>()
+
+	const snippets = defineSnippets<{ default: [] }>()
+
+	const defaults = uiDefaults().button
+
+	// A disabled button drops the focus: while busy it stays focusable, and the click handler stops it.
+	const nativeDisabled = computed(() => (to === undefined && href === undefined ? disabled : undefined))
+	const classes = computed(() => ['meeko-ui-button', className].filter(Boolean).join(' '))
+	const linkRel = computed(() => rel ?? (target === '_blank' ? 'noopener noreferrer' : undefined))
+</script>
+
+<template>
+	<component
+		is="to !== undefined ? 'MeekoLink' : href !== undefined ? 'a' : 'button'"
+		bind:to="to"
+		bind:params="params"
+		bind:search="search"
+		bind:resolve="resolve"
+		bind:href="href"
+		bind:target="target"
+		bind:rel="linkRel.value"
+		bind:download="download"
+		bind:type="type"
+		bind:disabled="nativeDisabled.value"
+		bind:aria-busy="loading ? 'true' : undefined"
+		bind:aria-disabled="loading ? 'true' : undefined"
+		bind:aria-label="ariaLabel ?? rest['aria-label']"
+		bind:data-tone="tone"
+		bind:data-icon-only="iconOnly ? '' : undefined"
+		bind:class="classes.value"
+		bind:data-variant="variant ?? defaults?.variant ?? 'primary'"
+		bind:data-size="size ?? defaults?.size ?? 'md'"
+		bind:data-shape="shape ?? defaults?.shape ?? 'rounded'"
+		bind="rest"
+		on:click="
+			(event) => {
+				if (loading) {
+					event.preventDefault()
+					return
+				}
+				emit('click', event)
+			}
+		"
+	>
+		<render snippet="snippets.default" />
+	</component>
+</template>

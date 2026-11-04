@@ -1,5 +1,5 @@
 import { defineSocketChannel } from "@meekojs/meeko/server";
-import { chatInput, chatMessage } from "../../shared/schemas/demo.js";
+import { chatInput, chatMessage } from "../../shared/schemas/demo";
 
 export default defineSocketChannel({
   clientToServer: { message: chatInput },

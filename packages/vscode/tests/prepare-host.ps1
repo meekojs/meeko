@@ -15,6 +15,7 @@ $target = "$targetOs-$targetCpu"
 $temporaryRoot = if ($IsWindows) { [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath()) } else { '/tmp' }
 $testRoot = Join-Path $temporaryRoot ("meeko-host-" + [guid]::NewGuid().ToString('N'))
 $consumer = Join-Path $testRoot 'consumer'
+$secondary = Join-Path $testRoot 'secondary'
 $extension = Join-Path $testRoot 'vsix/extension'
 $vscode = $VSCodeExecutable
 if (!$vscode -and $IsWindows) { $vscode = Join-Path $env:LOCALAPPDATA 'Programs/Microsoft VS Code/Code.exe' }
@@ -31,7 +32,10 @@ if ($vscode -and !(Test-Path -LiteralPath $vscode -PathType Leaf)) {
 if (!(Test-Path -LiteralPath $vsix)) { throw "Primero genera el VSIX para ${target}: $vsix" }
 
 try {
-  New-Item -ItemType Directory -Path $consumer -Force | Out-Null
+  New-Item -ItemType Directory -Path $consumer, $secondary -Force | Out-Null
+  Set-Content -LiteralPath (Join-Path $secondary 'Secondary.meeko') -Encoding utf8 -Value '<script lang="ts">const count = 1;</script><template><p>{count}</p></template>'
+  $workspace = Join-Path $testRoot 'meeko.code-workspace'
+  Set-Content -LiteralPath $workspace -Encoding utf8 -Value '{"folders":[{"path":"consumer"},{"path":"secondary"}]}'
   $extractionRoot = Join-Path $testRoot 'vsix'
   if ($IsWindows) {
     Expand-Archive -LiteralPath $vsix -DestinationPath $extractionRoot
@@ -104,11 +108,15 @@ onMounted(() => {
   else { Remove-Item Env:MEEKO_HOST_VSCODE -ErrorAction SilentlyContinue }
   $env:MEEKO_HOST_EXTENSION = $extension
   $env:MEEKO_HOST_CONSUMER = $consumer
+  $env:MEEKO_HOST_WORKSPACE = $workspace
+  $env:MEEKO_HOST_SECONDARY = $secondary
   $env:MEEKO_HOST_DATA = Join-Path $testRoot 'user-data'
   Push-Location $editorRoot
   try {
     & pnpm run test:host
     if ($LASTEXITCODE -ne 0) { throw 'Falló la prueba en VS Code.' }
+    & pnpm run test:host:snippets
+    if ($LASTEXITCODE -ne 0) { throw 'Falló la prueba de fragmentos en VS Code.' }
   } finally {
     Pop-Location
   }

@@ -1,0 +1,19 @@
+{
+	"login": {
+		"title": "Iniciar sesión",
+		"description": "Acceso de administración del dashboard de la documentación de Meeko.",
+		"lead": "Administración de la documentación de Meeko: fuentes, traducciones, snapshots, moderación y métricas.",
+		"username": "Usuario",
+		"password": "Contraseña",
+		"submit": "Entrar",
+		"submitting": "Entrando…",
+		"lifetime": "La sesión dura {ttl} y se cierra tras {idle} sin actividad.",
+		"errors": {
+			"INVALID_CREDENTIALS": "El usuario o la contraseña no son correctos.",
+			"RATE_LIMITED": "Demasiados intentos. Espera unos minutos antes de volver a intentarlo.",
+			"LOGIN_NOT_CONFIGURED": "Este servidor no tiene cuenta de administrador. Define ADMIN_USERNAME y ADMIN_PASSWORD_HASH en apps/dashboard/.env y reinícialo.",
+			"INVALID_ORIGIN": "El servidor rechazó el envío por su origen. Abre el dashboard desde su dirección habitual.",
+			"generic": "No se pudo iniciar sesión. Vuelve a intentarlo; si sigue fallando, revisa la consola del servidor."
+		}
+	}
+}

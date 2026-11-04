@@ -22,6 +22,7 @@ Es opcional y se ejecuta fuera del servidor, en un script o en CI. Meeko no depe
 ## Uso
 
 <!-- no-check -->
+
 ```ts
 // scripts/openapi.ts
 import { writeFile } from "node:fs/promises";
@@ -48,14 +49,14 @@ Ejecútelo con un cargador de TypeScript (`npx tsx scripts/openapi.ts`): `load` 
 
 `generateOpenApi(options)` recibe un objeto `OpenApiOptions`:
 
-| Opción | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `manifest` | `ServerManifest` | obligatorio | Los endpoints, como los devuelve `discoverServerManifest` de `@meekojs/meeko/build`. |
-| `info` | `{ title: string; version: string }` | obligatorio | `info` del documento. |
-| `publicSchemas` | `Record<string, Schema>` | obligatorio | Los schemas que se pueden publicar, por nombre: el nombre es la clave de `components.schemas`. Un identificador de JavaScript; una misma instancia no puede aparecer dos veces. |
-| `toJsonSchema` | `(schema: Schema) => unknown` | obligatorio | Convierte un schema en JSON Schema; debe devolver un objeto serializable. |
-| `load` | `(file: string) => Promise<unknown>` | obligatorio | Carga el módulo de un archivo del manifiesto; su export por defecto es la definición. |
-| `cookieName` | `string` | `"__Host-meeko.sid"` | La cookie del esquema de seguridad `sessionCookie`. |
+| Opción          | Tipo                                 | Por defecto          | Descripción                                                                                                                                                                     |
+| --------------- | ------------------------------------ | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `manifest`      | `ServerManifest`                     | obligatorio          | Los endpoints, como los devuelve `discoverServerManifest` de `@meekojs/meeko/build`.                                                                                            |
+| `info`          | `{ title: string; version: string }` | obligatorio          | `info` del documento.                                                                                                                                                           |
+| `publicSchemas` | `Record<string, Schema>`             | obligatorio          | Los schemas que se pueden publicar, por nombre: el nombre es la clave de `components.schemas`. Un identificador de JavaScript; una misma instancia no puede aparecer dos veces. |
+| `toJsonSchema`  | `(schema: Schema) => unknown`        | obligatorio          | Convierte un schema en JSON Schema; debe devolver un objeto serializable.                                                                                                       |
+| `load`          | `(file: string) => Promise<unknown>` | obligatorio          | Carga el módulo de un archivo del manifiesto; su export por defecto es la definición.                                                                                           |
+| `cookieName`    | `string`                             | `"__Host-meeko.sid"` | La cookie del esquema de seguridad `sessionCookie`.                                                                                                                             |
 
 ## Valor devuelto
 
@@ -89,6 +90,7 @@ Una promesa con el documento como objeto JSON:
 ### El registro de schemas públicos
 
 <!-- no-check -->
+
 ```ts
 // shared/schemas/public.ts: sólo lo que el documento puede mostrar
 export { userParams, userSchema } from "./user";
@@ -116,6 +118,7 @@ await generateOpenApi({ ...options, publicSchemas: { orderSchema } });
 `Error: OpenAPI <archivo> response uses a schema outside publicSchemas`, con la ruta del archivo del endpoint (`params`, `query`, `body`, `input` u `output` según el campo).
 
 <!-- no-check -->
+
 ```ts good
 await generateOpenApi({ ...options, publicSchemas: { orderSchema, userSchema, userParams } });
 ```
@@ -142,6 +145,7 @@ await generateOpenApi({ manifest, info, publicSchemas, toJsonSchema });
 `TypeError: OpenAPI generation requires a module loader`.
 
 <!-- no-check -->
+
 ```ts good
 await generateOpenApi({ manifest, info, publicSchemas, toJsonSchema, load: (file) => import(pathToFileURL(file).href) });
 ```
@@ -155,6 +159,7 @@ toJsonSchema: (schema) => JSON.stringify(convert(schema)),
 `Error: OpenAPI schema userSchema is not representable as JSON Schema`. Si el conversor lanza (un `transform` que JSON Schema no expresa), el error es `OpenAPI schema userSchema cannot be converted: …`.
 
 <!-- no-check -->
+
 ```ts good
 toJsonSchema: (schema) => toJsonSchema(schema as never), // un objeto, no un texto
 ```

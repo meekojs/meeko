@@ -1,0 +1,144 @@
+<script lang="ts">
+	// The search of the whole documentation, on <UICommandPalette>: the palette opens, closes and walks the
+	// results; this component only asks the server, and counts what the reader settled on.
+	import type { CommandPaletteStatus } from '@meekojs/ui/runtime'
+
+	import { metricsActive, sendMetric, storedQuery } from 'meeko-docs/metrics'
+
+	import type { SearchResult } from '../utils/search'
+
+	const { locale, t } = useI18n()
+	/** The language of the documentation that the dialog searches: the one of the page. */
+	const searchLocale = locale === 'en' ? 'en' : 'es'
+
+	const query = signal('')
+	const results = signal<readonly SearchResult[]>([])
+	const status = signal<CommandPaletteStatus>('idle')
+	/** The modifier of the shortcut: Ctrl until the browser says it runs on an Apple platform. */
+	const modifier = signal('Ctrl')
+	let request = 0
+	let timer: ReturnType<typeof setTimeout> | undefined
+	// A search is counted once it settles (1.2 s without typing) or when the reader opens a result
+	// or closes the dialog, never per key; the server stores it normalized with its own results. A
+	// query that looks like personal data or a secret is never sent (the server drops it too).
+	let settle: ReturnType<typeof setTimeout> | undefined
+	let recorded = ''
+	function recordSearch(): void {
+		if (settle !== undefined) clearTimeout(settle)
+		settle = undefined
+		const text = storedQuery(query.value)
+		if (text.length < 2 || text === recorded || !metricsActive()) return
+		recorded = text
+		sendMetric('/api/docs/search', { q: text, locale: searchLocale })
+	}
+
+	async function run(text: string, id: number): Promise<void> {
+		try {
+			const found = await searchDocs(text, searchLocale)
+			if (id !== request) return
+			results.value = found
+			status.value = found.length ? 'ready' : 'empty'
+			if (settle !== undefined) clearTimeout(settle)
+			settle = setTimeout(recordSearch, 1200)
+		} catch {
+			if (id === request) status.value = 'unavailable'
+		}
+	}
+
+	effect(() => {
+		const text = query.value.trim()
+		const id = ++request
+		if (timer !== undefined) clearTimeout(timer)
+		if (settle !== undefined) clearTimeout(settle)
+		if (!text) {
+			results.value = []
+			status.value = 'idle'
+			return
+		}
+		status.value = 'loading'
+		timer = setTimeout(() => {
+			void run(text, id)
+		}, 120)
+	})
+
+	onMounted(() => {
+		if (/Mac|iPhone|iPad/.test(navigator.userAgent)) modifier.value = '⌘'
+		return () => {
+			if (timer !== undefined) clearTimeout(timer)
+			if (settle !== undefined) clearTimeout(settle)
+		}
+	})
+</script>
+
+<template>
+	<UICommandPalette
+		inputId="meeko-search"
+		inputName="q"
+		hrefBy="url"
+		labelBy="title"
+		childrenBy="sections"
+		model:query="query"
+		bind:results="results.value"
+		bind:status="status.value"
+		bind:label="t('search.open')"
+		bind:inputLabel="t('search.input')"
+		bind:placeholder="t('search.placeholder')"
+		on:close="recordSearch"
+	>
+		<snippet
+			name="trigger"
+			params="key"
+		>
+			<svg
+				class="meeko-ui-command-icon"
+				viewBox="0 0 24 24"
+				aria-hidden="true"
+			>
+				<circle
+					cx="11"
+					cy="11"
+					r="7"
+				/>
+				<path d="m20 20-3.5-3.5" />
+			</svg>
+			<span class="meeko-ui-command-trigger-label">{t('search.trigger')}</span>
+			<span
+				class="meeko-ui-command-keys"
+				aria-hidden="true"
+			>
+				<kbd>{key}</kbd>
+				<kbd>K</kbd>
+			</span>
+		</snippet>
+		<snippet
+			name="item"
+			params="item"
+		>
+			<strong>{item.title}</strong>
+			<span
+				class="meeko-ui-command-excerpt"
+				html="item.excerpt"
+			/>
+		</snippet>
+		<snippet
+			name="status"
+			params="current, text"
+		>
+			<I18nT
+				if:when="current === 'idle'"
+				key="search.hint"
+				bind:values="{ modifier: modifier.value }"
+			>
+				<snippet
+					name="kbd"
+					params="label"
+				>
+					<kbd>{label}</kbd>
+				</snippet>
+			</I18nT>
+			<template if:when="current === 'loading'">{t('search.loading')}</template>
+			<template if:when="current === 'empty'">{t('search.empty', { query: text })}</template>
+			<template if:when="current === 'unavailable'">{t('search.unavailable')}</template>
+		</snippet>
+	</UICommandPalette>
+</template>

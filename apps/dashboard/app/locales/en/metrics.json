@@ -1,0 +1,127 @@
+{
+	"metrics": {
+		"title": "Metrics",
+		"description": "Views, searches and answers to “Was this helpful?” of each web, by UTC day and by language. No cookies and no data about the readers.",
+		"site": "Web",
+		"locale": "Language",
+		"range": "Date range",
+		"allLanguages": "All languages",
+		"days": "{days} days",
+		"invalidRange": "Invalid range",
+		"from": "From",
+		"to": "To",
+		"apply": "Apply",
+		"failed": "The metrics could not be loaded",
+		"totals": "Totals of the range",
+		"views": "Views",
+		"searches": "Searches",
+		"helpful": "Was this helpful?",
+		"emptySearchCount": {
+			"plural": "count",
+			"forms": {
+				"one": "{total} without results",
+				"other": "{total} without results"
+			}
+		},
+		"allFound": "All with results",
+		"yesShare": "{share} yes",
+		"answers": {
+			"plural": "count",
+			"forms": {
+				"one": "{total} answer: {yes} yes, {no} no",
+				"other": "{total} answers: {yes} yes, {no} no"
+			}
+		},
+		"noAnswers": "No answers",
+		"viewsByDay": "Views per day",
+		"noViews": "No views in this range. The webs count one view per page shown when they have DATABASE_URL and DOCS_METRICS is not off.",
+		"chartLabel": "Views per day of {site}, {range}",
+		"topPages": "Most viewed pages",
+		"topPagesHint": "The first 20, by language",
+		"noPages": "No page viewed in this range.",
+		"topSearches": "Most frequent searches",
+		"normalized": "Normalized queries",
+		"noSearches": "Nobody searched in this range.",
+		"topSearchesCaption": "Most frequent searches of {site}",
+		"query": "Query",
+		"times": "Times",
+		"results": "Results",
+		"none": "None",
+		"emptySearches": "Searches without results",
+		"emptySearchesHint": "What the documentation lacks",
+		"allFoundRange": "Every search of this range found something.",
+		"timesCount": {
+			"plural": "count",
+			"forms": {
+				"one": "{total} time",
+				"other": "{total} times"
+			}
+		},
+		"helpfulByPage": "Was this helpful? by page",
+		"helpfulHint": "Most answered first",
+		"noAnswersRange": "No answers in this range.",
+		"helpfulCaption": "Answers to “Was this helpful?” by page of {site}",
+		"page": "Page",
+		"yes": "Yes",
+		"answersColumn": "Answers",
+		"commentsColumn": "Comments",
+		"yesNo": "{yes} yes · {no} no",
+		"comments": {
+			"pending": "Pending",
+			"reviewed": "Reviewed",
+			"bothAnswers": "Yes and no",
+			"answeredNo": "Answered no",
+			"answeredYes": "Answered yes",
+			"emptyFiltered": "No comment matches the filters.",
+			"emptyPending": "No pending comments in this range: all of them are reviewed.",
+			"emptyReviewed": "You have not reviewed any comment of this range yet.",
+			"empty": "Nobody left a comment in this range.",
+			"markedReviewed": "Comment about {path} marked as reviewed.",
+			"markedPending": "Comment about {path} pending again.",
+			"deleted": "Comment about {path} deleted.",
+			"count": {
+				"plural": "count",
+				"forms": {
+					"one": "{total} comment",
+					"other": "{total} comments"
+				}
+			},
+			"status": "Status",
+			"pathPlaceholder": "Filter by path: /docs/signal…",
+			"failed": "The comments could not be loaded",
+			"notChanged": "The change was not made",
+			"helped": "It helped",
+			"notHelped": "It did not help",
+			"reviewedBy": "Reviewed {date} by {user}",
+			"reviewedOn": "Reviewed {date}",
+			"reopen": "Back to pending",
+			"review": "Mark as reviewed",
+			"about": "the comment about {path} of {date}",
+			"delete": "Delete",
+			"pages": "Pages of comments",
+			"newer": "Newer",
+			"older": "Older",
+			"pageOf": "Page {page} of {pages}",
+			"deleteTitle": "Delete this comment?",
+			"deleteText": "The comment about {path} and its answer disappear from the metrics. It cannot be undone; to keep it, mark it as reviewed.",
+			"notDeleted": "Not deleted",
+			"deleting": "Deleting…",
+			"deleteConfirm": "Delete the comment"
+		}
+	},
+	"chart": {
+		"peak": "Peak: {views} on {day}.",
+		"noViews": "No views.",
+		"keys": "Use the arrow keys to go through the days; the table below has every value.",
+		"views": {
+			"plural": "count",
+			"forms": {
+				"one": "view",
+				"other": "views"
+			}
+		},
+		"table": "See the values as a table",
+		"day": "Day (UTC)",
+		"viewsColumn": "Views"
+	}
+}

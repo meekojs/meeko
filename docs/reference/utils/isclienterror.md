@@ -13,7 +13,7 @@ related:
   - docs/framework.md#errores
 ---
 
-`isClientError(error, code?)` comprueba si `error` es un [`ClientError`](/docs/reference/clienterror) y, con `code`, si tiene ese código. Es un *type guard*: en la rama verdadera, TypeScript sabe que `error` es un `ClientError` (y, con `code`, que `error.code` es ese literal).
+`isClientError(error, code?)` comprueba si `error` es un [`ClientError`](/docs/reference/clienterror) y, con `code`, si tiene ese código. Es un _type guard_: en la rama verdadera, TypeScript sabe que `error` es un `ClientError` (y, con `code`, que `error.code` es ese literal).
 
 Sirve donde el error llega como `unknown`: un `catch`, `provideErrorHandler`, el `onError` de `mountClientApp` o el `errorMessage` de `useForm`. A diferencia de `instanceof`, reconoce también el `ClientError` de otra copia de Meeko en la misma página.
 
@@ -31,10 +31,10 @@ export function describe(error: unknown): string {
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `error` | `unknown` | obligatorio | El valor que se comprueba. |
-| `code` | `string` | cualquiera | El código esperado, como `"NOT_FOUND"`. Con un literal, estrecha `error.code` a ese literal. |
+| Parámetro | Tipo      | Por defecto | Descripción                                                                                  |
+| --------- | --------- | ----------- | -------------------------------------------------------------------------------------------- |
+| `error`   | `unknown` | obligatorio | El valor que se comprueba.                                                                   |
+| `code`    | `string`  | cualquiera  | El código esperado, como `"NOT_FOUND"`. Con un literal, estrecha `error.code` a ese literal. |
 
 ## Valor devuelto
 
@@ -45,6 +45,7 @@ export function describe(error: unknown): string {
 ### Un observador de errores de la aplicación
 
 <!-- no-check -->
+
 ```ts
 import { isClientError, mountClientApp } from "@meekojs/meeko/framework";
 
@@ -109,6 +110,7 @@ if (error instanceof Error && error.message === "NOT_FOUND") showNotFound();
 No es un error de compilación, pero también acepta errores que no vienen del servidor.
 
 <!-- no-check -->
+
 ```ts good
 if (isClientError(error, "NOT_FOUND")) showNotFound();
 ```
@@ -122,6 +124,7 @@ provideErrorHandler((error) => console.warn(error.code));
 `meeko check` da `TS18046: 'error' is of type 'unknown'.`
 
 <!-- no-check -->
+
 ```ts good
 provideErrorHandler((error) => { if (isClientError(error)) console.warn(error.code); });
 ```

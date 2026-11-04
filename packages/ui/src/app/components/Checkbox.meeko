@@ -1,0 +1,33 @@
+<script lang="ts">
+	import { useId } from '@meekojs/meeko'
+
+	import type { UICheckboxProps } from '../types/forms'
+
+	const { label, description, invalid, describedBy, class: className, ...rest } = defineProps<UICheckboxProps>()
+
+	const checked = defineModel<boolean>({ default: false })
+
+	const id = useId()
+</script>
+
+<template>
+	<label bind:class="['meeko-ui-choice', className].filter(Boolean).join(' ')">
+		<input
+			type="checkbox"
+			model="checked"
+			bind:aria-invalid="invalid ? 'true' : undefined"
+			bind:aria-describedby="[describedBy ?? rest['aria-describedby'], description ? id + '-description' : undefined].filter(Boolean).join(' ') || undefined"
+			bind="rest"
+		/>
+		<span class="meeko-ui-choice-content">
+			<span>{label}</span>
+			<span
+				if:when="description"
+				class="meeko-ui-choice-description"
+				bind:id="id + '-description'"
+			>
+				{description}
+			</span>
+		</span>
+	</label>
+</template>

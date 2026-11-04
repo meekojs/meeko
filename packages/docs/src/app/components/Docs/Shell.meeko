@@ -1,0 +1,203 @@
+<script lang="ts">
+	// The structure of every documentation site, on @meekojs/ui and with no data source of its own: what it
+	// paints comes in `view`, and what the reader changes goes out as an event.
+	import { useI18n } from '@meekojs/i18n'
+
+	import type { DocsShellView } from '../../../runtime/shell'
+
+	import * as DocsAnnouncements from './Announcements.meeko'
+	import * as DocsNavigation from './Navigation.meeko'
+	import * as DocsUntranslated from './Untranslated.meeko'
+
+	const props = defineProps<{ view: DocsShellView }>()
+
+	const emit = defineEmits<{ queryChange: [query: string]; dismissAnnouncement: [id: number]; stayLocale: [] }>()
+
+	const snippets = defineSnippets<{ default: []; after?: []; aside?: []; footer?: []; headerActions?: []; searchResults?: [] }>()
+
+	const { t } = useI18n()
+	// The shell speaks the language of its catalog: the document's in es and en, Spanish in a demo locale
+	// such as ar, which declares the Spanish catalog.
+	const shellLocale = t('shell.meta.lang')
+
+	const brand = computed(() => {
+		const { name, brandName, homeHref, logo } = props.view.product
+		return { name: brandName ?? 'Meeko', ...(brandName ? { compact: true } : { product: name }), href: homeHref, image: logo ?? { src: '/brand/meeko-logo.png', width: 28, height: 28 }, ariaLabel: brandName ? t('shell.brand.site', { name: brandName }) : t('shell.brand.home', { name }) }
+	})
+	const license = computed(() => [{ label: t('shell.footer.license'), href: 'https://github.com/meekojs/meeko/blob/main/LICENSE' }])
+	const hasToc = computed(() => (props.view.toc?.length ?? 0) > 0)
+	// A filter stays while it empties the list; without one, a view with no navigation has no sidebar.
+	const hasSidebar = computed(() => props.view.navigation.length > 0 || props.view.search?.mode === 'filter')
+	const notice = computed(() => (!props.view.locale.originalHref ? undefined : props.view.locale.fallback ? 'untranslated' : props.view.locale.outdated ? 'outdated' : undefined))
+	const suggestedLabel = computed(() => props.view.locales.find((item) => item.code === props.view.locale.suggested)?.label ?? '')
+</script>
+
+<template>
+	<div
+		dir="ltr"
+		bind:lang="shellLocale"
+	>
+		<UIApp>
+			<UIPage
+				bind:layout="props.view.layout ?? 'docs'"
+				bind:skipLabel="t('shell.skip')"
+			>
+				<snippet name="header">
+					<UIHeader
+						bind:brand="brand.value"
+						bind:items="props.view.product.links"
+						bind:label="props.view.product.linksLabel ?? t('shell.nav.ecosystem')"
+						bind:menuLabel="t('shell.nav.menu')"
+					>
+						<snippet name="actions">
+							<render
+								if:when="snippets.searchResults && props.view.search?.mode === 'dialog'"
+								snippet="snippets.searchResults"
+							/>
+							<render
+								if:when="snippets.headerActions"
+								snippet="snippets.headerActions"
+							/>
+							<UILocaleSwitcher
+								bind:items="props.view.locales"
+								bind:label="t('shell.locale.label')"
+							/>
+							<UIThemeToggle icons />
+						</snippet>
+					</UIHeader>
+				</snippet>
+				<snippet
+					if:when="props.view.announcements.length > 0"
+					name="notices"
+				>
+					<DocsAnnouncements
+						bind:items="props.view.announcements"
+						on:dismiss="(id) => emit('dismissAnnouncement', id)"
+					/>
+				</snippet>
+				<snippet
+					if:when="hasSidebar.value"
+					name="bar"
+				>
+					<UIDrawer
+						bind:title="t('shell.nav.contents')"
+						bind:triggerLabel="t('shell.nav.contents')"
+					>
+						<DocsNavigation
+							searchId="docs-search-mobile"
+							bind:view="props.view"
+							on:queryChange="(query) => emit('queryChange', query)"
+						/>
+					</UIDrawer>
+				</snippet>
+				<snippet
+					if:when="hasSidebar.value"
+					name="sidebar"
+				>
+					<div id="docs-navigation">
+						<DocsNavigation
+							searchId="docs-search"
+							bind:view="props.view"
+							on:queryChange="(query) => emit('queryChange', query)"
+						/>
+					</div>
+				</snippet>
+				<snippet
+					if:when="hasToc.value || snippets.aside"
+					name="aside"
+				>
+					<UITableOfContents
+						if:when="hasToc.value"
+						bind:entries="props.view.toc ?? []"
+					/>
+					<render
+						if:when="snippets.aside"
+						snippet="snippets.aside"
+					/>
+				</snippet>
+				<UITableOfContents
+					if:when="hasToc.value"
+					variant="collapsible"
+					bind:entries="props.view.toc ?? []"
+				/>
+				<DocsUntranslated
+					if:when="notice.value"
+					bind:kind="notice.value!"
+					bind:href="props.view.locale.originalHref!"
+					bind:hreflang="notice.value === 'untranslated' ? props.view.locale.content : props.view.locale.original"
+				/>
+				<div bind:lang="props.view.locale.fallback ? props.view.locale.content : undefined">
+					<render snippet="snippets.default" />
+				</div>
+				<render
+					if:when="snippets.after"
+					snippet="snippets.after"
+				/>
+				<div
+					if:when="props.view.pager"
+					class="docs-pager"
+				>
+					<UIPageNavigation
+						bind:previous="props.view.pager?.previous"
+						bind:next="props.view.pager?.next"
+					/>
+				</div>
+				<p
+					if:when="props.view.edit"
+					class="docs-edit"
+				>
+					<a
+						rel="noopener"
+						bind:href="props.view.edit!.href"
+					>
+						{t('shell.edit', { source: props.view.edit!.source })}
+					</a>
+				</p>
+				<snippet name="footer">
+					<render
+						if:when="snippets.footer"
+						snippet="snippets.footer"
+					/>
+					<UIFooter
+						if:when="!snippets.footer"
+						bind:items="license.value"
+						bind:label="t('shell.footer.license')"
+					>
+						<snippet name="legal">{t('shell.footer.tagline', { name: props.view.product.name })}</snippet>
+					</UIFooter>
+				</snippet>
+			</UIPage>
+			<UILocaleSuggestion
+				if:when="props.view.locale.suggested"
+				bind:items="props.view.locales"
+				bind:suggested="props.view.locale.suggested"
+				bind:label="t('shell.locale.suggestion', { locale: props.view.locale.suggested! })"
+				bind:message="t('shell.locale.message', { locale: props.view.locale.suggested!, language: suggestedLabel.value })"
+				bind:goLabel="t('shell.locale.offer', { locale: props.view.locale.suggested!, language: suggestedLabel.value })"
+				bind:stayLabel="t('shell.locale.stay', { locale: props.view.locale.requested, language: props.view.locales.find((item) => item.current)?.label ?? '' })"
+				on:stay="() => emit('stayLocale')"
+			/>
+		</UIApp>
+	</div>
+</template>
+
+<style scoped>
+	.docs-pager {
+		margin-block-start: var(--ui-space-10);
+	}
+	/* A link with a path of the repository, which wraps on a narrow screen. */
+	.docs-edit {
+		margin: var(--ui-space-6) 0 0;
+		color: var(--ui-color-text-soft);
+		font-size: var(--ui-font-size-sm);
+		line-height: var(--ui-line-height-normal);
+		overflow-wrap: anywhere;
+	}
+	.docs-edit a {
+		border-radius: var(--ui-radius-xs);
+		color: inherit;
+	}
+	.docs-edit a:hover {
+		color: var(--ui-color-text);
+	}
+</style>

@@ -36,11 +36,11 @@ Con `id: "42"`, el enlace es `/users/42?tab=perfil`.
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `id` | `RouteId` | obligatorio | El ID de la ruta: la ruta de su archivo en `app/pages`, sin grupos `(…)`, como `"/"`, `"/about"`, `"/users/[id]"` o `"/docs/[...slug]"`. Sin query ni fragmento. |
-| `options.params` | `{ [segmento]: string }` | ninguno | Los segmentos dinámicos. Obligatorio en una ruta dinámica y prohibido en una estática. Los valores son texto no vacío; un `[...slug]` admite `/`. |
-| `options.search` | `Record<string, string \| number \| boolean \| null \| undefined>` | ninguno | La query string. Omite las claves con `null` o `undefined`. |
+| Parámetro        | Tipo                                                               | Por defecto | Descripción                                                                                                                                                      |
+| ---------------- | ------------------------------------------------------------------ | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`             | `RouteId`                                                          | obligatorio | El ID de la ruta: la ruta de su archivo en `app/pages`, sin grupos `(…)`, como `"/"`, `"/about"`, `"/users/[id]"` o `"/docs/[...slug]"`. Sin query ni fragmento. |
+| `options.params` | `{ [segmento]: string }`                                           | ninguno     | Los segmentos dinámicos. Obligatorio en una ruta dinámica y prohibido en una estática. Los valores son texto no vacío; un `[...slug]` admite `/`.                |
+| `options.search` | `Record<string, string \| number \| boolean \| null \| undefined>` | ninguno     | La query string. Omite las claves con `null` o `undefined`.                                                                                                      |
 
 Fuera de una aplicación (una prueba unitaria, un script), la otra forma recibe el manifiesto: `href(routes, id, options)`.
 
@@ -112,6 +112,7 @@ href("/users/[id]?tab=1", { params: { id: "7" } });
 `meeko check` da `TS2345: Argument of type '"/nowhere"' is not assignable to parameter of type '"/" | "/users/[id]"'.`, con la lista de rutas de la aplicación. Con query en el ID, `TS2769: No overload matches this call.`
 
 <!-- no-check -->
+
 ```ts good
 href("/users/[id]", { params: { id: "7" }, search: { tab: "1" } });
 ```
@@ -126,6 +127,7 @@ href("/users/[id]", { params: { id: 7 } });
 `meeko check` da `TS2554: Expected 2 arguments, but got 1.` y `TS2769: No overload matches this call.` Sin tipos (un ID que llega como `string`), la ejecución lanza `Error: Missing route parameter: id`, también con `id: ""`.
 
 <!-- no-check -->
+
 ```ts good
 href("/users/[id]", { params: { id: String(user.id) } });
 ```
@@ -141,6 +143,7 @@ href("/users/[id]", { params: { id: "equipo/ana" } });
 En ejecución, `Error: Invalid route parameter: id`. Para rutas con barras, usa un segmento `[...slug]`.
 
 <!-- no-check -->
+
 ```ts good
 href("/docs/[...slug]", { params: { slug: "equipo/ana" } });
 ```
@@ -155,6 +158,7 @@ const url = href("/users/[id]", { params: { id: "1" } });
 `Error: href(id) needs a running Meeko application (a server request or a mounted browser app); outside one, pass the manifest: href(routes, id)`.
 
 <!-- no-check -->
+
 ```ts good
 const url = href(routes, "/users/[id]", { params: { id: "1" } });
 ```

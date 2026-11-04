@@ -1,0 +1,685 @@
+<script
+	server
+	lang="ts"
+>
+	import { definePage } from '@meekojs/meeko/framework'
+	import * as v from 'valibot'
+
+	import { attempt } from '../../utils/errors'
+
+	export const route = definePage({ params: v.object({ id: v.pipe(v.string(), v.regex(/^[1-9]\d{0,15}$/)) }), render: 'ssr' })
+
+	const { params } = usePage()
+	export const detail = await attempt(() => rpc.sources.get({ id: Number(params.id) }))
+	if (!detail.ok && detail.failure.code === 'SOURCE_NOT_FOUND') notFound()
+</script>
+
+<script lang="ts">
+	import type { TableColumn } from '@meekojs/ui/runtime'
+
+	import type { Comparison, Conflict, RevisionRow } from '../../../shared/schemas/dashboard'
+	import type { Failure } from '../../utils/errors'
+
+	import { downloadText } from '../../utils/download'
+	import { describeError } from '../../utils/errors'
+	import { shortHash } from '../../utils/format'
+	import { siteLabels } from '../../utils/labels'
+
+	export interface Props {
+		params: { id: string }
+		search: Record<string, string | string[]>
+	}
+
+	const props = defineProps<Props>()
+
+	const i18n = useI18n()
+	const { t, localePath } = i18n
+	const format = useFormat()
+	const formatDate = format.date
+
+	// The page remounts for another id: its initial value is enough.
+	const sourceId = untrack(() => Number(props.params.id))
+
+	const data = signal(detail.ok ? detail.data : null)
+	const notice = signal('')
+	const noticeLink = signal<{ href: string; label: string } | null>(null)
+	const actionFailure = signal<Failure | null>(null)
+
+	async function reload() {
+		try {
+			data.value = await rpc.sources.get({ id: sourceId })
+		} catch (error) {
+			actionFailure.value = describeError(error)
+		}
+	}
+
+	function announce(text: string, link: { href: string; label: string } | null = null) {
+		notice.value = text
+		noticeLink.value = link
+	}
+
+	const revisionStatus = (status: RevisionRow['status']) => t(`source.status.${status}`)
+	const pending = computed(() => data.value?.revisions.filter((revision) => revision.pending) ?? [])
+	// A published revision after the snapshot, or the snapshot's one archived since (back to Git).
+	const pendingPublished = computed(() => pending.value.filter((revision) => revision.status === 'published'))
+	const pendingTitle = computed(() => {
+		const published = pendingPublished.value
+		if (published.length === 1) return t('source.pending.one', { id: published[0]?.id ?? 0 })
+		if (published.length > 1) return t('source.pending.many', { count: published.length })
+		return t('source.pending.archived', { id: pending.value[0]?.id ?? 0 })
+	})
+	const pendingText = computed(() => (pendingPublished.value.length ? t('source.pending.notIncluded') : t('source.pending.stillShown')))
+	const editLabel = computed(() => (data.value?.source.publishedRevisionId ? t('source.newDraft') : t('source.edit')))
+	const isTranslation = computed(() => data.value?.source.locale === 'en')
+	const canTranslate = computed(() => data.value?.source.site === 'site' && data.value.source.file !== null && data.value.source.kind !== 'page')
+
+	// Publish and archive: both ask first, because the next snapshot changes what the site shows.
+	type Action = 'publish' | 'archive'
+	const action = signal<{ kind: Action; revision: RevisionRow } | null>(null)
+	const confirming = signal(false)
+	const acting = signal(false)
+	const confirmFailure = signal<Failure | null>(null)
+
+	function ask(kind: Action, revision: RevisionRow) {
+		action.value = { kind, revision }
+		confirmFailure.value = null
+		confirming.value = true
+	}
+
+	async function confirm() {
+		const current = action.value
+		if (!current) return
+		acting.value = true
+		confirmFailure.value = null
+		try {
+			if (current.kind === 'publish') {
+				const revision = await rpc.revisions.publish({ id: current.revision.id })
+				announce(t('source.notice.published', { id: revision.id }), { href: localePath('/snapshots'), label: t('source.publishDocs') })
+			} else {
+				const revision = await rpc.revisions.archive({ id: current.revision.id })
+				announce(current.revision.status === 'published' ? t('source.notice.archivedPublished', { id: revision.id }) : t('source.notice.archived', { id: revision.id }), current.revision.status === 'published' ? { href: localePath('/snapshots'), label: t('source.publishDocs') } : null)
+			}
+			confirming.value = false
+			await reload()
+		} catch (error) {
+			confirmFailure.value = describeError(error)
+		} finally {
+			acting.value = false
+		}
+	}
+
+	async function exportMarkdown(revision: RevisionRow) {
+		actionFailure.value = null
+		try {
+			const file = await rpc.revisions.export({ id: revision.id })
+			downloadText(file.filename, file.markdown)
+			announce(t('source.notice.exported', { filename: file.filename, id: file.revisionId, file: file.file }))
+		} catch (error) {
+			actionFailure.value = describeError(error)
+		}
+	}
+
+	// Comparison of two sides: Git now or any revision.
+	const sideOptions = computed(() => ['git', ...(data.value?.revisions.map((revision) => `r${revision.id}`) ?? [])])
+	const sideLabel = (value: string) => (value === 'git' ? t('source.gitNow') : t('source.sideRevision', { id: value.slice(1), status: revisionStatus(data.value?.revisions.find((revision) => `r${revision.id}` === value)?.status ?? 'draft').toLocaleLowerCase(i18n.locale) }))
+	const compared = signal<{ from: string; to: string } | null>(null)
+	const fromSide = signal<string | null>('git')
+	const toSide = signal<string | null>(data.value?.revisions[0] ? `r${data.value.revisions[0].id}` : null)
+	const comparison = signal<Comparison | null>(null)
+	const comparing = signal(false)
+	const compareFailure = signal<Failure | null>(null)
+	const side = (value: string) => (value === 'git' ? ({ kind: 'git' } as const) : ({ kind: 'revision', id: Number(value.slice(1)) } as const))
+
+	async function compareSides() {
+		if (!fromSide.value || !toSide.value) return
+		comparing.value = true
+		try {
+			comparison.value = await rpc.revisions.compare({ sourceId, from: side(fromSide.value), to: side(toSide.value) })
+			compared.value = { from: sideLabel(fromSide.value), to: sideLabel(toSide.value) }
+			compareFailure.value = null
+		} catch (error) {
+			compareFailure.value = describeError(error)
+		} finally {
+			comparing.value = false
+		}
+	}
+
+	// Conflict with Git: the three sides and, when trivial, a new draft with both changes.
+	const conflict = signal<Conflict | null>(null)
+	const conflictFailure = signal<Failure | null>(null)
+	const loadingConflict = signal<number | null>(null)
+	const merging = signal(false)
+	const baseOrigin = (origin: 'commit' | 'import' | 'working-tree') => t(`source.origin.${origin === 'working-tree' ? 'workingTree' : origin}`)
+	const conflictLead = computed(() => {
+		const current = conflict.value
+		if (!current) return ''
+		if (current.state === 'missing') return t('source.conflict.missing')
+		if (current.baseOrigin) return t('source.conflict.lead', { base: shortHash(current.baseHash), origin: baseOrigin(current.baseOrigin) + (current.baseCommit ? ' ' + current.baseCommit.slice(0, 10) : ''), git: shortHash(current.gitHash) })
+		return t('source.conflict.noBase', { base: shortHash(current.baseHash) })
+	})
+
+	async function openConflict(revision: RevisionRow) {
+		loadingConflict.value = revision.id
+		try {
+			conflict.value = await rpc.revisions.conflict({ id: revision.id })
+			conflictFailure.value = null
+		} catch (error) {
+			conflictFailure.value = describeError(error)
+		} finally {
+			loadingConflict.value = null
+		}
+	}
+
+	async function merge() {
+		const current = conflict.value
+		if (!current) return
+		merging.value = true
+		try {
+			const draft = await rpc.revisions.merge({ id: current.revisionId, note: t('source.mergeNote', { id: current.revisionId }) })
+			conflict.value = null
+			announce(t('source.notice.merged', { id: draft.id, revision: current.revisionId }), { href: localePath(`/sources/${sourceId}/edit?revision=${draft.id}`), label: t('source.openDraft', { id: draft.id }) })
+			await reload()
+		} catch (error) {
+			conflictFailure.value = describeError(error)
+		} finally {
+			merging.value = false
+		}
+	}
+
+	const busyRow = computed(() => acting.value || merging.value)
+
+	const facts = computed(() => {
+		const current = data.value
+		if (!current) return []
+		const { source } = current
+		return [
+			{ label: t('source.facts.path'), value: source.locale === 'en' ? '/en' + (source.path === '/' ? '' : source.path) : source.path, code: true },
+			{ label: t('source.facts.locale'), value: t(`locale.${source.locale}`) },
+			{ label: t('source.facts.file'), value: source.file ?? t('source.facts.meekoFile'), code: source.file !== null },
+			{ label: t('source.facts.baseHash'), value: shortHash(source.baseHash), code: true, ...(source.baseHash ? { title: source.baseHash } : {}) },
+			{ label: t('source.facts.gitHash'), value: shortHash(current.gitHash), code: true, ...(current.gitHash ? { title: current.gitHash } : {}) },
+			{ label: t('source.facts.imported'), value: formatDate(source.importedAt) },
+			...(source.removedAt ? [{ label: t('source.facts.removed'), value: formatDate(source.removedAt) }] : []),
+			{ label: t('source.facts.published'), value: source.publishedRevisionId ? `#${source.publishedRevisionId}` : t('source.facts.noPublished') },
+		]
+	})
+	const actionFacts = computed(() => {
+		const current = action.value
+		if (!current) return []
+		const replaces = data.value?.source.publishedRevisionId
+		return [
+			{ label: t('source.columns.author'), value: current.revision.author },
+			{ label: t('source.columns.status'), value: revisionStatus(current.revision.status) },
+			...(current.kind === 'publish' && replaces ? [{ label: t('source.confirm.replaces'), value: `#${replaces}` }] : []),
+			...(current.revision.note ? [{ label: t('source.columns.note'), value: current.revision.note }] : []),
+		]
+	})
+	// The last column holds the actions of the row: it has no value of its own.
+	const revisionColumns = [
+		{ key: 'id', label: t('source.columns.revision'), rowHeader: true },
+		{ key: 'status', label: t('source.columns.status') },
+		{ key: 'author', label: t('source.columns.author') },
+		{ key: 'createdAt', label: t('source.columns.created') },
+		{ key: 'publishedAt', label: t('source.columns.published') },
+		{ key: 'note', label: t('source.columns.note') },
+		{ key: 'baseHash', label: t('source.columns.actions'), numeric: true },
+	] satisfies TableColumn<RevisionRow>[]
+</script>
+
+<template>
+	<DashPage
+		bind:title="data.value ? data.value.source.title : t('source.fallbackTitle', { id: props.params.id })"
+		bind:description="data.value ? siteLabels[data.value.source.site] + ' · ' + t(`locale.${data.value.source.locale}`) + ' · ' + t(`labels.kind.${data.value.source.kind}`) + ' · ' + data.value.source.path : t('source.fallbackDescription')"
+	>
+		<snippet name="actions">
+			<UILink
+				variant="ghost"
+				bind:href="localePath('/sources')"
+			>
+				{t('source.allSources')}
+			</UILink>
+			<UILink
+				if:when="canTranslate.value"
+				variant="outline"
+				bind:href="localePath('/translations/' + props.params.id)"
+			>
+				{isTranslation.value ? t('source.compareOriginal') : t('source.seeTranslation')}
+			</UILink>
+			<UILink
+				if:when="data.value?.editable"
+				bind:href="localePath('/sources/' + props.params.id + '/edit')"
+			>
+				{editLabel.value}
+			</UILink>
+		</snippet>
+		<DashFailure
+			if:when="!detail.ok"
+			bind:failure="detail.failure"
+		/>
+		<div
+			if:when="data.value"
+			class="dash-stack"
+		>
+			<UICard
+				bind:title="t('source.heading')"
+				bind:description="data.value?.source.state ? t(`labels.stateHelp.${data.value.source.state}`) : undefined"
+			>
+				<snippet name="actions">
+					<DashStateBadge
+						bind:state="data.value?.source.state ?? null"
+						bind:importStale="data.value?.source.importStale ?? false"
+						bind:removed="data.value?.source.removedAt !== null"
+					/>
+				</snippet>
+				<UIDescriptionList
+					bind:columns="3"
+					bind:items="facts.value"
+				/>
+			</UICard>
+
+			<UIAlert
+				if:when="pending.value.length"
+				tone="info"
+				bind:title="pendingTitle.value"
+				bind:description="pendingText.value"
+			>
+				<snippet name="actions">
+					<UILink
+						size="sm"
+						variant="outline"
+						bind:href="localePath('/snapshots')"
+					>
+						{t('source.publishDocs')}
+					</UILink>
+				</snippet>
+			</UIAlert>
+
+			<DashNotice bind:text="notice.value">
+				<a
+					if:when="noticeLink.value"
+					bind:href="noticeLink.value?.href"
+				>
+					{noticeLink.value?.label}
+				</a>
+			</DashNotice>
+			<DashFailure
+				if:when="actionFailure.value"
+				bind:title="t('source.actionFailed')"
+				bind:failure="actionFailure.value"
+			/>
+
+			<UICard
+				id="revisiones"
+				bind:title="t('source.revisions')"
+				bind:description="t('source.revisionCount', { count: data.value?.revisions.length ?? 0 })"
+			>
+				<UIEmpty
+					if:when="!data.value?.revisions.length"
+					bind:title="data.value?.editable ? t('source.noRevisions.editable') : data.value?.source.file ? t('source.noRevisions.gone') : t('source.noRevisions.meeko')"
+				/>
+				<UITable
+					if:when="data.value?.revisions.length"
+					rowKey="id"
+					bind:hideCaption="true"
+					bind:caption="t('source.revisionsCaption')"
+					bind:columns="revisionColumns"
+					bind:rows="data.value?.revisions ?? []"
+				>
+					<snippet
+						name="header-baseHash"
+						params="column"
+					>
+						<span class="meeko-ui-sr-only">{column.label}</span>
+					</snippet>
+					<snippet
+						name="cell"
+						params="revision, column"
+					>
+						<span
+							if:when="column.key === 'id'"
+							class="dash-cell"
+						>
+							#{String(revision.id)}
+							<code bind:title="revision.baseHash ? t('source.writtenOn', { hash: revision.baseHash }) : undefined">{shortHash(revision.baseHash)}</code>
+						</span>
+						<span
+							if:when="column.key === 'status'"
+							class="dash-badges"
+						>
+							<UIBadge bind:tone="revision.status === 'published' ? 'accent' : 'neutral'">{revisionStatus(revision.status)}</UIBadge>
+							<span
+								if:when="revision.pending"
+								bind:title="revision.status === 'archived' ? t('source.badges.archivedAfter') : t('source.badges.publishedAfter')"
+							>
+								<UIBadge tone="accent">{t('source.badges.noSnapshot')}</UIBadge>
+							</span>
+							<span
+								if:when="revision.conflict"
+								bind:title="t('source.badges.conflictHelp')"
+							>
+								<UIBadge tone="danger">{t('source.badges.conflict')}</UIBadge>
+							</span>
+						</span>
+						<span if:when="column.key === 'author'">{revision.author}</span>
+						<span
+							if:when="column.key === 'createdAt'"
+							class="dash-nowrap"
+						>
+							{formatDate(revision.createdAt)}
+						</span>
+						<span
+							if:when="column.key === 'publishedAt'"
+							class="dash-nowrap"
+						>
+							{formatDate(revision.publishedAt)}
+						</span>
+						<span if:when="column.key === 'note'">{revision.note ?? '—'}</span>
+						<span
+							if:when="column.key === 'baseHash'"
+							class="dash-row-actions"
+						>
+							<UILink
+								if:when="data.value?.editable"
+								size="sm"
+								variant="ghost"
+								bind:href="localePath('/sources/' + props.params.id + '/edit?revision=' + revision.id)"
+								bind:ariaLabel="revision.status === 'draft' ? t('source.row.editDraft', { id: revision.id }) : t('source.row.fromRevision', { id: revision.id })"
+							>
+								{revision.status === 'draft' ? t('source.edit') : t('source.row.startHere')}
+							</UILink>
+							<UIButton
+								if:when="revision.status !== 'published'"
+								size="sm"
+								variant="outline"
+								bind:disabled="busyRow.value"
+								on:click="() => ask('publish', revision)"
+							>
+								{t('source.row.publish')}
+								<span class="meeko-ui-sr-only">{t('source.row.theRevision', { id: revision.id })}</span>
+							</UIButton>
+							<UIButton
+								if:when="revision.status !== 'archived'"
+								size="sm"
+								variant="ghost"
+								bind:disabled="busyRow.value"
+								on:click="() => ask('archive', revision)"
+							>
+								{t('source.row.archive')}
+								<span class="meeko-ui-sr-only">{t('source.row.theRevision', { id: revision.id })}</span>
+							</UIButton>
+							<UIButton
+								size="sm"
+								variant="ghost"
+								on:click="() => exportMarkdown(revision)"
+							>
+								<span class="meeko-ui-sr-only">{t('source.row.export', { id: revision.id })}</span>
+								.md
+							</UIButton>
+							<UIButton
+								if:when="revision.conflict"
+								size="sm"
+								variant="outline"
+								bind:disabled="loadingConflict.value !== null"
+								on:click="() => openConflict(revision)"
+							>
+								{loadingConflict.value === revision.id ? t('source.row.loading') : t('source.row.seeConflict')}
+								<span class="meeko-ui-sr-only">{t('source.row.ofRevision', { id: revision.id })}</span>
+							</UIButton>
+						</span>
+					</snippet>
+				</UITable>
+			</UICard>
+
+			<UICard
+				if:when="conflict.value || conflictFailure.value"
+				bind:title="conflict.value ? t('source.conflict.title', { id: conflict.value.revisionId }) : t('source.badges.conflict')"
+			>
+				<snippet name="actions">
+					<UIButton
+						size="sm"
+						variant="ghost"
+						on:click="
+							() => {
+								conflict.value = null
+								conflictFailure.value = null
+							}
+						"
+					>
+						{t('actions.close')}
+					</UIButton>
+				</snippet>
+				<div class="dash-tight">
+					<DashFailure
+						if:when="conflictFailure.value"
+						bind:title="t('source.conflict.failed')"
+						bind:failure="conflictFailure.value"
+					/>
+					<p
+						if:when="conflict.value"
+						class="dash-meta"
+					>
+						{conflictLead.value}
+					</p>
+					<UIAlert
+						if:when="conflict.value?.merge"
+						role="note"
+						bind:tone="conflict.value?.merge?.clean ? 'info' : 'danger'"
+						bind:title="conflict.value?.merge?.clean ? t('source.conflict.trivial') : t('source.conflict.zones', { count: conflict.value?.merge?.conflicts ?? 0 })"
+						bind:description="conflict.value?.merge?.clean ? t('source.conflict.trivialText') : t('source.conflict.manual')"
+					>
+						<snippet
+							if:when="conflict.value?.merge?.clean"
+							name="actions"
+						>
+							<UIButton
+								bind:disabled="merging.value"
+								on:click="merge"
+							>
+								{merging.value ? t('source.conflict.creating') : t('source.conflict.merge')}
+							</UIButton>
+						</snippet>
+					</UIAlert>
+					<div
+						if:when="conflict.value"
+						class="dash-columns source-three-way"
+					>
+						<section
+							class="dash-tight"
+							aria-labelledby="base-git-heading"
+						>
+							<h3
+								id="base-git-heading"
+								class="dash-heading"
+							>
+								{t('source.conflict.baseGit')}
+							</h3>
+							<p class="dash-meta">{t('source.conflict.baseGitHint')}</p>
+							<UIDiff
+								bind:label="t('source.conflict.baseGitLabel')"
+								bind:diff="conflict.value?.diffs.baseToGit ?? ''"
+								bind:emptyText="conflict.value?.baseOrigin ? t('source.conflict.noChanges') : t('source.conflict.noBaseDiff')"
+							/>
+						</section>
+						<section
+							class="dash-tight"
+							aria-labelledby="base-revision-heading"
+						>
+							<h3
+								id="base-revision-heading"
+								class="dash-heading"
+							>
+								{t('source.conflict.baseRevision')}
+							</h3>
+							<p class="dash-meta">{t('source.conflict.baseRevisionHint')}</p>
+							<UIDiff
+								bind:label="t('source.conflict.baseRevisionLabel')"
+								bind:diff="conflict.value?.diffs.baseToRevision ?? ''"
+								bind:emptyText="conflict.value?.baseOrigin ? t('source.conflict.noChanges') : t('source.conflict.noBaseDiff')"
+							/>
+						</section>
+						<section
+							class="dash-tight"
+							aria-labelledby="git-revision-heading"
+						>
+							<h3
+								id="git-revision-heading"
+								class="dash-heading"
+							>
+								{t('source.conflict.gitRevision')}
+							</h3>
+							<p class="dash-meta">{t('source.conflict.gitRevisionHint')}</p>
+							<UIDiff
+								bind:label="t('source.conflict.gitRevisionLabel')"
+								bind:diff="conflict.value?.diffs.gitToRevision ?? ''"
+							/>
+						</section>
+					</div>
+				</div>
+			</UICard>
+
+			<UICard
+				if:when="data.value?.source.file && data.value?.revisions.length"
+				bind:title="t('source.compare.title')"
+			>
+				<snippet
+					if:when="comparison.value && !comparison.value.tooLarge"
+					name="actions"
+				>
+					<UIBadge tone="success">+{String(comparison.value?.added ?? 0)}</UIBadge>
+					<UIBadge tone="danger">−{String(comparison.value?.removed ?? 0)}</UIBadge>
+				</snippet>
+				<div class="dash-tight">
+					<form
+						class="dash-filters"
+						bind:aria-label="t('source.compare.label')"
+						on:submit="
+							(event) => {
+								event.preventDefault()
+								void compareSides()
+							}
+						"
+					>
+						<UIField
+							id="compare-from"
+							bind:label="t('source.compare.from')"
+						>
+							<snippet
+								name="default"
+								params="id, describedBy"
+							>
+								<UISelect
+									model="fromSide"
+									bind:id="id"
+									bind:describedBy="describedBy"
+									bind:options="sideOptions.value"
+									bind:labelBy="sideLabel"
+								/>
+							</snippet>
+						</UIField>
+						<UIField
+							id="compare-to"
+							bind:label="t('source.compare.to')"
+						>
+							<snippet
+								name="default"
+								params="id, describedBy"
+							>
+								<UISelect
+									model="toSide"
+									bind:id="id"
+									bind:describedBy="describedBy"
+									bind:options="sideOptions.value"
+									bind:labelBy="sideLabel"
+								/>
+							</snippet>
+						</UIField>
+						<UIButton
+							type="submit"
+							variant="secondary"
+							bind:disabled="comparing.value || !fromSide.value || !toSide.value"
+						>
+							{comparing.value ? t('source.compare.running') : t('source.compare.submit')}
+						</UIButton>
+					</form>
+					<DashFailure
+						if:when="compareFailure.value"
+						bind:title="t('source.compare.failed')"
+						bind:failure="compareFailure.value"
+					/>
+					<UIEmpty
+						if:when="comparison.value?.tooLarge"
+						bind:title="t('source.compare.tooLarge')"
+					/>
+					<UIDiff
+						if:when="comparison.value && !comparison.value.tooLarge"
+						bind:emptyText="t('source.compare.same')"
+						bind:diff="comparison.value?.diff ?? ''"
+						bind:label="t('source.compare.diffLabel', { from: compared.value?.from ?? '', to: compared.value?.to ?? '' })"
+					/>
+				</div>
+			</UICard>
+
+			<UICard
+				if:when="data.value?.source.file"
+				bind:title="t('source.gitDiff.title')"
+			>
+				<snippet
+					if:when="data.value?.diff"
+					name="actions"
+				>
+					<UIBadge tone="success">+{String(data.value?.source.added ?? 0)}</UIBadge>
+					<UIBadge tone="danger">−{String(data.value?.source.removed ?? 0)}</UIBadge>
+				</snippet>
+				<UIDiff
+					bind:label="t('source.gitDiff.label')"
+					bind:diff="data.value?.diff ?? ''"
+					bind:emptyText="data.value?.source.publishedRevisionId ? t('source.gitDiff.same') : t('source.gitDiff.none')"
+				/>
+			</UICard>
+		</div>
+
+		<UIModal
+			model="confirming"
+			bind:title="action.value ? (action.value.kind === 'publish' ? t('source.confirm.publishTitle', { id: action.value.revision.id }) : t('source.confirm.archiveTitle', { id: action.value.revision.id })) : ''"
+			bind:description="action.value?.kind === 'publish' ? t('source.confirm.publishText') : action.value?.revision.status === 'published' ? t('source.confirm.archivePublishedText') : t('source.confirm.archiveText')"
+		>
+			<div class="dash-tight">
+				<UIDescriptionList
+					if:when="action.value"
+					bind:columns="2"
+					bind:items="actionFacts.value"
+				/>
+				<UIAlert
+					if:when="action.value?.kind === 'publish' && action.value?.revision.conflict"
+					tone="warning"
+					bind:description="t('source.confirm.conflictWarning')"
+				/>
+				<DashFailure
+					if:when="confirmFailure.value"
+					bind:title="action.value?.kind === 'publish' ? t('source.confirm.notPublished') : t('source.confirm.notArchived')"
+					bind:failure="confirmFailure.value"
+				/>
+			</div>
+			<snippet name="footer">
+				<UIButton
+					variant="ghost"
+					on:click="() => (confirming.value = false)"
+				>
+					{t('actions.cancel')}
+				</UIButton>
+				<UIButton
+					bind:disabled="acting.value"
+					on:click="confirm"
+				>
+					{acting.value ? t('source.confirm.working') : action.value?.kind === 'publish' ? t('source.confirm.publish') : t('source.confirm.archive')}
+				</UIButton>
+			</snippet>
+		</UIModal>
+	</DashPage>
+</template>
+
+<style scoped>
+	.source-three-way {
+		--dash-column: var(--ui-floating-panel-width);
+	}
+</style>

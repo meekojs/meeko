@@ -1,0 +1,771 @@
+<script
+	server
+	lang="ts"
+>
+	import { definePage } from '@meekojs/meeko/framework'
+	import * as v from 'valibot'
+
+	import { attempt, failed } from '../utils/errors'
+	import { defaultRange, metricsLocale, rangeFailure } from '../utils/metrics'
+
+	export const route = definePage({
+		search: v.object({ site: v.optional(v.picklist(['site', 'ui', 'i18n'])), lang: v.optional(v.string()), from: v.optional(v.string()), to: v.optional(v.string()) }),
+		render: 'ssr',
+	})
+
+	const { search } = usePage()
+	const range = defaultRange(search.from, search.to)
+	const site = search.site ?? 'site'
+	// ?lang=es|en limits every reading to that language of the web; without it, both together.
+	const locale = metricsLocale(search.lang)
+	const filter = locale ? { locale } : {}
+	// A range of the URL that no reading accepts (`2026-99-99`, reversed) is an error state at once.
+	const invalidRange = rangeFailure(site, range)
+	export const initialSummary = invalidRange ? failed(invalidRange) : await attempt(() => rpc.metrics.get({ site, ...range, ...filter }))
+	export const initialComments = invalidRange ? failed(invalidRange) : await attempt(() => rpc.metrics.feedback.list({ site, ...range, ...filter, status: 'pending' }))
+</script>
+
+<script lang="ts">
+	import type { TableColumn, UINavigationTabsItem } from '@meekojs/ui/runtime'
+
+	import type { DocsLocale } from '../../shared/schemas/dashboard'
+	import type { FeedbackCommentRow, MetricsSummaryView } from '../../shared/schemas/metrics'
+	import type { Failure } from '../utils/errors'
+
+	import { describeError } from '../utils/errors'
+	import { siteLabels, sites } from '../utils/labels'
+	import { defaultRange, formatRange, localePagePath, metricsHref, metricsLocale, pageWithin, presets, rangeFailure, todayUtc } from '../utils/metrics'
+
+	export interface Props {
+		params: Record<string, string>
+		search: { site?: 'site' | 'ui' | 'i18n' | undefined; lang?: string | undefined; from?: string | undefined; to?: string | undefined }
+	}
+
+	const props = defineProps<Props>()
+
+	const i18n = useI18n()
+	const { t, localePath } = i18n
+	const format = useFormat()
+	const formatDate = format.date
+	const formatNumber = format.number
+	const percent = format.percent
+	const rangeText = (value: { from: string; to: string }) => formatRange(value, i18n.locale, t('metrics.invalidRange'))
+
+	// The page remounts for another web or range (links and the GET form): its initial values are enough.
+	const site = untrack(() => props.search.site ?? 'site')
+	const range = untrack(() => defaultRange(props.search.from, props.search.to))
+	const locale = untrack(() => metricsLocale(props.search.lang))
+	const invalidRange = rangeFailure(site, range)
+	const navigation = useNavigation()
+	const summary = initialSummary.ok ? initialSummary.data : null
+	const summaryFailure: Failure | null = initialSummary.ok ? null : initialSummary.failure
+	const notice = signal('')
+
+	const tabs: readonly UINavigationTabsItem[] = sites.map((name) => ({ label: siteLabels[name], href: localePath(metricsHref(name, range, locale)), current: name === site }))
+	const presetLinks: readonly UINavigationTabsItem[] = presets.map((preset) => ({ label: t('metrics.days', { days: preset.days }), href: localePath(metricsHref(site, preset.range(), locale)), current: preset.matches(range) }))
+	const localeChoices: readonly (DocsLocale | null)[] = [null, 'es', 'en']
+	const localeLinks: readonly UINavigationTabsItem[] = localeChoices.map((choice) => ({ label: choice ? t(`locale.${choice}`) : t('metrics.allLanguages'), href: localePath(metricsHref(site, range, choice)), current: choice === locale }))
+	// The native GET form sends them; it remounts the page, which reads them from the address again.
+	const from = signal(range.from)
+	const to = signal(range.to)
+
+	type SearchRow = MetricsSummaryView['topSearches'][number]
+	type FeedbackRow = MetricsSummaryView['feedback'][number]
+	const number = (value: number) => formatNumber(value)
+	const searchColumns = [
+		{ key: 'query', label: t('metrics.query'), rowHeader: true },
+		{ key: 'count', label: t('metrics.times'), numeric: true, format: number },
+		{ key: 'results', label: t('metrics.results'), numeric: true },
+	] satisfies TableColumn<SearchRow>[]
+	const helpfulColumns = [
+		{ key: 'path', label: t('metrics.page'), rowHeader: true },
+		{ key: 'ratio', label: t('metrics.yes') },
+		{ key: 'helpful', label: t('metrics.answersColumn'), numeric: true, format: (_: number, row: FeedbackRow) => t('metrics.yesNo', { yes: formatNumber(row.helpful), no: formatNumber(row.unhelpful) }) },
+		{ key: 'comments', label: t('metrics.commentsColumn'), numeric: true, format: number },
+	] satisfies TableColumn<FeedbackRow>[]
+	const localeText = locale ? t(`locale.${locale}`) : t('metrics.allLanguages')
+	const pagePath = (path: string, of: DocsLocale) => localePagePath(path, of)
+	const answers = summary ? summary.totals.helpful + summary.totals.unhelpful : 0
+	const hasViews = summary ? summary.totals.views > 0 : false
+
+	// Comments ---------------------------------------------------------------------------------------
+
+	const comments = signal(initialComments.ok ? initialComments.data : null)
+	const commentsFailure = signal<Failure | null>(initialComments.ok ? null : initialComments.failure)
+	const status = signal<'all' | 'pending' | 'reviewed'>('pending')
+	const answer = signal<'all' | 'helpful' | 'unhelpful'>('all')
+	const pathFilter = signal('')
+	const page = signal(1)
+	const loadingComments = signal(false)
+	const actionFailure = signal<Failure | null>(null)
+	let request = 0
+	let timer: ReturnType<typeof setTimeout> | undefined
+
+	const pages = computed(() => (comments.value ? Math.max(1, Math.ceil(comments.value.total / comments.value.pageSize)) : 1))
+	const statusOptions = [
+		{ value: 'pending', label: t('metrics.comments.pending') },
+		{ value: 'reviewed', label: t('metrics.comments.reviewed') },
+		{ value: 'all', label: t('filters.allMasculine') },
+	] as const
+	const answerOptions = [
+		{ value: 'all', label: t('metrics.comments.bothAnswers') },
+		{ value: 'unhelpful', label: t('metrics.comments.answeredNo') },
+		{ value: 'helpful', label: t('metrics.comments.answeredYes') },
+	] as const
+	const commentsEmpty = computed(() => {
+		if (pathFilter.value.trim() || answer.value !== 'all') return t('metrics.comments.emptyFiltered')
+		if (status.value === 'pending') return t('metrics.comments.emptyPending')
+		if (status.value === 'reviewed') return t('metrics.comments.emptyReviewed')
+		return t('metrics.comments.empty')
+	})
+
+	async function loadComments() {
+		if (invalidRange) {
+			commentsFailure.value = invalidRange
+			return
+		}
+		const id = ++request
+		loadingComments.value = true
+		try {
+			const list = await rpc.metrics.feedback.list({ site, ...range, ...(locale ? { locale } : {}), status: status.value, answer: answer.value, path: pathFilter.value.trim(), page: page.value })
+			if (id !== request) return
+			// After any mutation (reviewing, reopening or deleting a row that leaves the list) the page
+			// may start past the new total: show the last page that exists instead of an empty one.
+			const within = pageWithin(list.page, list.total, list.pageSize)
+			if (within !== list.page && list.items.length === 0) {
+				page.value = within
+				return await loadComments()
+			}
+			comments.value = list
+			commentsFailure.value = null
+		} catch (error) {
+			if (id === request) commentsFailure.value = describeError(error)
+		} finally {
+			if (id === request) loadingComments.value = false
+		}
+	}
+
+	function filter(change: () => void) {
+		change()
+		page.value = 1
+		void loadComments()
+	}
+
+	/** Runs `change` each time what `read` reads changes, not for its first value. */
+	function onChange(read: () => unknown, change: () => void) {
+		let first = true
+		return effect(() => {
+			read()
+			if (first) first = false
+			else untrack(change)
+		})
+	}
+
+	function goTo(next: number) {
+		page.value = Math.min(pages.value, Math.max(1, next))
+		void loadComments()
+		document.getElementById('comments-heading')?.focus()
+	}
+
+	async function toggleReviewed(item: FeedbackCommentRow) {
+		actionFailure.value = null
+		try {
+			const updated = await rpc.metrics.feedback.review({ id: item.id, reviewed: item.reviewedAt === null })
+			await loadComments()
+			notice.value = updated.reviewedAt ? t('metrics.comments.markedReviewed', { path: pagePath(updated.path, updated.locale) }) : t('metrics.comments.markedPending', { path: pagePath(updated.path, updated.locale) })
+		} catch (error) {
+			actionFailure.value = describeError(error)
+		}
+	}
+
+	// Deletion asks first: it cannot be undone.
+	const deleting = signal<FeedbackCommentRow | null>(null)
+	const confirming = signal(false)
+	const answering = signal(false)
+	const deleteFailure = signal<Failure | null>(null)
+
+	function askDelete(item: FeedbackCommentRow) {
+		deleting.value = item
+		deleteFailure.value = null
+		confirming.value = true
+	}
+
+	async function confirmDelete() {
+		const item = deleting.value
+		if (!item) return
+		answering.value = true
+		try {
+			await rpc.metrics.feedback.delete({ id: item.id })
+			await loadComments()
+			notice.value = t('metrics.comments.deleted', { path: pagePath(item.path, item.locale) })
+			// The native dialog gives the focus back to its trigger, which left with the row.
+			const dialog = document.querySelector('dialog[open]')
+			if (dialog) dialog.addEventListener('close', () => requestAnimationFrame(() => document.getElementById('comments-heading')?.focus()), { once: true })
+			confirming.value = false
+		} catch (error) {
+			deleteFailure.value = describeError(error)
+		} finally {
+			answering.value = false
+		}
+	}
+
+	onMounted(() => {
+		// Choosing a filter loads the comments again, from the first page.
+		const stopChoices = onChange(
+			() => [status.value, answer.value],
+			() => filter(() => {}),
+		)
+		// The path filter waits until the typing stops.
+		const stopPath = onChange(
+			() => pathFilter.value,
+			() => {
+				if (timer !== undefined) clearTimeout(timer)
+				timer = setTimeout(() => filter(() => {}), 300)
+			},
+		)
+		return () => {
+			stopChoices()
+			stopPath()
+			if (timer !== undefined) clearTimeout(timer)
+		}
+	})
+</script>
+
+<template>
+	<DashPage
+		bind:title="t('metrics.title')"
+		bind:description="t('metrics.description')"
+	>
+		<div class="dash-stack">
+			<UINavigationTabs
+				bind:items="tabs"
+				bind:label="t('metrics.site')"
+			/>
+
+			<div class="metrics-filters">
+				<UINavigationTabs
+					variant="segmented"
+					bind:items="localeLinks"
+					bind:label="t('metrics.locale')"
+				/>
+				<UINavigationTabs
+					variant="segmented"
+					bind:items="presetLinks"
+					bind:label="t('metrics.range')"
+				/>
+				<form
+					class="dash-filters metrics-range"
+					method="get"
+					bind:action="localePath('/metrics')"
+				>
+					<input
+						type="hidden"
+						name="site"
+						bind:value="site"
+					/>
+					<input
+						if:when="locale"
+						type="hidden"
+						name="lang"
+						bind:value="locale"
+					/>
+					<UIField
+						id="metrics-from"
+						bind:label="t('metrics.from')"
+					>
+						<snippet
+							name="default"
+							params="id, describedBy"
+						>
+							<UIInput
+								type="date"
+								name="from"
+								required
+								model="from"
+								bind:id="id"
+								bind:describedBy="describedBy"
+								bind:max="todayUtc()"
+							/>
+						</snippet>
+					</UIField>
+					<UIField
+						id="metrics-to"
+						bind:label="t('metrics.to')"
+					>
+						<snippet
+							name="default"
+							params="id, describedBy"
+						>
+							<UIInput
+								type="date"
+								name="to"
+								required
+								model="to"
+								bind:id="id"
+								bind:describedBy="describedBy"
+								bind:max="todayUtc()"
+							/>
+						</snippet>
+					</UIField>
+					<UIButton
+						type="submit"
+						variant="outline"
+					>
+						{t('metrics.apply')}
+					</UIButton>
+				</form>
+			</div>
+
+			<DashNotice bind:text="notice.value" />
+
+			<DashFailure
+				if:when="summaryFailure"
+				bind:title="t('metrics.failed')"
+				bind:failure="summaryFailure!"
+			/>
+
+			<div
+				if:when="summary"
+				class="dash-stack metrics-body"
+				bind:aria-busy="navigation.pending.value ? 'true' : undefined"
+			>
+				<UICard bind:aria-label="t('metrics.totals')">
+					<div class="dash-stats">
+						<UIStat
+							bind:label="t('metrics.views')"
+							bind:value="formatNumber(summary?.totals.views ?? 0)"
+							bind:detail="rangeText(range) + ' · ' + localeText"
+						/>
+						<UIStat
+							bind:label="t('metrics.searches')"
+							bind:value="formatNumber(summary?.totals.searches ?? 0)"
+							bind:detail="summary?.totals.emptySearches ? t('metrics.emptySearchCount', { count: summary.totals.emptySearches, total: formatNumber(summary.totals.emptySearches) }) : t('metrics.allFound')"
+						/>
+						<UIStat
+							bind:label="t('metrics.helpful')"
+							bind:value="answers ? t('metrics.yesShare', { share: percent((summary?.totals.helpful ?? 0) / answers) }) : '—'"
+							bind:detail="answers ? t('metrics.answers', { count: answers, total: formatNumber(answers), yes: formatNumber(summary?.totals.helpful ?? 0), no: formatNumber(summary?.totals.unhelpful ?? 0) }) : t('metrics.noAnswers')"
+						/>
+					</div>
+				</UICard>
+
+				<UICard
+					bind:title="t('metrics.viewsByDay')"
+					bind:description="siteLabels[site] + ' · ' + localeText + ' · ' + rangeText(range)"
+				>
+					<UIEmpty
+						if:when="!hasViews"
+						bind:title="t('metrics.noViews')"
+					/>
+					<DashViewsChart
+						if:when="hasViews"
+						bind:days="summary?.daily ?? []"
+						bind:label="t('metrics.chartLabel', { site: siteLabels[site], range: rangeText(range) })"
+					/>
+				</UICard>
+
+				<div class="dash-columns">
+					<UICard
+						bind:title="t('metrics.topPages')"
+						bind:description="t('metrics.topPagesHint')"
+					>
+						<UIEmpty
+							if:when="!summary?.topPages.length"
+							bind:title="t('metrics.noPages')"
+						/>
+						<ol
+							if:when="summary?.topPages.length"
+							class="metrics-ranking"
+						>
+							<li
+								each:of="summary?.topPages ?? []"
+								each:as="row"
+								each:key="row.locale + row.path"
+							>
+								<code>{pagePath(row.path, row.locale)}</code>
+								<span
+									class="metrics-meter"
+									aria-hidden="true"
+								>
+									<span bind:style="'width: ' + (row.views / (summary?.topPages[0]?.views || 1)) * 100 + '%'" />
+								</span>
+								<span class="metrics-number">{formatNumber(row.views)}</span>
+							</li>
+						</ol>
+					</UICard>
+
+					<UICard
+						bind:title="t('metrics.topSearches')"
+						bind:description="t('metrics.normalized')"
+					>
+						<UIEmpty
+							if:when="!summary?.topSearches.length"
+							bind:title="t('metrics.noSearches')"
+						/>
+						<UITable
+							if:when="summary?.topSearches.length"
+							rowKey="query"
+							bind:hideCaption="true"
+							bind:caption="t('metrics.topSearchesCaption', { site: siteLabels[site] })"
+							bind:columns="searchColumns"
+							bind:rows="summary?.topSearches ?? []"
+						>
+							<snippet
+								name="cell-results"
+								params="row"
+							>
+								<UIBadge
+									if:when="row.results === 0"
+									tone="danger"
+								>
+									{t('metrics.none')}
+								</UIBadge>
+								<span if:when="row.results > 0">{formatNumber(row.results)}</span>
+							</snippet>
+						</UITable>
+					</UICard>
+
+					<UICard
+						bind:title="t('metrics.emptySearches')"
+						bind:description="t('metrics.emptySearchesHint')"
+					>
+						<UIEmpty
+							if:when="!summary?.emptySearches.length"
+							bind:title="t('metrics.allFoundRange')"
+						/>
+						<ol
+							if:when="summary?.emptySearches.length"
+							class="metrics-ranking"
+						>
+							<li
+								each:of="summary?.emptySearches ?? []"
+								each:as="row"
+								each:key="row.query"
+							>
+								<span class="metrics-query">{row.query}</span>
+								<span
+									class="metrics-meter"
+									aria-hidden="true"
+								>
+									<span bind:style="'width: ' + (row.count / (summary?.emptySearches[0]?.count || 1)) * 100 + '%'" />
+								</span>
+								<span class="metrics-number">{t('metrics.timesCount', { count: row.count, total: formatNumber(row.count) })}</span>
+							</li>
+						</ol>
+					</UICard>
+
+					<UICard
+						bind:title="t('metrics.helpfulByPage')"
+						bind:description="t('metrics.helpfulHint')"
+					>
+						<UIEmpty
+							if:when="!summary?.feedback.length"
+							bind:title="t('metrics.noAnswersRange')"
+						/>
+						<UITable
+							if:when="summary?.feedback.length"
+							bind:rowKey="(row) => row.locale + row.path"
+							bind:hideCaption="true"
+							bind:caption="t('metrics.helpfulCaption', { site: siteLabels[site] })"
+							bind:columns="helpfulColumns"
+							bind:rows="summary?.feedback ?? []"
+						>
+							<snippet
+								name="cell-path"
+								params="row"
+							>
+								<code>{pagePath(row.path, row.locale)}</code>
+							</snippet>
+							<snippet
+								name="cell-ratio"
+								params="row"
+							>
+								<span class="metrics-ratio">
+									<span
+										class="metrics-meter"
+										aria-hidden="true"
+									>
+										<span bind:style="'width: ' + row.ratio * 100 + '%'" />
+									</span>
+									<span class="metrics-number">{percent(row.ratio)}</span>
+								</span>
+							</snippet>
+						</UITable>
+					</UICard>
+				</div>
+			</div>
+
+			<UICard
+				headingId="comments-heading"
+				bind:title="t('metrics.commentsColumn')"
+				bind:description="(comments.value ? t('metrics.comments.count', { count: comments.value.total, total: formatNumber(comments.value.total) }) : '') + ' · ' + localeText + ' · ' + rangeText(range)"
+			>
+				<div class="dash-tight">
+					<div class="dash-filters">
+						<UIRadioGroup
+							name="comment-status"
+							variant="segmented"
+							model="status"
+							bind:legend="t('metrics.comments.status')"
+							bind:options="statusOptions"
+						/>
+						<UIRadioGroup
+							name="comment-answer"
+							variant="segmented"
+							model="answer"
+							bind:legend="t('metrics.helpful')"
+							bind:options="answerOptions"
+						/>
+						<UIField
+							id="comment-path"
+							class="dash-grow"
+							bind:label="t('metrics.page')"
+						>
+							<snippet
+								name="default"
+								params="id, describedBy"
+							>
+								<UIInput
+									type="search"
+									model="pathFilter"
+									bind:id="id"
+									bind:describedBy="describedBy"
+									bind:placeholder="t('metrics.comments.pathPlaceholder')"
+								/>
+							</snippet>
+						</UIField>
+					</div>
+					<DashFailure
+						if:when="commentsFailure.value"
+						bind:title="t('metrics.comments.failed')"
+						bind:failure="commentsFailure.value!"
+					/>
+					<DashFailure
+						if:when="actionFailure.value"
+						bind:title="t('metrics.comments.notChanged')"
+						bind:failure="actionFailure.value!"
+					/>
+					<div
+						class="metrics-comments dash-tight"
+						bind:aria-busy="loadingComments.value ? 'true' : undefined"
+					>
+						<UIEmpty
+							if:when="comments.value && !comments.value.items.length"
+							bind:title="commentsEmpty.value"
+						/>
+						<ul
+							if:when="comments.value?.items.length"
+							class="metrics-comment-items"
+						>
+							<li
+								each:of="comments.value?.items ?? []"
+								each:as="item"
+								each:key="item.id"
+							>
+								<div class="dash-badges">
+									<code>{pagePath(item.path, item.locale)}</code>
+									<UIBadge bind:tone="item.helpful ? 'neutral' : 'danger'">{item.helpful ? t('metrics.comments.helped') : t('metrics.comments.notHelped')}</UIBadge>
+									<span class="dash-meta">{formatDate(item.createdAt)}</span>
+									<span
+										if:when="item.reviewedAt"
+										class="dash-meta"
+									>
+										· {item.reviewedBy ? t('metrics.comments.reviewedBy', { date: formatDate(item.reviewedAt), user: item.reviewedBy }) : t('metrics.comments.reviewedOn', { date: formatDate(item.reviewedAt) })}
+									</span>
+								</div>
+								<p
+									class="metrics-comment"
+									bind:lang="item.locale"
+								>
+									<span class="metrics-comment-text">{item.comment}</span>
+								</p>
+								<div class="dash-row-actions">
+									<UIButton
+										size="sm"
+										variant="outline"
+										on:click="() => void toggleReviewed(item)"
+									>
+										{item.reviewedAt ? t('metrics.comments.reopen') : t('metrics.comments.review')}
+										<span class="meeko-ui-sr-only">{t('metrics.comments.about', { path: pagePath(item.path, item.locale), date: formatDate(item.createdAt) })}</span>
+									</UIButton>
+									<UIButton
+										size="sm"
+										variant="ghost"
+										on:click="() => askDelete(item)"
+									>
+										{t('metrics.comments.delete')}
+										<span class="meeko-ui-sr-only">{t('metrics.comments.about', { path: pagePath(item.path, item.locale), date: formatDate(item.createdAt) })}</span>
+									</UIButton>
+								</div>
+							</li>
+						</ul>
+						<nav
+							if:when="pages.value > 1"
+							class="dash-row"
+							bind:aria-label="t('metrics.comments.pages')"
+						>
+							<UIButton
+								size="sm"
+								variant="outline"
+								bind:disabled="page.value <= 1 || loadingComments.value"
+								on:click="() => goTo(page.value - 1)"
+							>
+								{t('metrics.comments.newer')}
+							</UIButton>
+							<span class="dash-meta">{t('metrics.comments.pageOf', { page: page.value, pages: pages.value })}</span>
+							<UIButton
+								size="sm"
+								variant="outline"
+								bind:disabled="page.value >= pages.value || loadingComments.value"
+								on:click="() => goTo(page.value + 1)"
+							>
+								{t('metrics.comments.older')}
+							</UIButton>
+						</nav>
+					</div>
+				</div>
+			</UICard>
+		</div>
+
+		<UIModal
+			model="confirming"
+			bind:title="t('metrics.comments.deleteTitle')"
+			bind:description="deleting.value ? t('metrics.comments.deleteText', { path: pagePath(deleting.value.path, deleting.value.locale) }) : ''"
+		>
+			<div class="dash-tight">
+				<UIProse if:when="deleting.value">
+					<blockquote class="metrics-comment">
+						<span class="metrics-comment-text">{deleting.value?.comment}</span>
+					</blockquote>
+				</UIProse>
+				<DashFailure
+					if:when="deleteFailure.value"
+					bind:title="t('metrics.comments.notDeleted')"
+					bind:failure="deleteFailure.value!"
+				/>
+			</div>
+			<snippet name="footer">
+				<UIButton
+					variant="ghost"
+					on:click="() => (confirming.value = false)"
+				>
+					{t('actions.cancel')}
+				</UIButton>
+				<UIButton
+					tone="danger"
+					bind:disabled="answering.value"
+					on:click="confirmDelete"
+				>
+					{answering.value ? t('metrics.comments.deleting') : t('metrics.comments.deleteConfirm')}
+				</UIButton>
+			</snippet>
+		</UIModal>
+	</DashPage>
+</template>
+
+<style scoped>
+	.metrics-filters {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: space-between;
+		align-items: flex-end;
+		gap: var(--ui-space-4) var(--ui-space-6);
+	}
+	.metrics-range {
+		flex: 1 1 var(--ui-container-sm);
+		justify-content: flex-end;
+	}
+	.metrics-body,
+	.metrics-comments {
+		transition: opacity var(--ui-duration-base) var(--ui-ease-out);
+	}
+	.metrics-body[aria-busy='true'],
+	.metrics-comments[aria-busy='true'] {
+		opacity: var(--ui-opacity-subtle);
+	}
+	.metrics-ranking {
+		display: grid;
+		margin: 0;
+		padding: 0;
+		font-size: var(--ui-font-size-md);
+		list-style: none;
+	}
+	.metrics-ranking li {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) minmax(var(--ui-space-12), var(--ui-space-24)) auto;
+		align-items: center;
+		gap: var(--ui-space-3);
+		border-bottom: var(--ui-border-width) solid var(--ui-color-border);
+		padding-block: var(--ui-space-2);
+	}
+	.metrics-ranking li:last-child {
+		border-bottom: 0;
+	}
+	.metrics-ranking code,
+	.metrics-query {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.metrics-meter {
+		display: block;
+		border-radius: var(--ui-radius-full);
+		background: var(--ui-color-control-active);
+		height: var(--ui-space-1-5);
+		overflow: hidden;
+	}
+	.metrics-meter > span {
+		display: block;
+		border-radius: var(--ui-radius-full);
+		background: var(--ui-color-primary);
+		height: 100%;
+	}
+	.metrics-number {
+		font-variant-numeric: tabular-nums;
+		text-align: end;
+		white-space: nowrap;
+	}
+	.metrics-ratio {
+		display: grid;
+		grid-template-columns: minmax(var(--ui-space-12), var(--ui-space-20)) var(--ui-space-12);
+		align-items: center;
+		gap: var(--ui-space-2);
+	}
+	.metrics-comment-items {
+		display: grid;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	.metrics-comment-items li {
+		display: grid;
+		gap: var(--ui-space-2);
+		border-bottom: var(--ui-border-width) solid var(--ui-color-border);
+		padding-block: var(--ui-space-4);
+	}
+	.metrics-comment-items li:first-child {
+		padding-block-start: 0;
+	}
+	.metrics-comment-items li:last-child {
+		border-bottom: 0;
+		padding-block-end: 0;
+	}
+	.metrics-comment {
+		margin: 0;
+		max-width: var(--ui-prose-measure);
+		overflow-wrap: anywhere;
+	}
+	/* On its own element: the line breaks of the comment count, and those of the template do not. */
+	.metrics-comment-text {
+		white-space: pre-line;
+	}
+	.metrics-comment-items .dash-row-actions {
+		justify-content: flex-start;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.metrics-body,
+		.metrics-comments {
+			transition: none;
+		}
+	}
+</style>

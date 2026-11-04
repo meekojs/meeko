@@ -1,270 +1,332 @@
-import assert from "node:assert/strict";
-import { createServer } from "node:http";
-import { once } from "node:events";
-import test from "node:test";
-import WebSocket from "ws";
-import { attachNodeWebSocketServer } from "../src/node.ts";
-import { createSocketHub, defineSocketChannel, MemorySessionStore, SessionManager } from "../src/framework-server.ts";
-import type { Schema } from "../src/framework-server.ts";
-import type { SocketHub } from "../src/framework-server/socket.ts";
+import assert from 'node:assert/strict'
+import { once } from 'node:events'
+import { createServer } from 'node:http'
+import test from 'node:test'
+import WebSocket from 'ws'
+
+import type { Schema } from '../src/framework-server.ts'
+import type { SocketHub } from '../src/server/socket/runtime.ts'
+
+import { createSocketHub, defineSocketChannel, MemorySessionStore, SessionManager } from '../src/framework-server.ts'
+import { attachNodeWebSocketServer } from '../src/node.ts'
 
 const textSchema: Schema<{ text: string }> = {
-  "~standard": {
-    version: 1,
-    validate(value) {
-      return value && typeof value === "object" && typeof (value as { text?: unknown }).text === "string"
-        ? { value: value as { text: string } }
-        : { issues: [{}] };
-    },
-  },
-};
+	'~standard': {
+		version: 1,
+		validate(value) {
+			return value && typeof value === 'object' && typeof (value as { text?: unknown }).text === 'string' ? { value: value as { text: string } } : { issues: [{}] }
+		},
+	},
+}
 
-test("official Node adapter upgrades real WebSockets and enforces origin, session, events, and shutdown", async () => {
-  const store = new MemorySessionStore<{ user: string }>();
-  const sessions = new SessionManager({ store, secure: false });
-  const handle = await sessions.load(new Request("http://127.0.0.1/"));
-  const session = await handle.create({ user: "alice" });
-  const hub = createSocketHub({
-    channels: {
-      chat: defineSocketChannel({
-        clientToServer: { message: textSchema },
-        serverToClient: { message: textSchema },
-        auth: "required",
-        authorize: ({ context, roomId }) => (context.session.current?.data as { user: string } | undefined)?.user === roomId,
-        handlers: { message: ({ payload, emit }) => emit("message", payload) },
-      }),
-    },
-    sessions,
-    services: {},
-  });
-  const server = createServer((_request, response) => { response.writeHead(404); response.end(); });
-  server.listen(0, "127.0.0.1");
-  await once(server, "listening");
-  const address = server.address();
-  assert.ok(address && typeof address !== "string");
-  const origin = `http://127.0.0.1:${address.port}`;
-  const url = `ws://127.0.0.1:${address.port}/_meeko/socket/chat?room=alice`;
-  const adapter = attachNodeWebSocketServer({ server, hub, publicOrigin: origin, heartbeatMs: 30, maxMessageBytes: 256 });
-  const connect = (requestedOrigin: string, cookie?: string, target = url) => new WebSocket(target, { headers: { origin: requestedOrigin, ...(cookie ? { cookie } : {}) } });
-  const rejection = async (peer: WebSocket): Promise<number> => {
-    return await new Promise<number>((resolve, reject) => {
-      peer.once("unexpected-response", (_request, response) => { response.resume(); resolve(response.statusCode ?? 0); });
-      peer.once("open", () => reject(new Error("Socket handshake unexpectedly succeeded")));
-      peer.once("error", reject);
-    });
-  };
-  /** An auth refusal completes the upgrade and closes at once: resolves with the close, after any message. */
-  const denial = async (peer: WebSocket): Promise<{ code: number; reason: string; messages: number }> => {
-    let messages = 0;
-    peer.on("message", () => { messages++; });
-    return await new Promise((resolve, reject) => {
-      peer.once("unexpected-response", (_request, response) => { response.resume(); reject(new Error(`HTTP ${response.statusCode}`)); });
-      // Sent while the server closes: it never reaches the hub.
-      peer.once("open", () => peer.send(JSON.stringify({ event: "message", payload: { text: "early" } })));
-      peer.once("close", (code: number, reason: Buffer) => resolve({ code, reason: reason.toString(), messages }));
-      peer.once("error", reject);
-    });
-  };
-  try {
-    assert.equal(await rejection(connect("http://evil.test", `meeko.sid=${session.id}`)), 403);
-    assert.deepEqual(await denial(connect(origin)), { code: 4401, reason: "Autenticación requerida", messages: 0 });
-    const otherRoom = `ws://127.0.0.1:${address.port}/_meeko/socket/chat?room=bob`;
-    assert.deepEqual(await denial(connect(origin, `meeko.sid=${session.id}`, otherRoom)), { code: 4403, reason: "Acceso denegado", messages: 0 });
-    assert.equal(await rejection(connect(origin, undefined, `ws://127.0.0.1:${address.port}/_meeko/socket/missing`)), 404);
-    assert.equal(await rejection(connect(origin, undefined, `ws://127.0.0.1:${address.port}/_meeko/socket/bad.name`)), 400);
-    const peer = connect(origin, `meeko.sid=${session.id}`);
-    await once(peer, "open");
-    const reply = once(peer, "message");
-    peer.send(JSON.stringify({ event: "message", payload: { text: "hello" } }));
-    const [data] = await reply;
-    assert.deepEqual(JSON.parse(String(data)) as unknown, { event: "message", payload: { text: "hello" } });
-    const invalid = once(peer, "close");
-    peer.send(JSON.stringify({ event: "message", payload: { text: 4 } }));
-    assert.equal((await invalid)[0], 1008);
+test('official Node adapter upgrades real WebSockets and enforces origin, session, events, and shutdown', async () => {
+	const store = new MemorySessionStore<{ user: string }>()
+	const sessions = new SessionManager({ store, secure: false })
+	const handle = await sessions.load(new Request('http://127.0.0.1/'))
+	const session = await handle.create({ user: 'alice' })
+	const hub = createSocketHub({
+		channels: {
+			chat: defineSocketChannel({
+				clientToServer: { message: textSchema },
+				serverToClient: { message: textSchema },
+				auth: 'required',
+				authorize: ({ context, roomId }) => (context.session.current?.data as { user: string } | undefined)?.user === roomId,
+				handlers: { message: ({ payload, emit }) => emit('message', payload) },
+			}),
+		},
+		sessions,
+		services: {},
+	})
+	const server = createServer((_request, response) => {
+		response.writeHead(404)
+		response.end()
+	})
+	server.listen(0, '127.0.0.1')
+	await once(server, 'listening')
+	const address = server.address()
+	assert.ok(address && typeof address !== 'string')
+	const origin = `http://127.0.0.1:${address.port}`
+	const url = `ws://127.0.0.1:${address.port}/_meeko/socket/chat?room=alice`
+	const adapter = attachNodeWebSocketServer({ server, hub, publicOrigin: origin, heartbeatMs: 30, maxMessageBytes: 256 })
+	const connect = (requestedOrigin: string, cookie?: string, target = url) => new WebSocket(target, { headers: { origin: requestedOrigin, ...(cookie ? { cookie } : {}) } })
+	const rejection = async (peer: WebSocket): Promise<number> => {
+		return await new Promise<number>((resolve, reject) => {
+			peer.once('unexpected-response', (_request, response) => {
+				response.resume()
+				resolve(response.statusCode ?? 0)
+			})
+			peer.once('open', () => reject(new Error('Socket handshake unexpectedly succeeded')))
+			peer.once('error', reject)
+		})
+	}
+	/** An auth refusal completes the upgrade and closes at once: resolves with the close, after any message. */
+	const denial = async (peer: WebSocket): Promise<{ code: number; reason: string; messages: number }> => {
+		let messages = 0
+		peer.on('message', () => {
+			messages++
+		})
+		return await new Promise((resolve, reject) => {
+			peer.once('unexpected-response', (_request, response) => {
+				response.resume()
+				reject(new Error(`HTTP ${response.statusCode}`))
+			})
+			// Sent while the server closes: it never reaches the hub.
+			peer.once('open', () => peer.send(JSON.stringify({ event: 'message', payload: { text: 'early' } })))
+			peer.once('close', (code: number, reason: Buffer) => resolve({ code, reason: reason.toString(), messages }))
+			peer.once('error', reject)
+		})
+	}
+	try {
+		assert.equal(await rejection(connect('http://evil.test', `meeko.sid=${session.id}`)), 403)
+		assert.deepEqual(await denial(connect(origin)), { code: 4401, reason: 'Autenticación requerida', messages: 0 })
+		const otherRoom = `ws://127.0.0.1:${address.port}/_meeko/socket/chat?room=bob`
+		assert.deepEqual(await denial(connect(origin, `meeko.sid=${session.id}`, otherRoom)), { code: 4403, reason: 'Acceso denegado', messages: 0 })
+		assert.equal(await rejection(connect(origin, undefined, `ws://127.0.0.1:${address.port}/_meeko/socket/missing`)), 404)
+		assert.equal(await rejection(connect(origin, undefined, `ws://127.0.0.1:${address.port}/_meeko/socket/bad.name`)), 400)
+		const peer = connect(origin, `meeko.sid=${session.id}`)
+		await once(peer, 'open')
+		const reply = once(peer, 'message')
+		peer.send(JSON.stringify({ event: 'message', payload: { text: 'hello' } }))
+		const [data] = await reply
+		assert.deepEqual(JSON.parse(String(data)) as unknown, { event: 'message', payload: { text: 'hello' } })
+		const invalid = once(peer, 'close')
+		peer.send(JSON.stringify({ event: 'message', payload: { text: 4 } }))
+		assert.equal((await invalid)[0], 1008)
 
-    const revoked = connect(origin, `meeko.sid=${session.id}`);
-    await once(revoked, "open");
-    await store.delete(session.id);
-    const revokedClose = once(revoked, "close");
-    revoked.send(JSON.stringify({ event: "message", payload: { text: "later" } }));
-    assert.equal((await revokedClose)[0], 1008);
+		const revoked = connect(origin, `meeko.sid=${session.id}`)
+		await once(revoked, 'open')
+		await store.delete(session.id)
+		const revokedClose = once(revoked, 'close')
+		revoked.send(JSON.stringify({ event: 'message', payload: { text: 'later' } }))
+		assert.equal((await revokedClose)[0], 1008)
 
-    const freshHandle = await sessions.load(new Request(origin));
-    const fresh = await freshHandle.create({ user: "alice" });
-    const large = connect(origin, `meeko.sid=${fresh.id}`);
-    await once(large, "open");
-    const largeClose = once(large, "close");
-    large.send("x".repeat(257));
-    assert.equal((await largeClose)[0], 1009);
+		const freshHandle = await sessions.load(new Request(origin))
+		const fresh = await freshHandle.create({ user: 'alice' })
+		const large = connect(origin, `meeko.sid=${fresh.id}`)
+		await once(large, 'open')
+		const largeClose = once(large, 'close')
+		large.send('x'.repeat(257))
+		assert.equal((await largeClose)[0], 1009)
 
-    const active = connect(origin, `meeko.sid=${fresh.id}`);
-    await once(active, "open");
-    const closed = once(active, "close");
-    await adapter.close();
-    await closed;
-    assert.equal(server.listenerCount("upgrade"), 0);
-  } finally {
-    await adapter.close();
-    server.close();
-    await once(server, "close");
-  }
-});
+		const active = connect(origin, `meeko.sid=${fresh.id}`)
+		await once(active, 'open')
+		const closed = once(active, 'close')
+		await adapter.close()
+		await closed
+		assert.equal(server.listenerCount('upgrade'), 0)
+	} finally {
+		await adapter.close()
+		server.close()
+		await once(server, 'close')
+	}
+})
 
-test("a loopback public origin accepts its other loopback names on the same port only", async () => {
-  const store = new MemorySessionStore<{ user: string }>();
-  const sessions = new SessionManager({ store, secure: false });
-  const session = await (await sessions.load(new Request("http://localhost/"))).create({ user: "alice" });
-  const hub = createSocketHub({
-    channels: {
-      chat: defineSocketChannel({
-        clientToServer: { message: textSchema },
-        serverToClient: { message: textSchema },
-        auth: "required",
-        handlers: { message: ({ payload, emit }) => emit("message", payload) },
-      }),
-    },
-    sessions,
-    services: {},
-  });
-  const server = createServer((_request, response) => { response.writeHead(404); response.end(); });
-  server.listen(0, "127.0.0.1");
-  await once(server, "listening");
-  const address = server.address();
-  assert.ok(address && typeof address !== "string");
-  const adapter = attachNodeWebSocketServer({ server, hub, publicOrigin: `http://127.0.0.1:${address.port}` });
-  const connect = (origin: string) => new WebSocket(`ws://127.0.0.1:${address.port}/_meeko/socket/chat`, {
-    headers: { origin, cookie: `meeko.sid=${session.id}` },
-  });
-  const status = (peer: WebSocket) => new Promise<number>((resolve, reject) => {
-    peer.once("unexpected-response", (_request, response) => { response.resume(); resolve(response.statusCode ?? 0); });
-    peer.once("open", () => { peer.close(); resolve(101); });
-    peer.once("error", reject);
-  });
-  try {
-    assert.equal(await status(connect(`http://localhost:${address.port}`)), 101);
-    assert.equal(await status(connect(`http://[::1]:${address.port}`)), 101);
-    assert.equal(await status(connect(`http://localhost:${address.port + 1}`)), 403);
-    assert.equal(await status(connect(`https://localhost:${address.port}`)), 403);
-    assert.equal(await status(connect(`http://localhost.evil.test:${address.port}`)), 403);
-    // Credentials in the header are refused as an origin mismatch, not a server error.
-    assert.equal(await status(connect(`http://user:secret@localhost:${address.port}`)), 403);
-  } finally {
-    await adapter.close();
-    server.close();
-    await once(server, "close");
-  }
-});
+test('a loopback public origin accepts its other loopback names on the same port only', async () => {
+	const store = new MemorySessionStore<{ user: string }>()
+	const sessions = new SessionManager({ store, secure: false })
+	const session = await (await sessions.load(new Request('http://localhost/'))).create({ user: 'alice' })
+	const hub = createSocketHub({
+		channels: {
+			chat: defineSocketChannel({
+				clientToServer: { message: textSchema },
+				serverToClient: { message: textSchema },
+				auth: 'required',
+				handlers: { message: ({ payload, emit }) => emit('message', payload) },
+			}),
+		},
+		sessions,
+		services: {},
+	})
+	const server = createServer((_request, response) => {
+		response.writeHead(404)
+		response.end()
+	})
+	server.listen(0, '127.0.0.1')
+	await once(server, 'listening')
+	const address = server.address()
+	assert.ok(address && typeof address !== 'string')
+	const adapter = attachNodeWebSocketServer({ server, hub, publicOrigin: `http://127.0.0.1:${address.port}` })
+	const connect = (origin: string) =>
+		new WebSocket(`ws://127.0.0.1:${address.port}/_meeko/socket/chat`, {
+			headers: { origin, cookie: `meeko.sid=${session.id}` },
+		})
+	const status = (peer: WebSocket) =>
+		new Promise<number>((resolve, reject) => {
+			peer.once('unexpected-response', (_request, response) => {
+				response.resume()
+				resolve(response.statusCode ?? 0)
+			})
+			peer.once('open', () => {
+				peer.close()
+				resolve(101)
+			})
+			peer.once('error', reject)
+		})
+	try {
+		assert.equal(await status(connect(`http://localhost:${address.port}`)), 101)
+		assert.equal(await status(connect(`http://[::1]:${address.port}`)), 101)
+		assert.equal(await status(connect(`http://localhost:${address.port + 1}`)), 403)
+		assert.equal(await status(connect(`https://localhost:${address.port}`)), 403)
+		assert.equal(await status(connect(`http://localhost.evil.test:${address.port}`)), 403)
+		// Credentials in the header are refused as an origin mismatch, not a server error.
+		assert.equal(await status(connect(`http://user:secret@localhost:${address.port}`)), 403)
+	} finally {
+		await adapter.close()
+		server.close()
+		await once(server, 'close')
+	}
+})
 
-test("a public origin outside loopback never accepts a loopback Origin", async () => {
-  const store = new MemorySessionStore<{ user: string }>();
-  const sessions = new SessionManager({ store, secure: false });
-  const session = await (await sessions.load(new Request("http://localhost/"))).create({ user: "alice" });
-  const hub = createSocketHub({
-    channels: {
-      chat: defineSocketChannel({
-        clientToServer: { message: textSchema },
-        serverToClient: { message: textSchema },
-        auth: "required",
-        handlers: { message: ({ payload, emit }) => emit("message", payload) },
-      }),
-    },
-    sessions,
-    services: {},
-  });
-  const server = createServer((_request, response) => { response.writeHead(404); response.end(); });
-  server.listen(0, "127.0.0.1");
-  await once(server, "listening");
-  const address = server.address();
-  assert.ok(address && typeof address !== "string");
-  const adapter = attachNodeWebSocketServer({ server, hub, publicOrigin: "https://example.com" });
-  try {
-    const peer = new WebSocket(`ws://127.0.0.1:${address.port}/_meeko/socket/chat`, {
-      headers: { origin: `http://localhost:${address.port}`, cookie: `meeko.sid=${session.id}` },
-    });
-    const status = await new Promise<number>((resolve, reject) => {
-      peer.once("unexpected-response", (_request, response) => { response.resume(); resolve(response.statusCode ?? 0); });
-      peer.once("open", () => { peer.close(); resolve(101); });
-      peer.once("error", reject);
-    });
-    assert.equal(status, 403);
-  } finally {
-    await adapter.close();
-    server.close();
-    await once(server, "close");
-  }
-});
+test('a public origin outside loopback never accepts a loopback Origin', async () => {
+	const store = new MemorySessionStore<{ user: string }>()
+	const sessions = new SessionManager({ store, secure: false })
+	const session = await (await sessions.load(new Request('http://localhost/'))).create({ user: 'alice' })
+	const hub = createSocketHub({
+		channels: {
+			chat: defineSocketChannel({
+				clientToServer: { message: textSchema },
+				serverToClient: { message: textSchema },
+				auth: 'required',
+				handlers: { message: ({ payload, emit }) => emit('message', payload) },
+			}),
+		},
+		sessions,
+		services: {},
+	})
+	const server = createServer((_request, response) => {
+		response.writeHead(404)
+		response.end()
+	})
+	server.listen(0, '127.0.0.1')
+	await once(server, 'listening')
+	const address = server.address()
+	assert.ok(address && typeof address !== 'string')
+	const adapter = attachNodeWebSocketServer({ server, hub, publicOrigin: 'https://example.com' })
+	try {
+		const peer = new WebSocket(`ws://127.0.0.1:${address.port}/_meeko/socket/chat`, {
+			headers: { origin: `http://localhost:${address.port}`, cookie: `meeko.sid=${session.id}` },
+		})
+		const status = await new Promise<number>((resolve, reject) => {
+			peer.once('unexpected-response', (_request, response) => {
+				response.resume()
+				resolve(response.statusCode ?? 0)
+			})
+			peer.once('open', () => {
+				peer.close()
+				resolve(101)
+			})
+			peer.once('error', reject)
+		})
+		assert.equal(status, 403)
+	} finally {
+		await adapter.close()
+		server.close()
+		await once(server, 'close')
+	}
+})
 
-test("Node upgrade preserves a client error status across separate module graphs", async () => {
-  class ApiError extends Error {
-    readonly code = "INVALID_ORIGIN";
-    readonly status = 403;
-  }
-  const hub: SocketHub = {
-    async preflight() { throw new ApiError("Invalid origin"); },
-    async accept() { throw new Error("Unexpected upgrade"); },
-    async broadcast() { throw new Error("Unexpected broadcast"); },
-  };
-  const server = createServer((_request, response) => { response.writeHead(404); response.end(); });
-  server.listen(0, "127.0.0.1");
-  await once(server, "listening");
-  const address = server.address();
-  assert.ok(address && typeof address !== "string");
-  const origin = `http://127.0.0.1:${address.port}`;
-  let observed = 0;
-  const adapter = attachNodeWebSocketServer({ server, hub, publicOrigin: origin,
-    onError() { observed++; throw new Error("observer failed"); },
-  });
-  try {
-    const peer = new WebSocket(`ws://127.0.0.1:${address.port}/_meeko/socket/chat`, { headers: { origin } });
-    const status = await new Promise<number>((resolve, reject) => {
-      peer.once("unexpected-response", (_request, response) => { response.resume(); resolve(response.statusCode ?? 0); });
-      peer.once("error", reject);
-    });
-    assert.equal(status, 403);
-    assert.equal(observed, 1);
-  } finally {
-    await adapter.close();
-    server.close();
-    await once(server, "close");
-  }
-});
+test('Node upgrade preserves a client error status across separate module graphs', async () => {
+	class ApiError extends Error {
+		readonly code = 'INVALID_ORIGIN'
+		readonly status = 403
+	}
+	const hub: SocketHub = {
+		async preflight() {
+			throw new ApiError('Invalid origin')
+		},
+		async accept() {
+			throw new Error('Unexpected upgrade')
+		},
+		async broadcast() {
+			throw new Error('Unexpected broadcast')
+		},
+	}
+	const server = createServer((_request, response) => {
+		response.writeHead(404)
+		response.end()
+	})
+	server.listen(0, '127.0.0.1')
+	await once(server, 'listening')
+	const address = server.address()
+	assert.ok(address && typeof address !== 'string')
+	const origin = `http://127.0.0.1:${address.port}`
+	let observed = 0
+	const adapter = attachNodeWebSocketServer({
+		server,
+		hub,
+		publicOrigin: origin,
+		onError() {
+			observed++
+			throw new Error('observer failed')
+		},
+	})
+	try {
+		const peer = new WebSocket(`ws://127.0.0.1:${address.port}/_meeko/socket/chat`, { headers: { origin } })
+		const status = await new Promise<number>((resolve, reject) => {
+			peer.once('unexpected-response', (_request, response) => {
+				response.resume()
+				resolve(response.statusCode ?? 0)
+			})
+			peer.once('error', reject)
+		})
+		assert.equal(status, 403)
+		assert.equal(observed, 1)
+	} finally {
+		await adapter.close()
+		server.close()
+		await once(server, 'close')
+	}
+})
 
-test("Node message delivery treats a cross-graph policy error as a policy close", async () => {
-  class ApiError extends Error {
-    readonly code = "FORBIDDEN";
-    readonly status = 403;
-  }
-  const hub: SocketHub = {
-    async preflight() {},
-    async accept(_name, _request, peer) {
-      return {
-        async receive() { throw new ApiError("private details"); },
-        async emit() {},
-        close(code?: number) { peer.close(code); },
-      };
-    },
-    async broadcast() {},
-  };
-  const server = createServer((_request, response) => { response.writeHead(404); response.end(); });
-  server.listen(0, "127.0.0.1");
-  await once(server, "listening");
-  const address = server.address();
-  assert.ok(address && typeof address !== "string");
-  const origin = `http://127.0.0.1:${address.port}`;
-  let observed = 0;
-  const adapter = attachNodeWebSocketServer({ server, hub, publicOrigin: origin,
-    onError() { observed++; throw new Error("observer failed"); },
-  });
-  try {
-    const peer = new WebSocket(`ws://127.0.0.1:${address.port}/_meeko/socket/chat`, { headers: { origin } });
-    await once(peer, "open");
-    const closed = once(peer, "close");
-    peer.send(JSON.stringify({ event: "message", payload: "test" }));
-    assert.equal((await closed)[0], 1008);
-    assert.equal(observed, 1);
-  } finally {
-    await adapter.close();
-    server.close();
-    await once(server, "close");
-  }
-});
+test('Node message delivery treats a cross-graph policy error as a policy close', async () => {
+	class ApiError extends Error {
+		readonly code = 'FORBIDDEN'
+		readonly status = 403
+	}
+	const hub: SocketHub = {
+		async preflight() {},
+		async accept(_name, _request, peer) {
+			return {
+				async receive() {
+					throw new ApiError('private details')
+				},
+				async emit() {},
+				close(code?: number) {
+					peer.close(code)
+				},
+			}
+		},
+		async broadcast() {},
+	}
+	const server = createServer((_request, response) => {
+		response.writeHead(404)
+		response.end()
+	})
+	server.listen(0, '127.0.0.1')
+	await once(server, 'listening')
+	const address = server.address()
+	assert.ok(address && typeof address !== 'string')
+	const origin = `http://127.0.0.1:${address.port}`
+	let observed = 0
+	const adapter = attachNodeWebSocketServer({
+		server,
+		hub,
+		publicOrigin: origin,
+		onError() {
+			observed++
+			throw new Error('observer failed')
+		},
+	})
+	try {
+		const peer = new WebSocket(`ws://127.0.0.1:${address.port}/_meeko/socket/chat`, { headers: { origin } })
+		await once(peer, 'open')
+		const closed = once(peer, 'close')
+		peer.send(JSON.stringify({ event: 'message', payload: 'test' }))
+		assert.equal((await closed)[0], 1008)
+		assert.equal(observed, 1)
+	} finally {
+		await adapter.close()
+		server.close()
+		await once(server, 'close')
+	}
+})

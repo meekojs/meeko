@@ -1,17 +1,17 @@
-import { join } from "node:path";
-import { runTests } from "@vscode/test-electron";
+import { runTests } from '@vscode/test-electron'
+import { join } from 'node:path'
 
-const executable = process.env.MEEKO_HOST_VSCODE;
-const extension = process.env.MEEKO_HOST_EXTENSION;
-const consumer = process.env.MEEKO_HOST_CONSUMER;
-const data = process.env.MEEKO_HOST_DATA;
+const executable = process.env.MEEKO_HOST_VSCODE
+const extension = process.env.MEEKO_HOST_EXTENSION
+const consumer = process.env.MEEKO_HOST_CONSUMER
+const data = process.env.MEEKO_HOST_DATA
 if (!extension || !consumer || !data) {
-  throw new Error("Faltan MEEKO_HOST_EXTENSION, MEEKO_HOST_CONSUMER o MEEKO_HOST_DATA.");
+	throw new Error('Faltan MEEKO_HOST_EXTENSION, MEEKO_HOST_CONSUMER o MEEKO_HOST_DATA.')
 }
 
 await runTests({
-  ...(executable ? { vscodeExecutablePath: executable } : { version: "stable", cachePath: join(data, "..", "vscode-download") }),
-  extensionDevelopmentPath: extension,
-  extensionTestsPath: join(import.meta.dirname, "host-index.cjs"),
-  launchArgs: [consumer, "--skip-welcome", "--disable-extensions", "--disable-workspace-trust", "--user-data-dir", data],
-});
+	...(executable ? { vscodeExecutablePath: executable } : { version: 'stable', cachePath: join(data, '..', 'vscode-download') }),
+	extensionDevelopmentPath: extension,
+	extensionTestsPath: join(import.meta.dirname, 'host-index.cjs'),
+	launchArgs: [process.env.MEEKO_HOST_WORKSPACE ?? consumer, '--skip-welcome', '--disable-extensions', '--disable-workspace-trust', '--user-data-dir', data],
+})

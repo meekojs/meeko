@@ -27,6 +27,7 @@ Es lo que usan las entradas que genera `meeko build` para Node, Bun, Deno y Clou
 ## Uso
 
 <!-- no-check -->
+
 ```ts
 // server/host.ts, empaquetado con Vite y el plugin meeko()
 import { createServerApp } from "@meekojs/meeko/server";
@@ -42,34 +43,34 @@ console.log(server.url);
 
 ## Opciones
 
-| Opción | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `manifest` | `AppManifest` | obligatorio | Rutas, endpoints, canales, middleware, assets del cliente y, desde `1.7`, `contentSecurityPolicy`, `headers` y `buildId`. Debe tener `version: 1`. |
-| `load` | `(key) => Promise<unknown>` | obligatorio | Devuelve el módulo de cada clave del manifiesto (páginas, sidecars, API, RPC, canales, middleware). El servidor nunca lee el disco por su cuenta. |
-| `production` | `boolean` | obligatorio | Exige un almacén de sesiones persistente, oculta los detalles de los errores y activa la caché de páginas y la CSP. |
-| `runtime` | export por defecto de `server/runtime.ts` | ninguno | La fábrica de `defineServerRuntime`: servicios, sesiones, Socket, `onError`, `close`… |
-| `platform` | `ServerPlatform` | `{ name: "node", env: {} }` | Nombre, entorno y `waitUntil` del runtime; lo recibe la fábrica y cada petición sin plataforma propia. |
-| `assets` | `AssetReader` | ninguno | Lector de los archivos públicos del build, como `createNodeAssetReader`. Sin él, sólo responde la aplicación. |
-| `prerender` | `PrerenderSource` | ninguno | Las páginas prerenderizadas, que se sirven desde su archivo sin loader ni render. |
-| `document` | `DocumentOptions` | ninguno | HTML de confianza para `<head>` y el final de `<body>`, y el nonce del host. |
-| `publicOrigin` | origen | `runtime.publicOrigin` | Origen público con el que se comprueba `Origin`. Sólo `http:` o `https:`. |
-| `plugins` | `PluginRegistration[]` | ninguno | Los plugins de `app/plugins` y de los módulos, que se ejecutan en cada petición de página. |
-| `appName`, `loadRedis` | | ninguno | El nombre de `package.json`, para el prefijo Redis por defecto, y el import del paquete `redis` para `MEEKO_REDIS_URL`. |
-| `prerendering` | `boolean` | `false` | Lo activa `meeko build` al prerenderizar: sesiones en memoria aunque sea producción. |
-| `defaultSocketPubSub` | `SocketPubSub` | `LocalSocketPubSub` | Broker de Socket si el runtime no declara ninguno. |
+| Opción                 | Tipo                                      | Por defecto                 | Descripción                                                                                                                                        |
+| ---------------------- | ----------------------------------------- | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `manifest`             | `AppManifest`                             | obligatorio                 | Rutas, endpoints, canales, middleware, assets del cliente y, desde `1.7`, `contentSecurityPolicy`, `headers` y `buildId`. Debe tener `version: 1`. |
+| `load`                 | `(key) => Promise<unknown>`               | obligatorio                 | Devuelve el módulo de cada clave del manifiesto (páginas, sidecars, API, RPC, canales, middleware). El servidor nunca lee el disco por su cuenta.  |
+| `production`           | `boolean`                                 | obligatorio                 | Exige un almacén de sesiones persistente, oculta los detalles de los errores y activa la caché de páginas y la CSP.                                |
+| `runtime`              | export por defecto de `server/runtime.ts` | ninguno                     | La fábrica de `defineServerRuntime`: servicios, sesiones, Socket, `onError`, `close`…                                                              |
+| `platform`             | `ServerPlatform`                          | `{ name: "node", env: {} }` | Nombre, entorno y `waitUntil` del runtime; lo recibe la fábrica y cada petición sin plataforma propia.                                             |
+| `assets`               | `AssetReader`                             | ninguno                     | Lector de los archivos públicos del build, como `createNodeAssetReader`. Sin él, sólo responde la aplicación.                                      |
+| `prerender`            | `PrerenderSource`                         | ninguno                     | Las páginas prerenderizadas, que se sirven desde su archivo sin loader ni render.                                                                  |
+| `document`             | `DocumentOptions`                         | ninguno                     | HTML de confianza para `<head>` y el final de `<body>`, y el nonce del host.                                                                       |
+| `publicOrigin`         | origen                                    | `runtime.publicOrigin`      | Origen público con el que se comprueba `Origin`. Sólo `http:` o `https:`.                                                                          |
+| `plugins`              | `PluginRegistration[]`                    | ninguno                     | Los plugins de `app/plugins` y de los módulos, que se ejecutan en cada petición de página.                                                         |
+| `appName`, `loadRedis` |                                           | ninguno                     | El nombre de `package.json`, para el prefijo Redis por defecto, y el import del paquete `redis` para `MEEKO_REDIS_URL`.                            |
+| `prerendering`         | `boolean`                                 | `false`                     | Lo activa `meeko build` al prerenderizar: sesiones en memoria aunque sea producción.                                                               |
+| `defaultSocketPubSub`  | `SocketPubSub`                            | `LocalSocketPubSub`         | Broker de Socket si el runtime no declara ninguno.                                                                                                 |
 
 ## Valor devuelto
 
 Una promesa de `ServerApp`:
 
-| Miembro | Descripción |
-| --- | --- |
-| `fetch(request, platform?)` | Atiende una petición y siempre resuelve con un `Response`. Una URL sin ruta, sin página de error, es `404 Not Found` en texto. |
-| `socket` | `{ hub, pathnamePrefix, maxMessageBytes?, pubsub?, sessionCookieName? }` si la aplicación tiene canales; lo usa el adaptador para el upgrade. |
-| `manifest` | El manifiesto recibido. |
-| `publicOrigin` | El origen público resuelto, o `undefined`. |
-| `reportError(error, requestId, info?)` | Envía un fallo del transporte al mismo observador que los de las peticiones. |
-| `close()` | Espera las tareas de `waitUntil` y cierra sesiones y recursos del runtime. |
+| Miembro                                | Descripción                                                                                                                                   |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fetch(request, platform?)`            | Atiende una petición y siempre resuelve con un `Response`. Una URL sin ruta, sin página de error, es `404 Not Found` en texto.                |
+| `socket`                               | `{ hub, pathnamePrefix, maxMessageBytes?, pubsub?, sessionCookieName? }` si la aplicación tiene canales; lo usa el adaptador para el upgrade. |
+| `manifest`                             | El manifiesto recibido.                                                                                                                       |
+| `publicOrigin`                         | El origen público resuelto, o `undefined`.                                                                                                    |
+| `reportError(error, requestId, info?)` | Envía un fallo del transporte al mismo observador que los de las peticiones.                                                                  |
+| `close()`                              | Espera las tareas de `waitUntil` y cierra sesiones y recursos del runtime.                                                                    |
 
 Rechaza con `TypeError` si el manifiesto es de otra versión (`Unsupported Meeko application manifest; rebuild the application`), falta el cargador (`createServerApp requires a module loader`), `publicOrigin` no es HTTP(S) o el runtime devuelve algo que no es un objeto o unas `sessions` que no son un `SessionManager`; y con `Error` en producción sin almacén persistente.
 
@@ -111,6 +112,7 @@ Un `POST /api/health` responde `405` con `Allow: GET`, y `/otra` responde `404 N
 ### Probar el build de Node sin abrir un puerto
 
 <!-- no-check -->
+
 ```ts
 // tests/smoke.test.ts
 import { test } from "node:test";
@@ -130,6 +132,7 @@ test("la portada responde", async () => {
 ### Un host con su propio nonce
 
 <!-- no-check -->
+
 ```ts
 const app = await createServerApp({
   manifest, load, runtime, production: true,
@@ -153,6 +156,7 @@ const app = await createServerApp({ manifest, load, production: true });
 Rechaza con `Production requires a persistent session store: set MEEKO_REDIS_URL (with the redis package installed), or return { sessions } with a persistent SessionStore from server/runtime.ts`.
 
 <!-- no-check -->
+
 ```ts good
 const app = await createServerApp({ manifest, load, runtime, production: true, platform: { name: "node", env: process.env } });
 ```
@@ -169,6 +173,7 @@ await createServerApp({ manifest, load, production: false });
 `TypeError: Unsupported Meeko application manifest; rebuild the application`. El manifiesto y el runtime deben venir del mismo `@meekojs/meeko`.
 
 <!-- no-check -->
+
 ```ts good
 // vuelve a ejecutar meeko build y usa el manifiesto nuevo
 const app = await createServerApp({ manifest, load, production: false });
@@ -183,6 +188,7 @@ const runtime = () => ({ sessions: new MemorySessionStore() });
 `TypeError: server/runtime.ts must return { sessions: SessionManager } or omit sessions`: el almacén va dentro del gestor.
 
 <!-- no-check -->
+
 ```ts good
 const runtime = defineServerRuntime(() => ({ sessions: new SessionManager({ store: new MemorySessionStore() }) }));
 ```

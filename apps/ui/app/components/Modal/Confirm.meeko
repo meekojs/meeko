@@ -1,0 +1,42 @@
+<script lang="ts">
+	const props = defineProps<{ message: string; level?: number; size?: 'sm' | 'md' | 'lg' }>({ level: 0, size: 'lg' })
+
+	const { t } = useI18n()
+	const modal = useModalInstance<boolean>()
+	const manager = useModal()
+	const nested = signal('')
+	async function openNested() {
+		const level = props.level + 1
+		const result = await manager.open<boolean>('ModalConfirm', { message: t('demo.confirm.nestedMessage'), level, size: level === 1 ? 'md' : 'sm' })
+		nested.value = result ? t('demo.confirm.nestedAccepted') : t('demo.confirm.nestedCancelled')
+	}
+</script>
+
+<template>
+	<UIModal
+		bind:title="props.level === 0 ? t('demo.confirm.title') : t('demo.confirm.levelTitle', { level: props.level + 1 })"
+		bind:description="props.message"
+		bind:size="props.size"
+	>
+		<p>{t('demo.confirm.meta', { size: props.size.toUpperCase(), level: props.level + 1 })}</p>
+		<p>{t('demo.confirm.result')}</p>
+		<p if:when="props.level === 0">{t('demo.confirm.stack')}</p>
+		<UIButton
+			if:when="props.level < 2"
+			variant="secondary"
+			on:click="openNested"
+		>
+			{t('demo.confirm.openNested')}
+		</UIButton>
+		<p role="status">{nested.value}</p>
+		<snippet name="footer">
+			<UIButton
+				variant="secondary"
+				on:click="() => modal.dismiss()"
+			>
+				{t('demo.confirm.cancel')}
+			</UIButton>
+			<UIButton on:click="() => modal.close(true)">{t('demo.confirm.accept')}</UIButton>
+		</snippet>
+	</UIModal>
+</template>

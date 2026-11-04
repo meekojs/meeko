@@ -1,0 +1,115 @@
+<script server lang="ts">
+	import { definePage } from '@meekojs/meeko/framework'
+
+	import type { NavLink, RenderedDoc } from '../../../shared/types/docs'
+
+	import { readPage } from '../../../server/content/db'
+
+	export const route = definePage({ render: 'ssr' })
+
+	type DocCard = Pick<NavLink, 'featured' | 'href'> & Pick<RenderedDoc, 'title' | 'description'> & { readonly section: string }
+	type IndexPage = { readonly sections: readonly { readonly title: string; readonly docs: readonly DocCard[] }[] }
+	const { locale } = await usePageI18n()
+	const snapshot = await readPage<IndexPage>('/docs', locale)
+	if (!snapshot) notFound()
+	export const sections = snapshot.sections
+</script>
+
+<script lang="ts">
+	import { splitLocalePath } from 'meeko-docs-content/locale'
+
+	export interface Props {
+		params: Record<string, string>
+		search: Record<string, string | string[]>
+	}
+
+	const { t } = useI18n()
+	// The snapshot of each language has `/docs/<slug>` or `/en/docs/<slug>`, and every guide of the
+	// catalog has that form; `to` localizes the route again, so the link keeps the reader's language.
+	const slugOf = (href: string): string => splitLocalePath(href).path.slice('/docs/'.length)
+	useHead({ title: t('docs.index.headTitle'), meta: [{ name: 'description', content: t('docs.index.description') }] })
+</script>
+
+<template>
+	<UIContainer
+		size="2xl"
+		class="docs-index"
+	>
+		<section data-pagefind-ignore>
+			<UIPageHeader bind:title="t('docs.index.title')">
+				<UIProse>
+					<p>
+						<I18nT key="docs.index.lead">
+							<snippet
+								name="code"
+								params="text"
+							>
+								<code>{text}</code>
+							</snippet>
+						</I18nT>
+					</p>
+				</UIProse>
+			</UIPageHeader>
+			<section
+				each:of="sections"
+				each:as="section"
+				each:key="section.title"
+			>
+				<h2>{section.title}</h2>
+				<ul>
+					<li
+						each:of="section.docs"
+						each:as="doc"
+						each:key="doc.href"
+					>
+						<UILinkCard
+							to="/docs/[slug]"
+							bind:params="{ slug: slugOf(doc.href) }"
+							bind:title="doc.title"
+							bind:description="doc.description"
+						>
+							<UIBadge
+								if:when="doc.featured"
+								tone="accent"
+								class="featured"
+							>
+								{t('docs.layout.featured')}
+							</UIBadge>
+						</UILinkCard>
+					</li>
+				</ul>
+			</section>
+		</section>
+	</UIContainer>
+</template>
+
+<style scoped>
+	section > section {
+		margin-block-start: var(--ui-space-10);
+	}
+	h2 {
+		margin: 0 0 var(--ui-space-4);
+		color: var(--ui-color-text);
+		font-weight: var(--ui-font-weight-semibold);
+		font-size: var(--ui-font-size-xl);
+		line-height: var(--ui-line-height-snug);
+		letter-spacing: var(--ui-tracking-tight);
+	}
+	ul {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--ui-floating-panel-width)), 1fr));
+		gap: var(--ui-space-3);
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	li {
+		display: grid;
+	}
+	li :global(.featured) {
+		align-self: flex-start;
+	}
+	:global(.docs-index) {
+		padding-block: var(--ui-space-12) var(--ui-space-20);
+	}
+</style>

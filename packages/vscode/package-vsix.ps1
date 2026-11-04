@@ -4,6 +4,9 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+if (-not ('System.IO.Compression.ZipFile' -as [type])) {
+  Add-Type -AssemblyName System.IO.Compression.FileSystem
+}
 
 if (!$Target) {
   $hostOs = if ($IsWindows) { 'win32' } elseif ($IsLinux) { 'linux' } elseif ($IsMacOS) { 'darwin' } else { throw 'Sistema operativo no admitido para el VSIX.' }
@@ -42,7 +45,7 @@ try {
     Copy-Item -LiteralPath (Join-Path $extensionRoot $name) -Destination $stagingRoot
   }
   Copy-Item -LiteralPath (Join-Path $extensionRoot '../../LICENSE') -Destination $stagingRoot
-  foreach ($name in @('dist', 'syntaxes', 'icons')) {
+  foreach ($name in @('dist', 'syntaxes', 'icons', 'snippets')) {
     Copy-Item -LiteralPath (Join-Path $extensionRoot $name) -Destination $stagingRoot -Recurse
   }
 
@@ -59,7 +62,7 @@ try {
       throw "El paquete aislado contiene binarios nativos inesperados: $($installedNativePackages -join ', ')."
     }
     New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
-    & pnpm dlx '@vscode/vsce@4.0.0' package --target $Target --allow-missing-repository --out $outputFile
+    & npm exec --yes --package=@vscode/vsce@4.1.0 -- vsce package --target $Target --allow-missing-repository --out $outputFile
     if ($LASTEXITCODE -ne 0) { throw 'Falló la creación del VSIX.' }
     $binaryEntry = "extension/node_modules/@typescript/$nativePackage/lib/$nativeExecutable"
     if ($targetOs -ne 'win32') {
@@ -80,6 +83,12 @@ try {
       })
       if ($nativeEntries.Count -ne 1) {
         throw "El VSIX contiene $($nativeEntries.Count) ejecutables nativos de TypeScript; se esperaba uno."
+      }
+      # vsce no comprueba las rutas que declara `contributes`: sin esto, un archivo olvidado sólo se nota en el editor.
+      $contributed = @($manifest.contributes.grammars.path) + @($manifest.contributes.snippets.path) + @($manifest.contributes.languages.configuration)
+      foreach ($path in @($contributed | Where-Object { $_ })) {
+        $entry = 'extension/' + ($path -replace '^\./', '')
+        if (!$archive.GetEntry($entry)) { throw "El VSIX no contiene $entry, que declara contributes." }
       }
     } finally {
       $archive.Dispose()

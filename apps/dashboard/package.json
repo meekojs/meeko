@@ -1,0 +1,32 @@
+{
+	"name": "meeko-dashboard",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"assets": "pnpm -F meeko-docs run build && node ../../packages/docs/scripts/assets.mjs",
+		"build": "pnpm run assets && meeko build .",
+		"check": "pnpm run assets && meeko check .",
+		"dev": "pnpm run assets && meeko dev .",
+		"start": "meeko start .",
+		"test": "tsx --test --test-concurrency=1 tests/*.test.ts",
+		"test:e2e": "pnpm run assets && node --test --test-concurrency=1 tests/*.e2e.mjs"
+	},
+	"dependencies": {
+		"@meekojs/i18n": "workspace:*",
+		"@meekojs/meeko": "workspace:*",
+		"@meekojs/ui": "workspace:*",
+		"meeko-docs": "workspace:*",
+		"meeko-docs-content": "workspace:*",
+		"valibot": "^1.5.0"
+	},
+	"devDependencies": {
+		"@types/node": "^24.0.0",
+		"playwright-core": "1.64.1",
+		"tsx": "^4.20.0",
+		"typescript": "7.0.2",
+		"vite": "8.3.5"
+	},
+	"engines": {
+		"node": ">=24"
+	}
+}

@@ -1,0 +1,22 @@
+{
+	"sources": {
+		"title": "Sources",
+		"description": "Every public page of the three webs as Git imported it, in Spanish and its translations into English (docs/en), with its state against the published revisions.",
+		"filter": "Filter sources",
+		"placeholder": "Title, path or file…",
+		"noMarkdown": "No Markdown (.meeko)",
+		"includeRemoved": "Include removed",
+		"count": "{shown} of {total} sources",
+		"caption": "Sources of the documentation",
+		"emptyFiltered": "No source matches the filters.",
+		"empty": "No sources imported. Import from Git in Snapshots.",
+		"columns": {
+			"title": "Source",
+			"site": "Web",
+			"locale": "Language",
+			"kind": "Kind",
+			"state": "State",
+			"importedAt": "Imported"
+		}
+	}
+}

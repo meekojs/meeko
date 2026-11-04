@@ -1,0 +1,125 @@
+<script lang="ts">
+	import type { ReferencePage } from '../../shared/types/reference'
+
+	interface Props {
+		/** A written page of the reference, merged with its generated types (packages/docs-content/src/content/reference.ts). */
+		page: ReferencePage
+		/** `title:` meta of Pagefind, for the search result. */
+		searchTitle: string
+	}
+
+	const props = defineProps<Props>()
+
+	const { localePath, t } = useI18n()
+</script>
+
+<template>
+	<UIProse
+		as="article"
+		data-pagefind-body
+		bind:data-pagefind-meta="props.searchTitle"
+	>
+		<div data-pagefind-ignore>
+			<UIBreadcrumb
+				bind:label="t('docs.reference.breadcrumb')"
+				bind:items="[
+					{ label: t('docs.reference.title'), href: localePath('/docs/reference') },
+					{ label: props.page.group.title, href: props.page.group.href, current: false },
+				]"
+			/>
+		</div>
+		<h1 class="title">
+			<code>{props.page.title}</code>
+		</h1>
+		<p>{props.page.description}</p>
+		<div
+			class="meta"
+			data-pagefind-ignore
+		>
+			<UIBadge tone="accent">{props.page.kindLabel}</UIBadge>
+			<UIBadge if:when="props.page.since">{t('docs.reference.since', { version: props.page.since ?? '' })}</UIBadge>
+			<UIBadge if:when="props.page.autoImport">{t('docs.reference.noImport')}</UIBadge>
+			<code if:when="props.page.specifier">{props.page.specifier}</code>
+			<UILink
+				if:when="props.page.sourceUrl"
+				variant="ghost"
+				size="sm"
+				rel="noopener"
+				bind:href="props.page.sourceUrl!"
+			>
+				<svg
+					class="meeko-ui-icon"
+					viewBox="0 0 16 16"
+					aria-hidden="true"
+				>
+					<path d="m5.5 5-3 3 3 3M10.5 5l3 3-3 3M9 3.5l-2 9" />
+				</svg>
+				{t('docs.reference.source')}
+			</UILink>
+		</div>
+		<p
+			if:when="props.page.autoImport"
+			html="props.page.autoImport"
+		/>
+		<div
+			if:when="props.page.importCode"
+			html="props.page.importCode"
+		/>
+		<div
+			class="body"
+			html="props.page.body"
+		/>
+	</UIProse>
+</template>
+
+<style scoped>
+	.title {
+		overflow-wrap: anywhere;
+	}
+	.title code {
+		background: none;
+		padding: 0;
+		color: inherit;
+		font-size: var(--ui-prose-code-size);
+	}
+	.meta {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: var(--ui-space-2);
+		margin-block-end: var(--ui-space-5);
+		border-block-end: var(--ui-border-width) solid var(--ui-color-border);
+		padding-block-end: var(--ui-space-5);
+	}
+	.body :global(.type-block + .type-block) {
+		margin-block-start: var(--ui-space-1);
+	}
+	.body :global(.type-of) {
+		margin: 0 0 var(--ui-space-1-5);
+		font-size: var(--ui-font-size-sm);
+	}
+	.body :global(.related-list) {
+		margin: 0;
+		border-block-start: var(--ui-border-width) solid var(--ui-color-border);
+		padding: 0;
+		list-style: none;
+	}
+	.body :global(.related-list li) {
+		display: grid;
+		grid-template-columns: minmax(10rem, 15rem) minmax(0, 1fr);
+		align-items: baseline;
+		gap: var(--ui-space-1) var(--ui-space-5);
+		margin: 0;
+		border-block-end: var(--ui-border-width) solid var(--ui-color-border);
+		padding: var(--ui-space-2) 0;
+	}
+	.body :global(.related-note) {
+		color: var(--ui-color-text-soft);
+		font-size: var(--ui-font-size-md);
+	}
+	@media (max-width: 40rem) {
+		.body :global(.related-list li) {
+			grid-template-columns: minmax(0, 1fr);
+		}
+	}
+</style>

@@ -41,10 +41,10 @@ async function order(): Promise<void> {
 
 ## Parámetros
 
-| Parámetro | Tipo | Descripción |
-| --- | --- | --- |
-| `input` | la entrada del schema `input` | Obligatorio: los datos del procedimiento. |
-| `options.signal` | `AbortSignal` | Cancela la llamada. |
+| Parámetro        | Tipo                          | Descripción                               |
+| ---------------- | ----------------------------- | ----------------------------------------- |
+| `input`          | la entrada del schema `input` | Obligatorio: los datos del procedimiento. |
+| `options.signal` | `AbortSignal`                 | Cancela la llamada.                       |
 
 ## Valor devuelto
 
@@ -112,6 +112,7 @@ await rpc.orders.create({ item: "té" });
 `meeko check` da `TS2741: Property 'qty' is missing in type '{ item: string; }' but required in type '{ item: string; qty: number; }'.` Si la entrada llega sin tipos y no supera el schema, el servidor responde `400 INVALID_INPUT` con `issues`.
 
 <!-- no-check -->
+
 ```ts good
 await rpc.orders.create({ item: "té", qty: 1 });
 ```
@@ -125,6 +126,7 @@ await rpc.orders.remove({ id: "1" });
 `meeko check` da `TS2339: Property 'remove' does not exist on type '{ create: …; } & { list: …; }'.` Un archivo nuevo de `server/rpc` necesita `meeko check`, `meeko dev` o `meeko routes` para aparecer en el cliente.
 
 <!-- no-check -->
+
 ```ts good
 // server/rpc/orders/remove.ts existe
 await rpc.orders.remove({ id: "1" });

@@ -30,10 +30,10 @@ export default defineMeekoConfig({
 
 ## Opciones
 
-| Opción | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `allow` | `readonly string[]` | `["/"]` si no hay `disallow` | Prefijos permitidos (`Allow:`). |
-| `disallow` | `readonly string[]` | `[]` | Prefijos prohibidos (`Disallow:`). |
+| Opción     | Tipo                | Por defecto                  | Descripción                        |
+| ---------- | ------------------- | ---------------------------- | ---------------------------------- |
+| `allow`    | `readonly string[]` | `["/"]` si no hay `disallow` | Prefijos permitidos (`Allow:`).    |
+| `disallow` | `readonly string[]` | `[]`                         | Prefijos prohibidos (`Disallow:`). |
 
 Cada entrada empieza por `/`, sin espacios, `?` ni `#`. `robots: true` equivale a `{}`.
 

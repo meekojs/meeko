@@ -1,0 +1,297 @@
+<script lang="ts">
+	import { englishExamples as examples } from '../../utils/examples.en'
+
+	const tab = signal<'account' | 'team'>('account')
+	const shown = signal(10)
+	const busy = signal(false)
+	const suggesting = signal(false)
+	const locales = [
+		{ code: 'es', label: 'Español', href: '#locale' },
+		{ code: 'en', label: 'English', href: '#locale', current: true },
+	]
+	async function more() {
+		busy.value = true
+		await new Promise((done) => setTimeout(done, 400))
+		shown.value = Math.min(30, shown.value + 10)
+		busy.value = false
+	}
+</script>
+
+<template>
+	<DocsPage
+		locale="en"
+		title="Navigation"
+		description="Tree, tabs, breadcrumb, pagination, contents and language: real links, which work without hydrating."
+	>
+		<p>
+			Every link of a list accepts
+			<code>href</code>
+			(any URL) or
+			<code>to</code>
+			(a route with typed
+			<code>params</code>
+			and
+			<code>search</code>), plus
+			<code>target</code>,
+			<code>rel</code>,
+			<code>download</code>,
+			<code>hreflang</code>,
+			<code>lang</code>
+			and
+			<code>title</code>. With
+			<code>to</code>
+			it navigates without reloading, it is localized with
+			<code>@meekojs/i18n</code>
+			and the active route decides
+			<code>aria-current</code>. With
+			<code>href</code>, it is the current one when it matches the
+			<code>current</code>
+			prop.
+		</p>
+		<h2 id="tree">UINavigationTree</h2>
+		<p>
+			The side navigation of this guide. Each group folds with a
+			<code>details</code>, and the current group always shows the current link.
+		</p>
+		<DocsPreview layout="stack">
+			<UINavigationTree
+				label="Sample tree"
+				current="#install"
+				featuredLabel="Featured"
+				bind:groups="[
+					{
+						title: 'First steps',
+						items: [
+							{ label: 'Setup', href: '#install' },
+							{ label: 'Theming', href: '#tree', featured: true },
+						],
+					},
+					{ title: 'Parts', items: [{ label: 'UIButton', href: '#tree', code: true }] },
+				]"
+			/>
+		</DocsPreview>
+		<DocsCode bind:code="examples.navigationTree" />
+		<DocsApi
+			caption="UINavigationTree props"
+			bind:rows="[
+				{ name: 'groups', type: 'readonly UINavigationTreeGroup[]', description: 'Required. title, icon, open and items; each link accepts icon, code, featured and aliases.' },
+				{ name: 'current', type: 'string', description: 'The current link, when they use href.' },
+				{ name: 'label', type: 'string', description: 'Name of the navigation.' },
+				{ name: 'collapsible', type: 'boolean', default: 'true', description: 'Groups fold.' },
+				{ name: 'featuredLabel / emptyText', type: 'string', description: 'Label of a featured link and text without links.' },
+				{ name: 'class', type: 'string', description: 'Additional classes.' },
+			]"
+		/>
+		<p>
+			It accepts the
+			<code>item(item, current)</code>,
+			<code>icon(entry)</code>
+			and
+			<code>empty</code>
+			snippets.
+		</p>
+		<h2 id="tabs">UINavigationTabs and UITabs</h2>
+		<p>
+			<code>UINavigationTabs</code>
+			are links between pages, not a
+			<code>tablist</code>: the indicator follows the current one with anchor positioning.
+			<code>UITabs</code>
+			are panels of one page, with the ARIA tabs pattern: the arrows change the panel, and the chosen one shows before hydration.
+		</p>
+		<DocsPreview layout="stack">
+			<UINavigationTabs
+				label="Sample sections"
+				current="#tabs"
+				bind:items="[
+					{ label: 'Metrics', href: '#tabs' },
+					{ label: 'Moderation', href: '#tree' },
+				]"
+			/>
+			<UITabs
+				label="Sample settings"
+				model="tab"
+				bind:items="[
+					{ value: 'account', label: 'Account' },
+					{ value: 'team', label: 'Team' },
+				]"
+			>
+				<snippet name="panel-account">The details of your account.</snippet>
+				<snippet name="panel-team">The people of your team.</snippet>
+			</UITabs>
+		</DocsPreview>
+		<DocsCode bind:code="examples.tabs" />
+		<DocsApi
+			caption="UINavigationTabs props"
+			bind:rows="[
+				{ name: 'items', type: 'readonly UINavigationLink[]', description: 'Required. The links.' },
+				{ name: 'current / label / class', type: 'string', description: 'Current link, name of the navigation and classes.' },
+			]"
+		/>
+		<DocsApi
+			caption="UITabs props"
+			bind:rows="[
+				{ name: 'items', type: 'readonly UITabsItem[]', description: 'Required. value, label and disabled.' },
+				{ name: 'model', type: 'Signal<Value | undefined>', description: 'The chosen tab; by default, the first one.' },
+				{ name: 'label / labelledBy', type: 'string', description: 'Accessible name of the list of tabs.' },
+				{ name: 'id / class', type: 'string', description: 'Identity and classes of the root.' },
+			]"
+		/>
+		<p>
+			It accepts the
+			<code>panel-&lt;value&gt;</code>,
+			<code>panel(item)</code>
+			and
+			<code>tab(item)</code>
+			snippets, and the
+			<code>change</code>
+			event.
+		</p>
+		<h2 id="pagers">UIBreadcrumb, UIPageNavigation and UIPagination</h2>
+		<p>
+			The last item of
+			<code>UIBreadcrumb</code>
+			is the current page, and without a target it is text.
+			<code>UIPageNavigation</code>
+			links the previous and the next page.
+			<code>UIPagination</code>
+			counts what is shown and loads more: with
+			<code>moreLink</code>
+			it is a link that works without JavaScript.
+		</p>
+		<DocsPreview layout="stack">
+			<UIBreadcrumb
+				label="Sample breadcrumb"
+				bind:items="[{ label: 'Home', href: '#pagers' }, { label: 'Guides', href: '#pagers' }, { label: 'Navigation' }]"
+			/>
+			<UIPageNavigation
+				label="Sample pages"
+				bind:previous="{ label: 'Modal', to: '/modals' }"
+				bind:next="{ label: 'Popover', to: '/popover' }"
+			/>
+			<UIPagination
+				label="Sample pagination"
+				bind:shown="shown.value"
+				bind:total="30"
+				bind:hasMore="shown.value < 30"
+				bind:busy="busy.value"
+				on:loadMore="more"
+			/>
+		</DocsPreview>
+		<DocsCode bind:code="examples.pagers" />
+		<DocsApi
+			caption="UIBreadcrumb and UIPageNavigation props"
+			bind:rows="[
+				{ name: 'items', type: 'readonly UIBreadcrumbItem[]', description: 'UIBreadcrumb. Required. The last one is the current page.' },
+				{ name: 'previous / next', type: 'UINavigationLink', description: 'UIPageNavigation. The neighbor pages.' },
+				{ name: 'previousLabel / nextLabel', type: 'string', description: 'UIPageNavigation. The text above each link.' },
+				{ name: 'label / class', type: 'string', description: 'Name of the navigation and classes.' },
+			]"
+		/>
+		<DocsApi
+			caption="UIPagination props"
+			bind:rows="[
+				{ name: 'shown / total', type: 'number', description: 'How many show and how many there are.' },
+				{ name: 'countText', type: 'string', description: 'Replaces the count.' },
+				{ name: 'hasMore / busy', type: 'boolean', default: 'false', description: 'Whether there is more and whether it is loading.' },
+				{ name: 'moreLink', type: 'UILinkTarget', description: 'A link instead of the button: it works without JavaScript.' },
+				{ name: 'loadMoreLabel / loadingLabel', type: 'string', description: 'Texts of the button.' },
+				{ name: 'label / class', type: 'string', description: 'Name of the navigation and classes.' },
+			]"
+		/>
+		<p>
+			It accepts the
+			<code>default</code>
+			snippet and the
+			<code>loadMore</code>
+			event.
+		</p>
+		<h2 id="toc">UITableOfContents</h2>
+		<p>
+			It paints the active entry with
+			<code>scroll-target-group</code>, without a script, where it exists. A minimal
+			<code>IntersectionObserver</code>
+			keeps
+			<code>aria-current="location"</code>
+			in every browser. Use
+			<code>variant="aside"</code>
+			in the column and
+			<code>variant="collapsible"</code>
+			in the content:
+			<code>UIPage</code>
+			shows each one only when it applies.
+		</p>
+		<DocsPreview layout="stack">
+			<UITableOfContents
+				label="Sample contents"
+				bind:entries="[
+					{ id: 'tree', text: 'UINavigationTree', level: 2 },
+					{ id: 'tabs', text: 'UINavigationTabs and UITabs', level: 2 },
+					{ id: 'pagers', text: 'Breadcrumb and pagination', level: 2 },
+				]"
+			/>
+		</DocsPreview>
+		<DocsCode bind:code="examples.toc" />
+		<DocsApi
+			caption="UITableOfContents props"
+			bind:rows="[
+				{ name: 'entries', type: 'readonly UITableOfContentsEntry[]', description: 'Required. id, text and level.' },
+				{ name: 'active', type: 'string', description: 'Hands the control of the active entry to the application.' },
+				{ name: 'variant', type: 'aside | collapsible', default: 'aside', description: 'In the column or folding in the content.' },
+				{ name: 'label / class', type: 'string', description: 'Name of the navigation and classes.' },
+			]"
+		/>
+		<h2 id="locale">UILocaleSwitcher and UILocaleSuggestion</h2>
+		<p>
+			They are presentation: they receive the targets already computed and read neither routes nor cookies. With fewer than two languages, the switcher paints nothing. The suggestion is written in the language it offers and the
+			<code>stay</code>
+			button, in the current one; the application decides when to show it, after mounting, and what it stores.
+		</p>
+		<DocsPreview>
+			<UILocaleSwitcher
+				label="Sample language"
+				bind:items="locales"
+			/>
+			<UIButton
+				variant="outline"
+				on:click="() => (suggesting.value = true)"
+			>
+				Show the suggestion
+			</UIButton>
+		</DocsPreview>
+		<UILocaleSuggestion
+			if:when="suggesting.value"
+			label="Sample suggestion"
+			suggested="es"
+			message="Stay here or read it elsewhere."
+			goLabel="Read this page elsewhere"
+			stayLabel="Stay in English"
+			bind:items="locales"
+			on:stay="() => (suggesting.value = false)"
+		/>
+		<DocsCode bind:code="examples.locale" />
+		<DocsApi
+			caption="UILocaleSwitcher and UILocaleSuggestion props"
+			bind:rows="[
+				{ name: 'items', type: 'readonly UILocaleItem[]', description: 'Required. code, label, href or to, and current.' },
+				{ name: 'suggested', type: 'string', description: 'UILocaleSuggestion. The code it offers.' },
+				{ name: 'message / goLabel / stayLabel', type: 'string', description: 'UILocaleSuggestion. Its texts.' },
+				{ name: 'label / class', type: 'string', description: 'Accessible name and classes.' },
+			]"
+		/>
+		<p>
+			The types
+			<code>UINavigationTreeProps</code>,
+			<code>UINavigationTabsProps</code>,
+			<code>UITabsProps</code>,
+			<code>UIBreadcrumbProps</code>,
+			<code>UIPageNavigationProps</code>,
+			<code>UIPaginationProps</code>,
+			<code>UITableOfContentsProps</code>,
+			<code>UILocaleSwitcherProps</code>
+			and
+			<code>UILocaleSuggestionProps</code>
+			are exported from
+			<code>@meekojs/ui/runtime</code>.
+		</p>
+	</DocsPage>
+</template>

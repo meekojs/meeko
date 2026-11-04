@@ -41,24 +41,25 @@ Sin `socket.pubsub`, el hub crea uno igual, con `console.error` como observador,
 
 `new LocalSocketPubSub(options?)`:
 
-| Opción | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
+| Opción            | Tipo                       | Por defecto                                              | Descripción                                                                                                                                                  |
+| ----------------- | -------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `onListenerError` | `(error: unknown) => void` | `console.error("[meeko] Socket listener failed", error)` | Recibe el fallo de un listener. Los listeners del hub nunca fallan; esto cubre listeners propios. Un observador que lanza no detiene la entrega a los demás. |
 
 ## Valor devuelto
 
 Un `SocketPubSub`:
 
-| Método | Descripción |
-| --- | --- |
+| Método                                       | Descripción                                                                                           |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | `publish(channel, room, { event, payload })` | Llama a todos los listeners del par canal/sala y se resuelve cuando terminan sus intentos de entrega. |
-| `subscribe(channel, room, listener)` | Añade un listener y devuelve, de forma síncrona, la función que lo quita. |
+| `subscribe(channel, room, listener)`         | Añade un listener y devuelve, de forma síncrona, la función que lo quita.                             |
 
 ## Ejemplos
 
 ### Broadcast desde una API
 
 <!-- no-check -->
+
 ```ts
 // server/api/orders/[id]/ready.post.ts
 export default defineApiRoute({
@@ -92,6 +93,7 @@ console.log(received); // [{ text: "Hola" }]
 ### Decidir el broker según el despliegue
 
 <!-- no-check -->
+
 ```ts
 // server/runtime.ts
 export default defineServerRuntime(async ({ env }) => {
@@ -115,6 +117,7 @@ export default defineServerRuntime(async ({ env }) => {
 `broadcast` se resuelve, pero sólo reciben el mensaje los peers conectados a la réplica que lo publicó: los usuarios de la otra réplica no ven el cambio. Desde `1.7`, una aplicación de producción con canales y sin `socket.pubsub` lo avisa una vez por proceso al arrancar, como el contador en memoria de `rateLimit`: `[meeko] Los canales de Socket usan LocalSocketPubSub, el broker en memoria de cada instancia: …`. Meeko no puede contar las réplicas, así que el aviso sale también con una sola instancia; declare `new LocalSocketPubSub()` para quitarlo.
 
 <!-- no-check -->
+
 ```ts good
 socket: { pubsub: new RedisSocketPubSub({ publisher: redis, subscriber, prefix: "app:prod:" }) }
 ```
@@ -128,6 +131,7 @@ socket: { pubsub: new LocalSocketPubSub() } // en un Worker
 Las conexiones viven en los Durable Objects de cada sala, no en el aislado. El Worker rechaza la aplicación al crearla: `Socket channels on Cloudflare Workers require DurableObjectSocketPubSub: leave runtime.socket.pubsub unset and bind MEEKO_SOCKET, or set it to new DurableObjectSocketPubSub(env.MEEKO_SOCKET)…`.
 
 <!-- no-check -->
+
 ```ts good
 socket: env.MEEKO_SOCKET ? { pubsub: new DurableObjectSocketPubSub(env.MEEKO_SOCKET) } : {}
 ```

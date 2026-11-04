@@ -1,0 +1,41 @@
+<script lang="ts">
+	import { examples } from '../utils/examples'
+</script>
+<template>
+	<DocsPage
+		product="Meeko i18n"
+		title="Números y fechas"
+		description="Usa Intl con el idioma activo y opciones explícitas para tus datos."
+	>
+		<h2 id="formatters">number y date</h2>
+		<DocsCode
+			label="Dentro de un componente"
+			bind:code="examples.format"
+		/>
+		<p>
+			<code>number</code>
+			admite las opciones de
+			<code>Intl.NumberFormat</code>;
+			<code>date</code>, las de
+			<code>Intl.DateTimeFormat</code>. Las instancias se reutilizan por sus opciones dentro del traductor.
+		</p>
+		<DocsApi
+			caption="Firmas de los formateadores"
+			bind:rows="[
+				{ name: 'number', type: '(value: number, options?: Intl.NumberFormatOptions) => string', description: 'Monedas, porcentajes, decimales y otras representaciones numéricas.' },
+				{ name: 'date', type: '(value: Date | number, options?: Intl.DateTimeFormatOptions) => string', description: 'Fecha o timestamp, con formato del idioma activo.' },
+			]"
+		/>
+		<h2 id="ssr">Consistencia entre servidor y navegador</h2>
+		<p>
+			Usa la misma fecha y especifica
+			<code>timeZone</code>
+			cuando el resultado deba coincidir en SSR e hidratación. El laboratorio usa una fecha fija y UTC para permitir comparar los idiomas sin depender del reloj ni de la zona del equipo.
+		</p>
+		<p>
+			La moneda se elige con
+			<code>currency</code>; el idioma define su presentación, no una conversión de divisas.
+		</p>
+		<UILink href="/playground">Comparar formatos</UILink>
+	</DocsPage>
+</template>

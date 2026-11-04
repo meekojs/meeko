@@ -20,6 +20,7 @@ related:
 ## Uso
 
 <!-- no-check -->
+
 ```ts
 import { createServerApp } from "@meekojs/meeko/server";
 import { createDenoAssetReader, serveDeno } from "@meekojs/meeko/deno";
@@ -33,10 +34,10 @@ await serveDeno(app, { handleSignals: true });
 
 ## Parámetros
 
-| Opción | Tipo | Descripción |
-| --- | --- | --- |
-| `root` | `string \| URL` | Carpeta con los archivos del manifiesto, como ruta o URL `file:`. |
-| `assets` | `AssetManifest` | Las rutas públicas con su `type`, `etag`, `size` e `immutable`. |
+| Opción   | Tipo            | Descripción                                                       |
+| -------- | --------------- | ----------------------------------------------------------------- |
+| `root`   | `string \| URL` | Carpeta con los archivos del manifiesto, como ruta o URL `file:`. |
+| `assets` | `AssetManifest` | Las rutas públicas con su `type`, `etag`, `size` e `immutable`.   |
 
 ## Valor devuelto
 
@@ -83,6 +84,7 @@ await createDenoAssetReader({ root, assets }).get("/robots.txt", request); // en
 `Error: The Meeko Deno adapter requires the Deno runtime`. En Node, use `createNodeAssetReader`.
 
 <!-- no-check -->
+
 ```ts good
 const assets = createNodeAssetReader({ root: fileURLToPath(new URL("./client/", import.meta.url)), assets: manifest.assets ?? {} });
 ```

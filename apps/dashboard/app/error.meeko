@@ -1,0 +1,22 @@
+<script lang="ts">
+	const props = defineProps<{ status: number; message: string }>()
+
+	const { t, localePath } = useI18n()
+</script>
+
+<template>
+	<DashPage
+		bind:title="props.status === 404 ? t('errors.notFoundTitle') : t('errors.serverTitle')"
+		bind:description="props.status === 404 ? t('errors.notFoundText') : t('errors.serverText')"
+	>
+		<div class="dash-actions">
+			<UILink bind:href="localePath('/')">{t('errors.backHome')}</UILink>
+			<UILink
+				variant="ghost"
+				bind:href="localePath('/sources')"
+			>
+				{t('errors.seeSources')}
+			</UILink>
+		</div>
+	</DashPage>
+</template>

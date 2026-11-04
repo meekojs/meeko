@@ -39,8 +39,8 @@ Mientras `user.value` es `null`, sólo existe el segundo párrafo. Dentro del `<
 
 ## Atributos
 
-| Atributo | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
+| Atributo  | Tipo                | Por defecto | Descripción                                                                                                   |
+| --------- | ------------------- | ----------- | ------------------------------------------------------------------------------------------------------------- |
 | `if:when` | cualquier expresión | obligatorio | La condición. Se evalúa como booleano de JavaScript y se vuelve a evaluar cuando cambian las señales que lee. |
 
 No hay `if:else` ni `else-if`: escribe la condición contraria en otra etiqueta (`if:when="!user.value"`). Un atributo `if:` desconocido es `MEEK024: Directiva de plantilla incompleta` y, junto a un `if:when`, el aviso `MEEK119` (desde `1.7`), porque se escribiría como atributo HTML literal.

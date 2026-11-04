@@ -1,0 +1,49 @@
+<script server lang="ts">
+	import type { PageLocale } from 'meeko-docs-content/locale'
+
+	import { definePage, documentHtml } from '@meekojs/meeko/framework'
+
+	import type { NavSection, Pager, RenderedDoc } from '../../../shared/types/docs'
+
+	import { readPage } from '../../../server/content/db'
+
+	export const route = definePage({
+		render: 'ssr',
+		layout: 'docs',
+	})
+
+	// /en/docs/x reads the English page of the snapshot (the Spanish text and `i18n.fallback` when it is not translated).
+	const { params } = usePage()
+	const { locale } = await usePageI18n()
+	type GuidePage = {
+		readonly doc: RenderedDoc
+		readonly nav: readonly NavSection[]
+		readonly pages: Pager
+		readonly current: string
+		readonly head: { readonly title: string; readonly description: string }
+		readonly i18n?: PageLocale
+	}
+	const snapshot = await readPage<GuidePage>(`/docs/${params.slug}`, locale)
+	if (!snapshot) notFound()
+	export const { head } = snapshot
+	// The template only reads the HTML: the rest of the document is for the layout. Nothing reads it but
+	// `html`, so the first load carries it once, in the page's HTML.
+	export const doc = { html: documentHtml(snapshot.doc.html) }
+	// Without it in the payload (a snapshot older than the languages), the page is the original.
+	export const layoutProps = { nav: snapshot.nav, current: snapshot.current, toc: snapshot.doc.toc, pager: snapshot.pages, editUrl: snapshot.doc.editUrl, source: snapshot.doc.source, i18n: snapshot.i18n ?? null }
+</script>
+
+<script lang="ts">
+	export interface Props {
+		params: { slug: string }
+		search: Record<string, string | string[]>
+	}
+</script>
+
+<template>
+	<UIProse
+		as="article"
+		data-pagefind-body
+		bind:html="doc.html"
+	/>
+</template>

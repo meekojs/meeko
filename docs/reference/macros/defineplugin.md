@@ -18,11 +18,11 @@ related:
 
 `definePlugin(setup)` declara un plugin de aplicación: un archivo de `app/plugins` que lo exporta por defecto y se ejecuta al arrancar la aplicación, antes de pintar la página. El sufijo del archivo decide dónde:
 
-| Archivo | Dónde y cuándo |
-| --- | --- |
-| `app/plugins/x.client.ts` | Sólo en el navegador, una vez, antes de la hidratación. |
+| Archivo                   | Dónde y cuándo                                                                                    |
+| ------------------------- | ------------------------------------------------------------------------------------------------- |
+| `app/plugins/x.client.ts` | Sólo en el navegador, una vez, antes de la hidratación.                                           |
 | `app/plugins/x.server.ts` | Sólo en el servidor, una vez por petición de página, antes del render (también al prerenderizar). |
-| `app/plugins/x.ts` | En los dos. |
+| `app/plugins/x.ts`        | En los dos.                                                                                       |
 
 `setup` recibe la aplicación: publica valores para todos los componentes con `app.provide`, registra observadores de errores con `app.onError` y lee la ruta con `app.route`. Se autoimporta.
 
@@ -54,19 +54,19 @@ const accent = inject(accentKey);
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `setup` | `(app: PluginApp, options: Options) => void \| Promise<void>` | obligatorio | La función del plugin. Puede ser asíncrona: Meeko espera a cada plugin antes del siguiente. `options` son las que pasa un módulo con `meeko.addPlugin({ src, options })`; en `app/plugins`, `undefined`. |
+| Parámetro | Tipo                                                          | Por defecto | Descripción                                                                                                                                                                                              |
+| --------- | ------------------------------------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `setup`   | `(app: PluginApp, options: Options) => void \| Promise<void>` | obligatorio | La función del plugin. Puede ser asíncrona: Meeko espera a cada plugin antes del siguiente. `options` son las que pasa un módulo con `meeko.addPlugin({ src, options })`; en `app/plugins`, `undefined`. |
 
 `PluginApp`:
 
-| Miembro | Descripción |
-| --- | --- |
-| `side` | `"client"` o `"server"`. |
-| `route` | La ruta, como `useRoute()`. En el navegador sigue a la ruta confirmada: un `effect` que la lee se repite al navegar. |
-| `request` | La petición en el servidor; `undefined` en el navegador. |
-| `provide(key, value)` | Publica un valor para todos los componentes, que lo leen con `inject(key)`. `key` sale de `createContext`. |
-| `onError(handler)` | En el navegador, recibe lo mismo que `mountClientApp({ onError })`, con `{ side: "client", source }`; en el servidor, los fallos del render de esa petición, con `{ side: "server", requestId }`. |
+| Miembro               | Descripción                                                                                                                                                                                       |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `side`                | `"client"` o `"server"`.                                                                                                                                                                          |
+| `route`               | La ruta, como `useRoute()`. En el navegador sigue a la ruta confirmada: un `effect` que la lee se repite al navegar.                                                                              |
+| `request`             | La petición en el servidor; `undefined` en el navegador.                                                                                                                                          |
+| `provide(key, value)` | Publica un valor para todos los componentes, que lo leen con `inject(key)`. `key` sale de `createContext`.                                                                                        |
+| `onError(handler)`    | En el navegador, recibe lo mismo que `mountClientApp({ onError })`, con `{ side: "client", source }`; en el servidor, los fallos del render de esa petición, con `{ side: "server", requestId }`. |
 
 ## Valor devuelto
 
@@ -137,6 +137,7 @@ export default definePlugin((app) => {
 `meeko check` da `TS2345: Argument of type 'string' is not assignable to parameter of type 'ContextKey<…>'.` con `Type 'string' is not assignable to type 'symbol'.` La clave sale de `createContext`, que también tipa el valor.
 
 <!-- no-check -->
+
 ```ts good
 export const themeKey = createContext<string>("theme");
 export default definePlugin((app) => {
@@ -154,6 +155,7 @@ export default (app: unknown) => {};
 `meeko check` no lo detecta. Al arrancar, la aplicación falla con `TypeError: <plugin> must default-export definePlugin(...)`, con el nombre del plugin.
 
 <!-- no-check -->
+
 ```ts good
 export default definePlugin((app) => {});
 ```
@@ -170,6 +172,7 @@ export default definePlugin((app) => {
 ```
 
 <!-- no-check -->
+
 ```ts good
 export default definePlugin((app) => {
   app.provide(cartKey, signal<string[]>([]));

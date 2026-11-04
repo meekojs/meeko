@@ -1,0 +1,350 @@
+<script
+	server
+	lang="ts"
+>
+	import { attempt } from '../utils/errors'
+
+	export const health = await attempt(() => rpc.health.get({}))
+</script>
+
+<script lang="ts">
+	import type { TableColumn } from '@meekojs/ui/runtime'
+
+	import type { Health, HealthReport, SourceRow } from '../../shared/schemas/dashboard'
+
+	import { describeError } from '../utils/errors'
+	import { siteLabels } from '../utils/labels'
+
+	const i18n = useI18n()
+	const { t, localePath } = i18n
+	const format = useFormat()
+	const formatDate = format.date
+	const formatNumber = format.number
+
+	type Undocumented = HealthReport['undocumentedExports'][number]
+	type Broken = HealthReport['brokenLinks'][number]
+
+	const empty: Health = { report: null, job: null, pages: [] }
+	const report = signal(health.ok ? health.data.report : null)
+	const pages: readonly SourceRow[] = health.ok ? health.data.pages : empty.pages
+	const failure = signal(health.ok ? null : health.failure)
+
+	const {
+		jobs,
+		failure: jobFailure,
+		starting,
+		start,
+	} = useJobs(
+		{ content: null, health: health.ok ? health.data.job : null },
+		{
+			onFinish: async () => {
+				try {
+					const next = await rpc.health.get({})
+					report.value = next.report
+					failure.value = null
+				} catch (error) {
+					failure.value = describeError(error)
+				}
+			},
+		},
+	)
+
+	const checking = computed(() => jobs.value.health?.status === 'running' || starting.value === 'health')
+
+	// The first visit after the dashboard starts has no report: check right away.
+	onMounted(() => {
+		if (!report.value && !jobs.value.health) void start({ kind: 'health' })
+	})
+
+	// The kinds of the API reference (meeko-docs-content `apiKinds`); its own labels are Spanish.
+	const apiKinds = ['block', 'macro', 'tag', 'directive', 'function', 'class', 'const', 'enum', 'interface', 'type'] as const
+	const kindName = (kind: string, fallback: string) => {
+		const known = apiKinds.find((candidate) => candidate === kind)
+		return known ? t(`health.apiKind.${known}`) : fallback
+	}
+	const exportKinds = computed(() => ['all', ...[...new Set((report.value?.undocumentedExports ?? []).map((item) => item.kind))].sort((a, b) => kindName(a, a).localeCompare(kindName(b, b), i18n.locale))])
+	const exportKind = signal<string | null>('all')
+	const exportQuery = signal('')
+	const exports = computed(() => {
+		const text = exportQuery.value.trim().toLocaleLowerCase(i18n.locale)
+		return (report.value?.undocumentedExports ?? []).filter((item) => (!exportKind.value || exportKind.value === 'all' || item.kind === exportKind.value) && (!text || item.id.toLocaleLowerCase(i18n.locale).includes(text)))
+	})
+	const kindOption = (value: string) => (value === 'all' ? t('filters.allMasculine') : kindName(value, (report.value?.undocumentedExports ?? []).find((item) => item.kind === value)?.kindLabel ?? value))
+
+	// 243 exports today: the first page, then the rest on request.
+	const pageSize = 25
+	const showAll = signal(false)
+	const shownExports = computed(() => (showAll.value ? exports.value : exports.value.slice(0, pageSize)))
+
+	const reason = (value: Broken['reason']) => t(`health.reasons.${value}`)
+
+	const exportColumns = [
+		{ key: 'name', label: t('health.columns.export') },
+		{ key: 'specifier', label: t('health.columns.module') },
+		{ key: 'kindLabel', label: t('health.columns.kind') },
+	] satisfies TableColumn<Undocumented>[]
+
+	const linkColumns = [
+		{ key: 'file', label: t('health.columns.file') },
+		{ key: 'href', label: t('health.columns.link') },
+		{ key: 'target', label: t('health.columns.target') },
+		{ key: 'reason', label: t('health.columns.reason') },
+	] satisfies TableColumn<Broken>[]
+
+	const pageColumns = [
+		{ key: 'title', label: t('health.columns.page') },
+		{ key: 'site', label: t('health.columns.site') },
+		{ key: 'path', label: t('health.columns.path') },
+		{ key: 'importedAt', label: t('health.columns.imported') },
+	] satisfies TableColumn<SourceRow>[]
+
+	const linkKey = (link: Broken) => `${link.file}:${link.line ?? 0}:${link.href}`
+	const pageCounts = computed(() => ({ ui: pages.filter((page) => page.site === 'ui' && page.removedAt === null).length, i18n: pages.filter((page) => page.site === 'i18n' && page.removedAt === null).length }))
+</script>
+
+<template>
+	<DashPage
+		bind:title="t('health.title')"
+		bind:description="t('health.description')"
+	>
+		<snippet name="actions">
+			<UIButton
+				bind:disabled="checking.value"
+				on:click="() => void start({ kind: 'health' })"
+			>
+				{checking.value ? t('health.checking') : t('health.check')}
+			</UIButton>
+		</snippet>
+		<div class="dash-stack">
+			<DashFailure
+				if:when="failure.value"
+				bind:failure="failure.value"
+			/>
+			<DashFailure
+				if:when="jobFailure.value"
+				bind:title="t('health.cannotStart')"
+				bind:failure="jobFailure.value"
+			/>
+			<p
+				class="dash-meta dash-status"
+				role="status"
+				aria-live="polite"
+			>
+				<span if:when="checking.value">{t('health.running')}</span>
+				<span if:when="!checking.value && report.value">{t('health.checked', { date: formatDate(report.value?.checkedAt), guides: t('health.guides', { count: report.value?.checked.guides ?? 0 }), references: t('health.references', { count: report.value?.checked.references ?? 0 }), links: t('health.links', { count: report.value?.checked.links ?? 0 }) })}</span>
+				<span if:when="!checking.value && !report.value && jobs.value.health?.status === 'failed'">{t('health.lastFailed')}</span>
+			</p>
+
+			<UISkeleton
+				if:when="checking.value && !report.value"
+				bind:lines="3"
+				bind:widths="['full', 'long', 'short']"
+			/>
+
+			<UICard
+				if:when="report.value"
+				bind:title="t('health.pending')"
+			>
+				<snippet name="actions">
+					<UIBadge>{formatNumber(report.value?.pendingReferences.length ?? 0)}</UIBadge>
+				</snippet>
+				<UIEmpty
+					if:when="!report.value?.pendingReferences.length"
+					bind:title="t('health.pendingNone')"
+				>
+					<code>docs/reference/taxonomy.json</code>
+				</UIEmpty>
+				<ul
+					if:when="report.value?.pendingReferences.length"
+					class="dash-list"
+				>
+					<li
+						each:of="report.value?.pendingReferences ?? []"
+						each:as="item"
+						each:key="item.symbol"
+					>
+						<strong>{item.name}</strong>
+						<span
+							class="dash-soft"
+							lang="es"
+						>
+							{item.groupTitle}
+						</span>
+						<code>{item.symbol}</code>
+					</li>
+				</ul>
+			</UICard>
+
+			<UICard
+				if:when="report.value"
+				bind:title="t('health.broken')"
+				bind:description="t('health.brokenLead')"
+			>
+				<snippet
+					if:when="report.value?.brokenLinks.length"
+					name="actions"
+				>
+					<UIBadge tone="danger">{formatNumber(report.value?.brokenLinks.length ?? 0)}</UIBadge>
+				</snippet>
+				<UITable
+					bind:hideCaption="true"
+					bind:caption="t('health.broken')"
+					bind:emptyText="t('health.brokenNone')"
+					bind:columns="linkColumns"
+					bind:rows="report.value?.brokenLinks ?? []"
+					bind:rowKey="linkKey"
+				>
+					<snippet
+						name="cell"
+						params="row, column"
+					>
+						<code if:when="column.key === 'file'">{row.file}{row.line ? ':' + row.line : ''}</code>
+						<code if:when="column.key === 'href'">{row.href}</code>
+						<code if:when="column.key === 'target'">{row.target}</code>
+						<span if:when="column.key === 'reason'">{reason(row.reason)}</span>
+					</snippet>
+				</UITable>
+			</UICard>
+
+			<UICard
+				if:when="report.value"
+				bind:title="t('health.exports')"
+				bind:description="t('health.exportsLead')"
+			>
+				<snippet name="actions">
+					<UIBadge>{formatNumber(report.value?.undocumentedExports.length ?? 0)}</UIBadge>
+				</snippet>
+				<div class="dash-tight">
+					<form
+						class="dash-filters"
+						role="search"
+						bind:aria-label="t('health.filterExports')"
+						on:submit="(event) => event.preventDefault()"
+					>
+						<UIField
+							id="exports-query"
+							class="dash-grow"
+							bind:label="t('actions.search')"
+						>
+							<snippet
+								name="default"
+								params="id, describedBy"
+							>
+								<UIInput
+									type="search"
+									model="exportQuery"
+									bind:id="id"
+									bind:describedBy="describedBy"
+									bind:placeholder="t('health.exportsPlaceholder')"
+								/>
+							</snippet>
+						</UIField>
+						<UIField
+							id="exports-kind"
+							bind:label="t('health.columns.kind')"
+						>
+							<snippet
+								name="default"
+								params="id, describedBy"
+							>
+								<UISelect
+									model="exportKind"
+									bind:id="id"
+									bind:describedBy="describedBy"
+									bind:placeholder="t('filters.allMasculine')"
+									bind:options="exportKinds.value"
+									bind:labelBy="kindOption"
+								/>
+							</snippet>
+						</UIField>
+					</form>
+					<UITable
+						rowKey="id"
+						bind:hideCaption="true"
+						bind:caption="t('health.exports')"
+						bind:emptyText="t('health.exportsNone')"
+						bind:columns="exportColumns"
+						bind:rows="shownExports.value"
+					>
+						<snippet
+							name="cell"
+							params="row, column"
+						>
+							<span
+								if:when="column.key === 'name'"
+								class="dash-cell"
+							>
+								<code>{row.name}</code>
+								<UIBadge
+									if:when="row.deprecated"
+									tone="danger"
+								>
+									{t('health.deprecated')}
+								</UIBadge>
+							</span>
+							<code if:when="column.key === 'specifier'">{row.specifier}</code>
+							<span if:when="column.key === 'kindLabel'">{kindName(row.kind, row.kindLabel)}</span>
+						</snippet>
+					</UITable>
+					<UIPagination
+						if:when="exports.value.length > pageSize"
+						bind:hasMore="true"
+						bind:countText="showAll.value ? t('health.showingAll', { total: formatNumber(exports.value.length) }) : t('health.showingSome', { shown: pageSize, total: formatNumber(exports.value.length) })"
+						bind:loadMoreLabel="showAll.value ? t('health.showLess') : t('health.showAll')"
+						on:loadMore="() => (showAll.value = !showAll.value)"
+					/>
+				</div>
+			</UICard>
+
+			<UICard
+				bind:title="t('health.meekoPages')"
+				bind:description="t('health.meekoLead')"
+			>
+				<snippet name="actions">
+					<UIBadge>UI {formatNumber(pageCounts.value.ui)} · i18n {formatNumber(pageCounts.value.i18n)}</UIBadge>
+				</snippet>
+				<UITable
+					rowKey="id"
+					bind:hideCaption="true"
+					bind:caption="t('health.meekoCaption')"
+					bind:columns="pageColumns"
+					bind:rows="pages"
+					bind:emptyText="health.ok ? t('health.meekoNone') : t('health.meekoUnreadable')"
+				>
+					<snippet
+						name="cell"
+						params="row, column"
+					>
+						<span
+							if:when="column.key === 'title'"
+							class="dash-cell"
+						>
+							<a bind:href="localePath('/sources/' + row.id)">{row.title}</a>
+							<UIBadge
+								if:when="row.removedAt"
+								tone="danger"
+							>
+								{t('badge.removed')}
+							</UIBadge>
+						</span>
+						<span if:when="column.key === 'site'">{siteLabels[row.site]}</span>
+						<code if:when="column.key === 'path'">{row.path}</code>
+						<span
+							if:when="column.key === 'importedAt'"
+							class="dash-nowrap"
+						>
+							{formatDate(row.importedAt)}
+						</span>
+					</snippet>
+				</UITable>
+			</UICard>
+
+			<UICard bind:title="t('health.lastCheck')">
+				<DashJob
+					bind:empty="t('health.noCheck')"
+					bind:job="jobs.value.health"
+				/>
+			</UICard>
+		</div>
+	</DashPage>
+</template>

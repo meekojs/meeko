@@ -1,0 +1,27 @@
+<script lang="ts">
+import { signal } from "@meekojs/meeko";
+
+const active = signal({ id: 2 });
+const rows = [{ id: 1 }, { id: 2 }, { id: 3 }];
+function identity<T>(value: T): T {
+  return value;
+}
+function advance(): void {
+  active.value = { id: active.value.id + 1 };
+}
+</script>
+
+<template>
+  <section>
+    <p class="less">{rows[0]!.id < active.value.id}</p>
+    <p class="tight">{rows[0]!.id<active.value.id}</p>
+    <p class="less-equal">{active.value.id <= 2 ? "yes" : "no"}</p>
+    <p class="string">{"<b>" + active.value.id + "</b>"}</p>
+    <p class="template">{`<i>${active.value.id < 3}</i>`}</p>
+    <p class="generic">{identity<number>(active.value.id)}</p>
+    <ul>
+      <li each:of=rows each:as="row" each:key="row.id" bind:title="row.id < active.value.id ? 'before' : 'after'">{row.id < active.value.id ? "before" : "after"} &lt; {row.id}</li>
+    </ul>
+    <button type="button" on:click=advance>next</button>
+  </section>
+</template>

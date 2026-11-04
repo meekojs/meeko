@@ -1,0 +1,84 @@
+{
+	"schema": 1,
+	"fixture": "67272b3462a27f1b78ea4e6a8f12e740f51ba54d2fc3b8c5688799c1fbbdaf01",
+	"environment": {
+		"node": "v24.21.0",
+		"platform": "win32",
+		"arch": "x64",
+		"cpu": "Intel(R) Core(TM) Ultra 9 285K",
+		"browser": "156.0.8078.74",
+		"esbuild": "0.28.2",
+		"revision": "8c41b47d",
+		"dirty": "false",
+		"measuredAt": "2026-11-03T09:37:14.535Z",
+		"rounds": "7",
+		"coldRounds": "3",
+		"warmups": "2"
+	},
+	"metrics": {
+		"compile.cold": {
+			"unit": "ms",
+			"samples": 3,
+			"median": 14.148400000000038,
+			"p95": 15.270700000000033,
+			"minimum": 13.36909999999989,
+			"maximum": 15.270700000000033
+		},
+		"compile.warm": {
+			"unit": "ms",
+			"samples": 7,
+			"median": 0.3003833333333356,
+			"p95": 0.42625000000000457,
+			"minimum": 0.22460000000000188,
+			"maximum": 0.42625000000000457
+		},
+		"ssr.render": {
+			"unit": "ms",
+			"samples": 7,
+			"median": 0.017400000000000092,
+			"p95": 0.01931899999999814,
+			"minimum": 0.01523400000000038,
+			"maximum": 0.01931899999999814
+		},
+		"bundle.raw": {
+			"unit": "bytes",
+			"samples": 1,
+			"median": 21865,
+			"p95": 21865,
+			"minimum": 21865,
+			"maximum": 21865
+		},
+		"bundle.gzip": {
+			"unit": "bytes",
+			"samples": 1,
+			"median": 8298,
+			"p95": 8298,
+			"minimum": 8298,
+			"maximum": 8298
+		},
+		"client.hydration": {
+			"unit": "ms",
+			"samples": 7,
+			"median": 0.29999999701976776,
+			"p95": 0.4000000059604645,
+			"minimum": 0.29999999701976776,
+			"maximum": 0.4000000059604645
+		},
+		"lsp.completion.warm": {
+			"unit": "ms",
+			"samples": 7,
+			"median": 35.09130000000005,
+			"p95": 36.52489999999989,
+			"minimum": 31.999899999999798,
+			"maximum": 36.52489999999989
+		},
+		"lsp.completion.cold": {
+			"unit": "ms",
+			"samples": 3,
+			"median": 242.51819999999998,
+			"p95": 308.3875000000003,
+			"minimum": 241.96900000000005,
+			"maximum": 308.3875000000003
+		}
+	}
+}

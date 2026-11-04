@@ -1,0 +1,43 @@
+.meeko-ui-link-card {
+	display: flex;
+	flex-direction: column;
+	gap: var(--ui-space-1-5);
+	transition:
+		border-color var(--ui-duration-fast),
+		background-color var(--ui-duration-fast);
+	box-sizing: border-box;
+	border: var(--ui-border-width) solid var(--ui-color-border);
+	border-radius: var(--ui-radius-lg);
+	background: var(--ui-color-surface);
+	padding: var(--ui-link-card-padding, var(--ui-space-4));
+	min-width: 0;
+	height: 100%;
+	color: var(--ui-color-text);
+	font-family: var(--ui-font-sans);
+	text-decoration: none;
+	overflow-wrap: anywhere;
+}
+.meeko-ui-link-card:hover {
+	border-color: var(--ui-color-border-strong);
+	background: var(--ui-color-control-hover);
+}
+.meeko-ui-link-card:focus-visible {
+	outline: var(--ui-focus-ring);
+	outline-offset: var(--ui-focus-ring-offset);
+}
+.meeko-ui-link-card-title {
+	font-weight: var(--ui-font-weight-medium);
+	font-size: var(--ui-font-size-lg);
+	line-height: var(--ui-line-height-snug);
+	letter-spacing: var(--ui-tracking-tight);
+}
+.meeko-ui-link-card-description {
+	color: var(--ui-color-text-soft);
+	font-size: var(--ui-font-size-sm);
+	line-height: var(--ui-line-height-normal);
+}
+@media (prefers-reduced-motion: reduce) {
+	.meeko-ui-link-card {
+		transition: none;
+	}
+}

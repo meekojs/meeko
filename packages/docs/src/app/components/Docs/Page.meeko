@@ -1,0 +1,54 @@
+<script lang="ts">
+	import { useI18n } from '@meekojs/i18n'
+
+	import * as DocsFeedback from './Feedback.meeko'
+	import * as DocsUntranslated from './Untranslated.meeko'
+
+	// `locale`: the language the page's prose is written in. A page without it is in the default locale
+	// (Spanish), so under /en/… it is an untranslated page: it shows the note and marks its content with
+	// lang. A translated page (app/pages/en/…) declares `locale="en"`. The only <main> is <DocsShell>'s.
+	const props = defineProps<{ title: string; description: string; landing?: boolean; product?: string; locale?: string }>({ product: 'Meeko UI' })
+
+	const snippets = defineSnippets<{ default: [] }>()
+
+	const route = useRoute()
+	const i18n = useI18n()
+	const shellLocale = i18n.t('shell.meta.lang')
+	const prose = computed(() => props.locale ?? i18n.defaultLocale)
+	// The note is for a locale the shell speaks (es, en); a demo locale (ar) shows the original as is.
+	const untranslated = computed(() => prose.value !== i18n.locale && shellLocale === i18n.locale)
+
+	useHead(() => ({ title: props.title + ' · ' + props.product, meta: [{ name: 'description', content: props.description }] }))
+</script>
+
+<template>
+	<div
+		class="docs-page"
+		bind:data-landing="props.landing ? '' : undefined"
+		bind:lang="prose.value === i18n.locale ? undefined : prose.value"
+	>
+		<DocsUntranslated
+			if:when="untranslated.value"
+			bind:href="i18n.switchLocalePath(prose.value)"
+			bind:hreflang="prose.value"
+		/>
+		<UIPageHeader
+			bind:title="props.title"
+			bind:description="props.description"
+			bind:layout="props.landing ? 'landing' : 'docs'"
+		/>
+		<UIProse as="article">
+			<render snippet="snippets.default" />
+		</UIProse>
+		<DocsFeedback
+			if:when="!props.landing"
+			bind:path="route.path.value"
+		/>
+	</div>
+</template>
+
+<style scoped>
+	.docs-page:not([data-landing]) {
+		max-width: var(--ui-prose-width);
+	}
+</style>

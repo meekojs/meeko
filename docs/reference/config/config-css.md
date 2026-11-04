@@ -29,9 +29,9 @@ export default defineMeekoConfig({
 
 ## Opciones
 
-| Opción | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `scopeAttribute` | `"all" \| "matched"` | `"all"` | Qué elementos reciben el atributo de `<style scoped>`. |
+| Opción           | Tipo                 | Por defecto | Descripción                                            |
+| ---------------- | -------------------- | ----------- | ------------------------------------------------------ |
+| `scopeAttribute` | `"all" \| "matched"` | `"all"`     | Qué elementos reciben el atributo de `<style scoped>`. |
 
 ## Resultado
 
@@ -48,10 +48,10 @@ h2 { margin: 0; }
 </style>
 ```
 
-| `scopeAttribute` | Elementos con el atributo |
-| --- | --- |
-| `"all"` | `<article>`, `<h2>` y `<p>` |
-| `"matched"` | `<article>` (`.card`) y `<h2>` (`h2`); `<p>` no, porque ningún selector puede seleccionarlo |
+| `scopeAttribute` | Elementos con el atributo                                                                   |
+| ---------------- | ------------------------------------------------------------------------------------------- |
+| `"all"`          | `<article>`, `<h2>` y `<p>`                                                                 |
+| `"matched"`      | `<article>` (`.card`) y `<h2>` (`h2`); `<p>` no, porque ningún selector puede seleccionarlo |
 
 ## Ejemplos
 

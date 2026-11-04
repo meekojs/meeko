@@ -1,0 +1,68 @@
+{
+	"snapshots": {
+		"title": "Snapshots",
+		"description": "El site sirve un único snapshot activo, con la documentación en español y en inglés. Importa las fuentes desde Git, publica uno nuevo con las revisiones publicadas o vuelve a uno anterior.",
+		"actions": "Acciones",
+		"actionsHint": "Se ejecutan en un proceso aparte, de una en una.",
+		"import": "Importar desde Git",
+		"publish": "Publicar snapshot…",
+		"hint": "Importar actualiza las fuentes y sus traducciones (docs/en) con los archivos del repositorio y nunca toca las revisiones. Publicar renderiza toda la documentación en los dos idiomas y activa el resultado en el site.",
+		"cannotStart": "No se pudo iniciar el trabajo",
+		"conflict": "Otro cambio se publicó mientras tanto",
+		"retry": "Volver a publicar",
+		"noJob": "Ningún trabajo desde que arrancó el dashboard.",
+		"done": "Terminado.",
+		"failed": "El trabajo falló: revisa su salida.",
+		"activated": "El snapshot #{id} es ahora el activo: el site lo sirve desde ya.",
+		"rollback": "Volver al #{id}",
+		"activate": "Activar el #{id}",
+		"pending": {
+			"title": "Revisiones sin publicar en el site",
+			"count": {
+				"plural": "count",
+				"forms": {
+					"one": "{count} revisión",
+					"other": "{count} revisiones"
+				}
+			},
+			"noActive": "No hay snapshot activo: el site no muestra ninguna revisión hasta la primera publicación.",
+			"changedAfter": "Cambiaron después del snapshot activo #{id}: el site no muestra estos cambios hasta que publiques un snapshot.",
+			"publishedAfter": "Se publicaron después del snapshot activo #{id}: el site no las muestra hasta que publiques un snapshot.",
+			"unreadable": "No se pudieron leer las revisiones publicadas.",
+			"allIncluded": "El snapshot activo #{id} incluye todas las revisiones publicadas.",
+			"none": "No hay revisiones publicadas pendientes.",
+			"archived": "revisión #{id} archivada: la página vuelve a Git · {date}",
+			"published": "revisión #{id} de {author} · {date}"
+		},
+		"saved": "Guardados",
+		"retention": "Se conservan los 5 últimos y el que estaba activo.",
+		"caption": "Snapshots guardados, del más reciente al más antiguo",
+		"empty": "No hay snapshots: publica el primero para que el site tenga documentación.",
+		"byLocale": "{es} páginas en español y {en} en inglés",
+		"split": "es {es} · en {en}",
+		"activeBadge": "Activo",
+		"columns": {
+			"id": "Snapshot",
+			"publishedAt": "Publicado",
+			"publishedBy": "Por",
+			"pages": "Páginas",
+			"note": "Nota",
+			"active": "Estado"
+		},
+		"confirm": {
+			"title": "¿Activar el snapshot #{id}?",
+			"text": "El site público servirá este snapshot, en los dos idiomas, en cuanto confirmes. Puedes volver al actual desde esta misma lista.",
+			"replaces": "Sustituye a",
+			"failed": "No se activó",
+			"activating": "Activando…",
+			"activate": "Activar snapshot"
+		},
+		"publishModal": {
+			"title": "Publicar un snapshot",
+			"text": "Renderiza las guías, la referencia y las páginas en español y en inglés con las revisiones publicadas sobre Git, y lo activa en el site.",
+			"noteHint": "Opcional. Qué cambia en esta publicación.",
+			"failed": "No se pudo iniciar",
+			"submit": "Publicar y activar"
+		}
+	}
+}

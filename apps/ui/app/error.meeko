@@ -1,0 +1,18 @@
+<script lang="ts">
+	const props = defineProps<{ status: number; message: string }>()
+
+	const { t } = useI18n()
+</script>
+
+<template>
+	<DocsPage
+		bind:locale="t('shell.meta.lang')"
+		bind:description="t('error.description')"
+		bind:title="props.status === 404 ? t('error.notFound') : t('error.failed')"
+	>
+		<p>{t('error.hint')}</p>
+		<div class="docs-actions">
+			<UILink to="/components">{t('error.action')}</UILink>
+		</div>
+	</DocsPage>
+</template>

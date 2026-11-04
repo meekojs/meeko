@@ -1,23 +1,30 @@
-import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
-import { writeFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
-import test from "node:test";
-import ts from "@typescript/typescript6";
-import { createTempProject, linkRepositoryPackages } from "./helpers/temp-project.ts";
+import ts from '@typescript/typescript6'
+import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
+import { writeFile } from 'node:fs/promises'
+import { join, resolve } from 'node:path'
+import test from 'node:test'
+
+import { createTempProject, linkRepositoryPackages } from './helpers/temp-project.ts'
 
 const compilerOptions = {
-  target: "ES2022", module: "NodeNext", moduleResolution: "NodeNext", lib: ["ES2022", "DOM"], types: [],
-  strict: true, noEmit: true, skipLibCheck: true,
-};
+	target: 'ES2022',
+	module: 'NodeNext',
+	moduleResolution: 'NodeNext',
+	lib: ['ES2022', 'DOM'],
+	types: [],
+	strict: true,
+	noEmit: true,
+	skipLibCheck: true,
+}
 
 async function application(files: Record<string, string>, exactOptionalPropertyTypes: boolean): Promise<{ root: string; remove(): Promise<void> }> {
-  const project = await createTempProject("named-layouts-types-");
-  await linkRepositoryPackages(project.root);
-  await writeFile(join(project.root, "package.json"), JSON.stringify({ type: "module" }));
-  await writeFile(join(project.root, "tsconfig.json"), JSON.stringify({ compilerOptions: { ...compilerOptions, exactOptionalPropertyTypes }, include: ["*.ts"] }));
-  for (const [name, source] of Object.entries(files)) await writeFile(join(project.root, name), source);
-  return project;
+	const project = await createTempProject('named-layouts-types-')
+	await linkRepositoryPackages(project.root)
+	await writeFile(join(project.root, 'package.json'), JSON.stringify({ type: 'module' }))
+	await writeFile(join(project.root, 'tsconfig.json'), JSON.stringify({ compilerOptions: { ...compilerOptions, exactOptionalPropertyTypes }, include: ['*.ts'] }))
+	for (const [name, source] of Object.entries(files)) await writeFile(join(project.root, name), source)
+	return project
 }
 
 // What `.meeko/types/routes.d.ts` declares for a project with three layouts.
@@ -35,7 +42,7 @@ declare module "@meekojs/meeko/framework" {
   }
 }
 export {};
-`;
+`
 
 const typed = `import { defineGroup, definePage, useLayout } from "@meekojs/meeko/framework";
 import type { LayoutHandle, LayoutName, LayoutProps, PageLayout } from "@meekojs/meeko/framework";
@@ -85,57 +92,60 @@ const page = useLayout<PageLayout<"/print">>();
 // @ts-expect-error A page without a named layout has no layout props.
 page.set({ title: "x" });
 export { title };
-`;
+`
 
 for (const exact of [true, false]) {
-  test(`layout and layoutProps are typed against the chosen layout (exactOptionalPropertyTypes: ${exact})`, { timeout: 120_000 }, async () => {
-    const project = await application({ "routes.d.ts": generated, "page.ts": typed }, exact);
-    try {
-      const result = spawnSync(process.execPath, [resolve("node_modules/typescript/bin/tsc"), "-p", join(project.root, "tsconfig.json")], { encoding: "utf8", windowsHide: true });
-      assert.equal(result.status, 0, `${result.stdout}${result.stderr}`);
-    } finally {
-      await project.remove();
-    }
-  });
+	test(`layout and layoutProps are typed against the chosen layout (exactOptionalPropertyTypes: ${exact})`, { timeout: 120_000 }, async () => {
+		const project = await application({ 'routes.d.ts': generated, 'page.ts': typed }, exact)
+		try {
+			const result = spawnSync(process.execPath, [resolve('node_modules/typescript/bin/tsc'), '-p', join(project.root, 'tsconfig.json')], { encoding: 'utf8', windowsHide: true })
+			assert.equal(result.status, 0, `${result.stdout}${result.stderr}`)
+		} finally {
+			await project.remove()
+		}
+	})
 }
 
-test("the editor completes layout names and the props of the chosen layout", { timeout: 120_000 }, async () => {
-  const sources = {
-    "routes.d.ts": generated,
-    "name.route.ts": 'import { definePage } from "@meekojs/meeko/framework";\nexport const route = definePage({ layout: "" });\n',
-    "props.route.ts": 'import { definePage } from "@meekojs/meeko/framework";\nexport const route = definePage({ layout: "dashboard", layoutProps: {  } });\n',
-    "render.route.ts": 'import { definePage } from "@meekojs/meeko/framework";\nexport const route = definePage({ layout: "auth", render: "" });\n',
-    "group.ts": 'import { defineGroup } from "@meekojs/meeko/framework";\nexport default defineGroup({ layout: "dashboard", layoutProps: {  } });\n',
-  };
-  const project = await application(sources, true);
-  try {
-    const files = Object.keys(sources).map((name) => join(project.root, name));
-    const options = ts.parseJsonConfigFileContent({ compilerOptions: { ...compilerOptions, exactOptionalPropertyTypes: true } }, ts.sys, project.root).options;
-    const service = ts.createLanguageService({
-      getCompilationSettings: () => options,
-      getScriptFileNames: () => files,
-      getScriptVersion: () => "1",
-      getScriptSnapshot: (file) => { const text = ts.sys.readFile(file); return text === undefined ? undefined : ts.ScriptSnapshot.fromString(text); },
-      getCurrentDirectory: () => project.root,
-      getDefaultLibFileName: (settings) => ts.getDefaultLibFilePath(settings),
-      fileExists: ts.sys.fileExists,
-      readFile: ts.sys.readFile,
-      readDirectory: ts.sys.readDirectory,
-      directoryExists: ts.sys.directoryExists,
-      getDirectories: ts.sys.getDirectories,
-      realpath: (path) => ts.sys.realpath?.(path) ?? path,
-    });
-    const complete = (name: string, marker: string): string[] => {
-      const source = sources[name as keyof typeof sources];
-      const offset = source.indexOf(marker) + marker.length;
-      const result = service.getCompletionsAtPosition(join(project.root, name), offset, { quotePreference: "double" });
-      return (result?.entries.map((entry) => entry.name) ?? []).sort();
-    };
-    assert.deepEqual(complete("name.route.ts", 'layout: "'), ["auth", "dashboard", "default"]);
-    assert.deepEqual(complete("props.route.ts", "layoutProps: { "), ["showAlert", "title"]);
-    assert.deepEqual(complete("render.route.ts", 'render: "'), ["client", "prerender", "ssr", "stream"]);
-    assert.deepEqual(complete("group.ts", "layoutProps: { "), ["showAlert", "title"]);
-  } finally {
-    await project.remove();
-  }
-});
+test('the editor completes layout names and the props of the chosen layout', { timeout: 120_000 }, async () => {
+	const sources = {
+		'routes.d.ts': generated,
+		'name.route.ts': 'import { definePage } from "@meekojs/meeko/framework";\nexport const route = definePage({ layout: "" });\n',
+		'props.route.ts': 'import { definePage } from "@meekojs/meeko/framework";\nexport const route = definePage({ layout: "dashboard", layoutProps: {  } });\n',
+		'render.route.ts': 'import { definePage } from "@meekojs/meeko/framework";\nexport const route = definePage({ layout: "auth", render: "" });\n',
+		'group.ts': 'import { defineGroup } from "@meekojs/meeko/framework";\nexport default defineGroup({ layout: "dashboard", layoutProps: {  } });\n',
+	}
+	const project = await application(sources, true)
+	try {
+		const files = Object.keys(sources).map((name) => join(project.root, name))
+		const options = ts.parseJsonConfigFileContent({ compilerOptions: { ...compilerOptions, exactOptionalPropertyTypes: true } }, ts.sys, project.root).options
+		const service = ts.createLanguageService({
+			getCompilationSettings: () => options,
+			getScriptFileNames: () => files,
+			getScriptVersion: () => '1',
+			getScriptSnapshot: (file) => {
+				const text = ts.sys.readFile(file)
+				return text === undefined ? undefined : ts.ScriptSnapshot.fromString(text)
+			},
+			getCurrentDirectory: () => project.root,
+			getDefaultLibFileName: (settings) => ts.getDefaultLibFilePath(settings),
+			fileExists: ts.sys.fileExists,
+			readFile: ts.sys.readFile,
+			readDirectory: ts.sys.readDirectory,
+			directoryExists: ts.sys.directoryExists,
+			getDirectories: ts.sys.getDirectories,
+			realpath: (path) => ts.sys.realpath?.(path) ?? path,
+		})
+		const complete = (name: string, marker: string): string[] => {
+			const source = sources[name as keyof typeof sources]
+			const offset = source.indexOf(marker) + marker.length
+			const result = service.getCompletionsAtPosition(join(project.root, name), offset, { quotePreference: 'double' })
+			return (result?.entries.map((entry) => entry.name) ?? []).sort()
+		}
+		assert.deepEqual(complete('name.route.ts', 'layout: "'), ['auth', 'dashboard', 'default'])
+		assert.deepEqual(complete('props.route.ts', 'layoutProps: { '), ['showAlert', 'title'])
+		assert.deepEqual(complete('render.route.ts', 'render: "'), ['client', 'prerender', 'ssr', 'stream'])
+		assert.deepEqual(complete('group.ts', 'layoutProps: { '), ['showAlert', 'title'])
+	} finally {
+		await project.remove()
+	}
+})

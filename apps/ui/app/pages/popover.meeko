@@ -1,0 +1,193 @@
+<script lang="ts">
+	import { examples } from '../utils/examples'
+
+	const action = signal('Ninguna acción todavía.')
+	const filtersOpen = signal(false)
+	const published = signal(true)
+	const drafts = signal(false)
+	const filters = signal('Mostrando proyectos publicados.')
+	function applyFilters() {
+		const shown = [published.value ? 'publicados' : '', drafts.value ? 'borradores' : ''].filter(Boolean)
+		filters.value = shown.length ? 'Mostrando proyectos ' + shown.join(' y ') + '.' : 'Sin filtros: no se muestra ningún proyecto.'
+		filtersOpen.value = false
+	}
+</script>
+
+<template>
+	<DocsPage
+		title="Popover"
+		description="Menús, diálogos ligeros y tooltips anclados a su disparador, con teclado y capa superior nativa."
+	>
+		<p>
+			<code>UIPopover</code>
+			coloca su contenido en la capa superior del navegador con el atributo
+			<code>popover</code>
+			y lo ancla al disparador con CSS anchor positioning, sin JavaScript. Si no cabe, se coloca al otro lado con
+			<code>position-try-fallbacks</code>. Un navegador sin anclaje lo abre sin anclar: sigue funcionando.
+		</p>
+		<h2 id="menu">Menú de acciones</h2>
+		<p>
+			Con
+			<code>role="menu"</code>, los hijos con
+			<code>role="menuitem"</code>
+			se recorren con las flechas,
+			<code>Inicio</code>,
+			<code>Fin</code>
+			y la primera letra de cada acción.
+			<code>Esc</code>
+			cierra el menú y devuelve el foco al disparador.
+		</p>
+		<DocsPreview>
+			<UIPopover
+				role="menu"
+				placement="bottom-start"
+				bind:offset="6"
+			>
+				<snippet name="trigger">Acciones del proyecto</snippet>
+				<UIButton
+					variant="ghost"
+					role="menuitem"
+					on:click="() => (action.value = 'Proyecto renombrado.')"
+				>
+					Renombrar
+				</UIButton>
+				<UIButton
+					variant="ghost"
+					role="menuitem"
+					on:click="() => (action.value = 'Proyecto duplicado.')"
+				>
+					Duplicar
+				</UIButton>
+				<UIButton
+					variant="ghost"
+					role="menuitem"
+					on:click="() => (action.value = 'Proyecto archivado.')"
+				>
+					Archivar
+				</UIButton>
+			</UIPopover>
+			<p
+				id="menu-status"
+				class="docs-status"
+				role="status"
+			>
+				{action.value}
+			</p>
+		</DocsPreview>
+		<DocsCode bind:code="examples.popoverMenu" />
+		<h2 id="dialog">Diálogo ligero</h2>
+		<p>
+			Con
+			<code>role="dialog"</code>
+			el foco entra en el contenido al abrirse. Úsalo para controles breves que no necesitan bloquear la página; para una tarea que exige atención, usa
+			<a href="/modals">Modal</a>. El modelo controla la apertura desde código.
+		</p>
+		<DocsPreview>
+			<UIPopover
+				role="dialog"
+				label="Filtrar proyectos"
+				model="filtersOpen"
+				bind:offset="6"
+			>
+				<snippet name="trigger">Filtrar</snippet>
+				<div class="docs-stack">
+					<div
+						class="docs-stack"
+						data-dense
+						role="group"
+						aria-label="Estado"
+					>
+						<UICheckbox
+							label="Publicados"
+							model="published"
+						/>
+						<UICheckbox
+							label="Borradores"
+							model="drafts"
+						/>
+					</div>
+					<UIButton
+						size="sm"
+						on:click="applyFilters"
+					>
+						Aplicar filtros
+					</UIButton>
+				</div>
+			</UIPopover>
+			<p
+				id="filters-status"
+				class="docs-status"
+				role="status"
+			>
+				{filters.value}
+			</p>
+		</DocsPreview>
+		<DocsCode bind:code="examples.popoverDialog" />
+		<h2 id="tooltip">Tooltip</h2>
+		<p>
+			Con
+			<code>mode="hint"</code>
+			el contenido es un tooltip: se abre al pasar el puntero, tras
+			<code>delay</code>, o al enfocar el disparador, y nunca recibe el foco. El disparador lo referencia con
+			<code>aria-describedby</code>. Escribe en él información complementaria, nunca la única explicación de una acción.
+			<code>UITooltip</code>
+			es esta misma variante con el aspecto de un tooltip, y es la que usa este ejemplo; véase
+			<a href="/overlays">Superposiciones</a>.
+		</p>
+		<DocsPreview>
+			<UITooltip bind:offset="6">
+				<snippet name="trigger">Estado: borrador</snippet>
+				Sólo tu equipo puede verlo hasta que lo publiques.
+			</UITooltip>
+		</DocsPreview>
+		<DocsCode bind:code="examples.popoverTooltip" />
+		<h2 id="anchor">Un disparador propio</h2>
+		<p>
+			El snippet
+			<code>anchor</code>
+			sustituye el botón que pinta UI. Recibe los atributos del disparador para aplicarlos con
+			<code>bind="trigger"</code>; UIPopover lo encuentra por su
+			<code>id</code>
+			y le añade el teclado y el anclaje.
+		</p>
+		<DocsCode bind:code="examples.popoverAnchor" />
+		<h2 id="api">API</h2>
+		<DocsApi
+			caption="Propiedades de UIPopover"
+			bind:rows="[
+				{ name: 'model', type: 'Signal<boolean>', default: 'false', description: 'Apertura del contenido, de doble vía.' },
+				{ name: 'mode', type: 'auto | manual | hint', default: 'auto', description: 'auto se cierra al pulsar fuera y con Esc; manual sólo desde el disparador, Esc o el modelo; hint es un tooltip.' },
+				{ name: 'role', type: 'menu | dialog | tooltip', description: 'Patrón ARIA del contenido. Con mode=hint, tooltip por defecto.' },
+				{ name: 'placement', type: 'top | bottom | left | right, con -start o -end', default: 'bottom-start', description: 'Lado y alineación respecto al disparador.' },
+				{ name: 'offset', type: 'number', default: '0', description: 'Separación en píxeles con el disparador.' },
+				{ name: 'label', type: 'string', description: 'Nombre accesible del contenido. Sin ella, un menú o un diálogo se nombran con el disparador.' },
+				{ name: 'matchWidth', type: 'boolean', default: 'false', description: 'El contenido mide al menos lo que el disparador.' },
+				{ name: 'delay / closeDelay', type: 'number', default: '300 / 150', description: 'Con mode=hint, milisegundos antes de abrir y de cerrar.' },
+				{ name: 'class / triggerClass', type: 'string', description: 'Clases del contenido y del botón disparador.' },
+				{ name: 'triggerId', type: 'string', description: 'id del disparador. Por defecto, uno estable entre SSR e hidratación.' },
+			]"
+		/>
+		<p>
+			Admite los snippets
+			<code>default</code>,
+			<code>trigger</code>
+			y
+			<code>anchor</code>. El evento
+			<code>toggle</code>
+			recibe un objeto con
+			<code>open</code>
+			cada vez que el contenido se abre o se cierra. Con una
+			<code>ref:</code>, el componente expone
+			<code>show()</code>,
+			<code>hide()</code>
+			y
+			<code>toggle()</code>. Los tipos
+			<code>UIPopoverProps</code>,
+			<code>PopoverPlacement</code>
+			y
+			<code>PopoverTrigger</code>
+			se exportan desde
+			<code>@meekojs/ui/runtime</code>.
+		</p>
+	</DocsPage>
+</template>

@@ -12,6 +12,7 @@ related:
   - "syntax:on"
   - docs/api.md#html-sin-escapar-con-html
   - docs/api.md#html-de-confianza-trustedhtml-y-trusthtml
+  - "@meekojs/meeko/framework#documentHtml"
 ---
 
 `html="expresión"` llena un elemento con el HTML de la expresión, **sin escapar**: es la vía para pintar Markdown renderizado, el resultado de un resaltador de código o un icono SVG. La expresión es un `string`; `null` y `undefined` dejan el elemento vacío.
@@ -37,9 +38,9 @@ El módulo de servidor que produce el HTML lo sanea, si viene de usuarios, y lo 
 
 ## Atributos
 
-| Atributo | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `html` | `TrustedHtml \| null \| undefined` | obligatorio | El contenido del elemento. Un `string` sin marcar compila con el aviso `MEEK107`; un número u otro tipo es un error de tipos. |
+| Atributo | Tipo                               | Por defecto | Descripción                                                                                                                   |
+| -------- | ---------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `html`   | `TrustedHtml \| null \| undefined` | obligatorio | El contenido del elemento. Un `string` sin marcar compila con el aviso `MEEK107`; un número u otro tipo es un error de tipos. |
 
 El elemento debe estar vacío en la plantilla y ser un elemento HTML estándar que admita contenido: no `<img>`, `<input>` ni otros vacíos, ni `<textarea>`, `<title>`, `<script>` o `<style>`, ni `<template>`.
 
@@ -88,6 +89,7 @@ export const article = { title: params.slug, body: articleHtml(`<p>Entrada <stro
 Un comentario de un usuario puede traer `<img onerror>`. Sanéalo con una biblioteca como DOMPurify y márcalo después:
 
 <!-- no-check -->
+
 ```ts
 // server/content/comments.ts
 import DOMPurify from "isomorphic-dompurify";
@@ -213,5 +215,6 @@ Con `const count = 3`, `meeko check` da `TS2345: Argument of type 'number' is no
 - **SSR.** Elige un elemento que admita el contenido (`<div html>` para bloques, `<ul html>` para `<li>`, `<tbody html>` para filas): si el navegador sacaría parte del contenido, el SSR deja el elemento vacío y sin JavaScript no se ve.
 - **Hidratación.** Un contenido idéntico no se toca; uno distinto se sustituye entero y pierde la selección o el foco que hubiera dentro.
 - **Rendimiento.** Cada cambio sustituye `innerHTML` completo. Para contenido que cambia a menudo, usa la plantilla.
+- **Peso.** Un valor de los datos de la página llega dos veces en la primera carga: en el HTML y en el payload. Si es grande y sólo lo lee `html`, márcalo con [`documentHtml`](/docs/reference/documenthtml) y viaja una vez.
 - **Elementos personalizados.** En una etiqueta con guion (`<x-markdown html="intro">`), `html` es un atributo HTML literal y el elemento admite hijos. En una etiqueta de componente, `html` no es una prop (`MEEK032`), y `bind:html` es un atributo llamado `html`.
 - **CSP.** El contenido insertado puede traer atributos `style` u `on*`, que una CSP estricta bloquea: tenlo en cuenta al sanear.

@@ -1,0 +1,22 @@
+/* Shared by every component: load first, so that a component's own class can still override them. */
+.meeko-ui-sr-only {
+	position: absolute;
+	clip-path: inset(50%);
+	margin: calc(var(--ui-border-width) * -1);
+	border: 0;
+	padding: 0;
+	width: var(--ui-border-width);
+	height: var(--ui-border-width);
+	overflow: hidden;
+	white-space: nowrap;
+}
+.meeko-ui-icon {
+	flex: none;
+	fill: none;
+	stroke: currentColor;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+	stroke-width: var(--ui-icon-stroke-width);
+	width: var(--ui-icon-size);
+	height: var(--ui-icon-size);
+}

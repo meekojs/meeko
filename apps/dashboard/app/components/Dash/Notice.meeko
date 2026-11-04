@@ -1,0 +1,27 @@
+<script lang="ts">
+	// The result of an action. The live region is always in the document, so its text is announced when it
+	// arrives; the snippet adds what comes next, such as a link.
+	const props = defineProps<{ text: string }>()
+
+	const snippets = defineSnippets<{ default?: [] }>()
+</script>
+
+<template>
+	<div
+		class="dash-status"
+		role="status"
+		aria-live="polite"
+	>
+		<UIAlert
+			if:when="props.text"
+			role="none"
+			tone="success"
+			bind:description="props.text"
+		>
+			<render
+				if:when="snippets.default"
+				snippet="snippets.default"
+			/>
+		</UIAlert>
+	</div>
+</template>

@@ -40,26 +40,26 @@ El HTML del servidor sale con la lista vacía; al montar, el navegador abre el c
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `canal` | nombre de un canal | obligatorio | Uno de los archivos de `server/socket`, como `"chat"`. Un nombre que no existe es un error de tipos. |
-| `opciones.roomId` | `string` | ninguna | Sala a la que se une (`?room=`); el canal la recibe en `authorize` y en sus handlers. |
-| `opciones.baseUrl` | `string` | el origen del navegador | URL base HTTP(S) o WS(S). |
-| `opciones.pathnamePrefix` | `string` | `"/_meeko/socket"` | Prefijo de las rutas de los canales. |
-| `opciones.retryMs`, `opciones.maxRetryMs` | `number` | `500`, `30000` | Retroceso de reconexión: el primer retraso se duplica en cada intento hasta el máximo. |
-| `opciones.maxMessageBytes` | `number` | 64 KiB | Tamaño máximo de un mensaje entrante. |
-| `opciones.onError` | `(error: unknown) => void` | el observador más cercano | Mensajes inválidos, fallos de los listeners y rechazos de autorización. |
+| Parámetro                                 | Tipo                       | Por defecto               | Descripción                                                                                          |
+| ----------------------------------------- | -------------------------- | ------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `canal`                                   | nombre de un canal         | obligatorio               | Uno de los archivos de `server/socket`, como `"chat"`. Un nombre que no existe es un error de tipos. |
+| `opciones.roomId`                         | `string`                   | ninguna                   | Sala a la que se une (`?room=`); el canal la recibe en `authorize` y en sus handlers.                |
+| `opciones.baseUrl`                        | `string`                   | el origen del navegador   | URL base HTTP(S) o WS(S).                                                                            |
+| `opciones.pathnamePrefix`                 | `string`                   | `"/_meeko/socket"`        | Prefijo de las rutas de los canales.                                                                 |
+| `opciones.retryMs`, `opciones.maxRetryMs` | `number`                   | `500`, `30000`            | Retroceso de reconexión: el primer retraso se duplica en cada intento hasta el máximo.               |
+| `opciones.maxMessageBytes`                | `number`                   | 64 KiB                    | Tamaño máximo de un mensaje entrante.                                                                |
+| `opciones.onError`                        | `(error: unknown) => void` | el observador más cercano | Mensajes inválidos, fallos de los listeners y rechazos de autorización.                              |
 
 ## Valor devuelto
 
 Un `SocketClient` del contrato del canal:
 
-| Propiedad | Tipo | Descripción |
-| --- | --- | --- |
-| `state` | `ReadonlySignal<"connecting" \| "open" \| "closed" \| "unauthorized">` | Estado de la conexión. `"unauthorized"` es terminal: el servidor rechazó la sesión o la autorización y el cliente no reintenta. |
-| `emit(evento, datos)` | `Promise<void>` | Valida y envía un evento de `clientToServer`. Rechaza si el socket no está abierto o los datos no son válidos: no hay cola. |
-| `on(evento, listener)` | `() => void` | Escucha un evento de `serverToClient` ya validado; devuelve la función que deja de escucharlo. |
-| `close()` | `void` | Cierra la conexión y deja de reconectar. |
+| Propiedad              | Tipo                                                                   | Descripción                                                                                                                     |
+| ---------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `state`                | `ReadonlySignal<"connecting" \| "open" \| "closed" \| "unauthorized">` | Estado de la conexión. `"unauthorized"` es terminal: el servidor rechazó la sesión o la autorización y el cliente no reintenta. |
+| `emit(evento, datos)`  | `Promise<void>`                                                        | Valida y envía un evento de `clientToServer`. Rechaza si el socket no está abierto o los datos no son válidos: no hay cola.     |
+| `on(evento, listener)` | `() => void`                                                           | Escucha un evento de `serverToClient` ya validado; devuelve la función que deja de escucharlo.                                  |
+| `close()`              | `void`                                                                 | Cierra la conexión y deja de reconectar.                                                                                        |
 
 Con `await`, la promesa resuelve con el cliente cuando su estado es `"open"`.
 
@@ -104,6 +104,7 @@ const send = (text: string) => chat.emit("message", { text, roomId: "general" })
 ### Un canal con autorización
 
 <!-- no-check -->
+
 ```ts
 // server/socket/room.ts
 import { defineSocketChannel } from "@meekojs/meeko/server";
@@ -132,6 +133,7 @@ chat.on("mesage", (message) => console.log(message));
 `meeko check` da `TS2345: Argument of type '"chats"' is not assignable to parameter of type '"chat"'` y, en el evento, `TS2345: Argument of type '"mesage"' is not assignable to parameter of type '"message"'`.
 
 <!-- no-check -->
+
 ```ts good
 const chat = await useSocket("chat");
 chat.on("message", (message) => console.log(message.text));
@@ -167,6 +169,7 @@ void chat.emit("message", { text: "Hola", roomId: "general" }); // aún "connect
 `emit` rechaza con `Socket is disconnected` mientras el socket no está abierto: no hay cola ni reenvío. Espera la conexión con `await useSocket(...)` o comprueba `state` antes de enviar.
 
 <!-- no-check -->
+
 ```ts good
 const chat = await useSocket("chat");
 await chat.emit("message", { text: "Hola", roomId: "general" });

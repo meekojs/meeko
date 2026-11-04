@@ -1,0 +1,93 @@
+/* <UIPopover>: its place, without JavaScript. The `meeko` layer lets any rule of the application win.
+   A browser without anchor positioning opens the content without an anchor: it still works. */
+@layer meeko {
+	[data-meeko-popover] {
+		position-anchor: auto;
+		position-try-fallbacks: flip-block, flip-inline;
+		translate: var(--popover-from, 0 calc(var(--ui-space-1) * -1));
+		opacity: var(--ui-opacity-hidden);
+		transition:
+			opacity var(--ui-duration-base) var(--ui-ease-out),
+			translate var(--ui-duration-base) var(--ui-ease-out),
+			display var(--ui-duration-base) allow-discrete,
+			overlay var(--ui-duration-base) allow-discrete;
+		box-sizing: border-box;
+		margin: 0;
+		inset: auto;
+	}
+	[data-meeko-popover]:popover-open {
+		translate: 0;
+		opacity: var(--ui-opacity-visible);
+	}
+	@starting-style {
+		[data-meeko-popover]:popover-open {
+			translate: var(--popover-from, 0 calc(var(--ui-space-1) * -1));
+			opacity: var(--ui-opacity-hidden);
+		}
+	}
+	[data-meeko-popover][data-match-width] {
+		min-width: anchor-size(width);
+	}
+
+	/* It slides out of its trigger, on the side it opens. */
+	[data-meeko-popover][data-placement^='bottom'] {
+		--popover-from: 0 calc(var(--ui-space-1) * -1);
+		margin-block-start: var(--popover-offset, 0);
+	}
+	[data-meeko-popover][data-placement^='top'] {
+		--popover-from: 0 var(--ui-space-1);
+		margin-block-end: var(--popover-offset, 0);
+	}
+	[data-meeko-popover][data-placement^='right'] {
+		--popover-from: calc(var(--ui-space-1) * -1) 0;
+		margin-inline-start: var(--popover-offset, 0);
+	}
+	[data-meeko-popover][data-placement^='left'] {
+		--popover-from: var(--ui-space-1) 0;
+		margin-inline-end: var(--popover-offset, 0);
+	}
+
+	[data-meeko-popover][data-placement='top'] {
+		position-area: top;
+	}
+	[data-meeko-popover][data-placement='top-start'] {
+		position-area: top span-right;
+	}
+	[data-meeko-popover][data-placement='top-end'] {
+		position-area: top span-left;
+	}
+	[data-meeko-popover][data-placement='bottom'] {
+		position-area: bottom;
+	}
+	[data-meeko-popover][data-placement='bottom-start'] {
+		position-area: bottom span-right;
+	}
+	[data-meeko-popover][data-placement='bottom-end'] {
+		position-area: bottom span-left;
+	}
+	[data-meeko-popover][data-placement='left'] {
+		position-area: left;
+	}
+	[data-meeko-popover][data-placement='left-start'] {
+		position-area: left span-bottom;
+	}
+	[data-meeko-popover][data-placement='left-end'] {
+		position-area: left span-top;
+	}
+	[data-meeko-popover][data-placement='right'] {
+		position-area: right;
+	}
+	[data-meeko-popover][data-placement='right-start'] {
+		position-area: right span-bottom;
+	}
+	[data-meeko-popover][data-placement='right-end'] {
+		position-area: right span-top;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		[data-meeko-popover] {
+			translate: none;
+			transition: none;
+		}
+	}
+}

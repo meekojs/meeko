@@ -1,0 +1,251 @@
+<script server lang="ts">
+	import type { PageLocale } from 'meeko-docs-content/locale'
+
+	import { definePage } from '@meekojs/meeko/framework'
+
+	import type { NavSection, Pager, TocEntry } from '../../../../shared/types/docs'
+	import type { ReferenceIndexGroup } from '../../../../shared/types/reference'
+
+	import { readPage } from '../../../../server/content/db'
+
+	export const route = definePage({
+		render: 'ssr',
+		layout: 'docs',
+	})
+
+	type ReferenceIndexPage = {
+		readonly groups: readonly ReferenceIndexGroup[]
+		readonly total: number
+		readonly modules: readonly { readonly id: string; readonly label: string; readonly href: string; readonly code: boolean }[]
+		readonly exportsIcon: string
+		/** `null` when the dashboard hides `/docs/reference/exports`: its card and its section leave. */
+		readonly exportsLink: string | null
+		readonly nav: readonly NavSection[]
+		readonly current: string
+		readonly toc: readonly TocEntry[]
+		readonly pages: Pager
+		readonly source: string
+		readonly editUrl: string
+		readonly head: { readonly title: string; readonly description: string }
+		readonly i18n?: PageLocale
+	}
+	const { locale } = await usePageI18n()
+	const snapshot = await readPage<ReferenceIndexPage>('/docs/reference', locale)
+	if (!snapshot) notFound()
+	export const { groups, total, modules, exportsIcon, exportsLink, head } = snapshot
+	// Without it in the payload (a snapshot older than the languages), the page is the original.
+	export const layoutProps = { nav: snapshot.nav, current: snapshot.current, toc: snapshot.toc, pager: snapshot.pages, editUrl: snapshot.editUrl, source: snapshot.source, i18n: snapshot.i18n ?? null }
+</script>
+
+<script lang="ts">
+	export interface Props {
+		params: Record<string, string>
+		search: Record<string, string | string[]>
+	}
+
+	const { t } = useI18n()
+</script>
+
+<template>
+	<UIProse as="article">
+		<h1>{t('docs.reference.title')}</h1>
+		<p>{t('docs.reference.lead', { total })}</p>
+		<ul
+			class="cards"
+			bind:aria-label="t('docs.reference.groups')"
+		>
+			<li
+				each:of="groups"
+				each:as="group"
+				each:key="group.anchor"
+			>
+				<UILinkCard
+					bind:href="'#' + group.anchor"
+					bind:title="group.title"
+				>
+					<span
+						class="meeko-ui-link-card-description"
+						html="group.description"
+					/>
+					<UIBadge>{group.entries.length}</UIBadge>
+				</UILinkCard>
+			</li>
+			<li if:when="exportsLink">
+				<UILinkCard
+					bind:href="exportsLink!"
+					bind:title="t('docs.reference.allExports')"
+					bind:description="t('docs.reference.allExportsCard')"
+				/>
+			</li>
+		</ul>
+
+		<section
+			each:of="groups"
+			each:as="group"
+			each:key="group.anchor"
+		>
+			<h2
+				class="group-title"
+				bind:id="group.anchor"
+			>
+				<svg
+					class="meeko-ui-icon"
+					viewBox="0 0 16 16"
+					aria-hidden="true"
+				>
+					<path bind:d="group.icon" />
+				</svg>
+				{group.title}
+				<a
+					class="heading-anchor"
+					data-pagefind-ignore
+					bind:aria-label="t('docs.reference.anchor')"
+					bind:href="'#' + group.anchor"
+				>
+					#
+				</a>
+			</h2>
+			<p html="group.description" />
+			<ul class="entries">
+				<li
+					each:of="group.entries"
+					each:as="entry"
+					each:key="entry.name"
+				>
+					<span>
+						<a bind:href="entry.href">
+							<code>{entry.name}</code>
+						</a>
+						<UIBadge
+							if:when="entry.featured"
+							tone="accent"
+							class="featured"
+						>
+							{t('docs.layout.featured')}
+						</UIBadge>
+					</span>
+					<span
+						class="summary"
+						html="entry.description"
+					/>
+				</li>
+			</ul>
+		</section>
+
+		<section if:when="exportsLink && modules.length">
+			<h2
+				id="todos-los-exports"
+				class="group-title"
+			>
+				<svg
+					class="meeko-ui-icon"
+					viewBox="0 0 16 16"
+					aria-hidden="true"
+				>
+					<path bind:d="exportsIcon" />
+				</svg>
+				{t('docs.reference.allExports')}
+				<a
+					class="heading-anchor"
+					href="#todos-los-exports"
+					data-pagefind-ignore
+					bind:aria-label="t('docs.reference.anchor')"
+				>
+					#
+				</a>
+			</h2>
+			<p>
+				<I18nT key="docs.reference.modules">
+					<snippet
+						name="a"
+						params="text"
+					>
+						<a bind:href="exportsLink">{text}</a>
+					</snippet>
+				</I18nT>
+			</p>
+			<ul class="modules">
+				<li
+					each:of="modules"
+					each:as="module"
+					each:key="module.id"
+					bind:id="module.id"
+				>
+					<a bind:href="module.href">
+						<code if:when="module.code">{module.label}</code>
+						<span if:when="!module.code">{module.label}</span>
+					</a>
+				</li>
+			</ul>
+		</section>
+	</UIProse>
+</template>
+
+<style scoped>
+	.cards {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr));
+		gap: var(--ui-space-3);
+		margin-block: var(--ui-space-8) var(--ui-space-4);
+		padding: 0;
+		max-width: none;
+		list-style: none;
+	}
+	.cards li {
+		display: grid;
+		margin: 0;
+		padding: 0;
+	}
+	.cards :global(.meeko-ui-badge) {
+		align-self: flex-start;
+	}
+	.group-title {
+		display: flex;
+		align-items: center;
+		gap: var(--ui-space-2);
+	}
+	.entries {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		column-gap: var(--ui-space-8);
+		margin: 0;
+		border-block-start: var(--ui-border-width) solid var(--ui-color-border);
+		padding: 0;
+		max-width: none;
+		list-style: none;
+	}
+	.entries li {
+		display: flex;
+		flex-direction: column;
+		gap: var(--ui-space-0-5);
+		margin: 0;
+		border-block-end: var(--ui-border-width) solid var(--ui-color-border);
+		padding: var(--ui-space-2) 0;
+	}
+	.entries a {
+		overflow-wrap: anywhere;
+	}
+	.summary {
+		font-size: var(--ui-font-size-md);
+	}
+	.modules {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--ui-space-1-5);
+		padding: 0;
+		max-width: none;
+		list-style: none;
+	}
+	.modules li {
+		margin: 0;
+		padding: 0;
+	}
+	.modules li:target a {
+		background: var(--ui-color-primary-soft);
+	}
+	@media (max-width: 48rem) {
+		.entries {
+			grid-template-columns: minmax(0, 1fr);
+		}
+	}
+</style>

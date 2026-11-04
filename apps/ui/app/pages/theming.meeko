@@ -1,0 +1,249 @@
+<script lang="ts">
+	import { examples } from '../utils/examples'
+</script>
+
+<template>
+	<DocsPage
+		title="Temas y personalización"
+		description="Una sola fuente de diseño: tokens --ui-* para color, tamaño y forma, que puedes conectar con tu marca."
+	>
+		<h2 id="theme">Claro, oscuro y sistema</h2>
+		<p>
+			<code>theme</code>
+			pertenece al framework. Guarda la preferencia y aplica
+			<code>data-theme</code>
+			antes del primer pintado.
+			<a href="/theme-toggle">UIThemeToggle</a>
+			permite cambiarla, también sin JavaScript. Los tokens cambian solos: no escribas reglas por tema.
+		</p>
+		<h2 id="palette">La paleta</h2>
+		<p>Cada escala tiene 12 pasos: 1 y 2 para fondos, 3 a 5 para controles, 6 a 8 para bordes, 9 y 10 para sólidos, 11 y 12 para texto. El fondo es blanco puro en claro y negro puro en oscuro. El violeta es para la acción principal, el foco, la selección y lo activo: si todo es violeta, nada destaca.</p>
+		<h3 id="scale-primary"><code>--ui-color-primary-*</code></h3>
+		<div
+			class="docs-scale"
+			role="img"
+			aria-label="Escala primary, del paso 1 al 12"
+		>
+			<span style="background: var(--ui-color-primary-1)" />
+			<span style="background: var(--ui-color-primary-2)" />
+			<span style="background: var(--ui-color-primary-3)" />
+			<span style="background: var(--ui-color-primary-4)" />
+			<span style="background: var(--ui-color-primary-5)" />
+			<span style="background: var(--ui-color-primary-6)" />
+			<span style="background: var(--ui-color-primary-7)" />
+			<span style="background: var(--ui-color-primary-8)" />
+			<span style="background: var(--ui-color-primary-9)" />
+			<span style="background: var(--ui-color-primary-10)" />
+			<span style="background: var(--ui-color-primary-11)" />
+			<span style="background: var(--ui-color-primary-12)" />
+		</div>
+		<h3 id="scale-surface"><code>--ui-color-surface-*</code></h3>
+		<div
+			class="docs-scale"
+			role="img"
+			aria-label="Escala surface, del paso 1 al 12"
+		>
+			<span style="background: var(--ui-color-surface-1)" />
+			<span style="background: var(--ui-color-surface-2)" />
+			<span style="background: var(--ui-color-surface-3)" />
+			<span style="background: var(--ui-color-surface-4)" />
+			<span style="background: var(--ui-color-surface-5)" />
+			<span style="background: var(--ui-color-surface-6)" />
+			<span style="background: var(--ui-color-surface-7)" />
+			<span style="background: var(--ui-color-surface-8)" />
+			<span style="background: var(--ui-color-surface-9)" />
+			<span style="background: var(--ui-color-surface-10)" />
+			<span style="background: var(--ui-color-surface-11)" />
+			<span style="background: var(--ui-color-surface-12)" />
+		</div>
+		<h3 id="scale-info"><code>--ui-color-info-*</code></h3>
+		<div
+			class="docs-scale"
+			role="img"
+			aria-label="Escala info, del paso 1 al 12"
+		>
+			<span style="background: var(--ui-color-info-1)" />
+			<span style="background: var(--ui-color-info-2)" />
+			<span style="background: var(--ui-color-info-3)" />
+			<span style="background: var(--ui-color-info-4)" />
+			<span style="background: var(--ui-color-info-5)" />
+			<span style="background: var(--ui-color-info-6)" />
+			<span style="background: var(--ui-color-info-7)" />
+			<span style="background: var(--ui-color-info-8)" />
+			<span style="background: var(--ui-color-info-9)" />
+			<span style="background: var(--ui-color-info-10)" />
+			<span style="background: var(--ui-color-info-11)" />
+			<span style="background: var(--ui-color-info-12)" />
+		</div>
+		<h3 id="scale-success"><code>--ui-color-success-*</code></h3>
+		<div
+			class="docs-scale"
+			role="img"
+			aria-label="Escala success, del paso 1 al 12"
+		>
+			<span style="background: var(--ui-color-success-1)" />
+			<span style="background: var(--ui-color-success-2)" />
+			<span style="background: var(--ui-color-success-3)" />
+			<span style="background: var(--ui-color-success-4)" />
+			<span style="background: var(--ui-color-success-5)" />
+			<span style="background: var(--ui-color-success-6)" />
+			<span style="background: var(--ui-color-success-7)" />
+			<span style="background: var(--ui-color-success-8)" />
+			<span style="background: var(--ui-color-success-9)" />
+			<span style="background: var(--ui-color-success-10)" />
+			<span style="background: var(--ui-color-success-11)" />
+			<span style="background: var(--ui-color-success-12)" />
+		</div>
+		<h3 id="scale-warning"><code>--ui-color-warning-*</code></h3>
+		<div
+			class="docs-scale"
+			role="img"
+			aria-label="Escala warning, del paso 1 al 12"
+		>
+			<span style="background: var(--ui-color-warning-1)" />
+			<span style="background: var(--ui-color-warning-2)" />
+			<span style="background: var(--ui-color-warning-3)" />
+			<span style="background: var(--ui-color-warning-4)" />
+			<span style="background: var(--ui-color-warning-5)" />
+			<span style="background: var(--ui-color-warning-6)" />
+			<span style="background: var(--ui-color-warning-7)" />
+			<span style="background: var(--ui-color-warning-8)" />
+			<span style="background: var(--ui-color-warning-9)" />
+			<span style="background: var(--ui-color-warning-10)" />
+			<span style="background: var(--ui-color-warning-11)" />
+			<span style="background: var(--ui-color-warning-12)" />
+		</div>
+		<h3 id="scale-danger"><code>--ui-color-danger-*</code></h3>
+		<div
+			class="docs-scale"
+			role="img"
+			aria-label="Escala danger, del paso 1 al 12"
+		>
+			<span style="background: var(--ui-color-danger-1)" />
+			<span style="background: var(--ui-color-danger-2)" />
+			<span style="background: var(--ui-color-danger-3)" />
+			<span style="background: var(--ui-color-danger-4)" />
+			<span style="background: var(--ui-color-danger-5)" />
+			<span style="background: var(--ui-color-danger-6)" />
+			<span style="background: var(--ui-color-danger-7)" />
+			<span style="background: var(--ui-color-danger-8)" />
+			<span style="background: var(--ui-color-danger-9)" />
+			<span style="background: var(--ui-color-danger-10)" />
+			<span style="background: var(--ui-color-danger-11)" />
+			<span style="background: var(--ui-color-danger-12)" />
+		</div>
+		<h2 id="tokens">Tokens de uso</h2>
+		<p>
+			Lee el token de uso, no el paso:
+			<code>--ui-color-border</code>, no
+			<code>--ui-color-surface-6</code>. Ningún hex, tamaño o fuente suelto: si te falta algo, se añade a UI. El contrato completo está en
+			<code>packages/ui/DESIGN.md</code>.
+		</p>
+		<DocsCode
+			label="app/styles/main.css"
+			bind:code="examples.themeUse"
+		/>
+		<DocsApi
+			caption="Tokens principales"
+			bind:rows="[
+				{ name: '--ui-color-bg / -bg-subtle', type: 'color', description: 'Fondo de la página y bandas discretas.' },
+				{ name: '--ui-color-surface / -surface-raised', type: 'color', description: 'Card, panel y tabla; popover y modal.' },
+				{ name: '--ui-color-control / -hover / -active', type: 'color', description: 'Fondo de un control y sus estados.' },
+				{ name: '--ui-color-text / -text-soft', type: 'color', description: 'Texto y texto secundario.' },
+				{ name: '--ui-color-border / -border-strong / -control-border', type: 'color', description: 'Separadores, bordes discretos y borde de un campo con 3:1 o más.' },
+				{ name: '--ui-color-primary / -hover / -contrast', type: 'color', description: 'Acción principal y texto sobre ella.' },
+				{ name: '--ui-color-primary-soft / -text / -border', type: 'color', description: 'Etiqueta o fondo activo discreto, con su texto y su borde.' },
+				{ name: '--ui-color-danger / -soft / -border / -text', type: 'color', description: 'La misma forma tienen info, success y warning.' },
+				{ name: '--ui-font-size-xs … -6xl', type: 'rem', description: 'Tamaños de texto: lectura en lg, controles en md, títulos de 2xl en adelante.' },
+				{ name: '--ui-space-* / --ui-radius-*', type: 'rem', description: 'Espacio en pasos de 0,25rem y radios de xs a xl.' },
+				{ name: '--ui-control-height-sm / -md / -lg', type: 'rem', description: 'Altos de los controles, que crecen solos con un puntero táctil.' },
+				{ name: '--ui-duration-* / --ui-ease-*', type: 'tiempo', description: 'Movimiento: fast para color, base y slow para un panel.' },
+			]"
+		/>
+		<h2 id="scale">Escala fluida</h2>
+		<p>
+			La interfaz crece con la pantalla en un solo sitio, la base global: 16 px hasta 1440, 18 px a 2560 y 21 px a 3840, siempre a partir del tamaño de letra del navegador. Todos los tokens están en
+			<code>rem</code>, así que crecen a la vez. Lo que se escribe en
+			<code>px</code>
+			no crece.
+			<code>{'ui: { base: false }'}</code>
+			quita la base, y con ella la escala.
+		</p>
+		<h2 id="brand">Tu marca</h2>
+		<p>
+			Las hojas de
+			<code>app/styles</code>
+			se cargan después del módulo: sobrescribe los pasos de una escala y todo lo que los lee cambia con ellos.
+		</p>
+		<DocsCode
+			label="app/styles/main.css"
+			bind:code="examples.themeCss"
+		/>
+		<p>
+			Si tu web ya tiene sus variables,
+			<code>ui.tokens</code>
+			acepta valores CSS o referencias a ellas, y cada clave asigna los tokens
+			<code>--ui-*</code>
+			que le corresponden.
+		</p>
+		<DocsCode
+			label="meeko.config.ts"
+			bind:code="examples.theme"
+		/>
+		<DocsApi
+			caption="Claves de ui.tokens"
+			bind:rows="[
+				{ name: 'primary / primaryHover / onPrimary', type: 'string', description: '--ui-color-primary, su hover y el texto sobre ella.' },
+				{ name: 'accentSoft / accentText', type: 'string', description: 'Fondos y texto de estados activos: --ui-color-primary-soft y -text.' },
+				{ name: 'surface / surfaceHover', type: 'string', description: 'Superficies y controles, y sus estados.' },
+				{ name: 'text / textSoft / muted', type: 'string', description: 'Texto principal y secundario.' },
+				{ name: 'border / borderStrong', type: 'string', description: 'Separadores y contornos.' },
+				{ name: 'focus / danger', type: 'string', description: 'Foco de teclado y errores.' },
+				{ name: 'font / radius', type: 'string', description: 'Familia tipográfica y radio base.' },
+				{ name: 'controlHeight / controlPadding', type: 'string', description: 'Dimensiones de las acciones.' },
+				{ name: 'controlWeight / controlFontSize', type: 'string', description: 'Peso y tamaño de texto de las acciones.' },
+			]"
+		/>
+		<h2 id="defaults">Valores por defecto</h2>
+		<p>
+			<code>ui.defaults</code>
+			admite
+			<code>button</code>,
+			<code>link</code>
+			y
+			<code>card</code>. La prioridad es: props explícitas, defaults de aplicación y valores de base. Los defaults se aíslan por aplicación y petición SSR.
+		</p>
+		<h2 id="messages">Textos e idiomas</h2>
+		<p>
+			Los pocos textos que los componentes pintan por su cuenta (el cierre de
+			<code>UIModal</code>, el estado vacío de
+			<code>UITable</code>
+			y de
+			<code>UICombobox</code>, los nombres de
+			<code>UIThemeToggle</code>) vienen en español e inglés. Con
+			<code>@meekojs/i18n</code>
+			siguen el idioma del documento, sin configurar nada. Sin ese módulo,
+			<code>ui.locale</code>
+			elige el idioma; por defecto, español.
+			<code>ui.messages</code>
+			sobrescribe textos o añade otros idiomas.
+		</p>
+		<DocsCode bind:code="examples.messages" />
+		<p>
+			Una prop o un snippet del componente siempre ganan sobre estos textos. Lo que falta en un idioma se toma de su idioma base (<code>pt</code>
+			para
+			<code>pt-BR</code>), de
+			<code>ui.locale</code>
+			y, por último, del español. El servidor y el cliente eligen el mismo texto, así que la hidratación no cambia nada.
+		</p>
+		<p>
+			Los tipos
+			<code>UIOptions</code>,
+			<code>UITokens</code>
+			y
+			<code>UIDefaults</code>
+			se exportan desde
+			<code>@meekojs/ui</code>.
+		</p>
+	</DocsPage>
+</template>

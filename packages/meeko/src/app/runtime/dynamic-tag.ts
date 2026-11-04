@@ -1,0 +1,464 @@
+import type { AttributeLiteralCheck, AttributeValueOf } from '../../shared/html-attribute-values'
+import type { AttributeNameOf, AttributeValue, HtmlTagName, Words } from '../../shared/html-attributes'
+import type { ChannelsOf, IsUnion, PropsOf, TagProps } from './channels'
+import type { ElementOf } from './element-refs'
+import type { ExposedOf } from './expose'
+
+import { attributeValue, escapeHtml } from '../../core/server'
+/**
+ * Runtime and types behind `<component is>` with an HTML tag and the `bind="obj"` directive.
+ *
+ * `<component is="expression">` renders an element when the expression is a tag name and a
+ * component otherwise. The tag is checked here, in SSR and in the browser, before any HTML is
+ * built from it: only the elements of the HTML data that can hold template content qualify, so
+ * neither `<script>` nor a string with markup can reach the output through the tag name.
+ *
+ * `bind="obj"` writes the keys of an object as attributes of an element, or passes them as props of
+ * a component. Keys that start with `on` are rejected: event handlers never come from data.
+ */
+import { elementAccepts, elementAttributeNames } from '../../shared/html-attributes'
+
+/** Elements that `<component is>` refuses: document metadata, scripts, embedded documents and raw text. */
+const forbiddenTagNames = 'base body embed fencedframe head html iframe link meta noscript object param script slot style template textarea title'
+
+type ForbiddenTagName = Words<typeof forbiddenTagNames>
+
+/**
+ * Etiqueta HTML que `<component is>` puede renderizar: un elemento de los datos HTML de Meeko (MDN)
+ * que no sea de metadatos, de script, de documento incrustado ni de texto sin formato. Quedan fuera
+ * `script`, `style`, `iframe`, `object`, `embed`, `template`, `slot`, `textarea`, `title`, `base`,
+ * `link`, `meta`, `head`, `html`, `body`, `noscript`, `param` y `fencedframe`.
+ *
+ * @since 1.5.0
+ * @example
+ * ```html
+ * <script lang="ts">
+ * import type { TagName } from "@meekojs/meeko";
+ * // Sin contenido, también vale una etiqueta vacía como "hr" o "img".
+ * const props = defineProps<{ as: TagName; label: string }>();
+ * </script>
+ * <template><component is="props.as" bind:title="props.label" /></template>
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/api.md#etiquetas-html-en-component-is
+ */
+export type TagName = Exclude<HtmlTagName, ForbiddenTagName>
+
+/** Tags without content: `<component is>` rejects them when it has children (MEEK031). */
+export type VoidTagName = 'area' | 'br' | 'col' | 'hr' | 'img' | 'input' | 'source' | 'track' | 'wbr'
+
+/**
+ * Atributos que acepta `bind="obj"` en un elemento `Tag`: los globales (`class`, `id`, `role`,
+ * `aria-*`, `data-*`…) y los propios de la etiqueta según los datos HTML de Meeko. Con una unión de
+ * etiquetas vale cualquier atributo de alguna de ellas; un valor `null`, `undefined` o `false` no
+ * escribe el atributo. No admite claves `on*`: los manejadores no se crean desde datos. Desde `1.8`,
+ * el tipo de cada valor ofrece al completado los valores del estándar (`"submit" | "reset" |
+ * "button"` en `type` de `<button>`) sin dejar de admitir cualquier otro (véase `AttributeValueOf`).
+ *
+ * @typeParam Tag Etiqueta o unión de etiquetas del elemento.
+ * @since 1.5.0
+ * @example
+ * ```html
+ * <script lang="ts">
+ * import { computed } from "@meekojs/meeko";
+ * import type { ElementAttributes } from "@meekojs/meeko";
+ * const props = defineProps<{ href?: string; busy: boolean }>();
+ * const state = computed((): ElementAttributes<"a" | "button"> => ({ "aria-busy": props.busy, "data-kind": props.href ? "link" : "action" }));
+ * </script>
+ * <template><component is="props.href ? 'a' : 'button'" bind="state.value" bind:href="props.href">Abrir</component></template>
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/api.md#atributos-en-bloque-con-bind
+ */
+export type ElementAttributes<Tag extends string = TagName> = { readonly [Name in AttributeNameOf<Tag>]?: AttributeValueOf<Tag, Name> }
+
+/**
+ * Type check of the value of an HTML attribute, in the code that `meeko check` and the editor read:
+ * a string literal outside the values of the standard is the warning MEEK122 (see
+ * `AttributeLiteralCheck`). Curried, so that TypeScript infers the value with `Tag` and `Name` given:
+ * `checkAttributeValue<"button", "type">()(value)`. Generated code never calls it at run time.
+ */
+export function checkAttributeValue<Tag extends string, Name extends string>(): <const Value>(value: Value & AttributeLiteralCheck<Tag, Name, Value>) => Value {
+	return (value) => value
+}
+
+const voidTags = new Set(['area', 'br', 'col', 'hr', 'img', 'input', 'source', 'track', 'wbr'])
+
+let allowedTags: ReadonlySet<string> | undefined
+
+/** Whether `value` is a tag that `<component is>` may render. */
+export function isTagName(value: unknown): value is TagName {
+	if (typeof value !== 'string') return false
+	allowedTags ??= new Set(Object.keys(elementAttributeNames).filter((tag) => !forbiddenTagNames.split(' ').includes(tag)))
+	return allowedTags.has(value)
+}
+
+/** Whether `tag` is an element without content, such as `img`. */
+export function isVoidTag(tag: string): boolean {
+	return voidTags.has(tag)
+}
+
+/** A short, inert description of a rejected value for an error message. */
+function describe(value: unknown): string {
+	if (typeof value === 'string') return JSON.stringify(value.length > 40 ? `${value.slice(0, 40)}…` : value)
+	return value === null ? 'null' : typeof value
+}
+
+/**
+ * The tag of `<component is>`, checked: an allowed HTML tag, without content when it is void, and
+ * never inside `<svg>`. Throws a `TypeError` with MEEK112 (or MEEK031) otherwise, before any HTML
+ * is built from it.
+ */
+export function dynamicTagName(value: unknown, content: boolean, svg = false): TagName {
+	if (svg) throw new TypeError(`MEEK112: <component is> dentro de <svg> sólo admite componentes, no la etiqueta ${describe(value)}`)
+	if (!isTagName(value)) {
+		const name = typeof value === 'string' && /^[A-Z][\w$]*$/.test(value) ? ` Un texto nunca se convierte en un componente: pasa el módulo importado o el resultado de await resolveComponent(${JSON.stringify(value)})` : ''
+		throw new TypeError(`MEEK112: <component is> no puede renderizar ${describe(value)}: is debe ser un componente o una etiqueta HTML permitida (no script, style, iframe, object, embed, template, textarea…).${name}`)
+	}
+	if (content && voidTags.has(value)) throw new TypeError(`MEEK031: <${value}> no admite contenido; quita el contenido de <component is> o elige otra etiqueta`)
+	return value
+}
+
+/** Closing tag of `tag`; a void element has none. */
+export function closeTag(tag: string): string {
+	return voidTags.has(tag) ? '' : `</${tag}>`
+}
+
+/** Tags of the value of `is`. */
+export type TagPart<T> = Extract<T, string>
+/** Components of the value of `is`. */
+export type ComponentPart<T> = Exclude<T, string>
+
+/** Value of `ref:` on `<component is>` whose expression is `T`: the element of a tag or the exposed value of a component. */
+export type DynamicRefOf<T> = ElementOf<TagPart<T>, false> | ExposedOf<ComponentPart<T>>
+
+/** The value of `is` typed as its components, for the props check of the hydration. Returns `value`. */
+export function componentPart<const T>(value: T): ComponentPart<T> {
+	return value as ComponentPart<T>
+}
+
+/** SSR of `<component is>` whose expression is always a tag: the element, without markers. */
+export function renderElementTag<const T>(value: T, render: (tag: TagPart<T>) => string, content: boolean): string {
+	return render(dynamicTagName(value, content) as TagPart<T>)
+}
+
+/**
+ * SSR of `<component is>` whose expression may be a tag or a component: a tag renders the element
+ * between the markers of the component region, so the browser can swap one for the other.
+ */
+export function renderDynamic<const T>(id: number, value: T, element: (tag: TagPart<T>) => string, component: (value: ComponentPart<T>) => string, content: boolean, svg = false): string {
+	if (typeof value === 'string') return `<!--meeko:component:${id}-->${element(dynamicTagName(value, content, svg) as TagPart<T>)}<!--/meeko:component:${id}-->`
+	return component(value as ComponentPart<T>)
+}
+
+/**
+ * Type text of MEEK112 for the value of `is`: a tag that `<component is>` cannot render, any
+ * `string`, a tag inside `<svg>`, or a void tag with content (MEEK031). Short, so that TypeScript
+ * never truncates it.
+ */
+export type TagCheck<T, Content extends boolean, Svg extends boolean> = 0 extends 1 & T ? unknown : [TagPart<T>] extends [never] ? unknown : Svg extends true ? 'MEEK112: dentro de <svg>, is sólo admite componentes' : string extends TagPart<T> ? "MEEK112: is es un string cualquiera; usa una unión de etiquetas, como 'a' | 'button'" : [Exclude<TagPart<T>, TagName>] extends [never] ? (Content extends true ? ([Extract<TagPart<T>, VoidTagName>] extends [never] ? unknown : `MEEK031: <${Extract<TagPart<T>, VoidTagName>}> no admite contenido`) : unknown) : `MEEK112: <${Exclude<TagPart<T>, TagName> & string}> no es una etiqueta que <component is> pueda renderizar`
+
+/** Type-only check of the value of `is`; generated code never calls it. `check` maps to `is`. */
+export function checkTag<const T, const Content extends boolean, const Svg extends boolean>(value: T, content: Content, svg: Svg, check: TagCheck<T, Content, Svg>): void {
+	void value
+	void content
+	void svg
+	void check
+}
+
+/**
+ * Type text of MEEK112 for an attribute that no possible tag of `is` accepts. `value` on a `<select>`
+ * has its own text: the attribute does not exist there, and the value comes from its options.
+ */
+export type TagAttributeCheck<Tag extends string, Name extends string, Accepted extends string> = 0 extends 1 & Tag ? unknown : [Tag] extends [never] ? unknown : [Extract<Tag, Accepted>] extends [never] ? (Name extends 'value' ? ('select' extends Tag ? 'MEEK112: <select> no tiene el atributo value: Meeko no lo escribiría nunca; marca la opción elegida con bind:selected, o escribe <select> en la plantilla con model' : `MEEK112: ${Name} no se aplica a ninguna etiqueta posible de is`) : `MEEK112: ${Name} no se aplica a ninguna etiqueta posible de is`) : unknown
+
+/**
+ * Whether the current tag of `<component is>` accepts the attribute `name`: `accepted` lists the
+ * tags whose HTML data has it. The compiler only calls it for attributes that are not global. In
+ * `meeko check`, `check` maps to the attribute and fails when no possible tag accepts it.
+ */
+export function tagAttribute<const Tag extends string, const Name extends string, const Accepted extends string>(tag: Tag, name: Name, accepted: readonly Accepted[], check?: TagAttributeCheck<Tag, Name, Accepted>): boolean {
+	void name
+	void check
+	return (accepted as readonly string[]).includes(tag)
+}
+
+/**
+ * The tag of the branch of HTML tags of `<component is>` with component names among its string
+ * literals (since 1.8), such as `to ? 'MeekoLink' : 'a'`: its type leaves the names out. That
+ * branch only renders while the value is a tag; a name, read before the branch is released,
+ * gives `fallback`, one of its tags, so the element never fails in between.
+ */
+export function tagBranch<const T, const Name extends string>(value: T, names: readonly Name[], fallback: Exclude<T, Name>): Exclude<T, Name> {
+	return (names as readonly unknown[]).includes(value) ? fallback : (value as Exclude<T, Name>)
+}
+
+/** Prop names of the components of a union of modules: those of every member. */
+type BranchPropName<M> = M extends { readonly renderToString: (props: infer Props, ...rest: never[]) => unknown } ? (Props extends unknown ? keyof Props : never) : never
+
+/**
+ * Type text of MEEK112 for an attribute of `<component is>` with component names that no branch
+ * takes: no tag of `is` accepts it and it is no prop of the components `M`.
+ */
+export type BranchAttributeCheck<Name extends string, M> = 0 extends 1 & M ? unknown : Name extends BranchPropName<M> ? unknown : `MEEK112: ${Name} no se aplica a ninguna rama de is: ni a sus etiquetas ni a las props de sus componentes`
+
+/**
+ * Type-only check of an attribute of `<component is>` with component names that no tag of `is`
+ * accepts: it must be a prop of one of its components. Generated code never calls it at run time.
+ */
+export function checkBranchAttribute<const Name extends string, M>(name: Name, components: () => M, check: BranchAttributeCheck<Name, M>): void {
+	void name
+	void components
+	void check
+}
+
+/** Type text of MEEK112 for a feature of `<component is>` that only a tag, or only a component, has. */
+export type DynamicFeatureCheck<T, Feature extends string, Kind extends 'tag' | 'component'> = 0 extends 1 & T ? unknown : Kind extends 'tag' ? ([ComponentPart<T>] extends [never] ? unknown : `MEEK112: ${Feature} sólo vale si is es una etiqueta HTML`) : [TagPart<T>] extends [never] ? unknown : `MEEK112: ${Feature} sólo vale si is es un componente`
+
+/**
+ * Type-only check of `<component is>` with an expression that may be a tag or a component: an
+ * attribute that only an element has (`aria-label`, `html`) or that only a component has (`model`,
+ * `<snippet>`) needs `is` to be of that kind. Generated code never calls it.
+ */
+export function checkDynamicFeature<const T, const Feature extends string, const Kind extends 'tag' | 'component'>(value: T, feature: Feature, kind: Kind, check: DynamicFeatureCheck<T, Feature, Kind>): void {
+	void value
+	void feature
+	void kind
+	void check
+}
+
+/** Whether a key of `bind="obj"` names an event handler, which never comes from data. */
+function isHandlerKey(key: string): boolean {
+	return /^on/i.test(key)
+}
+
+/** Message of the error for a key of `bind="obj"` that names a handler. */
+function handlerKeyError(key: string): TypeError {
+	return new TypeError(`MEEK113: bind="…" no admite la clave ${JSON.stringify(key)}: un manejador de eventos no se crea desde datos; usa on:evento`)
+}
+
+/**
+ * A type error whose text carries a Meeko code: an object with that text as its only key, which no
+ * value is assignable to. Unlike a string literal type, it never reduces the whole object to `never`.
+ */
+type TypeMessage<Text extends string> = { readonly [Key in Text]: never }
+
+/** Type text of MEEK113 for a key of `bind="obj"` on an element. */
+export type AttributeSpreadCheck<T, Tag extends string> = {
+	readonly [K in keyof T]: K extends string ? (Lowercase<K> extends `on${string}` ? TypeMessage<'MEEK113: bind no admite claves on*; usa on:evento'> : K extends `data-meeko${string}` ? TypeMessage<'MEEK113: data-meeko* está reservado a Meeko'> : string extends K ? AttributeValue : K extends AttributeNameOf<Tag> ? AttributeValue : TypeMessage<`MEEK113: ${K} no es un atributo de la etiqueta`>) : never
+}
+
+/** Explicit `class` and `style` of an element with `bind="obj"`, which the spread combines with its own. */
+export interface SpreadExplicit {
+	readonly class?: unknown
+	readonly style?: unknown
+}
+
+const attributeName = /^[a-zA-Z_:][a-zA-Z0-9_:.-]*$/
+
+function styleText(value: string | null): string {
+	return value === null ? '' : value.trim().replace(/;+$/, '').trim()
+}
+
+/**
+ * The single `class` or `style` of an element with the static attribute and its `bind:` directive,
+ * as SSR, hydration and updates write it. `class` adds the dynamic classes after the static ones;
+ * `style` writes the static declarations first, so the dynamic ones win. A dynamic value that is
+ * `undefined`, `null`, `false` or empty leaves the static text as written.
+ */
+export function joinAttribute(name: 'class' | 'style', fixed: string, value: unknown): string {
+	const dynamic = attributeValue(name, value)
+	if (name === 'class') {
+		const classes = dynamic?.trim()
+		return classes ? (fixed.trim() ? `${fixed} ${classes}` : classes) : fixed
+	}
+	const declarations = styleText(dynamic)
+	if (!declarations) return fixed
+	return [styleText(fixed), declarations].filter(Boolean).join('; ')
+}
+
+/**
+ * Attributes of `bind="obj"` on an element, in the order they are written: the combined `class`
+ * and `style`, then the other keys. `excluded` are the names the element sets itself, which win;
+ * `accepts` filters by the current tag of `<component is>`. `undefined`, `null` and `false` leave
+ * a key out, as with `bind:name`. `class` joins the explicit classes and the object's; `style`
+ * writes the object's declarations first, so the explicit ones win.
+ */
+export function spreadEntries<T extends object | null | undefined, const Tag extends string>(tag: Tag, value: T & NoInfer<T extends object ? AttributeSpreadCheck<T, Tag> : unknown>, excluded: readonly string[], explicit?: SpreadExplicit, accepts?: (tag: string, name: string) => boolean): Array<readonly [string, string]> {
+	if (value !== null && value !== undefined && typeof value !== 'object') {
+		throw new TypeError(`MEEK113: bind="…" espera un objeto de atributos, no ${typeof value}`)
+	}
+	const source = (value ?? {}) as Record<string, unknown>
+	const entries: Array<readonly [string, string]> = []
+	// HTML attribute names have no case: `ID` is `id`, and `Data-Meeko` is reserved like `data-meeko`.
+	const own = (name: string): string | null => {
+		const key = Object.keys(source).find((candidate) => candidate.toLowerCase() === name)
+		return key === undefined ? null : attributeValue(name, source[key])
+	}
+	const skipped = new Set(excluded.map((name) => name.toLowerCase()))
+	const classes = [attributeValue('class', explicit?.class), own('class')].filter((item): item is string => Boolean(item))
+	if (classes.length) entries.push(['class', classes.join(' ')])
+	const styles = [styleText(own('style')), styleText(attributeValue('style', explicit?.style))].filter(Boolean)
+	if (styles.length) entries.push(['style', styles.join('; ')])
+	for (const key of Object.keys(source)) {
+		if (isHandlerKey(key)) throw handlerKeyError(key)
+		const name = key.toLowerCase()
+		if (name.startsWith('data-meeko')) throw new TypeError(`MEEK113: bind="…" no admite ${JSON.stringify(key)}: data-meeko* está reservado a Meeko`)
+		if (name === 'class' || name === 'style' || skipped.has(name)) continue
+		if (!attributeName.test(key)) throw new TypeError(`MEEK113: bind="…" no admite ${JSON.stringify(key)}: no es un nombre de atributo`)
+		if (accepts && !accepts(tag, key)) continue
+		const resolved = attributeValue(key, source[key])
+		if (resolved === null) continue
+		// One attribute per name, also for `id` and `ID` in the same object.
+		skipped.add(name)
+		entries.push([key, resolved])
+	}
+	return entries
+}
+
+/** SSR of `bind="obj"` on an element: its attributes, escaped. */
+export function renderSpread(entries: ReadonlyArray<readonly [string, string]>): string {
+	return entries.map(([name, value]) => ` ${name}="${escapeHtml(value)}"`).join('')
+}
+
+/** `accepts` of {@link spreadEntries} for `<component is>`: the attribute data of the current tag. */
+export function tagAccepts(tag: string, name: string): boolean {
+	return elementAccepts(tag, name)
+}
+
+/** Prop names of a component module; any name for `any`, `never` or a value that is no module. */
+type PropNameOf<M> = 0 extends 1 & M ? string : [M] extends [never] ? string : [M] extends [{ readonly renderToString: (props: infer Props, ...rest: never[]) => unknown }] ? (Props extends unknown ? keyof Props : never) : string
+
+/** Type text of MEEK113 for a key of `bind="obj"` on a component. */
+export type PropsSpreadCheck<T, M> = {
+	readonly [K in keyof T]: K extends string ? (Lowercase<K> extends `on${string}` ? TypeMessage<'MEEK113: bind no admite claves on*; usa on:evento'> : string extends K ? unknown : K extends PropNameOf<M> ? unknown : TypeMessage<`MEEK113: ${K} no es una prop del componente`>) : never
+}
+
+/**
+ * Props of `bind="obj"` on a component tag or a `<component is>` with a component: a copy of the
+ * object without its `undefined` keys, which Meeko treats as absent props. The generated code
+ * spreads it before the explicit props, which win. `component` only types the check.
+ */
+export function spreadProps<M, T extends object | null | undefined>(component: () => M, value: T & NoInfer<T extends object ? PropsSpreadCheck<T, M> : unknown>): T {
+	void component
+	if (value === null || value === undefined) return {} as T
+	if (typeof value !== 'object') throw new TypeError(`MEEK113: bind="…" espera un objeto de props, no ${typeof value}`)
+	const props: Record<string, unknown> = {}
+	for (const [key, item] of Object.entries(value)) {
+		if (isHandlerKey(key)) throw handlerKeyError(key)
+		if (item !== undefined) props[key] = item
+	}
+	return props as T
+}
+
+/** Prop names of the components of `is`: none without components, any name for `any`. */
+type DynamicPropName<M> = [M] extends [never] ? never : PropNameOf<M>
+
+/** The tags of `is` that can render: any other is MEEK112 on `is` itself, and checks nothing here. */
+type RenderableTag<Is> = Extract<TagPart<Is>, TagName>
+
+/** Type text of MEEK113 for a key of `bind="obj"` on `<component is>`, by what `is` can be. */
+type DynamicKeyMessage<K extends string, M, Tag extends string> = [Tag] extends [never] ? `MEEK113: ${K} no es una prop del componente` : [M] extends [never] ? `MEEK113: ${K} no es un atributo de la etiqueta` : `MEEK113: ${K} no es una prop del componente ni un atributo de la etiqueta`
+
+/**
+ * Check of `bind="obj"` on a `<component is>` whose value decides at run time: each key must be
+ * taken by what `is` can be, a prop of its components or an attribute of its tags. Without any
+ * value that can render, MEEK112 on `is` says so and nothing is checked here.
+ */
+export type DynamicSpreadCheck<T, Is, M = ComponentPart<Is>, Tag extends string = RenderableTag<Is>> = 0 extends 1 & Is
+	? unknown
+	: [M | Tag] extends [never]
+		? unknown
+		: {
+				readonly [K in keyof T]: K extends string ? (Lowercase<K> extends `on${string}` ? TypeMessage<'MEEK113: bind no admite claves on*; usa on:evento'> : string extends K ? ([M] extends [never] ? AttributeValue : unknown) : K extends DynamicPropName<M> ? unknown : K extends `data-meeko${string}` ? TypeMessage<'MEEK113: data-meeko* está reservado a Meeko'> : K extends AttributeNameOf<Tag> ? AttributeValue : TypeMessage<DynamicKeyMessage<K, M, Tag>>) : never
+			}
+
+/**
+ * Type-only check of `bind="obj"` on the element of a `<component is>` that may be a tag or a
+ * component, whose keys {@link DynamicSpreadCheck} checks against both. Generated code never calls
+ * it at run time; its `never` goes on to `spreadEntries`, which has nothing left to check.
+ */
+export function dynamicSpread<const Is, T extends object | null | undefined>(is: () => Is, value: T & NoInfer<T extends object ? DynamicSpreadCheck<T, Is> : unknown>): never {
+	void is
+	return value as never
+}
+
+/** `spreadProps` for the same `<component is>`, in the code of the type check: it gives the object's type to the tag call. */
+export function dynamicProps<const Is, T extends object | null | undefined>(is: () => Is, value: T & NoInfer<T extends object ? DynamicSpreadCheck<T, Is> : unknown>): T {
+	void is
+	return value
+}
+
+/**
+ * `dynamicProps` when `is` and `bind` read the same object (`option.component`, `option.props`).
+ * With several possible values, {@link checkCorrelatedBind} checks the object against the value of
+ * its own entry, so the props of the tag call are only the explicit ones.
+ */
+export function correlatedProps<const Is, T extends object | null | undefined>(is: () => Is, value: T & NoInfer<T extends object ? DynamicSpreadCheck<T, Is> : unknown>): true extends IsUnion<Is> ? {} : T {
+	void is
+	return value as true extends IsUnion<Is> ? {} : T
+}
+
+/** Type of a property path, in each member of a union. */
+type PathValue<T, Path extends readonly string[]> = Path extends readonly [infer Head extends string, ...infer Rest extends readonly string[]] ? (T extends unknown ? (Head extends keyof T ? PathValue<T[Head], Rest> : never) : never) : T
+
+/** The keys of a `bind` object that pass a value: TypeScript adds `label?: undefined` to the entries of a list that lack it, and Meeko treats `undefined` as an absent prop. */
+type PresentKeys<Bound> = { [K in keyof Bound as [Bound[K]] extends [undefined] ? never : K]: Bound[K] }
+
+/** Text of MEEK113 for each key of the object of one entry that its value of `is` does not take. */
+type EntryKeyErrors<S, M, Tag extends string> = {
+	[K in keyof S]-?: K extends string ? (Lowercase<K> extends `on${string}` ? 'MEEK113: bind no admite claves on*; usa on:evento' : string extends K ? never : K extends DynamicPropName<M> | AttributeNameOf<Tag> ? never : `${DynamicKeyMessage<K, M, Tag>} de esa entrada`) : never
+}[keyof S]
+
+/** Text of MEEK113 for each prop of the component of one entry that its object leaves out. */
+type EntryMissingProps<S, Props> = {
+	[K in keyof Props]-?: K extends string ? (K extends keyof S ? never : {} extends Pick<Props, K> ? never : `MEEK113: falta la prop obligatoria ${K} del componente de esa entrada`) : never
+}[keyof Props]
+
+/** Text of MEEK113 for each prop of the component of one entry that its object gets wrong. */
+type EntryWrongProps<S, Props, Accepted> = {
+	[K in keyof Props]-?: K extends string ? (K extends keyof S ? ([S[K]] extends [Accepted[K & keyof Accepted]] ? never : `MEEK113: ${K} no tiene el tipo de esa prop en el componente de esa entrada`) : never) : never
+}[keyof Props]
+
+/** Whether the object of one entry, with the explicit props `S` carries, gives the props of its component. */
+type EntryPropErrors<S, Props, Accepted = TagProps<Props>> = [S] extends [Accepted] ? never : [EntryMissingProps<S, Props> | EntryWrongProps<S, Props, Accepted>] extends [never] ? 'MEEK113: el objeto de bind no encaja con las props del componente de esa entrada' : EntryMissingProps<S, Props> | EntryWrongProps<S, Props, Accepted>
+
+/**
+ * The props of one entry against its component. A generic component only has its props with its
+ * type parameters as `unknown`, since a union cannot call its `__meekoTag`: a `(item: number) => string`
+ * would fail against `(item: unknown) => string`. Of those, only the names are checked.
+ */
+type EntryComponentErrors<S, M> = [M] extends [{ readonly __meekoGeneric: true }] ? EntryMissingProps<S, PropsOf<M>> : EntryPropErrors<S, PropsOf<M>>
+
+/** Props of the required models of a component: `modelValue` for the unnamed one. */
+type RequiredModelProps<M> = ChannelsOf<M> extends { readonly models: infer Models } ? (Models extends object ? { [K in keyof Models]-?: {} extends Pick<Models, K> ? never : K extends 'default' ? 'modelValue' : K }[keyof Models] : never) : never
+
+/** Text of MEEK113 for each required model of the component of one entry that neither its object nor the tag passes. */
+type EntryModelErrors<S, M, Given extends string> = { [K in Exclude<RequiredModelProps<M>, keyof S | Given> & string]: `MEEK113: falta el modelo obligatorio ${K} del componente de esa entrada` }[Exclude<RequiredModelProps<M>, keyof S | Given> & string]
+
+/** Errors of the object `S` of one entry against its value of `is`, with the names of the explicit props. */
+type EntryBoundErrors<S, Is, Given extends string, M = ComponentPart<Is>, Tag extends string = RenderableTag<Is>> = [M | Tag] extends [never] ? never : EntryKeyErrors<S, M, Tag> | ([M] extends [never] ? never : [TagPart<Is>] extends [never] ? EntryComponentErrors<S & Record<Given, never>, M> | EntryModelErrors<S, M, Given> : never)
+
+/** Errors of one entry: `any` checks nothing, and an absent object passes no props. */
+type EntryErrors<Is, Bound, Given extends string> = 0 extends 1 & Is ? never : 0 extends 1 & Bound ? never : Bound extends object ? EntryBoundErrors<PresentKeys<Bound>, Is, Given> : EntryBoundErrors<{}, Is, Given>
+
+/** Errors of every member of a union of entries, each against its own value of `is`. */
+type CorrelatedBindErrors<Entry, IsPath extends readonly string[], BindPath extends readonly string[], Given extends string> = Entry extends unknown ? EntryErrors<PathValue<Entry, IsPath>, PathValue<Entry, BindPath>, Given> : never
+
+/**
+ * Type text of MEEK113 for `is` and `bind` that read the same object, when `is` has several possible
+ * values: each member of the union is checked on its own, which keeps the relation between both.
+ * A value without alternatives has nothing to correlate: the tag call checks it.
+ */
+export type CorrelatedBindCheck<Entry, IsPath extends readonly string[], BindPath extends readonly string[], Given extends string> = true extends IsUnion<PathValue<Entry, IsPath>> ? ([CorrelatedBindErrors<Entry, IsPath, BindPath, Given>] extends [never] ? unknown : CorrelatedBindErrors<Entry, IsPath, BindPath, Given>) : unknown
+
+/**
+ * Type-only check of `is="option.component" bind="option.props"`: `entry` is the object both read,
+ * `isPath` and `bindPath` the rest of each expression and `given` the props written next to `bind`.
+ * `check` maps to the value of `bind`. Generated code never calls it at run time.
+ */
+export function checkCorrelatedBind<Entry, const IsPath extends readonly string[], const BindPath extends readonly string[], const Given extends string>(entry: Entry, isPath: IsPath, bindPath: BindPath, given: readonly Given[], check: CorrelatedBindCheck<Entry, IsPath, BindPath, Given>): void {
+	void entry
+	void isPath
+	void bindPath
+	void given
+	void check
+}

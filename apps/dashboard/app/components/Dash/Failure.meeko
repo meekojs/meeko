@@ -1,0 +1,29 @@
+<script lang="ts">
+	// What the dashboard says about a failure, in the language of the page: the design is <UIAlert>.
+	import type { Failure } from '../../utils/errors'
+
+	import { failureMessage, issueText } from '../../utils/i18n'
+
+	const props = defineProps<{ failure: Failure; title?: string }>()
+
+	const i18n = useI18n()
+</script>
+
+<template>
+	<UIAlert
+		tone="danger"
+		bind:title="props.title ?? i18n.t('errors.title')"
+		bind:description="failureMessage(i18n, props.failure)"
+	>
+		<p
+			if:when="props.failure.detail"
+			class="dash-failure-line"
+		>
+			<code>{issueText(i18n, props.failure.detail)}</code>
+		</p>
+		<p class="dash-failure-line">
+			{i18n.t('errors.code')}
+			<code>{props.failure.code}</code>
+		</p>
+	</UIAlert>
+</template>

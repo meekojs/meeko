@@ -26,29 +26,45 @@ npm pack ./packages/meeko --dry-run --json
 
 Las órdenes `pnpm run …` de la raíz reenvían al paquete `packages/meeko` (`pnpm -F @meekojs/meeko run …`); `verify` además comprueba la extensión de Chrome (`pnpm -F meeko-devtools-extension run check`).
 
-`pilot:e2e` comprueba SSR e hidratación en Chromium, Firefox y WebKit durante desarrollo y desde el build de producción. `package:smoke` instala el tarball en un proyecto temporal fuera del monorepo y comprueba CLI, SSR, declaraciones de TypeScript, Vite y un proyecto generado con `meeko init`. El paquete npm sólo incluye `dist`, `README.md`, `LICENSE` y `package.json`; no incluye ejemplos, pruebas, variantes del logo ni archivos locales. Antes de subir una versión, se revisa el resultado de `npm pack --dry-run --json` para confirmar esa lista.
+`pilot:e2e` comprueba SSR e hidratación en Chromium, Firefox y WebKit durante desarrollo y desde el build de producción. `package:smoke` instala el tarball en un proyecto temporal fuera del monorepo y comprueba CLI, SSR, declaraciones de TypeScript, Vite y un proyecto generado con `meeko init`. El paquete npm sólo incluye `dist`, `README.md`, `LICENSE`, `CHANGELOG.md` y `package.json`; no incluye ejemplos, pruebas, variantes del logo ni archivos locales. Antes de subir una versión, se revisa el resultado de `npm pack --dry-run --json` para confirmar esa lista.
 
-## Publicar una actualización
+## Publicar los paquetes de Meeko
 
-Actualiza la versión de `packages/meeko/package.json` y [CHANGELOG.md](../packages/meeko/CHANGELOG.md), ejecuta las verificaciones y sube el commit a `main`. Tras comprobar que CI pasó y que el commit remoto coincide con el probado localmente, comprueba el tarball. Una versión publicada no se sobrescribe; las correcciones requieren un número nuevo.
+La release propuesta `1.8.0` está **sin publicar**. Los seis paquetes públicos son `@meekojs/meeko`, `@meekojs/i18n`, `@meekojs/icon`, `@meekojs/ui`, `@meekojs/eslint-plugin` y `@meekojs/prettier-plugin`, en ese orden. `meeko-docs`, `meeko-docs-content`, `meeko-language` y `meeko-devtools-extension` son privados y no se publican en npm. Las extensiones mantienen su propia versión.
 
-`0.0.2` se publicó manualmente con `npm publish --access public` desde el commit verificado, tras completar la autenticación de npm. El registro confirmó la versión y el checksum antes de crear la etiqueta. No guardes códigos ni tokens en el repositorio.
+Se propone alinear los seis en `1.8.0`: permite comprobar una sola etiqueta para toda la entrega y evita mezclar UI nueva con core 1.7. El número no constituye una auditoría de estabilidad nueva; se aplica la política de estabilidad. El usuario debe aprobar esta decisión. Si prefiere mantener los nuevos en `0.1.0`, cambia sus cinco manifiestos y encabezados de changelog, esta guía y la migración, y adapta la comprobación de versiones de `publish.yml` y `scripts/publish-packages.ps1` a un mapa explícito antes de etiquetar. Conserva core 1.8 y los rangos `>=1.8 <2`.
 
-## Publicación confiable para versiones posteriores
+Antes de publicar, termina e integra el programa de diseño y resuelve la pregunta abierta sobre el hash scrypt de `docs/reference/commands/meeko-auth-hash.md`. Repite todos los gates sobre el commit final: `pnpm build`, `pnpm check`, `pnpm test:packages`, `pnpm -F @meekojs/ui test`, `pnpm -F @meekojs/i18n test`, `pnpm package:smoke`, `pnpm package:workspace-smoke` y las verificaciones anteriores. `pnpm package:workspace-smoke -Offline` permite ensayar sin red si el store contiene las dependencias. Revisa los tarballs reales, incluyendo declaraciones `.d.meeko.ts`, Inter y su OFL, y ausencia de datos de prueba o rutas locales.
 
-El workflow [`.github/workflows/publish.yml`](../.github/workflows/publish.yml) ejecuta las verificaciones, comprueba que `v<versión>` coincida con `packages/meeko/package.json` y publica desde un runner de GitHub mediante OIDC, con `npm publish --provenance` dentro de `packages/meeko`. npm asocia el Trusted Publisher al repositorio y al nombre del workflow (`publish.yml`), no a la carpeta del paquete, así que el paso a workspace no lo cambia; `repository.directory` del manifiesto indica la carpeta. El **Trusted Publisher** para `meekojs/meeko` y `publish.yml` se registró en npm con permiso de publicación. Su primera ejecución publicó `0.0.3` con procedencia firmada. No añadas un token de publicación a GitHub.
+`pnpm format:check` tiene deuda de formato conocida, pero **no está invocado por `ci.yml` ni `publish.yml`**. No bloquea directamente esos workflows; CI sí ejecuta `pnpm lint`. `.woodpecker/web.yml` sí ejecuta `pnpm format:check` en `gates`, y `images`/`release` dependen de ese gate: la deuda bloquea ese pipeline web. Corrige el formato en una entrega separada y validada antes de desplegar; no retires el gate. No silencies gates ni apliques un autofix global: formatea sólo los archivos de release y trata el saneamiento global en un cambio separado. Comprueba también las reglas de protección de rama y checks requeridos en GitHub.
 
-Antes de cada versión, comprueba `npm trust list @meekojs/meeko`. Crea `v<versión>` sobre el commit aprobado y súbela. La etiqueta activa el workflow; comprueba que éste terminó correctamente y que la versión pública de npm corresponde a la etiqueta. npm genera procedencia automáticamente cuando publica desde este flujo confiable. Si falla la publicación, conserva la etiqueta y corrige el flujo; no reutilices la misma versión después de una publicación exitosa.
+### Primera publicación de los paquetes nuevos
 
-Nada se publica por un push a `main` ni por un pull request: npm, la release de GitHub y las tiendas sólo reciben una versión cuando el mantenedor sube la etiqueta correspondiente.
+Un paquete debe existir en npm para configurar su publicador confiable, así que `@meekojs/i18n`, `@meekojs/icon`, `@meekojs/ui`, `@meekojs/eslint-plugin` y `@meekojs/prettier-plugin` se publican una vez desde la sesión interactiva del mantenedor. **`@meekojs/meeko` no pasa por aquí:** sus versiones llevan procedencia firmada y publicar una a mano la perdería. `publish-first.ps1` deja al workflow cualquier paquete que ya exista en npm, aunque sólo tenga versiones bajo `next`: lo que cuenta es su documento raíz, no una etiqueta. No guardes tokens ni OTP en archivos o argumentos. Usa Node 24+ y npm **11.5.1 o superior** (el workflow fija 11.19.0).
+
+1. Autoriza el contenido y las versiones; comprueba la propiedad o el permiso de publicación del scope `@meekojs` y ejecuta `npm login` tú mismo.
+2. Integra el commit de release en `main` con `test` y `redis-integration` en verde sobre ese SHA, según su ruleset, y actualiza tu checkout con `git fetch origin`.
+3. Ejecuta `pwsh -NoProfile -File scripts/publish-first.ps1` desde un checkout limpio. Sólo prepara tarballs con `pnpm pack` y ejecuta `npm publish --dry-run`; comprueba la sesión y el estado de las seis versiones en el registro. Un error de red o de autenticación detiene el proceso: nunca equivale a una versión ausente.
+4. Sólo tras autorizar expresamente la publicación, ejecuta `pwsh -NoProfile -File scripts/publish-first.ps1 -Execute`, que exige que el commit esté en `origin/main`. npm pide la autenticación u OTP en la consola, una vez por paquete si hace falta. Se detiene al primer error y muestra qué versiones llegaron a npm.
+5. Si se detuvo a mitad, corrige la causa y ejecuta `scripts/publish-first.ps1 -Execute -Resume`, que omite lo ya publicado. El workflow no sirve para reanudar: rechaza los paquetes que aún no existen en npm, porque no tienen publicador confiable.
+6. En npm, configura **para cada uno de los seis paquetes** el Trusted Publisher de GitHub Actions: owner `meekojs`, repository `meeko`, workflow `publish.yml`, environment `npm`. Confirma que el de `@meekojs/meeko` usa exactamente ese environment. Comprueba `npm trust list <paquete>` desde tu sesión. No añadas tokens de publicación a GitHub.
+7. Verifica versiones, `dist-tags`, integridad y metadatos públicos de los cinco. Su versión inicial no tiene procedencia OIDC; las siguientes, sí.
+8. Sólo con autorización, crea y sube `v1.8.0` sobre el mismo SHA, sin demora: hasta entonces los cinco piden un core `>=1.8` que aún no está en npm. El workflow publica `@meekojs/meeko` con procedencia, omite los cinco y crea la release de GitHub. Omitir no demuestra que un tarball publicado sea idéntico ni cambia sus dist-tags.
+9. Comprueba los seis con una instalación limpia fuera del repositorio.
+
+### Publicación confiable posterior
+
+Actualiza juntos los seis manifiestos, changelogs y rangos de compatibilidad. La etiqueta debe apuntar a un commit de `main`. El job `package-gates` lo comprueba, compara `v<versión>` con **cada** manifiesto, ejecuta los gates, instala los tarballs en un consumidor externo y guarda los seis tarballs que publicará, tras comprobar su nombre, su versión y que `pnpm pack` resolvió `workspace:*`. Una versión con sufijo usa `next`; una estable usa `latest`.
+
+El job `publish` es el único con `id-token: write` y con el environment `npm`, así que su aprobación llega con los gates en verde. Sólo recibe esos tarballs: no instala dependencias ni ejecuta código del proyecto. `scripts/publish-packages.ps1 -Trusted` consulta las seis versiones antes de publicar la primera; sólo un HTTP 404 significa que falta una, y no empieza si algún paquete aún no existe en npm. Si una versión ya existe, la omite para permitir reanudar. Una versión publicada es inmutable: una corrección exige otra versión. Si hay un fallo parcial, conserva la etiqueta, revisa el estado real y reejecuta el workflow tras corregir la causa. No se publica nada por un push a `main` o una PR.
 
 ## Etiquetas y destinos
 
-| Etiqueta | Workflow | Comprueba | Publica |
-| --- | --- | --- | --- |
-| `v<versión>` | `publish.yml` | `packages/meeko/package.json` | npm (`@meekojs/meeko`) y la release de GitHub con los seis VSIX y el ZIP de Chrome |
-| `vscode-v<versión>` | `publish-vscode.yml` | `packages/vscode/package.json` | Visual Studio Marketplace y Open VSX |
-| `devtools-v<versión>` | `publish-devtools.yml` | `packages/devtools/manifest.json` | Chrome Web Store |
+| Etiqueta              | Workflow               | Comprueba                         | Publica                                                                                      |
+| --------------------- | ---------------------- | --------------------------------- | -------------------------------------------------------------------------------------------- |
+| `v<versión>`          | `publish.yml`          | Los seis manifiestos públicos     | npm (los seis paquetes públicos) y la release de GitHub con los seis VSIX y el ZIP de Chrome |
+| `vscode-v<versión>`   | `publish-vscode.yml`   | `packages/vscode/package.json`    | Visual Studio Marketplace y Open VSX                                                         |
+| `devtools-v<versión>` | `publish-devtools.yml` | `packages/devtools/manifest.json` | Chrome Web Store                                                                             |
 
 `publish.yml` sólo se dispara con etiquetas que empiezan por `v` y un dígito (`v[0-9]*`): con `v*` también lo disparaba `vscode-v<versión>`. Cada workflow falla antes de publicar si la etiqueta no coincide exactamente con la versión de su archivo. Las extensiones conservan así un número de versión independiente del paquete npm: una corrección de la extensión no obliga a publicar Meeko, y una versión de Meeko no sube las extensiones a las tiendas.
 
@@ -72,12 +88,12 @@ Los secretos se guardan en **Settings → Secrets and variables → Actions → 
 
 `publish-vscode.yml` comprueba que `vscode-v<versión>` coincide con `packages/vscode/package.json` y que la versión es `major.minor.patch`; ninguna de las dos tiendas acepta sufijos de prerelease en la versión de la extensión. Después ejecuta en Windows, Ubuntu y macOS las pruebas unitarias de la extensión, el VSIX de la plataforma y la prueba en un host aislado de VS Code. Sólo si todo pasa, empaqueta los seis VSIX y los publica con `@vscode/vsce@4.0.0` y `ovsx@1.3.0`, ambas versiones fijadas. Para Marketplace, `vsce publish --azure-credential` toma el acceso de la sesión que abre `azure/login` con Entra ID; con el PAT transitorio y en Open VSX, cada herramienta lee su token de la variable de entorno. Ningún token aparece en la línea de órdenes. `--skip-duplicate` permite repetir la ejecución si una tienda falló después de que la otra publicara.
 
-| Secreto | Uso |
-| --- | --- |
-| `AZURE_CLIENT_ID` | ID de aplicación (cliente) del registro de Microsoft Entra ID que publica en Marketplace. No es una contraseña. |
-| `AZURE_TENANT_ID` | ID del directorio (tenant) de ese registro. No es una contraseña. |
-| `VSCE_PAT` | Respaldo opcional para Marketplace si faltan los dos ID de Entra. El secreto anterior se eliminó y su PAT se revocó. |
-| `OVSX_PAT` | Token de Open VSX limitado a publicar `meekojs.meeko-language`. |
+| Secreto           | Uso                                                                                                                  |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `AZURE_CLIENT_ID` | ID de aplicación (cliente) del registro de Microsoft Entra ID que publica en Marketplace. No es una contraseña.      |
+| `AZURE_TENANT_ID` | ID del directorio (tenant) de ese registro. No es una contraseña.                                                    |
+| `VSCE_PAT`        | Respaldo opcional para Marketplace si faltan los dos ID de Entra. El secreto anterior se eliminó y su PAT se revocó. |
+| `OVSX_PAT`        | Token de Open VSX limitado a publicar `meekojs.meeko-language`.                                                      |
 
 Visual Studio Marketplace se publica con **Microsoft Entra ID** y OIDC: GitHub emite en cada ejecución un token de corta duración para el environment `vscode-marketplace`, Entra lo cambia por un acceso a Azure DevOps y no se guarda ningún token. Los PAT globales de Azure DevOps (los de **All accessible organizations**, el único ámbito que admite Marketplace) [se retiran el 1 de diciembre de 2026](https://code.visualstudio.com/api/working-with-extensions/publishing-extension). El workflow conserva la ruta de respaldo con `VSCE_PAT` si faltan los dos ID de Entra, pero ese secreto ya no está configurado.
 
@@ -102,12 +118,12 @@ Alta en Open VSX:
 
 `publish-devtools.yml` comprueba que `devtools-v<versión>` coincide con `packages/devtools/manifest.json`. En Windows ejecuta `pnpm run devtools:check` y la prueba de la extensión instalada en Chrome for Testing. Después empaqueta un ZIP con `manifest.json` en la raíz, como exige la tienda (`package-zip.ps1 -RootLayout`), lo sube y lo envía a revisión mediante la [API v2 de Chrome Web Store](https://developer.chrome.com/docs/webstore/using-api). La versión 1.1 de la API está obsoleta; la v2 identifica cada elemento por publisher, por lo que hace falta `CHROME_PUBLISHER_ID`. La publicación sólo ocurre si existen los cinco secretos; con una configuración incompleta el job avisa qué nombres faltan y no publica.
 
-| Secreto | Uso |
-| --- | --- |
-| `CHROME_EXTENSION_ID` | ID del elemento Meeko DevTools en la tienda. |
-| `CHROME_PUBLISHER_ID` | ID del publisher, visible en **Publisher → Settings** del panel de desarrollador. |
-| `CHROME_CLIENT_ID` | ID del cliente OAuth de Google Cloud. |
-| `CHROME_CLIENT_SECRET` | Secreto de ese cliente OAuth. |
+| Secreto                | Uso                                                                                                    |
+| ---------------------- | ------------------------------------------------------------------------------------------------------ |
+| `CHROME_EXTENSION_ID`  | ID del elemento Meeko DevTools en la tienda.                                                           |
+| `CHROME_PUBLISHER_ID`  | ID del publisher, visible en **Publisher → Settings** del panel de desarrollador.                      |
+| `CHROME_CLIENT_ID`     | ID del cliente OAuth de Google Cloud.                                                                  |
+| `CHROME_CLIENT_SECRET` | Secreto de ese cliente OAuth.                                                                          |
 | `CHROME_REFRESH_TOKEN` | Refresh token de la cuenta propietaria con el ámbito `https://www.googleapis.com/auth/chromewebstore`. |
 
 Alta:
@@ -149,7 +165,6 @@ El paquete [npm `0.0.4`](https://www.npmjs.com/package/@meekojs/meeko/v/0.0.4) s
 El paquete [npm `0.1.0`](https://www.npmjs.com/package/@meekojs/meeko/v/0.1.0) salió del commit `b492cf1` y coincide con la etiqueta [`v0.1.0`](https://github.com/meekojs/meeko/releases/tag/v0.1.0). Contiene cambios incompatibles respecto de `0.0.4`, documentados con su migración en el [CHANGELOG](../packages/meeko/CHANGELOG.md). La [CI de `main`](https://github.com/meekojs/meeko/actions/runs/40168927109) pasó antes de etiquetar. El [workflow de publicación](https://github.com/meekojs/meeko/actions/runs/40169193614) repitió los gates y publicó mediante OIDC con procedencia SLSA firmada. Se instaló después desde npm en un proyecto vacío, donde la reactividad, las subrutas `framework` y `server` y los comandos `dev`, `check`, `build` y `start` de la CLI respondieron.
 
 ## Versión 1.0.0-rc.1
-
 
 El paquete [npm `1.0.0-rc.1`](https://www.npmjs.com/package/@meekojs/meeko/v/1.0.0-rc.1) salió del commit `d8d7910` y coincide con la etiqueta [`v1.0.0-rc.1`](https://github.com/meekojs/meeko/releases/tag/v1.0.0-rc.1). Se publicó en el dist-tag `next`; `latest` sigue en `0.1.0`.
 
@@ -193,7 +208,7 @@ El paquete [npm `1.1.0`](https://www.npmjs.com/package/@meekojs/meeko/v/1.1.0) s
 
 ## Versión 1.2.0
 
-El paquete [npm `1.2.0`](https://www.npmjs.com/package/@meekojs/meeko/v/1.2.0) salió del commit `1580cd9` y coincide con la etiqueta [`v1.2.0`](https://github.com/meekojs/meeko/releases/tag/v1.2.0). Es un minor con las funciones y cambios recogidos en el [CHANGELOG](../packages/meeko/CHANGELOG.md) y la [guía de actualización](migration-1.2.md). Sus cambios aceptados como excepción (las props reactivas, el `Origin` que exige `session.create()` contra el *login CSRF* y los eventos tipados por elemento) están en [stability.md](stability.md#excepciones-aprobadas). La extensión de VS Code sube a `1.2.0`. Meeko DevTools sigue en `1.0.0`: desde `1.1.0` sólo cambió de carpeta (`packages/devtools`) y ganó descripciones en sus tipos generados, sin cambios en los archivos que empaqueta. Ninguna de las dos se ha publicado en las tiendas.
+El paquete [npm `1.2.0`](https://www.npmjs.com/package/@meekojs/meeko/v/1.2.0) salió del commit `1580cd9` y coincide con la etiqueta [`v1.2.0`](https://github.com/meekojs/meeko/releases/tag/v1.2.0). Es un minor con las funciones y cambios recogidos en el [CHANGELOG](../packages/meeko/CHANGELOG.md) y la [guía de actualización](migration-1.2.md). Sus cambios aceptados como excepción (las props reactivas, el `Origin` que exige `session.create()` contra el _login CSRF_ y los eventos tipados por elemento) están en [stability.md](stability.md#excepciones-aprobadas). La extensión de VS Code sube a `1.2.0`. Meeko DevTools sigue en `1.0.0`: desde `1.1.0` sólo cambió de carpeta (`packages/devtools`) y ganó descripciones en sus tipos generados, sin cambios en los archivos que empaqueta. Ninguna de las dos se ha publicado en las tiendas.
 
 - **Validación previa.** `diegootayza` consumió el checkout mediante `link:` y adoptó la autenticación integrada, `MeekoOutlet`, `MeekoLink` y `@utilities`. Una revisión independiente del diff desde `1f412ba` no encontró P0 ni P1. Su P2 (un middleware que sustituía la `Request` perdía la IP del cliente y `rateLimit` caía en un contador común) y sus P3 (`href` estático no ASCII en `MeekoLink`, `X-Forwarded-For` con puerto, `MEEKO_TRUST_PROXY` validada al arrancar en cada adaptador, secuencias de escape en `meeko auth hash`, componentes propios llamados `MeekoLink` o `MeekoOutlet` con `MEEK106`, la excepción de los eventos tipados y la hoja de estilos con hash desconocido) se corrigieron antes de publicar.
 - **Gates locales** sobre el árbol del commit de la versión (salvo esta sección): instalación congelada, `verify` (1004/1004 y 10/10 de DevTools), conformidad en Node 24.21.0, Bun 1.4.4, Deno 2.9.8 y workerd 1.20261019.1 (74/74), `e2e` (5/5), `pilot:e2e` en Chromium, Firefox y WebKit (8/8), `package:smoke`, el consumidor full-stack, el VSIX de VS Code (281 archivos), el host aislado, `npm pack --dry-run` (480 archivos, sólo `dist/`, `README.md`, `LICENSE` y `package.json`), `site:build` (420 páginas) y `git diff --check`. El host aislado falló primero porque su prueba seguía esperando sólo los dos comandos de valores en vivo, sin los tres de creación de archivos; se corrigió en el propio test (`53c97d7`).

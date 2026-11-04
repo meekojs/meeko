@@ -1,0 +1,43 @@
+<template>
+	<DocsPage
+		product="Meeko i18n"
+		locale="en"
+		title="Playground"
+		description="Try translations, plurals, selectors, formats and RTL direction with the real module."
+	>
+		<TranslationLab />
+		<h2 id="how-it-works">One contract in three languages</h2>
+		<p>
+			The playground uses Spanish, English and Arabic JSON catalogs registered in
+			<code>meeko.config.ts</code>. Signals update the arguments of
+			<code>t</code>; the language links point to
+			<code>switchLocalePath</code>
+			and load the other language in a full navigation, keeping the search and the fragment of the URL.
+		</p>
+		<p>
+			This page is a project file at
+			<code>app/pages/en/playground.meeko</code>: it replaces the
+			<code>/en/playground</code>
+			route that the module generates from
+			<code>app/pages/playground.meeko</code>, so its prose can be written in English. Every page of this site has its English file in
+			<code>app/pages/en/</code>; a page without one would show the Spanish original with an «untranslated» notice.
+		</p>
+		<p>
+			Its links are written once:
+			<MeekoLink to="/routing">languages and routes</MeekoLink>
+			points to
+			<code>/en/routing</code>
+			here and to
+			<code>/routing</code>
+			in Spanish, and
+			<MeekoLink
+				to="/routing"
+				hreflang="es"
+			>
+				the Spanish version
+			</MeekoLink>
+			forces another language with
+			<code>hreflang</code>.
+		</p>
+	</DocsPage>
+</template>

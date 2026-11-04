@@ -56,44 +56,44 @@ export default defineMeekoConfig({
 
 ### Comunes a `node`, `bun`, `deno` y `cloudflare` (desde 1.7)
 
-| Opción | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `contentSecurityPolicy` | `Record<string, readonly string[]>` | ninguna | La política por directiva. Meeko le añade, según la respuesta, hashes o un nonce (en `script-src-elem` y `style-src-elem` si existen), y nunca a una directiva con `'unsafe-inline'` salvo que tenga `'strict-dynamic'`. Sólo en producción. |
-| `headers` | `Record<string, string \| Record<string, string>>` | ninguna | Una clave con nombre de cabecera se aplica a todas las respuestas; una clave que empieza por `/` es un patrón de `pathname` con sus propias cabeceras, aplicadas después de las globales y en el orden escrito. `*` sustituye a cualquier secuencia, `/` incluida. También en `meeko dev`. |
+| Opción                  | Tipo                                               | Por defecto | Descripción                                                                                                                                                                                                                                                                                |
+| ----------------------- | -------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `contentSecurityPolicy` | `Record<string, readonly string[]>`                | ninguna     | La política por directiva. Meeko le añade, según la respuesta, hashes o un nonce (en `script-src-elem` y `style-src-elem` si existen), y nunca a una directiva con `'unsafe-inline'` salvo que tenga `'strict-dynamic'`. Sólo en producción.                                               |
+| `headers`               | `Record<string, string \| Record<string, string>>` | ninguna     | Una clave con nombre de cabecera se aplica a todas las respuestas; una clave que empieza por `/` es un patrón de `pathname` con sus propias cabeceras, aplicadas después de las globales y en el orden escrito. `*` sustituye a cualquier secuencia, `/` incluida. También en `meeko dev`. |
 
 ### Por adaptador
 
-| Adaptador | Opción | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- | --- |
-| `node` | `host` | `string` | `"127.0.0.1"` | Interfaz de `meeko start`; `MEEKO_HOST` (o `HOST`) la sustituye. |
-| `node` | `port` | `number` | `4173` | Puerto de `meeko start`, de `0` a `65535`; `MEEKO_PORT` (o `PORT`) lo sustituye. |
-| `cloudflare` | `name` | `string` | el `name` de `package.json` | Nombre del Worker: minúsculas, dígitos y guiones. |
-| `cloudflare` | `socketClassName` | `string` | `"MeekoSocketRoom"` | Clase Durable Object de las salas de Socket. |
-| `cloudflare` | `compatibilityDate` | `string` (`YYYY-MM-DD`) | la fecha con la que se prueba Meeko | Fecha de compatibilidad de Workers. |
-| `cloudflare` | `wrangler` | `Record<string, unknown>` | `{}` | Más campos de `wrangler.jsonc` (`d1_databases`, `vars`, `routes`…). `compatibility_flags` y `durable_objects.bindings` se combinan con los de Meeko; `main`, `assets`, `no_bundle` y `find_additional_modules` son de Meeko. |
-| `static` | `contentSecurityPolicy` | `Record<string, readonly string[]>` | ninguna | Desde `1.3`. La política de todas las páginas, con los hashes de todos los `.html` de la salida. |
-| `static` | `headers` | `Record<string, string>` | ninguna | Desde `1.3`. Cabeceras de todas las respuestas; sin patrones de ruta. |
-| `static` | `headerFiles` | `("_headers" \| "nginx")[]` | `[]` | Desde `1.3`. Dónde se escriben: `/_headers` (Netlify, Cloudflare Pages) o `/_meeko/headers.conf` (nginx). |
+| Adaptador    | Opción                  | Tipo                                | Por defecto                         | Descripción                                                                                                                                                                                                                  |
+| ------------ | ----------------------- | ----------------------------------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `node`       | `host`                  | `string`                            | `"127.0.0.1"`                       | Interfaz de `meeko start`; `MEEKO_HOST` (o `HOST`) la sustituye.                                                                                                                                                             |
+| `node`       | `port`                  | `number`                            | `4173`                              | Puerto de `meeko start`, de `0` a `65535`; `MEEKO_PORT` (o `PORT`) lo sustituye.                                                                                                                                             |
+| `cloudflare` | `name`                  | `string`                            | el `name` de `package.json`         | Nombre del Worker: minúsculas, dígitos y guiones.                                                                                                                                                                            |
+| `cloudflare` | `socketClassName`       | `string`                            | `"MeekoSocketRoom"`                 | Clase Durable Object de las salas de Socket.                                                                                                                                                                                 |
+| `cloudflare` | `compatibilityDate`     | `string` (`YYYY-MM-DD`)             | la fecha con la que se prueba Meeko | Fecha de compatibilidad de Workers.                                                                                                                                                                                          |
+| `cloudflare` | `wrangler`              | `Record<string, unknown>`           | `{}`                                | Más campos de `wrangler.jsonc` (`d1_databases`, `vars`, `routes`…). `compatibility_flags` y `durable_objects.bindings` se combinan con los de Meeko; `main`, `assets`, `no_bundle` y `find_additional_modules` son de Meeko. |
+| `static`     | `contentSecurityPolicy` | `Record<string, readonly string[]>` | ninguna                             | Desde `1.3`. La política de todas las páginas, con los hashes de todos los `.html` de la salida.                                                                                                                             |
+| `static`     | `headers`               | `Record<string, string>`            | ninguna                             | Desde `1.3`. Cabeceras de todas las respuestas; sin patrones de ruta.                                                                                                                                                        |
+| `static`     | `headerFiles`           | `("_headers" \| "nginx")[]`         | `[]`                                | Desde `1.3`. Dónde se escriben: `/_headers` (Netlify, Cloudflare Pages) o `/_meeko/headers.conf` (nginx).                                                                                                                    |
 
 ## Resultado
 
-| Adaptador | Salida | Cómo se ejecuta |
-| --- | --- | --- |
-| `node` | `.meeko/output/node/`: `index.mjs`, `chunks/`, `client/`, `prerender/` | `meeko start` o `node index.mjs`; necesita `node_modules`. |
-| `bun` | `.meeko/output/bun/`: `index.js` con las dependencias incluidas | `bun index.js`, sin `node_modules`. |
-| `deno` | `.meeko/output/deno/`: `main.js` con las dependencias incluidas | `deno run --allow-net --allow-env --allow-read=… main.js`. |
-| `cloudflare` | `.meeko/output/cloudflare/`: `worker.js`, `assets/`, `wrangler.jsonc` | `wrangler deploy --config …/wrangler.jsonc`. |
-| `static` | `.meeko/output/static/`: HTML, payloads, `404.html`, assets | Cualquier hosting de archivos; sólo páginas `render: "prerender"`. |
+| Adaptador    | Salida                                                                 | Cómo se ejecuta                                                    |
+| ------------ | ---------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `node`       | `.meeko/output/node/`: `index.mjs`, `chunks/`, `client/`, `prerender/` | `meeko start` o `node index.mjs`; necesita `node_modules`.         |
+| `bun`        | `.meeko/output/bun/`: `index.js` con las dependencias incluidas        | `bun index.js`, sin `node_modules`.                                |
+| `deno`       | `.meeko/output/deno/`: `main.js` con las dependencias incluidas        | `deno run --allow-net --allow-env --allow-read=… main.js`.         |
+| `cloudflare` | `.meeko/output/cloudflare/`: `worker.js`, `assets/`, `wrangler.jsonc`  | `wrangler deploy --config …/wrangler.jsonc`.                       |
+| `static`     | `.meeko/output/static/`: HTML, payloads, `404.html`, assets            | Cualquier hosting de archivos; sólo páginas `render: "prerender"`. |
 
 La CSP de cada respuesta en los adaptadores con servidor:
 
-| Respuesta | `Content-Security-Policy` |
-| --- | --- |
-| Página prerenderizada | La política con los hashes de los scripts y `<style>` en línea que escribe Meeko (nunca los de dentro de `#app` o de un teleport); se sigue sirviendo desde su archivo, con `ETag` y `304`. |
-| Página SSR, `"stream"`, de error y 404 | La política con un nonce nuevo en cada respuesta, que Meeko pone en sus `<script>` y `<style>`. |
-| Página SSR con `cache` | La política con los hashes del código en línea que escribe Meeko, sin nonce. |
-| JSON de API, RPC y navegación | `default-src 'none'; frame-ancestors 'none'`. |
-| Archivos públicos y lo demás | La política tal cual. |
+| Respuesta                              | `Content-Security-Policy`                                                                                                                                                                   |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Página prerenderizada                  | La política con los hashes de los scripts y `<style>` en línea que escribe Meeko (nunca los de dentro de `#app` o de un teleport); se sigue sirviendo desde su archivo, con `ETag` y `304`. |
+| Página SSR, `"stream"`, de error y 404 | La política con un nonce nuevo en cada respuesta, que Meeko pone en sus `<script>` y `<style>`.                                                                                             |
+| Página SSR con `cache`                 | La política con los hashes del código en línea que escribe Meeko, sin nonce.                                                                                                                |
+| JSON de API, RPC y navegación          | `default-src 'none'; frame-ancestors 'none'`.                                                                                                                                               |
+| Archivos públicos y lo demás           | La política tal cual.                                                                                                                                                                       |
 
 Una cabecera que la respuesta ya trae (de Meeko, de un handler o de un middleware) no se sustituye, y un `304` nunca lleva la CSP.
 
@@ -168,6 +168,7 @@ server: { adapter: "node", headers: { "Content-Security-Policy": "default-src 's
 `…/meeko.config.ts: server.headers no puede fijar Content-Security-Policy; use server.contentSecurityPolicy, que añade los hashes de los scripts`. Escrita a mano, la política no llevaría el nonce ni los hashes y bloquearía los scripts de Meeko.
 
 <!-- no-check -->
+
 ```ts good
 server: { adapter: "node", contentSecurityPolicy: { "default-src": ["'self'"] } }
 ```
@@ -181,6 +182,7 @@ server: { adapter: "static", headers: { "/admin/*": { "X-Robots-Tag": "noindex" 
 `…/meeko.config.ts: server.headers "/admin/*": el adaptador static aplica sus cabeceras a todas las rutas; los patrones de ruta necesitan un adaptador con servidor`. `headerFiles` escribe un único bloque para todas las rutas.
 
 <!-- no-check -->
+
 ```ts good
 server: { adapter: "static", headers: { "X-Robots-Tag": "noindex" } }
 ```
@@ -194,6 +196,7 @@ server: { adapter: "node", headers: { "/docs/*": "max-age=60" } }
 `…/meeko.config.ts: server.headers "/docs/*" must be an object of header values`.
 
 <!-- no-check -->
+
 ```ts good
 server: { adapter: "node", headers: { "/docs/*": { "Cache-Control": "public, max-age=60" } } }
 ```
@@ -207,6 +210,7 @@ server: { adapter: "bun", contentSecurityPolicy: { "script-src": ["self ok"] } }
 `…/meeko.config.ts: server.contentSecurityPolicy: invalid source "self ok" in script-src`.
 
 <!-- no-check -->
+
 ```ts good
 server: { adapter: "bun", contentSecurityPolicy: { "script-src": ["'self'"] } }
 ```
@@ -220,6 +224,7 @@ server: { adapter: "static", port: 3000 } as never
 `…/meeko.config.ts: server (static): campo desconocido port`. Con `cloudflare`, un nombre no válido da `server.name debe ser un nombre de Worker (minúsculas, dígitos y guiones)`, y con `node`, un puerto fuera de rango, `server.port debe ser un entero entre 0 y 65535`.
 
 <!-- no-check -->
+
 ```ts good
 server: { adapter: "node", port: 3000 }
 ```
@@ -230,4 +235,4 @@ server: { adapter: "node", port: 3000 }
 - **Desarrollo.** La CSP sólo se aplica en producción (`meeko start`, `meeko preview` y las salidas); en `meeko dev`, Vite inyecta scripts sin nonce. `headers` sí se aplica en `meeko dev` a lo que atiende la aplicación.
 - **Cookies y cachés.** Una respuesta con `Set-Cookie` y un `Cache-Control` `public` sale como `private, no-store` y sin `ETag`, con o sin estas opciones.
 - **Variables de entorno.** `MEEKO_HOST`, `MEEKO_PORT` y `MEEKO_PUBLIC_ORIGIN` se leen al ejecutarse, no en el build; `server.host` y `server.port` sólo se aplican a Node.
-- **Host propio.** Las opciones viajan en el manifiesto (`AppManifest.contentSecurityPolicy` y `AppManifest.headers`); un host que crea su `AppManifest` a mano las pasa allí.
+- **Host propio.** Las opciones viajan en el manifiesto (`AppManifest.contentSecurityPolicy` y `AppManifest.headers`); un host que crea su `AppManifest` a mano las pasa allí. Desde `1.8`, las cabeceras de `addPublicFile` viajan aparte, en `AppManifest.publicFileHeaders`, por el `pathname` exacto del archivo: los patrones de `headers` las sustituyen sólo en las cabeceras que fijan. Esto vale en producción: en `meeko dev`, los archivos públicos no pasan por la aplicación, así que llevan sólo las cabeceras de `addPublicFile` y `headers` no les afecta.

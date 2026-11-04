@@ -22,6 +22,7 @@ Es la pieza HTTP de `serveNode`. Úsela sola para montar Meeko en un servidor No
 ## Uso
 
 <!-- no-check -->
+
 ```ts
 import { createServer } from "node:http";
 import { toNodeListener } from "@meekojs/meeko/node";
@@ -32,11 +33,11 @@ server.listen(3000);
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `handler` | `(request: Request) => Response \| Promise<Response>` | obligatorio | El handler Fetch. |
-| `options.publicOrigin` | `string` | la cabecera `Host` y el protocolo del socket | Origen con el que se construyen las URL, como `https://example.com` tras un proxy TLS. Una petición en forma absoluta a otro origen responde `400`. |
-| `options.onError` | `(error, requestId) => void` | la consola | Recibe los fallos del handler o del stream de la respuesta, con un ID de correlación. |
+| Parámetro              | Tipo                                                  | Por defecto                                  | Descripción                                                                                                                                         |
+| ---------------------- | ----------------------------------------------------- | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `handler`              | `(request: Request) => Response \| Promise<Response>` | obligatorio                                  | El handler Fetch.                                                                                                                                   |
+| `options.publicOrigin` | `string`                                              | la cabecera `Host` y el protocolo del socket | Origen con el que se construyen las URL, como `https://example.com` tras un proxy TLS. Una petición en forma absoluta a otro origen responde `400`. |
+| `options.onError`      | `(error, requestId) => void`                          | la consola                                   | Recibe los fallos del handler o del stream de la respuesta, con un ID de correlación.                                                               |
 
 ## Valor devuelto
 
@@ -47,6 +48,7 @@ El listener `(request: IncomingMessage, response: ServerResponse) => void`. Nunc
 ### HTTPS directo, sin proxy
 
 <!-- no-check -->
+
 ```ts
 import { readFileSync } from "node:fs";
 import { createServer } from "node:https";
@@ -63,6 +65,7 @@ server.listen(443);
 ### Meeko junto a otra aplicación
 
 <!-- no-check -->
+
 ```ts
 import { createServer } from "node:http";
 import { toNodeListener } from "@meekojs/meeko/node";
@@ -94,6 +97,7 @@ toNodeListener(handler, { publicOrigin: "example.com" });
 `TypeError: Invalid publicOrigin: example.com`, al crear el listener. Con otro esquema, `publicOrigin must use HTTP or HTTPS`.
 
 <!-- no-check -->
+
 ```ts good
 toNodeListener(handler, { publicOrigin: "https://example.com" });
 ```
@@ -107,6 +111,7 @@ createServer(toNodeListener((request) => app.fetch(request))); // tras un proxy 
 Sin `publicOrigin`, la URL sale de `Host` y del socket (`http://`), así que la aplicación no reconoce el `Origin` `https://` del navegador y responde `403 INVALID_ORIGIN` a las mutaciones. `createServerApp` también acepta `publicOrigin` o `MEEKO_PUBLIC_ORIGIN`.
 
 <!-- no-check -->
+
 ```ts good
 createServer(toNodeListener((request) => app.fetch(request), { publicOrigin: process.env.MEEKO_PUBLIC_ORIGIN }));
 ```
@@ -120,6 +125,7 @@ createServer(toNodeListener((request) => app.fetch(request))).listen(3000); // l
 No hay error al arrancar, pero los upgrades no los atiende nadie y el cliente reintenta para siempre. `toNodeListener` sólo atiende HTTP.
 
 <!-- no-check -->
+
 ```ts good
 const server = createServer(toNodeListener((request) => app.fetch(request), { publicOrigin }));
 if (app.socket) attachNodeWebSocketServer({ server, hub: app.socket.hub, publicOrigin, pathnamePrefix: app.socket.pathnamePrefix });

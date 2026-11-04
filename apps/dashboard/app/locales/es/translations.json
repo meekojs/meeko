@@ -1,0 +1,58 @@
+{
+	"translations": {
+		"title": "Traducciones",
+		"description": "Las guías y la referencia escrita del site y su traducción al inglés (docs/en): traducidas, desactualizadas porque el español cambió, o sin traducir, que /en publica en español con el aviso «sin traducir».",
+		"byStatus": "Traducciones por estado",
+		"all": "Todas",
+		"filter": "Filtrar traducciones",
+		"placeholder": "Título, ruta o archivo…",
+		"count": "{shown} de {total} páginas",
+		"caption": "Traducciones al inglés de las páginas del site",
+		"emptyFiltered": "Ninguna página coincide con los filtros.",
+		"empty": "No hay fuentes importadas. Importa desde Git en Snapshots.",
+		"compare": "Comparar",
+		"edit": "Editar la traducción",
+		"columns": {
+			"page": "Página",
+			"status": "Estado",
+			"file": "Traducción",
+			"imported": "Importada",
+			"actions": "Acciones",
+			"kind": "Tipo"
+		},
+		"origin": {
+			"import": "la última importación",
+			"workingTree": "el working tree",
+			"commit": "un commit de Git"
+		},
+		"detail": {
+			"title": "Traducción de {title}",
+			"fallbackTitle": "Traducción {id}",
+			"fallbackDescription": "Una página del site frente a su traducción al inglés.",
+			"all": "Todas las traducciones",
+			"original": "Ver el original",
+			"status": "Estado",
+			"originalFile": "Original",
+			"originalHash": "Hash del original (importado)",
+			"sourceHash": "source-hash de la traducción",
+			"foundIn": "Texto traducido, encontrado en",
+			"shown": "/en muestra",
+			"revision": "La revisión publicada #{id}",
+			"git": "El archivo de Git",
+			"fallback": "El original en español, con el aviso «sin traducir»",
+			"missingTitle": "Sin traducción.",
+			"missingText": "Crea {file} en el repositorio con el texto traducido y su source-hash, e importa las fuentes: desde entonces se edita aquí como una revisión.",
+			"download": "Descargar el original",
+			"changes": "Cambios del original desde que se tradujo",
+			"changesLead": "Lo que hay que trasladar a la traducción: el diff del español desde el texto del que se tradujo hasta el de ahora.",
+			"changesLabel": "Diff del original desde que se tradujo",
+			"noChanges": "El original no cambió desde que se tradujo.",
+			"noTranslation": "Todavía no hay traducción.",
+			"baseUnknown": "No se encuentra el texto del que se tradujo: compara los dos textos de abajo.",
+			"originalText": "Original en español",
+			"translationText": "Traducción al inglés"
+		},
+		"editShort": "Editar",
+		"editOf": "la traducción de {path}"
+	}
+}

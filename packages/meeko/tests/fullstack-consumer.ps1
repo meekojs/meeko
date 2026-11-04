@@ -11,7 +11,8 @@ $starter = Join-Path $run 'starter'
 $serverProcess = $null
 
 try {
-  & (Join-Path $repo 'node_modules/.bin/tsc.cmd') -p (Join-Path $repo 'tsconfig.build.json')
+  # The build of the package, not a bare tsc: only this one writes the explicit ESM extensions of dist.
+  & node (Join-Path $repo '../../scripts/build-package.mjs') $repo
   if ($LASTEXITCODE -ne 0) { throw 'Meeko package build failed.' }
   New-Item -ItemType Directory -Path $consumer -Force | Out-Null
   $env:npm_config_cache = Join-Path $scratch 'npm-cache'

@@ -1,0 +1,11 @@
+/*
+ * The only thing this site adds to UI: the choreography of the /transitions demo, an effect. The name
+ * exists only during a navigation, so that no other transition of the page repeats it.
+ */
+html:active-view-transition-type(meeko-route) .view-transition-demo-project {
+	view-transition-name: ui-demo-project;
+}
+::view-transition-group(ui-demo-project) {
+	animation-duration: var(--ui-duration-slow);
+	animation-timing-function: var(--ui-ease-out);
+}

@@ -1,4 +1,4 @@
-import { mountClientApp } from "../../../src/framework/client.ts";
+import { mountClientApp } from "../../../src/app/runtime/client.ts";
 import { page, routes } from "./page.ts";
 
 interface Report { readonly message: string; readonly source: string }

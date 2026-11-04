@@ -1,0 +1,74 @@
+<script lang="ts">
+	import { examples } from '../utils/examples'
+</script>
+
+<template>
+	<DocsPage
+		title="Link y LinkCard"
+		description="Navega con enlaces reales y comparte la jerarquía visual de tus acciones."
+	>
+		<h2 id="link">UILink</h2>
+		<DocsPreview>
+			<UILink
+				id="link-route"
+				to="/installation"
+			>
+				Instalación
+			</UILink>
+			<UILink
+				id="link-anchor"
+				href="/theming"
+				variant="outline"
+			>
+				Personalización
+			</UILink>
+		</DocsPreview>
+		<DocsCode bind:code="examples.link" />
+		<DocsApi
+			caption="Propiedades de UILink"
+			bind:rows="[
+				{ name: 'to', type: 'RouteId', description: 'Ruta de la aplicación, con navegación del cliente. Excluye href, target y rel.' },
+				{ name: 'params / search', type: 'parámetros de la ruta / objeto', description: 'Con to: los parámetros de una ruta dinámica (obligatorios en ella) y la query string.' },
+				{ name: 'href', type: 'string', description: 'Cualquier URL. Excluye to; hace falta uno de los dos.' },
+				{ name: 'variant / size / shape', type: 'UIActionVariant / UIActionSize / UIActionShape', default: 'primary / md / rounded', description: 'Misma API visual que UIButton.' },
+				{ name: 'target / rel', type: 'string', description: 'Atributos nativos del enlace. Para _blank se añade noopener noreferrer cuando rel no está definido.' },
+				{ name: 'ariaLabel', type: 'string', description: 'Nombre accesible cuando el contenido visible no basta; gana sobre aria-label.' },
+				{ name: 'id / title / aria-* / data-*', type: 'atributos HTML', description: 'Llegan tal cual al enlace.' },
+				{ name: 'class', type: 'string', description: 'Clases adicionales.' },
+			]"
+		/>
+		<h2 id="link-card">UILinkCard</h2>
+		<DocsPreview layout="stack">
+			<UILinkCard
+				to="/theming"
+				title="Personaliza tu interfaz"
+				description="Conecta tus colores, radios y tipografía con los tokens de UI."
+			/>
+		</DocsPreview>
+		<DocsApi
+			caption="Propiedades de UILinkCard"
+			bind:rows="[
+				{ name: 'to', type: 'RouteId', description: 'Ruta de la aplicación, con navegación del cliente. Excluye href; con @meekojs/i18n apunta a la versión en el idioma actual.' },
+				{ name: 'params / search / resolve', type: 'parámetros de la ruta / objeto / boolean', description: 'Con to, como en UILink: los parámetros de una ruta dinámica, la query string y si el href pasa por los resolvedores de enlaces.' },
+				{ name: 'href', type: 'string', description: 'Cualquier URL. Excluye to; hace falta uno de los dos.' },
+				{ name: 'title', type: 'string', description: 'Obligatoria. Texto principal del enlace.' },
+				{ name: 'description', type: 'string', description: 'Texto de apoyo opcional.' },
+				{ name: 'target / rel / hreflang / download', type: 'string', description: 'Atributos nativos del enlace, como en UILink.' },
+				{ name: 'id / aria-* / data-*', type: 'atributos HTML', description: 'Llegan tal cual al enlace.' },
+				{ name: 'class', type: 'string', description: 'Clases adicionales.' },
+			]"
+		/>
+		<p>
+			<code>UILink</code>
+			requiere el snippet
+			<code>default</code>
+			y emite
+			<code>click</code>.
+			<code>UILinkCard</code>
+			admite contenido adicional con el snippet
+			<code>default</code>
+			opcional. No incluyas enlaces ni botones dentro de una LinkCard: toda la superficie ya es un enlace.
+		</p>
+		<p>Los enlaces internos participan en la navegación de Meeko; conservan el clic central, abrir en otra pestaña y el fallback sin JavaScript.</p>
+	</DocsPage>
+</template>

@@ -1,0 +1,123 @@
+.meeko-ui-card {
+	--card-padding: var(--ui-space-5);
+	--card-background: var(--ui-color-surface);
+	--card-color: var(--ui-color-text);
+	--card-muted: var(--ui-color-text-soft);
+	--card-border: var(--ui-color-border);
+
+	display: flex;
+	flex-direction: column;
+	box-sizing: border-box;
+	border: var(--ui-border-width) solid var(--card-border);
+	border-radius: var(--ui-radius-lg);
+	background: var(--card-background);
+	min-width: 0;
+	color: var(--card-color);
+	line-height: var(--ui-line-height-normal);
+	font-family: var(--ui-font-sans);
+}
+.meeko-ui-card[data-variant='soft'] {
+	--card-background: var(--ui-color-control-hover);
+	--card-border: transparent;
+}
+.meeko-ui-card[data-variant='solid'] {
+	--card-background: var(--ui-color-primary);
+	--card-color: var(--ui-color-primary-contrast);
+	--card-muted: var(--ui-color-primary-contrast);
+	--card-border: transparent;
+}
+.meeko-ui-card[data-variant='elevated'] {
+	--card-background: var(--ui-color-surface-raised);
+	--card-border: var(--ui-color-border);
+	box-shadow: var(--ui-card-shadow, var(--ui-shadow-md));
+}
+.meeko-ui-card-header,
+.meeko-ui-card-body,
+.meeko-ui-card-footer {
+	padding: var(--card-padding);
+	overflow-wrap: anywhere;
+}
+.meeko-ui-card-header {
+	display: grid;
+	gap: var(--ui-space-1-5);
+	padding-bottom: 0;
+}
+.meeko-ui-card-header[data-actions] {
+	grid-template-columns: minmax(0, 1fr) auto;
+	column-gap: var(--ui-space-4);
+}
+.meeko-ui-card-header[data-actions] > * {
+	grid-column: 1;
+}
+.meeko-ui-card-header[data-actions] > .meeko-ui-card-actions {
+	grid-row: 1 / span 2;
+	grid-column: 2;
+}
+.meeko-ui-card-actions {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	align-items: center;
+	align-self: start;
+	gap: var(--ui-space-2);
+	min-height: 1lh;
+}
+.meeko-ui-card-title,
+.meeko-ui-card-header :is(h1, h2, h3, h4) {
+	margin: 0;
+	color: inherit;
+	font-weight: var(--ui-font-weight-semibold);
+	font-size: var(--ui-font-size-xl);
+	line-height: var(--ui-line-height-snug);
+	letter-spacing: var(--ui-tracking-tight);
+}
+/* An app rule such as ".page p { color }" is more specific than the class alone, and on a solid
+   it would leave the text unreadable. */
+.meeko-ui-card[data-variant='solid'] :where(p, li) {
+	color: inherit;
+}
+.meeko-ui-card .meeko-ui-card-description {
+	margin: 0;
+	color: var(--card-muted);
+	font-size: var(--ui-font-size-md);
+}
+.meeko-ui-card-body {
+	flex: 1;
+}
+.meeko-ui-card-body > :first-child,
+.meeko-ui-card-footer > :first-child {
+	margin-top: 0;
+}
+.meeko-ui-card-body > :last-child,
+.meeko-ui-card-footer > :last-child {
+	margin-bottom: 0;
+}
+.meeko-ui-card-footer {
+	padding-top: 0;
+}
+/* A table inside a card lines up with the rest of its body: the card already gives the margin. */
+.meeko-ui-card-body .meeko-ui-table > :is(thead, tbody, tfoot) > tr > :first-child {
+	padding-inline-start: 0;
+}
+.meeko-ui-card-body .meeko-ui-table > :is(thead, tbody, tfoot) > tr > :last-child {
+	padding-inline-end: 0;
+}
+/* A table alone reaches the edges of its card, which is its frame; its first and last cells keep the card's padding. */
+.meeko-ui-card:has(> .meeko-ui-card-body > .meeko-ui-table-scroll:only-child) > .meeko-ui-card-header {
+	padding-bottom: var(--ui-space-3);
+}
+.meeko-ui-card-body:has(> .meeko-ui-table-scroll:only-child) {
+	padding: 0;
+}
+.meeko-ui-card-body > .meeko-ui-table-scroll:only-child {
+	border-radius: inherit;
+}
+.meeko-ui-card-body > .meeko-ui-table-scroll:only-child > .meeko-ui-table {
+	background: transparent;
+}
+.meeko-ui-card-body > .meeko-ui-table-scroll:only-child > .meeko-ui-table > :is(thead, tbody, tfoot) > tr > :first-child {
+	padding-inline-start: var(--card-padding);
+}
+.meeko-ui-card-body > .meeko-ui-table-scroll:only-child > .meeko-ui-table > :is(thead, tbody, tfoot) > tr > :last-child {
+	padding-inline-end: var(--card-padding);
+}

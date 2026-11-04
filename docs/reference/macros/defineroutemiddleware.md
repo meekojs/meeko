@@ -47,21 +47,21 @@ Las páginas que lo piden con `definePage({ middleware: ["auth"] })` o un `+grou
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
+| Parámetro    | Tipo                                                                                 | Por defecto | Descripción                                                                                                                                                                                  |
+| ------------ | ------------------------------------------------------------------------------------ | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `middleware` | `(context: RouteMiddlewareContext) => void \| Response \| Promise<void \| Response>` | obligatorio | La función. Recibe `url`, `match` (la ruta y sus `params`), `signal` (se aborta si la navegación se cancela), `phase` (`"server"` o `"client"`) y `request`, que sólo existe en el servidor. |
-| `options` | `{ global?: boolean }` | global | Desde `1.6`. `{ global: false }` lo hace con nombre. **Debe ser un objeto literal**: Meeko lo lee sin ejecutar el archivo. |
+| `options`    | `{ global?: boolean }`                                                               | global      | Desde `1.6`. `{ global: false }` lo hace con nombre. **Debe ser un objeto literal**: Meeko lo lee sin ejecutar el archivo.                                                                   |
 
 ## Valor devuelto
 
 El mismo middleware, para exportarlo por defecto. Lo que hace cada resultado:
 
-| Resultado | En el servidor | En el navegador |
-| --- | --- | --- |
-| `undefined` | Continúa con el siguiente middleware y la página | Igual |
-| `Response.redirect(url)` | Responde con la redirección | `location.assign` con la URL: una carga de página nueva |
-| Otro `Response` | Lo responde | Cancela la navegación y la entrega a `onNavigationError` |
-| Un error | Página de error | Cancela la navegación |
+| Resultado                | En el servidor                                   | En el navegador                                          |
+| ------------------------ | ------------------------------------------------ | -------------------------------------------------------- |
+| `undefined`              | Continúa con el siguiente middleware y la página | Igual                                                    |
+| `Response.redirect(url)` | Responde con la redirección                      | `location.assign` con la URL: una carga de página nueva  |
+| Otro `Response`          | Lo responde                                      | Cancela la navegación y la entrega a `onNavigationError` |
+| Un error                 | Página de error                                  | Cancela la navegación                                    |
 
 ## Ejemplos
 
@@ -128,6 +128,7 @@ export const route = definePage({ middleware: ["auth", "admn"] });
 `meeko check`, `meeko dev` y `meeko build` se detienen con `el middleware "admn" no existe; crea app/middleware/admn.ts con defineRouteMiddleware(..., { global: false }) (middleware con nombre disponibles: "admin", "auth"), o app/middleware/admn.server.ts con defineServerRouteMiddleware para uno que sólo se ejecuta en el servidor`.
 
 <!-- no-check -->
+
 ```ts good
 export const route = definePage({ middleware: ["auth", "admin"] });
 ```
@@ -144,6 +145,7 @@ export default defineGroup({ middleware: ["locale"] });
 `el middleware "locale" (…/10-locale.ts) es global y ya se ejecuta en todas las rutas; quítalo de middleware o decláralo con defineRouteMiddleware(..., { global: false })`.
 
 <!-- no-check -->
+
 ```ts good
 export default defineRouteMiddleware(() => {}, { global: false });
 ```
@@ -158,6 +160,7 @@ export default defineRouteMiddleware(() => {}, { global: false });
 `un archivo *.server.ts de app/middleware es middleware de ruta de servidor; decláralo con defineServerRouteMiddleware en lugar de defineRouteMiddleware`.
 
 <!-- no-check -->
+
 ```ts good
 // app/middleware/auth.server.ts
 import { redirect } from "@meekojs/meeko/framework";
@@ -179,6 +182,7 @@ export default defineRouteMiddleware(({ url }) => {
 ```
 
 <!-- no-check -->
+
 ```ts good
 // app/middleware/admin.server.ts: en el servidor, con la sesión
 export default defineServerRouteMiddleware(({ session, url }) => {

@@ -1,0 +1,31 @@
+<script lang="ts">
+	import type { UIBrand } from '../../types/navigation'
+
+	import { linkTarget } from '../../utils/navigation'
+	import * as ItemLink from './ItemLink.meeko'
+
+	const props = defineProps<{ brand: UIBrand }>()
+</script>
+
+<template>
+	<ItemLink
+		class="meeko-ui-brand"
+		bind:link="linkTarget(props.brand)"
+		bind:aria-label="props.brand.ariaLabel"
+	>
+		<img
+			if:when="props.brand.image"
+			alt=""
+			bind:src="props.brand.image?.src"
+			bind:width="props.brand.image?.width"
+			bind:height="props.brand.image?.height"
+		/>
+		<span bind:class="props.brand.product || props.brand.compact ? 'meeko-ui-brand-name' : undefined">{props.brand.name}</span>
+		<strong
+			if:when="props.brand.product"
+			class="meeko-ui-brand-product"
+		>
+			{props.brand.product}
+		</strong>
+	</ItemLink>
+</template>

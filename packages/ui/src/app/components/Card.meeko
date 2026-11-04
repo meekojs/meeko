@@ -1,0 +1,62 @@
+<script lang="ts">
+	import type { UICardProps } from '../types/card'
+
+	import { uiDefaults } from '../utils/defaults'
+
+	const { title, headingId, description, variant, density, padding, class: className, ...rest } = defineProps<UICardProps>()
+
+	const snippets = defineSnippets<{ header?: []; actions?: []; default: []; footer?: [] }>()
+
+	const id = useId()
+	const defaults = uiDefaults().card
+	const titleId = headingId ?? id + '-title'
+</script>
+
+<template>
+	<section
+		bind:class="['meeko-ui-card', className].filter(Boolean).join(' ')"
+		bind:data-density="density ?? 'normal'"
+		bind:data-padding="padding"
+		bind:data-variant="variant ?? defaults?.variant ?? 'outline'"
+		bind:aria-labelledby="title && !snippets.header ? titleId : rest['aria-labelledby']"
+		bind="rest"
+	>
+		<header
+			if:when="snippets.header || snippets.actions || title || description"
+			class="meeko-ui-card-header"
+			bind:data-actions="snippets.actions ? '' : undefined"
+		>
+			<render
+				if:when="snippets.header"
+				snippet="snippets.header"
+			/>
+			<h2
+				if:when="!snippets.header && title"
+				class="meeko-ui-card-title"
+				bind:id="titleId"
+				bind:tabindex="headingId ? -1 : undefined"
+			>
+				{title}
+			</h2>
+			<p
+				if:when="!snippets.header && description"
+				class="meeko-ui-card-description"
+			>
+				{description}
+			</p>
+			<div
+				if:when="snippets.actions"
+				class="meeko-ui-card-actions"
+			>
+				<render snippet="snippets.actions" />
+			</div>
+		</header>
+		<div class="meeko-ui-card-body"><render snippet="snippets.default" /></div>
+		<footer
+			if:when="snippets.footer"
+			class="meeko-ui-card-footer"
+		>
+			<render snippet="snippets.footer" />
+		</footer>
+	</section>
+</template>

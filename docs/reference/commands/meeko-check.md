@@ -34,22 +34,22 @@ La línea `OK` lleva la ruta absoluta del proyecto. El starter lo declara como `
 
 ## Opciones
 
-| Opción | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `[directorio]` | ruta | `.` | Raíz del proyecto que se comprueba. Se lee su `.env` antes de cargar `meeko.config.ts`. |
-| `[componente.meeko]` | ruta | ninguno | En lugar de un directorio: comprueba sólo ese componente. Una ruta que no es un directorio existente se trata como un componente. |
-| `--json` | bandera | no | Sólo con un componente, y siempre después de él: imprime los diagnósticos como un array JSON en la salida estándar. |
+| Opción               | Tipo    | Por defecto | Descripción                                                                                                                       |
+| -------------------- | ------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `[directorio]`       | ruta    | `.`         | Raíz del proyecto que se comprueba. Se lee su `.env` antes de cargar `meeko.config.ts`.                                           |
+| `[componente.meeko]` | ruta    | ninguno     | En lugar de un directorio: comprueba sólo ese componente. Una ruta que no es un directorio existente se trata como un componente. |
+| `--json`             | bandera | no          | Sólo con un componente, y siempre después de él: imprime los diagnósticos como un array JSON en la salida estándar.               |
 
 ## Resultado
 
-| Caso | Salida estándar | Salida de errores | Código |
-| --- | --- | --- | --- |
-| Proyecto sin errores | `<ruta absoluta>: OK` | Los avisos (`aviso MEEKxxx`), si los hay | `0` |
-| Proyecto con errores en un `.meeko` | | Todos los diagnósticos, avisos incluidos, como `archivo:línea:columna CÓDIGO: mensaje` | `1` |
-| Proyecto con errores en un `.ts` | | `Falló la comprobación con TypeScript (<tsconfig>):` y la salida de `tsc` | `1` |
-| Componente sin errores | `<ruta>: OK` | Los avisos | `0` |
-| Componente con errores | | Los diagnósticos | `1` |
-| Componente con `--json` | El array de diagnósticos | | `1` si hay algún error |
+| Caso                                | Salida estándar          | Salida de errores                                                                      | Código                 |
+| ----------------------------------- | ------------------------ | -------------------------------------------------------------------------------------- | ---------------------- |
+| Proyecto sin errores                | `<ruta absoluta>: OK`    | Los avisos (`aviso MEEKxxx`), si los hay                                               | `0`                    |
+| Proyecto con errores en un `.meeko` |                          | Todos los diagnósticos, avisos incluidos, como `archivo:línea:columna CÓDIGO: mensaje` | `1`                    |
+| Proyecto con errores en un `.ts`    |                          | `Falló la comprobación con TypeScript (<tsconfig>):` y la salida de `tsc`              | `1`                    |
+| Componente sin errores              | `<ruta>: OK`             | Los avisos                                                                             | `0`                    |
+| Componente con errores              |                          | Los diagnósticos                                                                       | `1`                    |
+| Componente con `--json`             | El array de diagnósticos |                                                                                        | `1` si hay algún error |
 
 Cada diagnóstico de un `.meeko` apunta al archivo original, con su línea y su columna:
 
@@ -59,6 +59,8 @@ C:\proyectos\tienda\app\components\Greeting.meeko:3:23 aviso MEEK101: props.name
 ```
 
 El orden de un proyecto es: la configuración, la migración de `server/session.ts`, los archivos generados, los `.meeko` (si alguno tiene errores se detiene ahí) y, por último, TypeScript con `.meeko/tsconfig.app.json`, `tsconfig.server.json` y `tsconfig.shared.json`, uno tras otro.
+
+Un módulo normal de `app/` se comprueba con `tsconfig.app.json`, y por eso puede usar los autoimports sólo para código de navegador (`useHead`, `useForm`, `resolveComponent`…), que no existen en `server/`. Como sus exports también llegan al servidor, ese módulo entra además en el programa de `tsconfig.server.json`: desde `1.8`, `meeko check` omite ahí sus diagnósticos, ya comprobados en `tsconfig.app.json`. **`tsc -p .meeko/tsconfig.server.json` a mano no los omite** y da `TS2304` en esos nombres: use `meeko check`.
 
 ## Ejemplos
 

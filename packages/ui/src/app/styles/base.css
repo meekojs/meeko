@@ -1,0 +1,97 @@
+/*
+ * The global base of a Meeko app: reset, body and browser surfaces. In a layer, so any unlayered rule
+ * of the app wins without a fight. The module loads it unless `ui: { base: false }`.
+ */
+@layer ui-base {
+	*,
+	::before,
+	::after {
+		box-sizing: border-box;
+	}
+	:root {
+		background: var(--ui-color-bg);
+		scrollbar-color: var(--ui-color-border-strong) transparent;
+		scrollbar-gutter: stable;
+		accent-color: var(--ui-color-primary);
+		color-scheme: light;
+		caret-color: var(--ui-color-primary-text);
+		/*
+		 * The whole interface grows with the screen, here and nowhere else: every token is in rem. 16px
+		 * up to 1440, 18px at 2560 and 21px at 3840. The percentages keep the reader's own font size,
+		 * and the zoom works because it narrows the viewport.
+		 */
+		font-size: clamp(100%, 82% + 0.2vw, 137.5%);
+		-webkit-text-size-adjust: 100%;
+		text-size-adjust: 100%;
+	}
+	:root[data-theme='dark'] {
+		color-scheme: dark;
+	}
+	/*
+	 * Neither a dialog nor its ::backdrop reach the gutter kept for the scrollbar, which only takes the
+	 * background color of the root. So the root takes the color of the overlay, or of the drawer that
+	 * touches the gutter, and the body covers the screen so that the overlay does not darken the root twice.
+	 */
+	:root:has(.meeko-ui-modal:modal, .meeko-ui-drawer:modal) {
+		transition: background-color var(--ui-duration-slow) linear;
+		background-color: var(--ui-color-overlay-solid);
+	}
+	:root:has(.meeko-ui-drawer[data-side='end']:modal) {
+		background-color: var(--ui-color-surface-raised);
+	}
+	:root:has(.meeko-ui-modal:modal, .meeko-ui-drawer:modal) body {
+		min-block-size: 100dvh;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		:root:has(.meeko-ui-modal:modal, .meeko-ui-drawer:modal) {
+			transition: none;
+		}
+	}
+	body {
+		margin: 0;
+		background: var(--ui-color-bg);
+		color: var(--ui-color-text);
+		font: var(--ui-font-weight-regular) var(--ui-font-size-lg) / var(--ui-line-height-normal) var(--ui-font-sans);
+		-webkit-font-smoothing: antialiased;
+		-moz-osx-font-smoothing: grayscale;
+	}
+	:where(button, input, select, textarea) {
+		color: inherit;
+		font: inherit;
+		letter-spacing: inherit;
+	}
+	:where(code, kbd, pre, samp) {
+		font-family: var(--ui-font-mono);
+	}
+	:where(kbd) {
+		border: var(--ui-border-width) solid var(--ui-color-border);
+		border-radius: var(--ui-radius-xs);
+		background: var(--ui-color-bg-subtle);
+		padding: 0 var(--ui-space-1);
+		color: var(--ui-color-text-soft);
+		font-weight: var(--ui-font-weight-medium);
+		font-size: var(--ui-font-size-xs);
+		line-height: var(--ui-line-height-normal);
+	}
+	:where(img, video) {
+		max-inline-size: 100%;
+		block-size: auto;
+	}
+	:where(a) {
+		border-radius: var(--ui-radius-xs);
+		color: var(--ui-color-primary-text);
+		text-decoration-color: var(--ui-color-primary-border);
+		text-underline-offset: var(--ui-underline-offset);
+	}
+	:where(a):hover {
+		text-decoration-color: currentColor;
+	}
+	::selection {
+		background: var(--ui-color-selection);
+		color: var(--ui-color-text);
+	}
+	:focus-visible {
+		outline: var(--ui-focus-ring);
+		outline-offset: var(--ui-focus-ring-offset);
+	}
+}

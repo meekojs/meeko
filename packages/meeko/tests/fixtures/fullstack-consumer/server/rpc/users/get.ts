@@ -1,5 +1,5 @@
 import { defineRpc } from "@meekojs/meeko/server";
-import { userParams, userSchema } from "../../../shared/schemas/demo.js";
+import { userParams, userSchema } from "../../../shared/schemas/demo";
 
 export default defineRpc({
   input: userParams,

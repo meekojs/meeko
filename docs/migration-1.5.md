@@ -46,11 +46,11 @@ Un import de valores de un componente que llega al `server/` de un layer ya fall
 
 Algunas interfaces de objetos que Meeko entrega a la aplicación tienen miembros nuevos y obligatorios:
 
-| Interfaz | Miembros nuevos |
-| --- | --- |
-| `RouteState` (de `useRoute()`) | `isActive(to, { params, prefix })` |
-| `DataResource` y `LoadedResource` (de `useApi`, `useRpcQuery` y los recursos) | `refreshing` |
-| `Form` (de `useForm`) | `trySubmit`, `commit` y `field` |
+| Interfaz                                                                      | Miembros nuevos                    |
+| ----------------------------------------------------------------------------- | ---------------------------------- |
+| `RouteState` (de `useRoute()`)                                                | `isActive(to, { params, prefix })` |
+| `DataResource` y `LoadedResource` (de `useApi`, `useRpcQuery` y los recursos) | `refreshing`                       |
+| `Form` (de `useForm`)                                                         | `trySubmit`, `commit` y `field`    |
 
 [stability.md](stability.md#entradas-del-paquete) recoge desde `1.5` la regla: una interfaz que Meeko **entrega** puede ganar miembros en un minor, como una unión que Meeko entrega puede ganar miembros. Leerlas y desestructurarlas no cambia. Lo que deja de compilar es implementarlas a mano, por ejemplo en una prueba:
 
@@ -128,7 +128,7 @@ Viajan en el payload: una prop con `undefined` deja la prop en el valor por defe
 
 - **`form.field(name)`** devuelve un `FormField` tipado (la señal, el nombre, los IDs de `useId`, el mensaje, `invalid` y `describedBy`) para un componente de campo propio: `<AppField bind:field="form.field('email')" label="Correo" />`. Un componente de campo que sirve dentro y fuera de un formulario declara `field` opcional y el modelo por defecto con opciones sin nombre, `defineModel<string>({ default: "" })`, para que también sea opcional, y lee `computed(() => props.field?.value ?? model)`. Véase [Componentes de campo: `FormField`](framework.md#componentes-de-campo-formfield).
 - **`form.trySubmit(event)`** envía como `submit`, pero resuelve con un `FormSubmission` (`{ ok: true, result }` o `{ ok: false, reason: "invalid" | "error" | "skipped" }`) y nunca rechaza. `submit` no cambia.
-- **`form.commit(values?)`** toma los valores como nuevos iniciales de `dirty` y de `reset()`, sin borrar `submitted`; la opción `onSuccess(result, form)` se ejecuta tras un envío correcto, por ejemplo para llamar a `commit`.
+- **`form.commit(values?)`** tomaba los valores como nuevos iniciales de `dirty` y de `reset()` en 1.5, sin borrar `submitted`; la opción `onSuccess(result, form)` se ejecuta tras un envío correcto, por ejemplo para llamar a `commit`. En la API actual, `reset()` vuelve siempre al `initial` declarado; `commit` sólo actualiza la referencia de `dirty`.
 - **`focusInvalid: true`** mueve el foco al primer control inválido tras un envío con errores en los campos, del schema o de los `issues` del servidor.
 
 Véase [Formularios: `useForm`](framework.md#formularios-useform).
@@ -183,7 +183,7 @@ Para marcar la sección de la navegación, `<MeekoLink to="/dashboard" match="pr
 
 ### `<MeekoPopover>` y `<MeekoSelect>`
 
-`<MeekoPopover>` es un popover accesible sobre la API nativa `popover` y *CSS anchor positioning* (menús, diálogos no modales y tooltips con `mode="hint"`), y `<MeekoSelect>` un select accesible construido sobre él, cuyo `model` toma el tipo de `options`, con búsqueda, grupos, selección múltiple y `bind:field` de `useForm`. Ninguno trae estilos visuales y ambos funcionan con una CSP sin `'unsafe-inline'`. El snippet `anchor` de `<MeekoPopover>` acepta un disparador propio con `bind="trigger"`. Véase [Popover](api.md#popover-meekopopover) y [Select](api.md#select-meekoselect).
+`<MeekoPopover>` es un popover accesible sobre la API nativa `popover` y _CSS anchor positioning_ (menús, diálogos no modales y tooltips con `mode="hint"`), y `<MeekoSelect>` un select accesible construido sobre él, cuyo `model` toma el tipo de `options`, con búsqueda, grupos, selección múltiple y `bind:field` de `useForm`. Ninguno trae estilos visuales y ambos funcionan con una CSP sin `'unsafe-inline'`. El snippet `anchor` de `<MeekoPopover>` acepta un disparador propio con `bind="trigger"`. Véase [Popover](api.md#popover-meekopopover) y [Select](api.md#select-meekoselect).
 
 ### Aliases de ruta
 
@@ -203,15 +203,15 @@ Véase [Aliases de ruta](framework.md#aliases-de-ruta).
 
 ## Códigos nuevos
 
-| Código | Dónde | Qué señala |
-| --- | --- | --- |
+| Código    | Dónde                                         | Qué señala                                                                                                                                                                                                                                       |
+| --------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `MEEK112` | Compilador, `meeko check`, editor y ejecución | Una etiqueta que `<component is>` no puede renderizar (`script`, `style`, `iframe`…: error de compilación con un literal, de tipos con una expresión y `TypeError` en ejecución), o un atributo que no admite ninguna de sus etiquetas posibles. |
-| `MEEK113` | `meeko check`, editor y ejecución | El valor de `bind="…"` que no es un objeto, una clave `on*` o `data-meeko*`, o una clave que no es una prop del componente. |
-| `MEEK114` | Compilador | Un `to` estático de `<MeekoTeleport>` que no es `"body"` ni `"#id"`. |
-| `MEEK115` | `meeko check` | Un `+group.ts` fuera de `app/pages`. |
-| `MEEK116` | Compilador | `<MeekoAwait>` sin `for`. |
-| `MEEK117` | `meeko check`, `meeko build` y editor (pista) | Una página o un layout que pinta en un `each:of` los datos de un `useApi` o un `useRpcQuery` sin `await` sin ocuparse de su carga. No hace fallar la comprobación. |
-| `MEEK118` | `meeko check`, `meeko dev` y build | `@/` (o un alias de `app/`) en `shared/`, que no ve `app/`. |
+| `MEEK113` | `meeko check`, editor y ejecución             | El valor de `bind="…"` que no es un objeto, una clave `on*` o `data-meeko*`, o una clave que no es una prop del componente.                                                                                                                      |
+| `MEEK114` | Compilador                                    | Un `to` estático de `<MeekoTeleport>` que no es `"body"` ni `"#id"`.                                                                                                                                                                             |
+| `MEEK115` | `meeko check`                                 | Un `+group.ts` fuera de `app/pages`.                                                                                                                                                                                                             |
+| `MEEK116` | Compilador                                    | `<MeekoAwait>` sin `for`.                                                                                                                                                                                                                        |
+| `MEEK117` | `meeko check`, `meeko build` y editor (pista) | Una página o un layout que pinta en un `each:of` los datos de un `useApi` o un `useRpcQuery` sin `await` sin ocuparse de su carga. No hace fallar la comprobación.                                                                               |
+| `MEEK118` | `meeko check`, `meeko dev` y build            | `@/` (o un alias de `app/`) en `shared/`, que no ve `app/`.                                                                                                                                                                                      |
 
 ## Editor
 

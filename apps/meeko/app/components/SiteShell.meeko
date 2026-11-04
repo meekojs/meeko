@@ -1,0 +1,147 @@
+<script lang="ts">
+	// The adapter of the snapshot: it builds the view of <DocsShell> from what a page of the snapshot brings,
+	// the announcements of the request and the language. <DocsShell> knows none of them.
+	import type { PageLocale } from 'meeko-docs-content/locale'
+	import type { PublicAnnouncement } from 'meeko-docs-content/moderation/shared'
+	import type { DocsShellView } from 'meeko-docs/shell'
+
+	import { inject } from '@meekojs/meeko'
+	import { dismissCookie, moderationEndpoint } from 'meeko-docs-content/moderation/shared'
+	import { refreshOnNavigation } from 'meeko-docs/state'
+
+	import type { NavSection, Pager, TocEntry } from '../../shared/types/docs'
+
+	import { announcementsKey } from '../utils/announcements'
+
+	interface Props {
+		layout: 'docs' | 'landing'
+		nav?: readonly NavSection[] | undefined
+		/** URL of the page, to mark it in the sidebar and for the «¿Te sirvió?» widget. */
+		current?: string | undefined
+		toc?: readonly TocEntry[] | undefined
+		pager?: Pager | undefined
+		/** "Edit on GitHub" link and repository path of the source. */
+		editUrl?: string | undefined
+		source?: string | undefined
+		/** The language of the page in the snapshot: a missing translation shows the Spanish text with a notice. */
+		i18n?: PageLocale | null | undefined
+	}
+
+	const props = defineProps<Props>()
+
+	const snippets = defineSnippets<{ default: [] }>()
+
+	const route = useRoute()
+	const i18n = useI18n()
+	const { localePath, t } = i18n
+
+	// The links in the language of the document: /docs/api in Spanish, /en/docs/api in English.
+	const doc = (slug: string): string => localePath(href('/docs/[slug]', { params: { slug } }))
+	const repository = 'https://github.com/meekojs/meeko'
+	const start = doc('inicio-rapido')
+
+	/** What the server plugin provided for this request; nothing on the browser, which hydrates the state instead. */
+	function provided(): readonly PublicAnnouncement[] {
+		try {
+			return inject(announcementsKey)
+		} catch {
+			return []
+		}
+	}
+
+	// In SSR the plugin's list goes into the state, so the banner is in the first HTML and the browser
+	// hydrates the same list from the payload, without a flash. That state keeps its first value across
+	// client navigations: after each one it asks the server again (server/middleware/20-moderation.ts), so
+	// announcements that start, end or change in the dashboard show without a reload.
+	const announcements = useState<readonly PublicAnnouncement[]>('site:announcements', provided)
+	refreshOnNavigation(
+		announcements,
+		() => moderationEndpoint('site', i18n.locale === 'en' ? 'en' : 'es'),
+		(moderation) => moderation.announcements,
+	)
+
+	/** Closes an announcement and remembers it in a cookie, which the server reads on the next page. */
+	function dismiss(id: number): void {
+		document.cookie = dismissCookie(document.cookie, id, location.protocol === 'https:')
+		announcements.value = announcements.value.filter((item) => item.id !== id)
+	}
+
+	// The reader's language (the cookie, then navigator.languages) as a suggestion, never a redirect: computed
+	// once mounted and only for a version this page has. Staying stores the current language.
+	const suggestion = signal<string | undefined>(undefined)
+	onMounted(() => {
+		const preferred = i18n.suggestedLocale()
+		suggestion.value = preferred !== undefined && i18n.pageLocales().includes(preferred) && preferred !== i18n.locale ? preferred : undefined
+	})
+	function stay(): void {
+		i18n.rememberLocale(i18n.locale)
+		suggestion.value = undefined
+	}
+
+	const view = computed<DocsShellView>(() => {
+		const page = props.i18n
+		const fallback = page?.fallback === true
+		const outdated = page?.status === 'outdated'
+		return {
+			layout: props.layout,
+			product: {
+				name: 'Meeko',
+				brandName: 'Meeko',
+				repository,
+				homeHref: localePath(href('/')),
+				logo: { src: '/brand/meeko-logo.webp', width: 24, height: 24 },
+				linksLabel: t('a11y.primaryNav'),
+				links: [
+					{ label: t('nav.guide'), href: doc('framework') },
+					{ label: t('nav.api'), href: localePath(href('/docs/reference')) },
+					{ label: t('nav.changes'), href: doc('changelog') },
+					{ label: 'GitHub', href: repository, rel: 'noopener', title: t('a11y.github') },
+				],
+			},
+			current: props.current ?? route.path.value,
+			navigation: (props.nav ?? []).map((section) => ({ title: section.title, ...(section.icon ? { icon: section.icon } : {}), items: section.links.map((link) => ({ label: link.label, href: link.href, ...(link.code ? { code: true } : {}), ...(link.featured ? { featured: true } : {}) })) })),
+			...(props.toc?.length ? { toc: props.toc } : {}),
+			...(props.pager ? { pager: { ...(props.pager.previous ? { previous: props.pager.previous } : {}), ...(props.pager.next ? { next: props.pager.next } : {}) } } : {}),
+			...(props.editUrl ? { edit: { href: props.editUrl, source: props.source ?? '' } } : {}),
+			locale: { requested: i18n.locale, content: fallback ? 'es' : i18n.locale, fallback, outdated, original: 'es', originalHref: fallback || outdated ? i18n.switchLocalePath('es') : undefined, suggested: suggestion.value },
+			locales: i18n.pageLocales().map((code) => ({ code, label: i18n.localeName(code), href: i18n.switchLocalePath(code), current: code === i18n.locale })),
+			announcements: announcements.value,
+			search: { mode: 'dialog', query: '' },
+		}
+	})
+
+	// The layout stays mounted between pages, and the widget belongs to one: its key gives each page its own.
+	const feedbackPages = computed(() => (props.layout === 'docs' && props.current ? [props.current] : []))
+</script>
+
+<template>
+	<DocsShell
+		bind:view="view.value"
+		on:dismissAnnouncement="dismiss"
+		on:stayLocale="stay"
+	>
+		<render snippet="snippets.default" />
+		<snippet name="after">
+			<DocsFeedback
+				each:of="feedbackPages.value"
+				each:as="path"
+				each:key="path"
+				bind:path="path"
+			/>
+		</snippet>
+		<snippet name="searchResults">
+			<SiteSearch />
+		</snippet>
+		<snippet name="headerActions">
+			<UILink
+				size="sm"
+				bind:href="start"
+			>
+				{t('nav.start')}
+			</UILink>
+		</snippet>
+		<snippet name="footer">
+			<SiteFooter />
+		</snippet>
+	</DocsShell>
+</template>

@@ -1,0 +1,35 @@
+<script lang="ts">
+	import type { UIPageHeaderProps } from '../types/navigation'
+
+	const props = defineProps<UIPageHeaderProps>({ layout: 'docs' })
+
+	const snippets = defineSnippets<{ default?: []; breadcrumb?: []; actions?: [] }>()
+</script>
+
+<template>
+	<header
+		bind:class="['meeko-ui-page-header', props.class].filter(Boolean).join(' ')"
+		bind:data-layout="props.layout"
+	>
+		<render
+			if:when="snippets.breadcrumb"
+			snippet="snippets.breadcrumb"
+		/>
+		<div class="meeko-ui-page-header-row">
+			<div class="meeko-ui-page-header-text">
+				<h1>{props.title}</h1>
+				<p if:when="props.description">{props.description}</p>
+			</div>
+			<div
+				if:when="snippets.actions"
+				class="meeko-ui-page-header-actions"
+			>
+				<render snippet="snippets.actions" />
+			</div>
+		</div>
+		<render
+			if:when="snippets.default"
+			snippet="snippets.default"
+		/>
+	</header>
+</template>

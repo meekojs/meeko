@@ -24,6 +24,7 @@ Los adaptadores de Node, Bun, Deno y Cloudflare de Meeko lo comparten. Se usa di
 ## Uso
 
 <!-- no-check -->
+
 ```ts
 // server.ts, en Deno
 import { createSocketUpgradeHandler } from "@meekojs/meeko/server";
@@ -47,23 +48,23 @@ Deno.serve(async (request) => {
 
 ## Opciones
 
-| Opción | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `hub` | `SocketHub` | obligatorio | El hub de la aplicación (`app.socket.hub`) o uno de `createSocketHub`. |
-| `publicOrigin` | origen | obligatorio | Origen público fijo, `http:` o `https:`. La URL de cada handshake se reconstruye con él: la política nunca se deduce de una cabecera `Host` que el cliente controla. |
-| `pathnamePrefix` | texto | `/_meeko/socket` | Prefijo de los canales, que se sirven en `<prefijo>/<nombre>`. |
-| `maxPendingBytes` | número | 65 536 | Bytes entrantes que se retienen mientras el hub autoriza una conexión nueva. |
-| `onError` | `(error) => void` | ninguno | Fallos del transporte y de las sesiones. |
+| Opción            | Tipo              | Por defecto      | Descripción                                                                                                                                                          |
+| ----------------- | ----------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `hub`             | `SocketHub`       | obligatorio      | El hub de la aplicación (`app.socket.hub`) o uno de `createSocketHub`.                                                                                               |
+| `publicOrigin`    | origen            | obligatorio      | Origen público fijo, `http:` o `https:`. La URL de cada handshake se reconstruye con él: la política nunca se deduce de una cabecera `Host` que el cliente controla. |
+| `pathnamePrefix`  | texto             | `/_meeko/socket` | Prefijo de los canales, que se sirven en `<prefijo>/<nombre>`.                                                                                                       |
+| `maxPendingBytes` | número            | 65 536           | Bytes entrantes que se retienen mientras el hub autoriza una conexión nueva.                                                                                         |
+| `onError`         | `(error) => void` | ninguno          | Fallos del transporte y de las sesiones.                                                                                                                             |
 
 ## Valor devuelto
 
 `(request: Request) => Promise<SocketUpgrade>`, donde `SocketUpgrade` es una de:
 
-| `action` | Cuándo | Qué hace el adaptador |
-| --- | --- | --- |
-| `"pass"` | La ruta no empieza por el prefijo. | Pasar la petición a `app.fetch`. |
-| `"reject"` | Nombre de canal inválido o no es un `GET` con `Upgrade: websocket` (`400`), canal desconocido (`404`), `Origin` no permitido (`403`), sesión o autorización rechazadas (`401`, `403`). | Responder con `status`. Desde `1.1`, un `401` o `403` de la sesión o del canal lleva `close` (`4401` o `4403`): el adaptador hace el upgrade y cierra con ese código, que el navegador sí puede leer. |
-| `"upgrade"` | El hub aceptó el handshake. | Hacer el upgrade y llamar a `open(peer)`, que devuelve `{ receive(message), closed() }` para conectar los eventos del socket. |
+| `action`    | Cuándo                                                                                                                                                                                 | Qué hace el adaptador                                                                                                                                                                                 |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `"pass"`    | La ruta no empieza por el prefijo.                                                                                                                                                     | Pasar la petición a `app.fetch`.                                                                                                                                                                      |
+| `"reject"`  | Nombre de canal inválido o no es un `GET` con `Upgrade: websocket` (`400`), canal desconocido (`404`), `Origin` no permitido (`403`), sesión o autorización rechazadas (`401`, `403`). | Responder con `status`. Desde `1.1`, un `401` o `403` de la sesión o del canal lleva `close` (`4401` o `4403`): el adaptador hace el upgrade y cierra con ese código, que el navegador sí puede leer. |
+| `"upgrade"` | El hub aceptó el handshake.                                                                                                                                                            | Hacer el upgrade y llamar a `open(peer)`, que devuelve `{ receive(message), closed() }` para conectar los eventos del socket.                                                                         |
 
 Lanza `TypeError` al crearse si `publicOrigin` no es HTTP(S) (`Socket publicOrigin must use HTTP or HTTPS`) o el prefijo no es válido, y `RangeError` si `maxPendingBytes` no es un entero positivo.
 
@@ -90,6 +91,7 @@ console.log(await handleUpgrade(new Request("http://localhost/_meeko/socket/nope
 ### Node, con el adaptador de Meeko
 
 <!-- no-check -->
+
 ```ts
 import { createServer } from "node:http";
 import { attachNodeWebSocketServer, toNodeListener } from "@meekojs/meeko/node";
@@ -112,6 +114,7 @@ createSocketUpgradeHandler({ hub, publicOrigin: new URL(request.url).origin });
 Con un proxy delante, `request.url` lleva el `Host` que envía el cliente: la comprobación de `Origin` aceptaría lo que un atacante quiera. El origen es configuración.
 
 <!-- no-check -->
+
 ```ts good
 createSocketUpgradeHandler({ hub, publicOrigin: process.env.MEEKO_PUBLIC_ORIGIN ?? "http://127.0.0.1:3000" });
 ```
@@ -125,6 +128,7 @@ createSocketUpgradeHandler({ hub, publicOrigin: "localhost:3000" });
 `TypeError: Socket publicOrigin must use HTTP or HTTPS`.
 
 <!-- no-check -->
+
 ```ts good
 createSocketUpgradeHandler({ hub, publicOrigin: "http://localhost:3000" });
 ```
@@ -138,6 +142,7 @@ if (upgrade.action === "reject") return new Response(null, { status: upgrade.sta
 El navegador no expone el estado HTTP de un WebSocket rechazado: el cliente sólo ve un error genérico y vuelve a intentarlo para siempre. Con `close`, el adaptador acepta y cierra con `4401`/`4403`, y `createSocketClient` pasa a `"unauthorized"` sin reintentar.
 
 <!-- no-check -->
+
 ```ts good
 if (upgrade.action === "reject" && !upgrade.close) return new Response(null, { status: upgrade.status });
 // …hace el upgrade y cierra con upgrade.close.code y upgrade.close.reason

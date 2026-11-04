@@ -1,0 +1,83 @@
+<script lang="ts">
+	import { englishExamples as examples } from '../../utils/examples.en'
+	const i18n = useI18n()
+	const name = signal('Meeko')
+</script>
+<template>
+	<DocsPage
+		product="Meeko i18n"
+		locale="en"
+		landing
+		title="Every language. The same contract."
+		description="Typed translations, catalogs per language and native formats for your Meeko applications."
+	>
+		<div class="docs-actions">
+			<UILink to="/installation">Start translating</UILink>
+			<UILink
+				to="/playground"
+				variant="outline"
+			>
+				Open the playground
+			</UILink>
+		</div>
+		<div class="docs-showcase">
+			<div>
+				<h2>A message that understands your data.</h2>
+				<p>Write a translation with parameters and use it from your component. Keys and arguments reach your editor typed.</p>
+				<UIField
+					id="home-name"
+					label="Your name"
+				>
+					<snippet
+						name="default"
+						params="id, describedBy"
+					>
+						<UIInput
+							model="name"
+							bind:id="id"
+							bind:describedBy="describedBy"
+						/>
+					</snippet>
+				</UIField>
+				<section aria-label="Live translation">
+					<UICard>
+						<div class="docs-stack">
+							<p
+								data-output="greeting"
+								role="status"
+							>
+								{i18n.t('greeting', { name: name.value })}
+							</p>
+							<UIBadge tone="accent">{i18n.locale}</UIBadge>
+						</div>
+					</UICard>
+				</section>
+			</div>
+			<DocsCode bind:code="examples.usage" />
+		</div>
+		<h2>From the catalog to the interface</h2>
+		<p>The module validates the languages when the application is prepared and generates the TypeScript contract. In SSR and in the browser, the catalog of the active language is used; formatters are reused per options.</p>
+		<div class="docs-grid">
+			<UILinkCard
+				to="/messages"
+				title="Typed parameters"
+				description="Keys, arguments and contracts between languages."
+			/>
+			<UILinkCard
+				to="/plurals"
+				title="Plurals and selectors"
+				description="The right text for every quantity and alternative."
+			/>
+			<UILinkCard
+				to="/formatting"
+				title="Numbers and dates"
+				description="Intl formats and consistent results in SSR."
+			/>
+			<UILinkCard
+				to="/namespaces"
+				title="Catalogs per route"
+				description="Load common and add namespaces when a route needs them."
+			/>
+		</div>
+	</DocsPage>
+</template>

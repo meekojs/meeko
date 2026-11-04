@@ -1,0 +1,44 @@
+<script lang="ts">
+	import { englishExamples as examples } from '../../../utils/examples.en'
+</script>
+<template>
+	<DocsPage
+		locale="en"
+		title="View Transitions"
+		description="Connect a list surface and a detail surface with the browser's native API."
+	>
+		<p>When you open the project, its card turns into the detail view through the browser's native API.</p>
+		<div class="docs-grid">
+			<UICard
+				title="Project Aurora"
+				description="The team's website"
+				class="view-transition-demo-project"
+			>
+				<p>One surface, two views. The navigation keeps the visual identity of the project.</p>
+				<snippet name="footer">
+					<UILink
+						to="/transitions/project"
+						variant="outline"
+					>
+						See project
+					</UILink>
+				</snippet>
+			</UICard>
+		</div>
+		<p>
+			You can also
+			<MeekoLink
+				to="/transitions/project"
+				data-meeko-view-transition="false"
+			>
+				open it without a transition</MeekoLink
+			>.
+		</p>
+		<h2>Configuration</h2>
+		<p>This feature belongs to the framework, not to the UI module. It needs browser support and respects reduced motion; navigation keeps working when it cannot animate.</p>
+		<DocsCode
+			label="Configuration, CSS and link"
+			bind:code="examples.transitions"
+		/>
+	</DocsPage>
+</template>

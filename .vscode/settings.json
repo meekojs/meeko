@@ -1,0 +1,14 @@
+{
+	"eslint.validate": ["javascript", "javascriptreact", "typescript", "typescriptreact", "meeko"],
+	"eslint.workingDirectories": [{ "directory": "." }],
+	"editor.codeActionsOnSave": {
+		"source.fixAll.eslint": "explicit"
+	},
+	"editor.formatOnSave": true,
+	"[javascript][javascriptreact][typescript][typescriptreact][json][jsonc][css][html][markdown]": {
+		"editor.defaultFormatter": "esbenp.prettier-vscode"
+	},
+	"[meeko]": {
+		"editor.defaultFormatter": "meekojs.meeko-language"
+	}
+}

@@ -1,0 +1,129 @@
+// The public contract of the moderation screen: rules that hide or feature a page of a web, and
+// the announcements each web shows in its header. Dates travel as ISO strings.
+import * as v from 'valibot'
+
+import { localeSchema, siteSchema } from './dashboard'
+
+const id = v.pipe(v.number(), v.integer(), v.minValue(1))
+/** The version of a rule or an announcement the screen read: a write applies only while the row still has it. */
+const version = v.pipe(v.number(), v.integer(), v.minValue(1))
+const date = v.string()
+/** An instant that the browser chose in its local time and sent as ISO. */
+const instant = v.pipe(
+	v.string(),
+	v.check((value) => !Number.isNaN(Date.parse(value)), 'validation.date'),
+)
+
+export const moderationActionSchema = v.picklist(['hide', 'feature'])
+export const announcementToneSchema = v.picklist(['info', 'success', 'warning', 'danger'])
+/** Whether an announcement shows now (meeko-docs-content `announcementState`). */
+export const announcementStateSchema = v.picklist(['live', 'scheduled', 'ended', 'inactive'])
+/** The language a rule or an announcement applies to; `null` for every language. */
+export const moderationLocaleSchema = v.nullable(localeSchema)
+
+/** A page a rule can name: a source of the web, or a page of the site's active snapshot. */
+export const knownPageSchema = v.object({ path: v.string(), title: v.string(), origin: v.picklist(['source', 'snapshot']) })
+
+export const moderationRuleSchema = v.object({
+	id: v.number(),
+	site: siteSchema,
+	/** The language whose page it moderates, or `null` for every language. */
+	locale: moderationLocaleSchema,
+	/** The path without the language prefix, the same in every language. */
+	path: v.string(),
+	/** The title of the page, or `null` when the web no longer has it. */
+	title: v.nullable(v.string()),
+	action: moderationActionSchema,
+	reason: v.nullable(v.string()),
+	author: v.string(),
+	createdAt: date,
+	version: v.number(),
+})
+
+export const announcementSchema = v.object({
+	id: v.number(),
+	site: siteSchema,
+	/** The language whose pages show it, or `null` for every language. */
+	locale: moderationLocaleSchema,
+	message: v.string(),
+	tone: announcementToneSchema,
+	startsAt: v.nullable(date),
+	endsAt: v.nullable(date),
+	active: v.boolean(),
+	state: announcementStateSchema,
+	author: v.string(),
+	createdAt: date,
+	version: v.number(),
+})
+
+export const moderationSchema = v.object({
+	site: siteSchema,
+	pages: v.array(knownPageSchema),
+	rules: v.array(moderationRuleSchema),
+	announcements: v.array(announcementSchema),
+	/** Rules and announcements of every web, for the counters of the tabs. */
+	counts: v.object({
+		site: v.object({ rules: v.number(), live: v.number() }),
+		ui: v.object({ rules: v.number(), live: v.number() }),
+		i18n: v.object({ rules: v.number(), live: v.number() }),
+	}),
+})
+
+export const moderationInput = v.object({ site: siteSchema })
+
+/** A rule or an announcement to delete, at the version the screen read. */
+export const moderationIdInput = v.object({ id, version })
+
+/** Switches an announcement on or off, at the version the screen read; nothing else changes. */
+export const announcementActiveInput = v.object({ id, version, active: v.boolean() })
+
+/** The longest reason and message the schema of the database accepts. */
+export const maxReasonLength = 2000
+export const maxMessageLength = 500
+
+export const saveRuleInput = v.pipe(
+	v.object({
+		site: siteSchema,
+		/** The language of the page, `null` for every language; Spanish without it, as before. */
+		locale: v.optional(moderationLocaleSchema),
+		path: v.pipe(v.string(), v.regex(/^\/[^?#\s]*$/, 'validation.choosePage'), v.maxLength(512)),
+		action: moderationActionSchema,
+		reason: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(maxReasonLength, 'validation.max2000'))),
+		/**
+		 * The rule of this page the screen read, or `null` when it had none: its id and its version.
+		 * A rule deleted and created again starts at version 1 again, so the version alone does not
+		 * name it.
+		 */
+		id: v.nullable(id),
+		version: v.nullable(version),
+	}),
+	v.check((input) => (input.id === null) === (input.version === null), 'validation.ruleVersion'),
+)
+
+export const saveAnnouncementInput = v.pipe(
+	v.object({
+		/** The announcement to change; a new one without it. */
+		id: v.optional(id),
+		/** The version of that announcement the screen read; required with `id`. */
+		version: v.optional(version),
+		site: siteSchema,
+		/** The language whose pages show it, `null` for every language; without it, Spanish for a new one and the one it had for a change. */
+		locale: v.optional(moderationLocaleSchema),
+		message: v.pipe(v.string(), v.trim(), v.minLength(1, 'validation.message'), v.maxLength(maxMessageLength, 'validation.max500')),
+		tone: announcementToneSchema,
+		startsAt: v.nullable(instant),
+		endsAt: v.nullable(instant),
+		active: v.boolean(),
+	}),
+	v.check((input) => input.startsAt === null || input.endsAt === null || Date.parse(input.endsAt) > Date.parse(input.startsAt), 'validation.endAfterStart'),
+	v.check((input) => (input.id === undefined) === (input.version === undefined), 'validation.announcementVersion'),
+)
+
+export type ModerationLocale = v.InferOutput<typeof moderationLocaleSchema>
+export type ModerationAction = v.InferOutput<typeof moderationActionSchema>
+export type AnnouncementTone = v.InferOutput<typeof announcementToneSchema>
+export type AnnouncementState = v.InferOutput<typeof announcementStateSchema>
+export type KnownPageRow = v.InferOutput<typeof knownPageSchema>
+export type ModerationRuleRow = v.InferOutput<typeof moderationRuleSchema>
+export type AnnouncementRow = v.InferOutput<typeof announcementSchema>
+export type ModerationView = v.InferOutput<typeof moderationSchema>

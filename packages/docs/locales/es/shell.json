@@ -1,0 +1,114 @@
+{
+	"shell": {
+		"meta": {
+			"lang": "es"
+		},
+		"skip": "Saltar al contenido",
+		"brand": {
+			"home": "Meeko {name}, inicio",
+			"site": "{name}, inicio"
+		},
+		"nav": {
+			"ecosystem": "Ecosistema",
+			"docs": "Documentación",
+			"framework": "Framework",
+			"docsOf": "Documentación de {product}",
+			"featured": "Destacado",
+			"empty": "No hay coincidencias. Prueba con otro nombre.",
+			"menu": "Menú",
+			"contents": "Contenidos"
+		},
+		"search": {
+			"label": "Buscar en la guía",
+			"placeholder": "Filtrar documentación…"
+		},
+		"package": "Paquete de Meeko",
+		"footer": {
+			"tagline": "Meeko {name} · Documentación del ecosistema Meeko.",
+			"license": "Licencia MIT"
+		},
+		"locale": {
+			"label": "Idioma",
+			"offer": {
+				"select": "locale",
+				"forms": {
+					"es": "Leer esta página en español",
+					"en": "Read this page in English",
+					"other": "{language}"
+				}
+			},
+			"stay": {
+				"select": "locale",
+				"forms": {
+					"es": "Seguir en español",
+					"en": "Seguir en inglés",
+					"other": "Seguir en {language}"
+				}
+			},
+			"suggestion": {
+				"select": "locale",
+				"forms": {
+					"es": "Sugerencia de idioma",
+					"en": "Language suggestion",
+					"other": "Sugerencia de idioma"
+				}
+			},
+			"message": {
+				"select": "locale",
+				"forms": {
+					"es": "Esta página también está en español.",
+					"en": "This page is also available in English.",
+					"other": "{language}"
+				}
+			}
+		},
+		"outdated": {
+			"title": "La traducción puede estar desactualizada",
+			"message": "El original cambió después de traducirse esta página."
+		},
+		"untranslated": {
+			"title": "Página sin traducir",
+			"message": "Esta página aún no está traducida y se muestra en su versión original.",
+			"original": "Ver la versión original"
+		},
+		"announcements": {
+			"close": "Cerrar aviso"
+		},
+		"api": {
+			"caption": "Propiedades",
+			"name": "Nombre",
+			"type": "Tipo / valor inicial",
+			"description": "Descripción"
+		},
+		"code": {
+			"label": "Ejemplo .meeko",
+			"copy": "Copiar",
+			"copyLabel": "Copiar código",
+			"copied": "Copiado",
+			"copyFailed": "Selecciona el código para copiarlo."
+		},
+		"feedback": {
+			"title": "¿Te sirvió esta página?",
+			"yes": "Sí",
+			"no": "No",
+			"thanks": "Gracias por tu respuesta: nos ayuda a mejorar la documentación.",
+			"addComment": "Añadir un comentario",
+			"commentLabel": "Comentario opcional: qué falta, qué no se entiende o qué sobra",
+			"counter": "{length} de {max} caracteres",
+			"hint": "Se envía al elegir «Sí» o «No». Solo se guardan la página, tu respuesta y el comentario: ni cookies ni datos tuyos.",
+			"helpfulRequired": "Elige «Sí» o «No».",
+			"commentTooLong": "Usa como mucho {max} caracteres.",
+			"rateLimited": "Has enviado varias respuestas seguidas. Vuelve a intentarlo en unos minutos.",
+			"failed": "No se pudo enviar tu respuesta. Comprueba la conexión y vuelve a intentarlo."
+		},
+		"theme": {
+			"light": "Claro",
+			"dark": "Oscuro",
+			"system": "Sistema",
+			"unknown": "Cambiar tema",
+			"cycle": "Tema: {current}. Cambiar a {next}",
+			"group": "Tema"
+		},
+		"edit": "Editar en GitHub: {source}"
+	}
+}

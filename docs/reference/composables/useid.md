@@ -152,6 +152,7 @@ const titleId = useId();
 Además, la plantilla no puede usar `titleId`: `meeko check` da `MEEK057`. Llama a `useId` antes del primer `await`:
 
 <!-- no-check -->
+
 ```ts good
 const titleId = useId();
 const panel = await useElementRef("panel");

@@ -35,22 +35,22 @@ La única línea de la salida estándar es la carpeta generada, así que un scri
 
 ## Opciones
 
-| Opción | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `[directorio]` | ruta | `.` | Raíz del proyecto. |
+| Opción                                      | Tipo                                                  | Por defecto                | Descripción                                                                                                                                                                                                                                                                                                                                  |
+| ------------------------------------------- | ----------------------------------------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `[directorio]`                              | ruta                                                  | `.`                        | Raíz del proyecto.                                                                                                                                                                                                                                                                                                                           |
 | `--adapter <nombre>` o `--adapter=<nombre>` | `node` \| `bun` \| `deno` \| `cloudflare` \| `static` | `server.adapter`, o `node` | Adaptador de esta ejecución. Puede ir en cualquier posición después de `build`. No cambia qué opciones de `server` se leen: `host` y `port` sólo con `server.adapter: "node"`, `headerFiles` sólo con `"static"`, y `contentSecurityPolicy` y `headers` de un `server` que no es `"static"` se aplican con cualquier adaptador con servidor. |
-| `MEEKO_PUBLIC_ORIGIN` | origen | ninguno | Origen de las URL absolutas (`sitemap.xml`, `robots.txt`, `document.seo`) si `meeko.config.ts` no declara `site`. |
-| `.env` del proyecto | | | Se lee antes de la configuración, como en `meeko check`. |
+| `MEEKO_PUBLIC_ORIGIN`                       | origen                                                | ninguno                    | Origen de las URL absolutas (`sitemap.xml`, `robots.txt`, `document.seo`) si `meeko.config.ts` no declara `site`.                                                                                                                                                                                                                            |
+| `.env` del proyecto                         |                                                       |                            | Se lee antes de la configuración, como en `meeko check`.                                                                                                                                                                                                                                                                                     |
 
 ## Resultado
 
-| Adaptador | Carpeta | Contenido | Se ejecuta con |
-| --- | --- | --- | --- |
-| `node` | `.meeko/output/node/` | `index.mjs`, `chunks/`, `client/`, `prerender/` | `meeko start`, `meeko preview` o `node .meeko/output/node/index.mjs`; necesita `node_modules` con `@meekojs/meeko` |
-| `bun` | `.meeko/output/bun/` | `index.js` con todas las dependencias, `chunks/`, `client/`, `prerender/` | `bun .meeko/output/bun/index.js` |
-| `deno` | `.meeko/output/deno/` | `main.js` con todas las dependencias, `chunks/`, `client/`, `prerender/` | `deno run --allow-net --allow-env --allow-read=.meeko/output/deno …/main.js` |
-| `cloudflare` | `.meeko/output/cloudflare/` | `worker.js`, `wrangler.jsonc`, los assets y las páginas prerenderizadas | `wrangler deploy --config .meeko/output/cloudflare/wrangler.jsonc` |
-| `static` | `.meeko/output/static/` | El HTML y el payload de cada página, los assets, `404.html` y los archivos de cabeceras | Cualquier hosting estático |
+| Adaptador    | Carpeta                     | Contenido                                                                               | Se ejecuta con                                                                                                     |
+| ------------ | --------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `node`       | `.meeko/output/node/`       | `index.mjs`, `chunks/`, `client/`, `prerender/`                                         | `meeko start`, `meeko preview` o `node .meeko/output/node/index.mjs`; necesita `node_modules` con `@meekojs/meeko` |
+| `bun`        | `.meeko/output/bun/`        | `index.js` con todas las dependencias, `chunks/`, `client/`, `prerender/`               | `bun .meeko/output/bun/index.js`                                                                                   |
+| `deno`       | `.meeko/output/deno/`       | `main.js` con todas las dependencias, `chunks/`, `client/`, `prerender/`                | `deno run --allow-net --allow-env --allow-read=.meeko/output/deno …/main.js`                                       |
+| `cloudflare` | `.meeko/output/cloudflare/` | `worker.js`, `wrangler.jsonc`, los assets y las páginas prerenderizadas                 | `wrangler deploy --config .meeko/output/cloudflare/wrangler.jsonc`                                                 |
+| `static`     | `.meeko/output/static/`     | El HTML y el payload de cada página, los assets, `404.html` y los archivos de cabeceras | Cualquier hosting estático                                                                                         |
 
 Además:
 

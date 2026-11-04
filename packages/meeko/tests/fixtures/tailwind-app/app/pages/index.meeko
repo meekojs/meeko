@@ -1,0 +1,12 @@
+<script server lang="ts">
+export const route = { render: 'prerender' }
+</script>
+
+<template>
+	<main class="flex gap-gutter text-white bg-brand meeko-probe">
+		<Card
+			tone="strong"
+			title="Tailwind"
+		/>
+	</main>
+</template>

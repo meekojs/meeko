@@ -1,25 +1,28 @@
-import { build } from "esbuild";
+import { build } from 'esbuild'
+import { readFile } from 'node:fs/promises'
+
+const { version: meekoVersion } = JSON.parse(await readFile(new URL('../meeko/package.json', import.meta.url), 'utf8'))
 
 const common = {
-  bundle: true,
-  platform: "node",
-  format: "esm",
-  target: "node20",
-  mainFields: ["module", "main"],
-  // Bundled CommonJS dependencies call `require`. The import is renamed: bundled modules of the
-  // server import `createRequire` themselves, and a second top-level binding fails to load.
-  banner: { js: "import { createRequire as __meekoCreateRequire } from 'node:module'; const require = __meekoCreateRequire(import.meta.url);" },
-  sourcemap: true,
-  logLevel: "info",
-};
+	bundle: true,
+	platform: 'node',
+	format: 'esm',
+	target: 'node20',
+	mainFields: ['module', 'main'],
+	// Bundled CommonJS dependencies call `require`. The import is renamed: bundled modules of the
+	// server import `createRequire` themselves, and a second top-level binding fails to load.
+	banner: { js: "import { createRequire as __meekoCreateRequire } from 'node:module'; const require = __meekoCreateRequire(import.meta.url);" },
+	sourcemap: true,
+	logLevel: 'info',
+}
 
 // Thin VS Code client.
 await build({
-  ...common,
-  entryPoints: ["src/extension.ts"],
-  outfile: "dist/extension.js",
-  external: ["vscode"],
-});
+	...common,
+	entryPoints: ['src/extension.ts'],
+	outfile: 'dist/extension.js',
+	external: ['vscode'],
+})
 
 // Bundled fallback of the Meeko language server, used when the workspace has no
 // @meekojs/meeko with `meeko-language-server`. TypeScript stays an installed dependency:
@@ -28,8 +31,9 @@ await build({
 // workspace has no Prettier. Vite is never bundled: sorting classes by the stylesheet loads the
 // project's own Vite, and only normalizes them when there is none.
 await build({
-  ...common,
-  entryPoints: ["../meeko/src/language-server/main.ts"],
-  outfile: "dist/server.js",
-  external: ["@typescript/typescript6", "prettier", "prettier/*", "vite"],
-});
+	...common,
+	entryPoints: ['../meeko/src/language-server/main.ts'],
+	outfile: 'dist/server.js',
+	define: { __MEEKO_BUNDLED_VERSION__: JSON.stringify(meekoVersion) },
+	external: ['@typescript/typescript6', 'prettier', 'prettier/*', 'vite'],
+})

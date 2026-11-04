@@ -1,4 +1,4 @@
 #!/usr/bin/env node
-import { runLanguageServer } from "./server.js";
+import { runLanguageServer } from './server'
 
-runLanguageServer(process.argv.slice(2));
+runLanguageServer(process.argv.slice(2))

@@ -6,6 +6,7 @@ description: Enlaza en los dos sentidos un control de formulario, o el modelo de
 symbols:
   - "syntax:model"
 related:
+  - docs/como-elegir.md
   - "syntax:definemodel"
   - "syntax:bind"
   - "syntax:on"
@@ -40,15 +41,16 @@ const plan = signal<string | null>("free");
 
 ## Atributos
 
-| Control | Propiedad y evento | Tipo de la señal |
-| --- | --- | --- |
-| `<input>` de texto (cualquier `type` salvo los siguientes, o `bind:type`) y `<textarea>` | `value`, en `input` | `Signal<string>` |
-| `<input type="checkbox">` | `checked`, en `change` | `Signal<boolean>` o, desde `1.7.1`, `Signal<boolean \| undefined>`: `undefined` se pinta desmarcado y `change` escribe siempre un booleano |
-| `<input type="radio">` | marcado si la señal vale su `value`; `change` escribe ese valor | `Signal<string \| null \| undefined>` |
-| `<select>` | `value`, en `change` | `Signal<string>` |
-| `<select multiple>` | las opciones seleccionadas, en `change` | `Signal<string[]>` |
-| Etiqueta de componente: `model` | el modelo por defecto del hijo | `Signal<T>` de su `defineModel<T>()` |
-| Etiqueta de componente: `model:nombre` | el modelo `nombre` del hijo | `Signal<T>` de su `defineModel<T>("nombre")` |
+| Control                                                                                  | Propiedad y evento                                              | Tipo de la señal                                                                                                                           |
+| ---------------------------------------------------------------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `<input>` de texto (cualquier `type` salvo los siguientes, o `bind:type`) y `<textarea>` | `value`, en `input`                                             | `Signal<string>`                                                                                                                           |
+| `<input type="range">` (desde `1.8`)                                                     | `value`, en `input`                                             | `Signal<number>`, que recibe números, o `Signal<string>`                                                                                   |
+| `<input type="checkbox">`                                                                | `checked`, en `change`                                          | `Signal<boolean>` o, desde `1.7.1`, `Signal<boolean \| undefined>`: `undefined` se pinta desmarcado y `change` escribe siempre un booleano |
+| `<input type="radio">`                                                                   | marcado si la señal vale su `value`; `change` escribe ese valor | `Signal<string \| null \| undefined>`                                                                                                      |
+| `<select>`                                                                               | `value`, en `change`                                            | `Signal<string>`                                                                                                                           |
+| `<select multiple>`                                                                      | las opciones seleccionadas, en `change`                         | `Signal<string[]>`                                                                                                                         |
+| Etiqueta de componente: `model`                                                          | el modelo por defecto del hijo                                  | `Signal<T>` de su `defineModel<T>()`                                                                                                       |
+| Etiqueta de componente: `model:nombre`                                                   | el modelo `nombre` del hijo                                     | `Signal<T>` de su `defineModel<T>("nombre")`                                                                                               |
 
 La expresión debe ser una **señal escribible**: no su `.value`, ni un `computed`.
 
@@ -100,6 +102,8 @@ const total = computed(() => {
   <p>Total: {total.value.toFixed(2)} €</p>
 </template>
 ```
+
+Un `<input type="range">` siempre tiene un número: desde `1.8`, una señal que guarda un número lo recibe como número, sin convertirlo.
 
 ### Mostrar la contraseña con `bind:type`
 
@@ -229,7 +233,7 @@ Con `const ageText = signal("0")` y `const accepted = signal(false)`.
 <AppSearch model="search" model:open="panelOpen" bind:open="panelOpen.value" />
 ```
 
-`MEEK066: model:open y bind:open pasan los dos open; un modelo no es una prop, deja sólo model:open`.
+`MEEK066: model:open y bind:open pasan los dos el modelo open; deja model:open, que comparte la señal, o bind:open, que pasa el valor`. Lo mismo ocurre con `on:update:open` junto a `model:open`: con `model:open` el hijo escribe en la señal y no emite el evento.
 
 ```html good
 <AppSearch model="search" model:open="panelOpen" />
@@ -240,5 +244,6 @@ Con `const ageText = signal("0")` y `const accepted = signal(false)`.
 - **Hidratación.** `model` no rompe la hidratación cuando el usuario escribe pronto: las regiones `if:`, `each:` y `<render>` que leen la señal se hidratan con el valor del SSR y reaccionan después al valor restaurado.
 - **Números y fechas.** Los controles entregan texto. Guarda texto en la señal y conviértelo donde se use, o deja que lo haga el schema de `useForm` (`v.transform(Number)`).
 - **Estado del componente.** Una señal de nivel superior del script viaja en el estado SSR y se restaura al hidratar; la que el padre pasa por `model` pertenece al padre y no forma parte del estado del hijo.
+- **Prop y evento.** Desde `1.8`, un componente también acepta su modelo con `bind:modelValue` y `on:update:modelValue`. `<input model="value">` dentro del hijo funciona igual con cualquier forma. Véase [`defineModel`](../macros/definemodel.md#por-prop-y-evento). En un control nativo, `model` no cambia.
 - **Elementos personalizados.** En una etiqueta con guion (`<my-input model="query">`), `model` es un atributo HTML literal, no la directiva.
 - **Accesibilidad.** `model` no da nombre al control: envuélvelo en un `<label>` o usa `aria-label`.

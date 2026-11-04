@@ -1,0 +1,74 @@
+<script lang="ts">
+	import { examples } from '../utils/examples'
+</script>
+<template>
+	<DocsPage
+		product="Meeko i18n"
+		title="API pública"
+		description="Exports del paquete, opciones del módulo y contrato del traductor."
+	>
+		<h2 id="translator">useI18n y el traductor</h2>
+		<DocsApi
+			caption="@meekojs/i18n"
+			bind:rows="[
+				{ name: 'useI18n()', type: 'I18n', description: 'Obtiene la instancia proporcionada por el plugin. Autoimportado en componentes.' },
+				{ name: 'locale', type: 'readonly string', description: 'Idioma del documento, leído del prefijo de la URL.' },
+				{ name: 'defaultLocale · locales · dir', type: 'readonly', description: 'Idioma sin prefijo, idiomas configurados y dirección del documento.' },
+				{ name: 't(key, values?)', type: 'string', description: 'Clave y parámetros correlacionados con el registro generado.' },
+				{ name: 'number(value, options?)', type: 'string', description: 'Formato Intl.NumberFormat.' },
+				{ name: 'date(value, options?)', type: 'string', description: 'Formato Intl.DateTimeFormat.' },
+				{ name: 'has(key, { locale }?)', type: 'boolean', description: 'Si la clave tiene mensaje en los catálogos cargados, para una clave que llega de un dato.' },
+				{ name: 'localePath(path, locale?)', type: 'string', description: 'Ruta interna en un idioma: sin prefijo en el idioma por defecto, con /en/… en los demás.' },
+				{ name: 'switchLocalePath(locale)', type: 'string', description: 'Ruta equivalente de la página actual en otro idioma, con búsqueda y fragmento. Reactiva.' },
+				{ name: 'pageLocales()', type: 'readonly string[]', description: 'Idiomas que tienen versión de la página actual. Reactiva.' },
+				{ name: 'localeName(locale, displayLocale?)', type: 'string', description: 'Nombre del idioma, por defecto en ese idioma (English, Español).' },
+				{ name: 'directionOf(locale)', type: 'ltr | rtl', description: 'Dirección de un idioma configurado.' },
+				{ name: 'suggestedLocale()', type: 'string | undefined', description: 'Idioma de la cookie o del navegador si no es el actual. Sólo en el navegador; nunca redirige.' },
+				{ name: 'rememberLocale(locale)', type: 'void', description: 'Guarda el idioma en la cookie, por ejemplo al descartar una sugerencia.' },
+				{ name: 'switchLocale(locale)', type: 'void', description: 'Guarda el idioma y navega a la ruta equivalente (documento nuevo).' },
+			]"
+		/>
+		<h2 id="module">Opciones del módulo</h2>
+		<DocsApi
+			caption="I18nModuleOptions · @meekojs/i18n/module"
+			bind:rows="[
+				{ name: 'defaultLocale', type: 'string', description: 'Obligatoria. Idioma para URLs sin prefijo.' },
+				{ name: 'catalogs', type: 'Record<string, string | Record<string, string>>', description: 'Obligatoria. Archivo JSON o mapa de namespaces por idioma. Requiere common.' },
+				{ name: 'routes', type: 'Record<string, readonly string[]>', description: 'Namespaces adicionales por ID exacto de ruta.' },
+				{ name: 'global', type: 'readonly string[]', description: 'Namespaces que se cargan en todas las rutas junto a common, como el catálogo de un Shell compartido.' },
+				{ name: 'directions', type: 'Record<string, ltr | rtl>', description: 'Dirección por idioma; los demás usan ltr.' },
+				{ name: 'strategy', type: 'prefix_except_default', description: 'Por defecto. El idioma por defecto sin prefijo y los demás con prefijo, con rutas generadas desde las mismas páginas.' },
+				{ name: 'exclude', type: 'readonly string[]', description: 'IDs de ruta, con comodín, sin versiones en otros idiomas ni hreflang.' },
+				{ name: 'partial', type: 'Record<string, readonly string[]>', description: 'Para un idioma con traducción parcial, las únicas rutas que tienen versión en él.' },
+				{ name: 'cookie', type: '{ name, domain?, maxAge? } | false', description: 'Cookie del idioma elegido, sólo para sugerir. Por defecto meeko-locale.' },
+				{ name: 'hreflang', type: 'boolean', description: 'link rel=alternate por idioma y x-default en el head. Por defecto true.' },
+				{ name: 'sitemap', type: 'boolean', description: 'Alternativas xhtml:link en el sitemap.xml de Meeko. Por defecto true.' },
+			]"
+		/>
+		<h2 id="low-level">Integraciones de bajo nivel</h2>
+		<p>
+			<code>createI18n(options)</code>
+			recibe el idioma, los mensajes compilados, los idiomas y la URL actual. Para aplicaciones Meeko el módulo prepara ese catálogo y su contexto.
+		</p>
+		<DocsCode
+			label="Integración en navegador"
+			bind:code="examples.manual"
+		/>
+		<p>
+			<code>i18nContext</code>
+			es la clave pública para proporcionar una instancia desde una integración propia.
+			<code>localeOf</code>,
+			<code>localizedPath</code>,
+			<code>stripLocale</code>
+			y
+			<code>negotiateLocale</code>
+			se documentan en
+			<a href="/routing">idiomas y rutas</a>. Los tipos
+			<code>I18n</code>,
+			<code>I18nValue</code>
+			e
+			<code>I18nMessageValues</code>
+			se importan desde la raíz del paquete.
+		</p>
+	</DocsPage>
+</template>

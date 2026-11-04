@@ -1,0 +1,147 @@
+.meeko-ui-modal {
+	translate: 0 calc(var(--ui-modal-depth, 0) * var(--ui-modal-stack-offset) * -1);
+	scale: calc(1 - var(--ui-modal-depth, 0) * var(--ui-modal-stack-scale));
+	transition:
+		opacity var(--ui-duration-slow) var(--ui-ease-out),
+		scale var(--ui-duration-slow) var(--ui-ease-out),
+		translate var(--ui-duration-slow) var(--ui-ease-out);
+	box-sizing: border-box;
+	margin: auto;
+	box-shadow: var(--ui-shadow-lg);
+	border: var(--ui-border-width) solid var(--ui-color-border);
+	border-radius: var(--ui-radius-xl);
+	background: var(--ui-color-surface-raised);
+	padding: 0;
+	width: min(var(--ui-modal-width-md), calc(100vw - var(--ui-space-8)));
+	max-width: none;
+	max-height: calc(100dvh - var(--ui-space-8));
+	overflow: hidden;
+	color: var(--ui-color-text);
+	font-size: var(--ui-font-size-md);
+	font-family: var(--ui-font-sans);
+}
+.meeko-ui-modal[data-meeko-ui-modal-behind],
+.meeko-ui-modal[data-meeko-ui-modal-state='closing'] {
+	pointer-events: none;
+}
+.meeko-ui-modal[open] {
+	display: flex;
+	flex-direction: column;
+}
+.meeko-ui-modal[data-size='sm'] {
+	width: min(var(--ui-modal-width-sm), calc(100vw - var(--ui-space-8)));
+}
+.meeko-ui-modal[data-size='lg'] {
+	width: min(var(--ui-modal-width-lg), calc(100vw - var(--ui-space-8)));
+}
+.meeko-ui-modal::backdrop {
+	transition: opacity var(--ui-duration-slow) linear;
+	background: transparent;
+}
+.meeko-ui-modal[data-meeko-ui-modal-top]::backdrop {
+	background: var(--ui-color-overlay);
+}
+.meeko-ui-modal-heading {
+	display: flex;
+	flex: none;
+	justify-content: space-between;
+	align-items: flex-start;
+	gap: var(--ui-space-4);
+	padding: var(--ui-space-5) var(--ui-space-5) 0;
+}
+.meeko-ui-modal-heading h2 {
+	margin: 0;
+	font-weight: var(--ui-font-weight-semibold);
+	font-size: var(--ui-font-size-xl);
+	line-height: var(--ui-line-height-snug);
+	letter-spacing: var(--ui-tracking-tight);
+}
+.meeko-ui-modal-heading p {
+	margin: var(--ui-space-1-5) 0 0;
+	color: var(--ui-color-text-soft);
+	line-height: var(--ui-line-height-normal);
+}
+.meeko-ui-modal-close {
+	display: inline-flex;
+	flex: none;
+	justify-content: center;
+	align-items: center;
+	cursor: pointer;
+	margin: calc(var(--ui-space-2) * -1) calc(var(--ui-space-2) * -1) 0 0;
+	border: 0;
+	border-radius: var(--ui-radius-md);
+	background: transparent;
+	padding: 0;
+	width: var(--ui-control-height-md);
+	height: var(--ui-control-height-md);
+	color: var(--ui-color-text-soft);
+}
+.meeko-ui-modal-close:hover {
+	background: var(--ui-color-control-active);
+	color: var(--ui-color-text);
+}
+.meeko-ui-modal-close:focus-visible {
+	outline: var(--ui-focus-ring);
+	outline-offset: var(--ui-focus-ring-offset);
+}
+.meeko-ui-modal-body {
+	padding: var(--ui-space-5);
+	min-height: 0;
+	overflow: auto;
+	overscroll-behavior: contain;
+}
+.meeko-ui-modal-footer {
+	display: flex;
+	flex: none;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	gap: var(--ui-space-2);
+	border-top: var(--ui-border-width) solid var(--ui-color-border);
+	padding: var(--ui-space-3) var(--ui-space-5);
+}
+/* A media query cannot read a custom property: this width is the only literal in the component sheets. */
+@media (max-width: 30rem) {
+	.meeko-ui-modal-heading {
+		padding: var(--ui-space-4) var(--ui-space-4) 0;
+	}
+	.meeko-ui-modal-body,
+	.meeko-ui-modal-footer {
+		padding: var(--ui-space-4);
+	}
+}
+/* The entrance is CSS: it does not block the page, and WebKit does not paint a modal that opens inside a
+   View Transition. No `display` or `overlay allow-discrete` here: they would keep the closing dialog in
+   the new capture of its exit. */
+@starting-style {
+	.meeko-ui-modal[open] {
+		translate: 0 var(--ui-space-4);
+		scale: calc(1 - var(--ui-modal-stack-scale));
+		opacity: var(--ui-opacity-hidden);
+	}
+	.meeko-ui-modal[open]::backdrop {
+		opacity: var(--ui-opacity-hidden);
+	}
+}
+/* The exit is a View Transition, with a name only during its own type: any other transition, such as a
+   navigation with a modal open, neither captures the modal nor plays its animation again. */
+html:active-view-transition-type(ui-modal-close) .meeko-ui-modal[data-meeko-ui-modal-state='closing'] {
+	view-transition-name: ui-modal;
+}
+html:active-view-transition-type(ui-modal-close)::view-transition-group(root) {
+	animation-duration: var(--ui-duration-base);
+}
+html:active-view-transition-type(ui-modal-close)::view-transition-old(ui-modal) {
+	animation: ui-modal-out var(--ui-duration-base) var(--ui-ease-in) both;
+}
+@keyframes ui-modal-out {
+	to {
+		transform: translateY(var(--ui-space-3)) scale(calc(1 - var(--ui-modal-stack-scale)));
+		opacity: var(--ui-opacity-hidden);
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.meeko-ui-modal,
+	.meeko-ui-modal::backdrop {
+		transition: none;
+	}
+}

@@ -1,0 +1,48 @@
+<script lang="ts">
+	// The note of a page shown in its original language, or of a translation older than its original,
+	// with a link to the original.
+	import { useI18n } from '@meekojs/i18n'
+
+	const props = defineProps<{ href: string; hreflang: string | undefined; kind?: 'untranslated' | 'outdated' }>()
+
+	const { t } = useI18n()
+</script>
+
+<template>
+	<div
+		class="docs-untranslated"
+		bind:lang="t('shell.meta.lang')"
+	>
+		<UIAlert
+			bind:tone="props.kind === 'outdated' ? 'warning' : 'info'"
+			bind:aria-label="props.kind === 'outdated' ? t('shell.outdated.title') : t('shell.untranslated.title')"
+			bind:title="props.kind === 'outdated' ? t('shell.outdated.title') : t('shell.untranslated.title')"
+			bind:description="props.kind === 'outdated' ? t('shell.outdated.message') : t('shell.untranslated.message')"
+		>
+			<snippet name="icon">
+				<svg
+					viewBox="0 0 16 16"
+					aria-hidden="true"
+				>
+					<path d="M2 3.25h6.5M5.25 1.75v1.5M7.25 3.25C6.6 6.1 4.9 8.2 2.25 9.5M3.9 5.6c.8 1.5 2 2.7 3.6 3.4M8.25 14.25l2.75-6.5 2.75 6.5M9.15 12.1h3.7" />
+				</svg>
+			</snippet>
+			<snippet name="actions">
+				<UILink
+					variant="outline"
+					size="sm"
+					bind:href="props.href"
+					bind:hreflang="props.hreflang"
+				>
+					{t('shell.untranslated.original')}
+				</UILink>
+			</snippet>
+		</UIAlert>
+	</div>
+</template>
+
+<style scoped>
+	.docs-untranslated {
+		margin-block-end: var(--ui-space-6);
+	}
+</style>

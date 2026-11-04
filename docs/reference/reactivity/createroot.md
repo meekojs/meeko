@@ -37,9 +37,9 @@ count.value = 2; // seen sigue siendo [0, 1]
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `fn` | `(dispose: () => void) => T` | obligatorio | Se ejecuta en el momento, con la raíz nueva activa. Todo lo reactivo que cree pertenece a la raíz. |
+| Parámetro | Tipo                         | Por defecto | Descripción                                                                                        |
+| --------- | ---------------------------- | ----------- | -------------------------------------------------------------------------------------------------- |
+| `fn`      | `(dispose: () => void) => T` | obligatorio | Se ejecuta en el momento, con la raíz nueva activa. Todo lo reactivo que cree pertenece a la raíz. |
 
 ## Valor devuelto
 
@@ -132,6 +132,7 @@ createRoot(() => {
 No hay error, pero el efecto vive para siempre: una raíz que nadie libera retiene sus efectos y todo lo que leen. Guarda `dispose` y llámalo cuando el trabajo termine, o deja que lo haga el componente con `onCleanup`:
 
 <!-- no-check -->
+
 ```ts good
 const dispose = createRoot((dispose) => {
   effect(() => { document.title = title.value; });

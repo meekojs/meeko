@@ -1,0 +1,205 @@
+<script lang="ts">
+	import type { UIMarkdownEditorMode } from '../../app/types/markdown-editor'
+	import type { MarkdownEditorHandle } from '../crepe'
+
+	import { uiMessages } from '../../app/utils/messages'
+	import { loadMarkdownEditor } from '../load'
+
+	interface Props {
+		label: string
+		id?: string
+		readonly?: boolean
+		disabled?: boolean
+		describedBy?: string
+		placeholder?: string
+		class?: string
+	}
+
+	const props = defineProps<Props>()
+
+	const value = defineModel<string>({ default: '' })
+
+	const mode = defineModel<UIMarkdownEditorMode>('mode', { default: 'visual' })
+
+	const snippets = defineSnippets<{ tools?: [] }>()
+
+	const host = useElementRef('host')
+
+	const labelId = useId()
+	const messages = uiMessages().markdownEditor
+	const locked = computed(() => Boolean(props.readonly || props.disabled))
+
+	// `loading` also fills the first paint: the server never loads Crepe. The surface has its height
+	// before and after it, so nothing moves when the editor arrives.
+	const state = signal<'failed' | 'loading' | 'ready' | 'unsafe'>('loading')
+	const mounted = signal(false)
+
+	let handle: MarkdownEditorHandle | null = null
+	/** What Crepe holds: when the model differs, somebody else wrote it. */
+	let held = ''
+	let generation = 0
+
+	async function close() {
+		const previous = handle
+		handle = null
+		await previous?.destroy()
+	}
+
+	async function open(text: string) {
+		const current = ++generation
+		state.value = 'loading'
+		held = text
+		try {
+			await close()
+			const element = host.value
+			if (!element || !loadMarkdownEditor) return
+			const { createMarkdownEditor } = await loadMarkdownEditor()
+			if (current !== generation) return
+			const created = await createMarkdownEditor(element, text, {
+				readonly: untrack(() => locked.value),
+				labelledBy: labelId,
+				describedBy: props.describedBy,
+				placeholder: props.placeholder ?? messages.placeholder,
+				texts: messages,
+				onChange(markdown) {
+					held = markdown
+					value.value = markdown
+				},
+			})
+			if (current !== generation) return void (await created.destroy())
+			handle = created
+			if (created.canSplice) {
+				state.value = 'ready'
+				return
+			}
+			// Saving would rewrite blocks nobody touched: this text is only safe as text.
+			await close()
+			state.value = 'unsafe'
+			mode.value = 'code'
+		} catch (error) {
+			if (current !== generation) return
+			console.error(error)
+			state.value = 'failed'
+			mode.value = 'code'
+		}
+	}
+
+	// Leaving the field is what comes before a click on «save»: the text has to be up to date by then.
+	const flush = () => void handle?.flush()
+
+	onMounted(() => {
+		mounted.value = true
+	})
+
+	effect(() => {
+		if (!mounted.value) return
+		const text = value.value
+		const visual = mode.value === 'visual'
+		untrack(() => {
+			if (!visual) return flush()
+			// The first time, after a failure, or with a text that somebody else wrote: Crepe has no way
+			// of taking a new document that keeps the bytes of the old one, so it starts over.
+			if (generation === 0 || (!handle && state.value !== 'loading') || text !== held) void open(text)
+		})
+	})
+
+	effect(() => {
+		const value = locked.value
+		untrack(() => handle?.setReadonly(value))
+	})
+
+	onCleanup(() => {
+		generation++
+		void close()
+	})
+</script>
+
+<template>
+	<div
+		bind:class="['ui-markdown-editor', props.class].filter(Boolean).join(' ')"
+		bind:data-mode="mode.value"
+		bind:data-state="state.value"
+		bind:data-disabled="props.disabled ? '' : undefined"
+	>
+		<div class="ui-markdown-editor-bar">
+			<span
+				class="ui-markdown-editor-label"
+				bind:id="labelId"
+			>
+				{props.label}
+			</span>
+			<div
+				if:when="snippets.tools"
+				class="ui-markdown-editor-tools"
+			>
+				<render snippet="snippets.tools" />
+			</div>
+			<div
+				class="ui-markdown-editor-modes"
+				role="group"
+				bind:aria-label="messages.mode"
+			>
+				<button
+					type="button"
+					bind:aria-pressed="mode.value === 'visual' ? 'true' : 'false'"
+					on:click="() => (mode.value = 'visual')"
+				>
+					{messages.visual}
+				</button>
+				<button
+					type="button"
+					bind:aria-pressed="mode.value === 'code' ? 'true' : 'false'"
+					on:click="() => (mode.value = 'code')"
+				>
+					{messages.code}
+				</button>
+			</div>
+		</div>
+		<p
+			if:when="state.value === 'unsafe' || state.value === 'failed'"
+			class="ui-markdown-editor-notice"
+			role="status"
+		>
+			{state.value === 'unsafe' ? messages.unsafe : messages.failed}
+		</p>
+		<div class="ui-markdown-editor-surface">
+			<div
+				if:when="mode.value === 'visual' && state.value === 'loading'"
+				class="ui-markdown-editor-marker"
+				role="status"
+			>
+				<span class="ui-markdown-editor-marker-text">{messages.loading}</span>
+				<span
+					class="ui-markdown-editor-marker-line"
+					aria-hidden="true"
+				/>
+				<span
+					class="ui-markdown-editor-marker-line"
+					aria-hidden="true"
+				/>
+				<span
+					class="ui-markdown-editor-marker-line"
+					aria-hidden="true"
+				/>
+			</div>
+			<div
+				ref:host
+				class="ui-markdown-editor-host"
+				bind:hidden="mode.value !== 'visual' || state.value === 'loading'"
+				on:focusout="flush"
+			/>
+			<textarea
+				if:when="mode.value === 'code'"
+				class="ui-markdown-editor-code"
+				spellcheck="false"
+				autocapitalize="off"
+				model="value"
+				bind:id="props.id"
+				bind:aria-labelledby="labelId"
+				bind:aria-describedby="props.describedBy"
+				bind:readonly="props.readonly"
+				bind:disabled="props.disabled"
+			/>
+		</div>
+	</div>
+</template>

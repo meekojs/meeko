@@ -1,0 +1,162 @@
+<script
+	server
+	lang="ts"
+>
+	// The only page without a session (app/middleware/10-auth.server.ts lets it through, and sends a
+	// logged-in browser on to `next`). It renders the form for the native submission too.
+	import { safeNext } from '../../server/dashboard/auth'
+
+	const { context, search } = usePage()
+	const { config } = context.services.auth
+	// The page says it in its language; the server only gives the durations.
+	const hours = (ms: number) => (ms % 3_600_000 === 0 ? `${ms / 3_600_000} h` : `${Math.round(ms / 60_000)} min`)
+	export const next = safeNext(typeof search.next === 'string' ? search.next : '/')
+	export const configured = config.admin !== null
+	export const lifetime = { ttl: hours(config.ttlMs), idle: hours(config.idleMs) }
+</script>
+
+<script lang="ts">
+	import { stripLocale } from '@meekojs/i18n'
+	import { ClientError } from '@meekojs/meeko/framework'
+
+	import { loginInput } from '../../shared/schemas/auth'
+	import { issueText } from '../utils/i18n'
+
+	const i18n = useI18n()
+	const { t } = i18n
+
+	useHead({ title: t('app.titleSuffix', { title: t('login.title') }), meta: [{ name: 'description', content: t('login.description') }] })
+
+	const codes = ['INVALID_CREDENTIALS', 'RATE_LIMITED', 'LOGIN_NOT_CONFIGURED', 'INVALID_ORIGIN'] as const
+
+	// After the login the dashboard opens in the language of this page, also when `next` came from
+	// the other one (the language switch keeps the query): /en/login?next=/sources goes to /en/sources.
+	const target = i18n.localePath(stripLocale(next, i18n.locales))
+
+	const form = useForm({
+		schema: loginInput,
+		initial: { username: '', password: '', next: target },
+		action: '/api/auth/login',
+		submit: async (values) => {
+			const result = await api.auth.login.post({ body: values })
+			// A full load: the new session's CSRF token comes with the next document.
+			window.location.assign(result.next)
+			return result
+		},
+		errorMessage: (failure) => {
+			const code = failure instanceof ClientError ? codes.find((known) => known === failure.code) : undefined
+			return code ? t(`login.errors.${code}`) : t('login.errors.generic')
+		},
+	})
+
+	// The native form comes back here after an error, with `next` kept, in the language of this page.
+	const back = target === i18n.localePath('/') ? i18n.localePath('/login') : `${i18n.localePath('/login')}?next=${encodeURIComponent(target)}`
+	const fieldError = (message: string | undefined) => issueText(i18n, message)
+</script>
+
+<template>
+	<div class="dash-login">
+		<UICard
+			variant="elevated"
+			padding="lg"
+			bind:aria-label="t('login.title')"
+		>
+			<div class="dash-form">
+				<img
+					src="/brand/meeko-logo.png"
+					width="44"
+					height="44"
+					alt=""
+				/>
+				<UIPageHeader
+					layout="dashboard"
+					class="dash-login-header"
+					bind:title="t('login.title')"
+					bind:description="t('login.lead')"
+				/>
+				<UIAlert
+					if:when="!configured"
+					tone="warning"
+					role="status"
+					bind:description="t('login.errors.LOGIN_NOT_CONFIGURED')"
+				/>
+				<UIAlert
+					if:when="form.error.value"
+					tone="danger"
+					bind:description="form.error.value ?? ''"
+				/>
+				<form
+					class="dash-form"
+					method="post"
+					action="/api/auth/login"
+					novalidate
+					bind:aria-busy="form.pending.value ? 'true' : undefined"
+					on:submit="form.submit"
+				>
+					<input
+						type="hidden"
+						name="return"
+						bind:value="back"
+					/>
+					<input
+						type="hidden"
+						name="next"
+						bind:value="form.fields.next.value"
+					/>
+					<UIField
+						id="login-username"
+						bind:label="t('login.username')"
+						bind:error="fieldError(form.errors.value.username)"
+					>
+						<snippet
+							name="default"
+							params="id, describedBy"
+						>
+							<UIInput
+								name="username"
+								type="text"
+								autocomplete="username"
+								autocapitalize="none"
+								required
+								model="form.fields.username"
+								bind:spellcheck="false"
+								bind:id="id"
+								bind:describedBy="describedBy"
+								bind:invalid="Boolean(form.errors.value.username)"
+							/>
+						</snippet>
+					</UIField>
+					<UIField
+						id="login-password"
+						bind:label="t('login.password')"
+						bind:error="fieldError(form.errors.value.password)"
+					>
+						<snippet
+							name="default"
+							params="id, describedBy"
+						>
+							<UIInput
+								name="password"
+								type="password"
+								autocomplete="current-password"
+								required
+								model="form.fields.password"
+								bind:id="id"
+								bind:describedBy="describedBy"
+								bind:invalid="Boolean(form.errors.value.password)"
+							/>
+						</snippet>
+					</UIField>
+					<UIButton
+						type="submit"
+						size="lg"
+						bind:loading="form.pending.value"
+					>
+						{form.pending.value ? t('login.submitting') : t('login.submit')}
+					</UIButton>
+				</form>
+				<p class="dash-meta">{t('login.lifetime', lifetime)}</p>
+			</div>
+		</UICard>
+	</div>
+</template>

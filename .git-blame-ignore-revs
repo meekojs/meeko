@@ -1,0 +1,4 @@
+# Commits without changes of behavior, which git blame and GitHub skip.
+
+# style: aplica el formato de Prettier a todo el repositorio
+301dcd851040a6b469ac73e08d06dbbaf971d7db

@@ -1,0 +1,75 @@
+<script lang="ts">
+	import { englishExamples as examples } from '../../utils/examples.en'
+</script>
+<template>
+	<DocsPage
+		product="Meeko i18n"
+		locale="en"
+		title="Public API"
+		description="Package exports, module options and the contract of the translator."
+	>
+		<h2 id="translator">useI18n and the translator</h2>
+		<DocsApi
+			caption="@meekojs/i18n"
+			bind:rows="[
+				{ name: 'useI18n()', type: 'I18n', description: 'Gets the instance provided by the plugin. Auto-imported in components.' },
+				{ name: 'locale', type: 'readonly string', description: 'Language of the document, read from the URL prefix.' },
+				{ name: 'defaultLocale · locales · dir', type: 'readonly', description: 'Language without a prefix, configured languages and direction of the document.' },
+				{ name: 't(key, values?)', type: 'string', description: 'Key and parameters correlated with the generated registry.' },
+				{ name: 'number(value, options?)', type: 'string', description: 'Intl.NumberFormat format.' },
+				{ name: 'date(value, options?)', type: 'string', description: 'Intl.DateTimeFormat format.' },
+				{ name: 'has(key, { locale }?)', type: 'boolean', description: 'Whether the key has a message in the loaded catalogs, for a key that comes from data.' },
+				{ name: 'localePath(path, locale?)', type: 'string', description: 'Internal route in a language: without a prefix in the default language, with /en/… in the others.' },
+				{ name: 'switchLocalePath(locale)', type: 'string', description: 'Equivalent route of the current page in another language, with search and fragment. Reactive.' },
+				{ name: 'pageLocales()', type: 'readonly string[]', description: 'Languages that have a version of the current page. Reactive.' },
+				{ name: 'localeName(locale, displayLocale?)', type: 'string', description: 'Name of the language, by default in that language (English, Español).' },
+				{ name: 'directionOf(locale)', type: 'ltr | rtl', description: 'Direction of a configured language.' },
+				{ name: 'suggestedLocale()', type: 'string | undefined', description: 'Language of the cookie or the browser if it is not the current one. Only in the browser; it never redirects.' },
+				{ name: 'rememberLocale(locale)', type: 'void', description: 'Stores the language in the cookie, for example when a suggestion is dismissed.' },
+				{ name: 'switchLocale(locale)', type: 'void', description: 'Stores the language and navigates to the equivalent route (a new document).' },
+			]"
+		/>
+		<h2 id="module">Module options</h2>
+		<DocsApi
+			caption="I18nModuleOptions · @meekojs/i18n/module"
+			bind:rows="[
+				{ name: 'defaultLocale', type: 'string', description: 'Required. Language for URLs without a prefix.' },
+				{ name: 'catalogs', type: 'Record<string, string | Record<string, string>>', description: 'Required. JSON file or map of namespaces per language. Requires common.' },
+				{ name: 'routes', type: 'Record<string, readonly string[]>', description: 'Additional namespaces per exact route ID.' },
+				{ name: 'global', type: 'readonly string[]', description: 'Namespaces loaded on every route together with common, such as the catalog of a shared shell.' },
+				{ name: 'directions', type: 'Record<string, ltr | rtl>', description: 'Direction per language; the others use ltr.' },
+				{ name: 'strategy', type: 'prefix_except_default', description: 'The default. The default language without a prefix and the others with one, with routes generated from the same pages.' },
+				{ name: 'exclude', type: 'readonly string[]', description: 'Route IDs, with wildcards, without versions in other languages or hreflang.' },
+				{ name: 'partial', type: 'Record<string, readonly string[]>', description: 'For a language with a partial translation, the only routes that have a version in it.' },
+				{ name: 'cookie', type: '{ name, domain?, maxAge? } | false', description: 'Cookie of the chosen language, only to suggest. meeko-locale by default.' },
+				{ name: 'hreflang', type: 'boolean', description: 'link rel=alternate per language and x-default in the head. true by default.' },
+				{ name: 'sitemap', type: 'boolean', description: 'xhtml:link alternates in Meeko\'s sitemap.xml. true by default.' },
+			]"
+		/>
+		<h2 id="low-level">Low-level integrations</h2>
+		<p>
+			<code>createI18n(options)</code>
+			receives the language, the compiled messages, the languages and the current URL. For Meeko applications the module prepares that catalog and its context.
+		</p>
+		<DocsCode
+			label="Integration in the browser"
+			bind:code="examples.manual"
+		/>
+		<p>
+			<code>i18nContext</code>
+			is the public key to provide an instance from your own integration.
+			<code>localeOf</code>,
+			<code>localizedPath</code>,
+			<code>stripLocale</code>
+			and
+			<code>negotiateLocale</code>
+			are documented in
+			<MeekoLink to="/routing">languages and routes</MeekoLink>. The
+			<code>I18n</code>,
+			<code>I18nValue</code>
+			and
+			<code>I18nMessageValues</code>
+			types are imported from the root of the package.
+		</p>
+	</DocsPage>
+</template>

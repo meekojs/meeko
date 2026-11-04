@@ -1,0 +1,567 @@
+<script lang="ts">
+	import { computed, signal } from '@meekojs/meeko'
+
+	import type { DemoSource } from '../../shared/types/demo'
+
+	interface Props {
+		/** The counter example of the package, highlighted on the server line by line. */
+		source: DemoSource
+	}
+
+	/** A write to `count`, as the DevTools timeline lists it. */
+	interface SignalEvent {
+		readonly id: number
+		readonly from: number
+		readonly to: number
+	}
+
+	const props = defineProps<Props>()
+
+	const { t } = useI18n()
+
+	// The same state as examples/counter/Counter.meeko, rendered on the server and hydrated here.
+	const count = signal(0)
+	const doubled = computed(() => count.value * 2)
+	const events = signal<readonly SignalEvent[]>([])
+	const fileName = computed(() => props.source.file.split('/').pop() ?? props.source.file)
+	/** Alternates on every change so the CSS flash restarts; absent until the first change. */
+	const pulse = computed(() => {
+		const latest = events.value[0]
+		return latest === undefined ? undefined : latest.id % 2 ? 'a' : 'b'
+	})
+	const announcement = computed(() => (events.value.length ? t('home.demo.announcement', { count: count.value, doubled: doubled.value }) : ''))
+
+	function increment(): void {
+		const from = count.value
+		count.value++
+		const id = (events.value[0]?.id ?? 0) + 1
+		events.value = [{ id, from, to: count.value }, ...events.value].slice(0, 4)
+	}
+
+	function reset(): void {
+		count.value = 0
+		events.value = []
+	}
+</script>
+
+<template>
+	<figure
+		class="demo"
+		aria-labelledby="demo-caption"
+	>
+		<div class="window">
+			<div class="titlebar">
+				<p class="path">
+					<svg
+						viewBox="0 0 16 16"
+						aria-hidden="true"
+					>
+						<path d="M4 1.5h5.5L13 5v9.5H4z M9.5 1.5V5H13" />
+					</svg>
+					<span class="dir">examples / counter /</span>
+					<b>{fileName.value}</b>
+				</p>
+				<UIButton
+					variant="outline"
+					size="sm"
+					bind:disabled="events.value.length === 0"
+					on:click="reset"
+				>
+					{t('home.demo.reset')}
+				</UIButton>
+			</div>
+			<div class="panes">
+				<section
+					class="pane code"
+					bind:aria-label="t('home.demo.code')"
+				>
+					<header class="pane-head">
+						<span>{t('home.demo.editor')}</span>
+						<a
+							rel="noopener"
+							bind:href="props.source.url"
+						>
+							{t('home.demo.github')}
+						</a>
+					</header>
+					<pre
+						class="shiki source"
+						tabindex="0"
+						aria-label="Counter.meeko"
+						bind:data-pulse="pulse.value"
+					><code><span
+							each:of="props.source.lines"
+							each:as="line"
+							each:index="index"
+							class="line"
+							bind:data-mark="line.mark"
+						><span
+								class="ln"
+								aria-hidden="true"
+							>{index + 1}</span><span
+								class="text"
+								html="line.html"
+							/></span></code></pre>
+				</section>
+				<section
+					class="pane result"
+					bind:aria-label="t('home.demo.result')"
+				>
+					<header class="pane-head">
+						<span>{t('home.demo.resultTitle')}</span>
+						<span class="note">{t('home.demo.resultNote')}</span>
+					</header>
+					<div class="stage">
+						<UIButton
+							variant="outline"
+							size="lg"
+							on:click="increment"
+						>
+							{t('home.demo.counter', { count: count.value, doubled: doubled.value })}
+						</UIButton>
+						<p class="hint">{t('home.demo.hint')}</p>
+					</div>
+				</section>
+				<section
+					class="pane devtools"
+					bind:aria-label="t('home.demo.devtools')"
+				>
+					<header class="pane-head">
+						<span>DevTools</span>
+						<UIBadge>{t('home.demo.devtoolsTag')}</UIBadge>
+					</header>
+					<div class="tree">
+						<span class="node">&lt;Counter&gt;</span>
+						<span class="instance">#1</span>
+					</div>
+					<p class="group-title">Props</p>
+					<dl class="rows">
+						<div class="row">
+							<dt>initial</dt>
+							<dd class="value muted">undefined</dd>
+							<dd class="site" />
+						</div>
+					</dl>
+					<p class="group-title">{t('home.demo.signals')}</p>
+					<dl class="rows">
+						<div
+							class="row signal"
+							bind:data-flash="pulse.value"
+						>
+							<dt>count</dt>
+							<dd class="value">{count.value}</dd>
+							<dd class="site">{fileName.value}:{props.source.countLine}</dd>
+						</div>
+						<div
+							class="row derived"
+							bind:data-flash="pulse.value"
+						>
+							<dt>
+								doubled
+								<span class="kind">computed</span>
+							</dt>
+							<dd class="value">{doubled.value}</dd>
+							<dd class="site">{fileName.value}:{props.source.doubledLine}</dd>
+						</div>
+					</dl>
+					<p class="group-title">{t('home.demo.timeline')}</p>
+					<ol class="timeline">
+						<li
+							each:of="events.value"
+							each:as="event"
+							each:key="event.id"
+						>
+							<span class="seq">{event.id}</span>
+							<span class="name">count</span>
+							<span class="change">{event.from} → {event.to}</span>
+						</li>
+					</ol>
+					<p
+						if:when="events.value.length === 0"
+						class="empty"
+					>
+						{t('home.demo.empty')}
+					</p>
+					<p class="disclaimer">{t('home.demo.disclaimer')}</p>
+				</section>
+			</div>
+		</div>
+		<figcaption
+			id="demo-caption"
+			class="fig-label"
+		>
+			<b>FIG. 01</b>
+			<span>{t('home.demo.caption')}</span>
+		</figcaption>
+		<p
+			class="meeko-ui-sr-only"
+			aria-live="polite"
+		>
+			{announcement.value}
+		</p>
+	</figure>
+</template>
+
+<style scoped>
+	.demo {
+		position: relative;
+		margin: 0;
+	}
+	/* The window melts into the ground instead of ending on a hard edge: an effect of this drawing. */
+	.window {
+		position: relative;
+		mask-image: linear-gradient(to bottom, black calc(100% - var(--ui-space-12)), transparent);
+		box-shadow: var(--ui-shadow-lg);
+		border: var(--ui-border-width) solid var(--ui-color-border-strong);
+		border-bottom: 0;
+		border-radius: var(--ui-radius-xl) var(--ui-radius-xl) 0 0;
+		background: var(--ui-color-bg);
+		overflow: hidden;
+	}
+	.titlebar {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: var(--ui-space-4);
+		border-bottom: var(--ui-border-width) solid var(--ui-color-border);
+		background: var(--ui-color-surface);
+		padding-inline: var(--ui-space-4) var(--ui-space-2);
+		min-height: var(--ui-control-height-lg);
+	}
+	.path {
+		display: flex;
+		align-items: center;
+		gap: var(--ui-space-2);
+		margin: 0;
+		min-width: 0;
+		color: var(--ui-color-text-soft);
+		font-size: var(--ui-font-size-sm);
+		font-family: var(--ui-font-mono);
+		white-space: nowrap;
+	}
+	.path b {
+		color: var(--ui-color-text);
+		font-weight: var(--ui-font-weight-medium);
+	}
+	.path svg {
+		flex: none;
+		fill: none;
+		stroke: currentColor;
+		stroke-linejoin: round;
+		stroke-width: var(--ui-icon-stroke-width);
+		width: var(--ui-icon-size);
+		height: var(--ui-icon-size);
+	}
+	.panes {
+		display: grid;
+		grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr) minmax(0, 1fr);
+	}
+	.pane {
+		padding-bottom: var(--ui-space-12);
+		min-width: 0;
+	}
+	.pane + .pane {
+		border-left: var(--ui-border-width) solid var(--ui-color-border);
+	}
+	.pane-head {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: var(--ui-space-3);
+		border-bottom: var(--ui-border-width) solid var(--ui-color-border);
+		padding-inline: var(--ui-space-4);
+		min-height: var(--ui-control-height-md);
+		color: var(--ui-color-text);
+		font-weight: var(--ui-font-weight-medium);
+		font-size: var(--ui-font-size-sm);
+	}
+	.pane-head a {
+		color: var(--ui-color-text-soft);
+		font-weight: var(--ui-font-weight-regular);
+		text-decoration: none;
+	}
+	.pane-head a:hover {
+		color: var(--ui-color-primary-text);
+	}
+	.note {
+		color: var(--ui-color-text-soft);
+		font-weight: var(--ui-font-weight-regular);
+	}
+
+	/* Editor: long lines wrap under their own text, never past the pane; the number stays in its column. */
+	.source {
+		margin: 0;
+		padding: var(--ui-space-3) 0;
+		overflow: visible;
+		font-size: var(--ui-font-size-xs);
+		line-height: var(--ui-line-height-relaxed);
+	}
+	.source:focus-visible {
+		outline-offset: calc(var(--ui-focus-ring-width) * -1);
+	}
+	.line {
+		display: grid;
+		grid-template-columns: var(--ui-space-12) minmax(0, 1fr);
+		transition: background-color var(--ui-duration-slow) var(--ui-ease-out);
+		padding-inline-end: var(--ui-space-4);
+	}
+	.text {
+		padding-inline-start: 2ch;
+		text-indent: -2ch;
+		white-space: pre-wrap;
+		overflow-wrap: anywhere;
+	}
+	.ln {
+		padding-inline-end: var(--ui-space-4);
+		color: var(--ui-color-text-soft);
+		font-variant-numeric: tabular-nums;
+		user-select: none;
+		text-align: end;
+	}
+	.source[data-pulse] .line[data-mark] {
+		background: var(--ui-color-primary-soft);
+	}
+	.source[data-pulse] .line[data-mark] .ln {
+		color: var(--ui-color-primary-text);
+	}
+	.source[data-pulse='a'] .line[data-mark='count'] {
+		animation: line-a 0.9s var(--ui-ease-out);
+	}
+	.source[data-pulse='b'] .line[data-mark='count'] {
+		animation: line-b 0.9s var(--ui-ease-out);
+	}
+	@keyframes line-a {
+		from {
+			background-color: var(--ui-color-primary-border);
+		}
+	}
+	@keyframes line-b {
+		from {
+			background-color: var(--ui-color-primary-border);
+		}
+	}
+
+	/* Result: a dotted ground, an effect of the drawing. */
+	.stage {
+		display: grid;
+		place-content: center;
+		justify-items: center;
+		gap: var(--ui-space-4);
+		background:
+			radial-gradient(circle at center, var(--ui-color-border-strong) 1px, transparent 1.5px) 0 0 / var(--ui-space-5) var(--ui-space-5),
+			transparent;
+		padding: var(--ui-space-12) var(--ui-space-5) var(--ui-space-4);
+		min-height: 15rem;
+		font-variant-numeric: tabular-nums;
+	}
+	/* The ground of the page behind the text, so the dots never cross a line. */
+	.hint {
+		margin: 0;
+		background: var(--ui-color-bg);
+		padding-inline: var(--ui-space-1);
+		max-width: var(--ui-container-sm);
+		color: var(--ui-color-text-soft);
+		font-size: var(--ui-font-size-sm);
+		line-height: var(--ui-line-height-normal);
+		text-align: center;
+	}
+
+	/* DevTools */
+	.devtools {
+		background: var(--ui-color-surface);
+		font-size: var(--ui-font-size-sm);
+	}
+	.tree {
+		display: flex;
+		align-items: center;
+		gap: var(--ui-space-2);
+		margin: var(--ui-space-3) var(--ui-space-3) 0;
+		border-radius: var(--ui-radius-md);
+		background: var(--ui-color-primary-soft);
+		padding: var(--ui-space-1-5) var(--ui-space-2);
+		font-family: var(--ui-font-mono);
+	}
+	.node {
+		color: var(--ui-color-primary-text);
+	}
+	.instance {
+		color: var(--ui-color-text-soft);
+	}
+	.group-title {
+		margin: var(--ui-space-4) var(--ui-space-4) var(--ui-space-1-5);
+		color: var(--ui-color-text-soft);
+		font-weight: var(--ui-font-weight-medium);
+		font-size: var(--ui-font-size-xs);
+	}
+	.rows {
+		margin: 0;
+		border-top: var(--ui-border-width) solid var(--ui-color-border);
+	}
+	.row {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
+		align-items: baseline;
+		gap: 0 var(--ui-space-3);
+		border-bottom: var(--ui-border-width) solid var(--ui-color-border);
+		padding: var(--ui-space-1-5) var(--ui-space-4);
+		font-family: var(--ui-font-mono);
+	}
+	.row dt {
+		color: var(--ui-color-text);
+	}
+	.row dd {
+		margin: 0;
+	}
+	.value {
+		color: var(--ui-color-text);
+		font-variant-numeric: tabular-nums;
+		text-align: end;
+	}
+	.value.muted {
+		color: var(--ui-color-text-soft);
+	}
+	.site {
+		grid-column: 1 / -1;
+		color: var(--ui-color-text-soft);
+		font-size: var(--ui-font-size-xs);
+	}
+	.site:empty {
+		display: none;
+	}
+	.kind {
+		margin-inline-start: var(--ui-space-1-5);
+		color: var(--ui-color-text-soft);
+		font-size: var(--ui-font-size-xs);
+	}
+	/* The pink of Meeko's nose: only the instant a signal changes. An effect of the demo. */
+	.signal[data-flash='a'] {
+		animation: flash-a 1.1s var(--ui-ease-out);
+	}
+	.signal[data-flash='b'] {
+		animation: flash-b 1.1s var(--ui-ease-out);
+	}
+	.signal[data-flash='a'] .value {
+		animation: nose-a 1.1s var(--ui-ease-out);
+	}
+	.signal[data-flash='b'] .value {
+		animation: nose-b 1.1s var(--ui-ease-out);
+	}
+	.derived[data-flash] .value {
+		color: var(--ui-color-primary-text);
+	}
+	@keyframes flash-a {
+		from {
+			background-color: var(--ui-color-pink-3);
+		}
+	}
+	@keyframes flash-b {
+		from {
+			background-color: var(--ui-color-pink-3);
+		}
+	}
+	@keyframes nose-a {
+		from,
+		30% {
+			color: var(--ui-color-pink-9);
+		}
+	}
+	@keyframes nose-b {
+		from,
+		30% {
+			color: var(--ui-color-pink-9);
+		}
+	}
+	.timeline {
+		margin: 0;
+		padding: 0 var(--ui-space-4);
+		font-family: var(--ui-font-mono);
+		list-style: none;
+	}
+	.timeline li {
+		display: grid;
+		grid-template-columns: var(--ui-space-6) auto 1fr;
+		gap: var(--ui-space-2);
+		padding-block: var(--ui-space-1);
+	}
+	.timeline li:first-child .change {
+		color: var(--ui-color-text);
+	}
+	.seq {
+		color: var(--ui-color-text-soft);
+		font-variant-numeric: tabular-nums;
+	}
+	.change {
+		font-variant-numeric: tabular-nums;
+		text-align: end;
+	}
+	.empty {
+		margin: 0;
+		padding: var(--ui-space-1) var(--ui-space-4);
+		color: var(--ui-color-text-soft);
+	}
+	.disclaimer {
+		margin: var(--ui-space-4) var(--ui-space-4) 0;
+		color: var(--ui-color-text-soft);
+		font-size: var(--ui-font-size-xs);
+		line-height: var(--ui-line-height-normal);
+	}
+	.fig-label {
+		margin-block-start: var(--ui-space-4);
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.source[data-pulse] .line[data-mark='count'],
+		.signal[data-flash],
+		.signal[data-flash] .value {
+			animation: none;
+		}
+		.line {
+			transition: none;
+		}
+	}
+	@media (max-width: 68rem) {
+		.panes {
+			grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+		}
+		.code {
+			grid-column: 1 / -1;
+		}
+		.result {
+			border-top: var(--ui-border-width) solid var(--ui-color-border);
+			border-left: 0;
+		}
+		.devtools {
+			border-top: var(--ui-border-width) solid var(--ui-color-border);
+		}
+	}
+	@media (max-width: 40rem) {
+		.panes {
+			grid-template-columns: minmax(0, 1fr);
+		}
+		.pane + .pane {
+			border-left: 0;
+		}
+		.pane {
+			padding-bottom: var(--ui-space-6);
+		}
+		.devtools {
+			padding-bottom: var(--ui-space-12);
+		}
+		.dir {
+			display: none;
+		}
+		.stage {
+			padding-top: var(--ui-space-8);
+			min-height: 11rem;
+		}
+		.line {
+			grid-template-columns: var(--ui-space-10) minmax(0, 1fr);
+		}
+		.ln {
+			padding-inline-end: var(--ui-space-3);
+		}
+		.fig-label {
+			padding-inline: var(--ui-space-4);
+		}
+	}
+</style>

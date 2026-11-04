@@ -8,6 +8,7 @@ symbols:
 types:
   - "@meekojs/meeko#Component"
 related:
+  - docs/como-elegir.md
   - "syntax:meekooutlet"
   - "syntax:defineprops"
   - "syntax:snippet-tag"
@@ -15,13 +16,14 @@ related:
   - "syntax:on"
   - docs/api.md#etiquetas-de-componente-appbutton-
   - docs/api.md#etiquetas-html-en-component-is
+  - docs/api.md#nombres-de-componente-en-is
   - docs/api.md#atributos-en-bloque-con-bind
   - docs/api.md#props-estáticas
 ---
 
 `<component is="expresión">` pinta el componente que devuelve la expresión: una prop que recibe un componente, el de una tabla de vistas, el elegido por una condición. Cada `bind:` pasa una prop tipada, cada `on:` un evento de su `defineEmits`, y `meeko check` comprueba las props obligatorias, sus nombres y sus tipos. Si `is` cambia, Meeko libera la instancia anterior y renderiza e hidrata la nueva en el mismo sitio.
 
-Para un componente fijo, la etiqueta con su nombre es más corta: `<AppButton bind:label="'Guardar'" />` equivale a `<component is="AppButton" bind:label="'Guardar'"></component>`. Desde `1.5`, `is` también acepta una **etiqueta HTML** (`is="props.href ? 'a' : 'button'"`), con sus atributos, eventos y contenido.
+Para un componente fijo, la etiqueta con su nombre es más corta: `<AppButton bind:label="'Guardar'" />` equivale a `<component is="AppButton" bind:label="'Guardar'"></component>`. Desde `1.5`, `is` también acepta una **etiqueta HTML** (`is="props.href ? 'a' : 'button'"`), con sus atributos, eventos y contenido. Desde `1.8`, un literal en PascalCase nombra un componente conocido al compilar, también `<MeekoLink>`: `is="to ? 'MeekoLink' : 'button'"`.
 
 ## Uso
 
@@ -43,15 +45,15 @@ const props = defineProps<{ content: Component<{ label: string }>; label: string
 
 ## Atributos
 
-| Atributo | Tipo | Descripción |
-| --- | --- | --- |
-| `is` | `Component<Props>`, una etiqueta HTML o una unión de ambos | Sólo en `<component>`. Una etiqueta no permitida (`script`, `iframe`, `style`…) es `MEEK112`. |
-| `bind:prop` | el tipo de la prop | Una prop con el valor de una expresión. Una prop opcional acepta `undefined`, que equivale a no pasarla. |
-| `prop="texto"` | literal | Prop estática: el texto como literal (`variant="primary"`) o `true` sin valor. Los nombres con guiones no son props (`MEEK032`). |
-| `bind="objeto"` | props o atributos | Desde `1.5`, props (o atributos de la etiqueta) desde un objeto, sin claves `on*`; las explícitas ganan (`MEEK113`). |
-| `on:evento` | `(…args) => unknown` | La prop de callback `onEvento` de un evento de `defineEmits`. |
-| `model`, `model:nombre` | `Signal<T>` | Los modelos del hijo, de `defineModel`. |
-| `ref:nombre` | | Nombra la instancia para `useElementRef`; su tipo sale del `defineExpose` del hijo. |
+| Atributo                | Tipo                                                       | Descripción                                                                                                                                                                                                                          |
+| ----------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `is`                    | `Component<Props>`, una etiqueta HTML o una unión de ambos | Sólo en `<component>`. Una etiqueta no permitida (`script`, `iframe`, `style`…) es `MEEK112`. Desde `1.8`, también literales en PascalCase con el nombre de un componente (`'MeekoLink'`, `'UICard'`); uno desconocido es `MEEK132`. |
+| `bind:prop`             | el tipo de la prop                                         | Una prop con el valor de una expresión. Una prop opcional acepta `undefined`, que equivale a no pasarla.                                                                                                                             |
+| `prop="texto"`          | literal                                                    | Prop estática: el texto como literal (`variant="primary"`) o `true` sin valor. Los nombres con guiones no son props (`MEEK032`).                                                                                                     |
+| `bind="objeto"`         | props o atributos                                          | Desde `1.5`, props o atributos de lo que `is` pueda ser, desde un objeto, sin claves `on*`; las explícitas ganan (`MEEK113`).                                                                                                        |
+| `on:evento`             | `(…args) => unknown`                                       | La prop de callback `onEvento` de un evento de `defineEmits`.                                                                                                                                                                        |
+| `model`, `model:nombre` | `Signal<T>`                                                | Los modelos del hijo, de `defineModel`.                                                                                                                                                                                              |
+| `ref:nombre`            |                                                            | Nombra la instancia para `useElementRef`; su tipo sale del `defineExpose` del hijo.                                                                                                                                                  |
 
 El contenido entre las etiquetas son los snippets del componente (`<snippet name="…">` y el contenido suelto, `default`) o, con una etiqueta HTML, sus hijos.
 
@@ -99,6 +101,24 @@ const snippets = defineSnippets<{ default: [] }>();
 
 Sin `href` renderiza `<button class="button" type="button">`; con él, `<a class="button" href="…">`. `type` no se escribe en `<a>` ni `href` en `<button>`.
 
+### Una ruta, un enlace o un botón con `'MeekoLink'` (desde 1.8)
+
+```html
+<!-- app/components/AppAction.meeko -->
+<script lang="ts">
+const props = defineProps<{ to?: RouteId; href?: string }>();
+const snippets = defineSnippets<{ default: [] }>();
+</script>
+
+<template>
+  <component is="props.to !== undefined ? 'MeekoLink' : props.href !== undefined ? 'a' : 'button'" class="action" bind:to="props.to" bind:href="props.href" type="button">
+    <render snippet="snippets.default" />
+  </component>
+</template>
+```
+
+Con `to`, la rama de `'MeekoLink'` pinta el `<a>` de `<MeekoLink>`, con su `href` tipado y `aria-current`; `meeko check` la comprueba tras `props.to !== undefined`, así que `to` es una ruta. `href` sólo llega al `<a>` de la segunda rama y `type`, al `<button>`. Cada nombre se resuelve al compilar, como su etiqueta; véase [Nombres de componente en `is`](../../api.md#nombres-de-componente-en-is).
+
 ### Una sección con la etiqueta elegida por el padre
 
 ```html
@@ -123,6 +143,58 @@ const snippets = defineSnippets<{ default: [] }>();
 </component>
 ```
 
+### Una lista con un componente por fila
+
+```html
+<script lang="ts">
+import * as AppInput from "./AppInput.meeko";
+import * as AppSelect from "./AppSelect.meeko";
+
+type Option =
+  | { id: string; component: typeof AppSelect; props: AppSelectProps }
+  | { id: string; component: typeof AppInput; props: AppInputProps };
+
+const options: Option[] = [
+  { id: "role", component: AppSelect, props: { label: "Rol", options: ["admin", "user"] } },
+  { id: "name", component: AppInput, props: { placeholder: "Nombre" } },
+];
+</script>
+
+<template>
+  <component each:of="options" each:as="option" each:key="option.id" is="option.component" bind="option.props" />
+</template>
+```
+
+`is` y `bind` leen el mismo objeto, así que `meeko check` comprueba cada entrada contra su propio componente. Con el tipo escrito, unas props equivocadas fallan en la propia lista. Sin él, como en `const options = [{ … }]`, TypeScript también conserva la relación entre `component` y `props` de cada entrada, y el error sale en `bind`: `{ component: AppInput, props: { label: "Nombre" } }` da `MEEK113: label no es una prop del componente de esa entrada`. Vale con cualquier camino de propiedades que empiece igual en los dos, como `current.value.component` y `current.value.props`, y también con una etiqueta HTML en una de las entradas.
+
+Si `is` y `bind` no leen el mismo objeto (`is="views[mode.value]" bind="attrs"`), TypeScript no puede relacionarlos: el objeto debe valer para todos los componentes posibles.
+
+Usa `AppSelectProps`, no `ComponentProps<"AppSelect">`: este último incluye los eventos de `defineEmits`, y `bind` no admite claves `on*` (`MEEK113`). Los eventos se pasan con `on:`, y el contenido entre las etiquetas es el snippet `default` de cada fila.
+
+En un componente genérico, `meeko check` comprueba sus nombres y sus props obligatorias, no el tipo de sus valores: sólo su etiqueta puede inferir sus parámetros de tipo, y una lista de módulos distintos no puede llamarla entrada a entrada. Solo en la lista, sí se comprueban.
+
+Un módulo no es un dato que se pueda enviar al navegador, así que no va en un `signal` ni en `useState`: `meeko check` da `MEEK136`, y al renderizar en el servidor sería un error. Si la lista cambia, guarda en la señal qué entradas se pintan y léelas con un `computed`:
+
+```html
+<script lang="ts">
+import * as AppInput from "./AppInput.meeko";
+import * as AppSelect from "./AppSelect.meeko";
+
+const entries = {
+  role: { component: AppSelect, props: { label: "Rol", options: ["admin", "user"] } },
+  name: { component: AppInput, props: { placeholder: "Nombre" } },
+};
+const visible = signal<("role" | "name")[]>(["role", "name"]);
+const options = computed(() => visible.value.map((id) => ({ id, ...entries[id] })));
+</script>
+
+<template>
+  <component each:of="options.value" each:as="option" each:key="option.id" is="option.component" bind="option.props" />
+</template>
+```
+
+Cada fila conserva su instancia al reordenar. Si cambia el componente de una fila, Meeko libera el anterior y monta el nuevo en su sitio; si sólo cambian sus props, las recibe la misma instancia.
+
 ## Errores comunes
 
 ### Una etiqueta que no se puede renderizar
@@ -141,6 +213,38 @@ const tag = signal<"a" | "script">("a");
 const tag = signal<"a" | "button">("a");
 </script>
 <template><component is="tag.value">x</component></template>
+```
+
+### `MeekoLink` como valor de `is`
+
+```html bad
+<component is="internal ? MeekoLink : 'a'" to="/about">Acerca</component>
+```
+
+`meeko check` da `TS2304: Cannot find name 'MeekoLink'`: `<MeekoLink>` es una etiqueta del compilador, no un valor del script. Desde `1.8` se nombra con un literal, como cualquier componente:
+
+```html good
+<component is="internal ? 'MeekoLink' : 'a'" to="/about" href="https://example.com">Acerca</component>
+```
+
+### El nombre de un componente como texto en los datos
+
+```html bad
+<script lang="ts">
+const options = [{ id: "role", component: "AppSelect", props: { label: "Rol", options: ["admin"] } }] as const;
+</script>
+<template><component each:of="options" each:as="option" each:key="option.id" is="option.component" bind="option.props" /></template>
+```
+
+`meeko check` da `MEEK112: <AppSelect> no es una etiqueta que <component is> pueda renderizar: is nunca convierte un texto en un componente`, y dice qué hacer. Sin `as const`, el valor es un `string` y el mensaje empieza por `is es un string cualquiera`. Hay tres salidas: el literal en la plantilla (`is="kind === 'select' ? 'AppSelect' : 'AppInput'"`), el módulo importado en los datos, o [`resolveComponent`](componentregistry.md) para cargarlo en ejecución.
+
+```html good
+<script lang="ts">
+import * as AppSelect from "./AppSelect.meeko";
+
+const options = [{ id: "role", component: AppSelect, props: { label: "Rol", options: ["admin"] } }];
+</script>
+<template><component each:of="options" each:as="option" each:key="option.id" is="option.component" bind="option.props" /></template>
 ```
 
 ### Olvidar una prop obligatoria
@@ -196,5 +300,6 @@ Con `defineProps<{ title: string; count?: number }>()` en `Card`, `meeko check` 
 - **SSR e hidratación.** El servidor renderiza el componente elegido con su estado; la hidratación reclama el mismo HTML. Si `is` cambia en el navegador, la instancia anterior se libera (sus efectos, limpiezas y eventos) y la nueva se monta en los mismos marcadores.
 - **Cambio de etiqueta.** Con una etiqueta HTML, un cambio de `is` crea el elemento nuevo y **mueve** a él los hijos, que conservan su estado y el foco.
 - **Navegación con datos.** Un componente elegido en tiempo de ejecución obliga al navegador a hacer la pasada previa de una navegación, porque podría esperar datos con `await useApi`.
+- **Nombre conocido o nombre en ejecución.** Un literal en `is` se resuelve al compilar y sale en el HTML de SSR. Un nombre que llega en ejecución se carga con [`resolveComponent`](componentregistry.md), que devuelve una promesa con el módulo para `is`.
 - **Seguridad.** `is` nunca interpreta texto como HTML: sólo módulos de componente o etiquetas de una lista permitida. Los elementos personalizados (`x-card`) y las etiquetas SVG no se admiten como valor de `is`.
 - **Outlet.** En los layouts, [`<MeekoOutlet />`](/docs/reference/meekooutlet) equivale a `<component is="props.outlet">` sin declarar la prop.

@@ -1,0 +1,90 @@
+{
+	"home": {
+		"hero": {
+			"title": "Typed <code>.meeko</code> components,",
+			"titleLine2": "from the server to the browser.",
+			"lead": "A component engine for TypeScript and a full-stack framework. One file gives the server HTML and the reactivity that updates it, without a virtual DOM.",
+			"start": "Get started",
+			"requires": "Requires Node 24 and"
+		},
+		"flow": {
+			"title": "One typed file.",
+			"titleSoft": "The server sends HTML and the browser only wires up what changes.",
+			"typedTitle": "A typed <code>.meeko</code> file",
+			"typedBody": "Script, template and styles together. TypeScript checks props, events, models and every template expression, with the error on the line of the <code>.meeko</code> file.",
+			"typedLink": "Components and API",
+			"signalsTitle": "Signals without a virtual DOM",
+			"signalsAnd": "and",
+			"signalsBody": "update only the text or the attribute that changes. Lists keep their nodes by key.",
+			"signalsLink": "Reactivity",
+			"signalsAnchor": "reactivity",
+			"ssrTitle": "SSR plus hydration",
+			"ssrBody": "The server sends the complete page and the state of every signal; the browser hydrates it without painting it again. Also streaming, prerendering and client pages.",
+			"ssrLink": "Rendering modes",
+			"ssrAnchor": "rendering-modes",
+			"figure": "Isometric drawing: the Counter.meeko file goes to the server, which sends HTML; the browser hydrates it and receives the state of the signals.",
+			"figureHydrate": "HYDRATE",
+			"figureState": "SIGNAL STATE",
+			"caption": "Compile, render on the server, hydrate"
+		},
+		"deploy": {
+			"title": "Full-stack out of the box.",
+			"titleSoft": "One standalone build per adapter and the same conformance suite for all four.",
+			"figure": "Isometric drawing: meeko build with an adapter feeds four platforms, Node, Bun, Deno and Workers, inside the frame of a single conformance suite.",
+			"figureSuite": "CONFORMANCE SUITE",
+			"caption": "One build, four targets",
+			"fullstackTitle": "Full-stack out of the box",
+			"fullstackBody": "File-based routes, layouts, server code in the page itself, typed API and RPC, sessions with revocation and WebSocket across instances.",
+			"fullstackLink": "Framework guide",
+			"platformsTitle": "Node, Bun, Deno and Cloudflare",
+			"platformsBody": "One standalone build per adapter, checked by the same conformance suite. SemVer since 1.0, with an explicit stability policy.",
+			"platformsLink": "1.x stability"
+		},
+		"tools": {
+			"title": "Tools that see the runtime.",
+			"titleSoft": "The editor and DevTools show the real signals of each instance.",
+			"editorCode": "Lines 10 to 17 of Counter.meeko",
+			"hover": "Hover of the count signal",
+			"instances": "Counter.meeko · 1 instance",
+			"editValue": "Edit value",
+			"connected": "connected to meeko dev",
+			"caption": "A rendering of the VS Code extension with meeko dev running: the value of each signal at the end of its line and in the hover",
+			"editorTitle": "An editor with superpowers",
+			"editorBody": "A language server with the diagnostics of <code>meeko check</code>, server/browser execution zones, signal hovers and live values from <code>meeko dev</code>.",
+			"editorLink": "Editors",
+			"devtoolsTitle": "Per-instance DevTools",
+			"devtoolsBody": "A tree of instances with their props and signals, a filterable timeline and a breakpoint per instance, inside the page or in a Chrome DevTools panel. It only exists in development.",
+			"devtoolsLink": "DevTools",
+			"catCaption": "Meeko peeking over the editor"
+		},
+		"start": {
+			"title": "Quick start.",
+			"titleSoft": "One command creates the full-stack application; its scripts take it to production.",
+			"dev": "Starts the development server.",
+			"check": "Generates the contracts and checks the types.",
+			"build": "Client, server and prerendered pages; with <code>--adapter</code>, an output for Bun, Deno, Cloudflare or a static host.",
+			"start": "Production SSR with Node 24.",
+			"full": "Full quick start",
+			"guide": "Framework guide"
+		},
+		"demo": {
+			"reset": "Reset",
+			"code": "Code of Counter.meeko",
+			"editor": "Editor",
+			"github": "View on GitHub",
+			"result": "Result in the browser",
+			"resultTitle": "Result",
+			"resultNote": "SSR and hydrated on this page",
+			"counter": "{count} · double: {doubled}",
+			"hint": "Press the button: the signal changes and only its text updates.",
+			"devtools": "Rendering of DevTools",
+			"devtoolsTag": "rendering",
+			"signals": "Signals",
+			"timeline": "Timeline",
+			"empty": "No changes yet.",
+			"disclaimer": "The real panel only exists in development, inside the page or in Chrome DevTools.",
+			"caption": "Counter.meeko from the repository, its result and a rendering of DevTools",
+			"announcement": "count is {count}; doubled is {doubled}."
+		}
+	}
+}

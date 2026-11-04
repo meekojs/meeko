@@ -41,12 +41,12 @@ await navigator.navigate("/users/42");
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `routes` | `RouteRecord[]` | obligatorio | Manifiesto de rutas, idealmente creado con `createRouteManifest`. |
-| `render` | `(context) => void \| boolean \| Promise<…>` | obligatorio | Pinta cada navegación. Devolver `false` la cancela y el historial no cambia. |
-| `browser` | `Window` | `window` | La ventana cuyo `history` y `location` se usan. |
-| `onError` | `(error) => void` | consola | Fallos de las navegaciones por historial (atrás y adelante), que no tienen a quién rechazar. |
+| Parámetro | Tipo                                         | Por defecto | Descripción                                                                                  |
+| --------- | -------------------------------------------- | ----------- | -------------------------------------------------------------------------------------------- |
+| `routes`  | `RouteRecord[]`                              | obligatorio | Manifiesto de rutas, idealmente creado con `createRouteManifest`.                            |
+| `render`  | `(context) => void \| boolean \| Promise<…>` | obligatorio | Pinta cada navegación. Devolver `false` la cancela y el historial no cambia.                 |
+| `browser` | `Window`                                     | `window`    | La ventana cuyo `history` y `location` se usan.                                              |
+| `onError` | `(error) => void`                            | consola     | Fallos de las navegaciones por historial (atrás y adelante), que no tienen a quién rechazar. |
 
 El callback recibe un `NavigationContext`: `url` (la URL de destino), `match` (`{ route, params }`), `signal` (se aborta si otra navegación sustituye a ésta) y `retainedLayouts` (la longitud del prefijo de layouts común con la ruta anterior, que el host puede conservar).
 
@@ -54,16 +54,17 @@ El callback recibe un `NavigationContext`: `url` (la URL de destino), `match` (`
 
 Un `Navigator`:
 
-| Miembro | Descripción |
-| --- | --- |
+| Miembro                      | Descripción                                                                                                                                                                                                            |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `navigate(to, { replace? })` | Navega a `to` en el mismo origen. Resuelve `true` si navegó, `false` si la URL no tiene ruta o se canceló, y rechaza si el render falla o la URL es de otro origen. Con `replace`, sustituye la entrada del historial. |
-| `dispose()` | Deja de escuchar `popstate`. |
+| `dispose()`                  | Deja de escuchar `popstate`.                                                                                                                                                                                           |
 
 ## Ejemplos
 
 ### Conservar los layouts comunes
 
 <!-- no-check -->
+
 ```ts
 const mounted: Array<{ dispose(): void }> = [];
 const navigator = createNavigator(routes, async ({ match, retainedLayouts }) => {
@@ -77,6 +78,7 @@ const navigator = createNavigator(routes, async ({ match, retainedLayouts }) => 
 ### Interceptar los enlaces tú mismo
 
 <!-- no-check -->
+
 ```ts
 document.addEventListener("click", (event) => {
   const anchor = (event.target as Element).closest("a");
@@ -99,6 +101,7 @@ await navigator.navigate("https://otro.example/users/42");
 Rechaza con `TypeError: External navigation is not a Meeko route`: `createNavigator` sólo cambia la URL dentro del mismo origen, como `history.pushState`. Un enlace externo es una navegación del navegador. Después de `dispose()`, `navigate` rechaza con `Navigator disposed`.
 
 <!-- no-check -->
+
 ```ts good
 location.assign("https://otro.example/users/42");
 ```
@@ -115,6 +118,7 @@ createNavigator(routes, async ({ match }) => {
 Si el usuario hace clic en dos enlaces seguidos, la respuesta lenta de la primera navegación puede llegar después y pintar encima de la segunda.
 
 <!-- no-check -->
+
 ```ts good
 createNavigator(routes, async ({ match, signal }) => {
   const html = await (await fetch(`/fragments${match.route.id}`, { signal })).text();
@@ -132,6 +136,7 @@ createNavigator(routes, () => {});
 El historial cambia, pero la página no: el callback es el único que pinta. Para la navegación completa de Meeko (datos, layouts, hidratación, middleware), usa `mountClientApp`.
 
 <!-- no-check -->
+
 ```ts good
 const app = await mountClientApp({ root, payload, routes, loadPage, serverData: true });
 ```

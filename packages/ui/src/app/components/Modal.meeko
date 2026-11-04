@@ -1,0 +1,104 @@
+<script lang="ts">
+	import type { ModalDismissReason } from '../types/modal'
+
+	import { modalExitRegistration, optionalModalInstance } from '../composables/useModal'
+	import { uiMessages } from '../utils/messages'
+	import { mountModalDialog } from '../utils/modal-dialog'
+
+	interface Props {
+		title: string
+		description?: string
+		size?: 'sm' | 'md' | 'lg'
+		closeOnEscape?: boolean
+		closeOnBackdrop?: boolean
+		closeButton?: boolean
+		closeLabel?: string
+		class?: string
+	}
+
+	const props = defineProps<Props>()
+
+	const emit = defineEmits<{ dismiss: [reason: ModalDismissReason] }>()
+
+	const open = defineModel<boolean>({ default: false })
+
+	const snippets = defineSnippets<{ default: []; footer?: [] }>()
+
+	const dialog = useElementRef('dialog')
+
+	const id = useId()
+	const text = uiMessages().modal
+	const instance = optionalModalInstance()
+	const registerExit = modalExitRegistration()
+	if (instance) open.value = true
+
+	function dismiss(reason: ModalDismissReason) {
+		open.value = false
+		try {
+			emit('dismiss', reason)
+		} finally {
+			instance?.dismiss()
+		}
+	}
+
+	onMounted(() => {
+		if (!dialog.value) return
+		const controller = mountModalDialog(dialog.value, open, props, dismiss)
+		const unregister = registerExit?.(controller.close)
+		return () => {
+			unregister?.()
+			controller.dispose()
+		}
+	})
+</script>
+
+<template>
+	<dialog
+		ref:dialog
+		bind:class="['meeko-ui-modal', props.class].filter(Boolean).join(' ')"
+		bind:data-size="props.size ?? 'md'"
+		bind:closedby="props.closeOnEscape === false ? 'none' : props.closeOnBackdrop === false ? 'closerequest' : 'any'"
+		bind:aria-labelledby="id + '-title'"
+		bind:aria-describedby="props.description ? id + '-description' : undefined"
+	>
+		<div class="meeko-ui-modal-heading">
+			<div>
+				<h2 bind:id="id + '-title'">{props.title}</h2>
+				<p
+					if:when="props.description"
+					bind:id="id + '-description'"
+				>
+					{props.description}
+				</p>
+			</div>
+			<button
+				if:when="props.closeButton !== false"
+				type="button"
+				class="meeko-ui-modal-close"
+				bind:aria-label="props.closeLabel ?? text.close"
+				on:click="() => dismiss('button')"
+			>
+				<svg
+					width="20"
+					height="20"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="1.75"
+					aria-hidden="true"
+				>
+					<path d="M6 6l12 12M6 18L18 6" />
+				</svg>
+			</button>
+		</div>
+		<div class="meeko-ui-modal-body">
+			<render snippet="snippets.default" />
+		</div>
+		<footer
+			if:when="snippets.footer"
+			class="meeko-ui-modal-footer"
+		>
+			<render snippet="snippets.footer" />
+		</footer>
+	</dialog>
+</template>

@@ -1,0 +1,58 @@
+{
+	"a11y": {
+		"home": "Meeko, inicio",
+		"primaryNav": "Principal",
+		"footerNav": "Pie de página",
+		"github": "Meeko en GitHub"
+	},
+	"nav": {
+		"guide": "Guía",
+		"api": "API",
+		"changes": "Cambios",
+		"start": "Empezar"
+	},
+	"footer": {
+		"built": "Hecho con Meeko: cada página de este sitio es un componente <code>.meeko</code> prerenderizado.",
+		"dedication": "Dedicado a Meeko, la gatita del autor.",
+		"docs": "Documentación",
+		"quickStart": "Inicio rápido",
+		"frameworkGuide": "Guía del framework",
+		"componentsApi": "Componentes y API",
+		"reference": "Referencia de la API",
+		"devtools": "DevTools",
+		"project": "Proyecto",
+		"changes": "Cambios",
+		"stability": "Estabilidad 1.x",
+		"license": "Licencia MIT"
+	},
+	"search": {
+		"open": "Buscar en la documentación",
+		"trigger": "Buscar…",
+		"placeholder": "Buscar: signals, defineModel, prerender…",
+		"input": "Texto de búsqueda",
+		"hint": "Escribe para buscar en las guías y en la referencia de la API. Ábrela desde cualquier página con <kbd>/</kbd> o <kbd>{modifier}</kbd> <kbd>K</kbd>; muévete con las flechas y entra con <kbd>Intro</kbd>.",
+		"loading": "Buscando…",
+		"empty": "Sin resultados para «{query}».",
+		"unavailable": "La búsqueda no está disponible ahora mismo. Vuelve a intentarlo en unos momentos."
+	},
+	"actions": {
+		"copy": "Copiar",
+		"copied": "Copiado",
+		"copyFailed": "Error"
+	},
+	"error": {
+		"notFoundTitle": "Esta página no existe",
+		"notFoundDetail": "Puede que el enlace sea antiguo o que la página haya cambiado de nombre.",
+		"failedTitle": "Algo salió mal",
+		"failedDetail": "No se pudo mostrar la página ({message}).",
+		"hint": "Busca en la documentación con <kbd>/</kbd> o vuelve a un punto conocido.",
+		"home": "Volver al inicio",
+		"guide": "Leer la guía",
+		"reference": "Referencia de la API",
+		"notFoundCaption": "Meeko buscó por todas partes y no la encontró",
+		"failedCaption": "Meeko espera a que el servidor responda"
+	},
+	"cat": {
+		"drawing": "Dibujo de línea: Meeko, la gatita ragdoll del logo, con su melena de pelo largo, orejas grandes, la máscara alrededor de los ojos azules y el hocico blanco, asomada detrás de un editor en perspectiva isométrica; una tarjeta flota sobre una línea resaltada del código."
+	}
+}

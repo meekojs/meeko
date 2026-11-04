@@ -28,9 +28,9 @@ export default defineMeekoConfig({
 
 ## Opciones
 
-| Valor | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `extends` | `readonly string[]` | `[]` | Carpetas del proyecto con `app/pages`, como las de `layers`. |
+| Valor     | Tipo                | Por defecto | Descripción                                                  |
+| --------- | ------------------- | ----------- | ------------------------------------------------------------ |
+| `extends` | `readonly string[]` | `[]`        | Carpetas del proyecto con `app/pages`, como las de `layers`. |
 
 ## Resultado
 

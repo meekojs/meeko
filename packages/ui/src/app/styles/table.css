@@ -1,0 +1,113 @@
+/* `position`: what a cell hides for a screen reader stays inside this box, and never widens the page. */
+.meeko-ui-table-scroll {
+	position: relative;
+	max-width: 100%;
+	overflow-x: auto;
+	overscroll-behavior-inline: contain;
+}
+.meeko-ui-table-scroll:focus-visible {
+	outline: var(--ui-focus-ring);
+	outline-offset: var(--ui-focus-ring-offset);
+}
+.meeko-ui-table {
+	--table-columns: minmax(var(--ui-table-column-min), 2fr) minmax(calc(var(--ui-table-column-min) * 1.25), 3fr) calc(var(--ui-table-column-min) * 0.75);
+	--table-border: var(--ui-color-border);
+	--table-background: var(--ui-color-surface);
+	--table-hover: var(--ui-color-control-hover);
+	border-collapse: separate;
+	border-spacing: 0;
+	background: var(--table-background);
+
+	width: 100%;
+	color: var(--ui-color-text);
+	font-size: var(--ui-font-size-md);
+	font-family: var(--ui-font-sans);
+	font-variant-numeric: tabular-nums;
+	text-align: left;
+	/* A table scrolls before a word breaks, also inside a card, whose text may break anywhere. */
+	overflow-wrap: normal;
+
+	& > thead > tr > th,
+	& .meeko-ui-badge {
+		white-space: nowrap;
+	}
+	& > caption {
+		padding: var(--ui-space-2) var(--ui-space-3);
+		color: var(--ui-color-text-soft);
+		text-align: inherit;
+	}
+	& > :is(thead, tbody, tfoot) > tr > :is(th, td) {
+		vertical-align: middle;
+		border-bottom: var(--ui-border-width) solid var(--table-border);
+		padding: var(--ui-space-2) var(--ui-space-3);
+		text-align: inherit;
+	}
+	& > :is(thead, tbody, tfoot) > tr > th {
+		color: var(--ui-color-text-soft);
+		font-weight: var(--ui-font-weight-medium);
+	}
+	&[data-caption='hidden'] > caption {
+		position: absolute;
+		clip-path: inset(50%);
+		padding: 0;
+		width: var(--ui-border-width);
+		height: var(--ui-border-width);
+		overflow: hidden;
+		white-space: nowrap;
+	}
+	& > tbody > tr:hover {
+		background: var(--table-hover);
+	}
+	& > tbody > tr > th {
+		color: var(--ui-color-text);
+	}
+	/* A row is scanned: a link marks itself when the pointer reaches it. */
+	& a:not(.meeko-ui-button) {
+		text-decoration: none;
+	}
+	& a:not(.meeko-ui-button):hover {
+		text-decoration: underline;
+	}
+	/* A type breaks at its spaces, and a name is never cut: `anywhere` would let the column shrink to a
+	   few letters (`docs/en/do|ctor.md`). `break-word` only cuts what does not fit even in a whole line,
+	   and it does not count for the width of the column, so a grid column stays inside the table. */
+	& code {
+		font-size: var(--ui-prose-code-size);
+		font-family: var(--ui-font-mono);
+		overflow-wrap: break-word;
+	}
+	& > tbody > tr:last-child > :is(th, td) {
+		border-bottom: 0;
+	}
+	& > tfoot > tr:first-child > :is(th, td) {
+		border-top: var(--ui-border-width) solid var(--table-border);
+	}
+	& > tfoot > tr:last-child > :is(th, td) {
+		border-bottom: 0;
+	}
+}
+
+@supports (grid-template-columns: subgrid) {
+	.meeko-ui-table[data-layout='grid'] {
+		display: grid;
+		grid-template-columns: var(--table-columns);
+
+		& > caption {
+			grid-column: 1 / -1;
+		}
+		& > tbody > tr > .meeko-ui-table-empty {
+			grid-column: 1 / -1;
+		}
+		& > :is(thead, tbody, tfoot),
+		& > :is(thead, tbody, tfoot) > tr {
+			display: grid;
+			grid-template-columns: subgrid;
+			grid-column: 1 / -1;
+		}
+		& > :is(thead, tbody, tfoot) > tr > :is(th, td) {
+			display: flex;
+			align-items: center;
+			min-width: 0;
+		}
+	}
+}

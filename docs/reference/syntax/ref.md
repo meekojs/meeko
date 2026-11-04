@@ -36,9 +36,9 @@ onMounted(() => {
 
 ## Atributos
 
-| Atributo | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `ref:<nombre>` | sin valor | ninguno | Nombra la etiqueta. `<nombre>` es un identificador, único en la plantilla. |
+| Atributo       | Tipo      | Por defecto | Descripción                                                                |
+| -------------- | --------- | ----------- | -------------------------------------------------------------------------- |
+| `ref:<nombre>` | sin valor | ninguno     | Nombra la etiqueta. `<nombre>` es un identificador, único en la plantilla. |
 
 Vale en elementos HTML y SVG, en etiquetas de componente y en `<component is>`. No vale en `<template>`, ni dentro del contenido de un `<snippet>` (o del contenido suelto de una etiqueta de componente, que es el snippet `default`).
 
@@ -46,11 +46,11 @@ Vale en elementos HTML y SVG, en etiquetas de componente y en `<component is>`. 
 
 Nada en el HTML. En el script, `useElementRef("nombre")` devuelve:
 
-| Dónde está la `ref:` | Sin `await` | Con `await` |
-| --- | --- | --- |
-| Un elemento | `ReadonlySignal<Elemento \| null>`: `null` en SSR, antes de hidratar y mientras un `if:when` lo oculta | El elemento, nunca `null`; el resto del setup sigue sólo en el navegador |
-| Un componente | `ReadonlySignal<Expuesto \| null>`, con el valor de su `defineExpose` | El valor expuesto |
-| Dentro de `each:of` | `ReadonlySignal<readonly Elemento[]>`, en orden de documento | No admite `await` (`MEEK056`) |
+| Dónde está la `ref:` | Sin `await`                                                                                            | Con `await`                                                              |
+| -------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
+| Un elemento          | `ReadonlySignal<Elemento \| null>`: `null` en SSR, antes de hidratar y mientras un `if:when` lo oculta | El elemento, nunca `null`; el resto del setup sigue sólo en el navegador |
+| Un componente        | `ReadonlySignal<Expuesto \| null>`, con el valor de su `defineExpose`                                  | El valor expuesto                                                        |
+| Dentro de `each:of`  | `ReadonlySignal<readonly Elemento[]>`, en orden de documento                                           | No admite `await` (`MEEK056`)                                            |
 
 ## Ejemplos
 

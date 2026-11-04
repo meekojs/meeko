@@ -17,13 +17,14 @@ related:
   - docs/framework.md#cloudflare-workers
 ---
 
-`createSocketRoomClass(app, DurableObject, options)` devuelve la clase que se exporta desde el Worker para las salas de Socket: un Durable Object por par canal/sala. La sala acepta los WebSockets con la API de hibernación (`ctx.acceptWebSocket`), así que las conexiones inactivas no mantienen el objeto en memoria; al despertar, reconstruye cada conexión desde su *attachment* y el hub vuelve a autorizarla. Reparte las publicaciones a sus peers en orden.
+`createSocketRoomClass(app, DurableObject, options)` devuelve la clase que se exporta desde el Worker para las salas de Socket: un Durable Object por par canal/sala. La sala acepta los WebSockets con la API de hibernación (`ctx.acceptWebSocket`), así que las conexiones inactivas no mantienen el objeto en memoria; al despertar, reconstruye cada conexión desde su _attachment_ y el hub vuelve a autorizarla. Reparte las publicaciones a sus peers en orden.
 
 `DurableObject` se importa de `cloudflare:workers` y se pasa como argumento para que `@meekojs/meeko/cloudflare` se pueda cargar fuera de Workers. `app` es la misma aplicación o fábrica que recibe `createWorker`.
 
 ## Uso
 
 <!-- no-check -->
+
 ```ts
 import { DurableObject } from "cloudflare:workers";
 import { createSocketRoomClass, createWorker } from "@meekojs/meeko/cloudflare";
@@ -41,14 +42,14 @@ El nombre exportado debe ser el de `wrangler.jsonc` (`server.socketClassName`, `
 
 `createSocketRoomClass(app, base, options?)`:
 
-| Opción | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `maxMessageBytes` | `number` | `socket.maxMessageBytes` de la aplicación, o `65536` | Mensaje entrante más grande; los mayores cierran el peer con `1009`. |
-| `autoResponse` | `{ request, response } \| false` | `{ request: "ping", response: "pong" }` | Mensaje de texto que el runtime responde sin despertar el objeto. Los pings del protocolo se responden siempre. |
-| `keepHeaders` | `readonly string[]` | `[]` | Cabeceras adicionales (en minúsculas) que el canal ve en `context.request` antes y después de hibernar. Por defecto se conservan la cookie de sesión, `origin` y `authorization`; `"cookie"` conserva la cabecera completa. |
-| `maxPendingPublications` | `number` | `1024` | Publicaciones sin entregar que acepta una sala; por encima, `publish` rechaza con `SOCKET_BACKLOG_EXCEEDED` (`503`). |
-| `rebuildTimeoutMs` | `number` | `5000` | Milisegundos que las publicaciones esperan a las conexiones que se reconstruyen tras hibernar. |
-| `onError` | `(error, requestId) => void` | el de la aplicación | Observador de errores. |
+| Opción                   | Tipo                             | Por defecto                                          | Descripción                                                                                                                                                                                                                 |
+| ------------------------ | -------------------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `maxMessageBytes`        | `number`                         | `socket.maxMessageBytes` de la aplicación, o `65536` | Mensaje entrante más grande; los mayores cierran el peer con `1009`.                                                                                                                                                        |
+| `autoResponse`           | `{ request, response } \| false` | `{ request: "ping", response: "pong" }`              | Mensaje de texto que el runtime responde sin despertar el objeto. Los pings del protocolo se responden siempre.                                                                                                             |
+| `keepHeaders`            | `readonly string[]`              | `[]`                                                 | Cabeceras adicionales (en minúsculas) que el canal ve en `context.request` antes y después de hibernar. Por defecto se conservan la cookie de sesión, `origin` y `authorization`; `"cookie"` conserva la cabecera completa. |
+| `maxPendingPublications` | `number`                         | `1024`                                               | Publicaciones sin entregar que acepta una sala; por encima, `publish` rechaza con `SOCKET_BACKLOG_EXCEEDED` (`503`).                                                                                                        |
+| `rebuildTimeoutMs`       | `number`                         | `5000`                                               | Milisegundos que las publicaciones esperan a las conexiones que se reconstruyen tras hibernar.                                                                                                                              |
+| `onError`                | `(error, requestId) => void`     | el de la aplicación                                  | Observador de errores.                                                                                                                                                                                                      |
 
 ## Valor devuelto
 
@@ -72,12 +73,14 @@ Con un historial `migrations` propio en `server.wrangler`, añada esa entrada al
 ### Un idioma por conexión que sobrevive a la hibernación
 
 <!-- no-check -->
+
 ```ts
 // worker.ts
 export const MeekoSocketRoom = createSocketRoomClass(createCloudflareApp, DurableObject, { keepHeaders: ["accept-language"] });
 ```
 
 <!-- no-check -->
+
 ```ts
 // server/socket/support.ts
 export default defineSocketChannel({
@@ -95,6 +98,7 @@ export default defineSocketChannel({
 ### Salas muy activas
 
 <!-- no-check -->
+
 ```ts
 export const MeekoSocketRoom = createSocketRoomClass(createCloudflareApp, DurableObject, {
   maxPendingPublications: 4096,
@@ -116,6 +120,7 @@ export const MeekoSocketRoom = createSocketRoomClass(createCloudflareApp, undefi
 `TypeError: createSocketRoomClass requires DurableObject from cloudflare:workers`. Pásela desde el Worker.
 
 <!-- no-check -->
+
 ```ts good
 import { DurableObject } from "cloudflare:workers";
 export const MeekoSocketRoom = createSocketRoomClass(createCloudflareApp, DurableObject);
@@ -130,6 +135,7 @@ createSocketRoomClass(createCloudflareApp, DurableObject, { keepHeaders: ["Accep
 `TypeError: keepHeaders must list lowercase header names: Accept-Language`.
 
 <!-- no-check -->
+
 ```ts good
 createSocketRoomClass(createCloudflareApp, DurableObject, { keepHeaders: ["accept-language"] });
 ```
@@ -143,19 +149,21 @@ createSocketRoomClass(createCloudflareApp, DurableObject, { maxPendingPublicatio
 `RangeError: Invalid maxPendingPublications`; con un valor válido, `RangeError: rebuildTimeoutMs must be a non-negative number`.
 
 <!-- no-check -->
+
 ```ts good
 createSocketRoomClass(createCloudflareApp, DurableObject, { maxPendingPublications: 512, rebuildTimeoutMs: 2_000 });
 ```
 
-### Una cookie que no cabe en el *attachment*
+### Una cookie que no cabe en el _attachment_
 
 ```ts bad
 createSocketRoomClass(createCloudflareApp, DurableObject, { keepHeaders: ["cookie"] }); // cookies de analítica de 20 KB
 ```
 
-Cloudflare limita el *attachment* de un WebSocket a 16.384 bytes. Meeko estima el tamaño antes de aceptar: el upgrade responde `431` y `onError` recibe el error, en lugar de abrir una conexión que se cerraría con `1011`.
+Cloudflare limita el _attachment_ de un WebSocket a 16.384 bytes. Meeko estima el tamaño antes de aceptar: el upgrade responde `431` y `onError` recibe el error, en lugar de abrir una conexión que se cerraría con `1011`.
 
 <!-- no-check -->
+
 ```ts good
 createSocketRoomClass(createCloudflareApp, DurableObject); // sólo la cookie de sesión de Meeko
 ```

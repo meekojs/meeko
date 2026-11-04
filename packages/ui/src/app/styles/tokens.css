@@ -1,0 +1,274 @@
+/*
+ * The design tokens of Meeko. Raw values live here and in palette.css only; everything else reads
+ * var(--ui-*). packages/ui/DESIGN.md says which one to use for what.
+ *
+ * Steps follow the Radix convention: 1-2 backgrounds, 3-5 controls, 6-8 borders, 9-10 solids, 11-12 text.
+ */
+:root {
+	/* Backgrounds */
+	--ui-color-bg: var(--ui-color-surface-1);
+	--ui-color-bg-subtle: var(--ui-color-surface-2);
+	--ui-color-surface: var(--ui-color-surface-2);
+	--ui-color-surface-raised: var(--ui-color-surface-1);
+	--ui-color-overlay: rgb(0 0 0 / 50%);
+	/* The overlay over the page, already opaque: the gutter of the scrollbar only takes a solid color. */
+	--ui-color-overlay-solid: color-mix(in srgb, var(--ui-color-bg) 50%, black);
+
+	/* Controls */
+	--ui-color-control: var(--ui-color-surface-3);
+	--ui-color-control-hover: var(--ui-color-surface-4);
+	--ui-color-control-active: var(--ui-color-surface-5);
+
+	/* Borders */
+	--ui-color-border: var(--ui-color-surface-6);
+	--ui-color-border-strong: var(--ui-color-surface-8);
+	--ui-color-control-border: var(--ui-color-surface-9);
+
+	/* Text */
+	--ui-color-text: var(--ui-color-surface-12);
+	--ui-color-text-soft: var(--ui-color-surface-11);
+
+	/* Browser surfaces */
+	--ui-color-focus: var(--ui-color-primary-9);
+	--ui-color-selection: var(--ui-color-primary-5);
+
+	/* Primary: --ui-color-primary-contrast comes with the other scales, below */
+	--ui-color-primary: var(--ui-color-primary-9);
+	--ui-color-primary-hover: var(--ui-color-primary-10);
+	--ui-color-primary-active: color-mix(in oklab, var(--ui-color-primary) 50%, var(--ui-color-primary-hover));
+	--ui-color-primary-soft: var(--ui-color-primary-3);
+	--ui-color-primary-soft-hover: var(--ui-color-primary-4);
+	--ui-color-primary-border: var(--ui-color-primary-7);
+	--ui-color-primary-text: var(--ui-color-primary-11);
+
+	/* States */
+	--ui-color-info: var(--ui-color-info-9);
+	--ui-color-info-hover: var(--ui-color-info-10);
+	--ui-color-info-soft: var(--ui-color-info-3);
+	--ui-color-info-border: var(--ui-color-info-7);
+	--ui-color-info-text: var(--ui-color-info-11);
+	--ui-color-success: var(--ui-color-success-9);
+	--ui-color-success-hover: var(--ui-color-success-10);
+	--ui-color-success-soft: var(--ui-color-success-3);
+	--ui-color-success-border: var(--ui-color-success-7);
+	--ui-color-success-text: var(--ui-color-success-11);
+	--ui-color-warning: var(--ui-color-warning-9);
+	--ui-color-warning-hover: var(--ui-color-warning-10);
+	--ui-color-warning-soft: var(--ui-color-warning-3);
+	--ui-color-warning-border: var(--ui-color-warning-7);
+	--ui-color-warning-text: var(--ui-color-warning-11);
+	--ui-color-danger: var(--ui-color-danger-9);
+	--ui-color-danger-hover: var(--ui-color-danger-10);
+	--ui-color-danger-soft: var(--ui-color-danger-3);
+	--ui-color-danger-border: var(--ui-color-danger-7);
+	--ui-color-danger-text: var(--ui-color-danger-11);
+
+	/*
+	 * Text on a solid: white when it reaches 4.5:1, black otherwise. Light step 10 is darker than 9,
+	 * so the text on a hovered solid is a token of its own. tests/tokens.test.mjs computes them all.
+	 */
+	--ui-color-primary-contrast: #ffffff;
+	--ui-color-primary-contrast-hover: #ffffff;
+	--ui-color-surface-contrast: #000000;
+	--ui-color-surface-contrast-hover: #000000;
+	--ui-color-info-contrast: #000000;
+	--ui-color-info-contrast-hover: #ffffff;
+	--ui-color-success-contrast: #000000;
+	--ui-color-success-contrast-hover: #ffffff;
+	--ui-color-warning-contrast: #000000;
+	--ui-color-warning-contrast-hover: #ffffff;
+	--ui-color-danger-contrast: #ffffff;
+	--ui-color-danger-contrast-hover: #ffffff;
+	--ui-color-cyan-contrast: #000000;
+	--ui-color-cyan-contrast-hover: #ffffff;
+	--ui-color-orange-contrast: #ffffff;
+	--ui-color-orange-contrast-hover: #ffffff;
+	--ui-color-pink-contrast: #ffffff;
+	--ui-color-pink-contrast-hover: #ffffff;
+
+	/* Type */
+	--ui-font-sans: 'Inter Variable', Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+	--ui-font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', 'JetBrains Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+	--ui-font-size-xs: 0.75rem;
+	--ui-font-size-sm: 0.8125rem;
+	--ui-font-size-md: 0.875rem;
+	--ui-font-size-lg: 1rem;
+	--ui-font-size-xl: 1.125rem;
+	--ui-font-size-2xl: 1.375rem;
+	--ui-font-size-3xl: 1.75rem;
+	--ui-font-size-4xl: 2.25rem;
+	--ui-font-size-5xl: 3rem;
+	--ui-font-size-6xl: 4rem;
+	--ui-line-height-none: 1;
+	--ui-line-height-tight: 1.2;
+	--ui-line-height-snug: 1.35;
+	--ui-line-height-normal: 1.5;
+	--ui-line-height-relaxed: 1.65;
+	--ui-font-weight-regular: 400;
+	--ui-font-weight-medium: 500;
+	--ui-font-weight-semibold: 600;
+	--ui-font-weight-bold: 700;
+	--ui-tracking-normal: 0;
+	--ui-tracking-snug: -0.006em;
+	--ui-tracking-tight: -0.014em;
+	--ui-tracking-display: -0.025em;
+	--ui-underline-offset: 0.2em;
+
+	/* Space, on a 0.25rem grid: the suffix counts steps */
+	--ui-space-0: 0;
+	--ui-space-0-5: 0.125rem;
+	--ui-space-1: 0.25rem;
+	--ui-space-1-5: 0.375rem;
+	--ui-space-2: 0.5rem;
+	--ui-space-3: 0.75rem;
+	--ui-space-4: 1rem;
+	--ui-space-5: 1.25rem;
+	--ui-space-6: 1.5rem;
+	--ui-space-8: 2rem;
+	--ui-space-10: 2.5rem;
+	--ui-space-12: 3rem;
+	--ui-space-16: 4rem;
+	--ui-space-20: 5rem;
+	--ui-space-24: 6rem;
+
+	/* Shape */
+	--ui-radius-xs: 0.1875rem;
+	--ui-radius-sm: 0.25rem;
+	--ui-radius-md: 0.375rem;
+	--ui-radius-lg: 0.5rem;
+	--ui-radius-xl: 0.75rem;
+	--ui-radius-full: 999px;
+	--ui-border-width: 1px;
+	--ui-focus-ring-width: 2px;
+	--ui-focus-ring-offset: 2px;
+	--ui-focus-ring: var(--ui-focus-ring-width) solid var(--ui-color-focus);
+
+	/* Controls: touch screens get taller ones and a text size that does not make iOS zoom in */
+	--ui-control-height-sm: 1.75rem;
+	--ui-control-height-md: 2.25rem;
+	--ui-control-height-lg: 2.75rem;
+	--ui-control-padding-sm: 0 var(--ui-space-2);
+	--ui-control-padding-md: 0 var(--ui-space-3);
+	--ui-control-padding-lg: 0 var(--ui-space-4);
+	--ui-control-font-size-sm: var(--ui-font-size-md);
+	--ui-control-font-size: var(--ui-font-size-md);
+	--ui-control-font-size-lg: var(--ui-font-size-md);
+	--ui-control-font-weight: var(--ui-font-weight-medium);
+	--ui-input-font-size: var(--ui-font-size-md);
+	--ui-opacity-disabled: 0.55;
+
+	/* Depth */
+	--ui-shadow-sm: 0 1px 2px rgb(0 0 0 / 8%);
+	--ui-shadow-md: 0 2px 4px rgb(0 0 0 / 6%), 0 6px 16px rgb(0 0 0 / 10%);
+	--ui-shadow-lg: 0 4px 8px rgb(0 0 0 / 8%), 0 16px 40px rgb(0 0 0 / 16%);
+
+	/* Motion */
+	--ui-duration-fast: 120ms;
+	--ui-duration-base: 180ms;
+	--ui-duration-slow: 220ms;
+	--ui-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+	--ui-ease-in: cubic-bezier(0.4, 0, 1, 1);
+	--ui-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+	/* Layout */
+	--ui-container-sm: 40rem;
+	--ui-container-md: 48rem;
+	--ui-container-lg: 64rem;
+	--ui-container-xl: 80rem;
+	--ui-container-2xl: 96rem;
+	--ui-container-3xl: 120rem;
+	--ui-container-4k: 240rem;
+	--ui-container-gutter-sm: clamp(0.75rem, 1vw, 1.5rem);
+	--ui-container-gutter-md: clamp(1rem, 2vw, 4rem);
+	--ui-container-gutter-lg: clamp(1.5rem, 3vw, 6rem);
+	--ui-modal-width-sm: 26rem;
+	--ui-modal-width-md: 34rem;
+	--ui-modal-width-lg: 48rem;
+	--ui-modal-stack-offset: 12px;
+	--ui-modal-stack-scale: 0.04;
+	--ui-popover-max-height: min(20rem, 70vh);
+	--ui-table-column-min: 10rem;
+	--ui-header-height: 3.5rem;
+	--ui-page-width: var(--ui-container-2xl);
+	--ui-page-sidebar-width: 15rem;
+	--ui-page-aside-width: 13.5rem;
+	--ui-drawer-width: 19rem;
+	--ui-prose-width: var(--ui-container-lg);
+	--ui-prose-measure: 75ch;
+	--ui-prose-code-size: 0.86em;
+	--ui-prose-code-padding: 0.1em 0.2em;
+	--ui-toc-max-height: 50dvh;
+	--ui-code-max-height: 36rem;
+	--ui-log-max-height: 20rem;
+	--ui-floating-panel-width: 23rem;
+	--ui-tabs-indicator-height: 2px;
+	--ui-landing-title-size: clamp(var(--ui-font-size-4xl), 6vw, var(--ui-font-size-6xl));
+	--ui-page-title-size: var(--ui-font-size-3xl);
+	--ui-page-title-tracking: var(--ui-tracking-tight);
+	--ui-option-active-ring: inset 0 0 0 var(--ui-border-width) var(--ui-color-focus);
+	--ui-brand-image-height: 1.75rem;
+	--ui-icon-size: 1rem;
+	--ui-icon-size-sm: 0.8125rem;
+	--ui-icon-stroke-width: 1.4;
+	--ui-opacity-subtle: 0.7;
+	--ui-opacity-hidden: 0;
+	--ui-opacity-visible: 1;
+	--ui-duration-spin: 800ms;
+	--ui-z-sticky: 20;
+	--ui-z-floating: 30;
+	--ui-tooltip-max-width: 18rem;
+	--ui-command-width: 40rem;
+	--ui-command-max-height: 34rem;
+	--ui-command-offset: 12vh;
+	--ui-command-trigger-width: 12.5rem;
+	--ui-command-icon-size: 1rem;
+	--ui-command-icon-stroke: 1.6;
+	--ui-skeleton-width-long: 80%;
+	--ui-skeleton-width-short: 50%;
+	--ui-skeleton-duration: 1.5s;
+	--ui-switch-width: 2.25rem;
+	--ui-switch-height: 1.25rem;
+	--ui-switch-thumb: 0.875rem;
+	--ui-switch-travel: 1rem;
+	--ui-slider-track: 0.25rem;
+	--ui-slider-thumb: 1rem;
+	--ui-toast-width: 24rem;
+	--ui-badge-dot-size: 0.375rem;
+}
+
+:root[data-theme='dark'] {
+	/* On pure black, panels rise by getting lighter; shadows only separate what overlaps. */
+	--ui-color-surface-raised: var(--ui-color-surface-3);
+	--ui-color-control-border: var(--ui-color-surface-10);
+	--ui-shadow-sm: 0 1px 2px rgb(0 0 0 / 60%);
+	--ui-shadow-md: 0 2px 4px rgb(0 0 0 / 50%), 0 6px 16px rgb(0 0 0 / 60%);
+	--ui-shadow-lg: 0 4px 8px rgb(0 0 0 / 50%), 0 16px 40px rgb(0 0 0 / 70%);
+
+	--ui-color-primary-contrast: #ffffff;
+	--ui-color-primary-contrast-hover: #ffffff;
+	--ui-color-surface-contrast: #ffffff;
+	--ui-color-surface-contrast-hover: #ffffff;
+	--ui-color-info-contrast: #000000;
+	--ui-color-info-contrast-hover: #000000;
+	--ui-color-success-contrast: #000000;
+	--ui-color-success-contrast-hover: #000000;
+	--ui-color-warning-contrast: #000000;
+	--ui-color-warning-contrast-hover: #000000;
+	--ui-color-danger-contrast: #000000;
+	--ui-color-danger-contrast-hover: #000000;
+	--ui-color-cyan-contrast: #000000;
+	--ui-color-cyan-contrast-hover: #000000;
+	--ui-color-orange-contrast: #000000;
+	--ui-color-orange-contrast-hover: #000000;
+	--ui-color-pink-contrast: #000000;
+	--ui-color-pink-contrast-hover: #000000;
+}
+
+@media (pointer: coarse) {
+	:root {
+		--ui-control-height-sm: 2.25rem;
+		--ui-control-height-md: 2.5rem;
+		--ui-control-height-lg: 2.75rem;
+		--ui-input-font-size: var(--ui-font-size-lg);
+	}
+}

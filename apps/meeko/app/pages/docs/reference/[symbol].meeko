@@ -1,0 +1,526 @@
+<script server lang="ts">
+	import type { PageLocale } from 'meeko-docs-content/locale'
+
+	import { definePage, documentHtml } from '@meekojs/meeko/framework'
+
+	import type { ApiPage } from '../../../../shared/types/api'
+	import type { NavSection, Pager, TocEntry } from '../../../../shared/types/docs'
+	import type { ReferencePage } from '../../../../shared/types/reference'
+
+	import { readPage } from '../../../../server/content/db'
+
+	export const route = definePage({
+		render: 'ssr',
+		layout: 'docs',
+	})
+
+	const { params } = usePage()
+	const { locale } = await usePageI18n()
+	type SymbolPage = {
+		readonly written: ReferencePage | null
+		readonly page: ApiPage | null
+		readonly nav: readonly NavSection[]
+		readonly current: string
+		readonly pages: Pager
+		readonly toc: readonly TocEntry[]
+		readonly editUrl: string
+		readonly editPath: string
+		readonly index: string
+		readonly searchTitle: string
+		readonly head: { readonly title: string; readonly description: string }
+		readonly i18n?: PageLocale
+	}
+	const snapshot = await readPage<SymbolPage>(`/docs/reference/${params.symbol}`, locale)
+	if (!snapshot) notFound()
+	export const { page, index, searchTitle, head } = snapshot
+	// Only `html` reads the body of a written page, so the first load carries it once, in the page's HTML.
+	export const written = snapshot.written && { ...snapshot.written, body: documentHtml(snapshot.written.body) }
+	// Without it in the payload (a snapshot older than the languages), the page is the original.
+	export const layoutProps = { nav: snapshot.nav, current: snapshot.current, toc: snapshot.toc, pager: snapshot.pages, editUrl: snapshot.editUrl, source: snapshot.editPath, i18n: snapshot.i18n ?? null }
+</script>
+
+<script lang="ts">
+	export interface Props {
+		params: { symbol: string }
+		search: Record<string, string | string[]>
+	}
+
+	const { t } = useI18n()
+</script>
+
+<template>
+	<ReferenceArticle
+		if:when="written"
+		bind:page="written"
+		bind:searchTitle="searchTitle"
+	/>
+	<UIProse
+		if:when="page"
+		as="article"
+		data-pagefind-body
+		bind:data-pagefind-meta="searchTitle"
+	>
+		<div data-pagefind-ignore>
+			<UIBreadcrumb
+				bind:label="t('docs.reference.breadcrumb')"
+				bind:items="[
+					{ label: t('docs.reference.title'), href: index },
+					{ label: page.group.title, href: page.group.href, current: false },
+				]"
+			/>
+		</div>
+		<h1 class="title">
+			<code>{page.name}</code>
+		</h1>
+		<p class="badges">
+			<UIBadge tone="accent">{page.kindLabel}</UIBadge>
+			<UIBadge if:when="page.since">{t('docs.reference.since', { version: page.since ?? '' })}</UIBadge>
+			<UIBadge
+				if:when="page.deprecated !== null"
+				tone="neutral"
+			>
+				{t('docs.reference.deprecated')}
+			</UIBadge>
+			<UIBadge if:when="page.autoImport">{t('docs.reference.noImport')}</UIBadge>
+		</p>
+		<UIAlert
+			if:when="page.deprecated !== null"
+			tone="warning"
+			bind:title="t('docs.reference.deprecatedNote')"
+		>
+			<div html="page.deprecated" />
+		</UIAlert>
+		<div
+			class="description"
+			html="page.description"
+		/>
+		<p
+			if:when="page.autoImport"
+			class="autoimport"
+			html="page.autoImport"
+		/>
+		<div
+			if:when="page.importCode"
+			class="import"
+			html="page.importCode"
+		/>
+		<p
+			if:when="page.sourceUrl"
+			class="source"
+			data-pagefind-ignore
+		>
+			<UILink
+				variant="ghost"
+				size="sm"
+				rel="noopener"
+				bind:href="page.sourceUrl!"
+			>
+				<svg
+					class="meeko-ui-icon"
+					viewBox="0 0 24 24"
+					aria-hidden="true"
+				>
+					<path d="m8 8-4 4 4 4M16 8l4 4-4 4M13.5 5l-3 14" />
+				</svg>
+				{t('docs.reference.source')}
+				<span class="path">{page.sourceLabel}</span>
+			</UILink>
+		</p>
+
+		<section if:when="page.signatures.length > 0">
+			<h2 id="firma">
+				{page.signatureTitle}
+				<a
+					class="heading-anchor"
+					href="#firma"
+					data-pagefind-ignore
+					bind:aria-label="t('docs.reference.anchor')"
+				>
+					#
+				</a>
+			</h2>
+			<div
+				each:of="page.signatures"
+				each:as="signature"
+				class="signature"
+			>
+				<div
+					if:when="signature.description"
+					class="signature-description"
+					html="signature.description"
+				/>
+				<div html="signature.code" />
+			</div>
+		</section>
+
+		<section if:when="page.typeParameters.length > 0">
+			<h2 id="parametros-de-tipo">
+				{t('docs.reference.typeParameters')}
+				<a
+					class="heading-anchor"
+					href="#parametros-de-tipo"
+					data-pagefind-ignore
+					bind:aria-label="t('docs.reference.anchor')"
+				>
+					#
+				</a>
+			</h2>
+			<dl class="parameters">
+				<div
+					each:of="page.typeParameters"
+					each:as="parameter"
+					each:key="parameter.name"
+				>
+					<dt>
+						<code class="parameter-name">{parameter.name}</code>
+						<code
+							if:when="parameter.type"
+							class="parameter-type"
+							html="parameter.type"
+						/>
+					</dt>
+					<dd html="parameter.description" />
+				</div>
+			</dl>
+		</section>
+
+		<section if:when="page.parameters.length > 0">
+			<h2 id="parametros">
+				{t('docs.reference.parameters')}
+				<a
+					class="heading-anchor"
+					href="#parametros"
+					data-pagefind-ignore
+					bind:aria-label="t('docs.reference.anchor')"
+				>
+					#
+				</a>
+			</h2>
+			<dl class="parameters">
+				<div
+					each:of="page.parameters"
+					each:as="parameter"
+					each:key="parameter.name"
+				>
+					<dt>
+						<code class="parameter-name">{parameter.name}</code>
+						<span
+							class="parameter-type"
+							html="parameter.type"
+						/>
+						<span
+							if:when="parameter.optional"
+							class="optional"
+						>
+							{t('docs.reference.optional')}
+						</span>
+					</dt>
+					<dd html="parameter.description" />
+				</div>
+			</dl>
+		</section>
+
+		<section if:when="page.returns">
+			<h2 id="devuelve">
+				{t('docs.reference.returns')}
+				<a
+					class="heading-anchor"
+					href="#devuelve"
+					data-pagefind-ignore
+					bind:aria-label="t('docs.reference.anchor')"
+				>
+					#
+				</a>
+			</h2>
+			<dl class="parameters">
+				<div>
+					<dt>
+						<span
+							class="parameter-type"
+							html="page.returns?.type ?? ''"
+						/>
+					</dt>
+					<dd html="page.returns?.description ?? ''" />
+				</div>
+			</dl>
+		</section>
+
+		<section if:when="page.throws.length > 0">
+			<h2 id="lanza">
+				{t('docs.reference.throws')}
+				<a
+					class="heading-anchor"
+					href="#lanza"
+					data-pagefind-ignore
+					bind:aria-label="t('docs.reference.anchor')"
+				>
+					#
+				</a>
+			</h2>
+			<dl class="parameters">
+				<div
+					each:of="page.throws"
+					each:as="thrown"
+				>
+					<dt>
+						<span
+							class="parameter-type"
+							html="thrown.type || '<code>Error</code>'"
+						/>
+					</dt>
+					<dd html="thrown.description" />
+				</div>
+			</dl>
+		</section>
+
+		<section if:when="page.examples.length > 0">
+			<h2 id="ejemplos">
+				{t('docs.reference.examples', { count: page.examples.length })}
+				<a
+					class="heading-anchor"
+					href="#ejemplos"
+					data-pagefind-ignore
+					bind:aria-label="t('docs.reference.anchor')"
+				>
+					#
+				</a>
+			</h2>
+			<div
+				each:of="page.examples"
+				each:as="example"
+				class="example"
+				html="example"
+			/>
+		</section>
+
+		<section if:when="page.members.length > 0">
+			<h2 id="miembros">
+				{page.membersTitle}
+				<a
+					class="heading-anchor"
+					href="#miembros"
+					data-pagefind-ignore
+					bind:aria-label="t('docs.reference.anchor')"
+				>
+					#
+				</a>
+			</h2>
+			<div
+				each:of="page.members"
+				each:as="member"
+				each:key="member.id"
+				class="member"
+			>
+				<h3 bind:id="member.id">
+					<code>{member.name}</code>
+					<a
+						class="heading-anchor"
+						data-pagefind-ignore
+						bind:aria-label="t('docs.reference.anchor')"
+						bind:href="'#' + member.id"
+					>
+						#
+					</a>
+				</h3>
+				<p
+					if:when="member.kind"
+					class="member-meta"
+					data-pagefind-ignore
+				>
+					<span>{member.kind}</span>
+					<span
+						each:of="member.flags"
+						each:as="flag"
+					>
+						{flag}
+					</span>
+					<span
+						if:when="member.since"
+						class="since"
+					>
+						{t('docs.reference.sinceLower', { version: member.since ?? '' })}
+					</span>
+					<span
+						if:when="member.deprecated !== null"
+						class="obsolete"
+					>
+						{t('docs.reference.deprecatedLower')}
+					</span>
+				</p>
+				<div
+					class="member-signature"
+					html="member.signature"
+				/>
+				<div
+					if:when="member.deprecated"
+					class="member-deprecation"
+					html="member.deprecated ?? ''"
+				/>
+				<div
+					class="member-description"
+					html="member.description"
+				/>
+			</div>
+		</section>
+
+		<section if:when="page.see.length > 0 || page.related.length > 0">
+			<h2 id="vease-tambien">
+				{t('docs.reference.seeAlso')}
+				<a
+					class="heading-anchor"
+					href="#vease-tambien"
+					data-pagefind-ignore
+					bind:aria-label="t('docs.reference.anchor')"
+				>
+					#
+				</a>
+			</h2>
+			<ul
+				if:when="page.see.length > 0"
+				class="see"
+			>
+				<li
+					each:of="page.see"
+					each:as="entry"
+					html="entry"
+				/>
+			</ul>
+			<ul
+				if:when="page.related.length > 0"
+				class="related"
+				bind:aria-label="t('docs.reference.related')"
+			>
+				<li
+					each:of="page.related"
+					each:as="link"
+					each:key="link.href"
+				>
+					<a bind:href="link.href">
+						<code>{link.name}</code>
+					</a>
+				</li>
+			</ul>
+		</section>
+	</UIProse>
+</template>
+
+<style scoped>
+	.title {
+		overflow-wrap: anywhere;
+	}
+	.title code,
+	.member h3 code {
+		background: none;
+		padding: 0;
+		color: inherit;
+		font-size: var(--ui-prose-code-size);
+	}
+	.badges {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--ui-space-1-5);
+	}
+	.source {
+		margin: 0;
+	}
+	.path {
+		overflow: hidden;
+		font-family: var(--ui-font-mono);
+		text-overflow: ellipsis;
+	}
+	.signature + .signature,
+	.example + .example {
+		margin-block-start: var(--ui-space-4);
+	}
+	.parameters {
+		border-block-start: var(--ui-border-width) solid var(--ui-color-border);
+	}
+	.parameters > div {
+		border-block-end: var(--ui-border-width) solid var(--ui-color-border);
+		padding-block: var(--ui-space-3);
+	}
+	.parameters dt {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: var(--ui-space-1-5) var(--ui-space-2);
+	}
+	.parameters dd {
+		margin: var(--ui-space-1) 0 0;
+	}
+	.parameters dd :global(p) {
+		margin: 0;
+	}
+	.parameters dd:empty {
+		display: none;
+	}
+	.parameter-name {
+		font-weight: var(--ui-font-weight-semibold);
+	}
+	.parameter-type :global(code),
+	code.parameter-type {
+		background: transparent;
+		padding: 0;
+		color: var(--ui-color-text-soft);
+	}
+	.member {
+		border-block-start: var(--ui-border-width) solid var(--ui-color-border);
+	}
+	.member h3 {
+		margin: var(--ui-space-4) 0 var(--ui-space-1);
+	}
+	.member-meta {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--ui-space-1-5);
+		color: var(--ui-color-text-soft);
+		font-size: var(--ui-font-size-sm);
+	}
+	.member-meta span + span::before {
+		margin-inline-end: var(--ui-space-1-5);
+		content: '·';
+	}
+	.member-meta .obsolete {
+		color: var(--ui-color-text);
+		font-weight: var(--ui-font-weight-semibold);
+	}
+	.member-signature :global(.shiki) {
+		margin: 0 0 var(--ui-space-3);
+		border: var(--ui-border-width) solid var(--ui-color-border);
+		border-radius: var(--ui-radius-lg);
+		background: var(--ui-color-bg-subtle) !important;
+		padding: var(--ui-space-2) var(--ui-space-3);
+		overflow-x: auto;
+		font-size: var(--ui-font-size-sm);
+		line-height: var(--ui-line-height-relaxed);
+	}
+	.member-deprecation {
+		margin: 0 0 var(--ui-space-2);
+		border: var(--ui-border-width) solid var(--ui-color-border);
+		border-radius: var(--ui-radius-md);
+		background: var(--ui-color-surface);
+		padding: var(--ui-space-2) var(--ui-space-3);
+	}
+	.member-deprecation :global(p) {
+		margin: 0;
+	}
+	.see :global(.api-see-source) {
+		color: var(--ui-color-text-soft);
+		font-size: var(--ui-font-size-sm);
+	}
+	.see :global(.api-see-source)::before {
+		margin-inline-end: var(--ui-space-1);
+		content: '·';
+	}
+	.related {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--ui-space-1-5);
+		padding: 0;
+		list-style: none;
+	}
+	.related li {
+		margin: 0;
+		padding: 0;
+	}
+</style>

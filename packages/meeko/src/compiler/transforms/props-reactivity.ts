@@ -1,0 +1,112 @@
+import ts from '@typescript/typescript6'
+
+import { isValueReference, shadowedBelow } from '../../app/definitions/scope'
+
+/** A read of `props` that runs once, so it misses later changes of the parent's props. */
+export interface PropsReadOnce {
+	/** Offset in the script content. */
+	readonly start: number
+	readonly message: string
+}
+
+/**
+ * Reads of the props view that run once: in the top-level setup code, or directly in an `onMounted`
+ * callback. With reactive props the child stays mounted when the parent changes a prop, so such a
+ * read keeps the first value. Reads inside other functions (handlers, `computed`, `effect`) run
+ * again and are fine, `untrack(() => props.x)` among them; so are calls of a function prop and
+ * `signal(props.x)` or `signal(props.x ?? 0)`, an explicit initial value.
+ */
+export function propsReadsOnce(file: ts.SourceFile, propsName: string): PropsReadOnce[] {
+	const found: PropsReadOnce[] = []
+	const visit = (node: ts.Node, scope: 'setup' | 'mounted' | undefined): void => {
+		if (ts.isFunctionLike(node)) {
+			const call = node.parent
+			const mounted = scope === 'setup' && ts.isCallExpression(call) && call.arguments[0] === node && ts.isIdentifier(call.expression) && call.expression.text === 'onMounted'
+			ts.forEachChild(node, (child) => visit(child, mounted ? 'mounted' : undefined))
+			return
+		}
+		if (scope && ts.isIdentifier(node) && node.text === propsName) {
+			const message = readOnceMessage(node, propsName, scope, file)
+			if (message) found.push({ start: node.getStart(file), message })
+		}
+		ts.forEachChild(node, (child) => visit(child, scope))
+	}
+	for (const statement of file.statements) {
+		if (ts.isImportDeclaration(statement) || ts.isTypeAliasDeclaration(statement) || ts.isInterfaceDeclaration(statement)) continue
+		visit(statement, 'setup')
+	}
+	return found
+}
+
+/**
+ * `node` is part of the first argument of a `signal(...)` call or of the options of a
+ * `defineModel(...)`, whose only option is its `default`, outside any nested function.
+ */
+function signalInitialValue(node: ts.Node): boolean {
+	let child = node
+	for (let parent = node.parent; parent && !ts.isFunctionLike(parent) && !ts.isStatement(parent); child = parent, parent = parent.parent) {
+		if (!ts.isCallExpression(parent) || !ts.isIdentifier(parent.expression)) continue
+		if (parent.expression.text === 'signal' && parent.arguments[0] === child) return true
+		if (parent.expression.text === 'defineModel' && parent.arguments.includes(child as ts.Expression)) return true
+	}
+	return false
+}
+
+function readOnceMessage(node: ts.Identifier, propsName: string, scope: 'setup' | 'mounted', file: ts.SourceFile): string | undefined {
+	const parent = node.parent
+	const fix = scope === 'mounted' ? 'léela en un effect(() => …) para reaccionar a sus cambios' : `léela donde se usa: {${propsName}.x} en la plantilla, computed(() => ${propsName}.x) o una función`
+	const when = scope === 'mounted' ? 'onMounted se ejecuta una sola vez' : 'el setup se ejecuta una sola vez'
+	if (ts.isVariableDeclaration(parent) && parent.initializer === node && ts.isObjectBindingPattern(parent.name)) {
+		return `Desestructurar ${propsName} copia sus valores: ${when} y no se actualizarán cuando el padre cambie las props; ${fix}`
+	}
+	if ((ts.isSpreadElement(parent) || ts.isSpreadAssignment(parent)) && parent.expression === node) {
+		return `Expandir ${propsName} copia sus valores: ${when} y no se actualizarán cuando el padre cambie las props; ${fix}`
+	}
+	const access = (ts.isPropertyAccessExpression(parent) || ts.isElementAccessExpression(parent)) && parent.expression === node ? parent : undefined
+	if (!access) return undefined
+	const outer = access.parent
+	// Calling a function prop (an event callback) is not a copy of its value.
+	if (ts.isCallExpression(outer) && outer.expression === access) return undefined
+	// signal(props.x), or any expression of it (`signal(props.x ?? 0)`), states that the prop is only the initial value.
+	if (signalInitialValue(access)) return undefined
+	const text = access.getText(file)
+	const initial = scope === 'setup' ? `. Si sólo quieres el valor inicial, usa signal(${text}) o untrack(() => ${text})` : ''
+	return `${text} se lee una sola vez porque ${when}: no se actualizará cuando el padre cambie la prop; ${fix}${initial}`
+}
+
+/**
+ * Reads of a destructured `defineProps` name (`const { label } = defineProps<Props>()`) that run
+ * once, like {@link propsReadsOnce}: `label` reads `props.label`, so a read in the top-level setup
+ * or directly in `onMounted` keeps the first value. A name that a closer scope declares is another
+ * variable.
+ */
+export function propAliasReadsOnce(file: ts.SourceFile, aliases: ReadonlySet<string>): PropsReadOnce[] {
+	const found: PropsReadOnce[] = []
+	const visit = (node: ts.Node, scope: 'setup' | 'mounted' | undefined): void => {
+		if (ts.isFunctionLike(node)) {
+			const call = node.parent
+			const mounted = scope === 'setup' && ts.isCallExpression(call) && call.arguments[0] === node && ts.isIdentifier(call.expression) && call.expression.text === 'onMounted'
+			ts.forEachChild(node, (child) => visit(child, mounted ? 'mounted' : undefined))
+			return
+		}
+		if (ts.isTypeNode(node)) return
+		if (scope && ts.isIdentifier(node) && aliases.has(node.text) && isValueReference(node) && !shadowedBelow(node, file)) {
+			const parent = node.parent
+			// A call of a function prop, `signal(label)` and its default values are not copies.
+			const called = ts.isCallExpression(parent) && parent.expression === node
+			const destructuring = ts.isBindingElement(parent) && ts.isObjectBindingPattern(parent.parent) && ts.isVariableDeclaration(parent.parent.parent) && parent.parent.parent.initializer !== undefined && ts.isCallExpression(parent.parent.parent.initializer) && ts.isIdentifier(parent.parent.parent.initializer.expression) && parent.parent.parent.initializer.expression.text === 'defineProps'
+			if (!called && !destructuring && !signalInitialValue(node)) {
+				const when = scope === 'mounted' ? 'onMounted se ejecuta una sola vez' : 'el setup se ejecuta una sola vez'
+				const fix = scope === 'mounted' ? 'léela en un effect(() => …) para reaccionar a sus cambios' : `léela donde se usa: {${node.text}} en la plantilla, computed(() => ${node.text}) o una función`
+				const initial = scope === 'setup' ? `. Si sólo quieres el valor inicial, usa signal(${node.text}) o untrack(() => ${node.text})` : ''
+				found.push({ start: node.getStart(file), message: `${node.text} es una prop de defineProps y aquí se lee una sola vez porque ${when}: no se actualizará cuando el padre cambie la prop; ${fix}${initial}` })
+			}
+		}
+		ts.forEachChild(node, (child) => visit(child, scope))
+	}
+	for (const statement of file.statements) {
+		if (ts.isImportDeclaration(statement) || ts.isTypeAliasDeclaration(statement) || ts.isInterfaceDeclaration(statement)) continue
+		visit(statement, 'setup')
+	}
+	return found
+}

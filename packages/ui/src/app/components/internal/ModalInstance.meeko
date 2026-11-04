@@ -1,0 +1,13 @@
+<script lang="ts">
+	import type { ModalInstance } from '../../types/modal'
+
+	import { provideModalInstance } from '../../composables/useModal'
+
+	const props = defineProps<{ instance: ModalInstance }>()
+
+	provideModalInstance(props.instance.id)
+</script>
+
+<template>
+	<component is="props.instance.component" />
+</template>

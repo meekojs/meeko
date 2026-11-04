@@ -58,9 +58,9 @@ Con `rows: User[]`, `T` es `User`: el manejador de `on:select` y el parámetro `
 
 ## Atributos
 
-| Atributo | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `generic` | lista de parámetros de tipo | ninguno | Los parámetros del componente, con la sintaxis de TypeScript entre `<` y `>`: `T`, `T extends X`, `T = X`, `K extends keyof T`. Sin modificadores `const`, `in` ni `out`. |
+| Atributo  | Tipo                        | Por defecto | Descripción                                                                                                                                                               |
+| --------- | --------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `generic` | lista de parámetros de tipo | ninguno     | Los parámetros del componente, con la sintaxis de TypeScript entre `<` y `>`: `T`, `T extends X`, `T = X`, `K extends keyof T`. Sin modificadores `const`, `in` ni `out`. |
 
 ## Resultado
 

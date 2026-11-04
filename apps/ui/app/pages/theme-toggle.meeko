@@ -1,0 +1,93 @@
+<script lang="ts">
+	import { examples } from '../utils/examples'
+
+	const labels: Record<string, string> = { light: 'Claro', dark: 'Oscuro', system: 'Sistema' }
+	const { theme, resolved } = useTheme()
+	const summary = computed(() => {
+		const choice = labels[theme.value] ?? theme.value
+		const applied = labels[resolved.value] ?? resolved.value
+		return theme.value === 'system' ? 'Elección: sistema. Se aplica el tema ' + applied.toLowerCase() + '.' : 'Elección: ' + choice.toLowerCase() + '.'
+	})
+</script>
+
+<template>
+	<DocsPage
+		title="ThemeToggle"
+		description="Cambia entre tema claro, oscuro y del sistema con un botón o un grupo de opciones que funcionan sin JavaScript."
+	>
+		<p>
+			<code>UIThemeToggle</code>
+			usa la opción
+			<code>theme</code>
+			de
+			<code>meeko.config.ts</code>. Es un formulario que envía
+			<code>POST /_meeko/theme</code>: sin JavaScript, el servidor guarda la preferencia y vuelve a la misma página. Con JavaScript, el tema cambia al instante, sin navegar. Los dos ejemplos y la cabecera comparten la misma preferencia.
+		</p>
+		<h2 id="cycle">Un botón que alterna</h2>
+		<p>
+			En
+			<code>mode="cycle"</code>, el valor por defecto, cada pulsación pasa a la siguiente elección. Su nombre accesible indica el tema actual y el siguiente.
+		</p>
+		<DocsPreview>
+			<UIThemeToggle id="theme-cycle" />
+			<p
+				class="docs-status"
+				role="status"
+			>
+				{summary.value}
+			</p>
+		</DocsPreview>
+		<DocsCode bind:code="examples.themeToggle" />
+		<h2 id="select">Un grupo de opciones</h2>
+		<p>
+			En
+			<code>mode="select"</code>, cada elección es un radio. Las flechas,
+			<code>Inicio</code>
+			y
+			<code>Fin</code>
+			mueven el foco y la elección, como en un grupo de radios nativo.
+		</p>
+		<DocsPreview>
+			<UIThemeToggle
+				id="theme-select"
+				mode="select"
+			/>
+		</DocsPreview>
+		<DocsCode bind:code="examples.themeToggleSelect" />
+		<h2 id="custom">Elecciones, textos e iconos</h2>
+		<p>
+			<code>themes</code>
+			limita y ordena las elecciones;
+			<code>labels</code>
+			y
+			<code>messages</code>
+			sustituyen sus nombres y los textos accesibles en un selector concreto: por defecto siguen el idioma del documento y
+			<code>ui.messages</code>
+			(véase
+			<MeekoLink to="/theming">Temas</MeekoLink>). Un snippet con el nombre de cada elección sustituye su texto, por ejemplo por un icono; en ese caso el nombre se conserva como etiqueta accesible.
+		</p>
+		<DocsCode bind:code="examples.themeToggleCustom" />
+		<h2 id="api">API</h2>
+		<DocsApi
+			caption="Propiedades de UIThemeToggle"
+			bind:rows="[
+				{ name: 'mode', type: 'cycle | select', default: 'cycle', description: 'Un botón que alterna o un grupo de radios.' },
+				{ name: 'themes', type: 'ThemeChoice[]', description: 'Elecciones y su orden. Por defecto, los temas de la configuración y system si está activo.' },
+				{ name: 'labels', type: 'Partial<Record<ThemeChoice, string>>', default: 'Claro, Oscuro, Sistema', description: 'Nombre visible de cada elección. El valor por defecto sigue el idioma del documento.' },
+				{ name: 'icons', type: 'boolean', default: 'false', description: 'Con cycle, pinta un icono de light, dark y system en lugar de su nombre, que sigue en el aria-label.' },
+				{ name: 'messages', type: 'ThemeToggleMessages', description: 'Textos accesibles: cycle, unknown y group.' },
+				{ name: 'class / id', type: 'string', description: 'Clases e id del formulario raíz.' },
+			]"
+		/>
+		<p>
+			Para leer o cambiar el tema desde tu código, usa
+			<code>useTheme()</code>; para construir tu propio selector, usa
+			<code>useThemeToggle()</code>
+			de
+			<code>@meekojs/meeko/framework</code>. El tipo
+			<code>UIThemeToggleProps</code>
+			se exporta desde
+			<code>@meekojs/ui/runtime</code>.
+		</p>
+	</DocsPage>
+</template>

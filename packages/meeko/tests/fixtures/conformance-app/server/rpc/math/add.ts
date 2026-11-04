@@ -1,5 +1,5 @@
 import { defineRpc } from "@meekojs/meeko/server";
-import { sum, total } from "../../../shared/schemas.js";
+import { sum, total } from "../../../shared/schemas";
 
 export default defineRpc({
   input: sum,

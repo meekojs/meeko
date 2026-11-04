@@ -37,10 +37,10 @@ Después del `if`, `session` ya no es `undefined`.
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `url` | `string \| URL` | obligatorio | El destino: una ruta (`"/login"`) o una URL absoluta. |
-| `status` | `301 \| 302 \| 303 \| 307 \| 308` | `302` | El estado HTTP. `301` y `308` son permanentes (el navegador y las cachés los recuerdan); `303` cambia el método a `GET`; `307` y `308` lo conservan. |
+| Parámetro | Tipo                              | Por defecto | Descripción                                                                                                                                          |
+| --------- | --------------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `url`     | `string \| URL`                   | obligatorio | El destino: una ruta (`"/login"`) o una URL absoluta.                                                                                                |
+| `status`  | `301 \| 302 \| 303 \| 307 \| 308` | `302`       | El estado HTTP. `301` y `308` son permanentes (el navegador y las cachés los recuerdan); `303` cambia el método a `GET`; `307` y `308` lo conservan. |
 
 ## Valor devuelto
 
@@ -84,6 +84,7 @@ export default defineServerRouteMiddleware(({ session, url }) => {
 `redirect()` no funciona dentro de `load`, que es una opción de ruta. Allí se devuelve un `Response`:
 
 <!-- no-check -->
+
 ```ts
 // app/pages/legacy.route.ts
 import { definePage } from "@meekojs/meeko/framework";
@@ -122,6 +123,7 @@ export const route = definePage({ load: ({ params }) => { if (!params.id) redire
 `MEEK073: redirect() sólo funciona en el código de nivel superior de <script server>, que se ejecuta en cada petición; llámala fuera de cualquier función y fuera de las opciones de ruta`.
 
 <!-- no-check -->
+
 ```ts good
 export const route = definePage({ load: ({ params, url }) => params.id ? { id: params.id } : Response.redirect(new URL("/", url)) });
 ```
@@ -135,6 +137,7 @@ redirect("/login", 404);
 `meeko check` del proyecto da `TS2345: Argument of type '404' is not assignable to parameter of type '301 | 302 | 303 | 307 | 308 | undefined'.` En ejecución, `RangeError: redirect status must be 301, 302, 303, 307 or 308, not 404`. Para un `404`, usa `notFound()`.
 
 <!-- no-check -->
+
 ```ts good
 redirect("/login", 303);
 ```
@@ -153,6 +156,7 @@ try {
 ```
 
 <!-- no-check -->
+
 ```ts good
 if (!session) redirect("/login");
 try {

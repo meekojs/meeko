@@ -21,6 +21,7 @@ Se importa de `@meekojs/meeko/password`, sólo en el servidor. Usa `node:crypto`
 ## Uso
 
 <!-- no-check -->
+
 ```ts
 // server/api/signup.post.ts
 import { ApiError, defineApiRoute } from "@meekojs/meeko/server";
@@ -44,8 +45,8 @@ export default defineApiRoute({
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
+| Parámetro  | Tipo     | Por defecto | Descripción                                         |
+| ---------- | -------- | ----------- | --------------------------------------------------- |
 | `password` | `string` | obligatorio | La contraseña en texto, de 1 a 4096 bytes en UTF-8. |
 
 ## Valor devuelto
@@ -77,6 +78,7 @@ ADMIN_PASSWORD_HASH=scrypt$131072$8$1$…
 ### Cambiar la contraseña
 
 <!-- no-check -->
+
 ```ts
 // server/rpc/account/password.ts
 import { ApiError, defineRpc } from "@meekojs/meeko/server";
@@ -110,6 +112,7 @@ import { hashPassword } from "@meekojs/meeko/password";
 `meeko check` avisa con `MEEK109: @meekojs/meeko/password sólo funciona en el servidor: el <script> y la plantilla de un componente también se ejecutan en el navegador, donde sus funciones fallan. Mueve ese código a <script server> o a server/; para usar sus tipos, impórtalos con import type. Desde 2.0 será un error`.
 
 <!-- no-check -->
+
 ```ts good
 // server/api/signup.post.ts
 import { hashPassword } from "@meekojs/meeko/password";
@@ -124,6 +127,7 @@ const ok = (await hashPassword(input.password)) === user.passwordHash; // siempr
 La sal es aleatoria: dos hashes de la misma contraseña nunca coinciden, y la comparación no es de tiempo constante.
 
 <!-- no-check -->
+
 ```ts good
 const ok = await verifyPassword(input.password, user.passwordHash);
 ```
@@ -137,6 +141,7 @@ await hashPassword("");
 `RangeError: The password is empty` (y `The password exceeds 4096 bytes` por encima del límite). Valida la longitud en el schema de la entrada, para que el usuario reciba un `400` con su mensaje.
 
 <!-- no-check -->
+
 ```ts good
 const signupInput = v.object({ password: v.pipe(v.string(), v.minLength(12, "Usa al menos 12 caracteres."), v.maxLength(1024)) });
 ```

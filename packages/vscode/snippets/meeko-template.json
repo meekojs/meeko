@@ -1,0 +1,56 @@
+{
+	"Elemento condicional": {
+		"prefix": "mif",
+		"body": [
+			"<${1:div} if:when=\"${2:visible.value}\">",
+			"\t$0",
+			"</${1}>"
+		],
+		"description": "Elemento condicional"
+	},
+	"Lista con identidad estable": {
+		"prefix": "meach",
+		"body": [
+			"<${1:div}",
+			"\teach:of=\"${2:items.value}\"",
+			"\teach:as=\"${3:item}\"",
+			"\teach:key=\"${3}.id\"",
+			">",
+			"\t{${3}.${4:label}}$0",
+			"</${1}>"
+		],
+		"description": "Lista con identidad estable"
+	},
+	"Renderizar un snippet con argumentos": {
+		"prefix": "mrender",
+		"body": [
+			"<render",
+			"\tsnippet=\"snippets.${1:default}\"",
+			"\targs=\"${2:label}\"",
+			"/>",
+			"$0"
+		],
+		"description": "Renderizar un snippet con argumentos"
+	},
+	"Contenido de un snippet dentro de un componente": {
+		"prefix": "msnippet",
+		"body": [
+			"<snippet",
+			"\tname=\"${1:default}\"",
+			"\tparams=\"${2:label}\"",
+			">",
+			"\t{${2}}$0",
+			"</snippet>"
+		],
+		"description": "Contenido de un snippet dentro de un componente"
+	},
+	"Elemento o componente dinámico": {
+		"prefix": "mis",
+		"body": [
+			"<component is=\"${1:tag}\">",
+			"\t$0",
+			"</component>"
+		],
+		"description": "Elemento o componente dinámico"
+	}
+}

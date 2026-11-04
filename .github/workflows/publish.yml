@@ -7,8 +7,9 @@ on:
       # `vscode-v*`, que publica la extensión en su propio workflow.
       - 'v[0-9]*'
 
-# Mínimo privilegio: cada job amplía sólo lo que necesita. `id-token: write` queda
-# limitado a `publish` (npm Trusted Publishing) y `contents: write` a `github-release`.
+# Mínimo privilegio: cada job amplía sólo lo que necesita. `id-token: write` queda limitado a
+# `publish`, que no instala dependencias ni ejecuta código del proyecto, y `contents: write` a
+# `github-release`.
 permissions:
   contents: read
 
@@ -172,36 +173,49 @@ jobs:
         working-directory: packages/vscode
         if: runner.os == 'Linux'
 
-  publish:
+  package-gates:
+    name: Gates y tarballs
     needs: [redis-integration, bun, deno, workerd, vscode-extension]
     runs-on: windows-latest
-    timeout-minutes: 30
-    permissions:
-      contents: read
-      id-token: write
+    timeout-minutes: 90
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
     steps:
       - uses: actions/checkout@v7
+        with:
+          # Hace falta la historia para comprobar que la etiqueta está en main.
+          fetch-depth: 0
       - uses: pnpm/action-setup@v6
         with:
           version: 12.14.0
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
-          registry-url: 'https://registry.npmjs.org'
           cache: pnpm
-      - name: Comprobar versión de la etiqueta
-        id: version
+      - name: Comprobar que la etiqueta apunta a un commit de main
+        shell: pwsh
+        # Una etiqueta sobre otra rama se saltaría los checks requeridos de main (lint, E2E de UI e i18n…).
+        run: |
+          git merge-base --is-ancestor $env:GITHUB_SHA origin/main
+          if ($LASTEXITCODE -ne 0) { throw "$env:GITHUB_REF_NAME ($env:GITHUB_SHA) no está en main." }
+      - name: Comprobar versión de la etiqueta en los seis paquetes
         shell: pwsh
         run: |
-          $packageVersion = node -p "JSON.parse(require('node:fs').readFileSync('packages/meeko/package.json', 'utf8')).version"
-          if ($env:GITHUB_REF_NAME -ne "v$packageVersion") {
-            throw "La etiqueta $env:GITHUB_REF_NAME no coincide con packages/meeko/package.json ($packageVersion)."
+          foreach ($name in @('meeko', 'i18n', 'icon', 'ui', 'eslint-plugin', 'prettier-plugin')) {
+            $manifest = Get-Content -Raw "packages/$name/package.json" | ConvertFrom-Json
+            if ($env:GITHUB_REF_NAME -ne "v$($manifest.version)" -or $manifest.private) {
+              throw "La etiqueta $env:GITHUB_REF_NAME no coincide con $($manifest.name) ($($manifest.version))."
+            }
           }
-          # Una prerelease (1.0.0-rc.1) se publica en `next` y nunca mueve `latest`.
-          $distTag = if ($packageVersion.Contains('-')) { 'next' } else { 'latest' }
-          "dist-tag=$distTag" >> $env:GITHUB_OUTPUT
-          Write-Output "npm dist-tag: $distTag"
       - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm lint
+      - run: pnpm format:check
+      - run: pnpm check
+      - run: pnpm -F meeko-site run test
+      - run: pnpm -F meeko-docs-content run test
+      - run: pnpm test:packages
+      - run: pnpm package:workspace-smoke
       - name: Verify package and DevTools
         shell: pwsh
         run: |
@@ -240,6 +254,16 @@ jobs:
           $tarballs = @(Get-ChildItem -LiteralPath packages/meeko/.meeko/ci-artifacts -Filter '*.tgz' -File)
           if ($tarballs.Count -ne 1) { throw "Expected one Meeko tarball, found $($tarballs.Count)." }
           ./packages/meeko/tests/fullstack-consumer.ps1 -Tarball $tarballs[0].FullName
+      - name: Empaquetar y comprobar los seis tarballs
+        shell: pwsh
+        run: ./scripts/publish-packages.ps1 -PackOnly -ExpectedVersion ($env:GITHUB_REF_NAME.Substring(1)) -ArtifactDirectory (Join-Path $env:RUNNER_TEMP 'npm-tarballs')
+      - name: Guardar los tarballs que pasaron los gates
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: meeko-npm-tarballs
+          path: ${{ runner.temp }}/npm-tarballs/
+          if-no-files-found: error
+          overwrite: true
       - name: Diagnostic logs on failure
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -247,17 +271,38 @@ jobs:
           name: meeko-publish-gate-logs
           path: .meeko/ci-logs/
           if-no-files-found: ignore
-      - name: Publicar con identidad OIDC
+
+  # Job aparte: la aprobación del environment llega con los gates ya en verde, y el token OIDC
+  # no está disponible mientras se instalan dependencias o se ejecutan pruebas.
+  publish:
+    name: Publicar en npm
+    environment: npm
+    needs: package-gates
+    runs-on: windows-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: meeko-npm-tarballs
+          path: ${{ runner.temp }}/npm-tarballs
+      - name: Publicar los paquetes pendientes con identidad OIDC
         shell: pwsh
-        # npm vincula el Trusted Publisher al repositorio y a este archivo (publish.yml), no a la carpeta.
-        working-directory: packages/meeko
-        env:
-          NPM_DIST_TAG: ${{ steps.version.outputs.dist-tag }}
+        # npm vincula el Trusted Publisher al repositorio, a este archivo (publish.yml) y al environment `npm`.
+        # Configura uno por paquete tras su primera publicación interactiva.
         run: |
-          if ($env:NPM_DIST_TAG -notin @('latest', 'next')) { throw "dist-tag inesperado: '$env:NPM_DIST_TAG'." }
           npm install --global npm@11.19.0
-          npm publish --provenance --access public --tag $env:NPM_DIST_TAG
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./scripts/publish-packages.ps1 -Trusted -Execute -ExpectedVersion ($env:GITHUB_REF_NAME.Substring(1)) -ArtifactDirectory (Join-Path $env:RUNNER_TEMP 'npm-tarballs')
 
   github-release:
     name: Release de GitHub con VSIX y ZIP

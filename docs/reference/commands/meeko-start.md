@@ -34,15 +34,16 @@ El starter lo declara como `"start": "meeko start ."`, así que en el servidor b
 
 ## Opciones
 
-| Opción | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `[directorio]` | ruta | `.` | Raíz del proyecto, que contiene `.meeko/output/node/` y el `.env`. |
-| `MEEKO_PORT` (o `PORT`) | número | `server.port` del build, o `4173` | Puerto HTTP. `PORT` vale siempre, porque lo inyectan muchas plataformas. |
-| `MEEKO_HOST` | texto | `server.host` del build, o `127.0.0.1` | Dirección. Usa `0.0.0.0` para aceptar tráfico de otras máquinas (un contenedor, por ejemplo). |
-| `MEEKO_PUBLIC_ORIGIN` | origen | ninguno | Origen público HTTPS tras un proxy, para las comprobaciones de `Origin` de HTTP y Socket. |
-| `MEEKO_REDIS_URL` | URL | ninguna | Redis de las sesiones si `server/runtime.ts` no declara `sessions`. Necesita el paquete `redis` instalado. |
-| `MEEKO_SESSION_TTL`, `MEEKO_SESSION_SAMESITE` | texto | `7d`, `Lax` | Duración y `SameSite` de las sesiones por defecto. |
-| `MEEKO_TRUST_PROXY` | número o `true` | ninguno | Proxies de confianza para `X-Forwarded-For` (rate limit, `clientAddress`). |
+| Opción                                        | Tipo                           | Por defecto                            | Descripción                                                                                                                                         |
+| --------------------------------------------- | ------------------------------ | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `[directorio]`                                | ruta                           | `.`                                    | Raíz del proyecto, que contiene `.meeko/output/node/` y el `.env`.                                                                                  |
+| `MEEKO_PORT` (o `PORT`)                       | número                         | `server.port` del build, o `4173`      | Puerto HTTP. `PORT` vale siempre, porque lo inyectan muchas plataformas.                                                                            |
+| `MEEKO_HOST`                                  | texto                          | `server.host` del build, o `127.0.0.1` | Dirección. Usa `0.0.0.0` para aceptar tráfico de otras máquinas (un contenedor, por ejemplo).                                                       |
+| `MEEKO_PUBLIC_ORIGIN`                         | origen                         | ninguno                                | Origen público HTTPS tras un proxy, para las comprobaciones de `Origin` de HTTP y Socket.                                                           |
+| `MEEKO_REDIS_URL`                             | URL                            | ninguna                                | Redis de las sesiones si `server/runtime.ts` no declara `sessions`. Necesita el paquete `redis` instalado.                                          |
+| `MEEKO_SESSION_TTL`, `MEEKO_SESSION_SAMESITE` | texto                          | `7d`, `Lax`                            | Duración y `SameSite` de las sesiones por defecto.                                                                                                  |
+| `MEEKO_TRUST_PROXY`                           | número, `true` o `cloudflare`  | ninguno                                | Proxies de confianza para `X-Forwarded-For` (rate limit, `clientAddress`). Desde `1.8`, `cloudflare` lee `CF-Connecting-IP` tras Cloudflare Tunnel. |
+| `MEEKO_TRUSTED_PROXIES`                       | CIDR o IP, separados por comas | loopback y redes privadas              | Desde `1.8`, con `MEEKO_TRUST_PROXY=cloudflare`: redes de `cloudflared` y los proxies, las únicas cuyo `CF-Connecting-IP` se lee.                   |
 
 `start` no admite banderas ni más argumentos: `meeko start . extra` termina con `Argumento de más para start: extra`.
 
@@ -50,7 +51,7 @@ El starter lo declara como `"start": "meeko start ."`, así que en el servidor b
 
 - **En la salida estándar**, la URL para abrirla, como `http://localhost:4173`: desde `1.7.1`, loopback (`127.0.0.1`, `::1`) y todas las interfaces (`0.0.0.0`, `::`) se muestran como `localhost`, aunque el servidor escuche en la dirección configurada. Con `0.0.0.0` o `::` siguen líneas `Red: http://<IP>:4173` con las direcciones de red. La primera línea es siempre la URL local, sola, para los scripts que la leen.
 - **El proceso** sigue en marcha hasta `SIGINT` o `SIGTERM`, que cierran Socket, HTTP, las tareas de `waitUntil` y el runtime, por ese orden. Las respuestas abiertas tienen `shutdownTimeout` milisegundos (10 000 por defecto) para terminar.
-- **Las respuestas** llevan los assets con `ETag` (y `immutable` los que tienen hash), las páginas prerenderizadas desde su archivo y, desde `1.7`, `Content-Security-Policy` y las cabeceras de `server.headers`.
+- **Las respuestas** llevan los assets con `ETag` (y `immutable` los que tienen hash), las páginas prerenderizadas desde su archivo y, desde `1.7`, `Content-Security-Policy` y las cabeceras de `server.headers`. **No se comprimen:** véase el ejemplo siguiente.
 
 ## Ejemplos
 
@@ -65,6 +66,8 @@ meeko start
 ```
 
 El proxy (nginx, Caddy) termina TLS y reenvía a `127.0.0.1:3000`. Sin `MEEKO_PUBLIC_ORIGIN`, las mutaciones que llegan con `Origin: https://tienda.example.com` se rechazan.
+
+`meeko start` no comprime: en producción, ese proxy o una CDN debe hacerlo. Véase [Build, despliegue y verificación](/docs/framework#build-despliegue-y-verificación).
 
 ### En un contenedor
 
@@ -97,6 +100,7 @@ console.log(server.url);
 ### Sesiones persistentes declaradas en el runtime
 
 <!-- no-check -->
+
 ```ts
 // server/runtime.ts
 import { createClient } from "redis";

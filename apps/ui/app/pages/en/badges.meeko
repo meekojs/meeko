@@ -1,0 +1,41 @@
+<script lang="ts">
+	import { englishExamples as examples } from '../../utils/examples.en'
+</script>
+
+<template>
+	<DocsPage
+		locale="en"
+		title="Badge"
+		description="Describe states and metadata with text labels."
+	>
+		<h2 id="usage">Usage</h2>
+		<DocsPreview>
+			<UIBadge>Information</UIBadge>
+			<UIBadge tone="accent">Published</UIBadge>
+			<UIBadge tone="info">Beta</UIBadge>
+			<UIBadge tone="success">Active</UIBadge>
+			<UIBadge
+				tone="warning"
+				dot
+			>
+				Pending
+			</UIBadge>
+			<UIBadge tone="danger">Review</UIBadge>
+		</DocsPreview>
+		<DocsCode bind:code="examples.badge" />
+		<DocsApi
+			bind:rows="[
+				{ name: 'tone', type: 'neutral | accent | info | success | warning | danger', default: 'neutral', description: 'Visual treatment of the label.' },
+				{ name: 'dot', type: 'boolean', default: 'false', description: 'Adds a decorative dot in the color of the tone.' },
+				{ name: 'class', type: 'string', description: 'Additional classes.' },
+			]"
+		/>
+		<h2 id="content">Content and accessibility</h2>
+		<p>
+			The
+			<code>default</code>
+			snippet is required. Badge renders as a
+			<code>span</code>: it adds no interaction, roles or announcements. Use text that explains the state; color must not be its only meaning.
+		</p>
+	</DocsPage>
+</template>

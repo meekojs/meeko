@@ -1,0 +1,174 @@
+<script lang="ts" generic="T extends object">
+	import type { Snippet } from '@meekojs/meeko'
+	import type { TableCellValue, TableColumn, UITableProps } from '@meekojs/ui/runtime'
+
+	import { uiMessages } from '../utils/messages'
+
+	const props = defineProps<UITableProps<T>>({ layout: 'native', hideHeader: false })
+
+	// `cell-<clave>` y `header-<clave>` salen de las claves de T: `value` tiene el tipo de esa columna.
+	const snippets = defineSnippets<
+		{ [K in Extract<keyof T, string> as `cell-${K}`]?: [row: T, value: T[K]] } & {
+			[K in Extract<keyof T, string> as `header-${K}`]?: [column: TableColumn<T>]
+		} & {
+			header?: [column: TableColumn<T>]
+			cell?: [row: T, column: TableColumn<T>, value: T[keyof T], index: number]
+			footer?: [column: TableColumn<T>, rows: readonly T[]]
+			empty?: []
+			caption?: []
+		}
+	>()
+
+	// Sobre T, TypeScript no lee un nombre calculado; los snippets de cada columna se leen de esta vista.
+	const byName = snippets as { readonly [name: string]: Snippet<never> | undefined }
+
+	function columnCell(column: TableColumn<T>): Snippet<[row: T, value: T[keyof T]]> | undefined {
+		return byName[`cell-${column.key}`] as Snippet<[row: T, value: T[keyof T]]> | undefined
+	}
+
+	function columnHeader(column: TableColumn<T>): Snippet<[column: TableColumn<T>]> | undefined {
+		return byName[`header-${column.key}`] as Snippet<[column: TableColumn<T>]> | undefined
+	}
+
+	const id = useId()
+	const text = uiMessages().table
+
+	function keyOf(row: T): string | number {
+		return typeof props.rowKey === 'function' ? props.rowKey(row) : (row[props.rowKey] as string | number)
+	}
+
+	function cellText(row: T, column: TableColumn<T>): string {
+		// La unión pública correlaciona key y format; la llamada conserva esa relación.
+		const format = column.format as ((value: T[keyof T], row: T) => TableCellValue) | undefined
+		const value = format ? format(row[column.key], row) : row[column.key]
+		return value == null ? '' : String(value)
+	}
+
+	function footerText(column: TableColumn<T>): string {
+		const value = typeof column.footer === 'function' ? column.footer(props.rows) : column.footer
+		return value == null ? '' : String(value)
+	}
+</script>
+
+<template>
+	<div
+		class="meeko-ui-table-scroll"
+		tabindex="0"
+		bind:role="props.caption || snippets.caption ? 'region' : undefined"
+		bind:aria-labelledby="props.caption || snippets.caption ? id + '-caption' : undefined"
+	>
+		<table
+			role="table"
+			bind:class="['meeko-ui-table', props.class].filter(Boolean).join(' ')"
+			bind:data-layout="props.layout"
+			bind:data-density="props.density ?? 'normal'"
+			bind:data-caption="props.hideCaption ? 'hidden' : undefined"
+			bind:style="'--table-columns: ' + (props.gridColumns ?? 'repeat(' + Math.max(1, props.columns.length) + ', minmax(var(--ui-table-column-min), 1fr))')"
+		>
+			<caption
+				if:when="props.caption || snippets.caption"
+				bind:id="id + '-caption'"
+			>
+				<render
+					if:when="snippets.caption"
+					snippet="snippets.caption"
+				/>
+				{snippets.caption ? '' : props.caption}
+			</caption>
+			<thead
+				if:when="!props.hideHeader"
+				role="rowgroup"
+			>
+				<tr role="row">
+					<th
+						each:of="props.columns"
+						each:as="column"
+						each:key="column.key"
+						role="columnheader"
+						scope="col"
+						bind:data-numeric="column.numeric ? '' : undefined"
+					>
+						<render
+							if:when="columnHeader(column)"
+							snippet="columnHeader(column)"
+							args="column"
+						/>
+						<render
+							if:when="!columnHeader(column) && snippets.header"
+							snippet="snippets.header"
+							args="column"
+						/>
+						<span if:when="!columnHeader(column) && !snippets.header">{column.label}</span>
+					</th>
+				</tr>
+			</thead>
+			<tbody role="rowgroup">
+				<tr
+					each:of="props.rows"
+					each:as="row"
+					each:index="_index"
+					each:key="keyOf(row)"
+					role="row"
+				>
+					<component
+						each:of="props.columns"
+						each:as="column"
+						each:key="column.key"
+						is="column.rowHeader ? 'th' : 'td'"
+						bind:role="column.rowHeader ? 'rowheader' : 'cell'"
+						bind:scope="column.rowHeader ? 'row' : undefined"
+						bind:data-numeric="column.numeric ? '' : undefined"
+					>
+						<render
+							if:when="columnCell(column)"
+							snippet="columnCell(column)"
+							args="row, row[column.key]"
+						/>
+						<render
+							if:when="!columnCell(column) && snippets.cell"
+							snippet="snippets.cell"
+							args="row, column, row[column.key], _index"
+						/>
+						<span if:when="!columnCell(column) && !snippets.cell">{cellText(row, column)}</span>
+					</component>
+				</tr>
+				<tr
+					if:when="props.rows.length === 0"
+					role="row"
+				>
+					<td
+						role="cell"
+						class="meeko-ui-table-empty"
+						bind:colspan="Math.max(1, props.columns.length)"
+					>
+						<render
+							if:when="snippets.empty"
+							snippet="snippets.empty"
+						/>
+						<span if:when="!snippets.empty">{props.emptyText ?? text.empty}</span>
+					</td>
+				</tr>
+			</tbody>
+			<tfoot
+				if:when="snippets.footer || props.columns.some((column) => column.footer !== undefined)"
+				role="rowgroup"
+			>
+				<tr role="row">
+					<td
+						each:of="props.columns"
+						each:as="column"
+						each:key="column.key"
+						role="cell"
+					>
+						<render
+							if:when="snippets.footer"
+							snippet="snippets.footer"
+							args="column, props.rows"
+						/>
+						<span if:when="!snippets.footer">{footerText(column)}</span>
+					</td>
+				</tr>
+			</tfoot>
+		</table>
+	</div>
+</template>

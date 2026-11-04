@@ -1,0 +1,40 @@
+<script lang="ts">
+	// <UIProse>: the reading styles live in prose.css. The only script is one delegated listener for the
+	// copy buttons of HTML that was rendered elsewhere, such as a Markdown snapshot.
+	import { computed } from '@meekojs/meeko'
+
+	import type { UIProseProps } from '../types/navigation'
+
+	import { copyFromMarkup } from '../utils/clipboard'
+	import { uiMessages } from '../utils/messages'
+
+	const { as = 'div', html, class: className, ...rest } = defineProps<UIProseProps>()
+
+	const snippets = defineSnippets<{ default?: [] }>()
+
+	const text = uiMessages().code
+	const classes = computed(() => ['meeko-ui-prose', className].filter(Boolean).join(' '))
+</script>
+
+<template>
+	<component
+		if:when="html"
+		is="as"
+		bind:class="classes.value"
+		bind="rest"
+		on:click="(event) => copyFromMarkup(event, text)"
+		html="html"
+	/>
+	<component
+		if:when="!html"
+		is="as"
+		bind:class="classes.value"
+		bind="rest"
+		on:click="(event) => copyFromMarkup(event, text)"
+	>
+		<render
+			if:when="snippets.default"
+			snippet="snippets.default"
+		/>
+	</component>
+</template>

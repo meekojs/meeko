@@ -1,0 +1,94 @@
+{
+	"editor": {
+		"title": "Editar {title}",
+		"fallbackTitle": "Editar la fuente {id}",
+		"fallbackDescription": "Editor del Markdown de una fuente.",
+		"compareOriginal": "Comparar con el original",
+		"back": "Volver a la fuente",
+		"cannotOpen": "No se puede abrir el editor",
+		"draft": "Borrador",
+		"note": "Nota",
+		"noteHint": "Opcional. Qué cambia y por qué.",
+		"status": {
+			"lines": {
+				"plural": "count",
+				"forms": {
+					"one": "{lines} línea cambiada sin guardar",
+					"other": "{lines} líneas cambiadas sin guardar"
+				}
+			},
+			"note": "La nota tiene cambios sin guardar",
+			"none": "Sin cambios todavía",
+			"saved": "Todo guardado"
+		},
+		"origin": {
+			"draft": "Borrador #{id}",
+			"revision": "Nuevo borrador a partir de la revisión #{id}",
+			"git": "Nuevo borrador a partir de Git ({hash})"
+		},
+		"tooLarge": "El Markdown ocupa {size} kB y el límite es {limit} kB.",
+		"created": "Borrador #{id} creado.",
+		"savedDraft": "Borrador #{id} guardado.",
+		"issues": {
+			"frontmatter": "Bloquea la publicación",
+			"render": "El render fallaría",
+			"link": "Enlace roto"
+		},
+		"leave": "Hay cambios sin guardar en el borrador. ¿Salir y perderlos?",
+		"size": "{size} de {limit} kB",
+		"create": "Crear borrador",
+		"save": "Guardar borrador",
+		"importStale": "Git cambió desde la última importación. El borrador parte del archivo de Git de ahora; importa las fuentes para que el resumen lo refleje.",
+		"notSaved": "No se guardó el borrador",
+		"publishFromSource": "Publicarlo desde la fuente",
+		"markdownLabel": "Markdown de la fuente",
+		"stamped": "source-hash actualizado al original de ahora ({hash}). Guarda el borrador para conservarlo.",
+		"translation": {
+			"title": "Traducción de «{title}».",
+			"text": "Cuando hayas trasladado los cambios del original, márcala como traducida: el frontmatter guarda el hash del original de ahora y deja de aparecer como desactualizada al publicarla.",
+			"stamp": "Marcar como traducida",
+			"stamping": "Marcando…",
+			"failed": "No se marcó como traducida"
+		},
+		"preview": {
+			"title": "Vista previa",
+			"auto": "Al escribir",
+			"rendering": "Renderizando…",
+			"refresh": "Actualizar",
+			"real": "Renderizando con el render real del site…",
+			"stale": "La vista previa no incluye los últimos cambios.",
+			"done": "Render en {ms} ms, igual que en el site.",
+			"donePartial": "Render en {ms} ms, igual que en el site, salvo las secciones generadas.",
+			"failed": "Sin vista previa",
+			"issues": "Avisos de la vista previa",
+			"issueCount": {
+				"plural": "count",
+				"forms": {
+					"one": "{count} aviso",
+					"other": "{count} avisos"
+				}
+			},
+			"blocking": {
+				"plural": "count",
+				"forms": {
+					"one": "{count} impide publicar",
+					"other": "{count} impiden publicar"
+				}
+			},
+			"line": "Línea {line}",
+			"frame": "Vista previa del borrador"
+		},
+		"frontmatter": {
+			"title": "Frontmatter",
+			"asText": "Tiene algo que los campos no conservarían: se edita como texto.",
+			"asTextShort": "como texto",
+			"count": {
+				"plural": "count",
+				"forms": {
+					"one": "{count} campo",
+					"other": "{count} campos"
+				}
+			}
+		}
+	}
+}

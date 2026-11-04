@@ -1,0 +1,403 @@
+<script
+	server
+	lang="ts"
+>
+	import { attempt } from '../utils/errors'
+
+	export const snapshots = await attempt(() => rpc.snapshots.list({}))
+	export const initialJobs = await attempt(() => rpc.jobs.status({}))
+	export const initialPending = await attempt(() => rpc.revisions.pending({}))
+</script>
+
+<script lang="ts">
+	import type { TableColumn } from '@meekojs/ui/runtime'
+
+	import type { PendingRevision, SnapshotRow } from '../../shared/schemas/dashboard'
+	import type { Failure } from '../utils/errors'
+
+	import { describeError } from '../utils/errors'
+	import { jobSummary } from '../utils/i18n'
+
+	const i18n = useI18n()
+	const { t, localePath } = i18n
+	const format = useFormat()
+	const formatDate = format.date
+	const formatNumber = format.number
+
+	const list = signal<readonly SnapshotRow[]>(snapshots.ok ? snapshots.data : [])
+	const listFailure = signal<Failure | null>(snapshots.ok ? null : snapshots.failure)
+	const notice = signal('')
+
+	// Published revisions that the active snapshot does not have yet: what the next publication adds.
+	const pending = signal(initialPending.ok ? initialPending.data : null)
+	const pendingLead = computed(() => {
+		const active = pending.value?.activeSnapshotId
+		if (!active) return t('snapshots.pending.noActive')
+		if (pending.value?.revisions.some((revision) => revision.change === 'archived')) return t('snapshots.pending.changedAfter', { id: active })
+		return t('snapshots.pending.publishedAfter', { id: active })
+	})
+
+	/** Reads again what the active snapshot lacks: it depends on which one is active. */
+	async function reloadPending() {
+		try {
+			pending.value = await rpc.revisions.pending({})
+		} catch {
+			// The section says it could not read them; the list or the action shows the failure.
+			pending.value = null
+		}
+	}
+
+	async function reload() {
+		try {
+			list.value = await rpc.snapshots.list({})
+			listFailure.value = null
+		} catch (error) {
+			listFailure.value = describeError(error)
+		}
+		await reloadPending()
+	}
+
+	const {
+		jobs,
+		failure: jobFailure,
+		starting,
+		start,
+	} = useJobs(initialJobs.ok ? initialJobs.data : { content: null, health: null }, {
+		onFinish: (job) => {
+			notice.value = job.status === 'succeeded' ? (jobSummary(i18n, job) ?? t('snapshots.done')) : job.conflict ? '' : t('snapshots.failed')
+			// A publication, or a conflict with a rollback, changes which snapshot is active.
+			if (job.kind === 'publish') void reload()
+		},
+	})
+
+	const conflict = computed(() => (jobs.value.content?.kind === 'publish' && jobs.value.content.conflict ? jobs.value.content : null))
+
+	const busy = computed(() => jobs.value.content?.status === 'running' || starting.value === 'import' || starting.value === 'publish')
+
+	// Activation (rollback): asks first, because the public site switches on confirm.
+	const target = signal<SnapshotRow | null>(null)
+	const confirming = signal(false)
+	const activating = signal(false)
+	const activateFailure = signal<Failure | null>(null)
+
+	function askActivate(snapshot: SnapshotRow) {
+		target.value = snapshot
+		activateFailure.value = null
+		confirming.value = true
+	}
+
+	async function activate() {
+		const snapshot = target.value
+		if (!snapshot) return
+		activating.value = true
+		try {
+			list.value = await rpc.snapshots.activate({ id: snapshot.id })
+			confirming.value = false
+			notice.value = t('snapshots.activated', { id: snapshot.id })
+			// A rollback to an older snapshot leaves out what was published after it, and a return
+			// includes it again: the pending revisions are those of the snapshot active now.
+			await reloadPending()
+		} catch (error) {
+			activateFailure.value = describeError(error)
+		} finally {
+			activating.value = false
+		}
+	}
+
+	// Publication: why, stored with the snapshot; who publishes is the user of the session (F5).
+	const publishing = signal(false)
+	const note = signal('')
+
+	function askPublish() {
+		publishing.value = true
+	}
+
+	async function publish() {
+		const started = await start({ kind: 'publish', ...(note.value.trim() ? { note: note.value } : {}) })
+		if (started) {
+			publishing.value = false
+			notice.value = ''
+		}
+	}
+
+	// «Volver a publicar» after a conflict sends the note of the lost publication. The job keeps it,
+	// so it also works after a reload, when the form starts empty.
+	async function retry() {
+		const lost = conflict.value
+		if (lost && !note.value.trim()) note.value = lost.note ?? ''
+		await publish()
+	}
+
+	async function importSources() {
+		notice.value = ''
+		await start({ kind: 'import' })
+	}
+
+	const active = computed(() => list.value.find((snapshot) => snapshot.active) ?? null)
+	const activateLabel = (snapshot: SnapshotRow) => (active.value && snapshot.id < active.value.id ? t('snapshots.rollback', { id: snapshot.id }) : t('snapshots.activate', { id: snapshot.id }))
+	const conflictSummary = computed(() => (conflict.value ? jobSummary(i18n, conflict.value) : null))
+	const pendingChange = (revision: PendingRevision) => (revision.change === 'archived' ? t('snapshots.pending.archived', { id: revision.id, date: formatDate(revision.archivedAt ?? revision.publishedAt) }) : t('snapshots.pending.published', { id: revision.id, author: revision.author, date: formatDate(revision.publishedAt) }))
+
+	const targetFacts = computed(() => {
+		const snapshot = target.value
+		if (!snapshot) return []
+		return [
+			{ label: t('snapshots.columns.publishedAt'), value: formatDate(snapshot.publishedAt) },
+			{ label: t('snapshots.columns.publishedBy'), value: snapshot.publishedBy ?? '—' },
+			{ label: t('snapshots.columns.pages'), value: `${formatNumber(snapshot.pages)} · ${t('snapshots.split', { es: formatNumber(snapshot.pagesByLocale.es), en: formatNumber(snapshot.pagesByLocale.en) })}` },
+			...(active.value ? [{ label: t('snapshots.confirm.replaces'), value: `#${active.value.id}` }] : []),
+		]
+	})
+
+	const columns = [
+		{ key: 'id', label: t('snapshots.columns.id') },
+		{ key: 'publishedAt', label: t('snapshots.columns.publishedAt') },
+		{ key: 'publishedBy', label: t('snapshots.columns.publishedBy') },
+		{ key: 'pages', label: t('snapshots.columns.pages') },
+		{ key: 'note', label: t('snapshots.columns.note') },
+		{ key: 'active', label: t('snapshots.columns.active') },
+	] satisfies TableColumn<SnapshotRow>[]
+</script>
+
+<template>
+	<DashPage
+		bind:title="t('snapshots.title')"
+		bind:description="t('snapshots.description')"
+	>
+		<div class="dash-stack">
+			<UICard
+				bind:title="t('snapshots.actions')"
+				bind:description="t('snapshots.actionsHint')"
+			>
+				<div class="dash-tight">
+					<div class="dash-actions">
+						<UIButton
+							variant="secondary"
+							bind:disabled="busy.value"
+							on:click="importSources"
+						>
+							{starting.value === 'import' ? t('actions.starting') : t('snapshots.import')}
+						</UIButton>
+						<UIButton
+							bind:disabled="busy.value"
+							on:click="askPublish"
+						>
+							{t('snapshots.publish')}
+						</UIButton>
+					</div>
+					<p class="dash-meta">{t('snapshots.hint')}</p>
+					<DashFailure
+						if:when="jobFailure.value"
+						bind:title="t('snapshots.cannotStart')"
+						bind:failure="jobFailure.value"
+					/>
+					<UIAlert
+						if:when="conflict.value"
+						tone="danger"
+						bind:title="t('snapshots.conflict')"
+						bind:description="conflictSummary.value ?? ''"
+					>
+						<snippet name="actions">
+							<UIButton
+								bind:disabled="busy.value"
+								on:click="retry"
+							>
+								{t('snapshots.retry')}
+							</UIButton>
+						</snippet>
+					</UIAlert>
+					<DashNotice bind:text="notice.value" />
+					<DashJob
+						bind:empty="t('snapshots.noJob')"
+						bind:job="jobs.value.content"
+					/>
+				</div>
+			</UICard>
+
+			<UICard bind:title="t('snapshots.pending.title')">
+				<snippet
+					if:when="pending.value"
+					name="actions"
+				>
+					<UIBadge>{pending.value ? t('snapshots.pending.count', { count: pending.value.revisions.length }) : ''}</UIBadge>
+				</snippet>
+				<UIEmpty
+					if:when="!pending.value"
+					bind:title="t('snapshots.pending.unreadable')"
+				/>
+				<UIEmpty
+					if:when="pending.value && !pending.value.revisions.length"
+					bind:title="pending.value?.activeSnapshotId ? t('snapshots.pending.allIncluded', { id: pending.value.activeSnapshotId }) : t('snapshots.pending.none')"
+				/>
+				<div
+					if:when="pending.value && pending.value.revisions.length"
+					class="dash-tight"
+				>
+					<p class="dash-meta">{pendingLead.value}</p>
+					<ul class="dash-list">
+						<li
+							each:of="pending.value?.revisions ?? []"
+							each:as="revision"
+							each:key="revision.id"
+						>
+							<a bind:href="localePath('/sources/' + revision.sourceId)">{revision.title}</a>
+							<DashLocaleTag
+								bind:locale="revision.locale"
+								bind:name="t(`locale.${revision.locale}`)"
+								bind:short="t(`locale.short.${revision.locale}`)"
+							/>
+							<span class="dash-soft">
+								<code>{revision.path}</code>
+								· {pendingChange(revision)}
+							</span>
+						</li>
+					</ul>
+				</div>
+			</UICard>
+
+			<UICard
+				bind:title="t('snapshots.saved')"
+				bind:description="t('snapshots.retention')"
+			>
+				<DashFailure
+					if:when="listFailure.value"
+					bind:failure="listFailure.value"
+				/>
+				<UITable
+					if:when="!listFailure.value"
+					rowKey="id"
+					bind:hideCaption="true"
+					bind:caption="t('snapshots.caption')"
+					bind:emptyText="t('snapshots.empty')"
+					bind:columns="columns"
+					bind:rows="list.value"
+				>
+					<snippet
+						name="cell"
+						params="row, column"
+					>
+						<strong if:when="column.key === 'id'">#{String(row.id)}</strong>
+						<span
+							if:when="column.key === 'publishedAt'"
+							class="dash-nowrap"
+						>
+							{formatDate(row.publishedAt)}
+						</span>
+						<span if:when="column.key === 'publishedBy'">{row.publishedBy ?? '—'}</span>
+						<span
+							if:when="column.key === 'pages'"
+							class="dash-cell"
+							bind:title="t('snapshots.byLocale', { es: formatNumber(row.pagesByLocale.es), en: formatNumber(row.pagesByLocale.en) })"
+						>
+							{formatNumber(row.pages)}
+							<span class="dash-meta dash-nowrap">{t('snapshots.split', { es: formatNumber(row.pagesByLocale.es), en: formatNumber(row.pagesByLocale.en) })}</span>
+						</span>
+						<span if:when="column.key === 'note'">{row.note ?? '—'}</span>
+						<UIBadge
+							if:when="column.key === 'active' && row.active"
+							tone="accent"
+						>
+							{t('snapshots.activeBadge')}
+						</UIBadge>
+						<UIButton
+							if:when="column.key === 'active' && !row.active"
+							size="sm"
+							variant="outline"
+							bind:disabled="busy.value || activating.value"
+							on:click="() => askActivate(row)"
+						>
+							{activateLabel(row)}
+						</UIButton>
+					</snippet>
+				</UITable>
+			</UICard>
+		</div>
+
+		<UIModal
+			model="confirming"
+			bind:title="t('snapshots.confirm.title', { id: target.value?.id ?? '' })"
+			bind:description="t('snapshots.confirm.text')"
+		>
+			<div class="dash-tight">
+				<UIDescriptionList
+					if:when="target.value"
+					bind:columns="2"
+					bind:items="targetFacts.value"
+				/>
+				<DashFailure
+					if:when="activateFailure.value"
+					bind:title="t('snapshots.confirm.failed')"
+					bind:failure="activateFailure.value"
+				/>
+			</div>
+			<snippet name="footer">
+				<UIButton
+					variant="ghost"
+					on:click="() => (confirming.value = false)"
+				>
+					{t('actions.cancel')}
+				</UIButton>
+				<UIButton
+					bind:disabled="activating.value"
+					on:click="activate"
+				>
+					{activating.value ? t('snapshots.confirm.activating') : t('snapshots.confirm.activate')}
+				</UIButton>
+			</snippet>
+		</UIModal>
+
+		<UIModal
+			model="publishing"
+			bind:title="t('snapshots.publishModal.title')"
+			bind:description="t('snapshots.publishModal.text')"
+		>
+			<div class="dash-tight">
+				<form
+					id="publish-form"
+					on:submit="
+						(event) => {
+							event.preventDefault()
+							void publish()
+						}
+					"
+				>
+					<UIField
+						id="publish-note"
+						bind:label="t('snapshots.columns.note')"
+						bind:description="t('snapshots.publishModal.noteHint')"
+					>
+						<snippet
+							name="default"
+							params="id, describedBy"
+						>
+							<UIInput
+								model="note"
+								bind:id="id"
+								bind:describedBy="describedBy"
+							/>
+						</snippet>
+					</UIField>
+				</form>
+				<DashFailure
+					if:when="jobFailure.value"
+					bind:title="t('snapshots.publishModal.failed')"
+					bind:failure="jobFailure.value"
+				/>
+			</div>
+			<snippet name="footer">
+				<UIButton
+					variant="ghost"
+					on:click="() => (publishing.value = false)"
+				>
+					{t('actions.cancel')}
+				</UIButton>
+				<UIButton
+					bind:disabled="busy.value"
+					on:click="publish"
+				>
+					{starting.value === 'publish' ? t('actions.starting') : t('snapshots.publishModal.submit')}
+				</UIButton>
+			</snippet>
+		</UIModal>
+	</DashPage>
+</template>

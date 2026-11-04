@@ -1,83 +1,169 @@
-import { existsSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { join, relative, resolve } from "node:path";
-import { generateTypeScriptAutoImports } from "../autoimports-ts.js";
-import { generateAppTypes } from "./check-app.js";
-import type { AppTypesOptions } from "./check-app.js";
-import { frameworkTsconfigPaths, resolveProjectAliases } from "./aliases.js";
-import { loadMeekoConfig, resolveConfigSources } from "./config.js";
-import { generateServerContracts } from "./contracts-generate.js";
-import { generateRoutes } from "./generate.js";
-import { generatePageContracts } from "./page-contracts-generate.js";
-import { generateRouteBlockTypes, routeBlockTypesDirectory } from "./route-block-types.js";
-import { generateServicesTypes, servicesDeclaration } from "./services-types.js";
+import { existsSync } from 'node:fs'
+import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises'
+import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 
-export const projectNames = ["app", "server", "shared"] as const;
+import type { AppTypesOptions } from './check-app'
+
+import { generateComponentRegistry, linkComponentName, linkComponentSpecifier } from '../autoimports/components'
+import { discoverComponents } from '../autoimports/registry'
+import { generateTypeScriptAutoImports } from '../autoimports/typescript'
+import { generateRouteBlockTypes, routeBlockTypesDirectory } from '../compiler/codegen/route-block-types'
+import { frameworkTsconfigPaths, resolveProjectAliases } from './aliases'
+import { generateAppTypes } from './check-app'
+import { discoverConfiguredRoutes, loadConfiguredModules, loadMeekoConfig, resolveConfigSources } from './config'
+import { writeConfigTypesSync } from './config-types'
+import { generateServerContracts } from './contracts-generate'
+import { generateRoutes } from './generate'
+import { generateModuleTypes } from './module-types'
+import { generatePageContracts } from './page-contracts-generate'
+import { generateServicesTypes, servicesDeclaration } from './services-types'
+
+export const projectNames = ['app', 'server', 'shared'] as const
 
 const compilerOptions = {
-  target: "ES2022", module: "ESNext", moduleResolution: "Bundler", lib: ["ES2022", "DOM"],
-  types: ["node", "vite/client"], strict: true, noEmit: true, allowArbitraryExtensions: true,
-  exactOptionalPropertyTypes: true, noUncheckedIndexedAccess: true, verbatimModuleSyntax: true,
-  skipLibCheck: true,
-} as const;
+	target: 'ES2022',
+	module: 'ESNext',
+	moduleResolution: 'Bundler',
+	lib: ['ES2022', 'DOM'],
+	types: ['node', 'vite/client'],
+	strict: true,
+	noEmit: true,
+	allowArbitraryExtensions: true,
+	exactOptionalPropertyTypes: true,
+	noUncheckedIndexedAccess: true,
+	verbatimModuleSyntax: true,
+	skipLibCheck: true,
+} as const
 
 const generatedIncludes: Record<(typeof projectNames)[number], string[]> = {
-  app: [
-    "generated/entry-client.ts", "generated/clients.client.ts", "generated/socket-contracts.ts",
-    "types/**/*.d.meeko.ts", "types/routes.d.ts", "types/virtual-pages.d.ts",
-    "types/server-contracts.d.ts", "types/autoimports/client.d.ts",
-  ],
-  server: [
-    "generated/entry-server.ts", "generated/clients.server.ts", "generated/socket-contracts.ts",
-    "generated/page-contracts.server.ts", "types/virtual-pages.d.ts", "types/routes.d.ts",
-    "types/**/*.d.meeko.ts", "types/autoimports/server.d.ts", `${routeBlockTypesDirectory}/**/*.route.ts`,
-    // The type of RequestContext.services, from server/runtime.ts.
-    servicesDeclaration,
-  ],
-  shared: ["types/autoimports/shared.d.ts"],
-};
+	app: [
+		'types/modules/**/*.d.ts',
+		'generated/entry-client.ts',
+		'generated/clients.client.ts',
+		'generated/socket-contracts.ts',
+		'generated/components.ts',
+		'types/**/*.d.meeko.ts',
+		'types/components.d.ts',
+		'types/routes.d.ts',
+		'types/virtual-pages.d.ts',
+		'types/server-contracts.d.ts',
+		'types/autoimports/client.d.ts',
+		'types/i18n.d.ts',
+	],
+	server: [
+		'types/modules/**/*.d.ts',
+		'generated/entry-server.ts',
+		'generated/clients.server.ts',
+		'generated/socket-contracts.ts',
+		'generated/components.ts',
+		'generated/page-contracts.server.ts',
+		'types/virtual-pages.d.ts',
+		'types/routes.d.ts',
+		'types/**/*.d.meeko.ts',
+		'types/components.d.ts',
+		'types/autoimports/server.d.ts',
+		'types/i18n.d.ts',
+		`${routeBlockTypesDirectory}/**/*.route.ts`,
+		// The type of RequestContext.services, from server/runtime.ts.
+		servicesDeclaration,
+	],
+	shared: ['types/autoimports/shared.d.ts', 'types/modules/**/*.d.ts'],
+}
 
-async function writeIfChanged(file: string, source: string): Promise<void> {
-  try { if (await readFile(file, "utf8") === source) return; }
-  catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
-  await writeFile(file, source, "utf8");
+export async function writeIfChanged(file: string, source: string): Promise<void> {
+	try {
+		if ((await readFile(file, 'utf8')) === source) return
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+	}
+	await writeFile(file, source, 'utf8')
+}
+
+/** Augments the public module with the modules discovered for one project. */
+export async function generateComponentRegistryTypes(projectRoot: string): Promise<string> {
+	const root = resolve(projectRoot)
+	const output = join(root, '.meeko', 'types', 'components.d.ts')
+	const names = new Map<string, string>()
+	const deprecated = new Map<string, string>()
+	for (const entry of await discoverComponents(root)) {
+		const location = relative(root, entry.file)
+		const external = location === '..' || location.startsWith(`..${sep}`) || isAbsolute(location) || location.split(sep).includes('node_modules')
+		if (external && !existsSync(entry.file.replace(/\.meeko$/, '.d.meeko.ts'))) {
+			throw new Error(`El componente externo ${entry.name} necesita una declaración adyacente .d.meeko.ts: ${entry.file}`)
+		}
+		const previous = names.get(entry.name)
+		if (previous && previous !== entry.file) {
+			throw new Error(`Componente ${entry.name} ambiguo: ${previous}, ${entry.file}. Cambia el prefijo o el nombre de uno de ellos.`)
+		}
+		names.set(entry.name, entry.file)
+		if (entry.deprecatedFor) deprecated.set(entry.name, entry.deprecatedFor)
+	}
+	const entries = [...names]
+		.sort(([left], [right]) => left.localeCompare(right))
+		.map(([name, file]) => {
+			const path = relative(join(root, '.meeko', 'types'), file).replaceAll('\\', '/')
+			const specifier = path.startsWith('.') ? path : `./${path}`
+			const replacement = deprecated.get(name)
+			return `${replacement ? `    /** @deprecated Usa ${replacement}: este nombre se retira en Meeko 2.0 (MEEK134). */\n` : ''}    readonly ${JSON.stringify(name)}: typeof import(${JSON.stringify(specifier)});`
+		})
+	// Since 1.8, `<MeekoLink>` is registered too, unless the project has a component called MeekoLink.
+	if (!names.has(linkComponentName)) entries.push(`    readonly ${JSON.stringify(linkComponentName)}: typeof import(${JSON.stringify(linkComponentSpecifier)});`)
+	const source = [
+		'// Generated by Meeko. Component modules registered for this project.',
+		'import type {} from "@meekojs/meeko";',
+		'declare module "@meekojs/meeko" {',
+		'  interface ComponentRegistry {',
+		...entries,
+		'  }',
+		'}',
+		'export {};',
+		'',
+	].join('\n')
+	await mkdir(join(root, '.meeko', 'types'), { recursive: true })
+	await writeIfChanged(output, source)
+	return output
 }
 
 /** Keeps TypeScript's three execution scopes under Meeko's generated directory. */
 export async function generateFrameworkTsconfigs(projectRoot: string): Promise<string[]> {
-  const generatedRoot = join(resolve(projectRoot), ".meeko");
-  const config = await loadMeekoConfig(projectRoot);
-  const sourceRoots = (await resolveConfigSources(projectRoot, config)).map(({ root }) => relative(generatedRoot, root).replaceAll("\\", "/"));
-  const aliases = await resolveProjectAliases(projectRoot, config);
-  await mkdir(generatedRoot, { recursive: true });
-  const configs: string[] = [];
-  for (const name of projectNames) {
-    const file = join(generatedRoot, `tsconfig.${name}.json`);
-    const includes = [...generatedIncludes[name]];
-    const excludes: string[] = [];
-    for (const root of sourceRoots) {
-      if (name === "app") {
-        includes.push(`${root}/app/**/*.ts`, `${root}/server/**/*.client.ts`, `${root}/shared/**/*.client.ts`);
-        excludes.push(`${root}/app/pages/**/*.route.ts`, `${root}/app/**/*.server.ts`, `${root}/app/**/*.shared.ts`);
-      } else if (name === "server") {
-        includes.push(`${root}/server/**/*.ts`, `${root}/app/**/*.server.ts`, `${root}/app/pages/**/*.route.ts`, `${root}/shared/**/*.server.ts`);
-        excludes.push(`${root}/server/**/*.client.ts`, `${root}/server/**/*.shared.ts`);
-      } else {
-        includes.push(`${root}/shared/**/*.ts`, `${root}/app/**/*.shared.ts`, `${root}/server/**/*.shared.ts`);
-        excludes.push(`${root}/shared/**/*.client.ts`, `${root}/shared/**/*.server.ts`);
-      }
-    }
-    // `#server/` only in the server project, `@/` not in shared/: see `aliasesForScope`.
-    const paths = frameworkTsconfigPaths(projectRoot, aliases, name === "app" ? "client" : name, generatedRoot);
-    const source = JSON.stringify({
-      compilerOptions: { ...compilerOptions, rootDirs: name === "shared" ? undefined : ["..", "./types"], ...(Object.keys(paths).length ? { paths } : {}) },
-      include: includes,
-      ...(excludes.length ? { exclude: excludes } : {}),
-    }, null, 2) + "\n";
-    await writeIfChanged(file, source);
-    configs.push(file);
-  }
-  return configs;
+	const generatedRoot = join(resolve(projectRoot), '.meeko')
+	const config = await loadMeekoConfig(projectRoot)
+	const sourceRoots = (await resolveConfigSources(projectRoot, config)).map(({ root }) => relative(generatedRoot, root).replaceAll('\\', '/'))
+	const aliases = await resolveProjectAliases(projectRoot, config)
+	await mkdir(generatedRoot, { recursive: true })
+	const configs: string[] = []
+	for (const name of projectNames) {
+		const file = join(generatedRoot, `tsconfig.${name}.json`)
+		const includes = [...generatedIncludes[name]]
+		const excludes: string[] = []
+		for (const root of sourceRoots) {
+			if (name === 'app') {
+				includes.push(`${root}/app/**/*.ts`, `${root}/server/**/*.client.ts`, `${root}/shared/**/*.client.ts`)
+				excludes.push(`${root}/app/pages/**/*.route.ts`, `${root}/app/**/*.server.ts`, `${root}/app/**/*.shared.ts`)
+			} else if (name === 'server') {
+				includes.push(`${root}/server/**/*.ts`, `${root}/app/**/*.server.ts`, `${root}/app/pages/**/*.route.ts`, `${root}/shared/**/*.server.ts`)
+				excludes.push(`${root}/server/**/*.client.ts`, `${root}/server/**/*.shared.ts`)
+			} else {
+				includes.push(`${root}/shared/**/*.ts`, `${root}/app/**/*.shared.ts`, `${root}/server/**/*.shared.ts`)
+				excludes.push(`${root}/shared/**/*.client.ts`, `${root}/shared/**/*.server.ts`)
+			}
+		}
+		// `#server/` only in the server project, `@/` not in shared/: see `aliasesForScope`.
+		const paths = frameworkTsconfigPaths(projectRoot, aliases, name === 'app' ? 'client' : name, generatedRoot)
+		const source =
+			JSON.stringify(
+				{
+					compilerOptions: { ...compilerOptions, rootDirs: name === 'shared' ? undefined : ['..', './types'], ...(Object.keys(paths).length ? { paths } : {}) },
+					include: includes,
+					...(excludes.length ? { exclude: excludes } : {}),
+				},
+				null,
+				2,
+			) + '\n'
+		await writeIfChanged(file, source)
+		configs.push(file)
+	}
+	return configs
 }
 
 /**
@@ -85,20 +171,34 @@ export async function generateFrameworkTsconfigs(projectRoot: string): Promise<s
  * component declarations: the editor's open documents and its tolerance to a component being written.
  */
 export async function prepareFrameworkTypeDeclarations(projectRoot: string, options: AppTypesOptions = {}): Promise<string[]> {
-  const root = resolve(projectRoot);
-  const routes = await generateRoutes(root);
-  const server = await generateServerContracts(root);
-  const components = await generateAppTypes(root, options);
-  await generateRouteBlockTypes(root);
-  const pageContracts = await generatePageContracts(root);
-  const services = await generateServicesTypes(root);
-  const imports = await generateTypeScriptAutoImports(root);
-  const tsconfigs = await generateFrameworkTsconfigs(root);
-  // What `meeko routes` lists: the declarations and manifests a project reads, not the copies.
-  return [routes.types, routes.manifest, server.types, server.manifest, ...components, pageContracts, services, imports.client, imports.server, imports.shared, ...tsconfigs];
+	const root = resolve(projectRoot)
+	const i18nTypes = join(root, '.meeko', 'types', 'i18n.d.ts')
+	// Before the modules run: a failing setup still leaves the editor the types of its options.
+	const configTypes = writeConfigTypesSync(root, await loadMeekoConfig(root))
+	const { modules } = await loadConfiguredModules(root)
+	const moduleTypes = await generateModuleTypes(root, modules.typeTemplates)
+	if (!modules.names.includes('@meekojs/meeko/i18n')) {
+		const existing = await readFile(i18nTypes, 'utf8').catch((error: NodeJS.ErrnoException) => {
+			if (error.code !== 'ENOENT') throw error
+			return undefined
+		})
+		if (existing?.startsWith('// Generated by @meekojs/meeko/i18n. Do not edit.\n')) await unlink(i18nTypes)
+	}
+	const routes = await generateRoutes(root)
+	const server = await generateServerContracts(root)
+	const componentRegistry = await generateComponentRegistry(root)
+	const componentRegistryTypes = await generateComponentRegistryTypes(root)
+	const components = await generateAppTypes(root, options)
+	await generateRouteBlockTypes(root, await discoverConfiguredRoutes(root))
+	const pageContracts = await generatePageContracts(root)
+	const services = await generateServicesTypes(root)
+	const imports = await generateTypeScriptAutoImports(root)
+	const tsconfigs = await generateFrameworkTsconfigs(root)
+	// What `meeko routes` lists: the declarations and manifests a project reads, not the copies.
+	return [routes.types, routes.manifest, server.types, server.manifest, ...components, componentRegistryTypes, componentRegistry, pageContracts, services, imports.client, imports.server, imports.shared, ...moduleTypes, ...(existsSync(i18nTypes) ? [i18nTypes] : []), ...tsconfigs, ...configTypes]
 }
 
 /** Whether the project has the `.meeko/tsconfig.*.json` that Vite resolves from its `tsconfig.json`. */
 export function hasFrameworkTsconfigs(projectRoot: string): boolean {
-  return projectNames.every((name) => existsSync(join(resolve(projectRoot), ".meeko", `tsconfig.${name}.json`)));
+	return projectNames.every((name) => existsSync(join(resolve(projectRoot), '.meeko', `tsconfig.${name}.json`)))
 }

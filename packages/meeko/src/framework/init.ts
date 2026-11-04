@@ -1,15 +1,16 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { basename, dirname, join, resolve } from "node:path";
-import { scaffoldDestinationEntries } from "../init.js";
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { basename, dirname, join, resolve } from 'node:path'
+
+import { scaffoldDestinationEntries } from '../init'
 
 const files: Readonly<Record<string, string>> = {
-  ".gitignore": "node_modules/\n.meeko/\n.env\n",
-  "public/.gitkeep": "",
-  "app/styles/main.css": `:root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+	'.gitignore': 'node_modules/\n.meeko/\n.env\n',
+	'public/.gitkeep': '',
+	'app/styles/main.css': `:root { color-scheme: light dark; font-family: system-ui, sans-serif; }
 * { box-sizing: border-box; }
 body { margin: 0; }
 `,
-  "meeko.config.ts": `import { defineMeekoConfig } from "@meekojs/meeko/framework";
+	'meeko.config.ts': `import { defineMeekoConfig } from "@meekojs/meeko/framework";
 
 export default defineMeekoConfig({
   layers: [],
@@ -17,7 +18,7 @@ export default defineMeekoConfig({
   imports: { serverDirs: [] },
 });
 `,
-  "tsconfig.json": `{
+	'tsconfig.json': `{
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",
@@ -33,11 +34,12 @@ export default defineMeekoConfig({
   "references": [
     { "path": "./.meeko/tsconfig.app.json" },
     { "path": "./.meeko/tsconfig.server.json" },
-    { "path": "./.meeko/tsconfig.shared.json" }
+    { "path": "./.meeko/tsconfig.shared.json" },
+    { "path": "./.meeko/tsconfig.config.json" }
   ]
 }
 `,
-  "app/pages/index.meeko": `<script server lang="ts">
+	'app/pages/index.meeko': `<script server lang="ts">
 export const route = definePage({ render: "prerender" });
 </script>
 
@@ -61,11 +63,11 @@ const count = signal(0);
   </section>
 </template>
 `,
-  "app/app.meeko": `<template>
+	'app/app.meeko': `<template>
   <div class="site-root"><MeekoOutlet /></div>
 </template>
 `,
-  "app/layouts/default.meeko": `<template>
+	'app/layouts/default.meeko': `<template>
   <div class="app-shell">
     <header><MeekoLink to="/">Meeko</MeekoLink></header>
     <main><MeekoOutlet /></main>
@@ -77,7 +79,7 @@ const count = signal(0);
 header { margin-bottom: 2rem; }
 </style>
 `,
-  ".env.example": `# Copy to .env (ignored by git). meeko dev, build, start, preview and check read .env;
+	'.env.example': `# Copy to .env (ignored by git). meeko dev, build, start, preview and check read .env;
 # a variable already set in the environment wins. Every variable Meeko reads starts with MEEKO_.
 
 # Port and address of dev, start and preview (default 127.0.0.1:4173). PORT also works.
@@ -94,8 +96,11 @@ header { margin-bottom: 2rem; }
 
 # Number of proxies in front of the server whose X-Forwarded-For can be trusted, for rateLimit.
 # MEEKO_TRUST_PROXY=1
+# Behind Cloudflare Tunnel, cloudflare reads CF-Connecting-IP when the proxies are in these networks.
+# MEEKO_TRUST_PROXY=cloudflare
+# MEEKO_TRUSTED_PROXIES=127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, ::1/128, fc00::/7
 `,
-  "README.md": `# Meeko framework starter
+	'README.md': `# Meeko framework starter
 
 Requires Node 24.
 
@@ -106,57 +111,63 @@ npm run dev
 
 Routes live in \`app/pages\`. \`app/layouts/default.meeko\` keeps the shared shell during client navigation. Put shared route guards in \`app/middleware\` with \`defineRouteMiddleware\`, and server request middleware in \`server/middleware\` with \`defineServerMiddleware\`; see the framework guide for their execution and security boundaries. Sessions need no setup: development keeps them in memory, and production stores them in Redis when \`MEEKO_REDIS_URL\` is set (see \`.env.example\`); add \`server/runtime.ts\` with \`defineServerRuntime\` for services, Socket policy or your own session store. Global styles in \`app/styles/main.css\` load automatically; component styles stay in \`<style>\` blocks. Run \`npm run check\` for types, then \`npm run build\` and \`npm start\` for production SSR. The build in \`.meeko/output/node\` runs without the application sources; \`MEEKO_HOST\`, \`MEEKO_PORT\` (or \`PORT\`) and \`MEEKO_PUBLIC_ORIGIN\` configure it. Generated files live under \`.meeko/\`.
 `,
-};
+}
 
 function record(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+	return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 /** Creates a framework project without overwriting unrelated user files. */
 export async function initFrameworkProject(directory: string): Promise<string> {
-  const target = resolve(directory);
-  const name = basename(target).toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^[._-]+|[._-]+$/g, "") || "meeko-app";
-  const metadata: unknown = JSON.parse(await readFile(new URL("../../package.json", import.meta.url), "utf8"));
-  if (!record(metadata) || typeof metadata.version !== "string") throw new Error("No se puede leer la versión del paquete de Meeko");
-  // The same destinations as `meeko init`.
-  const entries = await scaffoldDestinationEntries(target);
-  const existing: unknown = entries.includes("package.json") ? JSON.parse(await readFile(join(target, "package.json"), "utf8")) : {};
-  if (!record(existing) || (existing.scripts !== undefined && !record(existing.scripts))
-    || (existing.dependencies !== undefined && !record(existing.dependencies))
-    || (existing.devDependencies !== undefined && !record(existing.devDependencies))) {
-    throw new Error(`package.json no válido en ${target}`);
-  }
-  const scripts = {
-    dev: "meeko dev .",
-    check: "meeko check .",
-    build: "meeko build .",
-    start: "meeko start .",
-  };
-  const oldScripts = existing.scripts as Record<string, unknown> | undefined;
-  for (const command of Object.keys(scripts)) if (oldScripts && command in oldScripts) {
-    throw new Error(`El destino ya define el script ${command}: ${target}`);
-  }
-  const manifest = {
-    ...existing,
-    name: typeof existing.name === "string" ? existing.name : name,
-    private: true,
-    type: "module",
-    engines: { ...(record(existing.engines) ? existing.engines : {}), node: ">=24" },
-    scripts: { ...oldScripts, ...scripts },
-    dependencies: { ...(existing.dependencies as Record<string, unknown> | undefined), "@meekojs/meeko": metadata.version },
-    devDependencies: {
-      ...(existing.devDependencies as Record<string, unknown> | undefined),
-      "@types/node": "^24.0.0", typescript: "^7.0.2", vite: "^8.3.5",
-    },
-  };
-  await mkdir(target, { recursive: true });
-  for (const [filename, content] of Object.entries(files)) {
-    const output = join(target, filename);
-    await mkdir(dirname(output), { recursive: true });
-    await writeFile(output, content, { encoding: "utf8", flag: "wx" });
-  }
-  await writeFile(join(target, "package.json"), JSON.stringify(manifest, null, 2) + "\n", {
-    encoding: "utf8", flag: entries.includes("package.json") ? "w" : "wx",
-  });
-  return target;
+	const target = resolve(directory)
+	const name =
+		basename(target)
+			.toLowerCase()
+			.replace(/[^a-z0-9._-]+/g, '-')
+			.replace(/^[._-]+|[._-]+$/g, '') || 'meeko-app'
+	const metadata: unknown = JSON.parse(await readFile(new URL('../../package.json', import.meta.url), 'utf8'))
+	if (!record(metadata) || typeof metadata.version !== 'string') throw new Error('No se puede leer la versión del paquete de Meeko')
+	// The same destinations as `meeko init`.
+	const entries = await scaffoldDestinationEntries(target)
+	const existing: unknown = entries.includes('package.json') ? JSON.parse(await readFile(join(target, 'package.json'), 'utf8')) : {}
+	if (!record(existing) || (existing.scripts !== undefined && !record(existing.scripts)) || (existing.dependencies !== undefined && !record(existing.dependencies)) || (existing.devDependencies !== undefined && !record(existing.devDependencies))) {
+		throw new Error(`package.json no válido en ${target}`)
+	}
+	const scripts = {
+		dev: 'meeko dev .',
+		check: 'meeko check .',
+		build: 'meeko build .',
+		start: 'meeko start .',
+	}
+	const oldScripts = existing.scripts as Record<string, unknown> | undefined
+	for (const command of Object.keys(scripts))
+		if (oldScripts && command in oldScripts) {
+			throw new Error(`El destino ya define el script ${command}: ${target}`)
+		}
+	const manifest = {
+		...existing,
+		name: typeof existing.name === 'string' ? existing.name : name,
+		private: true,
+		type: 'module',
+		engines: { ...(record(existing.engines) ? existing.engines : {}), node: '>=24' },
+		scripts: { ...oldScripts, ...scripts },
+		dependencies: { ...(existing.dependencies as Record<string, unknown> | undefined), '@meekojs/meeko': metadata.version },
+		devDependencies: {
+			...(existing.devDependencies as Record<string, unknown> | undefined),
+			'@types/node': '^24.0.0',
+			typescript: '^7.0.2',
+			vite: '^8.3.5',
+		},
+	}
+	await mkdir(target, { recursive: true })
+	for (const [filename, content] of Object.entries(files)) {
+		const output = join(target, filename)
+		await mkdir(dirname(output), { recursive: true })
+		await writeFile(output, content, { encoding: 'utf8', flag: 'wx' })
+	}
+	await writeFile(join(target, 'package.json'), JSON.stringify(manifest, null, 2) + '\n', {
+		encoding: 'utf8',
+		flag: entries.includes('package.json') ? 'w' : 'wx',
+	})
+	return target
 }

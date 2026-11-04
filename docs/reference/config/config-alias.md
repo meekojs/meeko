@@ -34,6 +34,7 @@ export default defineMeekoConfig({
 ```
 
 <!-- no-check -->
+
 ```ts
 // un .ts de app/
 import { Button } from "ui/Button";
@@ -41,8 +42,8 @@ import { Button } from "ui/Button";
 
 ## Opciones
 
-| Valor | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
+| Valor   | Tipo                              | Por defecto              | Descripción                                                                            |
+| ------- | --------------------------------- | ------------------------ | -------------------------------------------------------------------------------------- |
 | `alias` | `Record<string, string \| false>` | `{}` (sólo los de Meeko) | Prefijo → carpeta relativa a la raíz del proyecto (también la de un layer), o `false`. |
 
 - **Clave.** Termina en `/`; sin espacios, `*` ni `\`; no empieza por `.` ni `/`; sin `//`.
@@ -50,11 +51,11 @@ import { Button } from "ui/Button";
 
 ## Resultado
 
-| Dónde apunta | Dónde se puede usar |
-| --- | --- |
-| Dentro de `server/` | Sólo en el código de servidor; en un componente o en `app/`, `MEEK108`. |
-| Dentro de `app/` | En `app/` y en el servidor; en `shared/`, `MEEK118`. |
-| Otra carpeta (`shared/`, la raíz, `lib/`) | En todo el proyecto. |
+| Dónde apunta                              | Dónde se puede usar                                                     |
+| ----------------------------------------- | ----------------------------------------------------------------------- |
+| Dentro de `server/`                       | Sólo en el código de servidor; en un componente o en `app/`, `MEEK108`. |
+| Dentro de `app/`                          | En `app/` y en el servidor; en `shared/`, `MEEK118`.                    |
+| Otra carpeta (`shared/`, la raíz, `lib/`) | En todo el proyecto.                                                    |
 
 Se aplica en Vite (`meeko dev`, `meeko build` y todos los adaptadores), en los `tsconfig` que genera Meeko (los que usan `meeko check` y el editor), en el servidor de lenguaje y en los módulos de `@utilities`. Un alias propio apunta exactamente a su carpeta; no se busca en los layers como los de Meeko. Cambiar uno de Meeko (`"@/": "src/"`) lo convierte en un alias propio, con el ámbito de su carpeta nueva.
 
@@ -74,7 +75,7 @@ import * as Dialog from "ui/Dialog.meeko";
 </script>
 ```
 
-### Liberar `#shared/` para los *subpath imports* de Node
+### Liberar `#shared/` para los _subpath imports_ de Node
 
 ```ts
 import { defineMeekoConfig } from "@meekojs/meeko/framework";

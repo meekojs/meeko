@@ -1,0 +1,71 @@
+{
+	"name": "@meekojs/eslint-plugin",
+	"version": "1.8.0",
+	"description": "ESLint parser and template rules for Meeko components.",
+	"keywords": [
+		"meeko",
+		"typescript",
+		"eslint-plugin"
+	],
+	"homepage": "https://meekojs.com/docs/eslint",
+	"bugs": {
+		"url": "https://github.com/meekojs/meeko/issues"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/meekojs/meeko.git",
+		"directory": "packages/eslint-plugin"
+	},
+	"license": "MIT",
+	"sideEffects": true,
+	"type": "module",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"default": "./dist/index.js"
+		},
+		"./parser": {
+			"types": "./dist/parser.d.ts",
+			"default": "./dist/parser.js"
+		}
+	},
+	"types": "./dist/index.d.ts",
+	"files": [
+		"dist/",
+		"README.md",
+		"LICENSE",
+		"CHANGELOG.md"
+	],
+	"scripts": {
+		"build": "pnpm run types:generate && node ../../scripts/build-package.mjs",
+		"check": "pnpm run types:generate && tsc6 -p tsconfig.json --noEmit",
+		"prepack": "pnpm run build",
+		"test": "pnpm run build && node --test tests/*.test.mjs",
+		"types:generate": "node scripts/generate-rule-types.mjs"
+	},
+	"dependencies": {
+		"@eslint/js": "10.0.1",
+		"@typescript-eslint/eslint-plugin": "8.72.1",
+		"@typescript-eslint/parser": "8.72.1",
+		"@typescript-eslint/utils": "8.72.1",
+		"eslint-plugin-perfectionist": "5.13.0",
+		"eslint-plugin-unused-imports": "4.4.1",
+		"typescript": "npm:@typescript/typescript6@6.0.2"
+	},
+	"devDependencies": {
+		"@meekojs/meeko": "workspace:*",
+		"@types/node": "^24.0.0",
+		"eslint": "10.13.0"
+	},
+	"peerDependencies": {
+		"@meekojs/meeko": ">=1.8 <2",
+		"eslint": "^10.0.0"
+	},
+	"engines": {
+		"node": ">=24"
+	},
+	"publishConfig": {
+		"access": "public",
+		"provenance": true
+	}
+}

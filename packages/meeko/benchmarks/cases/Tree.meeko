@@ -1,13 +1,20 @@
 <script lang="ts">
-import * as Branch from "./TreeBranch.generated.js";
+	import * as Branch from './TreeBranch.generated.js'
 
-const branches = Array.from({ length: 16 }, (_, index) => index);
+	const branches = Array.from({ length: 16 }, (_, index) => index)
 </script>
 
 <template>
-  <section>
-    <div each:of="branches" each:as="branch" each:key="branch">
-      <component is="Branch" bind:branch="branch"></component>
-    </div>
-  </section>
+	<section>
+		<div
+			each:of="branches"
+			each:as="branch"
+			each:key="branch"
+		>
+			<component
+				is="Branch"
+				bind:branch="branch"
+			/>
+		</div>
+	</section>
 </template>

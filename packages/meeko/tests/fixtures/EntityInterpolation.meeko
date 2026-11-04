@@ -1,0 +1,24 @@
+<script lang="ts">
+import { signal } from "@meekojs/meeko";
+
+const first = 1;
+const active = signal({ id: 2 });
+const ready = signal(true);
+function advance(): void {
+  active.value = { id: active.value.id + 1 };
+  ready.value = !ready.value;
+}
+</script>
+
+<template>
+  <section>
+    <p class="tight">{first<active.value.id&&ready.value}</p>
+    <p class="spaced">{first < active.value.id && ready.value}</p>
+    <p class="string">{ready.value && "<b>"}</p>
+    <p class="template">{ready.value && `}<b>${active.value.id}`}</p>
+    <p class="entities">{ready.value &amp;&amp; active.value.id}</p>
+    <p class="literal">{'&lt;' + active.value.id}</p>
+    <p class="numeric">{"&#60;&#x3c;" === "<<" &amp;&amp; first<2}</p>
+    <button type="button" on:click=advance>next</button>
+  </section>
+</template>

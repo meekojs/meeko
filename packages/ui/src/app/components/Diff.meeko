@@ -1,0 +1,40 @@
+<script lang="ts">
+	import { computed } from '@meekojs/meeko'
+
+	import type { UIDiffLineKind, UIDiffProps } from '../types/navigation'
+
+	import { uiMessages } from '../utils/messages'
+
+	const props = defineProps<UIDiffProps>()
+
+	const text = uiMessages().diff
+
+	/** The lines of a unified diff, each with its kind for the colors and the screen reader. */
+	const kindOf = (line: string): UIDiffLineKind => (line.startsWith('@@') ? 'hunk' : line.startsWith('+++') || line.startsWith('---') ? 'file' : line.startsWith('+') ? 'add' : line.startsWith('-') ? 'remove' : 'context')
+
+	const lines = computed(() =>
+		props.diff
+			.replace(/\n$/, '')
+			.split('\n')
+			.map((line, index) => ({ index, text: line, kind: kindOf(line) })),
+	)
+
+	const defaults: Readonly<Partial<Record<UIDiffLineKind, string>>> = { add: text.added, remove: text.removed }
+	const labelOf = (kind: UIDiffLineKind): string => props.lineLabels?.[kind] ?? defaults[kind] ?? ''
+</script>
+
+<template>
+	<p
+		if:when="!props.diff"
+		bind:class="['meeko-ui-diff-empty', props.class].filter(Boolean).join(' ')"
+	>
+		{props.emptyText ?? text.empty}
+	</p>
+	<pre
+		if:when="props.diff"
+		tabindex="0"
+		bind:class="['meeko-ui-diff', props.class].filter(Boolean).join(' ')"
+		bind:aria-label="props.label"
+	><span each:of="lines.value" each:as="line" each:key="line.index" class="meeko-ui-diff-line" bind:data-kind="line.kind"><span class="meeko-ui-sr-only">{labelOf(line.kind)}</span>{line.text}
+</span></pre>
+</template>

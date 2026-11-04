@@ -1,0 +1,22 @@
+/* <UITooltip> is a <UIPopover mode="hint">: this sheet only paints it smaller than a panel. */
+[data-meeko-popover].meeko-ui-tooltip {
+	box-shadow: var(--ui-shadow-sm);
+	border-radius: var(--ui-radius-md);
+	padding: var(--ui-space-1) var(--ui-space-2);
+	max-width: var(--ui-tooltip-max-width);
+	overflow: visible;
+	font-size: var(--ui-font-size-sm);
+	line-height: var(--ui-line-height-snug);
+}
+.meeko-ui-tooltip-trigger {
+	cursor: help;
+	border: 0;
+	background: transparent;
+	padding: 0;
+	color: inherit;
+	font: inherit;
+}
+.meeko-ui-tooltip-trigger:focus-visible {
+	outline: var(--ui-focus-ring);
+	outline-offset: var(--ui-focus-ring-offset);
+}

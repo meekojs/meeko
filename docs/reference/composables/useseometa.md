@@ -44,17 +44,17 @@ useSeoMeta({
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `input` | `SeoMetaInput`, `ReadonlySignal<SeoMetaInput>` o `() => SeoMetaInput` | obligatorio | Los campos de SEO. Un campo `undefined` o `null` no produce nada. |
+| Parámetro | Tipo                                                                  | Por defecto | Descripción                                                       |
+| --------- | --------------------------------------------------------------------- | ----------- | ----------------------------------------------------------------- |
+| `input`   | `SeoMetaInput`, `ReadonlySignal<SeoMetaInput>` o `() => SeoMetaInput` | obligatorio | Los campos de SEO. Un campo `undefined` o `null` no produce nada. |
 
-| Campo | Etiqueta |
-| --- | --- |
-| `title` | `<title>` |
-| `description`, `robots`, `author`, `keywords`, `themeColor`, `colorScheme`, `applicationName`, `referrer` | `<meta name="…">` (`theme-color`, `color-scheme`, `application-name`) |
-| `ogTitle`, `ogDescription`, `ogImage`, `ogImageAlt`, `ogImageWidth`, `ogImageHeight`, `ogUrl`, `ogType`, `ogSiteName`, `ogLocale` | `<meta property="og:…">` (`og:image:alt`, `og:site_name`…) |
-| `twitterCard` (`"summary"`, `"summary_large_image"`, `"app"` o `"player"`), `twitterSite`, `twitterCreator`, `twitterTitle`, `twitterDescription`, `twitterImage`, `twitterImageAlt` | `<meta name="twitter:…">` |
-| `canonical` | `<link rel="canonical">` |
+| Campo                                                                                                                                                                                | Etiqueta                                                              |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------- |
+| `title`                                                                                                                                                                              | `<title>`                                                             |
+| `description`, `robots`, `author`, `keywords`, `themeColor`, `colorScheme`, `applicationName`, `referrer`                                                                            | `<meta name="…">` (`theme-color`, `color-scheme`, `application-name`) |
+| `ogTitle`, `ogDescription`, `ogImage`, `ogImageAlt`, `ogImageWidth`, `ogImageHeight`, `ogUrl`, `ogType`, `ogSiteName`, `ogLocale`                                                    | `<meta property="og:…">` (`og:image:alt`, `og:site_name`…)            |
+| `twitterCard` (`"summary"`, `"summary_large_image"`, `"app"` o `"player"`), `twitterSite`, `twitterCreator`, `twitterTitle`, `twitterDescription`, `twitterImage`, `twitterImageAlt` | `<meta name="twitter:…">`                                             |
+| `canonical`                                                                                                                                                                          | `<link rel="canonical">`                                              |
 
 `ogImageWidth` y `ogImageHeight` admiten números; el resto, cadenas.
 
@@ -120,6 +120,7 @@ useSeoMeta({ title: "Precios", ogimage: "/og/pricing.png" });
 `meeko check` da `TS2353: Object literal may only specify known properties, and 'ogimage' does not exist in type 'HeadSource<SeoMetaInput>'` y, en ejecución, `TypeError: useSeoMeta: unknown field ogimage`.
 
 <!-- no-check -->
+
 ```ts good
 useSeoMeta({ title: "Precios", ogImage: "/og/pricing.png" });
 ```
@@ -133,6 +134,7 @@ useSeoMeta({ twitterCard: "large" });
 `meeko check` da `TS2322: Type '"large"' is not assignable to type '"app" | "player" | "summary" | "summary_large_image" | null | undefined'`.
 
 <!-- no-check -->
+
 ```ts good
 useSeoMeta({ twitterCard: "summary_large_image" });
 ```
@@ -146,6 +148,7 @@ useSeoMeta({ title: props.data.name });
 El título se fija con el valor de ese momento: si el layout o la página se conservan al navegar y la prop cambia, la etiqueta se queda con el producto anterior. Pasa un getter:
 
 <!-- no-check -->
+
 ```ts good
 useSeoMeta(() => ({ title: props.data.name }));
 ```
@@ -159,6 +162,7 @@ useSeoMeta({ ogImage: "/og/home.png", canonical: "/" });
 No hay error, pero los buscadores y las redes sociales esperan URL absolutas en `og:image` y en la canónica. Usa el origen público del sitio, o `document.seo` para la canónica:
 
 <!-- no-check -->
+
 ```ts good
 useSeoMeta({ ogImage: "https://example.com/og/home.png", canonical: "https://example.com/" });
 ```

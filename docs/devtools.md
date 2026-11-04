@@ -4,22 +4,35 @@ DevTools permite examinar y editar cada instancia hidratada durante el desarroll
 
 ## Panel dentro de la página
 
-El ejemplo Vite lo monta automáticamente en modo desarrollo:
+Desde `1.8`, la forma recomendada es activarlo en `meeko.config.ts`, como `devtools: true` en Nuxt:
 
-```powershell
-pnpm run build
-pnpm run vite:dev
+```ts
+// meeko.config.ts
+import { defineMeekoConfig } from "@meekojs/meeko/framework";
+
+export default defineMeekoConfig({ devtools: true });
 ```
 
-Una aplicación puede montar el panel explícitamente:
+Con esa opción, `meeko dev` monta el panel en todas las páginas sin código de la aplicación. Nunca lo añade `meeko build`, `meeko start`, `meeko preview` ni una página prerenderizada: el bundle de producción no contiene `@meekojs/meeko/devtools-ui`. Por defecto es `false` en `1.x`, para que quien actualiza no vea un panel nuevo sin pedirlo. `{ position: "bottom-left" }` lo fija en otra esquina (`"bottom-right"`, la de por defecto, `"bottom-left"`, `"top-right"` o `"top-left"`), y `{ panel: false }` lo desactiva sin borrar las opciones. Un valor que no es válido detiene `meeko dev`, `build` y `check` con un mensaje que nombra la opción; véase la [referencia de `devtools`](reference/config/config-devtools.md). La [extensión de Chrome](#panel-de-chrome-devtools) y el [puente del editor](#puente-del-editor) funcionan con o sin la opción, porque leen el mismo hook.
+
+Como alternativa, una aplicación puede montarlo por su cuenta, por ejemplo en otro contenedor; no combine las dos formas, o puede haber dos paneles:
 
 ```ts
 if (import.meta.env.DEV) {
   const { mountDevtoolsPanel } = await import("@meekojs/meeko/devtools-ui");
-  const panel = mountDevtoolsPanel();
+  const panel = mountDevtoolsPanel({ position: "top-right" });
   // panel.unmount() libera la interfaz cuando deje de usarse.
 }
 ```
+
+El ejemplo Vite del repositorio lo monta así en modo desarrollo (`pnpm run build` y `pnpm run vite:dev`).
+
+### Aspecto, minimizar y mover
+
+- **Colores de Meeko.** El panel usa los tokens del sitio de Meeko (acento azul, superficies neutras e Inter si la página la tiene, con `system-ui` de respaldo). Es oscuro o claro según el sistema; si `<html>` tiene `data-theme="light"` o `"dark"` (la opción [`theme`](framework.md#tema-clarooscuro-sin-parpadeo)), sigue a la página y cambia con ella. Los tokens viven dentro de su Shadow DOM: ni el CSS de la aplicación lo altera ni el panel altera la aplicación.
+- **Minimizar.** El botón **Minimizar** (o `Alt+Mayús+M` en cualquier parte de la página) pliega el panel a una pastilla con el logo y, en rosa, el número de eventos nuevos desde que se plegó. Un clic en la pastilla o el mismo atajo lo restauran. El foco pasa a la pastilla o al botón, y los lectores de pantalla oyen «Restaurar Meeko DevTools · N eventos nuevos».
+- **Mover.** El asa de la cabecera (los seis puntos) lleva el panel a la esquina más cercana al soltarla; con el asa enfocada, las flechas lo mueven de esquina. La pastilla también se arrastra.
+- **Memoria.** El estado plegado y la esquina elegida se guardan en `localStorage` (`meeko:devtools-panel`) del origen de la aplicación y sobreviven a las recargas. Si cambia `position` en la configuración, manda la nueva. Sin `localStorage` (modo privado, almacenamiento bloqueado) el panel funciona igual, sin memoria.
 
 El panel ofrece:
 
@@ -27,10 +40,25 @@ El panel ofrece:
 - el detalle de props y señales;
 - un editor de señales;
 - una línea de tiempo filtrable;
+- navegación y preparación de datos con duración y origen, sin copiar sus valores;
 - resaltado del DOM;
 - un punto de parada por instancia.
 
 Cada evento conserva el nombre y el archivo `.meeko` del componente y una copia segura del nuevo valor. Al seleccionar un evento de una instancia activa se abre su detalle. Los estilos viven en Shadow DOM para no alterar los de la aplicación.
+
+## Navegación y datos
+
+El filtro **Navegación y datos** de ambos paneles muestra las operaciones de la aplicación, separadas de las señales y del ciclo de vida de componentes:
+
+| Evento                       | Fases                                  | Qué mide                                                                                 |
+| ---------------------------- | -------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `navigation`                 | `start` → `commit`, `cancel` o `error` | Desde que comienza una navegación cliente hasta confirmar su vista, cancelarla o fallar. |
+| `data`                       | `start` → `ready`, `cancel` o `error`  | Preparación de módulos y datos antes del commit de la vista.                             |
+| `data` con `source: "cache"` | `ready`                                | Lectura satisfecha por la caché local de recursos, sin repetir la petición.              |
+
+Cada operación tiene un `operationId` que enlaza inicio y final, el patrón declarado de la ruta (por ejemplo, `/users/[id]`) y `durationMs` al finalizar. El origen de datos es `server`, `client` o `static` según el transporte de la ruta; las lecturas de recursos locales se identifican como `cache`. La duración de una navegación no espera al final visual de una View Transition.
+
+Estos eventos no incluyen la URL resuelta, query, fragmento, parámetros, cabeceras, mensajes de error ni resultados del loader. Los eventos de caché tampoco incluyen claves de recursos ni valores. Las props y señales siguen siendo inspeccionables por sus mecanismos existentes: esta limitación se refiere a los metadatos de navegación y datos. Sin un runtime de desarrollo que instale el hook no se registran estas operaciones. Se conserva el límite compartido de los últimos 100 eventos.
 
 ## Panel de Chrome DevTools
 
@@ -43,13 +71,14 @@ Cada evento conserva el nombre y el archivo `.meeko` del componente y una copia 
    - usa **Resaltar** para ubicar la instancia en la página;
    - activa el punto de parada y provoca una actualización de su señal.
 
-La extensión consulta el hook de la página inspeccionada. No necesita cuenta, servicio remoto, permisos de host ni scripts de contenido. Su versión (`1.0.0`) es independiente de la del paquete npm; la instalación, el empaquetado y las pruebas se describen en [`packages/devtools/README.md`](../packages/devtools/README.md).
+La extensión consulta el hook de la página inspeccionada. No necesita cuenta, servicio remoto, permisos de host ni scripts de contenido. Usa los mismos colores que el panel dentro de la página y sigue el tema claro u oscuro de Chrome DevTools. Su versión (`1.0.0`) es independiente de la del paquete npm; la instalación, el empaquetado y las pruebas se describen en [`packages/devtools/README.md`](../packages/devtools/README.md).
 
 ## Protocolo
 
 El hook y cada captura declaran `protocolVersion: 1`. Los tipos públicos se exportan desde `@meekojs/meeko`:
 
 - `DevtoolsHook`, `DevtoolsSnapshot`, `DevtoolsInstance`, `DevtoolsEvent`, `DevtoolsEventKind` y `DevtoolsValue`;
+- `DevtoolsActivity`, para los metadatos opcionales de navegación y datos;
 - `DevtoolsReadSite` y `DevtoolsReadKind`, para las lecturas;
 - `DevtoolsWriteSite`, `DevtoolsAssignmentSite` y `DevtoolsEditSite`, para las escrituras;
 - `DevtoolsCommandResult` y `DevtoolsProtocolVersion`;
@@ -59,12 +88,12 @@ Desde `1.1`, cada `DevtoolsInstance` de la captura puede llevar el campo opciona
 
 El hook expone:
 
-| Método | Efecto |
-| --- | --- |
-| `snapshot()` | Captura serializable de instancias, eventos recientes y selección. |
-| `subscribe(listener)` | Avisa de cada cambio; devuelve la función para cancelar la suscripción. |
-| `select(id)` / `highlight(id)` | Selecciona o resalta una instancia; `null` las retira. |
-| `setBreakpoint(id, enabled)` | Activa o desactiva el punto de parada de una instancia. |
+| Método                               | Efecto                                                                                       |
+| ------------------------------------ | -------------------------------------------------------------------------------------------- |
+| `snapshot()`                         | Captura serializable de instancias, eventos recientes y selección.                           |
+| `subscribe(listener)`                | Avisa de cada cambio; devuelve la función para cancelar la suscripción.                      |
+| `select(id)` / `highlight(id)`       | Selecciona o resalta una instancia; `null` las retira.                                       |
+| `setBreakpoint(id, enabled)`         | Activa o desactiva el punto de parada de una instancia.                                      |
 | `setSignal(instanceId, name, value)` | Sustituye el valor de una señal editable y devuelve `{ ok: true }` o `{ ok: false, error }`. |
 
 La versión sólo cambia con incompatibilidades y, según la [política de estabilidad](stability.md#devtools-y-editor), sólo en una versión major de Meeko. Dentro del protocolo 1 pueden aparecer campos o tipos de evento nuevos. Los dos paneles rechazan un hook o una captura con otra versión, o sin ella (runtimes anteriores a 1.0), y muestran un mensaje que indica la versión encontrada y la admitida. Nunca leen datos de un protocolo que no conocen. El panel integrado viaja en el mismo paquete que el runtime. La extensión de Chrome necesita un `@meekojs/meeko` que implemente el protocolo 1.
@@ -109,6 +138,7 @@ Desde `1.1`, `meeko dev` publica los valores de las señales de las páginas abi
    ```
 
    Varios `meeko dev` del mismo proyecto, en puertos distintos, conviven sin sustituirse el descriptor, y el editor se conecta a todos. Al cerrarse, cada servidor borra el suyo si sigue siendo de su sesión. Al arrancar, borra los descriptores huérfanos de procesos que ya no existen (por ejemplo, de un `meeko dev` terminado a la fuerza), incluido el `.meeko/dev/editor-bridge.json` único de las versiones de desarrollo anteriores. El puerto es el que `meeko dev` usa de verdad: si `4173` estaba ocupado y tomó `4174`, el descriptor es `editor-bridge-4174.json`. Cuando `meeko dev` se reinicia porque cambió un `@meekojs/meeko` enlazado, el servidor nuevo escucha en el mismo puerto y escribe un descriptor con otra sesión y otro token; el editor vuelve a conectarse con él.
+
 2. El editor lee los descriptores y abre `GET <url>/events` en cada uno, un stream SSE con los eventos `hello` (`protocol`, `session`, `root`), `snapshot` (todas las señales) y `update` (señales nuevas o cambiadas y las que desaparecen en `removed`). Si no había otro editor conectado, las pestañas abiertas no estaban enviando valores: el servidor les pide su estado y espera a que todas respondan, o como mucho unos 300 ms, antes de enviar `snapshot`; sin pestañas lo envía al momento. Lo que llega durante esa espera va en la propia instantánea, no en un `update`.
 3. Para editar una señal, el editor envía `POST <url>/command` con `{ "type": "setSignal", "id", "value" }`. El servidor reenvía la orden a la pestaña que tiene la instancia y responde con su resultado, `{ ok: true }` o `{ ok: false, error }`, como `setSignal` del hook.
 4. Entre el navegador y `meeko dev` los mensajes viajan por el WebSocket de HMR de Vite. El navegador sólo envía valores mientras hay al menos un editor conectado.
@@ -140,14 +170,14 @@ Las ubicaciones sólo se generan en desarrollo, cuando el compilador trabaja con
 
 Cada evento de señal se puede desplegar para ver las expresiones que dependían de ella en esa instancia, con archivo, línea, columna y tipo de lectura:
 
-| Tipo | Origen |
-| --- | --- |
-| `text` | Interpolación `{...}` de la plantilla. |
-| `attribute` | Atributo enlazado (`bind:`). |
-| `computed` | Función pasada a `computed(...)` en el script `.meeko`. |
-| `if` | Condición `if:when`. |
-| `each` | Lista `each:of`. |
-| `prop` | Prop pasada a un componente hijo (`name` indica la prop). |
+| Tipo        | Origen                                                    |
+| ----------- | --------------------------------------------------------- |
+| `text`      | Interpolación `{...}` de la plantilla.                    |
+| `attribute` | Atributo enlazado (`bind:`).                              |
+| `computed`  | Función pasada a `computed(...)` en el script `.meeko`.   |
+| `if`        | Condición `if:when`.                                      |
+| `each`      | Lista `each:of`.                                          |
+| `prop`      | Prop pasada a un componente hijo (`name` indica la prop). |
 
 El seguimiento usa las dependencias activas de cada instancia, así que una rama que ya no lee la señal deja de aparecer. Una lectura indica **dónde se usa** la señal, no quién la escribió.
 

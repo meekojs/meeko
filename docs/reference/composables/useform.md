@@ -20,7 +20,9 @@ related:
   - docs/framework.md#formularios-sin-javascript-form
 ---
 
-`useForm` reúne lo que repite cada formulario: una señal escribible por campo para `model`, la validación con un [Standard Schema](https://standardschema.dev) (como los de Valibot) al enviar, los `issues` de un `400` del servidor repartidos por campo, un mensaje para el formulario completo, `pending`, `submitted`, `dirty`, `reset` y `commit`. Se llama en el nivel superior del `<script>` de un componente y se autoimporta en las aplicaciones del framework.
+`useForm` reúne lo que repite cada formulario: una señal escribible por campo para `model`, la validación con un [Standard Schema](https://standardschema.dev) (como los de Valibot) al enviar, los `issues` de un `400` del servidor repartidos por campo, un mensaje para el formulario completo, `pending`, `submitted`, `dirty`, `reset`, `load` y `commit`. Se llama en el nivel superior del `<script>` de un componente y se autoimporta en las aplicaciones del framework.
+
+Los tipos `Form`, `FormField` y `FormSubmission` también se autoimportan como tipos en el `<script>` del componente y en `app/`. En código de `server/`, `shared/` o `<script server>` se requiere una importación explícita si sólo se necesita describir un tipo.
 
 El formulario es estado del componente: no viaja en el payload. El servidor lo renderiza con `initial` y el navegador vuelve a crearlo con el mismo `initial` al hidratar.
 
@@ -58,35 +60,36 @@ const form = useForm({
 
 `useForm(options)` recibe un objeto:
 
-| Opción | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `schema` | Standard Schema v1 | sin schema | Valida los campos al enviar. Con schema, los campos tienen el tipo de su **entrada** y `submit` recibe su **salida** (un `v.transform` puede convertir texto en número). Sin schema, sólo valida el servidor. |
-| `initial` | `Values` | obligatorio | Valor inicial de cada campo. Con schema, una clave por cada clave de su entrada, también las opcionales (con `undefined`). Debe depender sólo de props, datos de la ruta y estado, porque el navegador lo vuelve a evaluar al hidratar. |
-| `submit` | `(values) => Result \| PromiseLike<Result>` | obligatorio | Envía los datos válidos y devuelve el resultado, o rechaza. Recibe la salida del schema, o los valores de los campos sin schema. |
-| `errorMessage` | `(failure: unknown) => string` | `failure.message` | Texto de `error` para un fallo sin `issues`, como un `409` o un fallo de red. En un `ClientError`, el `message` por defecto es su `code`. |
-| `onSuccess` | `(result, form) => void` | ninguno | Desde `1.5`. Se ejecuta tras un envío correcto, con `submitted` ya en `true`. Un error que lance va al observador de errores del componente y no cambia el resultado del envío. |
-| `focusInvalid` | `boolean` | `false` | Desde `1.5`. Tras un envío con errores en los campos, mueve el foco al primer control inválido del `<form>` del evento una vez pintados los mensajes. |
-| `action` | `string` | ninguna | Desde `1.7`. Ruta del endpoint con `form` al que se envía el `<form method="post">` sin JavaScript, como `"/api/feedback"`. Al volver de ese envío, el SSR pinta su resultado: `errors`, `error` y `failure`, o `submitted`, y los valores de los campos que el endpoint lista en `form.echo` (por defecto, ninguno: los demás parten de `initial`). |
+| Opción         | Tipo                                        | Por defecto       | Descripción                                                                                                                                                                                                                                                                                                                                          |
+| -------------- | ------------------------------------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `schema`       | Standard Schema v1                          | sin schema        | Valida los campos al enviar. Con schema, los campos tienen el tipo de su **entrada** y `submit` recibe su **salida** (un `v.transform` puede convertir texto en número). Sin schema, sólo valida el servidor.                                                                                                                                        |
+| `initial`      | `Values`                                    | obligatorio       | Valor inicial de cada campo. Con schema, una clave por cada clave de su entrada, también las opcionales (con `undefined`). Debe depender sólo de props, datos de la ruta y estado, porque el navegador lo vuelve a evaluar al hidratar.                                                                                                              |
+| `submit`       | `(values) => Result \| PromiseLike<Result>` | obligatorio       | Envía los datos válidos y devuelve el resultado, o rechaza. Recibe la salida del schema, o los valores de los campos sin schema.                                                                                                                                                                                                                     |
+| `errorMessage` | `(failure: unknown) => string`              | `failure.message` | Texto de `error` para un fallo sin `issues`, como un `409` o un fallo de red. En un `ClientError`, el `message` por defecto es su `code`.                                                                                                                                                                                                            |
+| `onSuccess`    | `(result, form) => void`                    | ninguno           | Desde `1.5`. Se ejecuta tras un envío correcto, con `submitted` ya en `true`. Un error que lance va al observador de errores del componente y no cambia el resultado del envío.                                                                                                                                                                      |
+| `focusInvalid` | `boolean`                                   | `false`           | Desde `1.5`. Tras un envío con errores en los campos, mueve el foco al primer control inválido del `<form>` del evento una vez pintados los mensajes.                                                                                                                                                                                                |
+| `action`       | `string`                                    | ninguna           | Desde `1.7`. Ruta del endpoint con `form` al que se envía el `<form method="post">` sin JavaScript, como `"/api/feedback"`. Al volver de ese envío, el SSR pinta su resultado: `errors`, `error` y `failure`, o `submitted`, y los valores de los campos que el endpoint lista en `form.echo` (por defecto, ninguno: los demás parten de `initial`). |
 
 ## Valor devuelto
 
 Un `Form<Values, Result>`. `fields` son señales escribibles; el resto de señales son de sólo lectura y `csrfToken` es un texto.
 
-| Propiedad | Tipo | Descripción |
-| --- | --- | --- |
-| `fields` | `{ [K in keyof Values]: Signal<Values[K]> }` | Una señal por campo, para `model` en `<input>`, `<textarea>` y `<select>`, y para `model:nombre` en un componente. |
-| `errors` | `ReadonlySignal<{ [ruta]?: string }>` | Primer mensaje de cada ruta con error: `errors.value.name`, `errors.value["items.0.name"]`. Un campo sin error no tiene clave. |
-| `error` | `ReadonlySignal<string \| null>` | Mensaje del formulario completo: un issue con ruta `""`, un issue de un campo que el formulario no tiene o el texto de `errorMessage`. |
-| `failure` | `ReadonlySignal<Error \| null>` | Error original del último envío fallido, también el `ClientError` de un `400`. |
-| `pending` | `ReadonlySignal<boolean>` | `true` mientras un schema asíncrono valida o se ejecuta `submit`. |
-| `submitted` | `ReadonlySignal<boolean>` | `true` cuando el último envío terminó bien. |
-| `dirty` | `ReadonlySignal<boolean>` | `true` si algún campo difiere de los valores iniciales. Compara arrays, objetos planos y fechas por contenido. |
-| `submit(event?)` | `Promise<Result \| undefined>` | Envía. Resuelve con lo que devuelve tu `submit`, o con `undefined` si los datos no son válidos, si el envío falla o si ya había uno en curso. Nunca rechaza. |
-| `trySubmit(event?)` | `Promise<FormSubmission<Result>>` | Desde `1.5`. Envía igual, pero resuelve con cómo terminó: `{ ok: true, result }` u `{ ok: false, reason }` con `"invalid"`, `"error"` o `"skipped"`. Nunca rechaza. |
-| `reset(values?)` | `void` | Vuelve a los valores iniciales, o a ellos combinados con `values`, que pasan a ser la referencia de `dirty`. Borra `errors`, `error`, `failure` y `submitted` y descarta el resultado de una validación o un envío en curso. |
-| `commit(values?)` | `void` | Desde `1.5`. Escribe `values` y toma los valores actuales como nuevos valores iniciales: `dirty` vuelve a `false`. No borra `submitted`, `errors`, `error` ni `failure`. |
-| `field(name)` | `FormField<Values[K]>` | Desde `1.5`. Las piezas de un campo para un componente propio: su señal, su mensaje, `invalid`, `name` e IDs estables entre SSR e hidratación. Devuelve siempre el mismo objeto para el mismo campo. |
-| `csrfToken` | `string \| undefined` | Desde `1.7`. El token CSRF de la sesión para el campo oculto `_csrf` de un formulario nativo, o `undefined` sin sesión: en SSR, el de la petición; en el navegador, el de la meta `meeko-csrf-token`. Es un texto, no una señal. |
+| Propiedad           | Tipo                                         | Descripción                                                                                                                                                                                                                          |
+| ------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `fields`            | `{ [K in keyof Values]: Signal<Values[K]> }` | Una señal por campo, para `model` en `<input>`, `<textarea>` y `<select>`, y para `model:nombre` en un componente.                                                                                                                   |
+| `errors`            | `ReadonlySignal<{ [ruta]?: string }>`        | Primer mensaje de cada ruta con error: `errors.value.name`, `errors.value["items.0.name"]`. Un campo sin error no tiene clave.                                                                                                       |
+| `error`             | `ReadonlySignal<string \| null>`             | Mensaje del formulario completo: un issue con ruta `""`, un issue de un campo que el formulario no tiene o el texto de `errorMessage`.                                                                                               |
+| `failure`           | `ReadonlySignal<Error \| null>`              | Error original del último envío fallido, también el `ClientError` de un `400`.                                                                                                                                                       |
+| `pending`           | `ReadonlySignal<boolean>`                    | `true` mientras un schema asíncrono valida o se ejecuta `submit`.                                                                                                                                                                    |
+| `submitted`         | `ReadonlySignal<boolean>`                    | `true` cuando el último envío terminó bien.                                                                                                                                                                                          |
+| `dirty`             | `ReadonlySignal<boolean>`                    | `true` si algún campo difiere de los valores iniciales. Compara arrays, objetos planos y fechas por contenido.                                                                                                                       |
+| `submit(event?)`    | `Promise<Result \| undefined>`               | Envía. Resuelve con lo que devuelve tu `submit`, o con `undefined` si los datos no son válidos, si el envío falla o si ya había uno en curso. Nunca rechaza.                                                                         |
+| `trySubmit(event?)` | `Promise<FormSubmission<Result>>`            | Desde `1.5`. Envía igual, pero resuelve con cómo terminó: `{ ok: true, result }` u `{ ok: false, reason }` con `"invalid"`, `"error"` o `"skipped"`. Nunca rechaza.                                                                  |
+| `reset(values?)`    | `void`                                       | Vuelve a `initial`, incluso después de `load` o `commit`. Si recibe valores, los combina con `initial` y toma el resultado como referencia de `dirty`. Acepta el evento `reset` nativo. Limpia errores y el estado del último envío. |
+| `load(values)`      | `void`                                       | Combina un registro con los valores actuales, toma el resultado como referencia de `dirty` y limpia errores y el estado del último envío. `reset()` aún vuelve a `initial`.                                                          |
+| `commit(values?)`   | `void`                                       | Desde `1.5`. Escribe `values` y toma los valores actuales como nueva referencia de `dirty`: vuelve a `false`. No borra `submitted`, `errors`, `error` ni `failure`.                                                                  |
+| `field(name)`       | `FormField<Values[K]>`                       | Desde `1.5`. Las piezas de un campo para un componente propio: su señal, su mensaje, `invalid`, `name` e IDs estables entre SSR e hidratación. Devuelve siempre el mismo objeto para el mismo campo.                                 |
+| `csrfToken`         | `string \| undefined`                        | Desde `1.7`. El token CSRF de la sesión para el campo oculto `_csrf` de un formulario nativo, o `undefined` sin sesión: en SSR, el de la petición; en el navegador, el de la meta `meeko-csrf-token`. Es un texto, no una señal.     |
 
 ## Ejemplos
 
@@ -95,6 +98,7 @@ Un `Form<Values, Result>`. `fields` son señales escribibles; el resto de señal
 Sin schema en el navegador, el servidor valida. La respuesta `400` de una entrada que no supera el schema de `defineApiRoute` trae `issues` con `path` y `message`, y `useForm` pone cada mensaje en su campo. Un `ApiError` con `issues` (desde `1.5`) hace lo mismo con otro estado, como un `409`:
 
 <!-- no-check -->
+
 ```ts
 // server/api/signup.post.ts
 import { ApiError, defineApiRoute } from "@meekojs/meeko/server";
@@ -140,6 +144,8 @@ Con el `409`, `form.errors.value.email` es «Ese correo ya tiene una cuenta.», 
 ### Editar un registro y guardar como nueva referencia
 
 `initial` sale de los datos de la página. Tras guardar, `onSuccess` llama a `commit` con lo que devolvió el servidor: `dirty` vuelve a `false` y el «Guardado» de `submitted` se mantiene.
+
+Si el registro llega después de crear el componente, llama `form.load({ name: record.name, bio: record.bio })` cuando termine la carga. `load` marca esos valores como limpios; `form.reset()` vuelve a los valores declarados en `initial`.
 
 ```html
 <!-- app/pages/profile.meeko -->
@@ -245,6 +251,7 @@ Un `FormField<boolean>` no admite ese campo (`TS2322`): el tipo de salida no pue
 Con `form` en el endpoint y `action` en `useForm`, el mismo formulario se envía con JSON cuando hay JavaScript y como un `<form method="post">` nativo antes de hidratar o sin él. Cada control lleva el `name` de su campo:
 
 <!-- no-check -->
+
 ```ts
 // server/api/feedback.post.ts
 import { defineApiRoute } from "@meekojs/meeko/server";
@@ -287,6 +294,7 @@ Sin JavaScript, el servidor valida con el mismo schema de `body`, responde `303`
 Desde `1.5`, cada cambio vuelve a validar también los campos que ya muestran un error del schema. Con una regla de Valibot que lleva el error a `confirm`, corregir la contraseña quita «Las contraseñas no coinciden» sin tocar la confirmación:
 
 <!-- no-check -->
+
 ```ts
 import * as v from "valibot";
 
@@ -361,6 +369,7 @@ const form = useForm({ initial: { age: 0 }, submit: save });
 `meeko check` da `TS2322: Type 'Signal<number>' is not assignable to type '{ value: string; }'`. Guarda el texto en el campo y conviértelo en el schema, cuya salida es la que recibe `submit`:
 
 <!-- no-check -->
+
 ```ts good
 const ageInput = v.object({ age: v.pipe(v.string(), v.transform(Number), v.integer("Escribe un número entero.")) });
 const form = useForm({ schema: ageInput, initial: { age: "" }, submit: (values) => save(values) }); // values.age es number
@@ -372,6 +381,7 @@ const form = useForm({ schema: ageInput, initial: { age: "" }, submit: (values) 
 Con schema, `initial` necesita un valor por cada clave de la entrada, también las opcionales.
 
 <!-- no-check -->
+
 ```ts bad
 const signupInput = v.object({ name: v.string(), email: v.string() });
 const form = useForm({ schema: signupInput, initial: { name: "" }, submit });
@@ -380,6 +390,7 @@ const form = useForm({ schema: signupInput, initial: { name: "" }, submit });
 `meeko check` da `TS2769: No overload matches this call` con `Property 'email' is missing in type '{ name: string; }' but required in type 'Complete<{ name: string; email: string; }>'`.
 
 <!-- no-check -->
+
 ```ts good
 const form = useForm({ schema: signupInput, initial: { name: "", email: "" }, submit });
 ```
@@ -393,6 +404,7 @@ form.fields.tags.value.push(tag);
 ```
 
 <!-- no-check -->
+
 ```ts good
 form.fields.tags.value = [...form.fields.tags.value, tag];
 ```

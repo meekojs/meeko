@@ -1,0 +1,38 @@
+<script lang="ts" generic="K extends I18nMessageKey">
+	import type { I18nMessageKey, I18nMessageTags, I18nMessageValues, I18nRichPart, I18nTranslateOptions } from '@meekojs/i18n'
+	import type { Snippet } from '@meekojs/meeko'
+
+	import { useI18n } from '@meekojs/i18n'
+
+	import * as I18nTPart from './internal/I18nTPart.meeko'
+
+	// `values` no puede ser obligatorio según K: un tipo condicional impide inferir K para los snippets.
+	const props = defineProps<{
+		/** Clave del mensaje, con sus etiquetas en el catálogo: `"Pulsa <kbd>Esc</kbd> para salir."`. */
+		key: K
+		/** Valores de los parámetros del mensaje. Sin un valor que el mensaje usa, lanza `TypeError`, como `t()`. */
+		values?: I18nMessageValues<K>
+		/** Idioma del mensaje, si no es el del documento (un namespace de `multilingual`). */
+		locale?: string
+	}>()
+
+	// Un snippet por etiqueta del mensaje, que recibe el texto de la etiqueta en el idioma del documento.
+	const snippets = defineSnippets<{ [Tag in I18nMessageTags<K>]: [text: string] }>()
+
+	// Sobre K, TypeScript no lee un nombre calculado; los snippets de cada etiqueta se leen de esta vista.
+	const byTag = snippets as unknown as { readonly [tag: string]: Snippet<[text: string]> | undefined }
+
+	const i18n = useI18n()
+	// La firma pública correlaciona clave y valores; aquí la clave es genérica.
+	const rich = i18n.rich as (key: string, values?: unknown, options?: I18nTranslateOptions) => readonly I18nRichPart[]
+</script>
+
+<!-- Sin espacios alrededor de la etiqueta: serían texto dentro de la frase. -->
+<template><I18nTPart
+		each:of="rich(props.key, props.values, props.locale === undefined ? undefined : { locale: props.locale })"
+		each:as="part"
+		each:index="index"
+		each:key="index"
+		bind:snippet="part.tag === undefined ? undefined : byTag[part.tag]"
+		bind:text="part.text"
+	/></template>

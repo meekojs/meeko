@@ -1,0 +1,114 @@
+<script lang="ts">
+	import type { UIContainerSize } from '@meekojs/ui'
+
+	import { examples } from '../utils/examples'
+
+	const sizes = ['sm', 'md', 'lg', 'xl', '2xl', '3xl', '4k', 'full'] as const
+	const size = signal<UIContainerSize | null>('xl')
+</script>
+
+<template>
+	<DocsPage
+		title="Container"
+		description="Centra tu contenido y adapta su ancho desde el móvil hasta pantallas 4K."
+	>
+		<h2 id="usage">Un ancho para cada contenido</h2>
+		<p>Container ocupa el ancho disponible de su padre hasta el límite elegido. No aumenta la tipografía ni estira las columnas: controla el espacio de la composición.</p>
+		<div class="docs-actions">
+			<UIField
+				id="container-size"
+				label="Ancho máximo"
+			>
+				<snippet
+					name="default"
+					params="id, describedBy"
+				>
+					<UISelect
+						model="size"
+						bind:options="sizes"
+						bind:id="id"
+						bind:describedBy="describedBy"
+					/>
+				</snippet>
+			</UIField>
+		</div>
+		<div class="docs-grid">
+			<UIContainer
+				as="section"
+				ariaLabel="Vista previa del contenedor"
+				class="container-example"
+				bind:size="size.value ?? 'xl'"
+			>
+				<UICard
+					title="Un espacio para tu interfaz"
+					variant="soft"
+				>
+					<p>El contenedor usa size={size.value ?? 'xl'} y gutter=md.</p>
+				</UICard>
+			</UIContainer>
+		</div>
+		<p>
+			La vista previa está limitada por esta columna de documentación. En tu aplicación,
+			<code>4k</code>
+			permite un ancho exterior de hasta
+			<code>240rem</code>: 3840 píxeles CSS con una fuente raíz de 16px.
+		</p>
+		<DocsCode bind:code="examples.container" />
+		<h2 id="sizes">Anchos máximos</h2>
+		<DocsApi
+			caption="Tamaños del contenedor"
+			bind:rows="[
+				{ name: 'sm', type: '40rem', description: '640px. Formularios y contenido compacto.' },
+				{ name: 'md', type: '48rem', description: '768px. Lectura y configuración.' },
+				{ name: 'lg', type: '64rem', description: '1024px. Contenido de una aplicación.' },
+				{ name: 'xl', type: '80rem', description: '1280px. Valor por defecto.' },
+				{ name: '2xl', type: '96rem', description: '1536px. Paneles amplios.' },
+				{ name: '3xl', type: '120rem', description: '1920px. Vistas de escritorio grandes.' },
+				{ name: '4k', type: '240rem', description: '3840px. Superficies de trabajo en 4K.' },
+				{ name: 'full', type: 'none', description: 'Sin límite: ocupa el ancho disponible del padre.' },
+			]"
+		/>
+		<p>Las equivalencias en píxeles usan una raíz de 16px. El comportamiento depende del viewport CSS, no de la resolución física del monitor. En pantallas mayores que el máximo, el contenido sigue centrado.</p>
+		<h2 id="gutters">Espacio lateral adaptable</h2>
+		<p>
+			<code>gutter</code>
+			añade padding lógico a ambos lados, incluido en el ancho exterior. El valor
+			<code>md</code>
+			crece entre 16 y 64px;
+			<code>sm</code>, entre 12 y 24px;
+			<code>lg</code>, entre 24 y 96px. Usa
+			<code>none</code>
+			cuando el padre ya aporta ese espacio.
+		</p>
+		<DocsCode bind:code="examples.containerNested" />
+		<UIAlert tone="info">Un contenedor 4K no obliga a que todo el texto mida 3840px. Combina una superficie amplia con contenedores menores para lectura, formularios y detalles.</UIAlert>
+		<h2 id="api">API</h2>
+		<DocsApi
+			bind:rows="[
+				{ name: 'size', type: 'UIContainerSize', default: 'xl', description: 'Ancho máximo. sm, md, lg, xl, 2xl, 3xl, 4k o full.' },
+				{ name: 'gutter', type: 'none | sm | md | lg', default: 'md', description: 'Padding lateral fluido con soporte de dirección RTL.' },
+				{ name: 'as', type: 'UIContainerTag', default: 'div', description: 'div, section, main, article, header, footer, nav o aside.' },
+				{ name: 'id / ariaLabel / class', type: 'string', description: 'Identidad, nombre accesible y clases adicionales.' },
+			]"
+		/>
+		<p>
+			Requiere el snippet
+			<code>default</code>. No añade roles, encabezados ni comportamiento interactivo. Elige
+			<code>as</code>
+			según la semántica del contenido; no anides otro
+			<code>main</code>
+			dentro del principal.
+		</p>
+		<h2 id="customize">Personalización</h2>
+		<p>
+			Usa una clase para sobrescribir
+			<code>--ui-container-max-width</code>
+			o
+			<code>--ui-container-gutter</code>. El contenedor no oculta contenido que desborde: las tablas y los bloques de código deben gestionar su propio scroll.
+		</p>
+		<DocsCode
+			label="app/styles/main.css"
+			bind:code="examples.containerCss"
+		/>
+	</DocsPage>
+</template>

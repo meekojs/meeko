@@ -1,0 +1,9 @@
+{
+	"private": true,
+	"type": "module",
+	"devDependencies": {
+		"@meekojs/meeko": "*",
+		"@tailwindcss/postcss": "*",
+		"tailwindcss": "*"
+	}
+}

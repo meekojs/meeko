@@ -1,0 +1,18 @@
+<script lang="ts">
+	import type { UITextareaProps } from '../types/forms'
+
+	const { invalid, describedBy, spellcheck, class: className, ...rest } = defineProps<UITextareaProps>()
+
+	const value = defineModel<string>({ default: '' })
+</script>
+
+<template>
+	<textarea
+		model="value"
+		bind:spellcheck="spellcheck === undefined ? undefined : String(spellcheck)"
+		bind:aria-invalid="invalid ? 'true' : undefined"
+		bind:aria-describedby="describedBy ?? rest['aria-describedby']"
+		bind:class="['meeko-ui-input', 'meeko-ui-textarea', className].filter(Boolean).join(' ')"
+		bind="rest"
+	/>
+</template>

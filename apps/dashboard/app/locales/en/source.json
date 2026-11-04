@@ -1,0 +1,165 @@
+{
+	"source": {
+		"fallbackTitle": "Source {id}",
+		"fallbackDescription": "Detail of a documentation source.",
+		"allSources": "All sources",
+		"seeTranslation": "See the translation",
+		"compareOriginal": "Compare with the original",
+		"newDraft": "New draft",
+		"edit": "Edit",
+		"heading": "Source",
+		"status": {
+			"draft": "Draft",
+			"published": "Published",
+			"archived": "Archived"
+		},
+		"pending": {
+			"one": "Revision #{id} is published",
+			"many": {
+				"plural": "count",
+				"forms": {
+					"one": "{count} published revision",
+					"other": "{count} published revisions"
+				}
+			},
+			"archived": "Revision #{id} was archived",
+			"notIncluded": "but the active snapshot does not include it yet: the site still shows the previous version.",
+			"stillShown": "but the active snapshot still shows it: the site goes back to the Git text with the next publication."
+		},
+		"publishDocs": "Publish the documentation",
+		"notice": {
+			"published": "Revision #{id} published. The site will show it once you publish the documentation.",
+			"archivedPublished": "Revision #{id} archived. The next publication shows Git again.",
+			"archived": "Revision #{id} archived.",
+			"exported": "Downloaded {filename} with revision #{id}. Copy it to {file} to bring it to the repository.",
+			"merged": "Draft #{id} created with the current Git and the changes of revision #{revision}."
+		},
+		"openDraft": "Open draft #{id}",
+		"mergeNote": "Current Git + changes of revision #{id}",
+		"gitNow": "Git now",
+		"sideRevision": "Revision #{id} · {status}",
+		"origin": {
+			"import": "the last import",
+			"workingTree": "the working tree",
+			"commit": "a commit"
+		},
+		"facts": {
+			"path": "Public path",
+			"locale": "Language",
+			"file": "File",
+			"meekoFile": ".meeko page: its text lives in the repository",
+			"baseHash": "Base hash (imported)",
+			"gitHash": "Hash in Git now",
+			"imported": "Imported",
+			"removed": "Removed",
+			"published": "Published revision",
+			"noPublished": "None: Git is published"
+		},
+		"actionFailed": "The action did not finish",
+		"revisions": "Revisions",
+		"revisionCount": {
+			"plural": "count",
+			"forms": {
+				"one": "{count} revision",
+				"other": "{count} revisions"
+			}
+		},
+		"noRevisions": {
+			"editable": "No revisions: the site publishes the file in Git. Edit the source to create the first draft.",
+			"gone": "No revisions. Git no longer has this file, so it cannot be edited.",
+			"meeko": ".meeko pages have no revisions: they change in the repository."
+		},
+		"revisionsCaption": "Revisions of the source, newest first",
+		"columns": {
+			"revision": "Revision",
+			"status": "Status",
+			"author": "Author",
+			"created": "Created",
+			"published": "Published",
+			"note": "Note",
+			"actions": "Actions"
+		},
+		"writtenOn": "Written over Git {hash}",
+		"badges": {
+			"archivedAfter": "Archived after the active snapshot, which still shows it: the site goes back to Git with the next publication.",
+			"publishedAfter": "Published after the active snapshot: the site does not show it yet.",
+			"noSnapshot": "Not in snapshot",
+			"conflictHelp": "Git changed after it was written: its base is not the file of now.",
+			"conflict": "Conflict with Git"
+		},
+		"row": {
+			"editDraft": "Edit draft #{id}",
+			"fromRevision": "New draft from revision #{id}",
+			"startHere": "Start from here",
+			"publish": "Publish",
+			"archive": "Archive",
+			"theRevision": "revision #{id}",
+			"export": "Export revision #{id} to",
+			"loading": "Loading…",
+			"seeConflict": "See conflict",
+			"ofRevision": "of revision #{id}"
+		},
+		"conflict": {
+			"title": "Conflict of revision #{id} with Git",
+			"failed": "It did not finish",
+			"missing": "Git no longer has this file.",
+			"lead": "The revision was written over a version of Git ({base}, found in {origin}) that is not the current one ({git}).",
+			"noBase": "The Git text it was written over cannot be found ({base}): only the current Git and the revision are compared, without a merge.",
+			"trivial": "Trivial merge.",
+			"trivialText": "Git and the revision changed different parts: you can create a new draft with the current Git and the changes of the revision, and review it before publishing.",
+			"zones": {
+				"plural": "count",
+				"forms": {
+					"one": "{count} area changed on both sides.",
+					"other": "{count} areas changed on both sides."
+				}
+			},
+			"manual": "There is no automatic merge: edit a draft by hand from Git or from the revision.",
+			"creating": "Creating…",
+			"merge": "Create draft: current Git + my changes",
+			"baseGit": "Base → Git now",
+			"baseGitHint": "What changed in Git since the revision was written.",
+			"baseGitLabel": "Diff from the base to the current Git",
+			"baseRevision": "Base → revision",
+			"baseRevisionHint": "What the revision changed.",
+			"baseRevisionLabel": "Diff from the base to the revision",
+			"gitRevision": "Git now → revision",
+			"gitRevisionHint": "What the site will show if the revision is published as is.",
+			"gitRevisionLabel": "Diff from the current Git to the revision",
+			"noChanges": "No changes.",
+			"noBaseDiff": "No base: it cannot be shown."
+		},
+		"compare": {
+			"title": "Compare",
+			"label": "Compare two versions",
+			"from": "From",
+			"to": "To",
+			"running": "Comparing…",
+			"submit": "Compare",
+			"failed": "Could not compare",
+			"tooLarge": "The texts are too different to compare line by line.",
+			"same": "Both versions are the same.",
+			"diffLabel": "Diff from {from} to {to}"
+		},
+		"gitDiff": {
+			"title": "Diff with Git",
+			"label": "Unified diff from Git to the published revision",
+			"same": "The published revision matches Git.",
+			"none": "No published revision: the site shows exactly Git."
+		},
+		"confirm": {
+			"publishTitle": "Publish revision #{id}?",
+			"archiveTitle": "Archive revision #{id}?",
+			"publishText": "It becomes the published text of this source and archives the previous published one. The site shows it from the next publication of the documentation.",
+			"archivePublishedText": "It stops being the published text: the next publication of the documentation shows Git again.",
+			"archiveText": "It stays in the history and can no longer be edited; you can start a new draft from it.",
+			"replaces": "Replaces",
+			"conflictWarning": "This revision was written over another version of Git: publishing it discards what changed in Git since then. Review the conflict first.",
+			"notPublished": "Not published",
+			"notArchived": "Not archived",
+			"working": "One moment…",
+			"publish": "Publish revision",
+			"archive": "Archive revision"
+		}
+	}
+}

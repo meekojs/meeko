@@ -43,53 +43,53 @@ const activity = signal<
     <header class="dashboard-header" id="overview">
       <div>
         <h1>El sistema, en vivo.</h1>
-        <p>
-          Una vista para comprobar el recorrido completo: HTML del servidor,
-          estado reactivo y llamadas tipadas que llegan a esta aplicación.
-        </p>
+        <p
+          >Una vista para comprobar el recorrido completo: HTML del servidor,
+          estado reactivo y llamadas tipadas que llegan a esta aplicación.</p
+        >
       </div>
       <button
         class="dashboard-signout"
         type="button"
         on:click="signOut"
         bind:disabled="pending.value !== ''"
+        >Cerrar sesión</button
       >
-        Cerrar sesión
-      </button>
     </header>
 
     <section class="execution-strip" aria-label="Estado de la ejecución">
-      <div>
-        <span>Render inicial</span><strong>SSR</strong
-        ><small>{props.data.renderedAt}</small>
-      </div>
-      <div>
-        <span>Socket</span
+      <div
+        ><span>Render inicial</span><strong>SSR</strong
+        ><small>{props.data.renderedAt}</small></div
+      >
+      <div
+        ><span>Socket</span
         ><strong>{socketOpen.value ? "Conectado" : "Desconectado"}</strong
-        ><small>Canal con autorización</small>
-      </div>
+        ><small>Canal con autorización</small></div
+      >
     </section>
 
-    <section class="activity-section" aria-labelledby="activity-title">
-      <div class="section-title">
-        <div>
-          <h2 id="activity-title">Actividad de esta vista</h2>
-          <p>Resultados de tus acciones actuales, sin datos inventados.</p>
-        </div>
-      </div>
-      <p class="activity-empty" if:when="activity.value.length === 0">
-        Aún no hay operaciones. Prueba una acción para ver su resultado aquí.
-      </p>
-      <ol class="activity-list">
-        <li each:of="activity.value" each:as="item" each:key="item.id">
-          <span>{item.time}</span>
-          <div>
-            <strong>{item.label}</strong
-            ><small>{item.detail}</small>
-          </div>
-        </li>
-      </ol>
-    </section>
+    <section class="activity-section" aria-labelledby="activity-title"
+      ><div class="section-title"
+        ><div
+          ><h2 id="activity-title">Actividad de esta vista</h2
+          ><p
+            >Resultados de tus acciones actuales, sin datos inventados.</p
+          ></div
+        ></div
+      ><p class="activity-empty" if:when="activity.value.length === 0"
+        >Aún no hay operaciones. Prueba una acción para ver su resultado
+        aquí.</p
+      ><ol class="activity-list"
+        ><li each:of="activity.value" each:as="item" each:key="item.id"
+          ><span>{item.time}</span
+          ><div
+            ><strong>{item.label}</strong
+            ><small>{item.detail}</small></div
+          ></li
+        ></ol
+      ></section
+    >
   </div>
 </div>
 </template>

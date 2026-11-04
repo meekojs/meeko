@@ -1,0 +1,272 @@
+<script
+	server
+	lang="ts"
+>
+	import { attempt } from '../../utils/errors'
+
+	const { search } = usePage()
+	const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value) ?? ''
+
+	export const sources = await attempt(() => rpc.sources.list({}))
+	// Filters arrive in the address, such as the links of the overview: /sources?site=ui&state=edited.
+	export const initial = { site: first(search.site), kind: first(search.kind), state: first(search.state), lang: first(search.lang), q: first(search.q), removed: first(search.removed) === '1' }
+</script>
+
+<script lang="ts">
+	import type { TableColumn } from '@meekojs/ui/runtime'
+
+	import type { DivergenceState, DocsLocale, DocsSite, SourceKind, SourceRow } from '../../../shared/schemas/dashboard'
+
+	import { kinds, siteLabels, sites, states } from '../../utils/labels'
+
+	const i18n = useI18n()
+	const { t, localePath } = i18n
+	const format = useFormat()
+
+	type StateFilter = DivergenceState | 'importStale' | 'page'
+	const stateFilters: readonly StateFilter[] = [...states, 'importStale', 'page']
+	const stateFilterLabel = (filter: StateFilter) => (filter === 'importStale' ? t('badge.importStale') : filter === 'page' ? t('sources.noMarkdown') : t(`labels.state.${filter}`))
+	const locales: readonly DocsLocale[] = ['es', 'en']
+
+	type All = 'all'
+	const pick = <T extends string>(value: string, allowed: readonly T[]): T | All => (allowed.includes(value as T) ? (value as T) : 'all')
+
+	// Each select starts with «all»: a UISelect keeps a value once chosen.
+	const siteOptions: readonly (DocsSite | All)[] = ['all', ...sites]
+	const kindOptions: readonly (SourceKind | All)[] = ['all', ...kinds]
+	const stateOptions: readonly (StateFilter | All)[] = ['all', ...stateFilters]
+	const localeOptions: readonly (DocsLocale | All)[] = ['all', ...locales]
+
+	const site = signal<DocsSite | All | null>(pick(initial.site, sites))
+	const kind = signal<SourceKind | All | null>(pick(initial.kind, kinds))
+	const state = signal<StateFilter | All | null>(pick(initial.state, stateFilters))
+	const locale = signal<DocsLocale | All | null>(pick(initial.lang, locales))
+	const chosen = <T extends string>(value: T | All | null): T | null => (value === 'all' ? null : value)
+	const query = signal(initial.q)
+	const includeRemoved = signal(initial.removed)
+
+	const all: readonly SourceRow[] = sources.ok ? sources.data : []
+
+	const normalize = (text: string) =>
+		text
+			.normalize('NFD')
+			.replace(/\p{Diacritic}/gu, '')
+			.toLocaleLowerCase(i18n.locale)
+
+	const matches = (row: SourceRow, filter: StateFilter) => (filter === 'importStale' ? row.importStale : filter === 'page' ? row.state === null : row.state === filter)
+
+	const rows = computed(() => {
+		const text = normalize(query.value.trim())
+		return all.filter((row) => (includeRemoved.value || row.removedAt === null) && (!chosen(site.value) || row.site === site.value) && (!chosen(kind.value) || row.kind === kind.value) && (!chosen(locale.value) || row.locale === locale.value) && (!chosen(state.value) || matches(row, chosen(state.value)!)) && (!text || normalize(`${row.title} ${row.path} ${row.file ?? ''}`).includes(text)))
+	})
+
+	const filtered = computed(() => Boolean(chosen(site.value) || chosen(kind.value) || chosen(state.value) || chosen(locale.value) || query.value.trim() || includeRemoved.value))
+
+	function clear() {
+		site.value = 'all'
+		kind.value = 'all'
+		state.value = 'all'
+		locale.value = 'all'
+		query.value = ''
+		includeRemoved.value = false
+	}
+
+	// The address keeps the filters, so a reload or a shared link opens the same list.
+	effect(() => {
+		const params = new URLSearchParams()
+		const filters = { site: chosen(site.value), kind: chosen(kind.value), state: chosen(state.value), lang: chosen(locale.value) }
+		for (const [key, value] of Object.entries(filters)) if (value) params.set(key, value)
+		if (query.value.trim()) params.set('q', query.value.trim())
+		if (includeRemoved.value) params.set('removed', '1')
+		if (typeof window === 'undefined') return
+		const next = `${location.pathname}${params.size ? `?${params}` : ''}`
+		if (next !== `${location.pathname}${location.search}`) history.replaceState(history.state, '', next)
+	})
+
+	const columns = [
+		{ key: 'title', label: t('sources.columns.title') },
+		{ key: 'site', label: t('sources.columns.site') },
+		{ key: 'locale', label: t('sources.columns.locale') },
+		{ key: 'kind', label: t('sources.columns.kind') },
+		{ key: 'state', label: t('sources.columns.state') },
+		{ key: 'importedAt', label: t('sources.columns.importedAt') },
+	] satisfies TableColumn<SourceRow>[]
+</script>
+
+<template>
+	<DashPage
+		bind:title="t('sources.title')"
+		bind:description="t('sources.description')"
+	>
+		<DashFailure
+			if:when="!sources.ok"
+			bind:failure="sources.failure"
+		/>
+		<div
+			if:when="sources.ok"
+			class="dash-stack"
+		>
+			<form
+				class="dash-filters"
+				role="search"
+				bind:aria-label="t('sources.filter')"
+				on:submit="(event) => event.preventDefault()"
+			>
+				<UIField
+					id="sources-query"
+					class="dash-grow"
+					bind:label="t('actions.search')"
+				>
+					<snippet
+						name="default"
+						params="id, describedBy"
+					>
+						<UIInput
+							type="search"
+							model="query"
+							bind:id="id"
+							bind:describedBy="describedBy"
+							bind:placeholder="t('sources.placeholder')"
+						/>
+					</snippet>
+				</UIField>
+				<UIField
+					id="sources-site"
+					bind:label="t('sources.columns.site')"
+				>
+					<snippet
+						name="default"
+						params="id, describedBy"
+					>
+						<UISelect
+							model="site"
+							bind:id="id"
+							bind:describedBy="describedBy"
+							bind:placeholder="t('filters.allFeminine')"
+							bind:options="siteOptions"
+							bind:labelBy="(value) => (value === 'all' ? t('filters.allFeminine') : siteLabels[value])"
+						/>
+					</snippet>
+				</UIField>
+				<UIField
+					id="sources-locale"
+					bind:label="t('sources.columns.locale')"
+				>
+					<snippet
+						name="default"
+						params="id, describedBy"
+					>
+						<UISelect
+							model="locale"
+							bind:id="id"
+							bind:describedBy="describedBy"
+							bind:placeholder="t('filters.allMasculine')"
+							bind:options="localeOptions"
+							bind:labelBy="(value) => (value === 'all' ? t('filters.allMasculine') : t(`locale.${value}`))"
+						/>
+					</snippet>
+				</UIField>
+				<UIField
+					id="sources-kind"
+					bind:label="t('sources.columns.kind')"
+				>
+					<snippet
+						name="default"
+						params="id, describedBy"
+					>
+						<UISelect
+							model="kind"
+							bind:id="id"
+							bind:describedBy="describedBy"
+							bind:placeholder="t('filters.allMasculine')"
+							bind:options="kindOptions"
+							bind:labelBy="(value) => (value === 'all' ? t('filters.allMasculine') : t(`labels.kind.${value}`))"
+						/>
+					</snippet>
+				</UIField>
+				<UIField
+					id="sources-state"
+					bind:label="t('sources.columns.state')"
+				>
+					<snippet
+						name="default"
+						params="id, describedBy"
+					>
+						<UISelect
+							model="state"
+							bind:id="id"
+							bind:describedBy="describedBy"
+							bind:placeholder="t('filters.allMasculine')"
+							bind:options="stateOptions"
+							bind:labelBy="(value) => (value === 'all' ? t('filters.allMasculine') : stateFilterLabel(value))"
+						/>
+					</snippet>
+				</UIField>
+				<UICheckbox
+					model="includeRemoved"
+					bind:label="t('sources.includeRemoved')"
+				/>
+				<UIButton
+					if:when="filtered.value"
+					variant="ghost"
+					on:click="clear"
+				>
+					{t('actions.clearFilters')}
+				</UIButton>
+			</form>
+
+			<div class="dash-tight">
+				<p
+					class="dash-meta"
+					role="status"
+					aria-live="polite"
+				>
+					{t('sources.count', { shown: format.number(rows.value.length), total: format.number(all.length) })}
+				</p>
+				<UICard>
+					<UITable
+						rowKey="id"
+						bind:hideCaption="true"
+						bind:caption="t('sources.caption')"
+						bind:columns="columns"
+						bind:rows="rows.value"
+						bind:emptyText="all.length ? t('sources.emptyFiltered') : t('sources.empty')"
+					>
+						<snippet
+							name="cell"
+							params="row, column"
+						>
+							<span
+								if:when="column.key === 'title'"
+								class="dash-cell"
+							>
+								<a bind:href="localePath('/sources/' + row.id)">{row.title}</a>
+								<code>{row.file ?? row.path}</code>
+							</span>
+							<span if:when="column.key === 'site'">{siteLabels[row.site]}</span>
+							<DashLocaleTag
+								if:when="column.key === 'locale'"
+								bind:locale="row.locale"
+								bind:name="t(`locale.${row.locale}`)"
+								bind:short="t(`locale.short.${row.locale}`)"
+							/>
+							<span if:when="column.key === 'kind'">{t(`labels.kind.${row.kind}`)}</span>
+							<DashStateBadge
+								if:when="column.key === 'state'"
+								bind:state="row.state"
+								bind:importStale="row.importStale"
+								bind:removed="row.removedAt !== null"
+							/>
+							<span
+								if:when="column.key === 'importedAt'"
+								class="dash-nowrap"
+							>
+								{format.date(row.importedAt)}
+							</span>
+						</snippet>
+					</UITable>
+				</UICard>
+			</div>
+		</div>
+	</DashPage>
+</template>

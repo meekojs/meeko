@@ -1,0 +1,160 @@
+<script lang="ts">
+	import type { TableColumn } from '@meekojs/ui/runtime'
+
+	import { examples } from '../utils/examples'
+
+	interface Project {
+		id: number
+		name: string
+		category: string
+		status: string
+	}
+	const columns = [
+		{ key: 'name', label: 'Proyecto', footer: 'Total de proyectos' },
+		{ key: 'category', label: 'Tipo', footer: (rows) => rows.length },
+		{ key: 'status', label: 'Estado', footer: 'Equipo Meeko', format: (value) => value.toUpperCase() },
+	] satisfies TableColumn<Project>[]
+	const environmentColumns = [
+		{ key: 'name', label: 'Entorno' },
+		{ key: 'value', label: 'Valor' },
+	] satisfies TableColumn<{ name: string; value: string }>[]
+	const environment = [{ name: 'Entorno', value: 'Desarrollo' }]
+	const layouts = ['native', 'grid'] as const
+	const layout = signal<(typeof layouts)[number] | null>('native')
+	const projects = signal<Project[]>([
+		{ id: 1, name: 'Sitio principal', category: 'Sitio web', status: 'Publicado' },
+		{ id: 2, name: 'Panel de clientes', category: 'Aplicación', status: 'En desarrollo' },
+		{ id: 3, name: 'Guía de componentes', category: 'Documentación', status: 'Publicado' },
+	])
+	function addProject() {
+		const id = Math.max(0, ...projects.value.map((project) => project.id)) + 1
+		projects.value = [...projects.value, { id, name: 'Proyecto ' + id, category: 'Aplicación', status: 'Borrador' }]
+	}
+</script>
+
+<template>
+	<DocsPage
+		title="Table"
+		description="Presenta filas y columnas tipadas con distribución nativa o CSS Grid."
+	>
+		<div class="docs-actions">
+			<UIField
+				id="table-layout"
+				label="Distribución"
+			>
+				<snippet
+					name="default"
+					params="id, describedBy"
+				>
+					<UISelect
+						model="layout"
+						bind:options="layouts"
+						bind:id="id"
+						bind:describedBy="describedBy"
+					/>
+				</snippet>
+			</UIField>
+			<UIButton on:click="addProject">Añadir proyecto</UIButton>
+		</div>
+		<UITable
+			caption="Proyectos del equipo"
+			rowKey="id"
+			gridColumns="minmax(180px, 2fr) minmax(180px, 3fr) 160px"
+			bind:columns="columns"
+			bind:rows="projects.value"
+			bind:layout="layout.value ?? 'native'"
+		/>
+		<UITable
+			caption="Tabla sin cabecera ni pie"
+			rowKey="name"
+			hideHeader
+			bind:columns="environmentColumns"
+			bind:rows="environment"
+		>
+			<snippet
+				name="cell"
+				params="row, column, value"
+			>
+				<strong if:when="column.key === 'name'">{row.name}</strong>
+				<span if:when="column.key !== 'name'">{String(value)}</span>
+			</snippet>
+		</UITable>
+		<UITable
+			caption="Tabla vacía"
+			rowKey="name"
+			layout="grid"
+			bind:columns="environmentColumns"
+			bind:rows="[]"
+		/>
+		<h2 id="typed-data">Columnas y filas tipadas</h2>
+		<DocsCode bind:code="examples.table" />
+		<p>
+			<code>TableColumn&lt;T&gt;</code>
+			relaciona
+			<code>key</code>
+			con el valor recibido por
+			<code>format</code>. Usa
+			<code>satisfies</code>
+			para conservar esa comprobación sin perder la inferencia.
+			<code>rowKey</code>
+			puede ser una propiedad con valores string/number o una función.
+		</p>
+		<DocsApi
+			bind:rows="[
+				{ name: 'rows', type: 'readonly T[]', description: 'Obligatoria. Datos de las filas.' },
+				{ name: 'columns', type: 'readonly TableColumn<T>[]', description: 'Obligatoria. key, label, format opcional y footer opcional.' },
+				{ name: 'rowKey', type: 'TableRowKey<T>', description: 'Obligatoria. Clave estable de cada fila.' },
+				{ name: 'layout', type: 'native | grid', default: 'native', description: 'Distribución de las columnas.' },
+				{ name: 'gridColumns', type: 'string', description: 'Plantilla de columnas CSS para el modo grid.' },
+				{ name: 'caption', type: 'string', description: 'Nombre visible y accesible de la tabla.' },
+				{ name: 'hideHeader', type: 'boolean', default: 'false', description: 'Oculta la cabecera.' },
+				{ name: 'emptyText', type: 'string', default: 'No hay datos.', description: 'Contenido alternativo cuando no hay filas. El valor por defecto sigue el idioma del documento (véase Temas).' },
+				{ name: 'class', type: 'string', description: 'Clases adicionales de la tabla.' },
+			]"
+		/>
+		<h2 id="snippets">Personalizar las celdas</h2>
+		<p>
+			Los snippets opcionales son
+			<code>header(column)</code>,
+			<code>cell(row, column, value, index)</code>,
+			<code>footer(column, rows)</code>
+			y
+			<code>empty()</code>. El pie aparece cuando hay contenido de footer. El contenedor permite desplazamiento horizontal en pantallas estrechas.
+		</p>
+		<h2 id="column-snippets">Celdas por columna</h2>
+		<p>
+			Cada clave de la fila tiene sus propios snippets:
+			<code>cell-&lt;clave&gt;(row, value)</code>, con
+			<code>value</code>
+			del tipo de esa columna, y
+			<code>header-&lt;clave&gt;(column)</code>. Una clave que la fila no tiene da error de tipos. Gana
+			<code>cell-&lt;clave&gt;</code>; después
+			<code>cell</code>
+			y por último
+			<code>format</code>. En la cabecera,
+			<code>header-&lt;clave&gt;</code>,
+			<code>header</code>
+			y la etiqueta.
+		</p>
+		<UITable
+			caption="Estado por proyecto"
+			rowKey="id"
+			bind:columns="columns"
+			bind:rows="projects.value"
+		>
+			<snippet
+				name="cell-status"
+				params="_row, value"
+			>
+				<UIBadge bind:tone="value === 'Publicado' ? 'accent' : 'neutral'">{value}</UIBadge>
+			</snippet>
+			<snippet
+				name="header-name"
+				params="column"
+			>
+				<abbr title="Nombre del proyecto">{column.label}</abbr>
+			</snippet>
+		</UITable>
+		<DocsCode bind:code="examples.tableColumnSnippets" />
+	</DocsPage>
+</template>

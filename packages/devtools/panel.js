@@ -1,73 +1,79 @@
 // @ts-check
 
-import {
-  commandExpression, groupInstances, normalizeCommandResult, normalizeSnapshot, parseSignalValue, protocolMismatch,
-  readKindLabel, snapshotExpression, writeLabel,
-} from "./protocol.js";
+import { commandExpression, groupInstances, normalizeCommandResult, normalizeSnapshot, parseSignalValue, protocolMismatch, readKindLabel, snapshotExpression, writeLabel } from './protocol.js'
 
 /** @typedef {import('./protocol.js').DevtoolsSnapshot} DevtoolsSnapshot */
 /** @typedef {import('./protocol.js').DevtoolsInstance} DevtoolsInstance */
 /** @typedef {import('./protocol.js').DevtoolsHook} DevtoolsHook */
 /** @typedef {import('./protocol.js').DevtoolsCommand} DevtoolsCommand */
 
-const connection = required("connection");
-const instanceCount = required("instance-count");
-const instanceList = required("instance-list");
-const detailEmpty = required("detail-empty");
-const emptyTitle = required("empty-title");
-const emptyDescription = required("empty-description");
-const detailContent = required("detail-content");
-const detailName = required("detail-name");
-const detailFile = required("detail-file");
-const detailId = required("detail-id");
-const detailParent = required("detail-parent");
-const detailChildren = required("detail-children");
-const detailStatus = required("detail-status");
-const propsValue = required("props-value");
-const signalsValue = required("signals-value");
-const highlightButton = /** @type {HTMLButtonElement} */ (required("highlight"));
-const breakpointButton = /** @type {HTMLButtonElement} */ (required("breakpoint"));
-const search = /** @type {HTMLInputElement} */ (required("search"));
-const selectedEvents = /** @type {HTMLInputElement} */ (required("selected-events"));
-const signalEvents = /** @type {HTMLInputElement} */ (required("signal-events"));
-const eventList = required("event-list");
-const eventCount = required("event-count");
-const editorForm = /** @type {HTMLFormElement} */ (required("signal-editor"));
-const editName = /** @type {HTMLSelectElement} */ (required("edit-name"));
-const editValue = /** @type {HTMLTextAreaElement} */ (required("edit-value"));
-const editMessage = required("edit-message");
+// The theme of Chrome DevTools, not only the system's; outside DevTools (tests) the CSS follows the system.
+const themeName = typeof chrome === 'undefined' ? undefined : chrome.devtools?.panels?.themeName
+if (themeName) document.documentElement.dataset.theme = themeName === 'dark' ? 'dark' : 'light'
+
+const connection = required('connection')
+const instanceCount = required('instance-count')
+const instanceList = required('instance-list')
+const detailEmpty = required('detail-empty')
+const emptyTitle = required('empty-title')
+const emptyDescription = required('empty-description')
+const detailContent = required('detail-content')
+const detailName = required('detail-name')
+const detailFile = required('detail-file')
+const detailId = required('detail-id')
+const detailParent = required('detail-parent')
+const detailChildren = required('detail-children')
+const detailStatus = required('detail-status')
+const propsValue = required('props-value')
+const signalsValue = required('signals-value')
+const highlightButton = /** @type {HTMLButtonElement} */ (required('highlight'))
+const breakpointButton = /** @type {HTMLButtonElement} */ (required('breakpoint'))
+const search = /** @type {HTMLInputElement} */ (required('search'))
+const selectedEvents = /** @type {HTMLInputElement} */ (required('selected-events'))
+const signalEvents = /** @type {HTMLInputElement} */ (required('signal-events'))
+const activityEvents = /** @type {HTMLInputElement} */ (required('activity-events'))
+const eventList = required('event-list')
+const eventCount = required('event-count')
+const editorForm = /** @type {HTMLFormElement} */ (required('signal-editor'))
+const editName = /** @type {HTMLSelectElement} */ (required('edit-name'))
+const editValue = /** @type {HTMLTextAreaElement} */ (required('edit-value'))
+const editMessage = required('edit-message')
 
 /** @type {DevtoolsSnapshot | null} */
-let snapshot = null;
+let snapshot = null
 /** @type {string | null} */
-let highlightedId = null;
+let highlightedId = null
 /** @type {ReturnType<typeof setInterval> | undefined} */
-let timer;
-let inFlight = false;
-let signature = "";
+let timer
+let inFlight = false
+let signature = ''
 /** @type {string | null} */
-let mismatch = null;
+let mismatch = null
 /** Estado del editor; el texto escrito no se reemplaza mientras `dirty` sea verdadero. */
-const editor = { instanceId: "", name: "", dirty: false };
+const editor = { instanceId: '', name: '', dirty: false }
 
 /** Obtiene un elemento obligatorio de la interfaz. */
 function required(/** @type {string} */ id) {
-  const element = document.getElementById(id);
-  if (!element) throw new Error(`Missing panel element: ${id}`);
-  return element;
+	const element = document.getElementById(id)
+	if (!element) throw new Error(`Missing panel element: ${id}`)
+	return element
 }
 
 /** Ejecuta una expresión pequeña en el marco principal inspeccionado. */
 function evaluate(/** @type {string} */ expression) {
-  return new Promise(/** @type {(resolve:(value:unknown)=>void,reject:(reason:Error)=>void)=>void} */ ((resolve, reject) => {
-    chrome.devtools.inspectedWindow.eval(expression, (result, exception) => {
-      if (exception) {
-        reject(new Error(exception.value ?? exception.description ?? "Inspected window evaluation failed"));
-      } else {
-        resolve(result);
-      }
-    });
-  }));
+	return new Promise(
+		/** @type {(resolve:(value:unknown)=>void,reject:(reason:Error)=>void)=>void} */ (
+			(resolve, reject) => {
+				chrome.devtools.inspectedWindow.eval(expression, (result, exception) => {
+					if (exception) {
+						reject(new Error(exception.value ?? exception.description ?? 'Inspected window evaluation failed'))
+					} else {
+						resolve(result)
+					}
+				})
+			}
+		),
+	)
 }
 
 /**
@@ -77,349 +83,367 @@ function evaluate(/** @type {string} */ expression) {
  * @param {Parameters<DevtoolsHook[K]>} args
  */
 async function command(action, args) {
-  const result = normalizeCommandResult(await evaluate(commandExpression(action, args)));
-  if (!result.ok) throw new Error(result.error === "Meeko DevTools unavailable" ? "Meeko DevTools no está disponible en esta página" : result.error);
-  await refresh();
+	const result = normalizeCommandResult(await evaluate(commandExpression(action, args)))
+	if (!result.ok) throw new Error(result.error === 'Meeko DevTools unavailable' ? 'Meeko DevTools no está disponible en esta página' : result.error)
+	await refresh()
 }
 
 /** Actualiza los datos mientras el panel está visible. */
 async function refresh() {
-  if (inFlight) return;
-  inFlight = true;
-  try {
-    const raw = await evaluate(snapshotExpression());
-    const nextMismatch = protocolMismatch(raw);
-    if (nextMismatch !== mismatch) {
-      mismatch = nextMismatch;
-      snapshot = null;
-      signature = "";
-      render();
-    }
-    if (mismatch) {
-      setConnection("Protocolo no compatible", true);
-      connection.title = mismatch;
-      return;
-    }
-    const next = normalizeSnapshot(raw);
-    if (!next) {
-      setConnection("Meeko no detectado", true);
-      if (snapshot) {
-        snapshot = null;
-        signature = "";
-        render();
-      }
-      return;
-    }
-    setConnection("Meeko activo", false);
-    const nextSignature = JSON.stringify(next);
-    if (nextSignature !== signature) {
-      snapshot = next;
-      signature = nextSignature;
-      if (highlightedId && !next.instances.some((item) => item.id === highlightedId)) highlightedId = null;
-      render();
-    }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    setConnection(`Error: ${message}`, true);
-  } finally {
-    inFlight = false;
-  }
+	if (inFlight) return
+	inFlight = true
+	try {
+		const raw = await evaluate(snapshotExpression())
+		const nextMismatch = protocolMismatch(raw)
+		if (nextMismatch !== mismatch) {
+			mismatch = nextMismatch
+			snapshot = null
+			signature = ''
+			render()
+		}
+		if (mismatch) {
+			setConnection('Protocolo no compatible', true)
+			connection.title = mismatch
+			return
+		}
+		const next = normalizeSnapshot(raw)
+		if (!next) {
+			setConnection('Meeko no detectado', true)
+			if (snapshot) {
+				snapshot = null
+				signature = ''
+				render()
+			}
+			return
+		}
+		setConnection('Meeko activo', false)
+		const nextSignature = JSON.stringify(next)
+		if (nextSignature !== signature) {
+			snapshot = next
+			signature = nextSignature
+			if (highlightedId && !next.instances.some((item) => item.id === highlightedId)) highlightedId = null
+			render()
+		}
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error)
+		setConnection(`Error: ${message}`, true)
+	} finally {
+		inFlight = false
+	}
 }
 
 function setConnection(/** @type {string} */ message, /** @type {boolean} */ offline) {
-  connection.textContent = message;
-  connection.classList.toggle("offline", offline);
-  connection.title = message;
+	connection.textContent = message
+	connection.classList.toggle('offline', offline)
+	connection.title = message
 }
 
 /** Crea un nodo con texto; nunca interpreta valores de la aplicación como HTML. */
-function node(/** @type {keyof HTMLElementTagNameMap} */ tag, /** @type {string} */ text, /** @type {string} */ className = "") {
-  const element = document.createElement(tag);
-  element.textContent = text;
-  if (className) element.className = className;
-  return element;
+function node(/** @type {keyof HTMLElementTagNameMap} */ tag, /** @type {string} */ text, /** @type {string} */ className = '') {
+	const element = document.createElement(tag)
+	element.textContent = text
+	if (className) element.className = className
+	return element
 }
 
 /** Recupera el foco de un botón tras actualizar el árbol. */
 function restoreFocus(/** @type {string | undefined} */ id) {
-  if (!id) return;
-  const buttons = instanceList.querySelectorAll("button[data-instance-id]");
-  for (const button of buttons) {
-    if (button instanceof HTMLButtonElement && button.dataset.instanceId === id) {
-      button.focus({ preventScroll: true });
-      break;
-    }
-  }
+	if (!id) return
+	const buttons = instanceList.querySelectorAll('button[data-instance-id]')
+	for (const button of buttons) {
+		if (button instanceof HTMLButtonElement && button.dataset.instanceId === id) {
+			button.focus({ preventScroll: true })
+			break
+		}
+	}
 }
 
 function renderInstances() {
-  const focusedId = document.activeElement instanceof HTMLButtonElement && instanceList.contains(document.activeElement)
-    ? document.activeElement.dataset.instanceId : undefined;
-  const instances = snapshot?.instances ?? [];
-  instanceCount.textContent = String(instances.length);
-  const filter = search.value.trim().toLocaleLowerCase();
-  const groups = groupInstances(instances).filter((group) => `${group.name} ${group.file}`.toLocaleLowerCase().includes(filter));
-  const fragment = document.createDocumentFragment();
-  for (const group of groups) {
-    const section = document.createElement("section");
-    section.className = "group";
-    const heading = node("div", group.name, "group-heading");
-    heading.append(node("span", String(group.instances.length)));
-    heading.title = group.file;
-    section.append(heading);
-    const list = document.createElement("ul");
-    for (const instance of group.instances) {
-      const item = document.createElement("li");
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "instance-button";
-      button.dataset.instanceId = instance.id;
-      button.setAttribute("aria-current", String(instance.id === snapshot?.selectedId));
-      button.setAttribute("aria-label", `${instance.name}, instancia ${instance.id}${instance.breakpoint ? ", breakpoint activo" : ""}`);
-      button.append(node("span", instance.id, "id"));
-      if (instance.breakpoint) button.append(node("span", "", "breakpoint-dot"));
-      button.addEventListener("click", () => { void selectInstance(instance.id); });
-      item.append(button);
-      list.append(item);
-    }
-    section.append(list);
-    fragment.append(section);
-  }
-  if (!groups.length) fragment.append(node("p", filter ? "No hay componentes que coincidan." : "Todavía no hay instancias hidratadas.", "list-empty"));
-  instanceList.replaceChildren(fragment);
-  restoreFocus(focusedId);
+	const focusedId = document.activeElement instanceof HTMLButtonElement && instanceList.contains(document.activeElement) ? document.activeElement.dataset.instanceId : undefined
+	const instances = snapshot?.instances ?? []
+	instanceCount.textContent = String(instances.length)
+	const filter = search.value.trim().toLocaleLowerCase()
+	const groups = groupInstances(instances).filter((group) => `${group.name} ${group.file}`.toLocaleLowerCase().includes(filter))
+	const fragment = document.createDocumentFragment()
+	for (const group of groups) {
+		const section = document.createElement('section')
+		section.className = 'group'
+		const heading = node('div', group.name, 'group-heading')
+		heading.append(node('span', String(group.instances.length)))
+		heading.title = group.file
+		section.append(heading)
+		const list = document.createElement('ul')
+		for (const instance of group.instances) {
+			const item = document.createElement('li')
+			const button = document.createElement('button')
+			button.type = 'button'
+			button.className = 'instance-button'
+			button.dataset.instanceId = instance.id
+			button.setAttribute('aria-current', String(instance.id === snapshot?.selectedId))
+			button.setAttribute('aria-label', `${instance.name}, instancia ${instance.id}${instance.breakpoint ? ', breakpoint activo' : ''}`)
+			button.append(node('span', instance.id, 'id'))
+			if (instance.breakpoint) button.append(node('span', '', 'breakpoint-dot'))
+			button.addEventListener('click', () => {
+				void selectInstance(instance.id)
+			})
+			item.append(button)
+			list.append(item)
+		}
+		section.append(list)
+		fragment.append(section)
+	}
+	if (!groups.length) fragment.append(node('p', filter ? 'No hay componentes que coincidan.' : 'Todavía no hay instancias hidratadas.', 'list-empty'))
+	instanceList.replaceChildren(fragment)
+	restoreFocus(focusedId)
 }
 
 function valueText(/** @type {unknown} */ value) {
-  if (value === undefined) return "—";
-  try {
-    const serialized = JSON.stringify(value, null, 2) ?? String(value);
-    return serialized.length > 100_000 ? `${serialized.slice(0, 100_000)}\n… (valor truncado)` : serialized;
-  } catch {
-    return "(valor no serializable)";
-  }
+	if (value === undefined) return '—'
+	try {
+		const serialized = JSON.stringify(value, null, 2) ?? String(value)
+		return serialized.length > 100_000 ? `${serialized.slice(0, 100_000)}\n… (valor truncado)` : serialized
+	} catch {
+		return '(valor no serializable)'
+	}
 }
 
 function renderDetails() {
-  const selected = snapshot?.instances.find((item) => item.id === snapshot?.selectedId);
-  detailEmpty.hidden = Boolean(selected);
-  detailContent.hidden = !selected;
-  if (!selected) {
-    editorForm.hidden = true;
-    emptyTitle.textContent = mismatch ? "Versión de protocolo no compatible" : snapshot ? "Selecciona una instancia" : "Meeko no detectado";
-    emptyDescription.textContent = mismatch ?? (snapshot
-      ? "Examina sus propiedades, señales y relación con otros componentes."
-      : "Abre una aplicación Meeko con Vite en desarrollo y espera a que se hidrate.");
-    return;
-  }
-  detailName.textContent = selected.name;
-  detailFile.textContent = selected.file || selected.componentId;
-  detailId.textContent = selected.id;
-  detailParent.textContent = selected.parentId ?? "—";
-  detailChildren.textContent = selected.childIds.length ? selected.childIds.join(", ") : "—";
-  detailStatus.textContent = selected.status === "hydrated" ? "Hidratado" : selected.status;
-  propsValue.textContent = valueText(selected.props);
-  signalsValue.textContent = valueText(selected.signals);
-  const highlighted = highlightedId === selected.id;
-  highlightButton.setAttribute("aria-pressed", String(highlighted));
-  highlightButton.textContent = highlighted ? "Quitar resaltado" : "Resaltar DOM";
-  breakpointButton.setAttribute("aria-pressed", String(selected.breakpoint));
-  breakpointButton.textContent = selected.breakpoint ? "Desactivar breakpoint" : "Activar breakpoint";
-  renderEditor(selected);
+	const selected = snapshot?.instances.find((item) => item.id === snapshot?.selectedId)
+	detailEmpty.hidden = Boolean(selected)
+	detailContent.hidden = !selected
+	if (!selected) {
+		editorForm.hidden = true
+		emptyTitle.textContent = mismatch ? 'Versión de protocolo no compatible' : snapshot ? 'Selecciona una instancia' : 'Meeko no detectado'
+		emptyDescription.textContent = mismatch ?? (snapshot ? 'Examina sus propiedades, señales y relación con otros componentes.' : 'Abre una aplicación Meeko con Vite en desarrollo y espera a que se hidrate.')
+		return
+	}
+	detailName.textContent = selected.name
+	detailFile.textContent = selected.file || selected.componentId
+	detailId.textContent = selected.id
+	detailParent.textContent = selected.parentId ?? '—'
+	detailChildren.textContent = selected.childIds.length ? selected.childIds.join(', ') : '—'
+	detailStatus.textContent = selected.status === 'hydrated' ? 'Hidratado' : selected.status
+	propsValue.textContent = valueText(selected.props)
+	signalsValue.textContent = valueText(selected.signals)
+	const highlighted = highlightedId === selected.id
+	highlightButton.setAttribute('aria-pressed', String(highlighted))
+	highlightButton.textContent = highlighted ? 'Quitar resaltado' : 'Resaltar DOM'
+	breakpointButton.setAttribute('aria-pressed', String(selected.breakpoint))
+	breakpointButton.textContent = selected.breakpoint ? 'Desactivar breakpoint' : 'Activar breakpoint'
+	renderEditor(selected)
 }
 
 /** Sincroniza el editor con la instancia seleccionada sin pisar el texto que el usuario está escribiendo. */
 function renderEditor(/** @type {DevtoolsInstance} */ selected) {
-  const names = Object.keys(selected.signals);
-  if (editor.instanceId !== selected.id) {
-    editor.instanceId = selected.id;
-    editor.name = names[0] ?? "";
-    editor.dirty = false;
-    setEditorMessage("", "");
-  }
-  if (!names.includes(editor.name)) {
-    editor.name = names[0] ?? "";
-    editor.dirty = false;
-  }
-  editorForm.hidden = names.length === 0;
-  if (names.length === 0) return;
-  const current = [...editName.options].map((option) => option.value);
-  if (current.join("\u0000") !== names.join("\u0000")) {
-    editName.replaceChildren(...names.map((name) => {
-      const option = document.createElement("option");
-      option.value = name;
-      option.textContent = name;
-      return option;
-    }));
-  }
-  editName.value = editor.name;
-  if (!editor.dirty) editValue.value = JSON.stringify(selected.signals[editor.name], null, 2) ?? "null";
+	const names = Object.keys(selected.signals)
+	if (editor.instanceId !== selected.id) {
+		editor.instanceId = selected.id
+		editor.name = names[0] ?? ''
+		editor.dirty = false
+		setEditorMessage('', '')
+	}
+	if (!names.includes(editor.name)) {
+		editor.name = names[0] ?? ''
+		editor.dirty = false
+	}
+	editorForm.hidden = names.length === 0
+	if (names.length === 0) return
+	const current = [...editName.options].map((option) => option.value)
+	if (current.join('\u0000') !== names.join('\u0000')) {
+		editName.replaceChildren(
+			...names.map((name) => {
+				const option = document.createElement('option')
+				option.value = name
+				option.textContent = name
+				return option
+			}),
+		)
+	}
+	editName.value = editor.name
+	if (!editor.dirty) editValue.value = JSON.stringify(selected.signals[editor.name], null, 2) ?? 'null'
 }
 
 function setEditorMessage(/** @type {string} */ message, /** @type {''|'ok'|'error'} */ state) {
-  editMessage.textContent = message;
-  editMessage.setAttribute("role", state === "error" ? "alert" : "status");
-  if (state) editMessage.dataset.state = state;
-  else delete editMessage.dataset.state;
+	editMessage.textContent = message
+	editMessage.setAttribute('role', state === 'error' ? 'alert' : 'status')
+	if (state) editMessage.dataset.state = state
+	else delete editMessage.dataset.state
 }
 
 function eventTime(/** @type {number} */ at) {
-  if (at > 1_000_000_000_000) return new Date(at).toLocaleTimeString();
-  return `${(at / 1000).toFixed(2)} s`;
+	if (at > 1_000_000_000_000) return new Date(at).toLocaleTimeString()
+	return `${(at / 1000).toFixed(2)} s`
 }
 
 function renderEvents() {
-  const all = snapshot?.events ?? [];
-  const selectedId = snapshot?.selectedId;
-  const events = all.filter((event) => (!selectedEvents.checked || event.instanceId === selectedId) && (!signalEvents.checked || event.kind === "signal"));
-  eventCount.textContent = String(events.length);
-  const fragment = document.createDocumentFragment();
-  for (const event of [...events].reverse()) {
-    const item = document.createElement("li");
-    item.dataset.eventId = String(event.id);
-    const time = node("time", eventTime(event.at));
-    if (event.at > 1_000_000_000_000) time.setAttribute("datetime", new Date(event.at).toISOString());
-    const instance = snapshot?.instances.find((entry) => entry.id === event.instanceId);
-    const name = event.componentName ?? instance?.name ?? event.instanceId;
-    const file = event.file ?? instance?.file ?? "";
-    const sourceLabel = `${name} · ${event.instanceId}${file ? ` · ${file}` : ""}`;
-    const source = node(instance ? "button" : "span", sourceLabel, "event-source");
-    source.title = file || name;
-    if (source instanceof HTMLButtonElement) {
-      source.type = "button";
-      source.setAttribute("aria-label", `Seleccionar ${name}, instancia ${event.instanceId}`);
-      source.addEventListener("click", () => { void selectInstance(event.instanceId); });
-    }
-    const detail = event.kind === "signal"
-      ? `${event.detail ?? "Señal"}${Object.hasOwn(event, "value") ? ` → ${valueText(event.value)}` : ""}`
-      : event.detail ?? "";
-    item.append(time, node("span", event.kind, "event-kind"), source, node("span", detail, "event-detail"));
-    if (event.kind === "signal" && event.write) {
-      const write = node("p", writeLabel(event.write), "event-write");
-      if (event.write.kind === "assignment") write.append(node("span", ": "), node("code", event.write.expression));
-      item.append(write);
-    }
-    if (event.kind === "signal" && event.reads?.length) {
-      const sites = node("details", "", "event-reads");
-      sites.append(node("summary", `${event.reads.length} lectura(s) que dependen de la señal`));
-      const list = document.createElement("ul");
-      for (const read of event.reads) {
-        const row = document.createElement("li");
-        row.append(node("code", `${read.file}:${read.line}:${read.column}`), node("span", ` ${readKindLabel(read)}: `), node("code", read.expression));
-        list.append(row);
-      }
-      sites.append(list);
-      item.append(sites);
-    }
-    fragment.append(item);
-  }
-  if (!events.length) fragment.append(node("li", selectedEvents.checked && !selectedId ? "Selecciona una instancia para ver sus eventos." : "Sin eventos registrados.", "list-empty"));
-  eventList.replaceChildren(fragment);
+	const all = snapshot?.events ?? []
+	const selectedId = snapshot?.selectedId
+	const events = all.filter((event) => (!selectedEvents.checked || event.instanceId === selectedId) && (!signalEvents.checked || event.kind === 'signal') && (!activityEvents.checked || event.kind === 'navigation' || event.kind === 'data'))
+	eventCount.textContent = String(events.length)
+	const fragment = document.createDocumentFragment()
+	for (const event of [...events].reverse()) {
+		const item = document.createElement('li')
+		item.dataset.eventId = String(event.id)
+		const time = node('time', eventTime(event.at))
+		if (event.at > 1_000_000_000_000) time.setAttribute('datetime', new Date(event.at).toISOString())
+		const instance = snapshot?.instances.find((entry) => entry.id === event.instanceId)
+		const name = event.activity ? (event.kind === 'navigation' ? 'Navegación' : 'Datos') : (event.componentName ?? instance?.name ?? event.instanceId)
+		const file = event.file ?? instance?.file ?? ''
+		const sourceLabel = `${name} · ${event.instanceId}${file ? ` · ${file}` : ''}`
+		const source = node(instance ? 'button' : 'span', sourceLabel, 'event-source')
+		source.title = file || name
+		if (source instanceof HTMLButtonElement) {
+			source.type = 'button'
+			source.setAttribute('aria-label', `Seleccionar ${name}, instancia ${event.instanceId}`)
+			source.addEventListener('click', () => {
+				void selectInstance(event.instanceId)
+			})
+		}
+		const detail = event.kind === 'signal' ? `${event.detail ?? 'Señal'}${Object.hasOwn(event, 'value') ? ` → ${valueText(event.value)}` : ''}` : (event.detail ?? '')
+		item.append(time, node('span', event.kind, 'event-kind'), source, node('span', detail, 'event-detail'))
+		if (event.kind === 'signal' && event.write) {
+			const write = node('p', writeLabel(event.write), 'event-write')
+			if (event.write.kind === 'assignment') write.append(node('span', ': '), node('code', event.write.expression))
+			item.append(write)
+		}
+		if (event.kind === 'signal' && event.reads?.length) {
+			const sites = node('details', '', 'event-reads')
+			sites.append(node('summary', `${event.reads.length} lectura(s) que dependen de la señal`))
+			const list = document.createElement('ul')
+			for (const read of event.reads) {
+				const row = document.createElement('li')
+				row.append(node('code', `${read.file}:${read.line}:${read.column}`), node('span', ` ${readKindLabel(read)}: `), node('code', read.expression))
+				list.append(row)
+			}
+			sites.append(list)
+			item.append(sites)
+		}
+		fragment.append(item)
+	}
+	if (!events.length) fragment.append(node('li', selectedEvents.checked && !selectedId ? 'Selecciona una instancia para ver sus eventos.' : 'Sin eventos registrados.', 'list-empty'))
+	eventList.replaceChildren(fragment)
 }
 
 function render() {
-  renderInstances();
-  renderDetails();
-  renderEvents();
+	renderInstances()
+	renderDetails()
+	renderEvents()
 }
 
 async function selectInstance(/** @type {string} */ id) {
-  try {
-    if (highlightedId && highlightedId !== id) {
-      await command("highlight", [null]);
-      highlightedId = null;
-    }
-    await command("select", [id]);
-  } catch (error) {
-    setConnection(error instanceof Error ? error.message : String(error), true);
-  }
+	try {
+		if (highlightedId && highlightedId !== id) {
+			await command('highlight', [null])
+			highlightedId = null
+		}
+		await command('select', [id])
+	} catch (error) {
+		setConnection(error instanceof Error ? error.message : String(error), true)
+	}
 }
 
-highlightButton.addEventListener("click", async () => {
-  const id = snapshot?.selectedId;
-  if (!id) return;
-  try {
-    const next = highlightedId === id ? null : id;
-    await command("highlight", [next]);
-    highlightedId = next;
-    renderDetails();
-  } catch (error) {
-    setConnection(error instanceof Error ? error.message : String(error), true);
-  }
-});
+highlightButton.addEventListener('click', async () => {
+	const id = snapshot?.selectedId
+	if (!id) return
+	try {
+		const next = highlightedId === id ? null : id
+		await command('highlight', [next])
+		highlightedId = next
+		renderDetails()
+	} catch (error) {
+		setConnection(error instanceof Error ? error.message : String(error), true)
+	}
+})
 
-breakpointButton.addEventListener("click", async () => {
-  const selected = snapshot?.instances.find((item) => item.id === snapshot?.selectedId);
-  if (!selected) return;
-  try {
-    await command("setBreakpoint", [selected.id, !selected.breakpoint]);
-  } catch (error) {
-    setConnection(error instanceof Error ? error.message : String(error), true);
-  }
-});
+breakpointButton.addEventListener('click', async () => {
+	const selected = snapshot?.instances.find((item) => item.id === snapshot?.selectedId)
+	if (!selected) return
+	try {
+		await command('setBreakpoint', [selected.id, !selected.breakpoint])
+	} catch (error) {
+		setConnection(error instanceof Error ? error.message : String(error), true)
+	}
+})
 
-editName.addEventListener("change", () => {
-  editor.name = editName.value;
-  editor.dirty = false;
-  setEditorMessage("", "");
-  renderDetails();
-});
-editValue.addEventListener("input", () => { editor.dirty = true; });
-editorForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const id = snapshot?.selectedId;
-  const name = editor.name;
-  if (!id || !name) return;
-  const parsed = parseSignalValue(editValue.value);
-  if (!parsed.ok) {
-    setEditorMessage(parsed.error, "error");
-    return;
-  }
-  try {
-    await command("setSignal", [id, name, parsed.value]);
-    editor.dirty = false;
-    setEditorMessage(`Señal ${name} actualizada.`, "ok");
-    renderDetails();
-  } catch (error) {
-    setEditorMessage(`No se pudo editar ${name}: ${error instanceof Error ? error.message : String(error)}`, "error");
-  }
-});
+editName.addEventListener('change', () => {
+	editor.name = editName.value
+	editor.dirty = false
+	setEditorMessage('', '')
+	renderDetails()
+})
+editValue.addEventListener('input', () => {
+	editor.dirty = true
+})
+editorForm.addEventListener('submit', async (event) => {
+	event.preventDefault()
+	const id = snapshot?.selectedId
+	const name = editor.name
+	if (!id || !name) return
+	const parsed = parseSignalValue(editValue.value)
+	if (!parsed.ok) {
+		setEditorMessage(parsed.error, 'error')
+		return
+	}
+	try {
+		await command('setSignal', [id, name, parsed.value])
+		editor.dirty = false
+		setEditorMessage(`Señal ${name} actualizada.`, 'ok')
+		renderDetails()
+	} catch (error) {
+		setEditorMessage(`No se pudo editar ${name}: ${error instanceof Error ? error.message : String(error)}`, 'error')
+	}
+})
 
-search.addEventListener("input", renderInstances);
-selectedEvents.addEventListener("change", renderEvents);
-signalEvents.addEventListener("change", renderEvents);
-instanceList.addEventListener("keydown", (event) => {
-  if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
-  const buttons = [...instanceList.querySelectorAll("button[data-instance-id]")];
-  const index = document.activeElement ? buttons.indexOf(document.activeElement) : -1;
-  const next = buttons[index + (event.key === "ArrowDown" ? 1 : -1)];
-  if (next instanceof HTMLButtonElement) {
-    next.focus();
-    event.preventDefault();
-  }
-});
+search.addEventListener('input', renderInstances)
+selectedEvents.addEventListener('change', renderEvents)
+signalEvents.addEventListener('change', () => {
+	if (signalEvents.checked) activityEvents.checked = false
+	renderEvents()
+})
+activityEvents.addEventListener('change', () => {
+	if (activityEvents.checked) {
+		signalEvents.checked = false
+		selectedEvents.checked = false
+	}
+	renderEvents()
+})
+instanceList.addEventListener('keydown', (event) => {
+	if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+	const buttons = [...instanceList.querySelectorAll('button[data-instance-id]')]
+	const index = document.activeElement ? buttons.indexOf(document.activeElement) : -1
+	const next = buttons[index + (event.key === 'ArrowDown' ? 1 : -1)]
+	if (next instanceof HTMLButtonElement) {
+		next.focus()
+		event.preventDefault()
+	}
+})
 
 function startPolling() {
-  if (timer) return;
-  void refresh();
-  timer = setInterval(() => { void refresh(); }, 700);
+	if (timer) return
+	void refresh()
+	timer = setInterval(() => {
+		void refresh()
+	}, 700)
 }
 
 function stopPolling() {
-  if (!timer) return;
-  clearInterval(timer);
-  timer = undefined;
+	if (!timer) return
+	clearInterval(timer)
+	timer = undefined
 }
 
-window.addEventListener("message", (event) => {
-  if (event.origin !== location.origin || !event.data || event.data.source !== "meeko-devtools") return;
-  if (event.data.visible) startPolling();
-  else stopPolling();
-});
-document.addEventListener("visibilitychange", () => { if (document.hidden) stopPolling(); else startPolling(); });
-window.addEventListener("unload", () => {
-  stopPolling();
-  if (highlightedId) void evaluate(commandExpression("highlight", [null]));
-});
+window.addEventListener('message', (event) => {
+	if (event.origin !== location.origin || !event.data || event.data.source !== 'meeko-devtools') return
+	if (event.data.visible) startPolling()
+	else stopPolling()
+})
+document.addEventListener('visibilitychange', () => {
+	if (document.hidden) stopPolling()
+	else startPolling()
+})
+window.addEventListener('unload', () => {
+	stopPolling()
+	if (highlightedId) void evaluate(commandExpression('highlight', [null]))
+})
 
-startPolling();
+startPolling()

@@ -1,32 +1,40 @@
-import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
-import test from "node:test";
-import { checkFrameworkProject } from "../src/framework/check-project.ts";
-import { generateServicesTypes } from "../src/framework/services-types.ts";
-import { createTempProject, linkRepositoryPackages } from "./helpers/temp-project.ts";
+import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { join, resolve } from 'node:path'
+import test from 'node:test'
+
+import { checkFrameworkProject } from '../src/framework/check-project.ts'
+import { generateServicesTypes } from '../src/framework/services-types.ts'
+import { createTempProject, linkRepositoryPackages } from './helpers/temp-project.ts'
 
 const compilerOptions = {
-  target: "ES2022", module: "NodeNext", moduleResolution: "NodeNext", lib: ["ES2022", "DOM"], types: [],
-  strict: true, noEmit: true, skipLibCheck: true, exactOptionalPropertyTypes: true,
-};
+	target: 'ES2022',
+	module: 'NodeNext',
+	moduleResolution: 'NodeNext',
+	lib: ['ES2022', 'DOM'],
+	types: [],
+	strict: true,
+	noEmit: true,
+	skipLibCheck: true,
+	exactOptionalPropertyTypes: true,
+}
 
 async function application(files: Record<string, string>): Promise<{ root: string; remove(): Promise<void> }> {
-  const project = await createTempProject("services-types-");
-  await linkRepositoryPackages(project.root);
-  await writeFile(join(project.root, "package.json"), JSON.stringify({ type: "module" }));
-  await writeFile(join(project.root, "tsconfig.json"), JSON.stringify({ compilerOptions, include: ["*.ts", ".meeko/types/services.d.ts"] }));
-  for (const [name, source] of Object.entries(files)) {
-    await mkdir(join(project.root, ...name.split("/").slice(0, -1)), { recursive: true });
-    await writeFile(join(project.root, ...name.split("/")), source);
-  }
-  return project;
+	const project = await createTempProject('services-types-')
+	await linkRepositoryPackages(project.root)
+	await writeFile(join(project.root, 'package.json'), JSON.stringify({ type: 'module' }))
+	await writeFile(join(project.root, 'tsconfig.json'), JSON.stringify({ compilerOptions, include: ['*.ts', '.meeko/types/services.d.ts'] }))
+	for (const [name, source] of Object.entries(files)) {
+		await mkdir(join(project.root, ...name.split('/').slice(0, -1)), { recursive: true })
+		await writeFile(join(project.root, ...name.split('/')), source)
+	}
+	return project
 }
 
 function tsc(root: string): { status: number | null; output: string } {
-  const result = spawnSync(process.execPath, [resolve("node_modules/typescript/bin/tsc"), "-p", join(root, "tsconfig.json")], { encoding: "utf8", windowsHide: true });
-  return { status: result.status, output: `${result.stdout}${result.stderr}` };
+	const result = spawnSync(process.execPath, [resolve('node_modules/typescript/bin/tsc'), '-p', join(root, 'tsconfig.json')], { encoding: 'utf8', windowsHide: true })
+	return { status: result.status, output: `${result.stdout}${result.stderr}` }
 }
 
 // `defineServerRuntime` is an autoimport of server/: the copy that the declaration reads imports it.
@@ -35,13 +43,13 @@ const runtime = `import { Database } from "./utils/database.js";
 export default defineServerRuntime(async ({ prerendering }) => ({
   services: (_request, { platform }) => ({ db: new Database(prerendering), region: platform.name }),
 }));
-`;
+`
 
 const database = `export class Database {
   constructor(readonly connected: boolean) {}
   readonly users = { count: async (): Promise<number> => 1 };
 }
-`;
+`
 
 const usage = `import { createRequestContext, defineApiRoute, defineRpc, defineSocketChannel } from "@meekojs/meeko/server";
 import type { AppServices, PlatformName, RequestContext, Schema, SessionHandle } from "@meekojs/meeko/server";
@@ -96,58 +104,59 @@ defineApiRoute({ handler: async ({ context }) => Response.json(await takesAppCon
 defineApiRoute({ handler: ({ context }) => context.services.cache });
 // @ts-expect-error Nor does a server route middleware see one.
 defineServerRouteMiddleware(({ services }) => { void services.cache; });
-`;
+`
 
-test("RequestContext.services takes the type of server/runtime.ts everywhere, without casts", { timeout: 120_000 }, async () => {
-  const project = await application({ "server/runtime.ts": runtime, "server/utils/database.ts": database, "usage.ts": usage });
-  try {
-    await generateServicesTypes(project.root);
-    const copy = await readFile(join(project.root, ".meeko", "types", "server-runtime.ts"), "utf8");
-    assert.match(copy, /^\/\/ @ts-nocheck\n/);
-    assert.match(copy, /import \{ defineServerRuntime(?: as defineServerRuntime)? \} from "@meekojs\/meeko\/server"/);
-    assert.match(copy, /from "\.\.\/\.\.\/server\/utils\/database\.js"/);
-    const result = tsc(project.root);
-    assert.equal(result.status, 0, result.output);
-  } finally {
-    await project.remove();
-  }
-});
+test('RequestContext.services takes the type of server/runtime.ts everywhere, without casts', { timeout: 120_000 }, async () => {
+	const project = await application({ 'server/runtime.ts': runtime, 'server/utils/database.ts': database, 'usage.ts': usage })
+	try {
+		await generateServicesTypes(project.root)
+		const copy = await readFile(join(project.root, '.meeko', 'types', 'server-runtime.ts'), 'utf8')
+		assert.match(copy, /^\/\/ @ts-nocheck\n/)
+		assert.match(copy, /import \{ defineServerRuntime(?: as defineServerRuntime)? \} from "@meekojs\/meeko\/server"/)
+		assert.match(copy, /from "\.\.\/\.\.\/server\/utils\/database\.js"/)
+		const result = tsc(project.root)
+		assert.equal(result.status, 0, result.output)
+	} finally {
+		await project.remove()
+	}
+})
 
 test("meeko check types context.services in a page's <script server> and in server code from server/runtime.ts", { timeout: 180_000 }, async () => {
-  const project = await createTempProject("services-check-");
-  const root = project.root;
-  try {
-    await linkRepositoryPackages(root);
-    const page = (member: string) => [
-      '<script server lang="ts">',
-      "const { context } = usePage();",
-      `export const users: number = await context.services.db.${member}();`,
-      "</script>",
-      "<template><p>{users}</p></template>",
-      "",
-    ].join("\n");
-    const files: Record<string, string> = {
-      "package.json": '{"private":true,"type":"module"}\n',
-      "server/runtime.ts": "export default defineServerRuntime(() => ({ services: { db: { countUsers: async (): Promise<number> => 1 } } }));\n",
-      "server/utils/users.ts": 'import type { RequestContext } from "@meekojs/meeko/server";\nexport const countUsers = (context: RequestContext): Promise<number> => context.services.db.countUsers();\n',
-      "app/pages/index.meeko": page("countUsers"),
-    };
-    for (const [file, contents] of Object.entries(files)) {
-      await mkdir(join(root, ...file.split("/").slice(0, -1)), { recursive: true });
-      await writeFile(join(root, ...file.split("/")), contents);
-    }
-    await checkFrameworkProject(root);
-    assert.match(await readFile(join(root, ".meeko", "tsconfig.server.json"), "utf8"), /"types\/services\.d\.ts"/);
-    await writeFile(join(root, "app", "pages", "index.meeko"), page("countPosts"));
-    await assert.rejects(checkFrameworkProject(root), /Property 'countPosts' does not exist/);
-  } finally {
-    await project.remove();
-  }
-});
+	const project = await createTempProject('services-check-')
+	const root = project.root
+	try {
+		await linkRepositoryPackages(root)
+		const page = (member: string) =>
+			[
+				'<script server lang="ts">',
+				'const { context } = usePage();',
+				`export const users: number = await context.services.db.${member}();`,
+				'</script>',
+				'<template><p>{users}</p></template>',
+				'',
+			].join('\n')
+		const files: Record<string, string> = {
+			'package.json': '{"private":true,"type":"module"}\n',
+			'server/runtime.ts': 'export default defineServerRuntime(() => ({ services: { db: { countUsers: async (): Promise<number> => 1 } } }));\n',
+			'server/utils/users.ts': 'import type { RequestContext } from "@meekojs/meeko/server";\nexport const countUsers = (context: RequestContext): Promise<number> => context.services.db.countUsers();\n',
+			'app/pages/index.meeko': page('countUsers'),
+		}
+		for (const [file, contents] of Object.entries(files)) {
+			await mkdir(join(root, ...file.split('/').slice(0, -1)), { recursive: true })
+			await writeFile(join(root, ...file.split('/')), contents)
+		}
+		await checkFrameworkProject(root)
+		assert.match(await readFile(join(root, '.meeko', 'tsconfig.server.json'), 'utf8'), /"types\/services\.d\.ts"/)
+		await writeFile(join(root, 'app', 'pages', 'index.meeko'), page('countPosts'))
+		await assert.rejects(checkFrameworkProject(root), /Property 'countPosts' does not exist/)
+	} finally {
+		await project.remove()
+	}
+})
 
-test("without server/runtime.ts, services stay unknown and a member access is an error", { timeout: 120_000 }, async () => {
-  const project = await application({
-    "usage.ts": `import { defineApiRoute } from "@meekojs/meeko/server";
+test('without server/runtime.ts, services stay unknown and a member access is an error', { timeout: 120_000 }, async () => {
+	const project = await application({
+		'usage.ts': `import { defineApiRoute } from "@meekojs/meeko/server";
 import type { AppServices } from "@meekojs/meeko/server";
 type Equals<A, B> = (<V>() => V extends A ? 1 : 2) extends (<V>() => V extends B ? 1 : 2) ? true : false;
 declare function expect<T extends true>(): void;
@@ -155,13 +164,13 @@ expect<Equals<AppServices, unknown>>();
 // @ts-expect-error Services are unknown without a runtime.
 defineApiRoute({ handler: ({ context }) => context.services.db });
 `,
-  });
-  try {
-    await generateServicesTypes(project.root);
-    assert.equal(await readFile(join(project.root, ".meeko", "types", "services.d.ts"), "utf8"), "// Generated by Meeko: without server/runtime.ts in TypeScript, RequestContext.services is unknown.\nexport {};\n");
-    const result = tsc(project.root);
-    assert.equal(result.status, 0, result.output);
-  } finally {
-    await project.remove();
-  }
-});
+	})
+	try {
+		await generateServicesTypes(project.root)
+		assert.equal(await readFile(join(project.root, '.meeko', 'types', 'services.d.ts'), 'utf8'), '// Generated by Meeko: without server/runtime.ts in TypeScript, RequestContext.services is unknown.\nexport {};\n')
+		const result = tsc(project.root)
+		assert.equal(result.status, 0, result.output)
+	} finally {
+		await project.remove()
+	}
+})

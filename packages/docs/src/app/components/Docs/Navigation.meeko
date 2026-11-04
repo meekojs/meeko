@@ -1,0 +1,67 @@
+<script lang="ts">
+	// What the sidebar and the drawer of the small screens share: the filter, the guide and the package.
+	import { useI18n } from '@meekojs/i18n'
+
+	import type { DocsShellView } from '../../../runtime/shell'
+
+	const props = defineProps<{ view: DocsShellView; searchId: string }>()
+
+	const emit = defineEmits<{ queryChange: [query: string] }>()
+
+	const { t } = useI18n()
+
+	const query = signal(untrack(() => props.view.search?.query ?? ''))
+	// The other copy of the filter, or a reset from the site, writes here without echoing the event.
+	effect(() => {
+		query.value = props.view.search?.query ?? ''
+	})
+	effect(() => {
+		const text = query.value
+		if (text !== untrack(() => props.view.search?.query ?? '')) emit('queryChange', text)
+	})
+
+	const packageGroups = computed(() => [{ title: t('shell.package'), items: [{ label: props.view.product.packageName ?? '', href: 'https://www.npmjs.com/package/' + props.view.product.packageName, code: true }] }])
+</script>
+
+<template>
+	<div class="docs-navigation">
+		<UIField
+			if:when="props.view.search?.mode === 'filter'"
+			bind:id="props.searchId"
+			bind:label="t('shell.search.label')"
+		>
+			<snippet
+				name="default"
+				params="id, describedBy"
+			>
+				<UIInput
+					type="search"
+					model="query"
+					bind:id="id"
+					bind:describedBy="describedBy"
+					bind:placeholder="t('shell.search.placeholder')"
+				/>
+			</snippet>
+		</UIField>
+		<UINavigationTree
+			bind:groups="props.view.navigation"
+			bind:current="props.view.current"
+			bind:label="t('shell.nav.docsOf', { product: props.view.product.name })"
+			bind:featuredLabel="t('shell.nav.featured')"
+			bind:emptyText="t('shell.nav.empty')"
+		/>
+		<UINavigationTree
+			if:when="props.view.product.packageName"
+			bind:collapsible="false"
+			bind:groups="packageGroups.value"
+			bind:label="t('shell.package')"
+		/>
+	</div>
+</template>
+
+<style scoped>
+	.docs-navigation {
+		display: grid;
+		gap: var(--ui-space-6);
+	}
+</style>

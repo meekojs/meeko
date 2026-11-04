@@ -1,5 +1,5 @@
 import { defineSocketChannel } from "@meekojs/meeko/server";
-import { text } from "../../shared/schemas.js";
+import { text } from "../../shared/schemas";
 
 // Every handshake is refused by the channel's authorization, never by its session.
 export default defineSocketChannel({

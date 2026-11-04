@@ -1,0 +1,101 @@
+<script lang="ts">
+	export interface Props {
+		status: number
+		message: string
+	}
+
+	const props = defineProps<Props>()
+
+	const { localePath, t } = useI18n()
+
+	// An error under /en/… is shown in English, with its links to the English pages.
+	const home = localePath(href('/'))
+	const guide = localePath(href('/docs/[slug]', { params: { slug: 'framework' } }))
+	const reference = localePath(href('/docs/reference'))
+
+	const title = computed(() => (props.status === 404 ? t('error.notFoundTitle') : t('error.failedTitle')))
+	const description = computed(() => (props.status === 404 ? t('error.notFoundDetail') : t('error.failedDetail', { message: props.message })))
+
+	useHead(() => ({ title: title.value + ' · Meeko', meta: [{ name: 'description', content: description.value }] }))
+</script>
+
+<template>
+	<UIContainer
+		size="2xl"
+		class="site-error"
+	>
+		<section class="error">
+			<div class="copy">
+				<UIPageHeader
+					layout="landing"
+					bind:title="title.value"
+					bind:description="description.value"
+				/>
+				<UIProse>
+					<p>
+						<I18nT key="error.hint">
+							<snippet
+								name="kbd"
+								params="text"
+							>
+								<kbd>{text}</kbd>
+							</snippet>
+						</I18nT>
+					</p>
+				</UIProse>
+				<p class="actions">
+					<UILink bind:href="home">{t('error.home')}</UILink>
+					<UILink
+						variant="outline"
+						bind:href="guide"
+					>
+						{t('error.guide')}
+					</UILink>
+					<UILink
+						variant="outline"
+						bind:href="reference"
+					>
+						{t('error.reference')}
+					</UILink>
+				</p>
+			</div>
+			<div class="figure">
+				<CatFigure
+					bind:label="'FIG. ' + props.status"
+					bind:caption="props.status === 404 ? t('error.notFoundCaption') : t('error.failedCaption')"
+				/>
+			</div>
+		</section>
+	</UIContainer>
+</template>
+
+<style scoped>
+	.error {
+		display: grid;
+		grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+		align-items: center;
+		gap: var(--ui-space-16);
+		padding-block: var(--ui-space-20);
+	}
+	.copy {
+		display: grid;
+		gap: var(--ui-space-6);
+	}
+	.actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--ui-space-2);
+		margin: 0;
+	}
+	@media (max-width: 54rem) {
+		.error {
+			grid-template-columns: minmax(0, 1fr);
+			gap: var(--ui-space-10);
+			padding-block: var(--ui-space-10);
+		}
+		.figure {
+			order: -1;
+			max-width: var(--ui-floating-panel-width);
+		}
+	}
+</style>

@@ -13,9 +13,11 @@ related:
   - docs/api.md#snippets-con-definesnippets
 ---
 
-`<snippet name="x">` va dentro de la etiqueta de un componente y llena su snippet `x`: un trozo de plantilla del padre que el hijo pinta donde quiere, con `<render>`, y al que puede pasar argumentos. Es el equivalente de los *slots* con nombre de Vue o de los *snippets* de Svelte.
+`<snippet name="x">` va dentro de la etiqueta de un componente y llena su snippet `x`: un trozo de plantilla del padre que el hijo pinta donde quiere, con `<render>`, y al que puede pasar argumentos. Es el equivalente de los _slots_ con nombre de Vue o de los _snippets_ de Svelte.
 
 El contenido suelto de la etiqueta (lo que no está en un `<snippet>`) llena el snippet `default`. El contenido pertenece al padre: lee sus señales y funciones y sigue siendo reactivo.
+
+También puedes suministrar filas y celdas de tabla a un componente propio, por ejemplo `<AppTable><tr><td>Ana</td></tr></AppTable>`. El compilador conserva esas etiquetas en los snippets y permite que el hijo las pinte con `<render>` dentro de `<thead>`, `<tbody>` o `<tfoot>`. El HTML resultante debe respetar la estructura de una tabla: las secciones reciben filas y las filas reciben celdas.
 
 ## Uso
 
@@ -40,11 +42,11 @@ const message = signal("¿Borrar la cuenta?");
 
 ## Atributos
 
-| Atributo | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `name` | identificador | obligatorio | El snippet que llena, una clave del `defineSnippets` del hijo. |
-| `params` | lista de identificadores | sin parámetros | Nombres de los argumentos, separados por comas, con los tipos de la tupla del hijo: `params="item, index"`. |
-| `if:when` | expresión | siempre | Desde `1.4`. Pasa el snippet sólo mientras la expresión es verdadera; el hijo debe declararlo opcional. |
+| Atributo  | Tipo                                | Por defecto    | Descripción                                                                                                                                                                                                       |
+| --------- | ----------------------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`    | identificador o segmentos con guion | obligatorio    | El snippet que llena, una clave del `defineSnippets` del hijo. Desde `1.8` admite segmentos unidos por guiones (`cell-email`, `header-created-at`), sin guion final ni doble: `/^[A-Za-z_$][\w$]*(?:-[\w$]+)*$/`. |
+| `params`  | lista de identificadores            | sin parámetros | Nombres de los argumentos, separados por comas, con los tipos de la tupla del hijo: `params="item, index"`.                                                                                                       |
+| `if:when` | expresión                           | siempre        | Desde `1.4`. Pasa el snippet sólo mientras la expresión es verdadera; el hijo debe declararlo opcional.                                                                                                           |
 
 ## Resultado
 
@@ -88,6 +90,19 @@ const users = signal([{ id: "1", email: "ana@example.com" }]);
 ```
 
 `user` es `{ id: string; email: string }`, inferido de `rows`.
+
+### Una celda por columna (`cell-<clave>`)
+
+Desde `1.8`, un hijo genérico puede declarar snippets cuyo nombre sale de las claves de sus filas (véase [`defineSnippets`](/docs/reference/definesnippets)). `UITable` declara `cell-<clave>` y `header-<clave>`:
+
+```html
+<UITable bind:rows="users.value" bind:columns="columns" rowKey="id">
+  <snippet name="cell-email" params="row, value"><a bind:href="'mailto:' + value">{value}</a></snippet>
+  <snippet name="header-status">Estado</snippet>
+</UITable>
+```
+
+`value` tiene el tipo de la columna (`string` para `email`). Una clave que la fila no tiene, como `name="cell-nope"`, da `TS2353` en `meeko check` y en el editor, que también completa los nombres posibles.
 
 ### Reenviar un snippet opcional con `if:when`
 
@@ -140,6 +155,22 @@ El contenido suelto no admite condición. Para condicionarlo, escríbelo en `<sn
 <AppDialog>
   <snippet name="title">Confirmar</snippet>
 </AppDialog>
+```
+
+### Un nombre que no es un identificador ni segmentos con guion
+
+```html bad
+<UITable bind:rows="users.value" bind:columns="columns" rowKey="id">
+  <snippet name="cell-">…</snippet>
+</UITable>
+```
+
+`MEEK061: <snippet> necesita name con el nombre del snippet del hijo que llena: un identificador o segmentos unidos por guiones, como name="title" o name="cell-email"`.
+
+```html good
+<UITable bind:rows="users.value" bind:columns="columns" rowKey="id">
+  <snippet name="cell-email" params="row, value">{value}</snippet>
+</UITable>
 ```
 
 ### Un snippet que el hijo no declara, o que falta
@@ -209,5 +240,6 @@ El contenido suelto no admite condición. Para condicionarlo, escríbelo en `<sn
 - **Ámbito.** El contenido ve el ámbito del padre, no el del hijo: para usar un valor del hijo, el hijo debe pasarlo en `args` y el padre nombrarlo en `params`.
 - **SSR e hidratación.** El servidor pinta el snippet dentro del HTML del hijo, entre marcas `<!--meeko:snippet:N-->`, y el navegador lo hidrata en el mismo sitio. Se libera cuando se libera el padre o el hijo.
 - **Reactividad.** Un cambio en las señales del padre o en los argumentos actualiza sólo los enlaces del snippet; no se reconstruye cuando cambian otras props del hijo.
+- **Espacios.** Desde `1.8`, el texto de los extremos de un `<snippet>` que sólo tiene espacios y algún salto de línea no se pinta: es el formato del archivo, y el snippet puede acabar dentro de una frase. Un espacio en la misma línea (`<snippet name="a"> <b>x</b> </snippet>`) sí es contenido.
 - **Restricciones.** Un `<snippet>` admite sólo `name`, `params` e `if:when` (`MEEK061`), no puede repetirse y puede cerrarse solo (`<snippet name="x" />`, un snippet vacío). Una `ref:` dentro de su contenido da `MEEK052`, porque el hijo puede pintarlo varias veces.
 - **`<component is>`.** Desde `1.5`, su contenido también son snippets del componente, como en su etiqueta.

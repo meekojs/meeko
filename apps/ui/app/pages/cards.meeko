@@ -1,0 +1,115 @@
+<script lang="ts">
+	import { examples } from '../utils/examples'
+
+	const count = signal(0)
+	const variants = ['outline', 'soft', 'solid', 'elevated'] as const
+	const variant = signal<(typeof variants)[number] | null>('outline')
+</script>
+
+<template>
+	<DocsPage
+		title="Card"
+		description="Agrupa contenido con variantes, cabecera y acciones opcionales."
+	>
+		<div class="docs-actions">
+			<UIField
+				id="card-variant"
+				label="Variante"
+			>
+				<snippet
+					name="default"
+					params="id, describedBy"
+				>
+					<UISelect
+						model="variant"
+						bind:options="variants"
+						bind:id="id"
+						bind:describedBy="describedBy"
+					/>
+				</snippet>
+			</UIField>
+		</div>
+		<UICard
+			title="Tu espacio de trabajo"
+			description="Una card controlada por props, con contenido reactivo."
+			bind:variant="variant.value ?? 'outline'"
+		>
+			<p role="status">Cambios guardados: {count.value}</p>
+			<snippet name="footer">
+				<UIButton
+					variant="secondary"
+					on:click="() => count.value++"
+				>
+					Guardar cambio
+				</UIButton>
+			</snippet>
+		</UICard>
+		<div class="docs-grid">
+			<UICard
+				title="Outline"
+				description="Borde definido para separar contenido."
+				variant="outline"
+			>
+				<p>Detalles del proyecto y contenido relacionado.</p>
+			</UICard>
+			<UICard
+				title="Soft"
+				description="Un fondo tenue, sin borde visible."
+				variant="soft"
+			>
+				<p>Información complementaria dentro de una vista.</p>
+			</UICard>
+			<UICard
+				title="Solid"
+				description="El color de acento para destacar contenido."
+				variant="solid"
+			>
+				<p>Un mensaje relevante para el equipo.</p>
+			</UICard>
+			<UICard
+				title="Elevated"
+				description="Una superficie elevada mediante sombra."
+				variant="elevated"
+			>
+				<p>Contenido que necesita distinguirse del fondo.</p>
+			</UICard>
+		</div>
+		<div class="docs-grid">
+			<UICard class="card-demo-custom">
+				<snippet name="header"><h2>Cabecera personalizada</h2></snippet>
+				<p>Los snippets conservan el contenido y las acciones de tu aplicación.</p>
+			</UICard>
+			<UICard class="card-demo-minimal"><p>También puedes utilizar sólo el cuerpo, sin cabecera ni pie.</p></UICard>
+		</div>
+		<h2 id="usage">Uso y snippets</h2>
+		<DocsCode bind:code="examples.card" />
+		<p>
+			La cabecera puede venir de
+			<code>title</code>
+			y
+			<code>description</code>
+			o del snippet
+			<code>header</code>, que tiene prioridad.
+			<code>default</code>
+			contiene el cuerpo y
+			<code>footer</code>
+			las acciones.
+		</p>
+		<DocsApi
+			bind:rows="[
+				{ name: 'title / description', type: 'string', description: 'Texto opcional de la cabecera.' },
+				{ name: 'variant', type: 'outline | soft | solid | elevated', default: 'outline', description: 'Variante visual; admite ui.defaults.card.' },
+				{ name: 'class', type: 'string', description: 'Clases adicionales.' },
+			]"
+		/>
+		<p>
+			El snippet
+			<code>default</code>
+			es obligatorio.
+			<code>header</code>
+			y
+			<code>footer</code>
+			son opcionales. El componente usa una sección con nombre accesible cuando se especifica un título.
+		</p>
+	</DocsPage>
+</template>

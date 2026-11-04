@@ -37,26 +37,28 @@ En SSR, con `name: "Ana"`, el párrafo dice «Ana tiene 3 mensajes sin leer»; c
 
 ## Atributos
 
-| Sintaxis | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
+| Sintaxis      | Tipo                           | Por defecto | Descripción                                                                                                                                                                  |
+| ------------- | ------------------------------ | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `{expresión}` | cualquier expresión TypeScript | obligatorio | Se evalúa en el ámbito del `<script>` (y de los datos de `<script server>`), y su resultado se escribe como texto. Sólo en el contenido de un elemento, no en los atributos. |
 
 Qué admite la expresión:
 
-- Cualquier expresión TypeScript: llamadas, ternarios, operadores, plantillas literales (`` {`${count.value} €`} ``), `as` y `!`.
+- Cualquier expresión TypeScript: llamadas, ternarios, operadores, plantillas literales (``{`${count.value} €`}``), `as` y `!`.
 - Llaves propias de JavaScript: un objeto literal (`{ { total: count.value }.total }`), una plantilla con `${…}`, cadenas con `{` o `}`, comentarios y expresiones regulares. La interpolación termina en la llave que equilibra la de apertura.
+- `<`, `&&` y cadenas con etiquetas se escriben tal cual: `{a<b&&c}`, `{ok && "<b>"}`. El `<` de una expresión nunca abre una etiqueta.
+- Las referencias de carácter HTML (`&lt;`, `&amp;`, `&#60;`) se decodifican antes de evaluar, como en el valor de un atributo y en Vue: `{x &amp;&amp; y}` es `x && y`, y `{'&lt;'}` pinta `<`. Para conservar una referencia literal, escribe su `&` desde JavaScript: `{"\x26lt;"}` pinta `&lt;`. Los diagnósticos y los source maps señalan la posición en la fuente, después de la referencia.
 - No admite sentencias (`if`, `const`, `;`): calcula el valor en el script o con un `computed`.
 
 ## Resultado
 
 Un nodo de texto con `String(valor)`, entre dos comentarios de marca: escapado en el HTML del servidor y asignado con `textContent` en el navegador.
 
-| Valor | Texto |
-| --- | --- |
-| `string`, `number`, `boolean` | Su conversión a texto: `"Ana"`, `3`, `true`. |
-| `null`, `undefined` | Su conversión a texto: `null`, `undefined`. Usa `?? ""` para no pintar nada. |
-| Un objeto o una señal | `[object Object]`: lee `.value` o la propiedad que quieres. |
-| HTML (`"<b>hola</b>"`) | El texto literal `<b>hola</b>`, escapado. Para insertar HTML usa la directiva `html`. |
+| Valor                         | Texto                                                                                 |
+| ----------------------------- | ------------------------------------------------------------------------------------- |
+| `string`, `number`, `boolean` | Su conversión a texto: `"Ana"`, `3`, `true`.                                          |
+| `null`, `undefined`           | Su conversión a texto: `null`, `undefined`. Usa `?? ""` para no pintar nada.          |
+| Un objeto o una señal         | `[object Object]`: lee `.value` o la propiedad que quieres.                           |
+| HTML (`"<b>hola</b>"`)        | El texto literal `<b>hola</b>`, escapado. Para insertar HTML usa la directiva `html`. |
 
 ## Ejemplos
 

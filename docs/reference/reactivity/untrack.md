@@ -35,9 +35,9 @@ query.value = "a";  // log: Buscar "a" desde la página 2
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `fn` | `() => T` | obligatorio | Función que lee señales. Se ejecuta en el momento, una vez. |
+| Parámetro | Tipo      | Por defecto | Descripción                                                 |
+| --------- | --------- | ----------- | ----------------------------------------------------------- |
+| `fn`      | `() => T` | obligatorio | Función que lee señales. Se ejecuta en el momento, una vez. |
 
 ## Valor devuelto
 
@@ -115,6 +115,7 @@ effect(() => {
 No hay error: el efecto se repite al cambiar `page`. Lee `.value` dentro de la función:
 
 <!-- no-check -->
+
 ```ts good
 effect(() => {
   console.log(query.value, untrack(() => page.value));
@@ -134,6 +135,7 @@ effect(() => {
 `total` acumula cada cambio de `price` y no vuelve atrás nunca. Si el valor depende de otros, es un `computed`:
 
 <!-- no-check -->
+
 ```ts good
 const total = computed(() => items.value.reduce((sum, item) => sum + item.price, 0));
 ```

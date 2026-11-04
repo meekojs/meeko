@@ -1,0 +1,302 @@
+<script
+	server
+	lang="ts"
+>
+	import { attempt } from '../utils/errors'
+
+	export const overview = await attempt(() => rpc.overview.get({}))
+</script>
+
+<script lang="ts">
+	import type { TableColumn } from '@meekojs/ui/runtime'
+
+	import type { DivergenceState, SiteSummary, TranslationStatus } from '../../shared/schemas/dashboard'
+
+	import { siteLabels, states, translationTones } from '../utils/labels'
+
+	const { t, localePath } = useI18n()
+	const format = useFormat()
+
+	const markdown = (summary: SiteSummary) => summary.kinds.guide + summary.kinds.reference
+	const stateHref = (summary: SiteSummary, state: DivergenceState) => localePath(`/sources?site=${summary.site}&state=${state}`)
+	const staleHref = (summary: SiteSummary) => localePath(`/sources?site=${summary.site}&state=importStale`)
+	const attention = (summary: SiteSummary) => summary.states.edited + summary.states.conflict + summary.states.missing + summary.importStale
+	const translationStates: readonly TranslationStatus[] = ['translated', 'outdated', 'missing']
+	const data = overview.ok ? overview.data : null
+	const snapshot = data?.activeSnapshot ?? null
+	const lastJob = data?.jobs.content ?? null
+	const savedSnapshots = data?.snapshots ?? 0
+	const translationCounts = data?.translations ?? { translated: 0, outdated: 0, missing: 0, total: 0 }
+	const translated = computed(() => (translationCounts.total ? translationCounts.translated / translationCounts.total : 0))
+
+	const number = (value: number) => format.number(value)
+	const summaries: readonly SiteSummary[] = data?.sites ?? []
+	const sourceRows = summaries.map((summary) => ({ site: summary.site, guide: summary.kinds.guide, reference: summary.kinds.reference, page: summary.kinds.page, total: summary.total, removed: summary.removed, lastImportedAt: summary.lastImportedAt }))
+	const sourceColumns = [
+		{ key: 'site', label: t('overview.site'), rowHeader: true },
+		{ key: 'guide', label: t('overview.guides'), numeric: true, format: number },
+		{ key: 'reference', label: t('labels.kind.reference'), numeric: true, format: number },
+		{ key: 'page', label: t('overview.meekoPages'), numeric: true, format: number },
+		{ key: 'total', label: t('overview.total'), numeric: true },
+		{ key: 'removed', label: t('overview.removed'), numeric: true, format: (value: number) => (value ? format.number(value) : '—') },
+		{ key: 'lastImportedAt', label: t('overview.lastImport'), format: (value: string | null) => format.date(value) },
+	] satisfies TableColumn<(typeof sourceRows)[number]>[]
+
+	// One column per state of a summary, with the two that follow.
+	const divergenceRows = summaries.map((summary) => ({ ...summary, ...summary.states, attention: attention(summary) }))
+	const divergenceColumns: TableColumn<(typeof divergenceRows)[number]>[] = [
+		{ key: 'site', label: t('overview.site'), rowHeader: true },
+		...states.map((state) => ({ key: state, label: t(`labels.state.${state}`), numeric: true })),
+		{ key: 'importStale', label: t('badge.importStale'), numeric: true },
+		{ key: 'attention', label: t('overview.attention') },
+	]
+	const stateOf = (key: string) => states.find((state) => state === key)
+	const countOf = (summary: SiteSummary, key: string) => summary.states[stateOf(key) ?? 'git']
+	const columnHelp = (key: string) => {
+		const state = stateOf(key)
+		return state ? t(`labels.stateHelp.${state}`) : key === 'importStale' ? t('badge.importStaleHelp') : undefined
+	}
+</script>
+
+<template>
+	<DashPage
+		bind:title="t('overview.title')"
+		bind:description="t('overview.description')"
+	>
+		<DashFailure
+			if:when="!overview.ok"
+			bind:failure="overview.failure"
+		/>
+		<div
+			if:when="overview.ok"
+			class="dash-stack"
+		>
+			<UICard bind:aria-label="t('overview.publication')">
+				<div class="dash-stats">
+					<UIStat bind:label="t('overview.activeSnapshot')">
+						<snippet name="value">
+							<a
+								if:when="snapshot"
+								bind:href="localePath('/snapshots')"
+							>
+								#{String(snapshot?.id)}
+							</a>
+							<a
+								if:when="!snapshot"
+								bind:href="localePath('/snapshots')"
+							>
+								{t('overview.publishFirst')}
+							</a>
+						</snippet>
+						<snippet name="detail">
+							<span if:when="snapshot">{t('overview.pages', { count: snapshot?.pages ?? 0, pages: format.number(snapshot?.pages ?? 0) })} · {format.date(snapshot?.publishedAt)} · {t('overview.by', { user: snapshot?.publishedBy ?? t('overview.unknownUser') })} · {t('overview.byLocale', { es: format.number(snapshot?.pagesByLocale.es ?? 0), en: format.number(snapshot?.pagesByLocale.en ?? 0) })}</span>
+							<span if:when="!snapshot">{t('overview.noSnapshot')}</span>
+						</snippet>
+					</UIStat>
+					<UIStat
+						bind:label="t('overview.lastJob')"
+						bind:value="lastJob ? t(`labels.jobStatus.${lastJob.status}`) : '—'"
+						bind:detail="lastJob ? t(`labels.job.${lastJob.kind}`) + ' · ' + format.date(lastJob.startedAt) : t('overview.noJob')"
+					/>
+					<UIStat
+						bind:label="t('overview.savedSnapshots')"
+						bind:value="format.number(savedSnapshots)"
+					/>
+				</div>
+			</UICard>
+
+			<UICard
+				bind:title="t('overview.translations')"
+				bind:description="t('overview.translationsLead')"
+			>
+				<snippet name="actions">
+					<UILink
+						size="sm"
+						variant="ghost"
+						bind:href="localePath('/translations')"
+					>
+						{t('overview.seeTranslations')}
+					</UILink>
+				</snippet>
+				<div class="dash-tight">
+					<div
+						class="translation-bar"
+						role="img"
+						bind:aria-label="t('overview.translationsShare', { share: format.percent(translated.value), translated: format.number(translationCounts.translated), total: format.number(translationCounts.total) })"
+					>
+						<span
+							each:of="translationStates"
+							each:as="status"
+							each:key="status"
+							bind:data-status="status"
+							bind:style="'flex-grow: ' + translationCounts[status]"
+						/>
+					</div>
+					<ul class="translation-legend">
+						<li
+							each:of="translationStates"
+							each:as="status"
+							each:key="status"
+						>
+							<a
+								bind:href="localePath('/translations?status=' + status)"
+								bind:title="t(`labels.translationHelp.${status}`)"
+							>
+								<UIBadge
+									bind:dot="true"
+									bind:tone="translationTones[status]"
+								>
+									{format.number(translationCounts[status])}
+								</UIBadge>
+								{t(`labels.translation.${status}`)}
+							</a>
+						</li>
+					</ul>
+				</div>
+			</UICard>
+
+			<UICard bind:title="t('overview.sourcesBySite')">
+				<UITable
+					rowKey="site"
+					bind:hideCaption="true"
+					bind:caption="t('overview.sourcesCaption')"
+					bind:columns="sourceColumns"
+					bind:rows="sourceRows"
+				>
+					<snippet
+						name="cell-site"
+						params="row"
+					>
+						<a bind:href="localePath('/sources?site=' + row.site)">{siteLabels[row.site]}</a>
+					</snippet>
+					<snippet
+						name="cell-total"
+						params="row"
+					>
+						<strong>{format.number(row.total)}</strong>
+					</snippet>
+				</UITable>
+			</UICard>
+			<UIEmpty
+				if:when="sourceRows.every((row) => row.total === 0)"
+				bind:title="t('overview.noSources')"
+			>
+				<a bind:href="localePath('/snapshots')">{t('nav.snapshots')}</a>
+			</UIEmpty>
+
+			<UICard
+				bind:title="t('overview.divergence')"
+				bind:description="t('overview.divergenceLead')"
+			>
+				<UITable
+					rowKey="site"
+					bind:hideCaption="true"
+					bind:caption="t('overview.divergenceCaption')"
+					bind:columns="divergenceColumns"
+					bind:rows="divergenceRows"
+				>
+					<snippet
+						name="header"
+						params="column"
+					>
+						<span bind:title="columnHelp(column.key)">{column.label}</span>
+					</snippet>
+					<snippet
+						name="cell"
+						params="row, column"
+					>
+						<span if:when="column.key === 'site'">{siteLabels[row.site]}</span>
+						<a
+							if:when="stateOf(column.key) && markdown(row) && countOf(row, column.key)"
+							bind:class="column.key === 'conflict' || column.key === 'missing' ? 'dash-danger' : undefined"
+							bind:href="stateHref(row, stateOf(column.key)!)"
+							bind:aria-label="t('overview.stateLink', { count: format.number(countOf(row, column.key)), site: siteLabels[row.site], state: t(`labels.state.${stateOf(column.key)!}`) })"
+						>
+							{format.number(countOf(row, column.key))}
+						</a>
+						<span
+							if:when="stateOf(column.key) && markdown(row) && !countOf(row, column.key)"
+							class="dash-soft"
+						>
+							0
+						</span>
+						<span
+							if:when="stateOf(column.key) && !markdown(row)"
+							class="dash-soft"
+							bind:aria-label="t('overview.notApplicable')"
+						>
+							—
+						</span>
+						<a
+							if:when="column.key === 'importStale' && row.importStale"
+							bind:href="staleHref(row)"
+						>
+							{format.number(row.importStale)}
+						</a>
+						<span
+							if:when="column.key === 'importStale' && !row.importStale"
+							class="dash-soft"
+						>
+							{markdown(row) ? '0' : '—'}
+						</span>
+						<UIBadge
+							if:when="column.key === 'attention' && attention(row)"
+							tone="accent"
+						>
+							{t('overview.toReview', { count: format.number(attention(row)) })}
+						</UIBadge>
+						<span
+							if:when="column.key === 'attention' && !attention(row)"
+							class="dash-soft"
+						>
+							{t('overview.upToDate')}
+						</span>
+					</snippet>
+				</UITable>
+			</UICard>
+		</div>
+	</DashPage>
+</template>
+
+<style scoped>
+	.translation-bar {
+		display: flex;
+		gap: var(--ui-space-0-5);
+		border-radius: var(--ui-radius-full);
+		background: var(--ui-color-control-active);
+		height: var(--ui-space-2);
+		overflow: hidden;
+	}
+	.translation-bar span {
+		flex-basis: 0;
+		min-width: 0;
+	}
+	.translation-bar [data-status='translated'] {
+		background: var(--ui-color-success);
+	}
+	.translation-bar [data-status='outdated'] {
+		background: var(--ui-color-warning);
+	}
+	.translation-bar [data-status='missing'] {
+		background: var(--ui-color-border-strong);
+	}
+	.translation-legend {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--ui-space-2) var(--ui-space-6);
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	.translation-legend a {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--ui-space-2);
+		color: var(--ui-color-text);
+		font-size: var(--ui-font-size-md);
+		text-decoration: none;
+	}
+	.translation-legend a:hover {
+		text-decoration: underline;
+	}
+</style>

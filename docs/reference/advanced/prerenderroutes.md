@@ -48,15 +48,15 @@ console.log(files); // [ ".../dist/prerender/index.html", ".../blog/hola/index.h
 
 ## Opciones
 
-| Opción | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `routes` | `RouteRecord[]` | obligatorio | El manifiesto de rutas; sólo se renderizan las `render: "prerender"`. |
-| `handler` | `(request) => Promise<Response>` | obligatorio | Renderiza una página. No debe ejecutar `server/middleware`, que vuelve a ejecutarse al servir el archivo. |
-| `outputRoot` | ruta | obligatorio | Carpeta de salida del HTML, los payloads y `manifest.json`. |
-| `loadRoute` | `(file) => Promise<PageRoute>` | ninguno | Carga el sidecar de una ruta para leer `render` y `prerenderEntries`. Sin él, sólo cuenta `RouteRecord.render`. |
-| `origin` | origen | `http://meeko.local` | Origen de las peticiones de render. |
-| `transformHtml` | `(html) => string \| Promise<string>` | ninguno | Transforma el HTML antes de guardarlo. |
-| `extendUrls` | `(urls) => void \| Promise<void>` | ninguno | Desde `1.2`. Recibe las URL y puede añadir o quitar; cada una añadida debe tener ruta. Es el hook `prerender:routes` de los módulos. |
+| Opción          | Tipo                                  | Por defecto          | Descripción                                                                                                                          |
+| --------------- | ------------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `routes`        | `RouteRecord[]`                       | obligatorio          | El manifiesto de rutas; sólo se renderizan las `render: "prerender"`.                                                                |
+| `handler`       | `(request) => Promise<Response>`      | obligatorio          | Renderiza una página. No debe ejecutar `server/middleware`, que vuelve a ejecutarse al servir el archivo.                            |
+| `outputRoot`    | ruta                                  | obligatorio          | Carpeta de salida del HTML, los payloads y `manifest.json`.                                                                          |
+| `loadRoute`     | `(file) => Promise<PageRoute>`        | ninguno              | Carga el sidecar de una ruta para leer `render` y `prerenderEntries`. Sin él, sólo cuenta `RouteRecord.render`.                      |
+| `origin`        | origen                                | `http://meeko.local` | Origen de las peticiones de render.                                                                                                  |
+| `transformHtml` | `(html) => string \| Promise<string>` | ninguno              | Transforma el HTML antes de guardarlo.                                                                                               |
+| `extendUrls`    | `(urls) => void \| Promise<void>`     | ninguno              | Desde `1.2`. Recibe las URL y puede añadir o quitar; cada una añadida debe tener ruta. Es el hook `prerender:routes` de los módulos. |
 
 ## Valor devuelto
 
@@ -73,6 +73,7 @@ Rechaza si una ruta dinámica no tiene `prerenderEntries` (`Dynamic prerender ro
 ### Añadir un pie de página al HTML
 
 <!-- no-check -->
+
 ```ts
 await prerenderRoutes({
   routes, handler, loadRoute, outputRoot: "dist/prerender",
@@ -85,6 +86,7 @@ Los hashes de `manifest.json` se calculan sobre el HTML final, así que un scrip
 ### Añadir URL desde un CMS
 
 <!-- no-check -->
+
 ```ts
 await prerenderRoutes({
   routes, handler, loadRoute, outputRoot: "dist/prerender",
@@ -105,6 +107,7 @@ const sidecars = { "post.route.ts": { render: "prerender" } };
 `Dynamic prerender route /blog/[slug] requires prerenderEntries`: no hay forma de saber qué URL generar.
 
 <!-- no-check -->
+
 ```ts good
 const sidecars = { "post.route.ts": { render: "prerender", prerenderEntries: async () => (await cms.listSlugs()).map((slug) => ({ slug })) } };
 ```
@@ -118,6 +121,7 @@ await prerenderRoutes({ routes, handler: (request) => app.fetch(request), output
 `app.fetch` de `createServerApp` ejecuta `server/middleware` y sirve las páginas ya prerenderizadas. El middleware se ejecutaría dos veces (al prerenderizar y al servir) y un middleware que exige sesión respondería `401`, que detiene el prerender porque sólo se aceptan respuestas `200`.
 
 <!-- no-check -->
+
 ```ts good
 await prerenderRoutes({ routes, handler: createFrameworkHandler({ routes, loadPage, loadRoute }), loadRoute, outputRoot });
 ```
@@ -131,6 +135,7 @@ await prerenderRoutes({ routes: [{ id: "/about", file: "about.meeko", layouts: [
 Sin `loadRoute`, `prerenderRoutes` sólo ve `RouteRecord.render`: una ruta que declara `render: "prerender"` sólo en su sidecar no se prerenderiza y el resultado es `[]`.
 
 <!-- no-check -->
+
 ```ts good
 await prerenderRoutes({ routes, handler, loadRoute, outputRoot });
 ```

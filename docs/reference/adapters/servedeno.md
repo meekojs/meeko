@@ -25,6 +25,7 @@ Es lo que ejecuta la salida de `meeko build --adapter deno` (`.meeko/output/deno
 ## Uso
 
 <!-- no-check -->
+
 ```ts
 import { createServerApp } from "@meekojs/meeko/server";
 import { createDenoAssetReader, serveDeno } from "@meekojs/meeko/deno";
@@ -41,26 +42,26 @@ console.log(server.url);
 
 `serveDeno(app, options?)`:
 
-| Opción | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `host` | `string` | `"127.0.0.1"` | Interfaz; `"0.0.0.0"` acepta tráfico remoto. |
-| `port` | `number` | `4173` | Puerto; `0` elige uno libre. |
-| `publicOrigin` | `string` | el de la aplicación, o la URL en la que escucha | Origen de las URL y de la comprobación de `Origin`. |
-| `platform` | `ServerPlatform` | Deno con `Deno.env.toObject()` | La plataforma de cada petición. |
-| `onError` | `(error, requestId) => void` | el de la aplicación | Observador de los fallos del transporte. |
-| `maxMessageBytes` | `number` | `socket.maxMessageBytes` de la aplicación, o `65536` | Mensaje de Socket entrante más grande; los mayores cierran el peer con `1009`. |
-| `idleTimeout` | `number` | `60` | Segundos sin `pong` antes de que Deno cierre un peer; los pings se envían a la mitad. |
-| `handleSignals` | `boolean` | `false` | Cierre ordenado ante las señales y, desde `1.3`, `processErrors`. |
+| Opción            | Tipo                         | Por defecto                                          | Descripción                                                                           |
+| ----------------- | ---------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `host`            | `string`                     | `"127.0.0.1"`                                        | Interfaz; `"0.0.0.0"` acepta tráfico remoto.                                          |
+| `port`            | `number`                     | `4173`                                               | Puerto; `0` elige uno libre.                                                          |
+| `publicOrigin`    | `string`                     | el de la aplicación, o la URL en la que escucha      | Origen de las URL y de la comprobación de `Origin`.                                   |
+| `platform`        | `ServerPlatform`             | Deno con `Deno.env.toObject()`                       | La plataforma de cada petición.                                                       |
+| `onError`         | `(error, requestId) => void` | el de la aplicación                                  | Observador de los fallos del transporte.                                              |
+| `maxMessageBytes` | `number`                     | `socket.maxMessageBytes` de la aplicación, o `65536` | Mensaje de Socket entrante más grande; los mayores cierran el peer con `1009`.        |
+| `idleTimeout`     | `number`                     | `60`                                                 | Segundos sin `pong` antes de que Deno cierre un peer; los pings se envían a la mitad. |
+| `handleSignals`   | `boolean`                    | `false`                                              | Cierre ordenado ante las señales y, desde `1.3`, `processErrors`.                     |
 
 ## Valor devuelto
 
 Una promesa con un `DenoServer`:
 
-| Miembro | Descripción |
-| --- | --- |
-| `url` | La URL local con la dirección en la que escucha, como `http://127.0.0.1:4173`. La salida de `meeko build --adapter deno` *muestra* `http://localhost:4173` desde `1.7.1`; `url` no cambia. |
-| `finished` | Se resuelve cuando el servidor HTTP se ha detenido. |
-| `close()` | Cierra los peers de Socket con `1001`, detiene HTTP, espera las tareas de `waitUntil` y cierra la aplicación, por ese orden. Durante el cierre, las peticiones nuevas reciben `503`. |
+| Miembro    | Descripción                                                                                                                                                                                |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `url`      | La URL local con la dirección en la que escucha, como `http://127.0.0.1:4173`. La salida de `meeko build --adapter deno` _muestra_ `http://localhost:4173` desde `1.7.1`; `url` no cambia. |
+| `finished` | Se resuelve cuando el servidor HTTP se ha detenido.                                                                                                                                        |
+| `close()`  | Cierra los peers de Socket con `1001`, detiene HTTP, espera las tareas de `waitUntil` y cierra la aplicación, por ese orden. Durante el cierre, las peticiones nuevas reciben `503`.       |
 
 ## Ejemplos
 
@@ -89,6 +90,7 @@ CMD ["run", "--allow-net", "--allow-env", "--allow-read=.", "main.js"]
 ### Pruebas con un puerto libre
 
 <!-- no-check -->
+
 ```ts
 const server = await serveDeno(app, { port: 0 });
 const response = await fetch(`${server.url}/api/health`);
@@ -133,6 +135,7 @@ await serveDeno(app, { port: 70000, maxMessageBytes: 0 });
 `RangeError: Invalid port: 70000`; con un puerto válido, `RangeError: Invalid maxMessageBytes` (o `Invalid idleTimeout`).
 
 <!-- no-check -->
+
 ```ts good
 await serveDeno(app, { port: 8000, maxMessageBytes: 16 * 1024 });
 ```

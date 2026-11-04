@@ -21,6 +21,7 @@ Se importa de `@meekojs/meeko/password`, sólo en el servidor (Node, Bun y Deno)
 ## Uso
 
 <!-- no-check -->
+
 ```ts
 // server/rpc/auth/login.ts
 import { ApiError, defineRpc } from "@meekojs/meeko/server";
@@ -48,10 +49,10 @@ Comparar contra un hash fijo cuando el usuario no existe hace que la respuesta t
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
+| Parámetro  | Tipo     | Por defecto | Descripción             |
+| ---------- | -------- | ----------- | ----------------------- |
 | `password` | `string` | obligatorio | La contraseña recibida. |
-| `hash` | `string` | obligatorio | El hash guardado. |
+| `hash`     | `string` | obligatorio | El hash guardado.       |
 
 ## Valor devuelto
 
@@ -64,6 +65,7 @@ Lanza `TypeError: Invalid password hash: expected scrypt$<N>$<r>$<p>$<salt>$<has
 ### Una cuenta de administración en `.env`
 
 <!-- no-check -->
+
 ```ts
 // server/api/admin/login.post.ts
 import { ApiError, defineApiRoute } from "@meekojs/meeko/server";
@@ -89,6 +91,7 @@ Si `ADMIN_PASSWORD_HASH` falta, `verifyPassword` lanza `TypeError` por el hash v
 ### Actualizar el hash tras entrar
 
 <!-- no-check -->
+
 ```ts
 if (await verifyPassword(input.password, user.passwordHash)) {
   if (needsRehash(user.passwordHash)) {
@@ -108,6 +111,7 @@ await verifyPassword(input.password, "$2b$10$…"); // un hash de bcrypt
 `TypeError: Invalid password hash: expected scrypt$<N>$<r>$<p>$<salt>$<hash> within Meeko's limits`. Migra esas cuentas verificando con su biblioteca y guardando un hash nuevo con `hashPassword` tras el siguiente inicio de sesión.
 
 <!-- no-check -->
+
 ```ts good
 const valid = user.passwordHash.startsWith("scrypt$")
   ? await verifyPassword(input.password, user.passwordHash)
@@ -124,6 +128,7 @@ if (!user) throw new ApiError("UNKNOWN_EMAIL", 404);
 ```
 
 <!-- no-check -->
+
 ```ts good
 const valid = await verifyPassword(input.password, user?.passwordHash ?? DUMMY_HASH);
 if (!user || !valid) throw new ApiError("INVALID_CREDENTIALS", 401);
@@ -138,6 +143,7 @@ try { await verifyPassword(input.password, hash); } catch { throw new ApiError("
 ```
 
 <!-- no-check -->
+
 ```ts good
 if (!(await verifyPassword(input.password, hash))) throw new ApiError("INVALID_CREDENTIALS", 401);
 ```

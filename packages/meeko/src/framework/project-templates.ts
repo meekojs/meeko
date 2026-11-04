@@ -2,7 +2,7 @@
 export const clientEntrySource = `import { mountClientApp, type ClientComponent, type ClientRoute, type RouteMiddleware } from "@meekojs/meeko/framework";
 import { modules as pages } from "virtual:meeko-client-pages";
 import { modules as clientRoutes } from "virtual:meeko-client-routes";
-import { documentConfig, errorPage, routes } from "virtual:meeko-manifest/client";
+import { documentConfig, errorPage, routes, viewTransitions } from "virtual:meeko-manifest/client";
 import { plugins } from "virtual:meeko-plugins/client";
 import { middleware as middlewareModules, namedMiddleware } from "virtual:meeko-middleware/client";
 
@@ -24,8 +24,8 @@ const loadNamedMiddleware = async (file: string): Promise<RouteMiddleware> => {
 // app/error.meeko joins the bundle even when no route falls back to it.
 const errorPages = import.meta.glob("/app/error.meeko");
 
-// Optional global stylesheet. Vite includes it in the client bundle when present.
-import.meta.glob("/app/styles/main.css", { eager: true });
+// Module stylesheets followed by the optional application stylesheet, processed by Vite/PostCSS.
+import "virtual:meeko-global-styles";
 
 const root = document.getElementById("app");
 const payload = document.getElementById("meeko-payload")?.textContent;
@@ -33,7 +33,7 @@ if (!root || !payload) throw new Error("Missing Meeko SSR data");
 
 const hydrationStart = performance.now();
 await mountClientApp({
-  root, payload, routes, errorPage, serverData: true, loadMiddleware, loadNamedMiddleware, plugins,
+  root, payload, routes, errorPage, viewTransitions, serverData: true, loadMiddleware, loadNamedMiddleware, plugins,
   // The head that the server renders from meeko.config.ts and the modules; useHead and navigation update it.
   ...(documentConfig ? { document: documentConfig } : {}),
   async loadPage(file) {
@@ -50,14 +50,14 @@ await mountClientApp({
   },
 });
 performance.measure("meeko-hydration", { start: hydrationStart, end: performance.now() });
-`;
+`
 
 /**
  * The client entry of the static adapter: navigation reads each page's payload file,
  * `<path>/index.meeko.json`, because a static host does not negotiate `Accept`.
  */
-export const staticClientEntrySource = clientEntrySource.replace("serverData: true,", 'serverData: "static",');
-if (staticClientEntrySource === clientEntrySource) throw new Error("The static client entry template lost its serverData option");
+export const staticClientEntrySource = clientEntrySource.replace('serverData: true,', 'serverData: "static",')
+if (staticClientEntrySource === clientEntrySource) throw new Error('The static client entry template lost its serverData option')
 
 /** Adapter-neutral application entry: the baked manifest plus its module map. */
 export const serverEntrySource = `import { createServerApp, type ServerApp, type ServerAppOptions } from "@meekojs/meeko/server";
@@ -70,7 +70,7 @@ export type AppHostOptions = Omit<ServerAppOptions, "manifest" | "load" | "runti
 export function createApp(options: AppHostOptions): Promise<ServerApp> {
   return createServerApp({ ...options, manifest, load, runtime, plugins, appName, loadRedis });
 }
-`;
+`
 
 /** Node adapter entry; \`meeko build\` bundles it to .meeko/output/node/index.mjs. */
 export const nodeEntrySource = `import { readFile } from "node:fs/promises";
@@ -86,6 +86,9 @@ import { createApp, load, manifest } from "./entry-server.ts";
 export { load, manifest };
 
 const output = dirname(fileURLToPath(import.meta.url));
+
+// The project root: MEEKO_ROOT for an output deployed elsewhere, or the folder three levels up (.meeko/output/node).
+const projectRoot = process.env.MEEKO_ROOT ? resolve(process.env.MEEKO_ROOT) : resolve(output, "../../..");
 
 interface PrerenderIndex { readonly pages?: Record<string, { file: string; headOffset: number; etag: string; payload?: string; scriptHashes?: string[]; styleHashes?: string[] }> }
 
@@ -125,6 +128,7 @@ export async function createNodeApp(options: { readonly prerendering?: boolean }
   return createApp({
     production: true,
     prerendering: options.prerendering === true,
+    root: projectRoot,
     platform: {
       name: "node",
       env: process.env,
@@ -153,4 +157,4 @@ export async function start() {
 }
 
 if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) await start();
-`;
+`

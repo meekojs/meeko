@@ -44,11 +44,11 @@ Con `await`, el servidor renderiza el componente hasta esa línea (aquí, `EUR/U
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `url` | texto | obligatorio | URL `ws:` o `wss:` del canal, con `?room=` si hace falta. |
-| `contract` | `SocketContract` | obligatorio | Los schemas de cada evento en cada dirección. |
-| `options` | `SocketClientOptions` | `{}` | `retryMs`, `maxRetryMs`, `maxMessageBytes`, `webSocketFactory` y `onError`. Sin `onError`, los fallos van al observador de errores del componente. |
+| Parámetro  | Tipo                  | Por defecto | Descripción                                                                                                                                        |
+| ---------- | --------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `url`      | texto                 | obligatorio | URL `ws:` o `wss:` del canal, con `?room=` si hace falta.                                                                                          |
+| `contract` | `SocketContract`      | obligatorio | Los schemas de cada evento en cada dirección.                                                                                                      |
+| `options`  | `SocketClientOptions` | `{}`        | `retryMs`, `maxRetryMs`, `maxMessageBytes`, `webSocketFactory` y `onError`. Sin `onError`, los fallos van al observador de errores del componente. |
 
 ## Valor devuelto
 
@@ -178,6 +178,7 @@ button.addEventListener("click", () => {
 Fuera del setup de un componente no hay a quién ligar la limpieza: el cliente se cierra y la llamada lanza `onCleanup() requires an active component root`.
 
 <!-- no-check -->
+
 ```ts good
 button.addEventListener("click", () => {
   const chat = createSocketClient(url, chatContract);

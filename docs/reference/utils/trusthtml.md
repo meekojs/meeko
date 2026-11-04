@@ -10,6 +10,7 @@ related:
   - "syntax:html"
   - "syntax:interpolation"
   - "syntax:script-server"
+  - "@meekojs/meeko/framework#documentHtml"
   - docs/api.md#html-de-confianza-trustedhtml-y-trusthtml
   - docs/api.md#html-sin-escapar-con-html
 ---
@@ -55,9 +56,9 @@ export const post = article(params.slug, `<p>Entrada <em>${params.slug}</em></p>
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `html` | `string` | obligatorio | HTML que el código ya sabe seguro: propio o saneado. |
+| Parámetro | Tipo     | Por defecto | Descripción                                          |
+| --------- | -------- | ----------- | ---------------------------------------------------- |
+| `html`    | `string` | obligatorio | HTML que el código ya sabe seguro: propio o saneado. |
 
 ## Valor devuelto
 
@@ -68,6 +69,7 @@ El mismo `html`, con el tipo `TrustedHtml`. Un `TrustedHtml` se puede usar donde
 ### HTML de usuarios, saneado donde nace
 
 <!-- no-check -->
+
 ```ts
 // server/content/comments.ts
 import DOMPurify from "isomorphic-dompurify";
@@ -138,6 +140,7 @@ const body: TrustedHtml = raw;
 `meeko check` da `TS2322: Type 'string' is not assignable to type 'TrustedHtml'.`
 
 <!-- no-check -->
+
 ```ts good
 const body: TrustedHtml = trustHtml(DOMPurify.sanitize(await response.text()));
 ```

@@ -22,6 +22,7 @@ related:
 ## Uso
 
 <!-- no-check -->
+
 ```ts
 import { WebSocketServer } from "ws";
 import type WebSocket from "ws";
@@ -51,15 +52,15 @@ server.on("upgrade", (incoming, socket, head) => {
 
 `createNodeSocketUpgradeHandler(options)`:
 
-| Opción | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `hub` | `SocketHub` | obligatorio | El hub de la aplicación. |
-| `publicOrigin` | `string` | obligatorio | Origen público fijo (`http:` o `https:`); la política nunca se deduce de `Host`. |
-| `pathnamePrefix` | `string` | `"/_meeko/socket"` | Prefijo de los canales. |
-| `maxPendingBytes` | `number` | `65536` | Bytes entrantes que se retienen mientras el hub autoriza la conexión. |
-| `upgrade(incoming, socket, head)` | `NodeAcceptedSocket \| Promise<…>` | obligatorio | Hace el handshake y devuelve `{ peer, onMessage, onClose }`. |
-| `reject(incoming, socket, status)` | `void` | destruye el socket | Responde a un handshake rechazado por HTTP (`400`, `403` de Origin, `404`). |
-| `onError` | `(error: unknown) => void` | la consola | Fallos del upgrade y de las sesiones. |
+| Opción                             | Tipo                               | Por defecto        | Descripción                                                                      |
+| ---------------------------------- | ---------------------------------- | ------------------ | -------------------------------------------------------------------------------- |
+| `hub`                              | `SocketHub`                        | obligatorio        | El hub de la aplicación.                                                         |
+| `publicOrigin`                     | `string`                           | obligatorio        | Origen público fijo (`http:` o `https:`); la política nunca se deduce de `Host`. |
+| `pathnamePrefix`                   | `string`                           | `"/_meeko/socket"` | Prefijo de los canales.                                                          |
+| `maxPendingBytes`                  | `number`                           | `65536`            | Bytes entrantes que se retienen mientras el hub autoriza la conexión.            |
+| `upgrade(incoming, socket, head)`  | `NodeAcceptedSocket \| Promise<…>` | obligatorio        | Hace el handshake y devuelve `{ peer, onMessage, onClose }`.                     |
+| `reject(incoming, socket, status)` | `void`                             | destruye el socket | Responde a un handshake rechazado por HTTP (`400`, `403` de Origin, `404`).      |
+| `onError`                          | `(error: unknown) => void`         | la consola         | Fallos del upgrade y de las sesiones.                                            |
 
 ## Valor devuelto
 
@@ -72,6 +73,7 @@ Desde `1.1`, un rechazo de sesión (`401`) o de autorización del canal (`403`) 
 ### Una respuesta HTTP real en los rechazos
 
 <!-- no-check -->
+
 ```ts
 import { STATUS_CODES } from "node:http";
 
@@ -88,6 +90,7 @@ Es lo que hace `attachNodeWebSocketServer`.
 ### Compartir `upgrade` con otro servicio
 
 <!-- no-check -->
+
 ```ts
 server.on("upgrade", async (incoming, socket, head) => {
   if (await handleUpgrade(incoming, socket, head)) return; // un canal de Meeko
@@ -107,6 +110,7 @@ createNodeSocketUpgradeHandler({ hub, publicOrigin: "wss://example.com", upgrade
 `TypeError: Socket publicOrigin must use HTTP or HTTPS`. El `Origin` que envía el navegador es el de la página.
 
 <!-- no-check -->
+
 ```ts good
 createNodeSocketUpgradeHandler({ hub, publicOrigin: "https://example.com", upgrade });
 ```
@@ -120,6 +124,7 @@ createNodeSocketUpgradeHandler({ hub, publicOrigin, pathnamePrefix: "/_meeko/soc
 `TypeError: Invalid socket pathname prefix`.
 
 <!-- no-check -->
+
 ```ts good
 createNodeSocketUpgradeHandler({ hub, publicOrigin, pathnamePrefix: app.socket!.pathnamePrefix, upgrade });
 ```
@@ -133,6 +138,7 @@ server.on("upgrade", (incoming, socket, head) => { void handleUpgrade(incoming, 
 No hay error, pero un upgrade a otra ruta queda abierto sin respuesta hasta que el cliente se cansa. Destruya el socket cuando el handler devuelve `false`.
 
 <!-- no-check -->
+
 ```ts good
 server.on("upgrade", (incoming, socket, head) => {
   void handleUpgrade(incoming, socket, head).then((handled) => { if (!handled) socket.destroy(); });

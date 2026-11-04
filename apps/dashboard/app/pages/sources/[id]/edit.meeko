@@ -1,0 +1,747 @@
+<script
+	server
+	lang="ts"
+>
+	import { definePage } from '@meekojs/meeko/framework'
+	import * as v from 'valibot'
+
+	import { attempt } from '../../../utils/errors'
+
+	export const route = definePage({ params: v.object({ id: v.pipe(v.string(), v.regex(/^[1-9]\d{0,15}$/)) }), render: 'ssr' })
+
+	const { params, search } = usePage()
+	// ?revision=N edits that draft, or starts a new draft from another revision.
+	const revisionParam = typeof search.revision === 'string' && /^[1-9]\d{0,15}$/.test(search.revision) ? Number(search.revision) : undefined
+	export const editor = await attempt(() => rpc.editor.get({ sourceId: Number(params.id), ...(revisionParam ? { revisionId: revisionParam } : {}) }))
+	if (!editor.ok && editor.failure.code === 'SOURCE_NOT_FOUND') notFound()
+</script>
+
+<script lang="ts">
+	import type { UIMarkdownEditorMode } from '@meekojs/ui/editor'
+
+	import { splitMarkdownSource } from '@meekojs/ui/editor'
+
+	import type { Preview, PreviewIssue } from '../../../../shared/schemas/dashboard'
+	import type { Failure } from '../../../utils/errors'
+	import type { FrontmatterField } from '../../../utils/frontmatter'
+
+	import { encodedBytes } from '../../../../shared/schemas/dashboard'
+	import { describeError } from '../../../utils/errors'
+	import { shortHash } from '../../../utils/format'
+	import { frontmatterKeys, headLineCount, lineRange, readFrontmatter, writeFrontmatter } from '../../../utils/frontmatter'
+	import { siteLabels } from '../../../utils/labels'
+	import { previewDocument, readPreviewTokens } from '../../../utils/preview-document'
+	import { previewStyles } from '../../../utils/preview-styles'
+	import { setUnsaved } from '../../../utils/unsaved'
+
+	export interface Props {
+		params: { id: string }
+		search: Record<string, string | string[]>
+	}
+
+	const props = defineProps<Props>()
+
+	const i18n = useI18n()
+	const { t, localePath } = i18n
+	const format = useFormat()
+	const formatNumber = format.number
+
+	const data = editor.ok ? editor.data : null
+	// The page remounts for another id: its initial value is enough.
+	const sourceId = untrack(() => Number(props.params.id))
+
+	// The frontmatter is edited as fields and the body in UIMarkdownEditor: Crepe never sees the first.
+	// `text` is the file they make, and it is the loaded one, byte by byte, until one of them changes.
+	const loaded = data?.start.markdown ?? ''
+	const parts = splitMarkdownSource(loaded)
+	const head = signal(parts.head)
+	const body = signal(parts.body)
+	const text = computed(() => (head.value === parts.head && body.value === parts.body ? loaded : head.value + body.value))
+	const mode = signal<UIMarkdownEditorMode>('visual')
+	// Its difference with the text is what a save would store.
+	const saved = signal(loaded)
+	const draftId = signal<number | null>(data?.revision?.id ?? null)
+	const note = signal(data?.revision?.note ?? '')
+	const savedNote = signal(data?.revision?.note ?? '')
+
+	/** Lines that differ between two texts once their common start and end are set aside: O(n), for every keystroke. */
+	function changedLines(before: string, after: string): number {
+		if (before === after) return 0
+		const a = before.split('\n')
+		const b = after.split('\n')
+		let start = 0
+		while (start < a.length && start < b.length && a[start] === b[start]) start++
+		let endA = a.length
+		let endB = b.length
+		while (endA > start && endB > start && a[endA - 1] === b[endB - 1]) {
+			endA--
+			endB--
+		}
+		return Math.max(endA - start, endB - start, 1)
+	}
+
+	const changed = computed(() => changedLines(saved.value, text.value))
+	const noteChanged = computed(() => draftId.value !== null && note.value.trim() !== savedNote.value.trim())
+	const dirty = computed(() => changed.value > 0 || noteChanged.value)
+	// What the text weighs in the JSON of a save, escapes included: the limit of the RPC body.
+	const bytes = computed(() => encodedBytes(text.value))
+	const maxBytes = data?.maxBytes ?? 900_000
+	const tooLarge = computed(() => bytes.value > maxBytes)
+
+	const status = computed(() => {
+		if (changed.value > 0) return t('editor.status.lines', { count: changed.value, lines: formatNumber(changed.value) })
+		if (noteChanged.value) return t('editor.status.note')
+		return draftId.value === null ? t('editor.status.none') : t('editor.status.saved')
+	})
+
+	const origin = computed(() => {
+		if (!data) return ''
+		if (draftId.value !== null) return t('editor.origin.draft', { id: draftId.value })
+		if (data.start.from === 'revision') return t('editor.origin.revision', { id: data.start.revisionId ?? 0 })
+		return t('editor.origin.git', { hash: shortHash(data.start.baseHash) })
+	})
+
+	// Saving -----------------------------------------------------------------------------------
+
+	const saving = signal(false)
+	const saveFailure = signal<Failure | null>(null)
+	const notice = signal('')
+
+	/** SHA-256 of a text in hexadecimal, as meeko-docs-content hashes it. */
+	async function hash(value: string): Promise<string> {
+		const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value.replace(/\r\n?/g, '\n')))
+		return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('')
+	}
+
+	async function save() {
+		if (!data || saving.value) return
+		notice.value = ''
+		saveFailure.value = null
+		if (tooLarge.value) {
+			saveFailure.value = { code: 'TOO_LARGE', detail: t('editor.tooLarge', { size: formatNumber(Math.round(bytes.value / 1000)), limit: formatNumber(maxBytes / 1000) }) }
+			return
+		}
+		saving.value = true
+		const markdown = text.value
+		try {
+			const revision = await rpc.revisions.save({
+				sourceId,
+				markdown,
+				...(note.value.trim() ? { note: note.value } : {}),
+				...(draftId.value === null ? (data.start.baseHash ? { baseHash: data.start.baseHash } : {}) : { revisionId: draftId.value, expectedHash: await hash(saved.value) }),
+			})
+			const created = draftId.value === null
+			draftId.value = revision.id
+			saved.value = markdown
+			savedNote.value = revision.note ?? ''
+			notice.value = created ? t('editor.created', { id: revision.id }) : t('editor.savedDraft', { id: revision.id })
+			// A reload keeps editing the same draft.
+			if (created) history.replaceState(history.state, '', `${location.pathname}?revision=${revision.id}`)
+		} catch (error) {
+			saveFailure.value = describeError(error)
+		} finally {
+			saving.value = false
+		}
+	}
+
+	// Preview ----------------------------------------------------------------------------------
+
+	const preview = signal<Preview | null>(null)
+	const previewFailure = signal<Failure | null>(null)
+	const previewing = signal(false)
+	const previewed = signal<string | null>(null)
+	const auto = signal(true)
+	const stale = computed(() => previewed.value !== null && previewed.value !== text.value)
+	let timer: ReturnType<typeof setTimeout> | undefined
+
+	async function refreshPreview() {
+		if (!data || tooLarge.value || !text.value.trim()) return
+		clearTimeout(timer)
+		const markdown = text.value
+		previewing.value = true
+		try {
+			const result = await rpc.preview.render({ sourceId, markdown })
+			preview.value = result
+			previewed.value = markdown
+			previewFailure.value = null
+		} catch (error) {
+			const failure = describeError(error)
+			// A newer request replaced this one: its answer is the one that counts.
+			if (failure.code !== 'PREVIEW_SUPERSEDED') previewFailure.value = failure
+		} finally {
+			previewing.value = false
+		}
+	}
+
+	// While typing, the preview waits for a pause: each render costs about a second.
+	effect(() => {
+		const current = text.value
+		if (!auto.value || typeof window === 'undefined' || current === previewed.value) return
+		clearTimeout(timer)
+		timer = setTimeout(() => void refreshPreview(), 1200)
+	})
+
+	// The HTML of meeko-docs-content's render, the same the site serves, keeps the raw HTML of the
+	// Markdown. It never enters this document: it is the srcdoc of an iframe sandboxed without
+	// allow-scripts or allow-same-origin (utils/preview-document.ts), so a <style> or a script of a
+	// draft cannot reach the controls of the editor. The CSP of the dashboard still applies inside.
+	const theme = signal<'dark' | 'light'>('dark')
+	const previewSource = computed(() => {
+		const current = preview.value
+		if (!current || typeof document === 'undefined') return null
+		return previewDocument({ html: current.html, theme: theme.value, styles: previewStyles, tokens: readPreviewTokens(document.documentElement, previewStyles) })
+	})
+
+	const issueKind = (kind: PreviewIssue['kind']) => t(`editor.issues.${kind}`)
+	const blocking = computed(() => preview.value?.issues.filter((issue) => issue.kind !== 'link').length ?? 0)
+
+	// The fields of the frontmatter. Which ones there are is decided on opening, so that a row does not
+	// disappear when its value is emptied; a head with something the fields could not write back as
+	// it was is edited as text.
+	const fields = computed(() => readFrontmatter(head.value))
+	const asText = readFrontmatter(parts.head) === null
+	const rows: readonly Pick<FrontmatterField, 'key' | 'kind'>[] = (() => {
+		const present = readFrontmatter(parts.head) ?? []
+		// A translation always has its `source-hash`, which «mark as translated» writes.
+		const known = frontmatterKeys.filter(({ key }) => present.some((field) => field.key === key) || (key === 'source-hash' ? data?.original : data?.source.kind === 'reference'))
+		return [...known, ...present.filter((field) => !frontmatterKeys.some(({ key }) => key === field.key))]
+	})()
+	const hasFrontmatter = asText || rows.length > 0
+	const fieldValue = (key: string) => fields.value?.find((field) => field.key === key)?.value ?? ''
+	const fieldId = (key: string) => `frontmatter-${key}`
+	function setField(row: Pick<FrontmatterField, 'key' | 'kind'>, value: string) {
+		if (fields.value) head.value = writeFrontmatter(head.value, row.key, row.kind, value)
+	}
+	// Each row edits its own signal, tied to the head both ways: a stamp changes the field, and a change of
+	// the field that writes the same value (a list with a new empty line) leaves what is being typed alone.
+	const fieldModels = rows.map((row) => {
+		const written = computed(() => fieldValue(row.key))
+		const model = signal(written.value)
+		effect(() => {
+			model.value = written.value
+		})
+		effect(() => {
+			const value = model.value
+			untrack(() => {
+				if (value !== written.value) setField(row, value)
+			})
+		})
+		return { ...row, model }
+	})
+
+	/** The text area of the code mode: it appears when the mode changes, in the next frames. */
+	async function codeArea(): Promise<HTMLTextAreaElement | null> {
+		for (let frame = 0; frame < 10; frame++) {
+			const element = document.getElementById('draft-markdown')
+			if (element instanceof HTMLTextAreaElement) return element
+			await new Promise((resolve) => requestAnimationFrame(resolve))
+		}
+		return null
+	}
+
+	// Moves the caret to a line of the file: a field of the frontmatter, or that line in code mode.
+	// Everything here is inside DashPage's snippet, where `ref:` is not allowed (MEEK052), so the
+	// elements are found by their ids.
+	async function goToLine(line: number) {
+		const offset = headLineCount(head.value)
+		if (line <= offset) {
+			const details = document.querySelector('#draft-frontmatter details')
+			if (details instanceof HTMLDetailsElement) details.open = true
+			const field = fields.value?.filter((candidate) => candidate.line <= line).at(-1)
+			document.getElementById(field ? fieldId(field.key) : 'frontmatter-text')?.focus()
+			return
+		}
+		mode.value = 'code'
+		const element = await codeArea()
+		if (!element) return
+		const [start, end] = lineRange(element.value, line - offset)
+		element.focus()
+		element.setSelectionRange(start, end)
+		const lineHeight = Number.parseFloat(getComputedStyle(element).lineHeight) || 20
+		element.scrollTop = Math.max(0, (line - offset - 4) * lineHeight)
+	}
+
+	// Leaving with unsaved changes asks first: a reload or a closed tab here, a navigation of the app in the plugin.
+	const leave = (event: BeforeUnloadEvent) => {
+		if (!dirty.value) return
+		event.preventDefault()
+		event.returnValue = ''
+	}
+	effect(() => setUnsaved(dirty.value ? t('editor.leave') : null))
+	onMounted(() => {
+		window.addEventListener('beforeunload', leave)
+		// The preview follows the theme of the dashboard: its tokens are read again when it changes.
+		const root = document.documentElement
+		const readTheme = () => (theme.value = root.dataset.theme === 'light' ? 'light' : 'dark')
+		readTheme()
+		const observer = new MutationObserver(readTheme)
+		observer.observe(root, { attributes: true, attributeFilter: ['data-theme'] })
+		void refreshPreview()
+		return () => observer.disconnect()
+	})
+	onCleanup(() => {
+		clearTimeout(timer)
+		setUnsaved(null)
+		if (typeof window !== 'undefined') window.removeEventListener('beforeunload', leave)
+	})
+
+	const sizeLabel = computed(() => t('editor.size', { size: formatNumber(Math.ceil(bytes.value / 1000)), limit: formatNumber(maxBytes / 1000) }))
+
+	// A translation (docs/en/**) says which original it was made from in its `source-hash`. Marking it
+	// as translated writes the hash of the original that Git has now: the text of the editor changes
+	// and is saved as a draft like any other change.
+	const original = data?.original ?? null
+	const stamping = signal(false)
+	const stampFailure = signal<Failure | null>(null)
+	async function markTranslated() {
+		if (!original || stamping.value) return
+		stamping.value = true
+		stampFailure.value = null
+		try {
+			const stamped = await rpc.translations.stamp({ sourceId, markdown: text.value })
+			const next = splitMarkdownSource(stamped.markdown)
+			head.value = next.head
+			body.value = next.body
+			notice.value = t('editor.stamped', { hash: shortHash(stamped.sourceHash) })
+		} catch (error) {
+			stampFailure.value = describeError(error)
+		} finally {
+			stamping.value = false
+		}
+	}
+</script>
+
+<template>
+	<DashPage
+		bind:title="data ? t('editor.title', { title: data.source.title }) : t('editor.fallbackTitle', { id: props.params.id })"
+		bind:description="data ? siteLabels[data.source.site] + ' · ' + t(`locale.${data.source.locale}`) + ' · ' + t(`labels.kind.${data.source.kind}`) + ' · ' + (data.source.file ?? data.source.path) : t('editor.fallbackDescription')"
+	>
+		<snippet name="actions">
+			<UILink
+				if:when="original"
+				variant="outline"
+				bind:href="localePath('/translations/' + props.params.id)"
+			>
+				{t('editor.compareOriginal')}
+			</UILink>
+			<UILink
+				variant="ghost"
+				bind:href="localePath('/sources/' + props.params.id)"
+			>
+				{t('editor.back')}
+			</UILink>
+		</snippet>
+		<DashFailure
+			if:when="!editor.ok"
+			bind:title="t('editor.cannotOpen')"
+			bind:failure="editor.failure"
+		/>
+		<div
+			if:when="data"
+			class="dash-stack"
+		>
+			<UICard>
+				<form
+					class="editor-bar"
+					bind:aria-label="t('editor.draft')"
+					on:submit="
+						(event) => {
+							event.preventDefault()
+							void save()
+						}
+					"
+				>
+					<div class="editor-note">
+						<UIField
+							id="draft-note"
+							bind:label="t('editor.note')"
+							bind:description="t('editor.noteHint')"
+						>
+							<snippet
+								name="default"
+								params="id, describedBy"
+							>
+								<UIInput
+									model="note"
+									bind:id="id"
+									bind:describedBy="describedBy"
+								/>
+							</snippet>
+						</UIField>
+					</div>
+					<div class="editor-save">
+						<p class="dash-meta">{origin.value}</p>
+						<p
+							class="dash-meta"
+							role="status"
+							aria-live="polite"
+						>
+							<UIBadge
+								bind:dot="true"
+								bind:tone="dirty.value ? 'accent' : 'neutral'"
+							>
+								{status.value}
+							</UIBadge>
+						</p>
+						<UIButton
+							type="submit"
+							bind:disabled="saving.value || !dirty.value || tooLarge.value"
+						>
+							{saving.value ? t('actions.saving') : draftId.value === null ? t('editor.create') : t('editor.save')}
+						</UIButton>
+					</div>
+					<div
+						if:when="data.source.importStale"
+						class="editor-wide"
+					>
+						<UIAlert
+							tone="warning"
+							bind:description="t('editor.importStale')"
+						/>
+					</div>
+					<div
+						if:when="original"
+						class="editor-wide"
+					>
+						<UIAlert
+							tone="info"
+							bind:title="t('editor.translation.title', { title: original?.title ?? '' })"
+							bind:description="t('editor.translation.text')"
+						>
+							<snippet name="actions">
+								<UIButton
+									size="sm"
+									variant="outline"
+									bind:disabled="stamping.value || !original?.baseHash"
+									on:click="markTranslated"
+								>
+									{stamping.value ? t('editor.translation.stamping') : t('editor.translation.stamp')}
+								</UIButton>
+							</snippet>
+						</UIAlert>
+					</div>
+					<div
+						if:when="stampFailure.value"
+						class="editor-wide"
+					>
+						<DashFailure
+							bind:title="t('editor.translation.failed')"
+							bind:failure="stampFailure.value!"
+						/>
+					</div>
+					<div
+						if:when="saveFailure.value"
+						class="editor-wide"
+					>
+						<DashFailure
+							bind:title="t('editor.notSaved')"
+							bind:failure="saveFailure.value!"
+						/>
+					</div>
+					<div class="editor-wide editor-notice">
+						<DashNotice bind:text="notice.value">
+							<a
+								if:when="draftId.value !== null"
+								bind:href="localePath('/sources/' + props.params.id + '#revisiones')"
+							>
+								{t('editor.publishFromSource')}
+							</a>
+						</DashNotice>
+					</div>
+				</form>
+			</UICard>
+
+			<UICard
+				if:when="hasFrontmatter"
+				id="draft-frontmatter"
+				density="compact"
+			>
+				<UIDisclosure bind:summary="t('editor.frontmatter.title') + ' · ' + (asText ? t('editor.frontmatter.asTextShort') : t('editor.frontmatter.count', { count: fields.value?.length ?? 0 }))">
+					<UIField
+						if:when="asText"
+						id="frontmatter-text"
+						bind:label="t('editor.frontmatter.asText')"
+					>
+						<snippet
+							name="default"
+							params="id, describedBy"
+						>
+							<UITextarea
+								class="dash-code"
+								model="head"
+								bind:rows="8"
+								bind:spellcheck="false"
+								bind:id="id"
+								bind:describedBy="describedBy"
+							/>
+						</snippet>
+					</UIField>
+					<div
+						if:when="!asText"
+						class="editor-frontmatter"
+					>
+						<div
+							each:of="fieldModels"
+							each:as="row"
+							each:key="row.key"
+							bind:class="row.key === 'description' || row.key === 'source-hash' ? 'editor-wide' : undefined"
+						>
+							<UIField
+								bind:id="fieldId(row.key)"
+								bind:label="row.key"
+							>
+								<snippet
+									name="default"
+									params="id, describedBy"
+								>
+									<UITextarea
+										if:when="row.kind === 'list'"
+										class="dash-code"
+										model="row.model"
+										bind:rows="4"
+										bind:spellcheck="false"
+										bind:id="id"
+										bind:describedBy="describedBy"
+									/>
+									<UIInput
+										if:when="row.kind === 'text'"
+										model="row.model"
+										bind:spellcheck="false"
+										bind:class="row.key === 'source-hash' ? 'dash-code' : undefined"
+										bind:id="id"
+										bind:describedBy="describedBy"
+										bind:readonly="row.key === 'source-hash'"
+									/>
+								</snippet>
+							</UIField>
+						</div>
+					</div>
+				</UIDisclosure>
+			</UICard>
+
+			<div class="editor-panes">
+				<section
+					class="dash-tight"
+					aria-labelledby="markdown-heading"
+				>
+					<h2
+						id="markdown-heading"
+						class="meeko-ui-sr-only"
+					>
+						Markdown
+					</h2>
+					<div class="editor-markdown">
+						<UIMarkdownEditor
+							id="draft-markdown"
+							describedBy="draft-size"
+							model="body"
+							model:mode="mode"
+							bind:label="t('editor.markdownLabel')"
+						>
+							<snippet name="tools">
+								<UIBadge bind:tone="tooLarge.value ? 'danger' : 'neutral'">{sizeLabel.value}</UIBadge>
+							</snippet>
+						</UIMarkdownEditor>
+					</div>
+					<p
+						id="draft-size"
+						class="meeko-ui-sr-only"
+					>
+						{sizeLabel.value}
+					</p>
+				</section>
+
+				<section
+					class="dash-tight editor-preview-pane"
+					aria-labelledby="preview-heading"
+					bind:aria-busy="previewing.value ? 'true' : undefined"
+				>
+					<div class="dash-row">
+						<h2
+							id="preview-heading"
+							class="dash-heading"
+						>
+							{t('editor.preview.title')}
+						</h2>
+						<p
+							class="dash-meta dash-status"
+							role="status"
+							aria-live="polite"
+						>
+							<span if:when="previewing.value">{t('editor.preview.real')}</span>
+							<span if:when="!previewing.value && stale.value">{t('editor.preview.stale')}</span>
+							<span if:when="!previewing.value && !stale.value && preview.value">{preview.value?.complete ? t('editor.preview.done', { ms: formatNumber(preview.value?.durationMs ?? 0) }) : t('editor.preview.donePartial', { ms: formatNumber(preview.value?.durationMs ?? 0) })}</span>
+						</p>
+						<div class="dash-actions">
+							<UICheckbox
+								model="auto"
+								bind:label="t('editor.preview.auto')"
+							/>
+							<UIButton
+								size="sm"
+								variant="outline"
+								bind:disabled="previewing.value || tooLarge.value"
+								on:click="refreshPreview"
+							>
+								{previewing.value ? t('editor.preview.rendering') : t('editor.preview.refresh')}
+							</UIButton>
+						</div>
+					</div>
+					<DashFailure
+						if:when="previewFailure.value"
+						bind:title="t('editor.preview.failed')"
+						bind:failure="previewFailure.value"
+					/>
+					<UICard
+						if:when="preview.value && preview.value.issues.length"
+						density="compact"
+						bind:aria-label="t('editor.preview.issues')"
+					>
+						<snippet name="header">
+							<p class="dash-heading">
+								{t('editor.preview.issueCount', { count: preview.value?.issues.length ?? 0 })}
+								<span if:when="blocking.value">· {t('editor.preview.blocking', { count: blocking.value })}</span>
+							</p>
+						</snippet>
+						<ul class="editor-issues">
+							<li
+								each:of="preview.value?.issues ?? []"
+								each:as="issue"
+								each:index="index"
+								each:key="index"
+							>
+								<UIBadge bind:tone="issue.kind === 'link' ? 'accent' : 'danger'">{issueKind(issue.kind)}</UIBadge>
+								<code lang="en">{issue.message}</code>
+								<UIButton
+									if:when="issue.line !== null"
+									size="sm"
+									variant="ghost"
+									on:click="() => void goToLine(issue.line ?? 1)"
+								>
+									{t('editor.preview.line', { line: String(issue.line) })}
+								</UIButton>
+							</li>
+						</ul>
+					</UICard>
+					<UISkeleton
+						if:when="!preview.value && !previewFailure.value"
+						bind:lines="3"
+						bind:widths="['full', 'long', 'short']"
+					/>
+					<iframe
+						if:when="previewSource.value"
+						class="editor-preview"
+						sandbox=""
+						referrerpolicy="no-referrer"
+						bind:title="t('editor.preview.frame')"
+						bind:data-stale="stale.value ? 'true' : undefined"
+						bind:srcdoc="previewSource.value"
+					/>
+				</section>
+			</div>
+		</div>
+	</DashPage>
+</template>
+
+<style scoped>
+	.editor-bar {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
+		align-items: end;
+		gap: var(--ui-space-3) var(--ui-space-6);
+	}
+	.editor-note {
+		max-width: var(--ui-container-sm);
+	}
+	.editor-save {
+		display: grid;
+		justify-items: end;
+		gap: var(--ui-space-1-5);
+	}
+	.editor-bar > .editor-wide {
+		grid-column: 1 / -1;
+	}
+	/* Without a notice, its live region takes no row of the bar. */
+	.editor-notice:not(:has(.meeko-ui-alert)) {
+		display: contents;
+	}
+	.editor-frontmatter {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(min(var(--ui-floating-panel-width), 100%), 1fr));
+		gap: var(--ui-space-3) var(--ui-space-4);
+	}
+	.editor-frontmatter > .editor-wide {
+		grid-column: 1 / -1;
+	}
+	/* The two panes start and end at the same height: same header, same gap under it, same frame. */
+	.editor-panes {
+		--ui-markdown-editor-height: max(30.625rem, calc(100dvh - 15.375rem));
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		align-items: start;
+		gap: var(--ui-space-4);
+	}
+	.editor-preview-pane {
+		gap: var(--ui-space-2);
+	}
+	.editor-issues {
+		display: grid;
+		gap: var(--ui-space-1-5);
+		margin: 0;
+		padding: 0;
+		font-size: var(--ui-font-size-sm);
+		list-style: none;
+	}
+	.editor-issues li {
+		display: grid;
+		grid-template-columns: auto minmax(0, 1fr) auto;
+		align-items: center;
+		gap: var(--ui-space-2);
+	}
+	.editor-issues code {
+		overflow-wrap: anywhere;
+	}
+	/* The render of the site in a sandboxed iframe; its rules live in the document inside it. */
+	.editor-preview {
+		display: block;
+		transition: opacity var(--ui-duration-base) var(--ui-ease-out);
+		box-sizing: border-box;
+		border: var(--ui-border-width) solid var(--ui-color-border);
+		border-radius: var(--ui-radius-lg);
+		background: var(--ui-color-bg);
+		width: 100%;
+		height: var(--ui-markdown-editor-height);
+	}
+	.editor-preview[data-stale] {
+		opacity: var(--ui-opacity-subtle);
+	}
+	@media (max-width: 75rem) {
+		.editor-panes {
+			grid-template-columns: minmax(0, 1fr);
+		}
+		.editor-panes {
+			--ui-markdown-editor-height: 28rem;
+		}
+		.editor-preview {
+			height: 70dvh;
+			min-height: 22rem;
+		}
+	}
+	@media (max-width: 48rem) {
+		.editor-bar {
+			grid-template-columns: minmax(0, 1fr);
+		}
+		.editor-save {
+			justify-items: start;
+		}
+		.editor-issues li {
+			grid-template-columns: minmax(0, 1fr);
+			justify-items: start;
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.editor-preview {
+			transition: none;
+		}
+	}
+</style>

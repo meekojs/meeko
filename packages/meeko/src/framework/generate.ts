@@ -1,32 +1,34 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import { join, relative, resolve } from "node:path";
-import { discoverConfiguredLayouts, discoverConfiguredRoutes, loadMeekoConfig } from "./config.js";
-import { discoverRouteMiddleware } from "./route-middleware-discovery.js";
-import { resolveThemeConfig } from "./theme.js";
-import type { ResolvedThemeConfig } from "./theme.js";
+import { mkdir, writeFile } from 'node:fs/promises'
+import { join, relative, resolve } from 'node:path'
+
+import type { ResolvedThemeConfig } from '../shared/theme'
+
+import { resolveThemeConfig } from '../shared/theme'
+import { discoverConfiguredLayouts, discoverConfiguredRoutes, loadMeekoConfig } from './config'
+import { discoverRouteMiddleware } from './route-middleware-discovery'
 
 export interface GeneratedRouteFiles {
-  readonly types: string;
-  readonly manifest: string;
-  readonly count: number;
+	readonly types: string
+	readonly manifest: string
+	readonly count: number
 }
 
 function paramsFor(id: string): readonly string[] {
-  const params: string[] = [];
-  for (const part of id.split("/").filter(Boolean)) {
-    const match = /^\[(?:\.\.\.)?([A-Za-z_$][\w$]*)\]$/.exec(part);
-    if (!match) continue;
-    const name = match[1]!;
-    if (params.includes(name)) throw new Error(`Duplicate route parameter ${name} in ${id}`);
-    params.push(name);
-  }
-  return params;
+	const params: string[] = []
+	for (const part of id.split('/').filter(Boolean)) {
+		const match = /^\[(?:\.\.\.)?([A-Za-z_$][\w$]*)\]$/.exec(part)
+		if (!match) continue
+		const name = match[1]!
+		if (params.includes(name)) throw new Error(`Duplicate route parameter ${name} in ${id}`)
+		params.push(name)
+	}
+	return params
 }
 
 function portable(root: string, file: string): string {
-  const path = relative(root, file).replaceAll("\\", "/");
-  if (path.startsWith("../") || path === "..") throw new Error(`Route file escapes project root: ${file}`);
-  return path;
+	const path = relative(root, file).replaceAll('\\', '/')
+	if (path.startsWith('../') || path === '..') throw new Error(`Route file escapes project root: ${file}`)
+	return path
 }
 
 /**
@@ -34,97 +36,105 @@ function portable(root: string, file: string): string {
  * `.meeko/types/routes.d.ts` and the editor's program declare the same members.
  */
 export function generatedThemeLines(theme: ResolvedThemeConfig): string[] {
-  const union = (names: readonly string[]): string => names.map((name) => JSON.stringify(name)).join(" | ");
-  return [
-    "  // From theme of meeko.config.ts.",
-    "  interface GeneratedTheme {",
-    `    readonly themes: ${union(theme.themes)};`,
-    `    readonly choices: ${union([...theme.themes, ...theme.system ? ["system"] : []])};`,
-    "  }",
-  ];
+	const union = (names: readonly string[]): string => names.map((name) => JSON.stringify(name)).join(' | ')
+	return [
+		'  // From theme of meeko.config.ts.',
+		'  interface GeneratedTheme {',
+		`    readonly themes: ${union(theme.themes)};`,
+		`    readonly choices: ${union([...theme.themes, ...(theme.system ? ['system'] : [])])};`,
+		'  }',
+	]
 }
 
 /** Generates public route types and a portable manifest from one route discovery pass. */
 export async function generateRoutes(projectRoot: string): Promise<GeneratedRouteFiles> {
-  const root = resolve(projectRoot);
-  const routes = await discoverConfiguredRoutes(root);
-  const types = join(root, ".meeko", "types", "routes.d.ts");
-  const manifest = join(root, ".meeko", "manifests", "routes.json");
-  const virtualTypes = join(root, ".meeko", "types", "virtual-pages.d.ts");
-  const lines = routes.map((route) => {
-    const params = paramsFor(route.id);
-    const shape = params.length ? `{ ${params.map((param) => `${JSON.stringify(param)}: string`).join("; ")} }` : "Record<never, never>";
-    return `    ${JSON.stringify(route.id)}: ${shape};`;
-  });
-  // `theme` of meeko.config.ts types useTheme() with the literal union of its themes.
-  const theme = resolveThemeConfig((await loadMeekoConfig(root)).theme);
-  const themeLines = theme ? generatedThemeLines(theme) : [];
-  // Named layouts with the props of each, which `definePage`, `defineGroup` and `useLayout` check.
-  const typesDirectory = join(root, ".meeko", "types");
-  const layoutLines = Object.entries(await discoverConfiguredLayouts(root)).sort(([left], [right]) => left.localeCompare(right)).map(([name, file]) => {
-    const path = relative(typesDirectory, file).replaceAll("\\", "/");
-    // Meeko declares the components of the project; a layout of an installed package has no declaration.
-    const declared = !relative(root, file).replaceAll("\\", "/").startsWith("../") && !path.split("/").includes("node_modules");
-    return `    ${JSON.stringify(name)}: ${declared ? `import(${JSON.stringify(path.startsWith(".") ? path : `./${path}`)}).ComponentProps` : "Record<string, unknown>"};`;
-  });
-  const pageLayoutLines = routes.map((route) => `    ${JSON.stringify(route.id)}: ${route.layout ? JSON.stringify(route.layout.name) : "false"};`);
-  // Named route middleware, which `middleware` of `definePage` and `defineGroup` names.
-  const middlewareLines = Object.entries((await discoverRouteMiddleware(root)).named).sort(([left], [right]) => left.localeCompare(right))
-    .map(([name, file]) => `    ${JSON.stringify(name)}: ${JSON.stringify(portable(root, file))};`);
-  const declarations = [
-    "// Generated by Meeko. Edit app/pages instead.",
-    'import "@meekojs/meeko/framework";',
-    'declare module "@meekojs/meeko/framework" {',
-    "  interface GeneratedRoutes {",
-    ...lines,
-    "  }",
-    ...themeLines,
-    ...layoutLines.length ? ["  // From app/layouts, the layers and meeko.addLayout.", "  interface GeneratedLayouts {", ...layoutLines, "  }"] : [],
-    "  interface GeneratedPageLayouts {",
-    ...pageLayoutLines,
-    "  }",
-    // Without named middleware, "#none" (never a middleware name) makes RouteMiddlewareName never.
-    "  // From app/middleware: defineRouteMiddleware(..., { global: false }), and defineServerRouteMiddleware in *.server.ts.",
-    "  interface GeneratedRouteMiddleware {",
-    ...middlewareLines.length ? middlewareLines : ['    "#none": never;'],
-    "  }",
-    "}",
-    `export type RouteId = ${routes.length ? routes.map((route) => JSON.stringify(route.id)).join(" | ") : "never"};`,
-    'export type RouteParams<Id extends RouteId> = import("@meekojs/meeko/framework").GeneratedRoutes[Id];',
-    "export {};",
-    "",
-  ].join("\n");
-  const portableRoutes = routes.map((route) => ({
-    id: route.id,
-    file: portable(root, route.file),
-    layouts: route.layouts.map((layout) => portable(root, layout)),
-    ...(route.error ? { error: portable(root, route.error) } : {}),
-    ...(route.sidecar ? { sidecar: portable(root, route.sidecar) } : {}),
-    ...(route.render ? { render: route.render } : {}),
-    ...(route.layout ? { layout: { ...route.layout, file: portable(root, route.layout.file) } } : {}),
-    ...(route.middleware?.length ? { middleware: route.middleware.map((file) => portable(root, file)) } : {}),
-    ...(route.serverMiddleware?.length ? { serverMiddleware: route.serverMiddleware.map((file) => portable(root, file)) } : {}),
-  }));
-  await mkdir(join(root, ".meeko", "types"), { recursive: true });
-  await mkdir(join(root, ".meeko", "manifests"), { recursive: true });
-  await writeFile(types, declarations, "utf8");
-  await writeFile(virtualTypes, [
-    'declare module "virtual:meeko-client-pages" { export const modules: Record<string, () => Promise<unknown>>; }',
-    'declare module "virtual:meeko-manifest/client" { export const routes: readonly import("@meekojs/meeko/framework").RouteRecord[]; export const errorPage: import("@meekojs/meeko/framework").ErrorPageRecord | undefined; export const documentConfig: import("@meekojs/meeko/framework").DocumentConfig | undefined; }',
-    'declare module "virtual:meeko-client-routes" { export const modules: Record<string, () => Promise<unknown>>; }',
-    'declare module "virtual:meeko-plugins/client" { export const plugins: readonly import("@meekojs/meeko/framework").PluginRegistration[]; }',
-    'declare module "virtual:meeko-middleware/client" { export const middleware: readonly (readonly [string, unknown])[]; export const namedMiddleware: Record<string, () => Promise<unknown>>; }',
-    'declare module "virtual:meeko-server-app" {',
-    '  export const manifest: import("@meekojs/meeko/server").AppManifest;',
-    '  export const plugins: readonly import("@meekojs/meeko/framework").PluginRegistration[];',
-    '  export const runtime: import("@meekojs/meeko/server").ServerRuntimeDefinition<any, any> | undefined;',
-    '  export const appName: string | undefined;',
-    '  export const loadRedis: (() => Promise<unknown>) | undefined;',
-    '  export const nodeServer: { readonly host: string; readonly port: number };',
-    '  export function load(key: string): Promise<unknown>;',
-    '}',
-    "",
-  ].join("\n"), "utf8");
-  await writeFile(manifest, `${JSON.stringify({ version: 1, routes: portableRoutes }, null, 2)}\n`, "utf8");
-  return { types, manifest, count: routes.length };
+	const root = resolve(projectRoot)
+	const routes = await discoverConfiguredRoutes(root)
+	const types = join(root, '.meeko', 'types', 'routes.d.ts')
+	const manifest = join(root, '.meeko', 'manifests', 'routes.json')
+	const virtualTypes = join(root, '.meeko', 'types', 'virtual-pages.d.ts')
+	const lines = routes.map((route) => {
+		const params = paramsFor(route.id)
+		const shape = params.length ? `{ ${params.map((param) => `${JSON.stringify(param)}: string`).join('; ')} }` : 'Record<never, never>'
+		return `    ${JSON.stringify(route.id)}: ${shape};`
+	})
+	// `theme` of meeko.config.ts types useTheme() with the literal union of its themes.
+	const theme = resolveThemeConfig((await loadMeekoConfig(root)).theme)
+	const themeLines = theme ? generatedThemeLines(theme) : []
+	// Named layouts with the props of each, which `definePage`, `defineGroup` and `useLayout` check.
+	const typesDirectory = join(root, '.meeko', 'types')
+	const layoutLines = Object.entries(await discoverConfiguredLayouts(root))
+		.sort(([left], [right]) => left.localeCompare(right))
+		.map(([name, file]) => {
+			const path = relative(typesDirectory, file).replaceAll('\\', '/')
+			// Meeko declares the components of the project; a layout of an installed package has no declaration.
+			const declared = !relative(root, file).replaceAll('\\', '/').startsWith('../') && !path.split('/').includes('node_modules')
+			return `    ${JSON.stringify(name)}: ${declared ? `import(${JSON.stringify(path.startsWith('.') ? path : `./${path}`)}).ComponentProps` : 'Record<string, unknown>'};`
+		})
+	const pageLayoutLines = routes.map((route) => `    ${JSON.stringify(route.id)}: ${route.layout ? JSON.stringify(route.layout.name) : 'false'};`)
+	// Named route middleware, which `middleware` of `definePage` and `defineGroup` names.
+	const middlewareLines = Object.entries((await discoverRouteMiddleware(root)).named)
+		.sort(([left], [right]) => left.localeCompare(right))
+		.map(([name, file]) => `    ${JSON.stringify(name)}: ${JSON.stringify(portable(root, file))};`)
+	const declarations = [
+		'// Generated by Meeko. Edit app/pages instead.',
+		'import "@meekojs/meeko/framework";',
+		'declare module "@meekojs/meeko/framework" {',
+		'  interface GeneratedRoutes {',
+		...lines,
+		'  }',
+		...themeLines,
+		...(layoutLines.length ? ['  // From app/layouts, the layers and meeko.addLayout.', '  interface GeneratedLayouts {', ...layoutLines, '  }'] : []),
+		'  interface GeneratedPageLayouts {',
+		...pageLayoutLines,
+		'  }',
+		// Without named middleware, "#none" (never a middleware name) makes RouteMiddlewareName never.
+		'  // From app/middleware: defineRouteMiddleware(..., { global: false }), and defineServerRouteMiddleware in *.server.ts.',
+		'  interface GeneratedRouteMiddleware {',
+		...(middlewareLines.length ? middlewareLines : ['    "#none": never;']),
+		'  }',
+		'}',
+		`export type RouteId = ${routes.length ? routes.map((route) => JSON.stringify(route.id)).join(' | ') : 'never'};`,
+		'export type RouteParams<Id extends RouteId> = import("@meekojs/meeko/framework").GeneratedRoutes[Id];',
+		'export {};',
+		'',
+	].join('\n')
+	const portableRoutes = routes.map((route) => ({
+		id: route.id,
+		file: portable(root, route.file),
+		layouts: route.layouts.map((layout) => portable(root, layout)),
+		...(route.error ? { error: portable(root, route.error) } : {}),
+		...(route.sidecar ? { sidecar: portable(root, route.sidecar) } : {}),
+		...(route.render ? { render: route.render } : {}),
+		...(route.layout ? { layout: { ...route.layout, file: portable(root, route.layout.file) } } : {}),
+		...(route.middleware?.length ? { middleware: route.middleware.map((file) => portable(root, file)) } : {}),
+		...(route.serverMiddleware?.length ? { serverMiddleware: route.serverMiddleware.map((file) => portable(root, file)) } : {}),
+	}))
+	await mkdir(join(root, '.meeko', 'types'), { recursive: true })
+	await mkdir(join(root, '.meeko', 'manifests'), { recursive: true })
+	await writeFile(types, declarations, 'utf8')
+	await writeFile(
+		virtualTypes,
+		[
+			'declare module "virtual:meeko-client-pages" { export const modules: Record<string, () => Promise<unknown>>; }',
+			'declare module "virtual:meeko-global-styles" {}',
+			'declare module "virtual:meeko-manifest/client" { export const routes: readonly import("@meekojs/meeko/framework").RouteRecord[]; export const errorPage: import("@meekojs/meeko/framework").ErrorPageRecord | undefined; export const documentConfig: import("@meekojs/meeko/framework").DocumentConfig | undefined; export const viewTransitions: boolean; }',
+			'declare module "virtual:meeko-client-routes" { export const modules: Record<string, () => Promise<unknown>>; }',
+			'declare module "virtual:meeko-plugins/client" { export const plugins: readonly import("@meekojs/meeko/framework").PluginRegistration[]; }',
+			'declare module "virtual:meeko-middleware/client" { export const middleware: readonly (readonly [string, unknown])[]; export const namedMiddleware: Record<string, () => Promise<unknown>>; }',
+			'declare module "virtual:meeko-server-app" {',
+			'  export const manifest: import("@meekojs/meeko/server").AppManifest;',
+			'  export const plugins: readonly import("@meekojs/meeko/framework").PluginRegistration[];',
+			'  export const runtime: import("@meekojs/meeko/server").ServerRuntimeDefinition<any, any> | undefined;',
+			'  export const appName: string | undefined;',
+			'  export const loadRedis: (() => Promise<unknown>) | undefined;',
+			'  export const nodeServer: { readonly host: string; readonly port: number };',
+			'  export function load(key: string): Promise<unknown>;',
+			'}',
+			'',
+		].join('\n'),
+		'utf8',
+	)
+	await writeFile(manifest, `${JSON.stringify({ version: 1, routes: portableRoutes }, null, 2)}\n`, 'utf8')
+	return { types, manifest, count: routes.length }
 }

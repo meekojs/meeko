@@ -1,0 +1,28 @@
+<script lang="ts">
+	import { computed } from '@meekojs/meeko'
+
+	import type { UISliderProps } from '../types/forms'
+
+	const { label, class: className, style, ...rest } = defineProps<UISliderProps>()
+
+	const value = defineModel<number>({ default: 50 })
+
+	// The filled part of the track, which WebKit and Blink cannot draw without the position.
+	const fill = computed(() => {
+		const min = Number(rest.min ?? 0)
+		const max = Number(rest.max ?? 100)
+		return max > min ? Math.min(100, Math.max(0, ((value.value - min) / (max - min)) * 100)) : 0
+	})
+</script>
+
+<template>
+	<label bind:class="['meeko-ui-slider', className].filter(Boolean).join(' ')">
+		<span>{label}</span>
+		<input
+			type="range"
+			model="value"
+			bind:style="[style, '--slider-fill: ' + fill.value + '%'].filter(Boolean).join('; ')"
+			bind="rest"
+		/>
+	</label>
+</template>

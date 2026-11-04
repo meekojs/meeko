@@ -1,35 +1,42 @@
-import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { createRequire } from "node:module";
-import { dirname, join, resolve } from "node:path";
-import test from "node:test";
+import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
+import { dirname, join, resolve } from 'node:path'
+import test from 'node:test'
 
-const require = createRequire(import.meta.url);
+const require = createRequire(import.meta.url)
 // TypeScript 7, the compiler that `meeko check` runs on applications.
-const tsc = join(dirname(require.resolve("typescript/package.json")), "bin", "tsc");
+const tsc = join(dirname(require.resolve('typescript/package.json')), 'bin', 'tsc')
 
 const tsconfig = JSON.stringify({
-  compilerOptions: {
-    target: "ES2022", module: "NodeNext", moduleResolution: "NodeNext", lib: ["ES2022", "DOM"], types: [],
-    strict: true, exactOptionalPropertyTypes: true, noEmit: true, skipLibCheck: true,
-  },
-  include: ["*.ts"],
-});
+	compilerOptions: {
+		target: 'ES2022',
+		module: 'NodeNext',
+		moduleResolution: 'NodeNext',
+		lib: ['ES2022', 'DOM'],
+		types: [],
+		strict: true,
+		exactOptionalPropertyTypes: true,
+		noEmit: true,
+		skipLibCheck: true,
+	},
+	include: ['*.ts'],
+})
 
 /** Type-checks `files` against the built declarations, as an application that imports the package. */
 async function check(files: Record<string, string>): Promise<{ status: number | null; output: string }> {
-  await mkdir(resolve(".meeko"), { recursive: true });
-  // Inside the package, so `@meekojs/meeko/server` resolves to its own exports.
-  const root = await mkdtemp(resolve(".meeko/session-types-"));
-  try {
-    await writeFile(join(root, "tsconfig.json"), tsconfig);
-    for (const [name, source] of Object.entries(files)) await writeFile(join(root, name), source);
-    const result = spawnSync(process.execPath, [tsc, "-p", join(root, "tsconfig.json")], { encoding: "utf8", windowsHide: true });
-    return { status: result.status, output: `${result.stdout}${result.stderr}` };
-  } finally {
-    await rm(root, { recursive: true, force: true });
-  }
+	await mkdir(resolve('.meeko'), { recursive: true })
+	// Inside the package, so `@meekojs/meeko/server` resolves to its own exports.
+	const root = await mkdtemp(resolve('.meeko/session-types-'))
+	try {
+		await writeFile(join(root, 'tsconfig.json'), tsconfig)
+		for (const [name, source] of Object.entries(files)) await writeFile(join(root, name), source)
+		const result = spawnSync(process.execPath, [tsc, '-p', join(root, 'tsconfig.json')], { encoding: 'utf8', windowsHide: true })
+		return { status: result.status, output: `${result.stdout}${result.stderr}` }
+	} finally {
+		await rm(root, { recursive: true, force: true })
+	}
 }
 
 const declared = `import { defineApiRoute, defineRpc, defineSocketChannel, SessionHandle } from "@meekojs/meeko/server";
@@ -104,7 +111,7 @@ declare const handle: SessionHandle;
 const handleUser: string | undefined = handle.current?.data.user;
 
 void user; void role; void wrongRole; void pageUser; void shape; void handleUser;
-`;
+`
 
 const undeclared = `import type { RequestContext } from "@meekojs/meeko/server";
 
@@ -117,14 +124,14 @@ void data.user;
 void context.session.create({ userId: "u_1" });
 void context.session.create("plain");
 void unknownData;
-`;
+`
 
-test("declaring MeekoSession types session data in API, RPC, Socket, pages, authorize and locals", async () => {
-  const result = await check({ "app.ts": declared });
-  assert.equal(result.status, 0, result.output);
-});
+test('declaring MeekoSession types session data in API, RPC, Socket, pages, authorize and locals', async () => {
+	const result = await check({ 'app.ts': declared })
+	assert.equal(result.status, 0, result.output)
+})
 
-test("without a MeekoSession declaration session data stays unknown", async () => {
-  const result = await check({ "app.ts": undeclared });
-  assert.equal(result.status, 0, result.output);
-});
+test('without a MeekoSession declaration session data stays unknown', async () => {
+	const result = await check({ 'app.ts': undeclared })
+	assert.equal(result.status, 0, result.output)
+})

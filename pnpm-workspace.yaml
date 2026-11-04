@@ -1,11 +1,11 @@
 packages:
-    - packages/*
-    - apps/*
+  - packages/*
+  - apps/*
 
 allowBuilds:
-    esbuild: true
-    sharp: true
-    workerd: true
+  esbuild: true
+  sharp: true
+  workerd: true
 
 # Command shims do not add node_modules/.pnpm/node_modules to NODE_PATH: in a workspace it holds
 # every package of every project, and code outside node_modules (the tests' temporary projects)

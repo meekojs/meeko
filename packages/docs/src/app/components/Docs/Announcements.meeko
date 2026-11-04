@@ -1,0 +1,70 @@
+<script lang="ts">
+	// The dashboard's notices, as <UIAlert>. It receives them: the state, the cookie and the endpoint belong
+	// to each site, and the moderation preview of the dashboard paints the same banner with its own list.
+	import { useI18n } from '@meekojs/i18n'
+
+	import type { AnnouncementTone, PublicAnnouncement } from '../../../runtime/state'
+
+	import { announcementRole } from '../../../runtime/state'
+
+	const props = defineProps<{ items: readonly PublicAnnouncement[] }>()
+
+	const emit = defineEmits<{ dismiss: [id: number] }>()
+
+	const { t } = useI18n()
+	const root = useElementRef('root')
+
+	const icons: Record<AnnouncementTone, string> = {
+		info: 'M8 14.25A6.25 6.25 0 1 0 8 1.75a6.25 6.25 0 0 0 0 12.5ZM8 7.25v4M8 4.75v.01',
+		success: 'M8 14.25A6.25 6.25 0 1 0 8 1.75a6.25 6.25 0 0 0 0 12.5ZM5.25 8.25l1.9 1.9 3.6-3.9',
+		warning: 'M8 14.25A6.25 6.25 0 1 0 8 1.75a6.25 6.25 0 0 0 0 12.5ZM8 4.75v4M8 11.25v.01',
+		danger: 'M7.13 2.5 1.6 12a1 1 0 0 0 .87 1.5h11.06a1 1 0 0 0 .87-1.5L8.87 2.5a1 1 0 0 0-1.74 0ZM8 6v3.25M8 11.5v.01',
+	}
+
+	/** The focus stays in the notices while any is left, and then moves to the content. */
+	function close(id: number): void {
+		const main = document.querySelector<HTMLElement>('main')
+		emit('dismiss', id)
+		requestAnimationFrame(() => {
+			const next = root.value?.querySelector<HTMLElement>('.meeko-ui-dismiss')
+			if (next) next.focus()
+			else main?.focus({ preventScroll: true })
+		})
+	}
+</script>
+
+<template>
+	<div
+		ref:root
+		class="docs-announcements"
+	>
+		<UIAlert
+			each:of="props.items"
+			each:as="item"
+			each:key="item.id"
+			class="docs-announcement"
+			bind:dismiss="true"
+			bind:tone="item.tone"
+			bind:role="announcementRole(item.tone)"
+			bind:description="item.message"
+			bind:closeLabel="t('shell.announcements.close')"
+			on:dismiss="() => close(item.id)"
+		>
+			<snippet name="icon">
+				<svg
+					viewBox="0 0 16 16"
+					aria-hidden="true"
+				>
+					<path bind:d="icons[item.tone]" />
+				</svg>
+			</snippet>
+		</UIAlert>
+	</div>
+</template>
+
+<style scoped>
+	.docs-announcements {
+		display: grid;
+		gap: var(--ui-space-2);
+	}
+</style>

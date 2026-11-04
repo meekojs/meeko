@@ -1,0 +1,80 @@
+<script lang="ts">
+	import type { Job } from '../../../shared/schemas/dashboard'
+
+	import { jobSummary } from '../../utils/i18n'
+	import { jobTones } from '../../utils/labels'
+
+	const props = defineProps<{ job: Job | null; empty: string }>()
+
+	const i18n = useI18n()
+	const { t } = i18n
+	const format = useFormat()
+	const id = useId()
+
+	const duration = (job: Job) => {
+		if (!job.finishedAt) return ''
+		const seconds = (new Date(job.finishedAt).getTime() - new Date(job.startedAt).getTime()) / 1000
+		return seconds < 60 ? t('job.seconds', { value: i18n.number(seconds, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) }) : t('job.minutes', { minutes: Math.floor(seconds / 60), seconds: Math.round(seconds % 60) })
+	}
+	const summary = computed(() => (props.job ? jobSummary(i18n, props.job) : null))
+	const hasOutput = computed(() => Boolean(props.job?.output.length))
+	const log = computed(() => {
+		const job = props.job
+		if (!job) return ''
+		const dropped = job.dropped > 0 ? `${t('job.dropped', { count: job.dropped })}\n` : ''
+		return dropped + (hasOutput.value ? job.output.join('\n') : t('job.noOutput'))
+	})
+</script>
+
+<template>
+	<section
+		class="dash-tight"
+		bind:aria-labelledby="id + '-title'"
+		bind:aria-busy="props.job?.status === 'running' ? 'true' : undefined"
+	>
+		<UIEmpty
+			if:when="!props.job"
+			bind:title="props.empty"
+		/>
+		<header
+			if:when="props.job"
+			class="dash-row"
+		>
+			<h3
+				class="dash-heading"
+				bind:id="id + '-title'"
+			>
+				{props.job ? t(`labels.job.${props.job.kind}`) : ''}
+			</h3>
+			<span role="status">
+				<UIBadge
+					bind:dot="true"
+					bind:tone="props.job ? jobTones[props.job.status] : 'neutral'"
+				>
+					{props.job ? t(`labels.jobStatus.${props.job.status}`) : ''}
+				</UIBadge>
+			</span>
+		</header>
+		<p
+			if:when="props.job"
+			class="dash-meta"
+		>
+			{t('job.started', { date: format.date(props.job?.startedAt) })}
+			<span if:when="props.job?.finishedAt">· {props.job ? duration(props.job) : ''}</span>
+			<span if:when="props.job?.exitCode !== null && props.job?.exitCode !== undefined && props.job?.exitCode !== 0">· {t('job.exitCode', { code: String(props.job?.exitCode) })}</span>
+		</p>
+		<p
+			if:when="summary.value"
+			class="dash-text"
+		>
+			{summary.value}
+		</p>
+		<UICodeBlock
+			if:when="props.job"
+			mode="log"
+			bind:code="log.value"
+			bind:label="props.job ? t('job.output', { job: t(`labels.job.${props.job.kind}`).toLocaleLowerCase(i18n.locale) }) : t('job.outputFallback')"
+			bind:textLang="hasOutput.value ? 'en' : undefined"
+		/>
+	</section>
+</template>

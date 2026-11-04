@@ -33,17 +33,17 @@ export default defineMeekoConfig({
 
 ## Opciones
 
-| Opción | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `appDirs` | `readonly string[]` | `[]` | Desde `1.3`. Carpetas dentro de `app/`, con el ámbito de `app/`: componentes y `.ts` de `app/`, en el navegador y en SSR; también el código de servidor. No `shared/`. |
-| `sharedDirs` | `readonly string[]` | `[]` | Desde `1.3`. Carpetas dentro de `shared/`, con el ámbito de `shared/`: todo el proyecto. |
-| `serverDirs` | `readonly string[]` | `[]` | Carpetas dentro de `server/`, sólo para el código de servidor: `server/`, `<script server>`, sidecars `*.route.ts` y `*.server.ts`. |
+| Opción       | Tipo                | Por defecto | Descripción                                                                                                                                                            |
+| ------------ | ------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `appDirs`    | `readonly string[]` | `[]`        | Desde `1.3`. Carpetas dentro de `app/`, con el ámbito de `app/`: componentes y `.ts` de `app/`, en el navegador y en SSR; también el código de servidor. No `shared/`. |
+| `sharedDirs` | `readonly string[]` | `[]`        | Desde `1.3`. Carpetas dentro de `shared/`, con el ámbito de `shared/`: todo el proyecto.                                                                               |
+| `serverDirs` | `readonly string[]` | `[]`        | Carpetas dentro de `server/`, sólo para el código de servidor: `server/`, `<script server>`, sidecars `*.route.ts` y `*.server.ts`.                                    |
 
 Cada entrada es una ruta relativa que empieza por su raíz (`app/…`, `shared/…`, `server/…`), con `/` o `\` y sin segmentos `.` ni `..`.
 
 ## Resultado
 
-Cada carpeta se lee de forma recursiva, en el proyecto y en cada layer. Sólo sus `.ts` aportan exports (sin `*.test.ts`, `*.spec.ts` ni `*.d.ts`); los `.meeko` de estas carpetas no son componentes. Los sufijos `.client.ts`, `.server.ts` y `.shared.ts` mandan sobre el ámbito de la carpeta.
+Cada carpeta se lee de forma recursiva, en el proyecto y en cada layer. Sus `.ts` y `.mts` aportan exports (sin `*.test.ts`, `*.spec.ts` ni `*.d.ts`); los `.meeko` de estas carpetas no son componentes. Los sufijos `.client.ts`, `.server.ts` y `.shared.ts` mandan sobre el ámbito de la carpeta. Los nombres de los exports son planos: la subcarpeta no se añade al nombre, a diferencia de los componentes (`App/Card.meeko` es `AppCard`). `export function total()` en `app/utils/cart/total.ts` es `total`, no `CartTotal`, y dos archivos que exportan `total` en un ámbito son el error de nombre repetido, aunque estén en carpetas distintas. Un `.mts` aporta sus exports como un `.ts`. Un `.cts` sólo sirve para tipos: `export type` funciona, pero un valor con `export` da `TS1287` en `meeko check` y `meeko build` y hace responder `500` a la página en `meeko dev`, y `export =` no aporta ningún nombre.
 
 - Un `type` o una `interface` llegan con `import type`.
 - Un export del proyecto con el nombre de un autoimport del framework (`useRoute`, `useForm`…) tiene prioridad.
@@ -63,6 +63,7 @@ export async function markReady(id: string): Promise<{ id: string; status: "read
 ```
 
 <!-- no-check -->
+
 ```ts
 // server/api/orders/[id]/ready.post.ts: markReady llega por autoimport
 export default defineApiRoute({ params: orderParams, handler: ({ params }) => markReady(params.id) });

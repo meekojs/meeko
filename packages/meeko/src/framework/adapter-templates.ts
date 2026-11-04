@@ -36,10 +36,12 @@ async function prerenderSource(): Promise<PrerenderSource | undefined> {
     },
   };
 }
-`;
+`
 
 /** Bun adapter entry; \`meeko build --adapter bun\` bundles it to .meeko/output/bun/index.js. */
 export const bunEntrySource = `import { networkInterfaces } from "node:os";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { createBunAssetReader, createBunServer } from "@meekojs/meeko/bun";
 import { listeningMessage, meekoEnv } from "@meekojs/meeko/internal";
 import { handleProcessErrors } from "@meekojs/meeko/server";
@@ -56,6 +58,8 @@ interface BunRuntime {
 
 const bun = (globalThis as unknown as { Bun: BunRuntime }).Bun;
 const output = new URL("./", import.meta.url);
+// The project root: MEEKO_ROOT for an output deployed elsewhere, or the folder three levels up (.meeko/output/bun).
+const projectRoot = bun.env.MEEKO_ROOT ? resolve(bun.env.MEEKO_ROOT) : resolve(fileURLToPath(output), "../../..");
 const readText = (file: URL) => bun.file(file).text();
 
 ${prerenderSource}
@@ -65,6 +69,7 @@ export async function createBunApp() {
   const publicOrigin = meekoEnv(bun.env, "PUBLIC_ORIGIN");
   return createApp({
     production: true,
+    root: projectRoot,
     platform: {
       name: "bun",
       env: bun.env,
@@ -104,10 +109,12 @@ export async function start() {
 }
 
 if (import.meta.main) await start();
-`;
+`
 
 /** Deno adapter entry; \`meeko build --adapter deno\` bundles it to .meeko/output/deno/main.js. */
-export const denoEntrySource = `import { createDenoAssetReader, serveDeno } from "@meekojs/meeko/deno";
+export const denoEntrySource = `import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { createDenoAssetReader, serveDeno } from "@meekojs/meeko/deno";
 import { listeningMessage, meekoEnv } from "@meekojs/meeko/internal";
 import type { PrerenderSource, PrerenderedPage } from "@meekojs/meeko/server";
 import { createApp, load, manifest } from "./entry-server.ts";
@@ -123,6 +130,8 @@ interface DenoRuntime {
 
 const deno = (globalThis as unknown as { Deno: DenoRuntime }).Deno;
 const output = new URL("./", import.meta.url);
+// The project root: MEEKO_ROOT for an output deployed elsewhere, or the folder three levels up (.meeko/output/deno).
+const projectRoot = deno.env.get("MEEKO_ROOT") ? resolve(deno.env.get("MEEKO_ROOT")!) : resolve(fileURLToPath(output), "../../..");
 const readText = (file: URL) => deno.readTextFile(file);
 
 ${prerenderSource}
@@ -133,6 +142,7 @@ export async function createDenoApp() {
   const publicOrigin = meekoEnv(env, "PUBLIC_ORIGIN");
   return createApp({
     production: true,
+    root: projectRoot,
     platform: {
       name: "deno",
       env,
@@ -164,14 +174,14 @@ export async function start() {
 }
 
 if (import.meta.main) await start();
-`;
+`
 
 /**
  * Cloudflare Workers entry; `meeko build --adapter cloudflare` bundles it to
  * .meeko/output/cloudflare/worker.js. Only Worker entrypoints are exported.
  */
 export function cloudflareEntrySource(socketClassName: string): string {
-  return `import { DurableObject } from "cloudflare:workers";
+	return `import { DurableObject } from "cloudflare:workers";
 import {
   createCloudflareAssetReader, createCloudflarePrerenderSource, createSocketRoomClass, createWorker, DurableObjectSocketPubSub,
 } from "@meekojs/meeko/cloudflare";
@@ -205,5 +215,5 @@ export default createWorker(createCloudflareApp);
 
 /** Durable Object hosting the WebSockets of one Socket room. */
 export const ${socketClassName} = createSocketRoomClass(createCloudflareApp, DurableObject);
-`;
+`
 }

@@ -1,3 +1,3 @@
-import { conformanceSuite } from "./assertions.ts";
+import { conformanceSuite } from './assertions.ts'
 
-conformanceSuite("node");
+conformanceSuite('node')

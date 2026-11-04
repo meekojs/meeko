@@ -1,0 +1,147 @@
+# Entrega de las webs de meekojs.com (docs/deploy-meekojs.md) en el Coolify de voidcat-local.
+#
+# GitHub Actions (.github/workflows/ci.yml) sigue siendo la verificación completa del framework y de
+# la publicación en npm: Windows, los cuatro runtimes, e2e y paquetes. Este pipeline solo entrega las
+# webs y necesita lo que solo tiene el agente de voidcat-local: el socket de Docker, el registry, la
+# red `coolify` (la base de producción no publica puerto) y la API local de Coolify. Repite los gates
+# que afectan a las webs para que una imagen nunca salga de un commit que no los pasa.
+#
+# Dos maneras de llegar aquí:
+#
+# - **Un push a `main`**: gates, SonarQube y las imágenes con el SHA como etiqueta. No migra ni
+#   despliega nada.
+# - **Un pipeline manual sobre `main` con `MEEKOJS_DEPLOY=true`**, lanzado por una persona desde la UI
+#   de Woodpecker: lo mismo y después el release de contenido (migrar, importar y sincronizar) y el
+#   deploy en Coolify de los destinos de `MEEKOJS_TARGETS` (por defecto, `meeko ui i18n`). El
+#   dashboard solo entra con `MEEKOJS_TARGETS` que lo nombre y `MEEKOJS_DASHBOARD_READY=true`.
+#
+# Un manual sin `MEEKOJS_DEPLOY=true`, o sobre otra rama, solo construye. `concurrency: 1` pone los
+# pipelines en fila: dos releases nunca escriben a la vez en la base.
+#
+# Los pasos `images` y `release` montan el socket de Docker y el certificado del registry, y por eso
+# el repositorio debe estar marcado *trusted* para volúmenes, como mt, cdn, Quantum y Vuno.
+
+when:
+  - event: push
+    branch: main
+  - event: manual
+    branch: main
+
+concurrency: 1
+
+labels:
+  hostname: voidcat-local
+
+clone:
+  - name: git
+    image: woodpeckerci/plugin-git:latest@sha256:550075c844fcec0af41d9d28f9860aa5d8c43e1e9419be4b9266dc02c2f29804
+    settings:
+      partial: false
+      depth: 0
+
+steps:
+  # Imagen no-slim: trae git, que usan algunas pruebas y el análisis de SonarQube.
+  - name: install
+    image: node:24-bookworm@sha256:14078204b6bb268c107ceff6d3c43f45a888105e5c2b18b14c32b3409d93a1b0
+    environment:
+      CI: 'true'
+      NODE_OPTIONS: --max-old-space-size=8192
+    commands:
+      - corepack enable
+      - corepack prepare --activate
+      - pnpm install --frozen-lockfile
+      - pnpm run build
+
+  - name: gates
+    image: node:24-bookworm@sha256:14078204b6bb268c107ceff6d3c43f45a888105e5c2b18b14c32b3409d93a1b0
+    depends_on: [install]
+    environment:
+      CI: 'true'
+      NODE_OPTIONS: --max-old-space-size=8192
+    commands:
+      - corepack enable
+      - pnpm format:check
+      - pnpm design:check
+      - pnpm lint
+      - pnpm check:apps
+      - pnpm -F meeko-dashboard run check
+      # Sin DATABASE_URL las pruebas de integración se saltan; nunca apuntan a producción.
+      - pnpm -F meeko-site run test
+      - pnpm -F meeko-docs-content run test
+      - pnpm -F meeko-docs run test
+
+  # `failure: ignore`: el veredicto del Quality Gate queda a la vista sin retener la entrega, como en
+  # Vuno. Proyecto `meekojs-web` en el SonarQube oficial (sonarqube-dev).
+  - name: sonarqube
+    image: sonarsource/sonar-scanner-cli:12.1.0.3233_8.0.1@sha256:23ca0f137965d9dff2198074043fd48d386280bc5d0ccac8c8349cea4cf096a9
+    depends_on: [gates]
+    failure: ignore
+    environment:
+      SONAR_HOST_URL:
+        from_secret: sonar_host_url
+      SONAR_TOKEN:
+        from_secret: sonar_token
+    commands:
+      - sonar-scanner -Dsonar.qualitygate.wait=true -Dsonar.qualitygate.timeout=300
+
+  - name: images
+    image: docker:29-cli
+    depends_on: [gates]
+    environment:
+      REGISTRY_HOST:
+        from_secret: registry_host
+      REGISTRY_USERNAME:
+        from_secret: registry_username
+      REGISTRY_PASSWORD:
+        from_secret: registry_password
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /opt/woodpecker/buildkitd.toml:/opt/woodpecker/buildkitd.toml:ro
+      - /opt/woodpecker/certs:/opt/woodpecker/certs:ro
+    commands:
+      - sh deploy/ci-publish.sh
+
+  # Migraciones antes del deploy: son aditivas, y las webs en marcha siguen funcionando con ellas.
+  - name: release
+    image: docker:29-cli
+    depends_on: [images]
+    when:
+      - event: manual
+        evaluate: 'MEEKOJS_DEPLOY == "true"'
+    environment:
+      REGISTRY_HOST:
+        from_secret: registry_host
+      REGISTRY_USERNAME:
+        from_secret: registry_username
+      REGISTRY_PASSWORD:
+        from_secret: registry_password
+      DATABASE_URL:
+        from_secret: meekojs_database_url
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /opt/woodpecker/certs:/opt/woodpecker/certs:ro
+    commands:
+      - sh deploy/ci-release.sh
+
+  - name: deploy
+    image: alpine:3.22
+    depends_on: [release]
+    when:
+      - event: manual
+        evaluate: 'MEEKOJS_DEPLOY == "true"'
+    environment:
+      REGISTRY_HOST:
+        from_secret: registry_host
+      COOLIFY_API_URL:
+        from_secret: coolify_local_api_url
+      COOLIFY_TOKEN:
+        from_secret: coolify_local_token
+      COOLIFY_UUID_MEEKOJS_SITE:
+        from_secret: coolify_uuid_meekojs_site
+      COOLIFY_UUID_MEEKOJS_UI:
+        from_secret: coolify_uuid_meekojs_ui
+      COOLIFY_UUID_MEEKOJS_I18N:
+        from_secret: coolify_uuid_meekojs_i18n
+    commands:
+      - apk add --no-cache curl jq
+      - sh deploy/ci-deploy.sh

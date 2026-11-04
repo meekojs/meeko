@@ -1,24 +1,31 @@
-import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
-import { writeFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
-import test from "node:test";
-import ts from "@typescript/typescript6";
-import { createTempProject, linkRepositoryPackages } from "./helpers/temp-project.ts";
+import ts from '@typescript/typescript6'
+import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
+import { writeFile } from 'node:fs/promises'
+import { join, resolve } from 'node:path'
+import test from 'node:test'
+
+import { createTempProject, linkRepositoryPackages } from './helpers/temp-project.ts'
 
 const compilerOptions = {
-  target: "ES2022", module: "NodeNext", moduleResolution: "NodeNext", lib: ["ES2022", "DOM"], types: [],
-  strict: true, noEmit: true, skipLibCheck: true,
-};
+	target: 'ES2022',
+	module: 'NodeNext',
+	moduleResolution: 'NodeNext',
+	lib: ['ES2022', 'DOM'],
+	types: [],
+	strict: true,
+	noEmit: true,
+	skipLibCheck: true,
+}
 
 /** A temporary application that imports the built package, with `files` beside its tsconfig. */
 async function application(files: Record<string, string>, exactOptionalPropertyTypes: boolean): Promise<{ root: string; remove(): Promise<void> }> {
-  const project = await createTempProject("define-page-types-");
-  await linkRepositoryPackages(project.root);
-  await writeFile(join(project.root, "package.json"), JSON.stringify({ type: "module" }));
-  await writeFile(join(project.root, "tsconfig.json"), JSON.stringify({ compilerOptions: { ...compilerOptions, exactOptionalPropertyTypes }, include: ["*.ts"] }));
-  for (const [name, source] of Object.entries(files)) await writeFile(join(project.root, name), source);
-  return project;
+	const project = await createTempProject('define-page-types-')
+	await linkRepositoryPackages(project.root)
+	await writeFile(join(project.root, 'package.json'), JSON.stringify({ type: 'module' }))
+	await writeFile(join(project.root, 'tsconfig.json'), JSON.stringify({ compilerOptions: { ...compilerOptions, exactOptionalPropertyTypes }, include: ['*.ts'] }))
+	for (const [name, source] of Object.entries(files)) await writeFile(join(project.root, name), source)
+	return project
 }
 
 const typed = `import { definePage } from "@meekojs/meeko/framework";
@@ -105,50 +112,53 @@ definePage({ render: "client", sitemapEntries: [{}] });
 // @ts-expect-error Not a render mode.
 definePage({ render: "static" });
 export { clientMode, explicitClientMode };
-`;
+`
 
 for (const exact of [true, false]) {
-  test(`definePage infers each render mode with TypeScript 7 (exactOptionalPropertyTypes: ${exact})`, { timeout: 120_000 }, async () => {
-    const project = await application({ "page.ts": typed }, exact);
-    try {
-      const result = spawnSync(process.execPath, [resolve("node_modules/typescript/bin/tsc"), "-p", join(project.root, "tsconfig.json")], { encoding: "utf8", windowsHide: true });
-      assert.equal(result.status, 0, `${result.stdout}${result.stderr}`);
-    } finally {
-      await project.remove();
-    }
-  });
+	test(`definePage infers each render mode with TypeScript 7 (exactOptionalPropertyTypes: ${exact})`, { timeout: 120_000 }, async () => {
+		const project = await application({ 'page.ts': typed }, exact)
+		try {
+			const result = spawnSync(process.execPath, [resolve('node_modules/typescript/bin/tsc'), '-p', join(project.root, 'tsconfig.json')], { encoding: 'utf8', windowsHide: true })
+			assert.equal(result.status, 0, `${result.stdout}${result.stderr}`)
+		} finally {
+			await project.remove()
+		}
+	})
 }
 
-test("the editor completes the four render modes in definePage, before and after load", { timeout: 120_000 }, async () => {
-  const sources = {
-    "empty.route.ts": 'import { definePage } from "@meekojs/meeko/framework";\nexport const route = definePage({ render: "" });\n',
-    "loaded.route.ts": 'import { definePage } from "@meekojs/meeko/framework";\nexport const route = definePage({ load: () => 1, render: "s" });\n',
-    "client.route.ts": 'import { definePage } from "@meekojs/meeko/framework";\nexport const route = definePage({ render: "c", load: async ({ url }) => url.href });\n',
-  };
-  const project = await application(sources, true);
-  try {
-    const files = Object.keys(sources).map((name) => join(project.root, name));
-    const options = ts.parseJsonConfigFileContent({ compilerOptions: { ...compilerOptions, exactOptionalPropertyTypes: true } }, ts.sys, project.root).options;
-    const service = ts.createLanguageService({
-      getCompilationSettings: () => options,
-      getScriptFileNames: () => files,
-      getScriptVersion: () => "1",
-      getScriptSnapshot: (file) => { const text = ts.sys.readFile(file); return text === undefined ? undefined : ts.ScriptSnapshot.fromString(text); },
-      getCurrentDirectory: () => project.root,
-      getDefaultLibFileName: (settings) => ts.getDefaultLibFilePath(settings),
-      fileExists: ts.sys.fileExists,
-      readFile: ts.sys.readFile,
-      readDirectory: ts.sys.readDirectory,
-      directoryExists: ts.sys.directoryExists,
-      getDirectories: ts.sys.getDirectories,
-      realpath: (path) => ts.sys.realpath?.(path) ?? path,
-    });
-    for (const [name, source] of Object.entries(sources)) {
-      const offset = source.indexOf('render: "') + 'render: "'.length;
-      const result = service.getCompletionsAtPosition(join(project.root, name), offset, { quotePreference: "double" });
-      assert.deepEqual(result?.entries.map((entry) => entry.name).sort(), ["client", "prerender", "ssr", "stream"], name);
-    }
-  } finally {
-    await project.remove();
-  }
-});
+test('the editor completes the four render modes in definePage, before and after load', { timeout: 120_000 }, async () => {
+	const sources = {
+		'empty.route.ts': 'import { definePage } from "@meekojs/meeko/framework";\nexport const route = definePage({ render: "" });\n',
+		'loaded.route.ts': 'import { definePage } from "@meekojs/meeko/framework";\nexport const route = definePage({ load: () => 1, render: "s" });\n',
+		'client.route.ts': 'import { definePage } from "@meekojs/meeko/framework";\nexport const route = definePage({ render: "c", load: async ({ url }) => url.href });\n',
+	}
+	const project = await application(sources, true)
+	try {
+		const files = Object.keys(sources).map((name) => join(project.root, name))
+		const options = ts.parseJsonConfigFileContent({ compilerOptions: { ...compilerOptions, exactOptionalPropertyTypes: true } }, ts.sys, project.root).options
+		const service = ts.createLanguageService({
+			getCompilationSettings: () => options,
+			getScriptFileNames: () => files,
+			getScriptVersion: () => '1',
+			getScriptSnapshot: (file) => {
+				const text = ts.sys.readFile(file)
+				return text === undefined ? undefined : ts.ScriptSnapshot.fromString(text)
+			},
+			getCurrentDirectory: () => project.root,
+			getDefaultLibFileName: (settings) => ts.getDefaultLibFilePath(settings),
+			fileExists: ts.sys.fileExists,
+			readFile: ts.sys.readFile,
+			readDirectory: ts.sys.readDirectory,
+			directoryExists: ts.sys.directoryExists,
+			getDirectories: ts.sys.getDirectories,
+			realpath: (path) => ts.sys.realpath?.(path) ?? path,
+		})
+		for (const [name, source] of Object.entries(sources)) {
+			const offset = source.indexOf('render: "') + 'render: "'.length
+			const result = service.getCompletionsAtPosition(join(project.root, name), offset, { quotePreference: 'double' })
+			assert.deepEqual(result?.entries.map((entry) => entry.name).sort(), ['client', 'prerender', 'ssr', 'stream'], name)
+		}
+	} finally {
+		await project.remove()
+	}
+})

@@ -1,0 +1,173 @@
+<script lang="ts">
+	import { useI18n } from '@meekojs/i18n'
+
+	import { feedbackInput, metricsLimits, useDocsMetrics } from '../../../metrics/state'
+
+	// «¿Te sirvió?» al final de una página: sí o no y un comentario opcional. Con JavaScript se envía
+	// como JSON; sin él (o antes de hidratar) es un <form method="post"> nativo que vuelve a esta
+	// página con 303 y el resultado ya pintado. Sólo se muestra con las métricas activas.
+	const props = defineProps<{ path: string }>()
+
+	const metrics = useDocsMetrics()
+	const { t } = useI18n()
+	const route = useRoute()
+	const action = '/api/docs/feedback'
+	const form = useForm({
+		schema: feedbackInput,
+		initial: { path: untrack(() => props.path), helpful: false, comment: '' },
+		action,
+		submit: async (values) => {
+			const response = await fetch(action, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify(values), credentials: 'same-origin' })
+			if (!response.ok) throw Object.assign(new Error(`HTTP ${response.status}`), { status: response.status })
+			return (await response.json()) as { saved: boolean }
+		},
+		errorMessage: (failure) => ((failure as { status?: number }).status === 429 ? t('shell.feedback.rateLimited') : t('shell.feedback.failed')),
+	})
+	const returnTo = computed(() => String(route.url.value).split('#')[0] + '#docs-feedback')
+	const comment = signal(untrack(() => form.fields.comment.value ?? ''))
+	effect(() => {
+		form.fields.comment.value = comment.value
+	})
+	const length = computed(() => comment.value.length)
+	const over = computed(() => length.value > metricsLimits.comment)
+	const answered = computed(() => form.submitted.value)
+	// The schema's messages are Spanish: the widget shows its own text for each field in error.
+	const commentError = computed(() => (over.value || form.errors.value.comment ? t('shell.feedback.commentTooLong', { max: metricsLimits.comment }) : undefined))
+	const helpfulError = computed(() => (form.errors.value.helpful ? t('shell.feedback.helpfulRequired') : undefined))
+</script>
+
+<template>
+	<section
+		if:when="metrics.value.enabled"
+		id="docs-feedback"
+		class="docs-feedback"
+		aria-labelledby="docs-feedback-title"
+		data-pagefind-ignore
+		bind:lang="t('shell.meta.lang')"
+	>
+		<div role="status">
+			<UIAlert
+				if:when="answered.value"
+				tone="success"
+				role="none"
+				bind:description="t('shell.feedback.thanks')"
+			/>
+		</div>
+		<form
+			if:when="!answered.value"
+			method="post"
+			novalidate
+			class="docs-feedback-form"
+			bind:action="action"
+			on:submit="form.submit"
+		>
+			<input
+				type="hidden"
+				name="return"
+				bind:value="returnTo.value"
+			/>
+			<input
+				type="hidden"
+				name="path"
+				bind:value="form.fields.path.value"
+			/>
+			<div class="docs-feedback-question">
+				<h2 id="docs-feedback-title">{t('shell.feedback.title')}</h2>
+				<div
+					class="docs-feedback-answers"
+					role="group"
+					aria-labelledby="docs-feedback-title"
+				>
+					<UIButton
+						type="submit"
+						name="helpful"
+						value="true"
+						variant="outline"
+						size="sm"
+						bind:disabled="form.pending.value || over.value"
+						on:click="() => (form.fields.helpful.value = true)"
+					>
+						{t('shell.feedback.yes')}
+					</UIButton>
+					<UIButton
+						type="submit"
+						name="helpful"
+						value="false"
+						variant="outline"
+						size="sm"
+						bind:disabled="form.pending.value || over.value"
+						on:click="() => (form.fields.helpful.value = false)"
+					>
+						{t('shell.feedback.no')}
+					</UIButton>
+				</div>
+			</div>
+			<UIDisclosure
+				bind:summary="t('shell.feedback.addComment')"
+				bind:open="Boolean(comment.value) || Boolean(commentError.value)"
+			>
+				<UIField
+					id="docs-feedback-comment"
+					bind:label="t('shell.feedback.commentLabel')"
+					bind:error="commentError.value"
+					bind:hint="t('shell.feedback.hint')"
+					bind:counter="t('shell.feedback.counter', { length: length.value, max: metricsLimits.comment })"
+				>
+					<snippet
+						name="default"
+						params="id, describedBy"
+					>
+						<UITextarea
+							name="comment"
+							model="comment"
+							bind:rows="3"
+							bind:id="id"
+							bind:describedBy="describedBy"
+							bind:invalid="Boolean(commentError.value)"
+						/>
+					</snippet>
+				</UIField>
+			</UIDisclosure>
+			<UIAlert
+				if:when="helpfulError.value"
+				tone="danger"
+				bind:description="helpfulError.value"
+			/>
+			<UIAlert
+				if:when="form.error.value"
+				tone="danger"
+				bind:description="form.error.value"
+			/>
+		</form>
+	</section>
+</template>
+
+<style scoped>
+	.docs-feedback {
+		margin-block-start: var(--ui-space-12);
+		border-block-start: var(--ui-border-width) solid var(--ui-color-border);
+		padding-block-start: var(--ui-space-6);
+		max-width: var(--ui-prose-width);
+	}
+	.docs-feedback-form {
+		display: grid;
+		gap: var(--ui-space-3);
+	}
+	.docs-feedback-question {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: var(--ui-space-3) var(--ui-space-5);
+	}
+	h2 {
+		margin: 0;
+		color: var(--ui-color-text);
+		font-weight: var(--ui-font-weight-semibold);
+		font-size: var(--ui-font-size-lg);
+		line-height: var(--ui-line-height-snug);
+	}
+	.docs-feedback-answers {
+		display: flex;
+		gap: var(--ui-space-2);
+	}
+</style>

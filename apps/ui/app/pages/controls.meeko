@@ -1,0 +1,191 @@
+<script lang="ts">
+	import { examples } from '../utils/examples'
+
+	const comment = signal('')
+	const accepted = signal(false)
+	const notifications = signal(true)
+	const period = signal('week')
+	const volume = signal(40)
+	const periods = [
+		{ value: 'day', label: 'Día' },
+		{ value: 'week', label: 'Semana' },
+		{ value: 'month', label: 'Mes' },
+		{ value: 'year', label: 'Año', disabled: true },
+	]
+</script>
+
+<template>
+	<DocsPage
+		title="Controles de formulario"
+		description="Textarea, Checkbox, RadioGroup, Switch y Slider: HTML nativo, con su teclado y su envío, y el aspecto de UI."
+	>
+		<p>
+			Todos conservan el control nativo, así que el teclado, el foco y el envío de un formulario son los del navegador, también sin JavaScript. Sus modelos se enlazan con una señal:
+			<code>model="field"</code>.
+		</p>
+		<h2 id="textarea">UITextarea</h2>
+		<p>
+			Dentro de
+			<a href="/forms">UIField</a>
+			recibe el id y la descripción, y el campo pinta el contador.
+		</p>
+		<DocsPreview layout="stack">
+			<UIField
+				id="comment"
+				label="Comentario"
+				hint="Opcional"
+				bind:counter="comment.value.length + '/200'"
+			>
+				<snippet
+					name="default"
+					params="id, describedBy"
+				>
+					<UITextarea
+						name="comment"
+						placeholder="Qué te gustaría contarnos"
+						model="comment"
+						bind:rows="4"
+						bind:maxlength="200"
+						bind:id="id"
+						bind:describedBy="describedBy"
+					/>
+				</snippet>
+			</UIField>
+		</DocsPreview>
+		<DocsCode bind:code="examples.textarea" />
+		<DocsApi
+			caption="Propiedades de UITextarea"
+			bind:rows="[
+				{ name: 'model', type: 'Signal<string>', default: 'Cadena vacía', description: 'Texto, de doble vía.' },
+				{ name: 'rows / name / maxlength / placeholder', type: 'atributos HTML', description: 'Llegan tal cual al textarea.' },
+				{ name: 'required / disabled', type: 'boolean', default: 'false', description: 'Estado nativo.' },
+				{ name: 'invalid / describedBy', type: 'boolean / string', description: 'aria-invalid y aria-describedby.' },
+				{ name: 'class', type: 'string', description: 'Clases adicionales.' },
+			]"
+		/>
+		<h2 id="checkbox">UICheckbox y UISwitch</h2>
+		<p>
+			<code>UISwitch</code>
+			tiene el mismo contrato que
+			<code>UICheckbox</code>, con
+			<code>role="switch"</code>: úsalo para algo que se aplica al instante.
+		</p>
+		<DocsPreview layout="stack">
+			<UICheckbox
+				label="Acepto las condiciones"
+				description="Puedes retirarlo más tarde."
+				name="accepted"
+				value="yes"
+				model="accepted"
+			/>
+			<UISwitch
+				label="Notificaciones"
+				name="notifications"
+				model="notifications"
+			/>
+			<p
+				id="controls-status"
+				class="docs-status"
+				role="status"
+			>
+				{accepted.value ? 'Condiciones aceptadas.' : 'Condiciones sin aceptar.'} {notifications.value ? 'Notificaciones activas.' : 'Notificaciones apagadas.'}
+			</p>
+		</DocsPreview>
+		<DocsCode bind:code="examples.checkbox" />
+		<DocsApi
+			caption="Propiedades de UICheckbox y UISwitch"
+			bind:rows="[
+				{ name: 'model', type: 'Signal<boolean>', default: 'false', description: 'Marcado, de doble vía.' },
+				{ name: 'label', type: 'string', description: 'Obligatoria. Etiqueta visible.' },
+				{ name: 'description', type: 'string', description: 'Texto de apoyo bajo la etiqueta.' },
+				{ name: 'name / value', type: 'string', description: 'Lo que envía el formulario.' },
+				{ name: 'required / disabled', type: 'boolean', default: 'false', description: 'Estado nativo.' },
+				{ name: 'invalid / describedBy', type: 'boolean / string', description: 'aria-invalid y aria-describedby.' },
+				{ name: 'class', type: 'string', description: 'Clases adicionales.' },
+			]"
+		/>
+		<h2 id="radio">UIRadioGroup</h2>
+		<p>
+			Un
+			<code>fieldset</code>
+			con su
+			<code>legend</code>
+			y un radio nativo por opción: las flechas mueven la selección.
+			<code>variant="segmented"</code>
+			lo pinta como un conmutador compacto.
+		</p>
+		<DocsPreview layout="stack">
+			<UIRadioGroup
+				legend="Periodo"
+				name="period"
+				model="period"
+				bind:options="periods"
+			/>
+			<UIRadioGroup
+				legend="Periodo, segmentado"
+				name="period-segmented"
+				variant="segmented"
+				model="period"
+				bind:options="periods"
+			/>
+		</DocsPreview>
+		<DocsCode bind:code="examples.radio" />
+		<DocsApi
+			caption="Propiedades de UIRadioGroup"
+			bind:rows="[
+				{ name: 'model', type: 'Signal<string>', description: 'Valor elegido, de doble vía.' },
+				{ name: 'legend', type: 'string', description: 'Obligatoria. Nombre del grupo.' },
+				{ name: 'options', type: 'readonly UIRadioOption[]', description: 'Obligatoria. value, label y disabled.' },
+				{ name: 'name / required / disabled', type: 'string / boolean', description: 'Envío y estado nativos.' },
+				{ name: 'variant', type: 'default | segmented', default: 'default', description: 'Lista de radios o conmutador compacto.' },
+				{ name: 'class', type: 'string', description: 'Clases adicionales.' },
+			]"
+		/>
+		<h2 id="slider">UISlider</h2>
+		<p>
+			Un
+			<code>input type="range"</code>
+			con la etiqueta dentro de su
+			<code>label</code>. La parte llena de la pista sigue al valor.
+		</p>
+		<DocsPreview layout="stack">
+			<UISlider
+				label="Volumen"
+				name="volume"
+				model="volume"
+				bind:min="0"
+				bind:max="100"
+				bind:step="5"
+			/>
+			<p
+				id="slider-status"
+				class="docs-status"
+				role="status"
+			>
+				Volumen: {volume.value}
+			</p>
+		</DocsPreview>
+		<DocsCode bind:code="examples.slider" />
+		<DocsApi
+			caption="Propiedades de UISlider"
+			bind:rows="[
+				{ name: 'model', type: 'Signal<number>', default: '50', description: 'Valor, de doble vía.' },
+				{ name: 'label', type: 'string', description: 'Obligatoria. Etiqueta visible.' },
+				{ name: 'min / max / step', type: 'number', default: '0 / 100 / 1', description: 'Límites y paso, nativos.' },
+				{ name: 'name / disabled', type: 'string / boolean', description: 'Envío y estado nativos.' },
+				{ name: 'class', type: 'string', description: 'Clases adicionales.' },
+			]"
+		/>
+		<p>
+			Los tipos
+			<code>UITextareaProps</code>,
+			<code>UICheckboxProps</code>,
+			<code>UISwitchProps</code>,
+			<code>UIRadioGroupProps</code>
+			y
+			<code>UISliderProps</code>
+			se exportan desde
+			<code>@meekojs/ui/runtime</code>.
+		</p>
+	</DocsPage>
+</template>

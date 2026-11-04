@@ -1,0 +1,187 @@
+<script lang="ts" generic="T, Multiple extends boolean = false">
+	// <UICombobox>: what the native <select> of <UISelect> cannot do, a search, an asynchronous filter and
+	// several values, on <UIPopover>. The behavior lives in ../utils/combobox.ts. Its template has no
+	// whitespace between the tags: it would be text in the options.
+	import { onMounted, useId } from '@meekojs/meeko'
+
+	import type { ComboboxModel, ComboboxSettings, ComboboxSnippets, UIComboboxProps } from '../types/combobox'
+
+	import { createCombobox } from '../utils/combobox'
+	import { uiMessages } from '../utils/messages'
+	import * as Popover from './Popover.meeko'
+
+	const props = defineProps<UIComboboxProps<T, Multiple>>()
+
+	const emit = defineEmits<{ change: [value: ComboboxModel<T, Multiple>] }>()
+
+	const model = defineModel<ComboboxModel<T, Multiple>>({ default: null as unknown as ComboboxModel<T, Multiple> })
+
+	const snippets = defineSnippets<ComboboxSnippets<T>>()
+
+	const root = useElementRef('root')
+
+	const text = uiMessages().select
+
+	// The IDs of the trigger, the list and each option come from useId: the same in SSR and hydration.
+	const combobox = createCombobox<T>(props as ComboboxSettings<T>, model, useId(), (value) => emit('change', value as ComboboxModel<T, Multiple>))
+	onMounted(() => combobox.mount(root.value))
+</script>
+
+<!-- No whitespace between the tags of this template: it would be text inside the trigger and the options. Prettier keeps it that way; tests/templates-without-whitespace.test.mjs guards it. -->
+<template><div
+		ref:root
+		data-meeko-select
+		bind:class="props.class"
+		bind:data-open="combobox.open.value ? '' : undefined"
+		bind:data-disabled="props.disabled ? '' : undefined"
+		bind:data-multiple="combobox.multiple.value ? '' : undefined"
+		bind:data-loading="combobox.loading.value ? '' : undefined"
+		bind:data-clearable="props.clearable ? '' : undefined"
+		><Popover
+			mode="manual"
+			matchWidth
+			model="combobox.open"
+			bind:placement="props.placement ?? 'bottom-start'"
+			bind:offset="props.offset ?? 0"
+			bind:triggerId="combobox.triggerId.value"
+			bind:class="props.listClass"
+			><snippet name="anchor">
+				<button
+					if:when="!props.searchable"
+					type="button"
+					role="combobox"
+					data-meeko-select-trigger
+					aria-haspopup="listbox"
+					bind="combobox.triggerAttributes.value"
+					on:click="combobox.triggerClick"
+					on:keydown="combobox.keydown"
+					on:keyup="combobox.keyup"
+					><span
+						if:when="snippets.value && combobox.selected.value.length"
+						data-meeko-select-values
+						><span
+							each:of="combobox.selectedEntries.value"
+							each:as="entry"
+							each:key="entry.key"
+							data-meeko-select-value
+							><render
+								snippet="snippets.value"
+								args="entry.option" /></span></span
+					><span
+						if:when="!snippets.value && combobox.selected.value.length"
+						data-meeko-select-value
+						>{combobox.valueText.value}</span
+					><span
+						if:when="!combobox.selected.value.length"
+						data-meeko-select-placeholder
+						>{props.placeholder ?? ''}</span
+					></button
+				><span
+					if:when="props.searchable && combobox.multiple.value && combobox.selected.value.length"
+					data-meeko-select-values
+					><span
+						each:of="combobox.selectedEntries.value"
+						each:as="entry"
+						each:key="entry.key"
+						data-meeko-select-value
+						><render
+							if:when="snippets.value"
+							snippet="snippets.value"
+							args="entry.option"
+						/><template if:when="!snippets.value">{entry.label}</template></span
+					></span
+				><input
+					if:when="props.searchable"
+					type="text"
+					role="combobox"
+					autocomplete="off"
+					aria-autocomplete="list"
+					aria-haspopup="listbox"
+					data-meeko-select-trigger
+					bind:placeholder="props.placeholder"
+					bind:value="combobox.inputText.value"
+					bind="combobox.triggerAttributes.value"
+					on:input="combobox.input"
+					on:click="combobox.inputClick"
+					on:keydown="combobox.keydown"
+				/></snippet
+			><div
+				role="listbox"
+				data-meeko-select-list
+				bind:id="combobox.listboxId"
+				bind:aria-multiselectable="combobox.multiple.value ? 'true' : undefined"
+				bind:aria-label="props.label"
+				bind:aria-labelledby="props.label === undefined ? combobox.triggerId.value : undefined"
+				bind:aria-busy="combobox.loading.value ? 'true' : undefined"
+				on:mousedown="combobox.keepFocus"
+				on:click="combobox.optionClick"
+				on:pointermove="combobox.optionHover"
+				><div
+					each:of="combobox.groups.value"
+					each:as="group"
+					each:key="group.key"
+					data-meeko-select-group
+					bind:role="group.name === undefined ? 'presentation' : 'group'"
+					bind:aria-labelledby="group.id"
+					><div
+						if:when="group.name !== undefined"
+						role="presentation"
+						data-meeko-select-group-label
+						bind:id="group.id"
+						><render
+							if:when="snippets.group"
+							snippet="snippets.group"
+							args="group.name ?? ''"
+						/><template if:when="!snippets.group">{group.name}</template></div
+					><div
+						each:of="group.entries"
+						each:as="entry"
+						each:key="entry.key"
+						role="option"
+						bind="combobox.listOption(entry)"
+						><render
+							if:when="snippets.option"
+							snippet="snippets.option"
+							args="entry.option, combobox.stateOf(entry)"
+						/><template if:when="!snippets.option">{entry.label}</template></div
+					></div
+				><div
+					if:when="combobox.loading.value"
+					role="presentation"
+					data-meeko-select-loading
+					><render snippet="snippets.loading" /></div
+				><div
+					if:when="!combobox.loading.value && !combobox.entries.value.length"
+					role="presentation"
+					data-meeko-select-empty
+					><render
+						if:when="snippets.empty"
+						snippet="snippets.empty"
+					/><template if:when="!snippets.empty">{text.empty}</template></div
+				></div
+			></Popover
+		><button
+			if:when="combobox.showClear.value"
+			type="button"
+			data-meeko-select-clear
+			bind:aria-label="props.clearLabel ?? text.clear"
+			on:click="combobox.clear"
+			>×</button
+		><input
+			each:of="combobox.hiddenValues.value"
+			each:as="value"
+			type="hidden"
+			bind:name="combobox.name.value"
+			bind:value="value"
+			bind:disabled="props.disabled" /><input
+			if:when="props.required"
+			type="text"
+			hidden
+			required
+			tabindex="-1"
+			aria-hidden="true"
+			data-meeko-select-validity
+			bind:value="combobox.selected.value.length ? 'selected' : ''"
+			bind:disabled="props.disabled"
+			on:invalid="combobox.reportInvalid"
+	/></div></template>

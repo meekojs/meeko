@@ -1,0 +1,141 @@
+<script lang="ts">
+	import type { Snippet } from '@meekojs/meeko'
+	import type { ThemeChoice, ThemeToggleSnippets } from '@meekojs/meeko/framework'
+
+	// <UIThemeToggle>: the successor of the deprecated <MeekoThemeToggle> of the core, with the same
+	// contract and markup, over the public useThemeToggle(). The theme itself (the cookie, the inline
+	// script, the icon rule of <head> and POST /_meeko/theme) stays in the core. Its template has no
+	// whitespace between the tags: it would be text.
+	import { computed } from '@meekojs/meeko'
+	import { useRoute, useThemeToggle } from '@meekojs/meeko/framework'
+
+	import type { UIThemeToggleProps } from '../types/theme-toggle'
+	import type { ThemeToggleItem } from '../utils/theme-toggle'
+
+	import { icons } from '../utils/icons'
+	import { uiMessages } from '../utils/messages'
+	import { themeToggleGroupLabel, themeToggleItems, themeToggleKeyTarget, themeToggleMode, themeToggleStatus } from '../utils/theme-toggle'
+	import { withViewTransition } from '../utils/view-transition'
+	import * as Icon from './internal/Icon.meeko'
+
+	const props = defineProps<UIThemeToggleProps>()
+
+	const snippets = defineSnippets<ThemeToggleSnippets>()
+
+	const themeIcons: Readonly<Record<string, string | undefined>> = { light: icons.themeLight, dark: icons.themeDark, system: icons.themeSystem }
+	/** The stroke of a choice for `icons`; a snippet or another theme keep their own content. */
+	const iconOf = (name: string): string | undefined => (props.icons && !named[name] ? themeIcons[name] : undefined)
+
+	// The template reads them by the name of each choice, a string: in an application, the names of
+	// ThemeToggleSnippets are the generated theme names, which a plain string cannot index.
+	const named: Readonly<Record<string, Snippet | undefined>> = snippets
+
+	const toggle = useThemeToggle()
+	const route = useRoute()
+	const mode = computed(() => themeToggleMode(props.mode))
+	const { themeToggle: text, locale } = uiMessages()
+	// What it paints does not depend on the theme; what it says does, one primitive per binding, so
+	// the end of hydration rewrites only the values that change. The same choices keep their list.
+	let painted: readonly ThemeToggleItem[] | undefined
+	const items = computed(() => (painted = themeToggleItems(toggle, { themes: props.themes, labels: props.labels, text }, painted)))
+	const status = computed(() => themeToggleStatus(toggle, items.value, { labels: props.labels, messages: props.messages, text, locale }))
+	const next = computed(() => status.value.next)
+	const label = computed(() => status.value.label)
+	const checked = computed(() => status.value.checked)
+	const focused = computed(() => status.value.focused)
+	const group = computed(() => themeToggleGroupLabel(props.messages, text))
+
+	/** The theme writes `data-theme` synchronously, so the fade captures the page before and after it. */
+	const choose = (choice: string): void => {
+		withViewTransition(() => toggle.theme.set(choice as ThemeChoice), { types: ['ui-theme'] })
+	}
+
+	/** With JavaScript the form never posts: the theme changes at once, without a navigation. */
+	const submit = (event: SubmitEvent): void => {
+		event.preventDefault()
+		const submitter = event.submitter as HTMLButtonElement | null
+		choose(submitter?.name === 'theme' ? submitter.value : next.value)
+	}
+
+	/** The arrow keys, `Home` and `End` move the focus and the choice, as in a native radio group. */
+	const keydown = (event: KeyboardEvent): void => {
+		const radios = [...(event.currentTarget as HTMLElement).querySelectorAll<HTMLButtonElement>('[role=radio]')]
+		const current = radios.indexOf(event.target as HTMLButtonElement)
+		const target = current < 0 ? undefined : themeToggleKeyTarget(event.key, current, radios.length)
+		if (target === undefined) return
+		event.preventDefault()
+		radios[target]!.focus()
+		choose(radios[target]!.value)
+	}
+</script>
+
+<!-- No whitespace between the tags of this template: it would be text inside the button and the group. Prettier keeps it that way; tests/templates-without-whitespace.test.mjs guards it. -->
+<template><form
+		if:when="mode.value === 'cycle'"
+		method="post"
+		action="/_meeko/theme"
+		data-meeko-theme-toggle="cycle"
+		bind:class="props.class"
+		bind:id="props.id"
+		on:submit="submit"
+		><input
+			type="hidden"
+			name="theme"
+			bind:value="next.value"
+		/><input
+			type="hidden"
+			name="return"
+			bind:value="route.url.value"
+		/><button
+			type="submit"
+			bind:aria-label="label.value"
+			><span
+				each:of="items.value"
+				each:as="item"
+				each:key="item.name"
+				bind:data-meeko-theme-icon="item.icon"
+				aria-hidden="true"
+				><render
+					if:when="named[item.name]"
+					snippet="named[item.name]"
+				/><Icon
+					if:when="iconOf(item.name)"
+					bind:path="iconOf(item.name) ?? ''"
+				/><template if:when="!named[item.name] && !iconOf(item.name)">{item.label}</template></span
+			></button
+		></form
+	><form
+		if:when="mode.value === 'select'"
+		method="post"
+		action="/_meeko/theme"
+		data-meeko-theme-toggle="select"
+		bind:class="props.class"
+		bind:id="props.id"
+		on:submit="submit"
+		><input
+			type="hidden"
+			name="return"
+			bind:value="route.url.value"
+		/><div
+			role="radiogroup"
+			bind:aria-label="group.value"
+			on:keydown="keydown"
+			><button
+				each:of="items.value"
+				each:as="item"
+				each:key="item.name"
+				type="submit"
+				name="theme"
+				bind:value="item.name"
+				role="radio"
+				bind:aria-checked="checked.value === undefined ? undefined : String(checked.value === item.name)"
+				bind:tabindex="focused.value === undefined ? undefined : focused.value === item.name ? '0' : '-1'"
+				bind:aria-label="named[item.name] ? item.label : undefined"
+				bind:data-meeko-theme-option="item.name"
+				><render
+					if:when="named[item.name]"
+					snippet="named[item.name]"
+				/><template if:when="!named[item.name]">{item.label}</template></button
+			></div
+		></form
+	></template>

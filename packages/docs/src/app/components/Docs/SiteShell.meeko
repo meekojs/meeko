@@ -1,0 +1,116 @@
+<script lang="ts">
+	// The adapter of a site written in .meeko pages (UI and i18n): it builds the view of <DocsShell> from its
+	// navigation, the moderation of the request, the language and the metrics. <DocsShell> knows none of them.
+	import { useI18n } from '@meekojs/i18n'
+
+	import type { DocsShellView } from '../../../runtime/shell'
+
+	import { metricsActive, normalizeQuery, sendMetric, storedQuery } from '../../../metrics/state'
+	import { dismissCookie, moderateNavigation, useDocsModeration } from '../../../runtime/state'
+	import * as DocsShell from './Shell.meeko'
+
+	interface Item {
+		href: string
+		label: string
+		description: string
+		aliases?: readonly string[]
+	}
+
+	const props = defineProps<{ name: string; packageName: string; repository: string; navigation: readonly { title: string; items: readonly Item[] }[] }>()
+
+	const snippets = defineSnippets<{ default: [] }>()
+
+	const route = useRoute()
+	const i18n = useI18n()
+	const { t } = i18n
+	// The links of a partial locale point to the pages of the language its catalog speaks, so it never
+	// links to pages it does not have.
+	const shellLocale = t('shell.meta.lang')
+	const linkLocale = i18n.locales.includes(shellLocale) ? shellLocale : i18n.defaultLocale
+	const framework = 'https://meekojs.com' + (linkLocale === i18n.defaultLocale ? '' : '/' + linkLocale)
+	// Hidden and featured pages from the dashboard (empty without a database). The moderation of a language
+	// uses its public URLs (`/en/…`), so it applies to the links once localized.
+	const moderation = useDocsModeration()
+	const query = signal('')
+	const localized = computed(() => props.navigation.map((group) => ({ title: group.title, items: group.items.map((item) => ({ ...item, href: i18n.localePath(item.href, linkLocale) })) })))
+	const groups = computed(() =>
+		moderateNavigation(localized.value, moderation.value)
+			.map((group) => ({ ...group, items: group.items.filter((item) => (item.label + ' ' + item.description).toLocaleLowerCase(shellLocale).includes(query.value.trim().toLocaleLowerCase(shellLocale))) }))
+			.filter((group) => group.items.length),
+	)
+
+	// The reader's language as a suggestion, never a redirect: computed in the browser after hydration
+	// (cookie, then navigator.languages) and only for a version this page has. Staying keeps the current
+	// language in the cookie, so it is not offered again.
+	const suggestion = signal<string | undefined>(undefined)
+	onMounted(() => {
+		const preferred = i18n.suggestedLocale()
+		suggestion.value = preferred !== undefined && i18n.pageLocales().includes(preferred) && preferred !== i18n.locale ? preferred : undefined
+	})
+	function stay(): void {
+		i18n.rememberLocale(i18n.locale)
+		suggestion.value = undefined
+	}
+
+	/** Closes a notice and remembers it in a cookie, which the server reads on the next page. */
+	function dismiss(id: number): void {
+		document.cookie = dismissCookie(document.cookie, id, location.protocol === 'https:')
+		moderation.value = { ...moderation.value, announcements: moderation.value.announcements.filter((item) => item.id !== id) }
+	}
+
+	// The filter is a search of the guide: once the reader stops typing for 1.5 s (never per key), its
+	// normalized query and the pages it matched are counted, once per query. A query that looks like
+	// personal data or a secret is never sent (the server drops it too).
+	let searchTimer: ReturnType<typeof setTimeout> | undefined
+	let recorded = ''
+	function recordSearch() {
+		if (searchTimer !== undefined) clearTimeout(searchTimer)
+		searchTimer = undefined
+		const text = storedQuery(query.value)
+		if (text.length < 2 || text === recorded || !metricsActive()) return
+		recorded = text
+		sendMetric('/api/docs/search', { q: text, locale: linkLocale === 'en' ? 'en' : 'es', results: groups.value.reduce((count, group) => count + group.items.length, 0) })
+	}
+	onMounted(() => {
+		effect(() => {
+			const text = query.value
+			if (searchTimer !== undefined) clearTimeout(searchTimer)
+			searchTimer = normalizeQuery(text).length >= 2 ? setTimeout(recordSearch, 1500) : undefined
+		})
+		return () => {
+			if (searchTimer !== undefined) clearTimeout(searchTimer)
+		}
+	})
+
+	const view = computed<DocsShellView>(() => ({
+		product: {
+			name: props.name,
+			packageName: props.packageName,
+			repository: props.repository,
+			homeHref: i18n.localePath('/', linkLocale),
+			links: [
+				{ label: t('shell.nav.docs'), href: i18n.localePath('/installation', linkLocale) },
+				{ label: t('shell.nav.framework'), href: framework },
+				{ label: 'GitHub', href: props.repository },
+			],
+		},
+		current: route.path.value,
+		navigation: groups.value,
+		// A page says in which language its prose is written: <DocsPage> shows that note.
+		locale: { requested: i18n.locale, content: i18n.locale, fallback: false, suggested: suggestion.value },
+		locales: i18n.pageLocales().map((code) => ({ code, label: i18n.localeName(code), href: i18n.switchLocalePath(code), current: code === i18n.locale })),
+		announcements: moderation.value.announcements,
+		search: { mode: 'filter', query: query.value },
+	}))
+</script>
+
+<template>
+	<DocsShell
+		bind:view="view.value"
+		on:queryChange="(text) => (query.value = text)"
+		on:dismissAnnouncement="dismiss"
+		on:stayLocale="stay"
+	>
+		<render snippet="snippets.default" />
+	</DocsShell>
+</template>

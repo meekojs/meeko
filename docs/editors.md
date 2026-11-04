@@ -4,6 +4,47 @@ Meeko incluye un servidor de lenguaje ([Language Server Protocol](https://micros
 
 El bloque `<script server lang="ts">` de una página se analiza como un módulo TypeScript propio, con los autoimports de servidor (o de cliente si su `render` estático es `"client"`) y posiciones del `.meeko`: diagnósticos de tipos, completado, hover, navegación, referencias, símbolos y formato. Un bloque fuera de `app/pages` de alguna raíz configurada, o en un `+layout` o `+error`, produce `MEEK044` sobre su etiqueta de apertura. Los `export const` de un bloque con código de nivel superior tienen su tipo en el `<script>` y en la plantilla de la página, y «ir a definición» sobre uno de ellos lleva a su `export`.
 
+## Fragmentos de código
+
+Escribe un prefijo y elige el fragmento en el completado. `Tab` recorre los campos editables y mantiene sincronizados los nombres repetidos. Los esqueletos usan el nombre del archivo como título inicial.
+
+| Prefijo          | Dónde                                | Contenido                                                                  |
+| ---------------- | ------------------------------------ | -------------------------------------------------------------------------- |
+| `meeko`, `mcomp` | Raíz de un `.meeko`                  | Componente con `<script lang="ts">` y `<template>`                         |
+| `mpage`          | Raíz de una página `.meeko`          | `definePage` en `<script server>` y plantilla                              |
+| `mlayout`        | Raíz de un layout `.meeko`           | Layout con `<MeekoOutlet />`                                               |
+| `mprops`         | `<script>`                           | Interfaz `Props` y `defineProps<Props>()`                                  |
+| `mpropsd`        | `<script>`                           | Props desestructuradas con defaults reactivos, desde Meeko 1.8             |
+| `memits`         | `<script>`                           | `defineEmits` con argumentos tipados                                       |
+| `mmodel`         | `<script>`                           | `defineModel` con valor por defecto                                        |
+| `msnippets`      | `<script>`                           | Contrato `defineSnippets`                                                  |
+| `mexpose`        | `<script>`                           | `defineExpose` de un valor del setup                                       |
+| `msignal`        | `<script>`                           | Señal con `signal`                                                         |
+| `mcomputed`      | `<script>`                           | Valor derivado con `computed`                                              |
+| `meffect`        | `<script>`                           | Efecto reactivo con `effect`                                               |
+| `mmounted`       | `<script>`                           | Temporizador de navegador con `onCleanup` dentro de `onMounted`            |
+| `mref`           | `<script>`                           | `useElementRef` y comentario con el `ref:` que debes añadir a la plantilla |
+| `mif`            | `<template>`                         | Elemento con `if:when`                                                     |
+| `meach`          | `<template>`                         | Lista con `each:of`, `each:as` y `each:key`                                |
+| `mrender`        | `<template>`                         | `<render>` con `snippet` y `args`                                          |
+| `msnippet`       | Dentro de una etiqueta de componente | `<snippet>` con `name` y `params`                                          |
+| `mis`            | `<template>`                         | `<component is>` dinámico                                                  |
+| `mform`          | Raíz de un `.meeko`                  | Componente con `useForm` y formulario enlazado                             |
+| `mapi`           | `server/api/*.get.ts`                | `defineApiRoute` con una respuesta JSON                                    |
+| `mrpc`           | `server/rpc/*.ts`                    | `defineRpc` con imports de schemas de `shared/`                            |
+| `mmiddleware`    | `app/middleware/*.server.ts`         | `defineServerRouteMiddleware` con nombre                                   |
+| `mcomposable`    | Composable `.ts`                     | `AbortController` con liberación mediante `onCleanup`                      |
+
+Los fragmentos de script y plantilla se insertan en el bloque indicado: ajusta los nombres a los valores del componente y reúne los imports si ya existen. `mmounted` registra la limpieza dentro del callback para respetar `MEEK128`. Llama al composable de `mcomposable` durante el setup de un componente. En `mrpc`, crea o reutiliza los schemas reales en `shared/`, ajusta la ruta relativa a la profundidad del archivo y adapta el handler al schema de salida. `mmiddleware` crea middleware con nombre (`global: false`): decláralo en `middleware` de la página o del grupo para ejecutarlo.
+
+VS Code elige los fragmentos declarados en [`contributes.snippets`](https://code.visualstudio.com/api/references/contribution-points#contributes.snippets) por el lenguaje en la posición del cursor, y dentro de un bloque ese lenguaje es `typescript` o `html`, no `meeko`. Por eso la extensión sólo declara los esqueletos. Los de script y plantilla los ofrece su proveedor de completado en `<script>`, en `<script server>` y en el contenido de `<template>`, y no en `<style>`, en comentarios, en cadenas, en valores de atributo ni en expresiones `{…}`. De ahí salen tres límites:
+
+- **Insert Snippet** lista lo declarado para el lenguaje del cursor: los esqueletos en la raíz y lo declarado para `typescript` en `<script>`. Los fragmentos de script y plantilla no aparecen ahí: se eligen en el completado.
+- Con `"editor.tabCompletion": "on"`, `Tab` también los expande. Con `"onlySnippets"`, sólo expande los declarados, así que dentro de un bloque no los expande.
+- Un fragmento tuyo declarado para `meeko` sale en la raíz. Para usarlo en `<script>`, decláralo para `typescript`.
+
+La declaración sólo selecciona el lenguaje y el archivo de fragmentos; no admite una condición por proyecto ni por archivo. Por eso los cuatro fragmentos TypeScript aparecen también fuera de proyectos Meeko mientras la extensión está habilitada, y dentro de los bloques TypeScript de un `.meeko`, comentarios y cadenas incluidos. Sus prefijos específicos (`mapi`, `mrpc`, `mmiddleware`, `mcomposable`) reducen las coincidencias accidentales.
+
 ## Funciones propias de Meeko
 
 Además de las funciones de TypeScript, el servidor entiende la reactividad, los componentes (también los [genéricos](#componentes-genéricos)) y la estructura de la aplicación. Todas se calculan de forma estática, sin la aplicación en marcha; los textos que muestran no forman parte del contrato. La petición `meeko/executionZones` y los modificadores de token propios (`signal`, `computed`, `resource` y `reactive`) son internos de la extensión de VS Code y pueden cambiar en un minor (véase [stability.md](stability.md#fuera-del-contrato)).
@@ -12,12 +53,12 @@ Además de las funciones de TypeScript, el servidor entiende la reactividad, los
 
 Los tipos de token son los de TypeScript. Sobre ellos, el servidor añade modificadores:
 
-| Modificador | Marca |
-| --- | --- |
-| `signal` | Una señal (`signal`, `useState`, `defineModel`, `useElementRef`) declarada en el nivel superior del `<script>`, y cada uso. |
-| `computed` | Un valor `computed` o una señal de sólo lectura, y cada uso. |
-| `resource` | Un recurso de datos (`useApi`, `useRpcQuery`, `useRpcMutation`), y cada uso. |
-| `reactive` | Los tokens de una expresión de la plantilla que lee un valor reactivo. |
+| Modificador    | Marca                                                                                                                             |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `signal`       | Una señal (`signal`, `useState`, `defineModel`, `useElementRef`) declarada en el nivel superior del `<script>`, y cada uso.       |
+| `computed`     | Un valor `computed` o una señal de sólo lectura, y cada uso.                                                                      |
+| `resource`     | Un recurso de datos (`useApi`, `useRpcQuery`, `useRpcMutation`), y cada uso.                                                      |
+| `reactive`     | Los tokens de una expresión de la plantilla que lee un valor reactivo.                                                            |
 | `modification` | Una escritura de `.value`, o una llamada que vuelve a cargar un recurso (`refresh`, `mutate`). Es el modificador estándar de LSP. |
 
 Lo que decide si un `.value` es reactivo es el tipo, no el nombre: sólo cuenta el `value` de una `Signal` o `ReadonlySignal` de Meeko (incluidas las que devuelven `useElementRef` y los composables). `props.value`, `input.value` o `event.currentTarget.value` son lecturas normales y no se marcan.
@@ -29,9 +70,12 @@ Un tema o un cliente puede colorearlos con reglas de token semántico (por ejemp
 Además del tipo de TypeScript, el hover añade:
 
 - **Señales, `computed` y recursos.** Su tipo, la lista de lecturas y escrituras en el script y la plantilla, con enlaces a cada una, y cómo llega su valor al navegador: si se serializa en el estado del componente, si viaja en el payload, si se recalcula en el navegador o si sólo existe en el navegador.
-- **Componentes.** Desde la `1.4`, la ficha es la firma de la etiqueta en un bloque TypeScript, con una línea por prop y su tipo declarado (`variant?: CardVariant`), por evento (`on:save(id: number)`) y por modelo (`model:open?: boolean`), y los snippets como contenido (`header?()`, `default()`); le siguen un enlace que abre el `.meeko` y el JSDoc de cada prop, evento, modelo y snippet que lo tenga. Las secciones vacías se omiten. Sobre una etiqueta de componente o el identificador que lo importa: el archivo `.meeko` y sus props, eventos, modelos, snippets y valor expuesto. En la etiqueta de un [componente genérico](api.md#componentes-genéricos-generic), el hover muestra los parámetros de tipo que infieren sus props (`T = User`) y las props, eventos, modelos, snippets y valor expuesto ya resueltos con ellos.
+- **Componentes.** Desde la `1.4`, la ficha es la firma de la etiqueta en un bloque TypeScript, con una línea por prop y su tipo declarado (`variant?: CardVariant`), por evento (`on:save(id: number)`) y por modelo (`model:open?: boolean`), y los snippets como contenido (`header?()`, `default()`); le siguen un enlace que abre el `.meeko` y el JSDoc de cada prop, evento, modelo y snippet que lo tenga. Las secciones vacías se omiten. Sobre una etiqueta de componente o el identificador que lo importa: el archivo `.meeko` y sus props, eventos, modelos, snippets y valor expuesto. En la etiqueta de un [componente genérico](api.md#componentes-genéricos-generic), el hover muestra los parámetros de tipo que infieren sus props (`T = User`) y las props, eventos, modelos, snippets y valor expuesto ya resueltos con ellos. Desde la `1.8`, una prop con valor por defecto lo muestra tras su tipo (`size?: "sm" | "md" = "md"`), en la ficha, en el hover de la prop sobre la etiqueta y en el detalle del completado, tanto si el default va en el argumento de `defineProps` como en la desestructuración.
 - **Snippets.** Sobre el `name` de un `<snippet>`: la firma del snippet del hijo, con los tipos de sus parámetros y si es opcional, y desde la `1.4` su JSDoc.
 - **Etiquetas propias de Meeko.** Desde la `1.4`, `<MeekoLink>`, `<MeekoOutlet />` y `<MeekoThemeToggle>` tienen la misma ficha que un componente: sus props con los tipos de `MeekoLinkProps`, `MeekoOutletProps` y `MeekoThemeToggleProps` de `@meekojs/meeko/framework` (en `<MeekoLink to="/users/[id]">`, `to` es esa ruta y `bind:params` sus parámetros), su contenido (`default`), el elemento que renderizan, su documentación y un enlace a la guía. «Ir a definición» sobre la etiqueta abre ese tipo, y sobre el valor de `to`, la página. El hover y el completado de `to`, `bind:params` y `bind:search` usan los tipos y el JSDoc de `MeekoLinkProps`; `on:click` y los demás atributos son los de un `<a>`, y el completado ofrece los atributos de `<a>` salvo `href`. Con un `@meekojs/meeko` anterior a `1.4`, que no declara esos tipos, la ficha usa la descripción incluida en el servidor. Un componente del proyecto con uno de esos nombres conserva su propia ficha (`MEEK106`). Desde la `1.5`, `<MeekoAwait>` tiene la misma ficha (`MeekoAwaitProps`, con sus snippets `default(refreshing)`, `pending` y `error(error, retry)`), su `for` es una expresión con hover y definición, y dentro de su contenido los datos de `for` se leen como cargados, sin `!`. También desde la `1.5`, `<MeekoTeleport>` (`MeekoTeleportProps`, con `to` y `disabled`; el completado de `to="…"` ofrece `body` y los `#id` del componente, de `app/app.meeko` y de los layouts), `<MeekoPopover>` (`MeekoPopoverProps`) y `<MeekoSelect>` (`MeekoSelectProps`, con el tipo de sus opciones) tienen hover, completado y la comprobación de sus props, y la gramática las colorea como etiquetas propias.
+
+Desde core `1.8`, `<MeekoPopover>`, `<MeekoSelect>` y `<MeekoThemeToggle>` están obsoletos: el compilador emite `MEEK121` y el editor tacha la etiqueta y explica el reemplazo en el hover. Siguen funcionando en `1.x` y se retiran en `2.0`. Usa `UIPopover`, `UISelect` y `UIThemeToggle` del módulo `@meekojs/ui` 0.2; el sistema de temas permanece en core. Véase [Migración a 1.8](migration-1.8.md).
+
 - **Rutas, API y RPC.** Sobre el ID de `href("/users/[id]")`: la página, sus `params`, su modo de render y sus layouts. Sobre `useApi("/api/notes")` o `api.notes.get`: el método, la ruta y el handler, con los schemas de su contrato. Sobre `useRpcQuery("users.get")`, `useRpcMutation(...)` o `rpc.users.get`: el procedimiento, su URL y su handler con sus schemas. Desde la `1.6`, sobre un nombre de `middleware: ["auth"]` en `definePage`: el archivo de `app/middleware` del middleware con nombre y sus páginas (o que es global o no existe), y «ir a definición» lo abre. Un middleware de ruta de servidor (`*.server.ts`) se marca como «sólo servidor».
 
 ### Ir a definición en rutas, API y RPC
@@ -63,16 +107,16 @@ La lente se pide con `textDocument/codeLens`. Las lentes de valores reactivos us
 
 El servidor indica, por líneas completas, dónde se ejecuta el código de un `.meeko`:
 
-| Zona (`kind`) | Motivo (`reason`) | Líneas |
-| --- | --- | --- |
-| `server` | `server-block` | `<script server>` de una página. |
-| `browser` | `client-route-block` | `<script server>` de una página `render: "client"`, que se ejecuta en el navegador. |
-| `shared` | `setup` | El setup del `<script>`, que se ejecuta en SSR y al hidratar. |
-| `browser` | `client-page` | El setup de una página `render: "client"`. |
-| `browser` | `continuation` | El setup a partir del primer `await` de navegador. |
-| `browser` | `onMounted` | El cuerpo de cada callback de `onMounted`. |
-| `browser` | `browser-function` | Una función del setup que sólo se usa desde código de navegador. |
-| `browser` | `inline-handler` | Una función escrita en un `on:*` de la plantilla que ocupa sus propias líneas. |
+| Zona (`kind`) | Motivo (`reason`)    | Líneas                                                                              |
+| ------------- | -------------------- | ----------------------------------------------------------------------------------- |
+| `server`      | `server-block`       | `<script server>` de una página.                                                    |
+| `browser`     | `client-route-block` | `<script server>` de una página `render: "client"`, que se ejecuta en el navegador. |
+| `shared`      | `setup`              | El setup del `<script>`, que se ejecuta en SSR y al hidratar.                       |
+| `browser`     | `client-page`        | El setup de una página `render: "client"`.                                          |
+| `browser`     | `continuation`       | El setup a partir del primer `await` de navegador.                                  |
+| `browser`     | `onMounted`          | El cuerpo de cada callback de `onMounted`.                                          |
+| `browser`     | `browser-function`   | Una función del setup que sólo se usa desde código de navegador.                    |
+| `browser`     | `inline-handler`     | Una función escrita en un `on:*` de la plantilla que ocupa sus propias líneas.      |
 
 **Funciones de navegador.** Una función declarada en el nivel superior del setup (`function guardar() {}` o `const guardar = () => {}`) sale como «Sólo navegador» cuando todos sus usos se ejecutan en el navegador: como manejador `on:*` de la plantilla (también en un componente), dentro de `onMounted`, en la continuación tras el primer `await` de navegador o desde otra función de navegador. El hover de la zona dice por qué (por ejemplo, «Sólo se usa como manejador de `on:click` y en `onMounted`»). La función sigue compartida si también se llama en el nivel superior del setup, dentro de `effect` o `computed`, desde una expresión de la plantilla que se renderiza, se pasa como prop o modelo de un hijo, se publica con `defineExpose` o tiene un uso que el análisis no clasifica. Un manejador que se llama al enlazarse (`on:click="crear(guardar)"`) cuenta como uso compartido, porque en un componente se evalúa durante el SSR.
 
@@ -97,25 +141,83 @@ Además de las de imports y `href`:
 - **Props leídas una sola vez (`MEEK101`).** «Convertir en computed» cambia `const upper = props.label.toUpperCase()` por `computed(() => props.label.toUpperCase())` y añade `.value` a cada uso, en el script y en la plantilla (una propiedad abreviada conserva su clave: `{ upper }` pasa a `{ upper: upper.value }`). Una desestructuración `const { label, title: heading } = props` se convierte en un `computed` por nombre. Si sólo interesa el primer valor, «Leer … sólo una vez con untrack» lo declara con `untrack(() => props.x)`.
 - **Añadir `each:as` (`MEEK022`).** En una lista sin `each:as`, lo añade con el singular de la lista (`variants.value` → `variant`) o `item`. Funciona aunque el componente no compile, que es lo que provoca ese error.
 - **Crear un componente.** En una etiqueta como `<AppNuevo bind:title="name.value" />` cuyo componente no existe, crea `app/components/App/Nuevo.meeko` (dentro de la carpeta más larga de `app/components` con la que empieza el nombre, como los nombra el autoimport) con una prop por cada `bind:`, del tipo del valor que pasa la etiqueta. Sólo se ofrece si el cliente admite crear archivos en una edición de workspace (`resourceOperations` con `create`).
+- **Llaves dobles (`MEEK020`).** Por costumbre de Vue, `{{ props.label }}` o `{ {props.label} }` en el texto de la plantilla leen sus llaves interiores como un objeto literal. El compilador, `meeko check` y el editor dicen «Meeko interpola con una sola llave: {expr}, no {{expr}}» sobre la interpolación entera. «Convertir a {props.label}» la corrige; «Mostrar las llaves como texto» la convierte en `{"{ props.label }"}`, como en [una llave sin cerrar](reference/syntax/interpolation.md#una-llave-sin-cerrar), y es la única opción cuando el interior no es una expresión (`{{hola mundo}}`). «Corregir todas las del archivo» aplica a todas la que corresponde. Un objeto literal con sus claves (`{{ a: 1 }}`) es una expresión válida y no avisa. En VS Code, el segundo `{` escrito delante de un `}` cerrado automáticamente no abre otro par.
 - **Añadir `each:key`.** En una lista sin clave, propone `each:key="item.id"` (u otra propiedad identificadora del elemento) o el propio elemento si es una cadena o un número.
 - **Mover el sidecar a `<script server>`.** En las primeras líneas de una página con un `x.route.ts` junto a ella, mueve su contenido a un bloque `<script server lang="ts">` y borra el sidecar en una sola edición. Los imports relativos siguen funcionando porque ambos archivos comparten carpeta. Sólo se ofrece si el cliente admite borrar archivos en una edición de workspace (`workspace.workspaceEdit.documentChanges` y `resourceOperations` con `delete`).
 
-### Completado de directivas, modelos y snippets
+### Completado de atributos, directivas, modelos y snippets
 
-En el nombre de un atributo de la plantilla, el completado ofrece las directivas de Meeko que admite la etiqueta: `if:when`, `each:of`, `each:as`, `each:key`, `each:index`, `bind:`, `on:` y `ref:` en cualquier etiqueta, también en las de componente; `html` en los elementos, `model` en `input`, `textarea` y `select`, y `model:` en los componentes. No repite las que la etiqueta ya tiene, y tras un prefijo (`on:`, `model:`) vuelve a abrir el completado con los nombres del hijo.
+En el nombre de un atributo de la plantilla, el completado ofrece las directivas de Meeko que admite la etiqueta: `if:when`, `each:of`, `each:as`, `each:key`, `each:index`, `bind:`, `on:`, `ref:` y `bind` en cualquier etiqueta, también en las de componente; `html` en los elementos, `model` en `input`, `textarea` y `select`, y `model:` en los componentes. No repite las que la etiqueta ya tiene, y tras un prefijo (`on:`, `model:`) vuelve a abrir el completado con los nombres del hijo.
+
+Como la extensión de HTML de VS Code y Vue, cada atributo se inserta con su valor y el cursor dentro de las comillas (`title="|"`), salvo que el nombre ya tenga un `=` detrás. En una etiqueta de componente del proyecto (`<AppCard>`, también autoimportada o de un módulo, como `UICard`), el completado ofrece primero lo que declara el hijo, con su tipo y su JSDoc, y después las directivas:
+
+| El hijo declara                              | Se ofrece                                      |
+| -------------------------------------------- | ---------------------------------------------- |
+| `title: string`, `variant?: "a" \| "b"`      | `title="…"`, `variant="…"` (abre sus valores)  |
+| `label?: string \| number`, `unknown`        | `label="…"` y `bind:label="…"`                 |
+| `disabled?: boolean`                         | `disabled` (pasa `true`) y `bind:disabled="…"` |
+| `item: Item` y cualquier otro tipo           | `bind:item="…"`                                |
+| `defineEmits<{ save: […] }>`, `onSelect?: …` | `on:save="…"`, `on:select="…"`                 |
+| `defineModel()`, `defineModel("open")`       | `model="…"`, `model:open="…"`                  |
+
+Las props obligatorias van antes que las opcionales y no se repiten las que la etiqueta ya pasa (como texto o con `bind:`). Tras `bind:` se ofrecen todas las props, también las de texto (`bind:title="todo.title"`); tras `on:`, sólo los eventos, y tras `model:`, sólo los modelos con nombre. Meeko no tiene props `prop={expr}` al estilo de JSX: el editor nunca las inserta. Dentro de las comillas de un `bind:`, `on:`, `model`, `if:when` o `each:` vacíos se completan las expresiones de TypeScript, también justo al escribir la comilla de apertura, y en una prop de texto con valores literales, esos valores.
 
 El hover de `html` advierte que inserta HTML sin escapar. Desde `1.3`, cuando su valor es un `string` (o `any`) sin la marca `TrustedHtml`, el editor subraya toda la expresión con el aviso `MEEK107`, el mismo de `meeko check`; desaparece al marcar el HTML con `trustHtml(…)` donde se produce (véase [HTML de confianza](api.md#html-de-confianza-trustedhtml-y-trusthtml)).
 
 El completado ofrece los modelos del hijo tras `model:` en una etiqueta de componente, los nombres de los snippets del hijo en `<snippet name="…">` y sus parámetros en `params`.
 
+#### `bind:` en un elemento
+
+Desde `1.8`, al escribir `bind` en un elemento HTML, además de `bind` (un objeto de atributos) y del `bind:` genérico, se ofrece cada atributo de esa etiqueta con `bind:`: `bind:type`, `bind:disabled` y `bind:formaction` en un `<button>`, `bind:href` en un `<a>`, `bind:closedby` en un `<dialog>`, y después los globales (`bind:class`, `bind:style`, `bind:id`…), el resto de globales, los `aria-*` y `bind:data-…`. Cada uno inserta `bind:atributo="…"` con el cursor dentro, reemplaza lo ya escrito (`bind:cl`) y muestra en `detail` el tipo que espera la expresión: `bind:type: 'submit' | 'reset' | 'button'`, `bind:disabled: boolean` o `bind:hidden: boolean | 'until-found' | 'hidden'`, porque `true` escribe el valor vacío. Los atributos obsoletos aparecen tachados. Los nombres, los valores y la documentación salen de los [datos HTML de Meeko](#datos-html-de-meeko), con la misma tabla de atributos que el compilador. Dentro de las comillas de un atributo estático (`type="…"`, `role="…"`, `aria-pressed="…"`) se ofrecen sus valores; en una lista separada por espacios, como `role`, sólo se reemplaza el valor que se escribe.
+
+#### Lo que declara el script, según la directiva
+
+Desde `1.8`, dentro del valor de una directiva el completado de TypeScript se ordena por lo que esa directiva espera. Primero va lo que encaja, con su tipo en `detail`, junto con el camino hasta el valor: `name.value` de una señal o un `computed`, `props.title` de `defineProps`, `snippets.icon` de `defineSnippets` o `item.id` del elemento de una lista. Después van el resto de nombres del script y de la plantilla, y por último los imports y los globales.
+
+| Dónde                             | Primero                                                                                                                               |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `ref:`                            | Los nombres de `useElementRef("…")` del script; los que aún no tienen etiqueta, antes                                                 |
+| `on:click="…"`, `on:save="…"`     | Las funciones cuya firma admite el evento (`MouseEvent`, `SubmitEvent`, los argumentos de `defineEmits`); una sin parámetros, después |
+| `model="…"`, `model:open="…"`     | Las señales escribibles del tipo del control (`string` en un texto, `boolean` en un checkbox) o del modelo; nunca un `computed`       |
+| `bind:type="…"` en un elemento    | Los valores del atributo (`'submit'`), y después lo que tiene su tipo                                                                 |
+| `bind:title="…"` en un componente | Lo que es asignable al tipo de la prop                                                                                                |
+| `if:when="…"`                     | Los booleanos y, después, lo opcional (`snippets.icon`)                                                                               |
+| `each:of="…"`, `each:key="…"`     | Las listas e iterables (`props.items`, `rows.value`); los campos del elemento (`item.id`)                                             |
+| `<render snippet="…">`            | Los snippets de `defineSnippets`; los dinámicos como `snippets['cell-…']`, con el cursor en el nombre                                 |
+| `{…}`                             | Las declaraciones de la plantilla y del script, antes que los imports y los globales                                                  |
+
+Un valor vacío (`model=""`, `{}`, `snippet=""`) también se completa. Las referencias que todavía no tienen etiqueta (de tipo `never`) no se proponen como valor.
+
+#### Mientras se escribe
+
+Un atributo a medio escribir no compila, y el diagnóstico dice lo que falta en cada paso: `bind` sin valor indica las dos formas (`bind:atributo="expresión"` o `bind="obj"`), `bind:` se marca sobre sí mismo (y no sobre la etiqueta) y pide el nombre del atributo, y `bind:class` sin `=` pide su valor. Cada edición vuelve a comprobar el documento; al terminar de escribir `bind:class="props.class"` el diagnóstico desaparece. Un resultado que llega de una versión anterior del documento se descarta.
+
 ### HTML y CSS en la plantilla y en `<style>`
 
 Desde `1.2`, el servidor también entiende el marcado y los estilos. Lee el texto, sin compilar el componente, así que funciona mientras una etiqueta o una regla están a medio escribir:
 
-- **Plantilla:** completado de etiquetas, de atributos HTML (después de las directivas de Meeko y sin los manejadores `onclick`…, que en Meeko se escriben `on:click`) y de sus valores (`type="checkbox"`), con la documentación de MDN en el hover. Tras `on:` en un elemento, los eventos del DOM con su descripción. Las etiquetas de componente y los valores que son expresiones (`bind:`, `on:`, `if:when`, `each:`…, `{…}`) siguen en manos de TypeScript.
+- **Plantilla:** completado de etiquetas, de atributos HTML (después de las directivas de Meeko y sin los manejadores `onclick`…, que en Meeko se escriben `on:click`) y de sus valores (`type="checkbox"`), con la documentación de MDN en el hover. Tras `on:` en un elemento, los eventos del DOM con su descripción. Los atributos de una etiqueta de componente salen del hijo (véase [Completado de atributos](#completado-de-atributos-directivas-modelos-y-snippets)), y los valores que son expresiones (`bind:`, `on:`, `if:when`, `each:`…, `{…}`) siguen en manos de TypeScript.
 - **Etiquetas:** la de apertura y la de cierre se renombran juntas (edición vinculada, que la extensión de VS Code activa con `editor.linkedEditing` en los `.meeko`), y la extensión cierra la etiqueta al escribir `>` o `</` (ajuste `meeko.autoClosingTags`). Otros clientes la piden con `meeko/tagComplete`, que devuelve un snippet como `$0</div>`.
 - **`<style>`:** completado y hover de propiedades y valores, diagnósticos de CSS (`:global(…)` y las at-rules desconocidas no son errores) y el selector de color.
 - **Clases:** en `class="…"` se completan las clases del proyecto (véase [Completado de clases CSS](#completado-de-clases-css)), e ir a definición lleva de una clase a sus selectores. En `<style scoped>`, una clase que no nombran ni la plantilla ni el script se marca como sin uso (atenuada, con el código `MEEK_UNUSED_CLASS`). Cuenta cualquier aparición del nombre, también en un `computed` o en `classList.add("open")`, y un prefijo antes de una interpolación (`` `badge--${tone}` ``) cubre todas las clases que empiezan por él. Las de `:global(…)` nunca se marcan, porque pueden alcanzar a otros componentes.
+
+### Datos HTML de Meeko
+
+Desde `1.8`, las etiquetas, los atributos y sus valores salen de las especificaciones, no de una lista escrita a mano. `packages/meeko/scripts/html-data.ts` genera los módulos de `packages/meeko/src/shared/html-data/`, que se versionan:
+
+- `tags.ts` y `attribute-names.ts`: los nombres que necesita el runtime (etiquetas de `<component is>`, elementos vacíos, atributos de cada elemento para `bind="obj"` y atributos booleanos), como cadenas cortas.
+- `attributes.ts`, `aria.ts` y `events.ts`: los detalles para el compilador y el editor, que no llegan al bundle del navegador. Cada atributo lleva su descripción, sus valores enumerados (`closedby`: `any`, `closerequest` y `none`), si es booleano y si es experimental o está obsoleto; también los estados, propiedades y roles de ARIA, y los eventos `on:`.
+
+Las fuentes son el [HTML Living Standard](https://html.spec.whatwg.org/) del WHATWG (índices de elementos, atributos y manejadores, y las definiciones de valores), [WAI-ARIA 1.3](https://w3c.github.io/aria/) con DPUB-ARIA y Graphics ARIA, [Referrer Policy](https://w3c.github.io/webappsec-referrer-policy/) y `@mdn/browser-compat-data`, que indica qué es experimental u obsoleto y añade los atributos estándar de otras especificaciones (`part`, `exportparts`…). Lo que aceptaba Meeko 1.7 y ya no está en ninguna especificación se sigue aceptando, marcado como obsoleto, para no romper código existente.
+
+Para actualizarlos:
+
+```sh
+pnpm -F @meekojs/meeko html-data            # descarga las especificaciones y regenera
+pnpm -F @meekojs/meeko html-data --offline  # sólo regenera desde las instantáneas
+```
+
+La descarga guarda lo que extrae en `packages/meeko/scripts/html-data/*.json`, con la fecha y el commit de cada especificación, así que la generación es reproducible sin red. Para un `@mdn/browser-compat-data` nuevo basta con actualizar la dependencia y regenerar. `tests/html-data.test.ts`, dentro de `pnpm -F @meekojs/meeko test`, falla si un módulo no coincide con lo que generan las instantáneas.
 
 ### Completado de clases CSS
 
@@ -162,12 +264,12 @@ El servidor reconoce los componentes por la extensión `.meeko` de su ruta; el `
 
 Se envían en `initializationOptions` de la petición `initialize`. Todas son opcionales.
 
-| Opción | Por defecto | Efecto |
-| --- | --- | --- |
-| `trusted` | `true` | Con `true`, el servidor ejecuta `meeko.config.*` del proyecto con Node, también el `setup` de sus [módulos](framework.md#módulos), para conocer sus autoimports, componentes y layers, y comprueba los contratos de páginas y layouts al guardar. Con `false` no ejecuta código del proyecto: lee la configuración de forma estática (sólo listas literales; de `modules`, sólo las carpetas de layer), así que los autoimports y componentes de los módulos no existen para el editor, y omite los contratos. |
-| `projectContracts` | `true` | `false` desactiva la comprobación de contratos de páginas (`MEEK_PAGE_PROPS`, `MEEK_LAYOUT_PROPS`, `MEEK_ERROR_PROPS`) al guardar. |
-| `diagnosticsDelay` | `300` | Milisegundos de espera tras una edición antes de comprobar el componente. |
-| `format` | `{}` | Ajustes de formato para clientes sin `workspace/configuration`, por ejemplo `{ "indentSections": true }`. Si el cliente admite esa petición, prevalece su sección `meeko.format`. |
+| Opción             | Por defecto | Efecto                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ------------------ | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `trusted`          | `true`      | Con `true`, el servidor ejecuta `meeko.config.*` del proyecto con Node, también el `setup` de sus [módulos](framework.md#módulos), para conocer sus autoimports, componentes y layers, y comprueba los contratos de páginas y layouts al guardar. Con `false` no ejecuta código del proyecto: lee la configuración de forma estática (sólo listas literales; de `modules`, sólo las carpetas de layer), así que los autoimports y componentes de los módulos no existen para el editor, y omite los contratos. |
+| `projectContracts` | `true`      | `false` desactiva la comprobación de contratos de páginas (`MEEK_PAGE_PROPS`, `MEEK_LAYOUT_PROPS`, `MEEK_ERROR_PROPS`) al guardar.                                                                                                                                                                                                                                                                                                                                                                             |
+| `diagnosticsDelay` | `300`       | Milisegundos de espera tras una edición antes de comprobar el componente.                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `format`           | `{}`        | Ajustes de formato para clientes sin `workspace/configuration`, por ejemplo `{ "indentSections": true }`. Si el cliente admite esa petición, prevalece su sección `meeko.format`.                                                                                                                                                                                                                                                                                                                              |
 
 Fuera de VS Code `trusted` vale `true` porque es el usuario quien configura el servidor para su proyecto, del mismo modo que `meeko check` ejecuta la configuración. Usa `trusted: false` al abrir código de terceros. La extensión de VS Code envía el estado de confianza del workspace.
 
@@ -178,8 +280,10 @@ El servidor formatea los `.meeko` con [Prettier](https://prettier.io) y el plugi
 - **Script, estilo y plantilla.** `<script>` y `<script server>` se formatean como TypeScript y `<style>` como CSS (o SCSS/Less según `lang`). La plantilla se formatea como HTML: los atributos largos van uno por línea, se respetan las etiquetas PascalCase y el autocierre, y los valores de `bind:`, `bind` (desde 1.5), `on:`, `if:when`, `each:of`, `each:key`, `model`, `<component is>` y `<render>` y el texto `{expr}` se formatean como expresiones TypeScript. Una expresión que Prettier no entiende se deja tal cual. `<!-- prettier-ignore -->` excluye el nodo siguiente.
 - **Arrays como los objetos.** Con la opción `meekoPreserveArrayBreaks` (por defecto `true`), un array, un patrón de desestructuración (`const [a, b] = …`) o una tupla de TypeScript que en el código tiene un salto de línea entre `[` y su primer elemento se imprime expandido, un elemento por línea (los arrays de números se reparten por líneas, como hace Prettier al romperlos). Si no hay salto ahí, decide Prettier, que lo deja en una línea si cabe en `printWidth`. Es la regla de `objectWrap: "preserve"` para los objetos: para colapsar un array basta con unir `[` y el primer elemento y volver a formatear. Los comentarios y huecos (`[, a]`) entre `[` y el primer elemento cuentan para el salto, y un array vacío no se fuerza. Con `"meekoPreserveArrayBreaks": false` la salida es exactamente la de Prettier.
 - **Atributo `class` normalizado.** Desde 1.3, el valor de cada `class="…"` estático de un elemento se normaliza siempre, sin opción, como hace Prettier con el HTML suelto: se quitan los espacios del principio y del final, cualquier secuencia de espacios, tabuladores o saltos de línea queda en un espacio y una clase repetida se elimina (se conserva la primera). Sólo cuentan como separadores los espacios ASCII que separan clases en HTML; un espacio no separable forma parte de la clase. `class="  "` queda como `class=""` y `<p class>` no cambia. No se tocan `bind:class` ni otras directivas, otros atributos, el `class` de una etiqueta de componente (`<Card class="…">` o `<component is>`, donde es una [prop estática](api.md#props-estáticas)) ni un valor con referencias de carácter (`&amp;`). Los atributos estáticos de Meeko no interpolan `{expr}`: su valor es texto literal, así que el cambio no altera las clases del elemento.
-- **Orden de las clases.** La opción `meekoSortClasses` ordena esas mismas clases: `"off"` (por defecto) conserva su orden, `"alphabetical"` las ordena por código de carácter (`B` antes que `a`, sin depender del idioma) y `"stylesheet"` sigue la hoja global del proyecto, como `prettier-plugin-tailwindcss` sigue la de Tailwind. Véase [Orden por la hoja global](#orden-por-la-hoja-global).
+- **Orden de las clases.** La opción `meekoSortClasses` ordena esas mismas clases: `"off"` (por defecto) conserva su orden, `"alphabetical"` las ordena por código de carácter (`B` antes que `a`, sin depender del idioma) y `"stylesheet"` sigue la hoja global del proyecto, como `prettier-plugin-tailwindcss` sigue la de Tailwind. Véase [Orden por la hoja global](#orden-por-la-hoja-global). Desde `1.8`, con un orden elegido también se aplica al `class` de una etiqueta de componente y a las cadenas de `bind:class`, y `meekoClassFunctions` nombra las funciones cuyas cadenas son clases (`["tv", "clsx", "cn"]`). Guardar en el editor da lo mismo que `@meekojs/prettier-plugin` en la CLI, así que `prettier --check` pasa después de guardar.
 - **Qué Prettier se usa.** En un workspace de confianza, si el proyecto tiene `prettier`, se usa ese Prettier con su configuración (`.prettierrc`, `.editorconfig`, plugins). Si no, se usa el que incluye Meeko, con las opciones del editor (`tabSize`, `insertSpaces`) y `meeko.format.indentSections`; la configuración del proyecto prevalece sobre ambas. En un workspace no confiable se usa siempre el incluido, sin leer la configuración del proyecto, porque cargarla ejecuta código.
+- **Espacios de la plantilla.** El compilador conserva los espacios de la plantilla como nodos de texto; sólo descarta el que tiene un salto de línea en el borde de un `<snippet>` y el que separa los `<snippet>` de un componente. Desde 1.8, con cualquier `htmlWhitespaceSensitivity`, también la de por defecto, el formato no añade ni quita ningún espacio en el límite entre dos nodos, también en los bordes de `<template>`: `<li each:of="a" each:as="b">{b}</li>` sigue sin nodos de espacio, con los saltos de línea dentro de las etiquetas (`>{b}</li`, y el `>` en la línea siguiente). Si prefiere el contenido en su propia línea, escriba usted ese salto: el formato lo conserva y esos espacios son nodos de texto, invisibles en un bloque, pero no entre elementos en línea o `inline-block`. Un espacio sí puede pasar a ser un salto de línea con su sangría, que se pinta igual salvo en un elemento con `white-space: pre` por CSS: use `<!-- prettier-ignore -->` en él. `<pre>` y `<textarea>` no cambian. La sensibilidad decide dónde van los saltos de línea que el espacio permite, no si hay espacio.
+- **`.prettierignore` y `.gitignore`.** Desde 1.8, un archivo que excluyen no se formatea, ni al guardar con `editor.formatOnSave` ni con «Formatear documento»: el servidor no devuelve ediciones, igual que la CLI de Prettier. Busca esos archivos en la carpeta del `.meeko` y en las superiores, hasta la raíz del repositorio (la carpeta con `.git`), así que valen el de la raíz y el de un subproyecto, y cada patrón es relativo a la carpeta de su archivo. En un workspace no confiable también se respetan, porque sólo se leen sus patrones. Es la forma de conservar una plantilla escrita en una sola línea, donde los espacios entre etiquetas son texto: añada el archivo a `.prettierignore`.
 - **Límites.** Sólo se formatea el documento completo, no un rango. Un archivo que no compila no se formatea.
 
 Para formatear desde la CLI o en CI, añada el plugin a la configuración de Prettier del proyecto:
@@ -205,13 +309,91 @@ Con `"meekoSortClasses": "stylesheet"` (en la CLI, `--plugin @meekojs/meeko/pret
 - **Workspaces no confiables.** Procesar la hoja ejecuta código del proyecto (la configuración de PostCSS y los módulos de `@utilities`). La CLI de Prettier ya ejecuta código del proyecto al cargar su configuración; en VS Code, en un workspace no confiable el servidor no lee esa configuración y fuerza `"off"`: sólo se normaliza.
 - **Rendimiento.** En un proyecto real con dos módulos `@utilities` y ocho `@import`, la primera vez que se procesa la hoja tarda unos 220-260 ms (cargar Vite y los módulos incluidos); cada formateo siguiente sólo comprueba las fechas de los archivos, en torno a 1,5-2 ms.
 
+### El paquete `@meekojs/prettier-plugin`
+
+Plugin de Prettier para secciones TypeScript, plantilla y CSS de componentes `.meeko`.
+
+```js
+export default {
+	plugins: ['@meekojs/prettier-plugin'],
+	meekoIndentSections: true,
+}
+```
+
+Requiere Prettier 3 y Meeko. Conserva el contrato de formato de la entrada anterior `@meekojs/meeko/prettier`, que sigue disponible por compatibilidad en Meeko 1.x. La implementación del paquete usa las entradas públicas `/compiler` y `/parse`; no importa archivos privados de Meeko.
+
+### Orden de las clases
+
+`meekoSortClasses` ordena las clases de cada atributo estático `class="…"` de la plantilla. En un elemento, el valor se normaliza siempre: espacios colapsados y sin clases repetidas. Con un orden elegido (cualquier valor menos `"off"`), también ordena y normaliza el `class` de una etiqueta de componente, que es la prop `class`, y las cadenas de `bind:class` (véase [Cadenas en expresiones](#cadenas-en-expresiones)); con `"off"`, esos valores se quedan como están.
+
+| Valor            | Orden                                                                                                                                                  |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `"off"`          | El del código (por defecto).                                                                                                                           |
+| `"stylesheet"`   | Primera aparición en `app/styles/main.css`, procesada como en `meeko dev`, y después en el `<style>` del componente; las clases desconocidas, primero. |
+| `"tailwind"`     | El oficial de Tailwind CSS 4, el mismo de `prettier-plugin-tailwindcss`; las clases que Tailwind no conoce, primero y en su orden.                     |
+| `"alphabetical"` | Por código de carácter.                                                                                                                                |
+
+```js
+export default {
+	plugins: ['@meekojs/prettier-plugin'],
+	meekoSortClasses: 'tailwind',
+	// Opcional; relativa a la raíz del proyecto Meeko. Por defecto, app/styles/main.css.
+	meekoTailwindStylesheet: 'app/styles/main.css',
+}
+```
+
+Con `"tailwind"`, el plugin carga el design system de la hoja `meekoTailwindStylesheet` con sus `@import`, `@theme`, `@plugin`, `@utility` y `@custom-variant`, usando el `tailwindcss` 4 instalado en el proyecto (es una dependencia opcional: no se instala con el plugin). Los módulos de `@plugin` se cargan con `@tailwindcss/node` (también en TypeScript) si el proyecto tiene `@tailwindcss/postcss` o `@tailwindcss/vite`; sin ellos, sólo módulos JavaScript. El design system se reutiliza entre archivos y se recarga cuando cambia la hoja o algo que importa. Si falta `tailwindcss`, la hoja no existe o Tailwind la rechaza, las clases no se ordenan y se avisa una vez. En un workspace no confiable del editor, `"stylesheet"` y `"tailwind"` se comportan como `"off"`, porque ejecutarían código del proyecto.
+
+`prettier-plugin-tailwindcss` no reconoce el parser `meeko`; con `"tailwind"` no hace falta.
+
+### Cadenas en expresiones
+
+`meekoClassFunctions` nombra las funciones cuyas cadenas son listas de clases, como `tailwindFunctions` de `prettier-plugin-tailwindcss`. Por defecto es `[]`, y sin un `meekoSortClasses` distinto de `"off"` no hace nada.
+
+```js
+export default {
+	plugins: ['@meekojs/prettier-plugin'],
+	meekoSortClasses: 'tailwind',
+	meekoClassFunctions: ['tv', 'clsx', 'cn'],
+}
+```
+
+```ts
+const button = tv({
+	base: 'flex text-white', // antes: 'text-white flex'
+	variants: { size: { sm: 'p-1 text-sm', lg: on ? 'block p-4' : 'flex p-2' } },
+	compoundVariants: [{ size: 'sm', class: 'mt-1 block' }],
+})
+```
+
+- **Dónde.** En todo el JavaScript y TypeScript que Prettier formatee con el plugin cargado: `<script>`, `<script server>`, las expresiones de la plantilla y los archivos `.ts`, `.tsx`, `.js` y `.mjs`. No hace falta otro parser: el plugin ya sustituye el printer `estree` de Prettier y ordena el AST antes de imprimir. En un `.ts`, el orden sale del proyecto Meeko que contiene el archivo; con `"stylesheet"`, sólo de la hoja global.
+- **Qué se ordena.** Los literales de cadena y las plantillas de cadena de los argumentos, a cualquier profundidad, a través de objetos, arrays, spreads, ternarios, `&&`, `||`, `??`, `+` y `as`. Sirve para `base`, `slots`, `variants`, `compoundVariants` y `compoundSlots` de `tv()`.
+- **Qué no se ordena.** Las claves de un objeto, las comparaciones y la condición de un ternario, el cuerpo de una función, los argumentos de una llamada no nombrada (`cn(t('page title'))`), las plantillas etiquetadas, las cadenas fuera de una función nombrada y los valores con una secuencia de escape (`\t`, ` `), cuyos tokens no son el texto del código.
+- **Nombres.** Se comparan literalmente, sin seguir los `import`: `tv` no cubre un alias ni `styles.tv(…)`, y un miembro se escribe entero (`styles.cn`).
+- **Plantillas de cadena.** Los espacios junto a `${…}` no cambian, y un token pegado a `${…}` (`p-${size}`) no se mueve porque es sólo parte de una clase: `` `text-white flex p-${size} block` `` queda `` `flex text-white p-${size} block` ``. Lo mismo vale para los extremos de una concatenación con `+`. Una plantilla sin `${…}` se trata como una cadena.
+- **Clases desconocidas y repetidas.** Las reglas de `class`: las desconocidas, primero; sin repetidas y con los espacios colapsados. Si el orden no se puede cargar, se avisa una vez y las cadenas sólo se normalizan.
+
+Todo literal de esos argumentos se trata como lista de clases. Una cadena con espacios que no lo es, como el nombre de una variante (`defaultVariants: { size: 'x large' }`), también se reordena; en ese caso, usa un nombre sin espacios o `// prettier-ignore`.
+
+`bind:class` sigue las mismas reglas sin necesidad de nombrar una función: `bind:class="on ? 'text-white flex' : ''"` queda `bind:class="on ? 'flex text-white' : ''"`. Depende sólo de `meekoSortClasses`, igual que el `class` estático.
+
+#### Servidor de lenguaje
+
+El servidor de lenguaje formatea con el plugin del núcleo (`@meekojs/meeko/prettier`), que desde `1.8` conoce estas opciones y da el mismo resultado que este paquete: `prettier --check` pasa después de guardar. En un workspace no confiable no ordena nada, porque ordenar puede ejecutar código del proyecto.
+
+#### Junto a `prettier-plugin-tailwindcss`
+
+Pueden convivir en un proyecto, en cualquier orden de `plugins`. El de Tailwind ordena al analizar y este al imprimir, así que, si ambos ven la misma cadena, gana `meekoSortClasses`. No repitas una función en `tailwindFunctions` y `meekoClassFunctions`: con `"tailwind"` el orden es el mismo, pero ese plugin también ordena las claves de los objetos y no quita las clases desconocidas repetidas, mientras que este sí las quita.
+
+`pnpm -F @meekojs/prettier-plugin test` comprueba el resultado esperado, la idempotencia y la compilación de componentes reales.
+
 ### Ajustes del editor
 
 El servidor pide la sección `meeko.format` con `workspace/configuration` en cada formateo, así que un cambio se aplica sin reiniciarlo. Los clientes sin esa petición pueden enviar `format` en las opciones de inicialización o `{ "meeko": { "format": { ... } } }` con `workspace/didChangeConfiguration`.
 
-| Ajuste | Por defecto | Efecto |
-| --- | --- | --- |
-| `meeko.format.indentSections` | `false` | Indenta un nivel el contenido de cada sección (`<script>`, `<script server>`, `<template>` y `<style>`), como `vueIndentScriptAndStyle` de Prettier más la plantilla. Con `false`, el formato quita esa indentación base. El nivel usa `tabSize` o un tabulador según `insertSpaces`. Equivale a la opción `meekoIndentSections` del plugin; si el proyecto la fija en su configuración de Prettier, prevalece. |
+| Ajuste                        | Por defecto | Efecto                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ----------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `meeko.format.indentSections` | `false`     | Indenta un nivel el contenido de cada sección (`<script>`, `<script server>`, `<template>` y `<style>`), como `vueIndentScriptAndStyle` de Prettier más la plantilla. Con `false`, el formato quita esa indentación base. El nivel usa `tabSize` o un tabulador según `insertSpaces`. Equivale a la opción `meekoIndentSections` del plugin; si el proyecto la fija en su configuración de Prettier, prevalece. |
 
 En cada editor, el ajuste va en el objeto de ajustes del servidor como `settings.meeko.format.indentSections`; los ejemplos de cada sección lo muestran.
 
@@ -221,7 +403,7 @@ En cada editor, el ajuste va en el objeto de ajustes del servidor como `settings
 - Un import de un `.meeko` del proyecto se resuelve al componente tal como está en el editor, con sus cambios sin guardar, aunque exista su declaración generada `.d.meeko.ts` (junto a él o en `.meeko/types`), que con resolución `NodeNext` TypeScript elegiría primero.
 - Los usos de un símbolo marcado `@deprecated` en su JSDoc, como el alias `useSocket` de `@meekojs/meeko/framework`, se publican como pistas tachadas (`DiagnosticTag.Deprecated`, códigos `TS6385` y `TS6387`) con el motivo de la etiqueta. Los hovers muestran `{@link X}` como el nombre en código, su texto o un enlace.
 - Para detectar cambios guardados en archivos `.ts`, `.css`, `tsconfig*.json` y `meeko.config.*`, el servidor registra observadores con `workspace/didChangeWatchedFiles` cuando el cliente admite el registro dinámico. Si tu editor no lo admite, vuelve a abrir el componente o reinicia el servidor tras cambiar un módulo importado. Desde la `1.4` observa también la creación y el borrado de carpetas bajo `app/`, `server/` y `shared/`, porque al crear, mover o renombrar una carpeta el editor puede notificar sólo la carpeta y no cada `.meeko` de dentro.
-- El completado del `<script>` no ofrece los tipos auxiliares del código virtual (`__MeekoEmit`, `__MeekoDeclaredProps`…), que tampoco aparecen en el hover ni en «Ir a definición». De `@meekojs/meeko` sólo sugiere las entradas públicas de su `exports` (salvo `internal`): un nombre que exporta una entrada se importa desde ella (`import { MeekoModule } from "@meekojs/meeko/framework"`), también con el paquete enlazado con `link:`, que TypeScript resuelve fuera de `node_modules` y por el que sugeriría rutas relativas a sus archivos, y un nombre que no exporta ninguna entrada no se sugiere. Los exports de los paquetes se ordenan después de los nombres locales y de los autoimports del proyecto.
+- El completado del `<script>` no ofrece los tipos auxiliares del código virtual (`__MeekoEmit`, `__MeekoDeclaredProps`…), que tampoco aparecen en el hover ni en «Ir a definición». De `@meekojs/meeko` sólo sugiere las entradas públicas de su `exports` (salvo `internal`): un nombre que exporta una entrada se importa desde ella (`import { MeekoModule } from "@meekojs/meeko/framework"`), también con el paquete enlazado con `link:`, que TypeScript resuelve fuera de `node_modules` y por el que sugeriría rutas relativas a sus archivos, y un nombre que no exporta ninguna entrada no se sugiere. Los exports de los paquetes se ordenan después de los nombres locales y de los autoimports del proyecto. Un autoimport del proyecto (un export de `app/utils`, `shared/types`…) se completa sin import, con su archivo como detalle, como en el build: también si su archivo no está en el programa de TypeScript o si un global del DOM se llama igual (`navigation`). Los imports relativos que escribe el editor (completado, «Add import», autoimport ambiguo) no llevan extensión (`./settings/context`), salvo que `tsconfig.json` use `moduleResolution` `node16` o `nodenext`, que la exige (`./settings/context.js`).
 
 ### Comprobación del proyecto
 
@@ -315,12 +497,12 @@ Las opciones de inicialización se pueden fijar sin recompilar en `settings.json
 
 ```json
 {
-  "lsp": {
-    "meeko-language-server": {
-      "initialization_options": { "trusted": true },
-      "settings": { "meeko": { "format": { "indentSections": true } } }
-    }
-  }
+	"lsp": {
+		"meeko-language-server": {
+			"initialization_options": { "trusted": true },
+			"settings": { "meeko": { "format": { "indentSections": true } } }
+		}
+	}
 }
 ```
 
@@ -357,15 +539,15 @@ Después añade el cliente en **Preferences → Package Settings → LSP → Set
 
 ```json
 {
-  "clients": {
-    "meeko": {
-      "enabled": true,
-      "command": ["npx", "meeko-language-server", "--stdio"],
-      "selector": "text.html.meeko",
-      "initializationOptions": { "trusted": true },
-      "settings": { "meeko.format.indentSections": true }
-    }
-  }
+	"clients": {
+		"meeko": {
+			"enabled": true,
+			"command": ["npx", "meeko-language-server", "--stdio"],
+			"selector": "text.html.meeko",
+			"initializationOptions": { "trusted": true },
+			"settings": { "meeko.format.indentSections": true }
+		}
+	}
 }
 ```
 
@@ -375,3 +557,27 @@ Después añade el cliente en **Preferences → Package Settings → LSP → Set
 - El renombrado y las referencias que abarcan archivos `.meeko` se inician desde un `.meeko`. Desde un `.ts` responde el servidor TypeScript del editor, que no conoce los componentes.
 - El modelo semántico necesita secciones sintácticamente cerradas. Mientras se escribe un archivo incompleto los diagnósticos siguen llegando, pero completado y navegación pueden pausarse hasta que vuelva a ser válido.
 - Un proyecto con más de 2000 componentes `.meeko` sólo carga los primeros 2000 para referencias y renombrado entre archivos.
+
+## Tailwind CSS
+
+Instala la extensión oficial **Tailwind CSS IntelliSense** (`bradlc.vscode-tailwindcss`) y configura Tailwind en el proyecto. Esta extensión aporta las utilidades, variantes, valores y documentación de Tailwind; Meeko aporta el análisis de componentes y las clases CSS escritas en sus `<style>` y en `app/styles/main.css`, incluidos sus imports locales.
+
+Meeko Language registra automáticamente `tailwindCSS.includeLanguages: { "meeko": "html" }` y activa `editor.quickSuggestions.strings` para `[meeko]`. Son valores predeterminados de VS Code: respetan tus ajustes explícitos y no escriben en `settings.json`. [VS Code documenta `configurationDefaults` para otras configuraciones registradas](https://code.visualstudio.com/api/references/contribution-points#contributes.configurationDefaults).
+
+`meeko.classes.completion` controla el completado y hover de clases de Meeko:
+
+- `auto` (predeterminado): si Tailwind IntelliSense está activo y el proyecto declara `tailwindcss` como dependencia o lo importa desde sus hojas fuente, delega las clases de la hoja procesada `.meeko/styles/main.css` a Tailwind. Conserva las clases escritas en componentes y hojas fuente.
+- `on`: incluye también las clases de la hoja procesada.
+- `off`: desactiva el completado y hover de clases de Meeko. La navegación a definiciones y las variables CSS siguen disponibles.
+
+Las cadenas de `bind:class="active.value ? 'bg-blue-500' : 'bg-gray-500'"` reciben sugerencias de clases; no hace falta añadir `bind:class` a `tailwindCSS.classAttributes`, porque el atributo `class` predeterminado reconoce el prefijo `:`. Meeko conserva además el análisis TypeScript de la expresión.
+
+Para funciones como `clsx` y `cn` dentro del `<script>`, configura las funciones que realmente usa tu proyecto:
+
+```json
+{
+	"tailwindCSS.classFunctions": ["clsx", "cn"]
+}
+```
+
+La detección de Meeko lee el manifiesto del paquete del componente y las hojas fuente indexadas, sin ejecutar plugins CSS. No clasifica individualmente la hoja procesada: en `auto` también delega sus clases de terceros que no tienen una definición fuente indexada. En otros clientes LSP, comunica `meeko.classes` mediante `workspace/configuration` (o `initializationOptions.classes`), incluido `tailwindActive: true` si el cliente tiene un proveedor Tailwind activo.

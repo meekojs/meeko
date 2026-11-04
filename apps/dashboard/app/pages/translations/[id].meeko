@@ -1,0 +1,196 @@
+<script
+	server
+	lang="ts"
+>
+	import { definePage } from '@meekojs/meeko/framework'
+	import * as v from 'valibot'
+
+	import { attempt } from '../../utils/errors'
+
+	export const route = definePage({ params: v.object({ id: v.pipe(v.string(), v.regex(/^[1-9]\d{0,15}$/)) }), render: 'ssr' })
+
+	const { params } = usePage()
+	// By the id of the original or of its translation: the source pages link here with their own.
+	export const detail = await attempt(() => rpc.translations.get({ id: Number(params.id) }))
+	if (!detail.ok && (detail.failure.code === 'TRANSLATION_NOT_FOUND' || detail.failure.code === 'SOURCE_NOT_FOUND')) notFound()
+</script>
+
+<script lang="ts">
+	import { downloadText } from '../../utils/download'
+	import { shortHash } from '../../utils/format'
+	import { translationTones } from '../../utils/labels'
+
+	export interface Props {
+		params: { id: string }
+		search: Record<string, string | string[]>
+	}
+
+	const props = defineProps<Props>()
+
+	const i18n = useI18n()
+	const { t, localePath } = i18n
+	const format = useFormat()
+
+	const data = detail.ok ? detail.data : null
+	const origin = (value: 'commit' | 'import' | 'working-tree') => t(`translations.origin.${value === 'working-tree' ? 'workingTree' : value}`)
+	const editable = data?.translation !== null && data?.translation !== undefined && data.translation.removedAt === null
+	const englishPath = data ? '/en' + (data.original.path === '/' ? '' : data.original.path) : ''
+	const lead = data ? t(`labels.translationHelp.${data.status}`) : ''
+	const changesEmpty = !data ? '' : data.status === 'translated' ? t('translations.detail.noChanges') : data.status === 'missing' ? t('translations.detail.noTranslation') : data.translatedFrom === null ? t('translations.detail.baseUnknown') : t('translations.detail.noChanges')
+
+	const facts = data
+		? [
+				{ label: t('translations.detail.originalFile'), value: data.original.file ?? '—', code: true },
+				{ label: t('translations.columns.file'), value: data.file ?? '—', code: true },
+				{ label: t('translations.detail.originalHash'), value: shortHash(data.original.baseHash), code: true, ...(data.original.baseHash ? { title: data.original.baseHash } : {}) },
+				{ label: t('translations.detail.sourceHash'), value: shortHash(data.sourceHash), code: true, ...(data.sourceHash ? { title: data.sourceHash } : {}) },
+				...(data.translatedFrom ? [{ label: t('translations.detail.foundIn'), value: origin(data.translatedFrom) }] : []),
+				{ label: t('translations.detail.shown'), value: data.translationRevisionId ? t('translations.detail.revision', { id: data.translationRevisionId }) : data.translation ? t('translations.detail.git') : t('translations.detail.fallback') },
+				...(data.translation ? [{ label: t('translations.columns.imported'), value: format.date(data.translation.importedAt) }] : []),
+			]
+		: []
+
+	/** The original as the start of its translation, for the repository (`docs/en/…`): nothing is written here. */
+	function downloadOriginal() {
+		if (!data?.originalMarkdown || !data.file) return
+		downloadText(data.file.split('/').pop() ?? 'translation.md', data.originalMarkdown)
+	}
+</script>
+
+<template>
+	<DashPage
+		bind:title="data ? t('translations.detail.title', { title: i18n.locale === 'en' ? (data.translation?.title ?? data.original.title) : data.original.title }) : t('translations.detail.fallbackTitle', { id: props.params.id })"
+		bind:description="data ? t(`labels.kind.${data.original.kind}`) + ' · ' + data.original.path + ' → ' + englishPath : t('translations.detail.fallbackDescription')"
+	>
+		<snippet name="actions">
+			<UILink
+				variant="ghost"
+				bind:href="localePath('/translations')"
+			>
+				{t('translations.detail.all')}
+			</UILink>
+			<UILink
+				if:when="data"
+				variant="outline"
+				bind:href="localePath('/sources/' + data?.original.id)"
+			>
+				{t('translations.detail.original')}
+			</UILink>
+			<UILink
+				if:when="editable"
+				bind:href="localePath('/sources/' + data?.translation?.id + '/edit')"
+			>
+				{t('translations.edit')}
+			</UILink>
+		</snippet>
+		<DashFailure
+			if:when="!detail.ok"
+			bind:failure="detail.failure"
+		/>
+		<div
+			if:when="data"
+			class="dash-stack"
+		>
+			<UICard
+				bind:title="t('translations.detail.status')"
+				bind:description="lead"
+			>
+				<snippet name="actions">
+					<UIBadge
+						bind:dot="true"
+						bind:tone="data ? translationTones[data.status] : 'neutral'"
+					>
+						{data ? t(`labels.translation.${data.status}`) : ''}
+					</UIBadge>
+				</snippet>
+				<UIDescriptionList
+					bind:columns="3"
+					bind:items="facts"
+				/>
+			</UICard>
+
+			<UIAlert
+				if:when="data?.status === 'missing'"
+				tone="info"
+				bind:title="t('translations.detail.missingTitle')"
+				bind:description="t('translations.detail.missingText', { file: data?.file ?? '' })"
+			>
+				<snippet name="actions">
+					<UIButton
+						size="sm"
+						variant="outline"
+						bind:disabled="!data?.originalMarkdown"
+						on:click="downloadOriginal"
+					>
+						{t('translations.detail.download')}
+					</UIButton>
+				</snippet>
+			</UIAlert>
+
+			<UICard
+				bind:title="t('translations.detail.changes')"
+				bind:description="t('translations.detail.changesLead')"
+			>
+				<UIDiff
+					bind:label="t('translations.detail.changesLabel')"
+					bind:diff="data?.originalChanges ?? ''"
+					bind:emptyText="changesEmpty"
+				/>
+			</UICard>
+
+			<div class="dash-columns">
+				<section
+					class="dash-tight"
+					aria-labelledby="original-heading"
+				>
+					<div class="dash-row">
+						<h2
+							id="original-heading"
+							class="dash-heading"
+						>
+							{t('translations.detail.originalText')}
+						</h2>
+						<DashLocaleTag
+							locale="es"
+							bind:name="t('locale.es')"
+							bind:short="t('locale.short.es')"
+						/>
+					</div>
+					<UICodeBlock
+						textLang="es"
+						bind:label="t('translations.detail.originalText')"
+						bind:code="data?.originalMarkdown ?? ''"
+					/>
+				</section>
+				<section
+					class="dash-tight"
+					aria-labelledby="english-heading"
+				>
+					<div class="dash-row">
+						<h2
+							id="english-heading"
+							class="dash-heading"
+						>
+							{t('translations.detail.translationText')}
+						</h2>
+						<DashLocaleTag
+							locale="en"
+							bind:name="t('locale.en')"
+							bind:short="t('locale.short.en')"
+						/>
+					</div>
+					<UICodeBlock
+						if:when="data?.translationMarkdown !== null"
+						textLang="en"
+						bind:label="t('translations.detail.translationText')"
+						bind:code="data?.translationMarkdown ?? ''"
+					/>
+					<UIEmpty
+						if:when="data?.translationMarkdown === null"
+						bind:title="t('translations.detail.noTranslation')"
+					/>
+				</section>
+			</div>
+		</div>
+	</DashPage>
+</template>

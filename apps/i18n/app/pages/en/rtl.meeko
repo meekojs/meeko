@@ -1,0 +1,38 @@
+<script lang="ts">
+	import { englishExamples as examples } from '../../utils/examples.en'
+</script>
+<template>
+	<DocsPage
+		product="Meeko i18n"
+		locale="en"
+		title="RTL direction"
+		description="Integrate right-to-left languages with the right markup and layout."
+	>
+		<h2 id="direction">Lang and direction of the document</h2>
+		<p>
+			The plugin publishes the active language in
+			<code>lang</code>
+			and applies
+			<code>dir</code>
+			according to
+			<code>directions</code>. Languages without an override use LTR.
+		</p>
+		<DocsCode
+			label="Configuration and CSS"
+			bind:code="examples.rtl"
+		/>
+		<h2 id="layout">Logical properties</h2>
+		<p>
+			Use padding-inline, margin-inline and text-align: start so the layout follows the direction of the content.
+			<code>UIContainer</code>
+			already uses logical margins and padding.
+		</p>
+		<p>On this site the documentation shell speaks the language of the page in LTR (Spanish in the Arabic playground), while the playground result declares the language and direction of its catalog. That way you can read the instructions and check the Arabic block in RTL.</p>
+		<UILink
+			to="/playground"
+			hreflang="ar"
+		>
+			See the playground in Arabic
+		</UILink>
+	</DocsPage>
+</template>

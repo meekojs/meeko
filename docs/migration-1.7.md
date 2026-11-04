@@ -96,13 +96,13 @@ Junto a `serveNode` o `serveDeno` con `handleSignals`, una segunda llamada a `ha
 
 Todos señalan código que ya fallaba en ejecución o que no hacía lo que parecía:
 
-| Qué | Dónde se ve |
-| --- | --- |
-| `props.x = …` es `TS2540`: el script ve `defineProps<T>()` como `Readonly<T>`. En ejecución ya lanzaba un `TypeError`. | `meeko check`, `meeko build` y el editor |
-| Un manejador `on*` de los eventos del DOM en `htmlAttrs` o `bodyAttrs` de `useHead` es un error de tipos. En ejecución ya lanzaba un `TypeError`. | `meeko check`, `meeko build` y el editor |
+| Qué                                                                                                                                                                                                                     | Dónde se ve                              |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| `props.x = …` es `TS2540`: el script ve `defineProps<T>()` como `Readonly<T>`. En ejecución ya lanzaba un `TypeError`.                                                                                                  | `meeko check`, `meeko build` y el editor |
+| Un manejador `on*` de los eventos del DOM en `htmlAttrs` o `bodyAttrs` de `useHead` es un error de tipos. En ejecución ya lanzaba un `TypeError`.                                                                       | `meeko check`, `meeko build` y el editor |
 | `usePage()`, `redirect()` o `notFound()` dentro de `export const head = () => …` o de la función de `useHead(() => …)` y `useSeoMeta(() => …)` en `<script server>` son `MEEK073`. Fallaban en cada petición con `500`. | `meeko check`, `meeko build` y el editor |
-| Una ruta dinámica `render: "prerender"` sin `prerenderEntries` detiene el descubrimiento (`Dynamic prerender route /posts/[id] requires prerenderEntries`). Hasta ahora sólo fallaba `meeko build`. | `meeko check` y `meeko dev` |
-| `meeko check componente.meeko` comprueba lo mismo que el del proyecto: `MEEK044`, `MEEK100` y los errores de tipos de su `<script server>`. | `meeko check <componente>` y el editor |
+| Una ruta dinámica `render: "prerender"` sin `prerenderEntries` detiene el descubrimiento (`Dynamic prerender route /posts/[id] requires prerenderEntries`). Hasta ahora sólo fallaba `meeko build`.                     | `meeko check` y `meeko dev`              |
+| `meeko check componente.meeko` comprueba lo mismo que el del proyecto: `MEEK044`, `MEEK100` y los errores de tipos de su `<script server>`.                                                                             | `meeko check <componente>` y el editor   |
 
 `meeko check` acepta además `export default definePage(...)` en `<script server>` y en un sidecar `*.route.ts`, que antes fallaba con `has no exported member 'route'`, y `signal(props.x ?? 0)` ya no da `MEEK101`.
 
@@ -226,7 +226,7 @@ Si tenía un `setTimeout` propio o un `if` alrededor de la consulta, puede quita
 
 ## La referencia de la API
 
-El sitio tiene una referencia nueva en [`/docs/reference`](https://meeko.diegootayza.com/docs/reference): una página por símbolo (componentes, macros, composables, reactividad, utilidades, sintaxis, servidor, adaptadores, comandos y configuración), con su tipo exacto tomado del código, ejemplos y los errores comunes con su mensaje real, y la lista de todos los exports por módulo en [`/docs/reference/exports`](https://meeko.diegootayza.com/docs/reference/exports). Sus fuentes están en [`docs/reference`](reference/README.md).
+El sitio tiene una referencia nueva en [`/docs/reference`](https://meekojs.com/docs/reference): una página por símbolo (componentes, macros, composables, reactividad, utilidades, sintaxis, servidor, adaptadores, comandos y configuración), con su tipo exacto tomado del código, ejemplos y los errores comunes con su mensaje real, y la lista de todos los exports por módulo en [`/docs/reference/exports`](https://meekojs.com/docs/reference/exports). Sus fuentes están en [`docs/reference`](reference/README.md).
 
 ## Editor
 

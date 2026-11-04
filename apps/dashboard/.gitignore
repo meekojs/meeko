@@ -1,0 +1,6 @@
+node_modules/
+.meeko/
+.env
+# Copied from packages/docs/assets by `pnpm run assets`.
+/public/brand/
+/public/fonts/

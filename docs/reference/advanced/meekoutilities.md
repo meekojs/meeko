@@ -54,10 +54,10 @@ Resultado:
 
 ## Opciones
 
-| Opción | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `root` | ruta | `process.cwd()` | Carpeta desde la que se resuelven las rutas de `@utilities` cuando la hoja no tiene archivo (CSS procesado sin la opción `from` de PostCSS). Con archivo, la ruta es siempre relativa a la hoja. |
-| `autoImports` | `boolean` | `true` | Desde `1.4`. Aplica los autoimports de `app/` y `shared/` a los módulos de `@utilities` y a sus imports locales, ejecutando `meeko.config.*` una vez por hoja. `false` empaqueta los módulos como en `1.3`, sin ejecutar la configuración. |
+| Opción        | Tipo      | Por defecto     | Descripción                                                                                                                                                                                                                                |
+| ------------- | --------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `root`        | ruta      | `process.cwd()` | Carpeta desde la que se resuelven las rutas de `@utilities` cuando la hoja no tiene archivo (CSS procesado sin la opción `from` de PostCSS). Con archivo, la ruta es siempre relativa a la hoja.                                           |
+| `autoImports` | `boolean` | `true`          | Desde `1.4`. Aplica los autoimports de `app/` y `shared/` a los módulos de `@utilities` y a sus imports locales, ejecutando `meeko.config.*` una vez por hoja. `false` empaqueta los módulos como en `1.3`, sin ejecutar la configuración. |
 
 La at-rule admite una ruta entre comillas a un `.ts`, `.mts`, `.js` o `.mjs`, relativa a la hoja que la contiene, y `layer(<nombre>)` opcional. No lleva bloque y debe ir después de los `@import`.
 
@@ -94,6 +94,7 @@ export default defineUtilities(({ rule, atRule }) => [
 ### Con Tailwind
 
 <!-- no-check -->
+
 ```ts
 // postcss.config.ts
 import { meekoUtilities } from "@meekojs/meeko/postcss";

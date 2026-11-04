@@ -1,0 +1,32 @@
+<script lang="ts">
+	import { examples } from '../utils/examples'
+</script>
+<template>
+	<DocsPage
+		product="Meeko i18n"
+		title="Dirección RTL"
+		description="Integra idiomas de derecha a izquierda con el marcado y el layout adecuados."
+	>
+		<h2 id="direction">Lang y dirección del documento</h2>
+		<p>
+			El plugin publica el idioma activo en
+			<code>lang</code>
+			y aplica
+			<code>dir</code>
+			según
+			<code>directions</code>. Los idiomas sin override usan LTR.
+		</p>
+		<DocsCode
+			label="Configuración y CSS"
+			bind:code="examples.rtl"
+		/>
+		<h2 id="layout">Propiedades lógicas</h2>
+		<p>
+			Usa padding-inline, margin-inline y text-align: start para que el layout siga la dirección del contenido.
+			<code>UIContainer</code>
+			ya usa márgenes y padding lógicos.
+		</p>
+		<p>En este sitio el shell documental usa el idioma de la página en LTR (español en el laboratorio árabe), mientras el resultado del laboratorio declara el idioma y la dirección del catálogo. Así puedes leer las instrucciones y comprobar el bloque árabe en RTL.</p>
+		<UILink href="/ar/playground">Ver el laboratorio en árabe</UILink>
+	</DocsPage>
+</template>

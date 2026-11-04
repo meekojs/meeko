@@ -1,0 +1,19 @@
+<script lang="ts">
+	import type { UIInputProps } from '../types/forms'
+
+	const { invalid, describedBy, spellcheck, class: className, type = 'text', ...rest } = defineProps<UIInputProps>()
+
+	const value = defineModel<string>({ default: '' })
+</script>
+
+<template>
+	<input
+		model="value"
+		bind:spellcheck="spellcheck === undefined ? undefined : String(spellcheck)"
+		bind:type="type"
+		bind:aria-invalid="invalid ? 'true' : undefined"
+		bind:aria-describedby="describedBy ?? rest['aria-describedby']"
+		bind:class="['meeko-ui-input', className].filter(Boolean).join(' ')"
+		bind="rest"
+	/>
+</template>

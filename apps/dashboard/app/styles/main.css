@@ -1,0 +1,189 @@
+/*
+ * What @meekojs/ui cannot know: how this app arranges its screens. Layout only, on the tokens of UI: the
+ * look of everything is in its components, and a page keeps the drawing of its own data in its scoped styles.
+ */
+:where(code) {
+	font-size: var(--ui-prose-code-size);
+}
+
+/* Header: the account of the session sits in the bar, and on a phone in the menu of the sections. */
+.dash-account {
+	display: flex;
+	align-items: center;
+	gap: var(--ui-space-2);
+	margin: 0;
+	min-width: 0;
+}
+.dash-account-menu {
+	justify-content: space-between;
+	margin-block-start: var(--ui-space-2);
+	border-top: var(--ui-border-width) solid var(--ui-color-border);
+	padding-block-start: var(--ui-space-3);
+}
+.dash-user {
+	max-width: var(--ui-table-column-min);
+	overflow: hidden;
+	color: var(--ui-color-text-soft);
+	font-size: var(--ui-font-size-sm);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+@media (max-width: 80rem) {
+	.dash-account-bar .dash-user {
+		display: none;
+	}
+}
+@media (max-width: 48rem) {
+	.dash-account-bar {
+		display: none;
+	}
+}
+
+/* Login: one panel at the optical center of the page. */
+.dash-login {
+	display: grid;
+	align-content: center;
+	justify-items: center;
+	min-height: calc(100dvh - var(--ui-header-height) - var(--ui-space-24));
+}
+.dash-login > .meeko-ui-card {
+	width: min(100%, var(--ui-floating-panel-width));
+}
+.dash-login-header {
+	margin: 0;
+}
+
+/* The rhythm of a page: its sections, and what belongs together inside one. */
+.dash-stack {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: var(--ui-space-6);
+}
+.dash-tight {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: var(--ui-space-3);
+}
+.dash-form {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: var(--ui-space-4);
+}
+.dash-columns {
+	--dash-column: var(--ui-container-sm);
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--dash-column)), 1fr));
+	gap: var(--ui-space-4);
+}
+.dash-stats {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--ui-floating-panel-width)), 1fr));
+	gap: var(--ui-space-6);
+}
+.dash-row {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: space-between;
+	align-items: center;
+	gap: var(--ui-space-2) var(--ui-space-4);
+}
+.dash-actions,
+.dash-badges {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--ui-space-2);
+}
+.dash-badges {
+	gap: var(--ui-space-1-5);
+}
+.dash-row-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: var(--ui-space-1);
+}
+
+/* Filters: the fields share a row, and what does not fit goes to the next one. */
+.dash-filters {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-end;
+	gap: var(--ui-space-3) var(--ui-space-4);
+}
+.dash-filters > .meeko-ui-field {
+	flex: 1 1 var(--ui-table-column-min);
+	min-width: 0;
+}
+.dash-filters > .meeko-ui-field:not(.dash-grow) {
+	max-width: var(--ui-floating-panel-width);
+}
+.dash-filters > .dash-grow {
+	flex-grow: 3;
+}
+
+/* Text of a screen, on the scale of UI. */
+.dash-heading {
+	margin: 0;
+	font-weight: var(--ui-font-weight-semibold);
+	font-size: var(--ui-font-size-lg);
+	line-height: var(--ui-line-height-snug);
+}
+.dash-text {
+	margin: 0;
+	font-size: var(--ui-font-size-md);
+}
+.dash-meta {
+	margin: 0;
+	color: var(--ui-color-text-soft);
+	font-size: var(--ui-font-size-sm);
+	font-variant-numeric: tabular-nums;
+}
+/* A live region stays in the document, out of the flow, until it has something to say. */
+.dash-status:not(:has(*)) {
+	position: absolute;
+}
+.meeko-ui-input.dash-code {
+	font-family: var(--ui-font-mono);
+}
+.dash-soft {
+	color: var(--ui-color-text-soft);
+}
+.dash-danger {
+	color: var(--ui-color-danger-text);
+	font-weight: var(--ui-font-weight-semibold);
+}
+.dash-nowrap {
+	white-space: nowrap;
+}
+.dash-locale-tag {
+	text-decoration: none;
+}
+/* A cell of a table with two lines: a title and its path. */
+.dash-cell {
+	display: grid;
+	justify-items: start;
+	gap: var(--ui-space-0-5);
+	min-width: var(--ui-table-column-min);
+}
+.dash-list {
+	display: grid;
+	margin: 0;
+	padding: 0;
+	font-size: var(--ui-font-size-md);
+	list-style: none;
+}
+.dash-list li {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: var(--ui-space-1) var(--ui-space-3);
+	border-bottom: var(--ui-border-width) solid var(--ui-color-border);
+	padding-block: var(--ui-space-2);
+}
+.dash-list li:last-child {
+	border-bottom: 0;
+}
+/* A detail inside an alert, under its description. */
+.dash-failure-line {
+	margin: var(--ui-space-1) 0 0;
+}

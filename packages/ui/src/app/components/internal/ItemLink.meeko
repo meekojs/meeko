@@ -1,0 +1,48 @@
+<script lang="ts">
+	// The link of every list of the package: an <a> with `href`, or a route with <MeekoLink> with `to`.
+	import { computed } from '@meekojs/meeko'
+
+	import type { UIForwardedAttributes } from '../../types/button'
+	import type { UILinkTarget } from '../../types/navigation'
+
+	type Props = UIForwardedAttributes & {
+		link: UILinkTarget & { readonly current?: boolean | undefined }
+		current?: 'page' | 'location' | undefined
+		class?: string
+	}
+
+	const { link, current, class: className, ...rest } = defineProps<Props>()
+
+	const snippets = defineSnippets<{ default: [] }>()
+
+	const linkRel = computed(() => link.rel ?? (link.target === '_blank' ? 'noopener noreferrer' : undefined))
+	// The item's own flag always wins: `true` forces the state and `false` removes it. Without it, a route
+	// is left to <MeekoLink>, which follows the active route, and an <a> uses what its list worked out.
+	const ariaCurrent = computed(() => {
+		if (link.current !== undefined) return link.current ? (current ?? 'page') : false
+		return link.to === undefined ? current : undefined
+	})
+</script>
+
+<template>
+	<component
+		is="link.to !== undefined ? 'MeekoLink' : 'a'"
+		bind:to="link.to"
+		bind:params="link.params"
+		bind:search="link.search"
+		bind:resolve="link.resolve"
+		bind:match="link.match"
+		bind:href="link.href"
+		bind:target="link.target"
+		bind:rel="linkRel.value"
+		bind:download="link.download"
+		bind:hreflang="link.hreflang"
+		bind:lang="link.lang"
+		bind:title="link.title"
+		bind:aria-current="ariaCurrent.value"
+		bind:class="className"
+		bind="rest"
+	>
+		<render snippet="snippets.default" />
+	</component>
+</template>

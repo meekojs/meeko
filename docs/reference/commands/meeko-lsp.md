@@ -37,12 +37,12 @@ vim.lsp.enable("meeko")
 
 ## Opciones
 
-| Opción | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `--stdio` | transporte | | JSON-RPC por stdin y stdout. Es el que usan casi todos los editores. |
-| `--node-ipc` | transporte | | El canal IPC de Node, para un cliente que lanza el servidor con `fork`. |
-| `--socket=<puerto>` | transporte | | Un socket TCP en ese puerto. |
-| `--pipe=<nombre>` | transporte | | Una tubería con nombre (un named pipe en Windows, un socket de dominio en POSIX). |
+| Opción              | Tipo       | Por defecto | Descripción                                                                       |
+| ------------------- | ---------- | ----------- | --------------------------------------------------------------------------------- |
+| `--stdio`           | transporte |             | JSON-RPC por stdin y stdout. Es el que usan casi todos los editores.              |
+| `--node-ipc`        | transporte |             | El canal IPC de Node, para un cliente que lanza el servidor con `fork`.           |
+| `--socket=<puerto>` | transporte |             | Un socket TCP en ese puerto.                                                      |
+| `--pipe=<nombre>`   | transporte |             | Una tubería con nombre (un named pipe en Windows, un socket de dominio en POSIX). |
 
 Las opciones del servidor van en `initializationOptions` del `initialize`, no en la línea de comandos: `trusted` (`true` por defecto: ejecuta `meeko.config.*` y los `setup` de los módulos), `projectContracts`, `diagnosticsDelay` y `format`. Véase [Opciones de inicialización](/docs/editors#opciones-de-inicialización).
 

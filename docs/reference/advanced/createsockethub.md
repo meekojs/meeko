@@ -56,29 +56,29 @@ console.log(sent); // [ '{"event":"message","payload":{"text":"HOLA"}}' ]
 
 ## Opciones
 
-| Opción | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `channels` | `Record<string, SocketChannelDefinition>` | obligatorio | Los canales por nombre: el export por defecto de cada `server/socket/<nombre>.ts`. |
-| `sessions` | `SessionManager` | obligatorio | Carga la sesión del handshake y cierra el peer si se revoca. |
-| `services` | `S` o `(request) => S` | obligatorio | Servicios de los callbacks del canal, compartidos o creados en cada handshake. |
-| `allowedOrigins` | `string[]` | ninguno | Orígenes aceptados además del de la propia URL del handshake. |
-| `maxMessageBytes` | número | 65 536 | Mensaje entrante o saliente más grande, serializado. Un mensaje entrante mayor cierra con `1009`; un `broadcast` mayor rechaza con `SOCKET_LIMIT_EXCEEDED` (413). |
-| `maxBufferBytes` | número | 1 MiB | Bytes salientes pendientes por peer antes de cerrarlo. |
-| `maxPendingDeliveries` | número | 256 | Entregas del broker en espera por peer; uno más lento se cierra con `1013`. |
-| `sessionRefreshMs` | número | 1000 | Durante cuánto reutilizan las entregas la última lectura de la sesión; `0` la relee en cada entrega. |
-| `pubsub` | `SocketPubSub` | `LocalSocketPubSub` | Broker entre instancias. |
-| `platform` | `ServerPlatform` | ninguno | Lo que ven los callbacks en `context.platform`. |
-| `onDeliveryError` | `(error, { channel, room, event? }) => void` | `console.error` | Entregas fallidas a un peer local, que se cierra. Nunca llega al emisor. |
+| Opción                 | Tipo                                         | Por defecto         | Descripción                                                                                                                                                       |
+| ---------------------- | -------------------------------------------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `channels`             | `Record<string, SocketChannelDefinition>`    | obligatorio         | Los canales por nombre: el export por defecto de cada `server/socket/<nombre>.ts`.                                                                                |
+| `sessions`             | `SessionManager`                             | obligatorio         | Carga la sesión del handshake y cierra el peer si se revoca.                                                                                                      |
+| `services`             | `S` o `(request) => S`                       | obligatorio         | Servicios de los callbacks del canal, compartidos o creados en cada handshake.                                                                                    |
+| `allowedOrigins`       | `string[]`                                   | ninguno             | Orígenes aceptados además del de la propia URL del handshake.                                                                                                     |
+| `maxMessageBytes`      | número                                       | 65 536              | Mensaje entrante o saliente más grande, serializado. Un mensaje entrante mayor cierra con `1009`; un `broadcast` mayor rechaza con `SOCKET_LIMIT_EXCEEDED` (413). |
+| `maxBufferBytes`       | número                                       | 1 MiB               | Bytes salientes pendientes por peer antes de cerrarlo.                                                                                                            |
+| `maxPendingDeliveries` | número                                       | 256                 | Entregas del broker en espera por peer; uno más lento se cierra con `1013`.                                                                                       |
+| `sessionRefreshMs`     | número                                       | 1000                | Durante cuánto reutilizan las entregas la última lectura de la sesión; `0` la relee en cada entrega.                                                              |
+| `pubsub`               | `SocketPubSub`                               | `LocalSocketPubSub` | Broker entre instancias.                                                                                                                                          |
+| `platform`             | `ServerPlatform`                             | ninguno             | Lo que ven los callbacks en `context.platform`.                                                                                                                   |
+| `onDeliveryError`      | `(error, { channel, room, event? }) => void` | `console.error`     | Entregas fallidas a un peer local, que se cierra. Nunca llega al emisor.                                                                                          |
 
 ## Valor devuelto
 
 Un `SocketHub`:
 
-| Método | Descripción |
-| --- | --- |
-| `preflight(name, request, roomId?)` | Comprueba el canal, `Origin`, la sesión y la autorización antes del upgrade. Rechaza con `ApiError`: `UNKNOWN_SOCKET_CHANNEL` (404), `INVALID_ORIGIN` (403), `401` o `403` del canal. |
-| `accept(name, request, peer, roomId?)` | Acepta un peer ya conectado; resuelve con su `SocketConnection` cuando está suscrito a su canal y sala. |
-| `broadcast(name, roomId, event, payload)` | Valida el evento con el schema `serverToClient` y lo publica en el broker; cada peer de la sala lo recibe como mucho una vez. |
+| Método                                    | Descripción                                                                                                                                                                           |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `preflight(name, request, roomId?)`       | Comprueba el canal, `Origin`, la sesión y la autorización antes del upgrade. Rechaza con `ApiError`: `UNKNOWN_SOCKET_CHANNEL` (404), `INVALID_ORIGIN` (403), `401` o `403` del canal. |
+| `accept(name, request, peer, roomId?)`    | Acepta un peer ya conectado; resuelve con su `SocketConnection` cuando está suscrito a su canal y sala.                                                                               |
+| `broadcast(name, roomId, event, payload)` | Valida el evento con el schema `serverToClient` y lo publica en el broker; cada peer de la sala lo recibe como mucho una vez.                                                         |
 
 `SocketConnection` tiene `receive(message)` para cada mensaje del cliente, `emit(event, payload)` y `close(code?, reason?)`. Un mensaje que no es JSON o no tiene `event` y `payload` cierra el peer con `1008` y `receive` rechaza con `INVALID_SOCKET_MESSAGE`.
 
@@ -87,6 +87,7 @@ Un `SocketHub`:
 ### Broadcast desde una tarea o una API
 
 <!-- no-check -->
+
 ```ts
 // server/api/maintenance.post.ts
 export default defineApiRoute({
@@ -105,6 +106,7 @@ En una aplicación, el autoimport `socket` envuelve el hub de la aplicación. En
 ### Varias instancias con Redis
 
 <!-- no-check -->
+
 ```ts
 import { createClient } from "redis";
 import { createSocketHub, RedisSocketPubSub } from "@meekojs/meeko/server";
@@ -129,6 +131,7 @@ await hub.broadcast("chat", "general", "message", { body: "hola" });
 Rechaza con `ApiError` `INVALID_SOCKET_PAYLOAD` (400) antes de publicar: lo que sale también se valida, para que el cliente reciba siempre lo que su contrato dice.
 
 <!-- no-check -->
+
 ```ts good
 await hub.broadcast("chat", "general", "message", { text: "hola" });
 ```
@@ -142,6 +145,7 @@ await hub.preflight("chat", new Request("http://localhost/_meeko/socket/chat", {
 `ApiError` `INVALID_ORIGIN` (403). El navegador envía `Origin` en los WebSocket, y sin esta comprobación cualquier página podría conectarse con las cookies del usuario.
 
 <!-- no-check -->
+
 ```ts good
 createSocketHub({ channels, sessions, services: {}, allowedOrigins: ["https://app.example.com"] });
 ```
@@ -155,6 +159,7 @@ createSocketHub({ channels, sessions, services: {}, maxMessageBytes: 0 });
 `RangeError: Invalid socket limits`, al crear el hub.
 
 <!-- no-check -->
+
 ```ts good
 createSocketHub({ channels, sessions, services: {}, maxMessageBytes: 16 * 1024 });
 ```

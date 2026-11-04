@@ -1,0 +1,39 @@
+<script lang="ts">
+	import type { DivergenceState } from '../../../shared/schemas/dashboard'
+
+	import { stateTones } from '../../utils/labels'
+
+	const props = defineProps<{ state: DivergenceState | null; importStale?: boolean; removed?: boolean }>({ importStale: false, removed: false })
+
+	const { t } = useI18n()
+</script>
+
+<template>
+	<span class="dash-badges">
+		<UIBadge
+			if:when="props.removed"
+			tone="danger"
+		>
+			{t('badge.removed')}
+		</UIBadge>
+		<span
+			if:when="props.state"
+			bind:title="props.state ? t(`labels.stateHelp.${props.state}`) : undefined"
+		>
+			<UIBadge bind:tone="props.state ? stateTones[props.state] : 'neutral'">{props.state ? t(`labels.state.${props.state}`) : ''}</UIBadge>
+		</span>
+		<span
+			if:when="!props.state && !props.removed"
+			class="dash-soft"
+			bind:title="t('badge.noMarkdownHelp')"
+		>
+			{t('badge.noMarkdown')}
+		</span>
+		<span
+			if:when="props.importStale"
+			bind:title="t('badge.importStaleHelp')"
+		>
+			<UIBadge tone="accent">{t('badge.importStale')}</UIBadge>
+		</span>
+	</span>
+</template>

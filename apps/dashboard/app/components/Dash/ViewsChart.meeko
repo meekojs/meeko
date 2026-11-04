@@ -1,0 +1,285 @@
+<script lang="ts">
+	import type { TableColumn } from '@meekojs/ui/runtime'
+
+	interface Day {
+		day: string
+		views: number
+	}
+
+	const props = defineProps<{ days: readonly Day[]; label: string }>()
+
+	const i18n = useI18n()
+	const { t } = i18n
+	const format = useFormat()
+	const formatNumber = format.number
+
+	/** A UTC day as «31 oct», or with the weekday and the year. */
+	const short = (day: string) => format.day(day, { day: 'numeric', month: 'short' })
+	const long = (day: string) => format.day(day, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
+
+	/**
+	 * A clean top for the axis, at least the largest day: four gridline steps of 1, 2 or 5 times a
+	 * power of ten, so every tick is a whole number (0, 10, 20, 30, 40).
+	 */
+	function niceTop(max: number): number {
+		if (max <= 4) return 4
+		const quarter = max / 4
+		const power = 10 ** Math.floor(Math.log10(quarter))
+		for (const step of [1, 2, 5, 10]) if (step * power >= quarter) return 4 * step * power
+		return 40 * power
+	}
+
+	const top = computed(() => niceTop(Math.max(0, ...props.days.map((entry) => entry.views))))
+	/** Four gridlines from the top down to the baseline. */
+	const ticks = computed(() => [1, 0.75, 0.5, 0.25, 0].map((share) => ({ share, value: top.value * share })))
+	const tickLabel = (value: number) => (value >= 10_000 ? i18n.number(value, { notation: 'compact', maximumFractionDigits: 0 }) : formatNumber(Math.round(value * 100) / 100))
+	/** The days the axis names: the first, the middle and the last. */
+	const labelled = computed(() => {
+		const count = props.days.length
+		return new Set(count <= 3 ? props.days.map((_, index) => index) : [0, Math.floor((count - 1) / 2), count - 1])
+	})
+
+	/** The day the tooltip describes: under the pointer, or chosen with the arrow keys. */
+	const active = signal<number | null>(null)
+	const current = computed(() => (active.value === null ? null : (props.days[active.value] ?? null)))
+	const tooltipLeft = computed(() => (active.value === null || !props.days.length ? 0 : ((active.value + 0.5) / props.days.length) * 100))
+	const peak = computed(() => props.days.reduce<Day | null>((best, entry) => (entry.views > 0 && (!best || entry.views > best.views) ? entry : best), null))
+
+	function onKeydown(event: KeyboardEvent): void {
+		const count = props.days.length
+		if (!count) return
+		const index = active.value ?? count - 1
+		const moves: Record<string, number> = { ArrowRight: index + 1, ArrowLeft: index - 1, Home: 0, End: count - 1 }
+		if (!(event.key in moves)) return
+		event.preventDefault()
+		active.value = Math.min(count - 1, Math.max(0, moves[event.key]!))
+	}
+
+	const columns = [
+		{ key: 'day', label: t('chart.day'), rowHeader: true, format: (day: string) => long(day) },
+		{ key: 'views', label: t('chart.viewsColumn'), numeric: true, format: (views: number) => formatNumber(views) },
+	] satisfies TableColumn<Day>[]
+
+	function onPointer(event: PointerEvent): void {
+		const target = event.currentTarget as HTMLElement
+		const box = target.getBoundingClientRect()
+		if (!props.days.length || box.width <= 0) return
+		active.value = Math.min(props.days.length - 1, Math.max(0, Math.floor(((event.clientX - box.left) / box.width) * props.days.length)))
+	}
+</script>
+
+<template>
+	<figure class="views-chart">
+		<div
+			class="plot"
+			role="img"
+			tabindex="0"
+			bind:aria-label="props.label + '. ' + (peak.value ? t('chart.peak', { views: formatNumber(peak.value.views), day: long(peak.value.day) }) : t('chart.noViews')) + ' ' + t('chart.keys')"
+			on:keydown="onKeydown"
+			on:focus="() => (active.value ??= props.days.length - 1)"
+			on:blur="() => (active.value = null)"
+		>
+			<div
+				class="grid"
+				aria-hidden="true"
+			>
+				<div
+					each:of="ticks.value"
+					each:as="tick"
+					each:key="tick.share"
+					class="tick"
+					bind:style="'bottom: ' + tick.share * 100 + '%'"
+				>
+					<span>{tickLabel(tick.value)}</span>
+				</div>
+			</div>
+			<div
+				class="columns"
+				aria-hidden="true"
+				on:pointermove="onPointer"
+				on:pointerleave="() => (active.value = null)"
+			>
+				<div
+					each:of="props.days"
+					each:as="entry"
+					each:index="index"
+					each:key="entry.day"
+					class="column"
+					bind:data-active="active.value === index ? 'true' : undefined"
+				>
+					<span
+						class="bar"
+						bind:style="'height: ' + (entry.views / top.value) * 100 + '%'"
+						bind:data-zero="entry.views === 0 ? 'true' : undefined"
+					/>
+				</div>
+			</div>
+			<div
+				if:when="current.value"
+				class="tooltip"
+				aria-hidden="true"
+				bind:style="'left: ' + tooltipLeft.value + '%'"
+				bind:data-edge="tooltipLeft.value < 15 ? 'start' : tooltipLeft.value > 85 ? 'end' : undefined"
+			>
+				<strong>{formatNumber(current.value?.views ?? 0)}</strong>
+				<span>{t('chart.views', { count: current.value?.views ?? 0 })} · {long(current.value?.day ?? '')}</span>
+			</div>
+		</div>
+		<div
+			class="axis"
+			aria-hidden="true"
+		>
+			<span
+				each:of="props.days"
+				each:as="entry"
+				each:index="index"
+				each:key="entry.day"
+			>
+				{labelled.value.has(index) ? short(entry.day) : ''}
+			</span>
+		</div>
+		<div class="table-view">
+			<UIDisclosure bind:summary="t('chart.table')">
+				<div class="table-scroll">
+					<UITable
+						density="compact"
+						rowKey="day"
+						bind:hideCaption="true"
+						bind:caption="props.label"
+						bind:columns="columns"
+						bind:rows="props.days"
+					/>
+				</div>
+			</UIDisclosure>
+		</div>
+	</figure>
+</template>
+
+<style scoped>
+	.views-chart {
+		--chart-axis: var(--ui-control-height-lg);
+		margin: 0;
+	}
+	.plot {
+		position: relative;
+		margin-inline-start: var(--chart-axis);
+		border-radius: var(--ui-radius-md);
+		height: calc(var(--ui-space-24) * 2);
+	}
+	.plot:focus-visible {
+		outline: var(--ui-focus-ring);
+		outline-offset: var(--ui-space-1-5);
+	}
+	.grid {
+		position: absolute;
+		inset: 0;
+		pointer-events: none;
+	}
+	.tick {
+		position: absolute;
+		right: 0;
+		left: 0;
+		border-top: var(--ui-border-width) solid var(--ui-color-border);
+	}
+	.tick span {
+		position: absolute;
+		top: 0;
+		right: calc(100% + var(--ui-space-2));
+		transform: translateY(-50%);
+		color: var(--ui-color-text-soft);
+		font-size: var(--ui-font-size-xs);
+		font-variant-numeric: tabular-nums;
+		white-space: nowrap;
+	}
+	.columns {
+		display: flex;
+		position: absolute;
+		align-items: flex-end;
+		inset: 0;
+	}
+	.column {
+		display: flex;
+		flex: 1 1 0;
+		justify-content: center;
+		align-items: flex-end;
+		min-width: 0;
+		height: 100%;
+	}
+	.column[data-active='true'] {
+		background: var(--ui-color-primary-soft);
+	}
+	.bar {
+		transition: height var(--ui-duration-slow) var(--ui-ease-out);
+		border-radius: var(--ui-radius-xs) var(--ui-radius-xs) 0 0;
+		background: var(--ui-color-primary);
+		width: min(var(--ui-space-6), calc(100% - 2 * var(--ui-border-width)));
+	}
+	.bar[data-zero='true'] {
+		height: 0;
+	}
+	.column[data-active='true'] .bar {
+		background: var(--ui-color-primary-hover);
+	}
+	.tooltip {
+		display: grid;
+		position: absolute;
+		top: calc(var(--ui-space-2) * -1);
+		gap: var(--ui-space-0-5);
+		transform: translate(-50%, -100%);
+		z-index: var(--ui-z-floating);
+		box-shadow: var(--ui-shadow-md);
+		border: var(--ui-border-width) solid var(--ui-color-border-strong);
+		border-radius: var(--ui-radius-lg);
+		background: var(--ui-color-surface-raised);
+		padding: var(--ui-space-1-5) var(--ui-space-2);
+		pointer-events: none;
+		font-size: var(--ui-font-size-sm);
+		white-space: nowrap;
+	}
+	.tooltip[data-edge='start'] {
+		transform: translate(calc(var(--ui-space-4) * -1), -100%);
+	}
+	.tooltip[data-edge='end'] {
+		transform: translate(calc(-100% + var(--ui-space-4)), -100%);
+	}
+	.tooltip strong {
+		font-weight: var(--ui-font-weight-semibold);
+		font-size: var(--ui-font-size-md);
+		font-variant-numeric: tabular-nums;
+	}
+	.tooltip span {
+		color: var(--ui-color-text-soft);
+	}
+	.axis {
+		display: flex;
+		margin-inline-start: var(--chart-axis);
+		margin-block-start: var(--ui-space-2);
+		color: var(--ui-color-text-soft);
+		font-size: var(--ui-font-size-xs);
+	}
+	.axis span {
+		flex: 1 1 0;
+		min-width: 0;
+		overflow: visible;
+		text-align: center;
+		white-space: nowrap;
+	}
+	.axis span:first-child {
+		text-align: start;
+	}
+	.axis span:last-child {
+		text-align: end;
+	}
+	.table-view {
+		margin-block-start: var(--ui-space-4);
+	}
+	.table-scroll {
+		max-height: var(--ui-log-max-height);
+		overflow: auto;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.bar {
+			transition: none;
+		}
+	}
+</style>

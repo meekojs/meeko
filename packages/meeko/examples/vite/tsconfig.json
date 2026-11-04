@@ -1,10 +1,10 @@
 {
-  "extends": "../../tsconfig.json",
-  "compilerOptions": {
-    "rootDir": "../..",
-    "rootDirs": ["../..", "../../.meeko/types"],
-    "noEmit": true,
-    "allowArbitraryExtensions": true
-  },
-  "include": ["main.ts"]
+	"extends": "../../tsconfig.json",
+	"compilerOptions": {
+		"rootDir": "../..",
+		"rootDirs": ["../..", "../../.meeko/types"],
+		"noEmit": true,
+		"allowArbitraryExtensions": true
+	},
+	"include": ["main.ts"]
 }

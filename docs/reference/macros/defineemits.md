@@ -40,8 +40,8 @@ const emit = defineEmits<{ save: [id: number]; close: [] }>();
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
+| Parámetro               | Tipo                      | Por defecto | Descripción                                                                                                                                               |
+| ----------------------- | ------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `T` (argumento de tipo) | `{ [evento]: [...args] }` | obligatorio | Un objeto cuyas claves son los eventos (identificadores) y cuyos valores son tuplas con nombre: `{ save: [id: number]; close: [] }`. Sin él es `MEEK046`. |
 
 No admite argumentos en ejecución (`MEEK047`): los eventos se declaran sólo en el tipo.

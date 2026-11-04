@@ -1,0 +1,101 @@
+<script lang="ts">
+	import type { UIBrand, UILocaleItem, UINavigationLink } from '@meekojs/ui/runtime'
+
+	import { stripLocale } from '@meekojs/i18n'
+
+	const route = useRoute()
+	const i18n = useI18n()
+	const { t } = i18n
+
+	const sections = [
+		{ href: '/', key: 'overview' },
+		{ href: '/sources', key: 'sources' },
+		{ href: '/translations', key: 'translations' },
+		{ href: '/moderation', key: 'moderation' },
+		{ href: '/metrics', key: 'metrics' },
+		{ href: '/health', key: 'health' },
+		{ href: '/snapshots', key: 'snapshots' },
+	] as const
+
+	// Under /en the route is /en/sources: the active section compares the path without the prefix.
+	const path = computed(() => stripLocale(route.path.value, i18n.locales))
+	const current = (href: string) => (href === '/' ? path.value === '/' : path.value === href || path.value.startsWith(href + '/'))
+
+	// F5: who is logged in, for the header; `null` on the login page. Logging in and out loads a new
+	// document, so it is read once per document.
+	const session = await useRpcQuery('auth.session')
+	const user = computed(() => session.data.value.user)
+
+	const brand = computed<UIBrand>(() => ({ name: 'Meeko', product: 'Dashboard', href: i18n.localePath('/'), image: { src: '/brand/meeko-logo.png', width: 26, height: 26 }, ariaLabel: t('a11y.brand') }))
+	const items = computed<readonly UINavigationLink[]>(() => (user.value ? sections.map(({ href, key }) => ({ label: t(`nav.${key}`), href: i18n.localePath(href), current: current(href) })) : []))
+	const locales = computed<readonly UILocaleItem[]>(() => i18n.pageLocales().map((code) => ({ code, label: i18n.localeName(code), href: i18n.switchLocalePath(code), current: code === i18n.locale })))
+
+	// The language of the browser is only a suggestion: the address decides the language and nothing
+	// redirects. It is read after hydration, so the server HTML and the first paint match.
+	const suggestion = signal<string | undefined>(undefined)
+	// The same words as the public webs, in the language it offers and not in the reader's: they belong
+	// to neither catalog, and the English one must stay free of Spanish.
+	const offers: Readonly<Record<string, { readonly message: string; readonly go: string }>> = {
+		es: { message: 'Esta página también está en español.', go: 'Leer esta página en español' },
+		en: { message: 'This page is also available in English.', go: 'Read this page in English' },
+	}
+	const offer = computed(() => offers[suggestion.value ?? ''])
+	onMounted(() => {
+		suggestion.value = i18n.suggestedLocale()
+	})
+	function stay() {
+		i18n.rememberLocale(i18n.locale)
+		suggestion.value = undefined
+	}
+</script>
+
+<template>
+	<UIApp>
+		<UIPage
+			layout="dashboard"
+			bind:skipLabel="t('a11y.skip')"
+		>
+			<snippet name="header">
+				<UIHeader
+					bind:brand="brand.value"
+					bind:items="items.value"
+					bind:label="t('a11y.sections')"
+				>
+					<snippet name="actions">
+						<DashAccount
+							if:when="user.value"
+							class="dash-account-bar"
+							bind:user="user.value ?? ''"
+						/>
+						<UILocaleSwitcher
+							bind:items="locales.value"
+							bind:label="t('locale.label')"
+						/>
+						<UIThemeToggle icons />
+					</snippet>
+					<!-- On a phone the account leaves the bar for the menu of the sections. -->
+					<snippet
+						if:when="user.value"
+						name="menu"
+					>
+						<DashAccount
+							class="dash-account-menu"
+							bind:user="user.value ?? ''"
+						/>
+					</snippet>
+				</UIHeader>
+			</snippet>
+			<MeekoOutlet />
+		</UIPage>
+		<UILocaleSuggestion
+			if:when="suggestion.value"
+			bind:items="locales.value"
+			bind:suggested="suggestion.value"
+			bind:label="t('locale.label')"
+			bind:message="offer.value?.message"
+			bind:goLabel="offer.value?.go"
+			bind:stayLabel="t('locale.stay')"
+			on:stay="stay"
+		/>
+	</UIApp>
+</template>

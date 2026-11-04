@@ -29,8 +29,8 @@ Siguiente paso: cd C:\proyectos\tienda && npm install && npm run dev
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
+| Parámetro      | Tipo | Por defecto | Descripción                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| -------------- | ---- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `<directorio>` | ruta | obligatorio | Carpeta de la aplicación. Se crea si no existe; si existe, sólo puede contener `.git` (una carpeta recién creada con `git init`) o un `package.json` con lockfiles (`package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `bun.lock`, `bun.lockb`), `pnpm-workspace.yaml`, `node_modules`, `.npmrc` y `.git`; las mismas que `meeko init`. Hasta `1.6`, una carpeta con sólo `.git` y los lockfiles de Bun se rechazaban. Su nombre normalizado es el `name` del `package.json` si éste no tiene uno. |
 
 ## Resultado
@@ -53,9 +53,9 @@ tienda/
 
 `package.json` recibe estos scripts y fija `@meekojs/meeko` a la versión exacta de la CLI que lo creó, con `@types/node`, `typescript` y `vite` como dependencias de desarrollo:
 
-| Script | Comando |
-| --- | --- |
-| `dev` | `meeko dev .` |
+| Script  | Comando         |
+| ------- | --------------- |
+| `dev`   | `meeko dev .`   |
 | `check` | `meeko check .` |
 | `build` | `meeko build .` |
 | `start` | `meeko start .` |
@@ -169,6 +169,6 @@ meeko init-framework .
 
 - **`.meeko/` no se versiona.** El `.gitignore` del starter lo excluye, igual que `.env`. Los tipos y entradas se regeneran con `meeko dev` o `meeko check`.
 - **Sin servidor que configurar.** Las sesiones funcionan sin `server/runtime.ts`: en memoria en desarrollo y, en producción, en Redis con `MEEKO_REDIS_URL`. Añade `server/runtime.ts` con `defineServerRuntime` cuando necesites servicios, tu propio almacén o la política de Socket.
-- **`.env.example`.** Documenta `MEEKO_PORT`, `MEEKO_HOST`, `MEEKO_PUBLIC_ORIGIN`, `MEEKO_REDIS_URL`, `MEEKO_SESSION_TTL`, `MEEKO_SESSION_SAMESITE` y `MEEKO_TRUST_PROXY`. Cópialo a `.env`: `dev`, `build`, `start`, `preview` y `check` lo leen.
+- **`.env.example`.** Documenta `MEEKO_PORT`, `MEEKO_HOST`, `MEEKO_PUBLIC_ORIGIN`, `MEEKO_REDIS_URL`, `MEEKO_SESSION_TTL`, `MEEKO_SESSION_SAMESITE`, `MEEKO_TRUST_PROXY` y, desde `1.8`, `MEEKO_TRUSTED_PROXIES` (comentadas). Cópialo a `.env`: `dev`, `build`, `start`, `preview` y `check` lo leen.
 - **Versión exacta.** El proyecto fija la versión de `@meekojs/meeko` con la que se creó; actualízala a mano con el gestor de paquetes.
 - **Windows y POSIX.** El mensaje usa `&&`, que funciona en PowerShell 7, `cmd` y POSIX.

@@ -1,9 +1,9 @@
-import type { DevelopmentServerRecord, EditorLiveAlias, EditorLiveSignal } from "../../../meeko/src/devtools-bridge-protocol.js";
+import type { DevelopmentServerRecord, EditorLiveAlias, EditorLiveSignal } from '../../../meeko/src/shared/devtools-bridge-protocol'
 
-export type { EditorBridgeDescriptor, EditorBridgeEvent, EditorCommandResult, EditorLiveAlias, EditorLiveSignal } from "../../../meeko/src/devtools-bridge-protocol.js";
+export type { EditorBridgeDescriptor, EditorBridgeEvent, EditorCommandResult, EditorLiveAlias, EditorLiveSignal } from '../../../meeko/src/shared/devtools-bridge-protocol'
 
 /** Descriptores del puente: cada `meeko dev` en marcha escribe el suyo, con su puerto en el nombre. */
-export const bridgeDescriptorGlob = "**/.meeko/dev/editor-bridge-*.json";
+export const bridgeDescriptorGlob = '**/.meeko/dev/editor-bridge-*.json'
 
 /**
  * `true` si el descriptor, con su ruta relativa a la carpeta del workspace, es de un proyecto del
@@ -12,30 +12,30 @@ export const bridgeDescriptorGlob = "**/.meeko/dev/editor-bridge-*.json";
  * herramientas y pruebas): sus valores no son del código del workspace.
  */
 export function isWorkspaceBridgeDescriptor(path: string): boolean {
-  const segments = path.split(/[\\/]/).filter(Boolean);
-  const name = segments.at(-1) ?? "";
-  if (!/^editor-bridge-\d+\.json$/.test(name) || segments.at(-2) !== "dev" || segments.at(-3) !== ".meeko") return false;
-  const project = segments.slice(0, -3);
-  return !project.some((segment) => segment === "node_modules" || segment === ".meeko");
+	const segments = path.split(/[\\/]/).filter(Boolean)
+	const name = segments.at(-1) ?? ''
+	if (!/^editor-bridge-\d+\.json$/.test(name) || segments.at(-2) !== 'dev' || segments.at(-3) !== '.meeko') return false
+	const project = segments.slice(0, -3)
+	return !project.some((segment) => segment === 'node_modules' || segment === '.meeko')
 }
 
 /** Registro de cada `meeko dev` en marcha: `.meeko/dev/server.json` del proyecto que sirve. */
-export const devServerRecordGlob = "**/.meeko/dev/server.json";
+export const devServerRecordGlob = '**/.meeko/dev/server.json'
 
 /**
  * `true` si el registro de `meeko dev`, con su ruta relativa a la carpeta del workspace, es de un
  * proyecto del workspace, con los mismos descartes que {@link isWorkspaceBridgeDescriptor}.
  */
 export function isWorkspaceDevServerRecord(path: string): boolean {
-  const segments = path.split(/[\\/]/).filter(Boolean);
-  if (segments.at(-1) !== "server.json" || segments.at(-2) !== "dev" || segments.at(-3) !== ".meeko") return false;
-  return !segments.slice(0, -3).some((segment) => segment === "node_modules" || segment === ".meeko");
+	const segments = path.split(/[\\/]/).filter(Boolean)
+	if (segments.at(-1) !== 'server.json' || segments.at(-2) !== 'dev' || segments.at(-3) !== '.meeko') return false
+	return !segments.slice(0, -3).some((segment) => segment === 'node_modules' || segment === '.meeko')
 }
 
 /** `meeko dev` en marcha que no publica valores en vivo, con el motivo que escribió. */
 export interface BridgeOff {
-  pid: number;
-  reason: string;
+	pid: number
+	reason: string
 }
 
 /**
@@ -44,17 +44,20 @@ export interface BridgeOff {
  * No comprueba si el proceso sigue vivo.
  */
 export function bridgeOffFromRecord(text: string): BridgeOff | undefined {
-  let record: Partial<DevelopmentServerRecord>;
-  try { record = JSON.parse(text) as Partial<DevelopmentServerRecord>; }
-  catch { return undefined; }
-  if (record === null || typeof record !== "object" || !Number.isSafeInteger(record.pid) || (record.pid ?? 0) <= 0 || record.editorBridge !== false) return undefined;
-  return { pid: record.pid!, reason: typeof record.editorBridgeReason === "string" && record.editorBridgeReason ? record.editorBridgeReason : "sin motivo registrado" };
+	let record: Partial<DevelopmentServerRecord>
+	try {
+		record = JSON.parse(text) as Partial<DevelopmentServerRecord>
+	} catch {
+		return undefined
+	}
+	if (record === null || typeof record !== 'object' || !Number.isSafeInteger(record.pid) || (record.pid ?? 0) <= 0 || record.editorBridge !== false) return undefined
+	return { pid: record.pid!, reason: typeof record.editorBridgeReason === 'string' && record.editorBridgeReason ? record.editorBridgeReason : 'sin motivo registrado' }
 }
 
 /** Texto y tooltip de la barra de estado de «Meeko live». */
 export interface LiveStatus {
-  text: string;
-  tooltip: string;
+	text: string
+	tooltip: string
 }
 
 /**
@@ -63,62 +66,61 @@ export interface LiveStatus {
  * explica por qué no hay valores en vivo en lugar de mostrar sólo «desconectado».
  */
 export function liveStatus(connected: readonly string[], descriptors: number, off: readonly BridgeOff[]): LiveStatus {
-  if (connected.length) return { text: "$(pulse) Meeko live: conectado", tooltip: `Valores en vivo de ${connected.join(", ")}. Pulsa para reconectar.` };
-  if (off.length) {
-    const servers = off.map((item) => `meeko dev (PID ${item.pid}): ${item.reason}`).join("\n");
-    return {
-      text: "$(circle-slash) Meeko live: desactivado en meeko dev",
-      tooltip: `${servers}\n\nEse meeko dev no publica valores en vivo. MEEKO_EDITOR_BRIDGE=0 (en el entorno o en el .env del proyecto) desactiva el puente con el editor: quítalo y reinicia meeko dev. El puente sólo arranca cuando meeko dev escucha en loopback o en todas las interfaces.`,
-    };
-  }
-  return {
-    text: "$(debug-disconnect) Meeko live: desconectado",
-    tooltip: descriptors ? "meeko dev no responde. Pulsa para reconectar." : "Arranca meeko dev para ver los valores de las señales junto al código.",
-  };
+	if (connected.length) return { text: '$(pulse) Meeko live: conectado', tooltip: `Valores en vivo de ${connected.join(', ')}. Pulsa para reconectar.` }
+	if (off.length) {
+		const servers = off.map((item) => `meeko dev (PID ${item.pid}): ${item.reason}`).join('\n')
+		return {
+			text: '$(circle-slash) Meeko live: desactivado en meeko dev',
+			tooltip: `${servers}\n\nEse meeko dev no publica valores en vivo. MEEKO_EDITOR_BRIDGE=0 (en el entorno o en el .env del proyecto) desactiva el puente con el editor: quítalo y reinicia meeko dev. El puente sólo arranca cuando meeko dev escucha en loopback o en todas las interfaces.`,
+		}
+	}
+	return {
+		text: '$(debug-disconnect) Meeko live: desconectado',
+		tooltip: descriptors ? 'meeko dev no responde. Pulsa para reconectar.' : 'Arranca meeko dev para ver los valores de las señales junto al código.',
+	}
 }
 
 /** Valores de una misma declaración de señal en todas las instancias montadas. */
 export interface LiveGroup {
-  name: string;
-  /** Línea y columna (desde 1) que publicó el navegador. */
-  line: number;
-  column: number;
-  signals: EditorLiveSignal[];
+	name: string
+	/** Línea y columna (desde 1) que publicó el navegador. */
+	line: number
+	column: number
+	signals: EditorLiveSignal[]
 }
 
 /** Grupo situado en el texto actual del documento; `line` empieza en 0. */
 export interface LivePlacement {
-  group: LiveGroup;
-  line: number;
+	group: LiveGroup
+	line: number
 }
 
 /** Clave de comparación de rutas: barras `/` y, en sistemas sin distinción de mayúsculas, minúsculas. */
 export function fileKey(path: string, caseInsensitive: boolean): string {
-  const normalized = path.replaceAll("\\", "/");
-  return caseInsensitive ? normalized.toLowerCase() : normalized;
+	const normalized = path.replaceAll('\\', '/')
+	return caseInsensitive ? normalized.toLowerCase() : normalized
 }
 
 /** Agrupa por declaración las señales de `file`, con las instancias en orden estable. */
 export function groupSignals(signals: Iterable<EditorLiveSignal>, file: string, caseInsensitive: boolean): LiveGroup[] {
-  const key = fileKey(file, caseInsensitive);
-  const groups = new Map<string, LiveGroup>();
-  for (const signal of signals) {
-    if (signal.line === undefined || signal.column === undefined || fileKey(signal.file, caseInsensitive) !== key) continue;
-    const id = `${signal.name}@${signal.line}:${signal.column}`;
-    let group = groups.get(id);
-    if (!group) {
-      group = { name: signal.name, line: signal.line, column: signal.column, signals: [] };
-      groups.set(id, group);
-    }
-    group.signals.push(signal);
-  }
-  const order = (left: EditorLiveSignal, right: EditorLiveSignal): number =>
-    left.tab.localeCompare(right.tab, "en", { numeric: true }) || left.instanceId.localeCompare(right.instanceId, "en", { numeric: true });
-  return [...groups.values()].map((group) => ({ ...group, signals: group.signals.sort(order) })).sort((left, right) => left.line - right.line || left.column - right.column);
+	const key = fileKey(file, caseInsensitive)
+	const groups = new Map<string, LiveGroup>()
+	for (const signal of signals) {
+		if (signal.line === undefined || signal.column === undefined || fileKey(signal.file, caseInsensitive) !== key) continue
+		const id = `${signal.name}@${signal.line}:${signal.column}`
+		let group = groups.get(id)
+		if (!group) {
+			group = { name: signal.name, line: signal.line, column: signal.column, signals: [] }
+			groups.set(id, group)
+		}
+		group.signals.push(signal)
+	}
+	const order = (left: EditorLiveSignal, right: EditorLiveSignal): number => left.tab.localeCompare(right.tab, 'en', { numeric: true }) || left.instanceId.localeCompare(right.instanceId, 'en', { numeric: true })
+	return [...groups.values()].map((group) => ({ ...group, signals: group.signals.sort(order) })).sort((left, right) => left.line - right.line || left.column - right.column)
 }
 
 function escapeRegExp(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+	return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 /**
@@ -126,34 +128,38 @@ function escapeRegExp(text: string): string {
  * el nombre ya no está en la posición publicada, usa la declaración más cercana con ese nombre.
  */
 export function placeGroups(groups: readonly LiveGroup[], lines: readonly string[]): LivePlacement[] {
-  const placements: LivePlacement[] = [];
-  for (const group of groups) {
-    const reported = group.line - 1;
-    const text = lines[reported];
-    const word = new RegExp(`^${escapeRegExp(group.name)}(?![\\w$])`);
-    if (text !== undefined && word.test(text.slice(group.column - 1))) {
-      placements.push({ group, line: reported });
-      continue;
-    }
-    const declaration = new RegExp(`\\b(?:const|let|var|function)\\s+${escapeRegExp(group.name)}(?![\\w$])`);
-    let best: number | undefined;
-    for (const [index, candidate] of lines.entries()) {
-      if (!declaration.test(candidate)) continue;
-      if (best === undefined || Math.abs(index - reported) < Math.abs(best - reported)) best = index;
-    }
-    if (best !== undefined) placements.push({ group, line: best });
-  }
-  return placements;
+	const placements: LivePlacement[] = []
+	for (const group of groups) {
+		const reported = group.line - 1
+		const text = lines[reported]
+		const word = new RegExp(`^${escapeRegExp(group.name)}(?![\\w$])`)
+		if (text !== undefined && word.test(text.slice(group.column - 1))) {
+			placements.push({ group, line: reported })
+			continue
+		}
+		const declaration = new RegExp(`\\b(?:const|let|var|function)\\s+${escapeRegExp(group.name)}(?![\\w$])`)
+		let best: number | undefined
+		for (const [index, candidate] of lines.entries()) {
+			if (!declaration.test(candidate)) continue
+			if (best === undefined || Math.abs(index - reported) < Math.abs(best - reported)) best = index
+		}
+		if (best !== undefined) placements.push({ group, line: best })
+	}
+	return placements
 }
 
 /** JSON en una línea, recortado a `limit` caracteres. */
 export function previewValue(signal: EditorLiveSignal, limit = 60): string {
-  let text = signal.json;
-  if (!signal.truncated) {
-    try { text = JSON.stringify(JSON.parse(signal.json)); } catch { text = signal.json; }
-  }
-  const compact = text.replace(/\s+/g, " ");
-  return compact.length > limit || signal.truncated ? `${compact.slice(0, limit - 1)}…` : compact;
+	let text = signal.json
+	if (!signal.truncated) {
+		try {
+			text = JSON.stringify(JSON.parse(signal.json))
+		} catch {
+			text = signal.json
+		}
+	}
+	const compact = text.replace(/\s+/g, ' ')
+	return compact.length > limit || signal.truncated ? `${compact.slice(0, limit - 1)}…` : compact
 }
 
 /**
@@ -161,50 +167,54 @@ export function previewValue(signal: EditorLiveSignal, limit = 60): string {
  * señal es la del padre recibida con `defineModel`, `open = true (= dialogOpen)`.
  */
 export function inlineText(group: LiveGroup, limit = 60): string {
-  const first = group.signals[0];
-  if (!first) return "";
-  const count = group.signals.length;
-  const alias = first.alias ? ` (= ${first.alias.name})` : "";
-  return `${group.name} = ${previewValue(first, limit)}${alias}${count > 1 ? ` · ${count} instancias` : ""}`;
+	const first = group.signals[0]
+	if (!first) return ''
+	const count = group.signals.length
+	const alias = first.alias ? ` (= ${first.alias.name})` : ''
+	return `${group.name} = ${previewValue(first, limit)}${alias}${count > 1 ? ` · ${count} instancias` : ''}`
 }
 
 /** Nombre del archivo de una ruta con barras `/` o `\`. */
 function baseName(path: string): string {
-  return path.slice(Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\")) + 1);
+	return path.slice(Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\')) + 1)
 }
 
 /** Código Markdown en línea que el contenido no puede cerrar. */
 function inlineCode(text: string): string {
-  const longest = Math.max(0, ...[...text.matchAll(/`+/g)].map((match) => match[0].length));
-  const marks = "`".repeat(longest + 1);
-  return longest ? `${marks} ${text} ${marks}` : `${marks}${text}${marks}`;
+	const longest = Math.max(0, ...[...text.matchAll(/`+/g)].map((match) => match[0].length))
+	const marks = '`'.repeat(longest + 1)
+	return longest ? `${marks} ${text} ${marks}` : `${marks}${text}${marks}`
 }
 
 /** Descripción de un alias para el hover: «alias de `dialogOpen` (lab.meeko:5)». */
 export function aliasDescription(alias: EditorLiveAlias): string {
-  const place = `${baseName(alias.file)}${alias.line === undefined ? "" : `:${alias.line}`}`;
-  return `alias de ${inlineCode(alias.name)} (${escapeMarkdown(place)})`;
+	const place = `${baseName(alias.file)}${alias.line === undefined ? '' : `:${alias.line}`}`
+	return `alias de ${inlineCode(alias.name)} (${escapeMarkdown(place)})`
 }
 
 /** JSON con sangría para el hover; un valor recortado se muestra tal como llegó. */
 export function formatValue(signal: EditorLiveSignal, limit = 4000): string {
-  let text = signal.json;
-  if (!signal.truncated) {
-    try { text = JSON.stringify(JSON.parse(signal.json), null, 2); } catch { text = signal.json; }
-  }
-  return text.length > limit ? `${text.slice(0, limit)}\n…` : signal.truncated ? `${text}…` : text;
+	let text = signal.json
+	if (!signal.truncated) {
+		try {
+			text = JSON.stringify(JSON.parse(signal.json), null, 2)
+		} catch {
+			text = signal.json
+		}
+	}
+	return text.length > limit ? `${text.slice(0, limit)}\n…` : signal.truncated ? `${text}…` : text
 }
 
 /** Bloque de código Markdown que no puede cerrarse desde el contenido. */
 function fence(text: string, language: string): string {
-  const longest = Math.max(2, ...[...text.matchAll(/`+/g)].map((match) => match[0].length));
-  const marks = "`".repeat(longest + 1);
-  return `${marks}${language}\n${text}\n${marks}`;
+	const longest = Math.max(2, ...[...text.matchAll(/`+/g)].map((match) => match[0].length))
+	const marks = '`'.repeat(longest + 1)
+	return `${marks}${language}\n${text}\n${marks}`
 }
 
 /** Texto Markdown que no interpreta el contenido como formato. */
 export function escapeMarkdown(text: string): string {
-  return text.replace(/[\\`*_{}[\]()#+\-.!|<>]/g, "\\$&");
+	return text.replace(/[\\`*_{}[\]()#+\-.!|<>]/g, '\\$&')
 }
 
 /**
@@ -212,71 +222,100 @@ export function escapeMarkdown(text: string): string {
  * un enlace para editarlo.
  */
 export function hoverMarkdown(group: LiveGroup, editLink?: (signal: EditorLiveSignal) => string, maxInstances = 10): string {
-  const parts: string[] = [];
-  const count = group.signals.length;
-  parts.push(`**Meeko live** · \`${group.name}\`${count > 1 ? ` · ${count} instancias` : ""}`);
-  for (const signal of group.signals.slice(0, maxInstances)) {
-    const header = `${escapeMarkdown(signal.component)} · ${escapeMarkdown(signal.instanceId)} · ${escapeMarkdown(signal.tab)}`;
-    const alias = signal.alias ? ` · ${aliasDescription(signal.alias)}` : "";
-    const edit = editLink ? ` · [Editar valor](${editLink(signal)})` : "";
-    parts.push(`${header}${alias}${edit}${signal.truncated ? " · *recortado*" : ""}\n\n${fence(formatValue(signal), "json")}`);
-  }
-  if (count > maxInstances) parts.push(`… y ${count - maxInstances} instancias más`);
-  return parts.join("\n\n");
+	const parts: string[] = []
+	const count = group.signals.length
+	parts.push(`**Meeko live** · \`${group.name}\`${count > 1 ? ` · ${count} instancias` : ''}`)
+	for (const signal of group.signals.slice(0, maxInstances)) {
+		const header = `${escapeMarkdown(signal.component)} · ${escapeMarkdown(signal.instanceId)} · ${escapeMarkdown(signal.tab)}`
+		const alias = signal.alias ? ` · ${aliasDescription(signal.alias)}` : ''
+		const edit = editLink ? ` · [Editar valor](${editLink(signal)})` : ''
+		parts.push(`${header}${alias}${edit}${signal.truncated ? ' · *recortado*' : ''}\n\n${fence(formatValue(signal), 'json')}`)
+	}
+	if (count > maxInstances) parts.push(`… y ${count - maxInstances} instancias más`)
+	return parts.join('\n\n')
 }
 
-export type ParsedValue = { ok: true; value: unknown } | { ok: false; error: string };
+export type ParsedValue = { ok: true; value: unknown } | { ok: false; error: string }
 
 /** Valida el JSON que escribe el usuario para `setSignal`. */
 export function parseEditedValue(text: string): ParsedValue {
-  if (!text.trim()) return { ok: false, error: "Escribe un valor JSON, por ejemplo 3, \"texto\", true o null" };
-  try {
-    return { ok: true, value: JSON.parse(text) as unknown };
-  } catch (error) {
-    return { ok: false, error: `JSON no válido: ${error instanceof Error ? error.message : String(error)}` };
-  }
+	if (!text.trim()) return { ok: false, error: 'Escribe un valor JSON, por ejemplo 3, "texto", true o null' }
+	try {
+		return { ok: true, value: JSON.parse(text) as unknown }
+	} catch (error) {
+		return { ok: false, error: `JSON no válido: ${error instanceof Error ? error.message : String(error)}` }
+	}
 }
 
 /** Valor inicial del cuadro de edición: el JSON actual en una línea si es corto. */
 export function editableValue(signal: EditorLiveSignal): string {
-  if (signal.truncated) return "";
-  try { return JSON.stringify(JSON.parse(signal.json)); } catch { return signal.json; }
+	if (signal.truncated) return ''
+	try {
+		return JSON.stringify(JSON.parse(signal.json))
+	} catch {
+		return signal.json
+	}
 }
 
 /** URL HTTP de loopback válida para el puente, o `undefined`. */
 export function loopbackBridgeUrl(url: unknown): URL | undefined {
-  if (typeof url !== "string") return undefined;
-  let parsed: URL;
-  try { parsed = new URL(url); } catch { return undefined; }
-  if (parsed.protocol !== "http:" || parsed.username || parsed.password) return undefined;
-  const host = parsed.hostname.startsWith("[") ? parsed.hostname.slice(1, -1) : parsed.hostname;
-  const loopback = host === "localhost" || host === "::1" || /^127(?:\.\d{1,3}){3}$/.test(host);
-  return loopback ? parsed : undefined;
+	if (typeof url !== 'string') return undefined
+	let parsed: URL
+	try {
+		parsed = new URL(url)
+	} catch {
+		return undefined
+	}
+	if (parsed.protocol !== 'http:' || parsed.username || parsed.password) return undefined
+	const host = parsed.hostname.startsWith('[') ? parsed.hostname.slice(1, -1) : parsed.hostname
+	const loopback = host === 'localhost' || host === '::1' || /^127(?:\.\d{1,3}){3}$/.test(host)
+	return loopback ? parsed : undefined
 }
 
-/** Lector incremental de `text/event-stream`. */
+/** Límite por evento SSE, incluida la instantánea de señales. */
+export const maxSseFrameBytes = 4 * 1024 * 1024
+
+/** Lector incremental de `text/event-stream`; rechaza eventos demasiado grandes. */
 export class SseParser {
-  private buffer = "";
+	private buffer = ''
+	private rejected = false
 
-  constructor(private readonly onEvent: (event: string, data: string) => void) {}
+	constructor(
+		private readonly onEvent: (event: string, data: string) => void,
+		private readonly maxBytes = maxSseFrameBytes,
+	) {}
 
-  push(chunk: string): void {
-    this.buffer += chunk.replace(/\r\n?/g, "\n");
-    let end: number;
-    while ((end = this.buffer.indexOf("\n\n")) >= 0) {
-      const frame = this.buffer.slice(0, end);
-      this.buffer = this.buffer.slice(end + 2);
-      let event = "message";
-      const data: string[] = [];
-      for (const line of frame.split("\n")) {
-        if (!line || line.startsWith(":")) continue;
-        const colon = line.indexOf(":");
-        const field = colon < 0 ? line : line.slice(0, colon);
-        const value = colon < 0 ? "" : line.slice(colon + 1).replace(/^ /, "");
-        if (field === "event") event = value;
-        else if (field === "data") data.push(value);
-      }
-      if (data.length) this.onEvent(event, data.join("\n"));
-    }
-  }
+	/** `false` indica un evento excesivo; se descarta el búfer y no se aceptan más datos. */
+	push(chunk: string): boolean {
+		if (this.rejected) return false
+		const incoming = chunk.replace(/\r\n?/g, '\n')
+		// Process complete frames before retaining the incomplete tail. A large chunk can
+		// contain many valid small events without counting them as a single frame.
+		this.buffer += incoming
+		let end: number
+		while ((end = this.buffer.indexOf('\n\n')) >= 0) {
+			const frame = this.buffer.slice(0, end)
+			this.buffer = this.buffer.slice(end + 2)
+			if (Buffer.byteLength(frame, 'utf8') > this.maxBytes) return this.reject()
+			let event = 'message'
+			const data: string[] = []
+			for (const line of frame.split('\n')) {
+				if (!line || line.startsWith(':')) continue
+				const colon = line.indexOf(':')
+				const field = colon < 0 ? line : line.slice(0, colon)
+				const value = colon < 0 ? '' : line.slice(colon + 1).replace(/^ /, '')
+				if (field === 'event') event = value
+				else if (field === 'data') data.push(value)
+			}
+			if (data.length) this.onEvent(event, data.join('\n'))
+		}
+		if (Buffer.byteLength(this.buffer, 'utf8') > this.maxBytes) return this.reject()
+		return true
+	}
+
+	private reject(): false {
+		this.buffer = ''
+		this.rejected = true
+		return false
+	}
 }

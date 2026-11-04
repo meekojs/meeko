@@ -1,0 +1,22 @@
+{
+	"error": {
+		"notFound": "Esta página no existe",
+		"failed": "No pudimos cargar la página",
+		"description": "Vuelve a la documentación de i18n para continuar.",
+		"hint": "Comprueba la dirección o elige una guía del menú.",
+		"action": "Ir a la instalación"
+	},
+	"lab": {
+		"languages": "Idioma del ejemplo",
+		"name": "Nombre para traducir",
+		"total": "Cantidad de elementos: {total}",
+		"role": "Permiso del usuario",
+		"owner": "Administrar",
+		"viewer": "Consultar",
+		"currency": "Moneda",
+		"result": "Resultado traducido",
+		"date": "Fecha · UTC",
+		"active": "Idioma activo:",
+		"note": ". Datos de ejemplo locales. Cambiar idioma navega a otro documento; editar los controles no guarda información."
+	}
+}

@@ -2,9 +2,19 @@
 .meeko/
 .pnpm-store/
 .serena/
+.env
 *.bundle.js
 *.d.meeko.ts
 *.generated.ts
 *.tsbuildinfo
 dist/
 node_modules/
+
+# Agent worktrees
+/.claude/worktrees/
+/.codex/worktrees/
+/.worktrees/
+
+# Incremental progress reports from hc workers (Codex sandbox fallback)
+/.hc-reports/
+.dist-building/

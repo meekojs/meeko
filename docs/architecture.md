@@ -16,30 +16,49 @@ El ejemplo de `examples/counter` ejercita el contrato en un servidor HTTP. Cada 
 
 ## Límites de responsabilidad
 
-| Parte | Responsabilidad |
-| --- | --- |
-| Parser | Analizar secciones, plantilla y expresiones conservando posiciones originales. |
-| Compilador | Validar la sintaxis y producir módulos tipados para SSR e hidratación. |
-| Runtime reactivo | Registrar dependencias, agrupar actualizaciones y liberar observadores por instancia. |
-| Runtime de navegador | Reclamar nodos existentes, conectar eventos y aplicar cambios precisos. |
-| Integración de herramientas | Mostrar diagnósticos en `.meeko`, transformar archivos en Vite y mantener HMR. |
-| Framework | Rutas, páginas, modos de render, navegación y clientes API/RPC/Socket (`src/framework`). |
-| Núcleo de servidor | Aplicación portable sobre Web APIs: runtime, contratos, sesiones, middleware y Socket (`src/framework-server`). |
-| Adaptadores | Conectar el núcleo con Node, Bun, Deno y Cloudflare Workers (`src/node.ts`, `src/bun.ts`, `src/deno.ts`, `src/cloudflare.ts`). |
+| Parte                       | Responsabilidad                                                                                                                |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Parser                      | Analizar secciones, plantilla y expresiones conservando posiciones originales.                                                 |
+| Compilador                  | Validar la sintaxis y producir módulos tipados para SSR e hidratación.                                                         |
+| Runtime reactivo            | Registrar dependencias, agrupar actualizaciones y liberar observadores por instancia.                                          |
+| Runtime de navegador        | Reclamar nodos existentes, conectar eventos y aplicar cambios precisos.                                                        |
+| Integración de herramientas | Mostrar diagnósticos en `.meeko`, transformar archivos en Vite y mantener HMR.                                                 |
+| Framework                   | Rutas, páginas, modos de render, navegación y clientes API/RPC/Socket (`src/framework`).                                       |
+| Núcleo de servidor          | Aplicación portable sobre Web APIs: runtime, contratos, sesiones, middleware y Socket (`src/framework-server`).                |
+| Adaptadores                 | Conectar el núcleo con Node, Bun, Deno y Cloudflare Workers (`src/node.ts`, `src/bun.ts`, `src/deno.ts`, `src/cloudflare.ts`). |
 
 La [guía del framework](framework.md) describe el framework, el servidor y los adaptadores.
 
-El parser de secciones vive en `src/compiler/sfc.ts`; `src/compiler/template.ts` construye un AST propio de HTML. Ambos conservan límites de inicio y fin en el archivo original. El generador de `src/compiler.ts` usa esas posiciones para errores de sintaxis y devuelve segmentos de mapeo para el script y las expresiones. `src/check.ts` verifica el módulo mediante TypeScript 7 y presenta los errores en el `.meeko` original. Un error en código auxiliar generado sin segmento se identifica como tal y se sitúa al inicio del archivo para no atribuirle una ubicación falsa.
+El parser de secciones vive en `src/compiler/parser/sfc.ts`; `src/compiler/parser/template.ts` construye un AST propio de HTML. Ambos conservan límites de inicio y fin en el archivo original. El generador de `src/compiler.ts` usa esas posiciones para errores de sintaxis y devuelve segmentos de mapeo para el script y las expresiones. `src/check.ts` verifica el módulo mediante TypeScript 7 y presenta los errores en el `.meeko` original. Un error en código auxiliar generado sin segmento se identifica como tal y se sitúa al inicio del archivo para no atribuirle una ubicación falsa.
+
+### Compilador: expresiones, CSS y generación
+
+`src/compiler.ts` conserva la orquestación de SSR e hidratación y el contrato público `compile`. Dos pasos tienen módulos internos propios:
+
+- `compiler/expressions.ts`: validación de expresiones, nombres libres, condiciones de estrechamiento y reescritura de locales. Al reemplazar un parámetro de snippet o una fila de lista, conserva los segmentos originales con `markSource`; extraerlo no cambia el origen que recibe un diagnóstico.
+- `compiler/transforms/scoped-css.ts`: transformación de selectores, `:global(...)`, exclusión de keyframes y cálculo de los elementos a los que se aplica el atributo de ámbito. Mantiene las ubicaciones de PostCSS para que el orquestador las traduzca al `.meeko`.
+
+Estos módulos no son nuevas entradas públicas del paquete. Las pruebas de snippets, estrechamiento, estilos y mapeos comprueban el mismo comportamiento observable en los tres pasos.
+
+### Navegador: payload, streaming y confirmación
+
+`app/runtime/client.ts` coordina la aplicación, los layouts y la confirmación de la ruta. `client-payload.ts` valida el payload de hidratación y su versión antes de modificar el árbol. `client-deferred.ts` agrupa la validación de fragmentos deferred, su cola hasta que la página se haya montado, la lectura ndjson, los timeouts y la cancelación de los loaders del navegador.
+
+La confirmación de DOM, head, estado compartido, layouts y token CSRF sigue siendo una operación del orquestador. Los helpers de transporte no pueden confirmar una ruta ni tocar el historial. View Transitions envuelve esa confirmación después de preparar módulos y datos; no envuelve la carga de la página. Las pruebas de streaming y navegación verifican que una ruta abortada no sobrescriba la nueva y que un fallo conserve la vista anterior.
+
+Los límites de rendimiento y el escenario reproducible están descritos en [Rendimiento](performance.md).
 
 El runtime de `src/dom.ts` usa comentarios como límites de condiciones, listas y componentes hijos. Una lista comprueba las claves durante SSR y al hidratar; al cambiar, mueve los rangos de nodos de las claves existentes. Cada elemento de la lista mantiene señales para su dato y su índice, de modo que expresiones reactivas y comparaciones estrictas leen los valores actuales. Al quitar una región se desconectan sus eventos y observadores.
 
 `<MeekoTeleport>` (desde `1.5`, `src/teleport.ts`) compila su contenido en la plantilla del componente, como el de una condición, y lo encierra entre `<!--meeko:portal…-->` y `<!--/meeko:portal…-->`. En un documento del servidor, `renderTeleport` entrega el contenido a un colector y deja en su sitio una referencia (`<!--meeko:portal-ref:clave-->`); `src/framework/teleports.ts` lo coloca después, sobre el HTML final, dentro del elemento del `id` o tras la aplicación, así que el destino puede renderizarse antes o después. Al hidratar, `bindTeleport` sigue la referencia hasta el contenido, lo hidrata en el componente que lo declara y mueve esos mismos nodos cuando cambian `to` o `disabled`. Las búsquedas de marcadores saltan los rangos `meeko:portal`, de modo que el contenido teleportado nunca se confunde con los marcadores del componente que contiene su destino. Sin colector (un render en el navegador o fuera del framework) el contenido sale en su sitio y el navegador lo mueve al terminar el montaje.
 
-`<component is>` con una etiqueta HTML (desde `1.5`) se compila según los resultados posibles de `is`, que el compilador lee de la sintaxis (`src/compiler/dynamic-tag.ts`): si todos son literales, es un elemento sin marcadores cuyos hijos pertenecen a la plantilla que lo rodea; si alguno puede ser un componente, el elemento va entre los comentarios del rango del componente y su contenido es el snippet `default`. `src/dynamic-tag.ts` comprueba la etiqueta antes de escribir HTML, en SSR y en el navegador, y tipa la unión de etiquetas, sus atributos y `bind="obj"`; `src/html-attributes.ts` copia los datos HTML de `vscode-html-languageservice`, de los que el compilador escribe junto a cada atributo no global la lista de etiquetas que lo admiten. Al cambiar la etiqueta, `bindElementTag` y `bindDynamic` crean el elemento nuevo, le mueven los hijos con sus nodos y vuelven a enlazar sólo los enlaces propios del elemento; los de los hijos siguen vivos. `bindSpread` escribe y retira los atributos de `bind="obj"`.
+`<component is>` con una etiqueta HTML (desde `1.5`) se compila según los resultados posibles de `is`, que el compilador lee de la sintaxis (`src/compiler/transforms/dynamic-tag.ts`): si todos son literales, es un elemento sin marcadores cuyos hijos pertenecen a la plantilla que lo rodea; si alguno puede ser un componente, el elemento va entre los comentarios del rango del componente y su contenido es el snippet `default`. `src/dynamic-tag.ts` comprueba la etiqueta antes de escribir HTML, en SSR y en el navegador, y tipa la unión de etiquetas, sus atributos y `bind="obj"`; `src/html-attributes.ts` copia los datos HTML de `vscode-html-languageservice`, de los que el compilador escribe junto a cada atributo no global la lista de etiquetas que lo admiten. Al cambiar la etiqueta, `bindElementTag` y `bindDynamic` crean el elemento nuevo, le mueven los hijos con sus nodos y vuelven a enlazar sólo los enlaces propios del elemento; los de los hijos siguen vivos. `bindSpread` escribe y retira los atributos de `bind="obj"`.
 
 El plugin `src/vite.ts` usa el mismo compilador para cliente y SSR y expone el CSS como módulo virtual. En desarrollo, cada componente acepta sus propias actualizaciones HMR: `src/hmr.ts` captura las señales editables por instancia, renderiza la nueva versión, hidrata su raíz o rango existente y actualiza los estilos. Una actualización del runtime recarga la página.
 
 Los módulos generados importan el runtime desde `@meekojs/meeko/internal`. Esta ruta agrupa las funciones de DOM, SSR, HMR y DevTools que el compilador necesita y se versiona junto con él. Desde `1.5`, un componente que usa `<MeekoThemeToggle>`, `<MeekoAwait>`, `<MeekoPopover>` o `<MeekoSelect>` importa además su módulo compilado (`@meekojs/meeko/builtins/theme-toggle`, `/await`, `/popover` o `/select`), y sólo ese componente: la tabla `builtinComponentModules` del compilador asocia cada etiqueta a su módulo, y `scripts/builtin-components.ts` compila su `.meeko` dentro del paquete. Una etiqueta integrada nueva sigue ese patrón para no crecer el runtime de todas las aplicaciones. En desarrollo, `src/devtools.ts` registra las instancias hidratadas y expone un hook de lectura que comparten el panel integrado y la extensión de Chrome. Ni SSR ni el build de producción registran instancias en ese hook.
+
+Desde core `1.8`, `<MeekoPopover>`, `<MeekoSelect>` y `<MeekoThemeToggle>` están obsoletos: el compilador emite `MEEK121` y el editor tacha la etiqueta y explica el reemplazo en el hover. Siguen funcionando en `1.x` y se retiran en `2.0`. Usa `UIPopover`, `UISelect` y `UIThemeToggle` del módulo `@meekojs/ui` 0.2; el sistema de temas permanece en core. Véase [Migración a 1.8](migration-1.8.md).
 
 ## Reglas para SSR
 

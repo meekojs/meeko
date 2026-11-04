@@ -44,8 +44,8 @@ La página anterior sigue visible mientras `pending` vale `true`; al confirmarse
 
 Un `NavigationState`:
 
-| Propiedad | Tipo | Descripción |
-| --- | --- | --- |
+| Propiedad | Tipo                      | Descripción                                                                                         |
+| --------- | ------------------------- | --------------------------------------------------------------------------------------------------- |
 | `pending` | `ReadonlySignal<boolean>` | `true` mientras se carga una página nueva. En SSR y fuera de `mountClientApp` vale siempre `false`. |
 
 Nunca lanza: fuera de una aplicación montada devuelve un estado fijo con `pending` en `false`.
@@ -132,6 +132,7 @@ navigation.pending.value = true;
 `meeko check` da `TS2540: Cannot assign to 'value' because it is a read-only property`. El estado lo lleva el navegador de la aplicación; para un indicador propio, usa una señal tuya:
 
 <!-- no-check -->
+
 ```ts good
 const saving = signal(false);
 ```

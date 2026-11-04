@@ -40,10 +40,10 @@ function close(): void {
 
 ## Atributos
 
-| Atributo | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `snippet` | `Snippet<Args> \| undefined` | obligatorio | El snippet que se pinta, normalmente una clave de `defineSnippets`: `snippets.title`. |
-| `args` | lista de expresiones | sin argumentos | Los argumentos, separados por comas, con los tipos de la tupla del snippet: `args="row, i"`. |
+| Atributo  | Tipo                         | Por defecto    | Descripción                                                                                  |
+| --------- | ---------------------------- | -------------- | -------------------------------------------------------------------------------------------- |
+| `snippet` | `Snippet<Args> \| undefined` | obligatorio    | El snippet que se pinta, normalmente una clave de `defineSnippets`: `snippets.title`.        |
+| `args`    | lista de expresiones         | sin argumentos | Los argumentos, separados por comas, con los tipos de la tupla del snippet: `args="row, i"`. |
 
 `<render>` puede cerrarse solo y no admite contenido: no hay contenido «por defecto» dentro de la etiqueta. Para un texto alternativo, usa `if:when` con la condición contraria.
 

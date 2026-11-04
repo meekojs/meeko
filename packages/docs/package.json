@@ -1,0 +1,35 @@
+{
+	"name": "meeko-docs",
+	"private": true,
+	"keywords": [
+		"meeko",
+		"meeko-module"
+	],
+	"type": "module",
+	"exports": {
+		".": "./src/module.ts",
+		"./server": "./src/server.ts",
+		"./moderation": "./src/runtime/server.ts",
+		"./metrics": "./src/metrics/state.ts",
+		"./metrics/plugin": "./src/metrics/plugin.ts",
+		"./metrics/server": "./src/metrics/server.ts",
+		"./shell": "./src/runtime/shell.ts",
+		"./state": "./src/runtime/state.ts"
+	},
+	"scripts": {
+		"build": "node scripts/build.mjs",
+		"test": "tsx --test tests/*.test.ts"
+	},
+	"dependencies": {
+		"@meekojs/i18n": "workspace:*",
+		"@meekojs/meeko": "workspace:*",
+		"@meekojs/ui": "workspace:*",
+		"meeko-docs-content": "workspace:*"
+	},
+	"devDependencies": {
+		"tsx": "^4.20.0"
+	},
+	"peerDependencies": {
+		"@meekojs/meeko": ">=1.8 <2"
+	}
+}

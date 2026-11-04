@@ -1,0 +1,315 @@
+/* The body of main.css loads after this sheet: two classes, so that .meeko-ui-input does not undo them. */
+.meeko-ui-input.meeko-ui-textarea {
+	min-height: var(--ui-space-24);
+	resize: vertical;
+}
+.meeko-ui-field-meta {
+	display: flex;
+	justify-content: space-between;
+	gap: var(--ui-space-3);
+}
+.meeko-ui-field-counter {
+	flex: none;
+	margin-inline-start: auto;
+	font-variant-numeric: tabular-nums;
+}
+.meeko-ui-choice,
+.meeko-ui-slider {
+	display: flex;
+	align-items: center;
+	gap: var(--ui-space-2);
+	min-height: var(--ui-control-height-md);
+	color: var(--ui-color-text);
+	font: var(--ui-font-weight-regular) var(--ui-font-size-md) / var(--ui-line-height-normal) var(--ui-font-sans);
+}
+.meeko-ui-choice {
+	cursor: pointer;
+}
+.meeko-ui-choice-content {
+	display: grid;
+	gap: var(--ui-space-0-5);
+}
+.meeko-ui-choice-description {
+	color: var(--ui-color-text-soft);
+	font-size: var(--ui-font-size-sm);
+}
+.meeko-ui-choice input,
+.meeko-ui-slider input {
+	flex-shrink: 0;
+	margin: 0;
+	accent-color: var(--ui-color-primary);
+}
+.meeko-ui-choice input {
+	width: var(--ui-space-4);
+	height: var(--ui-space-4);
+}
+/* The browser's own box has a border of its own colour: only this one reaches 3:1 in both themes. */
+.meeko-ui-choice:not(.meeko-ui-switch) input {
+	display: inline-grid;
+	place-content: center;
+	appearance: none;
+	transition:
+		background-color var(--ui-duration-fast),
+		border-color var(--ui-duration-fast);
+	cursor: inherit;
+	box-sizing: border-box;
+	border: var(--ui-border-width) solid var(--ui-color-control-border);
+	border-radius: var(--ui-radius-xs);
+	background: var(--ui-color-control);
+}
+.meeko-ui-choice:not(.meeko-ui-switch) input[type='radio'] {
+	border-radius: var(--ui-radius-full);
+}
+.meeko-ui-choice:not(.meeko-ui-switch):hover input:not(:disabled, :checked) {
+	background: var(--ui-color-control-hover);
+}
+.meeko-ui-choice:not(.meeko-ui-switch) input:checked {
+	border-color: var(--ui-color-primary);
+	background: var(--ui-color-primary);
+}
+.meeko-ui-choice:not(.meeko-ui-switch) input:checked::before {
+	background: var(--ui-color-primary-contrast);
+	content: '';
+}
+.meeko-ui-choice:not(.meeko-ui-switch) input[type='checkbox']:checked::before {
+	clip-path: polygon(14% 52%, 0 66%, 38% 100%, 100% 20%, 85% 6%, 36% 72%);
+	width: var(--ui-space-3);
+	height: var(--ui-space-3);
+}
+.meeko-ui-choice:not(.meeko-ui-switch) input[type='radio']:checked::before {
+	border-radius: var(--ui-radius-full);
+	width: var(--ui-space-1-5);
+	height: var(--ui-space-1-5);
+}
+.meeko-ui-choice input:focus-visible,
+.meeko-ui-slider input:focus-visible {
+	outline: var(--ui-focus-ring);
+	outline-offset: var(--ui-focus-ring-offset);
+}
+.meeko-ui-choice:has(input:disabled),
+.meeko-ui-slider:has(input:disabled),
+.meeko-ui-radio-group:disabled {
+	opacity: var(--ui-opacity-disabled);
+	cursor: not-allowed;
+}
+.meeko-ui-switch input {
+	appearance: none;
+	transition:
+		background-color var(--ui-duration-fast),
+		border-color var(--ui-duration-fast);
+	cursor: inherit;
+	box-sizing: border-box;
+	border: var(--ui-border-width) solid var(--ui-color-control-border);
+	border-radius: var(--ui-radius-full);
+	background: var(--ui-color-control);
+	width: var(--ui-switch-width);
+	height: var(--ui-switch-height);
+}
+.meeko-ui-switch:hover input:not(:disabled, :checked) {
+	background: var(--ui-color-control-hover);
+}
+.meeko-ui-switch input::before {
+	display: block;
+	transition: translate var(--ui-duration-fast) var(--ui-ease-out);
+	margin: var(--ui-space-0-5);
+	border-radius: var(--ui-radius-full);
+	background: var(--ui-color-text-soft);
+	width: var(--ui-switch-thumb);
+	height: var(--ui-switch-thumb);
+	content: '';
+}
+.meeko-ui-switch input:checked {
+	border-color: var(--ui-color-primary);
+	background: var(--ui-color-primary);
+}
+.meeko-ui-switch input:checked::before {
+	translate: var(--ui-switch-travel);
+	background: var(--ui-color-primary-contrast);
+}
+.meeko-ui-switch:dir(rtl) input:checked::before {
+	translate: calc(-1 * var(--ui-switch-travel));
+}
+.meeko-ui-choice input[aria-invalid='true'] {
+	border-color: var(--ui-color-danger);
+}
+.meeko-ui-radio-group {
+	margin: 0;
+	border: 0;
+	padding: 0;
+	min-width: 0;
+	color: var(--ui-color-text);
+	font-family: var(--ui-font-sans);
+}
+.meeko-ui-radio-group legend {
+	margin-bottom: var(--ui-space-2);
+	padding: 0;
+	font-weight: var(--ui-font-weight-medium);
+	font-size: var(--ui-font-size-sm);
+}
+.meeko-ui-radio-options {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--ui-space-2);
+}
+.meeko-ui-radio-group[data-variant='segmented'] .meeko-ui-radio-options {
+	gap: var(--ui-space-0-5);
+	border: var(--ui-border-width) solid var(--ui-color-control-border);
+	border-radius: var(--ui-radius-lg);
+	background: var(--ui-color-control);
+	padding: var(--ui-space-0-5);
+	width: fit-content;
+}
+.meeko-ui-radio-group[data-variant='segmented'] .meeko-ui-choice {
+	position: relative;
+	transition:
+		background-color var(--ui-duration-fast),
+		color var(--ui-duration-fast);
+	border-radius: var(--ui-radius-md);
+	padding-inline: var(--ui-space-3);
+	min-height: var(--ui-control-height-sm);
+}
+.meeko-ui-radio-group[data-variant='segmented'] .meeko-ui-choice:hover:not(:has(:disabled, :checked)) {
+	background: var(--ui-color-control-hover);
+}
+.meeko-ui-radio-group[data-variant='segmented'] .meeko-ui-choice input {
+	position: absolute;
+	opacity: var(--ui-opacity-hidden);
+	inset: 0;
+	border: 0;
+	width: 100%;
+	height: 100%;
+}
+.meeko-ui-radio-group[data-variant='segmented'] .meeko-ui-choice:has(:checked) {
+	background: var(--ui-color-primary-soft);
+	color: var(--ui-color-primary-text);
+	font-weight: var(--ui-font-weight-semibold);
+}
+.meeko-ui-radio-group[data-variant='segmented'] .meeko-ui-choice:has(:focus-visible) {
+	outline: var(--ui-focus-ring);
+	outline-offset: var(--ui-focus-ring-offset);
+}
+.meeko-ui-slider {
+	flex-direction: column;
+	align-items: stretch;
+}
+.meeko-ui-slider input {
+	appearance: none;
+	cursor: pointer;
+	background: transparent;
+	width: 100%;
+	min-height: var(--ui-control-height-md);
+}
+.meeko-ui-slider input:disabled {
+	cursor: inherit;
+}
+/* WebKit and Blink have no pseudo-element for the filled part: <UISlider> gives the position in --slider-fill. */
+.meeko-ui-slider input::-webkit-slider-runnable-track {
+	border-radius: var(--ui-radius-full);
+	background: linear-gradient(to var(--slider-direction, right), var(--ui-color-primary) var(--slider-fill, 0%), var(--ui-color-control-border) var(--slider-fill, 0%));
+	height: var(--ui-slider-track);
+}
+.meeko-ui-slider:dir(rtl) input {
+	--slider-direction: left;
+}
+.meeko-ui-slider input::-moz-range-track {
+	border-radius: var(--ui-radius-full);
+	background: var(--ui-color-control-border);
+	height: var(--ui-slider-track);
+}
+.meeko-ui-slider input::-moz-range-progress {
+	border-radius: var(--ui-radius-full);
+	background: var(--ui-color-primary);
+	height: var(--ui-slider-track);
+}
+.meeko-ui-slider input::-webkit-slider-thumb {
+	appearance: none;
+	margin-block-start: calc((var(--ui-slider-track) - var(--ui-slider-thumb)) / 2);
+	border: var(--ui-border-width) solid var(--ui-color-primary);
+	border-radius: var(--ui-radius-full);
+	background: var(--ui-color-primary-contrast);
+	width: var(--ui-slider-thumb);
+	height: var(--ui-slider-thumb);
+}
+.meeko-ui-slider input::-moz-range-thumb {
+	box-sizing: border-box;
+	border: var(--ui-border-width) solid var(--ui-color-primary);
+	border-radius: var(--ui-radius-full);
+	background: var(--ui-color-primary-contrast);
+	width: var(--ui-slider-thumb);
+	height: var(--ui-slider-thumb);
+}
+.meeko-ui-badge {
+	gap: var(--ui-space-1-5);
+}
+.meeko-ui-badge-dot {
+	border-radius: var(--ui-radius-full);
+	background: currentColor;
+	width: var(--ui-badge-dot-size);
+	height: var(--ui-badge-dot-size);
+}
+.meeko-ui-badge[data-tone='info'] {
+	border-color: transparent;
+	background: var(--ui-color-info-soft);
+	color: var(--ui-color-info-text);
+}
+.meeko-ui-badge[data-tone='success'] {
+	border-color: transparent;
+	background: var(--ui-color-success-soft);
+	color: var(--ui-color-success-text);
+}
+.meeko-ui-badge[data-tone='warning'] {
+	border-color: transparent;
+	background: var(--ui-color-warning-soft);
+	color: var(--ui-color-warning-text);
+}
+.meeko-ui-card[data-density='compact'] {
+	--card-padding: var(--ui-space-3);
+}
+.meeko-ui-card[data-density='comfortable'] {
+	--card-padding: var(--ui-space-6);
+}
+.meeko-ui-card[data-padding='none'] {
+	--card-padding: var(--ui-space-0);
+}
+.meeko-ui-card[data-padding='sm'] {
+	--card-padding: var(--ui-space-3);
+}
+.meeko-ui-card[data-padding='md'] {
+	--card-padding: var(--ui-space-5);
+}
+.meeko-ui-card[data-padding='lg'] {
+	--card-padding: var(--ui-space-6);
+}
+.meeko-ui-table[data-density='compact'] > :is(thead, tbody, tfoot) > tr > :is(th, td) {
+	padding: var(--ui-space-1) var(--ui-space-2);
+}
+.meeko-ui-table[data-density='comfortable'] > :is(thead, tbody, tfoot) > tr > :is(th, td) {
+	padding: var(--ui-space-4) var(--ui-space-3);
+}
+.meeko-ui-table > :is(thead, tbody, tfoot) > tr > [data-numeric] {
+	justify-content: flex-end;
+	text-align: end;
+}
+@media (pointer: coarse) {
+	.meeko-ui-choice,
+	.meeko-ui-slider input {
+		min-height: var(--ui-control-height-lg);
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.meeko-ui-choice input,
+	.meeko-ui-switch input::before,
+	.meeko-ui-radio-group[data-variant='segmented'] .meeko-ui-choice {
+		transition: none;
+	}
+}
+/* Forced colours drop backgrounds: the native controls keep every state visible. */
+@media (forced-colors: active) {
+	.meeko-ui-choice input,
+	.meeko-ui-slider input {
+		appearance: auto;
+	}
+	.meeko-ui-choice input::before {
+		display: none;
+	}
+}

@@ -4,19 +4,21 @@ group: components
 since: 1.4.0
 description: Selector del tema claro/oscuro que no salta al cargar, accesible y funcional sin JavaScript, con los temas de meeko.config.ts.
 symbols:
-  - "syntax:meekothemetoggle"
+  - 'syntax:meekothemetoggle'
 types:
-  - "@meekojs/meeko/framework#MeekoThemeToggleProps"
-  - "@meekojs/meeko/framework#ThemeToggleMessages"
-  - "@meekojs/meeko/framework#ThemeToggleSnippets"
+  - '@meekojs/meeko/framework#MeekoThemeToggleProps'
+  - '@meekojs/meeko/framework#ThemeToggleMessages'
+  - '@meekojs/meeko/framework#ThemeToggleSnippets'
 related:
-  - "@meekojs/meeko/framework#useTheme"
-  - "config:theme"
-  - "syntax:meekolink"
+  - '@meekojs/meeko/framework#useTheme'
+  - 'config:theme'
+  - 'syntax:meekolink'
   - docs/framework.md#meekothemetoggle
   - docs/framework.md#tema-clarooscuro-sin-parpadeo
   - docs/framework.md#iconos-que-no-saltan
 ---
+
+> **Obsoleto desde 1.8; retirada en 2.0.** `<MeekoThemeToggle>` sigue funcionando en 1.x y emite `MEEK121`. Usa `<UIThemeToggle>` de `@meekojs/ui` 0.2 con su módulo activo. Conserva props, snippets y marcado `data-meeko-*`. Véase [Migración a 1.8](../../migration-1.8.md).
 
 Con `theme` en `meeko.config.ts`, `<MeekoThemeToggle>` es el selector de tema listo para usar: un botón que pasa a la elección siguiente (`mode="cycle"`) o un grupo de radios (`mode="select"`). Cada snippet (`light`, `dark`, `system` o un tema propio) es el icono de esa elección.
 
@@ -26,22 +28,22 @@ Pinta todos los iconos y una regla que Meeko añade a `<head>` muestra el de `da
 
 ```ts
 // meeko.config.ts
-import { defineMeekoConfig } from "@meekojs/meeko/framework";
+import { defineMeekoConfig } from '@meekojs/meeko/framework'
 
-export default defineMeekoConfig({ theme: true });
+export default defineMeekoConfig({ theme: true })
 ```
 
 ```html
 <!-- app/layouts/default.meeko -->
 <template>
-  <header>
-    <MeekoThemeToggle class="toggle">
-      <snippet name="light"><IconSun /></snippet>
-      <snippet name="dark"><IconMoon /></snippet>
-      <snippet name="system"><IconMonitor /></snippet>
-    </MeekoThemeToggle>
-  </header>
-  <main><MeekoOutlet /></main>
+	<header>
+		<MeekoThemeToggle class="toggle">
+			<snippet name="light"><IconSun /></snippet>
+			<snippet name="dark"><IconMoon /></snippet>
+			<snippet name="system"><IconMonitor /></snippet>
+		</MeekoThemeToggle>
+	</header>
+	<main><MeekoOutlet /></main>
 </template>
 ```
 
@@ -49,13 +51,13 @@ El botón dice «Tema: oscuro. Cambiar a sistema» y cada clic pasa a la elecci�
 
 ## Props
 
-| Atributo | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `mode` o `bind:mode` | `"cycle" \| "select"` | `"cycle"` | Un botón que pasa a la elección siguiente, o un grupo de radios que se maneja con las flechas. |
-| `bind:themes` | `readonly ThemeChoice[]` | los temas y `"system"` si está activo | Las elecciones y su orden, como `bind:themes="['light', 'dark']"`. |
-| `bind:labels` | `Partial<Record<ThemeChoice, string>>` | «Claro», «Oscuro», «Sistema» | El nombre de cada elección; un tema propio sin etiqueta se llama como el tema. |
-| `bind:messages` | `ThemeToggleMessages` | en español | Textos accesibles: `cycle(current, next)` (el `aria-label` del botón), `unknown` («Cambiar tema») y `group` («Tema»). |
-| `class`, `id` | `string` | ninguno | Del `<form>` raíz. Otros atributos no pasan: envuelve la etiqueta si los necesitas. |
+| Atributo             | Tipo                                   | Por defecto                           | Descripción                                                                                                           |
+| -------------------- | -------------------------------------- | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `mode` o `bind:mode` | `"cycle" \| "select"`                  | `"cycle"`                             | Un botón que pasa a la elección siguiente, o un grupo de radios que se maneja con las flechas.                        |
+| `bind:themes`        | `readonly ThemeChoice[]`               | los temas y `"system"` si está activo | Las elecciones y su orden, como `bind:themes="['light', 'dark']"`.                                                    |
+| `bind:labels`        | `Partial<Record<ThemeChoice, string>>` | «Claro», «Oscuro», «Sistema»          | El nombre de cada elección; un tema propio sin etiqueta se llama como el tema.                                        |
+| `bind:messages`      | `ThemeToggleMessages`                  | en español                            | Textos accesibles: `cycle(current, next)` (el `aria-label` del botón), `unknown` («Cambiar tema») y `group` («Tema»). |
+| `class`, `id`        | `string`                               | ninguno                               | Del `<form>` raíz. Otros atributos no pasan: envuelve la etiqueta si los necesitas.                                   |
 
 Snippets: uno por elección, con su nombre (`light`, `dark`, `system`, `sepia`…), sin parámetros. Sin snippet se pinta la etiqueta de la elección. `meeko check` tipa `themes`, `labels` y los snippets con los temas de la configuración.
 
@@ -74,21 +76,31 @@ Con JavaScript, el envío se intercepta y el cambio es inmediato con `useTheme()
 ### Un grupo de radios
 
 ```html
-<MeekoThemeToggle mode="select" class="theme-radios" />
+<MeekoThemeToggle
+	mode="select"
+	class="theme-radios"
+/>
 ```
 
 ```css
-.theme-radios [role="radio"][aria-checked="true"] { font-weight: 700; }
+.theme-radios [role='radio'][aria-checked='true'] {
+	font-weight: 700;
+}
 /* Antes de hidratar, sin aria-checked, el CSS lee la elección de <html>: */
-[data-theme-choice="dark"] .theme-radios [data-meeko-theme-option="dark"] { font-weight: 700; }
+[data-theme-choice='dark'] .theme-radios [data-meeko-theme-option='dark'] {
+	font-weight: 700;
+}
 ```
 
 ### Sólo claro y oscuro, con etiquetas propias
 
 ```html
-<MeekoThemeToggle bind:themes="['light', 'dark']" bind:labels="{ light: 'Día', dark: 'Noche' }">
-  <snippet name="light">☀️</snippet>
-  <snippet name="dark">🌙</snippet>
+<MeekoThemeToggle
+	bind:themes="['light', 'dark']"
+	bind:labels="{ light: 'Día', dark: 'Noche' }"
+>
+	<snippet name="light">☀️</snippet>
+	<snippet name="dark">🌙</snippet>
 </MeekoThemeToggle>
 ```
 
@@ -97,25 +109,27 @@ Sin `system` en la lista, en modo sistema se muestra el icono del tema efectivo,
 ### Traducir los textos accesibles
 
 ```html
-<MeekoThemeToggle bind:labels="{ light: 'Light', dark: 'Dark', system: 'System' }"
-  bind:messages="{ cycle: (current, next) => `Theme: ${current}. Switch to ${next}`, unknown: 'Change theme', group: 'Theme' }" />
+<MeekoThemeToggle
+	bind:labels="{ light: 'Light', dark: 'Dark', system: 'System' }"
+	bind:messages="{ cycle: (current, next) => `Theme: ${current}. Switch to ${next}`, unknown: 'Change theme', group: 'Theme' }"
+/>
 ```
 
 ### Un tema propio
 
 ```ts
 // meeko.config.ts
-import { defineMeekoConfig } from "@meekojs/meeko/framework";
+import { defineMeekoConfig } from '@meekojs/meeko/framework'
 
-export default defineMeekoConfig({ theme: { themes: ["light", "dark", "sepia"] } });
+export default defineMeekoConfig({ theme: { themes: ['light', 'dark', 'sepia'] } })
 ```
 
 ```html
 <MeekoThemeToggle>
-  <snippet name="light"><IconSun /></snippet>
-  <snippet name="dark"><IconMoon /></snippet>
-  <snippet name="sepia"><IconBook /></snippet>
-  <snippet name="system"><IconMonitor /></snippet>
+	<snippet name="light"><IconSun /></snippet>
+	<snippet name="dark"><IconMoon /></snippet>
+	<snippet name="sepia"><IconBook /></snippet>
+	<snippet name="system"><IconMonitor /></snippet>
 </MeekoThemeToggle>
 ```
 
@@ -131,8 +145,9 @@ export default defineMeekoConfig({ theme: { themes: ["light", "dark", "sepia"] }
 `meeko check` da `MEEK111: <MeekoThemeToggle> sólo existe con theme en meeko.config.ts: añade theme: true (o sus opciones) para usarlo`. Si `meeko check` no puede leer `theme` sin ejecutar la configuración (`theme: variable`), el componente da el mismo error al renderizarse.
 
 <!-- no-check -->
+
 ```ts good
-export default defineMeekoConfig({ theme: true });
+export default defineMeekoConfig({ theme: true })
 ```
 
 ### Un `mode` que no existe

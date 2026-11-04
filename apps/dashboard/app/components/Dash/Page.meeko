@@ -1,0 +1,25 @@
+<script lang="ts">
+	const props = defineProps<{ title: string; description: string }>()
+
+	const snippets = defineSnippets<{ default: []; actions?: [] }>()
+
+	const { t } = useI18n()
+
+	useHead(() => ({ title: t('app.titleSuffix', { title: props.title }), meta: [{ name: 'description', content: props.description }] }))
+</script>
+
+<template>
+	<UIPageHeader
+		layout="dashboard"
+		bind:title="props.title"
+		bind:description="props.description"
+	>
+		<snippet
+			if:when="snippets.actions"
+			name="actions"
+		>
+			<render snippet="snippets.actions" />
+		</snippet>
+	</UIPageHeader>
+	<render snippet="snippets.default" />
+</template>

@@ -1,0 +1,53 @@
+<script lang="ts">
+	import { englishExamples as examples } from '../../utils/examples.en'
+</script>
+<template>
+	<DocsPage
+		product="Meeko i18n"
+		locale="en"
+		title="Messages and parameters"
+		description="Let TypeScript check the keys and the values each message needs."
+	>
+		<h2 id="interpolation">Interpolation</h2>
+		<p>
+			Write parameters in the form
+			<code>{'{name}'}</code>. Each required argument accepts a string, number or boolean; a required value cannot be null or undefined.
+		</p>
+		<DocsCode
+			label="JSON catalog"
+			bind:code="examples.catalog"
+		/>
+		<DocsCode
+			label="Valid calls and expected errors"
+			bind:code="examples.types"
+		/>
+		<h2 id="contracts">The same contract between languages</h2>
+		<p>
+			Every language needs the same namespaces, keys and parameters. If one translation uses
+			<code>name</code>
+			and another uses
+			<code>user</code>
+			for the same message, preparing the module fails. Plural categories can vary by language.
+		</p>
+		<h2 id="types">Public types</h2>
+		<DocsApi
+			caption="Types exported from @meekojs/i18n"
+			bind:rows="[
+				{ name: 'I18n', type: 'interface', description: 'Contract of the translator and its formatters.' },
+				{ name: 'I18nValue', type: 'string | number | boolean', description: 'Values for interpolation and selectors.' },
+				{ name: 'I18nMessageValues<K>', type: 'generic type', description: 'Required arguments for a key of the generated registry.' },
+			]"
+		/>
+		<h2 id="dynamic">Dynamic keys</h2>
+		<p>
+			A union of keys needs valid arguments for every alternative. Narrow the key with an
+			<code>if</code>
+			when each case has different parameters. If any alternative requires values, the argument cannot be omitted.
+		</p>
+		<p>
+			Old registries declared as
+			<code>true</code>
+			keep their open contract. The module generates new registries with explicit parameters.
+		</p>
+	</DocsPage>
+</template>

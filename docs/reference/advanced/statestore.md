@@ -31,22 +31,22 @@ console.log(state.snapshot()); // { theme: "dark", count: 1 }
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `initial` | `Record<string, unknown>` | `{}` | Valores iniciales por clave. Deben poder serializarse con `serializeJson`: objetos planos, arrays, textos, números, booleanos y `null`. |
+| Parámetro | Tipo                      | Por defecto | Descripción                                                                                                                             |
+| --------- | ------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `initial` | `Record<string, unknown>` | `{}`        | Valores iniciales por clave. Deben poder serializarse con `serializeJson`: objetos planos, arrays, textos, números, booleanos y `null`. |
 
 ## Valor devuelto
 
 Una instancia con:
 
-| Miembro | Descripción |
-| --- | --- |
-| `get(key, factory)` | La señal de `key`; la crea con `factory()` si no existe. Es lo que hace `useState(key, factory)`. |
-| `seed(values)` | Añade valores sin sustituir las claves que ya existen. Es como el navegador recibe el estado de una navegación del servidor. |
-| `snapshot()` | Copia los valores actuales por clave, comprobando que se pueden serializar. |
-| `seal()` | Congela el almacén: claves nuevas, `seed` y escrituras lanzan `STATE_SEALED`. El servidor lo llama tras el render síncrono. |
-| `sealed` | `true` cuando ya está sellado. |
-| `seedForNavigation(values, commit)`, `navigationDraft()` | Aplican el estado de una navegación sólo si su cambio del DOM termina bien; los usa `mountClientApp`. |
+| Miembro                                                  | Descripción                                                                                                                  |
+| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `get(key, factory)`                                      | La señal de `key`; la crea con `factory()` si no existe. Es lo que hace `useState(key, factory)`.                            |
+| `seed(values)`                                           | Añade valores sin sustituir las claves que ya existen. Es como el navegador recibe el estado de una navegación del servidor. |
+| `snapshot()`                                             | Copia los valores actuales por clave, comprobando que se pueden serializar.                                                  |
+| `seal()`                                                 | Congela el almacén: claves nuevas, `seed` y escrituras lanzan `STATE_SEALED`. El servidor lo llama tras el render síncrono.  |
+| `sealed`                                                 | `true` cuando ya está sellado.                                                                                               |
+| `seedForNavigation(values, commit)`, `navigationDraft()` | Aplican el estado de una navegación sólo si su cambio del DOM termina bien; los usa `mountClientApp`.                        |
 
 El constructor lanza `TypeError` si un valor no es serializable (`Non-plain object at $.when`) y `get` si la clave está vacía o es `__proto__`, `constructor` o `prototype` (`Invalid state key`).
 
@@ -80,6 +80,7 @@ El layout lee `3` en el SSR y el navegador lo recibe en el payload: la hidrataci
 ### Leer el estado de la aplicación montada
 
 <!-- no-check -->
+
 ```ts
 const app = await mountClientApp(options);
 const theme = app.state.get("theme", () => "light");
@@ -116,6 +117,7 @@ export const route = definePage({
 Cuando el temporizador se dispara, el almacén ya está sellado: `StateSealedError: STATE_SEALED: Meeko state "count" cannot change after the page was rendered; the browser already received it`. El estado viaja con el HTML, así que un cambio posterior no puede llegar al navegador.
 
 <!-- no-check -->
+
 ```ts good
 export const route = definePage({
   load: async ({ state }) => {
@@ -148,6 +150,7 @@ state.get("__proto__", () => ({}));
 `TypeError: Invalid state key`. También `""`, `constructor` y `prototype`.
 
 <!-- no-check -->
+
 ```ts good
 state.get("proto.settings", () => ({}));
 ```

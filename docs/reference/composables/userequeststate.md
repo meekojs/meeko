@@ -24,6 +24,7 @@ Al terminar la petición, el valor desaparece con ella: nunca se comparte entre 
 ## Uso
 
 <!-- no-check -->
+
 ```ts
 // server/rpc/users/get.ts
 import { defineRpc, useRequestState } from "@meekojs/meeko/server";
@@ -48,11 +49,11 @@ Si una página pide el mismo usuario en dos componentes durante el SSR, la base 
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `context` | `RequestContext` | obligatorio | El contexto de la petición: el `context` de un handler, de `load`, del middleware o de `usePage()`. |
-| `key` | `string` | obligatorio | Clave del valor dentro de la petición. Usa un prefijo propio (`"users:byId"`) para no chocar con otras piezas. |
-| `factory` | `() => T` | obligatorio | Crea el valor si la clave no existe todavía en esta petición. |
+| Parámetro | Tipo             | Por defecto | Descripción                                                                                                    |
+| --------- | ---------------- | ----------- | -------------------------------------------------------------------------------------------------------------- |
+| `context` | `RequestContext` | obligatorio | El contexto de la petición: el `context` de un handler, de `load`, del middleware o de `usePage()`.            |
+| `key`     | `string`         | obligatorio | Clave del valor dentro de la petición. Usa un prefijo propio (`"users:byId"`) para no chocar con otras piezas. |
+| `factory` | `() => T`        | obligatorio | Crea el valor si la clave no existe todavía en esta petición.                                                  |
 
 ## Valor devuelto
 
@@ -63,6 +64,7 @@ El valor `T` de esa clave en la petición. No es una señal ni viaja al navegado
 ### Compartir con la página lo que calculó el middleware
 
 <!-- no-check -->
+
 ```ts
 // app/middleware/01-tenant.server.ts
 import { useRequestState } from "@meekojs/meeko/server";
@@ -145,6 +147,7 @@ export const findUser = (id: string) => cache.get(id) ?? loadUser(id);
 No hay error, pero el `Map` vive en el proceso: lo comparten todas las peticiones y todos los usuarios, crece sin límite y puede devolver a un usuario datos de otro. Guarda la caché en la petición:
 
 <!-- no-check -->
+
 ```ts good
 export const findUser = (context: RequestContext, id: string) =>
   useRequestState(context, "users", () => new Map<string, Promise<User>>()).get(id) ?? loadUser(id);
@@ -160,6 +163,7 @@ const user = useRequestState(context, "user", () => loadUser()); // espera un Us
 `useRequestState` no conoce el tipo guardado: la segunda llamada recibe el texto que guardó la primera, con el tipo `User`, y falla más adelante. Usa claves distintas, o un helper con la clave y el tipo fijos como el de arriba.
 
 <!-- no-check -->
+
 ```ts good
 useRequestState(context, "user:id", () => session.userId);
 ```

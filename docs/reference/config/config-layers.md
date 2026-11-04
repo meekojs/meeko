@@ -37,9 +37,9 @@ layers/admin/app/pages/admin/index.meeko → /admin
 
 ## Opciones
 
-| Valor | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `layers` | `readonly string[]` | `[]` | Rutas relativas a la raíz del proyecto, de carpetas con `app/pages`. Se aplican después de la aplicación y de `extends`, en el orden escrito. |
+| Valor    | Tipo                | Por defecto | Descripción                                                                                                                                   |
+| -------- | ------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `layers` | `readonly string[]` | `[]`        | Rutas relativas a la raíz del proyecto, de carpetas con `app/pages`. Se aplican después de la aplicación y de `extends`, en el orden escrito. |
 
 Cada carpeta:
 

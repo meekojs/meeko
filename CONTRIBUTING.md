@@ -9,7 +9,7 @@
 
 ## Estructura
 
-El repositorio es un workspace de pnpm con un único lockfile: el paquete `@meekojs/meeko` en `packages/meeko`, la extensión de VS Code en `packages/vscode`, la de Chrome DevTools en `packages/devtools` y el sitio en `apps/site`. La documentación (`docs/`) y el logo (`assets/brand/`) son del repositorio. Instala siempre desde la raíz.
+El repositorio es un workspace de pnpm con un único lockfile: el paquete `@meekojs/meeko` en `packages/meeko`, la extensión de VS Code en `packages/vscode`, la de Chrome DevTools en `packages/devtools` y el sitio en `apps/meeko`. La documentación (`docs/`) y el logo (`assets/brand/`) son del repositorio. Instala siempre desde la raíz.
 
 ## Verificación local
 

@@ -44,23 +44,23 @@ C:\proyectos\tienda\.meeko\tsconfig.shared.json
 
 ## Parámetros
 
-| Parámetro | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
+| Parámetro      | Tipo | Por defecto | Descripción                                                                                                                                        |
+| -------------- | ---- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `<directorio>` | ruta | obligatorio | Raíz del proyecto. A diferencia de `dev`, `check` y `build`, no tiene valor por defecto: `meeko routes` sin él da `Falta el directorio de routes`. |
 
 ## Resultado
 
-| Archivo | Qué contiene |
-| --- | --- |
-| `.meeko/types/routes.d.ts` | Las rutas (`RouteId`, sus parámetros), los layouts y los middleware con nombre. |
-| `.meeko/manifests/routes.json` | El manifiesto de rutas. |
-| `.meeko/types/server-contracts.d.ts` | Los tipos de `api`, `rpc` y `socket` a partir de los contratos de `server/`. |
-| `.meeko/manifests/server.json` | El manifiesto de endpoints, procedimientos y canales. |
-| `.meeko/types/**/*.d.meeko.ts` | La declaración de cada componente `.meeko` de la aplicación. |
-| `.meeko/generated/page-contracts.server.ts` | Los contratos de props de páginas y layouts que comprueba el proyecto `server` (desde `1.7` en `routes`). |
-| `.meeko/types/services.d.ts` | El tipo de `context.services`, a partir de `server/runtime.ts` (desde `1.7` en `routes`). |
-| `.meeko/types/autoimports/{client,server,shared}.d.ts` | Los autoimports de cada ámbito. |
-| `.meeko/tsconfig.{app,server,shared}.json` | Los proyectos de TypeScript de cada ámbito (desde `1.7` en `routes`). |
+| Archivo                                                | Qué contiene                                                                                              |
+| ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| `.meeko/types/routes.d.ts`                             | Las rutas (`RouteId`, sus parámetros), los layouts y los middleware con nombre.                           |
+| `.meeko/manifests/routes.json`                         | El manifiesto de rutas.                                                                                   |
+| `.meeko/types/server-contracts.d.ts`                   | Los tipos de `api`, `rpc` y `socket` a partir de los contratos de `server/`.                              |
+| `.meeko/manifests/server.json`                         | El manifiesto de endpoints, procedimientos y canales.                                                     |
+| `.meeko/types/**/*.d.meeko.ts`                         | La declaración de cada componente `.meeko` de la aplicación.                                              |
+| `.meeko/generated/page-contracts.server.ts`            | Los contratos de props de páginas y layouts que comprueba el proyecto `server` (desde `1.7` en `routes`). |
+| `.meeko/types/services.d.ts`                           | El tipo de `context.services`, a partir de `server/runtime.ts` (desde `1.7` en `routes`).                 |
+| `.meeko/types/autoimports/{client,server,shared}.d.ts` | Los autoimports de cada ámbito.                                                                           |
+| `.meeko/tsconfig.{app,server,shared}.json`             | Los proyectos de TypeScript de cada ámbito (desde `1.7` en `routes`).                                     |
 
 Termina con código `0`, o con `1` y el mensaje si el descubrimiento falla: dos rutas que resuelven a la misma URL, un contrato de API sin `response`, un layout o un middleware con nombre que no existe, `render` calculado…
 

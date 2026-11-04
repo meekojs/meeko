@@ -1,0 +1,70 @@
+{
+	"name": "@meekojs/prettier-plugin",
+	"version": "1.8.0",
+	"description": "Prettier formatting for Meeko components.",
+	"keywords": [
+		"meeko",
+		"typescript",
+		"prettier-plugin"
+	],
+	"homepage": "https://meekojs.com/docs/tooling",
+	"bugs": {
+		"url": "https://github.com/meekojs/meeko/issues"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/meekojs/meeko.git",
+		"directory": "packages/prettier-plugin"
+	},
+	"license": "MIT",
+	"sideEffects": true,
+	"type": "module",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"default": "./dist/index.js"
+		}
+	},
+	"types": "./dist/index.d.ts",
+	"files": [
+		"dist/",
+		"README.md",
+		"LICENSE",
+		"CHANGELOG.md"
+	],
+	"scripts": {
+		"build": "node ../../scripts/build-package.mjs",
+		"check": "tsc -p tsconfig.json --noEmit",
+		"prepack": "pnpm run build",
+		"test": "node --test tests/*.test.mjs"
+	},
+	"dependencies": {
+		"@typescript/typescript6": "6.0.2",
+		"postcss": "^8.5.31",
+		"postcss-selector-parser": "^7.1.7"
+	},
+	"devDependencies": {
+		"@meekojs/meeko": "workspace:*",
+		"@types/node": "^24.0.0",
+		"prettier": "3.9.10",
+		"typescript": "7.0.2",
+		"vite": "8.3.5"
+	},
+	"peerDependencies": {
+		"@meekojs/meeko": ">=1.8 <2",
+		"prettier": "^3.9.10",
+		"tailwindcss": "^4.0.0"
+	},
+	"peerDependenciesMeta": {
+		"tailwindcss": {
+			"optional": true
+		}
+	},
+	"engines": {
+		"node": ">=24"
+	},
+	"publishConfig": {
+		"access": "public",
+		"provenance": true
+	}
+}

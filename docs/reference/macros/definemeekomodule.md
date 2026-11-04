@@ -18,7 +18,7 @@ related:
   - docs/framework.md#hooks
 ---
 
-`defineMeekoModule` declara un módulo: código que configura el proyecto, como los módulos de Nuxt. Su `setup` añade componentes, autoimports, layouts, plugins de aplicación, middleware y handlers de servidor, entradas de `<head>`, archivos públicos y plugins de Vite, y reacciona a los hooks del build. El proyecto lo lista en `modules` de `meeko.config.ts`.
+`defineMeekoModule` declara un módulo: código que configura el proyecto, como los módulos de Nuxt. Su `setup` añade componentes, autoimports, layouts, plugins de aplicación, middleware y handlers de servidor, entradas de `<head>`, archivos públicos y plugins de Vite, y reacciona a los hooks del build. El proyecto lo registra por su nombre en `modules` de `meeko.config.ts` (`modules: ["@acme/hello"]` o `["./modules/hello"]`) y le pasa opciones en la clave de su `meta.configKey`. Un paquete lo exporta por defecto en su subpath `./module` o en su raíz, y declara `"keywords": ["meeko-module"]` en su `package.json` para que el editor complete su nombre.
 
 `setup` se ejecuta en Node al cargar la configuración (en `meeko dev`, `meeko build`, `meeko check` y el servidor de lenguaje de un workspace de confianza), una vez por configuración y proceso. Nunca llega al navegador.
 
@@ -29,6 +29,11 @@ related:
 import { defineMeekoModule } from "@meekojs/meeko/framework";
 
 export interface HelloOptions { greeting: string }
+
+// Tipa la clave `hello` de meeko.config.ts; Meeko carga esta ampliación sola.
+declare module "@meekojs/meeko/framework" {
+  interface MeekoConfig { readonly hello?: Partial<HelloOptions> }
+}
 
 export default defineMeekoModule<HelloOptions>({
   meta: { name: "hello", configKey: "hello", compatibility: { meeko: ">=1.2" } },
@@ -53,15 +58,17 @@ export default defineMeekoConfig({
 
 ## Parámetros
 
-| Opción | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `meta.name` | `string` | obligatorio | Nombre único del módulo; dos módulos con el mismo nombre son un error. |
-| `meta.configKey` | `string` | ninguno | Clave de `meeko.config.ts` con las opciones del módulo. |
-| `meta.compatibility.meeko` | rango de npm | cualquiera | Como `">=1.2"`. La carga falla si la versión de Meeko queda fuera. |
-| `defaults` | `Partial<Options>` | `{}` | Valores por defecto de las opciones. |
-| `setup` | `(options, meeko) => void \| Promise<void>` | obligatorio | Recibe las opciones combinadas y el objeto `meeko`. Puede ser asíncrona. |
+| Opción                     | Tipo                                        | Por defecto | Descripción                                                                                                                                                                 |
+| -------------------------- | ------------------------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `meta.name`                | `string`                                    | obligatorio | Nombre único del módulo; dos módulos con el mismo nombre son un error.                                                                                                      |
+| `meta.configKey`           | `string`                                    | ninguno     | Clave de `meeko.config.ts` con las opciones del módulo; desde `1.8`, la única forma documentada de pasárselas. No puede ser una opción de Meeko ni repetirse entre módulos. |
+| `meta.compatibility.meeko` | rango de npm                                | cualquiera  | Como `">=1.2"`. La carga falla si la versión de Meeko queda fuera.                                                                                                          |
+| `defaults`                 | `Partial<Options>`                          | `{}`        | Valores por defecto de las opciones.                                                                                                                                        |
+| `setup`                    | `(options, meeko) => void \| Promise<void>` | obligatorio | Recibe las opciones combinadas y el objeto `meeko`. Puede ser asíncrona.                                                                                                    |
 
-Las opciones se combinan en este orden: `defaults`, después `config[meta.configKey]` y por último las de `[módulo, opciones]` en `modules`. Los objetos planos se combinan en profundidad; los arrays se sustituyen.
+Las opciones se combinan en este orden: `defaults` y después `config[meta.configKey]`. Los objetos planos se combinan en profundidad; los arrays se sustituyen.
+
+**Tipos de la clave.** Para que `meeko.config.ts` tipe la clave sin importar el módulo, el módulo amplía `MeekoConfig` (`declare module "@meekojs/meeko/framework" { interface MeekoConfig { readonly hello?: … } }`) en el archivo de su export por defecto o en uno que éste importe. Meeko escribe `.meeko/types/config.d.ts`, que importa los tipos de cada módulo de `modules`, y así la ampliación se carga sola en el editor y en `meeko check`.
 
 ## Valor devuelto
 
@@ -69,26 +76,29 @@ Un `MeekoModule<Options>`, para exportarlo por defecto. Sin `meta.name` lanza `T
 
 El objeto `meeko` de `setup`:
 
-| Miembro | Qué hace |
-| --- | --- |
-| `rootDir`, `dev`, `config` | Carpeta del proyecto, `true` en `meeko dev` y la configuración cargada. |
-| `addLayer(dir)` | Añade un layer. |
-| `addComponentsDir(dir, { prefix })` | Autoimporta los `.meeko` de la carpeta con un prefijo. |
-| `addLayout(name, file)` | Desde `1.5`, un layout con nombre. |
-| `addAutoImports(entries)` / `addAutoImportsDir(dir, { scope })` | Autoimports de un paquete, un archivo o una carpeta, con su ámbito (`"app"`, `"client"`, `"server"`, `"shared"`). |
-| `addPlugin({ src, mode?, options? })` | Un plugin de aplicación (`definePlugin`). |
-| `addServerMiddleware(file)` / `addServerHandler({ route, handler })` | Middleware de servidor (antes que el del proyecto) y un handler para una ruta exacta. |
-| `addPublicFile(path, contents)` | Un archivo público. |
-| `addHead(input)` | Entradas de `document.head`. |
-| `addVitePlugin(plugin)` / `extendViteConfig(fn)` | Plugins y configuración de Vite en `meeko dev` y `meeko build`. |
-| `hooks.hook(name, fn)` | `ready`, `routes:resolved`, `build:before`, `prerender:routes`, `build:done`. |
-| `warn(message)` | Un aviso con el nombre del módulo. |
+| Miembro                                                              | Qué hace                                                                                                                                                                                                                                                                                                                          |
+| -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `rootDir`, `dev`, `config`                                           | Carpeta del proyecto, `true` en `meeko dev` y la configuración cargada.                                                                                                                                                                                                                                                           |
+| `addLayer(dir)`                                                      | Añade un layer.                                                                                                                                                                                                                                                                                                                   |
+| `addComponentsDir(dir, { prefix })`                                  | Autoimporta los `.meeko` de la carpeta con un prefijo.                                                                                                                                                                                                                                                                            |
+| `addLayout(name, file)`                                              | Desde `1.5`, un layout con nombre.                                                                                                                                                                                                                                                                                                |
+| `extendRoutes(fn)`                                                   | Desde `1.8`, transforma el manifiesto de rutas: `fn(routes)` devuelve la lista completa, validada como manifiesto.                                                                                                                                                                                                                |
+| `addAutoImports(entries)` / `addAutoImportsDir(dir, { scope })`      | Autoimports de un paquete, un archivo o una carpeta, con su ámbito (`"app"`, `"client"`, `"server"`, `"shared"`). En `addAutoImports`, `componentOnly: true` restringe una entrada `app` al código de componentes y módulos de `app/` que también pueden ejecutarse en el navegador; la excluye de `<script server>` y `server/`. |
+| `addPlugin({ src, mode?, options? })`                                | Un plugin de aplicación (`definePlugin`).                                                                                                                                                                                                                                                                                         |
+| `addServerMiddleware(file)` / `addServerHandler({ route, handler })` | Middleware de servidor (antes que el del proyecto) y un handler para una ruta exacta.                                                                                                                                                                                                                                             |
+| `addPublicFile(path, contents)`                                      | Un archivo público.                                                                                                                                                                                                                                                                                                               |
+| `addTypeTemplate(filename, contents)`                                | Una declaración `.d.ts` generada, retirada cuando se desactiva el módulo.                                                                                                                                                                                                                                                         |
+| `addHead(input)`                                                     | Entradas de `document.head`.                                                                                                                                                                                                                                                                                                      |
+| `addVitePlugin(plugin)` / `extendViteConfig(fn)`                     | Plugins y configuración de Vite en `meeko dev` y `meeko build`.                                                                                                                                                                                                                                                                   |
+| `hooks.hook(name, fn)`                                               | `ready`, `routes:resolved`, `build:before`, `prerender:routes`, `sitemap:resolved` (desde `1.8`), `build:done`.                                                                                                                                                                                                                   |
+| `warn(message)`                                                      | Un aviso con el nombre del módulo.                                                                                                                                                                                                                                                                                                |
 
 ## Ejemplos
 
 ### Añadir archivos al build con un hook
 
 <!-- no-check -->
+
 ```ts
 // modules/humans/index.ts
 import { writeFile } from "node:fs/promises";
@@ -148,6 +158,7 @@ export default defineMeekoModule({ meta: {}, setup() {} });
 `meeko check`, `meeko dev` y `meeko build` se detienen al cargar la configuración con `No se puede cargar el módulo de Meeko ./modules/hello: defineMeekoModule requires meta.name`.
 
 <!-- no-check -->
+
 ```ts good
 export default defineMeekoModule({ meta: { name: "hello" }, setup() {} });
 ```
@@ -161,6 +172,7 @@ export default defineMeekoModule({ meta: { name: "hello", compatibility: { meeko
 La carga de la configuración se detiene con `El módulo de Meeko hello necesita Meeko >=9; este proyecto usa 1.7.0` (con la versión instalada). Declara el rango en el que pruebas el módulo.
 
 <!-- no-check -->
+
 ```ts good
 export default defineMeekoModule({ meta: { name: "hello", compatibility: { meeko: "^1.2.0" } }, setup() {} });
 ```
@@ -174,6 +186,7 @@ meeko.addPlugin({ src: new URL("./runtime/analytics.ts", import.meta.url), optio
 ```
 
 <!-- no-check -->
+
 ```ts good
 meeko.addPlugin({ src: new URL("./runtime/analytics.server.ts", import.meta.url), options: { endpoint: "/api/collect" } });
 ```

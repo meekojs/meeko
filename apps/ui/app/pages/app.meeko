@@ -1,0 +1,44 @@
+<script lang="ts">
+	import { examples } from '../utils/examples'
+</script>
+
+<template>
+	<DocsPage
+		title="App"
+		description="Aloja los modales programáticos sin cambiar la estructura visual de tu aplicación."
+	>
+		<h2 id="usage">Un host en la raíz</h2>
+		<p>
+			<code>UIApp</code>
+			representa el contenido de su snippet y la pila de modales del manager. No genera un contenedor visual adicional. Úsalo una sola vez alrededor del outlet.
+		</p>
+		<DocsCode
+			label="app/app.meeko"
+			bind:code="examples.app"
+		/>
+		<h2 id="contract">Contrato</h2>
+		<p>
+			No tiene props ni eventos públicos. Requiere el snippet
+			<code>default</code>. El plugin registrado por
+			<code>@meekojs/ui</code>
+			proporciona el contexto; no necesitas crear un plugin propio ni llamar a
+			<code>provideModal</code>.
+		</p>
+		<p>
+			<code>useModal()</code>
+			abre componentes cuyo nombre empieza por
+			<code>Modal</code>, con las props del registro de componentes de tu aplicación.
+			<code>useModalInstance()</code>
+			cierra la instancia actual con un resultado o la descarta.
+		</p>
+		<DocsCode
+			label="Dentro de un componente"
+			bind:code="examples.modalOpen"
+		/>
+		<p>
+			Consulta la guía de
+			<a href="/modals">Modal</a>
+			para el componente de confirmación, los tamaños y los cierres protegidos.
+		</p>
+	</DocsPage>
+</template>

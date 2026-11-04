@@ -19,13 +19,13 @@ related:
 
 `meeko preview` arranca el build de producción con el runtime de su adaptador, para comprobar que lo que se va a desplegar funciona: no compila nada, así que antes hay que ejecutar [`meeko build`](/docs/reference/meeko-build) con el mismo adaptador.
 
-| Adaptador | Qué ejecuta |
-| --- | --- |
-| `node` | El mismo servidor que [`meeko start`](/docs/reference/meeko-start), en este proceso. |
-| `bun` | `bun .meeko/output/bun/index.js`, como proceso hijo. |
-| `deno` | `deno run -A .meeko/output/deno/main.js`, como proceso hijo. |
+| Adaptador    | Qué ejecuta                                                                                                   |
+| ------------ | ------------------------------------------------------------------------------------------------------------- |
+| `node`       | El mismo servidor que [`meeko start`](/docs/reference/meeko-start), en este proceso.                          |
+| `bun`        | `bun .meeko/output/bun/index.js`, como proceso hijo.                                                          |
+| `deno`       | `deno run -A .meeko/output/deno/main.js`, como proceso hijo.                                                  |
 | `cloudflare` | `wrangler dev --config .meeko/output/cloudflare/wrangler.jsonc`, el Worker en `workerd` con bindings locales. |
-| `static` | Un servidor pequeño que responde como un hosting estático, con la CSP y las cabeceras de `server`. |
+| `static`     | Un servidor pequeño que responde como un hosting estático, con la CSP y las cabeceras de `server`.            |
 
 ## Uso
 
@@ -40,12 +40,12 @@ http://localhost:4173
 
 ## Opciones
 
-| Opción | Tipo | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `[directorio]` | ruta | `.` | Raíz del proyecto. |
-| `--adapter <nombre>` o `--adapter=<nombre>` | `node` \| `bun` \| `deno` \| `cloudflare` \| `static` | `server.adapter`, o `node` | Qué build ejecutar. Debe coincidir con el del último `meeko build`. |
-| `MEEKO_PORT` (o `PORT`), `MEEKO_HOST` | número, texto | `127.0.0.1:4173` | Dirección del servidor. Con `cloudflare` se pasan a `wrangler dev` como `--port` e `--ip`. |
-| `MEEKO_PUBLIC_ORIGIN` y demás variables | | | Las mismas de `meeko start`; el `.env` del proyecto se lee antes de arrancar y los procesos hijos heredan el entorno. |
+| Opción                                      | Tipo                                                  | Por defecto                | Descripción                                                                                                           |
+| ------------------------------------------- | ----------------------------------------------------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `[directorio]`                              | ruta                                                  | `.`                        | Raíz del proyecto.                                                                                                    |
+| `--adapter <nombre>` o `--adapter=<nombre>` | `node` \| `bun` \| `deno` \| `cloudflare` \| `static` | `server.adapter`, o `node` | Qué build ejecutar. Debe coincidir con el del último `meeko build`.                                                   |
+| `MEEKO_PORT` (o `PORT`), `MEEKO_HOST`       | número, texto                                         | `127.0.0.1:4173`           | Dirección del servidor. Con `cloudflare` se pasan a `wrangler dev` como `--port` e `--ip`.                            |
+| `MEEKO_PUBLIC_ORIGIN` y demás variables     |                                                       |                            | Las mismas de `meeko start`; el `.env` del proyecto se lee antes de arrancar y los procesos hijos heredan el entorno. |
 
 ## Resultado
 

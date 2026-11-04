@@ -55,10 +55,10 @@ handler(new Error("boom"), "event");
 
 `@meekojs/meeko/server` sólo usa Web APIs y `node:async_hooks`. Las herramientas de build y el transporte Node pasan a subrutas propias:
 
-| Símbolos | Antes | Después |
-| --- | --- | --- |
+| Símbolos                                                                                                                                                                                                  | Antes                   | Después                |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- | ---------------------- |
 | `discoverRoutes`, `discoverConfiguredRoutes`, `composeFrameworkRoutes`, `loadMeekoConfig`, `readMeekoConfigSync`, `resolveConfigSources`, `discoverServerManifest`, `prerenderRoutes`, `prerenderProject` | `@meekojs/meeko/server` | `@meekojs/meeko/build` |
-| `toNodeListener`, `attachNodeWebSocketServer`, `createNodeSocketUpgradeHandler` | `@meekojs/meeko/server` | `@meekojs/meeko/node` |
+| `toNodeListener`, `attachNodeWebSocketServer`, `createNodeSocketUpgradeHandler`                                                                                                                           | `@meekojs/meeko/server` | `@meekojs/meeko/node`  |
 
 ```ts
 // Antes
@@ -121,10 +121,10 @@ La fábrica recibe `{ env, production, platform, prerendering }` y puede devolve
 
 `meeko build` escribe un build autónomo por adaptador. Node es el adaptador por defecto:
 
-| Antes | Después |
-| --- | --- |
-| `.meeko/output/server/entry.js` | `.meeko/output/node/index.mjs`, con `chunks/` y `client/` |
-| `.meeko/output/prerender/` | `.meeko/output/node/prerender/`, con un índice `{ version: 1, pages }` en `manifest.json` |
+| Antes                           | Después                                                                                   |
+| ------------------------------- | ----------------------------------------------------------------------------------------- |
+| `.meeko/output/server/entry.js` | `.meeko/output/node/index.mjs`, con `chunks/` y `client/`                                 |
+| `.meeko/output/prerender/`      | `.meeko/output/node/prerender/`, con un índice `{ version: 1, pages }` en `manifest.json` |
 
 ```sh
 # Antes: el despliegue dependía de la salida anterior y de las fuentes
