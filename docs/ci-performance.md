@@ -11,7 +11,7 @@ CI se ejecuta en los pull requests y en los pushes a `main`. Un nuevo commit can
 - **Dependencias pnpm:** `actions/setup-node`, con `pnpm-lock.yaml` como clave; la instalación siempre usa `--frozen-lockfile`.
 - **Build del workspace:** `.github/actions/build-workspace` utiliza `actions/cache/restore` y `save`. La clave incluye el árbol Git completo, la versión exacta de Node, sistema y arquitectura. No hay coincidencias parciales. Se guardan `dist` y declaraciones generadas inmediatamente después de compilar, antes de que las pruebas puedan modificarlos. Main y una etiqueta con el mismo árbol pueden reutilizar ese build, sujeto al alcance de cachés de GitHub.
 - **ESLint:** caché de resultados con comparación por contenido; el cambio de lockfile o configuración invalida su familia de claves.
-- **Descargas npm:** `.github/actions/cache-npm` conserva únicamente `_cacache`, usado por el empaquetado aislado de VSIX. No guarda `.npmrc`, tokens ni `node_modules`.
+- **Descargas npm:** `.github/actions/cache-npm` exporta `NPM_CONFIG_CACHE` a un directorio propio de `RUNNER_TEMP` y conserva únicamente su `_cacache`, usado por el empaquetado aislado de VSIX. Así los comandos ejecutados desde carpetas temporales usan la misma ruta que restaura y guarda la acción. No guarda `.npmrc`, tokens ni `node_modules`.
 
 Los resultados de las pruebas, las comprobaciones de consumidores y los bundles de aplicaciones no se reutilizan desde caché. La caché de compilación prepara los paquetes que consumen las fases `:prepared`; los comandos autónomos y los hooks `prepack` conservan sus builds. Los navegadores se instalan con Playwright, cuya documentación desaconseja su caché por el coste de restaurarla.
 

@@ -6,11 +6,12 @@ runs:
     - id: directory
       shell: pwsh
       run: |
-        $cache = npm config get cache
-        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        $cache = Join-Path $env:RUNNER_TEMP 'meeko-npm-cache'
+        "NPM_CONFIG_CACHE=$cache" >> $env:GITHUB_ENV
+        "npm_config_cache=$cache" >> $env:GITHUB_ENV
         "path=$cache" >> $env:GITHUB_OUTPUT
     - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
       with:
         path: ${{ steps.directory.outputs.path }}/_cacache
-        key: npm-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'packages/vscode/package.json', 'packages/vscode/package-vsix.ps1') }}
-        restore-keys: npm-v1-${{ runner.os }}-${{ runner.arch }}-
+        key: npm-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'packages/vscode/package.json', 'packages/vscode/package-vsix.ps1') }}
+        restore-keys: npm-v2-${{ runner.os }}-${{ runner.arch }}-
