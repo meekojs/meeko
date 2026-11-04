@@ -40,9 +40,9 @@ test('the required CI test check waits for every parallel test job', () => {
 	const workflow = read('.github/workflows/ci.yml')
 	const gate = workflow.split('\n  test:\n')[1]?.split('\n  performance:\n')[0]
 	assert.ok(gate, 'the workflow keeps the required test check')
-	assert.match(gate, /needs: \[core-tests, checks, verify, ui-browser\]/)
+	assert.match(gate, /needs: \[core-tests, checks, test-support, verify, ui-browser\]/)
 	assert.match(gate, /if: always\(\)/)
-	for (const result of ['core-tests', 'checks', 'verify', 'ui-browser']) {
+	for (const result of ['core-tests', 'checks', 'test-support', 'verify', 'ui-browser']) {
 		assert.ok(gate.includes(`needs.${result}.result`), `${result} must contribute to the test result`)
 	}
 })
@@ -86,7 +86,7 @@ test('core shards execute every file exactly once and reject invalid shard indic
 	const parent = fileURLToPath(new URL('packages/meeko/.meeko/', repository))
 	mkdirSync(parent, { recursive: true })
 	const fixture = mkdtempSync(join(parent, 'sharding-'))
-	const runner = fileURLToPath(new URL('packages/meeko/scripts/run-tests.mjs', repository))
+	const runner = fileURLToPath(new URL('packages/meeko/scripts/run-tests.ts', repository))
 	const environment = { ...process.env }
 	delete environment.NODE_TEST_CONTEXT
 	try {
@@ -96,7 +96,7 @@ test('core shards execute every file exactly once and reject invalid shard indic
 		}
 		for (const shard of ['1/3', '2/3', '3/3']) {
 			const result = spawnSync(process.execPath, [runner], { cwd: fixture, env: { ...environment, MEEKO_TEST_SHARD: shard }, timeout: 30_000, encoding: 'utf8' })
-			assert.equal(result.status, 0, result.stderr)
+			assert.equal(result.status, 0, result.error?.message ?? `${result.stdout}\n${result.stderr}`)
 		}
 		assert.deepEqual(readFileSync(join(fixture, 'executed.txt'), 'utf8').trim().split('\n').sort(), ['0', '1', '2', '3', '4', '5'])
 		for (const shard of ['0/3', '4/3', '1/0', 'bad']) {

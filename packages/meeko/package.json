@@ -144,7 +144,7 @@
 		"pilot:e2e": "node --import tsx --test --test-force-exit tests/pilot.e2e.ts",
 		"pilot:serve": "node examples/pilot/.output/server/http.js",
 		"test": "pnpm run build && pnpm run test:prepared",
-		"test:prepared": "node scripts/clean-test-tmp.mjs && pnpm run example:compile && node scripts/run-tests.mjs",
+		"test:prepared": "node scripts/clean-test-tmp.mjs && pnpm run example:compile && node scripts/run-tests.ts",
 		"verify": "pnpm run build && pnpm run verify:prepared",
 		"verify:prepared": "pnpm run check && pnpm run test:prepared && pnpm run example:check && tsc -p tsconfig.test.json --noEmit && pnpm run vite:types:prepared && pnpm run benchmark:check && pnpm run vite:build && pnpm run pilot:check:prepared",
 		"vite:build": "vite build examples/vite --config examples/vite/vite.config.ts",

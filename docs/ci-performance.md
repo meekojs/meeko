@@ -25,10 +25,26 @@ Los comandos terminados en `:prepared` son fases internas que requieren el build
 
 `site:build`, `ui:build`, `i18n:build` y `tooling:build` seleccionan el paquete destino y sus dependencias con los filtros `...` de pnpm. Los atajos de sitios excluyen `meeko-docs` del recorrido porque cada app ya lo construye en su propio script `build`. Los filtros de los scripts no llevan comillas simples: en Windows se pasarían como parte del nombre del paquete. Los hooks `prepack` siguen construyendo antes de empaquetar.
 
+## Publicación y artefactos
+
+`scripts/package-vsix-matrix.ps1` comprueba la versión, valida y compila la extensión una vez y reutiliza `packages/vscode/package-vsix.ps1` para cada destino. Los destinos se declaran en `scripts/vsix-targets.ps1`. Los workflows de npm y de VS Code consumen esta misma preparación.
+
+`scripts/release-assets.ps1` centraliza el inventario de archivos y versiones, rechaza faltantes y extras, y escribe o verifica `SHA256SUMS.txt`. La release de GitHub verifica de nuevo los hashes justo antes de subir los archivos. Las publicaciones en Marketplace y Open VSX validan el inventario de VSIX antes de usar sus herramientas propias.
+
+## Webs documentales y soporte de pruebas
+
+UI e i18n usan los defaults de `meeko-docs/site-config` y el middleware de `meeko-docs/health`. Cada aplicación conserva sus módulos, catálogos, navegación y opciones particulares, incluido el laboratorio árabe. Las declaraciones `defineApiRoute` y sus schemas permanecen en los archivos de cada app porque el generador de contratos los analiza directamente; los handlers ya proceden del módulo compartido.
+
+`scripts/test-support/fixture.ts` crea consumidores temporales, escribe archivos dentro de su raíz y elimina enlaces antes de limpiar el directorio, incluso si la inicialización falla. `dev-server.ts` gestiona puertos HTTP/HMR distintos, espera el banner y una respuesta del proceso propio, conserva logs y cierra su árbol de procesos. Los helpers de UI y las pruebas consumidoras de icon e i18n reutilizan estas funciones. El límite de vida predeterminado del servidor es de 360 segundos para cubrir los E2E existentes de hasta 300 segundos; cada wrapper puede fijar el suyo.
+
+Los helpers nuevos y sus tests se ejecutan directamente con Node 24 como TypeScript con sintaxis borrable. El runner del núcleo también es `run-tests.ts`; conserva el loader de los tests legacy que todavía usan imports sin extensión. CI comprueba los contratos de fixtures/procesos y artefactos en Windows y Linux, y exige ambos resultados en el check agregado `test`.
+
 ## Medición
 
 Después de integrar, comparar una ejecución inicial y otra con caché del mismo árbol. Revisar los hits de `Build workspace with exact cache`, los tiempos de cada shard, las colas de runners y la duración total. El paralelismo reduce la espera y puede aumentar los minutos facturados. El reparto de Node es por archivos, por lo que un archivo especialmente lento puede dominar un shard.
 
 Referencia previa: el job `test` del run `41764885365` tardó 80,4 minutos, incluyendo 25,2 de `verify`, 24 de UI E2E y 10 de tipos. Estas cifras describen el flujo anterior; el nuevo tiempo debe medirse en GitHub Actions. El plazo de verificación y visibilidad de Microsoft Marketplace permanece fuera del control de las cachés locales.
+
+La [primera medición del CI separado y con cachés](https://github.com/meekojs/meeko/actions/runs/41789210691) completó los 17 jobs en 23 min 37 s, incluidos 32 s iniciales en cola, frente a los 80 min 27 s del [run anterior](https://github.com/meekojs/meeko/actions/runs/41764885365): una reducción observada del 70,6 %. Es una ejecución de esa fase; los cambios posteriores de reutilización y sus nuevos checks necesitan su propia validación en CI.
 
 Fuentes: [cachés de GitHub Actions](https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching), [sharding de Node](https://nodejs.org/docs/latest-v24.x/api/cli.html#--test-shard), [Playwright en CI](https://playwright.dev/docs/ci#caching-browsers).

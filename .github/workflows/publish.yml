@@ -208,6 +208,7 @@ jobs:
       - run: pnpm check
       - run: pnpm -F meeko-site run test
       - run: pnpm -F meeko-docs-content run test
+      - run: pnpm -F meeko-docs run test
       - run: pnpm test:packages
       - run: pnpm package:workspace-smoke
       - name: Node adapter conformance
@@ -326,23 +327,10 @@ jobs:
         run: |
           $assets = Join-Path $env:RUNNER_TEMP 'release-assets'
           New-Item -ItemType Directory -Force $assets | Out-Null
-          pnpm -F meeko-language run check
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          pnpm -F meeko-language run build
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          foreach ($target in @('win32-x64', 'win32-arm64', 'linux-x64', 'linux-arm64', 'darwin-x64', 'darwin-arm64')) {
-            pwsh -NoProfile -File packages/vscode/package-vsix.ps1 -Target $target -SkipBuild
-            if ($LASTEXITCODE -ne 0) { throw "Falló el VSIX $target." }
-            $vsix = "packages/vscode/artifacts/meeko-language-$env:VSCODE_VERSION-$target.vsix"
-            if (!(Test-Path -LiteralPath $vsix -PathType Leaf)) { throw "Falta $vsix." }
-            Copy-Item -LiteralPath $vsix -Destination $assets
-          }
+          ./scripts/package-vsix-matrix.ps1 -ExpectedVersion $env:VSCODE_VERSION -OutputDirectory $assets
           pwsh -NoProfile -File packages/devtools/package-zip.ps1 -OutputPath (Join-Path $assets "meeko-devtools-$env:DEVTOOLS_VERSION.zip")
           if ($LASTEXITCODE -ne 0) { throw 'Falló el ZIP de Chrome DevTools.' }
-          $lines = Get-ChildItem -LiteralPath $assets -File | Sort-Object Name | ForEach-Object {
-            "$((Get-FileHash -Algorithm SHA256 -LiteralPath $_.FullName).Hash.ToLowerInvariant())  $($_.Name)"
-          }
-          Set-Content -LiteralPath (Join-Path $assets 'SHA256SUMS.txt') -Value $lines -Encoding utf8NoBOM
+          ./scripts/release-assets.ps1 -Directory $assets -VscodeVersion $env:VSCODE_VERSION -DevtoolsVersion $env:DEVTOOLS_VERSION -WriteChecksums | Out-Null
           Get-ChildItem -LiteralPath $assets -File | Format-Table Name, Length
       - name: Crear o actualizar la release
         shell: pwsh
@@ -354,8 +342,7 @@ jobs:
           DEVTOOLS_VERSION: ${{ steps.version.outputs.devtools }}
         run: |
           $tag = $env:GITHUB_REF_NAME
-          $assets = @(Get-ChildItem -LiteralPath (Join-Path $env:RUNNER_TEMP 'release-assets') -File | ForEach-Object FullName)
-          if ($assets.Count -ne 8) { throw "Se esperaban 8 archivos (6 VSIX, ZIP y SHA256SUMS); hay $($assets.Count)." }
+          $assets = @(./scripts/release-assets.ps1 -Directory (Join-Path $env:RUNNER_TEMP 'release-assets') -VscodeVersion $env:VSCODE_VERSION -DevtoolsVersion $env:DEVTOOLS_VERSION -VerifyChecksums)
           gh release view $tag --repo $env:GITHUB_REPOSITORY --json tagName 2>$null | Out-Null
           if ($LASTEXITCODE -eq 0) {
             # Release ya creada (a mano o en un intento anterior): sólo se reemplazan los adjuntos.

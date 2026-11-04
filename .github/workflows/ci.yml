@@ -35,6 +35,8 @@ jobs:
         run: pnpm -F meeko-site run test
       - name: Test documentation content package
         run: pnpm -F meeko-docs-content run test
+      - name: Test shared documentation module
+        run: pnpm -F meeko-docs run test
       # Without DATABASE_URL the integration tests and the browser E2E of the dashboard are skipped.
       - name: Check and test the documentation dashboard
         run: pnpm -F meeko-dashboard run check && pnpm -F meeko-dashboard run test
@@ -116,6 +118,22 @@ jobs:
       - name: Check every public package and application
         run: pnpm run check && pnpm run check:apps
 
+  test-support:
+    name: Test support (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-24.04]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-workspace
+      - name: Fixture and process lifecycle contracts
+        run: node --test scripts/test-support/test-support.test.ts
+      - name: Release asset contracts
+        run: pwsh -NoProfile -File scripts/release-assets.test.ps1
+
   verify:
     name: Verify package and DevTools (${{ matrix.shard }}/3)
     runs-on: windows-latest
@@ -184,7 +202,7 @@ jobs:
 
   # Conserva el check `test` como resultado único de todos los gates anteriores.
   test:
-    needs: [core-tests, checks, verify, ui-browser]
+    needs: [core-tests, checks, test-support, verify, ui-browser]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -192,11 +210,13 @@ jobs:
       - name: Require every test job to pass
         env:
           CHECKS: ${{ needs.checks.result }}
+          TEST_SUPPORT: ${{ needs.test-support.result }}
           CORE: ${{ needs.core-tests.result }}
           VERIFY: ${{ needs.verify.result }}
           UI_BROWSER: ${{ needs.ui-browser.result }}
         run: |
           test "$CHECKS" = success
+          test "$TEST_SUPPORT" = success
           test "$CORE" = success
           test "$VERIFY" = success
           test "$UI_BROWSER" = success
