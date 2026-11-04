@@ -13,6 +13,9 @@ on:
 permissions:
   contents: read
 
+env:
+  NODE_OPTIONS: --max-old-space-size=8192
+
 jobs:
   redis-integration:
     runs-on: ubuntu-24.04
@@ -28,14 +31,7 @@ jobs:
           --health-retries 10
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-        with:
-          version: 12.14.0
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '24'
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup-workspace
       - name: Redis real session integration
         run: |
           mkdir -p .meeko/ci-logs
@@ -57,17 +53,10 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-        with:
-          version: 12.14.0
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '24'
-          cache: pnpm
+      - uses: ./.github/actions/setup-workspace
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.4.4
-      - run: pnpm install --frozen-lockfile
       - name: Bun adapter conformance
         run: |
           mkdir -p .meeko/ci-logs
@@ -89,17 +78,10 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-        with:
-          version: 12.14.0
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '24'
-          cache: pnpm
+      - uses: ./.github/actions/setup-workspace
       - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
         with:
           deno-version: 2.9.8
-      - run: pnpm install --frozen-lockfile
       - name: Deno adapter conformance
         run: |
           mkdir -p .meeko/ci-logs
@@ -121,15 +103,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
-        with:
-          version: 12.14.0
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: '24'
-          cache: pnpm
+      - uses: ./.github/actions/setup-workspace
       # wrangler (devDependency) brings workerd; D1 and Durable Objects run locally.
-      - run: pnpm install --frozen-lockfile
       - name: Cloudflare Workers adapter conformance
         run: |
           mkdir -p .meeko/ci-logs
@@ -156,14 +131,9 @@ jobs:
         os: [windows-latest, ubuntu-24.04, macos-latest]
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
+      - uses: ./.github/actions/setup-workspace
         with:
-          version: 12.14.0
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '24'
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+          npm-cache: 'true'
       - run: pnpm run package:vsix
         working-directory: packages/vscode
       - run: pnpm run test:host:isolated
@@ -173,9 +143,39 @@ jobs:
         working-directory: packages/vscode
         if: runner.os == 'Linux'
 
+  # La suite larga corre en paralelo con los tarballs; ambos resultados son obligatorios para publicar.
+  verify:
+    name: Verify package and DevTools (${{ matrix.shard }}/3)
+    runs-on: windows-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+      MEEKO_TEST_SHARD: ${{ matrix.shard }}/3
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-workspace
+        with:
+          build: 'true'
+      - name: Verify package and DevTools
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force .meeko/ci-logs | Out-Null
+          pnpm run verify:prepared 2>&1 | Tee-Object -FilePath .meeko/ci-logs/verify.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Diagnostic log on failure
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: meeko-publish-verify-log-${{ matrix.shard }}
+          path: .meeko/ci-logs/verify.log
+          if-no-files-found: ignore
+
   package-gates:
     name: Gates y tarballs
-    needs: [redis-integration, bun, deno, workerd, vscode-extension]
     runs-on: windows-latest
     timeout-minutes: 90
     env:
@@ -185,13 +185,6 @@ jobs:
         with:
           # Hace falta la historia para comprobar que la etiqueta está en main.
           fetch-depth: 0
-      - uses: pnpm/action-setup@v6
-        with:
-          version: 12.14.0
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '24'
-          cache: pnpm
       - name: Comprobar que la etiqueta apunta a un commit de main
         shell: pwsh
         # Una etiqueta sobre otra rama se saltaría los checks requeridos de main (lint, E2E de UI e i18n…).
@@ -207,8 +200,9 @@ jobs:
               throw "La etiqueta $env:GITHUB_REF_NAME no coincide con $($manifest.name) ($($manifest.version))."
             }
           }
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm build
+      - uses: ./.github/actions/setup-workspace
+        with:
+          build: 'true'
       - run: pnpm lint
       - run: pnpm format:check
       - run: pnpm check
@@ -216,12 +210,6 @@ jobs:
       - run: pnpm -F meeko-docs-content run test
       - run: pnpm test:packages
       - run: pnpm package:workspace-smoke
-      - name: Verify package and DevTools
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force .meeko/ci-logs | Out-Null
-          pnpm run verify 2>&1 | Tee-Object -FilePath .meeko/ci-logs/verify.log
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Node adapter conformance
         shell: pwsh
         run: |
@@ -277,7 +265,7 @@ jobs:
   publish:
     name: Publicar en npm
     environment: npm
-    needs: package-gates
+    needs: [package-gates, verify, redis-integration, bun, deno, workerd, vscode-extension]
     runs-on: windows-latest
     timeout-minutes: 20
     permissions:
@@ -313,13 +301,9 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: ./.github/actions/setup-workspace
         with:
-          version: 12.14.0
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: '24'
-          cache: pnpm
+          npm-cache: 'true'
       - name: Leer versiones
         id: version
         shell: pwsh
@@ -334,7 +318,6 @@ jobs:
           "prerelease=$($packageVersion.Contains('-').ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
           "vscode=$vscodeVersion" >> $env:GITHUB_OUTPUT
           "devtools=$devtoolsVersion" >> $env:GITHUB_OUTPUT
-      - run: pnpm install --frozen-lockfile
       - name: Empaquetar los seis VSIX y el ZIP de Chrome
         shell: pwsh
         env:
@@ -343,8 +326,12 @@ jobs:
         run: |
           $assets = Join-Path $env:RUNNER_TEMP 'release-assets'
           New-Item -ItemType Directory -Force $assets | Out-Null
+          pnpm -F meeko-language run check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm -F meeko-language run build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           foreach ($target in @('win32-x64', 'win32-arm64', 'linux-x64', 'linux-arm64', 'darwin-x64', 'darwin-arm64')) {
-            pwsh -NoProfile -File packages/vscode/package-vsix.ps1 -Target $target
+            pwsh -NoProfile -File packages/vscode/package-vsix.ps1 -Target $target -SkipBuild
             if ($LASTEXITCODE -ne 0) { throw "Falló el VSIX $target." }
             $vsix = "packages/vscode/artifacts/meeko-language-$env:VSCODE_VERSION-$target.vsix"
             if (!(Test-Path -LiteralPath $vsix -PathType Leaf)) { throw "Falta $vsix." }

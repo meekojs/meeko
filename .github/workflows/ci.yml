@@ -2,30 +2,29 @@ name: Verificación
 
 on:
   push:
+    branches: [main]
   pull_request:
+
+# Un nuevo commit sustituye las comprobaciones anteriores de la misma rama o PR.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_OPTIONS: --max-old-space-size=8192
 
 permissions:
   contents: read
 
 jobs:
-  test:
+  core-tests:
     runs-on: windows-latest
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
+      - uses: ./.github/actions/setup-workspace
         with:
-          version: 12.14.0
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '24'
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - name: Build workspace and lint tooling
-        run: pnpm run build
-      - run: pnpm lint
-      - name: Check every public package and application
-        run: pnpm run check && pnpm run check:apps
+          build: 'true'
       - name: Test UI, i18n, icon, ESLint and Prettier
         shell: pwsh
         run: |
@@ -39,29 +38,12 @@ jobs:
       # Without DATABASE_URL the integration tests and the browser E2E of the dashboard are skipped.
       - name: Check and test the documentation dashboard
         run: pnpm -F meeko-dashboard run check && pnpm -F meeko-dashboard run test
-      - name: Verify package and DevTools
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force .meeko/ci-logs | Out-Null
-          pnpm run verify 2>&1 | Tee-Object -FilePath .meeko/ci-logs/verify.log
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Node adapter conformance
         shell: pwsh
         run: |
           pnpm run conformance:node 2>&1 | Tee-Object -FilePath .meeko/ci-logs/conformance-node.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - run: node packages/meeko/node_modules/playwright-core/cli.js install chromium firefox webkit
-      - name: UI browser E2E
-        shell: pwsh
-        run: |
-          $env:MEEKO_CHROME_PATH = node -p "require('./packages/ui/node_modules/playwright-core').chromium.executablePath()"
-          pnpm -F meeko-ui-site run build
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          # markdown-editor.e2e.mjs reads the output of this app too, as `pnpm test:e2e` of packages/ui builds it.
-          pnpm -F meeko-i18n-site run build
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          node --test --test-concurrency=1 packages/ui/tests/*.e2e.mjs packages/icon/tests/*.e2e.mjs 2>&1 | Tee-Object -FilePath .meeko/ci-logs/ui-e2e.log
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: i18n public site E2E
         shell: pwsh
         run: |
@@ -116,20 +98,116 @@ jobs:
           path: packages/meeko/.meeko/ci-artifacts/*.tgz
           if-no-files-found: ignore
 
+  checks:
+    name: Types and lint
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-workspace
+        with:
+          build: 'true'
+      - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: node_modules/.cache/eslint
+          key: eslint-v1-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'eslint.config.*', 'packages/eslint-plugin/src/**', 'packages/eslint-plugin/scripts/**', 'packages/eslint-plugin/package.json', 'scripts/build-package.mjs') }}-${{ github.sha }}
+          restore-keys: eslint-v1-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'eslint.config.*', 'packages/eslint-plugin/src/**', 'packages/eslint-plugin/scripts/**', 'packages/eslint-plugin/package.json', 'scripts/build-package.mjs') }}-
+      - run: pnpm lint
+      - name: Check every public package and application
+        run: pnpm run check && pnpm run check:apps
+
+  verify:
+    name: Verify package and DevTools (${{ matrix.shard }}/3)
+    runs-on: windows-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+      MEEKO_TEST_SHARD: ${{ matrix.shard }}/3
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-workspace
+        with:
+          build: 'true'
+      - name: Verify package and DevTools
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force .meeko/ci-logs | Out-Null
+          pnpm run verify:prepared 2>&1 | Tee-Object -FilePath .meeko/ci-logs/verify.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Diagnostic log on failure
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: meeko-verify-log-${{ matrix.shard }}
+          path: .meeko/ci-logs/verify.log
+          if-no-files-found: ignore
+
+  ui-browser:
+    name: UI browser E2E (${{ matrix.shard }}/3)
+    runs-on: windows-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-workspace
+        with:
+          build: 'true'
+      - run: node packages/meeko/node_modules/playwright-core/cli.js install chromium
+      - name: UI browser E2E
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force .meeko/ci-logs | Out-Null
+          $env:MEEKO_CHROME_PATH = node -p "require('./packages/ui/node_modules/playwright-core').chromium.executablePath()"
+          pnpm -F meeko-ui-site run build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # markdown-editor.e2e.mjs reads the output of apps/i18n too.
+          pnpm -F meeko-i18n-site run build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --test --test-shard=${{ matrix.shard }}/3 --test-concurrency=1 packages/ui/tests/*.e2e.mjs packages/icon/tests/*.e2e.mjs 2>&1 | Tee-Object -FilePath .meeko/ci-logs/ui-e2e.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Diagnostic log on failure
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: meeko-ui-browser-log-${{ matrix.shard }}
+          path: .meeko/ci-logs/ui-e2e.log
+          if-no-files-found: ignore
+
+  # Conserva el check `test` como resultado único de todos los gates anteriores.
+  test:
+    needs: [core-tests, checks, verify, ui-browser]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require every test job to pass
+        env:
+          CHECKS: ${{ needs.checks.result }}
+          CORE: ${{ needs.core-tests.result }}
+          VERIFY: ${{ needs.verify.result }}
+          UI_BROWSER: ${{ needs.ui-browser.result }}
+        run: |
+          test "$CHECKS" = success
+          test "$CORE" = success
+          test "$VERIFY" = success
+          test "$UI_BROWSER" = success
+
   performance:
     name: Performance budgets
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-        with:
-          version: 12.14.0
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '24'
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup-workspace
       - run: node packages/meeko/node_modules/playwright-core/cli.js install chromium
       - name: Measure and compare reproducible performance budgets
         run: pnpm -F @meekojs/meeko run benchmark:budget
@@ -160,14 +238,7 @@ jobs:
           --health-retries 10
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-        with:
-          version: 12.14.0
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '24'
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup-workspace
       - name: Redis real session integration
         run: |
           mkdir -p .meeko/ci-logs
@@ -189,17 +260,10 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-        with:
-          version: 12.14.0
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '24'
-          cache: pnpm
+      - uses: ./.github/actions/setup-workspace
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.4.4
-      - run: pnpm install --frozen-lockfile
       - name: Bun adapter conformance
         run: |
           mkdir -p .meeko/ci-logs
@@ -221,17 +285,10 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-        with:
-          version: 12.14.0
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '24'
-          cache: pnpm
+      - uses: ./.github/actions/setup-workspace
       - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
         with:
           deno-version: 2.9.8
-      - run: pnpm install --frozen-lockfile
       - name: Deno adapter conformance
         run: |
           mkdir -p .meeko/ci-logs
@@ -253,15 +310,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
-        with:
-          version: 12.14.0
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: '24'
-          cache: pnpm
+      - uses: ./.github/actions/setup-workspace
       # wrangler (devDependency) brings workerd; D1 and Durable Objects run locally.
-      - run: pnpm install --frozen-lockfile
       - name: Cloudflare Workers adapter conformance
         run: |
           mkdir -p .meeko/ci-logs
@@ -288,14 +338,9 @@ jobs:
         os: [windows-latest, ubuntu-24.04, macos-latest]
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
+      - uses: ./.github/actions/setup-workspace
         with:
-          version: 12.14.0
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '24'
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+          npm-cache: 'true'
       - run: pnpm run package:vsix
         working-directory: packages/vscode
       - run: pnpm run test:host:isolated
