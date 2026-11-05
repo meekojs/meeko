@@ -4,7 +4,7 @@
 # la publicación en npm: Windows, los cuatro runtimes, e2e y paquetes. Este pipeline solo entrega las
 # webs y necesita lo que solo tiene el agente de voidcat-local: el socket de Docker, el registry, la
 # red `coolify` (la base de producción no publica puerto) y la API local de Coolify. Repite los gates
-# que afectan a las webs para que una imagen nunca salga de un commit que no los pasa.
+# que afectan a las webs y exige que pasen antes de hacer el release y desplegar.
 #
 # Dos maneras de llegar aquí:
 #
