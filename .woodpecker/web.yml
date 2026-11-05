@@ -84,9 +84,10 @@ steps:
     commands:
       - sonar-scanner -Dsonar.qualitygate.wait=true -Dsonar.qualitygate.timeout=300
 
+  # Construir imágenes en paralelo con gates acorta la entrega. El release espera ambos resultados.
   - name: images
     image: docker:29-cli
-    depends_on: [gates]
+    depends_on: [install]
     environment:
       REGISTRY_HOST:
         from_secret: registry_host
@@ -104,7 +105,7 @@ steps:
   # Migraciones antes del deploy: son aditivas, y las webs en marcha siguen funcionando con ellas.
   - name: release
     image: docker:29-cli
-    depends_on: [images]
+    depends_on: [gates, images]
     when:
       - event: push
         branch: main
