@@ -49,7 +49,7 @@ const { total } = await rpc.math.sum({ a: 1, b: 2 }); // POST https://example.co
 | Parameter  | Type                          | Default  | Description                                                                                                                      |
 | ---------- | ----------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------- |
 | `manifest` | `{ rpc: { id, pathname }[] }` | required | The public procedures. The dotted `id` is the method path; `pathname` is its route, normally `/_meeko/rpc/<carpetas>/<archivo>`. |
-| `options`  | `ClientOptions`               | `{}`     | `baseUrl`, `fetch`, `csrfToken` and `headers`, as in `createApiClient`.                                                          |
+| `options`  | `ClientOptions`               | `{}`     | `baseUrl`, `fetch`, `credentials`, `csrfToken` and `headers`, as in `createApiClient`.                                           |
 
 `Contract` describes each procedure with `RpcOperation<Input, Output>`; in an application it comes from `.meeko/types/server-contracts.d.ts`.
 

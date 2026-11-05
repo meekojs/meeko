@@ -50,13 +50,14 @@ const ada = await api.users.byId.get({ params: { id: "42" }, query: { tab: "perf
 
 ## Parameters
 
-| Parameter           | Type                                         | Default  | Description                                                                                                                                                                                                         |
-| ------------------- | -------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `manifest`          | `{ api: { clientKey, pathname, method }[] }` | required | Public endpoints. `clientKey` is the method path (`"users.byId"` → `api.users.byId`); `pathname` uses `[param]` for dynamic segments. In an application, `meeko check` writes it to `.meeko/manifests/server.json`. |
-| `options.baseUrl`   | URL or `() => string`                        | none     | Origin against which paths resolve. Without it, relative paths: valid in the browser, not Node.                                                                                                                     |
-| `options.fetch`     | `typeof fetch`                               | global   | `fetch` implementation, for testing or adding logic.                                                                                                                                                                |
-| `options.csrfToken` | text or `() => string \| undefined`          | none     | Token sent in `x-meeko-csrf` on methods other than `GET` and `HEAD`.                                                                                                                                                |
-| `options.headers`   | `HeadersInit` or `() => HeadersInit`         | none     | Headers for each request.                                                                                                                                                                                           |
+| Parameter             | Type                                         | Default       | Description                                                                                                                                                                                                         |
+| --------------------- | -------------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `manifest`            | `{ api: { clientKey, pathname, method }[] }` | required      | Public endpoints. `clientKey` is the method path (`"users.byId"` → `api.users.byId`); `pathname` uses `[param]` for dynamic segments. In an application, `meeko check` writes it to `.meeko/manifests/server.json`. |
+| `options.baseUrl`     | URL or `() => string`                        | none          | Origin against which paths resolve. Without it, relative paths: valid in the browser, not Node.                                                                                                                     |
+| `options.fetch`       | `typeof fetch`                               | global        | `fetch` implementation, for testing or adding logic.                                                                                                                                                                |
+| `options.credentials` | `RequestCredentials`                         | `same-origin` | Fetch credentials: `same-origin`, `include`, or `omit`.                                                                                                                                                             |
+| `options.csrfToken`   | text or `() => string \| undefined`          | none          | Token sent in `x-meeko-csrf` on methods other than `GET` and `HEAD`.                                                                                                                                                |
+| `options.headers`     | `HeadersInit` or `() => HeadersInit`         | none          | Headers for each request.                                                                                                                                                                                           |
 
 `Contract` (the type argument) describes each operation with `ApiOperation<Params, Query, Body, Output>`. In an application it comes from `.meeko/types/server-contracts.d.ts`.
 
@@ -125,6 +126,8 @@ export const api = createApiClient<ApiContract>(manifest, createBrowserClientOpt
 ```
 
 `createBrowserClientOptions()` reads the token from the `meeko-csrf-token` meta on each call and updates it from responses' `x-meeko-csrf-token` header.
+
+For a cookie-based API on another origin, pass `{ ...createBrowserClientOptions(), baseUrl: apiUrl, credentials: 'include' }`. The server must allow the origin and credentials through CORS, and the browser still applies cookie rules. Check that the CSRF token and server protection belong to that API. During SSR, `credentials` does not automatically forward cookies from the incoming request.
 
 ## Common mistakes
 

@@ -1,6 +1,10 @@
 # Cambios de Meeko UI
 
-## 1.8.0 — sin publicar
+## 1.9.0 — 2026-11-05
+
+- Publicación coordinada con `@meekojs/meeko` 1.9.0, sin cambios funcionales en este paquete.
+
+## 1.8.0 — 2026-11-04
 
 - **El texto de una página larga ya no se recoloca cuando llega su índice lateral.** `UIPage` creaba la columna de `aside` con `:has()`, y el `<aside>` va después de `<main>`: en una descarga lenta se pintaba el texto a todo el ancho y se estrechaba al llegar. Ahora la columna depende de una marca en la etiqueta de apertura de `.meeko-ui-page-body`, que sigue a un `aside` condicional. Es interna y no cambia el aspecto.
 - **El disparador de un `UIPopover`, más robusto.** Un tooltip ya no se queda abierto si su disparador sale del documento. Cambiar `triggerId` ya no deja escuchadores en el disparador anterior: pasan al nuevo, y un tooltip abierto se cierra. Un disparador sustituido por otro con el mismo `id`, con un `if:when` en el snippet `anchor`, sigue funcionando; antes el tooltip dejaba de abrirse. Con un modelo que empieza abierto, en cualquier `mode`, el disparador ya no se queda sin teclado ni puntero.

@@ -1,6 +1,10 @@
 # Cambios de ESLint para Meeko
 
-## 1.8.0 — sin publicar
+## 1.9.0 — 2026-11-05
+
+- Publicación coordinada con `@meekojs/meeko` 1.9.0, sin cambios funcionales en este paquete.
+
+## 1.8.0 — 2026-11-04
 
 - Añade la regla optativa `meeko/prefer-ui-components`: avisa de `<button>`, `<input>` (salvo `type="hidden"`), `<textarea>`, `<select>`, `<dialog>` y `<table>` escritos a mano donde hay un componente de `@meekojs/ui`, y dice cuál. No se activa en `recommended` ni en `defineEslint`, porque usar UI no es obligatorio. `allow` lista las etiquetas que un proyecto admite.
 

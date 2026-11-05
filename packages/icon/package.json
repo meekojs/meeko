@@ -1,6 +1,6 @@
 {
 	"name": "@meekojs/icon",
-	"version": "1.8.0",
+	"version": "1.9.0",
 	"description": "Typed Iconify icons for Meeko, resolved at build time.",
 	"keywords": [
 		"meeko",

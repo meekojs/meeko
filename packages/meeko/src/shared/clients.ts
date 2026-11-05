@@ -411,6 +411,8 @@ export interface ClientOptions {
 	readonly baseUrl?: string | (() => string)
 	/** Implementación de `fetch`; por defecto, la global. */
 	readonly fetch?: typeof fetch
+	/** Credenciales de `fetch`; por defecto, `same-origin`. */
+	readonly credentials?: RequestCredentials
 	/** Token CSRF que se envía en `x-meeko-csrf` en los métodos distintos de GET y HEAD. */
 	readonly csrfToken?: string | (() => string | undefined)
 	/** Cabeceras adicionales de cada petición. */
@@ -620,7 +622,7 @@ export async function requestApi(endpoint: PublicApiEndpoint, input: ApiRequestI
 	const response = await fetcher(url, {
 		method: endpoint.method,
 		headers: headersFor(options, endpoint.method, input.body !== undefined, headers),
-		credentials: 'same-origin',
+		credentials: options.credentials ?? 'same-origin',
 		...(input.body === undefined ? {} : { body: JSON.stringify(input.body) }),
 		...(input.signal ? { signal: input.signal } : {}),
 	})
@@ -634,7 +636,7 @@ export async function requestRpc(endpoint: PublicRpcEndpoint, input: unknown, re
 	const response = await fetcher(endpointUrl(endpoint.pathname, options), {
 		method: 'POST',
 		headers: headersFor(options, 'POST', true, headers),
-		credentials: 'same-origin',
+		credentials: options.credentials ?? 'same-origin',
 		body: JSON.stringify(input),
 		...(request.signal ? { signal: request.signal } : {}),
 	})

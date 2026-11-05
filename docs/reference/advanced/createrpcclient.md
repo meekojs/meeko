@@ -48,7 +48,7 @@ const { total } = await rpc.math.sum({ a: 1, b: 2 }); // POST https://example.co
 | Parámetro  | Tipo                          | Por defecto | Descripción                                                                                                                                   |
 | ---------- | ----------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | `manifest` | `{ rpc: { id, pathname }[] }` | obligatorio | Los procedimientos públicos. El `id` con puntos es el camino del método; `pathname`, su ruta, normalmente `/_meeko/rpc/<carpetas>/<archivo>`. |
-| `options`  | `ClientOptions`               | `{}`        | `baseUrl`, `fetch`, `csrfToken` y `headers`, como en `createApiClient`.                                                                       |
+| `options`  | `ClientOptions`               | `{}`        | `baseUrl`, `fetch`, `credentials`, `csrfToken` y `headers`, como en `createApiClient`.                                                        |
 
 `Contract` describe cada procedimiento con `RpcOperation<Input, Output>`; en una aplicación sale de `.meeko/types/server-contracts.d.ts`.
 

@@ -1,6 +1,10 @@
 # Cambios de Meeko Icon
 
-## 1.8.0 — sin publicar
+## 1.9.0 — 2026-11-05
+
+- Publicación coordinada con `@meekojs/meeko` 1.9.0, sin cambios funcionales en este paquete.
+
+## 1.8.0 — 2026-11-04
 
 - **Primera versión.** Módulo `@meekojs/icon`: se registra con `modules: ['@meekojs/icon']` y sus opciones van en la clave `icon` (`collections`, `include`, `local`, `size`), tipada sin imports.
 - **`<UIIcon>` resuelto al compilar.** Cada `name` literal (y cada literal de una expresión `bind:name`) se resuelve durante el build con `@iconify/utils` y el paquete `@iconify-json/<colección>` del proyecto, y se incrusta en el `<svg>` del componente que lo usa: el bundle sólo lleva los iconos usados, sin peticiones en tiempo de ejecución ni CDN. Los nombres dinámicos que no son literales salen de `icon.include` (o `'<colección>:*'`); fuera de él se pinta un `<svg>` vacío y `meeko dev` avisa.
