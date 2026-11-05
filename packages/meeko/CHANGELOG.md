@@ -1,6 +1,6 @@
 # Cambios de Meeko
 
-## 1.8.1 — 2026-11-05
+## 1.9.0 — 2026-11-05
 
 - **Credenciales configurables en los clientes API y RPC.** `ClientOptions.credentials` acepta `same-origin`, `include` u `omit` y conserva `same-origin` por defecto. Permite usar cookies HttpOnly con una API en otro origen desde el navegador sin reemplazar el `fetch` del cliente. El servidor debe configurar CORS y proteger las mutaciones contra CSRF; esta opción no reenvía automáticamente las cookies de una petición SSR.
 
