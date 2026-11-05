@@ -1,6 +1,6 @@
 {
 	"name": "@meekojs/i18n",
-	"version": "1.8.0",
+	"version": "1.8.1",
 	"description": "Typed localization and catalogs for Meeko.",
 	"keywords": [
 		"meeko",

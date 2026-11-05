@@ -1,6 +1,6 @@
 {
 	"name": "@meekojs/meeko",
-	"version": "1.8.0",
+	"version": "1.8.1",
 	"description": "Typed .meeko component engine with SSR, hydration, signals, Vite, and DevTools.",
 	"keywords": [
 		"meeko",

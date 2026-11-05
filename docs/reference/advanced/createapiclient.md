@@ -49,13 +49,14 @@ const ada = await api.users.byId.get({ params: { id: "42" }, query: { tab: "perf
 
 ## Parámetros
 
-| Parámetro           | Tipo                                         | Por defecto | Descripción                                                                                                                                                                                                                            |
-| ------------------- | -------------------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `manifest`          | `{ api: { clientKey, pathname, method }[] }` | obligatorio | Los endpoints públicos. `clientKey` es el camino del método (`"users.byId"` → `api.users.byId`); `pathname` usa `[param]` para los segmentos dinámicos. En una aplicación, `meeko check` lo escribe en `.meeko/manifests/server.json`. |
-| `options.baseUrl`   | URL o `() => string`                         | ninguna     | Origen contra el que se resuelven las rutas. Sin él, rutas relativas: valen en el navegador, no en Node.                                                                                                                               |
-| `options.fetch`     | `typeof fetch`                               | el global   | Implementación de `fetch`, para pruebas o para añadir lógica.                                                                                                                                                                          |
-| `options.csrfToken` | texto o `() => string \| undefined`          | ninguno     | Token que se envía en `x-meeko-csrf` en los métodos distintos de `GET` y `HEAD`.                                                                                                                                                       |
-| `options.headers`   | `HeadersInit` o `() => HeadersInit`          | ninguno     | Cabeceras de cada petición.                                                                                                                                                                                                            |
+| Parámetro             | Tipo                                         | Por defecto   | Descripción                                                                                                                                                                                                                            |
+| --------------------- | -------------------------------------------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `manifest`            | `{ api: { clientKey, pathname, method }[] }` | obligatorio   | Los endpoints públicos. `clientKey` es el camino del método (`"users.byId"` → `api.users.byId`); `pathname` usa `[param]` para los segmentos dinámicos. En una aplicación, `meeko check` lo escribe en `.meeko/manifests/server.json`. |
+| `options.baseUrl`     | URL o `() => string`                         | ninguna       | Origen contra el que se resuelven las rutas. Sin él, rutas relativas: valen en el navegador, no en Node.                                                                                                                               |
+| `options.fetch`       | `typeof fetch`                               | el global     | Implementación de `fetch`, para pruebas o para añadir lógica.                                                                                                                                                                          |
+| `options.credentials` | `RequestCredentials`                         | `same-origin` | Credenciales de `fetch`: `same-origin`, `include` u `omit`.                                                                                                                                                                            |
+| `options.csrfToken`   | texto o `() => string \| undefined`          | ninguno       | Token que se envía en `x-meeko-csrf` en los métodos distintos de `GET` y `HEAD`.                                                                                                                                                       |
+| `options.headers`     | `HeadersInit` o `() => HeadersInit`          | ninguno       | Cabeceras de cada petición.                                                                                                                                                                                                            |
 
 `Contract` (el argumento de tipo) describe cada operación con `ApiOperation<Params, Query, Body, Output>`. En una aplicación sale de `.meeko/types/server-contracts.d.ts`.
 
@@ -124,6 +125,8 @@ export const api = createApiClient<ApiContract>(manifest, createBrowserClientOpt
 ```
 
 `createBrowserClientOptions()` lee el token de la meta `meeko-csrf-token` en cada llamada y lo actualiza con la cabecera `x-meeko-csrf-token` de las respuestas.
+
+Para una API en otro origen que usa cookies, pasa `{ ...createBrowserClientOptions(), baseUrl: apiUrl, credentials: 'include' }`. El servidor debe permitir el origen y las credenciales mediante CORS; el navegador aplica las reglas de cookies. Comprueba que el token CSRF y la protección del servidor correspondan a esa API. En SSR, `credentials` no reenvía automáticamente las cookies de la petición entrante.
 
 ## Errores comunes
 

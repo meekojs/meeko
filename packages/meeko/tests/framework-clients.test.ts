@@ -60,6 +60,52 @@ test('API and RPC clients use only public paths and preserve params, query, body
 	assert.equal(calls.length, 3)
 })
 
+test('API and RPC clients forward configured fetch credentials', async () => {
+	for (const credentials of [undefined, 'include', 'omit'] as const) {
+		const calls: Array<{ url: string; init: RequestInit }> = []
+		const fetcher: typeof fetch = async (input, init) => {
+			calls.push({ url: String(input), init: init ?? {} })
+			return Response.json({ id: String(calls.length) })
+		}
+		const options = { baseUrl: 'https://example.test', fetch: fetcher, csrfToken: 'token', ...(credentials ? { credentials } : {}) }
+		const api = createApiClient<ApiContract>(
+			{
+				api: [
+					{ clientKey: 'users.byId', pathname: '/api/users/[id]', method: 'GET' },
+					{ clientKey: 'users', pathname: '/api/users', method: 'POST' },
+				],
+			},
+			options,
+		)
+		const rpc = createRpcClient<RpcContract>({ rpc: [{ id: 'users.get', pathname: '/_meeko/rpc/users/get' }] }, options)
+
+		await api.users.byId.get({ params: { id: '42' }, query: {} })
+		await api.users.post({ body: { name: 'Ada' } })
+		await rpc.users.get({ id: '42' })
+
+		assert.deepEqual(
+			calls.map(({ init }) => init.credentials),
+			Array(3).fill(credentials ?? 'same-origin'),
+		)
+		assert.deepEqual(
+			calls.map(({ url }) => url),
+			[
+				'https://example.test/api/users/42',
+				'https://example.test/api/users',
+				'https://example.test/_meeko/rpc/users/get',
+			],
+		)
+		assert.deepEqual(
+			calls.map(({ init }) => init.body),
+			[undefined, JSON.stringify({ name: 'Ada' }), JSON.stringify({ id: '42' })],
+		)
+		assert.deepEqual(
+			calls.map(({ init }) => new Headers(init.headers).get('x-meeko-csrf')),
+			[null, 'token', 'token'],
+		)
+	}
+})
+
 test('clients normalize server errors and malformed responses', async () => {
 	const manifest = { api: [{ clientKey: 'users.byId', pathname: '/api/users/[id]', method: 'GET' as const }] }
 	const api = createApiClient<ApiContract>(manifest, {

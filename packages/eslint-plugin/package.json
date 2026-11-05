@@ -1,6 +1,6 @@
 {
 	"name": "@meekojs/eslint-plugin",
-	"version": "1.8.0",
+	"version": "1.8.1",
 	"description": "ESLint parser and template rules for Meeko components.",
 	"keywords": [
 		"meeko",

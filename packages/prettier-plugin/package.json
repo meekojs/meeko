@@ -1,6 +1,6 @@
 {
 	"name": "@meekojs/prettier-plugin",
-	"version": "1.8.0",
+	"version": "1.8.1",
 	"description": "Prettier formatting for Meeko components.",
 	"keywords": [
 		"meeko",

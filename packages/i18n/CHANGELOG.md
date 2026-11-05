@@ -1,6 +1,10 @@
 # Cambios de Meeko i18n
 
-## 1.8.0 — sin publicar
+## 1.8.1 — 2026-11-05
+
+- Publicación coordinada con `@meekojs/meeko` 1.8.1, sin cambios funcionales en este paquete.
+
+## 1.8.0 — 2026-11-04
 
 - **Los catálogos de una página se piden a la vez.** Cada namespace esperaba al anterior, así que cada uno costaba al visitante una ida y vuelta antes de hidratar: `common`, `shell` y `docs` retrasaban la carga de la ruta dos latencias. Ahora se piden juntos, también al navegar y con los de `multilingual`. En móvil con CPU ×4 y 4G emulado, detrás de un proxy local con HTTP/2 y Brotli, la página es interactiva 1,2 s antes con tres catálogos (5,95 → 4,71 s) y 0,6 s antes con dos (5,10 → 4,48 s), sin que cambie el primer pintado. No cambian la API ni el orden de fusión. Si falla un catálogo, el error sigue siendo el del primero de la lista que falla, lo anterior se conserva y lo posterior no se fusiona; la diferencia es que ese resto ya se ha pedido.
 - **`@meekojs/i18n/server` se puede importar fuera de un build.** Importaba su módulo virtual de forma estática, así que cargar esa entrada pública en Node daba `ERR_UNSUPPORTED_ESM_URL_SCHEME`. Ahora `usePageI18n()` lo carga al ejecutarse.

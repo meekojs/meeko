@@ -1,6 +1,10 @@
 # Cambios de Meeko
 
-## 1.8.0 — sin publicar
+## 1.8.1 — 2026-11-05
+
+- **Credenciales configurables en los clientes API y RPC.** `ClientOptions.credentials` acepta `same-origin`, `include` u `omit` y conserva `same-origin` por defecto. Permite usar cookies HttpOnly con una API en otro origen desde el navegador sin reemplazar el `fetch` del cliente. El servidor debe configurar CORS y proteger las mutaciones contra CSRF; esta opción no reenvía automáticamente las cookies de una petición SSR.
+
+## 1.8.0 — 2026-11-04
 
 - **`defineModel` también como prop y evento.** Un componente con `defineModel` sólo aceptaba una señal escribible, y quien venía de Vue o tenía el valor en un objeto (`bind="option.props"`) no podía pasarlo. Ahora, sin cambiar el hijo, acepta también `bind:modelValue` con `on:update:modelValue`, `bind:nombre` con `on:update:nombre` y la prop dentro de `bind="objeto"`. Con prop y evento, el padre decide cada escritura y el control vuelve al valor de la prop si no la cambia; con sólo la prop, la escritura se queda en el hijo hasta que la prop cambie; con sólo el evento, se queda en el hijo y además llama al evento. El HTML del servidor sale con el valor de la prop, que no viaja en el estado del hijo. `ComponentProps`, `<Nombre>Props`, `<Nombre>Emits`, `meeko check` y el editor los conocen, y `next` tiene el tipo del modelo. `model` junto a `bind:modelValue` u `on:update:modelValue` es `MEEK066`, y declarar la prop o el evento del modelo en el script es `MEEK063`.
 - **Un padre con `await` ya no pierde lo que se escribe.** Si el manejador de `on:update:modelValue` devuelve una promesa, el hijo conserva lo escrito hasta que termine la última escritura, y entonces vuelve a seguir a la prop. El cursor no salta, una escritura anterior que termina después no pisa el valor y un rechazo llega al manejador de errores en lugar de quedar sin capturar. Un manejador síncrono no cambia.
