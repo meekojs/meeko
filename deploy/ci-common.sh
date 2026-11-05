@@ -12,7 +12,7 @@ image_name() {
 	printf '%s/meekojs/%s' "$REGISTRY_HOST" "$1"
 }
 
-# Los destinos que pide el pipeline manual (MEEKOJS_TARGETS), o las tres webs públicas. El dashboard
+# Los destinos que pide MEEKOJS_TARGETS, o las tres webs públicas por defecto. El dashboard
 # solo entra si se nombra y MEEKOJS_DASHBOARD_READY=true (F5 terminado): docs/deploy-meekojs.md, paso 8.
 targets() {
 	list=${MEEKOJS_TARGETS:-meeko ui i18n}

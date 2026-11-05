@@ -4,19 +4,19 @@
 # la publicación en npm: Windows, los cuatro runtimes, e2e y paquetes. Este pipeline solo entrega las
 # webs y necesita lo que solo tiene el agente de voidcat-local: el socket de Docker, el registry, la
 # red `coolify` (la base de producción no publica puerto) y la API local de Coolify. Repite los gates
-# que afectan a las webs para que una imagen nunca salga de un commit que no los pasa.
+# que afectan a las webs y exige que pasen antes de hacer el release y desplegar.
 #
 # Dos maneras de llegar aquí:
 #
-# - **Un push a `main`**: gates, SonarQube y las imágenes con el SHA como etiqueta. No migra ni
-#   despliega nada.
+# - **Un push a `main`**: gates, SonarQube, imágenes con el SHA, release de contenido y despliegue
+#   de las tres webs públicas en Coolify.
 # - **Un pipeline manual sobre `main` con `MEEKOJS_DEPLOY=true`**, lanzado por una persona desde la UI
-#   de Woodpecker: lo mismo y después el release de contenido (migrar, importar y sincronizar) y el
-#   deploy en Coolify de los destinos de `MEEKOJS_TARGETS` (por defecto, `meeko ui i18n`). El
+#   de Woodpecker: permite repetir el release y despliegue de los destinos de `MEEKOJS_TARGETS`
+#   (por defecto, `meeko ui i18n`). El
 #   dashboard solo entra con `MEEKOJS_TARGETS` que lo nombre y `MEEKOJS_DASHBOARD_READY=true`.
 #
-# Un manual sin `MEEKOJS_DEPLOY=true`, o sobre otra rama, solo construye. `concurrency: 1` pone los
-# pipelines en fila: dos releases nunca escriben a la vez en la base.
+# Un manual sin `MEEKOJS_DEPLOY=true` solo construye. `concurrency: 1` pone los pipelines en fila:
+# dos releases nunca escriben a la vez en la base.
 #
 # Los pasos `images` y `release` montan el socket de Docker y el certificado del registry, y por eso
 # el repositorio debe estar marcado *trusted* para volúmenes, como mt, cdn, Quantum y Vuno.
@@ -84,9 +84,10 @@ steps:
     commands:
       - sonar-scanner -Dsonar.qualitygate.wait=true -Dsonar.qualitygate.timeout=300
 
+  # Construir imágenes en paralelo con gates acorta la entrega. El release espera ambos resultados.
   - name: images
     image: docker:29-cli
-    depends_on: [gates]
+    depends_on: [install]
     environment:
       REGISTRY_HOST:
         from_secret: registry_host
@@ -104,8 +105,10 @@ steps:
   # Migraciones antes del deploy: son aditivas, y las webs en marcha siguen funcionando con ellas.
   - name: release
     image: docker:29-cli
-    depends_on: [images]
+    depends_on: [gates, images]
     when:
+      - event: push
+        branch: main
       - event: manual
         evaluate: 'MEEKOJS_DEPLOY == "true"'
     environment:
@@ -127,6 +130,8 @@ steps:
     image: alpine:3.22
     depends_on: [release]
     when:
+      - event: push
+        branch: main
       - event: manual
         evaluate: 'MEEKOJS_DEPLOY == "true"'
     environment:

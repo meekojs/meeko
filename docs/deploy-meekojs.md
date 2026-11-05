@@ -1,13 +1,13 @@
 # Despliegue de meekojs.com en voidcat-local
 
-Runbook para publicar las webs de Meeko en el Coolify de `voidcat-local`, detrás del túnel de Cloudflare `voidcat-local` y de Traefik. Cada paso que toca infraestructura tiene una casilla **Confirmar con el usuario**: no se ejecuta sin esa confirmación explícita, aunque los anteriores ya estén hechos. Los secretos nunca se escriben en este documento, en la consola ni en los logs: salen del archivo de secretos del host o de los secretos de Woodpecker.
+Runbook para publicar las webs de Meeko en el Coolify de `voidcat-local`, detrás del túnel de Cloudflare `voidcat-local` y de Traefik. Los pasos de aprovisionamiento inicial requieren confirmación. Después, cada push a `main` ejecuta el release de contenido y despliega las tres webs públicas; quien publique en esa rama autoriza el cambio en producción. Los secretos nunca se escriben en este documento, en la consola ni en los logs: salen del archivo de secretos del host o de los secretos de Woodpecker.
 
 | Dominio                 | App              | Paquete             | Imagen (`<registry>/meekojs/…`) | Estado                   |
 | ----------------------- | ---------------- | ------------------- | ------------------------------- | ------------------------ |
-| `meekojs.com`           | `apps/meeko`     | `meeko-site`        | `meeko`                         | Listo para desplegar     |
-| `www.meekojs.com`       | `apps/meeko`     | —                   | — (301 a `meekojs.com`)         | Listo para desplegar     |
-| `ui.meekojs.com`        | `apps/ui`        | `meeko-ui-site`     | `ui`                            | Listo para desplegar     |
-| `i18n.meekojs.com`      | `apps/i18n`      | `meeko-i18n-site`   | `i18n`                          | Listo para desplegar     |
+| `meekojs.com`           | `apps/meeko`     | `meeko-site`        | `meeko`                         | En producción            |
+| `www.meekojs.com`       | `apps/meeko`     | —                   | — (301 a `meekojs.com`)         | En producción            |
+| `ui.meekojs.com`        | `apps/ui`        | `meeko-ui-site`     | `ui`                            | En producción            |
+| `i18n.meekojs.com`      | `apps/i18n`      | `meeko-i18n-site`   | `i18n`                          | En producción            |
 | `dashboard.meekojs.com` | `apps/dashboard` | `meeko-dashboard`   | `dashboard`                     | **Bloqueado por F5**     |
 | —                       | release          | `deploy/release.sh` | `content`                       | Una ejecución por deploy |
 
@@ -26,9 +26,9 @@ navegador ─TLS─ Cloudflare ── túnel voidcat-local (cloudflared) ── 
   - `content`: el monorepo entero, porque `docs:import` y `docs:sync` renderizan con Vite desde `docs/**`, el código de los paquetes (JSDoc), la taxonomía y `apps/*/app/utils/navigation.ts`. Su `CMD` es `deploy/release.sh`.
   - `dashboard`: `content` más el build del dashboard. Sus trabajos (importar, publicar, salud y vista previa) son procesos hijo que cargan `meeko-docs-content` con Vite sobre el mismo árbol, así que la imagen necesita el repositorio y las dependencias de desarrollo. No incluye `.git`: el historial de un archivo para resolver un conflicto de revisiones (`findGitVersion`) no está disponible y el detalle compara solo Git con la revisión.
 - **Salud**: `GET /healthz` responde `200` con `{"status":"ok","database":"up|down|unconfigured"}` y `Cache-Control: no-store` mientras el proceso atiende (`meeko-docs-content/liveness`). La base no decide la salud, porque las webs degradan sin ella; el estado viaja en el cuerpo. Como mucho una consulta `SELECT 1` cada 5 s, en un pool de una conexión con 2 s de límite.
-- **CI/CD**: `.woodpecker/web.yml`. Un push a `main` ejecuta gates, SonarQube (`meekojs-web`) y publica las imágenes con el SHA del commit. Un pipeline **manual** sobre `main` con `MEEKOJS_DEPLOY=true` hace además el release de contenido (`deploy/ci-release.sh`) y el deploy en Coolify (`deploy/ci-deploy.sh`). GitHub Actions (`.github/workflows/ci.yml`) sigue siendo la verificación completa del framework y de npm; Woodpecker solo entrega las webs, porque necesita el socket de Docker, el registry, la red `coolify` y la API local de Coolify de voidcat-local.
+- **CI/CD**: `.woodpecker/web.yml`. Un push a `main` ejecuta gates y construye las imágenes con el SHA del commit en paralelo; SonarQube (`meekojs-web`) analiza el código. Sólo después de que pasen gates e imágenes hace el release de contenido (`deploy/ci-release.sh`) y despliega las tres webs públicas en Coolify (`deploy/ci-deploy.sh`). Un pipeline **manual** sobre `main` con `MEEKOJS_DEPLOY=true` permite repetir el despliegue o elegir `MEEKOJS_TARGETS`. GitHub Actions (`.github/workflows/ci.yml`) sigue siendo la verificación completa del framework y de npm; Woodpecker entrega las webs porque necesita el socket de Docker, el registry, la red `coolify` y la API local de Coolify de voidcat-local.
 
-## Estado comprobado de la infraestructura (2026-10-31, solo lectura)
+## Estado inicial de la infraestructura (2026-10-31, solo lectura)
 
 - Coolify 4.5.3 con un servidor (`localhost`) y el proyecto **`meeko`** ya creado. Las apps del host usan la red `coolify`, dominios `http://` (TLS en Cloudflare) y, cuando tienen healthcheck, `health_check_host=127.0.0.1`.
 - La app **`meeko-site`** de Coolify sirve hoy el sitio estático (nginx) en `meeko.diegootayza.com`. Se queda como vuelta atrás: no se borra.
@@ -36,6 +36,8 @@ navegador ─TLS─ Cloudflare ── túnel voidcat-local (cloudflared) ── 
 - El Docker del host ya confía en el registry y tiene sesión: Coolify puede tirar de las imágenes de `<registry>/meekojs/*`.
 - Woodpecker: `meekojs/meeko` **no está activado** todavía. SonarQube oficial (`sonarqube-dev`): no hay proyecto meeko.
 - Traefik no tiene `forwardedHeaders.trustedIPs` en el entrypoint `http` (ver «IP del cliente»).
+
+**Estado comprobado el 2026-11-04**: `meekojs.com`, `ui.meekojs.com` e `i18n.meekojs.com` responden `200` y sus `/healthz` indican `database: up`; `www.meekojs.com` redirige con `301`. Woodpecker tiene `meekojs/meeko` activo y la segunda ejecución manual de construcción terminó con `install`, `gates`, `sonarqube` e `images` en verde. Las cuatro imágenes del commit `272fab9f` están en el registry. El despliegue automático por push queda habilitado al publicar este cambio en `main`.
 
 ## Variables por app
 
@@ -75,14 +77,14 @@ Sin valores reales: los secretos se cargan desde `/root/meekojs-produccion.secre
 
 ### Secretos de Woodpecker (repo `meekojs/meeko`)
 
-| Secreto                                                                             | Origen                                                                                                 |
-| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `registry_host`, `registry_username`, `registry_password`                           | Los mismos de mt, cdn, Quantum y Vuno (`deploy-ops/references/credentials.md`).                        |
-| `sonar_host_url`, `sonar_token`                                                     | `<SONAR_CI_URL>` y `sonarqube_ci_token`.                                                               |
-| `meekojs_database_url`                                                              | URL del **propietario** `meekojs` (migraciones). Solo eventos `manual`.                                |
-| `coolify_local_token`                                                               | `coolify_local_api_token` del host. Solo eventos `manual`.                                             |
-| `coolify_local_api_url`                                                             | `<COOLIFY_API_URL_CI>`: API de Coolify alcanzable desde los contenedores de CI. Solo eventos `manual`. |
-| `coolify_uuid_meekojs_site`, `coolify_uuid_meekojs_ui`, `coolify_uuid_meekojs_i18n` | UUID de cada app de Coolify (paso 2).                                                                  |
+| Secreto                                                                             | Origen                                                                                                     |
+| ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `registry_host`, `registry_username`, `registry_password`                           | Los mismos de mt, cdn, Quantum y Vuno (`deploy-ops/references/credentials.md`).                            |
+| `sonar_host_url`, `sonar_token`                                                     | `<SONAR_CI_URL>` y `sonarqube_ci_token`.                                                                   |
+| `meekojs_database_url`                                                              | URL del **propietario** `meekojs` (migraciones). Eventos `push` y `manual`.                                |
+| `coolify_local_token`                                                               | `coolify_local_api_token` del host. Eventos `push` y `manual`.                                             |
+| `coolify_local_api_url`                                                             | `<COOLIFY_API_URL_CI>`: API de Coolify alcanzable desde los contenedores de CI. Eventos `push` y `manual`. |
+| `coolify_uuid_meekojs_site`, `coolify_uuid_meekojs_ui`, `coolify_uuid_meekojs_i18n` | UUID de cada app de Coolify (paso 2).                                                                      |
 
 ### Valores que no se versionan
 
@@ -117,7 +119,7 @@ Pendiente de verificar en vivo, tras el primer deploy: que `CF-Connecting-IP` ll
 
 ## Paso 0. Woodpecker y SonarQube
 
-- [ ] **Confirmar con el usuario**: activar `meekojs/meeko` en Woodpecker, marcarlo _trusted_ para volúmenes y crear sus secretos.
+- [x] Activar `meekojs/meeko` en Woodpecker, marcarlo _trusted_ para volúmenes y crear sus secretos.
 
 1. Activar el repositorio (la cuenta de Woodpecker debe ver la organización `meekojs` en GitHub):
 
@@ -138,11 +140,11 @@ Pendiente de verificar en vivo, tras el primer deploy: que `CF-Connecting-IP` ll
    ssh voidcat-local 'T=$(cat /srv/development/shared-services/secrets/woodpecker_api_token); jq -n --rawfile v /srv/development/shared-services/secrets/sonarqube_ci_token "{name:\"sonar_token\", value:(\$v|rtrimstr(\"\n\")), events:[\"push\",\"manual\"], images:[]}" | curl -fsS -X POST -H "Authorization: Bearer $T" -H "Content-Type: application/json" --data-binary @- <WOODPECKER_URL>/api/repos/<repo-id>/secrets | jq .name'
    ```
 
-   `meekojs_database_url` y `coolify_local_token` llevan `events:["manual"]`, de modo que un push nunca los recibe.
+   Para el despliegue automático, `meekojs_database_url`, `coolify_local_api_url`, `coolify_local_token` y los tres `coolify_uuid_meekojs_*` llevan `events:["push","manual"]`. Se entregan solo a los pasos que los declaran en `.woodpecker/web.yml`.
 
 4. SonarQube: el primer análisis crea `meekojs-web` (el usuario `dev-agents` tiene `provisioning`). **Verificación**: `mcp__sonarqube__search_my_sonarqube_projects` con `q=meekojs` tras el primer push, y el paso `sonarqube` en verde o con el veredicto del Gate.
 
-**Verificación del paso**: un push a `main` deja `install`, `gates`, `images` en verde y las imágenes en el registry:
+**Verificación del paso**: un push a `main` deja `install`, `gates`, `images`, `release` y `deploy` en verde, y las imágenes en el registry:
 
 ```sh
 ssh voidcat-local 'P=$(cat /opt/woodpecker/secrets/registry-password); curl -fsS --cacert /opt/woodpecker/certs/registry-ca.crt -u "registry:$P" https://<REGISTRY>/v2/meekojs/meeko/tags/list; unset P'
@@ -245,9 +247,10 @@ ssh voidcat-local 'journalctl -u cloudflared -o cat --no-pager | grep "Updated t
 curl -sI https://ui.meekojs.com/ | head -1    # antes del deploy: 404 de Traefik
 ```
 
-## Paso 4. Primer deploy
+## Paso 4. Despliegue automático y ejecución manual
 
-- [ ] **Confirmar con el usuario**: lanzar el pipeline manual de Woodpecker sobre `main` con `MEEKOJS_DEPLOY=true` (y `MEEKOJS_TARGETS=meeko ui i18n`).
+- Un push a `main` lanza automáticamente gates, imágenes, release de contenido y deploy de `meeko`, `ui` e `i18n`. No publica el dashboard.
+- Para repetir o acotar el despliegue sin un push: lanzar un pipeline manual de Woodpecker sobre `main` con `MEEKOJS_DEPLOY=true` y, si procede, `MEEKOJS_TARGETS`.
 
 El pipeline ejecuta gates, imágenes, el release (paso 5) y el deploy de cada app en serie: fija la etiqueta `<sha>`, lanza el deploy y espera a `finished`. Coolify solo cambia el tráfico cuando el contenedor nuevo pasa su `HEALTHCHECK`.
 
@@ -266,7 +269,7 @@ ssh voidcat-local 'for c in $(docker ps --filter label=coolify.name=<app-uuid> -
 
 ## Paso 5. Release: migrar, importar y sincronizar
 
-- [ ] **Confirmar con el usuario**: ejecutar el release contra la base de producción (lo hace el paso `release` del pipeline manual; a mano, solo si el pipeline no está disponible).
+- El paso `release` se ejecuta automáticamente en los pushes a `main` y en un pipeline manual con `MEEKOJS_DEPLOY=true`. Una ejecución directa contra la base de producción requiere confirmación si el pipeline no está disponible.
 
 `deploy/release.sh` aplica `db:migrate` → `docs:import` → `docs:sync`, cada uno con un límite de 15 min. Es idempotente: no repite migraciones, la importación no toca revisiones y el snapshot nuevo solo se activa si el render termina. Corre antes del deploy de las apps porque las migraciones son aditivas y las webs en marcha siguen funcionando con ellas.
 
