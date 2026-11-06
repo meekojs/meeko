@@ -1,8 +1,8 @@
-import { spawn } from 'node:child_process'
-import { mkdir, mkdtemp, rm, symlink, unlink, writeFile } from 'node:fs/promises'
-import { createServer } from 'node:net'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+
+import { startDevServer } from '../../../../scripts/test-support/dev-server.ts'
+import { createFixture } from '../../../../scripts/test-support/fixture.ts'
 
 const packageRoot = fileURLToPath(new URL('../..', import.meta.url))
 const i18nRoot = fileURLToPath(new URL('../../../i18n', import.meta.url))
@@ -10,7 +10,7 @@ const viteRoot = fileURLToPath(new URL('../../../meeko/node_modules/vite', impor
 export const cli = fileURLToPath(new URL('../../../meeko/dist/cli.js', import.meta.url))
 
 /** What must stop before an application can be removed: Windows does not delete a folder in use. */
-const stops = new Map()
+const fixtures = new Map()
 
 const route = (options = '') => `import { definePage } from '@meekojs/meeko/framework'\nexport const route = definePage({ render: 'prerender'${options} })\n`
 
@@ -143,7 +143,9 @@ const dashboard = `<template>
 const landing = `<template>
 	<UIPage layout="landing">
 		<snippet name="header"><UIHeader bind:brand="{ name: 'Meeko', href: '/', compact: true, ariaLabel: 'Meeko, inicio' }" /></snippet>
-		<UIPageHeader layout="landing" title="Portada" description="Una portada." />
+		<UIPageHeader layout="landing" headingId="portada" description="Una portada.">
+			<snippet name="title">Portada <code>.meeko</code></snippet>
+		</UIPageHeader>
 		<UINavigationTree bind:groups="[{ items: [{ label: 'Suelto', href: '/x' }] }]" bind:collapsible="false" emptyText="Nada" />
 	</UIPage>
 </template>
@@ -152,16 +154,7 @@ const landing = `<template>
 /** Writes the application under packages/ui/.meeko and links the packages it needs; everything goes away with the test. */
 export async function createNavigationApp(context) {
 	const parent = join(packageRoot, '.meeko')
-	await mkdir(parent, { recursive: true })
-	const root = await mkdtemp(join(parent, 'navigation-'))
 	const links = { '@meekojs/ui': packageRoot, '@meekojs/i18n': i18nRoot, vite: viteRoot }
-	const linkPaths = Object.keys(links).map((target) => join(root, 'node_modules', target))
-	// The links go first, so removing the application never walks into the packages.
-	context.after(async () => {
-		await stops.get(root)?.()
-		for (const link of linkPaths) await unlink(link).catch(() => undefined)
-		await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
-	})
 	const config = { modules: ['@meekojs/ui', '@meekojs/i18n'], theme: true, i18n: { defaultLocale: 'es', catalogs: { es: 'app/locales/es.json', en: 'app/locales/en.json' } }, server: { adapter: 'static' } }
 	const files = {
 		'package.json': JSON.stringify({ name: 'navigation-fixture', private: true, type: 'module' }),
@@ -207,48 +200,16 @@ export async function createNavigationApp(context) {
 		'app/locales/es.json': '{"hello":"Hola"}',
 		'app/locales/en.json': '{"hello":"Hello"}',
 	}
-	for (const [file, source] of Object.entries(files)) {
-		await mkdir(dirname(join(root, file)), { recursive: true })
-		await writeFile(join(root, file), source)
-	}
-	for (const [target, source] of Object.entries(links)) {
-		await mkdir(dirname(join(root, 'node_modules', target)), { recursive: true })
-		await symlink(source, join(root, 'node_modules', target), 'junction')
-	}
+	const fixture = await createFixture(context, parent, 'navigation-', { files, links })
+	const { root } = fixture
+	fixtures.set(root, fixture)
+	context.after(() => fixtures.delete(root))
 	return root
-}
-
-async function freePort() {
-	const server = createServer().listen(0, '127.0.0.1')
-	await new Promise((done) => server.once('listening', done))
-	const { port } = server.address()
-	await new Promise((done) => server.close(done))
-	return port
 }
 
 /** `meeko dev` on the application. MEEKO_FIXTURE_PORT fixes the port, for a visual review by hand. */
 export async function serveNavigationApp(root) {
-	const httpPort = process.env.MEEKO_FIXTURE_PORT ?? (await freePort())
-	const server = spawn(process.execPath, [cli, 'dev', root], { cwd: root, env: { ...process.env, NODE_OPTIONS: '--max-old-space-size=8192', PORT: String(httpPort), MEEKO_HMR_PORT: String(await freePort()), MEEKO_EDITOR_BRIDGE: '0' }, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
-	stops.set(root, async () => {
-		if (server.exitCode !== null) return
-		const exited = new Promise((done) => server.once('exit', done))
-		server.kill()
-		await exited
-	})
-	let logs = ''
-	server.stdout.on('data', (chunk) => (logs += chunk))
-	server.stderr.on('data', (chunk) => (logs += chunk))
-	const origin = `http://127.0.0.1:${httpPort}`
-	const started = Date.now()
-	while (true) {
-		if (server.exitCode !== null || Date.now() - started > 60_000) throw new Error(logs)
-		try {
-			if ((await fetch(origin)).ok) break
-		} catch {
-			/* Server is starting. */
-		}
-		await new Promise((done) => setTimeout(done, 100))
-	}
-	return { origin, logs: () => logs }
+	const { origin, logs, stop } = await startDevServer({ root, cli, port: process.env.MEEKO_FIXTURE_PORT ? Number(process.env.MEEKO_FIXTURE_PORT) : undefined })
+	fixtures.get(root)?.setStop(stop)
+	return { origin, logs }
 }

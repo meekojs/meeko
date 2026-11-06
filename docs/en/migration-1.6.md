@@ -1,8 +1,10 @@
 ---
-source-hash: d50806772d19d0b5fde7bdeeee73a00f53caa516214e4cc2da97b5d3d0e6400f
+source-hash: 849a9b412d071ec9b3acff70c66298d95b3f3326db78757705d2eea908dbdd76
 ---
 
 # Upgrade from 1.5 to 1.6
+
+**From:** 1.5.x. **To:** 1.6.0. **Status:** published on npm; the latest version checked on November 5, 2026 is 1.9.0. **Who acts:** maintainers upgrading an application from 1.5.x to 1.6.0.
 
 `1.6` is a minor release: new features (named route middleware, requested with `middleware` in `definePage` and `+group.ts`, and server route middleware, `app/middleware/*.server.ts` with `defineServerRouteMiddleware`) are optional. Two changes ship as [approved exceptions](stability.md#approved-exceptions) to stability policy: `app/middleware`'s `*.server.ts` files, ignored through `1.5`, become server route middleware, and a spread in page options that may contain `middleware` requires declaring it afterward. Other noticeable upgrade changes include browser global middleware order, the render URL in the payload, `<MeekoThemeToggle>` on pages served at another URL, the `POST /_meeko/theme` redirect, a new auto-imported name and new discovery errors. This guide collects them, what to review and how to adopt each feature. The complete list of additions and fixes is in the [CHANGELOG](../../packages/meeko/CHANGELOG.md); compatibility commitments are in the [stability policy](stability.md).
 

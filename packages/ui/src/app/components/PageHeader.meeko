@@ -3,7 +3,7 @@
 
 	const props = defineProps<UIPageHeaderProps>({ layout: 'docs' })
 
-	const snippets = defineSnippets<{ default?: []; breadcrumb?: []; actions?: [] }>()
+	const snippets = defineSnippets<{ default?: []; title?: []; breadcrumb?: []; actions?: [] }>()
 </script>
 
 <template>
@@ -17,7 +17,13 @@
 		/>
 		<div class="meeko-ui-page-header-row">
 			<div class="meeko-ui-page-header-text">
-				<h1>{props.title}</h1>
+				<h1 bind:id="props.headingId">
+					<render
+						if:when="snippets.title"
+						snippet="snippets.title"
+					/>
+					<span if:when="!snippets.title">{props.title}</span>
+				</h1>
 				<p if:when="props.description">{props.description}</p>
 			</div>
 			<div

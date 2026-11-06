@@ -1,52 +1,32 @@
 ---
-source-hash: 25a8623535a6b337c4dce471fc0048d392ee8c6cb47101ac7548e3697954fecf
+source-hash: 98db1aafbbf9ee2980133a1abbc6d397762e92d3fa9fa6054539ca2639a02e43
 ---
 
-# Documentation guide
+# Documentation map
 
-The documentation is organized by task. Existing guides keep their paths and anchors to preserve links from the repository and the public website.
+Find an answer by what you want to do. Guides teach a path; the reference keeps signatures, types, limits and source links.
 
-## Get started
+| I want to… | Go to… | What you will find |
+| --- | --- | --- |
+| Create an app from scratch | [Quick start](inicio-rapido.md) | Requirements, commands and the first visible change. |
+| Understand components and reactivity | [Components and .meeko language](api.md) | Templates, props, state, events and composition. |
+| Add pages and parameters | [Routing](routing.md) | The common path and task-focused guides. |
+| Load data or choose SSR | [Route data](routing-data.md) | Loading, errors and rendering modes. |
+| Submit a form | [Framework forms](framework.md#forms-useform) | Data, validation and mutations. |
+| Prepare a deployment | [Build and deployment](framework.md#build-deployment-and-verification) | Outputs and requirements by adapter. |
+| Find a function or type | [Meeko reference](reference/README.md) | Index by category and export catalog. |
 
-- [First application](primeros-pasos.md).
-- [Choose Meeko](como-elegir.md).
-- [Full-stack framework](framework.md#create-an-application): structure, configuration and local development.
+## To learn
 
-## Framework and server
+After [Quick start](inicio-rapido.md), follow [Your first application](primeros-pasos.md). You will create an interactive list and a second route. [Common decisions](como-elegir.md) helps you choose between mechanisms when you have a concrete case.
 
-- [Routing, layouts and SSR](framework.md#routing-layouts-and-ssr).
-- [Middleware](framework.md#route-and-server-middleware).
-- [API and RPC](framework.md#api-and-rpc).
-- [View Transitions](framework.md#native-view-transitions).
-- [Reference by category](reference/README.md): macros, reactivity, composables, utilities and server.
+## To build
 
-## Components and modules
+- [Full-stack framework](framework.md): the general app, server and browser model.
+- [Routing](routing.md): pages, layouts, data, navigation and middleware, each with its own guide.
+- [Meeko UI](ui.md) and [internationalization](i18n.md): optional ecosystem packages.
+- [Doctor](doctor.md), [editors](editors.md) and [testing](testing.md): check and debug an app.
 
-- [Components and API](api.md).
-- [Meeko UI](ui.md) and [Meeko UI API](ui-api.md).
-- [Internationalization](i18n.md).
-- [Modules](framework.md#modules) and [layers](framework.md#layers).
+## To look something up
 
-## Tooling and quality
-
-- [Doctor](doctor.md): local diagnostics without running the project.
-- [Editors and LSP](editors.md).
-- [ESLint](eslint.md): `defineEslint`, Perfectionist, rules and parser.
-- [ESLint and Prettier](tooling.md).
-- [DevTools](devtools.md).
-- [Tests and CI](testing.md).
-
-## Architecture and performance
-
-- [Architecture](architecture.md).
-- [Benchmarks](benchmarks.md).
-- [Performance measurements and budgets](performance.md).
-- [Stability contract](stability.md).
-
-## Maintain and publish
-
-- [Development plan](roadmap.md).
-- [Releases](releasing.md).
-- [Changelog](../../packages/meeko/CHANGELOG.md).
-
-The public website publishes these categories from `packages/docs-content/src/content/catalog.ts`; the detailed reference has its own taxonomy. When adding a guide, update this index and its catalog entry if it should be public.
+Use the header search to find a symbol or task from any page. The [curated reference](reference/README.md) explains common usage; the [module catalog](/docs/reference/exports) keeps every package export. For compatibility, read [stability](stability.md) and the [changelog](../packages/meeko/CHANGELOG.md).

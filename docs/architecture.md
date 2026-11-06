@@ -1,5 +1,7 @@
 # Arquitectura de Meeko
 
+**Alcance:** arquitectura del código de este checkout (`1.8.0`); npm publica `1.9.0` al 5 de noviembre de 2026. Comprueba los detalles posteriores en el código de la versión correspondiente.
+
 ## Objetivo
 
 Meeko compila archivos `.meeko` a código TypeScript con `renderWithState(props)` o `renderToString(props)` para SSR y `hydrate(root, props, state?)` para conectar eventos y señales al DOM existente. El runtime del navegador evita un árbol virtual y actualiza los nodos afectados por cada señal.
@@ -58,7 +60,7 @@ El plugin `src/vite.ts` usa el mismo compilador para cliente y SSR y expone el C
 
 Los módulos generados importan el runtime desde `@meekojs/meeko/internal`. Esta ruta agrupa las funciones de DOM, SSR, HMR y DevTools que el compilador necesita y se versiona junto con él. Desde `1.5`, un componente que usa `<MeekoThemeToggle>`, `<MeekoAwait>`, `<MeekoPopover>` o `<MeekoSelect>` importa además su módulo compilado (`@meekojs/meeko/builtins/theme-toggle`, `/await`, `/popover` o `/select`), y sólo ese componente: la tabla `builtinComponentModules` del compilador asocia cada etiqueta a su módulo, y `scripts/builtin-components.ts` compila su `.meeko` dentro del paquete. Una etiqueta integrada nueva sigue ese patrón para no crecer el runtime de todas las aplicaciones. En desarrollo, `src/devtools.ts` registra las instancias hidratadas y expone un hook de lectura que comparten el panel integrado y la extensión de Chrome. Ni SSR ni el build de producción registran instancias en ese hook.
 
-Desde core `1.8`, `<MeekoPopover>`, `<MeekoSelect>` y `<MeekoThemeToggle>` están obsoletos: el compilador emite `MEEK121` y el editor tacha la etiqueta y explica el reemplazo en el hover. Siguen funcionando en `1.x` y se retiran en `2.0`. Usa `UIPopover`, `UISelect` y `UIThemeToggle` del módulo `@meekojs/ui` 0.2; el sistema de temas permanece en core. Véase [Migración a 1.8](migration-1.8.md).
+Desde core `1.8`, `<MeekoPopover>`, `<MeekoSelect>` y `<MeekoThemeToggle>` están obsoletos: el compilador emite `MEEK121` y el editor tacha la etiqueta y explica el reemplazo en el hover. Siguen funcionando en `1.x` y se retiran en `2.0`. Usa `UIPopover`, `UISelect` y `UIThemeToggle` del módulo `@meekojs/ui` 1.8; el sistema de temas permanece en core. Véase [Migración a 1.8](migration-1.8.md).
 
 ## Reglas para SSR
 

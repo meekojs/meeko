@@ -203,7 +203,8 @@ export type UIPageProps = Omit<ElementAttributes<'div'>, 'class'> & {
 
 /**
  * Props de `<UIPageHeader>`, el encabezado con el único `<h1>` de una página. Sus snippets son
- * `breadcrumb`, `actions` y `default`, éste bajo la descripción.
+ * `title`, `breadcrumb`, `actions` y `default`, éste bajo la descripción. `title` permite
+ * títulos con marcado, como los de una portada traducida.
  *
  * @since 1.8.0
  * @example
@@ -214,8 +215,10 @@ export type UIPageProps = Omit<ElementAttributes<'div'>, 'class'> & {
  * ```
  */
 export interface UIPageHeaderProps {
-	/** Título de la página. */
-	readonly title: string
+	/** Título de la página; puede sustituirse por el snippet `title`. */
+	readonly title?: string
+	/** Identificador del título, para enlazarlo con aria-labelledby. */
+	readonly headingId?: string
 	/** Texto bajo el título. */
 	readonly description?: string
 	/** Disposición de la página, que fija el tamaño del título y el borde; `"docs"` por defecto. */

@@ -1,5 +1,7 @@
 # Migrar de 0.1.0 a 1.0
 
+**Origen:** 0.1.0. **Destino:** 1.0.0. **Estado:** publicado en npm; la versión más reciente consultada el 5 de noviembre de 2026 es 1.9.0. **Quién actúa:** quien mantenga una aplicación que actualiza desde 0.1.0 a 1.0.0.
+
 Esta guía reúne los cambios incompatibles entre `0.1.0` y `1.0`. Su lista completa, con lo añadido y corregido, está en el [CHANGELOG](../packages/meeko/CHANGELOG.md). A partir de 1.0 rige la [política de estabilidad](stability.md).
 
 ## Orden recomendado

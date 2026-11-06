@@ -10,7 +10,7 @@
 		description="Componentes tipados para pasar de las señales a una interfaz completa. Renderizada en el servidor y adaptada a tu marca."
 		landing
 	>
-		<div class="docs-actions">
+		<div class="docs-actions meeko-ui-landing-actions">
 			<UILink href="/installation">Empezar a construir</UILink>
 			<UILink
 				href="/components"
@@ -19,7 +19,7 @@
 				Ver componentes
 			</UILink>
 		</div>
-		<div class="docs-showcase">
+		<div class="meeko-ui-landing-showcase">
 			<div>
 				<h2>Componentes reales. Desde el primer render.</h2>
 				<p>Esta web usa el mismo paquete que instalas en tu aplicación. Prueba un control, cambia el tema y lleva el ejemplo a tu proyecto.</p>

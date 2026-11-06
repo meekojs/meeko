@@ -236,7 +236,12 @@
 						"@meekojs/meeko/framework#useTheme"
 					]
 				},
-				{ "name": "useThemeToggle", "symbols": ["@meekojs/meeko/framework#useThemeToggle"] },
+				{
+					"name": "useThemeToggle",
+					"symbols": [
+						"@meekojs/meeko/framework#useThemeToggle"
+					]
+				},
 				{
 					"name": "useLayout",
 					"symbols": [
@@ -874,7 +879,7 @@
 						"cli:check"
 					],
 					"slug": "meeko-check",
-					"fallback": "/docs/inicio-rapido#desarrollo",
+					"fallback": "/docs/inicio-rapido#cambiar-la-primera-página",
 					"description": "Comprueba un proyecto o un componente `.meeko` con TypeScript y los diagnósticos de Meeko."
 				},
 				{
@@ -937,7 +942,7 @@
 						"cli:compile"
 					],
 					"slug": "meeko-compile",
-					"fallback": "/docs/inicio-rapido#desarrollo",
+					"fallback": "/docs/api#herramientas",
 					"description": "Compila un componente `.meeko` a un módulo TypeScript."
 				},
 				{
@@ -946,7 +951,7 @@
 						"cli:types"
 					],
 					"slug": "meeko-types",
-					"fallback": "/docs/inicio-rapido#desarrollo",
+					"fallback": "/docs/api#herramientas",
 					"description": "Genera las declaraciones de tipos de un componente `.meeko`."
 				},
 				{
@@ -955,7 +960,7 @@
 						"cli:check-app"
 					],
 					"slug": "meeko-check-app",
-					"fallback": "/docs/inicio-rapido#desarrollo",
+					"fallback": "/docs/api#herramientas",
 					"description": "Comprueba todos los componentes de la aplicación."
 				},
 				{

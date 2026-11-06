@@ -28,6 +28,7 @@
 	const shellLocale = t('shell.meta.lang')
 	const linkLocale = i18n.locales.includes(shellLocale) ? shellLocale : i18n.defaultLocale
 	const framework = 'https://meekojs.com' + (linkLocale === i18n.defaultLocale ? '' : '/' + linkLocale)
+	const landing = computed(() => route.path.value.replace(/\/$/, '') === i18n.localePath('/', linkLocale).replace(/\/$/, ''))
 	// Hidden and featured pages from the dashboard (empty without a database). The moderation of a language
 	// uses its public URLs (`/en/…`), so it applies to the links once localized.
 	const moderation = useDocsModeration()
@@ -83,6 +84,7 @@
 	})
 
 	const view = computed<DocsShellView>(() => ({
+		layout: landing.value ? 'landing' : 'docs',
 		product: {
 			name: props.name,
 			packageName: props.packageName,
@@ -91,6 +93,7 @@
 			links: [
 				{ label: t('shell.nav.docs'), href: i18n.localePath('/installation', linkLocale) },
 				{ label: t('shell.nav.framework'), href: framework },
+				...(props.packageName === '@meekojs/ui' ? [{ label: 'Meeko i18n', href: `https://i18n.meekojs.com${linkLocale === 'en' ? '/en' : ''}` }] : [{ label: 'Meeko UI', href: `https://ui.meekojs.com${linkLocale === 'en' ? '/en' : ''}` }]),
 				{ label: 'GitHub', href: props.repository },
 			],
 		},
@@ -98,7 +101,7 @@
 		navigation: groups.value,
 		// A page says in which language its prose is written: <DocsPage> shows that note.
 		locale: { requested: i18n.locale, content: i18n.locale, fallback: false, suggested: suggestion.value },
-		locales: i18n.pageLocales().map((code) => ({ code, label: i18n.localeName(code), href: i18n.switchLocalePath(code), current: code === i18n.locale })),
+		locales: i18n.pageLocales().map((code) => ({ code, label: i18n.localeName(code), href: i18n.switchLocalePath(code), target: '_top' as const, current: code === i18n.locale })),
 		announcements: moderation.value.announcements,
 		search: { mode: 'filter', query: query.value },
 	}))

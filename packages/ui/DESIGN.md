@@ -12,6 +12,8 @@
 4. El violeta es para la acción principal, el foco, la selección y lo que está activo. Si todo es violeta, nada destaca.
 5. Plataforma antes que JavaScript. Los navegadores antiguos funcionan, sin animación.
 
+Las portadas comparten `UIPage` y `UIPageHeader` con `layout="landing"`. Sus acciones, escaparates y secciones leen las clases `meeko-ui-landing-*` de `page.css`; cada producto aporta sólo su texto y su demo.
+
 ## Color
 
 Pasos de cada escala: 1-2 fondos, 3-5 controles, 6-8 bordes, 9-10 sólidos, 11-12 texto.
@@ -33,6 +35,7 @@ Pasos de cada escala: 1-2 fondos, 3-5 controles, 6-8 bordes, 9-10 sólidos, 11-1
 | Texto sobre la acción             | `--ui-color-primary-contrast`, `-contrast-hover`                        | blanco                |
 | Etiqueta o fondo activo discreto  | `--ui-color-primary-soft`, `-soft-hover`, con `--ui-color-primary-text` | primary 3, 4, 11      |
 | Borde violeta                     | `--ui-color-primary-border`                                             | primary 7             |
+| Código en prosa y bloques         | `--ui-color-code-soft`, `-header`, `-border`, `-text`                   | cyan 3, 2, 6, 12      |
 | Foco                              | `--ui-focus-ring`, con `outline-offset: var(--ui-focus-ring-offset)`    | primary 9             |
 | Selección de texto                | `--ui-color-selection`                                                  | primary 5             |
 | Fondo de un modal abierto         | `--ui-color-overlay`                                                    | negro al 50 %         |

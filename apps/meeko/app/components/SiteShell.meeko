@@ -92,8 +92,10 @@
 				logo: { src: '/brand/meeko-logo.webp', width: 24, height: 24 },
 				linksLabel: t('a11y.primaryNav'),
 				links: [
-					{ label: t('nav.guide'), href: doc('framework') },
+					{ label: t('nav.guide'), href: localePath(href('/docs')) },
 					{ label: t('nav.api'), href: localePath(href('/docs/reference')) },
+					{ label: 'Meeko UI', href: `https://ui.meekojs.com${i18n.locale === 'en' ? '/en' : ''}` },
+					{ label: 'Meeko i18n', href: `https://i18n.meekojs.com${i18n.locale === 'en' ? '/en' : ''}` },
 					{ label: t('nav.changes'), href: doc('changelog') },
 					{ label: 'GitHub', href: repository, rel: 'noopener', title: t('a11y.github') },
 				],
@@ -104,7 +106,7 @@
 			...(props.pager ? { pager: { ...(props.pager.previous ? { previous: props.pager.previous } : {}), ...(props.pager.next ? { next: props.pager.next } : {}) } } : {}),
 			...(props.editUrl ? { edit: { href: props.editUrl, source: props.source ?? '' } } : {}),
 			locale: { requested: i18n.locale, content: fallback ? 'es' : i18n.locale, fallback, outdated, original: 'es', originalHref: fallback || outdated ? i18n.switchLocalePath('es') : undefined, suggested: suggestion.value },
-			locales: i18n.pageLocales().map((code) => ({ code, label: i18n.localeName(code), href: i18n.switchLocalePath(code), current: code === i18n.locale })),
+			locales: i18n.pageLocales().map((code) => ({ code, label: i18n.localeName(code), href: i18n.switchLocalePath(code), target: '_top' as const, current: code === i18n.locale })),
 			announcements: announcements.value,
 			search: { mode: 'dialog', query: '' },
 		}

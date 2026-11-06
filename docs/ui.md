@@ -1,6 +1,14 @@
 # Meeko UI
 
-El módulo `@meekojs/ui` pertenece al ecosistema Meeko y se distribuye como un paquete con versión propia. Su instalación y API se describen en la [API de Meeko UI](ui-api.md). Actívalo en la configuración:
+## Empezar en una aplicación
+
+Instala los paquetes publicados en una aplicación Meeko con Node.js 24 o superior:
+
+```sh
+pnpm add @meekojs/meeko @meekojs/ui
+```
+
+Activa el módulo en `meeko.config.ts`:
 
 ```ts
 import { defineMeekoConfig } from '@meekojs/meeko/framework'
@@ -10,6 +18,24 @@ export default defineMeekoConfig({
 	theme: true,
 })
 ```
+
+Después, **archivo `app/pages/index.meeko`** en una aplicación nueva:
+
+```meeko
+<script server lang="ts">
+export const route = definePage({ render: "prerender" });
+</script>
+
+<template>
+  <h1>Contacto</h1>
+  <UIBadge tone="success">Disponible</UIBadge>
+  <UIButton type="button">Guardar</UIButton>
+</template>
+```
+
+Verás el título, un badge y un botón con los estilos de UI. `UIButton` usa `<MeekoLink>` con `to`, un `<a>` con `href` y un `<button>` sin destino. `UILink` también acepta `to` o `href`, siempre como enlace. `UISelect` es nativo; usa `UICombobox` para búsqueda o selección múltiple. La [referencia de UI](ui-api.md) detalla las props.
+
+El módulo `@meekojs/ui` pertenece al ecosistema Meeko y tiene versión propia.
 
 ## Container
 
@@ -25,9 +51,9 @@ export default defineMeekoConfig({
 - **Avisos:** `UIAlert`, `UIToast`, `UIEmpty` y `UISkeleton`.
 - **Superposiciones:** `UIModal`, `UIDrawer`, `UIPopover`, `UITooltip`, `UICommandPalette` y el host `UIApp`.
 
-`UILink` comparte las variantes `primary`, `secondary`, `outline` y `ghost`, los tamaños `sm`, `md`, `lg` y las formas `rounded`, `pill` con `UIButton`. Requiere `href`; no simula un botón. `UILinkCard` requiere `to` o `href`, y `title`, con descripción y contenido opcionales. `UIBadge` tiene tonos `neutral`, `accent`, `info`, `success`, `warning` y `danger`, y `dot`, sin añadir interacción o anuncios.
+`UILink` comparte las variantes `primary`, `secondary`, `outline` y `ghost`, los tamaños `sm`, `md`, `lg` y las formas `rounded`, `pill` con `UIButton`. Requiere `to` o `href`; no simula un botón. `UILinkCard` requiere `to` o `href`, y `title`, con descripción y contenido opcionales. `UIBadge` tiene tonos `neutral`, `info`, `success`, `warning` y `danger`, y `dot`, sin añadir interacción o anuncios.
 
-Registra todos estos componentes, salvo `UIMarkdownEditor`, y añade su CSS mediante `meeko.addStylesheet`, además de la base global y la fuente Inter. La hoja pasa por Vite y la configuración PostCSS del proyecto, con imports, assets, HMR en desarrollo y nombres de assets con hash en producción. Se carga antes de `app/styles/main.css`, donde la aplicación puede sobrescribir los estilos. Desde core 1.8, `MeekoSelect`, `MeekoPopover` y `MeekoThemeToggle` están obsoletos (`MEEK121`, retirada en 2.0): UI 1.8 registra `UISelect`, `UICombobox`, `UIPopover` y `UIThemeToggle`. `UISelect` es un `<select>` nativo; para buscar o elegir varias opciones, `UICombobox`. `useTheme`, `useThemeToggle`, la configuración del tema y `POST /_meeko/theme` permanecen en el framework. UI 1.8 necesita Meeko `>=1.8 <2`. Véase [Migración a 1.8](migration-1.8.md).
+Registra todos estos componentes, salvo `UIMarkdownEditor`, y añade su CSS mediante `meeko.addStylesheet`, además de la base global y la fuente Inter. La hoja pasa por Vite y la configuración PostCSS del proyecto, con imports, assets, HMR en desarrollo y nombres de assets con hash en producción. Se carga antes de `app/styles/main.css`, donde la aplicación puede sobrescribir los estilos. Desde core 1.8, `MeekoSelect`, `MeekoPopover` y `MeekoThemeToggle` están obsoletos (`MEEK121`, retirada en 2.0): UI 1.9 registra `UISelect`, `UICombobox`, `UIPopover` y `UIThemeToggle`. `UISelect` es un `<select>` nativo; para buscar o elegir varias opciones, `UICombobox`. `useTheme`, `useThemeToggle`, la configuración del tema y `POST /_meeko/theme` permanecen en el framework. UI 1.9 necesita Meeko `>=1.8 <2`. Véase [Migración a 1.8](migration-1.8.md).
 
 ```html
 <script lang="ts">
@@ -55,7 +81,7 @@ Registra todos estos componentes, salvo `UIMarkdownEditor`, y añade su CSS medi
 </template>
 ```
 
-`UIButton` admite `type`, `disabled`, `class`, `variant="primary|secondary"` y el evento `click`; su tipo por defecto es `button`. `UIInput` comparte un modelo de texto y admite `id`, `name`, `type`, `placeholder`, `required`, `disabled`, `invalid`, `describedBy` y `class`. `UIField` exige `id` y `label`, admite `description`, `error`, `required` y `class`, y entrega el ID del control y su descripción al snippet. El control debe recibir también `invalid` cuando tenga un error y `required` si es obligatorio.
+`UIButton` admite `type`, `disabled`, `class`, `variant="primary|secondary|outline|ghost"` y el evento `click`; su tipo por defecto es `button`. `UIInput` comparte un modelo de texto y admite `id`, `name`, `type`, `placeholder`, `required`, `disabled`, `invalid`, `describedBy` y `class`. `UIField` exige `id` y `label`, admite `description`, `error`, `required` y `class`, y entrega el ID del control y su descripción al snippet. El control debe recibir también `invalid` cuando tenga un error y `required` si es obligatorio.
 
 Personaliza los tokens `--ui-*` desde el CSS de la aplicación: `--ui-color-primary-9`, `--ui-radius-md`, `--ui-font-sans`… El [contrato visual](../packages/ui/DESIGN.md) dice qué token usar para cada cosa. El tema oscuro usa `data-theme="dark"` y los tokens cambian solos. La base global (`ui: { base: false }` la omite) pone el reset, el `body`, la escala fluida y el foco; la aplicación define su disposición.
 

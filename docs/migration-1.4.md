@@ -1,5 +1,7 @@
 # Actualizar de 1.3 a 1.4
 
+**Origen:** 1.3.x. **Destino:** 1.4.0. **Estado:** publicado en npm; la versión más reciente consultada el 5 de noviembre de 2026 es 1.9.0. **Quién actúa:** quien mantenga una aplicación que actualiza desde 1.3.x a 1.4.0.
+
 `1.4` es un minor: lo nuevo (el tema claro/oscuro con `theme`, `useTheme()` y `<MeekoThemeToggle>`, `data-theme-choice`, `if:when` en `<snippet>`, los tipos con el nombre de cada componente, `defineSnippets` con `Snippet<Args>`, `MeekoLinkProps` y `RouteId`, los autoimports en los módulos de `@utilities` y la CSP con hashes de estilos) es opcional. Un cambio se publica como [excepción aprobada](stability.md#excepciones-aprobadas) a la política de estabilidad: un módulo no puede usar como `meta.configKey` una clave propia de `MeekoConfig`, y `theme` lo es desde esta versión. Además, algunos cambios se notan al actualizar: los autoimports y la ejecución de la configuración al generar el CSS de `@utilities`, el objeto `snippets` de un hijo, el aviso `MEEK106` de un componente propio llamado `MeekoThemeToggle`, el completado del editor y `meeko dev` con un Meeko enlazado. Esta guía los reúne con lo que conviene revisar en cada uno. La lista completa, con lo añadido y corregido, está en el [CHANGELOG](../packages/meeko/CHANGELOG.md); los compromisos de compatibilidad, en la [política de estabilidad](stability.md).
 
 ## Orden recomendado

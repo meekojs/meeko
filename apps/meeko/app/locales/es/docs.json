@@ -6,7 +6,7 @@
 		"index": {
 			"title": "Documentación",
 			"headTitle": "Documentación · Meeko",
-			"description": "Toda la documentación de Meeko: guía del framework, API de componentes, editores, DevTools, estabilidad, arquitectura, migración y cambios.",
+			"description": "Elige una guía de Meeko según tu tarea: comenzar, crear componentes y rutas, cargar datos, probar una aplicación o consultar un símbolo.",
 			"lead": "Todo lo que necesitas para escribir componentes <code>.meeko</code> y aplicaciones full-stack con Meeko."
 		},
 		"reference": {

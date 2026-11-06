@@ -25,6 +25,8 @@ En Node, ESLint carga `eslint.config.ts` con `jiti` 2.2 o superior instalado en 
 
 ## Opciones de defineEslint
 
+`meeko/rules-of-composables` se activa como `error` en todos los lenguajes habilitados. Reconoce cualquier `useX()` (mayúscula, número o `_` después de `use`), incluidos composables propios. Exige llamarlos en la raíz del script de un `.meeko` o en el cuerpo principal de otro composable, antes de una suspensión o retorno anticipado y fuera de callbacks, condiciones y bucles. También sigue imports con alias y accesos estáticos. No sigue aliases dinámicos ni verifica el contexto de ejecución del invocador. Para generar IDs desde funciones ordinarias o handlers, usa [`createId()`](reference/utils/create-id.md). Esta regla se puede personalizar incluso con `meeko: false`.
+
 Las tres opciones de lenguaje están activadas por defecto:
 
 | Opción          | Efecto                                                                                                                                                                          |
@@ -41,7 +43,7 @@ La base recomendada de JavaScript también se aplica a los scripts de los lengua
 
 Se excluyen por defecto `**/node_modules/**`, `**/dist/**`, `**/.meeko/**`, `**/*.d.meeko.ts` y `**/*.generated.ts`. `ignores` añade patrones a esa lista. No se ignoran los componentes `*.meeko`.
 
-Las reglas personalizadas se aplican por ámbito: las del núcleo a los lenguajes habilitados, las `@typescript-eslint/*` a TS y/o Meeko, y las `meeko/*` a los componentes. El namespace `perfectionist/*` se admite salvo con `perfectionist: false`, y `unused-imports/*` requiere `unusedImports: true`; ambos se aplican a los lenguajes habilitados. Seleccionar una regla de un namespace desactivado produce un error; desactivar todos los lenguajes también produce un error. `typescript: false` permite incorporar tu propio preset TypeScript mientras mantienes Meeko.
+Las reglas personalizadas se aplican por ámbito: las del núcleo a los lenguajes habilitados, las `@typescript-eslint/*` a TS y/o Meeko, y las `meeko/*` a los componentes, salvo `meeko/rules-of-composables`, que se aplica a todos los lenguajes habilitados. El namespace `perfectionist/*` se admite salvo con `perfectionist: false`, y `unused-imports/*` requiere `unusedImports: true`; ambos se aplican a los lenguajes habilitados. Seleccionar una regla de un namespace desactivado produce un error; desactivar todos los lenguajes también produce un error. `typescript: false` permite incorporar tu propio preset TypeScript mientras mantienes Meeko.
 
 Los nombres y las opciones de reglas están tipados: una regla desconocida, un nivel inválido o `['error', { allow: true }]` en una regla Meeko sin opciones fallan al comprobar `eslint.config.ts`. Los tipos del núcleo vienen de la API pública de ESLint. Los tipos TypeScript-ESLint son un snapshot reproducible de los `meta.schema` públicos de la versión fijada, generado mediante `pnpm types:generate`. Representan la forma, claves y enums del esquema; límites numéricos, expresiones regulares y combinaciones semánticas se validan por ESLint en ejecución. Perfectionist publica tipos de opciones precisos desde su entrada pública y el helper los reutiliza directamente. Las opciones de unused-imports reutilizan el snapshot de `no-unused-vars`; las pruebas comprueban que ambos esquemas públicos siguen siendo idénticos. El generador no forma parte del código que carga el consumidor.
 
