@@ -44,18 +44,68 @@
 	}
 
 	const { t } = useI18n()
+	const query = signal('')
+	const visible = computed(() => {
+		const name = query.value.trim().toLocaleLowerCase()
+		return groups.map((group) => ({ ...group, entries: group.entries.filter((entry) => entry.name.toLocaleLowerCase().includes(name)) })).filter((group) => group.entries.length > 0)
+	})
+	const visibleCount = computed(() => visible.value.reduce((count, group) => count + group.entries.length, 0))
+	function onFilterKeydown(event: KeyboardEvent): void {
+		if (event.key === 'Escape') query.value = ''
+	}
 </script>
 
 <template>
 	<UIProse as="article">
 		<h1>{t('docs.reference.title')}</h1>
 		<p>{t('docs.reference.lead', { total })}</p>
+		<div
+			class="reference-filter"
+			role="search"
+			data-pagefind-ignore
+			on:keydown="onFilterKeydown"
+		>
+			<UIField
+				id="reference-filter"
+				bind:label="t('docs.exports.filter')"
+			>
+				<snippet
+					name="default"
+					params="id, describedBy"
+				>
+					<UIInput
+						type="search"
+						autocomplete="off"
+						model="query"
+						bind:id="id"
+						bind:describedBy="describedBy"
+						bind:placeholder="t('docs.exports.placeholder')"
+					/>
+				</snippet>
+			</UIField>
+			<p aria-live="polite">{visibleCount.value === total ? t('docs.exports.total', { total }) : t('docs.exports.partial', { count: visibleCount.value, total })}</p>
+		</div>
+		<UIEmpty if:when="visibleCount.value === 0">
+			<snippet name="title">
+				<I18nT
+					key="docs.exports.empty"
+					bind:values="{ query: query.value.trim() }"
+				>
+					<snippet
+						name="kbd"
+						params="text"
+					>
+						<kbd>{text}</kbd>
+					</snippet>
+				</I18nT>
+			</snippet>
+		</UIEmpty>
 		<ul
 			class="cards"
 			bind:aria-label="t('docs.reference.groups')"
 		>
 			<li
-				each:of="groups"
+				each:of="visible.value"
 				each:as="group"
 				each:key="group.anchor"
 			>
@@ -80,7 +130,7 @@
 		</ul>
 
 		<section
-			each:of="groups"
+			each:of="visible.value"
 			each:as="group"
 			each:key="group.anchor"
 		>
@@ -190,6 +240,9 @@
 		padding: 0;
 		max-width: none;
 		list-style: none;
+	}
+	.reference-filter {
+		margin-block: var(--ui-space-6);
 	}
 	.cards li {
 		display: grid;

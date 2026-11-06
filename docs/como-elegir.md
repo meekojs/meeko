@@ -1,6 +1,8 @@
-# Cómo elegir en Meeko
+# Decisiones habituales en Meeko
 
-Esta guía conecta las capacidades existentes. Empieza con la [primera aplicación](primeros-pasos.md) si aún no tienes un proyecto y usa la [referencia](/docs/reference) para los contratos y opciones de cada API.
+Esta guía reúne las decisiones que aparecen al construir una aplicación: dónde poner una ruta, cómo cargar datos y cuándo usar API, RPC o Socket. Empieza con la [primera aplicación](primeros-pasos.md) si aún no tienes un proyecto y usa la [referencia](/docs/reference) para los contratos y opciones de cada API.
+
+Para aprender a conectar páginas, datos y layouts, sigue el recorrido [Router: páginas y navegación](router.md).
 
 ## Página y código de servidor
 

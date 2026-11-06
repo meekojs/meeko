@@ -120,11 +120,13 @@ test('every symbol of the taxonomy exists in the package', async () => {
 	assert.deepEqual(missing, [], 'symbols of docs/reference/taxonomy.json that the package does not have')
 })
 
-test('an entry declares a slug exactly when its first symbol has no generated page', async () => {
+test('an entry declares a slug for a written URL or when its symbol has no generated page', async () => {
 	for (const group of taxonomyModule.taxonomy()) {
 		for (const entry of group.entries) {
 			const symbol = await reference.referenceSymbol(entry.symbols[0])
-			if (symbol?.info) assert.equal(entry.slug, undefined, `${entry.name}: its page takes the slug of /docs/reference/${symbol.info.slug}; remove "slug"`)
+			if (symbol?.info && entry.slug) {
+				assert.ok(reference.writtenPages().some((page) => page.slug === entry.slug && page.symbols.includes(entry.symbols[0])), `${entry.name}: an explicit slug needs a written page for its symbol`)
+			} else if (symbol?.info) assert.equal(entry.slug, undefined)
 			else {
 				assert.ok(entry.slug, `${entry.name}: ${entry.symbols[0]} has no generated page; give the entry a "slug"`)
 				assert.ok(entry.fallback || !entry.pending || symbol?.kind === 'config', `${entry.name}: a pending entry without a generated page needs a "fallback"`)

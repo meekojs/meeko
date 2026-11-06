@@ -1,0 +1,125 @@
+---
+source-hash: c7e82fa24fc2cc4ab089537ee62bef74bf83c9c03bc3e19b9e809ac2b786f334
+---
+
+# Server runtime and errors
+
+This guide expands [the framework overview](framework.md).
+
+## Server runtime
+
+`server/runtime.ts` exports `defineServerRuntime(factory)` by default. Meeko calls the factory once per process with `{ env, production, platform, prerendering, root }` and waits for the application's resources:
+
+```ts
+import { defineServerRuntime, SessionManager } from '@meekojs/meeko/server'
+import { createDatabase } from './utils/database.js'
+
+export default defineServerRuntime(async ({ env, production, prerendering }) => {
+	const db = await createDatabase(env.DATABASE_URL)
+	return {
+		sessions: new SessionManager({ store: db.sessionStore(), production: production && !prerendering }),
+		services: (request, { platform }) => ({ db, region: platform.env.REGION }),
+		socket: { allowedOrigins: [], maxMessageBytes: 64 * 1024 },
+		publicOrigin: env.MEEKO_PUBLIC_ORIGIN,
+		onError: (error, requestId) => console.error('request failed', requestId, error),
+		close: () => db.close(),
+	}
+})
+```
+
+- `sessions` is optional since `1.2`. Without `server/runtime.ts`, or if it does not return `sessions`, Meeko creates them: in memory during development and in Redis with `MEEKO_REDIS_URL` in production (see [Sessions without configuration](framework-auth.md#sessions-without-configuration)). Explicit `sessions` always take precedence.
+- `services` can be a shared object or a per-request function; it reaches pages, API, RPC and Socket as `RequestContext.services`. Since `1.7` its type is inferred from this file, without casts (see [Service types](#service-types)).
+- `RequestContext.platform` exposes `{ name, env, waitUntil(promise) }`. In Node, `serveNode` waits for tasks registered with `waitUntil` before closing the application. Tasks registered outside an HTTP request, such as in Socket callbacks, are the application's responsibility: `app.close()` waits for them and their failures reach the runtime's `onError` observer instead of the console.
+- `publicOrigin` is the application's public origin, for example `https://example.com` behind a proxy terminating TLS. HTTP and Socket compare `Origin` against this value; `MEEKO_PUBLIC_ORIGIN` overrides it in `meeko dev` and Node, Bun, Deno and Workers outputs. Without `publicOrigin`, Socket uses the server's listening address. If that address or `publicOrigin` is loopback, Socket also accepts other loopback names (`localhost`, `127.0.0.1`, `[::1]`) with the same scheme and port. This assumes no other process listens on that port at another loopback address; if one does, configure `publicOrigin` with a non-loopback origin or change the port.
+- `onError` receives internal failures with their request ID; without it, Meeko logs the error name and ID, and during development also the complete error. It also receives Socket delivery failures, unless `socket.onDeliveryError` observes them separately, and, since `1.3`, the process's unhandled promise rejections and uncaught exceptions, with a third argument (see [Errors](#errors)).
+- `processErrors` (since `1.3`) decides what happens to these process failures; without declaring it, a rejection is reported and the server keeps serving, and an exception is reported and the server shuts down gracefully with code 1 (see [Failures outside a request](#failures-outside-a-request)).
+- `socket.pubsub` selects the broadcast broker; `socket.maxPendingDeliveries` and `socket.sessionRefreshMs` limit each peer's queue and how often its deliveries reread the session. See [Broadcast and multiple instances](framework-websocket.md#broadcast-and-multiple-instances).
+- `close` runs after sessions close, when stopping the server.
+- `root` (since `1.8`) is the absolute project root path, for reading its files from the server (content, templates, a Git repository). Do not use `import.meta.url` for this, because the build moves server code to `.meeko/output/…`, or `process.cwd()`, which is only the root when the CLI launches the process. In `meeko dev` it is the project root; in Node, Bun and Deno outputs (including `meeko start`, `node .meeko/output/node/index.mjs` from any folder and during prerendering) it is the folder three levels above the output. If you deploy the output outside the project, `MEEKO_ROOT` (absolute or relative to the working directory) specifies its location; without it, the path would point to the folder three levels above the new location. In Cloudflare Workers, without a filesystem, and in a custom `createServerApp` that does not pass the `root` option, it is `undefined`. Pass it to services: `defineServerRuntime(({ root }) => ({ services: { docs: join(root!, "docs") } }))`.
+
+`createServerApp({ manifest, load, runtime, production })` from `@meekojs/meeko/server` creates the same application from a manifest and module loader, exposing `fetch(request, platform?)`, `socket`, `publicOrigin`, `reportError` and `close()`. The entry point generated by `meeko build` uses it; a custom host can serve it with `serveNode(app, { host, port, publicOrigin, handleSignals, shutdownTimeout })` from `@meekojs/meeko/node`. If the server starts but the Socket connection fails, `serveNode` releases the port and closes the application before propagating the error.
+
+### Service types
+
+Since `1.7`, `context.services` has the type returned by `server/runtime.ts`, without `as unknown as MisServicios`. `meeko check`, `meeko dev` and the editor generate `.meeko/types/services.d.ts`, which augments the `GeneratedServices` interface from `@meekojs/meeko/server` with the type of `services` from the default export: the shared object or, if `services` is a per-request function, its return value (without the promise). The resulting type is called `AppServices`:
+
+```ts
+// server/runtime.ts
+export default defineServerRuntime(async ({ env }) => {
+	const db = await createDatabase(env.DATABASE_URL)
+	return { services: { db, search: createSearch(db) }, close: () => db.close() }
+})
+
+// server/utils/docs.ts
+import type { RequestContext } from '@meekojs/meeko/server'
+export const findDoc = (context: RequestContext, slug: string) => context.services.db.docs.find(slug) // typed
+```
+
+- **Where.** In `usePage().context` in `<script server>`, in the handlers, `authorize`, `locals` and `rateLimit.key` of `defineApiRoute` and `defineRpc`, in `defineSocketChannel`, in `defineServerRouteMiddleware` (`services` and `context.services`) and in any `RequestContext` written without a type argument. `defineServerMiddleware` receives no context: it runs before one exists. The optional `context` in `definePage`'s `load` remains the type `C` from its type arguments.
+- **Resolution.** `RequestContext<TServices>` uses `AppServices` when `TServices` is `unknown`, the default; an explicit type (`RequestContext<MisServicios>`, `defineServerRouteMiddleware<MisServicios>`) or `any` still takes precedence. Without `server/runtime.ts`, with a JavaScript one or without `services`, `AppServices` is `unknown`, as through `1.6`. An `as unknown as MisServicios` cast still compiles; a direct cast to a type incompatible with the inferred one becomes an error, because it is one.
+- **Tests and contexts with other services.** `RequestContext` compares by its services type, so a context with any other services (a test's context, `createRequestContext(request, { db: falso }, session)`) is still accepted where a `RequestContext` without a type argument is expected, such as a route handler without an explicit type, as in `1.6`. In exchange, to receive a route context in a function, write `RequestContext` without a type argument (its `services` are already `AppServices`): `RequestContext<AppServices>` does not accept the `RequestContext` of an untyped route.
+- **Auto-imports.** The declaration reads a copy of `server/runtime.ts` in `.meeko/types/server-runtime.ts` with its server auto-imports written as imports, so `defineServerRuntime` without importing it also works in the editor. The copy has `// @ts-nocheck`: errors are reported only once, in `server/runtime.ts`. It regenerates on every `meeko check`, when starting `meeko dev` and during editor checks.
+- **Custom host.** Without generated declarations, augment `GeneratedServices` manually in a `.d.ts` under `server/`, like `MeekoSession`: `interface GeneratedServices { readonly services: MisServicios }`. `ServerRuntimeServices<typeof runtime>` calculates that type from a runtime definition.
+- **Limitations.** This is a type; it does not validate at runtime. If a service mentions `RequestContext` in its own type, TypeScript may encounter a circular reference; write `RequestContext<MisServicios>` at that point.
+
+## Errors
+
+No failure is lost without passing through a Meeko observer: each level has its own, and anything a level does not handle moves to the next or, without an observer, to the console, as without Meeko.
+
+| Level                 | What it catches                                                                                                                                                                   | Observer                                                                                                                                                                                                                                            | Policy                                                                                                                                                                                                                                              |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Component             | `on:` handlers, `effect`, cleanup, `onMounted`, the continuation of a setup with `await`, forms, mutations and `useStorage` for that component and its children.                  | `provideErrorHandler((error, source) => …)` in `<script>`; the nearest wins ([Route and server middleware](framework-rendering.md#route-and-server-middleware), [api.md](api.md#meeko-components)).                                                                       | Observes without changing the interface. Without a provider, moves to the application.                                                                                                                                                              |
+| Application (browser) | The above without a nearer provider, navigation, Socket clients and, since `1.3`, the page's uncaught exceptions (`"uncaught"`) and unhandled promise rejections (`"rejection"`). | `mountClientApp({ onError })` and plugins' `app.onError` ([Application plugins](framework-configuration.md#application-plugins)); `onNavigationError` takes precedence for navigation.                                                                                        | Without either, navigation, Socket and global failures go to the first active `provideErrorHandler`; without one, to the console.                                                                                                                   |
+| Page (SSR)            | A failure in the loader, `<script server>`, rendering (also `render: "stream"` before the first byte) or a data `await`.                                                          | Nearest `+error.meeko` or `app/error.meeko` ([Application error page](framework-rendering.md#application-error-page-apperrormeeko)), and runtime and plugin `onError` with the response's `requestId`.                                                                    | HTML displays the status and a public message; a `5xx` is reported with its private error. A rejected deferred stream value is sent as `{ code, status }` and its cause reaches the same observers ([Streaming SSR](framework-rendering.md#streaming-ssr-render-stream)). |
+| API and RPC           | Errors thrown by handlers, `auth`, `authorize`, `locals` and validation.                                                                                                          | Normalized response: `ApiError` preserves `code` and `status`, everything else is `INTERNAL_ERROR`, with `requestId` and `x-request-id` ([API and RPC](framework-api.md#api-and-rpc)). On the client, `ClientError` (`isClientError(error, "CODIGO")` since `1.3`). | Only `5xx` reach runtime `onError`; `4xx` are expected responses.                                                                                                                                                                                   |
+| Server runtime        | `5xx` from pages, API, RPC, Socket, `waitUntil` and transport, and process failures since `1.3`.                                                                                  | `onError` in `server/runtime.ts` ([Server runtime](#server-runtime)).                                                                                                                                                                               | Never changes the response; a failing observer is logged without private details.                                                                                                                                                                   |
+| Process (since `1.3`) | Unhandled promise rejections and uncaught exceptions outside the request flow.                                                                                                    | Runtime `onError`, with `{ kind, inRequest }` as its third argument.                                                                                                                                                                                | `processErrors`; see [Failures outside a request](#failures-outside-a-request).                                                                                                                                                                     |
+
+`ErrorSource`, the second argument of browser observers, gains `"uncaught"` and `"rejection"` in `1.3`. It is a union Meeko delivers to the application, so under the [stability policy](stability.md#public-api), an exhaustive `switch` over it needs a default branch.
+
+```ts
+import { isClientError, mountClientApp } from '@meekojs/meeko/framework'
+
+await mountClientApp({
+	...options,
+	onError(error, source) {
+		if (isClientError(error, 'UNAUTHENTICATED')) return location.assign('/login')
+		navigator.sendBeacon('/api/client-errors', JSON.stringify({ source, message: String(error) }))
+	},
+})
+```
+
+### Global browser failures
+
+While an application is mounted, `mountClientApp` listens to `error` and `unhandledrejection` on `window`: a throwing `setTimeout`, a `fetch().then()` without `catch` in setup or a library failure reach `onError` and `app.onError` with source `"uncaught"` or `"rejection"`. The first argument is the thrown error or rejection reason, unchanged.
+
+- **No duplicates.** An error already received by a Meeko observer (an event, navigation…) that the application rethrows or leaves rejected is not reported again.
+- **Console.** When an observer receives it, Meeko calls `preventDefault()` and the browser does not repeat it in the console. Without any observer, the event is untouched and the browser displays it as usual. An event another listener already marked with `preventDefault()` is considered handled.
+- **Cross-origin scripts.** The opaque `"Script error."` from a cross-origin script loaded without CORS has no error, file or line: it is left to the console. To observe it, load the script with `crossorigin` and serve `Access-Control-Allow-Origin`.
+- **Lifecycle.** Listeners register on hydration and are removed with `app.dispose()` or if hydration fails. An HMR component change does not remount the application; an entry point change reloads the page. With two applications on the same page, only the first one observing each failure receives it.
+
+### Failures outside a request
+
+On the server, a promise nobody awaits inside a handler, a throwing `setTimeout` or a library callback fall outside the request's `try`. Without a policy, Node 15+, Bun and Deno terminate the process on the first unhandled rejection or uncaught exception, without passing through `onError` or shutting the server down gracefully. Since `1.3`, `meeko dev`, `meeko build` outputs (Node, Bun, Deno and Cloudflare Workers), and `serveNode` and `serveDeno` with `handleSignals` apply the `processErrors` policy from `server/runtime.ts`:
+
+| Failure              | Default                                                                                                                                                                                                                 | Other options                                                                                                                              |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `unhandledRejection` | `"report"`: reaches `onError` and the server keeps serving.                                                                                                                                                             | `"shutdown"`: also shuts down gracefully with code 1. `"off"`: the runtime decides (in Node, the rejection becomes an uncaught exception). |
+| `uncaughtException`  | `"shutdown"`: reaches `onError`, the server stops accepting connections, waits for open responses and `waitUntil` tasks, closes the application and exits with code 1, because the process state is no longer reliable. | `"off"`: the runtime decides.                                                                                                              |
+
+```ts
+// server/runtime.ts
+export default defineServerRuntime(() => ({
+	processErrors: { unhandledRejection: 'shutdown' },
+	onError(error, requestId, info) {
+		if (info) logger.fatal({ kind: info.kind, inRequest: info.inRequest, requestId }, error)
+		else logger.error({ requestId }, error)
+	},
+}))
+```
+
+- **Observer.** Runtime `onError` receives the error, an ID and `{ kind, inRequest }` (type `ServerErrorInfo`); request failures do not include that third argument. Without `onError`, Meeko writes the complete error to the console, as the runtime would. `processErrors: false` disables both cases.
+- **`requestId`.** If the failure occurs in a request's asynchronous work and the runtime retains that context until the event, the ID is the response's (`x-request-id`) and `inRequest` is `true`; otherwise, the ID is new. Node retains context for rejections and exceptions; Deno and workerd for rejections; Bun 1.4 only for exceptions.
+- **Application listeners.** If the application registered its own `process.on("uncaughtException" | "unhandledRejection")` (or, in Deno, previously marked the event with `preventDefault()`), Meeko reports to `onError` and lets it decide: it does not terminate the process.
+- **By runtime.** Node and Bun use `process` events; Deno uses `globalThis`'s `unhandledrejection` and `error`. In Cloudflare Workers there is no process to terminate: the isolate's unhandled rejections reach `onError` and an exception only fails the request or `waitUntil` task that threw it, which Meeko already reports. In `meeko dev`, an application rejection does not stop the development server; the policy is that of the runtime it started with.
+- **Custom hosts.** `handleProcessErrors(app, { close, onError?, shutdownTimeout? })` from `@meekojs/meeko/server` applies the same policy to a host that uses neither `serveNode` nor `serveDeno`, such as `Bun.serve` with `createBunServer`; it returns the function that removes listeners. `close` must stop the server and close the application; `shutdownTimeout` (15 s by default) limits its duration before exiting anyway. Since `1.7` it installs only once per application: a second call (for example, your own alongside `serveNode` with `handleSignals`) adds no listeners and, if its options differ, ignores them with a console warning.

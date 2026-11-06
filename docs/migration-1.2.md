@@ -1,5 +1,7 @@
 # Actualizar de 1.1 a 1.2
 
+**Origen:** 1.1.x. **Destino:** 1.2.0. **Estado:** publicado en npm; la versión más reciente consultada el 5 de noviembre de 2026 es 1.9.0. **Quién actúa:** quien mantenga una aplicación que actualiza desde 1.1.x a 1.2.0.
+
 `1.2` es un minor: lo nuevo (módulos, `document` y `useHead`, `<MeekoLink>` y `<MeekoOutlet />`, sesiones sin configuración, contraseñas, `rateLimit`, `useForm`, `useStorage`, utilidades de PostCSS…) es opcional. Dos cambios de comportamiento se publican como [excepciones aprobadas](stability.md#excepciones-aprobadas) a la política de estabilidad: las props reactivas y la protección contra el _login CSRF_ en `session.create()`. Además, algunos cambios se notan al actualizar. Esta guía los reúne con lo que conviene revisar en cada uno. La lista completa, con lo añadido y corregido, está en el [CHANGELOG](../packages/meeko/CHANGELOG.md); los compromisos de compatibilidad, en la [política de estabilidad](stability.md).
 
 ## Orden recomendado

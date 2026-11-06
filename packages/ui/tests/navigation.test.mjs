@@ -76,11 +76,14 @@ test('the navigation components render on the server with their semantics', { ti
 
 	await t.test('UIPageHeader: title, description, breadcrumb and actions', () => {
 		const header = block(es, '<header class="meeko-ui-page-header', '</header>')
-		assert.ok(header.includes('<h1>Navegación</h1>'))
+		assert.match(header, /<h1[^>]*><span>Navegación<\/span><\/h1>/)
 		assert.ok(header.includes('Todos los componentes de navegación juntos.'))
 		assert.ok(header.includes('meeko-ui-breadcrumb'))
 		assert.ok(header.includes('Editar'))
 		assert.equal(attribute(tag(dashboard, /meeko-ui-page-header/), 'data-layout'), 'dashboard')
+		const landingHeader = block(landing, '<header class="meeko-ui-page-header', '</header>')
+		assert.equal(attribute(tag(landingHeader, /<h1\b/), 'id'), 'portada')
+		assert.match(landingHeader, /Portada<code>\.meeko<\/code>/)
 	})
 
 	await t.test('UIHeader: a compact brand hides its name on a narrow phone, without a product', () => {

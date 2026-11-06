@@ -558,17 +558,42 @@ Después añade el cliente en **Preferences → Package Settings → LSP → Set
 - El modelo semántico necesita secciones sintácticamente cerradas. Mientras se escribe un archivo incompleto los diagnósticos siguen llegando, pero completado y navegación pueden pausarse hasta que vuelva a ser válido.
 - Un proyecto con más de 2000 componentes `.meeko` sólo carga los primeros 2000 para referencias y renombrado entre archivos.
 
+## Variables CSS y controles independientes
+
+Meeko ofrece completado, hover, «Ir a definición», búsqueda de referencias y renombrado de variables CSS en `<style>` y estilos inline de `.meeko`, y en archivos `.css` de paquetes con `meeko.config.*`. Funciona sin Tailwind y también con el lenguaje `tailwindcss`. Abrir sólo una hoja CSS activa la extensión en un workspace Meeko; el soporte CSS registra únicamente esas funciones de variables, sin hacerse cargo del formato ni de los diagnósticos de CSS.
+
+Las fuentes son la hoja abierta, `app/styles/main.css`, sus imports locales y la hoja procesada `.meeko/styles/main.css` cuando existe. Los cambios sin guardar en hojas importadas se reflejan entre documentos y al cerrarlas vuelve a contar la versión guardada. El hover muestra el valor y su archivo; la definición prioriza las fuentes escritas frente al CSS generado. Las hojas CSS se leen sin ejecutar la configuración ni plugins del proyecto, también en workspaces no confiables. No se escanea todo el disco: los imports quedan dentro del paquete y tienen un límite de 64 archivos. Los componentes `.meeko` conservan además sus fuentes de estilos globales y las reglas de visibilidad de `scoped`.
+
+| Ajuste                          | Predeterminado | Controla únicamente                   |
+| ------------------------------- | -------------- | ------------------------------------- |
+| `meeko.cssVariables.completion` | `true`         | Sugerencias de variables CSS          |
+| `meeko.cssVariables.hover`      | `true`         | Hover de variables CSS                |
+| `meeko.cssVariables.definition` | `true`         | Ir a definición de variables CSS      |
+| `meeko.cssVariables.references` | `true`         | Buscar referencias de variables CSS   |
+| `meeko.cssVariables.rename`     | `true`         | Renombrar variables CSS               |
+| `meeko.classes.completion`      | `"auto"`       | Sugerencias de clases en `.meeko`     |
+| `meeko.classes.hover`           | `"auto"`       | Hover de clases en `.meeko`           |
+| `meeko.classes.definition`      | `true`         | Ir a definición de clases en `.meeko` |
+
+Todos tienen ámbito de recurso y se actualizan sin reiniciar el servidor. Por ejemplo, `"meeko.classes.completion": "off"` conserva las variables y el hover de clases. Para mantener el comportamiento anterior, donde ese ajuste apagaba también el hover de clases, añade `"meeko.classes.hover": "off"`. Cada ajuste de variables afecta sólo a las sugerencias o información aportadas por Meeko: otros proveedores de VS Code o Tailwind pueden seguir aportando las suyas.
+
+Otros clientes LSP pueden comunicar `meeko.cssVariables` mediante `workspace/configuration`, `initializationOptions.cssVariables` o una notificación de configuración con `settings.meeko.cssVariables`. Para hojas CSS necesitan sincronizar los documentos; el servidor registra dinámicamente los proveedores que el cliente admite. Las referencias y el renombrado leen las fuentes actuales de `app/`, los componentes raíz y los imports locales indexados del mismo paquete. Los buffers abiertos tienen prioridad. Se excluyen los artefactos generados, dependencias, carpetas ocultas y paquetes anidados; el recorrido se limita a 2000 archivos/directorios y 16 MiB. Si la cobertura es incompleta o no se puede analizar el CSS, las operaciones sobre variables compartidas informan de la limitación en lugar de devolver una edición parcial.
+
+Las referencias incluyen declaraciones (cuando se solicitan), `@property`, `var(...)`, `--theme(...)`, consultas de estilo y nombres de propiedades personalizadas en `transition`, `transition-property` y `will-change`. También participan los estilos inline estáticos y las partes literales de `bind:style`. Se excluyen comentarios, contenido de cadenas y código JavaScript/TypeScript. Un nombre declarado de forma privada en `<style scoped>` o en estilos inline pertenece a ese componente para estas operaciones; `:global(...)`, `@property` y las declaraciones sin `scoped` son compartidas. Esto agrupa nombres por componente, sin intentar resolver la herencia del DOM entre elementos.
+
+El renombrado exige un nombre completo como `--color-brand` y una declaración editable. Rechaza colisiones e identificadores escapados. VS Code recibe una edición del workspace, con versiones de los documentos abiertos, para aplicarla o deshacerla entre archivos; el servidor no escribe archivos. Un renombrado local de componente sigue disponible si otra hoja no relacionada está incompleta. No cambia las clases de utilidades derivadas de Tailwind, valores generados dinámicamente en scripts ni identificadores CSS fuera de los contextos soportados. Revisa esos usos de la aplicación cuando renombres un token de tema público.
+
 ## Tailwind CSS
 
 Instala la extensión oficial **Tailwind CSS IntelliSense** (`bradlc.vscode-tailwindcss`) y configura Tailwind en el proyecto. Esta extensión aporta las utilidades, variantes, valores y documentación de Tailwind; Meeko aporta el análisis de componentes y las clases CSS escritas en sus `<style>` y en `app/styles/main.css`, incluidos sus imports locales.
 
 Meeko Language registra automáticamente `tailwindCSS.includeLanguages: { "meeko": "html" }` y activa `editor.quickSuggestions.strings` para `[meeko]`. Son valores predeterminados de VS Code: respetan tus ajustes explícitos y no escriben en `settings.json`. [VS Code documenta `configurationDefaults` para otras configuraciones registradas](https://code.visualstudio.com/api/references/contribution-points#contributes.configurationDefaults).
 
-`meeko.classes.completion` controla el completado y hover de clases de Meeko:
+`meeko.classes.completion` y `meeko.classes.hover` controlan por separado sus funciones de clases de Meeko:
 
 - `auto` (predeterminado): si Tailwind IntelliSense está activo y el proyecto declara `tailwindcss` como dependencia o lo importa desde sus hojas fuente, delega las clases de la hoja procesada `.meeko/styles/main.css` a Tailwind. Conserva las clases escritas en componentes y hojas fuente.
 - `on`: incluye también las clases de la hoja procesada.
-- `off`: desactiva el completado y hover de clases de Meeko. La navegación a definiciones y las variables CSS siguen disponibles.
+- `off`: desactiva sólo la función elegida. La definición se controla con `meeko.classes.definition`; las variables tienen sus propios ajustes.
 
 Las cadenas de `bind:class="active.value ? 'bg-blue-500' : 'bg-gray-500'"` reciben sugerencias de clases; no hace falta añadir `bind:class` a `tailwindCSS.classAttributes`, porque el atributo `class` predeterminado reconoce el prefijo `:`. Meeko conserva además el análisis TypeScript de la expresión.
 

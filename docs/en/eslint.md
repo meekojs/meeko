@@ -1,5 +1,5 @@
 ---
-source-hash: a3294d815524ade9c76cecf56d7c19c527ff269166875c4bd92af47298300243
+source-hash: c1406d76530d3d3c2537696d1b444388cf08c7834cfe7b597c07b31a1a802991
 ---
 
 # ESLint
@@ -7,6 +7,8 @@ source-hash: a3294d815524ade9c76cecf56d7c19c527ff269166875c4bd92af47298300243
 `@meekojs/eslint-plugin` analyzes complete `.meeko` components with ESLint 10 and Flat Config. It reuses Meeko's public parser for the sections and the template, and TypeScript-ESLint for scripts and expressions. It does not execute the configuration or generate project files.
 
 ## Installation and configuration
+
+`meeko/rules-of-composables` defaults to `error` in every enabled language. It recognizes any `useX()` name (uppercase letter, digit or `_` after `use`), including custom composables. Calls belong at the root of a `.meeko` script or in another composable's main body, before suspension or early return and outside callbacks, conditions and loops. Import aliases and static member calls are recognized; dynamic aliases and the caller's runtime context are not verified. Use [`createId()`](reference/utils/create-id.md) for identifiers created inside ordinary functions or handlers. This rule can be configured even with `meeko: false`.
 
 ```sh
 pnpm add -D eslint jiti @meekojs/eslint-plugin
@@ -45,7 +47,7 @@ The recommended JavaScript base also applies to the scripts of the enabled langu
 
 `**/node_modules/**`, `**/dist/**`, `**/.meeko/**`, `**/*.d.meeko.ts` and `**/*.generated.ts` are excluded by default. `ignores` adds patterns to that list. `*.meeko` components are not ignored.
 
-Custom rules apply by scope: core rules to the enabled languages, `@typescript-eslint/*` rules to TS and/or Meeko, and `meeko/*` rules to components. The `perfectionist/*` namespace is accepted except with `perfectionist: false`, and `unused-imports/*` requires `unusedImports: true`; both apply to the enabled languages. Selecting a rule from a disabled namespace is an error; disabling every language is also an error. `typescript: false` lets you bring your own TypeScript preset while keeping Meeko.
+Custom rules apply by scope: core rules to the enabled languages, `@typescript-eslint/*` rules to TS and/or Meeko, and `meeko/*` rules to components, except `meeko/rules-of-composables`, which applies to every enabled language. The `perfectionist/*` namespace is accepted except with `perfectionist: false`, and `unused-imports/*` requires `unusedImports: true`; both apply to the enabled languages. Selecting a rule from a disabled namespace is an error; disabling every language is also an error. `typescript: false` lets you bring your own TypeScript preset while keeping Meeko.
 
 Rule names and options are typed: an unknown rule, an invalid level or `['error', { allow: true }]` on a Meeko rule without options fail when checking `eslint.config.ts`. Core types come from ESLint's public API. TypeScript-ESLint types are a reproducible snapshot of the public `meta.schema` of the pinned version, generated with `pnpm types:generate`. They represent the shape, keys and enums of the schema; numeric limits, regular expressions and semantic combinations are validated by ESLint at run time. Perfectionist publishes precise option types from its public entry point and the helper reuses them directly. The unused-imports options reuse the `no-unused-vars` snapshot; the tests check that both public schemas remain identical. The generator is not part of the code the consumer loads.
 

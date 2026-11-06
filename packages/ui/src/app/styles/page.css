@@ -231,3 +231,63 @@
 .meeko-ui-page-header[data-layout='landing'] .meeko-ui-page-header-text p {
 	font-size: var(--ui-font-size-xl);
 }
+.meeko-ui-page-header[data-layout='landing'] h1 code {
+	border-radius: var(--ui-radius-sm);
+	background: var(--ui-color-code-soft);
+	padding: var(--ui-prose-code-padding);
+	color: var(--ui-color-code-text);
+	font-weight: var(--ui-font-weight-medium);
+	font-size: var(--ui-prose-code-size);
+}
+.meeko-ui-landing-soft {
+	color: var(--ui-color-text-soft);
+}
+.meeko-ui-landing-page {
+	padding-block-start: var(--ui-space-16);
+}
+.meeko-ui-landing-actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--ui-space-3);
+	margin-block: var(--ui-space-5);
+}
+.meeko-ui-landing-showcase {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--ui-floating-panel-width)), 1fr));
+	align-items: start;
+	gap: var(--ui-space-10);
+	margin-block: var(--ui-space-12);
+	border-block: var(--ui-border-width) solid var(--ui-color-border);
+	padding-block: var(--ui-space-8);
+}
+.meeko-ui-landing-showcase > div {
+	display: grid;
+	gap: var(--ui-space-5);
+	min-width: 0;
+}
+.meeko-ui-landing-showcase > div > :is(h2, p) {
+	margin-block: 0;
+}
+.meeko-ui-landing-section {
+	border-block-start: var(--ui-border-width) solid var(--ui-color-border);
+	padding-block: var(--ui-space-24) var(--ui-space-20);
+}
+.meeko-ui-landing-section-title {
+	margin: 0;
+	max-width: var(--ui-container-md);
+	color: var(--ui-color-text);
+	font-weight: var(--ui-font-weight-semibold);
+	font-size: var(--ui-font-size-4xl);
+	line-height: var(--ui-line-height-tight);
+	letter-spacing: var(--ui-tracking-display);
+	text-wrap: balance;
+}
+@media (max-width: 48rem) {
+	.meeko-ui-landing-section {
+		padding-block: var(--ui-space-16) var(--ui-space-12);
+	}
+	.meeko-ui-landing-section-title {
+		font-size: var(--ui-font-size-3xl);
+	}
+}

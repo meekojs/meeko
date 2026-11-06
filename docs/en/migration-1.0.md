@@ -1,8 +1,10 @@
 ---
-source-hash: e5b020c8bead81d7e80b7663327076cb587b662ad9ef059dd81ee89039a577aa
+source-hash: 961cba0ff895e86416bffbd3d1c70040863e3656deb9dcbe943af149b5369849
 ---
 
 # Migrate from 0.1.0 to 1.0
+
+**From:** 0.1.0. **To:** 1.0.0. **Status:** published on npm; the latest version checked on November 5, 2026 is 1.9.0. **Who acts:** maintainers upgrading an application from 0.1.0 to 1.0.0.
 
 This guide collects breaking changes between `0.1.0` and `1.0`. The full list, including additions and fixes, is in the [CHANGELOG](../../packages/meeko/CHANGELOG.md). The [stability policy](stability.md) applies from 1.0 onward.
 

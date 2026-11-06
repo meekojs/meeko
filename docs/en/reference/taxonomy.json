@@ -1,5 +1,5 @@
 {
-	"source-hash": "b8ccf5f10a4c3887060ea4e18b6d529f3b3a9d4179ab651c46d847a9c6c9046b",
+	"source-hash": "f582f7ac18a963e6f3805fba637a2a00c5c7d1b9851e22c22aeaf0f045fb3ea8",
 	"groups": {
 		"components": {
 			"title": "Components",
@@ -58,6 +58,9 @@
 		}
 	},
 	"entries": {
+		"@meekojs/meeko#createId": {
+			"description": "Creates a cryptographic UUID v4 without a component context."
+		},
 		"autoimport:useApi": {
 			"description": "Reads an API endpoint from a component, with SSR, hydration and contract types."
 		},

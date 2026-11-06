@@ -6,7 +6,7 @@ Modo de lectura: documentación técnica con ejemplos interactivos. **Esta web n
 
 ## Estructura
 
-Cabecera del ecosistema, navegación lateral por tareas y una columna de lectura. En móvil, el menú se abre desde la cabecera; la documentación y los enlaces de recuperación funcionan sin JavaScript. El filtro busca nombres y descripciones del catálogo local.
+Cabecera del ecosistema y portada a ancho completo con los patrones de `@meekojs/ui`. Las guías tienen navegación lateral por tareas y una columna de lectura. En móvil, el menú de las guías se abre desde la cabecera; la documentación y los enlaces de recuperación funcionan sin JavaScript. El filtro busca nombres y descripciones del catálogo local.
 
 La portada muestra un componente vivo. Las guías reúnen uso, ejemplo, código copiable y contrato de API. Las tablas y el código pueden desplazarse horizontalmente dentro de su contenedor; la página no debe desbordarse.
 

@@ -22,11 +22,16 @@
 	const snapshot = await readPage<HomePayload>('/', locale)
 	if (!snapshot) notFound()
 	export const { demo, editorLines, command, quickStart, version, head } = snapshot
+	// The small full-stack example below receives data from this server block.
+	export const showcaseTasks = locale === 'en'
+		? [{ id: 1, title: 'Create a page', done: true }, { id: 2, title: 'Add route data', done: false }]
+		: [{ id: 1, title: 'Crear una página', done: true }, { id: 2, title: 'Añadir datos de ruta', done: false }]
 </script>
 
 <script lang="ts">
 	import { signal } from '@meekojs/meeko'
 	import { copyText } from '@meekojs/ui/runtime'
+	import { showcaseCode } from '../utils/showcase-code'
 
 	export interface Props {
 		params: Record<string, string>
@@ -45,8 +50,15 @@
 	const stability = doc('stability')
 	const quickStartPage = doc('inicio-rapido')
 	const reactivity = doc('api', t('home.flow.signalsAnchor'))
-	const renderModes = doc('framework', t('home.flow.ssrAnchor'))
+	const renderModes = doc('routing-data', t('home.flow.ssrAnchor'))
 	const copied = signal<'idle' | 'done' | 'error'>('idle')
+	const showcasePending = signal(false)
+	const exampleCode = showcaseCode({
+		first: t('home.showcase.taskOne'),
+		second: t('home.showcase.taskTwo'),
+		all: t('home.showcase.all'),
+		pending: t('home.showcase.pending'),
+	})
 	let reset: ReturnType<typeof setTimeout> | undefined
 
 	function copyCommand(): void {
@@ -66,21 +78,28 @@
 	>
 		<UIContainer size="2xl">
 			<div class="hero-copy">
-				<h1 id="hero-title">
-					<span class="line">
-						<I18nT key="home.hero.title">
-							<snippet
-								name="code"
-								params="text"
-							>
-								<code>{text}</code>
-							</snippet>
-						</I18nT>
-					</span>
-					<span class="line tone-soft">{t('home.hero.titleLine2')}</span>
-				</h1>
-				<p class="lead">{t('home.hero.lead')}</p>
-				<div class="actions">
+				<UIPageHeader
+					layout="landing"
+					headingId="hero-title"
+					bind:description="t('home.hero.lead')"
+				>
+					<snippet name="title">
+						<span class="line">
+							<I18nT key="home.hero.title">
+								<snippet
+									name="code"
+									params="text"
+								>
+									<code>{text}</code>
+								</snippet>
+							</I18nT>
+						</span>
+						<span class="line meeko-ui-landing-soft">{t('home.hero.titleLine2')}</span>
+					</snippet>
+				</UIPageHeader>
+			</div>
+			<div class="hero-copy-details">
+				<div class="meeko-ui-landing-actions">
 					<UILink href="#inicio-rápido">{t('home.hero.start')}</UILink>
 					<UIButton
 						variant="outline"
@@ -101,7 +120,7 @@
 					<span>{t('footer.license')}</span>
 					<span>
 						{t('home.hero.requires')}
-						<code>pnpm add @meekojs/meeko</code>
+						<code>npm</code>
 					</span>
 				</p>
 			</div>
@@ -112,16 +131,16 @@
 	</section>
 
 	<section
-		class="chapter chapter-flow"
+		class="chapter meeko-ui-landing-section chapter-flow"
 		aria-labelledby="flow-title"
 	>
 		<UIContainer size="2xl">
 			<h2
 				id="flow-title"
-				class="chapter-title"
+				class="meeko-ui-landing-section-title"
 			>
 				{t('home.flow.title')}
-				<span class="tone-soft">{t('home.flow.titleSoft')}</span>
+				<span class="meeko-ui-landing-soft">{t('home.flow.titleSoft')}</span>
 			</h2>
 			<div class="split">
 				<ul class="facts">
@@ -160,7 +179,8 @@
 					<li>
 						<h3>{t('home.flow.signalsTitle')}</h3>
 						<p>
-							<code>signal</code>,
+							<code>signal</code>
+							,
 							<code>computed</code>
 							{t('home.flow.signalsAnd')}
 							<code>effect</code>
@@ -350,16 +370,16 @@
 	</section>
 
 	<section
-		class="chapter chapter-deploy"
+		class="chapter meeko-ui-landing-section chapter-deploy"
 		aria-labelledby="deploy-title"
 	>
 		<UIContainer size="2xl">
 			<h2
 				id="deploy-title"
-				class="chapter-title"
+				class="meeko-ui-landing-section-title"
 			>
 				{t('home.deploy.title')}
-				<span class="tone-soft">{t('home.deploy.titleSoft')}</span>
+				<span class="meeko-ui-landing-soft">{t('home.deploy.titleSoft')}</span>
 			</h2>
 			<div class="split reverse">
 				<figure class="figure">
@@ -578,16 +598,58 @@
 	</section>
 
 	<section
-		class="chapter chapter-tools"
+		class="chapter meeko-ui-landing-section chapter-showcase"
+		aria-labelledby="showcase-title"
+	>
+		<UIContainer size="2xl">
+			<h2
+				id="showcase-title"
+				class="meeko-ui-landing-section-title"
+			>
+				{t('home.showcase.title')}
+				<span class="meeko-ui-landing-soft">{t('home.showcase.subtitle')}</span>
+			</h2>
+			<p class="showcase-lead">{t('home.showcase.lead')}</p>
+			<div class="showcase-grid">
+				<UICodeBlock
+					lang="meeko"
+					bind:label="t('home.showcase.file')"
+					bind:code="exampleCode"
+				/>
+				<div class="showcase-result">
+					<p class="showcase-result-label">{t('home.showcase.result')}</p>
+					<button
+						type="button"
+						on:click="() => (showcasePending.value = !showcasePending.value)"
+					>
+						{showcasePending.value ? t('home.showcase.all') : t('home.showcase.pending')}
+					</button>
+					<ul>
+						<li
+							each:of="showcasePending.value ? showcaseTasks.filter((task) => !task.done) : showcaseTasks"
+							each:as="task"
+							each:key="task.id"
+						>
+							{task.title}{task.done ? ' ✓' : ''}
+						</li>
+					</ul>
+					<p>{t('home.showcase.note')}</p>
+				</div>
+			</div>
+		</UIContainer>
+	</section>
+
+	<section
+		class="chapter meeko-ui-landing-section chapter-tools"
 		aria-labelledby="tools-title"
 	>
 		<UIContainer size="2xl">
 			<h2
 				id="tools-title"
-				class="chapter-title"
+				class="meeko-ui-landing-section-title"
 			>
 				{t('home.tools.title')}
-				<span class="tone-soft">{t('home.tools.titleSoft')}</span>
+				<span class="meeko-ui-landing-soft">{t('home.tools.titleSoft')}</span>
 			</h2>
 			<figure
 				class="editor-frame"
@@ -695,16 +757,16 @@
 	</section>
 
 	<section
-		class="chapter chapter-start"
+		class="chapter meeko-ui-landing-section chapter-start"
 		aria-labelledby="inicio-rápido"
 	>
 		<UIContainer size="2xl">
 			<h2
 				id="inicio-rápido"
-				class="chapter-title"
+				class="meeko-ui-landing-section-title"
 			>
 				{t('home.start.title')}
-				<span class="tone-soft">{t('home.start.titleSoft')}</span>
+				<span class="meeko-ui-landing-soft">{t('home.start.titleSoft')}</span>
 			</h2>
 			<div class="start">
 				<UIProse bind:html="quickStart" />
@@ -770,42 +832,20 @@
 	.hero {
 		padding-block-start: var(--ui-space-16);
 	}
+	.hero-copy-details,
 	.hero-copy {
 		max-width: var(--ui-container-lg);
 	}
-	h1 {
-		margin: 0;
-		color: var(--ui-color-text);
-		font-weight: var(--ui-font-weight-bold);
-		font-size: var(--ui-landing-title-size);
-		line-height: var(--ui-line-height-tight);
-		letter-spacing: var(--ui-tracking-display);
-	}
-	h1 .line {
+	.line {
 		display: block;
 	}
-	h1 code {
-		font-weight: var(--ui-font-weight-medium);
-		font-size: var(--ui-prose-code-size);
+	.hero-copy-details {
+		margin-block-start: var(--ui-space-3);
 	}
-	.lead {
-		margin: var(--ui-space-6) 0 0;
-		max-width: var(--ui-prose-measure);
-		color: var(--ui-color-text-soft);
-		font-size: var(--ui-font-size-xl);
-		line-height: var(--ui-line-height-normal);
-	}
-	.actions {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: var(--ui-space-3);
-		margin-block-start: var(--ui-space-8);
-	}
-	.actions :global(.meeko-ui-button) {
+	.hero-copy-details :global(.meeko-ui-button) {
 		max-width: 100%;
 	}
-	.actions code {
+	.hero-copy-details code {
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
@@ -834,19 +874,12 @@
 	}
 
 	@media (prefers-reduced-motion: no-preference) {
-		h1 .line,
-		.lead,
-		.actions,
+		.hero-copy,
+		.hero-copy-details,
 		.meta {
 			animation: settle 0.9s var(--ui-ease-out) both;
 		}
-		h1 .line + .line {
-			animation-delay: 0.08s;
-		}
-		.lead {
-			animation-delay: 0.16s;
-		}
-		.actions {
+		.hero-copy-details {
 			animation-delay: 0.24s;
 		}
 		.meta {
@@ -858,22 +891,8 @@
 	}
 
 	/* Chapters: a two-tone statement, then the facts beside a technical figure. */
-	.chapter {
-		border-block-start: var(--ui-border-width) solid var(--ui-color-border);
-		padding-block: var(--ui-space-24) var(--ui-space-20);
-	}
 	.chapter-flow {
 		border-block-start: 0;
-	}
-	.chapter-title {
-		margin: 0;
-		max-width: var(--ui-container-md);
-		color: var(--ui-color-text);
-		font-weight: var(--ui-font-weight-semibold);
-		font-size: var(--ui-font-size-4xl);
-		line-height: var(--ui-line-height-tight);
-		letter-spacing: var(--ui-tracking-display);
-		text-wrap: balance;
 	}
 	.split {
 		display: grid;
@@ -1103,6 +1122,61 @@
 		padding-block-start: var(--ui-space-5);
 	}
 
+	.showcase-lead {
+		max-width: 55rem;
+		color: var(--ui-color-text-soft);
+		line-height: var(--ui-line-height-relaxed);
+	}
+	.showcase-grid {
+		display: grid;
+		grid-template-columns: minmax(0, 1.3fr) minmax(16rem, 0.7fr);
+		gap: var(--ui-space-5);
+		align-items: stretch;
+		margin-block-start: var(--ui-space-8);
+	}
+	.showcase-grid :global(.meeko-ui-code-block) {
+		min-width: 0;
+		margin: 0;
+	}
+	.showcase-result {
+		border: var(--ui-border-width) solid var(--ui-color-border);
+		border-radius: var(--ui-radius-lg);
+		padding: var(--ui-space-6);
+		background: var(--ui-color-surface);
+	}
+	.showcase-result-label {
+		margin: 0 0 var(--ui-space-4);
+		color: var(--ui-color-text-soft);
+		font-size: var(--ui-font-size-sm);
+	}
+	.showcase-result button {
+		border: var(--ui-border-width) solid var(--ui-color-border);
+		border-radius: var(--ui-radius-md);
+		padding: var(--ui-space-2) var(--ui-space-3);
+		background: var(--ui-color-surface);
+		color: var(--ui-color-text);
+		cursor: pointer;
+	}
+	.showcase-result button:focus-visible {
+		outline: var(--ui-focus-ring-width) solid var(--ui-color-focus);
+		outline-offset: var(--ui-focus-ring-offset);
+	}
+	.showcase-result ul {
+		padding-inline-start: var(--ui-space-5);
+	}
+	.showcase-result li {
+		margin-block: var(--ui-space-2);
+	}
+	.showcase-result > p:last-child {
+		color: var(--ui-color-text-soft);
+		font-size: var(--ui-font-size-sm);
+	}
+	@media (max-width: 48rem) {
+		.showcase-grid {
+			grid-template-columns: minmax(0, 1fr);
+		}
+	}
+
 	/* Quick start: the init command, the scripts and the way to the guide. */
 	.start {
 		display: grid;
@@ -1158,12 +1232,6 @@
 		}
 	}
 	@media (max-width: 48rem) {
-		.chapter {
-			padding-block: var(--ui-space-16) var(--ui-space-12);
-		}
-		.chapter-title {
-			font-size: var(--ui-font-size-3xl);
-		}
 		.editor-body {
 			grid-template-columns: minmax(0, 1fr);
 			padding-block-end: var(--ui-space-4);

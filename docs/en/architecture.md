@@ -1,8 +1,10 @@
 ---
-source-hash: a08861d44321f47f42fd0df3b8f0744182509bdddebc82c954090281a84e4328
+source-hash: c4b4eed364adaceff064ef4a8ff6b644f7e73065ca42f911a2c5f82e5f9b8edc
 ---
 
 # Meeko architecture
+
+**Scope:** architecture of this checkout (`1.8.0`); npm publishes `1.9.0` as of November 5, 2026. Check later implementation details against the corresponding version's source code.
 
 ## Goal
 
@@ -62,7 +64,7 @@ The `src/vite.ts` plugin uses the same compiler for the client and SSR and expos
 
 Generated modules import the runtime from `@meekojs/meeko/internal`. This path groups the DOM, SSR, HMR and DevTools functions the compiler needs and is versioned alongside it. Since `1.5`, a component using `<MeekoThemeToggle>`, `<MeekoAwait>`, `<MeekoPopover>` or `<MeekoSelect>` also imports its compiled module (`@meekojs/meeko/builtins/theme-toggle`, `/await`, `/popover` or `/select`), and only that component does so: the compiler's `builtinComponentModules` table maps each tag to its module, and `scripts/builtin-components.ts` compiles its `.meeko` inside the package. A new built-in tag follows this pattern to avoid growing the runtime of every application. In development, `src/devtools.ts` registers hydrated instances and exposes a read hook shared by the integrated panel and the Chrome extension. Neither SSR nor the production build registers instances in that hook.
 
-Since core `1.8`, `<MeekoPopover>`, `<MeekoSelect>` and `<MeekoThemeToggle>` are deprecated: the compiler emits `MEEK121` and the editor strikes through the tag and explains its replacement on hover. They keep working in `1.x` and are removed in `2.0`. Use `UIPopover`, `UISelect` and `UIThemeToggle` from the `@meekojs/ui` 0.2 module; the theme system remains in core. See [Migration to 1.8](migration-1.8.md).
+Since core `1.8`, `<MeekoPopover>`, `<MeekoSelect>` and `<MeekoThemeToggle>` are deprecated: the compiler emits `MEEK121` and the editor strikes through the tag and explains its replacement on hover. They keep working in `1.x` and are removed in `2.0`. Use `UIPopover`, `UISelect` and `UIThemeToggle` from the `@meekojs/ui` 1.8 module; the theme system remains in core. See [Migration to 1.8](migration-1.8.md).
 
 ## SSR rules
 

@@ -1,5 +1,9 @@
 # Meeko DevTools
 
+## Inspeccionar una interacción
+
+En una aplicación que ya usa `@meekojs/meeko`, activa `devtools: true` en `meeko.config.ts` como se muestra abajo y arranca `pnpm exec meeko dev .`. Abre la página, pulsa un control que cambie una señal y selecciona la instancia en el panel flotante. El detalle muestra sus props y señales; la línea de tiempo deja relacionar el cambio con la interacción. Para comprobar una navegación, sigue el filtro **Navegación y datos** y compara los eventos de inicio y final mediante `operationId`. El panel sólo está disponible en desarrollo.
+
 DevTools permite examinar y editar cada instancia hidratada durante el desarrollo con Vite. Hay dos interfaces sobre el mismo runtime: un panel dentro de la página y un panel de Chrome DevTools. Ambas consumen el hook `window.__MEEKO_DEVTOOLS__`, que sólo existe en desarrollo.
 
 ## Panel dentro de la página
@@ -8,9 +12,9 @@ Desde `1.8`, la forma recomendada es activarlo en `meeko.config.ts`, como `devto
 
 ```ts
 // meeko.config.ts
-import { defineMeekoConfig } from "@meekojs/meeko/framework";
+import { defineMeekoConfig } from '@meekojs/meeko/framework'
 
-export default defineMeekoConfig({ devtools: true });
+export default defineMeekoConfig({ devtools: true })
 ```
 
 Con esa opción, `meeko dev` monta el panel en todas las páginas sin código de la aplicación. Nunca lo añade `meeko build`, `meeko start`, `meeko preview` ni una página prerenderizada: el bundle de producción no contiene `@meekojs/meeko/devtools-ui`. Por defecto es `false` en `1.x`, para que quien actualiza no vea un panel nuevo sin pedirlo. `{ position: "bottom-left" }` lo fija en otra esquina (`"bottom-right"`, la de por defecto, `"bottom-left"`, `"top-right"` o `"top-left"`), y `{ panel: false }` lo desactiva sin borrar las opciones. Un valor que no es válido detiene `meeko dev`, `build` y `check` con un mensaje que nombra la opción; véase la [referencia de `devtools`](reference/config/config-devtools.md). La [extensión de Chrome](#panel-de-chrome-devtools) y el [puente del editor](#puente-del-editor) funcionan con o sin la opción, porque leen el mismo hook.

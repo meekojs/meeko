@@ -11,7 +11,8 @@ import type { ApiSymbolInfo, ApiTypeBlock } from './api'
 import type { TaxonomyEntry, TaxonomyGroup } from './reference-taxonomy'
 
 import { apiCodeLinks, apiConfigBlock, apiConfigKeys, apiHref, apiSlugSet, apiSymbolInfo, apiSymbolMarkdown, apiTypeBlocks } from './api'
-import { apiGroups, exportsHref, groupHref, referenceHref } from './api-groups'
+import { exportsHref, referenceHref } from './api-groups'
+import { navigation } from './catalog'
 import { createHighlight } from './highlight'
 import { codeBlockHtml, documentHeadings, escapeHtml, localizedAnchor, renderInline, renderMarkdown, rewriteHref } from './markdown'
 import { messages } from './messages'
@@ -371,25 +372,40 @@ export async function referenceEntryAt(href: string): Promise<ResolvedEntry | un
 // Navigation
 
 /**
- * The sidebar of the reference: one section per group of the taxonomy with its icon, then every
- * export by module, the exhaustive reference generated from the sources.
+ * Compact links to the guide sections, the curated groups and the exhaustive export index.
  */
-export async function referenceNavigation(): Promise<NavSection[]> {
+export async function referenceNavigation(activeHref?: string, activeLabel?: string): Promise<NavSection[]> {
 	const { groups } = await resolvedTaxonomy()
 	const text = messages()
 	const sections: NavSection[] = [
+		{
+			title: text.documentation,
+			links: navigation()
+				.filter((section) => section.title !== text.reference && section.links.length > 0)
+				.map((section) => ({ href: section.links[0]!.href, label: section.title })),
+		},
 		{ title: text.reference, links: [{ href: referenceHref, label: text.referenceIndex }] },
 		...groups.map(({ group, entries }) => ({
 			title: group.title,
 			icon: groupIcons[group.icon]!,
-			links: entries.map((entry): NavLink => ({ href: entry.href, label: entry.entry.name, code: true })),
+			links: [
+				{ href: `${referenceHref}#${group.anchor}`, label: group.title },
+				...entries.filter((entry) => entry.href === activeHref).map((entry) => ({ href: entry.href, label: entry.entry.name })),
+			],
 		})),
 		{
 			title: text.allExports,
 			icon: groupIcons.exports!,
-			links: [{ href: exportsHref, label: text.exportsByModule }, ...apiGroups().map((group) => ({ href: groupHref(group), label: group.specifier ?? group.title, code: group.specifier !== null }))],
+			links: [{ href: exportsHref, label: text.exportsByModule }],
 		},
 	]
+	if (activeHref?.startsWith(`${referenceHref}/`) && !sections.some((section) => section.links.some((link) => link.href === activeHref))) {
+		const exportsSection = sections.at(-1)!
+		sections[sections.length - 1] = {
+			...exportsSection,
+			links: [...exportsSection.links, { href: activeHref, label: activeLabel ?? activeHref.slice(referenceHref.length + 1) }],
+		}
+	}
 	return sections
 }
 
@@ -416,12 +432,12 @@ export async function referenceIndex(): Promise<ReferenceIndexGroup[]> {
 			description: await renderInline(group.description),
 			href: entries[0]?.href ?? referenceHref,
 			entries: await Promise.all(
-				entries.map(async (entry): Promise<ReferenceIndexEntry> => ({
-					name: entry.entry.name,
-					href: entry.href,
-					description: await renderInline(entry.description.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')),
-					written: entry.page !== undefined,
-				})),
+				entries.map(async (entry): Promise<ReferenceIndexEntry> => {
+					const symbol = await referenceSymbol(entry.entry.symbols[0]!)
+					const description = await renderInline(entry.description.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1'))
+					const deprecated = symbol?.info?.deprecated ? `<strong>${currentLocale() === 'en' ? 'Deprecated' : 'Obsoleto'}.</strong> ` : ''
+					return { name: entry.entry.name, href: entry.href, description: trustHtml(`${deprecated}${description}`), written: entry.page !== undefined }
+				}),
 			),
 		})),
 	)
@@ -438,15 +454,23 @@ const relatedMarker = '<!--meeko:related-->'
 const usageTitles: ReadonlySet<string> = new Set([...pageSections[0].titles, ...englishPageSections[0].titles])
 
 /** The body with the generated sections: "Tipo" after "Uso" and "Relacionado" at the end, in the language of the render. */
-function withGeneratedSections(body: string): string {
+export function withGeneratedSections(body: string): string {
 	const text = messages()
 	const lines = body.replace(/\s+$/, '').split('\n')
-	let fenced = false
+	let fence: string | null = null
 	let inUsage = false
 	let at = lines.length
 	for (const [index, line] of lines.entries()) {
-		if (/^(`{3,}|~{3,})/.test(line)) fenced = !fenced
-		if (fenced || !line.startsWith('## ')) continue
+		const marker = /^\s{0,3}(`{3,}|~{3,})(.*)$/.exec(line)
+		if (marker && !fence) {
+			fence = marker[1]!
+			continue
+		}
+		if (fence) {
+			if (marker && marker[1]![0] === fence[0] && marker[1]!.length >= fence.length && !marker[2]!.trim()) fence = null
+			continue
+		}
+		if (!line.startsWith('## ')) continue
 		if (inUsage) {
 			at = index
 			break

@@ -1,8 +1,10 @@
 ---
-source-hash: f6db2c9992c4f2d083ad6d3141839562dd8589376218716d6cefe3d42c3d0ca3
+source-hash: 14625638d87ece0089e25be0e65dc12d7ba85674c8b57dba01962ed33135ad5c
 ---
 
 # 1.x stability policy
+
+**Scope:** compatibility policy for the 1.x series. This checkout declares `@meekojs/meeko@1.8.0`; npm publishes `1.9.0` as of November 5, 2026. Consult the changelog and migration guide for changes in a particular release.
 
 Starting with `1.0.0`, `@meekojs/meeko` follows [Semantic Versioning](https://semver.org/lang/es/). This page defines what that promise covers, what falls outside it, how an API is removed and which environments run Meeko. Changes in each version are recorded in the [CHANGELOG](../../packages/meeko/CHANGELOG.md); upgrading from `0.1.0` is explained in the [1.0 migration guide](migration-1.0.md), from `1.0` to `1.1` in [Upgrade from 1.0 to 1.1](migration-1.1.md), from `1.1` to `1.2` in [Upgrade from 1.1 to 1.2](migration-1.2.md), from `1.2` to `1.3` in [Upgrade from 1.2 to 1.3](migration-1.3.md), from `1.3` to `1.4` in [Upgrade from 1.3 to 1.4](migration-1.4.md), from `1.4` to `1.5` in [Upgrade from 1.4 to 1.5](migration-1.5.md), from `1.5` to `1.6` in [Upgrade from 1.5 to 1.6](migration-1.6.md), from `1.6` to `1.7` in [Upgrade from 1.6 to 1.7](migration-1.7.md), and from `1.7` to `1.8` in [Upgrade from 1.7 to 1.8](migration-1.8.md).
 

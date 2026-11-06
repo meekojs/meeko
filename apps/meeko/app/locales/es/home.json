@@ -1,11 +1,11 @@
 {
 	"home": {
 		"hero": {
-			"title": "Componentes <code>.meeko</code> tipados,",
-			"titleLine2": "del servidor al navegador.",
-			"lead": "Un motor de componentes para TypeScript y un framework full-stack. Un solo archivo da el HTML del servidor y la reactividad que lo actualiza, sin DOM virtual.",
+			"title": "Crea aplicaciones web con TypeScript y <code>.meeko</code>,",
+			"titleLine2": "con servidor integrado.",
+			"lead": "Meeko compila componentes tipados y los hidrata sobre HTML del servidor. Su framework añade rutas, datos y contratos API para construir una aplicación completa; el motor también funciona por separado en Vite.",
 			"start": "Empezar",
-			"requires": "Requiere Node 24 y"
+			"requires": "Requiere Node.js 24+ y"
 		},
 		"flow": {
 			"title": "Un archivo tipado.",
@@ -39,6 +39,18 @@
 			"platformsTitle": "Node, Bun, Deno y Cloudflare",
 			"platformsBody": "Un build autónomo por adaptador, comprobado por la misma suite de conformidad. SemVer desde 1.0, con una política de estabilidad explícita.",
 			"platformsLink": "Estabilidad 1.x"
+		},
+		"showcase": {
+			"title": "Datos del servidor, interacción en el navegador.",
+			"subtitle": "Una tarea pequeña de extremo a extremo.",
+			"lead": "Esta lista recibe dos tareas desde el bloque de servidor de la página. El filtro usa una señal en el navegador. Es un ejemplo real del sitio, con datos fijos para que puedas probarlo sin servicios externos.",
+			"file": "app/pages/index.meeko · ejemplo completo",
+			"result": "Resultado en esta página",
+			"taskOne": "Crear una página",
+			"taskTwo": "Añadir datos de ruta",
+			"pending": "Mostrar pendientes",
+			"all": "Mostrar todas",
+			"note": "La página entrega las tareas en el HTML inicial; el botón cambia la lista después de hidratarse."
 		},
 		"tools": {
 			"title": "Herramientas que ven el runtime.",

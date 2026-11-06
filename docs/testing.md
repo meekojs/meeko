@@ -1,42 +1,57 @@
-# Pruebas y distribución
+# Probar una aplicación Meeko
 
-## Preparación y tipos
+## Probar una aplicación instalada
 
-Ejecuta desde la raíz con Node.js 24+ y pnpm 12.14.0:
+En un proyecto externo, instala Meeko y ejecuta sus comprobaciones desde la raíz de **tu aplicación**:
 
 ```sh
-pnpm install --frozen-lockfile
-pnpm build
-pnpm lint
-pnpm check
-pnpm check:apps
+pnpm add @meekojs/meeko
+pnpm exec meeko check .
+pnpm exec meeko build .
 ```
 
-El build prepara los cinco paquetes públicos, la base documental privada y sus entradas `dist/`, incluidas las que importa `eslint.config.ts`. Por eso precede al lint en un checkout limpio. `check` comprueba los paquetes y `check:apps`, las webs públicas del framework, UI e i18n.
+`check` prepara y comprueba el proyecto; `build` verifica la salida de producción. Ejecuta las pruebas propias de tu aplicación con el runner que hayas elegido. Los comandos del monorepo están en [Contribuir a Meeko](contributing.md#pruebas-del-monorepo).
 
-## Pruebas por categoría
+### Probar una interacción en el navegador
 
-| Categoría             | Comando                                                             | Alcance                                                        |
-| --------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------- |
-| Núcleo                | `pnpm test`                                                         | Compilador, SSR, hidratación, framework y runtime.             |
-| Paquetes              | `pnpm test:packages`                                                | UI, i18n y plugins ESLint/Prettier, usando el build previo.    |
-| Verificación ampliada | `pnpm verify`                                                       | Núcleo, ejemplos, tipos de pruebas, Vite y DevTools.           |
-| Navegador del núcleo  | `pnpm e2e`                                                          | Interacciones e hidratación del motor.                         |
-| Navegador de UI       | `pnpm -F @meekojs/ui test:e2e`                                      | Web UI, Container, cards, tablas, modales y View Transitions.  |
-| Web i18n              | `pnpm -F meeko-i18n-site build && pnpm -F meeko-i18n-site test:e2e` | Build de producción, catálogos reales, cambio de idioma y RTL. |
-| Web pública           | `pnpm -F meeko-site test`                                           | Referencias y contenido del sitio.                             |
-| Distribución          | `pnpm package:workspace-smoke`                                      | Todos los paquetes instalados desde tarballs.                  |
+Playwright puede comprobar la página generada y su hidratación sin una utilidad de test específica de Meeko. Desde la raíz de **tu aplicación**:
 
-Las pruebas UI usan Chrome instalado por defecto. En CI se usa Chromium de Playwright mediante `MEEKO_CHROME_PATH`; puedes establecer esa variable para elegir otro ejecutable compatible. Los escenarios UI se ejecutan secuencialmente porque algunos prueban HMR modificando y restaurando artefactos.
+```sh
+pnpm add -D @playwright/test
+pnpm exec playwright install chromium
+```
 
-## Declaraciones y consumidor instalado
+**Archivo nuevo: `playwright.config.ts`:**
 
-El build de UI genera declaraciones junto a cada `.meeko`. Al moverlas desde `.meeko/types`, reajusta sus imports relativos y añade extensiones ESM para NodeNext; las referencias a componentes conservan su extensión `.meeko`.
+```ts
+import { defineConfig } from '@playwright/test'
 
-Las regresiones comprueban todas las declaraciones distribuidas sin `skipLibCheck`. El smoke crea el consumidor en el directorio temporal del sistema, fuera del workspace, para impedir que resuelva dependencias no declaradas desde el `node_modules` del repositorio. Comprueba exports, tipos, ESLint/Prettier, componentes y CSS procesado por el PostCSS del consumidor. No publica paquetes y conserva su carpeta temporal para diagnóstico.
+export default defineConfig({
+  use: { baseURL: 'http://localhost:4173' },
+  webServer: {
+    command: 'pnpm exec meeko dev .',
+    url: 'http://localhost:4173',
+    reuseExistingServer: !process.env.CI,
+  },
+})
+```
 
-La instalación del consumidor usa `--prefer-offline --ignore-scripts`: reutiliza el store y descarga lo que falte del registro, sin ejecutar scripts de instalación de terceros. Una caché local incompleta no debe confundirse con una dependencia disponible gracias al workspace.
+**Archivo nuevo: `tests/home.spec.ts`**, para el contador del starter generado por `meeko init-framework`:
 
-## CI
+```ts
+import { expect, test } from '@playwright/test'
 
-La verificación principal construye antes de lint, comprueba paquetes y aplicaciones, ejecuta las pruebas del ecosistema y del núcleo y valida consumidores instalados. Los jobs existentes de Redis, Node/Bun/Deno/workerd y VS Code mantienen sus escenarios específicos. Los logs de fallo se conservan como artefactos; las pruebas locales no equivalen a una ejecución remota de Actions.
+test('el contador responde después de hidratarse', async ({ page }) => {
+  await page.goto('/')
+  const button = page.getByRole('button', { name: 'Count: 0' })
+  await expect(button).toBeVisible()
+  await button.click()
+  await expect(page.getByRole('button', { name: 'Count: 1' })).toBeVisible()
+})
+```
+
+Ejecuta `pnpm exec playwright test`. En CI, instala dependencias y Chromium, y ejecuta `pnpm exec meeko check .`, `pnpm exec meeko build .` y `pnpm exec playwright test` desde el directorio de la aplicación. Si cambiaste el contador durante el tutorial, ajusta el test a la interacción real de tu página.
+
+## Pruebas del repositorio
+
+La [matriz de pruebas del monorepo](contributing.md#pruebas-del-monorepo) incluye núcleo, paquetes, navegador, distribución y CI.
