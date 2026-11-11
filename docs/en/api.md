@@ -1,8 +1,8 @@
 ---
-source-hash: 1f1d1b3351a737be734a6420ceb9a371bdb42b72c0d427ab06545c38ccb72d73
+source-hash: 10c35e5e7c8b3bf8dd0c03fd6aa166a9551da5b95c44d8edf1ec4546d1622aaa
 ---
 
-# Components and the .meeko language
+# Meeko API
 
 This page describes the component engine's public contract, exercised by the examples and tests. The [stability policy](stability.md) specifies what SemVer covers in the 1.x series.
 
@@ -93,6 +93,7 @@ Existing fragment links to this page remain here and lead to their new locations
 - <a id="generated-module"></a>[Generated module](component-advanced.md#generated-module)
 - <a id="reactivity"></a>[Reactivity](language-reactivity.md#reactivity)
 - <a id="lifecycle"></a>[Lifecycle](language-reactivity.md#lifecycle)
+- <a id="new-ids-createid"></a>[New IDs: createId](language-reactivity.md#new-ids-createid)
 - <a id="stable-ids-useid"></a>[Stable IDs: useId](language-reactivity.md#stable-ids-useid)
 - <a id="built-in-components"></a>[Built-in components](component-builtins.md#built-in-components)
 - <a id="popover-meekopopover"></a>[Popover: <MeekoPopover>](component-builtins.md#popover-meekopopover)
