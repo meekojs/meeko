@@ -1,8 +1,7 @@
 <script lang="ts">
-	// <UITooltip>: a <UIPopover mode="hint"> with the look of a tooltip. `interestfor` would save the delays, but
-	// only Chrome, Edge and Opera have it, neither Firefox nor Safari, and it is still experimental, so the hover,
-	// the focus and Escape stay in <UIPopover>. Its template has no whitespace between the tags: it would be text
-	// in the tooltip.
+	// <UITooltip>: a <UIPopover mode="hint"> with the look of a tooltip. The browser opens and closes it where
+	// it has Interest Invokers (`interestfor`: Chromium since 142, neither Firefox nor Safari yet), and the script
+	// of <UIPopover> everywhere else. Its template has no whitespace between the tags: it would be text in the tooltip.
 	import type { TooltipSnippets, UITooltipProps } from '../types/tooltip'
 
 	import * as Popover from './Popover.meeko'
@@ -37,6 +36,7 @@
 				type="button"
 				bind:id="trigger.id"
 				bind:aria-describedby="trigger['aria-describedby']"
+				bind:interestfor="trigger.interestfor"
 				bind:class="['meeko-ui-tooltip-trigger', props.triggerClass].filter(Boolean).join(' ')"
 				><render snippet="snippets.trigger"
 			/></button></snippet
