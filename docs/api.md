@@ -89,7 +89,6 @@ Los enlaces existentes a fragmentos de esta página siguen aquí y llevan a su n
 - <a id="módulo-generado"></a>[Módulo generado](component-advanced.md#módulo-generado)
 - <a id="reactividad"></a>[Reactividad](language-reactivity.md#reactividad)
 - <a id="ciclo-de-vida"></a>[Ciclo de vida](language-reactivity.md#ciclo-de-vida)
-- <a id="ids-nuevos-createid"></a>[IDs nuevos: createId](language-reactivity.md#ids-nuevos-createid)
 - <a id="ids-estables-useid"></a>[IDs estables: useId](language-reactivity.md#ids-estables-useid)
 - <a id="componentes-integrados"></a>[Componentes integrados](component-builtins.md#componentes-integrados)
 - <a id="popover-meekopopover"></a>[Popover: <MeekoPopover>](component-builtins.md#popover-meekopopover)

@@ -1,5 +1,5 @@
 ---
-source-hash: 507ffce975d6e436b415b6ae8bcdc8d480dab663045b8da68bc6d9894eda9ddb
+source-hash: 1f1d1b3351a737be734a6420ceb9a371bdb42b72c0d427ab06545c38ccb72d73
 ---
 
 # Components and the .meeko language
@@ -93,7 +93,6 @@ Existing fragment links to this page remain here and lead to their new locations
 - <a id="generated-module"></a>[Generated module](component-advanced.md#generated-module)
 - <a id="reactivity"></a>[Reactivity](language-reactivity.md#reactivity)
 - <a id="lifecycle"></a>[Lifecycle](language-reactivity.md#lifecycle)
-- <a id="new-ids-createid"></a>[New IDs: createId](language-reactivity.md#new-ids-createid)
 - <a id="stable-ids-useid"></a>[Stable IDs: useId](language-reactivity.md#stable-ids-useid)
 - <a id="built-in-components"></a>[Built-in components](component-builtins.md#built-in-components)
 - <a id="popover-meekopopover"></a>[Popover: <MeekoPopover>](component-builtins.md#popover-meekopopover)

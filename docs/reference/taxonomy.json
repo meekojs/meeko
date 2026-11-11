@@ -236,7 +236,12 @@
 						"@meekojs/meeko/framework#useTheme"
 					]
 				},
-				{ "name": "useThemeToggle", "symbols": ["@meekojs/meeko/framework#useThemeToggle"] },
+				{
+					"name": "useThemeToggle",
+					"symbols": [
+						"@meekojs/meeko/framework#useThemeToggle"
+					]
+				},
 				{
 					"name": "useLayout",
 					"symbols": [

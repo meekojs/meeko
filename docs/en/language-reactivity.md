@@ -1,5 +1,5 @@
 ---
-source-hash: 8f912c51b3a8dd48862ebe89a10b36476cfc7f88a7ba03779db18207df4f5280
+source-hash: e638fd4d6983b20ab8d8e2450118e2d57b7d76f9e31c92c365e6da392176ac4d
 ---
 
 # Reactivity and lifecycle
@@ -51,11 +51,8 @@ There is no `onUpdated`: use `effect` to react to changes.
 
 Observers created during `hydrate` belong to that instance. During Vite HMR, writable script signals are preserved by name; computed values are recalculated. This in-memory HMR state is independent of JSON transfer between server and browser.
 
-The `@meekojs/meeko` root exports exactly `signal`, `computed`, `effect`, `batch`, `untrack`, `createRoot`, `onCleanup`, `onMounted`, `createContext`, `provide`, `inject`, `provideErrorHandler`, `serializeJson`, since `1.3`, `trustHtml` and, since `1.5`, `useId` and, since `1.8`, `createId`, plus signal, context, component, `HotState`, DevTools and, since `1.3`, `TrustedHtml` types. This engine also documents `@meekojs/meeko/vite` and `@meekojs/meeko/devtools-ui`. Framework and adapter subpaths (`/framework`, `/server`, `/node`, `/bun`, `/deno`, `/cloudflare` and `/build`) are described in the [framework guide](framework.md). The compiler imports its DOM, HMR and DevTools registration functions from `@meekojs/meeko/internal`. That path is a contract between the compiler and its runtime of the **exact same version**, and is not intended for manual imports. A generated module must be compiled with the same package version that executes it, so it must be recompiled when updating Meeko.
+The `@meekojs/meeko` root exports exactly `signal`, `computed`, `effect`, `batch`, `untrack`, `createRoot`, `onCleanup`, `onMounted`, `createContext`, `provide`, `inject`, `provideErrorHandler`, `serializeJson`, since `1.3`, `trustHtml` and, since `1.5`, `useId`, plus signal, context, component, `HotState`, DevTools and, since `1.3`, `TrustedHtml` types. This engine also documents `@meekojs/meeko/vite` and `@meekojs/meeko/devtools-ui`. Framework and adapter subpaths (`/framework`, `/server`, `/node`, `/bun`, `/deno`, `/cloudflare` and `/build`) are described in the [framework guide](framework.md). The compiler imports its DOM, HMR and DevTools registration functions from `@meekojs/meeko/internal`. That path is a contract between the compiler and its runtime of the **exact same version**, and is not intended for manual imports. A generated module must be compiled with the same package version that executes it, so it must be recompiled when updating Meeko.
 
-### New IDs: `createId`
-
-`createId()` generates a cryptographic UUID v4 on server and browser without a component context. It is exported from the root and autoimported in Meeko applications; it can run inside functions, handlers and modules. Each call creates a new value. Serialize IDs created during SSR with their data to preserve them on the client. Use `useId()` for DOM identifiers that match during hydration. See [createId](reference/utils/create-id.md) for uniqueness limits and examples.
 
 ### Stable IDs: `useId`
 

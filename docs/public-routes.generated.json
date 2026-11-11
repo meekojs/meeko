@@ -4,12 +4,12 @@
       "es",
       "en"
     ],
-    "routes": 1354,
+    "routes": 1350,
     "guideSources": 59,
-    "curatedSymbols": 172,
-    "generatedSymbols": 574,
+    "curatedSymbols": 171,
+    "generatedSymbols": 573,
     "sharedSymbols": 134,
-    "distinctReferenceDestinations": 612
+    "distinctReferenceDestinations": 610
   },
   "routes": [
     {
@@ -101,7 +101,6 @@
         "/docs/language-reactivity",
         "/docs/language-reactivity#ciclo-de-vida",
         "/docs/language-reactivity#ids-estables-useid",
-        "/docs/language-reactivity#ids-nuevos-createid",
         "/docs/language-reactivity#reactividad",
         "/docs/stability",
         "/docs/stability#entornos-soportados"
@@ -149,7 +148,6 @@
         "módulo-generado",
         "reactividad",
         "ciclo-de-vida",
-        "ids-nuevos-createid",
         "ids-estables-useid",
         "componentes-integrados",
         "popover-meekopopover",
@@ -219,7 +217,7 @@
       "translation": "original",
       "status": "current",
       "title": "Cambios de Meeko · Meeko",
-      "purpose": "defineModel también como prop y evento. Un componente con defineModel sólo aceptaba una señal escribible, y quien venía de Vue o tenía el valor en un objeto…",
+      "purpose": "Credenciales configurables en los clientes API y RPC. ClientOptions.credentials acepta same-origin, include u omit y conserva same-origin por defecto. Permite…",
       "links": [
         "/docs/api#atributos-en-bloque-con-bind",
         "/docs/api#atributos-seg%C3%BAn-la-etiqueta",
@@ -330,7 +328,8 @@
       ],
       "anchors": [
         "cambios-de-meeko",
-        "180--sin-publicar",
+        "190--2026-11-05",
+        "180--2026-11-04",
         "seguridad",
         "171---2026-10-29",
         "correcciones",
@@ -1590,7 +1589,6 @@
         "reactividad-y-ciclo-de-vida",
         "reactividad",
         "ciclo-de-vida",
-        "ids-nuevos-createid",
         "ids-estables-useid"
       ]
     },
@@ -4138,32 +4136,6 @@
       "anchors": []
     },
     {
-      "path": "/docs/reference/create-id",
-      "kind": "curated-reference",
-      "audience": "developer",
-      "source": "docs/reference/utils/create-id.md",
-      "locale": "es",
-      "translation": "original",
-      "status": "current",
-      "title": "createId · Referencia de Meeko · Meeko",
-      "purpose": "Genera UUID v4 criptográficos en servidor y navegador desde funciones, handlers o módulos.",
-      "links": [
-        "/docs/reference/createid",
-        "/docs/reference/useid"
-      ],
-      "anchors": [
-        "uso",
-        "tipo",
-        "parámetros",
-        "valor-devuelto",
-        "ejemplos",
-        "errores-comunes",
-        "esperar-el-mismo-id-en-servidor-y-navegador",
-        "notas",
-        "relacionado"
-      ]
-    },
-    {
       "path": "/docs/reference/createapiclient",
       "kind": "curated-reference",
       "audience": "developer",
@@ -4503,19 +4475,6 @@
       "status": "current",
       "title": "createI18n · Referencia de Meeko · Meeko",
       "purpose": "Builds one request or tab translator; formatter instances are cached per options.",
-      "links": [],
-      "anchors": []
-    },
-    {
-      "path": "/docs/reference/createid",
-      "kind": "generated-reference",
-      "audience": "expert",
-      "source": "packages/meeko/src/core/create-id.ts",
-      "locale": "es",
-      "translation": "original",
-      "status": "current",
-      "title": "createId · Referencia de Meeko · Meeko",
-      "purpose": "Genera un UUID v4 criptográfico nuevo en servidor o navegador, sin contexto de componente.",
       "links": [],
       "anchors": []
     },
@@ -7639,7 +7598,7 @@
       "locale": "es",
       "translation": "original",
       "status": "current",
-      "title": "if, else-if y else · Referencia de Meeko · Meeko",
+      "title": "if:when · Referencia de Meeko · Meeko",
       "purpose": "Pinta una etiqueta con su contenido sólo mientras una expresión es verdadera, y estrecha los tipos dentro de ella.",
       "links": [
         "/docs/api#condiciones-con-ifwhen-y-tipos",
@@ -7655,7 +7614,6 @@
         "uso",
         "tipo",
         "atributos",
-        "ramas-alternativas",
         "resultado",
         "ejemplos",
         "estados-de-una-carga",
@@ -15423,7 +15381,6 @@
         "/en/docs/framework",
         "/en/docs/language-reactivity",
         "/en/docs/language-reactivity#lifecycle",
-        "/en/docs/language-reactivity#new-ids-createid",
         "/en/docs/language-reactivity#reactivity",
         "/en/docs/language-reactivity#stable-ids-useid",
         "/en/docs/stability",
@@ -15472,7 +15429,6 @@
         "generated-module",
         "reactivity",
         "lifecycle",
-        "new-ids-createid",
         "stable-ids-useid",
         "built-in-components",
         "popover-meekopopover",
@@ -15542,7 +15498,7 @@
       "translation": "missing",
       "status": "current",
       "title": "Cambios de Meeko · Meeko",
-      "purpose": "defineModel también como prop y evento. Un componente con defineModel sólo aceptaba una señal escribible, y quien venía de Vue o tenía el valor en un objeto…",
+      "purpose": "Credenciales configurables en los clientes API y RPC. ClientOptions.credentials acepta same-origin, include u omit y conserva same-origin por defecto. Permite…",
       "links": [
         "/en/docs/api#a-button-that-is-a-route-link-or-button",
         "/en/docs/api#attribute-values",
@@ -15604,7 +15560,8 @@
       ],
       "anchors": [
         "cambios-de-meeko",
-        "180--sin-publicar",
+        "190--2026-11-05",
+        "180--2026-11-04",
         "seguridad",
         "171---2026-10-29",
         "correcciones",
@@ -16865,7 +16822,6 @@
         "reactivity-and-lifecycle",
         "reactivity",
         "lifecycle",
-        "new-ids-createid",
         "stable-ids-useid"
       ]
     },
@@ -19394,38 +19350,12 @@
       "anchors": []
     },
     {
-      "path": "/en/docs/reference/create-id",
-      "kind": "curated-reference",
-      "audience": "developer",
-      "source": "docs/en/reference/utils/create-id.md",
-      "locale": "en",
-      "translation": "translated",
-      "status": "current",
-      "title": "createId · Meeko reference · Meeko",
-      "purpose": "Generates cryptographic UUID v4 identifiers on server and browser from functions, handlers or modules.",
-      "links": [
-        "/en/docs/reference/createid",
-        "/en/docs/reference/useid"
-      ],
-      "anchors": [
-        "usage",
-        "type",
-        "parameters",
-        "return-value",
-        "examples",
-        "common-mistakes",
-        "expecting-the-same-id-on-server-and-browser",
-        "notes",
-        "related"
-      ]
-    },
-    {
       "path": "/en/docs/reference/createapiclient",
       "kind": "curated-reference",
       "audience": "developer",
       "source": "docs/en/reference/advanced/createapiclient.md",
       "locale": "en",
-      "translation": "translated",
+      "translation": "outdated",
       "status": "current",
       "title": "createApiClient · Meeko reference · Meeko",
       "purpose": "Creates a typed API endpoint client from its public manifest, without importing server code, for explicit, external or test clients.",
@@ -19762,19 +19692,6 @@
       "anchors": []
     },
     {
-      "path": "/en/docs/reference/createid",
-      "kind": "generated-reference",
-      "audience": "expert",
-      "source": "packages/meeko/src/core/create-id.ts",
-      "locale": "en",
-      "translation": "missing",
-      "status": "current",
-      "title": "createId · Meeko reference · Meeko",
-      "purpose": "Genera un UUID v4 criptográfico nuevo en servidor o navegador, sin contexto de componente.",
-      "links": [],
-      "anchors": []
-    },
-    {
       "path": "/en/docs/reference/createlocalcalls",
       "kind": "curated-reference",
       "audience": "developer",
@@ -20074,7 +19991,7 @@
       "audience": "developer",
       "source": "docs/en/reference/advanced/createrpcclient.md",
       "locale": "en",
-      "translation": "translated",
+      "translation": "outdated",
       "status": "current",
       "title": "createRpcClient · Meeko reference · Meeko",
       "purpose": "Creates a typed RPC procedure client from its public manifest, where each call is a JSON POST with the CSRF token.",
@@ -22868,7 +22785,7 @@
       "locale": "en",
       "translation": "translated",
       "status": "current",
-      "title": "if, else-if and else · Meeko reference · Meeko",
+      "title": "if:when · Meeko reference · Meeko",
       "purpose": "Renders a tag and its content only while an expression is truthy, and narrows types inside it.",
       "links": [
         "/en/docs/api#conditions-with-ifwhen-and-types",
@@ -22884,7 +22801,6 @@
         "usage",
         "type",
         "attributes",
-        "alternative-branches",
         "result",
         "examples",
         "loading-states",
