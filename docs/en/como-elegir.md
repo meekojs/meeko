@@ -1,10 +1,12 @@
 ---
-source-hash: f7b0d7b10e5883de29c2256e044dc6b26b6d5daa45274442f1d66a6584962e99
+source-hash: aecbb92ab337d41f6b992768ced5e900902f22ead98aabbae84455b642a222ce
 ---
 
-# Choosing in Meeko
+# Common decisions in Meeko
 
-This guide connects existing capabilities. Start with [your first application](primeros-pasos.md) if you do not have a project yet, and use the [reference](/en/docs/reference) for each API's contracts and options.
+This guide covers decisions that come up while building an application: where to put a route, how to load data, and when to use API, RPC or Socket. Start with [your first application](primeros-pasos.md) if you do not have a project yet, and use the [reference](/en/docs/reference) for each API's contracts and options.
+
+To learn how to connect pages, data and layouts, follow [Router: pages and navigation](router.md).
 
 ## Pages and server code
 
@@ -41,10 +43,10 @@ API and RPC share contract validation and server checks. The client's TypeScript
 
 | You need                                                     | Choose                                    | Direction                                    |
 | ------------------------------------------------------------ | ----------------------------------------- | -------------------------------------------- |
-| Computed text between tags                                   | `{expresión}`                             | Read.                                        |
-| A computed HTML attribute or prop                            | `bind:nombre="expresión"`                 | From the parent to the element or component. |
-| An editable control value or a model declared by a component | `model="señal"` or `model:nombre="señal"` | Read and write a signal.                     |
-| Respond to an event                                          | `on:nombre="handler"`                     | The event calls the handler.                 |
+| Computed text between tags                                   | `{expression}`                            | Read.                                        |
+| A computed HTML attribute or prop                            | `bind:name="expression"`                  | From the parent to the element or component. |
+| An editable control value or a model declared by a component | `model="signal"` or `model:name="signal"` | Read and write a signal.                     |
+| Respond to an event                                          | `on:name="handler"`                       | The event calls the handler.                 |
 
 `bind:` does not turn an expression into a two-way binding. If you have a signal, read its value: `bind:disabled="saving.value"`; passing `saving` passes the signal object. `model` requires a writable signal, and the child component must declare its model with `defineModel`. See [bind](reference/syntax/bind.md), [model](reference/syntax/model.md) and [on](reference/syntax/on.md).
 

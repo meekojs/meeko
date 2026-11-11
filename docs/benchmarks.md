@@ -1,5 +1,7 @@
 # Comparativa reproducible: Meeko y Vue
 
+**Registro histórico:** las cifras de esta página provienen de corridas locales de octubre de 2026 sobre las revisiones identificadas abajo. No miden la versión npm actual (`1.9.0` al 5 de noviembre de 2026) ni fijan un presupuesto de rendimiento. Para medir el checkout actual, ejecuta los comandos de reproducción y conserva el JSON con versiones y revisión.
+
 Esta prueba usa el mismo caso funcional en ambos motores: un botón renderizado en el servidor con valor inicial `0`, valor derivado `doble`, hidratación y un clic que actualiza ambos valores. El ejemplo de Meeko es [`Counter.meeko`](../packages/meeko/examples/counter/Counter.meeko); la contraparte de Vue está en [`benchmarks/vue-counter.ts`](../packages/meeko/benchmarks/vue-counter.ts). Vue usa una función `render` escrita a mano y su runtime de producción, sin compilador de plantillas en el navegador. Meeko usa el módulo producido por su compilador. Se comprueba el texto visible antes y después de cada clic.
 
 ## Cómo repetirla

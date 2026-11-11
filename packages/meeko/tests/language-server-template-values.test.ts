@@ -244,6 +244,12 @@ describe('language server: completion from the script, by directive', () => {
 		ordered(title, 'name.value', 'checked')
 	})
 
+	test('if and else-if offer the same condition expressions as if:when', async () => {
+		const expected = labels(await complete('<div if:when="^"></div>'), 5)
+		assert.deepEqual(labels(await complete('<div if="^"></div>'), 5), expected)
+		assert.deepEqual(labels(await complete('<div if="false"></div><div else-if="^"></div>'), 5), expected)
+	})
+
 	test('if:when, each:of and each:key offer conditions, lists and fields', async () => {
 		const condition = await complete('<div if:when="^"></div>')
 		assert.deepEqual(labels(condition, 2), ['checked.value', 'props.open'])

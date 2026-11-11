@@ -9,7 +9,7 @@ import { join, posix } from 'node:path'
 
 import type { RenderedDoc, TocEntry } from '../types/docs'
 
-import { pageOfSource } from './catalog'
+import { catalog, pageOfSource } from './catalog'
 import { blockLanguage, createHighlight } from './highlight'
 import { originalFile } from './i18n'
 import { messages } from './messages'
@@ -24,6 +24,27 @@ function inlineText(token: Token | undefined): string {
 		.map((child) => (child.type === 'text' || child.type === 'code_inline' ? child.content : ''))
 		.join('')
 		.trim()
+}
+
+/** Raw-text HTML elements and component-like generic names in prose are examples, not markup. */
+function literalTag(html: string): boolean {
+	return /^<\/?(?:script|style|textarea|title|xmp|iframe|noembed|noframes|plaintext|listing|pre)(?=[\s/>])/i.test(html) || /^<\/?[A-Z][\w.-]*\s*>/.test(html)
+}
+
+/** Escape block openers before parsing: an unclosed raw-text tag can consume later headings. */
+function parseDocument(md: MarkdownIt, text: string): Token[] {
+	let tokens = md.parse(text, {})
+	let lines: string[] | undefined
+	while (true) {
+		const block = tokens.find((token) => token.type === 'html_block' && literalTag(token.content.trimStart()))
+		if (!block?.map) return tokens
+		lines ??= text.split('\n')
+		const line = block.map[0]
+		const escaped = lines[line]!.replace(/^([ \t]{0,3})</, '$1&lt;')
+		if (escaped === lines[line]) return tokens
+		lines[line] = escaped
+		tokens = md.parse(lines.join('\n'), {})
+	}
 }
 
 /**
@@ -163,6 +184,11 @@ function markdown(html = true): Promise<MarkdownIt> {
 	return sourceCache(`markdown:renderer:${html}`, async () => {
 		const highlight = await createHighlight()
 		const md = markdownIt({ html, linkify: false, typographer: false })
+		if (html)
+			md.renderer.rules.html_inline = (tokens, index) => {
+				const content = tokens[index]!.content
+				return literalTag(content) ? md.utils.escapeHtml(content) : content
+			}
 		md.renderer.rules.fence = (tokens, index) => {
 			const token = tokens[index]!
 			const code = token.content.replace(/\n$/, '')
@@ -218,7 +244,7 @@ export async function renderSource(source: string, transform: (text: string) => 
  */
 export async function renderMarkdown(text: string, source: string, options: RenderOptions = {}): Promise<RenderedDoc> {
 	const md = await markdown()
-	const tokens = md.parse(text, {})
+	const tokens = parseDocument(md, text)
 	const slugger = new GithubSlugger()
 	const toc: TocEntry[] = []
 	let title = ''
@@ -238,7 +264,18 @@ export async function renderMarkdown(text: string, source: string, options: Rend
 			for (const child of token.children ?? []) {
 				if (child.type !== 'link_open') continue
 				const href = child.attrGet('href')
-				if (typeof href === 'string' && href) child.attrSet('href', rewriteHref(href, source))
+				if (typeof href === 'string' && href) {
+					let rewritten = rewriteHref(href, source)
+					const hashAt = rewritten.indexOf('#')
+					if (hashAt > 0 && currentSourceContext()?.locale === 'en') {
+						const target = catalog.find((entry) => entry.href === rewritten.slice(0, hashAt))
+						if (target) {
+							const anchor = await localizedAnchor(target.source, decodeURIComponent(rewritten.slice(hashAt + 1)))
+							rewritten = rewritten.slice(0, hashAt) + (anchor ? `#${anchor}` : '')
+						}
+					}
+					child.attrSet('href', rewritten)
+				}
 			}
 			if (options.codeLinks && tokens[index - 1]?.type !== 'heading_open') linkCode(token, options.codeLinks, linked)
 		}
@@ -275,7 +312,7 @@ export async function localizedAnchor(path: string, anchor: string): Promise<str
  */
 export async function textHeadings(text: string): Promise<ReadonlyMap<string, string>> {
 	const md = await markdown()
-	const tokens = md.parse(text, {})
+	const tokens = parseDocument(md, text)
 	const slugger = new GithubSlugger()
 	const found = new Map<string, string>()
 	for (const [index, token] of tokens.entries()) {

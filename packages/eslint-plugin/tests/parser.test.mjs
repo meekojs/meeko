@@ -9,6 +9,11 @@ import parser from '../dist/parser.js'
 const lint = (source, rules = {}) => new Linter().verify(source, [...plugin.configs.recommended, { files: ['**/*.meeko'], rules }], { filename: 'App.meeko' })
 const unused = (source) => lint(source).filter((message) => message.ruleId === '@typescript-eslint/no-unused-vars')
 
+test('if and else-if expressions count as template reads while else remains a boolean directive', () => {
+	const source = '<script lang="ts">const loading=true;const failed=false;</script><template><p if="loading">Cargando</p><p else-if="failed">Error</p><p else>Listo</p></template>'
+	assert.deepEqual(lint(source), [])
+})
+
 test('script variables, imported components and type-only imports are read by the template', () => {
 	const messages = lint(`<script lang="ts">
 import Card from './Card.meeko';

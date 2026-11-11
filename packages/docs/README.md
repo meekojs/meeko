@@ -12,6 +12,8 @@
 
 `pnpm build` lo prepara después del núcleo y UI. Las aplicaciones también ejecutan su preparación antes de `dev`, `build` y `check`. `meeko.config.ts` del paquete describe las dependencias de sus plantillas durante esa generación.
 
+`meeko-docs/site-config` comparte los defaults de tema, origen, documento, cookie y catálogo `shell` de UI e i18n. Cada llamada devuelve objetos nuevos. Cada web mantiene sus módulos en el orden original y define sus catálogos, `global`, rutas y opciones de idioma particulares. `meeko-docs/health` comparte el middleware de `/healthz`; las rutas `server/api/docs/*.post.ts` siguen declarando directamente `defineApiRoute({...})` porque el generador de contratos lee sus schemas en esos archivos.
+
 **Shell.** `DocsShell` pinta `UIPage`, `UIHeader`, `UIFooter`, `UIDrawer`, `UINavigationTree`, `UITableOfContents`, `UIPageNavigation`, `UILocaleSwitcher` y `UILocaleSuggestion`. Recibe una sola prop, `view` (`DocsShellView`), con todo ya resuelto: **no lee la base de datos, ni la moderación, ni las rutas**, y sirve igual a una web de páginas `.meeko` y a un snapshot.
 
 ```html

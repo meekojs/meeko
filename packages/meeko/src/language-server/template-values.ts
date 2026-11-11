@@ -66,7 +66,7 @@ export function valueSiteAt(source: string, offset: number): ValueSite | undefin
 		const open = source.lastIndexOf('{', offset - 1)
 		if (open >= context.value.start && open > source.lastIndexOf('}', offset - 1)) return {}
 		// A static value (`variant="primary"`) is text: TypeScript completes its literals.
-		const expression = /^(?:(?:bind|on|model|if|each)(?::|$)|html$)/.test(context.value.attribute) || (context.tag === 'render' && context.value.attribute === 'snippet')
+		const expression = /^(?:(?:bind|on|model|if|each)(?::|$)|else-if$|html$)/.test(context.value.attribute) || (context.tag === 'render' && context.value.attribute === 'snippet')
 		return expression ? { attribute: context.value.attribute, tag: context.tag, component: context.component } : undefined
 	}
 	if (context) return undefined
@@ -301,7 +301,7 @@ function fitFor(checker: ts.TypeChecker, site: ValueSite, expected: ts.Type | un
 			return !usable || checker.isTypeAssignableTo(type, usable) ? 0 : undefined
 		}
 	}
-	if (attribute === 'if:when') {
+	if (attribute === 'if' || attribute === 'else-if' || attribute === 'if:when') {
 		// A condition: a boolean first, then a value that may be missing (an optional snippet).
 		return (type) => {
 			if (callable(type)) return undefined

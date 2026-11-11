@@ -135,7 +135,7 @@ export class Source {
 		const each = find('each:of')
 		const snippet = node.tagName === 'snippet'
 		if (snippet) {
-			const condition = find('if:when')
+			const condition = find('if') ?? find('if:when')
 			if (condition) this.expression(condition)
 		}
 		if (each) {
@@ -165,7 +165,7 @@ export class Source {
 		for (const attribute of attributes) {
 			const name = attribute.name
 			const custom = node.tagName !== undefined && isCustomElementTag(node.tagName)
-			if (name === 'bind' || name.startsWith('bind:') || name.startsWith('on:') || (!custom && (name === 'model' || name.startsWith('model:'))) || (name === 'if:when' && !snippet) || name === 'each:key' || (node.tagName === 'component' && name === 'is') || (node.tagName === 'render' && (name === 'snippet' || name === 'args')) || (name === 'html' && !node.componentName && !custom) || (node.componentName === 'MeekoAwait' && name === 'for')) this.expression(attribute)
+			if (name === 'bind' || name.startsWith('bind:') || name.startsWith('on:') || (!custom && (name === 'model' || name.startsWith('model:'))) || (['if', 'else-if', 'if:when'].includes(name) && !snippet) || name === 'each:key' || (node.tagName === 'component' && name === 'is') || (node.tagName === 'render' && (name === 'snippet' || name === 'args')) || (name === 'html' && !node.componentName && !custom) || (node.componentName === 'MeekoAwait' && name === 'for')) this.expression(attribute)
 		}
 		if (node.nodeName === '#text') {
 			const text = this.text.slice(node.start, node.end)

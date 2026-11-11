@@ -22,7 +22,8 @@
 	"scripts": {
 		"check": "tsc -p tsconfig.json --noEmit",
 		"test": "tsx --test --test-concurrency=1 tests/*.test.ts",
-		"translations": "tsx scripts/translations.ts"
+		"translations": "tsx scripts/translations.ts",
+		"inventory": "tsx scripts/inventory.ts"
 	},
 	"dependencies": {
 		"@meekojs/meeko": "workspace:*",

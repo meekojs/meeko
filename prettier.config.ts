@@ -2,11 +2,7 @@ import type { MeekoPrettierOptions } from '@meekojs/prettier-plugin'
 
 import { type Config } from 'prettier'
 
-const config: Config &
-	MeekoPrettierOptions & {
-		cssDeclarationSorterKeepOverrides: boolean
-		cssDeclarationSorterOrder: 'concentric-css'
-	} = {
+const config: Config & MeekoPrettierOptions & { cssDeclarationSorterKeepOverrides: boolean; cssDeclarationSorterOrder: 'concentric-css' } = {
 	plugins: ['@meekojs/prettier-plugin', 'prettier-plugin-css-order', 'prettier-plugin-packagejson'],
 	cssDeclarationSorterKeepOverrides: false,
 	cssDeclarationSorterOrder: 'concentric-css',

@@ -1090,12 +1090,64 @@ export function bindModel<K extends NativeModelKind>(scope: DomScope, id: number
 }
 
 /** Genera los límites estables de una condición en SSR. */
-export function renderIf(id: number, condition: unknown, render: () => string): string {
-	return `<!--meeko:if:${id}-->${condition ? render() : ''}<!--/meeko:if:${id}-->`
+export function renderIf(id: number, condition: unknown, render: () => string, otherwise?: () => string): string {
+	return `<!--meeko:if:${id}-->${condition ? render() : (otherwise?.() ?? '')}<!--/meeko:if:${id}-->`
+}
+
+/** Intercambia dos ramas exclusivas y libera por completo la rama anterior antes de hidratar otra. */
+function bindIfElse(scope: DomScope, id: number, read: () => unknown, render: () => string, hydrate: (inner: DomScope) => () => void, otherwise: () => string, hydrateOtherwise: (inner: DomScope) => () => void): () => void {
+	const inner = region(scope, 'if', id)
+	const order = reserveUpdateOrder()
+	const at = currentIdBase()
+	let active = Boolean(read())
+	let release = (active ? hydrate : hydrateOtherwise)(inner)
+	let stop = () => {}
+	stop = effectInOrder(order, () =>
+		mountBatch(() => {
+			const next = Boolean(read())
+			if (next === active) return
+			const html = withIdBase(at, () => lateRender(next ? render : otherwise))
+			const failures: unknown[] = []
+			try {
+				release()
+			} catch (error) {
+				failures.push(error)
+			}
+			release = () => {}
+			try {
+				clearRegion(inner)
+			} catch (error) {
+				failures.push(error)
+			}
+			if (failures.length) {
+				stop()
+				if (failures.length === 1) throw failures[0]
+				throw new AggregateError(failures, `Meeko condition ${id} cleanup failed`)
+			}
+			try {
+				insertHtml(inner.end!, html)
+				release = withIdBase(at, () => (next ? hydrate : hydrateOtherwise)(inner))
+				active = next
+			} catch (error) {
+				stop()
+				try {
+					clearRegion(inner)
+				} catch (cleanupError) {
+					throw new AggregateError([error, cleanupError], `Meeko condition ${id} update and cleanup failed`, { cause: cleanupError })
+				}
+				throw error
+			}
+		}),
+	)
+	return () => {
+		stop()
+		release()
+	}
 }
 
 /** Hidrata una condición y conserva los nodos mientras sigue siendo verdadera. */
-export function bindIf(scope: DomScope, id: number, read: () => unknown, render: () => string, hydrate: (inner: DomScope) => () => void): () => void {
+export function bindIf(scope: DomScope, id: number, read: () => unknown, render: () => string, hydrate: (inner: DomScope) => () => void, otherwise?: () => string, hydrateOtherwise?: (inner: DomScope) => () => void): () => void {
+	if (otherwise && hydrateOtherwise) return bindIfElse(scope, id, read, render, hydrate, otherwise, hydrateOtherwise)
 	const inner = region(scope, 'if', id)
 	// Its content hydrates first; the condition still updates before that content does.
 	const order = reserveUpdateOrder()

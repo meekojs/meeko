@@ -1,11 +1,10 @@
 import assert from 'node:assert/strict'
-import { spawn } from 'node:child_process'
-import { once } from 'node:events'
 import { mkdir } from 'node:fs/promises'
-import { createServer } from 'node:net'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright-core'
+
+import { startDevServer } from '../../../scripts/test-support/dev-server.ts'
 
 const demo = fileURLToPath(new URL('../../../apps/ui/', import.meta.url))
 const output = fileURLToPath(new URL('../.meeko/', import.meta.url))
@@ -19,38 +18,9 @@ async function until(check, message) {
 }
 
 test('modals hydrate, stack, settle, restore focus and work on mobile', { timeout: 120_000 }, async (context) => {
-	const socket = createServer().listen(0, '127.0.0.1')
-	await once(socket, 'listening')
-	const port = socket.address().port
-	await new Promise((done) => socket.close(done))
-	const hmr = createServer().listen(0, '127.0.0.1')
-	await once(hmr, 'listening')
-	const hmrPort = hmr.address().port
-	await new Promise((done) => hmr.close(done))
 	const cli = fileURLToPath(new URL('../../meeko/dist/cli.js', import.meta.url))
-	const server = spawn(process.execPath, [cli, 'dev', demo], { cwd: demo, env: { ...process.env, PORT: String(port), MEEKO_HMR_PORT: String(hmrPort), MEEKO_EDITOR_BRIDGE: '0' }, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
-	let logs = ''
-	server.stdout.on('data', (chunk) => {
-		logs += chunk
-	})
-	server.stderr.on('data', (chunk) => {
-		logs += chunk
-	})
-	context.after(() => {
-		server.kill()
-	})
-	const origin = `http://127.0.0.1:${port}`
-	await until(
-		async () => {
-			if (server.exitCode !== null) throw new Error(logs)
-			try {
-				return (await fetch(`${origin}/modals`)).ok
-			} catch {
-				return false
-			}
-		},
-		() => logs,
-	)
+	const { origin, stop } = await startDevServer({ root: demo, cli, path: '/modals', startupTimeout: 30_000 })
+	context.after(stop)
 	const browser = await chromium.launch({ ...(process.env.MEEKO_CHROME_PATH ? { executablePath: process.env.MEEKO_CHROME_PATH } : { channel: 'chrome' }), headless: true })
 	context.after(() => browser.close())
 	const page = await browser.newPage({ viewport: { width: 1280, height: 800 } })

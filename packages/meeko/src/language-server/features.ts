@@ -731,10 +731,14 @@ interface TemplateDirective {
 const snippetAttributes = [
 	{ name: 'name', detail: 'Snippet del hijo que llena', insert: 'name="$1"' },
 	{ name: 'params', detail: 'Nombres de sus parámetros, separados por comas', insert: 'params="$1"' },
+	{ name: 'if', detail: 'Pasa el snippet sólo mientras la expresión es verdadera; el hijo debe declararlo opcional', insert: 'if="$1"' },
 	{ name: 'if:when', detail: 'Pasa el snippet sólo mientras la expresión es verdadera; el hijo debe declararlo opcional', insert: 'if:when="$1"' },
 ] as const
 
 const templateDirectives: readonly TemplateDirective[] = [
+	{ name: 'if', detail: 'Primera rama de una cadena condicional', insert: 'if="$1"', on: 'all' },
+	{ name: 'else-if', detail: 'Rama alternativa si no se cumplió la anterior', insert: 'else-if="$1"', on: 'all' },
+	{ name: 'else', detail: 'Rama final cuando ninguna condición anterior se cumple', insert: 'else', on: 'all' },
 	{ name: 'if:when', detail: 'Muestra la etiqueta mientras la expresión es verdadera', insert: 'if:when="$1"', on: 'all' },
 	{ name: 'each:of', detail: 'Repite la etiqueta por cada elemento de la lista', insert: 'each:of="$1"', on: 'all' },
 	{ name: 'each:as', detail: 'Nombre de cada elemento de each:of', insert: 'each:as="$1"', on: 'all' },
@@ -774,6 +778,9 @@ export function directiveNameCompletion(document: TextDocument, position: Positi
 		return [
 			{ name: 'snippet', detail: 'Snippet que se va a renderizar', insert: 'snippet="$1"' },
 			{ name: 'args', detail: 'Argumentos del snippet, separados por comas', insert: 'args="$1"' },
+			{ name: 'if', detail: 'Primera rama condicional', insert: 'if="$1"' },
+			{ name: 'else-if', detail: 'Alternativa a la condición anterior', insert: 'else-if="$1"' },
+			{ name: 'else', detail: 'Rama final', insert: 'else' },
 			{ name: 'if:when', detail: 'Renderiza sólo si la expresión es verdadera', insert: 'if:when="$1"' },
 		]
 			.filter((attribute) => !present.has(attribute.name))
@@ -793,7 +800,7 @@ export function directiveNameCompletion(document: TextDocument, position: Positi
 			.filter((attribute) => !present.has(attribute.name))
 			.map((attribute, index): CompletionItem => ({
 				label: attribute.name,
-				kind: attribute.name === 'if:when' ? CompletionItemKind.Keyword : CompletionItemKind.Property,
+				kind: attribute.name === 'if' || attribute.name === 'if:when' ? CompletionItemKind.Keyword : CompletionItemKind.Property,
 				detail: attribute.detail,
 				documentation: { kind: MarkupKind.Markdown, value: specialTemplateDocumentation('snippet', attribute.name)! },
 				sortText: `0${String(index).padStart(2, '0')}`,

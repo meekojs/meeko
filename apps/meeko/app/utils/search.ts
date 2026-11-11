@@ -26,11 +26,28 @@ function escapeText(value: string): string {
 	return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;')
 }
 
+/** Keeps positions in the original text while comparing words without accents. */
+function foldedText(value: string): { text: string; positions: number[] } {
+	let text = ''
+	const positions: number[] = []
+	for (let index = 0; index < value.length;) {
+		const character = String.fromCodePoint(value.codePointAt(index)!)
+		const folded = character.normalize('NFD').replace(/\p{M}/gu, '').toLocaleLowerCase()
+		text += folded
+		for (let offset = 0; offset < folded.length; offset++) positions.push(index)
+		index += character.length
+	}
+	return { text, positions }
+}
+
 function excerptHtml(value: string, query: string): TrustedHtml {
-	const needle = query.trim().split(/\s+/)[0]?.toLocaleLowerCase() ?? ''
-	const at = needle ? value.toLocaleLowerCase().indexOf(needle) : -1
+	const needle = foldedText(query.trim().split(/\s+/)[0] ?? '').text
+	const folded = foldedText(value)
+	const at = needle ? folded.text.indexOf(needle) : -1
 	if (at < 0) return trustHtml(escapeText(value))
-	return trustHtml(`${escapeText(value.slice(0, at))}<mark>${escapeText(value.slice(at, at + needle.length))}</mark>${escapeText(value.slice(at + needle.length))}`)
+	const start = folded.positions[at]!
+	const end = folded.positions[at + needle.length] ?? value.length
+	return trustHtml(`${escapeText(value.slice(0, start))}<mark>${escapeText(value.slice(start, end))}</mark>${escapeText(value.slice(end))}`)
 }
 
 /** Searches the documentation of `locale`; the result URLs of English carry `/en`. */

@@ -14,7 +14,7 @@
 | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `app/styles/main.css`, `.iso`    | Las figuras isométricas: trazos finos sobre pasos de la escala `surface`, con las etiquetas en las unidades de cada dibujo (`--fig-text`, en `px` del `viewBox`).                         |
 | `app/components/CatFigure.meeko` | El dibujo de Meeko: su geometría, la mezcla del trazo medio y los ojos con el acento.                                                                                                     |
-| `app/pages/index.meeko`          | La entrada de la portada (`settle`, `rise`, con `prefers-reduced-motion`), los tamaños de `--fig-text` de cada figura y la escena del editor de la FIG. 04.                               |
+| `app/pages/index.meeko`          | La entrada de los controles y la demo (`settle`, `rise`, con `prefers-reduced-motion`), los tamaños de `--fig-text` de cada figura y la escena del editor de la FIG. 04.                  |
 | `app/components/LiveDemo.meeko`  | La ventana que se funde con el fondo (`mask-image`), la trama de puntos del resultado y los destellos al cambiar una señal, con el rosa de la nariz de Meeko (`--ui-color-pink-3`, `-9`). |
 
 Todo lo demás, también dentro de esos archivos (textos, botones, leyendas de figura), es de UI: los controles son `UIButton` y `UIBadge`, y las fuentes y los tamaños salen de tokens.

@@ -33,6 +33,7 @@ import { MeekoCompileError, parseSfc } from '../compiler/parser/sfc'
 import { attributeValueStart, decodeTemplateExpression, isCustomElementTag, parseTemplate } from '../compiler/parser/template'
 import { generatedServicesDeclaration, projectDeclarationFiles } from '../compiler/project-declarations'
 import { projectRoot } from '../compiler/project-root'
+import { prepareConditionals } from '../compiler/transforms/conditionals'
 import { branchTakes, isBranchCondition, isCandidates, isComponentName, isLeaves, scriptValueNames } from '../compiler/transforms/dynamic-tag'
 import { templateEventDeclaration, templateEventType } from '../compiler/transforms/events'
 import { analyzeServerScript } from '../compiler/transforms/server-script'
@@ -700,9 +701,11 @@ export function createVirtualComponent(source: string, filename: string, options
 	}
 
 	const root = parseTemplate(source, document.template, filename)
+	prepareConditionals(root, source, filename, true)
 
 	/** Recorre la plantilla y conserva el ámbito de cada lista. */
 	const visit = (node: TemplateNode): void => {
+		if (node.conditionalContinuation) return
 		const attrs = node.attrs ?? []
 		let childrenVisited = false
 		// `if:when` narrows the bindings and the children of its element, like `v-if` in Vue.
@@ -1015,6 +1018,19 @@ export function createVirtualComponent(source: string, filename: string, options
 		if (narrows) {
 			code += '}\n'
 			guards.pop()
+		}
+		if (node.conditionalElse) {
+			if (narrows) {
+				code += 'if (!('
+				mapped(condition.value, conditionStart)
+				code += ')) {\n'
+				guards.push({ text: `!(${condition.value})`, names: new Set(freeIdentifiers(condition.value).map(({ name }) => name)) })
+			}
+			visit({ ...node.conditionalElse, conditionalContinuation: false })
+			if (narrows) {
+				code += '}\n'
+				guards.pop()
+			}
 		}
 	}
 

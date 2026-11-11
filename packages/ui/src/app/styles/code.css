@@ -5,7 +5,7 @@
 .meeko-ui-code-block,
 .meeko-ui-prose .code-block {
 	margin: 0;
-	border: var(--ui-border-width) solid var(--ui-color-border);
+	border: var(--ui-border-width) solid var(--ui-color-code-border);
 	border-radius: var(--ui-radius-lg);
 	background: var(--ui-color-bg-subtle);
 	min-width: 0;
@@ -18,7 +18,8 @@
 	display: flex;
 	align-items: center;
 	gap: var(--ui-space-2);
-	border-bottom: var(--ui-border-width) solid var(--ui-color-border);
+	border-bottom: var(--ui-border-width) solid var(--ui-color-code-border);
+	background: var(--ui-color-code-header);
 	padding-inline: var(--ui-space-4) var(--ui-space-1-5);
 	padding-block: var(--ui-space-1);
 	min-height: var(--ui-control-height-md);

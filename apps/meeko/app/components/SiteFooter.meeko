@@ -1,10 +1,17 @@
 <script lang="ts">
-	const { localePath, t } = useI18n()
+	const { locale, localePath, t } = useI18n()
 
 	// The links in the language of the document: /docs/api in Spanish, /en/docs/api in English.
 	const doc = (slug: string): string => localePath(href('/docs/[slug]', { params: { slug } }))
 	const brand = { name: 'Meeko', href: localePath(href('/')), image: { src: '/brand/meeko-logo.webp', width: 24, height: 24 }, ariaLabel: t('a11y.home') }
 	const groups = [
+		{
+			title: locale === 'en' ? 'Ecosystem' : 'Ecosistema',
+			items: [
+				{ label: 'Meeko UI', href: `https://ui.meekojs.com${locale === 'en' ? '/en' : ''}` },
+				{ label: 'Meeko i18n', href: `https://i18n.meekojs.com${locale === 'en' ? '/en' : ''}` },
+			],
+		},
 		{
 			title: t('footer.docs'),
 			items: [

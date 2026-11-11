@@ -23,7 +23,7 @@
 
 <template>
 	<div
-		class="docs-page"
+		bind:class="props.landing ? 'docs-page meeko-ui-landing-page' : 'docs-page'"
 		bind:data-landing="props.landing ? '' : undefined"
 		bind:lang="prose.value === i18n.locale ? undefined : prose.value"
 	>
@@ -32,14 +32,29 @@
 			bind:href="i18n.switchLocalePath(prose.value)"
 			bind:hreflang="prose.value"
 		/>
-		<UIPageHeader
-			bind:title="props.title"
-			bind:description="props.description"
-			bind:layout="props.landing ? 'landing' : 'docs'"
-		/>
-		<UIProse as="article">
-			<render snippet="snippets.default" />
-		</UIProse>
+		<UIContainer
+			if:when="props.landing"
+			size="2xl"
+		>
+			<UIPageHeader
+				bind:title="props.title"
+				bind:description="props.description"
+				bind:layout="props.landing ? 'landing' : 'docs'"
+			/>
+			<UIProse as="article">
+				<render snippet="snippets.default" />
+			</UIProse>
+		</UIContainer>
+		<div if:when="!props.landing">
+			<UIPageHeader
+				bind:title="props.title"
+				bind:description="props.description"
+				layout="docs"
+			/>
+			<UIProse as="article">
+				<render snippet="snippets.default" />
+			</UIProse>
+		</div>
 		<DocsFeedback
 			if:when="!props.landing"
 			bind:path="route.path.value"

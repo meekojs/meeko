@@ -7,6 +7,8 @@ import { compileError, hyphenatedStandardElements, maskComponentTags, maskedForm
 /** Atributo normalizado de una etiqueta de plantilla. */
 export interface TemplateAttribute {
 	name: string
+	/** Nombre escrito antes de normalizar un alias de directiva. */
+	originalName?: string
 	value: string
 	start: number
 	end: number
@@ -32,6 +34,10 @@ export interface TemplateNode {
 	 * Los elementos vacíos (`<input />`) y los de SVG o MathML no lo llevan.
 	 */
 	selfClosing?: boolean
+	/** Siguiente rama de una cadena condicional, sin retirarla del árbol de origen. */
+	conditionalElse?: TemplateNode
+	/** La rama se compila desde su condición anterior, no de nuevo como hermana. */
+	conditionalContinuation?: boolean
 	sourceCodeLocation?: {
 		startOffset: number
 		endOffset: number

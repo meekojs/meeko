@@ -5,8 +5,9 @@ import { test } from 'node:test'
 import { pathToFileURL } from 'node:url'
 
 interface Manifest {
+	activationEvents: string[]
 	contributes: {
-		configuration: { properties: Record<string, { type: string; default: unknown }> }
+		configuration: { properties: Record<string, { type: string; default: unknown; scope?: string }> }
 		configurationDefaults: Record<string, Record<string, unknown>>
 		semanticTokenModifiers: Array<{ id: string }>
 		semanticTokenScopes: Array<{ language: string; scopes: Record<string, string[]> }>
@@ -101,4 +102,13 @@ test('Tailwind defaults support Meeko attributes without changing user settings'
 	// Every key: a language default replaces the whole object, and attribute names are "other".
 	assert.deepEqual(manifest.contributes.configurationDefaults['[meeko]']?.['editor.quickSuggestions'], { other: 'on', comments: 'off', strings: 'on' })
 	assert.equal(manifest.contributes.configuration.properties['meeko.classes.completion']?.default, 'auto')
+})
+
+test('CSS features have independent resource settings and activate in CSS-only Meeko workspaces', () => {
+	for (const name of ['cssVariables.completion', 'cssVariables.hover', 'cssVariables.definition', 'cssVariables.references', 'cssVariables.rename', 'classes.definition']) {
+		const setting = manifest.contributes.configuration.properties[`meeko.${name}`]
+		assert.deepEqual([setting?.type, setting?.default, setting?.scope], ['boolean', true, 'resource'], name)
+	}
+	assert.equal(manifest.contributes.configuration.properties['meeko.classes.hover']?.default, 'auto')
+	assert.ok(manifest.activationEvents.includes('workspaceContains:**/meeko.config.{ts,js,mts,mjs,cts,cjs}'))
 })

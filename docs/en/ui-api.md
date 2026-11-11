@@ -1,5 +1,5 @@
 ---
-source-hash: 98288c9ccdd6b96e48c28660b77a0cd3891519e1f2a4dd4d28a1c63fbc3ae8e2
+source-hash: 2f80b5ddb41e414fa62d4639f5175e02d4235defe56126c63710c1b1d68b5502
 ---
 
 # Meeko UI API
@@ -10,24 +10,15 @@ Visual components and styles for Meeko. It is a package of the same ecosystem, w
 
 ## Installation
 
-In an application of this monorepo, add the workspace dependency to its `package.json`:
-
-```json
-{
-	"dependencies": {
-		"@meekojs/meeko": "workspace:*",
-		"@meekojs/ui": "workspace:*"
-	}
-}
-```
-
-Then run `pnpm install` from the root. To install a published version of the package in an external consumer:
+In an external Meeko application running Node.js 24 or later, install both published packages:
 
 ```sh
-pnpm add @meekojs/ui
+pnpm add @meekojs/meeko @meekojs/ui
 ```
 
-The application needs `@meekojs/meeko` and Node.js 24 or later. UI requires Meeko `>=1.8 <2` because `UIThemeToggle` uses `useThemeToggle()`.
+Enable the module with the configuration below. Then, in `app/pages/index.meeko`, you can render `<UIButton>Save</UIButton>`; without `to` or `href`, it is a native button with type `button`. See the [application example](#usage) for a complete field and action.
+
+UI requires Meeko `>=1.8 <2`. To contribute **inside this monorepo**, use `workspace:*` dependencies and run `pnpm install` from its root; that syntax does not belong in an external application.
 
 ## Configuration
 
@@ -202,11 +193,11 @@ You can override `--ui-container-max-width` and `--ui-container-gutter` from a c
 
 ### Basic controls
 
-| Component  | API                                                                                                                                                                                                                                                                                            |
-| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `UIButton` | Route (`to`, `params`, `search`), link (`href`, `target`, `rel`, `download`) or button (`type`, `disabled`); see [UIButton](#uibutton-route-link-or-button). Always `variant`, `size`, `shape`, `class`, `click` event and `default` snippet. By default `button`, `primary`, `md`, `rounded`. |
-| `UIInput`  | Text model with `model`. Props: `id`, `name`, `type`, `placeholder`, `required`, `disabled`, `invalid`, `describedBy` and `class`. Accepted types: `text`, `email`, `password`, `search`, `url`, `tel`. By default it uses `text` and an empty value.                                          |
-| `UIField`  | Requires `id`, `label` and the `default(id, describedBy)` snippet. Optional props: `description`, `error`, `required`, `class`. The error takes priority over the description and is announced with `role="alert"`.                                                                            |
+| Component  | API                                                                                                                                                                                                                                                                                             |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `UIButton` | Route (`to`, `params`, `search`), link (`href`, `target`, `rel`, `download`) or button (`type`, `disabled`); see [UIButton](#uibutton-route-link-or-button). Accepts `variant`, `size`, `shape`, `class`, `click` event and `default` snippet. By default `button`, `primary`, `md`, `rounded`. |
+| `UIInput`  | Text model with `model`. Props: `id`, `name`, `type`, `placeholder`, `required`, `disabled`, `invalid`, `describedBy` and `class`. Accepted types: `text`, `email`, `password`, `search`, `url`, `tel`. By default it uses `text` and an empty value.                                           |
+| `UIField`  | Requires `id`, `label` and the `default(id, describedBy)` snippet. Optional props: `description`, `error`, `required`, `class`. The error takes priority over the description and is announced with `role="alert"`.                                                                             |
 
 It also includes `UIApp` and `UIModal` for [modals](#modals), `UITable` for [tables](#tables), `UICard` for [cards](#cards), and the navigation and label components below.
 
@@ -252,7 +243,7 @@ It also includes `UIApp` and `UIModal` for [modals](#modals), `UITable` for [tab
 
 - `UILink` gives a real `<a>` the appearance of an action, with the defaults of `ui.defaults.link`. It receives `href` (any URL) or `to` (a route of the application with typed `params` and `search`, as in `UIButton`, with client navigation and the `href` localized with `@meekojs/i18n`); one of the two, not both. With either it accepts `target`, `rel`, `download`, `hreflang` and `lang`. It shares `variant`, `size` and `shape` with `UIButton`, and accepts `ariaLabel`, `class`, `id`, `title`, `aria-*`, `data-*` and the `click` event. It does not simulate buttons or use artificial roles. For `target="_blank"` it adds `noopener noreferrer` if `rel` is not specified.
 - `UILinkCard` is a linked surface: it requires `title` and a destination, `href` (any URL) or `to` (a route of the application with `params`, `search` and `resolve`, as in `UILink`, with client navigation and the `href` localized with `@meekojs/i18n`), with optional `description`, `class` and `default` snippet. It accepts `target`, `rel`, `download`, `hreflang`, `lang`, `id`, `aria-*`, `data-*` and the `click` event; `title` is the card's text, not the HTML attribute. The content must not include other links or buttons, because the whole card is a single link.
-- `UIBadge` shows metadata, with `tone="neutral|accent|danger"` (`neutral` by default), `class` and a required `default` snippet. It keeps text semantics; it adds no announcements or interaction.
+- `UIBadge` shows metadata, with `tone="neutral|info|success|warning|danger"` (`neutral` by default), `dot`, `class` and a required `default` snippet. It keeps text semantics; it adds no announcements or interaction.
 
 ```html
 <UILink
@@ -266,12 +257,12 @@ It also includes `UIApp` and `UIModal` for [modals](#modals), `UITable` for [tab
 	title="Framework"
 	description="Routes, SSR and data."
 />
-<UIBadge tone="accent">Feature</UIBadge>
+<UIBadge tone="info">Feature</UIBadge>
 ```
 
 The public site `apps/meeko` uses these actions in its home page, header and errors; `UILinkCard` makes up the documentation index and `UIBadge` the reference metadata. Its `meeko.config.ts` links the tokens to the current palette, including the neutral actions and the blue focus.
 
-Since UI 1.8, `UIPopover`, `UISelect` and `UIThemeToggle` are components of the UI module. They replace `MeekoPopover`, `MeekoSelect` and `MeekoThemeToggle`, deprecated since core 1.8 and due for removal in 2.0. They keep the contract and the `data-meeko-*` markup; see [Migration to 1.8](migration-1.8.md).
+Since UI 1.8, `UIPopover`, `UISelect`, `UICombobox` and `UIThemeToggle` belong to the UI module. `MeekoPopover`, `MeekoSelect` and `MeekoThemeToggle` were deprecated in core 1.8 and are due for removal in 2.0. To replace `MeekoSelect`, use `UISelect` for a native `<select>` or `UICombobox` for search or multiple selection; they do not share the same contract. See [Migration to 1.8](migration-1.8.md).
 
 ## Customization
 
@@ -444,7 +435,7 @@ Each key of the row has its own snippets, `cell-<clave>` and `header-<clave>`. A
 		name="cell-status"
 		params="row, value"
 	>
-		<UIBadge bind:tone="value === 'Publicado' ? 'accent' : 'neutral'">{value}</UIBadge>
+		<UIBadge bind:tone="value === 'Publicado' ? 'success' : 'neutral'">{value}</UIBadge>
 	</snippet>
 	<snippet
 		name="header-name"

@@ -21,6 +21,8 @@ interface Node {
 export type MeekoParserServices = ReturnType<typeof parseTypeScript>['services'] & {
 	readonly isMeeko: true
 	readonly templateBody: TemplateNode
+	/** Rangos de los scripts originales; excluyen la plantilla y el scaffolding del análisis. */
+	readonly scriptRanges: ReadonlyArray<{ start: number; end: number }>
 }
 
 export const meta = { name: '@meekojs/eslint-plugin/parser', version: '0.1.0' }
@@ -180,7 +182,7 @@ export function parseForESLint(text: string, options: ParserOptions = {}): Omit<
 		ast: result.ast,
 		scopeManager: manager,
 		visitorKeys: { ...keys, MeekoScope: ['children'] },
-		services: { ...result.services, isMeeko: true, templateBody: source.template } satisfies MeekoParserServices,
+		services: { ...result.services, isMeeko: true, templateBody: source.template, scriptRanges: source.scripts.map((section) => ({ start: section.contentStart, end: section.contentEnd })) } satisfies MeekoParserServices,
 	}
 }
 

@@ -522,7 +522,7 @@ test('the editor completes the attributes of <MeekoTeleport> and the targets of 
 	const attributes = teleportCompletion(document, document.positionAt(text.indexOf('MeekoTeleport t') + 15))!
 	assert.deepEqual(
 		attributes.map((item) => item.label),
-		['to', 'bind:to', 'disabled', 'bind:disabled', 'if:when', 'each:of'],
+		['if', 'else-if', 'else', 'to', 'bind:to', 'disabled', 'bind:disabled', 'if:when', 'each:of'],
 	)
 	const root = await mkdtemp(join(tmpdir(), 'meeko-teleport-editor-'))
 	try {
