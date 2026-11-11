@@ -1,8 +1,8 @@
-import { execFileSync, spawn } from 'node:child_process'
-import { once } from 'node:events'
-import { mkdir, mkdtemp, rm, symlink, unlink, writeFile } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+
+import { startDevServer } from '../../../../scripts/test-support/dev-server.ts'
+import { createFixture } from '../../../../scripts/test-support/fixture.ts'
 
 export const formsPage = `<script lang="ts">
 import { signal } from '@meekojs/meeko'
@@ -85,59 +85,16 @@ const sent = signal('')
 export async function startForms(context, { port = 4568, timeout = 120_000, page = formsPage } = {}) {
 	const packageRoot = fileURLToPath(new URL('../../', import.meta.url))
 	const parent = join(packageRoot, '.meeko')
-	await mkdir(parent, { recursive: true })
-	const root = await mkdtemp(join(parent, 'd1-forms-'))
-	const link = join(root, 'node_modules', '@meekojs', 'ui')
-	const resources = {}
-	context.after(async () => {
-		const server = resources.server
-		if (server && server.exitCode === null && server.signalCode === null) {
-			const closed = once(server, 'close')
-			if (process.platform === 'win32') {
-				try {
-					execFileSync('taskkill', ['/PID', String(server.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true })
-				} catch {
-					server.kill('SIGKILL')
-				}
-			} else server.kill('SIGKILL')
-			await closed
-		}
-		await unlink(link).catch(() => undefined)
-		await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
-	})
 	const files = {
 		'package.json': JSON.stringify({ name: 'ui-forms-test', private: true, type: 'module' }),
 		'meeko.config.ts': `import { defineMeekoConfig } from '@meekojs/meeko/framework'\nexport default defineMeekoConfig({ modules: ['@meekojs/ui'] })\n`,
 		'app/app.meeko': '<template><UIApp><MeekoOutlet /></UIApp></template>',
 		'app/pages/index.meeko': page,
 	}
-	for (const [file, source] of Object.entries(files)) {
-		await mkdir(dirname(join(root, file)), { recursive: true })
-		await writeFile(join(root, file), source)
-	}
-	await mkdir(dirname(link), { recursive: true })
-	await symlink(packageRoot, link, 'junction')
+	const fixture = await createFixture(context, parent, 'd1-forms-', { files, links: { '@meekojs/ui': packageRoot } })
+	const { root } = fixture
 	const cli = fileURLToPath(new URL('../../../meeko/dist/cli.js', import.meta.url))
-	const server = spawn(process.execPath, [cli, 'dev', root], { cwd: root, timeout, env: { ...process.env, NODE_OPTIONS: '--max-old-space-size=8192', PORT: String(port), MEEKO_HMR_PORT: String(port + 1), MEEKO_EDITOR_BRIDGE: '0' }, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
-
-	resources.server = server
-	let logs = ''
-	server.stdout.on('data', (chunk) => {
-		logs += chunk
-	})
-	server.stderr.on('data', (chunk) => {
-		logs += chunk
-	})
-	const origin = `http://127.0.0.1:${port}`
-	const started = Date.now()
-	while (true) {
-		if (server.exitCode !== null || Date.now() - started > 40_000) throw new Error(logs)
-		try {
-			if ((await fetch(origin)).ok) break
-		} catch {
-			/* Starting. */
-		}
-		await new Promise((resolve) => setTimeout(resolve, 100))
-	}
-	return { origin, root, server }
+	const { origin, child, stop } = await startDevServer({ root, cli, port, timeout, startupTimeout: 40_000 })
+	fixture.setStop(stop)
+	return { origin, root, server: child }
 }

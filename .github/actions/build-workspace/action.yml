@@ -1,0 +1,33 @@
+name: Build workspace with exact cache
+description: Reutiliza únicamente builds del mismo árbol Git, Node, sistema y arquitectura.
+runs:
+  using: composite
+  steps:
+    - id: identity
+      shell: pwsh
+      run: |
+        $tree = git rev-parse 'HEAD^{tree}'
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        $node = node --version
+        "key=workspace-v1-${{ runner.os }}-${{ runner.arch }}-$node-$tree" >> $env:GITHUB_OUTPUT
+    - id: cache
+      uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
+      with:
+        key: ${{ steps.identity.outputs.key }}
+        # Sin restore-keys: un build de otras fuentes no es válido.
+        path: |
+          packages/*/dist
+          packages/docs/src/**/*.d.meeko.ts
+          packages/eslint-plugin/src/**/*.generated.ts
+    - if: steps.cache.outputs.cache-hit != 'true'
+      shell: pwsh
+      run: pnpm build
+    # Guardar antes de las pruebas: ninguna mutación de un test puede entrar en el build compartido.
+    - if: steps.cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5
+      with:
+        key: ${{ steps.identity.outputs.key }}
+        path: |
+          packages/*/dist
+          packages/docs/src/**/*.d.meeko.ts
+          packages/eslint-plugin/src/**/*.generated.ts
