@@ -232,6 +232,7 @@ for (const [name, start] of engines) {
 			// Escape and the backdrop close it; `/` opens it outside a field only.
 			await page.keyboard.press('Escape')
 			await page.waitForFunction(() => !globalThis.document.querySelector('dialog.meeko-ui-command[open]'))
+			await page.locator('body').click({ position: { x: 2, y: 2 } })
 			await page.keyboard.press('/')
 			await dialog.waitFor()
 			await page.mouse.click(4, 880)
