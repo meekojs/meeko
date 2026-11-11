@@ -1,5 +1,6 @@
 // Shared workspace rules, including .meeko scripts and templates.
 import { defineEslint } from '@meekojs/eslint-plugin'
+import turboConfig from 'eslint-config-turbo/flat'
 import globals from 'globals'
 
 export default defineEslint(
@@ -49,6 +50,8 @@ export default defineEslint(
 			'**/tests/fixtures/**',
 		],
 	},
+
+	...turboConfig,
 
 	{
 		// ESLint's defaults already parse the latest syntax, .js/.mjs as modules and .cjs as CommonJS.
@@ -110,6 +113,8 @@ export default defineEslint(
 		name: 'meeko/tests',
 		files: ['**/tests/**'],
 		rules: {
+			// Las pruebas crean contextos de componente sintéticos dentro de callbacks de node:test.
+			'meeko/rules-of-composables': 'off',
 			// `if (false) { ... }` holds type-level assertions that tsc checks and the runtime never runs.
 			'no-constant-condition': 'off',
 			// Expected output is matched with its literal indentation.
@@ -118,6 +123,20 @@ export default defineEslint(
 	},
 
 	// Zones and their runtime globals.
+	{
+		// Implementaciones internas que eligen el contexto SSR/cliente o establecen el contexto
+		// durante el arranque. Esta excepción no forma parte del preset de los consumidores.
+		name: 'meeko/internal-composable-context',
+		files: [
+			'packages/meeko/src/app/composables/use-theme-toggle.ts',
+			'packages/meeko/src/app/composables/use-theme.ts',
+			'packages/meeko/src/app/composables/useAwaitZone.ts',
+			'packages/meeko/src/app/runtime/theme-context.ts',
+			'packages/meeko/src/app/definitions/define-plugin.ts',
+			'packages/ui/src/app/composables/useModal.ts',
+		],
+		rules: { 'meeko/rules-of-composables': 'off' },
+	},
 	{
 		name: 'meeko/ui-preferences',
 		files: ['packages/ui/**/*.{js,mjs,cjs,ts,tsx,meeko}'],

@@ -92,14 +92,14 @@ const doctor = 'docs/doctor.md'
 const doctorHash = contentHash(readGitFile(doctor))
 const doctorEn = `---\nsource-hash: ${doctorHash}\n---\n\n# Doctor in English\n\nIt checks the [API](./api.md) and the [framework](../framework.md#señales).\n\n## What it checks\n`
 
-test('the title of the quick start follows the language of the render', async () => {
-	const readme = '# Meeko\n\n<p align="center">\n\t<img src="logo.png" alt="Meeko">\n</p>\n\nBody.\n'
-	const transform = catalogEntry('inicio-rapido')?.transform
-	assert.ok(transform)
-	const english = await withSourceOverlay(createOverlay([]), async () => transform(readme), 'en')
-	assert.equal(english, '# Quick start\n\nBody.\n')
-	const spanish = await withSourceOverlay(createOverlay([]), async () => transform(readme), 'es')
-	assert.equal(spanish, '# Inicio rápido\n\nBody.\n')
+test('the quick start has a short source and a translated title', async () => {
+	assert.equal(catalogEntry('inicio-rapido')?.transform, undefined)
+	const spanish = await withSourceOverlay(createOverlay([]), async () => renderSource('docs/inicio-rapido.md'), 'es')
+	const english = await withSourceOverlay(createOverlay([]), async () => renderSource('docs/inicio-rapido.md'), 'en')
+	assert.equal(spanish.title, 'Inicio rápido')
+	assert.equal(english.title, 'Quick start')
+	assert.match(spanish.html, /id="create-a-full-stack-application"/)
+	assert.match(english.html, /id="crear-una-aplicación-full-stack"/)
 })
 
 test('in English a guide is read from its translation, and falls back to Spanish without one', async () => {
@@ -149,7 +149,7 @@ test('the English render prefixes its links, marks each page and keeps Spanish a
 	assert.equal(reference.payload.written.editPath, 'docs/en/reference/reactivity/signal.md')
 	const home = at<{ head: { title: string }; i18n: unknown }>('/')
 	assert.equal(home.translation, null)
-	assert.match(home.payload.head.title, /Typed \.meeko components/)
+	assert.match(home.payload.head.title, /Build web apps with TypeScript and \.meeko components/)
 	assert.match(at<{ text: string }>('/llms.txt').payload.text, /\(https:\/\/meekojs\.com\/en\/docs\/doctor\)/)
 	const fallbacks = pages.filter((page) => page.translation === 'missing')
 	assert.ok(fallbacks.length > 0)

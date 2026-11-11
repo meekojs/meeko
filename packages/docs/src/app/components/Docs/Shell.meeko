@@ -27,7 +27,7 @@
 	const license = computed(() => [{ label: t('shell.footer.license'), href: 'https://github.com/meekojs/meeko/blob/main/LICENSE' }])
 	const hasToc = computed(() => (props.view.toc?.length ?? 0) > 0)
 	// A filter stays while it empties the list; without one, a view with no navigation has no sidebar.
-	const hasSidebar = computed(() => props.view.navigation.length > 0 || props.view.search?.mode === 'filter')
+	const hasSidebar = computed(() => props.view.layout !== 'landing' && (props.view.navigation.length > 0 || props.view.search?.mode === 'filter'))
 	const notice = computed(() => (!props.view.locale.originalHref ? undefined : props.view.locale.fallback ? 'untranslated' : props.view.locale.outdated ? 'outdated' : undefined))
 	const suggestedLabel = computed(() => props.view.locales.find((item) => item.code === props.view.locale.suggested)?.label ?? '')
 </script>

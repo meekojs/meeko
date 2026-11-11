@@ -1,48 +1,28 @@
-# Guía de documentación
+# Mapa de documentación
 
-La documentación se organiza por tareas. Las guías existentes mantienen sus rutas y anclas para conservar los enlaces del repositorio y de la web pública.
+Busca la respuesta según lo que quieres hacer. Las guías enseñan un recorrido; la referencia conserva firmas, tipos, límites y enlaces al código.
 
-## Empezar
+| Quiero… | Ve a… | Qué encontrarás |
+| --- | --- | --- |
+| Crear una aplicación desde cero | [Inicio rápido](inicio-rapido.md) | Requisitos, comandos y primer cambio visible. |
+| Entender componentes y reactividad | [Componentes y lenguaje .meeko](api.md) | Plantilla, props, estado, eventos y composición. |
+| Añadir páginas y parámetros | [Rutas](routing.md) | El camino habitual y guías por tarea. |
+| Cargar datos o elegir SSR | [Datos de rutas](routing-data.md) | Carga, errores y modos de render. |
+| Enviar un formulario | [Formularios del framework](framework.md#formularios-useform) | Datos, validación y mutaciones. |
+| Preparar un despliegue | [Build y despliegue](framework.md#build-despliegue-y-verificación) | Salidas y requisitos por adaptador. |
+| Localizar una función o tipo | [Referencia de Meeko](reference/README.md) | Índice por categoría y catálogo de exports. |
 
-- [Primera aplicación](primeros-pasos.md).
-- [Elegir Meeko](como-elegir.md).
-- [Framework full-stack](framework.md#crear-una-aplicación): estructura, configuración y desarrollo local.
+## Para aprender
 
-## Framework y servidor
+Después del [Inicio rápido](inicio-rapido.md), sigue [Tu primera aplicación](primeros-pasos.md). Crearás una lista interactiva y una segunda ruta. [Decisiones habituales](como-elegir.md) ayuda a escoger entre mecanismos cuando ya tienes un caso concreto.
 
-- [Routing, layouts y SSR](framework.md#routing-layouts-y-ssr).
-- [Middleware](framework.md#middleware-de-rutas-y-servidor).
-- [API y RPC](framework.md#api-y-rpc).
-- [View Transitions](framework.md#view-transitions-nativas).
-- [Referencia por categorías](reference/README.md): macros, reactividad, composables, utilidades y servidor.
+## Para construir
 
-## Componentes y módulos
+- [Framework full-stack](framework.md): modelo general de aplicación, servidor y cliente.
+- [Routing](routing.md): páginas, layouts, datos, navegación y middleware, cada tema con una guía propia.
+- [Meeko UI](ui.md) e [internacionalización](i18n.md): paquetes opcionales del ecosistema.
+- [Doctor](doctor.md), [editores](editors.md) y [pruebas](testing.md): comprobar y depurar la aplicación.
 
-- [Componentes y API](api.md).
-- [Meeko UI](ui.md) y [API de Meeko UI](ui-api.md).
-- [Internacionalización](i18n.md).
-- [Módulos](framework.md#módulos) y [layers](framework.md#layers).
+## Para consultar
 
-## Herramientas y calidad
-
-- [Doctor](doctor.md): diagnóstico local sin ejecutar el proyecto.
-- [Editores y LSP](editors.md).
-- [ESLint](eslint.md): `defineEslint`, Perfectionist, reglas y parser.
-- [ESLint y Prettier](tooling.md).
-- [DevTools](devtools.md).
-- [Pruebas y CI](testing.md).
-
-## Arquitectura y rendimiento
-
-- [Arquitectura](architecture.md).
-- [Benchmarks](benchmarks.md).
-- [Mediciones y presupuestos de rendimiento](performance.md).
-- [Contrato de estabilidad](stability.md).
-
-## Mantener y publicar
-
-- [Plan de desarrollo](roadmap.md).
-- [Publicaciones](releasing.md).
-- [Historial de cambios](../packages/meeko/CHANGELOG.md).
-
-La web pública publica estas categorías desde `packages/docs-content/src/content/catalog.ts`; la referencia detallada tiene su propia taxonomía. Al añadir una guía, actualiza este índice y su entrada del catálogo cuando deba ser pública.
+Usa la búsqueda de la cabecera para encontrar un símbolo o una tarea desde cualquier página. La [referencia curada](reference/README.md) explica el uso habitual; el [catálogo por módulo](/docs/reference/exports) conserva todos los exports del paquete. Para entender la compatibilidad, lee [estabilidad](stability.md) y el [historial de cambios](../packages/meeko/CHANGELOG.md).

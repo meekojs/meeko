@@ -136,19 +136,26 @@
 		max-width: 100%;
 		height: auto;
 	}
-	:scope :is(:not(pre) > code, kbd) {
+	:scope :not(pre) > code {
 		border-radius: var(--ui-radius-sm);
-		background: var(--ui-color-control-hover);
+		background: var(--ui-color-code-soft);
 		padding: var(--ui-prose-code-padding);
-		color: var(--ui-color-text);
+		color: var(--ui-color-code-text);
 		font-size: var(--ui-prose-code-size);
 		font-family: var(--ui-font-mono);
 		overflow-wrap: anywhere;
 	}
 	:scope kbd {
 		border: var(--ui-border-width) solid var(--ui-color-border);
+		border-radius: var(--ui-radius-sm);
+		background: var(--ui-color-control-hover);
+		padding: var(--ui-prose-code-padding);
+		color: var(--ui-color-text);
+		font-size: var(--ui-prose-code-size);
+		font-family: var(--ui-font-mono);
 	}
 	:scope a > code {
+		background: var(--ui-color-primary-soft);
 		color: inherit;
 	}
 

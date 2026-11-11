@@ -117,7 +117,7 @@ const frameworkTypes: readonly string[] = ['RouteId', 'LayoutProps']
 
 function builtins(root: string): AutoImport[] {
 	const entries: AutoImport[] = [
-		...['signal', 'computed', 'effect', 'batch', 'untrack', 'onCleanup', 'onMounted', 'provide', 'inject', 'createContext', 'provideErrorHandler', 'useId'].map((name): AutoImport => ({ name, imported: name, file: '@meekojs/meeko', specifier: '@meekojs/meeko', scope: 'shared', typeOnly: false, component: false })),
+		...['signal', 'computed', 'effect', 'batch', 'untrack', 'onCleanup', 'onMounted', 'provide', 'inject', 'createContext', 'provideErrorHandler', 'useId', 'createId'].map((name): AutoImport => ({ name, imported: name, file: '@meekojs/meeko', specifier: '@meekojs/meeko', scope: 'shared', typeOnly: false, component: false })),
 		// Since 1.7: `createRoot`, which its siblings of `@meekojs/meeko` already were.
 		{ name: 'createRoot', imported: 'createRoot', file: '@meekojs/meeko', specifier: '@meekojs/meeko', scope: 'shared', typeOnly: false, component: false },
 		// Since 1.7: `useNavigation`, like `useRoute`; on the server it is a fixed state with `pending` false.
@@ -160,7 +160,7 @@ function builtins(root: string): AutoImport[] {
  * the project's own export wins, instead of making the name ambiguous. `useApiMutation` comes from
  * the generated clients; the others, from `@meekojs/meeko/framework`.
  */
-const yieldingBuiltins: ReadonlySet<string> = new Set(['useRoute', 'useForm', 'useStorage', 'useApiMutation', 'useHead', 'useSeoMeta', 'useTheme', 'useId', 'useLayout', 'defineGroup', 'defineServerRouteMiddleware', 'createRoot', 'useNavigation', 'defer', 'ClientError', 'isClientError', 'Form', 'FormField', 'FormSubmission', ...frameworkTypes])
+const yieldingBuiltins: ReadonlySet<string> = new Set(['useRoute', 'useForm', 'useStorage', 'useApiMutation', 'useHead', 'useSeoMeta', 'useTheme', 'useId', 'createId', 'useLayout', 'defineGroup', 'defineServerRouteMiddleware', 'createRoot', 'useNavigation', 'defer', 'ClientError', 'isClientError', 'Form', 'FormField', 'FormSubmission', ...frameworkTypes])
 
 /** `api`, `rpc`, `socket`… of `.meeko/generated/clients.client.ts` or `clients.server.ts`. */
 export function isGeneratedClient(file: string): boolean {

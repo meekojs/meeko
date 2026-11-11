@@ -70,7 +70,11 @@ export class LanguageServers {
 				const clientOptions: LanguageClientOptions = {
 					documentSelector: [{ language: 'meeko', scheme: folder?.uri.scheme ?? '*', ...(folder ? { pattern: { baseUri: folder.uri.toString(), pattern: '**/*.meeko' } } : {}) }],
 					...(folder ? { workspaceFolder: folder } : {}),
-					initializationOptions: { trusted, classes: { completion: vscode.workspace.getConfiguration('meeko', folder?.uri).get<string>('classes.completion', 'auto'), tailwindActive: vscode.extensions.getExtension('bradlc.vscode-tailwindcss')?.isActive === true } },
+					initializationOptions: {
+						trusted,
+						classes: { completion: vscode.workspace.getConfiguration('meeko', folder?.uri).get<string>('classes.completion', 'auto'), hover: vscode.workspace.getConfiguration('meeko', folder?.uri).get<string>('classes.hover', 'auto'), definition: vscode.workspace.getConfiguration('meeko', folder?.uri).get<boolean>('classes.definition', true), tailwindActive: vscode.extensions.getExtension('bradlc.vscode-tailwindcss')?.isActive === true },
+						cssVariables: { completion: vscode.workspace.getConfiguration('meeko', folder?.uri).get<boolean>('cssVariables.completion', true), hover: vscode.workspace.getConfiguration('meeko', folder?.uri).get<boolean>('cssVariables.hover', true), definition: vscode.workspace.getConfiguration('meeko', folder?.uri).get<boolean>('cssVariables.definition', true), references: vscode.workspace.getConfiguration('meeko', folder?.uri).get<boolean>('cssVariables.references', true), rename: vscode.workspace.getConfiguration('meeko', folder?.uri).get<boolean>('cssVariables.rename', true) },
+					},
 					outputChannel: this.output,
 					middleware: {
 						workspace: {

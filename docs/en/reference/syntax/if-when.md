@@ -1,5 +1,5 @@
 ---
-title: if:when
+title: if, else-if and else
 group: syntax
 since: 1.0.0
 description: Renders a tag and its content only while an expression is truthy, and narrows types inside it.
@@ -12,10 +12,10 @@ related:
   - "syntax:interpolation"
   - "syntax:meekoawait"
   - docs/api.md#condiciones-con-ifwhen-y-tipos
-source-hash: c69dee5a9d6d205fad33aa88b14c7d9b61888bc0345c212439052dccebce1bc0
+source-hash: 06cf7247d2d7305cf32f4532613048fa991289eacb530ea1680714fdff443add
 ---
 
-`if:when="expresión"` makes a tag and all its content exist only while the expression is truthy (in the JavaScript sense: `0`, `""`, `null` and `undefined` are falsy). Valid on HTML elements, component tags, `<component is>` and, since `1.4`, `<snippet>`.
+`if="expresión"` makes a tag and all its content exist only while the expression is truthy (in the JavaScript sense: `0`, `""`, `null` and `undefined` are falsy). `if:when="expresión"` remains available as a compatible alias. Valid on HTML elements, component tags, `<component is>` and, since `1.4`, `<snippet>`.
 
 Since `1.2`, it also narrows types, like Vue's `v-if`: inside the tag, `meeko check` and the editor check attributes, props, events and content knowing the condition holds, without `!`.
 
@@ -44,7 +44,21 @@ While `user.value` is `null`, only the second paragraph exists. Inside `<article
 | --------- | -------------- | -------- | -------------------------------------------------------------------------------------------------- |
 | `if:when` | any expression | required | The condition. Evaluated as a JavaScript boolean and reevaluated when the signals it reads change. |
 
-There is no `if:else` or `else-if`: write the opposite condition on another tag (`if:when="!user.value"`). An unknown `if:` attribute produces `MEEK024: Directiva de plantilla incompleta` and, alongside an `if:when`, warning `MEEK119` (since `1.7`), because it would be written as a literal HTML attribute.
+## Alternative branches
+
+`else-if="expression"` tests another condition only if the previous branch did not match. `else`, without a value, is the final fallback. Only the first matching branch renders; later conditions and content are not evaluated.
+
+```html
+<p if="loading.value">Cargando…</p>
+<p else-if="error.value">No se pudo cargar.</p>
+<p else>Contenido disponible.</p>
+```
+
+Branches must be consecutive siblings: only whitespace and comments may appear between them. A chain may also start with `if:when`. To group several nodes without adding a DOM element, use `<template if="…">`, `<template else-if="…">` and `<template else>`.
+
+Types also narrow through rejected conditions: an `else-if` knows the previous branches were false, and `else` knows all their negations. Switching branches releases their effects, listeners and components; returning to a branch creates fresh state.
+
+An orphan branch, multiple conditional directives on one tag, a value on `else`, or a branch after `else` produces `MEEK138`. Do not combine a condition with `each:of` on the same tag: place the chain inside `<template each:of="…">`. A `<snippet>` declaration accepts `if` or `if:when`, but chains belong inside its content.
 
 ## Result
 

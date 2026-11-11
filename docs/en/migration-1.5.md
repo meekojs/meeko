@@ -1,8 +1,10 @@
 ---
-source-hash: 92b43efb2b999d8ac97b89914cca7135c6b106f90789cdd81380669a1271655e
+source-hash: aa0bfe3da7c6a590161740eeb0780573f078f2df691ad0f4e9b5e3b7e9a474b5
 ---
 
 # Upgrade from 1.4 to 1.5
+
+**From:** 1.4.x. **To:** 1.5.0. **Status:** published on npm; the latest version checked on November 5, 2026 is 1.9.0. **Who acts:** maintainers upgrading an application from 1.4.x to 1.5.0.
 
 `1.5` is a minor release: new features (named layouts with `+group.ts`, `layoutProps` and `useLayout()`; `useForm` with `field`, `trySubmit`, `commit`, `onSuccess` and `focusInvalid`; `useId()`; `ApiError` with `issues`; HTML tags and `bind="obj"` on `<component is>`; `<MeekoTeleport>`, `<MeekoAwait>`, `<MeekoPopover>` and `<MeekoSelect>`; `match` on `<MeekoLink>` and `useRoute().isActive()`; `refreshing` and `keepPrevious` in `useApi` and `useRpcQuery`, and path aliases `~/`, `@/`, `#shared/` and `#server/`) are optional. Two changes are released as [approved exceptions](stability.md#approved-exceptions) to the stability policy: unnamed `bind="…"` is no longer a literal attribute, and `alias` becomes a `MeekoConfig` key. Other changes are noticeable when updating: project `paths` in generated `tsconfig` files, `MEEK108` for layers' `server/`, interfaces gaining members, compiled modules for built-in tags, new auto-imported names and codes `MEEK112` through `MEEK118`. This guide collects them and what you should review for each, and explains how to adopt each feature. The full list, including additions and fixes, is in the [CHANGELOG](../../packages/meeko/CHANGELOG.md); compatibility commitments are in the [stability policy](stability.md).
 

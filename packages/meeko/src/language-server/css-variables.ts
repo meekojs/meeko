@@ -26,6 +26,15 @@ export interface CssVariableRule {
 const identifier = /^--[\w\u0080-\uffff-]+$/u
 const word = /[\w\u0080-\uffff-]/u
 
+/** Cada función de variables se configura de forma independiente de las clases y de Tailwind. */
+export interface CssVariableSettings {
+	readonly completion?: boolean
+	readonly hover?: boolean
+	readonly definition?: boolean
+	readonly references?: boolean
+	readonly rename?: boolean
+}
+
 /** Lee CSS sin ejecutar plugins ni configuración; undefined conserva la última versión válida. */
 export function cssVariableRules(css: string, base = 0): CssVariableRule[] | undefined {
 	let root: postcss.Root
@@ -111,7 +120,7 @@ function rulesOf(source: ClassSource): readonly CssVariableRule[] {
 	const region = component ? styleRegion(source.text) : undefined
 	const css = region ? source.text.slice(region.contentStart, region.contentEnd) : source.text
 	let declarations = cssVariableRules(css, region?.contentStart ?? 0)
-	if (!declarations && component) {
+	if (!declarations) {
 		declarations = cssVariableRules(completedPrefix(css), region?.contentStart ?? 0)
 		if (declarations?.length) recovered.add(source)
 	}
@@ -124,13 +133,17 @@ function rulesOf(source: ClassSource): readonly CssVariableRule[] {
 interface VariableToken {
 	readonly start: number
 	readonly end: number
+	readonly declaration: boolean
 }
 
 /** Nombre dentro de var(…), o una propiedad --nombre, en CSS o estilos inline literales. */
-export function cssVariableTokenAt(source: string, offset: number): VariableToken | undefined {
+export function cssVariableTokenAt(source: string, offset: number, language = 'meeko'): VariableToken | undefined {
 	const region = styleRegion(source)
 	let start: number, end: number
-	if (region && offset >= region.contentStart && offset <= region.contentEnd) {
+	if (language === 'css' || language === 'tailwindcss') {
+		start = 0
+		end = source.length
+	} else if (region && offset >= region.contentStart && offset <= region.contentEnd) {
 		start = region.contentStart
 		end = region.contentEnd
 	} else {
@@ -182,7 +195,7 @@ export function cssVariableTokenAt(source: string, offset: number): VariableToke
 			while (end > 0 && /\s/.test(css[end - 1]!)) end--
 			let begin = end
 			while (begin > 0 && word.test(css[begin - 1]!)) begin--
-			stack.push({ variable: css.slice(begin, end).toLowerCase() === 'var', first: true, start: index + 1 })
+			stack.push({ variable: ['var', '--theme'].includes(css.slice(begin, end).toLowerCase()), first: true, start: index + 1 })
 		} else if (char === ')') stack.pop()
 		else if (char === ',' && stack.at(-1)) stack.at(-1)!.first = false
 	}
@@ -196,8 +209,9 @@ export function cssVariableTokenAt(source: string, offset: number): VariableToke
 	const variable = frame?.variable && frame.first && !css.slice(frame.start, from).trim()
 	const before = css.slice(0, from).trimEnd()
 	const declaration = css.slice(from, to).startsWith('--') && (!before || /[;{]$/.test(before) || /@property\s*$/.test(before))
-	if (!(variable && (!prefix || prefix === '-' || prefix.startsWith('--'))) && !declaration) return undefined
-	return { start: start + from, end: start + to }
+	const namedProperty = css.slice(from, to).startsWith('--') && (/@(?:supports|container)[^{;]*\(\s*$/.test(before) || /(?:^|[;{])\s*(?:transition|transition-property|will-change)\s*:[^;{}]*$/.test(before))
+	if (!(variable && (!prefix || prefix === '-' || prefix.startsWith('--'))) && !declaration && !namedProperty) return undefined
+	return { start: start + from, end: start + to, declaration }
 }
 
 interface VariableDefinition {
@@ -239,7 +253,7 @@ export function isCssVariableCompletionData(data: unknown): data is { meekoCssVa
 
 /** Completado diferido: las reglas completas sólo se leen al seleccionar una sugerencia. */
 export function cssVariableCompletion(document: TextDocument, position: Position, view: () => ClassView): CompletionItem[] | undefined {
-	const token = cssVariableTokenAt(document.getText(), document.offsetAt(position))
+	const token = cssVariableTokenAt(document.getText(), document.offsetAt(position), document.languageId)
 	if (!token) return undefined
 	return [...definitions(view())].map(([name, entries]) => ({
 		label: name,
@@ -256,7 +270,7 @@ export function resolveCssVariableCompletion(item: CompletionItem, view: ClassVi
 }
 
 export function cssVariableHover(document: TextDocument, position: Position, view: () => ClassView): Hover | undefined {
-	const token = cssVariableTokenAt(document.getText(), document.offsetAt(position))
+	const token = cssVariableTokenAt(document.getText(), document.offsetAt(position), document.languageId)
 	if (!token || token.start === token.end) return undefined
 	const contents = markdown(view(), document.getText().slice(token.start, token.end))
 	return contents && { contents, range: { start: document.positionAt(token.start), end: document.positionAt(token.end) } }
@@ -264,7 +278,7 @@ export function cssVariableHover(document: TextDocument, position: Position, vie
 
 const documents = new WeakMap<ClassSource, TextDocument>()
 export function cssVariableDefinition(document: TextDocument, position: Position, view: () => ClassView): Location[] | undefined {
-	const token = cssVariableTokenAt(document.getText(), document.offsetAt(position))
+	const token = cssVariableTokenAt(document.getText(), document.offsetAt(position), document.languageId)
 	if (!token || token.start === token.end) return undefined
 	const entries = definitions(view()).get(document.getText().slice(token.start, token.end)) ?? []
 	const authored = entries.filter(({ source }) => !source.stale && source.origin !== 'snapshot')

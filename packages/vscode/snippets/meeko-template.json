@@ -2,11 +2,20 @@
 	"Elemento condicional": {
 		"prefix": "mif",
 		"body": [
-			"<${1:div} if:when=\"${2:visible.value}\">",
+			"<${1:div} if=\"${2:visible.value}\">",
 			"\t$0",
 			"</${1}>"
 		],
 		"description": "Elemento condicional"
+	},
+	"Cadena condicional": {
+		"prefix": "mifelse",
+		"body": [
+			"<${1:p} if=\"${2:loading.value}\">${3:Cargando…}</${1}>",
+			"<${1} else-if=\"${4:error.value}\">${5:No se pudo cargar}</${1}>",
+			"<${1} else>$0</${1}>"
+		],
+		"description": "Ramas exclusivas if, else-if y else"
 	},
 	"Lista con identidad estable": {
 		"prefix": "meach",

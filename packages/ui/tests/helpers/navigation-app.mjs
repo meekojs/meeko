@@ -143,7 +143,9 @@ const dashboard = `<template>
 const landing = `<template>
 	<UIPage layout="landing">
 		<snippet name="header"><UIHeader bind:brand="{ name: 'Meeko', href: '/', compact: true, ariaLabel: 'Meeko, inicio' }" /></snippet>
-		<UIPageHeader layout="landing" title="Portada" description="Una portada." />
+		<UIPageHeader layout="landing" headingId="portada" description="Una portada.">
+			<snippet name="title">Portada <code>.meeko</code></snippet>
+		</UIPageHeader>
 		<UINavigationTree bind:groups="[{ items: [{ label: 'Suelto', href: '/x' }] }]" bind:collapsible="false" emptyText="Nada" />
 	</UIPage>
 </template>

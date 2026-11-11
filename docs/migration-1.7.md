@@ -1,5 +1,7 @@
 # Actualizar de 1.6 a 1.7
 
+**Origen:** 1.6.x. **Destino:** 1.7.0. **Estado:** publicado en npm; la versión más reciente consultada el 5 de noviembre de 2026 es 1.9.0. **Quién actúa:** quien mantenga una aplicación que actualiza desde 1.6.x a 1.7.0.
+
 `1.7` es un minor: lo nuevo (la CSP y las cabeceras en los adaptadores con servidor, la caché de páginas SSR con `cache`, los formularios sin JavaScript con `form` y `useForm({ action })`, `rateLimit` en SQL, `clientAddress`, `sitemapEntries`, los `services` tipados y `debounceMs`/`enabled` en `useApi` y `useRpcQuery`) es opcional. Tres cambios se publican como [excepciones aprobadas](stability.md#excepciones-aprobadas) a la política de estabilidad: una conversión directa de `context.services` a un tipo incompatible es un error de tipos, asignar `computed(...).value` lanza y `PageInputError.name` es `"PageInputError"`. Además, algunos cambios se notan al actualizar: los hashes de CSP sólo cubren el código que escribe Meeko, comprobaciones nuevas en `meeko check` y en el editor, nombres nuevos que se autoimportan, avisos nuevos y mensajes en español. Esta guía los reúne con lo que conviene revisar en cada uno y explica cómo adoptar cada función. La lista completa, con lo añadido y corregido, está en el [CHANGELOG](../packages/meeko/CHANGELOG.md); los compromisos de compatibilidad, en la [política de estabilidad](stability.md).
 
 ## Orden recomendado

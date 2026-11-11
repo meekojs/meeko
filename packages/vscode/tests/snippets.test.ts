@@ -68,13 +68,13 @@ test('snippet contributions contain valid JSON, unique m-prefixed shortcuts and 
 			expand(snippet)
 		}
 	}
-	assert.equal(prefixes.size, 25)
+	assert.equal(prefixes.size, 26)
 })
 
 test('only the skeletons of the file are declared for the language meeko', () => {
 	assert.deepEqual(prefixesOf(snippets('meeko')).sort(), ['mcomp', 'meeko', 'mform', 'mlayout', 'mpage'])
 	assert.deepEqual(prefixesOf(scriptSnippets).sort(), ['mcomputed', 'meffect', 'memits', 'mexpose', 'mmodel', 'mmounted', 'mprops', 'mpropsd', 'mref', 'msignal', 'msnippets'])
-	assert.deepEqual(prefixesOf(templateSnippets).sort(), ['meach', 'mif', 'mis', 'mrender', 'msnippet'])
+	assert.deepEqual(prefixesOf(templateSnippets).sort(), ['meach', 'mif', 'mifelse', 'mis', 'mrender', 'msnippet'])
 	for (const { path } of manifest.contributes.snippets) assert.ok(!/meeko-(script|template)/.test(path), `${path}: VS Code would offer it at the root`)
 })
 

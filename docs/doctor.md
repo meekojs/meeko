@@ -1,5 +1,18 @@
 # Diagnóstico del proyecto
 
+## Cuando algo no arranca
+
+Si `meeko check`, el editor o el servidor de desarrollo no encuentran un paquete o los tipos generados, ejecuta desde la raíz de **tu aplicación**:
+
+```sh
+pnpm exec meeko doctor .
+pnpm exec meeko doctor . --json
+```
+
+La salida legible comienza con `Meeko doctor — <ruta>` y `Proyecto: <tipo> · Node <versión>`, sigue con líneas `OK`, `AVISO` o `ERROR`, enumera los paquetes detectados y termina indicando los límites de la inspección. El informe JSON expone los mismos hallazgos para adjuntarlo a una incidencia. Si aparece `ERROR`, el proceso sale con código 1; un `AVISO` no cambia el código de éxito.
+
+Una versión de Node inferior a 24 exige actualizar Node. Si faltan dependencias, instálalas en la aplicación. Si faltan artefactos `.meeko`, ejecuta `pnpm exec meeko check .` y vuelve a abrir el editor. Doctor comprueba presencia y resolución; `check` es la validación que prepara el proyecto.
+
 `meeko doctor` inspecciona el entorno local sin ejecutar la configuración ni los módulos de la aplicación, cargar `.env`, lanzar el LSP, conectarse a servicios o modificar archivos.
 
 ```sh

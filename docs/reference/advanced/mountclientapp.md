@@ -90,7 +90,7 @@ await app.navigate("/users/42");
 await app.navigate("/users/42?tab=perfil", { replace: true });
 ```
 
-En un componente, la forma habitual es `useNavigation().navigate(…)` o un `<MeekoLink>`; `app.navigate` es para código fuera de los componentes, como un atajo de teclado global.
+En un componente, usa un `<MeekoLink>` para enlazar páginas. `useNavigation()` sólo expone el estado `pending`, no un método `navigate`. `app.navigate` pertenece a la instancia devuelta por `mountClientApp` y permite navegar desde código que tenga acceso a ella, como un atajo de teclado global.
 
 ### Un sitio estático
 

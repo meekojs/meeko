@@ -246,13 +246,13 @@ describe('language server: what template completion inserts', () => {
 		const snippet = (await complete('<Card><snippet |></snippet></Card>')).inserted
 		assert.deepEqual(
 			snippet.map((item) => item.newText),
-			['name="$1"', 'params="$1"', 'if:when="$1"'],
+			['name="$1"', 'params="$1"', 'if="$1"', 'if:when="$1"'],
 		)
 		// The extension point of the snippet names: `snippetNameCompletion` in features.ts.
 		assert.deepEqual((await complete('<Card><snippet name="|"></snippet></Card>')).inserted.map((item) => item.label).sort(), ['default', 'icon'])
 		assert.deepEqual(
 			(await complete('<render |/>')).inserted.map((item) => item.newText),
-			['snippet="$1"', 'args="$1"', 'if:when="$1"'],
+			['snippet="$1"', 'args="$1"', 'if="$1"', 'else-if="$1"', 'else', 'if:when="$1"'],
 		)
 		assert.ok(find((await complete('<component |></component>')).inserted, 'if:when'))
 	})

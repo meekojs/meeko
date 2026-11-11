@@ -16,7 +16,7 @@ export interface CatalogEntry {
 	/** Short label of the sidebar; the page title is the document's own heading. */
 	readonly label: string
 	readonly section: string
-	/** Rewrites the Markdown before rendering, such as the quick start's title and logo for the site. */
+	/** Optional source transform for a document that needs one. */
 	readonly transform?: (text: string) => string
 }
 
@@ -25,25 +25,45 @@ export interface CatalogEntry {
  * to it, and to any other file of the repository, go to GitHub.
  */
 export const catalog: readonly CatalogEntry[] = [
-	// The quick start, whose title and centered logo (an image from GitHub, which the CSP blocks)
-	// become the page's own heading.
 	{
 		slug: 'inicio-rapido',
 		href: '/docs/inicio-rapido',
 		source: 'docs/inicio-rapido.md',
 		label: 'Inicio rápido',
 		section: 'Empezar',
-		// The title comes from the messages of the language being rendered, so the English page does not get the Spanish one.
-		transform: (text) => text.replace(/^# Meeko\n+<p align="center">[\s\S]*?<\/p>\n+/, () => `# ${messages().quickStart}\n\n`),
 	},
 	{ slug: 'primeros-pasos', href: '/docs/primeros-pasos', source: 'docs/primeros-pasos.md', label: 'Primera aplicación', section: 'Empezar' },
 	{ slug: 'documentacion', href: '/docs/documentacion', source: 'docs/README.md', label: 'Mapa de documentación', section: 'Empezar' },
-	{ slug: 'como-elegir', href: '/docs/como-elegir', source: 'docs/como-elegir.md', label: 'Cómo elegir', section: 'Empezar' },
-	{ slug: 'framework', href: '/docs/framework', source: 'docs/framework.md', label: 'Framework full-stack', section: 'Framework' },
-	{ slug: 'api', href: '/docs/api', source: 'docs/api.md', label: 'Componentes y API', section: 'Componentes y módulos' },
-	{ slug: 'ui', href: '/docs/ui', source: 'docs/ui.md', label: 'Meeko UI', section: 'Componentes y módulos' },
-	{ slug: 'ui-api', href: '/docs/ui-api', source: 'docs/ui-api.md', label: 'API de Meeko UI', section: 'Componentes y módulos' },
-	{ slug: 'i18n', href: '/docs/i18n', source: 'docs/i18n.md', label: 'Internacionalización', section: 'Componentes y módulos' },
+	{ slug: 'como-elegir', href: '/docs/como-elegir', source: 'docs/como-elegir.md', label: 'Decisiones habituales', section: 'Fundamentos' },
+	{ slug: 'framework', href: '/docs/framework', source: 'docs/framework.md', label: 'Framework full-stack', section: 'Fundamentos' },
+	{ slug: 'api', href: '/docs/api', source: 'docs/api.md', label: 'Componentes y lenguaje .meeko', section: 'Fundamentos' },
+	{ slug: 'component-basics', href: '/docs/component-basics', source: 'docs/component-basics.md', label: 'Componentes y props', section: 'Fundamentos' },
+	{ slug: 'component-template', href: '/docs/component-template', source: 'docs/component-template.md', label: 'Plantillas y directivas', section: 'Fundamentos' },
+	{ slug: 'component-events', href: '/docs/component-events', source: 'docs/component-events.md', label: 'Eventos, modelos y snippets', section: 'Fundamentos' },
+	{ slug: 'language-reactivity', href: '/docs/language-reactivity', source: 'docs/language-reactivity.md', label: 'Reactividad y ciclo de vida', section: 'Fundamentos' },
+	{ slug: 'component-styles', href: '/docs/component-styles', source: 'docs/component-styles.md', label: 'Estilos de componentes', section: 'Fundamentos' },
+	{ slug: 'component-dynamic', href: '/docs/component-dynamic', source: 'docs/component-dynamic.md', label: 'Componentes dinámicos', section: 'Fundamentos' },
+	{ slug: 'component-attributes', href: '/docs/component-attributes', source: 'docs/component-attributes.md', label: 'Atributos y props estáticas', section: 'Fundamentos' },
+	{ slug: 'component-advanced', href: '/docs/component-advanced', source: 'docs/component-advanced.md', label: 'Composición y módulo generado', section: 'Fundamentos' },
+	{ slug: 'component-builtins', href: '/docs/component-builtins', source: 'docs/component-builtins.md', label: 'Componentes integrados', section: 'Fundamentos' },
+	{ slug: 'routing', href: '/docs/routing', source: 'docs/routing.md', label: 'Rutas: por dónde empezar', section: 'Guías prácticas' },
+	{ slug: 'router', href: '/docs/router', source: 'docs/router.md', label: 'Crear rutas y navegar', section: 'Guías prácticas' },
+	{ slug: 'routing-pages', href: '/docs/routing-pages', source: 'docs/routing-pages.md', label: 'Páginas y parámetros', section: 'Guías prácticas' },
+	{ slug: 'routing-data', href: '/docs/routing-data', source: 'docs/routing-data.md', label: 'Cargar datos', section: 'Guías prácticas' },
+	{ slug: 'routing-layouts', href: '/docs/routing-layouts', source: 'docs/routing-layouts.md', label: 'Layouts', section: 'Guías prácticas' },
+	{ slug: 'routing-navigation', href: '/docs/routing-navigation', source: 'docs/routing-navigation.md', label: 'Navegación', section: 'Guías prácticas' },
+	{ slug: 'routing-middleware', href: '/docs/routing-middleware', source: 'docs/routing-middleware.md', label: 'Middleware de rutas', section: 'Guías prácticas' },
+	{ slug: 'framework-configuration', href: '/docs/framework-configuration', source: 'docs/framework-configuration.md', label: 'Configurar y ampliar', section: 'Guías prácticas' },
+	{ slug: 'framework-rendering', href: '/docs/framework-rendering', source: 'docs/framework-rendering.md', label: 'Renderizar páginas y layouts', section: 'Guías prácticas' },
+	{ slug: 'framework-api', href: '/docs/framework-api', source: 'docs/framework-api.md', label: 'Crear API y RPC', section: 'Guías prácticas' },
+	{ slug: 'framework-websocket', href: '/docs/framework-websocket', source: 'docs/framework-websocket.md', label: 'Usar WebSocket', section: 'Guías prácticas' },
+	{ slug: 'framework-server', href: '/docs/framework-server', source: 'docs/framework-server.md', label: 'Runtime y errores del servidor', section: 'Guías prácticas' },
+	{ slug: 'framework-auth', href: '/docs/framework-auth', source: 'docs/framework-auth.md', label: 'Autenticación y sesiones', section: 'Guías prácticas' },
+	{ slug: 'framework-deployment', href: '/docs/framework-deployment', source: 'docs/framework-deployment.md', label: 'Construir y desplegar', section: 'Guías prácticas' },
+	{ slug: 'performance', href: '/docs/performance', source: 'docs/performance.md', label: 'Medir tu aplicación', section: 'Guías prácticas' },
+	{ slug: 'ui', href: '/docs/ui', source: 'docs/ui.md', label: 'Meeko UI', section: 'Ecosistema' },
+	{ slug: 'ui-api', href: '/docs/ui-api', source: 'docs/ui-api.md', label: 'Componentes de Meeko UI', section: 'Ecosistema' },
+	{ slug: 'i18n', href: '/docs/i18n', source: 'docs/i18n.md', label: 'Internacionalización', section: 'Ecosistema' },
 	{ slug: 'doctor', href: '/docs/doctor', source: 'docs/doctor.md', label: 'Doctor', section: 'Herramientas' },
 	{ slug: 'editors', href: '/docs/editors', source: 'docs/editors.md', label: 'Editores', section: 'Herramientas' },
 	{ slug: 'eslint', href: '/docs/eslint', source: 'docs/eslint.md', label: 'ESLint', section: 'Herramientas' },
@@ -52,17 +72,22 @@ export const catalog: readonly CatalogEntry[] = [
 	{ slug: 'testing', href: '/docs/testing', source: 'docs/testing.md', label: 'Pruebas y CI', section: 'Herramientas' },
 	{ slug: 'stability', href: '/docs/stability', source: 'docs/stability.md', label: 'Estabilidad 1.x', section: 'Referencia' },
 	{ slug: 'architecture', href: '/docs/architecture', source: 'docs/architecture.md', label: 'Arquitectura', section: 'Referencia' },
+	{ slug: 'routing-data-reference', href: '/docs/routing-data-reference', source: 'docs/routing-data-reference.md', label: 'Routing: datos en detalle', section: 'Referencia' },
+	{ slug: 'routing-layouts-reference', href: '/docs/routing-layouts-reference', source: 'docs/routing-layouts-reference.md', label: 'Routing: layouts en detalle', section: 'Referencia' },
+	{ slug: 'routing-navigation-reference', href: '/docs/routing-navigation-reference', source: 'docs/routing-navigation-reference.md', label: 'Routing: navegación en detalle', section: 'Referencia' },
+	{ slug: 'routing-middleware-reference', href: '/docs/routing-middleware-reference', source: 'docs/routing-middleware-reference.md', label: 'Routing: middleware en detalle', section: 'Referencia' },
+	{ slug: 'framework-reference', href: '/docs/framework-reference', source: 'docs/framework-reference.md', label: 'Runtimes, compatibilidad y límites', section: 'Referencia' },
+	{ slug: 'migration-1.0', href: '/docs/migration-1.0', source: 'docs/migration-1.0.md', label: 'Migrar a 1.0', section: 'Referencia' },
+	{ slug: 'migration-1.1', href: '/docs/migration-1.1', source: 'docs/migration-1.1.md', label: 'Actualizar a 1.1', section: 'Referencia' },
+	{ slug: 'migration-1.2', href: '/docs/migration-1.2', source: 'docs/migration-1.2.md', label: 'Actualizar a 1.2', section: 'Referencia' },
+	{ slug: 'migration-1.3', href: '/docs/migration-1.3', source: 'docs/migration-1.3.md', label: 'Actualizar a 1.3', section: 'Referencia' },
+	{ slug: 'migration-1.4', href: '/docs/migration-1.4', source: 'docs/migration-1.4.md', label: 'Actualizar a 1.4', section: 'Referencia' },
+	{ slug: 'migration-1.5', href: '/docs/migration-1.5', source: 'docs/migration-1.5.md', label: 'Actualizar a 1.5', section: 'Referencia' },
 	{ slug: 'migration-1.6', href: '/docs/migration-1.6', source: 'docs/migration-1.6.md', label: 'Actualizar a 1.6', section: 'Referencia' },
 	{ slug: 'migration-1.7', href: '/docs/migration-1.7', source: 'docs/migration-1.7.md', label: 'Actualizar a 1.7', section: 'Referencia' },
 	{ slug: 'migration-1.8', href: '/docs/migration-1.8', source: 'docs/migration-1.8.md', label: 'Actualizar a 1.8', section: 'Referencia' },
-	{ slug: 'migration-1.5', href: '/docs/migration-1.5', source: 'docs/migration-1.5.md', label: 'Actualizar a 1.5', section: 'Referencia' },
-	{ slug: 'migration-1.4', href: '/docs/migration-1.4', source: 'docs/migration-1.4.md', label: 'Actualizar a 1.4', section: 'Referencia' },
-	{ slug: 'migration-1.3', href: '/docs/migration-1.3', source: 'docs/migration-1.3.md', label: 'Actualizar a 1.3', section: 'Referencia' },
-	{ slug: 'migration-1.2', href: '/docs/migration-1.2', source: 'docs/migration-1.2.md', label: 'Actualizar a 1.2', section: 'Referencia' },
-	{ slug: 'migration-1.1', href: '/docs/migration-1.1', source: 'docs/migration-1.1.md', label: 'Actualizar a 1.1', section: 'Referencia' },
-	{ slug: 'migration-1.0', href: '/docs/migration-1.0', source: 'docs/migration-1.0.md', label: 'Migrar a 1.0', section: 'Referencia' },
 	{ slug: 'benchmarks', href: '/docs/benchmarks', source: 'docs/benchmarks.md', label: 'Rendimiento', section: 'Referencia' },
-	{ slug: 'performance', href: '/docs/performance', source: 'docs/performance.md', label: 'Presupuestos de rendimiento', section: 'Referencia' },
+	{ slug: 'contributing', href: '/docs/contributing', source: 'docs/contributing.md', label: 'Contribuir a Meeko', section: 'Proyecto' },
 	{ slug: 'roadmap', href: '/docs/roadmap', source: 'docs/roadmap.md', label: 'Plan de desarrollo', section: 'Proyecto' },
 	{ slug: 'changelog', href: '/docs/changelog', source: 'CHANGELOG.md', label: 'Cambios', section: 'Proyecto' },
 ]
@@ -72,11 +97,35 @@ const englishLabels: Readonly<Record<string, string>> = {
 	'inicio-rapido': 'Quick start',
 	'primeros-pasos': 'First application',
 	documentacion: 'Documentation map',
-	'como-elegir': 'How to choose',
+	'como-elegir': 'Common decisions',
 	framework: 'Full-stack framework',
-	api: 'Components and API',
+	'framework-configuration': 'Configure and extend',
+	'framework-rendering': 'Render pages and layouts',
+	'framework-api': 'Build APIs and RPC',
+	'framework-websocket': 'Use WebSocket',
+	'framework-server': 'Server runtime and errors',
+	'framework-auth': 'Authentication and sessions',
+	'framework-deployment': 'Build and deploy',
+	'framework-reference': 'Runtimes, compatibility and limits',
+	routing: 'Routing: start here',
+	router: 'Create routes and navigate',
+	'routing-pages': 'Pages and parameters',
+	'routing-data': 'Load data',
+	'routing-layouts': 'Layouts',
+	'routing-navigation': 'Navigation',
+	'routing-middleware': 'Route middleware',
+	api: 'Components and .meeko language',
+	'component-basics': 'Components and props',
+	'component-template': 'Templates and directives',
+	'component-events': 'Events, models and snippets',
+	'language-reactivity': 'Reactivity and lifecycle',
+	'component-styles': 'Component styles',
+	'component-dynamic': 'Dynamic components',
+	'component-attributes': 'Attributes and static props',
+	'component-advanced': 'Composition and generated module',
+	'component-builtins': 'Built-in components',
 	ui: 'Meeko UI',
-	'ui-api': 'Meeko UI API',
+	'ui-api': 'Meeko UI components',
 	i18n: 'Internationalization',
 	doctor: 'Doctor',
 	editors: 'Editors',
@@ -86,9 +135,14 @@ const englishLabels: Readonly<Record<string, string>> = {
 	testing: 'Testing and CI',
 	stability: 'Stability 1.x',
 	architecture: 'Architecture',
+	'routing-data-reference': 'Routing: data details',
+	'routing-layouts-reference': 'Routing: layout details',
+	'routing-navigation-reference': 'Routing: navigation details',
+	'routing-middleware-reference': 'Routing: middleware details',
 	'migration-1.0': 'Migrate to 1.0',
 	benchmarks: 'Performance',
-	performance: 'Performance budgets',
+	performance: 'Measure your application',
+	contributing: 'Contribute to Meeko',
 	roadmap: 'Roadmap',
 	changelog: 'Changes',
 }
@@ -96,8 +150,9 @@ const englishLabels: Readonly<Record<string, string>> = {
 /** The sections of the sidebar in English, by their Spanish title. */
 const englishSections: Readonly<Record<string, string>> = {
 	Empezar: 'Get started',
-	Framework: 'Framework',
-	'Componentes y módulos': 'Components and modules',
+	Fundamentos: 'Fundamentals',
+	'Guías prácticas': 'How-to guides',
+	Ecosistema: 'Ecosystem',
 	Herramientas: 'Tools',
 	Referencia: 'Reference',
 	Proyecto: 'Project',
@@ -118,6 +173,9 @@ export function catalogSection(title: string, locale: DocsLocale = currentLocale
 /** Slugs of the `/docs/[slug]` pages, for `prerenderEntries`. */
 export const docSlugs: readonly string[] = catalog.map((entry) => entry.slug)
 
+/** A short destination map for the docs landing page; the complete inventory remains in the sidebar. */
+export const docsIndexSlugs: ReadonlySet<string> = new Set(['inicio-rapido', 'primeros-pasos', 'como-elegir', 'framework', 'api', 'component-basics', 'routing', 'routing-data', 'routing-navigation', 'ui', 'i18n', 'editors', 'doctor', 'testing', 'stability', 'changelog'])
+
 /** The entry of a slug. */
 export function catalogEntry(slug: string): CatalogEntry | undefined {
 	return catalog.find((entry) => entry.slug === slug)
@@ -136,7 +194,7 @@ export function navigation(): NavSection[] {
 		if (!section) sections.push((section = { title: entry.section, links: [] }))
 		section.links.push({ href: entry.href, label: catalogLabel(entry) })
 	}
-	// The groups of the taxonomy, each at its place in the index; the reference has its own sidebar.
+	// The index links to the taxonomy without expanding all its symbols in the guide sidebar.
 	const text = messages()
 	const reference = {
 		title: text.reference,
@@ -146,8 +204,8 @@ export function navigation(): NavSection[] {
 			{ href: exportsHref, label: text.allExports },
 		],
 	}
-	const guides = sections.findIndex((section) => section.title === 'Componentes y módulos')
-	sections.splice(guides < 0 ? sections.length : guides + 1, 0, reference)
+	const guides = sections.findIndex((section) => section.title === 'Referencia')
+	sections.splice(guides < 0 ? sections.length : guides, 0, reference)
 	return sections.map((section) => (section === reference ? section : { ...section, title: catalogSection(section.title) }))
 }
 
@@ -155,5 +213,8 @@ export function navigation(): NavSection[] {
 export function pager(href: string): Pager {
 	const index = catalog.findIndex((entry) => entry.href === href)
 	const link = (entry: CatalogEntry | undefined): NavLink | null => (entry ? { href: entry.href, label: catalogLabel(entry) } : null)
-	return { previous: link(catalog[index - 1]), next: link(catalog[index + 1]) }
+	if (index < 0) return { previous: null, next: null }
+	const current = catalog[index]!
+	const withinSection = (entry: CatalogEntry | undefined): CatalogEntry | undefined => entry?.section === current.section ? entry : undefined
+	return { previous: link(withinSection(catalog[index - 1])), next: link(withinSection(catalog[index + 1])) }
 }

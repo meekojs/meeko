@@ -269,8 +269,10 @@ const meekoPrinter: Printer<MeekoNode> = {
 			const previous = index > 0 ? node.children[index - 1] : undefined
 			if (previous) {
 				parts.push(hardline)
-				// One blank line between sections or comments is kept; more collapse into one.
-				if ((text.slice(previous.end, current.start).match(/\n/g)?.length ?? 0) > 1) parts.push(hardline)
+				// Separa siempre las secciones con una línea en blanco; conserva como máximo una
+				// alrededor de comentarios, sin separar `prettier-ignore` de su sección.
+				const attachedComment = previous.type === 'comment' && current.type === 'section'
+				if (!attachedComment && ((previous.type === 'section' && current.type === 'section') || (text.slice(previous.end, current.start).match(/\n/g)?.length ?? 0) > 1)) parts.push(hardline)
 			}
 			parts.push(isPrettierIgnore(previous) ? verbatim(options, current.start, current.end) : print())
 		}, 'children')
@@ -287,7 +289,7 @@ const meekoPrinter: Printer<MeekoNode> = {
 			const close = verbatim(options, node.contentEnd, node.end)
 			const content = text.slice(node.contentStart, node.contentEnd)
 			// The compiler renders this whitespace as text nodes: `<template><p></p></template>` has none.
-			const keepsEdges = parser === templateParserName
+			const keepsEdges = parser === templateParserName && options.htmlWhitespaceSensitivity !== 'ignore'
 			if (!content.trim()) return keepsEdges && content ? [open, ' ', close] : [open, close]
 			// The script needs it too: its class functions know the classes of the component's `<style>`.
 			const classOrder = parser === templateParserName || parser === 'typescript' ? (path.root as MeekoRootNode).classOrder : undefined

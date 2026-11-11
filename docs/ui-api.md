@@ -6,24 +6,15 @@ Componentes visuales y estilos para Meeko. Es un paquete del mismo ecosistema, c
 
 ## Instalación
 
-En una aplicación de este monorepo, añade la dependencia de workspace a su `package.json`:
-
-```json
-{
-	"dependencies": {
-		"@meekojs/meeko": "workspace:*",
-		"@meekojs/ui": "workspace:*"
-	}
-}
-```
-
-Después ejecuta `pnpm install` desde la raíz. Para instalar una versión publicada del paquete en un consumidor externo:
+En una aplicación externa de Meeko con Node.js 24 o superior, instala ambos paquetes publicados:
 
 ```sh
-pnpm add @meekojs/ui
+pnpm add @meekojs/meeko @meekojs/ui
 ```
 
-La aplicación necesita `@meekojs/meeko` y Node.js 24 o superior. UI requiere Meeko `>=1.8 <2` porque `UIThemeToggle` usa `useThemeToggle()`.
+Activa el módulo con la configuración siguiente. Después, en `app/pages/index.meeko`, puedes pintar `<UIButton>Guardar</UIButton>`; sin `to` ni `href` es un botón nativo de tipo `button`. Consulta el [ejemplo de aplicación](#uso) para un campo y una acción completos.
+
+UI requiere Meeko `>=1.8 <2`. Para contribuir **dentro de este monorepo**, usa las dependencias `workspace:*` y ejecuta `pnpm install` desde su raíz; esa sintaxis no corresponde a una aplicación externa.
 
 ## Configuración
 
@@ -198,11 +189,11 @@ Puedes sobrescribir `--ui-container-max-width` y `--ui-container-gutter` desde u
 
 ### Controles básicos
 
-| Componente | API                                                                                                                                                                                                                                                                                             |
-| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `UIButton` | Ruta (`to`, `params`, `search`), enlace (`href`, `target`, `rel`, `download`) o botón (`type`, `disabled`); véase [UIButton](#uibutton-ruta-enlace-o-botón). Siempre `variant`, `size`, `shape`, `class`, evento `click` y snippet `default`. Por defecto `button`, `primary`, `md`, `rounded`. |
-| `UIInput`  | Modelo de texto con `model`. Props: `id`, `name`, `type`, `placeholder`, `required`, `disabled`, `invalid`, `describedBy` y `class`. Tipos admitidos: `text`, `email`, `password`, `search`, `url`, `tel`. Por defecto usa `text` y un valor vacío.                                             |
-| `UIField`  | Requiere `id`, `label` y el snippet `default(id, describedBy)`. Props opcionales: `description`, `error`, `required`, `class`. El error tiene prioridad sobre la descripción y se anuncia con `role="alert"`.                                                                                   |
+| Componente | API                                                                                                                                                                                                                                                                                            |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `UIButton` | Ruta (`to`, `params`, `search`), enlace (`href`, `target`, `rel`, `download`) o botón (`type`, `disabled`); véase [UIButton](#uibutton-ruta-enlace-o-botón). Admite `variant`, `size`, `shape`, `class`, evento `click` y snippet `default`. Por defecto `button`, `primary`, `md`, `rounded`. |
+| `UIInput`  | Modelo de texto con `model`. Props: `id`, `name`, `type`, `placeholder`, `required`, `disabled`, `invalid`, `describedBy` y `class`. Tipos admitidos: `text`, `email`, `password`, `search`, `url`, `tel`. Por defecto usa `text` y un valor vacío.                                            |
+| `UIField`  | Requiere `id`, `label` y el snippet `default(id, describedBy)`. Props opcionales: `description`, `error`, `required`, `class`. El error tiene prioridad sobre la descripción y se anuncia con `role="alert"`.                                                                                  |
 
 También incluye `UIApp` y `UIModal` para [modales](#modales), `UITable` para [tablas](#tablas), `UICard` para [cards](#cards), y los componentes de navegación y etiquetas siguientes.
 
@@ -248,7 +239,7 @@ También incluye `UIApp` y `UIModal` para [modales](#modales), `UITable` para [t
 
 - `UILink` da apariencia de acción a un `<a>` real, con los defaults de `ui.defaults.link`. Recibe `href` (cualquier URL) o `to` (una ruta de la aplicación con `params` y `search` tipados, como en `UIButton`, con navegación del cliente y el `href` localizado con `@meekojs/i18n`); uno de los dos, no ambos. Con los dos acepta `target`, `rel`, `download`, `hreflang` y `lang`. Comparte `variant`, `size` y `shape` con `UIButton`, y admite `ariaLabel`, `class`, `id`, `title`, `aria-*`, `data-*` y evento `click`. No simula botones ni utiliza roles artificiales. Para `target="_blank"` añade `noopener noreferrer` si no se especifica `rel`.
 - `UILinkCard` es una superficie enlazada: requiere `title` y un destino, `href` (cualquier URL) o `to` (una ruta de la aplicación con `params`, `search` y `resolve`, como en `UILink`, con navegación del cliente y el `href` localizado con `@meekojs/i18n`), con `description`, `class` y snippet `default` opcionales. Acepta `target`, `rel`, `download`, `hreflang`, `lang`, `id`, `aria-*`, `data-*` y evento `click`; `title` es el texto de la card, no el atributo HTML. El contenido no debe incluir otros enlaces ni botones porque toda la card es un único enlace.
-- `UIBadge` muestra metadatos, con `tone="neutral|accent|danger"` (`neutral` por defecto), `class` y snippet `default` obligatorio. Conserva semántica de texto; no añade anuncios o interacción.
+- `UIBadge` muestra metadatos, con `tone="neutral|info|success|warning|danger"` (`neutral` por defecto), `dot`, `class` y snippet `default` obligatorio. Conserva semántica de texto; no añade anuncios o interacción.
 
 ```html
 <UILink
@@ -262,12 +253,12 @@ También incluye `UIApp` y `UIModal` para [modales](#modales), `UITable` para [t
 	title="Framework"
 	description="Rutas, SSR y datos."
 />
-<UIBadge tone="accent">Función</UIBadge>
+<UIBadge tone="info">Función</UIBadge>
 ```
 
 La web pública `apps/meeko` consume estas acciones en su portada, cabecera y errores; `UILinkCard` compone el índice documental y `UIBadge` los metadatos de referencia. Su `meeko.config.ts` enlaza los tokens con la paleta actual, incluidas las acciones neutras y el foco azul.
 
-Desde UI 1.8, `UIPopover`, `UISelect` y `UIThemeToggle` son componentes del módulo UI. Sustituyen a `MeekoPopover`, `MeekoSelect` y `MeekoThemeToggle`, obsoletos desde core 1.8 y con retirada en 2.0. Conservan el contrato y el marcado `data-meeko-*`; véase [Migración a 1.8](migration-1.8.md).
+Desde UI 1.8, `UIPopover`, `UISelect`, `UICombobox` y `UIThemeToggle` están en el módulo UI. `MeekoPopover`, `MeekoSelect` y `MeekoThemeToggle` quedaron obsoletos en core 1.8 y se retirarán en 2.0. Para sustituir `MeekoSelect`, usa `UISelect` si necesitas un `<select>` nativo o `UICombobox` si necesitas búsqueda o selección múltiple; no tienen el mismo contrato. Véase [Migración a 1.8](migration-1.8.md).
 
 ## Personalización
 
@@ -440,7 +431,7 @@ Cada clave de la fila tiene sus propios snippets, `cell-<clave>` y `header-<clav
 		name="cell-status"
 		params="row, value"
 	>
-		<UIBadge bind:tone="value === 'Publicado' ? 'accent' : 'neutral'">{value}</UIBadge>
+		<UIBadge bind:tone="value === 'Publicado' ? 'success' : 'neutral'">{value}</UIBadge>
 	</snippet>
 	<snippet
 		name="header-name"

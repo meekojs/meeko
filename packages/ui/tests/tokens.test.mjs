@@ -216,9 +216,19 @@ test('the frame of the page does not depend on how long the page is', async () =
 })
 
 test('inline code reads as a chip, so that its padding is not taken for a space before the punctuation', async () => {
-	assert.match(await read('prose.css'), /:not\(pre\) > code, kbd\) \{[^}]*background: var\(--ui-color-control-hover\)/)
+	assert.match(await read('prose.css'), /:not\(pre\) > code \{[^}]*background: var\(--ui-color-code-soft\)/)
 	const [, inline] = /--ui-prose-code-padding: \S+ (\d*\.?\d+)em/.exec(tokensCss)
 	assert.ok(Number(inline) <= 0.2, `${inline}em on each side`)
+})
+
+test('code text contrasts with its background in both themes', () => {
+	for (const theme of ['light', 'dark']) {
+		const text = color(theme, 'cyan', 12)
+		for (const step of [2, 3]) {
+			const ratio = contrast(text, color(theme, 'cyan', step))
+			assert.ok(ratio >= 4.5, `${theme} code on cyan-${step}: ${ratio.toFixed(2)}:1`)
+		}
+	}
 })
 
 test('every --ui-* variable a component sheet reads is declared', async () => {

@@ -114,7 +114,7 @@ export async function generateOpenApi(options: OpenApiOptions): Promise<Record<s
 		return { $ref: `#/components/schemas/${name}` }
 	}
 	const paths: Record<string, PathItem> = {}
-	const usePath = (path: string): PathItem => (paths[path] ??= {})
+	const ensurePath = (path: string): PathItem => (paths[path] ??= {})
 	const requireDefinition = async (file: string): Promise<Record<string, unknown>> => {
 		const module = await load(file)
 		if (!module || typeof module !== 'object' || !('default' in module) || !module.default || typeof module.default !== 'object') throw new Error(`OpenAPI handler has no default definition: ${file}`)
@@ -149,14 +149,14 @@ export async function generateOpenApi(options: OpenApiOptions): Promise<Record<s
 		if (definition.body) operation.requestBody = { required: true, content: { 'application/json': { schema: ref(definition.body, `${endpoint.file} body`) } } }
 		if (definition.auth === 'required') operation.security = [{ sessionCookie: [] }]
 		const path = publicPath(endpoint.pathname)
-		const item = usePath(path)
+		const item = ensurePath(path)
 		const method = endpoint.method.toLowerCase()
 		if (item[method]) throw new Error(`OpenAPI duplicate operation: ${endpoint.method} ${path}`)
 		item[method] = operation
 	}
 	for (const endpoint of options.manifest.rpc) {
 		const definition = (await requireDefinition(endpoint.file)) as unknown as RpcDefinition<Schema, Schema>
-		const item = usePath(endpoint.pathname)
+		const item = ensurePath(endpoint.pathname)
 		if (item.post) throw new Error(`OpenAPI duplicate operation: POST ${endpoint.pathname}`)
 		item.post = {
 			operationId: `rpc_${endpoint.id.replaceAll('.', '_')}`,

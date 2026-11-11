@@ -33,6 +33,9 @@ tester.run('attributes-order', rule, {
 		{ code: wrap('each:of="items" each:as="item" each:index="index" each:key="item.id"'), options: [{ alphabetical: true }] },
 	],
 	invalid: [
+		{ code: wrap('class="c" if="visible"'), output: wrap('if="visible" class="c"'), errors: error },
+		{ code: wrap('class="c" else-if="visible"'), output: wrap('else-if="visible" class="c"'), errors: error },
+		{ code: wrap('class="c" else'), output: wrap('else class="c"'), errors: error },
 		{ code: '<template><!-- keep --><Card bind:title="title" id="a" /></template>', output: '<template><!-- keep --><Card id="a" bind:title="title" /></template>', errors: error },
 		{ code: wrap('bind:title="title" class="c" id="a"'), output: wrap('class="c" id="a" bind:title="title"'), errors: error },
 		{ code: wrap('bind:title="title" class="c" id="a"', 'Card'), output: wrap('class="c" id="a" bind:title="title"', 'Card'), errors: error },

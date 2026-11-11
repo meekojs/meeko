@@ -99,11 +99,15 @@ const specialTagDocumentation = {
 
 const specialAttributeDocumentation = {
 	render: {
+		if: '**`if`** · Pinta este `<render>` sólo cuando la expresión es verdadera.',
+		'else-if': '**`else-if`** · Alternativa a la rama anterior de la cadena.',
+		else: '**`else`** · Alternativa final de la cadena, sin valor.',
 		snippet: '**`snippet`** · Expresión de tipo `Snippet<Args> | undefined` que se pinta. Normalmente `snippets.name`, declarado con `defineSnippets`. Es obligatorio; si es `undefined`, no pinta contenido.',
 		args: '**`args`** · Expresiones separadas por comas que recibe el snippet, en el orden y con los tipos de la tupla declarada en `defineSnippets`.',
 		'if:when': '**`if:when`** · Pinta este `<render>` sólo cuando la expresión es verdadera.',
 	},
 	snippet: {
+		if: '**`if`** · Alias de `if:when`: pasa el snippet al hijo sólo mientras la expresión es verdadera.',
 		name: '**`name`** · Nombre del snippet que llena en el componente hijo; debe coincidir con una clave de su `defineSnippets`.',
 		params: '**`params`** · Nombres de los argumentos que el hijo pasa desde `<render args="…">`, separados por comas. Sus tipos se infieren de `defineSnippets`.',
 		'if:when': '**`if:when`** · Pasa el snippet al hijo sólo cuando la expresión es verdadera. El hijo debe haberlo declarado como opcional.',

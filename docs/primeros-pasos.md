@@ -1,42 +1,92 @@
-# Primera aplicación full-stack
+# Tu primera aplicación
 
-Este recorrido usa el proyecto que genera `meeko init-framework`. Al terminar tendrás una página renderizada en el servidor, un botón que se hidrata en el navegador y comprobaciones de tipos. No necesitas configurar una base de datos para seguirlo.
+Vas a convertir el starter en una lista de tareas con un filtro y una segunda página. La lista aparece en el HTML inicial; el botón se activa al hidratarse en el navegador. No necesitas una base de datos.
 
-## Crear y ejecutar
+## Crear y abrir el proyecto
 
-Necesitas Node.js 24 o posterior. En una carpeta donde quieras crear el proyecto, ejecuta:
+Necesitas Node.js 24 o posterior y pnpm 12 para descargar la CLI. En la carpeta donde quieras crear `my-app`:
 
 ```powershell
-pnpm exec meeko init-framework my-app
+npm exec --yes --package=@meekojs/meeko@1.9.0 -- meeko init-framework my-app
 cd my-app
 npm install
 npm run dev
 ```
 
-Abre `http://localhost:4173`. El starter crea `app/pages/index.meeko`, `app/app.meeko`, `app/layouts/default.meeko` y `meeko.config.ts`. Cada archivo de `app/pages` es una ruta; el layout conserva la cabecera durante la navegación.
+Abre `http://localhost:4173`. Verás el contador del starter. Si ya seguiste el [Inicio rápido](inicio-rapido.md), conserva ese mismo proyecto y continúa desde aquí.
 
-## Leer la primera página
+## Sustituir la página inicial
 
-Abre `app/pages/index.meeko`, que el starter ya creó. Tiene tres partes:
+**Archivo: `my-app/app/pages/index.meeko`.** Sustituye todo su contenido por este componente:
 
-1. `<script server lang="ts">` declara la ruta con `definePage({ render: "prerender" })`. Esta página se genera como HTML durante el build.
-2. `<script lang="ts">` crea una señal `count` para la interacción. El componente se ejecuta durante SSR y se conecta al HTML en el navegador.
-3. `<template>` muestra el contador y usa `on:click` para incrementarlo.
+```meeko
+<script server lang="ts">
+export const route = definePage({ render: "prerender" });
+</script>
 
-Modifica el texto del `<h1>` y comprueba el resultado en el navegador. Después pulsa el botón: el valor cambia sin volver a cargar la página. Si quieres ver el ejemplo exacto que genera la CLI, está en el [starter](https://github.com/meekojs/meeko/blob/main/packages/meeko/src/framework/init.ts).
+<script lang="ts">
+import { signal } from "@meekojs/meeko";
 
-## Comprobar y construir
+const tasks = [
+  { id: 1, title: "Crear una página", done: true },
+  { id: 2, title: "Probar el filtro", done: false },
+  { id: 3, title: "Añadir otra ruta", done: false },
+];
+const onlyPending = signal(false);
+</script>
+
+<template>
+  <main>
+    <h1>Mis tareas</h1>
+    <p>Una lista pequeña para empezar con Meeko.</p>
+    <button type="button" on:click="() => onlyPending.value = !onlyPending.value">
+      {onlyPending.value ? "Mostrar todas" : "Mostrar pendientes"}
+    </button>
+    <ul>
+      <li
+        each:of="onlyPending.value ? tasks.filter((task) => !task.done) : tasks"
+        each:as="task"
+        each:key="task.id"
+      >
+        {task.title}{task.done ? " ✓" : ""}
+      </li>
+    </ul>
+    <a href="/acerca">Acerca de esta lista</a>
+  </main>
+</template>
+```
+
+Guarda el archivo. Verás tres tareas. Al pulsar «Mostrar pendientes» sólo quedarán dos. `render: "prerender"` genera el HTML inicial durante el build; el navegador hidrata el botón y `signal` actualiza la lista. En el framework `definePage` está disponible en el bloque `server`; `signal` se importa explícitamente del motor.
+
+## Añadir una ruta
+
+**Archivo nuevo: `my-app/app/pages/acerca.meeko`.** Crea el archivo con este contenido:
+
+```meeko
+<script server lang="ts">
+export const route = definePage({ render: "prerender" });
+</script>
+
+<template>
+  <main>
+    <h1>Acerca de esta lista</h1>
+    <p>Mi primera aplicación Meeko tiene dos páginas.</p>
+    <a href="/">Volver a mis tareas</a>
+  </main>
+</template>
+```
+
+Abre `http://localhost:4173/acerca` o sigue el enlace desde la lista. Los archivos de `app/pages` definen rutas; aquí `<a>` basta para enlazar páginas. Consulta [navegación](routing-navigation.md) cuando necesites enlaces con estado activo o navegación programática.
+
+## Comprobar el resultado
+
+Detén `npm run dev` con Ctrl+C. Desde `my-app`:
 
 ```powershell
 npm run check
 npm run build
-npm start
 ```
 
-`check` genera declaraciones del proyecto y comprueba los contratos TypeScript. `build` genera el cliente, el servidor Node y las páginas prerenderizadas en `.meeko/output/node/`. `start` sirve el build con SSR. Para un despliegue real, configura el origen público y las sesiones según la [guía de despliegue](framework.md#build-despliegue-y-verificación).
+`check` comprueba los tipos y `build` genera las páginas. Si el editor señala un error, revisa que cada archivo esté en `app/pages`, que el import de `signal` esté en el bloque de cliente y que Node sea 24 o posterior.
 
-## Siguiente paso: datos y componentes
-
-Cuando la página necesite datos iniciales, usa el código de servidor de la página o un loader en `definePage`. Para una consulta iniciada por un componente, usa `useApi` o `useRpcQuery`. La guía [Cómo elegir](como-elegir.md) explica cuándo corresponde cada opción y cómo mostrar carga y errores.
-
-Para crear componentes reutilizables, colócalos en `app/components`. Lee [autoimports y registro de componentes](framework.md#autoimports-y-typescript) para conocer nombres, props y carga por nombre. Si una decisión de sintaxis no está clara, consulta la [referencia de componentes](api.md) y vuelve al recorrido.
+Continúa con [Cargar datos de una ruta](routing-data.md) para sustituir la lista fija por datos del servidor. La [guía de componentes](api.md) explica props, composición y estilos cuando quieras extraer la lista a `app/components`.

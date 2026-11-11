@@ -40,6 +40,7 @@ import { extractSourceMappings, markSource, remapDecodedRegions } from './compil
 import { scanInterpolations } from './compiler/parser/interpolation'
 import { compileError, locate, parseSfc } from './compiler/parser/sfc'
 import { attributeValueStart, decodeTemplateExpression, decodeTemplateText, expressionSourceOffset, isCustomElementTag, parseTemplate } from './compiler/parser/template'
+import { prepareConditionals } from './compiler/transforms/conditionals'
 import { branchTakes, correlatedBind, importedComponents, isBranchCondition, isCandidates, isComponentName, isLeaves, scriptValueNames } from './compiler/transforms/dynamic-tag'
 import { templateEventType } from './compiler/transforms/events'
 import { layoutShiftHints } from './compiler/transforms/layout-shift'
@@ -93,6 +94,8 @@ interface ConditionBinding {
 	build?: (map: (expression: string, offset: number) => string) => string
 	render: string
 	bindings: TemplateBindings
+	/** Rama alternativa, compilada detrás de la negación de la condición. */
+	otherwise?: { render: string; bindings: TemplateBindings }
 }
 
 interface ListBinding {
@@ -251,7 +254,7 @@ interface SnippetBinding {
 	 * `if:when="expression"` (since 1.4): the parent passes the snippet only while the expression is
 	 * true. `attributeOffset` is the start of `if:when`, where MEEK110 reports a required snippet.
 	 */
-	condition?: { expression: string; offset: number; attributeOffset: number }
+	condition?: { expression: string; offset: number; attributeOffset: number; attributeLength: number }
 	/**
 	 * `meeko check` only: references that the content of the snippet reads as truthy, such as
 	 * `items.data.value` inside `<MeekoAwait for="items">`, mapped to `length` characters at `offset`.
@@ -861,6 +864,7 @@ function textParts(raw: string, bindings: TemplateBindings, context: TemplateCon
 }
 
 function renderNode(node: TemplateNode, bindings: TemplateBindings, context: TemplateContext): string {
+	if (node.conditionalContinuation) return quote('')
 	if (node.nodeName === '#text') {
 		return textParts(context.source.slice(node.start, node.end), bindings, context, node.start).join(' + ') || quote('')
 	}
@@ -901,8 +905,21 @@ function renderNode(node: TemplateNode, bindings: TemplateBindings, context: Tem
 		if (condition) {
 			const offset = attributeValueOffset(node, 'if:when', context)
 			validateExpression(condition.value, context.source, context.filename, offset)
-			bindings.regions.push({ kind: 'condition', id, expression: condition.value, offset, render: html, bindings: inner })
-			return `__meeko.renderIf(${id}, ${markSource(condition.value, offset)}, () => ${html})`
+			let otherwise: ConditionBinding['otherwise']
+			if (node.conditionalElse) {
+				const alternate = emptyBindings()
+				const negative = { code: `!(${markSource(condition.value, offset)})`, names: namesOf(condition.value) }
+				const alternateGuards = context.narrow ? [...outerGuards, negative] : outerGuards
+				context.guards = alternateGuards
+				try {
+					const render = narrowed(renderNode({ ...node.conditionalElse, conditionalContinuation: false }, alternate, context), alternateGuards)
+					otherwise = { render, bindings: alternate }
+				} finally {
+					context.guards = outerGuards
+				}
+			}
+			bindings.regions.push({ kind: 'condition', id, expression: condition.value, offset, render: html, bindings: inner, ...(otherwise ? { otherwise } : {}) })
+			return `__meeko.renderIf(${id}, ${markSource(condition.value, offset)}, () => ${html}${otherwise ? `, () => ${otherwise.render}` : ''})`
 		}
 		if (!itemName || !/^[a-zA-Z_$][\w$]*$/.test(itemName) || itemName.startsWith('__') || !/^[a-zA-Z_$][\w$]*$/.test(indexName) || indexName.startsWith('__') || itemName === indexName) {
 			throw compileError(context.source, context.filename, 'MEEK022', 'Una lista necesita identificadores válidos y distintos en each:as y each:index', position)
@@ -1916,7 +1933,7 @@ function conditionalSnippet(value: string, condition: string | undefined): strin
  */
 function snippetConditionCheck(entry: SnippetBinding, reference: string): string {
 	const condition = entry.condition!
-	return `void (() => __meeko.checkSnippetCondition(() => ${reference}, ${quote(entry.name)}, ${markSource('true', condition.attributeOffset, 'if:when'.length)}));`
+	return `void (() => __meeko.checkSnippetCondition(() => ${reference}, ${quote(entry.name)}, ${markSource('true', condition.attributeOffset, condition.attributeLength)}));`
 }
 
 function isContent(node: TemplateNode): boolean {
@@ -2001,7 +2018,7 @@ function componentSnippets(node: TemplateNode, context: TemplateContext, default
 			if (!conditionAttribute.value.trim()) fail(`if:when de <snippet> necesita una condición: el snippet ${name} se pasa sólo mientras es verdadera, como if:when="snippets.${name}"`, conditionAttribute.start)
 			const offset = attributeValueOffset(child, 'if:when', context)
 			validateExpression(conditionAttribute.value, context.source, context.filename, offset)
-			condition = { expression: conditionAttribute.value, offset, attributeOffset: conditionAttribute.start }
+			condition = { expression: conditionAttribute.value, offset, attributeOffset: conditionAttribute.start, attributeLength: (conditionAttribute.originalName ?? conditionAttribute.name).length }
 		}
 		named.push({ node: child, entry: { name, nameOffset, nameLength: nameAttribute!.value.length, params, paramsOffset, paramsLength: paramsAttribute?.value.length ?? 0, ...(condition ? { condition } : {}) } })
 	}
@@ -2562,7 +2579,11 @@ function taggedRefs(bindings: TemplateBindings, narrow: boolean): Map<RefBinding
 		for (const region of current.regions) {
 			if (region.kind === 'list') visit(region.bindings, unshadowed(guards, [region.itemName, region.indexName]))
 			else if (region.kind === 'teleport') visit(region.bindings, guards)
-			else visit(region.bindings, narrow ? [...guards, { code: region.build ? region.build(markSource) : markSource(region.expression, region.offset), names: namesOf(region.expression) }] : guards)
+			else {
+				const condition = region.build ? region.build(markSource) : markSource(region.expression, region.offset)
+				visit(region.bindings, narrow ? [...guards, { code: condition, names: namesOf(region.expression) }] : guards)
+				if (region.otherwise) visit(region.otherwise.bindings, narrow ? [...guards, { code: `!(${condition})`, names: namesOf(region.expression) }] : guards)
+			}
 		}
 	}
 	visit(bindings, [])
@@ -2757,7 +2778,9 @@ function hydrationBody(bindings: TemplateBindings, context: TemplateContext, hot
 			const condition = entry.build ? markSource(`(${entry.build((part, partOffset) => mappedExpression(part, partOffset))})`, entry.offset, entry.expression.length) : arrowExpression(entry.expression, entry.offset)
 			const own = entry.build ? entry.build((part, partOffset) => plainExpression(part, partOffset)) : plainExpression(entry.expression, entry.offset)
 			const inner = context.narrow ? [...guards, { code: own, names: namesOf(entry.expression) }] : guards
-			statements.push(`__meeko_cleanups.push(__meeko.bindIf(__scope, ${entry.id}, () => ${hot ? trackedRead(context, entry.offset, entry.expression, 'if', condition) : condition}, () => ${rewriteLocals(entry.render, locals)}, (__scope) => { ${hydrationBody(entry.bindings, context, hot, locals, inner)} }));`)
+			const alternateGuards = context.narrow ? [...guards, { code: `!(${own})`, names: namesOf(entry.expression) }] : guards
+			const alternate = entry.otherwise ? `, () => ${rewriteLocals(entry.otherwise.render, locals)}, (__scope) => { ${hydrationBody(entry.otherwise.bindings, context, hot, locals, alternateGuards)} }` : ''
+			statements.push(`__meeko_cleanups.push(__meeko.bindIf(__scope, ${entry.id}, () => ${hot ? trackedRead(context, entry.offset, entry.expression, 'if', condition) : condition}, () => ${rewriteLocals(entry.render, locals)}, (__scope) => { ${hydrationBody(entry.bindings, context, hot, locals, inner)} }${alternate}));`)
 		} else if (entry.kind === 'teleport') {
 			// `<MeekoTeleport>`: its content hydrates in this component wherever the document has it.
 			const to = arrowExpression(entry.expression, entry.offset)
@@ -2819,6 +2842,7 @@ function templateChildren(bindings: TemplateBindings, setupNames: ReadonlySet<st
 		}
 		for (const entry of current.regions) {
 			visit(entry.bindings, entry.kind === 'list' ? new Set([...locals, entry.itemName, entry.indexName]) : locals)
+			if (entry.kind === 'condition' && entry.otherwise) visit(entry.otherwise.bindings, locals)
 		}
 	}
 	visit(bindings, new Set())
@@ -2877,8 +2901,10 @@ function checkTemplateNames(bindings: TemplateBindings, late: ReadonlyMap<string
 		for (const entry of current.regions) {
 			check(entry.expression, entry.offset, locals)
 			if (entry.kind === 'teleport' && entry.disabled && !entry.disabled.literal) check(entry.disabled.expression, entry.disabled.offset, locals)
-			if (entry.kind !== 'list') visit(entry.bindings, locals)
-			else {
+			if (entry.kind !== 'list') {
+				visit(entry.bindings, locals)
+				if (entry.kind === 'condition' && entry.otherwise) visit(entry.otherwise.bindings, locals)
+			} else {
 				const inner = new Set([...locals, entry.itemName, entry.indexName])
 				if (entry.key !== undefined) check(entry.key, entry.keyOffset!, inner)
 				visit(entry.bindings, inner)
@@ -2922,6 +2948,7 @@ export function compile(source: string, filename = 'anonymous.meeko', options: C
 		throw error
 	}
 	const parsed = parseTemplate(source, template, filename)
+	prepareConditionals(parsed, source, filename)
 	const bindingsForTemplate = emptyBindings()
 	const projectComponents = [...(options.projectComponents ?? [])]
 	const knownComponents = new Set([...importedComponents(script.content), ...projectComponents.filter((name) => /^[A-Z]/.test(name))])

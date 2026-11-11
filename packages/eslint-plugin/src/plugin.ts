@@ -1,6 +1,7 @@
 import type { ESLint, Linter } from 'eslint'
 
 import typescript from '@typescript-eslint/eslint-plugin'
+import * as typescriptParser from '@typescript-eslint/parser'
 
 import parser from './parser'
 import attributesOrder from './rules/attributes-order'
@@ -12,6 +13,7 @@ import orderSections from './rules/order-sections'
 import paddingLineBetweenMacros from './rules/padding-line-between-macros'
 import preferStaticBindings from './rules/prefer-static-bindings'
 import preferUiComponents from './rules/prefer-ui-components'
+import rulesOfComposables from './rules/rules-of-composables'
 import scriptTypeImports from './script-type-imports'
 
 const componentTypeScript = {
@@ -32,6 +34,7 @@ const plugin: ESLint.Plugin & { configs: Record<string, Linter.Config[]> } = {
 		'padding-line-between-macros': paddingLineBetweenMacros,
 		'prefer-static-bindings': preferStaticBindings,
 		'prefer-ui-components': preferUiComponents,
+		'rules-of-composables': rulesOfComposables,
 	} as unknown as ESLint.Plugin['rules'],
 	configs: {},
 }
@@ -66,8 +69,23 @@ plugin.configs.base = [
 	},
 ]
 
+plugin.configs.composables = [
+	{
+		name: 'meeko/composables',
+		files: ['**/*.{js,mjs,cjs,ts,tsx,mts,cts,meeko}'],
+		plugins: { meeko: plugin },
+		rules: { 'meeko/rules-of-composables': 'error' },
+	},
+	{
+		name: 'meeko/composables-typescript',
+		files: ['**/*.{ts,tsx,mts,cts}'],
+		languageOptions: { parser: typescriptParser as unknown as Linter.Parser, parserOptions: { project: false, projectService: false } },
+	},
+]
+
 plugin.configs.recommended = [
 	...plugin.configs.base,
+	...plugin.configs.composables,
 	{
 		name: 'meeko/recommended',
 		files: ['**/*.meeko'],

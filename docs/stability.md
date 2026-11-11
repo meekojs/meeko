@@ -1,5 +1,7 @@
 # Política de estabilidad 1.x
 
+**Vigencia:** política de compatibilidad de la serie 1.x. Este checkout declara `@meekojs/meeko@1.8.0`; npm publica `1.9.0` al 5 de noviembre de 2026. Consulta el CHANGELOG y la guía de migración para los cambios concretos de cada versión.
+
 A partir de `1.0.0`, `@meekojs/meeko` sigue [Semantic Versioning](https://semver.org/lang/es/). Esta página define qué cubre esa promesa, qué queda fuera, cómo se retira una API y en qué entornos se ejecuta Meeko. Los cambios de cada versión se registran en el [CHANGELOG](../packages/meeko/CHANGELOG.md); la actualización desde `0.1.0` se explica en la [guía de migración a 1.0](migration-1.0.md), la de `1.0` a `1.1`, en [Actualizar de 1.0 a 1.1](migration-1.1.md), la de `1.1` a `1.2`, en [Actualizar de 1.1 a 1.2](migration-1.2.md), la de `1.2` a `1.3`, en [Actualizar de 1.2 a 1.3](migration-1.3.md), la de `1.3` a `1.4`, en [Actualizar de 1.3 a 1.4](migration-1.4.md), la de `1.4` a `1.5`, en [Actualizar de 1.4 a 1.5](migration-1.5.md), la de `1.5` a `1.6`, en [Actualizar de 1.5 a 1.6](migration-1.6.md), la de `1.6` a `1.7`, en [Actualizar de 1.6 a 1.7](migration-1.7.md), y la de `1.7` a `1.8`, en [Actualizar de 1.7 a 1.8](migration-1.8.md).
 
 | Versión         | Puede incluir                                                                                                       |
