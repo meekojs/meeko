@@ -1,5 +1,5 @@
 ---
-source-hash: bbfb6a650170a3c25c9cf49a6008951f568ca4f2555abaf9667408653347cb79
+source-hash: b7f081e516c6240d1c604a6ef5e4c3987da37557eac184f19b025a276a14d437
 ---
 
 # Templates and directives
@@ -76,21 +76,21 @@ Since `1.1`, `model="signal"` binds a form control to a signal in both direction
 
   ```html
   <script lang="ts">
-  	const password = signal('')
-  	const revealed = signal(false)
+	const password = signal('')
+	const revealed = signal(false)
   </script>
   <template>
-  	<input
-  		bind:type="revealed.value ? 'text' : 'password'"
-  		model="password"
-  		autocomplete="current-password"
-  	/>
-  	<button
-  		type="button"
-  		on:click="() => revealed.value = !revealed.value"
-  	>
-  		Show
-  	</button>
+	<input
+		bind:type="revealed.value ? 'text' : 'password'"
+		model="password"
+		autocomplete="current-password"
+	/>
+	<button
+		type="button"
+		on:click="() => revealed.value = !revealed.value"
+	>
+		Show
+	</button>
   </template>
   ```
 

@@ -1,5 +1,5 @@
 ---
-source-hash: 42d1fb3b9fd824930b8a46b96acd3caa4c67afdd882f2806b43ee3b4a9fab0eb
+source-hash: 33f341a69138aca2ec81af248315ddd7346018c667dfbfb441549184fa5a636b
 ---
 
 # Build APIs and RPC
@@ -648,21 +648,21 @@ A card whose data arrives after the first render is empty in the HTML and grows 
    ```html
    <!-- app/components/ItemsCard.meeko -->
    <script lang="ts">
-   	const items = await useApi('/api/items')
+	const items = await useApi('/api/items')
    </script>
    <template>
-   	<section class="card">
-   		<h2>Items</h2>
-   		<ul>
-   			<li
-   				each:of="items.data.value"
-   				each:as="item"
-   				each:key="item.id"
-   			>
-   				{item.name}
-   			</li>
-   		</ul>
-   	</section>
+	<section class="card">
+		<h2>Items</h2>
+		<ul>
+			<li
+				each:of="items.data.value"
+				each:as="item"
+				each:key="item.id"
+			>
+				{item.name}
+			</li>
+		</ul>
+	</section>
    </template>
    ```
 
@@ -670,34 +670,34 @@ A card whose data arrives after the first render is empty in the HTML and grows 
 
    ```html
    <script lang="ts">
-   	const items = useApi('/api/items')
+	const items = useApi('/api/items')
    </script>
    <template>
-   	<section class="card">
-   		<h2>Items</h2>
-   		<MeekoAwait
-   			for="items"
-   			reserve
-   		>
-   			<snippet name="pending">
-   				<ul class="skeleton">
-   					<li
-   						each:of="[1, 2, 3, 4]"
-   						each:as="row"
-   					></li>
-   				</ul>
-   			</snippet>
-   			<ul>
-   				<li
-   					each:of="items.data.value"
-   					each:as="item"
-   					each:key="item.id"
-   				>
-   					{item.name}
-   				</li>
-   			</ul>
-   		</MeekoAwait>
-   	</section>
+	<section class="card">
+		<h2>Items</h2>
+		<MeekoAwait
+			for="items"
+			reserve
+		>
+			<snippet name="pending">
+				<ul class="skeleton">
+					<li
+						each:of="[1, 2, 3, 4]"
+						each:as="row"
+					></li>
+				</ul>
+			</snippet>
+			<ul>
+				<li
+					each:of="items.data.value"
+					each:as="item"
+					each:key="item.id"
+				>
+					{item.name}
+				</li>
+			</ul>
+		</MeekoAwait>
+	</section>
    </template>
    ```
 
