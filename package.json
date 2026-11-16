@@ -19,7 +19,7 @@
 		"conformance:workerd": "pnpm -F @meekojs/meeko run conformance:workerd",
 		"dashboard:dev": "turbo watch dev --filter=meeko-dashboard",
 		"design:check": "node scripts/design-tokens-check.mjs",
-		"dev": "turbo watch dev --concurrency=4 --filter=meeko-site --filter=meeko-ui-site --filter=meeko-i18n-site --filter=meeko-dashboard",
+		"dev": "turbo watch dev --filter=meeko-site --filter=meeko-ui-site --filter=meeko-i18n-site --filter=meeko-dashboard",
 		"devtools:check": "pnpm -F meeko-devtools-extension run check",
 		"devtools:types": "pnpm -F meeko-devtools-extension run types",
 		"e2e": "pnpm -F @meekojs/meeko run e2e",

@@ -52,14 +52,15 @@ pnpm -F meeko-devtools-extension run check
 pnpm run site:build                       # compila el paquete y después el sitio
 ```
 
-Los comandos `build`, `check`, `tooling:build` y los builds/servidores de las tres webs usan
+Los comandos `build`, `check`, `tooling:build` y los builds/servidores de las aplicaciones usan
 [Turborepo](https://turborepo.dev/docs) para respetar el grafo del workspace y reutilizar resultados.
 La caché local vive en `.turbo/`; CI la conserva entre ejecuciones. Los comandos directos con
 `pnpm -F <paquete>` siguen disponibles cuando se quiere trabajar sólo dentro de un paquete.
 
-`pnpm dev` ejecuta el sitio público con `turbo watch`: prepara sus dependencias y, cuando cambia el
-código de un paquete del workspace, reconstruye su `dist` y reinicia el servidor afectado. Los comandos
-`site:dev`, `ui:dev`, `i18n:dev` y `dashboard:dev` ofrecen el mismo flujo para cada aplicación, sin una
-segunda terminal de build.
+`pnpm dev` ejecuta los cuatro sitios en paralelo con `turbo watch`: framework en
+`http://127.0.0.1:4173`, UI en `http://127.0.0.1:4174`, i18n en `http://127.0.0.1:4175` y dashboard en
+`http://127.0.0.1:4310`. Prepara sus dependencias y, cuando cambia el código de un paquete del
+workspace, reconstruye su `dist` y reinicia los servidores afectados. Los comandos `site:dev`,
+`ui:dev`, `i18n:dev` y `dashboard:dev` ofrecen el mismo flujo para cada aplicación por separado.
 
 [CONTRIBUTING.md](CONTRIBUTING.md) recoge las convenciones y [SECURITY.md](SECURITY.md) cómo informar de una vulnerabilidad. El código se distribuye bajo la [licencia MIT](LICENSE).

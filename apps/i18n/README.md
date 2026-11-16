@@ -12,7 +12,7 @@ pnpm build
 pnpm i18n:dev
 ```
 
-El servidor imprime la URL disponible. Para generar y servir el build Node:
+La web escucha en `http://127.0.0.1:4175`. Para generar y servir el build Node:
 
 ```powershell
 pnpm i18n:build

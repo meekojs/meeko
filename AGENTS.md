@@ -18,7 +18,7 @@ Requiere Node.js 24+ y pnpm 12.14.0. En Windows usa PowerShell 7.
 - `pnpm install`: instala el workspace.
 - `pnpm build`: construye núcleo, UI, i18n y plugins.
 - `pnpm tooling:build`: prepara los paquetes usados por ESLint y Prettier.
-- `pnpm dev`: inicia en paralelo los sitios del framework, UI, i18n y dashboard con Turbo; `pnpm site:dev`, `pnpm ui:dev`, `pnpm i18n:dev` y `pnpm dashboard:dev` inician cada uno por separado.
+- `pnpm dev`: inicia en paralelo los sitios del framework (4173), UI (4174), i18n (4175) y dashboard (4310) con Turbo; `pnpm site:dev`, `pnpm ui:dev`, `pnpm i18n:dev` y `pnpm dashboard:dev` inician cada uno por separado.
 - `pnpm i18n:dev`: inicia la web de i18n; `pnpm i18n:build` genera su build Node.
 - `pnpm check`: comprueba tipos de los cinco paquetes principales.
 - `pnpm test`: ejecuta las pruebas del núcleo; `pnpm verify`: amplía la validación con ejemplos, compilación y DevTools.

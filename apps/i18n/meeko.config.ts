@@ -3,6 +3,10 @@ import { docsLocaleDefaults, docsShellCatalog, docsSiteDefaults } from 'meeko-do
 
 export default defineMeekoConfig({
 	...docsSiteDefaults('i18n', 'Traducciones tipadas, catálogos, plurales y formatos para aplicaciones Meeko.'),
+	server: {
+		adapter: 'node',
+		port: 4175,
+	},
 	// meeko-docs sirve /sitemap.xml con la moderación vigente: un `sitemap: true` estático lo taparía.
 	modules: ['@meekojs/ui', 'meeko-docs', '@meekojs/i18n'],
 	i18n: {

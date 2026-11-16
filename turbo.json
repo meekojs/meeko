@@ -3,6 +3,7 @@
 	"globalDependencies": ["pnpm-lock.yaml", "scripts/build-package.mjs", "scripts/rebase-component-declaration.mjs", "packages/docs/scripts/assets.mjs"],
 	"globalEnv": ["CI"],
 	"globalPassThroughEnv": ["NODE_OPTIONS"],
+	"concurrency": "10",
 	"tasks": {
 		"build": {
 			"dependsOn": ["^build"],

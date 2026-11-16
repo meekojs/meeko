@@ -14,7 +14,7 @@ DATABASE_URL=postgresql://USUARIO:CLAVE@HOST:5432/BASE_DE_DATOS
 
 Desde la raíz del repositorio:
 
-`pnpm dev` inicia este sitio; `pnpm site:dev` es el alias explícito. Para la web pública de Meeko UI usa `pnpm ui:dev`.
+`pnpm dev` inicia los cuatro sitios en paralelo. Este sitio escucha en `http://127.0.0.1:4173`; para iniciarlo solo usa `pnpm site:dev`.
 
 ```powershell
 pnpm install

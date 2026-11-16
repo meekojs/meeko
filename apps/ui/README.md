@@ -12,7 +12,7 @@ pnpm build
 pnpm ui:dev
 ```
 
-Meeko imprime la URL disponible. `pnpm dev` sigue iniciando la documentación del framework; `pnpm ui:dev` inicia esta web.
+Esta web escucha en `http://127.0.0.1:4174`. `pnpm dev` inicia los cuatro sitios en paralelo; `pnpm ui:dev` inicia solo esta web.
 
 ```powershell
 pnpm -F meeko-ui-site check
