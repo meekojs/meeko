@@ -285,6 +285,8 @@ Cookies are per host, not per port: in development, all Meeko applications on `l
 
 In `"system"`, `resolved` follows `prefers-color-scheme` changes while the page is open, and a change in another tab arrives through the `localStorage` `storage` event. Client navigation preserves the theme, because it does not reload `<html>`. On the server, `theme` and `resolved` are those of the request and cannot be changed (`set` throws an error). Without `theme` in the configuration, `useTheme()` throws an error requesting it.
 
+When the effective theme changes, Meeko disables CSS transitions on `<html>`, its descendants and their pseudo-elements for the frame that applies the new values, then restores them on the next one. A `background-color`, `color` or `border-color` transition used for `hover` therefore does not accidentally animate every color during a theme change. CSS animations remain enabled.
+
 `meeko check` types themes from the configuration: with `themes: ["light", "dark", "sepia"]`, `resolved` is `"light" | "dark" | "sepia"` and `set("purple")` is a type error. Declarations are generated in `.meeko/types/routes.d.ts` (`GeneratedTheme`); without them, themes are `string`. The editor does not need them: it declares `GeneratedTheme` from `theme` read without executing `meeko.config.ts`, even before the first `meeko check`, when its value is a literal (`true` or an object with literal values).
 
 #### Icons that do not shift

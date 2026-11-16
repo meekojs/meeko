@@ -48,6 +48,9 @@ With `/users/[id]` and `id: "7"`, the second link is `<a href="/users/7">`; on `
 | any other               | `<a>` attributes                                                             |           | `class`, `target`, `rel`, `aria-*`, `data-*`, `on:click` and children pass through to the `<a>` unchanged.                                                                                                                                                                                                                                                                                                                                        |
 
 `href`, `bind:href` and static forms `params="…"` and `search="…"` are not supported (`MEEK105`).
+The public `MeekoLinkProps` type includes `Omit<ElementAttributes<'a'>, 'href'>`, so a wrapper
+component also receives the typed native link attributes; events are still declared with
+`defineEmits`.
 
 ## Result
 

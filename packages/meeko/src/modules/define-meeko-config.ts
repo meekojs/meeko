@@ -253,6 +253,8 @@ export interface MeekoConfig {
 	readonly viewTransitions?: boolean
 	/** Component directories, relative to each source root. The default `app/components` is always included. */
 	readonly components?: {
+		/** Incluye las subcarpetas en el nombre del componente; `false` usa sólo el nombre del archivo. Por defecto, `true`. */
+		readonly pathPrefix?: boolean
 		readonly dirs?: readonly {
 			/** Relative directory below the project or layer root. */
 			readonly path: string

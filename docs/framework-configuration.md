@@ -17,6 +17,7 @@ export default defineMeekoConfig({
 
 - `layers` (desde `1.2`): carpetas que aportan páginas, componentes, autoimports y plugins; véase [Layers](#layers). `extends`, el nombre anterior, sigue funcionando como alias.
 - `modules`: nombres de los módulos creados con `defineMeekoModule` (paquetes o rutas), que configuran el proyecto desde código; sus opciones van en la clave de cada uno, como `seo`. Véase [Módulos](#módulos).
+- `components`: carpetas adicionales de componentes y cómo se forman sus nombres. `app/components` siempre se incluye; `pathPrefix: false` conserva la búsqueda recursiva pero usa sólo el nombre del archivo.
 - `imports`: carpetas de autoimports además de las de por defecto, con el ámbito de la carpeta que las contiene; véase [Autoimports y TypeScript](#carpetas-de-autoimports).
   - `imports.appDirs` (desde `1.3`): carpetas dentro de `app/` (`"app/services"`), con el ámbito de `app/`: navegador y SSR, no `shared/` ni `server/`.
   - `imports.sharedDirs` (desde `1.3`): carpetas dentro de `shared/` (`"shared/validators"`), con el ámbito de `shared/`: aplicación y servidor.
@@ -32,7 +33,22 @@ export default defineMeekoConfig({
 
 Desde `1.2`, `css: { scopeAttribute: "matched" }` limita el atributo de `<style scoped>` a los elementos que algún selector con ámbito puede seleccionar; con `"all"`, el valor por defecto en `1.x`, va en todos los elementos de la plantilla. `"matched"` pasará a ser el valor por defecto en `2.0`. Véase [Estilos con ámbito](api.md#qué-elementos-reciben-el-atributo), con el caso de las clases que el script añade con la API del DOM.
 
-La configuración se ejecuta en `meeko dev`, `meeko build` y `meeko check`. En un workspace de confianza el servidor de lenguaje también la ejecuta, con sus módulos, por lo que las listas pueden construirse dinámicamente; en un workspace no confiable (o con `trusted: false`, ver [editores](editors.md)) el editor no ejecuta código del proyecto: lee `layers`, `extends`, `imports.appDirs`, `imports.sharedDirs` e `imports.serverDirs` como arrays literales de cadenas y, de `modules`, sólo las cadenas literales que son carpetas de layer. Desde `1.5` lee también `alias` cuando es un objeto literal de cadenas y `false`. Los autoimports y componentes de los módulos no existen para ese editor hasta que se confía en el workspace.
+La configuración se ejecuta en `meeko dev`, `meeko build` y `meeko check`. En un workspace de confianza el servidor de lenguaje también la ejecuta, con sus módulos, por lo que las listas pueden construirse dinámicamente; en un workspace no confiable (o con `trusted: false`, ver [editores](editors.md)) el editor no ejecuta código del proyecto: lee `layers`, `extends`, `imports.appDirs`, `imports.sharedDirs` e `imports.serverDirs` como arrays literales de cadenas, `components.pathPrefix` como booleano literal, `components.dirs` como objetos literales y, de `modules`, sólo las cadenas literales que son carpetas de layer. Desde `1.5` lee también `alias` cuando es un objeto literal de cadenas y `false`. Los autoimports y componentes de los módulos no existen para ese editor hasta que se confía en el workspace.
+
+### Nombres de componentes por archivo
+
+Por defecto, Meeko concatena en PascalCase la ruta bajo la raíz de componentes: `app/components/forms/TextInput.meeko` se usa como `<FormsTextInput>`. Para organizar los archivos en cualquier cantidad de subcarpetas sin añadirlas al nombre, desactiva `pathPrefix`:
+
+```ts
+export default defineMeekoConfig({
+	components: {
+		pathPrefix: false,
+		dirs: [{ path: 'app/widgets', prefix: 'Ui' }],
+	},
+})
+```
+
+La búsqueda sigue siendo recursiva. `app/components/forms/TextInput.meeko` pasa a ser `<TextInput>` y `app/widgets/feedback/ToastMessage.meeko`, `<UiToastMessage>`. El `prefix` explícito se conserva; sólo se omiten las carpetas. Con `pathPrefix: false`, `Index.meeko` se llama `<Index>` como cualquier otro archivo. Dos archivos con el mismo nombre base y prefijo producen el error `Nombre de componente duplicado` con ambas rutas; Meeko nunca elige uno por orden.
 
 El descubrimiento de servidor también rechaza árboles de cliente imposibles. Por ejemplo, no permite que `api.users.get()` sea a la vez una función y el padre de `api.users.get.post()`, ni que un procedimiento `rpc.users()` sea el padre de `rpc.users.get()`. El error se produce al generar el manifiesto e identifica ambos archivos, antes de inicializar el cliente o emitir tipos contradictorios.
 

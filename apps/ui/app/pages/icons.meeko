@@ -45,6 +45,10 @@
 		</p>
 		<DocsCode bind:code="examples.iconConfig" />
 		<p>
+			Con <code>icon.componentName</code> puedes cambiar el nombre autoimportado de <code>UIIcon</code> por cualquier nombre PascalCase, como
+			<code>Icon</code>, <code>AppIcon</code> o <code>Glyph</code>. La resolución al compilar y los tipos usan ese mismo nombre.
+		</p>
+		<p>
 			Los nombres disponibles forman una unión de TypeScript que Meeko genera en
 			<code>.meeko/types</code>: el editor completa
 			<code>name="lucide:…"</code>, y un nombre que no existe es un error de
@@ -211,6 +215,7 @@
 		<h3 id="options">Opciones del módulo</h3>
 		<DocsApi
 			bind:rows="[
+				{ name: 'componentName', type: 'string', default: 'UIIcon', description: 'Nombre PascalCase del componente autoimportado.' },
 				{ name: 'collections', type: 'string[]', default: '[]', description: 'Colecciones de Iconify (lucide, mdi…); cada una, el paquete @iconify-json/<colección> del proyecto. El editor completa las instaladas.' },
 				{ name: 'include', type: 'IconInclude[]', default: '[]', description: 'Iconos para nombres dinámicos, o colección:* para una entera.' },
 				{ name: 'local', type: 'string | false', default: 'app/icons si existe', description: 'Carpeta de SVG propios.' },

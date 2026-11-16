@@ -78,6 +78,10 @@ const publicTypeParameters: Readonly<Record<string, Readonly<Record<string, { pa
 		FormSubmission: { parameters: 'Result', arguments: 'Result' },
 	},
 	'@meekojs/meeko': {
+		ElementAttributes: {
+			parameters: 'Tag extends string = import("@meekojs/meeko").TagName',
+			arguments: 'Tag',
+		},
 		ResolvedComponent: {
 			parameters: 'Name extends import("@meekojs/meeko").ComponentName = import("@meekojs/meeko").ComponentName',
 			arguments: 'Name',

@@ -47,6 +47,9 @@ Con `/users/[id]` y `id: "7"`, el segundo enlace es `<a href="/users/7">`; en `/
 | cualquier otro         | atributos de `<a>`                                                           |             | `class`, `target`, `rel`, `aria-*`, `data-*`, `on:click` y los hijos pasan al `<a>` tal cual.                                                                                                                                                                                                                                                                                                                                                                  |
 
 `href`, `bind:href` y las formas estáticas `params="…"` y `search="…"` no se admiten (`MEEK105`).
+El tipo público `MeekoLinkProps` incluye `Omit<ElementAttributes<'a'>, 'href'>`, por lo que un
+componente envoltorio recibe también los atributos nativos tipados del enlace; los eventos se siguen
+declarando con `defineEmits`.
 
 ## Resultado
 

@@ -77,12 +77,14 @@ export function normalizeComponentDirectory(raw: string): string | undefined {
 }
 
 /** Validate component directories from both executed and statically read configuration. */
-export function componentDirectories(config: MeekoConfig['components']): readonly { path: string; prefix: string }[] {
+export function componentDirectories(config: MeekoConfig['components']): readonly { path: string; prefix: string; pathPrefix: boolean }[] {
 	if (config !== undefined && (!isPlainObject(config) || (config.dirs !== undefined && !Array.isArray(config.dirs)))) {
 		throw new TypeError('components.dirs debe ser un array de directorios')
 	}
+	if (config?.pathPrefix !== undefined && typeof config.pathPrefix !== 'boolean') throw new TypeError('components.pathPrefix debe ser un booleano')
+	const pathPrefix = config?.pathPrefix ?? true
 	return [
-		{ path: 'app/components', prefix: '' },
+		{ path: 'app/components', prefix: '', pathPrefix },
 		...(config?.dirs ?? []).map((entry, index) => {
 			if (!isPlainObject(entry) || typeof entry.path !== 'string' || normalizeComponentDirectory(entry.path) === undefined) {
 				throw new TypeError(`components.dirs[${index}].path debe ser una ruta relativa segura`)
@@ -91,7 +93,7 @@ export function componentDirectories(config: MeekoConfig['components']): readonl
 			if (typeof prefix !== 'string' || (prefix !== '' && !/^[A-Z][A-Za-z0-9]*$/.test(prefix))) {
 				throw new TypeError(`components.dirs[${index}].prefix debe ser un nombre PascalCase o una cadena vacía`)
 			}
-			return { path: normalizeComponentDirectory(entry.path)!, prefix }
+			return { path: normalizeComponentDirectory(entry.path)!, prefix, pathPrefix }
 		}),
 	]
 }
@@ -419,10 +421,15 @@ export function readMeekoConfigSync(projectRoot: string): MeekoConfig {
 	let componentDirs: MeekoConfig['components']
 	if (components !== undefined) {
 		if (!ts.isObjectLiteralExpression(components)) throw new TypeError(`${file}: components debe ser un objeto literal para que el editor lo lea`)
+		const pathPrefix = property(components, 'pathPrefix')
+		if (pathPrefix !== undefined && pathPrefix.kind !== ts.SyntaxKind.TrueKeyword && pathPrefix.kind !== ts.SyntaxKind.FalseKeyword) {
+			throw new TypeError(`${file}: components.pathPrefix debe ser un booleano literal para que el editor lo lea`)
+		}
 		const dirs = property(components, 'dirs')
 		if (dirs !== undefined) {
 			if (!ts.isArrayLiteralExpression(dirs)) throw new TypeError(`${file}: components.dirs debe ser un array literal para que el editor lo lea`)
 			componentDirs = {
+				...(pathPrefix ? { pathPrefix: pathPrefix.kind === ts.SyntaxKind.TrueKeyword } : {}),
 				dirs: dirs.elements.map((element, index) => {
 					if (!ts.isObjectLiteralExpression(element)) throw new TypeError(`${file}: components.dirs[${index}] debe ser un objeto literal`)
 					const path = property(element, 'path')
@@ -434,7 +441,7 @@ export function readMeekoConfigSync(projectRoot: string): MeekoConfig {
 				}),
 			}
 			componentDirectories(componentDirs)
-		} else componentDirs = {}
+		} else componentDirs = pathPrefix ? { pathPrefix: pathPrefix.kind === ts.SyntaxKind.TrueKeyword } : {}
 	}
 	const importDirs: { -readonly [Option in ImportDirectoryOption]?: readonly string[] } = {}
 	for (const option of importDirectoryOptions) {

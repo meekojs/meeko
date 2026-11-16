@@ -384,7 +384,7 @@ test('el 404.html del adaptador static hidrata en cualquier URL y navega en el c
 })
 
 /** What `<html>` showed in the first frame and every later change of its theme. */
-type ThemeProbe = { first?: { theme: string | null; moon: string; scheme: string }; changes: string[] }
+type ThemeProbe = { first?: { theme: string | null; moon: string; scheme: string; lightDark: string }; changes: string[] }
 
 /** Records, from the start of each document, what `<html>` shows before the first paint and every later theme change. */
 const themeProbe = (): void => {
@@ -399,10 +399,12 @@ const themeProbe = (): void => {
 	// The first frame: rendering waits for <head>, so this is what the first paint shows.
 	requestAnimationFrame(() => {
 		const moon = document.querySelector('.moon')
+		const lightDark = document.querySelector('.light-dark')
 		probe.first = {
 			theme: document.documentElement.getAttribute('data-theme'),
 			moon: moon ? getComputedStyle(moon).display : 'missing',
 			scheme: getComputedStyle(document.documentElement).colorScheme,
+			lightDark: lightDark ? getComputedStyle(lightDark).color : 'missing',
 		}
 	})
 	const violations: string[] = []
@@ -414,7 +416,7 @@ const themeProbe = (): void => {
 const themeToggle = `<script lang="ts">
 const { resolved, set } = useTheme();
 </script>
-<template><button id="toggle" type="button" aria-label="Tema oscuro" bind:aria-pressed="String(resolved.value === 'dark')" on:click="() => set(resolved.value === 'dark' ? 'light' : 'dark')"><span class="sun">sol</span><span class="moon">luna</span></button><p id="resolved">{resolved.value}</p></template>
+<template><span class="light-dark">tema</span><button id="toggle" type="button" aria-label="Tema oscuro" bind:aria-pressed="String(resolved.value === 'dark')" on:click="() => set(resolved.value === 'dark' ? 'light' : 'dark')"><span class="sun">sol</span><span class="moon">luna</span></button><p id="resolved">{resolved.value}</p></template>
 `
 
 test('el tema llega en el primer byte con la cookie y sin parpadeo en modo sistema, bajo una CSP estricta con nonce', { timeout: 240_000 }, async () => {
@@ -429,7 +431,7 @@ test('el tema llega en el primer byte con la cookie y sin parpadeo en modo siste
 		const files: Record<string, string> = {
 			'package.json': '{"name":"theme-app","private":true,"type":"module"}\n',
 			'meeko.config.mjs': 'export default { theme: true };\n',
-			'app/styles/main.css': '.moon { display: none }\n:root[data-theme="dark"] .sun { display: none }\n:root[data-theme="dark"] .moon { display: inline }\n',
+			'app/styles/main.css': '.moon { display: none }\n:root[data-theme="dark"] .sun { display: none }\n:root[data-theme="dark"] .moon { display: inline }\n.light-dark { color: light-dark(rgb(17, 17, 17), rgb(238, 238, 238)); transition: color 10s linear }\n',
 			'app/pages/index.meeko': themeToggle,
 		}
 		for (const [file, contents] of Object.entries(files)) {
@@ -494,19 +496,30 @@ test('el tema llega en el primer byte con la cookie y sin parpadeo en modo siste
 		assert.match(first.html, /<html data-theme="dark" data-theme-choice="dark">/)
 		assert.match(first.html, /<p id="resolved">(?:<!--[^>]*-->)?dark/)
 		assert.match(first.html, /aria-pressed="true"/)
-		assert.deepEqual((await cookie.probe()).first, { theme: 'dark', moon: 'inline', scheme: 'dark' })
+		assert.deepEqual((await cookie.probe()).first, { theme: 'dark', moon: 'inline', scheme: 'dark', lightDark: 'rgb(238, 238, 238)' })
 		assert.equal(await cookie.page.locator('#resolved').innerText(), 'dark')
 		// Hydration changed nothing.
 		assert.deepEqual((await cookie.probe()).changes, [])
 		// A change applies at once, and the next document comes from the server with it.
-		await cookie.page.locator('#toggle').click()
-		assert.equal(await cookie.page.evaluate(() => document.documentElement.getAttribute('data-theme')), 'light')
+		const changed = await cookie.page.evaluate(() => {
+			;(document.querySelector('#toggle') as HTMLButtonElement).click()
+			const probe = document.querySelector('.light-dark')!
+			return {
+				theme: document.documentElement.getAttribute('data-theme'),
+				suppressed: document.documentElement.hasAttribute('data-meeko-theme-changing'),
+				color: getComputedStyle(probe).color,
+				animations: probe.getAnimations().length,
+			}
+		})
+		assert.deepEqual(changed, { theme: 'light', suppressed: true, color: 'rgb(17, 17, 17)', animations: 0 })
+		await cookie.page.waitForFunction(() => !document.documentElement.hasAttribute('data-meeko-theme-changing'))
+		assert.equal(await cookie.page.locator('.light-dark').evaluate((element) => getComputedStyle(element).transitionDuration), '10s')
 		assert.equal(await cookie.page.locator('#resolved').innerText(), 'light')
 		assert.equal((await cookie.context.cookies(origin)).find((entry) => entry.name === 'meeko-theme')?.value, 'light')
 		await cookie.page.reload()
 		await cookie.page.waitForFunction(() => performance.getEntriesByName('meeko-hydration').length > 0)
 		assert.match(documents.at(-1)!.html, /<html data-theme="light" data-theme-choice="light">/)
-		assert.deepEqual((await cookie.probe()).first, { theme: 'light', moon: 'none', scheme: 'light' })
+		assert.deepEqual((await cookie.probe()).first, { theme: 'light', moon: 'none', scheme: 'light', lightDark: 'rgb(17, 17, 17)' })
 		assert.deepEqual((await cookie.probe()).changes, [])
 		assert.deepEqual(await cookie.page.evaluate(() => (window as unknown as { __cspViolations: string[] }).__cspViolations), [])
 		assert.deepEqual(cookie.errors, [])
@@ -515,7 +528,7 @@ test('el tema llega en el primer byte con la cookie y sin parpadeo en modo siste
 		// 2. No cookie and a dark system: dark before the first paint, by the client hint or the script.
 		documents.length = 0
 		const system = await open({ colorScheme: 'dark' })
-		assert.deepEqual((await system.probe()).first, { theme: 'dark', moon: 'inline', scheme: 'dark' })
+		assert.deepEqual((await system.probe()).first, { theme: 'dark', moon: 'inline', scheme: 'dark', lightDark: 'rgb(238, 238, 238)' })
 		const served = documents.at(-1)!
 		assert.equal(served.criticalCh, 'Sec-CH-Prefers-Color-Scheme')
 		// When Chromium sends the hint, the server resolves the theme with it. Under CDP emulation the
@@ -536,7 +549,10 @@ test('el tema llega en el primer byte con la cookie y sin parpadeo en modo siste
 		// "system" follows the operating system while the page is open.
 		await system.page.emulateMedia({ colorScheme: 'light' })
 		await system.page.waitForFunction(() => document.documentElement.getAttribute('data-theme') === 'light')
+		await system.page.waitForFunction(() => !document.documentElement.hasAttribute('data-meeko-theme-changing'))
 		assert.equal(await system.page.locator('#resolved').innerText(), 'light')
+		assert.equal(await system.page.locator('.light-dark').evaluate((element) => getComputedStyle(element).color), 'rgb(17, 17, 17)')
+		assert.equal(await system.page.locator('.light-dark').evaluate((element) => element.getAnimations().length), 0)
 		assert.deepEqual(await system.page.evaluate(() => (window as unknown as { __cspViolations: string[] }).__cspViolations), [])
 		assert.deepEqual(system.errors, [])
 		console.log(`[theme e2e] hints of the documents in system mode: ${JSON.stringify(documents.map((entry) => entry.hint))}`)

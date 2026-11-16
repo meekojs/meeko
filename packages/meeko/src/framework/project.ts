@@ -53,6 +53,8 @@ import { hasFrameworkTsconfigs, prepareFrameworkTypeDeclarations, writeIfChanged
 export { frameworkClientEntry, frameworkServerEntry } from './app-manifest'
 
 const clientOutput = '.meeko/output/client'
+/** Bit de `light-dark()` en `lightningcss.Features`; debe conservarse para seguir el tema elegido. */
+const lightningCssLightDark = 1 << 20
 const nodeOutput = '.meeko/output/node'
 /** Node server used only to prerender pages for adapters other than Node. */
 const prerenderServer = '.meeko/build/node'
@@ -284,6 +286,9 @@ export async function buildProject(projectRoot: string, options: BuildProjectOpt
 	await build({
 		root,
 		configFile: false,
+		// La bajada de Lightning CSS sigue `prefers-color-scheme`, pero el tema explícito de Meeko
+		// cambia `color-scheme` en `<html>` aunque difiera del sistema. La función nativa sí lo sigue.
+		...(config.theme === undefined || config.theme === false ? {} : { css: { lightningcss: { exclude: lightningCssLightDark } } }),
 		plugins: [meeko()],
 		logLevel: 'warn',
 		build: {

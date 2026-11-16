@@ -1,6 +1,7 @@
 import type { MeekoPopoverProps as PopoverProps } from './app/components/MeekoPopover/types'
 import type { MeekoSelectProps as SelectProps } from './app/components/MeekoSelect/types'
 import type { AwaitMessages, AwaitResource } from './app/runtime/await'
+import type { ElementAttributes } from './app/runtime/dynamic-tag'
 import type { RouteRecord } from './app/runtime/router'
 import type { MeekoTeleportProps as TeleportProps } from './app/runtime/teleport'
 import type { LayoutName as NamedLayoutName, LayoutProps as NamedLayoutProps } from './shared/layout'
@@ -219,7 +220,8 @@ export type RouteId = RouteKey
  * Props de la etiqueta propia `<MeekoLink>`, que renderiza un `<a>` cuyo `href` construye
  * {@link href}. `to` es el ID de la ruta; `params` y `search` se escriben con `bind:`; `match`
  * elige si el enlace está activo sólo en su ruta o también por debajo (desde 1.5.0). El resto de
- * atributos (`class`, `target`, `aria-*`, `on:click`…) y el contenido pasan al `<a>`; un
+ * atributos (`class`, `target`, `aria-*`, `on:click`…) y el contenido pasan al `<a>`. El tipo
+ * incluye los atributos de `ElementAttributes<'a'>`, salvo `href`, que construye Meeko; un
  * `aria-current` propio gana a la ruta, `false` lo quita y `null` o `undefined` dejan decidir a la
  * ruta (desde 1.8.0). El editor
  * muestra estas props en el hover de la etiqueta y lleva aquí con «Ir a definición». Sólo es un
@@ -241,7 +243,7 @@ export type RouteId = RouteKey
  * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#meekooutlet--y-meekolink
  */
-export interface MeekoLinkProps<K extends RouteId = RouteId> {
+export interface MeekoLinkProps<K extends RouteId = RouteId> extends Omit<ElementAttributes<'a'>, 'href'> {
 	/**
 	 * ID de la ruta de destino, como `to="/users/[id]"`: sólo las rutas que existen. También admite
 	 * una expresión con `bind:to`.

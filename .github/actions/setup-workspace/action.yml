@@ -21,6 +21,14 @@ runs:
         cache: pnpm
     - shell: pwsh
       run: pnpm install --frozen-lockfile
+    - name: Reutilizar la caché local de Turborepo
+      uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+      with:
+        path: .turbo
+        key: turbo-v1-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'turbo.json', 'package.json', 'packages/*/package.json', 'apps/*/package.json') }}-${{ github.sha }}
+        restore-keys: |
+          turbo-v1-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'turbo.json', 'package.json', 'packages/*/package.json', 'apps/*/package.json') }}-
+          turbo-v1-${{ runner.os }}-
     - if: inputs.build == 'true'
       uses: ./.github/actions/build-workspace
     - if: inputs.npm-cache == 'true'

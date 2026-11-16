@@ -1,5 +1,5 @@
 ---
-source-hash: 8f62493af480ea8c8be90ccd2250f3bf0341c0375a15055b3e607ad625bc756d
+source-hash: c9a8722464c0aea87c7c2db4cebcc88d2cd9051f549cf4c2eeac3d5636bb29d9
 ---
 
 # Configure and extend an application
@@ -21,6 +21,7 @@ export default defineMeekoConfig({
 
 - `layers` (since `1.2`): folders that contribute pages, components, auto-imports and plugins; see [Layers](#layers). `extends`, the previous name, still works as an alias.
 - `modules`: names of modules created with `defineMeekoModule` (packages or paths), which configure the project through code; their options go in each module's key, such as `seo`. See [Modules](#modules).
+- `components`: additional component folders and how their names are formed. `app/components` is always included; `pathPrefix: false` keeps recursive discovery but uses only the file name.
 - `imports`: auto-import folders in addition to the defaults, with the scope of their containing folder; see [Auto-imports and TypeScript](#auto-import-folders).
   - `imports.appDirs` (since `1.3`): folders inside `app/` (`"app/services"`), with `app/` scope: browser and SSR, not `shared/` or `server/`.
   - `imports.sharedDirs` (since `1.3`): folders inside `shared/` (`"shared/validators"`), with `shared/` scope: application and server.
@@ -36,7 +37,22 @@ export default defineMeekoConfig({
 
 Since `1.2`, `css: { scopeAttribute: "matched" }` limits the `<style scoped>` attribute to elements that a scoped selector can match; with `"all"`, the default in `1.x`, it goes on every template element. `"matched"` will become the default in `2.0`. See [Scoped styles](api.md#which-elements-receive-the-attribute), including classes added by a script through the DOM API.
 
-Configuration runs in `meeko dev`, `meeko build` and `meeko check`. In a trusted workspace, the language server also executes it, including its modules, so lists can be built dynamically; in an untrusted workspace (or with `trusted: false`, see [editors](editors.md)), the editor does not execute project code: it reads `layers`, `extends`, `imports.appDirs`, `imports.sharedDirs` and `imports.serverDirs` as literal string arrays and, from `modules`, only literal strings that are layer folders. Since `1.5`, it also reads `alias` when it is a literal object of strings and `false`. Module auto-imports and components do not exist for that editor until you trust the workspace.
+Configuration runs in `meeko dev`, `meeko build` and `meeko check`. In a trusted workspace, the language server also executes it, including its modules, so lists can be built dynamically; in an untrusted workspace (or with `trusted: false`, see [editors](editors.md)), the editor does not execute project code: it reads `layers`, `extends`, `imports.appDirs`, `imports.sharedDirs` and `imports.serverDirs` as literal string arrays, `components.pathPrefix` as a literal boolean, `components.dirs` as literal objects and, from `modules`, only literal strings that are layer folders. Since `1.5`, it also reads `alias` when it is a literal object of strings and `false`. Module auto-imports and components do not exist for that editor until you trust the workspace.
+
+### Component names from file names
+
+By default, Meeko concatenates the path below the component root in PascalCase: `app/components/forms/TextInput.meeko` is used as `<FormsTextInput>`. To organize files in any number of subfolders without adding them to the name, disable `pathPrefix`:
+
+```ts
+export default defineMeekoConfig({
+	components: {
+		pathPrefix: false,
+		dirs: [{ path: 'app/widgets', prefix: 'Ui' }],
+	},
+})
+```
+
+Discovery remains recursive. `app/components/forms/TextInput.meeko` becomes `<TextInput>`, and `app/widgets/feedback/ToastMessage.meeko` becomes `<UiToastMessage>`. An explicit `prefix` remains; only folders are omitted. With `pathPrefix: false`, `Index.meeko` is named `<Index>` like any other file. Two files with the same base name and prefix produce the `Nombre de componente duplicado` error with both paths; Meeko never chooses one by order.
 
 Server discovery also rejects impossible client trees. For example, it does not allow `api.users.get()` to be both a function and the parent of `api.users.get.post()`, or a procedure `rpc.users()` to be the parent of `rpc.users.get()`. The error occurs when generating the manifest and identifies both files, before initializing the client or emitting contradictory types.
 

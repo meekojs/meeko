@@ -482,21 +482,22 @@ export default defineMeekoConfig({
   modules: ['@meekojs/icon'],
   icon: {
     collections: ['lucide'], // @iconify-json/lucide del proyecto
+    componentName: 'AppIcon', // UIIcon por defecto
     local: 'app/icons', // SVG propios: 'local:<nombre>'
     size: '1em',
     include: ['lucide:sun', 'lucide:moon'], // para bind:name
   },
 })`,
 	iconDynamic: `<!-- Literales de la expresión: se resuelven al compilar -->
-<UIIcon
+<AppIcon
   bind:name="open.value ? 'lucide:x' : 'lucide:menu'"
   bind:label="open.value ? 'Cerrar menú' : 'Abrir menú'" />
 
 <!-- Un valor que llega de datos: el icono debe estar en icon.include -->
-<UIIcon bind:name="mode.value" />`,
+<AppIcon bind:name="mode.value" />`,
 	iconTypes: `import type { IconName } from '@meekojs/icon'
 
 const close: IconName = 'lucide:x'`,
 	iconLocal: `<!-- app/icons/paw.svg -->
-<UIIcon name="local:paw" label="Meeko" size="1.5em" />`,
+<AppIcon name="local:paw" label="Meeko" size="1.5em" />`,
 } as const

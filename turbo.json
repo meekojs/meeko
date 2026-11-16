@@ -1,15 +1,39 @@
 {
 	"$schema": "https://turborepo.dev/schema.json",
+	"globalDependencies": ["pnpm-lock.yaml", "scripts/build-package.mjs", "scripts/rebase-component-declaration.mjs", "packages/docs/scripts/assets.mjs"],
+	"globalEnv": ["CI"],
+	"globalPassThroughEnv": ["NODE_OPTIONS"],
 	"tasks": {
 		"build": {
-			"outputs": ["dist/**"]
+			"dependsOn": ["^build"],
+			"env": ["NODE_ENV", "MEEKO_*"],
+			"inputs": ["$TURBO_DEFAULT$", ".env*"],
+			"outputs": ["dist/**", ".meeko/output/**", "public/brand/**", "public/fonts/**", "src/app/components/**/*.d.meeko.ts"]
 		},
-		"check-types": {
-			"dependsOn": ["^check-types"]
+		"check": {
+			"dependsOn": ["^build"],
+			"outputs": []
+		},
+		"lint": {
+			"dependsOn": ["^build"],
+			"outputs": []
+		},
+		"test": {
+			"dependsOn": ["build"],
+			"env": ["DATABASE_URL", "MEEKO_*", "REDIS_URL"],
+			"outputs": []
+		},
+		"test:e2e": {
+			"dependsOn": ["build"],
+			"cache": false,
+			"passThroughEnv": ["DATABASE_URL", "MEEKO_*", "REDIS_URL"],
+			"outputs": []
 		},
 		"dev": {
+			"dependsOn": ["^build"],
 			"persistent": true,
-			"cache": false
+			"cache": false,
+			"interruptible": true
 		}
 	}
 }

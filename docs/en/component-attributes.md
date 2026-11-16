@@ -34,10 +34,13 @@ Since `1.8`, Meeko knows the values the HTML standard allows for each attribute 
 
 Since `1.8`, an element can carry both static `class` and `bind:class`, or `style` and `bind:style`, and Meeko writes a single attribute with both, identically in SSR, hydration and updates. Dynamic classes follow static ones, and dynamic `style` declarations follow static ones, so they win. If the dynamic value is `undefined`, `null`, `false` or an empty string, the static text remains as is. This also applies to a `<component is>` that can only be a tag; on a component, `class` and `bind:class` pass the same prop (`MEEK090`).
 
+`bind:style` also accepts an object. Keys may use camelCase (`backgroundColor`), kebab-case (`font-size`) or CSS custom-property syntax (`--accent`); `false`, `null` and `undefined` values are omitted, and numbers are written without adding units. `StyleValue`, exported by `@meekojs/meeko`, types an object stored or passed between components.
+
 ```html
 <article
 	class="card"
 	bind:class="open.value ? 'is-open' : undefined"
+	bind:style="{ backgroundColor: open.value ? 'white' : undefined, '--space': 8 }"
 >
 	...
 </article>

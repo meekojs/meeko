@@ -234,10 +234,11 @@ test('the style of <head> hides every icon but the one of data-theme-choice, als
 			':root[data-theme-choice="dark"] [data-meeko-theme-icon]:not([data-meeko-theme-icon~="dark"]){display:none}',
 			'@media (prefers-color-scheme:light){:root:is([data-theme-choice="system"],:not([data-theme-choice])) [data-meeko-theme-icon]:not([data-meeko-theme-icon~="system"],[data-meeko-theme-icon~="system-light"]){display:none}}',
 			'@media (prefers-color-scheme:dark){:root:is([data-theme-choice="system"],:not([data-theme-choice])) [data-meeko-theme-icon]:not([data-meeko-theme-icon~="system"],[data-meeko-theme-icon~="system-dark"]){display:none}}',
+			':root[data-meeko-theme-changing],:root[data-meeko-theme-changing]::before,:root[data-meeko-theme-changing]::after,:root[data-meeko-theme-changing] *,:root[data-meeko-theme-changing] *::before,:root[data-meeko-theme-changing] *::after{transition:none!important}',
 		].join('\n'),
 	)
-	// Only display: none, and nothing that could close the element.
-	assert.deepEqual([...new Set(style.match(/\{[^{}]*\}/g))], ['{display:none}'])
+	// Only icon visibility and transition suppression, and nothing that could close the element.
+	assert.deepEqual([...new Set(style.match(/\{[^{}]*\}/g))], ['{display:none}', '{transition:none!important}'])
 	assert.doesNotMatch(style, /<\//)
 	// Without system, the default theme also stands for a document without the attribute.
 	assert.match(themeStyle(resolved({ themes: ['paper', 'ink'], system: false })), /^:root:is\(\[data-theme-choice="paper"\],:not\(\[data-theme-choice\]\)\)/)

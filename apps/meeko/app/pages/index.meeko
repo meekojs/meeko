@@ -23,14 +23,22 @@
 	if (!snapshot) notFound()
 	export const { demo, editorLines, command, quickStart, version, head } = snapshot
 	// The small full-stack example below receives data from this server block.
-	export const showcaseTasks = locale === 'en'
-		? [{ id: 1, title: 'Create a page', done: true }, { id: 2, title: 'Add route data', done: false }]
-		: [{ id: 1, title: 'Crear una página', done: true }, { id: 2, title: 'Añadir datos de ruta', done: false }]
+	export const showcaseTasks =
+		locale === 'en'
+			? [
+					{ id: 1, title: 'Create a page', done: true },
+					{ id: 2, title: 'Add route data', done: false },
+				]
+			: [
+					{ id: 1, title: 'Crear una página', done: true },
+					{ id: 2, title: 'Añadir datos de ruta', done: false },
+				]
 </script>
 
 <script lang="ts">
 	import { signal } from '@meekojs/meeko'
 	import { copyText } from '@meekojs/ui/runtime'
+
 	import { showcaseCode } from '../utils/showcase-code'
 
 	export interface Props {
@@ -1130,19 +1138,19 @@
 	.showcase-grid {
 		display: grid;
 		grid-template-columns: minmax(0, 1.3fr) minmax(16rem, 0.7fr);
-		gap: var(--ui-space-5);
 		align-items: stretch;
+		gap: var(--ui-space-5);
 		margin-block-start: var(--ui-space-8);
 	}
 	.showcase-grid :global(.meeko-ui-code-block) {
-		min-width: 0;
 		margin: 0;
+		min-width: 0;
 	}
 	.showcase-result {
 		border: var(--ui-border-width) solid var(--ui-color-border);
 		border-radius: var(--ui-radius-lg);
-		padding: var(--ui-space-6);
 		background: var(--ui-color-surface);
+		padding: var(--ui-space-6);
 	}
 	.showcase-result-label {
 		margin: 0 0 var(--ui-space-4);
@@ -1150,12 +1158,12 @@
 		font-size: var(--ui-font-size-sm);
 	}
 	.showcase-result button {
+		cursor: pointer;
 		border: var(--ui-border-width) solid var(--ui-color-border);
 		border-radius: var(--ui-radius-md);
-		padding: var(--ui-space-2) var(--ui-space-3);
 		background: var(--ui-color-surface);
+		padding: var(--ui-space-2) var(--ui-space-3);
 		color: var(--ui-color-text);
-		cursor: pointer;
 	}
 	.showcase-result button:focus-visible {
 		outline: var(--ui-focus-ring-width) solid var(--ui-color-focus);

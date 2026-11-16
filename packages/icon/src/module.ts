@@ -23,7 +23,7 @@ const registryId = 'virtual:meeko-icon'
 const resolvedRegistry = '\0meeko-icon:registry'
 
 /**
- * Módulo de iconos de Iconify para Meeko. Registra `<UIIcon>`, resuelve al compilar cada nombre
+ * Módulo de iconos de Iconify para Meeko. Registra `<UIIcon>` (o `icon.componentName`), resuelve al compilar cada nombre
  * literal en el `<svg>` incrustado, empaqueta para nombres dinámicos sólo los iconos de
  * `icon.include` y genera los tipos de los nombres disponibles. Se registra por su nombre:
  * `modules: ['@meekojs/icon']`, con las opciones en la clave `icon`.
@@ -67,7 +67,7 @@ export default defineMeekoModule<IconModuleOptions>({
 			}
 		}
 
-		meeko.addComponentsDir(new URL('./app/components', import.meta.url), { prefix: 'UI' })
+		meeko.addComponentsDir(new URL('./app/components', import.meta.url), { prefix: 'UI', ...(resolved.componentName === 'UIIcon' ? {} : { rename: { Icon: resolved.componentName } }) })
 		meeko.addStylesheet(new URL('../src/app/styles/icon.css', import.meta.url))
 		meeko.addVitePlugin({
 			name: 'meeko-icon',
@@ -93,7 +93,7 @@ export default defineMeekoModule<IconModuleOptions>({
 					const state = current()
 					let result
 					try {
-						result = transformIconTags(code, (name) => resolveIcon(state, name))
+						result = transformIconTags(code, (name) => resolveIcon(state, name), resolved.componentName)
 					} catch (error) {
 						const offset = (error as Error & { offset?: number }).offset
 						const at = offset === undefined ? '' : `:${position(code, offset).line}:${position(code, offset).column}`

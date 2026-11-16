@@ -2,7 +2,7 @@ import type { ReadonlySignal, Signal } from '../../core/reactivity'
 import type { ResolvedThemeConfig, ThemeHead, ThemeSnapshot, ThemeState, ThemeToggleContext } from '../../shared/theme'
 
 import { batch, computed, createRoot, effect, markExternalSignal, signal, untrack } from '../../core/reactivity'
-import { isThemeChoice, readCookie, resolveChoice } from '../../shared/theme'
+import { isThemeChoice, readCookie, resolveChoice, THEME_TRANSITION_ATTRIBUTE } from '../../shared/theme'
 import { currentBrowser } from '../composables/useStorage'
 import { afterMountBatch, setupPhase } from './lifecycle'
 
@@ -25,6 +25,7 @@ export class BrowserTheme {
 	/** The real choice before hydration ends: the cookie, `localStorage` or the default. */
 	private stored: string
 	private applying = false
+	private transitionFrame: number | undefined
 	private readonly release: () => void
 	private readonly head: ThemeHead
 
@@ -69,13 +70,17 @@ export class BrowserTheme {
 		this.head = head
 		let resolved!: ReadonlySignal<string>
 		let known!: ReadonlySignal<boolean>
+		let appliedTheme: string | undefined
 		const releaseRoot = createRoot((dispose) => {
 			resolved = computed(() => (this.live.value ? resolveChoice(config, this.choice.value, this.preference.value) : server!.resolved))
 			known = computed(() => this.live.value || server!.known)
 			// `<html>` always shows the real theme, also while hydration renders the server's values.
 			effect(() => {
 				const current = this.live.value ? this.choice.value : this.stored
-				this.head.setTheme({ config, resolved: resolveChoice(config, current, this.preference.value), knownChoice: current })
+				const next = resolveChoice(config, current, this.preference.value)
+				if (appliedTheme !== undefined && appliedTheme !== next) this.suppressTransitions()
+				this.head.setTheme({ config, resolved: next, knownChoice: current })
+				appliedTheme = next
 			})
 			return dispose
 		})
@@ -144,7 +149,22 @@ export class BrowserTheme {
 	}
 
 	dispose(): void {
+		if (this.transitionFrame !== undefined) this.browser.cancelAnimationFrame(this.transitionFrame)
+		this.browser.document.documentElement.removeAttribute(THEME_TRANSITION_ATTRIBUTE)
 		this.release()
+	}
+
+	/** Keeps theme-dependent CSS transitions out of the frame that applies a different theme. */
+	private suppressTransitions(): void {
+		const root = this.browser.document.documentElement
+		root.setAttribute(THEME_TRANSITION_ATTRIBUTE, '')
+		if (this.transitionFrame !== undefined) this.browser.cancelAnimationFrame(this.transitionFrame)
+		this.transitionFrame = this.browser.requestAnimationFrame(() => {
+			this.transitionFrame = this.browser.requestAnimationFrame(() => {
+				root.removeAttribute(THEME_TRANSITION_ATTRIBUTE)
+				this.transitionFrame = undefined
+			})
+		})
 	}
 
 	private media(): MediaQueryList | undefined {

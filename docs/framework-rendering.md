@@ -281,6 +281,8 @@ Las cookies son por host, no por puerto: en desarrollo, todas las aplicaciones M
 
 En `"system"`, `resolved` sigue a los cambios de `prefers-color-scheme` mientras la página está abierta, y un cambio en otra pestaña llega por el evento `storage` de `localStorage`. La navegación en el cliente conserva el tema, porque no recarga `<html>`. En el servidor, `theme` y `resolved` son los de la petición y no se pueden cambiar (`set` lanza un error). Sin `theme` en la configuración, `useTheme()` lanza un error que lo pide.
 
+Cuando cambia el tema efectivo, Meeko desactiva las transiciones CSS de `<html>`, sus descendientes y sus pseudoelementos durante el frame del cambio, y las restaura en el siguiente. Así una transición de `background-color`, `color` o `border-color` usada por un `hover` no anima accidentalmente todos los colores al cambiar de tema. Las animaciones CSS no se desactivan.
+
 `meeko check` tipa los temas con la configuración: con `themes: ["light", "dark", "sepia"]`, `resolved` es `"light" | "dark" | "sepia"` y `set("purple")` es un error de tipos. Las declaraciones se generan en `.meeko/types/routes.d.ts` (`GeneratedTheme`); sin ellas, los temas son `string`. El editor no las necesita: declara `GeneratedTheme` a partir de `theme` leído sin ejecutar `meeko.config.ts`, también antes del primer `meeko check`, cuando su valor es un literal (`true` o un objeto con valores literales).
 
 #### Iconos que no saltan

@@ -55,6 +55,26 @@ export const booleanAttributeNames = 'allowfullscreen alpha async autofocus auto
 // Built on first use.
 let booleanAttributes: ReadonlySet<string> | undefined
 
+/** Nombre CSS de una clave de objeto: `backgroundColor`, `font-size` o `--custom`. */
+function stylePropertyName(name: string): string {
+	if (name.startsWith('--')) return name
+	if (name === 'cssFloat') return 'float'
+	const kebab = name.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)
+	return kebab.startsWith('ms-') ? `-${kebab}` : kebab
+}
+
+/** Convierte un objeto de estilos en declaraciones estables para SSR, hidratación y actualizaciones. */
+function styleObjectValue(value: object): string | null {
+	const declarations: string[] = []
+	for (const [key, raw] of Object.entries(value)) {
+		if (raw === false || raw === null || raw === undefined) continue
+		const name = stylePropertyName(key)
+		if (!/^(?:--[\w-]+|-?[_a-zA-Z][\w-]*)$/.test(name)) throw new TypeError(`Invalid CSS property name: ${key}`)
+		declarations.push(`${name}: ${String(raw)}`)
+	}
+	return declarations.length ? declarations.join('; ') : null
+}
+
 /**
  * Convierte un valor de atributo dinámico en su forma DOM; null lo elimina. Un atributo booleano
  * del estándar (`disabled`, `open`…) se escribe vacío con un valor verdadero. `hidden`, booleano
@@ -65,6 +85,14 @@ export function attributeValue(name: string, value: unknown): string | null {
 	booleanAttributes ??= new Set(booleanAttributeNames.split(' '))
 	if (booleanAttributes.has(name)) return value ? '' : null
 	if (name === 'hidden') return typeof value === 'string' && value !== '' ? value : value ? '' : null
+	if (name === 'class' && Array.isArray(value)) {
+		const classes = value.flatMap((item) => {
+			const resolved = attributeValue(name, item)?.trim()
+			return resolved ? [resolved] : []
+		})
+		return classes.length ? classes.join(' ') : null
+	}
+	if (name === 'style' && typeof value === 'object' && value !== null && !Array.isArray(value)) return styleObjectValue(value)
 	if (value === null || value === undefined || value === false) return null
 	return String(value)
 }

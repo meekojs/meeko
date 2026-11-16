@@ -55,6 +55,15 @@ test('meeko check types icon names in templates and in icon.include, and reports
 	await assert.rejects(readFile(join(generated, 'names-lucide.d.ts')), { code: 'ENOENT' })
 })
 
+test('icon.componentName changes the autoimported component name', { timeout: 240_000 }, async (context) => {
+	const { put, run } = await consumer(context)
+	await put('meeko.config.ts', config(`{ collections: ['lucide'], componentName: 'Glyph' }`))
+	await put('app/pages/index.meeko', '<template><Glyph name="lucide:search" /></template>\n')
+	await run('check')
+	await put('app/pages/index.meeko', '<template><UIIcon name="lucide:search" /></template>\n')
+	await assert.rejects(run('check'), /TS2304: Cannot find name 'UIIcon'/)
+})
+
 test('meeko build embeds the SVG at build time, accessible and without inline styles, and bundles only the icons used', { timeout: 240_000 }, async (context) => {
 	const { put, root, run } = await consumer(context)
 	await put('meeko.config.ts', config(`{ collections: ['lucide'], include: ['lucide:check'] }`, "\n\tserver: { adapter: 'static' },"))

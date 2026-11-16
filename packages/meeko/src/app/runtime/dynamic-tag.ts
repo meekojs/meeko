@@ -243,7 +243,7 @@ type TypeMessage<Text extends string> = { readonly [Key in Text]: never }
 
 /** Type text of MEEK113 for a key of `bind="obj"` on an element. */
 export type AttributeSpreadCheck<T, Tag extends string> = {
-	readonly [K in keyof T]: K extends string ? (Lowercase<K> extends `on${string}` ? TypeMessage<'MEEK113: bind no admite claves on*; usa on:evento'> : K extends `data-meeko${string}` ? TypeMessage<'MEEK113: data-meeko* está reservado a Meeko'> : string extends K ? AttributeValue : K extends AttributeNameOf<Tag> ? AttributeValue : TypeMessage<`MEEK113: ${K} no es un atributo de la etiqueta`>) : never
+	readonly [K in keyof T]: K extends string ? (Lowercase<K> extends `on${string}` ? TypeMessage<'MEEK113: bind no admite claves on*; usa on:evento'> : K extends `data-meeko${string}` ? TypeMessage<'MEEK113: data-meeko* está reservado a Meeko'> : string extends K ? AttributeValue : K extends AttributeNameOf<Tag> ? AttributeValueOf<Tag, K> : TypeMessage<`MEEK113: ${K} no es un atributo de la etiqueta`>) : never
 }
 
 /** Explicit `class` and `style` of an element with `bind="obj"`, which the spread combines with its own. */
@@ -368,7 +368,7 @@ export type DynamicSpreadCheck<T, Is, M = ComponentPart<Is>, Tag extends string 
 	: [M | Tag] extends [never]
 		? unknown
 		: {
-				readonly [K in keyof T]: K extends string ? (Lowercase<K> extends `on${string}` ? TypeMessage<'MEEK113: bind no admite claves on*; usa on:evento'> : string extends K ? ([M] extends [never] ? AttributeValue : unknown) : K extends DynamicPropName<M> ? unknown : K extends `data-meeko${string}` ? TypeMessage<'MEEK113: data-meeko* está reservado a Meeko'> : K extends AttributeNameOf<Tag> ? AttributeValue : TypeMessage<DynamicKeyMessage<K, M, Tag>>) : never
+				readonly [K in keyof T]: K extends string ? (Lowercase<K> extends `on${string}` ? TypeMessage<'MEEK113: bind no admite claves on*; usa on:evento'> : string extends K ? ([M] extends [never] ? AttributeValue : unknown) : K extends DynamicPropName<M> ? unknown : K extends `data-meeko${string}` ? TypeMessage<'MEEK113: data-meeko* está reservado a Meeko'> : K extends AttributeNameOf<Tag> ? AttributeValueOf<Tag, K> : TypeMessage<DynamicKeyMessage<K, M, Tag>>) : never
 			}
 
 /**
