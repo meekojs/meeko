@@ -20,7 +20,7 @@ void [invalidToken, removedAlias, invalidDefault, missingHref]
 // ui.defaults: class and ui for each component, with the slots of its own `ui` prop.
 const panel = {
 	defaults: {
-		card: { padding: 'sm', density: 'compact', ui: { header: 'panel-card-header' } },
+		card: { padding: 'sm', density: 'compact', actionsWrap: 'auto', ui: { header: 'panel-card-header' } },
 		table: { density: 'compact', class: 'panel-table', ui: { cell: 'panel-cell' } },
 		stat: { ui: { value: 'panel-stat-value' } },
 		alert: { class: 'panel-alert' },
@@ -33,6 +33,8 @@ const panel = {
 void panel
 // @ts-expect-error A slot that the card does not have.
 const unknownSlot: UIOptions = { defaults: { card: { ui: { head: 'x' } } } }
+// @ts-expect-error The actions of a card go inline, below or auto.
+const wrapDefault: UIOptions = { defaults: { card: { actionsWrap: 'wrap' } } }
 // @ts-expect-error The tone of an alert says what it is: it has no default.
 const toneDefault: UIOptions = { defaults: { alert: { tone: 'danger' } } }
 // @ts-expect-error The layout of a table is not a default.
@@ -45,7 +47,7 @@ const toastClass: UIOptions = { defaults: { toast: { class: 'x' } } }
 const prefixed: UIOptions = { defaults: { UICard: { class: 'x' } } }
 // @ts-expect-error Classes are a string.
 const classList: UIOptions = { defaults: { stat: { class: ['a'] } } }
-void [unknownSlot, toneDefault, layoutDefault, buttonSlots, toastClass, prefixed, classList]
+void [unknownSlot, wrapDefault, toneDefault, layoutDefault, buttonSlots, toastClass, prefixed, classList]
 
 /** The `ui` of each component in ui.defaults is exactly the `ui` prop of the component. */
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false
@@ -92,6 +94,6 @@ type SameSlots = [
 ]
 const sameSlots: false extends SameSlots[number] ? never : true = true
 // The variant defaults take the values of their props.
-type SameVariants = [Equal<NonNullable<UIDefaults['card']>['padding'], UICardProps['padding']>, Equal<NonNullable<UIDefaults['card']>['density'], UICardProps['density']>, Equal<NonNullable<UIDefaults['table']>['density'], UITableProps<{ id: number }>['density']>, Equal<NonNullable<UIDefaults['button']>['variant'], UIButtonProps['variant']>]
+type SameVariants = [Equal<NonNullable<UIDefaults['card']>['padding'], UICardProps['padding']>, Equal<NonNullable<UIDefaults['card']>['density'], UICardProps['density']>, Equal<NonNullable<UIDefaults['card']>['actionsWrap'], UICardProps['actionsWrap']>, Equal<NonNullable<UIDefaults['table']>['density'], UITableProps<{ id: number }>['density']>, Equal<NonNullable<UIDefaults['button']>['variant'], UIButtonProps['variant']>]
 const sameVariants: false extends SameVariants[number] ? never : true = true
 void [sameSlots, sameVariants]

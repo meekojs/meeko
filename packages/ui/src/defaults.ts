@@ -57,7 +57,7 @@ const components = {
 	badge: { look: badge },
 	breadcrumb: { look: breadcrumb },
 	button: action,
-	card: { look: card, variants: ['variant', 'padding'], props: { density: ['compact', 'normal', 'comfortable'] } },
+	card: { look: card, variants: ['variant', 'padding', 'actionsWrap'], props: { density: ['compact', 'normal', 'comfortable'] } },
 	checkbox: { look: checkbox },
 	codeBlock: { look: codeBlock },
 	combobox: { look: combobox },

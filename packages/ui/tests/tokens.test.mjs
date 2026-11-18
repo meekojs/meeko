@@ -180,12 +180,13 @@ test('text, soft text and focus tokens stay readable on every background', () =>
 })
 
 /** Comments, the prelude of a media query and the sheet's `@font-face` source are not values of a component. */
-// A media query and a Tailwind breakpoint (theme.css) take no var(): their lengths are the only raw ones.
+// A media query, a Tailwind breakpoint and a size of a container query (theme.css) take no var(): their lengths are the only raw ones.
 const strip = (css) =>
 	css
 		.replace(/\/\*[\s\S]*?\*\//g, '')
 		.replace(/@media[^{]+\{/g, '{')
 		.replace(/--breakpoint-[\w-]+:[^;]+;/g, '')
+		.replace(/--container-card-narrow:[^;]+;/g, '')
 
 async function componentSheets() {
 	const names = (await readdir(styles)).filter((name) => name.endsWith('.css') && !['palette.css', 'tokens.css', 'fonts.css'].includes(name))

@@ -28,7 +28,7 @@ test('ui.defaults accepts class and ui for every component, and the variants of 
 	assert.doesNotThrow(() =>
 		validateOptions({
 			defaults: {
-				card: { padding: 'sm', density: 'compact', variant: 'soft', ui: { header: 'my-card-header' } },
+				card: { padding: 'sm', density: 'compact', variant: 'soft', actionsWrap: 'auto', ui: { header: 'my-card-header' } },
 				table: { density: 'compact', class: 'my-table', ui: { base: 'my-scroll', cell: 'my-cell' } },
 				stat: { ui: { value: 'my-stat-value' } },
 				alert: { class: 'my-alert', ui: { title: 'my-alert-title' } },
@@ -50,7 +50,8 @@ test('ui.defaults accepts class and ui for every component, and the variants of 
 		[{ card: { ui: 'x' } }, /ui: defaults\.card\.ui must be an object/],
 		[{ card: { padding: 'xl' } }, /ui: invalid defaults\.card\.padding; use one of none, sm, md, lg/],
 		[{ card: { density: 'dense' } }, /ui: invalid defaults\.card\.density; use one of compact, normal, comfortable/],
-		[{ card: { shape: 'pill' } }, /ui: unknown option defaults\.card\.shape; card accepts class, ui, density, variant, padding/],
+		[{ card: { shape: 'pill' } }, /ui: unknown option defaults\.card\.shape; card accepts class, ui, density, variant, padding, actionsWrap/],
+		[{ card: { actionsWrap: 'wrap' } }, /ui: invalid defaults\.card\.actionsWrap; use one of inline, below, auto/],
 		[{ table: { layout: 'grid' } }, /ui: unknown option defaults\.table\.layout; table accepts class, ui, density/],
 		[{ alert: { tone: 'danger' } }, /unknown option defaults\.alert\.tone/],
 		[{ button: { ui: { base: 'x' } } }, /unknown option defaults\.button\.ui; button accepts class, variant, size, shape/],

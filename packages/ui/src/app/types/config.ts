@@ -37,6 +37,15 @@ export type UIActionShape = 'rounded' | 'pill'
 export type UICardVariant = 'outline' | 'soft' | 'solid' | 'elevated'
 
 /**
+ * Dónde van las acciones de una `UICard` respecto a su título: `inline` a su lado, `below` siempre debajo y
+ * `auto` debajo cuando la cabecera de la card es estrecha.
+ *
+ * @since 1.11.0
+ * @example `<UICard title="Pedidos" actionsWrap="auto">…</UICard>`
+ */
+export type UICardActionsWrap = 'inline' | 'below' | 'auto'
+
+/**
  * Lo que `ui.defaults` acepta para un componente: `class`, que se suma a la de cada instancia; `ui`, con
  * clases por slot (los de su `tv()`), si el componente tiene varias partes; y, en algunos componentes, el
  * valor de base de ciertas variantes (`V`). `T` es la función que devuelve `tv()`; un componente sin ella
@@ -69,11 +78,11 @@ type UIActionDefaults = UIComponentDefaults<typeof button, Pick<VariantProps<typ
  * reglas sin capa de la aplicación ganan a las de UI.
  *
  * Además, unas pocas variantes de apariencia general admiten un valor de base: `variant`, `size` y
- * `shape` en `button` y `link`; `variant`, `padding` y `density` en `card`, y `density` en `table`. La
+ * `shape` en `button` y `link`; `variant`, `padding`, `density` y `actionsWrap` en `card`, y `density` en `table`. La
  * prop explícita de la instancia gana siempre.
  *
- * @since 1.11.0 acepta `class` y `ui` en cada componente, y `padding`, `density` en `card` y `density` en
- * `table`. Antes sólo admitía las variantes de `button`, `link` y `card`.
+ * @since 1.11.0 acepta `class` y `ui` en cada componente, y `padding`, `density`, `actionsWrap` en `card` y
+ * `density` en `table`. Antes sólo admitía las variantes de `button`, `link` y `card`.
  * @example
  * ```ts
  * export default defineMeekoConfig({
@@ -98,6 +107,12 @@ export interface UIDefaults {
 		Pick<VariantProps<typeof card>, 'padding' | 'variant'> & {
 			/** Densidad de base; un `padding` de `ui.defaults` o de la instancia gana sobre ella. */
 			readonly density?: UIDensity
+			/**
+			 * Posición de base de las acciones; la prop `actionsWrap` de la instancia gana sobre ella.
+			 *
+			 * @since 1.11.0
+			 */
+			readonly actionsWrap?: UICardActionsWrap
 		}
 	>
 	readonly checkbox?: UIComponentDefaults<typeof checkbox>

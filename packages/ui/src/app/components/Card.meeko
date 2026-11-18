@@ -4,7 +4,7 @@
 	import { uiTheme } from '../utils/defaults'
 	import { card } from '../variants/card'
 
-	const { title, headingId, description, variant, density, padding, ui: ownUi, class: ownClass, ...rest } = defineProps<UICardProps>()
+	const { title, headingId, description, variant, density, padding, actionsWrap, ui: ownUi, class: ownClass, ...rest } = defineProps<UICardProps>()
 
 	const theme = uiTheme('card', () => ({ class: ownClass, ui: ownUi }))
 
@@ -19,7 +19,7 @@
 	const paddingOf = () => padding ?? (density ? densityPadding[density] : (theme.defaults?.padding ?? densityPadding[theme.defaults?.density ?? 'normal']))
 
 	const classes = card()
-	const variants = () => ({ variant: variant ?? theme.defaults?.variant ?? 'outline', padding: paddingOf(), actions: Boolean(snippets.actions) })
+	const variants = () => ({ variant: variant ?? theme.defaults?.variant ?? 'outline', padding: paddingOf(), actions: Boolean(snippets.actions), actionsWrap: actionsWrap ?? theme.defaults?.actionsWrap ?? 'inline' })
 </script>
 
 <template>

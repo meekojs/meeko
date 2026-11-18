@@ -147,11 +147,13 @@
 	--font-weight-control: var(--ui-control-font-weight);
 	--animate-spin: meeko-ui-spin var(--ui-duration-spin) linear infinite;
 
-	/* Breakpoints: a media query takes no var(), so these are the only raw lengths; the same as the sheets' @media */
+	/* Breakpoints: a media or container query takes no var(), so these are the only raw lengths; the same as the sheets' @media */
 	--breakpoint-phone: 30rem;
 	--breakpoint-compact: 40rem;
 	--breakpoint-tablet: 48rem;
 	/* Below it <UIPage> folds its sidebar into the bar above the content. */
 	--breakpoint-sidebar: 54rem;
 	--breakpoint-desktop: 75rem;
+	/* Of a container query (ui:@max-card-narrow:): below this width of its header, <UICard actionsWrap="auto"> puts its actions under the title. */
+	--container-card-narrow: 24rem;
 }

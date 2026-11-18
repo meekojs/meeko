@@ -110,6 +110,37 @@ test('a density of ui.defaults gives the padding of a card, and without defaults
 	assert.doesNotMatch(plain, /undefined|app-/)
 })
 
+/** A card with title, description and actions, and the classes of its header and of its actions. */
+const actionCard = (props = '') => `<UICard title="Orders" description="Today"${props}><snippet name="actions"><UIButton>Export</UIButton></snippet>Body</UICard>`
+const headerParts = (html) => [...html.matchAll(/<header[^>]*?class="([^"]*)"[\s\S]*?<div class="([^"]*)"/g)].map(([, header, actions]) => ({ header: header.split(' '), actions: actions.split(' ') }))
+
+test('actionsWrap places the actions of a card beside, below or by the width of its header, without a script', async (context) => {
+	const html = await render(context, [actionCard(), actionCard(' actionsWrap="inline"'), actionCard(' actionsWrap="below"'), actionCard(' actionsWrap="auto"'), '<UICard title="Plain" actionsWrap="auto">Body</UICard>'].join(''))
+	const [plain, inline, below, auto] = headerParts(html)
+	assert.deepEqual(plain, inline, 'inline is the default: a card without the prop does not change')
+	assert.ok(inline.header.includes('ui:grid-cols-[minmax(0,1fr)_auto]') && inline.header.includes('ui:gap-x-4'))
+	assert.ok(inline.actions.includes('ui:col-[2]') && inline.actions.includes('ui:row-[1/span_2]') && inline.actions.includes('ui:justify-end'))
+	assert.ok(!inline.header.includes('ui:@container'), 'only auto makes the header a container')
+	assert.ok(!below.header.some((name) => name.startsWith('ui:grid-cols-')), 'below has a single column')
+	assert.ok(!below.actions.some((name) => /col-|row-|justify-end/.test(name)) && below.actions.includes('ui:pt-1.5'))
+	assert.ok(auto.header.includes('ui:@container') && auto.header.includes('ui:grid-cols-[minmax(0,1fr)_auto]') && !auto.header.includes('ui:gap-x-4'))
+	for (const name of ['ui:col-[2]', 'ui:ms-4', 'ui:@max-card-narrow:col-[1]', 'ui:@max-card-narrow:row-auto', 'ui:@max-card-narrow:ms-0', 'ui:@max-card-narrow:justify-start']) assert.ok(auto.actions.includes(name), `auto: ${name}`)
+	// The order of the DOM does not change: the title, the description and then the actions.
+	for (const match of html.matchAll(/<header[\s\S]*?<\/header>/g)) if (match[0].includes('Export')) assert.match(match[0], /<h2[\s\S]*Orders[\s\S]*<p[\s\S]*Today[\s\S]*Export/)
+	const header = [...html.matchAll(/<header[^>]*?class="([^"]*)"/g)].at(-1)[1]
+	assert.ok(!header.includes('@container') && !header.includes('grid-cols'), 'without actions the prop changes nothing')
+	assert.doesNotMatch(html, /undefined/)
+})
+
+test('actionsWrap takes a default from ui.defaults, and the prop of the instance wins over it', async (context) => {
+	const html = await render(context, actionCard() + actionCard(' actionsWrap="inline"'), { card: { actionsWrap: 'auto' } })
+	const [fromDefaults, own] = headerParts(html)
+	assert.ok(fromDefaults.header.includes('ui:@container') && fromDefaults.actions.includes('ui:@max-card-narrow:col-[1]'))
+	assert.ok(!own.header.includes('ui:@container') && own.header.includes('ui:gap-x-4'))
+	const below = headerParts(await render(context, actionCard(), { card: { actionsWrap: 'below' } }))[0]
+	assert.ok(below.actions.includes('ui:pt-1.5') && !below.actions.includes('ui:col-[2]'))
+})
+
 test('uiTheme sums the classes slot by slot, follows the props and reuses the merge of the same ui', () => {
 	createRoot((dispose) => {
 		provide(uiDefaultsKey, { stat: { class: 'd', ui: { base: 'd-base', value: 'd-value' } } })

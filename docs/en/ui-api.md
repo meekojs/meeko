@@ -1,5 +1,5 @@
 ---
-source-hash: 5213412848336a2468fb17c6896d5f747df98e73abcae88523ab3f671a88a26f
+source-hash: 5858ac7d4e17704d83c3f9cc8956159602c52f3e85b9f5430eb8b6ed22a0ff57
 ---
 
 # Meeko UI API
@@ -354,7 +354,7 @@ export default defineMeekoConfig({
 ```
 
 - **`class` and `ui` add up.** The classes of `ui.defaults` are added to those of each instance, they do not replace them: first those of the component, then those of `ui.defaults` and last those of the instance. `class` reaches where the prop of the instance does: in `UITable`, the `<table>`. Without class merging, the cascade decides a conflict, as [What wins](#classes-per-slot) explains: an unlayered rule of your application wins over those of UI, and between two rules of yours their specificity and their order in your stylesheet decide, not the order of the classes in the attribute.
-- **Variants.** A few accept a base value: `variant`, `size` and `shape` in `button` and `link`; `variant`, `padding` and `density` in `card`, and `density` in `table`. The explicit prop of the instance always wins. In `card`, a `padding` or a `density` of the instance wins over both of `ui.defaults`, and at each level `padding` wins over `density`. The other variants have no default because they depend on each instance: the `tone` of `UIAlert`, `UIBadge` or `UIToast` says what the message is, and `layout`, `side`, `sticky`, the `size` of `UIModal` or `columns` follow the structure and the content of each page. Adjust their look with `class` and `ui`.
+- **Variants.** A few accept a base value: `variant`, `size` and `shape` in `button` and `link`; `variant`, `padding`, `density` and `actionsWrap` in `card`, and `density` in `table`. The explicit prop of the instance always wins. In `card`, a `padding` or a `density` of the instance wins over both of `ui.defaults`, and at each level `padding` wins over `density`. The other variants have no default because they depend on each instance: the `tone` of `UIAlert`, `UIBadge` or `UIToast` says what the message is, and `layout`, `side`, `sticky`, the `size` of `UIModal` or `columns` follow the structure and the content of each page. Adjust their look with `class` and `ui`.
 - **Components.** `UIButton`, `UILink`, `UIInput`, `UITextarea`, `UIContainer`, `UIProse`, `UIPopover` and `UITooltip` have no slots: they only accept `class`. `toast` only accepts `ui`, and it also applies to the notices of `useToast()`. `markdownEditor` is `UIMarkdownEditor`, from `@meekojs/ui/editor`. The `UIDefaults` type describes each component with its real slots, and the editor completes them.
 - **Validation.** An unknown component, option or slot, an empty class or a variant value that does not exist make the module fail to load with an error that says what is accepted, such as `ui: unknown slot head in defaults.card.ui; its slots are base, header, title, description, actions, body, footer`.
 - **Client.** The defaults travel with the JavaScript of every page, as a plain copy of the validated values: put classes there, not data.
@@ -617,9 +617,26 @@ The container supports focus and horizontal scrolling with the keyboard. `class`
 | `title`       | Optional title, rendered as `<h2>` and accessible name of the section.          |
 | `description` | Optional text under the title.                                                  |
 | `headingId`   | `id` of the title, which receives `tabindex="-1"` so code can move focus to it. |
+| `actionsWrap` | Where the actions go: `inline` by default, `below` or `auto`.                   |
 | `class`       | Additional classes on the section.                                              |
 
 Other attributes, such as `id` or `aria-label`, reach the `<section>`. The `actions` snippet goes next to the title, and a `UITable` alone in the body reaches the edge of the card, which frames it.
+
+`actionsWrap` decides where those actions go. With `inline`, the default, they take a column next to the title and the description; with `below` they always go underneath, in a row of their own; with `auto` they stay beside the title while they fit and move under it when the card's header is narrower than `24rem`, the theme's `card-narrow` container size. `auto` looks at the width of the card through a container query on its header, not at the window, so a narrow card on a wide screen also moves them down. It is pure CSS: the server HTML already has its final shape and nothing jumps on hydration. The DOM order does not change (title, description and actions), and neither do the focus and reading orders. With `auto`, the header adds no intrinsic width to the card, which takes its width from its container or its body. `ui.defaults.card.actionsWrap` sets the value for the whole application, and the prop of the instance wins over it.
+
+```html
+<UICard
+	title="Orders"
+	description="The last 30 days."
+	actionsWrap="auto"
+>
+	<snippet name="actions">
+		<UIButton variant="secondary">Export</UIButton>
+		<UIButton>New order</UIButton>
+	</snippet>
+	<p>Card content.</p>
+</UICard>
+```
 
 `outline` uses a surface and a border; `soft`, a faint background with no visible border; `solid`, the accent color and its contrast text; `elevated`, a surface with a shadow and no visible border. All respond to the tokens and the UI theme. `--card-padding` lets you adjust the inner spacing through a class; `--ui-card-shadow` customizes the shadow.
 

@@ -350,7 +350,7 @@ export default defineMeekoConfig({
 ```
 
 - **`class` y `ui` se suman.** Las clases de `ui.defaults` se añaden a las de cada instancia, no las sustituyen: van primero las del componente, después las de `ui.defaults` y al final las de la instancia. `class` llega donde llega la prop de la instancia: en `UITable`, a la `<table>`. Sin fusión de clases, en un conflicto decide la cascada, como explica [Qué gana](#clases-por-slot): una regla sin capa de tu aplicación gana a las de UI, y entre dos reglas tuyas deciden su especificidad y su orden en tu hoja, no el orden de las clases en el atributo.
-- **Variantes.** Unas pocas admiten un valor de base: `variant`, `size` y `shape` en `button` y `link`; `variant`, `padding` y `density` en `card`, y `density` en `table`. La prop explícita de la instancia gana siempre. En `card`, un `padding` o una `density` de la instancia ganan a los dos de `ui.defaults`, y en cada nivel `padding` gana a `density`. Las demás variantes no tienen default porque dependen de cada instancia: el `tone` de `UIAlert`, `UIBadge` o `UIToast` dice qué es el mensaje, y `layout`, `side`, `sticky`, `size` de `UIModal` o `columns` siguen a la estructura y el contenido de cada página. Su aspecto se retoca con `class` y `ui`.
+- **Variantes.** Unas pocas admiten un valor de base: `variant`, `size` y `shape` en `button` y `link`; `variant`, `padding`, `density` y `actionsWrap` en `card`, y `density` en `table`. La prop explícita de la instancia gana siempre. En `card`, un `padding` o una `density` de la instancia ganan a los dos de `ui.defaults`, y en cada nivel `padding` gana a `density`. Las demás variantes no tienen default porque dependen de cada instancia: el `tone` de `UIAlert`, `UIBadge` o `UIToast` dice qué es el mensaje, y `layout`, `side`, `sticky`, `size` de `UIModal` o `columns` siguen a la estructura y el contenido de cada página. Su aspecto se retoca con `class` y `ui`.
 - **Componentes.** `UIButton`, `UILink`, `UIInput`, `UITextarea`, `UIContainer`, `UIProse`, `UIPopover` y `UITooltip` no tienen slots: sólo admiten `class`. `toast` sólo admite `ui` y también se aplica a los avisos de `useToast()`. `markdownEditor` es `UIMarkdownEditor`, de `@meekojs/ui/editor`. El tipo `UIDefaults` describe cada componente con sus slots reales, y el editor los completa.
 - **Validación.** Un componente, una opción o un slot desconocidos, una clase vacía o un valor de variante que no existe hacen fallar la carga del módulo con un error que dice qué se admite, como `ui: unknown slot head in defaults.card.ui; its slots are base, header, title, description, actions, body, footer`.
 - **Cliente.** Los defaults viajan con el JavaScript de cada página, como una copia plana de los valores validados: pon ahí clases, no datos.
@@ -613,9 +613,26 @@ El contenedor admite foco y desplazamiento horizontal con teclado. `class` llega
 | `title`       | Título opcional, renderizado como `<h2>` y nombre accesible de la sección.    |
 | `description` | Texto opcional bajo el título.                                                |
 | `headingId`   | `id` del título, que recibe `tabindex="-1"` para llevarle el foco por código. |
+| `actionsWrap` | Dónde van las acciones: `inline` por defecto, `below` o `auto`.               |
 | `class`       | Clases adicionales sobre la sección.                                          |
 
 Los demás atributos, como `id` o `aria-label`, llegan a la `<section>`. El snippet `actions` va junto al título, y una `UITable` sola en el cuerpo llega hasta el borde de la card, que le sirve de marco.
+
+`actionsWrap` decide dónde van esas acciones. Con `inline`, el valor por defecto, ocupan una columna junto al título y la descripción; con `below` van siempre debajo, en una fila propia; con `auto` van al lado mientras quepan y bajan bajo el título cuando la cabecera de la card mide menos de `24rem`, el tamaño de contenedor `card-narrow` del tema. `auto` mira el ancho de la card con una container query sobre su cabecera, no el de la ventana, así que una card estrecha en una pantalla ancha también las baja. Es CSS puro: el HTML del servidor ya tiene su forma final y no hay saltos al hidratar. El orden del DOM no cambia (título, descripción y acciones), y con él el del foco y el de lectura. Con `auto`, la cabecera no aporta ancho intrínseco a la card, que toma su ancho del contenedor o del cuerpo. `ui.defaults.card.actionsWrap` fija el valor de toda la aplicación, y la prop de la instancia gana sobre él.
+
+```html
+<UICard
+	title="Pedidos"
+	description="Los últimos 30 días."
+	actionsWrap="auto"
+>
+	<snippet name="actions">
+		<UIButton variant="secondary">Exportar</UIButton>
+		<UIButton>Nuevo pedido</UIButton>
+	</snippet>
+	<p>Contenido de la card.</p>
+</UICard>
+```
 
 `outline` usa superficie y borde; `soft`, un fondo tenue sin borde visible; `solid`, el color de acento y su texto de contraste; `elevated`, superficie con sombra sin borde visible. Todas responden a los tokens y al tema de UI. `--card-padding` permite ajustar el espacio interno mediante una clase; `--ui-card-shadow` personaliza la sombra.
 
