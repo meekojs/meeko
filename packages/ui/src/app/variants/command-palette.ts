@@ -1,9 +1,11 @@
 // The look of <UICommandPalette>: a trigger with the look of a search field, and a dialog with a field, a status
-// and a list of rows. The dialog is the one of <UIModal> (`meeko-ui-modal`), placed higher and wider. The
+// and a list of rows. The dialog is the one of <UIModal> (`modalSurface`), placed higher and wider. The
 // `trigger` and `item` snippets are the app's markup: the trigger paints a direct <svg> as the icon, a direct
 // <span> with <kbd> as the shortcut and any other direct <span> as the label; a row paints <strong> as the title
 // and <small> as the excerpt; the dialog paints every <mark> as what was found.
 import { tv } from 'tailwind-variants/lite'
+
+import { modalSurface } from './modal'
 
 /** The focus ring of the trigger and the close button. */
 const focusRing = 'ui:focus-visible:outline-(length:--ui-focus-ring-width) ui:focus-visible:outline-focus ui:focus-visible:outline-offset-(--ui-focus-ring-offset) ui:focus-visible:outline-solid'
@@ -34,6 +36,7 @@ export const commandPalette = tv({
 		],
 		/** The dialog of <UIModal>, near the top of the page; `mark` is what was found. */
 		base: [
+			...modalSurface,
 			'ui:mx-auto ui:mt-(--ui-command-offset) ui:mb-auto',
 			'ui:w-[min(var(--ui-command-width),calc(100vw-var(--ui-space-8)))] ui:max-h-[min(var(--ui-command-max-height),calc(100dvh-var(--ui-space-16)))]',
 			'ui:[&_mark]:rounded-xs ui:[&_mark]:bg-primary-soft ui:[&_mark]:text-primary-text',

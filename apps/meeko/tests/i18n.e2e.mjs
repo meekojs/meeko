@@ -199,14 +199,14 @@ test('the English site: language, hreflang, interface, selector, links, fallback
 		const filter = page.locator('#api-filter')
 		const attack = '<img src=x onerror=globalThis.__xss=1>'
 		await filter.fill(attack)
-		const empty = page.locator('.meeko-ui-empty-title')
+		const empty = page.locator('main p').filter({ hasText: /^\s*No symbol matches/ })
 		await empty.waitFor()
 		assert.equal((await empty.textContent())?.replace(/\s+/g, ' ').trim(), `No symbol matches “${attack}”. The / key opens the search across the whole documentation.`)
 		assert.equal(await empty.locator('img').count(), 0, 'a value never becomes markup')
 		assert.equal(await empty.locator('kbd').textContent(), '/')
 		const kbd = await empty.locator('kbd').elementHandle()
 		await filter.fill('zzz-none')
-		await page.waitForFunction(() => globalThis.document.querySelector('.meeko-ui-empty-title')?.textContent?.includes('zzz-none'))
+		await empty.filter({ hasText: 'zzz-none' }).waitFor()
 		assert.equal(await kbd.evaluate((node) => node.isConnected), true, 'the snippet keeps its nodes when a value changes')
 		assert.equal(await page.evaluate(() => globalThis.__xss), undefined)
 		await filter.fill('')
@@ -279,7 +279,7 @@ test('the English site: language, hreflang, interface, selector, links, fallback
 		// An untranslated page: the notice, a link to the Spanish version and the article marked Spanish.
 		await page.goto(base + '/en' + fallback, { waitUntil: 'networkidle' })
 		const notice = page.locator('.docs-untranslated')
-		assert.equal((await notice.locator('.meeko-ui-alert-title').textContent())?.trim(), 'Not translated yet')
+		assert.equal((await notice.locator('p').first().textContent())?.trim(), 'Not translated yet')
 		assert.equal(await notice.locator('a').getAttribute('href'), fallback)
 		assert.equal(await notice.locator('a').getAttribute('hreflang'), 'es')
 		// Only the article is Spanish: the notice, the pager and the edit link of the English shell are not.

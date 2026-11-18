@@ -14,6 +14,7 @@
 	>
 		<UIAlert
 			if:when="props.text"
+			class="dash-notice"
 			role="none"
 			tone="success"
 			bind:description="props.text"

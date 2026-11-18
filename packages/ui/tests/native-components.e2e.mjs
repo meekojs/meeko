@@ -106,7 +106,7 @@ for (const [name, start] of engines) {
 					button.click()
 					const entry = globalThis.meekoTransitions.at(-1)
 					await entry.transition.ready
-					const names = [...globalThis.document.querySelectorAll('.meeko-ui-tabs-indicator')].map((element) => globalThis.getComputedStyle(element).viewTransitionName).filter((value) => value !== 'none')
+					const names = [...globalThis.document.querySelectorAll('[role=tab] > span')].map((element) => globalThis.getComputedStyle(element).viewTransitionName).filter((value) => value !== 'none')
 					return { names }
 				})
 				assert.deepEqual(during.names, ['ui-tabs-indicator'])

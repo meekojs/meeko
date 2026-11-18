@@ -3,6 +3,7 @@
 
 	import { useModalHost } from '../composables/useModal'
 	import { useToastHost } from '../composables/useToast'
+	import { toastHost as toastHostClass } from '../variants/feedback'
 	import * as ModalInstance from './internal/ModalInstance.meeko'
 	import * as Toast from './Toast.meeko'
 
@@ -34,8 +35,8 @@
 	<div
 		ref:toastHost
 		popover="manual"
-		class="meeko-ui-toast-host"
 		aria-live="polite"
+		bind:class="toastHostClass"
 	>
 		<Toast
 			each:of="toasts.entries.value"
@@ -47,6 +48,7 @@
 			bind:tone="entry.tone"
 			bind:duration="entry.duration"
 			bind:closeLabel="entry.closeLabel"
+			bind:ui="entry.ui"
 			on:dismiss="() => toasts.remove(entry.id)"
 		/>
 	</div>

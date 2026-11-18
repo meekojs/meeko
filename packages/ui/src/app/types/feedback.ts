@@ -1,26 +1,32 @@
 import type { ElementAttributes, Snippet } from '@meekojs/meeko'
 
+import type { alert, disclosure, empty, skeleton, toast } from '../variants/feedback'
 import type { UITone } from './forms'
+import type { UIThemeProps } from './theme'
 
 /** Aviso con acciones y cierre opcionales. @example `<UIAlert tone="warning" title="Sin conexión" description="Vuelve a intentarlo." />` */
-export type UIAlertProps = Omit<ElementAttributes<'section'>, 'title' | 'role' | 'class'> & {
-	/** Estado semántico. */
-	tone?: UITone
-	/** Título visible. */
-	title?: string
-	/** Contenido breve del aviso. */
-	description?: string
-	/** Snippet de icono decorativo, sin depender de una biblioteca. */
-	icon?: Snippet<[]>
-	/** Permite cerrar el aviso y emite `dismiss`. */
-	dismiss?: boolean
-	/** Nombre accesible del cierre; usa los mensajes de UI por defecto. */
-	closeLabel?: string
-	/** Semántica; danger usa alert y los demás note por defecto. `none`, dentro de una región viva que ya existía. */
-	role?: 'alert' | 'status' | 'note' | 'none'
-	/** Clases adicionales. */
-	class?: string
-}
+export type UIAlertProps = Omit<ElementAttributes<'section'>, 'title' | 'role' | 'class'> &
+	UIThemeProps<
+		typeof alert,
+		{
+			/** Estado semántico. */
+			tone?: UITone
+			/** Título visible. */
+			title?: string
+			/** Contenido breve del aviso. */
+			description?: string
+			/** Snippet de icono decorativo, sin depender de una biblioteca. */
+			icon?: Snippet<[]>
+			/** Permite cerrar el aviso y emite `dismiss`. */
+			dismiss?: boolean
+			/** Nombre accesible del cierre; usa los mensajes de UI por defecto. */
+			closeLabel?: string
+			/** Semántica; danger usa alert y los demás note por defecto. `none`, dentro de una región viva que ya existía. */
+			role?: 'alert' | 'status' | 'note' | 'none'
+			/** Clases adicionales del elemento raíz; equivale a `ui.base`. */
+			class?: string
+		}
+	>
 
 /**
  * Contenido plegable con `<details>` nativo: se abre con el teclado y sin JavaScript. Su contenido se
@@ -34,38 +40,47 @@ export type UIAlertProps = Omit<ElementAttributes<'section'>, 'title' | 'role' |
  * </UIDisclosure>
  * ```
  */
-export interface UIDisclosureProps {
-	/** Texto del elemento que lo abre. */
-	summary: string
-	/** Abierto; el lector puede cambiarlo después. */
-	open?: boolean
-	/** Clases adicionales. */
-	class?: string
-}
+export type UIDisclosureProps = UIThemeProps<
+	typeof disclosure,
+	{
+		/** Texto del elemento que lo abre. */
+		summary: string
+		/** Abierto; el lector puede cambiarlo después. */
+		open?: boolean
+		/** Clases adicionales del elemento raíz; equivale a `ui.base`. */
+		class?: string
+	}
+>
 
 /** Estado vacío con snippet de acciones. @example `<UIEmpty title="Sin resultados" variant="panel" />` */
-export interface UIEmptyProps {
-	/** Título; usa los mensajes de UI por defecto. */
-	title?: string
-	/** Ayuda para continuar. */
-	description?: string
-	/** Presentación dentro de contenido o como panel. */
-	variant?: 'inline' | 'panel'
-	/** Clases adicionales. */
-	class?: string
-}
+export type UIEmptyProps = UIThemeProps<
+	typeof empty,
+	{
+		/** Título; usa los mensajes de UI por defecto. */
+		title?: string
+		/** Ayuda para continuar. */
+		description?: string
+		/** Presentación dentro de contenido o como panel. */
+		variant?: 'inline' | 'panel'
+		/** Clases adicionales del elemento raíz; equivale a `ui.base`. */
+		class?: string
+	}
+>
 
 /** Marcador de carga decorativo; el estado se anuncia una vez. @example `<UISkeleton bind:lines="3" bind:widths="['full', 'long', 'short']" />` */
-export interface UISkeletonProps {
-	/** Número de líneas; tres por defecto. */
-	lines?: number
-	/** Anchos de la escala UI por línea, sin CSS arbitrario. */
-	widths?: readonly ('full' | 'long' | 'short')[]
-	/** Nombre accesible; usa los mensajes de UI por defecto. */
-	label?: string
-	/** Clases adicionales. */
-	class?: string
-}
+export type UISkeletonProps = UIThemeProps<
+	typeof skeleton,
+	{
+		/** Número de líneas; tres por defecto. */
+		lines?: number
+		/** Anchos de la escala UI por línea, sin CSS arbitrario. */
+		widths?: readonly ('full' | 'long' | 'short')[]
+		/** Nombre accesible; usa los mensajes de UI por defecto. */
+		label?: string
+		/** Clases adicionales del elemento raíz; equivale a `ui.base`. */
+		class?: string
+	}
+>
 
 /**
  * Dato con etiqueta y detalle opcional. Los snippets `value` y `detail` admiten marcado, como un enlace.
@@ -110,18 +125,21 @@ export interface UIDescriptionListProps {
 }
 
 /** Notificación breve presentada por el host de UIApp. @example `<UIToast text="Cambios guardados" tone="success" />` */
-export interface UIToastProps {
-	/** Mensaje de la notificación. */
-	text: string
-	/** Acciones opcionales del aviso. */
-	actions?: Snippet<[]>
-	/** Estado semántico. */
-	tone?: UITone
-	/** Milisegundos hasta cerrar; cero conserva el aviso. Se pausa con hover o foco. */
-	duration?: number
-	/** Nombre accesible del cierre. */
-	closeLabel?: string
-}
+export type UIToastProps = UIThemeProps<
+	typeof toast,
+	{
+		/** Mensaje de la notificación. */
+		text: string
+		/** Acciones opcionales del aviso. */
+		actions?: Snippet<[]>
+		/** Estado semántico. */
+		tone?: UITone
+		/** Milisegundos hasta cerrar; cero conserva el aviso. Se pausa con hover o foco. */
+		duration?: number
+		/** Nombre accesible del cierre. */
+		closeLabel?: string
+	}
+>
 
 /** Entrada del host de notificaciones. @example const entry: UIToastEntry = { id: 1, text: 'Guardado' } */
 export interface UIToastEntry extends UIToastProps {

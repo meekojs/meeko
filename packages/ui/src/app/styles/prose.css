@@ -15,7 +15,7 @@
  * A component inside the text is the end of its scope, so it keeps its own look. Inside @scope a selector
  * without :scope gets it as an implied ancestor: `.meeko-ui-prose h2` would look for a nested prose.
  */
-.meeko-ui-prose > :is(.meeko-ui-code-block, .meeko-ui-alert, .meeko-ui-table-scroll, .meeko-ui-card, .meeko-ui-diff) {
+.meeko-ui-prose > :is(.meeko-ui-code-block, .meeko-ui-table-scroll, .meeko-ui-card, .meeko-ui-diff) {
 	margin-block: 0 var(--ui-space-6);
 }
 .meeko-ui-prose > :first-child {
@@ -24,7 +24,7 @@
 .meeko-ui-prose > :last-child {
 	margin-bottom: 0;
 }
-@scope (.meeko-ui-prose) to ([class*='meeko-ui-'], [data-meeko-popover], [data-meeko-select], [data-meeko-theme-toggle]) {
+@scope (.meeko-ui-prose) to ([class*='meeko-ui-'], [class*='ui:'], [data-meeko-popover], [data-meeko-select], [data-meeko-theme-toggle]) {
 	:scope > :is(p, ul, ol, dl, blockquote, h1, h2, h3, h4),
 	:scope > :is(section, div) > :is(p, ul, ol, dl, blockquote, h2, h3, h4) {
 		max-width: var(--ui-prose-measure);

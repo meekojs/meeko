@@ -73,7 +73,19 @@ test('modals hydrate, stack, settle, restore focus and work on mobile', { timeou
 	)
 	await assertBackdrop(3)
 	await settleMotion()
-	assert.deepEqual(await page.locator('dialog[open]').evaluateAll((elements) => elements.map((element) => element.getAttribute('data-size'))), ['lg', 'md', 'sm'])
+	// Sizes lg, md and sm: each dialog is as wide as its token, within the screen.
+	const sized = await page.locator('dialog[open]').evaluateAll((elements) =>
+		elements.map((element, index) => {
+			const probe = globalThis.document.createElement('div')
+			probe.style.width = `min(var(--ui-modal-width-${['lg', 'md', 'sm'][index]}), calc(100vw - var(--ui-space-8)))`
+			globalThis.document.body.append(probe)
+			const expected = probe.getBoundingClientRect().width
+			probe.remove()
+			// offsetWidth: a dialog behind is scaled down, which its layout width ignores.
+			return Math.abs(element.offsetWidth - expected) < 1
+		}),
+	)
+	assert.deepEqual(sized, [true, true, true])
 	const widths = await page.locator('dialog[open]').evaluateAll((elements) => elements.map((element) => element.getBoundingClientRect().width))
 	assert.ok(widths[0] > widths[1] && widths[1] > widths[2], 'nested demo dialogs have distinct sizes')
 	assert.equal(await page.locator('dialog[open][data-meeko-ui-modal-behind]').count(), 2)

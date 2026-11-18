@@ -1,11 +1,12 @@
 <script lang="ts">
-	import { onCleanup, onMounted, signal } from '@meekojs/meeko'
+	import { computed, onCleanup, onMounted, signal } from '@meekojs/meeko'
 
 	import type { UIToastProps } from '../types/feedback'
 
 	import { icons } from '../utils/icons'
 	import { uiMessages } from '../utils/messages'
 	import { withViewTransition } from '../utils/view-transition'
+	import { toast, toastPlacement } from '../variants/feedback'
 	import * as Icon from './internal/Icon.meeko'
 
 	const props = defineProps<UIToastProps & { hosted?: boolean }>()
@@ -17,6 +18,7 @@
 	const element = useElementRef('element')
 
 	const text = uiMessages().feedback
+	const classes = computed(() => toast({ tone: props.tone }))
 	const visible = signal(true)
 	let timer: ReturnType<typeof setTimeout> | undefined
 	let remaining = 0
@@ -87,31 +89,30 @@
 	<div
 		ref:element
 		if:when="visible.value"
-		class="meeko-ui-toast"
+		bind:class="classes.value.base({ class: [props.hosted ? toastPlacement.hosted : toastPlacement.alone, props.ui?.base] })"
 		bind:popover="props.hosted ? undefined : 'manual'"
-		bind:data-tone="props.tone ?? 'neutral'"
 		on:mouseenter="enter"
 		on:mouseleave="leave"
 		on:focusin="focus"
 		on:focusout="blur"
 	>
-		<div class="meeko-ui-toast-content">
+		<div bind:class="classes.value.content({ class: props.ui?.content })">
 			<p
-				class="meeko-ui-toast-message"
+				bind:class="classes.value.message({ class: props.ui?.message })"
 				bind:role="props.tone === 'danger' ? 'alert' : props.hosted ? undefined : 'status'"
 			>
 				{props.text}
 			</p>
 			<div
 				if:when="snippets.actions || props.actions"
-				class="meeko-ui-feedback-actions"
+				bind:class="classes.value.actions({ class: props.ui?.actions })"
 			>
 				<render snippet="snippets.actions ?? props.actions" />
 			</div>
 		</div>
 		<button
 			type="button"
-			class="meeko-ui-dismiss"
+			bind:class="classes.value.dismiss({ class: props.ui?.dismiss })"
 			bind:aria-label="props.closeLabel ?? text.close"
 			on:click="close"
 		>

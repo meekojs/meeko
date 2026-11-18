@@ -169,7 +169,8 @@ test('the English UI documentation has an English interface, hreflang, a switche
 	await page.locator('#owner option:not(:disabled, [hidden])').first().click()
 	assert.equal(await page.getByRole('button', { name: 'Clear selection', exact: true }).count(), 1)
 	await page.goto(origin + '/en/modals', { waitUntil: 'networkidle' })
-	const closeButtons = page.locator('.meeko-ui-modal-close')
+	// The close button of a <UIModal>, in its heading: the dialog of the command palette has no title.
+	const closeButtons = page.locator('dialog[aria-labelledby] > div:first-child > button')
 	assert.deepEqual(await closeButtons.evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label'))), ['Close modal'], 'the declarative modal, after hydration')
 	await page.getByRole('button', { name: 'Open confirmation', exact: true }).click()
 	// A modal opened by name, mounted later under UIApp, reads the same locale.
@@ -204,8 +205,8 @@ test('the English UI documentation has an English interface, hreflang, a switche
 	await page.locator('#slider-status', { hasText: 'Volume: 100' }).waitFor()
 	await page.goto(origin + '/en/feedback', { waitUntil: 'networkidle' })
 	await page.getByRole('button', { name: 'Notify the save', exact: true }).click()
-	await page.locator('.meeko-ui-toast', { hasText: 'Changes saved' }).waitFor()
-	assert.equal(await page.locator('.meeko-ui-toast-host').getAttribute('aria-live'), 'polite')
+	// The host of the toasts is a manual popover and a polite live region.
+	await page.locator('[popover="manual"][aria-live="polite"]').getByText('Changes saved', { exact: true }).waitFor()
 	await page.getByRole('button', { name: 'Close all', exact: true }).click()
 	await page.getByRole('button', { name: 'Dismiss notification', exact: true }).first().click()
 	await page.getByRole('button', { name: 'Show the notice again', exact: true }).waitFor()
@@ -261,7 +262,7 @@ test('the English UI documentation has an English interface, hreflang, a switche
 	await ssr.goto(origin + '/en/tables')
 	assert.equal(await ssr.locator('.meeko-ui-table-empty').first().innerText(), 'No data.')
 	await ssr.goto(origin + '/en/modals')
-	assert.equal(await ssr.locator('.meeko-ui-modal-close').first().getAttribute('aria-label'), 'Close modal')
+	assert.equal(await ssr.locator('dialog[aria-labelledby] > div:first-child > button').first().getAttribute('aria-label'), 'Close modal')
 	await ssr.goto(origin + '/en/theme-toggle')
 	assert.equal(await ssr.locator('#theme-select [role="radiogroup"]').getAttribute('aria-label'), 'Theme')
 	assert.equal(await ssr.locator('#theme-cycle button').getAttribute('aria-label'), 'Change theme')

@@ -2,24 +2,26 @@
 	import type { UISkeletonProps } from '../types/feedback'
 
 	import { uiMessages } from '../utils/messages'
+	import { skeleton, skeletonWidths } from '../variants/feedback'
 
 	const props = defineProps<UISkeletonProps>()
 
 	const text = uiMessages().feedback
+	const classes = skeleton()
 </script>
 
 <template>
 	<div
 		role="status"
 		bind:aria-label="props.label ?? text.loading"
-		bind:class="['meeko-ui-skeleton', props.class].filter(Boolean).join(' ')"
+		bind:class="classes.base({ class: [props.ui?.base, props.class] })"
 	>
 		<span
 			each:of="Array.from({ length: Math.max(0, Math.min(100, Math.floor(props.lines ?? 3))) }, (_, index) => index)"
 			each:as="line"
 			each:key="line"
 			aria-hidden="true"
-			bind:data-width="props.widths?.[line] ?? 'full'"
+			bind:class="classes.line({ class: [skeletonWidths[props.widths?.[line] ?? 'full'], props.ui?.line] })"
 		/>
 	</div>
 </template>

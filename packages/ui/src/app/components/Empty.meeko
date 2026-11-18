@@ -1,21 +1,22 @@
 <script lang="ts">
+	import { computed } from '@meekojs/meeko'
+
 	import type { UIEmptyProps } from '../types/feedback'
 
 	import { uiMessages } from '../utils/messages'
+	import { empty } from '../variants/feedback'
 
 	const props = defineProps<UIEmptyProps>()
 
 	const snippets = defineSnippets<{ default?: []; title?: []; actions?: [] }>()
 
 	const text = uiMessages().feedback
+	const classes = computed(() => empty({ variant: props.variant }))
 </script>
 
 <template>
-	<div
-		bind:class="['meeko-ui-empty', props.class].filter(Boolean).join(' ')"
-		bind:data-variant="props.variant ?? 'inline'"
-	>
-		<p class="meeko-ui-empty-title">
+	<div bind:class="classes.value.base({ class: [props.ui?.base, props.class] })">
+		<p bind:class="classes.value.title({ class: props.ui?.title })">
 			<render
 				if:when="snippets.title"
 				snippet="snippets.title"
@@ -24,7 +25,7 @@
 		</p>
 		<p
 			if:when="props.description"
-			class="meeko-ui-empty-description"
+			bind:class="classes.value.description({ class: props.ui?.description })"
 		>
 			{props.description}
 		</p>
@@ -34,7 +35,7 @@
 		/>
 		<div
 			if:when="snippets.actions"
-			class="meeko-ui-feedback-actions"
+			bind:class="classes.value.actions({ class: props.ui?.actions })"
 		>
 			<render snippet="snippets.actions" />
 		</div>

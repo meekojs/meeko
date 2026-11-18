@@ -63,7 +63,7 @@
 	><dialog
 		ref:dialog
 		closedby="any"
-		bind:class="classes.base({ class: ['meeko-ui-modal', props.ui?.base, props.class] })"
+		bind:class="classes.base({ class: [props.ui?.base, props.class] })"
 		bind:aria-label="props.label ?? text.label"
 		on:keydown="palette.keydown"
 		><div bind:class="classes.field({ class: props.ui?.field })"

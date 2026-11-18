@@ -3,26 +3,29 @@
 	import type { UIDisclosureProps } from '../types/feedback'
 
 	import { icons } from '../utils/icons'
+	import { disclosure } from '../variants/feedback'
 	import { chevron } from '../variants/navigation'
 	import * as Icon from './internal/Icon.meeko'
 
 	const props = defineProps<UIDisclosureProps>()
 
 	const snippets = defineSnippets<{ default: [] }>()
+
+	const classes = disclosure()
 </script>
 
 <template>
 	<details
-		bind:class="['meeko-ui-disclosure', props.class].filter(Boolean).join(' ')"
+		bind:class="classes.base({ class: [props.ui?.base, props.class] })"
 		bind:open="props.open"
 	>
-		<summary>
+		<summary bind:class="classes.summary({ class: props.ui?.summary })">
 			{props.summary}
 			<Icon
 				bind:class="chevron"
 				bind:path="icons.chevron"
 			/>
 		</summary>
-		<div class="meeko-ui-disclosure-body"><render snippet="snippets.default" /></div>
+		<div bind:class="classes.body({ class: props.ui?.body })"><render snippet="snippets.default" /></div>
 	</details>
 </template>
