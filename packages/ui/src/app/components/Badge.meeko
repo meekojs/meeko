@@ -13,11 +13,11 @@
 </script>
 
 <template>
-	<span bind:class="classes.value.base({ class: props.class })">
+	<span bind:class="classes.value.base({ class: [props.ui?.base, props.class] })">
 		<span
 			if:when="props.dot"
 			aria-hidden="true"
-			bind:class="classes.value.dot()"
+			bind:class="classes.value.dot({ class: props.ui?.dot })"
 		/>
 		<render snippet="snippets.default" />
 	</span>

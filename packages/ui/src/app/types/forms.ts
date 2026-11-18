@@ -1,5 +1,8 @@
 import type { ElementAttributes } from '@meekojs/meeko'
 
+import type { badge } from '../variants/badge'
+import type { UIThemeProps } from './theme'
+
 /** Densidad de controles y superficies. @example const density: UIDensity = 'compact' */
 export type UIDensity = 'compact' | 'normal' | 'comfortable'
 
@@ -99,12 +102,18 @@ export interface UIFieldProps {
 	class?: string
 }
 
-/** Props de una etiqueta de estado. @example `<UIBadge tone="success" dot>Publicado</UIBadge>` */
-export interface UIBadgeProps {
-	/** Color semántico. */
-	tone?: UITone | 'accent'
-	/** Indicador circular decorativo. */
-	dot?: boolean
-	/** Clases adicionales. */
-	class?: string
-}
+/**
+ * Props de una etiqueta de estado. `ui` añade clases a sus slots: `base` y `dot`.
+ * @example `<UIBadge tone="success" dot>Publicado</UIBadge>`
+ */
+export type UIBadgeProps = UIThemeProps<
+	typeof badge,
+	{
+		/** Color semántico. */
+		tone?: UITone | 'accent'
+		/** Indicador circular decorativo. */
+		dot?: boolean
+		/** Clases adicionales del elemento raíz; equivale a `ui.base`. */
+		class?: string
+	}
+>
