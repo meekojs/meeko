@@ -2,6 +2,8 @@
 
 ## Sin publicar
 
+- **`publicOrigin` de los adaptadores de Bun, Deno y Cloudflare ya no se puede eludir con `//` al principio de la ruta.** Una ruta como `//otro.host/…` cambiaba el origen con el que Meeko compara `Origin`, así que una petición de otro sitio podía pasar la comprobación de origen. Afecta a quien pasa `publicOrigin` sólo al adaptador (`createBunServer`, `serveDeno`, `createWorker`); `serveNode` y `publicOrigin` del runtime no estaban afectados.
+- **Los patrones de `server.headers` llegan a todas las formas de una ruta.** El enrutador sirve `/admin/panel` también con `//admin/panel`, `/%61dmin/panel` o `/admin/panel/`, pero el patrón sólo se comparaba con la ruta tal como llegaba, y esas variantes salían sin sus cabeceras. Ahora el patrón se compara también con la ruta que sirve el enrutador.
 - **El cliente sólo hidrata con el payload que escribió el servidor.** La entrada de cliente buscaba `#app` y `#meeko-payload` con `getElementById`, y un elemento de la página con el mismo `id`, como HTML de usuario saneado, podía hacerse pasar por ellos. Ahora sólo cuentan los hijos directos de `<body>`, con `readHydrationDocument(document)`, nuevo en `@meekojs/meeko/framework`; una entrada de cliente propia debería usarlo. Además, al hidratar, el head de la ruta sólo adopta las etiquetas que el servidor escribió y nunca crea scripts ni estilos a partir del payload del documento.
 - **Una redirección de middleware de ruta en el navegador sólo sigue URL `http:` y `https:`.** Otro esquema, como `javascript:`, cancela la navegación con un error en lugar de cargarse. Una redirección a una ruta de la aplicación navega ahora en el cliente, sin recargar la página.
 

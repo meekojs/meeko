@@ -12,6 +12,7 @@ import type { DeclaredSitemapUrl } from './site-files'
 import { href, matchRoute } from '../app/runtime/router'
 import { serializeJson } from '../core/server'
 import { renderPage } from '../server/runtime/app'
+import { requestTargetUrl } from '../server/runtime/env'
 import { DOCUMENT_HEAD_PREFIX } from '../server/runtime/framework-render'
 import { documentShell } from '../server/runtime/inline-sources'
 import { loadConfiguredModules } from './config'
@@ -219,7 +220,7 @@ export async function prerenderRoutes(options: PrerenderOptions): Promise<string
 	await mkdir(outputRoot, { recursive: true })
 	const render = async (pathname: string, init?: RequestInit): Promise<Response> => {
 		try {
-			return await options.handler(new Request(new URL(pathname, origin), init))
+			return await options.handler(new Request(requestTargetUrl(pathname, origin), init))
 		} catch (error) {
 			const file = urls.get(pathname) ?? matchRoute(options.routes, pathname)?.route.file
 			throw new Error(`Prerender ${pathname}${file ? ` (${file})` : ''} failed: ${describeFailure(error)}`, { cause: error })
