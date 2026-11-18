@@ -13,6 +13,8 @@
 	const toasts = useToastHost()
 	const toastHost = useElementRef('toastHost')
 
+	// The host is a popover open for the whole visit. Its inline style repeats what the variant sets, so that
+	// without the stylesheet of UI (still loading or failed) an empty host is not the default box of a popover.
 	onMounted(() => toastHost.value?.showPopover?.())
 
 	// A modal opened after the host covers it: back on top of the top layer, or the toast would not be seen.
@@ -36,6 +38,7 @@
 		ref:toastHost
 		popover="manual"
 		aria-live="polite"
+		style="border: 0; padding: 0; background: transparent"
 		bind:class="toastHostClass"
 	>
 		<Toast

@@ -13,6 +13,9 @@
   - El extracto de un resultado de `UICommandPalette` se escribe con `<small>` en lugar de `<span class="meeko-ui-command-excerpt">`. Si tu snippet `item` usaba esa clase, cámbiala por `<small>`.
   - `MeekoSelect`, `MeekoPopover` y `MeekoThemeToggle`, los componentes obsoletos del núcleo, dejan de recibir aspecto de la hoja de UI: se ven con los estilos del navegador. Usa `UISelect` o `UICombobox`, `UIPopover` y `UIThemeToggle` (véase [Migración a 1.8](../../docs/migration-1.8.md)).
   - Los límites de 75rem y 54rem de `UIPage` y del índice pasan a ser exclusivos y coherentes entre sí: a exactamente 75rem se ve ya la columna `aside`, y a 54rem, la `sidebar`. El tema añade los breakpoints `compact` (40rem), `tablet` (48rem), `sidebar` (54rem) y `desktop` (75rem).
+- **`UIPopover` y `UITooltip` se pueden usar dentro de un `<p>`.** El contenido del popover era un `<div>`: dentro de un párrafo, el parser HTML cerraba el `<p>` antes, el DOM del cliente dejaba de coincidir con el del servidor y la página se quedaba sin JavaScript. Ahora es un `<span>`, que en la capa superior se pinta igual. El contenido que pongas dentro de un popover en un párrafo también debe ser contenido de frase.
+- **Un host de toasts vacío ya no aparece como un cuadro blanco sin la hoja de UI.** Si la hoja tarda o falla, el popover siempre abierto de `UIApp` se veía con el borde y el relleno por defecto del navegador. Su estilo en línea repite el de su variante, así que vacío no mide nada.
+- **`useScrollLock()` bloquea el desplazamiento para un cajón o panel propio.** `useScrollLock(() => open.value)` pone `overflow: hidden` en `<html>` con `scrollbar-gutter: stable`, como `UIDrawer`, así que la página no salta de lado. Varios bloqueos se suman y el último que se suelta devuelve los estilos que tenía `<html>`. Se exporta desde `@meekojs/ui/runtime` y se autoimporta.
 
 ## 1.9.0 — 2026-11-05
 

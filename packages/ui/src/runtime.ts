@@ -12,6 +12,7 @@ export type { UIBrand, UIBreadcrumbItem, UIBreadcrumbProps, UICodeBlockProps, UI
 export type { TabsSnippets, UITabsItem, UITabsProps } from './app/types/tabs'
 export type { TooltipSnippets, UITooltipProps } from './app/types/tooltip'
 export type { CommandPaletteItemState, CommandPaletteSnippets, CommandPaletteStatus, UICommandPaletteProps } from './app/types/command-palette'
+export { useScrollLock } from './app/composables/useScrollLock'
 export { useToast } from './app/composables/useToast'
 export type { UIThemeProps, UIVariantSlots } from './app/types/theme'
 export type { UIBadgeProps, UICheckboxProps, UIDensity, UIFieldProps, UIInputProps, UIRadioGroupProps, UIRadioOption, UISliderProps, UISwitchProps, UITextareaProps, UITone } from './app/types/forms'

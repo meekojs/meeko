@@ -46,7 +46,7 @@
 		if:when="snippets.anchor"
 		snippet="snippets.anchor"
 		args="popover.trigger.value"
-	/><div
+	/><span
 		ref:content
 		data-meeko-popover
 		bind:id="popover.contentId"
@@ -57,4 +57,4 @@
 		bind:tabindex="popover.role.value === 'dialog' ? '-1' : undefined"
 		bind:class="contentClass.value"
 		><render snippet="snippets.default"
-	/></div></template>
+	/></span></template>
