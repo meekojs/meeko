@@ -184,11 +184,11 @@ export default defineMeekoConfig({
 
 **Title.** `titleTemplate` comes from the highest-priority entry declaring it, and applies to the highest-priority title from `app/app.meeko`, layouts, page and route `head`, including error pages: `"Error"` or, above it, the title the error page itself (`app/error.meeko` or `+error.meeko`) declares with `useHead`, which its layouts' titles do not override. The `title` in `document.head` (or added by a module with `meeko.addHead`) is different: it is the site title and never passes through the template. A page without its own title shows that title unchanged, as does one whose winning title is an empty string, instead of a template around nothing. Without a site title, a page without a title has no managed `<title>` (the host's remains, if any), and an empty title is written empty. The rule is the same in SSR, hydration and client navigation. With the example configuration:
 
-| Page title | `<title>`          |
-| ---------- | ------------------ |
+| Page title | `<title>`           |
+| ---------- | ------------------- |
 | `"Shoes"`  | `Shoes Â· My store` |
-| none       | `My store`         |
-| `""`       | `My store`         |
+| none       | `My store`          |
+| `""`       | `My store`          |
 
 **Deduplication.** Each tag has a key: `key` if declared, otherwise its natural key. For `meta`, `name` (case-insensitive), `property` or `httpEquiv`, together with its `media` if present (two `theme-color` tags for light and dark coexist); for `link`, `rel` and `href`, except `rel: "canonical"` and `rel: "icon"`, which are unique even if `href` changes; for `script`, `src` or the code; for `style`, the CSS. With the same key, only the highest-priority tag remains, in the position where the first appeared. Thus a `document` `icon` replaces the `<link rel="icon" href="data:,">` Meeko writes by default, and a `meta name="viewport"` replaces the default viewport.
 
@@ -382,13 +382,13 @@ Without a cookie, server HTML does not include it (it does not know whether `loc
 
 Since `1.8`, `useThemeToggle()` from `@meekojs/meeko/framework` is the public API for building a selector. Call it in a component script with `theme` enabled in `meeko.config.ts`; without that configuration or outside an application, it throws `MEEK111`. It takes no parameters and returns a `ThemeToggleState`, shared by the entire application:
 
-| Member        | Description                                                                                                                                                                                                                                           |
-| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `theme`       | The same `ThemeState` as `useTheme()`: `theme`, `resolved`, `themes` and `set(choice)`.                                                                                                                                                               |
-| `choices`     | List of configured choices, in order, including `"system"` if enabled. Read-only.                                                                                                                                                                     |
-| `system`      | `ThemeToggleSystem`: `{ light, dark }`, the theme names for `"system"`; `undefined` without system mode.                                                                                                                                              |
+| Member        | Description                                                                                                                                                                                                                                              |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `theme`       | The same `ThemeState` as `useTheme()`: `theme`, `resolved`, `themes` and `set(choice)`.                                                                                                                                                                  |
+| `choices`     | List of configured choices, in order, including `"system"` if enabled. Read-only.                                                                                                                                                                        |
+| `system`      | `ThemeToggleSystem`: `{ light, dark }`, the theme names for `"system"`; `undefined` without system mode.                                                                                                                                                 |
 | `known`       | `ReadonlySignal<boolean>`: the server knows the choice if it received the cookie; in the browser, becomes `true` when hydration finishes. While `false`, use a neutral accessible name, such as â€œChange themeâ€, without announcing an unknown choice. |
-| `interactive` | `ReadonlySignal<boolean>`: `false` during SSR and hydration; `true` when browser handlers are ready. Use the native form while it is `false`.                                                                                                         |
+| `interactive` | `ReadonlySignal<boolean>`: `false` during SSR and hydration; `true` when browser handlers are ready. Use the native form while it is `false`.                                                                                                            |
 
 The form sends `POST /_meeko/theme` with `theme` (the valid choice) and `return` (the current URL). The endpoint validates the theme and `Origin`, saves the cookie and returns `303` to a same-origin path. The `static` adapter has no endpoint: changing the theme requires JavaScript. This example uses native submit buttons, each with its own accessible name, without implementing a radio group:
 
@@ -449,13 +449,13 @@ Since `1.4`, with `theme` in `meeko.config.ts`, Meeko includes its own theme sel
 />
 ```
 
-| Prop          | Default                      | What it does                                                                                                                                                        |
-| ------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `mode`        | `"cycle"`                    | `"cycle"`: a button advancing to the next choice in the list. `"select"`: a radio group.                                                                            |
-| `themes`      | the themes and `"system"`    | Choices and their order (`bind:themes="['light', 'dark']"`).                                                                                                        |
-| `labels`      | â€œClaroâ€, â€œOscuroâ€, â€œSistemaâ€ | Each choice's name; an unlabeled custom theme uses its theme name.                                                                                                  |
-| `messages`    | in Spanish                   | Accessible text: `cycle(current, next)` (the button's `aria-label`), `unknown` (â€œCambiar temaâ€) and `group` (â€œTemaâ€), for localization. Type `ThemeToggleMessages`. |
-| `class`, `id` | â€”                            | On the root `<form>`. Other attributes do not pass through: wrap the tag if you need them.                                                                          |
+| Prop          | Default                               | What it does                                                                                                                                                              |
+| ------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mode`        | `"cycle"`                             | `"cycle"`: a button advancing to the next choice in the list. `"select"`: a radio group.                                                                                  |
+| `themes`      | the themes and `"system"`             | Choices and their order (`bind:themes="['light', 'dark']"`).                                                                                                              |
+| `labels`      | â€œClaroâ€, â€œOscuroâ€, â€œSistemaâ€ | Each choice's name; an unlabeled custom theme uses its theme name.                                                                                                        |
+| `messages`    | in Spanish                            | Accessible text: `cycle(current, next)` (the button's `aria-label`), `unknown` (â€œCambiar temaâ€) and `group` (â€œTemaâ€), for localization. Type `ThemeToggleMessages`. |
+| `class`, `id` | â€”                                   | On the root `<form>`. Other attributes do not pass through: wrap the tag if you need them.                                                                                |
 
 Each snippet (`light`, `dark`, `system` or a custom theme name) is that choice's icon; without a snippet, its label renders. `meeko check` and the editor type snippets, `themes` and `labels` with the themes from `meeko.config.ts` (`system` only if enabled) and `mode` as `"cycle" | "select"`; the editor completes the tag, its props and snippets, and hovering shows the tag's reference entry. Its prop type is `MeekoThemeToggleProps`, auto-imported like `MeekoLinkProps`. It has no visual styles of its own: the button and radios are native elements styled by the application (`.toggle button`, `[role="radio"][aria-checked="true"]`, `[data-meeko-theme-option="dark"]`). To mark the selected radio before hydration too, when the choice is unknown and there is no `aria-checked`, use `data-theme-choice`, like the icons: `[data-theme-choice="dark"] [data-meeko-theme-option="dark"]`.
 

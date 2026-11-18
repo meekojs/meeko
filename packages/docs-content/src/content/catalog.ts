@@ -215,6 +215,6 @@ export function pager(href: string): Pager {
 	const link = (entry: CatalogEntry | undefined): NavLink | null => (entry ? { href: entry.href, label: catalogLabel(entry) } : null)
 	if (index < 0) return { previous: null, next: null }
 	const current = catalog[index]!
-	const withinSection = (entry: CatalogEntry | undefined): CatalogEntry | undefined => entry?.section === current.section ? entry : undefined
+	const withinSection = (entry: CatalogEntry | undefined): CatalogEntry | undefined => (entry?.section === current.section ? entry : undefined)
 	return { previous: link(withinSection(catalog[index - 1])), next: link(withinSection(catalog[index + 1])) }
 }

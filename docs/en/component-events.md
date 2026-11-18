@@ -137,16 +137,16 @@ Since `1.1`, a component receives parent content in named snippets, declared wit
   ```html
   <!-- AppPanel.meeko: defineSnippets<{ default: []; actions?: [close: () => void] }>() -->
   <AppCard>
-	<render snippet="snippets.default" />
-	<snippet
-		name="footer"
-		if:when="snippets.actions"
-	>
-		<render
-			snippet="snippets.actions"
-			args="close"
-		/>
-	</snippet>
+    <render snippet="snippets.default" />
+    <snippet
+    	name="footer"
+    	if:when="snippets.actions"
+    >
+    	<render
+    		snippet="snippets.actions"
+    		args="close"
+    	/>
+    </snippet>
   </AppCard>
   ```
 
@@ -157,36 +157,36 @@ Since `1.1`, a component receives parent content in named snippets, declared wit
   ```html
   <!-- app/components/App/Card.meeko -->
   <script lang="ts">
-	const snippets = defineSnippets<{ header?: []; default: []; footer?: [] }>()
+    const snippets = defineSnippets<{ header?: []; default: []; footer?: [] }>()
   </script>
 
   <!-- app/components/App/Modal.meeko -->
   <script lang="ts">
-	const open = defineModel<boolean>()
-	const snippets = defineSnippets<Omit<AppCardSnippets, 'footer'> & { actions?: [close: () => void] }>()
-	function close(): void {
-		open.value = false
-	}
+    const open = defineModel<boolean>()
+    const snippets = defineSnippets<Omit<AppCardSnippets, 'footer'> & { actions?: [close: () => void] }>()
+    function close(): void {
+    	open.value = false
+    }
   </script>
   <template>
-	<AppCard>
-		<snippet
-			name="header"
-			if:when="snippets.header"
-		>
-			<render snippet="snippets.header" />
-		</snippet>
-		<render snippet="snippets.default" />
-		<snippet
-			name="footer"
-			if:when="snippets.actions"
-		>
-			<render
-				snippet="snippets.actions"
-				args="close"
-			/>
-		</snippet>
-	</AppCard>
+    <AppCard>
+    	<snippet
+    		name="header"
+    		if:when="snippets.header"
+    	>
+    		<render snippet="snippets.header" />
+    	</snippet>
+    	<render snippet="snippets.default" />
+    	<snippet
+    		name="footer"
+    		if:when="snippets.actions"
+    	>
+    		<render
+    			snippet="snippets.actions"
+    			args="close"
+    		/>
+    	</snippet>
+    </AppCard>
   </template>
   ```
 
@@ -198,52 +198,52 @@ Since `1.1`, a component receives parent content in named snippets, declared wit
   ```html
   <!-- AppGrid.meeko -->
   <script
-	lang="ts"
-	generic="Row extends object"
+    lang="ts"
+    generic="Row extends object"
   >
-	import type { Snippet } from '@meekojs/meeko'
+    import type { Snippet } from '@meekojs/meeko'
 
-	type Column<R extends object> = { key: Extract<keyof R, string>; label: string }
-	const props = defineProps<{ rows: readonly Row[]; columns: readonly Column<Row>[] }>()
-	const snippets = defineSnippets<
-		{ [K in Extract<keyof Row, string> as `cell-${K}`]?: [row: Row, value: Row[K]] } & {
-			[K in Extract<keyof Row, string> as `header-${K}`]?: [column: Column<Row>]
-		} & { cell?: [row: Row, column: Column<Row>, value: unknown] }
-	>()
-	// For Row, TypeScript cannot read a computed name: the child reads it through a view.
-	const byName = snippets as { readonly [name: string]: Snippet<never> | undefined }
-	function cellOf(column: Column<Row>): Snippet<[row: Row, value: unknown]> | undefined {
-		return byName[`cell-${column.key}`] as Snippet<[row: Row, value: unknown]> | undefined
-	}
+    type Column<R extends object> = { key: Extract<keyof R, string>; label: string }
+    const props = defineProps<{ rows: readonly Row[]; columns: readonly Column<Row>[] }>()
+    const snippets = defineSnippets<
+    	{ [K in Extract<keyof Row, string> as `cell-${K}`]?: [row: Row, value: Row[K]] } & {
+    		[K in Extract<keyof Row, string> as `header-${K}`]?: [column: Column<Row>]
+    	} & { cell?: [row: Row, column: Column<Row>, value: unknown] }
+    >()
+    // For Row, TypeScript cannot read a computed name: the child reads it through a view.
+    const byName = snippets as { readonly [name: string]: Snippet<never> | undefined }
+    function cellOf(column: Column<Row>): Snippet<[row: Row, value: unknown]> | undefined {
+    	return byName[`cell-${column.key}`] as Snippet<[row: Row, value: unknown]> | undefined
+    }
   </script>
   <template>
-	<p each:of="props.rows" each:as="row">
-		<span each:of="props.columns" each:as="column">
-			<render
-				if:when="cellOf(column)"
-				snippet="cellOf(column)"
-				args="row, row[column.key]"
-			/>
-			<render
-				if:when="!cellOf(column)"
-				snippet="snippets.cell"
-				args="row, column, row[column.key]"
-			/>
-		</span>
-	</p>
+    <p each:of="props.rows" each:as="row">
+    	<span each:of="props.columns" each:as="column">
+    		<render
+    			if:when="cellOf(column)"
+    			snippet="cellOf(column)"
+    			args="row, row[column.key]"
+    		/>
+    		<render
+    			if:when="!cellOf(column)"
+    			snippet="snippets.cell"
+    			args="row, column, row[column.key]"
+    		/>
+    	</span>
+    </p>
   </template>
 
   <!-- In the parent: value is string, the type of User['email']. -->
   <AppGrid
-	bind:rows="users"
-	bind:columns="columns"
+    bind:rows="users"
+    bind:columns="columns"
   >
-	<snippet
-		name="cell-email"
-		params="row, value"
-	>
-		<a bind:href="'mailto:' + value">{value}</a>
-	</snippet>
+    <snippet
+    	name="cell-email"
+    	params="row, value"
+    >
+    	<a bind:href="'mailto:' + value">{value}</a>
+    </snippet>
   </AppGrid>
   ```
 

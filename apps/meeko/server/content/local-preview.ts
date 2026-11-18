@@ -37,7 +37,7 @@ export function localGuide<T>(path: string, locale: DocsLocale): Promise<T | nul
 		}
 		if (path === '/docs/reference' || path.startsWith('/docs/reference/')) {
 			const previous = await readSnapshotPage<Record<string, unknown>>(path, { locale })
-			return previous ? ({ ...previous, nav: await referenceNavigation(path, String(previous.head && (previous.head as { title?: string }).title || path)), current: path } as T) : null
+			return previous ? ({ ...previous, nav: await referenceNavigation(path, String((previous.head && (previous.head as { title?: string }).title) || path)), current: path } as T) : null
 		}
 		if (!entry) return null
 		const doc = await renderSource(entry.source, entry.transform)

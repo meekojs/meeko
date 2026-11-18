@@ -10,12 +10,13 @@
 
 <template>
 	<button on:click="update">Update</button>
-	<ul
-		><li
+	<ul>
+		<li
 			each:of="labels.value"
 			each:as="label"
 			each:key="index"
-			>{label}</li
-		></ul
-	>
+		>
+			{label}
+		</li>
+	</ul>
 </template>

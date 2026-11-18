@@ -28,17 +28,20 @@
 </script>
 
 <!-- No whitespace between the tags of this template: it would be text inside the tabs. Prettier keeps it that way; tests/templates-without-whitespace.test.mjs guards it. -->
-<template><div
+<template>
+	<div
 		ref:root
 		bind:id="props.id"
 		bind:class="['meeko-ui-tabs', props.class].filter(Boolean).join(' ')"
-		><div
+	>
+		<div
 			role="tablist"
 			class="meeko-ui-tabs-list"
 			bind:aria-label="props.label"
 			bind:aria-labelledby="props.labelledBy"
 			on:keydown="tabs.keydown"
-			><button
+		>
+			<button
 				each:of="props.items"
 				each:as="item"
 				each:key="item.value"
@@ -51,11 +54,17 @@
 				bind:tabindex="tabs.selected.value === item.value ? '0' : '-1'"
 				bind:disabled="item.disabled"
 				on:click="() => tabs.choose(item)"
-				><render
+			>
+				<render
 					if:when="snippets.tab"
 					snippet="snippets.tab"
-					args="item" /><template if:when="!snippets.tab">{item.label}</template><span class="meeko-ui-tabs-indicator" /></button></div
-		><div
+					args="item"
+				/>
+				<template if:when="!snippets.tab">{item.label}</template>
+				<span class="meeko-ui-tabs-indicator" />
+			</button>
+		</div>
+		<div
 			each:of="props.items"
 			each:as="item"
 			each:key="item.value"
@@ -65,10 +74,16 @@
 			bind:id="tabs.panelId(item)"
 			bind:aria-labelledby="tabs.tabId(item)"
 			bind:hidden="tabs.selected.value !== item.value"
-			><render
+		>
+			<render
 				if:when="panels['panel-' + item.value]"
-				snippet="panels['panel-' + item.value]" /><render
+				snippet="panels['panel-' + item.value]"
+			/>
+			<render
 				if:when="!panels['panel-' + item.value] && snippets.panel"
 				snippet="snippets.panel"
-				args="item" /></div
-	></div></template>
+				args="item"
+			/>
+		</div>
+	</div>
+</template>

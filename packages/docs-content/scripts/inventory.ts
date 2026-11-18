@@ -6,8 +6,8 @@ import { apiHref, apiSlugs } from '../src/content/api'
 import { catalogEntry } from '../src/content/catalog'
 import { referenceSymbol, resolvedTaxonomy } from '../src/content/reference'
 import { repositoryRoot } from '../src/content/repository'
-import { buildSnapshotPages } from '../src/snapshot'
 import { localizedPath } from '../src/locale'
+import { buildSnapshotPages } from '../src/snapshot'
 
 function object(value: unknown): Record<string, unknown> {
 	return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {}
@@ -29,9 +29,7 @@ function links(html: string): string[] {
 const pages = await buildSnapshotPages()
 const curatedEntries = (await resolvedTaxonomy()).entries
 const curated = new Set(curatedEntries.map((entry) => entry.href))
-const deprecated = new Set(
-	(await Promise.all(curatedEntries.map(async (entry) => ({ href: entry.href, deprecated: (await referenceSymbol(entry.entry.symbols[0]!))?.info?.deprecated })))).filter((entry) => entry.deprecated).map((entry) => entry.href),
-)
+const deprecated = new Set((await Promise.all(curatedEntries.map(async (entry) => ({ href: entry.href, deprecated: (await referenceSymbol(entry.entry.symbols[0]!))?.info?.deprecated })))).filter((entry) => entry.deprecated).map((entry) => entry.href))
 const generated = new Set((await apiSlugs()).map(apiHref))
 const shared = [...curated].filter((href) => generated.has(href)).length
 const indexMetadata = Object.fromEntries(

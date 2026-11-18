@@ -5,7 +5,7 @@
 	"scripts": {
 		"build": "pnpm -F meeko-docs run build && node ../../packages/docs/scripts/assets.mjs && meeko build .",
 		"check": "pnpm -F meeko-docs run build && meeko check .",
-		"dev": "pnpm -F meeko-docs run build && node ../../packages/docs/scripts/assets.mjs && meeko dev .",
+		"dev": "node ../../packages/docs/scripts/assets.mjs && meeko dev .",
 		"lint": "eslint .",
 		"lint:fix": "eslint . --fix",
 		"preview": "meeko preview .",
@@ -18,15 +18,15 @@
 		"@meekojs/ui": "workspace:*",
 		"meeko-docs": "workspace:*",
 		"meeko-docs-content": "workspace:*",
-		"pg": "8.23.1"
+		"pg": "catalog:"
 	},
 	"devDependencies": {
 		"@meekojs/eslint-plugin": "workspace:*",
-		"@types/node": "^24.19.2",
-		"eslint": "10.13.0",
-		"jiti": "2.7.0",
-		"playwright-core": "1.64.1",
-		"typescript": "7.0.2",
-		"vite": "8.3.5"
+		"@types/node": "catalog:",
+		"eslint": "catalog:",
+		"jiti": "catalog:",
+		"playwright-core": "catalog:",
+		"typescript": "catalog:",
+		"vite": "catalog:"
 	}
 }

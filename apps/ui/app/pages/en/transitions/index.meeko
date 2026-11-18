@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { englishExamples as examples } from '../../../utils/examples.en'
 </script>
+
 <template>
 	<DocsPage
 		locale="en"
@@ -31,8 +32,9 @@
 				to="/transitions/project"
 				data-meeko-view-transition="false"
 			>
-				open it without a transition</MeekoLink
-			>.
+				open it without a transition
+			</MeekoLink>
+			.
 		</p>
 		<h2>Configuration</h2>
 		<p>This feature belongs to the framework, not to the UI module. It needs browser support and respects reduced motion; navigation keeps working when it cannot animate.</p>

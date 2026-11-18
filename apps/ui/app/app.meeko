@@ -10,6 +10,7 @@
 		items: group.items.map(({ en, ...item }) => ({ ...item, label: english ? en.label : item.label, description: english ? en.description : item.description })),
 	}))
 </script>
+
 <template>
 	<DocsSiteShell
 		name="UI"

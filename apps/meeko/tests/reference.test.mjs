@@ -125,7 +125,10 @@ test('an entry declares a slug for a written URL or when its symbol has no gener
 		for (const entry of group.entries) {
 			const symbol = await reference.referenceSymbol(entry.symbols[0])
 			if (symbol?.info && entry.slug) {
-				assert.ok(reference.writtenPages().some((page) => page.slug === entry.slug && page.symbols.includes(entry.symbols[0])), `${entry.name}: an explicit slug needs a written page for its symbol`)
+				assert.ok(
+					reference.writtenPages().some((page) => page.slug === entry.slug && page.symbols.includes(entry.symbols[0])),
+					`${entry.name}: an explicit slug needs a written page for its symbol`,
+				)
 			} else if (symbol?.info) assert.equal(entry.slug, undefined)
 			else {
 				assert.ok(entry.slug, `${entry.name}: ${entry.symbols[0]} has no generated page; give the entry a "slug"`)

@@ -2,7 +2,6 @@
 source-hash: 8616f075e0096822087fb75238824c77ff9b35c808a6bd1b4364abc2d7c89f2c
 ---
 
-
 # Meeko as a full-stack framework
 
 A Meeko application organizes pages in `app/pages`, components in `app/components`, and endpoints in `server/`. The framework discovers those folders, renders pages on the server by default, and generates the required entries and types. If you do not have a project yet, start with [Create an application](#create-an-application).

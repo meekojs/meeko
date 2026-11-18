@@ -76,21 +76,21 @@ Since `1.1`, `model="signal"` binds a form control to a signal in both direction
 
   ```html
   <script lang="ts">
-	const password = signal('')
-	const revealed = signal(false)
+    const password = signal('')
+    const revealed = signal(false)
   </script>
   <template>
-	<input
-		bind:type="revealed.value ? 'text' : 'password'"
-		model="password"
-		autocomplete="current-password"
-	/>
-	<button
-		type="button"
-		on:click="() => revealed.value = !revealed.value"
-	>
-		Show
-	</button>
+    <input
+    	bind:type="revealed.value ? 'text' : 'password'"
+    	model="password"
+    	autocomplete="current-password"
+    />
+    <button
+    	type="button"
+    	on:click="() => revealed.value = !revealed.value"
+    >
+    	Show
+    </button>
   </template>
   ```
 

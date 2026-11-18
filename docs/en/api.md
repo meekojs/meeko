@@ -27,6 +27,7 @@ The script runs when the component is created; the template reads `count.value`,
 ## Explore by topic
 
 These guides preserve the examples and full contracts from the former API page:
+
 - [Components and props](component-basics.md)
 - [Templates and directives](component-template.md)
 - [Component styles](component-styles.md)
@@ -44,6 +45,7 @@ These guides preserve the examples and full contracts from the former API page:
 `@meekojs/meeko/prettier` is the Prettier plugin for `.meeko`. With `{ "plugins": ["@meekojs/meeko/prettier"] }` in Prettier configuration, `prettier --write "**/*.meeko"` formats script, `<script server>`, template and style; the `meekoIndentSections` option (default `false`) indents all section content by one level, and `meekoPreserveArrayBreaks` (default `true`) keeps an array with a newline after `[` expanded throughout all JavaScript and TypeScript Prettier formats, like `objectWrap: "preserve"` for objects. The language server uses the same plugin, so the editor and CI agree (see [editors](editors.md#formatting-with-prettier)).
 
 ## Compatibility and limits
+
 - Node.js 24 or later and TypeScript 7.0.2 for the CLI, build, Vite and language server. Supported runtimes and browsers are listed in the [stability policy](stability.md#supported-environments).
 - The public API follows SemVer during the 1.x series: breaking changes require a major version and deprecations are announced in a minor (see the [stability policy](stability.md)). The package is distributed as `@meekojs/meeko` under the MIT license.
 - The parser accepts the TypeScript and HTML subset described above; it reports unsupported constructs through diagnostics.
@@ -57,6 +59,7 @@ These guides preserve the examples and full contracts from the former API page:
 ## Links to previous sections
 
 Existing fragment links to this page remain here and lead to their new locations.
+
 - <a id="meeko-components"></a>[.meeko components](component-basics.md#meeko-components)
 - <a id="destructuring-in-the-script"></a>[Destructuring in the script](component-basics.md#destructuring-in-the-script)
 - <a id="reactive-props"></a>[Reactive props](component-basics.md#reactive-props)

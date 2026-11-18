@@ -33,48 +33,63 @@
 </script>
 
 <!-- No whitespace between the tags of this template: it would be text inside the trigger and the rows. Prettier keeps it that way; tests/templates-without-whitespace.test.mjs guards it. -->
-<template><button
+<template>
+	<button
 		if:when="props.trigger !== false"
 		type="button"
 		bind:class="['meeko-ui-command-trigger', props.triggerClass].filter(Boolean).join(' ')"
 		bind:aria-label="props.label ?? text.label"
 		on:click="palette.show"
-		><render
+	>
+		<render
 			if:when="snippets.trigger"
 			snippet="snippets.trigger"
 			args="palette.modifier.value"
-		/><template if:when="!snippets.trigger"
-			><svg
+		/>
+		<template if:when="!snippets.trigger">
+			<svg
 				class="meeko-ui-command-icon"
 				viewBox="0 0 24 24"
 				aria-hidden="true"
-				><circle
+			>
+				<circle
 					cx="11"
 					cy="11"
-					r="7" /><path d="m20 20-3.5-3.5" /></svg
-			><span class="meeko-ui-command-trigger-label">{props.label ?? text.label}</span
-			><span
+					r="7"
+				/>
+				<path d="m20 20-3.5-3.5" />
+			</svg>
+			<span class="meeko-ui-command-trigger-label">{props.label ?? text.label}</span>
+			<span
 				class="meeko-ui-command-keys"
 				aria-hidden="true"
-				><kbd>{palette.modifier.value}</kbd><kbd>K</kbd></span
-			></template
-		></button
-	><dialog
+			>
+				<kbd>{palette.modifier.value}</kbd>
+				<kbd>K</kbd>
+			</span>
+		</template>
+	</button>
+	<dialog
 		ref:dialog
 		closedby="any"
 		bind:class="['meeko-ui-modal', 'meeko-ui-command', props.class].filter(Boolean).join(' ')"
 		bind:aria-label="props.label ?? text.label"
 		on:keydown="palette.keydown"
-		><div class="meeko-ui-command-field"
-			><svg
+	>
+		<div class="meeko-ui-command-field">
+			<svg
 				class="meeko-ui-command-icon"
 				viewBox="0 0 24 24"
 				aria-hidden="true"
-				><circle
+			>
+				<circle
 					cx="11"
 					cy="11"
-					r="7" /><path d="m20 20-3.5-3.5" /></svg
-			><input
+					r="7"
+				/>
+				<path d="m20 20-3.5-3.5" />
+			</svg>
+			<input
 				ref:input
 				type="search"
 				role="combobox"
@@ -89,33 +104,41 @@
 				bind:aria-expanded="palette.showing.value ? 'true' : 'false'"
 				bind:aria-controls="palette.listId"
 				bind:aria-activedescendant="palette.activeId.value"
-			/><button
+			/>
+			<button
 				type="button"
 				class="meeko-ui-command-close"
 				bind:aria-label="props.closeLabel ?? text.close"
 				on:click="palette.hide"
-				><kbd aria-hidden="true">Esc</kbd></button
-			></div
-		><div
+			>
+				<kbd aria-hidden="true">Esc</kbd>
+			</button>
+		</div>
+		<div
 			role="status"
 			class="meeko-ui-command-status"
-			><render
+		>
+			<render
 				if:when="snippets.status && palette.status.value !== 'ready'"
 				snippet="snippets.status"
 				args="palette.status.value, query.value.trim()"
-			/><template if:when="!snippets.status && palette.status.value !== 'ready'">{commandPaletteStatusText(text, palette.status.value, query.value.trim())}</template></div
-		><ul
+			/>
+			<template if:when="!snippets.status && palette.status.value !== 'ready'">{commandPaletteStatusText(text, palette.status.value, query.value.trim())}</template>
+		</div>
+		<ul
 			role="listbox"
 			class="meeko-ui-command-list"
 			bind:id="palette.listId"
 			bind:aria-label="props.label ?? text.label"
 			bind:hidden="!palette.showing.value"
-			><li
+		>
+			<li
 				each:of="palette.rows.value"
 				each:as="row"
 				each:key="row.index"
 				role="presentation"
-				><component
+			>
+				<component
 					is="row.href === undefined ? 'button' : 'a'"
 					role="option"
 					class="meeko-ui-command-row"
@@ -126,12 +149,15 @@
 					bind:data-active="active.value === row.index ? '' : undefined"
 					bind:aria-selected="active.value === row.index ? 'true' : 'false'"
 					on:click="() => palette.pick(row)"
-					><render
+				>
+					<render
 						if:when="snippets.item"
 						snippet="snippets.item"
 						args="row.item, { active: active.value === row.index, depth: row.depth, index: row.index }"
-					/><template if:when="!snippets.item">{row.label}</template></component
-				></li
-			></ul
-		></dialog
-	></template>
+					/>
+					<template if:when="!snippets.item">{row.label}</template>
+				</component>
+			</li>
+		</ul>
+	</dialog>
+</template>

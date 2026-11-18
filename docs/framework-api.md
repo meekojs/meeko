@@ -644,21 +644,21 @@ Una card cuyos datos llegan después del primer pintado sale vacía en el HTML y
    ```html
    <!-- app/components/ItemsCard.meeko -->
    <script lang="ts">
-	const items = await useApi('/api/items')
+    const items = await useApi('/api/items')
    </script>
    <template>
-	<section class="card">
-		<h2>Items</h2>
-		<ul>
-			<li
-				each:of="items.data.value"
-				each:as="item"
-				each:key="item.id"
-			>
-				{item.name}
-			</li>
-		</ul>
-	</section>
+    <section class="card">
+    	<h2>Items</h2>
+    	<ul>
+    		<li
+    			each:of="items.data.value"
+    			each:as="item"
+    			each:key="item.id"
+    		>
+    			{item.name}
+    		</li>
+    	</ul>
+    </section>
    </template>
    ```
 
@@ -666,34 +666,34 @@ Una card cuyos datos llegan después del primer pintado sale vacía en el HTML y
 
    ```html
    <script lang="ts">
-	const items = useApi('/api/items')
+    const items = useApi('/api/items')
    </script>
    <template>
-	<section class="card">
-		<h2>Items</h2>
-		<MeekoAwait
-			for="items"
-			reserve
-		>
-			<snippet name="pending">
-				<ul class="skeleton">
-					<li
-						each:of="[1, 2, 3, 4]"
-						each:as="row"
-					></li>
-				</ul>
-			</snippet>
-			<ul>
-				<li
-					each:of="items.data.value"
-					each:as="item"
-					each:key="item.id"
-				>
-					{item.name}
-				</li>
-			</ul>
-		</MeekoAwait>
-	</section>
+    <section class="card">
+    	<h2>Items</h2>
+    	<MeekoAwait
+    		for="items"
+    		reserve
+    	>
+    		<snippet name="pending">
+    			<ul class="skeleton">
+    				<li
+    					each:of="[1, 2, 3, 4]"
+    					each:as="row"
+    				></li>
+    			</ul>
+    		</snippet>
+    		<ul>
+    			<li
+    				each:of="items.data.value"
+    				each:as="item"
+    				each:key="item.id"
+    			>
+    				{item.name}
+    			</li>
+    		</ul>
+    	</MeekoAwait>
+    </section>
    </template>
    ```
 

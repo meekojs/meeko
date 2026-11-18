@@ -41,10 +41,10 @@ const refreshes = new WeakMap<object, { url: string; sequence: number }>()
  * @example
  * ```ts
  * const announcements = useState('site:announcements', () => [])
- * refreshOnNavigation(announcements, () => moderationEndpoint('site'), (moderation) => moderation.announcements)
+ * useRefreshOnNavigation(announcements, () => moderationEndpoint('site'), (moderation) => moderation.announcements)
  * ```
  */
-export function refreshOnNavigation<T>(target: Signal<T>, endpoint: () => string | null, pick: (moderation: SiteModeration) => T): void {
+export function useRefreshOnNavigation<T>(target: Signal<T>, endpoint: () => string | null, pick: (moderation: SiteModeration) => T): void {
 	const route = useRoute()
 	const page = () => route.url.value.split('#')[0]!
 	onMounted(() => {
@@ -71,7 +71,7 @@ export function refreshOnNavigation<T>(target: Signal<T>, endpoint: () => string
  * y destacadas desde el dashboard, y avisos vigentes que el lector no cerró. Las rutas ocultas y
  * destacadas de la moderación inglesa llevan el prefijo `/en`. En SSR la escribe el plugin de servidor y viaja en el estado,
  * así que el navegador hidrata la misma; después de cada navegación confirmada se pide otra vez al
- * servidor ({@link refreshOnNavigation}), así que una regla o un aviso nuevos llegan sin recargar.
+ * servidor ({@link useRefreshOnNavigation}), así que una regla o un aviso nuevos llegan sin recargar.
  * Sin base de datos está vacía. Se llama en el `<script>` de un componente.
  *
  * @returns La señal compartida de la moderación.
@@ -87,7 +87,7 @@ export function useDocsModeration() {
 	const moderation = useState<SiteModeration>('meeko-docs:moderation', () => provided(docsModerationKey, emptyModeration))
 	const site = useState<ModerationSite | null>('meeko-docs:site', () => provided<ModerationSite | null>(docsSiteKey as ContextKey<ModerationSite | null>, null))
 	const route = useRoute()
-	refreshOnNavigation(
+	useRefreshOnNavigation(
 		moderation,
 		() => (site.value === null ? null : moderationEndpoint(site.value, splitLocalePath(route.path.value).locale)),
 		(fresh) => fresh,

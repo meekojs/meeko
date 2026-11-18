@@ -4,7 +4,7 @@ import { moderationResponse } from 'meeko-docs-content/moderation'
  * El handler de `/_meeko-docs/moderation/<web>` (español) y `/_meeko-docs/moderation/<web>/en`
  * (inglés) que añade el módulo con la opción `site`: la moderación de esa web y ese idioma en JSON,
  * sin los avisos que la cookie cerró y sin caché. El navegador la
- * pide tras cada navegación (`refreshOnNavigation` de `./state`). El módulo sólo registra la ruta
+ * pide tras cada navegación (`useRefreshOnNavigation` de `./state`). El módulo sólo registra la ruta
  * de su web, así que una web no sirve la moderación de otra.
  *
  * @param request La petición de la ruta.

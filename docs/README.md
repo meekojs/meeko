@@ -2,15 +2,15 @@
 
 Busca la respuesta según lo que quieres hacer. Las guías enseñan un recorrido; la referencia conserva firmas, tipos, límites y enlaces al código.
 
-| Quiero… | Ve a… | Qué encontrarás |
-| --- | --- | --- |
-| Crear una aplicación desde cero | [Inicio rápido](inicio-rapido.md) | Requisitos, comandos y primer cambio visible. |
-| Entender componentes y reactividad | [Componentes y lenguaje .meeko](api.md) | Plantilla, props, estado, eventos y composición. |
-| Añadir páginas y parámetros | [Rutas](routing.md) | El camino habitual y guías por tarea. |
-| Cargar datos o elegir SSR | [Datos de rutas](routing-data.md) | Carga, errores y modos de render. |
-| Enviar un formulario | [Formularios del framework](framework.md#formularios-useform) | Datos, validación y mutaciones. |
-| Preparar un despliegue | [Build y despliegue](framework.md#build-despliegue-y-verificación) | Salidas y requisitos por adaptador. |
-| Localizar una función o tipo | [Referencia de Meeko](reference/README.md) | Índice por categoría y catálogo de exports. |
+| Quiero…                            | Ve a…                                                              | Qué encontrarás                                  |
+| ---------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------ |
+| Crear una aplicación desde cero    | [Inicio rápido](inicio-rapido.md)                                  | Requisitos, comandos y primer cambio visible.    |
+| Entender componentes y reactividad | [Componentes y lenguaje .meeko](api.md)                            | Plantilla, props, estado, eventos y composición. |
+| Añadir páginas y parámetros        | [Rutas](routing.md)                                                | El camino habitual y guías por tarea.            |
+| Cargar datos o elegir SSR          | [Datos de rutas](routing-data.md)                                  | Carga, errores y modos de render.                |
+| Enviar un formulario               | [Formularios del framework](framework.md#formularios-useform)      | Datos, validación y mutaciones.                  |
+| Preparar un despliegue             | [Build y despliegue](framework.md#build-despliegue-y-verificación) | Salidas y requisitos por adaptador.              |
+| Localizar una función o tipo       | [Referencia de Meeko](reference/README.md)                         | Índice por categoría y catálogo de exports.      |
 
 ## Para aprender
 

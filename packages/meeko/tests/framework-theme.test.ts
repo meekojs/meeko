@@ -24,7 +24,7 @@ import { checkApp } from '../src/framework/check-app.ts'
 import { loadMeekoConfig } from '../src/framework/config.ts'
 import { buildProject } from '../src/framework/project.ts'
 import { prepareFrameworkTypeDeclarations } from '../src/framework/type-declarations.ts'
-import { resolveThemeConfig, themeScript, THEME_TRANSITION_ATTRIBUTE } from '../src/shared/theme.ts'
+import { resolveThemeConfig, THEME_TRANSITION_ATTRIBUTE, themeScript } from '../src/shared/theme.ts'
 import { staticAppConfig, writeStaticApp } from './helpers/static-app.ts'
 import { createTempProject, tempProject } from './helpers/temp-project.ts'
 

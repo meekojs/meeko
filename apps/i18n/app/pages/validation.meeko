@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { examples } from '../utils/examples'
 </script>
+
 <template>
 	<DocsPage
 		product="Meeko i18n"

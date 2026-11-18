@@ -11,6 +11,15 @@ Meeko es un monorepo pnpm. Instala dependencias desde la raíz y conserva el ún
 - `apps/meeko/`, `apps/ui/`, `apps/i18n/`: webs públicas del framework, UI e i18n; `packages/docs/` es su base documental privada compartida para UI e i18n.
 - `docs/`, `assets/brand/`, `scripts/`: documentación, recursos de marca y automatización.
 
+## Dependencias
+
+Prioriza siempre el catálogo de pnpm. Cada dependencia externa se declara como `"catalog:"` en su `package.json` y su versión vive una sola vez en `catalog` de `pnpm-workspace.yaml`. `catalogMode: strict` hace que `pnpm add` rechace versiones ajenas al catálogo y `catalogPrune` elimina las entradas sin uso.
+
+- Para añadir o actualizar, cambia la versión en el catálogo, usa `"catalog:"` en cada consumidor y ejecuta `pnpm install`. Nunca escribas una versión literal en un `package.json`.
+- Excepciones: paquetes internos con `workspace:*`; `peerDependencies` con rangos explícitos, porque son el contrato con los consumidores; y variantes deliberadas en catálogos con nombre, como `catalog:typescript6` (API de TypeScript 6 para ESLint y Prettier).
+- `@types/node` sigue el mínimo de `engines.node` y `@types/vscode` sigue `engines.vscode`; no los subas de versión mayor por `pnpm outdated`.
+- En dependencias publicadas usa rangos (`^x.y.z`) salvo que la versión exacta sea necesaria: `pnpm pack` sustituye `catalog:` por ese valor en el paquete publicado.
+
 ## Comandos de desarrollo y validación
 
 Requiere Node.js 24+ y pnpm 12.14.0. En Windows usa PowerShell 7.

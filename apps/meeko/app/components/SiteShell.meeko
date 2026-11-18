@@ -7,7 +7,7 @@
 
 	import { inject } from '@meekojs/meeko'
 	import { dismissCookie, moderationEndpoint } from 'meeko-docs-content/moderation/shared'
-	import { refreshOnNavigation } from 'meeko-docs/state'
+	import { useRefreshOnNavigation } from 'meeko-docs/state'
 
 	import type { NavSection, Pager, TocEntry } from '../../shared/types/docs'
 
@@ -54,7 +54,7 @@
 	// client navigations: after each one it asks the server again (server/middleware/20-moderation.ts), so
 	// announcements that start, end or change in the dashboard show without a reload.
 	const announcements = useState<readonly PublicAnnouncement[]>('site:announcements', provided)
-	refreshOnNavigation(
+	useRefreshOnNavigation(
 		announcements,
 		() => moderationEndpoint('site', i18n.locale === 'en' ? 'en' : 'es'),
 		(moderation) => moderation.announcements,

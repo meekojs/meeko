@@ -23,6 +23,7 @@ El script se ejecuta al crear el componente; la plantilla lee `count.value` y el
 ## Explora por tema
 
 Estas guías conservan los ejemplos y contratos completos de la antigua página API:
+
 - [Componentes y props](component-basics.md)
 - [Plantillas y directivas](component-template.md)
 - [Estilos de componentes](component-styles.md)
@@ -40,6 +41,7 @@ Estas guías conservan los ejemplos y contratos completos de la antigua página 
 `@meekojs/meeko/prettier` es el plugin de Prettier para `.meeko`. Con `{ "plugins": ["@meekojs/meeko/prettier"] }` en la configuración de Prettier, `prettier --write "**/*.meeko"` formatea script, `<script server>`, plantilla y estilo; la opción `meekoIndentSections` (por defecto `false`) indenta un nivel el contenido de todas las secciones, y `meekoPreserveArrayBreaks` (por defecto `true`) deja expandido, en todo el JavaScript y TypeScript que formatee Prettier, un array con un salto de línea tras `[`, como `objectWrap: "preserve"` con los objetos. El servidor de lenguaje usa el mismo plugin, así que el editor y la CI coinciden (véase [editores](editors.md#formato-con-prettier)).
 
 ## Compatibilidad y límites
+
 - Node.js 24 o posterior y TypeScript 7.0.2 para la CLI, el build, Vite y el servidor de lenguaje. Los entornos de ejecución y navegadores admitidos se listan en la [política de estabilidad](stability.md#entornos-soportados).
 - La API pública sigue SemVer durante la serie 1.x: los cambios incompatibles requieren una versión major y las deprecaciones se anuncian en un minor (véase la [política de estabilidad](stability.md)). El paquete se distribuye como `@meekojs/meeko` bajo licencia MIT.
 - El parser acepta el subconjunto de TypeScript y HTML descrito arriba; informa las construcciones no soportadas mediante diagnósticos.
@@ -53,6 +55,7 @@ Estas guías conservan los ejemplos y contratos completos de la antigua página 
 ## Enlaces a secciones anteriores
 
 Los enlaces existentes a fragmentos de esta página siguen aquí y llevan a su nueva ubicación.
+
 - <a id="componentes-meeko"></a>[Componentes .meeko](component-basics.md#componentes-meeko)
 - <a id="desestructuración-en-el-script"></a>[Desestructuración en el script](component-basics.md#desestructuración-en-el-script)
 - <a id="props-reactivas"></a>[Props reactivas](component-basics.md#props-reactivas)

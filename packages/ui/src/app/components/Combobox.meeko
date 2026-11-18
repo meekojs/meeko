@@ -28,7 +28,8 @@
 </script>
 
 <!-- No whitespace between the tags of this template: it would be text inside the trigger and the options. Prettier keeps it that way; tests/templates-without-whitespace.test.mjs guards it. -->
-<template><div
+<template>
+	<div
 		ref:root
 		data-meeko-select
 		bind:class="props.class"
@@ -37,7 +38,8 @@
 		bind:data-multiple="combobox.multiple.value ? '' : undefined"
 		bind:data-loading="combobox.loading.value ? '' : undefined"
 		bind:data-clearable="props.clearable ? '' : undefined"
-		><Popover
+	>
+		<Popover
 			mode="manual"
 			matchWidth
 			model="combobox.open"
@@ -45,7 +47,8 @@
 			bind:offset="props.offset ?? 0"
 			bind:triggerId="combobox.triggerId.value"
 			bind:class="props.listClass"
-			><snippet name="anchor">
+		>
+			<snippet name="anchor">
 				<button
 					if:when="!props.searchable"
 					type="button"
@@ -56,41 +59,55 @@
 					on:click="combobox.triggerClick"
 					on:keydown="combobox.keydown"
 					on:keyup="combobox.keyup"
-					><span
+				>
+					<span
 						if:when="snippets.value && combobox.selected.value.length"
 						data-meeko-select-values
-						><span
+					>
+						<span
 							each:of="combobox.selectedEntries.value"
 							each:as="entry"
 							each:key="entry.key"
 							data-meeko-select-value
-							><render
+						>
+							<render
 								snippet="snippets.value"
-								args="entry.option" /></span></span
-					><span
+								args="entry.option"
+							/>
+						</span>
+					</span>
+					<span
 						if:when="!snippets.value && combobox.selected.value.length"
 						data-meeko-select-value
-						>{combobox.valueText.value}</span
-					><span
+					>
+						{combobox.valueText.value}
+					</span>
+					<span
 						if:when="!combobox.selected.value.length"
 						data-meeko-select-placeholder
-						>{props.placeholder ?? ''}</span
-					></button
-				><span
+					>
+						{props.placeholder ?? ''}
+					</span>
+				</button>
+				<span
 					if:when="props.searchable && combobox.multiple.value && combobox.selected.value.length"
 					data-meeko-select-values
-					><span
+				>
+					<span
 						each:of="combobox.selectedEntries.value"
 						each:as="entry"
 						each:key="entry.key"
 						data-meeko-select-value
-						><render
+					>
+						<render
 							if:when="snippets.value"
 							snippet="snippets.value"
 							args="entry.option"
-						/><template if:when="!snippets.value">{entry.label}</template></span
-					></span
-				><input
+						/>
+						<template if:when="!snippets.value">{entry.label}</template>
+					</span>
+				</span>
+				<input
 					if:when="props.searchable"
 					type="text"
 					role="combobox"
@@ -104,8 +121,9 @@
 					on:input="combobox.input"
 					on:click="combobox.inputClick"
 					on:keydown="combobox.keydown"
-				/></snippet
-			><div
+				/>
+			</snippet>
+			<div
 				role="listbox"
 				data-meeko-select-list
 				bind:id="combobox.listboxId"
@@ -116,64 +134,81 @@
 				on:mousedown="combobox.keepFocus"
 				on:click="combobox.optionClick"
 				on:pointermove="combobox.optionHover"
-				><div
+			>
+				<div
 					each:of="combobox.groups.value"
 					each:as="group"
 					each:key="group.key"
 					data-meeko-select-group
 					bind:role="group.name === undefined ? 'presentation' : 'group'"
 					bind:aria-labelledby="group.id"
-					><div
+				>
+					<div
 						if:when="group.name !== undefined"
 						role="presentation"
 						data-meeko-select-group-label
 						bind:id="group.id"
-						><render
+					>
+						<render
 							if:when="snippets.group"
 							snippet="snippets.group"
 							args="group.name ?? ''"
-						/><template if:when="!snippets.group">{group.name}</template></div
-					><div
+						/>
+						<template if:when="!snippets.group">{group.name}</template>
+					</div>
+					<div
 						each:of="group.entries"
 						each:as="entry"
 						each:key="entry.key"
 						role="option"
 						bind="combobox.listOption(entry)"
-						><render
+					>
+						<render
 							if:when="snippets.option"
 							snippet="snippets.option"
 							args="entry.option, combobox.stateOf(entry)"
-						/><template if:when="!snippets.option">{entry.label}</template></div
-					></div
-				><div
+						/>
+						<template if:when="!snippets.option">{entry.label}</template>
+					</div>
+				</div>
+				<div
 					if:when="combobox.loading.value"
 					role="presentation"
 					data-meeko-select-loading
-					><render snippet="snippets.loading" /></div
-				><div
+				>
+					<render snippet="snippets.loading" />
+				</div>
+				<div
 					if:when="!combobox.loading.value && !combobox.entries.value.length"
 					role="presentation"
 					data-meeko-select-empty
-					><render
+				>
+					<render
 						if:when="snippets.empty"
 						snippet="snippets.empty"
-					/><template if:when="!snippets.empty">{text.empty}</template></div
-				></div
-			></Popover
-		><button
+					/>
+					<template if:when="!snippets.empty">{text.empty}</template>
+				</div>
+			</div>
+		</Popover>
+		<button
 			if:when="combobox.showClear.value"
 			type="button"
 			data-meeko-select-clear
 			bind:aria-label="props.clearLabel ?? text.clear"
 			on:click="combobox.clear"
-			>×</button
-		><input
+		>
+			×
+		</button>
+		<input
 			each:of="combobox.hiddenValues.value"
 			each:as="value"
 			type="hidden"
 			bind:name="combobox.name.value"
 			bind:value="value"
-			bind:disabled="props.disabled" /><input
+			bind:disabled="props.disabled"
+		/>
+		<input
 			if:when="props.required"
 			type="text"
 			hidden
@@ -184,4 +219,6 @@
 			bind:value="combobox.selected.value.length ? 'selected' : ''"
 			bind:disabled="props.disabled"
 			on:invalid="combobox.reportInvalid"
-	/></div></template>
+		/>
+	</div>
+</template>

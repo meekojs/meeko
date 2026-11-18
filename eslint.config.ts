@@ -52,6 +52,14 @@ export default defineEslint(
 	},
 
 	...turboConfig,
+	{
+		// Variables of the operating system and the ones Vite defines on import.meta.env are not
+		// configuration of a task, so turbo.json does not list them.
+		name: 'meeko/turbo-env',
+		rules: {
+			'turbo/no-undeclared-env-vars': ['error', { allowList: ['^(PATH|LOCALAPPDATA|ComSpec)$', '^(SSR|DEV|PROD|MODE|BASE_URL)$'] }],
+		},
+	},
 
 	{
 		// ESLint's defaults already parse the latest syntax, .js/.mjs as modules and .cjs as CommonJS.
@@ -111,8 +119,11 @@ export default defineEslint(
 	},
 	{
 		name: 'meeko/tests',
-		files: ['**/tests/**'],
+		files: ['**/tests/**', 'scripts/**/*.test.{mjs,ts}'],
 		rules: {
+			// Tests set and restore the variables they read (PORT, SITE_CANONICAL_ORIGIN) or pass them to
+			// mocks; they are not inputs of a cached task.
+			'turbo/no-undeclared-env-vars': 'off',
 			// Las pruebas crean contextos de componente sintéticos dentro de callbacks de node:test.
 			'meeko/rules-of-composables': 'off',
 			// `if (false) { ... }` holds type-level assertions that tsc checks and the runtime never runs.
@@ -171,6 +182,19 @@ export default defineEslint(
 		name: 'meeko/design-components',
 		files: ['apps/**/*.meeko', 'packages/docs/**/*.meeko'],
 		rules: { 'meeko/prefer-ui-components': 'error' },
+	},
+	{
+		// The showcase of the home page renders the code it shows next to it (app/utils/showcase-code.ts),
+		// whose <button> is native: a <UIButton> would no longer be the result of that code.
+		name: 'meeko/showcase-result',
+		files: ['apps/meeko/app/pages/index.meeko'],
+		rules: { 'meeko/prefer-ui-components': 'off' },
+	},
+	{
+		// Standalone example servers read PORT when run by hand; no Turborepo task runs them.
+		name: 'meeko/examples',
+		files: ['packages/meeko/examples/**'],
+		rules: { 'turbo/no-undeclared-env-vars': 'off' },
 	},
 	{
 		name: 'meeko/ui-tests',

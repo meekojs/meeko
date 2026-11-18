@@ -6,15 +6,15 @@ source-hash: 98db1aafbbf9ee2980133a1abbc6d397762e92d3fa9fa6054539ca2639a02e43
 
 Find an answer by what you want to do. Guides teach a path; the reference keeps signatures, types, limits and source links.
 
-| I want to… | Go to… | What you will find |
-| --- | --- | --- |
-| Create an app from scratch | [Quick start](inicio-rapido.md) | Requirements, commands and the first visible change. |
-| Understand components and reactivity | [Components and .meeko language](api.md) | Templates, props, state, events and composition. |
-| Add pages and parameters | [Routing](routing.md) | The common path and task-focused guides. |
-| Load data or choose SSR | [Route data](routing-data.md) | Loading, errors and rendering modes. |
-| Submit a form | [Framework forms](framework.md#forms-useform) | Data, validation and mutations. |
-| Prepare a deployment | [Build and deployment](framework.md#build-deployment-and-verification) | Outputs and requirements by adapter. |
-| Find a function or type | [Meeko reference](reference/README.md) | Index by category and export catalog. |
+| I want to…                           | Go to…                                                                 | What you will find                                   |
+| ------------------------------------ | ---------------------------------------------------------------------- | ---------------------------------------------------- |
+| Create an app from scratch           | [Quick start](inicio-rapido.md)                                        | Requirements, commands and the first visible change. |
+| Understand components and reactivity | [Components and .meeko language](api.md)                               | Templates, props, state, events and composition.     |
+| Add pages and parameters             | [Routing](routing.md)                                                  | The common path and task-focused guides.             |
+| Load data or choose SSR              | [Route data](routing-data.md)                                          | Loading, errors and rendering modes.                 |
+| Submit a form                        | [Framework forms](framework.md#forms-useform)                          | Data, validation and mutations.                      |
+| Prepare a deployment                 | [Build and deployment](framework.md#build-deployment-and-verification) | Outputs and requirements by adapter.                 |
+| Find a function or type              | [Meeko reference](reference/README.md)                                 | Index by category and export catalog.                |
 
 ## To learn
 

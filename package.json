@@ -55,16 +55,17 @@
 	"devDependencies": {
 		"@meekojs/eslint-plugin": "workspace:*",
 		"@meekojs/prettier-plugin": "workspace:*",
-		"esbuild": "0.28.2",
-		"eslint": "10.13.0",
-		"eslint-config-turbo": "^2.11.10",
-		"globals": "17.13.0",
-		"jiti": "2.7.0",
-		"prettier": "3.9.10",
-		"prettier-plugin-css-order": "2.2.0",
-		"prettier-plugin-packagejson": "3.0.3",
-		"turbo": "^2.11.11",
-		"typescript": "npm:@typescript/typescript6@6.0.2"
+		"esbuild": "catalog:",
+		"eslint": "catalog:",
+		"eslint-config-turbo": "catalog:",
+		"globals": "catalog:",
+		"jiti": "catalog:",
+		"prettier": "catalog:",
+		"prettier-plugin-css-order": "catalog:",
+		"prettier-plugin-packagejson": "catalog:",
+		"tsdown": "catalog:",
+		"turbo": "catalog:",
+		"typescript": "catalog:typescript6"
 	},
 	"packageManager": "pnpm@12.14.0",
 	"engines": {

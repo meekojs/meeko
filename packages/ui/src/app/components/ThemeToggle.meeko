@@ -70,7 +70,8 @@
 </script>
 
 <!-- No whitespace between the tags of this template: it would be text inside the button and the group. Prettier keeps it that way; tests/templates-without-whitespace.test.mjs guards it. -->
-<template><form
+<template>
+	<form
 		if:when="mode.value === 'cycle'"
 		method="post"
 		action="/_meeko/theme"
@@ -78,33 +79,41 @@
 		bind:class="props.class"
 		bind:id="props.id"
 		on:submit="submit"
-		><input
+	>
+		<input
 			type="hidden"
 			name="theme"
 			bind:value="next.value"
-		/><input
+		/>
+		<input
 			type="hidden"
 			name="return"
 			bind:value="route.url.value"
-		/><button
+		/>
+		<button
 			type="submit"
 			bind:aria-label="label.value"
-			><span
+		>
+			<span
 				each:of="items.value"
 				each:as="item"
 				each:key="item.name"
 				bind:data-meeko-theme-icon="item.icon"
 				aria-hidden="true"
-				><render
+			>
+				<render
 					if:when="named[item.name]"
 					snippet="named[item.name]"
-				/><Icon
+				/>
+				<Icon
 					if:when="iconOf(item.name)"
 					bind:path="iconOf(item.name) ?? ''"
-				/><template if:when="!named[item.name] && !iconOf(item.name)">{item.label}</template></span
-			></button
-		></form
-	><form
+				/>
+				<template if:when="!named[item.name] && !iconOf(item.name)">{item.label}</template>
+			</span>
+		</button>
+	</form>
+	<form
 		if:when="mode.value === 'select'"
 		method="post"
 		action="/_meeko/theme"
@@ -112,15 +121,18 @@
 		bind:class="props.class"
 		bind:id="props.id"
 		on:submit="submit"
-		><input
+	>
+		<input
 			type="hidden"
 			name="return"
 			bind:value="route.url.value"
-		/><div
+		/>
+		<div
 			role="radiogroup"
 			bind:aria-label="group.value"
 			on:keydown="keydown"
-			><button
+		>
+			<button
 				each:of="items.value"
 				each:as="item"
 				each:key="item.name"
@@ -132,10 +144,13 @@
 				bind:tabindex="focused.value === undefined ? undefined : focused.value === item.name ? '0' : '-1'"
 				bind:aria-label="named[item.name] ? item.label : undefined"
 				bind:data-meeko-theme-option="item.name"
-				><render
+			>
+				<render
 					if:when="named[item.name]"
 					snippet="named[item.name]"
-				/><template if:when="!named[item.name]">{item.label}</template></button
-			></div
-		></form
-	></template>
+				/>
+				<template if:when="!named[item.name]">{item.label}</template>
+			</button>
+		</div>
+	</form>
+</template>

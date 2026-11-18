@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { examples } from '../../utils/examples'
 </script>
+
 <template>
 	<DocsPage
 		title="View Transitions"
@@ -30,8 +31,9 @@
 				to="/transitions/project"
 				data-meeko-view-transition="false"
 			>
-				abrir sin transición</MeekoLink
-			>.
+				abrir sin transición
+			</MeekoLink>
+			.
 		</p>
 		<h2>Configuración</h2>
 		<p>Esta función pertenece al framework, no al módulo UI. Requiere soporte del navegador y respeta movimiento reducido; la navegación sigue funcionando cuando no puede animarse.</p>

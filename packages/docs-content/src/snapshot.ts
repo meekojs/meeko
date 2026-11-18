@@ -8,7 +8,7 @@ import { catalog, catalogLabel, catalogSection, docsIndexSlugs, navigation, page
 import { createHighlight, createTokenizer } from './content/highlight'
 import { codeBlockHtml, escapeHtml, renderSource } from './content/markdown'
 import { messages } from './content/messages'
-import { llmsFull, llmsIndex, referenceEntryAt, referenceIndex, referenceNavigation, referenceOnlySlugs, referencePage, referencePager, writtenPages } from './content/reference'
+import { llmsFull, llmsIndex, referenceIndex, referenceNavigation, referenceOnlySlugs, referencePage, referencePager, writtenPages } from './content/reference'
 import { groupIcons, taxonomyPath } from './content/reference-taxonomy'
 import { createSourceContext, currentLocale, githubUrl, pageLocale, readRepositoryFile, refreshSources, siteOrigin, withSourceContext } from './content/repository'
 import { docsLocales, localizedPath } from './locale'
@@ -205,7 +205,6 @@ async function renderPages(): Promise<SnapshotPage[]> {
 		const written = (await referencePage(symbol)) ?? null
 		const page = written ? null : ((await apiPage(symbol)) ?? null)
 		if (!written && !page) throw new Error(`Missing reference page: ${symbol}`)
-		const entry = await referenceEntryAt(href)
 		const title = written?.title ?? page?.name ?? symbol
 		add(
 			href,

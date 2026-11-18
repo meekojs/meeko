@@ -2,6 +2,7 @@
 	import { examples } from '../utils/examples'
 	const i18n = useI18n()
 </script>
+
 <template>
 	<DocsPage
 		product="Meeko i18n"
@@ -16,7 +17,8 @@
 		<p>
 			<code>common</code>
 			se carga siempre, junto a los namespaces de
-			<code>global</code>, como el catálogo de un Shell compartido.
+			<code>global</code>
+			, como el catálogo de un Shell compartido.
 			<code>routes</code>
 			relaciona IDs exactos del manifiesto con namespaces adicionales. Todos los idiomas declaran los mismos namespaces.
 		</p>

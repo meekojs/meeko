@@ -24,7 +24,8 @@
 	const snippets = defineSnippets<{ default?: [] }>()
 </script>
 
-<template><MeekoLink
+<template>
+	<MeekoLink
 		bind:to="to"
 		bind:params="params"
 		bind:search="search"
@@ -32,5 +33,7 @@
 		bind:resolve="resolve"
 		bind="rest"
 		on:click="(event) => emit('click', event)"
-		><render snippet="snippets.default"
-	/></MeekoLink></template>
+	>
+		<render snippet="snippets.default" />
+	</MeekoLink>
+</template>
