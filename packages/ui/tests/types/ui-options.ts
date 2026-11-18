@@ -1,6 +1,6 @@
 import type { UIDefaults, UIOptions } from '@meekojs/ui'
 import type { UIMarkdownEditorProps } from '@meekojs/ui/editor'
-import type { UIAlertProps, UIBadgeProps, UIBreadcrumbProps, UIButtonProps, UICardProps, UICheckboxProps, UICodeBlockProps, UIComboboxProps, UICommandPaletteProps, UIDescriptionListProps, UIDiffProps, UIDisclosureProps, UIDrawerProps, UIEmptyProps, UIFieldProps, UIFooterProps, UIHeaderProps, UIHintProps, UIIconButtonProps, UILinkCardProps, UILocaleSuggestionProps, UILocaleSwitcherProps, UIMenuProps, UIModalProps, UINavigationTabsProps, UINavigationTreeProps, UIPageHeaderProps, UIPageNavigationProps, UIPageProps, UIPaginationProps, UIRadioGroupProps, UISegmentedControlProps, UISelectProps, UISkeletonProps, UISliderProps, UIStatProps, UISwitchProps, UITableOfContentsProps, UITableProps, UITabsProps, UIThemeToggleProps, UIToastProps } from '@meekojs/ui/runtime'
+import type { UIAlertProps, UIBadgeProps, UIBreadcrumbProps, UIButtonProps, UICardProps, UICheckboxProps, UICodeBlockProps, UIComboboxProps, UICommandPaletteProps, UIDescriptionListProps, UIDiffProps, UIDisclosureProps, UIDrawerProps, UIEmptyProps, UIFieldProps, UIFooterProps, UIHeaderProps, UIHintProps, UIIconButtonProps, UILinkCardProps, UILocaleSuggestionProps, UILocaleSwitcherProps, UIMenuProps, UIModalProps, UINavigationTabsProps, UINavigationTreeProps, UIPageHeaderProps, UIPageNavigationProps, UIPageProps, UIPaginationProps, UIRadioGroupProps, UISegmentedControlProps, UISelectProps, UISkeletonProps, UISliderProps, UISparklineProps, UIStatProps, UISwitchProps, UITableOfContentsProps, UITableProps, UITabsProps, UIThemeToggleProps, UIToastProps } from '@meekojs/ui/runtime'
 
 import type { ComponentProps as LinkProps } from '../../dist/app/components/Link.d.meeko.ts'
 
@@ -88,6 +88,7 @@ type SameSlots = [
 	Equal<Slots<'select'>, UISelectProps<string>['ui']>,
 	Equal<Slots<'skeleton'>, UISkeletonProps['ui']>,
 	Equal<Slots<'slider'>, UISliderProps['ui']>,
+	Equal<Slots<'sparkline'>, UISparklineProps['ui']>,
 	Equal<Slots<'stat'>, UIStatProps['ui']>,
 	Equal<Slots<'switch'>, UISwitchProps['ui']>,
 	Equal<Slots<'table'>, UITableProps<{ id: number }>['ui']>,

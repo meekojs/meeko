@@ -156,4 +156,6 @@
 	--breakpoint-desktop: 75rem;
 	/* Of a container query (ui:@max-card-narrow:): below this width of its header, <UICard actionsWrap="auto"> puts its actions under the title. */
 	--container-card-narrow: 24rem;
+	/* Of a container query (ui:@max-stat-narrow:): below this width, a key figure of <UIStat> puts its sparkline under the value and makes the value smaller. */
+	--container-stat-narrow: 20rem;
 }

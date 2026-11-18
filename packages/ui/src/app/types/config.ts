@@ -7,7 +7,7 @@ import type { checkbox, radioGroup, segmentedControl, toggle } from '../variants
 import type { commandPalette } from '../variants/command-palette'
 import type { container } from '../variants/container'
 import type { codeBlock, diff } from '../variants/content'
-import type { descriptionList, stat } from '../variants/data'
+import type { descriptionList, sparkline, stat } from '../variants/data'
 import type { drawer } from '../variants/drawer'
 import type { alert, disclosure, empty, skeleton, toast } from '../variants/feedback'
 import type { field } from '../variants/field'
@@ -58,7 +58,7 @@ export type UICardActionsWrap = 'inline' | 'below' | 'auto'
  * ```ts
  * import type { stat } from '../variants/data'
  *
- * type StatDefaults = UIComponentDefaults<typeof stat> // { class?: string; ui?: { base?, label?, value?, detail? } }
+ * type StatDefaults = UIComponentDefaults<typeof stat> // { class?: string; ui?: { base?, label?, value?, detail?, change?, … } }
  * ```
  */
 export type UIComponentDefaults<T extends ((...args: never[]) => unknown) | undefined = undefined, V = {}> = Simplify<
@@ -175,6 +175,12 @@ export interface UIDefaults {
 	readonly select?: UIComponentDefaults<typeof select>
 	readonly skeleton?: UIComponentDefaults<typeof skeleton>
 	readonly slider?: UIComponentDefaults<typeof slider>
+	/**
+	 * `UISparkline`, también el de `UIStat trend`: `class` llega al `<svg>`, y `ui` a `base`, `area` y `line`.
+	 *
+	 * @since 1.11.0
+	 */
+	readonly sparkline?: UIComponentDefaults<typeof sparkline>
 	readonly stat?: UIComponentDefaults<typeof stat>
 	readonly switch?: UIComponentDefaults<typeof toggle>
 	/** `class` llega a la `<table>`, como la prop de la instancia; el contenedor es `ui.base`. */

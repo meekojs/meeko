@@ -10,7 +10,7 @@ import { checkbox, radioGroup, segmentedControl, toggle } from './app/variants/c
 import { commandPalette } from './app/variants/command-palette'
 import { container } from './app/variants/container'
 import { codeBlock, diff } from './app/variants/content'
-import { descriptionList, stat } from './app/variants/data'
+import { descriptionList, sparkline, stat } from './app/variants/data'
 import { drawer } from './app/variants/drawer'
 import { alert, disclosure, empty, skeleton, toast } from './app/variants/feedback'
 import { field } from './app/variants/field'
@@ -96,6 +96,7 @@ const components = {
 	select: { look: select },
 	skeleton: { look: skeleton },
 	slider: { look: slider },
+	sparkline: { look: sparkline },
 	stat: { look: stat },
 	switch: { look: toggle },
 	table: { look: table, variants: ['density'] },

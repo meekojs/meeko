@@ -8,7 +8,7 @@ import { compile } from '../../meeko/dist/compiler.js'
 import { createRoot, provide } from '../../meeko/dist/index.js'
 import { uiDefaultsKey, uiTheme } from '../dist/app/utils/defaults.js'
 
-const components = ['Card', 'Table', 'Stat', 'Alert', 'Button']
+const components = ['Card', 'Table', 'Stat', 'Sparkline', 'Alert', 'Button']
 
 /** Compiles the real components and a page that uses them, and renders it in SSR with the given `ui.defaults`. */
 async function render(context, template, defaults) {

@@ -1,5 +1,5 @@
 ---
-source-hash: 5d692639a9100b45b62a44d85606f6d105159c1fa9ad76297199729d25d43a0d
+source-hash: 08dbcece17031e4cdd469da06567564cb864586212ea249ac431d2a1f775c02e
 ---
 
 # Meeko UI API
@@ -1388,20 +1388,20 @@ To open or close it from the parent, assign its `model` or call `show()` and `hi
 
 The new controls keep native HTML, the keyboard and form submission. All models bind to a signal (`model="field"`), not with `bind:model`.
 
-| Component           | Contract                                                                                                                                                                                                    |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `UITextarea`        | String model; native attributes `rows`, `name`, `maxlength`, `required`, `disabled`; `invalid`, `describedBy`.                                                                                              |
-| `UICheckbox`        | Boolean model; `label`, `description`, `name`, `value`, `required`, `disabled`, `invalid`, `describedBy`.                                                                                                   |
-| `UIRadioGroup`      | String model; `legend`, `options` (`value`, `label`, `disabled`), `name`, `required`, `disabled`; `variant="default"` or `"segmented"`. Native arrows and selection.                                        |
-| `UISwitch`          | Boolean model and the Checkbox contract, with `role="switch"`.                                                                                                                                              |
-| `UISlider`          | Numeric model; `label`, `name`, `min`, `max`, `step`, `disabled` and native attributes.                                                                                                                     |
-| `UIAlert`           | `tone`, `title`, `description`, `icon` (snippet), `dismiss`, `closeLabel`, `role`; snippets `default`, `icon`, `actions`; `dismiss` event. Danger uses `alert`; the others, `note`; `status` can be chosen. |
-| `UIDisclosure`      | `summary`, `open`, `class`; `default` snippet. Native `<details>`: opens with the keyboard and without JavaScript.                                                                                          |
-| `UIEmpty`           | `title`, `description`, `variant="inline"` or `"panel"`; snippets `default` and `actions`.                                                                                                                  |
-| `UISkeleton`        | `lines`, `widths` (`full`, `long`, `short`), `label`; announces loading once and respects reduced motion.                                                                                                   |
-| `UIStat`            | `label`, `value`, `detail`, with `dl/dt/dd`; the `value` and `detail` snippets accept markup, such as a link.                                                                                               |
-| `UIDescriptionList` | `items` (`label`, `labelLang`, `value`, `detail`, `code`, `title`), `columns` (1, 2 or 3), one column on mobile. `code` renders the value in `<code>`.                                                      |
-| `UIToast`           | `text`, `tone`, `duration`, `closeLabel`, `actions` (snippet or prop); `dismiss` event. Manual native popover, without taking focus.                                                                        |
+| Component           | Contract                                                                                                                                                                                                                 |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `UITextarea`        | String model; native attributes `rows`, `name`, `maxlength`, `required`, `disabled`; `invalid`, `describedBy`.                                                                                                           |
+| `UICheckbox`        | Boolean model; `label`, `description`, `name`, `value`, `required`, `disabled`, `invalid`, `describedBy`.                                                                                                                |
+| `UIRadioGroup`      | String model; `legend`, `options` (`value`, `label`, `disabled`), `name`, `required`, `disabled`; `variant="default"` or `"segmented"`. Native arrows and selection.                                                     |
+| `UISwitch`          | Boolean model and the Checkbox contract, with `role="switch"`.                                                                                                                                                           |
+| `UISlider`          | Numeric model; `label`, `name`, `min`, `max`, `step`, `disabled` and native attributes.                                                                                                                                  |
+| `UIAlert`           | `tone`, `title`, `description`, `icon` (snippet), `dismiss`, `closeLabel`, `role`; snippets `default`, `icon`, `actions`; `dismiss` event. Danger uses `alert`; the others, `note`; `status` can be chosen.              |
+| `UIDisclosure`      | `summary`, `open`, `class`; `default` snippet. Native `<details>`: opens with the keyboard and without JavaScript.                                                                                                       |
+| `UIEmpty`           | `title`, `description`, `variant="inline"` or `"panel"`; snippets `default` and `actions`.                                                                                                                               |
+| `UISkeleton`        | `lines`, `widths` (`full`, `long`, `short`), `label`; announces loading once and respects reduced motion.                                                                                                                |
+| `UIStat`            | `label`, `value`, `detail`, with `dl/dt/dd`; the `value` and `detail` snippets accept markup, such as a link. With `change`, `period`, `trend`, `href` or `to`, a [key figure](#uistat-as-a-key-figure-and-uisparkline). |
+| `UIDescriptionList` | `items` (`label`, `labelLang`, `value`, `detail`, `code`, `title`), `columns` (1, 2 or 3), one column on mobile. `code` renders the value in `<code>`.                                                                   |
+| `UIToast`           | `text`, `tone`, `duration`, `closeLabel`, `actions` (snippet or prop); `dismiss` event. Manual native popover, without taking focus.                                                                                     |
 
 `UISegmentedControl` is a compact single choice with native radios, which works without JavaScript: string model; `options`, `legend` with `hideLegend` (for screen readers only) or `ariaLabel`, `size="sm"` or `"md"` (the height of a control of that size), `name`, `required` and `disabled`. When the options do not fit, it scrolls sideways without breaking them or widening the page. `ui.defaults.segmentedControl` takes `size`, and `ui`, its slots `base`, `legend`, `options`, `option` and `input`. For a compact switcher, prefer it to `UIRadioGroup variant="segmented"`, which wraps into several lines.
 
@@ -1412,6 +1412,55 @@ The prop types, `UIDensity`, `UITone` and `UIToastContext` are exported from `@m
 `UIBadge` adds the tones `info`, `success`, `warning` and `dot`. `UIInput` accepts `date`, `datetime-local` and native attributes such as `autocomplete`, `autocapitalize`, `spellcheck`, `min`, `max` and `step`. `UIField` adds `hint` and `counter` (string or number); the IDs of both are included in the `describedBy` its snippet receives.
 
 `UICard` and `UITable` accept `density="compact" | "normal" | "comfortable"`. Card adds `padding="none" | "sm" | "md" | "lg"`, which wins over density. Table columns accept `numeric` (end alignment) and `rowHeader` (`th scope="row"`), also in the grid layout. `hideCaption` hides a table's title from view, when a heading already says it, and it still names the table.
+
+### UIStat as a key figure and UISparkline
+
+With `change`, `period`, `trend`, `href` or `to`, `UIStat` is a key figure (a "KPI"). Without those props it renders the same markup and the same classes as before.
+
+```html
+<UIStat
+	label="Revenue"
+	value="€12,400"
+	bind:change="12.5"
+	period="vs. the previous 30 days"
+	bind:trend="[8.2, 9.1, 8.7, 10.4, 11.2, 10.9, 12.4]"
+	to="/revenue"
+/>
+<UIStat
+	label="Response time"
+	value="180 ms"
+	bind:change="-8"
+	good="down"
+/>
+<UIStat
+	label="Orders"
+	bind:value="320"
+	change="−8 orders"
+	period="this month"
+/>
+```
+
+- **Change.** `change` is a number, formatted with `Intl.NumberFormat` in the language of the document and with its sign: with `changeFormat="percent"` (the default) `12.5` is "+12.5%"; with `"number"`, the number as it is. It can also be a text already formatted: it is painted as it is, and its leading sign gives the direction (`-` or `−` goes down; `+` or any digit other than zero goes up; otherwise it does not change). `changeDirection` (`up`, `down` or `flat`) wins over the sign. A number that rounds to zero does not change.
+- **Tone.** `good` says which direction is good: `up` by default, `down` for a response time or an error rate. The good direction has the success tone, the other one the danger tone, and a change of zero is neutral. The arrow (↑, ↓ or →) is a decorative icon; the signed figure is hidden from screen readers, which read "Up 12.5%", "Down 3%" or "No change" instead (messages `stat.up`, `stat.down` and `stat.flat`, with `{change}` without its sign). The tone is not announced: the label already says what is measured.
+- **Period.** `period` follows the change, in soft text: "vs. the previous 30 days".
+- **Trend.** `trend` draws a `UISparkline` with an area beside the value, in the tone of the change (without one, the accent). Its accessible name sums up the series; `trendLabel` replaces it.
+- **Link.** `href` (any URL) or `to` (a route with `params`, `search` and `resolve`, with `<MeekoLink>`), with `target` and `rel`, render a link of its own, "View details" (message `stat.link`) or `linkLabel`. With the default text, its accessible name adds the label of the figure (`stat.linkName`: "View details: Revenue"), because a page with several figures would have several identical "View details" in the list of links; a `linkLabel` is the name as it is. It is not the whole card: its name would be all of its content, the `value` and `detail` snippets could not hold links of their own and the text could no longer be selected.
+- **Compact mode.** The `<dl>` of a key figure is a container (`container-type: inline-size`): below the `stat-narrow` container size of the theme (`--container-stat-narrow`, 20rem) the sparkline leaves the column beside the value and moves under the change, full width, and the value goes from `2xl` to `xl`. It follows the width of the figure, not that of the window, and it is pure CSS: no jumps on hydration. As a container does not give the width of its content, the figure takes `--ui-stat-intrinsic-width` (12rem) where nothing gives it a width, such as a flex row without `flex-basis`; in a grid or a block it fills its space. The width of the sparkline beside the value is `--ui-stat-trend-width` (7rem).
+- **Slots.** Besides `base`, `label`, `value` and `detail`, `ui` takes `change` (the `<dd>` of the change), `delta` (arrow and figure), `icon`, `period`, `trend` (the `<dd>` of the sparkline), `action` (the `<dd>` of the link) and `link`. `tone`, `direction`, `kpi` and `chart` are not props: the component sets them.
+
+`UISparkline` draws a series (`values`) as a line, with an optional `area`, in an `<svg>` without dependencies. It takes the width of its container and the height of `--ui-sparkline-height` (2rem) with a `viewBox` of 100 by 32 and `preserveAspectRatio="none"`; the stroke is not distorted (`vector-effect: non-scaling-stroke`, of `--ui-sparkline-stroke-width`). Its size does not depend on JavaScript, so SSR does not jump. It is `role="img"` and its `aria-label` sums up the series with the format of the language: "Trend: minimum 8.2, maximum 12.4, latest 12.4" (message `sparkline.label`, or `sparkline.empty` without values); `label` replaces it and `format` (options of `Intl.NumberFormat`) formats those numbers. `tone` (`neutral`, `accent`, `info`, `success`, `warning` or `danger`) colours the line; without it, `currentColor`. `min` and `max` set the vertical axis, such as `bind:min="0"`. Values that are not finite numbers are left out. When it appears, the series uncovers itself from left to right once, except with `prefers-reduced-motion`. It is an `<svg>` with `display: block`: inside a sentence, give it your own width and `display: inline-block`.
+
+```html
+<UISparkline
+	bind:values="visits"
+	area
+	tone="accent"
+	bind:min="0"
+/>
+```
+
+- **Defaults.** `ui.defaults.stat` takes the new slots, and `ui.defaults.sparkline` takes `class` and the slots `base`, `area` and `line`; the sparkline of `UIStat trend` gets them too.
+- **Types.** `UISparklineProps`, `UISparklineTone` and `UIStatDirection` are imported from `@meekojs/ui/runtime`, as `UIStatProps`.
 
 ### Notifications from a page
 

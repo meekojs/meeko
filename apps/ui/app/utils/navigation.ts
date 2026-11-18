@@ -41,7 +41,7 @@ export const navigation = [
 		items: [
 			{ label: 'Card', href: '/cards', description: 'Contenedores y snippets', en: { label: 'Card', description: 'Containers and snippets' } },
 			{ label: 'Table', href: '/tables', description: 'Filas y columnas tipadas', en: { label: 'Table', description: 'Typed rows and columns' } },
-			{ label: 'Datos y contenido', href: '/content', description: 'Stat, DescriptionList, Disclosure, Diff, CodeBlock y Prose', en: { label: 'Data and content', description: 'Stat, DescriptionList, Disclosure, Diff, CodeBlock and Prose' } },
+			{ label: 'Datos y contenido', href: '/content', description: 'Stat, Sparkline, DescriptionList, Disclosure, Diff, CodeBlock y Prose', en: { label: 'Data and content', description: 'Stat, Sparkline, DescriptionList, Disclosure, Diff, CodeBlock and Prose' } },
 			{ label: 'Avisos', href: '/feedback', description: 'Alert, Toast, Empty y Skeleton', en: { label: 'Feedback', description: 'Alert, Toast, Empty and Skeleton' } },
 		],
 	},

@@ -19,6 +19,15 @@ html:active-view-transition-type(ui-toast-close)::view-transition-old(ui-toast) 
 		opacity: var(--ui-opacity-hidden);
 	}
 }
+/* <UISparkline> uncovers its series once, from the start of the time axis (the left of its box). */
+@keyframes ui-sparkline-draw {
+	from {
+		clip-path: inset(0 100% 0 0);
+	}
+	to {
+		clip-path: inset(0);
+	}
+}
 /* The pulse of the lines of <UISkeleton>. */
 @keyframes ui-skeleton-pulse {
 	to {

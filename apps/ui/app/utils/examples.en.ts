@@ -401,6 +401,19 @@ export default defineMeekoConfig({
   { label: 'Author', value: 'Meeko team' },
 ]" />
 <UIDisclosure summary="Technical details"><p>It opens without JavaScript.</p></UIDisclosure>`,
+	kpi: `<!-- A key figure: change with its tone, period, trend and a link to the detail -->
+<UIStat label="Revenue" value="€12,400" bind:change="12.5"
+  period="vs. the previous 30 days"
+  bind:trend="[8.2, 9.1, 8.7, 10.4, 11.2, 10.9, 12.4]" to="/revenue" />
+
+<!-- Down is good: a response time that goes down is a success -->
+<UIStat label="Response time" value="180 ms" bind:change="-8" good="down" />
+
+<!-- A text already formatted: its sign gives the direction -->
+<UIStat label="Orders" bind:value="320" change="−8 orders" period="this month" />
+
+<!-- A sparkline on its own, with an area -->
+<UISparkline bind:values="visits" area tone="accent" />`,
 	diff: `<UIDiff label="Changes to the guide" bind:diff="patch" />`,
 	diffSample: `--- a/guide.md
 +++ b/guide.md

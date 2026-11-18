@@ -186,7 +186,7 @@ const strip = (css) =>
 		.replace(/\/\*[\s\S]*?\*\//g, '')
 		.replace(/@media[^{]+\{/g, '{')
 		.replace(/--breakpoint-[\w-]+:[^;]+;/g, '')
-		.replace(/--container-card-narrow:[^;]+;/g, '')
+		.replace(/--container-(?:card|stat)-narrow:[^;]+;/g, '')
 
 async function componentSheets() {
 	const names = (await readdir(styles)).filter((name) => name.endsWith('.css') && !['palette.css', 'tokens.css', 'fonts.css'].includes(name))

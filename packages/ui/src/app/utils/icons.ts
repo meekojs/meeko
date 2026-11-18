@@ -1,7 +1,9 @@
 /** The strokes of the icons the components draw themselves, on a grid of 16 by 16. */
 export const icons = {
+	arrowDown: 'M8 3v10M4 9l4 4 4-4',
 	arrowEnd: 'M3 8h10M9 4l4 4-4 4',
 	arrowStart: 'M13 8H3M7 4 3 8l4 4',
+	arrowUp: 'M8 13V3M4 7l4-4 4 4',
 	check: 'm3.5 8.5 3 3 6-7',
 	chevron: 'm5.5 6.5 2.5 2.5 2.5-2.5',
 	close: 'm4.5 4.5 7 7M11.5 4.5l-7 7',

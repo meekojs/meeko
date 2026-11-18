@@ -443,6 +443,19 @@ export default defineMeekoConfig({
   { label: 'Autor', value: 'Equipo Meeko' },
 ]" />
 <UIDisclosure summary="Detalles técnicos"><p>Se abre sin JavaScript.</p></UIDisclosure>`,
+	kpi: `<!-- Una cifra clave: variación con tono, periodo, tendencia y enlace al detalle -->
+<UIStat label="Ingresos" value="12 400 €" bind:change="12.5"
+  period="frente a los 30 días anteriores"
+  bind:trend="[8.2, 9.1, 8.7, 10.4, 11.2, 10.9, 12.4]" to="/ingresos" />
+
+<!-- Bajar es bueno: un tiempo de respuesta que baja es de éxito -->
+<UIStat label="Tiempo de respuesta" value="180 ms" bind:change="-8" good="down" />
+
+<!-- Un texto ya formateado: su signo da la dirección -->
+<UIStat label="Pedidos" bind:value="320" change="−8 pedidos" period="este mes" />
+
+<!-- Un sparkline suelto, con área -->
+<UISparkline bind:values="visits" area tone="accent" />`,
 	diff: `<UIDiff label="Cambios en la guía" bind:diff="patch" />`,
 	diffSample: `--- a/guide.md
 +++ b/guide.md

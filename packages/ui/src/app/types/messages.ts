@@ -232,6 +232,34 @@ export interface UIMessages {
 		/** `aria-label` del disparador de sólo icono, si no se pasa `ariaLabel`. */
 		readonly trigger: string
 	}
+	/**
+	 * `<UIStat>` con `change`, `href` o `to`.
+	 *
+	 * @since 1.11.0
+	 */
+	readonly stat: {
+		/** Texto accesible de una subida; `{change}` es la variación sin signo, como `12,5 %`. */
+		readonly up: string
+		/** Texto accesible de una bajada; `{change}` es la variación sin signo. */
+		readonly down: string
+		/** Texto accesible de una variación nula; admite `{change}`. */
+		readonly flat: string
+		/** Texto del enlace, si no se pasa `linkLabel`. */
+		readonly link: string
+		/** Nombre accesible del enlace con el texto por defecto: `{link}` es ese texto y `{label}`, la etiqueta del dato. */
+		readonly linkName: string
+	}
+	/**
+	 * `<UISparkline>`, también dentro de `<UIStat trend>`.
+	 *
+	 * @since 1.11.0
+	 */
+	readonly sparkline: {
+		/** Resumen accesible de la serie, si no se pasa `label`: `{min}`, `{max}` y `{last}`, ya formateados. */
+		readonly label: string
+		/** Nombre accesible de una serie sin valores. */
+		readonly empty: string
+	}
 }
 
 /**

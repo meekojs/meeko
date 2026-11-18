@@ -81,6 +81,8 @@ const spanish: UIMessages = {
 	},
 	hint: { label: 'Más información' },
 	menu: { trigger: 'Más acciones' },
+	stat: { up: 'Sube {change}', down: 'Baja {change}', flat: 'Sin cambios', link: 'Ver detalle', linkName: '{link}: {label}' },
+	sparkline: { label: 'Tendencia: mínimo {min}, máximo {max}, último {last}', empty: 'Sin datos' },
 }
 
 const english: UIMessages = {
@@ -149,6 +151,8 @@ const english: UIMessages = {
 	},
 	hint: { label: 'More information' },
 	menu: { trigger: 'More actions' },
+	stat: { up: 'Up {change}', down: 'Down {change}', flat: 'No change', link: 'View details', linkName: '{link}: {label}' },
+	sparkline: { label: 'Trend: minimum {min}, maximum {max}, latest {last}', empty: 'No data' },
 }
 
 /** The texts that come with the package. Spanish is complete and the last fallback of every locale. */
@@ -200,6 +204,8 @@ function merge(messages: UIMessages, layer: UIMessageOverrides | undefined): UIM
 		commandPalette: { ...messages.commandPalette, ...layer.commandPalette },
 		hint: { ...messages.hint, ...layer.hint },
 		menu: { ...messages.menu, ...layer.menu },
+		stat: { ...messages.stat, ...layer.stat },
+		sparkline: { ...messages.sparkline, ...layer.sparkline },
 	}
 }
 
