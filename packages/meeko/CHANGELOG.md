@@ -1,5 +1,9 @@
 # Cambios de Meeko
 
+## Sin publicar
+
+- **Guardar la hoja de la aplicación ya no se lleva la de un módulo.** En `meeko dev`, el cliente de Vite busca el `<link>` que debe actualizar por la primera URL que contiene la ruta de la hoja editada. Si un módulo registraba una hoja que terminaba en `app/styles/main.css`, como `@meekojs/ui` hasta la 1.9 (`src/app/styles/main.css`), al guardar `app/styles/main.css` se sustituía el enlace del módulo, que va antes: la página perdía sus estilos y no veía el cambio hasta recargar. Ahora cada hoja de desarrollo se enlaza por su ruta absoluta (`/@fs/…?direct`), que nunca forma parte de la de otra. `/app/styles/main.css?direct` se sigue sirviendo.
+
 ## 1.9.0 — 2026-11-05
 
 - **Credenciales configurables en los clientes API y RPC.** `ClientOptions.credentials` acepta `same-origin`, `include` u `omit` y conserva `same-origin` por defecto. Permite usar cookies HttpOnly con una API en otro origen desde el navegador sin reemplazar el `fetch` del cliente. El servidor debe configurar CORS y proteger las mutaciones contra CSRF; esta opción no reenvía automáticamente las cookies de una petición SSR.
