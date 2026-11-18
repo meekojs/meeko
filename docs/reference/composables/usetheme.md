@@ -18,7 +18,7 @@ related:
 
 Con `theme` en `meeko.config.ts`, Meeko guarda la elección del usuario en una cookie, escribe el tema en `<html>` desde el primer byte y, cuando el servidor no puede saberlo, lo aplica con un script de `<head>` antes del primer pintado. `useTheme()` da a los componentes ese estado: `theme`, la elección (`"system"` incluido), `resolved`, el tema que se ve, `themes`, la lista de temas, y `set`, que cambia la elección en `<html>`, `color-scheme`, la cookie y `localStorage`.
 
-Para un selector listo, usa `<UIThemeToggle>` del módulo `@meekojs/ui` 0.2; para uno propio, usa [`useThemeToggle()`](/docs/reference/usethemetoggle). `<MeekoThemeToggle>` está obsoleto desde core 1.8 y se retira en 2.0. `useTheme()` se autoimporta en los `.meeko` (un export propio con ese nombre tiene prioridad) y se llama mientras se ejecuta el script de un componente.
+Para un selector listo, usa `<UIThemeToggle>` del módulo `@meekojs/ui` 1.8 o posterior; para uno propio, usa [`useThemeToggle()`](/docs/reference/usethemetoggle). `<MeekoThemeToggle>` está obsoleto desde core 1.8 y se retira en 2.0. `useTheme()` se autoimporta en los `.meeko` (un export propio con ese nombre tiene prioridad) y se llama mientras se ejecuta el script de un componente.
 
 ## Uso
 

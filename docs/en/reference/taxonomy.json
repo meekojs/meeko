@@ -100,6 +100,9 @@
 		"cli:check": {
 			"description": "Checks a project or a `.meeko` component with TypeScript and Meeko's diagnostics."
 		},
+		"cli:doctor": {
+			"description": "Inspects Node, packages, configuration, `.meeko/` artifacts and the language server without running the project."
+		},
 		"cli:clean": {
 			"description": "Deletes what Meeko generates: `.meeko/` and the Vite cache; with `--all`, also `node_modules`."
 		},

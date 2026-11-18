@@ -22,12 +22,12 @@ export default defineSocketChannel({
 
 ```ts
 // Dentro de <script lang="ts"> de app/pages/chat/index.meeko
-const chat = typeof window === 'undefined' ? undefined : useSocket('chat', { roomId: 'general' })
-const unsubscribe = chat?.on('message', (message) => console.log(message.text))
-const send = async () => chat?.emit('message', { text: 'Hola', roomId: 'general' })
+const chat = useSocket('chat', { roomId: 'general' })
+const unsubscribe = chat.on('message', (message) => console.log(message.text))
+const send = async () => chat.emit('message', { text: 'Hola', roomId: 'general' })
 ```
 
-Hasta `1.6`, `useSocket` sin `await` sólo podía llamarse en el navegador (en SSR lanzaba un error), de ahí la comprobación de `window`; desde `1.7`, en SSR devuelve un cliente inerte que se queda en `"connecting"` (su `on` no registra nada y su `emit` rechaza), y la comprobación ya no hace falta. Desde `1.1`, `await useSocket(...)` en el nivel superior va más allá: el setup se divide en ese punto y el resto se ejecuta sólo en el navegador, tras montar el componente y con el socket ya abierto (estado `"open"`). La plantilla sólo puede usar los nombres declarados antes del `await` (`MEEK057`), y si el socket no llega a abrirse, la continuación sigue esperando (véase [api.md](api.md#composables-de-nivel-superior-y-await)):
+Hasta `1.6`, `useSocket` sin `await` sólo podía llamarse en el navegador (en SSR lanzaba un error), así que se protegía con `typeof window === 'undefined' ? undefined : useSocket(...)`; desde `1.7`, en SSR devuelve un cliente inerte que se queda en `"connecting"` (su `on` no registra nada y su `emit` rechaza), y la comprobación ya no hace falta. Desde `1.1`, `await useSocket(...)` en el nivel superior va más allá: el setup se divide en ese punto y el resto se ejecuta sólo en el navegador, tras montar el componente y con el socket ya abierto (estado `"open"`). La plantilla sólo puede usar los nombres declarados antes del `await` (`MEEK057`), y si el socket no llega a abrirse, la continuación sigue esperando (véase [api.md](api.md#composables-de-nivel-superior-y-await)):
 
 ```html
 <script lang="ts">

@@ -4,12 +4,12 @@
 			"es",
 			"en"
 		],
-		"routes": 1350,
+		"routes": 1360,
 		"guideSources": 59,
-		"curatedSymbols": 171,
-		"generatedSymbols": 573,
+		"curatedSymbols": 173,
+		"generatedSymbols": 576,
 		"sharedSymbols": 134,
-		"distinctReferenceDestinations": 610
+		"distinctReferenceDestinations": 615
 	},
 	"routes": [
 		{
@@ -46,7 +46,7 @@
 			"locale": "es",
 			"translation": "original",
 			"status": "current",
-			"title": "Componentes y lenguaje .meeko · Meeko",
+			"title": "API de Meeko · Meeko",
 			"purpose": "Esta página describe el contrato público del motor de componentes, que ejercitan los ejemplos y las pruebas. La política de estabilidad indica qué cubre SemVer…",
 			"links": [
 				"/docs/component-advanced",
@@ -101,12 +101,13 @@
 				"/docs/language-reactivity",
 				"/docs/language-reactivity#ciclo-de-vida",
 				"/docs/language-reactivity#ids-estables-useid",
+				"/docs/language-reactivity#ids-nuevos-createid",
 				"/docs/language-reactivity#reactividad",
 				"/docs/stability",
 				"/docs/stability#entornos-soportados"
 			],
 			"anchors": [
-				"componentes-y-lenguaje-meeko",
+				"api-de-meeko",
 				"explora-por-tema",
 				"herramientas",
 				"compatibilidad-y-límites",
@@ -148,6 +149,7 @@
 				"módulo-generado",
 				"reactividad",
 				"ciclo-de-vida",
+				"ids-nuevos-createid",
 				"ids-estables-useid",
 				"componentes-integrados",
 				"popover-meekopopover",
@@ -1272,6 +1274,7 @@
 			"anchors": [
 				"configurar-y-ampliar-la-aplicación",
 				"configuración",
+				"nombres-de-componentes-por-archivo",
 				"logs-del-servidor-en-la-consola-del-navegador",
 				"layers",
 				"carpetas-en-modules-deprecado",
@@ -1589,6 +1592,7 @@
 				"reactividad-y-ciclo-de-vida",
 				"reactividad",
 				"ciclo-de-vida",
+				"ids-nuevos-createid",
 				"ids-estables-useid"
 			]
 		},
@@ -2777,6 +2781,19 @@
 			"status": "current",
 			"title": "BunWebSocketHandler · Referencia de Meeko · Meeko",
 			"purpose": "Opciones y handlers WebSocket para Bun.serve({ websocket }), con los límites ya resueltos.",
+			"links": [],
+			"anchors": []
+		},
+		{
+			"path": "/docs/reference/classvalue",
+			"kind": "generated-reference",
+			"audience": "expert",
+			"source": "packages/meeko/src/shared/html-attribute-values.ts",
+			"locale": "es",
+			"translation": "original",
+			"status": "current",
+			"title": "ClassValue · Referencia de Meeko · Meeko",
+			"purpose": "Valor de class: un fragmento escalar o arrays, también anidados, cuyos fragmentos se unen con espacios.",
 			"links": [],
 			"anchors": []
 		},
@@ -4136,6 +4153,32 @@
 			"anchors": []
 		},
 		{
+			"path": "/docs/reference/create-id",
+			"kind": "curated-reference",
+			"audience": "developer",
+			"source": "docs/reference/utils/create-id.md",
+			"locale": "es",
+			"translation": "original",
+			"status": "current",
+			"title": "createId · Referencia de Meeko · Meeko",
+			"purpose": "Genera UUID v4 criptográficos en servidor y navegador desde funciones, handlers o módulos.",
+			"links": [
+				"/docs/reference/createid",
+				"/docs/reference/useid"
+			],
+			"anchors": [
+				"uso",
+				"tipo",
+				"parámetros",
+				"valor-devuelto",
+				"ejemplos",
+				"errores-comunes",
+				"esperar-el-mismo-id-en-servidor-y-navegador",
+				"notas",
+				"relacionado"
+			]
+		},
+		{
 			"path": "/docs/reference/createapiclient",
 			"kind": "curated-reference",
 			"audience": "developer",
@@ -4475,6 +4518,19 @@
 			"status": "current",
 			"title": "createI18n · Referencia de Meeko · Meeko",
 			"purpose": "Builds one request or tab translator; formatter instances are cached per options.",
+			"links": [],
+			"anchors": []
+		},
+		{
+			"path": "/docs/reference/createid",
+			"kind": "generated-reference",
+			"audience": "expert",
+			"source": "packages/meeko/src/core/create-id.ts",
+			"locale": "es",
+			"translation": "original",
+			"status": "current",
+			"title": "createId · Referencia de Meeko · Meeko",
+			"purpose": "Genera un UUID v4 criptográfico nuevo en servidor o navegador, sin contexto de componente.",
 			"links": [],
 			"anchors": []
 		},
@@ -6950,6 +7006,7 @@
 				"leer-una-señal-sin-depender-de-ella",
 				"errores-comunes",
 				"un-callback-async",
+				"devolver-una-limpieza-como-en-react",
 				"escribir-la-señal-que-el-efecto-lee",
 				"usar-effect-para-derivar-estado",
 				"tocar-el-dom-o-apis-del-navegador-sin-comprobarlo",
@@ -7598,7 +7655,7 @@
 			"locale": "es",
 			"translation": "original",
 			"status": "current",
-			"title": "if:when · Referencia de Meeko · Meeko",
+			"title": "if, else-if y else · Referencia de Meeko · Meeko",
 			"purpose": "Pinta una etiqueta con su contenido sólo mientras una expresión es verdadera, y estrecha los tipos dentro de ella.",
 			"links": [
 				"/docs/api#condiciones-con-ifwhen-y-tipos",
@@ -7614,6 +7671,7 @@
 				"uso",
 				"tipo",
 				"atributos",
+				"ramas-alternativas",
 				"resultado",
 				"ejemplos",
 				"estados-de-una-carga",
@@ -8525,6 +8583,40 @@
 			]
 		},
 		{
+			"path": "/docs/reference/meeko-doctor",
+			"kind": "curated-reference",
+			"audience": "developer",
+			"source": "docs/reference/commands/meeko-doctor.md",
+			"locale": "es",
+			"translation": "original",
+			"status": "current",
+			"title": "meeko doctor · Referencia de Meeko · Meeko",
+			"purpose": "Inspecciona el entorno local del proyecto (Node, paquetes, configuración, artefactos de .meeko/ y servidor de lenguaje) sin ejecutar su código, leer .env ni modificar archivos.",
+			"links": [
+				"/docs/doctor",
+				"/docs/editors",
+				"/docs/reference/meeko-check",
+				"/docs/reference/meeko-lsp",
+				"/docs/reference/meeko-routes"
+			],
+			"anchors": [
+				"uso",
+				"tipo",
+				"opciones",
+				"resultado",
+				"ejemplos",
+				"antes-de-abrir-una-incidencia",
+				"una-aplicación-dentro-de-un-monorepo",
+				"en-ci-sólo-como-requisito-de-node",
+				"errores-comunes",
+				"tomar-un-aviso-de-artefactos-por-un-fallo",
+				"esperar-que-valide-los-tipos",
+				"un-directorio-que-no-existe",
+				"notas",
+				"relacionado"
+			]
+		},
+		{
 			"path": "/docs/reference/meeko-init",
 			"kind": "curated-reference",
 			"audience": "developer",
@@ -8990,8 +9082,9 @@
 				"/docs/framework#enlaces-anclas-y-scroll",
 				"/docs/framework#meekooutlet--y-meekolink",
 				"/docs/reference/bind",
+				"/docs/reference/defineemits",
+				"/docs/reference/elementattributes",
 				"/docs/reference/href",
-				"/docs/reference/if-when",
 				"/docs/reference/meekolinkprops",
 				"/docs/reference/meekooutlet",
 				"/docs/reference/mountclientapp",
@@ -13310,6 +13403,19 @@
 			]
 		},
 		{
+			"path": "/docs/reference/stylevalue",
+			"kind": "generated-reference",
+			"audience": "expert",
+			"source": "packages/meeko/src/shared/html-attribute-values.ts",
+			"locale": "es",
+			"translation": "original",
+			"status": "current",
+			"title": "StyleValue · Referencia de Meeko · Meeko",
+			"purpose": "Valor de style: texto CSS o un objeto cuyas claves son propiedades CSS en camelCase, kebab-case o variables personalizadas (--color).",
+			"links": [],
+			"anchors": []
+		},
+		{
 			"path": "/docs/reference/tagname",
 			"kind": "generated-reference",
 			"audience": "expert",
@@ -15081,7 +15187,7 @@
 			"translation": "original",
 			"status": "current",
 			"title": "Política de estabilidad 1.x · Meeko",
-			"purpose": "Vigencia: política de compatibilidad de la serie 1.x. Este checkout declara @meekojs/meeko@1.8.0; npm publica 1.9.0 al 5 de noviembre de 2026. Consulta el…",
+			"purpose": "Vigencia: política de compatibilidad de la serie 1.x. Este checkout declara @meekojs/meeko@1.9.0, la versión que npm publica al 5 de noviembre de 2026…",
 			"links": [
 				"/docs/api",
 				"/docs/api#atributos-en-bloque-con-bind",
@@ -15325,9 +15431,9 @@
 			"audience": "learner",
 			"source": "docs/api.md",
 			"locale": "en",
-			"translation": "translated",
+			"translation": "outdated",
 			"status": "current",
-			"title": "Components and the .meeko language · Meeko",
+			"title": "Meeko API · Meeko",
 			"purpose": "This page describes the component engine's public contract, exercised by the examples and tests. The stability policy specifies what SemVer covers in the 1.x…",
 			"links": [
 				"/en/docs/component-advanced",
@@ -15381,13 +15487,14 @@
 				"/en/docs/framework",
 				"/en/docs/language-reactivity",
 				"/en/docs/language-reactivity#lifecycle",
+				"/en/docs/language-reactivity#new-ids-createid",
 				"/en/docs/language-reactivity#reactivity",
 				"/en/docs/language-reactivity#stable-ids-useid",
 				"/en/docs/stability",
 				"/en/docs/stability#supported-environments"
 			],
 			"anchors": [
-				"components-and-the-meeko-language",
+				"meeko-api",
 				"explore-by-topic",
 				"tools",
 				"compatibility-and-limits",
@@ -15429,6 +15536,7 @@
 				"generated-module",
 				"reactivity",
 				"lifecycle",
+				"new-ids-createid",
 				"stable-ids-useid",
 				"built-in-components",
 				"popover-meekopopover",
@@ -15700,7 +15808,7 @@
 			"audience": "learner",
 			"source": "docs/component-attributes.md",
 			"locale": "en",
-			"translation": "translated",
+			"translation": "outdated",
 			"status": "current",
 			"title": "Attributes and static props · Meeko",
 			"purpose": "In a <component is> with tags, Meeko writes each attribute only while the current tag accepts it according to its HTML data, without ternaries: bind:href…",
@@ -15803,7 +15911,7 @@
 			"audience": "learner",
 			"source": "docs/component-events.md",
 			"locale": "en",
-			"translation": "translated",
+			"translation": "outdated",
 			"status": "current",
 			"title": "Events, models and snippets · Meeko",
 			"purpose": "A component declares its events with the defineEmits<T>() macro, where each key of T is an event and its value is the argument tuple. It returns a typed…",
@@ -15849,7 +15957,7 @@
 			"audience": "learner",
 			"source": "docs/component-template.md",
 			"locale": "en",
-			"translation": "translated",
+			"translation": "outdated",
 			"status": "current",
 			"title": "Templates and directives · Meeko",
 			"purpose": "Since 1.2, if:when narrows types inside its element, as v-if does in Vue: its attributes, props, events and content are checked knowing the condition holds, in…",
@@ -15966,7 +16074,7 @@
 			"audience": "learner",
 			"source": "docs/README.md",
 			"locale": "en",
-			"translation": "translated",
+			"translation": "outdated",
 			"status": "current",
 			"title": "Documentation map · Meeko",
 			"purpose": "Find an answer by what you want to do. Guides teach a path; the reference keeps signatures, types, limits and source links.",
@@ -16386,7 +16494,7 @@
 			"audience": "learner",
 			"source": "docs/framework-api.md",
 			"locale": "en",
-			"translation": "translated",
+			"translation": "outdated",
 			"status": "current",
 			"title": "Build APIs and RPC · Meeko",
 			"purpose": "This guide expands the framework overview.",
@@ -16473,7 +16581,7 @@
 			"audience": "learner",
 			"source": "docs/framework-configuration.md",
 			"locale": "en",
-			"translation": "translated",
+			"translation": "outdated",
 			"status": "current",
 			"title": "Configure and extend an application · Meeko",
 			"purpose": "This guide expands the framework overview.",
@@ -16504,6 +16612,7 @@
 			"anchors": [
 				"configure-and-extend-an-application",
 				"configuration",
+				"component-names-from-file-names",
 				"server-logs-in-the-browser-console",
 				"layers",
 				"folders-in-modules-deprecated",
@@ -16540,7 +16649,7 @@
 			"audience": "learner",
 			"source": "docs/framework-deployment.md",
 			"locale": "en",
-			"translation": "translated",
+			"translation": "outdated",
 			"status": "current",
 			"title": "Build and deploy · Meeko",
 			"purpose": "This guide expands the framework overview.",
@@ -16689,7 +16798,7 @@
 			"audience": "learner",
 			"source": "docs/framework-server.md",
 			"locale": "en",
-			"translation": "translated",
+			"translation": "outdated",
 			"status": "current",
 			"title": "Server runtime and errors · Meeko",
 			"purpose": "This guide expands the framework overview.",
@@ -16822,6 +16931,7 @@
 				"reactivity-and-lifecycle",
 				"reactivity",
 				"lifecycle",
+				"new-ids-createid",
 				"stable-ids-useid"
 			]
 		},
@@ -18009,6 +18119,19 @@
 			"status": "current",
 			"title": "BunWebSocketHandler · Meeko reference · Meeko",
 			"purpose": "Opciones y handlers WebSocket para Bun.serve({ websocket }), con los límites ya resueltos.",
+			"links": [],
+			"anchors": []
+		},
+		{
+			"path": "/en/docs/reference/classvalue",
+			"kind": "generated-reference",
+			"audience": "expert",
+			"source": "packages/meeko/src/shared/html-attribute-values.ts",
+			"locale": "en",
+			"translation": "missing",
+			"status": "current",
+			"title": "ClassValue · Meeko reference · Meeko",
+			"purpose": "Valor de class: un fragmento escalar o arrays, también anidados, cuyos fragmentos se unen con espacios.",
 			"links": [],
 			"anchors": []
 		},
@@ -19350,6 +19473,32 @@
 			"anchors": []
 		},
 		{
+			"path": "/en/docs/reference/create-id",
+			"kind": "curated-reference",
+			"audience": "developer",
+			"source": "docs/en/reference/utils/create-id.md",
+			"locale": "en",
+			"translation": "translated",
+			"status": "current",
+			"title": "createId · Meeko reference · Meeko",
+			"purpose": "Generates cryptographic UUID v4 identifiers on server and browser from functions, handlers or modules.",
+			"links": [
+				"/en/docs/reference/createid",
+				"/en/docs/reference/useid"
+			],
+			"anchors": [
+				"usage",
+				"type",
+				"parameters",
+				"return-value",
+				"examples",
+				"common-mistakes",
+				"expecting-the-same-id-on-server-and-browser",
+				"notes",
+				"related"
+			]
+		},
+		{
 			"path": "/en/docs/reference/createapiclient",
 			"kind": "curated-reference",
 			"audience": "developer",
@@ -19688,6 +19837,19 @@
 			"status": "current",
 			"title": "createI18n · Meeko reference · Meeko",
 			"purpose": "Builds one request or tab translator; formatter instances are cached per options.",
+			"links": [],
+			"anchors": []
+		},
+		{
+			"path": "/en/docs/reference/createid",
+			"kind": "generated-reference",
+			"audience": "expert",
+			"source": "packages/meeko/src/core/create-id.ts",
+			"locale": "en",
+			"translation": "missing",
+			"status": "current",
+			"title": "createId · Meeko reference · Meeko",
+			"purpose": "Genera un UUID v4 criptográfico nuevo en servidor o navegador, sin contexto de componente.",
 			"links": [],
 			"anchors": []
 		},
@@ -22143,6 +22305,7 @@
 				"read-a-signal-without-depending-on-it",
 				"common-mistakes",
 				"an-async-callback",
+				"return-a-cleanup-as-in-react",
 				"write-the-signal-the-effect-reads",
 				"use-effect-to-derive-state",
 				"access-the-dom-or-browser-apis-without-checking",
@@ -22785,7 +22948,7 @@
 			"locale": "en",
 			"translation": "translated",
 			"status": "current",
-			"title": "if:when · Meeko reference · Meeko",
+			"title": "if, else-if and else · Meeko reference · Meeko",
 			"purpose": "Renders a tag and its content only while an expression is truthy, and narrows types inside it.",
 			"links": [
 				"/en/docs/api#conditions-with-ifwhen-and-types",
@@ -22801,6 +22964,7 @@
 				"usage",
 				"type",
 				"attributes",
+				"alternative-branches",
 				"result",
 				"examples",
 				"loading-states",
@@ -23706,6 +23870,40 @@
 			]
 		},
 		{
+			"path": "/en/docs/reference/meeko-doctor",
+			"kind": "curated-reference",
+			"audience": "developer",
+			"source": "docs/en/reference/commands/meeko-doctor.md",
+			"locale": "en",
+			"translation": "translated",
+			"status": "current",
+			"title": "meeko doctor · Meeko reference · Meeko",
+			"purpose": "Inspects the project's local environment (Node, packages, configuration, .meeko/ artifacts and language server) without running its code, reading .env or modifying files.",
+			"links": [
+				"/en/docs/doctor",
+				"/en/docs/editors",
+				"/en/docs/reference/meeko-check",
+				"/en/docs/reference/meeko-lsp",
+				"/en/docs/reference/meeko-routes"
+			],
+			"anchors": [
+				"usage",
+				"type",
+				"options",
+				"result",
+				"examples",
+				"before-opening-an-issue",
+				"an-application-inside-a-monorepo",
+				"in-ci-only-as-a-node-requirement",
+				"common-mistakes",
+				"treating-an-artifacts-aviso-as-a-failure",
+				"expecting-it-to-check-types",
+				"a-directory-that-does-not-exist",
+				"notes",
+				"related"
+			]
+		},
+		{
 			"path": "/en/docs/reference/meeko-init",
 			"kind": "curated-reference",
 			"audience": "developer",
@@ -24164,8 +24362,9 @@
 				"/en/docs/api#component-names-in-is",
 				"/en/docs/framework",
 				"/en/docs/reference/bind",
+				"/en/docs/reference/defineemits",
+				"/en/docs/reference/elementattributes",
 				"/en/docs/reference/href",
-				"/en/docs/reference/if-when",
 				"/en/docs/reference/meekolinkprops",
 				"/en/docs/reference/meekooutlet",
 				"/en/docs/reference/mountclientapp",
@@ -28461,6 +28660,19 @@
 			]
 		},
 		{
+			"path": "/en/docs/reference/stylevalue",
+			"kind": "generated-reference",
+			"audience": "expert",
+			"source": "packages/meeko/src/shared/html-attribute-values.ts",
+			"locale": "en",
+			"translation": "missing",
+			"status": "current",
+			"title": "StyleValue · Meeko reference · Meeko",
+			"purpose": "Valor de style: texto CSS o un objeto cuyas claves son propiedades CSS en camelCase, kebab-case o variables personalizadas (--color).",
+			"links": [],
+			"anchors": []
+		},
+		{
 			"path": "/en/docs/reference/tagname",
 			"kind": "generated-reference",
 			"audience": "expert",
@@ -30216,7 +30428,7 @@
 			"translation": "translated",
 			"status": "current",
 			"title": "1.x stability policy · Meeko",
-			"purpose": "Scope: compatibility policy for the 1.x series. This checkout declares @meekojs/meeko@1.8.0; npm publishes 1.9.0 as of November 5, 2026. Consult the changelog…",
+			"purpose": "Scope: compatibility policy for the 1.x series. This checkout declares @meekojs/meeko@1.9.0, the version npm publishes as of November 5, 2026. Consult the…",
 			"links": [
 				"/en/docs/api",
 				"/en/docs/api#attribute-values",

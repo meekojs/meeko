@@ -423,7 +423,7 @@ El formulario envía `POST /_meeko/theme` con `theme` (la elección válida) y `
 
 Para un botón cíclico con iconos, pinta todos los iconos y marca cada uno con `data-meeko-theme-icon="light"`, `"dark"`, `"system"` o el nombre de un tema propio. La regla que `theme` añade a `<head>` muestra el de la elección de `<html>` desde el primer frame: no elijas un único icono con un condicional sobre `resolved`. Si el selector omite `"system"`, añade el token `system-light` o `system-dark` al icono del tema correspondiente (por ejemplo, `data-meeko-theme-icon="light system-light"`); `toggle.system` indica esos temas. Estos iconos decorativos llevan `aria-hidden="true"`; el botón necesita texto o `aria-label`.
 
-La configuración `theme`, la cookie, el script de `<head>`, esta regla de iconos y `POST /_meeko/theme` permanecen en core. Para un control completo con teclado y accesibilidad usa `UIThemeToggle` de `@meekojs/ui` 0.2. Véase la [referencia de useThemeToggle](reference/composables/usethemetoggle.md).
+La configuración `theme`, la cookie, el script de `<head>`, esta regla de iconos y `POST /_meeko/theme` permanecen en core. Para un control completo con teclado y accesibilidad usa `UIThemeToggle` de `@meekojs/ui` 1.8 o posterior. Véase la [referencia de useThemeToggle](reference/composables/usethemetoggle.md).
 
 #### `<MeekoThemeToggle>`
 

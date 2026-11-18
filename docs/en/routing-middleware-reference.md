@@ -1,5 +1,5 @@
 ---
-source-hash: 9d3475f1a95aea648be5c4d5ef61f78c74e530dcd1d7e0a60d7b4d12f9965d35
+source-hash: 8e0c49098dfd30d3ce08bf626336416f411b0bceb3988c0eac1e1b58cb8ee3b6
 ---
 
 # Route middleware: technical details
@@ -15,7 +15,7 @@ Declare a guard affecting only part of the application as named middleware, requ
 export default defineRouteMiddleware(
 	({ url, phase, request }) => {
 		// A public cookie indicating the session: Meeko's session cookie is HttpOnly.
-		const cookies = phase === 'server' ? (request.headers.get('cookie') ?? '') : document.cookie
+		const cookies = phase === 'server' ? (request?.headers.get('cookie') ?? '') : document.cookie
 		if (!cookies.includes('signed-in=1')) {
 			const login = new URL('/login', url)
 			login.searchParams.set('next', url.pathname)

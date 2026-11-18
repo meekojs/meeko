@@ -11,7 +11,7 @@ Un guard que sólo afecta a una parte de la aplicación se declara con nombre y 
 export default defineRouteMiddleware(
 	({ url, phase, request }) => {
 		// Una cookie pública que indica la sesión: la cookie de sesión de Meeko es HttpOnly.
-		const cookies = phase === 'server' ? (request.headers.get('cookie') ?? '') : document.cookie
+		const cookies = phase === 'server' ? (request?.headers.get('cookie') ?? '') : document.cookie
 		if (!cookies.includes('signed-in=1')) {
 			const login = new URL('/login', url)
 			login.searchParams.set('next', url.pathname)

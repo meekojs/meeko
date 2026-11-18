@@ -427,7 +427,7 @@ The form sends `POST /_meeko/theme` with `theme` (the valid choice) and `return`
 
 For a cycling button with icons, render all icons and mark each with `data-meeko-theme-icon="light"`, `"dark"`, `"system"` or a custom theme name. The rule `theme` adds to `<head>` shows the icon for the choice on `<html>` from the first frame: do not select a single icon with a conditional on `resolved`. If the selector omits `"system"`, add the `system-light` or `system-dark` token to the corresponding theme's icon (for example, `data-meeko-theme-icon="light system-light"`); `toggle.system` identifies those themes. These decorative icons have `aria-hidden="true"`; the button needs text or an `aria-label`.
 
-The `theme` configuration, cookie, `<head>` script, this icon rule and `POST /_meeko/theme` remain in core. For a complete control with keyboard support and accessibility, use `UIThemeToggle` from `@meekojs/ui` 0.2. See the [useThemeToggle reference](reference/composables/usethemetoggle.md).
+The `theme` configuration, cookie, `<head>` script, this icon rule and `POST /_meeko/theme` remain in core. For a complete control with keyboard support and accessibility, use `UIThemeToggle` from `@meekojs/ui` 1.8 or later. See the [useThemeToggle reference](reference/composables/usethemetoggle.md).
 
 #### `<MeekoThemeToggle>`
 

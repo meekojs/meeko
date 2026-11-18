@@ -890,6 +890,15 @@
 					"description": "Comprueba un proyecto o un componente `.meeko` con TypeScript y los diagnósticos de Meeko."
 				},
 				{
+					"name": "meeko doctor",
+					"symbols": [
+						"cli:doctor"
+					],
+					"slug": "meeko-doctor",
+					"fallback": "/docs/doctor",
+					"description": "Inspecciona Node, paquetes, configuración, artefactos de `.meeko/` y servidor de lenguaje sin ejecutar el proyecto."
+				},
+				{
 					"name": "meeko clean",
 					"symbols": [
 						"cli:clean"

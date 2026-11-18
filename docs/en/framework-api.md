@@ -366,7 +366,7 @@ With JavaScript, `form.submit` cancels native submission and sends JSON with `su
 
 An error (validation, an `ApiError` from the handler or `locals`, `401`, `403 FORBIDDEN`, `429`, `413` or a `500`) also responds with `303`, back to the `return` field, `Referer` or `/`, never with the error's JSON. In both cases, the response sets a single-use, 60-second cookie, `__Host-meeko-form` (`meeko-form` without HTTPS), `HttpOnly`, `SameSite=Lax`, containing the result: code, status, `issues` (at most 20, as in a `400`) and, only for fields listed in `form.echo`, the submitted values. By default no values return: the form shows messages and its fields start from `initial`. Values travel in the cookie and page HTML, so `echo` must not include passwords, card numbers, PINs, IBANs or other sensitive data; even so, a field whose name contains `password`, `passcode`, `secret`, `token`, `cvc` or `cvv` never returns, nor do files. If it does not fit in the cookie, values are removed first, then the last `issues`.
 
-**The page.** That page's `GET` reads the cookie, deletes it in the same response (`Max-Age=0`, `cache-control: no-store`) and renders the page even if it is prerendered. A `useForm` whose `action` matches the endpoint path takes the result during SSR, just as after a JavaScript submission: `form.echo` values in its fields, `errors` and `error` distributed by `issues`, `failure` holding a `ClientError` with the code and status (and `error` holding `errorMessage(failure)` if there are no `issues`), or `submitted` set to `true` after success. The result travels in page state, so hydration renders the same thing, and the browser uses it only once: when the form mounts again, it starts from `initial`. A field with a server message loses it on change, as after a JavaScript submission. A field still containing an error returns as text, exactly as entered.
+**The page.** That page's `GET` reads the cookie, deletes it in the same response (`Max-Age=0`, `cache-control: no-store`) and renders the page even if it is prerendered. A `useForm` whose `action` matches the endpoint path takes the result during SSR, just as after a JavaScript submission: `form.echo` values in its fields, `errors` and `error` distributed by `issues`, `failure` holding a `ClientError` with the code and status (and `error` holding the text from the `errorMessage` option, or `failure.message` without it, if there are no `issues`), or `submitted` set to `true` after success. The result travels in page state, so hydration renders the same thing, and the browser uses it only once: when the form mounts again, it starts from `initial`. A field with a server message loses it on change, as after a JavaScript submission. A field still containing an error returns as text, exactly as entered.
 
 Why a cookie: a signed query would leave values, sometimes personal, in the address bar, history, logs and `Referer`, and would need a secret shared between instances; storing the result in the session store would create a session for every anonymous visitor. A single-use `HttpOnly` cookie leaves no trace in the URL, needs no server state, works across multiple instances and, with the `__Host-` prefix, cannot be planted by any subdomain. Its contents are only rendered as escaped text, and it is not signed: whoever can write that cookie (the user's own browser) can only change what they themselves see.
 
@@ -769,7 +769,7 @@ Use one storage key per mutation, including what distinguishes users or accounts
 			notify(`Venta #${receipt.number} cobrada.`)
 		} catch (error) {
 			// No response: remains uncertain and will retry with the same key.
-			if (!charge.uncertain.value) failure.value = errorMessage(error)
+			if (!charge.uncertain.value) failure.value = isClientError(error) ? `The server rejected the sale (${error.code}).` : 'The sale could not be charged.'
 		}
 	}
 	function discard(): void {
@@ -808,7 +808,7 @@ const charge = useRpcMutation('sales.checkout', {
 	},
 	onError(error, attempt) {
 		// Only rejections with a response: without a response, the sale remains pending verification.
-		if (!attempt.uncertain) notify(`The sale was not recorded: ${errorMessage(error)}`)
+		if (!attempt.uncertain) notify(`The sale was not recorded: ${isClientError(error) ? error.code : 'unexpected error'}`)
 	},
 })
 ```
@@ -1135,7 +1135,7 @@ export default defineApiRoute({
 
 `ClientError` and `isClientError` are auto-imported since `1.5` in components and `app/` modules (not in `server/`, where you throw `ApiError`), like `useForm`: `errorMessage: (failure) => isClientError(failure, "INVALID_CREDENTIALS") ? "…" : "…"` needs no import.
 
-**Other failures.** An error without `issues` puts the text of `errorMessage(failure)` in `error` and the original error in `failure`, and `form.submit()` resolves to `undefined`. A `ClientError` is an expected server response and is not reported elsewhere. Any other error (a network failure, a programming error in `submit` or a schema that throws) also reaches the component's error observer, `provideErrorHandler` or the `onError` of `mountClientApp`, with source `"event"`; without an observer, it is written to the console. Thus an unexpected failure is never silently lost, even if the template does not show `error`.
+**Other failures.** An error without `issues` puts the text from the `errorMessage` option (by default, `failure.message`) in `error` and the original error in `failure`, and `form.submit()` resolves to `undefined`. A `ClientError` is an expected server response and is not reported elsewhere. Any other error (a network failure, a programming error in `submit` or a schema that throws) also reaches the component's error observer, `provideErrorHandler` or the `onError` of `mountClientApp`, with source `"event"`; without an observer, it is written to the console. Thus an unexpected failure is never silently lost, even if the template does not show `error`.
 
 **`reset`, `load` and `dirty`.** `reset()` always returns fields to `initial`, even after `load` or `commit`. `reset(values)` combines `values` with `initial` and takes that result as the `dirty` baseline. `load(values)` combines data with current fields and uses the result as the `dirty` baseline; use it when loading a record to edit, including after an asynchronous request: `form.load({ name: category.name, description: category.description })`. Both clear errors and the last submission's state, and discard earlier results still in progress (although `pending` stays `true` until completion). `reset` can also be connected to `on:reset="form.reset"`. As with any signal, replace arrays and objects instead of mutating them: `form.fields.items.value = [...form.fields.items.value, item]`.
 

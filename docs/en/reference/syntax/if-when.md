@@ -12,10 +12,10 @@ related:
   - "syntax:interpolation"
   - "syntax:meekoawait"
   - docs/api.md#condiciones-con-ifwhen-y-tipos
-source-hash: 06cf7247d2d7305cf32f4532613048fa991289eacb530ea1680714fdff443add
+source-hash: 0b70f385aceeff94dae620dae47b15c26757ff40eb6b91f814de0c363edc2eb3
 ---
 
-`if="expresión"` makes a tag and all its content exist only while the expression is truthy (in the JavaScript sense: `0`, `""`, `null` and `undefined` are falsy). `if:when="expresión"` remains available as a compatible alias. Valid on HTML elements, component tags, `<component is>` and, since `1.4`, `<snippet>`.
+`if="expresión"` makes a tag and all its content exist only while the expression is truthy (in the JavaScript sense: `0`, `""`, `null` and `undefined` are falsy). `if`, `else-if` and `else` arrive in the release after `1.9.0`, not yet published; up to 1.9 the directive is `if:when="expresión"`, which remains available as a compatible alias of `if`. Valid on HTML elements, component tags, `<component is>` and, since `1.4`, `<snippet>`.
 
 Since `1.2`, it also narrows types, like Vue's `v-if`: inside the tag, `meeko check` and the editor check attributes, props, events and content knowing the condition holds, without `!`.
 
@@ -40,13 +40,16 @@ While `user.value` is `null`, only the second paragraph exists. Inside `<article
 
 ## Attributes
 
-| Attribute | Type           | Default  | Description                                                                                        |
-| --------- | -------------- | -------- | -------------------------------------------------------------------------------------------------- |
-| `if:when` | any expression | required | The condition. Evaluated as a JavaScript boolean and reevaluated when the signals it reads change. |
+| Attribute | Type           | Default  | Description                                                                                                               |
+| --------- | -------------- | -------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `if`      | any expression | required | The condition. Evaluated as a JavaScript boolean and reevaluated when the signals it reads change. After `1.9.0`.         |
+| `if:when` | any expression | required | Alias of `if`, available since `1.0`. It can start a chain with `else-if` and `else`.                                     |
+| `else-if` | any expression | required | Condition tested only if previous branches are falsy. Must follow an `if`, `if:when` or another `else-if`. After `1.9.0`. |
+| `else`    | no value       | —        | Final branch, when no previous one matches. After `1.9.0`.                                                                |
 
 ## Alternative branches
 
-`else-if="expression"` tests another condition only if the previous branch did not match. `else`, without a value, is the final fallback. Only the first matching branch renders; later conditions and content are not evaluated.
+After `1.9.0`, not yet published. `else-if="expression"` tests another condition only if the previous branch did not match. `else`, without a value, is the final fallback. Only the first matching branch renders; later conditions and content are not evaluated.
 
 ```html
 <p if="loading.value">Cargando…</p>
@@ -160,12 +163,14 @@ With `const visibleItems = computed(() => items.value.filter((item) => item.visi
 <p if:else>Not signed in.</p>
 ```
 
-`MEEK024: Directiva de plantilla incompleta`, on `if:else`.
+`MEEK024: Directiva de plantilla incompleta`, on `if:else`. The fallback is `else`, without prefix or value, on the next sibling (after `1.9.0`):
 
 ```html good
-<p if:when="user.value">Hello, {user.value.name}</p>
-<p if:when="!user.value">Not signed in.</p>
+<p if="user.value">Hello, {user.value.name}</p>
+<p else>Not signed in.</p>
 ```
+
+Up to `1.9`, without `else`, write the opposite condition: `<p if:when="!user.value">Not signed in.</p>`.
 
 ### Lose narrowing in an arrow function
 
