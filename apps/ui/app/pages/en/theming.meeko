@@ -209,6 +209,94 @@
 				{ name: 'controlWeight / controlFontSize', type: 'string', description: 'Weight and text size of the actions.' },
 			]"
 		/>
+		<h2 id="classes">Classes of each component</h2>
+		<p>
+			The components are painted with Tailwind 4 classes with the
+			<code>ui:</code>
+			prefix, which UI compiles by itself: your application does not need Tailwind. Those classes read the tokens, so everything above also changes the components. To adjust a particular one,
+			<code>class</code>
+			reaches its root element and the
+			<code>ui</code>
+			prop adds classes to each part, by the name of its slot;
+			<code>class</code>
+			is the same as
+			<code>ui.base</code>
+			. The slot names are in the props type of each component, and the editor completes them.
+		</p>
+		<DocsCode bind:code="examples.themeSlots" />
+		<p>
+			Your classes are added to those of the component, without removing any. The UI stylesheet sits in the
+			<code>ui-base</code>
+			,
+			<code>ui.components</code>
+			and
+			<code>ui.utilities</code>
+			layers and loads before yours, so any unlayered rule of your application wins, whatever its specificity. So does a rule on an element, such as
+			<code>{'a { color: … }'}</code>
+			: scope it to your content if you do not want to change the UI links.
+		</p>
+		<DocsCode
+			label="app/styles/main.css"
+			bind:code="examples.themeSlotsCss"
+		/>
+		<h3 id="migration">From the meeko-ui-* classes</h3>
+		<p>
+			The
+			<code>.meeko-ui-*</code>
+			classes of the components and the
+			<code>data-*</code>
+			attributes that only served for styling no longer exist: a rule that selected them stops applying without any error. Give the component a name of your own with
+			<code>class</code>
+			or
+			<code>ui</code>
+			and change the selector to that name. If the rule depended on a variant, such as
+			<code>[data-variant='outline']</code>
+			, put the class where you use that variant. The attributes that JavaScript reads (
+			<code>data-meeko-*</code>
+			) and ARIA are still there.
+		</p>
+		<DocsApi
+			caption="Most common equivalents"
+			bind:rows="[
+				{ name: '.meeko-ui-button[data-variant]', type: 'class + variant', description: 'UIButton and UILink: the variant prop (and size, shape, tone) and your class.' },
+				{ name: '.meeko-ui-badge / -badge-dot', type: 'ui.base / ui.dot', description: 'UIBadge.' },
+				{ name: '.meeko-ui-input / -textarea', type: 'class', description: 'UIInput and UITextarea.' },
+				{ name: '.meeko-ui-field-label / -error / -description', type: 'ui.label / ui.error / ui.description', description: 'UIField; also ui.meta and ui.counter.' },
+				{ name: '.meeko-ui-choice / -choice-content', type: 'ui.base / ui.content', description: 'UICheckbox and UISwitch; the control is ui.input.' },
+				{ name: '.meeko-ui-card-header / -title / -body / -footer', type: 'ui.header / ui.title / ui.body / ui.footer', description: 'UICard; class is ui.base.' },
+				{ name: '.meeko-ui-table-scroll / .meeko-ui-table', type: 'ui.base / class', description: 'UITable; also ui.cell, ui.headerCell, ui.bodyRow. Replaces --table-border, --table-background and --table-hover.' },
+				{ name: '.meeko-ui-modal-heading / -body / -footer', type: 'ui.heading / ui.body / ui.footer', description: 'UIModal; class is ui.base, the <dialog>.' },
+				{ name: '.meeko-ui-alert-title / -description', type: 'ui.title / ui.description', description: 'UIAlert; the tone prop replaces data-tone.' },
+				{ name: '.meeko-ui-page-main / -sidebar / -aside', type: 'ui.main / ui.sidebar / ui.aside', description: 'UIPage.' },
+				{ name: '.meeko-ui-header-nav / -actions', type: 'ui.nav / ui.actions', description: 'UIHeader.' },
+				{ name: '.meeko-ui-command-row / -excerpt', type: 'ui.row / <small>', description: 'UICommandPalette; the active row has aria-selected.' },
+				{ name: '.meeko-ui-tooltip / -tooltip-trigger', type: 'class / triggerClass', description: 'UITooltip and UIPopover.' },
+			]"
+		/>
+		<p>
+			<code>MeekoSelect</code>
+			,
+			<code>MeekoPopover</code>
+			and
+			<code>MeekoThemeToggle</code>
+			, deprecated in the core, no longer get their look from UI: use
+			<code>UISelect</code>
+			,
+			<code>UIPopover</code>
+			and
+			<MeekoLink to="/theme-toggle">UIThemeToggle</MeekoLink>
+			. To be confirmed:
+			<code>UIProse</code>
+			,
+			<code>UICodeBlock</code>
+			,
+			<code>UIDiff</code>
+			,
+			<code>UIIcon</code>
+			, the editor and utilities such as
+			<code>meeko-ui-sr-only</code>
+			still keep their classes.
+		</p>
 		<h2 id="defaults">Default values</h2>
 		<p>
 			<code>ui.defaults</code>

@@ -272,6 +272,19 @@ export default defineMeekoConfig({
   --ui-color-primary-9: #3b96ff;
   --ui-color-primary-10: #66adff;
 }`,
+	themeSlots: `<!-- class reaches the root; ui, each part by the name of its slot -->
+<UICard title="Pro plan" class="pricing-card"
+  bind:ui="{ header: 'pricing-header', title: 'pricing-title' }">
+  <p>Everything in the basic plan, with no limits.</p>
+</UICard>
+<UIBadge tone="success" dot bind:ui="{ dot: 'pulse' }">Published</UIBadge>`,
+	themeSlotsCss: `/* app/styles/main.css: without @layer, it wins over the component's classes */
+.pricing-card {
+  border-color: var(--ui-color-primary-border);
+}
+.pricing-title {
+  color: var(--ui-color-primary-text);
+}`,
 	buttonStates: `<UIButton tone="danger">Delete</UIButton>
 <UIButton tone="danger" variant="outline">Revoke</UIButton>
 <UIButton bind:loading="saving.value">Save</UIButton>

@@ -28,7 +28,7 @@ export default defineMeekoConfig({
 })
 ```
 
-El módulo registra los componentes con el prefijo `UI` y su hoja CSS mediante `meeko.addStylesheet`. Vite la procesa con el PostCSS del proyecto, resuelve sus imports y genera los assets del build. En desarrollo, los cambios de CSS usan HMR. No hace falta importar el CSS manualmente ni enlazar una URL fija. `theme: true` activa los temas del framework; el módulo UI también puede utilizarse sin esa opción.
+El módulo registra los componentes con el prefijo `UI` y su hoja CSS mediante `meeko.addStylesheet`. Esa hoja ya viene compilada con Tailwind 4 (`dist/styles/main.css`), así que la aplicación no necesita Tailwind. Vite la procesa con el PostCSS del proyecto, resuelve sus imports y genera los assets del build. En desarrollo, los cambios de CSS usan HMR. No hace falta importar el CSS manualmente ni enlazar una URL fija. `theme: true` activa los temas del framework; el módulo UI también puede utilizarse sin esa opción.
 
 ### Opciones tipadas y marca existente
 
@@ -199,7 +199,7 @@ También incluye `UIApp` y `UIModal` para [modales](#modales), `UITable` para [t
 
 ### UIButton: ruta, enlace o botón
 
-`UIButton` pinta el elemento que corresponde a lo que hace, con el mismo aspecto (`.meeko-ui-button` con `data-variant`, `data-size` y `data-shape`), también en hover, foco y con los estilos de enlace de la aplicación:
+`UIButton` pinta el elemento que corresponde a lo que hace, con el mismo aspecto (el de `variant`, `size`, `shape` y `tone`, más tu `class`), también en hover, foco y con los estilos de enlace de la aplicación:
 
 - **Con `to`**, un `<MeekoLink>`: un enlace a una ruta de la aplicación que navega sin recargar. `to` sólo admite rutas que existen; `params` es obligatorio en una ruta dinámica, con sus claves, y no se admite en una estática; `search` es la query string.
 - **Con `href`**, un `<a>` a cualquier URL, con `target`, `rel` y `download`. Con `target="_blank"` y sin `rel`, añade `rel="noopener noreferrer"`.
@@ -280,6 +280,109 @@ Desde UI 1.8, `UIPopover`, `UISelect`, `UICombobox` y `UIThemeToggle` están en 
 El tema oscuro usa `data-theme="dark"` en el elemento raíz.
 
 El módulo carga además la base global en la capa `ui-base`: la [escala fluida](../packages/ui/DESIGN.md#escala-fluida) de la raíz, reset, `body` con fondo, texto y fuente, `color-scheme`, `::selection`, barras de desplazamiento y foco. Sirve también Inter en `/_meeko-ui/fonts/`, con su `preload`, de modo que la aplicación no necesita copiar la fuente. Cualquier regla de la aplicación gana a esa capa; `ui: { base: false }` la omite por completo.
+
+### Clases por slot
+
+Los componentes se pintan con clases de Tailwind 4 con el prefijo `ui:`, compiladas por UI: tu aplicación no necesita Tailwind y esas clases no chocan con las suyas. Leen los tokens `--ui-*`, así que `ui.tokens`, el tema oscuro y redefinir un token cambian también los componentes.
+
+Para retocar un componente concreto, dale tus clases:
+
+- **`class`** llega al elemento raíz, como siempre. En `UITable` llega a la `<table>`.
+- **`ui`** añade clases a cada parte, por el nombre de su slot. `class` equivale a `ui.base` y se añade después. Sólo la tienen los componentes con varias partes; `UIButton`, `UILink`, `UIInput`, `UITextarea` y `UIContainer` usan `class`.
+
+```html
+<UICard
+	title="Plan Pro"
+	class="pricing-card"
+	bind:ui="{ header: 'pricing-header', title: 'pricing-title', footer: 'pricing-footer' }"
+>
+	…
+</UICard>
+<UIField
+	id="email"
+	label="Correo"
+	bind:ui="{ label: 'form-label', error: 'form-error' }"
+>
+	…
+</UIField>
+<UIBadge
+	tone="success"
+	dot
+	bind:ui="{ dot: 'pulse' }"
+>
+	Publicado
+</UIBadge>
+```
+
+```ts
+useToast().add({ text: 'Guardado', ui: { base: 'toast-wide' } })
+```
+
+Los nombres de los slots están en el JSDoc de cada tipo de props (`UICardProps`, `UIFieldProps`…), y el editor los completa. `UIThemeProps` y `UIVariantSlots`, de `@meekojs/ui/runtime`, describen las props de un componente con sus variantes y su `ui`.
+
+**Qué gana.** Tus clases se suman a las del componente, sin fusionarlas ni quitar ninguna: decide la cascada. La hoja de UI tiene tres capas, `ui-base` (la base global), `ui.components` (lo que aún se escribe a mano, como las View Transitions) y `ui.utilities` (las clases `ui:*`), y se carga antes que las hojas de la aplicación. Por eso cualquier regla sin capa de tu CSS gana a las tres, sea cual sea su especificidad, y también la de una capa que declare tu aplicación. Una regla sobre un elemento, como `a { color: … }`, también gana a un enlace de UI: limítala a tu contenido si no quieres cambiar los componentes.
+
+```css
+/* app/styles/main.css, sin @layer */
+.pricing-title {
+	color: var(--ui-color-primary-text);
+}
+.form-error {
+	font-weight: var(--ui-font-weight-semibold);
+}
+```
+
+### Migración desde las clases retiradas
+
+Antes, los componentes llevaban clases `.meeko-ui-*` y atributos `data-*` que sólo servían para darles estilo, y una aplicación podía seleccionarlos en su CSS. Ya no existen: una regla como `.meeko-ui-card-title { … }` o `.meeko-ui-button[data-variant='outline'] { … }` deja de aplicarse sin dar error. Para migrar:
+
+1. Busca en tus hojas y plantillas `meeko-ui-` y los selectores de atributo de componentes de UI (`[data-variant]`, `[data-tone]`, `[data-size]`…).
+2. Pon un nombre tuyo en el componente, con `class` o con la parte que corresponda de `ui`, según la tabla.
+3. Cambia el selector de tu regla por ese nombre. Si la regla dependía de una variante (`[data-variant='outline']`), pon la clase sólo donde usas esa variante, o pásala desde el mismo sitio que la prop.
+4. Deja tu regla sin `@layer`: así gana a la de UI.
+
+| Clase o atributo retirado                                                                                                                            | Ahora                                                                                                                                                     |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.meeko-ui-button` y sus `data-variant`, `data-size`, `data-shape`, `data-tone`                                                                      | `class` de `UIButton` o `UILink`; la variante, con las props `variant`, `size`, `shape` y `tone`.                                                         |
+| `.meeko-ui-badge`, `-badge-dot`                                                                                                                      | `UIBadge`: `class` (o `ui.base`) y `ui.dot`.                                                                                                              |
+| `.meeko-ui-input`, `-textarea`                                                                                                                       | `class` de `UIInput` o `UITextarea`.                                                                                                                      |
+| `.meeko-ui-field`, `-field-label`, `-field-description`, `-field-error`, `-field-meta`, `-counter`                                                   | `UIField`: `ui.base`, `ui.label`, `ui.description`, `ui.error`, `ui.meta`, `ui.counter`.                                                                  |
+| `.meeko-ui-choice`, `-choice-content`, `-choice-description`, `-switch`                                                                              | `UICheckbox` o `UISwitch`: `ui.base`, `ui.content`, `ui.description`; el control, `ui.input`.                                                             |
+| `.meeko-ui-radio-group`, `-radio-options` y su `data-variant`                                                                                        | `UIRadioGroup`: `ui.base`, `ui.options`, `ui.option`, `ui.legend`, `ui.input`; la prop `variant`.                                                         |
+| `.meeko-ui-slider`                                                                                                                                   | `UISlider`: `ui.base` y `ui.input`.                                                                                                                       |
+| `.meeko-ui-card`, `-card-header`, `-card-title`, `-card-description`, `-card-actions`, `-card-body`, `-card-footer` y `data-variant`, `data-padding` | `UICard`: `ui.base`, `ui.header`, `ui.title`, `ui.description`, `ui.actions`, `ui.body`, `ui.footer`; las props `variant` y `padding`.                    |
+| `.meeko-ui-link-card`, `-link-card-title`, `-link-card-description`                                                                                  | `UILinkCard`: `ui.base`, `ui.title`, `ui.description`.                                                                                                    |
+| `.meeko-ui-table-scroll`, `.meeko-ui-table`, `-table-empty` y `data-layout`, `data-density`, `data-numeric`                                          | `UITable`: `ui.base` (el contenedor), `class` o `ui.table`, `ui.empty`, `ui.headerCell`, `ui.cell`, `ui.footerCell`, `ui.bodyRow`.                        |
+| `--table-border`, `--table-background`, `--table-hover`                                                                                              | Una regla tuya sobre `ui.table`, `ui.cell` o `ui.bodyRow`.                                                                                                |
+| `.meeko-ui-stat`, `-stat-value`, `-stat-detail`                                                                                                      | `UIStat`: `ui.base`, `ui.label`, `ui.value`, `ui.detail`.                                                                                                 |
+| `.meeko-ui-description-list` y `data-columns`                                                                                                        | `UIDescriptionList`: `ui.base`, `ui.item`, `ui.label`, `ui.value`, `ui.code`, `ui.detail`; la prop `columns`.                                             |
+| `.meeko-ui-modal`, `-modal-heading`, `-modal-body`, `-modal-footer`, `-modal-close` y `data-size`                                                    | `UIModal`: `ui.base`, `ui.heading`, `ui.title`, `ui.description`, `ui.body`, `ui.footer`, `ui.close`; la prop `size`.                                     |
+| `.meeko-ui-drawer`, `-drawer-trigger`, `-drawer-panel`, `-drawer-heading`, `-drawer-body`, `-drawer-footer`, `-drawer-close` y `data-side`           | `UIDrawer`: `ui.base`, `ui.trigger`, `ui.panel`, `ui.heading`, `ui.title`, `ui.body`, `ui.footer`, `ui.close`.                                            |
+| `.meeko-ui-alert`, `-alert-icon`, `-alert-content`, `-alert-title`, `-alert-description`, `-feedback-actions`, `-dismiss` y `data-tone`              | `UIAlert`: `ui.base`, `ui.icon`, `ui.content`, `ui.title`, `ui.description`, `ui.actions`, `ui.dismiss`; la prop `tone`.                                  |
+| `.meeko-ui-toast`, `-toast-content`, `-toast-message`                                                                                                | `UIToast` o `useToast().add()`: `ui.base`, `ui.content`, `ui.message`, `ui.actions`, `ui.dismiss`.                                                        |
+| `.meeko-ui-empty`, `-empty-title`, `-empty-description`                                                                                              | `UIEmpty`: `ui.base`, `ui.title`, `ui.description`, `ui.actions`.                                                                                         |
+| `.meeko-ui-skeleton`; `.meeko-ui-disclosure`, `-disclosure-body`                                                                                     | `UISkeleton`: `ui.base`, `ui.line`. `UIDisclosure`: `ui.base`, `ui.summary`, `ui.body`.                                                                   |
+| `.meeko-ui-tabs`, `-tabs-list`, `-tabs-tab`, `-tabs-panel`, `-tabs-indicator`                                                                        | `UITabs`: `ui.base`, `ui.list`, `ui.tab`, `ui.panel`, `ui.indicator`.                                                                                     |
+| `.meeko-ui-page`, `-page-body`, `-page-sidebar`, `-page-main`, `-page-aside`, `-page-bar`, `-page-notices`, `-skip-link`                             | `UIPage`: `ui.base`, `ui.body`, `ui.sidebar`, `ui.main`, `ui.aside`, `ui.bar`, `ui.notices`, `ui.skip`.                                                   |
+| `.meeko-ui-page-header`, `-page-header-row`, `-page-header-text`, `-page-header-actions`                                                             | `UIPageHeader`: `ui.base`, `ui.row`, `ui.text`, `ui.title`, `ui.description`, `ui.actions`.                                                               |
+| `.meeko-ui-container` y `data-size`, `data-gutter`                                                                                                   | `class` de `UIContainer`; las props `size` y `gutter`.                                                                                                    |
+| `.meeko-ui-header`, `-header-bar`, `-header-nav`, `-header-actions`, `-header-toggle`, `-header-menu` y `data-sticky`                                | `UIHeader`: `ui.base`, `ui.bar`, `ui.nav`, `ui.link`, `ui.actions`, `ui.toggle`, `ui.menu`; la prop `sticky`.                                             |
+| `.meeko-ui-footer`, `-footer-inner`, `-footer-about`, `-footer-groups`, `-footer-title`, `-footer-actions`, `-footer-legal`                          | `UIFooter`: `ui.base`, `ui.inner`, `ui.about`, `ui.groups`, `ui.title`, `ui.list`, `ui.link`, `ui.actions`, `ui.legal`.                                   |
+| `.meeko-ui-nav-tree`, `-nav-group`, `-nav-group-title`, `-nav-link`, `-nav-label`, `-nav-chevron`, `-nav-empty`                                      | `UINavigationTree`: `ui.base`, `ui.group`, `ui.title`, `ui.link`, `ui.label`, `ui.chevron`, `ui.empty`.                                                   |
+| `.meeko-ui-nav-tabs`, `-nav-tabs-indicator` y su `data-variant`                                                                                      | `UINavigationTabs`: `ui.base`, `ui.link`, `ui.indicator`; la prop `variant`.                                                                              |
+| `.meeko-ui-breadcrumb`; `.meeko-ui-pagination`, `-pagination-count`; `.meeko-ui-page-nav`, `-page-nav-link`                                          | `UIBreadcrumb`: `ui.base`, `ui.list`, `ui.item`, `ui.link`. `UIPagination`: `ui.base`, `ui.count`, `ui.action`. `UIPageNavigation`: `ui.base`, `ui.link`. |
+| `.meeko-ui-toc`, `-toc-title`, `-toc-collapsible` y `data-nested`, `data-tracking`                                                                   | `UITableOfContents`: `ui.base`, `ui.title`, `ui.list`, `ui.link`, `ui.collapsible`.                                                                       |
+| `.meeko-ui-locale-switcher`; `.meeko-ui-locale-suggestion`, `-locale-suggestion-actions`                                                             | `UILocaleSwitcher`: `ui.base`, `ui.link`. `UILocaleSuggestion`: `ui.base`, `ui.message`, `ui.actions`.                                                    |
+| `.meeko-ui-command`, `-command-trigger`, `-command-field`, `-command-icon`, `-command-close`, `-command-status`, `-command-list`, `-command-row`     | `UICommandPalette`: `ui.base` (el diálogo), `ui.trigger`, `ui.field`, `ui.icon`, `ui.input`, `ui.close`, `ui.status`, `ui.list`, `ui.row`.                |
+| `.meeko-ui-command-excerpt`; `[data-active]` en una fila de la paleta                                                                                | Un `<small>` en tu snippet `item`; `[aria-selected='true']`.                                                                                              |
+| `.meeko-ui-tooltip`, `-tooltip-trigger` y `data-placement`, `data-match-width`                                                                       | `class` y `triggerClass` de `UITooltip` o `UIPopover`; las props `placement` y `matchWidth`.                                                              |
+| `data-clearable` de `UISelect` y `UICombobox`                                                                                                        | `UISelect` o `UICombobox`: `class` (la raíz), `ui.trigger`, `ui.clear` y el resto de sus slots.                                                           |
+
+Los atributos que lee JavaScript siguen ahí y puedes seguir usándolos en un selector: `data-meeko-*` (`data-meeko-popover`, `data-meeko-select-trigger`…), el `data-open` del contenido de un popover, los estados de `UIModal` y `UIToast` y todos los atributos ARIA (`aria-current`, `aria-selected`, `aria-expanded`, `aria-invalid`…).
+
+`MeekoSelect`, `MeekoPopover` y `MeekoThemeToggle`, obsoletos en el núcleo, ya no reciben aspecto de la hoja de UI: cámbialos por `UISelect` o `UICombobox`, `UIPopover` y `UIThemeToggle` ([Migración a 1.8](migration-1.8.md)).
+
+Pendiente de confirmar: `UIProse`, `UICodeBlock`, `UIDiff`, `UIIcon`, `UIMarkdownEditor` y las utilidades como `meeko-ui-sr-only` aún conservan sus clases `meeko-ui-*`. Esta guía se completará cuando migren.
 
 ## Modales
 
@@ -462,7 +565,7 @@ El snippet genérico `cell` sigue sirviendo para todas las columnas a la vez:
 
 El snippet `cell` sustituye el formateador y recibe el valor original. Su valor es la unión de los tipos de campo de la fila; para un valor con el tipo de su columna usa `cell-<clave>`, `row.age` o el `format` de esa columna. Los snippets por columna requieren `@meekojs/meeko` `1.8` o posterior. No escribas `<tr>` ni `<td>` en estos snippets.
 
-Los estilos se procesan con el PostCSS de Meeko. El contenedor admite foco y desplazamiento horizontal con teclado. Puedes personalizar `--table-border`, `--table-background` y `--table-hover` mediante una clase; define las columnas con `gridColumns`. La guía `/tables` muestra ambos layouts, formateadores, pies calculados, celdas personalizadas y estado vacío.
+El contenedor admite foco y desplazamiento horizontal con teclado. `class` llega a la `<table>`; las demás partes se personalizan con la prop `ui`: `base` (el contenedor que desplaza), `table`, `caption`, `section`, `row`, `bodyRow`, `headerCell`, `cell`, `footerCell` y `empty` (véase [Clases por slot](#clases-por-slot)). Define las columnas con `gridColumns`. La guía `/tables` muestra ambos layouts, formateadores, pies calculados, celdas personalizadas y estado vacío.
 
 ## Cards
 
@@ -584,7 +687,7 @@ src/
   runtime.ts
 ```
 
-El build de UI genera ESM, declaraciones TypeScript y los componentes con sus declaraciones adyacentes en `dist/app/components`. El módulo registra el plugin estático `dist/app/plugins/modal.js` y enlaza su alias privado `virtual:meeko-ui-components` con el registro de componentes que genera Meeko para el consumidor; UI no escribe un plugin en `.meeko/generated`. Las hojas se distribuyen directamente desde `src/app/styles/`: `main.css` importa `tokens.css`, y el consumidor las procesa con Vite/PostCSS. En el workspace, editar estos CSS actualiza la web de UI mediante HMR sin reconstruir el paquete. Los consumidores no necesitan generar archivos dentro de `node_modules`.
+El build de UI genera ESM, declaraciones TypeScript y los componentes con sus declaraciones adyacentes en `dist/app/components`. El módulo registra el plugin estático `dist/app/plugins/modal.js` y enlaza su alias privado `virtual:meeko-ui-components` con el registro de componentes que genera Meeko para el consumidor; UI no escribe un plugin en `.meeko/generated`. `scripts/build-styles.mjs` compila `src/app/styles/main.css` con Tailwind 4 en `dist/styles/main.css`, la hoja que añade el módulo: toma las clases de `src/app/components` y `src/app/variants`, nunca de la aplicación. En el workspace, `pnpm -F @meekojs/ui run build:styles` la recompila al editar un componente, una variante o una hoja, y la web de UI la recibe por HMR. Los consumidores no necesitan generar archivos dentro de `node_modules`.
 
 Más información en la [guía de UI](ui.md) y en la [web pública de Meeko UI](https://ui.meekojs.com), con instalación, personalización, API y ejemplos interactivos. En el monorepo se inicia mediante `pnpm ui:dev`.
 
@@ -660,7 +763,7 @@ Un `<button>` activo o un enlace con `href` llevan además `interestfor`: donde 
 </UIPopover>
 ```
 
-**Posición.** El contenido usa `position-anchor: auto`, `position-area` y `position-try-fallbacks: flip-block, flip-inline`, así que se coloca al otro lado si no cabe, sin JavaScript. Las reglas están en la capa `meeko` de `popover.css`, así que cualquier regla de tu CSS gana. Un navegador sin anchor positioning lo abre sin anclar. El contenido abierto lleva `data-open`.
+**Posición.** El contenido usa `position-anchor: auto`, `position-area` y `position-try-fallbacks: flip-block, flip-inline`, así que se coloca al otro lado si no cabe, sin JavaScript. Esas reglas son clases `ui:*` de la capa `ui.utilities`, así que cualquier regla sin capa de tu CSS gana. Un navegador sin anchor positioning lo abre sin anclar. El contenido abierto lleva `data-open`.
 
 **Disparador propio.** El snippet `anchor` sustituye el botón: recibe en `trigger` (tipo `PopoverTrigger`) los atributos que el disparador debe llevar, con el nombre de cada atributo como clave, así que basta con [`bind="trigger"`](api.md). `<UIPopover>` encuentra el elemento por su `id` al montarse y le añade el teclado y el anclaje:
 
@@ -1051,7 +1154,7 @@ Todo enlace de una lista acepta `href` (cualquier URL) o `to` (una ruta con `par
 | `UIProse`            | `as` (`div`, `article`, `section`), `html`, `class` y atributos                                                                                                                                                        | `default`                                                           |
 | `UIDiff`             | `diff`, `label`, `emptyText`, `lineLabels`, `class`                                                                                                                                                                    |                                                                     |
 
-- **`UIPage`** pinta un único `<main>` enfocable y el enlace para saltar a él, y coloca `sidebar` y `aside` en columnas fijas al desplazarse. A 75rem oculta `aside` y a 54rem oculta `sidebar` y muestra `bar`, donde va el `UIDrawer`. Con un `UIHeader` fijo, los anclajes dejan libre su altura.
+- **`UIPage`** pinta un único `<main>` enfocable y el enlace para saltar a él, y coloca `sidebar` y `aside` en columnas fijas al desplazarse. Por debajo de 75rem oculta `aside`, y por debajo de 54rem oculta `sidebar` y muestra `bar`, donde va el `UIDrawer`. Con un `UIHeader` fijo, los anclajes dejan libre su altura.
 - **`notices`** de `UIPage` va bajo la cabecera, con el ancho de la página, y no ocupa sitio si su contenido no pinta nada.
 - **`UIHeader`** tiene una altura fija, `--ui-header-height`. En pantallas estrechas sus enlaces pasan a un menú con `popover`, que flota y no mueve la página. Una imagen de `brand` declara `width` y `height` para reservar su espacio.
 - **`UIDrawer`** es un `<dialog>` modal con `command`, `commandfor` y `closedby`: abre, cierra y devuelve el foco sin JavaScript en los navegadores que los admiten; donde no, lo hace al hidratar. Ya hidratado, sale con la misma View Transition que `UIModal`, por su propio lado; al seguir un enlace se cierra al instante, porque la navegación ya es la transición.

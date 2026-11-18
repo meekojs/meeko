@@ -155,7 +155,7 @@ Con `pointer: coarse` los altos crecen solos, y los inputs usan `--ui-input-font
 
 El módulo lo hace todo con `modules: ['@meekojs/ui']`:
 
-- **`main.css`:** paleta, tokens, `@font-face` y componentes.
+- **`main.css`:** paleta, tokens, `@font-face` y componentes, compilada con Tailwind 4 por `scripts/build-styles.mjs` en `dist/styles/main.css`; la app no necesita Tailwind. Las clases de los componentes llevan el prefijo `ui:`, viven en `src/app/variants/` (`tv()` de `tailwind-variants/lite`) y leen los tokens a través de `theme.css`. Capas: `ui.components`, lo que aún se escribe a mano, y `ui.utilities`, las clases `ui:*`, por encima. Cualquier regla sin capa de la app gana a ambas.
 - **`base.css`:** reset, `body`, `color-scheme`, `::selection`, barras de desplazamiento y foco, en la capa `@layer ui-base`. Cualquier regla sin capa de la app gana, y también cualquier capa que declare, porque ésta se registra primero. Se omite con `ui: { base: false }`.
 - **La fuente:** se sirve en `/_meeko-ui/fonts/inter-latin-opsz-normal.woff2`, con su `preload`. La app no copia archivos ni escribe `@font-face`. La CSP sólo necesita `font-src 'self'`, y se sirve con CORS, así que también la carga un `<iframe sandbox srcdoc>` que lea `@meekojs/ui/styles/fonts.css`.
 
@@ -180,3 +180,5 @@ Para una marca propia, `ui.tokens` o una hoja de la app:
 	--ui-radius-md: 0.5rem;
 }
 ```
+
+Para retocar un componente concreto, `class` (el elemento raíz) y la prop `ui`, con clases por slot: `<UICard bind:ui="{ title: 'pricing-title' }">`. Las clases `.meeko-ui-*` y los atributos `data-*` que sólo daban estilo ya no existen; la [guía de migración](../../docs/ui-api.md#migración-desde-las-clases-retiradas) da su equivalente.
