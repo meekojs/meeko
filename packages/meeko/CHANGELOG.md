@@ -1,5 +1,10 @@
 # Cambios de Meeko
 
+## Sin publicar
+
+- **El cliente sólo hidrata con el payload que escribió el servidor.** La entrada de cliente buscaba `#app` y `#meeko-payload` con `getElementById`, y un elemento de la página con el mismo `id`, como HTML de usuario saneado, podía hacerse pasar por ellos. Ahora sólo cuentan los hijos directos de `<body>`, con `readHydrationDocument(document)`, nuevo en `@meekojs/meeko/framework`; una entrada de cliente propia debería usarlo. Además, al hidratar, el head de la ruta sólo adopta las etiquetas que el servidor escribió y nunca crea scripts ni estilos a partir del payload del documento.
+- **Una redirección de middleware de ruta en el navegador sólo sigue URL `http:` y `https:`.** Otro esquema, como `javascript:`, cancela la navegación con un error en lugar de cargarse. Una redirección a una ruta de la aplicación navega ahora en el cliente, sin recargar la página.
+
 ## 1.9.0 — 2026-11-05
 
 - **Credenciales configurables en los clientes API y RPC.** `ClientOptions.credentials` acepta `same-origin`, `include` u `omit` y conserva `same-origin` por defecto. Permite usar cookies HttpOnly con una API en otro origen desde el navegador sin reemplazar el `fetch` del cliente. El servidor debe configurar CORS y proteger las mutaciones contra CSRF; esta opción no reenvía automáticamente las cookies de una petición SSR.

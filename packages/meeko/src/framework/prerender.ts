@@ -152,8 +152,11 @@ function describeFailure(error: unknown): string {
 	return lines.join('\n')
 }
 
-/** The navigation payload embedded in a Meeko document; `serializeJson` escapes every `<` inside it. */
-const embeddedPayload = /<script id="meeko-payload" type="application\/json">([^<]*)<\/script>/
+/**
+ * The navigation payload embedded in a Meeko document; `serializeJson` escapes every `<` inside it.
+ * The last one is the server's: the page content and its teleports come before it.
+ */
+const embeddedPayload = /<script id="meeko-payload" type="application\/json">([^<]*)<\/script>/g
 
 /**
  * Prerenderiza las rutas `render: "prerender"`: genera sus URL (con `prerenderEntries` en las
@@ -239,7 +242,7 @@ export async function prerenderRoutes(options: PrerenderOptions): Promise<string
 		// The payload of the stored document comes from the same loader run as its HTML; only a
 		// document without one, or whose payload leaves out `documentHtml` values, which a navigation
 		// has no other way to receive, asks the handler a second time.
-		let navigationPayload = rendered.match(embeddedPayload)?.[1]
+		let navigationPayload = [...rendered.matchAll(embeddedPayload)].at(-1)?.[1]
 		if (navigationPayload === undefined || (JSON.parse(navigationPayload) as { documentHtml?: unknown }).documentHtml !== undefined) {
 			navigationPayload = undefined
 			const navigation = await render(pathname, { headers: { accept: 'application/meeko+json' } })
