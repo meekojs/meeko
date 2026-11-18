@@ -926,6 +926,8 @@ Tipos públicos de `@meekojs/ui/runtime`.
 />
 ```
 
+**Un panel que no es un menú.** Las notificaciones, la cuenta de usuario o unos filtros contienen controles, enlaces o texto, no una lista de acciones: no van en `UIMenu`, cuyo `role="menu"` obliga a que cada elemento sea un `menuitem` y quita la navegación con `Tab`. Usa `<UIPopover role="dialog" label="Notificaciones">` con el disparador que quieras (por ejemplo un `UIIconButton` en el snippet `anchor`): el foco entra en el panel, `Tab` recorre sus controles y `Esc` lo cierra y devuelve el foco.
+
 Cada entrada de `items` (`UIMenuEntry`) es una acción (`UIMenuAction`: un `<button role="menuitem">` con `onSelect`), un enlace (`UIMenuLink`: un `<a role="menuitem">` con `href`, o con `to`, `params` y `search` tipados, que navega con `<MeekoLink>`) o un separador (`{ separator: true }`, con `role="separator"`). Un ítem admite además `value`, `tone: 'danger'`, `disabled` (sigue visible, con `aria-disabled`, y no se puede elegir), `icon` (trazo SVG de 16 por 16) y `shortcut` (un recordatorio tras el texto; el atajo lo implementa la aplicación). El evento `select` recibe el ítem elegido, después de su `onSelect`.
 
 Sin `triggerLabel` ni snippet `trigger`, el disparador es un botón de sólo icono con tres puntos, para el menú de una fila, nombrado con `menu.trigger` de los mensajes («Más acciones», «More actions») salvo que se pase `ariaLabel`. Los snippets son `trigger` (contenido del botón), `anchor` (un disparador propio, como en `UIPopover`), `item` (interior de cada ítem de `items`) y `default` (ítems propios con `role="menuitem"` tras los de `items`). La lista sólo pinta contenido de frase, así que el componente es válido dentro de un `<p>`.
@@ -1456,6 +1458,7 @@ Con `change`, `period`, `trend`, `href` o `to`, `UIStat` es una cifra clave («K
 ```
 
 - **Defaults.** `ui.defaults.stat` admite los slots nuevos, y `ui.defaults.sparkline`, `class` y los slots `base`, `area` y `line`; el sparkline de `UIStat trend` también los recibe.
+- **Ayuda junto a la etiqueta.** `hint` pinta un `UIHint` (ⓘ) tras la etiqueta, con su clase extra en `ui.hint`: `<UIStat label="Ingresos" hint="Ventas cobradas, sin impuestos" … />`. El snippet `label` sustituye el texto de la etiqueta en pantalla; `label` sigue nombrando el enlace y el sparkline.
 - **Tipos.** `UISparklineProps`, `UISparklineTone` y `UIStatDirection` se importan desde `@meekojs/ui/runtime`, como `UIStatProps`.
 
 ### Notificaciones desde una página

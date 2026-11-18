@@ -1,5 +1,5 @@
 ---
-source-hash: 08dbcece17031e4cdd469da06567564cb864586212ea249ac431d2a1f775c02e
+source-hash: 08af63a425184736f2fc7a48b7400476643be59b2e962c36ee9962930dffb9bf
 ---
 
 # Meeko UI API
@@ -930,6 +930,8 @@ Public types from `@meekojs/ui/runtime`.
 />
 ```
 
+**A panel that is not a menu.** Notifications, the user account or a set of filters hold controls, links or text, not a list of actions: they do not belong in `UIMenu`, whose `role="menu"` makes every element a `menuitem` and takes away navigation with `Tab`. Use `<UIPopover role="dialog" label="Notifications">` with the trigger you want (for example a `UIIconButton` in the `anchor` snippet): the focus moves into the panel, `Tab` goes through its controls and `Esc` closes it and gives the focus back.
+
 Each entry of `items` (`UIMenuEntry`) is an action (`UIMenuAction`: a `<button role="menuitem">` with `onSelect`), a link (`UIMenuLink`: an `<a role="menuitem">` with `href`, or with typed `to`, `params` and `search`, which navigates with `<MeekoLink>`) or a separator (`{ separator: true }`, with `role="separator"`). An item also takes `value`, `tone: 'danger'`, `disabled` (still visible, with `aria-disabled`, and not choosable), `icon` (a 16 by 16 SVG path) and `shortcut` (a reminder after the text; the application implements the shortcut). The `select` event receives the chosen item, after its `onSelect`.
 
 Without `triggerLabel` or a `trigger` snippet, the trigger is an icon-only button with three dots, for a row menu, named with `menu.trigger` of the messages (“Más acciones”, “More actions”) unless `ariaLabel` is given. The snippets are `trigger` (content of the button), `anchor` (a custom trigger, as in `UIPopover`), `item` (inside of each item of `items`) and `default` (custom items with `role="menuitem"` after those of `items`). The list only paints phrasing content, so the component is valid inside a `<p>`.
@@ -1460,6 +1462,7 @@ With `change`, `period`, `trend`, `href` or `to`, `UIStat` is a key figure (a "K
 ```
 
 - **Defaults.** `ui.defaults.stat` takes the new slots, and `ui.defaults.sparkline` takes `class` and the slots `base`, `area` and `line`; the sparkline of `UIStat trend` gets them too.
+- **Help next to the label.** `hint` draws a `UIHint` (ⓘ) after the label, with its extra class in `ui.hint`: `<UIStat label="Revenue" hint="Paid sales, before tax" … />`. The `label` snippet replaces the text of the label on screen; `label` still names the link and the sparkline.
 - **Types.** `UISparklineProps`, `UISparklineTone` and `UIStatDirection` are imported from `@meekojs/ui/runtime`, as `UIStatProps`.
 
 ### Notifications from a page

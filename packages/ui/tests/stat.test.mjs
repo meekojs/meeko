@@ -13,7 +13,7 @@ import { statChange, statTone } from '../dist/app/utils/stat.js'
 import { sparkline, stat } from '../dist/app/variants/data.js'
 import { validateDefaults } from '../dist/defaults.js'
 
-const components = ['Sparkline', 'Stat']
+const components = ['Popover', 'Tooltip', 'Hint', 'Sparkline', 'Stat']
 const i18nKey = Symbol.for('meeko.i18n')
 
 /** Compiles the real components and a page with `template`, and renders it in SSR with the given contexts. */
@@ -221,4 +221,17 @@ test('ui.defaults validates the slots of a key figure and of a sparkline', async
 	const html = await render(context, '<UIStat label="Visitas" bind:value="1" bind:change="2" bind:ui="{ delta: \'mine\' }" />', { defaults: { stat: { ui: { change: 'app-change', delta: 'app-delta' } } } })
 	assert.match(html, /<dd class="[^"]*app-change">/)
 	assert.match(html, /<span class="[^"]*app-delta mine">/)
+})
+
+test('UIStat puts a UIHint after its label with hint, and the label snippet replaces the text of the term', async (context) => {
+	const html = await render(context, '<UIStat label="Ingresos" hint="Ventas cobradas, sin impuestos" value="12 400 €" bind:ui="{ hint: \'my-hint\' }" />')
+	const term = html.match(/<dt[^>]*>([\s\S]*?)<\/dt>/)?.[1] ?? ''
+	assert.match(term, /^Ingresos<button/, 'the label first, with no line break before its hint')
+	assert.match(term, /<button[^>]*aria-label="Más información"/, 'the hint is a UIHint, named by its default text')
+	assert.match(term, /class="[^"]*ui:ms-1[^"]* my-hint/, 'a space away from the label, with ui.hint')
+	assert.match(term, /Ventas cobradas, sin impuestos/)
+	const custom = await render(context, '<UIStat label="Ingresos" value="12 400 €"><snippet name="label"><strong>Ingresos</strong> netos</snippet></UIStat>')
+	assert.match(custom, /<dt[^>]*><strong>Ingresos<\/strong> netos<\/dt>/)
+	const plain = await render(context, '<UIStat label="Visitas" bind:value="1400" />')
+	assert.match(plain, /<dt class="[^"]*">Visitas<\/dt>/, 'without hint nor snippet, the term is its text alone')
 })

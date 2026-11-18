@@ -12,6 +12,7 @@
 	import { fillMessage, uiMessages } from '../utils/messages'
 	import { statChange, statTone } from '../utils/stat'
 	import { stat } from '../variants/data'
+	import * as Hint from './Hint.meeko'
 	import * as Icon from './internal/Icon.meeko'
 	import * as Sparkline from './Sparkline.meeko'
 
@@ -19,7 +20,7 @@
 
 	const theme = uiTheme('stat', () => props)
 
-	const snippets = defineSnippets<{ value?: []; detail?: [] }>()
+	const snippets = defineSnippets<{ label?: []; value?: []; detail?: [] }>()
 
 	const messages = uiMessages()
 	const text = messages.stat
@@ -42,7 +43,15 @@
 
 <template>
 	<dl bind:class="classes.value.base({ class: [theme.ui.base, theme.class] })">
-		<dt bind:class="classes.value.label({ class: theme.ui.label })">{props.label}</dt>
+		<dt bind:class="classes.value.label({ class: theme.ui.label })"
+			><render
+				if:when="snippets.label"
+				snippet="snippets.label" /><template if:when="!snippets.label">{props.label}</template
+			><Hint
+				if:when="props.hint"
+				bind:text="props.hint"
+				bind:class="classes.value.hint({ class: theme.ui.hint })"
+		/></dt>
 		<dd
 			if:when="snippets.value"
 			bind:class="classes.value.value({ class: theme.ui.value })"

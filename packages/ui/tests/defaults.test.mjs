@@ -8,7 +8,7 @@ import { compile } from '../../meeko/dist/compiler.js'
 import { createRoot, provide } from '../../meeko/dist/index.js'
 import { uiDefaultsKey, uiTheme } from '../dist/app/utils/defaults.js'
 
-const components = ['Card', 'Table', 'Stat', 'Sparkline', 'Alert', 'Button']
+const components = ['Card', 'Table', 'Stat', 'Sparkline', 'Hint', 'Tooltip', 'Popover', 'Alert', 'Button']
 
 /** Compiles the real components and a page that uses them, and renders it in SSR with the given `ui.defaults`. */
 async function render(context, template, defaults) {
@@ -30,7 +30,7 @@ async function render(context, template, defaults) {
 	for (const name of components) {
 		const source = await readFile(new URL(`../src/app/components/${name}.meeko`, import.meta.url), 'utf8')
 		// useId is an auto-import of the app; this compilation has no app, so it imports it.
-		await write(name, source.includes('useId()') ? source.replace(/(<script[^>]*>)/, '$1\nimport { useId } from "@meekojs/meeko"') : source)
+		await write(name, source.includes('useId()') && !/import \{[^}]*\buseId\b/.test(source) ? source.replace(/(<script[^>]*>)/, '$1\nimport { useId } from "@meekojs/meeko"') : source)
 	}
 	const imports = components.map((name) => `import * as UI${name} from "./${name}.meeko"`).join('; ')
 	await write('Page', `<script lang="ts">${imports}; const rows = [{ id: 1, name: "Ana" }]; const columns = [{ key: "name" as const, label: "Name" }]</script><template>${template}</template>`)

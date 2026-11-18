@@ -26,6 +26,8 @@ export const stat = tv({
 	slots: {
 		base: [list, 'ui:content-start ui:gap-1'],
 		label: term,
+		/** The <UIHint> after the label, a space away from its text. */
+		hint: 'ui:ms-1',
 		value: [value, 'ui:text-2xl ui:font-semibold ui:tracking-tight'],
 		detail,
 		/** The change and its period, on one line that wraps. */

@@ -1,6 +1,6 @@
 <script lang="ts">
-	// <UITableOfContents>: plain links. `scroll-target-group` paints the active one with no script where
-	// it exists; the observer below only keeps aria-current there, and is the paint everywhere else.
+	// <UITableOfContents>: plain links. The observer below keeps aria-current on the active one, which paints it
+	// in every browser (see tableOfContentsLink); `scroll-target-group` still lets the browser follow the target.
 	import { effect, signal } from '@meekojs/meeko'
 
 	import type { UITableOfContentsProps } from '../types/navigation'

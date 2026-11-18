@@ -62,7 +62,8 @@ type UIStatRouteLink = UIRouteTarget &
  * por debajo del tamaño de contenedor `stat-narrow` del tema (20rem) el valor se reduce y el sparkline baja
  * bajo la variación. Sin esas props, el marcado y las clases son los de siempre.
  *
- * @since 1.11.0 `change`, `changeFormat`, `changeDirection`, `good`, `period`, `trend`, `trendLabel`, `href`, `to` y `linkLabel`.
+ * @since 1.11.0 `change`, `changeFormat`, `changeDirection`, `good`, `period`, `trend`, `trendLabel`, `href`, `to`, `linkLabel`, `hint` y el snippet `label`.
+ * @example `<UIStat label="Ingresos" hint="Ventas cobradas, sin impuestos" value="12 400 €" />`
  * @example `<UIStat label="Visitas" bind:value="1400" detail="Esta semana" />`
  * @example `<UIStat label="Ingresos" value="12 400 €" bind:change="12.5" period="frente a los 30 días anteriores" bind:trend="[8, 9, 12, 11, 14]" to="/ingresos" />`
  */
@@ -71,8 +72,17 @@ export type UIStatProps = (UIStatWithoutLink | UIStatAnchorLink | UIStatRouteLin
 		UIThemeProps<
 			typeof stat,
 			{
-				/** Nombre del dato. */
+				/**
+				 * Nombre del dato. El snippet `label` sustituye su texto en pantalla (por ejemplo, con un icono); el nombre
+				 * sigue sirviendo para el enlace y el sparkline.
+				 */
 				label: string
+				/**
+				 * Ayuda junto a la etiqueta: un `UIHint` (ⓘ) con este texto, que se abre con el puntero, el foco o al
+				 * pulsarlo. Su clase extra va en `ui.hint`.
+				 * @since 1.11.0
+				 */
+				hint?: string
 				/** Valor presentado por la aplicación; el snippet `value` lo sustituye. */
 				value?: string | number
 				/** Contexto del valor; el snippet `detail` lo sustituye. */
