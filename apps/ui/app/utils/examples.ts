@@ -343,6 +343,19 @@ export default defineMeekoConfig({
 <UIButton iconOnly ariaLabel="Eliminar" variant="outline">
   <UIIcon name="lucide:trash-2" />
 </UIButton>`,
+	iconButton: `<UIIconButton label="Abrir el menú" icon="menu" />
+<UIIconButton label="Cerrar" icon="close" variant="outline" />
+<UIIconButton label="Confirmar" icon="check" variant="primary" on:click="confirm" />
+<UIIconButton label="Ver enlaces" icon="arrowEnd" to="/links" />
+<UIIconButton label="Eliminar">
+  <UIIcon name="lucide:trash-2" />
+</UIIconButton>`,
+	iconButtonStates: `<UIIconButton label="Fijar el panel" icon="check" variant="outline"
+  bind:pressed="pinned.value" on:click="() => (pinned.value = !pinned.value)" />
+<UIIconButton label="Borrar" icon="close" tone="danger" />
+<UIIconButton label="Guardando" icon="check" bind:loading="saving.value" />
+<UIIconButton label="Pequeño" icon="menu" size="sm" />
+<UIIconButton label="Sin tooltip" icon="menu" bind:tooltip="false" />`,
 	textarea: `<UIField id="comment" label="Comentario" bind:counter="comment.value.length + '/200'">
   <snippet name="default" params="id, describedBy">
     <UITextarea model="comment" bind:id="id" bind:describedBy="describedBy"
@@ -460,6 +473,11 @@ export default defineMeekoConfig({
 	tooltip: `<UITooltip text="Se publica al guardar" placement="top">
   <snippet name="trigger">¿Cuándo se publica?</snippet>
 </UITooltip>`,
+	hint: `<h3>Ingresos <UIHint text="Importe cobrado, sin impuestos ni devoluciones." /></h3>
+<p>
+  Margen bruto
+  <UIHint label="Qué es el margen" placement="bottom">Ingresos menos los <em>costes directos</em></UIHint>
+</p>`,
 	commandPalette: `<script lang="ts">
   const query = signal('')
   const pages = [{ title: 'Instalación', url: '/installation' }, { title: 'Temas', url: '/theming' }]

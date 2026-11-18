@@ -217,6 +217,11 @@
 	--ui-brand-image-height: 1.75rem;
 	--ui-icon-size: 1rem;
 	--ui-icon-size-sm: 0.8125rem;
+	/* An icon inside a sentence or a heading: the size of its text, lowered to sit on the line like a letter */
+	--ui-icon-size-text: 1em;
+	--ui-icon-text-align: -0.125em;
+	/* How far the hit area of <UIHint> reaches beyond its icon, without moving the text */
+	--ui-hint-hit-area: 0.25em;
 	--ui-icon-stroke-width: 1.4;
 	--ui-opacity-subtle: 0.7;
 	--ui-opacity-hidden: 0;

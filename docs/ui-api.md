@@ -235,6 +235,58 @@ También incluye `UIApp` y `UIModal` para [modales](#modales), `UITable` para [t
 - **Enlaces localizados.** Con `to`, el `href` pasa por los resolvedores de enlaces de la aplicación, como `<MeekoLink>`: con `@meekojs/i18n`, `<UIButton to="/guide">` apunta a `/en/guide` en una página en inglés, `hreflang="es"` elige otro idioma y `bind:resolve="false"` deja la ruta tal cual.
 - **Tipos.** `UIButtonProps`, `UILinkProps`, `UIRouteTarget`, `UIForwardedAttributes`, `UIAnchorAttributes` y `UIActionAppearance` se importan desde `@meekojs/ui/runtime`.
 
+### UIIconButton y UIHint
+
+`UIIconButton` es una acción de sólo icono con las tres formas de `UIButton` (`to`, `href` o un `<button>`), sus `variant`, `size`, `shape`, `tone`, `loading`, `disabled`, `type` y evento `click`. Es cuadrada y `ghost` por defecto. `label` es obligatorio: es su nombre accesible (`aria-label`) y el texto de su `UITooltip`, que no se anuncia como descripción para no leerlo dos veces; `tooltip="false"` lo quita si el contexto ya explica la acción. El icono es `icon`, el nombre de un icono del paquete (`UIIconName`: `close`, `menu`, `check`, `info`…) o el trazo `d` de un `<path>` en una rejilla de 16 por 16, o el snippet `default`, con un `<svg aria-hidden="true">` propio.
+
+```html
+<UIIconButton
+	label="Cerrar"
+	icon="close"
+	on:click="close"
+/>
+<UIIconButton
+	label="Fijar el panel"
+	variant="outline"
+	bind:pressed="pinned.value"
+	on:click="() => (pinned.value = !pinned.value)"
+>
+	<svg
+		viewBox="0 0 16 16"
+		aria-hidden="true"
+	>
+		<path d="M8 2v12" />
+	</svg>
+</UIIconButton>
+<UIIconButton
+	label="Ajustes"
+	to="/settings"
+	icon="menu"
+/>
+```
+
+`UIHint` es un ⓘ con una ayuda en un tooltip, para ponerlo junto a un texto o dentro de un encabezado. Toma el tamaño y el color del texto que lo rodea (`em`), se alcanza con el teclado y abre la ayuda con el puntero, con el foco y al pulsarlo, también en táctil. Es un `<button>` nombrado por `label` (por defecto el texto `hint.label` de los mensajes, «Más información») y descrito por la ayuda (`aria-describedby`). La ayuda es `text` o el snippet `default`; `placement` dice dónde se abre (`top` por defecto).
+
+```html
+<h2>Ingresos <UIHint text="Importe cobrado, sin impuestos ni devoluciones." /></h2>
+<p>
+	Margen bruto
+	<UIHint
+		label="Qué es el margen"
+		placement="right"
+	>
+		Ingresos menos los
+		<em>costes directos</em>
+	</UIHint>
+</p>
+```
+
+- **Contenido de frase.** Los dos pintan sólo un botón o un enlace y un `<span>` con `popover`, así que valen dentro de `<p>`, `<h2>` o `<label>` sin romper la hidratación.
+- **Conmutadores.** `pressed` sólo existe en un `<button>`: pinta `aria-pressed` y el aspecto de activo. Un enlace con `pressed` es un error de tipos.
+- **Deshabilitados.** Un `<button disabled>` no recibe foco y algunos navegadores no le dan eventos de puntero, así que su tooltip puede no abrirse: si el motivo importa, explícalo fuera del botón.
+- **Defaults.** `ui.defaults.iconButton` admite `variant`, `size`, `shape`, `class` y los slots `base`, `icon` y `tooltip`; `ui.defaults.hint`, `class` y los mismos slots.
+- **Tipos.** `UIIconButtonProps`, `UIIconName`, `UIHintProps` y `HintSnippets` se importan desde `@meekojs/ui/runtime`.
+
 ### Navegación y etiquetas
 
 - `UILink` da apariencia de acción a un `<a>` real, con los defaults de `ui.defaults.link`. Recibe `href` (cualquier URL) o `to` (una ruta de la aplicación con `params` y `search` tipados, como en `UIButton`, con navegación del cliente y el `href` localizado con `@meekojs/i18n`); uno de los dos, no ambos. Con los dos acepta `target`, `rel`, `download`, `hreflang` y `lang`. Comparte `variant`, `size` y `shape` con `UIButton`, y admite `ariaLabel`, `class`, `id`, `title`, `aria-*`, `data-*` y evento `click`. No simula botones ni utiliza roles artificiales. Para `target="_blank"` añade `noopener noreferrer` si no se especifica `rel`.
@@ -350,7 +402,7 @@ export default defineMeekoConfig({
 ```
 
 - **`class` y `ui` se suman.** Las clases de `ui.defaults` se añaden a las de cada instancia, no las sustituyen: van primero las del componente, después las de `ui.defaults` y al final las de la instancia. `class` llega donde llega la prop de la instancia: en `UITable`, a la `<table>`. Sin fusión de clases, en un conflicto decide la cascada, como explica [Qué gana](#clases-por-slot): una regla sin capa de tu aplicación gana a las de UI, y entre dos reglas tuyas deciden su especificidad y su orden en tu hoja, no el orden de las clases en el atributo.
-- **Variantes.** Unas pocas admiten un valor de base: `variant`, `size` y `shape` en `button` y `link`; `variant`, `padding`, `density` y `actionsWrap` en `card`, y `density` en `table`. La prop explícita de la instancia gana siempre. En `card`, un `padding` o una `density` de la instancia ganan a los dos de `ui.defaults`, y en cada nivel `padding` gana a `density`. Las demás variantes no tienen default porque dependen de cada instancia: el `tone` de `UIAlert`, `UIBadge` o `UIToast` dice qué es el mensaje, y `layout`, `side`, `sticky`, `size` de `UIModal` o `columns` siguen a la estructura y el contenido de cada página. Su aspecto se retoca con `class` y `ui`.
+- **Variantes.** Unas pocas admiten un valor de base: `variant`, `size` y `shape` en `button`, `link` e `iconButton`; `variant`, `padding`, `density` y `actionsWrap` en `card`, y `density` en `table`. La prop explícita de la instancia gana siempre. En `card`, un `padding` o una `density` de la instancia ganan a los dos de `ui.defaults`, y en cada nivel `padding` gana a `density`. Las demás variantes no tienen default porque dependen de cada instancia: el `tone` de `UIAlert`, `UIBadge` o `UIToast` dice qué es el mensaje, y `layout`, `side`, `sticky`, `size` de `UIModal` o `columns` siguen a la estructura y el contenido de cada página. Su aspecto se retoca con `class` y `ui`.
 - **Componentes.** `UIButton`, `UILink`, `UIInput`, `UITextarea`, `UIContainer`, `UIProse`, `UIPopover` y `UITooltip` no tienen slots: sólo admiten `class`. `toast` sólo admite `ui` y también se aplica a los avisos de `useToast()`. `markdownEditor` es `UIMarkdownEditor`, de `@meekojs/ui/editor`. El tipo `UIDefaults` describe cada componente con sus slots reales, y el editor los completa.
 - **Validación.** Un componente, una opción o un slot desconocidos, una clase vacía o un valor de variante que no existe hacen fallar la carga del módulo con un error que dice qué se admite, como `ui: unknown slot head in defaults.card.ui; its slots are base, header, title, description, actions, body, footer`.
 - **Cliente.** Los defaults viajan con el JavaScript de cada página, como una copia plana de los valores validados: pon ahí clases, no datos.

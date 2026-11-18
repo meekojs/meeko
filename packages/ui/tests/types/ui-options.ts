@@ -1,6 +1,6 @@
 import type { UIDefaults, UIOptions } from '@meekojs/ui'
 import type { UIMarkdownEditorProps } from '@meekojs/ui/editor'
-import type { UIAlertProps, UIBadgeProps, UIBreadcrumbProps, UIButtonProps, UICardProps, UICheckboxProps, UICodeBlockProps, UIComboboxProps, UICommandPaletteProps, UIDescriptionListProps, UIDiffProps, UIDisclosureProps, UIDrawerProps, UIEmptyProps, UIFieldProps, UIFooterProps, UIHeaderProps, UILinkCardProps, UILocaleSuggestionProps, UILocaleSwitcherProps, UIModalProps, UINavigationTabsProps, UINavigationTreeProps, UIPageHeaderProps, UIPageNavigationProps, UIPageProps, UIPaginationProps, UIRadioGroupProps, UISelectProps, UISkeletonProps, UISliderProps, UIStatProps, UISwitchProps, UITableOfContentsProps, UITableProps, UITabsProps, UIThemeToggleProps, UIToastProps } from '@meekojs/ui/runtime'
+import type { UIAlertProps, UIBadgeProps, UIBreadcrumbProps, UIButtonProps, UICardProps, UICheckboxProps, UICodeBlockProps, UIComboboxProps, UICommandPaletteProps, UIDescriptionListProps, UIDiffProps, UIDisclosureProps, UIDrawerProps, UIEmptyProps, UIFieldProps, UIFooterProps, UIHeaderProps, UIHintProps, UIIconButtonProps, UILinkCardProps, UILocaleSuggestionProps, UILocaleSwitcherProps, UIModalProps, UINavigationTabsProps, UINavigationTreeProps, UIPageHeaderProps, UIPageNavigationProps, UIPageProps, UIPaginationProps, UIRadioGroupProps, UISelectProps, UISkeletonProps, UISliderProps, UIStatProps, UISwitchProps, UITableOfContentsProps, UITableProps, UITabsProps, UIThemeToggleProps, UIToastProps } from '@meekojs/ui/runtime'
 
 import type { ComponentProps as LinkProps } from '../../dist/app/components/Link.d.meeko.ts'
 
@@ -69,6 +69,8 @@ type SameSlots = [
 	Equal<Slots<'field'>, UIFieldProps['ui']>,
 	Equal<Slots<'footer'>, UIFooterProps['ui']>,
 	Equal<Slots<'header'>, UIHeaderProps['ui']>,
+	Equal<Slots<'hint'>, UIHintProps['ui']>,
+	Equal<Slots<'iconButton'>, UIIconButtonProps['ui']>,
 	Equal<Slots<'linkCard'>, UILinkCardProps['ui']>,
 	Equal<Slots<'localeSuggestion'>, UILocaleSuggestionProps['ui']>,
 	Equal<Slots<'localeSwitcher'>, UILocaleSwitcherProps['ui']>,
@@ -94,6 +96,6 @@ type SameSlots = [
 ]
 const sameSlots: false extends SameSlots[number] ? never : true = true
 // The variant defaults take the values of their props.
-type SameVariants = [Equal<NonNullable<UIDefaults['card']>['padding'], UICardProps['padding']>, Equal<NonNullable<UIDefaults['card']>['density'], UICardProps['density']>, Equal<NonNullable<UIDefaults['card']>['actionsWrap'], UICardProps['actionsWrap']>, Equal<NonNullable<UIDefaults['table']>['density'], UITableProps<{ id: number }>['density']>, Equal<NonNullable<UIDefaults['button']>['variant'], UIButtonProps['variant']>]
+type SameVariants = [Equal<NonNullable<UIDefaults['card']>['padding'], UICardProps['padding']>, Equal<NonNullable<UIDefaults['card']>['density'], UICardProps['density']>, Equal<NonNullable<UIDefaults['card']>['actionsWrap'], UICardProps['actionsWrap']>, Equal<NonNullable<UIDefaults['table']>['density'], UITableProps<{ id: number }>['density']>, Equal<NonNullable<UIDefaults['button']>['variant'], UIButtonProps['variant']>, Equal<NonNullable<UIDefaults['iconButton']>['variant'], UIIconButtonProps['variant']>, Equal<NonNullable<UIDefaults['iconButton']>['size'], UIIconButtonProps['size']>]
 const sameVariants: false extends SameVariants[number] ? never : true = true
 void [sameSlots, sameVariants]

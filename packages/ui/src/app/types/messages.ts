@@ -215,6 +215,15 @@ export interface UIMessages {
 		/** Aviso si la búsqueda falla. */
 		readonly unavailable: string
 	}
+	/**
+	 * `<UIHint>`.
+	 *
+	 * @since 1.11.0
+	 */
+	readonly hint: {
+		/** `aria-label` del botón, si no se pasa `label`. */
+		readonly label: string
+	}
 }
 
 /**

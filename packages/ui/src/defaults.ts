@@ -4,7 +4,7 @@
 import type { UIDefaults } from './app/types/config'
 
 import { badge } from './app/variants/badge'
-import { button } from './app/variants/button'
+import { button, iconButton } from './app/variants/button'
 import { card, linkCard } from './app/variants/card'
 import { checkbox, radioGroup, toggle } from './app/variants/choice'
 import { commandPalette } from './app/variants/command-palette'
@@ -21,6 +21,7 @@ import { markdownEditor } from './app/variants/markdown-editor'
 import { modal } from './app/variants/modal'
 import { breadcrumb, navigationTabs, navigationTree, pageNavigation, pagination, tableOfContents } from './app/variants/navigation'
 import { page, pageHeader } from './app/variants/page'
+import { hint } from './app/variants/popover'
 import { combobox, select } from './app/variants/select'
 import { slider } from './app/variants/slider'
 import { table } from './app/variants/table'
@@ -71,6 +72,8 @@ const components = {
 	field: { look: field },
 	footer: { look: footer },
 	header: { look: header },
+	hint: { look: hint },
+	iconButton: { look: iconButton, variants: ['variant', 'size', 'shape'] },
 	input: { look: input },
 	link: action,
 	linkCard: { look: linkCard },

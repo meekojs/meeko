@@ -2,6 +2,8 @@
 	import { examples } from '../utils/examples'
 	const count = signal(0)
 	const actions = signal(0)
+	const iconClicks = signal(0)
+	const pinned = signal(false)
 </script>
 
 <template>
@@ -165,5 +167,141 @@
 			<a href="/links">UILink</a>
 			.
 		</p>
+		<h2 id="icon-button">UIIconButton</h2>
+		<p>
+			Una acción de sólo icono con las tres formas de
+			<code>UIButton</code>
+			(
+			<code>to</code>
+			,
+			<code>href</code>
+			o un botón) y su mismo aspecto, cuadrada y
+			<code>ghost</code>
+			por defecto.
+			<code>label</code>
+			es obligatorio: es su nombre accesible y el texto de su tooltip, que no se anuncia otra vez como descripción. El icono es
+			<code>icon</code>
+			, el nombre de un icono del paquete o el trazo de un
+			<code>&lt;path&gt;</code>
+			de 16 por 16, o un
+			<code>&lt;svg aria-hidden="true"&gt;</code>
+			propio en el snippet. Es contenido de frase: vale dentro de un párrafo o de una barra de herramientas.
+		</p>
+		<DocsPreview id="icon-buttons">
+			<UIIconButton
+				id="icon-button-menu"
+				label="Abrir el menú"
+				icon="menu"
+			/>
+			<UIIconButton
+				label="Cerrar"
+				icon="close"
+				variant="outline"
+			/>
+			<UIIconButton
+				label="Confirmar"
+				icon="check"
+				variant="primary"
+				on:click="() => iconClicks.value++"
+			/>
+			<UIIconButton
+				label="Idiomas"
+				icon="globe"
+				variant="secondary"
+				shape="pill"
+			/>
+			<UIIconButton
+				label="Ver enlaces"
+				icon="arrowEnd"
+				to="/links"
+			/>
+			<UIIconButton label="Eliminar">
+				<UIIcon name="lucide:trash-2" />
+			</UIIconButton>
+		</DocsPreview>
+		<p
+			id="icon-button-status"
+			role="status"
+		>
+			Confirmaciones: {iconClicks.value}
+		</p>
+		<DocsCode bind:code="examples.iconButton" />
+		<h3 id="icon-button-states">Conmutador, peligro, carga y tamaños</h3>
+		<p>
+			Con
+			<code>pressed</code>
+			, un botón es un conmutador: pinta
+			<code>aria-pressed</code>
+			y el aspecto de activo. Un enlace no lo admite.
+			<code>tooltip="false"</code>
+			quita el tooltip cuando el contexto ya explica la acción; el nombre sigue siendo
+			<code>label</code>
+			.
+		</p>
+		<DocsPreview id="icon-button-states-preview">
+			<UIIconButton
+				id="icon-button-pin"
+				label="Fijar el panel"
+				icon="check"
+				variant="outline"
+				bind:pressed="pinned.value"
+				on:click="() => (pinned.value = !pinned.value)"
+			/>
+			<UIIconButton
+				label="Borrar"
+				icon="close"
+				tone="danger"
+			/>
+			<UIIconButton
+				label="Borrar todo"
+				icon="close"
+				tone="danger"
+				variant="primary"
+			/>
+			<UIIconButton
+				label="Guardando"
+				icon="check"
+				variant="secondary"
+				bind:loading="true"
+			/>
+			<UIIconButton
+				label="Archivar (no disponible)"
+				icon="check"
+				variant="secondary"
+				disabled
+			/>
+			<UIIconButton
+				label="Pequeño"
+				icon="menu"
+				size="sm"
+			/>
+			<UIIconButton
+				label="Grande"
+				icon="menu"
+				size="lg"
+			/>
+			<UIIconButton
+				label="Sin tooltip"
+				icon="menu"
+				bind:tooltip="false"
+			/>
+		</DocsPreview>
+		<DocsCode bind:code="examples.iconButtonStates" />
+		<DocsApi
+			caption="Propiedades de UIIconButton"
+			bind:rows="[
+				{ name: 'label', type: 'string', description: 'Obligatoria. Nombre accesible y texto del tooltip.' },
+				{ name: 'icon', type: 'UIIconName | string', description: 'Un icono del paquete (close, menu, check, info…) o el trazo d de un path de 16 por 16. Sin ella, el snippet default.' },
+				{ name: 'tooltip', type: 'boolean', default: 'true', description: 'Con false, sin tooltip.' },
+				{ name: 'placement', type: 'PopoverPlacement', default: 'top', description: 'Dónde se abre el tooltip.' },
+				{ name: 'pressed', type: 'boolean', description: 'Sin to ni href. Conmutador: pinta aria-pressed y el aspecto de activo.' },
+				{ name: 'to / params / search / href / target / rel / download', type: 'como UIButton', description: 'Una ruta o un enlace.' },
+				{ name: 'type / disabled', type: 'button | submit | reset / boolean', default: 'button / false', description: 'Sin to ni href. El botón nativo.' },
+				{ name: 'variant', type: 'primary | secondary | outline | ghost', default: 'ghost', description: 'Jerarquía visual.' },
+				{ name: 'size / shape / tone', type: 'sm | md | lg / rounded | pill / danger', default: 'md / rounded', description: 'Tamaño, forma y acción destructiva.' },
+				{ name: 'loading', type: 'boolean', default: 'false', description: 'Cambia el icono por el spinner, anuncia aria-busy y bloquea la activación.' },
+				{ name: 'class / ui', type: 'string / { base, icon, tooltip }', description: 'Clases del botón y de sus partes.' },
+			]"
+		/>
 	</DocsPage>
 </template>

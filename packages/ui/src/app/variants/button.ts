@@ -92,6 +92,58 @@ export const button = tv({
 export type ButtonVariants = VariantProps<typeof button>
 
 /**
+ * What <UIIconButton> adds to the look of `button` with `iconOnly`: the pressed state of a toggle, read from
+ * `aria-pressed` so that it needs no class of its own, and the slots of its icon and of its tooltip. Its
+ * variants are the ones of `button`, so that `ui.defaults.iconButton` accepts the same values: the component
+ * passes them to both. Its default variant is `ghost`, the usual one of a toolbar.
+ */
+export const iconButton = tv({
+	slots: {
+		base: '',
+		icon: '',
+		tooltip: '',
+	},
+	variants: {
+		variant: {
+			primary: '',
+			secondary: '',
+			outline: '',
+			ghost: '',
+		},
+		tone: {
+			neutral: '',
+			danger: '',
+		},
+		size: {
+			sm: '',
+			md: '',
+			lg: '',
+		},
+		shape: {
+			rounded: '',
+			pill: '',
+		},
+	},
+	compoundVariants: [
+		// Pressed: a deeper solid, or the soft accent with its border, which the pointer does not take away.
+		{ variant: 'primary', tone: 'neutral', class: { base: 'ui:aria-pressed:bg-primary-active ui:aria-pressed:not-disabled:hover:bg-primary-active' } },
+		{
+			variant: ['secondary', 'outline', 'ghost'],
+			tone: 'neutral',
+			class: { base: 'ui:aria-pressed:border-primary-border ui:aria-pressed:bg-primary-soft ui:aria-pressed:text-primary-text ui:aria-pressed:not-disabled:hover:bg-primary-soft-hover' },
+		},
+		{ variant: 'primary', tone: 'danger', class: { base: 'ui:aria-pressed:bg-danger-hover ui:aria-pressed:text-danger-contrast-hover ui:aria-pressed:not-disabled:hover:bg-danger-hover' } },
+		{ variant: ['secondary', 'outline', 'ghost'], tone: 'danger', class: { base: 'ui:aria-pressed:border-danger-text ui:aria-pressed:bg-danger-soft ui:aria-pressed:not-disabled:hover:bg-danger-soft' } },
+	],
+	defaultVariants: {
+		variant: 'ghost',
+		tone: 'neutral',
+		size: 'md',
+		shape: 'rounded',
+	},
+})
+
+/**
  * The spinner of a busy button for an element that cannot take `aria-busy`, such as the "more" link of
  * Pagination, which marks itself with `aria-disabled` while the next page loads.
  */

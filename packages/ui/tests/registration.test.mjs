@@ -27,6 +27,8 @@ test('UI registers public components and composables without leaking private glo
 	assert.ok(components.some(({ name }) => name === 'UITabs'))
 	assert.ok(components.some(({ name }) => name === 'UITooltip'))
 	assert.ok(components.some(({ name }) => name === 'UICommandPalette'))
+	assert.ok(components.some(({ name }) => name === 'UIIconButton'))
+	assert.ok(components.some(({ name }) => name === 'UIHint'))
 	assert.ok(!components.some(({ name }) => name === 'UIInternalModalInstance' || name === 'UIModalInstance'))
 	const entries = await discoverAutoImports(root)
 	const fromUi = entries.filter((entry) => entry.file === '@meekojs/ui/runtime')

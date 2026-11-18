@@ -1,7 +1,7 @@
 import type { VariantProps } from 'tailwind-variants/lite'
 
 import type { badge } from '../variants/badge'
-import type { button } from '../variants/button'
+import type { button, iconButton } from '../variants/button'
 import type { card, linkCard } from '../variants/card'
 import type { checkbox, radioGroup, toggle } from '../variants/choice'
 import type { commandPalette } from '../variants/command-palette'
@@ -18,6 +18,7 @@ import type { markdownEditor } from '../variants/markdown-editor'
 import type { modal } from '../variants/modal'
 import type { breadcrumb, navigationTabs, navigationTree, pageNavigation, pagination, tableOfContents } from '../variants/navigation'
 import type { page, pageHeader } from '../variants/page'
+import type { hint } from '../variants/popover'
 import type { combobox, select } from '../variants/select'
 import type { slider } from '../variants/slider'
 import type { table } from '../variants/table'
@@ -78,7 +79,7 @@ type UIActionDefaults = UIComponentDefaults<typeof button, Pick<VariantProps<typ
  * reglas sin capa de la aplicación ganan a las de UI.
  *
  * Además, unas pocas variantes de apariencia general admiten un valor de base: `variant`, `size` y
- * `shape` en `button` y `link`; `variant`, `padding`, `density` y `actionsWrap` en `card`, y `density` en `table`. La
+ * `shape` en `button`, `link` e `iconButton`; `variant`, `padding`, `density` y `actionsWrap` en `card`, y `density` en `table`. La
  * prop explícita de la instancia gana siempre.
  *
  * @since 1.11.0 acepta `class` y `ui` en cada componente, y `padding`, `density`, `actionsWrap` en `card` y
@@ -128,6 +129,18 @@ export interface UIDefaults {
 	readonly field?: UIComponentDefaults<typeof field>
 	readonly footer?: UIComponentDefaults<typeof footer>
 	readonly header?: UIComponentDefaults<typeof header>
+	/**
+	 * `UIHint`: `class` llega al botón, como la prop de la instancia.
+	 *
+	 * @since 1.11.0
+	 */
+	readonly hint?: UIComponentDefaults<typeof hint>
+	/**
+	 * `UIIconButton`: `class` llega al botón o al enlace, y `variant`, `size` y `shape` son sus valores de base.
+	 *
+	 * @since 1.11.0
+	 */
+	readonly iconButton?: UIComponentDefaults<typeof iconButton, Pick<VariantProps<typeof iconButton>, 'shape' | 'size' | 'variant'>>
 	readonly input?: UIComponentDefaults<typeof input>
 	readonly link?: UIActionDefaults
 	readonly linkCard?: UIComponentDefaults<typeof linkCard>
