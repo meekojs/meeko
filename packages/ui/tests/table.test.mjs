@@ -99,7 +99,7 @@ import * as UITable from "./Table.meeko";
 const rows = [{ id: 1, code: "P-1048", total: "Bs 18.500", notes: "Entrega en la puerta trasera" }];
 const columns = [
 	{ key: "code" as const, label: "Code", rowHeader: true, nowrap: true },
-	{ key: "total" as const, label: "Total", numeric: true },
+	{ key: "total" as const, label: "Total", numeric: true, footer: "Bs 89.000" },
 	{ key: "id" as const, label: "Id", numeric: true, nowrap: false },
 	{ key: "notes" as const, label: "Notes", minWidth: "20rem" },
 ];
@@ -111,6 +111,10 @@ const columns = [
 	assert.match(cell('Bs 18.500'), /(?:^| )ui:whitespace-nowrap(?: |$)/, 'a numeric column is nowrap by default')
 	assert.doesNotMatch(cell('1'), /ui:whitespace-nowrap/, 'nowrap: false wins over numeric')
 	assert.doesNotMatch(cell('Entrega en la puerta trasera'), /ui:whitespace-nowrap/)
+	const footer = html.match(/<tfoot[\s\S]*?<\/tfoot>/)?.[0] ?? ''
+	const total = footer.match(/<td[^>]*class="([^"]*)"[^>]*>\s*(?:<span>)?Bs 89\.000/)?.[1] ?? ''
+	assert.match(total, /(?:^| )ui:text-end(?: |$)/, 'the total of a numeric column ends at the right edge, like its cells')
+	assert.match(total, /(?:^| )ui:whitespace-nowrap(?: |$)/, 'and does not break')
 	assert.match(html, /<th[^>]*style="min-inline-size: 20rem"[^>]*>(?:(?!<\/th>)[\s\S])*Notes/, 'minWidth sizes the header of its column')
 	const grid = await renderTablePage(context, page('grid'))
 	assert.match(grid, /--table-columns: minmax\(var\(--ui-table-column-min\), 1fr\) minmax\(var\(--ui-table-column-min\), 1fr\) minmax\(var\(--ui-table-column-min\), 1fr\) minmax\(20rem, 1fr\)/)

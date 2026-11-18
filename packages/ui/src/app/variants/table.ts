@@ -32,7 +32,7 @@ export const table = tv({
 		cell: ['ui:align-middle ui:[tr:last-child>&]:[border-bottom:0]', rowLine],
 		// The one cell that says the table has no rows.
 		empty: '',
-		footerCell: 'ui:align-middle ui:[text-align:inherit] ui:[border-top:var(--ui-border-width)_solid_var(--ui-color-border)]',
+		footerCell: 'ui:align-middle ui:[border-top:var(--ui-border-width)_solid_var(--ui-color-border)]',
 	},
 	variants: {
 		layout: {
@@ -60,14 +60,14 @@ export const table = tv({
 			true: { caption: 'ui:absolute ui:size-(--ui-border-width) ui:overflow-hidden ui:p-0 ui:whitespace-nowrap ui:[clip-path:inset(50%)]' },
 			false: { caption: 'ui:px-3 ui:py-2' },
 		},
-		/** A column of numbers ends at the right edge. */
+		/** A column of numbers ends at the right edge, also its total in the foot. */
 		numeric: {
-			true: { headerCell: 'ui:justify-end ui:text-end', cell: 'ui:justify-end ui:text-end' },
-			false: { headerCell: 'ui:[text-align:inherit]', cell: 'ui:[text-align:inherit]' },
+			true: { headerCell: 'ui:justify-end ui:text-end', cell: 'ui:justify-end ui:text-end', footerCell: 'ui:justify-end ui:text-end' },
+			false: { headerCell: 'ui:[text-align:inherit]', cell: 'ui:[text-align:inherit]', footerCell: 'ui:[text-align:inherit]' },
 		},
 		/** A cell that never breaks its text: a number, a code or a date. The header never breaks anyway. */
 		nowrap: {
-			true: { cell: 'ui:whitespace-nowrap' },
+			true: { cell: 'ui:whitespace-nowrap', footerCell: 'ui:whitespace-nowrap' },
 			false: '',
 		},
 		/** A header of a row, in the body: it keeps the color of the text. */

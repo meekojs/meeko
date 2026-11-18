@@ -178,7 +178,7 @@
 						each:as="column"
 						each:key="column.key"
 						role="cell"
-						bind:class="classes.footerCell({ ...variants(), class: props.ui?.footerCell })"
+						bind:class="classes.footerCell({ ...variants(), numeric: Boolean(column.numeric), nowrap: column.nowrap ?? Boolean(column.numeric), class: props.ui?.footerCell })"
 					>
 						<render
 							if:when="snippets.footer"
