@@ -49,9 +49,8 @@
 		<p
 			role="status"
 			bind:class="classes.message({ class: props.ui?.message })"
+			>{props.message ?? fillMessage(texts.value?.messages.language.message ?? '', language.value)}</p
 		>
-			{props.message ?? fillMessage(texts.value?.messages.language.message ?? '', language.value)}
-		</p>
 		<div bind:class="classes.actions({ class: props.ui?.actions })">
 			<ItemLink
 				bind:class="goClass()"

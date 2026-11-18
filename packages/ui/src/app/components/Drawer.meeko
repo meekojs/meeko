@@ -105,9 +105,8 @@
 				<h2
 					bind:id="dialogId() + '-title'"
 					bind:class="classes().title({ class: props.ui?.title })"
+					>{props.title}</h2
 				>
-					{props.title}
-				</h2>
 				<button
 					type="button"
 					command="close"

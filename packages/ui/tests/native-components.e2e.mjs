@@ -314,7 +314,7 @@ for (const [name, start] of engines) {
 			const { page, errors } = await open(browser, origin)
 			const trigger = page.getByRole('button', { name: 'Abrir panel', exact: true })
 			// The drawers of the fixture, by their title: "Panel" enters from the start, "Panel derecho" from the end.
-			const dialog = page.locator('dialog', { has: page.locator('h2', { hasText: /^\s*Panel\s*$/ }) })
+			const dialog = page.locator('dialog', { has: page.locator('h2', { hasText: /^Panel$/ }) })
 			const opened = async () => {
 				// With the keyboard: WebKit does not focus a button that is clicked, and there would be no focus to give back.
 				await trigger.focus()
@@ -357,7 +357,7 @@ for (const [name, start] of engines) {
 			await page.mouse.click(1200, 400)
 			await left(3)
 			// `closedBy="none"`, opened by the native command when the browser has it: only its button closes it.
-			const right = page.locator('dialog', { has: page.locator('h2', { hasText: /^\s*Panel derecho\s*$/ }) })
+			const right = page.locator('dialog', { has: page.locator('h2', { hasText: /^Panel derecho$/ }) })
 			await page.getByRole('button', { name: 'Abrir el derecho', exact: true }).click()
 			await right.and(page.locator('[open]')).waitFor()
 			await page.keyboard.press('Escape')
