@@ -17,7 +17,7 @@ export interface AuthEnv {
 	readonly DASHBOARD_SESSION_SAMESITE?: string | undefined
 	/** Login attempts per client IP and window (`20` by default). */
 	readonly DASHBOARD_LOGIN_IP_LIMIT?: string | undefined
-	/** Login attempts per user name and window (`5` by default). */
+	/** Login attempts per user name and client IP, and failures per user name before each one waits longer (`5` by default). */
 	readonly DASHBOARD_LOGIN_USER_LIMIT?: string | undefined
 	/** The window of both limits (`15m` by default). */
 	readonly DASHBOARD_LOGIN_WINDOW?: string | undefined
@@ -156,18 +156,74 @@ export function assertProductionAuth(config: AuthConfig, env: { readonly DATABAS
 /** The minimum duration of a failed login, so a failure takes the same time whatever failed. */
 export const failedLoginMs = 1000
 
+/** The longest extra wait of a failed login, however many failures a user name has. */
+export const maxFailureDelayMs = 15_000
+
 /**
- * Runs `task` and, if it throws, waits until `failedLoginMs` passed since `started` before
+ * Runs `task` and, if it throws, waits until `minimumMs` passed since `started` before
  * rethrowing: a wrong user, a wrong password and a rate limit answer after the same time.
+ * `minimumMs` may be a function, read after the failure, when the task decides how long it is.
  */
-export async function withConstantFailure<T>(task: () => Promise<T>, started: number = performance.now(), minimumMs: number = failedLoginMs): Promise<T> {
+export async function withConstantFailure<T>(task: () => Promise<T>, started: number = performance.now(), minimumMs: number | (() => number) = failedLoginMs): Promise<T> {
 	try {
 		return await task()
 	} catch (error) {
-		const left = minimumMs - (performance.now() - started)
+		const left = (typeof minimumMs === 'function' ? minimumMs() : minimumMs) - (performance.now() - started)
 		if (left > 0) await new Promise((done) => setTimeout(done, left))
 		throw error
 	}
+}
+
+/**
+ * The extra wait of a failed login when its user name has `failures` failures in the window:
+ * none up to `limit`, then 1 s, 2 s, 4 s… up to `maxFailureDelayMs`. It slows down a guess spread
+ * over many IPs without locking the account.
+ */
+export function failureDelayMs(failures: number, limit: number): number {
+	if (failures <= limit) return 0
+	return Math.min(maxFailureDelayMs, 1000 * 2 ** Math.min(failures - limit - 1, 16))
+}
+
+/** What a login attempt gets: the session, `401`, or `429` for the user name from this client. */
+export interface LoginVerdict {
+	readonly outcome: 'invalid' | 'limited' | 'ok'
+	/** The extra wait of a refusal, from {@link failureDelayMs}. */
+	readonly delayMs: number
+}
+
+/** What {@link loginVerdict} needs to know about an attempt whose credentials were already checked. */
+export interface LoginAttempt {
+	/** `SessionManager.rateLimit`: counts one hit of `key` in a fixed window and returns the total. */
+	count(key: string, windowMs: number): Promise<{ readonly count: number }>
+	readonly username: string
+	/** The client IP, `context.clientAddress`; without one, every client shares the counter. */
+	readonly address: string | undefined
+	/** Whether the user name and the password were right. */
+	readonly valid: boolean
+	readonly userLimit: number
+	readonly windowMs: number
+}
+
+/**
+ * Decides a login attempt after the password was checked, so the decision never shortens the
+ * check. Nobody can lock the administrator out from another IP:
+ *
+ * - per user name and client IP, every attempt counts: past `userLimit` in the window, that client
+ *   gets `429` for that name, also with the right password;
+ * - per user name from every IP, only refusals count: past `userLimit`, each refusal waits longer
+ *   ({@link failureDelayMs}), but the right password from another client still logs in.
+ *
+ * Any name counts the same way, so the answer does not tell whether the account exists. The limit
+ * per IP of every attempt is the route's `rateLimit`.
+ */
+export async function loginVerdict(attempt: LoginAttempt): Promise<LoginVerdict> {
+	const name = attempt.username.toLowerCase()
+	const pair = await attempt.count(`dashboard:login:pair:${name}\n${attempt.address ?? 'unknown'}`, attempt.windowMs)
+	const locked = pair.count > attempt.userLimit
+	if (attempt.valid && !locked) return { outcome: 'ok', delayMs: 0 }
+	// A right password from a locked client counts like a wrong one: the refusal is the same.
+	const user = await attempt.count(`dashboard:login:user:${name}`, attempt.windowMs)
+	return { outcome: locked ? 'limited' : 'invalid', delayMs: failureDelayMs(user.count, attempt.userLimit) }
 }
 
 /**
