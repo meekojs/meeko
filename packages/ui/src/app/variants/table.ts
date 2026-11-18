@@ -65,6 +65,11 @@ export const table = tv({
 			true: { headerCell: 'ui:justify-end ui:text-end', cell: 'ui:justify-end ui:text-end' },
 			false: { headerCell: 'ui:[text-align:inherit]', cell: 'ui:[text-align:inherit]' },
 		},
+		/** A cell that never breaks its text: a number, a code or a date. The header never breaks anyway. */
+		nowrap: {
+			true: { cell: 'ui:whitespace-nowrap' },
+			false: '',
+		},
 		/** A header of a row, in the body: it keeps the color of the text. */
 		rowHeader: {
 			true: { cell: 'ui:font-medium ui:text-text' },
@@ -76,6 +81,7 @@ export const table = tv({
 		density: 'normal',
 		hideCaption: false,
 		numeric: false,
+		nowrap: false,
 		rowHeader: false,
 	},
 })

@@ -37,6 +37,8 @@
 
 	/** The variants that the whole table shares. */
 	const variants = () => ({ layout: props.layout, density: props.density ?? 'normal', hideCaption: Boolean(props.hideCaption) })
+	// The columns of the grid layout: each one as wide as its `minWidth`, or --ui-table-column-min, and sharing the rest.
+	const gridTemplate = () => (props.columns.some((column) => column.minWidth) ? props.columns.map((column) => 'minmax(' + (column.minWidth ?? 'var(--ui-table-column-min)') + ', 1fr)').join(' ') : 'repeat(' + Math.max(1, props.columns.length) + ', minmax(var(--ui-table-column-min), 1fr))')
 
 	function keyOf(row: T): string | number {
 		return typeof props.rowKey === 'function' ? props.rowKey(row) : (row[props.rowKey] as string | number)
@@ -65,7 +67,7 @@
 		<table
 			role="table"
 			bind:class="classes.table({ ...variants(), class: [props.ui?.table, props.class] })"
-			bind:style="'--table-columns: ' + (props.gridColumns ?? 'repeat(' + Math.max(1, props.columns.length) + ', minmax(var(--ui-table-column-min), 1fr))')"
+			bind:style="'--table-columns: ' + (props.gridColumns ?? gridTemplate())"
 		>
 			<caption
 				if:when="props.caption || snippets.caption"
@@ -93,6 +95,7 @@
 						each:key="column.key"
 						role="columnheader"
 						scope="col"
+						bind:style="column.minWidth ? 'min-inline-size: ' + column.minWidth : undefined"
 						bind:class="classes.headerCell({ ...variants(), numeric: Boolean(column.numeric), class: props.ui?.headerCell })"
 					>
 						<render
@@ -128,7 +131,7 @@
 						is="column.rowHeader ? 'th' : 'td'"
 						bind:role="column.rowHeader ? 'rowheader' : 'cell'"
 						bind:scope="column.rowHeader ? 'row' : undefined"
-						bind:class="classes.cell({ ...variants(), numeric: Boolean(column.numeric), rowHeader: Boolean(column.rowHeader), class: props.ui?.cell })"
+						bind:class="classes.cell({ ...variants(), numeric: Boolean(column.numeric), nowrap: column.nowrap ?? Boolean(column.numeric), rowHeader: Boolean(column.rowHeader), class: props.ui?.cell })"
 					>
 						<render
 							if:when="columnCell(column)"

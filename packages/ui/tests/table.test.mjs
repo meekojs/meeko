@@ -51,7 +51,8 @@ const columns = [{ key: 'name' as const, label: 'Name' }];
 	}
 })
 
-test('table renders cell-<key> before cell, header-<key> before header, then the default text', async (context) => {
+/** Compiles Table.meeko and a page that uses it, and renders the page in SSR. */
+async function renderTablePage(context, pageSource) {
 	const { compile } = await import('../../meeko/dist/compiler.js')
 	const parent = fileURLToPath(new URL('../.meeko/', import.meta.url))
 	await mkdir(parent, { recursive: true })
@@ -69,8 +70,14 @@ test('table renders cell-<key> before cell, header-<key> before header, then the
 	const table = await readFile(new URL('../src/app/components/Table.meeko', import.meta.url), 'utf8')
 	// useId is an auto-import of the app; this compilation has no app, so it imports it.
 	await write('Table', table.replace("import type { Snippet } from '@meekojs/meeko'", "import type { Snippet } from '@meekojs/meeko'\n\timport { useId } from '@meekojs/meeko'"))
-	await write(
-		'Page',
+	await write('Page', pageSource)
+	const page = await import(pathToFileURL(`${directory}/Page.ts`).href)
+	return page.renderToString({}).replace(/<!--.*?-->/g, '')
+}
+
+test('table renders cell-<key> before cell, header-<key> before header, then the default text', async (context) => {
+	const html = await renderTablePage(
+		context,
 		`<script lang="ts">
 import * as UITable from "./Table.meeko";
 const rows = [{ id: 1, name: "Ana", age: 20 }];
@@ -78,12 +85,33 @@ const columns = [{ key: "name" as const, label: "Name" }, { key: "age" as const,
 </script>
 <template><UITable bind:rows="rows" bind:columns="columns" rowKey="id"><snippet name="cell-name" params="row, value"><b>{value}/{row.age}</b></snippet><snippet name="cell" params="row, column, value"><i>{column.key}:{String(value)}</i></snippet><snippet name="header-age" params="column"><u>{column.label}!</u></snippet></UITable></template>`,
 	)
-	const page = await import(pathToFileURL(`${directory}/Page.ts`).href)
-	const html = page.renderToString({}).replace(/<!--.*?-->/g, '')
 	const text = (pattern) => [...html.matchAll(pattern)].map((match) => match[1])
 	assert.deepEqual(text(/<b>(.*?)<\/b>/g), ['Ana/20'])
 	assert.deepEqual(text(/<i>(.*?)<\/i>/g), ['age:20', 'id:1'])
 	assert.deepEqual(text(/<u>(.*?)<\/u>/g), ['Age!'])
 	assert.match(html, /<span>Name<\/span>/)
 	assert.match(html, /<span>Id<\/span>/)
+})
+
+test('a numeric column never breaks, nowrap keeps a code whole and minWidth sizes a column', async (context) => {
+	const page = (layout) => `<script lang="ts">
+import * as UITable from "./Table.meeko";
+const rows = [{ id: 1, code: "P-1048", total: "Bs 18.500", notes: "Entrega en la puerta trasera" }];
+const columns = [
+	{ key: "code" as const, label: "Code", rowHeader: true, nowrap: true },
+	{ key: "total" as const, label: "Total", numeric: true },
+	{ key: "id" as const, label: "Id", numeric: true, nowrap: false },
+	{ key: "notes" as const, label: "Notes", minWidth: "20rem" },
+];
+</script>
+<template><UITable bind:rows="rows" bind:columns="columns" rowKey="id" layout="${layout}" /></template>`
+	const html = await renderTablePage(context, page('native'))
+	const cell = (text) => html.match(new RegExp(`<t[dh][^>]*class="([^"]*)"[^>]*>\\s*<span>${text}</span>`))?.[1] ?? ''
+	assert.match(cell('P-1048'), /(?:^| )ui:whitespace-nowrap(?: |$)/, 'nowrap keeps a code whole')
+	assert.match(cell('Bs 18.500'), /(?:^| )ui:whitespace-nowrap(?: |$)/, 'a numeric column is nowrap by default')
+	assert.doesNotMatch(cell('1'), /ui:whitespace-nowrap/, 'nowrap: false wins over numeric')
+	assert.doesNotMatch(cell('Entrega en la puerta trasera'), /ui:whitespace-nowrap/)
+	assert.match(html, /<th[^>]*style="min-inline-size: 20rem"[^>]*>(?:(?!<\/th>)[\s\S])*Notes/, 'minWidth sizes the header of its column')
+	const grid = await renderTablePage(context, page('grid'))
+	assert.match(grid, /--table-columns: minmax\(var\(--ui-table-column-min\), 1fr\) minmax\(var\(--ui-table-column-min\), 1fr\) minmax\(var\(--ui-table-column-min\), 1fr\) minmax\(20rem, 1fr\)/)
 })
