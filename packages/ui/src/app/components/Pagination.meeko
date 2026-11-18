@@ -6,6 +6,7 @@
 	import type { UIPaginationProps } from '../types/navigation'
 
 	import { fillMessage, uiMessages } from '../utils/messages'
+	import { button, disabledBusy } from '../variants/button'
 	import * as ItemLink from './internal/ItemLink.meeko'
 
 	const props = defineProps<UIPaginationProps>()
@@ -34,6 +35,8 @@
 	function holdLink(event: MouseEvent): void {
 		if (props.busy) event.preventDefault()
 	}
+	// The action goes to the end of the row, and shows a spinner while the next page loads.
+	const moreClass = button({ variant: 'outline', size: 'sm', class: `ui:ms-auto ${disabledBusy}` })
 </script>
 
 <template>
@@ -55,9 +58,7 @@
 		/>
 		<ItemLink
 			if:when="more.value && props.moreLink"
-			class="meeko-ui-button"
-			data-variant="outline"
-			data-size="sm"
+			bind:class="moreClass"
 			bind:link="props.moreLink!"
 			bind:aria-disabled="props.busy ? 'true' : undefined"
 		>
@@ -66,9 +67,7 @@
 		<button
 			if:when="more.value && !props.moreLink"
 			type="button"
-			class="meeko-ui-button"
-			data-variant="outline"
-			data-size="sm"
+			bind:class="moreClass"
 			bind:aria-disabled="props.busy ? 'true' : undefined"
 			on:click="load"
 		>

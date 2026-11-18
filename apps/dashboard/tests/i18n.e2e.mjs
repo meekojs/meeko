@@ -241,7 +241,7 @@ ${server.logs().slice(-2000)}`,
 	assert.equal(await page.getByRole('link', { name: 'Edit the translation' }).count(), 0)
 	await open(`/en/translations/${ids.testing}`)
 	await page.getByText('+Nuevo parrafo del original.').waitFor({ timeout: 30_000 })
-	assert.equal(await page.locator('.meeko-ui-badge').filter({ hasText: 'Outdated' }).count(), 1)
+	assert.equal(await page.getByText('Outdated', { exact: true }).count(), 1)
 	// The three actions of its header wrap on a phone instead of widening the page.
 	const viewport = page.viewportSize()
 	await page.setViewportSize({ width: 390, height: 844 })

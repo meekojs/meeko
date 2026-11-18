@@ -8,6 +8,7 @@
 	import { uiMessages } from '../utils/messages'
 	import { mountModalDialog } from '../utils/modal-dialog'
 	import { followsLink } from '../utils/navigation'
+	import { button } from '../variants/button'
 	import * as Icon from './internal/Icon.meeko'
 
 	const props = defineProps<UIDrawerProps>({ side: 'start', closedBy: 'any', closeOnNavigate: true })
@@ -65,6 +66,7 @@
 		controller = mountModalDialog(dialog.value, open, options, () => (open.value = false))
 		return controller.dispose
 	})
+	const triggerClass = button({ variant: 'outline', size: 'sm', class: 'meeko-ui-drawer-trigger' })
 </script>
 
 <template>
@@ -77,10 +79,8 @@
 		if:when="!snippets.trigger && props.triggerLabel"
 		type="button"
 		command="show-modal"
-		class="meeko-ui-button meeko-ui-drawer-trigger"
-		data-variant="outline"
-		data-size="sm"
 		aria-haspopup="dialog"
+		bind:class="triggerClass"
 		bind:commandfor="dialogId()"
 		on:click="() => (open.value = true)"
 	>

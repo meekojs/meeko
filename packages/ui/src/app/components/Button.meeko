@@ -1,12 +1,13 @@
 <script lang="ts">
 	// <UIButton>: a route with <MeekoLink> when it gets `to`, an <a> with `href`, otherwise a
-	// <button>. The three share the class and data-* attributes, so they look the same. The types
+	// <button>. The three share the classes of variants/button, so they look the same. The types
 	// (UIButtonProps) forbid the props of the other branches.
 	import { computed } from '@meekojs/meeko'
 
 	import type { UIButtonProps } from '../types/button'
 
 	import { uiDefaults } from '../utils/defaults'
+	import { button } from '../variants/button'
 
 	const { to, params, search, resolve, href, target, rel, download, type = 'button', disabled = false, tone, loading, iconOnly, ariaLabel, variant, size, shape, class: className, ...rest } = defineProps<UIButtonProps>()
 
@@ -18,7 +19,16 @@
 
 	// A disabled button drops the focus: while busy it stays focusable, and the click handler stops it.
 	const nativeDisabled = computed(() => (to === undefined && href === undefined ? disabled : undefined))
-	const classes = computed(() => ['meeko-ui-button', className].filter(Boolean).join(' '))
+	const classes = computed(() =>
+		button({
+			variant: variant ?? defaults?.variant,
+			tone,
+			size: size ?? defaults?.size,
+			shape: shape ?? defaults?.shape,
+			iconOnly: Boolean(iconOnly),
+			class: className,
+		}),
+	)
 	const linkRel = computed(() => rel ?? (target === '_blank' ? 'noopener noreferrer' : undefined))
 </script>
 
@@ -38,12 +48,7 @@
 		bind:aria-busy="loading ? 'true' : undefined"
 		bind:aria-disabled="loading ? 'true' : undefined"
 		bind:aria-label="ariaLabel ?? rest['aria-label']"
-		bind:data-tone="tone"
-		bind:data-icon-only="iconOnly ? '' : undefined"
 		bind:class="classes.value"
-		bind:data-variant="variant ?? defaults?.variant ?? 'primary'"
-		bind:data-size="size ?? defaults?.size ?? 'md'"
-		bind:data-shape="shape ?? defaults?.shape ?? 'rounded'"
 		bind="rest"
 		on:click="
 			(event) => {

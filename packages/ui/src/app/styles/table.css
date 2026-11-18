@@ -27,8 +27,7 @@
 	/* A table scrolls before a word breaks, also inside a card, whose text may break anywhere. */
 	overflow-wrap: normal;
 
-	& > thead > tr > th,
-	& .meeko-ui-badge {
+	& > thead > tr > th {
 		white-space: nowrap;
 	}
 	& > caption {
@@ -62,10 +61,10 @@
 		color: var(--ui-color-text);
 	}
 	/* A row is scanned: a link marks itself when the pointer reaches it. */
-	& a:not(.meeko-ui-button) {
+	& a {
 		text-decoration: none;
 	}
-	& a:not(.meeko-ui-button):hover {
+	& a:hover {
 		text-decoration: underline;
 	}
 	/* A type breaks at its spaces, and a name is never cut: `anywhere` would let the column shrink to a

@@ -104,13 +104,13 @@
 		color: var(--ui-color-text);
 		font-weight: var(--ui-font-weight-semibold);
 	}
-	:scope a:not(.heading-anchor, .meeko-ui-button) {
+	:scope a:not(.heading-anchor) {
 		border-radius: var(--ui-radius-xs);
 		color: var(--ui-color-primary-text);
 		text-decoration-color: var(--ui-color-primary-border);
 		text-underline-offset: var(--ui-underline-offset);
 	}
-	:scope a:not(.heading-anchor, .meeko-ui-button):hover {
+	:scope a:not(.heading-anchor):hover {
 		text-decoration-color: currentColor;
 	}
 	:scope a:focus-visible {

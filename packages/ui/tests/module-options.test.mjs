@@ -100,7 +100,8 @@ test('configured UI installs only a static defaults plugin and transforms its ow
 	assert.match(String(plugins[0].src), /app\/plugins\/config\.js$/)
 	const tokens = vite.find((plugin) => plugin.name === 'meeko-ui:tokens')
 	assert.equal(tokens.transform('body {}', '/consumer/styles.css'), undefined)
-	const path = fileURLToPath(new URL('../src/app/styles/main.css', import.meta.url))
+	// The tokens go after the compiled sheet, the one that the module adds to the app.
+	const path = fileURLToPath(new URL('../dist/styles/main.css', import.meta.url))
 	assert.match(tokens.transform(':root {}', path).code, /--ui-color-primary: var\(--pill\)/)
 })
 

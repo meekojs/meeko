@@ -1,0 +1,152 @@
+/*
+ * The design system of the components for Tailwind: each name reads its --ui-* token, so `ui: { tokens }`,
+ * the dark theme and an app that redefines a token keep working. `inline` puts the var() in the utility and
+ * `reference` emits no variable: the tokens are already in tokens.css. Each section follows a group of
+ * tokens.css; the last one names the tokens of the controls. A token without a Tailwind namespace
+ * (durations, control heights…) is read with `ui:prop-(--ui-token)`.
+ */
+@theme inline reference {
+	--*: initial;
+
+	/* Space: tokens.css sits on a 0.25rem grid, so ui:p-1.5 is --ui-space-1-5 */
+	--spacing: var(--ui-space-1);
+
+	/* Colors: the semantic tokens of tokens.css, never the palette steps */
+	--color-bg: var(--ui-color-bg);
+	--color-bg-subtle: var(--ui-color-bg-subtle);
+	--color-surface: var(--ui-color-surface);
+	--color-surface-raised: var(--ui-color-surface-raised);
+	--color-overlay: var(--ui-color-overlay);
+	--color-overlay-solid: var(--ui-color-overlay-solid);
+	--color-control: var(--ui-color-control);
+	--color-control-hover: var(--ui-color-control-hover);
+	--color-control-active: var(--ui-color-control-active);
+	--color-border: var(--ui-color-border);
+	--color-border-strong: var(--ui-color-border-strong);
+	--color-control-border: var(--ui-color-control-border);
+	--color-text: var(--ui-color-text);
+	--color-text-soft: var(--ui-color-text-soft);
+	--color-focus: var(--ui-color-focus);
+	--color-selection: var(--ui-color-selection);
+	--color-primary: var(--ui-color-primary);
+	--color-primary-hover: var(--ui-color-primary-hover);
+	--color-primary-active: var(--ui-color-primary-active);
+	--color-primary-soft: var(--ui-color-primary-soft);
+	--color-primary-soft-hover: var(--ui-color-primary-soft-hover);
+	--color-primary-border: var(--ui-color-primary-border);
+	--color-primary-text: var(--ui-color-primary-text);
+	--color-code-soft: var(--ui-color-code-soft);
+	--color-code-header: var(--ui-color-code-header);
+	--color-code-border: var(--ui-color-code-border);
+	--color-code-text: var(--ui-color-code-text);
+	--color-info: var(--ui-color-info);
+	--color-info-hover: var(--ui-color-info-hover);
+	--color-info-soft: var(--ui-color-info-soft);
+	--color-info-border: var(--ui-color-info-border);
+	--color-info-text: var(--ui-color-info-text);
+	--color-success: var(--ui-color-success);
+	--color-success-hover: var(--ui-color-success-hover);
+	--color-success-soft: var(--ui-color-success-soft);
+	--color-success-border: var(--ui-color-success-border);
+	--color-success-text: var(--ui-color-success-text);
+	--color-warning: var(--ui-color-warning);
+	--color-warning-hover: var(--ui-color-warning-hover);
+	--color-warning-soft: var(--ui-color-warning-soft);
+	--color-warning-border: var(--ui-color-warning-border);
+	--color-warning-text: var(--ui-color-warning-text);
+	--color-danger: var(--ui-color-danger);
+	--color-danger-hover: var(--ui-color-danger-hover);
+	--color-danger-soft: var(--ui-color-danger-soft);
+	--color-danger-border: var(--ui-color-danger-border);
+	--color-danger-text: var(--ui-color-danger-text);
+	--color-primary-contrast: var(--ui-color-primary-contrast);
+	--color-primary-contrast-hover: var(--ui-color-primary-contrast-hover);
+	--color-surface-contrast: var(--ui-color-surface-contrast);
+	--color-surface-contrast-hover: var(--ui-color-surface-contrast-hover);
+	--color-info-contrast: var(--ui-color-info-contrast);
+	--color-info-contrast-hover: var(--ui-color-info-contrast-hover);
+	--color-success-contrast: var(--ui-color-success-contrast);
+	--color-success-contrast-hover: var(--ui-color-success-contrast-hover);
+	--color-warning-contrast: var(--ui-color-warning-contrast);
+	--color-warning-contrast-hover: var(--ui-color-warning-contrast-hover);
+	--color-danger-contrast: var(--ui-color-danger-contrast);
+	--color-danger-contrast-hover: var(--ui-color-danger-contrast-hover);
+	--color-cyan-contrast: var(--ui-color-cyan-contrast);
+	--color-cyan-contrast-hover: var(--ui-color-cyan-contrast-hover);
+	--color-orange-contrast: var(--ui-color-orange-contrast);
+	--color-orange-contrast-hover: var(--ui-color-orange-contrast-hover);
+	--color-pink-contrast: var(--ui-color-pink-contrast);
+	--color-pink-contrast-hover: var(--ui-color-pink-contrast-hover);
+
+	/* Families */
+	--font-sans: var(--ui-font-sans);
+	--font-mono: var(--ui-font-mono);
+
+	/* Type sizes */
+	--text-xs: var(--ui-font-size-xs);
+	--text-sm: var(--ui-font-size-sm);
+	--text-md: var(--ui-font-size-md);
+	--text-lg: var(--ui-font-size-lg);
+	--text-xl: var(--ui-font-size-xl);
+	--text-2xl: var(--ui-font-size-2xl);
+	--text-3xl: var(--ui-font-size-3xl);
+	--text-4xl: var(--ui-font-size-4xl);
+	--text-5xl: var(--ui-font-size-5xl);
+	--text-6xl: var(--ui-font-size-6xl);
+
+	/* Line heights */
+	--leading-none: var(--ui-line-height-none);
+	--leading-tight: var(--ui-line-height-tight);
+	--leading-snug: var(--ui-line-height-snug);
+	--leading-normal: var(--ui-line-height-normal);
+	--leading-relaxed: var(--ui-line-height-relaxed);
+
+	/* Weights */
+	--font-weight-regular: var(--ui-font-weight-regular);
+	--font-weight-medium: var(--ui-font-weight-medium);
+	--font-weight-semibold: var(--ui-font-weight-semibold);
+	--font-weight-bold: var(--ui-font-weight-bold);
+
+	/* Tracking */
+	--tracking-normal: var(--ui-tracking-normal);
+	--tracking-snug: var(--ui-tracking-snug);
+	--tracking-tight: var(--ui-tracking-tight);
+	--tracking-display: var(--ui-tracking-display);
+
+	/* Radii */
+	--radius-xs: var(--ui-radius-xs);
+	--radius-sm: var(--ui-radius-sm);
+	--radius-md: var(--ui-radius-md);
+	--radius-lg: var(--ui-radius-lg);
+	--radius-xl: var(--ui-radius-xl);
+	--radius-full: var(--ui-radius-full);
+
+	/* Shadows */
+	--shadow-sm: var(--ui-shadow-sm);
+	--shadow-md: var(--ui-shadow-md);
+	--shadow-lg: var(--ui-shadow-lg);
+
+	/* Easings */
+	--ease-out: var(--ui-ease-out);
+	--ease-in: var(--ui-ease-in);
+	--ease-in-out: var(--ui-ease-in-out);
+
+	/* Containers */
+	--container-sm: var(--ui-container-sm);
+	--container-md: var(--ui-container-md);
+	--container-lg: var(--ui-container-lg);
+	--container-xl: var(--ui-container-xl);
+	--container-2xl: var(--ui-container-2xl);
+	--container-3xl: var(--ui-container-3xl);
+	--container-4k: var(--ui-container-4k);
+
+	/* Controls: the text of buttons and inputs (`-md`: ui:text-control is the color --ui-color-control), and the busy spinner */
+	--text-control-sm: var(--ui-control-font-size-sm);
+	--text-control-md: var(--ui-control-font-size);
+	--text-control-lg: var(--ui-control-font-size-lg);
+	--font-weight-control: var(--ui-control-font-weight);
+	--animate-spin: meeko-ui-spin var(--ui-duration-spin) linear infinite;
+
+	/* Breakpoints: a media query takes no var(), so these are the only raw lengths; the same as the sheets' @media */
+	--breakpoint-phone: 30rem;
+}

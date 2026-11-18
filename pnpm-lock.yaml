@@ -345,6 +345,9 @@ catalogs:
     shiki:
       specifier: 4.6.0
       version: 4.6.0
+    tailwind-variants:
+      specifier: ^4.0.2
+      version: 4.0.2
     tailwindcss:
       specifier: 4.3.5
       version: 4.3.5
@@ -897,6 +900,10 @@ importers:
         version: 8.3.8(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)
 
   packages/ui:
+    dependencies:
+      tailwind-variants:
+        specifier: 'catalog:'
+        version: 4.0.2
     devDependencies:
       '@codemirror/lang-css':
         specifier: 'catalog:'
@@ -934,6 +941,9 @@ importers:
       '@milkdown/kit':
         specifier: 'catalog:'
         version: 7.23.0(@codemirror/language@6.13.1)(@codemirror/state@6.7.6)(@codemirror/view@6.43.15)(supports-color@10.2.2)(typescript@7.0.2)
+      '@tailwindcss/postcss':
+        specifier: 'catalog:'
+        version: 4.3.5
       '@types/node':
         specifier: 'catalog:'
         version: 24.19.2
@@ -946,6 +956,9 @@ importers:
       playwright-core:
         specifier: 'catalog:'
         version: 1.65.1
+      postcss:
+        specifier: 'catalog:'
+        version: 8.5.33
       prettier:
         specifier: 'catalog:'
         version: 3.10.1
@@ -964,6 +977,9 @@ importers:
       remark-stringify:
         specifier: 'catalog:'
         version: 11.0.0
+      tailwindcss:
+        specifier: 'catalog:'
+        version: 4.3.5
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -3695,6 +3711,10 @@ packages:
     resolution: {integrity: sha512-SS+jx45GF1QjgEXQx4NJZV9ImqmO2NPz5FNsIHrsDjh2YsHnawpan7SNQ1o8NuhrbHZy9AZhIoCUiCeaW/C80g==}
     engines: {node: '>=18'}
 
+  tailwind-variants@4.0.2:
+    resolution: {integrity: sha512-sZvOFkfe5LlYG/crRX5IvP3oUHmJPu+7WmrLQFvF0kCRq51C+lurlzFMm/jURG/5keT7VOJ/it0N3jkzYux85w==}
+    engines: {node: '>=16.9.x', pnpm: '>=7.x'}
+
   tailwindcss@4.3.5:
     resolution: {integrity: sha512-FcQk9BuffmEHJP2G0XmB2SplU1aLTI7j07Kunk+U74Ny+XiWOtzXz9aujFZ/avntw1e2cOv/3PkgzflQ7gX2vQ==}
 
@@ -5623,7 +5643,7 @@ snapshots:
       '@vue/shared': 3.5.44
       estree-walker: 2.0.2
       magic-string: 0.30.21
-      postcss: 8.5.31
+      postcss: 8.5.33
       source-map-js: 1.2.2
 
   '@vue/compiler-sfc@3.5.45':
@@ -7135,6 +7155,8 @@ snapshots:
   style-mod@4.1.4: {}
 
   supports-color@10.2.2: {}
+
+  tailwind-variants@4.0.2: {}
 
   tailwindcss@4.3.5: {}
 

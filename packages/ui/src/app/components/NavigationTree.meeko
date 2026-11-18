@@ -8,6 +8,7 @@
 	import { icons } from '../utils/icons'
 	import { uiMessages } from '../utils/messages'
 	import { isCurrentLink, linkTarget, revealInScroller, scrollingAncestor } from '../utils/navigation'
+	import { badge } from '../variants/badge'
 	import * as Icon from './internal/Icon.meeko'
 	import * as ItemLink from './internal/ItemLink.meeko'
 
@@ -34,6 +35,8 @@
 			})
 		}),
 	)
+	// The badge of a featured item goes to the end of its link.
+	const featuredClass = badge({ tone: 'accent' }).base({ class: 'ui:ms-auto ui:flex-none' })
 </script>
 
 <template>
@@ -108,8 +111,7 @@
 						</span>
 						<span
 							if:when="!snippets.item && item.featured"
-							class="meeko-ui-badge"
-							data-tone="accent"
+							bind:class="featuredClass"
 						>
 							{props.featuredLabel ?? text.featured}
 						</span>

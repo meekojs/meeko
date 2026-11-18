@@ -76,7 +76,7 @@ test('form control borders reach 3:1 against every background and control state 
 })
 
 test('every form control draws its border from --ui-color-control-border, not from a decorative border', async () => {
-	const main = await read('main.css')
+	const main = await read('components.css')
 	const forms = await read('forms.css')
 	const rule = (css, selector) => {
 		const start = css.indexOf(`${selector} {`)
@@ -85,7 +85,9 @@ test('every form control draws its border from --ui-color-control-border, not fr
 	}
 	// The same rule paints <UIInput>, <UITextarea> and the trigger of <UISelect> and <UICombobox>.
 	assert.match(rule(main.replaceAll('\r\n', '\n'), '.meeko-ui-input,\n[data-meeko-select-trigger]'), /border: var\(--ui-border-width\) solid var\(--ui-color-control-border\)/)
-	assert.match(rule(main, ".meeko-ui-button[data-variant='outline']"), /border-color: var\(--ui-color-control-border\)/)
+	// The outline button is on Tailwind: its border is the color control-border of theme.css.
+	assert.match(await readFile(new URL('../src/app/variants/button.ts', import.meta.url), 'utf8'), /variant: 'outline', tone: 'neutral', class: 'ui:border-control-border /)
+	assert.match(await read('theme.css'), /--color-control-border: var\(--ui-color-control-border\);/)
 	for (const selector of ['.meeko-ui-choice:not(.meeko-ui-switch) input', '.meeko-ui-switch input', ".meeko-ui-radio-group[data-variant='segmented'] .meeko-ui-radio-options"]) assert.match(rule(forms, selector), /solid var\(--ui-color-control-border\)/, selector)
 	assert.match(rule(forms, '.meeko-ui-slider input::-webkit-slider-runnable-track'), /var\(--ui-color-control-border\)/)
 	assert.match(rule(forms, '.meeko-ui-slider input::-moz-range-track'), /var\(--ui-color-control-border\)/)
@@ -172,7 +174,12 @@ test('text, soft text and focus tokens stay readable on every background', () =>
 })
 
 /** Comments, the prelude of a media query and the sheet's `@font-face` source are not values of a component. */
-const strip = (css) => css.replace(/\/\*[\s\S]*?\*\//g, '').replace(/@media[^{]+\{/g, '{')
+// A media query and a Tailwind breakpoint (theme.css) take no var(): their lengths are the only raw ones.
+const strip = (css) =>
+	css
+		.replace(/\/\*[\s\S]*?\*\//g, '')
+		.replace(/@media[^{]+\{/g, '{')
+		.replace(/--breakpoint-[\w-]+:[^;]+;/g, '')
 
 async function componentSheets() {
 	const names = (await readdir(styles)).filter((name) => name.endsWith('.css') && !['palette.css', 'tokens.css', 'fonts.css'].includes(name))
@@ -183,7 +190,13 @@ test('component sheets and components have no colour, size, time or weight outsi
 	const sheets = await componentSheets()
 	assert.ok(sheets.length >= 7)
 	const meeko = (await readdir(components, { recursive: true })).filter((name) => name.endsWith('.meeko'))
-	const sources = [...sheets, ...(await Promise.all(meeko.map(async (name) => [name, await readFile(new URL(name.replaceAll('\\', '/'), components), 'utf8')])))]
+	const variants = new URL('../src/app/variants/', import.meta.url)
+	const classes = (await readdir(variants)).filter((name) => name.endsWith('.ts'))
+	const sources = [
+		...sheets,
+		...(await Promise.all(meeko.map(async (name) => [name, await readFile(new URL(name.replaceAll('\\', '/'), components), 'utf8')]))),
+		...(await Promise.all(classes.map(async (name) => [name, await readFile(new URL(name, variants), 'utf8')]))),
+	]
 	for (const [name, css] of sources) {
 		assert.doesNotMatch(css, /#[0-9a-fA-F]{3,8}\b(?![\w-])(?=[\s;,)])/, `${name}: a hex colour`)
 		assert.doesNotMatch(css, /\brgba?\(|\bhsla?\(|\boklch\(/, `${name}: a colour function`)

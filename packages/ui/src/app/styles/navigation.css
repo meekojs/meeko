@@ -179,12 +179,12 @@
 	padding: 0;
 	list-style: none;
 }
-.meeko-ui-footer a:not(.meeko-ui-brand, .meeko-ui-button) {
+.meeko-ui-footer a:not(.meeko-ui-brand) {
 	transition: color var(--ui-duration-fast);
 	color: inherit;
 	text-decoration: none;
 }
-.meeko-ui-footer a:not(.meeko-ui-brand, .meeko-ui-button):hover {
+.meeko-ui-footer a:not(.meeko-ui-brand):hover {
 	color: var(--ui-color-text);
 	text-decoration: underline;
 	text-underline-offset: var(--ui-underline-offset);
@@ -318,10 +318,6 @@ details[open] > summary > .meeko-ui-nav-chevron {
 	font-family: var(--ui-font-mono);
 	text-overflow: ellipsis;
 	white-space: nowrap;
-}
-.meeko-ui-nav-link .meeko-ui-badge {
-	flex: none;
-	margin-inline-start: auto;
 }
 .meeko-ui-nav-empty {
 	padding: var(--ui-space-1) var(--ui-space-2);
@@ -687,9 +683,6 @@ html:active-view-transition-type(ui-modal-close)::view-transition-old(ui-drawer-
 	font-size: var(--ui-font-size-sm);
 	font-variant-numeric: tabular-nums;
 }
-.meeko-ui-pagination .meeko-ui-button {
-	margin-inline-start: auto;
-}
 
 /* Table of contents */
 .meeko-ui-toc {
@@ -877,10 +870,6 @@ html:active-view-transition-type(ui-modal-close)::view-transition-old(ui-drawer-
 	.meeko-ui-locale-suggestion-actions {
 		grid-column: 1;
 		margin-top: 0;
-	}
-	.meeko-ui-locale-suggestion-actions > .meeko-ui-button[data-size] {
-		flex: 1 1 auto;
-		font-size: var(--ui-font-size-sm);
 	}
 }
 

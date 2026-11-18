@@ -69,6 +69,7 @@ catalog:
   remark-stringify: ^11.0.0
   sharp: 0.35.5
   shiki: 4.6.0
+  tailwind-variants: ^4.0.2
   tailwindcss: 4.3.5
   tsdown: 0.23.7
   tsx: ^4.23.15

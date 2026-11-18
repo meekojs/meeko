@@ -111,6 +111,7 @@
 					<UILink href="#inicio-rápido">{t('home.hero.start')}</UILink>
 					<UIButton
 						variant="outline"
+						class="copy-command"
 						on:click="copyCommand"
 					>
 						<span
@@ -850,7 +851,7 @@
 	.hero-copy-details {
 		margin-block-start: var(--ui-space-3);
 	}
-	.hero-copy-details :global(.meeko-ui-button) {
+	.hero-copy-details :global(.copy-command) {
 		max-width: 100%;
 	}
 	.hero-copy-details code {

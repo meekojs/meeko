@@ -5,6 +5,7 @@
 	import type { UILinkProps } from '../types/button'
 
 	import { uiDefaults } from '../utils/defaults'
+	import { button } from '../variants/button'
 
 	const { to, params, search, resolve, href, target, rel, ariaLabel, variant, size, shape, class: className, ...rest } = defineProps<UILinkProps>()
 
@@ -14,7 +15,7 @@
 
 	const defaults = uiDefaults().link
 
-	const classes = computed(() => ['meeko-ui-button', 'meeko-ui-link', className].filter(Boolean).join(' '))
+	const classes = computed(() => button({ variant: variant ?? defaults?.variant, size: size ?? defaults?.size, shape: shape ?? defaults?.shape, class: className }))
 	const linkRel = computed(() => rel ?? (target === '_blank' ? 'noopener noreferrer' : undefined))
 	// `ariaLabel` predates the forwarded `aria-label`; when both are given, `ariaLabel` wins.
 	const label = computed(() => ariaLabel ?? rest['aria-label'])
@@ -32,9 +33,6 @@
 		bind:rel="linkRel.value"
 		bind:aria-label="label.value"
 		bind:class="classes.value"
-		bind:data-variant="variant ?? defaults?.variant ?? 'primary'"
-		bind:data-size="size ?? defaults?.size ?? 'md'"
-		bind:data-shape="shape ?? defaults?.shape ?? 'rounded'"
 		bind="rest"
 		on:click="(event) => emit('click', event)"
 	>

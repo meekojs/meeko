@@ -117,7 +117,7 @@
 						class="meeko-ui-link-card-description"
 						html="group.description"
 					/>
-					<UIBadge>{group.entries.length}</UIBadge>
+					<UIBadge class="card-count">{group.entries.length}</UIBadge>
 				</UILinkCard>
 			</li>
 			<li if:when="exportsLink">
@@ -249,7 +249,7 @@
 		margin: 0;
 		padding: 0;
 	}
-	.cards :global(.meeko-ui-badge) {
+	.cards :global(.card-count) {
 		align-self: flex-start;
 	}
 	.group-title {

@@ -238,30 +238,6 @@
 	width: var(--ui-slider-thumb);
 	height: var(--ui-slider-thumb);
 }
-.meeko-ui-badge {
-	gap: var(--ui-space-1-5);
-}
-.meeko-ui-badge-dot {
-	border-radius: var(--ui-radius-full);
-	background: currentColor;
-	width: var(--ui-badge-dot-size);
-	height: var(--ui-badge-dot-size);
-}
-.meeko-ui-badge[data-tone='info'] {
-	border-color: transparent;
-	background: var(--ui-color-info-soft);
-	color: var(--ui-color-info-text);
-}
-.meeko-ui-badge[data-tone='success'] {
-	border-color: transparent;
-	background: var(--ui-color-success-soft);
-	color: var(--ui-color-success-text);
-}
-.meeko-ui-badge[data-tone='warning'] {
-	border-color: transparent;
-	background: var(--ui-color-warning-soft);
-	color: var(--ui-color-warning-text);
-}
 .meeko-ui-card[data-density='compact'] {
 	--card-padding: var(--ui-space-3);
 }
