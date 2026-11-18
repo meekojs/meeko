@@ -12,7 +12,7 @@
 4. El violeta es para la acción principal, el foco, la selección y lo que está activo. Si todo es violeta, nada destaca.
 5. Plataforma antes que JavaScript. Los navegadores antiguos funcionan, sin animación.
 
-Las portadas comparten `UIPage` y `UIPageHeader` con `layout="landing"`. Sus acciones, escaparates y secciones leen las clases `meeko-ui-landing-*` de `page.css`; cada producto aporta sólo su texto y su demo.
+Las portadas comparten `UIPage` y `UIPageHeader` con `layout="landing"`. Sus acciones y escaparates son las clases `docs-actions` y `docs-showcase` de la base documental (`packages/docs`), que comparten las webs de UI e i18n; la portada del framework define sus propias secciones. Cada producto aporta sólo su texto y su demo.
 
 ## Color
 

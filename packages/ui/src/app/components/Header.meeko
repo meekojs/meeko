@@ -6,6 +6,7 @@
 	import { icons } from '../utils/icons'
 	import { uiMessages } from '../utils/messages'
 	import { followsLink, isCurrentLink, linkTarget } from '../utils/navigation'
+	import { container } from '../variants/container'
 	import { header } from '../variants/header'
 	import * as Brand from './internal/Brand.meeko'
 	import * as Icon from './internal/Icon.meeko'
@@ -32,11 +33,7 @@
 		data-pagefind-ignore
 		bind:class="classes.base({ sticky: props.sticky, class: [props.ui?.base, props.class] })"
 	>
-		<div
-			data-gutter="md"
-			bind:data-size="props.size"
-			bind:class="classes.bar({ class: ['meeko-ui-container', props.ui?.bar] })"
-		>
+		<div bind:class="classes.bar({ class: [container({ size: props.size, gutter: 'md' }), props.ui?.bar] })">
 			<render
 				if:when="snippets.brand"
 				snippet="snippets.brand"

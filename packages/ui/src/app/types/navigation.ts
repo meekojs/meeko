@@ -4,6 +4,7 @@ import type { drawer } from '../variants/drawer'
 import type { footer, header } from '../variants/header'
 import type { localeSuggestion, localeSwitcher } from '../variants/locale'
 import type { breadcrumb, navigationTabs, navigationTree, pageNavigation, pagination, tableOfContents } from '../variants/navigation'
+import type { page, pageHeader } from '../variants/page'
 import type { UIRouteTarget } from './button'
 import type { UIContainerSize } from './container'
 import type { UITone } from './forms'
@@ -191,7 +192,8 @@ export type UIPageLayout = 'docs' | 'dashboard' | 'landing'
  * Props de `<UIPage>`, la estructura de una página: enlace para saltar al contenido, un único `<main>`
  * enfocable (`#contenido` por defecto) y las zonas `header`, `notices`, `bar`, `sidebar`, `aside` y
  * `footer` como snippets. `sidebar` y `aside` se ocultan en pantallas estrechas: `bar` es la barra que
- * entonces lleva el `<UIDrawer>`. Los demás atributos, como `lang` y `dir`, llegan a la raíz.
+ * entonces lleva el `<UIDrawer>`. Los demás atributos, como `lang` y `dir`, llegan a la raíz. `ui` añade clases
+ * a sus slots: `base`, `skip`, `notices`, `bar`, `body`, `sidebar`, `main` y `aside`.
  *
  * @since 1.8.0
  * @example
@@ -203,23 +205,28 @@ export type UIPageLayout = 'docs' | 'dashboard' | 'landing'
  * </UIPage>
  * ```
  */
-export type UIPageProps = Omit<ElementAttributes<'div'>, 'class'> & {
-	/** Disposición; `"docs"` por defecto. */
-	readonly layout?: UIPageLayout
-	/** `id` del `<main>`, destino del enlace para saltar; `"contenido"` por defecto. */
-	readonly mainId?: string
-	/** Idioma del contenido de `<main>`, cuando no es el del documento. */
-	readonly mainLang?: string
-	/** Texto del enlace para saltar al contenido. */
-	readonly skipLabel?: string
-	/** Clases adicionales, tras la del componente. */
-	readonly class?: string
-}
+export type UIPageProps = Omit<ElementAttributes<'div'>, 'class'> &
+	UIThemeProps<
+		typeof page,
+		{
+			/** Disposición; `"docs"` por defecto. */
+			readonly layout?: UIPageLayout
+			/** `id` del `<main>`, destino del enlace para saltar; `"contenido"` por defecto. */
+			readonly mainId?: string
+			/** Idioma del contenido de `<main>`, cuando no es el del documento. */
+			readonly mainLang?: string
+			/** Texto del enlace para saltar al contenido. */
+			readonly skipLabel?: string
+			/** Clases adicionales del elemento raíz; equivale a `ui.base`. */
+			readonly class?: string
+		}
+	>
 
 /**
  * Props de `<UIPageHeader>`, el encabezado con el único `<h1>` de una página. Sus snippets son
  * `title`, `breadcrumb`, `actions` y `default`, éste bajo la descripción. `title` permite
- * títulos con marcado, como los de una portada traducida.
+ * títulos con marcado, como los de una portada traducida. `ui` añade clases a sus slots: `base`, `row`,
+ * `text`, `title`, `description` y `actions`.
  *
  * @since 1.8.0
  * @example
@@ -229,18 +236,21 @@ export type UIPageProps = Omit<ElementAttributes<'div'>, 'class'> & {
  * </UIPageHeader>
  * ```
  */
-export interface UIPageHeaderProps {
-	/** Título de la página; puede sustituirse por el snippet `title`. */
-	readonly title?: string
-	/** Identificador del título, para enlazarlo con aria-labelledby. */
-	readonly headingId?: string
-	/** Texto bajo el título. */
-	readonly description?: string
-	/** Disposición de la página, que fija el tamaño del título y el borde; `"docs"` por defecto. */
-	readonly layout?: UIPageLayout
-	/** Clases adicionales, tras la del componente. */
-	readonly class?: string
-}
+export type UIPageHeaderProps = UIThemeProps<
+	typeof pageHeader,
+	{
+		/** Título de la página; puede sustituirse por el snippet `title`. */
+		readonly title?: string
+		/** Identificador del título, para enlazarlo con aria-labelledby. */
+		readonly headingId?: string
+		/** Texto bajo el título. */
+		readonly description?: string
+		/** Disposición de la página, que fija el tamaño del título y el borde; `"docs"` por defecto. */
+		readonly layout?: UIPageLayout
+		/** Clases adicionales del elemento raíz; equivale a `ui.base`. */
+		readonly class?: string
+	}
+>
 
 /**
  * Un enlace de `<UINavigationTree>`.

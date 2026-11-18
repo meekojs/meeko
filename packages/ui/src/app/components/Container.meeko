@@ -1,16 +1,9 @@
 <script lang="ts">
-	import type { UIContainerGutter, UIContainerSize, UIContainerTag } from '../types/container'
+	import type { UIContainerProps } from '../types/container'
 
-	interface Props {
-		as?: UIContainerTag
-		size?: UIContainerSize
-		gutter?: UIContainerGutter
-		id?: string
-		ariaLabel?: string
-		class?: string
-	}
+	import { container } from '../variants/container'
 
-	const props = defineProps<Props>({ as: 'div', size: 'xl', gutter: 'md' })
+	const props = defineProps<UIContainerProps>({ as: 'div', size: 'xl', gutter: 'md' })
 
 	const snippets = defineSnippets<{ default: [] }>()
 </script>
@@ -20,9 +13,7 @@
 		is="props.as"
 		bind:id="props.id"
 		bind:aria-label="props.ariaLabel"
-		bind:class="['meeko-ui-container', props.class].filter(Boolean).join(' ')"
-		bind:data-size="props.size"
-		bind:data-gutter="props.gutter"
+		bind:class="container({ size: props.size, gutter: props.gutter, class: props.class })"
 	>
 		<render snippet="snippets.default" />
 	</component>

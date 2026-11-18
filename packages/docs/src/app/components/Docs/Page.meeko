@@ -23,7 +23,7 @@
 
 <template>
 	<div
-		bind:class="props.landing ? 'docs-page meeko-ui-landing-page' : 'docs-page'"
+		class="docs-page"
 		bind:data-landing="props.landing ? '' : undefined"
 		bind:lang="prose.value === i18n.locale ? undefined : prose.value"
 	>

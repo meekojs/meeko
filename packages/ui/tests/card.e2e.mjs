@@ -17,7 +17,8 @@ test('UICard hydrates snippets, changes variants and supports both themes and mo
 	context.after(() => browser.close())
 	const ssr = await browser.newPage({ javaScriptEnabled: false })
 	await ssr.goto(`${origin}/cards`)
-	assert.equal(await ssr.locator('.meeko-ui-card').count(), 7)
+	// A card is the <section> that groups its parts for the table in its body.
+	assert.equal(await ssr.locator('section[class~="ui:group/card"]').count(), 7)
 	assert.equal(await ssr.getByRole('region', { name: 'Tu espacio de trabajo', exact: true }).getByRole('button', { name: 'Guardar cambio' }).count(), 1)
 	await ssr.close()
 	const page = await browser.newPage({ viewport: { width: 1280, height: 1000 }, colorScheme: 'light' })
@@ -28,13 +29,14 @@ test('UICard hydrates snippets, changes variants and supports both themes and mo
 	})
 	await page.goto(`${origin}/cards`, { waitUntil: 'networkidle' })
 	const card = page.getByRole('region', { name: 'Tu espacio de trabajo', exact: true })
-	const body = await card.locator('.meeko-ui-card-body').elementHandle()
+	const body = await card.locator(':scope > div').elementHandle()
 	await card.getByRole('button', { name: 'Guardar cambio' }).click()
 	assert.match(await card.getByRole('status').innerText(), /1/)
 	const styles = {}
+	const backgrounds = { outline: 'ui:bg-surface', soft: 'ui:bg-control-hover', solid: 'ui:bg-primary', elevated: 'ui:bg-surface-raised' }
 	for (const variant of ['outline', 'soft', 'solid', 'elevated']) {
 		await page.getByLabel('Variante', { exact: true }).selectOption(variant)
-		assert.equal(await card.getAttribute('data-variant'), variant)
+		assert.ok((await card.getAttribute('class')).split(' ').includes(backgrounds[variant]), variant)
 		styles[variant] = await card.evaluate((element) => {
 			const css = globalThis.getComputedStyle(element)
 			return { background: css.backgroundColor, color: css.color, shadow: css.boxShadow }
@@ -47,16 +49,16 @@ test('UICard hydrates snippets, changes variants and supports both themes and mo
 	assert.notEqual(styles.elevated.shadow, 'none')
 	// The reading styles of the page's <UIProse> stop at the card: on a solid, the text must still be the card's.
 	const solidText = await page
-		.locator('.meeko-ui-card[data-variant="solid"]')
+		.locator('section[class~="ui:bg-primary"]')
 		.last()
 		.evaluate((element) => {
 			const color = (selector) => globalThis.getComputedStyle(element.querySelector(selector)).color
-			return { card: globalThis.getComputedStyle(element).color, description: color('.meeko-ui-card-description'), body: color('.meeko-ui-card-body p') }
+			return { card: globalThis.getComputedStyle(element).color, description: color(':scope > header > p'), body: color(':scope > div p') }
 		})
 	assert.equal(solidText.description, solidText.card, 'the description of a solid card is readable')
 	assert.equal(solidText.body, solidText.card, 'the content of a solid card is readable')
 	assert.equal(await body.evaluate((element) => element.isConnected), true, 'variant updates retain hydrated content')
-	assert.equal(await page.locator('.card-demo-custom .meeko-ui-card-header h2').innerText(), 'Cabecera personalizada')
+	assert.equal(await page.locator('.card-demo-custom > header h2').innerText(), 'Cabecera personalizada')
 	assert.equal(await page.locator('.card-demo-minimal header, .card-demo-minimal footer').count(), 0)
 	assert.equal(await page.locator('.card-demo-custom footer').count(), 0)
 	await page.getByLabel('Variante', { exact: true }).selectOption('outline')

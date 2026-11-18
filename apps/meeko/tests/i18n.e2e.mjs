@@ -66,7 +66,7 @@ function spanishInterface() {
 function interfaceText() {
 	const page = globalThis.document.body.cloneNode(true)
 	// The navigation tree, the entries of both views of the index and the titles of the pager.
-	const documentation = '.docs-navigation nav, .meeko-ui-page-aside nav ul, details[data-pagefind-ignore] nav ul, nav:has(> a[rel="prev"], > a[rel="next"]) > a > span'
+	const documentation = '.docs-navigation nav, main ~ aside nav ul, details[data-pagefind-ignore] nav ul, nav:has(> a[rel="prev"], > a[rel="next"]) > a > span'
 	for (const element of page.querySelectorAll(`pre, code, script, style, main article, ${documentation}, .start .meeko-ui-prose, .docs-index ul`)) element.remove()
 	const names = [...page.querySelectorAll('[aria-label], [title], [placeholder], [alt]')].flatMap((element) => ['aria-label', 'title', 'placeholder', 'alt'].map((name) => element.getAttribute(name) ?? ''))
 	return [page.textContent ?? '', ...names].join('\n')
@@ -227,7 +227,7 @@ test('the English site: language, hreflang, interface, selector, links, fallback
 			globalThis.__e2eDocument = 'same'
 		})
 		// The shell of the snapshot, the first site that gives it all of this: index, pager and edit link.
-		const firstHeading = page.locator('.meeko-ui-page-aside nav a').first()
+		const firstHeading = page.locator('main ~ aside nav a').first()
 		const anchor = await firstHeading.getAttribute('href')
 		assert.equal(await page.locator(`main article [id="${decodeURIComponent(anchor.slice(1))}"]`).count(), 1, 'the index links a heading of the article')
 		const pager = page.locator('nav:has(> a[rel="prev"], > a[rel="next"])')
@@ -270,7 +270,7 @@ test('the English site: language, hreflang, interface, selector, links, fallback
 		assert.equal(await page.evaluate(() => globalThis.__e2eDocument), 'same', 'a result navigates on the client')
 		assert.equal(
 			await page
-				.locator('.meeko-ui-page-bar button[command="show-modal"]')
+				.locator('div:has(+ div > main) button[command="show-modal"]')
 				.textContent()
 				.then((text) => text?.trim()),
 			'Contents',
@@ -342,8 +342,8 @@ test('the English site: language, hreflang, interface, selector, links, fallback
 		// narrow-screen index folds, and it is there instead of the side column.
 		await page.goto(base + '/en' + guide, { waitUntil: 'networkidle' })
 		assert.ok(await page.locator('details[data-pagefind-ignore]:has(> nav)').isVisible(), 'the collapsible index at 390 px')
-		assert.ok(!(await page.locator('.meeko-ui-page-aside').isVisible()), 'no side column at 390 px')
-		await page.locator('.meeko-ui-page-bar button[command="show-modal"]').click()
+		assert.ok(!(await page.locator('main ~ aside').isVisible()), 'no side column at 390 px')
+		await page.locator('div:has(+ div > main) button[command="show-modal"]').click()
 		const drawer = page.locator('dialog:has(.docs-navigation)')
 		await drawer.waitFor()
 		await drawer.locator('a[href="/en/docs/api"]').first().click()
@@ -351,7 +351,7 @@ test('the English site: language, hreflang, interface, selector, links, fallback
 		await drawer.waitFor({ state: 'hidden' })
 		// The home page has no sidebar and no bar, and it is still one <main> and one <h1>.
 		await page.goto(base + '/en', { waitUntil: 'networkidle' })
-		assert.equal(await page.locator('.meeko-ui-page-sidebar, .meeko-ui-page-bar').count(), 0)
+		assert.equal(await page.locator('div:has(+ main), div:has(+ div > main)').count(), 0)
 		assert.equal(await page.locator('main#contenido').count(), 1)
 		assert.equal(await page.locator('h1').count(), 1)
 		assert.deepEqual(problems, [])

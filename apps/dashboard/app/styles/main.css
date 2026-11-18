@@ -46,7 +46,7 @@
 	justify-items: center;
 	min-height: calc(100dvh - var(--ui-header-height) - var(--ui-space-24));
 }
-.dash-login > .meeko-ui-card {
+.dash-login-card {
 	width: min(100%, var(--ui-floating-panel-width));
 }
 .dash-login-header {

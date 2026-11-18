@@ -4,6 +4,8 @@
  */
 .docs-page[data-landing] {
 	--ui-prose-width: none;
+
+	padding-block-start: var(--ui-space-16);
 }
 .docs-preview-content {
 	display: flex;
@@ -25,6 +27,24 @@
 	margin-block: var(--ui-space-5);
 }
 .docs-preview-content .docs-actions {
+	margin-block: 0;
+}
+/* The showcase of a landing page: the live example beside its code, between two lines. */
+.docs-showcase {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--ui-floating-panel-width)), 1fr));
+	align-items: start;
+	gap: var(--ui-space-10);
+	margin-block: var(--ui-space-12);
+	border-block: var(--ui-border-width) solid var(--ui-color-border);
+	padding-block: var(--ui-space-8);
+}
+.docs-showcase > div {
+	display: grid;
+	gap: var(--ui-space-5);
+	min-width: 0;
+}
+.docs-showcase > div > :is(h2, p) {
 	margin-block: 0;
 }
 .docs-stack {

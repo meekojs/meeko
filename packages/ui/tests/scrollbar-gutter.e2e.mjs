@@ -31,8 +31,8 @@ const dialogs = {
 	palette: { route: '/overlays', open: (page) => page.locator('main button:has(+ dialog > div > input[type="search"][role="combobox"])').first().click() },
 	modal: { route: '/modals', open: (page) => page.getByRole('button', { name: 'Modal declarativo', exact: true }).click() },
 	'drawer at the end': { route: '/overlays', open: (page) => page.getByRole('button', { name: 'Abrir filtros', exact: true }).click() },
-	// The contents of a narrow screen: its trigger only exists there.
-	'drawer at the start': { narrow: true, route: '/overlays', open: (page) => page.locator('.meeko-ui-page-bar button[aria-haspopup="dialog"]').click() },
+	// The contents of a narrow screen: its trigger only exists there, in the bar of UIPage just before the body that holds <main>.
+	'drawer at the start': { narrow: true, route: '/overlays', open: (page) => page.locator('div:has(+ div > main) button[aria-haspopup="dialog"]').click() },
 }
 
 async function measure(context, page, origin, dialog, theme, height) {

@@ -30,7 +30,7 @@ const measure = (page) =>
 			// Without the gutter that the base keeps for a classic scrollbar, which is not page.
 			available: globalThis.document.body.getBoundingClientRect().width,
 			overflow: globalThis.document.documentElement.scrollWidth > globalThis.innerWidth,
-			body: globalThis.document.querySelector('.meeko-ui-page-body').getBoundingClientRect().width,
+			body: globalThis.document.querySelector('main').parentElement.getBoundingClientRect().width,
 			// The bar of the site header, the first <header> of the page.
 			header: globalThis.document.querySelector('header > div').getBoundingClientRect().width,
 			prose: size(text),
@@ -83,13 +83,14 @@ test('a page title is 3xl with tight tracking at every width, in UIPageHeader an
 			prose.innerHTML = '<h1>Título</h1>'
 			globalThis.document.querySelector('main').append(prose)
 		})
-		for (const selector of ['.meeko-ui-page-header h1', '#title-probe h1']) {
+		// The first h1 of <main> is that of its UIPageHeader.
+		for (const selector of ['main h1', '#title-probe h1']) {
 			const { size, tracking } = await title(selector)
 			assert.ok(Math.abs(size - 1.75) < 0.001, `${selector} at ${width}: ${size}rem`)
 			assert.ok(Math.abs(tracking + 0.014) < 0.001, `${selector} at ${width}: ${tracking}em`)
 		}
 		await page.goto(origin + '/', { waitUntil: 'networkidle' })
-		const landing = await title('.meeko-ui-page-header[data-layout="landing"] h1')
+		const landing = await title('main h1')
 		assert.ok(landing.size >= 2.25 - 0.001, `the landing at ${width}: ${landing.size}rem`)
 		assert.ok(Math.abs(landing.tracking + 0.025) < 0.001, `the landing at ${width}: ${landing.tracking}em`)
 	}

@@ -4,20 +4,14 @@
  * specificity, and any unlayered rule of the app wins over both.
  */
 @import './utilities.css';
-@import './container.css';
 @import './modal.css';
-@import './table.css';
-@import './card.css';
-@import './link-card.css';
 @import './navigation.css';
-@import './page.css';
 @import './code.css';
 @import './prose.css';
 @import './popover.css';
 @import './select.css';
 @import './tabs.css';
 @import './theme-toggle.css';
-@import './forms.css';
 @import './feedback.css';
 
 /* The spinner of variants/button: a busy button turns it, so it stays when the rest of the button left. */

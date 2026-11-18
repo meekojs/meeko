@@ -159,7 +159,7 @@ async function readerJourney(page, problems, base, label) {
 	})
 
 	// The table of contents and its anchors, which the browser resolves in the adopted HTML.
-	const entry = page.locator('.meeko-ui-page-aside nav a').nth(2)
+	const entry = page.locator('main ~ aside nav a').nth(2)
 	const anchor = await entry.getAttribute('href')
 	await entry.click()
 	await page.waitForFunction((hash) => globalThis.location.hash === hash, anchor)

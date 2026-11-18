@@ -58,9 +58,8 @@
 				<h2
 					bind:id="id + '-title'"
 					bind:class="classes.value.title({ class: props.ui?.title })"
+					>{props.title}</h2
 				>
-					{props.title}
-				</h2>
 				<p
 					if:when="props.description"
 					bind:class="classes.value.description({ class: props.ui?.description })"

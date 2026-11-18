@@ -12,7 +12,7 @@
 		title="Every language. The same contract."
 		description="Typed translations, catalogs per language and native formats for your Meeko applications."
 	>
-		<div class="docs-actions meeko-ui-landing-actions">
+		<div class="docs-actions">
 			<UILink to="/installation">Start translating</UILink>
 			<UILink
 				to="/playground"
@@ -21,7 +21,7 @@
 				Open the playground
 			</UILink>
 		</div>
-		<div class="meeko-ui-landing-showcase">
+		<div class="docs-showcase">
 			<div>
 				<h2>A message that understands your data.</h2>
 				<p>Write a translation with parameters and use it from your component. Keys and arguments reach your editor typed.</p>

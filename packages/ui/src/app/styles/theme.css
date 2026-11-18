@@ -151,5 +151,7 @@
 	--breakpoint-phone: 30rem;
 	--breakpoint-compact: 40rem;
 	--breakpoint-tablet: 48rem;
+	/* Below it <UIPage> folds its sidebar into the bar above the content. */
+	--breakpoint-sidebar: 54rem;
 	--breakpoint-desktop: 75rem;
 }

@@ -2,29 +2,32 @@
 	import type { UICardProps } from '../types/card'
 
 	import { uiDefaults } from '../utils/defaults'
+	import { card } from '../variants/card'
 
-	const { title, headingId, description, variant, density, padding, class: className, ...rest } = defineProps<UICardProps>()
+	const { title, headingId, description, variant, density, padding, ui, class: className, ...rest } = defineProps<UICardProps>()
 
 	const snippets = defineSnippets<{ header?: []; actions?: []; default: []; footer?: [] }>()
 
 	const id = useId()
 	const defaults = uiDefaults().card
 	const titleId = headingId ?? id + '-title'
+
+	/** `density` gives the padding when `padding` does not: compact, normal and comfortable are sm, md and lg. */
+	const densityPadding = { compact: 'sm', normal: 'md', comfortable: 'lg' } as const
+
+	const classes = card()
+	const variants = () => ({ variant: variant ?? defaults?.variant ?? 'outline', padding: padding ?? densityPadding[density ?? 'normal'], actions: Boolean(snippets.actions) })
 </script>
 
 <template>
 	<section
-		bind:class="['meeko-ui-card', className].filter(Boolean).join(' ')"
-		bind:data-density="density ?? 'normal'"
-		bind:data-padding="padding"
-		bind:data-variant="variant ?? defaults?.variant ?? 'outline'"
+		bind:class="classes.base({ ...variants(), class: [ui?.base, className] })"
 		bind:aria-labelledby="title && !snippets.header ? titleId : rest['aria-labelledby']"
 		bind="rest"
 	>
 		<header
 			if:when="snippets.header || snippets.actions || title || description"
-			class="meeko-ui-card-header"
-			bind:data-actions="snippets.actions ? '' : undefined"
+			bind:class="classes.header({ ...variants(), class: ui?.header })"
 		>
 			<render
 				if:when="snippets.header"
@@ -32,29 +35,29 @@
 			/>
 			<h2
 				if:when="!snippets.header && title"
-				class="meeko-ui-card-title"
 				bind:id="titleId"
 				bind:tabindex="headingId ? -1 : undefined"
+				bind:class="classes.title({ class: ui?.title })"
 			>
 				{title}
 			</h2>
 			<p
 				if:when="!snippets.header && description"
-				class="meeko-ui-card-description"
+				bind:class="classes.description({ ...variants(), class: ui?.description })"
 			>
 				{description}
 			</p>
 			<div
 				if:when="snippets.actions"
-				class="meeko-ui-card-actions"
+				bind:class="classes.actions({ ...variants(), class: ui?.actions })"
 			>
 				<render snippet="snippets.actions" />
 			</div>
 		</header>
-		<div class="meeko-ui-card-body"><render snippet="snippets.default" /></div>
+		<div bind:class="classes.body({ class: ui?.body })"><render snippet="snippets.default" /></div>
 		<footer
 			if:when="snippets.footer"
-			class="meeko-ui-card-footer"
+			bind:class="classes.footer({ class: ui?.footer })"
 		>
 			<render snippet="snippets.footer" />
 		</footer>

@@ -1,32 +1,36 @@
 <script lang="ts">
-	import type { UIStatProps } from '../types/feedback'
+	import type { UIStatProps } from '../types/data'
+
+	import { stat } from '../variants/data'
 
 	const props = defineProps<UIStatProps>()
 
 	const snippets = defineSnippets<{ value?: []; detail?: [] }>()
+
+	const classes = stat()
 </script>
 
 <template>
-	<dl bind:class="['meeko-ui-stat', props.class].filter(Boolean).join(' ')">
-		<dt>{props.label}</dt>
+	<dl bind:class="classes.base({ class: [props.ui?.base, props.class] })">
+		<dt bind:class="classes.label({ class: props.ui?.label })">{props.label}</dt>
 		<dd
 			if:when="snippets.value"
-			class="meeko-ui-stat-value"
+			bind:class="classes.value({ class: props.ui?.value })"
 		>
 			<render snippet="snippets.value" />
 		</dd>
 		<template if:when="!snippets.value">
-			<dd class="meeko-ui-stat-value">{props.value}</dd>
+			<dd bind:class="classes.value({ class: props.ui?.value })">{props.value}</dd>
 		</template>
 		<dd
 			if:when="snippets.detail"
-			class="meeko-ui-stat-detail"
+			bind:class="classes.detail({ class: props.ui?.detail })"
 		>
 			<render snippet="snippets.detail" />
 		</dd>
 		<dd
 			if:when="!snippets.detail && props.detail"
-			class="meeko-ui-stat-detail"
+			bind:class="classes.detail({ class: props.ui?.detail })"
 		>
 			{props.detail}
 		</dd>

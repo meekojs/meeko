@@ -212,12 +212,11 @@ test('component sheets and components have no colour, size, time or weight outsi
 })
 
 test('what must differ from a surface does not rest on --ui-color-control, which ui.tokens.surface also sets', async () => {
-	const card = strip(await read('card.css'))
-	const linkCard = strip(await read('link-card.css'))
-	const table = strip(await read('table.css'))
-	assert.match(card, /\[data-variant='soft'\] \{\s*--card-background: var\(--ui-color-control-hover\)/)
-	assert.match(linkCard, /:hover \{[^}]*background: var\(--ui-color-control-hover\)/)
-	assert.match(table, /--table-hover: var\(--ui-color-control-hover\)/)
+	const { card, linkCard } = await import('../dist/app/variants/card.js')
+	const { table } = await import('../dist/app/variants/table.js')
+	assert.match(card({ variant: 'soft' }).base(), /(^| )ui:bg-control-hover( |$)/)
+	assert.match(linkCard().base(), /(^| )ui:hover:bg-control-hover( |$)/)
+	assert.match(table().bodyRow(), /(^| )ui:hover:bg-control-hover( |$)/)
 })
 
 test('nothing mentions the removed --meeko-ui-* variables', async () => {
@@ -229,9 +228,14 @@ test('nothing mentions the removed --meeko-ui-* variables', async () => {
 
 test('the frame of the page does not depend on how long the page is', async () => {
 	assert.match(await read('base.css'), /:root \{[^}]*scrollbar-gutter: stable/, 'a short page and a long one keep the header in place')
-	const page = await read('page.css')
-	assert.match(page, /\.meeko-ui-page-sidebar,\s*\.meeko-ui-page-aside \{[^}]*scrollbar-gutter: stable/, 'the sidebar is as wide with a long navigation as with a short one')
-	assert.doesNotMatch(/\.meeko-ui-skip-link \{[^}]*\}/.exec(page)[0], /box-shadow/, 'the shadow of the hidden skip link would show above the header')
+	const { page } = await import('../dist/app/variants/page.js')
+	const classes = page()
+	for (const slot of ['sidebar', 'aside']) assert.match(classes[slot](), /ui:\[scrollbar-gutter:stable\]/, `the ${slot} is as wide with a long navigation as with a short one`)
+	const shadows = classes
+		.skip()
+		.split(' ')
+		.filter((name) => /shadow/.test(name))
+	assert.ok(shadows.length > 0 && shadows.every((name) => name.startsWith('ui:focus-visible:')), 'the shadow of the hidden skip link would show above the header')
 })
 
 test('inline code reads as a chip, so that its padding is not taken for a space before the punctuation', async () => {

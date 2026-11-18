@@ -102,12 +102,12 @@
 								</snippet>
 							</I18nT>
 						</span>
-						<span class="line meeko-ui-landing-soft">{t('home.hero.titleLine2')}</span>
+						<span class="line tone-soft">{t('home.hero.titleLine2')}</span>
 					</snippet>
 				</UIPageHeader>
 			</div>
 			<div class="hero-copy-details">
-				<div class="meeko-ui-landing-actions">
+				<div class="hero-actions">
 					<UILink href="#inicio-rápido">{t('home.hero.start')}</UILink>
 					<UIButton
 						variant="outline"
@@ -140,16 +140,16 @@
 	</section>
 
 	<section
-		class="chapter meeko-ui-landing-section chapter-flow"
+		class="chapter chapter-flow"
 		aria-labelledby="flow-title"
 	>
 		<UIContainer size="2xl">
 			<h2
 				id="flow-title"
-				class="meeko-ui-landing-section-title"
+				class="chapter-title"
 			>
 				{t('home.flow.title')}
-				<span class="meeko-ui-landing-soft">{t('home.flow.titleSoft')}</span>
+				<span class="tone-soft">{t('home.flow.titleSoft')}</span>
 			</h2>
 			<div class="split">
 				<ul class="facts">
@@ -379,16 +379,16 @@
 	</section>
 
 	<section
-		class="chapter meeko-ui-landing-section chapter-deploy"
+		class="chapter chapter-deploy"
 		aria-labelledby="deploy-title"
 	>
 		<UIContainer size="2xl">
 			<h2
 				id="deploy-title"
-				class="meeko-ui-landing-section-title"
+				class="chapter-title"
 			>
 				{t('home.deploy.title')}
-				<span class="meeko-ui-landing-soft">{t('home.deploy.titleSoft')}</span>
+				<span class="tone-soft">{t('home.deploy.titleSoft')}</span>
 			</h2>
 			<div class="split reverse">
 				<figure class="figure">
@@ -607,16 +607,16 @@
 	</section>
 
 	<section
-		class="chapter meeko-ui-landing-section chapter-showcase"
+		class="chapter chapter-showcase"
 		aria-labelledby="showcase-title"
 	>
 		<UIContainer size="2xl">
 			<h2
 				id="showcase-title"
-				class="meeko-ui-landing-section-title"
+				class="chapter-title"
 			>
 				{t('home.showcase.title')}
-				<span class="meeko-ui-landing-soft">{t('home.showcase.subtitle')}</span>
+				<span class="tone-soft">{t('home.showcase.subtitle')}</span>
 			</h2>
 			<p class="showcase-lead">{t('home.showcase.lead')}</p>
 			<div class="showcase-grid">
@@ -649,16 +649,16 @@
 	</section>
 
 	<section
-		class="chapter meeko-ui-landing-section chapter-tools"
+		class="chapter chapter-tools"
 		aria-labelledby="tools-title"
 	>
 		<UIContainer size="2xl">
 			<h2
 				id="tools-title"
-				class="meeko-ui-landing-section-title"
+				class="chapter-title"
 			>
 				{t('home.tools.title')}
-				<span class="meeko-ui-landing-soft">{t('home.tools.titleSoft')}</span>
+				<span class="tone-soft">{t('home.tools.titleSoft')}</span>
 			</h2>
 			<figure
 				class="editor-frame"
@@ -766,16 +766,16 @@
 	</section>
 
 	<section
-		class="chapter meeko-ui-landing-section chapter-start"
+		class="chapter chapter-start"
 		aria-labelledby="inicio-rápido"
 	>
 		<UIContainer size="2xl">
 			<h2
 				id="inicio-rápido"
-				class="meeko-ui-landing-section-title"
+				class="chapter-title"
 			>
 				{t('home.start.title')}
-				<span class="meeko-ui-landing-soft">{t('home.start.titleSoft')}</span>
+				<span class="tone-soft">{t('home.start.titleSoft')}</span>
 			</h2>
 			<div class="start">
 				<UIProse bind:html="quickStart" />
@@ -851,6 +851,13 @@
 	.hero-copy-details {
 		margin-block-start: var(--ui-space-3);
 	}
+	.hero-actions {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: var(--ui-space-3);
+		margin-block: var(--ui-space-5);
+	}
 	.hero-copy-details :global(.copy-command) {
 		max-width: 100%;
 	}
@@ -900,6 +907,28 @@
 	}
 
 	/* Chapters: a two-tone statement, then the facts beside a technical figure. */
+	.chapter {
+		border-block-start: var(--ui-border-width) solid var(--ui-color-border);
+		padding-block: var(--ui-space-24) var(--ui-space-20);
+	}
+	.chapter-title {
+		margin: 0;
+		max-width: var(--ui-container-md);
+		color: var(--ui-color-text);
+		font-weight: var(--ui-font-weight-semibold);
+		font-size: var(--ui-font-size-4xl);
+		line-height: var(--ui-line-height-tight);
+		letter-spacing: var(--ui-tracking-display);
+		text-wrap: balance;
+	}
+	@media (max-width: 48rem) {
+		.chapter {
+			padding-block: var(--ui-space-16) var(--ui-space-12);
+		}
+		.chapter-title {
+			font-size: var(--ui-font-size-3xl);
+		}
+	}
 	.chapter-flow {
 		border-block-start: 0;
 	}

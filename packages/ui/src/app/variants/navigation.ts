@@ -169,10 +169,11 @@ export const tableOfContents = tv({
 		base: 'ui:font-sans ui:text-md ui:leading-normal ui:text-text-soft',
 		title: 'ui:mx-0 ui:mt-0 ui:mb-2 ui:font-medium ui:text-text',
 		list: 'ui:m-0 ui:list-none ui:p-0',
-		// The collapsible view: inside <UIPage>, only where its side column is gone.
+		// The collapsible view: inside <UIPage> (its `group/page`), only below `desktop`, where variants/page
+		// hides the aside with the same breakpoint.
 		collapsible: [
 			'ui:rounded-lg ui:border-(length:--ui-border-width) ui:border-border ui:font-sans ui:text-md',
-			'ui:in-[.meeko-ui-page]:mb-8 ui:in-[.meeko-ui-page]:hidden ui:max-desktop:in-[.meeko-ui-page]:block',
+			'ui:group-[&]/page:mb-8 ui:group-[&]/page:hidden ui:max-desktop:group-[&]/page:block',
 		],
 		summary: [
 			'ui:flex ui:cursor-pointer ui:list-none ui:items-center ui:justify-between ui:rounded-lg ui:px-3 ui:py-2 ui:font-medium ui:text-text',

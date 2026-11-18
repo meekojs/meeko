@@ -157,7 +157,7 @@ test('the English UI documentation has an English interface, hreflang, a switche
 	assert.equal(await page.getByRole('link', { name: 'See components', exact: true }).getAttribute('href'), '/en/components')
 	// The components bring their own texts: English pages pass none of them, also in dynamic states.
 	await page.goto(origin + '/en/tables', { waitUntil: 'networkidle' })
-	assert.equal(await page.getByRole('table', { name: 'Empty table', exact: true }).locator('.meeko-ui-table-empty').innerText(), 'No data.')
+	assert.equal(await page.getByRole('table', { name: 'Empty table', exact: true }).getByRole('cell').innerText(), 'No data.')
 	await page.goto(origin + '/en/select', { waitUntil: 'networkidle' })
 	// The page documents the same default text that the component shows.
 	assert.equal(await page.getByText('Sin resultados').count(), 0, 'the English page does not quote the Spanish default')
@@ -183,7 +183,8 @@ test('the English UI documentation has an English interface, hreflang, a switche
 	assert.deepEqual(await page.locator('#theme-select').getByRole('radiogroup', { name: 'Theme', exact: true }).getByRole('radio').allInnerTexts(), ['Light', 'Dark', 'System'])
 	// UILinkCard to: localized, and a navigation of the client that keeps the document.
 	await page.goto(origin + '/en/links', { waitUntil: 'networkidle' })
-	const card = page.locator('a.meeko-ui-link-card')
+	// A UILinkCard is the link whose title is a <strong>.
+	const card = page.locator('main a:has(> strong)')
 	assert.equal(await card.getAttribute('href'), '/en/theming')
 	await page.evaluate(() => {
 		globalThis.uiDocumentMarker = 'card'
@@ -193,9 +194,9 @@ test('the English UI documentation has an English interface, hreflang, a switche
 	assert.equal(await page.evaluate(() => globalThis.uiDocumentMarker), 'card')
 	// The Spanish versions keep the Spanish texts and the route without a prefix.
 	await page.goto(origin + '/tables', { waitUntil: 'networkidle' })
-	assert.equal(await page.getByRole('table', { name: 'Tabla vacía', exact: true }).locator('.meeko-ui-table-empty').innerText(), 'No hay datos.')
+	assert.equal(await page.getByRole('table', { name: 'Tabla vacía', exact: true }).getByRole('cell').innerText(), 'No hay datos.')
 	await page.goto(origin + '/links', { waitUntil: 'networkidle' })
-	assert.equal(await page.locator('a.meeko-ui-link-card').getAttribute('href'), '/theming')
+	assert.equal(await page.locator('main a:has(> strong)').getAttribute('href'), '/theming')
 	// The guides of the new components: their demos work, in English, in both directions of each control.
 	await page.goto(origin + '/en/controls', { waitUntil: 'networkidle' })
 	await page.getByRole('checkbox', { name: /I accept the terms/ }).check()
@@ -260,14 +261,14 @@ test('the English UI documentation has an English interface, hreflang, a switche
 	assert.equal(await ssr.getByRole('link', { name: 'Skip to content', exact: true }).count(), 1)
 	// The same texts the hydrated pages above show: SSR and the client choose the same ones.
 	await ssr.goto(origin + '/en/tables')
-	assert.equal(await ssr.locator('.meeko-ui-table-empty').first().innerText(), 'No data.')
+	assert.equal(await ssr.locator('td[colspan]').first().innerText(), 'No data.')
 	await ssr.goto(origin + '/en/modals')
 	assert.equal(await ssr.locator('dialog[aria-labelledby] > div:first-child > button').first().getAttribute('aria-label'), 'Close modal')
 	await ssr.goto(origin + '/en/theme-toggle')
 	assert.equal(await ssr.locator('#theme-select [role="radiogroup"]').getAttribute('aria-label'), 'Theme')
 	assert.equal(await ssr.locator('#theme-cycle button').getAttribute('aria-label'), 'Change theme')
 	await ssr.goto(origin + '/en/links')
-	assert.equal(await ssr.locator('a.meeko-ui-link-card').getAttribute('href'), '/en/theming')
+	assert.equal(await ssr.locator('main a:has(> strong)').getAttribute('href'), '/en/theming')
 	await ssr.close()
 	const sitemap = await (await fetch(origin + '/sitemap.xml')).text()
 	assert.match(sitemap, /<loc>https:\/\/ui\.meekojs\.com\/en\/buttons<\/loc>/)

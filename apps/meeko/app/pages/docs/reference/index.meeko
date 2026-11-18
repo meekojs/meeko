@@ -114,7 +114,7 @@
 					bind:title="group.title"
 				>
 					<span
-						class="meeko-ui-link-card-description"
+						class="card-description"
 						html="group.description"
 					/>
 					<UIBadge class="card-count">{group.entries.length}</UIBadge>
@@ -251,6 +251,12 @@
 	}
 	.cards :global(.card-count) {
 		align-self: flex-start;
+	}
+	/* The description of a group is HTML, so the card gets it in its snippet, with the look of its own. */
+	.card-description {
+		color: var(--ui-color-text-soft);
+		font-size: var(--ui-font-size-sm);
+		line-height: var(--ui-line-height-normal);
 	}
 	.group-title {
 		display: flex;

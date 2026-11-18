@@ -1,7 +1,9 @@
 import type { ElementAttributes } from '@meekojs/meeko'
 import type { MeekoLinkProps, RouteId } from '@meekojs/meeko/framework'
 
+import type { linkCard } from '../variants/card'
 import type { UIActionShape, UIActionSize, UIActionVariant } from './config'
+import type { UIThemeProps } from './theme'
 
 /** Los params de la ruta K: `{ id: string }` en `/users/[id]`, `{}` en una ruta estática. */
 type RouteParamsOf<K extends RouteId> = NonNullable<MeekoLinkProps<K>['params']>
@@ -198,6 +200,7 @@ interface UILinkAnchorProps {
  * los dos a la vez son un error de tipos, y con `to` el `href` pasa por los resolvedores de enlaces
  * de la aplicación, así que con `@meekojs/i18n` apunta al idioma del documento o al de `hreflang`.
  * `title` es el texto principal de la card, no el atributo HTML; los demás atributos llegan al `<a>`.
+ * `ui` añade clases a sus slots: `base`, `title` y `description`.
  *
  * @since 1.8.0
  * @example
@@ -210,14 +213,18 @@ interface UILinkAnchorProps {
 export type UILinkCardProps = (UILinkAnchorProps | UILinkRouteProps) &
 	UILinkTargetProps &
 	UIAnchorAttributes &
-	Omit<UIForwardedAttributes, 'title'> & {
-		/** Texto principal de la card. */
-		readonly title: string
-		/** Texto de apoyo, bajo el título. */
-		readonly description?: string
-		/** Clases adicionales, tras la del componente. */
-		readonly class?: string
-	}
+	Omit<UIForwardedAttributes, 'title'> &
+	UIThemeProps<
+		typeof linkCard,
+		{
+			/** Texto principal de la card. */
+			readonly title: string
+			/** Texto de apoyo, bajo el título. */
+			readonly description?: string
+			/** Clases adicionales del `<a>`; equivale a `ui.base`. */
+			readonly class?: string
+		}
+	>
 
 /**
  * Props de `<UILink>`, un enlace con la API visual de `<UIButton>` y los defaults de

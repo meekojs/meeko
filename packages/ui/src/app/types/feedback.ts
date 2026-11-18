@@ -82,47 +82,8 @@ export type UISkeletonProps = UIThemeProps<
 	}
 >
 
-/**
- * Dato con etiqueta y detalle opcional. Los snippets `value` y `detail` admiten marcado, como un enlace.
- *
- * @example `<UIStat label="Visitas" bind:value="1400" detail="Esta semana" />`
- */
-export interface UIStatProps {
-	/** Nombre del dato. */
-	label: string
-	/** Valor presentado por la aplicación; el snippet `value` lo sustituye. */
-	value?: string | number
-	/** Contexto del valor; el snippet `detail` lo sustituye. */
-	detail?: string
-	/** Clases adicionales. */
-	class?: string
-}
-
-/** Elemento de una lista de descripciones. @example const item: UIDescriptionItem = { label: 'Estado', value: 'Activo' } */
-export interface UIDescriptionItem {
-	/** Término, único dentro de la lista. */
-	label: string
-	/** Valor presentado por la aplicación. */
-	value: string | number
-	/** Contexto del valor. */
-	detail?: string
-	/** El valor es código o una ruta: se pinta en `<code>`, en monoespaciada. */
-	code?: boolean
-	/** Con `code`, texto de ayuda del valor, como un hash completo tras uno abreviado. */
-	title?: string
-	/** `lang` de la etiqueta, si está en otro idioma que el valor. */
-	labelLang?: string
-}
-
-/** Lista semántica de datos. @example `<UIDescriptionList bind:items="facts" bind:columns="2" />` */
-export interface UIDescriptionListProps {
-	/** Datos en orden de lectura. */
-	items: readonly UIDescriptionItem[]
-	/** Columnas en espacios amplios; una en móvil. */
-	columns?: 1 | 2 | 3
-	/** Clases adicionales. */
-	class?: string
-}
+// <UIStat> and <UIDescriptionList> have their props in types/data, beside their variants.
+export type { UIDescriptionItem, UIDescriptionListProps, UIStatProps } from './data'
 
 /** Notificación breve presentada por el host de UIApp. @example `<UIToast text="Cambios guardados" tone="success" />` */
 export type UIToastProps = UIThemeProps<

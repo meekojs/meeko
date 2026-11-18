@@ -116,7 +116,7 @@ test('UITable keeps sections, reactive rows and accessible table semantics in na
 	await page.setViewportSize({ width: 390, height: 844 })
 	assert.equal(await page.evaluate(() => globalThis.document.documentElement.scrollWidth <= globalThis.innerWidth), true, 'overflow stays inside the table')
 	// A name is never cut at 390 px: a long type breaks at its spaces, and the table scrolls before that.
-	const cutNames = await page.evaluate(() => [...globalThis.document.querySelectorAll('.meeko-ui-table code')].filter((code) => !/\s/.test(code.textContent.trim()) && code.getClientRects().length > 1).map((code) => code.textContent))
+	const cutNames = await page.evaluate(() => [...globalThis.document.querySelectorAll('table[role="table"] code')].filter((code) => !/\s/.test(code.textContent.trim()) && code.getClientRects().length > 1).map((code) => code.textContent))
 	assert.deepEqual(cutNames, [], 'code without spaces stays on one line')
 	// The code shows the characters that were written, not the ligatures of the system mono.
 	assert.equal(

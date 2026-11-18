@@ -52,36 +52,42 @@ test('the navigation components render on the server with their semantics', { ti
 
 	await t.test('UIPage: one main, focusable, with its skip link, in every layout', () => {
 		assert.equal(count(es, /<main\b/g), 1)
-		assert.ok(block(es, 'class="meeko-ui-page-notices"', '</section>').includes('Aviso de la página'), 'the notices have their place under the header')
-		assert.ok(!landing.includes('meeko-ui-page-notices'), 'without the snippet there is no wrapper')
+		// The wrapper of the notices is the one that hides when it is empty.
+		assert.ok(block(es, 'ui:not-has-[*]:hidden', '</section>').includes('Aviso de la página'), 'the notices have their place under the header')
+		assert.ok(!landing.includes('ui:not-has-[*]:hidden'), 'without the snippet there is no wrapper')
 		const main = tag(es, /<main\b/)
 		assert.equal(attribute(main, 'id'), 'contenido')
 		assert.equal(attribute(main, 'tabindex'), '-1')
-		assert.equal(attribute(tag(es, /meeko-ui-skip-link/), 'href'), '#contenido')
+		// The skip link is the first link of the page, fixed off the screen.
+		const skip = /<a\b[^>]*class="ui:fixed /
+		assert.equal(attribute(tag(es, skip), 'href'), '#contenido')
 		assert.ok(es.includes('Saltar al contenido'))
 		assert.ok(en.includes('Skip to content'), 'the skip link follows the locale of the document')
-		assert.match(tag(es, /class="meeko-ui-page"/), /data-layout="docs"/)
-		const custom = tag(dashboard, /class="meeko-ui-page"/)
-		assert.equal(attribute(custom, 'data-layout'), 'dashboard')
+		// The layout sets the padding of <main>: 10 and 20 for docs, 8 and 12 for a dashboard, none for a landing page.
+		assert.match(tag(es, /<main\b/), /ui:pt-10 ui:pb-20/)
+		const custom = tag(dashboard, /class="ui:group\/page /)
 		assert.equal(attribute(custom, 'lang'), 'es')
 		const customMain = tag(dashboard, /<main\b/)
 		assert.equal(attribute(customMain, 'id'), 'principal')
 		assert.equal(attribute(customMain, 'lang'), 'en')
-		assert.equal(attribute(tag(dashboard, /meeko-ui-skip-link/), 'href'), '#principal')
+		assert.match(customMain, /ui:pt-8 ui:pb-12/)
+		assert.equal(attribute(tag(dashboard, skip), 'href'), '#principal')
 		assert.ok(dashboard.includes('Ir al panel'))
-		assert.equal(attribute(tag(landing, /class="meeko-ui-page"/), 'data-layout'), 'landing')
-		assert.equal(count(dashboard, /meeko-ui-page-sidebar|meeko-ui-page-aside|meeko-ui-page-bar/g), 0, 'a zone without its snippet paints nothing')
+		assert.match(tag(landing, /<main\b/), /ui:pt-0 ui:pb-0/)
+		// The sidebar hides below `sidebar`, where the bar shows.
+		assert.equal(count(dashboard, /<aside\b|ui:max-sidebar:hidden|ui:max-sidebar:sticky/g), 0, 'a zone without its snippet paints nothing')
 		for (const html of [es, dashboard, landing]) assert.equal(count(html, /<h1\b/g), 1)
 	})
 
 	await t.test('UIPageHeader: title, description, breadcrumb and actions', () => {
-		const header = block(es, '<header class="meeko-ui-page-header', '</header>')
+		const pageHeader = '<header class="ui:grid ui:gap-4 '
+		const header = block(es, pageHeader, '</header>')
 		assert.match(header, /<h1[^>]*><span>Navegación<\/span><\/h1>/)
 		assert.ok(header.includes('Todos los componentes de navegación juntos.'))
 		assert.ok(header.includes('aria-label="Ruta de navegación"'))
 		assert.ok(header.includes('Editar'))
-		assert.equal(attribute(tag(dashboard, /meeko-ui-page-header/), 'data-layout'), 'dashboard')
-		const landingHeader = block(landing, '<header class="meeko-ui-page-header', '</header>')
+		assert.match(block(dashboard, pageHeader, '</header>'), /^<header class="[^"]*ui:mb-6 ui:pb-0/, 'a dashboard header has no border')
+		const landingHeader = block(landing, pageHeader, '</header>')
 		assert.equal(attribute(tag(landingHeader, /<h1\b/), 'id'), 'portada')
 		assert.match(landingHeader, /Portada<code>\.meeko<\/code>/)
 	})

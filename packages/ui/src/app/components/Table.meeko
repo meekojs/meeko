@@ -3,6 +3,7 @@
 	import type { TableCellValue, TableColumn, UITableProps } from '@meekojs/ui/runtime'
 
 	import { uiMessages } from '../utils/messages'
+	import { table } from '../variants/table'
 
 	const props = defineProps<UITableProps<T>>({ layout: 'native', hideHeader: false })
 
@@ -32,6 +33,10 @@
 
 	const id = useId()
 	const text = uiMessages().table
+	const classes = table()
+
+	/** The variants that the whole table shares. */
+	const variants = () => ({ layout: props.layout, density: props.density ?? 'normal', hideCaption: Boolean(props.hideCaption) })
 
 	function keyOf(row: T): string | number {
 		return typeof props.rowKey === 'function' ? props.rowKey(row) : (row[props.rowKey] as string | number)
@@ -52,22 +57,20 @@
 
 <template>
 	<div
-		class="meeko-ui-table-scroll"
 		tabindex="0"
+		bind:class="classes.base({ class: props.ui?.base })"
 		bind:role="props.caption || snippets.caption ? 'region' : undefined"
 		bind:aria-labelledby="props.caption || snippets.caption ? id + '-caption' : undefined"
 	>
 		<table
 			role="table"
-			bind:class="['meeko-ui-table', props.class].filter(Boolean).join(' ')"
-			bind:data-layout="props.layout"
-			bind:data-density="props.density ?? 'normal'"
-			bind:data-caption="props.hideCaption ? 'hidden' : undefined"
+			bind:class="classes.table({ ...variants(), class: [props.ui?.table, props.class] })"
 			bind:style="'--table-columns: ' + (props.gridColumns ?? 'repeat(' + Math.max(1, props.columns.length) + ', minmax(var(--ui-table-column-min), 1fr))')"
 		>
 			<caption
 				if:when="props.caption || snippets.caption"
 				bind:id="id + '-caption'"
+				bind:class="classes.caption({ ...variants(), class: props.ui?.caption })"
 			>
 				<render
 					if:when="snippets.caption"
@@ -78,15 +81,19 @@
 			<thead
 				if:when="!props.hideHeader"
 				role="rowgroup"
+				bind:class="classes.section({ ...variants(), class: props.ui?.section }) || undefined"
 			>
-				<tr role="row">
+				<tr
+					role="row"
+					bind:class="classes.row({ ...variants(), class: props.ui?.row }) || undefined"
+				>
 					<th
 						each:of="props.columns"
 						each:as="column"
 						each:key="column.key"
 						role="columnheader"
 						scope="col"
-						bind:data-numeric="column.numeric ? '' : undefined"
+						bind:class="classes.headerCell({ ...variants(), numeric: Boolean(column.numeric), class: props.ui?.headerCell })"
 					>
 						<render
 							if:when="columnHeader(column)"
@@ -102,13 +109,17 @@
 					</th>
 				</tr>
 			</thead>
-			<tbody role="rowgroup">
+			<tbody
+				role="rowgroup"
+				bind:class="classes.section({ ...variants(), class: props.ui?.section }) || undefined"
+			>
 				<tr
 					each:of="props.rows"
 					each:as="row"
 					each:index="_index"
 					each:key="keyOf(row)"
 					role="row"
+					bind:class="classes.bodyRow({ ...variants(), class: props.ui?.bodyRow })"
 				>
 					<component
 						each:of="props.columns"
@@ -117,7 +128,7 @@
 						is="column.rowHeader ? 'th' : 'td'"
 						bind:role="column.rowHeader ? 'rowheader' : 'cell'"
 						bind:scope="column.rowHeader ? 'row' : undefined"
-						bind:data-numeric="column.numeric ? '' : undefined"
+						bind:class="classes.cell({ ...variants(), numeric: Boolean(column.numeric), rowHeader: Boolean(column.rowHeader), class: props.ui?.cell })"
 					>
 						<render
 							if:when="columnCell(column)"
@@ -135,10 +146,11 @@
 				<tr
 					if:when="props.rows.length === 0"
 					role="row"
+					bind:class="classes.bodyRow({ ...variants(), class: props.ui?.bodyRow })"
 				>
 					<td
 						role="cell"
-						class="meeko-ui-table-empty"
+						bind:class="classes.cell({ ...variants(), class: [classes.empty({ ...variants() }), props.ui?.cell, props.ui?.empty] })"
 						bind:colspan="Math.max(1, props.columns.length)"
 					>
 						<render
@@ -152,13 +164,18 @@
 			<tfoot
 				if:when="snippets.footer || props.columns.some((column) => column.footer !== undefined)"
 				role="rowgroup"
+				bind:class="classes.section({ ...variants(), class: props.ui?.section }) || undefined"
 			>
-				<tr role="row">
+				<tr
+					role="row"
+					bind:class="classes.row({ ...variants(), class: props.ui?.row }) || undefined"
+				>
 					<td
 						each:of="props.columns"
 						each:as="column"
 						each:key="column.key"
 						role="cell"
+						bind:class="classes.footerCell({ ...variants(), class: props.ui?.footerCell })"
 					>
 						<render
 							if:when="snippets.footer"
