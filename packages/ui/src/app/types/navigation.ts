@@ -1,8 +1,13 @@
 import type { ElementAttributes, TrustedHtml } from '@meekojs/meeko'
 
+import type { drawer } from '../variants/drawer'
+import type { footer, header } from '../variants/header'
+import type { localeSuggestion, localeSwitcher } from '../variants/locale'
+import type { breadcrumb, navigationTabs, navigationTree, pageNavigation, pagination, tableOfContents } from '../variants/navigation'
 import type { UIRouteTarget } from './button'
 import type { UIContainerSize } from './container'
 import type { UITone } from './forms'
+import type { UIThemeProps } from './theme'
 
 /** `href` o `to`, excluyentes. */
 type UILinkDestination = { readonly href: string; readonly to?: undefined; readonly params?: undefined; readonly search?: undefined; readonly resolve?: undefined; readonly match?: undefined } | (UIRouteTarget & { readonly href?: undefined; readonly resolve?: boolean; readonly match?: 'exact' | 'prefix' })
@@ -86,7 +91,9 @@ export type UIBrand = UILinkTarget & {
 /**
  * Props de `<UIHeader>`: una barra de altura fija (`--ui-header-height`) con marca, enlaces y
  * acciones. En una pantalla estrecha los enlaces pasan a un menú nativo con `popover`, sin JavaScript
- * y sin mover la página. Sus snippets son `brand`, `nav`, `actions` y `menu`.
+ * y sin mover la página. Sus snippets son `brand`, `nav`, `actions` y `menu`. `ui` añade clases a sus
+ * slots: `base`, `bar`, `nav`, `link` (cada enlace de la barra y del menú), `actions`, `toggle`, `menu` y
+ * `menuNav`.
  *
  * @since 1.8.0
  * @example
@@ -96,24 +103,27 @@ export type UIBrand = UILinkTarget & {
  * </UIHeader>
  * ```
  */
-export interface UIHeaderProps {
-	/** Marca; el snippet `brand` la sustituye. */
-	readonly brand?: UIBrand
-	/** Enlaces principales; el snippet `nav` los sustituye en pantallas anchas. */
-	readonly items?: readonly UINavigationLink[]
-	/** Ruta actual, para marcar el enlace con `aria-current="page"`. */
-	readonly current?: string
-	/** `aria-label` de la navegación. */
-	readonly label?: string
-	/** `aria-label` del botón del menú en pantallas estrechas. */
-	readonly menuLabel?: string
-	/** Se queda fija arriba al desplazarse; `true` por defecto. */
-	readonly sticky?: boolean
-	/** Ancho máximo del contenido, como en `<UIContainer>`; `"2xl"` por defecto, el de `<UIPage>`. */
-	readonly size?: UIContainerSize
-	/** Clases adicionales, tras la del componente. */
-	readonly class?: string
-}
+export type UIHeaderProps = UIThemeProps<
+	typeof header,
+	{
+		/** Marca; el snippet `brand` la sustituye. */
+		readonly brand?: UIBrand
+		/** Enlaces principales; el snippet `nav` los sustituye en pantallas anchas. */
+		readonly items?: readonly UINavigationLink[]
+		/** Ruta actual, para marcar el enlace con `aria-current="page"`. */
+		readonly current?: string
+		/** `aria-label` de la navegación. */
+		readonly label?: string
+		/** `aria-label` del botón del menú en pantallas estrechas. */
+		readonly menuLabel?: string
+		/** Se queda fija arriba al desplazarse; `true` por defecto. */
+		readonly sticky?: boolean
+		/** Ancho máximo del contenido, como en `<UIContainer>`; `"2xl"` por defecto, el de `<UIPage>`. */
+		readonly size?: UIContainerSize
+		/** Clases adicionales del elemento raíz; equivale a `ui.base`. */
+		readonly class?: string
+	}
+>
 
 /**
  * Una columna de enlaces de `<UIFooter>`.
@@ -133,7 +143,9 @@ export interface UIFooterGroup {
 
 /**
  * Props de `<UIFooter>`: marca y descripción, columnas de enlaces (`groups`), una fila de enlaces
- * (`items`) y una línea legal. Sus snippets son `brand`, `about`, `actions` y `legal`.
+ * (`items`) y una línea legal. Sus snippets son `brand`, `about`, `actions` y `legal`. `ui` añade clases a
+ * sus slots: `base`, `inner`, `about`, `actions`, `groups`, `title`, `list`, `link` (cada enlace de las
+ * columnas y de la fila), `legal` y `legalNav`.
  *
  * @since 1.8.0
  * @example
@@ -143,22 +155,25 @@ export interface UIFooterGroup {
  * </UIFooter>
  * ```
  */
-export interface UIFooterProps {
-	/** Marca; el snippet `brand` la sustituye. */
-	readonly brand?: UIBrand
-	/** Texto bajo la marca; el snippet `about` lo sustituye. */
-	readonly description?: string
-	/** Columnas de enlaces. */
-	readonly groups?: readonly UIFooterGroup[]
-	/** Fila de enlaces, sin columnas. */
-	readonly items?: readonly UINavigationLink[]
-	/** `aria-label` de la navegación. */
-	readonly label?: string
-	/** Ancho máximo del contenido, como en `<UIContainer>`; `"2xl"` por defecto, el de `<UIPage>`. */
-	readonly size?: UIContainerSize
-	/** Clases adicionales, tras la del componente. */
-	readonly class?: string
-}
+export type UIFooterProps = UIThemeProps<
+	typeof footer,
+	{
+		/** Marca; el snippet `brand` la sustituye. */
+		readonly brand?: UIBrand
+		/** Texto bajo la marca; el snippet `about` lo sustituye. */
+		readonly description?: string
+		/** Columnas de enlaces. */
+		readonly groups?: readonly UIFooterGroup[]
+		/** Fila de enlaces, sin columnas. */
+		readonly items?: readonly UINavigationLink[]
+		/** `aria-label` de la navegación. */
+		readonly label?: string
+		/** Ancho máximo del contenido, como en `<UIContainer>`; `"2xl"` por defecto, el de `<UIPage>`. */
+		readonly size?: UIContainerSize
+		/** Clases adicionales del elemento raíz; equivale a `ui.base`. */
+		readonly class?: string
+	}
+>
 
 /**
  * Disposición de `<UIPage>` y `<UIPageHeader>`: `docs` tiene navegación, artículo e índice; `dashboard`,
@@ -269,7 +284,8 @@ export interface UINavigationTreeGroup {
 
 /**
  * Props de `<UINavigationTree>`, la navegación lateral: grupos que se pliegan con `<details>` nativo,
- * enlace actual, iconos, código y destacados. Sus snippets son `item`, `icon` y `empty`.
+ * enlace actual, iconos, código y destacados. Sus snippets son `item`, `icon` y `empty`. `ui` añade
+ * clases a sus slots: `base`, `group`, `title`, `titleText`, `chevron`, `list`, `link`, `label` y `empty`.
  *
  * @since 1.8.0
  * @example
@@ -277,22 +293,25 @@ export interface UINavigationTreeGroup {
  * <UINavigationTree bind:groups="groups" bind:current="route.path.value" label="Documentación" />
  * ```
  */
-export interface UINavigationTreeProps {
-	/** Grupos de enlaces. */
-	readonly groups: readonly UINavigationTreeGroup[]
-	/** Ruta actual, para marcar el enlace con `aria-current="page"`. */
-	readonly current?: string
-	/** `aria-label` de la navegación. */
-	readonly label?: string
-	/** Los grupos se pliegan; `true` por defecto. */
-	readonly collapsible?: boolean
-	/** Etiqueta de un enlace con `featured`. */
-	readonly featuredLabel?: string
-	/** Mensaje sin grupos; el snippet `empty` lo sustituye. */
-	readonly emptyText?: string
-	/** Clases adicionales, tras la del componente. */
-	readonly class?: string
-}
+export type UINavigationTreeProps = UIThemeProps<
+	typeof navigationTree,
+	{
+		/** Grupos de enlaces. */
+		readonly groups: readonly UINavigationTreeGroup[]
+		/** Ruta actual, para marcar el enlace con `aria-current="page"`. */
+		readonly current?: string
+		/** `aria-label` de la navegación. */
+		readonly label?: string
+		/** Los grupos se pliegan; `true` por defecto. */
+		readonly collapsible?: boolean
+		/** Etiqueta de un enlace con `featured`. */
+		readonly featuredLabel?: string
+		/** Mensaje sin grupos; el snippet `empty` lo sustituye. */
+		readonly emptyText?: string
+		/** Clases adicionales del elemento raíz; equivale a `ui.base`. */
+		readonly class?: string
+	}
+>
 
 /**
  * Cómo se cierra un `<UIDrawer>`: `any` con Escape o al pulsar fuera, `closerequest` sólo con Escape
@@ -322,7 +341,9 @@ export type UIDrawerSide = 'start' | 'end'
  * Props de `<UIDrawer>`, un panel lateral sobre un `<dialog>` modal nativo: abre con `command`
  * (también sin JavaScript en los navegadores que lo admiten), atrapa el foco y lo devuelve al cerrar.
  * Su modelo es `open`, y sus snippets son `default`, `footer` y `trigger`, que recibe el `id` del panel
- * para usar `commandfor`. Sin `triggerLabel` ni `trigger`, no pinta botón: ábrelo con el modelo.
+ * para usar `commandfor`. Sin `triggerLabel` ni `trigger`, no pinta botón: ábrelo con el modelo. `ui`
+ * añade clases a sus slots: `base` (el `<dialog>`), `trigger`, `panel`, `heading`, `title`, `close`,
+ * `body` y `footer`.
  *
  * @since 1.8.0
  * @example
@@ -332,24 +353,27 @@ export type UIDrawerSide = 'start' | 'end'
  * </UIDrawer>
  * ```
  */
-export interface UIDrawerProps {
-	/** Título visible y nombre accesible del panel. */
-	readonly title: string
-	/** `id` del `<dialog>`; por defecto, uno generado. */
-	readonly id?: string
-	/** Lado por el que entra; `"start"` por defecto. */
-	readonly side?: UIDrawerSide
-	/** Texto del botón que abre el panel. */
-	readonly triggerLabel?: string
-	/** `aria-label` del botón de cierre. */
-	readonly closeLabel?: string
-	/** Cómo se cierra el panel; `"any"` por defecto. */
-	readonly closedBy?: UIDrawerClosedBy
-	/** Seguir un enlace del panel lo cierra; `true` por defecto. */
-	readonly closeOnNavigate?: boolean
-	/** Clases adicionales, tras la del componente. */
-	readonly class?: string
-}
+export type UIDrawerProps = UIThemeProps<
+	typeof drawer,
+	{
+		/** Título visible y nombre accesible del panel. */
+		readonly title: string
+		/** `id` del `<dialog>`; por defecto, uno generado. */
+		readonly id?: string
+		/** Lado por el que entra; `"start"` por defecto. */
+		readonly side?: UIDrawerSide
+		/** Texto del botón que abre el panel. */
+		readonly triggerLabel?: string
+		/** `aria-label` del botón de cierre. */
+		readonly closeLabel?: string
+		/** Cómo se cierra el panel; `"any"` por defecto. */
+		readonly closedBy?: UIDrawerClosedBy
+		/** Seguir un enlace del panel lo cierra; `true` por defecto. */
+		readonly closeOnNavigate?: boolean
+		/** Clases adicionales del `<dialog>`; equivale a `ui.base`. */
+		readonly class?: string
+	}
+>
 
 /**
  * Una pestaña de `<UINavigationTabs>`: un enlace con un contador opcional junto al texto.
@@ -374,7 +398,8 @@ export type UINavigationTabsItem = UINavigationLink & {
  * indicador que se desplaza con CSS. Son navegación, no un `tablist`: cada uno lleva a otra URL.
  * `variant="segmented"` da a la fila la forma de un `<UIRadioGroup variant="segmented">`, para filtros en
  * la URL, sin indicador: varias filas conviven en una página sin repetir su View Transition. El evento
- * `select` recibe el clic y la pestaña; `event.preventDefault()` cancela la navegación.
+ * `select` recibe el clic y la pestaña; `event.preventDefault()` cancela la navegación. `ui` añade
+ * clases a sus slots: `base`, `link` e `indicator`.
  *
  * @since 1.8.0
  * @example
@@ -383,18 +408,21 @@ export type UINavigationTabsItem = UINavigationLink & {
  * <UINavigationTabs variant="segmented" label="Rango" bind:items="[{ label: '7 días', href: '?days=7', current: true }]" />
  * ```
  */
-export interface UINavigationTabsProps {
-	/** Enlaces. */
-	readonly items: readonly UINavigationTabsItem[]
-	/** Aspecto; `"underline"` por defecto. */
-	readonly variant?: 'underline' | 'segmented'
-	/** Ruta actual, para marcar el enlace con `aria-current="page"`. */
-	readonly current?: string
-	/** `aria-label` de la navegación. */
-	readonly label?: string
-	/** Clases adicionales, tras la del componente. */
-	readonly class?: string
-}
+export type UINavigationTabsProps = UIThemeProps<
+	typeof navigationTabs,
+	{
+		/** Enlaces. */
+		readonly items: readonly UINavigationTabsItem[]
+		/** Aspecto; `"underline"` por defecto. */
+		readonly variant?: 'underline' | 'segmented'
+		/** Ruta actual, para marcar el enlace con `aria-current="page"`. */
+		readonly current?: string
+		/** `aria-label` de la navegación. */
+		readonly label?: string
+		/** Clases adicionales del elemento raíz; equivale a `ui.base`. */
+		readonly class?: string
+	}
+>
 
 /**
  * Un paso de `<UIBreadcrumb>`. Sin destino, es sólo texto.
@@ -418,7 +446,7 @@ export type UIBreadcrumbItem =
 
 /**
  * Props de `<UIBreadcrumb>`: una lista ordenada dentro de un `<nav>`, con el último paso como página
- * actual.
+ * actual. `ui` añade clases a sus slots: `base`, `list`, `item`, `link` y `current` (un paso sin enlace).
  *
  * @since 1.8.0
  * @example
@@ -426,18 +454,22 @@ export type UIBreadcrumbItem =
  * <UIBreadcrumb bind:items="[{ label: 'Referencia', to: '/docs/reference' }, { label: 'useSignal' }]" />
  * ```
  */
-export interface UIBreadcrumbProps {
-	/** Pasos, del más general al actual. */
-	readonly items: readonly UIBreadcrumbItem[]
-	/** `aria-label` de la navegación. */
-	readonly label?: string
-	/** Clases adicionales, tras la del componente. */
-	readonly class?: string
-}
+export type UIBreadcrumbProps = UIThemeProps<
+	typeof breadcrumb,
+	{
+		/** Pasos, del más general al actual. */
+		readonly items: readonly UIBreadcrumbItem[]
+		/** `aria-label` de la navegación. */
+		readonly label?: string
+		/** Clases adicionales del elemento raíz; equivale a `ui.base`. */
+		readonly class?: string
+	}
+>
 
 /**
  * Props de `<UIPageNavigation>`: los enlaces a la página anterior y a la siguiente de un documento.
- * Para una lista larga, `<UIPagination>`.
+ * Para una lista larga, `<UIPagination>`. `ui` añade clases a sus slots: `base`, `link`, `hint` (el texto
+ * sobre el enlace), `label` e `icon`.
  *
  * @since 1.8.0
  * @example
@@ -445,24 +477,28 @@ export interface UIBreadcrumbProps {
  * <UIPageNavigation bind:previous="{ label: 'Inicio', to: '/' }" bind:next="{ label: 'Rutas', to: '/routes' }" />
  * ```
  */
-export interface UIPageNavigationProps {
-	/** Página anterior. */
-	readonly previous?: UINavigationLink
-	/** Página siguiente. */
-	readonly next?: UINavigationLink
-	/** `aria-label` de la navegación. */
-	readonly label?: string
-	/** Texto sobre el enlace anterior. */
-	readonly previousLabel?: string
-	/** Texto sobre el enlace siguiente. */
-	readonly nextLabel?: string
-	/** Clases adicionales, tras la del componente. */
-	readonly class?: string
-}
+export type UIPageNavigationProps = UIThemeProps<
+	typeof pageNavigation,
+	{
+		/** Página anterior. */
+		readonly previous?: UINavigationLink
+		/** Página siguiente. */
+		readonly next?: UINavigationLink
+		/** `aria-label` de la navegación. */
+		readonly label?: string
+		/** Texto sobre el enlace anterior. */
+		readonly previousLabel?: string
+		/** Texto sobre el enlace siguiente. */
+		readonly nextLabel?: string
+		/** Clases adicionales del elemento raíz; equivale a `ui.base`. */
+		readonly class?: string
+	}
+>
 
 /**
  * Props de `<UIPagination>`: recuento de una lista y acción de cargar más, con estado ocupado. Sin
  * `moreLink` emite `loadMore`; con él es un enlace, que funciona sin JavaScript (un cursor en la URL).
+ * `ui` añade clases a sus slots: `base`, `count` y `action`.
  *
  * @since 1.8.0
  * @example
@@ -470,28 +506,31 @@ export interface UIPageNavigationProps {
  * <UIPagination bind:shown="rows.value.length" bind:total="total" bind:busy="loading.value" on:loadMore="load" />
  * ```
  */
-export interface UIPaginationProps {
-	/** Elementos visibles. */
-	readonly shown?: number
-	/** Total de elementos. */
-	readonly total?: number
-	/** Texto del recuento, ya formateado; gana sobre `shown` y `total`. */
-	readonly countText?: string
-	/** Hay más que cargar; por defecto, si `shown` es menor que `total`. */
-	readonly hasMore?: boolean
-	/** Hay una carga en curso: la acción se anuncia ocupada, conserva el foco e ignora los clics. */
-	readonly busy?: boolean
-	/** Destino de la acción, si es un enlace. */
-	readonly moreLink?: UILinkTarget
-	/** Texto de la acción. */
-	readonly loadMoreLabel?: string
-	/** Texto de la acción con `busy`. */
-	readonly loadingLabel?: string
-	/** `aria-label` de la navegación. */
-	readonly label?: string
-	/** Clases adicionales, tras la del componente. */
-	readonly class?: string
-}
+export type UIPaginationProps = UIThemeProps<
+	typeof pagination,
+	{
+		/** Elementos visibles. */
+		readonly shown?: number
+		/** Total de elementos. */
+		readonly total?: number
+		/** Texto del recuento, ya formateado; gana sobre `shown` y `total`. */
+		readonly countText?: string
+		/** Hay más que cargar; por defecto, si `shown` es menor que `total`. */
+		readonly hasMore?: boolean
+		/** Hay una carga en curso: la acción se anuncia ocupada, conserva el foco e ignora los clics. */
+		readonly busy?: boolean
+		/** Destino de la acción, si es un enlace. */
+		readonly moreLink?: UILinkTarget
+		/** Texto de la acción. */
+		readonly loadMoreLabel?: string
+		/** Texto de la acción con `busy`. */
+		readonly loadingLabel?: string
+		/** `aria-label` de la navegación. */
+		readonly label?: string
+		/** Clases adicionales del elemento raíz; equivale a `ui.base`. */
+		readonly class?: string
+	}
+>
 
 /**
  * Una entrada de `<UITableOfContents>`: el `id` de un encabezado de la página.
@@ -526,7 +565,9 @@ export type UITableOfContentsVariant = 'aside' | 'collapsible'
 /**
  * Props de `<UITableOfContents>`: el índice de la página. Los enlaces funcionan sin JavaScript. La
  * entrada activa la pinta `scroll-target-group` donde exista; en todos los navegadores, un
- * `IntersectionObserver` mínimo mantiene `aria-current="location"`. `active` lo sustituye.
+ * `IntersectionObserver` mínimo mantiene `aria-current="location"`. `active` lo sustituye. `ui` añade
+ * clases a sus slots: `base` (el `<nav>`), `title`, `list`, `link`, y en la vista `collapsible`,
+ * `collapsible` (el `<details>`, que recibe `class`), `summary`, `chevron` y `panel`.
  *
  * @since 1.8.0
  * @example
@@ -535,18 +576,21 @@ export type UITableOfContentsVariant = 'aside' | 'collapsible'
  * <UITableOfContents bind:entries="toc" variant="collapsible" />
  * ```
  */
-export interface UITableOfContentsProps {
-	/** Entradas, en el orden de la página. */
-	readonly entries: readonly UITableOfContentsEntry[]
-	/** `id` de la entrada activa, si la controla la aplicación; desactiva el seguimiento del scroll. */
-	readonly active?: string
-	/** Vista; `"aside"` por defecto. */
-	readonly variant?: UITableOfContentsVariant
-	/** Título y `aria-label`. */
-	readonly label?: string
-	/** Clases adicionales, tras la del componente. */
-	readonly class?: string
-}
+export type UITableOfContentsProps = UIThemeProps<
+	typeof tableOfContents,
+	{
+		/** Entradas, en el orden de la página. */
+		readonly entries: readonly UITableOfContentsEntry[]
+		/** `id` de la entrada activa, si la controla la aplicación; desactiva el seguimiento del scroll. */
+		readonly active?: string
+		/** Vista; `"aside"` por defecto. */
+		readonly variant?: UITableOfContentsVariant
+		/** Título y `aria-label`. */
+		readonly label?: string
+		/** Clases adicionales del elemento raíz: el `<nav>` (`ui.base`) o, en la vista `collapsible`, el `<details>` (`ui.collapsible`). */
+		readonly class?: string
+	}
+>
 
 /**
  * Un idioma de `<UILocaleSwitcher>` y `<UILocaleSuggestion>`. Es sólo presentación: la aplicación
@@ -572,7 +616,7 @@ export type UILocaleItem = UILinkTarget & {
 
 /**
  * Props de `<UILocaleSwitcher>`: enlaces reales a esta página en cada idioma, sin enrutado ni cookie.
- * Con menos de dos idiomas no pinta nada.
+ * Con menos de dos idiomas no pinta nada. `ui` añade clases a sus slots: `base` y `link`.
  *
  * @since 1.8.0
  * @example
@@ -580,19 +624,23 @@ export type UILocaleItem = UILinkTarget & {
  * <UILocaleSwitcher bind:items="i18n.pageLocales().map(toItem)" />
  * ```
  */
-export interface UILocaleSwitcherProps {
-	/** Idiomas. */
-	readonly items: readonly UILocaleItem[]
-	/** `aria-label` de la navegación. */
-	readonly label?: string
-	/** Clases adicionales, tras la del componente. */
-	readonly class?: string
-}
+export type UILocaleSwitcherProps = UIThemeProps<
+	typeof localeSwitcher,
+	{
+		/** Idiomas. */
+		readonly items: readonly UILocaleItem[]
+		/** `aria-label` de la navegación. */
+		readonly label?: string
+		/** Clases adicionales del elemento raíz; equivale a `ui.base`. */
+		readonly class?: string
+	}
+>
 
 /**
  * Props de `<UILocaleSuggestion>`: un aviso flotante que ofrece otro idioma, escrito en ese idioma, sin
  * mover la página. La aplicación decide cuándo pintarlo (tras montar, para no desajustar la hidratación)
- * y atiende el evento `stay`, porque recordar la elección no es cosa de UI.
+ * y atiende el evento `stay`, porque recordar la elección no es cosa de UI. `ui` añade clases a sus
+ * slots: `base`, `icon`, `message`, `actions`, `go` y `stay`.
  *
  * @since 1.8.0
  * @example
@@ -600,22 +648,25 @@ export interface UILocaleSwitcherProps {
  * <UILocaleSuggestion if:when="suggestion.value" bind:items="items" bind:suggested="suggestion.value" on:stay="stay" />
  * ```
  */
-export interface UILocaleSuggestionProps {
-	/** Idiomas. */
-	readonly items: readonly UILocaleItem[]
-	/** Código del idioma que se ofrece; por defecto, el primero que no es el actual. */
-	readonly suggested?: string
-	/** `aria-label` del aviso. */
-	readonly label?: string
-	/** Texto del aviso. */
-	readonly message?: string
-	/** Texto del enlace. */
-	readonly goLabel?: string
-	/** Texto del botón para quedarse. */
-	readonly stayLabel?: string
-	/** Clases adicionales, tras la del componente. */
-	readonly class?: string
-}
+export type UILocaleSuggestionProps = UIThemeProps<
+	typeof localeSuggestion,
+	{
+		/** Idiomas. */
+		readonly items: readonly UILocaleItem[]
+		/** Código del idioma que se ofrece; por defecto, el primero que no es el actual. */
+		readonly suggested?: string
+		/** `aria-label` del aviso. */
+		readonly label?: string
+		/** Texto del aviso. */
+		readonly message?: string
+		/** Texto del enlace. */
+		readonly goLabel?: string
+		/** Texto del botón para quedarse. */
+		readonly stayLabel?: string
+		/** Clases adicionales del elemento raíz; equivale a `ui.base`. */
+		readonly class?: string
+	}
+>
 
 /**
  * Veredicto de un `<UICodeBlock>`: la forma correcta o el error que corrige.

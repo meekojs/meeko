@@ -7,6 +7,7 @@
 
 	import { uiMessages } from '../utils/messages'
 	import { isCurrentLink, linkTarget, revealInScroller } from '../utils/navigation'
+	import { navigationTabs } from '../variants/navigation'
 	import * as Badge from './Badge.meeko'
 	import * as ItemLink from './internal/ItemLink.meeko'
 
@@ -34,20 +35,22 @@
 		const item = link ? props.items[[...(root.value?.querySelectorAll('a') ?? [])].indexOf(link)] : undefined
 		if (item) emit('select', event, item)
 	}
+
+	const classes = (): ReturnType<typeof navigationTabs> => navigationTabs({ variant: props.variant })
 </script>
 
 <template>
 	<nav
 		ref:root
-		bind:class="['meeko-ui-nav-tabs', props.class].filter(Boolean).join(' ')"
+		bind:class="classes().base({ class: [props.ui?.base, props.class] })"
 		bind:aria-label="props.label ?? text.label"
-		bind:data-variant="props.variant ?? 'underline'"
 		on:click="select"
 	>
 		<ItemLink
 			each:of="props.items"
 			each:as="item"
 			each:key="item.label"
+			bind:class="classes().link({ class: props.ui?.link })"
 			bind:link="linkTarget(item)"
 			bind:current="isCurrentLink(item, props.current) ? 'page' : undefined"
 		>
@@ -62,8 +65,8 @@
 		</ItemLink>
 		<span
 			if:when="props.variant !== 'segmented'"
-			class="meeko-ui-nav-tabs-indicator"
 			aria-hidden="true"
+			bind:class="classes().indicator({ class: props.ui?.indicator })"
 		/>
 	</nav>
 </template>

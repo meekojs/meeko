@@ -67,10 +67,29 @@
 	gap: var(--ui-space-2);
 	margin-top: var(--ui-space-3);
 }
+/* The close button of <UIAlert> and <UIToast>: a square as tall as a control, in the color of its message. */
 .meeko-ui-dismiss {
+	display: inline-flex;
+	flex: none;
+	justify-content: center;
+	align-items: center;
+	cursor: pointer;
 	margin-inline-start: auto;
 	margin-block-start: calc((var(--ui-font-size-md) * var(--ui-line-height-normal) - var(--ui-control-height-md)) / 2);
+	border: 0;
+	border-radius: var(--ui-radius-md);
+	background: transparent;
+	width: var(--ui-control-height-md);
+	height: var(--ui-control-height-md);
 	color: inherit;
+}
+.meeko-ui-dismiss:hover {
+	background: var(--ui-color-control-hover);
+	color: var(--ui-color-text);
+}
+.meeko-ui-dismiss:focus-visible {
+	outline: var(--ui-focus-ring);
+	outline-offset: var(--ui-focus-ring-offset);
 }
 .meeko-ui-empty {
 	display: grid;

@@ -3,6 +3,7 @@
 
 	import { uiMessages } from '../utils/messages'
 	import { linkTarget } from '../utils/navigation'
+	import { footer } from '../variants/header'
 	import * as Brand from './internal/Brand.meeko'
 	import * as ItemLink from './internal/ItemLink.meeko'
 
@@ -11,21 +12,23 @@
 	const snippets = defineSnippets<{ brand?: []; about?: []; actions?: []; legal?: [] }>()
 
 	const text = uiMessages().footer
+
+	const classes = footer()
 </script>
 
 <template>
 	<footer
 		data-pagefind-ignore
-		bind:class="['meeko-ui-footer', props.class].filter(Boolean).join(' ')"
+		bind:class="classes.base({ class: [props.ui?.base, props.class] })"
 	>
 		<div
-			class="meeko-ui-container meeko-ui-footer-inner"
 			data-gutter="md"
 			bind:data-size="props.size"
+			bind:class="classes.inner({ class: ['meeko-ui-container', props.ui?.inner] })"
 		>
 			<div
 				if:when="snippets.brand || props.brand || snippets.about || props.description || snippets.actions"
-				class="meeko-ui-footer-about"
+				bind:class="classes.about({ class: props.ui?.about })"
 			>
 				<render
 					if:when="snippets.brand"
@@ -42,47 +45,54 @@
 				<p if:when="!snippets.about && props.description">{props.description}</p>
 				<div
 					if:when="snippets.actions"
-					class="meeko-ui-footer-actions"
+					bind:class="classes.actions({ class: props.ui?.actions })"
 				>
 					<render snippet="snippets.actions" />
 				</div>
 			</div>
 			<nav
 				if:when="props.groups?.length"
-				class="meeko-ui-footer-groups"
 				bind:aria-label="props.label ?? text.label"
+				bind:class="classes.groups({ class: props.ui?.groups })"
 			>
 				<div
 					each:of="props.groups ?? []"
 					each:as="group"
 					each:key="group.title"
 				>
-					<p class="meeko-ui-footer-title">{group.title}</p>
-					<ul>
+					<p bind:class="classes.title({ class: props.ui?.title })">{group.title}</p>
+					<ul bind:class="classes.list({ class: props.ui?.list })">
 						<li
 							each:of="group.items"
 							each:as="item"
 							each:key="item.label"
 						>
-							<ItemLink bind:link="linkTarget(item)">{item.label}</ItemLink>
+							<ItemLink
+								bind:link="linkTarget(item)"
+								bind:class="classes.link({ class: props.ui?.link })"
+							>
+								{item.label}
+							</ItemLink>
 						</li>
 					</ul>
 				</div>
 			</nav>
 			<div
 				if:when="snippets.legal || props.items?.length"
-				class="meeko-ui-footer-legal"
+				bind:class="classes.legal({ class: props.ui?.legal })"
 			>
 				<div if:when="snippets.legal"><render snippet="snippets.legal" /></div>
 				<nav
 					if:when="props.items?.length"
 					bind:aria-label="props.label ?? text.label"
+					bind:class="classes.legalNav({ class: props.ui?.legalNav })"
 				>
 					<ItemLink
 						each:of="props.items ?? []"
 						each:as="item"
 						each:key="item.label"
 						bind:link="linkTarget(item)"
+						bind:class="classes.link({ class: props.ui?.link })"
 					>
 						{item.label}
 					</ItemLink>

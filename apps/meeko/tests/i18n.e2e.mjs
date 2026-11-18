@@ -65,7 +65,9 @@ function spanishInterface() {
  */
 function interfaceText() {
 	const page = globalThis.document.body.cloneNode(true)
-	for (const element of page.querySelectorAll('pre, code, script, style, main article, .meeko-ui-nav-tree, .meeko-ui-toc ul, .meeko-ui-page-nav span, .start .meeko-ui-prose, .docs-index ul')) element.remove()
+	// The navigation tree, the entries of both views of the index and the titles of the pager.
+	const documentation = '.docs-navigation nav, .meeko-ui-page-aside nav ul, details[data-pagefind-ignore] nav ul, nav:has(> a[rel="prev"], > a[rel="next"]) > a > span'
+	for (const element of page.querySelectorAll(`pre, code, script, style, main article, ${documentation}, .start .meeko-ui-prose, .docs-index ul`)) element.remove()
 	const names = [...page.querySelectorAll('[aria-label], [title], [placeholder], [alt]')].flatMap((element) => ['aria-label', 'title', 'placeholder', 'alt'].map((name) => element.getAttribute(name) ?? ''))
 	return [page.textContent ?? '', ...names].join('\n')
 }
@@ -211,24 +213,24 @@ test('the English site: language, hreflang, interface, selector, links, fallback
 
 		// The selector: real links to the same page in each language, the current one marked.
 		await page.goto(base + '/en' + guide, { waitUntil: 'networkidle' })
-		const selector = page.locator('header nav.meeko-ui-locale-switcher')
+		const selector = page.locator('header nav:has(> a[hreflang])')
 		assert.equal(await selector.getAttribute('aria-label'), 'Language')
 		assert.equal(await selector.locator('a[hreflang="es"]').getAttribute('href'), guide)
 		assert.equal(await selector.locator('a[hreflang="en"]').getAttribute('href'), '/en' + guide)
 		assert.equal(await selector.locator('a[hreflang="en"]').getAttribute('aria-current'), 'page')
 
 		// Links keep /en: header, footer, sidebar, pager; client navigation stays in the same document.
-		for (const href of await page.locator('header nav.meeko-ui-header-nav a[href^="/"], footer a[href^="/"], #docs-navigation a, .meeko-ui-page-nav a').evaluateAll((links) => links.map((link) => link.getAttribute('href')))) {
+		for (const href of await page.locator('header nav:not(:has(> a[hreflang])) a[href^="/"], footer a[href^="/"], #docs-navigation a, nav:has(> a[rel="prev"], > a[rel="next"]) > a').evaluateAll((links) => links.map((link) => link.getAttribute('href')))) {
 			assert.ok(href === '/en' || href.startsWith('/en/'), `link ${href} keeps /en`)
 		}
 		await page.evaluate(() => {
 			globalThis.__e2eDocument = 'same'
 		})
 		// The shell of the snapshot, the first site that gives it all of this: index, pager and edit link.
-		const firstHeading = page.locator('.meeko-ui-page-aside .meeko-ui-toc a').first()
+		const firstHeading = page.locator('.meeko-ui-page-aside nav a').first()
 		const anchor = await firstHeading.getAttribute('href')
 		assert.equal(await page.locator(`main article [id="${decodeURIComponent(anchor.slice(1))}"]`).count(), 1, 'the index links a heading of the article')
-		const pager = page.locator('.meeko-ui-page-nav')
+		const pager = page.locator('nav:has(> a[rel="prev"], > a[rel="next"])')
 		assert.deepEqual(await pager.locator('a').evaluateAll((links) => links.map((link) => link.getAttribute('rel'))), ['prev', 'next'])
 		const edit = page.locator('main a[href*="/edit/"]')
 		assert.equal((await edit.textContent())?.trim(), 'Edit on GitHub: docs/framework.md')
@@ -268,7 +270,7 @@ test('the English site: language, hreflang, interface, selector, links, fallback
 		assert.equal(await page.evaluate(() => globalThis.__e2eDocument), 'same', 'a result navigates on the client')
 		assert.equal(
 			await page
-				.locator('.meeko-ui-drawer-trigger')
+				.locator('.meeko-ui-page-bar button[command="show-modal"]')
 				.textContent()
 				.then((text) => text?.trim()),
 			'Contents',
@@ -299,7 +301,7 @@ test('the English site: language, hreflang, interface, selector, links, fallback
 
 		// The suggestion: a Spanish page for an English reader offers the English version without
 		// redirecting; «stay» remembers Spanish in the cookie, and it does not come back.
-		const suggestion = page.locator('aside.meeko-ui-locale-suggestion')
+		const suggestion = page.locator('aside:has(> p[role="status"])')
 		await suggestion.waitFor()
 		assert.equal(page.url(), base + fallback, 'no redirect')
 		assert.equal(await suggestion.getAttribute('lang'), 'en')
@@ -323,7 +325,7 @@ test('the English site: language, hreflang, interface, selector, links, fallback
 		assert.equal(await suggestion.count(), 0, 'the reader already reads their language')
 
 		// Choosing a language with the selector stores it and loads the other document.
-		await page.locator('header nav.meeko-ui-locale-switcher a[hreflang="es"]').click()
+		await page.locator('header nav a[hreflang="es"]').click()
 		await page.waitForURL(base + guide)
 		assert.equal(await page.getAttribute('html', 'lang'), 'es')
 		assert.equal((await browserContext.cookies(base)).find((cookie) => cookie.name === 'meeko-locale')?.value, 'es')
@@ -332,17 +334,17 @@ test('the English site: language, hreflang, interface, selector, links, fallback
 		await page.setViewportSize({ width: 390, height: 844 })
 		for (const path of ['/en', '/en' + guide, '/en' + fallback]) {
 			await page.goto(base + path, { waitUntil: 'networkidle' })
-			assert.ok(await page.locator('header nav.meeko-ui-locale-switcher').isVisible(), `selector visible at 390 px in ${path}`)
+			assert.ok(await page.locator('header nav:has(> a[hreflang])').isVisible(), `selector visible at 390 px in ${path}`)
 			assert.ok(await page.evaluate(() => globalThis.document.documentElement.scrollWidth <= globalThis.innerWidth), `no horizontal scroll at 390 px in ${path}`)
 		}
 		await page.screenshot({ path: join(app, '.meeko', 'screenshots', 'i18n-fallback-mobile.png') })
 		// The drawer of the small screens: the sidebar opens in it, and a chosen page closes it. The
 		// narrow-screen index folds, and it is there instead of the side column.
 		await page.goto(base + '/en' + guide, { waitUntil: 'networkidle' })
-		assert.ok(await page.locator('.meeko-ui-toc-collapsible').isVisible(), 'the collapsible index at 390 px')
+		assert.ok(await page.locator('details[data-pagefind-ignore]:has(> nav)').isVisible(), 'the collapsible index at 390 px')
 		assert.ok(!(await page.locator('.meeko-ui-page-aside').isVisible()), 'no side column at 390 px')
-		await page.locator('.meeko-ui-drawer-trigger').click()
-		const drawer = page.locator('dialog.meeko-ui-drawer')
+		await page.locator('.meeko-ui-page-bar button[command="show-modal"]').click()
+		const drawer = page.locator('dialog:has(.docs-navigation)')
 		await drawer.waitFor()
 		await drawer.locator('a[href="/en/docs/api"]').first().click()
 		await page.waitForURL(base + '/en/docs/api')

@@ -149,5 +149,7 @@
 
 	/* Breakpoints: a media query takes no var(), so these are the only raw lengths; the same as the sheets' @media */
 	--breakpoint-phone: 30rem;
-	--breakpoint-tablet: 40rem;
+	--breakpoint-compact: 40rem;
+	--breakpoint-tablet: 48rem;
+	--breakpoint-desktop: 75rem;
 }

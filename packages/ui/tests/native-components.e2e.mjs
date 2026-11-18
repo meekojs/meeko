@@ -313,7 +313,8 @@ for (const [name, start] of engines) {
 		await t.test('UIDrawer: leaves with a View Transition, by every way out, and gives the focus back', async () => {
 			const { page, errors } = await open(browser, origin)
 			const trigger = page.getByRole('button', { name: 'Abrir panel', exact: true })
-			const dialog = page.locator('dialog.meeko-ui-drawer[data-side=start]')
+			// The drawers of the fixture, by their title: "Panel" enters from the start, "Panel derecho" from the end.
+			const dialog = page.locator('dialog', { has: page.locator('h2', { hasText: /^\s*Panel\s*$/ }) })
 			const opened = async () => {
 				// With the keyboard: WebKit does not focus a button that is clicked, and there would be no focus to give back.
 				await trigger.focus()
@@ -334,8 +335,8 @@ for (const [name, start] of engines) {
 			await opened()
 			// What the exit looks like: the panel, on its own, with an animation of the old image.
 			const exit = await page.evaluate(async () => {
-				const dialog = globalThis.document.querySelector('dialog.meeko-ui-drawer[data-side=start]')
-				dialog.querySelector('.meeko-ui-drawer-close').click()
+				const dialog = [...globalThis.document.querySelectorAll('dialog')].find((element) => element.querySelector('h2')?.textContent.trim() === 'Panel')
+				dialog.querySelector('button[command="close"]').click()
 				const entry = globalThis.meekoTransitions.at(-1)
 				const name = globalThis.getComputedStyle(dialog).viewTransitionName
 				await entry.transition.ready
@@ -356,13 +357,13 @@ for (const [name, start] of engines) {
 			await page.mouse.click(1200, 400)
 			await left(3)
 			// `closedBy="none"`, opened by the native command when the browser has it: only its button closes it.
-			const right = page.locator('dialog.meeko-ui-drawer[data-side=end]')
+			const right = page.locator('dialog', { has: page.locator('h2', { hasText: /^\s*Panel derecho\s*$/ }) })
 			await page.getByRole('button', { name: 'Abrir el derecho', exact: true }).click()
 			await right.and(page.locator('[open]')).waitFor()
 			await page.keyboard.press('Escape')
 			assert.equal(await right.evaluate((element) => element.open), true, 'Escape does not close it')
-			await right.locator('.meeko-ui-drawer-close').click()
-			await page.waitForFunction(() => !globalThis.document.querySelector('dialog.meeko-ui-drawer[data-side=end]').open)
+			await right.locator('button[command="close"]').click()
+			await page.waitForFunction(() => ![...globalThis.document.querySelectorAll('dialog')].find((element) => element.querySelector('h2')?.textContent.trim() === 'Panel derecho').open)
 			// A link closes it at once and navigates: the scroll lock leaves before the transition of the route,
 			// because changing the overflow of the root inside a View Transition crashes WebKit 27.2.
 			await opened()
@@ -384,12 +385,14 @@ for (const [name, start] of engines) {
 			await finished(page)
 			const nav = page.getByRole('navigation', { name: 'Rutas', exact: true })
 			assert.equal(await nav.locator('a[aria-current]').innerText(), 'Primera pestaña')
-			const before = await nav.locator('.meeko-ui-nav-tabs-indicator').boundingBox()
+			// The indicator is the last child of the row.
+			const before = await nav.locator(':scope > span[aria-hidden="true"]').boundingBox()
 			const during = await page.evaluate(async () => {
-				const indicator = () => globalThis.document.querySelector('.meeko-ui-nav-tabs-indicator')
+				// Each page mounts its own row: the indicator is looked up again after the navigation.
+				const indicator = () => globalThis.document.querySelector('nav[aria-label="Rutas"] > span[aria-hidden="true"]')
 				const already = globalThis.meekoTransitions.length
 				const name = globalThis.getComputedStyle(indicator()).viewTransitionName
-				;[...globalThis.document.querySelectorAll('.meeko-ui-nav-tabs a')].find((link) => link.textContent.trim() === 'Segunda').click()
+				;[...globalThis.document.querySelectorAll('nav[aria-label="Rutas"] a')].find((link) => link.textContent.trim() === 'Segunda').click()
 				const started = Date.now()
 				while (globalThis.meekoTransitions.length === already) {
 					if (Date.now() - started > 5000) throw new Error('the navigation started no View Transition')
@@ -408,7 +411,7 @@ for (const [name, start] of engines) {
 			await finished(page)
 			await page.locator('#route-b').waitFor()
 			assert.equal(await nav.locator('a[aria-current]').innerText(), 'Segunda')
-			const after = await nav.locator('.meeko-ui-nav-tabs-indicator').boundingBox()
+			const after = await nav.locator(':scope > span[aria-hidden="true"]').boundingBox()
 			const link = await nav.locator('a[aria-current]').boundingBox()
 			assert.ok(after.x > before.x && Math.abs(after.x - link.x) < 1 && Math.abs(after.width - link.width) < 1, JSON.stringify({ before, after, link }))
 			assert.deepEqual(errors, [])

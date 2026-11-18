@@ -29,8 +29,8 @@ export const commandPalette = tv({
 			...kbd,
 			'ui:[&>svg]:size-(--ui-command-icon-size) ui:[&>svg]:flex-none ui:[&>svg]:fill-none ui:[&>svg]:stroke-current ui:[&>svg]:[stroke-linecap:round] ui:[&>svg]:[stroke-width:var(--ui-command-icon-stroke)]',
 			'ui:[&>span:not(:has(kbd))]:flex-1 ui:[&>span:not(:has(kbd))]:text-start ui:[&>span:has(kbd)]:inline-flex ui:[&>span:has(kbd)]:gap-0.5',
-			'ui:max-tablet:w-(--ui-control-height-md) ui:max-tablet:min-w-0 ui:max-tablet:justify-center ui:max-tablet:border-transparent ui:max-tablet:bg-transparent ui:max-tablet:p-0',
-			'ui:max-tablet:[&>span:has(kbd)]:hidden ui:max-tablet:[&>span:not(:has(kbd))]:hidden',
+			'ui:max-compact:w-(--ui-control-height-md) ui:max-compact:min-w-0 ui:max-compact:justify-center ui:max-compact:border-transparent ui:max-compact:bg-transparent ui:max-compact:p-0',
+			'ui:max-compact:[&>span:has(kbd)]:hidden ui:max-compact:[&>span:not(:has(kbd))]:hidden',
 		],
 		/** The dialog of <UIModal>, near the top of the page; `mark` is what was found. */
 		base: [

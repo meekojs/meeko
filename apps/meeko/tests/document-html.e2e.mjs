@@ -159,7 +159,7 @@ async function readerJourney(page, problems, base, label) {
 	})
 
 	// The table of contents and its anchors, which the browser resolves in the adopted HTML.
-	const entry = page.locator('.meeko-ui-page-aside .meeko-ui-toc a').nth(2)
+	const entry = page.locator('.meeko-ui-page-aside nav a').nth(2)
 	const anchor = await entry.getAttribute('href')
 	await entry.click()
 	await page.waitForFunction((hash) => globalThis.location.hash === hash, anchor)
@@ -194,12 +194,12 @@ async function readerJourney(page, problems, base, label) {
 
 	// The language selector, both ways: the i18n plugin loads the other language as a new document,
 	// a first load that adopts its own HTML.
-	await page.locator('header nav.meeko-ui-locale-switcher a[hreflang="en"]').click()
+	await page.locator('header nav a[hreflang="en"]').click()
 	await page.waitForURL((target) => target.pathname === `/en${guide}`, { waitUntil: 'networkidle' })
 	assert.equal(await page.locator('html').getAttribute('lang'), 'en')
 	await assertAdopted(page, `${label}: English`)
 	await assertArticleOf(page, `/en${guide}`, `${label}: English`)
-	await page.locator('header nav.meeko-ui-locale-switcher a[hreflang="es"]').click()
+	await page.locator('header nav a[hreflang="es"]').click()
 	await page.waitForURL((target) => target.pathname === guide, { waitUntil: 'networkidle' })
 	assert.equal(await page.locator('html').getAttribute('lang'), 'es')
 	await assertAdopted(page, `${label}: Spanish`)

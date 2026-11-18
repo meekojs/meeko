@@ -24,14 +24,15 @@ const measure = (page) =>
 		const measure75 = character.getBoundingClientRect().width
 		character.remove()
 		const visible = (selector) => [...globalThis.document.querySelectorAll(selector)].find((element) => element.getBoundingClientRect().width > 0)
-		const link = visible('.meeko-ui-nav-link')
+		const link = visible('#docs-navigation nav a')
 		return {
 			root,
 			// Without the gutter that the base keeps for a classic scrollbar, which is not page.
 			available: globalThis.document.body.getBoundingClientRect().width,
 			overflow: globalThis.document.documentElement.scrollWidth > globalThis.innerWidth,
 			body: globalThis.document.querySelector('.meeko-ui-page-body').getBoundingClientRect().width,
-			header: globalThis.document.querySelector('.meeko-ui-header-bar').getBoundingClientRect().width,
+			// The bar of the site header, the first <header> of the page.
+			header: globalThis.document.querySelector('header > div').getBoundingClientRect().width,
 			prose: size(text),
 			textWidth: text.getBoundingClientRect().width,
 			measure75,

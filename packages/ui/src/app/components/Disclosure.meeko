@@ -3,6 +3,7 @@
 	import type { UIDisclosureProps } from '../types/feedback'
 
 	import { icons } from '../utils/icons'
+	import { chevron } from '../variants/navigation'
 	import * as Icon from './internal/Icon.meeko'
 
 	const props = defineProps<UIDisclosureProps>()
@@ -18,7 +19,7 @@
 		<summary>
 			{props.summary}
 			<Icon
-				class="meeko-ui-nav-chevron"
+				bind:class="chevron"
 				bind:path="icons.chevron"
 			/>
 		</summary>

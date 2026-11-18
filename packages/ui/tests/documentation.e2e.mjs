@@ -60,7 +60,7 @@ test('public UI documentation renders every guide, navigates, copies code and va
 	await page.getByRole('button', { name: 'Contenidos', exact: true }).click()
 	await navigation.getByRole('link', { name: 'Field e Input', exact: true }).click()
 	await page.getByRole('heading', { name: 'Field e Input', level: 1 }).waitFor()
-	assert.equal(await page.locator('dialog.meeko-ui-drawer:modal').count(), 0)
+	assert.equal(await page.locator('dialog:modal').count(), 0)
 	await page.getByRole('button', { name: 'Guardar nombre', exact: true }).click()
 	await page.getByRole('alert').filter({ hasText: 'Escribe un nombre.' }).waitFor()
 	assert.equal(await page.locator('#name').getAttribute('aria-invalid'), 'true')

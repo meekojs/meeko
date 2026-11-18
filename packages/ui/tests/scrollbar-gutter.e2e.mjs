@@ -32,7 +32,7 @@ const dialogs = {
 	modal: { route: '/modals', open: (page) => page.getByRole('button', { name: 'Modal declarativo', exact: true }).click() },
 	'drawer at the end': { route: '/overlays', open: (page) => page.getByRole('button', { name: 'Abrir filtros', exact: true }).click() },
 	// The contents of a narrow screen: its trigger only exists there.
-	'drawer at the start': { narrow: true, route: '/overlays', open: (page) => page.locator('.meeko-ui-page-bar .meeko-ui-drawer-trigger').click() },
+	'drawer at the start': { narrow: true, route: '/overlays', open: (page) => page.locator('.meeko-ui-page-bar button[aria-haspopup="dialog"]').click() },
 }
 
 async function measure(context, page, origin, dialog, theme, height) {

@@ -1,7 +1,3 @@
-/* A heading reached by an anchor stays clear of the sticky header. */
-:root:has(.meeko-ui-header[data-sticky]) {
-	scroll-padding-block-start: calc(var(--ui-header-height) + var(--ui-space-4));
-}
 .meeko-ui-page {
 	display: flex;
 	flex-direction: column;
@@ -112,11 +108,6 @@
 .meeko-ui-page[data-layout='landing'] .meeko-ui-page-main {
 	padding-block: 0;
 }
-/* The collapsible table of contents belongs to the widths where the side column is gone. */
-.meeko-ui-page .meeko-ui-toc-collapsible {
-	display: none;
-	margin-bottom: var(--ui-space-8);
-}
 @media (max-width: 75rem) {
 	.meeko-ui-page-body {
 		gap: var(--ui-space-10);
@@ -129,9 +120,6 @@
 	}
 	.meeko-ui-page-body:has(> .meeko-ui-page-sidebar)[data-ui-page-aside] {
 		grid-template-columns: var(--ui-page-sidebar-width) minmax(0, 1fr);
-	}
-	.meeko-ui-page .meeko-ui-toc-collapsible {
-		display: block;
 	}
 }
 @media (max-width: 54rem) {

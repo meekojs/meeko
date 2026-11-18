@@ -29,21 +29,19 @@
 	}
 	/*
 	 * Neither a dialog nor its ::backdrop reach the gutter kept for the scrollbar, which only takes the
-	 * background color of the root. So the root takes the color of the overlay, or of the drawer that
-	 * touches the gutter, and the body covers the screen so that the overlay does not darken the root twice.
+	 * background color of the root. So the root takes the color of the overlay, and the body covers the
+	 * screen so that the overlay does not darken the root twice. <UIDrawer> does the same from
+	 * variants/drawer, with the color of the panel when it touches the gutter.
 	 */
-	:root:has(.meeko-ui-modal:modal, .meeko-ui-drawer:modal) {
+	:root:has(.meeko-ui-modal:modal) {
 		transition: background-color var(--ui-duration-slow) linear;
 		background-color: var(--ui-color-overlay-solid);
 	}
-	:root:has(.meeko-ui-drawer[data-side='end']:modal) {
-		background-color: var(--ui-color-surface-raised);
-	}
-	:root:has(.meeko-ui-modal:modal, .meeko-ui-drawer:modal) body {
+	:root:has(.meeko-ui-modal:modal) body {
 		min-block-size: 100dvh;
 	}
 	@media (prefers-reduced-motion: reduce) {
-		:root:has(.meeko-ui-modal:modal, .meeko-ui-drawer:modal) {
+		:root:has(.meeko-ui-modal:modal) {
 			transition: none;
 		}
 	}

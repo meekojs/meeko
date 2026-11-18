@@ -9,6 +9,7 @@
 	import { uiMessages } from '../utils/messages'
 	import { isCurrentLink, linkTarget, revealInScroller, scrollingAncestor } from '../utils/navigation'
 	import { badge } from '../variants/badge'
+	import { codeLabel, foldingTitle, navigationTree } from '../variants/navigation'
 	import * as Icon from './internal/Icon.meeko'
 	import * as ItemLink from './internal/ItemLink.meeko'
 
@@ -35,6 +36,8 @@
 			})
 		}),
 	)
+
+	const classes = navigationTree()
 	// The badge of a featured item goes to the end of its link.
 	const featuredClass = badge({ tone: 'accent' }).base({ class: 'ui:ms-auto ui:flex-none' })
 </script>
@@ -42,7 +45,7 @@
 <template>
 	<nav
 		ref:root
-		bind:class="['meeko-ui-nav-tree', props.class].filter(Boolean).join(' ')"
+		bind:class="classes.base({ class: [props.ui?.base, props.class] })"
 		bind:aria-label="props.label ?? text.label"
 	>
 		<component
@@ -51,15 +54,15 @@
 			each:index="index"
 			each:key="groupKey(group, index)"
 			is="folds(group) ? 'details' : 'div'"
-			class="meeko-ui-nav-group"
+			bind:class="classes.group({ class: props.ui?.group })"
 			bind:open="folds(group) ? startsOpen(group) : undefined"
 		>
 			<component
 				if:when="group.title !== undefined"
 				is="folds(group) ? 'summary' : 'p'"
-				class="meeko-ui-nav-group-title"
+				bind:class="classes.title({ class: [folds(group) ? foldingTitle : undefined, props.ui?.title] })"
 			>
-				<span>
+				<span bind:class="classes.titleText({ class: props.ui?.titleText })">
 					<render
 						if:when="snippets.icon && group.icon"
 						snippet="snippets.icon"
@@ -73,21 +76,20 @@
 				</span>
 				<Icon
 					if:when="folds(group)"
-					class="meeko-ui-nav-chevron"
+					bind:class="classes.chevron({ class: props.ui?.chevron })"
 					bind:path="icons.chevron"
 				/>
 			</component>
-			<ul>
+			<ul bind:class="classes.list({ class: props.ui?.list })">
 				<li
 					each:of="group.items"
 					each:as="item"
 					each:key="item.label"
 				>
 					<ItemLink
-						class="meeko-ui-nav-link"
+						bind:class="classes.link({ class: props.ui?.link })"
 						bind:link="linkTarget(item)"
 						bind:current="isCurrent(item) ? 'page' : undefined"
-						bind:data-code="item.code ? '' : undefined"
 					>
 						<render
 							if:when="snippets.item"
@@ -105,7 +107,7 @@
 						/>
 						<span
 							if:when="!snippets.item"
-							class="meeko-ui-nav-label"
+							bind:class="classes.label({ class: [item.code ? codeLabel : undefined, props.ui?.label] })"
 						>
 							{item.label}
 						</span>
@@ -121,8 +123,8 @@
 		</component>
 		<div
 			if:when="props.groups.length === 0"
-			class="meeko-ui-nav-empty"
 			role="status"
+			bind:class="classes.empty({ class: props.ui?.empty })"
 		>
 			<render
 				if:when="snippets.empty"

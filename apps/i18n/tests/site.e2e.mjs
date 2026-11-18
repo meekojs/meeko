@@ -157,7 +157,7 @@ test('production i18n documentation renders guides, translates, switches locale 
 	await page.waitForURL(origin + '/namespaces')
 	await page.locator('[data-output="namespace"]').waitFor()
 	assert.equal(await page.locator('[data-output="namespace"]').innerText(), 'Tu pedido tiene 3 productos.')
-	assert.equal(await page.locator('dialog.meeko-ui-drawer:modal').count(), 0)
+	assert.equal(await page.locator('dialog:modal').count(), 0)
 	for (const locale of ['en', 'ar']) {
 		const ssr = await browser.newPage({ javaScriptEnabled: false, viewport: { width: 390, height: 844 } })
 		await ssr.goto(origin + '/' + locale + '/playground')
@@ -276,7 +276,7 @@ test('the English site has an English interface, hreflang, a switcher, /en links
 			route,
 		)
 		// Internal links of the shell keep /en (the Arabic playground link of the lab is the exception).
-		const internal = await page.locator('header.meeko-ui-header a[href^="/"]:not([hreflang]), #docs-navigation a[href^="/"], main a[href^="/"]:not([hreflang])').evaluateAll((links) => links.map((link) => link.getAttribute('href')))
+		const internal = await page.locator('header:not(main header) a[href^="/"]:not([hreflang]), #docs-navigation a[href^="/"], main a[href^="/"]:not([hreflang])').evaluateAll((links) => links.map((link) => link.getAttribute('href')))
 		for (const href of internal) assert.match(href, /^\/en(\/|$|\?)/, `${route} links to ${href}`)
 	}
 	await page.goto(origin + '/en/routing')
