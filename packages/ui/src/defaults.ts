@@ -6,7 +6,7 @@ import type { UIDefaults } from './app/types/config'
 import { badge } from './app/variants/badge'
 import { button, iconButton } from './app/variants/button'
 import { card, linkCard } from './app/variants/card'
-import { checkbox, radioGroup, toggle } from './app/variants/choice'
+import { checkbox, radioGroup, segmentedControl, toggle } from './app/variants/choice'
 import { commandPalette } from './app/variants/command-palette'
 import { container } from './app/variants/container'
 import { codeBlock, diff } from './app/variants/content'
@@ -18,6 +18,7 @@ import { footer, header } from './app/variants/header'
 import { input, textarea } from './app/variants/input'
 import { localeSuggestion, localeSwitcher } from './app/variants/locale'
 import { markdownEditor } from './app/variants/markdown-editor'
+import { menu } from './app/variants/menu'
 import { modal } from './app/variants/modal'
 import { breadcrumb, navigationTabs, navigationTree, pageNavigation, pagination, tableOfContents } from './app/variants/navigation'
 import { page, pageHeader } from './app/variants/page'
@@ -80,6 +81,7 @@ const components = {
 	localeSuggestion: { look: localeSuggestion },
 	localeSwitcher: { look: localeSwitcher },
 	markdownEditor: { look: markdownEditor },
+	menu: { look: menu },
 	modal: { look: modal },
 	navigationTabs: { look: navigationTabs },
 	navigationTree: { look: navigationTree },
@@ -90,6 +92,7 @@ const components = {
 	popover: {},
 	prose: {},
 	radioGroup: { look: radioGroup },
+	segmentedControl: { look: segmentedControl, variants: ['size'] },
 	select: { look: select },
 	skeleton: { look: skeleton },
 	slider: { look: slider },

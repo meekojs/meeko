@@ -909,6 +909,44 @@ Tipos públicos de `@meekojs/ui/runtime`.
 | `delay`        | `number`           | Con `mode="hint"`, milisegundos que el puntero espera sobre el disparador antes de abrir; `300` por defecto. |
 | `closeDelay`   | `number`           | Con `mode="hint"`, milisegundos antes de cerrar al salir el puntero; `150` por defecto.                      |
 
+## UIMenu
+
+`<UIMenu>` es un menú de acciones con el patrón _Menu Button_ del APG, sobre `<UIPopover role="menu">`: el disparador lleva `aria-haspopup="menu"`, `aria-expanded` y `popovertarget`, así que abre la lista sin JavaScript, y la lista (`role="menu"`) se ancla con CSS en la capa superior. Las flechas recorren los ítems y saltan los desactivados, `Inicio` y `Fin` van a los extremos, una letra salta al ítem que empieza por ella, `Esc` cierra, `Tab` sale y el foco vuelve al disparador al cerrar o al elegir.
+
+```html
+<UIMenu
+	triggerLabel="Acciones"
+	bind:items="[
+		{ label: 'Renombrar', shortcut: 'F2', onSelect: rename },
+		{ label: 'Ajustes', to: '/settings' },
+		{ separator: true },
+		{ label: 'Eliminar', tone: 'danger', onSelect: remove },
+	]"
+	on:select="(item) => log(item.label)"
+/>
+```
+
+Cada entrada de `items` (`UIMenuEntry`) es una acción (`UIMenuAction`: un `<button role="menuitem">` con `onSelect`), un enlace (`UIMenuLink`: un `<a role="menuitem">` con `href`, o con `to`, `params` y `search` tipados, que navega con `<MeekoLink>`) o un separador (`{ separator: true }`, con `role="separator"`). Un ítem admite además `value`, `tone: 'danger'`, `disabled` (sigue visible, con `aria-disabled`, y no se puede elegir), `icon` (trazo SVG de 16 por 16) y `shortcut` (un recordatorio tras el texto; el atajo lo implementa la aplicación). El evento `select` recibe el ítem elegido, después de su `onSelect`.
+
+Sin `triggerLabel` ni snippet `trigger`, el disparador es un botón de sólo icono con tres puntos, para el menú de una fila, nombrado con `menu.trigger` de los mensajes («Más acciones», «More actions») salvo que se pase `ariaLabel`. Los snippets son `trigger` (contenido del botón), `anchor` (un disparador propio, como en `UIPopover`), `item` (interior de cada ítem de `items`) y `default` (ítems propios con `role="menuitem"` tras los de `items`). La lista sólo pinta contenido de frase, así que el componente es válido dentro de un `<p>`.
+
+| Prop           | Tipo                     | Descripción                                                                                       |
+| -------------- | ------------------------ | ------------------------------------------------------------------------------------------------- |
+| `items`        | `readonly UIMenuEntry[]` | Ítems y separadores, en orden.                                                                    |
+| `triggerLabel` | `string`                 | Texto del disparador, seguido de un chevron.                                                      |
+| `ariaLabel`    | `string`                 | Nombre accesible del disparador; en el de sólo icono, «Más acciones» por defecto.                 |
+| `label`        | `string`                 | `aria-label` de la lista. Sin ella, el menú se nombra con su disparador.                          |
+| `variant`      | `UIActionVariant`        | Variante del disparador: `"secondary"` por defecto, `"ghost"` en el de sólo icono.                |
+| `size`         | `UIActionSize`           | Tamaño del disparador; `"md"` por defecto.                                                        |
+| `disabled`     | `boolean`                | Desactiva el disparador.                                                                          |
+| `placement`    | `PopoverPlacement`       | Dónde se abre; `"bottom-start"` por defecto.                                                      |
+| `offset`       | `number`                 | Separación en píxeles con el disparador; `4` por defecto.                                         |
+| `triggerId`    | `string`                 | `id` del disparador; por defecto, uno de `useId`.                                                 |
+| `class`        | `string`                 | Clases de la lista; equivale a `ui.base`.                                                         |
+| `ui`           | objeto                   | Clases por slot: `base`, `trigger`, `chevron`, `item`, `icon`, `label`, `shortcut` y `separator`. |
+
+El modelo por defecto (`model="open"`) es la apertura. `ui.defaults.menu` acepta `class` y `ui`. Los tipos `UIMenuProps`, `UIMenuEntry`, `UIMenuItem`, `UIMenuAction`, `UIMenuLink`, `UIMenuSeparator` y `MenuSnippets` se exportan desde `@meekojs/ui/runtime`.
+
 ## UISelect
 
 Un `<select>` nativo con `appearance: base-select`: el navegador trae la lista, el teclado y el valor de formulario. Para buscar, filtrar en un servidor o elegir varias opciones, usa [`UICombobox`](#uicombobox); `multiple`, `searchable`, `filter` y `max` en `UISelect` son un error de tipos que lo indica.
@@ -1360,6 +1398,8 @@ Los controles nuevos conservan el HTML nativo, el teclado y el envío de formula
 | `UIStat`            | `label`, `value`, `detail`, con `dl/dt/dd`; los snippets `value` y `detail` admiten marcado, como un enlace.                                                                                                |
 | `UIDescriptionList` | `items` (`label`, `labelLang`, `value`, `detail`, `code`, `title`), `columns` (1, 2 o 3), una columna en móvil. `code` pinta el valor en `<code>`.                                                          |
 | `UIToast`           | `text`, `tone`, `duration`, `closeLabel`, `actions` (snippet o prop); evento `dismiss`. Popover nativo manual, sin tomar el foco.                                                                           |
+
+`UISegmentedControl` es una selección única compacta con radios nativos, que funciona sin JavaScript: modelo string; `options`, `legend` con `hideLegend` (sólo para lectores de pantalla) o `ariaLabel`, `size="sm"` o `"md"` (la altura de un control de ese tamaño), `name`, `required` y `disabled`. Si las opciones no caben, se desplaza en horizontal sin partirlas ni ensanchar la página. `ui.defaults.segmentedControl` admite `size`, y `ui`, sus slots `base`, `legend`, `options`, `option` e `input`. Para un conmutador compacto, prefiérelo a `UIRadioGroup variant="segmented"`, que se parte en varias líneas.
 
 Los tipos de props, `UIDensity`, `UITone` y `UIToastContext` se exportan desde `@meekojs/ui/runtime`. Los textos predeterminados se configuran en `ui.messages.<locale>.feedback` (`close`, `empty`, `loading`); hay español e inglés.
 

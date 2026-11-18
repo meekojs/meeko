@@ -15,6 +15,7 @@ export type { CommandPaletteItemState, CommandPaletteSnippets, CommandPaletteSta
 export { useScrollLock } from './app/composables/useScrollLock'
 export { useToast } from './app/composables/useToast'
 export type { UIThemeProps, UIVariantSlots } from './app/types/theme'
-export type { UIBadgeProps, UICheckboxProps, UIDensity, UIFieldProps, UIInputProps, UIRadioGroupProps, UIRadioOption, UISliderProps, UISwitchProps, UITextareaProps, UITone } from './app/types/forms'
+export type { UIBadgeProps, UICheckboxProps, UIDensity, UIFieldProps, UIInputProps, UIRadioGroupProps, UIRadioOption, UISegmentedControlProps, UISliderProps, UISwitchProps, UITextareaProps, UITone } from './app/types/forms'
 export type { UIAlertProps, UIDescriptionItem, UIDescriptionListProps, UIDisclosureProps, UIEmptyProps, UISkeletonProps, UIStatProps, UIToastContext, UIToastEntry, UIToastProps } from './app/types/feedback'
 export type { UICardProps } from './app/types/card'
+export type { MenuSnippets, UIMenuAction, UIMenuEntry, UIMenuItem, UIMenuLink, UIMenuProps, UIMenuSeparator } from './app/types/menu'

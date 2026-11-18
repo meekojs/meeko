@@ -1,5 +1,5 @@
 ---
-source-hash: f4deba2123695651da9f9acc59e1b142ee5bdde84c17360c70e7017f81e1069f
+source-hash: 5d692639a9100b45b62a44d85606f6d105159c1fa9ad76297199729d25d43a0d
 ---
 
 # Meeko UI API
@@ -913,6 +913,44 @@ Public types from `@meekojs/ui/runtime`.
 | `delay`        | `number`           | With `mode="hint"`, milliseconds the pointer waits over the trigger before opening; `300` by default. |
 | `closeDelay`   | `number`           | With `mode="hint"`, milliseconds before closing when the pointer leaves; `150` by default.            |
 
+## UIMenu
+
+`<UIMenu>` is an action menu with the APG _Menu Button_ pattern, on top of `<UIPopover role="menu">`: the trigger carries `aria-haspopup="menu"`, `aria-expanded` and `popovertarget`, so it opens the list without JavaScript, and the list (`role="menu"`) is anchored with CSS in the top layer. The arrows move through the items and skip the disabled ones, `Home` and `End` go to the ends, a letter jumps to the item that starts with it, `Esc` closes, `Tab` leaves and the focus returns to the trigger on closing or choosing.
+
+```html
+<UIMenu
+	triggerLabel="Actions"
+	bind:items="[
+		{ label: 'Rename', shortcut: 'F2', onSelect: rename },
+		{ label: 'Settings', to: '/settings' },
+		{ separator: true },
+		{ label: 'Delete', tone: 'danger', onSelect: remove },
+	]"
+	on:select="(item) => log(item.label)"
+/>
+```
+
+Each entry of `items` (`UIMenuEntry`) is an action (`UIMenuAction`: a `<button role="menuitem">` with `onSelect`), a link (`UIMenuLink`: an `<a role="menuitem">` with `href`, or with typed `to`, `params` and `search`, which navigates with `<MeekoLink>`) or a separator (`{ separator: true }`, with `role="separator"`). An item also takes `value`, `tone: 'danger'`, `disabled` (still visible, with `aria-disabled`, and not choosable), `icon` (a 16 by 16 SVG path) and `shortcut` (a reminder after the text; the application implements the shortcut). The `select` event receives the chosen item, after its `onSelect`.
+
+Without `triggerLabel` or a `trigger` snippet, the trigger is an icon-only button with three dots, for a row menu, named with `menu.trigger` of the messages (“Más acciones”, “More actions”) unless `ariaLabel` is given. The snippets are `trigger` (content of the button), `anchor` (a custom trigger, as in `UIPopover`), `item` (inside of each item of `items`) and `default` (custom items with `role="menuitem"` after those of `items`). The list only paints phrasing content, so the component is valid inside a `<p>`.
+
+| Prop           | Type                     | Description                                                                                          |
+| -------------- | ------------------------ | ---------------------------------------------------------------------------------------------------- |
+| `items`        | `readonly UIMenuEntry[]` | Items and separators, in order.                                                                      |
+| `triggerLabel` | `string`                 | Text of the trigger, followed by a chevron.                                                          |
+| `ariaLabel`    | `string`                 | Accessible name of the trigger; on the icon-only one, “More actions” by default.                     |
+| `label`        | `string`                 | `aria-label` of the list. Without it, the menu is named by its trigger.                              |
+| `variant`      | `UIActionVariant`        | Variant of the trigger: `"secondary"` by default, `"ghost"` on the icon-only one.                    |
+| `size`         | `UIActionSize`           | Size of the trigger; `"md"` by default.                                                              |
+| `disabled`     | `boolean`                | Disables the trigger.                                                                                |
+| `placement`    | `PopoverPlacement`       | Where it opens; `"bottom-start"` by default.                                                         |
+| `offset`       | `number`                 | Distance in pixels from the trigger; `4` by default.                                                 |
+| `triggerId`    | `string`                 | `id` of the trigger; by default, one from `useId`.                                                   |
+| `class`        | `string`                 | Classes of the list; same as `ui.base`.                                                              |
+| `ui`           | object                   | Classes per slot: `base`, `trigger`, `chevron`, `item`, `icon`, `label`, `shortcut` and `separator`. |
+
+The default model (`model="open"`) is whether it is open. `ui.defaults.menu` takes `class` and `ui`. The types `UIMenuProps`, `UIMenuEntry`, `UIMenuItem`, `UIMenuAction`, `UIMenuLink`, `UIMenuSeparator` and `MenuSnippets` are exported from `@meekojs/ui/runtime`.
+
 ## UISelect
 
 A native `<select>` with `appearance: base-select`: the browser brings the list, the keyboard and the form value. To search, filter on a server or choose several options, use [`UICombobox`](#uicombobox); `multiple`, `searchable`, `filter` and `max` on `UISelect` are a type error that says so.
@@ -1364,6 +1402,8 @@ The new controls keep native HTML, the keyboard and form submission. All models 
 | `UIStat`            | `label`, `value`, `detail`, with `dl/dt/dd`; the `value` and `detail` snippets accept markup, such as a link.                                                                                               |
 | `UIDescriptionList` | `items` (`label`, `labelLang`, `value`, `detail`, `code`, `title`), `columns` (1, 2 or 3), one column on mobile. `code` renders the value in `<code>`.                                                      |
 | `UIToast`           | `text`, `tone`, `duration`, `closeLabel`, `actions` (snippet or prop); `dismiss` event. Manual native popover, without taking focus.                                                                        |
+
+`UISegmentedControl` is a compact single choice with native radios, which works without JavaScript: string model; `options`, `legend` with `hideLegend` (for screen readers only) or `ariaLabel`, `size="sm"` or `"md"` (the height of a control of that size), `name`, `required` and `disabled`. When the options do not fit, it scrolls sideways without breaking them or widening the page. `ui.defaults.segmentedControl` takes `size`, and `ui`, its slots `base`, `legend`, `options`, `option` and `input`. For a compact switcher, prefer it to `UIRadioGroup variant="segmented"`, which wraps into several lines.
 
 The prop types, `UIDensity`, `UITone` and `UIToastContext` are exported from `@meekojs/ui/runtime`. The default texts are configured in `ui.messages.<locale>.feedback` (`close`, `empty`, `loading`); there is Spanish and English.
 

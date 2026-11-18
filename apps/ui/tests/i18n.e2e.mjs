@@ -10,7 +10,7 @@ import { chromium } from 'playwright-core'
 /** Spanish interface texts of the shell and of this site that an /en/ page must never contain. */
 const spanishInterface = ['Saltar al contenido', 'Buscar en la guía', 'Filtrar documentación', 'Ecosistema', 'Documentación', 'Menú', 'Paquete de Meeko', 'Licencia MIT', 'Destacado', 'No hay coincidencias', 'Copiar', 'Ejemplo .meeko', 'Propiedades', 'Tipo / valor inicial', 'Descripción', '¿Te sirvió', 'Añadir un comentario', 'Cerrar aviso', 'Cerrar modal', 'Cambiar tema', 'Tema:', 'Claro', 'Oscuro', 'Sistema', 'Idioma', 'Seguir en', 'Primeros pasos', 'Componentes', 'Integración con Meeko', 'Esta página no existe', 'Ver componentes', 'Quitar selección', 'Sin resultados', 'No hay datos']
 
-const guides = ['/', '/installation', '/theming', '/components', '/container', '/buttons', '/links', '/badges', '/icons', '/forms', '/controls', '/select', '/editor', '/cards', '/tables', '/content', '/feedback', '/page', '/navigation', '/modals', '/popover', '/overlays', '/app', '/theme-toggle', '/transitions', '/transitions/project']
+const guides = ['/', '/installation', '/theming', '/components', '/container', '/buttons', '/links', '/badges', '/icons', '/forms', '/controls', '/select', '/editor', '/cards', '/tables', '/content', '/feedback', '/page', '/navigation', '/modals', '/popover', '/menu', '/overlays', '/app', '/theme-toggle', '/transitions', '/transitions/project']
 
 async function freePort() {
 	const socket = createServer().listen(0, '127.0.0.1')

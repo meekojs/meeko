@@ -6,6 +6,21 @@
 	const notifications = signal(true)
 	const period = signal('week')
 	const volume = signal(40)
+	const days = signal('30')
+	const dayOptions = [
+		{ value: '7', label: '7 días' },
+		{ value: '30', label: '30 días' },
+		{ value: '90', label: '90 días' },
+	]
+	const range = signal('month')
+	const ranges = [
+		{ value: 'today', label: 'Hoy' },
+		{ value: 'week', label: 'Esta semana' },
+		{ value: 'month', label: 'Este mes' },
+		{ value: 'quarter', label: 'Este trimestre' },
+		{ value: 'year', label: 'Este año' },
+		{ value: 'all', label: 'Todo el histórico' },
+	]
 	const periods = [
 		{ value: 'day', label: 'Día' },
 		{ value: 'week', label: 'Semana' },
@@ -17,7 +32,7 @@
 <template>
 	<DocsPage
 		title="Controles de formulario"
-		description="Textarea, Checkbox, RadioGroup, Switch y Slider: HTML nativo, con su teclado y su envío, y el aspecto de UI."
+		description="Textarea, Checkbox, RadioGroup, SegmentedControl, Switch y Slider: HTML nativo, con su teclado y su envío, y el aspecto de UI."
 	>
 		<p>
 			Todos conservan el control nativo, así que el teclado, el foco y el envío de un formulario son los del navegador, también sin JavaScript. Sus modelos se enlazan con una señal:
@@ -144,6 +159,76 @@
 				{ name: 'class', type: 'string', description: 'Clases adicionales.' },
 			]"
 		/>
+		<h2 id="segmented">UISegmentedControl</h2>
+		<p>
+			Una selección única compacta, como el periodo de un gráfico: los mismos radios nativos de
+			<code>UIRadioGroup</code>
+			con el aspecto de un control segmentado, así que las flechas, el envío del formulario y
+			<code>required</code>
+			funcionan también sin JavaScript. Su altura total es la de un control de su tamaño,
+			<code>sm</code>
+			o
+			<code>md</code>
+			, y se alinea con un
+			<code>UIButton</code>
+			a su lado.
+		</p>
+		<p>
+			Necesita un nombre:
+			<code>legend</code>
+			, que
+			<code>hideLegend</code>
+			deja sólo para los lectores de pantalla, o
+			<code>ariaLabel</code>
+			. Si las opciones no caben, el control se desplaza en horizontal dentro de su ancho: ninguna opción se parte y la página no se ensancha.
+		</p>
+		<DocsPreview layout="stack">
+			<UISegmentedControl
+				legend="Periodo del gráfico"
+				hideLegend
+				size="sm"
+				name="days"
+				model="days"
+				bind:options="dayOptions"
+			/>
+			<p
+				id="segmented-status"
+				class="docs-status"
+				role="status"
+			>
+				Mostrando los últimos {days.value} días.
+			</p>
+			<UISegmentedControl
+				legend="Intervalo"
+				name="range"
+				model="range"
+				bind:options="ranges"
+			/>
+		</DocsPreview>
+		<DocsCode bind:code="examples.segmented" />
+		<p>
+			<code>UIRadioGroup variant="segmented"</code>
+			sigue disponible y se parte en varias líneas cuando no cabe; para un conmutador compacto, usa
+			<code>UISegmentedControl</code>
+			. Su
+			<code>size</code>
+			admite un valor por aplicación en
+			<code>ui.defaults.segmentedControl</code>
+			.
+		</p>
+		<DocsApi
+			caption="Propiedades de UISegmentedControl"
+			bind:rows="[
+				{ name: 'model', type: 'Signal<string>', description: 'Valor elegido, de doble vía.' },
+				{ name: 'options', type: 'readonly UIRadioOption[]', description: 'Obligatoria. value, label y disabled.' },
+				{ name: 'legend', type: 'string', description: 'Nombre del grupo, en su legend. Obligatoria sin ariaLabel.' },
+				{ name: 'hideLegend', type: 'boolean', default: 'false', description: 'La leyenda sólo para lectores de pantalla.' },
+				{ name: 'ariaLabel', type: 'string', description: 'Nombre del grupo sin leyenda, en lugar de legend.' },
+				{ name: 'size', type: 'sm | md', default: 'md', description: 'Altura y texto, los de un control de ese tamaño.' },
+				{ name: 'name / required / disabled', type: 'string / boolean', description: 'Envío y estado nativos.' },
+				{ name: 'class / ui', type: 'string / objeto', description: 'Clases del fieldset y de base, legend, options, option e input.' },
+			]"
+		/>
 		<h2 id="slider">UISlider</h2>
 		<p>
 			Un
@@ -189,6 +274,8 @@
 			<code>UISwitchProps</code>
 			,
 			<code>UIRadioGroupProps</code>
+			,
+			<code>UISegmentedControlProps</code>
 			y
 			<code>UISliderProps</code>
 			se exportan desde

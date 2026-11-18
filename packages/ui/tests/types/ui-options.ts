@@ -1,6 +1,6 @@
 import type { UIDefaults, UIOptions } from '@meekojs/ui'
 import type { UIMarkdownEditorProps } from '@meekojs/ui/editor'
-import type { UIAlertProps, UIBadgeProps, UIBreadcrumbProps, UIButtonProps, UICardProps, UICheckboxProps, UICodeBlockProps, UIComboboxProps, UICommandPaletteProps, UIDescriptionListProps, UIDiffProps, UIDisclosureProps, UIDrawerProps, UIEmptyProps, UIFieldProps, UIFooterProps, UIHeaderProps, UIHintProps, UIIconButtonProps, UILinkCardProps, UILocaleSuggestionProps, UILocaleSwitcherProps, UIModalProps, UINavigationTabsProps, UINavigationTreeProps, UIPageHeaderProps, UIPageNavigationProps, UIPageProps, UIPaginationProps, UIRadioGroupProps, UISelectProps, UISkeletonProps, UISliderProps, UIStatProps, UISwitchProps, UITableOfContentsProps, UITableProps, UITabsProps, UIThemeToggleProps, UIToastProps } from '@meekojs/ui/runtime'
+import type { UIAlertProps, UIBadgeProps, UIBreadcrumbProps, UIButtonProps, UICardProps, UICheckboxProps, UICodeBlockProps, UIComboboxProps, UICommandPaletteProps, UIDescriptionListProps, UIDiffProps, UIDisclosureProps, UIDrawerProps, UIEmptyProps, UIFieldProps, UIFooterProps, UIHeaderProps, UIHintProps, UIIconButtonProps, UILinkCardProps, UILocaleSuggestionProps, UILocaleSwitcherProps, UIMenuProps, UIModalProps, UINavigationTabsProps, UINavigationTreeProps, UIPageHeaderProps, UIPageNavigationProps, UIPageProps, UIPaginationProps, UIRadioGroupProps, UISegmentedControlProps, UISelectProps, UISkeletonProps, UISliderProps, UIStatProps, UISwitchProps, UITableOfContentsProps, UITableProps, UITabsProps, UIThemeToggleProps, UIToastProps } from '@meekojs/ui/runtime'
 
 import type { ComponentProps as LinkProps } from '../../dist/app/components/Link.d.meeko.ts'
 
@@ -75,6 +75,7 @@ type SameSlots = [
 	Equal<Slots<'localeSuggestion'>, UILocaleSuggestionProps['ui']>,
 	Equal<Slots<'localeSwitcher'>, UILocaleSwitcherProps['ui']>,
 	Equal<Slots<'markdownEditor'>, UIMarkdownEditorProps['ui']>,
+	Equal<Slots<'menu'>, UIMenuProps['ui']>,
 	Equal<Slots<'modal'>, UIModalProps['ui']>,
 	Equal<Slots<'navigationTabs'>, UINavigationTabsProps['ui']>,
 	Equal<Slots<'navigationTree'>, UINavigationTreeProps['ui']>,
@@ -83,6 +84,7 @@ type SameSlots = [
 	Equal<Slots<'pageNavigation'>, UIPageNavigationProps['ui']>,
 	Equal<Slots<'pagination'>, UIPaginationProps['ui']>,
 	Equal<Slots<'radioGroup'>, UIRadioGroupProps['ui']>,
+	Equal<Slots<'segmentedControl'>, UISegmentedControlProps['ui']>,
 	Equal<Slots<'select'>, UISelectProps<string>['ui']>,
 	Equal<Slots<'skeleton'>, UISkeletonProps['ui']>,
 	Equal<Slots<'slider'>, UISliderProps['ui']>,
@@ -96,6 +98,6 @@ type SameSlots = [
 ]
 const sameSlots: false extends SameSlots[number] ? never : true = true
 // The variant defaults take the values of their props.
-type SameVariants = [Equal<NonNullable<UIDefaults['card']>['padding'], UICardProps['padding']>, Equal<NonNullable<UIDefaults['card']>['density'], UICardProps['density']>, Equal<NonNullable<UIDefaults['card']>['actionsWrap'], UICardProps['actionsWrap']>, Equal<NonNullable<UIDefaults['table']>['density'], UITableProps<{ id: number }>['density']>, Equal<NonNullable<UIDefaults['button']>['variant'], UIButtonProps['variant']>, Equal<NonNullable<UIDefaults['iconButton']>['variant'], UIIconButtonProps['variant']>, Equal<NonNullable<UIDefaults['iconButton']>['size'], UIIconButtonProps['size']>]
+type SameVariants = [Equal<NonNullable<UIDefaults['card']>['padding'], UICardProps['padding']>, Equal<NonNullable<UIDefaults['card']>['density'], UICardProps['density']>, Equal<NonNullable<UIDefaults['card']>['actionsWrap'], UICardProps['actionsWrap']>, Equal<NonNullable<UIDefaults['table']>['density'], UITableProps<{ id: number }>['density']>, Equal<NonNullable<UIDefaults['button']>['variant'], UIButtonProps['variant']>, Equal<NonNullable<UIDefaults['iconButton']>['variant'], UIIconButtonProps['variant']>, Equal<NonNullable<UIDefaults['iconButton']>['size'], UIIconButtonProps['size']>, Equal<NonNullable<UIDefaults['segmentedControl']>['size'], UISegmentedControlProps['size']>]
 const sameVariants: false extends SameVariants[number] ? never : true = true
 void [sameSlots, sameVariants]

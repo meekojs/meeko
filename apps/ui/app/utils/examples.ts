@@ -187,6 +187,32 @@ export default defineMeekoConfig({
   <button role="menuitem">Perfil</button>
   <button role="menuitem">Cerrar sesión</button>
 </UIPopover>`,
+	menu: `<script lang="ts">
+  import type { UIMenuEntry } from '@meekojs/ui/runtime'
+
+  const items: UIMenuEntry[] = [
+    { label: 'Renombrar', shortcut: 'F2', onSelect: () => rename() },
+    { label: 'Duplicar', onSelect: () => duplicate() },
+    { label: 'Ver en Popover', to: '/popover' },
+    { label: 'Archivar', disabled: true },
+    { separator: true },
+    { label: 'Eliminar', tone: 'danger', onSelect: () => remove() },
+  ]
+</script>
+
+<template>
+  <UIMenu triggerLabel="Acciones del proyecto" bind:items="items" on:select="(item) => console.log(item.label)" />
+</template>`,
+	menuRow: `<UITable caption="Archivos" bind:hideCaption="true" rowKey="id" bind:rows="files" bind:columns="columns">
+  <snippet name="cell-actions" params="file">
+    <UIMenu bind:ariaLabel="'Acciones de ' + file.name" size="sm" placement="bottom-end" bind:items="actionsOf(file)" />
+  </snippet>
+</UITable>`,
+	menuSnippets: `<UIMenu label="Cuenta" bind:items="[{ label: 'Perfil', to: '/profile' }, { label: 'Salir', onSelect: logout }]">
+  <snippet name="trigger"><img src="/me.png" alt="Mi cuenta" width="24" height="24" /></snippet>
+  <snippet name="item" params="item"><strong>{item.label}</strong></snippet>
+  <button type="button" role="menuitem" on:click="openHelp">Ayuda</button>
+</UIMenu>`,
 	themeToggle: `// meeko.config.ts
 export default defineMeekoConfig({
   modules: ['@meekojs/ui'],
@@ -377,6 +403,20 @@ export default defineMeekoConfig({
 <template>
   <UIRadioGroup model="period" legend="Periodo" name="period" bind:options="periods" />
   <UIRadioGroup model="period" legend="Periodo" variant="segmented" bind:options="periods" />
+</template>`,
+	segmented: `<script lang="ts">
+  const days = signal('30')
+  const options = [
+    { value: '7', label: '7 días' },
+    { value: '30', label: '30 días' },
+    { value: '90', label: '90 días' },
+  ]
+</script>
+
+<template>
+  <form method="get">
+    <UISegmentedControl legend="Periodo del gráfico" hideLegend size="sm" name="days" model="days" bind:options="options" />
+  </form>
 </template>`,
 	slider: `<UISlider model="volume" label="Volumen" name="volume" bind:min="0" bind:max="100" bind:step="5" />`,
 	alert: `<UIAlert tone="success" title="Cambios guardados" description="Ya están publicados." />

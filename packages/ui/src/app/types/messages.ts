@@ -224,6 +224,14 @@ export interface UIMessages {
 		/** `aria-label` del botón, si no se pasa `label`. */
 		readonly label: string
 	}
+	/**
+	 * Menú de acciones (`<UIMenu>`).
+	 * @since 1.11.0
+	 */
+	readonly menu: {
+		/** `aria-label` del disparador de sólo icono, si no se pasa `ariaLabel`. */
+		readonly trigger: string
+	}
 }
 
 /**

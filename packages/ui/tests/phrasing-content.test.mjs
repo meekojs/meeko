@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url'
 // element in their markup makes the HTML parser close the <p> early: the DOM of the client no longer matches
 // the server's and the page is left without JavaScript. Their own elements must be phrasing content; the
 // content of the popover, which in the top layer is laid out as a block anyway, is a <span>.
-const components = ['Popover', 'Tooltip', 'IconButton', 'Hint']
+const components = ['Popover', 'Tooltip', 'IconButton', 'Hint', 'Menu']
 const block = new Set(['address', 'article', 'aside', 'blockquote', 'details', 'dialog', 'div', 'dl', 'fieldset', 'figure', 'footer', 'form', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'hr', 'main', 'menu', 'nav', 'ol', 'p', 'pre', 'section', 'table', 'ul'])
 
 function* elements(node) {

@@ -80,6 +80,7 @@ const spanish: UIMessages = {
 		unavailable: 'La búsqueda no está disponible ahora mismo.',
 	},
 	hint: { label: 'Más información' },
+	menu: { trigger: 'Más acciones' },
 }
 
 const english: UIMessages = {
@@ -147,6 +148,7 @@ const english: UIMessages = {
 		unavailable: 'Search is not available right now.',
 	},
 	hint: { label: 'More information' },
+	menu: { trigger: 'More actions' },
 }
 
 /** The texts that come with the package. Spanish is complete and the last fallback of every locale. */
@@ -197,6 +199,7 @@ function merge(messages: UIMessages, layer: UIMessageOverrides | undefined): UIM
 		markdownEditor: { ...messages.markdownEditor, ...layer.markdownEditor },
 		commandPalette: { ...messages.commandPalette, ...layer.commandPalette },
 		hint: { ...messages.hint, ...layer.hint },
+		menu: { ...messages.menu, ...layer.menu },
 	}
 }
 

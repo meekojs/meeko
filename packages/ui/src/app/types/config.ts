@@ -3,7 +3,7 @@ import type { VariantProps } from 'tailwind-variants/lite'
 import type { badge } from '../variants/badge'
 import type { button, iconButton } from '../variants/button'
 import type { card, linkCard } from '../variants/card'
-import type { checkbox, radioGroup, toggle } from '../variants/choice'
+import type { checkbox, radioGroup, segmentedControl, toggle } from '../variants/choice'
 import type { commandPalette } from '../variants/command-palette'
 import type { container } from '../variants/container'
 import type { codeBlock, diff } from '../variants/content'
@@ -15,6 +15,7 @@ import type { footer, header } from '../variants/header'
 import type { input, textarea } from '../variants/input'
 import type { localeSuggestion, localeSwitcher } from '../variants/locale'
 import type { markdownEditor } from '../variants/markdown-editor'
+import type { menu } from '../variants/menu'
 import type { modal } from '../variants/modal'
 import type { breadcrumb, navigationTabs, navigationTree, pageNavigation, pagination, tableOfContents } from '../variants/navigation'
 import type { page, pageHeader } from '../variants/page'
@@ -79,7 +80,7 @@ type UIActionDefaults = UIComponentDefaults<typeof button, Pick<VariantProps<typ
  * reglas sin capa de la aplicación ganan a las de UI.
  *
  * Además, unas pocas variantes de apariencia general admiten un valor de base: `variant`, `size` y
- * `shape` en `button`, `link` e `iconButton`; `variant`, `padding`, `density` y `actionsWrap` en `card`, y `density` en `table`. La
+ * `shape` en `button`, `link` e `iconButton`; `variant`, `padding`, `density` y `actionsWrap` en `card`; `size` en `segmentedControl`, y `density` en `table`. La
  * prop explícita de la instancia gana siempre.
  *
  * @since 1.11.0 acepta `class` y `ui` en cada componente, y `padding`, `density`, `actionsWrap` en `card` y
@@ -148,6 +149,12 @@ export interface UIDefaults {
 	readonly localeSwitcher?: UIComponentDefaults<typeof localeSwitcher>
 	/** `UIMarkdownEditor`, del módulo `@meekojs/ui/editor`. */
 	readonly markdownEditor?: UIComponentDefaults<typeof markdownEditor>
+	/**
+	 * `class` llega a la lista del menú, como la prop de la instancia.
+	 *
+	 * @since 1.11.0
+	 */
+	readonly menu?: UIComponentDefaults<typeof menu>
 	readonly modal?: UIComponentDefaults<typeof modal>
 	readonly navigationTabs?: UIComponentDefaults<typeof navigationTabs>
 	readonly navigationTree?: UIComponentDefaults<typeof navigationTree>
@@ -159,6 +166,12 @@ export interface UIDefaults {
 	readonly popover?: UIComponentDefaults
 	readonly prose?: UIComponentDefaults
 	readonly radioGroup?: UIComponentDefaults<typeof radioGroup>
+	/**
+	 * `size` de base; la prop de la instancia gana sobre él.
+	 *
+	 * @since 1.11.0
+	 */
+	readonly segmentedControl?: UIComponentDefaults<typeof segmentedControl, Pick<VariantProps<typeof segmentedControl>, 'size'>>
 	readonly select?: UIComponentDefaults<typeof select>
 	readonly skeleton?: UIComponentDefaults<typeof skeleton>
 	readonly slider?: UIComponentDefaults<typeof slider>

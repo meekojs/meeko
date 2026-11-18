@@ -92,7 +92,7 @@ test('every form control draws its border from --ui-color-control-border, not fr
 	const choice = await variant('choice')
 	assert.match(choice, /const boxBorder = '[^']*ui:border-solid ui:border-control-border /)
 	assert.match(choice, /'ui:border-\(length:--ui-border-width\) ui:border-solid ui:border-control-border ui:checked:border-primary ui:aria-\[invalid=true\]:border-danger'/)
-	assert.match(choice, /options: '[^']*ui:border-solid ui:border-control-border /)
+	assert.match(choice, /const track = '[^']*ui:border-solid ui:border-control-border /)
 	// The track of a slider, in WebKit and Blink and in Firefox.
 	const slider = await variant('slider')
 	assert.match(slider, /\[&::-webkit-slider-runnable-track\]:\[background:[^\]]*var\(--ui-color-control-border\)/)

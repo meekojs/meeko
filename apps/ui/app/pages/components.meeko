@@ -23,7 +23,7 @@
 			title: 'Formularios',
 			items: [
 				{ href: '/forms', name: 'Field e Input', description: 'Etiquetas, modelos de texto y mensajes de error.' },
-				{ href: '/controls', name: 'Controles de formulario', description: 'Textarea, Checkbox, RadioGroup, Switch y Slider.' },
+				{ href: '/controls', name: 'Controles de formulario', description: 'Textarea, Checkbox, RadioGroup, SegmentedControl, Switch y Slider.' },
 				{ href: '/select', name: 'Select y Combobox', description: 'Una o varias opciones tipadas, con búsqueda y envío en formularios.' },
 				{ href: '/editor', name: 'Editor de Markdown', description: 'Edición visual y de código, con guardado por bloques.' },
 			],
@@ -43,6 +43,7 @@
 			items: [
 				{ href: '/modals', name: 'Modal', description: 'Declarativo o programático, con soporte de anidación.' },
 				{ href: '/popover', name: 'Popover', description: 'Menús, diálogos ligeros y tooltips anclados a su disparador.' },
+				{ href: '/menu', name: 'Menu', description: 'Menú de acciones con enlaces, separadores y teclado completo.' },
 				{ href: '/overlays', name: 'Superposiciones', description: 'Drawer, Tooltip y CommandPalette.' },
 				{ href: '/app', name: 'App', description: 'El host de los modales programáticos.' },
 			],

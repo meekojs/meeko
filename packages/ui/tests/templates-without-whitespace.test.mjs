@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url'
 // and the markup, a stable contract inherited from MeekoPopover, MeekoSelect and MeekoThemeToggle.
 // Prettier adds none: prettier.config.ts formats these files with `htmlWhitespaceSensitivity: "strict"`,
 // which keeps the whitespace as written (`"ignore"`, the default of the repository, breaks the tags into lines).
-const components = ['Popover', 'Select', 'ThemeToggle', 'Tabs', 'Tooltip', 'CommandPalette', 'Combobox', 'IconButton', 'Hint']
+const components = ['Popover', 'Select', 'ThemeToggle', 'Tabs', 'Tooltip', 'CommandPalette', 'Combobox', 'IconButton', 'Hint', 'Menu']
 
 const isLineBreak = (node) => node.nodeName === '#text' && /^[\t\n\f\r ]*\n[\t\n\f\r ]*$/.test(node.value ?? '')
 const isContent = (node) => node.nodeName !== '#comment' && (node.nodeName !== '#text' || Boolean(node.value?.trim()))
