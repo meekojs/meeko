@@ -6,10 +6,13 @@
 
 	import type { PopoverSnippets, PopoverToggleEvent, UIPopoverProps } from '../types/popover'
 
+	import { uiTheme } from '../utils/defaults'
 	import { createPopover } from '../utils/popover'
 	import { popover as look, popoverTrigger } from '../variants/popover'
 
 	const props = defineProps<UIPopoverProps>()
+
+	const theme = uiTheme('popover', () => props)
 
 	const emit = defineEmits<{ toggle: [event: PopoverToggleEvent] }>()
 
@@ -23,7 +26,7 @@
 	const popover = createPopover(props, open, useId(), (now) => emit('toggle', { open: now }))
 	onMounted(() => popover.mount(content.value))
 
-	const contentClass = computed(() => look({ role: popover.role.value ?? 'none', placement: popover.placement.value, matchWidth: props.matchWidth === true, class: props.class }))
+	const contentClass = computed(() => look({ role: popover.role.value ?? 'none', placement: popover.placement.value, matchWidth: props.matchWidth === true, class: theme.class }))
 	const triggerClass = computed(() => popoverTrigger({ class: props.triggerClass }))
 	defineExpose({ show: popover.show, hide: popover.hide, toggle: popover.toggle })
 </script>

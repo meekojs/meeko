@@ -5,6 +5,7 @@
 
 	import type { UITableOfContentsProps } from '../types/navigation'
 
+	import { uiTheme } from '../utils/defaults'
 	import { icons } from '../utils/icons'
 	import { uiMessages } from '../utils/messages'
 	import { followsLink } from '../utils/navigation'
@@ -12,6 +13,8 @@
 	import * as Icon from './internal/Icon.meeko'
 
 	const props = defineProps<UITableOfContentsProps>({ variant: 'aside' })
+
+	const theme = uiTheme('tableOfContents', () => props)
 
 	const text = uiMessages().tableOfContents
 	const spied = signal<string | undefined>(undefined)
@@ -23,11 +26,11 @@
 	const tracking = (): 'auto' | 'manual' => (props.active === undefined ? 'auto' : 'manual')
 	/** Levels 3 and 4 are indented; deeper ones are not, as before. */
 	const nested = (level: number): 0 | 1 | 2 => (level === 3 ? 1 : level === 4 ? 2 : 0)
-	const linkClass = (level: number): string => classes.link({ class: [tableOfContentsLink({ nested: nested(level), tracking: tracking() }), props.ui?.link] })
+	const linkClass = (level: number): string => classes.link({ class: [tableOfContentsLink({ nested: nested(level), tracking: tracking() }), theme.ui.link] })
 	// The <nav> is the root of the aside; in the collapsible view, the panel of its <details>.
 	const navClass = (): string =>
 		classes.base({
-			class: [tracking() === 'auto' ? tableOfContentsTracking : undefined, props.ui?.base, props.variant === 'aside' ? props.class : classes.panel({ class: props.ui?.panel })],
+			class: [tracking() === 'auto' ? tableOfContentsTracking : undefined, theme.ui.base, props.variant === 'aside' ? theme.class : classes.panel({ class: theme.ui.panel })],
 		})
 
 	function closeOnChoice(event: MouseEvent): void {
@@ -87,8 +90,8 @@
 		bind:class="navClass()"
 		bind:aria-label="props.label ?? text.label"
 	>
-		<p bind:class="classes.title({ class: props.ui?.title })">{props.label ?? text.label}</p>
-		<ul bind:class="classes.list({ class: props.ui?.list })">
+		<p bind:class="classes.title({ class: theme.ui.title })">{props.label ?? text.label}</p>
+		<ul bind:class="classes.list({ class: theme.ui.list })">
 			<li
 				each:of="props.entries"
 				each:as="entry"
@@ -108,12 +111,12 @@
 		ref:panel
 		if:when="props.variant === 'collapsible' && props.entries.length"
 		data-pagefind-ignore
-		bind:class="classes.collapsible({ class: [props.ui?.collapsible, props.class] })"
+		bind:class="classes.collapsible({ class: [theme.ui.collapsible, theme.class] })"
 	>
-		<summary bind:class="classes.summary({ class: props.ui?.summary })">
+		<summary bind:class="classes.summary({ class: theme.ui.summary })">
 			{props.label ?? text.label}
 			<Icon
-				bind:class="classes.chevron({ class: props.ui?.chevron })"
+				bind:class="classes.chevron({ class: theme.ui.chevron })"
 				bind:path="icons.chevron"
 			/>
 		</summary>
@@ -122,7 +125,7 @@
 			bind:class="navClass()"
 			on:click="closeOnChoice"
 		>
-			<ul bind:class="classes.list({ class: props.ui?.list })">
+			<ul bind:class="classes.list({ class: theme.ui.list })">
 				<li
 					each:of="props.entries"
 					each:as="entry"

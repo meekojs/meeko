@@ -3,6 +3,7 @@
 
 	import type { UIToastProps } from '../types/feedback'
 
+	import { uiTheme } from '../utils/defaults'
 	import { icons } from '../utils/icons'
 	import { uiMessages } from '../utils/messages'
 	import { withViewTransition } from '../utils/view-transition'
@@ -10,6 +11,8 @@
 	import * as Icon from './internal/Icon.meeko'
 
 	const props = defineProps<UIToastProps & { hosted?: boolean }>()
+
+	const theme = uiTheme('toast', () => props)
 
 	const emit = defineEmits<{ dismiss: [] }>()
 
@@ -89,30 +92,30 @@
 	<div
 		ref:element
 		if:when="visible.value"
-		bind:class="classes.value.base({ class: [props.hosted ? toastPlacement.hosted : toastPlacement.alone, props.ui?.base] })"
+		bind:class="classes.value.base({ class: [props.hosted ? toastPlacement.hosted : toastPlacement.alone, theme.ui.base] })"
 		bind:popover="props.hosted ? undefined : 'manual'"
 		on:mouseenter="enter"
 		on:mouseleave="leave"
 		on:focusin="focus"
 		on:focusout="blur"
 	>
-		<div bind:class="classes.value.content({ class: props.ui?.content })">
+		<div bind:class="classes.value.content({ class: theme.ui.content })">
 			<p
-				bind:class="classes.value.message({ class: props.ui?.message })"
+				bind:class="classes.value.message({ class: theme.ui.message })"
 				bind:role="props.tone === 'danger' ? 'alert' : props.hosted ? undefined : 'status'"
 			>
 				{props.text}
 			</p>
 			<div
 				if:when="snippets.actions || props.actions"
-				bind:class="classes.value.actions({ class: props.ui?.actions })"
+				bind:class="classes.value.actions({ class: theme.ui.actions })"
 			>
 				<render snippet="snippets.actions ?? props.actions" />
 			</div>
 		</div>
 		<button
 			type="button"
-			bind:class="classes.value.dismiss({ class: props.ui?.dismiss })"
+			bind:class="classes.value.dismiss({ class: theme.ui.dismiss })"
 			bind:aria-label="props.closeLabel ?? text.close"
 			on:click="close"
 		>

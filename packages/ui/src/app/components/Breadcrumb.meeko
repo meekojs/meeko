@@ -1,12 +1,15 @@
 <script lang="ts">
 	import type { UIBreadcrumbItem, UIBreadcrumbProps, UINavigationLink } from '../types/navigation'
 
+	import { uiTheme } from '../utils/defaults'
 	import { uiMessages } from '../utils/messages'
 	import { linkTarget } from '../utils/navigation'
 	import { breadcrumb } from '../variants/navigation'
 	import * as ItemLink from './internal/ItemLink.meeko'
 
 	const props = defineProps<UIBreadcrumbProps>()
+
+	const theme = uiTheme('breadcrumb', () => props)
 
 	const text = uiMessages().breadcrumb
 
@@ -18,20 +21,20 @@
 
 <template>
 	<nav
-		bind:class="classes.base({ class: [props.ui?.base, props.class] })"
+		bind:class="classes.base({ class: [theme.ui.base, theme.class] })"
 		bind:aria-label="props.label ?? text.label"
 	>
-		<ol bind:class="classes.list({ class: props.ui?.list })">
+		<ol bind:class="classes.list({ class: theme.ui.list })">
 			<li
 				each:of="props.items"
 				each:as="item"
 				each:index="index"
 				each:key="item.label"
-				bind:class="classes.item({ class: props.ui?.item })"
+				bind:class="classes.item({ class: theme.ui.item })"
 			>
 				<ItemLink
 					if:when="hasTarget(item) && !isCurrent(item, index)"
-					bind:class="classes.link({ class: props.ui?.link })"
+					bind:class="classes.link({ class: theme.ui.link })"
 					bind:link="linkTarget(item as UINavigationLink)"
 				>
 					{item.label}
@@ -39,7 +42,7 @@
 				<span
 					if:when="!hasTarget(item) || isCurrent(item, index)"
 					bind:aria-current="isCurrent(item, index) ? 'page' : undefined"
-					bind:class="classes.current({ class: props.ui?.current })"
+					bind:class="classes.current({ class: theme.ui.current })"
 				>
 					{item.label}
 				</span>

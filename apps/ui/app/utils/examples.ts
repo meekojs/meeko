@@ -274,6 +274,16 @@ export default defineMeekoConfig({
     },
   },
 })`,
+	themeDefaults: `export default defineMeekoConfig({
+  modules: ['@meekojs/ui'],
+  ui: {
+    defaults: {
+      card: { padding: 'sm', ui: { header: 'panel-card-header' } },
+      table: { density: 'compact', class: 'panel-table' },
+      stat: { ui: { value: 'panel-stat-value' } },
+    },
+  },
+})`,
 	messages: `// meeko.config.ts
 export default defineMeekoConfig({
   modules: ['@meekojs/ui'],

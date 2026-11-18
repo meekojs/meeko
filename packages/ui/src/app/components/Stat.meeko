@@ -1,9 +1,12 @@
 <script lang="ts">
 	import type { UIStatProps } from '../types/data'
 
+	import { uiTheme } from '../utils/defaults'
 	import { stat } from '../variants/data'
 
 	const props = defineProps<UIStatProps>()
+
+	const theme = uiTheme('stat', () => props)
 
 	const snippets = defineSnippets<{ value?: []; detail?: [] }>()
 
@@ -11,26 +14,26 @@
 </script>
 
 <template>
-	<dl bind:class="classes.base({ class: [props.ui?.base, props.class] })">
-		<dt bind:class="classes.label({ class: props.ui?.label })">{props.label}</dt>
+	<dl bind:class="classes.base({ class: [theme.ui.base, theme.class] })">
+		<dt bind:class="classes.label({ class: theme.ui.label })">{props.label}</dt>
 		<dd
 			if:when="snippets.value"
-			bind:class="classes.value({ class: props.ui?.value })"
+			bind:class="classes.value({ class: theme.ui.value })"
 		>
 			<render snippet="snippets.value" />
 		</dd>
 		<template if:when="!snippets.value">
-			<dd bind:class="classes.value({ class: props.ui?.value })">{props.value}</dd>
+			<dd bind:class="classes.value({ class: theme.ui.value })">{props.value}</dd>
 		</template>
 		<dd
 			if:when="snippets.detail"
-			bind:class="classes.detail({ class: props.ui?.detail })"
+			bind:class="classes.detail({ class: theme.ui.detail })"
 		>
 			<render snippet="snippets.detail" />
 		</dd>
 		<dd
 			if:when="!snippets.detail && props.detail"
-			bind:class="classes.detail({ class: props.ui?.detail })"
+			bind:class="classes.detail({ class: theme.ui.detail })"
 		>
 			{props.detail}
 		</dd>

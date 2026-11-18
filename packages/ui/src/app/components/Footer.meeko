@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { UIFooterProps } from '../types/navigation'
 
+	import { uiTheme } from '../utils/defaults'
 	import { uiMessages } from '../utils/messages'
 	import { linkTarget } from '../utils/navigation'
 	import { container } from '../variants/container'
@@ -9,6 +10,8 @@
 	import * as ItemLink from './internal/ItemLink.meeko'
 
 	const props = defineProps<UIFooterProps>({ size: '2xl' })
+
+	const theme = uiTheme('footer', () => props)
 
 	const snippets = defineSnippets<{ brand?: []; about?: []; actions?: []; legal?: [] }>()
 
@@ -20,12 +23,12 @@
 <template>
 	<footer
 		data-pagefind-ignore
-		bind:class="classes.base({ class: [props.ui?.base, props.class] })"
+		bind:class="classes.base({ class: [theme.ui.base, theme.class] })"
 	>
-		<div bind:class="classes.inner({ class: [container({ size: props.size, gutter: 'md' }), props.ui?.inner] })">
+		<div bind:class="classes.inner({ class: [container({ size: props.size, gutter: 'md' }), theme.ui.inner] })">
 			<div
 				if:when="snippets.brand || props.brand || snippets.about || props.description || snippets.actions"
-				bind:class="classes.about({ class: props.ui?.about })"
+				bind:class="classes.about({ class: theme.ui.about })"
 			>
 				<render
 					if:when="snippets.brand"
@@ -42,7 +45,7 @@
 				<p if:when="!snippets.about && props.description">{props.description}</p>
 				<div
 					if:when="snippets.actions"
-					bind:class="classes.actions({ class: props.ui?.actions })"
+					bind:class="classes.actions({ class: theme.ui.actions })"
 				>
 					<render snippet="snippets.actions" />
 				</div>
@@ -50,15 +53,15 @@
 			<nav
 				if:when="props.groups?.length"
 				bind:aria-label="props.label ?? text.label"
-				bind:class="classes.groups({ class: props.ui?.groups })"
+				bind:class="classes.groups({ class: theme.ui.groups })"
 			>
 				<div
 					each:of="props.groups ?? []"
 					each:as="group"
 					each:key="group.title"
 				>
-					<p bind:class="classes.title({ class: props.ui?.title })">{group.title}</p>
-					<ul bind:class="classes.list({ class: props.ui?.list })">
+					<p bind:class="classes.title({ class: theme.ui.title })">{group.title}</p>
+					<ul bind:class="classes.list({ class: theme.ui.list })">
 						<li
 							each:of="group.items"
 							each:as="item"
@@ -66,7 +69,7 @@
 						>
 							<ItemLink
 								bind:link="linkTarget(item)"
-								bind:class="classes.link({ class: props.ui?.link })"
+								bind:class="classes.link({ class: theme.ui.link })"
 							>
 								{item.label}
 							</ItemLink>
@@ -76,20 +79,20 @@
 			</nav>
 			<div
 				if:when="snippets.legal || props.items?.length"
-				bind:class="classes.legal({ class: props.ui?.legal })"
+				bind:class="classes.legal({ class: theme.ui.legal })"
 			>
 				<div if:when="snippets.legal"><render snippet="snippets.legal" /></div>
 				<nav
 					if:when="props.items?.length"
 					bind:aria-label="props.label ?? text.label"
-					bind:class="classes.legalNav({ class: props.ui?.legalNav })"
+					bind:class="classes.legalNav({ class: theme.ui.legalNav })"
 				>
 					<ItemLink
 						each:of="props.items ?? []"
 						each:as="item"
 						each:key="item.label"
 						bind:link="linkTarget(item)"
-						bind:class="classes.link({ class: props.ui?.link })"
+						bind:class="classes.link({ class: theme.ui.link })"
 					>
 						{item.label}
 					</ItemLink>

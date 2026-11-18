@@ -6,14 +6,17 @@
 	import type { UIProseProps } from '../types/navigation'
 
 	import { copyFromMarkup } from '../utils/clipboard'
+	import { uiTheme } from '../utils/defaults'
 	import { uiMessages } from '../utils/messages'
 
-	const { as = 'div', html, class: className, ...rest } = defineProps<UIProseProps>()
+	const { as = 'div', html, class: ownClass, ...rest } = defineProps<UIProseProps>()
+
+	const theme = uiTheme('prose', () => ({ class: ownClass }))
 
 	const snippets = defineSnippets<{ default?: [] }>()
 
 	const text = uiMessages().code
-	const classes = computed(() => ['meeko-ui-prose', className].filter(Boolean).join(' '))
+	const classes = computed(() => ['meeko-ui-prose', theme.class].filter(Boolean).join(' '))
 </script>
 
 <template>

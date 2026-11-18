@@ -62,7 +62,7 @@ export default defineMeekoConfig({
 })
 ```
 
-`UIOptions`, `UITokens` y `UIDefaults` se exportan como tipos de `@meekojs/ui`. Los defaults son por aplicación y petición SSR; no hay estado mutable global. Las props explícitas ganan sobre `ui.defaults`, y éstos sobre los valores de base. Los defaults disponibles son `button` y `link` (`variant`, `size`, `shape`), y `card` (`variant`). Sin opciones se conserva la configuración original y no se instala el plugin de defaults.
+`UIOptions`, `UITokens` y `UIDefaults` se exportan como tipos de `@meekojs/ui`. Los defaults son por aplicación y petición SSR; no hay estado mutable global. Las props explícitas ganan sobre `ui.defaults`, y éstos sobre los valores de base. Cada componente admite `class` y `ui`, que se suman a las de sus instancias, y unos pocos, variantes: véase [Clases y variantes por defecto](#clases-y-variantes-por-defecto). Sin opciones se conserva la configuración original y no se instala el plugin de defaults.
 
 `tokens` admite `primary`, `primaryHover`, `onPrimary`, `accentSoft`, `accentText`, `surface`, `surfaceHover`, `text`, `textSoft`, `muted`, `border`, `borderStrong`, `danger`, `focus`, `radius`, `font`, `controlHeight`, `controlPadding`, `controlWeight` y `controlFontSize`. Cada clave asigna tokens `--ui-*`: `primary` es `--ui-color-primary`, `text` es `--ui-color-text`, y `surface`, a la vez, las superficies y los controles. Las referencias `var(...)` siguen los temas de la aplicación sin duplicar sus colores.
 
@@ -331,6 +331,29 @@ Los nombres de los slots están en el JSDoc de cada tipo de props (`UICardProps`
 	font-weight: var(--ui-font-weight-semibold);
 }
 ```
+
+### Clases y variantes por defecto
+
+`ui.defaults` da a todas las instancias de un componente las mismas clases, sin repetirlas en cada una: así cambia una aplicación la densidad de todo su panel. La clave es el nombre del componente en camelCase sin el prefijo `UI` (`card`, `table`, `stat`, `alert`, `descriptionList`, `modal`, `drawer`…), y cada componente que acepta `class` o `ui` admite aquí las dos:
+
+```ts
+export default defineMeekoConfig({
+	modules: ['@meekojs/ui'],
+	ui: {
+		defaults: {
+			card: { padding: 'sm', ui: { header: 'panel-card-header' } },
+			table: { density: 'compact', class: 'panel-table' },
+			stat: { ui: { value: 'panel-stat-value' } },
+		},
+	},
+})
+```
+
+- **`class` y `ui` se suman.** Las clases de `ui.defaults` se añaden a las de cada instancia, no las sustituyen: van primero las del componente, después las de `ui.defaults` y al final las de la instancia. `class` llega donde llega la prop de la instancia: en `UITable`, a la `<table>`. Sin fusión de clases, en un conflicto decide la cascada, como explica [Qué gana](#clases-por-slot): una regla sin capa de tu aplicación gana a las de UI, y entre dos reglas tuyas deciden su especificidad y su orden en tu hoja, no el orden de las clases en el atributo.
+- **Variantes.** Unas pocas admiten un valor de base: `variant`, `size` y `shape` en `button` y `link`; `variant`, `padding` y `density` en `card`, y `density` en `table`. La prop explícita de la instancia gana siempre. En `card`, un `padding` o una `density` de la instancia ganan a los dos de `ui.defaults`, y en cada nivel `padding` gana a `density`. Las demás variantes no tienen default porque dependen de cada instancia: el `tone` de `UIAlert`, `UIBadge` o `UIToast` dice qué es el mensaje, y `layout`, `side`, `sticky`, `size` de `UIModal` o `columns` siguen a la estructura y el contenido de cada página. Su aspecto se retoca con `class` y `ui`.
+- **Componentes.** `UIButton`, `UILink`, `UIInput`, `UITextarea`, `UIContainer`, `UIProse`, `UIPopover` y `UITooltip` no tienen slots: sólo admiten `class`. `toast` sólo admite `ui` y también se aplica a los avisos de `useToast()`. `markdownEditor` es `UIMarkdownEditor`, de `@meekojs/ui/editor`. El tipo `UIDefaults` describe cada componente con sus slots reales, y el editor los completa.
+- **Validación.** Un componente, una opción o un slot desconocidos, una clase vacía o un valor de variante que no existe hacen fallar la carga del módulo con un error que dice qué se admite, como `ui: unknown slot head in defaults.card.ui; its slots are base, header, title, description, actions, body, footer`.
+- **Cliente.** Los defaults viajan con el JavaScript de cada página, como una copia plana de los valores validados: pon ahí clases, no datos.
 
 ### Migración desde las clases retiradas
 

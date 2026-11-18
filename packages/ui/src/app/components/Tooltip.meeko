@@ -7,10 +7,13 @@
 
 	import type { TooltipSnippets, UITooltipProps } from '../types/tooltip'
 
+	import { uiTheme } from '../utils/defaults'
 	import { tooltipTrigger } from '../variants/popover'
 	import * as Popover from './Popover.meeko'
 
 	const props = defineProps<UITooltipProps>()
+
+	const theme = uiTheme('tooltip', () => props)
 
 	const open = defineModel<boolean>({ default: false })
 
@@ -28,7 +31,7 @@
 		bind:delay="props.delay"
 		bind:closeDelay="props.closeDelay"
 		bind:triggerId="props.triggerId"
-		bind:class="props.class"
+		bind:class="theme.class"
 		><snippet
 			name="anchor"
 			params="trigger"

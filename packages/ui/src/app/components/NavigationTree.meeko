@@ -5,6 +5,7 @@
 
 	import type { UINavigationTreeGroup, UINavigationTreeItem, UINavigationTreeProps } from '../types/navigation'
 
+	import { uiTheme } from '../utils/defaults'
 	import { icons } from '../utils/icons'
 	import { uiMessages } from '../utils/messages'
 	import { isCurrentLink, linkTarget, revealInScroller, scrollingAncestor } from '../utils/navigation'
@@ -14,6 +15,8 @@
 	import * as ItemLink from './internal/ItemLink.meeko'
 
 	const props = defineProps<UINavigationTreeProps>({ collapsible: true })
+
+	const theme = uiTheme('navigationTree', () => props)
 
 	const snippets = defineSnippets<{ item?: [item: UINavigationTreeItem, current: boolean]; icon?: [entry: UINavigationTreeGroup | UINavigationTreeItem]; empty?: [] }>()
 
@@ -45,7 +48,7 @@
 <template>
 	<nav
 		ref:root
-		bind:class="classes.base({ class: [props.ui?.base, props.class] })"
+		bind:class="classes.base({ class: [theme.ui.base, theme.class] })"
 		bind:aria-label="props.label ?? text.label"
 	>
 		<component
@@ -54,15 +57,15 @@
 			each:index="index"
 			each:key="groupKey(group, index)"
 			is="folds(group) ? 'details' : 'div'"
-			bind:class="classes.group({ class: props.ui?.group })"
+			bind:class="classes.group({ class: theme.ui.group })"
 			bind:open="folds(group) ? startsOpen(group) : undefined"
 		>
 			<component
 				if:when="group.title !== undefined"
 				is="folds(group) ? 'summary' : 'p'"
-				bind:class="classes.title({ class: [folds(group) ? foldingTitle : undefined, props.ui?.title] })"
+				bind:class="classes.title({ class: [folds(group) ? foldingTitle : undefined, theme.ui.title] })"
 			>
-				<span bind:class="classes.titleText({ class: props.ui?.titleText })">
+				<span bind:class="classes.titleText({ class: theme.ui.titleText })">
 					<render
 						if:when="snippets.icon && group.icon"
 						snippet="snippets.icon"
@@ -76,18 +79,18 @@
 				</span>
 				<Icon
 					if:when="folds(group)"
-					bind:class="classes.chevron({ class: props.ui?.chevron })"
+					bind:class="classes.chevron({ class: theme.ui.chevron })"
 					bind:path="icons.chevron"
 				/>
 			</component>
-			<ul bind:class="classes.list({ class: props.ui?.list })">
+			<ul bind:class="classes.list({ class: theme.ui.list })">
 				<li
 					each:of="group.items"
 					each:as="item"
 					each:key="item.label"
 				>
 					<ItemLink
-						bind:class="classes.link({ class: props.ui?.link })"
+						bind:class="classes.link({ class: theme.ui.link })"
 						bind:link="linkTarget(item)"
 						bind:current="isCurrent(item) ? 'page' : undefined"
 					>
@@ -107,7 +110,7 @@
 						/>
 						<span
 							if:when="!snippets.item"
-							bind:class="classes.label({ class: [item.code ? codeLabel : undefined, props.ui?.label] })"
+							bind:class="classes.label({ class: [item.code ? codeLabel : undefined, theme.ui.label] })"
 						>
 							{item.label}
 						</span>
@@ -124,7 +127,7 @@
 		<div
 			if:when="props.groups.length === 0"
 			role="status"
-			bind:class="classes.empty({ class: props.ui?.empty })"
+			bind:class="classes.empty({ class: theme.ui.empty })"
 		>
 			<render
 				if:when="snippets.empty"

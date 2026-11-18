@@ -4,6 +4,7 @@
 	// handlers take over from the native close. The platform traps the focus and gives the focus back.
 	import type { UIDrawerProps } from '../types/navigation'
 
+	import { uiTheme } from '../utils/defaults'
 	import { icons } from '../utils/icons'
 	import { uiMessages } from '../utils/messages'
 	import { mountModalDialog } from '../utils/modal-dialog'
@@ -13,6 +14,8 @@
 	import * as Icon from './internal/Icon.meeko'
 
 	const props = defineProps<UIDrawerProps>({ side: 'start', closedBy: 'any', closeOnNavigate: true })
+
+	const theme = uiTheme('drawer', () => props)
 
 	const emit = defineEmits<{ close: [] }>()
 
@@ -70,7 +73,7 @@
 
 	const classes = (): ReturnType<typeof drawer> => drawer({ side: props.side })
 	// The trigger is an outline button of variants/button, whose gap already leaves room for the icon.
-	const triggerClass = (): string => button({ variant: 'outline', size: 'sm', class: props.ui?.trigger })
+	const triggerClass = (): string => button({ variant: 'outline', size: 'sm', class: theme.ui.trigger })
 </script>
 
 <template>
@@ -94,17 +97,17 @@
 	<dialog
 		ref:dialog
 		bind:id="dialogId()"
-		bind:class="classes().base({ class: [props.ui?.base, props.class] })"
+		bind:class="classes().base({ class: [theme.ui.base, theme.class] })"
 		bind:closedby="props.closedBy"
 		bind:aria-labelledby="dialogId() + '-title'"
 		on:click="onDialogClick"
 		on:close="onClose"
 	>
-		<div bind:class="classes().panel({ class: props.ui?.panel })">
-			<div bind:class="classes().heading({ class: props.ui?.heading })">
+		<div bind:class="classes().panel({ class: theme.ui.panel })">
+			<div bind:class="classes().heading({ class: theme.ui.heading })">
 				<h2
 					bind:id="dialogId() + '-title'"
-					bind:class="classes().title({ class: props.ui?.title })"
+					bind:class="classes().title({ class: theme.ui.title })"
 					>{props.title}</h2
 				>
 				<button
@@ -112,16 +115,16 @@
 					command="close"
 					bind:commandfor="dialogId()"
 					bind:aria-label="props.closeLabel ?? text.close"
-					bind:class="classes().close({ class: props.ui?.close })"
+					bind:class="classes().close({ class: theme.ui.close })"
 					on:click="onCloseClick"
 				>
 					<Icon bind:path="icons.close" />
 				</button>
 			</div>
-			<div bind:class="classes().body({ class: props.ui?.body })"><render snippet="snippets.default" /></div>
+			<div bind:class="classes().body({ class: theme.ui.body })"><render snippet="snippets.default" /></div>
 			<footer
 				if:when="snippets.footer"
-				bind:class="classes().footer({ class: props.ui?.footer })"
+				bind:class="classes().footer({ class: theme.ui.footer })"
 			>
 				<render snippet="snippets.footer" />
 			</footer>

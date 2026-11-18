@@ -6,12 +6,15 @@
 	import type { UICodeBlockProps } from '../types/navigation'
 
 	import { copyFeedbackTime, copyText } from '../utils/clipboard'
+	import { uiTheme } from '../utils/defaults'
 	import { icons } from '../utils/icons'
 	import { uiMessages } from '../utils/messages'
 	import { codeBlock, codeBlockCopy, codeBlockMode, codeBlockTone } from '../variants/content'
 	import * as Icon from './internal/Icon.meeko'
 
 	const props = defineProps<UICodeBlockProps>({ mode: 'code' })
+
+	const theme = uiTheme('codeBlock', () => props)
 
 	const snippets = defineSnippets<{ default?: [] }>()
 
@@ -55,16 +58,16 @@
 <template>
 	<figure
 		ref:root
-		bind:class="classes.base({ class: [tone.value.base, props.ui?.base, props.class] })"
+		bind:class="classes.base({ class: [tone.value.base, theme.ui.base, theme.class] })"
 	>
 		<figcaption
 			if:when="showsHead.value"
 			data-pagefind-ignore
-			bind:class="classes.head({ class: [tone.value.head, props.ui?.head] })"
+			bind:class="classes.head({ class: [tone.value.head, theme.ui.head] })"
 		>
 			<span
 				if:when="props.verdict"
-				bind:class="classes.verdict({ class: props.ui?.verdict })"
+				bind:class="classes.verdict({ class: theme.ui.verdict })"
 			>
 				<Icon
 					size="sm"
@@ -73,19 +76,19 @@
 			>
 			<span
 				if:when="props.label"
-				bind:class="classes.label({ class: [tone.value.label, props.ui?.label] })"
+				bind:class="classes.label({ class: [tone.value.label, theme.ui.label] })"
 				bind:lang="props.labelLang"
 				>{props.label}</span
 			>
 			<span
 				if:when="props.lang"
-				bind:class="classes.lang({ class: props.ui?.lang })"
+				bind:class="classes.lang({ class: theme.ui.lang })"
 				>{props.lang}</span
 			>
 			<button
 				if:when="showsCopy.value"
 				type="button"
-				bind:class="classes.copy({ class: [copyColor.value, ready.value ? undefined : codeBlockCopy.waiting, props.ui?.copy] })"
+				bind:class="classes.copy({ class: [copyColor.value, ready.value ? undefined : codeBlockCopy.waiting, theme.ui.copy] })"
 				bind:lang="props.uiLang"
 				bind:aria-label="props.copyAriaLabel"
 				on:click="copy"
@@ -101,19 +104,19 @@
 		</figcaption>
 		<div
 			if:when="props.html"
-			bind:class="classes.content({ class: props.ui?.content })"
+			bind:class="classes.content({ class: theme.ui.content })"
 			html="props.html"
 		/>
 		<div
 			if:when="!props.html && snippets.default"
-			bind:class="classes.content({ class: props.ui?.content })"
+			bind:class="classes.content({ class: theme.ui.content })"
 		>
 			<render snippet="snippets.default" />
 		</div>
 		<pre
 			if:when="!props.html && !snippets.default"
 			tabindex="0"
-			bind:class="classes.code({ class: [codeBlockMode[props.mode ?? 'code'], props.ui?.code] })"
+			bind:class="classes.code({ class: [codeBlockMode[props.mode ?? 'code'], theme.ui.code] })"
 			bind:lang="props.textLang"
 			bind:role="props.mode === 'log' ? 'log' : undefined"
 			bind:aria-label="name.value"

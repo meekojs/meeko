@@ -1,5 +1,9 @@
 # Cambios de Meeko UI
 
+## 1.11.0 — sin publicar
+
+- **`ui.defaults` acepta `class` y `ui` en cada componente.** Cada componente que admite `class` o `ui` los admite también en `ui.defaults`, con su nombre en camelCase sin el prefijo (`card`, `table`, `stat`, `descriptionList`…): `ui: { defaults: { card: { padding: 'sm', ui: { header: 'panel-card-header' } }, table: { density: 'compact', class: 'panel-table' }, stat: { ui: { value: 'panel-stat-value' } } } }`. Las clases se suman a las de cada instancia (primero las del componente, después las de `ui.defaults` y al final las de la instancia), sin fusionarlas: en un conflicto decide la cascada y tu CSS sin capa gana. `card` admite además `padding` y `density`, y `table`, `density`; la prop explícita de la instancia gana siempre. Las opciones se validan al cargar el módulo, con un error que dice qué componentes, slots y valores se admiten, y `UIDefaults` tipa cada componente con sus slots reales. Al cliente sólo llega una copia plana de los valores validados.
+
 ## Sin publicar
 
 Se publica en la serie 1.x como [excepción aprobada](../../docs/stability.md#excepciones-aprobadas): retira clases y atributos de estilo que una app podía usar para personalizar, sin cambiar props, eventos, snippets ni tokens. La [guía de migración](../../docs/ui-api.md#clases-por-slot) da la equivalencia de cada uno.

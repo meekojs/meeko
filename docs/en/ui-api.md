@@ -1,5 +1,5 @@
 ---
-source-hash: dc2c82b25b7dc6675787b383f22d906bc6b014fd7377577a8a760027bbbc3024
+source-hash: 5213412848336a2468fb17c6896d5f747df98e73abcae88523ab3f671a88a26f
 ---
 
 # Meeko UI API
@@ -66,7 +66,7 @@ export default defineMeekoConfig({
 })
 ```
 
-`UIOptions`, `UITokens` and `UIDefaults` are exported as types from `@meekojs/ui`. Defaults are per application and per SSR request; there is no global mutable state. Explicit props win over `ui.defaults`, and those over the base values. The available defaults are `button` and `link` (`variant`, `size`, `shape`), and `card` (`variant`). Without options, the original configuration is kept and the defaults plugin is not installed.
+`UIOptions`, `UITokens` and `UIDefaults` are exported as types from `@meekojs/ui`. Defaults are per application and per SSR request; there is no global mutable state. Explicit props win over `ui.defaults`, and those over the base values. Each component accepts `class` and `ui`, which add up to those of its instances, and a few accept variants: see [Default classes and variants](#default-classes-and-variants). Without options, the original configuration is kept and the defaults plugin is not installed.
 
 `tokens` accepts `primary`, `primaryHover`, `onPrimary`, `accentSoft`, `accentText`, `surface`, `surfaceHover`, `text`, `textSoft`, `muted`, `border`, `borderStrong`, `danger`, `focus`, `radius`, `font`, `controlHeight`, `controlPadding`, `controlWeight` and `controlFontSize`. Each key assigns `--ui-*` tokens: `primary` is `--ui-color-primary`, `text` is `--ui-color-text`, and `surface` covers both surfaces and controls. `var(...)` references follow the application's themes without duplicating their colors.
 
@@ -335,6 +335,29 @@ The slot names are in the JSDoc of each props type (`UICardProps`, `UIFieldProps
 	font-weight: var(--ui-font-weight-semibold);
 }
 ```
+
+### Default classes and variants
+
+`ui.defaults` gives every instance of a component the same classes, without repeating them on each one: this is how an application changes the density of its whole dashboard. The key is the name of the component in camelCase without the `UI` prefix (`card`, `table`, `stat`, `alert`, `descriptionList`, `modal`, `drawer`…), and every component that accepts `class` or `ui` accepts both here:
+
+```ts
+export default defineMeekoConfig({
+	modules: ['@meekojs/ui'],
+	ui: {
+		defaults: {
+			card: { padding: 'sm', ui: { header: 'panel-card-header' } },
+			table: { density: 'compact', class: 'panel-table' },
+			stat: { ui: { value: 'panel-stat-value' } },
+		},
+	},
+})
+```
+
+- **`class` and `ui` add up.** The classes of `ui.defaults` are added to those of each instance, they do not replace them: first those of the component, then those of `ui.defaults` and last those of the instance. `class` reaches where the prop of the instance does: in `UITable`, the `<table>`. Without class merging, the cascade decides a conflict, as [What wins](#classes-per-slot) explains: an unlayered rule of your application wins over those of UI, and between two rules of yours their specificity and their order in your stylesheet decide, not the order of the classes in the attribute.
+- **Variants.** A few accept a base value: `variant`, `size` and `shape` in `button` and `link`; `variant`, `padding` and `density` in `card`, and `density` in `table`. The explicit prop of the instance always wins. In `card`, a `padding` or a `density` of the instance wins over both of `ui.defaults`, and at each level `padding` wins over `density`. The other variants have no default because they depend on each instance: the `tone` of `UIAlert`, `UIBadge` or `UIToast` says what the message is, and `layout`, `side`, `sticky`, the `size` of `UIModal` or `columns` follow the structure and the content of each page. Adjust their look with `class` and `ui`.
+- **Components.** `UIButton`, `UILink`, `UIInput`, `UITextarea`, `UIContainer`, `UIProse`, `UIPopover` and `UITooltip` have no slots: they only accept `class`. `toast` only accepts `ui`, and it also applies to the notices of `useToast()`. `markdownEditor` is `UIMarkdownEditor`, from `@meekojs/ui/editor`. The `UIDefaults` type describes each component with its real slots, and the editor completes them.
+- **Validation.** An unknown component, option or slot, an empty class or a variant value that does not exist make the module fail to load with an error that says what is accepted, such as `ui: unknown slot head in defaults.card.ui; its slots are base, header, title, description, actions, body, footer`.
+- **Client.** The defaults travel with the JavaScript of every page, as a plain copy of the validated values: put classes there, not data.
 
 ### Migrating from the removed classes
 

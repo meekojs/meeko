@@ -8,10 +8,13 @@
 	import type { CommandPaletteSnippets, UICommandPaletteProps } from '../types/command-palette'
 
 	import { createCommandPalette } from '../utils/command-palette'
+	import { uiTheme } from '../utils/defaults'
 	import { commandPaletteStatusText, uiMessages } from '../utils/messages'
 	import { commandPalette } from '../variants/command-palette'
 
 	const props = defineProps<UICommandPaletteProps<T>>()
+
+	const theme = uiTheme('commandPalette', () => props)
 
 	const emit = defineEmits<{ open: []; close: []; choose: [item: T] }>()
 
@@ -39,7 +42,7 @@
 <template><button
 		if:when="props.trigger !== false"
 		type="button"
-		bind:class="classes.trigger({ class: [props.ui?.trigger, props.triggerClass] })"
+		bind:class="classes.trigger({ class: [theme.ui.trigger, props.triggerClass] })"
 		bind:aria-label="props.label ?? text.label"
 		on:click="palette.show"
 		><render
@@ -63,14 +66,14 @@
 	><dialog
 		ref:dialog
 		closedby="any"
-		bind:class="classes.base({ class: [props.ui?.base, props.class] })"
+		bind:class="classes.base({ class: [theme.ui.base, theme.class] })"
 		bind:aria-label="props.label ?? text.label"
 		on:keydown="palette.keydown"
-		><div bind:class="classes.field({ class: props.ui?.field })"
+		><div bind:class="classes.field({ class: theme.ui.field })"
 			><svg
 				viewBox="0 0 24 24"
 				aria-hidden="true"
-				bind:class="classes.icon({ class: props.ui?.icon })"
+				bind:class="classes.icon({ class: theme.ui.icon })"
 				><circle
 					cx="11"
 					cy="11"
@@ -90,17 +93,17 @@
 				bind:aria-expanded="palette.showing.value ? 'true' : 'false'"
 				bind:aria-controls="palette.listId"
 				bind:aria-activedescendant="palette.activeId.value"
-				bind:class="classes.input({ class: props.ui?.input })"
+				bind:class="classes.input({ class: theme.ui.input })"
 			/><button
 				type="button"
-				bind:class="classes.close({ class: props.ui?.close })"
+				bind:class="classes.close({ class: theme.ui.close })"
 				bind:aria-label="props.closeLabel ?? text.close"
 				on:click="palette.hide"
 				><kbd aria-hidden="true">Esc</kbd></button
 			></div
 		><div
 			role="status"
-			bind:class="classes.status({ class: props.ui?.status })"
+			bind:class="classes.status({ class: theme.ui.status })"
 			><render
 				if:when="snippets.status && palette.status.value !== 'ready'"
 				snippet="snippets.status"
@@ -108,7 +111,7 @@
 			/><template if:when="!snippets.status && palette.status.value !== 'ready'">{commandPaletteStatusText(text, palette.status.value, query.value.trim())}</template></div
 		><ul
 			role="listbox"
-			bind:class="classes.list({ class: props.ui?.list })"
+			bind:class="classes.list({ class: theme.ui.list })"
 			bind:id="palette.listId"
 			bind:aria-label="props.label ?? text.label"
 			bind:hidden="!palette.showing.value"
@@ -120,7 +123,7 @@
 				><component
 					is="row.href === undefined ? 'button' : 'a'"
 					role="option"
-					bind:class="classes.row({ class: props.ui?.row })"
+					bind:class="classes.row({ class: theme.ui.row })"
 					bind:id="palette.rowId(row.index)"
 					bind:href="row.href"
 					bind:type="row.href === undefined ? 'button' : undefined"

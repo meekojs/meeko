@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 
 import type { UIOptions } from './options'
 
+import { normalizeDefaults } from './defaults'
 import { messagesConfig, tokenStyles, validateOptions } from './options'
 
 declare module '@meekojs/meeko/framework' {
@@ -52,7 +53,9 @@ export default defineMeekoModule<UIOptions>({
 					if (id.split('?')[0]?.replaceAll('\\', '/').toLowerCase() === tokensFile) return { code: code + customTokens, map: null }
 				},
 			})
-		if (options.defaults && Object.keys(options.defaults).length) meeko.addPlugin({ src: new URL('./app/plugins/config.js', import.meta.url), options: options.defaults })
+		// Only the validated plain values reach the client, where every page reads them.
+		const defaults = options.defaults && normalizeDefaults(options.defaults)
+		if (defaults && Object.keys(defaults).length) meeko.addPlugin({ src: new URL('./app/plugins/config.js', import.meta.url), options: defaults })
 
 		// Without these options the components read the texts of the package, or the locale of i18n, by themselves.
 		if (options.locale !== undefined || options.messages !== undefined)

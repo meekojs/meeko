@@ -4,11 +4,14 @@
 	import type { ModalDismissReason, UIModalProps } from '../types/modal'
 
 	import { modalExitRegistration, optionalModalInstance } from '../composables/useModal'
+	import { uiTheme } from '../utils/defaults'
 	import { uiMessages } from '../utils/messages'
 	import { mountModalDialog } from '../utils/modal-dialog'
 	import { modal } from '../variants/modal'
 
 	const props = defineProps<UIModalProps>()
+
+	const theme = uiTheme('modal', () => props)
 
 	const emit = defineEmits<{ dismiss: [reason: ModalDismissReason] }>()
 
@@ -48,21 +51,21 @@
 <template>
 	<dialog
 		ref:dialog
-		bind:class="classes.value.base({ class: [props.ui?.base, props.class] })"
+		bind:class="classes.value.base({ class: [theme.ui.base, theme.class] })"
 		bind:closedby="props.closeOnEscape === false ? 'none' : props.closeOnBackdrop === false ? 'closerequest' : 'any'"
 		bind:aria-labelledby="id + '-title'"
 		bind:aria-describedby="props.description ? id + '-description' : undefined"
 	>
-		<div bind:class="classes.value.heading({ class: props.ui?.heading })">
+		<div bind:class="classes.value.heading({ class: theme.ui.heading })">
 			<div>
 				<h2
 					bind:id="id + '-title'"
-					bind:class="classes.value.title({ class: props.ui?.title })"
+					bind:class="classes.value.title({ class: theme.ui.title })"
 					>{props.title}</h2
 				>
 				<p
 					if:when="props.description"
-					bind:class="classes.value.description({ class: props.ui?.description })"
+					bind:class="classes.value.description({ class: theme.ui.description })"
 					bind:id="id + '-description'"
 				>
 					{props.description}
@@ -71,7 +74,7 @@
 			<button
 				if:when="props.closeButton !== false"
 				type="button"
-				bind:class="classes.value.close({ class: props.ui?.close })"
+				bind:class="classes.value.close({ class: theme.ui.close })"
 				bind:aria-label="props.closeLabel ?? text.close"
 				on:click="() => dismiss('button')"
 			>
@@ -88,12 +91,12 @@
 				</svg>
 			</button>
 		</div>
-		<div bind:class="classes.value.body({ class: props.ui?.body })">
+		<div bind:class="classes.value.body({ class: theme.ui.body })">
 			<render snippet="snippets.default" />
 		</div>
 		<footer
 			if:when="snippets.footer"
-			bind:class="classes.value.footer({ class: props.ui?.footer })"
+			bind:class="classes.value.footer({ class: theme.ui.footer })"
 		>
 			<render snippet="snippets.footer" />
 		</footer>

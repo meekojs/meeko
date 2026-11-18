@@ -12,6 +12,7 @@
 	import type { UIThemeToggleProps } from '../types/theme-toggle'
 	import type { ThemeToggleItem } from '../utils/theme-toggle'
 
+	import { uiTheme } from '../utils/defaults'
 	import { icons } from '../utils/icons'
 	import { uiMessages } from '../utils/messages'
 	import { themeToggleGroupLabel, themeToggleItems, themeToggleKeyTarget, themeToggleMode, themeToggleStatus } from '../utils/theme-toggle'
@@ -20,6 +21,8 @@
 	import * as Icon from './internal/Icon.meeko'
 
 	const props = defineProps<UIThemeToggleProps>()
+
+	const theme = uiTheme('themeToggle', () => props)
 
 	const snippets = defineSnippets<ThemeToggleSnippets>()
 
@@ -77,7 +80,7 @@
 		method="post"
 		action="/_meeko/theme"
 		data-meeko-theme-toggle="cycle"
-		bind:class="classes.value.base({ class: [props.ui?.base, props.class] })"
+		bind:class="classes.value.base({ class: [theme.ui.base, theme.class] })"
 		bind:id="props.id"
 		on:submit="submit"
 		><input
@@ -91,14 +94,14 @@
 		/><button
 			type="submit"
 			bind:aria-label="label.value"
-			bind:class="classes.value.button({ class: props.ui?.button })"
+			bind:class="classes.value.button({ class: theme.ui.button })"
 			><span
 				each:of="items.value"
 				each:as="item"
 				each:key="item.name"
 				bind:data-meeko-theme-icon="item.icon"
 				aria-hidden="true"
-				bind:class="classes.value.icon({ class: props.ui?.icon })"
+				bind:class="classes.value.icon({ class: theme.ui.icon })"
 				><render
 					if:when="named[item.name]"
 					snippet="named[item.name]"
@@ -113,7 +116,7 @@
 		method="post"
 		action="/_meeko/theme"
 		data-meeko-theme-toggle="select"
-		bind:class="classes.value.base({ class: [props.ui?.base, props.class] })"
+		bind:class="classes.value.base({ class: [theme.ui.base, theme.class] })"
 		bind:id="props.id"
 		on:submit="submit"
 		><input
@@ -123,7 +126,7 @@
 		/><div
 			role="radiogroup"
 			bind:aria-label="group.value"
-			bind:class="classes.value.group({ class: props.ui?.group })"
+			bind:class="classes.value.group({ class: theme.ui.group })"
 			on:keydown="keydown"
 			><button
 				each:of="items.value"
@@ -137,7 +140,7 @@
 				bind:tabindex="focused.value === undefined ? undefined : focused.value === item.name ? '0' : '-1'"
 				bind:aria-label="named[item.name] ? item.label : undefined"
 				bind:data-meeko-theme-option="item.name"
-				bind:class="classes.value.button({ class: props.ui?.button })"
+				bind:class="classes.value.button({ class: theme.ui.button })"
 				><render
 					if:when="named[item.name]"
 					snippet="named[item.name]"
