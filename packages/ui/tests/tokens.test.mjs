@@ -77,20 +77,27 @@ test('form control borders reach 3:1 against every background and control state 
 
 test('every form control draws its border from --ui-color-control-border, not from a decorative border', async () => {
 	const main = await read('components.css')
-	const forms = await read('forms.css')
+	const variant = (name) => readFile(new URL(`../src/app/variants/${name}.ts`, import.meta.url), 'utf8')
 	const rule = (css, selector) => {
 		const start = css.indexOf(`${selector} {`)
 		assert.notEqual(start, -1, `no ${selector} rule`)
 		return css.slice(start, css.indexOf('\n}', start))
 	}
-	// The same rule paints <UIInput>, <UITextarea> and the trigger of <UISelect> and <UICombobox>.
-	assert.match(rule(main.replaceAll('\r\n', '\n'), '.meeko-ui-input,\n[data-meeko-select-trigger]'), /border: var\(--ui-border-width\) solid var\(--ui-color-control-border\)/)
-	// The outline button is on Tailwind: its border is the color control-border of theme.css.
-	assert.match(await readFile(new URL('../src/app/variants/button.ts', import.meta.url), 'utf8'), /variant: 'outline', tone: 'neutral', class: 'ui:border-control-border /)
+	// The variants are on Tailwind: the border is the color control-border of theme.css.
 	assert.match(await read('theme.css'), /--color-control-border: var\(--ui-color-control-border\);/)
-	for (const selector of ['.meeko-ui-choice:not(.meeko-ui-switch) input', '.meeko-ui-switch input', ".meeko-ui-radio-group[data-variant='segmented'] .meeko-ui-radio-options"]) assert.match(rule(forms, selector), /solid var\(--ui-color-control-border\)/, selector)
-	assert.match(rule(forms, '.meeko-ui-slider input::-webkit-slider-runnable-track'), /var\(--ui-color-control-border\)/)
-	assert.match(rule(forms, '.meeko-ui-slider input::-moz-range-track'), /var\(--ui-color-control-border\)/)
+	// <UIInput>, <UITextarea> and, through `control`, the trigger of <UISelect> and <UICombobox>.
+	assert.match(await variant('input'), /ui:border-solid ui:border-control-border /)
+	assert.match(rule(main, '[data-meeko-select-trigger]'), /border: var\(--ui-border-width\) solid var\(--ui-color-control-border\)/)
+	assert.match(await variant('button'), /variant: 'outline', tone: 'neutral', class: 'ui:border-control-border /)
+	// The box of a checkbox or a radio, the track of a switch and the frame of a segmented group.
+	const choice = await variant('choice')
+	assert.match(choice, /const boxBorder = '[^']*ui:border-solid ui:border-control-border /)
+	assert.match(choice, /'ui:border-\(length:--ui-border-width\) ui:border-solid ui:border-control-border ui:checked:border-primary ui:aria-\[invalid=true\]:border-danger'/)
+	assert.match(choice, /options: '[^']*ui:border-solid ui:border-control-border /)
+	// The track of a slider, in WebKit and Blink and in Firefox.
+	const slider = await variant('slider')
+	assert.match(slider, /\[&::-webkit-slider-runnable-track\]:\[background:[^\]]*var\(--ui-color-control-border\)/)
+	assert.match(slider, /\[&::-moz-range-track\]:bg-control-border/)
 })
 
 /** The value of a token that points to a step, in a theme: `--ui-color-text` becomes a hex. */

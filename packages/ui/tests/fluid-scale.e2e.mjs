@@ -36,7 +36,7 @@ const measure = (page) =>
 			textWidth: text.getBoundingClientRect().width,
 			measure75,
 			navigation: link ? size(link) : undefined,
-			control: visible('.meeko-ui-input')?.getBoundingClientRect().height,
+			control: visible('input[type="search"]')?.getBoundingClientRect().height,
 		}
 	})
 

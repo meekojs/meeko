@@ -22,8 +22,6 @@
 @import './forms.css';
 @import './feedback.css';
 
-.meeko-ui-input,
-.meeko-ui-field,
 [data-meeko-select],
 [data-meeko-popover],
 [data-meeko-theme-toggle] {
@@ -35,12 +33,10 @@
 		rotate: 1turn;
 	}
 }
-.meeko-ui-input:disabled,
 [data-meeko-select][data-disabled] {
 	opacity: var(--ui-opacity-disabled);
 	cursor: not-allowed;
 }
-.meeko-ui-input,
 [data-meeko-select-trigger] {
 	display: block;
 	transition: background-color var(--ui-duration-fast);
@@ -54,7 +50,6 @@
 	color: var(--ui-color-text);
 	font: var(--ui-font-weight-regular) var(--ui-input-font-size) / var(--ui-line-height-snug) var(--ui-font-sans);
 }
-.meeko-ui-input:hover:not(:disabled),
 [data-meeko-select-trigger]:hover {
 	background: var(--ui-color-control-hover);
 }
@@ -62,15 +57,12 @@
 	cursor: pointer;
 	text-align: start;
 }
-.meeko-ui-input::placeholder,
 [data-meeko-select-placeholder] {
 	color: var(--ui-color-text-soft);
 }
-.meeko-ui-input[aria-invalid='true'],
 [data-meeko-select-trigger][aria-invalid='true'] {
 	border-color: var(--ui-color-danger);
 }
-.meeko-ui-input:focus-visible,
 [data-meeko-select-trigger]:focus-visible,
 [data-meeko-popover-trigger]:focus-visible,
 [data-meeko-theme-toggle] button:focus-visible {
@@ -78,30 +70,10 @@
 	outline-offset: var(--ui-focus-ring-offset);
 }
 @media (prefers-reduced-motion: reduce) {
-	.meeko-ui-input,
 	[data-meeko-select-trigger],
 	[data-meeko-popover-trigger] {
 		transition: none;
 	}
-}
-.meeko-ui-field {
-	display: grid;
-	gap: var(--ui-space-1-5);
-	color: var(--ui-color-text);
-}
-.meeko-ui-field-label {
-	font-weight: var(--ui-font-weight-medium);
-	font-size: var(--ui-font-size-sm);
-}
-.meeko-ui-field-description {
-	margin: 0;
-	color: var(--ui-color-text-soft);
-	font-size: var(--ui-font-size-sm);
-}
-.meeko-ui-field-error {
-	margin: 0;
-	color: var(--ui-color-danger-text);
-	font-size: var(--ui-font-size-sm);
 }
 [data-meeko-popover] {
 	box-shadow: var(--ui-shadow-md);

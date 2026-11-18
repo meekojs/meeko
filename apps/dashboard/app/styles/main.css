@@ -103,18 +103,18 @@
 	gap: var(--ui-space-1);
 }
 
-/* Filters: the fields share a row, and what does not fit goes to the next one. */
+/* Filters: the fields share a row, and what does not fit goes to the next one. A <UIField> is the only <div> of the row. */
 .dash-filters {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: flex-end;
 	gap: var(--ui-space-3) var(--ui-space-4);
 }
-.dash-filters > .meeko-ui-field {
+.dash-filters > div {
 	flex: 1 1 var(--ui-table-column-min);
 	min-width: 0;
 }
-.dash-filters > .meeko-ui-field:not(.dash-grow) {
+.dash-filters > div:not(.dash-grow) {
 	max-width: var(--ui-floating-panel-width);
 }
 .dash-filters > .dash-grow {
@@ -142,7 +142,7 @@
 .dash-status:not(:has(*)) {
 	position: absolute;
 }
-.meeko-ui-input.dash-code {
+.dash-code {
 	font-family: var(--ui-font-mono);
 }
 .dash-soft {

@@ -3,29 +3,34 @@
 
 	import type { UISwitchProps } from '../types/forms'
 
-	const { label, description, invalid, describedBy, class: className, ...rest } = defineProps<UISwitchProps>()
+	import { toggle } from '../variants/choice'
+
+	const { label, description, invalid, describedBy, class: className, ui, ...rest } = defineProps<UISwitchProps>()
 
 	const checked = defineModel<boolean>({ default: false })
 
 	const id = useId()
+
+	const classes = toggle()
 </script>
 
 <template>
-	<label bind:class="['meeko-ui-choice', 'meeko-ui-switch', className].filter(Boolean).join(' ')">
+	<label bind:class="classes.base({ class: [ui?.base, className] })">
 		<input
 			type="checkbox"
 			role="switch"
 			model="checked"
 			bind:aria-invalid="invalid ? 'true' : undefined"
 			bind:aria-describedby="[describedBy ?? rest['aria-describedby'], description ? id + '-description' : undefined].filter(Boolean).join(' ') || undefined"
+			bind:class="classes.input({ class: ui?.input })"
 			bind="rest"
 		/>
-		<span class="meeko-ui-choice-content">
+		<span bind:class="classes.content({ class: ui?.content })">
 			<span>{label}</span>
 			<span
 				if:when="description"
-				class="meeko-ui-choice-description"
 				bind:id="id + '-description'"
+				bind:class="classes.description({ class: ui?.description })"
 			>
 				{description}
 			</span>

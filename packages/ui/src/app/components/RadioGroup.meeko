@@ -3,26 +3,29 @@
 
 	import type { UIRadioGroupProps } from '../types/forms'
 
-	const { legend, options, name, required, variant = 'default', class: className, ...rest } = defineProps<UIRadioGroupProps>()
+	import { radioGroup } from '../variants/choice'
+
+	const { legend, options, name, required, variant = 'default', class: className, ui, ...rest } = defineProps<UIRadioGroupProps>()
 
 	const value = defineModel<string>({ default: '' })
 
 	const id = useId()
+
+	const classes = radioGroup({ variant })
 </script>
 
 <template>
 	<fieldset
-		bind:class="['meeko-ui-radio-group', className].filter(Boolean).join(' ')"
-		bind:data-variant="variant"
+		bind:class="classes.base({ class: [ui?.base, className] })"
 		bind="rest"
 	>
-		<legend>{legend}</legend>
-		<div class="meeko-ui-radio-options">
+		<legend bind:class="classes.legend({ class: ui?.legend })">{legend}</legend>
+		<div bind:class="classes.options({ class: ui?.options })">
 			<label
 				each:of="options"
 				each:as="option"
 				each:key="option.value"
-				class="meeko-ui-choice"
+				bind:class="classes.option({ class: ui?.option })"
 			>
 				<input
 					type="radio"
@@ -32,6 +35,7 @@
 					bind:value="option.value"
 					bind:disabled="option.disabled"
 					bind:required="required"
+					bind:class="classes.input({ class: ui?.input })"
 				/>
 				<span>{option.label}</span>
 			</label>
