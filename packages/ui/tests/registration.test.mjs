@@ -58,11 +58,14 @@ test('UI registers a static app plugin and only aliases the consumer component r
 			addHead() {},
 		},
 	)
-	assert.equal(plugins.length, 2)
+	assert.equal(plugins.length, 3)
 	assert.match(fileURLToPath(plugins[0]).replaceAll('\\', '/'), /\/dist\/app\/plugins\/modal\.js$/)
 	await access(plugins[0])
 	assert.match(fileURLToPath(plugins[1]).replaceAll('\\', '/'), /\/dist\/app\/plugins\/toast\.js$/)
 	await access(plugins[1])
+	// Always on: it measures the gutter of the scrollbar for the locks of the page and for the app.
+	assert.match(fileURLToPath(plugins[2]).replaceAll('\\', '/'), /\/dist\/app\/plugins\/scrollbar-gutter\.js$/)
+	await access(plugins[2])
 	assert.equal(vitePlugins[0].resolveId('virtual:meeko-ui-components'), join(root, '.meeko', 'generated', 'components.ts'))
 	assert.equal(vitePlugins[0].resolveId('unrelated-module'), undefined)
 	await assert.rejects(access(join(root, '.meeko')), { code: 'ENOENT' })

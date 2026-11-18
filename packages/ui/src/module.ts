@@ -74,5 +74,7 @@ export default defineMeekoModule<UIOptions>({
 		})
 		meeko.addPlugin(new URL('./app/plugins/modal.js', import.meta.url))
 		meeko.addPlugin(new URL('./app/plugins/toast.js', import.meta.url))
+		// The width of the gutter of the scrollbar, `--ui-scrollbar-gutter`, for the locks of the page and for the app.
+		meeko.addPlugin(new URL('./app/plugins/scrollbar-gutter.js', import.meta.url))
 	},
 })

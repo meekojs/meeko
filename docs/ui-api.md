@@ -1206,6 +1206,45 @@ Todo enlace de una lista acepta `href` (cualquier URL) o `to` (una ruta con `par
 - **Hojas sueltas.** `@meekojs/ui/styles/prose.css` y `@meekojs/ui/styles/code.css` son esas mismas reglas como archivos, para un documento que no recibe las de la página, como un `<iframe sandbox srcdoc>`. Leen `var(--ui-*)`: ese documento tiene que declarar sus valores.
 - **`UIDiff`** recibe un diff unificado y marca cada línea con `data-kind` (`add`, `remove`, `hunk`, `file`, `context`) y un texto para lectores de pantalla.
 
+### Paneles propios y el canal de la barra
+
+La base reserva el canal de la barra de desplazamiento con `scrollbar-gutter: stable`, así que la página no se mueve al cambiar de largo. En esa franja Chromium sólo pinta el color de fondo de `<html>`: un panel `position: fixed`, un `<dialog>` modal y su `::backdrop` se recortan antes de ella aunque se extiendan con un `inset` negativo, y `100vw` ya la descuenta. Por eso el módulo mide su ancho y lo escribe en `<html>` como `--ui-scrollbar-gutter` (`0px` sin barra, con barras superpuestas, en el servidor o sin JavaScript), y lo actualiza al redimensionar, al cambiar el zoom y al aparecer o desaparecer la barra. `data-meeko-ui-scrollbar-gutter` dice en qué lado está (`right`, o `left` en un navegador que la pasa a la izquierda en una página de derecha a izquierda).
+
+Al bloquear el desplazamiento, `UIDrawer` y `useScrollLock()` devuelven el canal a la ventana y dan a `<html>` ese ancho como relleno en su lado: la página no se mueve, y el panel y el fondo llegan hasta el borde de la ventana. Mientras dura el bloqueo, la variable conserva el ancho de antes. Sin el ancho medido, como antes de hidratar, el canal sigue reservado y `UIDrawer`, `UIModal` y `UICommandPalette` dan a `<html>` el color de lo que lo toca. `UIModal` y `UICommandPalette` no bloquean la página: su barra sigue ahí y lleva ese color.
+
+Un panel propio sólo necesita `useScrollLock()` mientras está abierto: con `right: 0` o `inset-inline-end: 0` cubre la franja.
+
+```html
+<script lang="ts">
+	import { useScrollLock } from '@meekojs/ui/runtime'
+
+	const open = defineModel<boolean>({ default: false })
+	const snippets = defineSnippets<{ default: [] }>()
+	useScrollLock(() => open.value)
+</script>
+
+<template>
+	<aside
+		if:when="open.value"
+		class="sheet"
+	>
+		<render snippet="snippets.default" />
+	</aside>
+</template>
+
+<style scoped>
+	.sheet {
+		position: fixed;
+		inset-block: 0;
+		inset-inline-end: 0;
+		inline-size: min(24rem, 100%);
+		background: var(--ui-color-surface-raised);
+	}
+</style>
+```
+
+Un elemento fijo que no deba moverse durante el bloqueo, como una barra con `right: 0` y contenido alineado al final, puede apartar ese contenido con `padding-inline-end: var(--ui-scrollbar-gutter)` mientras el panel está abierto. Fuera de un bloqueo, el canal sigue reservado y la ventana de un elemento fijo ya lo descuenta: no le sumes la variable.
+
 ## Plataforma y View Transitions
 
 `UIModal`, `UIDrawer`, `UIPopover`, `UITabs`, `UIThemeToggle` y `UISelect` usan `<dialog>`, `popover`, anclaje CSS, `appearance: base-select`, `@starting-style` y View Transitions. Los navegadores antiguos funcionan sin animación y con el `<select>` más básico, igual que Firefox, que aún muestra su lista nativa. Lo que la plataforma no cubre está en `UICombobox`, sobre `UIPopover`.

@@ -1,5 +1,5 @@
 ---
-source-hash: 5858ac7d4e17704d83c3f9cc8956159602c52f3e85b9f5430eb8b6ed22a0ff57
+source-hash: f38939ceb5bbf04cc2506bb6fcf1345344afeaa88fa4a568abe4533eb78565bf
 ---
 
 # Meeko UI API
@@ -1209,6 +1209,45 @@ Every link in a list accepts `href` (any URL) or `to` (a route with typed `param
 - **`UIProse`** dresses rendered Markdown. The `meeko-ui-prose` class also works on any element, and inside it `.heading-anchor`, `.table-wrap`, `.callout`, `.code-block` and `.shiki`, the classes of a snapshot, are styled. The component handles the `button[data-copy]` buttons of that HTML. A UI component inside the text keeps its appearance: the reading styles end at it (`@scope`).
 - **Standalone stylesheets.** `@meekojs/ui/styles/prose.css` and `@meekojs/ui/styles/code.css` are those same rules as files, for a document that does not receive the page's, such as an `<iframe sandbox srcdoc>`. They read `var(--ui-*)`: that document has to declare their values.
 - **`UIDiff`** receives a unified diff and marks each line with `data-kind` (`add`, `remove`, `hunk`, `file`, `context`) and a text for screen readers.
+
+### Own panels and the scrollbar gutter
+
+The base reserves the scrollbar gutter with `scrollbar-gutter: stable`, so the page does not move when its length changes. In that strip Chromium only paints the background color of `<html>`: a `position: fixed` panel, a modal `<dialog>` and its `::backdrop` are clipped before it even when they extend with a negative `inset`, and `100vw` already leaves it out. That is why the module measures its width and writes it on `<html>` as `--ui-scrollbar-gutter` (`0px` without a scrollbar, with overlay scrollbars, on the server or without JavaScript), and updates it when the window is resized, when the zoom changes and when the scrollbar appears or disappears. `data-meeko-ui-scrollbar-gutter` tells which side it is on (`right`, or `left` in a browser that moves it to the left in a right-to-left page).
+
+When they lock scrolling, `UIDrawer` and `useScrollLock()` give the gutter back to the window and give `<html>` that width as padding on its side: the page does not move, and the panel and the backdrop reach the edge of the window. While the lock lasts, the variable keeps the width from before. Without the measured width, as before hydration, the gutter stays reserved and `UIDrawer`, `UIModal` and `UICommandPalette` give `<html>` the color of whatever touches it. `UIModal` and `UICommandPalette` do not lock the page: its scrollbar is still there and takes that color.
+
+An own panel only needs `useScrollLock()` while it is open: with `right: 0` or `inset-inline-end: 0` it covers the strip.
+
+```html
+<script lang="ts">
+	import { useScrollLock } from '@meekojs/ui/runtime'
+
+	const open = defineModel<boolean>({ default: false })
+	const snippets = defineSnippets<{ default: [] }>()
+	useScrollLock(() => open.value)
+</script>
+
+<template>
+	<aside
+		if:when="open.value"
+		class="sheet"
+	>
+		<render snippet="snippets.default" />
+	</aside>
+</template>
+
+<style scoped>
+	.sheet {
+		position: fixed;
+		inset-block: 0;
+		inset-inline-end: 0;
+		inline-size: min(24rem, 100%);
+		background: var(--ui-color-surface-raised);
+	}
+</style>
+```
+
+A fixed element that must not move during the lock, such as a bar with `right: 0` and content aligned to the end, can move that content aside with `padding-inline-end: var(--ui-scrollbar-gutter)` while the panel is open. Outside a lock, the gutter stays reserved and the box of a fixed element already leaves it out: do not add the variable to it.
 
 ## Platform and View Transitions
 

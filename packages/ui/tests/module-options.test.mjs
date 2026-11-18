@@ -148,7 +148,7 @@ test('configured UI installs only a static defaults plugin and transforms its ow
 			addHead() {},
 		},
 	)
-	assert.equal(plugins.length, 3)
+	assert.equal(plugins.length, 4)
 	assert.deepEqual(plugins[0].options, { link: { shape: 'pill' } })
 	assert.match(String(plugins[0].src), /app\/plugins\/config\.js$/)
 	const tokens = vite.find((plugin) => plugin.name === 'meeko-ui:tokens')
