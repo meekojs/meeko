@@ -285,17 +285,11 @@
 			<code>UIPopover</code>
 			and
 			<MeekoLink to="/theme-toggle">UIThemeToggle</MeekoLink>
-			. To be confirmed:
-			<code>UIProse</code>
-			,
-			<code>UICodeBlock</code>
-			,
-			<code>UIDiff</code>
-			,
-			<code>UIIcon</code>
-			, the editor and utilities such as
+			. The
+			<code>meeko-ui-prose</code>
+			class, which dresses Markdown on any element, and the
 			<code>meeko-ui-sr-only</code>
-			still keep their classes.
+			utility stay public API, because an application does not compile Tailwind.
 		</p>
 		<h2 id="defaults">Default values</h2>
 		<p>

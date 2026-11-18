@@ -1,5 +1,5 @@
 ---
-source-hash: 5eab05979a29d418a335b2aff91ded65ed2792eaef78c7659246f9e1ae14c71e
+source-hash: dc2c82b25b7dc6675787b383f22d906bc6b014fd7377577a8a760027bbbc3024
 ---
 
 # Meeko UI API
@@ -386,7 +386,7 @@ The attributes that JavaScript reads are still there and you can keep using them
 
 `MeekoSelect`, `MeekoPopover` and `MeekoThemeToggle`, deprecated in the core, no longer get their look from the UI stylesheet: replace them with `UISelect` or `UICombobox`, `UIPopover` and `UIThemeToggle` ([Migration to 1.8](migration-1.8.md)).
 
-To be confirmed: `UIProse`, `UICodeBlock`, `UIDiff`, `UIIcon`, `UIMarkdownEditor` and utilities such as `meeko-ui-sr-only` still keep their `meeko-ui-*` classes. This guide will be completed when they migrate.
+`UICodeBlock`, `UIDiff`, the icons and the frame of `UIMarkdownEditor` also drop their classes (`.meeko-ui-code-block` and the `.meeko-ui-code-*` ones, `.meeko-ui-diff*`, `.meeko-ui-icon` and the `ui-markdown-editor-*` ones of the frame) and their styling `data-*`: customize them with `class` and `ui`. The `meeko-ui-prose` class, which dresses Markdown on any element, and the `meeko-ui-sr-only` utility stay public API, because an application does not compile Tailwind; so do `data-kind` on each line of `UIDiff` and the `ui-markdown-editor` class, which the Crepe theme hangs from.
 
 ## Modals
 

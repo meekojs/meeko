@@ -382,7 +382,7 @@ Los atributos que lee JavaScript siguen ahí y puedes seguir usándolos en un se
 
 `MeekoSelect`, `MeekoPopover` y `MeekoThemeToggle`, obsoletos en el núcleo, ya no reciben aspecto de la hoja de UI: cámbialos por `UISelect` o `UICombobox`, `UIPopover` y `UIThemeToggle` ([Migración a 1.8](migration-1.8.md)).
 
-Pendiente de confirmar: `UIProse`, `UICodeBlock`, `UIDiff`, `UIIcon`, `UIMarkdownEditor` y las utilidades como `meeko-ui-sr-only` aún conservan sus clases `meeko-ui-*`. Esta guía se completará cuando migren.
+`UICodeBlock`, `UIDiff`, los iconos y el marco de `UIMarkdownEditor` también dejan sus clases (`.meeko-ui-code-block` y las `.meeko-ui-code-*`, `.meeko-ui-diff*`, `.meeko-ui-icon` y las `ui-markdown-editor-*` del marco) y sus `data-*` de estilo: personalízalos con `class` y `ui`. Siguen siendo API pública la clase `meeko-ui-prose`, que viste Markdown en cualquier elemento, y la utilidad `meeko-ui-sr-only`, porque una aplicación no compila Tailwind; también `data-kind` en cada línea de `UIDiff` y la clase `ui-markdown-editor`, de la que cuelga el tema de Crepe.
 
 ## Modales
 

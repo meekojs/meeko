@@ -284,17 +284,11 @@
 			<code>UIPopover</code>
 			y
 			<a href="/theme-toggle">UIThemeToggle</a>
-			. Pendiente de confirmar:
-			<code>UIProse</code>
-			,
-			<code>UICodeBlock</code>
-			,
-			<code>UIDiff</code>
-			,
-			<code>UIIcon</code>
-			, el editor y utilidades como
+			. Siguen siendo API pública la clase
+			<code>meeko-ui-prose</code>
+			, que viste Markdown en cualquier elemento, y la utilidad
 			<code>meeko-ui-sr-only</code>
-			aún conservan sus clases.
+			, porque una aplicación no compila Tailwind.
 		</p>
 		<h2 id="defaults">Valores por defecto</h2>
 		<p>
