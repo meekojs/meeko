@@ -1,7 +1,10 @@
+/*
+ * <UISelect>: the list of its <select>, which the browser draws. The trigger is on Tailwind
+ * (../variants/select.ts); what stays here are the parts the browser makes and only CSS reaches: the
+ * ::picker(select) of a customizable select, its ::picker-icon, the <selectedcontent> it copies, the
+ * ::checkmark of each option and their entrance, all behind @supports (appearance: base-select).
+ */
 /* Firefox keeps its own list, and paints it with these colours. */
-select[data-meeko-select-trigger] {
-	cursor: pointer;
-}
 select[data-meeko-select-trigger] option,
 select[data-meeko-select-trigger] optgroup {
 	background: var(--ui-color-surface-raised);
@@ -12,13 +15,6 @@ select[data-meeko-select-trigger] optgroup {
 	select[data-meeko-select-trigger],
 	select[data-meeko-select-trigger]::picker(select) {
 		appearance: base-select;
-	}
-	select[data-meeko-select-trigger] {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		gap: var(--ui-space-2);
-		text-align: start;
 	}
 	select[data-meeko-select-trigger]:has(option[data-meeko-select-placeholder]:checked) selectedcontent {
 		color: var(--ui-color-text-soft);
@@ -110,12 +106,6 @@ select[data-meeko-select-trigger] optgroup {
 		margin-inline-start: auto;
 		color: var(--ui-color-primary-text);
 	}
-	select[data-meeko-select-trigger] legend {
-		padding: var(--ui-space-1-5) var(--ui-space-2);
-		color: var(--ui-color-text-soft);
-		font-weight: var(--ui-font-weight-regular);
-		font-size: var(--ui-font-size-sm);
-	}
 
 	/* Where the list opens: the same places as <UIPopover>. */
 	select[data-placement^='left']::picker(select),
@@ -162,12 +152,5 @@ select[data-meeko-select-trigger] optgroup {
 	select[data-meeko-select-trigger]::picker(select),
 	select[data-meeko-select-trigger]::picker-icon {
 		transition: none;
-	}
-}
-
-/* Firefox paints its arrow at the very end of the select: the clear button goes just before it. */
-@supports not (appearance: base-select) {
-	[data-meeko-select][data-clearable] select + [data-meeko-select-clear] {
-		inset-inline-end: var(--ui-space-5);
 	}
 }

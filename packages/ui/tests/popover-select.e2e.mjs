@@ -190,9 +190,9 @@ test('the active row looks the same in UISelect, UICombobox and UICommandPalette
 		await page.goto(origin + '/overlays', { waitUntil: 'networkidle' })
 		await page.waitForFunction(() => globalThis.performance.getEntriesByName('meeko-hydration').length > 0)
 		await setTheme(page, theme)
-		await page.locator('.meeko-ui-command-trigger').first().click()
-		await page.locator('dialog.meeko-ui-command[open] input').fill('a')
-		const palette = await look(page.locator('.meeko-ui-command-row[data-active]'))
+		await page.locator('button:has(+ dialog > div > input[type="search"][role="combobox"])').first().click()
+		await page.locator('dialog[open]:has(> div > input[type="search"][role="combobox"]) input').fill('a')
+		const palette = await look(page.locator('dialog[open] [role="option"][aria-selected="true"]'))
 
 		assert.notEqual(palette.ring, 'none', theme)
 		assert.deepEqual(select, palette, `UISelect, ${theme}`)

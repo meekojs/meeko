@@ -13,6 +13,10 @@ const config: Config & MeekoPrettierOptions & { cssDeclarationSorterKeepOverride
 		// The examples of the documentation are `html` fences in Meeko syntax. Prettier's HTML parser would
 		// change what they say: `<Content />` becomes `<content />` and a lone `<form>` gets closed.
 		{ files: '*.md', options: { embeddedLanguageFormatting: 'off' } },
+		// The whitespace between the tags of these templates would be text in their buttons and options
+		// (tests/templates-without-whitespace.test.mjs): `ignore` breaks the tags into lines, `strict` keeps
+		// the whitespace as written and only breaks inside the tags.
+		{ files: '**/src/app/components/{Combobox,CommandPalette,Popover,Select,Tabs,ThemeToggle,Tooltip}.meeko', options: { htmlWhitespaceSensitivity: 'strict' } },
 	],
 	printWidth: 800,
 	semi: false,

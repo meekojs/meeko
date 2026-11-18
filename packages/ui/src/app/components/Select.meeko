@@ -1,14 +1,16 @@
 <script lang="ts" generic="T">
 	// <UISelect>: a native <select>. For a search, an asynchronous filter or several values, <UICombobox>.
-	// The behavior lives in ../utils/select.ts. Its template has no whitespace between the
+	// The behavior lives in ../utils/select.ts and the look in ../variants/select.ts. Its template has no whitespace between the
 	// tags: it would be text in the options. <selectedcontent> copies
 	// the whole option, so with an `option` snippet the trigger paints `value`, or the label, by itself.
-	import { onMounted, useId } from '@meekojs/meeko'
+	import { computed, onMounted, useId } from '@meekojs/meeko'
 
 	import type { SelectModel, SelectSettings, SelectSnippets, UISelectProps } from '../types/select'
 
 	import { uiMessages } from '../utils/messages'
 	import { createSelect } from '../utils/select'
+	import { control } from '../variants/input'
+	import { select as look } from '../variants/select'
 
 	const props = defineProps<UISelectProps<T>>()
 
@@ -24,106 +26,90 @@
 
 	const select = createSelect<T>(props as SelectSettings<T>, model, useId(), (value) => emit('change', value as SelectModel<T>))
 	onMounted(() => select.mount(root.value))
+
+	const classes = computed(() => look({ disabled: props.disabled === true, clearable: props.clearable === true }))
+	// The <select> is the trigger and, with `appearance: base-select`, also holds the list: `listClass` goes on it.
+	const triggerClass = computed(() => control({ clearable: props.clearable === true, class: [classes.value.trigger(), props.ui?.trigger, props.listClass] }))
 </script>
 
-<!-- No whitespace between the tags of this template: it would be text inside the trigger and the options. Prettier keeps it that way; tests/templates-without-whitespace.test.mjs guards it. -->
-<template>
-	<div
+<!-- No whitespace between the tags of this template: it would be text inside the trigger and the options. Prettier keeps it that way (htmlWhitespaceSensitivity "strict" in prettier.config.ts); tests/templates-without-whitespace.test.mjs guards it. -->
+<template><div
 		ref:root
 		data-meeko-select
-		bind:class="props.class"
+		bind:class="classes.value.base({ class: [props.ui?.base, props.class] })"
 		bind:data-disabled="props.disabled ? '' : undefined"
-		bind:data-clearable="props.clearable ? '' : undefined"
-	>
-		<select
+		><select
 			data-meeko-select-trigger
+			bind:class="triggerClass.value"
 			bind="select.attributes.value"
 			on:change="select.change"
 			on:invalid="select.reportInvalid"
-		>
-			<button type="button">
-				<span
+			><button type="button"
+				><span
 					if:when="snippets.value && select.chosen.value"
 					data-meeko-select-value
-				>
-					<render
+					bind:class="classes.value.value({ class: props.ui?.value })"
+					><render
 						snippet="snippets.value"
-						args="select.value.value"
-					/>
-				</span>
-				<span
+						args="select.value.value" /></span
+				><span
 					if:when="!snippets.value && snippets.option && select.chosen.value"
 					data-meeko-select-value
-				>
-					{select.label.value}
-				</span>
-				<selectedcontent if:when="(!snippets.value && !snippets.option) || !select.chosen.value" />
-			</button>
-			<option
+					bind:class="classes.value.value({ class: props.ui?.value })"
+					>{select.label.value}</span
+				><selectedcontent if:when="(!snippets.value && !snippets.option) || !select.chosen.value" /></button
+			><option
 				if:when="select.nativeIndex.value === 0"
 				hidden
 				selected
 				bind:value="select.blankValue.value"
 				data-meeko-select-placeholder
-			>
-				{select.blankLabel.value}
-			</option>
-			<template
+				>{select.blankLabel.value}</option
+			><template
 				each:of="select.groups.value"
 				each:as="group"
 				each:key="group.key"
-			>
-				<template if:when="group.name === undefined">
-					<option
+				><template if:when="group.name === undefined"
+					><option
 						each:of="group.entries"
 						each:as="entry"
 						each:key="entry.key"
 						bind="select.option(entry)"
-					>
-						<render
+						><render
 							if:when="snippets.option"
 							snippet="snippets.option"
 							args="entry.option, select.stateOf(entry)"
-						/>
-						<template if:when="!snippets.option">{entry.label}</template>
-					</option>
-				</template>
-				<optgroup
+						/><template if:when="!snippets.option">{entry.label}</template></option
+					></template
+				><optgroup
 					if:when="group.name !== undefined"
 					bind:label="group.name"
-				>
-					<legend data-meeko-select-group-label>
-						<render
+					><legend
+						data-meeko-select-group-label
+						bind:class="classes.value.groupLabel({ class: props.ui?.groupLabel })"
+						><render
 							if:when="snippets.group"
 							snippet="snippets.group"
 							args="group.name ?? ''"
-						/>
-						<template if:when="!snippets.group">{group.name}</template>
-					</legend>
-					<option
+						/><template if:when="!snippets.group">{group.name}</template></legend
+					><option
 						each:of="group.entries"
 						each:as="entry"
 						each:key="entry.key"
 						bind="select.option(entry)"
-					>
-						<render
+						><render
 							if:when="snippets.option"
 							snippet="snippets.option"
 							args="entry.option, select.stateOf(entry)"
-						/>
-						<template if:when="!snippets.option">{entry.label}</template>
-					</option>
-				</optgroup>
-			</template>
-		</select>
-		<button
+						/><template if:when="!snippets.option">{entry.label}</template></option
+					></optgroup
+				></template
+			></select
+		><button
 			if:when="select.showClear.value"
 			type="button"
 			data-meeko-select-clear
+			bind:class="classes.value.clear({ class: props.ui?.clear })"
 			bind:aria-label="props.clearLabel ?? text.clear"
-			on:click="select.clear"
-		>
-			×
-		</button>
-	</div>
-</template>
+			on:click="select.clear">×</button></div
+	></template>

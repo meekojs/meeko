@@ -1,7 +1,7 @@
 <script lang="ts" generic="T">
 	// <UICommandPalette>: a search dialog that knows nothing about where the results come from. The parent
 	// reads `query` and passes `results` and `status`. The dialog is the one of <UIModal>, with its entrance,
-	// exit and backdrop. Its template has no whitespace between the tags: it would be
+	// exit and backdrop; the look lives in ../variants/command-palette.ts. Its template has no whitespace between the tags: it would be
 	// text inside the trigger and the rows.
 	import { onMounted, useId } from '@meekojs/meeko'
 
@@ -9,6 +9,7 @@
 
 	import { createCommandPalette } from '../utils/command-palette'
 	import { commandPaletteStatusText, uiMessages } from '../utils/messages'
+	import { commandPalette } from '../variants/command-palette'
 
 	const props = defineProps<UICommandPaletteProps<T>>()
 
@@ -29,67 +30,52 @@
 	const text = uiMessages().commandPalette
 	const palette = createCommandPalette<T>(props, { open, query, active }, useId(), { open: () => emit('open'), close: () => emit('close'), choose: (item) => emit('choose', item) })
 	onMounted(() => palette.mount(dialog.value, input.value))
+
+	const classes = commandPalette()
 	defineExpose({ show: palette.show, hide: palette.hide })
 </script>
 
-<!-- No whitespace between the tags of this template: it would be text inside the trigger and the rows. Prettier keeps it that way; tests/templates-without-whitespace.test.mjs guards it. -->
-<template>
-	<button
+<!-- No whitespace between the tags of this template: it would be text inside the trigger and the rows. Prettier keeps it that way (htmlWhitespaceSensitivity "strict" in prettier.config.ts); tests/templates-without-whitespace.test.mjs guards it. -->
+<template><button
 		if:when="props.trigger !== false"
 		type="button"
-		bind:class="['meeko-ui-command-trigger', props.triggerClass].filter(Boolean).join(' ')"
+		bind:class="classes.trigger({ class: [props.ui?.trigger, props.triggerClass] })"
 		bind:aria-label="props.label ?? text.label"
 		on:click="palette.show"
-	>
-		<render
+		><render
 			if:when="snippets.trigger"
 			snippet="snippets.trigger"
 			args="palette.modifier.value"
-		/>
-		<template if:when="!snippets.trigger">
-			<svg
-				class="meeko-ui-command-icon"
+		/><template if:when="!snippets.trigger"
+			><svg
 				viewBox="0 0 24 24"
 				aria-hidden="true"
-			>
-				<circle
+				><circle
 					cx="11"
 					cy="11"
-					r="7"
-				/>
-				<path d="m20 20-3.5-3.5" />
-			</svg>
-			<span class="meeko-ui-command-trigger-label">{props.label ?? text.label}</span>
-			<span
-				class="meeko-ui-command-keys"
-				aria-hidden="true"
-			>
-				<kbd>{palette.modifier.value}</kbd>
-				<kbd>K</kbd>
-			</span>
-		</template>
-	</button>
-	<dialog
+					r="7" /><path d="m20 20-3.5-3.5" /></svg
+			><span>{props.label ?? text.label}</span
+			><span aria-hidden="true"
+				><kbd>{palette.modifier.value}</kbd
+				><kbd>K</kbd></span
+			></template
+		></button
+	><dialog
 		ref:dialog
 		closedby="any"
-		bind:class="['meeko-ui-modal', 'meeko-ui-command', props.class].filter(Boolean).join(' ')"
+		bind:class="classes.base({ class: ['meeko-ui-modal', props.ui?.base, props.class] })"
 		bind:aria-label="props.label ?? text.label"
 		on:keydown="palette.keydown"
-	>
-		<div class="meeko-ui-command-field">
-			<svg
-				class="meeko-ui-command-icon"
+		><div bind:class="classes.field({ class: props.ui?.field })"
+			><svg
 				viewBox="0 0 24 24"
 				aria-hidden="true"
-			>
-				<circle
+				bind:class="classes.icon({ class: props.ui?.icon })"
+				><circle
 					cx="11"
 					cy="11"
-					r="7"
-				/>
-				<path d="m20 20-3.5-3.5" />
-			</svg>
-			<input
+					r="7" /><path d="m20 20-3.5-3.5" /></svg
+			><input
 				ref:input
 				type="search"
 				role="combobox"
@@ -104,60 +90,49 @@
 				bind:aria-expanded="palette.showing.value ? 'true' : 'false'"
 				bind:aria-controls="palette.listId"
 				bind:aria-activedescendant="palette.activeId.value"
-			/>
-			<button
+				bind:class="classes.input({ class: props.ui?.input })"
+			/><button
 				type="button"
-				class="meeko-ui-command-close"
+				bind:class="classes.close({ class: props.ui?.close })"
 				bind:aria-label="props.closeLabel ?? text.close"
 				on:click="palette.hide"
-			>
-				<kbd aria-hidden="true">Esc</kbd>
-			</button>
-		</div>
-		<div
+				><kbd aria-hidden="true">Esc</kbd></button
+			></div
+		><div
 			role="status"
-			class="meeko-ui-command-status"
-		>
-			<render
+			bind:class="classes.status({ class: props.ui?.status })"
+			><render
 				if:when="snippets.status && palette.status.value !== 'ready'"
 				snippet="snippets.status"
 				args="palette.status.value, query.value.trim()"
-			/>
-			<template if:when="!snippets.status && palette.status.value !== 'ready'">{commandPaletteStatusText(text, palette.status.value, query.value.trim())}</template>
-		</div>
-		<ul
+			/><template if:when="!snippets.status && palette.status.value !== 'ready'">{commandPaletteStatusText(text, palette.status.value, query.value.trim())}</template></div
+		><ul
 			role="listbox"
-			class="meeko-ui-command-list"
+			bind:class="classes.list({ class: props.ui?.list })"
 			bind:id="palette.listId"
 			bind:aria-label="props.label ?? text.label"
 			bind:hidden="!palette.showing.value"
-		>
-			<li
+			><li
 				each:of="palette.rows.value"
 				each:as="row"
 				each:key="row.index"
 				role="presentation"
-			>
-				<component
+				><component
 					is="row.href === undefined ? 'button' : 'a'"
 					role="option"
-					class="meeko-ui-command-row"
+					bind:class="classes.row({ class: props.ui?.row })"
 					bind:id="palette.rowId(row.index)"
 					bind:href="row.href"
 					bind:type="row.href === undefined ? 'button' : undefined"
 					bind:data-depth="row.depth"
-					bind:data-active="active.value === row.index ? '' : undefined"
 					bind:aria-selected="active.value === row.index ? 'true' : 'false'"
 					on:click="() => palette.pick(row)"
-				>
-					<render
+					><render
 						if:when="snippets.item"
 						snippet="snippets.item"
 						args="row.item, { active: active.value === row.index, depth: row.depth, index: row.index }"
-					/>
-					<template if:when="!snippets.item">{row.label}</template>
-				</component>
-			</li>
-		</ul>
-	</dialog>
-</template>
+					/><template if:when="!snippets.item">{row.label}</template></component
+				></li
+			></ul
+		></dialog
+	></template>

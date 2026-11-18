@@ -219,10 +219,10 @@ for (const [name, start] of engines) {
 			await page.keyboard.press('Enter')
 			await page.waitForFunction(() => globalThis.location.hash === '#routes')
 			await out.filter({ hasText: 'Rutas|open,close' }).waitFor()
-			await page.waitForFunction(() => !globalThis.document.querySelector('dialog.meeko-ui-command[open]'))
+			await page.waitForFunction(() => !globalThis.document.querySelector('dialog[open]:has(> div > input[type="search"][role="combobox"])'))
 
 			// The field keeps the search, and opening again selects it. New results go to the first row.
-			await page.locator('.meeko-ui-command-trigger').click()
+			await page.getByRole('button', { name: 'Buscar', exact: true }).click()
 			await dialog.waitFor()
 			assert.equal(await input.inputValue(), 'todo')
 			assert.equal(await input.evaluate((element) => [element.selectionStart, element.selectionEnd].join()), '0,4')
@@ -231,16 +231,16 @@ for (const [name, start] of engines) {
 
 			// Escape and the backdrop close it; `/` opens it outside a field only.
 			await page.keyboard.press('Escape')
-			await page.waitForFunction(() => !globalThis.document.querySelector('dialog.meeko-ui-command[open]'))
+			await page.waitForFunction(() => !globalThis.document.querySelector('dialog[open]:has(> div > input[type="search"][role="combobox"])'))
 			await page.locator('body').click({ position: { x: 2, y: 2 } })
 			await page.keyboard.press('/')
 			await dialog.waitFor()
 			await page.mouse.click(4, 880)
-			await page.waitForFunction(() => !globalThis.document.querySelector('dialog.meeko-ui-command[open]'))
+			await page.waitForFunction(() => !globalThis.document.querySelector('dialog[open]:has(> div > input[type="search"][role="combobox"])'))
 			await dialog.waitFor({ state: 'hidden' })
 			await page.locator('label[for=plain]').click()
 			await page.keyboard.press('/')
-			assert.equal(await page.locator('dialog.meeko-ui-command[open]').count(), 0, '/ inside a select is not a shortcut')
+			assert.equal(await page.locator('dialog[open]:has(> div > input[type="search"][role="combobox"])').count(), 0, '/ inside a select is not a shortcut')
 
 			// A second palette, with buttons, only by its model, without its shortcut.
 			await page.locator('#open-actions').click()

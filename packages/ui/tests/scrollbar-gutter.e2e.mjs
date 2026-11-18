@@ -28,7 +28,7 @@ async function pixels(context, buffer, points) {
 const close = (first, second) => first.every((channel, index) => Math.abs(channel - second[index]) <= 2)
 
 const dialogs = {
-	palette: { route: '/overlays', open: (page) => page.locator('main .meeko-ui-command-trigger').first().click() },
+	palette: { route: '/overlays', open: (page) => page.locator('main button:has(+ dialog > div > input[type="search"][role="combobox"])').first().click() },
 	modal: { route: '/modals', open: (page) => page.getByRole('button', { name: 'Modal declarativo', exact: true }).click() },
 	'drawer at the end': { route: '/overlays', open: (page) => page.getByRole('button', { name: 'Abrir filtros', exact: true }).click() },
 	// The contents of a narrow screen: its trigger only exists there.

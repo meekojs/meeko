@@ -7,14 +7,19 @@ import { createCombobox, defaultComboboxFilter, toggleSelection } from '../dist/
 import { createPopover, interestDelay, interestSource, listKeyTarget, normalizeText, popoverPlacement, typeaheadIndex, watchTriggerId } from '../dist/app/utils/popover.js'
 import { groupOptions, sameOption, selectDisabled, selectLabel, selectValue } from '../dist/app/utils/select-options.js'
 import { themeToggleItems, themeToggleKeyTarget, themeToggleMode, themeToggleStatus } from '../dist/app/utils/theme-toggle.js'
+import { popover } from '../dist/app/variants/popover.js'
 
-test('an unknown placement falls back to bottom-start, and popover.css places each one', async () => {
+test('an unknown placement falls back to bottom-start, and the variants of popover place each one', () => {
 	assert.equal(popoverPlacement('top-end'), 'top-end')
 	assert.equal(popoverPlacement('sideways'), 'bottom-start')
 	assert.equal(popoverPlacement(undefined), 'bottom-start')
-	const css = await readFile(new URL('../src/app/styles/popover.css', import.meta.url), 'utf8')
 	for (const [placement, area] of Object.entries({ top: 'top', 'top-start': 'top span-right', 'top-end': 'top span-left', bottom: 'bottom', 'bottom-start': 'bottom span-right', 'bottom-end': 'bottom span-left', left: 'left', 'left-start': 'left span-bottom', 'left-end': 'left span-top', right: 'right', 'right-start': 'right span-bottom', 'right-end': 'right span-top' })) {
-		assert.match(css, new RegExp(`\\[data-placement='${placement}'\\] \\{\\s*position-area: ${area};`), placement)
+		assert.ok(
+			popover({ placement })
+				.split(' ')
+				.includes(`ui:[position-area:${area.replace(' ', '_')}]`),
+			placement,
+		)
 	}
 })
 

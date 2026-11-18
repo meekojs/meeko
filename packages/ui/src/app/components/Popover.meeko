@@ -1,12 +1,13 @@
 <script lang="ts">
 	// <UIPopover>: the successor of the deprecated <MeekoPopover> of the core, with the same contract
-	// and markup. The behavior lives in ../utils/popover.ts. Its template has no whitespace
-	// between the tags: it would be text in the trigger.
-	import { onMounted, useId } from '@meekojs/meeko'
+	// and markup. The behavior lives in ../utils/popover.ts and the look in ../variants/popover.ts. Its
+	// template has no whitespace between the tags: it would be text in the trigger.
+	import { computed, onMounted, useId } from '@meekojs/meeko'
 
 	import type { PopoverSnippets, PopoverToggleEvent, UIPopoverProps } from '../types/popover'
 
 	import { createPopover } from '../utils/popover'
+	import { popover as look, popoverTrigger } from '../variants/popover'
 
 	const props = defineProps<UIPopoverProps>()
 
@@ -21,32 +22,31 @@
 	// The IDs of the trigger and the content come from useId: the same in SSR and hydration.
 	const popover = createPopover(props, open, useId(), (now) => emit('toggle', { open: now }))
 	onMounted(() => popover.mount(content.value))
+
+	const contentClass = computed(() => look({ role: popover.role.value ?? 'none', placement: popover.placement.value, matchWidth: props.matchWidth === true, class: props.class }))
+	const triggerClass = computed(() => popoverTrigger({ class: props.triggerClass }))
 	defineExpose({ show: popover.show, hide: popover.hide, toggle: popover.toggle })
 </script>
 
-<!-- No whitespace between the tags of this template: it would be text inside the button and the content. Prettier keeps it that way; tests/templates-without-whitespace.test.mjs guards it. -->
-<template>
-	<button
+<!-- No whitespace between the tags of this template: it would be text inside the button and the content. Prettier keeps it that way (htmlWhitespaceSensitivity "strict" in prettier.config.ts); tests/templates-without-whitespace.test.mjs guards it. -->
+<template><button
 		if:when="!snippets.anchor && snippets.trigger"
 		type="button"
 		data-meeko-popover-trigger
 		bind:id="popover.trigger.value.id"
-		bind:class="props.triggerClass"
+		bind:class="triggerClass.value"
 		bind:popovertarget="popover.trigger.value.popovertarget"
 		bind:aria-controls="popover.trigger.value['aria-controls']"
 		bind:aria-expanded="popover.trigger.value['aria-expanded']"
 		bind:aria-haspopup="popover.trigger.value['aria-haspopup']"
 		bind:aria-describedby="popover.trigger.value['aria-describedby']"
 		bind:interestfor="popover.trigger.value.interestfor"
-	>
-		<render snippet="snippets.trigger" />
-	</button>
-	<render
+		><render snippet="snippets.trigger" /></button
+	><render
 		if:when="snippets.anchor"
 		snippet="snippets.anchor"
 		args="popover.trigger.value"
-	/>
-	<div
+	/><div
 		ref:content
 		data-meeko-popover
 		bind:id="popover.contentId"
@@ -55,10 +55,6 @@
 		bind:aria-label="props.label"
 		bind:aria-labelledby="popover.labelledBy.value"
 		bind:tabindex="popover.role.value === 'dialog' ? '-1' : undefined"
-		bind:class="props.class"
-		bind:data-placement="popover.placement.value"
-		bind:data-match-width="props.matchWidth ? '' : undefined"
-	>
-		<render snippet="snippets.default" />
-	</div>
-</template>
+		bind:class="contentClass.value"
+		><render snippet="snippets.default"
+	/></div></template>

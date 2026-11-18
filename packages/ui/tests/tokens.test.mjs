@@ -76,18 +76,17 @@ test('form control borders reach 3:1 against every background and control state 
 })
 
 test('every form control draws its border from --ui-color-control-border, not from a decorative border', async () => {
-	const main = await read('components.css')
 	const variant = (name) => readFile(new URL(`../src/app/variants/${name}.ts`, import.meta.url), 'utf8')
-	const rule = (css, selector) => {
-		const start = css.indexOf(`${selector} {`)
-		assert.notEqual(start, -1, `no ${selector} rule`)
-		return css.slice(start, css.indexOf('\n}', start))
-	}
+	const component = (name) => readFile(new URL(`../src/app/components/${name}.meeko`, import.meta.url), 'utf8')
 	// The variants are on Tailwind: the border is the color control-border of theme.css.
 	assert.match(await read('theme.css'), /--color-control-border: var\(--ui-color-control-border\);/)
 	// <UIInput>, <UITextarea> and, through `control`, the trigger of <UISelect> and <UICombobox>.
 	assert.match(await variant('input'), /ui:border-solid ui:border-control-border /)
-	assert.match(rule(main, '[data-meeko-select-trigger]'), /border: var\(--ui-border-width\) solid var\(--ui-color-control-border\)/)
+	for (const name of ['Select', 'Combobox']) {
+		const source = await component(name)
+		assert.match(source, /import \{ control \} from '\.\.\/variants\/input'/, name)
+		assert.match(source, /const triggerClass = computed\(\(\) => control\(/, name)
+	}
 	assert.match(await variant('button'), /variant: 'outline', tone: 'neutral', class: 'ui:border-control-border /)
 	// The box of a checkbox or a radio, the track of a switch and the frame of a segmented group.
 	const choice = await variant('choice')

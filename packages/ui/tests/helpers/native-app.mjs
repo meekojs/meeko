@@ -98,7 +98,7 @@ const showcase = `<script lang="ts">
 				on:close="() => (events.value = [...events.value, 'close'])"
 				on:choose="(item) => (chosen.value = item.title)"
 			>
-				<snippet name="item" params="item, state"><strong>{item.title}</strong><span class="meeko-ui-command-excerpt" bind:data-depth="state.depth" html="trustHtml(item.excerpt)" /></snippet>
+				<snippet name="item" params="item, state"><strong>{item.title}</strong><small bind:data-depth="state.depth" html="trustHtml(item.excerpt)" /></snippet>
 			</UICommandPalette>
 			<UICommandPalette bind:trigger="false" bind:shortcut="false" label="Acciones" bind:results="buttons" status="ready" on:choose="(item) => (chosen.value = item)" model="selectOpen" />
 			<button id="open-actions" type="button" on:click="() => (selectOpen.value = true)">Acciones</button>

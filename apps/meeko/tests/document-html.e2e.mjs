@@ -175,9 +175,9 @@ async function readerJourney(page, problems, base, label) {
 	await page.locator(`${article} button[data-copy][data-state]`).first().waitFor()
 
 	// The search.
-	await page.locator('.meeko-ui-command-trigger').first().click()
-	await page.locator('dialog.meeko-ui-command input[type="search"]').fill('signal')
-	await page.locator('dialog.meeko-ui-command .meeko-ui-command-row').first().waitFor()
+	await page.locator('button:has(+ dialog > div > input[type="search"][role="combobox"])').first().click()
+	await page.locator('dialog:has(> div > input[type="search"][role="combobox"]) input[type="search"]').fill('signal')
+	await page.locator('dialog:has(> div > input[type="search"][role="combobox"]) [role="option"]').first().waitFor()
 	await page.keyboard.press('Escape')
 
 	// Client navigation to another guide and through the history, in one document.

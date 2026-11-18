@@ -246,7 +246,7 @@ test('the English site: language, hreflang, interface, selector, links, fallback
 
 		// The search dialog: the shortcut, a query, the arrows and Enter, which go through the router.
 		await page.keyboard.press('/')
-		const dialog = page.locator('dialog.meeko-ui-command')
+		const dialog = page.locator('dialog:has(> div > input[type="search"][role="combobox"])')
 		await dialog.waitFor()
 		assert.equal(await page.evaluate(() => globalThis.document.activeElement?.id), 'meeko-search')
 		assert.equal((await dialog.getByRole('status').locator('kbd').count()) > 0, true, 'the hint names its keys')
