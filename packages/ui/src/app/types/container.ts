@@ -14,6 +14,7 @@ export type UIContainerTag = 'div' | 'section' | 'main' | 'article' | 'header' |
  * Props de `<UIContainer>`, que centra su contenido con un ancho máximo y un margen lateral. Las variables
  * `--ui-container-max-width` y `--ui-container-gutter` de la aplicación ganan a `size` y `gutter`.
  *
+ * @since 1.10.0
  * @example `<UIContainer as="section" size="2xl" gutter="lg" ariaLabel="Novedades">…</UIContainer>`
  */
 export type UIContainerProps = UIThemeProps<

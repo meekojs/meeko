@@ -28,6 +28,7 @@ function release() {
  * así que la página no salta de lado cuando desaparece la barra. Varios bloqueos a la vez se suman: el documento
  * vuelve a desplazarse cuando se suelta el último, con los estilos en línea que tenía `<html>`. Se suelta solo al
  * destruirse el componente. En el servidor no hace nada. Llámalo durante el setup, no tras un `await`.
+ * @since 1.10.0
  * @example
  * ```ts
  * import { signal } from '@meekojs/meeko'

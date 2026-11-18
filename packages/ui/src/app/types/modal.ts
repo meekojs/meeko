@@ -33,6 +33,7 @@ export type ModalDismissReason = 'escape' | 'backdrop' | 'button' | 'native'
 
 /**
  * Props de `<UIModal>`, un `<dialog>` modal nativo con título, cuerpo y pie opcional.
+ * @since 1.10.0
  * @example
  * ```html
  * <UIModal model="open" title="Renombrar" size="sm"><p>Contenido</p></UIModal>
