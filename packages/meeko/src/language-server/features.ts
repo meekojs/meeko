@@ -23,6 +23,7 @@ import { autoImportedValues } from '../autoimports/transform'
 import { deprecatedBuiltinTags, shadowedBuiltinTags } from '../compiler'
 import { parseSfc } from '../compiler/parser/sfc'
 import { serverOnlyCompletion } from '../compiler/transforms/client-boundary'
+import { pageHeadApis } from '../compiler/transforms/server-script'
 import { modelEventName, modelPropName } from '../shared/model-names'
 import { eachKeyActions, sidecarActions } from './actions'
 import { builtinTag, builtinTags } from './builtin-tags'
@@ -945,6 +946,7 @@ export function completionList(base: FeatureContext, position: Position, trigger
 	// `<script server>` and a component under server/ (an email template) run only on the server:
 	// the virtual code and the SSR graph resolve their autoimports with the server target.
 	const serverTarget = !browser
+	const serverBlock = context.component !== base.component
 	// A type the project autoimports (`MeekoLinkProps`) needs no import: its own item stands for it.
 	const autoTypes = new Set(
 		context.project
@@ -968,7 +970,8 @@ export function completionList(base: FeatureContext, position: Position, trigger
 		if (entry.source === undefined && !entry.hasAction && generated.has(entry.name)) return false
 		const meeko = meekoAutoImport(context.project, entry, publicExports)
 		if (meeko && 'hidden' in meeko) return false
-		if (serverTarget && entry.hasAction && browserCodeNames.has(entry.name)) return false
+		// `useHead` and `useSeoMeta` are browser code, but a page's `<script server>` imports them from the framework.
+		if (serverTarget && entry.hasAction && browserCodeNames.has(entry.name) && !(serverBlock && (pageHeadApis as readonly string[]).includes(entry.name))) return false
 		if (meeko) publicImports.set(entry, meeko.specifier)
 		const module = meeko?.specifier ?? entry.data?.moduleSpecifier
 		if (!entry.hasAction || module === undefined) return true

@@ -148,7 +148,7 @@ test('the deprecated <MeekoPopover>, <MeekoSelect> and <MeekoThemeToggle> warn o
 		['warning', 'warning', 'warning'],
 	)
 	assert.match(deprecated[0]!.message, /<MeekoPopover> está obsoleta desde Meeko 1\.8.*<UIPopover> de @meekojs\/ui/)
-	assert.match(deprecated[1]!.message, /<UISelect>/)
+	assert.match(deprecated[1]!.message, /<MeekoSelect> está obsoleta desde Meeko 1\.8.*<UICombobox> de @meekojs\/ui/)
 	assert.match(deprecated[2]!.message, /<UIThemeToggle>/)
 	// A project component with the same name is not the deprecated tag: only MEEK106.
 	const shadowed = compile('<template><MeekoPopover /></template>', '/project/app/components/Menu.meeko', { projectComponents: ['MeekoPopover'] })

@@ -435,7 +435,7 @@ const builtinTags: readonly string[] = [linkTag, outletTag, teleportTag, ...Obje
  */
 export const deprecatedBuiltinTags: Readonly<Record<string, string>> = {
 	MeekoPopover: 'UIPopover',
-	MeekoSelect: 'UISelect',
+	MeekoSelect: 'UICombobox',
 	MeekoThemeToggle: 'UIThemeToggle',
 }
 
