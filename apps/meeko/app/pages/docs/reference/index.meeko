@@ -139,7 +139,7 @@
 				bind:id="group.anchor"
 			>
 				<svg
-					class="meeko-ui-icon"
+					class="line-icon"
 					viewBox="0 0 16 16"
 					aria-hidden="true"
 				>
@@ -188,7 +188,7 @@
 				class="group-title"
 			>
 				<svg
-					class="meeko-ui-icon"
+					class="line-icon"
 					viewBox="0 0 16 16"
 					aria-hidden="true"
 				>

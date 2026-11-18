@@ -8,6 +8,7 @@
 	import { copyFeedbackTime, copyText } from '../utils/clipboard'
 	import { icons } from '../utils/icons'
 	import { uiMessages } from '../utils/messages'
+	import { codeBlock, codeBlockCopy, codeBlockMode, codeBlockTone } from '../variants/content'
 	import * as Icon from './internal/Icon.meeko'
 
 	const props = defineProps<UICodeBlockProps>({ mode: 'code' })
@@ -21,6 +22,10 @@
 	const state = signal<'idle' | 'done' | 'error'>('idle')
 	let timer: ReturnType<typeof setTimeout> | undefined
 
+	const classes = codeBlock()
+	const tone = computed(() => codeBlockTone[props.verdict ?? 'none'])
+	// A verdict's header keeps its own color; otherwise the button says its state with it.
+	const copyColor = computed(() => (props.verdict ? codeBlockCopy.verdict : codeBlockCopy[state.value]))
 	const showsCopy = computed(() => props.copy ?? props.mode !== 'log')
 	const showsHead = computed(() => showsCopy.value || props.label !== undefined || props.lang !== undefined || props.verdict !== undefined)
 	const name = computed(() => props.label ?? props.lang ?? (props.mode === 'log' ? text.log : text.label))
@@ -50,71 +55,65 @@
 <template>
 	<figure
 		ref:root
-		bind:class="['meeko-ui-code-block', props.class].filter(Boolean).join(' ')"
-		bind:data-mode="props.mode"
-		bind:data-verdict="props.verdict"
+		bind:class="classes.base({ class: [tone.value.base, props.ui?.base, props.class] })"
 	>
 		<figcaption
 			if:when="showsHead.value"
-			class="meeko-ui-code-head"
 			data-pagefind-ignore
+			bind:class="classes.head({ class: [tone.value.head, props.ui?.head] })"
 		>
 			<span
 				if:when="props.verdict"
-				class="meeko-ui-code-verdict"
+				bind:class="classes.verdict({ class: props.ui?.verdict })"
 			>
-				<Icon bind:path="props.verdict === 'good' ? icons.check : icons.close" />
-				{verdictText.value}
-			</span>
+				<Icon
+					size="sm"
+					bind:path="props.verdict === 'good' ? icons.check : icons.close"
+				/>{verdictText.value}</span
+			>
 			<span
 				if:when="props.label"
-				class="meeko-ui-code-label"
+				bind:class="classes.label({ class: [tone.value.label, props.ui?.label] })"
 				bind:lang="props.labelLang"
+				>{props.label}</span
 			>
-				{props.label}
-			</span>
 			<span
 				if:when="props.lang"
-				class="meeko-ui-code-lang"
+				bind:class="classes.lang({ class: props.ui?.lang })"
+				>{props.lang}</span
 			>
-				{props.lang}
-			</span>
 			<button
 				if:when="showsCopy.value"
 				type="button"
-				class="meeko-ui-code-copy"
+				bind:class="classes.copy({ class: [copyColor.value, ready.value ? undefined : codeBlockCopy.waiting, props.ui?.copy] })"
 				bind:lang="props.uiLang"
 				bind:aria-label="props.copyAriaLabel"
-				bind:data-ready="ready.value ? '' : undefined"
-				bind:data-state="state.value === 'idle' ? undefined : state.value"
 				on:click="copy"
+				>{copyState.value}</button
 			>
-				{copyState.value}
-			</button>
 			<span
 				if:when="showsCopy.value"
-				class="meeko-ui-sr-only"
+				class="ui:sr-only"
 				role="status"
 				bind:lang="props.uiLang"
+				>{state.value === 'idle' ? '' : copyState.value}</span
 			>
-				{state.value === 'idle' ? '' : copyState.value}
-			</span>
 		</figcaption>
 		<div
 			if:when="props.html"
-			class="meeko-ui-code-content"
+			bind:class="classes.content({ class: props.ui?.content })"
 			html="props.html"
 		/>
 		<div
 			if:when="!props.html && snippets.default"
-			class="meeko-ui-code-content"
+			bind:class="classes.content({ class: props.ui?.content })"
 		>
 			<render snippet="snippets.default" />
 		</div>
 		<pre
 			if:when="!props.html && !snippets.default"
-			class="meeko-ui-code-content"
 			tabindex="0"
+			bind:class="classes.code({ class: [codeBlockMode[props.mode ?? 'code'], props.ui?.code] })"
 			bind:lang="props.textLang"
 			bind:role="props.mode === 'log' ? 'log' : undefined"
 			bind:aria-label="name.value"

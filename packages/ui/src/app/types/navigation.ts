@@ -1,5 +1,6 @@
 import type { ElementAttributes, TrustedHtml } from '@meekojs/meeko'
 
+import type { codeBlock, diff } from '../variants/content'
 import type { drawer } from '../variants/drawer'
 import type { footer, header } from '../variants/header'
 import type { localeSuggestion, localeSwitcher } from '../variants/locale'
@@ -693,6 +694,8 @@ export type UICodeBlockVerdict = 'bad' | 'good'
  * Props de `<UICodeBlock>`: código con etiqueta, lenguaje, veredicto y botón de copiar. `html` recibe
  * un `<pre>` ya resaltado (Shiki, por ejemplo) y el snippet `default`, marcado propio; `code` es lo que
  * se copia. `mode="log"` es una salida de texto: `role="log"`, líneas partidas y sin botón por defecto.
+ * `ui` añade clases a sus slots: `base`, `head` (la cabecera), `verdict`, `label`, `lang`, `copy`, `code`
+ * (el `<pre>` que pinta desde `code`) y `content` (el que envuelve `html` o el snippet).
  *
  * @since 1.8.0
  * @example
@@ -701,40 +704,43 @@ export type UICodeBlockVerdict = 'bad' | 'good'
  * <UICodeBlock bind:code="source" bind:html="highlighted" lang="ts" verdict="good" />
  * ```
  */
-export interface UICodeBlockProps {
-	/** Texto del bloque y lo que se copia. Sin él, se copia el texto pintado. */
-	readonly code?: string
-	/** Un `<pre>` ya resaltado, en lugar de pintar `code`. */
-	readonly html?: TrustedHtml
-	/** Título del bloque. */
-	readonly label?: string
-	/** Lenguaje, junto al título. */
-	readonly lang?: string
-	/** Veredicto del ejemplo. */
-	readonly verdict?: UICodeBlockVerdict
-	/** Texto del veredicto. */
-	readonly verdictLabel?: string
-	/** Presentación; `"code"` por defecto. */
-	readonly mode?: 'code' | 'log'
-	/** Muestra el botón de copiar; por defecto, salvo en `mode="log"`. */
-	readonly copy?: boolean
-	/** Texto del botón de copiar. */
-	readonly copyLabel?: string
-	/** Nombre accesible del botón de copiar, si el texto visible no basta. */
-	readonly copyAriaLabel?: string
-	/** Texto tras copiar. */
-	readonly copiedLabel?: string
-	/** Texto si la copia falla. */
-	readonly copyFailedLabel?: string
-	/** Idioma del botón de copiar y de su aviso, si no es el del documento. */
-	readonly uiLang?: string
-	/** Idioma del título, si no es el del documento. */
-	readonly labelLang?: string
-	/** Idioma del texto de `code`, si es lenguaje natural, como un log o un Markdown. */
-	readonly textLang?: string
-	/** Clases adicionales, tras la del componente. */
-	readonly class?: string
-}
+export type UICodeBlockProps = UIThemeProps<
+	typeof codeBlock,
+	{
+		/** Texto del bloque y lo que se copia. Sin él, se copia el texto pintado. */
+		readonly code?: string
+		/** Un `<pre>` ya resaltado, en lugar de pintar `code`. */
+		readonly html?: TrustedHtml
+		/** Título del bloque. */
+		readonly label?: string
+		/** Lenguaje, junto al título. */
+		readonly lang?: string
+		/** Veredicto del ejemplo. */
+		readonly verdict?: UICodeBlockVerdict
+		/** Texto del veredicto. */
+		readonly verdictLabel?: string
+		/** Presentación; `"code"` por defecto. */
+		readonly mode?: 'code' | 'log'
+		/** Muestra el botón de copiar; por defecto, salvo en `mode="log"`. */
+		readonly copy?: boolean
+		/** Texto del botón de copiar. */
+		readonly copyLabel?: string
+		/** Nombre accesible del botón de copiar, si el texto visible no basta. */
+		readonly copyAriaLabel?: string
+		/** Texto tras copiar. */
+		readonly copiedLabel?: string
+		/** Texto si la copia falla. */
+		readonly copyFailedLabel?: string
+		/** Idioma del botón de copiar y de su aviso, si no es el del documento. */
+		readonly uiLang?: string
+		/** Idioma del título, si no es el del documento. */
+		readonly labelLang?: string
+		/** Idioma del texto de `code`, si es lenguaje natural, como un log o un Markdown. */
+		readonly textLang?: string
+		/** Clases adicionales del elemento raíz; equivale a `ui.base`. */
+		readonly class?: string
+	}
+>
 
 /**
  * Props de `<UIProse>`: estilos de lectura para Markdown renderizado, con títulos, listas, enlaces,
@@ -771,7 +777,8 @@ export type UIDiffLineKind = 'add' | 'context' | 'file' | 'hunk' | 'remove'
 
 /**
  * Props de `<UIDiff>`: un diff unificado, con cada línea marcada por su tipo en color y para los
- * lectores de pantalla.
+ * lectores de pantalla. `ui` añade clases a sus slots: `base` (el `<pre>`), `line` y `empty` (el mensaje
+ * sin cambios).
  *
  * @since 1.8.0
  * @example
@@ -779,15 +786,18 @@ export type UIDiffLineKind = 'add' | 'context' | 'file' | 'hunk' | 'remove'
  * <UIDiff bind:diff="patch" label="Cambios en la guía" />
  * ```
  */
-export interface UIDiffProps {
-	/** El diff unificado, tal cual. */
-	readonly diff: string
-	/** Nombre accesible del bloque. */
-	readonly label: string
-	/** Mensaje sin cambios. */
-	readonly emptyText?: string
-	/** Texto para lectores de pantalla ante cada tipo de línea. */
-	readonly lineLabels?: Readonly<Partial<Record<UIDiffLineKind, string>>>
-	/** Clases adicionales, tras la del componente. */
-	readonly class?: string
-}
+export type UIDiffProps = UIThemeProps<
+	typeof diff,
+	{
+		/** El diff unificado, tal cual. */
+		readonly diff: string
+		/** Nombre accesible del bloque. */
+		readonly label: string
+		/** Mensaje sin cambios. */
+		readonly emptyText?: string
+		/** Texto para lectores de pantalla ante cada tipo de línea. */
+		readonly lineLabels?: Readonly<Partial<Record<UIDiffLineKind, string>>>
+		/** Clases adicionales del elemento raíz, el `<pre>` o el mensaje sin cambios; equivale a `ui.base`. */
+		readonly class?: string
+	}
+>

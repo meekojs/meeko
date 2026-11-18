@@ -1,12 +1,14 @@
 <script lang="ts">
-	const props = defineProps<{ path: string; class?: string }>()
+	import { icon } from '../../variants/content'
+
+	const props = defineProps<{ path: string; size?: 'md' | 'sm'; class?: string }>()
 </script>
 
 <template>
 	<svg
 		viewBox="0 0 16 16"
 		aria-hidden="true"
-		bind:class="['meeko-ui-icon', props.class].filter(Boolean).join(' ')"
+		bind:class="icon({ size: props.size, class: props.class })"
 	>
 		<path bind:d="props.path" />
 	</svg>

@@ -266,7 +266,7 @@ function assertOverrides(html) {
 	assert.ok(ariaLabels(html).includes('Clear from the prop'), 'clearLabel')
 	assert.ok(ariaLabels(html).includes('Close from the prop'), 'closeLabel')
 	assert.ok(html.includes('Night'), 'the labels of UIThemeToggle')
-	assert.match(html, /data-meeko-theme-icon="dark"[^>]*>\s*<svg[^>]*class="meeko-ui-icon"/, 'UIThemeToggle icons paints the icon')
+	assert.match(html, /data-meeko-theme-icon="dark"[^>]*>\s*<svg[^>]*class="ui:flex-none /, 'UIThemeToggle icons paints the icon')
 }
 
 function assertApp(html, { empty, clear, close, unknown, group, light }) {

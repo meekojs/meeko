@@ -32,7 +32,7 @@ test('the navigation components work in a browser, with and without JavaScript',
 		})
 		await page.goto(origin, { waitUntil: 'networkidle' })
 		// Hydrated: the copy button of a code block only shows then.
-		await page.locator('.meeko-ui-code-copy[data-ready]').first().waitFor()
+		await page.locator('figure > figcaption > button').first().waitFor()
 		return { page, errors }
 	}
 
@@ -51,7 +51,7 @@ test('the navigation components work in a browser, with and without JavaScript',
 		await page.locator('header [popover] a', { hasText: 'Acerca de' }).waitFor()
 		await page.keyboard.press('Escape')
 		// The copy button needs the script, so it does not show.
-		assert.equal(await page.locator('.meeko-ui-code-copy').first().isVisible(), false)
+		assert.equal(await page.locator('figure > figcaption > button').first().isVisible(), false)
 		// The collapsible table of contents is a native details.
 		await page.locator('summary', { hasText: 'En esta página' }).click()
 		await page.locator('details:has(> summary) a', { hasText: 'Tercera sección' }).click()
@@ -381,16 +381,16 @@ test('the navigation components work in a browser, with and without JavaScript',
 
 	await t.test('UICodeBlock and UIProse copy, say so, and come back', async () => {
 		const { page, errors } = await open()
-		const block = page.locator('.meeko-ui-code-block').first()
-		const copy = block.locator('.meeko-ui-code-copy')
+		const block = page.locator('figure:has(> figcaption)').first()
+		const copy = block.locator('figcaption > button')
 		await copy.click()
 		await until(async () => (await copy.innerText()).trim() === 'Copiado', 'the button did not confirm')
-		assert.equal(await copy.getAttribute('data-state'), 'done')
+		assert.match(await copy.getAttribute('class'), /(^| )ui:text-success-text( |$)/, 'the color of done')
 		assert.equal(await block.locator('[role="status"]').innerText(), 'Copiado')
 		assert.equal(await page.evaluate(() => globalThis.navigator.clipboard.readText()), 'pnpm add @meekojs/ui')
 		await until(async () => (await copy.innerText()).trim() === 'Copiar', 'the button did not come back')
 		// The highlighted block copies its `code`, not the markup.
-		await page.locator('.meeko-ui-code-block').nth(1).locator('.meeko-ui-code-copy').click()
+		await page.locator('figure:has(> figcaption)').nth(1).locator('figcaption > button').click()
 		await until(async () => (await page.evaluate(() => globalThis.navigator.clipboard.readText())) === 'const a = 1', 'the highlighted code')
 		// A snapshot's button: the delegated listener of UIProse.
 		const snapshot = page.locator('#snapshot .code-copy')

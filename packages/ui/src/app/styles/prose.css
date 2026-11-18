@@ -2,6 +2,10 @@
  * Long-form text rendered from Markdown, public as the class `meeko-ui-prose`. Text keeps a reading
  * measure while code and tables may take the whole column. It also dresses the HTML of a snapshot:
  * .heading-anchor, .table-wrap, .callout and, in code.css, .code-block come from the renderer.
+ *
+ * It stays CSS, not Tailwind: it dresses HTML that no component writes, and an app puts the class on any
+ * element, such as the <body> of the <iframe sandbox> of the dashboard, which reads this sheet on its own
+ * (`@meekojs/ui/styles/prose.css`) with no utility of the package. <UIProse> paints the same class.
  */
 .meeko-ui-prose {
 	max-width: var(--ui-prose-width);
@@ -14,11 +18,9 @@
 /*
  * A component inside the text is the end of its scope, so it keeps its own look. Inside @scope a selector
  * without :scope gets it as an implied ancestor: `.meeko-ui-prose h2` would look for a nested prose. A
- * component on Tailwind ends it by its ui:* classes, and sets its own margin in the prose (variants/card).
+ * component on Tailwind ends it by its ui:* classes, and sets its own margin in the prose (`inProse` of
+ * variants/card); a nested prose or a `meeko-ui-sr-only` of the app, by their public class.
  */
-.meeko-ui-prose > :is(.meeko-ui-code-block, .meeko-ui-diff) {
-	margin-block: 0 var(--ui-space-6);
-}
 .meeko-ui-prose > :first-child {
 	margin-top: 0;
 }

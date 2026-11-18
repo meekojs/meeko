@@ -153,7 +153,7 @@ test('the dashboard shows the overview, filters the sources, opens a detail and 
 	await page.waitForURL(/\/sources\/\d+$/)
 	await page.getByRole('heading', { level: 1, name: 'Doctor' }).waitFor()
 	assert.equal(await page.getByRole('cell', { name: 'Publicada' }).count(), 1)
-	assert.match((await page.locator('.meeko-ui-diff-line[data-kind="add"]').allTextContents()).join('\n'), /Una línea editada desde el dashboard/)
+	assert.match((await page.locator('pre > span[data-kind="add"]').allTextContents()).join('\n'), /Una línea editada desde el dashboard/)
 
 	// Snapshots: roll back to the first one, in the temporary schema, after confirming.
 	await page.goto(`${origin}/snapshots`, { waitUntil: 'networkidle' })
