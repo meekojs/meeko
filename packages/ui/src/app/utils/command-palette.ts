@@ -89,7 +89,8 @@ export function createCommandPalette<T>(props: UICommandPaletteProps<T>, models:
 		const shortcut = (event: KeyboardEvent): void => {
 			if (props.shortcut === false || open.value) return
 			const target = event.target as HTMLElement | null
-			const typing = target?.isContentEditable === true || /^(?:input|textarea|select)$/i.test(target?.tagName ?? '')
+			// `closest`: with `appearance: base-select` the focus is on the `<button>` inside the `<select>`.
+			const typing = target?.isContentEditable === true || (typeof target?.closest === 'function' && target.closest('input, textarea, select') !== null)
 			if (!commandShortcut(event, typing)) return
 			event.preventDefault()
 			show()
