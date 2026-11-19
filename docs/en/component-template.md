@@ -1,5 +1,5 @@
 ---
-source-hash: e66840f5a1d4970e163f2e1c8f19d67751965b849d23303bbce7fb8938408001
+source-hash: d361e01bfe5012c4535ce677bc27c3174e019f531aa0acb520f0639f36a43c82
 ---
 
 # Templates and directives
@@ -278,3 +278,27 @@ Since `1.9`, a `{…}` expression inside a template `<script>` or `<style>` (als
 - **Other raw text elements.** `<xmp>`, `<iframe>`, `<noembed>` and `<noframes>` also write their content as is and, since `1.10`, reject `{…}` with `MEEK140`: the browser showed the markers and entities, or ignored the content.
 - **`<textarea>` and `<title>`.** Their content is text (RCDATA): `{…}` is escaped and, since `1.10`, the whole content is one text bound to the element, without the hydration markers that used to show as text (`<!--meeko:text:0-->`). Hydration and updates write its `textContent`; in `<textarea>` that is the default value, which the control shows until the user edits it (for an editable value, use `model`).
 - **`<noscript>`.** Only a browser without JavaScript shows it, and it reads it as HTML: since `1.10` its static markup is written as is (it used to be escaped, as text) and each `{…}` is escaped without markers. It is neither hydrated nor updated.
+
+## Phrasing content
+
+HTML defines what may go inside each element. `<p>`, `<span>`, `<button>`, `<label>`, headings (`<h1>`…`<h6>`), `<em>`, `<strong>`, `<code>` and others only admit **phrasing content**: text and inline elements such as `<span>`, `<a>`, `<img>` or `<input>`. A block element (`<div>`, `<ul>`, `<table>`, `<form>`, `<section>`…) cannot go inside. `<a>`, `<ins>` and `<del>` are transparent: they admit what their parent admits.
+
+Inside a `<p>` this is not only about validity: the browser **closes the paragraph** before the block and moves what follows out of it. If the block is written in the template, the compiler already sees that tree and the result is not the one written (`<p>a<div>b</div>c</p>` renders as `<p>a</p><div>b</div>c<p></p>`). If a component renders the block, or it is a `<div />`, the server HTML has it inside the `<p>`, the browser moves it out while parsing and hydration no longer finds the DOM it expects: the whole page is left without JavaScript.
+
+```html
+<template>
+	<!-- MEEK139: <UITooltip> renders a <div> inside <p> -->
+	<p>Price <UITooltip text="VAT included">…</UITooltip></p>
+
+	<!-- A block container admits both -->
+	<div class="paragraph">Price <UITooltip text="VAT included">…</UITooltip></div>
+</template>
+```
+
+Since `1.10`, `meeko check`, `meeko build` and the editor warn about it with `MEEK139`:
+
+- For the HTML elements of the template, in any parent that only admits phrasing content.
+- For a component, in `meeko check` and the editor, when its root is known: that of a component imported with a `.meeko` path or autoimported (also from a module, such as `@meekojs/ui`), with the block HTML tags at the top level of its template, following the components it renders there (`<UITooltip>` renders a `<Popover>`, which renders a `<div>`). Meeko's own tags, `<component is>`, `resolveComponent` and snippet content are not checked.
+- It is a warning: it changes neither the exit code of `meeko check` nor the compilation.
+
+In `meeko dev`, if the page still fails to hydrate, the browser shows it: `console.error` with the component, the location in the template and the expected and found node, and Vite's error overlay. For a `<p>` that the browser closed before a block, the message says so. In production the error is thrown as before.

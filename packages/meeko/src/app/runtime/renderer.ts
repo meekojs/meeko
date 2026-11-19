@@ -14,6 +14,7 @@ import { componentErrorReporter } from './component-errors'
 import { closeTag, dynamicTagName } from './dynamic-tag'
 import { refTarget } from './element-refs'
 import { contentNamespace, inertElement } from './html-content-dom'
+import { HydrationMismatchError, missingRegionEnd } from './hydration-errors'
 import { childIdBase, currentIdBase, withIdBase } from './ids'
 import { afterMountBatch, mountBatch } from './lifecycle'
 import { reactiveProps } from './props'
@@ -160,7 +161,13 @@ function regionEnd(start: Node): Node {
 		if (nestedRegion(data) === kind) depth++
 		else if (end.test(data) && --depth === 0) return node
 	}
-	throw new Error(`Missing end marker for ${(start as Comment).data}`)
+	throw missingRegionEnd(start as Comment)
+}
+
+/** An attribute as hydration found it, for a {@link HydrationMismatchError}. */
+function attributeFound(target: Element, name: string): string {
+	const value = target.getAttribute(name)
+	return value === null ? `<${target.localName}> without ${name}` : `${name}=${JSON.stringify(value)}`
 }
 
 /** Marks an element filled by `html="..."`; its content is the expression's, never Meeko's. */
@@ -402,7 +409,7 @@ export function bindComponent<Props extends object>(scope: DomScope, id: number,
 	try {
 		;({ inner, state } = componentRegion(scope, id))
 	} catch (error) {
-		throw new Error(`Hydration mismatch in ${location}: ${error instanceof Error ? error.message : String(error)}`, { cause: error })
+		throw new HydrationMismatchError(location, error instanceof Error ? error.message : String(error), { cause: error })
 	}
 	const owner = currentEffectOwner()
 	const report = componentErrorReporter('mounted')
@@ -602,7 +609,7 @@ function regionElement(inner: DomScope): Element {
 export function bindElementTag<const T>(scope: DomScope, element: number, read: () => T, content: boolean, open: (tag: TagPart<T>) => string, hydrate: (tag: TagPart<T>, scope: DomScope) => () => void, location: string): () => void {
 	let target = findMarked(scope, element)
 	let tag = dynamicTagName(untrack(read), content) as TagPart<T>
-	if (target.localName !== tag) throw new Error(`Hydration mismatch in ${location}: expected <${tag}>, found <${target.localName}>`)
+	if (target.localName !== tag) throw new HydrationMismatchError(location, `expected <${tag}>, found <${target.localName}>`, { expected: `<${tag}>`, found: `<${target.localName}>` })
 	// The element's bindings hydrate first; the tag still updates before they run.
 	const order = reserveUpdateOrder()
 	let release = untrack(() => hydrate(tag, scope))
@@ -656,7 +663,7 @@ export function bindDynamic<const T, Props extends object>(scope: DomScope, id: 
 	try {
 		;({ inner } = componentRegion(scope, id))
 	} catch (error) {
-		throw new Error(`Hydration mismatch in ${location}: ${error instanceof Error ? error.message : String(error)}`, { cause: error })
+		throw new HydrationMismatchError(location, error instanceof Error ? error.message : String(error), { cause: error })
 	}
 	// The element or the child hydrates first; the value still updates before they react.
 	const order = reserveUpdateOrder()
@@ -684,7 +691,7 @@ export function bindDynamic<const T, Props extends object>(scope: DomScope, id: 
 		)
 	const mountElement = (next: TagPart<T>): void => {
 		target = regionElement(inner)
-		if (target.localName !== next) throw new Error(`Hydration mismatch in ${location}: expected <${next}>, found <${target.localName}>`)
+		if (target.localName !== next) throw new HydrationMismatchError(location, `expected <${next}>, found <${target.localName}>`, { expected: `<${next}>`, found: `<${target.localName}>` })
 		releaseContent = element.hydrateContent(inner)
 		release = element.hydrate(next, inner)
 		tag = next
@@ -776,7 +783,7 @@ export function bindSpread(scope: DomScope, id: number, read: () => ReadonlyArra
 	const target = findMarked(scope, id)
 	let current = new Map(read())
 	for (const [name, value] of current) {
-		if (target.getAttribute(name) !== value) throw new Error(`Hydration mismatch in ${location}: attribute ${name}`)
+		if (target.getAttribute(name) !== value) throw new HydrationMismatchError(location, `attribute ${name}`, { expected: `${name}=${JSON.stringify(value)}`, found: attributeFound(target, name) })
 	}
 	let first = true
 	return effect(() => {
@@ -820,7 +827,7 @@ export function bindText(scope: DomScope, id: number, read: () => unknown, locat
 		marker.parentNode!.insertBefore(text, marker.nextSibling)
 	}
 	if (!text || text.nodeType !== 3) throw new Error(`Missing text node in ${location}`)
-	if (text.textContent !== initial) throw new Error(`Hydration mismatch in ${location}`)
+	if (text.textContent !== initial) throw new HydrationMismatchError(location, undefined, { expected: `text ${JSON.stringify(initial)}`, found: `text ${JSON.stringify(text.textContent)}` })
 	let first = true
 	return effect(() => {
 		const next = String(read())
@@ -917,7 +924,7 @@ export function bindHtml(scope: DomScope, id: number, read: () => unknown, locat
 export function bindAttribute(scope: DomScope, id: number, name: string, read: () => unknown, location: string, source?: EffectSource): () => void {
 	const target = findMarked(scope, id)
 	const initial = attributeValue(name, read())
-	if (target.getAttribute(name) !== initial) throw new Error(`Hydration mismatch in ${location}`)
+	if (target.getAttribute(name) !== initial) throw new HydrationMismatchError(location, undefined, { expected: initial === null ? `no ${name}` : `${name}=${JSON.stringify(initial)}`, found: attributeFound(target, name) })
 	let first = true
 	return effect(() => {
 		const next = attributeValue(name, read())

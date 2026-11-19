@@ -41,6 +41,7 @@ import { scanInterpolations } from './compiler/parser/interpolation'
 import { compileError, locate, parseSfc } from './compiler/parser/sfc'
 import { attributeValueStart, decodeTemplateExpression, decodeTemplateText, expressionSourceOffset, isCustomElementTag, parseTemplate } from './compiler/parser/template'
 import { prepareConditionals } from './compiler/transforms/conditionals'
+import { contentModelHints } from './compiler/transforms/content-model'
 import { branchTakes, correlatedBind, importedComponents, isBranchCondition, isCandidates, isComponentName, isLeaves, scriptValueNames } from './compiler/transforms/dynamic-tag'
 import { templateEventType } from './compiler/transforms/events'
 import { layoutShiftHints } from './compiler/transforms/layout-shift'
@@ -3263,6 +3264,8 @@ export function compile(source: string, filename = 'anonymous.meeko', options: C
 			message: `${name} está escrito como texto y con bind:${name}: sólo vale bind:${name} y el texto se ignora; deja uno de los dos, con el texto como alternativa dentro de la expresión si lo necesitas`,
 		})),
 		...layoutShiftHints(source, filename, script.content, script.contentStart, parsed),
+		// MEEK139: a block element inside an element that only admits phrasing content.
+		...contentModelHints(source, filename, parsed),
 	]
 	return { code, css, mappings, ...(warnings.length ? { warnings } : {}) }
 }

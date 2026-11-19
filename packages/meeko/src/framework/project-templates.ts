@@ -1,5 +1,6 @@
 /** Vite entry modules generated for a framework application. */
 export const clientEntrySource = `import { mountClientApp, readHydrationDocument, type ClientComponent, type ClientRoute, type RouteMiddleware } from "@meekojs/meeko/framework";
+import { reportHydrationError } from "@meekojs/meeko/internal";
 import { modules as pages } from "virtual:meeko-client-pages";
 import { modules as clientRoutes } from "virtual:meeko-client-routes";
 import { documentConfig, errorPage, routes, viewTransitions } from "virtual:meeko-manifest/client";
@@ -31,7 +32,8 @@ import "virtual:meeko-global-styles";
 const { root, payload } = readHydrationDocument(document);
 
 const hydrationStart = performance.now();
-await mountClientApp({
+// In meeko dev, a page that does not hydrate says so in the browser: console.error and Vite's overlay.
+const mounted = mountClientApp({
   root, payload, routes, errorPage, viewTransitions, serverData: true, loadMiddleware, loadNamedMiddleware, plugins,
   // The head that the server renders from meeko.config.ts and the modules; useHead and navigation update it.
   ...(documentConfig ? { document: documentConfig } : {}),
@@ -48,6 +50,13 @@ await mountClientApp({
     return module.route ?? module.default ?? (module as ClientRoute);
   },
 });
+try {
+  await mounted;
+} catch (error) {
+  // The error still reaches the terminal of meeko dev; production builds drop this branch.
+  if (import.meta.env.DEV) reportHydrationError(error);
+  throw error;
+}
 performance.measure("meeko-hydration", { start: hydrationStart, end: performance.now() });
 `
 

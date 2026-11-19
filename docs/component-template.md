@@ -274,3 +274,27 @@ Desde `1.9`, una expresión `{…}` dentro de un `<script>` o un `<style>` de la
 - **Otros elementos de texto crudo.** `<xmp>`, `<iframe>`, `<noembed>` y `<noframes>` también escriben su contenido tal cual y, desde `1.10`, rechazan `{…}` con `MEEK140`: el navegador mostraba los marcadores y las entidades, o ignoraba el contenido.
 - **`<textarea>` y `<title>`.** Su contenido es texto (RCDATA): `{…}` se escapa y, desde `1.10`, todo el contenido es un único texto enlazado al elemento, sin marcadores de hidratación, que antes se veían como texto (`<!--meeko:text:0-->`). La hidratación y las actualizaciones escriben su `textContent`; en `<textarea>` es el valor por defecto, que el control muestra mientras el usuario no lo edite (para un valor editable, use `model`).
 - **`<noscript>`.** Sólo lo muestra un navegador sin JavaScript, que lo lee como HTML: desde `1.10` su marcado estático se escribe tal cual (antes salía escapado, como texto) y cada `{…}` se escapa sin marcadores. No se hidrata ni se actualiza.
+
+## Contenido de frase
+
+HTML define qué puede ir dentro de cada elemento. `<p>`, `<span>`, `<button>`, `<label>`, los encabezados (`<h1>`…`<h6>`), `<em>`, `<strong>`, `<code>` y otros sólo admiten **contenido de frase**: texto y elementos en línea como `<span>`, `<a>`, `<img>` o `<input>`. Un elemento de bloque (`<div>`, `<ul>`, `<table>`, `<form>`, `<section>`…) no puede ir dentro. `<a>`, `<ins>` y `<del>` son transparentes: admiten lo que admite su padre.
+
+Dentro de un `<p>` no es sólo una cuestión de validez: el navegador **cierra el párrafo** antes del bloque y saca de él lo que sigue. Si el bloque está escrito en la plantilla, el compilador ya ve ese árbol y el resultado no es el escrito (`<p>a<div>b</div>c</p>` se pinta como `<p>a</p><div>b</div>c<p></p>`). Si el bloque lo pinta un componente, o es un `<div />`, el HTML del servidor lo lleva dentro del `<p>`, el navegador lo saca al leerlo y la hidratación ya no encuentra el DOM que espera: la página entera se queda sin JavaScript.
+
+```html
+<template>
+	<!-- MEEK139: <UITooltip> pinta un <div> dentro de <p> -->
+	<p>Precio <UITooltip text="Con IVA">…</UITooltip></p>
+
+	<!-- Un contenedor de bloque admite ambos -->
+	<div class="paragraph">Precio <UITooltip text="Con IVA">…</UITooltip></div>
+</template>
+```
+
+Desde `1.10`, `meeko check`, `meeko build` y el editor lo avisan con `MEEK139`:
+
+- Para los elementos HTML de la plantilla, en cualquier padre que sólo admite contenido de frase.
+- Para un componente, en `meeko check` y en el editor, cuando se conoce su raíz: la de un componente importado con una ruta `.meeko` o autoimportado (también de un módulo, como `@meekojs/ui`), con las etiquetas HTML de bloque del nivel superior de su plantilla, siguiendo los componentes que pinta ahí (`<UITooltip>` pinta un `<Popover>`, que pinta un `<div>`). Las etiquetas propias de Meeko, `<component is>`, `resolveComponent` y el contenido de los snippets no se comprueban.
+- Es un aviso: no cambia el código de salida de `meeko check` ni la compilación.
+
+En `meeko dev`, si la hidratación de la página falla de todas formas, el navegador lo muestra: `console.error` con el componente, la ubicación en la plantilla y el nodo esperado y el encontrado, y el overlay de errores de Vite. Para un `<p>` que el navegador cerró antes de un bloque, el mensaje lo dice. En producción el error se lanza como hasta ahora.

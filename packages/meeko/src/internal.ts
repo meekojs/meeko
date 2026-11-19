@@ -8,6 +8,7 @@ export { createRoot, finishWithCleanup, trackReadSite, withReadSite } from './co
 export { attributeValue, escapeHtml, rawHtml, renderAttribute, serializeJson, textElementContent } from './core/server'
 export { checkTrustedHtml, checkTrustedSrcdoc } from './shared/trusted-html'
 export type { TrustedHtmlCheck, UntrustedHtmlMessage, UntrustedSrcdocMessage } from './shared/trusted-html'
+export { describeHydrationError, reportHydrationError } from './app/runtime/hydration-errors'
 export { bindAttribute, bindComponent, bindDynamic, bindElementRef, bindElementTag, bindEvent, bindFor, bindHtml, bindIf, bindModel, bindSnippet, bindSpread, bindText, bindTextContent, componentProps, indexKey, keyToken, releaseAll, renderComponent, renderFor, renderIf, renderSnippet, withStateSnapshot } from './app/runtime/renderer'
 export type { ComponentModule, ComponentRelease, DomScope, DynamicElement } from './app/runtime/renderer'
 export { withComponentProps } from './app/runtime/resolved-component'
