@@ -5,7 +5,7 @@ import { join, resolve } from 'node:path'
 import test from 'node:test'
 import { pathToFileURL } from 'node:url'
 
-import type { AttributeValueOf, AttributeValues } from '../src/index.ts'
+import type { AttributeValueOf, AttributeValues, ClassValue, StyleValue } from '../src/index.ts'
 
 import { checkSource } from '../src/check.ts'
 import { compile } from '../src/compiler.ts'
@@ -51,6 +51,18 @@ test('ElementAttributes and AttributeValueOf suggest the values and still accept
 	void wrong
 })
 
+test('ClassValue and AttributeValueOf accept nested class arrays', () => {
+	const classes: ClassValue = ['card', false, ['rounded', null, undefined]]
+	const attribute: AttributeValueOf<'div', 'class'> = classes
+	assert.deepEqual(attribute, classes)
+})
+
+test('StyleValue and AttributeValueOf accept style objects', () => {
+	const styles: StyleValue = { backgroundColor: 'red', '--space': '1rem', opacity: 0.5, display: false }
+	const attribute: AttributeValueOf<'div', 'style'> = styles
+	assert.deepEqual(attribute, styles)
+})
+
 test('the type check code wraps checked values; the run-time code does not change', () => {
 	const source = `<script lang="ts">\nconst kind = "submit";\n</script>\n<template><button type="sumbit" bind:value="kind"><span bind:aria-pressed="kind">x</span></button><a href="/" rel="external">y</a></template>`
 	const checked = compile(source, 'Values.meeko', { typeCheck: true }).code
@@ -65,7 +77,7 @@ test('meeko check warns with MEEK122 on a literal outside the values, never on a
 	const { root, cleanup } = await typeProject()
 	const script = `<script lang="ts">\nimport { signal } from "@meekojs/meeko";\nconst text = signal<string>("submit");\nconst kind = signal<"submit" | "nope">("submit");\nconst wrongKind = signal<"nope" | "other">("nope");\nconst flag = signal(true);\n</script>\n`
 	const cases: Array<{ name: string; template: string; at?: string; message?: RegExp }> = [
-		{ name: 'Valid', template: `<button type="submit">a</button><button type="SUBMIT">b</button><button bind:type="text.value">c</button><button bind:type="kind.value">d</button><div hidden="until-found"></div><div bind:hidden="flag.value"></div><div hidden></div><dialog closedby="any"></dialog><a target="_blank" rel="noopener external">e</a><input type="datetime-local" /><component is="flag.value ? 'a' : 'button'" bind:type="'reset'">f</component>` },
+		{ name: 'Valid', template: `<button type="submit">a</button><button type="SUBMIT">b</button><button bind:type="text.value">c</button><button bind:type="kind.value">d</button><div hidden="until-found"></div><div bind:hidden="flag.value"></div><div bind:style="{ backgroundColor: 'red', '--space': 4, display: false }"></div><div hidden></div><dialog closedby="any"></dialog><a target="_blank" rel="noopener external">e</a><input type="datetime-local" /><component is="flag.value ? 'a' : 'button'" bind:type="'reset'">f</component>` },
 		{ name: 'StaticType', template: `<button type="sumbit">a</button>`, at: `"sumbit"`, message: /^"sumbit" no es un valor de type en <button>: admite .*submit.*\. Es un aviso en 1\.x y será un error en 2\.0$/ },
 		{ name: 'BoundLiteral', template: `<button bind:type="'sumbit'">a</button>`, at: `'sumbit'` },
 		{ name: 'BoundUnion', template: `<button bind:type="wrongKind.value">a</button>`, at: 'wrongKind.value' },
@@ -110,6 +122,20 @@ test('hidden writes until-found and other texts as they are, and stays boolean o
 	assert.equal(attributeValue('itemscope', true), '')
 	// Other enumerated attributes keep their text.
 	assert.equal(attributeValue('popover', 'manual'), 'manual')
+})
+
+test('class arrays join their non-empty fragments with spaces', () => {
+	assert.equal(attributeValue('class', ['card', false, ['rounded', null, undefined], '']), 'card rounded')
+	assert.equal(renderAttribute('class', ['card', ['rounded', 'wide']]), ' class="card rounded wide"')
+	assert.equal(attributeValue('class', [false, null, undefined, '']), null)
+	assert.equal(attributeValue('title', ['a', 'b']), 'a,b')
+})
+
+test('style objects serialize camelCase, kebab-case and custom properties', () => {
+	assert.equal(attributeValue('style', { backgroundColor: 'red', 'font-size': '1rem', '--space': 4, opacity: 0.5, display: false, color: null }), 'background-color: red; font-size: 1rem; --space: 4; opacity: 0.5')
+	assert.equal(renderAttribute('style', { color: 'rgb(1, 2, 3)', WebkitTransform: 'scale(1)' }), ' style="color: rgb(1, 2, 3); -webkit-transform: scale(1)"')
+	assert.equal(attributeValue('style', { color: undefined }), null)
+	assert.throws(() => attributeValue('style', { 'color;background': 'red' }), /Invalid CSS property name/)
 })
 
 const hiddenPage = `<script lang="ts">

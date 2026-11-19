@@ -27,7 +27,8 @@
 		<p
 			if:when="expanded.value"
 			class="task-detail"
-			>{props.task.detail}</p
 		>
+			{props.task.detail}
+		</p>
 	</article>
 </template>

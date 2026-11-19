@@ -6,7 +6,7 @@ import type { PropsSource } from './props'
 import type { Snippet, SnippetData } from './snippets'
 
 import { observeCallback } from '../../core/error-observer'
-import { batch, createContext, createRoot, currentEffectOwner, effect, effectInOrder, findContext, finishWithCleanup, isWritableSignal, provide, reserveUpdateOrder, signal, switchOwner, untrack } from '../../core/reactivity'
+import { batch, bindingEffect, createContext, createRoot, currentEffectOwner, effectInOrder, findContext, finishWithCleanup, isWritableSignal, provide, reserveUpdateOrder, signal, switchOwner, untrack } from '../../core/reactivity'
 import { attributeValue, rawHtml, serializeJson } from '../../core/server'
 import { documentHtmlIndex } from '../../shared/document-html'
 import { sameChannels } from './channels'
@@ -14,6 +14,7 @@ import { componentErrorReporter } from './component-errors'
 import { closeTag, dynamicTagName } from './dynamic-tag'
 import { refTarget } from './element-refs'
 import { contentNamespace, inertElement } from './html-content-dom'
+import { HydrationMismatchError, missingRegionEnd } from './hydration-errors'
 import { childIdBase, currentIdBase, withIdBase } from './ids'
 import { afterMountBatch, mountBatch } from './lifecycle'
 import { reactiveProps } from './props'
@@ -160,7 +161,13 @@ function regionEnd(start: Node): Node {
 		if (nestedRegion(data) === kind) depth++
 		else if (end.test(data) && --depth === 0) return node
 	}
-	throw new Error(`Missing end marker for ${(start as Comment).data}`)
+	throw missingRegionEnd(start as Comment)
+}
+
+/** An attribute as hydration found it, for a {@link HydrationMismatchError}. */
+function attributeFound(target: Element, name: string): string {
+	const value = target.getAttribute(name)
+	return value === null ? `<${target.localName}> without ${name}` : `${name}=${JSON.stringify(value)}`
 }
 
 /** Marks an element filled by `html="..."`; its content is the expression's, never Meeko's. */
@@ -402,7 +409,7 @@ export function bindComponent<Props extends object>(scope: DomScope, id: number,
 	try {
 		;({ inner, state } = componentRegion(scope, id))
 	} catch (error) {
-		throw new Error(`Hydration mismatch in ${location}: ${error instanceof Error ? error.message : String(error)}`, { cause: error })
+		throw new HydrationMismatchError(location, error instanceof Error ? error.message : String(error), { cause: error })
 	}
 	const owner = currentEffectOwner()
 	const report = componentErrorReporter('mounted')
@@ -602,7 +609,7 @@ function regionElement(inner: DomScope): Element {
 export function bindElementTag<const T>(scope: DomScope, element: number, read: () => T, content: boolean, open: (tag: TagPart<T>) => string, hydrate: (tag: TagPart<T>, scope: DomScope) => () => void, location: string): () => void {
 	let target = findMarked(scope, element)
 	let tag = dynamicTagName(untrack(read), content) as TagPart<T>
-	if (target.localName !== tag) throw new Error(`Hydration mismatch in ${location}: expected <${tag}>, found <${target.localName}>`)
+	if (target.localName !== tag) throw new HydrationMismatchError(location, `expected <${tag}>, found <${target.localName}>`, { expected: `<${tag}>`, found: `<${target.localName}>` })
 	// The element's bindings hydrate first; the tag still updates before they run.
 	const order = reserveUpdateOrder()
 	let release = untrack(() => hydrate(tag, scope))
@@ -656,7 +663,7 @@ export function bindDynamic<const T, Props extends object>(scope: DomScope, id: 
 	try {
 		;({ inner } = componentRegion(scope, id))
 	} catch (error) {
-		throw new Error(`Hydration mismatch in ${location}: ${error instanceof Error ? error.message : String(error)}`, { cause: error })
+		throw new HydrationMismatchError(location, error instanceof Error ? error.message : String(error), { cause: error })
 	}
 	// The element or the child hydrates first; the value still updates before they react.
 	const order = reserveUpdateOrder()
@@ -684,7 +691,7 @@ export function bindDynamic<const T, Props extends object>(scope: DomScope, id: 
 		)
 	const mountElement = (next: TagPart<T>): void => {
 		target = regionElement(inner)
-		if (target.localName !== next) throw new Error(`Hydration mismatch in ${location}: expected <${next}>, found <${target.localName}>`)
+		if (target.localName !== next) throw new HydrationMismatchError(location, `expected <${next}>, found <${target.localName}>`, { expected: `<${next}>`, found: `<${target.localName}>` })
 		releaseContent = element.hydrateContent(inner)
 		release = element.hydrate(next, inner)
 		tag = next
@@ -776,10 +783,10 @@ export function bindSpread(scope: DomScope, id: number, read: () => ReadonlyArra
 	const target = findMarked(scope, id)
 	let current = new Map(read())
 	for (const [name, value] of current) {
-		if (target.getAttribute(name) !== value) throw new Error(`Hydration mismatch in ${location}: attribute ${name}`)
+		if (target.getAttribute(name) !== value) throw new HydrationMismatchError(location, `attribute ${name}`, { expected: `${name}=${JSON.stringify(value)}`, found: attributeFound(target, name) })
 	}
 	let first = true
-	return effect(() => {
+	return bindingEffect(() => {
 		const next = new Map(read())
 		if (first) {
 			first = false
@@ -820,15 +827,34 @@ export function bindText(scope: DomScope, id: number, read: () => unknown, locat
 		marker.parentNode!.insertBefore(text, marker.nextSibling)
 	}
 	if (!text || text.nodeType !== 3) throw new Error(`Missing text node in ${location}`)
-	if (text.textContent !== initial) throw new Error(`Hydration mismatch in ${location}`)
+	if (text.textContent !== initial) throw new HydrationMismatchError(location, undefined, { expected: `text ${JSON.stringify(initial)}`, found: `text ${JSON.stringify(text.textContent)}` })
 	let first = true
-	return effect(() => {
+	return bindingEffect(() => {
 		const next = String(read())
 		if (first) {
 			first = false
 			if (text.textContent === next) return
 		}
 		text.textContent = next
+	}, source)
+}
+
+/**
+ * Conecta el texto completo de un `<textarea>` o un `<title>` con expresiones, que no admiten
+ * marcadores de texto: comprueba el del SSR y escribe `textContent` cuando cambia. En `<textarea>`
+ * es el valor por defecto, que también muestra mientras el usuario no lo edite.
+ */
+export function bindTextContent(scope: DomScope, id: number, read: () => string, location: string, source?: EffectSource): () => void {
+	const target = findMarked(scope, id)
+	if (target.textContent !== read()) throw new Error(`Hydration mismatch in ${location}`)
+	let first = true
+	return bindingEffect(() => {
+		const next = read()
+		if (first) {
+			first = false
+			return
+		}
+		if (target.textContent !== next) target.textContent = next
 	}, source)
 }
 
@@ -871,7 +897,7 @@ export function bindHtml(scope: DomScope, id: number, read: () => unknown, locat
 	if (!target) throw new Error(`Missing Meeko target ${htmlMarker}="${id}" in ${location}`)
 	const reader = findContext(documentHtmlReader)
 	let current: string | undefined
-	return effect(() => {
+	return bindingEffect(() => {
 		// The SSR render types the value; the browser only checks it.
 		const next = rawHtml(read() as string | null | undefined)
 		const first = current === undefined
@@ -898,9 +924,9 @@ export function bindHtml(scope: DomScope, id: number, read: () => unknown, locat
 export function bindAttribute(scope: DomScope, id: number, name: string, read: () => unknown, location: string, source?: EffectSource): () => void {
 	const target = findMarked(scope, id)
 	const initial = attributeValue(name, read())
-	if (target.getAttribute(name) !== initial) throw new Error(`Hydration mismatch in ${location}`)
+	if (target.getAttribute(name) !== initial) throw new HydrationMismatchError(location, undefined, { expected: initial === null ? `no ${name}` : `${name}=${JSON.stringify(initial)}`, found: attributeFound(target, name) })
 	let first = true
-	return effect(() => {
+	return bindingEffect(() => {
 		const next = attributeValue(name, read())
 		if (first) {
 			first = false
@@ -1067,7 +1093,7 @@ export function bindModel<K extends NativeModelKind>(scope: DomScope, id: number
 			})
 		: () => {}
 	let first = true
-	const stop = effect(() => {
+	const stop = bindingEffect(() => {
 		model = writable()
 		const value = model.value
 		const radio = radioValue ? radioValue() : undefined
@@ -1090,12 +1116,64 @@ export function bindModel<K extends NativeModelKind>(scope: DomScope, id: number
 }
 
 /** Genera los límites estables de una condición en SSR. */
-export function renderIf(id: number, condition: unknown, render: () => string): string {
-	return `<!--meeko:if:${id}-->${condition ? render() : ''}<!--/meeko:if:${id}-->`
+export function renderIf(id: number, condition: unknown, render: () => string, otherwise?: () => string): string {
+	return `<!--meeko:if:${id}-->${condition ? render() : (otherwise?.() ?? '')}<!--/meeko:if:${id}-->`
+}
+
+/** Intercambia dos ramas exclusivas y libera por completo la rama anterior antes de hidratar otra. */
+function bindIfElse(scope: DomScope, id: number, read: () => unknown, render: () => string, hydrate: (inner: DomScope) => () => void, otherwise: () => string, hydrateOtherwise: (inner: DomScope) => () => void): () => void {
+	const inner = region(scope, 'if', id)
+	const order = reserveUpdateOrder()
+	const at = currentIdBase()
+	let active = Boolean(read())
+	let release = (active ? hydrate : hydrateOtherwise)(inner)
+	let stop = () => {}
+	stop = effectInOrder(order, () =>
+		mountBatch(() => {
+			const next = Boolean(read())
+			if (next === active) return
+			const html = withIdBase(at, () => lateRender(next ? render : otherwise))
+			const failures: unknown[] = []
+			try {
+				release()
+			} catch (error) {
+				failures.push(error)
+			}
+			release = () => {}
+			try {
+				clearRegion(inner)
+			} catch (error) {
+				failures.push(error)
+			}
+			if (failures.length) {
+				stop()
+				if (failures.length === 1) throw failures[0]
+				throw new AggregateError(failures, `Meeko condition ${id} cleanup failed`)
+			}
+			try {
+				insertHtml(inner.end!, html)
+				release = withIdBase(at, () => (next ? hydrate : hydrateOtherwise)(inner))
+				active = next
+			} catch (error) {
+				stop()
+				try {
+					clearRegion(inner)
+				} catch (cleanupError) {
+					throw new AggregateError([error, cleanupError], `Meeko condition ${id} update and cleanup failed`, { cause: cleanupError })
+				}
+				throw error
+			}
+		}),
+	)
+	return () => {
+		stop()
+		release()
+	}
 }
 
 /** Hidrata una condición y conserva los nodos mientras sigue siendo verdadera. */
-export function bindIf(scope: DomScope, id: number, read: () => unknown, render: () => string, hydrate: (inner: DomScope) => () => void): () => void {
+export function bindIf(scope: DomScope, id: number, read: () => unknown, render: () => string, hydrate: (inner: DomScope) => () => void, otherwise?: () => string, hydrateOtherwise?: (inner: DomScope) => () => void): () => void {
+	if (otherwise && hydrateOtherwise) return bindIfElse(scope, id, read, render, hydrate, otherwise, hydrateOtherwise)
 	const inner = region(scope, 'if', id)
 	// Its content hydrates first; the condition still updates before that content does.
 	const order = reserveUpdateOrder()
@@ -1201,7 +1279,7 @@ export function bindSnippet(scope: DomScope, id: number, read: () => unknown, re
 	const args = signal<readonly unknown[]>(untrack(readArgs))
 	let stopSnippet = () => {}
 	let first = true
-	stopSnippet = effect(() =>
+	stopSnippet = bindingEffect(() =>
 		mountBatch(() => {
 			const next = snippetOf(read())
 			if (first) {
@@ -1231,7 +1309,7 @@ export function bindSnippet(scope: DomScope, id: number, read: () => unknown, re
 	)
 	let stopArgs = () => {}
 	try {
-		stopArgs = effect(() => {
+		stopArgs = bindingEffect(() => {
 			const next = readArgs()
 			if (
 				!sameArguments(

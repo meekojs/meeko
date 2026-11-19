@@ -14,14 +14,25 @@ function labels(template: string): string[] | undefined {
 
 test('component tags offer the list and condition directives, without the ones already there', () => {
 	const offered = labels(`<AppCard\n  each:of="variants.value"\n  each:as="variant"\n  e|\n  bind:variant="variant"\n>`)
-	assert.deepEqual(offered, ['if:when', 'each:key', 'each:index', 'bind:', 'on:', 'ref:', 'bind', 'model:'])
+	assert.deepEqual(offered, ['if', 'else-if', 'else', 'if:when', 'each:key', 'each:index', 'bind:', 'on:', 'ref:', 'bind', 'model:'])
 })
 
-test('<snippet> offers name, params and if:when, without the ones already there', () => {
-	assert.deepEqual(labels(`<AppCard><snippet |>x</snippet></AppCard>`), ['name', 'params', 'if:when'])
-	assert.deepEqual(labels(`<AppCard><snippet name="footer" i|>x</snippet></AppCard>`), ['params', 'if:when'])
+test('<snippet> offers name, params, if and if:when, without the ones already there', () => {
+	assert.deepEqual(labels(`<AppCard><snippet |>x</snippet></AppCard>`), ['name', 'params', 'if', 'if:when'])
+	assert.deepEqual(labels(`<AppCard><snippet name="footer" i|>x</snippet></AppCard>`), ['params', 'if', 'if:when'])
 	assert.deepEqual(labels(`<AppCard><snippet name="footer" params="a" if:when="a" |>x</snippet></AppCard>`), [])
-	assert.deepEqual(labels(`<AppCard><snippet on:|>x</snippet></AppCard>`), ['name', 'params', 'if:when'])
+	assert.deepEqual(labels(`<AppCard><snippet on:|>x</snippet></AppCard>`), ['name', 'params', 'if', 'if:when'])
+	// if and if:when are alternatives: with one written, the other is not offered.
+	assert.deepEqual(labels(`<AppCard><snippet name="footer" params="a" if="a" |>x</snippet></AppCard>`), [])
+})
+
+test('a tag with a conditional directive is offered no other one: the compiler takes one per tag', () => {
+	for (const written of ['if="a"', 'if:when="a"', 'else-if="a"', 'else']) {
+		const offered = labels(`<p ${written} |>`)!
+		assert.ok(!offered.some((label) => ['if', 'if:when', 'else-if', 'else'].includes(label)), `${written}: ${JSON.stringify(offered.slice(0, 6))}`)
+		assert.ok(offered.includes('each:of') && offered.includes('bind:'), written)
+	}
+	assert.ok(!labels(`<render snippet="a" if="b" |/>`)!.includes('else'))
 })
 
 test('each: completes in a component tag and replaces what was typed', () => {
@@ -36,7 +47,7 @@ test('each: completes in a component tag and replaces what was typed', () => {
 
 test('elements offer the directives first, then their HTML attributes without event handlers', () => {
 	const offered = labels(`<p class="x" |>`)!
-	assert.deepEqual(offered.slice(0, 9), ['if:when', 'each:of', 'each:as', 'each:key', 'each:index', 'bind:', 'on:', 'ref:', 'html'])
+	assert.deepEqual(offered.slice(0, 12), ['if', 'else-if', 'else', 'if:when', 'each:of', 'each:as', 'each:key', 'each:index', 'bind:', 'on:', 'ref:', 'html'])
 	assert.ok(offered.includes('id') && offered.includes('hidden'), JSON.stringify(offered))
 	assert.ok(!offered.includes('class'), 'an attribute already written is not offered again')
 	assert.ok(!offered.some((label) => /^on[a-z]/.test(label)), 'events are written as on:event')

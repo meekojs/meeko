@@ -6,8 +6,8 @@
 		"github": "Meeko en GitHub"
 	},
 	"nav": {
-		"guide": "Guía",
-		"api": "API",
+		"guide": "Documentación",
+		"api": "Referencia de Meeko",
 		"changes": "Cambios",
 		"start": "Empezar"
 	},

@@ -2,7 +2,7 @@
 title: onCleanup
 group: reactivity
 since: 1.0.0
-description: Registra en la raíz activa la liberación síncrona de un recurso, que se ejecuta al desmontar o liberar el componente.
+description: Registra la liberación síncrona de un recurso en el propietario activo, el componente o la ejecución de un effect, que la ejecuta al liberarse.
 symbols:
   - "@meekojs/meeko#onCleanup"
 related:
@@ -14,7 +14,14 @@ related:
   - docs/api.md#ciclo-de-vida
 ---
 
-`onCleanup(release)` dice a Meeko qué hacer cuando el componente deja de existir: parar un temporizador, quitar un listener de `window`, cerrar una conexión, destruir una instancia de una librería. La función se registra en la raíz activa (el componente cuyo script se ejecuta, o la de [`createRoot`](/docs/reference/createroot)) y se ejecuta cuando esa raíz se libera: al desmontar el componente, al cambiar de página, cuando su `if:when` o su fila de `each:of` desaparecen, y también si el render o la hidratación fallan.
+`onCleanup(release)` dice a Meeko qué hacer cuando el componente deja de existir: parar un temporizador, quitar un listener de `window`, cerrar una conexión, destruir una instancia de una librería. La función se registra en el propietario activo y se ejecuta cuando éste se libera:
+
+| Dónde se llama                                                                  | Se registra en           | Se ejecuta                                                                                                                                   |
+| ------------------------------------------------------------------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Script del componente, un composable que llama u `onMounted` (antes de `await`) | El componente            | Al desmontarlo, al cambiar de página, cuando su `if:when` o su fila de `each:of` desaparecen, y también si el render o la hidratación fallan |
+| Dentro de un [`effect`](/docs/reference/effect) (desde `1.10`)                  | Esa ejecución del efecto | Antes de la siguiente ejecución y al detener el efecto                                                                                       |
+| Dentro de [`createRoot`](/docs/reference/createroot)                            | Esa raíz                 | Al llamar a su `dispose`                                                                                                                     |
+| Tras un `await`, en un manejador de evento o al evaluar un módulo               | Nada: lanza un error     | —                                                                                                                                            |
 
 Es la pieza con la que se escriben composables que limpian lo suyo. Se exporta desde `@meekojs/meeko` y se autoimporta en las aplicaciones del framework.
 
@@ -43,7 +50,7 @@ Cualquier componente que llame a `useNow()` en su script tiene un reloj que se d
 
 ## Valor devuelto
 
-`void`. Sin raíz activa lanza `Error: onCleanup() requires an active component root`.
+`void`. Sin propietario activo lanza `Error: onCleanup() requires an active component root: …`, con un mensaje que dice dónde llamarlo. En desarrollo (`import.meta.env.DEV` de Vite, o `NODE_ENV` distinto de `production`) además lo escribe con `console.warn`, porque en una función `async` sin `catch` ese error se pierde.
 
 ## Ejemplos
 
@@ -82,6 +89,24 @@ export function useTicker(url: string): ReadonlySignal<number | null> {
   return price;
 }
 ```
+
+### Limpiar en cada ejecución de un efecto
+
+Dentro de un `effect`, la limpieza pertenece a esa ejecución: corre antes de la siguiente y al detener el efecto.
+
+```ts
+import { effect, onCleanup, signal } from "@meekojs/meeko";
+
+const room = signal("general");
+effect(() => {
+  const name = room.value;
+  console.log(`entra en ${name}`);
+  onCleanup(() => console.log(`sale de ${name}`));
+});
+room.value = "random"; // "sale de general", después "entra en random"
+```
+
+Devolver la función desde el efecto es equivalente.
 
 ### Varias limpiezas
 
@@ -184,7 +209,7 @@ onMounted(async () => {
 });
 ```
 
-Si el componente se desmonta mientras espera, el socket queda abierto, y tras el `await` ya no hay raíz activa. `meeko check` y el editor dan el aviso `MEEK129`. Registra la limpieza antes del primer `await` y deja que compruebe lo que haya:
+Tras el `await` ya no hay raíz activa: `onCleanup` lanza `Error: onCleanup() requires an active component root…`, que en desarrollo también se avisa por consola, y si el componente se desmonta mientras espera, el socket queda abierto. `meeko check` y el editor dan el aviso `MEEK129`. Registra la limpieza antes del primer `await` y deja que compruebe lo que haya:
 
 <!-- no-check -->
 
@@ -203,4 +228,4 @@ onMounted(async () => {
 - **Servidor.** En SSR la raíz del componente se libera al terminar el render, así que las limpiezas también se ejecutan: no dejes temporizadores abiertos en el servidor, o créalos sólo en el navegador (`typeof window`, `onMounted`). Una limpieza así que usa APIs del navegador es el aviso `MEEK128`; véase [Usar APIs del navegador en una limpieza que también corre en SSR](#usar-apis-del-navegador-en-una-limpieza-que-también-corre-en-ssr).
 - **Render fallido.** Si el render o la hidratación fallan, Meeko libera todo lo ya registrado. Si además falla una limpieza, entrega un `AggregateError` con las dos causas.
 - **Errores.** Una limpieza que lanza no impide las demás. Un rechazo de una limpieza que devolvió una promesa por error llega al [`provideErrorHandler`](/docs/reference/provideerrorhandler) más cercano con la fuente `"cleanup"`.
-- **Efectos.** No hace falta `onCleanup` para los `effect` y `computed` del componente: pertenecen a la misma raíz y se detienen solos.
+- **Efectos.** No hace falta `onCleanup` para los `effect` y `computed` del componente: pertenecen a la misma raíz y se detienen solos. Dentro de un `effect`, `onCleanup` limpia esa ejecución (desde `1.10`; hasta `1.9` se registraba en el componente y sólo corría al desmontarlo).

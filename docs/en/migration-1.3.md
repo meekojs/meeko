@@ -1,8 +1,10 @@
 ---
-source-hash: 8626afad1b4d9418664ca59781b218d70565cbe531f240eeceaeb5e6246e15ec
+source-hash: c8c1ce0e2c1234a92afc98781a47d41cb18b29ff75c04a8b55e9ade84cf4ee16
 ---
 
 # Upgrade from 1.2 to 1.3
+
+**From:** 1.2.x. **To:** 1.3.0. **Status:** published on npm; the latest version checked on November 5, 2026 is 1.9.0. **Who acts:** maintainers upgrading an application from 1.2.x to 1.3.0.
 
 `1.3` is a minor release: new features (the `static` adapter, `site`, `sitemap`, `robots`, `document.seo`, hash-based CSP, `trustHtml`, `isClientError`, `imports.appDirs` and `imports.sharedDirs`, CSS class completion in the editor, class sorting with Prettier…) are optional. One type-only change is released as an [approved exception](stability.md#approved-exceptions) to the stability policy: csstype-typed `@meekojs/meeko/postcss` declarations. Other changes are noticeable when updating: new diagnostics, Prettier formatting output, handling of global failures in the browser and server, and server logs in the browser console during `meeko dev`. This guide collects them and what you should review for each. The full list, including additions and fixes, is in the [CHANGELOG](../../packages/meeko/CHANGELOG.md); compatibility commitments are in the [stability policy](stability.md).
 

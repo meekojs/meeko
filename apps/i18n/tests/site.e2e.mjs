@@ -48,7 +48,7 @@ test('production i18n documentation renders guides, translates, switches locale 
 		assert.equal(response.status(), 200, route)
 		assert.equal(await page.locator('main h1').count(), 1, route)
 		assert.match(await page.title(), / · Meeko i18n$/, route)
-		assert.equal(await page.locator('.meeko-ui-code-block:has(pre:not(.shiki))').count(), 0, route)
+		assert.equal(await page.locator('figure:has(pre:not(.shiki))').count(), 0, route)
 		assert.ok(await page.locator('meta[name="description"]').getAttribute('content'), route)
 	}
 	await page.goto(origin + '/installation')
@@ -157,7 +157,7 @@ test('production i18n documentation renders guides, translates, switches locale 
 	await page.waitForURL(origin + '/namespaces')
 	await page.locator('[data-output="namespace"]').waitFor()
 	assert.equal(await page.locator('[data-output="namespace"]').innerText(), 'Tu pedido tiene 3 productos.')
-	assert.equal(await page.locator('dialog.meeko-ui-drawer:modal').count(), 0)
+	assert.equal(await page.locator('dialog:modal').count(), 0)
 	for (const locale of ['en', 'ar']) {
 		const ssr = await browser.newPage({ javaScriptEnabled: false, viewport: { width: 390, height: 844 } })
 		await ssr.goto(origin + '/' + locale + '/playground')
@@ -191,7 +191,7 @@ test('production i18n documentation renders guides, translates, switches locale 
 	await page.getByRole('link', { name: 'Ir a la instalación', exact: true }).click()
 	await page.getByRole('heading', { name: 'Instalación', level: 1 }).waitFor()
 	// A client navigation brings the highlighted code too, with the colors of the documentation of the site in each theme.
-	const keyword = page.locator('.meeko-ui-code-block .shiki span', { hasText: /^import$/ }).first()
+	const keyword = page.locator('figure .shiki span', { hasText: /^import$/ }).first()
 	const keywordColor = (theme) =>
 		keyword.evaluate((span, value) => {
 			globalThis.document.documentElement.dataset.theme = value
@@ -262,7 +262,7 @@ test('the English site has an English interface, hreflang, a switcher, /en links
 		const texts = await interfaceTexts()
 		for (const spanish of spanishInterface) assert.ok(!texts.includes(spanish), `${route} shows the Spanish interface text «${spanish}»`)
 		// The copiable examples speak English too, except the catalogs that teach the source language.
-		const blocks = await page.locator('.meeko-ui-code-block pre').allInnerTexts()
+		const blocks = await page.locator('figure pre').allInnerTexts()
 		const code = sourceCatalogTexts.reduce((text, allowed) => text.replaceAll(allowed, ''), blocks.join('\n'))
 		const spanishLine = code.split('\n').find((line) => spanishCode.test(line))
 		assert.equal(spanishLine, undefined, `${route} shows Spanish in a copiable example`)
@@ -276,7 +276,7 @@ test('the English site has an English interface, hreflang, a switcher, /en links
 			route,
 		)
 		// Internal links of the shell keep /en (the Arabic playground link of the lab is the exception).
-		const internal = await page.locator('header.meeko-ui-header a[href^="/"]:not([hreflang]), #docs-navigation a[href^="/"], main a[href^="/"]:not([hreflang])').evaluateAll((links) => links.map((link) => link.getAttribute('href')))
+		const internal = await page.locator('header:not(main header) a[href^="/"]:not([hreflang]), #docs-navigation a[href^="/"], main a[href^="/"]:not([hreflang])').evaluateAll((links) => links.map((link) => link.getAttribute('href')))
 		for (const href of internal) assert.match(href, /^\/en(\/|$|\?)/, `${route} links to ${href}`)
 	}
 	await page.goto(origin + '/en/routing')

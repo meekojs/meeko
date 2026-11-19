@@ -70,7 +70,13 @@ export class LanguageServers {
 				const clientOptions: LanguageClientOptions = {
 					documentSelector: [{ language: 'meeko', scheme: folder?.uri.scheme ?? '*', ...(folder ? { pattern: { baseUri: folder.uri.toString(), pattern: '**/*.meeko' } } : {}) }],
 					...(folder ? { workspaceFolder: folder } : {}),
-					initializationOptions: { trusted, classes: { completion: vscode.workspace.getConfiguration('meeko', folder?.uri).get<string>('classes.completion', 'auto'), tailwindActive: vscode.extensions.getExtension('bradlc.vscode-tailwindcss')?.isActive === true } },
+					initializationOptions: {
+						trusted,
+						warmup: vscode.workspace.getConfiguration('meeko', folder?.uri).get<boolean>('languageServer.warmup', true),
+						warmupFiles: openComponents(folder),
+						classes: { completion: vscode.workspace.getConfiguration('meeko', folder?.uri).get<string>('classes.completion', 'auto'), hover: vscode.workspace.getConfiguration('meeko', folder?.uri).get<string>('classes.hover', 'auto'), definition: vscode.workspace.getConfiguration('meeko', folder?.uri).get<boolean>('classes.definition', true), tailwindActive: vscode.extensions.getExtension('bradlc.vscode-tailwindcss')?.isActive === true },
+						cssVariables: { completion: vscode.workspace.getConfiguration('meeko', folder?.uri).get<boolean>('cssVariables.completion', true), hover: vscode.workspace.getConfiguration('meeko', folder?.uri).get<boolean>('cssVariables.hover', true), definition: vscode.workspace.getConfiguration('meeko', folder?.uri).get<boolean>('cssVariables.definition', true), references: vscode.workspace.getConfiguration('meeko', folder?.uri).get<boolean>('cssVariables.references', true), rename: vscode.workspace.getConfiguration('meeko', folder?.uri).get<boolean>('cssVariables.rename', true) },
+					},
 					outputChannel: this.output,
 					middleware: {
 						workspace: {
@@ -129,4 +135,13 @@ export class LanguageServers {
 		await this.pending.catch(() => undefined)
 		await this.stop()
 	}
+}
+
+/**
+ * `.meeko` files open in tabs of a folder, also the tabs restored and not yet shown: the server
+ * prepares their projects first, so the first colors do not wait for the TypeScript program.
+ */
+function openComponents(folder: vscode.WorkspaceFolder | undefined): string[] {
+	const files = vscode.window.tabGroups.all.flatMap((group) => group.tabs.map((tab) => (tab.input instanceof vscode.TabInputText ? tab.input.uri : undefined)))
+	return files.flatMap((uri) => (uri?.scheme === 'file' && uri.fsPath.endsWith('.meeko') && (!folder || vscode.workspace.getWorkspaceFolder(uri)?.uri.toString() === folder.uri.toString()) ? [uri.fsPath] : []))
 }

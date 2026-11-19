@@ -77,6 +77,7 @@ export default defineMeekoConfig({
 	// Documentation is rendered from PostgreSQL on each request.
 	server: {
 		adapter: 'node',
+		port: 4173,
 		// No inline script runs without its SHA-256, which the build adds to script-src on every
 		// build (the theme script of `theme`, for example): changing a script needs no manual step.
 		//

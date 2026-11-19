@@ -187,7 +187,9 @@ export function searchableText(path: string, payload: unknown): string {
 	const chunks: string[] = []
 	const visit = (value: unknown): void => {
 		if (typeof value === 'string') {
-			const text = decodeEntities(value.replace(/<[^>]*>/g, ' '))
+			// Los controles del HTML renderizado no son contenido de la página.
+			const html = value.replace(/<div\b[^>]*\bdata-pagefind-ignore\b[^>]*>[\s\S]*?<\/div>/gi, ' ').replace(/<button\b[^>]*\bdata-copy\b[^>]*>[\s\S]*?<\/button>/gi, ' ')
+			const text = decodeEntities(html.replace(/<[^>]*>/g, ' '))
 				.replace(/\s+/g, ' ')
 				.trim()
 			if (text && isText(text)) chunks.push(text)
@@ -322,6 +324,14 @@ export async function listPages<T = unknown>(options?: Queryable | SnapshotReadO
 /** The text search configuration of each language. */
 const searchConfigs: Readonly<Record<DocsLocale, string>> = { es: 'spanish', en: 'english' }
 
+/** Recorta una ventana de texto sin mostrar palabras partidas por sus extremos. */
+export function searchExcerpt(value: string, start: number, totalLength: number): string {
+	let text = value
+	if (start > 1) text = text.replace(/^\S*\s+/, '')
+	if (start - 1 + value.length < totalLength) text = text.replace(/\s+\S*$/, '')
+	return `${start > 1 ? '…' : ''}${text.trim()}${start - 1 + value.length < totalLength ? '…' : ''}`
+}
+
 /**
  * Searches the published documentation pages of a language (Spanish by default). A page matches
  * the words of the query in the configuration of its language (`spanish` or `english`, which find
@@ -337,26 +347,30 @@ export async function searchPages(query: string, limit: number, options?: Querya
 	// Literals, from a closed list, so the partial index of the language applies.
 	const config = searchConfigs[locale]
 	const vector = `to_tsvector('${config}', p.searchable_text)`
-	const result = await db.query<{ url: string; title: string; excerpt: string; payload: unknown }>(
+	const result = await db.query<{ url: string; title: string; excerpt: string; excerpt_start: number; text_length: number; payload: unknown }>(
 		`SELECT p.path AS url,
 			p.payload,
 			COALESCE(p.payload #>> '{head,title}', p.payload #>> '{doc,title}', p.payload #>> '{written,title}', p.payload #>> '{page,name}',
 				CASE WHEN p.path = '/docs' THEN $3 ELSE p.path END) AS title,
-			substring(p.searchable_text FROM greatest(1, strpos(lower(p.searchable_text), lower(split_part($1, ' ', 1))) - 80) FOR 240) AS excerpt
+			greatest(1, strpos(lower(p.searchable_text), lower(split_part($1, ' ', 1))) - 120) AS excerpt_start,
+			length(p.searchable_text) AS text_length,
+			substring(p.searchable_text FROM greatest(1, strpos(lower(p.searchable_text), lower(split_part($1, ' ', 1))) - 120) FOR 360) AS excerpt
 		FROM docs_pages AS p
 		JOIN docs_snapshots AS s ON s.id = p.snapshot_id
 		WHERE s.active AND p.locale = '${locale}' AND (p.path = '/docs' OR p.path LIKE '/docs/%')
 			AND (${vector} @@ plainto_tsquery('${config}', $1) OR to_tsvector('simple', p.searchable_text) @@ plainto_tsquery('simple', $1))
 		ORDER BY CASE
 			WHEN lower(p.path) = '/docs/reference/' || lower($1) THEN 0
-			WHEN lower(p.path) LIKE '%' || lower($1) || '%' THEN 1
-			ELSE 2 END,
+			WHEN lower(COALESCE(p.payload #>> '{doc,title}', p.payload #>> '{written,title}', p.payload #>> '{page,name}', p.payload #>> '{head,title}', '')) = lower($1) THEN 1
+			WHEN lower(p.path) LIKE '%' || lower($1) || '%' THEN 2
+			WHEN lower(COALESCE(p.payload #>> '{doc,title}', p.payload #>> '{written,title}', p.payload #>> '{page,name}', p.payload #>> '{head,title}', '')) LIKE lower($1) || '%' THEN 3
+			ELSE 4 END,
 			ts_rank(to_tsvector('simple', p.searchable_text), plainto_tsquery('simple', $1)) DESC,
 			ts_rank(${vector}, plainto_tsquery('${config}', $1)) DESC, p.path
 		LIMIT $2`,
 		[term, Math.min(limit, 50), locale === 'es' ? 'Documentación' : 'Documentation'],
 	)
-	return result.rows.map(({ url: path, title, excerpt, payload }) => {
+	return result.rows.map(({ url: path, title, excerpt, excerpt_start, text_length, payload }) => {
 		const url = localizedPath(path, locale)
 		const toc = payload && typeof payload === 'object' && 'toc' in payload && Array.isArray(payload.toc) ? (payload.toc as unknown[]) : []
 		const sections = toc
@@ -364,6 +378,6 @@ export async function searchPages(query: string, limit: number, options?: Querya
 			.filter((item) => item.text.toLocaleLowerCase().includes(term.toLocaleLowerCase()))
 			.slice(0, 3)
 			.map((item) => ({ url: `${url}#${encodeURIComponent(item.id)}`, title: item.text, excerpt: item.text }))
-		return { url, title, excerpt, sections }
+		return { url, title, excerpt: searchExcerpt(excerpt, excerpt_start, text_length), sections }
 	})
 }

@@ -11,6 +11,7 @@
 		type="button"
 		bind:data-id="props.id"
 		on:click="() => count.value++"
-		>{props.id}: {count.value}</button
 	>
+		{props.id}: {count.value}
+	</button>
 </template>

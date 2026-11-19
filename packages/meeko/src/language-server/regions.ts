@@ -123,3 +123,61 @@ export function tagAt(source: string, offset: number): TagContext | undefined {
 		...(quote ? { value: { attribute, start: valueStart } } : {}),
 	}
 }
+
+/** Index after the `}` that closes the `{` at `start`, skipping strings and nested braces. */
+function braceEnd(source: string, start: number, limit: number): number {
+	let depth = 0
+	for (let index = start; index < limit; index++) {
+		const char = source[index]
+		if (char === '"' || char === "'" || char === '`') {
+			const close = source.indexOf(char, index + 1)
+			if (close < 0 || close >= limit) return limit
+			index = close
+		} else if (char === '{') depth++
+		else if (char === '}' && --depth === 0) return index + 1
+	}
+	return limit
+}
+
+/**
+ * Tramos de la plantilla donde la gramática pinta TypeScript: las interpolaciones `{…}` y los
+ * valores entre comillas de los atributos. Fuera de ellos (nombres de etiqueta y de atributo,
+ * texto) un token semántico taparía el color de la gramática.
+ * @param source Texto completo del `.meeko`.
+ * @returns Tramos `[inicio, fin)` ordenados; `undefined` si el archivo no tiene plantilla.
+ */
+export function templateExpressionRanges(source: string): { readonly template: Region; readonly ranges: ReadonlyArray<readonly [number, number]> } | undefined {
+	const template = templateRegion(source)
+	if (!template) return undefined
+	const ranges: Array<readonly [number, number]> = []
+	const limit = template.contentEnd
+	let index = template.contentStart
+	while (index < limit) {
+		if (source.startsWith('<!--', index)) {
+			const close = source.indexOf('-->', index + 4)
+			index = close < 0 || close >= limit ? limit : close + 3
+		} else if (source[index] === '{') {
+			const end = braceEnd(source, index, limit)
+			ranges.push([index, end])
+			index = end
+		} else if (source[index] === '<' && /[A-Za-z/]/.test(source[index + 1] ?? '')) {
+			// Inside a tag: a quoted value or `{…}` is an expression; the tag ends at `>` outside them.
+			index++
+			while (index < limit && source[index] !== '>') {
+				const char = source[index]!
+				if (char === '"' || char === "'") {
+					const close = source.indexOf(char, index + 1)
+					const end = close < 0 || close >= limit ? limit : close
+					ranges.push([index + 1, end])
+					index = end + 1
+				} else if (char === '{') {
+					const end = braceEnd(source, index, limit)
+					ranges.push([index, end])
+					index = end
+				} else index++
+			}
+			index++
+		} else index++
+	}
+	return { template, ranges }
+}

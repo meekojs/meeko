@@ -15,7 +15,7 @@ related:
   - "syntax:meekoawait"
   - docs/framework.md#streaming-ssr-render-stream
   - docs/framework.md#modos-de-render
-source-hash: 5cdb8031f1d211925c885e71c14ae8653c26550628aa11e7ee6b1feaba23389e
+source-hash: 101fa9c1c235856fc823369a61fe1fb21df8e2b19b3c7c8d3cb5db27bc00fda1
 ---
 
 `defer(fábrica)` or `defer(promesa)` marks slow page data. With `render: "stream"`, the server sends HTML before the value resolves and the value arrives later in the same response; the page reads it with reactive `status`, `value` and `error`. With `"ssr"` or `"prerender"`, the server awaits it before rendering, so HTML always contains it.
@@ -63,7 +63,7 @@ const props = defineProps<Props>();
 </template>
 ```
 
-The title arrives in the first byte; comments arrive when the API responds or after 5 seconds. Since `1.7`, `defer` is auto-imported in `<script server>` (including route options), `*.route.ts` sidecars and `server/`; previously you had to import it from `@meekojs/meeko/framework`, and explicit imports still work.
+The title arrives in the first byte; comments arrive when the API responds or after 5 seconds. Since `1.7`, `defer` is auto-imported in `<script server>` (including route options), `*.route.ts` sidecars and `server/`; previously you had to import it from `@meekojs/meeko/framework`, and explicit imports still work. It is auto-imported only in server code: in a component's `<script>` or a `render: "client"` sidecar, which reach the browser, import it from `@meekojs/meeko/framework`.
 
 ## Parameters
 

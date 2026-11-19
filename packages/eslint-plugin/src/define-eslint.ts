@@ -33,6 +33,7 @@ export type DefineEslintRules = Partial<
 			'meeko/padding-line-between-macros': Linter.RuleEntry<[]>
 			'meeko/prefer-static-bindings': Linter.RuleEntry<[]>
 			'meeko/prefer-ui-components': Linter.RuleEntry<[{ allow?: Array<'button' | 'dialog' | 'input' | 'select' | 'table' | 'textarea'> }]>
+			'meeko/rules-of-composables': Linter.RuleEntry<[]>
 		}
 >
 
@@ -124,7 +125,8 @@ export function defineEslint<const Rules extends DefineEslintRules = DefineEslin
 		const recommended = typescript.configs['flat/recommended'] as unknown as Linter.Config[]
 		config.push(...recommended.map((entry) => ({ ...entry, files: typeScriptFiles })))
 	}
-	if (meeko) config.push(...plugin.configs.recommended)
+	if (meeko) config.push(...plugin.configs.recommended.filter((entry) => !entry.name?.startsWith('meeko/composables')))
+	config.push({ name: 'meeko/composables', files, plugins: { meeko: plugin }, rules: { 'meeko/rules-of-composables': 'error' } })
 	if (sorting !== false)
 		config.push({
 			name: 'meeko/perfectionist',
@@ -149,13 +151,15 @@ export function defineEslint<const Rules extends DefineEslintRules = DefineEslin
 	const core: Linter.RulesRecord = {}
 	const tsRules: Linter.RulesRecord = {}
 	const meekoRules: Linter.RulesRecord = {}
+	const sharedRules: Linter.RulesRecord = {}
 	const optionalRules: Linter.RulesRecord = {}
 	for (const [name, value] of Object.entries(options.rules ?? {})) {
 		const level = Array.isArray(value) ? value[0] : value
 		if (options.unusedImports && (name === 'no-unused-vars' || name === '@typescript-eslint/no-unused-vars') && level !== 'off' && level !== 0) {
 			throw new TypeError(`defineEslint: ${name} conflicts with unusedImports; configure unused-imports/no-unused-vars instead`)
 		}
-		if (name.startsWith('meeko/')) {
+		if (name === 'meeko/rules-of-composables') sharedRules[name] = value
+		else if (name.startsWith('meeko/')) {
 			if (!meeko) throw new TypeError(`defineEslint: ${name} requires meeko`)
 			if (!Object.hasOwn(plugin.rules ?? {}, name.slice('meeko/'.length))) throw new TypeError(`defineEslint: unknown rule ${name}`)
 			meekoRules[name] = value
@@ -182,6 +186,7 @@ export function defineEslint<const Rules extends DefineEslintRules = DefineEslin
 	if (Object.keys(core).length) config.push({ name: 'meeko/rules', files, rules: core })
 	if (Object.keys(tsRules).length) config.push({ name: 'meeko/typescript-rules', files: typedFiles, rules: tsRules })
 	if (Object.keys(meekoRules).length) config.push({ name: 'meeko/template-rules', files: meekoFiles, rules: meekoRules })
+	if (Object.keys(sharedRules).length) config.push({ name: 'meeko/composable-rules', files, rules: sharedRules })
 	if (Object.keys(optionalRules).length) config.push({ name: 'meeko/optional-rules', files, rules: optionalRules })
 	return [...config, ...overrides]
 }

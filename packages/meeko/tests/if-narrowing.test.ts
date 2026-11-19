@@ -49,6 +49,40 @@ const template = `<template>
   <div each:of="rows.value" each:as="row" each:key="row.id"><span if:when="row.owner">{row.owner.name}</span></div>
 </template>`
 
+test('short conditional chains narrow positive and negative branches in the CLI and editor', { timeout: 120_000 }, async () => {
+	const source = `<script lang="ts">
+const props=defineProps<{value: {kind:'number';amount:number}|{kind:'text';text:string}|null}>();
+</script>
+<template>
+<p if="props.value===null">Vacío</p>
+<p else-if="props.value.kind==='number'" bind:title="props.value.amount.toFixed()">{props.value.amount.toFixed()}</p>
+<p else>{props.value.text.toUpperCase()}</p>
+</template>`
+	const { root, cleanup } = await checkProject({ 'Chain.meeko': source })
+	try {
+		assert.deepEqual(await checkSource(source, join(root, 'Chain.meeko')), [])
+		const model = createEditorModel(source, join(root, 'Chain.meeko'))
+		try {
+			assert.deepEqual(
+				model.service.getSyntacticDiagnostics(model.virtualFilename).map((item) => item.messageText),
+				[],
+			)
+			assert.deepEqual(
+				model.service.getSemanticDiagnostics(model.virtualFilename).map((item) => item.messageText),
+				[],
+			)
+			const offset = source.indexOf('props.value.text.toUpperCase()')
+			assert.notEqual(model.toGenerated(offset), undefined)
+		} finally {
+			model.dispose()
+		}
+		const wrong = source.replace('props.value.text.toUpperCase()', 'props.value.amount.toFixed()')
+		assert.ok((await checkSource(wrong, join(root, 'Wrong.meeko'))).some((item) => item.code === 'TS2339'))
+	} finally {
+		await cleanup()
+	}
+})
+
 test("if:when narrows the types of its element's bindings and children in meeko check", { timeout: 120_000 }, async () => {
 	const { root, cleanup } = await checkProject({ 'WorkspaceHeader.meeko': header })
 	try {

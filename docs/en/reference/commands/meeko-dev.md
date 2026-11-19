@@ -14,7 +14,7 @@ related:
   - docs/framework.md#configuración
   - docs/framework.md#logs-del-servidor-en-la-consola-del-navegador
   - docs/devtools.md#puente-del-editor
-source-hash: e611983970f6de03f2422d7f6d9e388e969b052d727900331f397148d755e3e7
+source-hash: b039247a5a10eaf47160119e0c6c772df72154308dd38add618e60a4c59cde9a
 ---
 
 `meeko dev` starts the application in the specified directory (current directory by default) in development mode. It first reads the project's `.env`, loads `meeko.config.ts` and its modules and generates Vite entry points, route, contract and auto-import types and, since `1.7`, `.meeko/types/services.d.ts` in `.meeko/`. It then creates a Node HTTP server with Vite in middleware mode: SSR with uncompiled `app/` and `server/` modules, component and CSS HMR, and server logs in the browser console.
@@ -36,15 +36,16 @@ The [`meeko init-framework`](/en/docs/reference/meeko-init-framework) starter de
 
 ## Options
 
-| Option                   | Type   | Default                     | Description                                                                                                                                                      |
-| ------------------------ | ------ | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `[directorio]`           | path   | `.`                         | Project root. Also the folder whose `.env` is read.                                                                                                              |
-| `MEEKO_PORT` (or `PORT`) | number | first available from `4173` | HTTP port. Overrides `server.port` from `meeko.config.ts` (only with `adapter: "node"`). An explicitly specified port is used as-is: if occupied, startup fails. |
-| `MEEKO_HOST`             | text   | `127.0.0.1`                 | Listening address. Overrides `server.host`. With `0.0.0.0`, accepts connections from other machines. `HOST` remains valid, with a warning, until `2.0`.          |
-| `MEEKO_PUBLIC_ORIGIN`    | origin | none                        | Public origin for HTTP and Socket `Origin` checks behind a proxy or tunnel.                                                                                      |
-| `MEEKO_HMR_PORT`         | number | derived from HTTP port      | Vite HMR WebSocket port, listening only on `127.0.0.1`.                                                                                                          |
-| `MEEKO_EDITOR_BRIDGE=0`  | `0`    | enabled                     | Disables the editor bridge (extension live values). Since `1.7.1`, `meeko dev` reports this after the URL and the extension shows it in the status bar.          |
-| `MEEKO_LINK_WATCH=0`     | `0`    | enabled                     | With linked `@meekojs/meeko` (`link:`, `npm link`, a workspace), does not restart the server when the package rebuilds: only warns.                              |
+| Option                   | Type   | Default                     | Description                                                                                                                                                                                                    |
+| ------------------------ | ------ | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `[directorio]`           | path   | `.`                         | Project root. Also the folder whose `.env` is read.                                                                                                                                                            |
+| `MEEKO_PORT` (or `PORT`) | number | first available from `4173` | HTTP port. Overrides `server.port` from `meeko.config.ts` (only with `adapter: "node"`). An explicitly specified port is used as-is: if occupied, startup fails.                                               |
+| `MEEKO_HOST`             | text   | `127.0.0.1`                 | Listening address. Overrides `server.host`. With `0.0.0.0`, accepts connections from other machines. `HOST` remains valid, with a warning, until `2.0`.                                                        |
+| `MEEKO_PUBLIC_ORIGIN`    | origin | none                        | Public origin for HTTP and Socket `Origin` checks behind a proxy or tunnel.                                                                                                                                    |
+| `MEEKO_HMR_PORT`         | number | derived from HTTP port      | Vite HMR WebSocket port, listening only on `127.0.0.1`.                                                                                                                                                        |
+| `MEEKO_ALLOWED_HOSTS`    | list   | none                        | Since `1.10`. Hosts (or `true`) added to `dev.allowedHosts`, separated by commas, to open `meeko dev` through a proxy or a tunnel; see [`dev`](../config/config-dev.md#opening-meeko-dev-from-another-device). |
+| `MEEKO_EDITOR_BRIDGE=0`  | `0`    | enabled                     | Disables the editor bridge (extension live values). Since `1.7.1`, `meeko dev` reports this after the URL and the extension shows it in the status bar.                                                        |
+| `MEEKO_LINK_WATCH=0`     | `0`    | enabled                     | With linked `@meekojs/meeko` (`link:`, `npm link`, a workspace), does not restart the server when the package rebuilds: only warns.                                                                            |
 
 Accepts no flags: `meeko dev --port 3000` exits with `Opción desconocida para dev: --port`. Set ports and address through environment variables, in the shell or `.env`.
 

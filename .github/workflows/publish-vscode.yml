@@ -13,6 +13,9 @@ on:
 permissions:
   contents: read
 
+env:
+  NODE_OPTIONS: --max-old-space-size=8192
+
 concurrency:
   group: publish-vscode-${{ github.ref }}
   cancel-in-progress: false
@@ -51,14 +54,9 @@ jobs:
         os: [windows-latest, ubuntu-24.04, macos-latest]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: ./.github/actions/setup-workspace
         with:
-          version: 12.14.0
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: '24'
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+          npm-cache: 'true'
       - run: pnpm run test
         working-directory: packages/vscode
       - run: pnpm run package:vsix
@@ -109,17 +107,10 @@ jobs:
           allow-no-subscriptions: true
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: steps.stores.outputs.any == 'true'
-      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: ./.github/actions/setup-workspace
         if: steps.stores.outputs.any == 'true'
         with:
-          version: 12.14.0
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        if: steps.stores.outputs.any == 'true'
-        with:
-          node-version: '24'
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-        if: steps.stores.outputs.any == 'true'
+          npm-cache: 'true'
       - name: Empaquetar los seis VSIX
         if: steps.stores.outputs.any == 'true'
         shell: pwsh
@@ -127,14 +118,7 @@ jobs:
           VSCODE_VERSION: ${{ needs.version.outputs.version }}
         run: |
           $packages = Join-Path $env:RUNNER_TEMP 'vsix'
-          New-Item -ItemType Directory -Force $packages | Out-Null
-          foreach ($target in @('win32-x64', 'win32-arm64', 'linux-x64', 'linux-arm64', 'darwin-x64', 'darwin-arm64')) {
-            pwsh -NoProfile -File packages/vscode/package-vsix.ps1 -Target $target
-            if ($LASTEXITCODE -ne 0) { throw "Falló el VSIX $target." }
-            $vsix = "packages/vscode/artifacts/meeko-language-$env:VSCODE_VERSION-$target.vsix"
-            if (!(Test-Path -LiteralPath $vsix -PathType Leaf)) { throw "Falta $vsix." }
-            Copy-Item -LiteralPath $vsix -Destination $packages
-          }
+          ./scripts/package-vsix-matrix.ps1 -ExpectedVersion $env:VSCODE_VERSION -OutputDirectory $packages
           Get-ChildItem -LiteralPath $packages -File | Format-Table Name, Length
       - name: Publicar en Visual Studio Marketplace
         if: steps.stores.outputs.vsce == 'true'
@@ -150,8 +134,7 @@ jobs:
           # la pasaba carácter a carácter; construido así, sigue siendo un array.
           $auth = @()
           if ($env:USE_ENTRA -eq 'true') { $auth += '--azure-credential' }
-          $packages = @(Get-ChildItem -LiteralPath (Join-Path $env:RUNNER_TEMP 'vsix') -Filter '*.vsix' -File | ForEach-Object FullName)
-          if ($packages.Count -ne 6) { throw "Se esperaban 6 VSIX; hay $($packages.Count)." }
+          $packages = @(./scripts/release-assets.ps1 -Directory (Join-Path $env:RUNNER_TEMP 'vsix') -VscodeVersion $env:VSCODE_VERSION)
           $first = @($packages | Where-Object { $_ -like '*-darwin-arm64.vsix' })
           if ($first.Count -ne 1) { throw 'Falta el VSIX darwin-arm64.' }
           $rest = @($packages | Where-Object { $_ -ne $first[0] })
@@ -192,12 +175,12 @@ jobs:
         env:
           # ovsx lee el token de OVSX_PAT; nunca se pasa como argumento.
           OVSX_PAT: ${{ secrets.OVSX_PAT }}
+          VSCODE_VERSION: ${{ needs.version.outputs.version }}
         run: |
           # Un secreto pegado con un salto de línea o espacios al final hace que ovsx rechace la
           # cabecera Authorization («Invalid character in header content»).
           $env:OVSX_PAT = $env:OVSX_PAT.Trim()
-          $packages = @(Get-ChildItem -LiteralPath (Join-Path $env:RUNNER_TEMP 'vsix') -Filter '*.vsix' -File | ForEach-Object FullName)
-          if ($packages.Count -ne 6) { throw "Se esperaban 6 VSIX; hay $($packages.Count)." }
+          $packages = @(./scripts/release-assets.ps1 -Directory (Join-Path $env:RUNNER_TEMP 'vsix') -VscodeVersion $env:VSCODE_VERSION)
           # Uno a uno, para reconocer el resultado de cada plataforma. Una versión que subió un
           # intento anterior (por ejemplo, uno que acabó por un timeout) y que Open VSX aún no ha
           # activado no cuenta como duplicada para --skip-duplicate: ovsx falla con «… is already

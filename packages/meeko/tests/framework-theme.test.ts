@@ -24,7 +24,7 @@ import { checkApp } from '../src/framework/check-app.ts'
 import { loadMeekoConfig } from '../src/framework/config.ts'
 import { buildProject } from '../src/framework/project.ts'
 import { prepareFrameworkTypeDeclarations } from '../src/framework/type-declarations.ts'
-import { resolveThemeConfig, themeScript } from '../src/shared/theme.ts'
+import { resolveThemeConfig, THEME_TRANSITION_ATTRIBUTE, themeScript } from '../src/shared/theme.ts'
 import { staticAppConfig, writeStaticApp } from './helpers/static-app.ts'
 import { createTempProject, tempProject } from './helpers/temp-project.ts'
 
@@ -477,8 +477,10 @@ test('useTheme() rejects an unknown theme, and fails clearly without theme in th
 			theme.state.set('dark')
 			assert.equal(theme.state.resolved.value, 'dark')
 			assert.deepEqual(applied, ['light', 'dark'])
+			assert.equal(browser.document.documentElement.hasAttribute(THEME_TRANSITION_ATTRIBUTE), true)
 		} finally {
 			theme.dispose()
+			assert.equal(browser.document.documentElement.hasAttribute(THEME_TRANSITION_ATTRIBUTE), false)
 			browser.happyDOM.abort()
 		}
 		// On the server the theme is read-only: it changes in the browser.

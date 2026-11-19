@@ -1,0 +1,205 @@
+<script lang="ts">
+	import type { TableColumn, UIMenuEntry } from '@meekojs/ui/runtime'
+
+	import { englishExamples as examples } from '../../utils/examples.en'
+
+	const last = signal('No action yet.')
+	const row = signal('No row touched.')
+	const actions: UIMenuEntry[] = [
+		{ label: 'Rename', value: 'rename', shortcut: 'F2', icon: 'M10.5 3 13 5.5 6 12.5H3.5V10Z' },
+		{ label: 'Duplicate', value: 'duplicate', icon: 'M5.5 5.5h7v7h-7ZM3.5 10.5v-7h7' },
+		{ label: 'See Popover', to: '/popover' },
+		{ label: 'Archive', value: 'archive', disabled: true },
+		{ separator: true },
+		{ label: 'Delete', value: 'delete', tone: 'danger', icon: 'M3.5 4.5h9M6.5 4.5v-1h3v1M4.5 4.5l.5 8h6l.5-8' },
+	]
+	const files = [
+		{ id: 1, name: 'Quarterly report', actions: '' },
+		{ id: 2, name: 'Budget 2027', actions: '' },
+	]
+	const fileColumns = [
+		{ key: 'name', label: 'File', rowHeader: true },
+		{ key: 'actions', label: 'Actions', numeric: true },
+	] satisfies TableColumn<(typeof files)[number]>[]
+	const rowActions = (file: string): UIMenuEntry[] => [
+		{ label: 'Open', onSelect: () => (row.value = 'Opened: ' + file + '.') },
+		{ label: 'Download', onSelect: () => (row.value = 'Downloaded: ' + file + '.') },
+		{ separator: true },
+		{ label: 'Delete', tone: 'danger', onSelect: () => (row.value = 'Deleted: ' + file + '.') },
+	]
+</script>
+
+<template>
+	<DocsPage
+		locale="en"
+		title="Menu"
+		description="An action menu with the Menu Button pattern: trigger, items from data, links, separators and full keyboard support."
+	>
+		<p>
+			<code>UIMenu</code>
+			is a
+			<MeekoLink to="/popover">UIPopover</MeekoLink>
+			with
+			<code>role="menu"</code>
+			: the trigger carries
+			<code>aria-haspopup="menu"</code>
+			and
+			<code>aria-expanded</code>
+			, the list opens in the top layer with the
+			<code>popover</code>
+			attribute, also without JavaScript, and it is anchored with CSS. The arrows move through the items,
+			<code>Home</code>
+			and
+			<code>End</code>
+			go to the ends, a letter jumps to the item that starts with it,
+			<code>Esc</code>
+			closes,
+			<code>Tab</code>
+			leaves and the focus returns to the trigger on closing.
+		</p>
+		<h2 id="actions">Actions, links and separators</h2>
+		<p>
+			Each item of
+			<code>items</code>
+			is an action, a
+			<code>button</code>
+			that calls
+			<code>onSelect</code>
+			, or a link with
+			<code>href</code>
+			or
+			<code>to</code>
+			, which navigates with MeekoLink.
+			<code>{'{ separator: true }'}</code>
+			draws a line between groups,
+			<code>tone: 'danger'</code>
+			marks a destructive action and an item with
+			<code>disabled</code>
+			is shown, but the arrows skip it. The
+			<code>select</code>
+			event receives the chosen item.
+		</p>
+		<DocsPreview>
+			<UIMenu
+				triggerLabel="Project actions"
+				bind:items="actions"
+				on:select="(item) => (last.value = 'Chosen: ' + item.label + '.')"
+			/>
+			<p
+				id="menu-status"
+				class="docs-status"
+				role="status"
+			>
+				{last.value}
+			</p>
+		</DocsPreview>
+		<DocsCode bind:code="examples.menu" />
+		<h2 id="row">Row menu</h2>
+		<p>
+			Without
+			<code>triggerLabel</code>
+			or a
+			<code>trigger</code>
+			snippet, the trigger is an icon-only button with three dots, named “More actions” in the language of the document. Give it a name of its own with
+			<code>ariaLabel</code>
+			when there are several on the page.
+		</p>
+		<DocsPreview layout="stack">
+			<UITable
+				caption="Files"
+				density="compact"
+				rowKey="id"
+				bind:hideCaption="true"
+				bind:rows="files"
+				bind:columns="fileColumns"
+			>
+				<snippet
+					name="cell-actions"
+					params="file"
+				>
+					<UIMenu
+						size="sm"
+						placement="bottom-end"
+						bind:ariaLabel="'Actions for ' + file.name"
+						bind:items="rowActions(file.name)"
+					/>
+				</snippet>
+			</UITable>
+			<p
+				id="row-status"
+				class="docs-status"
+				role="status"
+			>
+				{row.value}
+			</p>
+		</DocsPreview>
+		<DocsCode bind:code="examples.menuRow" />
+		<h2 id="snippets">Custom trigger and items</h2>
+		<p>
+			The
+			<code>trigger</code>
+			snippet puts its content in the trigger button, and
+			<code>anchor</code>
+			replaces it with one of your own, as in UIPopover. The
+			<code>item</code>
+			snippet paints the inside of each item of
+			<code>items</code>
+			, and loose content is added at the end of the list: elements with
+			<code>role="menuitem"</code>
+			, which get the same keyboard.
+		</p>
+		<DocsCode bind:code="examples.menuSnippets" />
+		<h2 id="api">API</h2>
+		<DocsApi
+			caption="UIMenu props"
+			bind:rows="[
+				{ name: 'items', type: 'readonly UIMenuEntry[]', description: 'Actions, links and separators, in order.' },
+				{ name: 'triggerLabel', type: 'string', description: 'Text of the trigger, followed by a chevron. Without it or a trigger snippet, a three-dot button.' },
+				{ name: 'ariaLabel', type: 'string', default: 'More actions', description: 'Accessible name of the trigger; the default text only on the icon-only one.' },
+				{ name: 'label', type: 'string', description: 'aria-label of the list. Without it, the trigger names it.' },
+				{ name: 'variant / size', type: 'UIButton', default: 'secondary (ghost without text) / md', description: 'Look of the trigger.' },
+				{ name: 'disabled', type: 'boolean', default: 'false', description: 'Disables the trigger.' },
+				{ name: 'placement / offset', type: 'PopoverPlacement / number', default: 'bottom-start / 4', description: 'Where the list opens and how far.' },
+				{ name: 'model', type: 'Signal<boolean>', default: 'false', description: 'Whether the list is open, two-way.' },
+				{ name: 'triggerId', type: 'string', description: 'id of the trigger. By default, one that is stable between SSR and hydration.' },
+				{ name: 'class / ui', type: 'string / object', description: 'Classes of the list and of base, trigger, chevron, item, icon, label, shortcut and separator.' },
+			]"
+		/>
+		<DocsApi
+			caption="Fields of an item (UIMenuItem)"
+			bind:rows="[
+				{ name: 'label', type: 'string', description: 'Required. Visible text, also used to jump by typing.' },
+				{ name: 'onSelect', type: '(item) => void', description: 'Action when chosen. Excludes href and to.' },
+				{ name: 'href / to', type: 'string / route', description: 'Destination of a link; to navigates with MeekoLink, with typed params and search.' },
+				{ name: 'value', type: 'string', description: 'Free identifier, to recognize it in select.' },
+				{ name: 'tone', type: 'neutral | danger', default: 'neutral', description: 'danger for a destructive action.' },
+				{ name: 'disabled', type: 'boolean', default: 'false', description: 'Visible but not choosable.' },
+				{ name: 'icon', type: 'string', description: 'Decorative SVG path, on a 16 by 16 grid.' },
+				{ name: 'shortcut', type: 'string', description: 'Shortcut shown after the text; the application implements it.' },
+			]"
+		/>
+		<p>
+			The
+			<code>select</code>
+			event receives the item, after its
+			<code>onSelect</code>
+			. The types
+			<code>UIMenuProps</code>
+			,
+			<code>UIMenuEntry</code>
+			,
+			<code>UIMenuItem</code>
+			and
+			<code>MenuSnippets</code>
+			are exported from
+			<code>@meekojs/ui/runtime</code>
+			, and
+			<code>ui.defaults.menu</code>
+			accepts
+			<code>class</code>
+			and
+			<code>ui</code>
+			.
+		</p>
+	</DocsPage>
+</template>

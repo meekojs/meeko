@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { type ChildProcess, spawn } from 'node:child_process'
 import { once } from 'node:events'
+import { realpathSync } from 'node:fs'
 import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:net'
 import { dirname, join } from 'node:path'
@@ -10,7 +11,7 @@ import { chromium } from 'playwright-core'
 
 import { resolveMeekoModules } from '../src/framework/module-loader'
 import { buildProject } from '../src/framework/project'
-import { frameworkStylesheets, globalStylesheetSnapshotFile } from '../src/framework/styles'
+import { directStylesheetUrl, frameworkStylesheets, globalStylesheetSnapshotFile } from '../src/framework/styles'
 import { defineMeekoModule } from '../src/modules/define-meeko-module'
 import { linkRepositoryPackages, repositoryRoot, stopChild, tempProject } from './helpers/temp-project'
 
@@ -36,6 +37,17 @@ async function freePort(): Promise<number> {
 	await once(server, 'close')
 	return address.port
 }
+
+test('directStylesheetUrl names each development stylesheet by its absolute path, so none is part of another', () => {
+	assert.equal(directStylesheetUrl('/srv/app/app/styles/main.css'), '/@fs/srv/app/app/styles/main.css?direct')
+	assert.equal(directStylesheetUrl('C:\\Work\\app\\app\\styles\\main.css'), '/@fs/C:/Work/app/app/styles/main.css?direct')
+	assert.equal(directStylesheetUrl('/srv/a b/#1?/main.css'), '/@fs/srv/a%20b/%231%3F/main.css?direct')
+	// Vite's client takes the first link whose URL contains the path of an update: the application's
+	// stylesheet must not be part of the URL of a module's sheet that ends like it.
+	const application = directStylesheetUrl('/srv/app/app/styles/main.css').replace(/\?direct$/, '')
+	const theme = directStylesheetUrl('/srv/app/node_modules/theme/src/app/styles/main.css').replace(/\?direct$/, '')
+	assert.ok(!theme.includes(application) && !application.includes(theme))
+})
 
 test('addStylesheet validates CSS files, preserves order, deduplicates and owns linked directories', async (context) => {
 	const root = await tempProject(context, 'registered-styles')
@@ -128,7 +140,8 @@ test('module styles use consumer PostCSS, import assets and enter SSR/static has
 		)
 		if (adapter === 'static') {
 			const html = await readFile(join(result.output, 'index.html'), 'utf8')
-			for (const file of styles) assert.ok(html.includes(file), file)
+			// Without app/error.meeko the default error page has its own stylesheet, which the pages do not load.
+			for (const file of styles) assert.equal(html.includes(file), !file.startsWith('default-error-'), file)
 		}
 	}
 })
@@ -165,7 +178,14 @@ test('linked module CSS has SSR links, CSS-only HMR and a processed editor snaps
 	assert.equal(child.exitCode, null, logs)
 	const html = await (await fetch(origin)).text()
 	assert.match(html, /data-vite-dev-id="[^"]*styles\/main\.css"/)
-	assert.ok(html.indexOf('/@fs/') < html.indexOf('/app/styles/main.css?direct'), html)
+	// Module sheets first and the app's last, each by its absolute path: no URL is part of another (see directStylesheetUrl).
+	const linked = [...html.matchAll(/<link rel="stylesheet" href="([^"]+)" data-vite-dev-id=/g)].map((match) => match[1]!)
+	assert.equal(linked.length, 2, html)
+	assert.ok(
+		linked.every((href) => /^\/@fs\/[^/]/.test(href) && href.endsWith('?direct')),
+		html,
+	)
+	assert.equal(linked[1], directStylesheetUrl(realpathSync.native(join(root, 'app/styles/main.css'))), html)
 	browser = await chromium.launch({ ...(process.env.MEEKO_CHROME_PATH ? { executablePath: process.env.MEEKO_CHROME_PATH } : { channel: 'chrome' as const }), headless: true })
 	const page = await browser.newPage()
 	const errors: string[] = []

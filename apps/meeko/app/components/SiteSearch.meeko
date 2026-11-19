@@ -90,7 +90,6 @@
 			params="key"
 		>
 			<svg
-				class="meeko-ui-command-icon"
 				viewBox="0 0 24 24"
 				aria-hidden="true"
 			>
@@ -101,11 +100,8 @@
 				/>
 				<path d="m20 20-3.5-3.5" />
 			</svg>
-			<span class="meeko-ui-command-trigger-label">{t('search.trigger')}</span>
-			<span
-				class="meeko-ui-command-keys"
-				aria-hidden="true"
-			>
+			<span>{t('search.trigger')}</span>
+			<span aria-hidden="true">
 				<kbd>{key}</kbd>
 				<kbd>K</kbd>
 			</span>
@@ -115,10 +111,7 @@
 			params="item"
 		>
 			<strong>{item.title}</strong>
-			<span
-				class="meeko-ui-command-excerpt"
-				html="item.excerpt"
-			/>
+			<small html="item.excerpt" />
 		</snippet>
 		<snippet
 			name="status"

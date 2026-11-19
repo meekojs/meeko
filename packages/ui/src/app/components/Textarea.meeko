@@ -1,7 +1,12 @@
 <script lang="ts">
 	import type { UITextareaProps } from '../types/forms'
 
-	const { invalid, describedBy, spellcheck, class: className, ...rest } = defineProps<UITextareaProps>()
+	import { uiTheme } from '../utils/defaults'
+	import { textarea } from '../variants/input'
+
+	const { invalid, describedBy, spellcheck, class: ownClass, ...rest } = defineProps<UITextareaProps>()
+
+	const theme = uiTheme('textarea', () => ({ class: ownClass }))
 
 	const value = defineModel<string>({ default: '' })
 </script>
@@ -12,7 +17,7 @@
 		bind:spellcheck="spellcheck === undefined ? undefined : String(spellcheck)"
 		bind:aria-invalid="invalid ? 'true' : undefined"
 		bind:aria-describedby="describedBy ?? rest['aria-describedby']"
-		bind:class="['meeko-ui-input', 'meeko-ui-textarea', className].filter(Boolean).join(' ')"
+		bind:class="textarea({ class: theme.class })"
 		bind="rest"
 	/>
 </template>

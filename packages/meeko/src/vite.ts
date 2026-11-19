@@ -19,7 +19,7 @@ import { moduleSpecifiers } from './compiler/import-graph'
 import { sourceMapForCompiled } from './compiler/sourcemap'
 import { assertRouteBlockPlacement, isPageFile, routeBlockFile, routeBlockId, routeBlockSource, withoutRouteBlock } from './compiler/transforms/route-block'
 import { resolveProjectAliases, resolveProjectAliasesSync } from './framework/aliases'
-import { clientMiddlewareSource, clientPluginsSource, clientRoutesSource, clientSidecarsSource, readBuildAppData, serverAppSource } from './framework/app-manifest'
+import { clientMiddlewareSource, clientPluginsSource, clientRoutesSource, clientSidecarsSource, portableErrorPage, readBuildAppData, serverAppSource } from './framework/app-manifest'
 import { generateAppTypeForFile, generateAppTypes } from './framework/check-app'
 import { componentDirectories, discoverConfiguredRoutes, loadConfiguredModules, loadMeekoConfig, resolveConfigSources } from './framework/config'
 import { builtinOptimizeInclude, devScanIgnored, invalidateDevModules, isComponentSource, isDevWatchIgnored, isDiscoverySource, isModuleScript } from './framework/dev-watch'
@@ -89,6 +89,16 @@ let viteFsDeny: Promise<string[]> | undefined
  * Vite's default `server.fs.deny`. A list returned from `config` replaces the default
  * when the user sets none, so the plugin adds its pattern to these.
  */
+/**
+ * Fingerprint of a compiled component without its CSS: the stylesheet text and the hash of its
+ * style module are left out, so two versions that only differ in `<style>` share it.
+ */
+function hotCodeSignature(code: string, css: string): string {
+	let stripped = code.replaceAll(/\?meeko-style=[0-9a-f]{64}/g, '')
+	if (css) stripped = stripped.split(JSON.stringify(css)).join('')
+	return createHash('sha256').update(stripped).digest('hex').slice(0, 16)
+}
+
 function defaultFsDeny(): Promise<string[]> {
 	viteFsDeny ??= resolveConfig({ configFile: false, envDir: false, logLevel: 'silent', plugins: [] }, 'serve').then((resolved) => [...resolved.server.fs.deny])
 	return viteFsDeny
@@ -306,11 +316,14 @@ export function meeko(): Plugin {
 			}
 			if (virtual === clientPagesModule) {
 				const routes = await discoverConfiguredRoutes(root)
+				const errorPage = await portableErrorPage(root)
 				const unique = [...new Set(routes.flatMap((route) => [route.file, ...route.layouts, ...(route.error ? [route.error] : [])]))]
-				const entries = unique.map((file) => {
+				const keys = unique.map((file) => {
 					const path = relative(root, file).replaceAll('\\', '/')
 					if (path === '..' || path.startsWith('../') || isAbsolute(path)) throw new Error(`Page outside Meeko project: ${file}`)
-					const specifier = `/${path}`
+					return `/${path}`
+				})
+				const entries = [...new Set([...keys, errorPage.file, ...errorPage.layouts])].map((specifier) => {
 					return `${JSON.stringify(specifier)}: () => import(${JSON.stringify(specifier)})`
 				})
 				return `export const modules = {${entries.join(',')}};`
@@ -432,8 +445,10 @@ export function meeko(): Plugin {
 			// The SSR document gives the inline <style> of this CSS the id of the client's module, so
 			// Vite's client adopts it in place instead of appending a copy (see style-modules.ts).
 			const styleRegistration = serverTransform && isDev && result.css ? `\n__meeko.registerStyleModule(css, ${JSON.stringify(cssModule)});` : ''
-			const hotCode = isDev ? `\nif (import.meta.hot) {\n  __meeko.enableHotModule(__hotId);\n  __meeko.connectLiveBridge(import.meta.hot);\n  import.meta.hot.accept((next) => { if (next) __meeko.replaceHotModule(__hotId, next); });\n}\n` : ''
 			const code = transformAutoImports(source, filename, result.code, registry, serverTransform ? 'server' : 'client')
+			// Two versions with the same code but another CSS differ only in their <style>: the update
+			// replaces the sheet and leaves the mounted instances alone. `hot.data` outlives each version.
+			const hotCode = isDev ? `\nif (import.meta.hot) {\n  __meeko.enableHotModule(__hotId);\n  __meeko.connectLiveBridge(import.meta.hot);\n  const __meekoHotData = import.meta.hot.data;\n  const __meekoHotCode = ${JSON.stringify(hotCodeSignature(code, result.css))};\n  __meekoHotData.meekoCode = __meekoHotCode;\n  import.meta.hot.accept((next) => { if (next) __meeko.acceptHotModule(__hotId, next, { styleOnly: __meekoHotData.meekoCode === __meekoHotCode && next.css !== css }); });\n}\n` : ''
 			await checkBoundary(code, result.code)
 			const shifted = code.length - result.code.length
 			const mappings = result.mappings.map((mapping) => ({

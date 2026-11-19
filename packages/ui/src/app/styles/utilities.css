@@ -1,4 +1,7 @@
-/* Shared by every component: load first, so that a component's own class can still override them. */
+/*
+ * The public utility of the package, for an app's own markup: the apps do not compile Tailwind, so they
+ * cannot write ui:sr-only. The components of UI use ui:sr-only instead.
+ */
 .meeko-ui-sr-only {
 	position: absolute;
 	clip-path: inset(50%);
@@ -9,14 +12,4 @@
 	height: var(--ui-border-width);
 	overflow: hidden;
 	white-space: nowrap;
-}
-.meeko-ui-icon {
-	flex: none;
-	fill: none;
-	stroke: currentColor;
-	stroke-linecap: round;
-	stroke-linejoin: round;
-	stroke-width: var(--ui-icon-stroke-width);
-	width: var(--ui-icon-size);
-	height: var(--ui-icon-size);
 }

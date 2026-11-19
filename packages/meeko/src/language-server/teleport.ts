@@ -11,6 +11,9 @@ const teleportTag = 'MeekoTeleport'
 
 /** What `<MeekoTeleport>` admits, besides `if:when` and `each:of`. */
 const teleportAttributes = [
+	{ name: 'if', detail: 'Primera rama de una cadena condicional', insert: 'if="$1"', trigger: false },
+	{ name: 'else-if', detail: 'Alternativa a la rama anterior', insert: 'else-if="$1"', trigger: false },
+	{ name: 'else', detail: 'Alternativa final, sin valor', insert: 'else', trigger: false },
 	{ name: 'to', detail: 'Destino: "body" o "#id" de un elemento del documento', insert: 'to="$1"', trigger: true },
 	{ name: 'bind:to', detail: 'Destino calculado: una expresión de tipo "body" | `#${string}`', insert: 'bind:to="$1"', trigger: false },
 	{ name: 'disabled', detail: 'Pinta el contenido en su sitio, sin moverlo', insert: 'disabled', trigger: false },

@@ -3,20 +3,27 @@
 	// Escape and on a click outside without JavaScript, and it floats, so it never moves the page.
 	import type { UIHeaderProps } from '../types/navigation'
 
+	import { uiTheme } from '../utils/defaults'
 	import { icons } from '../utils/icons'
 	import { uiMessages } from '../utils/messages'
 	import { followsLink, isCurrentLink, linkTarget } from '../utils/navigation'
+	import { container } from '../variants/container'
+	import { header } from '../variants/header'
 	import * as Brand from './internal/Brand.meeko'
 	import * as Icon from './internal/Icon.meeko'
 	import * as ItemLink from './internal/ItemLink.meeko'
 
 	const props = defineProps<UIHeaderProps>({ sticky: true, size: '2xl' })
 
+	const theme = uiTheme('header', () => props)
+
 	const snippets = defineSnippets<{ brand?: []; nav?: []; actions?: []; menu?: [] }>()
 
 	const id = useId()
 	const text = uiMessages().header
 	const panel = useElementRef('panel')
+
+	const classes = header()
 
 	/** A client navigation keeps the header mounted: the chosen link closes the menu. */
 	function closeMenu(event: MouseEvent): void {
@@ -27,14 +34,9 @@
 <template>
 	<header
 		data-pagefind-ignore
-		bind:class="['meeko-ui-header', props.class].filter(Boolean).join(' ')"
-		bind:data-sticky="props.sticky ? '' : undefined"
+		bind:class="classes.base({ sticky: props.sticky, class: [theme.ui.base, theme.class] })"
 	>
-		<div
-			class="meeko-ui-container meeko-ui-header-bar"
-			data-gutter="md"
-			bind:data-size="props.size"
-		>
+		<div bind:class="classes.bar({ class: [container({ size: props.size, gutter: 'md' }), theme.ui.bar] })">
 			<render
 				if:when="snippets.brand"
 				snippet="snippets.brand"
@@ -49,8 +51,8 @@
 			/>
 			<nav
 				if:when="!snippets.nav && props.items?.length"
-				class="meeko-ui-header-nav"
 				bind:aria-label="props.label ?? text.label"
+				bind:class="classes.nav({ class: theme.ui.nav })"
 			>
 				<ItemLink
 					each:of="props.items ?? []"
@@ -58,13 +60,14 @@
 					each:key="item.label"
 					bind:link="linkTarget(item)"
 					bind:current="isCurrentLink(item, props.current) ? 'page' : undefined"
+					bind:class="classes.link({ class: theme.ui.link })"
 				>
 					{item.label}
 				</ItemLink>
 			</nav>
 			<div
 				if:when="snippets.actions || props.items?.length || snippets.menu"
-				class="meeko-ui-header-actions"
+				bind:class="classes.actions({ class: theme.ui.actions })"
 			>
 				<render
 					if:when="snippets.actions"
@@ -73,9 +76,9 @@
 				<button
 					if:when="props.items?.length || snippets.menu"
 					type="button"
-					class="meeko-ui-header-toggle"
 					bind:popovertarget="id + '-menu'"
 					bind:aria-label="props.menuLabel ?? text.menu"
+					bind:class="classes.toggle({ class: theme.ui.toggle })"
 				>
 					<Icon bind:path="icons.menu" />
 				</button>
@@ -85,13 +88,14 @@
 			ref:panel
 			if:when="props.items?.length || snippets.menu"
 			popover="auto"
-			class="meeko-ui-header-menu"
 			bind:id="id + '-menu'"
+			bind:class="classes.menu({ class: theme.ui.menu })"
 			on:click="closeMenu"
 		>
 			<nav
 				if:when="props.items?.length"
 				bind:aria-label="props.menuLabel ?? text.menu"
+				bind:class="classes.menuNav({ class: theme.ui.menuNav })"
 			>
 				<ItemLink
 					each:of="props.items ?? []"
@@ -99,6 +103,7 @@
 					each:key="item.label"
 					bind:link="linkTarget(item)"
 					bind:current="isCurrentLink(item, props.current) ? 'page' : undefined"
+					bind:class="classes.link({ class: theme.ui.link })"
 				>
 					{item.label}
 				</ItemLink>

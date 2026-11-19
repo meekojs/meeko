@@ -12,7 +12,7 @@ import { join } from 'node:path'
 import { after, before, describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 
-import { assertProductionAuth, authConfig, loginLocation, logoutLocation, parseDuration, safeNext, withConstantFailure } from '../server/dashboard/auth'
+import { assertProductionAuth, authConfig, failureDelayMs, loginLocation, loginVerdict, logoutLocation, maxFailureDelayMs, parseDuration, safeNext, withConstantFailure } from '../server/dashboard/auth'
 import { createDashboardSessions } from '../server/dashboard/sessions'
 import runtime from '../server/runtime'
 import { startDashboard, testAdmin } from './fixtures/auth.mjs'
@@ -104,6 +104,39 @@ describe('login rules', () => {
 		assert.throws(() => createDashboardSessions(config, null, true), /Persistent session storage/)
 	})
 
+	test('failures lock one client out of a user name, never the right password from another', async () => {
+		const windows = new Map<string, number>()
+		const count = async (key: string) => {
+			windows.set(key, (windows.get(key) ?? 0) + 1)
+			return { count: windows.get(key)! }
+		}
+		const attempt = (address: string | undefined, valid: boolean, username = 'Admin') => loginVerdict({ count, username, address, valid, userLimit: 5, windowMs: 60_000 })
+		// An attacker fails many times from one IP: past the limit, that IP is refused even when right.
+		const outcomes: string[] = []
+		for (let index = 0; index < 7; index++) outcomes.push((await attempt('203.0.113.9', false)).outcome)
+		assert.deepEqual(outcomes, ['invalid', 'invalid', 'invalid', 'invalid', 'invalid', 'limited', 'limited'])
+		const locked = await attempt('203.0.113.9', true)
+		assert.equal(locked.outcome, 'limited')
+		// The refusal of a right password from the locked client waits as long as a wrong one.
+		assert.deepEqual(await attempt('203.0.113.9', false, 'admin'), { outcome: 'limited', delayMs: failureDelayMs(9, 5) })
+		assert.ok(locked.delayMs > 0)
+		// The administrator, from another IP, still logs in: the failures did not lock the account.
+		assert.deepEqual(await attempt('198.51.100.1', true), { outcome: 'ok', delayMs: 0 })
+		// Failures spread over many IPs slow every refusal down, without a lock.
+		let last = { outcome: '', delayMs: 0 }
+		for (let index = 0; index < 4; index++) last = await attempt(`192.0.2.${index}`, false)
+		assert.deepEqual(last, { outcome: 'invalid', delayMs: failureDelayMs(13, 5) })
+		assert.deepEqual(await attempt('198.51.100.2', true), { outcome: 'ok', delayMs: 0 })
+		// The delay grows and has a ceiling.
+		assert.deepEqual(
+			[4, 5, 6, 7, 8, 100].map((failures) => failureDelayMs(failures, 5)),
+			[0, 0, 1000, 2000, 4000, maxFailureDelayMs],
+		)
+		// A name that does not exist counts the same way, so the limit does not reveal accounts.
+		for (let index = 0; index < 5; index++) await attempt('203.0.113.9', false, 'nadie')
+		assert.equal((await attempt('203.0.113.9', false, 'nadie')).outcome, 'limited')
+	})
+
 	test('a failed login always takes at least the same time', async () => {
 		const started = performance.now()
 		await assert.rejects(
@@ -139,6 +172,8 @@ describe('login over HTTP', { skip: url ? false : 'DATABASE_URL is not set', tim
 			DASHBOARD_LOGIN_WINDOW: '15m',
 			DASHBOARD_SESSION_TTL: '2h',
 			DASHBOARD_SESSION_IDLE: '20m',
+			// X-Forwarded-For gives the client IP, so a test can log in from another address.
+			MEEKO_TRUST_PROXY: '1',
 		})
 		origin = server.origin
 	})
@@ -316,12 +351,27 @@ describe('login over HTTP', { skip: url ? false : 'DATABASE_URL is not set', tim
 		assert.ok(redirected(await page('/', expired)))
 	})
 
-	test('login attempts are limited per user name, for any name, and per IP', async () => {
-		// The account already used its 8 attempts of the window in the tests above, logins included.
+	test('login attempts are limited per user name and IP, for any name, and per IP', async () => {
+		// This client already used its 8 attempts of the window in the tests above, logins included.
 		const blocked = await login(account.username, account.password)
 		assert.equal(blocked.status, 429)
 		assert.equal(((await blocked.json()) as { code: string }).code, 'RATE_LIMITED')
 		assert.equal(sessionCookie(blocked), undefined, 'not even with the right password')
+		// Another client still logs in: failures from one IP do not lock the administrator out.
+		const elsewhere = await login(account.username, account.password, { 'x-forwarded-for': '198.51.100.7' })
+		assert.equal(elsewhere.status, 200)
+		assert.ok(sessionCookie(elsewhere))
+		// Failures from many IPs (3 above, 6 here, with a limit of 8) make each refusal wait longer.
+		let elapsed = 0
+		for (let attempt = 1; attempt <= 6; attempt++) {
+			const started = performance.now()
+			const response = await login(account.username, 'not-the-password', { 'x-forwarded-for': `203.0.113.${attempt}` })
+			elapsed = performance.now() - started
+			assert.equal(response.status, 401)
+		}
+		assert.ok(elapsed >= 1950, `${elapsed} ms`)
+		// And still the right password from a new IP logs in.
+		assert.equal((await login(account.username, account.password, { 'x-forwarded-for': '198.51.100.8' })).status, 200)
 		// A name that does not exist is limited the same way, so the limit does not reveal accounts.
 		let last = 0
 		for (let attempt = 1; attempt <= 9; attempt++) last = (await login('Nadie', 'x')).status

@@ -96,6 +96,11 @@ interface Observer {
 	disposed: boolean
 	/** Lecturas atribuidas a tramos concretos durante la última ejecución; sólo en desarrollo. */
 	readSites?: { owner: Owner | undefined; bySignal: Map<InternalSignal<unknown>, EffectSource[]> } | undefined
+	/**
+	 * What one run of a public `effect` created: its `onCleanup` calls, the cleanup it returned, and
+	 * the effects, `computed` and roots it created. Released before the next run and when it stops.
+	 */
+	scope?: Owner
 }
 
 interface Owner {
@@ -291,10 +296,36 @@ function asyncFailureReport(owner: Owner | undefined, source: 'effect' | 'cleanu
 
 type SyncCleanupCallback<F extends () => unknown> = [Extract<ReturnType<F>, PromiseLike<unknown>>] extends [never] ? F : never
 
+/** Guidance shared by the error and the development warning of `onCleanup` without a root. */
+export const cleanupWithoutOwnerMessage = 'onCleanup() requires an active component root: call it synchronously in the component script, a composable it calls, an effect, onMounted or createRoot. After an await there is no active root: register the cleanup before the first await, or return it from onMounted or from an effect.'
+
 /**
- * Registra en la raíz activa la liberación síncrona de un recurso externo. Se ejecuta al desmontar
- * o liberar el componente, también tras un render o una hidratación que fallan. TypeScript y el
- * runtime rechazan un callback que devuelve una promesa.
+ * Whether the runtime runs in development: `import.meta.env.DEV` where a bundler defines it (Vite),
+ * otherwise `NODE_ENV` other than `production`. Without either, it is not development.
+ */
+export function isDevelopment(): boolean {
+	try {
+		const env = (import.meta as { env?: { DEV?: unknown } }).env
+		if (env && typeof env.DEV === 'boolean') return env.DEV
+	} catch {
+		/* `import.meta.env` may be a getter that throws in foreign hosts. */
+	}
+	const nodeEnv = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.NODE_ENV
+	return nodeEnv !== undefined && nodeEnv !== 'production'
+}
+
+/**
+ * Registra la liberación síncrona de un recurso externo en el propietario activo:
+ *
+ * - en el script de un componente, en un composable que llama o en `onMounted`, en el componente,
+ *   que la ejecuta al desmontarse o liberarse, también tras un render o una hidratación que fallan;
+ * - dentro de un `effect` (desde `1.10`), en esa ejecución del efecto: se ejecuta antes de la
+ *   siguiente ejecución y al detenerse el efecto;
+ * - dentro de `createRoot`, en esa raíz.
+ *
+ * TypeScript y el runtime rechazan un callback que devuelve una promesa. Sin un propietario activo
+ * (fuera de un componente o tras un `await`) lanza un error que indica qué usar y, en desarrollo,
+ * lo avisa también por consola, porque en una función `async` ese error suele perderse.
  *
  * @param release Función síncrona que libera el recurso.
  * @throws {Error} Sin una raíz de componente activa.
@@ -314,8 +345,55 @@ type SyncCleanupCallback<F extends () => unknown> = [Extract<ReturnType<F>, Prom
  * @see https://github.com/meekojs/meeko/blob/main/docs/api.md#reactividad
  */
 export function onCleanup<const F extends () => unknown>(release: SyncCleanupCallback<F>): void {
-	if (!activeOwner) throw new Error('onCleanup() requires an active component root')
+	if (!activeOwner) {
+		if (isDevelopment()) {
+			try {
+				console.warn(`[meeko] ${cleanupWithoutOwnerMessage}`)
+			} catch {
+				/* A broken console must not hide the error below. */
+			}
+		}
+		throw new Error(cleanupWithoutOwnerMessage)
+	}
 	activeOwner.children.add(release)
+}
+
+/** Throws the collected failures: the only one as is, several as an `AggregateError`. */
+function throwFailures(failures: readonly unknown[], message: string): void {
+	if (failures.length === 1) throw failures[0]
+	if (failures.length > 1) throw new AggregateError(failures, message)
+}
+
+/**
+ * Releases what an owner holds, in this order: its cleanups and child roots in registration order,
+ * then its observers (and what their runs created). Every step runs even if an earlier one fails;
+ * the failures are returned. The owner stays usable for new registrations.
+ */
+function releaseOwner(owner: Owner): unknown[] {
+	const failures: unknown[] = []
+	for (const child of [...owner.children]) {
+		owner.children.delete(child)
+		try {
+			const result = child()
+			if (observeReturnedPromise(result, asyncFailureReport(owner, 'cleanup', 'Meeko asynchronous cleanup rejected'))) {
+				failures.push(new TypeError('Meeko cleanup callbacks must be synchronous'))
+			}
+		} catch (error) {
+			failures.push(error)
+		}
+	}
+	for (const observer of [...owner.observers]) failures.push(...disposeObserver(observer))
+	owner.observers.clear()
+	owner.context.clear()
+	return failures
+}
+
+/** Stops an observer for good and releases what its last run created. */
+function disposeObserver(observer: Observer): unknown[] {
+	observer.disposed = true
+	pending.delete(observer)
+	detach(observer)
+	return observer.scope ? releaseOwner(observer.scope) : []
 }
 
 function detach(observer: Observer): void {
@@ -441,7 +519,8 @@ export function restoreSignal(target: Signal<unknown>, value: unknown): void {
 	else target.value = value
 }
 
-type SyncEffectCallback<F extends () => unknown> = [Extract<ReturnType<F>, PromiseLike<unknown>>] extends [never] ? F : never
+/** Rejects an asynchronous effect, and one that returns an asynchronous cleanup. */
+type SyncEffectCallback<F extends () => unknown> = [Extract<ReturnType<F>, PromiseLike<unknown>>] extends [never] ? ([Extract<ReturnType<F>, () => PromiseLike<unknown>>] extends [never] ? F : never) : never
 
 /**
  * Depth of renders whose output is discarded and that must not touch the browser: the render
@@ -469,27 +548,64 @@ export function isDryRender(): boolean {
 }
 
 /**
+ * Lo que puede devolver el callback de un {@link effect}: nada, o una limpieza síncrona que se
+ * ejecuta antes de la siguiente ejecución y al detener el efecto (desde `1.10`).
+ *
+ * @example
+ * ```ts
+ * import { effect, signal } from "@meekojs/meeko";
+ * import type { EffectResult } from "@meekojs/meeko";
+ *
+ * const delay = signal(1_000);
+ * const tick = (): EffectResult => {
+ *   const id = setInterval(() => console.log("tic"), delay.value);
+ *   return () => clearInterval(id);
+ * };
+ * effect(tick);
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/api.md#reactividad
+ */
+export type EffectResult = void | (() => void)
+
+/**
  * Ejecuta `fn` ahora y cada vez que cambia una señal que leyó. Pertenece a la raíz activa y se
  * libera con ella. El callback debe ser síncrono: TypeScript y el runtime rechazan uno que devuelve
  * una promesa. En SSR sólo se ejecuta la primera vez.
  *
- * @param fn Callback síncrono que lee señales.
+ * Desde `1.10` cada ejecución es propietaria de lo que registra: la función que devuelve `fn`, los
+ * `onCleanup` que llama y los `effect`, `computed` y `createRoot` que crea se liberan antes de la
+ * siguiente ejecución y al detener el efecto (con `stop`, o al liberar su componente o raíz). En
+ * SSR la limpieza se ejecuta al terminar el render, cuando se libera la raíz.
+ *
+ * @param fn Callback síncrono que lee señales; puede devolver una limpieza síncrona.
  * @param source Ubicación de la expresión para DevTools; la añade el compilador en desarrollo.
- * @returns Una función que detiene el observador.
+ * @returns Una función que detiene el observador y ejecuta su última limpieza.
+ * @throws {TypeError} Si `fn` devuelve una promesa.
  * @example
  * ```ts
  * import { effect, signal } from "@meekojs/meeko";
  *
- * const query = signal("");
+ * const delay = signal(1_000);
  * const stop = effect(() => {
- *   document.title = query.value ? `Buscar: ${query.value}` : "Buscar";
+ *   const id = setInterval(() => console.log("tic"), delay.value);
+ *   return () => clearInterval(id); // antes de cada nueva ejecución y al detenerlo
  * });
- * query.value = "meeko";
- * stop();
+ * delay.value = 500; // limpia el intervalo de 1 s y crea uno de 500 ms
+ * stop(); // limpia el último
  * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/api.md#reactividad
  */
 export function effect<const F extends () => unknown>(fn: SyncEffectCallback<F>, source?: EffectSource): () => void {
+	if (dryDepth > 0) return () => {}
+	return observe(fn, source, nextObserverId++, true)
+}
+
+/**
+ * An effect whose callback's return value is ignored and whose runs own nothing: what it creates
+ * belongs to the enclosing root, as `effect` did before `1.10`. The template bindings use it, since
+ * they manage the regions they create across runs. Internal.
+ */
+export function bindingEffect(fn: () => unknown, source?: EffectSource): () => void {
 	if (dryDepth > 0) return () => {}
 	return observe(fn, source)
 }
@@ -509,42 +625,55 @@ export function effectInOrder(order: number, fn: () => unknown, source?: EffectS
 	return observe(fn, source, order)
 }
 
-function observe(fn: () => unknown, source?: EffectSource, order = nextObserverId++): () => void {
+function observe(fn: () => unknown, source?: EffectSource, order = nextObserverId++, scoped = false): () => void {
 	const owner = activeOwner
+	// One owner per effect, reused by every run: released before the next one and when it stops.
+	const scope: Owner | undefined = scoped ? { observers: new Set(), children: new Set(), parent: owner, context: new Map() } : undefined
 	const observer: Observer = {
 		id: order,
 		dependencies: new Set(),
 		disposed: false,
+		...(scope ? { scope } : {}),
 		run() {
 			detach(observer)
+			const failures = scope ? releaseOwner(scope) : []
 			const previous = activeObserver
 			const previousOwner = activeOwner
 			activeObserver = observer
-			activeOwner = owner
+			activeOwner = scope ?? owner
 			try {
 				const result: unknown = fn()
 				if (observeReturnedPromise(result, asyncFailureReport(owner, 'effect', 'Meeko asynchronous effect rejected'))) {
-					stop()
-					throw new TypeError('Meeko effect callbacks must be synchronous')
+					failures.push(...stopObserver())
+					failures.push(new TypeError('Meeko effect callbacks must be synchronous'))
+				} else if (scope && typeof result === 'function') {
+					scope.children.add(result as () => unknown)
 				}
+			} catch (error) {
+				failures.push(error)
 			} finally {
 				activeObserver = previous
 				activeOwner = previousOwner
 			}
+			// Stopped during its own run: what the run registered afterwards is released now.
+			if (scope && observer.disposed) failures.push(...releaseOwner(scope))
+			throwFailures(failures, 'Meeko effect and its cleanup failed')
 		},
 	}
 	if (source) effectSources.set(observer, { owner, source })
 	owner?.observers.add(observer)
-	function stop(): void {
-		observer.disposed = true
-		pending.delete(observer)
-		detach(observer)
+	function stopObserver(): unknown[] {
 		owner?.observers.delete(observer)
+		return disposeObserver(observer)
+	}
+	function stop(): void {
+		throwFailures(stopObserver(), 'Meeko effect cleanup failed')
 	}
 	try {
 		observer.run()
 	} catch (error) {
-		stop()
+		const failures = stopObserver()
+		if (failures.length > 0) throw new AggregateError([error, ...failures], 'Meeko effect setup and cleanup failed')
 		throw error
 	}
 	return stop
@@ -757,28 +886,9 @@ export function createRoot<T>(fn: (dispose: () => void) => T): T {
 	const previous = activeOwner
 	activeOwner = owner
 	const dispose = () => {
-		const failures: unknown[] = []
-		for (const child of [...owner.children]) {
-			try {
-				const result = child()
-				if (observeReturnedPromise(result, asyncFailureReport(owner, 'cleanup', 'Meeko asynchronous cleanup rejected'))) {
-					failures.push(new TypeError('Meeko cleanup callbacks must be synchronous'))
-				}
-			} catch (error) {
-				failures.push(error)
-			}
-		}
-		owner.children.clear()
-		for (const observer of owner.observers) {
-			observer.disposed = true
-			pending.delete(observer)
-			detach(observer)
-		}
-		owner.observers.clear()
-		owner.context.clear()
+		const failures = releaseOwner(owner)
 		owner.parent?.children.delete(dispose)
-		if (failures.length === 1) throw failures[0]
-		if (failures.length > 1) throw new AggregateError(failures, 'Meeko root cleanup failed')
+		throwFailures(failures, 'Meeko root cleanup failed')
 	}
 	owner.parent?.children.add(dispose)
 	try {

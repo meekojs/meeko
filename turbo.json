@@ -1,0 +1,54 @@
+{
+	"$schema": "https://v2-11-11.turborepo.dev/schema.json",
+	"futureFlags": {
+		"watchUsingTaskInputs": true
+	},
+	"globalEnv": ["CI"],
+	"globalPassThroughEnv": ["NODE_OPTIONS"],
+	"concurrency": "10",
+	"tasks": {
+		"build": {
+			"dependsOn": ["^build"],
+			"env": ["NODE_ENV", "MEEKO_*"],
+			"inputs": [
+				"$TURBO_DEFAULT$",
+				".env*",
+				"!tests/**",
+				"$TURBO_ROOT$/tsconfig.base.json",
+				"$TURBO_ROOT$/scripts/build-package.mjs",
+				"$TURBO_ROOT$/tsdown.config.ts",
+				"$TURBO_ROOT$/scripts/rebase-component-declaration.mjs",
+				"$TURBO_ROOT$/packages/docs/scripts/assets.mjs",
+				"$TURBO_ROOT$/packages/docs/assets/**",
+				"$TURBO_ROOT$/assets/brand/**"
+			],
+			"outputs": ["dist/**", ".meeko/output/**", "public/brand/**", "public/fonts/**", "src/app/components/**/*.d.meeko.ts"]
+		},
+		"check": {
+			"dependsOn": ["^build"],
+			"inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/tsconfig.base.json"],
+			"outputs": []
+		},
+		"lint": {
+			"dependsOn": ["^build"],
+			"outputs": []
+		},
+		"test": {
+			"dependsOn": ["build"],
+			"env": ["DATABASE_URL", "MEEKO_*", "REDIS_URL"],
+			"outputs": []
+		},
+		"test:e2e": {
+			"dependsOn": ["build"],
+			"cache": false,
+			"passThroughEnv": ["DASHBOARD_*", "DATABASE_URL", "MEEKO_*", "REDIS_URL", "SITE_CANONICAL_ORIGIN"],
+			"outputs": []
+		},
+		"dev": {
+			"dependsOn": ["^build"],
+			"passThroughEnv": ["DASHBOARD_*", "SITE_CANONICAL_ORIGIN"],
+			"persistent": true,
+			"cache": false
+		}
+	}
+}

@@ -1,0 +1,22 @@
+/*
+ * The rules of the components that are not on Tailwind yet. main.css imports this file in the layer
+ * ui.components, under the utilities of ui.utilities: a ui:* class wins over these rules whatever their
+ * specificity, and any unlayered rule of the app wins over both.
+ */
+@import './utilities.css';
+@import './modal.css';
+@import './navigation.css';
+@import './code.css';
+@import './prose.css';
+@import './popover.css';
+@import './select.css';
+@import './tabs.css';
+@import './theme-toggle.css';
+@import './feedback.css';
+
+/* The spinner of variants/button: a busy button turns it, so it stays when the rest of the button left. */
+@keyframes meeko-ui-spin {
+	to {
+		rotate: 1turn;
+	}
+}

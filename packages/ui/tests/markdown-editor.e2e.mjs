@@ -351,7 +351,7 @@ async function startConsumer(context) {
 
 test('the component: SSR marker, one load, readonly, disabled, a text from outside, a failed chunk and its release', { timeout: 240_000 }, async (context) => {
 	const { origin, html } = await startConsumer(context)
-	assert.match(html, /ui-markdown-editor-marker/, 'the server paints the marker')
+	assert.match(html, /<div[^>]*role="status"/, 'the server paints the marker')
 	assert.match(html, /Cargando el editor…/)
 	assert.doesNotMatch(html, /class="milkdown|ProseMirror/, 'and not Crepe')
 	assert.doesNotMatch(html, /crepe[^"]*\.(?:js|css)/, 'nor does it ask for its chunk')
@@ -379,7 +379,7 @@ test('the component: SSR marker, one load, readonly, disabled, a text from outsi
 	assert.equal(await text(), '# Título\n\nTexto.\n', 'opening is not an edit')
 	assert.equal(await browserPage.getByRole('textbox', { name: 'Contenido' }).count(), 1, 'named by its label')
 	assert.equal(documents, 1, 'Vite does not reload the page to optimize Crepe')
-	assert.equal(await browserPage.locator('.ui-markdown-editor-marker').count(), 0)
+	assert.equal(await root.getByRole('status').filter({ hasText: 'Cargando el editor…' }).count(), 0)
 
 	// The model follows a real key, right when the editor loses the focus.
 	await editor.locator('p').click()
@@ -405,7 +405,7 @@ test('the component: SSR marker, one load, readonly, disabled, a text from outsi
 	// Disabled: as read-only, and it looks so.
 	await set('disabled', true)
 	assert.equal(await code.isDisabled(), true)
-	assert.equal(await root.getAttribute('data-disabled'), '')
+	assert.notEqual(await root.evaluate((element) => globalThis.getComputedStyle(element).opacity), '1')
 	await browserPage.getByRole('button', { name: 'Visual' }).click()
 	await editor.getByText('Desde el código.').waitFor()
 	assert.equal(await editor.getAttribute('contenteditable'), 'false', 'also when Crepe starts over while disabled')
@@ -420,7 +420,7 @@ test('the component: SSR marker, one load, readonly, disabled, a text from outsi
 	// What Crepe could not write back as it was opens as text, with a notice, and is not touched.
 	const tricky = '[a]: https://example.com\n\nTexto con [a].\n'
 	await set('text', tricky)
-	await browserPage.locator('.ui-markdown-editor-notice').getByText('reescribiría').waitFor({ timeout: 30_000 })
+	await browserPage.getByRole('status').filter({ hasText: 'reescribiría' }).waitFor({ timeout: 30_000 })
 	assert.equal(await root.getAttribute('data-state'), 'unsafe')
 	assert.equal(await root.getAttribute('data-mode'), 'code')
 	assert.equal(await code.inputValue(), tricky)
@@ -439,7 +439,7 @@ test('the component: SSR marker, one load, readonly, disabled, a text from outsi
 	const offline = await browser.newPage()
 	await offline.route(/editor\/crepe/, (route) => route.abort())
 	await offline.goto(origin)
-	await offline.locator('.ui-markdown-editor-notice').getByText('No se pudo cargar el editor visual').waitFor({ timeout: 60_000 })
+	await offline.getByRole('status').filter({ hasText: 'No se pudo cargar el editor visual' }).waitFor({ timeout: 60_000 })
 	assert.equal(await offline.locator('.ui-markdown-editor').getAttribute('data-mode'), 'code')
 	await offline.locator('#code').fill('# Sigue\n')
 	assert.equal(await offline.evaluate(() => globalThis.controls.text.value), '# Sigue\n')

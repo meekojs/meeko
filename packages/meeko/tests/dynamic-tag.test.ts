@@ -482,6 +482,56 @@ test('class and style beside bind:class and bind:style write one attribute in SS
 	}
 })
 
+test('bind:class accepts nested arrays in SSR, hydration and updates', async () => {
+	const source = `<script lang="ts">
+import { signal, type ClassValue } from "@meekojs/meeko";
+const classes = signal<ClassValue>(["card", false, ["rounded", null]]);
+</script>
+<template><div class="base" bind:class="classes.value">x</div><button on:click="() => classes.value = ['active', ['wide', undefined]]">t</button></template>`
+	const { component, cleanup } = await load({ ClassArray: source }, 'ClassArray')
+	const window = new Window()
+	try {
+		const rendered = component.renderWithState({})
+		assert.match(rendered.html, /<div class="base card rounded"/)
+		const root = window.document.createElement('main')
+		root.innerHTML = rendered.html
+		const release = component.hydrate(root as unknown as Element, {}, rendered.state)
+		const element = root.querySelector('div')!
+		assert.equal(element.getAttribute('class'), 'base card rounded')
+		;(root.querySelector('button') as unknown as HTMLElement).click()
+		assert.equal(element.getAttribute('class'), 'base active wide')
+		release()
+	} finally {
+		window.happyDOM.abort()
+		await cleanup()
+	}
+})
+
+test('bind:style accepts an object in SSR, hydration and updates', async () => {
+	const source = `<script lang="ts">
+import { signal, type StyleValue } from "@meekojs/meeko";
+const styles = signal<StyleValue>({ backgroundColor: "red", "--space": "4px", opacity: 0.5, display: false });
+</script>
+<template><div style="margin: 0;" bind:style="styles.value">x</div><button on:click="() => styles.value = { color: 'blue', '--space': 8 }">t</button></template>`
+	const { component, cleanup } = await load({ StyleObject: source }, 'StyleObject')
+	const window = new Window()
+	try {
+		const rendered = component.renderWithState({})
+		assert.match(rendered.html, /<div style="margin: 0; background-color: red; --space: 4px; opacity: 0.5"/)
+		const root = window.document.createElement('main')
+		root.innerHTML = rendered.html
+		const release = component.hydrate(root as unknown as Element, {}, rendered.state)
+		const element = root.querySelector('div')!
+		assert.equal(element.getAttribute('style'), 'margin: 0; background-color: red; --space: 4px; opacity: 0.5')
+		;(root.querySelector('button') as unknown as HTMLElement).click()
+		assert.equal(element.getAttribute('style'), 'margin: 0; color: blue; --space: 8')
+		release()
+	} finally {
+		window.happyDOM.abort()
+		await cleanup()
+	}
+})
+
 /** The six orders of a static attribute, its `bind:` directive and `bind="obj"`, on any tag. */
 const everyOrder = (first: string, second: string, third: string): string[][] => [
 	[first, second, third],

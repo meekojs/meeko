@@ -9,6 +9,7 @@ const rules = {
 	'@typescript-eslint/no-unused-vars': ['warn', { args: 'all', argsIgnorePattern: '^_' }],
 	'@typescript-eslint/no-explicit-any': ['error', { ignoreRestArgs: true }],
 	'meeko/button-has-type': ['error'],
+	'meeko/rules-of-composables': 'error',
 	'meeko/no-autofocus': 0,
 	'meeko/attributes-order': ['warn', { order: ['ref', 'list', 'conditional', 'definition', 'attributes', 'model', 'bindings', 'spread', 'events', 'content'], alphabetical: true }],
 	'meeko/order-macros': ['error', { order: ['defineProps', 'defineEmits', 'defineModel', 'defineSnippets', 'useElementRef', 'defineExpose'] }],
@@ -36,6 +37,8 @@ defineEslint({
 defineEslint({ rules: { 'no-debbuger': 'error' } })
 // @ts-expect-error Meeko rule does not accept options.
 defineEslint({ rules: { 'meeko/button-has-type': ['error', { allow: true }] } })
+// @ts-expect-error Composable rule does not accept options.
+defineEslint({ rules: { 'meeko/rules-of-composables': ['error', { names: ['useId'] }] } })
 // @ts-expect-error Meeko rule severity is checked.
 defineEslint({ rules: { 'meeko/no-autofocus': 'fatal' } })
 // @ts-expect-error Macro names are checked.

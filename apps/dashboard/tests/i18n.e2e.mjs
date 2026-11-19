@@ -168,7 +168,7 @@ ${server.logs().slice(-2000)}`,
 				title: globalThis.document.title,
 				alternates: [...globalThis.document.querySelectorAll('link[rel="alternate"][hreflang]')].map((link) => [link.getAttribute('hreflang'), new URL(link.href).pathname]),
 				links: [...globalThis.document.querySelectorAll('a[href^="/"]:not([hreflang])')].map((link) => link.getAttribute('href')),
-				selector: [...globalThis.document.querySelectorAll('.meeko-ui-locale-switcher a')].map((link) => [link.getAttribute('hreflang'), new URL(link.href).pathname, link.getAttribute('aria-current')]),
+				selector: [...globalThis.document.querySelectorAll('header nav a[hreflang]')].map((link) => [link.getAttribute('hreflang'), new URL(link.href).pathname, link.getAttribute('aria-current')]),
 			}
 		})
 		assert.doesNotMatch(report.text, spanish, `${path}: Spanish text in the page`)
@@ -202,13 +202,13 @@ ${server.logs().slice(-2000)}`,
 	// The language switch keeps the page and its query --------------------------------------------
 
 	await open('/en/sources?site=ui')
-	await page.locator('.meeko-ui-locale-switcher a[hreflang="es"]').click()
+	await page.locator('header nav a[hreflang="es"]').click()
 	await page.waitForURL((address) => address.pathname === '/sources' && address.search === '?site=ui', { timeout: 60_000 })
 	await hydrated()
 	assert.equal(await page.getAttribute('html', 'lang'), 'es')
 	assert.equal(await page.getByRole('heading', { level: 1 }).textContent(), 'Fuentes')
 	assert.equal((await browserContext.cookies(origin)).find((cookie) => cookie.name === 'meeko-dashboard-locale')?.value, 'es', 'the choice is remembered')
-	await page.locator('.meeko-ui-locale-switcher a[hreflang="en"]').click()
+	await page.locator('header nav a[hreflang="en"]').click()
 	await page.waitForURL((address) => address.pathname === '/en/sources', { timeout: 60_000 })
 	await hydrated()
 
@@ -241,7 +241,7 @@ ${server.logs().slice(-2000)}`,
 	assert.equal(await page.getByRole('link', { name: 'Edit the translation' }).count(), 0)
 	await open(`/en/translations/${ids.testing}`)
 	await page.getByText('+Nuevo parrafo del original.').waitFor({ timeout: 30_000 })
-	assert.equal(await page.locator('.meeko-ui-badge').filter({ hasText: 'Outdated' }).count(), 1)
+	assert.equal(await page.getByText('Outdated', { exact: true }).count(), 1)
 	// The three actions of its header wrap on a phone instead of widening the page.
 	const viewport = page.viewportSize()
 	await page.setViewportSize({ width: 390, height: 844 })

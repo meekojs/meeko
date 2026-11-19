@@ -94,7 +94,7 @@ test('links navigate in the client between the root layouts, also from a 404', {
 		assert.equal(await page.evaluate(() => globalThis.sameDocument === true), true, `${journey} loaded a new document`)
 		await page.locator('main').first().waitFor()
 		assert.equal(await page.locator('header').first().isVisible(), true, `${journey}: header`)
-		assert.equal((await page.locator('.meeko-ui-nav-tree').count()) > 0, docs, `${journey}: the layout of the destination`)
+		assert.equal((await page.locator('#docs-navigation nav').count()) > 0, docs, `${journey}: the layout of the destination`)
 		assert.deepEqual(problems, [], journey)
 		await page.close()
 	}

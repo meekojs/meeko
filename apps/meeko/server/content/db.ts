@@ -31,7 +31,8 @@ export function siteModeration(locale: DocsLocale = 'es'): Promise<SiteModeratio
  * when it does not exist or is hidden. `path` has no language prefix.
  */
 export async function readPage<T>(path: string, locale: DocsLocale = 'es'): Promise<T | null> {
-	const [page, moderation] = await Promise.all([readSnapshotPage<T>(path, { locale }), siteModeration(locale)])
+	const local = process.env.MEEKO_DOCS_LOCAL_PREVIEW === '1' ? await (await import('./local-preview')).localGuide<T>(path, locale) : null
+	const [page, moderation] = await Promise.all([local ?? readSnapshotPage<T>(path, { locale }), siteModeration(locale)])
 	if (page === null || isHiddenPath(moderation, localizedPath(path, locale))) return null
 	return moderateSnapshotPayload(page, moderation)
 }

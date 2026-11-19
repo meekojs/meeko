@@ -224,7 +224,7 @@ test('the site hides, features and announces what the dashboard moderates', { sk
 		// A translation older than its original stays published, with a warning and a link to the original.
 		await page.goto(base + '/en' + featured, { waitUntil: 'networkidle' })
 		const outdated = page.locator('.docs-untranslated')
-		assert.equal((await outdated.locator('.meeko-ui-alert-title').textContent())?.trim(), 'This translation may be out of date')
+		assert.equal((await outdated.locator('p').first().textContent())?.trim(), 'This translation may be out of date')
 		assert.equal(await outdated.locator('a').getAttribute('href'), featured)
 		assert.equal(await outdated.locator('a').getAttribute('hreflang'), 'es')
 		assert.equal(await page.locator('main article').evaluate((element) => element.closest('[lang]')?.getAttribute('lang')), 'en', 'its text is the translation')
@@ -238,7 +238,7 @@ test('the site hides, features and announces what the dashboard moderates', { sk
 		assert.equal(guide.status(), 200)
 		const sidebar = page.locator('#docs-navigation')
 		assert.equal(await sidebar.locator(`a[href="${hidden}"]`).count(), 0, 'not in the sidebar')
-		assert.equal((await sidebar.locator(`a[href="${featured}"] .meeko-ui-badge`).textContent())?.trim(), 'Destacado')
+		assert.equal(await sidebar.locator(`a[href="${featured}"]`).getByText('Destacado', { exact: true }).count(), 1)
 		await page.goto(base + '/docs', { waitUntil: 'networkidle' })
 		assert.equal(await page.locator(`main a[href="${hidden}"]`).count(), 0, 'not in /docs')
 		assert.equal(await page.locator(`main a[href="${featured}"] .featured`).count(), 1)

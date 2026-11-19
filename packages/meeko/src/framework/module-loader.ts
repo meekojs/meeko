@@ -310,7 +310,7 @@ export interface ResolvedModules {
 	/** Module files resolved from string entries; they never reach a browser bundle. */
 	readonly entryFiles: readonly string[]
 	readonly layers: readonly string[]
-	readonly componentsDirs: readonly { readonly dir: string; readonly prefix: string; readonly exclude?: readonly string[] }[]
+	readonly componentsDirs: readonly { readonly dir: string; readonly prefix: string; readonly exclude?: readonly string[]; readonly rename?: Readonly<Record<string, string>> }[]
 	/** Named layouts of `addLayout`, in the order the modules add them. */
 	readonly layouts: readonly { readonly name: string; readonly file: string; readonly module: string }[]
 	/** Route manifest transforms of `extendRoutes`, in the order the modules add them. */
@@ -575,7 +575,7 @@ async function runModules(root: string, config: MeekoConfig, dev: boolean): Prom
 	const names: string[] = []
 	const entryFiles: string[] = []
 	const layers: string[] = []
-	const componentsDirs: Array<{ dir: string; prefix: string; exclude?: readonly string[] }> = []
+	const componentsDirs: Array<{ dir: string; prefix: string; exclude?: readonly string[]; rename?: Readonly<Record<string, string>> }> = []
 	const layouts: Array<{ name: string; file: string; module: string }> = []
 	const routeExtenders: Array<ResolvedModules['routeExtenders'][number]> = []
 	const autoImports: ResolvedModuleAutoImport[] = []
@@ -660,11 +660,17 @@ async function runModules(root: string, config: MeekoConfig, dev: boolean): Prom
 			addLayer(dir: string | URL) {
 				layers.push(existingDirectory(dir, 'layer'))
 			},
-			addComponentsDir(dir: string | URL, componentOptions?: { readonly prefix?: string; readonly exclude?: readonly string[] }) {
+			addComponentsDir(dir: string | URL, componentOptions?: { readonly prefix?: string; readonly exclude?: readonly string[]; readonly rename?: Readonly<Record<string, string>> }) {
 				const prefix = componentOptions?.prefix === undefined ? '' : pascalCase(componentOptions.prefix)
 				if (componentOptions?.prefix !== undefined && !/^[A-Z][A-Za-z0-9]*$/.test(prefix)) throw new TypeError(`Módulo de Meeko ${name}: prefijo de componentes no válido ${componentOptions.prefix}`)
 				const exclude = normalizeComponentExcludes(componentOptions?.exclude)
-				componentsDirs.push({ dir: existingDirectory(dir, 'components directory'), prefix, ...(exclude.length ? { exclude } : {}) })
+				const rename = componentOptions?.rename
+				if (rename !== undefined && (!rename || typeof rename !== 'object' || Array.isArray(rename))) throw new TypeError(`Módulo de Meeko ${name}: rename de componentes debe ser un objeto`)
+				for (const [path, componentName] of Object.entries(rename ?? {})) {
+					if (!/^[A-Za-z0-9][\w-]*(?:\/[A-Za-z0-9][\w-]*)*$/.test(path)) throw new TypeError(`Módulo de Meeko ${name}: ruta de componente no válida en rename: ${path}`)
+					if (!/^[A-Z][A-Za-z0-9]*$/.test(componentName)) throw new TypeError(`Módulo de Meeko ${name}: nombre de componente no válido en rename: ${componentName}`)
+				}
+				componentsDirs.push({ dir: existingDirectory(dir, 'components directory'), prefix, ...(exclude.length ? { exclude } : {}), ...(rename && Object.keys(rename).length ? { rename: { ...rename } } : {}) })
 			},
 			addLayout(layoutName: string, file: string | URL) {
 				if (typeof layoutName !== 'string' || !/^[A-Za-z0-9][\w-]*(?:\/[A-Za-z0-9][\w-]*)*$/.test(layoutName)) {

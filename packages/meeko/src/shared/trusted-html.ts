@@ -83,6 +83,9 @@ export function trustHtml(html: string): TrustedHtml {
  */
 export type UntrustedHtmlMessage = 'MEEK107: html inserta un string sin escapar; márquelo con trustHtml(…) o use {expr}'
 
+/** The type text of the `MEEK107` warning for `bind:srcdoc` of an `<iframe>`, since 1.10. */
+export type UntrustedSrcdocMessage = 'MEEK107: srcdoc crea un documento con un string sin escapar; márquelo con trustHtml(…)'
+
 /**
  * Members of `T` that `html` warns about: strings that are neither `TrustedHtml` nor finite literal
  * types. `{} extends Record<M, 1>` holds for `string` and template literal patterns
@@ -97,7 +100,7 @@ type UntrustedHtmlMembers<T> = T extends TrustedHtml | null | undefined ? never 
  * `UntrustedHtmlMessage` otherwise: a `string` without the `TrustedHtml` brand, a template literal
  * pattern, or `any`, which says nothing about where the HTML comes from.
  */
-export type TrustedHtmlCheck<T> = 0 extends 1 & T ? UntrustedHtmlMessage : [UntrustedHtmlMembers<T>] extends [never] ? unknown : UntrustedHtmlMessage
+export type TrustedHtmlCheck<T, Message = UntrustedHtmlMessage> = 0 extends 1 & T ? Message : [UntrustedHtmlMembers<T>] extends [never] ? unknown : Message
 
 /**
  * Type check that `meeko check` wraps around the value of `html="expression"` (never in the
@@ -106,6 +109,15 @@ export type TrustedHtmlCheck<T> = 0 extends 1 & T ? UntrustedHtmlMessage : [Untr
  * literal written in the template, such as `html="'<br>'"`, as a literal type.
  */
 export function checkTrustedHtml<const T>(value: T, trust: TrustedHtmlCheck<T>): T {
+	void trust
+	return value
+}
+
+/**
+ * {@link checkTrustedHtml} for the value of `bind:srcdoc` on an `<iframe>`: the document it creates
+ * runs its scripts unless a `sandbox` stops them, like `html` in the page. Since 1.10.
+ */
+export function checkTrustedSrcdoc<const T>(value: T, trust: TrustedHtmlCheck<T, UntrustedSrcdocMessage>): T {
 	void trust
 	return value
 }

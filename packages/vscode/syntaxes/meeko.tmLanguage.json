@@ -1,5 +1,14 @@
 {
 	"scopeName": "source.meeko",
+	"injections": {
+		"L:meta.embedded.block.typescript -comment -string, L:meta.embedded.inline.typescript -comment -string": {
+			"patterns": [
+				{
+					"include": "#reactiveNames"
+				}
+			]
+		}
+	},
 	"patterns": [
 		{
 			"include": "#rootComment"
@@ -15,6 +24,50 @@
 		}
 	],
 	"repository": {
+		"reactiveNames": {
+			"comment": "Paints Meeko's reactive declarations and writes of .value before the language server answers, with the scopes of package.json semanticTokenScopes: the semantic tokens later confirm them (and color the uses) without a visible change. A declaration with a type annotation is left to the semantic tokens: consuming its name would make TypeScript read the type as the variable.",
+			"patterns": [
+				{
+					"comment": "const count = signal(0); an awaited useElementRef is the element, not a signal.",
+					"match": "(?<=\\bconst |\\blet |\\bvar )([A-Za-z_$][\\w$]*)(?=\\s*=\\s*(?:signal|useState|defineModel|useStorage|useElementRef)\\s*(?:<[^;()]*>)?\\s*\\()",
+					"captures": {
+						"1": {
+							"name": "support.class.component.signal.meeko"
+						}
+					}
+				},
+				{
+					"comment": "const doubled = computed(() => …)",
+					"match": "(?<=\\bconst |\\blet |\\bvar )([A-Za-z_$][\\w$]*)(?=\\s*=\\s*(?:computed)\\s*(?:<[^;()]*>)?\\s*\\()",
+					"captures": {
+						"1": {
+							"name": "entity.name.function.computed.meeko"
+						}
+					}
+				},
+				{
+					"comment": "const posts = await useApi(…)",
+					"match": "(?<=\\bconst |\\blet |\\bvar )([A-Za-z_$][\\w$]*)(?=\\s*=\\s*(?:(?:await\\s+)?(?:useApi|useRpcQuery|useRpcMutation|useApiMutation))\\s*(?:<[^;()]*>)?\\s*\\()",
+					"captures": {
+						"1": {
+							"name": "entity.name.type.resource.meeko"
+						}
+					}
+				},
+				{
+					"comment": "count.value = 1, count.value += 1, count.value++: a write, like the modification semantic token.",
+					"match": "(\\.)(value)(?=\\s*(?:(?:[-+*/%&|^]|\\*\\*|<<|>>>?|\\?\\?|&&|\\|\\|)?=(?![=>])|\\+\\+|--))",
+					"captures": {
+						"1": {
+							"name": "punctuation.accessor.ts"
+						},
+						"2": {
+							"name": "keyword.control.write.meeko"
+						}
+					}
+				}
+			]
+		},
 		"rootComment": {
 			"comment": "A comment between sections. The embedded scope, here and on the opening tags, takes these positions out of the language meeko: VS Code offers the snippets declared for meeko wherever the language at the cursor is meeko, and comments and attribute values must offer none.",
 			"name": "comment.block.html",
@@ -242,7 +295,7 @@
 			"patterns": [{ "include": "#customElementExpressionAttribute" }, { "name": "string.quoted.double.html", "begin": "\"", "end": "\"" }, { "name": "string.quoted.single.html", "begin": "'", "end": "'" }, { "name": "entity.other.attribute-name.directive.meeko", "match": "\\bref:[A-Za-z_$][\\w$]*" }, { "name": "entity.other.attribute-name.html", "match": "\\b[\\w:-]+\\b" }]
 		},
 		"customElementExpressionAttribute": {
-			"begin": "(?<![\\w:-])(on:[\\w-]+(?::[\\w-]+)?|(?:bind|if|each):[\\w-]+)(\\s*=\\s*)([\"'])",
+			"begin": "(?<![\\w:-])(on:[\\w-]+(?::[\\w-]+)?|(?:bind|if|each):[\\w-]+|if|else-if)(\\s*=\\s*)([\"'])",
 			"end": "\\3",
 			"beginCaptures": {
 				"1": { "name": "entity.other.attribute-name.directive.meeko", "patterns": [{ "include": "#directiveName" }] },
@@ -271,7 +324,7 @@
 			"comment": "Control flow directives read as keywords and events as functions; bindings stay attributes.",
 			"patterns": [
 				{
-					"match": "(?<![\\w:-])(?:if|each):[\\w-]+",
+					"match": "(?<![\\w:-])(?:(?:if|each):[\\w-]+|if|else-if|else)(?![\\w:-])",
 					"name": "keyword.control.flow.meeko"
 				},
 				{ "match": "(?<![\\w:-])on:[\\w-]+(?::[\\w-]+)?", "name": "entity.name.function.event.meeko" }
@@ -300,7 +353,7 @@
 			"patterns": [{ "include": "source.ts" }]
 		},
 		"expressionAttribute": {
-			"begin": "(?<![\\w:-])(on:[\\w-]+(?::[\\w-]+)?|(?:bind|if|each|model):[\\w-]+|model|bind|is)(\\s*=\\s*)([\"'])",
+			"begin": "(?<![\\w:-])(on:[\\w-]+(?::[\\w-]+)?|(?:bind|if|each|model):[\\w-]+|if|else-if|model|bind|is)(\\s*=\\s*)([\"'])",
 			"end": "\\3",
 			"beginCaptures": {
 				"1": { "name": "entity.other.attribute-name.directive.meeko", "patterns": [{ "include": "#directiveName" }] },

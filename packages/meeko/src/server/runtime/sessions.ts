@@ -1,8 +1,10 @@
 import type { Unsubscribe } from '../socket/runtime'
+import type { DevAllowedHosts } from './dev-hosts'
 import type { RateLimitHit } from './rate-limit'
 
 import { ApiError, SessionRevokedError, SessionSecurityError } from '../errors'
 import { encodeBase64Url } from './base64url'
+import { isDevOriginAllowed, rejectedDevOriginMessage } from './dev-hosts'
 import { warnOnce } from './env'
 import { countRateLimit, MemoryRateCounter } from './rate-limit'
 
@@ -102,12 +104,33 @@ function validTtl(value: unknown): value is number {
 }
 
 /**
- * Whether `Origin` is the request's own origin (the public origin behind `createServerApp`) or
- * one of `allowedOrigins`. A missing Origin is never allowed.
+ * @internal The hosts of `dev.allowedHosts` and `MEEKO_ALLOWED_HOSTS`, which `createServerApp`
+ * gives the app's manager outside production (`ServerAppOptions.devAllowedHosts`). Read it from
+ * the manager; a production manager never has it.
  */
-export function isAllowedOrigin(request: Request, allowedOrigins: readonly string[]): boolean {
+export const devAllowedHosts: unique symbol = Symbol.for('meeko.session.devAllowedHosts') as never
+
+/** @internal Sets {@link devAllowedHosts} on a manager that is not in production. */
+export const allowDevHosts: unique symbol = Symbol.for('meeko.session.allowDevHosts') as never
+
+/**
+ * Whether `Origin` is the request's own origin (the public origin behind `createServerApp`) or
+ * one of `allowedOrigins`. A missing Origin is never allowed. With `dev` (only `meeko dev` passes
+ * it), an origin that `dev.allowedHosts` names also passes, and a refusal warns once per origin
+ * with the option that allows it.
+ */
+export function isAllowedOrigin(request: Request, allowedOrigins: readonly string[], dev?: DevAllowedHosts): boolean {
 	const origin = request.headers.get('origin')
-	return origin !== null && (origin === new URL(request.url).origin || allowedOrigins.includes(origin))
+	if (origin !== null && (origin === new URL(request.url).origin || allowedOrigins.includes(origin))) return true
+	if (dev === undefined) return false
+	if (origin !== null && isDevOriginAllowed(origin, request.url, dev)) return true
+	warnOnce(`dev-origin:${origin ?? ''}`, rejectedDevOriginMessage(origin))
+	return false
+}
+
+/** {@link isAllowedOrigin} with the allowed origins of a manager, and its dev hosts if it has them. */
+export function isSessionOriginAllowed(request: Request, sessions: Pick<SessionManager, 'allowedOrigins'>): boolean {
+	return isAllowedOrigin(request, sessions.allowedOrigins ?? [], (sessions as { [devAllowedHosts]?: DevAllowedHosts })[devAllowedHosts])
 }
 
 /**
@@ -509,11 +532,12 @@ export class SessionHandle<T = SessionData> {
 	private assertCreateOrigin(): void {
 		const request = this.request
 		if (!request || this.origin !== 'unchecked' || safeMethods.has(request.method)) return
-		if (isAllowedOrigin(request, this.manager.allowedOrigins)) {
+		if (isSessionOriginAllowed(request, this.manager)) {
 			this.origin = 'verified'
 			return
 		}
-		if (!productionManagers.has(this.manager)) {
+		// In `meeko dev` the refusal already warned, with the option that allows the origin.
+		if (!productionManagers.has(this.manager) && this.manager[devAllowedHosts] === undefined) {
 			warnOnce('session:create-origin', '[meeko] session.create() rechazó una petición sin un Origin permitido (403 INVALID_ORIGIN): los navegadores lo envían, pero un script o una app nativa debe enviar Origin, o la ruta declarar origin: "none" (inseguro frente al login CSRF).')
 		}
 		throw new SessionSecurityError('INVALID_ORIGIN')
@@ -680,7 +704,9 @@ export class SessionManager<T = unknown> {
 	/** Nombre de la cookie de sesión. */
 	readonly cookieName: string
 	/** Orígenes adicionales aceptados en las mutaciones de API y RPC, con o sin sesión, y en los formularios nativos. */
-	readonly allowedOrigins: readonly string[]
+	readonly allowedOrigins: readonly string[];
+	/** @internal Hosts that `meeko dev` accepts (`dev.allowedHosts`); `undefined` outside `meeko dev`. */
+	[devAllowedHosts]?: DevAllowedHosts
 	private readonly secure: boolean
 	private readonly sameSite: 'Lax' | 'Strict' | 'None'
 	private readonly production: boolean
@@ -705,6 +731,14 @@ export class SessionManager<T = unknown> {
 		this.allowedOrigins = options.allowedOrigins ?? []
 		this.production = options.production === true
 		if (this.production) productionManagers.add(this)
+	}
+	/**
+	 * @internal Accepts the Origins of `dev.allowedHosts` in this manager's checks. Only
+	 * `createServerApp` calls it, outside production; a production manager ignores it.
+	 */
+	[allowDevHosts](hosts: DevAllowedHosts): void {
+		if (this.production) return
+		this[devAllowedHosts] = hosts
 	}
 	/** Serializa la cabecera `Set-Cookie` de la sesión con la política del gestor; `ttlMs` 0 la borra. */
 	serializeCookie(value: string, ttlMs: number): string {
@@ -779,7 +813,7 @@ export class SessionManager<T = unknown> {
 	 */
 	assertMutationAllowed(request: Request, session: SessionHandle<T>, mutating = !['GET', 'HEAD', 'OPTIONS'].includes(request.method)): void {
 		if (!session.current || !mutating) return
-		if (!isAllowedOrigin(request, this.allowedOrigins)) throw new SessionSecurityError('INVALID_ORIGIN')
+		if (!isSessionOriginAllowed(request, this)) throw new SessionSecurityError('INVALID_ORIGIN')
 		if (request.headers.get('x-meeko-csrf') !== session.current.csrfToken) throw new SessionSecurityError('INVALID_CSRF')
 		// This request may now replace its session: Origin and CSRF were both verified.
 		session[settleSessionOrigin]?.('verified')

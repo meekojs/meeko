@@ -5,10 +5,15 @@
 
 	import type { UIPaginationProps } from '../types/navigation'
 
+	import { uiTheme } from '../utils/defaults'
 	import { fillMessage, uiMessages } from '../utils/messages'
+	import { button } from '../variants/button'
+	import { pagination } from '../variants/navigation'
 	import * as ItemLink from './internal/ItemLink.meeko'
 
 	const props = defineProps<UIPaginationProps>()
+
+	const theme = uiTheme('pagination', () => props)
 
 	const emit = defineEmits<{ loadMore: [] }>()
 
@@ -34,18 +39,21 @@
 	function holdLink(event: MouseEvent): void {
 		if (props.busy) event.preventDefault()
 	}
+	const classes = pagination()
+	// The action goes to the end of the row, and shows a spinner while the next page loads.
+	const moreClass = (): string => button({ variant: 'outline', size: 'sm', class: classes.action({ class: theme.ui.action }) })
 </script>
 
 <template>
 	<nav
-		bind:class="['meeko-ui-pagination', props.class].filter(Boolean).join(' ')"
+		bind:class="classes.base({ class: [theme.ui.base, theme.class] })"
 		bind:aria-label="props.label ?? text.label"
 		bind:aria-busy="props.busy ? 'true' : undefined"
 		on:click="holdLink"
 	>
 		<p
-			class="meeko-ui-pagination-count"
 			role="status"
+			bind:class="classes.count({ class: theme.ui.count })"
 		>
 			{count.value}
 		</p>
@@ -55,9 +63,7 @@
 		/>
 		<ItemLink
 			if:when="more.value && props.moreLink"
-			class="meeko-ui-button"
-			data-variant="outline"
-			data-size="sm"
+			bind:class="moreClass()"
 			bind:link="props.moreLink!"
 			bind:aria-disabled="props.busy ? 'true' : undefined"
 		>
@@ -66,9 +72,7 @@
 		<button
 			if:when="more.value && !props.moreLink"
 			type="button"
-			class="meeko-ui-button"
-			data-variant="outline"
-			data-size="sm"
+			bind:class="moreClass()"
 			bind:aria-disabled="props.busy ? 'true' : undefined"
 			on:click="load"
 		>

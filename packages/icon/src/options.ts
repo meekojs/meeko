@@ -12,6 +12,8 @@ import type { IconCollectionName, IconInclude } from './index'
  * ```
  */
 export interface IconModuleOptions {
+	/** Nombre del componente autoimportado. Por defecto, `'UIIcon'`. */
+	readonly componentName?: string
 	/**
 	 * Colecciones de Iconify que usa el proyecto, como `'lucide'`. Cada una es un paquete
 	 * `@iconify-json/<colección>` instalado en el proyecto (`pnpm add -D @iconify-json/lucide`).
@@ -33,6 +35,7 @@ export interface IconModuleOptions {
 
 /** Options with defaults applied and validated. */
 export interface ResolvedIconOptions {
+	readonly componentName: string
 	readonly collections: readonly string[]
 	readonly include: readonly string[]
 	readonly local: false | string | undefined
@@ -46,7 +49,9 @@ const sizePattern = /^(?:\d*\.?\d+(?:px|em|rem|ex|ch|vw|vh|vmin|vmax|cm|mm|in|pt
 /** Validates the options before reading any file; the errors name the wrong option. */
 export function resolveOptions(options: IconModuleOptions): ResolvedIconOptions {
 	if (!options || typeof options !== 'object' || Array.isArray(options)) throw new TypeError('icon: options must be an object')
-	for (const key of Object.keys(options)) if (!['collections', 'include', 'local', 'size'].includes(key)) throw new TypeError(`icon: unknown option ${key}`)
+	for (const key of Object.keys(options)) if (!['collections', 'componentName', 'include', 'local', 'size'].includes(key)) throw new TypeError(`icon: unknown option ${key}`)
+	const componentName = options.componentName ?? 'UIIcon'
+	if (typeof componentName !== 'string' || !/^[A-Z][A-Za-z0-9]*$/.test(componentName)) throw new TypeError(`icon: invalid componentName ${JSON.stringify(componentName)}; use a PascalCase name such as "AppIcon"`)
 	const collections = options.collections ?? []
 	if (!Array.isArray(collections) || collections.some((name) => typeof name !== 'string' || !prefixPattern.test(name))) throw new TypeError('icon: collections must be a list of Iconify prefixes, such as ["lucide"]')
 	if (collections.includes('local')) throw new TypeError('icon: "local" is reserved for the SVG files of icon.local')
@@ -56,5 +61,5 @@ export function resolveOptions(options: IconModuleOptions): ResolvedIconOptions 
 	const size = options.size ?? '1em'
 	if (typeof size !== 'string' || !sizePattern.test(size)) throw new TypeError(`icon: invalid size ${JSON.stringify(size)}; use a CSS length such as "1em" or "20px"`)
 	if (options.local !== undefined && options.local !== false && (typeof options.local !== 'string' || !options.local.trim())) throw new TypeError('icon: local must be a folder or false')
-	return { collections: [...new Set(collections)], include: [...new Set(include)], local: options.local, size }
+	return { collections: [...new Set(collections)], componentName, include: [...new Set(include)], local: options.local, size }
 }

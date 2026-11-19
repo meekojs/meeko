@@ -285,6 +285,12 @@ const untrustedHtmlType = /\bMEEK107: /
  */
 export const untrustedHtmlMessage = '`html` inserta HTML sin escapar; un `string` puede venir de un usuario (XSS). Sanéelo y márquelo con `trustHtml(…)`, o use `{expr}`, que escapa.'
 
+/**
+ * Message of the `MEEK107` warning for `bind:srcdoc` of an `<iframe>` (since 1.10): the document is
+ * HTML that runs its scripts unless `sandbox` stops them.
+ */
+export const untrustedSrcdocMessage = '`srcdoc` crea un documento con HTML sin escapar; un `string` puede venir de un usuario (XSS). Sanéelo o constrúyalo usted y márquelo con `trustHtml(…)`; si el documento no es de confianza, añada al iframe `sandbox` sin `allow-scripts` ni `allow-same-origin`.'
+
 /** The type error of `RequiredSnippetMessage` that `checkSnippetCondition` reports for `<snippet if:when>`. */
 const requiredSnippetType = /\bMEEK110: ([A-Za-z_$][\w$]*) /
 
@@ -503,7 +509,7 @@ export async function checkSource(source: string, filename: string, options: Che
 					return { code: 'MEEK122', message: attributeValueMessage(attributeValue[1]!, [...new Set(tags)], value), filename: entry.original, location: locate(entry.source, offset ?? 0), severity: 'warning' }
 				}
 				if (untrustedHtmlType.test(diagnostic.message)) {
-					return { code: 'MEEK107', message: untrustedHtmlMessage, filename: entry.original, location: locate(entry.source, offset ?? 0), severity: 'warning' }
+					return { code: 'MEEK107', message: /\bMEEK107: srcdoc /.test(diagnostic.message) ? untrustedSrcdocMessage : untrustedHtmlMessage, filename: entry.original, location: locate(entry.source, offset ?? 0), severity: 'warning' }
 				}
 				const meekType = meekTypeText.exec(diagnostic.message)
 				if (meekType) {

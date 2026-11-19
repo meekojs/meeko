@@ -23,7 +23,7 @@
 			title: 'Forms',
 			items: [
 				{ href: '/forms', name: 'Field and Input', description: 'Labels, text models and error messages.' },
-				{ href: '/controls', name: 'Form controls', description: 'Textarea, Checkbox, RadioGroup, Switch and Slider.' },
+				{ href: '/controls', name: 'Form controls', description: 'Textarea, Checkbox, RadioGroup, SegmentedControl, Switch and Slider.' },
 				{ href: '/select', name: 'Select and Combobox', description: 'One or several typed options, with search and form submission.' },
 				{ href: '/editor', name: 'Markdown editor', description: 'Visual and code editing, with block-level saving.' },
 			],
@@ -43,6 +43,7 @@
 			items: [
 				{ href: '/modals', name: 'Modal', description: 'Declarative or programmatic, with nesting support.' },
 				{ href: '/popover', name: 'Popover', description: 'Menus, lightweight dialogs and tooltips anchored to their trigger.' },
+				{ href: '/menu', name: 'Menu', description: 'Action menu with links, separators and full keyboard support.' },
 				{ href: '/overlays', name: 'Overlays', description: 'Drawer, Tooltip and CommandPalette.' },
 				{ href: '/app', name: 'App', description: 'The host of programmatic modals.' },
 			],
@@ -86,17 +87,20 @@
 		</section>
 		<UIAlert tone="info">
 			The core tags
-			<code>MeekoSelect</code>,
+			<code>MeekoSelect</code>
+			,
 			<code>MeekoPopover</code>
 			and
 			<code>MeekoThemeToggle</code>
 			are deprecated since Meeko 1.8 and will be removed in 2.0. Replace them with
 			<code>UISelect</code>
 			or
-			<code>UICombobox</code>,
+			<code>UICombobox</code>
+			,
 			<code>UIPopover</code>
 			and
-			<code>UIThemeToggle</code>.
+			<code>UIThemeToggle</code>
+			.
 		</UIAlert>
 	</DocsPage>
 </template>

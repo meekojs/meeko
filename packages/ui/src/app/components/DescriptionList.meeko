@@ -1,29 +1,45 @@
 <script lang="ts">
-	import type { UIDescriptionListProps } from '../types/feedback'
+	import type { UIDescriptionListProps } from '../types/data'
+
+	import { uiTheme } from '../utils/defaults'
+	import { descriptionList } from '../variants/data'
 
 	const props = defineProps<UIDescriptionListProps>()
+
+	const theme = uiTheme('descriptionList', () => props)
+
+	const classes = descriptionList()
 </script>
 
 <template>
-	<dl
-		bind:class="['meeko-ui-description-list', props.class].filter(Boolean).join(' ')"
-		bind:data-columns="props.columns ?? 1"
-	>
+	<dl bind:class="classes.base({ columns: props.columns ?? 1, class: [theme.ui.base, theme.class] })">
 		<div
 			each:of="props.items"
 			each:as="item"
 			each:key="item.label"
+			bind:class="classes.item({ class: theme.ui.item })"
 		>
-			<dt bind:lang="item.labelLang">{item.label}</dt>
-			<dd if:when="item.code">
-				<code bind:title="item.title">{item.value}</code>
+			<dt
+				bind:lang="item.labelLang"
+				bind:class="classes.label({ class: theme.ui.label })"
+				>{item.label}</dt
+			>
+			<dd
+				if:when="item.code"
+				bind:class="classes.value({ class: theme.ui.value })"
+			>
+				<code
+					bind:title="item.title"
+					bind:class="classes.code({ class: theme.ui.code })"
+					>{item.value}</code
+				>
 			</dd>
 			<template if:when="!item.code">
-				<dd>{item.value}</dd>
+				<dd bind:class="classes.value({ class: theme.ui.value })">{item.value}</dd>
 			</template>
 			<dd
 				if:when="item.detail"
-				class="meeko-ui-stat-detail"
+				bind:class="classes.detail({ class: theme.ui.detail })"
 			>
 				{item.detail}
 			</dd>

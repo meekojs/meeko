@@ -1,8 +1,10 @@
 ---
-source-hash: 317edaa39ff9c71b561a51871e72694c9f0ba72054ef29bf6340c15a1b999f34
+source-hash: f8b7414013448db2bbfe89b4d001e5e81c03592f10c0edb88eebe24aada373bb
 ---
 
 # Upgrade from 1.6 to 1.7
+
+**From:** 1.6.x. **To:** 1.7.0. **Status:** published on npm; the latest version checked on November 5, 2026 is 1.9.0. **Who acts:** maintainers upgrading an application from 1.6.x to 1.7.0.
 
 `1.7` is a minor release: new features (CSP and headers in server adapters, SSR page caching with `cache`, forms without JavaScript with `form` and `useForm({ action })`, SQL `rateLimit`, `clientAddress`, `sitemapEntries`, typed `services` and `debounceMs`/`enabled` in `useApi` and `useRpcQuery`) are optional. Three changes ship as [approved exceptions](stability.md#approved-exceptions) to stability policy: directly casting `context.services` to an incompatible type is a type error, assigning `computed(...).value` throws and `PageInputError.name` is `"PageInputError"`. Other noticeable upgrade changes include CSP hashes covering only Meeko-written code, new checks in `meeko check` and the editor, new auto-imported names, new warnings and Spanish messages. This guide collects them, what to review and how to adopt each feature. The complete list of additions and fixes is in the [CHANGELOG](../../packages/meeko/CHANGELOG.md); compatibility commitments are in the [stability policy](stability.md).
 

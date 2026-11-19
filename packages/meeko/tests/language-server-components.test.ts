@@ -222,3 +222,29 @@ const value = AppC;
 		assert.ok(!values.some((item) => item.label === 'AppCardSnippets'))
 	})
 })
+
+describe('language server: props composed in app/types', () => {
+	let workspace: LanguageProject
+
+	before(async () => {
+		workspace = await languageProject('lsp-component-app-types-', {
+			'app/types/helpers.ts': 'type KeysOfUnion<T> = T extends T ? keyof T : never;\nexport type ExclusiveUnion<T, U = T> = T extends U ? Partial<Record<Exclude<KeysOfUnion<U>, keyof T>, never>> & T : never;\n',
+			'app/types/components/button.ts': "export type UnionButtonProps = ExclusiveUnion<ElementAttributes<'button'> | MeekoLinkProps>;\n",
+			'app/components/Button.meeko': '<script lang="ts">\ntype Props = UnionButtonProps & { loading?: boolean };\nconst props = defineProps<Props>();\n</script>\n<template><button bind:disabled="props.disabled">{String(props.loading)}</button></template>\n',
+		})
+	})
+
+	after(async () => {
+		await workspace?.dispose()
+	})
+
+	test('an autoimported type keeps the component props instead of becoming any', async () => {
+		const child = await workspace.open('app/components/Button.meeko')
+		assert.match(child.component.code, /import type \{ UnionButtonProps as UnionButtonProps \} from "\.\.\/types\/components\/button\.js"/)
+		const summary = componentSummary(workspace.project.service.getProgram()!, child.component)!
+		const props = new Map(summary.props.map((prop) => [prop.name, prop.type]))
+		assert.equal(props.get('loading'), 'boolean', JSON.stringify(summary.props))
+		assert.notEqual(props.get('disabled'), 'any')
+		assert.ok(props.has('to'))
+	})
+})

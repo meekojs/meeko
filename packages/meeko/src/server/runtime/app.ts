@@ -11,6 +11,7 @@ import type { SocketHub, SocketPubSub } from '../socket/runtime'
 import type { AssetManifest, AssetReader } from './assets'
 import type { ContentSecurityPolicy } from './csp'
 import type { ServerRuntime, ServerRuntimeDefinition } from './definition'
+import type { DevAllowedHosts } from './dev-hosts'
 import type { ServerManifest } from './discovery'
 import type { DocumentMarkup, DocumentOptions, PageHandlerOptions, PageModule, PageRoute, PrerenderSource } from './framework-render'
 import type { ServerPlatform } from './platform'
@@ -27,11 +28,12 @@ import { composeServerMiddleware } from '../middleware/index'
 import { createSocketHub, withSocketHub } from '../socket/runtime'
 import { contentSecurityPolicy, JSON_CONTENT_SECURITY_POLICY } from './csp'
 import { createContextDispatcher, createLocalServerFetch, loadSocketChannels } from './discovery'
-import { copySocketAddress, setRequestEnvironment, trustProxyOf, warnOnce } from './env'
+import { copySocketAddress, requestTargetUrl, setRequestEnvironment, trustProxyOf, warnOnce } from './env'
 import { createPageHandler, withRouteManifest } from './framework-render'
 import { createDetachedPlatform } from './platform'
 import { registerProcessErrors, withRequestScope } from './process-errors'
 import { createRequestContext } from './request-context'
+import { allowDevHosts } from './sessions'
 import { createSessionDefaults, warnIgnoredSessionEnv } from './zero-config'
 
 type ServerHeaders = Readonly<Record<string, string | Readonly<Record<string, string>>>>
@@ -210,6 +212,19 @@ export interface ServerAppOptions<Env = Readonly<Record<string, string | undefin
 	readonly document?: DocumentOptions
 	/** Sustituye a `ServerRuntime.publicOrigin`. */
 	readonly publicOrigin?: string
+	/**
+	 * Hosts y orígenes adicionales cuyo `Origin` aceptan, sólo en desarrollo, las comprobaciones de
+	 * API, RPC, formularios, `session.create` y Socket, además del origen de la aplicación y de
+	 * `allowedOrigins`. `meeko dev` pasa aquí `dev.allowedHosts` y `MEEKO_ALLOWED_HOSTS`; con la
+	 * opción presente, cada `Origin` rechazado avisa una vez en la consola con la opción que lo
+	 * permite. Con `production: true` se ignora: nada se relaja en producción.
+	 * @since 1.10.0
+	 * @example
+	 * ```ts
+	 * const app = await createServerApp({ manifest, load, runtime, production: false, devAllowedHosts: ["mi-pc.tailnet.ts.net"] });
+	 * ```
+	 */
+	readonly devAllowedHosts?: DevAllowedHosts
 	/** Lo activa `meeko build` mientras prerenderiza páginas. */
 	readonly prerendering?: boolean
 	/**
@@ -398,6 +413,19 @@ function headerPattern(pattern: string): RegExp {
 	)
 }
 
+/**
+ * The path the router serves for `pathname`: without empty segments, so neither `//` nor a trailing
+ * `/`, and with each segment decoded, as `matchRoute` reads it. `undefined` when a segment does not
+ * decode, so no route answers it.
+ */
+function routedPathname(pathname: string): string | undefined {
+	try {
+		return `/${pathname.split('/').filter(Boolean).map(decodeURIComponent).join('/')}`
+	} catch {
+		return undefined
+	}
+}
+
 /** Whether a response body is JSON: API, RPC, errors and the navigation payloads. */
 function jsonResponse(pathname: string, response: Response): boolean {
 	if (pathname.startsWith('/api/') || pathname.startsWith('/_meeko/rpc/')) return true
@@ -426,7 +454,12 @@ function responseHeaders(policy: ContentSecurityPolicy | undefined, configured: 
 		// Later entries win: the global headers first, the public file, then each pattern in written order.
 		const extra = new Map<string, string>(global.map(([name, value]) => [name.toLowerCase(), value]))
 		for (const [name, value] of Object.entries(fileHeaders.get(pathname) ?? {})) extra.set(name.toLowerCase(), value)
-		for (const pattern of patterns) if (pattern.test.test(pathname)) for (const [name, value] of pattern.headers) extra.set(name.toLowerCase(), value)
+		// The router ignores empty segments and decodes the rest: `//admin/panel` and `/%61dmin/panel`
+		// serve `/admin/panel`, so a pattern applies when it matches the written path or the routed one.
+		const routed = patterns.length ? routedPathname(pathname) : undefined
+		for (const pattern of patterns) {
+			if (pattern.test.test(pathname) || (routed !== undefined && pattern.test.test(routed))) for (const [name, value] of pattern.headers) extra.set(name.toLowerCase(), value)
+		}
 		// A 304 updates the stored response's headers: a policy without the hashes of that document would replace its own.
 		const csp = basePolicy && response.status !== 304 && !response.headers.has('content-security-policy') ? (jsonResponse(pathname, response) ? JSON_CONTENT_SECURITY_POLICY : basePolicy) : undefined
 		// `public` and `s-maxage` both let a shared cache store the response, also when `headers` adds them.
@@ -502,6 +535,8 @@ export async function createServerApp<Env = Readonly<Record<string, string | und
 	trustProxyOf(basePlatform.env)
 	const runtime = await createRuntime(options, basePlatform)
 	const sessions = runtime.sessions
+	// Development only: the manager itself also refuses it in production.
+	if (!options.production && options.devAllowedHosts !== undefined) sessions[allowDevHosts](options.devAllowedHosts)
 	let closing: Promise<void> | undefined
 	const close = (): Promise<void> => {
 		closing ??= (async () => {
@@ -637,10 +672,7 @@ export async function createServerApp<Env = Readonly<Record<string, string | und
 			const url = new URL(request.url)
 			if (url.origin === publicOrigin) return request
 			// Assigned fields keep a `//host/...` pathname on the public origin.
-			const target = new URL(publicOrigin)
-			target.pathname = url.pathname
-			target.search = url.search
-			return copySocketAddress(request, new Request(target, request))
+			return copySocketAddress(request, new Request(requestTargetUrl(url.pathname + url.search, publicOrigin), request))
 		}
 		let socket: ServerAppSocket | undefined
 		if (manifest.server.socket?.length) {

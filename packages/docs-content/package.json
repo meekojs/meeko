@@ -21,23 +21,24 @@
 	},
 	"scripts": {
 		"check": "tsc -p tsconfig.json --noEmit",
+		"inventory": "tsx scripts/inventory.ts",
 		"test": "tsx --test --test-concurrency=1 tests/*.test.ts",
 		"translations": "tsx scripts/translations.ts"
 	},
 	"dependencies": {
 		"@meekojs/meeko": "workspace:*",
-		"@typescript/typescript6": "6.0.2",
-		"github-slugger": "2.0.0",
-		"markdown-it": "15.0.3",
-		"pg": "8.23.1",
-		"prettier": "3.9.10",
-		"shiki": "4.5.0",
-		"valibot": "1.5.0"
+		"@typescript/typescript6": "catalog:",
+		"github-slugger": "catalog:",
+		"markdown-it": "catalog:",
+		"pg": "catalog:",
+		"prettier": "catalog:",
+		"shiki": "catalog:",
+		"valibot": "catalog:"
 	},
 	"devDependencies": {
-		"@types/node": "^24.0.0",
-		"@types/pg": "8.23.1",
-		"tsx": "^4.20.0",
-		"typescript": "7.0.2"
+		"@types/node": "catalog:",
+		"@types/pg": "catalog:",
+		"tsx": "catalog:",
+		"typescript": "catalog:"
 	}
 }

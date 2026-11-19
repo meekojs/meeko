@@ -32,14 +32,29 @@
 			bind:href="i18n.switchLocalePath(prose.value)"
 			bind:hreflang="prose.value"
 		/>
-		<UIPageHeader
-			bind:title="props.title"
-			bind:description="props.description"
-			bind:layout="props.landing ? 'landing' : 'docs'"
-		/>
-		<UIProse as="article">
-			<render snippet="snippets.default" />
-		</UIProse>
+		<UIContainer
+			if:when="props.landing"
+			size="2xl"
+		>
+			<UIPageHeader
+				bind:title="props.title"
+				bind:description="props.description"
+				bind:layout="props.landing ? 'landing' : 'docs'"
+			/>
+			<UIProse as="article">
+				<render snippet="snippets.default" />
+			</UIProse>
+		</UIContainer>
+		<div if:when="!props.landing">
+			<UIPageHeader
+				layout="docs"
+				bind:title="props.title"
+				bind:description="props.description"
+			/>
+			<UIProse as="article">
+				<render snippet="snippets.default" />
+			</UIProse>
+		</div>
 		<DocsFeedback
 			if:when="!props.landing"
 			bind:path="route.path.value"

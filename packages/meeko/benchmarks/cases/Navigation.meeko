@@ -18,51 +18,60 @@
 		<button
 			type="button"
 			on:click="navigate"
-			>Next view</button
 		>
+			Next view
+		</button>
 		<section
 			if:when="props.mode === 'reuse'"
 			bind:data-view="view.value"
-			><h1>View {view.value}</h1
-			><p
+		>
+			<h1>View {view.value}</h1>
+			<p
 				each:of="rows"
 				each:as="row"
 				each:key="row"
-				>{names[view.value]} {row}</p
-			></section
-		>
+			>
+				{names[view.value]} {row}
+			</p>
+		</section>
 		<section
 			if:when="props.mode === 'mount' && view.value === 0"
 			bind:data-view="0"
-			><h1>View 0</h1
-			><p
+		>
+			<h1>View 0</h1>
+			<p
 				each:of="rows"
 				each:as="row"
 				each:key="row"
-				>Home {row}</p
-			></section
-		>
+			>
+				Home {row}
+			</p>
+		</section>
 		<section
 			if:when="props.mode === 'mount' && view.value === 1"
 			bind:data-view="1"
-			><h1>View 1</h1
-			><p
+		>
+			<h1>View 1</h1>
+			<p
 				each:of="rows"
 				each:as="row"
 				each:key="row"
-				>Catalog {row}</p
-			></section
-		>
+			>
+				Catalog {row}
+			</p>
+		</section>
 		<section
 			if:when="props.mode === 'mount' && view.value === 2"
 			bind:data-view="2"
-			><h1>View 2</h1
-			><p
+		>
+			<h1>View 2</h1>
+			<p
 				each:of="rows"
 				each:as="row"
 				each:key="row"
-				>Profile {row}</p
-			></section
-		>
+			>
+				Profile {row}
+			</p>
+		</section>
 	</main>
 </template>

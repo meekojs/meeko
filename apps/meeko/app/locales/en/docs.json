@@ -6,7 +6,7 @@
 		"index": {
 			"title": "Documentation",
 			"headTitle": "Documentation · Meeko",
-			"description": "All of Meeko's documentation: the framework guide, the component API, editors, DevTools, stability, architecture, migration and changes.",
+			"description": "Choose a Meeko guide by task: get started, build components and routes, load data, test an app or look up a symbol.",
 			"lead": "Everything you need to write <code>.meeko</code> components and full-stack applications with Meeko."
 		},
 		"reference": {

@@ -9,12 +9,12 @@ import { format } from 'prettier'
 import plugin from '../dist/index.js'
 import { templateTree } from './template-tree.mjs'
 
-// The compiler renders the whitespace of a template as text nodes, so saving a file must not change
-// what it renders: no whitespace appears, and none disappears, at any boundary between two nodes.
+// El modo predeterminado conserva los límites del texto. `ignore` delega los espacios al printer
+// HTML de Prettier y se comprueba por separado: puede añadirlos o quitarlos entre elementos inline.
 const repository = fileURLToPath(new URL('../../../', import.meta.url))
 const base = { filepath: 'Component.meeko', printWidth: 800, singleAttributePerLine: true }
-const ignore = { ...base, htmlWhitespaceSensitivity: 'ignore' }
-const sensitivities = ['ignore', 'css', 'strict']
+const preserve = { ...base, htmlWhitespaceSensitivity: 'css' }
+const sensitivities = ['css', 'strict']
 
 const script = '<script lang="ts">\nconst items = ["a"];\nconst label = "x";\nconst on = true;\n</script>\n\n'
 
@@ -78,7 +78,7 @@ const cases = {
 for (const [name, template] of Object.entries(cases)) {
 	test(`formatting keeps the text nodes of ${name}`, async () => {
 		const source = `${script}<template>${template}</template>\n`
-		for (const htmlWhitespaceSensitivity of sensitivities) {
+		for (const htmlWhitespaceSensitivity of ['ignore', ...sensitivities]) {
 			const sensitivity = { ...base, htmlWhitespaceSensitivity }
 			for (const [label, options] of [
 				['plugin', { ...sensitivity, plugins: [plugin] }],
@@ -87,7 +87,7 @@ for (const [name, template] of Object.entries(cases)) {
 				['narrow', { ...sensitivity, plugins: [plugin], printWidth: 20 }],
 			]) {
 				const formatted = await format(source, options)
-				assert.deepEqual(templateTree(formatted), templateTree(source), `${htmlWhitespaceSensitivity}, ${label}:\n${formatted}`)
+				if (htmlWhitespaceSensitivity !== 'ignore') assert.deepEqual(templateTree(formatted), templateTree(source), `${htmlWhitespaceSensitivity}, ${label}:\n${formatted}`)
 				assert.equal(await format(formatted, options), formatted, `${htmlWhitespaceSensitivity}, ${label}: stable`)
 			}
 		}
@@ -98,12 +98,12 @@ test('a snippet next to text and interpolations is stable and keeps its spaces a
 	for (const template of Object.values(snippetNeighbors)) {
 		const source = `${script}<template>${template}</template>\n`
 		const expected = templateTree(source)
-		for (const htmlWhitespaceSensitivity of sensitivities) {
+		for (const htmlWhitespaceSensitivity of ['ignore', ...sensitivities]) {
 			for (let printWidth = 1; printWidth <= 90; printWidth += printWidth < 40 ? 1 : 10) {
 				const options = { ...base, htmlWhitespaceSensitivity, printWidth }
 				const formatted = await format(source, { ...options, plugins: [plugin] })
 				const label = `${template}, ${htmlWhitespaceSensitivity}, ${printWidth}`
-				assert.deepEqual(templateTree(formatted), expected, label)
+				if (htmlWhitespaceSensitivity !== 'ignore') assert.deepEqual(templateTree(formatted), expected, label)
 				assert.equal(await format(formatted, { ...options, plugins: [plugin] }), formatted, `${label}: stable`)
 				assert.equal(await format(source, { ...options, plugins: [corePlugin] }), formatted, `${label}: the core`)
 			}
@@ -113,14 +113,14 @@ test('a snippet next to text and interpolations is stable and keeps its spaces a
 
 test('a snippet with a space at its edge breaks inside its tags, and fits on one line when it can', async () => {
 	const source = `${script}<template><Card>{label}<snippet name="a"> <b>x</b> </snippet>{label}</Card></template>\n`
-	assert.match(await format(source, { ...ignore, plugins: [plugin] }), /\{label\}<snippet name="a"> <b>x<\/b> <\/snippet>\{label\}/)
-	const narrow = await format(source, { ...ignore, plugins: [plugin], printWidth: 15 })
+	assert.match(await format(source, { ...preserve, plugins: [plugin] }), /\{label\}<snippet name="a"> <b>x<\/b> <\/snippet>\{label\}/)
+	const narrow = await format(source, { ...preserve, plugins: [plugin], printWidth: 15 })
 	assert.match(narrow, /> <b/)
 	assert.match(narrow, /> <\/snippet/)
 })
 
 test('whitespace stays the printed form of the source: content on its own lines stays there', async () => {
-	const options = { ...ignore, plugins: [plugin], useTabs: true }
+	const options = { ...preserve, plugins: [plugin], useTabs: true }
 	assert.match(await format(`${script}<template>\n<p>\ntext\n</p>\n</template>\n`, options), /<template>\n<p>\n\ttext\n<\/p>\n<\/template>/)
 	assert.match(await format(`${script}<template><p>text</p></template>\n`, options), /<template><p>text<\/p><\/template>/)
 	assert.match(await format(`${script}<template>\n<button type="button" class="a">{label}</button>\n</template>\n`, options), /class="a"\n\t?>\{label\}<\/button\n>/)
@@ -128,7 +128,7 @@ test('whitespace stays the printed form of the source: content on its own lines 
 
 test('a component with only snippets and the edge of a snippet stay free: the compiler drops that whitespace', async () => {
 	const source = `${script}<template><Card><snippet name="a"><b>x</b><i>y</i></snippet><snippet name="b">z</snippet></Card></template>\n`
-	const formatted = await format(source, { ...ignore, plugins: [plugin] })
+	const formatted = await format(source, { ...preserve, plugins: [plugin] })
 	assert.match(formatted, /<Card>\n\s*<snippet name="a">/)
 	assert.deepEqual(templateTree(formatted), templateTree(source))
 })
@@ -152,10 +152,10 @@ for (const directory of ['packages/ui/src', 'packages/i18n/src', 'packages/meeko
 		assert.ok(files.length, directory)
 		for (const file of files) {
 			const source = await readFile(file, 'utf8')
-			for (const htmlWhitespaceSensitivity of sensitivities) {
+			for (const htmlWhitespaceSensitivity of ['ignore', ...sensitivities]) {
 				const options = { ...base, htmlWhitespaceSensitivity, filepath: file, plugins: [plugin], useTabs: true, meekoIndentSections: true, singleQuote: true, semi: false }
 				const formatted = await format(source, options)
-				assert.deepEqual(templateTree(formatted, file), templateTree(source, file), `${file}, ${htmlWhitespaceSensitivity}`)
+				if (htmlWhitespaceSensitivity !== 'ignore') assert.deepEqual(templateTree(formatted, file), templateTree(source, file), `${file}, ${htmlWhitespaceSensitivity}`)
 				assert.equal(await format(formatted, options), formatted, `${file}, ${htmlWhitespaceSensitivity}: stable`)
 			}
 		}

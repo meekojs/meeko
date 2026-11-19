@@ -809,6 +809,7 @@
 								<DocsAnnouncements bind:items="preview.value" />
 								<div aria-hidden="true">
 									<UISkeleton
+										class="moderation-preview-skeleton"
 										bind:lines="3"
 										bind:widths="['short', 'full', 'long']"
 									/>
@@ -953,7 +954,7 @@
 		padding: var(--ui-space-4);
 		overflow: hidden;
 	}
-	.moderation-preview-frame :global(.meeko-ui-skeleton > span) {
+	.moderation-preview-frame :global(.moderation-preview-skeleton > span) {
 		animation: none;
 	}
 	@media (max-width: 75rem) {

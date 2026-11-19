@@ -52,6 +52,37 @@ export type AttributeValues<Tag extends string, Name extends string> = ClosedVal
 type HintedAttributeValue = (string & {}) | number | boolean | null | undefined
 
 /**
+ * Valor de `class`: un fragmento escalar o arrays, también anidados, cuyos fragmentos se unen con
+ * espacios. `false`, `null`, `undefined` y los textos vacíos dentro del array se omiten.
+ *
+ * @since 1.10.0
+ * @example
+ * ```ts
+ * import type { ClassValue } from "@meekojs/meeko";
+ * const active = true;
+ * // Se escribe como class="button button--active".
+ * const classes: ClassValue = ["button", active && "button--active", [null, ""]];
+ * ```
+ */
+export type ClassValue = HintedAttributeValue | readonly ClassValue[]
+
+/**
+ * Valor de `style`: texto CSS o un objeto cuyas claves son propiedades CSS en camelCase,
+ * kebab-case o variables personalizadas (`--color`). Los valores `false`, `null` y `undefined`
+ * omiten la declaración; los números se escriben sin añadir unidades.
+ *
+ * @since 1.10.0
+ * @example
+ * ```ts
+ * import type { StyleValue } from "@meekojs/meeko";
+ * const hidden = false;
+ * // Se escribe como style="background-color: red; --gap: 4px; z-index: 2".
+ * const style: StyleValue = { backgroundColor: "red", "--gap": "4px", zIndex: 2, display: hidden && "none" };
+ * ```
+ */
+export type StyleValue = HintedAttributeValue | Readonly<Record<string, string | number | false | null | undefined>>
+
+/**
  * Valor de un atributo HTML del elemento `Tag`: cualquier valor de atributo, como antes de `1.8`,
  * con los valores del estándar ({@link AttributeValues}) como sugerencias para el completado y el
  * hover. Es el tipo de cada clave de `ElementAttributes<Tag>`.
@@ -66,7 +97,7 @@ type HintedAttributeValue = (string & {}) | number | boolean | null | undefined
  * const type: AttributeValueOf<"button", "type"> = "submit";
  * ```
  */
-export type AttributeValueOf<Tag extends string, Name extends string> = AttributeValues<Tag, Name> | HintedAttributeValue
+export type AttributeValueOf<Tag extends string, Name extends string> = AttributeValues<Tag, Name> | (Name extends 'class' ? ClassValue : Name extends 'style' ? StyleValue : HintedAttributeValue)
 
 /**
  * A type error whose text carries a Meeko code: an object with that text as its only key, which no

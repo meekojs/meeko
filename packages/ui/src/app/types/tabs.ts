@@ -1,3 +1,6 @@
+import type { tabs } from '../variants/tabs'
+import type { UIThemeProps } from './theme'
+
 /**
  * Una pestaña de `<UITabs>`.
  * @since 1.8.0
@@ -46,15 +49,18 @@ export interface TabsSnippets<Value extends string = string> {
  * </UITabs>
  * ```
  */
-export interface UITabsProps<Value extends string = string> {
-	/** Las pestañas, en orden. */
-	readonly items: readonly UITabsItem<Value>[]
-	/** `aria-label` de la lista de pestañas. */
-	readonly label?: string
-	/** `aria-labelledby` de la lista de pestañas, si un título visible ya la nombra. */
-	readonly labelledBy?: string
-	/** Clases del elemento raíz. */
-	readonly class?: string
-	/** `id` del elemento raíz. */
-	readonly id?: string
-}
+export type UITabsProps<Value extends string = string> = UIThemeProps<
+	typeof tabs,
+	{
+		/** Las pestañas, en orden. */
+		readonly items: readonly UITabsItem<Value>[]
+		/** `aria-label` de la lista de pestañas. */
+		readonly label?: string
+		/** `aria-labelledby` de la lista de pestañas, si un título visible ya la nombra. */
+		readonly labelledBy?: string
+		/** Clases del elemento raíz; equivale a `ui.base`. */
+		readonly class?: string
+		/** `id` del elemento raíz. */
+		readonly id?: string
+	}
+>

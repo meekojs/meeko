@@ -8,6 +8,17 @@ export function escapeHtml(value: unknown): string {
 }
 
 /**
+ * Contenido SSR de un `<textarea>` o un `<title>` con expresiones: el texto completo escapado, sin
+ * marcadores, que el navegador mostraría como texto. En `<textarea>` repite un salto de línea
+ * inicial, que el analizador HTML descarta.
+ *
+ * @internal
+ */
+export function textElementContent(tag: string, text: string): string {
+	return escapeHtml(tag === 'textarea' && text.startsWith('\n') ? `\n${text}` : text)
+}
+
+/**
  * Contenido de la directiva `html="expresión"`: el HTML de la expresión **sin escapar**; `null` y
  * `undefined` dejan el elemento vacío. Es inseguro con contenido no confiable, que podría ejecutar
  * scripts en la página (XSS).
@@ -55,18 +66,137 @@ export const booleanAttributeNames = 'allowfullscreen alpha async autofocus auto
 // Built on first use.
 let booleanAttributes: ReadonlySet<string> | undefined
 
+/** Nombre CSS de una clave de objeto: `backgroundColor`, `font-size` o `--custom`. */
+function stylePropertyName(name: string): string {
+	if (name.startsWith('--')) return name
+	if (name === 'cssFloat') return 'float'
+	const kebab = name.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)
+	return kebab.startsWith('ms-') ? `-${kebab}` : kebab
+}
+
+/** Convierte un objeto de estilos en declaraciones estables para SSR, hidratación y actualizaciones. */
+function styleObjectValue(value: object): string | null {
+	const declarations: string[] = []
+	for (const [key, raw] of Object.entries(value)) {
+		if (raw === false || raw === null || raw === undefined) continue
+		const name = stylePropertyName(key)
+		if (!/^(?:--[\w-]+|-?[_a-zA-Z][\w-]*)$/.test(name)) throw new TypeError(`Invalid CSS property name: ${key}`)
+		declarations.push(`${name}: ${String(raw)}`)
+	}
+	return declarations.length ? declarations.join('; ') : null
+}
+
 /**
  * Convierte un valor de atributo dinámico en su forma DOM; null lo elimina. Un atributo booleano
  * del estándar (`disabled`, `open`…) se escribe vacío con un valor verdadero. `hidden`, booleano
  * hasta `1.8` y hoy enumerado, conserva esa regla salvo con un texto no vacío, que se escribe tal
  * cual: `"until-found"` lo oculta hasta que la búsqueda de la página lo encuentra.
+ *
+ * Desde `1.9`, en un atributo que lleva una URL (`href`, `xlink:href`, `src`, `action`,
+ * `formaction`, `poster`…) un esquema `javascript:`, `vbscript:` o `data:` (salvo `data:image/*` en
+ * `src` y `poster`) se escribe {@link blockedUrl}, igual que la URL de un `content` con la forma de
+ * `<meta http-equiv="refresh">`. Desde `1.10`, también los valores de una animación SVG (`to`,
+ * `from`, `by` y cada elemento de `values`), que con `attributeName="href"` son una URL.
  */
 export function attributeValue(name: string, value: unknown): string | null {
 	booleanAttributes ??= new Set(booleanAttributeNames.split(' '))
 	if (booleanAttributes.has(name)) return value ? '' : null
 	if (name === 'hidden') return typeof value === 'string' && value !== '' ? value : value ? '' : null
+	if (name === 'class' && Array.isArray(value)) {
+		const classes = value.flatMap((item) => {
+			const resolved = attributeValue(name, item)?.trim()
+			return resolved ? [resolved] : []
+		})
+		return classes.length ? classes.join(' ') : null
+	}
+	if (name === 'style' && typeof value === 'object' && value !== null && !Array.isArray(value)) return styleObjectValue(value)
 	if (value === null || value === undefined || value === false) return null
-	return String(value)
+	return safeUrlAttribute(name, String(value))
+}
+
+/**
+ * Valor inerte que sustituye a una URL con un esquema que ejecuta código o crea un documento
+ * (`javascript:`, `vbscript:`, `data:`) en un atributo dinámico que lleva una URL.
+ *
+ * @since 1.9.0
+ * @example
+ * ```ts
+ * attributeValue("href", "javascript:alert(1)") === blockedUrl; // true
+ * attributeValue("href", "mailto:ana@example.com"); // "mailto:ana@example.com"
+ * ```
+ */
+export const blockedUrl = 'about:invalid#meeko-unsafe-url'
+
+/** Attributes of HTML, SVG and MathML whose value the browser navigates to or loads as a URL. */
+const urlAttributes = new Set(['href', 'xlink:href', 'src', 'action', 'formaction', 'poster', 'cite', 'background', 'data', 'ping', 'manifest', 'codebase', 'longdesc', 'classid', 'archive', 'profile', 'icon', 'lowsrc', 'dynsrc'])
+
+/** Where `data:image/*` loads an image, which runs no script in the page. */
+const imageUrlAttributes = new Set(['src', 'poster'])
+
+/**
+ * Values of an SVG animation (`<animate>`, `<set>`…): with `attributeName="href"` they become the
+ * URL of the animated attribute. `values` is a list separated by `;`. They hold no URL elsewhere.
+ */
+const animationValueAttributes = new Set(['to', 'from', 'by', 'values'])
+
+/** The `content` of `<meta http-equiv="refresh">`: a delay, a separator and the URL, with an optional `url=` and quote. */
+const refreshContent = /^[\t\n\f\r ]*[\d.]+(?:[\t\n\f\r ]*[;,][\t\n\f\r ]*|[\t\n\f\r ]+)(?:url[\t\n\f\r ]*=[\t\n\f\r ]*)?["']?([\s\S]*)$/i
+
+/** Keys of `${attribute} ${scheme}` already warned about, once per process. */
+const warnedUrls = new Set<string>()
+
+/**
+ * The scheme the browser reads in `value`, lowercase, or `undefined` for a relative URL. As the URL
+ * parser does, it skips leading C0 controls and spaces and drops every tab and line break.
+ */
+function urlScheme(value: string): string | undefined {
+	const normalized = value.replace(/^[\u0000- ]+/, '').replace(/[\t\n\r]/g, '')
+	return /^([a-zA-Z][a-zA-Z0-9+.-]*):/.exec(normalized)?.[1]?.toLowerCase()
+}
+
+/** Whether `value`, a URL of the attribute `name`, runs a script or creates a document. */
+function unsafeUrl(name: string, value: string): string | undefined {
+	const scheme = urlScheme(value)
+	if (scheme === 'javascript' || scheme === 'vbscript') return scheme
+	if (scheme !== 'data') return undefined
+	const image = /^data:image\//i.test(value.replace(/^[\u0000- ]+/, '').replace(/[\t\n\r]/g, ''))
+	return image && imageUrlAttributes.has(name) ? undefined : scheme
+}
+
+/** Whether this process runs a production build, where the warning stays silent. */
+function production(): boolean {
+	try {
+		// Vite replaces the whole expression in the browser bundle; without it, `process` may not exist.
+		return process.env.NODE_ENV === 'production'
+	} catch {
+		return false
+	}
+}
+
+/**
+ * The value of a dynamic attribute with its URL checked: in an attribute that carries a URL (and in
+ * the URL of a `content` shaped like a `<meta http-equiv="refresh">`), a `javascript:`, `vbscript:`
+ * or `data:` scheme (but `data:image/*` in `src` and `poster`) becomes {@link blockedUrl}. SSR,
+ * hydration and updates all read it from {@link attributeValue}, so they always agree.
+ */
+function safeUrlAttribute(name: string, value: string): string {
+	const lower = name.toLowerCase()
+	let scheme: string | undefined
+	if (urlAttributes.has(lower)) scheme = unsafeUrl(lower, value)
+	// As in `src`, `data:image/*` passes: an animated `href` of an `<image>` may load one.
+	else if (animationValueAttributes.has(lower)) scheme = (lower === 'values' ? value.split(';') : [value]).map((item) => unsafeUrl('src', item)).find((item) => item !== undefined)
+	else if (lower === 'content') {
+		const url = refreshContent.exec(value)?.[1]
+		if (url !== undefined) scheme = unsafeUrl('href', url)
+	}
+	if (scheme === undefined) return value
+	const key = `${lower} ${scheme}`
+	if (!warnedUrls.has(key) && !production()) {
+		warnedUrls.add(key)
+		// Only the scheme: the value may be long or come from a visitor.
+		console.warn(`Meeko: se ha bloqueado una URL ${scheme}: en el atributo ${lower}; se escribe ${blockedUrl}. Para ejecutar código al pulsar, usa on:click.`)
+	}
+	return blockedUrl
 }
 
 /** Genera un atributo HTML dinámico con escape seguro para SSR. */

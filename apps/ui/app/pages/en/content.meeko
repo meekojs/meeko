@@ -1,6 +1,12 @@
 <script lang="ts">
 	import { englishExamples as examples } from '../../utils/examples.en'
 
+	const revenue = [8.2, 9.1, 8.7, 10.4, 11.2, 10.9, 12.4]
+	const latency = [210, 205, 198, 201, 190, 186, 180]
+	const errors = [0.5, 0.3, 0.4, 0.6, 0.4, 0.4, 0.4]
+	const orders = [348, 341, 352, 330, 336, 325, 320]
+	const conversion = [2.6, 2.7, 2.6, 2.8, 2.9, 3, 3.1]
+
 	const details = [
 		{ label: 'Status', value: 'Published', detail: 'Today' },
 		{ label: 'Author', value: 'Meeko team' },
@@ -12,11 +18,13 @@
 	<DocsPage
 		locale="en"
 		title="Data and content"
-		description="Stat, DescriptionList, Disclosure, Diff, CodeBlock and Prose: figures, details, changes, code and long text."
+		description="Stat, Sparkline, DescriptionList, Disclosure, Diff, CodeBlock and Prose: figures, details, changes, code and long text."
 	>
 		<h2 id="stat">UIStat and UIDescriptionList</h2>
 		<p>
-			A figure with its label, or several label and value pairs. Both are a description list (<code>dl</code>).
+			A figure with its label, or several label and value pairs. Both are a description list (
+			<code>dl</code>
+			).
 			<code>UIDescriptionList</code>
 			stays in one column on mobile.
 		</p>
@@ -59,10 +67,121 @@
 				{ name: 'class', type: 'string', description: 'Additional classes.' },
 			]"
 		/>
+		<h2 id="kpi">UIStat as a key figure and UISparkline</h2>
+		<p>
+			With
+			<code>change</code>
+			, UIStat adds the change with its arrow and its tone (up is good unless
+			<code>good="down"</code>
+			), the period, a sparkline with
+			<code>trend</code>
+			and a link to the detail with
+			<code>to</code>
+			or
+			<code>href</code>
+			. Below 20rem of width of the figure itself, not of the window, the sparkline moves down and the value gets smaller.
+		</p>
+		<DocsPreview layout="stack">
+			<div
+				id="kpi-wide"
+				class="docs-grid"
+				style="inline-size: 100%"
+			>
+				<UIStat
+					label="Revenue"
+					value="€12,400"
+					period="vs. the previous 30 days"
+					to="/tables"
+					bind:change="12.5"
+					bind:trend="revenue"
+				/>
+				<UIStat
+					label="Response time"
+					value="180 ms"
+					good="down"
+					period="vs. last week"
+					bind:change="-8"
+					bind:trend="latency"
+				/>
+				<UIStat
+					label="Error rate"
+					value="0.4%"
+					period="vs. yesterday"
+					bind:change="0"
+					bind:trend="errors"
+				/>
+			</div>
+			<div
+				id="kpi-compact"
+				style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: var(--ui-space-4); inline-size: 100%"
+			>
+				<UIStat
+					label="Orders"
+					change="−8 orders"
+					period="this month"
+					bind:value="320"
+					bind:trend="orders"
+				/>
+				<UIStat
+					label="Conversion"
+					value="3.1%"
+					changeFormat="number"
+					period="points"
+					bind:change="0.4"
+					bind:trend="conversion"
+				/>
+				<UIStat
+					label="Sign-ups"
+					href="https://github.com/meekojs/meeko"
+					linkLabel="See the sign-ups"
+					bind:value="48"
+					bind:change="-3"
+				/>
+			</div>
+			<div
+				id="sparkline-visits"
+				style="inline-size: 100%; max-inline-size: 20rem"
+			>
+				<p>Visits this week</p>
+				<UISparkline
+					area
+					tone="accent"
+					bind:values="[1200, 1350, 1280, 1500, 1720, 1610, 1890]"
+				/>
+			</div>
+		</DocsPreview>
+		<DocsCode bind:code="examples.kpi" />
+		<DocsApi
+			caption="UIStat key figure props"
+			bind:rows="[
+				{ name: 'change', type: 'number | string', description: 'The change. A number is formatted in the language of the document, with its sign; a text is painted as it is and its sign gives the direction.' },
+				{ name: 'changeFormat', type: `'percent' | 'number'`, default: `'percent'`, description: 'How a numeric change is formatted: 12.5 is 12.5% or 12.5.' },
+				{ name: 'changeDirection', type: `'up' | 'down' | 'flat'`, description: 'The direction when the sign does not say it.' },
+				{ name: 'good', type: `'up' | 'down'`, default: `'up'`, description: 'Which direction is good: it gives the success or danger tone.' },
+				{ name: 'period', type: 'string', description: 'The period of the comparison, after the change.' },
+				{ name: 'trend', type: 'readonly number[]', description: 'A series for a UISparkline beside the value.' },
+				{ name: 'trendLabel', type: 'string', description: 'Accessible name of the sparkline; by default, minimum, maximum and latest.' },
+				{ name: 'to / href', type: 'UIRouteTarget | string', description: 'A link to the detail, with its own text: not the whole figure.' },
+				{ name: 'linkLabel', type: 'string', default: `'View details'`, description: 'Text of the link; the default one adds the label to its accessible name.' },
+			]"
+		/>
+		<DocsApi
+			caption="UISparkline props"
+			bind:rows="[
+				{ name: 'values', type: 'readonly number[]', description: 'Required. The series, from the oldest to the latest.' },
+				{ name: 'area', type: 'boolean', default: 'false', description: 'Fills the area under the line.' },
+				{ name: 'tone', type: `'neutral' | 'accent' | 'info' | 'success' | 'warning' | 'danger'`, description: 'Colour of the line; without it, currentColor.' },
+				{ name: 'min / max', type: 'number', description: 'Bounds of the vertical axis; by default, those of the series.' },
+				{ name: 'label', type: 'string', description: 'Accessible name; by default, minimum, maximum and latest.' },
+				{ name: 'format', type: 'Intl.NumberFormatOptions', description: 'Format of the numbers of the summary.' },
+				{ name: 'class', type: 'string', description: 'Additional classes of the svg.' },
+			]"
+		/>
 		<h2 id="disclosure">UIDisclosure</h2>
 		<p>
 			A native
-			<code>details</code>: it opens with the keyboard and without JavaScript.
+			<code>details</code>
+			: it opens with the keyboard and without JavaScript.
 		</p>
 		<DocsPreview layout="stack">
 			<UIDisclosure summary="Technical details">
@@ -81,11 +200,17 @@
 		<p>
 			It receives a unified diff and marks each line with
 			<code>data-kind</code>
-			(<code>add</code>,
-			<code>remove</code>,
-			<code>hunk</code>,
-			<code>file</code>,
-			<code>context</code>) and a text for screen readers: color is not the only meaning.
+			(
+			<code>add</code>
+			,
+			<code>remove</code>
+			,
+			<code>hunk</code>
+			,
+			<code>file</code>
+			,
+			<code>context</code>
+			) and a text for screen readers: color is not the only meaning.
 		</p>
 		<UIDiff
 			label="Changes in the guide"
@@ -111,8 +236,10 @@
 			(Shiki with
 			<code>--shiki-light</code>
 			and
-			<code>--shiki-dark</code>) and in
-			<code>code</code>, what is copied.
+			<code>--shiki-dark</code>
+			) and in
+			<code>code</code>
+			, what is copied.
 			<code>mode="log"</code>
 			uses
 			<code>role="log"</code>
@@ -156,17 +283,20 @@ build: done in 1.2 s"
 		<h2 id="prose">UIProse</h2>
 		<p>
 			It dresses rendered Markdown or your own HTML. Text keeps a reading measure, while code and tables may take the whole column. A UI component inside the text keeps its look. All these guides are inside a
-			<code>UIProse</code>.
+			<code>UIProse</code>
+			.
 		</p>
 		<DocsPreview layout="stack">
 			<UIProse as="section">
 				<h3>A section title</h3>
 				<p>
 					A paragraph with
-					<a href="#prose">a link</a>,
+					<a href="#prose">a link</a>
+					,
 					<strong>emphasis</strong>
 					and
-					<code>code</code>.
+					<code>code</code>
+					.
 				</p>
 				<ul>
 					<li>A list</li>
@@ -185,15 +315,20 @@ build: done in 1.2 s"
 		<DocsCode bind:code="examples.codeBlock" />
 		<p>
 			The types
-			<code>UIStatProps</code>,
-			<code>UIDescriptionListProps</code>,
-			<code>UIDisclosureProps</code>,
-			<code>UIDiffProps</code>,
+			<code>UIStatProps</code>
+			,
+			<code>UIDescriptionListProps</code>
+			,
+			<code>UIDisclosureProps</code>
+			,
+			<code>UIDiffProps</code>
+			,
 			<code>UICodeBlockProps</code>
 			and
 			<code>UIProseProps</code>
 			are exported from
-			<code>@meekojs/ui/runtime</code>.
+			<code>@meekojs/ui/runtime</code>
+			.
 		</p>
 	</DocsPage>
 </template>

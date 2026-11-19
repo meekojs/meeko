@@ -40,7 +40,6 @@ export function createSelect<T>(props: SelectSettings<T>, model: Signal<unknown>
 	const showClear = computed(() => props.clearable === true && props.disabled !== true && chosen.value)
 	const attributes = computed(() => ({
 		id: triggerId.value,
-		class: props.listClass,
 		name: props.name ?? props.field?.name,
 		required: props.required,
 		disabled: props.disabled,

@@ -1,8 +1,12 @@
 ---
-source-hash: 85fe356f15fddbb21cb27774741ed9e7ff0b21b57bab0d488e1738ac135a48d9
+source-hash: 200a5b5b03891b2acbd6f2579f1b96c36685108442dc022666d9bb2454c27436
 ---
 
 # Meeko DevTools
+
+## Inspect an interaction
+
+In an application already using `@meekojs/meeko`, enable `devtools: true` in `meeko.config.ts` as shown below and start `pnpm exec meeko dev .`. Open the page, press a control that changes a signal, and select its instance in the floating panel. Its detail view shows props and signals; the timeline helps connect the change to the interaction. To inspect navigation, use the **Navigation and data** filter and match start and end events by `operationId`. The panel is available only in development.
 
 DevTools lets you inspect and edit each hydrated instance during development with Vite. There are two interfaces over the same runtime: an in-page panel and a Chrome DevTools panel. Both consume the `window.__MEEKO_DEVTOOLS__` hook, which only exists in development.
 
@@ -12,9 +16,9 @@ Since `1.8`, the recommended approach is to enable it in `meeko.config.ts`, like
 
 ```ts
 // meeko.config.ts
-import { defineMeekoConfig } from "@meekojs/meeko/framework";
+import { defineMeekoConfig } from '@meekojs/meeko/framework'
 
-export default defineMeekoConfig({ devtools: true });
+export default defineMeekoConfig({ devtools: true })
 ```
 
 With this option, `meeko dev` mounts the panel on every page without application code. `meeko build`, `meeko start`, `meeko preview` and prerendered pages never add it: the production bundle does not contain `@meekojs/meeko/devtools-ui`. It defaults to `false` in `1.x`, so upgrading does not introduce a new panel without asking. `{ position: "bottom-left" }` places it in another corner (`"bottom-right"`, the default, `"bottom-left"`, `"top-right"` or `"top-left"`), and `{ panel: false }` disables it without deleting the options. An invalid value stops `meeko dev`, `build` and `check` with a message naming the option; see the [`devtools` reference](reference/config/config-devtools.md). The [Chrome extension](#chrome-devtools-panel) and [editor bridge](#editor-bridge) work with or without this option, because they read the same hook.

@@ -73,9 +73,12 @@ route.isActive("/missing");
 // @ts-expect-error static route rejects params
 route.isActive("/", { params: { id: "x" } });
 const section: MeekoLinkProps<"/"> = { to: "/", match: "prefix" };
+const anchor: MeekoLinkProps<"/"> = { to: "/", target: "_blank", rel: "noopener", download: true, hreflang: "es", "aria-label": "Inicio", "data-section": "main" };
+// @ts-expect-error href is built from to, params and search
+const manualHref: MeekoLinkProps<"/"> = { to: "/", href: "/manual" };
 // @ts-expect-error match is "exact" or "prefix"
 const partial: MeekoLinkProps<"/"> = { to: "/", match: "partial" };
-void active; void section; void partial;
+void active; void section; void anchor; void manualHref; void partial;
 `,
 		)
 		const config = join(root, 'tsconfig.json')

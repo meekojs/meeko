@@ -1,10 +1,12 @@
 # Actualizar de 1.7 a 1.8
 
-`1.8` es un minor. `<MeekoPopover>`, `<MeekoSelect>` y `<MeekoThemeToggle>` quedan obsoletos: siguen funcionando en `1.x` y se retiran en `2.0`. UI `1.8.0` ofrece sus reemplazos con el mismo contrato. La nueva API pública estable `useThemeToggle()` permite construir un selector propio. Los módulos se registran por su nombre (`modules: ['@meekojs/i18n']`) con sus opciones en su clave; importarlos y `[módulo, opciones]` quedan obsoletos (`MEEK126`). Como cambio de seguridad, toda mutación de API y RPC comprueba `Origin` por defecto, también sin sesión (véase [Origin en todas las mutaciones](#origin-en-todas-las-mutaciones)). Esta guía describe los cambios previstos, todavía sin publicar; consulta también el [CHANGELOG](../packages/meeko/CHANGELOG.md) y la [política de estabilidad](stability.md).
+**Origen:** 1.7.x. **Destino:** 1.8.0. **Estado:** publicado en npm; la versión más reciente consultada el 5 de noviembre de 2026 es 1.9.0. **Quién actúa:** quien mantenga una aplicación que actualiza desde 1.7.x a 1.8.0.
+
+`1.8` es un minor. `<MeekoPopover>`, `<MeekoSelect>` y `<MeekoThemeToggle>` quedan obsoletos: siguen funcionando en `1.x` y se retiran en `2.0`. UI `1.8.0` ofrece sus reemplazos con el mismo contrato. La nueva API pública estable `useThemeToggle()` permite construir un selector propio. Los módulos se registran por su nombre (`modules: ['@meekojs/i18n']`) con sus opciones en su clave; importarlos y `[módulo, opciones]` quedan obsoletos (`MEEK126`). Como cambio de seguridad, toda mutación de API y RPC comprueba `Origin` por defecto, también sin sesión (véase [Origin en todas las mutaciones](#origin-en-todas-las-mutaciones)). Consulta también el [CHANGELOG](../packages/meeko/CHANGELOG.md) y la [política de estabilidad](stability.md).
 
 ## Orden recomendado
 
-1. Actualiza core a `1.8` y `@meekojs/ui` a `1.8.0` cuando están publicados. UI 1.8 requiere Meeko `>=1.8 <2`; no uses el nuevo `UIThemeToggle` con core 1.7.
+1. Actualiza core y `@meekojs/ui` a `1.8.0`. UI 1.8 requiere Meeko `>=1.8 <2`; no uses el nuevo `UIThemeToggle` con core 1.7.
 2. Activa el módulo UI en `meeko.config.ts`.
 3. Renombra las tres etiquetas y actualiza los imports explícitos de sus tipos.
 4. Ejecuta `meeko check` y comprueba los controles, sus estilos y los formularios en tu aplicación.
@@ -195,7 +197,7 @@ Para ordenar también exports, objetos, interfaces, tipos, enums, `switch`, `Set
 
 ## Instalar los paquetes nuevos
 
-Preparación de release, sin publicar: espera a que npm confirme las seis versiones. Todos los paquetes públicos se alinean en `1.8.0`.
+Los seis paquetes públicos de Meeko tuvieron una versión `1.8.0` en npm. Esta guía conserva las instrucciones de instalación específicas de ese destino histórico; comprueba las versiones de todos los paquetes antes de actualizar una aplicación.
 
 ```sh
 pnpm add @meekojs/meeko@^1.8.0 @meekojs/ui@^1.8.0 @meekojs/i18n@^1.8.0 @meekojs/icon@^1.8.0

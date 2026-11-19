@@ -2,11 +2,12 @@
 title: effect
 group: reactivity
 since: 1.0.0
-description: Ejecuta una función síncrona ahora y cada vez que cambia una señal que leyó; devuelve la función que la detiene.
+description: Ejecuta una función síncrona ahora y cada vez que cambia una señal que leyó; puede devolver una limpieza y devuelve la función que la detiene.
 symbols:
   - "@meekojs/meeko#effect"
 types:
   - "@meekojs/meeko#ReadonlySignal"
+  - "@meekojs/meeko#EffectResult"
 related:
   - "@meekojs/meeko#computed"
   - "@meekojs/meeko#onCleanup"
@@ -41,16 +42,46 @@ La primera ejecución ocurre al crear el efecto; cada letra que escribe el usuar
 
 ## Parámetros
 
-| Parámetro | Tipo            | Por defecto | Descripción                                                                                                                                 |
-| --------- | --------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `fn`      | `() => unknown` | obligatorio | Callback **síncrono** que lee señales. Un callback que devuelve una promesa (`async`) es un error de tipos y, en ejecución, un `TypeError`. |
-| `source`  | `EffectSource`  | ninguno     | Ubicación de la expresión para DevTools. La añade el compilador en desarrollo; no la escribas.                                              |
+| Parámetro | Tipo                         | Por defecto | Descripción                                                                                                                                                                                                               |
+| --------- | ---------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fn`      | `() => void \| (() => void)` | obligatorio | Callback **síncrono** que lee señales y puede devolver una limpieza (desde `1.10`). Un callback que devuelve una promesa (`async`), o una limpieza que la devuelve, es un error de tipos y, en ejecución, un `TypeError`. |
+| `source`  | `EffectSource`               | ninguno     | Ubicación de la expresión para DevTools. La añade el compilador en desarrollo; no la escribas.                                                                                                                            |
 
 ## Valor devuelto
 
-Una función `() => void` que detiene el efecto: deja de observar sus señales y no vuelve a ejecutarse. En un componente no hace falta llamarla, porque el efecto se detiene al desmontarlo; sirve para pararlo antes, o para un efecto creado fuera de una raíz.
+Una función `() => void` que detiene el efecto: deja de observar sus señales, no vuelve a ejecutarse y ejecuta la limpieza de su última ejecución. En un componente no hace falta llamarla, porque el efecto se detiene al desmontarlo; sirve para pararlo antes, o para un efecto creado fuera de una raíz.
+
+## Limpieza por ejecución
+
+Desde `1.10`, cada ejecución del efecto es propietaria de lo que registra, como en Solid o en `useEffect` de React:
+
+- la función que devuelve `fn`;
+- los [`onCleanup`](/docs/reference/oncleanup) que llama;
+- los `effect`, `computed` y [`createRoot`](/docs/reference/createroot) que crea.
+
+Todo ello se libera **antes de la siguiente ejecución** y **al detener el efecto** (con la función que devuelve, al desmontar su componente o al liberar su raíz), en el orden en que se registró, con la función devuelta en último lugar. En SSR el efecto se ejecuta una vez y su limpieza corre al terminar el render, cuando se libera la raíz, igual que un `onCleanup` del script.
+
+Cualquier otro valor devuelto (un número, un objeto) se ignora. Una promesa devuelta detiene el efecto y lanza `TypeError` (véase [Un callback `async`](#un-callback-async)).
+
+Hasta `1.9` la función devuelta se ignoraba y `onCleanup` dentro del efecto se registraba en el componente, que la ejecutaba una sola vez al desmontarse; véase [Excepciones aprobadas](/docs/stability#excepciones-aprobadas).
 
 ## Ejemplos
+
+### Liberar lo de cada ejecución
+
+```ts
+import { effect, signal } from "@meekojs/meeko";
+
+const delay = signal(1_000);
+const tick = (): void => console.log("tic");
+effect(() => {
+  const id = setInterval(tick, delay.value);
+  return () => clearInterval(id);
+});
+delay.value = 500; // para el intervalo de 1 s antes de crear el de 500 ms
+```
+
+La limpieza también corre al desmontar el componente o al detener el efecto, así que no hace falta otro `onCleanup` fuera.
 
 ### Detener un efecto
 
@@ -91,27 +122,27 @@ El efecto creado dentro de `onMounted` pertenece igualmente al componente: Meeko
 
 ### Trabajo asíncrono desde un efecto síncrono
 
-El efecto lee las señales de forma síncrona y lanza la petición; la cancelación y el error son responsabilidad tuya:
+El efecto lee las señales de forma síncrona, lanza la petición y devuelve su cancelación; el error es responsabilidad tuya:
 
 ```ts
 import { effect, signal } from "@meekojs/meeko";
 
 const query = signal("");
 const results = signal<string[]>([]);
-let controller: AbortController | undefined;
 
 effect(() => {
   const q = query.value.trim(); // la dependencia se registra aquí, antes de cualquier await
-  controller?.abort();
   if (!q) { results.value = []; return; }
-  const current = new AbortController();
-  controller = current;
-  fetch(`/api/search?q=${encodeURIComponent(q)}`, { signal: current.signal })
+  const controller = new AbortController();
+  fetch(`/api/search?q=${encodeURIComponent(q)}`, { signal: controller.signal })
     .then((response) => response.json() as Promise<string[]>)
     .then((list) => { results.value = list; })
-    .catch((error: unknown) => { if (!current.signal.aborted) console.error(error); });
+    .catch((error: unknown) => { if (!controller.signal.aborted) console.error(error); });
+  return () => controller.abort();
 });
 ```
+
+Cada nueva búsqueda aborta la anterior, y al desmontar el componente se aborta la última.
 
 En un componente del framework, [`useRpcQuery`](/docs/reference/use-rpc-query) o [`useApi`](/docs/reference/use-api) con `debounceMs` y `enabled` (desde `1.7`) ya hacen esto, con cancelación, SSR e hidratación.
 
@@ -145,6 +176,48 @@ effect(async () => {
 effect(() => {
   const q = query.value;
   void fetch(`/api/users?q=${q}`).then((response) => response.json()).then((list) => { users.value = list; });
+});
+```
+
+### Devolver una función que no es una limpieza
+
+```ts bad
+effect(() => props.onSelect);
+```
+
+Desde `1.10`, una función devuelta es la limpieza de esa ejecución: Meeko la llama antes de la siguiente y al detener el efecto. Un efecto con cuerpo de expresión que sólo pretendía leer un valor que es una función lo llamaría. Usa un cuerpo con llaves:
+
+<!-- no-check -->
+
+```ts good
+effect(() => {
+  void props.onSelect;
+});
+```
+
+### `onCleanup` después de un `await`
+
+```ts bad
+effect(() => {
+  void connect(url.value).then((socket) => {
+    onCleanup(() => socket.close());
+  });
+});
+```
+
+El `then` corre cuando el efecto ya terminó su ejecución: no hay propietario activo, así que `onCleanup` lanza `Error: onCleanup() requires an active component root…` (y, en desarrollo, lo avisa por consola). Registra la limpieza durante la ejecución y deja que compruebe lo que haya:
+
+<!-- no-check -->
+
+```ts good
+effect(() => {
+  let socket: Socket | undefined;
+  let released = false;
+  void connect(url.value).then((opened) => {
+    if (released) opened.close();
+    else socket = opened;
+  });
+  return () => { released = true; socket?.close(); };
 });
 ```
 
@@ -203,4 +276,5 @@ onMounted(() => {
 - **Orden.** Los efectos pendientes se ejecutan en orden de creación: un efecto padre, como el de un `if:when`, corre antes que los que creó. Varias escrituras seguidas ejecutan el efecto varias veces; agrúpalas con [`batch`](/docs/reference/batch).
 - **Errores.** Una excepción de un efecto creado en el setup hace fallar el render. Una que ocurre al reaccionar a una escritura se propaga a quien escribió (por ejemplo, el manejador `on:click`), que la entrega al [`provideErrorHandler`](/docs/reference/provideerrorhandler) más cercano. Si fallan varios observadores en la misma ronda, se agrupan en un `AggregateError`.
 - **Ciclo de vida.** Dentro de un componente, el efecto se detiene al desmontarlo, al cambiar de página o cuando desaparece su `if:when` o su fila de `each:of`. Fuera de una raíz (un módulo o una prueba), vive hasta que llamas a la función que devuelve, o lo creas dentro de [`createRoot`](/docs/reference/createroot).
+- **Limpieza.** Desde `1.10`, la función devuelta, los `onCleanup` y lo que crea cada ejecución se liberan antes de la siguiente y al detener el efecto (véase [Limpieza por ejecución](#limpieza-por-ejecución)). Una limpieza que falla llega a quien escribió la señal, como un fallo del efecto, y no impide la nueva ejecución. Un efecto que crea otro efecto, un `computed` o un `createRoot` los recrea en cada ejecución: créalos fuera si deben durar más.
 - **Sin `onUpdated`.** Meeko no tiene un gancho de actualización: un efecto que lee las señales es la forma de reaccionar a sus cambios.

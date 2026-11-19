@@ -1,5 +1,5 @@
 ---
-source-hash: de85ecf8da996b1c5cde00a8cabef006f2983c7e8b5049e9c2a0b88cf6fdaa20
+source-hash: 011d85b997057a4727264a709ae79d54a1a8be6caa111d3909cf7d47f9218806
 ---
 
 # Editors
@@ -78,7 +78,7 @@ In addition to the TypeScript type, hover adds:
 - **Snippets.** On the `name` of a `<snippet>`: the child's snippet signature, with parameter types and optionality, and since `1.4` its JSDoc.
 - **Meeko built-in tags.** Since `1.4`, `<MeekoLink>`, `<MeekoOutlet />` and `<MeekoThemeToggle>` have the same card as a component: props with the types of `MeekoLinkProps`, `MeekoOutletProps` and `MeekoThemeToggleProps` from `@meekojs/meeko/framework` (in `<MeekoLink to="/users/[id]">`, `to` is that route and `bind:params` its parameters), their content (`default`), rendered element, documentation and a link to the guide. Going to definition on the tag opens that type, and on the `to` value, the page. Hover and completion for `to`, `bind:params` and `bind:search` use the types and JSDoc of `MeekoLinkProps`; `on:click` and other attributes are those of an `<a>`, and completion offers `<a>` attributes except `href`. With an `@meekojs/meeko` earlier than `1.4`, which does not declare these types, the card uses the description included in the server. A project component with one of those names keeps its own card (`MEEK106`). Since `1.5`, `<MeekoAwait>` has the same card (`MeekoAwaitProps`, with its `default(refreshing)`, `pending` and `error(error, retry)` snippets), its `for` is an expression with hover and definition, and inside its content the `for` data is read as loaded, without `!`. Also since `1.5`, `<MeekoTeleport>` (`MeekoTeleportProps`, with `to` and `disabled`; completion of `to="…"` offers `body` and the `#id` values from the component, `app/app.meeko` and layouts), `<MeekoPopover>` (`MeekoPopoverProps`) and `<MeekoSelect>` (`MeekoSelectProps`, with its option type) have hover, completion and prop checking, and the grammar colors them as built-in tags.
 
-Since core `1.8`, `<MeekoPopover>`, `<MeekoSelect>` and `<MeekoThemeToggle>` are deprecated: the compiler emits `MEEK121` and the editor strikes through the tag and explains the replacement on hover. They keep working in `1.x` and are removed in `2.0`. Use `UIPopover`, `UISelect` and `UIThemeToggle` from the `@meekojs/ui` 0.2 module; the theme system remains in core. See [Migration to 1.8](migration-1.8.md).
+Since core `1.8`, `<MeekoPopover>`, `<MeekoSelect>` and `<MeekoThemeToggle>` are deprecated: the compiler emits `MEEK121` and the editor strikes through the tag and explains the replacement on hover. They keep working in `1.x` and are removed in `2.0`. Use `UIPopover`, `UICombobox` and `UIThemeToggle` from the `@meekojs/ui` 1.8 or later module; the theme system remains in core. See [Migration to 1.8](migration-1.8.md).
 
 - **Routes, API and RPC.** On the ID in `href("/users/[id]")`: the page, its `params`, rendering mode and layouts. On `useApi("/api/notes")` or `api.notes.get`: the method, route and handler, with its contract schemas. On `useRpcQuery("users.get")`, `useRpcMutation(...)` or `rpc.users.get`: the procedure, its URL and handler with schemas. Since `1.6`, on a `middleware: ["auth"]` name in `definePage`: the named middleware's `app/middleware` file and its pages (or whether it is global or missing), and going to definition opens it. Server route middleware (`*.server.ts`) is marked as server-only.
 
@@ -273,6 +273,8 @@ Sent in `initializationOptions` of the `initialize` request. All are optional.
 | `trusted`          | `true`  | With `true`, the server runs the project's `meeko.config.*` with Node, including its [modules'](framework.md#modules) `setup`, to discover auto-imports, components and layers, and checks page and layout contracts on save. With `false`, it executes no project code: configuration is read statically (only literal lists; from `modules`, only layer folders), so module auto-imports and components do not exist for the editor, and contracts are skipped. |
 | `projectContracts` | `true`  | `false` disables page contract checking (`MEEK_PAGE_PROPS`, `MEEK_LAYOUT_PROPS`, `MEEK_ERROR_PROPS`) on save.                                                                                                                                                                                                                                                                                                                                                     |
 | `diagnosticsDelay` | `300`   | Milliseconds to wait after an edit before checking the component.                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `warmup`           | `true`  | On start, builds in the background the TypeScript program of the applications (folders with `meeko.config.*`, up to two levels below each workspace folder, at most two), so the first component opened gets colors and hover without waiting about a second. `false` turns it off.                                                                                                                                                                               |
+| `warmupFiles`      | `[]`    | Paths of the components open in the editor on start: their projects are prepared before those found in the folders. The VS Code extension sends the open `.meeko` tabs.                                                                                                                                                                                                                                                                                           |
 | `format`           | `{}`    | Formatting settings for clients without `workspace/configuration`, for example `{ "indentSections": true }`. If the client supports that request, its `meeko.format` section takes precedence.                                                                                                                                                                                                                                                                    |
 
 Outside VS Code, `trusted` is `true` because the user configures the server for their project, just as `meeko check` executes configuration. Use `trusted: false` when opening third-party code. The VS Code extension sends the workspace trust state.
@@ -562,17 +564,42 @@ Then add the client in **Preferences → Package Settings → LSP → Settings**
 - The semantic model needs syntactically closed sections. While typing an incomplete file, diagnostics continue arriving, but completion and navigation may pause until it becomes valid again.
 - A project with more than 2000 `.meeko` components only loads the first 2000 for cross-file references and renaming.
 
+## CSS variables and independent controls
+
+Meeko provides CSS variable completion, hover, Go to Definition, reference lookup and rename in `.meeko` `<style>` blocks and inline styles, and in `.css` files of packages with `meeko.config.*`. It works without Tailwind and also with the `tailwindcss` language. Opening only a stylesheet activates the extension in a Meeko workspace; CSS support registers only these variable features, without taking over CSS formatting or diagnostics.
+
+Sources include the open stylesheet, `app/styles/main.css`, its local imports and the processed `.meeko/styles/main.css` when present. Unsaved changes in imported stylesheets update other documents; closing them restores the saved version. Hover shows values and source files; definition prefers authored sources over generated CSS. Stylesheets are read without executing project configuration or plugins, including in untrusted workspaces. The entire disk is not scanned: imports stay inside the package and have a limit of 64 files. `.meeko` components additionally retain global component styles and `scoped` visibility rules.
+
+| Setting                         | Default  | Controls only                            |
+| ------------------------------- | -------- | ---------------------------------------- |
+| `meeko.cssVariables.completion` | `true`   | CSS variable suggestions                 |
+| `meeko.cssVariables.hover`      | `true`   | CSS variable hover                       |
+| `meeko.cssVariables.definition` | `true`   | Go to Definition for CSS variables       |
+| `meeko.cssVariables.references` | `true`   | Find CSS variable references             |
+| `meeko.cssVariables.rename`     | `true`   | Rename CSS variables                     |
+| `meeko.classes.completion`      | `"auto"` | Class suggestions in `.meeko`            |
+| `meeko.classes.hover`           | `"auto"` | Class hover in `.meeko`                  |
+| `meeko.classes.definition`      | `true`   | Go to Definition for classes in `.meeko` |
+
+All settings have resource scope and update without restarting the server. For example, `"meeko.classes.completion": "off"` preserves variables and class hover. To retain the previous behavior, where this setting also disabled class hover, add `"meeko.classes.hover": "off"`. Each variable setting affects only Meeko's own suggestions or information: other VS Code or Tailwind providers may still provide theirs.
+
+Other LSP clients can supply `meeko.cssVariables` through `workspace/configuration`, `initializationOptions.cssVariables` or a configuration notification with `settings.meeko.cssVariables`. For CSS files they need to synchronize documents; the server dynamically registers the providers that the client supports. Reference lookup and rename read the current sources under `app/`, root components and indexed local imports in the same package. Open buffers take precedence. Generated output, dependencies, hidden folders and nested packages are excluded; traversal is limited to 2000 files/directories and 16 MiB. If coverage is incomplete or CSS cannot be parsed, shared-variable operations report the limitation instead of returning a partial edit.
+
+References include declarations (when requested), `@property`, `var(...)`, `--theme(...)`, style queries and custom property names in `transition`, `transition-property` and `will-change`. Static inline styles and literal parts of `bind:style` also participate. Comments, string contents and JavaScript/TypeScript code do not. A name declared privately in `<style scoped>` or inline styles belongs to that component for these operations; `:global(...)`, `@property` and unscoped declarations are shared. This groups names by component, without attempting to resolve DOM inheritance between elements.
+
+Rename requires a complete name such as `--color-brand` and an editable declaration. It rejects collisions and escaped identifiers. VS Code receives one workspace edit, with versions for open documents, so it can apply or undo it across files; the server does not write files. A component-local rename remains available when an unrelated stylesheet is incomplete. It does not rename derived Tailwind utility classes, values generated dynamically in scripts or CSS identifiers outside the supported contexts. Review those application-level uses when renaming a public theme token.
+
 ## Tailwind CSS
 
 Install the official **Tailwind CSS IntelliSense** extension (`bradlc.vscode-tailwindcss`) and configure Tailwind in the project. That extension provides Tailwind utilities, variants, values and documentation; Meeko provides component analysis and CSS classes written in their `<style>` blocks and `app/styles/main.css`, including local imports.
 
 Meeko Language automatically registers `tailwindCSS.includeLanguages: { "meeko": "html" }` and enables `editor.quickSuggestions.strings` for `[meeko]`. These are VS Code defaults: they respect your explicit settings and do not write to `settings.json`. [VS Code documents `configurationDefaults` for other registered settings](https://code.visualstudio.com/api/references/contribution-points#contributes.configurationDefaults).
 
-`meeko.classes.completion` controls Meeko class completion and hover:
+`meeko.classes.completion` and `meeko.classes.hover` independently control their Meeko class features:
 
 - `auto` (default): if Tailwind IntelliSense is active and the project declares `tailwindcss` as a dependency or imports it from source stylesheets, delegates classes from the processed `.meeko/styles/main.css` stylesheet to Tailwind. Retains classes written in components and source stylesheets.
 - `on`: also includes classes from the processed stylesheet.
-- `off`: disables Meeko class completion and hover. Definition navigation and CSS variables remain available.
+- `off`: disables only the selected feature. Definition is controlled by `meeko.classes.definition`; variables have their own settings.
 
 Strings in `bind:class="active.value ? 'bg-blue-500' : 'bg-gray-500'"` receive class suggestions; you do not need to add `bind:class` to `tailwindCSS.classAttributes`, because the default `class` attribute recognizes the `:` prefix. Meeko also retains TypeScript analysis of the expression.
 

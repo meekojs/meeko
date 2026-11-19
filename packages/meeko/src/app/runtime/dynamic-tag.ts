@@ -230,6 +230,14 @@ function isHandlerKey(key: string): boolean {
 	return /^on/i.test(key)
 }
 
+/**
+ * Keys of `bind="obj"` on an element that never come from data, besides the handlers: a whole
+ * document (`srcdoc`) and a header (`http-equiv`). The template still writes them with
+ * `bind:srcdoc` or `http-equiv`. `formaction`, a URL, passes with its scheme checked by
+ * `attributeValue`, as `action` and `href` do: wrappers of `<button>` forward it.
+ */
+const unsafeSpreadKeys = new Set(['srcdoc', 'http-equiv'])
+
 /** Message of the error for a key of `bind="obj"` that names a handler. */
 function handlerKeyError(key: string): TypeError {
 	return new TypeError(`MEEK113: bind="…" no admite la clave ${JSON.stringify(key)}: un manejador de eventos no se crea desde datos; usa on:evento`)
@@ -243,7 +251,7 @@ type TypeMessage<Text extends string> = { readonly [Key in Text]: never }
 
 /** Type text of MEEK113 for a key of `bind="obj"` on an element. */
 export type AttributeSpreadCheck<T, Tag extends string> = {
-	readonly [K in keyof T]: K extends string ? (Lowercase<K> extends `on${string}` ? TypeMessage<'MEEK113: bind no admite claves on*; usa on:evento'> : K extends `data-meeko${string}` ? TypeMessage<'MEEK113: data-meeko* está reservado a Meeko'> : string extends K ? AttributeValue : K extends AttributeNameOf<Tag> ? AttributeValue : TypeMessage<`MEEK113: ${K} no es un atributo de la etiqueta`>) : never
+	readonly [K in keyof T]: K extends string ? (Lowercase<K> extends `on${string}` ? TypeMessage<'MEEK113: bind no admite claves on*; usa on:evento'> : K extends `data-meeko${string}` ? TypeMessage<'MEEK113: data-meeko* está reservado a Meeko'> : string extends K ? AttributeValue : K extends AttributeNameOf<Tag> ? AttributeValueOf<Tag, K> : TypeMessage<`MEEK113: ${K} no es un atributo de la etiqueta`>) : never
 }
 
 /** Explicit `class` and `style` of an element with `bind="obj"`, which the spread combines with its own. */
@@ -302,6 +310,7 @@ export function spreadEntries<T extends object | null | undefined, const Tag ext
 		if (isHandlerKey(key)) throw handlerKeyError(key)
 		const name = key.toLowerCase()
 		if (name.startsWith('data-meeko')) throw new TypeError(`MEEK113: bind="…" no admite ${JSON.stringify(key)}: data-meeko* está reservado a Meeko`)
+		if (unsafeSpreadKeys.has(name)) throw new TypeError(`MEEK113: bind="…" no admite la clave ${JSON.stringify(key)}: srcdoc y http-equiv no se crean desde datos; escríbelo con bind:${name} en la plantilla`)
 		if (name === 'class' || name === 'style' || skipped.has(name)) continue
 		if (!attributeName.test(key)) throw new TypeError(`MEEK113: bind="…" no admite ${JSON.stringify(key)}: no es un nombre de atributo`)
 		if (accepts && !accepts(tag, key)) continue
@@ -368,7 +377,7 @@ export type DynamicSpreadCheck<T, Is, M = ComponentPart<Is>, Tag extends string 
 	: [M | Tag] extends [never]
 		? unknown
 		: {
-				readonly [K in keyof T]: K extends string ? (Lowercase<K> extends `on${string}` ? TypeMessage<'MEEK113: bind no admite claves on*; usa on:evento'> : string extends K ? ([M] extends [never] ? AttributeValue : unknown) : K extends DynamicPropName<M> ? unknown : K extends `data-meeko${string}` ? TypeMessage<'MEEK113: data-meeko* está reservado a Meeko'> : K extends AttributeNameOf<Tag> ? AttributeValue : TypeMessage<DynamicKeyMessage<K, M, Tag>>) : never
+				readonly [K in keyof T]: K extends string ? (Lowercase<K> extends `on${string}` ? TypeMessage<'MEEK113: bind no admite claves on*; usa on:evento'> : string extends K ? ([M] extends [never] ? AttributeValue : unknown) : K extends DynamicPropName<M> ? unknown : K extends `data-meeko${string}` ? TypeMessage<'MEEK113: data-meeko* está reservado a Meeko'> : K extends AttributeNameOf<Tag> ? AttributeValueOf<Tag, K> : TypeMessage<DynamicKeyMessage<K, M, Tag>>) : never
 			}
 
 /**

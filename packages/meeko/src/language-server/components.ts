@@ -18,6 +18,11 @@ export interface ComponentMember {
 	readonly values?: readonly string[]
 	/** Props: el valor por defecto tal como se escribe en `defineProps` (`"md"`), si lo tiene. */
 	readonly default?: string
+	/**
+	 * Props: un atributo HTML que la prop hereda de `ElementAttributes` (`title` en `<MeekoLink>`).
+	 * El completado lo ofrece; la firma de la etiqueta lo resume en una línea.
+	 */
+	readonly inherited?: true
 }
 
 /**
@@ -134,6 +139,18 @@ function declaredType(checker: ts.TypeChecker, symbol: ts.Symbol, resolved: ts.T
 /** Cada canal de un componente como tipo: de los alias de su módulo o de la comprobación de una etiqueta del padre. */
 type ChannelTypes = (name: 'props' | 'events' | 'models' | 'snippets' | 'exposed' | 'defaults') => { type: ts.Type; at: ts.Node } | undefined
 
+/**
+ * Si una prop viene de `ElementAttributes`: un tipo mapeado sobre los datos HTML generados, así que
+ * su símbolo no tiene declaración propia o la declaran esos tipos.
+ *
+ * @example
+ * htmlAttribute(checker.getPropertyOfType(linkProps, "title")!) // true
+ */
+export function htmlAttribute(symbol: ts.Symbol): boolean {
+	const declarations = symbol.declarations ?? []
+	return !declarations.length || declarations.every((declaration) => /[\\/](?:dynamic-tag|html-attribute-values|html-data[\\/][^\\/]+)\.(?:d\.)?ts$/.test(declaration.getSourceFile().fileName))
+}
+
 function summarize(checker: ts.TypeChecker, channel: ChannelTypes, typeParameters: readonly string[] | undefined, declared: boolean): ComponentSummary {
 	const members = (name: Parameters<ChannelTypes>[0], value?: (type: ts.Type, at: ts.Node) => ts.Type): ComponentMember[] | undefined => {
 		const found = channel(name)
@@ -148,7 +165,7 @@ function summarize(checker: ts.TypeChecker, channel: ChannelTypes, typeParameter
 			const member = { name: symbol.name, type: short(checker.typeToString(type, found.at, typeFormat)), optional, ...(documentation ? { documentation } : {}) }
 			if (name !== 'props') return member
 			const { attribute, values } = propAttribute(checker, type)
-			return { ...member, attribute, ...(values.length ? { values } : {}) }
+			return { ...member, attribute, ...(values.length ? { values } : {}), ...(htmlAttribute(symbol) ? { inherited: true as const } : {}) }
 		})
 	}
 	// A model is a Signal<T>: the parent binds a signal of T.
@@ -251,8 +268,11 @@ function parameters(tuple: string): string {
  */
 export function componentSignature(summary: ComponentSummary, name: string): string {
 	const optional = (member: ComponentMember): string => (member.optional ? '?' : '')
+	// The HTML attributes a component forwards (`ElementAttributes<'a'>`) are listed by completion.
+	const inherited = summary.props.filter((prop) => prop.inherited).length
 	const attributes = [
-		...summary.props.map(propSignature),
+		...summary.props.filter((prop) => !prop.inherited).map(propSignature),
+		...(inherited ? [`// …y ${inherited} atributos HTML`] : []),
 		...summary.events.map((event) => `on:${event.name}(${parameters(event.type)})`),
 		...summary.models.map((model) => `${model.name === 'default' ? 'model' : `model:${model.name}`}${optional(model)}: ${model.type}`),
 	]

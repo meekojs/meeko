@@ -15,16 +15,18 @@
 		<button
 			type="button"
 			on:click="rotate"
-			>Rotate</button
 		>
+			Rotate
+		</button>
 		<ul>
 			<li
 				each:of="items.value"
 				each:as="item"
 				each:key="item.id"
 				bind:data-id="item.id"
-				>{item.label}</li
 			>
+				{item.label}
+			</li>
 		</ul>
 	</section>
 </template>

@@ -1,28 +1,45 @@
 <script lang="ts">
 	import type { UIPageHeaderProps } from '../types/navigation'
 
+	import { uiTheme } from '../utils/defaults'
+	import { pageHeader } from '../variants/page'
+
 	const props = defineProps<UIPageHeaderProps>({ layout: 'docs' })
 
-	const snippets = defineSnippets<{ default?: []; breadcrumb?: []; actions?: [] }>()
+	const theme = uiTheme('pageHeader', () => props)
+
+	const snippets = defineSnippets<{ default?: []; title?: []; breadcrumb?: []; actions?: [] }>()
+
+	const classes = pageHeader()
 </script>
 
 <template>
-	<header
-		bind:class="['meeko-ui-page-header', props.class].filter(Boolean).join(' ')"
-		bind:data-layout="props.layout"
-	>
+	<header bind:class="classes.base({ layout: props.layout, class: [theme.ui.base, theme.class] })">
 		<render
 			if:when="snippets.breadcrumb"
 			snippet="snippets.breadcrumb"
 		/>
-		<div class="meeko-ui-page-header-row">
-			<div class="meeko-ui-page-header-text">
-				<h1>{props.title}</h1>
-				<p if:when="props.description">{props.description}</p>
+		<div bind:class="classes.row({ class: theme.ui.row })">
+			<div bind:class="classes.text({ class: theme.ui.text })">
+				<h1
+					bind:id="props.headingId"
+					bind:class="classes.title({ layout: props.layout, class: theme.ui.title })"
+				>
+					<render
+						if:when="snippets.title"
+						snippet="snippets.title"
+					/>
+					<span if:when="!snippets.title">{props.title}</span>
+				</h1>
+				<p
+					if:when="props.description"
+					bind:class="classes.description({ layout: props.layout, class: theme.ui.description })"
+					>{props.description}</p
+				>
 			</div>
 			<div
 				if:when="snippets.actions"
-				class="meeko-ui-page-header-actions"
+				bind:class="classes.actions({ class: theme.ui.actions })"
 			>
 				<render snippet="snippets.actions" />
 			</div>
