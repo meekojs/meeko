@@ -66,7 +66,7 @@ async function setup() {
 	Reflect.set(globalThis, 'Node', browser.Node)
 	const header = browser.document.createElement('header') as unknown as Element
 	const root = browser.document.createElement('main') as unknown as Element
-	browser.document.body.append(header as unknown as globalThis.Node, root as unknown as globalThis.Node)
+	browser.document.body.append(header as unknown as Parameters<typeof browser.document.body.append>[0], root as unknown as Parameters<typeof browser.document.body.append>[0])
 	const badgeModule = await load(directory, badge, 'Badge')
 	const original = await load(directory, cart('Con artículos:'))
 	enableHotModule(original.__hotId)

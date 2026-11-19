@@ -273,7 +273,6 @@ test('the Socket handshake follows the dev hosts of the sessions manager', async
 		await hub.preflight('chat', handshake(tunnelOrigin))
 		await assert.rejects(hub.preflight('chat', handshake('https://evil.example')), { code: 'INVALID_ORIGIN' })
 	} finally {
-		await hub.close?.()
 		await sessions.close()
 	}
 })

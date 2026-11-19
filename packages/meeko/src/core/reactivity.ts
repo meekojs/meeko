@@ -519,8 +519,14 @@ export function restoreSignal(target: Signal<unknown>, value: unknown): void {
 	else target.value = value
 }
 
+/**
+ * The cleanups among `Result` that return a promise. A cleanup that only throws (`() => never`) is
+ * not one: `never` is assignable to a promise, but the cleanup never returns.
+ */
+type AsyncCleanup<Result> = Result extends () => infer Returned ? ([Returned] extends [never] ? never : [Extract<Returned, PromiseLike<unknown>>] extends [never] ? never : Result) : never
+
 /** Rejects an asynchronous effect, and one that returns an asynchronous cleanup. */
-type SyncEffectCallback<F extends () => unknown> = [Extract<ReturnType<F>, PromiseLike<unknown>>] extends [never] ? ([Extract<ReturnType<F>, () => PromiseLike<unknown>>] extends [never] ? F : never) : never
+type SyncEffectCallback<F extends () => unknown> = [Extract<ReturnType<F>, PromiseLike<unknown>>] extends [never] ? ([AsyncCleanup<ReturnType<F>>] extends [never] ? F : never) : never
 
 /**
  * Depth of renders whose output is discarded and that must not touch the browser: the render

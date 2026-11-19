@@ -12,6 +12,11 @@ import { signal } from '../src/core/reactivity.ts'
 import { directiveNameCompletion } from '../src/language-server/features.ts'
 import { valueSiteAt } from '../src/language-server/template-values.ts'
 
+/** Clicks the element of `root` that `selector` names: happy-dom's elements are not the DOM types of `lib`. */
+function click(root: { querySelector(selector: string): unknown }, selector: string): void {
+	;(root.querySelector(selector) as HTMLElement).click()
+}
+
 interface Component {
 	renderWithState(props: Record<string, unknown>): { html: string; state: Record<string, unknown> }
 	hydrate(root: Element, props: Record<string, unknown>, state: Record<string, unknown>): () => void
@@ -66,11 +71,11 @@ test('hydrates every initial branch, updates exclusively, and preserves an uncha
 				const release = component.hydrate(root as unknown as Element, props, rendered.state)
 				try {
 					const branch = root.querySelector('.branch')
-					root.querySelector<HTMLButtonElement>('#increment')!.click()
+					click(root, '#increment')
 					assert.equal(root.querySelector('.branch'), branch)
 					assert.match(root.querySelector('.branch')!.textContent, /:1$/)
 					for (let step = 1; step <= 6; step++) {
-						root.querySelector<HTMLButtonElement>('#next')!.click()
+						click(root, '#next')
 						assert.equal(root.querySelectorAll('.branch').length, 1)
 						assert.equal(root.querySelector('.branch')!.textContent, `${['zero', 'one', 'other'][(initial + step) % 3]}:1`)
 					}
@@ -98,10 +103,10 @@ test('switching a component branch releases its resources and creates fresh comp
 			root.innerHTML = rendered.html
 			const release = component.hydrate(root as unknown as Element, props, rendered.state)
 			try {
-				root.querySelector<HTMLButtonElement>('.child')!.click()
+				click(root, '.child')
 				assert.equal(root.querySelector('.child')!.textContent, 'a:1')
 				for (const label of ['b', 'c', 'a']) {
-					root.querySelector<HTMLButtonElement>('#next')!.click()
+					click(root, '#next')
 					assert.equal(root.querySelector('.child')!.textContent, `${label}:0`)
 				}
 				assert.deepEqual(released, ['a', 'b', 'c'])
@@ -129,7 +134,7 @@ test('supports nested template chains inside keyed lists and legacy if:when as t
 					[...root.querySelectorAll('.entry')].map((element) => element.textContent),
 					['zero', 'one', 'other'],
 				)
-				root.querySelector<HTMLButtonElement>('#swap')!.click()
+				click(root, '#swap')
 				assert.deepEqual(
 					[...root.querySelectorAll('.entry')].map((element) => element.textContent),
 					['other', 'zero'],

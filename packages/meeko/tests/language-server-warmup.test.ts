@@ -66,7 +66,8 @@ describe('language server: warm-up of the workspace applications', () => {
 				if (/proyecto preparado/.test(message)) done()
 			})
 		})
-		connection.onRequest(() => null)
+		// Any request of the server (configuration, capabilities, progress) answers null: the star handler of vscode-jsonrpc, which ProtocolConnection's type leaves out.
+		;(connection as unknown as { onRequest(handler: () => null): void }).onRequest(() => null)
 		connection.listen()
 		try {
 			await connection.sendRequest('initialize', { processId: process.pid, rootUri: pathToFileURL(root).href, workspaceFolders: [{ uri: pathToFileURL(root).href, name: 'w' }], initializationOptions: { trusted: false, warmupFiles: [join(root, 'apps/web/app/pages/index.meeko')] }, capabilities: {} })
