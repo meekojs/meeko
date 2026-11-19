@@ -336,8 +336,8 @@ test('focusInvalid focuses the first invalid control of the submitted form after
 	}
 })
 
-test('meeko check accepts the field component of docs/framework.md with field, with model and with neither, without MEEK101', { timeout: 180_000 }, async (context) => {
-	const docs = await readFile(join(repositoryRoot, '..', '..', 'docs', 'framework.md'), 'utf8')
+test('meeko check accepts the field component of docs/framework-api.md with field, with model and with neither, without MEEK101', { timeout: 180_000 }, async (context) => {
+	const docs = await readFile(join(repositoryRoot, '..', '..', 'docs', 'framework-api.md'), 'utf8')
 	const section = docs.slice(docs.indexOf('**Un campo con `field` o con `model`.**'))
 	const [component, usage] = [...section.matchAll(/```html\n([^]*?)```/g)].slice(0, 2).map((match) => match[1]!)
 	assert.match(component!, /^<!-- app\/components\/AppTextField\.meeko -->/)
