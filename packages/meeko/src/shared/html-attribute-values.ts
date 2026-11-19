@@ -56,6 +56,13 @@ type HintedAttributeValue = (string & {}) | number | boolean | null | undefined
  * espacios. `false`, `null`, `undefined` y los textos vacíos dentro del array se omiten.
  *
  * @since 1.10.0
+ * @example
+ * ```ts
+ * import type { ClassValue } from "@meekojs/meeko";
+ * const active = true;
+ * // Se escribe como class="button button--active".
+ * const classes: ClassValue = ["button", active && "button--active", [null, ""]];
+ * ```
  */
 export type ClassValue = HintedAttributeValue | readonly ClassValue[]
 
@@ -65,6 +72,13 @@ export type ClassValue = HintedAttributeValue | readonly ClassValue[]
  * omiten la declaración; los números se escriben sin añadir unidades.
  *
  * @since 1.10.0
+ * @example
+ * ```ts
+ * import type { StyleValue } from "@meekojs/meeko";
+ * const hidden = false;
+ * // Se escribe como style="background-color: red; --gap: 4px; z-index: 2".
+ * const style: StyleValue = { backgroundColor: "red", "--gap": "4px", zIndex: 2, display: hidden && "none" };
+ * ```
  */
 export type StyleValue = HintedAttributeValue | Readonly<Record<string, string | number | false | null | undefined>>
 

@@ -167,6 +167,12 @@
 					"scope": "resource",
 					"description": "Usa el servidor de lenguaje del paquete @meekojs/meeko del workspace, para que el editor coincida con el compilador del proyecto. Se usa el servidor incluido si ese paquete no está, si este ajuste está desactivado o si el workspace no es de confianza."
 				},
+				"meeko.languageServer.warmup": {
+					"type": "boolean",
+					"default": true,
+					"scope": "resource",
+					"description": "Prepara al iniciar, en segundo plano, el programa TypeScript de los proyectos de las pestañas .meeko abiertas (o de hasta dos aplicaciones de la carpeta), para que el primer componente reciba colores y hover sin esperar alrededor de un segundo. Desactívalo para ahorrar memoria en workspaces con muchas aplicaciones."
+				},
 				"meeko.format.indentSections": {
 					"type": "boolean",
 					"default": false,

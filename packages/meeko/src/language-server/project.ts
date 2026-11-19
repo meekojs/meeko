@@ -204,6 +204,7 @@ export class MeekoProject {
 	constructor(
 		root: string,
 		private readonly options: WorkspaceOptions,
+		registry?: ts.DocumentRegistry,
 	) {
 		this.root = resolve(root)
 		this.aliases = resolveProjectAliasesSync(this.root)
@@ -267,7 +268,7 @@ export class MeekoProject {
 				return this.resolveLiterals(host, literals, containingFile, redirectedReference, options, containingSourceFile)
 			},
 		}
-		this.service = ts.createLanguageService(host, ts.createDocumentRegistry(ts.sys.useCaseSensitiveFileNames, this.root))
+		this.service = ts.createLanguageService(host, registry ?? ts.createDocumentRegistry(ts.sys.useCaseSensitiveFileNames, this.root))
 		this.loading = this.reloadRegistry()
 	}
 
@@ -286,6 +287,18 @@ export class MeekoProject {
 			await current
 			if (current === this.loading) return
 		}
+	}
+
+	/**
+	 * Carga la configuración y crea el programa TypeScript y su checker antes de que se abra un
+	 * componente: la primera petición (tokens semánticos, hover) no paga ese coste.
+	 */
+	async warm(): Promise<void> {
+		await this.ready()
+		// Cede el turno: una petición que llegue mientras tanto se atiende antes del trabajo síncrono.
+		await new Promise((resolve) => setImmediate(resolve))
+		this.scan()
+		this.service.getProgram()?.getTypeChecker()
 	}
 
 	/** Registro de autoimports vigente, dinámico o estático según la confianza. */
@@ -679,6 +692,8 @@ function meekoFiles(root: string): string[] {
 /** Conjunto de proyectos, uno por raíz de paquete. */
 export class MeekoWorkspace {
 	private readonly projects = new Map<string, MeekoProject>()
+	/** Compartido entre proyectos: las bibliotecas de TypeScript y las dependencias se analizan una vez. */
+	private readonly registry = ts.createDocumentRegistry(ts.sys.useCaseSensitiveFileNames)
 
 	constructor(readonly options: WorkspaceOptions) {}
 
@@ -688,7 +703,7 @@ export class MeekoWorkspace {
 		const key = pathKey(root)
 		let project = this.projects.get(key)
 		if (!project) {
-			project = new MeekoProject(root, this.options)
+			project = new MeekoProject(root, this.options, this.registry)
 			this.projects.set(key, project)
 		}
 		return project

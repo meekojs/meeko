@@ -44,7 +44,7 @@ vim.lsp.enable("meeko")
 | `--socket=<puerto>` | transporte |             | Un socket TCP en ese puerto.                                                      |
 | `--pipe=<nombre>`   | transporte |             | Una tubería con nombre (un named pipe en Windows, un socket de dominio en POSIX). |
 
-Las opciones del servidor van en `initializationOptions` del `initialize`, no en la línea de comandos: `trusted` (`true` por defecto: ejecuta `meeko.config.*` y los `setup` de los módulos), `projectContracts`, `diagnosticsDelay` y `format`. Véase [Opciones de inicialización](/docs/editors#opciones-de-inicialización).
+Las opciones del servidor van en `initializationOptions` del `initialize`, no en la línea de comandos: `trusted` (`true` por defecto: ejecuta `meeko.config.*` y los `setup` de los módulos), `projectContracts`, `diagnosticsDelay`, `warmup`, `warmupFiles` y `format`. Véase [Opciones de inicialización](/docs/editors#opciones-de-inicialización).
 
 ## Resultado
 

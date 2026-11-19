@@ -1,4 +1,4 @@
-import type { CodeAction, CompletionItem, CompletionList, Diagnostic, DocumentSymbol, FoldingRange, FormattingOptions, Hover, Location, ParameterInformation, Position, Range, SemanticTokens, SemanticTokensLegend, SignatureHelp, SignatureInformation, TextEdit, WorkspaceEdit } from 'vscode-languageserver/node'
+import type { CodeAction, CompletionItem, CompletionList, Diagnostic, DocumentSymbol, FoldingRange, FormattingOptions, Hover, Location, ParameterInformation, Position, Range, SemanticTokens, SemanticTokensEdit, SemanticTokensLegend, SignatureHelp, SignatureInformation, TextEdit, WorkspaceEdit } from 'vscode-languageserver/node'
 
 import ts from '@typescript/typescript6'
 import { isBuiltin } from 'node:module'
@@ -35,6 +35,7 @@ import { locationOf, sourceRange, toRange } from './locations'
 import { componentFiles, htmlDirectiveDocs } from './model'
 import { meekoAutoImport, packageCompletion, pathKey } from './project'
 import { analyzeReactivity } from './reactivity'
+import { templateExpressionRanges } from './regions'
 import { refNameCompletion, typedValueCompletion, valueSiteAt } from './template-values'
 
 export { documentationMarkdown } from './components'
@@ -754,6 +755,9 @@ const templateDirectives: readonly TemplateDirective[] = [
 	{ name: 'model:', detail: 'Enlaza un modelo del componente (defineModel) con una señal', insert: 'model:', on: 'component' },
 ]
 
+/** The conditional directives, of which a tag takes one. */
+const conditionalDirectives = ['if', 'if:when', 'else-if', 'else']
+
 /**
  * Directivas de Meeko en el nombre de un atributo de una etiqueta de la plantilla (`each:`,
  * `if:when`, `bind:`…), también en las etiquetas de componente. Lee el texto, como
@@ -773,6 +777,10 @@ export function directiveNameCompletion(document: TextDocument, position: Positi
 	const start = document.positionAt(offset - word.length)
 	const end = document.positionAt(nameEnd)
 	const present = writtenAttributes(source, context, offset - word.length)
+	// A tag takes one conditional directive (if, if:when, else-if or else): once one is written, the
+	// others would only lead to the compiler's error.
+	const conditional = conditionalDirectives.some((name) => present.has(name))
+	const offered = (name: string): boolean => !present.has(name) && !(conditional && conditionalDirectives.includes(name))
 	// Items whose range ends at the cursor (`bindAttributeCompletion`…) replace the whole name.
 	const whole = (items: CompletionItem[]): CompletionItem[] => (nameEnd === offset ? items : items.map((item) => (item.textEdit && 'range' in item.textEdit && document.offsetAt(item.textEdit.range.end) === offset ? { ...item, textEdit: { ...item.textEdit, range: { start: item.textEdit.range.start, end } } } : item)))
 	if (context.tag === 'render') {
@@ -784,7 +792,7 @@ export function directiveNameCompletion(document: TextDocument, position: Positi
 			{ name: 'else', detail: 'Rama final', insert: 'else' },
 			{ name: 'if:when', detail: 'Renderiza sólo si la expresión es verdadera', insert: 'if:when="$1"' },
 		]
-			.filter((attribute) => !present.has(attribute.name))
+			.filter((attribute) => offered(attribute.name))
 			.map((attribute, index): CompletionItem => ({
 				label: attribute.name,
 				kind: CompletionItemKind.Property,
@@ -798,7 +806,7 @@ export function directiveNameCompletion(document: TextDocument, position: Positi
 	// `<snippet>` only admits name, params and if:when (MEEK061).
 	if (context.tag === 'snippet') {
 		return snippetAttributes
-			.filter((attribute) => !present.has(attribute.name))
+			.filter((attribute) => offered(attribute.name))
 			.map((attribute, index): CompletionItem => ({
 				label: attribute.name,
 				kind: attribute.name === 'if' || attribute.name === 'if:when' ? CompletionItemKind.Keyword : CompletionItemKind.Property,
@@ -864,7 +872,7 @@ export function directiveNameCompletion(document: TextDocument, position: Positi
 	const directives = templateDirectives
 		.filter((directive) => directive.on === 'all' || directive.on === (component ? 'component' : 'element'))
 		.filter((directive) => !directive.elements || directive.elements.includes((builtin?.element ?? context.tag).toLowerCase()))
-		.filter((directive) => directive.name.endsWith(':') || !present.has(directive.name))
+		.filter((directive) => directive.name.endsWith(':') || offered(directive.name))
 		// The child's own models replace the generic `model:`.
 		.filter((directive) => !(memberItems && directive.name === 'model:'))
 		.map((directive, index): CompletionItem => ({
@@ -1493,10 +1501,20 @@ export function semanticTokens(context: FeatureContext): SemanticTokens {
 	}
 	addReactiveModifiers(context, tokens)
 	tokens.sort((left, right) => left.start - right.start || left.end - right.end)
+	// Tag and attribute names keep the grammar's color: `variant` in `<Button variant="…">` is a prop
+	// key in the virtual code, and its `property` token would paint it like a TypeScript property.
+	const template = templateExpressionRanges(document.getText())
+	let range = 0
+	const painted = (start: number): boolean => {
+		if (!template || start < template.template.contentStart || start >= template.template.contentEnd) return true
+		while (range < template.ranges.length && template.ranges[range]![1] <= start) range++
+		const current = template.ranges[range]
+		return current !== undefined && current[0] <= start
+	}
 	const builder = new SemanticTokensBuilder()
 	let previousEnd = -1
 	for (const token of tokens) {
-		if (token.start < previousEnd) continue
+		if (token.start < previousEnd || !painted(token.start)) continue
 		previousEnd = token.end
 		const start = document.positionAt(token.start)
 		const end = document.positionAt(token.end)
@@ -1507,6 +1525,52 @@ export function semanticTokens(context: FeatureContext): SemanticTokens {
 		}
 	}
 	return builder.build()
+}
+
+/**
+ * Tokens semánticos de las líneas de un rango, a partir de los del documento completo (en caché por
+ * versión): el editor pinta antes lo visible sin recalcular el componente.
+ * @param tokens Tokens del documento completo.
+ * @param range Rango visible que pide el cliente.
+ * @returns Tokens que empiezan dentro de las líneas del rango.
+ */
+export function semanticTokensInRange(tokens: SemanticTokens, range: Range): SemanticTokens {
+	const data: number[] = []
+	let line = 0
+	let character = 0
+	let previousLine = 0
+	let previousCharacter = 0
+	for (let index = 0; index < tokens.data.length; index += 5) {
+		const deltaLine = tokens.data[index]!
+		line += deltaLine
+		character = deltaLine === 0 ? character + tokens.data[index + 1]! : tokens.data[index + 1]!
+		if (line < range.start.line) continue
+		if (line > range.end.line) break
+		data.push(line - previousLine, line === previousLine ? character - previousCharacter : character, tokens.data[index + 2]!, tokens.data[index + 3]!, tokens.data[index + 4]!)
+		previousLine = line
+		previousCharacter = character
+	}
+	return { data }
+}
+
+/**
+ * Diferencia entre dos resultados de tokens semánticos como una sola edición: el prefijo y el sufijo
+ * comunes no se envían. Al escribir en una línea sólo cambian sus tokens y los desplazamientos.
+ * @param previous Datos que el cliente ya tiene.
+ * @param next Datos nuevos del documento.
+ * @returns Las ediciones que convierten `previous` en `next`; vacías si son iguales.
+ */
+export function semanticTokensEdits(previous: readonly number[], next: readonly number[]): SemanticTokensEdit[] {
+	let start = 0
+	while (start < previous.length && start < next.length && previous[start] === next[start]) start++
+	let previousEnd = previous.length
+	let nextEnd = next.length
+	while (previousEnd > start && nextEnd > start && previous[previousEnd - 1] === next[nextEnd - 1]) {
+		previousEnd--
+		nextEnd--
+	}
+	if (start === previousEnd && start === nextEnd) return []
+	return [{ start, deleteCount: previousEnd - start, data: next.slice(start, nextEnd) }]
 }
 
 /**

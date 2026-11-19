@@ -2,6 +2,8 @@
 
 ## Sin publicar
 
+- **Servidor de lenguaje: el primer componente tiene colores sin esperar.** Al iniciar prepara en segundo plano el programa TypeScript de los proyectos de `warmupFiles` (las pestañas abiertas) o de hasta dos aplicaciones de las carpetas del workspace; `warmup: false` lo desactiva. Los proyectos comparten el registro de documentos de TypeScript, ofrece tokens semánticos por rango y por diferencias (`range`, `full/delta`) y ya no emite tokens sobre los nombres de etiqueta y de atributo de la plantilla, que conservan el color de la gramática.
+- **Servidor de lenguaje: completado de las directivas condicionales.** `if`, `if:when`, `else-if` y `else` se ofrecen en elementos, componentes, `<snippet>` y `<render>`, y una etiqueta que ya tiene una no recibe las demás. La firma de una etiqueta resume en una línea los atributos HTML que hereda de `ElementAttributes` (`<MeekoLink>`).
 - **Seguridad: una expresión `{…}` dentro de un `<script>` o un `<style>` de la plantilla es el error `MEEK140`** (compilación, `meeko check` y editor): el escape HTML no protegía ese contenido. Pase los datos con `useHead` (JSON) o con atributos `data-*`.
 - **Seguridad: los atributos dinámicos con una URL neutralizan los esquemas peligrosos.** En `href`, `src`, `action`, `formaction`, `xlink:href`, `poster`… y en la URL de un `content` de `<meta http-equiv="refresh">`, los esquemas `javascript:`, `vbscript:` y `data:` (salvo `data:image/*` en `src` y `poster`) se sustituyen por `about:invalid#meeko-unsafe-url`, en SSR, hidratación y actualizaciones, con un aviso fuera de producción. Los atributos estáticos de la plantilla no cambian.
 - **Seguridad: `bind="obj"` rechaza las claves `srcdoc` y `http-equiv` (`MEEK113`),** como las `on*`.

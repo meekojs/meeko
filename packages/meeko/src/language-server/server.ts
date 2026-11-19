@@ -2,7 +2,7 @@ import type { Connection, Diagnostic, InitializeResult, Position, Range, Semanti
 
 import ts from '@typescript/typescript6'
 import { createHash } from 'node:crypto'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, dirname, isAbsolute, join, relative, sep } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -22,7 +22,7 @@ import { collectCssVariableProject, cssVariableReferences, prepareCssVariableRen
 import { cssVariableCompletion, cssVariableDefinition, cssVariableHover, cssVariableTokenAt, isCssVariableCompletionData, resolveCssVariableCompletion } from './css-variables'
 import { componentDiagnostics, contractRange, frameworkContractRoot, projectCheckRoot, tokenEnd } from './diagnostics'
 import { colorPresentations, cssCompletion, cssHover, documentColors, htmlCompletion, htmlHover, linkedEditingRanges, specialTemplateHover, styleDiagnostics, tagCompletion } from './embedded'
-import { codeActions, completionList, componentNameCompletion, componentTagMembers, definition, directiveNameCompletion, documentSymbols, foldingRanges, formatting, hover, prepareRename, references, rename, resolveCompletion, semanticTokens, semanticTokensLegend, shadowedTagsOf, signatureHelp } from './features'
+import { codeActions, completionList, componentNameCompletion, componentTagMembers, definition, directiveNameCompletion, documentSymbols, foldingRanges, formatting, hover, prepareRename, references, rename, resolveCompletion, semanticTokens, semanticTokensEdits, semanticTokensInRange, semanticTokensLegend, shadowedTagsOf, signatureHelp } from './features'
 import { codeLenses } from './lenses'
 import { documentLinks, inlayHints, linkRouteCompletion, workspaceSymbols } from './nav'
 import { MeekoProject, MeekoWorkspace, pathKey } from './project'
@@ -63,6 +63,17 @@ export interface LanguageServerInitializationOptions {
 	readonly projectContracts?: boolean
 	/** Espera en milisegundos antes de comprobar un documento editado. Por defecto 300. */
 	readonly diagnosticsDelay?: number
+	/**
+	 * Prepara en segundo plano las aplicaciones de las carpetas del workspace al iniciar, para que
+	 * el primer componente abierto reciba colores y hover sin esperar al programa TypeScript.
+	 * Por defecto es `true`.
+	 */
+	readonly warmup?: boolean
+	/**
+	 * Componentes abiertos en el editor al iniciar (rutas de archivo): sus proyectos se preparan
+	 * primero. Sin ellos se preparan las aplicaciones que se encuentren en las carpetas.
+	 */
+	readonly warmupFiles?: readonly string[]
 	/**
 	 * Opciones de formato para clientes sin `workspace/configuration`. Si el cliente la admite,
 	 * prevalece su sección `meeko.format`.
@@ -110,6 +121,37 @@ function uriToPath(uri: string): string | undefined {
 	} catch {
 		return undefined
 	}
+}
+
+/** Most applications prepared on start: each TypeScript program holds memory until the server stops. */
+const warmupLimit = 2
+const skippedFolders = new Set(['node_modules', 'dist', 'build', 'out', 'coverage'])
+
+/**
+ * Aplicaciones Meeko (carpetas con `meeko.config.*`) de las carpetas del workspace: primero las
+ * propias carpetas y después hasta dos niveles por debajo (`apps/web`), como mucho {@link warmupLimit}.
+ * @param folders Carpetas del workspace.
+ * @returns Raíces de las aplicaciones que se preparan al iniciar.
+ */
+export function applicationRoots(folders: readonly string[]): string[] {
+	const found: string[] = []
+	const isApplication = (folder: string): boolean => ['ts', 'mts', 'js', 'mjs'].some((extension) => existsSync(join(folder, `meeko.config.${extension}`)))
+	const children = (folder: string): string[] => {
+		try {
+			return readdirSync(folder, { withFileTypes: true })
+				.filter((entry) => entry.isDirectory() && !entry.name.startsWith('.') && !skippedFolders.has(entry.name))
+				.map((entry) => join(folder, entry.name))
+				.sort()
+		} catch {
+			return []
+		}
+	}
+	let level = [...folders]
+	for (let depth = 0; depth <= 2 && level.length && found.length < warmupLimit; depth++) {
+		for (const folder of level) if (found.length < warmupLimit && isApplication(folder)) found.push(folder)
+		level = level.filter((folder) => !isApplication(folder)).flatMap(children)
+	}
+	return found
 }
 
 /**
@@ -172,6 +214,11 @@ export function startLanguageServer(connection: Connection): void {
 	let configurationSupport = false
 	let configurationRegistration = false
 	let codeLensRefresh = false
+	/** Prepares the applications of the workspace folders before a component opens; see {@link warmProjects}. */
+	let warmup = true
+	/** The running warm-up: shutdown awaits it, since loading a configuration writes under `.meeko/`. */
+	let warming: Promise<void> = Promise.resolve()
+	let warmupFiles: readonly string[] = []
 	let deleteFiles = false
 	let createFiles = false
 	let versionedEdits = false
@@ -453,6 +500,8 @@ export function startLanguageServer(connection: Connection): void {
 		folders = (params.workspaceFolders?.map((folder) => folder.uri) ?? (params.rootUri ? [params.rootUri] : [])).flatMap((uri) => uriToPath(uri) ?? [])
 		contracts = options.projectContracts !== false
 		if (typeof options.diagnosticsDelay === 'number' && options.diagnosticsDelay >= 0) delay = options.diagnosticsDelay
+		warmup = options.warmup !== false
+		warmupFiles = Array.isArray(options.warmupFiles) ? options.warmupFiles.filter((file): file is string => typeof file === 'string' && file.endsWith('.meeko')) : []
 		semanticRefresh = params.capabilities.workspace?.semanticTokens?.refreshSupport === true
 		watchedRegistration = params.capabilities.workspace?.didChangeWatchedFiles?.dynamicRegistration === true
 		configurationSupport = params.capabilities.workspace?.configuration === true
@@ -497,11 +546,36 @@ export function startLanguageServer(connection: Connection): void {
 				documentFormattingProvider: true,
 				codeActionProvider: { codeActionKinds: [CodeActionKind.QuickFix, CodeActionKind.RefactorRewrite] },
 				codeLensProvider: { resolveProvider: false },
-				semanticTokensProvider: { legend: semanticTokensLegend, full: true },
+				semanticTokensProvider: { legend: semanticTokensLegend, full: { delta: true }, range: true },
 			},
 			serverInfo: { name: 'meeko-language-server', ...(version ? { version } : {}) },
 		}
 	})
+
+	/**
+	 * Builds the TypeScript program of the workspace applications in the background. Without it the
+	 * first semantic tokens of a component wait ~1 s and the editor first paints it without colors.
+	 */
+	const warmProjects = async (): Promise<void> => {
+		// The open tabs say which applications the user works on; in a monorepo the folder search
+		// alone would pick the first ones by name.
+		const projects = new Map<string, MeekoProject>()
+		for (const file of warmupFiles.slice(0, warmupLimit * 4)) {
+			const project = workspace.projectFor(file)
+			projects.set(pathKey(project.root), project)
+		}
+		if (!projects.size) for (const root of applicationRoots(folders)) projects.set(pathKey(root), workspace.projectFor(join(root, 'app', 'app.meeko')))
+		for (const project of [...projects.values()].slice(0, warmupLimit)) {
+			if (stopped) return
+			const started = performance.now()
+			try {
+				await project.warm()
+				log(`${project.root}: proyecto preparado en ${Math.round(performance.now() - started)} ms`)
+			} catch (error) {
+				log(`${project.root}: no se pudo preparar el proyecto: ${error instanceof Error ? error.message : String(error)}`)
+			}
+		}
+	}
 
 	connection.onInitialized(() => {
 		// Registros específicos: CSS no recibe formato, diagnósticos ni otras funciones de .meeko.
@@ -522,6 +596,7 @@ export function startLanguageServer(connection: Connection): void {
 		// A pull-model client (VS Code) only notifies setting changes for a registered section; the
 		// notification clears the cached meeko.classes settings of each document.
 		if (configurationSupport && configurationRegistration) void connection.client.register(DidChangeConfigurationNotification.type, { section: 'meeko' })
+		if (warmup) warming = warmProjects()
 		if (!watchedRegistration) return
 		void connection.client.register(DidChangeWatchedFilesNotification.type, {
 			watchers: [
@@ -570,6 +645,7 @@ export function startLanguageServer(connection: Connection): void {
 		const edited = openVersions.get(document.uri) !== document.version
 		openVersions.delete(document.uri)
 		semanticCache.delete(document.uri)
+		sentTokens.delete(document.uri)
 		const virtual = virtualProjects.get(document.uri)
 		const filename = virtual?.filename ?? uriToPath(document.uri)
 		if (filename?.toLowerCase().endsWith('.css')) {
@@ -849,17 +925,35 @@ export function startLanguageServer(connection: Connection): void {
 			})),
 		})),
 	)
-	connection.languages.semanticTokens.on(async ({ textDocument }) => {
+	/** Tokens of the whole document, cached per version: the full and range requests share them. */
+	const documentTokens = async (uri: string): Promise<SemanticTokens> => {
 		const empty: SemanticTokens = { data: [] }
-		const document = documents.get(textDocument.uri)
+		const document = documents.get(uri)
 		if (!document) return empty
-		const cached = semanticCache.get(textDocument.uri)
+		const cached = semanticCache.get(uri)
 		if (cached && cached.version === document.version) return cached.tokens
-		const tokens = await withContext(textDocument.uri, (context) => semanticTokens(context))
+		const tokens = await withContext(uri, (context) => semanticTokens(context))
 		if (!tokens) return empty
-		if (documents.get(textDocument.uri)?.version === document.version) semanticCache.set(textDocument.uri, { version: document.version, tokens })
+		if (documents.get(uri)?.version === document.version) semanticCache.set(uri, { version: document.version, tokens })
 		return tokens
+	}
+	/** The last full or delta result sent per document: a delta request names it by its `resultId`. */
+	const sentTokens = new Map<string, { resultId: string; data: number[] }>()
+	let resultIds = 0
+	const sent = (uri: string, tokens: SemanticTokens): SemanticTokens & { resultId: string } => {
+		const resultId = String(++resultIds)
+		sentTokens.set(uri, { resultId, data: tokens.data })
+		return { resultId, data: tokens.data }
+	}
+	connection.languages.semanticTokens.on(async ({ textDocument }) => sent(textDocument.uri, await documentTokens(textDocument.uri)))
+	connection.languages.semanticTokens.onDelta(async ({ textDocument, previousResultId }) => {
+		const previous = sentTokens.get(textDocument.uri)
+		const tokens = sent(textDocument.uri, await documentTokens(textDocument.uri))
+		// An unknown result (another server, a restart) gets the whole document.
+		if (previous?.resultId !== previousResultId) return tokens
+		return { resultId: tokens.resultId, edits: semanticTokensEdits(previous.data, tokens.data) }
 	})
+	connection.languages.semanticTokens.onRange(async ({ textDocument, range }) => semanticTokensInRange(await documentTokens(textDocument.uri), range))
 
 	// Pending checks are cancelled and running project checks are awaited, not abandoned: they
 	// load configuration and write under `.meeko/`, so after the reply nothing touches the workspace.
@@ -868,7 +962,7 @@ export function startLanguageServer(connection: Connection): void {
 		for (const timer of [...timers.values(), ...contractTimers.values()]) clearTimeout(timer)
 		timers.clear()
 		contractTimers.clear()
-		await Promise.allSettled([...contractRuns.values()])
+		await Promise.allSettled([...contractRuns.values(), warming])
 		workspace.dispose()
 		for (const entry of virtualProjects.values()) entry.project.dispose()
 		virtualProjects.clear()
