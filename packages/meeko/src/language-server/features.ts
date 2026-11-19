@@ -29,7 +29,7 @@ import { eachKeyActions, sidecarActions } from './actions'
 import { builtinTag, builtinTags } from './builtin-tags'
 import { builtinTagDefinition, builtinTagHover } from './builtins'
 import { componentSummary, componentSummaryMarkdown, documentationMarkdown, memberDocumentation, propSignature, tagSummary } from './components'
-import { bindAttributeCompletion, domEventCompletion, dynamicTagAttributeCompletion, dynamicTagHover, dynamicTags, htmlAttributeCompletion, specialTemplateDocumentation, tagAt } from './embedded'
+import { bindAttributeCompletion, domEventCompletion, dynamicTagAttributeCompletion, dynamicTagHover, dynamicTags, htmlAttributeCompletion, nativeTagName, specialTemplateDocumentation, tagAt } from './embedded'
 import { appTargetDefinition, appTargetHover, componentFile, componentMarkdown, componentModuleAt, componentTagName, componentTypeAt, reactiveHover } from './insights'
 import { locationOf, sourceRange, toRange } from './locations'
 import { componentFiles, htmlDirectiveDocs } from './model'
@@ -864,7 +864,7 @@ export function directiveNameCompletion(document: TextDocument, position: Positi
 					})),
 			) ?? []
 		const rejected = new Set(builtin?.rejected ?? [])
-		const html = bindAttributeCompletion(document, position, word, tags ?? [builtin?.element ?? context.tag], present, '1').filter((item) => !rejected.has(item.label.slice(5)) && !builtinProps.some((prop) => prop.label === item.label))
+		const html = bindAttributeCompletion(document, position, word, tags ?? [builtin?.element ?? nativeTagName(context)], present, '1').filter((item) => !rejected.has(item.label.slice(5)) && !builtinProps.some((prop) => prop.label === item.label))
 		return whole(nameOnly([...builtinProps, ...html], valued))
 	}
 	// `model:va`, `ref:ti`: the name after the prefix has its own completion.
@@ -895,7 +895,7 @@ export function directiveNameCompletion(document: TextDocument, position: Positi
 	const html = tags ? whole(nameOnly(dynamicTagAttributeCompletion(document, position, word, tags, present), valued)) : htmlAttributeCompletion(document, position, present, builtin?.element).filter((item) => !rejected.has(item.label))
 	// Then each attribute with `bind:` (`bind:class`, `bind:type`…), which `bind` filters to.
 	const builtinBound = new Set(builtin?.props.flatMap((prop) => prop.attributes) ?? [])
-	const bound = bindAttributeCompletion(document, position, word, tags ?? [builtin?.element ?? context.tag], present, '2').filter((item) => !rejected.has(item.label.slice(5)) && !builtinBound.has(item.label) && !builtinBound.has(item.label.slice(5)))
+	const bound = bindAttributeCompletion(document, position, word, tags ?? [builtin?.element ?? nativeTagName(context)], present, '2').filter((item) => !rejected.has(item.label.slice(5)) && !builtinBound.has(item.label) && !builtinBound.has(item.label.slice(5)))
 	return [...ownProps, ...directives, ...refs, ...html, ...whole(nameOnly(bound, valued))]
 }
 

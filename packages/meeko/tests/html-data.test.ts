@@ -36,7 +36,9 @@ test('enumerated attributes carry the values of the standard', () => {
 		assert.ok(!('freeform' in data) && !('tokens' in data))
 	}
 	assert.equal(htmlElementAttributes.input.step.freeform, true)
-	assert.equal(htmlElementAttributes.button.command.freeform, true)
+	// `command` is closed: its keywords and the custom commands, which start with `--`.
+	assert.deepEqual(htmlElementAttributes.button.command.prefixes, ['--'])
+	assert.equal(htmlElementAttributes.button.command.kind, 'enum')
 	assert.equal(htmlElementAttributes.iframe.sandbox.tokens, true)
 	assert.equal(htmlGlobalAttributes.role.tokens, true)
 })

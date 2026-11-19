@@ -14,5 +14,5 @@ export type { ComponentRegistry, ComponentName, ComponentOf, ComponentProps, Com
 export type { HotState } from './app/runtime/hmr'
 export type { Snippet } from './app/runtime/snippets'
 export type { ElementAttributes, TagName } from './app/runtime/dynamic-tag'
-export type { AttributeValueOf, AttributeValues, ClassValue, StyleValue } from './shared/html-attribute-values'
+export type { AttributeValueOf, AttributeValues, ClassValue, StrictAttributeValueOf, StyleValue } from './shared/html-attribute-values'
 export type { DevtoolsActivity, DevtoolsAssignmentSite, DevtoolsCommandResult, DevtoolsEditSite, DevtoolsEvent, DevtoolsEventKind, DevtoolsHook, DevtoolsInstance, DevtoolsProtocolVersion, DevtoolsReadKind, DevtoolsReadSite, DevtoolsRegistration, DevtoolsSignalSite, DevtoolsSnapshot, DevtoolsValue, DevtoolsWriteSite } from './app/runtime/devtools'

@@ -969,7 +969,9 @@ export function createVirtualComponent(source: string, filename: string, options
 				if (attr.name === 'bind' && directives) {
 					const start = attributeValueStart(source, attr)
 					if (start === undefined || !attr.value.trim()) continue
-					code += `__meeko_spread<${tagType ?? JSON.stringify(element.tagName ?? '')}>((`
+					// An element inside `<svg>` is its SVG one (`svg:a`), as in the compiler's type check.
+					const spreadTag = element.namespaceURI === 'http://www.w3.org/2000/svg' ? `svg:${element.tagName ?? ''}` : (element.tagName ?? '')
+					code += `__meeko_spread<${tagType ?? JSON.stringify(spreadTag)}>((`
 					mapped(attr.value, start)
 					code += '));\n'
 					spreads = true

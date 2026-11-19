@@ -379,6 +379,7 @@ const ownConfigKeys = Object.keys({
 	alias: true,
 	viewTransitions: true,
 	devtools: true,
+	check: true,
 } satisfies Record<keyof MeekoConfig, true>)
 
 /** Version of Meeko that added each key of `ownConfigKeys` after 1.2, for the message. */
@@ -391,6 +392,7 @@ const ownConfigKeySince: Readonly<Record<string, string>> = {
 	alias: '1.5',
 	viewTransitions: '1.7',
 	devtools: '1.8',
+	check: '1.10',
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {

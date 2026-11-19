@@ -328,6 +328,27 @@ export interface MeekoConfig {
 	 * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#aliases-de-ruta
 	 */
 	readonly alias?: Readonly<Record<string, string | false>>
+	/**
+	 * Comprobaciones de `meeko check`, `meeko build` y el editor. `attributeValues` es el modo de
+	 * `MEEK122`: `"warn"` (por defecto) avisa de cada literal de texto que un atributo nativo con
+	 * valores cerrados no admite (`"shwo"` en `popovertargetaction`); `"strict"` da además un error
+	 * cuando ese atributo recibe un tipo amplio, como `string | null`, en vez de sus valores. `null`
+	 * y `undefined` siguen omitiendo el atributo. Debe ser un literal: se lee sin ejecutar la
+	 * configuración.
+	 * @since 1.10.0
+	 * @example
+	 * ```ts
+	 * import { defineMeekoConfig } from "@meekojs/meeko/framework";
+	 *
+	 * export default defineMeekoConfig({
+	 *   check: { attributeValues: "strict" },
+	 * });
+	 * ```
+	 * @see https://github.com/meekojs/meeko/blob/main/docs/component-attributes.md
+	 */
+	readonly check?: {
+		readonly attributeValues?: 'warn' | 'strict'
+	}
 	/** Destino del servidor de producción. Por defecto, `{ adapter: "node" }`. */
 	readonly server?: MeekoServerConfig
 	/**

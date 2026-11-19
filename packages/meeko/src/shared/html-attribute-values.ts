@@ -1,36 +1,61 @@
 import type { ariaAttributes } from './html-data/aria'
 import type { htmlElementAttributes, htmlGlobalAttributes } from './html-data/attributes'
+import type { svgElementAttributes, svgGlobalAttributes } from './html-data/svg'
 
 /**
- * Values of each HTML attribute, as types, from the HTML data that `scripts/html-data.ts`
- * generates (`src/shared/html-data`). Only types: the data stays out of every bundle.
+ * Values of each native attribute, HTML and SVG, as types, from the data that `scripts/html-data.ts`
+ * generates (`src/shared/html-data`). Only types: the data stays out of every bundle. Completion,
+ * hover, `bind:attr`, `bind="obj"`, `ElementAttributes<Tag>` and the check of static attributes all
+ * read the same data, in the editor and in `meeko check`.
+ *
+ * A tag is an HTML element (`"button"`), an SVG one (`"circle"`) or, for the four names that both
+ * have (`a`, `script`, `style`, `title`), the SVG one with the prefix `svg:` (`"svg:a"`), which the
+ * compiler writes for every element inside `<svg>`.
  *
  * In 1.x a value type offers the values of the standard to completion and hover without narrowing
  * what an attribute accepts: `type` of `<button>` is `"submit" | "reset" | "button"` plus any other
- * value. A string literal outside the values is the warning MEEK122 (see {@link AttributeLiteralCheck});
- * 2.0 makes the closed values strict.
+ * value, and `null` or `undefined` always leave an attribute out. A string literal outside the
+ * values is the warning MEEK122 (see {@link AttributeLiteralCheck}), member by member in a union;
+ * the strict mode (`check.attributeValues: "strict"`) also refuses a wide type such as `string`
+ * (see {@link AttributeStrictCheck}), and 2.0 makes it the default.
  */
 
 type ElementData = typeof htmlElementAttributes
 type GlobalData = typeof htmlGlobalAttributes
 type AriaData = typeof ariaAttributes
+type SvgElementData = typeof svgElementAttributes
+type SvgGlobalData = typeof svgGlobalAttributes
 
-/** The global or ARIA data of the attribute `Name`, or `undefined`. */
+/** The global or ARIA data of the HTML attribute `Name`, or `undefined`. */
 type SharedData<Name extends string> = Name extends keyof GlobalData ? GlobalData[Name] : Name extends keyof AriaData ? AriaData[Name] : undefined
 
-/** The data of the attribute `Name` on `Tag`: its own, or else the global or ARIA one. Distributive over `Tag`. */
-type AttributeDataOf<Tag extends string, Name extends string> = Tag extends keyof ElementData ? (Name extends keyof ElementData[Tag] ? ElementData[Tag][Name] : SharedData<Name>) : SharedData<Name>
-
-/** The closed values of an attribute's data: its `values`, unless they are suggestions or tokens of a list. */
-type ClosedValues<Data> = Data extends { readonly values: readonly (infer Value extends string)[] } ? (Data extends { readonly freeform: true } | { readonly tokens: true } | { readonly type: 'token list' } ? never : Value) : never
+/** The global or ARIA data of the SVG attribute `Name`, or `undefined`. */
+type SvgSharedData<Name extends string> = Name extends keyof SvgGlobalData ? SvgGlobalData[Name] : Name extends keyof AriaData ? AriaData[Name] : undefined
 
 /**
- * Valores que el estándar HTML admite en el atributo `Name` de la etiqueta `Tag`, como unión de
- * literales: `"submit" | "reset" | "button"` en `type` de `<button>`, `"" | "hidden" | "until-found"`
- * en `hidden`, `"true" | "false" | "mixed" | "undefined"` en `aria-pressed`. `never` en un atributo de
- * texto libre, en uno cuyos valores son sugerencias (`freeform`) o una lista de palabras (`rel`,
- * `class`), y en una etiqueta o un atributo que los datos HTML no conocen. Con una unión de
- * etiquetas, los valores de cualquiera de ellas.
+ * The SVG element that `Tag` names, or `never` for an HTML or custom element: `"svg:a"` is `"a"`,
+ * and a name that only SVG has (`"circle"`) is itself.
+ */
+export type SvgTagOf<Tag extends string> = Tag extends `svg:${infer Name}` ? Name : Tag extends keyof ElementData ? never : Tag extends keyof SvgElementData ? Tag : never
+
+/** The data of the attribute `Name` on `Tag`: its own, or else the global or ARIA one. Distributive over `Tag`. */
+type AttributeDataOf<Tag extends string, Name extends string> = Tag extends string ? ([SvgTagOf<Tag>] extends [never] ? (Tag extends keyof ElementData ? (Name extends keyof ElementData[Tag] ? ElementData[Tag][Name] : SharedData<Name>) : SharedData<Name>) : SvgTagOf<Tag> extends keyof SvgElementData ? (Name extends keyof SvgElementData[SvgTagOf<Tag>] ? SvgElementData[SvgTagOf<Tag>][Name] : SvgSharedData<Name>) : SvgSharedData<Name>) : never
+
+/** The closed values of an attribute's data: the `values` of an `enum`, and what starts with one of its `prefixes`. */
+type ClosedValues<Data> = Data extends { readonly kind: 'enum'; readonly values: readonly (infer Value extends string)[] } ? Value | (Data extends { readonly prefixes: readonly (infer Prefix extends string)[] } ? `${Prefix}${string}` : never) : never
+
+/** What a boolean attribute may be written with: the empty string or its own name. */
+type PresenceValues<Data, Name extends string> = Data extends { readonly kind: 'boolean' } ? '' | Name : never
+
+/**
+ * Valores que el estándar admite en el atributo `Name` de la etiqueta `Tag`, HTML o SVG, como unión
+ * de literales: `"submit" | "reset" | "button"` en `type` de `<button>`, `"toggle" | "show" | "hide"`
+ * en `popovertargetaction`, `"" | "hidden" | "until-found"` en `hidden`, `"true" | "false" | "mixed" |
+ * "undefined"` en `aria-pressed`, `"userSpaceOnUse" | "objectBoundingBox"` en `gradientUnits` de
+ * `<linearGradient>`. En `command` incluye además los comandos propios (`--${string}`). `never` en
+ * un atributo de texto libre o de ID (`popovertarget`), en uno cuyos valores son sugerencias
+ * (`freeform`) o una lista de palabras (`rel`, `class`), y en una etiqueta o un atributo que los
+ * datos no conocen. Con una unión de etiquetas, los valores de cualquiera de ellas.
  *
  * @typeParam Tag Etiqueta o unión de etiquetas.
  * @typeParam Name Nombre del atributo, en minúsculas.
@@ -83,9 +108,10 @@ export type ClassValue = HintedAttributeValue | readonly ClassValue[]
 export type StyleValue = HintedAttributeValue | Readonly<Record<string, string | number | false | null | undefined>>
 
 /**
- * Valor de un atributo HTML del elemento `Tag`: cualquier valor de atributo, como antes de `1.8`,
- * con los valores del estándar ({@link AttributeValues}) como sugerencias para el completado y el
- * hover. Es el tipo de cada clave de `ElementAttributes<Tag>`.
+ * Valor de un atributo nativo, HTML o SVG, del elemento `Tag`: cualquier valor de atributo, como
+ * antes de `1.8`, con los valores del estándar ({@link AttributeValues}) como sugerencias para el
+ * completado y el hover. `null` y `undefined` omiten cualquier atributo. Es el tipo de cada clave de
+ * `ElementAttributes<Tag>`; {@link StrictAttributeValueOf} es su forma estricta.
  *
  * @typeParam Tag Etiqueta o unión de etiquetas.
  * @typeParam Name Nombre del atributo.
@@ -100,19 +126,72 @@ export type StyleValue = HintedAttributeValue | Readonly<Record<string, string |
 export type AttributeValueOf<Tag extends string, Name extends string> = AttributeValues<Tag, Name> | (Name extends 'class' ? ClassValue : Name extends 'style' ? StyleValue : HintedAttributeValue)
 
 /**
+ * Valor de un atributo nativo del elemento `Tag` según su semántica en el estándar, sin los valores
+ * amplios que {@link AttributeValueOf} admite por compatibilidad. Un atributo de conjunto cerrado
+ * sólo acepta sus valores: `"toggle" | "show" | "hide"` en `popovertargetaction`, con `boolean` si
+ * `"true"` y `"false"` están entre ellos (`draggable`, `aria-pressed`), y `boolean`, `""` o su
+ * nombre en un atributo booleano (`disabled`). `false`, `null` y `undefined` siempre lo omiten. Los
+ * demás atributos (texto, IDs, listas, números, `class` y `style`) son los de `AttributeValueOf`.
+ * Es el tipo que comprueba el modo estricto (`check.attributeValues: "strict"`).
+ *
+ * @typeParam Tag Etiqueta o unión de etiquetas.
+ * @typeParam Name Nombre del atributo.
+ * @since 1.10.0
+ * @example
+ * ```ts
+ * import type { StrictAttributeValueOf } from "@meekojs/meeko";
+ * let action: StrictAttributeValueOf<"button", "popovertargetaction"> = "show";
+ * action = null; // omite el atributo
+ * // @ts-expect-error "shwo" no es un valor de popovertargetaction.
+ * action = "shwo";
+ * ```
+ */
+export type StrictAttributeValueOf<Tag extends string, Name extends string> = StrictValue<AttributeDataOf<Tag, Name>, Tag, Name>
+
+type StrictValue<Data, Tag extends string, Name extends string> = Data extends { readonly kind: 'boolean' } ? boolean | '' | Name | null | undefined : Data extends { readonly kind: 'enum' } ? ClosedValues<Data> | (['true' | 'false'] extends [ClosedValues<Data>] ? boolean : Name extends 'hidden' ? boolean : false) | null | undefined : AttributeValueOf<Tag, Name>
+
+/**
  * A type error whose text carries a Meeko code: an object with that text as its only key, which no
  * value is assignable to.
  */
 type TypeMessage<Text extends string> = { readonly [Key in Text]: never }
 
-/** Whether every member of the string type `Text` is a literal: `"a" | "b"`, not `string` nor `${number}px`. */
-type IsLiteral<Text extends string> = [Text] extends [never] ? false : {} extends Record<Text, 1> ? false : true
+/** The members of `Value` that are string literals: `"a"`, not `string` nor `${number}px`. Distributive. */
+type LiteralMembers<Value> = Value extends string ? (string extends Value ? never : {} extends Record<Value, 1> ? never : Value) : never
+
+/** `Text` as the attribute compares it: without case in HTML, as written in SVG. */
+type Compared<Text extends string, Tag extends string> = [SvgTagOf<Tag>] extends [never] ? Lowercase<Text> : Text
+
+/** The values that the data of an attribute close: an `enum`'s, or the two of a boolean attribute. */
+type CheckedValues<Tag extends string, Name extends string> = AttributeValues<Tag, Name> | PresenceValues<AttributeDataOf<Tag, Name>, Name>
+
+/** The literals among `Member` that are not one of `Valid`. Distributive over `Member`. */
+type OutsideValues<Member extends string, Valid extends string, Tag extends string> = Member extends string ? (Compared<Member, Tag> extends Compared<Valid, Tag> ? never : Member) : never
+
+/** The literals among `Member` that cannot be one ID: the empty string or a text with a space. */
+type NotAnId<Member extends string> = Member extends '' | `${string} ${string}` ? Member : never
+
+/**
+ * The string literals of `Value` that the attribute `Name` of `Tag` does not admit, one by one:
+ * `"shwo"` in `"show" | "shwo" | null` for `popovertargetaction`. Those outside the closed values
+ * of an attribute, and for a reference to one element (`popovertarget`) an empty ID or one with
+ * spaces. `never` when every literal is valid, and for an attribute with free text.
+ */
+export type InvalidAttributeLiterals<Tag extends string, Name extends string, Value> = [CheckedValues<Tag, Name>] extends [never] ? ([AttributeDataOf<Tag, Name>] extends [{ readonly kind: 'id' }] ? NotAnId<LiteralMembers<Value>> : never) : OutsideValues<LiteralMembers<Value>, CheckedValues<Tag, Name>, Tag>
 
 /**
  * `unknown` when `Value` is a valid value of the attribute `Name` of `Tag`; otherwise the text of
- * the warning MEEK122, which the type check reports and `meeko check` turns into a warning. Only a
- * string literal, or a union of them, that shares no value with {@link AttributeValues} warns,
- * compared without case like HTML: `type="sumbit"` or `bind:type="'sumbit'"` on `<button>`. A
- * `string`, a number, a boolean, `null`, `undefined` or an attribute with free text never warn.
+ * the warning MEEK122 with each invalid literal, which the type check reports and `meeko check`
+ * turns into a warning. Every string literal of `Value` is compared on its own, without case in
+ * HTML and with it in SVG: `"show" | "shwo" | null` warns about `"shwo"`, and `"show" | null` does
+ * not. A `string`, a number, a boolean, `null`, `undefined` or an attribute with free text never warn.
  */
-export type AttributeLiteralCheck<Tag extends string, Name extends string, Value> = [AttributeValues<Tag, Name>] extends [never] ? unknown : IsLiteral<Extract<Value, string>> extends false ? unknown : [Extract<Lowercase<Extract<Value, string>>, Lowercase<AttributeValues<Tag, Name>>>] extends [never] ? TypeMessage<`MEEK122: ${Name} de <${Tag}> no admite ese valor`> : unknown
+export type AttributeLiteralCheck<Tag extends string, Name extends string, Value> = [InvalidAttributeLiterals<Tag, Name, Value>] extends [never] ? unknown : TypeMessage<`MEEK122: ${Name} de <${Tag}> no admite ${InvalidAttributeLiterals<Tag, Name, Value>}`>
+
+/**
+ * The strict check of MEEK122 (`check.attributeValues: "strict"`): besides the invalid literals of
+ * {@link AttributeLiteralCheck}, an attribute with a closed set of values refuses a type that is not
+ * within {@link StrictAttributeValueOf}, such as `string | null`. An attribute without a closed set
+ * is checked as in the default mode.
+ */
+export type AttributeStrictCheck<Tag extends string, Name extends string, Value> = [InvalidAttributeLiterals<Tag, Name, Value>] extends [never] ? ([CheckedValues<Tag, Name>] extends [never] ? unknown : [Value] extends [StrictAttributeValueOf<Tag, Name>] ? unknown : TypeMessage<`MEEK122: ${Name} de <${Tag}> exige un tipo cerrado`>) : AttributeLiteralCheck<Tag, Name, Value>

@@ -158,8 +158,8 @@ describe('language server: completion from the script, by directive', () => {
 		assert.equal(find(button, 'bind:').newText, 'bind:')
 		assert.equal(find(button, 'bind').newText, 'bind="$1"')
 		const type = find(button, 'bind:type')
-		assert.deepEqual([type.newText, type.replaces, type.format, type.detail], ['bind:type="$1"', 'bind', InsertTextFormat.Snippet, "bind:type: 'submit' | 'reset' | 'button'"])
-		assert.equal(find(button, 'bind:disabled').detail, 'bind:disabled: boolean')
+		assert.deepEqual([type.newText, type.replaces, type.format, type.detail], ['bind:type="$1"', 'bind', InsertTextFormat.Snippet, "bind:type: 'submit' | 'reset' | 'button' | null | undefined"])
+		assert.equal(find(button, 'bind:disabled').detail, 'bind:disabled: boolean | null | undefined')
 		ordered(button, 'bind:', 'bind:type')
 		ordered(button, 'bind:type', 'bind:class')
 		ordered(button, 'bind:class', 'bind:aria-label')
@@ -173,7 +173,7 @@ describe('language server: completion from the script, by directive', () => {
 			'<a> has no type',
 		)
 		const input = await complete('<input bind:^ />')
-		assert.equal(find(input, 'bind:checked').detail, 'bind:checked: boolean')
+		assert.equal(find(input, 'bind:checked').detail, 'bind:checked: boolean | null | undefined')
 		assert.equal(find(input, 'bind:type').replaces, 'bind:')
 		// A component: its props, with bind: also the text ones.
 		const component = await complete('<Card bind^ />')
@@ -184,7 +184,7 @@ describe('language server: completion from the script, by directive', () => {
 
 	test("Meeko's HTML data: recent attributes, static values, roles and deprecated entries", async () => {
 		const dialog = await complete('<dialog bind:^ ></dialog>')
-		assert.equal(find(dialog, 'bind:closedby').detail, "bind:closedby: 'any' | 'closerequest' | 'none'")
+		assert.equal(find(dialog, 'bind:closedby').detail, "bind:closedby: 'any' | 'closerequest' | 'none' | null | undefined")
 		// Deprecated attributes are marked, as the editor strikes them through.
 		const offered = async (body: string): Promise<CompletionItem[]> => {
 			const marked = page(body)

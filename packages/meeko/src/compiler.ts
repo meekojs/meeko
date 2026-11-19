@@ -27,7 +27,7 @@ import { analyzeSnippets, SnippetsError, snippetTypeParts } from './app/definiti
 import { ElementRefError, resolveElementRef, validateElementRefBinding } from './app/definitions/use-element-ref'
 import { isTagName, isVoidTag } from './app/runtime/dynamic-tag'
 import { emitPropName } from './app/runtime/emits'
-import { closedAttributeValues, closedAttributeValuesOf } from './compiler/attribute-values'
+import { checksAttributeValue, svgTagPrefix } from './compiler/attribute-values'
 import { emitComponentChannels } from './compiler/codegen/channels'
 import { emitComponentProps } from './compiler/codegen/props'
 import { emitComponentRelease } from './compiler/codegen/release'
@@ -348,6 +348,8 @@ interface TemplateContext {
 	selectModel: { expression: string; offset: number } | undefined
 	/** Compiled for `meeko check`: the content of an `if:when` is checked behind its condition. */
 	narrow: boolean
+	/** The strict mode of MEEK122, when `narrow`: a closed set of values refuses a wide type. */
+	strictAttributeValues: boolean
 	/** `if:when` conditions around the node being compiled, when `narrow`. */
 	guards: Guard[]
 	/** Meeko's own tags that a component of the project replaces; see {@link shadowedBuiltinTags}. */
@@ -816,6 +818,11 @@ export interface CompileOptions {
 	 * tras su condición, que estrecha sus tipos.
 	 */
 	typeCheck?: boolean
+	/**
+	 * Con `typeCheck`, el modo estricto de `MEEK122` (`check.attributeValues: "strict"`): un atributo
+	 * con un conjunto cerrado de valores rechaza también un tipo amplio como `string | null`.
+	 */
+	strictAttributeValues?: boolean
 	/**
 	 * Elementos que reciben el atributo de `<style scoped>`: `"all"` (por defecto en 1.x), todos los
 	 * de la plantilla; `"matched"`, sólo los que algún selector con ámbito puede seleccionar. Es el
@@ -1295,9 +1302,13 @@ function renderNodeContent(node: TemplateNode, bindings: TemplateBindings, conte
 	let spreadIndex: number | undefined
 	// Since 1.8 `meeko check` and the editor check the value of an attribute with closed values in
 	// the HTML data, such as `type` of `<button>`: a string literal outside them is MEEK122, a warning.
-	const htmlTag = !custom && node.namespaceURI !== 'http://www.w3.org/2000/svg'
-	const checksValue = (name: string): boolean => context.narrow && htmlTag && closedAttributeValues(tag, name) !== undefined
-	const checkedValue = (code: string, name: string): string => (checksValue(name) ? `__meeko.checkAttributeValue<${quote(tag)}, ${quote(name)}>()(${code})` : code)
+	// Since 1.10 also on an SVG element, whose tag carries the prefix `svg:` in the types, and each
+	// literal of a union on its own; the strict mode refuses a wide type too.
+	const svgTag = !custom && node.namespaceURI === 'http://www.w3.org/2000/svg'
+	const htmlTag = !custom && (node.namespaceURI === undefined || node.namespaceURI === 'http://www.w3.org/1999/xhtml')
+	const nativeTag = svgTag ? `${svgTagPrefix}${tag}` : htmlTag ? tag : undefined
+	const checksValue = (name: string): boolean => context.narrow && nativeTag !== undefined && checksAttributeValue(nativeTag, name)
+	const checkedValue = (code: string, name: string): string => (checksValue(name) ? `__meeko.${attributeCheckName(context)}<${quote(nativeTag!)}, ${quote(name)}>()(${code})` : code)
 	const joined = spread ? new Map<string, string>() : joinedAttributes(node)
 	const bound = boundAttributeNames(node, (name) => foreignAttributeName(name, node.namespaceURI))
 	for (const attr of node.attrs ?? []) {
@@ -1367,7 +1378,8 @@ function renderNodeContent(node: TemplateNode, bindings: TemplateBindings, conte
 		}
 	}
 	if (spread) {
-		const binding: SpreadBinding = { id: mark(), ...spread, tag: quote(tag), excluded: [...excluded], explicit, filtered: false }
+		// In the type check, an element inside `<svg>` is its SVG one: `"a" as "svg:a"`.
+		const binding: SpreadBinding = { id: mark(), ...spread, tag: context.narrow && svgTag ? `(${quote(tag)} as ${quote(`${svgTagPrefix}${tag}`)})` : quote(tag), excluded: [...excluded], explicit, filtered: false }
 		bindings.spreads.push(binding)
 		attrs.splice(spreadIndex ?? attrs.length, 0, { kind: 'dynamic', expression: `__meeko.renderSpread(${spreadCode(binding, markSource)})` })
 	}
@@ -1495,8 +1507,8 @@ function renderDynamicTag(node: TemplateNode, bindings: TemplateBindings, contex
 	const tagVariable = `__meeko_tag_${element}`
 	// Since 1.8, as on an element: the value of an attribute with closed values is checked against
 	// those of the possible tags (MEEK122), only in the code of the type check.
-	const checksTagValue = (name: string): boolean => context.narrow && !foreign && closedAttributeValuesOf(tags, name) !== undefined
-	const checkedTagValue = (code: string, name: string): string => (checksTagValue(name) ? `__meeko.checkAttributeValue<typeof ${tagVariable}, ${quote(name)}>()(${code})` : code)
+	const checksTagValue = (name: string): boolean => context.narrow && !foreign && tags.some((tag) => checksAttributeValue(tag, name))
+	const checkedTagValue = (code: string, name: string): string => (checksTagValue(name) ? `__meeko.${attributeCheckName(context)}<typeof ${tagVariable}, ${quote(name)}>()(${code})` : code)
 	/** The element's own bindings, which a new tag hydrates again. */
 	const own = emptyBindings()
 	/** SSR code of the attributes of the opening tag. */
@@ -1880,6 +1892,11 @@ function addSpreadPart(explicit: SpreadBinding['explicit'], name: 'class' | 'sty
 }
 
 /** SSR code of `bind="obj"` on an element, or the read of its hydration with `map` for its expressions. */
+/** The helper that checks the value of an attribute in the code of the type check (MEEK122). */
+function attributeCheckName(context: TemplateContext): string {
+	return context.strictAttributeValues ? 'checkAttributeValueStrict' : 'checkAttributeValue'
+}
+
 function spreadCode(spread: SpreadBinding, map: (expression: string, offset: number) => string): string {
 	const part = (name: 'class' | 'style', value: SpreadPart): string => {
 		if ('code' in value) return value.code
@@ -3088,7 +3105,7 @@ export function compile(source: string, filename = 'anonymous.meeko', options: C
 	const projectComponents = [...(options.projectComponents ?? [])]
 	const knownComponents = new Set([...importedComponents(script.content), ...projectComponents.filter((name) => /^[A-Z]/.test(name))])
 	const componentNames = { names: new Set([...knownComponents, ...scriptValueNames(script.content)]), complete: options.projectComponents !== undefined }
-	const context: TemplateContext = { componentNames, branchComponents: new WeakSet(), source, filename, templateOffset: template.contentStart, scopeAttribute, scopeTargets: targets, nextText: 0, nextRegion: 0, nextRef: 0, nextHtml: 0, nextElement: 0, listDepth: 0, refs: new Map(), usedRefs: new Set(), nextSnippet: 0, snippetDepth: 0, selectModel: undefined, narrow: options.typeCheck === true, guards: [], shadowedTags: shadowedBuiltinTags(script.content, projectComponents), shadowedUses: new Map(), deprecatedUses: new Map(), strayDirectives: new Map(), replacedAttributes: new Map(), theme: options.theme, knownComponents, builtinModules: new Set(), decodedRegions: [] }
+	const context: TemplateContext = { componentNames, branchComponents: new WeakSet(), source, filename, templateOffset: template.contentStart, scopeAttribute, scopeTargets: targets, nextText: 0, nextRegion: 0, nextRef: 0, nextHtml: 0, nextElement: 0, listDepth: 0, refs: new Map(), usedRefs: new Set(), nextSnippet: 0, snippetDepth: 0, selectModel: undefined, narrow: options.typeCheck === true, strictAttributeValues: options.strictAttributeValues === true, guards: [], shadowedTags: shadowedBuiltinTags(script.content, projectComponents), shadowedUses: new Map(), deprecatedUses: new Map(), strayDirectives: new Map(), replacedAttributes: new Map(), theme: options.theme, knownComponents, builtinModules: new Set(), decodedRegions: [] }
 	const html = renderNode(parsed, bindingsForTemplate, context)
 	const hot = options.hot === true
 	const scriptParts = compileScript(script, source, filename, hot, context.refs, generic, context.narrow)

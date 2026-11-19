@@ -16,10 +16,10 @@ import { ariaRoles } from '../shared/html-data/aria'
 import { builtinTag } from './builtin-tags'
 import { cssClassRules } from './class-rules'
 import { attributeValueType, htmlAttributeSource } from './html-data-source'
-import { styleRegion, tagAt, templateRegion } from './regions'
+import { nativeTagName, styleRegion, tagAt, templateRegion } from './regions'
 
 export type { TagContext } from './regions'
-export { styleRegion, tagAt, templateRegion } from './regions'
+export { nativeTagName, styleRegion, tagAt, templateRegion } from './regions'
 
 // HTML of the template and CSS of `<style>`, outside the TypeScript model: what the editor offers
 // while writing markup and styles. Every function reads the text, so it works while a tag or a
@@ -360,9 +360,10 @@ export function htmlCompletion(document: TextDocument, position: Position): Comp
  */
 function staticValueCompletion(document: TextDocument, position: Position, context: TagContext): CompletionItem[] | undefined {
 	const value = context.value!
+	// SVG attributes keep their case (`gradientUnits`); HTML ones are read without it.
 	const info = htmlAttributeSource()
-		.attributes(context.tag)
-		.find((attribute) => attribute.name === value.attribute.toLowerCase())
+		.attributes(nativeTagName(context))
+		.find((attribute) => attribute.name === (context.svg ? value.attribute : value.attribute.toLowerCase()))
 	if (!info?.values?.length) return undefined
 	const source = document.getText()
 	const offset = document.offsetAt(position)

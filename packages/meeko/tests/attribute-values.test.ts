@@ -77,10 +77,12 @@ test('meeko check warns with MEEK122 on a literal outside the values, never on a
 	const { root, cleanup } = await typeProject()
 	const script = `<script lang="ts">\nimport { signal } from "@meekojs/meeko";\nconst text = signal<string>("submit");\nconst kind = signal<"submit" | "nope">("submit");\nconst wrongKind = signal<"nope" | "other">("nope");\nconst flag = signal(true);\n</script>\n`
 	const cases: Array<{ name: string; template: string; at?: string; message?: RegExp }> = [
-		{ name: 'Valid', template: `<button type="submit">a</button><button type="SUBMIT">b</button><button bind:type="text.value">c</button><button bind:type="kind.value">d</button><div hidden="until-found"></div><div bind:hidden="flag.value"></div><div bind:style="{ backgroundColor: 'red', '--space': 4, display: false }"></div><div hidden></div><dialog closedby="any"></dialog><a target="_blank" rel="noopener external">e</a><input type="datetime-local" /><component is="flag.value ? 'a' : 'button'" bind:type="'reset'">f</component>` },
+		{ name: 'Valid', template: `<button type="submit">a</button><button type="SUBMIT">b</button><button bind:type="text.value">c</button><div hidden="until-found"></div><div bind:hidden="flag.value"></div><div bind:style="{ backgroundColor: 'red', '--space': 4, display: false }"></div><div hidden></div><dialog closedby="any"></dialog><a target="_blank" rel="noopener external">e</a><input type="datetime-local" /><component is="flag.value ? 'a' : 'button'" bind:type="'reset'">f</component>` },
 		{ name: 'StaticType', template: `<button type="sumbit">a</button>`, at: `"sumbit"`, message: /^"sumbit" no es un valor de type en <button>: admite .*submit.*\. Es un aviso en 1\.x y será un error en 2\.0$/ },
 		{ name: 'BoundLiteral', template: `<button bind:type="'sumbit'">a</button>`, at: `'sumbit'` },
 		{ name: 'BoundUnion', template: `<button bind:type="wrongKind.value">a</button>`, at: 'wrongKind.value' },
+		// Since 1.10 each literal of a union is checked on its own: a valid one does not hide an invalid one.
+		{ name: 'MixedUnion', template: `<button bind:type="kind.value">a</button>`, at: 'kind.value', message: /^"nope" no es un valor de type en <button>: admite submit, reset, button\./ },
 		{ name: 'Hidden', template: `<div hidden="nope"></div>`, at: `"nope"`, message: /admite "", hidden, until-found|admite until-found, hidden, ""/ },
 		{ name: 'InputType', template: `<input type="emial" />`, at: `"emial"` },
 		{ name: 'Aria', template: `<span aria-pressed="maybe">x</span>`, at: `"maybe"` },

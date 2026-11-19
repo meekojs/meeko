@@ -69,8 +69,35 @@ export interface TagContext {
 	/** End of the tag: its `>`, or where the next tag starts while it is unfinished. */
 	readonly tagEnd: number
 	readonly component: boolean
+	/** Whether the tag is SVG content: inside `<svg>`, or `<svg>` itself, and not inside `<foreignObject>`. */
+	readonly svg: boolean
 	/** The quoted value containing `offset`, with the name of its attribute. */
 	readonly value?: { readonly attribute: string; readonly start: number }
+}
+
+/** Whether a tag that follows `before`, the template up to it, is SVG content. */
+function insideSvg(before: string): boolean {
+	const depth = (name: string): number => {
+		let open = 0
+		for (const match of before.matchAll(new RegExp(`<(/?)${name}(?=[\\s/>])[^>]*?(/?)>`, 'g'))) {
+			if (match[1]) open = Math.max(0, open - 1)
+			else if (!match[2]) open++
+		}
+		return open
+	}
+	if (!before.includes('<svg')) return false
+	// What follows the last open `<foreignObject>` is HTML again, unless an `<svg>` opens inside it.
+	const foreign = before.lastIndexOf('<foreignObject')
+	if (foreign >= 0 && depth('foreignObject') > 0) return insideSvg(before.slice(foreign + '<foreignObject'.length))
+	return depth('svg') > 0
+}
+
+/**
+ * The tag of `context` as the attribute data name it: with the prefix `svg:` for SVG content
+ * (`svg:a`), and as written otherwise.
+ */
+export function nativeTagName(context: Pick<TagContext, 'tag' | 'svg'>, tag = context.tag): string {
+	return context.svg && !context.tag.includes('-') ? `svg:${tag}` : tag
 }
 
 export function tagAt(source: string, offset: number): TagContext | undefined {
@@ -120,6 +147,7 @@ export function tagAt(source: string, offset: number): TagContext | undefined {
 		tagStart,
 		tagEnd,
 		component: /^[A-Z]/.test(tag) || tag === 'component',
+		svg: tag === 'svg' || insideSvg(source.slice(template.contentStart, tagStart)),
 		...(quote ? { value: { attribute, start: valueStart } } : {}),
 	}
 }

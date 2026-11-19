@@ -7,7 +7,9 @@
  * `type` is left out of `<a>` and `<area>`: there it is only a MIME hint, and with
  * `is="href ? 'a' : 'button'"` `bind:type` is the type of the button.
  */
+import type { SvgTagOf } from './html-attribute-values'
 import type { ariaAttributes } from './html-data/aria'
+import type { svgElementAttributes, svgGlobalAttributes } from './html-data/svg'
 
 import { elementAttributeNames, globalAttributeNames } from './html-data/attribute-names'
 
@@ -29,12 +31,22 @@ export type GlobalAttributeName = Words<typeof globalAttributeNames> | AriaAttri
 /** ARIA attributes of the standard (`aria-pressed`, `aria-expanded`…). */
 type AriaAttributeName = keyof typeof ariaAttributes & string
 
+/** Elements of the SVG data. */
+export type SvgTagName = keyof typeof svgElementAttributes
+
+/**
+ * Attributes of the SVG element `Tag` in the SVG data: its own, the core and presentation ones,
+ * `aria-*` and `data-*`, with their case (`viewBox`).
+ */
+export type SvgAttributeName<Tag extends string> = (Tag extends SvgTagName ? keyof (typeof svgElementAttributes)[Tag] & string : never) | (keyof typeof svgGlobalAttributes & string) | AriaAttributeName | `aria-${string}` | `data-${string}`
+
 /**
  * Attribute names of `Tag`: the global ones and its own. Distributive, so a union of tags accepts
- * the attributes of any of them; an element outside the HTML data (a custom element, SVG) accepts
- * any name.
+ * the attributes of any of them. An SVG element (`"circle"`, `"svg:a"`) lists the names of the SVG
+ * data for completion and still accepts any other, as SVG has attributes of other namespaces; a
+ * custom element accepts any name.
  */
-export type AttributeNameOf<Tag extends string> = Tag extends HtmlTagName ? GlobalAttributeName | Words<(typeof elementAttributeNames)[Tag]> : string
+export type AttributeNameOf<Tag extends string> = Tag extends string ? ([SvgTagOf<Tag>] extends [never] ? (Tag extends HtmlTagName ? GlobalAttributeName | Words<(typeof elementAttributeNames)[Tag]> : string) : SvgAttributeName<SvgTagOf<Tag>> | (string & {})) : never
 
 /** Value of an attribute: `null`, `undefined` and `false` leave it out; `true` writes it empty. */
 export type AttributeValue = string | number | boolean | null | undefined

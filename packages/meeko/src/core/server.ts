@@ -61,7 +61,7 @@ export function collectRenderedHtml<T>(values: Map<string, boolean>, render: () 
  * Boolean attributes of the standard: `booleanAttributeNames` of `src/shared/html-data/attribute-names.ts`,
  * which `core` cannot import (it is the lowest layer); `tests/html-attributes.test.ts` keeps both equal.
  */
-export const booleanAttributeNames = 'allowfullscreen alpha async autofocus autoplay checked controls default defer disabled formnovalidate headingreset inert ismap itemscope loop multiple muted nomodule novalidate open playsinline readonly required reversed scoped seamless selected shadowrootclonable shadowrootcustomelementregistry shadowrootdelegatesfocus shadowrootserializable typemustmatch'
+export const booleanAttributeNames = 'allowfullscreen alpha async autofocus autoplay checked controls credentialless default defer disabled disablepictureinpicture disableremoteplayback formnovalidate headingreset inert ismap itemscope loop multiple muted nomodule novalidate open playsinline readonly required reversed scoped seamless selected shadowrootclonable shadowrootcustomelementregistry shadowrootdelegatesfocus shadowrootserializable switch typemustmatch webkitdirectory'
 
 // Built on first use.
 let booleanAttributes: ReadonlySet<string> | undefined

@@ -191,6 +191,11 @@ export async function loadMeekoConfig(projectRoot: string): Promise<MeekoConfig>
 	}
 	const document = config.document as Record<string, unknown> | undefined
 	if (config.viewTransitions !== undefined && typeof config.viewTransitions !== 'boolean') throw new TypeError(`${file}: viewTransitions debe ser un booleano`)
+	const check = config.check as Record<string, unknown> | undefined
+	if (check !== undefined) {
+		if (!check || typeof check !== 'object' || Array.isArray(check)) throw new TypeError(`${file}: check debe ser un objeto`)
+		if (check.attributeValues !== undefined && check.attributeValues !== 'warn' && check.attributeValues !== 'strict') throw new TypeError(`${file}: check.attributeValues debe ser "warn" o "strict"`)
+	}
 	if (document !== undefined) {
 		if (!document || typeof document !== 'object' || Array.isArray(document)) throw new TypeError(`${file}: document debe ser un objeto`)
 		if (document.lang !== undefined && typeof document.lang !== 'string') throw new TypeError(`${file}: document.lang debe ser una cadena`)
@@ -463,7 +468,12 @@ export function readMeekoConfigSync(projectRoot: string): MeekoConfig {
 	const modules = moduleList && ts.isArrayLiteralExpression(moduleList) ? moduleList.elements.filter(ts.isStringLiteral).map((entry) => entry.text) : undefined
 	// Only a literal object is known; otherwise the editor uses the default aliases.
 	const alias = staticAliasOption(config)
+	// `check.attributeValues`: the mode of MEEK122, a string literal.
+	const checkOption = property(config, 'check')
+	const attributeValues = checkOption && ts.isObjectLiteralExpression(checkOption) ? property(checkOption, 'attributeValues') : undefined
+	const attributeMode = attributeValues && ts.isStringLiteralLike(attributeValues) && (attributeValues.text === 'strict' || attributeValues.text === 'warn') ? attributeValues.text : undefined
 	return {
+		...(attributeMode ? { check: { attributeValues: attributeMode } } : {}),
 		...(alias ? { alias } : {}),
 		...(layers ? { layers } : {}),
 		...(extensions ? { extends: extensions } : {}),
