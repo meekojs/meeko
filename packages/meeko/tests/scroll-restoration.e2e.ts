@@ -1,6 +1,6 @@
 import type { Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import type { Browser, BrowserContextOptions, Page } from 'playwright-core'
+import type { Browser, BrowserContextOptions, Request as BrowserRequest, Page } from 'playwright-core'
 
 import assert from 'node:assert/strict'
 import { mkdir, writeFile } from 'node:fs/promises'
@@ -41,7 +41,7 @@ const files: Record<string, string> = {
 	'app/pages/slow.meeko': `<script server lang="ts">
 export const route = definePage({
 	load: async () => {
-		await new Promise((done) => setTimeout(done, 1200))
+		await (globalThis as typeof globalThis & { __meekoScrollGate?: (path: string) => Promise<void> }).__meekoScrollGate?.('/slow')
 		return {}
 	},
 })
@@ -55,7 +55,7 @@ export const route = definePage({
 	render: 'stream',
 	load: () => ({
 		more: defer(async () => {
-			await new Promise((done) => setTimeout(done, 1200))
+			await (globalThis as typeof globalThis & { __meekoScrollGate?: (path: string) => Promise<void> }).__meekoScrollGate?.('/grow')
 			return 15000
 		}),
 	}),
@@ -185,7 +185,7 @@ async function open(browser: Browser, origin: string, path: string, options: Bro
 	const errors: string[] = []
 	page.on('pageerror', (error) => errors.push(error.message))
 	await page.addInitScript({ content: spy })
-	await page.goto(origin + path, { waitUntil: 'networkidle' })
+	await page.goto(origin + path, { waitUntil: 'domcontentloaded' })
 	await page.waitForFunction(() => performance.getEntriesByName('meeko-hydration').length > 0, undefined, { timeout: 30_000 })
 	return { page, errors, close: () => context.close() }
 }
@@ -297,7 +297,7 @@ test('a reload and a return from another document keep the position, and other c
 		await scrollPage(page, 500)
 		await follow(page, 'to-long', 'long')
 		await scrollPage(page, 12000)
-		await page.reload({ waitUntil: 'networkidle' })
+		await page.reload({ waitUntil: 'domcontentloaded' })
 		await page.waitForFunction(() => performance.getEntriesByName('meeko-hydration').length > 0)
 		await nextFrames(page)
 		near(await scrollPosition(page), 12000, `${engine}: reload`)
@@ -321,8 +321,7 @@ test('a reload and a return from another document keep the position, and other c
 		await nextFrames(page)
 		near(await scrollPosition(page), 12000, `${engine}: back from another document`)
 		// SPA navigation still restores by itself after coming back.
-		await page.waitForTimeout(100)
-		assert.equal(await page.evaluate(() => history.scrollRestoration), 'manual', 'and the page takes over again')
+		await page.waitForFunction(() => history.scrollRestoration === 'manual')
 
 		// The state of other code survives new navigations and traversals.
 		await page.evaluate(() => history.replaceState({ ...history.state, mine: 1 }, ''))
@@ -335,6 +334,77 @@ test('a reload and a return from another document keep the position, and other c
 	})
 })
 
+async function waitForSignal(promise: Promise<void>, message: string): Promise<void> {
+	const timeout = Promise.withResolvers<never>()
+	const timer = setTimeout(() => timeout.reject(new Error(message)), 10_000)
+	try {
+		await Promise.race([promise, timeout.promise])
+	} finally {
+		clearTimeout(timer)
+	}
+}
+
+/** Holds only the navigation armed by the test. Always release the loader before closing the server. */
+function holdNavigation(path: string) {
+	const host = globalThis as typeof globalThis & { __meekoScrollGate?: (path: string) => Promise<void> }
+	const started = Promise.withResolvers<void>()
+	const released = Promise.withResolvers<void>()
+	const resumed = Promise.withResolvers<void>()
+	const completed = Promise.withResolvers<void>()
+	let stopTracking: (() => void) | undefined
+	const gate = async (requestedPath: string) => {
+		if (requestedPath !== path) return
+		started.resolve()
+		await released.promise
+		resumed.resolve()
+	}
+	host.__meekoScrollGate = gate
+	return {
+		async back(page: Page) {
+			let pending: BrowserRequest | undefined
+			const onComplete = (request: BrowserRequest): void => {
+				if (request === pending) completed.resolve()
+			}
+			page.on('requestfinished', onComplete)
+			page.on('requestfailed', onComplete)
+			stopTracking = () => {
+				page.off('requestfinished', onComplete)
+				page.off('requestfailed', onComplete)
+			}
+			await Promise.all([
+				page.waitForRequest((request) => {
+					if (new URL(request.url()).pathname !== path || request.headers().accept !== 'application/meeko+json') return false
+					pending = request
+					return true
+				}),
+				page.goBack(),
+			])
+			await waitForSignal(started.promise, 'Loader did not start for ' + path)
+		},
+		async waitForCompletion() {
+			await waitForSignal(resumed.promise, 'Loader did not resume for ' + path)
+			await waitForSignal(completed.promise, 'Request did not finish or abort for ' + path)
+		},
+		release() {
+			if (host.__meekoScrollGate === gate) delete host.__meekoScrollGate
+			released.resolve()
+		},
+		close() {
+			stopTracking?.()
+		},
+	}
+}
+
+async function withHeldNavigation(path: string, run: (hold: ReturnType<typeof holdNavigation>) => Promise<void>): Promise<void> {
+	const hold = holdNavigation(path)
+	try {
+		await run(hold)
+	} finally {
+		hold.release()
+		hold.close()
+	}
+}
+
 test('with a request in flight the last destination wins, and late content neither jumps on another page nor moves a reader who scrolled', { timeout: 300_000 }, async () => {
 	await withServedApp(async (origin, browser, engine) => {
 		// Back to a slow page: the position arrives with its page, and the first frame already has it.
@@ -343,9 +413,10 @@ test('with a request in flight the last destination wins, and late content neith
 		await follow(slow.page, 'to-long', 'long')
 		await scrollPage(slow.page, 7000)
 		await clearFrames(slow.page)
-		await slow.page.goBack()
-		await slow.page.waitForTimeout(300)
-		near(await scrollPosition(slow.page), 7000, `${engine}: the old page does not move while the request is in flight`)
+		await withHeldNavigation('/slow', async (hold) => {
+			await hold.back(slow.page)
+			near(await scrollPosition(slow.page), 7000, `${engine}: the old page does not move while the request is in flight`)
+		})
 		await settled(slow.page, 'slow')
 		near(await scrollPosition(slow.page), 2000, `${engine}: back to the slow page`)
 		await assertNoJump(slow.page, 'slow', 2000, `${engine}: slow`)
@@ -358,12 +429,15 @@ test('with a request in flight the last destination wins, and late content neith
 		await follow(page, 'to-slow', 'slow')
 		await scrollPage(page, 3000)
 		await follow(page, 'to-long', 'long')
-		await page.goBack()
-		await page.waitForFunction(() => location.pathname === '/slow')
-		await page.goBack()
-		await settled(page, 'short')
-		near(await scrollPosition(page), 400, `${engine}: the last destination`)
-		await page.waitForTimeout(1600)
+		await withHeldNavigation('/slow', async (hold) => {
+			await hold.back(page)
+			await page.goBack()
+			await settled(page, 'short')
+			near(await scrollPosition(page), 400, `${engine}: the last destination`)
+			hold.release()
+			await hold.waitForCompletion()
+			await nextFrames(page)
+		})
 		assert.equal(await page.evaluate(() => document.querySelector('h1')?.id), 'short', `${engine}: the slow answer does not commit`)
 		near(await scrollPosition(page), 400, `${engine}: and does not move the page`)
 		assert.deepEqual(errors, [])
@@ -374,8 +448,11 @@ test('with a request in flight the last destination wins, and late content neith
 		await grow.page.waitForSelector('#grown')
 		await scrollPage(grow.page, 12000)
 		await follow(grow.page, 'to-short', 'short')
-		await grow.page.goBack()
-		await settled(grow.page, 'grow')
+		await withHeldNavigation('/grow', async (hold) => {
+			await hold.back(grow.page)
+			await settled(grow.page, 'grow')
+			assert.equal(await grow.page.locator('#grown').count(), 0)
+		})
 		await grow.page.waitForSelector('#grown', { timeout: 30_000 })
 		await nextFrames(grow.page)
 		await nextFrames(grow.page)
@@ -384,9 +461,11 @@ test('with a request in flight the last destination wins, and late content neith
 
 		// The same with a reader who scrolls meanwhile: the page stays with them.
 		await follow(grow.page, 'to-short', 'short')
-		await grow.page.goBack()
-		await settled(grow.page, 'grow')
-		await grow.page.evaluate(() => scrollTo({ top: 0, behavior: 'instant' }))
+		await withHeldNavigation('/grow', async (hold) => {
+			await hold.back(grow.page)
+			await settled(grow.page, 'grow')
+			await grow.page.evaluate(() => scrollTo({ top: 0, behavior: 'instant' }))
+		})
 		await grow.page.waitForSelector('#grown', { timeout: 30_000 })
 		await nextFrames(grow.page)
 		await nextFrames(grow.page)
@@ -395,11 +474,16 @@ test('with a request in flight the last destination wins, and late content neith
 		// And content that arrives after leaving does not move the next page.
 		await scrollPage(grow.page, 12000)
 		await follow(grow.page, 'to-short', 'short')
-		await grow.page.goBack()
-		await grow.page.waitForFunction(() => document.querySelector('h1')?.id === 'grow')
-		await follow(grow.page, 'to-short', 'short')
-		await scrollPage(grow.page, 200)
-		await grow.page.waitForTimeout(1600)
+		await withHeldNavigation('/grow', async (hold) => {
+			await hold.back(grow.page)
+			await grow.page.waitForFunction(() => document.querySelector('h1')?.id === 'grow')
+			await follow(grow.page, 'to-short', 'short')
+			await scrollPage(grow.page, 200)
+			hold.release()
+			await hold.waitForCompletion()
+			await nextFrames(grow.page)
+		})
+		assert.equal(await grow.page.locator('h1').getAttribute('id'), 'short')
 		near(await scrollPosition(grow.page), 200, `${engine}: no late jump on another page`)
 		assert.deepEqual(grow.errors, [])
 		await grow.close()

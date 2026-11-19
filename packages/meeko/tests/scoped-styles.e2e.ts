@@ -130,7 +130,8 @@ async function firstPaintAndHydrated(browser: Browser, url: string): Promise<{ f
 	const page = await browser.newPage()
 	const errors: string[] = []
 	page.on('pageerror', (error) => errors.push(error.message))
-	await page.goto(url, { waitUntil: 'networkidle' })
+	await page.goto(url, { waitUntil: 'domcontentloaded' })
+	await page.waitForFunction(() => performance.getEntriesByName('meeko-hydration').length > 0)
 	await page.locator('#count').click()
 	await page.locator('#count', { hasText: '1' }).waitFor()
 	assert.deepEqual(errors, [])

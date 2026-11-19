@@ -57,11 +57,13 @@ jobs:
       - name: Core browser E2E
         shell: pwsh
         run: |
-          pnpm run e2e 2>&1 | Tee-Object -FilePath .meeko/ci-logs/browser-e2e.log
+          $env:MEEKO_E2E_ARTIFACTS = Join-Path $PWD '.meeko/ci-logs/browser-artifacts'
+          pnpm -F @meekojs/meeko run e2e:prepared 2>&1 | Tee-Object -FilePath .meeko/ci-logs/browser-e2e.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Pilot multimotor E2E
         shell: pwsh
         run: |
+          $env:MEEKO_E2E_ARTIFACTS = Join-Path $PWD '.meeko/ci-logs/browser-artifacts'
           pnpm run pilot:e2e 2>&1 | Tee-Object -FilePath .meeko/ci-logs/pilot-e2e.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - run: pnpm run package:smoke

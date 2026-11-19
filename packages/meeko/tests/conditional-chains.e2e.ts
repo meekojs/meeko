@@ -65,7 +65,8 @@ onCleanup(()=>{
 			page.on('console', (message) => {
 				if (message.type() === 'error') errors.push(message.text())
 			})
-			await page.goto(origin, { waitUntil: 'networkidle' })
+			await page.goto(origin, { waitUntil: 'domcontentloaded' })
+			await page.waitForFunction(() => performance.getEntriesByName('meeko-hydration').length > 0)
 			assert.equal(await page.locator('.branch').count(), 1)
 			await page.locator('.branch').click()
 			assert.equal(await page.locator('.branch').textContent(), 'zero:1')

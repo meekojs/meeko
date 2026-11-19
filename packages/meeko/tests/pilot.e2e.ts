@@ -7,14 +7,15 @@ import test from 'node:test'
 import { pathToFileURL } from 'node:url'
 import { chromium, firefox, webkit } from 'playwright-core'
 
+import type { BrowserSession } from './helpers/browser-session.ts'
+
 import { buildPilot } from '../examples/pilot/build.ts'
 import { createPilotServer } from '../examples/pilot/server.ts'
+import { withBrowserSession } from './helpers/browser-session.ts'
 
 const browsers = { chromium, firefox, webkit } as const
 type PilotBrowser = keyof typeof browsers
 type LaunchedBrowser = Awaited<ReturnType<typeof chromium.launch>>
-// A failed browser launch may leave Playwright cleanup pending. The runner uses
-// --test-force-exit after all engines report, while per-engine timeouts bound failures.
 const browserTimeoutMs = 12_000
 // Budget for one engine's contract: launch, page flow and assertions.
 const engineTimeoutMs = 18_000
@@ -73,7 +74,7 @@ async function assertServedHtml(base: string, production: boolean): Promise<void
 }
 
 /** Ejecuta el mismo contrato observable en un navegador ya iniciado. */
-async function assertPilotFlow(base: string, browser: LaunchedBrowser, timeline: Timeline): Promise<void> {
+async function assertPilotFlow(base: string, browser: BrowserSession, timeline: Timeline): Promise<void> {
 	const page = await browser.newPage()
 	page.setDefaultTimeout(browserTimeoutMs)
 	const errors: string[] = []
@@ -89,7 +90,7 @@ async function assertPilotFlow(base: string, browser: LaunchedBrowser, timeline:
 		timeline.note(`console.error: ${text}`)
 	})
 	timeline.mark('newPage')
-	await page.goto(base, { waitUntil: 'networkidle', timeout: browserTimeoutMs })
+	await page.goto(base, { waitUntil: 'domcontentloaded', timeout: browserTimeoutMs })
 	timeline.mark('goto')
 	await page.waitForFunction(() => document.documentElement.dataset.hydrated === 'true')
 	timeline.mark('hydrated')
@@ -152,7 +153,11 @@ async function runPilotEngines(context: test.TestContext, base: string, producti
 				})
 				const browser = await launching
 				timeline.mark('launch')
-				await assertPilotFlow(base, browser, timeline)
+				await withBrowserSession(
+					`pilot-${label}`,
+					async () => browser,
+					(session) => assertPilotFlow(base, session, timeline),
+				)
 			})
 		} finally {
 			console.log(`[pilot:e2e] ${label}: ${timeline.summary()}`)

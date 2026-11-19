@@ -114,7 +114,7 @@ test('meeko dev publishes live signal values to the editor and applies its edits
 			if (typeof frame.payload === 'string' && frame.payload.includes('meeko:live:update')) sent.push(frame.payload)
 		}),
 	)
-	await page.goto(`${origin}/live`, { waitUntil: 'networkidle' })
+	await page.goto(`${origin}/live`, { waitUntil: 'domcontentloaded' })
 	await page.waitForFunction(() => Boolean(window.__MEEKO_DEVTOOLS__?.snapshot().instances.some((instance) => instance.name === 'live')))
 	await page.locator('#count').click()
 	await new Promise((done) => setTimeout(done, 400))

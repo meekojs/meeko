@@ -281,6 +281,22 @@ function focus(): void { target.value?.focus(); }
 	assert.deepEqual(result, { Button: [], Page: [], Handlers: [] })
 })
 
+test('meeko check accepts generic is values constrained to allowed HTML tags', async () => {
+	const source = (constraint: string, template: string): string => `<script lang="ts" generic="T extends ${constraint}">
+import type { TagName } from '@meekojs/meeko'
+const { tag } = defineProps<{ tag: T }>()
+</script>
+<template>${template}</template>`
+	const result = await checkAll(
+		{
+			'Content.meeko': source("'a' | 'button'", '<component is="tag">Abrir</component>'),
+			'Empty.meeko': source('TagName', '<component is="tag" />'),
+		},
+		['Content', 'Empty'],
+	)
+	assert.deepEqual(result, { Content: [], Empty: [] })
+})
+
 test('meeko check reports attributes that no possible tag accepts and values of is that are not tags', async () => {
 	const script = `<script lang="ts">
 const props = defineProps<{ href?: string; tag: string; frame: "div" | "iframe"; media: "img" | "span" }>();

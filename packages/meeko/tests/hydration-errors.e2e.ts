@@ -92,7 +92,7 @@ test("meeko dev shows a failed hydration in the browser: console.error with the 
 		if (message.type() === 'error') consoleErrors.push(message.text())
 	})
 	tab.on('pageerror', (error) => pageErrors.push(error.message))
-	await tab.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'networkidle' })
+	await tab.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' })
 	// The browser closed the <p> before the component's <div>.
 	assert.equal(await tab.locator('p > .panel').count(), 0)
 	await until(
