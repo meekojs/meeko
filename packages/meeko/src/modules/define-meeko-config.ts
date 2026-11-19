@@ -1,5 +1,6 @@
 import type { DevtoolsPanelPosition } from '../devtools-ui/index'
 import type { ContentSecurityPolicy } from '../server/runtime/csp'
+import type { DevAllowedHosts } from '../server/runtime/dev-hosts'
 import type { DocumentConfig } from '../shared/head'
 import type { ThemeConfig } from '../shared/theme'
 import type { MeekoModuleEntry } from './define-meeko-module'
@@ -350,18 +351,44 @@ export interface MeekoConfig {
 	 * Opciones de `meeko dev`; no afectan a `meeko build` ni a `meeko start`. `serverLogs: false`
 	 * deja de reenviar a la consola del navegador lo que el código de servidor escribe con
 	 * `console.log`, `info`, `warn`, `error` o `debug` mientras atiende una petición (activado por
-	 * defecto). La terminal lo muestra igual en ambos casos.
+	 * defecto). La terminal lo muestra igual en ambos casos. Desde `1.10`, `allowedHosts` abre
+	 * `meeko dev` a otros hosts, como un proxy o un túnel.
 	 * @since 1.3.0
 	 * @example
 	 * ```ts
 	 * import { defineMeekoConfig } from "@meekojs/meeko/framework";
 	 *
-	 * export default defineMeekoConfig({ dev: { serverLogs: false } });
+	 * export default defineMeekoConfig({ dev: { serverLogs: false, allowedHosts: ["mi-pc.tailnet.ts.net"] } });
 	 * ```
+	 * @see https://github.com/meekojs/meeko/blob/main/docs/reference/config/config-dev.md
 	 */
 	readonly dev?: {
 		/** Reenvía los logs del servidor a la consola del navegador en `meeko dev`. Por defecto, `true`. */
 		readonly serverLogs?: boolean
+		/**
+		 * Hosts desde los que se puede abrir `meeko dev`, además de `localhost`, `*.localhost` y las
+		 * direcciones IP: un proxy, un túnel (`tailscale serve`, ngrok, cloudflared) o un nombre de la
+		 * red local. Cada entrada es un nombre de host, un sufijo que empieza por `.` (`.ts.net` acepta
+		 * sus subdominios) o un origen completo (`https://app.example.com:8443`); `true` acepta
+		 * cualquier host. Alimenta `server.allowedHosts` de Vite y los orígenes que aceptan, en
+		 * desarrollo, las comprobaciones de `Origin` de API, RPC, formularios, sesiones y Socket: un
+		 * host acepta `https://<host>` y `http://<host>` en cualquier puerto; un origen completo, sólo
+		 * ese origen; `true`, el `Origin` cuyo host es el de la propia petición, sea cual sea su
+		 * esquema. La variable `MEEKO_ALLOWED_HOSTS` (separada por comas, o `true`) añade entradas. No
+		 * cambia nada en `meeko build`, `meeko start` ni en producción; ahí se usan `allowedOrigins`
+		 * de `SessionManager` y `MEEKO_PUBLIC_ORIGIN`. Por defecto, ninguno.
+		 * @since 1.10.0
+		 * @example
+		 * ```ts
+		 * import { defineMeekoConfig } from "@meekojs/meeko/framework";
+		 *
+		 * export default defineMeekoConfig({
+		 *   dev: { allowedHosts: ["mi-pc.tailnet.ts.net", ".ngrok-free.app", "https://dev.example.com:8443"] },
+		 * });
+		 * ```
+		 * @see https://github.com/meekojs/meeko/blob/main/docs/reference/config/config-dev.md#abrir-meeko-dev-desde-otro-dispositivo
+		 */
+		readonly allowedHosts?: DevAllowedHosts
 	}
 	/**
 	 * Meeko DevTools en `meeko dev`: con `true` (o un objeto con `panel` distinto de `false`),

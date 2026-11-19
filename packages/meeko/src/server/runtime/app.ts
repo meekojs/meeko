@@ -11,6 +11,7 @@ import type { SocketHub, SocketPubSub } from '../socket/runtime'
 import type { AssetManifest, AssetReader } from './assets'
 import type { ContentSecurityPolicy } from './csp'
 import type { ServerRuntime, ServerRuntimeDefinition } from './definition'
+import type { DevAllowedHosts } from './dev-hosts'
 import type { ServerManifest } from './discovery'
 import type { DocumentMarkup, DocumentOptions, PageHandlerOptions, PageModule, PageRoute, PrerenderSource } from './framework-render'
 import type { ServerPlatform } from './platform'
@@ -32,6 +33,7 @@ import { createPageHandler, withRouteManifest } from './framework-render'
 import { createDetachedPlatform } from './platform'
 import { registerProcessErrors, withRequestScope } from './process-errors'
 import { createRequestContext } from './request-context'
+import { allowDevHosts } from './sessions'
 import { createSessionDefaults, warnIgnoredSessionEnv } from './zero-config'
 
 type ServerHeaders = Readonly<Record<string, string | Readonly<Record<string, string>>>>
@@ -210,6 +212,19 @@ export interface ServerAppOptions<Env = Readonly<Record<string, string | undefin
 	readonly document?: DocumentOptions
 	/** Sustituye a `ServerRuntime.publicOrigin`. */
 	readonly publicOrigin?: string
+	/**
+	 * Hosts y orígenes adicionales cuyo `Origin` aceptan, sólo en desarrollo, las comprobaciones de
+	 * API, RPC, formularios, `session.create` y Socket, además del origen de la aplicación y de
+	 * `allowedOrigins`. `meeko dev` pasa aquí `dev.allowedHosts` y `MEEKO_ALLOWED_HOSTS`; con la
+	 * opción presente, cada `Origin` rechazado avisa una vez en la consola con la opción que lo
+	 * permite. Con `production: true` se ignora: nada se relaja en producción.
+	 * @since 1.10.0
+	 * @example
+	 * ```ts
+	 * const app = await createServerApp({ manifest, load, runtime, production: false, devAllowedHosts: ["mi-pc.tailnet.ts.net"] });
+	 * ```
+	 */
+	readonly devAllowedHosts?: DevAllowedHosts
 	/** Lo activa `meeko build` mientras prerenderiza páginas. */
 	readonly prerendering?: boolean
 	/**
@@ -520,6 +535,8 @@ export async function createServerApp<Env = Readonly<Record<string, string | und
 	trustProxyOf(basePlatform.env)
 	const runtime = await createRuntime(options, basePlatform)
 	const sessions = runtime.sessions
+	// Development only: the manager itself also refuses it in production.
+	if (!options.production && options.devAllowedHosts !== undefined) sessions[allowDevHosts](options.devAllowedHosts)
 	let closing: Promise<void> | undefined
 	const close = (): Promise<void> => {
 		closing ??= (async () => {

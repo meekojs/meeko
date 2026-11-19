@@ -13,6 +13,7 @@ import { pathToFileURL } from 'node:url'
 import type { MeekoAdapterName } from '../modules/define-meeko-config'
 import type { ServerApp, ServerAppOptions } from '../server/runtime/app'
 import type { AssetManifest, AssetRecord } from '../server/runtime/assets'
+import type { DevAllowedHosts } from '../server/runtime/dev-hosts'
 import type { BuildAppData } from './app-manifest'
 import type { DevServerLogs } from './dev-server-logs'
 import type { EditorBridge } from './editor-bridge'
@@ -22,6 +23,7 @@ import type { PrerenderIndex } from './prerender'
 import { escapeHtml } from '../core/server'
 import { attachNodeWebSocketServer, toNodeListener } from '../node'
 import { reportServerError } from '../server/errors'
+import { allowedHostsEnv, blockedDevHostMessage, isDevHostAllowed, mergeDevAllowedHosts, parseAllowedHostsEnv, restrictedHostName, viteAllowedHosts } from '../server/runtime/dev-hosts'
 import { meekoEnv } from '../server/runtime/env'
 import { visibleHost } from '../server/runtime/fetch-host'
 import { listeningMessage } from '../server/runtime/listen-address'
@@ -598,6 +600,24 @@ export async function startProject(projectRoot: string, production: boolean): Pr
 	return startDevelopment(root)
 }
 
+/**
+ * `server.allowedHosts` of Vite in `meeko dev`: those of `dev.allowedHosts`, the listening host
+ * and the host of `MEEKO_PUBLIC_ORIGIN`, as Vite adds `server.host` and `server.origin`.
+ */
+export function devViteAllowedHosts(allowedHosts: DevAllowedHosts, host: string, publicOrigin: string | undefined): true | string[] {
+	const patterns = viteAllowedHosts(allowedHosts)
+	if (patterns === true) return true
+	const extra = [host]
+	if (publicOrigin) {
+		try {
+			extra.push(new URL(publicOrigin).hostname)
+		} catch {
+			/* createServerApp reports an invalid public origin */
+		}
+	}
+	return [...new Set([...patterns, ...extra.map((name) => name.toLowerCase())])]
+}
+
 async function startDevelopment(root: string): Promise<Server> {
 	assertNoLegacySessionFile(root)
 	// Every module resolution of this process (Vite plugin, autoimports, discovery) runs with dev: true.
@@ -605,6 +625,9 @@ async function startDevelopment(root: string): Promise<Server> {
 	const { config, modules } = await loadConfiguredModules(root)
 	const server = config.server?.adapter === 'node' ? config.server : undefined
 	const host = meekoEnv(process.env, 'HOST') || server?.host || '127.0.0.1'
+	// `dev.allowedHosts` and MEEKO_ALLOWED_HOSTS open `meeko dev` to a proxy, a tunnel or a LAN name:
+	// Vite's host check and, through the app's SessionManager, the Origin checks.
+	const allowedHosts = mergeDevAllowedHosts(config.dev?.allowedHosts, parseAllowedHostsEnv(process.env[allowedHostsEnv]))
 	// A port named by MEEKO_PORT, PORT or server.port (or the one a supervisor's first server took) is
 	// kept, and listening reports it when in use; otherwise dev takes the first free one from 4173 up.
 	const named = process.env[supervisedPortEnv] || meekoEnv(process.env, 'PORT') || server?.port
@@ -645,6 +668,7 @@ async function startDevelopment(root: string): Promise<Server> {
 		})
 	}
 	try {
+		const publicOrigin = meekoEnv(process.env, 'PUBLIC_ORIGIN')
 		const { createServer: createViteServer, searchForWorkspaceRoot } = await import('vite')
 		const { meeko } = await import('../vite')
 		if (config.dev?.serverLogs !== false) {
@@ -726,6 +750,9 @@ async function startDevelopment(root: string): Promise<Server> {
 						// Middleware mode opens a separate Vite WebSocket server, on a port derived
 						// from the app port so concurrent projects do not share 24678.
 						hmr: { host: devHmrHost, port: hmrPort },
+						// Like Vite's own `server.host` and `server.origin`, the listening host and the public
+						// origin are allowed too. Meeko checks the result first, with its own message (below).
+						allowedHosts: devViteAllowedHosts(allowedHosts, host, publicOrigin),
 						// Module files may live outside the workspace (a linked package); the browser loads their runtime files.
 						...(modules.ownedDirectories.length ? { fs: { allow: [searchForWorkspaceRoot(root), ...modules.ownedDirectories] } } : {}),
 					},
@@ -744,7 +771,6 @@ async function startDevelopment(root: string): Promise<Server> {
 				.join('')
 		}
 		const devServer = vite
-		const publicOrigin = meekoEnv(process.env, 'PUBLIC_ORIGIN')
 		const createDevApp = async (): Promise<ServerApp> => {
 			await modules.callHook('routes:resolved', { routes: await discoverConfiguredRoutes(root) })
 			const runtimeFile = findRuntimeFile(root)
@@ -768,6 +794,7 @@ async function startDevelopment(root: string): Promise<Server> {
 					},
 				},
 				...(publicOrigin ? { publicOrigin } : {}),
+				devAllowedHosts: allowedHosts,
 				document: {
 					// Vite's client and the unbundled global stylesheet replace the production manifest links.
 					head: ({ nonce }) => `<script type="module"${nonce ? ` nonce="${escapeHtml(nonce)}"` : ''} src="/@vite/client"></script>` + globalStylesheet() + (devtools.panel ? devtoolsPanelScript(nonce, escapeHtml) : ''),
@@ -779,9 +806,22 @@ async function startDevelopment(root: string): Promise<Server> {
 		// Requests wait for a pending rebuild (`reloader`, below), so they never meet the old routes or a
 		// closed module runner, and a restart waits for the requests in flight.
 		const serve = (request: Request): Promise<Response> => reloader.use((running) => running.fetch(request))
+		const blockedHosts = new Set<string>()
 		const listener = toNodeListener((request) => (serverLogs ? serverLogs.handle(request, () => serve(request)) : serve(request)), { onError: reportError, ...(origin ? { publicOrigin: origin } : {}) })
 		const httpServer = createServer((request, response) => {
 			if (bridge?.handle(request, response)) return
+			// The same check as Vite's `server.allowedHosts` (the resolved one, with what modules add),
+			// before Vite and the module public files, so the 403 names Meeko's option.
+			if (!isDevHostAllowed(request.headers.host, devServer.config.server.allowedHosts)) {
+				const message = blockedDevHostMessage(restrictedHostName(request.headers.host) ?? '')
+				if (!blockedHosts.has(message)) {
+					blockedHosts.add(message)
+					process.stderr.write(`${message}\n`)
+				}
+				response.writeHead(403, { 'content-type': 'text/plain; charset=utf-8' })
+				response.end(message)
+				return
+			}
 			// Vite cannot route a malformed target; the Meeko listener answers it with INVALID_URL.
 			let pathname: string
 			try {

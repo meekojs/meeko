@@ -13,6 +13,7 @@ import type { ResolvedModules } from './module-loader'
 import { createRouteManifest } from '../app/runtime/router'
 import { isMeekoModule } from '../modules/define-meeko-module'
 import { contentSecurityPolicy } from '../server/runtime/csp'
+import { normalizeDevAllowedHost } from '../server/runtime/dev-hosts'
 import { normalizeDocumentConfig, siteOrigin } from '../shared/head'
 import { resolveThemeConfig } from '../shared/theme'
 import { resolveDevtoolsConfig } from './dev-devtools'
@@ -208,6 +209,13 @@ export async function loadMeekoConfig(projectRoot: string): Promise<MeekoConfig>
 	if (dev !== undefined) {
 		if (!dev || typeof dev !== 'object' || Array.isArray(dev)) throw new TypeError(`${file}: dev debe ser un objeto`)
 		if (dev.serverLogs !== undefined && typeof dev.serverLogs !== 'boolean') throw new TypeError(`${file}: dev.serverLogs debe ser un booleano`)
+		if (dev.allowedHosts !== undefined && dev.allowedHosts !== true) {
+			if (!Array.isArray(dev.allowedHosts)) throw new TypeError(`${file}: dev.allowedHosts debe ser true o una lista de hosts`)
+			for (const [index, entry] of (dev.allowedHosts as unknown[]).entries()) {
+				const result = normalizeDevAllowedHost(entry)
+				if ('error' in result) throw new TypeError(`${file}: dev.allowedHosts[${index}] ${result.error}`)
+			}
+		}
 	}
 	resolveDevtoolsConfig(config.devtools, `${file}: devtools`)
 	// `document.theme` is what the build bakes from `theme`; the configuration has one place for it.

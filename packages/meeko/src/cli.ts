@@ -37,6 +37,8 @@ const usage =
 	'                      cloudflare para leer CF-Connecting-IP tras Cloudflare Tunnel\n' +
 	'     MEEKO_TRUSTED_PROXIES  redes (CIDR) de los proxies con cloudflare; por defecto, privadas\n' +
 	'     MEEKO_HMR_PORT   puerto del WebSocket de HMR de dev\n' +
+	'     MEEKO_ALLOWED_HOSTS  hosts de dev además de localhost (proxy, túnel, red local),\n' +
+	'                      separados por comas, o true; se suman a dev.allowedHosts\n' +
 	'     MEEKO_EDITOR_BRIDGE=0  desactiva el puente con el editor de dev\n' +
 	'     MEEKO_LINK_WATCH=0     dev no se reinicia al reconstruir un @meekojs/meeko enlazado (avisa)\n' +
 	'     HOST y PUBLIC_ORIGIN están obsoletas: usa MEEKO_HOST y MEEKO_PUBLIC_ORIGIN\n' +

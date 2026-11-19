@@ -11,6 +11,7 @@ import { activeRouteManifest, href as runtimeHref } from './app/runtime/router'
 
 export { createNavigator, createRouteManifest, matchRoute } from './app/runtime/router'
 export { defineMeekoConfig } from './modules/define-meeko-config'
+export type { DevAllowedHosts } from './server/runtime/dev-hosts'
 export type { MeekoConfig, MeekoDevtoolsConfig, RobotsConfig, ServerHeaders, ServerResponseConfig, SitemapConfig, SitemapEntriesContext, SitemapEntry, StaticHeaderFile } from './modules/define-meeko-config'
 export { defineMeekoModule } from './modules/define-meeko-module'
 export type { MeekoHookable, MeekoHooks, MeekoModule, MeekoModuleContext, MeekoModuleDefinition, MeekoModuleEntry, MeekoModuleMeta, MeekoModuleName, MeekoModuleNames, ModulePublicFileOptions, ModuleAutoImport, ModulePlugin, ModuleServerHandler, SitemapAlternate, SitemapResolvedUrl } from './modules/define-meeko-module'
