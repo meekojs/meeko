@@ -14,7 +14,7 @@ export type { ComponentModule, ComponentRelease, DomScope, DynamicElement } from
 export { withComponentProps } from './app/runtime/resolved-component'
 export { checkAttributeValue, checkBranchAttribute, checkCorrelatedBind, checkDynamicFeature, checkTag, closeTag, componentPart, correlatedProps, dynamicProps, dynamicSpread, joinAttribute, renderDynamic, renderElementTag, renderSpread, spreadEntries, spreadProps, tagAccepts, tagAttribute, tagBranch } from './app/runtime/dynamic-tag'
 export type { AttributeSpreadCheck, BranchAttributeCheck, ComponentPart, DynamicFeatureCheck, DynamicRefOf, PropsSpreadCheck, SpreadExplicit, TagAttributeCheck, TagCheck, TagPart } from './app/runtime/dynamic-tag'
-export { enableHotModule, registerHotInstance, registerHotScope, replaceHotModule, replaceHotStyle, restoreSignals, snapshotSignals, transferState } from './app/runtime/hmr'
+export { acceptHotModule, enableHotModule, HotRecoveryError, registerHotInstance, registerHotScope, replaceHotModule, replaceHotStyle, restoreSignals, snapshotSignals, transferState } from './app/runtime/hmr'
 export { registerStyleModule } from './app/runtime/style-modules'
 export type { HotComponent, HotState } from './app/runtime/hmr'
 export { devtoolsUpdate, devtoolsWrite, registerDevtoolsInstance } from './app/runtime/devtools'

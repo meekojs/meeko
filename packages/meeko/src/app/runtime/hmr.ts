@@ -5,6 +5,7 @@ import { serializeJson } from '../../core/server'
 import { borrowedKey } from './models'
 import { parseRegionHtml } from './renderer'
 import { componentModulePath, stateModuleMessage } from './state-check'
+import { lateRender } from './suspense'
 
 /**
  * Valores de las señales editables de un componente, por nombre, que HMR transfiere en memoria
@@ -184,17 +185,57 @@ export function replaceHotStyle(id: string, css: string): void {
 	style.textContent = css
 }
 
-/** Sustituye las instancias activas sin recargar la página y conserva señales editables. */
-export function replaceHotModule(id: string, next: unknown): void {
-	if (typeof next !== 'object' || next === null || !('renderToString' in next) || !('hydrate' in next) || typeof next.renderToString !== 'function' || typeof next.hydrate !== 'function') {
-		throw new TypeError('Invalid Meeko hot module')
+/**
+ * Some instance of a hot module could be neither updated nor restored: it is no longer live, and
+ * only a full reload brings it back (see {@link acceptHotModule}).
+ */
+export class HotRecoveryError extends AggregateError {}
+
+/**
+ * HTML of a hot instance rendered in the browser, as a region that mounts after its page: state
+ * that exists only in the browser (`useStorage`, the theme) shows its current value instead of the
+ * SSR one, so the hydration that follows matches the DOM it has just inserted. The live DOM may
+ * have diverged from the SSR long ago, so it is never hydrated as is.
+ */
+function renderHot(entry: HotInstance, component: HotComponent, state: HotState): string {
+	return entry.withParent(() => lateRender(() => component.renderToString(entry.props, state)))
+}
+
+function mountHot(entry: HotInstance, component: HotComponent, state: HotState, content: string | DocumentFragment): void {
+	if (entry.target.kind === 'root') {
+		const { root } = entry.target
+		if (typeof content === 'string') root.innerHTML = content
+		else root.replaceChildren(content)
+		entry.withParent(() => component.hydrate(root, entry.props, state))
+		return
 	}
-	const component = next as HotComponent
+	const hydrateScope = component.hydrateScope
+	if (!hydrateScope) throw new Error('Updated Meeko child component has no hydrateScope export')
+	const { scope } = entry.target
+	if (typeof content === 'string') replaceScope(scope, content)
+	else {
+		const range = scopeRange(scope)
+		range.deleteContents()
+		range.insertNode(content)
+	}
+	entry.withParent(() => hydrateScope(scope, entry.props, state))
+}
+
+/**
+ * Sustituye las instancias activas sin recargar la página y conserva señales editables. Cada
+ * instancia se libera y se vuelve a montar en el navegador: la nueva versión renderiza con el estado
+ * actual del cliente y se hidrata contra ese HTML, nunca contra un DOM que ya divergió del SSR. Si
+ * falla, las instancias vuelven a la versión anterior y el error se relanza; si tampoco se pueden
+ * restaurar, lanza {@link HotRecoveryError}.
+ */
+export function replaceHotModule(id: string, next: unknown): void {
+	const component = hotComponent(next)
+	// Every snapshot first: releasing one instance may change what another one holds.
 	const prepared = [...(instances.get(id)?.values() ?? [])].map((slot) => {
 		const entry = slot.current
 		const state = entry.snapshot()
 		const previous = entry.target.kind === 'root' ? entry.target.root.innerHTML : scopeRange(entry.target.scope).cloneContents()
-		return { slot, entry, state, html: entry.withParent(() => component.renderToString(entry.props, state)), previous }
+		return { slot, entry, state, previous }
 	})
 	type Prepared = (typeof prepared)[number]
 	const committed: Prepared[] = []
@@ -208,19 +249,14 @@ export function replaceHotModule(id: string, next: unknown): void {
 			}
 		}
 		try {
-			if (entry.target.kind === 'root') entry.target.root.innerHTML = previous as string
-			else {
-				const range = scopeRange(entry.target.scope)
-				range.deleteContents()
-				range.insertNode(previous as DocumentFragment)
+			let content: string | DocumentFragment
+			try {
+				content = renderHot(entry, entry.component, state)
+			} catch {
+				// The previous version no longer renders here: hydrate the nodes it left.
+				content = typeof previous === 'string' ? previous : (previous.cloneNode(true) as DocumentFragment)
 			}
-			if (entry.target.kind === 'root') {
-				const { root } = entry.target
-				entry.withParent(() => entry.component.hydrate(root, entry.props, state))
-			} else {
-				const { scope } = entry.target
-				entry.withParent(() => entry.component.hydrateScope?.(scope, entry.props, state))
-			}
+			mountHot(entry, entry.component, state, content)
 			if (slot.current === entry || slot.current === partial) throw new Error('Restored Meeko component did not register its hydrated instance')
 		} catch (rollbackError) {
 			failures.push(rollbackError)
@@ -235,19 +271,11 @@ export function replaceHotModule(id: string, next: unknown): void {
 		}
 	}
 	for (const item of prepared) {
-		const { slot, entry, state, html } = item
+		const { slot, entry, state } = item
 		try {
+			// Released before rendering: the new version acquires browser state (useStorage) afresh.
 			entry.dispose()
-			if (entry.target.kind === 'root') entry.target.root.innerHTML = html
-			else replaceScope(entry.target.scope, html)
-			if (entry.target.kind === 'root') {
-				const { root } = entry.target
-				entry.withParent(() => component.hydrate(root, entry.props, state))
-			} else {
-				if (!component.hydrateScope) throw new Error('Updated Meeko child component has no hydrateScope export')
-				const { scope } = entry.target
-				entry.withParent(() => component.hydrateScope!(scope, entry.props, state))
-			}
+			mountHot(entry, component, state, renderHot(entry, component, state))
 			if (slot.current === entry) throw new Error('Updated Meeko component did not register its hydrated instance')
 			committed.push(item)
 		} catch (error) {
@@ -255,8 +283,50 @@ export function replaceHotModule(id: string, next: unknown): void {
 			rollback(item, failures)
 			for (const previous of committed.reverse()) rollback(previous, failures)
 			if (failures.length === 1) throw error
-			throw new AggregateError(failures, 'Meeko hot replacement and recovery failed')
+			throw new HotRecoveryError(failures, 'Meeko hot replacement and recovery failed')
 		}
 	}
 	replaceHotStyle(id, component.css ?? '')
+}
+
+function hotComponent(next: unknown): HotComponent {
+	if (typeof next !== 'object' || next === null || !('renderToString' in next) || !('hydrate' in next) || typeof next.renderToString !== 'function' || typeof next.hydrate !== 'function') {
+		throw new TypeError('Invalid Meeko hot module')
+	}
+	return next as HotComponent
+}
+
+/** Opciones de {@link acceptHotModule}. */
+export interface AcceptHotOptions {
+	/** Sólo cambió el CSS del componente: se sustituye la hoja y las instancias siguen montadas. */
+	readonly styleOnly?: boolean
+	/** Recarga completa cuando una instancia queda sin recuperar; por defecto `location.reload()`. */
+	readonly reload?: () => void
+	/** Destino de los fallos; por defecto `console.error`. */
+	readonly report?: (message: string, error: unknown) => void
+}
+
+/**
+ * Aplica la versión nueva de un módulo `.meeko` que Vite envía por HMR. Un cambio que sólo toca
+ * `<style>` sustituye la hoja sin volver a montar las instancias. Si la actualización falla, las
+ * instancias siguen con la versión anterior y el fallo se informa; si alguna no se puede
+ * restaurar, la página se recarga entera en lugar de dejar el componente sin actualizar.
+ */
+export function acceptHotModule(id: string, next: unknown, options: AcceptHotOptions = {}): void {
+	const report = options.report ?? ((message: string, error: unknown) => console.error(message, error))
+	try {
+		const component = hotComponent(next)
+		if (options.styleOnly) {
+			replaceHotStyle(id, component.css ?? '')
+			return
+		}
+		replaceHotModule(id, component)
+	} catch (error) {
+		if (error instanceof HotRecoveryError || (error instanceof TypeError && error.message === 'Invalid Meeko hot module')) {
+			report(`[meeko] Hot update of ${id} failed and could not be undone; reloading the page.`, error)
+			;(options.reload ?? (() => location.reload()))()
+			return
+		}
+		report(`[meeko] Hot update of ${id} failed; the previous version stays mounted. Save the file again once it is fixed.`, error)
+	}
 }

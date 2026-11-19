@@ -5,7 +5,7 @@ import test from 'node:test'
 import type { HotComponent } from '../src/app/runtime/hmr.ts'
 import type { DomScope } from '../src/app/runtime/renderer.ts'
 
-import { enableHotModule, registerHotInstance, registerHotScope, replaceHotModule, replaceHotStyle, restoreSignals, snapshotSignals } from '../src/app/runtime/hmr.ts'
+import { acceptHotModule, enableHotModule, HotRecoveryError, registerHotInstance, registerHotScope, replaceHotModule, replaceHotStyle, restoreSignals, snapshotSignals } from '../src/app/runtime/hmr.ts'
 import { computed, createContext, createRoot, inject, provide, signal } from '../src/core/reactivity.ts'
 
 test('HMR conserva señales editables y omite valores derivados', () => {
@@ -579,6 +579,57 @@ test("HMR preserves each component's parent context during replacement and rollb
 		)
 	} finally {
 		for (const stop of stops) stop()
+		window.happyDOM.abort()
+	}
+})
+
+test('acceptHotModule reloads the page when an instance cannot be restored, and only then', () => {
+	const window = new Window()
+	const id = 'test:hot-accept-reload'
+	enableHotModule(id)
+	const root = window.document.createElement('main') as unknown as Element
+	let failRestore = false
+	const old: HotComponent<Record<string, never>> = {
+		renderToString() {
+			return '<button>old</button>'
+		},
+		hydrate(element, props) {
+			if (failRestore) throw new Error('restore failed')
+			return registerHotInstance(
+				id,
+				element,
+				props,
+				old,
+				() => ({}),
+				() => {},
+			)
+		},
+	}
+	const broken: HotComponent<Record<string, never>> = {
+		renderToString() {
+			return '<button>broken</button>'
+		},
+		hydrate() {
+			throw new Error('hydrate failed')
+		},
+	}
+	root.innerHTML = old.renderToString({})
+	old.hydrate(root, {})
+	const reports: unknown[] = []
+	let reloads = 0
+	const options = { reload: () => reloads++, report: (_message: string, error: unknown) => reports.push(error) }
+	try {
+		// The previous version is back and live: report, no reload.
+		acceptHotModule(id, broken, options)
+		assert.equal(reloads, 0)
+		assert.match(String(reports[0]), /hydrate failed/)
+		assert.equal(root.textContent, 'old')
+		// Neither version mounts: the component would stay dead, so the page reloads.
+		failRestore = true
+		acceptHotModule(id, broken, options)
+		assert.equal(reloads, 1)
+		assert.ok(reports[1] instanceof HotRecoveryError)
+	} finally {
 		window.happyDOM.abort()
 	}
 })
