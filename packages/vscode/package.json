@@ -30,8 +30,8 @@
 	"scripts": {
 		"build": "node build.mjs",
 		"check": "tsc -p tsconfig.json --noEmit",
-		"install:local": "pwsh -NoProfile -File install-local.ps1",
-		"package:vsix": "pwsh -NoProfile -File package-vsix.ps1",
+		"install:local": "node install-local.mjs",
+		"package:vsix": "node package-vsix.mjs",
 		"test": "tsx --test tests/*.test.ts",
 		"test:host": "node tests/run-host.mjs",
 		"test:host:css": "node --test --test-timeout=60000 tests/run-host-css.mjs",

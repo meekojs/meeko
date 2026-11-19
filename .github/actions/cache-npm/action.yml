@@ -12,5 +12,5 @@ runs:
       with:
         # El post-job usa un contexto estable, sin outputs de pasos de la acción anidada.
         path: ${{ runner.temp }}/meeko-npm-cache/_cacache
-        key: npm-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'packages/vscode/package.json', 'packages/vscode/package-vsix.ps1') }}
+        key: npm-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'packages/vscode/package.json', 'packages/vscode/package-vsix.mjs') }}
         restore-keys: npm-v2-${{ runner.os }}-${{ runner.arch }}-
