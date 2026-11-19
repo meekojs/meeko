@@ -16,6 +16,9 @@ const config: Config & MeekoPrettierOptions & { cssDeclarationSorterKeepOverride
 		// The whitespace between the tags of these templates would be text in their buttons and options
 		// (tests/templates-without-whitespace.test.mjs): `ignore` breaks the tags into lines, `strict` keeps
 		// the whitespace as written and only breaks inside the tags.
+		// The same holds for the core components (their compiled copies in src/builtins/ are generated from
+		// these sources) and for the example whose list items render their text without whitespace.
+		{ files: ['packages/meeko/src/app/components/{MeekoAwait,MeekoLink,MeekoPopover,MeekoSelect,MeekoThemeToggle}/*.meeko', 'packages/meeko/examples/primitives/Primitives.meeko'], options: { htmlWhitespaceSensitivity: 'strict' } },
 		{ files: '**/src/{app/components/{CodeBlock,Combobox,CommandPalette,DescriptionList,Diff,Drawer,Hint,IconButton,LocaleSuggestion,Menu,Modal,PageHeader,Popover,SegmentedControl,Select,Stat,Tabs,ThemeToggle,Tooltip},editor/components/MarkdownEditor}.meeko', options: { htmlWhitespaceSensitivity: 'strict' } },
 	],
 	printWidth: 800,

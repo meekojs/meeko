@@ -30,8 +30,7 @@
 
 <!-- No whitespace between the tags: it would be text inside the zone. The zone never changes
      element, so its focus, its reserve and its attributes survive every state. -->
-<template>
-	<div
+<template><div
 		ref:box
 		bind:id="props.id"
 		bind:class="props.class"
@@ -40,34 +39,27 @@
 		bind:data-meeko-refreshing="zone.refreshing.value ? '' : undefined"
 		bind:data-meeko-reserve="zone.reserve.value"
 		bind:data-meeko-reserve-min="zone.minimum.value"
-	>
-		<render
+		><render
 			if:when="zone.state.value === 'ready'"
 			snippet="snippets.default"
 			args="zone.refreshing.value"
-		/>
-		<render
+		/><render
 			if:when="zone.state.value === 'pending'"
 			snippet="snippets.pending"
-		/>
-		<template if:when="zone.state.value === 'error'">
-			<render
+		/><template if:when="zone.state.value === 'error'"
+			><render
 				if:when="snippets.error"
 				snippet="snippets.error"
 				args="zone.error.value, zone.retry"
-			/>
-			<p
+			/><p
 				if:when="!snippets.error"
 				role="alert"
-			>
-				{zone.messages.value.error}
+				>{zone.messages.value.error}
 				<button
 					type="button"
 					on:click="zone.retry"
-				>
-					{zone.messages.value.retry}
-				</button>
-			</p>
-		</template>
-	</div>
-</template>
+					>{zone.messages.value.retry}</button
+				></p
+			></template
+		></div
+	></template>
