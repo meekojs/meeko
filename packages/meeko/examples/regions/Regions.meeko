@@ -54,7 +54,7 @@
 				<button on:click="() => select(item.id)">{item.label}</button>
 				<small>{index}</small>
 				<strong if:when="index === 0">first</strong>
-				<span if:when="selected.value === item.id">selected</span>
+				<span if:when="selected.value === item.id"> selected</span>
 			</li>
 		</ul>
 	</section>

@@ -25,14 +25,10 @@
 		<p>
 			<code>UIButton</code>
 			renders the element that matches what it does, with the same look: with
-			<code>to</code>
-			, a link to a route of the application that navigates without reloading; with
-			<code>href</code>
-			, an
+			<code>to</code>, a link to a route of the application that navigates without reloading; with <code>href</code>, an
 			<code>&lt;a&gt;</code>
 			to any URL; with neither, a
-			<code>&lt;button type="button"&gt;</code>
-			.
+			<code>&lt;button type="button"&gt;</code>.
 		</p>
 		<DocsPreview id="button-kinds">
 			<UIButton
@@ -70,22 +66,19 @@
 			and in the editor:
 			<code>to</code>
 			with
-			<code>href</code>
-			,
+			<code>href</code>,
 			<code>type</code>
 			or
 			<code>disabled</code>
 			on a link,
 			<code>target</code>
 			on a button, a route that does not exist or a dynamic route without
-			<code>params</code>
-			. A link cannot be disabled: it has no native state, and
+			<code>params</code>. A link cannot be disabled: it has no native state, and
 			<code>aria-disabled</code>
 			without removing
 			<code>href</code>
 			would still navigate. If the action is not available, do not render the link, or use a button with
-			<code>disabled</code>
-			.
+			<code>disabled</code>.
 		</p>
 		<h2 id="sizes">Sizes and states</h2>
 		<DocsPreview>
@@ -108,10 +101,7 @@
 			keeps the text, adds the spinner, announces
 			<code>aria-busy</code>
 			and blocks the action without taking its focus. With
-			<code>iconOnly</code>
-			, the button is square: always name it with
-			<code>ariaLabel</code>
-			.
+			<code>iconOnly</code>, the button is square: always name it with <code>ariaLabel</code>.
 		</p>
 		<DocsPreview>
 			<UIButton tone="danger">Delete</UIButton>
@@ -163,28 +153,20 @@
 		</p>
 		<p>
 			For a link with its own visual hierarchy and the defaults of
-			<code>ui.defaults.link</code>
-			, use
-			<MeekoLink to="/links">UILink</MeekoLink>
-			.
+			<code>ui.defaults.link</code>, use <MeekoLink to="/links">UILink</MeekoLink>.
 		</p>
 		<h2 id="icon-button">UIIconButton</h2>
 		<p>
 			An icon-only action with the three forms of
 			<code>UIButton</code>
-			(
-			<code>to</code>
-			,
+			(<code>to</code>,
 			<code>href</code>
 			or a button) and the same look, square and
 			<code>ghost</code>
 			by default.
 			<code>label</code>
 			is required: it is its accessible name and the text of its tooltip, which is not announced again as a description. The icon is
-			<code>icon</code>
-			, the name of an icon of the package or the stroke of a 16 by 16
-			<code>&lt;path&gt;</code>
-			, or your own
+			<code>icon</code>, the name of an icon of the package or the stroke of a 16 by 16 <code>&lt;path&gt;</code>, or your own
 			<code>&lt;svg aria-hidden="true"&gt;</code>
 			in the snippet. It is phrasing content: it fits inside a paragraph or a toolbar.
 		</p>
@@ -230,14 +212,12 @@
 		<h3 id="icon-button-states">Toggle, danger, loading and sizes</h3>
 		<p>
 			With
-			<code>pressed</code>
-			, a button is a toggle: it renders
+			<code>pressed</code>, a button is a toggle: it renders
 			<code>aria-pressed</code>
 			and the active look. A link does not take it.
 			<code>tooltip="false"</code>
 			removes the tooltip when the context already explains the action; the name is still
-			<code>label</code>
-			.
+			<code>label</code>.
 		</p>
 		<DocsPreview id="icon-button-states-preview">
 			<UIIconButton

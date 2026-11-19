@@ -113,8 +113,7 @@
 		</section>
 		<p bind:lang="uiLocale">
 			{t('lab.active')}
-			<code>{i18n.locale}</code>
-			{t('lab.note')}
+			<code>{i18n.locale}</code>{t('lab.note')}
 		</p>
 	</div>
 </template>

@@ -37,8 +37,7 @@
 	>
 		<p>
 			They all keep the native control, so the keyboard, the focus and form submission are those of the browser, also without JavaScript. Their models bind to a signal:
-			<code>model="field"</code>
-			.
+			<code>model="field"</code>.
 		</p>
 		<h2 id="textarea">UITextarea</h2>
 		<p>
@@ -84,10 +83,7 @@
 		<p>
 			<code>UISwitch</code>
 			has the same contract as
-			<code>UICheckbox</code>
-			, with
-			<code>role="switch"</code>
-			: use it for something that applies at once.
+			<code>UICheckbox</code>, with <code>role="switch"</code>: use it for something that applies at once.
 		</p>
 		<DocsPreview layout="stack">
 			<UICheckbox
@@ -169,19 +165,16 @@
 			also work without JavaScript. Its total height is the one of a control of its size,
 			<code>sm</code>
 			or
-			<code>md</code>
-			, and it lines up with a
+			<code>md</code>, and it lines up with a
 			<code>UIButton</code>
 			next to it.
 		</p>
 		<p>
 			It needs a name:
-			<code>legend</code>
-			, which
+			<code>legend</code>, which
 			<code>hideLegend</code>
 			leaves to screen readers only, or
-			<code>ariaLabel</code>
-			. When the options do not fit, the control scrolls sideways inside its own width: no option breaks and the page does not get wider.
+			<code>ariaLabel</code>. When the options do not fit, the control scrolls sideways inside its own width: no option breaks and the page does not get wider.
 		</p>
 		<DocsPreview layout="stack">
 			<UISegmentedControl
@@ -210,12 +203,10 @@
 		<p>
 			<code>UIRadioGroup variant="segmented"</code>
 			is still available and wraps into several lines when it does not fit; for a compact switcher, use
-			<code>UISegmentedControl</code>
-			. Its
+			<code>UISegmentedControl</code>. Its
 			<code>size</code>
 			takes an application value in
-			<code>ui.defaults.segmentedControl</code>
-			.
+			<code>ui.defaults.segmentedControl</code>.
 		</p>
 		<DocsApi
 			caption="UISegmentedControl props"
@@ -235,8 +226,7 @@
 			An
 			<code>input type="range"</code>
 			with the label inside its
-			<code>label</code>
-			. The filled part of the track follows the value.
+			<code>label</code>. The filled part of the track follows the value.
 		</p>
 		<DocsPreview layout="stack">
 			<UISlider
@@ -268,20 +258,12 @@
 		/>
 		<p>
 			The types
-			<code>UITextareaProps</code>
-			,
-			<code>UICheckboxProps</code>
-			,
-			<code>UISwitchProps</code>
-			,
-			<code>UIRadioGroupProps</code>
-			,
+			<code>UITextareaProps</code>, <code>UICheckboxProps</code>, <code>UISwitchProps</code>, <code>UIRadioGroupProps</code>,
 			<code>UISegmentedControlProps</code>
 			and
 			<code>UISliderProps</code>
 			are exported from
-			<code>@meekojs/ui/runtime</code>
-			.
+			<code>@meekojs/ui/runtime</code>.
 		</p>
 	</DocsPage>
 </template>

@@ -47,9 +47,9 @@
 		</UIContainer>
 		<div if:when="!props.landing">
 			<UIPageHeader
-				layout="docs"
 				bind:title="props.title"
 				bind:description="props.description"
+				layout="docs"
 			/>
 			<UIProse as="article">
 				<render snippet="snippets.default" />

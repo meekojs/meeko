@@ -123,8 +123,7 @@
 			the actions move under the title when the card is narrow, even on a wide window;
 			<code>below</code>
 			always puts them underneath and
-			<code>inline</code>
-			, the default, always beside it. It is pure CSS and the DOM order does not change.
+			<code>inline</code>, the default, always beside it. It is pure CSS and the DOM order does not change.
 		</p>
 		<UICard
 			title="Orders"

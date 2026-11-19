@@ -81,7 +81,9 @@
 					if:when="snippets.caption"
 					snippet="snippets.caption"
 				/>
-				{snippets.caption ? '' : props.caption}
+				{
+					snippets.caption ? '' : props.caption
+				}
 			</caption>
 			<thead
 				if:when="!props.hideHeader"

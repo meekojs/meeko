@@ -74,15 +74,11 @@
 			<a
 				href="/"
 				bind:aria-current="props.view === 'active' ? 'page' : null"
+				>Pendientes ({activeCount.value})</a
 			>
-				Pendientes ({activeCount.value})
-			</a>
 			<a
 				href="/completed"
-				bind:aria-current="props.view === 'completed' ? 'page' : null"
-			>
-				Terminadas
-			</a>
+				bind:aria-current="props.view === 'completed' ? 'page' : null">Terminadas</a>
 		</nav>
 		<div class="toolbar">
 			<form on:submit="addTask">
@@ -103,24 +99,21 @@
 				type="button"
 				bind:disabled="busy.value"
 				on:click="synchronize"
+				>{busy.value ? 'Sincronizando…' : 'Sincronizar API'}</button
 			>
-				{busy.value ? 'Sincronizando…' : 'Sincronizar API'}
-			</button>
 		</div>
 		<p
 			if:when="error.value !== ''"
 			role="alert"
 			class="feedback error"
+			>{error.value}</p
 		>
-			{error.value}
-		</p>
 		<p
 			if:when="syncMessage.value !== ''"
 			role="status"
 			class="feedback"
+			>{syncMessage.value}</p
 		>
-			{syncMessage.value}
-		</p>
 		<p class="summary">{visibleTasks.value.length} {props.view === 'completed' ? 'terminadas' : 'pendientes'}</p>
 		<ul class="task-list">
 			<li
@@ -137,16 +130,12 @@
 					class="state-button"
 					type="button"
 					on:click="() => toggleTask(task.id)"
+					>{task.done ? 'Reabrir' : 'Completar'}</button
 				>
-					{task.done ? 'Reabrir' : 'Completar'}
-				</button>
 			</li>
 		</ul>
 		<p
 			if:when="visibleTasks.value.length === 0"
-			class="empty"
-		>
-			No hay tareas en esta vista.
-		</p>
+			class="empty">No hay tareas en esta vista.</p>
 	</section>
 </template>

@@ -63,8 +63,7 @@
 			requiere el snippet
 			<code>default</code>
 			y emite
-			<code>click</code>
-			.
+			<code>click</code>.
 			<code>UILinkCard</code>
 			admite contenido adicional con el snippet
 			<code>default</code>

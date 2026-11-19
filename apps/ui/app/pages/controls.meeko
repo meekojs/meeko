@@ -36,8 +36,7 @@
 	>
 		<p>
 			Todos conservan el control nativo, así que el teclado, el foco y el envío de un formulario son los del navegador, también sin JavaScript. Sus modelos se enlazan con una señal:
-			<code>model="field"</code>
-			.
+			<code>model="field"</code>.
 		</p>
 		<h2 id="textarea">UITextarea</h2>
 		<p>
@@ -83,10 +82,7 @@
 		<p>
 			<code>UISwitch</code>
 			tiene el mismo contrato que
-			<code>UICheckbox</code>
-			, con
-			<code>role="switch"</code>
-			: úsalo para algo que se aplica al instante.
+			<code>UICheckbox</code>, con <code>role="switch"</code>: úsalo para algo que se aplica al instante.
 		</p>
 		<DocsPreview layout="stack">
 			<UICheckbox
@@ -168,19 +164,16 @@
 			funcionan también sin JavaScript. Su altura total es la de un control de su tamaño,
 			<code>sm</code>
 			o
-			<code>md</code>
-			, y se alinea con un
+			<code>md</code>, y se alinea con un
 			<code>UIButton</code>
 			a su lado.
 		</p>
 		<p>
 			Necesita un nombre:
-			<code>legend</code>
-			, que
+			<code>legend</code>, que
 			<code>hideLegend</code>
 			deja sólo para los lectores de pantalla, o
-			<code>ariaLabel</code>
-			. Si las opciones no caben, el control se desplaza en horizontal dentro de su ancho: ninguna opción se parte y la página no se ensancha.
+			<code>ariaLabel</code>. Si las opciones no caben, el control se desplaza en horizontal dentro de su ancho: ninguna opción se parte y la página no se ensancha.
 		</p>
 		<DocsPreview layout="stack">
 			<UISegmentedControl
@@ -209,12 +202,10 @@
 		<p>
 			<code>UIRadioGroup variant="segmented"</code>
 			sigue disponible y se parte en varias líneas cuando no cabe; para un conmutador compacto, usa
-			<code>UISegmentedControl</code>
-			. Su
+			<code>UISegmentedControl</code>. Su
 			<code>size</code>
 			admite un valor por aplicación en
-			<code>ui.defaults.segmentedControl</code>
-			.
+			<code>ui.defaults.segmentedControl</code>.
 		</p>
 		<DocsApi
 			caption="Propiedades de UISegmentedControl"
@@ -234,8 +225,7 @@
 			Un
 			<code>input type="range"</code>
 			con la etiqueta dentro de su
-			<code>label</code>
-			. La parte llena de la pista sigue al valor.
+			<code>label</code>. La parte llena de la pista sigue al valor.
 		</p>
 		<DocsPreview layout="stack">
 			<UISlider
@@ -267,20 +257,12 @@
 		/>
 		<p>
 			Los tipos
-			<code>UITextareaProps</code>
-			,
-			<code>UICheckboxProps</code>
-			,
-			<code>UISwitchProps</code>
-			,
-			<code>UIRadioGroupProps</code>
-			,
+			<code>UITextareaProps</code>, <code>UICheckboxProps</code>, <code>UISwitchProps</code>, <code>UIRadioGroupProps</code>,
 			<code>UISegmentedControlProps</code>
 			y
 			<code>UISliderProps</code>
 			se exportan desde
-			<code>@meekojs/ui/runtime</code>
-			.
+			<code>@meekojs/ui/runtime</code>.
 		</p>
 	</DocsPage>
 </template>

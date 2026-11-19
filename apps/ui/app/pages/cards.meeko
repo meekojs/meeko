@@ -89,8 +89,7 @@
 			y
 			<code>description</code>
 			o del snippet
-			<code>header</code>
-			, que tiene prioridad.
+			<code>header</code>, que tiene prioridad.
 			<code>default</code>
 			contiene el cuerpo y
 			<code>footer</code>
@@ -122,8 +121,7 @@
 			las acciones bajan bajo el título cuando la card es estrecha, aunque la ventana sea ancha;
 			<code>below</code>
 			las pone siempre debajo e
-			<code>inline</code>
-			, el valor por defecto, siempre al lado. Es CSS puro y el orden del DOM no cambia.
+			<code>inline</code>, el valor por defecto, siempre al lado. Es CSS puro y el orden del DOM no cambia.
 		</p>
 		<UICard
 			title="Pedidos"

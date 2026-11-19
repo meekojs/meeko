@@ -35,8 +35,7 @@
 			The
 			<code>default</code>
 			snippet is required. Badge renders as a
-			<code>span</code>
-			: it adds no interaction, roles or announcements. Use text that explains the state; color must not be its only meaning.
+			<code>span</code>: it adds no interaction, roles or announcements. Use text that explains the state; color must not be its only meaning.
 		</p>
 	</DocsPage>
 </template>

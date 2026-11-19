@@ -66,8 +66,7 @@
 			requires the
 			<code>default</code>
 			snippet and emits
-			<code>click</code>
-			.
+			<code>click</code>.
 			<code>UILinkCard</code>
 			accepts extra content with the optional
 			<code>default</code>

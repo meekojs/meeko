@@ -34,8 +34,7 @@
 			El snippet
 			<code>default</code>
 			es obligatorio. Badge se representa como un
-			<code>span</code>
-			: no añade interacción, roles ni anuncios. Usa texto que explique el estado; el color no debe ser su único significado.
+			<code>span</code>: no añade interacción, roles ni anuncios. Usa texto que explique el estado; el color no debe ser su único significado.
 		</p>
 	</DocsPage>
 </template>

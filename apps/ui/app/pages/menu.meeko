@@ -39,14 +39,10 @@
 			es un
 			<a href="/popover">UIPopover</a>
 			con
-			<code>role="menu"</code>
-			: el disparador lleva
+			<code>role="menu"</code>: el disparador lleva
 			<code>aria-haspopup="menu"</code>
 			y
-			<code>aria-expanded</code>
-			, la lista se abre en la capa superior con el atributo
-			<code>popover</code>
-			, también sin JavaScript, y se ancla con CSS. Las flechas recorren los ítems,
+			<code>aria-expanded</code>, la lista se abre en la capa superior con el atributo <code>popover</code>, también sin JavaScript, y se ancla con CSS. Las flechas recorren los ítems,
 			<code>Inicio</code>
 			y
 			<code>Fin</code>
@@ -63,12 +59,10 @@
 			es una acción, un
 			<code>button</code>
 			que llama a
-			<code>onSelect</code>
-			, o un enlace con
+			<code>onSelect</code>, o un enlace con
 			<code>href</code>
 			o
-			<code>to</code>
-			, que navega con MeekoLink.
+			<code>to</code>, que navega con MeekoLink.
 			<code>{'{ separator: true }'}</code>
 			traza una línea entre grupos,
 			<code>tone: 'danger'</code>
@@ -98,8 +92,7 @@
 			Sin
 			<code>triggerLabel</code>
 			ni snippet
-			<code>trigger</code>
-			, el disparador es un botón de sólo icono con tres puntos, nombrado «Más acciones» en el idioma del documento. Dale un nombre propio con
+			<code>trigger</code>, el disparador es un botón de sólo icono con tres puntos, nombrado «Más acciones» en el idioma del documento. Dale un nombre propio con
 			<code>ariaLabel</code>
 			cuando haya varios en la página.
 		</p>
@@ -142,10 +135,7 @@
 			lo sustituye por uno propio, como en UIPopover. El snippet
 			<code>item</code>
 			pinta el interior de cada ítem de
-			<code>items</code>
-			, y el contenido suelto se añade al final de la lista: elementos con
-			<code>role="menuitem"</code>
-			, que reciben el mismo teclado.
+			<code>items</code>, y el contenido suelto se añade al final de la lista: elementos con <code>role="menuitem"</code>, que reciben el mismo teclado.
 		</p>
 		<DocsCode bind:code="examples.menuSnippets" />
 		<h2 id="api">API</h2>
@@ -181,24 +171,17 @@
 			El evento
 			<code>select</code>
 			recibe el ítem, tras su
-			<code>onSelect</code>
-			. Los tipos
-			<code>UIMenuProps</code>
-			,
-			<code>UIMenuEntry</code>
-			,
+			<code>onSelect</code>. Los tipos <code>UIMenuProps</code>, <code>UIMenuEntry</code>,
 			<code>UIMenuItem</code>
 			y
 			<code>MenuSnippets</code>
 			se exportan desde
-			<code>@meekojs/ui/runtime</code>
-			, y
+			<code>@meekojs/ui/runtime</code>, y
 			<code>ui.defaults.menu</code>
 			acepta
 			<code>class</code>
 			y
-			<code>ui</code>
-			.
+			<code>ui</code>.
 		</p>
 	</DocsPage>
 </template>

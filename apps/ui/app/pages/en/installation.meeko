@@ -11,8 +11,7 @@
 		<h2 id="requirements">Before you start</h2>
 		<p>
 			You need a Meeko application, Node.js 24 or later and a Meeko version in the range
-			<code>&gt;=1.8 &lt;2</code>
-			. UI belongs to the Meeko ecosystem and ships as a separate package.
+			<code>&gt;=1.8 &lt;2</code>. UI belongs to the Meeko ecosystem and ships as a separate package.
 		</p>
 		<h2 id="install">Install the package</h2>
 		<DocsCode
@@ -35,8 +34,7 @@
 		<h2 id="host">Add UIApp</h2>
 		<p>
 			Wrap your application to host the modals opened with
-			<code>useModal()</code>
-			. The module's plugin creates the manager and
+			<code>useModal()</code>. The module's plugin creates the manager and
 			<code>UIApp</code>
 			renders its stack.
 		</p>
@@ -55,8 +53,7 @@
 			Continue with
 			<MeekoLink to="/theming">theming and customization</MeekoLink>
 			or explore
-			<MeekoLink to="/components">all components</MeekoLink>
-			.
+			<MeekoLink to="/components">all components</MeekoLink>.
 		</p>
 	</DocsPage>
 </template>

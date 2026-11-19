@@ -17,9 +17,8 @@
 	<button
 		type="button"
 		on:click="() => count.value++"
+		>{count.value} · doble: {doubled.value}</button
 	>
-		{count.value} · doble: {doubled.value}
-	</button>
 </template>
 
 <style scoped>

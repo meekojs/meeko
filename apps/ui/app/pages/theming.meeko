@@ -135,12 +135,7 @@
 		<h2 id="tokens">Tokens de uso</h2>
 		<p>
 			Lee el token de uso, no el paso:
-			<code>--ui-color-border</code>
-			, no
-			<code>--ui-color-surface-6</code>
-			. Ningún hex, tamaño o fuente suelto: si te falta algo, se añade a UI. El contrato completo está en
-			<code>packages/ui/DESIGN.md</code>
-			.
+			<code>--ui-color-border</code>, no <code>--ui-color-surface-6</code>. Ningún hex, tamaño o fuente suelto: si te falta algo, se añade a UI. El contrato completo está en <code>packages/ui/DESIGN.md</code>.
 		</p>
 		<DocsCode
 			label="app/styles/main.css"
@@ -166,8 +161,7 @@
 		<h2 id="scale">Escala fluida</h2>
 		<p>
 			La interfaz crece con la pantalla en un solo sitio, la base global: 16 px hasta 1440, 18 px a 2560 y 21 px a 3840, siempre a partir del tamaño de letra del navegador. Todos los tokens están en
-			<code>rem</code>
-			, así que crecen a la vez. Lo que se escribe en
+			<code>rem</code>, así que crecen a la vez. Lo que se escribe en
 			<code>px</code>
 			no crece.
 			<code>{'ui: { base: false }'}</code>
@@ -211,28 +205,24 @@
 		<h2 id="classes">Clases de cada componente</h2>
 		<p>
 			Los componentes se pintan con clases de Tailwind 4 con el prefijo
-			<code>ui:</code>
-			, que UI compila por su cuenta: tu aplicación no necesita Tailwind. Esas clases leen los tokens, así que todo lo anterior también cambia los componentes. Para retocar uno concreto,
+			<code>ui:</code>, que UI compila por su cuenta: tu aplicación no necesita Tailwind. Esas clases leen los tokens, así que todo lo anterior también cambia los componentes. Para retocar uno concreto,
 			<code>class</code>
 			llega a su elemento raíz y la prop
 			<code>ui</code>
 			añade clases a cada parte, por el nombre de su slot;
 			<code>class</code>
 			equivale a
-			<code>ui.base</code>
-			. Los nombres de los slots están en el tipo de props de cada componente, y el editor los completa.
+			<code>ui.base</code>. Los nombres de los slots están en el tipo de props de cada componente, y el editor los completa.
 		</p>
 		<DocsCode bind:code="examples.themeSlots" />
 		<p>
 			Tus clases se suman a las del componente, sin quitar ninguna. La hoja de UI va en las capas
-			<code>ui-base</code>
-			,
+			<code>ui-base</code>,
 			<code>ui.components</code>
 			y
 			<code>ui.utilities</code>
 			y se carga antes que la tuya, así que cualquier regla sin capa de tu aplicación gana, sea cual sea su especificidad. También una regla sobre un elemento, como
-			<code>{'a { color: … }'}</code>
-			: limítala a tu contenido si no quieres cambiar los enlaces de UI.
+			<code>{'a { color: … }'}</code>: limítala a tu contenido si no quieres cambiar los enlaces de UI.
 		</p>
 		<DocsCode
 			label="app/styles/main.css"
@@ -249,10 +239,7 @@
 			o
 			<code>ui</code>
 			y cambia el selector por ese nombre. Si la regla dependía de una variante, como
-			<code>[data-variant='outline']</code>
-			, pon la clase donde usas esa variante. Siguen ahí los atributos que lee JavaScript (
-			<code>data-meeko-*</code>
-			) y el ARIA.
+			<code>[data-variant='outline']</code>, pon la clase donde usas esa variante. Siguen ahí los atributos que lee JavaScript (<code>data-meeko-*</code>) y el ARIA.
 		</p>
 		<DocsApi
 			caption="Equivalencias más usadas"
@@ -273,33 +260,19 @@
 			]"
 		/>
 		<p>
-			<code>MeekoSelect</code>
-			,
+			<code>MeekoSelect</code>,
 			<code>MeekoPopover</code>
 			y
-			<code>MeekoThemeToggle</code>
-			, obsoletos en el núcleo, ya no reciben aspecto de UI: usa
-			<code>UISelect</code>
-			,
+			<code>MeekoThemeToggle</code>, obsoletos en el núcleo, ya no reciben aspecto de UI: usa <code>UISelect</code>,
 			<code>UIPopover</code>
 			y
-			<a href="/theme-toggle">UIThemeToggle</a>
-			. Siguen siendo API pública la clase
-			<code>meeko-ui-prose</code>
-			, que viste Markdown en cualquier elemento, y la utilidad
-			<code>meeko-ui-sr-only</code>
-			, porque una aplicación no compila Tailwind.
+			<a href="/theme-toggle">UIThemeToggle</a>. Siguen siendo API pública la clase <code>meeko-ui-prose</code>, que viste Markdown en cualquier elemento, y la utilidad <code>meeko-ui-sr-only</code>, porque una aplicación no compila Tailwind.
 		</p>
 		<h2 id="defaults">Valores por defecto</h2>
 		<p>
 			<code>ui.defaults</code>
 			da a todas las instancias de un componente las mismas clases. La clave es su nombre sin el prefijo, en camelCase, como
-			<code>card</code>
-			,
-			<code>table</code>
-			,
-			<code>descriptionList</code>
-			…; cada componente que acepta
+			<code>card</code>, <code>table</code>, <code>descriptionList</code>…; cada componente que acepta
 			<code>class</code>
 			o
 			<code>ui</code>
@@ -313,40 +286,30 @@
 		/>
 		<p>
 			Algunas variantes admiten también un valor de base:
-			<code>variant</code>
-			,
+			<code>variant</code>,
 			<code>size</code>
 			y
 			<code>shape</code>
 			en
 			<code>button</code>
 			y
-			<code>link</code>
-			;
-			<code>variant</code>
-			,
+			<code>link</code>; <code>variant</code>,
 			<code>padding</code>
 			y
 			<code>density</code>
 			en
-			<code>card</code>
-			, y
+			<code>card</code>, y
 			<code>density</code>
 			en
-			<code>table</code>
-			. La prop explícita de la instancia gana siempre. Los defaults se validan al cargar el módulo y se aíslan por aplicación y petición SSR.
+			<code>table</code>. La prop explícita de la instancia gana siempre. Los defaults se validan al cargar el módulo y se aíslan por aplicación y petición SSR.
 		</p>
 		<h2 id="messages">Textos e idiomas</h2>
 		<p>
 			Los pocos textos que los componentes pintan por su cuenta (el cierre de
-			<code>UIModal</code>
-			, el estado vacío de
+			<code>UIModal</code>, el estado vacío de
 			<code>UITable</code>
 			y de
-			<code>UICombobox</code>
-			, los nombres de
-			<code>UIThemeToggle</code>
-			) vienen en español e inglés. Con
+			<code>UICombobox</code>, los nombres de <code>UIThemeToggle</code>) vienen en español e inglés. Con
 			<code>@meekojs/i18n</code>
 			siguen el idioma del documento, sin configurar nada. Sin ese módulo,
 			<code>ui.locale</code>
@@ -356,24 +319,20 @@
 		</p>
 		<DocsCode bind:code="examples.messages" />
 		<p>
-			Una prop o un snippet del componente siempre ganan sobre estos textos. Lo que falta en un idioma se toma de su idioma base (
-			<code>pt</code>
+			Una prop o un snippet del componente siempre ganan sobre estos textos. Lo que falta en un idioma se toma de su idioma base (<code>pt</code>
 			para
-			<code>pt-BR</code>
-			), de
+			<code>pt-BR</code>), de
 			<code>ui.locale</code>
 			y, por último, del español. El servidor y el cliente eligen el mismo texto, así que la hidratación no cambia nada.
 		</p>
 		<p>
 			Los tipos
-			<code>UIOptions</code>
-			,
+			<code>UIOptions</code>,
 			<code>UITokens</code>
 			y
 			<code>UIDefaults</code>
 			se exportan desde
-			<code>@meekojs/ui</code>
-			.
+			<code>@meekojs/ui</code>.
 		</p>
 	</DocsPage>
 </template>

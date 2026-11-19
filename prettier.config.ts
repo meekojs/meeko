@@ -7,7 +7,8 @@ const config: Config & MeekoPrettierOptions & { cssDeclarationSorterKeepOverride
 	cssDeclarationSorterKeepOverrides: false,
 	cssDeclarationSorterOrder: 'concentric-css',
 	endOfLine: 'auto',
-	htmlWhitespaceSensitivity: 'ignore',
+	// The plugin keeps the text of a template only with 'css' or 'strict': 'ignore' hands the whitespace to Prettier's HTML printer, which adds or drops visible spaces (a space before a comma after <code>).
+	htmlWhitespaceSensitivity: 'css',
 	meekoIndentSections: true,
 	overrides: [
 		// The examples of the documentation are `html` fences in Meeko syntax. Prettier's HTML parser would

@@ -14,14 +14,12 @@
 		<p>
 			<code>UIMarkdownEditor</code>
 			lives in its own module,
-			<code>@meekojs/ui/editor</code>
-			, because Crepe weighs 347 KB of gzipped JS: inside the main module it would be a chunk of every site. The JavaScript of Crepe loads in the browser, when the component mounts, and never enters the server bundle. Until then, the HTML of the server paints a placeholder with the final height.
+			<code>@meekojs/ui/editor</code>, because Crepe weighs 347 KB of gzipped JS: inside the main module it would be a chunk of every site. The JavaScript of Crepe loads in the browser, when the component mounts, and never enters the server bundle. Until then, the HTML of the server paints a placeholder with the final height.
 		</p>
 		<h2 id="setup">Setup</h2>
 		<p>
 			Crepe and CodeMirror are optional dependencies of
-			<code>@meekojs/ui</code>
-			: an application without the module does not install them.
+			<code>@meekojs/ui</code>: an application without the module does not install them.
 		</p>
 		<DocsCode
 			label="meeko.config.ts"
@@ -75,14 +73,12 @@
 			snippet goes in the bar, between the label and the switcher. The height is set with
 			<code>--ui-markdown-editor-height</code>
 			and the content scrolls inside. Its texts, also those of the menus of Crepe, are in
-			<code>ui.messages.&lt;language&gt;.markdownEditor</code>
-			.
+			<code>ui.messages.&lt;language&gt;.markdownEditor</code>.
 			<code>splitMarkdownSource</code>
 			and
 			<code>createMarkdownSplicer</code>
 			are exported from
-			<code>@meekojs/ui/editor</code>
-			, without Crepe.
+			<code>@meekojs/ui/editor</code>, without Crepe.
 		</p>
 	</DocsPage>
 </template>

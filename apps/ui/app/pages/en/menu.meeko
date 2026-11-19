@@ -40,12 +40,10 @@
 			is a
 			<MeekoLink to="/popover">UIPopover</MeekoLink>
 			with
-			<code>role="menu"</code>
-			: the trigger carries
+			<code>role="menu"</code>: the trigger carries
 			<code>aria-haspopup="menu"</code>
 			and
-			<code>aria-expanded</code>
-			, the list opens in the top layer with the
+			<code>aria-expanded</code>, the list opens in the top layer with the
 			<code>popover</code>
 			attribute, also without JavaScript, and it is anchored with CSS. The arrows move through the items,
 			<code>Home</code>
@@ -64,12 +62,10 @@
 			is an action, a
 			<code>button</code>
 			that calls
-			<code>onSelect</code>
-			, or a link with
+			<code>onSelect</code>, or a link with
 			<code>href</code>
 			or
-			<code>to</code>
-			, which navigates with MeekoLink.
+			<code>to</code>, which navigates with MeekoLink.
 			<code>{'{ separator: true }'}</code>
 			draws a line between groups,
 			<code>tone: 'danger'</code>
@@ -143,10 +139,7 @@
 			replaces it with one of your own, as in UIPopover. The
 			<code>item</code>
 			snippet paints the inside of each item of
-			<code>items</code>
-			, and loose content is added at the end of the list: elements with
-			<code>role="menuitem"</code>
-			, which get the same keyboard.
+			<code>items</code>, and loose content is added at the end of the list: elements with <code>role="menuitem"</code>, which get the same keyboard.
 		</p>
 		<DocsCode bind:code="examples.menuSnippets" />
 		<h2 id="api">API</h2>
@@ -182,24 +175,17 @@
 			The
 			<code>select</code>
 			event receives the item, after its
-			<code>onSelect</code>
-			. The types
-			<code>UIMenuProps</code>
-			,
-			<code>UIMenuEntry</code>
-			,
+			<code>onSelect</code>. The types <code>UIMenuProps</code>, <code>UIMenuEntry</code>,
 			<code>UIMenuItem</code>
 			and
 			<code>MenuSnippets</code>
 			are exported from
-			<code>@meekojs/ui/runtime</code>
-			, and
+			<code>@meekojs/ui/runtime</code>, and
 			<code>ui.defaults.menu</code>
 			accepts
 			<code>class</code>
 			and
-			<code>ui</code>
-			.
+			<code>ui</code>.
 		</p>
 	</DocsPage>
 </template>
