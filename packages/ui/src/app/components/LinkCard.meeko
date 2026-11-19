@@ -4,9 +4,12 @@
 
 	import type { UILinkCardProps } from '../types/button'
 
+	import { uiTheme } from '../utils/defaults'
 	import { linkCard } from '../variants/card'
 
-	const { to, params, search, resolve, href, target, rel, title, description, ui, class: className, ...rest } = defineProps<UILinkCardProps>()
+	const { to, params, search, resolve, href, target, rel, title, description, ui: ownUi, class: ownClass, ...rest } = defineProps<UILinkCardProps>()
+
+	const theme = uiTheme('linkCard', () => ({ class: ownClass, ui: ownUi }))
 
 	const emit = defineEmits<{ click: [event: MouseEvent] }>()
 
@@ -26,14 +29,14 @@
 		bind:href="href"
 		bind:target="target"
 		bind:rel="linkRel.value"
-		bind:class="classes.base({ class: [ui?.base, className] })"
+		bind:class="classes.base({ class: [theme.ui.base, theme.class] })"
 		bind="rest"
 		on:click="(event) => emit('click', event)"
 	>
-		<strong bind:class="classes.title({ class: ui?.title })">{title}</strong>
+		<strong bind:class="classes.title({ class: theme.ui.title })">{title}</strong>
 		<span
 			if:when="description"
-			bind:class="classes.description({ class: ui?.description })"
+			bind:class="classes.description({ class: theme.ui.description })"
 		>
 			{description}
 		</span>

@@ -5,6 +5,7 @@
 
 	import type { UINavigationTabsItem, UINavigationTabsProps } from '../types/navigation'
 
+	import { uiTheme } from '../utils/defaults'
 	import { uiMessages } from '../utils/messages'
 	import { isCurrentLink, linkTarget, revealInScroller } from '../utils/navigation'
 	import { navigationTabs } from '../variants/navigation'
@@ -12,6 +13,8 @@
 	import * as ItemLink from './internal/ItemLink.meeko'
 
 	const props = defineProps<UINavigationTabsProps>()
+
+	const theme = uiTheme('navigationTabs', () => props)
 
 	const emit = defineEmits<{ select: [event: MouseEvent, item: UINavigationTabsItem] }>()
 
@@ -42,7 +45,7 @@
 <template>
 	<nav
 		ref:root
-		bind:class="classes().base({ class: [props.ui?.base, props.class] })"
+		bind:class="classes().base({ class: [theme.ui.base, theme.class] })"
 		bind:aria-label="props.label ?? text.label"
 		on:click="select"
 	>
@@ -50,7 +53,7 @@
 			each:of="props.items"
 			each:as="item"
 			each:key="item.label"
-			bind:class="classes().link({ class: props.ui?.link })"
+			bind:class="classes().link({ class: theme.ui.link })"
 			bind:link="linkTarget(item)"
 			bind:current="isCurrentLink(item, props.current) ? 'page' : undefined"
 		>
@@ -66,7 +69,7 @@
 		<span
 			if:when="props.variant !== 'segmented'"
 			aria-hidden="true"
-			bind:class="classes().indicator({ class: props.ui?.indicator })"
+			bind:class="classes().indicator({ class: theme.ui.indicator })"
 		/>
 	</nav>
 </template>

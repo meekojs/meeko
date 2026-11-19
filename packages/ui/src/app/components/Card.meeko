@@ -1,33 +1,36 @@
 <script lang="ts">
 	import type { UICardProps } from '../types/card'
 
-	import { uiDefaults } from '../utils/defaults'
+	import { uiTheme } from '../utils/defaults'
 	import { card } from '../variants/card'
 
-	const { title, headingId, description, variant, density, padding, ui, class: className, ...rest } = defineProps<UICardProps>()
+	const { title, headingId, description, variant, density, padding, actionsWrap, ui: ownUi, class: ownClass, ...rest } = defineProps<UICardProps>()
+
+	const theme = uiTheme('card', () => ({ class: ownClass, ui: ownUi }))
 
 	const snippets = defineSnippets<{ header?: []; actions?: []; default: []; footer?: [] }>()
 
 	const id = useId()
-	const defaults = uiDefaults().card
 	const titleId = headingId ?? id + '-title'
 
 	/** `density` gives the padding when `padding` does not: compact, normal and comfortable are sm, md and lg. */
 	const densityPadding = { compact: 'sm', normal: 'md', comfortable: 'lg' } as const
+	/** The props of the card win over `ui.defaults`, and `padding` over `density` at each level. */
+	const paddingOf = () => padding ?? (density ? densityPadding[density] : (theme.defaults?.padding ?? densityPadding[theme.defaults?.density ?? 'normal']))
 
 	const classes = card()
-	const variants = () => ({ variant: variant ?? defaults?.variant ?? 'outline', padding: padding ?? densityPadding[density ?? 'normal'], actions: Boolean(snippets.actions) })
+	const variants = () => ({ variant: variant ?? theme.defaults?.variant ?? 'outline', padding: paddingOf(), actions: Boolean(snippets.actions), actionsWrap: actionsWrap ?? theme.defaults?.actionsWrap ?? 'inline' })
 </script>
 
 <template>
 	<section
-		bind:class="classes.base({ ...variants(), class: [ui?.base, className] })"
+		bind:class="classes.base({ ...variants(), class: [theme.ui.base, theme.class] })"
 		bind:aria-labelledby="title && !snippets.header ? titleId : rest['aria-labelledby']"
 		bind="rest"
 	>
 		<header
 			if:when="snippets.header || snippets.actions || title || description"
-			bind:class="classes.header({ ...variants(), class: ui?.header })"
+			bind:class="classes.header({ ...variants(), class: theme.ui.header })"
 		>
 			<render
 				if:when="snippets.header"
@@ -37,27 +40,27 @@
 				if:when="!snippets.header && title"
 				bind:id="titleId"
 				bind:tabindex="headingId ? -1 : undefined"
-				bind:class="classes.title({ class: ui?.title })"
+				bind:class="classes.title({ class: theme.ui.title })"
 			>
 				{title}
 			</h2>
 			<p
 				if:when="!snippets.header && description"
-				bind:class="classes.description({ ...variants(), class: ui?.description })"
+				bind:class="classes.description({ ...variants(), class: theme.ui.description })"
 			>
 				{description}
 			</p>
 			<div
 				if:when="snippets.actions"
-				bind:class="classes.actions({ ...variants(), class: ui?.actions })"
+				bind:class="classes.actions({ ...variants(), class: theme.ui.actions })"
 			>
 				<render snippet="snippets.actions" />
 			</div>
 		</header>
-		<div bind:class="classes.body({ class: ui?.body })"><render snippet="snippets.default" /></div>
+		<div bind:class="classes.body({ class: theme.ui.body })"><render snippet="snippets.default" /></div>
 		<footer
 			if:when="snippets.footer"
-			bind:class="classes.footer({ class: ui?.footer })"
+			bind:class="classes.footer({ class: theme.ui.footer })"
 		>
 			<render snippet="snippets.footer" />
 		</footer>

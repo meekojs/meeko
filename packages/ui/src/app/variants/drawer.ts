@@ -19,12 +19,17 @@ const slide = [
 
 /**
  * While it is open the page does not scroll, until its exit ends: changing the overflow of the root inside
- * a View Transition crashes WebKit 27.2. The root also takes the color that reaches the gutter of the
- * scrollbar, which neither a dialog nor its ::backdrop reach, and the body covers the screen so that the
- * overlay does not darken the root twice.
+ * a View Transition crashes WebKit 27.2. With the width of the gutter of the scrollbar measured
+ * (utils/scrollbar-gutter), the gutter goes back to the viewport and the root takes that width as padding on
+ * its side, so the page does not move and the panel and its ::backdrop reach the edge of the window. Without
+ * it, as before the hydration, the gutter stays, and only the background of the root reaches it: the root
+ * takes the color of what touches it, and the body covers the screen so that the overlay does not darken
+ * the root twice.
  */
 const root = [
 	'ui:[:root:has(&:is([open],[data-meeko-ui-modal-state=closing]))]:overflow-hidden ui:[:root:has(&:is([open],[data-meeko-ui-modal-state=closing]))]:[scrollbar-gutter:stable]',
+	'ui:[:root[data-meeko-ui-scrollbar-gutter]:has(&:is([open],[data-meeko-ui-modal-state=closing]))]:[scrollbar-gutter:auto]',
+	'ui:[:root[data-meeko-ui-scrollbar-gutter=right]:has(&:is([open],[data-meeko-ui-modal-state=closing]))]:pr-(--ui-scrollbar-gutter) ui:[:root[data-meeko-ui-scrollbar-gutter=left]:has(&:is([open],[data-meeko-ui-modal-state=closing]))]:pl-(--ui-scrollbar-gutter)',
 	'ui:[:root:has(&:modal)]:transition-[background-color] ui:[:root:has(&:modal)]:duration-(--ui-duration-slow) ui:[:root:has(&:modal)]:ease-linear ui:motion-reduce:[:root:has(&:modal)]:transition-none ui:motion-reduce:[:root:has(&:modal)]:duration-0',
 	'ui:[:root:has(&:modal)_body]:[min-block-size:100dvh]',
 ]
@@ -64,7 +69,7 @@ export const drawer = tv({
 				base: [
 					'ui:start-0 ui:end-auto ui:[border-inline-start:0] ui:[border-inline-end:var(--ui-border-width)_solid_var(--ui-color-border)]',
 					'ui:[--drawer-shift:-100%] ui:rtl:[--drawer-shift:100%]',
-					'ui:[:root:has(&:modal)]:bg-overlay-solid',
+					'ui:[:root:not([data-meeko-ui-scrollbar-gutter]):has(&:modal)]:bg-overlay-solid',
 					leaves.left,
 					leaves.rtlRight,
 				],
@@ -73,8 +78,8 @@ export const drawer = tv({
 				base: [
 					'ui:start-auto ui:end-0 ui:[border-inline-end:0] ui:[border-inline-start:var(--ui-border-width)_solid_var(--ui-color-border)]',
 					'ui:[--drawer-shift:100%] ui:rtl:[--drawer-shift:-100%]',
-					// The panel touches the gutter: the root takes its color.
-					'ui:[:root:has(&:modal)]:bg-surface-raised',
+					// Where the gutter stays, the panel touches it: the root takes its color.
+					'ui:[:root:not([data-meeko-ui-scrollbar-gutter]):has(&:modal)]:bg-surface-raised',
 					leaves.right,
 					leaves.rtlLeft,
 				],

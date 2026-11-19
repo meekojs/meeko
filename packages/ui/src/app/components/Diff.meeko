@@ -3,10 +3,13 @@
 
 	import type { UIDiffLineKind, UIDiffProps } from '../types/navigation'
 
+	import { uiTheme } from '../utils/defaults'
 	import { uiMessages } from '../utils/messages'
 	import { diff, diffLine } from '../variants/content'
 
 	const props = defineProps<UIDiffProps>()
+
+	const theme = uiTheme('diff', () => props)
 
 	const text = uiMessages().diff
 	const classes = diff()
@@ -20,7 +23,7 @@
 			.split('\n')
 			.map((line, index) => {
 				const kind = kindOf(line)
-				return { index, text: line, kind, class: classes.line({ class: [diffLine[kind], props.ui?.line] }) }
+				return { index, text: line, kind, class: classes.line({ class: [diffLine[kind], theme.ui.line] }) }
 			}),
 	)
 
@@ -31,13 +34,13 @@
 <template>
 	<p
 		if:when="!props.diff"
-		bind:class="classes.empty({ class: [props.ui?.base, props.ui?.empty, props.class] })"
+		bind:class="classes.empty({ class: [theme.ui.base, theme.ui.empty, theme.class] })"
 		>{props.emptyText ?? text.empty}</p
 	>
 	<pre
 		if:when="props.diff"
 		tabindex="0"
-		bind:class="classes.base({ class: [props.ui?.base, props.class] })"
+		bind:class="classes.base({ class: [theme.ui.base, theme.class] })"
 		bind:aria-label="props.label"
 	><span each:of="lines.value" each:as="line" each:key="line.index" bind:class="line.class" bind:data-kind="line.kind"><span class="ui:sr-only">{labelOf(line.kind)}</span>{line.text}
 </span></pre>

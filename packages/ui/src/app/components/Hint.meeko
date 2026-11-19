@@ -1,0 +1,59 @@
+<script lang="ts">
+	// <UIHint>: an ⓘ with a help text in a <UITooltip>, for a sentence or a heading. It is a <button> named by
+	// `label` and described by the tooltip (`aria-describedby`), with the size and colour of the text around it
+	// (the `hint` look of variants/popover). The tooltip opens with the pointer and the focus, as any other, and
+	// also when the button is pressed: a tap gives no hover, and a phone does not always focus a button. Its
+	// template has no whitespace between the tags: it would be text inside the sentence.
+	import { computed, signal } from '@meekojs/meeko'
+
+	import type { HintSnippets, UIHintProps } from '../types/tooltip'
+
+	import { uiTheme } from '../utils/defaults'
+	import { icons } from '../utils/icons'
+	import { uiMessages } from '../utils/messages'
+	import { hint } from '../variants/popover'
+	import * as Icon from './internal/Icon.meeko'
+	import * as Tooltip from './Tooltip.meeko'
+
+	const props = defineProps<UIHintProps>()
+
+	const theme = uiTheme('hint', () => props)
+
+	const snippets = defineSnippets<HintSnippets>()
+
+	const text = uiMessages().hint
+
+	const open = signal(false)
+
+	const classes = hint()
+	const baseClass = computed(() => classes.base({ class: [theme.ui.base, theme.class] }))
+</script>
+
+<!-- No whitespace between the tags of this template: it would be text inside the sentence. Prettier keeps it that way (htmlWhitespaceSensitivity "strict" in prettier.config.ts); tests/templates-without-whitespace.test.mjs guards it. -->
+<template><Tooltip
+		model="open"
+		bind:text="props.text"
+		bind:placement="props.placement"
+		bind:triggerId="props.id"
+		bind:class="classes.tooltip({ class: theme.ui.tooltip })"
+		><snippet
+			name="anchor"
+			params="trigger"
+		>
+			<button
+				type="button"
+				bind:id="trigger.id"
+				bind:aria-label="props.label ?? text.label"
+				bind:aria-describedby="trigger['aria-describedby']"
+				bind:interestfor="trigger.interestfor"
+				bind:class="baseClass.value"
+				on:click="() => (open.value = true)"
+				><Icon
+					size="text"
+					bind:path="icons.info"
+					bind:class="classes.icon({ class: theme.ui.icon })"
+			/></button></snippet
+		><render
+			if:when="snippets.default"
+			snippet="snippets.default"
+	/></Tooltip></template>

@@ -3,9 +3,12 @@
 
 	import type { UIBadgeProps } from '../types/forms'
 
+	import { uiTheme } from '../utils/defaults'
 	import { badge } from '../variants/badge'
 
 	const props = defineProps<UIBadgeProps>({ tone: 'neutral' })
+
+	const theme = uiTheme('badge', () => props)
 
 	const snippets = defineSnippets<{ default: [] }>()
 
@@ -13,11 +16,11 @@
 </script>
 
 <template>
-	<span bind:class="classes.value.base({ class: [props.ui?.base, props.class] })">
+	<span bind:class="classes.value.base({ class: [theme.ui.base, theme.class] })">
 		<span
 			if:when="props.dot"
 			aria-hidden="true"
-			bind:class="classes.value.dot({ class: props.ui?.dot })"
+			bind:class="classes.value.dot({ class: theme.ui.dot })"
 		/>
 		<render snippet="snippets.default" />
 	</span>

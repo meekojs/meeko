@@ -7,12 +7,15 @@
 	import type { ComboboxModel, ComboboxSettings, ComboboxSnippets, UIComboboxProps } from '../types/combobox'
 
 	import { createCombobox } from '../utils/combobox'
+	import { uiTheme } from '../utils/defaults'
 	import { uiMessages } from '../utils/messages'
 	import { control } from '../variants/input'
 	import { combobox as look } from '../variants/select'
 	import * as Popover from './Popover.meeko'
 
 	const props = defineProps<UIComboboxProps<T, Multiple>>()
+
+	const theme = uiTheme('combobox', () => props)
 
 	const emit = defineEmits<{ change: [value: ComboboxModel<T, Multiple>] }>()
 
@@ -29,14 +32,14 @@
 	onMounted(() => combobox.mount(root.value))
 
 	const classes = computed(() => look({ disabled: props.disabled === true, clearable: props.clearable === true }))
-	const triggerClass = computed(() => control({ clearable: props.clearable === true, class: [classes.value.trigger(), props.ui?.trigger] }))
+	const triggerClass = computed(() => control({ clearable: props.clearable === true, class: [classes.value.trigger(), theme.ui.trigger] }))
 </script>
 
 <!-- No whitespace between the tags of this template: it would be text inside the trigger and the options. Prettier keeps it that way (htmlWhitespaceSensitivity "strict" in prettier.config.ts); tests/templates-without-whitespace.test.mjs guards it. -->
 <template><div
 		ref:root
 		data-meeko-select
-		bind:class="classes.value.base({ class: [props.ui?.base, props.class] })"
+		bind:class="classes.value.base({ class: [theme.ui.base, theme.class] })"
 		bind:data-open="combobox.open.value ? '' : undefined"
 		bind:data-disabled="props.disabled ? '' : undefined"
 		bind:data-multiple="combobox.multiple.value ? '' : undefined"
@@ -64,37 +67,37 @@
 					><span
 						if:when="snippets.value && combobox.selected.value.length"
 						data-meeko-select-values
-						bind:class="classes.value.values({ class: props.ui?.values })"
+						bind:class="classes.value.values({ class: theme.ui.values })"
 						><span
 							each:of="combobox.selectedEntries.value"
 							each:as="entry"
 							each:key="entry.key"
 							data-meeko-select-value
-							bind:class="classes.value.value({ class: props.ui?.value })"
+							bind:class="classes.value.value({ class: theme.ui.value })"
 							><render
 								snippet="snippets.value"
 								args="entry.option" /></span></span
 					><span
 						if:when="!snippets.value && combobox.selected.value.length"
 						data-meeko-select-value
-						bind:class="classes.value.value({ class: props.ui?.value })"
+						bind:class="classes.value.value({ class: theme.ui.value })"
 						>{combobox.valueText.value}</span
 					><span
 						if:when="!combobox.selected.value.length"
 						data-meeko-select-placeholder
-						bind:class="classes.value.placeholder({ class: props.ui?.placeholder })"
+						bind:class="classes.value.placeholder({ class: theme.ui.placeholder })"
 						>{props.placeholder ?? ''}</span
 					></button
 				><span
 					if:when="props.searchable && combobox.multiple.value && combobox.selected.value.length"
 					data-meeko-select-values
-					bind:class="classes.value.chips({ class: props.ui?.chips })"
+					bind:class="classes.value.chips({ class: theme.ui.chips })"
 					><span
 						each:of="combobox.selectedEntries.value"
 						each:as="entry"
 						each:key="entry.key"
 						data-meeko-select-value
-						bind:class="classes.value.chip({ class: props.ui?.chip })"
+						bind:class="classes.value.chip({ class: theme.ui.chip })"
 						><render
 							if:when="snippets.value"
 							snippet="snippets.value"
@@ -120,7 +123,7 @@
 			><div
 				role="listbox"
 				data-meeko-select-list
-				bind:class="classes.value.list({ class: props.ui?.list })"
+				bind:class="classes.value.list({ class: theme.ui.list })"
 				bind:id="combobox.listboxId"
 				bind:aria-multiselectable="combobox.multiple.value ? 'true' : undefined"
 				bind:aria-label="props.label"
@@ -134,14 +137,14 @@
 					each:as="group"
 					each:key="group.key"
 					data-meeko-select-group
-					bind:class="classes.value.group({ class: props.ui?.group })"
+					bind:class="classes.value.group({ class: theme.ui.group })"
 					bind:role="group.name === undefined ? 'presentation' : 'group'"
 					bind:aria-labelledby="group.id"
 					><div
 						if:when="group.name !== undefined"
 						role="presentation"
 						data-meeko-select-group-label
-						bind:class="classes.value.groupLabel({ class: props.ui?.groupLabel })"
+						bind:class="classes.value.groupLabel({ class: theme.ui.groupLabel })"
 						bind:id="group.id"
 						><render
 							if:when="snippets.group"
@@ -153,7 +156,7 @@
 						each:as="entry"
 						each:key="entry.key"
 						role="option"
-						bind:class="classes.value.option({ class: props.ui?.option })"
+						bind:class="classes.value.option({ class: theme.ui.option })"
 						bind="combobox.listOption(entry)"
 						><render
 							if:when="snippets.option"
@@ -165,13 +168,13 @@
 					if:when="combobox.loading.value"
 					role="presentation"
 					data-meeko-select-loading
-					bind:class="classes.value.loading({ class: props.ui?.loading })"
+					bind:class="classes.value.loading({ class: theme.ui.loading })"
 					><render snippet="snippets.loading" /></div
 				><div
 					if:when="!combobox.loading.value && !combobox.entries.value.length"
 					role="presentation"
 					data-meeko-select-empty
-					bind:class="classes.value.empty({ class: props.ui?.empty })"
+					bind:class="classes.value.empty({ class: theme.ui.empty })"
 					><render
 						if:when="snippets.empty"
 						snippet="snippets.empty"
@@ -182,7 +185,7 @@
 			if:when="combobox.showClear.value"
 			type="button"
 			data-meeko-select-clear
-			bind:class="classes.value.clear({ class: props.ui?.clear })"
+			bind:class="classes.value.clear({ class: theme.ui.clear })"
 			bind:aria-label="props.clearLabel ?? text.clear"
 			on:click="combobox.clear"
 			>×</button

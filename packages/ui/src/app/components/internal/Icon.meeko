@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { icon } from '../../variants/content'
 
-	const props = defineProps<{ path: string; size?: 'md' | 'sm'; class?: string }>()
+	const props = defineProps<{ path: string; size?: 'md' | 'sm' | 'text'; class?: string }>()
 </script>
 
 <template>

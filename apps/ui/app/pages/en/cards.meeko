@@ -101,6 +101,7 @@
 			bind:rows="[
 				{ name: 'title / description', type: 'string', description: 'Optional header text.' },
 				{ name: 'variant', type: 'outline | soft | solid | elevated', default: 'outline', description: 'Visual variant; supports ui.defaults.card.' },
+				{ name: 'actionsWrap', type: 'inline | below | auto', default: 'inline', description: 'Where the actions go; auto moves them down in a narrow card and supports ui.defaults.card.' },
 				{ name: 'class', type: 'string', description: 'Additional classes.' },
 			]"
 		/>
@@ -113,5 +114,68 @@
 			<code>footer</code>
 			are optional. The component uses a section with an accessible name when a title is given.
 		</p>
+		<h2 id="actions">Header actions</h2>
+		<p>
+			The
+			<code>actions</code>
+			snippet goes next to the title. With
+			<code>actionsWrap="auto"</code>
+			the actions move under the title when the card is narrow, even on a wide window;
+			<code>below</code>
+			always puts them underneath and
+			<code>inline</code>
+			, the default, always beside it. It is pure CSS and the DOM order does not change.
+		</p>
+		<UICard
+			title="Orders"
+			description="The last 30 days."
+			actionsWrap="auto"
+			class="card-demo-actions"
+		>
+			<snippet name="actions">
+				<UIButton
+					variant="secondary"
+					size="sm"
+				>
+					Export
+				</UIButton>
+				<UIButton size="sm">New order</UIButton>
+			</snippet>
+			<p>With room, the actions stay next to the title.</p>
+		</UICard>
+		<div class="docs-grid">
+			<UICard
+				title="Invoices"
+				description="Awaiting payment."
+				actionsWrap="auto"
+			>
+				<snippet name="actions">
+					<UIButton
+						variant="secondary"
+						size="sm"
+					>
+						Export
+					</UIButton>
+					<UIButton size="sm">New order</UIButton>
+				</snippet>
+				<p>With auto, they move under the title if the card gets narrow.</p>
+			</UICard>
+			<UICard
+				title="Customers"
+				description="New this week."
+				actionsWrap="below"
+			>
+				<snippet name="actions">
+					<UIButton
+						variant="secondary"
+						size="sm"
+					>
+						Export
+					</UIButton>
+					<UIButton size="sm">New order</UIButton>
+				</snippet>
+				<p>With below, always under the title.</p>
+			</UICard>
+		</div>
 	</DocsPage>
 </template>

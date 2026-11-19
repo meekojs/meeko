@@ -7,12 +7,15 @@
 
 	import type { SelectModel, SelectSettings, SelectSnippets, UISelectProps } from '../types/select'
 
+	import { uiTheme } from '../utils/defaults'
 	import { uiMessages } from '../utils/messages'
 	import { createSelect } from '../utils/select'
 	import { control } from '../variants/input'
 	import { select as look } from '../variants/select'
 
 	const props = defineProps<UISelectProps<T>>()
+
+	const theme = uiTheme('select', () => props)
 
 	const emit = defineEmits<{ change: [value: SelectModel<T>] }>()
 
@@ -29,14 +32,14 @@
 
 	const classes = computed(() => look({ disabled: props.disabled === true, clearable: props.clearable === true }))
 	// The <select> is the trigger and, with `appearance: base-select`, also holds the list: `listClass` goes on it.
-	const triggerClass = computed(() => control({ clearable: props.clearable === true, class: [classes.value.trigger(), props.ui?.trigger, props.listClass] }))
+	const triggerClass = computed(() => control({ clearable: props.clearable === true, class: [classes.value.trigger(), theme.ui.trigger, props.listClass] }))
 </script>
 
 <!-- No whitespace between the tags of this template: it would be text inside the trigger and the options. Prettier keeps it that way (htmlWhitespaceSensitivity "strict" in prettier.config.ts); tests/templates-without-whitespace.test.mjs guards it. -->
 <template><div
 		ref:root
 		data-meeko-select
-		bind:class="classes.value.base({ class: [props.ui?.base, props.class] })"
+		bind:class="classes.value.base({ class: [theme.ui.base, theme.class] })"
 		bind:data-disabled="props.disabled ? '' : undefined"
 		><select
 			data-meeko-select-trigger
@@ -48,14 +51,14 @@
 				><span
 					if:when="snippets.value && select.chosen.value"
 					data-meeko-select-value
-					bind:class="classes.value.value({ class: props.ui?.value })"
+					bind:class="classes.value.value({ class: theme.ui.value })"
 					><render
 						snippet="snippets.value"
 						args="select.value.value" /></span
 				><span
 					if:when="!snippets.value && snippets.option && select.chosen.value"
 					data-meeko-select-value
-					bind:class="classes.value.value({ class: props.ui?.value })"
+					bind:class="classes.value.value({ class: theme.ui.value })"
 					>{select.label.value}</span
 				><selectedcontent if:when="(!snippets.value && !snippets.option) || !select.chosen.value" /></button
 			><option
@@ -86,7 +89,7 @@
 					bind:label="group.name"
 					><legend
 						data-meeko-select-group-label
-						bind:class="classes.value.groupLabel({ class: props.ui?.groupLabel })"
+						bind:class="classes.value.groupLabel({ class: theme.ui.groupLabel })"
 						><render
 							if:when="snippets.group"
 							snippet="snippets.group"
@@ -109,7 +112,7 @@
 			if:when="select.showClear.value"
 			type="button"
 			data-meeko-select-clear
-			bind:class="classes.value.clear({ class: props.ui?.clear })"
+			bind:class="classes.value.clear({ class: theme.ui.clear })"
 			bind:aria-label="props.clearLabel ?? text.clear"
 			on:click="select.clear">×</button></div
 	></template>

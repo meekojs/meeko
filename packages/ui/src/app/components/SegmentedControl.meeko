@@ -1,0 +1,55 @@
+<script lang="ts">
+	// <UISegmentedControl>: the native radios of <UIRadioGroup variant="segmented">, with a name that can be
+	// hidden, a size and a track that scrolls instead of wrapping. The browser does everything else: the
+	// arrows, the form and `required`. Its look is `segmentedControl` in ../variants/choice.ts.
+	import { useId } from '@meekojs/meeko'
+
+	import type { UISegmentedControlProps } from '../types/forms'
+
+	import { uiTheme } from '../utils/defaults'
+	import { segmentedControl } from '../variants/choice'
+
+	const { legend, hideLegend, ariaLabel, options, name, required, size, class: ownClass, ui: ownUi, ...rest } = defineProps<UISegmentedControlProps>()
+
+	const theme = uiTheme('segmentedControl', () => ({ class: ownClass, ui: ownUi }))
+
+	const value = defineModel<string>({ default: '' })
+
+	const id = useId()
+
+	const classes = segmentedControl({ size: size ?? theme.defaults?.size, hideLegend: Boolean(hideLegend) })
+</script>
+
+<template>
+	<fieldset
+		bind:class="classes.base({ class: [theme.ui.base, theme.class] })"
+		bind:aria-label="legend === undefined ? ariaLabel : undefined"
+		bind="rest"
+	>
+		<legend
+			if:when="legend !== undefined"
+			bind:class="classes.legend({ class: theme.ui.legend })"
+			>{legend}</legend
+		>
+		<div bind:class="classes.options({ class: theme.ui.options })">
+			<label
+				each:of="options"
+				each:as="option"
+				each:key="option.value"
+				bind:class="classes.option({ class: theme.ui.option })"
+			>
+				<input
+					type="radio"
+					model="value"
+					bind:name="name ?? id"
+					bind:form="rest.form"
+					bind:value="option.value"
+					bind:disabled="option.disabled"
+					bind:required="required"
+					bind:class="classes.input({ class: theme.ui.input })"
+				/>
+				<span>{option.label}</span>
+			</label>
+		</div>
+	</fieldset>
+</template>

@@ -575,8 +575,8 @@ export type UITableOfContentsVariant = 'aside' | 'collapsible'
 
 /**
  * Props de `<UITableOfContents>`: el índice de la página. Los enlaces funcionan sin JavaScript. La
- * entrada activa la pinta `scroll-target-group` donde exista; en todos los navegadores, un
- * `IntersectionObserver` mínimo mantiene `aria-current="location"`. `active` lo sustituye. `ui` añade
+ * entrada activa la marca `aria-current="location"`, que mantiene en todos los navegadores un
+ * `IntersectionObserver` mínimo tras hidratar. `active` lo sustituye. `ui` añade
  * clases a sus slots: `base` (el `<nav>`), `title`, `list`, `link`, y en la vista `collapsible`,
  * `collapsible` (el `<details>`, que recibe `class`), `summary`, `chevron` y `panel`.
  *

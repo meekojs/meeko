@@ -187,6 +187,32 @@ export default defineMeekoConfig({
   <button role="menuitem">Perfil</button>
   <button role="menuitem">Cerrar sesión</button>
 </UIPopover>`,
+	menu: `<script lang="ts">
+  import type { UIMenuEntry } from '@meekojs/ui/runtime'
+
+  const items: UIMenuEntry[] = [
+    { label: 'Renombrar', shortcut: 'F2', onSelect: () => rename() },
+    { label: 'Duplicar', onSelect: () => duplicate() },
+    { label: 'Ver en Popover', to: '/popover' },
+    { label: 'Archivar', disabled: true },
+    { separator: true },
+    { label: 'Eliminar', tone: 'danger', onSelect: () => remove() },
+  ]
+</script>
+
+<template>
+  <UIMenu triggerLabel="Acciones del proyecto" bind:items="items" on:select="(item) => console.log(item.label)" />
+</template>`,
+	menuRow: `<UITable caption="Archivos" bind:hideCaption="true" rowKey="id" bind:rows="files" bind:columns="columns">
+  <snippet name="cell-actions" params="file">
+    <UIMenu bind:ariaLabel="'Acciones de ' + file.name" size="sm" placement="bottom-end" bind:items="actionsOf(file)" />
+  </snippet>
+</UITable>`,
+	menuSnippets: `<UIMenu label="Cuenta" bind:items="[{ label: 'Perfil', to: '/profile' }, { label: 'Salir', onSelect: logout }]">
+  <snippet name="trigger"><img src="/me.png" alt="Mi cuenta" width="24" height="24" /></snippet>
+  <snippet name="item" params="item"><strong>{item.label}</strong></snippet>
+  <button type="button" role="menuitem" on:click="openHelp">Ayuda</button>
+</UIMenu>`,
 	themeToggle: `// meeko.config.ts
 export default defineMeekoConfig({
   modules: ['@meekojs/ui'],
@@ -274,6 +300,16 @@ export default defineMeekoConfig({
     },
   },
 })`,
+	themeDefaults: `export default defineMeekoConfig({
+  modules: ['@meekojs/ui'],
+  ui: {
+    defaults: {
+      card: { padding: 'sm', ui: { header: 'panel-card-header' } },
+      table: { density: 'compact', class: 'panel-table' },
+      stat: { ui: { value: 'panel-stat-value' } },
+    },
+  },
+})`,
 	messages: `// meeko.config.ts
 export default defineMeekoConfig({
   modules: ['@meekojs/ui'],
@@ -333,6 +369,19 @@ export default defineMeekoConfig({
 <UIButton iconOnly ariaLabel="Eliminar" variant="outline">
   <UIIcon name="lucide:trash-2" />
 </UIButton>`,
+	iconButton: `<UIIconButton label="Abrir el menú" icon="menu" />
+<UIIconButton label="Cerrar" icon="close" variant="outline" />
+<UIIconButton label="Confirmar" icon="check" variant="primary" on:click="confirm" />
+<UIIconButton label="Ver enlaces" icon="arrowEnd" to="/links" />
+<UIIconButton label="Eliminar">
+  <UIIcon name="lucide:trash-2" />
+</UIIconButton>`,
+	iconButtonStates: `<UIIconButton label="Fijar el panel" icon="check" variant="outline"
+  bind:pressed="pinned.value" on:click="() => (pinned.value = !pinned.value)" />
+<UIIconButton label="Borrar" icon="close" tone="danger" />
+<UIIconButton label="Guardando" icon="check" bind:loading="saving.value" />
+<UIIconButton label="Pequeño" icon="menu" size="sm" />
+<UIIconButton label="Sin tooltip" icon="menu" bind:tooltip="false" />`,
 	textarea: `<UIField id="comment" label="Comentario" bind:counter="comment.value.length + '/200'">
   <snippet name="default" params="id, describedBy">
     <UITextarea model="comment" bind:id="id" bind:describedBy="describedBy"
@@ -354,6 +403,20 @@ export default defineMeekoConfig({
 <template>
   <UIRadioGroup model="period" legend="Periodo" name="period" bind:options="periods" />
   <UIRadioGroup model="period" legend="Periodo" variant="segmented" bind:options="periods" />
+</template>`,
+	segmented: `<script lang="ts">
+  const days = signal('30')
+  const options = [
+    { value: '7', label: '7 días' },
+    { value: '30', label: '30 días' },
+    { value: '90', label: '90 días' },
+  ]
+</script>
+
+<template>
+  <form method="get">
+    <UISegmentedControl legend="Periodo del gráfico" hideLegend size="sm" name="days" model="days" bind:options="options" />
+  </form>
 </template>`,
 	slider: `<UISlider model="volume" label="Volumen" name="volume" bind:min="0" bind:max="100" bind:step="5" />`,
 	alert: `<UIAlert tone="success" title="Cambios guardados" description="Ya están publicados." />
@@ -380,6 +443,19 @@ export default defineMeekoConfig({
   { label: 'Autor', value: 'Equipo Meeko' },
 ]" />
 <UIDisclosure summary="Detalles técnicos"><p>Se abre sin JavaScript.</p></UIDisclosure>`,
+	kpi: `<!-- Una cifra clave: variación con tono, periodo, tendencia y enlace al detalle -->
+<UIStat label="Ingresos" value="12 400 €" bind:change="12.5"
+  period="frente a los 30 días anteriores"
+  bind:trend="[8.2, 9.1, 8.7, 10.4, 11.2, 10.9, 12.4]" to="/ingresos" />
+
+<!-- Bajar es bueno: un tiempo de respuesta que baja es de éxito -->
+<UIStat label="Tiempo de respuesta" value="180 ms" bind:change="-8" good="down" />
+
+<!-- Un texto ya formateado: su signo da la dirección -->
+<UIStat label="Pedidos" bind:value="320" change="−8 pedidos" period="este mes" />
+
+<!-- Un sparkline suelto, con área -->
+<UISparkline bind:values="visits" area tone="accent" />`,
 	diff: `<UIDiff label="Cambios en la guía" bind:diff="patch" />`,
 	diffSample: `--- a/guide.md
 +++ b/guide.md
@@ -450,6 +526,11 @@ export default defineMeekoConfig({
 	tooltip: `<UITooltip text="Se publica al guardar" placement="top">
   <snippet name="trigger">¿Cuándo se publica?</snippet>
 </UITooltip>`,
+	hint: `<h3>Ingresos <UIHint text="Importe cobrado, sin impuestos ni devoluciones." /></h3>
+<p>
+  Margen bruto
+  <UIHint label="Qué es el margen" placement="bottom">Ingresos menos los <em>costes directos</em></UIHint>
+</p>`,
 	commandPalette: `<script lang="ts">
   const query = signal('')
   const pages = [{ title: 'Instalación', url: '/installation' }, { title: 'Temas', url: '/theming' }]

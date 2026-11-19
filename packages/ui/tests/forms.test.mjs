@@ -18,7 +18,7 @@ async function render(context, name, template) {
 		const code = compile(source, `${directory}/${file}.meeko`)
 			.code.replaceAll('from "@meekojs/meeko/internal"', `from ${runtime('internal.js')}`)
 			.replaceAll('from "@meekojs/meeko"', `from ${runtime('index.js')}`)
-			.replaceAll(`from "./${name}.meeko"`, `from "./${name}.ts"`)
+			.replace(/from ["']\.\/(\w+)\.meeko["']/g, 'from "./$1.ts"')
 			.replace(/from ["'](?:\.\.\/)+(utils|variants)\/([\w-]+)["']/g, (_, folder, utility) => `from ${JSON.stringify(new URL(`../dist/app/${folder}/${utility}.js`, import.meta.url).href)}`)
 			.replace(/from ["']\.\/internal\/Icon\.meeko["']/g, 'from "./Icon.ts"')
 		await writeFile(`${directory}/${file}.ts`, code)
@@ -26,6 +26,19 @@ async function render(context, name, template) {
 	let source = await readFile(new URL(`../src/app/components/${name}.meeko`, import.meta.url), 'utf8')
 	if (name === 'Card' || name === 'Table') source = source.replace('<script lang="ts"', '<script lang="ts"').replace(/(<script[^>]*>)/, '$1\nimport { useId } from "@meekojs/meeko"')
 	if (source.includes('./internal/Icon.meeko')) await write('Icon', await readFile(new URL('../src/app/components/internal/Icon.meeko', import.meta.url), 'utf8'))
+	// The components it renders, and theirs: the <UISparkline> and the <UIHint> of <UIStat>, whose <UITooltip> renders a <UIPopover>.
+	const siblings = new Set()
+	const addSiblings = async (code) => {
+		for (const [, sibling] of code.matchAll(/from ["']\.\/(\w+)\.meeko["']/g)) {
+			if (sibling === name || siblings.has(sibling)) continue
+			siblings.add(sibling)
+			const own = await readFile(new URL(`../src/app/components/${sibling}.meeko`, import.meta.url), 'utf8')
+			if (own.includes('./internal/Icon.meeko')) await write('Icon', await readFile(new URL('../src/app/components/internal/Icon.meeko', import.meta.url), 'utf8'))
+			await write(sibling, own)
+			await addSiblings(own)
+		}
+	}
+	await addSiblings(source)
 	await write(name, source)
 	await write('Page', `<script lang="ts">import { signal } from "@meekojs/meeko"; import * as Component from "./${name}.meeko"</script><template>${template}</template>`)
 	const page = await import(pathToFileURL(`${directory}/Page.ts`).href)

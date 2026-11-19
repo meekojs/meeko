@@ -3,12 +3,15 @@
 
 	import type { UIAlertProps } from '../types/feedback'
 
+	import { uiTheme } from '../utils/defaults'
 	import { icons } from '../utils/icons'
 	import { uiMessages } from '../utils/messages'
 	import { alert } from '../variants/feedback'
 	import * as Icon from './internal/Icon.meeko'
 
-	const { tone = 'neutral', title, description, icon, dismiss, closeLabel, role, class: className, ui, ...rest } = defineProps<UIAlertProps>()
+	const { tone = 'neutral', title, description, icon, dismiss, closeLabel, role, class: ownClass, ui: ownUi, ...rest } = defineProps<UIAlertProps>()
+
+	const theme = uiTheme('alert', () => ({ class: ownClass, ui: ownUi }))
 
 	const emit = defineEmits<{ dismiss: [] }>()
 
@@ -22,14 +25,14 @@
 <template>
 	<section
 		if:when="visible.value"
-		bind:class="classes.value.base({ class: [ui?.base, className] })"
+		bind:class="classes.value.base({ class: [theme.ui.base, theme.class] })"
 		bind:role="role ?? (tone === 'danger' ? 'alert' : 'note')"
 		bind="rest"
 	>
 		<span
 			if:when="icon || snippets.icon"
 			aria-hidden="true"
-			bind:class="classes.value.icon({ class: ui?.icon })"
+			bind:class="classes.value.icon({ class: theme.ui.icon })"
 		>
 			<render
 				if:when="snippets.icon"
@@ -40,16 +43,16 @@
 				snippet="icon"
 			/>
 		</span>
-		<div bind:class="classes.value.content({ class: ui?.content })">
+		<div bind:class="classes.value.content({ class: theme.ui.content })">
 			<p
 				if:when="title"
-				bind:class="classes.value.title({ class: ui?.title })"
+				bind:class="classes.value.title({ class: theme.ui.title })"
 			>
 				{title}
 			</p>
 			<p
 				if:when="description"
-				bind:class="classes.value.description({ class: ui?.description })"
+				bind:class="classes.value.description({ class: theme.ui.description })"
 			>
 				{description}
 			</p>
@@ -59,7 +62,7 @@
 			/>
 			<div
 				if:when="snippets.actions"
-				bind:class="classes.value.actions({ class: ui?.actions })"
+				bind:class="classes.value.actions({ class: theme.ui.actions })"
 			>
 				<render snippet="snippets.actions" />
 			</div>
@@ -67,7 +70,7 @@
 		<button
 			if:when="dismiss"
 			type="button"
-			bind:class="classes.value.dismiss({ class: ui?.dismiss })"
+			bind:class="classes.value.dismiss({ class: theme.ui.dismiss })"
 			bind:aria-label="closeLabel ?? text.close"
 			on:click="
 				() => {

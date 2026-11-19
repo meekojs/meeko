@@ -193,8 +193,9 @@ export const tableOfContents = tv({
 
 /**
  * What a link of <UITableOfContents> adds by its place: the indent of a nested entry, and the accent on the
- * edge of the active one, which `scroll-target-group` paints without a script where it exists
- * (`tracking: auto`), and `aria-current` everywhere else.
+ * edge of the active one, from its `aria-current`, which the observer of the component keeps in every browser.
+ * `:target-current` would paint it with no script where `scroll-target-group` exists, but lightningcss, the
+ * minifier of Vite, warns about that pseudo-class in the build of every app; the accent waits for hydration.
  */
 export const tableOfContentsLink = tv({
 	variants: {
@@ -204,10 +205,7 @@ export const tableOfContentsLink = tv({
 			2: 'ui:ps-8',
 		},
 		tracking: {
-			auto: [
-				'ui:supports-[scroll-target-group:auto]:[&:target-current]:border-s-primary ui:supports-[scroll-target-group:auto]:[&:target-current]:text-text',
-				'ui:not-supports-[scroll-target-group:auto]:aria-[current=location]:border-s-primary ui:not-supports-[scroll-target-group:auto]:aria-[current=location]:text-text',
-			],
+			auto: 'ui:aria-[current=location]:border-s-primary ui:aria-[current=location]:text-text',
 			manual: 'ui:aria-[current=location]:border-s-primary ui:aria-[current=location]:text-text',
 		},
 	},

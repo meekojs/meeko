@@ -1,0 +1,121 @@
+<script lang="ts">
+	// <UIIconButton>: an action with only an icon. Like <UIButton>, a route with <MeekoLink> when it gets `to`, an
+	// <a> with `href`, otherwise a <button>, with the look of variants/button with `iconOnly` and the pressed state
+	// of `iconButton`. `label` is its accessible name (aria-label) and the text of its <UITooltip>, whose `anchor`
+	// is the action itself. The action never takes the `aria-describedby` of the tooltip: the tooltip says the
+	// label again, and it would be read twice. The template paints the action twice, inside the tooltip and
+	// without it; keep both alike. It has no whitespace between the tags: it would be text inside a sentence.
+	import { computed } from '@meekojs/meeko'
+
+	import type { UIIconButtonProps } from '../types/button'
+
+	import { uiTheme } from '../utils/defaults'
+	import { icons } from '../utils/icons'
+	import { button, iconButton } from '../variants/button'
+	import * as Icon from './internal/Icon.meeko'
+	import * as Tooltip from './Tooltip.meeko'
+
+	const { label, icon, tooltip = true, placement, pressed, to, params, search, resolve, href, target, rel, download, type = 'button', disabled = false, loading, variant, tone, size, shape, class: ownClass, ui, ...rest } = defineProps<UIIconButtonProps>()
+
+	const theme = uiTheme('iconButton', () => ({ class: ownClass, ui }))
+
+	const emit = defineEmits<{ click: [event: MouseEvent] }>()
+
+	const snippets = defineSnippets<{ default?: [] }>()
+
+	const look = computed(() => {
+		const choice = { variant: variant ?? theme.defaults?.variant ?? 'ghost', tone, size: size ?? theme.defaults?.size, shape: shape ?? theme.defaults?.shape }
+		const slots = iconButton(choice)
+		return {
+			base: button({ ...choice, iconOnly: true, class: slots.base({ class: [theme.ui.base, theme.class] }) }),
+			icon: slots.icon({ class: theme.ui.icon }),
+			tooltip: slots.tooltip({ class: theme.ui.tooltip }),
+		}
+	})
+
+	const native = computed(() => to === undefined && href === undefined)
+	// A disabled button drops the focus: while busy it stays focusable, and the click handler stops it.
+	const nativeDisabled = computed(() => (native.value ? disabled : undefined))
+	// `pressed` makes a toggle of a <button>; without it, the button is not one.
+	const ariaPressed = computed(() => (native.value && pressed !== undefined ? String(pressed) : undefined))
+	// The name of an icon of the package, or the `d` of a path on the grid of 16 by 16.
+	const path = computed(() => (icon === undefined ? undefined : Object.hasOwn(icons, icon) ? icons[icon as keyof typeof icons] : icon))
+	const linkRel = computed(() => rel ?? (target === '_blank' ? 'noopener noreferrer' : undefined))
+
+	function activate(event: MouseEvent): void {
+		if (loading) {
+			event.preventDefault()
+			return
+		}
+		emit('click', event)
+	}
+</script>
+
+<!-- No whitespace between the tags of this template: it would be text inside a sentence. Prettier keeps it that way (htmlWhitespaceSensitivity "strict" in prettier.config.ts); tests/templates-without-whitespace.test.mjs guards it. -->
+<template><Tooltip
+		if:when="tooltip"
+		bind:text="label"
+		bind:placement="placement"
+		bind:triggerId="typeof rest.id === 'string' ? rest.id : undefined"
+		bind:class="look.value.tooltip"
+	>
+		<snippet
+			name="anchor"
+			params="trigger"
+		>
+			<component
+				is="to !== undefined ? 'MeekoLink' : href !== undefined ? 'a' : 'button'"
+				bind:to="to"
+				bind:params="params"
+				bind:search="search"
+				bind:resolve="resolve"
+				bind:href="href"
+				bind:target="target"
+				bind:rel="linkRel.value"
+				bind:download="download"
+				bind:type="native.value ? type : undefined"
+				bind:disabled="nativeDisabled.value"
+				bind:aria-label="label"
+				bind:aria-pressed="ariaPressed.value"
+				bind:aria-busy="loading ? 'true' : undefined"
+				bind:aria-disabled="loading ? 'true' : undefined"
+				bind:class="look.value.base"
+				bind:id="trigger.id"
+				bind:interestfor="trigger.interestfor"
+				bind="rest"
+				on:click="activate"
+				><Icon
+					if:when="path.value"
+					bind:path="path.value"
+					bind:class="look.value.icon" /><render
+					if:when="!path.value && snippets.default"
+					snippet="snippets.default"
+			/></component>
+		</snippet></Tooltip
+	><component
+		if:when="!tooltip"
+		is="to !== undefined ? 'MeekoLink' : href !== undefined ? 'a' : 'button'"
+		bind:to="to"
+		bind:params="params"
+		bind:search="search"
+		bind:resolve="resolve"
+		bind:href="href"
+		bind:target="target"
+		bind:rel="linkRel.value"
+		bind:download="download"
+		bind:type="native.value ? type : undefined"
+		bind:disabled="nativeDisabled.value"
+		bind:aria-label="label"
+		bind:aria-pressed="ariaPressed.value"
+		bind:aria-busy="loading ? 'true' : undefined"
+		bind:aria-disabled="loading ? 'true' : undefined"
+		bind:class="look.value.base"
+		bind="rest"
+		on:click="activate"
+		><Icon
+			if:when="path.value"
+			bind:path="path.value"
+			bind:class="look.value.icon" /><render
+			if:when="!path.value && snippets.default"
+			snippet="snippets.default"
+	/></component></template>

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { UILinkTarget, UINavigationLink, UIPageNavigationProps } from '../types/navigation'
 
+	import { uiTheme } from '../utils/defaults'
 	import { icons } from '../utils/icons'
 	import { uiMessages } from '../utils/messages'
 	import { linkTarget } from '../utils/navigation'
@@ -9,6 +10,8 @@
 	import * as ItemLink from './internal/ItemLink.meeko'
 
 	const props = defineProps<UIPageNavigationProps>()
+
+	const theme = uiTheme('pageNavigation', () => props)
 
 	const text = uiMessages().pageNavigation
 
@@ -21,36 +24,36 @@
 	<nav
 		if:when="props.previous || props.next"
 		data-pagefind-ignore
-		bind:class="classes.base({ class: [props.ui?.base, props.class] })"
+		bind:class="classes.base({ class: [theme.ui.base, theme.class] })"
 		bind:aria-label="props.label ?? text.label"
 	>
 		<ItemLink
 			if:when="props.previous"
-			bind:class="classes.link({ class: props.ui?.link })"
+			bind:class="classes.link({ class: theme.ui.link })"
 			bind:link="withRel(props.previous!, 'prev')"
 		>
-			<small bind:class="classes.hint({ class: props.ui?.hint })">
+			<small bind:class="classes.hint({ class: theme.ui.hint })">
 				<Icon
-					bind:class="classes.icon({ class: props.ui?.icon })"
+					bind:class="classes.icon({ class: theme.ui.icon })"
 					bind:path="icons.arrowStart"
 				/>
 				{props.previousLabel ?? text.previous}
 			</small>
-			<span bind:class="classes.label({ class: props.ui?.label })">{props.previous?.label}</span>
+			<span bind:class="classes.label({ class: theme.ui.label })">{props.previous?.label}</span>
 		</ItemLink>
 		<ItemLink
 			if:when="props.next"
-			bind:class="classes.link({ class: [pageNavigationNext.link, props.ui?.link] })"
+			bind:class="classes.link({ class: [pageNavigationNext.link, theme.ui.link] })"
 			bind:link="withRel(props.next!, 'next')"
 		>
-			<small bind:class="classes.hint({ class: [pageNavigationNext.hint, props.ui?.hint] })">
+			<small bind:class="classes.hint({ class: [pageNavigationNext.hint, theme.ui.hint] })">
 				{props.nextLabel ?? text.next}
 				<Icon
-					bind:class="classes.icon({ class: props.ui?.icon })"
+					bind:class="classes.icon({ class: theme.ui.icon })"
 					bind:path="icons.arrowEnd"
 				/>
 			</small>
-			<span bind:class="classes.label({ class: props.ui?.label })">{props.next?.label}</span>
+			<span bind:class="classes.label({ class: theme.ui.label })">{props.next?.label}</span>
 		</ItemLink>
 	</nav>
 </template>

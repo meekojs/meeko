@@ -30,7 +30,7 @@ export const card = tv({
 		],
 		title: '',
 		description: 'ui:m-0 ui:text-md',
-		actions: 'ui:flex ui:min-h-lh ui:flex-wrap ui:items-center ui:justify-end ui:[align-self:start] ui:gap-2',
+		actions: 'ui:flex ui:min-h-lh ui:flex-wrap ui:items-center ui:[align-self:start] ui:gap-2',
 		body: [
 			'ui:flex-1 ui:p-(--card-padding) ui:[overflow-wrap:anywhere] ui:[&>:first-child]:mt-0 ui:[&>:last-child]:mb-0',
 			'ui:[&_table[role=table]>*>tr>:first-child]:ps-0 ui:[&_table[role=table]>*>tr>:last-child]:pe-0',
@@ -53,16 +53,42 @@ export const card = tv({
 			md: { base: 'ui:[--card-padding:var(--ui-space-5)]' },
 			lg: { base: 'ui:[--card-padding:var(--ui-space-6)]' },
 		},
-		/** With actions the header has two columns: the text, and the actions beside the title and description. */
+		/** With actions the text stays in the first column; `actionsWrap` places the actions. */
 		actions: {
-			true: { header: 'ui:grid-cols-[minmax(0,1fr)_auto] ui:gap-x-4 ui:[&>:not(:last-child)]:col-[1]', actions: 'ui:col-[2] ui:row-[1/span_2]' },
+			true: { header: 'ui:[&>:not(:last-child)]:col-[1]' },
 			false: { header: 'ui:gap-x-1.5' },
 		},
+		/** Where the actions go: it only applies with actions, in the compound variants below. */
+		actionsWrap: {
+			inline: {},
+			below: {},
+			auto: {},
+		},
 	},
+	compoundVariants: [
+		// Two columns: the text, and the actions beside the title and description.
+		{ actions: true, actionsWrap: 'inline', class: { header: 'ui:grid-cols-[minmax(0,1fr)_auto] ui:gap-x-4', actions: 'ui:col-[2] ui:row-[1/span_2] ui:justify-end' } },
+		// One column: the actions follow the text, in the order of the DOM.
+		{ actions: true, actionsWrap: 'below', class: { actions: 'ui:pt-1.5' } },
+		// The header is the container: below the width of --container-card-narrow the actions leave the second
+		// column for a row of their own, and the empty column takes no space because the gap is their margin.
+		{
+			actions: true,
+			actionsWrap: 'auto',
+			class: {
+				header: 'ui:@container ui:grid-cols-[minmax(0,1fr)_auto]',
+				actions: [
+					'ui:col-[2] ui:row-[1/span_2] ui:ms-4 ui:justify-end',
+					'ui:@max-card-narrow:col-[1] ui:@max-card-narrow:row-auto ui:@max-card-narrow:ms-0 ui:@max-card-narrow:justify-start ui:@max-card-narrow:pt-1.5',
+				],
+			},
+		},
+	],
 	defaultVariants: {
 		variant: 'outline',
 		padding: 'md',
 		actions: false,
+		actionsWrap: 'inline',
 	},
 })
 

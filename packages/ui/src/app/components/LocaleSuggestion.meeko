@@ -5,6 +5,7 @@
 
 	import type { UILinkTarget, UILocaleSuggestionProps } from '../types/navigation'
 
+	import { uiTheme } from '../utils/defaults'
 	import { icons } from '../utils/icons'
 	import { fillMessage, uiMessages, uiMessagesFor } from '../utils/messages'
 	import { linkTarget } from '../utils/navigation'
@@ -14,6 +15,8 @@
 	import * as ItemLink from './internal/ItemLink.meeko'
 
 	const props = defineProps<UILocaleSuggestionProps>()
+
+	const theme = uiTheme('localeSuggestion', () => props)
 
 	const emit = defineEmits<{ stay: [] }>()
 
@@ -30,28 +33,28 @@
 
 	const classes = localeSuggestion()
 	// Both actions are buttons of variants/button.
-	const goClass = (): string => button({ variant: 'primary', size: 'sm', class: classes.go({ class: props.ui?.go }) })
-	const stayClass = (): string => button({ variant: 'outline', size: 'sm', class: classes.stay({ class: props.ui?.stay }) })
+	const goClass = (): string => button({ variant: 'primary', size: 'sm', class: classes.go({ class: theme.ui.go }) })
+	const stayClass = (): string => button({ variant: 'outline', size: 'sm', class: classes.stay({ class: theme.ui.stay }) })
 </script>
 
 <template>
 	<aside
 		if:when="offered.value"
 		data-pagefind-ignore
-		bind:class="classes.base({ class: [props.ui?.base, props.class] })"
+		bind:class="classes.base({ class: [theme.ui.base, theme.class] })"
 		bind:lang="speaksOffered.value ? offered.value?.code : undefined"
 		bind:aria-label="props.label ?? texts.value?.messages.language.suggestion"
 	>
 		<Icon
-			bind:class="classes.icon({ class: props.ui?.icon })"
+			bind:class="classes.icon({ class: theme.ui.icon })"
 			bind:path="icons.globe"
 		/>
 		<p
 			role="status"
-			bind:class="classes.message({ class: props.ui?.message })"
+			bind:class="classes.message({ class: theme.ui.message })"
 			>{props.message ?? fillMessage(texts.value?.messages.language.message ?? '', language.value)}</p
 		>
-		<div bind:class="classes.actions({ class: props.ui?.actions })">
+		<div bind:class="classes.actions({ class: theme.ui.actions })">
 			<ItemLink
 				bind:class="goClass()"
 				bind:link="target.value!"

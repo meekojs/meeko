@@ -47,7 +47,7 @@ import { discoverErrorPage } from './routes-discovery'
 import { assertNoLegacySessionFile } from './runtime-migration'
 import { robotsTxt, siteFilesOptions, sitemapEntryRoutes, sitemapUrls, sitemapXml } from './site-files'
 import { assertStaticApp, previewStatic, writeStaticOutput } from './static-adapter'
-import { createGlobalStylesheetSnapshot, devStylesheetLink, frameworkStylesheets, stylesheetUrl } from './styles'
+import { createGlobalStylesheetSnapshot, devStylesheetLink, directStylesheetUrl, frameworkStylesheets } from './styles'
 import { hasFrameworkTsconfigs, prepareFrameworkTypeDeclarations, writeIfChanged } from './type-declarations'
 
 export { frameworkClientEntry, frameworkServerEntry } from './app-manifest'
@@ -739,7 +739,7 @@ async function startDevelopment(root: string): Promise<Server> {
 			return frameworkStylesheets(root, modules.stylesheets)
 				.map((file) => {
 					const moduleId = file.replaceAll('\\', '/')
-					return devStylesheetLink(`${stylesheetUrl(root, file)}?direct`, moduleId)
+					return devStylesheetLink(directStylesheetUrl(file), moduleId)
 				})
 				.join('')
 		}

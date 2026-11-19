@@ -215,7 +215,7 @@ test('generated starter serves a real Socket channel and shuts its Node transpor
 	assert.match(malformed, /"code":"INVALID_URL","status":400/)
 	assert.equal((await fetch(origin)).status, 200, 'the host must remain available after an invalid URL')
 	const html = await response.text()
-	assert.match(html, /<link rel="stylesheet" href="\/app\/styles\/main\.css\?direct" data-vite-dev-id="[^"]+\/app\/styles\/main\.css">/)
+	assert.match(html, /<link rel="stylesheet" href="\/@fs\/[^"]+\/app\/styles\/main\.css\?direct" data-vite-dev-id="[^"]+\/app\/styles\/main\.css">/)
 	const stylesheet = await fetch(`${origin}/app/styles/main.css?direct`)
 	assert.match(stylesheet.headers.get('content-type') ?? '', /text\/css/)
 	assert.match(await stylesheet.text(), /box-sizing: border-box/)

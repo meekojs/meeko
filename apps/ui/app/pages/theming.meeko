@@ -293,13 +293,48 @@
 		<h2 id="defaults">Valores por defecto</h2>
 		<p>
 			<code>ui.defaults</code>
-			admite
-			<code>button</code>
-			,
-			<code>link</code>
-			y
+			da a todas las instancias de un componente las mismas clases. La clave es su nombre sin el prefijo, en camelCase, como
 			<code>card</code>
-			. La prioridad es: props explícitas, defaults de aplicación y valores de base. Los defaults se aíslan por aplicación y petición SSR.
+			,
+			<code>table</code>
+			,
+			<code>descriptionList</code>
+			…; cada componente que acepta
+			<code>class</code>
+			o
+			<code>ui</code>
+			admite aquí las dos. Se suman a las de cada instancia: primero las del componente, después las de
+			<code>ui.defaults</code>
+			y al final las de la instancia. Sin fusión de clases, en un conflicto decide la cascada: tu CSS sin capa gana.
+		</p>
+		<DocsCode
+			label="meeko.config.ts"
+			bind:code="examples.themeDefaults"
+		/>
+		<p>
+			Algunas variantes admiten también un valor de base:
+			<code>variant</code>
+			,
+			<code>size</code>
+			y
+			<code>shape</code>
+			en
+			<code>button</code>
+			y
+			<code>link</code>
+			;
+			<code>variant</code>
+			,
+			<code>padding</code>
+			y
+			<code>density</code>
+			en
+			<code>card</code>
+			, y
+			<code>density</code>
+			en
+			<code>table</code>
+			. La prop explícita de la instancia gana siempre. Los defaults se validan al cargar el módulo y se aíslan por aplicación y petición SSR.
 		</p>
 		<h2 id="messages">Textos e idiomas</h2>
 		<p>

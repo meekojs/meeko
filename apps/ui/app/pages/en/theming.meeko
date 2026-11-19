@@ -294,13 +294,48 @@
 		<h2 id="defaults">Default values</h2>
 		<p>
 			<code>ui.defaults</code>
-			accepts
-			<code>button</code>
-			,
-			<code>link</code>
-			and
+			gives every instance of a component the same classes. The key is its name without the prefix, in camelCase, such as
 			<code>card</code>
-			. The priority is: explicit props, application defaults and base values. Defaults are isolated per application and SSR request.
+			,
+			<code>table</code>
+			,
+			<code>descriptionList</code>
+			…; every component that accepts
+			<code>class</code>
+			or
+			<code>ui</code>
+			accepts both here. They add up to those of each instance: first those of the component, then those of
+			<code>ui.defaults</code>
+			and last those of the instance. Without class merging, the cascade decides a conflict: your unlayered CSS wins.
+		</p>
+		<DocsCode
+			label="meeko.config.ts"
+			bind:code="examples.themeDefaults"
+		/>
+		<p>
+			A few variants also accept a base value:
+			<code>variant</code>
+			,
+			<code>size</code>
+			and
+			<code>shape</code>
+			in
+			<code>button</code>
+			and
+			<code>link</code>
+			;
+			<code>variant</code>
+			,
+			<code>padding</code>
+			and
+			<code>density</code>
+			in
+			<code>card</code>
+			, and
+			<code>density</code>
+			in
+			<code>table</code>
+			. The explicit prop of the instance always wins. Defaults are validated when the module loads and isolated per application and SSR request.
 		</p>
 		<h2 id="messages">Texts and languages</h2>
 		<p>

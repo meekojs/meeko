@@ -17,6 +17,8 @@ export const icon = tv({
 		size: {
 			md: 'ui:size-(--ui-icon-size)',
 			sm: 'ui:size-(--ui-icon-size-sm)',
+			// The size of the text around it, for an icon inside a sentence or a heading.
+			text: 'ui:size-(--ui-icon-size-text)',
 		},
 	},
 	defaultVariants: {

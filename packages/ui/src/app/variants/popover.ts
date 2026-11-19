@@ -74,3 +74,21 @@ export const popoverTrigger = tv({
 export const tooltipTrigger = tv({
 	base: ['ui:cursor-help ui:[border:0] ui:bg-transparent ui:p-0 ui:[color:inherit] ui:[font:inherit]', focusRing],
 })
+
+/**
+ * The look of <UIHint>: an ⓘ of the size of the text around it, in a heading as in a paragraph, that sits on
+ * its line like a letter. Its hit area reaches a little beyond the icon without moving the text around it.
+ */
+export const hint = tv({
+	slots: {
+		base: [
+			'ui:relative ui:m-0 ui:inline-flex ui:cursor-help ui:items-center ui:justify-center ui:rounded-full ui:[border:0] ui:bg-transparent ui:p-0 ui:align-(--ui-icon-text-align)',
+			'ui:text-text-soft ui:hover:text-text ui:[font:inherit] ui:leading-none',
+			'ui:transition-[color] ui:duration-(--ui-duration-fast) ui:motion-reduce:transition-none ui:motion-reduce:duration-0',
+			'ui:before:absolute ui:before:-inset-(--ui-hint-hit-area) ui:before:rounded-full',
+			focusRing,
+		],
+		icon: '',
+		tooltip: '',
+	},
+})

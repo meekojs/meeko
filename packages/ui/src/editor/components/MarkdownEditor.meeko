@@ -2,11 +2,14 @@
 	import type { UIMarkdownEditorMode, UIMarkdownEditorProps } from '../../app/types/markdown-editor'
 	import type { MarkdownEditorHandle } from '../crepe'
 
+	import { uiTheme } from '../../app/utils/defaults'
 	import { uiMessages } from '../../app/utils/messages'
 	import { markdownEditor, markdownEditorDisabled, markdownEditorMarkerLines } from '../../app/variants/markdown-editor'
 	import { loadMarkdownEditor } from '../load'
 
 	const props = defineProps<UIMarkdownEditorProps>()
+
+	const theme = uiTheme('markdownEditor', () => props)
 
 	const classes = markdownEditor()
 
@@ -109,37 +112,37 @@
 
 <template>
 	<div
-		bind:class="classes.base({ class: ['ui-markdown-editor', props.disabled ? markdownEditorDisabled.base : undefined, props.ui?.base, props.class] })"
+		bind:class="classes.base({ class: ['ui-markdown-editor', props.disabled ? markdownEditorDisabled.base : undefined, theme.ui.base, theme.class] })"
 		bind:data-mode="mode.value"
 		bind:data-state="state.value"
 	>
-		<div bind:class="classes.bar({ class: props.ui?.bar })">
+		<div bind:class="classes.bar({ class: theme.ui.bar })">
 			<span
-				bind:class="classes.label({ class: props.ui?.label })"
+				bind:class="classes.label({ class: theme.ui.label })"
 				bind:id="labelId"
 				>{props.label}</span
 			>
 			<div
 				if:when="snippets.tools"
-				bind:class="classes.tools({ class: props.ui?.tools })"
+				bind:class="classes.tools({ class: theme.ui.tools })"
 			>
 				<render snippet="snippets.tools" />
 			</div>
 			<div
 				role="group"
-				bind:class="classes.modes({ class: props.ui?.modes })"
+				bind:class="classes.modes({ class: theme.ui.modes })"
 				bind:aria-label="messages.mode"
 			>
 				<button
 					type="button"
-					bind:class="classes.mode({ class: props.ui?.mode })"
+					bind:class="classes.mode({ class: theme.ui.mode })"
 					bind:aria-pressed="mode.value === 'visual' ? 'true' : 'false'"
 					on:click="() => (mode.value = 'visual')"
 					>{messages.visual}</button
 				>
 				<button
 					type="button"
-					bind:class="classes.mode({ class: props.ui?.mode })"
+					bind:class="classes.mode({ class: theme.ui.mode })"
 					bind:aria-pressed="mode.value === 'code' ? 'true' : 'false'"
 					on:click="() => (mode.value = 'code')"
 					>{messages.code}</button
@@ -149,27 +152,27 @@
 		<p
 			if:when="state.value === 'unsafe' || state.value === 'failed'"
 			role="status"
-			bind:class="classes.notice({ class: props.ui?.notice })"
+			bind:class="classes.notice({ class: theme.ui.notice })"
 			>{state.value === 'unsafe' ? messages.unsafe : messages.failed}</p
 		>
-		<div bind:class="classes.surface({ class: [props.disabled ? markdownEditorDisabled.surface : undefined, props.ui?.surface] })">
+		<div bind:class="classes.surface({ class: [props.disabled ? markdownEditorDisabled.surface : undefined, theme.ui.surface] })">
 			<div
 				if:when="mode.value === 'visual' && state.value === 'loading'"
 				role="status"
-				bind:class="classes.marker({ class: props.ui?.marker })"
+				bind:class="classes.marker({ class: theme.ui.marker })"
 			>
-				<span bind:class="classes.markerText({ class: props.ui?.markerText })">{messages.loading}</span>
+				<span bind:class="classes.markerText({ class: theme.ui.markerText })">{messages.loading}</span>
 				<span
 					each:of="markdownEditorMarkerLines"
 					each:as="width"
 					each:key="width"
 					aria-hidden="true"
-					bind:class="classes.markerLine({ class: [width, props.ui?.markerLine] })"
+					bind:class="classes.markerLine({ class: [width, theme.ui.markerLine] })"
 				/>
 			</div>
 			<div
 				ref:host
-				bind:class="classes.host({ class: props.ui?.host })"
+				bind:class="classes.host({ class: theme.ui.host })"
 				bind:hidden="mode.value !== 'visual' || state.value === 'loading'"
 				on:focusout="flush"
 			/>
@@ -178,7 +181,7 @@
 				spellcheck="false"
 				autocapitalize="off"
 				model="value"
-				bind:class="classes.code({ class: props.ui?.code })"
+				bind:class="classes.code({ class: theme.ui.code })"
 				bind:id="props.id"
 				bind:aria-labelledby="labelId"
 				bind:aria-describedby="props.describedBy"

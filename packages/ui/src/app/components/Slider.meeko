@@ -3,9 +3,12 @@
 
 	import type { UISliderProps } from '../types/forms'
 
+	import { uiTheme } from '../utils/defaults'
 	import { slider } from '../variants/slider'
 
-	const { label, class: className, style, ui, ...rest } = defineProps<UISliderProps>()
+	const { label, class: ownClass, style, ui: ownUi, ...rest } = defineProps<UISliderProps>()
+
+	const theme = uiTheme('slider', () => ({ class: ownClass, ui: ownUi }))
 
 	const value = defineModel<number>({ default: 50 })
 
@@ -20,12 +23,12 @@
 </script>
 
 <template>
-	<label bind:class="classes.base({ class: [ui?.base, className] })">
+	<label bind:class="classes.base({ class: [theme.ui.base, theme.class] })">
 		<span>{label}</span>
 		<input
 			type="range"
 			model="value"
-			bind:class="classes.input({ class: ui?.input })"
+			bind:class="classes.input({ class: theme.ui.input })"
 			bind:style="[style, '--slider-fill: ' + fill.value + '%'].filter(Boolean).join('; ')"
 			bind="rest"
 		/>

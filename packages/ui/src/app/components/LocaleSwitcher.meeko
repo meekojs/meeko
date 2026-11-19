@@ -3,12 +3,15 @@
 	// what shows; the name of the language is what a screen reader hears.
 	import type { UILinkTarget, UILocaleItem, UILocaleSwitcherProps } from '../types/navigation'
 
+	import { uiTheme } from '../utils/defaults'
 	import { uiMessages } from '../utils/messages'
 	import { linkTarget } from '../utils/navigation'
 	import { localeSwitcher } from '../variants/locale'
 	import * as ItemLink from './internal/ItemLink.meeko'
 
 	const props = defineProps<UILocaleSwitcherProps>()
+
+	const theme = uiTheme('localeSwitcher', () => props)
 
 	const text = uiMessages().language
 
@@ -20,14 +23,14 @@
 <template>
 	<nav
 		if:when="props.items.length > 1"
-		bind:class="classes.base({ class: [props.ui?.base, props.class] })"
+		bind:class="classes.base({ class: [theme.ui.base, theme.class] })"
 		bind:aria-label="props.label ?? text.label"
 	>
 		<ItemLink
 			each:of="props.items"
 			each:as="item"
 			each:key="item.code"
-			bind:class="classes.link({ class: props.ui?.link })"
+			bind:class="classes.link({ class: theme.ui.link })"
 			bind:link="target(item)"
 			bind:current="item.current ? 'page' : undefined"
 		>

@@ -3,10 +3,13 @@
 
 	import type { UIEmptyProps } from '../types/feedback'
 
+	import { uiTheme } from '../utils/defaults'
 	import { uiMessages } from '../utils/messages'
 	import { empty } from '../variants/feedback'
 
 	const props = defineProps<UIEmptyProps>()
+
+	const theme = uiTheme('empty', () => props)
 
 	const snippets = defineSnippets<{ default?: []; title?: []; actions?: [] }>()
 
@@ -15,8 +18,8 @@
 </script>
 
 <template>
-	<div bind:class="classes.value.base({ class: [props.ui?.base, props.class] })">
-		<p bind:class="classes.value.title({ class: props.ui?.title })">
+	<div bind:class="classes.value.base({ class: [theme.ui.base, theme.class] })">
+		<p bind:class="classes.value.title({ class: theme.ui.title })">
 			<render
 				if:when="snippets.title"
 				snippet="snippets.title"
@@ -25,7 +28,7 @@
 		</p>
 		<p
 			if:when="props.description"
-			bind:class="classes.value.description({ class: props.ui?.description })"
+			bind:class="classes.value.description({ class: theme.ui.description })"
 		>
 			{props.description}
 		</p>
@@ -35,7 +38,7 @@
 		/>
 		<div
 			if:when="snippets.actions"
-			bind:class="classes.value.actions({ class: props.ui?.actions })"
+			bind:class="classes.value.actions({ class: theme.ui.actions })"
 		>
 			<render snippet="snippets.actions" />
 		</div>

@@ -1,7 +1,7 @@
 import type { ElementAttributes } from '@meekojs/meeko'
 
 import type { badge } from '../variants/badge'
-import type { checkbox, radioGroup, toggle } from '../variants/choice'
+import type { checkbox, radioGroup, segmentedControl, toggle } from '../variants/choice'
 import type { field } from '../variants/field'
 import type { input, textarea } from '../variants/input'
 import type { slider } from '../variants/slider'
@@ -103,6 +103,50 @@ export type UIRadioGroupProps = Omit<ElementAttributes<'fieldset'>, 'class'> &
 			class?: string
 		}
 	>
+
+/** Lo que nombra a un `<UISegmentedControl>`: una leyenda, visible u oculta, o un `aria-label`. */
+type UISegmentedControlName =
+	| {
+			/** Leyenda del grupo, su nombre accesible. Con `hideLegend`, sólo la leen los lectores de pantalla. */
+			legend: string
+			/** Oculta la leyenda a la vista sin quitársela a los lectores de pantalla; `false` por defecto. */
+			hideLegend?: boolean
+			ariaLabel?: never
+	  }
+	| {
+			/** Nombre accesible del grupo cuando no tiene leyenda: el `aria-label` del `<fieldset>`. */
+			ariaLabel: string
+			legend?: never
+			hideLegend?: never
+	  }
+
+/**
+ * Selección única compacta, como un periodo de 7, 30 o 90 días: radios nativos con el aspecto de un control
+ * segmentado, así que las flechas, el envío del formulario y la validación son los del navegador, también sin
+ * JavaScript. El valor se enlaza con `model`. Si las opciones no caben, el control se desplaza en horizontal
+ * dentro de su ancho, sin partir ninguna opción ni ensanchar la página. Necesita un nombre: `legend` (que
+ * `hideLegend` deja sólo para lectores de pantalla) o `ariaLabel`. `ui` añade clases a sus slots: `base` (el
+ * `<fieldset>`), `legend`, `options` (la pista que se desplaza), `option` (cada `<label>`) e `input`.
+ * @since 1.11.0
+ * @example `<UISegmentedControl legend="Periodo" hideLegend size="sm" model="days" bind:options="[{ value: '7', label: '7 días' }, { value: '30', label: '30 días' }, { value: '90', label: '90 días' }]" />`
+ */
+export type UISegmentedControlProps = Omit<ElementAttributes<'fieldset'>, 'class' | 'aria-label'> &
+	UIThemeProps<
+		typeof segmentedControl,
+		{
+			/** Opciones en orden de lectura. */
+			options: readonly UIRadioOption[]
+			/** Nombre común de los radios en el formulario; se genera uno si falta. */
+			name?: string
+			/** Selección obligatoria. */
+			required?: boolean
+			/** Altura y texto, los de un control de ese tamaño; `"md"` por defecto. */
+			size?: 'sm' | 'md'
+			/** Clases adicionales del `<fieldset>`; equivale a `ui.base`. */
+			class?: string
+		}
+	> &
+	UISegmentedControlName
 
 /**
  * Rango nativo con `model` numérico. `ui` añade clases a sus slots: `base` (el `<label>`) e `input`.

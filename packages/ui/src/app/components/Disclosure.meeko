@@ -2,12 +2,15 @@
 	// <UIDisclosure>: a native <details>, so it opens with the keyboard and without JavaScript.
 	import type { UIDisclosureProps } from '../types/feedback'
 
+	import { uiTheme } from '../utils/defaults'
 	import { icons } from '../utils/icons'
 	import { disclosure } from '../variants/feedback'
 	import { chevron } from '../variants/navigation'
 	import * as Icon from './internal/Icon.meeko'
 
 	const props = defineProps<UIDisclosureProps>()
+
+	const theme = uiTheme('disclosure', () => props)
 
 	const snippets = defineSnippets<{ default: [] }>()
 
@@ -16,16 +19,16 @@
 
 <template>
 	<details
-		bind:class="classes.base({ class: [props.ui?.base, props.class] })"
+		bind:class="classes.base({ class: [theme.ui.base, theme.class] })"
 		bind:open="props.open"
 	>
-		<summary bind:class="classes.summary({ class: props.ui?.summary })">
+		<summary bind:class="classes.summary({ class: theme.ui.summary })">
 			{props.summary}
 			<Icon
 				bind:class="chevron"
 				bind:path="icons.chevron"
 			/>
 		</summary>
-		<div bind:class="classes.body({ class: props.ui?.body })"><render snippet="snippets.default" /></div>
+		<div bind:class="classes.body({ class: theme.ui.body })"><render snippet="snippets.default" /></div>
 	</details>
 </template>

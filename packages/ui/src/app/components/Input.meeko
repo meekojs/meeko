@@ -1,9 +1,12 @@
 <script lang="ts">
 	import type { UIInputProps } from '../types/forms'
 
+	import { uiTheme } from '../utils/defaults'
 	import { input } from '../variants/input'
 
-	const { invalid, describedBy, spellcheck, class: className, type = 'text', ...rest } = defineProps<UIInputProps>()
+	const { invalid, describedBy, spellcheck, class: ownClass, type = 'text', ...rest } = defineProps<UIInputProps>()
+
+	const theme = uiTheme('input', () => ({ class: ownClass }))
 
 	const value = defineModel<string>({ default: '' })
 </script>
@@ -15,7 +18,7 @@
 		bind:type="type"
 		bind:aria-invalid="invalid ? 'true' : undefined"
 		bind:aria-describedby="describedBy ?? rest['aria-describedby']"
-		bind:class="input({ class: className })"
+		bind:class="input({ class: theme.class })"
 		bind="rest"
 	/>
 </template>

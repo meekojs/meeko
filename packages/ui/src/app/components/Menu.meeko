@@ -1,0 +1,173 @@
+<script lang="ts">
+	// <UIMenu>: the Menu Button pattern of the APG on top of <UIPopover role="menu">, which already has the
+	// keys of a menu (arrows, Home, End, typeahead, Esc, Tab), closes it when an item is chosen and gives the
+	// focus back to the trigger. This component only paints the trigger, through the `anchor` snippet of the
+	// popover, and the items of `items`; their look is ../variants/menu.ts. Its template has no whitespace
+	// between the tags: it would be text in the trigger and in the items, which typeahead reads.
+	import { computed } from '@meekojs/meeko'
+
+	import type { MenuSnippets, UIMenuItem, UIMenuLink, UIMenuProps } from '../types/menu'
+
+	import { uiTheme } from '../utils/defaults'
+	import { icons } from '../utils/icons'
+	import { uiMessages } from '../utils/messages'
+	import { button } from '../variants/button'
+	import { menu } from '../variants/menu'
+	import * as Icon from './internal/Icon.meeko'
+	import * as Popover from './Popover.meeko'
+
+	const props = defineProps<UIMenuProps>()
+
+	const theme = uiTheme('menu', () => props)
+
+	const emit = defineEmits<{ select: [item: UIMenuItem] }>()
+
+	const open = defineModel<boolean>({ default: false })
+
+	const snippets = defineSnippets<MenuSnippets>()
+
+	const text = uiMessages().menu
+
+	const classes = menu()
+
+	/** An entry of `items` ready for the template: every field is there, whatever its kind. */
+	interface Row {
+		readonly index: number
+		readonly separator: boolean
+		readonly item: UIMenuItem
+		/** The link of an enabled link item: a disabled one is an <a> without `href`, which goes nowhere. */
+		readonly link: UIMenuLink | undefined
+		/** A link item, painted as an <a> (or a <MeekoLink> with `to`); the others are a <button> or a separator. */
+		readonly anchor: boolean
+		readonly rel: string | undefined
+	}
+
+	const blank: UIMenuItem = { label: '' }
+
+	const rows = computed(() =>
+		(props.items ?? []).map((entry, index): Row => {
+			if (entry.separator === true) return { index, separator: true, item: blank, link: undefined, anchor: false, rel: undefined }
+			const item = entry
+			const isLink = item.to !== undefined || item.href !== undefined
+			const link = isLink && !item.disabled ? (item as UIMenuLink) : undefined
+			return {
+				index,
+				separator: false,
+				item,
+				link,
+				anchor: isLink,
+				rel: link ? (link.rel ?? (link.target === '_blank' ? 'noopener noreferrer' : undefined)) : undefined,
+			}
+		}),
+	)
+
+	/** A trigger without text or content of its own is a square button with three dots. */
+	const iconOnly = computed(() => props.triggerLabel === undefined && !snippets.trigger)
+
+	const triggerClass = computed(() =>
+		button({
+			variant: props.variant ?? (iconOnly.value ? 'ghost' : 'secondary'),
+			size: props.size,
+			iconOnly: iconOnly.value,
+			class: [classes.trigger(), theme.ui.trigger],
+		}),
+	)
+
+	const ariaLabel = computed(() => props.ariaLabel ?? (iconOnly.value ? text.trigger : undefined))
+
+	/** Choosing an item: its `onSelect` and then the event. <UIPopover> closes the menu and focuses the trigger. */
+	function choose(row: Row, event: MouseEvent): void {
+		if (row.separator) return
+		if (row.item.disabled) {
+			event.preventDefault()
+			return
+		}
+		if (!row.link) (row.item as { readonly onSelect?: (item: UIMenuItem) => void }).onSelect?.(row.item)
+		emit('select', row.item)
+	}
+</script>
+
+<!-- No whitespace between the tags of this template: it would be text inside the trigger and the items. Prettier keeps it that way (htmlWhitespaceSensitivity "strict" in prettier.config.ts); tests/templates-without-whitespace.test.mjs guards it. -->
+<template><Popover
+		role="menu"
+		model="open"
+		bind:label="props.label"
+		bind:placement="props.placement"
+		bind:offset="props.offset ?? 4"
+		bind:triggerId="props.triggerId"
+		bind:class="classes.base({ class: [theme.ui.base, theme.class] })"
+		><snippet
+			name="anchor"
+			params="trigger"
+		>
+			<render
+				if:when="snippets.anchor"
+				snippet="snippets.anchor"
+				args="trigger"
+			/><button
+				if:when="!snippets.anchor"
+				type="button"
+				bind:id="trigger.id"
+				bind:class="triggerClass.value"
+				bind:popovertarget="trigger.popovertarget"
+				bind:aria-controls="trigger['aria-controls']"
+				bind:aria-expanded="trigger['aria-expanded']"
+				bind:aria-haspopup="trigger['aria-haspopup']"
+				bind:aria-label="ariaLabel.value"
+				bind:disabled="props.disabled"
+				><render
+					if:when="snippets.trigger"
+					snippet="snippets.trigger" /><template if:when="!snippets.trigger && props.triggerLabel !== undefined"
+					>{props.triggerLabel
+					}<Icon
+						size="sm"
+						bind:path="icons.chevron"
+						bind:class="classes.chevron({ class: theme.ui.chevron })" /></template
+				><Icon
+					if:when="iconOnly.value"
+					bind:path="icons.dots"
+			/></button></snippet
+		><component
+			each:of="rows.value"
+			each:as="row"
+			each:key="row.index"
+			is="row.link?.to !== undefined ? 'MeekoLink' : row.anchor ? 'a' : row.separator ? 'span' : 'button'"
+			bind:role="row.separator ? 'separator' : 'menuitem'"
+			bind:type="row.anchor || row.separator ? undefined : 'button'"
+			bind:tabindex="row.separator ? undefined : '-1'"
+			bind:aria-disabled="row.item.disabled ? 'true' : undefined"
+			bind:to="row.link?.to"
+			bind:params="row.link?.params"
+			bind:search="row.link?.search"
+			bind:resolve="row.link?.resolve"
+			bind:match="row.link?.match"
+			bind:href="row.link?.href"
+			bind:target="row.link?.target"
+			bind:rel="row.rel"
+			bind:download="row.link?.download"
+			bind:hreflang="row.link?.hreflang"
+			bind:lang="row.link?.lang"
+			bind:title="row.link?.title"
+			bind:data-value="row.item.value"
+			bind:class="row.separator ? classes.separator({ class: theme.ui.separator }) : classes.item({ tone: row.item.tone, class: theme.ui.item })"
+			on:click="(event) => choose(row, event)"
+			><render
+				if:when="!row.separator && snippets.item"
+				snippet="snippets.item"
+				args="row.item"
+			/><template if:when="!row.separator && !snippets.item"
+				><Icon
+					if:when="row.item.icon"
+					bind:path="row.item.icon ?? ''"
+					bind:class="classes.icon({ class: theme.ui.icon })"
+				/><span bind:class="classes.label({ class: theme.ui.label })">{row.item.label}</span
+				><kbd
+					if:when="row.item.shortcut"
+					bind:class="classes.shortcut({ class: theme.ui.shortcut })"
+					>{row.item.shortcut}</kbd
+				></template
+			></component
+		><render
+			if:when="snippets.default"
+			snippet="snippets.default"
+	/></Popover></template>

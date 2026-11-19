@@ -83,7 +83,7 @@ export type UISkeletonProps = UIThemeProps<
 >
 
 // <UIStat> and <UIDescriptionList> have their props in types/data, beside their variants.
-export type { UIDescriptionItem, UIDescriptionListProps, UIStatProps } from './data'
+export type { UIDescriptionItem, UIDescriptionListProps, UISparklineProps, UISparklineTone, UIStatDirection, UIStatProps } from './data'
 
 /** Notificación breve presentada por el host de UIApp. @example `<UIToast text="Cambios guardados" tone="success" />` */
 export type UIToastProps = UIThemeProps<

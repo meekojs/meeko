@@ -8,10 +8,13 @@
 
 	import type { TabsSnippets, UITabsProps } from '../types/tabs'
 
+	import { uiTheme } from '../utils/defaults'
 	import { createTabs } from '../utils/tabs'
 	import { tabs as tabsVariant } from '../variants/tabs'
 
 	const props = defineProps<UITabsProps<Value>>()
+
+	const theme = uiTheme('tabs', () => props)
 
 	const emit = defineEmits<{ change: [value: Value] }>()
 
@@ -34,10 +37,10 @@
 <template><div
 		ref:root
 		bind:id="props.id"
-		bind:class="classes.base({ class: [props.ui?.base, props.class] })"
+		bind:class="classes.base({ class: [theme.ui.base, theme.class] })"
 		><div
 			role="tablist"
-			bind:class="classes.list({ class: props.ui?.list })"
+			bind:class="classes.list({ class: theme.ui.list })"
 			bind:aria-label="props.label"
 			bind:aria-labelledby="props.labelledBy"
 			on:keydown="tabs.keydown"
@@ -47,7 +50,7 @@
 				each:key="item.value"
 				type="button"
 				role="tab"
-				bind:class="classes.tab({ class: props.ui?.tab })"
+				bind:class="classes.tab({ class: theme.ui.tab })"
 				bind:id="tabs.tabId(item)"
 				bind:aria-controls="tabs.panelId(item)"
 				bind:aria-selected="tabs.selected.value === item.value ? 'true' : 'false'"
@@ -58,14 +61,14 @@
 					if:when="snippets.tab"
 					snippet="snippets.tab"
 					args="item" /><template if:when="!snippets.tab">{item.label}</template
-				><span bind:class="classes.indicator({ class: props.ui?.indicator })" /></button></div
+				><span bind:class="classes.indicator({ class: theme.ui.indicator })" /></button></div
 		><div
 			each:of="props.items"
 			each:as="item"
 			each:key="item.value"
 			role="tabpanel"
 			tabindex="0"
-			bind:class="classes.panel({ class: props.ui?.panel })"
+			bind:class="classes.panel({ class: theme.ui.panel })"
 			bind:id="tabs.panelId(item)"
 			bind:aria-labelledby="tabs.tabId(item)"
 			bind:hidden="tabs.selected.value !== item.value"

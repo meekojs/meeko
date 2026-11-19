@@ -7,6 +7,7 @@
 	const pages = [
 		{ title: 'UIDrawer', url: '#drawer' },
 		{ title: 'UITooltip', url: '#tooltip' },
+		{ title: 'UIHint', url: '#hint' },
 		{ title: 'UICommandPalette', url: '#command-palette' },
 	]
 	const results = computed(() => pages.filter((page) => page.title.toLowerCase().includes(query.value.trim().toLowerCase())))
@@ -16,7 +17,7 @@
 	<DocsPage
 		locale="en"
 		title="Overlays"
-		description="Drawer, Tooltip and CommandPalette, on top of native dialog and popover."
+		description="Drawer, Tooltip, Hint and CommandPalette, on top of native dialog and popover."
 	>
 		<p>
 			For a dialog with a result, use
@@ -112,6 +113,43 @@
 			<code>anchor(trigger)</code>
 			snippets, for a trigger of your own.
 		</p>
+		<h2 id="hint">UIHint</h2>
+		<p>
+			An information icon with a help text in a
+			<code>UITooltip</code>
+			, to place next to a text or inside a heading. It takes the size and colour of the text around it, is reachable with the keyboard and is phrasing content. It is a button named by
+			<code>label</code>
+			("More information" by default, in the language of the document) and described by the help; the help opens with the pointer, with the focus and when it is pressed.
+		</p>
+		<DocsPreview id="hint-preview">
+			<div>
+				<h3 id="hint-revenue">
+					Revenue
+					<UIHint text="Amount collected, before taxes and refunds." />
+				</h3>
+				<p>
+					Gross margin
+					<UIHint
+						id="hint-margin"
+						label="What the margin is"
+						placement="bottom"
+					>
+						Revenue minus the
+						<em>direct costs</em>
+					</UIHint>
+				</p>
+			</div>
+		</DocsPreview>
+		<DocsCode bind:code="examples.hint" />
+		<DocsApi
+			caption="UIHint props"
+			bind:rows="[
+				{ name: 'text', type: 'string', description: 'The help; for formatted content, the default snippet.' },
+				{ name: 'label', type: 'string', default: 'More information', description: 'Accessible name of the button; the default follows the language of the document.' },
+				{ name: 'placement', type: 'PopoverPlacement', default: 'top', description: 'Where the help opens.' },
+				{ name: 'id / class / ui', type: 'string / string / { base, icon, tooltip }', description: 'Identity of the button and classes of its parts.' },
+			]"
+		/>
 		<h2 id="command-palette">UICommandPalette</h2>
 		<p>
 			It does not search: read
