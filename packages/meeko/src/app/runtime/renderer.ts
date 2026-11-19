@@ -6,7 +6,7 @@ import type { PropsSource } from './props'
 import type { Snippet, SnippetData } from './snippets'
 
 import { observeCallback } from '../../core/error-observer'
-import { batch, createContext, createRoot, currentEffectOwner, effect, effectInOrder, findContext, finishWithCleanup, isWritableSignal, provide, reserveUpdateOrder, signal, switchOwner, untrack } from '../../core/reactivity'
+import { batch, bindingEffect, createContext, createRoot, currentEffectOwner, effectInOrder, findContext, finishWithCleanup, isWritableSignal, provide, reserveUpdateOrder, signal, switchOwner, untrack } from '../../core/reactivity'
 import { attributeValue, rawHtml, serializeJson } from '../../core/server'
 import { documentHtmlIndex } from '../../shared/document-html'
 import { sameChannels } from './channels'
@@ -786,7 +786,7 @@ export function bindSpread(scope: DomScope, id: number, read: () => ReadonlyArra
 		if (target.getAttribute(name) !== value) throw new HydrationMismatchError(location, `attribute ${name}`, { expected: `${name}=${JSON.stringify(value)}`, found: attributeFound(target, name) })
 	}
 	let first = true
-	return effect(() => {
+	return bindingEffect(() => {
 		const next = new Map(read())
 		if (first) {
 			first = false
@@ -829,7 +829,7 @@ export function bindText(scope: DomScope, id: number, read: () => unknown, locat
 	if (!text || text.nodeType !== 3) throw new Error(`Missing text node in ${location}`)
 	if (text.textContent !== initial) throw new HydrationMismatchError(location, undefined, { expected: `text ${JSON.stringify(initial)}`, found: `text ${JSON.stringify(text.textContent)}` })
 	let first = true
-	return effect(() => {
+	return bindingEffect(() => {
 		const next = String(read())
 		if (first) {
 			first = false
@@ -897,7 +897,7 @@ export function bindHtml(scope: DomScope, id: number, read: () => unknown, locat
 	if (!target) throw new Error(`Missing Meeko target ${htmlMarker}="${id}" in ${location}`)
 	const reader = findContext(documentHtmlReader)
 	let current: string | undefined
-	return effect(() => {
+	return bindingEffect(() => {
 		// The SSR render types the value; the browser only checks it.
 		const next = rawHtml(read() as string | null | undefined)
 		const first = current === undefined
@@ -926,7 +926,7 @@ export function bindAttribute(scope: DomScope, id: number, name: string, read: (
 	const initial = attributeValue(name, read())
 	if (target.getAttribute(name) !== initial) throw new HydrationMismatchError(location, undefined, { expected: initial === null ? `no ${name}` : `${name}=${JSON.stringify(initial)}`, found: attributeFound(target, name) })
 	let first = true
-	return effect(() => {
+	return bindingEffect(() => {
 		const next = attributeValue(name, read())
 		if (first) {
 			first = false
@@ -1093,7 +1093,7 @@ export function bindModel<K extends NativeModelKind>(scope: DomScope, id: number
 			})
 		: () => {}
 	let first = true
-	const stop = effect(() => {
+	const stop = bindingEffect(() => {
 		model = writable()
 		const value = model.value
 		const radio = radioValue ? radioValue() : undefined
@@ -1279,7 +1279,7 @@ export function bindSnippet(scope: DomScope, id: number, read: () => unknown, re
 	const args = signal<readonly unknown[]>(untrack(readArgs))
 	let stopSnippet = () => {}
 	let first = true
-	stopSnippet = effect(() =>
+	stopSnippet = bindingEffect(() =>
 		mountBatch(() => {
 			const next = snippetOf(read())
 			if (first) {
@@ -1309,7 +1309,7 @@ export function bindSnippet(scope: DomScope, id: number, read: () => unknown, re
 	)
 	let stopArgs = () => {}
 	try {
-		stopArgs = effect(() => {
+		stopArgs = bindingEffect(() => {
 			const next = readArgs()
 			if (
 				!sameArguments(

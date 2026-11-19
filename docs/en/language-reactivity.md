@@ -1,5 +1,5 @@
 ---
-source-hash: 1dc4cc576ffb15ff363a533668f410a8db4027a7f24e7e22f2f7502cd06a457c
+source-hash: 6f67af223eee903db681761f2e7e919ad3687637bc3052b848a4ce5d909f3e0e
 ---
 
 # Reactivity and lifecycle
@@ -10,21 +10,21 @@ source-hash: 1dc4cc576ffb15ff363a533668f410a8db4027a7f24e7e22f2f7502cd06a457c
 
 The `effect` callback must be synchronous: reads after an `await` cannot be registered as dependencies of that execution. TypeScript rejects a callback returning a promise and the runtime rejects the same case in JavaScript; if that promise also rejects, Meeko reports the rejection so it does not remain unhandled. Start async work from a synchronous effect and explicitly manage its cancellation and errors.
 
-The value returned by the `effect` callback is ignored: unlike React or Solid, a returned function is not a cleanup. `onCleanup` inside an effect does not clean up per run either: it registers on the active component or root and runs only when they are disposed, so every run would add another one. To release the previous run's resources, do it at the start of the next run and close the last one with `onCleanup` outside the effect:
+Since `1.10`, each `effect` run owns what it registers, as in Solid or React's `useEffect`: the function the callback returns, the `onCleanup` calls it makes and the `effect`, `computed` and `createRoot` it creates are released before the next run and when the effect stops (with the function `effect` returns, or when its component or root is disposed of). Any other returned value is ignored. In SSR the cleanup runs when rendering finishes, when the root is disposed of.
 
 ```ts
-let controller: AbortController | undefined
 effect(() => {
-	const q = query.value
-	controller?.abort()
-	const current = new AbortController()
-	controller = current
-	void fetch(`/api/search?q=${encodeURIComponent(q)}`, { signal: current.signal }).catch(() => {})
+	const controller = new AbortController()
+	void fetch(`/api/search?q=${encodeURIComponent(query.value)}`, { signal: controller.signal }).catch(() => {})
+	return () => controller.abort()
 })
-onCleanup(() => controller?.abort())
 ```
 
-`onCleanup(() => ...)` registers resource disposal in the active root and also requires a synchronous callback. TypeScript rejects functions that can return `PromiseLike`; the runtime protects JavaScript and callbacks changing behavior, observes any rejection and delivers a `TypeError` during disposal. All cleanups continue executing and simultaneous failures are aggregated. To close an async resource, explicitly start and observe that operation before unmounting or use a host that can await its own shutdown lifecycle.
+Until `1.9` the returned value was ignored and `onCleanup` inside an effect registered on the component, where it ran only on unmount; see the [stability policy](stability.md#approved-exceptions).
+
+`onCleanup(() => ...)` registers resource disposal in the active owner: the component or `createRoot` root, or the current run of an `effect`. It also requires a synchronous callback. TypeScript rejects functions that can return `PromiseLike`; the runtime protects JavaScript and callbacks changing behavior, observes any rejection and delivers a `TypeError` during disposal. All cleanups continue executing and simultaneous failures are aggregated. To close an async resource, explicitly start and observe that operation before unmounting or use a host that can await its own shutdown lifecycle.
+
+After an `await` (in your own `async` function, not the browser continuation of the component script), in an event handler or while evaluating a module there is no active owner: `onCleanup` throws an error saying where to call it and, in development, also warns with `console.warn`, because in an `async` function without `catch` the error is lost. Register the cleanup before the first `await`, return it from `onMounted` or from an `effect`, or create a root with `createRoot`.
 
 If rendering or hydration fails, Meeko disposes all effects and resources already registered. When both work and some cleanup fail, it delivers an `AggregateError` preserving both causes.
 
@@ -58,6 +58,7 @@ There is no `onUpdated`: use `effect` to react to changes.
 | ------------------------------------------------- | -------------------------------------------------- | ----------------------------------- |
 | Setup (top level of `<script>`)                   | On rendering and on hydration or mounting          | Server and browser                  |
 | `effect`                                          | During setup and whenever a signal it read changes | Server (first run only) and browser |
+| Cleanup of an `effect` (returned or `onCleanup`)  | Before the next run and when the effect stops      | Where the effect ran                |
 | `onMounted`                                       | Once, after hydration or mounting                  | Browser only                        |
 | `onCleanup` (and cleanup returned by `onMounted`) | On unmounting or disposing the component           | Where it was registered             |
 
@@ -65,7 +66,7 @@ There is no `onUpdated`: use `effect` to react to changes.
 
 Observers created during `hydrate` belong to that instance. During Vite HMR, writable script signals are preserved by name; computed values are recalculated. This in-memory HMR state is independent of JSON transfer between server and browser.
 
-The `@meekojs/meeko` root exports exactly `signal`, `computed`, `effect`, `batch`, `untrack`, `createRoot`, `onCleanup`, `onMounted`, `createContext`, `provide`, `inject`, `provideErrorHandler`, `serializeJson`, since `1.3`, `trustHtml`, since `1.5`, `useId` and, since `1.8`, `createId` and `isTooLargeToAnimate`, plus signal, context, component error, component, snippet, HTML tag and attribute value, `HotState`, DevTools and, since `1.3`, `TrustedHtml` types. This engine also documents `@meekojs/meeko/vite` and `@meekojs/meeko/devtools-ui`. Framework and adapter subpaths (`/framework`, `/server`, `/node`, `/bun`, `/deno`, `/cloudflare` and `/build`) are described in the [framework guide](framework.md). The compiler imports its DOM, HMR and DevTools registration functions from `@meekojs/meeko/internal`. That path is a contract between the compiler and its runtime of the **exact same version**, and is not intended for manual imports. A generated module must be compiled with the same package version that executes it, so it must be recompiled when updating Meeko.
+The `@meekojs/meeko` root exports exactly `signal`, `computed`, `effect`, `batch`, `untrack`, `createRoot`, `onCleanup`, `onMounted`, `createContext`, `provide`, `inject`, `provideErrorHandler`, `serializeJson`, since `1.3`, `trustHtml`, since `1.5`, `useId` and, since `1.8`, `createId` and `isTooLargeToAnimate`, plus signal, effect (`EffectResult`, since `1.10`), context, component error, component, snippet, HTML tag and attribute value, `HotState`, DevTools and, since `1.3`, `TrustedHtml` types. This engine also documents `@meekojs/meeko/vite` and `@meekojs/meeko/devtools-ui`. Framework and adapter subpaths (`/framework`, `/server`, `/node`, `/bun`, `/deno`, `/cloudflare` and `/build`) are described in the [framework guide](framework.md). The compiler imports its DOM, HMR and DevTools registration functions from `@meekojs/meeko/internal`. That path is a contract between the compiler and its runtime of the **exact same version**, and is not intended for manual imports. A generated module must be compiled with the same package version that executes it, so it must be recompiled when updating Meeko.
 
 ### New IDs: `createId`
 

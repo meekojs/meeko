@@ -13,15 +13,15 @@ In a framework app (`app/`), all of these are **auto-imported** in `.meeko` file
 
 ## What runs where
 
-| Code                                         | SSR                                     | Hydration / client mount            | Client dry pass (navigation preload) |
-| -------------------------------------------- | --------------------------------------- | ----------------------------------- | ------------------------------------ |
-| Top level of `<script lang="ts">`            | yes                                     | yes (again, from transferred state) | yes                                  |
-| `computed(fn)`                               | yes, eagerly                            | yes, recomputed (not transferred)   | yes                                  |
-| `effect(fn)`                                 | **first run only**                      | yes, and on every dependency change | **no**                               |
-| `onMounted(fn)`                              | **never**                               | once, after mount/hydration         | never                                |
-| `onCleanup(fn)`                              | **yes** — root is disposed after render | on unmount / dispose                | —                                    |
-| Code after first browser `await` (see below) | never                                   | after mount, browser only           | never                                |
-| `<script server>`                            | yes (server only)                       | never                               | —                                    |
+| Code                                         | SSR                                     | Hydration / client mount                                                   | Client dry pass (navigation preload) |
+| -------------------------------------------- | --------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------ |
+| Top level of `<script lang="ts">`            | yes                                     | yes (again, from transferred state)                                        | yes                                  |
+| `computed(fn)`                               | yes, eagerly                            | yes, recomputed (not transferred)                                          | yes                                  |
+| `effect(fn)`                                 | **first run only**                      | yes, and on every dependency change                                        | **no**                               |
+| `onMounted(fn)`                              | **never**                               | once, after mount/hydration                                                | never                                |
+| `onCleanup(fn)`                              | **yes** — root is disposed after render | on unmount / dispose (inside an `effect`: before its next run and on stop) | —                                    |
+| Code after first browser `await` (see below) | never                                   | after mount, browser only                                                  | never                                |
+| `<script server>`                            | yes (server only)                       | never                                                                      | —                                    |
 
 There is **no `onUpdated`**: use `effect`.
 
@@ -71,22 +71,23 @@ stop() // optional; inside a component it stops on unmount
 
 - Callback must be **synchronous**. `effect(async () => …)` is a type error (`TS2345 … parameter of type 'never'`) and at runtime `TypeError: Meeko effect callbacks must be synchronous`. Reads after `await` would not be tracked anyway.
 - Runs immediately, then on dependency changes, in creation order (parent before child).
-- **The return value is ignored** (only a returned promise is rejected). There is no per-run cleanup function like React. `onCleanup` inside an effect registers on the _owning root_ and runs only at unmount — calling it on every re-run accumulates cleanups. Manage per-run teardown with a closure variable:
+- **Per-run cleanup (since 1.10).** A function returned from the callback is that run's cleanup: it runs before the next run and when the effect stops (stop(), unmount, root dispose; in SSR when the render's root is released). `onCleanup` inside an effect belongs to that run too, and so do effects/`computed`/`createRoot` created inside it (recreated every run — create them outside if they must outlive a run). Other return values are ignored; a returned promise, or a cleanup returning one, is rejected. Up to 1.9 the returned function was silently ignored and `onCleanup` accumulated on the component.
 
 ```ts
-let controller: AbortController | undefined
 effect(() => {
 	const q = query.value.trim()           // track BEFORE any async work
-	controller?.abort()
 	if (!q) { results.value = []; return }
-	const current = (controller = new AbortController())
-	fetch(`/api/search?q=${encodeURIComponent(q)}`, { signal: current.signal })
+	const controller = new AbortController()
+	fetch(`/api/search?q=${encodeURIComponent(q)}`, { signal: controller.signal })
 		.then((r) => r.json() as Promise<string[]>)
 		.then((list) => { results.value = list })
-		.catch((e: unknown) => { if (!current.signal.aborted) console.error(e) })
+		.catch((e: unknown) => { if (!controller.signal.aborted) console.error(e) })
+	return () => controller.abort()          // before the next search and on unmount
 })
-onCleanup(() => controller?.abort())     // once, at top level
 ```
+
+- Don't return a function you only meant to read: `effect(() => props.onSelect)` would call it as a cleanup. Use a block body.
+- `onCleanup` after an `await`, in an event handler or at module level has no owner: it throws an error saying what to use and, in development, also `console.warn`s it.
 
 - Writing a signal the effect reads loops: `Error: Reactive update cycle exceeded 1000 iterations`. Derived state = `computed`, not `effect` + signal.
 - Browser APIs: guard with `typeof window` or create the effect inside `onMounted` (browser-only):

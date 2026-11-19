@@ -1,5 +1,5 @@
 export { batch, computed, createContext, createRoot, effect, inject, onCleanup, provide, signal, untrack } from './core/reactivity'
-export type { ContextKey, ReadonlySignal, Signal } from './core/reactivity'
+export type { ContextKey, EffectResult, ReadonlySignal, Signal } from './core/reactivity'
 export { provideErrorHandler } from './app/runtime/component-errors'
 export { onMounted } from './app/runtime/lifecycle'
 export { isTooLargeToAnimate } from './app/runtime/view-transitions'

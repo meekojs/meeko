@@ -83,7 +83,7 @@ In a Framework app `signal`, `computed`, etc. are auto-imported; in engine-only 
 
 - Assign, never mutate: `items.value = [...items.value, x]` (`push` notifies nothing).
 - `props` is reactive and read-only; `const t = props.x.trim()` freezes the first value (`MEEK101`) — use `computed`.
-- `computed` is pure and synchronous. `effect`/`onCleanup` callbacks must be synchronous; a function returned from `effect` is **not** a cleanup.
+- `computed` is pure and synchronous. `effect`/`onCleanup` callbacks must be synchronous; since 1.10 a function returned from `effect` (and `onCleanup` inside it) is that run's cleanup, run before the next run and on stop.
 - `effect` and top-level code also run during SSR; `onMounted` never does. Touch `window`/`document` only in `onMounted` or handlers. Top-level `onCleanup` also runs on the server.
 - Call `onMounted`, `onCleanup`, `inject`, `useState`, `useStorage`, `useId` synchronously during setup, not in handlers or after `await`.
 - Top-level signals and `useState` must hold JSON-serializable values (no `Date`, `Map`).

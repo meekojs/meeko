@@ -6,21 +6,21 @@
 
 El callback de `effect` debe ser síncrono: las lecturas posteriores a un `await` no pueden registrarse como dependencias de esa ejecución. TypeScript rechaza un callback que devuelve una promesa y el runtime rechaza el mismo caso en JavaScript; si esa promesa también rechaza, Meeko informa el rechazo para que no quede sin manejar. Inicie trabajo asíncrono desde un efecto síncrono y gestione explícitamente su cancelación y su error.
 
-El valor que devuelve el callback de `effect` se ignora: a diferencia de React o Solid, una función devuelta no es una limpieza. `onCleanup` dentro de un efecto tampoco limpia por ejecución: se registra en el componente o la raíz activos y sólo se ejecuta al liberarlos, así que cada ejecución añadiría otra. Para liberar lo de la ejecución anterior, hágalo al empezar la siguiente y cierre la última con `onCleanup` fuera del efecto:
+Desde `1.10`, cada ejecución de `effect` es propietaria de lo que registra, como en Solid o en `useEffect` de React: la función que devuelve el callback, los `onCleanup` que llama y los `effect`, `computed` y `createRoot` que crea se liberan antes de la siguiente ejecución y al detener el efecto (con la función que devuelve `effect`, o al liberar su componente o raíz). Cualquier otro valor devuelto se ignora. En SSR la limpieza corre al terminar el render, cuando se libera la raíz.
 
 ```ts
-let controller: AbortController | undefined
 effect(() => {
-	const q = query.value
-	controller?.abort()
-	const current = new AbortController()
-	controller = current
-	void fetch(`/api/search?q=${encodeURIComponent(q)}`, { signal: current.signal }).catch(() => {})
+	const controller = new AbortController()
+	void fetch(`/api/search?q=${encodeURIComponent(query.value)}`, { signal: controller.signal }).catch(() => {})
+	return () => controller.abort()
 })
-onCleanup(() => controller?.abort())
 ```
 
-`onCleanup(() => ...)` registra la liberación de un recurso en la raíz activa y también exige un callback síncrono. TypeScript rechaza funciones que puedan devolver `PromiseLike`; el runtime protege JavaScript y callbacks que cambien de comportamiento, observa cualquier rechazo y entrega un `TypeError` durante la liberación. Todas las limpiezas continúan ejecutándose y los fallos simultáneos se agrupan. Para cerrar un recurso asíncrono, inicie y observe explícitamente esa operación antes del desmontaje o use un host que pueda esperar su propio ciclo de cierre.
+Hasta `1.9` el valor devuelto se ignoraba y `onCleanup` dentro de un efecto se registraba en el componente, donde sólo corría al desmontarlo; véase la [política de estabilidad](stability.md#excepciones-aprobadas).
+
+`onCleanup(() => ...)` registra la liberación de un recurso en el propietario activo: el componente o la raíz de `createRoot`, o la ejecución en curso de un `effect`. También exige un callback síncrono. TypeScript rechaza funciones que puedan devolver `PromiseLike`; el runtime protege JavaScript y callbacks que cambien de comportamiento, observa cualquier rechazo y entrega un `TypeError` durante la liberación. Todas las limpiezas continúan ejecutándose y los fallos simultáneos se agrupan. Para cerrar un recurso asíncrono, inicie y observe explícitamente esa operación antes del desmontaje o use un host que pueda esperar su propio ciclo de cierre.
+
+Tras un `await` (de una función `async` propia, no de la continuación de navegador del script del componente), en un manejador de evento o al evaluar un módulo no hay propietario activo: `onCleanup` lanza un error que dice dónde llamarlo y, en desarrollo, lo avisa también con `console.warn`, porque en una función `async` sin `catch` el error se pierde. Registre la limpieza antes del primer `await`, devuélvala desde `onMounted` o desde un `effect`, o cree una raíz con `createRoot`.
 
 Si el render o la hidratación falla, Meeko libera todos los efectos y recursos ya registrados. Cuando el trabajo y alguna limpieza fallan a la vez, entrega un `AggregateError` que conserva ambas causas.
 
@@ -54,6 +54,7 @@ No hay `onUpdated`: para reaccionar a cambios, use `effect`.
 | ---------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------ |
 | Setup (nivel superior del `<script>`)                | Al renderizar y al hidratar o montar                      | Servidor y navegador                             |
 | `effect`                                             | Durante el setup y cada vez que cambia una señal que leyó | Servidor (sólo la primera ejecución) y navegador |
+| Limpieza de un `effect` (devuelta u `onCleanup`)     | Antes de la siguiente ejecución y al detener el efecto    | Donde se ejecutó el efecto                       |
 | `onMounted`                                          | Una vez, tras hidratar o montar                           | Sólo navegador                                   |
 | `onCleanup` (y la limpieza que devuelve `onMounted`) | Al desmontar o liberar el componente                      | Donde se registró                                |
 
@@ -61,7 +62,7 @@ No hay `onUpdated`: para reaccionar a cambios, use `effect`.
 
 Los observadores creados durante `hydrate` pertenecen a esa instancia. Durante HMR de Vite se conservan por nombre las señales editables del script; los valores derivados se calculan otra vez. Este estado en memoria de HMR es independiente de la transferencia JSON entre servidor y navegador.
 
-La raíz `@meekojs/meeko` exporta exactamente `signal`, `computed`, `effect`, `batch`, `untrack`, `createRoot`, `onCleanup`, `onMounted`, `createContext`, `provide`, `inject`, `provideErrorHandler`, `serializeJson`, desde `1.3`, `trustHtml`, desde `1.5`, `useId` y, desde `1.8`, `createId` e `isTooLargeToAnimate`, más los tipos de señales, contexto, errores de componente, componentes, snippets, etiquetas y valores de atributos HTML, `HotState`, DevTools y, desde `1.3`, `TrustedHtml`. Este motor documenta además `@meekojs/meeko/vite` y `@meekojs/meeko/devtools-ui`. Las subrutas del framework y de los adaptadores (`/framework`, `/server`, `/node`, `/bun`, `/deno`, `/cloudflare` y `/build`) se describen en la [guía del framework](framework.md). El compilador importa sus funciones de DOM, HMR y registro de DevTools desde `@meekojs/meeko/internal`. Esa ruta es un contrato entre el compilador y su runtime de la **misma versión exacta**, y no está destinada a imports manuales. Un módulo generado debe compilarse con la misma versión del paquete que lo ejecuta, así que hay que volver a compilarlo al actualizar Meeko.
+La raíz `@meekojs/meeko` exporta exactamente `signal`, `computed`, `effect`, `batch`, `untrack`, `createRoot`, `onCleanup`, `onMounted`, `createContext`, `provide`, `inject`, `provideErrorHandler`, `serializeJson`, desde `1.3`, `trustHtml`, desde `1.5`, `useId` y, desde `1.8`, `createId` e `isTooLargeToAnimate`, más los tipos de señales, efectos (`EffectResult`, desde `1.10`), contexto, errores de componente, componentes, snippets, etiquetas y valores de atributos HTML, `HotState`, DevTools y, desde `1.3`, `TrustedHtml`. Este motor documenta además `@meekojs/meeko/vite` y `@meekojs/meeko/devtools-ui`. Las subrutas del framework y de los adaptadores (`/framework`, `/server`, `/node`, `/bun`, `/deno`, `/cloudflare` y `/build`) se describen en la [guía del framework](framework.md). El compilador importa sus funciones de DOM, HMR y registro de DevTools desde `@meekojs/meeko/internal`. Esa ruta es un contrato entre el compilador y su runtime de la **misma versión exacta**, y no está destinada a imports manuales. Un módulo generado debe compilarse con la misma versión del paquete que lo ejecuta, así que hay que volver a compilarlo al actualizar Meeko.
 
 ### IDs nuevos: `createId`
 
