@@ -42,4 +42,4 @@ La lectura es estática: módulos importados, funciones y expresiones dinámicas
 
 La elección efectiva del LSP depende de la confianza del workspace y los ajustes de VS Code. Doctor informa qué servidor del proyecto está disponible; no afirma que el editor lo esté ejecutando ni modifica extensiones.
 
-Si faltan artefactos, ejecuta `pnpm exec meeko routes` o `pnpm exec meeko check`. Si faltan dependencias, instala desde la raíz del workspace. Consulta [Editores](editors.md), [Tooling](tooling.md) y [Pruebas](testing.md) para los flujos correspondientes.
+Si faltan artefactos, ejecuta `pnpm exec meeko routes .` o `pnpm exec meeko check .`. Si faltan dependencias, instala desde la raíz del workspace. Las opciones, el formato del informe y los códigos de salida están en la [referencia de `meeko doctor`](reference/commands/meeko-doctor.md). Consulta [Editores](editors.md), [Tooling](tooling.md) y [Pruebas](testing.md) para los flujos correspondientes.

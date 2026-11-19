@@ -14,12 +14,12 @@ related:
   - '@meekojs/meeko/framework#useHead'
   - docs/framework.md#tema-clarooscuro-sin-parpadeo
   - docs/framework.md#iconos-que-no-saltan
-source-hash: a476f6eb8d505035519e7b863f3d76e35ec6b096811427d8e2c9a884ebd79982
+source-hash: 09817d1a4729769da67fa14e86ecdc1cc95020a4f39660638ffdc7438e38bf34
 ---
 
 With `theme` in `meeko.config.ts`, Meeko stores the user's choice in a cookie, writes the theme to `<html>` from the first byte and, when the server cannot know it, applies it with a `<head>` script before the first render. `useTheme()` gives components that state: `theme`, the choice (including `"system"`), `resolved`, the visible theme, `themes`, the theme list, and `set`, which changes the choice in `<html>`, `color-scheme`, the cookie and `localStorage`.
 
-For a ready-made selector, use `<UIThemeToggle>` from `@meekojs/ui` 0.2; for a custom one, use [`useThemeToggle()`](/en/docs/reference/usethemetoggle). `<MeekoThemeToggle>` is deprecated since core 1.8 and removed in 2.0. `useTheme()` is auto-imported in `.meeko` files (your own export with that name takes priority) and is called while a component script runs.
+For a ready-made selector, use `<UIThemeToggle>` from `@meekojs/ui` 1.8 or later; for a custom one, use [`useThemeToggle()`](/en/docs/reference/usethemetoggle). `<MeekoThemeToggle>` is deprecated since core 1.8 and removed in 2.0. `useTheme()` is auto-imported in `.meeko` files (your own export with that name takes priority) and is called while a component script runs.
 
 ## Usage
 

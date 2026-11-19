@@ -362,7 +362,7 @@ Con JavaScript, `form.submit` cancela el envío nativo y manda JSON con `submit`
 
 Un error (de validación, un `ApiError` del handler o de `locals`, `401`, `403 FORBIDDEN`, `429`, `413` o un `500`) también responde `303`, de vuelta al campo `return`, a `Referer` o a `/`, nunca con el JSON del error. En los dos casos, la respuesta deja una cookie de un solo uso, `__Host-meeko-form` (`meeko-form` sin HTTPS), `HttpOnly`, `SameSite=Lax`, de 60 segundos, con el resultado: el código, el estado, los `issues` (como mucho 20, como en un `400`) y, sólo en los campos que lista `form.echo`, los valores enviados. Por defecto ningún valor vuelve: el formulario muestra los mensajes y sus campos parten de `initial`. Los valores viajan en la cookie y en el HTML de la página, así que `echo` no debe incluir contraseñas, números de tarjeta, PIN, IBAN ni otros datos sensibles; aun así, un campo cuyo nombre contiene `password`, `passcode`, `secret`, `token`, `cvc` o `cvv` nunca vuelve, y los archivos tampoco. Si no cabe en la cookie, primero se quitan los valores y después los últimos `issues`.
 
-**La página.** El `GET` de esa página lee la cookie, la borra en la misma respuesta (`Max-Age=0`, `cache-control: no-store`) y renderiza la página aunque esté prerenderizada. Un `useForm` con `action` igual a la ruta del endpoint toma el resultado durante el SSR, igual que tras un envío con JavaScript: los valores de `form.echo` en sus campos, `errors` y `error` repartidos por los `issues`, `failure` con un `ClientError` del código y el estado (y `error` con `errorMessage(failure)` si no hay `issues`) o `submitted` en `true` tras un envío correcto. El resultado viaja en el estado de la página, así que la hidratación pinta lo mismo, y el navegador lo usa una sola vez: al volver a montar el formulario, empieza de `initial`. Un campo con un mensaje del servidor lo pierde al cambiar, como tras un envío con JavaScript. Un campo que sigue con error vuelve como texto, tal como se escribió.
+**La página.** El `GET` de esa página lee la cookie, la borra en la misma respuesta (`Max-Age=0`, `cache-control: no-store`) y renderiza la página aunque esté prerenderizada. Un `useForm` con `action` igual a la ruta del endpoint toma el resultado durante el SSR, igual que tras un envío con JavaScript: los valores de `form.echo` en sus campos, `errors` y `error` repartidos por los `issues`, `failure` con un `ClientError` del código y el estado (y `error` con el texto de la opción `errorMessage`, o `failure.message` sin ella, si no hay `issues`) o `submitted` en `true` tras un envío correcto. El resultado viaja en el estado de la página, así que la hidratación pinta lo mismo, y el navegador lo usa una sola vez: al volver a montar el formulario, empieza de `initial`. Un campo con un mensaje del servidor lo pierde al cambiar, como tras un envío con JavaScript. Un campo que sigue con error vuelve como texto, tal como se escribió.
 
 Por qué una cookie: una query firmada dejaría los valores, a veces personales, en la barra de direcciones, el historial, los logs y el `Referer`, y necesitaría un secreto compartido entre instancias; guardar el resultado en el store de sesiones crearía una sesión para cada visitante anónimo. Una cookie `HttpOnly` de un solo uso no deja rastro en la URL, no necesita estado en el servidor, funciona con varias instancias y, con el prefijo `__Host-`, ningún subdominio puede plantarla. Su contenido sólo se pinta como texto escapado, y no se firma: quien puede escribir esa cookie (el propio navegador del usuario) sólo puede cambiar lo que él mismo ve.
 
@@ -765,7 +765,7 @@ Use una clave de almacenamiento por mutación, que incluya lo que la distinga en
 			notify(`Venta #${receipt.number} cobrada.`)
 		} catch (error) {
 			// Sin respuesta: queda en verificación y se reintentará con la misma clave.
-			if (!charge.uncertain.value) failure.value = errorMessage(error)
+			if (!charge.uncertain.value) failure.value = isClientError(error) ? `El servidor rechazó la venta (${error.code}).` : 'No se pudo cobrar la venta.'
 		}
 	}
 	function discard(): void {
@@ -804,7 +804,7 @@ const charge = useRpcMutation('sales.checkout', {
 	},
 	onError(error, attempt) {
 		// Sólo los rechazos con respuesta: sin respuesta, la venta sigue en verificación.
-		if (!attempt.uncertain) notify(`La venta no se registró: ${errorMessage(error)}`)
+		if (!attempt.uncertain) notify(`La venta no se registró: ${isClientError(error) ? error.code : 'error inesperado'}`)
 	},
 })
 ```
@@ -1131,7 +1131,7 @@ export default defineApiRoute({
 
 `ClientError` e `isClientError` se autoimportan desde `1.5` en los componentes y en los módulos de `app/` (no en `server/`, donde se lanza `ApiError`), como `useForm`: `errorMessage: (failure) => isClientError(failure, "INVALID_CREDENTIALS") ? "…" : "…"` no necesita import.
 
-**Otros fallos.** Un error sin `issues` pone en `error` el texto de `errorMessage(failure)` y en `failure` el error original, y `form.submit()` resuelve `undefined`. Un `ClientError` es una respuesta prevista del servidor y no se informa en otro sitio. Cualquier otro error (un fallo de red, un error de programación en `submit` o un schema que lanza) llega además al observador de errores del componente, `provideErrorHandler` o el `onError` de `mountClientApp`, con la fuente `"event"`; sin observador, se escribe en la consola. Así un fallo inesperado nunca se pierde en silencio, aunque la plantilla no muestre `error`.
+**Otros fallos.** Un error sin `issues` pone en `error` el texto de la opción `errorMessage` (por defecto, `failure.message`) y en `failure` el error original, y `form.submit()` resuelve `undefined`. Un `ClientError` es una respuesta prevista del servidor y no se informa en otro sitio. Cualquier otro error (un fallo de red, un error de programación en `submit` o un schema que lanza) llega además al observador de errores del componente, `provideErrorHandler` o el `onError` de `mountClientApp`, con la fuente `"event"`; sin observador, se escribe en la consola. Así un fallo inesperado nunca se pierde en silencio, aunque la plantilla no muestre `error`.
 
 **`reset`, `load` y `dirty`.** `reset()` siempre devuelve los campos a `initial`, incluso después de `load` o `commit`. `reset(values)` combina `values` con `initial` y toma ese resultado como referencia de `dirty`. `load(values)` combina los datos con los campos actuales y usa el resultado como referencia de `dirty`; sirve al cargar un registro para editar, incluso después de una petición asíncrona: `form.load({ name: category.name, description: category.description })`. Ambos limpian errores y el estado del último envío, y descartan resultados anteriores en curso (aunque `pending` sigue en `true` hasta que termine). `reset` también puede conectarse a `on:reset="form.reset"`. Como con cualquier señal, sustituya los arrays y objetos en lugar de mutarlos: `form.fields.items.value = [...form.fields.items.value, item]`.
 

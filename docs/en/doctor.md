@@ -1,5 +1,5 @@
 ---
-source-hash: b89b1d179821f7513ad2f97c91317a54207c04bcb28d75a981416e475fbb04ce
+source-hash: 603b04b24257a470b211021980b38e4907354196abcf83c6369795c386a10c70
 ---
 
 # Project diagnostics
@@ -46,4 +46,4 @@ Reading is static: imported modules, functions and dynamic expressions are neith
 
 The actual LSP selection depends on workspace trust and VS Code settings. Doctor reports which project server is available; it does not claim the editor is running it or modify extensions.
 
-If artifacts are missing, run `pnpm exec meeko routes` or `pnpm exec meeko check`. If dependencies are missing, install them from the workspace root. See [Editors](editors.md), [Tooling](tooling.md) and [Testing](testing.md) for the corresponding workflows.
+If artifacts are missing, run `pnpm exec meeko routes .` or `pnpm exec meeko check .`. If dependencies are missing, install them from the workspace root. Options, report format and exit codes are in the [`meeko doctor` reference](reference/commands/meeko-doctor.md). See [Editors](editors.md), [Tooling](tooling.md) and [Testing](testing.md) for the corresponding workflows.

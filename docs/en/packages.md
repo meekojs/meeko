@@ -12,13 +12,13 @@ source-hash: f2d26739d8709d8c0c06ba6f62fab5fca1c50eab76b7689c505a1e797a293026
 - `packages/eslint-plugin`: `@meekojs/eslint-plugin`, component parser and rules.
 - `packages/prettier-plugin`: `@meekojs/prettier-plugin`, component formatting.
 
-From the root, `pnpm build` builds the packages in dependency order and `pnpm check` checks their types. The new packages' `0.1.0` versions are local to the workspace; their publication and the minimum core version with the new APIs must be established before publishing.
+From the root, `pnpm build` builds the packages in dependency order and `pnpm check` checks their types. The five packages are published to npm together with the core and share its version number since `1.8.0`, the first published release; the current one is `1.9.0`. All of them declare `@meekojs/meeko` `>=1.8 <2` in `peerDependencies`.
 
 ## Meeko 1.x compatibility
 
 The `@meekojs/meeko/i18n`, `/i18n/module` and `/prettier` entry points retain their previous implementations for existing applications. New features belong in the new packages. This transitional compatibility avoids a runtime dependency from the core to optional packages; it will be removed with an explicit migration in a major version.
 
-Since core 1.8, `MeekoSelect`, `MeekoPopover` and `MeekoThemeToggle` are deprecated (`MEEK121` warning) and will be removed in 2.0. UI 1.8 provides `UISelect`, `UIPopover` and `UIThemeToggle` with the same contract and markup. Enable the `@meekojs/ui` module; the theme system and `useThemeToggle()` remain in core. See [Migration to 1.8](migration-1.8.md).
+Since core 1.8, `MeekoSelect`, `MeekoPopover` and `MeekoThemeToggle` are deprecated (`MEEK121` warning) and will be removed in 2.0. UI 1.8 provides `UICombobox`, `UIPopover` and `UIThemeToggle` with the same contract and markup. `UISelect` is a different component, a native `<select>`, which only a `<MeekoSelect>` without `multiple`, `searchable`, `filter` or `max` can move to. Enable the `@meekojs/ui` module; the theme system and `useThemeToggle()` remain in core. See [Migration to 1.8](migration-1.8.md).
 
 ## Tooling API and module types
 

@@ -1,5 +1,5 @@
 ---
-source-hash: 6a1c9d81f93468ec3eb728bfb09a0bc6fa77f271d4712f2d465b41b7f9f287ec
+source-hash: 25265e81c1bb06180d6e5301a86a206166bd8d8b7511baff8ad1ed6ad15d53a6
 ---
 
 # Use WebSocket
@@ -26,12 +26,12 @@ export default defineSocketChannel({
 
 ```ts
 // Inside <script lang="ts"> in app/pages/chat/index.meeko
-const chat = typeof window === 'undefined' ? undefined : useSocket('chat', { roomId: 'general' })
-const unsubscribe = chat?.on('message', (message) => console.log(message.text))
-const send = async () => chat?.emit('message', { text: 'Hello', roomId: 'general' })
+const chat = useSocket('chat', { roomId: 'general' })
+const unsubscribe = chat.on('message', (message) => console.log(message.text))
+const send = async () => chat.emit('message', { text: 'Hello', roomId: 'general' })
 ```
 
-Through `1.6`, `useSocket` without `await` could only be called in the browser (it threw during SSR), hence the `window` check; since `1.7`, during SSR it returns an inert client that stays in `"connecting"` (its `on` registers nothing and its `emit` rejects), so the check is no longer needed. Since `1.1`, top-level `await useSocket(...)` goes further: setup splits at that point and the rest runs only in the browser, after the component mounts and with the socket already open (`"open"` state). The template can only use names declared before the `await` (`MEEK057`), and if the socket never opens, the continuation keeps waiting (see [api.md](api.md#top-level-composables-and-await)):
+Through `1.6`, `useSocket` without `await` could only be called in the browser (it threw during SSR), so it was guarded with `typeof window === 'undefined' ? undefined : useSocket(...)`; since `1.7`, during SSR it returns an inert client that stays in `"connecting"` (its `on` registers nothing and its `emit` rejects), so the check is no longer needed. Since `1.1`, top-level `await useSocket(...)` goes further: setup splits at that point and the rest runs only in the browser, after the component mounts and with the socket already open (`"open"` state). The template can only use names declared before the `await` (`MEEK057`), and if the socket never opens, the continuation keeps waiting (see [api.md](api.md#top-level-composables-and-await)):
 
 ```html
 <script lang="ts">

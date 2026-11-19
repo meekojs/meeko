@@ -16,7 +16,7 @@ related:
   - "@meekojs/meeko#provideErrorHandler"
   - docs/api.md#reactividad
   - docs/api.md#ciclo-de-vida
-source-hash: d8a9ae4ed064a343cf63fc76b1e28614e597b9c6ef83d9cb97266e6b570e943d
+source-hash: d61afd956a3600ef7dca9a24fc29f1fa2d83a9e23995eef176d36e544a2fe5ff
 ---
 
 `effect(fn)` bridges signals and the outside world: it runs `fn` immediately, records the signals it reads and reruns it when any changes. Use it to synchronize something Meeko does not render (the document title, a third-party library, `localStorage`, a connection) with state. To calculate a value, use [`computed`](/en/docs/reference/computed); to render, use the template.
@@ -50,6 +50,8 @@ The first run occurs when the effect is created; every letter the user types cha
 ## Return value
 
 A `() => void` function that stops the effect: it stops observing its signals and never runs again. In a component, you need not call it because the effect stops on unmount; use it to stop earlier, or for an effect created outside a root.
+
+The value `fn` returns is ignored: unlike React's `useEffect` or Solid, a returned function is not a cleanup, and Meeko does not call it before the next run or when stopping. A returned promise stops the effect and throws `TypeError` (see [An `async` callback](#an-async-callback)).
 
 ## Examples
 
@@ -114,6 +116,8 @@ effect(() => {
 });
 ```
 
+Aborting the previous run's request at the start is the pattern for releasing something per run, because Meeko ignores what the callback returns. In a component, add `onCleanup(() => controller?.abort())` outside the effect to cancel the last one on unmount.
+
 In a framework component, [`useRpcQuery`](/en/docs/reference/use-rpc-query) or [`useApi`](/en/docs/reference/use-api) with `debounceMs` and `enabled` (since `1.7`) already handle this, with cancellation, SSR and hydration.
 
 ### Read a signal without depending on it
@@ -147,6 +151,29 @@ effect(() => {
   const q = query.value;
   void fetch(`/api/users?q=${q}`).then((response) => response.json()).then((list) => { users.value = list; });
 });
+```
+
+### Return a cleanup, as in React
+
+```ts bad
+effect(() => {
+  const id = setInterval(tick, delay.value);
+  return () => clearInterval(id);
+});
+```
+
+Meeko ignores the returned function: when `delay` changes, another interval starts without stopping the previous one. `onCleanup(() => clearInterval(id))` inside the effect does not help either: it registers on the component or root containing the effect and runs only when they are disposed, not before each run, so every run adds another cleanup. Release the previous run's resource at the start of the next, and the last one with `onCleanup` outside the effect:
+
+<!-- no-check -->
+
+```ts good
+let id: ReturnType<typeof setInterval> | undefined;
+effect(() => {
+  const ms = delay.value;
+  clearInterval(id);
+  id = setInterval(tick, ms);
+});
+onCleanup(() => clearInterval(id));
 ```
 
 ### Write the signal the effect reads
@@ -204,4 +231,5 @@ onMounted(() => {
 - **Order.** Pending effects run in creation order: a parent effect, such as an `if:when` effect, runs before those it created. Multiple successive writes run the effect multiple times; group them with [`batch`](/en/docs/reference/batch).
 - **Errors.** An exception in an effect created during setup fails rendering. One occurring in reaction to a write propagates to the writer (for example, the `on:click` handler), which sends it to the nearest [`provideErrorHandler`](/en/docs/reference/provideerrorhandler). If multiple observers fail in the same round, they are grouped in an `AggregateError`.
 - **Lifecycle.** Inside a component, the effect stops on unmount, page change or when its `if:when` or `each:of` row disappears. Outside a root (a module or test), it lives until you call its returned function, or create it inside [`createRoot`](/en/docs/reference/createroot).
+- **Cleanup.** There is no per-run cleanup: the return value is ignored, and `onCleanup` inside the effect registers on the active component or root (outside a root it throws) and runs once, when they are disposed.
 - **No `onUpdated`.** Meeko has no update hook: an effect reading signals is how you react to their changes.

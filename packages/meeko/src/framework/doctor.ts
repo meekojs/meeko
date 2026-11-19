@@ -97,7 +97,7 @@ export async function diagnoseProject(directory: string): Promise<DoctorReport> 
 		checks.push({ id: 'config', status: 'warning', message: 'No se pudo leer la configuración estática. Revisa sus arrays literales de layers, modules e imports; no se ha ejecutado código.' })
 	}
 	const generated = ['.meeko/tsconfig.app.json', '.meeko/tsconfig.server.json', '.meeko/tsconfig.shared.json', '.meeko/types/routes.d.ts', '.meeko/generated/entry-client.ts'].map((file) => ({ file, exists: existsSync(join(root, file)) }))
-	if (application) checks.push({ id: 'generated', status: generated.every((item) => item.exists) ? 'ok' : 'warning', message: generated.every((item) => item.exists) ? 'Los artefactos básicos de .meeko están presentes; esto no garantiza que estén actualizados.' : 'Faltan artefactos de .meeko; ejecuta meeko routes o meeko check para generarlos.' })
+	if (application) checks.push({ id: 'generated', status: generated.every((item) => item.exists) ? 'ok' : 'warning', message: generated.every((item) => item.exists) ? 'Los artefactos básicos de .meeko están presentes; esto no garantiza que estén actualizados.' : 'Faltan artefactos de .meeko; ejecuta meeko routes . o meeko check . para generarlos.' })
 	checks.push({ id: 'language-server', status: engine.languageServer ? 'ok' : 'warning', message: engine.languageServer ? 'Servidor de lenguaje del proyecto disponible.' : 'No se encontró el servidor de lenguaje del proyecto; el editor puede recurrir al incluido en su extensión.' })
 	return {
 		schemaVersion: 1,

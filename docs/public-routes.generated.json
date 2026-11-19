@@ -4,12 +4,12 @@
 			"es",
 			"en"
 		],
-		"routes": 1358,
+		"routes": 1364,
 		"guideSources": 59,
-		"curatedSymbols": 172,
-		"generatedSymbols": 576,
+		"curatedSymbols": 173,
+		"generatedSymbols": 578,
 		"sharedSymbols": 134,
-		"distinctReferenceDestinations": 614
+		"distinctReferenceDestinations": 617
 	},
 	"routes": [
 		{
@@ -219,7 +219,7 @@
 			"translation": "original",
 			"status": "current",
 			"title": "Cambios de Meeko · Meeko",
-			"purpose": "Credenciales configurables en los clientes API y RPC. ClientOptions.credentials acepta same-origin, include u omit y conserva same-origin por defecto. Permite…",
+			"purpose": "Seguridad: una expresión {…} dentro de un <script> o un <style> de la plantilla es el error MEEK140 (compilación, meeko check y editor): el escape HTML no…",
 			"links": [
 				"/docs/api#atributos-en-bloque-con-bind",
 				"/docs/api#atributos-seg%C3%BAn-la-etiqueta",
@@ -330,6 +330,7 @@
 			],
 			"anchors": [
 				"cambios-de-meeko",
+				"sin-publicar",
 				"190--2026-11-05",
 				"180--2026-11-04",
 				"seguridad",
@@ -637,7 +638,8 @@
 				"html-de-confianza-trustedhtml-y-trusthtml",
 				"html-que-viaja-una-vez-documenthtml",
 				"listas-con-y-sin-eachkey",
-				"elementos-sin-contenido-div-"
+				"elementos-sin-contenido-div-",
+				"script-y-style-en-la-plantilla"
 			]
 		},
 		{
@@ -7006,6 +7008,7 @@
 				"leer-una-señal-sin-depender-de-ella",
 				"errores-comunes",
 				"un-callback-async",
+				"devolver-una-limpieza-como-en-react",
 				"escribir-la-señal-que-el-efecto-lee",
 				"usar-effect-para-derivar-estado",
 				"tocar-el-dom-o-apis-del-navegador-sin-comprobarlo",
@@ -7593,6 +7596,19 @@
 				"notas",
 				"relacionado"
 			]
+		},
+		{
+			"path": "/docs/reference/hydrationdocument",
+			"kind": "generated-reference",
+			"audience": "expert",
+			"source": "packages/meeko/src/app/runtime/client-payload.ts",
+			"locale": "es",
+			"translation": "original",
+			"status": "current",
+			"title": "HydrationDocument · Referencia de Meeko · Meeko",
+			"purpose": "Raíz y payload de hidratación que el servidor escribe en un documento Meeko.",
+			"links": [],
+			"anchors": []
 		},
 		{
 			"path": "/docs/reference/i18n",
@@ -8582,6 +8598,40 @@
 			]
 		},
 		{
+			"path": "/docs/reference/meeko-doctor",
+			"kind": "curated-reference",
+			"audience": "developer",
+			"source": "docs/reference/commands/meeko-doctor.md",
+			"locale": "es",
+			"translation": "original",
+			"status": "current",
+			"title": "meeko doctor · Referencia de Meeko · Meeko",
+			"purpose": "Inspecciona el entorno local del proyecto (Node, paquetes, configuración, artefactos de .meeko/ y servidor de lenguaje) sin ejecutar su código, leer .env ni modificar archivos.",
+			"links": [
+				"/docs/doctor",
+				"/docs/editors",
+				"/docs/reference/meeko-check",
+				"/docs/reference/meeko-lsp",
+				"/docs/reference/meeko-routes"
+			],
+			"anchors": [
+				"uso",
+				"tipo",
+				"opciones",
+				"resultado",
+				"ejemplos",
+				"antes-de-abrir-una-incidencia",
+				"una-aplicación-dentro-de-un-monorepo",
+				"en-ci-sólo-como-requisito-de-node",
+				"errores-comunes",
+				"tomar-un-aviso-de-artefactos-por-un-fallo",
+				"esperar-que-valide-los-tipos",
+				"un-directorio-que-no-existe",
+				"notas",
+				"relacionado"
+			]
+		},
+		{
 			"path": "/docs/reference/meeko-init",
 			"kind": "curated-reference",
 			"audience": "developer",
@@ -9050,7 +9100,6 @@
 				"/docs/reference/defineemits",
 				"/docs/reference/elementattributes",
 				"/docs/reference/href",
-				"/docs/reference/if-when",
 				"/docs/reference/meekolinkprops",
 				"/docs/reference/meekooutlet",
 				"/docs/reference/mountclientapp",
@@ -11049,6 +11098,19 @@
 			"status": "current",
 			"title": "Reactive · Referencia de Meeko · Meeko",
 			"purpose": "Un valor o una señal de ese valor.",
+			"links": [],
+			"anchors": []
+		},
+		{
+			"path": "/docs/reference/readhydrationdocument",
+			"kind": "generated-reference",
+			"audience": "expert",
+			"source": "packages/meeko/src/app/runtime/client-payload.ts",
+			"locale": "es",
+			"translation": "original",
+			"status": "current",
+			"title": "readHydrationDocument · Referencia de Meeko · Meeko",
+			"purpose": "Localiza la raíz #app y el payload #meeko-payload que escribió el servidor, sin confundirlos con elementos de la página que repitan esos id, como el HTML de usuario saneado, que conserva los id.",
 			"links": [],
 			"anchors": []
 		},
@@ -15153,7 +15215,7 @@
 			"translation": "original",
 			"status": "current",
 			"title": "Política de estabilidad 1.x · Meeko",
-			"purpose": "Vigencia: política de compatibilidad de la serie 1.x. Este checkout declara @meekojs/meeko@1.8.0; npm publica 1.9.0 al 5 de noviembre de 2026. Consulta el…",
+			"purpose": "Vigencia: política de compatibilidad de la serie 1.x. Este checkout declara @meekojs/meeko@1.9.0, la versión que npm publica al 5 de noviembre de 2026…",
 			"links": [
 				"/docs/api",
 				"/docs/api#atributos-en-bloque-con-bind",
@@ -15166,6 +15228,7 @@
 				"/docs/api#qu%C3%A9-elementos-reciben-el-atributo",
 				"/docs/api#valores-de-los-atributos",
 				"/docs/changelog",
+				"/docs/component-template#script-y-style-en-la-plantilla",
 				"/docs/devtools",
 				"/docs/devtools#panel-dentro-de-la-p%C3%A1gina",
 				"/docs/devtools#puente-del-editor",
@@ -15223,7 +15286,8 @@
 				"/docs/migration-1.8",
 				"/docs/migration-1.8#m%C3%B3dulos-por-su-nombre",
 				"/docs/migration-1.8#origin-en-todas-las-mutaciones",
-				"/docs/migration-1.8#tipos-de-un-componente"
+				"/docs/migration-1.8#tipos-de-un-componente",
+				"/docs/ui-api#clases-por-slot"
 			],
 			"anchors": [
 				"política-de-estabilidad-1x",
@@ -15345,9 +15409,11 @@
 				"container",
 				"controles-básicos",
 				"uibutton-ruta-enlace-o-botón",
+				"uiiconbutton-y-uihint",
 				"navegación-y-etiquetas",
 				"personalización",
 				"clases-por-slot",
+				"clases-y-variantes-por-defecto",
 				"migración-desde-las-clases-retiradas",
 				"modales",
 				"tablas",
@@ -15357,14 +15423,17 @@
 				"desarrollo",
 				"uipopover",
 				"props-de-uipopover",
+				"uimenu",
 				"uiselect",
 				"uicombobox",
 				"props-de-uicombobox",
 				"uithemetoggle",
 				"estructura-y-navegación",
+				"paneles-propios-y-el-canal-de-la-barra",
 				"plataforma-y-view-transitions",
 				"pestañas-tooltips-y-paleta",
 				"formularios-y-estados",
+				"uistat-como-cifra-clave-y-uisparkline",
 				"notificaciones-desde-una-página"
 			]
 		},
@@ -15575,7 +15644,7 @@
 			"translation": "missing",
 			"status": "current",
 			"title": "Cambios de Meeko · Meeko",
-			"purpose": "Credenciales configurables en los clientes API y RPC. ClientOptions.credentials acepta same-origin, include u omit y conserva same-origin por defecto. Permite…",
+			"purpose": "Seguridad: una expresión {…} dentro de un <script> o un <style> de la plantilla es el error MEEK140 (compilación, meeko check y editor): el escape HTML no…",
 			"links": [
 				"/en/docs/api#a-button-that-is-a-route-link-or-button",
 				"/en/docs/api#attribute-values",
@@ -15637,6 +15706,7 @@
 			],
 			"anchors": [
 				"cambios-de-meeko",
+				"sin-publicar",
 				"190--2026-11-05",
 				"180--2026-11-04",
 				"seguridad",
@@ -15777,7 +15847,7 @@
 			"audience": "learner",
 			"source": "docs/component-attributes.md",
 			"locale": "en",
-			"translation": "outdated",
+			"translation": "translated",
 			"status": "current",
 			"title": "Attributes and static props · Meeko",
 			"purpose": "In a <component is> with tags, Meeko writes each attribute only while the current tag accepts it according to its HTML data, without ternaries: bind:href…",
@@ -15926,7 +15996,7 @@
 			"audience": "learner",
 			"source": "docs/component-template.md",
 			"locale": "en",
-			"translation": "outdated",
+			"translation": "translated",
 			"status": "current",
 			"title": "Templates and directives · Meeko",
 			"purpose": "Since 1.2, if:when narrows types inside its element, as v-if does in Vue: its attributes, props, events and content are checked knowing the condition holds, in…",
@@ -15944,7 +16014,8 @@
 				"trusted-html-trustedhtml-and-trusthtml",
 				"html-that-travels-once-documenthtml",
 				"lists-with-and-without-eachkey",
-				"elements-without-content-div-"
+				"elements-without-content-div-",
+				"script-and-style-in-the-template"
 			]
 		},
 		{
@@ -19211,7 +19282,7 @@
 			"audience": "developer",
 			"source": "docs/en/reference/config/config-server.md",
 			"locale": "en",
-			"translation": "translated",
+			"translation": "outdated",
 			"status": "current",
 			"title": "server · Meeko reference · Meeko",
 			"purpose": "The meeko build adapter (node, bun, deno, cloudflare or static) and its options, plus, since 1.7, response CSP and headers for server adapters.",
@@ -21269,7 +21340,7 @@
 			"audience": "developer",
 			"source": "docs/en/reference/macros/defineroutemiddleware.md",
 			"locale": "en",
-			"translation": "translated",
+			"translation": "outdated",
 			"status": "current",
 			"title": "defineRouteMiddleware · Meeko reference · Meeko",
 			"purpose": "Declares global or named route middleware in app/middleware, executed before the page in SSR and on each browser navigation.",
@@ -22274,6 +22345,7 @@
 				"read-a-signal-without-depending-on-it",
 				"common-mistakes",
 				"an-async-callback",
+				"return-a-cleanup-as-in-react",
 				"write-the-signal-the-effect-reads",
 				"use-effect-to-derive-state",
 				"access-the-dom-or-browser-apis-without-checking",
@@ -22855,6 +22927,19 @@
 				"notes",
 				"related"
 			]
+		},
+		{
+			"path": "/en/docs/reference/hydrationdocument",
+			"kind": "generated-reference",
+			"audience": "expert",
+			"source": "packages/meeko/src/app/runtime/client-payload.ts",
+			"locale": "en",
+			"translation": "missing",
+			"status": "current",
+			"title": "HydrationDocument · Meeko reference · Meeko",
+			"purpose": "Raíz y payload de hidratación que el servidor escribe en un documento Meeko.",
+			"links": [],
+			"anchors": []
 		},
 		{
 			"path": "/en/docs/reference/i18n",
@@ -23838,6 +23923,40 @@
 			]
 		},
 		{
+			"path": "/en/docs/reference/meeko-doctor",
+			"kind": "curated-reference",
+			"audience": "developer",
+			"source": "docs/en/reference/commands/meeko-doctor.md",
+			"locale": "en",
+			"translation": "translated",
+			"status": "current",
+			"title": "meeko doctor · Meeko reference · Meeko",
+			"purpose": "Inspects the project's local environment (Node, packages, configuration, .meeko/ artifacts and language server) without running its code, reading .env or modifying files.",
+			"links": [
+				"/en/docs/doctor",
+				"/en/docs/editors",
+				"/en/docs/reference/meeko-check",
+				"/en/docs/reference/meeko-lsp",
+				"/en/docs/reference/meeko-routes"
+			],
+			"anchors": [
+				"usage",
+				"type",
+				"options",
+				"result",
+				"examples",
+				"before-opening-an-issue",
+				"an-application-inside-a-monorepo",
+				"in-ci-only-as-a-node-requirement",
+				"common-mistakes",
+				"treating-an-artifacts-aviso-as-a-failure",
+				"expecting-it-to-check-types",
+				"a-directory-that-does-not-exist",
+				"notes",
+				"related"
+			]
+		},
+		{
 			"path": "/en/docs/reference/meeko-init",
 			"kind": "curated-reference",
 			"audience": "developer",
@@ -24287,7 +24406,7 @@
 			"audience": "developer",
 			"source": "docs/en/reference/components/meekolink.md",
 			"locale": "en",
-			"translation": "outdated",
+			"translation": "translated",
 			"status": "current",
 			"title": "<MeekoLink> · Meeko reference · Meeko",
 			"purpose": "Typed link to an application page that builds its href with href() and marks the current page or section with aria-current.",
@@ -24299,7 +24418,6 @@
 				"/en/docs/reference/defineemits",
 				"/en/docs/reference/elementattributes",
 				"/en/docs/reference/href",
-				"/en/docs/reference/if-when",
 				"/en/docs/reference/meekolinkprops",
 				"/en/docs/reference/meekooutlet",
 				"/en/docs/reference/mountclientapp",
@@ -26290,6 +26408,19 @@
 			"status": "current",
 			"title": "Reactive · Meeko reference · Meeko",
 			"purpose": "Un valor o una señal de ese valor.",
+			"links": [],
+			"anchors": []
+		},
+		{
+			"path": "/en/docs/reference/readhydrationdocument",
+			"kind": "generated-reference",
+			"audience": "expert",
+			"source": "packages/meeko/src/app/runtime/client-payload.ts",
+			"locale": "en",
+			"translation": "missing",
+			"status": "current",
+			"title": "readHydrationDocument · Meeko reference · Meeko",
+			"purpose": "Localiza la raíz #app y el payload #meeko-payload que escribió el servidor, sin confundirlos con elementos de la página que repitan esos id, como el HTML de usuario saneado, que conserva los id.",
 			"links": [],
 			"anchors": []
 		},
@@ -30363,7 +30494,7 @@
 			"translation": "translated",
 			"status": "current",
 			"title": "1.x stability policy · Meeko",
-			"purpose": "Scope: compatibility policy for the 1.x series. This checkout declares @meekojs/meeko@1.8.0; npm publishes 1.9.0 as of November 5, 2026. Consult the changelog…",
+			"purpose": "Scope: compatibility policy for the 1.x series. This checkout declares @meekojs/meeko@1.9.0, the version npm publishes as of November 5, 2026. Consult the…",
 			"links": [
 				"/en/docs/api",
 				"/en/docs/api#attribute-values",
@@ -30376,6 +30507,7 @@
 				"/en/docs/api#trusted-html-trustedhtml-and-trusthtml",
 				"/en/docs/api#which-elements-receive-the-attribute",
 				"/en/docs/changelog",
+				"/en/docs/component-template#script-and-style-in-the-template",
 				"/en/docs/devtools",
 				"/en/docs/devtools#editor-bridge",
 				"/en/docs/devtools#in-page-panel",
@@ -30433,7 +30565,8 @@
 				"/en/docs/migration-1.8",
 				"/en/docs/migration-1.8#component-types",
 				"/en/docs/migration-1.8#modules-by-name",
-				"/en/docs/migration-1.8#origin-in-all-mutations"
+				"/en/docs/migration-1.8#origin-in-all-mutations",
+				"/en/docs/ui-api#classes-per-slot"
 			],
 			"anchors": [
 				"1x-stability-policy",
@@ -30555,9 +30688,11 @@
 				"container",
 				"basic-controls",
 				"uibutton-route-link-or-button",
+				"uiiconbutton-and-uihint",
 				"navigation-and-labels",
 				"customization",
 				"classes-per-slot",
+				"default-classes-and-variants",
 				"migrating-from-the-removed-classes",
 				"modals",
 				"tables",
@@ -30567,14 +30702,17 @@
 				"development",
 				"uipopover",
 				"uipopover-props",
+				"uimenu",
 				"uiselect",
 				"uicombobox",
 				"uicombobox-props",
 				"uithemetoggle",
 				"structure-and-navigation",
+				"own-panels-and-the-scrollbar-gutter",
 				"platform-and-view-transitions",
 				"tabs-tooltips-and-palette",
 				"forms-and-states",
+				"uistat-as-a-key-figure-and-uisparkline",
 				"notifications-from-a-page"
 			]
 		},

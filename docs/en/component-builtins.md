@@ -1,5 +1,5 @@
 ---
-source-hash: f691b56c33fdb407c88cec7ccef126e8a79b268a9aa15ec05e56379fc4de8430
+source-hash: b5fe2b6831a8625a2aa94fcde6c4e2f5bba5b3f5d489d3e1c32b6037dd89e773
 ---
 
 # Built-in components
@@ -121,7 +121,7 @@ A trigger that is not a `<button>` (without `popovertarget`) opens content with 
 
 ### Select: `<MeekoSelect>`
 
-> **Deprecated since 1.8; removal in 2.0.** `<MeekoSelect>` keeps working in 1.x and emits `MEEK121`. Use `<UICombobox>` from `@meekojs/ui` 0.2 with its module active, which keeps props, snippets and `data-meeko-*` markup, or `<UISelect>`, a native `<select>`, if you do not need `multiple`, `searchable`, `filter` or `max`. See [Migration to 1.8](migration-1.8.md).
+> **Deprecated since 1.8; removal in 2.0.** `<MeekoSelect>` keeps working in 1.x and emits `MEEK121`. Use `<UICombobox>` from `@meekojs/ui` 1.8 or later with its module active, which keeps props, snippets and `data-meeko-*` markup, or `<UISelect>`, a native `<select>`, if you do not need `multiple`, `searchable`, `filter` or `max`. See [Migration to 1.8](migration-1.8.md).
 
 An accessible select built on `<MeekoPopover>`. `model` is the value and its type comes from `options`:
 

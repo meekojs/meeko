@@ -1,5 +1,5 @@
 ---
-source-hash: 8f912c51b3a8dd48862ebe89a10b36476cfc7f88a7ba03779db18207df4f5280
+source-hash: 1dc4cc576ffb15ff363a533668f410a8db4027a7f24e7e22f2f7502cd06a457c
 ---
 
 # Reactivity and lifecycle
@@ -9,6 +9,20 @@ source-hash: 8f912c51b3a8dd48862ebe89a10b36476cfc7f88a7ba03779db18207df4f5280
 `signal(initial)` creates a writable value with `.value`. `computed(() => expression)` creates a read-only computed value. `effect(() => ...)` observes signals read and returns a function canceling the observer. `batch(() => ...)` batches updates; `untrack(() => ...)` reads without subscribing the current observer. `createRoot(dispose => ...)` groups effects to dispose of them when an instance unmounts. If an observer fails, Meeko continues other pending observers and propagates errors; multiple failures are delivered in an `AggregateError`. If the `batch` callback also fails, both causes are preserved.
 
 The `effect` callback must be synchronous: reads after an `await` cannot be registered as dependencies of that execution. TypeScript rejects a callback returning a promise and the runtime rejects the same case in JavaScript; if that promise also rejects, Meeko reports the rejection so it does not remain unhandled. Start async work from a synchronous effect and explicitly manage its cancellation and errors.
+
+The value returned by the `effect` callback is ignored: unlike React or Solid, a returned function is not a cleanup. `onCleanup` inside an effect does not clean up per run either: it registers on the active component or root and runs only when they are disposed, so every run would add another one. To release the previous run's resources, do it at the start of the next run and close the last one with `onCleanup` outside the effect:
+
+```ts
+let controller: AbortController | undefined
+effect(() => {
+	const q = query.value
+	controller?.abort()
+	const current = new AbortController()
+	controller = current
+	void fetch(`/api/search?q=${encodeURIComponent(q)}`, { signal: current.signal }).catch(() => {})
+})
+onCleanup(() => controller?.abort())
+```
 
 `onCleanup(() => ...)` registers resource disposal in the active root and also requires a synchronous callback. TypeScript rejects functions that can return `PromiseLike`; the runtime protects JavaScript and callbacks changing behavior, observes any rejection and delivers a `TypeError` during disposal. All cleanups continue executing and simultaneous failures are aggregated. To close an async resource, explicitly start and observe that operation before unmounting or use a host that can await its own shutdown lifecycle.
 
@@ -51,7 +65,7 @@ There is no `onUpdated`: use `effect` to react to changes.
 
 Observers created during `hydrate` belong to that instance. During Vite HMR, writable script signals are preserved by name; computed values are recalculated. This in-memory HMR state is independent of JSON transfer between server and browser.
 
-The `@meekojs/meeko` root exports exactly `signal`, `computed`, `effect`, `batch`, `untrack`, `createRoot`, `onCleanup`, `onMounted`, `createContext`, `provide`, `inject`, `provideErrorHandler`, `serializeJson`, since `1.3`, `trustHtml` and, since `1.5`, `useId` and, since `1.8`, `createId`, plus signal, context, component, `HotState`, DevTools and, since `1.3`, `TrustedHtml` types. This engine also documents `@meekojs/meeko/vite` and `@meekojs/meeko/devtools-ui`. Framework and adapter subpaths (`/framework`, `/server`, `/node`, `/bun`, `/deno`, `/cloudflare` and `/build`) are described in the [framework guide](framework.md). The compiler imports its DOM, HMR and DevTools registration functions from `@meekojs/meeko/internal`. That path is a contract between the compiler and its runtime of the **exact same version**, and is not intended for manual imports. A generated module must be compiled with the same package version that executes it, so it must be recompiled when updating Meeko.
+The `@meekojs/meeko` root exports exactly `signal`, `computed`, `effect`, `batch`, `untrack`, `createRoot`, `onCleanup`, `onMounted`, `createContext`, `provide`, `inject`, `provideErrorHandler`, `serializeJson`, since `1.3`, `trustHtml`, since `1.5`, `useId` and, since `1.8`, `createId` and `isTooLargeToAnimate`, plus signal, context, component error, component, snippet, HTML tag and attribute value, `HotState`, DevTools and, since `1.3`, `TrustedHtml` types. This engine also documents `@meekojs/meeko/vite` and `@meekojs/meeko/devtools-ui`. Framework and adapter subpaths (`/framework`, `/server`, `/node`, `/bun`, `/deno`, `/cloudflare` and `/build`) are described in the [framework guide](framework.md). The compiler imports its DOM, HMR and DevTools registration functions from `@meekojs/meeko/internal`. That path is a contract between the compiler and its runtime of the **exact same version**, and is not intended for manual imports. A generated module must be compiled with the same package version that executes it, so it must be recompiled when updating Meeko.
 
 ### New IDs: `createId`
 

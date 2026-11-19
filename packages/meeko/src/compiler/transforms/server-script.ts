@@ -11,9 +11,11 @@ export type PageRequestApi = (typeof pageRequestApis)[number]
 /**
  * Head APIs that, called at the top level of `<script server>`, add to the page head of each
  * request: the block then has top-level code. They also work in components, so the component
- * `<script>` may use them.
+ * `<script>` may use them. In the block they are imported from the framework like the request
+ * APIs: their autoimport is browser code, which `server/` files do not get.
  */
-const pageHeadApis: readonly string[] = ['useHead', 'useSeoMeta']
+export const pageHeadApis = ['useHead', 'useSeoMeta'] as const
+export type PageHeadApi = (typeof pageHeadApis)[number]
 
 export const frameworkModule = '@meekojs/meeko/framework'
 
@@ -59,8 +61,8 @@ export interface ServerScript {
 				readonly request?: string
 		  }
 		| undefined
-	/** Request APIs used without an import or a declaration of the same name. */
-	readonly implicit: readonly PageRequestApi[]
+	/** Request and head APIs used without an import or a declaration of the same name. */
+	readonly implicit: ReadonlyArray<PageRequestApi | PageHeadApi>
 	/** `usePage` imports from the framework: the local name and the specifier text to drop in typed copies. */
 	readonly usePageImports: ReadonlyArray<{ readonly local: string; readonly start: number; readonly end: number }>
 	/** `definePage` imports from the framework, likewise: typed copies give its `data` the type of the exports. */
@@ -241,7 +243,7 @@ export function analyzeServerScript(source: string, filename: string, section: S
 	// Request APIs: imported from the framework under any local name, or used without any binding.
 	const moduleNames = scopeNames(file)
 	const apis = new Map<string, PageRequestApi>()
-	const headApis = new Set(pageHeadApis.filter((name) => !moduleNames.has(name)))
+	const headApis = new Set<string>(pageHeadApis.filter((name) => !moduleNames.has(name)))
 	const usePageImports: Array<{ local: string; start: number; end: number }> = []
 	const definePageImports: Array<{ local: string; start: number; end: number }> = []
 	for (const statement of file.statements) {
@@ -250,7 +252,7 @@ export function analyzeServerScript(source: string, filename: string, section: S
 		if (!bindings || !ts.isNamedImports(bindings) || statement.importClause?.isTypeOnly) continue
 		for (const [index, element] of bindings.elements.entries()) {
 			const imported = (element.propertyName ?? element.name).text
-			if (!element.isTypeOnly && pageHeadApis.includes(imported)) headApis.add(element.name.text)
+			if (!element.isTypeOnly && (pageHeadApis as readonly string[]).includes(imported)) headApis.add(element.name.text)
 			const elements = bindings.elements
 			const span = (): { local: string; start: number; end: number } => {
 				const [start, end] = index < elements.length - 1 ? [element.getStart(file), elements[index + 1]!.getStart(file)] : index > 0 ? [elements[index - 1]!.getEnd(), element.getEnd()] : [element.getStart(file), element.getEnd()]
@@ -325,17 +327,19 @@ export function analyzeServerScript(source: string, filename: string, section: S
 	// A request API called outside any function runs per request: the block has top-level code.
 	const references: Array<{ identifier: ts.Identifier; nested: boolean; inRoute: boolean }> = []
 	let headCall = false
+	const implicitHead = new Set<PageHeadApi>()
 	for (const statement of file.statements) {
 		if (ts.isImportDeclaration(statement) || typeOnlyStatement(statement)) continue
 		const inRoute = statement === route?.statement
 		visitReferences(statement, (identifier, nested) => {
 			if (apis.has(identifier.text)) references.push({ identifier, nested, inRoute })
+			if ((pageHeadApis as readonly string[]).includes(identifier.text) && !moduleNames.has(identifier.text)) implicitHead.add(identifier.text as PageHeadApi)
 			// useHead() at the top level adds to the head of every request, like `export const head`.
 			if (!nested && !inRoute && headApis.has(identifier.text)) headCall = true
 		})
 	}
 	if (headCall || references.some((reference) => !reference.nested && !reference.inRoute)) body = true
-	const implicit = [...new Set(references.map((reference) => apis.get(reference.identifier.text)!).filter((api) => !moduleNames.has(api)))]
+	const implicit = [...new Set(references.map((reference) => apis.get(reference.identifier.text)!).filter((api) => !moduleNames.has(api))), ...implicitHead]
 
 	if (!body) {
 		const misplaced = references[0]

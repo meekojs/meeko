@@ -50,6 +50,8 @@ La primera ejecución ocurre al crear el efecto; cada letra que escribe el usuar
 
 Una función `() => void` que detiene el efecto: deja de observar sus señales y no vuelve a ejecutarse. En un componente no hace falta llamarla, porque el efecto se detiene al desmontarlo; sirve para pararlo antes, o para un efecto creado fuera de una raíz.
 
+Lo que devuelve `fn` se ignora: a diferencia de `useEffect` en React o de Solid, una función devuelta no es una limpieza y Meeko no la llama antes de la siguiente ejecución ni al detenerse. Una promesa devuelta detiene el efecto y lanza `TypeError` (véase [Un callback `async`](#un-callback-async)).
+
 ## Ejemplos
 
 ### Detener un efecto
@@ -113,6 +115,8 @@ effect(() => {
 });
 ```
 
+Abortar al empezar la petición de la ejecución anterior es el patrón para liberar algo por ejecución, porque Meeko ignora lo que devuelve el callback. En un componente, añade `onCleanup(() => controller?.abort())` fuera del efecto para cancelar la última al desmontar.
+
 En un componente del framework, [`useRpcQuery`](/docs/reference/use-rpc-query) o [`useApi`](/docs/reference/use-api) con `debounceMs` y `enabled` (desde `1.7`) ya hacen esto, con cancelación, SSR e hidratación.
 
 ### Leer una señal sin depender de ella
@@ -146,6 +150,29 @@ effect(() => {
   const q = query.value;
   void fetch(`/api/users?q=${q}`).then((response) => response.json()).then((list) => { users.value = list; });
 });
+```
+
+### Devolver una limpieza, como en React
+
+```ts bad
+effect(() => {
+  const id = setInterval(tick, delay.value);
+  return () => clearInterval(id);
+});
+```
+
+Meeko ignora la función devuelta: al cambiar `delay` se crea otro intervalo sin parar el anterior. `onCleanup(() => clearInterval(id))` dentro del efecto tampoco sirve: se registra en el componente o la raíz que contiene el efecto y sólo se ejecuta al liberarlos, no antes de cada ejecución, así que cada ejecución añade otra limpieza. Libera lo de la ejecución anterior al empezar la siguiente, y lo último con `onCleanup` fuera del efecto:
+
+<!-- no-check -->
+
+```ts good
+let id: ReturnType<typeof setInterval> | undefined;
+effect(() => {
+  const ms = delay.value;
+  clearInterval(id);
+  id = setInterval(tick, ms);
+});
+onCleanup(() => clearInterval(id));
 ```
 
 ### Escribir la señal que el efecto lee
@@ -203,4 +230,5 @@ onMounted(() => {
 - **Orden.** Los efectos pendientes se ejecutan en orden de creación: un efecto padre, como el de un `if:when`, corre antes que los que creó. Varias escrituras seguidas ejecutan el efecto varias veces; agrúpalas con [`batch`](/docs/reference/batch).
 - **Errores.** Una excepción de un efecto creado en el setup hace fallar el render. Una que ocurre al reaccionar a una escritura se propaga a quien escribió (por ejemplo, el manejador `on:click`), que la entrega al [`provideErrorHandler`](/docs/reference/provideerrorhandler) más cercano. Si fallan varios observadores en la misma ronda, se agrupan en un `AggregateError`.
 - **Ciclo de vida.** Dentro de un componente, el efecto se detiene al desmontarlo, al cambiar de página o cuando desaparece su `if:when` o su fila de `each:of`. Fuera de una raíz (un módulo o una prueba), vive hasta que llamas a la función que devuelve, o lo creas dentro de [`createRoot`](/docs/reference/createroot).
+- **Limpieza.** No hay limpieza por ejecución: el valor devuelto se ignora y `onCleanup` dentro del efecto se registra en el componente o la raíz activos (fuera de una raíz lanza un error) y se ejecuta una sola vez, al liberarlos.
 - **Sin `onUpdated`.** Meeko no tiene un gancho de actualización: un efecto que lee las señales es la forma de reaccionar a sus cambios.
