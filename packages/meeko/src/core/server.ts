@@ -8,6 +8,17 @@ export function escapeHtml(value: unknown): string {
 }
 
 /**
+ * Contenido SSR de un `<textarea>` o un `<title>` con expresiones: el texto completo escapado, sin
+ * marcadores, que el navegador mostraría como texto. En `<textarea>` repite un salto de línea
+ * inicial, que el analizador HTML descarta.
+ *
+ * @internal
+ */
+export function textElementContent(tag: string, text: string): string {
+	return escapeHtml(tag === 'textarea' && text.startsWith('\n') ? `\n${text}` : text)
+}
+
+/**
  * Contenido de la directiva `html="expresión"`: el HTML de la expresión **sin escapar**; `null` y
  * `undefined` dejan el elemento vacío. Es inseguro con contenido no confiable, que podría ejecutar
  * scripts en la página (XSS).
@@ -84,7 +95,8 @@ function styleObjectValue(value: object): string | null {
  * Desde `1.9`, en un atributo que lleva una URL (`href`, `xlink:href`, `src`, `action`,
  * `formaction`, `poster`…) un esquema `javascript:`, `vbscript:` o `data:` (salvo `data:image/*` en
  * `src` y `poster`) se escribe {@link blockedUrl}, igual que la URL de un `content` con la forma de
- * `<meta http-equiv="refresh">`.
+ * `<meta http-equiv="refresh">`. Desde `1.10`, también los valores de una animación SVG (`to`,
+ * `from`, `by` y cada elemento de `values`), que con `attributeName="href"` son una URL.
  */
 export function attributeValue(name: string, value: unknown): string | null {
 	booleanAttributes ??= new Set(booleanAttributeNames.split(' '))
@@ -120,6 +132,12 @@ const urlAttributes = new Set(['href', 'xlink:href', 'src', 'action', 'formactio
 
 /** Where `data:image/*` loads an image, which runs no script in the page. */
 const imageUrlAttributes = new Set(['src', 'poster'])
+
+/**
+ * Values of an SVG animation (`<animate>`, `<set>`…): with `attributeName="href"` they become the
+ * URL of the animated attribute. `values` is a list separated by `;`. They hold no URL elsewhere.
+ */
+const animationValueAttributes = new Set(['to', 'from', 'by', 'values'])
 
 /** The `content` of `<meta http-equiv="refresh">`: a delay, a separator and the URL, with an optional `url=` and quote. */
 const refreshContent = /^[\t\n\f\r ]*[\d.]+(?:[\t\n\f\r ]*[;,][\t\n\f\r ]*|[\t\n\f\r ]+)(?:url[\t\n\f\r ]*=[\t\n\f\r ]*)?["']?([\s\S]*)$/i
@@ -165,6 +183,8 @@ function safeUrlAttribute(name: string, value: string): string {
 	const lower = name.toLowerCase()
 	let scheme: string | undefined
 	if (urlAttributes.has(lower)) scheme = unsafeUrl(lower, value)
+	// As in `src`, `data:image/*` passes: an animated `href` of an `<image>` may load one.
+	else if (animationValueAttributes.has(lower)) scheme = (lower === 'values' ? value.split(';') : [value]).map((item) => unsafeUrl('src', item)).find((item) => item !== undefined)
 	else if (lower === 'content') {
 		const url = refreshContent.exec(value)?.[1]
 		if (url !== undefined) scheme = unsafeUrl('href', url)

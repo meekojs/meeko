@@ -58,6 +58,16 @@ interface DynamicText {
 	offset: number
 }
 
+/**
+ * The content of an element that cannot hold text markers (see `textElementContent`): with
+ * `element`, a `<textarea>` or `<title>` whose whole text is bound to the element; without it, the
+ * escaped expressions of a `<noscript>`, which only the server and a render write.
+ */
+interface ElementText {
+	element?: number
+	parts: Array<{ text: string } | { expression: string; offset: number }>
+}
+
 interface EventBinding {
 	id: number
 	name: string
@@ -296,6 +306,7 @@ interface HtmlBinding {
 
 interface TemplateBindings {
 	texts: DynamicText[]
+	contents: ElementText[]
 	htmls: HtmlBinding[]
 	events: EventBinding[]
 	attributes: AttributeBinding[]
@@ -370,7 +381,7 @@ interface TemplateContext {
 }
 
 function emptyBindings(): TemplateBindings {
-	return { texts: [], htmls: [], events: [], attributes: [], components: [], refs: [], models: [], renders: [], regions: [], spreads: [], tags: [], dynamics: [] }
+	return { texts: [], contents: [], htmls: [], events: [], attributes: [], components: [], refs: [], models: [], renders: [], regions: [], spreads: [], tags: [], dynamics: [] }
 }
 
 const voidElements = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr'])
@@ -692,15 +703,96 @@ const rawTextElements = new Set(['textarea', 'title', 'script', 'style', 'xmp', 
  * text marker is a line comment (a value with a line break runs the next line), and between
  * backticks `${…}` runs. The data goes through `useHead` or a `data-*` attribute instead.
  */
-function rejectRawTextInterpolation(node: TemplateNode, tag: 'script' | 'style', context: TemplateContext): void {
+function rejectRawTextInterpolation(node: TemplateNode, tag: string, context: TemplateContext): void {
 	for (const child of node.childNodes ?? []) {
 		if (child.nodeName !== '#text') continue
 		const scan = scanInterpolations(context.source.slice(child.start, child.end))
 		const at = scan.segments[0]?.start ?? scan.unterminated
 		if (at === undefined) continue
-		const instead = tag === 'script' ? 'pasa los datos con useHead({ script: [{ type: "application/json", children: JSON.stringify(datos) }] }) o con un atributo data-* (bind:data-config="JSON.stringify(datos)") y léelos desde el script' : 'usa el <style> del componente, bind:style o variables CSS (bind:style="{ \'--color\': color }")'
+		const instead = tag === 'script' ? 'pasa los datos con useHead({ script: [{ type: "application/json", children: JSON.stringify(datos) }] }) o con un atributo data-* (bind:data-config="JSON.stringify(datos)") y léelos desde el script' : tag === 'style' ? 'usa el <style> del componente, bind:style o variables CSS (bind:style="{ \'--color\': color }")' : 'el navegador muestra o ignora ese contenido como texto sin interpretar; usa <pre> o <code> para mostrar texto'
 		throw compileError(context.source, context.filename, 'MEEK140', `<${tag}> de la plantilla no admite expresiones {…}: el navegador no lee su contenido como HTML y el escape no lo protege; ${instead}`, child.start + at)
 	}
+}
+
+/**
+ * RCDATA elements: the browser reads their content as text where character references still
+ * decode, so a comment marker would show as text. Their content is one text, bound to the element.
+ */
+const rcdataElements = new Set(['textarea', 'title'])
+
+/**
+ * RAWTEXT elements of HTML (and `<noscript>`, raw text while scripting runs): the browser reads
+ * their content as is, without character references, so the static content is written verbatim.
+ */
+const verbatimElements = new Set(['script', 'style', 'xmp', 'iframe', 'noembed', 'noframes', 'noscript', 'plaintext'])
+
+/** Whether `node` is in the HTML namespace, where the tokenizer reads RCDATA and RAWTEXT. */
+function htmlNamespace(node: TemplateNode): boolean {
+	return node.namespaceURI === undefined || node.namespaceURI === 'http://www.w3.org/1999/xhtml'
+}
+
+/**
+ * Content of an HTML element of {@link rcdataElements} or {@link verbatimElements}, which cannot
+ * hold the text markers of hydration:
+ *
+ * - `<textarea>` and `<title>` with `{…}`: the whole content is one text, escaped in SSR and bound
+ *   to the element's `textContent` (`bindTextContent`). Without `{…}`, the usual escaped text.
+ * - `<script>`, `<style>`, `<xmp>`, `<iframe>`, `<noembed>`, `<noframes>` and `<plaintext>`: the
+ *   static text verbatim; an expression is MEEK140.
+ * - `<noscript>`: the static text verbatim (HTML without scripting) and each expression escaped,
+ *   without markers or binding: only a browser without JavaScript shows it.
+ *
+ * `undefined` when the element keeps the usual rendering of its children, and `''` when it is empty.
+ */
+function textElementContent(node: TemplateNode, tag: string, bindings: TemplateBindings, context: TemplateContext, mark: () => number): string | undefined {
+	if (!htmlNamespace(node)) return undefined
+	const rcdata = rcdataElements.has(tag)
+	if (!rcdata && !verbatimElements.has(tag)) return undefined
+	if (!rcdata && tag !== 'noscript') rejectRawTextInterpolation(node, tag, context)
+	const texts = (node.childNodes ?? []).filter((child) => child.nodeName === '#text')
+	// The tokenizer gives these elements only text; anything else keeps the usual rendering.
+	if (texts.length !== (node.childNodes ?? []).length) return undefined
+	const parts: ElementText['parts'] = []
+	for (const child of texts) {
+		const raw = context.source.slice(child.start, child.end)
+		const scan = scanInterpolations(raw)
+		if (scan.unterminated !== undefined) throw compileError(context.source, context.filename, 'MEEK010', 'Expresión de plantilla sin cerrar', child.start + scan.unterminated)
+		let cursor = 0
+		const staticText = (end: number): void => {
+			const text = rcdata ? decodeTemplateText(raw.slice(cursor, end)) : raw.slice(cursor, end)
+			if (text) parts.push({ text })
+		}
+		for (const segment of scan.segments) {
+			staticText(segment.start)
+			const decoded = decodeTemplateExpression(segment.expression)
+			const expression = decoded.text
+			if (!expression) throw compileError(context.source, context.filename, 'MEEK009', 'Expresión de plantilla vacía', child.start + segment.start)
+			const expressionOffset = child.start + segment.expressionStart
+			if (doubleBraces(expression)) throw compileError(context.source, context.filename, 'MEEK020', doubleBracesMessage, child.start + segment.start)
+			validateExpression(expression, context.source, context.filename, expressionOffset, (position) => expressionSourceOffset(decoded, position))
+			if (decoded.pieces.length > 1) context.decodedRegions.push({ offset: expressionOffset, decoded })
+			parts.push({ expression, offset: expressionOffset })
+			cursor = segment.end
+		}
+		staticText(raw.length)
+	}
+	if (!rcdata) {
+		// The tokenizer ended the element at its first end tag, so the source cannot hold one; this
+		// keeps it that way for any text that reaches here.
+		const closing = parts.find((part) => 'text' in part && new RegExp(`</${tag}[\\t\\n\\f\\r />]`, 'i').test(`${part.text} `))
+		if (closing) throw compileError(context.source, context.filename, 'MEEK140', `<${tag}> de la plantilla no puede contener </${tag}>`, texts[0]!.start)
+		if (parts.some((part) => 'expression' in part)) bindings.contents.push({ parts })
+		return parts.map((part) => ('text' in part ? quote(part.text) : `__meeko.escapeHtml(${markSource(part.expression, part.offset)})`)).join(' + ')
+	}
+	if (!parts.some((part) => 'expression' in part)) return parts.map((part) => ('text' in part ? `__meeko.escapeHtml(${quote(part.text)})` : '')).join(' + ')
+	const element = mark()
+	bindings.contents.push({ element, parts })
+	return `__meeko.textElementContent(${quote(tag)}, ${textValue(parts, (expression, offset) => markSource(expression, offset))})`
+}
+
+/** The text of an {@link ElementText}: its static parts and `String()` of each expression, joined. */
+function textValue(parts: ElementText['parts'], map: (expression: string, offset: number) => string): string {
+	return [quote(''), ...parts.map((part) => ('text' in part ? quote(part.text) : `String(${map(part.expression, part.offset)})`))].join(' + ')
 }
 
 /** Resultado del compilador de un componente .meeko. */
@@ -1145,7 +1237,8 @@ function renderNodeContent(node: TemplateNode, bindings: TemplateBindings, conte
 		return `__meeko.renderComponent<any>(${id}, ${markSource(reference, referenceOffset, referenceLength)}, ${input}, __meeko_transfer)`
 	}
 	const tag = node.tagName!
-	if (tag === 'script' || tag === 'style') rejectRawTextInterpolation(node, tag, context)
+	// In <svg> and <math> the content of <script> and <style> is parsed as markup; MEEK140 still applies.
+	if ((tag === 'script' || tag === 'style') && !htmlNamespace(node)) rejectRawTextInterpolation(node, tag, context)
 
 	const attrs: Array<{ kind: 'static'; value: string } | { kind: 'dynamic'; expression: string }> = []
 	// One `data-meeko="N"` per element: its attributes, events, model and ref all find it by that number.
@@ -1250,7 +1343,7 @@ function renderNodeContent(node: TemplateNode, bindings: TemplateBindings, conte
 				continue
 			}
 			bindings.attributes.push({ id, name, expression: attr.value, offset })
-			attrs.push({ kind: 'dynamic', expression: `__meeko.renderAttribute(${quote(name)}, ${checkedValue(markSource(attr.value, offset), name)})` })
+			attrs.push({ kind: 'dynamic', expression: `__meeko.renderAttribute(${quote(name)}, ${name === 'srcdoc' && tag === 'iframe' && htmlTag ? srcdocValue(attr.value, offset, context) : checkedValue(markSource(attr.value, offset), name)})` })
 		} else if (attr.name.startsWith(':')) {
 			throw compileError(context.source, context.filename, 'MEEK012', `Directiva de plantilla no admitida: ${attr.name}`, context.templateOffset + (node.sourceCodeLocation?.startOffset ?? 0))
 		} else if (joined.has(attr.name)) {
@@ -1327,6 +1420,8 @@ function renderNodeContent(node: TemplateNode, bindings: TemplateBindings, conte
 			attrs.push({ kind: 'dynamic', expression: `__meeko.renderAttribute(${quote(name)}, ${build(marked)})` })
 		}
 	}
+	// Before the marker: a <textarea> or <title> with `{…}` binds its text through it.
+	const textContent = html || model ? undefined : textElementContent(node, tag, bindings, context, mark)
 	if (element !== undefined) attrs.push({ kind: 'static', value: ` data-meeko="${element}"` })
 	// Every element carries the attribute, or with `scopeAttribute: "matched"` only those that a
 	// scoped selector may match; SSR, hydration and every later render of a region share this string.
@@ -1347,6 +1442,7 @@ function renderNodeContent(node: TemplateNode, bindings: TemplateBindings, conte
 		return [opening, `__meeko.rawHtml(${htmlValue(html, context)}, ${quote(tag)}${namespace})`, quote(`</${tag}>`)].join(' + ')
 	}
 	if (model && tag === 'textarea') return [opening, `__meeko.modelText(${markSource(model.expression, model.offset)})`, quote('</textarea>')].join(' + ')
+	if (textContent !== undefined) return [opening, ...(textContent ? [textContent] : []), quote(`</${tag}>`)].join(' + ')
 	const selectModel = context.selectModel
 	if (model && tag === 'select') context.selectModel = { expression: model.expression, offset: model.offset }
 	let children: string[]
@@ -1902,6 +1998,17 @@ function htmlDirective(node: TemplateNode, attribute: { name: string; value: str
  * and the whole call too, so that `rawHtml` still reports a non-string value at the expression.
  * The modules that run never include the check.
  */
+/**
+ * The SSR value of `bind:srcdoc` on an `<iframe>`, a document of HTML: for `meeko check`, like
+ * {@link htmlValue}, it goes through `__meeko.checkTrustedSrcdoc`, and an untrusted `string` is
+ * the `MEEK107` warning. Since 1.10.
+ */
+function srcdocValue(expression: string, offset: number, context: TemplateContext): string {
+	const value = markSource(expression, offset)
+	if (!context.narrow) return value
+	return markSource(`__meeko.checkTrustedSrcdoc(${value}, ${markSource('true', offset, expression.length)})`, offset, expression.length)
+}
+
 function htmlValue(html: HtmlBinding, context: TemplateContext): string {
 	const value = markSource(html.expression, html.offset)
 	if (!context.narrow) return value
@@ -2661,6 +2768,14 @@ function hydrationBody(bindings: TemplateBindings, context: TemplateContext, hot
 		const source = hot ? `, { file: ${quote(context.filename)}, line: ${point.line}, column: ${point.column}, expression: ${quote(expression)}, kind: "text" }` : ''
 		statements.push(`__meeko_cleanups.push(__meeko.bindText(__scope, ${id}, () => ${arrowExpression(expression, offset)}, ${quote(location)}${source}));`)
 	}
+	for (const { element, parts } of bindings.contents) {
+		if (element === undefined) continue
+		const first = parts.find((part) => 'expression' in part) as { expression: string; offset: number }
+		const point = locate(context.source, first.offset)
+		const location = `${basename(context.filename)}:${point.line}:${point.column} (text content ${element})`
+		const source = hot ? `, { file: ${quote(context.filename)}, line: ${point.line}, column: ${point.column}, expression: ${quote(first.expression)}, kind: "text" }` : ''
+		statements.push(`__meeko_cleanups.push(__meeko.bindTextContent(__scope, ${element}, () => ${textValue(parts, (expression, offset) => arrowExpression(expression, offset))}, ${quote(location)}${source}));`)
+	}
 	for (const { id, expression, offset } of bindings.htmls) {
 		const point = locate(context.source, offset)
 		const location = `${basename(context.filename)}:${point.line}:${point.column} (html ${id})`
@@ -2882,6 +2997,7 @@ function checkTemplateNames(bindings: TemplateBindings, late: ReadonlyMap<string
 	}
 	const visit = (current: TemplateBindings, locals: ReadonlySet<string>): void => {
 		for (const entry of current.texts) check(entry.expression, entry.offset, locals)
+		for (const entry of current.contents) for (const part of entry.parts) if ('expression' in part) check(part.expression, part.offset, locals)
 		for (const entry of current.htmls) check(entry.expression, entry.offset, locals)
 		for (const entry of current.attributes) check(entry.expression, entry.offset, locals)
 		for (const entry of current.events) check(entry.expression, entry.offset, locals)

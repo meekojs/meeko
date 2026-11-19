@@ -192,3 +192,34 @@ test('a blocked URL warns once per attribute and scheme, without its value', () 
 	assert.match(message, /javascript:/)
 	assert.ok(!message.includes('secret-value'), message)
 })
+
+test('the values of an SVG animation never carry a script URL', async () => {
+	// With attributeName="href", `to`, `from`, `by` and each item of `values` are the URL of the link.
+	for (const name of ['to', 'from', 'by', 'values', 'TO']) {
+		for (const value of ['javascript:alert(1)', ' JAVA\tSCRIPT:alert(1)', 'vbscript:x', 'data:text/html,<script>alert(1)</script>']) {
+			assert.equal(attributeValue(name, value), blockedUrl, `${name}=${JSON.stringify(value)}`)
+		}
+	}
+	assert.equal(attributeValue('values', '#a; javascript:alert(1); #b'), blockedUrl)
+	assert.equal(attributeValue('values', '#a;\njavascript:alert(1)'), blockedUrl)
+	// Numbers, colours, paths, fragments and images stay.
+	for (const [name, value] of [
+		['to', '#other'],
+		['to', '/next'],
+		['from', '10'],
+		['by', '0 0 10 10'],
+		['values', '0;1;0'],
+		['values', '1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 1 0'],
+		['values', 'red; blue'],
+		['values', '#a;#b'],
+		['to', 'data:image/png;base64,AAAA'],
+	] as const) {
+		assert.equal(attributeValue(name, value), value, `${name}=${JSON.stringify(value)}`)
+	}
+	const v = { v: 'javascript:alert(1)' }
+	assert.equal(await render('<svg><a href="#x"><animate attributeName="href" bind:to="props.v" /><text>x</text></a></svg>', v), `<svg><a href="#x"><animate attributeName="href" to=${blocked} data-meeko="0"></animate><text>x</text></a></svg>`)
+	assert.equal(await render('<svg><a href="#x"><set attributeName="href" bind:to="props.v" /><text>x</text></a></svg>', v), `<svg><a href="#x"><set attributeName="href" to=${blocked} data-meeko="0"></set><text>x</text></a></svg>`)
+	assert.equal(await render('<svg><a href="#x"><animate attributeName="href" bind:values="props.v" /><text>x</text></a></svg>', { v: '#x;javascript:alert(1)' }), `<svg><a href="#x"><animate attributeName="href" values=${blocked} data-meeko="0"></animate><text>x</text></a></svg>`)
+	assert.equal(await render('<svg><a href="#x"><animate bind="props.o" /><text>x</text></a></svg>', { o: { attributeName: 'href', from: 'javascript:alert(1)' } }), `<svg><a href="#x"><animate attributeName="href" from=${blocked} data-meeko="0"></animate><text>x</text></a></svg>`)
+	assert.equal(await render('<svg><rect><animate attributeName="width" bind:values="props.v" /></rect></svg>', { v: '0;10;0' }), '<svg><rect><animate attributeName="width" values="0;10;0" data-meeko="0"></animate></rect></svg>')
+})

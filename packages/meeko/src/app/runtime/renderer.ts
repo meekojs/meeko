@@ -833,6 +833,25 @@ export function bindText(scope: DomScope, id: number, read: () => unknown, locat
 }
 
 /**
+ * Conecta el texto completo de un `<textarea>` o un `<title>` con expresiones, que no admiten
+ * marcadores de texto: comprueba el del SSR y escribe `textContent` cuando cambia. En `<textarea>`
+ * es el valor por defecto, que también muestra mientras el usuario no lo edite.
+ */
+export function bindTextContent(scope: DomScope, id: number, read: () => string, location: string, source?: EffectSource): () => void {
+	const target = findMarked(scope, id)
+	if (target.textContent !== read()) throw new Error(`Hydration mismatch in ${location}`)
+	let first = true
+	return effect(() => {
+		const next = read()
+		if (first) {
+			first = false
+			return
+		}
+		if (target.textContent !== next) target.textContent = next
+	}, source)
+}
+
+/**
  * Whether `target` already shows `html`, parsed in the context of `target` as `innerHTML` would,
  * in an inert document where nothing runs or loads.
  */

@@ -13,7 +13,7 @@ import type { JsonShape, SerializableExport, ServerData } from '../src/framework
 import type { TrustedHtml } from '../src/index.ts'
 
 import { parseRegionHtml } from '../src/app/runtime/renderer.ts'
-import { checkSource, untrustedHtmlMessage } from '../src/check.ts'
+import { checkSource, untrustedHtmlMessage, untrustedSrcdocMessage } from '../src/check.ts'
 import { compile } from '../src/compiler.ts'
 import { hasErrors, MeekoCompileError } from '../src/compiler/parser/sfc.ts'
 import { definePage } from '../src/framework.ts'
@@ -467,6 +467,34 @@ test('the editor types html and its hover warns that it is unsafe with untrusted
 	} finally {
 		await workspace.dispose()
 	}
+})
+
+test('meeko check warns with MEEK107 when bind:srcdoc of an iframe is a string without the TrustedHtml brand', { timeout: 90_000 }, async () => {
+	const root = await checkProject('srcdoc-trust-')
+	try {
+		const source = `<script lang="ts">
+import { trustHtml } from "@meekojs/meeko";
+const plain: string = String(Math.random());
+const trusted = trustHtml(plain);
+</script>
+<template>
+<iframe sandbox="" bind:srcdoc="plain"></iframe>
+<iframe bind:srcdoc="trusted"></iframe>
+<iframe bind:srcdoc="'<p>x</p>'"></iframe>
+<iframe bind:srcdoc="undefined"></iframe>
+<x-frame bind:srcdoc="plain"></x-frame>
+<div bind:title="plain"></div>
+</template>`
+		const diagnostics = await checkSource(source, join(root, 'Srcdoc.meeko'))
+		assert.deepEqual(
+			diagnostics.map(({ code, severity, message, location }) => ({ code, severity, message, offset: location.offset })),
+			[{ code: 'MEEK107', severity: 'warning', message: untrustedSrcdocMessage, offset: source.indexOf('bind:srcdoc="plain"') + 'bind:srcdoc="'.length }],
+		)
+	} finally {
+		await rm(root, { recursive: true, force: true })
+	}
+	// The module that runs writes the value as any attribute, with no check.
+	assert.doesNotMatch(compile('<template><iframe bind:srcdoc="doc"></iframe></template>', 'Srcdoc.meeko').code, /checkTrustedSrcdoc/)
 })
 
 test('the editor warns with MEEK107 on the whole value of an untrusted html', async () => {
