@@ -20,7 +20,7 @@ Un `<a href>` interno normal también puede navegar sin recargar. Los clics modi
 
 ## View Transitions nativas
 
-Configura `viewTransitions: true` en `meeko.config.ts` para animar cambios de página en navegadores compatibles. Puedes desactivar una navegación concreta con `data-meeko-view-transition="false"` en un enlace. La preferencia de movimiento reducido tiene prioridad. [Ver CSS y límites del navegador](routing-navigation-reference.md#view-transitions-nativas).
+Configura `viewTransitions: true` en `meeko.config.ts` para animar cambios de página en navegadores compatibles. Puedes desactivar una navegación concreta con `data-meeko-view-transition="false"` en un enlace. La preferencia de movimiento reducido tiene prioridad. [Ver CSS y límites del navegador](routing-navigation-reference.md#view-transitions-nativas). Si un elemento con nombre sólo existe en una de las dos páginas y desactivas la animación de su grupo, dale un fundido propio: [ver el patrón `:only-child`](routing-navigation-reference.md#elementos-que-sólo-están-en-una-de-las-dos-páginas).
 
 ## Estado de navegación
 

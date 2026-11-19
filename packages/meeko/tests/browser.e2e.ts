@@ -2008,3 +2008,110 @@ test('el router da a su View Transition el tipo meeko-route y funciona sin tipos
 		},
 	)
 })
+
+test('un elemento con view-transition-name que sólo está en una página se funde con el patrón :only-child de la guía', { timeout: 240_000 }, async () => {
+	// The documented pattern (docs/routing-navigation-reference.md, View Transitions nativas).
+	const onlyChild = [
+		'@keyframes app-fade-out { to { opacity: 0 } }',
+		'@keyframes app-fade-in { from { opacity: 0 } }',
+		'html:active-view-transition-type(meeko-route)::view-transition-old(*):only-child { animation: 150ms ease-out both app-fade-out }',
+		'html:active-view-transition-type(meeko-route)::view-transition-new(*):only-child { animation: 150ms ease-in both app-fade-in }',
+	].join('\n')
+	await withServedApp(
+		'route-transition-only-child-e2e',
+		{
+			'package.json': '{"name":"route-transition-only-child-app","private":true,"type":"module"}\n',
+			'meeko.config.mjs': 'export default { viewTransitions: true };\n',
+			'app/layouts/site.meeko': '<template><header id="header" class="site-header">Cabecera</header><main><MeekoOutlet /></main></template>\n',
+			'app/layouts/bare.meeko': '<template><main id="bare"><MeekoOutlet /></main></template>\n',
+			'app/pages/index.meeko': '<script server lang="ts">\nexport const route = definePage({ layout: "site" });\n</script>\n<template><h1 id="home">Inicio</h1><a id="to-plain" href="/plain">Sin cabecera</a></template>\n',
+			'app/pages/plain.meeko': '<script server lang="ts">\nexport const route = definePage({ layout: "bare" });\n</script>\n<template><h1 id="plain">Sin cabecera</h1><a id="to-home" href="/">Inicio</a></template>\n',
+			// A fixed header whose group does not animate, and a long root cross-fade to look inside the transition.
+			'app/styles/main.css': '.site-header { view-transition-name: header }\n::view-transition-group(header) { animation: none }\n::view-transition-group(root) { animation-duration: 10s }\n',
+		},
+		async (origin, browser) => {
+			type Opacity = { old: number; new: number }
+			type Frame = { early: Opacity; late: Opacity }
+			// Freezes every animation of each route transition halfway through a short fade and then long after it, and reads the header snapshots.
+			const freeze = (): void => {
+				const scope = globalThis as unknown as { frames: Frame[] }
+				scope.frames = []
+				const native = Document.prototype.startViewTransition as (this: Document, argument: unknown) => ViewTransition
+				;(Document.prototype as unknown as { startViewTransition: unknown }).startViewTransition = function (this: Document, argument: unknown) {
+					const transition = native.call(this, argument)
+					void transition.ready.then(
+						() => {
+							// No inner functions: the init script runs as written, without the helpers of the TypeScript build.
+							const frame = {} as Frame
+							for (const [moment, time] of [
+								['early', 75],
+								['late', 1000],
+							] as const) {
+								for (const animation of document.getAnimations()) {
+									animation.pause()
+									animation.currentTime = time
+								}
+								frame[moment] = {
+									old: Number(getComputedStyle(document.documentElement, '::view-transition-old(header)').opacity),
+									new: Number(getComputedStyle(document.documentElement, '::view-transition-new(header)').opacity),
+								}
+							}
+							scope.frames.push(frame)
+							transition.skipTransition()
+						},
+						() => {},
+					)
+					return transition
+				}
+			}
+			const open = async (pattern: boolean) => {
+				const page = await browser.newPage()
+				const errors: string[] = []
+				page.on('pageerror', (error) => errors.push(error.message))
+				page.on('console', (message) => {
+					if (message.type() === 'error') errors.push(message.text())
+				})
+				await page.addInitScript(freeze)
+				await page.goto(`${origin}/`)
+				await page.waitForFunction(() => performance.getEntriesByName('meeko-hydration').length > 0)
+				if (pattern) await page.addStyleTag({ content: onlyChild })
+				const frames = (): Promise<Frame[]> => page.evaluate(() => (globalThis as unknown as { frames: Frame[] }).frames)
+				const navigate = async (link: string, target: string, count: number): Promise<Frame> => {
+					await page.locator(link).click()
+					await page.locator(target).waitFor()
+					await page.waitForFunction((length) => (globalThis as unknown as { frames: Frame[] }).frames.length === length, count)
+					return (await frames()).at(-1)!
+				}
+				return { page, errors, navigate }
+			}
+
+			// Without the pattern, the header that only the first layout has stays fully painted over the next page.
+			const bare = await open(false)
+			assert.equal((await bare.navigate('#to-plain', '#plain', 1)).late.old, 1)
+			assert.deepEqual(bare.errors, [])
+			await bare.page.close()
+
+			// With it, the leaving header fades out and the arriving one fades in, while the rest of the page still animates.
+			const fixed = await open(true)
+			const leaving = await fixed.navigate('#to-plain', '#plain', 1)
+			assert.ok(leaving.early.old > 0 && leaving.early.old < 1, `fading out at 75 ms: ${leaving.early.old}`)
+			assert.equal(leaving.late.old, 0)
+			assert.equal(await fixed.page.locator('#header').count(), 0)
+			const arriving = await fixed.navigate('#to-home', '#home', 2)
+			assert.ok(arriving.early.new > 0 && arriving.early.new < 1, `fading in at 75 ms: ${arriving.early.new}`)
+			assert.equal(arriving.late.new, 1)
+			assert.deepEqual(fixed.errors, [])
+			await fixed.page.close()
+
+			// Reduced motion keeps navigation without a transition, so the pattern needs no media query of its own.
+			const reduced = await browser.newPage({ reducedMotion: 'reduce' })
+			await reduced.addInitScript(freeze)
+			await reduced.goto(`${origin}/`)
+			await reduced.waitForFunction(() => performance.getEntriesByName('meeko-hydration').length > 0)
+			await reduced.locator('#to-plain').click()
+			await reduced.locator('#plain').waitFor()
+			assert.deepEqual(await reduced.evaluate(() => (globalThis as unknown as { frames: Frame[] }).frames), [])
+			await reduced.close()
+		},
+	)
+})

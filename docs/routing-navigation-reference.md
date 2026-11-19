@@ -185,6 +185,42 @@ Para desactivar o activar una navegación concreta, usa `app.navigate('/projects
 
 Esta opción controla cambios dentro del mismo documento. Las navegaciones a documentos nuevos pueden usar `@view-transition { navigation: auto; }` en las hojas de ambas páginas del mismo origen, sujeto al soporte del navegador y a las reglas de esa API. Los modales de UI mantienen sus animaciones locales y no necesitan capturas de toda la página. El ejemplo `/transitions` de la web pública `apps/ui` incluye una superficie compartida entre lista y detalle, además de enlaces sin transición.
 
+### Elementos que sólo están en una de las dos páginas
+
+Si un elemento con `view-transition-name` existe sólo en la página de origen o sólo en la de destino, su grupo tiene una única captura: `::view-transition-old(nombre)` o `::view-transition-new(nombre)`. El fundido de esa captura hereda la duración y el relleno de su `::view-transition-group`. Por eso, si desactivas la animación del grupo, algo habitual en una cabecera fija que no debe moverse:
+
+```css
+::view-transition-group(header) {
+	animation: none;
+}
+```
+
+la captura no se anima: al ir a un layout sin cabecera, la antigua sigue pintada encima de la página nueva hasta que acaba toda la transición, y al volver la nueva aparece de golpe. Meeko no añade estilos propios a la transición, así que da a esas capturas sueltas un fundido corto en `app/styles/main.css`:
+
+```css
+@keyframes app-fade-out {
+	to {
+		opacity: 0;
+	}
+}
+
+@keyframes app-fade-in {
+	from {
+		opacity: 0;
+	}
+}
+
+html:active-view-transition-type(meeko-route)::view-transition-old(*):only-child {
+	animation: 150ms ease-out both app-fade-out;
+}
+
+html:active-view-transition-type(meeko-route)::view-transition-new(*):only-child {
+	animation: 150ms ease-in both app-fade-in;
+}
+```
+
+`:only-child` sólo afecta a los grupos con una captura; los elementos presentes en ambas páginas conservan su animación. Fija la duración y `both` en la propia regla, porque no pueden heredarse de un grupo con `animation: none`. Si un elemento necesita otro efecto, escribe su regla con el mismo prefijo y su nombre en lugar de `*`, como `html:active-view-transition-type(meeko-route)::view-transition-old(header):only-child`: el nombre la hace más específica. Con `prefers-reduced-motion: reduce`, Meeko navega sin transición y estas reglas no se aplican; si inicias tus propias transiciones, comprueba esa preferencia tú. En un navegador sin tipos de transición la regla no coincide y se mantiene el comportamiento anterior; quita `html:active-view-transition-type(meeko-route)` del selector si quieres aplicarla también a las transiciones de tus componentes.
+
 ## Estado de navegación
 
 `useNavigation()` devuelve `{ pending }`, una señal de sólo lectura que vale `true` desde que empieza una navegación hasta que su página se confirma, falla o se cancela, incluida la primera carga de una página `"client"` y la carga de los `await useApi`/`await useRpcQuery` de la página nueva (véase [Navegación y `render: "client"`](framework.md#navegación-y-render-client)). En SSR y fuera de `mountClientApp` vale siempre `false`. Desde `1.7` se autoimporta, como `useRoute` (un export propio con ese nombre tiene prioridad).

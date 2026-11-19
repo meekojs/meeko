@@ -189,6 +189,42 @@ To disable or enable a particular navigation, use `app.navigate('/projects', { v
 
 This option controls changes within the same document. Navigation to new documents can use `@view-transition { navigation: auto; }` in both same-origin pages' stylesheets, subject to browser support and that API's rules. UI modals keep their local animations and do not need whole-page snapshots. The `/transitions` example on the `apps/ui` public site includes a shared surface between list and detail, plus links without a transition.
 
+### Elements present on only one of the two pages
+
+When an element with a `view-transition-name` exists only on the source page or only on the destination page, its group has a single snapshot: `::view-transition-old(name)` or `::view-transition-new(name)`. That snapshot's fade inherits the duration and fill mode of its `::view-transition-group`. So if you turn off the group's animation, which is common for a fixed header that must not move:
+
+```css
+::view-transition-group(header) {
+	animation: none;
+}
+```
+
+the snapshot does not animate: when going to a layout without the header, the old one stays painted over the new page until the whole transition ends, and when coming back the new one pops in. Meeko adds no styles of its own to the transition, so give those lone snapshots a short fade in `app/styles/main.css`:
+
+```css
+@keyframes app-fade-out {
+	to {
+		opacity: 0;
+	}
+}
+
+@keyframes app-fade-in {
+	from {
+		opacity: 0;
+	}
+}
+
+html:active-view-transition-type(meeko-route)::view-transition-old(*):only-child {
+	animation: 150ms ease-out both app-fade-out;
+}
+
+html:active-view-transition-type(meeko-route)::view-transition-new(*):only-child {
+	animation: 150ms ease-in both app-fade-in;
+}
+```
+
+`:only-child` only affects groups with a single snapshot; elements present on both pages keep their animation. Set the duration and `both` in the rule itself, because they cannot be inherited from a group with `animation: none`. If an element needs a different effect, write its rule with the same prefix and its name instead of `*`, such as `html:active-view-transition-type(meeko-route)::view-transition-old(header):only-child`: the name makes it more specific. With `prefers-reduced-motion: reduce`, Meeko navigates without a transition and these rules do not apply; if you start your own transitions, check that preference yourself. In a browser without transition types the rule does not match and the previous behavior remains; remove `html:active-view-transition-type(meeko-route)` from the selector if you also want it for your components' transitions.
+
 ## Navigation state
 
 `useNavigation()` returns `{ pending }`, a read-only signal that is `true` from the start of navigation until its page is confirmed, fails or is canceled, including the first load of a `"client"` page and loading the new page's `await useApi`/`await useRpcQuery` calls (see [Navigation and `render: "client"`](framework.md#navigation-and-render-client)). In SSR and outside `mountClientApp`, it is always `false`. Since `1.7`, it is auto-imported, like `useRoute` (your own export with that name takes priority).

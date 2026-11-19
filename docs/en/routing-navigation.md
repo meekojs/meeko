@@ -24,7 +24,7 @@ An ordinary internal `<a href>` can also navigate without a reload. Modified cli
 
 ## Native View Transitions
 
-Set `viewTransitions: true` in `meeko.config.ts` to animate page changes in supporting browsers. Disable a particular navigation with `data-meeko-view-transition="false"` on a link. Reduced-motion preference takes priority. [See CSS and browser limits](routing-navigation-reference.md#native-view-transitions).
+Set `viewTransitions: true` in `meeko.config.ts` to animate page changes in supporting browsers. Disable a particular navigation with `data-meeko-view-transition="false"` on a link. Reduced-motion preference takes priority. [See CSS and browser limits](routing-navigation-reference.md#native-view-transitions). If a named element exists on only one of the two pages and you turn off its group animation, give it a fade of its own: [see the `:only-child` pattern](routing-navigation-reference.md#elements-present-on-only-one-of-the-two-pages).
 
 ## Navigation state
 
