@@ -143,13 +143,16 @@ export function watchDeferredChunks(browser: Window, receive: (line: DeferredLin
 		}
 	}
 	const isChunk = (element: Element): boolean => element.tagName === 'SCRIPT' && element.getAttribute('type') === 'application/json' && element.hasAttribute('data-meeko-deferred')
+	const isPayload = (element: Element): boolean => element.tagName === 'SCRIPT' && element.id === 'meeko-payload' && element.getAttribute('type') === 'application/json'
 	const scan = (): void => {
-		let afterPayload = false
+		// Only after the last payload, the server's (see readHydrationDocument): a teleport to
+		// `<body>` comes before it and may repeat its id.
+		let chunks: Element[] | undefined
 		for (let element = document.body?.firstElementChild ?? null; element; element = element.nextElementSibling) {
-			if (afterPayload) {
-				if (isChunk(element)) consume(element)
-			} else afterPayload = element.tagName === 'SCRIPT' && element.id === 'meeko-payload'
+			if (isPayload(element)) chunks = []
+			else if (chunks && isChunk(element)) chunks.push(element)
 		}
+		for (const chunk of chunks ?? []) consume(chunk)
 	}
 	const body = new Observer(scan)
 	const stop = (): void => {

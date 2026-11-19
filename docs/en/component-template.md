@@ -267,3 +267,11 @@ Since `1.8`, any non-void HTML element can close with `/>` when it has no conten
 - `<template>`, `<script>`, `<style>`, `<html>`, `<head>`, `<body>` and unknown names (`<foo />`) still require their closing tag: `MEEK001`.
 - `<td />`, `<th />`, `<tr />`, `<option />` and other table and list elements retain their names for the parser, so their own closing tag afterward (`<td /></td>`) produces `MEEK008`.
 - The language server, `meeko check`, ESLint parser and Prettier understand both forms. Prettier preserves them as written; the optional [`meeko/html-self-closing`](../../packages/eslint-plugin/docs/rules/html-self-closing.md) rule standardizes the style with autofix.
+
+## `<script>` and `<style>` in the template
+
+Since `1.9`, a `{…}` expression inside a template `<script>` or `<style>` (also in SVG) is error `MEEK140`, at compile time, in `meeko check` and in the editor. The browser does not read their content as HTML, so the escaping of `{…}` does not protect it: in a script, a value with a line break or with `${…}` between backticks would run. A `<script src="…">` or content without `{` stay the same.
+
+- **Data for a script.** Pass it with `useHead`, which writes a JSON block that cannot close its tag (`useHead({ script: [{ type: 'application/json', children: JSON.stringify(config) }] })`), or with `data-*` attributes (`<div bind:data-config="JSON.stringify(config)">`), and read it from the script.
+- **Styles.** Use the component `<style>` section, `bind:style` or CSS variables (`bind:style="{ '--accent': color }"`).
+- `<textarea>`, `<title>` and `<noscript>` do not change: their escaped text cannot leave the element.

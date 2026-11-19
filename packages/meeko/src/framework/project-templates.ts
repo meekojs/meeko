@@ -1,5 +1,5 @@
 /** Vite entry modules generated for a framework application. */
-export const clientEntrySource = `import { mountClientApp, type ClientComponent, type ClientRoute, type RouteMiddleware } from "@meekojs/meeko/framework";
+export const clientEntrySource = `import { mountClientApp, readHydrationDocument, type ClientComponent, type ClientRoute, type RouteMiddleware } from "@meekojs/meeko/framework";
 import { modules as pages } from "virtual:meeko-client-pages";
 import { modules as clientRoutes } from "virtual:meeko-client-routes";
 import { documentConfig, errorPage, routes, viewTransitions } from "virtual:meeko-manifest/client";
@@ -27,9 +27,8 @@ const errorPages = import.meta.glob("/app/error.meeko");
 // Module stylesheets followed by the optional application stylesheet, processed by Vite/PostCSS.
 import "virtual:meeko-global-styles";
 
-const root = document.getElementById("app");
-const payload = document.getElementById("meeko-payload")?.textContent;
-if (!root || !payload) throw new Error("Missing Meeko SSR data");
+// The server's root and payload, not an element of the page content with the same id.
+const { root, payload } = readHydrationDocument(document);
 
 const hydrationStart = performance.now();
 await mountClientApp({

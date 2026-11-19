@@ -686,6 +686,23 @@ function teleportRegion(node: TemplateNode, bindings: TemplateBindings, context:
 /** Elements whose content is not parsed as HTML, so `html` cannot fill them. */
 const rawTextElements = new Set(['textarea', 'title', 'script', 'style', 'xmp', 'iframe', 'noembed', 'noframes', 'noscript', 'plaintext'])
 
+/**
+ * `MEEK140`: a `{expression}` inside a template `<script>` or `<style>` (HTML or SVG). The browser
+ * does not read their content as HTML, so escaping it protects nothing: in a classic script the
+ * text marker is a line comment (a value with a line break runs the next line), and between
+ * backticks `${…}` runs. The data goes through `useHead` or a `data-*` attribute instead.
+ */
+function rejectRawTextInterpolation(node: TemplateNode, tag: 'script' | 'style', context: TemplateContext): void {
+	for (const child of node.childNodes ?? []) {
+		if (child.nodeName !== '#text') continue
+		const scan = scanInterpolations(context.source.slice(child.start, child.end))
+		const at = scan.segments[0]?.start ?? scan.unterminated
+		if (at === undefined) continue
+		const instead = tag === 'script' ? 'pasa los datos con useHead({ script: [{ type: "application/json", children: JSON.stringify(datos) }] }) o con un atributo data-* (bind:data-config="JSON.stringify(datos)") y léelos desde el script' : 'usa el <style> del componente, bind:style o variables CSS (bind:style="{ \'--color\': color }")'
+		throw compileError(context.source, context.filename, 'MEEK140', `<${tag}> de la plantilla no admite expresiones {…}: el navegador no lee su contenido como HTML y el escape no lo protege; ${instead}`, child.start + at)
+	}
+}
+
 /** Resultado del compilador de un componente .meeko. */
 export interface CompileResult {
 	code: string
@@ -1128,6 +1145,7 @@ function renderNodeContent(node: TemplateNode, bindings: TemplateBindings, conte
 		return `__meeko.renderComponent<any>(${id}, ${markSource(reference, referenceOffset, referenceLength)}, ${input}, __meeko_transfer)`
 	}
 	const tag = node.tagName!
+	if (tag === 'script' || tag === 'style') rejectRawTextInterpolation(node, tag, context)
 
 	const attrs: Array<{ kind: 'static'; value: string } | { kind: 'dynamic'; expression: string }> = []
 	// One `data-meeko="N"` per element: its attributes, events, model and ref all find it by that number.

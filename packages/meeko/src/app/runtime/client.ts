@@ -112,12 +112,13 @@ type ClientRouteContext = NavigationContext & {
  *
  * @example
  * ```ts
- * import { mountClientApp } from "@meekojs/meeko/framework";
+ * import { mountClientApp, readHydrationDocument } from "@meekojs/meeko/framework";
  * import type { ClientAppOptions, ClientComponent } from "@meekojs/meeko/framework";
  *
+ * const { root, payload } = readHydrationDocument(document);
  * const options: ClientAppOptions = {
- *   root: document.getElementById("app")!,
- *   payload: document.getElementById("meeko-payload")?.textContent,
+ *   root,
+ *   payload,
  *   routes,
  *   serverData: true,
  *   loadPage: async (file) => await pages[file]!() as ClientComponent,
@@ -137,9 +138,13 @@ export interface ClientAppOptions {
 	 * @since 1.1.0
 	 */
 	readonly errorPage?: ErrorPageRecord | undefined
-	/** Elemento raíz que contiene el HTML SSR (`#app`). */
+	/** Elemento raíz que contiene el HTML SSR (`#app`); `readHydrationDocument` lo localiza. */
 	readonly root: Element
-	/** Payload de hidratación de `#meeko-payload`, como texto JSON o ya analizado. */
+	/**
+	 * Payload de hidratación de `#meeko-payload`, como texto JSON o ya analizado. Léalo con
+	 * `readHydrationDocument`: `document.getElementById` puede devolver un elemento de la
+	 * página con el mismo `id`.
+	 */
 	readonly payload: string | unknown
 	/** Carga el módulo compilado de una página o un layout por su archivo. */
 	readonly loadPage: (file: string) => Promise<ClientComponent>
@@ -354,14 +359,15 @@ async function createTree(chain: readonly string[], props: Record<string, unknow
  * @throws {Error} Si la ruta o sus parámetros no coinciden con los del SSR, o falla la hidratación.
  * @example
  * ```ts
- * import { mountClientApp } from "@meekojs/meeko/framework";
+ * import { mountClientApp, readHydrationDocument } from "@meekojs/meeko/framework";
  * import type { ClientComponent } from "@meekojs/meeko/framework";
  * import { modules as pages } from "virtual:meeko-client-pages";
  * import { errorPage, routes } from "virtual:meeko-manifest/client";
  *
+ * const { root, payload } = readHydrationDocument(document);
  * const app = await mountClientApp({
- *   root: document.getElementById("app")!,
- *   payload: document.getElementById("meeko-payload")?.textContent,
+ *   root,
+ *   payload,
  *   routes,
  *   errorPage,
  *   serverData: true,
@@ -511,8 +517,9 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
 		// with every useHead of the hydrated tree registered.
 		release = documentHead.hold(() => {
 			// An error page without its own title has the one of its SSR error document.
-			if (payload.error) documentHead.setRoute(routeHeadInput(payload.head), undefined, errorTitleEntry(ERROR_PAGE_TITLE, appError!.layouts.length))
-			else documentHead.setRoute(routeHeadInput(payload.head), initialUrl.pathname)
+			// The document's payload only adopts the head SSR wrote: page content could forge it.
+			if (payload.error) documentHead.adoptRoute(routeHeadInput(payload.head), undefined, errorTitleEntry(ERROR_PAGE_TITLE, appError!.layouts.length))
+			else documentHead.adoptRoute(routeHeadInput(payload.head), initialUrl.pathname)
 			return withResourceScope(initialData, () => hydrateApp(committedRoute.state, () => mountBatch(() => withIdRoot(options.document?.idPrefix, () => first.component.hydrateScope({ root: options.root }, {}, payload.state)))))
 		})
 		resourceCache.merge(initialData.loadedData())
@@ -615,6 +622,20 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
 			if (!stream.committed) stream.control?.abort()
 		}
 	}
+	/**
+	 * Follows the redirect of a navigation: a route of this application navigates in place, and any
+	 * other HTTP(S) URL loads as a document. The target comes from data (a middleware may redirect to
+	 * a `?next=` of the URL), so another scheme, such as `javascript:`, which would run in this page,
+	 * fails without navigating.
+	 */
+	const followRedirect = (target: URL, source: string): void => {
+		if (target.protocol !== 'http:' && target.protocol !== 'https:') throw new Error(`${source} redirected to a ${target.protocol} URL; only http: and https: redirects are followed`)
+		if (target.origin === browser.location.origin && matchRoute(options.routes, target.pathname)) {
+			queueMicrotask(() => {
+				if (!disposed) navigator.navigate(target.href).catch((error: unknown) => reportNavigationError(browser, error, observeNavigationError))
+			})
+		} else browser.location.assign(target.href)
+	}
 	const renderRouteData = async (context: RenderContext, initialLoad: boolean, stream: { control?: AbortController; committed?: boolean; data?: (phase: 'ready' | 'cancel' | 'error') => void }): Promise<void | boolean> => {
 		const match = context.match
 		if (match && hasRouteMiddleware(match.route, options) && !initialLoad) {
@@ -630,7 +651,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
 				if (response.status >= 300 && response.status < 400 && location) {
 					const target = new URL(location, context.url)
 					if (target.href === context.url.href) throw new Error('Route middleware redirected to the same URL')
-					browser.location.assign(target.href)
+					followRedirect(target, 'Route middleware')
 				} else reportNavigationError(browser, new Error(`Route middleware blocked navigation: HTTP ${response.status}`), observeNavigationError)
 				return false
 			}
@@ -736,11 +757,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
 				void response.body?.cancel().catch(() => {})
 				if (context.signal.aborted || disposed) return false
 				if (redirect.href === context.url.href) throw new Error('Route data redirected to the same URL')
-				if (redirect.origin === browser.location.origin && matchRoute(options.routes, redirect.pathname)) {
-					queueMicrotask(() => {
-						if (!disposed) navigator.navigate(redirect.href).catch((error: unknown) => reportNavigationError(browser, error, observeNavigationError))
-					})
-				} else browser.location.assign(redirect.href)
+				followRedirect(redirect, 'Route data')
 				return false
 			}
 			// notFound() in top-level server code, or a loader's 404: the nearest error page, as in SSR.

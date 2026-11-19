@@ -29,7 +29,9 @@ export interface RouteMiddlewareContext {
 
 /**
  * Middleware de ruta: devolver `undefined` continúa y devolver un `Response` detiene la ruta. Una
- * redirección durante una navegación del navegador carga la URL nueva con `location.assign`.
+ * redirección durante una navegación del navegador sigue con una navegación de cliente si el destino
+ * es una ruta de la aplicación, y si no carga la URL con `location.assign`; un destino que no sea
+ * `http:` ni `https:`, como `javascript:`, falla sin navegar.
  *
  * @example
  * ```ts

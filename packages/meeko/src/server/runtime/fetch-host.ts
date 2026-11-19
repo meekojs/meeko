@@ -3,7 +3,7 @@ import type { ServerPlatform } from './platform'
 
 import { errorResponse } from '../contract-runtime'
 import { observeServerError } from '../errors'
-import { copySocketAddress } from './env'
+import { copySocketAddress, requestTargetUrl } from './env'
 
 /** Normalizes a configured public origin to `scheme://host[:port]`. */
 export function publicOriginOf(value: string): string {
@@ -28,7 +28,7 @@ export function rebaseRequest(request: Request, origin: string | undefined): Req
 	if (!origin) return request
 	const url = new URL(request.url)
 	if (url.origin === origin) return request
-	return copySocketAddress(request, new Request(new URL(url.pathname + url.search, origin), request))
+	return copySocketAddress(request, new Request(requestTargetUrl(url.pathname + url.search, origin), request))
 }
 
 /** Validates a positive integer adapter option. */

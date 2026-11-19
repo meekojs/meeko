@@ -57,12 +57,12 @@ Pages requesting it with `definePage({ middleware: ["auth"] })` or a `+group.ts`
 
 The same middleware, to export as default. What each result does:
 
-| Result                   | On the server                                 | In the browser                                          |
-| ------------------------ | --------------------------------------------- | ------------------------------------------------------- |
-| `undefined`              | Continues to the next middleware and the page | Same                                                    |
-| `Response.redirect(url)` | Responds with the redirect                    | `location.assign` with the URL: a new page load         |
-| Another `Response`       | Returns it as the response                    | Cancels navigation and passes it to `onNavigationError` |
-| An error                 | Error page                                    | Cancels navigation                                      |
+| Result                   | On the server                                 | In the browser                                                                                                                                                          |
+| ------------------------ | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `undefined`              | Continues to the next middleware and the page | Same                                                                                                                                                                    |
+| `Response.redirect(url)` | Responds with the redirect                    | Client navigation when the URL is a route of the application; otherwise `location.assign`. A scheme other than `http:` or `https:` cancels the navigation with an error |
+| Another `Response`       | Returns it as the response                    | Cancels navigation and passes it to `onNavigationError`                                                                                                                 |
+| An error                 | Error page                                    | Cancels navigation                                                                                                                                                      |
 
 ## Examples
 

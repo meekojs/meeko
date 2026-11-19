@@ -94,8 +94,12 @@ test('named middleware runs after the global middleware, in declared order, in S
 	calls.length = 0
 	assert.equal(await app.navigate('/panel?guest'), false)
 	assert.deepEqual(calls, ['global:client:/panel', 'auth:client:/panel'])
-	assert.deepEqual(assigned, ['https://example.test/?login'])
 	assert.equal(browser.location.pathname, '/admin')
+	// The redirect target is a route of the application: it navigates in place, without a page load.
+	for (let turn = 0; turn < 5 && browser.location.pathname !== '/'; turn++) await new Promise<void>((done) => setImmediate(done))
+	assert.deepEqual(assigned, [])
+	assert.equal(browser.location.href, 'https://example.test/?login')
+	assert.deepEqual(calls, ['global:client:/panel', 'auth:client:/panel', 'global:client:/'])
 	app.dispose()
 	browser.happyDOM.abort()
 })
