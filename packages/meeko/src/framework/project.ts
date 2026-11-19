@@ -29,11 +29,12 @@ import { visibleHost } from '../server/runtime/fetch-host'
 import { listeningMessage } from '../server/runtime/listen-address'
 import { handleProcessErrors, processErrorObserver } from '../server/runtime/process-errors'
 import { bunEntrySource, cloudflareEntrySource, denoEntrySource } from './adapter-templates'
-import { buildDataFile, discoverAppPlugins, findRuntimeFile, frameworkClientEntry, frameworkNodeEntry, frameworkServerEntry } from './app-manifest'
+import { buildDataFile, defaultErrorPageFile, discoverAppPlugins, findRuntimeFile, frameworkClientEntry, frameworkNodeEntry, frameworkServerEntry } from './app-manifest'
 import { assetKey } from './asset-key'
 import { cloudflareAssetsDirectory, cloudflarePrerenderDirectory, resolveWrangler, wranglerConfig, wranglerSource } from './cloudflare-build'
 import { discoverConfiguredRoutes, loadConfiguredModules, loadMeekoConfig, resolveConfigSources } from './config'
 import { contentTypes } from './content-types'
+import { defaultErrorLogo } from './default-error-logo'
 import { devtoolsPanelPlugin, devtoolsPanelScript, resolveDevtoolsConfig } from './dev-devtools'
 import { supervisedHmrPortEnv, supervisedPortEnv } from './dev-link'
 import { recordEditorBridgeOff } from './dev-lock'
@@ -43,7 +44,7 @@ import { createDevAppReloader, hotFileKey, isDiscoverySource, isRouteOptionsSour
 import { editorBridgeHost, editorBridgeOffReason, startEditorBridge } from './editor-bridge'
 import { installedModulePackages, resolvedDocument, resolveSiteOrigin, setModuleDevelopmentMode } from './module-loader'
 import { prerenderForBuild } from './prerender'
-import { clientEntrySource, nodeEntrySource, serverEntrySource, staticClientEntrySource } from './project-templates'
+import { clientEntrySource, defaultErrorPageSource, nodeEntrySource, serverEntrySource, staticClientEntrySource } from './project-templates'
 import { discoverRouteMiddleware } from './route-middleware-discovery'
 import { discoverErrorPage } from './routes-discovery'
 import { assertNoLegacySessionFile } from './runtime-migration'
@@ -112,6 +113,20 @@ export function adapterEntry(adapter: MeekoAdapterName): string {
 }
 
 /**
+ * Writes the logo of the default error page next to it, only when it changed: rewriting it on every
+ * start would make Vite reload the pages that import it.
+ */
+async function writeDefaultErrorLogo(target: string): Promise<void> {
+	const logo = Buffer.from(defaultErrorLogo, 'base64')
+	try {
+		if (logo.equals(await readFile(target))) return
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+	}
+	await writeFile(target, logo)
+}
+
+/**
  * Writes framework-owned Vite entries; no application file is overwritten. An entry that already has
  * its source is left alone: Vite watches them, and rewriting one reloads every page open on every
  * `meeko dev` of the project, with the state it had.
@@ -122,6 +137,8 @@ export async function prepareProject(projectRoot: string): Promise<void> {
 	await mkdir(generated, { recursive: true })
 	await Promise.all([
 		writeIfChanged(resolve(root, frameworkClientEntry), clientEntrySource),
+		writeIfChanged(resolve(root, defaultErrorPageFile), defaultErrorPageSource),
+		writeDefaultErrorLogo(resolve(generated, 'meeko-logo.webp')),
 		writeIfChanged(resolve(root, frameworkServerEntry), serverEntrySource),
 		writeIfChanged(resolve(root, frameworkNodeEntry), nodeEntrySource),
 	])

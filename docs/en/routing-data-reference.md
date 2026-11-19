@@ -1,5 +1,5 @@
 ---
-source-hash: 19f196ddf561aea9274d184c4b6a104f4f2c5a007ef0f57d57d640b3426fde17
+source-hash: 7f12cb04b52afa5b1df7fcec82eef2bf4fa81dd46ea8e98ddb7046c1d1999d60
 ---
 
 # Data and rendering: technical details
@@ -13,7 +13,7 @@ Full contracts for server code, rendering modes, streaming and page caching. Sta
 - **Unmatched URL.** A page request (GET or HEAD with `accept: text/html`, or navigation with `accept: application/meeko+json`) responds `404` with `app/error.meeko` inside the root layouts: `app/app.meeko` and `app/layouts/default.meeko` (or `app/pages/+layout.meeko`). The props are `{ status: 404, message: "NOT_FOUND" }`. Like a route's error page, the document is titled `Error` (`<title>` in SSR and `document.title` when navigating to an unmatched URL). The document includes the hydration payload, so the browser hydrates it and subsequent navigation works. In the browser, a link or `navigate()` to an unmatched URL loads the document: that URL may belong to server middleware, a file or a redirect, and checking it first with `fetch` would run a `GET` with side effects twice. If nothing else handles it, the server responds with `app/error.meeko`. For the same reason, returning through history to an unmatched entry reloads the document; navigation from the `404` page to application routes is client-side.
 - **Failed page.** The nearest `+error.meeko` still takes priority; if none exists, `app/error.meeko` is used. The same applies to a `render: "client"` route's browser loader.
 
-`/api/...`, `/_meeko/...`, assets and non-page requests keep their `404` responses (JSON or text). Without `app/error.meeko`, nothing changes: an unmatched URL responds `404` in plain text and the browser reloads the document. `app/error.meeko` and `app/pages/+error.meeko` would define the same level, so having both is a discovery error. In a layer or module, `app/error.meeko` backs up its own pages; the `404` uses the project's page. A custom host passes the page through `errorPage` to `createFrameworkHandler` and `mountClientApp` (`AppManifest.errorPage` in `createServerApp`).
+`/api/...`, `/_meeko/...`, assets and non-page requests keep their `404` responses (JSON or text). If the app has no `app/error.meeko`, the framework provides a default error page with the status code and a link to the home page. The static adapter generates the default `404.html` when the app also has no `public/404.html`. `app/error.meeko` and `app/pages/+error.meeko` would define the same level, so having both is a discovery error. In a layer or module, `app/error.meeko` backs up its own pages; the `404` uses the project's page. A custom host passes the page through `errorPage` to `createFrameworkHandler` and `mountClientApp` (`AppManifest.errorPage` in `createServerApp`).
 
 ## Page server code
 

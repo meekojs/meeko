@@ -165,13 +165,13 @@ test('app/error.meeko backs routes without +error.meeko and conflicts with app/p
 	}
 })
 
-test('app/error.meeko wraps in a root +layout.meeko and is absent without the file', async () => {
+test('the generated manifest uses the default error page until app/error.meeko exists', async () => {
 	const root = await project(['app/pages/+layout.meeko', 'app/pages/index.meeko'])
 	try {
 		assert.equal(await discoverErrorPage(root), undefined)
-		assert.match(await clientRoutesSource(root), /export const errorPage = undefined;/)
+		assert.match(await clientRoutesSource(root), /export const errorPage = .*default-error\.meeko/)
 		const { manifest } = await discoverAppManifest(root, { entry: '/client.js', css: [], preload: [] })
-		assert.equal('errorPage' in manifest, false)
+		assert.deepEqual(manifest.errorPage, { file: '/.meeko/generated/default-error.meeko', layouts: [] })
 		await writeFile(join(root, 'app/error.meeko'), '')
 		assert.deepEqual((await discoverErrorPage(root))?.layouts, [join(root, 'app/pages/+layout.meeko')])
 	} finally {

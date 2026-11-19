@@ -140,7 +140,8 @@ test('module styles use consumer PostCSS, import assets and enter SSR/static has
 		)
 		if (adapter === 'static') {
 			const html = await readFile(join(result.output, 'index.html'), 'utf8')
-			for (const file of styles) assert.ok(html.includes(file), file)
+			// Without app/error.meeko the default error page has its own stylesheet, which the pages do not load.
+			for (const file of styles) assert.equal(html.includes(file), !file.startsWith('default-error-'), file)
 		}
 	}
 })

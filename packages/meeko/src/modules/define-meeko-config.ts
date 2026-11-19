@@ -132,7 +132,7 @@ export type MeekoServerConfig =
 			/**
 			 * Sitio estático en `.meeko/output/static/`, sin servidor: los assets, `public/`, cada página
 			 * prerenderizada como `<ruta>/index.html` con su payload `<ruta>/index.meeko.json` y
-			 * `404.html` de `app/error.meeko`. Todas las páginas deben usar `render: "prerender"`, y la
+			 * `404.html` de la página de error de la app o de la predeterminada. Todas las páginas deben usar `render: "prerender"`, y la
 			 * aplicación no puede tener API, RPC, Socket ni middleware de servidor.
 			 * @since 1.3.0
 			 */

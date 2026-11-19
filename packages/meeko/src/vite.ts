@@ -19,7 +19,7 @@ import { moduleSpecifiers } from './compiler/import-graph'
 import { sourceMapForCompiled } from './compiler/sourcemap'
 import { assertRouteBlockPlacement, isPageFile, routeBlockFile, routeBlockId, routeBlockSource, withoutRouteBlock } from './compiler/transforms/route-block'
 import { resolveProjectAliases, resolveProjectAliasesSync } from './framework/aliases'
-import { clientMiddlewareSource, clientPluginsSource, clientRoutesSource, clientSidecarsSource, readBuildAppData, serverAppSource } from './framework/app-manifest'
+import { clientMiddlewareSource, clientPluginsSource, clientRoutesSource, clientSidecarsSource, portableErrorPage, readBuildAppData, serverAppSource } from './framework/app-manifest'
 import { generateAppTypeForFile, generateAppTypes } from './framework/check-app'
 import { componentDirectories, discoverConfiguredRoutes, loadConfiguredModules, loadMeekoConfig, resolveConfigSources } from './framework/config'
 import { builtinOptimizeInclude, devScanIgnored, invalidateDevModules, isComponentSource, isDevWatchIgnored, isDiscoverySource, isModuleScript } from './framework/dev-watch'
@@ -316,11 +316,14 @@ export function meeko(): Plugin {
 			}
 			if (virtual === clientPagesModule) {
 				const routes = await discoverConfiguredRoutes(root)
+				const errorPage = await portableErrorPage(root)
 				const unique = [...new Set(routes.flatMap((route) => [route.file, ...route.layouts, ...(route.error ? [route.error] : [])]))]
-				const entries = unique.map((file) => {
+				const keys = unique.map((file) => {
 					const path = relative(root, file).replaceAll('\\', '/')
 					if (path === '..' || path.startsWith('../') || isAbsolute(path)) throw new Error(`Page outside Meeko project: ${file}`)
-					const specifier = `/${path}`
+					return `/${path}`
+				})
+				const entries = [...new Set([...keys, errorPage.file, ...errorPage.layouts])].map((specifier) => {
 					return `${JSON.stringify(specifier)}: () => import(${JSON.stringify(specifier)})`
 				})
 				return `export const modules = {${entries.join(',')}};`
