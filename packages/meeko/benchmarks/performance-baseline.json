@@ -43,18 +43,18 @@
 		"bundle.raw": {
 			"unit": "bytes",
 			"samples": 1,
-			"median": 21865,
-			"p95": 21865,
-			"minimum": 21865,
-			"maximum": 21865
+			"median": 24345,
+			"p95": 24345,
+			"minimum": 24345,
+			"maximum": 24345
 		},
 		"bundle.gzip": {
 			"unit": "bytes",
 			"samples": 1,
-			"median": 8298,
-			"p95": 8298,
-			"minimum": 8298,
-			"maximum": 8298
+			"median": 9236,
+			"p95": 9236,
+			"minimum": 9236,
+			"maximum": 9236
 		},
 		"client.hydration": {
 			"unit": "ms",
