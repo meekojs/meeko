@@ -848,7 +848,7 @@ export function bindTextContent(scope: DomScope, id: number, read: () => string,
 	const target = findMarked(scope, id)
 	if (target.textContent !== read()) throw new Error(`Hydration mismatch in ${location}`)
 	let first = true
-	return effect(() => {
+	return bindingEffect(() => {
 		const next = read()
 		if (first) {
 			first = false
