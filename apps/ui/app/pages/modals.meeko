@@ -119,8 +119,7 @@
 			<code>footer</code>. El evento
 			<code>dismiss</code>
 			recibe
-			<code>escape</code>,
-			<code>backdrop</code>,
+			<code>escape</code>, <code>backdrop</code>,
 			<code>button</code>
 			o
 			<code>native</code>. No uses un modal para tareas que puedan resolverse dentro de la página.

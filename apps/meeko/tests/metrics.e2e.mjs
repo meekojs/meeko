@@ -161,8 +161,8 @@ test('the site counts views, confirmed searches and «¿Te sirvió?» without co
 		await new Promise((done) => setTimeout(done, 1500))
 		assert.deepEqual((await db.query('SELECT query, results FROM docs_searches ORDER BY id')).rows, [{ query: nothing, results: 0 }], 'one row, without its prefixes')
 		assert.deepEqual(searches, [{ query: nothing, results: 0 }])
-		await page.locator('dialog.meeko-ui-command').getByRole('button', { name: 'Cerrar la búsqueda' }).click()
-		await page.locator('dialog.meeko-ui-command').waitFor({ state: 'hidden' })
+		await page.locator('dialog:has(> div > input[type="search"][role="combobox"])').getByRole('button', { name: 'Cerrar la búsqueda' }).click()
+		await page.locator('dialog:has(> div > input[type="search"][role="combobox"])').waitFor({ state: 'hidden' })
 
 		// «¿Te sirvió?» with JavaScript: «No» with a comment, then thanks.
 		const widget = page.locator('#docs-feedback')

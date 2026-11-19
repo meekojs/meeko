@@ -22,10 +22,11 @@ try {
   if ($Tarball) {
     $archive = (Resolve-Path -LiteralPath $Tarball).Path
   } else {
-    # npm pack runs the package's prepack build. Nothing is published.
-    $filename = (& npm pack $packageRoot --pack-destination $runRoot | Select-Object -Last 1)
-    if ($LASTEXITCODE -ne 0 -or !$filename) { throw 'npm pack failed.' }
-    $archive = Join-Path $runRoot $filename
+    # pnpm pack runs the package's prepack build. Nothing is published.
+    # pnpm pack, not npm pack: it replaces the catalog: and workspace: versions, which npm cannot install.
+    $filename = (& pnpm -C $packageRoot pack --pack-destination $runRoot | Select-Object -Last 1)
+    if ($LASTEXITCODE -ne 0 -or !$filename) { throw 'pnpm pack failed.' }
+    $archive = Join-Path $runRoot (Split-Path -Leaf $filename)
   }
 
   Write-Fixture 'package.json' '{"name":"meeko-registry-consumer","private":true,"type":"module","scripts":{"check":"meeko check .","build":"vite build"}}'

@@ -69,8 +69,35 @@ export interface TagContext {
 	/** End of the tag: its `>`, or where the next tag starts while it is unfinished. */
 	readonly tagEnd: number
 	readonly component: boolean
+	/** Whether the tag is SVG content: inside `<svg>`, or `<svg>` itself, and not inside `<foreignObject>`. */
+	readonly svg: boolean
 	/** The quoted value containing `offset`, with the name of its attribute. */
 	readonly value?: { readonly attribute: string; readonly start: number }
+}
+
+/** Whether a tag that follows `before`, the template up to it, is SVG content. */
+function insideSvg(before: string): boolean {
+	const depth = (name: string): number => {
+		let open = 0
+		for (const match of before.matchAll(new RegExp(`<(/?)${name}(?=[\\s/>])[^>]*?(/?)>`, 'g'))) {
+			if (match[1]) open = Math.max(0, open - 1)
+			else if (!match[2]) open++
+		}
+		return open
+	}
+	if (!before.includes('<svg')) return false
+	// What follows the last open `<foreignObject>` is HTML again, unless an `<svg>` opens inside it.
+	const foreign = before.lastIndexOf('<foreignObject')
+	if (foreign >= 0 && depth('foreignObject') > 0) return insideSvg(before.slice(foreign + '<foreignObject'.length))
+	return depth('svg') > 0
+}
+
+/**
+ * The tag of `context` as the attribute data name it: with the prefix `svg:` for SVG content
+ * (`svg:a`), and as written otherwise.
+ */
+export function nativeTagName(context: Pick<TagContext, 'tag' | 'svg'>, tag = context.tag): string {
+	return context.svg && !context.tag.includes('-') ? `svg:${tag}` : tag
 }
 
 export function tagAt(source: string, offset: number): TagContext | undefined {
@@ -120,6 +147,65 @@ export function tagAt(source: string, offset: number): TagContext | undefined {
 		tagStart,
 		tagEnd,
 		component: /^[A-Z]/.test(tag) || tag === 'component',
+		svg: tag === 'svg' || insideSvg(source.slice(template.contentStart, tagStart)),
 		...(quote ? { value: { attribute, start: valueStart } } : {}),
 	}
+}
+
+/** Index after the `}` that closes the `{` at `start`, skipping strings and nested braces. */
+function braceEnd(source: string, start: number, limit: number): number {
+	let depth = 0
+	for (let index = start; index < limit; index++) {
+		const char = source[index]
+		if (char === '"' || char === "'" || char === '`') {
+			const close = source.indexOf(char, index + 1)
+			if (close < 0 || close >= limit) return limit
+			index = close
+		} else if (char === '{') depth++
+		else if (char === '}' && --depth === 0) return index + 1
+	}
+	return limit
+}
+
+/**
+ * Tramos de la plantilla donde la gramática pinta TypeScript: las interpolaciones `{…}` y los
+ * valores entre comillas de los atributos. Fuera de ellos (nombres de etiqueta y de atributo,
+ * texto) un token semántico taparía el color de la gramática.
+ * @param source Texto completo del `.meeko`.
+ * @returns Tramos `[inicio, fin)` ordenados; `undefined` si el archivo no tiene plantilla.
+ */
+export function templateExpressionRanges(source: string): { readonly template: Region; readonly ranges: ReadonlyArray<readonly [number, number]> } | undefined {
+	const template = templateRegion(source)
+	if (!template) return undefined
+	const ranges: Array<readonly [number, number]> = []
+	const limit = template.contentEnd
+	let index = template.contentStart
+	while (index < limit) {
+		if (source.startsWith('<!--', index)) {
+			const close = source.indexOf('-->', index + 4)
+			index = close < 0 || close >= limit ? limit : close + 3
+		} else if (source[index] === '{') {
+			const end = braceEnd(source, index, limit)
+			ranges.push([index, end])
+			index = end
+		} else if (source[index] === '<' && /[A-Za-z/]/.test(source[index + 1] ?? '')) {
+			// Inside a tag: a quoted value or `{…}` is an expression; the tag ends at `>` outside them.
+			index++
+			while (index < limit && source[index] !== '>') {
+				const char = source[index]!
+				if (char === '"' || char === "'") {
+					const close = source.indexOf(char, index + 1)
+					const end = close < 0 || close >= limit ? limit : close
+					ranges.push([index + 1, end])
+					index = end + 1
+				} else if (char === '{') {
+					const end = braceEnd(source, index, limit)
+					ranges.push([index, end])
+					index = end
+				} else index++
+			}
+			index++
+		} else index++
+	}
+	return { template, ranges }
 }

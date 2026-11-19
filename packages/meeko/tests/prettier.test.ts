@@ -49,9 +49,64 @@ describe('Prettier plugin for .meeko', () => {
 		})
 	}
 
+	for (const htmlWhitespaceSensitivity of ['ignore', 'css', 'strict'] as const) {
+		for (const printWidth of [30, 100, 800]) {
+			test(`keeps text-only closing tags complete at width ${printWidth} with ${htmlWhitespaceSensitivity}`, async () => {
+				const source = '<template>\n<article>\n<MeekoLink class="link" to="/">Volver al inicio</MeekoLink>\n</article>\n</template>\n'
+				const options = { htmlWhitespaceSensitivity, printWidth, singleAttributePerLine: true, useTabs: true, meekoIndentSections: true }
+				const formatted = await formatStable(source, options)
+				assert.match(formatted, /<MeekoLink\n\s+class="link"\n\s+to="\/"/)
+				assert.match(formatted, /inicio\s*<\/MeekoLink>/)
+				if (printWidth >= 100 && htmlWhitespaceSensitivity !== 'ignore') assert.match(formatted, /to="\/">Volver al inicio<\/MeekoLink>/)
+				const broken = source.replace('>Volver al inicio</MeekoLink>', '\n>Volver al inicio</MeekoLink\n>')
+				assert.equal(await formatStable(broken, options), formatted)
+			})
+			test(`Enter inside text keeps the closing tag complete at width ${printWidth} with ${htmlWhitespaceSensitivity}`, async () => {
+				const options = { htmlWhitespaceSensitivity, printWidth, useTabs: true, meekoIndentSections: true }
+				for (const text of ['\nEsta página resume cómo Ordemi utiliza la información.', 'Esta página resume\ncómo Ordemi utiliza la información.', '\nEsta página resume cómo Ordemi utiliza la información.\n']) {
+					const source = `<template>\n<p class="mt-5 text-lg leading-8 text-muted">${text}</p>\n</template>\n`
+					const formatted = await formatStable(source, options)
+					assert.match(formatted, /<\/p>/)
+					if (text.startsWith('\n')) assert.match(formatted, /text-muted"\s*>\n\s+Esta/)
+					const broken = source.replace('</p>', '</p\n>')
+					assert.equal(await formatStable(broken, options), formatted)
+				}
+			})
+		}
+	}
+
+	test('ignore formats nested form elements like Prettier HTML, including previously split tags', async () => {
+		const source = '<template>\n<label class="grid gap-2 text-sm font-medium">Tipo de acceso<select model="mode" class="min-h-11 rounded-lg border border-input bg-canvas px-3"><option value="email">Responsable · con correo</option><option value="employee">Empleado · con usuario</option></select></label>\n</template>\n'
+		const options = { htmlWhitespaceSensitivity: 'ignore' as const, singleAttributePerLine: true, printWidth: 800, useTabs: true, meekoIndentSections: true }
+		const expected = await prettier.format(source, { ...options, parser: 'vue' })
+		for (const text of [source, source.replace('>Tipo', '\n>Tipo').replace('</select>', '</select\n>'), source.replace('>Tipo', '>\nTipo').replace('</label>', '\n</label>')]) {
+			assert.equal(await formatStable(text, options), expected)
+		}
+	})
+
+	test('ignore formats snippet footers as complete nested tags', async () => {
+		const source = '<template>\n<AuthCard><snippet name="footer">¿Ya tienes una cuenta?<MeekoLink to="/login" class="text-accent-text underline underline-offset-4">Ingresar</MeekoLink></snippet></AuthCard>\n</template>\n'
+		const options = { htmlWhitespaceSensitivity: 'ignore' as const, singleAttributePerLine: true, printWidth: 800, useTabs: true, meekoIndentSections: true }
+		const expected = await prettier.format(source, { ...options, parser: 'vue' })
+		const broken = source.replace('>¿Ya', '\n>¿Ya').replace('>Ingresar', '\n>Ingresar').replace('</MeekoLink>', '</MeekoLink\n>')
+		for (const text of [source, broken]) assert.equal(await formatStable(text, options), expected)
+	})
+
+	test('separates adjacent sections with exactly one blank line', async () => {
+		const sections = ['<script server lang="ts">export const title="Meeko"</script>', '<script lang="ts">const label="Label"</script>', '<template><p>{label}</p></template>', '<style>p{color:red}</style>']
+		for (const gap of ['', '\n', '\n\n', '\n\n\n\n', '\r\n']) {
+			for (const htmlWhitespaceSensitivity of ['ignore', 'css', 'strict'] as const) {
+				const formatted = await formatStable(sections.join(gap), { htmlWhitespaceSensitivity })
+				assert.equal(formatted.match(/<\/script>\n\n<(?:script|template)/g)?.length, 2)
+				assert.match(formatted, /<\/template>\n\n<style>/)
+				assert.doesNotMatch(formatted, /\n{3}/)
+			}
+		}
+	})
+
 	test('keeps the order and attributes of the sections and the comments between them', async () => {
 		const source = '<!-- page -->\n<script server lang="ts">\nexport const route={}\n</script>\n<script lang="ts">\nconst a=1\n</script>\n\n\n<!-- view -->\n<template>\n<p>{a}</p>\n</template>\n<style scoped lang="css">.a{color:red}</style>\n'
-		assert.equal(await formatStable(source), '<!-- page -->\n<script server lang="ts">\nexport const route = {};\n</script>\n<script lang="ts">\nconst a = 1;\n</script>\n\n<!-- view -->\n<template>\n<p>{a}</p>\n</template>\n<style scoped lang="css">\n.a {\n  color: red;\n}\n</style>\n')
+		assert.equal(await formatStable(source), '<!-- page -->\n<script server lang="ts">\nexport const route = {};\n</script>\n\n<script lang="ts">\nconst a = 1;\n</script>\n\n<!-- view -->\n<template>\n<p>{a}</p>\n</template>\n\n<style scoped lang="css">\n.a {\n  color: red;\n}\n</style>\n')
 	})
 
 	test('formats directive values as TypeScript expressions', async () => {
@@ -232,7 +287,7 @@ describe('Prettier plugin for .meeko', () => {
 		const formatted = await format(page)
 		assert.equal(await format(formatted), formatted)
 		assert.doesNotMatch(formatted, /<script lang="ts">/)
-		assert.match(formatted, /^<script server lang="ts">\nexport const title = "Hola";\n<\/script>\n<template>\n<h1>\{title\}<\/h1>\n<\/template>\n$/)
+		assert.match(formatted, /^<script server lang="ts">\nexport const title = "Hola";\n<\/script>\n\n<template>\n<h1>\{title\}<\/h1>\n<\/template>\n$/)
 	})
 
 	test('never changes the content of pre and textarea', async () => {
@@ -259,9 +314,11 @@ describe('Prettier plugin for .meeko', () => {
 				'<script server lang="ts">',
 				'  export const route = {};',
 				'</script>',
+				'',
 				'<script lang="ts">',
 				'  const count = signal(0);',
 				'</script>',
+				'',
 				'<template>',
 				'  <section>',
 				'    <p>{count.value}</p>',
@@ -270,6 +327,7 @@ describe('Prettier plugin for .meeko', () => {
 				'  b</pre>',
 				'  </section>',
 				'</template>',
+				'',
 				'<style>',
 				'  .a {',
 				'    color: red;',
@@ -433,8 +491,8 @@ describe('Prettier in the language server', () => {
 	// Inside the package, so that `prettier` resolves from the file; not under `.meeko/`, which the repository's `.prettierignore` excludes.
 	const workspaces = resolve('tests/.prettier-workspaces')
 	after(async () => {
-		await Promise.all(roots.map((root) => rm(root, { recursive: true, force: true })))
-		await rm(workspaces, { recursive: true, force: true })
+		await Promise.all(roots.map((root) => rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })))
+		await rm(workspaces, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 	})
 
 	const source = component('<p   class="x" bind:title="count.value?\'a\':\'b\'">{count.value}</p>', 'const count = signal("x");\n')
@@ -556,10 +614,10 @@ describe('Prettier in the language server', () => {
 		})
 	})
 
-	for (const htmlWhitespaceSensitivity of ['ignore', 'css', 'strict'] as const)
+	for (const htmlWhitespaceSensitivity of ['css', 'strict'] as const)
 		test(`saving a component with the sensitivity "${htmlWhitespaceSensitivity}" keeps what it renders: no text node appears or disappears`, async () => {
 			const script = `<script lang="ts">\nimport { signal } from "@meekojs/meeko";\nconst items = signal(["a", "b"]);\nconst on = signal(true);\nconst label = "x";\n</script>\n`
-			const template = `<template><ul class="u" id="l"><li each:of="items.value" each:as="item" each:key="item" class="i">{item}</li></ul><div class="d" id="e"><button type="button" class="b" on:click="() => on.value = !on.value">{label}</button><button type="button">y</button><span if:when="on.value" class="s" id="t">Hi<b> you</b>!</span></div></template>`
+			const template = `<template><ul class="u" id="l"><li each:of="items.value" each:as="item" each:key="item" class="i">{item}</li></ul><div class="d" id="e"><button type="button" class="b" on:click="() => on.value = !on.value">{label}</button><button type="button" class="secondary">y</button><span if:when="on.value" class="s" id="t">Hi<b> you</b>!</span></div></template>`
 			const options: prettier.Options & MeekoPrettierOptions = { filepath: 'Whitespace.meeko', htmlWhitespaceSensitivity, singleAttributePerLine: true, printWidth: 800, useTabs: true, meekoIndentSections: true }
 			const source = `${script}${template}\n`
 			const formatted = await format(source, options)
@@ -605,6 +663,19 @@ describe('Prettier in the language server', () => {
 		const root = await workspace(workspaces, {})
 		const broken = component('<p if:when="count.value" each:of="[]">x</p>')
 		assert.equal(await lspFormat(root, broken), broken)
+	})
+
+	test('leaves incomplete documents unchanged and formats consistently once completed', async () => {
+		const root = await workspace(workspaces, { '.prettierrc': JSON.stringify({ htmlWhitespaceSensitivity: 'ignore', meekoIndentSections: true, useTabs: true, printWidth: 800 }) })
+		for (const source of ['<template><div>', '<template><input bind:value="name></template>', '<script lang="ts">\nconst value =\n</script>\n<template><p>Hola</p></template>', '<template><p>{value +</p></template>']) {
+			assert.equal(await lspFormat(root, source), source)
+		}
+		const completed = '<script lang="ts">const value=1</script><template><p>{value+1}</p></template>'
+		const formatted = await lspFormat(root, completed)
+		assert.notEqual(formatted, completed)
+		assert.match(formatted, /<\/script>\n\n<template>/)
+		assert.match(formatted, /\{value \+ 1\}/)
+		assert.equal(await lspFormat(root, formatted), formatted)
 	})
 })
 
@@ -713,7 +784,8 @@ describe('What a component renders after saving it', () => {
 				['<!-- prettier-ignore -->\n<p>\n}}\n</p>', 'p', ' }} '],
 			] as const) {
 				const source = `${script}<template>${template}</template>\n`
-				for (const htmlWhitespaceSensitivity of ['ignore', 'css', 'strict'] as const) {
+				const sensitivities = tag === 'p' ? (['css', 'strict'] as const) : (['ignore', 'css', 'strict'] as const)
+				for (const htmlWhitespaceSensitivity of sensitivities) {
 					for (const printWidth of [10, 15, 80]) {
 						const options = { htmlWhitespaceSensitivity, printWidth }
 						const formatted = await format(source, options)

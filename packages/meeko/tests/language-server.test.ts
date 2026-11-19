@@ -772,6 +772,15 @@ const later = 1;
 <template><p>{later}</p></template>
 `
 
+const headPage = `<script server lang="ts">
+const { url } = usePage();
+useHead({ title: url.pathname });
+const fix = useSe;
+export const path = url.pathname;
+</script>
+<template><p>{path}</p></template>
+`
+
 const leakPage = `<script lang="ts">
 const user = findUser();
 </script>
@@ -798,6 +807,7 @@ const props = defineProps<{ data: { name: string } }>();
 `,
 			'app/pages/profile.meeko': bodyPage,
 			'app/pages/modes.meeko': modesPage,
+			'app/pages/meta.meeko': headPage,
 			'app/pages/leak.meeko': leakPage,
 			'app/components/Widget.meeko': `<script server lang="ts">
 export const route = {};
@@ -903,6 +913,29 @@ const text = "widget";
 		const diagnostics = await client.waitForDiagnostics(uri, (items) => items.some((item) => item.code === 'TS2322'))
 		assert.equal(client.document(uri).getText(diagnostics.find((item) => item.code === 'TS2322')!.range), 'label')
 		await client.change(uri, bodyPage)
+	})
+
+	test('useHead and useSeoMeta are typed and completed in the block, other browser autoimports are not', async () => {
+		const uri = await client.open(file('app/pages/meta.meeko'))
+		// Only the unfinished `useSe`: the head APIs themselves type-check.
+		const diagnostics = await client.waitForDiagnostics(uri, (items) => items.length > 0)
+		assert.deepEqual(
+			diagnostics.map((item) => client.document(uri).getText(item.range)),
+			['useSe'],
+			JSON.stringify(diagnostics),
+		)
+		const hover = await client.connection.sendRequest(HoverRequest.type, { textDocument: { uri }, position: client.position(uri, 'useHead(', 2) })
+		assert.match((hover?.contents as MarkupContent).value, /useHead/)
+		const completions = await client.connection.sendRequest(CompletionRequest.type, { textDocument: { uri }, position: client.position(uri, 'useSe;', 5) })
+		const labels = (Array.isArray(completions) ? completions : (completions?.items ?? [])).map((item) => item.label)
+		assert.ok(labels.includes('useSeoMeta'), JSON.stringify(labels.filter((item) => /^use/.test(item))))
+		await client.change(uri, headPage.replace('useSe;', 'useTheme();'))
+		const theme = await client.waitForDiagnostics(uri, (items) => items.some((item) => client.document(uri).getText(item.range) === 'useTheme'))
+		assert.deepEqual(theme.map((item) => item.code).sort(), ['MEEK_AUTOIMPORT', 'TS2304'], JSON.stringify(theme))
+		assert.match(String(theme.find((item) => item.code === 'MEEK_AUTOIMPORT')!.message), /useTheme no está disponible en el ámbito server/)
+		const labelsAt = await client.connection.sendRequest(CompletionRequest.type, { textDocument: { uri }, position: client.position(uri, 'useTheme()', 5) })
+		assert.ok(!(Array.isArray(labelsAt) ? labelsAt : (labelsAt?.items ?? [])).some((item) => item.label === 'useTheme' || item.label === 'useForm'))
+		await client.change(uri, headPage)
 	})
 
 	test('a render: "client" block resolves autoimports in the client scope', async () => {
@@ -1333,7 +1366,7 @@ describe('Meeko language server built-in tags, component hover and completion', 
 			}
 			const link = await hoverAt('<MeekoLink', 3)
 			assert.equal(link.range, 'MeekoLink')
-			assert.match(link.value, /^```ts\n<MeekoLink\n {2}to: "\/users\/\[id\]"\n {2}bind:params\?: [^\n]+\n {2}bind:search\?: Readonly<Record<string, [^\n]+>>\n {2}match\?: "exact" \| "prefix"\n {2}bind:resolve\?: boolean\n>\n {2}default\?\(\)\n<\/MeekoLink>\n```/)
+			assert.match(link.value, /^```ts\n<MeekoLink\n {2}to: "\/users\/\[id\]"\n {2}bind:params\?: [^\n]+\n {2}bind:search\?: Readonly<Record<string, [^\n]+>>\n {2}match\?: "exact" \| "prefix"\n {2}bind:resolve\?: boolean\n {2}\/\/ …y \d+ atributos HTML\n>\n {2}default\?\(\)\n<\/MeekoLink>\n```/)
 			assert.doesNotMatch(link.value, /\bany\b/)
 			assert.match(link.value, /props: \[`MeekoLinkProps`\]\(file:\/\/\/[^)]+framework\.d\.ts#L\d+,\d+\)/)
 			assert.match(link.value, /- `bind:params`: Parámetros de una ruta dinámica/)

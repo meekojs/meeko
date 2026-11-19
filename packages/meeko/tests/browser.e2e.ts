@@ -6,13 +6,14 @@ import { randomUUID } from 'node:crypto'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { createServer as createHttpServer } from 'node:http'
 import { dirname, join, resolve } from 'node:path'
-import test from 'node:test'
+import { after, test as nodeTest } from 'node:test'
 import { pathToFileURL } from 'node:url'
 import { chromium } from 'playwright-core'
 import { createServer, preview } from 'vite'
 
 import type * as framework_server_tsTypes from '../src/framework-server.ts'
 import type * as node_tsTypes from '../src/node.ts'
+import type { BrowserSession } from './helpers/browser-session.ts'
 
 import { createExampleServer } from '../examples/counter/server.ts'
 import { prepareFrameworkTypes } from '../src/framework/check-project.ts'
@@ -20,82 +21,102 @@ import { generateServerContracts } from '../src/framework/contracts-generate.ts'
 import { buildProject } from '../src/framework/project.ts'
 import { previewStatic } from '../src/framework/static-adapter.ts'
 import { startConformanceOutput } from './conformance/harness.ts'
+import { withBrowserSession } from './helpers/browser-session.ts'
 import { componentIsListFiles } from './helpers/component-is-list.ts'
 import { polymorphicButton } from './helpers/polymorphic-button.ts'
 import { staticAppConfig, writeStaticApp } from './helpers/static-app.ts'
 import { createTempProject, linkRepositoryPackages } from './helpers/temp-project.ts'
 
-async function assertBrowserBehavior(url: string, development: boolean): Promise<void> {
-	const browser = await chromium.launch({
-		...(process.env.MEEKO_CHROME_PATH ? { executablePath: process.env.MEEKO_CHROME_PATH } : { channel: 'chrome' as const }),
-		headless: true,
-	})
-	try {
-		const page = await browser.newPage()
-		const errors: string[] = []
-		page.on('pageerror', (error) => errors.push(error.message))
-		page.on('console', (message) => {
-			if (message.type() === 'error') errors.push(`${message.text()} @ ${message.location().url}`)
-		})
-		await page.goto(url, { waitUntil: 'networkidle' })
-		if (development) {
-			await page.waitForFunction(() => Boolean(window.__MEEKO_DEVTOOLS__))
-			const initial = await page.evaluate(() => window.__MEEKO_DEVTOOLS__!.snapshot())
-			assert.ok(initial.instances.some((instance) => instance.name === 'Counter'))
-			assert.ok(initial.instances.some((instance) => instance.name === 'Parent'))
-			assert.ok(initial.instances.every((instance) => instance.status === 'hydrated'))
-			await page.locator('[data-meeko-devtools-panel] button[data-action="select"]', { hasText: 'Counter' }).click()
-			assert.equal(await page.locator('[data-meeko-devtools-panel] h3', { hasText: 'Señales' }).count(), 1)
-		} else {
-			assert.equal(await page.evaluate(() => window.__MEEKO_DEVTOOLS__ === undefined), true)
-			assert.equal(await page.locator('[data-meeko-devtools-panel]').count(), 0)
-		}
-		assert.equal(await page.locator("header img[alt='Meeko']").evaluate((image: HTMLImageElement) => image.naturalWidth > 0), true)
-		assert.match(await page.locator('#app button').innerText(), /^2 · doble: 4$/)
-		await page.locator('#app button').click()
-		assert.match(await page.locator('#app button').innerText(), /^3 · doble: 6$/)
-		if (development) {
-			const updated = await page.evaluate(() => window.__MEEKO_DEVTOOLS__!.snapshot())
-			const counter = updated.instances.find((instance) => instance.name === 'Counter')
-			assert.ok(counter)
-			assert.equal(counter.signals.count, 3)
-			assert.equal(updated.protocolVersion, 1)
-			const clicked = updated.events.filter((event) => event.kind === 'signal' && event.instanceId === counter.id).at(-1)
-			assert.ok(clicked?.write?.kind === 'assignment' && clicked.write.expression === 'count.value++' && clicked.write.file.endsWith('Counter.meeko'))
-			assert.ok(clicked.reads?.some((read) => read.kind === 'computed'))
-			const panel = page.locator('[data-meeko-devtools-panel]')
-			await panel.locator('button[data-action="select"]', { hasText: 'Counter' }).click()
-			await panel.locator('textarea[data-action="edit-value"]').fill('7')
-			await panel.locator('button[data-action="edit-apply"]').click()
-			await page.locator('#app button', { hasText: '7 · doble: 14' }).waitFor()
-			assert.match(await panel.locator('.editor-message').innerText(), /Señal count actualizada/)
-			assert.deepEqual(await page.evaluate((id) => window.__MEEKO_DEVTOOLS__!.setSignal(id, 'count', 3), counter.id), { ok: true })
-			assert.match(await page.locator('#app button').innerText(), /^3 · doble: 6$/)
-		}
+let chromiumBrowser: ReturnType<typeof chromium.launch> | undefined
 
-		await page.locator('#regions button', { hasText: 'Prepend' }).click()
-		await page.locator('#regions button', { hasText: 'Reverse' }).click()
-		assert.equal(await page.locator('#regions li').count(), 3)
-		assert.equal(await page.locator('#hot button').evaluate((button) => getComputedStyle(button).color), 'rgb(29, 78, 216)')
-		await page.locator('#hot button').click()
-		assert.match(await page.locator('#hot button').innerText(), /^Hot v3 1$/)
-		const firstChild = page.locator('#nested section > button').first()
-		assert.equal(await firstChild.innerText(), 'Root: 0')
-		await firstChild.click()
-		assert.equal(await firstChild.innerText(), 'Root: 1')
-		await page.locator('#nested button', { hasText: 'Update' }).click()
-		assert.equal(await firstChild.innerText(), 'Updated: 1')
-		await page.locator('#nested button', { hasText: 'Reverse' }).click()
-		assert.equal(await page.locator('#nested li').first().getAttribute('data-id'), 'b')
-		await page.locator('#nested button', { hasText: 'Toggle' }).click()
-		assert.equal(await page.locator('#nested button', { hasText: 'Conditional' }).count(), 0)
-		assert.deepEqual(errors, [])
-	} finally {
-		await browser.close()
-	}
+after(async () => {
+	const browser = await chromiumBrowser?.catch(() => undefined)
+	await browser?.close()
+})
+
+function browserTest(name: string, timeout: number, run: (browser: BrowserSession) => Promise<void>): void {
+	nodeTest(name, { timeout }, () =>
+		withBrowserSession(
+			`chromium-${name}`,
+			() => {
+				return (chromiumBrowser ??= chromium
+					.launch({
+						...(process.env.MEEKO_CHROME_PATH ? { executablePath: process.env.MEEKO_CHROME_PATH } : { channel: 'chrome' as const }),
+						headless: true,
+					})
+					.catch((error: unknown) => {
+						chromiumBrowser = undefined
+						throw error
+					}))
+			},
+			run,
+		),
+	)
 }
 
-test('Vite en desarrollo hidrata y actualiza componentes en Chrome real', async () => {
+async function assertBrowserBehavior(browser: BrowserSession, url: string, development: boolean): Promise<void> {
+	const page = await browser.newPage()
+	const errors: string[] = []
+	page.on('pageerror', (error) => errors.push(error.message))
+	page.on('console', (message) => {
+		if (message.type() === 'error') errors.push(`${message.text()} @ ${message.location().url}`)
+	})
+	await page.goto(url)
+	if (development) {
+		await page.waitForFunction(() => Boolean(window.__MEEKO_DEVTOOLS__))
+		const initial = await page.evaluate(() => window.__MEEKO_DEVTOOLS__!.snapshot())
+		assert.ok(initial.instances.some((instance) => instance.name === 'Counter'))
+		assert.ok(initial.instances.some((instance) => instance.name === 'Parent'))
+		assert.ok(initial.instances.every((instance) => instance.status === 'hydrated'))
+		await page.locator('[data-meeko-devtools-panel] button[data-action="select"]', { hasText: 'Counter' }).click()
+		assert.equal(await page.locator('[data-meeko-devtools-panel] h3', { hasText: 'Señales' }).count(), 1)
+	} else {
+		assert.equal(await page.evaluate(() => window.__MEEKO_DEVTOOLS__ === undefined), true)
+		assert.equal(await page.locator('[data-meeko-devtools-panel]').count(), 0)
+	}
+	assert.equal(await page.locator("header img[alt='Meeko']").evaluate((image: HTMLImageElement) => image.naturalWidth > 0), true)
+	assert.match(await page.locator('#app button').innerText(), /^2 · doble: 4$/)
+	await page.locator('#app button').click()
+	assert.match(await page.locator('#app button').innerText(), /^3 · doble: 6$/)
+	if (development) {
+		const updated = await page.evaluate(() => window.__MEEKO_DEVTOOLS__!.snapshot())
+		const counter = updated.instances.find((instance) => instance.name === 'Counter')
+		assert.ok(counter)
+		assert.equal(counter.signals.count, 3)
+		assert.equal(updated.protocolVersion, 1)
+		const clicked = updated.events.filter((event) => event.kind === 'signal' && event.instanceId === counter.id).at(-1)
+		assert.ok(clicked?.write?.kind === 'assignment' && clicked.write.expression === 'count.value++' && clicked.write.file.endsWith('Counter.meeko'))
+		assert.ok(clicked.reads?.some((read) => read.kind === 'computed'))
+		const panel = page.locator('[data-meeko-devtools-panel]')
+		await panel.locator('button[data-action="select"]', { hasText: 'Counter' }).click()
+		await panel.locator('textarea[data-action="edit-value"]').fill('7')
+		await panel.locator('button[data-action="edit-apply"]').click()
+		await page.locator('#app button', { hasText: '7 · doble: 14' }).waitFor()
+		assert.match(await panel.locator('.editor-message').innerText(), /Señal count actualizada/)
+		assert.deepEqual(await page.evaluate((id) => window.__MEEKO_DEVTOOLS__!.setSignal(id, 'count', 3), counter.id), { ok: true })
+		assert.match(await page.locator('#app button').innerText(), /^3 · doble: 6$/)
+	}
+
+	await page.locator('#regions button', { hasText: 'Prepend' }).click()
+	await page.locator('#regions button', { hasText: 'Reverse' }).click()
+	assert.equal(await page.locator('#regions li').count(), 3)
+	assert.equal(await page.locator('#hot button').evaluate((button) => getComputedStyle(button).color), 'rgb(29, 78, 216)')
+	await page.locator('#hot button').click()
+	assert.match(await page.locator('#hot button').innerText(), /^Hot v3 1$/)
+	const firstChild = page.locator('#nested section > button').first()
+	assert.equal(await firstChild.innerText(), 'Root: 0')
+	await firstChild.click()
+	assert.equal(await firstChild.innerText(), 'Root: 1')
+	await page.locator('#nested button', { hasText: 'Update' }).click()
+	assert.equal(await firstChild.innerText(), 'Updated: 1')
+	await page.locator('#nested button', { hasText: 'Reverse' }).click()
+	assert.equal(await page.locator('#nested li').first().getAttribute('data-id'), 'b')
+	await page.locator('#nested button', { hasText: 'Toggle' }).click()
+	assert.equal(await page.locator('#nested button', { hasText: 'Conditional' }).count(), 0)
+	assert.deepEqual(errors, [])
+}
+
+browserTest('Vite en desarrollo hidrata y actualiza componentes en Chrome real', 120_000, async (browser) => {
 	const server = await createServer({
 		configFile: resolve('examples/vite/vite.config.ts'),
 		root: resolve('examples/vite'),
@@ -105,13 +126,13 @@ test('Vite en desarrollo hidrata y actualiza componentes en Chrome real', async 
 		await server.listen()
 		const address = server.httpServer?.address() as AddressInfo | null
 		if (!address) throw new Error('Vite did not open an HTTP server')
-		await assertBrowserBehavior(`http://127.0.0.1:${address.port}/`, true)
+		await assertBrowserBehavior(browser, `http://127.0.0.1:${address.port}/`, true)
 	} finally {
 		await server.close()
 	}
 })
 
-test('Vite en producción hidrata y actualiza componentes en Chrome real', async () => {
+browserTest('Vite en producción hidrata y actualiza componentes en Chrome real', 120_000, async (browser) => {
 	const server = await preview({
 		configFile: resolve('examples/vite/vite.config.ts'),
 		root: resolve('examples/vite'),
@@ -120,18 +141,17 @@ test('Vite en producción hidrata y actualiza componentes en Chrome real', async
 	try {
 		const address = server.httpServer.address() as AddressInfo | null
 		if (!address) throw new Error('Vite preview did not open an HTTP server')
-		await assertBrowserBehavior(`http://127.0.0.1:${address.port}/`, false)
+		await assertBrowserBehavior(browser, `http://127.0.0.1:${address.port}/`, false)
 	} finally {
 		await new Promise<void>((resolveDone, reject) => server.httpServer.close((error) => (error ? reject(error) : resolveDone())))
 	}
 })
 
-test('la página SSR hidrata y vuelve a crear estado al navegar', async () => {
+browserTest('la página SSR hidrata y vuelve a crear estado al navegar', 120_000, async (browser) => {
 	const server = createExampleServer()
 	await new Promise<void>((resolveReady) => server.listen(0, '127.0.0.1', resolveReady))
 	const address = server.address() as AddressInfo
 	const url = `http://127.0.0.1:${address.port}/`
-	let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined
 	try {
 		const response = await fetch(url)
 		assert.equal(response.status, 200)
@@ -139,32 +159,28 @@ test('la página SSR hidrata y vuelve a crear estado al navegar', async () => {
 		const logoResponse = await fetch(`${url}meeko-logo.png`)
 		assert.equal(logoResponse.status, 200)
 		assert.match(logoResponse.headers.get('content-type') ?? '', /^image\/png/)
-		browser = await chromium.launch({
-			...(process.env.MEEKO_CHROME_PATH ? { executablePath: process.env.MEEKO_CHROME_PATH } : { channel: 'chrome' as const }),
-			headless: true,
-		})
 		const page = await browser.newPage()
 		const errors: string[] = []
 		page.on('pageerror', (error) => errors.push(error.message))
 		page.on('console', (message) => {
 			if (message.type() === 'error') errors.push(`${message.text()} @ ${message.location().url}`)
 		})
-		await page.goto(url, { waitUntil: 'networkidle' })
+		await page.goto(url)
 		assert.match(await page.locator('#app button').innerText(), /^2 · doble: 4$/)
 		await page.locator('#app button').click()
 		assert.match(await page.locator('#app button').innerText(), /^3 · doble: 6$/)
 		await page.getByRole('link', { name: 'Otro valor' }).click()
 		assert.match(await page.locator('#app button').innerText(), /^5 · doble: 10$/)
-		await page.goBack({ waitUntil: 'networkidle' })
+		await page.goBack()
+		await page.locator('#app button', { hasText: '2 · doble: 4' }).waitFor()
 		assert.match(await page.locator('#app button').innerText(), /^2 · doble: 4$/)
 		assert.deepEqual(errors, [])
 	} finally {
-		await browser?.close()
 		await new Promise<void>((resolveDone, reject) => server.close((error) => (error ? reject(error) : resolveDone())))
 	}
 })
 
-test('una página render: stream es interactiva antes del diferido y respeta una CSP estricta', { timeout: 240_000 }, async () => {
+browserTest('una página render: stream es interactiva antes del diferido y respeta una CSP estricta', 240_000, async (browser) => {
 	// Builds the conformance fixture with the Node adapter, then serves its
 	// output in-process with a CSP nonce and no 'unsafe-inline'.
 	const built = await startConformanceOutput('node')
@@ -193,12 +209,7 @@ test('una página render: stream es interactiva antes del diferido y respeta una
 	await new Promise<void>((resolveReady) => server.listen(0, '127.0.0.1', resolveReady))
 	const { port } = server.address() as AddressInfo
 	const delay = 4_000
-	let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined
 	try {
-		browser = await chromium.launch({
-			...(process.env.MEEKO_CHROME_PATH ? { executablePath: process.env.MEEKO_CHROME_PATH } : { channel: 'chrome' as const }),
-			headless: true,
-		})
 		const page = await browser.newPage()
 		const errors: string[] = []
 		page.on('pageerror', (error) => errors.push(error.message))
@@ -226,14 +237,13 @@ test('una página render: stream es interactiva antes del diferido y respeta una
 		assert.deepEqual(await page.evaluate(() => (window as unknown as { __cspViolations: string[] }).__cspViolations), [])
 		assert.deepEqual(errors, [])
 	} finally {
-		await browser?.close()
 		await new Promise<void>((resolveDone, reject) => server.close((error) => (error ? reject(error) : resolveDone())))
 		await app.close()
 		await built.stop()
 	}
 })
 
-test('Chrome real envía las excepciones y los rechazos globales a onError sin duplicados y deja de hacerlo al desmontar', { timeout: 120_000 }, async () => {
+browserTest('Chrome real envía las excepciones y los rechazos globales a onError sin duplicados y deja de hacerlo al desmontar', 120_000, async (browser) => {
 	const { build } = await import('esbuild')
 	const { createFrameworkHandler } = await import('../src/server/runtime/framework-render.ts')
 	const { page: fixturePage, routes } = await import('./fixtures/global-errors/page.ts')
@@ -260,22 +270,15 @@ test('Chrome real envía las excepciones y los rechazos globales a onError sin d
 	})
 	await new Promise<void>((resolveReady) => server.listen(0, '127.0.0.1', resolveReady))
 	const { port } = server.address() as AddressInfo
-	let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined
 	try {
-		browser = await chromium.launch({
-			...(process.env.MEEKO_CHROME_PATH ? { executablePath: process.env.MEEKO_CHROME_PATH } : { channel: 'chrome' as const }),
-			headless: true,
-		})
 		const page = await browser.newPage()
-		const pageErrors: string[] = []
 		const consoleErrors: string[] = []
-		page.on('pageerror', (error) => pageErrors.push(error.message))
 		page.on('console', (message) => {
 			if (message.type() === 'error') consoleErrors.push(message.text())
 		})
-		await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'networkidle' })
+		await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' })
 		type Report = { message: string; source: string }
-		type FixtureWindow = Window & { __ready?: boolean; __reports: Report[] }
+		type FixtureWindow = Window & { __ready?: boolean; __repeatFinished?: boolean; __reports: Report[] }
 		await page.waitForFunction(() => (window as unknown as FixtureWindow).__ready === true)
 		const reports = () => page.evaluate(() => (window as unknown as FixtureWindow).__reports)
 		await page.locator('#timer').click()
@@ -290,23 +293,22 @@ test('Chrome real envía las excepciones y los rechazos globales a onError sin d
 		assert.ok(!consoleErrors.some((text) => /timer failure|rejected failure/.test(text)), consoleErrors.join('\n'))
 		// The same error thrown again by the app is not reported twice.
 		await page.locator('#reported').click()
-		await page.waitForTimeout(300)
+		await page.waitForFunction(() => (window as unknown as FixtureWindow).__repeatFinished === true)
 		assert.equal((await reports()).length, 2)
 		// After dispose the browser's own report is back and onError hears nothing.
-		await page.locator('#dispose').click()
-		await page.waitForTimeout(300)
+		await Promise.all([
+			page.waitForEvent('pageerror', { predicate: (error) => error.message === 'after dispose' }),
+			page.locator('#dispose').click(),
+		])
 		assert.equal((await reports()).length, 2)
-		assert.ok(pageErrors.includes('after dispose'), pageErrors.join('\n'))
 	} finally {
-		await browser?.close()
 		await new Promise<void>((resolveDone, reject) => server.close((error) => (error ? reject(error) : resolveDone())))
 	}
 })
 
-test('el 404.html del adaptador static hidrata en cualquier URL y navega en el cliente bajo su CSP', { timeout: 240_000 }, async () => {
+browserTest('el 404.html del adaptador static hidrata en cualquier URL y navega en el cliente bajo su CSP', 240_000, async (browser) => {
 	const project = await createTempProject('static-e2e')
 	let server: Server | undefined
-	let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined
 	try {
 		await writeStaticApp(project.root, staticAppConfig)
 		await buildProject(project.root)
@@ -322,10 +324,6 @@ test('el 404.html del adaptador static hidrata en cualquier URL y navega en el c
 			else process.env.MEEKO_HOST = previous.host
 		}
 		const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
-		browser = await chromium.launch({
-			...(process.env.MEEKO_CHROME_PATH ? { executablePath: process.env.MEEKO_CHROME_PATH } : { channel: 'chrome' as const }),
-			headless: true,
-		})
 		const page = await browser.newPage()
 		const errors: string[] = []
 		const documents: string[] = []
@@ -377,14 +375,13 @@ test('el 404.html del adaptador static hidrata en cualquier URL y navega en el c
 		assert.deepEqual(await page.evaluate(() => (window as unknown as { __cspViolations: string[] }).__cspViolations), [])
 		assert.deepEqual(errors, [])
 	} finally {
-		await browser?.close()
 		if (server) await new Promise<void>((done) => server!.close(() => done()))
 		await project.remove()
 	}
 })
 
 /** What `<html>` showed in the first frame and every later change of its theme. */
-type ThemeProbe = { first?: { theme: string | null; moon: string; scheme: string }; changes: string[] }
+type ThemeProbe = { first?: { theme: string | null; moon: string; scheme: string; lightDark: string }; changes: string[] }
 
 /** Records, from the start of each document, what `<html>` shows before the first paint and every later theme change. */
 const themeProbe = (): void => {
@@ -399,10 +396,12 @@ const themeProbe = (): void => {
 	// The first frame: rendering waits for <head>, so this is what the first paint shows.
 	requestAnimationFrame(() => {
 		const moon = document.querySelector('.moon')
+		const lightDark = document.querySelector('.light-dark')
 		probe.first = {
 			theme: document.documentElement.getAttribute('data-theme'),
 			moon: moon ? getComputedStyle(moon).display : 'missing',
 			scheme: getComputedStyle(document.documentElement).colorScheme,
+			lightDark: lightDark ? getComputedStyle(lightDark).color : 'missing',
 		}
 	})
 	const violations: string[] = []
@@ -414,22 +413,21 @@ const themeProbe = (): void => {
 const themeToggle = `<script lang="ts">
 const { resolved, set } = useTheme();
 </script>
-<template><button id="toggle" type="button" aria-label="Tema oscuro" bind:aria-pressed="String(resolved.value === 'dark')" on:click="() => set(resolved.value === 'dark' ? 'light' : 'dark')"><span class="sun">sol</span><span class="moon">luna</span></button><p id="resolved">{resolved.value}</p></template>
+<template><span class="light-dark">tema</span><button id="toggle" type="button" aria-label="Tema oscuro" bind:aria-pressed="String(resolved.value === 'dark')" on:click="() => set(resolved.value === 'dark' ? 'light' : 'dark')"><span class="sun">sol</span><span class="moon">luna</span></button><p id="resolved">{resolved.value}</p></template>
 `
 
-test('el tema llega en el primer byte con la cookie y sin parpadeo en modo sistema, bajo una CSP estricta con nonce', { timeout: 240_000 }, async () => {
+browserTest('el tema llega en el primer byte con la cookie y sin parpadeo en modo sistema, bajo una CSP estricta con nonce', 240_000, async (browser) => {
 	const project = await createTempProject('theme-e2e')
 	const root = project.root
 	type ServerModule = typeof framework_server_tsTypes
 	type NodeModule = typeof node_tsTypes
 	let server: Server | undefined
 	let app: Awaited<ReturnType<ServerModule['createServerApp']>> | undefined
-	let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined
 	try {
 		const files: Record<string, string> = {
 			'package.json': '{"name":"theme-app","private":true,"type":"module"}\n',
 			'meeko.config.mjs': 'export default { theme: true };\n',
-			'app/styles/main.css': '.moon { display: none }\n:root[data-theme="dark"] .sun { display: none }\n:root[data-theme="dark"] .moon { display: inline }\n',
+			'app/styles/main.css': '.moon { display: none }\n:root[data-theme="dark"] .sun { display: none }\n:root[data-theme="dark"] .moon { display: inline }\n.light-dark { color: light-dark(rgb(17, 17, 17), rgb(238, 238, 238)); transition: color 10s linear }\n',
 			'app/pages/index.meeko': themeToggle,
 		}
 		for (const [file, contents] of Object.entries(files)) {
@@ -466,10 +464,6 @@ test('el tema llega en el primer byte con la cookie y sin parpadeo en modo siste
 		)
 		await new Promise<void>((ready) => server!.listen(0, '127.0.0.1', ready))
 		const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
-		browser = await chromium.launch({
-			...(process.env.MEEKO_CHROME_PATH ? { executablePath: process.env.MEEKO_CHROME_PATH } : { channel: 'chrome' as const }),
-			headless: true,
-		})
 		const open = async (options: { colorScheme: 'light' | 'dark'; cookie?: string }) => {
 			const context = await browser!.newContext({ colorScheme: options.colorScheme })
 			if (options.cookie) await context.addCookies([{ name: 'meeko-theme', value: options.cookie, url: origin }])
@@ -494,19 +488,30 @@ test('el tema llega en el primer byte con la cookie y sin parpadeo en modo siste
 		assert.match(first.html, /<html data-theme="dark" data-theme-choice="dark">/)
 		assert.match(first.html, /<p id="resolved">(?:<!--[^>]*-->)?dark/)
 		assert.match(first.html, /aria-pressed="true"/)
-		assert.deepEqual((await cookie.probe()).first, { theme: 'dark', moon: 'inline', scheme: 'dark' })
+		assert.deepEqual((await cookie.probe()).first, { theme: 'dark', moon: 'inline', scheme: 'dark', lightDark: 'rgb(238, 238, 238)' })
 		assert.equal(await cookie.page.locator('#resolved').innerText(), 'dark')
 		// Hydration changed nothing.
 		assert.deepEqual((await cookie.probe()).changes, [])
 		// A change applies at once, and the next document comes from the server with it.
-		await cookie.page.locator('#toggle').click()
-		assert.equal(await cookie.page.evaluate(() => document.documentElement.getAttribute('data-theme')), 'light')
+		const changed = await cookie.page.evaluate(() => {
+			;(document.querySelector('#toggle') as HTMLButtonElement).click()
+			const probe = document.querySelector('.light-dark')!
+			return {
+				theme: document.documentElement.getAttribute('data-theme'),
+				suppressed: document.documentElement.hasAttribute('data-meeko-theme-changing'),
+				color: getComputedStyle(probe).color,
+				animations: probe.getAnimations().length,
+			}
+		})
+		assert.deepEqual(changed, { theme: 'light', suppressed: true, color: 'rgb(17, 17, 17)', animations: 0 })
+		await cookie.page.waitForFunction(() => !document.documentElement.hasAttribute('data-meeko-theme-changing'))
+		assert.equal(await cookie.page.locator('.light-dark').evaluate((element) => getComputedStyle(element).transitionDuration), '10s')
 		assert.equal(await cookie.page.locator('#resolved').innerText(), 'light')
 		assert.equal((await cookie.context.cookies(origin)).find((entry) => entry.name === 'meeko-theme')?.value, 'light')
 		await cookie.page.reload()
 		await cookie.page.waitForFunction(() => performance.getEntriesByName('meeko-hydration').length > 0)
 		assert.match(documents.at(-1)!.html, /<html data-theme="light" data-theme-choice="light">/)
-		assert.deepEqual((await cookie.probe()).first, { theme: 'light', moon: 'none', scheme: 'light' })
+		assert.deepEqual((await cookie.probe()).first, { theme: 'light', moon: 'none', scheme: 'light', lightDark: 'rgb(17, 17, 17)' })
 		assert.deepEqual((await cookie.probe()).changes, [])
 		assert.deepEqual(await cookie.page.evaluate(() => (window as unknown as { __cspViolations: string[] }).__cspViolations), [])
 		assert.deepEqual(cookie.errors, [])
@@ -515,7 +520,7 @@ test('el tema llega en el primer byte con la cookie y sin parpadeo en modo siste
 		// 2. No cookie and a dark system: dark before the first paint, by the client hint or the script.
 		documents.length = 0
 		const system = await open({ colorScheme: 'dark' })
-		assert.deepEqual((await system.probe()).first, { theme: 'dark', moon: 'inline', scheme: 'dark' })
+		assert.deepEqual((await system.probe()).first, { theme: 'dark', moon: 'inline', scheme: 'dark', lightDark: 'rgb(238, 238, 238)' })
 		const served = documents.at(-1)!
 		assert.equal(served.criticalCh, 'Sec-CH-Prefers-Color-Scheme')
 		// When Chromium sends the hint, the server resolves the theme with it. Under CDP emulation the
@@ -536,23 +541,24 @@ test('el tema llega en el primer byte con la cookie y sin parpadeo en modo siste
 		// "system" follows the operating system while the page is open.
 		await system.page.emulateMedia({ colorScheme: 'light' })
 		await system.page.waitForFunction(() => document.documentElement.getAttribute('data-theme') === 'light')
+		await system.page.waitForFunction(() => !document.documentElement.hasAttribute('data-meeko-theme-changing'))
 		assert.equal(await system.page.locator('#resolved').innerText(), 'light')
+		assert.equal(await system.page.locator('.light-dark').evaluate((element) => getComputedStyle(element).color), 'rgb(17, 17, 17)')
+		assert.equal(await system.page.locator('.light-dark').evaluate((element) => element.getAnimations().length), 0)
 		assert.deepEqual(await system.page.evaluate(() => (window as unknown as { __cspViolations: string[] }).__cspViolations), [])
 		assert.deepEqual(system.errors, [])
 		console.log(`[theme e2e] hints of the documents in system mode: ${JSON.stringify(documents.map((entry) => entry.hint))}`)
 		await system.context.close()
 	} finally {
-		await browser?.close()
 		if (server) await new Promise<void>((done) => server!.close(() => done()))
 		await app?.close()
 		await project.remove()
 	}
 })
 
-test('una página estática aplica el tema guardado antes del primer pintado con el script permitido por su hash', { timeout: 240_000 }, async () => {
+browserTest('una página estática aplica el tema guardado antes del primer pintado con el script permitido por su hash', 240_000, async (browser) => {
 	const project = await createTempProject('theme-static-e2e')
 	let server: Server | undefined
-	let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined
 	try {
 		await writeStaticApp(project.root, staticAppConfig.replace('sitemap: true,', 'sitemap: true,\n  theme: true,'))
 		await mkdir(join(project.root, 'app', 'styles'), { recursive: true })
@@ -571,10 +577,6 @@ test('una página estática aplica el tema guardado antes del primer pintado con
 			else process.env.MEEKO_HOST = previous.host
 		}
 		const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
-		browser = await chromium.launch({
-			...(process.env.MEEKO_CHROME_PATH ? { executablePath: process.env.MEEKO_CHROME_PATH } : { channel: 'chrome' as const }),
-			headless: true,
-		})
 		for (const setup of [{ cookie: 'dark' }, { stored: 'dark' }]) {
 			const context = await browser.newContext({ colorScheme: 'light' })
 			if (setup.cookie) await context.addCookies([{ name: 'meeko-theme', value: setup.cookie, url: origin }])
@@ -595,7 +597,9 @@ test('una página estática aplica el tema guardado antes del primer pintado con
 			await page.waitForFunction(() => performance.getEntriesByName('meeko-hydration').length > 0)
 			await page.waitForFunction(() => (window as unknown as { __theme: ThemeProbe }).__theme.first !== undefined)
 			const probe = await page.evaluate(() => (window as unknown as { __theme: ThemeProbe }).__theme)
-			assert.deepEqual(probe.first, { theme: 'dark', moon: 'inline', scheme: 'dark' }, JSON.stringify(setup))
+			assert.ok(probe.first, JSON.stringify(setup))
+			const { theme, moon, scheme } = probe.first
+			assert.deepEqual({ theme, moon, scheme }, { theme: 'dark', moon: 'inline', scheme: 'dark' }, JSON.stringify(setup))
 			// Only the inline script set the theme, before <body> existed: nothing was painted light.
 			assert.deepEqual(probe.changes, ['null→dark (before <body>)'])
 			// The component rendered the prerendered default and switched once hydration ended.
@@ -607,7 +611,6 @@ test('una página estática aplica el tema guardado antes del primer pintado con
 			await context.close()
 		}
 	} finally {
-		await browser?.close()
 		if (server) await new Promise<void>((done) => server!.close(() => done()))
 		await project.remove()
 	}
@@ -645,14 +648,13 @@ const toggleProbe = (): void => {
 	document.addEventListener('securitypolicyviolation', (event) => violations.push(`${event.violatedDirective} ${event.blockedURI}`))
 }
 
-test('<MeekoThemeToggle> shows the right icon in the first frame, cycles with JavaScript and posts without it, under a strict CSP', { timeout: 240_000 }, async () => {
+browserTest('<MeekoThemeToggle> shows the right icon in the first frame, cycles with JavaScript and posts without it, under a strict CSP', 240_000, async (browser) => {
 	const project = await createTempProject('theme-toggle-e2e')
 	const root = project.root
 	type ServerModule = typeof framework_server_tsTypes
 	type NodeModule = typeof node_tsTypes
 	let server: Server | undefined
 	let app: Awaited<ReturnType<ServerModule['createServerApp']>> | undefined
-	let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined
 	try {
 		const files: Record<string, string> = {
 			'package.json': '{"name":"theme-toggle-app","private":true,"type":"module"}\n',
@@ -691,10 +693,6 @@ test('<MeekoThemeToggle> shows the right icon in the first frame, cycles with Ja
 		)
 		await new Promise<void>((ready) => server!.listen(0, '127.0.0.1', ready))
 		const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
-		browser = await chromium.launch({
-			...(process.env.MEEKO_CHROME_PATH ? { executablePath: process.env.MEEKO_CHROME_PATH } : { channel: 'chrome' as const }),
-			headless: true,
-		})
 
 		// 1. "system" without a cookie on a dark system: the first frame already shows the system icon and the dark theme.
 		const context = await browser.newContext({ colorScheme: 'dark' })
@@ -774,7 +772,6 @@ test('<MeekoThemeToggle> shows the right icon in the first frame, cycles with Ja
 		)
 		await plain.close()
 	} finally {
-		await browser?.close()
 		if (server) await new Promise<void>((done) => server!.close(() => done()))
 		await app?.close()
 		await project.remove()
@@ -870,14 +867,13 @@ async function send(event: SubmitEvent): Promise<void> {
 </template>
 `
 
-test('useForm en Chrome real: revalida la confirmación, lleva el 409 con issues al campo y enfoca el primer inválido', { timeout: 240_000 }, async () => {
+browserTest('useForm en Chrome real: revalida la confirmación, lleva el 409 con issues al campo y enfoca el primer inválido', 240_000, async (browser) => {
 	const project = await createTempProject('form-e2e')
 	const root = project.root
 	type ServerModule = typeof framework_server_tsTypes
 	type NodeModule = typeof node_tsTypes
 	let server: Server | undefined
 	let app: Awaited<ReturnType<ServerModule['createServerApp']>> | undefined
-	let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined
 	try {
 		const files: Record<string, string> = {
 			'package.json': '{"name":"form-app","private":true,"type":"module"}\n',
@@ -908,10 +904,6 @@ test('useForm en Chrome real: revalida la confirmación, lleva el 409 con issues
 		server = createHttpServer(toNodeListener((request) => running.fetch(request)))
 		await new Promise<void>((ready) => server!.listen(0, '127.0.0.1', ready))
 		const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
-		browser = await chromium.launch({
-			...(process.env.MEEKO_CHROME_PATH ? { executablePath: process.env.MEEKO_CHROME_PATH } : { channel: 'chrome' as const }),
-			headless: true,
-		})
 		const page = await browser.newPage()
 		const errors: string[] = []
 		page.on('pageerror', (error) => errors.push(error.message))
@@ -963,21 +955,19 @@ test('useForm en Chrome real: revalida la confirmación, lleva el 409 con issues
 		await page.locator('#created', { hasText: 'grace@example.com' }).waitFor()
 		assert.deepEqual(errors, [])
 	} finally {
-		await browser?.close()
 		if (server) await new Promise<void>((done) => server!.close(() => done()))
 		await app?.close()
 		await project.remove()
 	}
 })
 
-test('named layouts: the page chooses the layout and its props, the same layout keeps its state and another replaces it', { timeout: 240_000 }, async () => {
+browserTest('named layouts: the page chooses the layout and its props, the same layout keeps its state and another replaces it', 240_000, async (browser) => {
 	const project = await createTempProject('named-layouts-e2e')
 	const root = project.root
 	type ServerModule = typeof framework_server_tsTypes
 	type NodeModule = typeof node_tsTypes
 	let server: Server | undefined
 	let app: Awaited<ReturnType<ServerModule['createServerApp']>> | undefined
-	let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined
 	try {
 		const files: Record<string, string> = {
 			'package.json': '{"name":"layouts-app","private":true,"type":"module"}\n',
@@ -1032,10 +1022,6 @@ export const route = definePage({ layout: "auth" });
 		// What the page writes during its setup is in the first HTML, before any script runs.
 		const ssr = (await (await fetch(`${origin}/c`)).text()).replace(/<!--[^>]*-->/g, '')
 		assert.match(ssr, /<header id="title">Informe<\/header>/)
-		browser = await chromium.launch({
-			...(process.env.MEEKO_CHROME_PATH ? { executablePath: process.env.MEEKO_CHROME_PATH } : { channel: 'chrome' as const }),
-			headless: true,
-		})
 		const page = await browser.newPage()
 		const errors: string[] = []
 		page.on('pageerror', (error) => errors.push(error.message))
@@ -1079,7 +1065,6 @@ export const route = definePage({ layout: "auth" });
 		assert.equal(await page.locator('#title').innerText(), 'Informe')
 		assert.deepEqual(errors, [])
 	} finally {
-		await browser?.close()
 		if (server) await new Promise<void>((done) => server!.close(() => done()))
 		await app?.close()
 		await project.remove()
@@ -1121,14 +1106,15 @@ const items = useApi("/api/items");
 <template><main><MeekoLink id="back" to="/">Inicio</MeekoLink><section class="card"><h2>Items</h2><MeekoAwait for="items"${reserve ? ' reserve' : ''}><snippet name="pending"><p class="skeleton">Cargando…</p></snippet><snippet name="error" params="error, retry"><p role="alert">No se pudo cargar. <button on:click="retry">Reintentar</button></p></snippet><ul class="items"><li each:of="items.data.value" each:as="item" each:key="item.id">{item.name}</li></ul></MeekoAwait><button id="reload" type="button" on:click="() => items.refresh()">Recargar</button></section><footer class="after">Pie de página</footer></main></template>
 `
 
-test('<MeekoAwait reserve> keeps a card with late data from shifting the page on a second visit, under a strict CSP', { timeout: 300_000 }, async () => {
+browserTest('<MeekoAwait reserve> keeps a card with late data from shifting the page on a second visit, under a strict CSP', 300_000, async (browser) => {
 	const project = await createTempProject('await-e2e')
 	const root = project.root
 	type ServerModule = typeof framework_server_tsTypes
 	type NodeModule = typeof node_tsTypes
 	let server: Server | undefined
 	let app: Awaited<ReturnType<ServerModule['createServerApp']>> | undefined
-	let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined
+	const itemsGate = () => ({ requested: Promise.withResolvers<void>(), release: Promise.withResolvers<void>() })
+	let items = itemsGate()
 	try {
 		const files: Record<string, string> = {
 			'package.json': '{"name":"await-app","private":true,"type":"module"}\n',
@@ -1145,17 +1131,13 @@ test('<MeekoAwait reserve> keeps a card with late data from shifting the page on
 			'app/pages/index.meeko': '<template><main><p id="home">Inicio</p><MeekoLink id="to-reserve" to="/reserve">Con reserva</MeekoLink> <MeekoLink id="to-plain" to="/plain">Sin reserva</MeekoLink></main></template>\n',
 			'app/pages/reserve.meeko': awaitCard(true),
 			'app/pages/plain.meeko': awaitCard(false),
-			// Latency: the data arrives well after the first paint and after the 500 ms that follow a click.
 			'shared/schemas/items.ts': `export type Item = { id: number; name: string };
 export const items = { "~standard": { version: 1 as const, vendor: "e2e", types: undefined as unknown as { input: Item[]; output: Item[] }, validate: (value: unknown) => ({ value: value as Item[] }) } };
 `,
 			'server/api/items/index.get.ts': `import { items } from "../../../shared/schemas/items.js";
 export default defineApiRoute({
   response: items,
-  handler: async () => {
-    await new Promise((done) => setTimeout(done, 900));
-    return Array.from({ length: 8 }, (_, index) => ({ id: index + 1, name: \`Item \${index + 1}\` }));
-  },
+  handler: () => Array.from({ length: 8 }, (_, index) => ({ id: index + 1, name: \`Item \${index + 1}\` })),
 });
 `,
 		}
@@ -1183,6 +1165,11 @@ export default defineApiRoute({
 		const running = app
 		server = createHttpServer(
 			toNodeListener(async (request) => {
+				if (new URL(request.url).pathname === '/api/items') {
+					const pending = items
+					pending.requested.resolve()
+					await pending.release.promise
+				}
 				const response = await running.fetch(request)
 				const headers = new Headers(response.headers)
 				headers.set('content-security-policy', policy)
@@ -1191,10 +1178,6 @@ export default defineApiRoute({
 		)
 		await new Promise<void>((ready) => server!.listen(0, '127.0.0.1', ready))
 		const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
-		browser = await chromium.launch({
-			...(process.env.MEEKO_CHROME_PATH ? { executablePath: process.env.MEEKO_CHROME_PATH } : { channel: 'chrome' as const }),
-			headless: true,
-		})
 		const context = await browser.newContext({ viewport: { width: 800, height: 600 } })
 		await context.addInitScript(awaitProbe)
 		const page = await context.newPage()
@@ -1206,10 +1189,24 @@ export default defineApiRoute({
 		const probe = () => page.evaluate(() => (window as unknown as { __await: AwaitProbe }).__await)
 		/** Layout shifts since `since` (ms of the document): every entry, also those right after a click. */
 		const shiftsSince = async (since: number): Promise<number> => (await probe()).shifts.filter((entry) => entry.time >= since).reduce((total, entry) => total + entry.value, 0)
-		/** Waits for the data and for the layout-shift entries of its frame. */
+		const nextFrames = () => page.evaluate(() => new Promise<void>((ready) => requestAnimationFrame(() => requestAnimationFrame(() => ready()))))
+		const releaseItems = async (): Promise<void> => {
+			const pending = items
+			const timeout = setTimeout(() => pending.requested.reject(new Error('The page did not request /api/items')), 15_000)
+			try {
+				await pending.requested.promise
+				await nextFrames()
+				items = itemsGate()
+				pending.release.resolve()
+			} finally {
+				clearTimeout(timeout)
+			}
+		}
 		const ready = async (): Promise<void> => {
+			await page.waitForSelector('[data-meeko-await=pending]')
+			await releaseItems()
 			await page.waitForSelector('[data-meeko-await=ready] .items li')
-			await page.waitForTimeout(400)
+			await nextFrames()
 		}
 		const load = async (path: string): Promise<void> => {
 			await page.goto(`${origin}${path}`)
@@ -1224,6 +1221,7 @@ export default defineApiRoute({
 
 		// 1. First visit: the skeleton in the first frame; without memory the zone grows once, no more than without reserve.
 		await load('/reserve')
+		await page.waitForFunction(() => (window as unknown as { __await: AwaitProbe }).__await.first !== undefined)
 		const first = (await probe()).first
 		assert.equal(first?.state, 'pending')
 		assert.equal(first?.skeleton, true)
@@ -1257,6 +1255,7 @@ export default defineApiRoute({
 
 		// 3. Second visit by a full load: the script of <head> reserves the height before the first paint.
 		await load('/reserve')
+		await page.waitForFunction(() => (window as unknown as { __await: AwaitProbe }).__await.first !== undefined)
 		const reloaded = (await probe()).first
 		assert.equal(reloaded?.state, 'pending')
 		assert.equal(reloaded?.height, 320, 'the first frame already has the remembered height')
@@ -1280,6 +1279,7 @@ export default defineApiRoute({
 		since = await navigate('#reload')
 		await page.waitForSelector('[data-meeko-await][data-meeko-refreshing][aria-busy=true]')
 		assert.equal(await page.locator('.items li').count(), 8)
+		await releaseItems()
 		await page.waitForSelector('[data-meeko-await]:not([data-meeko-refreshing]):not([aria-busy])')
 		const lists = (await probe()).lists
 		assert.ok(lists.length > 0 && lists.every((count) => count === 8), `the list never emptied: ${JSON.stringify(lists)}`)
@@ -1291,7 +1291,7 @@ export default defineApiRoute({
 		console.log(`[await e2e] layout shift (CLS) by visit: ${JSON.stringify(Object.fromEntries(Object.entries(measures).map(([name, value]) => [name, Number(value.toFixed(4))])))}`)
 		await context.close()
 	} finally {
-		await browser?.close()
+		items.release.resolve()
 		if (server) await new Promise<void>((done) => server!.close(() => done()))
 		await app?.close()
 		await project.remove()
@@ -1325,14 +1325,13 @@ function onClick(event: MouseEvent): void {
 </template>
 `
 
-test('un <component is> con etiqueta pasa de <button> a <a> al recibir href y conserva el foco y el texto', { timeout: 240_000 }, async () => {
+browserTest('un <component is> con etiqueta pasa de <button> a <a> al recibir href y conserva el foco y el texto', 240_000, async (browser) => {
 	const project = await createTempProject('dynamic-tag-e2e')
 	const root = project.root
 	type ServerModule = typeof framework_server_tsTypes
 	type NodeModule = typeof node_tsTypes
 	let server: Server | undefined
 	let app: Awaited<ReturnType<ServerModule['createServerApp']>> | undefined
-	let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined
 	try {
 		const files: Record<string, string> = {
 			'package.json': '{"name":"dynamic-tag-app","private":true,"type":"module"}\n',
@@ -1372,10 +1371,6 @@ function open(): void {
 		const html = await (await fetch(`${origin}/`)).text()
 		// The server renders a <button> with its type and without target or href.
 		assert.match(html, /<button class="button" type="button" data-meeko="0">/)
-		browser = await chromium.launch({
-			...(process.env.MEEKO_CHROME_PATH ? { executablePath: process.env.MEEKO_CHROME_PATH } : { channel: 'chrome' as const }),
-			headless: true,
-		})
 		const page = await browser.newPage()
 		const errors: string[] = []
 		page.on('pageerror', (error) => errors.push(error.message))
@@ -1405,21 +1400,19 @@ function open(): void {
 		assert.deepEqual(link, { focused: true, href: '/docs', type: false, text: 'Abrir', input: 'hola', buttons: 0 })
 		assert.deepEqual(errors, [])
 	} finally {
-		await browser?.close()
 		if (server) await new Promise<void>((done) => server!.close(() => done()))
 		await app?.close()
 		await project.remove()
 	}
 })
 
-test("un botón de una sola plantilla con 'MeekoLink' en is pasa de <button> a ruta y a enlace, y navega en el cliente", { timeout: 240_000 }, async () => {
+browserTest("un botón de una sola plantilla con 'MeekoLink' en is pasa de <button> a ruta y a enlace, y navega en el cliente", 240_000, async (browser) => {
 	const project = await createTempProject('is-names-e2e')
 	const root = project.root
 	type ServerModule = typeof framework_server_tsTypes
 	type NodeModule = typeof node_tsTypes
 	let server: Server | undefined
 	let app: Awaited<ReturnType<ServerModule['createServerApp']>> | undefined
-	let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined
 	try {
 		const files: Record<string, string> = {
 			'package.json': '{"name":"is-names-app","private":true,"type":"module"}\n',
@@ -1456,10 +1449,6 @@ const clicks = signal(0);
 		const html = (await (await fetch(`${origin}/`)).text()).replace(/<!--[^>]*-->/g, '')
 		assert.match(html, /<button id="action" type="button"[^>]*>\s*Ir\s*<\/button>/)
 		assert.doesNotMatch(html, /id="action"[^>]*href/)
-		browser = await chromium.launch({
-			...(process.env.MEEKO_CHROME_PATH ? { executablePath: process.env.MEEKO_CHROME_PATH } : { channel: 'chrome' as const }),
-			headless: true,
-		})
 		const page = await browser.newPage()
 		const errors: string[] = []
 		page.on('pageerror', (error) => errors.push(error.message))
@@ -1489,7 +1478,6 @@ const clicks = signal(0);
 		assert.equal(await page.evaluate(() => (window as unknown as { kept?: number }).kept), 1, 'the route branch navigated in the client')
 		assert.deepEqual(errors, [])
 	} finally {
-		await browser?.close()
 		if (server) await new Promise<void>((done) => server!.close(() => done()))
 		await app?.close()
 		await project.remove()
@@ -1497,14 +1485,13 @@ const clicks = signal(0);
 })
 
 /** Builds an app in a temporary project, serves it and gives its origin and a Chrome to `run`. */
-async function withServedApp(name: string, files: Record<string, string>, run: (origin: string, browser: Awaited<ReturnType<typeof chromium.launch>>) => Promise<void>): Promise<void> {
+async function withServedApp(name: string, files: Record<string, string>, run: (origin: string) => Promise<void>): Promise<void> {
 	const project = await createTempProject(name)
 	const root = project.root
 	type ServerModule = typeof framework_server_tsTypes
 	type NodeModule = typeof node_tsTypes
 	let server: Server | undefined
 	let app: Awaited<ReturnType<ServerModule['createServerApp']>> | undefined
-	let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined
 	try {
 		for (const [file, contents] of Object.entries(files)) {
 			await mkdir(dirname(join(root, file)), { recursive: true })
@@ -1526,20 +1513,15 @@ async function withServedApp(name: string, files: Record<string, string>, run: (
 		const running = app
 		server = createHttpServer(toNodeListener((request) => running.fetch(request)))
 		await new Promise<void>((ready) => server!.listen(0, '127.0.0.1', ready))
-		browser = await chromium.launch({
-			...(process.env.MEEKO_CHROME_PATH ? { executablePath: process.env.MEEKO_CHROME_PATH } : { channel: 'chrome' as const }),
-			headless: true,
-		})
-		await run(`http://127.0.0.1:${(server.address() as AddressInfo).port}`, browser)
+		await run(`http://127.0.0.1:${(server.address() as AddressInfo).port}`)
 	} finally {
-		await browser?.close()
 		if (server) await new Promise<void>((done) => server!.close(() => done()))
 		await app?.close()
 		await project.remove()
 	}
 }
 
-test('un aria-current propio en <MeekoLink> gana a la ruta en SSR, hidratación y actualizaciones, sin Hydration mismatch', { timeout: 240_000 }, async () => {
+browserTest('un aria-current propio en <MeekoLink> gana a la ruta en SSR, hidratación y actualizaciones, sin Hydration mismatch', 240_000, async (browser) => {
 	await withServedApp(
 		'link-current-e2e',
 		{
@@ -1569,7 +1551,7 @@ const route = useRoute();
 			'app/pages/index.meeko': '<template><h1 id="index">Inicio</h1></template>\n',
 			'app/pages/about.meeko': '<template><h1 id="about">Acerca</h1></template>\n',
 		},
-		async (origin, browser) => {
+		async (origin) => {
 			const html = (await (await fetch(`${origin}/about`)).text()).replace(/<!--[^>]*-->/g, '')
 			const opening = (id: string): string => new RegExp(`<a [^>]*id="${id}"[^>]*>|<a id="${id}"[^>]*>`).exec(html)?.[0] ?? ''
 			assert.match(opening('plain'), /aria-current="page"/)
@@ -1610,8 +1592,8 @@ const route = useRoute();
 	)
 })
 
-test('un each: con un módulo distinto por fila hidrata, reordena, cambia is y libera estado y escuchadores', { timeout: 240_000 }, async () => {
-	await withServedApp('component-is-list-e2e', { ...componentIsListFiles }, async (origin, browser) => {
+browserTest('un each: con un módulo distinto por fila hidrata, reordena, cambia is y libera estado y escuchadores', 240_000, async (browser) => {
+	await withServedApp('component-is-list-e2e', { ...componentIsListFiles }, async (origin) => {
 		// SSR: each row with its own component, its props and its snippet.
 		const html = (await (await fetch(`${origin}/`)).text()).replace(/<!--[^>]*-->/g, '')
 		assert.match(html, /<li[^>]*data-id="role"[^>]*>\s*<div class="select"><label>Rol<select><option[^>]*>admin<\/option>/)
@@ -1693,7 +1675,7 @@ test('un each: con un módulo distinto por fila hidrata, reordena, cambia is y l
 	})
 })
 
-test('un módulo en un signal da 500 en SSR; empezar con undefined y asignarlo en el navegador funciona', { timeout: 240_000 }, async () => {
+browserTest('un módulo en un signal da 500 en SSR; empezar con undefined y asignarlo en el navegador funciona', 240_000, async (browser) => {
 	await withServedApp(
 		'module-in-signal-e2e',
 		{
@@ -1710,7 +1692,7 @@ async function choose(): Promise<void> {
 <template><button type="button" id="choose" on:click="choose">Elegir</button><component if:when="selected.value" is="selected.value!" /></template>
 `,
 		},
-		async (origin, browser) => {
+		async (origin) => {
 			assert.equal((await fetch(`${origin}/broken`)).status, 500)
 			const response = await fetch(`${origin}/chooser`)
 			assert.equal(response.status, 200)
@@ -1730,7 +1712,7 @@ async function choose(): Promise<void> {
 	)
 })
 
-test('al navegar a un módulo elegido en ejecución, la pasada previa espera su await useApi y no pinta la fila sin datos', { timeout: 240_000 }, async () => {
+browserTest('al navegar a un módulo elegido en ejecución, la pasada previa espera su await useApi y no pinta la fila sin datos', 240_000, async (browser) => {
 	await withServedApp(
 		'is-prepass-e2e',
 		{
@@ -1764,7 +1746,7 @@ const options = [{ id: "plain", component: AppPlain, props: { note: "nota" } }, 
 <template><h1 id="list">Lista</h1><component each:of="options" each:as="option" each:key="option.id" is="option.component" bind="option.props" /><MeekoLink id="to-home" to="/">Inicio</MeekoLink></template>
 `,
 		},
-		async (origin, browser) => {
+		async (origin) => {
 			// The document itself: the data is in the HTML of SSR.
 			const html = (await (await fetch(`${origin}/list`)).text()).replace(/<!--[^>]*-->/g, '')
 			assert.match(html, /<span class="loaded"[^>]*>uno,dos<\/span>/)
@@ -1825,7 +1807,7 @@ select, select::picker(select) { appearance: base-select; }
 </style>
 `
 
-test('un <select> con contenido rico hidrata en la opción real, no en el clon de <selectedcontent>, se actualiza y se libera', { timeout: 240_000 }, async () => {
+browserTest('un <select> con contenido rico hidrata en la opción real, no en el clon de <selectedcontent>, se actualiza y se libera', 240_000, async (browser) => {
 	await withServedApp(
 		'rich-select-e2e',
 		{
@@ -1833,7 +1815,7 @@ test('un <select> con contenido rico hidrata en la opción real, no en el clon d
 			'meeko.config.mjs': 'export default {};\n',
 			'app/pages/index.meeko': richSelectPage,
 		},
-		async (origin, browser) => {
+		async (origin) => {
 			const html = await (await fetch(`${origin}/`)).text()
 			assert.match(html, /<select id="rich"[^>]*><button type="button" id="open"><selectedcontent id="chosen"><\/selectedcontent><\/button>/)
 			assert.match(html, /<option value="a"[^>]*><span class="name">Alfa<\/span><\/option>/)
@@ -1917,7 +1899,7 @@ test('un <select> con contenido rico hidrata en la opción real, no en el clon d
 	)
 })
 
-test('el router da a su View Transition el tipo meeko-route y funciona sin tipos en los navegadores que no los tienen', { timeout: 240_000 }, async () => {
+browserTest('el router da a su View Transition el tipo meeko-route y funciona sin tipos en los navegadores que no los tienen', 240_000, async (browser) => {
 	await withServedApp(
 		'route-transition-type-e2e',
 		{
@@ -1926,7 +1908,7 @@ test('el router da a su View Transition el tipo meeko-route y funciona sin tipos
 			'app/pages/index.meeko': '<template><h1 id="home">Inicio</h1><a id="to-about" href="/about">Acerca</a></template>\n',
 			'app/pages/about.meeko': '<template><h1 id="about">Acerca</h1><a id="to-home" href="/">Inicio</a></template>\n',
 		},
-		async (origin, browser) => {
+		async (origin) => {
 			type Started = { options: boolean; types: string[] | null; active: boolean | null }
 			const spy = (withTypes: boolean): void => {
 				const scope = globalThis as unknown as { started: Started[] }
@@ -1989,6 +1971,113 @@ test('el router da a su View Transition el tipo meeko-route y funciona sin tipos
 			assert.equal(fallback[0]!.types, null)
 			assert.deepEqual(old.errors, [])
 			await old.page.close()
+		},
+	)
+})
+
+browserTest('un elemento con view-transition-name que sólo está en una página se funde con el patrón :only-child de la guía', 240_000, async (browser) => {
+	// The documented pattern (docs/routing-navigation-reference.md, View Transitions nativas).
+	const onlyChild = [
+		'@keyframes app-fade-out { to { opacity: 0 } }',
+		'@keyframes app-fade-in { from { opacity: 0 } }',
+		'html:active-view-transition-type(meeko-route)::view-transition-old(*):only-child { animation: 150ms ease-out both app-fade-out }',
+		'html:active-view-transition-type(meeko-route)::view-transition-new(*):only-child { animation: 150ms ease-in both app-fade-in }',
+	].join('\n')
+	await withServedApp(
+		'route-transition-only-child-e2e',
+		{
+			'package.json': '{"name":"route-transition-only-child-app","private":true,"type":"module"}\n',
+			'meeko.config.mjs': 'export default { viewTransitions: true };\n',
+			'app/layouts/site.meeko': '<template><header id="header" class="site-header">Cabecera</header><main><MeekoOutlet /></main></template>\n',
+			'app/layouts/bare.meeko': '<template><main id="bare"><MeekoOutlet /></main></template>\n',
+			'app/pages/index.meeko': '<script server lang="ts">\nexport const route = definePage({ layout: "site" });\n</script>\n<template><h1 id="home">Inicio</h1><a id="to-plain" href="/plain">Sin cabecera</a></template>\n',
+			'app/pages/plain.meeko': '<script server lang="ts">\nexport const route = definePage({ layout: "bare" });\n</script>\n<template><h1 id="plain">Sin cabecera</h1><a id="to-home" href="/">Inicio</a></template>\n',
+			// A fixed header whose group does not animate, and a long root cross-fade to look inside the transition.
+			'app/styles/main.css': '.site-header { view-transition-name: header }\n::view-transition-group(header) { animation: none }\n::view-transition-group(root) { animation-duration: 10s }\n',
+		},
+		async (origin) => {
+			type Opacity = { old: number; new: number }
+			type Frame = { early: Opacity; late: Opacity }
+			// Freezes every animation of each route transition halfway through a short fade and then long after it, and reads the header snapshots.
+			const freeze = (): void => {
+				const scope = globalThis as unknown as { frames: Frame[] }
+				scope.frames = []
+				const native = Document.prototype.startViewTransition as (this: Document, argument: unknown) => ViewTransition
+				;(Document.prototype as unknown as { startViewTransition: unknown }).startViewTransition = function (this: Document, argument: unknown) {
+					const transition = native.call(this, argument)
+					void transition.ready.then(
+						() => {
+							// No inner functions: the init script runs as written, without the helpers of the TypeScript build.
+							const frame = {} as Frame
+							for (const [moment, time] of [
+								['early', 75],
+								['late', 1000],
+							] as const) {
+								for (const animation of document.getAnimations()) {
+									animation.pause()
+									animation.currentTime = time
+								}
+								frame[moment] = {
+									old: Number(getComputedStyle(document.documentElement, '::view-transition-old(header)').opacity),
+									new: Number(getComputedStyle(document.documentElement, '::view-transition-new(header)').opacity),
+								}
+							}
+							scope.frames.push(frame)
+							transition.skipTransition()
+						},
+						() => {},
+					)
+					return transition
+				}
+			}
+			const open = async (pattern: boolean) => {
+				const page = await browser.newPage()
+				const errors: string[] = []
+				page.on('pageerror', (error) => errors.push(error.message))
+				page.on('console', (message) => {
+					if (message.type() === 'error') errors.push(message.text())
+				})
+				await page.addInitScript(freeze)
+				await page.goto(`${origin}/`)
+				await page.waitForFunction(() => performance.getEntriesByName('meeko-hydration').length > 0)
+				if (pattern) await page.addStyleTag({ content: onlyChild })
+				const frames = (): Promise<Frame[]> => page.evaluate(() => (globalThis as unknown as { frames: Frame[] }).frames)
+				const navigate = async (link: string, target: string, count: number): Promise<Frame> => {
+					await page.locator(link).click()
+					await page.locator(target).waitFor()
+					await page.waitForFunction((length) => (globalThis as unknown as { frames: Frame[] }).frames.length === length, count)
+					return (await frames()).at(-1)!
+				}
+				return { page, errors, navigate }
+			}
+
+			// Without the pattern, the header that only the first layout has stays fully painted over the next page.
+			const bare = await open(false)
+			assert.equal((await bare.navigate('#to-plain', '#plain', 1)).late.old, 1)
+			assert.deepEqual(bare.errors, [])
+			await bare.page.close()
+
+			// With it, the leaving header fades out and the arriving one fades in, while the rest of the page still animates.
+			const fixed = await open(true)
+			const leaving = await fixed.navigate('#to-plain', '#plain', 1)
+			assert.ok(leaving.early.old > 0 && leaving.early.old < 1, `fading out at 75 ms: ${leaving.early.old}`)
+			assert.equal(leaving.late.old, 0)
+			assert.equal(await fixed.page.locator('#header').count(), 0)
+			const arriving = await fixed.navigate('#to-home', '#home', 2)
+			assert.ok(arriving.early.new > 0 && arriving.early.new < 1, `fading in at 75 ms: ${arriving.early.new}`)
+			assert.equal(arriving.late.new, 1)
+			assert.deepEqual(fixed.errors, [])
+			await fixed.page.close()
+
+			// Reduced motion keeps navigation without a transition, so the pattern needs no media query of its own.
+			const reduced = await browser.newPage({ reducedMotion: 'reduce' })
+			await reduced.addInitScript(freeze)
+			await reduced.goto(`${origin}/`)
+			await reduced.waitForFunction(() => performance.getEntriesByName('meeko-hydration').length > 0)
+			await reduced.locator('#to-plain').click()
+			await reduced.locator('#plain').waitFor()
+			assert.deepEqual(await reduced.evaluate(() => (globalThis as unknown as { frames: Frame[] }).frames), [])
+			await reduced.close()
 		},
 	)
 })

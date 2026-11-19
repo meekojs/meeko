@@ -1,7 +1,10 @@
 /*
- * <UIMarkdownEditor>: its shell and the theme of Crepe, in the sheet of `@meekojs/ui/editor`. Crepe's
- * own sheets arrive later, with its chunk, so a rule here that must win over one of them is more
- * specific. Theme by tokens only: data-theme changes them, without classic.css or classic-dark.css.
+ * <UIMarkdownEditor>: the theme of Crepe, in the sheet of `@meekojs/ui/editor`. Its frame (bar, notice,
+ * surface, marker and text area) is on Tailwind, in variants/markdown-editor. This stays CSS because it
+ * dresses Milkdown's DOM, which the component does not write, under the class `ui-markdown-editor` of
+ * its root. Crepe's own sheets, without a layer, arrive later with its chunk, so this sheet has no layer
+ * either, and a rule that must win over one of them is more specific. Theme by tokens only: data-theme
+ * changes them, without classic.css or classic-dark.css.
  */
 .ui-markdown-editor {
 	--crepe-color-background: var(--ui-color-bg);
@@ -28,141 +31,8 @@
 	--crepe-font-code: var(--ui-font-mono);
 	--crepe-shadow-1: var(--ui-shadow-sm);
 	--crepe-shadow-2: var(--ui-shadow-md);
-	display: flex;
-	flex-direction: column;
-	gap: var(--ui-space-2);
-	min-width: 0;
-	color: var(--ui-color-text);
-	font-family: var(--ui-font-sans);
-}
-.ui-markdown-editor[data-disabled] {
-	opacity: var(--ui-opacity-disabled);
-}
-.ui-markdown-editor[data-disabled] .ui-markdown-editor-surface {
-	cursor: not-allowed;
-}
-
-.ui-markdown-editor-bar {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	gap: var(--ui-space-2) var(--ui-space-3);
-	min-height: var(--ui-control-height-md);
-}
-.ui-markdown-editor-label {
-	font-weight: var(--ui-font-weight-medium);
-	font-size: var(--ui-font-size-md);
-	line-height: var(--ui-line-height-snug);
-}
-.ui-markdown-editor-tools {
-	display: flex;
-	align-items: center;
-	gap: var(--ui-space-2);
-	color: var(--ui-color-text-soft);
-	font-size: var(--ui-font-size-xs);
-}
-.ui-markdown-editor-modes {
-	display: inline-flex;
-	gap: var(--ui-space-0-5);
-	margin-inline-start: auto;
-	border-radius: var(--ui-radius-md);
-	background: var(--ui-color-control);
-	padding: var(--ui-space-0-5);
-}
-.ui-markdown-editor-modes button {
-	transition:
-		background-color var(--ui-duration-fast),
-		color var(--ui-duration-fast);
-	cursor: pointer;
-	border: 0;
-	border-radius: var(--ui-radius-sm);
-	background: transparent;
-	padding: 0 var(--ui-space-2);
-	min-height: calc(var(--ui-control-height-sm) - var(--ui-space-1));
-	color: var(--ui-color-text-soft);
-	font-weight: var(--ui-font-weight-medium);
-	font-size: var(--ui-font-size-xs);
-	font-family: inherit;
-}
-.ui-markdown-editor-modes button:hover {
-	color: var(--ui-color-text);
-}
-.ui-markdown-editor-modes button[aria-pressed='true'] {
-	background: var(--ui-color-bg);
-	color: var(--ui-color-text);
-}
-.ui-markdown-editor-modes button:focus-visible {
-	outline: var(--ui-focus-ring);
-	outline-offset: var(--ui-focus-ring-offset);
-}
-.ui-markdown-editor-notice {
-	margin: 0;
-	border-radius: var(--ui-radius-md);
-	background: var(--ui-color-warning-soft);
-	padding: var(--ui-space-2) var(--ui-space-3);
-	color: var(--ui-color-warning-text);
-	font-size: var(--ui-font-size-sm);
-}
-
-/* The height is set from the first paint: the marker, Crepe and the text area scroll inside it. */
-.ui-markdown-editor-surface {
-	position: relative;
-	box-sizing: border-box;
-	border: var(--ui-border-width) solid var(--ui-color-border-strong);
-	border-radius: var(--ui-radius-lg);
-	background: var(--ui-color-bg);
-	height: var(--ui-markdown-editor-height, calc(var(--ui-space-24) * 5));
-	overflow: hidden;
-}
-.ui-markdown-editor-surface:focus-within {
-	outline: var(--ui-focus-ring);
-	outline-offset: var(--ui-focus-ring-offset);
-}
-.ui-markdown-editor-marker {
-	display: grid;
-	align-content: start;
-	gap: var(--ui-space-3);
-	padding: var(--ui-space-6);
-}
-.ui-markdown-editor-marker-text {
-	color: var(--ui-color-text-soft);
-	font-size: var(--ui-font-size-sm);
-}
-.ui-markdown-editor-marker-line {
-	border-radius: var(--ui-radius-xs);
-	background: var(--ui-color-control);
-	height: var(--ui-space-3);
-}
-.ui-markdown-editor-marker-line:nth-of-type(3) {
-	width: 80%;
-}
-.ui-markdown-editor-marker-line:nth-of-type(4) {
-	width: 60%;
-}
-.ui-markdown-editor-host {
-	height: 100%;
-	overflow: auto;
-	overscroll-behavior: contain;
-}
-.ui-markdown-editor-host[hidden] {
-	display: none;
-}
-.ui-markdown-editor-code {
-	display: block;
-	box-sizing: border-box;
-	outline: 0;
-	border: 0;
-	background: var(--ui-color-bg);
-	padding: var(--ui-space-4);
-	width: 100%;
-	height: 100%;
-	resize: none;
-	color: var(--ui-color-text);
-	font-size: var(--ui-font-size-sm);
-	line-height: var(--ui-line-height-relaxed);
-	font-family: var(--ui-font-mono);
-	font-variant-ligatures: none;
-	tab-size: 2;
+	/* The height of the surface (variants/markdown-editor), from the first paint. */
+	--ui-editor-surface-height: var(--ui-markdown-editor-height, calc(var(--ui-space-24) * 5));
 }
 
 /* Crepe -------------------------------------------------------------------------------------- */
@@ -205,6 +75,10 @@
 .ui-markdown-editor .milkdown .ProseMirror :is(h5, h6) {
 	margin-top: var(--ui-space-3);
 	font-size: var(--ui-font-size-md);
+}
+/* Bold has the weight of the published prose, also outside a <UIProse>, whose rules end at the editor. */
+.ui-markdown-editor .milkdown .ProseMirror strong {
+	font-weight: var(--ui-font-weight-semibold);
 }
 /* The band above a block of code says its language, as in the published page, instead of staying
    empty until the pointer passes over it. */
@@ -258,10 +132,5 @@
 	.ui-markdown-editor .milkdown .milkdown-table-block table {
 		min-width: calc(var(--ui-space-24) * 6);
 		table-layout: auto;
-	}
-}
-@media (prefers-reduced-motion: reduce) {
-	.ui-markdown-editor-modes button {
-		transition: none;
 	}
 }

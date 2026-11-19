@@ -31,11 +31,7 @@
 			(a route with typed
 			<code>params</code>
 			and
-			<code>search</code>), plus
-			<code>target</code>,
-			<code>rel</code>,
-			<code>download</code>,
-			<code>hreflang</code>,
+			<code>search</code>), plus <code>target</code>, <code>rel</code>, <code>download</code>, <code>hreflang</code>,
 			<code>lang</code>
 			and
 			<code>title</code>. With
@@ -43,8 +39,7 @@
 			it navigates without reloading, it is localized with
 			<code>@meekojs/i18n</code>
 			and the active route decides
-			<code>aria-current</code>. With
-			<code>href</code>, it is the current one when it matches the
+			<code>aria-current</code>. With <code>href</code>, it is the current one when it matches the
 			<code>current</code>
 			prop.
 		</p>
@@ -280,13 +275,7 @@
 		/>
 		<p>
 			The types
-			<code>UINavigationTreeProps</code>,
-			<code>UINavigationTabsProps</code>,
-			<code>UITabsProps</code>,
-			<code>UIBreadcrumbProps</code>,
-			<code>UIPageNavigationProps</code>,
-			<code>UIPaginationProps</code>,
-			<code>UITableOfContentsProps</code>,
+			<code>UINavigationTreeProps</code>, <code>UINavigationTabsProps</code>, <code>UITabsProps</code>, <code>UIBreadcrumbProps</code>, <code>UIPageNavigationProps</code>, <code>UIPaginationProps</code>, <code>UITableOfContentsProps</code>,
 			<code>UILocaleSwitcherProps</code>
 			and
 			<code>UILocaleSuggestionProps</code>

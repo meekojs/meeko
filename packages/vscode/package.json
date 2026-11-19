@@ -30,10 +30,11 @@
 	"scripts": {
 		"build": "node build.mjs",
 		"check": "tsc -p tsconfig.json --noEmit",
-		"install:local": "pwsh -NoProfile -File install-local.ps1",
-		"package:vsix": "pwsh -NoProfile -File package-vsix.ps1",
+		"install:local": "node install-local.mjs",
+		"package:vsix": "node package-vsix.mjs",
 		"test": "tsx --test tests/*.test.ts",
 		"test:host": "node tests/run-host.mjs",
+		"test:host:css": "node --test --test-timeout=60000 tests/run-host-css.mjs",
 		"test:host:isolated": "pwsh -NoProfile -File tests/prepare-host.ps1",
 		"test:host:snippets": "node tests/run-host-snippets.mjs",
 		"test:host:untrusted": "node tests/run-host-untrusted.mjs",
@@ -111,13 +112,66 @@
 					],
 					"default": "auto",
 					"scope": "resource",
-					"description": "Completado y hover de clases CSS: auto delega las clases generadas a Tailwind CSS IntelliSense cuando está activo y el proyecto usa Tailwind; on incluye todas; off desactiva ambos proveedores de clases de Meeko."
+					"description": "Completado de clases CSS: auto delega las clases generadas a Tailwind CSS IntelliSense cuando está activo y el proyecto usa Tailwind; on incluye todas; off desactiva sólo este completado. No afecta al hover, la definición ni las variables CSS."
+				},
+				"meeko.classes.hover": {
+					"type": "string",
+					"enum": [
+						"auto",
+						"on",
+						"off"
+					],
+					"default": "auto",
+					"scope": "resource",
+					"description": "Hover de clases CSS: auto omite las clases generadas cuando Tailwind está activo; on incluye todas; off desactiva sólo este hover."
+				},
+				"meeko.classes.definition": {
+					"type": "boolean",
+					"default": true,
+					"scope": "resource",
+					"description": "Ir a definición de clases CSS, independiente del completado, el hover y las variables."
+				},
+				"meeko.cssVariables.completion": {
+					"type": "boolean",
+					"default": true,
+					"scope": "resource",
+					"description": "Completado de variables CSS en .meeko y hojas .css del proyecto Meeko. No afecta al hover, la definición ni las clases."
+				},
+				"meeko.cssVariables.hover": {
+					"type": "boolean",
+					"default": true,
+					"scope": "resource",
+					"description": "Hover de variables CSS con sus valores y archivos de origen, independiente del completado y las clases."
+				},
+				"meeko.cssVariables.definition": {
+					"type": "boolean",
+					"default": true,
+					"scope": "resource",
+					"description": "Ir a definición de variables CSS, independiente del completado, el hover y las clases."
+				},
+				"meeko.cssVariables.references": {
+					"type": "boolean",
+					"default": true,
+					"scope": "resource",
+					"description": "Buscar referencias de variables CSS en las fuentes del paquete, independiente del completado, el hover, la definición y el renombrado."
+				},
+				"meeko.cssVariables.rename": {
+					"type": "boolean",
+					"default": true,
+					"scope": "resource",
+					"description": "Renombrar variables CSS en las fuentes del paquete con comprobación de ámbito y colisiones. No afecta a referencias ni a las otras funciones."
 				},
 				"meeko.languageServer.preferWorkspace": {
 					"type": "boolean",
 					"default": true,
 					"scope": "resource",
 					"description": "Usa el servidor de lenguaje del paquete @meekojs/meeko del workspace, para que el editor coincida con el compilador del proyecto. Se usa el servidor incluido si ese paquete no está, si este ajuste está desactivado o si el workspace no es de confianza."
+				},
+				"meeko.languageServer.warmup": {
+					"type": "boolean",
+					"default": true,
+					"scope": "resource",
+					"description": "Prepara al iniciar, en segundo plano, el programa TypeScript de los proyectos de las pestañas .meeko abiertas (o de hasta dos aplicaciones de la carpeta), para que el primer componente reciba colores y hover sin esperar alrededor de un segundo. Desactívalo para ahorrar memoria en workspaces con muchas aplicaciones."
 				},
 				"meeko.format.indentSections": {
 					"type": "boolean",
@@ -295,20 +349,23 @@
 			}
 		]
 	},
+	"activationEvents": [
+		"workspaceContains:**/meeko.config.{ts,js,mts,mjs,cts,cjs}"
+	],
 	"dependencies": {
-		"@typescript/typescript6": "6.0.2",
-		"prettier": "3.9.10",
-		"typescript": "7.0.2"
+		"@typescript/typescript6": "catalog:",
+		"prettier": "catalog:",
+		"typescript": "catalog:"
 	},
 	"devDependencies": {
-		"@types/node": "24.0.0",
-		"@types/vscode": "1.144.0",
-		"@vscode/test-electron": "3.1.0",
-		"esbuild": "0.28.2",
-		"tsx": "^4.20.0",
-		"vscode-languageclient": "11.0.0",
-		"vscode-oniguruma": "2.0.1",
-		"vscode-textmate": "9.3.2"
+		"@types/node": "catalog:",
+		"@types/vscode": "catalog:",
+		"@vscode/test-electron": "catalog:",
+		"esbuild": "catalog:",
+		"tsx": "catalog:",
+		"vscode-languageclient": "catalog:",
+		"vscode-oniguruma": "catalog:",
+		"vscode-textmate": "catalog:"
 	},
 	"engines": {
 		"vscode": "^1.144.0"

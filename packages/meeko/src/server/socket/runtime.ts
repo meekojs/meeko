@@ -8,6 +8,7 @@ import type { Schema } from '../schema'
 import { serializeJson } from '../../core/server'
 import { ApiError, normalizeServerError, observeErrorCallback, SessionRevokedError } from '../errors'
 import { createRequestContext } from '../runtime/request-context'
+import { devAllowedHosts, isAllowedOrigin } from '../runtime/sessions'
 
 type SchemaMap = Readonly<Record<string, Schema>>
 import type { SocketChannelDefinition } from './definitions'
@@ -307,11 +308,6 @@ function channelDefinition(value: unknown): SocketChannelDefinition<SchemaMap, S
 	return value as SocketChannelDefinition<SchemaMap, SchemaMap>
 }
 
-function originAllowed(request: Request, allowedOrigins: readonly string[]): boolean {
-	const origin = request.headers.get('origin')
-	return !!origin && (origin === new URL(request.url).origin || allowedOrigins.includes(origin))
-}
-
 /**
  * Crea el hub de Socket de un host propio. El host hace el upgrade HTTP y pasa el peer conectado a
  * `hub.accept`. El hub valida Origin, sesión, canal, sala, evento y payload, y aplica los límites
@@ -345,7 +341,8 @@ export function createSocketHub<TServices>(options: SocketHubOptions<TServices>)
 	const getDefinition = (name: string) => channelDefinition(options.channels[name])
 	const authorizeHandshake = async (name: string, request: Request, roomId?: string) => {
 		const definition = getDefinition(name)
-		if (!originAllowed(request, options.allowedOrigins ?? [])) throw new ApiError('INVALID_ORIGIN', 403)
+		// In `meeko dev`, the sessions' manager also carries the hosts of `dev.allowedHosts`.
+		if (!isAllowedOrigin(request, options.allowedOrigins ?? [], options.sessions[devAllowedHosts])) throw new ApiError('INVALID_ORIGIN', 403)
 		const session = await options.sessions.load(request)
 		if (definition.auth === 'required' && !session.current) throw new ApiError('UNAUTHENTICATED', 401)
 		const services = typeof options.services === 'function' ? await (options.services as (request: Request) => TServices | Promise<TServices>)(request) : options.services

@@ -441,7 +441,7 @@ export async function componentDiagnostics(project: MeekoProject, document: Text
 			// `on:event`, `model:name` and `bind:prop` on a component are reported at the attribute name, and a missing
 			// model, snippet or `<render args>` at the tag: mark the whole directive or tag name.
 			// MEEK080 marks the whole `useElementRef("name")` call, and MEEK110 the `if:when` of a `<snippet>`.
-			const directive = end === undefined ? (item.code === 'MEEK080' ? /^useElementRef\s*\(\s*(["'`])[^"'`]*\1\s*\)/ : item.code === 'MEEK110' ? /^if:when/ : /^(?:(?:on|model|bind):[\w$]+|model(?![\w$:])|<[A-Za-z][\w$.-]*)/).exec(source.slice(offset, offset + 256)) : null
+			const directive = end === undefined ? (item.code === 'MEEK080' ? /^useElementRef\s*\(\s*(["'`])[^"'`]*\1\s*\)/ : item.code === 'MEEK110' ? /^if(?::when)?/ : /^(?:(?:on|model|bind):[\w$]+|model(?![\w$:])|<[A-Za-z][\w$.-]*)/).exec(source.slice(offset, offset + 256)) : null
 			diagnostic.range = toRange(document, offset, end ?? (directive ? offset + directive[0].length : tokenEnd(source, offset)))
 			return diagnostic
 		})

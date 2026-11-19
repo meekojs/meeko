@@ -16,6 +16,7 @@ import { importSpecifier, pluginMode, pluginName, resolvedDocument } from './mod
 import { discoverRouteMiddleware } from './route-middleware-discovery'
 import { discoverErrorPage } from './routes-discovery'
 
+export const defaultErrorPageFile = '.meeko/generated/default-error.meeko'
 export const frameworkClientEntry = '.meeko/generated/entry-client.ts'
 export const frameworkServerEntry = '.meeko/generated/entry-server.ts'
 export const frameworkNodeEntry = '.meeko/generated/entry-node.ts'
@@ -62,17 +63,17 @@ function portableLayout(root: string, layout: NamedLayoutRecord): NamedLayoutRec
 	return { name: layout.name, file: moduleKey(root, layout.file), ...(layout.props ? { props: layout.props } : {}) }
 }
 
-/** `app/error.meeko` of the project with module keys, or undefined without one. */
-export async function portableErrorPage(projectRoot: string): Promise<ErrorPageRecord | undefined> {
+/** The project error page with module keys, or the framework default. */
+export async function portableErrorPage(projectRoot: string): Promise<ErrorPageRecord> {
 	const root = resolve(projectRoot)
 	const page = await discoverErrorPage(root, { layouts: await configuredModuleLayouts(root) })
-	return (
-		page && {
-			file: moduleKey(root, page.file),
-			layouts: page.layouts.map((layout) => moduleKey(root, layout)),
-			...(page.layout ? { layout: portableLayout(root, page.layout) } : {}),
-		}
-	)
+	return page
+		? {
+				file: moduleKey(root, page.file),
+				layouts: page.layouts.map((layout) => moduleKey(root, layout)),
+				...(page.layout ? { layout: portableLayout(root, page.layout) } : {}),
+			}
+		: { file: `/${defaultErrorPageFile}`, layouts: [] }
 }
 
 async function scripts(directory: string, exclude: RegExp): Promise<string[]> {
@@ -187,7 +188,7 @@ export async function discoverAppManifest(projectRoot: string, client: ClientAss
 	const manifest: AppManifest = {
 		version: 1,
 		routes,
-		...(errorPage ? { errorPage } : {}),
+		errorPage,
 		...(document ? { document } : {}),
 		...(response?.contentSecurityPolicy ? { contentSecurityPolicy: response.contentSecurityPolicy } : {}),
 		...(response?.headers ? { headers: response.headers } : {}),
@@ -207,7 +208,7 @@ export async function discoverAppManifest(projectRoot: string, client: ClientAss
 	for (const route of routes) {
 		for (const key of [route.file, ...route.layouts, ...(route.error ? [route.error] : []), ...(route.sidecar ? [route.sidecar] : []), ...(route.middleware ?? []), ...(route.serverMiddleware ?? [])]) modules.add(key)
 	}
-	if (errorPage) for (const key of [errorPage.file, ...errorPage.layouts]) modules.add(key)
+	for (const key of [errorPage.file, ...errorPage.layouts]) modules.add(key)
 	for (const endpoint of [...manifest.server.api, ...manifest.server.rpc, ...(manifest.server.socket ?? [])]) modules.add(endpoint.file)
 	for (const key of [...routeMiddleware, ...serverMiddleware, ...serverHandlers.map((handler) => handler.file)]) modules.add(key)
 	const runtimeFile = findRuntimeFile(root)
@@ -293,7 +294,7 @@ export async function clientRoutesSource(projectRoot: string): Promise<string> {
 	const errorPage = await portableErrorPage(root)
 	const { config, modules } = await loadConfiguredModules(root)
 	const document = resolvedDocument(config, modules)
-	return `export const routes = ${serializeJson(routes)};\nexport const errorPage = ${errorPage ? serializeJson(errorPage) : 'undefined'};\nexport const documentConfig = ${document ? serializeJson(document) : 'undefined'};\nexport const viewTransitions = ${config.viewTransitions === true};\n`
+	return `export const routes = ${serializeJson(routes)};\nexport const errorPage = ${serializeJson(errorPage)};\nexport const documentConfig = ${document ? serializeJson(document) : 'undefined'};\nexport const viewTransitions = ${config.viewTransitions === true};\n`
 }
 
 /**

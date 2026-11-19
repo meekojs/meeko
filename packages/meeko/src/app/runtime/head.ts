@@ -1,5 +1,5 @@
 import type { ReadonlySignal } from '../../core/reactivity'
-import type { DocumentConfig, HeadEntry, HeadInput, HeadSource, HeadTag, ResolvedSeo } from '../../shared/head'
+import type { DocumentConfig, HeadEntry, HeadInput, HeadSource, HeadTag, ResolvedHead, ResolvedSeo } from '../../shared/head'
 import type { DocumentTheme, ThemeHead } from '../../shared/theme'
 import type { ComponentRelease, DomScope } from './renderer'
 
@@ -122,6 +122,8 @@ export class BrowserHead implements ThemeHead {
 	private readonly seo: ResolvedSeo | undefined
 	/** Pathname of the committed page for `document.seo`; `undefined` on an error page. */
 	private pathname: string | undefined
+	/** The route input is the hydrated document's payload head, which may only adopt (see `adoptRoute`). */
+	private routeFromDocument = false
 
 	constructor(
 		private readonly document: Document,
@@ -175,7 +177,23 @@ export class BrowserHead implements ThemeHead {
 	 * `errorTitle`.
 	 */
 	setRoute(input: HeadInput | undefined, pathname?: string, errorTitle?: HeadEntry): void {
+		this.replaceRoute(input, pathname, errorTitle, false)
+	}
+
+	/**
+	 * `setRoute` with the head of the payload of the document being hydrated. The server already
+	 * wrote that head, so the first resolution only adopts it: a `<meta>`, `<link>`, `<script>` or
+	 * `<style>` of `input` that the document's head lacks is dropped, never created. The payload is
+	 * data inside the page, the one head input that page content could forge, and an element
+	 * created here would run, or load, with the document's nonce.
+	 */
+	adoptRoute(input: HeadInput | undefined, pathname?: string, errorTitle?: HeadEntry): void {
+		this.replaceRoute(input, pathname, errorTitle, !this.adopted)
+	}
+
+	private replaceRoute(input: HeadInput | undefined, pathname: string | undefined, errorTitle: HeadEntry | undefined, fromDocument: boolean): void {
 		this.route.input = input
+		this.routeFromDocument = fromDocument
 		this.pathname = pathname
 		this.errorTitle = errorTitle
 		this.changed()
@@ -215,10 +233,38 @@ export class BrowserHead implements ThemeHead {
 		if (this.holds === 0) this.flush()
 	}
 
+	private resolve(): ResolvedHead {
+		return resolveHead([this.config, ...this.entries, ...(this.errorTitle ? [this.errorTitle] : []), this.route], { seo: this.seo, pathname: this.pathname })
+	}
+
+	/**
+	 * Removes from the route input of the hydrated document every element that would win in
+	 * `tags` and that the document's head does not show (see `adoptRoute`). Whether anything changed.
+	 */
+	private dropUnwritten(tags: readonly HeadTag[]): boolean {
+		const input = this.route.input
+		if (!input) return false
+		const written = [...(this.document.head?.children ?? [])]
+		const missing = new Set(tags.filter((tag) => !written.some((element) => sameElement(element, tag))).map((tag) => tag.key))
+		const kept = (entry: HeadInput): boolean => {
+			const key = resolveHead([{ level: ROUTE_LEVEL, order: 0, input: entry }]).tags.find((tag) => !tag.fallback)?.key
+			return key === undefined || !missing.has(key)
+		}
+		const meta = input.meta?.filter((meta) => kept({ meta: [meta] }))
+		const link = input.link?.filter((link) => kept({ link: [link] }))
+		const script = input.script?.filter((script) => kept({ script: [script] }))
+		const style = input.style?.filter((style) => kept({ style: [style] }))
+		if (meta?.length === input.meta?.length && link?.length === input.link?.length && script?.length === input.script?.length && style?.length === input.style?.length) return false
+		this.route.input = { ...input, ...(meta ? { meta } : {}), ...(link ? { link } : {}), ...(script ? { script } : {}), ...(style ? { style } : {}) }
+		return true
+	}
+
 	private flush(): void {
 		this.dirty = false
 		if (this.disposed) return
-		const resolved = resolveHead([this.config, ...this.entries, ...(this.errorTitle ? [this.errorTitle] : []), this.route], { seo: this.seo, pathname: this.pathname })
+		let resolved = this.resolve()
+		if (this.routeFromDocument && !this.adopted && this.dropUnwritten(resolved.tags)) resolved = this.resolve()
+		this.routeFromDocument = false
 		const document = this.document
 		const title = resolved.title ?? this.defaultTitle
 		if (document.title !== title) document.title = title

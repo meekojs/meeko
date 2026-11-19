@@ -4,6 +4,10 @@ import { chromium } from 'playwright-core'
 
 import { startForms } from './helpers/forms-app.mjs'
 
+/** The host of the toasts in <UIApp>, a polite live region, and each toast in it. */
+const host = '[popover="manual"][aria-live="polite"]'
+const toasts = `${host} > div`
+
 test('forms hydrate, preserve native submission, keyboard and model updates; feedback closes and stacks', { timeout: 120_000 }, async (context) => {
 	const { origin } = await startForms(context)
 	const browser = await chromium.launch({ ...(process.env.MEEKO_CHROME_PATH ? { executablePath: process.env.MEEKO_CHROME_PATH } : { channel: 'chrome' }), headless: true })
@@ -41,20 +45,20 @@ test('forms hydrate, preserve native submission, keyboard and model updates; fee
 	assert.equal(await page.getByRole('alert').count(), 0)
 	await page.locator('#notify').click()
 	await page.locator('#notify').click()
-	assert.equal(await page.locator('.meeko-ui-toast-host[aria-live="polite"] .meeko-ui-toast').filter({ hasText: 'Cambios guardados' }).count(), 2, JSON.stringify({ errors, html: await page.locator('.meeko-ui-toast-host').innerHTML() }))
-	const boxes = await page.locator('.meeko-ui-toast').evaluateAll((elements) =>
+	assert.equal(await page.locator(toasts).filter({ hasText: 'Cambios guardados' }).count(), 2, JSON.stringify({ errors, html: await page.locator(host).innerHTML() }))
+	const boxes = await page.locator(toasts).evaluateAll((elements) =>
 		elements.map((element) => {
 			const box = element.getBoundingClientRect()
 			return { top: box.top, bottom: box.bottom }
 		}),
 	)
 	assert.ok(boxes[0].bottom <= boxes[1].top, 'notifications never overlap')
-	await page.locator('.meeko-ui-toast').first().getByRole('button').click()
+	await page.locator(toasts).first().getByRole('button').click()
 	// The exit is a View Transition: the toast leaves the DOM after its capture, not in the click.
-	await page.waitForFunction(() => globalThis.document.querySelectorAll('.meeko-ui-toast').length === 1)
+	await page.waitForFunction((selector) => globalThis.document.querySelectorAll(selector).length === 1, toasts)
 	await page.locator('#clear').click()
 	await page.locator('#timed').click()
-	const timed = page.locator('.meeko-ui-toast').filter({ hasText: 'Aviso temporal' })
+	const timed = page.locator(toasts).filter({ hasText: 'Aviso temporal' })
 	await timed.hover()
 	await page.waitForTimeout(1000)
 	assert.equal(await timed.count(), 1, 'hover pauses expiration')
@@ -70,41 +74,41 @@ test('forms hydrate, preserve native submission, keyboard and model updates; fee
 		}
 	})
 	await page.locator('#notify').click()
-	const closing = page.locator('.meeko-ui-toast').last()
+	const closing = page.locator(toasts).last()
 	assert.equal(await closing.evaluate((element) => globalThis.getComputedStyle(element).viewTransitionName), 'none')
 	await closing.getByRole('button').click()
 	await closing.waitFor({ state: 'detached' })
 	assert.deepEqual(await page.evaluate(() => globalThis.viewTransitionTypes), [['ui-toast-close']])
 	// With a modal open the host goes back to the top of the top layer, or the toast would stay behind it.
-	await page.evaluate(() => {
+	await page.evaluate((host) => {
 		const dialog = globalThis.document.createElement('dialog')
 		dialog.id = 'modal'
 		globalThis.document.body.append(dialog)
 		dialog.showModal()
 		globalThis.hostToggles = 0
-		globalThis.document.querySelector('.meeko-ui-toast-host').addEventListener('beforetoggle', () => globalThis.hostToggles++)
+		globalThis.document.querySelector(host).addEventListener('beforetoggle', () => globalThis.hostToggles++)
 		globalThis.document.querySelector('#notify').click()
-	})
+	}, host)
 	await page.waitForFunction(() => globalThis.hostToggles === 2)
-	assert.equal(await page.locator('.meeko-ui-toast-host').evaluate((element) => element.matches(':popover-open')), true)
+	assert.equal(await page.locator(host).evaluate((element) => element.matches(':popover-open')), true)
 	await page.evaluate(() => {
 		globalThis.document.querySelector('#modal').remove()
 		globalThis.document.querySelector('#clear').click()
 	})
-	await page.locator('.meeko-ui-toast').first().waitFor({ state: 'detached' })
+	await page.locator(toasts).first().waitFor({ state: 'detached' })
 	assert.equal(await page.getByRole('rowheader', { name: 'Ana' }).count(), 1)
 	await page.emulateMedia({ reducedMotion: 'reduce' })
 	assert.equal(
 		await page
-			.locator('.meeko-ui-skeleton > span')
+			.locator('[role="status"] > span[aria-hidden="true"]')
 			.first()
 			.evaluate((element) => globalThis.getComputedStyle(element).animationName),
 		'none',
 	)
 	// Less motion, no transition: the toast just goes.
 	await page.locator('#notify').click()
-	await page.locator('.meeko-ui-toast').last().getByRole('button').click()
-	await page.waitForFunction(() => globalThis.document.querySelectorAll('.meeko-ui-toast').length === 0)
+	await page.locator(toasts).last().getByRole('button').click()
+	await page.waitForFunction((selector) => globalThis.document.querySelectorAll(selector).length === 0, toasts)
 	assert.deepEqual(await page.evaluate(() => globalThis.viewTransitionTypes), [['ui-toast-close']])
 	assert.deepEqual(errors, [])
 	const native = await browser.newContext({ javaScriptEnabled: false })

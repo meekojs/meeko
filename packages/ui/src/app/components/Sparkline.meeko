@@ -1,0 +1,51 @@
+<script lang="ts">
+	// <UISparkline>: a series as a line in an <svg>, with an optional area under it. The paths are drawn on a box
+	// of 100 by 32 (sparklineBox in utils/sparkline, the viewBox below) that the <svg> stretches to the width of its container and the height of its
+	// token, so its size comes from CSS and not from JavaScript. It is an image named by a summary of the series.
+	import { computed } from '@meekojs/meeko'
+
+	import type { UISparklineProps } from '../types/data'
+
+	import { uiTheme } from '../utils/defaults'
+	import { fillMessage, uiMessages } from '../utils/messages'
+	import { sparklineShape } from '../utils/sparkline'
+	import { sparkline } from '../variants/data'
+
+	const props = defineProps<UISparklineProps>()
+
+	const theme = uiTheme('sparkline', () => props)
+
+	const messages = uiMessages()
+	const text = messages.sparkline
+
+	const shape = computed(() => sparklineShape(props.values, { min: props.min, max: props.max }))
+	const label = computed(() => {
+		if (props.label) return props.label
+		const summary = shape.value.summary
+		if (!summary) return text.empty
+		const format = new Intl.NumberFormat(messages.locale, props.format)
+		return fillMessage(text.label, { min: format.format(summary.min), max: format.format(summary.max), last: format.format(summary.last) })
+	})
+	const classes = computed(() => sparkline({ tone: props.tone }))
+</script>
+
+<template>
+	<svg
+		role="img"
+		viewBox="0 0 100 32"
+		preserveAspectRatio="none"
+		bind:aria-label="label.value"
+		bind:class="classes.value.base({ class: [theme.ui.base, theme.class] })"
+	>
+		<path
+			if:when="props.area && shape.value.area"
+			bind:d="shape.value.area"
+			bind:class="classes.value.area({ class: theme.ui.area })"
+		/>
+		<path
+			if:when="shape.value.line"
+			bind:d="shape.value.line"
+			bind:class="classes.value.line({ class: theme.ui.line })"
+		/>
+	</svg>
+</template>

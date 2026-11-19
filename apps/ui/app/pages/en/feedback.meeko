@@ -17,8 +17,7 @@
 			A notice inside the page, in four tones besides the neutral one.
 			<code>danger</code>
 			uses
-			<code>role="alert"</code>; the others,
-			<code>note</code>. Choose
+			<code>role="alert"</code>; the others, <code>note</code>. Choose
 			<code>status</code>
 			to announce a change, or
 			<code>none</code>
@@ -200,10 +199,7 @@
 			The default texts are in
 			<code>ui.messages.&lt;language&gt;.feedback</code>
 			(see
-			<MeekoLink to="/theming">Theming</MeekoLink>). The types
-			<code>UIAlertProps</code>,
-			<code>UIToastProps</code>,
-			<code>UIToastContext</code>,
+			<MeekoLink to="/theming">Theming</MeekoLink>). The types <code>UIAlertProps</code>, <code>UIToastProps</code>, <code>UIToastContext</code>,
 			<code>UIEmptyProps</code>
 			and
 			<code>UISkeletonProps</code>

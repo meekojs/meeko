@@ -22,8 +22,7 @@
 			uses the
 			<code>theme</code>
 			option of
-			<code>meeko.config.ts</code>. It is a form that sends
-			<code>POST /_meeko/theme</code>: without JavaScript, the server stores the preference and goes back to the same page. With JavaScript, the theme changes instantly, without navigating. Both examples and the header share the same preference.
+			<code>meeko.config.ts</code>. It is a form that sends <code>POST /_meeko/theme</code>: without JavaScript, the server stores the preference and goes back to the same page. With JavaScript, the theme changes instantly, without navigating. Both examples and the header share the same preference.
 		</p>
 		<h2 id="cycle">A button that cycles</h2>
 		<p>

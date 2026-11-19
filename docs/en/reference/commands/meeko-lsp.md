@@ -10,7 +10,7 @@ related:
   - docs/editors.md#arrancar-el-servidor
   - docs/editors.md#opciones-de-inicialización
   - docs/editors.md#comprobación-del-proyecto
-source-hash: cf7fc9c75568b94470181d1bbb3e0ee298590ceef6f24c10758888e739f27c71
+source-hash: c7f98e558e06b3643980f1467bbdc3e8d3e78f49e06c7dddb246898239c41536
 ---
 
 `meeko lsp` starts Meeko's language server (LSP): diagnostics, completion, hover, go to definition, quick fixes, CodeLens, Prettier formatting, semantic reactivity tokens and page and layout contract checking for `.meeko` files. It speaks JSON-RPC over the specified transport, usually standard input and output. You do not run it manually: the editor launches it.
@@ -45,7 +45,7 @@ vim.lsp.enable("meeko")
 | `--socket=<puerto>` | transport |         | A TCP socket on that port.                                             |
 | `--pipe=<nombre>`   | transport |         | A named pipe (a named pipe on Windows, a domain socket on POSIX).      |
 
-Server options go in `initializationOptions` of `initialize`, not on the command line: `trusted` (`true` by default: executes `meeko.config.*` and module `setup` functions), `projectContracts`, `diagnosticsDelay` and `format`. See [Initialization options](/en/docs/editors#initialization-options).
+Server options go in `initializationOptions` of `initialize`, not on the command line: `trusted` (`true` by default: executes `meeko.config.*` and module `setup` functions), `projectContracts`, `diagnosticsDelay`, `warmup`, `warmupFiles` and `format`. See [Initialization options](/en/docs/editors#initialization-options).
 
 ## Result
 

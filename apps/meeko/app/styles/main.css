@@ -61,3 +61,15 @@
 	fill: var(--ui-color-text-soft);
 	font: var(--ui-font-weight-medium) var(--fig-text, 9px) var(--ui-font-mono);
 }
+
+/* The line icons of the reference, as those of UI: strokes of the current color, of the size of a token. */
+.line-icon {
+	flex: none;
+	fill: none;
+	stroke: currentColor;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+	stroke-width: var(--ui-icon-stroke-width);
+	width: var(--ui-icon-size);
+	height: var(--ui-icon-size);
+}

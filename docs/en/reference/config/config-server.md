@@ -20,7 +20,7 @@ related:
   - docs/framework.md#csp-y-cabeceras-en-los-adaptadores-con-servidor
   - docs/framework.md#sitio-estático
   - docs/framework.md#cloudflare-workers
-source-hash: 21e66391c6a5a74c090f5e9f5eca36998f80558a587be68008f1227295a2f00e
+source-hash: 36add3c56b069526e0ab5e431310ed4195173667951fe261de2ca92981c36605
 ---
 
 `server` chooses where the built application runs: a discriminated union keyed by `adapter`. `meeko build` writes output to `.meeko/output/<adapter>/`; the CLI's `--adapter` takes precedence over configuration. Without `server`, the adapter is `node`.
@@ -66,7 +66,7 @@ export default defineMeekoConfig({
 
 | Adapter      | Option                  | Type                                | Default                       | Description                                                                                                                                                                                                                   |
 | ------------ | ----------------------- | ----------------------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `node`       | `host`                  | `string`                            | `"127.0.0.1"`                 | `meeko start` interface; `MEEKO_HOST` (or `HOST`) overrides it.                                                                                                                                                               |
+| `node`       | `host`                  | `string`                            | `"127.0.0.1"`                 | `meeko start` interface; `MEEKO_HOST` overrides it (bare `HOST` still works but is deprecated since `1.2`: it warns once and stops being read in `2.0`).                                                                      |
 | `node`       | `port`                  | `number`                            | `4173`                        | `meeko start` port, from `0` to `65535`; `MEEKO_PORT` (or `PORT`) overrides it.                                                                                                                                               |
 | `cloudflare` | `name`                  | `string`                            | `package.json`'s `name`       | Worker name: lowercase letters, digits and hyphens.                                                                                                                                                                           |
 | `cloudflare` | `socketClassName`       | `string`                            | `"MeekoSocketRoom"`           | Durable Object class for Socket rooms.                                                                                                                                                                                        |

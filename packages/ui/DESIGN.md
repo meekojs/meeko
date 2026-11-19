@@ -12,6 +12,8 @@
 4. El violeta es para la acción principal, el foco, la selección y lo que está activo. Si todo es violeta, nada destaca.
 5. Plataforma antes que JavaScript. Los navegadores antiguos funcionan, sin animación.
 
+Las portadas comparten `UIPage` y `UIPageHeader` con `layout="landing"`. Sus acciones y escaparates son las clases `docs-actions` y `docs-showcase` de la base documental (`packages/docs`), que comparten las webs de UI e i18n; la portada del framework define sus propias secciones. Cada producto aporta sólo su texto y su demo.
+
 ## Color
 
 Pasos de cada escala: 1-2 fondos, 3-5 controles, 6-8 bordes, 9-10 sólidos, 11-12 texto.
@@ -33,6 +35,7 @@ Pasos de cada escala: 1-2 fondos, 3-5 controles, 6-8 bordes, 9-10 sólidos, 11-1
 | Texto sobre la acción             | `--ui-color-primary-contrast`, `-contrast-hover`                        | blanco                |
 | Etiqueta o fondo activo discreto  | `--ui-color-primary-soft`, `-soft-hover`, con `--ui-color-primary-text` | primary 3, 4, 11      |
 | Borde violeta                     | `--ui-color-primary-border`                                             | primary 7             |
+| Código en prosa y bloques         | `--ui-color-code-soft`, `-header`, `-border`, `-text`                   | cyan 3, 2, 6, 12      |
 | Foco                              | `--ui-focus-ring`, con `outline-offset: var(--ui-focus-ring-offset)`    | primary 9             |
 | Selección de texto                | `--ui-color-selection`                                                  | primary 5             |
 | Fondo de un modal abierto         | `--ui-color-overlay`                                                    | negro al 50 %         |
@@ -152,7 +155,7 @@ Con `pointer: coarse` los altos crecen solos, y los inputs usan `--ui-input-font
 
 El módulo lo hace todo con `modules: ['@meekojs/ui']`:
 
-- **`main.css`:** paleta, tokens, `@font-face` y componentes.
+- **`main.css`:** paleta, tokens, `@font-face` y componentes, compilada con Tailwind 4 por `scripts/build-styles.mjs` en `dist/styles/main.css`; la app no necesita Tailwind. Las clases de los componentes llevan el prefijo `ui:`, viven en `src/app/variants/` (`tv()` de `tailwind-variants/lite`) y leen los tokens a través de `theme.css`. Capas: `ui.components`, lo que aún se escribe a mano, y `ui.utilities`, las clases `ui:*`, por encima. Cualquier regla sin capa de la app gana a ambas.
 - **`base.css`:** reset, `body`, `color-scheme`, `::selection`, barras de desplazamiento y foco, en la capa `@layer ui-base`. Cualquier regla sin capa de la app gana, y también cualquier capa que declare, porque ésta se registra primero. Se omite con `ui: { base: false }`.
 - **La fuente:** se sirve en `/_meeko-ui/fonts/inter-latin-opsz-normal.woff2`, con su `preload`. La app no copia archivos ni escribe `@font-face`. La CSP sólo necesita `font-src 'self'`, y se sirve con CORS, así que también la carga un `<iframe sandbox srcdoc>` que lea `@meekojs/ui/styles/fonts.css`.
 
@@ -177,3 +180,5 @@ Para una marca propia, `ui.tokens` o una hoja de la app:
 	--ui-radius-md: 0.5rem;
 }
 ```
+
+Para retocar un componente concreto, `class` (el elemento raíz) y la prop `ui`, con clases por slot: `<UICard bind:ui="{ title: 'pricing-title' }">`. Las clases `.meeko-ui-*` y los atributos `data-*` que sólo daban estilo ya no existen; la [guía de migración](../../docs/ui-api.md#migración-desde-las-clases-retiradas) da su equivalente.

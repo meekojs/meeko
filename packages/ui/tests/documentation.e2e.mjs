@@ -8,7 +8,7 @@ test('public UI documentation renders every guide, navigates, copies code and va
 	const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } })
 	const errors = []
 	page.on('pageerror', (error) => errors.push(error.message))
-	for (const route of ['/', '/installation', '/theming', '/components', '/container', '/buttons', '/links', '/badges', '/forms', '/controls', '/select', '/editor', '/cards', '/tables', '/content', '/feedback', '/page', '/navigation', '/modals', '/popover', '/overlays', '/app', '/theme-toggle', '/transitions', '/transitions/project']) {
+	for (const route of ['/', '/installation', '/theming', '/components', '/container', '/buttons', '/links', '/badges', '/forms', '/controls', '/select', '/editor', '/cards', '/tables', '/content', '/feedback', '/page', '/navigation', '/modals', '/popover', '/menu', '/overlays', '/app', '/theme-toggle', '/transitions', '/transitions/project']) {
 		const response = await page.goto(origin + route)
 		assert.equal(response.status(), 200, route)
 		assert.equal(await page.locator('main h1').count(), 1, route)
@@ -60,7 +60,7 @@ test('public UI documentation renders every guide, navigates, copies code and va
 	await page.getByRole('button', { name: 'Contenidos', exact: true }).click()
 	await navigation.getByRole('link', { name: 'Field e Input', exact: true }).click()
 	await page.getByRole('heading', { name: 'Field e Input', level: 1 }).waitFor()
-	assert.equal(await page.locator('dialog.meeko-ui-drawer:modal').count(), 0)
+	assert.equal(await page.locator('dialog:modal').count(), 0)
 	await page.getByRole('button', { name: 'Guardar nombre', exact: true }).click()
 	await page.getByRole('alert').filter({ hasText: 'Escribe un nombre.' }).waitFor()
 	assert.equal(await page.locator('#name').getAttribute('aria-invalid'), 'true')

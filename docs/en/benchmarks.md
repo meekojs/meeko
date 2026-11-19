@@ -1,8 +1,10 @@
 ---
-source-hash: 07450f7c4b4322af6aeaf8df4fd9be3ce13c7a78e3554f9b8efe9049faa82aa2
+source-hash: df23ff7315b4ca0902f24db08fd8e7896bf3d534283cde4fc8dd54109338b64b
 ---
 
 # Reproducible comparison: Meeko and Vue
+
+**Historical record:** the figures on this page come from local runs in October 2026 on the revisions identified below. They do not measure the current npm release (`1.9.0` as of November 5, 2026) or set a performance budget. To measure the current checkout, run the reproduction commands and retain the JSON with versions and revision.
 
 This test uses the same functional case in both engines: a server-rendered button with initial value `0`, computed value `doble`, hydration and a click that updates both values. The Meeko example is [`Counter.meeko`](../../packages/meeko/examples/counter/Counter.meeko); its Vue counterpart is in [`benchmarks/vue-counter.ts`](../../packages/meeko/benchmarks/vue-counter.ts). Vue uses a handwritten `render` function and its production runtime, without a browser template compiler. Meeko uses the module produced by its compiler. Visible text is checked before and after each click.
 

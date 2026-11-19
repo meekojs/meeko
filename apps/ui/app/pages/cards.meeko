@@ -99,6 +99,7 @@
 			bind:rows="[
 				{ name: 'title / description', type: 'string', description: 'Texto opcional de la cabecera.' },
 				{ name: 'variant', type: 'outline | soft | solid | elevated', default: 'outline', description: 'Variante visual; admite ui.defaults.card.' },
+				{ name: 'actionsWrap', type: 'inline | below | auto', default: 'inline', description: 'Dónde van las acciones; auto las baja en una card estrecha y admite ui.defaults.card.' },
 				{ name: 'class', type: 'string', description: 'Clases adicionales.' },
 			]"
 		/>
@@ -111,5 +112,67 @@
 			<code>footer</code>
 			son opcionales. El componente usa una sección con nombre accesible cuando se especifica un título.
 		</p>
+		<h2 id="actions">Acciones en la cabecera</h2>
+		<p>
+			El snippet
+			<code>actions</code>
+			va junto al título. Con
+			<code>actionsWrap="auto"</code>
+			las acciones bajan bajo el título cuando la card es estrecha, aunque la ventana sea ancha;
+			<code>below</code>
+			las pone siempre debajo e
+			<code>inline</code>, el valor por defecto, siempre al lado. Es CSS puro y el orden del DOM no cambia.
+		</p>
+		<UICard
+			title="Pedidos"
+			description="Los últimos 30 días."
+			actionsWrap="auto"
+			class="card-demo-actions"
+		>
+			<snippet name="actions">
+				<UIButton
+					variant="secondary"
+					size="sm"
+				>
+					Exportar
+				</UIButton>
+				<UIButton size="sm">Nuevo pedido</UIButton>
+			</snippet>
+			<p>Con espacio, las acciones quedan junto al título.</p>
+		</UICard>
+		<div class="docs-grid">
+			<UICard
+				title="Facturas"
+				description="Pendientes de cobro."
+				actionsWrap="auto"
+			>
+				<snippet name="actions">
+					<UIButton
+						variant="secondary"
+						size="sm"
+					>
+						Exportar
+					</UIButton>
+					<UIButton size="sm">Nuevo pedido</UIButton>
+				</snippet>
+				<p>Con auto, bajan bajo el título si la card se estrecha.</p>
+			</UICard>
+			<UICard
+				title="Clientes"
+				description="Altas de esta semana."
+				actionsWrap="below"
+			>
+				<snippet name="actions">
+					<UIButton
+						variant="secondary"
+						size="sm"
+					>
+						Exportar
+					</UIButton>
+					<UIButton size="sm">Nuevo pedido</UIButton>
+				</snippet>
+				<p>Con below, siempre bajo el título.</p>
+			</UICard>
+		</div>
 	</DocsPage>
 </template>

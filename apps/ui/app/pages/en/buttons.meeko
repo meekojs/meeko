@@ -2,6 +2,8 @@
 	import { englishExamples as examples } from '../../utils/examples.en'
 	const count = signal(0)
 	const actions = signal(0)
+	const iconClicks = signal(0)
+	const pinned = signal(false)
 </script>
 
 <template>
@@ -23,8 +25,7 @@
 		<p>
 			<code>UIButton</code>
 			renders the element that matches what it does, with the same look: with
-			<code>to</code>, a link to a route of the application that navigates without reloading; with
-			<code>href</code>, an
+			<code>to</code>, a link to a route of the application that navigates without reloading; with <code>href</code>, an
 			<code>&lt;a&gt;</code>
 			to any URL; with neither, a
 			<code>&lt;button type="button"&gt;</code>.
@@ -100,8 +101,7 @@
 			keeps the text, adds the spinner, announces
 			<code>aria-busy</code>
 			and blocks the action without taking its focus. With
-			<code>iconOnly</code>, the button is square: always name it with
-			<code>ariaLabel</code>.
+			<code>iconOnly</code>, the button is square: always name it with <code>ariaLabel</code>.
 		</p>
 		<DocsPreview>
 			<UIButton tone="danger">Delete</UIButton>
@@ -153,8 +153,136 @@
 		</p>
 		<p>
 			For a link with its own visual hierarchy and the defaults of
-			<code>ui.defaults.link</code>, use
-			<MeekoLink to="/links">UILink</MeekoLink>.
+			<code>ui.defaults.link</code>, use <MeekoLink to="/links">UILink</MeekoLink>.
 		</p>
+		<h2 id="icon-button">UIIconButton</h2>
+		<p>
+			An icon-only action with the three forms of
+			<code>UIButton</code>
+			(<code>to</code>,
+			<code>href</code>
+			or a button) and the same look, square and
+			<code>ghost</code>
+			by default.
+			<code>label</code>
+			is required: it is its accessible name and the text of its tooltip, which is not announced again as a description. The icon is
+			<code>icon</code>, the name of an icon of the package or the stroke of a 16 by 16 <code>&lt;path&gt;</code>, or your own
+			<code>&lt;svg aria-hidden="true"&gt;</code>
+			in the snippet. It is phrasing content: it fits inside a paragraph or a toolbar.
+		</p>
+		<DocsPreview id="icon-buttons">
+			<UIIconButton
+				id="icon-button-menu"
+				label="Open the menu"
+				icon="menu"
+			/>
+			<UIIconButton
+				label="Close"
+				icon="close"
+				variant="outline"
+			/>
+			<UIIconButton
+				label="Confirm"
+				icon="check"
+				variant="primary"
+				on:click="() => iconClicks.value++"
+			/>
+			<UIIconButton
+				label="Languages"
+				icon="globe"
+				variant="secondary"
+				shape="pill"
+			/>
+			<UIIconButton
+				label="See links"
+				icon="arrowEnd"
+				to="/links"
+			/>
+			<UIIconButton label="Delete">
+				<UIIcon name="lucide:trash-2" />
+			</UIIconButton>
+		</DocsPreview>
+		<p
+			id="icon-button-status"
+			role="status"
+		>
+			Confirmations: {iconClicks.value}
+		</p>
+		<DocsCode bind:code="examples.iconButton" />
+		<h3 id="icon-button-states">Toggle, danger, loading and sizes</h3>
+		<p>
+			With
+			<code>pressed</code>, a button is a toggle: it renders
+			<code>aria-pressed</code>
+			and the active look. A link does not take it.
+			<code>tooltip="false"</code>
+			removes the tooltip when the context already explains the action; the name is still
+			<code>label</code>.
+		</p>
+		<DocsPreview id="icon-button-states-preview">
+			<UIIconButton
+				id="icon-button-pin"
+				label="Pin the panel"
+				icon="check"
+				variant="outline"
+				bind:pressed="pinned.value"
+				on:click="() => (pinned.value = !pinned.value)"
+			/>
+			<UIIconButton
+				label="Remove"
+				icon="close"
+				tone="danger"
+			/>
+			<UIIconButton
+				label="Remove all"
+				icon="close"
+				tone="danger"
+				variant="primary"
+			/>
+			<UIIconButton
+				label="Saving"
+				icon="check"
+				variant="secondary"
+				bind:loading="true"
+			/>
+			<UIIconButton
+				label="Archive (unavailable)"
+				icon="check"
+				variant="secondary"
+				disabled
+			/>
+			<UIIconButton
+				label="Small"
+				icon="menu"
+				size="sm"
+			/>
+			<UIIconButton
+				label="Large"
+				icon="menu"
+				size="lg"
+			/>
+			<UIIconButton
+				label="No tooltip"
+				icon="menu"
+				bind:tooltip="false"
+			/>
+		</DocsPreview>
+		<DocsCode bind:code="examples.iconButtonStates" />
+		<DocsApi
+			caption="UIIconButton props"
+			bind:rows="[
+				{ name: 'label', type: 'string', description: 'Required. Accessible name and text of the tooltip.' },
+				{ name: 'icon', type: 'UIIconName | string', description: 'An icon of the package (close, menu, check, info…) or the d stroke of a 16 by 16 path. Without it, the default snippet.' },
+				{ name: 'tooltip', type: 'boolean', default: 'true', description: 'With false, no tooltip.' },
+				{ name: 'placement', type: 'PopoverPlacement', default: 'top', description: 'Where the tooltip opens.' },
+				{ name: 'pressed', type: 'boolean', description: 'Without to or href. A toggle: renders aria-pressed and the active look.' },
+				{ name: 'to / params / search / href / target / rel / download', type: 'as in UIButton', description: 'A route or a link.' },
+				{ name: 'type / disabled', type: 'button | submit | reset / boolean', default: 'button / false', description: 'Without to or href. The native button.' },
+				{ name: 'variant', type: 'primary | secondary | outline | ghost', default: 'ghost', description: 'Visual hierarchy.' },
+				{ name: 'size / shape / tone', type: 'sm | md | lg / rounded | pill / danger', default: 'md / rounded', description: 'Size, shape and destructive action.' },
+				{ name: 'loading', type: 'boolean', default: 'false', description: 'Swaps the icon for the spinner, announces aria-busy and blocks the action.' },
+				{ name: 'class / ui', type: 'string / { base, icon, tooltip }', description: 'Classes of the button and of its parts.' },
+			]"
+		/>
 	</DocsPage>
 </template>

@@ -1,16 +1,20 @@
 <script lang="ts">
-	// <UITableOfContents>: plain links. `scroll-target-group` paints the active one with no script where
-	// it exists; the observer below only keeps aria-current there, and is the paint everywhere else.
+	// <UITableOfContents>: plain links. The observer below keeps aria-current on the active one, which paints it
+	// in every browser (see tableOfContentsLink); `scroll-target-group` still lets the browser follow the target.
 	import { effect, signal } from '@meekojs/meeko'
 
 	import type { UITableOfContentsProps } from '../types/navigation'
 
+	import { uiTheme } from '../utils/defaults'
 	import { icons } from '../utils/icons'
 	import { uiMessages } from '../utils/messages'
 	import { followsLink } from '../utils/navigation'
+	import { tableOfContents, tableOfContentsLink, tableOfContentsTracking } from '../variants/navigation'
 	import * as Icon from './internal/Icon.meeko'
 
 	const props = defineProps<UITableOfContentsProps>({ variant: 'aside' })
+
+	const theme = uiTheme('tableOfContents', () => props)
 
 	const text = uiMessages().tableOfContents
 	const spied = signal<string | undefined>(undefined)
@@ -18,7 +22,16 @@
 	const panel = useElementRef('panel')
 
 	const activeId = (): string | undefined => props.active ?? spied.value
-	const nested = (level: number): number | undefined => (level > 2 ? level - 2 : undefined)
+	const classes = tableOfContents()
+	const tracking = (): 'auto' | 'manual' => (props.active === undefined ? 'auto' : 'manual')
+	/** Levels 3 and 4 are indented; deeper ones are not, as before. */
+	const nested = (level: number): 0 | 1 | 2 => (level === 3 ? 1 : level === 4 ? 2 : 0)
+	const linkClass = (level: number): string => classes.link({ class: [tableOfContentsLink({ nested: nested(level), tracking: tracking() }), theme.ui.link] })
+	// The <nav> is the root of the aside; in the collapsible view, the panel of its <details>.
+	const navClass = (): string =>
+		classes.base({
+			class: [tracking() === 'auto' ? tableOfContentsTracking : undefined, theme.ui.base, props.variant === 'aside' ? theme.class : classes.panel({ class: theme.ui.panel })],
+		})
 
 	function closeOnChoice(event: MouseEvent): void {
 		if (followsLink(event)) panel.value?.removeAttribute('open')
@@ -74,12 +87,11 @@
 	<nav
 		if:when="props.variant === 'aside' && props.entries.length"
 		data-pagefind-ignore
-		bind:class="['meeko-ui-toc', props.class].filter(Boolean).join(' ')"
+		bind:class="navClass()"
 		bind:aria-label="props.label ?? text.label"
-		bind:data-tracking="props.active === undefined ? 'auto' : 'manual'"
 	>
-		<p class="meeko-ui-toc-title">{props.label ?? text.label}</p>
-		<ul>
+		<p bind:class="classes.title({ class: theme.ui.title })">{props.label ?? text.label}</p>
+		<ul bind:class="classes.list({ class: theme.ui.list })">
 			<li
 				each:of="props.entries"
 				each:as="entry"
@@ -87,8 +99,8 @@
 			>
 				<a
 					bind:href="'#' + entry.id"
-					bind:data-nested="nested(entry.level)"
 					bind:aria-current="activeId() === entry.id ? 'location' : undefined"
+					bind:class="linkClass(entry.level)"
 				>
 					{entry.text}
 				</a>
@@ -99,22 +111,21 @@
 		ref:panel
 		if:when="props.variant === 'collapsible' && props.entries.length"
 		data-pagefind-ignore
-		bind:class="['meeko-ui-toc-collapsible', props.class].filter(Boolean).join(' ')"
+		bind:class="classes.collapsible({ class: [theme.ui.collapsible, theme.class] })"
 	>
-		<summary>
+		<summary bind:class="classes.summary({ class: theme.ui.summary })">
 			{props.label ?? text.label}
 			<Icon
-				class="meeko-ui-nav-chevron"
+				bind:class="classes.chevron({ class: theme.ui.chevron })"
 				bind:path="icons.chevron"
 			/>
 		</summary>
 		<nav
-			class="meeko-ui-toc"
 			bind:aria-label="props.label ?? text.label"
-			bind:data-tracking="props.active === undefined ? 'auto' : 'manual'"
+			bind:class="navClass()"
 			on:click="closeOnChoice"
 		>
-			<ul>
+			<ul bind:class="classes.list({ class: theme.ui.list })">
 				<li
 					each:of="props.entries"
 					each:as="entry"
@@ -122,8 +133,8 @@
 				>
 					<a
 						bind:href="'#' + entry.id"
-						bind:data-nested="nested(entry.level)"
 						bind:aria-current="activeId() === entry.id ? 'location' : undefined"
+						bind:class="linkClass(entry.level)"
 					>
 						{entry.text}
 					</a>

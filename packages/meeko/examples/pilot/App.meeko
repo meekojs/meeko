@@ -78,9 +78,7 @@
 			>
 			<a
 				href="/completed"
-				bind:aria-current="props.view === 'completed' ? 'page' : null"
-				>Terminadas</a
-			>
+				bind:aria-current="props.view === 'completed' ? 'page' : null">Terminadas</a>
 		</nav>
 		<div class="toolbar">
 			<form on:submit="addTask">
@@ -138,8 +136,6 @@
 		</ul>
 		<p
 			if:when="visibleTasks.value.length === 0"
-			class="empty"
-			>No hay tareas en esta vista.</p
-		>
+			class="empty">No hay tareas en esta vista.</p>
 	</section>
 </template>

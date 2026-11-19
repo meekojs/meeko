@@ -1,5 +1,6 @@
 /** Vite entry modules generated for a framework application. */
-export const clientEntrySource = `import { mountClientApp, type ClientComponent, type ClientRoute, type RouteMiddleware } from "@meekojs/meeko/framework";
+export const clientEntrySource = `import { mountClientApp, readHydrationDocument, type ClientComponent, type ClientRoute, type RouteMiddleware } from "@meekojs/meeko/framework";
+import { reportHydrationError } from "@meekojs/meeko/internal";
 import { modules as pages } from "virtual:meeko-client-pages";
 import { modules as clientRoutes } from "virtual:meeko-client-routes";
 import { documentConfig, errorPage, routes, viewTransitions } from "virtual:meeko-manifest/client";
@@ -21,23 +22,20 @@ const loadNamedMiddleware = async (file: string): Promise<RouteMiddleware> => {
   return routeMiddleware(file, await load());
 };
 
-// app/error.meeko joins the bundle even when no route falls back to it.
-const errorPages = import.meta.glob("/app/error.meeko");
-
 // Module stylesheets followed by the optional application stylesheet, processed by Vite/PostCSS.
 import "virtual:meeko-global-styles";
 
-const root = document.getElementById("app");
-const payload = document.getElementById("meeko-payload")?.textContent;
-if (!root || !payload) throw new Error("Missing Meeko SSR data");
+// The server's root and payload, not an element of the page content with the same id.
+const { root, payload } = readHydrationDocument(document);
 
 const hydrationStart = performance.now();
-await mountClientApp({
+// In meeko dev, a page that does not hydrate says so in the browser: console.error and Vite's overlay.
+const mounted = mountClientApp({
   root, payload, routes, errorPage, viewTransitions, serverData: true, loadMiddleware, loadNamedMiddleware, plugins,
   // The head that the server renders from meeko.config.ts and the modules; useHead and navigation update it.
   ...(documentConfig ? { document: documentConfig } : {}),
   async loadPage(file) {
-    const load = pages[file] ?? errorPages[file];
+    const load = pages[file];
     if (!load) throw new Error("Page module missing: " + file);
     return await load() as ClientComponent;
   },
@@ -49,6 +47,13 @@ await mountClientApp({
     return module.route ?? module.default ?? (module as ClientRoute);
   },
 });
+try {
+  await mounted;
+} catch (error) {
+  // The error still reaches the terminal of meeko dev; production builds drop this branch.
+  if (import.meta.env.DEV) reportHydrationError(error);
+  throw error;
+}
 performance.measure("meeko-hydration", { start: hydrationStart, end: performance.now() });
 `
 
@@ -157,4 +162,103 @@ export async function start() {
 }
 
 if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) await start();
+`
+
+/** Standalone fallback shared by SSR and browser navigation. */
+export const defaultErrorPageSource = `<script lang="ts">
+	import logo from "./meeko-logo.webp?no-inline"
+
+	const props = defineProps<{ status: number; message: string }>()
+</script>
+
+<template>
+	<main class="error" lang="en">
+		<div class="panel">
+			<div class="visual">
+				<img class="logo" bind:src="logo" alt="Meeko" width="96" height="96" />
+				<p class="status">{props.status}</p>
+			</div>
+			<h1>{props.status === 404 ? 'Page not found' : props.status >= 500 ? 'Something went wrong' : 'Request failed'}</h1>
+			<p class="detail">{props.status === 404 ? 'The page may have moved or the address may be incorrect.' : 'This page couldn’t load. You can return to the home page.'}</p>
+			<a href="/">Back to home</a>
+		</div>
+	</main>
+</template>
+
+<style scoped>
+	.error {
+		box-sizing: border-box;
+		display: grid;
+		min-height: 95vh;
+		place-items: center;
+		padding: 2rem 1rem;
+		font: 1rem/1.5 system-ui, sans-serif;
+		color: #fafafa;
+		background: #000;
+	}
+	.panel {
+		box-sizing: border-box;
+		width: min(100%, 34rem);
+		padding: clamp(1.75rem, 6vw, 3.5rem);
+		border: 1px solid #303030;
+		border-radius: 1.5rem;
+		background: #101010;
+		box-shadow: 0 1rem 3rem #ffffff08;
+	}
+	.visual {
+		display: flex;
+		align-items: center;
+		gap: clamp(.75rem, 4vw, 2rem);
+		margin-bottom: 1.5rem;
+	}
+	.logo {
+		display: block;
+		width: clamp(3.5rem, 15vw, 6rem);
+		height: auto;
+	}
+	@media (prefers-reduced-motion: no-preference) {
+		.logo {
+			animation: meeko-logo-float 2.4s ease-in-out 2;
+		}
+	}
+	@keyframes meeko-logo-float {
+		0%, 100% { transform: translateY(0) rotate(-4deg); }
+		50% { transform: translateY(-8px) rotate(4deg); }
+	}
+	.status {
+		margin: 0;
+		font-size: clamp(4rem, 12vw, 7rem);
+		font-weight: 800;
+		font-variant-numeric: tabular-nums;
+		line-height: .9;
+		letter-spacing: -.08em;
+		color: #f3eee7;
+	}
+	h1 {
+		margin: 0;
+		font-size: clamp(1.6rem, 5vw, 2.25rem);
+		line-height: 1.15;
+		letter-spacing: -.04em;
+	}
+	.detail {
+		margin: .75rem 0 1.5rem;
+		color: #b7b7b7;
+	}
+	a {
+		display: inline-block;
+		padding: .65rem 1rem;
+		border-radius: .6rem;
+		color: #111;
+		background: #f3eee7;
+		font-weight: 600;
+		text-decoration: none;
+	}
+	a:hover {
+		background: #ddd2c2;
+	}
+	a:focus-visible {
+		outline: 2px solid #f3eee7;
+		outline-offset: 4px;
+	}
+</style>
 `

@@ -3,7 +3,7 @@ import type { CompletionItem, Range } from 'vscode-languageserver/node'
 import ts from '@typescript/typescript6'
 import { CompletionItemKind, InsertTextFormat, MarkupKind } from 'vscode-languageserver/node'
 
-import { tagAt, templateRegion } from './embedded'
+import { nativeTagName, tagAt, templateRegion } from './embedded'
 import { attributeValueType, closedValues, htmlAttributeSource } from './html-data-source'
 
 // Completion of what goes inside the template's directives, from what the script declares:
@@ -54,6 +54,8 @@ export interface ValueSite {
 	readonly attribute?: string
 	readonly tag?: string
 	readonly component?: boolean
+	/** Whether the tag is SVG content, whose attributes are those of the SVG data. */
+	readonly svg?: boolean
 }
 
 /** The value or interpolation of the template that holds `offset`, if any. */
@@ -66,8 +68,9 @@ export function valueSiteAt(source: string, offset: number): ValueSite | undefin
 		const open = source.lastIndexOf('{', offset - 1)
 		if (open >= context.value.start && open > source.lastIndexOf('}', offset - 1)) return {}
 		// A static value (`variant="primary"`) is text: TypeScript completes its literals.
-		const expression = /^(?:(?:bind|on|model|if|each)(?::|$)|html$)/.test(context.value.attribute) || (context.tag === 'render' && context.value.attribute === 'snippet')
-		return expression ? { attribute: context.value.attribute, tag: context.tag, component: context.component } : undefined
+		const expression = /^(?:(?:bind|on|model|if|each)(?::|$)|else-if$|html$)/.test(context.value.attribute) || (context.tag === 'render' && context.value.attribute === 'snippet')
+		// The tag as the attribute data name it: `svg:a` inside `<svg>`.
+		return expression ? { attribute: context.value.attribute, tag: context.tag, component: context.component, svg: context.svg } : undefined
 	}
 	if (context) return undefined
 	const open = source.lastIndexOf('{', offset - 1)
@@ -200,7 +203,7 @@ function stringValueCompletion(input: TypedValueInput, literal: ts.StringLiteral
 	const { site, file } = input
 	if (!site.attribute?.startsWith('bind:') || site.component || !site.tag) return items
 	const info = htmlAttributeSource()
-		.attributes(site.tag)
+		.attributes(nativeTagName({ tag: site.tag, svg: site.svg === true }))
 		.find((candidate) => candidate.name === site.attribute!.slice(5))
 	const values = info?.values?.filter((value) => value !== '' && !items.some((item) => item.label === value)) ?? []
 	const start = literal.getStart(file) + 1
@@ -301,7 +304,7 @@ function fitFor(checker: ts.TypeChecker, site: ValueSite, expected: ts.Type | un
 			return !usable || checker.isTypeAssignableTo(type, usable) ? 0 : undefined
 		}
 	}
-	if (attribute === 'if:when') {
+	if (attribute === 'if' || attribute === 'else-if' || attribute === 'if:when') {
 		// A condition: a boolean first, then a value that may be missing (an optional snippet).
 		return (type) => {
 			if (callable(type)) return undefined
@@ -327,7 +330,7 @@ function fitFor(checker: ts.TypeChecker, site: ValueSite, expected: ts.Type | un
 	if (site.tag === 'render' && attribute === 'snippet') return () => undefined
 	if (attribute.startsWith('bind:') && !site.component && site.tag) {
 		const info = htmlAttributeSource()
-			.attributes(site.tag)
+			.attributes(nativeTagName({ tag: site.tag, svg: site.svg === true }))
 			.find((candidate) => candidate.name === attribute.slice(5))
 		if (info?.boolean) return (type) => scalarFit(type, ts.TypeFlags.BooleanLike)
 		const closed = info && closedValues(info)
@@ -336,8 +339,9 @@ function fitFor(checker: ts.TypeChecker, site: ValueSite, expected: ts.Type | un
 			return (type) => {
 				const { members } = parts(type)
 				if (!members.length) return undefined
-				// `true` writes the empty value (`hidden`, `popover`), when the attribute admits it.
-				if (members.every((member) => (member.isStringLiteral() && values.has(member.value)) || (values.has('') && member.flags & ts.TypeFlags.BooleanLike))) return 0
+				// A boolean writes `"true"` or `"false"` (`draggable`), and `true` the empty value of `hidden`.
+				const boolean = (values.has('true') && values.has('false')) || info.name === 'hidden'
+				if (members.every((member) => (member.isStringLiteral() && values.has(member.value)) || (boolean && member.flags & ts.TypeFlags.BooleanLike))) return 0
 				return members.every((member) => member.flags & ts.TypeFlags.StringLike) ? 1 : undefined
 			}
 		}
@@ -418,7 +422,7 @@ function literalItems(site: ValueSite, expected: ts.Type | undefined, range: Ran
 	let detail: string | undefined
 	if (site.attribute?.startsWith('bind:') && !site.component && site.tag) {
 		const info = htmlAttributeSource()
-			.attributes(site.tag)
+			.attributes(nativeTagName({ tag: site.tag, svg: site.svg === true }))
 			.find((candidate) => candidate.name === site.attribute!.slice(5))
 		if (info?.values?.length) {
 			values = info.values.filter((value) => value !== '')

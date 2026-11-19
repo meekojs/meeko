@@ -14,7 +14,7 @@ import { UnexposedRefError } from './app/runtime/element-refs'
 import { discoverAutoImports } from './autoimports/registry'
 import { applyAutoImports, compileWithAutoImports } from './autoimports/transform'
 import { aliasCandidates } from './compiler/aliases'
-import { closedAttributeValuesOf } from './compiler/attribute-values'
+import { attributeData, closedAttributeValuesOf, plainTagName } from './compiler/attribute-values'
 import { routeBlockTypeSource } from './compiler/codegen/route-block-types'
 import { pageRouteId } from './compiler/codegen/server-script'
 import { moduleSpecifiers, replaceModuleSpecifiers } from './compiler/import-graph'
@@ -23,6 +23,7 @@ import { compileError, locate, MeekoCompileError } from './compiler/parser/sfc'
 import { projectDeclarationFiles } from './compiler/project-declarations'
 import { projectRoot } from './compiler/project-root'
 import { resolveProjectAliases, resolveProjectAliasesSync } from './framework/aliases'
+import { readMeekoConfigSync } from './framework/config'
 import { modelPropName } from './shared/model-names'
 import { tscCommand } from './typescript-cli'
 
@@ -61,6 +62,24 @@ export interface CheckSourceOptions {
 	 * el proyecto ya tiene `.meeko/types`, los regenera antes.
 	 */
 	readonly withinProject?: boolean
+	/**
+	 * Modo de `MEEK122`: `"warn"` avisa de cada literal fuera de los valores de un atributo;
+	 * `"strict"` da además un error cuando un atributo con un conjunto cerrado de valores recibe un
+	 * tipo amplio como `string | null`. Por defecto, `check.attributeValues` de `meeko.config.*`,
+	 * leído sin ejecutar la configuración, y sin él `"warn"`.
+	 */
+	readonly attributeValues?: 'warn' | 'strict'
+}
+
+/** Whether a project checks attribute values in the strict mode: the option, or else `check.attributeValues` of its configuration. */
+function strictAttributeValues(root: string, options: CheckSourceOptions): boolean {
+	if (options.attributeValues) return options.attributeValues === 'strict'
+	try {
+		return readMeekoConfigSync(root).check?.attributeValues === 'strict'
+	} catch {
+		// A configuration that cannot be read is reported elsewhere; the default mode applies.
+		return false
+	}
 }
 
 /** The path aliases of a project, as `options` gives them or as `meeko check` (or the static reader) reads them. */
@@ -96,7 +115,7 @@ async function compileGraph(source: string, filename: string, options: CheckSour
 		const target = componentTarget(rootDirectory, original)
 		const registry = options.autoImports ? await options.autoImports(projectRoot(original)) : undefined
 		const aliases = await projectAliasesFor(projectRoot(original), options)
-		const compiled = await compileWithAutoImports(content, original, { typeCheck: true }, target, registry, aliases)
+		const compiled = await compileWithAutoImports(content, original, { typeCheck: true, strictAttributeValues: strictAttributeValues(projectRoot(original), options) }, target, registry, aliases)
 		const location = relative(rootDirectory, original)
 		// A module component can live outside the consumer project. Keep its temporary copy inside
 		// this check's nonce directory, or a second check/build will collide with the escaped file.
@@ -285,6 +304,12 @@ const untrustedHtmlType = /\bMEEK107: /
  */
 export const untrustedHtmlMessage = '`html` inserta HTML sin escapar; un `string` puede venir de un usuario (XSS). Sanéelo y márquelo con `trustHtml(…)`, o use `{expr}`, que escapa.'
 
+/**
+ * Message of the `MEEK107` warning for `bind:srcdoc` of an `<iframe>` (since 1.10): the document is
+ * HTML that runs its scripts unless `sandbox` stops them.
+ */
+export const untrustedSrcdocMessage = '`srcdoc` crea un documento con HTML sin escapar; un `string` puede venir de un usuario (XSS). Sanéelo o constrúyalo usted y márquelo con `trustHtml(…)`; si el documento no es de confianza, añada al iframe `sandbox` sin `allow-scripts` ni `allow-same-origin`.'
+
 /** The type error of `RequiredSnippetMessage` that `checkSnippetCondition` reports for `<snippet if:when>`. */
 const requiredSnippetType = /\bMEEK110: ([A-Za-z_$][\w$]*) /
 
@@ -296,17 +321,39 @@ export function requiredSnippetMessage(name: string): string {
 	return `if:when en <snippet name="${name}"> deja de pasar el snippet cuando la condición es falsa, pero el hijo declara ${name} como obligatorio. Decláralo opcional en el defineSnippets del hijo (${name}?: [...]) o quita if:when`
 }
 
-/** The type error of `AttributeLiteralCheck`: a literal outside the values of an attribute (MEEK122). */
-const attributeValueType = /"MEEK122: ([a-z][\w:.-]*) de <([^>]+)> no admite ese valor"/
+/**
+ * The type errors of `AttributeLiteralCheck` and `AttributeStrictCheck` (MEEK122): one text for each
+ * tag and each literal outside the values of an attribute, or the text of the strict mode.
+ */
+const attributeValueType = /"MEEK122: ([^\s"]+) de <([^>]+)> (?:no admite ((?:[^"\\]|\\.)*)|(exige un tipo cerrado))"/g
+
+/** What a MEEK122 type error says: the attribute, its tags, the invalid literals and whether it is the strict check. */
+function attributeValueFinding(message: string): { readonly name: string; readonly tags: readonly string[]; readonly invalid: readonly string[]; readonly strict: boolean } | undefined {
+	const matches = [...message.matchAll(attributeValueType)]
+	if (!matches.length) return undefined
+	const invalid = new Set<string>()
+	// TypeScript prints the literal inside a quoted property name: `\"` and `\\` are its escapes.
+	for (const match of matches) if (match[3] !== undefined) invalid.add(match[3].replace(/\\(.)/g, '$1'))
+	return { name: matches[0]![1]!, tags: [...new Set(matches.map((match) => match[2]!))], invalid: [...invalid], strict: matches.every((match) => match[4] !== undefined) }
+}
 
 /**
- * Message of the `MEEK122` warning, with the value and the values that the standard admits. A
- * warning in 1.x; it becomes an error in 2.0.
+ * Message of `MEEK122`. With `invalid`, the literals that the attribute does not admit, each one
+ * named, and the values that the standard admits: a warning in 1.x, an error in 2.0. Without them,
+ * the strict mode: the type of the value is wider than the closed set of the attribute.
  */
-export function attributeValueMessage(name: string, tags: readonly string[], value: string | undefined): string {
+export function attributeValueMessage(name: string, tags: readonly string[], invalid: readonly string[] = [], type?: string): string {
+	const names = tags.map(plainTagName)
+	const where = `${name} en <${names.join('> o <')}>`
+	if (tags.some((tag) => attributeData(tag, name)?.kind === 'id') && !closedAttributeValuesOf(tags, name)) {
+		return `${invalid.map((item) => JSON.stringify(item)).join(', ')} no es un ID válido para ${where}: admite el ID de un elemento, sin espacios y no vacío. Es un aviso en 1.x y será un error en 2.0`
+	}
 	const values = closedAttributeValuesOf(tags, name) ?? []
-	const shown = values.map((item) => (item === '' ? '""' : item)).join(', ')
-	return `${value === undefined ? 'Ese valor' : value} no es un valor de ${name} en <${tags.join('> o <')}>: admite ${shown}. Es un aviso en 1.x y será un error en 2.0`
+	const prefixes = [...new Set(tags.flatMap((tag) => attributeData(tag, name)?.prefixes ?? []))].map((prefix) => `${prefix}…`)
+	const shown = [...values.map((item) => (item === '' ? '""' : item)), ...prefixes].join(', ')
+	if (!invalid.length) return `${type === undefined ? 'El tipo de ese valor' : `El tipo ${type}`} es más amplio que los valores de ${where}: admite ${shown}, y null o undefined para omitirlo. Estrecha el tipo a esos valores; lo exige check.attributeValues: "strict"`
+	const quoted = invalid.map((item) => JSON.stringify(item))
+	return `${quoted.join(', ')} no ${quoted.length > 1 ? 'son valores' : 'es un valor'} de ${where}: admite ${shown}. Es un aviso en 1.x y será un error en 2.0`
 }
 
 /**
@@ -496,14 +543,15 @@ export async function checkSource(source: string, filename: string, options: Che
 				if (requiredSnippet) {
 					return { code: 'MEEK110', message: requiredSnippetMessage(requiredSnippet[1]!), filename: entry.original, location: locate(entry.source, offset ?? 0) }
 				}
-				const attributeValue = attributeValueType.exec(diagnostic.message)
+				const attributeValue = attributeValueFinding(diagnostic.message)
 				if (attributeValue) {
-					const tags = [...diagnostic.message.matchAll(/"MEEK122: [^ ]+ de <([^>]+)> no admite ese valor"/g)].map((match) => match[1]!)
-					const value = /Argument of type '([^']*)'/.exec(diagnostic.message)?.[1]
-					return { code: 'MEEK122', message: attributeValueMessage(attributeValue[1]!, [...new Set(tags)], value), filename: entry.original, location: locate(entry.source, offset ?? 0), severity: 'warning' }
+					const type = /(?:Argument of type|Type) '(.*?)' is not assignable/.exec(diagnostic.message)?.[1]
+					const message = attributeValueMessage(attributeValue.name, attributeValue.tags, attributeValue.invalid, type)
+					// The strict mode is an error; a literal outside the values stays a warning in 1.x.
+					return { code: 'MEEK122', message, filename: entry.original, location: locate(entry.source, offset ?? 0), ...(attributeValue.strict ? {} : { severity: 'warning' as const }) }
 				}
 				if (untrustedHtmlType.test(diagnostic.message)) {
-					return { code: 'MEEK107', message: untrustedHtmlMessage, filename: entry.original, location: locate(entry.source, offset ?? 0), severity: 'warning' }
+					return { code: 'MEEK107', message: /\bMEEK107: srcdoc /.test(diagnostic.message) ? untrustedSrcdocMessage : untrustedHtmlMessage, filename: entry.original, location: locate(entry.source, offset ?? 0), severity: 'warning' }
 				}
 				const meekType = meekTypeText.exec(diagnostic.message)
 				if (meekType) {

@@ -6,6 +6,21 @@
 	const notifications = signal(true)
 	const period = signal('week')
 	const volume = signal(40)
+	const days = signal('30')
+	const dayOptions = [
+		{ value: '7', label: '7 days' },
+		{ value: '30', label: '30 days' },
+		{ value: '90', label: '90 days' },
+	]
+	const range = signal('month')
+	const ranges = [
+		{ value: 'today', label: 'Today' },
+		{ value: 'week', label: 'This week' },
+		{ value: 'month', label: 'This month' },
+		{ value: 'quarter', label: 'This quarter' },
+		{ value: 'year', label: 'This year' },
+		{ value: 'all', label: 'All time' },
+	]
 	const periods = [
 		{ value: 'day', label: 'Day' },
 		{ value: 'week', label: 'Week' },
@@ -18,7 +33,7 @@
 	<DocsPage
 		locale="en"
 		title="Form controls"
-		description="Textarea, Checkbox, RadioGroup, Switch and Slider: native HTML, with its keyboard and submission, and the look of UI."
+		description="Textarea, Checkbox, RadioGroup, SegmentedControl, Switch and Slider: native HTML, with its keyboard and submission, and the look of UI."
 	>
 		<p>
 			They all keep the native control, so the keyboard, the focus and form submission are those of the browser, also without JavaScript. Their models bind to a signal:
@@ -68,8 +83,7 @@
 		<p>
 			<code>UISwitch</code>
 			has the same contract as
-			<code>UICheckbox</code>, with
-			<code>role="switch"</code>: use it for something that applies at once.
+			<code>UICheckbox</code>, with <code>role="switch"</code>: use it for something that applies at once.
 		</p>
 		<DocsPreview layout="stack">
 			<UICheckbox
@@ -142,6 +156,71 @@
 				{ name: 'class', type: 'string', description: 'Additional classes.' },
 			]"
 		/>
+		<h2 id="segmented">UISegmentedControl</h2>
+		<p>
+			A compact single choice, such as the period of a chart: the same native radios as
+			<code>UIRadioGroup</code>
+			with the look of a segmented control, so the arrows, form submission and
+			<code>required</code>
+			also work without JavaScript. Its total height is the one of a control of its size,
+			<code>sm</code>
+			or
+			<code>md</code>, and it lines up with a
+			<code>UIButton</code>
+			next to it.
+		</p>
+		<p>
+			It needs a name:
+			<code>legend</code>, which
+			<code>hideLegend</code>
+			leaves to screen readers only, or
+			<code>ariaLabel</code>. When the options do not fit, the control scrolls sideways inside its own width: no option breaks and the page does not get wider.
+		</p>
+		<DocsPreview layout="stack">
+			<UISegmentedControl
+				legend="Chart period"
+				hideLegend
+				size="sm"
+				name="days"
+				model="days"
+				bind:options="dayOptions"
+			/>
+			<p
+				id="segmented-status"
+				class="docs-status"
+				role="status"
+			>
+				Showing the last {days.value} days.
+			</p>
+			<UISegmentedControl
+				legend="Range"
+				name="range"
+				model="range"
+				bind:options="ranges"
+			/>
+		</DocsPreview>
+		<DocsCode bind:code="examples.segmented" />
+		<p>
+			<code>UIRadioGroup variant="segmented"</code>
+			is still available and wraps into several lines when it does not fit; for a compact switcher, use
+			<code>UISegmentedControl</code>. Its
+			<code>size</code>
+			takes an application value in
+			<code>ui.defaults.segmentedControl</code>.
+		</p>
+		<DocsApi
+			caption="UISegmentedControl props"
+			bind:rows="[
+				{ name: 'model', type: 'Signal<string>', description: 'Chosen value, two-way.' },
+				{ name: 'options', type: 'readonly UIRadioOption[]', description: 'Required. value, label and disabled.' },
+				{ name: 'legend', type: 'string', description: 'Name of the group, in its legend. Required without ariaLabel.' },
+				{ name: 'hideLegend', type: 'boolean', default: 'false', description: 'The legend for screen readers only.' },
+				{ name: 'ariaLabel', type: 'string', description: 'Name of the group without a legend, instead of legend.' },
+				{ name: 'size', type: 'sm | md', default: 'md', description: 'Height and text, those of a control of that size.' },
+				{ name: 'name / required / disabled', type: 'string / boolean', description: 'Native submission and state.' },
+				{ name: 'class / ui', type: 'string / object', description: 'Classes of the fieldset and of base, legend, options, option and input.' },
+			]"
+		/>
 		<h2 id="slider">UISlider</h2>
 		<p>
 			An
@@ -179,10 +258,8 @@
 		/>
 		<p>
 			The types
-			<code>UITextareaProps</code>,
-			<code>UICheckboxProps</code>,
-			<code>UISwitchProps</code>,
-			<code>UIRadioGroupProps</code>
+			<code>UITextareaProps</code>, <code>UICheckboxProps</code>, <code>UISwitchProps</code>, <code>UIRadioGroupProps</code>,
+			<code>UISegmentedControlProps</code>
 			and
 			<code>UISliderProps</code>
 			are exported from

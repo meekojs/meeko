@@ -1,6 +1,12 @@
 <script lang="ts">
 	import { examples } from '../utils/examples'
 
+	const revenue = [8.2, 9.1, 8.7, 10.4, 11.2, 10.9, 12.4]
+	const latency = [210, 205, 198, 201, 190, 186, 180]
+	const errors = [0.5, 0.3, 0.4, 0.6, 0.4, 0.4, 0.4]
+	const orders = [348, 341, 352, 330, 336, 325, 320]
+	const conversion = [2.6, 2.7, 2.6, 2.8, 2.9, 3, 3.1]
+
 	const details = [
 		{ label: 'Estado', value: 'Publicado', detail: 'Hoy' },
 		{ label: 'Autor', value: 'Equipo Meeko' },
@@ -11,7 +17,7 @@
 <template>
 	<DocsPage
 		title="Datos y contenido"
-		description="Stat, DescriptionList, Disclosure, Diff, CodeBlock y Prose: cifras, detalles, cambios, código y texto largo."
+		description="Stat, Sparkline, DescriptionList, Disclosure, Diff, CodeBlock y Prose: cifras, detalles, cambios, código y texto largo."
 	>
 		<h2 id="stat">UIStat y UIDescriptionList</h2>
 		<p>
@@ -58,6 +64,112 @@
 				{ name: 'class', type: 'string', description: 'Clases adicionales.' },
 			]"
 		/>
+		<h2 id="kpi">UIStat como cifra clave y UISparkline</h2>
+		<p>
+			Con
+			<code>change</code>, UIStat suma la variación con su flecha y su tono (la subida es buena salvo con <code>good="down"</code>), el periodo, un sparkline con
+			<code>trend</code>
+			y un enlace al detalle con
+			<code>to</code>
+			o
+			<code>href</code>. Por debajo de 20rem de ancho de la propia cifra, no de la ventana, el sparkline baja y el valor se reduce.
+		</p>
+		<DocsPreview layout="stack">
+			<div
+				id="kpi-wide"
+				class="docs-grid"
+				style="inline-size: 100%"
+			>
+				<UIStat
+					label="Ingresos"
+					value="12 400 €"
+					period="frente a los 30 días anteriores"
+					to="/tables"
+					bind:change="12.5"
+					bind:trend="revenue"
+				/>
+				<UIStat
+					label="Tiempo de respuesta"
+					value="180 ms"
+					good="down"
+					period="frente a la semana anterior"
+					bind:change="-8"
+					bind:trend="latency"
+				/>
+				<UIStat
+					label="Tasa de error"
+					value="0,4 %"
+					period="frente a ayer"
+					bind:change="0"
+					bind:trend="errors"
+				/>
+			</div>
+			<div
+				id="kpi-compact"
+				style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: var(--ui-space-4); inline-size: 100%"
+			>
+				<UIStat
+					label="Pedidos"
+					change="−8 pedidos"
+					period="este mes"
+					bind:value="320"
+					bind:trend="orders"
+				/>
+				<UIStat
+					label="Conversión"
+					value="3,1 %"
+					changeFormat="number"
+					period="puntos"
+					bind:change="0.4"
+					bind:trend="conversion"
+				/>
+				<UIStat
+					label="Altas"
+					href="https://github.com/meekojs/meeko"
+					linkLabel="Ver las altas"
+					bind:value="48"
+					bind:change="-3"
+				/>
+			</div>
+			<div
+				id="sparkline-visits"
+				style="inline-size: 100%; max-inline-size: 20rem"
+			>
+				<p>Visitas de la semana</p>
+				<UISparkline
+					area
+					tone="accent"
+					bind:values="[1200, 1350, 1280, 1500, 1720, 1610, 1890]"
+				/>
+			</div>
+		</DocsPreview>
+		<DocsCode bind:code="examples.kpi" />
+		<DocsApi
+			caption="Propiedades de cifra clave de UIStat"
+			bind:rows="[
+				{ name: 'change', type: 'number | string', description: 'Variación. Un número se formatea en el idioma del documento, con signo; un texto se pinta tal cual y su signo da la dirección.' },
+				{ name: 'changeFormat', type: `'percent' | 'number'`, default: `'percent'`, description: 'Cómo se formatea un change numérico: 12.5 es 12,5 % o 12,5.' },
+				{ name: 'changeDirection', type: `'up' | 'down' | 'flat'`, description: 'Dirección cuando el signo no la dice.' },
+				{ name: 'good', type: `'up' | 'down'`, default: `'up'`, description: 'Qué dirección es buena: da el tono de éxito o de peligro.' },
+				{ name: 'period', type: 'string', description: 'Periodo de la comparación, tras la variación.' },
+				{ name: 'trend', type: 'readonly number[]', description: 'Serie de un UISparkline junto al valor.' },
+				{ name: 'trendLabel', type: 'string', description: 'Nombre accesible del sparkline; por defecto, mínimo, máximo y último.' },
+				{ name: 'to / href', type: 'UIRouteTarget | string', description: 'Enlace al detalle, con su propio texto: no toda la cifra.' },
+				{ name: 'linkLabel', type: 'string', default: `'Ver detalle'`, description: 'Texto del enlace; el de por defecto añade la etiqueta a su nombre accesible.' },
+			]"
+		/>
+		<DocsApi
+			caption="Propiedades de UISparkline"
+			bind:rows="[
+				{ name: 'values', type: 'readonly number[]', description: 'Obligatoria. La serie, de la más antigua a la más reciente.' },
+				{ name: 'area', type: 'boolean', default: 'false', description: 'Rellena el área bajo la línea.' },
+				{ name: 'tone', type: `'neutral' | 'accent' | 'info' | 'success' | 'warning' | 'danger'`, description: 'Color de la línea; sin él, currentColor.' },
+				{ name: 'min / max', type: 'number', description: 'Límites del eje vertical; por defecto, los de la serie.' },
+				{ name: 'label', type: 'string', description: 'Nombre accesible; por defecto, mínimo, máximo y último.' },
+				{ name: 'format', type: 'Intl.NumberFormatOptions', description: 'Formato de los números del resumen.' },
+				{ name: 'class', type: 'string', description: 'Clases adicionales del svg.' },
+			]"
+		/>
 		<h2 id="disclosure">UIDisclosure</h2>
 		<p>
 			Un
@@ -82,10 +194,7 @@
 			Recibe un diff unificado y marca cada línea con
 			<code>data-kind</code>
 			(<code>add</code>,
-			<code>remove</code>,
-			<code>hunk</code>,
-			<code>file</code>,
-			<code>context</code>) y un texto para lectores de pantalla: el color no es el único significado.
+			<code>remove</code>, <code>hunk</code>, <code>file</code>, <code>context</code>) y un texto para lectores de pantalla: el color no es el único significado.
 		</p>
 		<UIDiff
 			label="Cambios en la guía"
@@ -111,8 +220,7 @@
 			ya resaltado (Shiki con
 			<code>--shiki-light</code>
 			y
-			<code>--shiki-dark</code>) y en
-			<code>code</code>, lo que se copia.
+			<code>--shiki-dark</code>) y en <code>code</code>, lo que se copia.
 			<code>mode="log"</code>
 			usa
 			<code>role="log"</code>
@@ -185,10 +293,7 @@ build: listo en 1,2 s"
 		<DocsCode bind:code="examples.codeBlock" />
 		<p>
 			Los tipos
-			<code>UIStatProps</code>,
-			<code>UIDescriptionListProps</code>,
-			<code>UIDisclosureProps</code>,
-			<code>UIDiffProps</code>,
+			<code>UIStatProps</code>, <code>UIDescriptionListProps</code>, <code>UIDisclosureProps</code>, <code>UIDiffProps</code>,
 			<code>UICodeBlockProps</code>
 			y
 			<code>UIProseProps</code>

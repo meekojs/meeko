@@ -41,11 +41,7 @@
 		/>
 		<p>
 			Its snippets are
-			<code>default</code>,
-			<code>header</code>,
-			<code>notices</code>,
-			<code>bar</code>,
-			<code>sidebar</code>,
+			<code>default</code>, <code>header</code>, <code>notices</code>, <code>bar</code>, <code>sidebar</code>,
 			<code>aside</code>
 			and
 			<code>footer</code>.
@@ -77,8 +73,7 @@
 		<h2 id="header">UIHeader and UIFooter</h2>
 		<p>
 			The header has a fixed height,
-			<code>--ui-header-height</code>. On narrow screens its links move to a menu with
-			<code>popover</code>, which floats and does not move the page. A
+			<code>--ui-header-height</code>. On narrow screens its links move to a menu with <code>popover</code>, which floats and does not move the page. A
 			<code>brand</code>
 			image declares
 			<code>width</code>
@@ -125,8 +120,7 @@
 		/>
 		<p>
 			It accepts the
-			<code>brand</code>,
-			<code>nav</code>,
+			<code>brand</code>, <code>nav</code>,
 			<code>actions</code>
 			and
 			<code>menu</code>
@@ -145,15 +139,12 @@
 		/>
 		<p>
 			It accepts the
-			<code>brand</code>,
-			<code>about</code>,
+			<code>brand</code>, <code>about</code>,
 			<code>actions</code>
 			and
 			<code>legal</code>
 			snippets. The types
-			<code>UIPageProps</code>,
-			<code>UIPageHeaderProps</code>,
-			<code>UIHeaderProps</code>,
+			<code>UIPageProps</code>, <code>UIPageHeaderProps</code>, <code>UIHeaderProps</code>,
 			<code>UIFooterProps</code>
 			and
 			<code>UIBrand</code>

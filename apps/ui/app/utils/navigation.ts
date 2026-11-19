@@ -30,7 +30,7 @@ export const navigation = [
 		en: { title: 'Forms' },
 		items: [
 			{ label: 'Field e Input', href: '/forms', description: 'Formularios, modelos y errores', en: { label: 'Field and Input', description: 'Forms, models and errors' } },
-			{ label: 'Controles de formulario', href: '/controls', description: 'Textarea, Checkbox, RadioGroup, Switch y Slider', en: { label: 'Form controls', description: 'Textarea, Checkbox, RadioGroup, Switch and Slider' } },
+			{ label: 'Controles de formulario', href: '/controls', description: 'Textarea, Checkbox, RadioGroup, SegmentedControl, Switch y Slider', en: { label: 'Form controls', description: 'Textarea, Checkbox, RadioGroup, SegmentedControl, Switch and Slider' } },
 			{ label: 'Select', href: '/select', description: 'Select nativo y Combobox con búsqueda y selección múltiple', en: { label: 'Select', description: 'Native Select and Combobox with search and multiple selection' } },
 			{ label: 'Editor de Markdown', href: '/editor', description: 'Edición visual y de código con Crepe', en: { label: 'Markdown editor', description: 'Visual and code editing with Crepe' } },
 		],
@@ -41,7 +41,7 @@ export const navigation = [
 		items: [
 			{ label: 'Card', href: '/cards', description: 'Contenedores y snippets', en: { label: 'Card', description: 'Containers and snippets' } },
 			{ label: 'Table', href: '/tables', description: 'Filas y columnas tipadas', en: { label: 'Table', description: 'Typed rows and columns' } },
-			{ label: 'Datos y contenido', href: '/content', description: 'Stat, DescriptionList, Disclosure, Diff, CodeBlock y Prose', en: { label: 'Data and content', description: 'Stat, DescriptionList, Disclosure, Diff, CodeBlock and Prose' } },
+			{ label: 'Datos y contenido', href: '/content', description: 'Stat, Sparkline, DescriptionList, Disclosure, Diff, CodeBlock y Prose', en: { label: 'Data and content', description: 'Stat, Sparkline, DescriptionList, Disclosure, Diff, CodeBlock and Prose' } },
 			{ label: 'Avisos', href: '/feedback', description: 'Alert, Toast, Empty y Skeleton', en: { label: 'Feedback', description: 'Alert, Toast, Empty and Skeleton' } },
 		],
 	},
@@ -53,6 +53,7 @@ export const navigation = [
 			{ label: 'Navegación', href: '/navigation', description: 'Árbol, pestañas, migas, paginación, índice e idioma', en: { label: 'Navigation', description: 'Tree, tabs, breadcrumb, pagination, contents and language' } },
 			{ label: 'Modal', href: '/modals', description: 'Diálogos, resultados y pilas anidadas', en: { label: 'Modal', description: 'Dialogs, results and nested stacks' } },
 			{ label: 'Popover', href: '/popover', description: 'Menús, diálogos ligeros y tooltips anclados', en: { label: 'Popover', description: 'Menus, lightweight dialogs and anchored tooltips' } },
+			{ label: 'Menu', href: '/menu', description: 'Menú de acciones con teclado completo', en: { label: 'Menu', description: 'Action menu with full keyboard support' } },
 			{ label: 'Superposiciones', href: '/overlays', description: 'Drawer, Tooltip y CommandPalette', en: { label: 'Overlays', description: 'Drawer, Tooltip and CommandPalette' } },
 			{ label: 'View Transitions', href: '/transitions', description: 'Navegación y superficies compartidas', en: { label: 'View Transitions', description: 'Navigation and shared surfaces' } },
 		],

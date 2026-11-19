@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { examples } from '../../utils/examples'
 </script>
+
 <template>
 	<DocsPage
 		title="View Transitions"

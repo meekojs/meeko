@@ -10,9 +10,9 @@
 		"types": "node scripts/protocol-types.mjs --write"
 	},
 	"devDependencies": {
-		"@typescript/typescript6": "6.0.2",
-		"playwright-core": "1.64.1",
-		"typescript": "7.0.2",
-		"vite": "8.3.5"
+		"@typescript/typescript6": "catalog:",
+		"playwright-core": "catalog:",
+		"typescript": "catalog:",
+		"vite": "catalog:"
 	}
 }

@@ -1,6 +1,8 @@
 import type { ReadonlySignal, Signal } from '@meekojs/meeko'
 
+import type { select } from '../variants/select'
 import type { PopoverPlacement } from './popover'
+import type { UIVariantSlots } from './theme'
 
 /**
  * Valor del modelo de `<UISelect>`: la opción elegida o `null`. Se infiere del tipo de `options`.
@@ -131,14 +133,15 @@ type OnlyInCombobox<Prop extends string> = `UISelect es un <select> nativo y no 
  * Props de la etiqueta propia `<UISelect>`, un `<select>` nativo con `appearance: base-select`: el
  * navegador trae su lista, su teclado y su valor de formulario. `T` es el tipo de cada opción y se infiere
  * de la etiqueta. Para buscar, filtrar en un servidor o elegir varias opciones, usa `<UICombobox>`: esas
- * props aquí son un error de tipos. Se autoimporta en `app/`.
+ * props aquí son un error de tipos. `ui` añade clases a sus partes: `base` (la raíz), `trigger` (el
+ * `<select>`), `value`, `groupLabel` y `clear`. Se autoimporta en `app/`.
  * @since 1.8.0
  * @example
  * ```html
  * <UISelect model="color" bind:options="colors" placeholder="Elige un color" name="color" />
  * ```
  */
-export interface UISelectProps<T> extends SelectBaseProps<T> {
+export interface UISelectProps<T> extends SelectBaseProps<T>, UIVariantSlots<typeof select> {
 	/** El campo de `useForm` (`form.field('x')`): su `id`, su `name`, su valor, `aria-invalid` y `aria-describedby`. */
 	readonly field?: SelectField<SelectModel<T>>
 	/** No existe aquí: usa `<UICombobox multiple>`. */

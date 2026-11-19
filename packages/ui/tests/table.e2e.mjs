@@ -78,7 +78,7 @@ test('UITable keeps sections, reactive rows and accessible table semantics in na
 	const byColumn = page.getByRole('table', { name: 'Estado por proyecto', exact: true })
 	assert.equal(await byColumn.locator('thead th abbr').innerText(), 'Proyecto', 'header-name replaces the label of its column only')
 	assert.equal(await byColumn.locator('thead th').nth(1).innerText(), 'Tipo')
-	assert.equal(await byColumn.locator('tbody tr').first().locator('td').last().locator('.meeko-ui-badge, [data-tone]').first().innerText(), 'Publicado', 'cell-status wins over the column formatter')
+	assert.equal(await byColumn.locator('tbody tr').first().locator('td').last().locator('span').first().innerText(), 'Publicado', 'cell-status, a badge, wins over the column formatter')
 	await until(
 		async () => (await byColumn.locator('tbody tr').count()) === 4 && (await byColumn.locator('tbody tr').last().locator('td').last().innerText()).trim() === 'Borrador',
 		() => 'Column snippet did not render the added row',
@@ -116,7 +116,7 @@ test('UITable keeps sections, reactive rows and accessible table semantics in na
 	await page.setViewportSize({ width: 390, height: 844 })
 	assert.equal(await page.evaluate(() => globalThis.document.documentElement.scrollWidth <= globalThis.innerWidth), true, 'overflow stays inside the table')
 	// A name is never cut at 390 px: a long type breaks at its spaces, and the table scrolls before that.
-	const cutNames = await page.evaluate(() => [...globalThis.document.querySelectorAll('.meeko-ui-table code')].filter((code) => !/\s/.test(code.textContent.trim()) && code.getClientRects().length > 1).map((code) => code.textContent))
+	const cutNames = await page.evaluate(() => [...globalThis.document.querySelectorAll('table[role="table"] code')].filter((code) => !/\s/.test(code.textContent.trim()) && code.getClientRects().length > 1).map((code) => code.textContent))
 	assert.deepEqual(cutNames, [], 'code without spaces stays on one line')
 	// The code shows the characters that were written, not the ligatures of the system mono.
 	assert.equal(

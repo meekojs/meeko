@@ -1,5 +1,7 @@
 # Actualizar de 1.2 a 1.3
 
+**Origen:** 1.2.x. **Destino:** 1.3.0. **Estado:** publicado en npm; la versión más reciente consultada el 5 de noviembre de 2026 es 1.9.0. **Quién actúa:** quien mantenga una aplicación que actualiza desde 1.2.x a 1.3.0.
+
 `1.3` es un minor: lo nuevo (el adaptador `static`, `site`, `sitemap`, `robots`, `document.seo`, la CSP con hashes, `trustHtml`, `isClientError`, `imports.appDirs` e `imports.sharedDirs`, el completado de clases CSS en el editor, el orden de clases con Prettier…) es opcional. Un cambio, sólo de tipos, se publica como [excepción aprobada](stability.md#excepciones-aprobadas) a la política de estabilidad: las declaraciones de `@meekojs/meeko/postcss` tipadas con csstype. Además, algunos cambios se notan al actualizar: diagnósticos nuevos, la salida del formato de Prettier, el tratamiento de los fallos globales en el navegador y en el servidor, y los logs del servidor en la consola del navegador durante `meeko dev`. Esta guía los reúne con lo que conviene revisar en cada uno. La lista completa, con lo añadido y corregido, está en el [CHANGELOG](../packages/meeko/CHANGELOG.md); los compromisos de compatibilidad, en la [política de estabilidad](stability.md).
 
 ## Orden recomendado

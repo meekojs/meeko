@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
-import { mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { readdir, readFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
+
+import { createFixture } from '../../../scripts/test-support/fixture.ts'
 
 const packageRoot = fileURLToPath(new URL('..', import.meta.url))
 const cli = fileURLToPath(new URL('./cli.js', import.meta.resolve('@meekojs/meeko')))
@@ -12,18 +14,9 @@ const cli = fileURLToPath(new URL('./cli.js', import.meta.resolve('@meekojs/meek
 /** A consumer project with @meekojs/icon linked and Lucide as a dependency (resolved from this package). */
 async function consumer(context) {
 	const temporary = join(packageRoot, '.meeko', 'tests')
-	await mkdir(temporary, { recursive: true })
-	const root = await mkdtemp(join(temporary, 'consumer-'))
-	context.after(() => rm(root, { recursive: true, force: true }))
-	const put = async (path, contents) => {
-		const file = join(root, path)
-		await mkdir(dirname(file), { recursive: true })
-		await writeFile(file, contents)
-	}
+	const { root, write: put } = await createFixture(context, temporary, 'consumer-', { links: { '@meekojs/icon': packageRoot } })
 	const run = (command) => promisify(execFile)(process.execPath, [cli, command, root], { cwd: packageRoot, windowsHide: true, maxBuffer: 1 << 26, env: { ...process.env, NODE_OPTIONS: '--max-old-space-size=8192' } })
 	await put('package.json', JSON.stringify({ type: 'module', private: true, devDependencies: { '@iconify-json/lucide': '*', '@meekojs/icon': '*' } }))
-	await mkdir(join(root, 'node_modules', '@meekojs'), { recursive: true })
-	await symlink(packageRoot, join(root, 'node_modules', '@meekojs', 'icon'), 'junction')
 	return { put, root, run }
 }
 
@@ -60,6 +53,15 @@ test('meeko check types icon names in templates and in icon.include, and reports
 	await put('app/pages/index.meeko', '<template><p>Sin iconos</p></template>\n')
 	await run('check')
 	await assert.rejects(readFile(join(generated, 'names-lucide.d.ts')), { code: 'ENOENT' })
+})
+
+test('icon.componentName changes the autoimported component name', { timeout: 240_000 }, async (context) => {
+	const { put, run } = await consumer(context)
+	await put('meeko.config.ts', config(`{ collections: ['lucide'], componentName: 'Glyph' }`))
+	await put('app/pages/index.meeko', '<template><Glyph name="lucide:search" /></template>\n')
+	await run('check')
+	await put('app/pages/index.meeko', '<template><UIIcon name="lucide:search" /></template>\n')
+	await assert.rejects(run('check'), /TS2304: Cannot find name 'UIIcon'/)
 })
 
 test('meeko build embeds the SVG at build time, accessible and without inline styles, and bundles only the icons used', { timeout: 240_000 }, async (context) => {

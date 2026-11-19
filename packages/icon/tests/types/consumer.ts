@@ -30,12 +30,14 @@ const include: IconInclude[] = ['lucide:search', 'lucide:*', 'local:logo']
 const wrongInclude: IconInclude[] = ['lucide:serch']
 
 // The `icon` key of meeko.config.ts, from the module's augmentation of MeekoConfig.
-const config: MeekoConfig = { modules: ['@meekojs/icon'], icon: { collections: ['lucide'], include: ['lucide:search'], local: 'app/icons', size: '1.25em' } }
+const config: MeekoConfig = { modules: ['@meekojs/icon'], icon: { collections: ['lucide'], componentName: 'AppIcon', include: ['lucide:search'], local: 'app/icons', size: '1.25em' } }
 // @ts-expect-error An unknown option of the key.
 const unknownOption: MeekoConfig = { icon: { colections: ['lucide'] } }
 // @ts-expect-error size is a string.
 const wrongSize: IconModuleOptions = { size: 20 }
+// @ts-expect-error The component name is a string.
+const wrongComponentName: IconModuleOptions = { componentName: false }
 // @ts-expect-error include entries are checked in the configuration.
 const wrongConfigInclude: MeekoConfig = { icon: { include: ['lucide:nope'] } }
 
-export { config, include, logo, loose, props, search, typo, unknownOption, wrongConfigInclude, wrongInclude, wrongProps, wrongSize }
+export { config, include, logo, loose, props, search, typo, unknownOption, wrongComponentName, wrongConfigInclude, wrongInclude, wrongProps, wrongSize }

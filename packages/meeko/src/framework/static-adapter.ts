@@ -169,14 +169,17 @@ export interface StaticOutputOptions {
 	/** The Node server that rendered the pages, relative to the project. */
 	readonly nodeServer: string
 	readonly config: StaticConfig | undefined
-	/** Whether the app has app/error.meeko, the source of 404.html. */
+	/**
+	 * Whether the app has app/error.meeko, the source of 404.html. Without it the default error page
+	 * writes 404.html unless public/ already has one.
+	 */
 	readonly errorPage: boolean
 }
 
 /**
  * Writes the static site: the client build (assets and `public/`), each prerendered page as
  * `<path>/index.html` with its navigation payload `<path>/index.meeko.json`, `404.html` from
- * app/error.meeko and the header files that `headerFiles` asks for.
+ * app/error.meeko or the default error page and the header files that `headerFiles` asks for.
  */
 export async function writeStaticOutput(options: StaticOutputOptions): Promise<{ readonly pages: number; readonly headers: Readonly<Record<string, string>> }> {
 	const { output } = options
@@ -195,21 +198,20 @@ export async function writeStaticOutput(options: StaticOutputOptions): Promise<{
 			await writeNew(join(folder, 'index.meeko.json'), await readFile(join(options.prerenderDirectory, ...page.payload.split('/'))), conflict('index.meeko.json'))
 		}
 	}
-	if (options.errorPage) {
+	const notFoundFile = join(output, '404.html')
+	if (options.errorPage || !existsSync(notFoundFile)) {
 		const server = await importNodeOutput(options.root, options.nodeServer)
 		const app = (await server.createNodeApp({ prerendering: true })) as InternalServerApp
 		try {
 			const response = await app[renderNotFound](new Request('http://meeko.local/404.html', { headers: { accept: 'text/html' } }))
 			if (response.status !== 404 || !(response.headers.get('content-type') ?? '').includes('text/html')) {
 				await response.body?.cancel()
-				throw new Error(`app/error.meeko respondió HTTP ${response.status} en lugar de la página 404`)
+				throw new Error(`La página de error respondió HTTP ${response.status} en lugar de la página 404`)
 			}
-			await writeNew(join(output, '404.html'), await response.text(), 'public/404.html choca con la página 404 que genera el adaptador static desde app/error.meeko')
+			await writeNew(notFoundFile, await response.text(), 'public/404.html choca con la página 404 que genera el adaptador static desde app/error.meeko; quita uno de los dos')
 		} finally {
 			await app.close()
 		}
-	} else {
-		process.stderr.write('[meeko] Sin app/error.meeko, el adaptador static no genera 404.html; el hosting mostrará su propia página 404.\n')
 	}
 	const headers = await staticHeaders(output, options.config)
 	for (const format of new Set(options.config?.headerFiles ?? [])) {

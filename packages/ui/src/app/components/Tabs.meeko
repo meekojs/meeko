@@ -8,9 +8,13 @@
 
 	import type { TabsSnippets, UITabsProps } from '../types/tabs'
 
+	import { uiTheme } from '../utils/defaults'
 	import { createTabs } from '../utils/tabs'
+	import { tabs as tabsVariant } from '../variants/tabs'
 
 	const props = defineProps<UITabsProps<Value>>()
+
+	const theme = uiTheme('tabs', () => props)
 
 	const emit = defineEmits<{ change: [value: Value] }>()
 
@@ -25,16 +29,18 @@
 
 	const tabs = createTabs<Value>(props, model, useId(), (value) => emit('change', value))
 	onMounted(() => tabs.mount(root.value))
+
+	const classes = tabsVariant()
 </script>
 
-<!-- No whitespace between the tags of this template: it would be text inside the tabs. Prettier keeps it that way; tests/templates-without-whitespace.test.mjs guards it. -->
+<!-- No whitespace between the tags of this template: it would be text inside the tabs. Prettier keeps it that way (htmlWhitespaceSensitivity "strict" in prettier.config.ts); tests/templates-without-whitespace.test.mjs guards it. -->
 <template><div
 		ref:root
 		bind:id="props.id"
-		bind:class="['meeko-ui-tabs', props.class].filter(Boolean).join(' ')"
+		bind:class="classes.base({ class: [theme.ui.base, theme.class] })"
 		><div
 			role="tablist"
-			class="meeko-ui-tabs-list"
+			bind:class="classes.list({ class: theme.ui.list })"
 			bind:aria-label="props.label"
 			bind:aria-labelledby="props.labelledBy"
 			on:keydown="tabs.keydown"
@@ -44,7 +50,7 @@
 				each:key="item.value"
 				type="button"
 				role="tab"
-				class="meeko-ui-tabs-tab"
+				bind:class="classes.tab({ class: theme.ui.tab })"
 				bind:id="tabs.tabId(item)"
 				bind:aria-controls="tabs.panelId(item)"
 				bind:aria-selected="tabs.selected.value === item.value ? 'true' : 'false'"
@@ -54,14 +60,15 @@
 				><render
 					if:when="snippets.tab"
 					snippet="snippets.tab"
-					args="item" /><template if:when="!snippets.tab">{item.label}</template><span class="meeko-ui-tabs-indicator" /></button></div
+					args="item" /><template if:when="!snippets.tab">{item.label}</template
+				><span bind:class="classes.indicator({ class: theme.ui.indicator })" /></button></div
 		><div
 			each:of="props.items"
 			each:as="item"
 			each:key="item.value"
 			role="tabpanel"
-			class="meeko-ui-tabs-panel"
 			tabindex="0"
+			bind:class="classes.panel({ class: theme.ui.panel })"
 			bind:id="tabs.panelId(item)"
 			bind:aria-labelledby="tabs.tabId(item)"
 			bind:hidden="tabs.selected.value !== item.value"

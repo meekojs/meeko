@@ -15,7 +15,7 @@ import type { ServerPlatform } from './server/runtime/platform'
 import { errorResponse } from './server/contract-runtime'
 import { ApiError, observeServerError } from './server/errors'
 import { assetResponse, etagMatches, findAsset } from './server/runtime/assets'
-import { setSocketAddress, trustProxyOf } from './server/runtime/env'
+import { requestTargetUrl, setSocketAddress, trustProxyOf } from './server/runtime/env'
 import { attachNodeWebSocketServer } from './server/runtime/node-websocket'
 import { handleProcessErrors } from './server/runtime/process-errors'
 
@@ -69,20 +69,6 @@ function originOf(value: string): string {
 }
 
 /**
- * Resolves a request-target against its origin. Origin-form targets are
- * assigned as path and query, so `//other.example/x` stays on `base` instead of
- * being read as a scheme-relative URL of another host.
- */
-function requestUrl(target: string, base: string): URL {
-	if (!target.startsWith('/')) return new URL(target, base)
-	const url = new URL(base)
-	const query = target.indexOf('?')
-	url.pathname = query < 0 ? target : target.slice(0, query)
-	url.search = query < 0 ? '' : target.slice(query)
-	return url
-}
-
-/**
  * Adapta un handler Fetch portable al callback del servidor HTTP de Node 24. Envía por separado
  * varias cabeceras `Set-Cookie`, cancela el cuerpo si el cliente se desconecta y trata un
  * request-target que empieza por `//` como ruta del origen propio.
@@ -114,7 +100,7 @@ export function toNodeListener(handler: (request: Request) => Promise<Response> 
 				const protocol = incoming.socket instanceof TLSSocket ? 'https' : 'http'
 				let url: URL
 				try {
-					url = requestUrl(incoming.url || '/', publicOrigin ?? `${protocol}://${authority}`)
+					url = requestTargetUrl(incoming.url || '/', publicOrigin ?? `${protocol}://${authority}`)
 					if (publicOrigin && url.origin !== publicOrigin) throw new TypeError('Absolute request target outside publicOrigin')
 				} catch {
 					throw new ApiError('INVALID_URL', 400)

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { examples } from '../utils/examples'
 </script>
+
 <template>
 	<DocsPage
 		product="Meeko i18n"
@@ -24,9 +25,7 @@
 			El runtime entrega
 			<code>count</code>
 			a las formas como alias de ese número. Cuando el selector se llama
-			<code>total</code>, basta con pasar
-			<code>{'{ total: 3 }'}</code>. Si el selector se llama
-			<code>count</code>, ese mismo argumento sigue siendo obligatorio.
+			<code>total</code>, basta con pasar <code>{'{ total: 3 }'}</code>. Si el selector se llama <code>count</code>, ese mismo argumento sigue siendo obligatorio.
 		</p>
 		<h2 id="select">Alternativas con select</h2>
 		<DocsCode

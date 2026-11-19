@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { englishExamples as examples } from '../../../utils/examples.en'
 </script>
+
 <template>
 	<DocsPage
 		locale="en"

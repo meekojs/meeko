@@ -25,8 +25,8 @@ function skippedRanges(source: string): Array<readonly [number, number]> {
 }
 
 /** The attributes of the tag that starts at `start`, and the offset after its name. */
-function readTag(source: string, start: number): { attributes: Attribute[]; end: number } | undefined {
-	let cursor = start + 1 + iconTag.length
+function readTag(source: string, start: number, tag: string): { attributes: Attribute[]; end: number } | undefined {
+	let cursor = start + 1 + tag.length
 	const attributes: Attribute[] = []
 	const pattern = /\s*([^\s"'<>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'))?/y
 	for (;;) {
@@ -56,23 +56,24 @@ export function literalNames(expression: string): string[] {
 }
 
 /**
- * Adds the resolved icons to every `<UIIcon>` of a component source.
+ * Adds the resolved icons to every configured icon component tag of a component source.
  *
  * @param source Text of the `.meeko` file.
  * @param resolve Resolves a full icon name; throws for an unknown icon.
+ * @param tag Name of the autoimported component. By default, `UIIcon`.
  * @returns The new source and the resolved names, or `undefined` when nothing changes.
  * @throws {Error} When a literal `name` does not resolve, with the offset of its tag in `offset`.
  */
-export function transformIconTags(source: string, resolve: (name: string) => IconData): { code: string; names: string[] } | undefined {
-	if (!source.includes(`<${iconTag}`)) return undefined
+export function transformIconTags(source: string, resolve: (name: string) => IconData, tag = iconTag): { code: string; names: string[] } | undefined {
+	if (!source.includes(`<${tag}`)) return undefined
 	const skipped = skippedRanges(source)
 	const insertions: Array<{ offset: number; text: string }> = []
 	const names = new Set<string>()
-	const tag = new RegExp(`<${iconTag}(?=[\\s/>])`, 'g')
-	for (const match of source.matchAll(tag)) {
+	const tagPattern = new RegExp(`<${tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=[\\s/>])`, 'g')
+	for (const match of source.matchAll(tagPattern)) {
 		const offset = match.index
 		if (skipped.some(([from, to]) => offset >= from && offset < to)) continue
-		const parsed = readTag(source, offset)
+		const parsed = readTag(source, offset, tag)
 		if (!parsed) continue
 		if (parsed.attributes.some((attribute) => attribute.name === 'resolved' || attribute.name === 'bind:resolved')) continue
 		const icons = new Map<string, IconData>()
@@ -96,7 +97,7 @@ export function transformIconTags(source: string, resolve: (name: string) => Ico
 		}
 		if (!icons.size) continue
 		for (const name of icons.keys()) names.add(name)
-		insertions.push({ offset: offset + 1 + iconTag.length, text: ` bind:resolved="${resolvedExpression(icons)}"` })
+		insertions.push({ offset: offset + 1 + tag.length, text: ` bind:resolved="${resolvedExpression(icons)}"` })
 	}
 	if (!insertions.length) return undefined
 	let code = source

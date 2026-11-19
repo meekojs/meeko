@@ -62,7 +62,7 @@ const props = defineProps<Props>();
 </template>
 ```
 
-El título llega en el primer byte; los comentarios, cuando la API responde o a los 5 segundos. Desde `1.7`, `defer` se autoimporta en `<script server>` (también dentro de las opciones de ruta), en los sidecars `*.route.ts` y en `server/`; antes había que importarlo de `@meekojs/meeko/framework`, y el import explícito sigue valiendo.
+El título llega en el primer byte; los comentarios, cuando la API responde o a los 5 segundos. Desde `1.7`, `defer` se autoimporta en `<script server>` (también dentro de las opciones de ruta), en los sidecars `*.route.ts` y en `server/`; antes había que importarlo de `@meekojs/meeko/framework`, y el import explícito sigue valiendo. Sólo se autoimporta en código de servidor: en el `<script>` de un componente o en un sidecar con `render: "client"`, que llegan al navegador, hay que importarlo de `@meekojs/meeko/framework`.
 
 ## Parámetros
 

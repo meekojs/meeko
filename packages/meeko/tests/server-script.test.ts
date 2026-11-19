@@ -520,3 +520,62 @@ test('meeko check types exports in the page, rejects misuse and checks usePage a
 		await rm(root, { recursive: true, force: true })
 	}
 })
+
+const headPage = `<script server lang="ts">
+const { url } = usePage();
+useHead({ title: \`Head of \${url.pathname}\`, meta: [{ name: "robots", content: "noindex" }] });
+useSeoMeta({ description: "Seo from the block", ogTitle: "Seo title" });
+export const path = url.pathname;
+</script>
+
+<template><p>{path}</p></template>
+`
+
+test('useHead and useSeoMeta in <script server> are imported from the framework without leaking other browser autoimports', () => {
+	const script = analyze(headPage)
+	assert.equal(script.body, true)
+	assert.deepEqual([...script.implicit].sort(), ['useHead', 'usePage', 'useSeoMeta'])
+	const generated = serverScriptModule(headPage, file)!.code
+	assert.match(generated, /^import \{ usePage, useHead, useSeoMeta \} from "@meekojs\/meeko\/framework";$/m)
+	// An explicit import, or a declaration of the same name, is not imported again.
+	const imported = page('import { useHead as head } from "@meekojs/meeko/framework";\nhead({ title: "x" });')
+	assert.deepEqual(analyze(imported).implicit, [])
+	assert.deepEqual(analyze(page('import { useHead } from "@meekojs/meeko/framework";\nuseHead({ title: "x" });')).implicit, [])
+	assert.deepEqual(analyze(page('function useHead(input: { title: string }) { return input; }\nuseHead({ title: "x" });\nexport const ok = 1;')).implicit, [])
+	// Only the head APIs: the other browser autoimports stay out of the block.
+	assert.deepEqual(analyze(page('const form = useForm({ initial: {}, submit: async () => null });\nexport const ok = 1;')).implicit, [])
+})
+
+test('top-level useHead and useSeoMeta in <script server> pass meeko check and reach the SSR head through Vite', { timeout: 180_000 }, async () => {
+	const root = await project({
+		'app/error.meeko': errorPage,
+		'app/pages/meta.meeko': headPage,
+	})
+	try {
+		const pageFile = join(root, 'app', 'pages', 'meta.meeko')
+		assert.deepEqual(await checkSource(headPage, pageFile), [])
+		await checkFrameworkProject(root)
+		// The server declarations still leave the browser-only autoimports out, as for server/ files.
+		const declarations = await readFile(join(root, '.meeko', 'types', 'autoimports', 'server.d.ts'), 'utf8')
+		assert.doesNotMatch(declarations, /\bconst (?:useHead|useSeoMeta|useForm)\b/)
+		// A browser-only autoimport other than the head APIs is still a type error in the block.
+		await writeFile(pageFile, headPage.replace('export const path', 'const theme = useTheme();\nexport const path'))
+		await assert.rejects(checkFrameworkProject(root), /meta\.meeko\(5,\d+\): error TS2304: Cannot find name 'useTheme'/)
+		await writeFile(pageFile, headPage)
+
+		const dev = await devApp(root)
+		try {
+			const response = await dev.fetch('/meta')
+			const html = await response.text()
+			assert.equal(response.status, 200, html)
+			assert.match(html, /<title>Head of \/meta<\/title>/)
+			assert.match(html, /<meta name="robots" content="noindex">/)
+			assert.match(html, /<meta name="description" content="Seo from the block">/)
+			assert.match(html, /<meta property="og:title" content="Seo title">/)
+		} finally {
+			await dev.close()
+		}
+	} finally {
+		await rm(root, { recursive: true, force: true })
+	}
+})

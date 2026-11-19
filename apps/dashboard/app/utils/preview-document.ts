@@ -7,6 +7,10 @@
 // @meekojs/ui serves the font with CORS, which an opaque origin needs, and the font-src 'self' that the
 // iframe inherits names the origin of the dashboard.
 
+import type { TrustedHtml } from '@meekojs/meeko'
+
+import { trustHtml } from '@meekojs/meeko'
+
 /** The root size of the page, with its fluid scale: the rem of the tokens measure the same inside. */
 const rootSize = '--dash-preview-root-size'
 
@@ -57,25 +61,28 @@ const safeToken = (value: string): boolean => !/[;{}<]/.test(value)
  * The `srcdoc` of the preview: the render's HTML in a document with the policy, the theme, the styles and
  * the values of {@link previewTokens}, as {@link readPreviewTokens} reads them from the dashboard.
  */
-export function previewDocument(input: { readonly html: string; readonly theme: 'dark' | 'light'; readonly styles: string; readonly tokens: Readonly<Record<string, string>> }): string {
+export function previewDocument(input: { readonly html: string; readonly theme: 'dark' | 'light'; readonly styles: string; readonly tokens: Readonly<Record<string, string>> }): TrustedHtml {
 	const tokens = Object.entries(input.tokens)
 		.filter(([name, value]) => /^--[a-z0-9-]+$/.test(name) && value.trim() !== '' && safeToken(value))
 		.map(([name, value]) => `${name}: ${value.trim()};`)
 		.join(' ')
-	return [
-		'<!doctype html>',
-		`<html lang="es" data-theme="${input.theme}">`,
-		'<head>',
-		'<meta charset="utf-8">',
-		`<meta http-equiv="Content-Security-Policy" content="${escapeAttribute(previewPolicy)}">`,
-		'<meta name="referrer" content="no-referrer">',
-		`<style>:root { color-scheme: ${input.theme}; ${tokens} }${input.styles}${previewPageStyles}</style>`,
-		'</head>',
-		'<body class="dash-preview meeko-ui-prose">',
-		input.html,
-		'</body>',
-		'</html>',
-	].join('\n')
+	// Trusted because the iframe that shows it is sandboxed without scripts: see the top of this file.
+	return trustHtml(
+		[
+			'<!doctype html>',
+			`<html lang="es" data-theme="${input.theme}">`,
+			'<head>',
+			'<meta charset="utf-8">',
+			`<meta http-equiv="Content-Security-Policy" content="${escapeAttribute(previewPolicy)}">`,
+			'<meta name="referrer" content="no-referrer">',
+			`<style>:root { color-scheme: ${input.theme}; ${tokens} }${input.styles}${previewPageStyles}</style>`,
+			'</head>',
+			'<body class="dash-preview meeko-ui-prose">',
+			input.html,
+			'</body>',
+			'</html>',
+		].join('\n'),
+	)
 }
 
 /** The values of the tokens that `styles` reads on `root` now, in the browser, and its root size. */

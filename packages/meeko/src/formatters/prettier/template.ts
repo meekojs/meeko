@@ -57,6 +57,8 @@ interface HtmlNode {
 	isWhitespaceSensitive?: boolean
 	/** Expresión sin espacios exteriores de una interpolación `{expr}`. */
 	meekoExpression?: string
+	/** Fuente de la plantilla con los comentarios asociados a su elemento. */
+	meekoOriginalText?: string
 	setProperty(property: string, value: unknown): void
 	createChild(node: Record<string, unknown>): HtmlNode
 	insertChildBefore(target: HtmlNode, node: Record<string, unknown>): void
@@ -115,7 +117,12 @@ const templateParser: Parser<HtmlNode> = {
 	async parse(text, options) {
 		const html = await hostHtml(options)
 		;(options as HostOptions)[hostKey] = html
-		const root = await html.parser.parse(maskInterpolatedLessThan(text), options)
+		let root = await html.parser.parse(maskInterpolatedLessThan(text), options)
+		const normalized = attachLeadingComments(root, text, options.htmlWhitespaceSensitivity === 'ignore')
+		if (normalized) {
+			root = await html.parser.parse(maskInterpolatedLessThan(normalized), options)
+			root.setProperty('meekoOriginalText', normalized)
+		}
 		restoreInterpolatedLessThan(root)
 		const template = root.children?.find((child) => child.kind === 'element' && child.name === 'template')
 		if (!template) throw new Error('The template wrapper was not parsed')
@@ -224,7 +231,7 @@ function isExpressionAttribute(name: string, element: HtmlNode | undefined): boo
 	const custom = tag !== undefined && !/^[A-Z]/.test(tag) && isCustomElementTag(tag)
 	// `bind="obj"` (since 1.5) on an element or a component; on a custom element it stays an attribute.
 	if (name === 'model' || name === 'bind' || /^model:./.test(name)) return !custom
-	if (/^(?:bind|on):./.test(name) || name === 'if:when' || name === 'each:of' || name === 'each:key') return true
+	if (/^(?:bind|on):./.test(name) || name === 'if' || name === 'else-if' || name === 'if:when' || name === 'each:of' || name === 'each:key') return true
 	if (name === 'is') return tag === 'component'
 	// `html="expression"` on a standard element; a component tag rejects it (MEEK032).
 	if (name === 'html') return tag !== undefined && !/^[A-Z]/.test(tag) && !custom
@@ -400,18 +407,21 @@ function holdsOnlySnippets(node: HtmlNode): boolean {
 /**
  * The compiler renders the whitespace of a template as text nodes, so saving a file must not add or
  * remove any: `<li each:of="a" each:as="b">{b}</li>` keeps its text node without whitespace, and
- * `Hi<b> you</b>` keeps its space. Every `htmlWhitespaceSensitivity` follows this rule: left to
- * itself, `"ignore"` would do both, and `"css"` would too wherever it takes an element for a block.
+ * `Hi<b> you</b>` keeps its space. `"css"` and `"strict"` follow this rule. With an explicit
+ * `"ignore"`, the user delegates whitespace to the HTML printer, including at element boundaries.
  * Formatting may still turn one whitespace into another (a space into a line break and indentation),
  * which renders the same outside `white-space: pre`. The compiler itself drops whitespace in two
  * places, which stay free: among the blocks of a component with only `<snippet>` content, and between
  * an element and the edge of a `<snippet>` when that whitespace has a line break.
  */
-function keepWhitespace(ast: HtmlNode): void {
+function keepWhitespace(ast: HtmlNode, options: ParserOptions<HtmlNode>): void {
 	ast.walk((node) => {
 		const children = node.children
 		if (children && hasOnlyItsWrittenForm(node)) children.push(node.createChild({ kind: 'comment', value: '', sourceSpan: node.sourceSpan }))
 		if (!children || (node.kind !== 'element' && node.kind !== 'root') || node.isWhitespaceSensitive) return
+		// `ignore` también se aplica a los snippets. Los elementos preformateados conservan
+		// su contenido literal, pero las demás etiquetas pueden separarse sin partir sus marcadores.
+		if (options.htmlWhitespaceSensitivity === 'ignore') return
 		if (holdsOnlySnippets(node)) {
 			node.isDanglingSpaceSensitive = false
 			for (const child of children) child.isLeadingSpaceSensitive = child.isTrailingSpaceSensitive = false
@@ -472,16 +482,74 @@ const visitorKeys: Record<string, readonly string[]> = {
 	text: ['children'],
 }
 
+/**
+ * Un comentario en su propia línea explica el siguiente elemento. Conserva la separación anterior
+ * y elimina las líneas vacías posteriores. Sólo cambia el espacio entre nodos, con la misma
+ * longitud para conservar los offsets; nunca toca el cuerpo de comentarios ni contenido literal.
+ * En modo `ignore`, anticipa los comentarios que el printer HTML pondrá en su propia línea.
+ */
+function attachLeadingComments(ast: HtmlNode, text: string, ignoreWhitespace: boolean): string | undefined {
+	let characters: string[] | undefined
+	ast.walk((node) => {
+		if (!node.children) return
+		for (let parent: HtmlNode | undefined = node; parent; parent = parent.parent) {
+			let previous = parent.prev
+			while (previous?.kind === 'text' && !previous.value?.trim()) previous = previous.prev
+			if (preformattedTags.has(parent.name ?? '') || parent.name === 'script' || parent.name === 'style' || (previous?.kind === 'comment' && previous.value?.trim() === 'prettier-ignore')) return
+		}
+		for (let index = 0; index < node.children.length - 1; index++) {
+			const comment = node.children[index]!
+			let nextIndex = index + 1
+			while (node.children[nextIndex]?.kind === 'text' && !node.children[nextIndex]?.value?.trim()) nextIndex++
+			const next = node.children[nextIndex]
+			if (!next) continue
+			if (comment.kind !== 'comment' || (next.kind !== 'element' && next.kind !== 'interpolation')) continue
+			let previous = comment.prev
+			while (previous?.kind === 'text' && !previous.value?.trim()) previous = previous.prev
+			if (previous?.kind === 'text' && previous.value?.trim()) continue
+			const start = comment.sourceSpan.start.offset
+			if (!ignoreWhitespace && text.slice(text.lastIndexOf('\n', start - 1) + 1, start).trim()) continue
+			const end = comment.sourceSpan.end.offset
+			const gap = text.slice(end, next.sourceSpan.start.offset)
+			if (!/^[\t\n\f\r ]*$/.test(gap) || (gap.match(/\n/g)?.length ?? 0) < 2) continue
+			characters ??= text.split('')
+			for (let offset = end; offset < end + gap.lastIndexOf('\n'); offset++) {
+				if (text[offset] === '\n' || text[offset] === '\r') characters[offset] = ' '
+			}
+		}
+	})
+	return characters?.join('')
+}
+
+/**
+ * Los saltos entre atributos no deben partir también `>texto</Tag>`. El contenido sin espacios
+ * exteriores conserva sus bordes pegados; si empieza en otra línea, conserva ese salto. Incluso
+ * si el texto ocupa varias líneas, `</Tag>` queda completo. El printer HTML entrega apertura,
+ * contenido y cierre como tres partes del grupo.
+ */
+function compactTextElement(node: HtmlNode, printed: Doc): Doc {
+	const child = node.children?.[0]
+	if (node.kind !== 'element' || node.isWhitespaceSensitive || node.children?.length !== 1 || child?.kind !== 'text' || child.hasTrailingSpaces) return printed
+	if (!printed || typeof printed !== 'object' || Array.isArray(printed) || printed.type !== 'group' || !Array.isArray(printed.contents) || printed.contents.length !== 3) return printed
+	const [opening, content, closing] = printed.contents
+	if (!Array.isArray(content)) return printed
+	const line = content.at(-1)
+	if (!line || typeof line !== 'object' || Array.isArray(line) || line.type !== 'line' || !line.soft) return printed
+	const tail = [content.slice(0, -1), closing!]
+	return { ...printed, contents: [opening!, child.hasLeadingSpaces ? tail : group(tail)] }
+}
+
 const templatePrinter: Printer<HtmlNode> = {
 	getVisitorKeys: (node) => (visitorKeys[node.kind] ?? []).filter((key) => Array.isArray((node as unknown as Record<string, unknown>)[key])),
 	preprocess(ast, options) {
+		if (ast.meekoOriginalText) options.originalText = ast.meekoOriginalText
 		extractInterpolations(ast)
 		// The HTML preprocess looks for `{{ }}` unless the parser is `html`; `{expr}` is already extracted.
 		const parser = options.parser
 		options.parser = 'html'
 		try {
 			const processed = host(options).printer.preprocess(ast, options) as HtmlNode
-			keepWhitespace(processed)
+			keepWhitespace(processed, options)
 			hideTextBraces(processed, options)
 			return processed
 		} finally {
@@ -490,7 +558,8 @@ const templatePrinter: Printer<HtmlNode> = {
 	},
 	print(path, options, print) {
 		const { node } = path
-		const printed = host(options).printer.print(path, options, print)
+		const original = host(options).printer.print(path, options, print)
+		const printed = options.htmlWhitespaceSensitivity === 'ignore' ? original : compactTextElement(node, original)
 		if (node.kind === 'text' && node.value === snippetEdgeSpace) return mapDoc(printed, (item) => (typeof item === 'string' ? item.replaceAll(snippetEdgeSpace, ' ') : item))
 		if (node.kind === 'root') return meekoBraces(printed)
 		if (isPrintedAsWritten(node)) return writtenElement(printed)

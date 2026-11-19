@@ -94,8 +94,9 @@ export function renderPage(clientSource: string, initial = 1): string {
 	'src/entry-client.ts': `import { hydrate } from "./App.meeko";
 import type { HotState } from "@meekojs/meeko";
 
-const root = document.getElementById("app");
-const payloadNode = document.getElementById("meeko-payload");
+// Only the children of <body> that the server writes: page content may repeat these ids.
+const root = document.querySelector<HTMLDivElement>("body > div#app");
+const payloadNode = [...document.querySelectorAll('body > div#app ~ script#meeko-payload[type="application/json"]')].at(-1);
 if (!root || !payloadNode?.textContent) throw new Error("Missing SSR root or payload");
 const payload: unknown = JSON.parse(payloadNode.textContent);
 if (typeof payload !== "object" || payload === null || !("props" in payload) || !("state" in payload)) throw new TypeError("Invalid SSR payload");

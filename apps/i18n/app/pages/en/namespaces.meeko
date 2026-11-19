@@ -2,6 +2,7 @@
 	import { englishExamples as examples } from '../../utils/examples.en'
 	const i18n = useI18n()
 </script>
+
 <template>
 	<DocsPage
 		product="Meeko i18n"

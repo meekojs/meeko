@@ -16,8 +16,7 @@
 			Un aviso dentro de la página, en cuatro tonos además del neutro.
 			<code>danger</code>
 			usa
-			<code>role="alert"</code>; los demás,
-			<code>note</code>. Elige
+			<code>role="alert"</code>; los demás, <code>note</code>. Elige
 			<code>status</code>
 			para anunciar un cambio, o
 			<code>none</code>
@@ -81,8 +80,7 @@
 			<code>default</code>,
 			<code>icon</code>
 			y
-			<code>actions</code>, y el evento
-			<code>dismiss</code>.
+			<code>actions</code>, y el evento <code>dismiss</code>.
 		</p>
 		<h2 id="toast">UIToast</h2>
 		<p>
@@ -196,10 +194,7 @@
 			Los textos por defecto están en
 			<code>ui.messages.&lt;idioma&gt;.feedback</code>
 			(véase
-			<a href="/theming">Temas</a>). Los tipos
-			<code>UIAlertProps</code>,
-			<code>UIToastProps</code>,
-			<code>UIToastContext</code>,
+			<a href="/theming">Temas</a>). Los tipos <code>UIAlertProps</code>, <code>UIToastProps</code>, <code>UIToastContext</code>,
 			<code>UIEmptyProps</code>
 			y
 			<code>UISkeletonProps</code>

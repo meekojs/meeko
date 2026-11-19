@@ -75,8 +75,7 @@
 			añade padding lógico a ambos lados, incluido en el ancho exterior. El valor
 			<code>md</code>
 			crece entre 16 y 64px;
-			<code>sm</code>, entre 12 y 24px;
-			<code>lg</code>, entre 24 y 96px. Usa
+			<code>sm</code>, entre 12 y 24px; <code>lg</code>, entre 24 y 96px. Usa
 			<code>none</code>
 			cuando el padre ya aporta ese espacio.
 		</p>

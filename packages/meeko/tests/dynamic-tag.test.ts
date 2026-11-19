@@ -281,6 +281,22 @@ function focus(): void { target.value?.focus(); }
 	assert.deepEqual(result, { Button: [], Page: [], Handlers: [] })
 })
 
+test('meeko check accepts generic is values constrained to allowed HTML tags', async () => {
+	const source = (constraint: string, template: string): string => `<script lang="ts" generic="T extends ${constraint}">
+import type { TagName } from '@meekojs/meeko'
+const { tag } = defineProps<{ tag: T }>()
+</script>
+<template>${template}</template>`
+	const result = await checkAll(
+		{
+			'Content.meeko': source("'a' | 'button'", '<component is="tag">Abrir</component>'),
+			'Empty.meeko': source('TagName', '<component is="tag" />'),
+		},
+		['Content', 'Empty'],
+	)
+	assert.deepEqual(result, { Content: [], Empty: [] })
+})
+
 test('meeko check reports attributes that no possible tag accepts and values of is that are not tags', async () => {
 	const script = `<script lang="ts">
 const props = defineProps<{ href?: string; tag: string; frame: "div" | "iframe"; media: "img" | "span" }>();
@@ -476,6 +492,56 @@ test('class and style beside bind:class and bind:style write one attribute in SS
 		// Released: the bindings no longer follow the signals.
 		button.click()
 		assert.equal(article.getAttribute('class'), 'card ring-4')
+	} finally {
+		window.happyDOM.abort()
+		await cleanup()
+	}
+})
+
+test('bind:class accepts nested arrays in SSR, hydration and updates', async () => {
+	const source = `<script lang="ts">
+import { signal, type ClassValue } from "@meekojs/meeko";
+const classes = signal<ClassValue>(["card", false, ["rounded", null]]);
+</script>
+<template><div class="base" bind:class="classes.value">x</div><button on:click="() => classes.value = ['active', ['wide', undefined]]">t</button></template>`
+	const { component, cleanup } = await load({ ClassArray: source }, 'ClassArray')
+	const window = new Window()
+	try {
+		const rendered = component.renderWithState({})
+		assert.match(rendered.html, /<div class="base card rounded"/)
+		const root = window.document.createElement('main')
+		root.innerHTML = rendered.html
+		const release = component.hydrate(root as unknown as Element, {}, rendered.state)
+		const element = root.querySelector('div')!
+		assert.equal(element.getAttribute('class'), 'base card rounded')
+		;(root.querySelector('button') as unknown as HTMLElement).click()
+		assert.equal(element.getAttribute('class'), 'base active wide')
+		release()
+	} finally {
+		window.happyDOM.abort()
+		await cleanup()
+	}
+})
+
+test('bind:style accepts an object in SSR, hydration and updates', async () => {
+	const source = `<script lang="ts">
+import { signal, type StyleValue } from "@meekojs/meeko";
+const styles = signal<StyleValue>({ backgroundColor: "red", "--space": "4px", opacity: 0.5, display: false });
+</script>
+<template><div style="margin: 0;" bind:style="styles.value">x</div><button on:click="() => styles.value = { color: 'blue', '--space': 8 }">t</button></template>`
+	const { component, cleanup } = await load({ StyleObject: source }, 'StyleObject')
+	const window = new Window()
+	try {
+		const rendered = component.renderWithState({})
+		assert.match(rendered.html, /<div style="margin: 0; background-color: red; --space: 4px; opacity: 0.5"/)
+		const root = window.document.createElement('main')
+		root.innerHTML = rendered.html
+		const release = component.hydrate(root as unknown as Element, {}, rendered.state)
+		const element = root.querySelector('div')!
+		assert.equal(element.getAttribute('style'), 'margin: 0; background-color: red; --space: 4px; opacity: 0.5')
+		;(root.querySelector('button') as unknown as HTMLElement).click()
+		assert.equal(element.getAttribute('style'), 'margin: 0; color: blue; --space: 8')
+		release()
 	} finally {
 		window.happyDOM.abort()
 		await cleanup()

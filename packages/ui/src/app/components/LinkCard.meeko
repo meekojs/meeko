@@ -4,13 +4,18 @@
 
 	import type { UILinkCardProps } from '../types/button'
 
-	const { to, params, search, resolve, href, target, rel, title, description, class: className, ...rest } = defineProps<UILinkCardProps>()
+	import { uiTheme } from '../utils/defaults'
+	import { linkCard } from '../variants/card'
+
+	const { to, params, search, resolve, href, target, rel, title, description, ui: ownUi, class: ownClass, ...rest } = defineProps<UILinkCardProps>()
+
+	const theme = uiTheme('linkCard', () => ({ class: ownClass, ui: ownUi }))
 
 	const emit = defineEmits<{ click: [event: MouseEvent] }>()
 
 	const snippets = defineSnippets<{ default?: [] }>()
 
-	const classes = computed(() => ['meeko-ui-link-card', className].filter(Boolean).join(' '))
+	const classes = linkCard()
 	const linkRel = computed(() => rel ?? (target === '_blank' ? 'noopener noreferrer' : undefined))
 </script>
 
@@ -24,14 +29,14 @@
 		bind:href="href"
 		bind:target="target"
 		bind:rel="linkRel.value"
-		bind:class="classes.value"
+		bind:class="classes.base({ class: [theme.ui.base, theme.class] })"
 		bind="rest"
 		on:click="(event) => emit('click', event)"
 	>
-		<strong class="meeko-ui-link-card-title">{title}</strong>
+		<strong bind:class="classes.title({ class: theme.ui.title })">{title}</strong>
 		<span
 			if:when="description"
-			class="meeko-ui-link-card-description"
+			bind:class="classes.description({ class: theme.ui.description })"
 		>
 			{description}
 		</span>

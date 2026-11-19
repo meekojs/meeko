@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { examples } from '../utils/examples'
 </script>
+
 <template>
 	<DocsPage
 		product="Meeko i18n"
@@ -52,9 +53,7 @@
 			y un
 			<code>link rel="alternate"</code>
 			por idioma más
-			<code>x-default</code>, con URL absolutas a partir de
-			<code>site</code>. Con
-			<code>sitemap: true</code>, el
+			<code>x-default</code>, con URL absolutas a partir de <code>site</code>. Con <code>sitemap: true</code>, el
 			<code>sitemap.xml</code>
 			de Meeko lista cada versión con sus alternativas.
 		</p>

@@ -32,10 +32,7 @@
 			y
 			<code>search</code>
 			tipados), además de
-			<code>target</code>,
-			<code>rel</code>,
-			<code>download</code>,
-			<code>hreflang</code>,
+			<code>target</code>, <code>rel</code>, <code>download</code>, <code>hreflang</code>,
 			<code>lang</code>
 			y
 			<code>title</code>. Con
@@ -45,8 +42,7 @@
 			y
 			<code>aria-current</code>
 			lo decide la ruta activa. Con
-			<code>href</code>, es el actual si coincide con la prop
-			<code>current</code>.
+			<code>href</code>, es el actual si coincide con la prop <code>current</code>.
 		</p>
 		<h2 id="tree">UINavigationTree</h2>
 		<p>
@@ -140,8 +136,7 @@
 			<code>panel-&lt;valor&gt;</code>,
 			<code>panel(item)</code>
 			y
-			<code>tab(item)</code>, y el evento
-			<code>change</code>.
+			<code>tab(item)</code>, y el evento <code>change</code>.
 		</p>
 		<h2 id="pagers">UIBreadcrumb, UIPageNavigation y UIPagination</h2>
 		<p>
@@ -275,13 +270,7 @@
 		/>
 		<p>
 			Los tipos
-			<code>UINavigationTreeProps</code>,
-			<code>UINavigationTabsProps</code>,
-			<code>UITabsProps</code>,
-			<code>UIBreadcrumbProps</code>,
-			<code>UIPageNavigationProps</code>,
-			<code>UIPaginationProps</code>,
-			<code>UITableOfContentsProps</code>,
+			<code>UINavigationTreeProps</code>, <code>UINavigationTabsProps</code>, <code>UITabsProps</code>, <code>UIBreadcrumbProps</code>, <code>UIPageNavigationProps</code>, <code>UIPaginationProps</code>, <code>UITableOfContentsProps</code>,
 			<code>UILocaleSwitcherProps</code>
 			y
 			<code>UILocaleSuggestionProps</code>

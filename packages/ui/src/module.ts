@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 
 import type { UIOptions } from './options'
 
+import { normalizeDefaults } from './defaults'
 import { messagesConfig, tokenStyles, validateOptions } from './options'
 
 declare module '@meekojs/meeko/framework' {
@@ -35,11 +36,12 @@ export default defineMeekoModule<UIOptions>({
 
 		// Registered first so that its layer goes before any layer of the app, and loses to it.
 		if (options.base !== false) meeko.addStylesheet(new URL('../src/app/styles/base.css', import.meta.url))
-		meeko.addStylesheet(new URL('../src/app/styles/main.css', import.meta.url))
+		// Compiled by scripts/build-styles.mjs: the app gets plain CSS and needs no Tailwind.
+		meeko.addStylesheet(new URL('./styles/main.css', import.meta.url))
 		// With CORS: fonts always load with it, and a document with an opaque origin, such as a sandboxed preview, is another origin.
 		meeko.addPublicFile(fontPath, () => readFile(new URL(`../src/app/styles/fonts/${fontFile}`, import.meta.url)), { headers: { 'Access-Control-Allow-Origin': '*' } })
 		meeko.addHead({ link: [{ rel: 'preload', href: `/${fontPath}`, as: 'font', type: 'font/woff2', crossorigin: 'anonymous' }] })
-		const tokensFile = fileURLToPath(new URL('../src/app/styles/main.css', import.meta.url))
+		const tokensFile = fileURLToPath(new URL('./styles/main.css', import.meta.url))
 			.replaceAll('\\', '/')
 			.toLowerCase()
 		const customTokens = tokenStyles(options.tokens)
@@ -51,7 +53,9 @@ export default defineMeekoModule<UIOptions>({
 					if (id.split('?')[0]?.replaceAll('\\', '/').toLowerCase() === tokensFile) return { code: code + customTokens, map: null }
 				},
 			})
-		if (options.defaults && Object.keys(options.defaults).length) meeko.addPlugin({ src: new URL('./app/plugins/config.js', import.meta.url), options: options.defaults })
+		// Only the validated plain values reach the client, where every page reads them.
+		const defaults = options.defaults && normalizeDefaults(options.defaults)
+		if (defaults && Object.keys(defaults).length) meeko.addPlugin({ src: new URL('./app/plugins/config.js', import.meta.url), options: defaults })
 
 		// Without these options the components read the texts of the package, or the locale of i18n, by themselves.
 		if (options.locale !== undefined || options.messages !== undefined)
@@ -60,7 +64,7 @@ export default defineMeekoModule<UIOptions>({
 				options: messagesConfig(options),
 			})
 
-		meeko.addAutoImports(['useModal', 'useModalInstance', 'useToast'].map((name) => ({ name, from: '@meekojs/ui/runtime', scope: 'app' as const, componentOnly: true })))
+		meeko.addAutoImports(['useModal', 'useModalInstance', 'useScrollLock', 'useToast'].map((name) => ({ name, from: '@meekojs/ui/runtime', scope: 'app' as const, componentOnly: true })))
 		const components = join(meeko.rootDir, '.meeko', 'generated', 'components.ts')
 		meeko.addVitePlugin({
 			name: 'meeko-ui:components',
@@ -70,5 +74,7 @@ export default defineMeekoModule<UIOptions>({
 		})
 		meeko.addPlugin(new URL('./app/plugins/modal.js', import.meta.url))
 		meeko.addPlugin(new URL('./app/plugins/toast.js', import.meta.url))
+		// The width of the gutter of the scrollbar, `--ui-scrollbar-gutter`, for the locks of the page and for the app.
+		meeko.addPlugin(new URL('./app/plugins/scrollbar-gutter.js', import.meta.url))
 	},
 })

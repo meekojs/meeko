@@ -13,6 +13,7 @@ import { pathToFileURL } from 'node:url'
 import type { MeekoAdapterName } from '../modules/define-meeko-config'
 import type { ServerApp, ServerAppOptions } from '../server/runtime/app'
 import type { AssetManifest, AssetRecord } from '../server/runtime/assets'
+import type { DevAllowedHosts } from '../server/runtime/dev-hosts'
 import type { BuildAppData } from './app-manifest'
 import type { DevServerLogs } from './dev-server-logs'
 import type { EditorBridge } from './editor-bridge'
@@ -22,16 +23,18 @@ import type { PrerenderIndex } from './prerender'
 import { escapeHtml } from '../core/server'
 import { attachNodeWebSocketServer, toNodeListener } from '../node'
 import { reportServerError } from '../server/errors'
+import { allowedHostsEnv, blockedDevHostMessage, isDevHostAllowed, mergeDevAllowedHosts, parseAllowedHostsEnv, restrictedHostName, viteAllowedHosts } from '../server/runtime/dev-hosts'
 import { meekoEnv } from '../server/runtime/env'
 import { visibleHost } from '../server/runtime/fetch-host'
 import { listeningMessage } from '../server/runtime/listen-address'
 import { handleProcessErrors, processErrorObserver } from '../server/runtime/process-errors'
 import { bunEntrySource, cloudflareEntrySource, denoEntrySource } from './adapter-templates'
-import { buildDataFile, discoverAppPlugins, findRuntimeFile, frameworkClientEntry, frameworkNodeEntry, frameworkServerEntry } from './app-manifest'
+import { buildDataFile, defaultErrorPageFile, discoverAppPlugins, findRuntimeFile, frameworkClientEntry, frameworkNodeEntry, frameworkServerEntry } from './app-manifest'
 import { assetKey } from './asset-key'
 import { cloudflareAssetsDirectory, cloudflarePrerenderDirectory, resolveWrangler, wranglerConfig, wranglerSource } from './cloudflare-build'
 import { discoverConfiguredRoutes, loadConfiguredModules, loadMeekoConfig, resolveConfigSources } from './config'
 import { contentTypes } from './content-types'
+import { defaultErrorLogo } from './default-error-logo'
 import { devtoolsPanelPlugin, devtoolsPanelScript, resolveDevtoolsConfig } from './dev-devtools'
 import { supervisedHmrPortEnv, supervisedPortEnv } from './dev-link'
 import { recordEditorBridgeOff } from './dev-lock'
@@ -41,18 +44,20 @@ import { createDevAppReloader, hotFileKey, isDiscoverySource, isRouteOptionsSour
 import { editorBridgeHost, editorBridgeOffReason, startEditorBridge } from './editor-bridge'
 import { installedModulePackages, resolvedDocument, resolveSiteOrigin, setModuleDevelopmentMode } from './module-loader'
 import { prerenderForBuild } from './prerender'
-import { clientEntrySource, nodeEntrySource, serverEntrySource, staticClientEntrySource } from './project-templates'
+import { clientEntrySource, defaultErrorPageSource, nodeEntrySource, serverEntrySource, staticClientEntrySource } from './project-templates'
 import { discoverRouteMiddleware } from './route-middleware-discovery'
 import { discoverErrorPage } from './routes-discovery'
 import { assertNoLegacySessionFile } from './runtime-migration'
 import { robotsTxt, siteFilesOptions, sitemapEntryRoutes, sitemapUrls, sitemapXml } from './site-files'
 import { assertStaticApp, previewStatic, writeStaticOutput } from './static-adapter'
-import { createGlobalStylesheetSnapshot, devStylesheetLink, frameworkStylesheets, stylesheetUrl } from './styles'
+import { createGlobalStylesheetSnapshot, devStylesheetLink, directStylesheetUrl, frameworkStylesheets } from './styles'
 import { hasFrameworkTsconfigs, prepareFrameworkTypeDeclarations, writeIfChanged } from './type-declarations'
 
 export { frameworkClientEntry, frameworkServerEntry } from './app-manifest'
 
 const clientOutput = '.meeko/output/client'
+/** Bit de `light-dark()` en `lightningcss.Features`; debe conservarse para seguir el tema elegido. */
+const lightningCssLightDark = 1 << 20
 const nodeOutput = '.meeko/output/node'
 /** Node server used only to prerender pages for adapters other than Node. */
 const prerenderServer = '.meeko/build/node'
@@ -108,6 +113,20 @@ export function adapterEntry(adapter: MeekoAdapterName): string {
 }
 
 /**
+ * Writes the logo of the default error page next to it, only when it changed: rewriting it on every
+ * start would make Vite reload the pages that import it.
+ */
+async function writeDefaultErrorLogo(target: string): Promise<void> {
+	const logo = Buffer.from(defaultErrorLogo, 'base64')
+	try {
+		if (logo.equals(await readFile(target))) return
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+	}
+	await writeFile(target, logo)
+}
+
+/**
  * Writes framework-owned Vite entries; no application file is overwritten. An entry that already has
  * its source is left alone: Vite watches them, and rewriting one reloads every page open on every
  * `meeko dev` of the project, with the state it had.
@@ -118,6 +137,8 @@ export async function prepareProject(projectRoot: string): Promise<void> {
 	await mkdir(generated, { recursive: true })
 	await Promise.all([
 		writeIfChanged(resolve(root, frameworkClientEntry), clientEntrySource),
+		writeIfChanged(resolve(root, defaultErrorPageFile), defaultErrorPageSource),
+		writeDefaultErrorLogo(resolve(generated, 'meeko-logo.webp')),
 		writeIfChanged(resolve(root, frameworkServerEntry), serverEntrySource),
 		writeIfChanged(resolve(root, frameworkNodeEntry), nodeEntrySource),
 	])
@@ -284,6 +305,9 @@ export async function buildProject(projectRoot: string, options: BuildProjectOpt
 	await build({
 		root,
 		configFile: false,
+		// La bajada de Lightning CSS sigue `prefers-color-scheme`, pero el tema explícito de Meeko
+		// cambia `color-scheme` en `<html>` aunque difiera del sistema. La función nativa sí lo sigue.
+		...(config.theme === undefined || config.theme === false ? {} : { css: { lightningcss: { exclude: lightningCssLightDark } } }),
 		plugins: [meeko()],
 		logLevel: 'warn',
 		build: {
@@ -593,6 +617,24 @@ export async function startProject(projectRoot: string, production: boolean): Pr
 	return startDevelopment(root)
 }
 
+/**
+ * `server.allowedHosts` of Vite in `meeko dev`: those of `dev.allowedHosts`, the listening host
+ * and the host of `MEEKO_PUBLIC_ORIGIN`, as Vite adds `server.host` and `server.origin`.
+ */
+export function devViteAllowedHosts(allowedHosts: DevAllowedHosts, host: string, publicOrigin: string | undefined): true | string[] {
+	const patterns = viteAllowedHosts(allowedHosts)
+	if (patterns === true) return true
+	const extra = [host]
+	if (publicOrigin) {
+		try {
+			extra.push(new URL(publicOrigin).hostname)
+		} catch {
+			/* createServerApp reports an invalid public origin */
+		}
+	}
+	return [...new Set([...patterns, ...extra.map((name) => name.toLowerCase())])]
+}
+
 async function startDevelopment(root: string): Promise<Server> {
 	assertNoLegacySessionFile(root)
 	// Every module resolution of this process (Vite plugin, autoimports, discovery) runs with dev: true.
@@ -600,6 +642,9 @@ async function startDevelopment(root: string): Promise<Server> {
 	const { config, modules } = await loadConfiguredModules(root)
 	const server = config.server?.adapter === 'node' ? config.server : undefined
 	const host = meekoEnv(process.env, 'HOST') || server?.host || '127.0.0.1'
+	// `dev.allowedHosts` and MEEKO_ALLOWED_HOSTS open `meeko dev` to a proxy, a tunnel or a LAN name:
+	// Vite's host check and, through the app's SessionManager, the Origin checks.
+	const allowedHosts = mergeDevAllowedHosts(config.dev?.allowedHosts, parseAllowedHostsEnv(process.env[allowedHostsEnv]))
 	// A port named by MEEKO_PORT, PORT or server.port (or the one a supervisor's first server took) is
 	// kept, and listening reports it when in use; otherwise dev takes the first free one from 4173 up.
 	const named = process.env[supervisedPortEnv] || meekoEnv(process.env, 'PORT') || server?.port
@@ -640,6 +685,7 @@ async function startDevelopment(root: string): Promise<Server> {
 		})
 	}
 	try {
+		const publicOrigin = meekoEnv(process.env, 'PUBLIC_ORIGIN')
 		const { createServer: createViteServer, searchForWorkspaceRoot } = await import('vite')
 		const { meeko } = await import('../vite')
 		if (config.dev?.serverLogs !== false) {
@@ -721,6 +767,9 @@ async function startDevelopment(root: string): Promise<Server> {
 						// Middleware mode opens a separate Vite WebSocket server, on a port derived
 						// from the app port so concurrent projects do not share 24678.
 						hmr: { host: devHmrHost, port: hmrPort },
+						// Like Vite's own `server.host` and `server.origin`, the listening host and the public
+						// origin are allowed too. Meeko checks the result first, with its own message (below).
+						allowedHosts: devViteAllowedHosts(allowedHosts, host, publicOrigin),
 						// Module files may live outside the workspace (a linked package); the browser loads their runtime files.
 						...(modules.ownedDirectories.length ? { fs: { allow: [searchForWorkspaceRoot(root), ...modules.ownedDirectories] } } : {}),
 					},
@@ -734,12 +783,11 @@ async function startDevelopment(root: string): Promise<Server> {
 			return frameworkStylesheets(root, modules.stylesheets)
 				.map((file) => {
 					const moduleId = file.replaceAll('\\', '/')
-					return devStylesheetLink(`${stylesheetUrl(root, file)}?direct`, moduleId)
+					return devStylesheetLink(directStylesheetUrl(file), moduleId)
 				})
 				.join('')
 		}
 		const devServer = vite
-		const publicOrigin = meekoEnv(process.env, 'PUBLIC_ORIGIN')
 		const createDevApp = async (): Promise<ServerApp> => {
 			await modules.callHook('routes:resolved', { routes: await discoverConfiguredRoutes(root) })
 			const runtimeFile = findRuntimeFile(root)
@@ -763,6 +811,7 @@ async function startDevelopment(root: string): Promise<Server> {
 					},
 				},
 				...(publicOrigin ? { publicOrigin } : {}),
+				devAllowedHosts: allowedHosts,
 				document: {
 					// Vite's client and the unbundled global stylesheet replace the production manifest links.
 					head: ({ nonce }) => `<script type="module"${nonce ? ` nonce="${escapeHtml(nonce)}"` : ''} src="/@vite/client"></script>` + globalStylesheet() + (devtools.panel ? devtoolsPanelScript(nonce, escapeHtml) : ''),
@@ -774,9 +823,22 @@ async function startDevelopment(root: string): Promise<Server> {
 		// Requests wait for a pending rebuild (`reloader`, below), so they never meet the old routes or a
 		// closed module runner, and a restart waits for the requests in flight.
 		const serve = (request: Request): Promise<Response> => reloader.use((running) => running.fetch(request))
+		const blockedHosts = new Set<string>()
 		const listener = toNodeListener((request) => (serverLogs ? serverLogs.handle(request, () => serve(request)) : serve(request)), { onError: reportError, ...(origin ? { publicOrigin: origin } : {}) })
 		const httpServer = createServer((request, response) => {
 			if (bridge?.handle(request, response)) return
+			// The same check as Vite's `server.allowedHosts` (the resolved one, with what modules add),
+			// before Vite and the module public files, so the 403 names Meeko's option.
+			if (!isDevHostAllowed(request.headers.host, devServer.config.server.allowedHosts)) {
+				const message = blockedDevHostMessage(restrictedHostName(request.headers.host) ?? '')
+				if (!blockedHosts.has(message)) {
+					blockedHosts.add(message)
+					process.stderr.write(`${message}\n`)
+				}
+				response.writeHead(403, { 'content-type': 'text/plain; charset=utf-8' })
+				response.end(message)
+				return
+			}
 			// Vite cannot route a malformed target; the Meeko listener answers it with INVALID_URL.
 			let pathname: string
 			try {

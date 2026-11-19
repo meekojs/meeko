@@ -90,6 +90,7 @@ test('the root entry exposes only the documented public runtime', async () => {
 		'batch',
 		'computed',
 		'createContext',
+		'createId',
 		'createRoot',
 		'effect',
 		'inject',

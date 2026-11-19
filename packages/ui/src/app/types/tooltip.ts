@@ -1,4 +1,6 @@
+import type { hint } from '../variants/popover'
 import type { PopoverPlacement, PopoverTrigger } from './popover'
+import type { UIThemeProps } from './theme'
 
 /**
  * Snippets de `<UITooltip>`: `trigger` es el contenido del botón que pinta Meeko, `anchor` lo sustituye
@@ -17,7 +19,7 @@ export interface TooltipSnippets {
 	default?: []
 	/** Contenido del `<button>` disparador que pinta Meeko. */
 	trigger?: []
-	/** Un disparador propio: recibe en {@link PopoverTrigger} su `id` y su `aria-describedby`. */
+	/** Un disparador propio: recibe en {@link PopoverTrigger} su `id`, su `aria-describedby` y su `interestfor`. */
 	anchor?: [trigger: PopoverTrigger]
 }
 
@@ -50,3 +52,47 @@ export interface UITooltipProps {
 	/** `id` del disparador; por defecto, uno de `useId`. */
 	readonly triggerId?: string
 }
+
+/**
+ * Snippets de `<UIHint>`: `default` es una ayuda con formato, en lugar de `text`.
+ * @since 1.11.0
+ * @example
+ * ```html
+ * <UIHint>Se calcula con los pedidos <strong>pagados</strong>.</UIHint>
+ * ```
+ */
+export interface HintSnippets {
+	/** Contenido con formato del tooltip, en lugar de `text`. */
+	default?: []
+}
+
+/**
+ * Props de `<UIHint>`, un icono ⓘ con una ayuda breve en un tooltip, para ponerlo junto a un texto o dentro de
+ * un encabezado: `<h2>Ingresos <UIHint text="Sin impuestos" /></h2>`. Es contenido de frase, toma el tamaño y el
+ * color del texto que lo rodea y se alcanza con el teclado. Es un `<button>` que se nombra con `label` («Más
+ * información» por defecto, en el idioma del documento) y se describe con la ayuda (`aria-describedby`); el
+ * tooltip se abre con el puntero, con el foco y al pulsarlo, también en táctil. Como en `<UITooltip>`, no
+ * pongas en él nada imprescindible ni interactivo. `ui` añade clases a sus slots: `base` (el botón; equivale a
+ * `class`), `icon` y `tooltip`.
+ * @since 1.11.0
+ * @example
+ * ```html
+ * <h2>Ingresos <UIHint text="Importe cobrado, sin impuestos ni devoluciones." /></h2>
+ * <p>Margen <UIHint label="Qué es el margen" placement="right">Ingresos menos <em>costes directos</em>.</UIHint></p>
+ * ```
+ */
+export type UIHintProps = UIThemeProps<
+	typeof hint,
+	{
+		/** El texto de la ayuda; o el snippet `default`, para un contenido con formato. */
+		readonly text?: string
+		/** Nombre accesible del botón; por defecto, el texto `hint.label` de los mensajes de UI. */
+		readonly label?: string
+		/** Dónde se abre la ayuda respecto al icono; `"top"` por defecto. */
+		readonly placement?: PopoverPlacement
+		/** `id` del botón; por defecto, uno de `useId`. */
+		readonly id?: string
+		/** Clases adicionales del botón; equivale a `ui.base`. */
+		readonly class?: string
+	}
+>

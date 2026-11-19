@@ -20,8 +20,7 @@
 		<h2 id="module">Registra el módulo</h2>
 		<p>
 			Regístralo por su nombre: sus opciones van en la clave
-			<code>ui</code>, tipada sin importar nada. Los componentes se registran con el prefijo
-			<code>UI</code>.
+			<code>ui</code>, tipada sin importar nada. Los componentes se registran con el prefijo <code>UI</code>.
 		</p>
 		<DocsCode
 			label="meeko.config.ts"

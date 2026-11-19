@@ -116,7 +116,7 @@
 				bind:href="page.sourceUrl!"
 			>
 				<svg
-					class="meeko-ui-icon"
+					class="line-icon"
 					viewBox="0 0 24 24"
 					aria-hidden="true"
 				>

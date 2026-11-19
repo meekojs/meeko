@@ -1,8 +1,10 @@
 ---
-source-hash: ed074d40080a93826586e239a33df52397d5371824b1f880d86bad30b5198301
+source-hash: 04942a42d304076e82b3174749d6482d199cb7bcf3b9a08d66b4afc93a4ba6e6
 ---
 
 # Upgrade from 1.3 to 1.4
+
+**From:** 1.3.x. **To:** 1.4.0. **Status:** published on npm; the latest version checked on November 5, 2026 is 1.9.0. **Who acts:** maintainers upgrading an application from 1.3.x to 1.4.0.
 
 `1.4` is a minor release: new features (light/dark theming with `theme`, `useTheme()` and `<MeekoThemeToggle>`, `data-theme-choice`, `if:when` on `<snippet>`, types named after each component, `defineSnippets` with `Snippet<Args>`, `MeekoLinkProps` and `RouteId`, auto-imports in `@utilities` modules and CSP with style hashes) are optional. One change is released as an [approved exception](stability.md#approved-exceptions) to the stability policy: a module cannot use a `MeekoConfig` key as its `meta.configKey`, and `theme` is one as of this version. Other changes are noticeable when updating: auto-imports and configuration execution when generating `@utilities` CSS, a child's `snippets` object, the `MEEK106` warning for your own component named `MeekoThemeToggle`, editor completion and `meeko dev` with a linked Meeko. This guide collects them and what you should review for each. The full list, including additions and fixes, is in the [CHANGELOG](../../packages/meeko/CHANGELOG.md); compatibility commitments are in the [stability policy](stability.md).
 

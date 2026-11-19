@@ -2,6 +2,10 @@
  * Long-form text rendered from Markdown, public as the class `meeko-ui-prose`. Text keeps a reading
  * measure while code and tables may take the whole column. It also dresses the HTML of a snapshot:
  * .heading-anchor, .table-wrap, .callout and, in code.css, .code-block come from the renderer.
+ *
+ * It stays CSS, not Tailwind: it dresses HTML that no component writes, and an app puts the class on any
+ * element, such as the <body> of the <iframe sandbox> of the dashboard, which reads this sheet on its own
+ * (`@meekojs/ui/styles/prose.css`) with no utility of the package. <UIProse> paints the same class.
  */
 .meeko-ui-prose {
 	max-width: var(--ui-prose-width);
@@ -13,18 +17,17 @@
 }
 /*
  * A component inside the text is the end of its scope, so it keeps its own look. Inside @scope a selector
- * without :scope gets it as an implied ancestor: `.meeko-ui-prose h2` would look for a nested prose.
+ * without :scope gets it as an implied ancestor: `.meeko-ui-prose h2` would look for a nested prose. A
+ * component on Tailwind ends it by its ui:* classes, and sets its own margin in the prose (`inProse` of
+ * variants/card); a nested prose or a `meeko-ui-sr-only` of the app, by their public class.
  */
-.meeko-ui-prose > :is(.meeko-ui-code-block, .meeko-ui-alert, .meeko-ui-table-scroll, .meeko-ui-card, .meeko-ui-diff) {
-	margin-block: 0 var(--ui-space-6);
-}
 .meeko-ui-prose > :first-child {
 	margin-top: 0;
 }
 .meeko-ui-prose > :last-child {
 	margin-bottom: 0;
 }
-@scope (.meeko-ui-prose) to ([class*='meeko-ui-'], [data-meeko-popover], [data-meeko-select], [data-meeko-theme-toggle]) {
+@scope (.meeko-ui-prose) to ([class*='meeko-ui-'], [class^='ui:'], [class*=' ui:'], [data-meeko-popover], [data-meeko-select], [data-meeko-theme-toggle]) {
 	:scope > :is(p, ul, ol, dl, blockquote, h1, h2, h3, h4),
 	:scope > :is(section, div) > :is(p, ul, ol, dl, blockquote, h2, h3, h4) {
 		max-width: var(--ui-prose-measure);
@@ -104,13 +107,13 @@
 		color: var(--ui-color-text);
 		font-weight: var(--ui-font-weight-semibold);
 	}
-	:scope a:not(.heading-anchor, .meeko-ui-button) {
+	:scope a:not(.heading-anchor) {
 		border-radius: var(--ui-radius-xs);
 		color: var(--ui-color-primary-text);
 		text-decoration-color: var(--ui-color-primary-border);
 		text-underline-offset: var(--ui-underline-offset);
 	}
-	:scope a:not(.heading-anchor, .meeko-ui-button):hover {
+	:scope a:not(.heading-anchor):hover {
 		text-decoration-color: currentColor;
 	}
 	:scope a:focus-visible {
@@ -136,19 +139,26 @@
 		max-width: 100%;
 		height: auto;
 	}
-	:scope :is(:not(pre) > code, kbd) {
+	:scope :not(pre) > code {
 		border-radius: var(--ui-radius-sm);
-		background: var(--ui-color-control-hover);
+		background: var(--ui-color-code-soft);
 		padding: var(--ui-prose-code-padding);
-		color: var(--ui-color-text);
+		color: var(--ui-color-code-text);
 		font-size: var(--ui-prose-code-size);
 		font-family: var(--ui-font-mono);
 		overflow-wrap: anywhere;
 	}
 	:scope kbd {
 		border: var(--ui-border-width) solid var(--ui-color-border);
+		border-radius: var(--ui-radius-sm);
+		background: var(--ui-color-control-hover);
+		padding: var(--ui-prose-code-padding);
+		color: var(--ui-color-text);
+		font-size: var(--ui-prose-code-size);
+		font-family: var(--ui-font-mono);
 	}
 	:scope a > code {
+		background: var(--ui-color-primary-soft);
 		color: inherit;
 	}
 

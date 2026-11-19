@@ -287,13 +287,18 @@ describe('CSS classes in the language server', () => {
 			assert.equal(definition[0]!.range.start.line, 7)
 
 			// Configuration changes are applied without restarting the server.
-			const configure = async (completion: 'auto' | 'on' | 'off', tailwindActive: boolean): Promise<void> => {
-				await client.sendNotification(DidChangeConfigurationNotification.type, { settings: { meeko: { classes: { completion, tailwindActive } } } })
+			const configure = async (completion: 'auto' | 'on' | 'off', tailwindActive: boolean, hover: 'auto' | 'on' | 'off' = 'auto', definition = true): Promise<void> => {
+				await client.sendNotification(DidChangeConfigurationNotification.type, { settings: { meeko: { classes: { completion, hover, definition, tailwindActive } } } })
 			}
 			await configure('off', true)
 			const off = await client.sendRequest(CompletionRequest.type, { textDocument: { uri }, position })
 			assert.ok(!JSON.stringify(off).includes('"meekoClass"'))
+			assert.ok(await client.sendRequest(HoverRequest.type, { textDocument: { uri }, position }), 'completion off does not disable hover')
+			assert.ok(await client.sendRequest(DefinitionRequest.type, { textDocument: { uri }, position }), 'completion off does not disable definition')
+			await configure('on', false, 'off', false)
+			assert.ok(labels((await complete('button u-7"', 'button '.length)).items).includes('u-1'), 'hover and definition off do not disable completion')
 			assert.equal(await client.sendRequest(HoverRequest.type, { textDocument: { uri }, position }), null)
+			assert.equal(await client.sendRequest(DefinitionRequest.type, { textDocument: { uri }, position }), null)
 			await configure('auto', true)
 			assert.ok(labels((await complete('button u-7"', 'button '.length)).items).includes('u-1'), 'without Tailwind the snapshot remains available')
 			await writeFile(join(root, 'package.json'), '{"dependencies":{"tailwindcss":"4"}}')
@@ -302,7 +307,7 @@ describe('CSS classes in the language server', () => {
 				['auto', false, true],
 				['on', true, true],
 			] as const) {
-				await configure(mode, active)
+				await configure(mode, active, mode)
 				const names = labels((await complete('button u-7"', 'button '.length)).items)
 				assert.equal(names.includes('u-1'), generated, `${mode}, Tailwind active=${active}`)
 				assert.ok(names.includes('page0'), 'component classes remain available')

@@ -10,10 +10,13 @@ import type { AutoImport, ImportScope } from './registry'
 import { compile } from '../compiler'
 import { originalOffset } from '../compiler/mapping'
 import { locate, parseSfc } from '../compiler/parser/sfc'
+import { parseTemplate } from '../compiler/parser/template'
 import { projectRoot } from '../compiler/project-root'
 import { checkClientBoundary } from '../compiler/transforms/client-boundary'
+import { contentModelHints } from '../compiler/transforms/content-model'
 import { resolveProjectAliases, resolveProjectAliasesSync } from '../framework/aliases'
 import { readThemeEnabledSync } from '../framework/config'
+import { componentBlockRoots } from './component-roots'
 import { autoImportCollision, discoverAutoImports, outputSpecifier } from './registry'
 
 function bindingNames(name: ts.BindingName, names: Set<string>): void {
@@ -201,6 +204,18 @@ export function checkComponentBoundary(source: string, filename: string, compile
 }
 
 /**
+ * `MEEK139` de los componentes de la plantilla: un componente cuya raíz conocida es un elemento de
+ * bloque, dentro de un elemento que sólo admite contenido de frase. Los avisos de los elementos HTML
+ * ya los da `compile`.
+ */
+function componentContentModel(source: string, filename: string, registry: readonly AutoImport[], aliases: ProjectAliases, known: readonly CompileDiagnostic[]): CompileDiagnostic[] {
+	const sfc = parseSfc(source, filename)
+	const reported = new Set(known.filter((item) => item.code === 'MEEK139').map((item) => item.location.offset))
+	const roots = componentBlockRoots(sfc.script.content, filename, registry, aliases)
+	return contentModelHints(source, filename, parseTemplate(source, sfc.template, filename), roots).filter((item) => !reported.has(item.location.offset))
+}
+
+/**
  * `MEEK134`: the old name of a `Carpeta/Index.meeko` (`<ButtonIndex>`, `ButtonIndexProps` or
  * `resolveComponent("ButtonIndex")`), which still works through 1.x. One warning per name, where it
  * is first used.
@@ -268,15 +283,18 @@ export async function compileWithAutoImports(source: string, filename: string, o
 	const compiled = compile(source, filename, { ...options, projectComponents: autoImportedValues(registry), ...(theme === undefined ? {} : { theme }) })
 	// Before the autoimports, which would only report a server autoimport as unavailable.
 	let boundary: CompileDiagnostic[] = []
+	// A known registry comes from the editor, which may not run the configuration: read it statically.
+	const projectAliases = async (): Promise<ProjectAliases> => knownAliases ?? (knownRegistry ? resolveProjectAliasesSync(root) : await resolveProjectAliases(root))
 	if (target === 'client') {
-		// A known registry comes from the editor, which may not run the configuration: read it statically.
-		const project = knownAliases ?? (knownRegistry ? resolveProjectAliasesSync(root) : await resolveProjectAliases(root))
+		const project = await projectAliases()
 		const serverDirectories = [...new Set([join(root, 'server'), ...project.sourceRoots.map((entry) => join(entry, 'server'))])]
 		boundary = checkComponentBoundary(source, filename, compiled, registry, serverDirectories, project.aliases)
 	}
 	const code = transformAutoImports(source, filename, compiled.code, registry, target)
 	const offset = code.length - compiled.code.length
-	const warnings = [...(compiled.warnings ?? []), ...boundary, ...deprecatedComponentNames(source, filename, compiled, registry)]
+	// MEEK139 of the components, whose root element only `meeko check` and the editor look up.
+	const components = options.typeCheck ? componentContentModel(source, filename, registry, await projectAliases(), compiled.warnings ?? []) : []
+	const warnings = [...(compiled.warnings ?? []), ...boundary, ...deprecatedComponentNames(source, filename, compiled, registry), ...components]
 	return {
 		...compiled,
 		code,

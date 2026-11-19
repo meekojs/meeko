@@ -130,7 +130,8 @@ async function firstPaintAndHydrated(browser: Browser, url: string): Promise<{ f
 	const page = await browser.newPage()
 	const errors: string[] = []
 	page.on('pageerror', (error) => errors.push(error.message))
-	await page.goto(url, { waitUntil: 'networkidle' })
+	await page.goto(url, { waitUntil: 'domcontentloaded' })
+	await page.waitForFunction(() => performance.getEntriesByName('meeko-hydration').length > 0)
 	await page.locator('#count').click()
 	await page.locator('#count', { hasText: '1' }).waitFor()
 	assert.deepEqual(errors, [])
@@ -191,7 +192,7 @@ test('meeko dev paints scoped styles the same before and after hydration, withou
 	// Vite's client adopts the server's <style> tags: no copy, same order.
 	assert.deepEqual(hydrated.sheets, first.sheets)
 	// The global sheet first; then the layout, the page and the card (its @import inlined), in tree order.
-	const order = [/^link \/app\/styles\/main\.css$/, /^style \.app-shell\[data-meeko-s-\w+\]$/, /^style \.page\[data-meeko-s-\w+\]$/, /^style :root$/]
+	const order = [/^link \/@fs\/.+\/app\/styles\/main\.css$/, /^style \.app-shell\[data-meeko-s-\w+\]$/, /^style \.page\[data-meeko-s-\w+\]$/, /^style :root$/]
 	assert.equal(first.sheets.length, order.length, first.sheets.join('\n'))
 	order.forEach((pattern, index) => assert.match(first.sheets[index]!, pattern))
 

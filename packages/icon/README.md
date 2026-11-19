@@ -21,16 +21,20 @@ export default defineMeekoConfig({
 	modules: ['@meekojs/icon'],
 	icon: {
 		collections: ['lucide'],
+		componentName: 'AppIcon',
 	},
 })
 ```
+
+`componentName` cambia el nombre autoimportado; por defecto es `UIIcon`. Acepta cualquier nombre
+PascalCase, por ejemplo `Icon`, `AppIcon` o `Glyph`.
 
 ## Ejemplo mínimo
 
 ```html
 <template>
-	<UIIcon name="lucide:search" />
-	<UIIcon
+	<AppIcon name="lucide:search" />
+	<AppIcon
 		name="lucide:trash-2"
 		label="Eliminar"
 	/>

@@ -7,7 +7,7 @@ import { serializeJson } from '../../core/server'
 import { defaultMaxBodyBytes, enforceRateLimit, errorResponse, finish, guard, readBounded, readJson, validate } from '../contract-runtime'
 import { ApiError, InvalidInputError, issuePath, maxPublicIssues, normalizeServerError, publicIssues, reportServerError, sentIssues } from '../errors'
 import { echoValues, formEncoding, formFlashCookie, formObject, formReturnPath, issueRoot, planFormConversion, sameOriginPath, seeOther } from '../forms/index'
-import { isAllowedOrigin, type SessionManager } from '../runtime/sessions'
+import { isSessionOriginAllowed, type SessionManager } from '../runtime/sessions'
 import { type ApiFormOptions, type ApiRouteDefinition, type ApiSuccessStatus, successStatuses } from './contracts'
 
 /** The fields of a native form, with `_csrf` and `return` apart. */
@@ -172,7 +172,7 @@ async function dispatchApiForm<P extends Schema | undefined, Q extends Schema | 
 		// `origin: "none"` exempts a submission without a session, such as a form-encoded webhook;
 		// with one, Origin is still required (guard() then checks it with the CSRF token).
 		const exempt = definition.origin === 'none' && !context.session.current
-		if (!exempt && !isAllowedOrigin(request, sessions.allowedOrigins ?? [])) throw new ApiError('INVALID_ORIGIN', 403)
+		if (!exempt && !isSessionOriginAllowed(request, sessions)) throw new ApiError('INVALID_ORIGIN', 403)
 		const maxBytes = options.maxBytes ?? defaultMaxBodyBytes
 		if (!Number.isSafeInteger(maxBytes) || maxBytes <= 0) throw new ApiError('INVALID_FORM_OPTIONS', 500)
 		if (options.echo !== undefined && !(Array.isArray(options.echo) && options.echo.every((name) => typeof name === 'string'))) throw new ApiError('INVALID_FORM_OPTIONS', 500)

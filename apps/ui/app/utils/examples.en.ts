@@ -179,6 +179,32 @@ export const englishExamples = {
   <button role="menuitem">Profile</button>
   <button role="menuitem">Sign out</button>
 </UIPopover>`,
+	menu: `<script lang="ts">
+  import type { UIMenuEntry } from '@meekojs/ui/runtime'
+
+  const items: UIMenuEntry[] = [
+    { label: 'Rename', shortcut: 'F2', onSelect: () => rename() },
+    { label: 'Duplicate', onSelect: () => duplicate() },
+    { label: 'See Popover', to: '/popover' },
+    { label: 'Archive', disabled: true },
+    { separator: true },
+    { label: 'Delete', tone: 'danger', onSelect: () => remove() },
+  ]
+</script>
+
+<template>
+  <UIMenu triggerLabel="Project actions" bind:items="items" on:select="(item) => console.log(item.label)" />
+</template>`,
+	menuRow: `<UITable caption="Files" bind:hideCaption="true" rowKey="id" bind:rows="files" bind:columns="columns">
+  <snippet name="cell-actions" params="file">
+    <UIMenu bind:ariaLabel="'Actions for ' + file.name" size="sm" placement="bottom-end" bind:items="actionsOf(file)" />
+  </snippet>
+</UITable>`,
+	menuSnippets: `<UIMenu label="Account" bind:items="[{ label: 'Profile', to: '/profile' }, { label: 'Sign out', onSelect: logout }]">
+  <snippet name="trigger"><img src="/me.png" alt="My account" width="24" height="24" /></snippet>
+  <snippet name="item" params="item"><strong>{item.label}</strong></snippet>
+  <button type="button" role="menuitem" on:click="openHelp">Help</button>
+</UIMenu>`,
 	modal: `<script lang="ts">
   const opened = signal(false)
 </script>
@@ -240,6 +266,16 @@ export default defineMeekoConfig({
     },
   },
 })`,
+	themeDefaults: `export default defineMeekoConfig({
+  modules: ['@meekojs/ui'],
+  ui: {
+    defaults: {
+      card: { padding: 'sm', ui: { header: 'panel-card-header' } },
+      table: { density: 'compact', class: 'panel-table' },
+      stat: { ui: { value: 'panel-stat-value' } },
+    },
+  },
+})`,
 	messages: `// meeko.config.ts
 export default defineMeekoConfig({
   modules: ['@meekojs/ui'],
@@ -272,12 +308,38 @@ export default defineMeekoConfig({
   --ui-color-primary-9: #3b96ff;
   --ui-color-primary-10: #66adff;
 }`,
+	themeSlots: `<!-- class reaches the root; ui, each part by the name of its slot -->
+<UICard title="Pro plan" class="pricing-card"
+  bind:ui="{ header: 'pricing-header', title: 'pricing-title' }">
+  <p>Everything in the basic plan, with no limits.</p>
+</UICard>
+<UIBadge tone="success" dot bind:ui="{ dot: 'pulse' }">Published</UIBadge>`,
+	themeSlotsCss: `/* app/styles/main.css: without @layer, it wins over the component's classes */
+.pricing-card {
+  border-color: var(--ui-color-primary-border);
+}
+.pricing-title {
+  color: var(--ui-color-primary-text);
+}`,
 	buttonStates: `<UIButton tone="danger">Delete</UIButton>
 <UIButton tone="danger" variant="outline">Revoke</UIButton>
 <UIButton bind:loading="saving.value">Save</UIButton>
 <UIButton iconOnly ariaLabel="Delete" variant="outline">
   <UIIcon name="lucide:trash-2" />
 </UIButton>`,
+	iconButton: `<UIIconButton label="Open the menu" icon="menu" />
+<UIIconButton label="Close" icon="close" variant="outline" />
+<UIIconButton label="Confirm" icon="check" variant="primary" on:click="confirm" />
+<UIIconButton label="See links" icon="arrowEnd" to="/links" />
+<UIIconButton label="Delete">
+  <UIIcon name="lucide:trash-2" />
+</UIIconButton>`,
+	iconButtonStates: `<UIIconButton label="Pin the panel" icon="check" variant="outline"
+  bind:pressed="pinned.value" on:click="() => (pinned.value = !pinned.value)" />
+<UIIconButton label="Remove" icon="close" tone="danger" />
+<UIIconButton label="Saving" icon="check" bind:loading="saving.value" />
+<UIIconButton label="Small" icon="menu" size="sm" />
+<UIIconButton label="No tooltip" icon="menu" bind:tooltip="false" />`,
 	textarea: `<UIField id="comment" label="Comment" bind:counter="comment.value.length + '/200'">
   <snippet name="default" params="id, describedBy">
     <UITextarea model="comment" bind:id="id" bind:describedBy="describedBy"
@@ -299,6 +361,20 @@ export default defineMeekoConfig({
 <template>
   <UIRadioGroup model="period" legend="Period" name="period" bind:options="periods" />
   <UIRadioGroup model="period" legend="Period" variant="segmented" bind:options="periods" />
+</template>`,
+	segmented: `<script lang="ts">
+  const days = signal('30')
+  const options = [
+    { value: '7', label: '7 days' },
+    { value: '30', label: '30 days' },
+    { value: '90', label: '90 days' },
+  ]
+</script>
+
+<template>
+  <form method="get">
+    <UISegmentedControl legend="Chart period" hideLegend size="sm" name="days" model="days" bind:options="options" />
+  </form>
 </template>`,
 	slider: `<UISlider model="volume" label="Volume" name="volume" bind:min="0" bind:max="100" bind:step="5" />`,
 	alert: `<UIAlert tone="success" title="Changes saved" description="They are already published." />
@@ -325,6 +401,19 @@ export default defineMeekoConfig({
   { label: 'Author', value: 'Meeko team' },
 ]" />
 <UIDisclosure summary="Technical details"><p>It opens without JavaScript.</p></UIDisclosure>`,
+	kpi: `<!-- A key figure: change with its tone, period, trend and a link to the detail -->
+<UIStat label="Revenue" value="€12,400" bind:change="12.5"
+  period="vs. the previous 30 days"
+  bind:trend="[8.2, 9.1, 8.7, 10.4, 11.2, 10.9, 12.4]" to="/revenue" />
+
+<!-- Down is good: a response time that goes down is a success -->
+<UIStat label="Response time" value="180 ms" bind:change="-8" good="down" />
+
+<!-- A text already formatted: its sign gives the direction -->
+<UIStat label="Orders" bind:value="320" change="−8 orders" period="this month" />
+
+<!-- A sparkline on its own, with an area -->
+<UISparkline bind:values="visits" area tone="accent" />`,
 	diff: `<UIDiff label="Changes to the guide" bind:diff="patch" />`,
 	diffSample: `--- a/guide.md
 +++ b/guide.md
@@ -390,6 +479,11 @@ export default defineMeekoConfig({
 	tooltip: `<UITooltip text="It is published when you save" placement="top">
   <snippet name="trigger">When is it published?</snippet>
 </UITooltip>`,
+	hint: `<h3>Revenue <UIHint text="Amount collected, before taxes and refunds." /></h3>
+<p>
+  Gross margin
+  <UIHint label="What the margin is" placement="bottom">Revenue minus the <em>direct costs</em></UIHint>
+</p>`,
 	commandPalette: `<script lang="ts">
   const query = signal('')
   const pages = [{ title: 'Installation', url: '/installation' }, { title: 'Theming', url: '/theming' }]
@@ -429,16 +523,17 @@ export default defineMeekoConfig({
   modules: ['@meekojs/icon'],
   icon: {
     collections: ['lucide'], // @iconify-json/lucide of the project
+    componentName: 'AppIcon', // UIIcon by default
     local: 'app/icons', // your own SVG files: 'local:<name>'
     size: '1em',
     include: ['lucide:sun', 'lucide:moon'], // for bind:name
   },
 })`,
 	iconDynamic: `<!-- Literals of the expression: they are resolved at compile time -->
-<UIIcon
+<AppIcon
   bind:name="open.value ? 'lucide:x' : 'lucide:menu'"
   bind:label="open.value ? 'Close menu' : 'Open menu'" />
 
 <!-- A value that comes from data: the icon must be in icon.include -->
-<UIIcon bind:name="mode.value" />`,
+<AppIcon bind:name="mode.value" />`,
 } as const satisfies Record<keyof typeof spanish, string>

@@ -14,6 +14,8 @@ import type { BunServerLike } from '../src/bun.ts'
 import type { AppManifest, PrerenderedPage, Schema, ServerApp, ServerAppOptions, ServerPlatform, SocketHub } from '../src/framework-server.ts'
 
 import { createBunServer } from '../src/bun.ts'
+import { createWorker } from '../src/cloudflare.ts'
+import { serveDeno } from '../src/deno.ts'
 import { createServerApp, defineApiRoute, defineRpc, defineServerMiddleware, defineServerRuntime, defineSocketChannel, MemorySessionStore, SessionManager } from '../src/framework-server.ts'
 import { prerenderRoutes } from '../src/framework/prerender.ts'
 import { createNodeAssetReader, serveNode, toNodeListener } from '../src/node.ts'
@@ -555,6 +557,97 @@ test('app.fetch keeps a // pathname under publicOrigin and without it', async ()
 		assert.equal(forged.status, 405, String(publicOrigin))
 		assert.equal(forged.headers.get('set-cookie'), null)
 		assert.deepEqual(seen, [`${publicOrigin ?? 'http://local.test'}//evil.example/api/login`])
+		await app.close()
+	}
+})
+
+test('Bun, Deno and Cloudflare keep a // pathname on the publicOrigin passed to the adapter', async () => {
+	const publicOrigin = 'https://app.example'
+	const forge = (path: string, origin: string): Request => new Request(`http://10.0.0.5:4173${path}`, { method: 'POST', headers: { origin } })
+	const adapters: Record<string, (request: Request) => Promise<Response>> = {
+		bun: async (request) => {
+			const { app } = await fixture()
+			try {
+				const server: BunServerLike = { url: new URL('http://10.0.0.5:4173/'), upgrade: () => false }
+				return (await createBunServer(app, { publicOrigin, platform: platform({}) }).fetch(request, server))!
+			} finally {
+				await app.close()
+			}
+		},
+		deno: async (request) => {
+			const { app } = await fixture()
+			let handler!: (request: Request) => Response | Promise<Response>
+			const fake = {
+				serve: (_options: unknown, serve: typeof handler) => {
+					handler = serve
+					return { addr: { hostname: '10.0.0.5', port: 4173 }, finished: Promise.resolve(), shutdown: async () => {} }
+				},
+				env: { toObject: () => ({}) },
+				build: { os: 'linux' },
+				addSignalListener() {},
+				removeSignalListener() {},
+			}
+			Object.assign(globalThis, { Deno: fake })
+			try {
+				const server = await serveDeno(app, { publicOrigin, platform: platform({}) })
+				try {
+					return await handler(request)
+				} finally {
+					await server.close()
+				}
+			} finally {
+				delete (globalThis as { Deno?: unknown }).Deno
+			}
+		},
+		cloudflare: async (request) => {
+			// Workers need a Durable Object broker for Socket channels; HTTP alone is enough here.
+			const { app } = await fixture({ manifest: { ...manifest, server: { ...manifest.server, socket: [] } } })
+			try {
+				return await createWorker(() => app, { publicOrigin }).fetch(request, {}, { waitUntil() {} } as never)
+			} finally {
+				await app.close()
+			}
+		},
+	}
+	for (const [name, serve] of Object.entries(adapters)) {
+		// The configured origin itself still signs in.
+		assert.equal((await serve(forge('/api/login', publicOrigin))).status, 200, name)
+		// A scheme-relative pathname must not move the request onto the attacker's host.
+		const forged = await serve(forge('//evil.example/api/login', 'https://evil.example'))
+		assert.notEqual(forged.status, 200, name)
+		assert.equal(forged.headers.get('set-cookie'), null, name)
+	}
+})
+
+test('server.headers patterns reach every path the router serves for them', async () => {
+	const page = { renderWithState: () => ({ html: '<p>admin</p>', state: {} }), renderToString: () => '<p>admin</p>' }
+	const app = await createServerApp({
+		manifest: {
+			version: 1,
+			routes: [{ id: '/admin/panel', file: '/app/pages/admin/panel.meeko', layouts: [] }],
+			server: { api: [], rpc: [] },
+			routeMiddleware: [],
+			serverMiddleware: [],
+			client: { entry: '/assets/entry.js', css: [], preload: [] },
+			headers: { '/admin/*': { 'x-frame-options': 'DENY', 'x-robots-tag': 'noindex' }, '/admin/panel': { 'x-exact': 'yes' } },
+		},
+		load: async () => page,
+		production: true,
+		runtime: defineServerRuntime(() => ({ sessions: new SessionManager({ store: new MemorySessionStore(), secure: false }) })),
+	})
+	try {
+		for (const path of ['/admin/panel', '//admin/panel', '/admin//panel', '/%61dmin/panel', '/admin/panel/', '/admin/%70anel?x=1']) {
+			const response = await app.fetch(new Request(`https://site.example${path}`, { headers: { accept: 'text/html' } }))
+			assert.match(await response.text(), /<p>admin<\/p>/, path)
+			assert.equal(response.headers.get('x-frame-options'), 'DENY', path)
+			assert.equal(response.headers.get('x-robots-tag'), 'noindex', path)
+			assert.equal(response.headers.get('x-exact'), 'yes', path)
+		}
+		// A path the router does not serve keeps only the patterns it matches as written.
+		const other = await app.fetch(new Request('https://site.example/administrator', { headers: { accept: 'text/html' } }))
+		await other.body?.cancel()
+		assert.equal(other.headers.get('x-frame-options'), null)
+	} finally {
 		await app.close()
 	}
 })

@@ -7,9 +7,10 @@ $consumer = Join-Path $testRoot 'consumer'
 
 try {
   New-Item -ItemType Directory -Path $consumer -Force | Out-Null
-  $packageName = (& npm pack $repoRoot --pack-destination $testRoot --silent | Select-Object -Last 1)
+  # pnpm pack, not npm pack: it replaces the catalog: and workspace: versions, which npm cannot install.
+  $packageName = (& pnpm -C $repoRoot pack --pack-destination $testRoot | Select-Object -Last 1)
   if ($LASTEXITCODE -ne 0 -or !$packageName) { throw 'No se pudo empaquetar Meeko.' }
-  $tarball = Join-Path $testRoot $packageName
+  $tarball = Join-Path $testRoot (Split-Path -Leaf $packageName)
 
   Set-Content -LiteralPath (Join-Path $consumer 'package.json') -Encoding utf8 -Value '{"name":"meeko-external-consumer","private":true,"type":"module"}'
   Set-Content -LiteralPath (Join-Path $consumer 'Counter.meeko') -Encoding utf8 -Value @'

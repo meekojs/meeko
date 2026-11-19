@@ -5,7 +5,7 @@ import type { Output, Schema } from './schema'
 import { serializeJson } from '../core/server'
 import { ApiError, InvalidInputError, normalizeServerError, publicIssues, sentIssues } from './errors'
 import { countRateLimit, rateLimitKey, rateLimitSettings, rateLimitSubject, retryAfterSeconds } from './runtime/rate-limit'
-import { isAllowedOrigin, type SessionManager, settleSessionOrigin } from './runtime/sessions'
+import { isSessionOriginAllowed, type SessionManager, settleSessionOrigin } from './runtime/sessions'
 
 export async function validate<S extends Schema>(schema: S, value: unknown, label: string): Promise<Output<S>> {
 	const result = await schema['~standard'].validate(value)
@@ -107,7 +107,7 @@ export async function guard<S>(definition: Guarded<S>, context: RequestContext<S
 	// session's rule): a missing, `null` or foreign one is 403. SSR clients send the request's
 	// own origin, so local dispatch passes. `origin: "required"` is the same as the default.
 	if (definition.origin !== 'none' && (mutating ?? !['GET', 'HEAD', 'OPTIONS'].includes(request.method))) {
-		if (!isAllowedOrigin(request, sessions.allowedOrigins ?? [])) throw new ApiError('INVALID_ORIGIN', 403)
+		if (!isSessionOriginAllowed(request, sessions)) throw new ApiError('INVALID_ORIGIN', 403)
 		context.session[settleSessionOrigin]?.('verified')
 	}
 	// An explicit, documented opt-out for webhooks and public APIs: no anonymous Origin check, and

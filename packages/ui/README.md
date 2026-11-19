@@ -22,7 +22,9 @@ export default defineMeekoConfig({
 })
 ```
 
-El módulo registra los componentes con el prefijo `UI` y su CSS. `theme: true` activa los temas del framework y es opcional.
+El módulo registra los componentes con el prefijo `UI` y su CSS, ya compilado: la aplicación no necesita Tailwind. `theme: true` activa los temas del framework y es opcional.
+
+Para adaptarlo a tu marca, redefine los tokens `--ui-*` o usa `ui.tokens`. Para retocar un componente, `class` llega a su elemento raíz y la prop `ui` añade clases a cada parte: `<UICard bind:ui="{ title: 'pricing-title' }">`. Cualquier regla sin capa de tu CSS gana a la del componente. Consulta las [clases por slot](https://meekojs.com/docs/ui-api#clases-por-slot) y cómo [migrar desde las clases `.meeko-ui-*`](https://meekojs.com/docs/ui-api#migración-desde-las-clases-retiradas).
 
 ## Ejemplo mínimo
 

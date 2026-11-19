@@ -1,5 +1,7 @@
 # Actualizar de 1.5 a 1.6
 
+**Origen:** 1.5.x. **Destino:** 1.6.0. **Estado:** publicado en npm; la versión más reciente consultada el 5 de noviembre de 2026 es 1.9.0. **Quién actúa:** quien mantenga una aplicación que actualiza desde 1.5.x a 1.6.0.
+
 `1.6` es un minor: lo nuevo (el middleware de ruta con nombre, que las rutas piden con `middleware` en `definePage` y en `+group.ts`, y el middleware de ruta de servidor, `app/middleware/*.server.ts` con `defineServerRouteMiddleware`) es opcional. Dos cambios se publican como [excepciones aprobadas](stability.md#excepciones-aprobadas) a la política de estabilidad: los archivos `*.server.ts` de `app/middleware`, que hasta `1.5` se ignoraban, son middleware de ruta de servidor, y un spread en las opciones de una página que puede llevar `middleware` exige declararlo después. Además, algunos cambios se notan al actualizar: el orden del middleware global en el navegador, la URL del render en el payload, `<MeekoThemeToggle>` en las páginas servidas en otra URL, la redirección de `POST /_meeko/theme`, un nombre nuevo que se autoimporta y errores de descubrimiento nuevos. Esta guía los reúne con lo que conviene revisar en cada uno y explica cómo adoptar cada función. La lista completa, con lo añadido y corregido, está en el [CHANGELOG](../packages/meeko/CHANGELOG.md); los compromisos de compatibilidad, en la [política de estabilidad](stability.md).
 
 ## Orden recomendado

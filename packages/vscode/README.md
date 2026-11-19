@@ -109,6 +109,7 @@ En un workspace no confiable la extensión nunca ejecuta código del proyecto: u
 | Ajuste                                 | Por defecto | Descripción                                                                                                                                                                                                                                                                               |
 | -------------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `meeko.languageServer.preferWorkspace` | `true`      | Usa el servidor de `@meekojs/meeko` del proyecto cuando existe. Se ignora en modo restringido.                                                                                                                                                                                            |
+| `meeko.languageServer.warmup`          | `true`      | Prepara al iniciar el programa TypeScript de los proyectos de las pestañas `.meeko` abiertas, para que el primer componente tenga colores y hover sin esperar. Desactívalo para ahorrar memoria.                                                                                          |
 | `meeko.format.indentSections`          | `false`     | Al formatear, indenta un nivel el contenido de cada sección (`<script>`, `<script server>`, `<template>` y `<style>`), como `vueIndentScriptAndStyle` de Prettier más la plantilla. El contenido de `<pre>` y `<textarea>` no cambia. Con `false`, el formato quita esa indentación base. |
 | `meeko.editor.executionZones`          | `true`      | Muestra las zonas de ejecución: una barra en el margen y un color de línea tenue para el código que se ejecuta sólo en el servidor, en ambos lados o sólo en el navegador.                                                                                                                |
 | `meeko.live.enabled`                   | `true`      | Conecta con `meeko dev` para mostrar y editar los valores en vivo de las señales. Sólo en workspaces de confianza y con un servidor de desarrollo en loopback.                                                                                                                            |
@@ -165,20 +166,20 @@ Para compilar, empaquetar e instalar la extensión en el VS Code local, desde la
 pnpm run vscode:install
 ```
 
-También puedes ejecutar `pnpm run install:local` desde `packages/vscode`, o `pwsh -NoProfile -File packages/vscode/install-local.ps1` desde la raíz. El script detecta la plataforma y versión, comprueba tipos, construye el VSIX y lo instala con `code --install-extension --force`, también si ya está instalada esa versión. Después ejecuta **Developer: Reload Window** en VS Code.
+También puedes ejecutar `pnpm run install:local` desde `packages/vscode`, o `node packages/vscode/install-local.mjs` desde la raíz. El script detecta la plataforma y versión, comprueba tipos, construye el VSIX y lo instala con `code --install-extension --force`, también si ya está instalada esa versión. Si `code` no está en el `PATH`, como en una terminal de WSL fuera de VS Code, usa el `code-server` más reciente de `~/.vscode-server`, que instala en el servidor remoto. Después ejecuta **Developer: Reload Window** en VS Code.
 
-Para reinstalar el último VSIX sin compilar: `pnpm run install:local -- -UseExistingVsix` desde `packages/vscode`. Esta opción reutiliza el artefacto existente; no incorpora nuevos cambios de fuente. Si el CLI tiene otro nombre o ruta, usa `-CodeCommand`, por ejemplo `pwsh -NoProfile -File install-local.ps1 -CodeCommand code-insiders`.
+Para reinstalar el último VSIX sin compilar: `pnpm run install:local -- --use-existing-vsix` desde `packages/vscode`. Esta opción reutiliza el artefacto existente; no incorpora nuevos cambios de fuente. Si el CLI tiene otro nombre o ruta, usa `--code`, por ejemplo `node install-local.mjs --code code-insiders`; `--target` instala el VSIX de otra plataforma.
 
-El empaquetado usa VSCE `4.1.0`. El instalador suprime exclusivamente el aviso `DEP0169` durante la ejecución del CLI de VS Code y restaura `NODE_OPTIONS` al terminar. Es una solución temporal al uso de `url.parse()` dentro de VS Code ([incidencia abierta](https://github.com/microsoft/vscode/issues/319867)), no un cambio en esa API. Para ver también ese aviso durante una investigación, ejecuta el script con `-ShowCliDeprecations`.
+El empaquetado usa VSCE `4.1.0`. El instalador suprime exclusivamente el aviso `DEP0169` durante la ejecución del CLI de VS Code. Es una solución temporal al uso de `url.parse()` dentro de VS Code ([incidencia abierta](https://github.com/microsoft/vscode/issues/319867)), no un cambio en esa API. Para ver también ese aviso durante una investigación, ejecuta el script con `--show-cli-deprecations`.
 
-```powershell
+```sh
 pnpm run package:vsix
-pwsh -NoProfile -File package-vsix.ps1 -Target linux-x64
-pwsh -NoProfile -File package-vsix.ps1 -Target darwin-arm64
+node package-vsix.mjs --target linux-x64
+node package-vsix.mjs --target darwin-arm64
 pnpm run test:host:isolated
 ```
 
-`package:vsix` genera un VSIX para el sistema y arquitectura del equipo. `-Target` también admite `win32-x64`, `win32-arm64`, `linux-x64`, `linux-arm64`, `darwin-x64` y `darwin-arm64`, de modo que se pueden preparar paquetes para otros equipos desde Windows. Cada archivo se guarda en `artifacts/meeko-language-<versión>-<target>.vsix`; el script local no publica ni instala nada. La publicación en Marketplace y Open VSX sólo ocurre al subir una etiqueta `vscode-v<versión>`, como explica [docs/releasing.md](https://github.com/meekojs/meeko/blob/main/docs/releasing.md). El script requiere PowerShell 7, aísla la instalación de TypeScript 6/7 y verifica que el VSIX contenga exactamente el ejecutable nativo de TypeScript 7 para su destino. [VS Code distribuye extensiones con binarios nativos por plataforma](https://code.visualstudio.com/api/working-with-extensions/publishing-extension#platform-specific-extensions).
+`package:vsix` genera un VSIX para el sistema y arquitectura del equipo. `--target` también admite `win32-x64`, `win32-arm64`, `linux-x64`, `linux-arm64`, `darwin-x64` y `darwin-arm64`, de modo que se pueden preparar paquetes para otros equipos desde cualquier sistema. Cada archivo se guarda en `artifacts/meeko-language-<versión>-<target>.vsix`; el script local no publica ni instala nada. La publicación en Marketplace y Open VSX sólo ocurre al subir una etiqueta `vscode-v<versión>`, como explica [docs/releasing.md](https://github.com/meekojs/meeko/blob/main/docs/releasing.md). El script sólo requiere Node; `package-vsix.ps1` e `install-local.ps1` se mantienen como envoltorios con los parámetros anteriores. Resuelve las versiones `catalog:` de pnpm, aísla la instalación de TypeScript 6/7 y verifica que el VSIX contenga exactamente el ejecutable nativo de TypeScript 7 para su destino. [VS Code distribuye extensiones con binarios nativos por plataforma](https://code.visualstudio.com/api/working-with-extensions/publishing-extension#platform-specific-extensions).
 
 `test:host:isolated` prueba el VSIX de la **plataforma anfitriona** en un VS Code real: extrae el paquete, instala Meeko en un proyecto consumidor temporal y comprueba que se usa el servidor de lenguaje del proyecto, diagnósticos con rango completo, contratos, navegación, hover, referencias, renombrado, completado, ayuda de firma, símbolos, plegado, tokens semánticos y formato al guardar. En Windows busca la instalación habitual de VS Code; en macOS y Linux intenta encontrar `code` en `PATH`. Si no lo encuentra, `@vscode/test-electron` descarga la versión estable en una carpeta temporal. Puedes indicar otra instalación con `pwsh -NoProfile -File tests/prepare-host.ps1 -VSCodeExecutable <ruta>`. La matriz de CI ejecuta esta prueba en Windows, Linux y macOS (con `xvfb-run` en Linux). No se generan VSIX para Alpine ni para web, que necesitarían soporte adicional del ejecutable TypeScript 7 y del host de extensión.
 
@@ -190,17 +191,42 @@ pnpm run test:host:isolated
 - El formato usa Prettier con el plugin de Meeko, en memoria: el del proyecto con su configuración si existe y el workspace es de confianza, o el incluido en la extensión. Normaliza los `class="…"` estáticos, mantiene expandidos los arrays con un salto tras `[` (`meekoPreserveArrayBreaks`) y, si la configuración de Prettier del proyecto lo pide, ordena las clases (`meekoSortClasses`); el orden por la hoja global usa el Vite del proyecto, porque la extensión no lo incluye, y no se aplica en modo restringido. Sólo formatea el documento completo y no formatea un archivo que no compila (véase [docs/editors.md](../../docs/editors.md#formato-con-prettier)).
 - Generar un VSIX cruzado confirma su contenido, pero no sustituye la prueba del host de destino. La matriz de CI comprueba la extensión en Windows, Linux y macOS.
 
+## Variables CSS y controles independientes
+
+Meeko ofrece completado, hover, «Ir a definición», búsqueda de referencias y renombrado de variables CSS en `<style>` y estilos inline de `.meeko`, y en archivos `.css` de paquetes con `meeko.config.*`. Funciona sin Tailwind y también con el lenguaje `tailwindcss`. Abrir sólo una hoja CSS activa la extensión en un workspace Meeko; el soporte CSS registra únicamente esas funciones de variables, sin hacerse cargo del formato ni de los diagnósticos de CSS.
+
+Las fuentes son la hoja abierta, `app/styles/main.css`, sus imports locales y la hoja procesada `.meeko/styles/main.css` cuando existe. Los cambios sin guardar en hojas importadas se reflejan entre documentos y al cerrarlas vuelve a contar la versión guardada. El hover muestra el valor y su archivo; la definición prioriza las fuentes escritas frente al CSS generado. Las hojas CSS se leen sin ejecutar la configuración ni plugins del proyecto, también en workspaces no confiables. No se escanea todo el disco: los imports quedan dentro del paquete y tienen un límite de 64 archivos. Los componentes `.meeko` conservan además sus fuentes de estilos globales y las reglas de visibilidad de `scoped`.
+
+| Ajuste                          | Predeterminado | Controla únicamente                   |
+| ------------------------------- | -------------- | ------------------------------------- |
+| `meeko.cssVariables.completion` | `true`         | Sugerencias de variables CSS          |
+| `meeko.cssVariables.hover`      | `true`         | Hover de variables CSS                |
+| `meeko.cssVariables.definition` | `true`         | Ir a definición de variables CSS      |
+| `meeko.cssVariables.references` | `true`         | Buscar referencias de variables CSS   |
+| `meeko.cssVariables.rename`     | `true`         | Renombrar variables CSS               |
+| `meeko.classes.completion`      | `"auto"`       | Sugerencias de clases en `.meeko`     |
+| `meeko.classes.hover`           | `"auto"`       | Hover de clases en `.meeko`           |
+| `meeko.classes.definition`      | `true`         | Ir a definición de clases en `.meeko` |
+
+Todos tienen ámbito de recurso y se actualizan sin reiniciar el servidor. Por ejemplo, `"meeko.classes.completion": "off"` conserva las variables y el hover de clases. Para mantener el comportamiento anterior, donde ese ajuste apagaba también el hover de clases, añade `"meeko.classes.hover": "off"`. Cada ajuste de variables afecta sólo a las sugerencias o información aportadas por Meeko: otros proveedores de VS Code o Tailwind pueden seguir aportando las suyas.
+
+Otros clientes LSP pueden comunicar `meeko.cssVariables` mediante `workspace/configuration`, `initializationOptions.cssVariables` o una notificación de configuración con `settings.meeko.cssVariables`. Para hojas CSS necesitan sincronizar los documentos; el servidor registra dinámicamente los proveedores que el cliente admite. Las referencias y el renombrado leen las fuentes actuales de `app/`, los componentes raíz y los imports locales indexados del mismo paquete. Los buffers abiertos tienen prioridad. Se excluyen los artefactos generados, dependencias, carpetas ocultas y paquetes anidados; el recorrido se limita a 2000 archivos/directorios y 16 MiB. Si la cobertura es incompleta o no se puede analizar el CSS, las operaciones sobre variables compartidas informan de la limitación en lugar de devolver una edición parcial.
+
+Las referencias incluyen declaraciones (cuando se solicitan), `@property`, `var(...)`, `--theme(...)`, consultas de estilo y nombres de propiedades personalizadas en `transition`, `transition-property` y `will-change`. También participan los estilos inline estáticos y las partes literales de `bind:style`. Se excluyen comentarios, contenido de cadenas y código JavaScript/TypeScript. Un nombre declarado de forma privada en `<style scoped>` o en estilos inline pertenece a ese componente para estas operaciones; `:global(...)`, `@property` y las declaraciones sin `scoped` son compartidas. Esto agrupa nombres por componente, sin intentar resolver la herencia del DOM entre elementos.
+
+El renombrado exige un nombre completo como `--color-brand` y una declaración editable. Rechaza colisiones e identificadores escapados. VS Code recibe una edición del workspace, con versiones de los documentos abiertos, para aplicarla o deshacerla entre archivos; el servidor no escribe archivos. Un renombrado local de componente sigue disponible si otra hoja no relacionada está incompleta. No cambia las clases de utilidades derivadas de Tailwind, valores generados dinámicamente en scripts ni identificadores CSS fuera de los contextos soportados. Revisa esos usos de la aplicación cuando renombres un token de tema público.
+
 ## Tailwind CSS
 
 Instala la extensión oficial **Tailwind CSS IntelliSense** (`bradlc.vscode-tailwindcss`) y configura Tailwind en el proyecto. Esta extensión aporta las utilidades, variantes, valores y documentación de Tailwind; Meeko aporta el análisis de componentes y las clases CSS escritas en sus `<style>` y en `app/styles/main.css`, incluidos sus imports locales.
 
 Meeko Language registra automáticamente `tailwindCSS.includeLanguages: { "meeko": "html" }` y activa `editor.quickSuggestions.strings` para `[meeko]`. Son valores predeterminados de VS Code: respetan tus ajustes explícitos y no escriben en `settings.json`. [VS Code documenta `configurationDefaults` para otras configuraciones registradas](https://code.visualstudio.com/api/references/contribution-points#contributes.configurationDefaults).
 
-`meeko.classes.completion` controla el completado y hover de clases de Meeko:
+`meeko.classes.completion` y `meeko.classes.hover` controlan por separado sus funciones de clases de Meeko:
 
 - `auto` (predeterminado): si Tailwind IntelliSense está activo y el proyecto declara `tailwindcss` como dependencia o lo importa desde sus hojas fuente, delega las clases de la hoja procesada `.meeko/styles/main.css` a Tailwind. Conserva las clases escritas en componentes y hojas fuente.
 - `on`: incluye también las clases de la hoja procesada.
-- `off`: desactiva el completado y hover de clases de Meeko. La navegación a definiciones y las variables CSS siguen disponibles.
+- `off`: desactiva sólo la función elegida. La definición se controla con `meeko.classes.definition`; las variables tienen sus propios ajustes.
 
 Las cadenas de `bind:class="active.value ? 'bg-blue-500' : 'bg-gray-500'"` reciben sugerencias de clases; no hace falta añadir `bind:class` a `tailwindCSS.classAttributes`, porque el atributo `class` predeterminado reconoce el prefijo `:`. Meeko conserva además el análisis TypeScript de la expresión.
 

@@ -543,12 +543,13 @@ test('edit a source with its preview, save the draft and publish it; rejections,
 	await page.goto(`${origin}/sources/${ids.doctor}/edit?revision=${draft}`, { waitUntil: 'networkidle' })
 	await hydrated()
 	await crepe.waitFor({ timeout: 60_000 })
-	const box = async (target) => target.locator('.ui-markdown-editor-surface').boundingBox()
+	// The surface is the last box of the editor, under its bar and its notice.
+	const box = async (target) => target.locator('.ui-markdown-editor > div:last-child').boundingBox()
 	const hydratedBox = await box(page)
 	const noScript = await browser.newContext({ javaScriptEnabled: false, viewport: { width: 1440, height: 900 }, storageState: await page.context().storageState() })
 	const firstPaint = await noScript.newPage()
 	await firstPaint.goto(`${origin}/sources/${ids.doctor}/edit?revision=${draft}`)
-	await firstPaint.locator('.ui-markdown-editor-marker').getByText('Cargando el editor…').waitFor()
+	await firstPaint.locator('.ui-markdown-editor').getByRole('status').filter({ hasText: 'Cargando el editor…' }).waitFor()
 	assert.equal(await firstPaint.locator('.milkdown').count(), 0, 'the server does not render Crepe')
 	assert.deepEqual(await box(firstPaint), hydratedBox, 'nothing moves when the editor arrives')
 	await noScript.close()
@@ -624,7 +625,7 @@ test('edit a source with its preview, save the draft and publish it; rejections,
 		element.value = value
 		element.dispatchEvent(new Event('input', { bubbles: true }))
 	}, over)
-	await page.locator('.meeko-ui-badge[data-tone="danger"]').filter({ hasText: 'kB' }).waitFor()
+	await page.locator('span[class~="ui:bg-danger-soft"]').filter({ hasText: 'kB' }).waitFor()
 	assert.equal(await page.getByRole('button', { name: /^(Crear|Guardar) borrador$/ }).isDisabled(), true)
 
 	// Expected in the console: the refused publication of the reference page (422), the failed save

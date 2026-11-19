@@ -216,10 +216,15 @@ test('Chrome: recuperar un documentHtml sólo inserta lo que la respuesta actual
 			await page.evaluate(() => {
 				;(window as unknown as { sameDocument: boolean }).sameDocument = true
 			})
-			await page.locator('#toggle').click()
-			await page.locator('#toggle').click()
+			const warned = page.waitForEvent('console', { predicate: (message) => /Document HTML could not be recovered/.test(message.text()) })
+			await Promise.all([
+				warned,
+				(async () => {
+					await page.locator('#toggle').click()
+					await page.locator('#toggle').click()
+				})(),
+			])
 			await page.waitForFunction(() => document.querySelector('article')?.childNodes.length === 1)
-			await page.waitForTimeout(1000)
 			assert.equal(documents.length, 1, 'no second reload')
 			assert.equal(await sameDocument(page), true)
 			assert.equal(await page.locator('article').innerText(), '', 'nothing was inserted')
