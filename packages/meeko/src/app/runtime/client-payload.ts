@@ -17,6 +17,8 @@ export interface HydrationPayload {
 	deferred: readonly PayloadDeferred[]
 	/** Data of the top-level data awaits that the server rendered, by request key. */
 	resources: Record<string, unknown>
+	/** Data keys that the page's loader declared with `depends`: an invalidation of one reruns it. */
+	keys: readonly string[]
 	/** Props the named layout rendered with, when the page has one. */
 	layoutProps: Record<string, unknown> | undefined
 	/**
@@ -69,6 +71,7 @@ export function readPayload(value: unknown): HydrationPayload {
 	if (parsed.sharedState !== undefined && !isRecord(parsed.sharedState)) throw new TypeError('Invalid Meeko shared state')
 	if (parsed.resources !== undefined && !isRecord(parsed.resources)) throw new TypeError('Invalid Meeko page data')
 	if (parsed.layoutProps !== undefined && !isRecord(parsed.layoutProps)) throw new TypeError('Invalid Meeko layout props')
+	if (parsed.keys !== undefined && !(Array.isArray(parsed.keys) && parsed.keys.every((key) => typeof key === 'string'))) throw new TypeError('Invalid Meeko data keys')
 	// A path and its query, as the server saw them: never another origin nor a fragment.
 	if (parsed.url !== undefined && (typeof parsed.url !== 'string' || !parsed.url.startsWith('/') || parsed.url.includes('#'))) {
 		throw new TypeError('Invalid Meeko payload URL')
@@ -91,6 +94,7 @@ export function readPayload(value: unknown): HydrationPayload {
 		head,
 		deferred: readDeferredEntries(parsed.deferred),
 		resources: (parsed.resources as Record<string, unknown> | undefined) ?? {},
+		keys: (parsed.keys as string[] | undefined) ?? [],
 		layoutProps: parsed.layoutProps as Record<string, unknown> | undefined,
 		url: parsed.url as string | undefined,
 		documentHtml: readDocumentHtmlIdentities(parsed.documentHtml),

@@ -1,6 +1,6 @@
 import type { ClientOptions } from '../../shared/clients'
 
-import { currentRequest } from './request-context'
+import { currentRequest, sessionOf } from './request-context'
 
 /**
  * Opciones de cliente para el servidor: leen la URL, las cookies, `authorization`, el token CSRF y
@@ -31,7 +31,7 @@ export function createServerClientOptions(): ClientOptions {
 			headers.set('origin', new URL(request.url).origin)
 			return headers
 		},
-		csrfToken: () => currentRequest().context.session.current?.csrfToken,
+		csrfToken: () => sessionOf(currentRequest().context).current?.csrfToken,
 		fetch: async (input, init) => {
 			const active = currentRequest()
 			const request = new Request(input, init)

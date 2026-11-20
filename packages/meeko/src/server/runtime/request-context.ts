@@ -1,12 +1,17 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 
+import type { DataKey } from '../../framework'
+import type { RequestCookies, ResponseHeaders } from './cookies'
 import type { ContextServices } from './definition'
 import type { ServerPlatform } from './platform'
 import type { SessionData, SessionHandle } from './sessions'
 
+import { checkDataKey } from '../../shared/invalidation'
+import { ResponseState } from './cookies'
 import { clientAddressOf, requestEnvironmentOf } from './env'
 import { defaultPlatform } from './platform'
 import { takeScopedRequestId } from './process-errors'
+import { disabledSessionError, isDisabledSession } from './sessions'
 
 /**
  * Contexto de una petición HTTP: sesión, servicios, plataforma y estado propios de esa petición,
@@ -45,9 +50,27 @@ export interface RequestContext<out TServices = unknown, TEnv = unknown> {
 	readonly services: ContextServices<TServices>
 	/**
 	 * Sesión de la petición: leer, crear, rotar, revocar y verificar. Sus datos tienen el tipo de
-	 * `MeekoSession` cuando la aplicación lo declara (desde `1.2`), o `unknown`.
+	 * `MeekoSession` cuando la aplicación lo declara (desde `1.2`), o `unknown`. Desde `1.10`, si
+	 * `server/runtime.ts` devuelve `sessions: false`, leerla lanza un error que lo explica.
 	 */
 	readonly session: SessionHandle<SessionData>
+	/**
+	 * Cookies de la petición (desde `1.10`): lee las del navegador y escribe las de la respuesta, con
+	 * `HttpOnly`, `SameSite=Lax`, `Path=/` y `Secure` por defecto. Véase {@link RequestCookies}.
+	 */
+	readonly cookies: RequestCookies
+	/**
+	 * Cabeceras que esta petición añade a su respuesta (desde `1.10`), sea cual sea: JSON, una
+	 * redirección, un error o una página. Véase {@link ResponseHeaders}.
+	 */
+	readonly responseHeaders: ResponseHeaders
+	/**
+	 * Marca claves de datos como cambiadas por esta escritura (desde `1.10`), además de las de
+	 * `invalidates`, como `` context.invalidate(`orders.${id}`) ``. Sólo viajan, en la cabecera
+	 * `x-meeko-invalidate`, con la respuesta correcta de una mutación de API o RPC; un error no
+	 * invalida nada.
+	 */
+	readonly invalidate: (...keys: DataKey[]) => void
 	/** Estado propio de la petición; véase {@link useRequestState}. */
 	readonly state: Map<string, unknown>
 	/** Runtime que atiende la petición, con su entorno y el soporte de trabajo en segundo plano. */
@@ -204,11 +227,73 @@ function combinedSignal(request: AbortSignal, revocation: AbortSignal): AbortSig
  * ```
  */
 export function createRequestContext<TServices, TEnv = unknown>(request: Request, services: TServices, session: SessionHandle<any>, platform?: ServerPlatform<TEnv>): RequestContext<TServices, TEnv> {
+	return buildRequestContext(request, services, session, platform)
+}
+
+/** The handle of a context, also when `context.session` throws (`sessions: false`). Internal. */
+export const contextSession: unique symbol = Symbol.for('meeko.context.session') as never
+/** The cookies and response headers of a context, shared by the contexts derived from it. Internal. */
+export const contextResponse: unique symbol = Symbol.for('meeko.context.response') as never
+
+type InternalContext = RequestContext<unknown, unknown> & { readonly [contextSession]?: SessionHandle<any>; readonly [contextResponse]?: ResponseState }
+
+/** The session handle of a context for Meeko's own reads: it never throws, also with `sessions: false`. */
+export function sessionOf(context: RequestContext<unknown, unknown>): SessionHandle<any> {
+	return (context as InternalContext)[contextSession] ?? context.session
+}
+
+/** The cookies and response headers of a context, if Meeko created it. */
+export function responseStateOf(context: RequestContext<unknown, unknown>): ResponseState | undefined {
+	return (context as InternalContext)[contextResponse]
+}
+
+/** The data keys a request invalidated, shared by the contexts derived from it. */
+const invalidatedKeys = new WeakMap<object, Set<string>>()
+
+/** The set of data keys a request invalidated, created on first use. Internal. */
+export function invalidatedKeysOf(context: RequestContext<unknown, unknown>): Set<string> {
+	const owner: object = responseStateOf(context) ?? context
+	let keys = invalidatedKeys.get(owner)
+	if (!keys) invalidatedKeys.set(owner, (keys = new Set()))
+	return keys
+}
+
+/** Adds what the request wrote with `cookies` and `responseHeaders` to a response's headers. */
+export function applyResponseState(headers: Headers, context: RequestContext<unknown, unknown>): void {
+	responseStateOf(context)?.applyTo(headers)
+}
+
+/**
+ * A copy of `context` with some fields replaced, such as the request of a local API call. Unlike a
+ * spread, it keeps the getters, so `session` still throws with `sessions: false`; the cookies and
+ * response headers stay those of the original request.
+ */
+export function deriveContext<TServices, TEnv>(context: RequestContext<TServices, TEnv>, fields: Partial<Pick<RequestContext<TServices, TEnv>, 'request' | 'signal' | 'idempotencyKey'>>): RequestContext<TServices, TEnv> {
+	const descriptors: PropertyDescriptorMap = Object.getOwnPropertyDescriptors(context)
+	for (const key of Reflect.ownKeys(descriptors)) descriptors[key as string] = { ...descriptors[key as string], configurable: true }
+	const derived = Object.defineProperties({}, descriptors) as RequestContext<TServices, TEnv>
+	for (const [key, value] of Object.entries(fields)) Object.defineProperty(derived, key, { value, enumerable: true, configurable: true, writable: false })
+	return derived
+}
+
+/** Options of {@link buildRequestContext}. */
+export interface RequestContextInit {
+	/** The cookies and headers of this request, already given to the services factory. */
+	readonly response?: ResponseState | undefined
+	/** Default `Secure` of new cookies; `true` when absent. */
+	readonly secureCookies?: boolean | undefined
+	/** A Socket handshake: cookies and headers can only be read. */
+	readonly readOnly?: boolean | undefined
+}
+
+/** {@link createRequestContext} with the response state Meeko's hosts share with their services. */
+export function buildRequestContext<TServices, TEnv = unknown>(request: Request, services: TServices, session: SessionHandle<any>, platform?: ServerPlatform<TEnv>, init: RequestContextInit = {}): RequestContext<TServices, TEnv> {
 	const revocation = (session as Partial<SessionHandle> | undefined)?.signal
 	let signal: AbortSignal | undefined
 	const resolvedPlatform = platform ?? (defaultPlatform() as ServerPlatform<TEnv>)
 	let address: { readonly value: string | undefined } | undefined
-	return {
+	const response = init.response ?? new ResponseState(request, { secure: init.secureCookies ?? true, sessionCookieName: sessionCookieNameOf(session), readOnly: init.readOnly })
+	const context = {
 		// The first context of a ServerApp request takes the ID its process failures carry.
 		// `services` is the written type unless it is `unknown`, which ContextServices resolves.
 		request,
@@ -224,5 +309,32 @@ export function createRequestContext<TServices, TEnv = unknown>(request: Request
 		get clientAddress() {
 			return (address ??= { value: clientAddressOf(request, resolvedPlatform.env) }).value
 		},
+		cookies: response.cookies,
+		responseHeaders: response.headers,
+		invalidate: (...keys: DataKey[]): void => {
+			const target = invalidatedKeysOf(context)
+			for (const key of keys) target.add(checkDataKey(key, 'context.invalidate()'))
+		},
+		[contextSession]: session,
+		[contextResponse]: response,
 	}
+	// Without Meeko sessions, any use of context.session explains why instead of reading undefined.
+	// Not enumerable, so spreading the context does not throw.
+	if (isDisabledSession(session)) {
+		Object.defineProperty(context, 'session', {
+			get() {
+				throw disabledSessionError()
+			},
+			enumerable: false,
+			configurable: true,
+		})
+	}
+	return context
+}
+
+/** The Meeko session cookie of a handle, which `context.cookies` reads but never writes. */
+function sessionCookieNameOf(session: SessionHandle<unknown> | undefined): string | undefined {
+	if (isDisabledSession(session)) return undefined
+	const manager = (session as unknown as { readonly manager?: { readonly cookieName?: unknown } } | undefined)?.manager
+	return typeof manager?.cookieName === 'string' ? manager.cookieName : undefined
 }

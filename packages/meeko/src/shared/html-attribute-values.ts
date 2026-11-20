@@ -77,19 +77,21 @@ export type AttributeValues<Tag extends string, Name extends string> = ClosedVal
 type HintedAttributeValue = (string & {}) | number | boolean | null | undefined
 
 /**
- * Valor de `class`: un fragmento escalar o arrays, también anidados, cuyos fragmentos se unen con
- * espacios. `false`, `null`, `undefined` y los textos vacíos dentro del array se omiten.
+ * Valor de `class`, con la semántica de `clsx`: un texto o un número; un objeto cuyas claves son
+ * clases que se aplican si su valor es verdadero; o arrays, también anidados, de cualquiera de
+ * ellos. Los fragmentos se unen con espacios en su orden. `null`, `undefined`, los booleanos y los
+ * textos vacíos se omiten. Una función, un símbolo o una señal sin `.value` no son clases.
  *
  * @since 1.10.0
  * @example
  * ```ts
  * import type { ClassValue } from "@meekojs/meeko";
  * const active = true;
- * // Se escribe como class="button button--active".
- * const classes: ClassValue = ["button", active && "button--active", [null, ""]];
+ * // Se escribe como class="button button--active rounded".
+ * const classes: ClassValue = ["button", { "button--active": active, "button--busy": false }, [null, "", "rounded"]];
  * ```
  */
-export type ClassValue = HintedAttributeValue | readonly ClassValue[]
+export type ClassValue = HintedAttributeValue | { readonly [name: string]: HintedAttributeValue } | readonly ClassValue[]
 
 /**
  * Valor de `style`: texto CSS o un objeto cuyas claves son propiedades CSS en camelCase,

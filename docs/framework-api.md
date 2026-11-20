@@ -706,7 +706,7 @@ Una card cuyos datos llegan después del primer pintado sale vacía en el HTML y
 
 #### Mutaciones
 
-`useRpcMutation(procedimiento)` no hace ninguna petición hasta que se llama `mutate(input)`, nunca en SSR. `mutate` envía el token CSRF como `rpc.*`, actualiza `pending`, `data` y `error` y devuelve la salida del procedimiento, o rechaza con su error. No se puede esperar con `await` en el nivel superior (`MEEK055`): espere `mutate` dentro de un handler.
+`useRpcMutation(procedimiento)` no hace ninguna petición hasta que se llama `mutate(input)`, nunca en SSR. Desde `1.10`, una escritura que declara `invalidates` recarga sola los datos montados que dependen de ella antes de que `mutate` resuelva (véase [Claves de datos e invalidación](#claves-de-datos-e-invalidación)); el `refresh()` a mano de los ejemplos sigue funcionando. `mutate` envía el token CSRF como `rpc.*`, actualiza `pending`, `data` y `error` y devuelve la salida del procedimiento, o rechaza con su error. No se puede esperar con `await` en el nivel superior (`MEEK055`): espere `mutate` dentro de un handler.
 
 Desde `1.2`, cada envío empieza con `pending` en `true` y `error` en `null` en una sola actualización, y termina escribiendo a la vez `data` o `error` y `pending` en `false`: un `effect` que lee varias de esas señales nunca ve una mezcla del intento anterior y del nuevo. Las opciones `onSuccess(output, intento)` y `onError(error, intento)` se llaman después, con el estado ya actualizado, una vez por intento (véase [Avisos de cada intento](#avisos-de-cada-intento-onsuccess-y-onerror)).
 
@@ -860,6 +860,101 @@ Un valor que no es un UUID rechaza con `TypeError` sin enviar la petición. La c
 | Código que no es un componente (un script, una cola propia, un service worker) o una clave que ya existe fuera de Meeko, como el id de un pedido sin conexión | `api.*` / `rpc.*` con `idempotencyKey`: usted guarda la clave y repite la llamada con ella                   |
 | Pruebas de la deduplicación del servidor                                                                                                                      | `api.*` / `rpc.*` con `idempotencyKey`, sin escribir la cabecera a mano                                      |
 
+#### Claves de datos e invalidación
+
+Desde `1.10`, los datos tienen identidad. Cada lectura depende de **claves de datos** y cada escritura declara las que cambia. Tras una escritura correcta, Meeko vuelve a pedir sólo los datos montados que dependen de esas claves: no hace falta llamar a `refresh()` en cada recurso tras `mutate`, ni recargar la página entera.
+
+```ts
+// server/rpc/orders/add.ts
+export default defineRpc({
+	input: newOrder,
+	output: orderSchema,
+	// Cambia los pedidos; la respuesta lo dice al navegador.
+	invalidates: ['orders'],
+	handler: async ({ input, context }) => {
+		const order = await db.orders.insert(input)
+		// Una clave que depende de la entrada.
+		context.invalidate(`customers.${order.customerId}`)
+		return order
+	},
+})
+```
+
+```html
+<!-- app/pages/orders.meeko -->
+<script lang="ts">
+	const orders = await useApi('/api/orders') // clave "orders"
+	const count = await useRpcQuery('orders.count') // clave "orders.count"
+	const stats = useRpcQuery('stats.summary') // clave "stats.summary": no cambia
+	const add = useRpcMutation('orders.add')
+</script>
+<template>
+	<button
+		bind:disabled="add.pending.value"
+		on:click="() => add.mutate({ item: 'café' })"
+	>
+		Añadir
+	</button>
+	<p>{count.data.value} pedidos</p>
+</template>
+```
+
+`add.mutate()` resuelve cuando `orders` y `count` ya tienen sus datos nuevos; `stats` no se vuelve a pedir. Mientras tanto, la lista sigue en pantalla con `refreshing` en `true` y el botón sigue desactivado, porque `pending` de la mutación también espera a las recargas.
+
+##### La clave de cada lectura
+
+| Lectura                      | Clave por convención                                                                                                                                                                                                |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `useRpcQuery("orders.list")` | El ID del procedimiento: `"orders.list"`.                                                                                                                                                                           |
+| `useApi("/api/orders")`      | Los segmentos estáticos tras `/api`, unidos por puntos y sin los dinámicos: `/api/orders` y `/api/orders/[id]` dan `"orders"`, `/api/orders/[id]/items` da `"orders.items"`, `/api/admin/orders`, `"admin.orders"`. |
+| El loader de la página       | Ninguna: declara las suyas con `depends` (véase [Recargar los datos de la página](routing-data-reference.md#recargar-los-datos-de-la-página-depends)).                                                              |
+
+Un punto dentro de un segmento de la ruta pasa a `-` y una ruta sin segmentos estáticos tiene la clave `"api"`. La opción `keys` del último argumento de `useApi` y `useRpcQuery` **suma** claves a la de la convención. Es una lista, una señal o una función que lee señales, y se lee cuando llega una invalidación, así que puede depender de las props:
+
+```ts
+const order = useApi('/api/orders/[id]', () => ({ params: { id: props.id } }), { keys: () => [`orders.${props.id}`] })
+const kpis = useRpcQuery('reports.kpis', {}, { keys: ['orders', 'stats'] })
+```
+
+Las claves son jerárquicas por puntos: invalidar `"orders"` refresca lo que depende de `"orders"`, `"orders.count"` o `"orders.42"`, nunca `"ordersArchive"`. Una clave más concreta no sube: invalidar `"orders.42"` refresca la ficha que declaró `"orders.42"`, no la lista `"orders"`. Una clave es una cadena de hasta 200 caracteres sin caracteres de control ni segmentos vacíos (`"orders..x"` o `".orders"` lanzan `TypeError`).
+
+##### Qué pasa tras una escritura
+
+- **En el servidor.** `invalidates` en `defineRpc` y en un `defineApiRoute` `POST`, `PUT`, `PATCH` o `DELETE` declara las claves fijas; `context.invalidate(...claves)` en el handler añade las que dependen de la entrada. Sólo una respuesta correcta (`2xx`) las envía. Un error (un `ApiError`, una excepción, una salida que no cumple su schema) no invalida nada, aunque el handler llamara a `invalidate` antes de fallar. Un `GET` nunca invalida.
+- **En el navegador.** `api.*`, `rpc.*`, `useRpcMutation`, `useApiMutation` y, a través de ellos, el `submit` de [`useForm`](#formularios-useform) aplican las claves de la respuesta antes de resolver. Cada `useApi` y `useRpcQuery` montado cuya clave coincide se recarga como con `refresh()`: conserva `data`, pone `pending` y `refreshing` en `true` y un fallo sólo actualiza su `error`. Un recurso con `enabled` en `false` no pide nada. El loader de la página visible se vuelve a ejecutar si declaró una clave que coincide.
+- **Sin volver a montar.** La página y sus componentes siguen montados: `props.data` y los exports de `<script server>` cambian en su sitio y sólo se actualiza lo que los lee, con el foco, lo que se está escribiendo y el estado de los componentes intactos. El `head` de la ruta también se actualiza.
+- **Una recarga por tarea.** Las invalidaciones de la misma tarea, como dos mutaciones que terminan juntas, se agrupan: cada dato se pide una vez. Una invalidación posterior reinicia la recarga en curso, para que los datos reflejen también la última escritura.
+- **Sólo lo montado.** Un recurso que no está montado, como el de una página de la que ya se navegó o el de una región `if:` cerrada, no se pide: carga sus datos al montarse.
+- **SSR.** No cambia nada: el render del servidor no registra recursos y un documento nunca lleva claves. Una llamada a `api.*` o `rpc.*` en el servidor ignora la cabecera.
+- **Formularios sin JavaScript.** Un envío nativo a un endpoint con `form` responde `303` sin claves: la página a la que vuelve se carga de nuevo con sus datos.
+
+##### Invalidar desde el navegador: `invalidate`
+
+`invalidate(...claves)`, de `@meekojs/meeko/framework` y autoimportada en `app/`, invalida claves sin una mutación, por ejemplo cuando un socket avisa de un cambio hecho por otra persona. Devuelve una promesa que se cumple cuando terminan las recargas y nunca rechaza; en el servidor no hace nada. Sin claves lanza `TypeError`.
+
+```html
+<script lang="ts">
+	const orders = await useApi('/api/orders')
+	const feed = useSocket('orders')
+	// Otra persona cambió un pedido: se recargan la lista y su ficha, si están montadas.
+	feed.on('changed', ({ id }) => invalidate('orders', `orders.${id}`))
+</script>
+```
+
+##### Recargar toda la ruta: `useRoute().refresh()`
+
+`useRoute().refresh()` es la alternativa explícita cuando no hay una clave: vuelve a ejecutar el loader de la página y recarga cada `useApi` y `useRpcQuery` montado, también los de los layouts, sin volver a montar nada. Úselo para un botón «Actualizar» o tras un cambio que no conoce el servidor; para una mutación, prefiera `invalidates`, que sólo pide lo que cambió.
+
+##### Comprobación: `MEEK141` y autocompletado
+
+`meeko check` avisa con `MEEK141` de una clave de `invalidates` o de `invalidate()` en `server/api` o `server/rpc` que ninguna lectura puede usar: ni la clave por convención de un endpoint `GET` o de un procedimiento, ni una de `keys` o `depends` escrita en `app/`. Suele ser una errata (`"ordres"`) o una clave demasiado concreta (`"orders.42"` cuando la lista depende de `"orders"`). Es un aviso: una clave que la lectura construye con una variable no se ve desde ahí.
+
+El tipo `DataKey` acepta cualquier cadena; las claves por convención de la aplicación, con sus prefijos, llegan al autocompletado de `invalidates`, `invalidate()`, `keys` y `depends()` a través de `GeneratedDataKeys`, que `meeko check` y `meeko dev` generan en `.meeko/types/server-contracts.d.ts`.
+
+##### El protocolo
+
+Una respuesta correcta lleva la cabecera `x-meeko-invalidate` con las claves separadas por comas, cada una codificada como un componente de URL (`orders, customers.7`); como mucho 64 claves. Viaja en una cabecera, no en el cuerpo, así que la salida del procedimiento, el contrato y el OpenAPI no cambian y funciona igual con `204` y con `contentType: "response"`. Un cliente propio puede leerla; si llama desde otro origen con CORS, añada `x-meeko-invalidate` a `Access-Control-Expose-Headers`.
+
 #### `load` o composables
 
 | Necesidad                                                                                       | Use                                                                                    |
@@ -870,6 +965,7 @@ Un valor que no es un UUID rechaza con `TypeError` sin enviar la petición. La c
 | Datos que dependen de señales del componente y se recargan al cambiar                           | `useApi` / `useRpcQuery`, con o sin `await`                                            |
 | Datos que pueden llegar después del primer pintado, con un indicador de carga                   | `useApi` / `useRpcQuery` sin `await`, con [`<MeekoAwait>`](#meekoawait) para no saltar |
 | Escrituras                                                                                      | `useRpcMutation` / `useApiMutation`, o `api.*`/`rpc.*` en un handler                   |
+| Datos que deben actualizarse tras una escritura                                                 | `invalidates` en la escritura y la clave de la lectura (desde `1.10`)                  |
 | Escrituras que no deben aplicarse dos veces si se pierde la respuesta (cobros, pasos de cocina) | `useRpcMutation` / `useApiMutation` con `retrySafe`                                    |
 | Estado del navegador que debe sobrevivir a una recarga (un ticket abierto, la caja elegida)     | [`useStorage`](#estado-persistente-usestorage)                                         |
 | Formularios que envían datos, con validación y errores por campo                                | `useForm` con `api.*`/`rpc.*` en su `submit`                                           |

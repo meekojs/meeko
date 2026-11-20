@@ -7,6 +7,7 @@ import type { ApiEndpoint, RpcEndpoint } from '../server/runtime/discovery'
 import { discoverAutoImports } from '../autoimports/registry'
 import { autoImportCompilerHost, autoImportSourceReader } from '../autoimports/typescript'
 import { discoverServerManifest } from '../server/api/manifest-discovery'
+import { apiDataKey, dataKeyPrefixes } from '../shared/invalidation'
 import { resolveProjectAliases, withAliasPaths } from './aliases'
 import { resolveConfigSources } from './config'
 import { generateSocketContracts } from './socket-contracts-generate'
@@ -413,6 +414,26 @@ function successStatus(expression: ts.Expression | undefined, file: ts.SourceFil
 	return value
 }
 
+/**
+ * The data keys by convention of the reads, with every key above them, for the completion of
+ * `invalidates`, `invalidate()`, `keys` and `depends()` (`GeneratedDataKeys`).
+ */
+export function conventionDataKeys(api: readonly Pick<ApiEndpoint, 'pathname' | 'method'>[], rpc: readonly Pick<RpcEndpoint, 'id'>[]): string[] {
+	const keys = new Set<string>()
+	const add = (key: string): void => {
+		for (const prefix of dataKeyPrefixes(key)) keys.add(prefix)
+	}
+	for (const endpoint of api) if (endpoint.method === 'GET') add(apiDataKey(endpoint.pathname))
+	for (const endpoint of rpc) add(endpoint.id)
+	return [...keys].sort()
+}
+
+function dataKeysDeclaration(api: readonly ApiEndpoint[], rpc: readonly RpcEndpoint[]): string[] {
+	const keys = conventionDataKeys(api, rpc)
+	if (!keys.length) return []
+	return ['declare module "@meekojs/meeko/framework" {', '  interface GeneratedDataKeys {', ...keys.map((key) => `    ${JSON.stringify(key)}: true;`), '  }', '}']
+}
+
 /** Generate public API/RPC declarations without importing handler modules. */
 export async function generateServerContracts(projectRoot: string): Promise<GeneratedServerContracts> {
 	const root = resolve(projectRoot)
@@ -457,6 +478,7 @@ export async function generateServerContracts(projectRoot: string): Promise<Gene
 		'export type RpcContract = {',
 		...rpc.map(({ endpoint, shape }) => `  ${JSON.stringify(endpoint.id)}: ${shape.type};`),
 		'};',
+		...dataKeysDeclaration(discovered.api, discovered.rpc),
 		'',
 	]
 	await mkdir(outputDir, { recursive: true })

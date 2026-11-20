@@ -1,15 +1,17 @@
 <script lang="ts">
 	import { effect, onMounted } from '@meekojs/meeko'
 
-	import { useModalHost } from '../composables/useModal'
+	import { useModalConfirms, useModalHost } from '../composables/useModal'
 	import { useToastHost } from '../composables/useToast'
 	import { toastHost as toastHostClass } from '../variants/feedback'
+	import * as ConfirmInstance from './internal/ConfirmInstance.meeko'
 	import * as ModalInstance from './internal/ModalInstance.meeko'
 	import * as Toast from './Toast.meeko'
 
 	const snippets = defineSnippets<{ default: [] }>()
 
 	const modals = useModalHost()
+	const confirms = useModalConfirms()
 	const toasts = useToastHost()
 	const toastHost = useElementRef('toastHost')
 
@@ -33,6 +35,12 @@
 		each:as="instance"
 		each:key="instance.id"
 		bind:instance="instance"
+	/>
+	<ConfirmInstance
+		each:of="[...confirms.value.values()]"
+		each:as="entry"
+		each:key="entry.id"
+		bind:instance="entry"
 	/>
 	<div
 		ref:toastHost

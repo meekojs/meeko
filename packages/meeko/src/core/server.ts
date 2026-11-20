@@ -87,6 +87,38 @@ function styleObjectValue(value: object): string | null {
 }
 
 /**
+ * Texto de `class` de un valor dinámico, con la semántica de `clsx`: un texto o un número se
+ * escriben tal cual; `null`, `undefined` y los booleanos se omiten; un array, también anidado, une
+ * sus fragmentos con espacios; un objeto aporta cada clave cuyo valor es verdadero, en su orden.
+ * Dentro de un array o un objeto, los fragmentos vacíos se omiten. `null` si no queda ninguna clase.
+ */
+function classValue(value: unknown): string | null {
+	if (value === null || value === undefined || typeof value === 'boolean') return null
+	if (typeof value !== 'object') return String(value)
+	const classes: string[] = []
+	collectClasses(value, classes)
+	return classes.length ? classes.join(' ') : null
+}
+
+/** Adds the non-empty fragments of a nested `class` value to `classes`, in order. */
+function collectClasses(value: unknown, classes: string[]): void {
+	if (value === null || value === undefined || typeof value === 'boolean') return
+	if (Array.isArray(value)) {
+		for (const item of value) collectClasses(item, classes)
+		return
+	}
+	if (typeof value === 'object') {
+		for (const [key, enabled] of Object.entries(value)) {
+			const name = key.trim()
+			if (enabled && name) classes.push(name)
+		}
+		return
+	}
+	const text = String(value).trim()
+	if (text) classes.push(text)
+}
+
+/**
  * Convierte un valor de atributo dinámico en su forma DOM; null lo elimina. Un atributo booleano
  * del estándar (`disabled`, `open`…) se escribe vacío con un valor verdadero. `hidden`, booleano
  * hasta `1.8` y hoy enumerado, conserva esa regla salvo con un texto no vacío, que se escribe tal
@@ -97,18 +129,15 @@ function styleObjectValue(value: object): string | null {
  * `src` y `poster`) se escribe {@link blockedUrl}, igual que la URL de un `content` con la forma de
  * `<meta http-equiv="refresh">`. Desde `1.10`, también los valores de una animación SVG (`to`,
  * `from`, `by` y cada elemento de `values`), que con `attributeName="href"` son una URL.
+ *
+ * Desde `1.10`, `class` admite arrays anidados y objetos `{ clase: condición }`, como `clsx`, y
+ * omite `true`; `style` admite un objeto de declaraciones.
  */
 export function attributeValue(name: string, value: unknown): string | null {
 	booleanAttributes ??= new Set(booleanAttributeNames.split(' '))
 	if (booleanAttributes.has(name)) return value ? '' : null
 	if (name === 'hidden') return typeof value === 'string' && value !== '' ? value : value ? '' : null
-	if (name === 'class' && Array.isArray(value)) {
-		const classes = value.flatMap((item) => {
-			const resolved = attributeValue(name, item)?.trim()
-			return resolved ? [resolved] : []
-		})
-		return classes.length ? classes.join(' ') : null
-	}
+	if (name === 'class') return classValue(value)
 	if (name === 'style' && typeof value === 'object' && value !== null && !Array.isArray(value)) return styleObjectValue(value)
 	if (value === null || value === undefined || value === false) return null
 	return safeUrlAttribute(name, String(value))

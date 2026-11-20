@@ -7,8 +7,8 @@ import type { Schema } from '../schema'
 
 import { serializeJson } from '../../core/server'
 import { ApiError, normalizeServerError, observeErrorCallback, SessionRevokedError } from '../errors'
-import { createRequestContext } from '../runtime/request-context'
-import { devAllowedHosts, isAllowedOrigin } from '../runtime/sessions'
+import { buildRequestContext, type RequestContext } from '../runtime/request-context'
+import { devAllowedHosts, hasAuthenticator, isAllowedOrigin, isAuthenticated } from '../runtime/sessions'
 
 type SchemaMap = Readonly<Record<string, Schema>>
 import type { SocketChannelDefinition } from './definitions'
@@ -339,14 +339,19 @@ export function createSocketHub<TServices>(options: SocketHubOptions<TServices>)
 	}
 	const pubsub = options.pubsub ?? new LocalSocketPubSub()
 	const getDefinition = (name: string) => channelDefinition(options.channels[name])
+	/** A Socket context: its cookies and response headers can be read, never written. */
+	const socketContext = (request: Request, services: TServices, session: SessionHandle): RequestContext<TServices> => buildRequestContext(request, services, session, options.platform, { readOnly: true })
 	const authorizeHandshake = async (name: string, request: Request, roomId?: string) => {
 		const definition = getDefinition(name)
 		// In `meeko dev`, the sessions' manager also carries the hosts of `dev.allowedHosts`.
 		if (!isAllowedOrigin(request, options.allowedOrigins ?? [], options.sessions[devAllowedHosts])) throw new ApiError('INVALID_ORIGIN', 403)
 		const session = await options.sessions.load(request)
-		if (definition.auth === 'required' && !session.current) throw new ApiError('UNAUTHENTICATED', 401)
+		// Without the application's own check, a missing session is refused before any service runs.
+		const ownCheck = hasAuthenticator(options.sessions)
+		if (definition.auth === 'required' && !ownCheck && !(await isAuthenticated(undefined, session, options.sessions))) throw new ApiError('UNAUTHENTICATED', 401)
 		const services = typeof options.services === 'function' ? await (options.services as (request: Request) => TServices | Promise<TServices>)(request) : options.services
-		const context = createRequestContext(request, services, session, options.platform)
+		const context = socketContext(request, services, session)
+		if (definition.auth === 'required' && ownCheck && !(await isAuthenticated(context, session, options.sessions))) throw new ApiError('UNAUTHENTICATED', 401)
 		if (definition.authorize && !(await definition.authorize({ context, ...(roomId === undefined ? {} : { roomId }) }))) throw new ApiError('FORBIDDEN', 403)
 		return { definition, services, session }
 	}
@@ -402,8 +407,9 @@ export function createSocketHub<TServices>(options: SocketHubOptions<TServices>)
 				if (!schema) throw new ApiError('UNKNOWN_SOCKET_EVENT', 404)
 				const checked = await validate(schema, payload)
 				const fresh = await sessionForDelivery()
-				if (definition.auth === 'required' && !fresh.current) failAndClose(new ApiError('UNAUTHENTICATED', 401), 1008, 'Session expired')
-				const sendContext = createRequestContext(request, services, fresh, options.platform)
+				// The application's own check ran at the handshake; deliveries only follow Meeko sessions.
+				if (definition.auth === 'required' && !hasAuthenticator(options.sessions) && !fresh.current) failAndClose(new ApiError('UNAUTHENTICATED', 401), 1008, 'Session expired')
+				const sendContext = socketContext(request, services, fresh)
 				if (definition.authorize && !(await definition.authorize({ context: sendContext, ...scope }))) throw new ApiError('FORBIDDEN', 403)
 				if (definition.authorizeSend && !(await definition.authorizeSend({ event, payload: checked, context: sendContext, ...scope }))) {
 					if (broadcast) return
@@ -541,8 +547,8 @@ export function createSocketHub<TServices>(options: SocketHubOptions<TServices>)
 					const payload = await validate(schema, (envelope as { payload: unknown }).payload)
 					// Re-read storage and policy for every event, including after a session revocation.
 					const fresh = remember(await options.sessions.load(request))
-					if (definition.auth === 'required' && !fresh.current) failAndClose(new ApiError('UNAUTHENTICATED', 401), 1008, 'Session expired')
-					const eventContext = createRequestContext(request, services, fresh, options.platform)
+					const eventContext = socketContext(request, services, fresh)
+					if (definition.auth === 'required' && !(await isAuthenticated(eventContext, fresh, options.sessions))) failAndClose(new ApiError('UNAUTHENTICATED', 401), 1008, 'Session expired')
 					if (definition.authorize && !(await definition.authorize({ context: eventContext, ...(roomId === undefined ? {} : { roomId }) }))) throw new ApiError('FORBIDDEN', 403)
 					if (definition.authorizeEvent && !(await definition.authorizeEvent({ event, payload, context: eventContext, ...(roomId === undefined ? {} : { roomId }) }))) throw new ApiError('FORBIDDEN', 403)
 					const handler = definition.handlers?.[event]

@@ -1,9 +1,9 @@
-import type { ResolvedComponent } from '@meekojs/meeko'
+import type { ReadonlySignal, ResolvedComponent } from '@meekojs/meeko'
 import type { PluginApp } from '@meekojs/meeko/framework'
 
 import { createContext, inject, onCleanup, provide, signal } from '@meekojs/meeko'
 
-import type { ModalArgs, ModalContext, ModalInstance, ModalInstanceContext, ModalName, ModalResolver } from '../types/modal'
+import type { ModalArgs, ModalConfirmInstance, ModalContext, ModalInstance, ModalInstanceContext, ModalName, ModalResolver, UIConfirmOptions } from '../types/modal'
 
 const modalKey = createContext<ModalContext>('@meekojs/ui/modal')
 const instanceKey = createContext<ModalInstanceContext>('@meekojs/ui/modal.instance')
@@ -14,6 +14,8 @@ interface PendingModal {
 	id: number
 	closing?: boolean
 	component?: ResolvedComponent<ModalName>
+	/** Una confirmación de `confirm()`: el host la pinta con su propio diálogo, sin cargar nada. */
+	confirm?: UIConfirmOptions
 	resolve(result: unknown): void
 	reject(error: unknown): void
 }
@@ -37,6 +39,7 @@ export function createModalManager(load: ModalResolver, options: ModalManagerOpt
 	const hot = options.hot ?? (import.meta as { hot?: unknown }).hot !== undefined
 	const relay = options.relay === true
 	const instances = signal<ReadonlyMap<number, ModalInstance>>(new Map())
+	const confirms = signal<ReadonlyMap<number, ModalConfirmInstance>>(new Map())
 	const pending = new Map<number, PendingModal>()
 	const exits = new Map<number, () => Promise<void>>()
 	let nextId = 0
@@ -45,12 +48,15 @@ export function createModalManager(load: ModalResolver, options: ModalManagerOpt
 
 	function publish() {
 		const ready = new Map<number, ModalInstance>()
+		const asks = new Map<number, ModalConfirmInstance>()
 		for (const entry of pending.values()) {
+			if (entry.confirm) asks.set(entry.id, { id: entry.id, options: entry.confirm })
+			else if (entry.component) ready.set(entry.id, { id: entry.id, component: entry.component })
 			// Un import lento no debe invertir el orden de las capas de diálogo.
-			if (!entry.component) break
-			ready.set(entry.id, { id: entry.id, component: entry.component })
+			else break
 		}
 		instances.value = ready
+		confirms.value = asks
 	}
 
 	function settle(entry: PendingModal, result: unknown) {
@@ -98,6 +104,20 @@ export function createModalManager(load: ModalResolver, options: ModalManagerOpt
 				return instances.value
 			},
 		}),
+		confirms: Object.freeze({
+			get value() {
+				return confirms.value
+			},
+		}),
+		confirm(options: UIConfirmOptions): Promise<boolean> {
+			if (disposed) return Promise.reject(new Error('The modal provider has been disposed'))
+			const id = ++nextId
+			return new Promise<boolean>((resolve, reject) => {
+				// Cualquier otro final (Esc, el fondo, el botón de cierre, el relevo del host) resuelve `false`.
+				pending.set(id, { id, confirm: Object.freeze({ ...options }), resolve: (result) => resolve(result === true), reject })
+				publish()
+			})
+		},
 		open<R = unknown>(...request: ModalArgs): Promise<R | undefined> {
 			if (disposed) return Promise.reject(new Error('The modal provider has been disposed'))
 			const id = ++nextId
@@ -166,6 +186,11 @@ function modalContext(manager: ReturnType<typeof createModalManager>, client: ()
 			if (!manager.hosted) return Promise.reject<R | undefined>(new Error('Mount UIApp before opening a modal'))
 			return manager.open<R>(...request)
 		},
+		confirm: (options: UIConfirmOptions) => {
+			if (!client()) return Promise.reject<boolean>(new Error('Modals can only be opened in the browser'))
+			if (!manager.hosted) return Promise.reject<boolean>(new Error('Mount UIApp before opening a modal'))
+			return manager.confirm(options)
+		},
 		dismiss: manager.dismiss,
 		dismissAll: manager.dismissAll,
 	}
@@ -213,6 +238,14 @@ export function useModalHost(): ModalContext {
 	return useModal()
 }
 
+const noConfirms: ReadonlySignal<ReadonlyMap<number, ModalConfirmInstance>> = Object.freeze({ value: new Map() })
+
+/** Las confirmaciones de `confirm()` que pinta el host; uso interno de `UIApp`. */
+export function useModalConfirms(): ReadonlySignal<ReadonlyMap<number, ModalConfirmInstance>> {
+	// Un proveedor creado antes de actualizar el paquete por HMR puede no tenerlas todavía.
+	return inject(managerKey).confirms ?? noConfirms
+}
+
 /** Obtiene el gestor del UIApp más cercano. Llámalo durante el setup, antes de await. */
 export function useModal(): ModalContext {
 	return inject(modalKey)
@@ -224,9 +257,11 @@ export function useModalInstance<R = unknown>(): ModalInstanceContext<R> {
 }
 
 /** Conecta el componente dinámico con su propia instancia; uso interno del host. */
-export function provideModalInstance(id: number): void {
+export function provideModalInstance(id: number): ModalInstanceContext {
 	const manager = inject(managerKey)
-	provide(instanceKey, { id, close: (result) => manager.close(id, result), dismiss: () => manager.dismiss(id) })
+	const instance: ModalInstanceContext = { id, close: (result) => manager.close(id, result), dismiss: () => manager.dismiss(id) }
+	provide(instanceKey, instance)
+	return instance
 }
 
 /** Contexto opcional para que UIModal también funcione de forma declarativa. */

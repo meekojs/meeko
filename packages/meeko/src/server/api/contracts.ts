@@ -1,3 +1,4 @@
+import type { DataKey } from '../../framework'
 import type { RateLimitOptions } from '../runtime/rate-limit'
 import type { RequestContext } from '../runtime/request-context'
 import type { Schema } from '../schema'
@@ -110,12 +111,17 @@ export interface ApiRouteDefinition<P extends Schema | undefined, Q extends Sche
 	 * generador lo lea.
 	 */
 	status?: T
-	/** `"required"` responde `401 UNAUTHENTICATED` sin sesión. */
+	/**
+	 * `"required"` responde `401 UNAUTHENTICATED` sin sesión o, desde `1.10`, cuando
+	 * `isAuthenticated` de `server/runtime.ts` devuelve `false`.
+	 */
 	auth?: 'required' | 'optional'
 	/**
 	 * Comprobación de `Origin` en las peticiones `POST`, `PUT`, `PATCH` y `DELETE`. Desde `1.8`, por
 	 * defecto (sin `origin`) responden `403 INVALID_ORIGIN` si su `Origin` falta, es `null` o no es
-	 * el de la aplicación ni uno de `SessionManager.allowedOrigins`, haya o no sesión. `"required"`
+	 * el de la aplicación ni uno de `SessionManager.allowedOrigins`, haya o no sesión. Desde `1.10`, antes se
+	 * rechaza (`403 INVALID_ORIGIN`) la que el navegador marca `Sec-Fetch-Site: cross-site` o
+	 * `same-site`, salvo con un `Origin` de `allowedOrigins`. `"required"`
 	 * (desde `1.2`) equivale al valor por defecto y lo deja explícito.
 	 *
 	 * `"none"` (desde `1.2`, **inseguro**) desactiva la comprobación en las peticiones sin sesión,
@@ -153,8 +159,21 @@ export interface ApiRouteDefinition<P extends Schema | undefined, Q extends Sche
 	 */
 	locals?: (context: RequestContext<S>) => L | Promise<L>
 	/**
+	 * Claves de datos que cambia el endpoint (desde `1.10`), como `["orders"]`, en `POST`, `PUT`,
+	 * `PATCH` y `DELETE`; un `GET` no invalida. Una respuesta correcta las
+	 * envía en la cabecera `x-meeko-invalidate` y el navegador vuelve a pedir los datos montados que
+	 * dependen de ellas: cada `useApi` y `useRpcQuery` cuya clave coincide y el loader de la ruta
+	 * actual si las declaró con `depends`. Una clave cubre las que empiezan por ella y un punto
+	 * (`"orders"` cubre `"orders.list"` y `"orders.42"`). Un error no invalida nada. El handler añade
+	 * claves que dependen de la entrada con `context.invalidate`.
+	 * @since 1.10.0
+	 */
+	invalidates?: readonly DataKey[]
+	/**
 	 * Recibe la entrada validada, el contexto y `locals`; su resultado se valida con `response`. Con
-	 * `status: 204` no devuelve nada.
+	 * `status: 204` no devuelve nada. Desde `1.10`, `context.invalidate(...claves)` añade claves de datos a
+	 * las de `invalidates`, como `` context.invalidate(`orders.${id}`) ``; sólo viajan si la respuesta es
+	 * correcta.
 	 */
 	handler: (args: { params: OptionalOutput<P>; query: OptionalOutput<Q>; body: OptionalOutput<B>; context: RequestContext<S>; locals: L }) => Promise<ApiHandlerResult<R, T>> | ApiHandlerResult<R, T>
 }

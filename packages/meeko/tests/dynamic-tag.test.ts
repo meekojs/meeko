@@ -523,6 +523,61 @@ const classes = signal<ClassValue>(["card", false, ["rounded", null]]);
 	}
 })
 
+test('bind:class accepts clsx-style objects and arrays in SSR, hydration, updates and release', async () => {
+	// Before 1.10 an object wrote class="[object Object]".
+	const source = `<script lang="ts">
+import { signal } from "@meekojs/meeko";
+const on = signal(true);
+const size = signal<"sm" | "lg">("sm");
+const attrs = signal<{ class: unknown; title: string }>({ class: { own: true }, title: "a" });
+</script>
+<template><div><p bind:class="{ active: on.value, idle: !on.value }">a</p><article class="card" bind:class="['round', { open: on.value }, [[size.value === 'lg' && 'wide']]]">b</article><span class="tag" bind:class="{ lit: on.value }" bind="attrs.value">c</span><component is="on.value ? 'em' : 'strong'" class="dyn" bind:class="{ on: on.value }">d</component><button on:click="() => { on.value = !on.value; size.value = 'lg' }">t</button></div></template>`
+	const { component, cleanup } = await load({ ClassObject: source }, 'ClassObject')
+	const window = new Window()
+	try {
+		const rendered = component.renderWithState({})
+		assert.doesNotMatch(rendered.html, /object Object/)
+		assert.match(rendered.html, /<p class="active"/)
+		assert.match(rendered.html, /<article class="card round open"/)
+		assert.match(rendered.html, /<span class="tag lit own"/)
+		assert.match(rendered.html, /<em class="dyn on"/)
+		const root = window.document.createElement('main')
+		root.innerHTML = rendered.html
+		// Hydration compares with the same value: no mismatch.
+		const release = component.hydrate(root as unknown as Element, {}, rendered.state)
+		const classes = () => ['p', 'article', 'span', 'em, strong'].map((selector) => root.querySelector(selector)!.getAttribute('class'))
+		assert.deepEqual(classes(), ['active', 'card round open', 'tag lit own', 'dyn on'])
+		const button = root.querySelector('button') as unknown as HTMLElement
+		button.click()
+		assert.deepEqual(classes(), ['idle', 'card round wide', 'tag own', 'dyn'])
+		button.click()
+		assert.deepEqual(classes(), ['active', 'card round open wide', 'tag lit own', 'dyn on'])
+		release()
+		// Released: the bindings no longer follow the signals.
+		button.click()
+		assert.deepEqual(classes(), ['active', 'card round open wide', 'tag lit own', 'dyn on'])
+	} finally {
+		window.happyDOM.abort()
+		await cleanup()
+	}
+})
+
+test('hydration compares a class object with the server HTML and reports a difference', async () => {
+	const source = `<template><p bind:class="{ server: true, client: false }">a</p></template>`
+	const { component, cleanup } = await load({ ClassMismatch: source }, 'ClassMismatch')
+	const window = new Window()
+	try {
+		const rendered = component.renderWithState({})
+		assert.match(rendered.html, /<p class="server"/)
+		const root = window.document.createElement('main')
+		root.innerHTML = rendered.html.replace('class="server"', 'class="other"')
+		assert.throws(() => component.hydrate(root as unknown as Element, {}, rendered.state), /Hydration mismatch/)
+	} finally {
+		window.happyDOM.abort()
+		await cleanup()
+	}
+})
+
 test('bind:style accepts an object in SSR, hydration and updates', async () => {
 	const source = `<script lang="ts">
 import { signal, type StyleValue } from "@meekojs/meeko";
@@ -898,7 +953,7 @@ import * as Panel from "./Panel.meeko";
 
 test('bind="obj" compares attribute names without case: data-meeko* stays reserved and the explicit binding wins', async () => {
 	const { spreadEntries } = (await import(pathToFileURL(resolve('src/app/runtime/dynamic-tag.ts')).href)) as typeof dynamic_tag_tsTypes
-	const spread = (value: Record<string, unknown>, excluded: readonly string[], explicit?: { class?: unknown; style?: unknown }) => spreadEntries('div', value as never, excluded, explicit)
+	const spread = (value: Record<string, unknown>, excluded: readonly string[], explicit?: { class?: string; style?: unknown }) => spreadEntries('div', value as never, excluded, explicit)
 	assert.throws(
 		() => spread({ 'Data-Meeko': '0' }, []),
 		(error: unknown) => error instanceof TypeError && /^MEEK113: .*data-meeko\* está reservado/.test(error.message),

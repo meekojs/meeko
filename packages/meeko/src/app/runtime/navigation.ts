@@ -2,6 +2,7 @@ import type { ReadonlySignal } from '../../core/reactivity'
 import type { GeneratedRoutes, RouteId } from '../../framework'
 
 import { batch, createContext, provide, signal } from '../../core/reactivity'
+import { invalidateAll } from '../../shared/invalidation'
 import { routeCurrent } from '../../shared/link'
 import { activeRouteManifest, href } from './router'
 
@@ -19,7 +20,11 @@ import { activeRouteManifest, href } from './router'
  * ```
  */
 export interface NavigationState {
-	/** `true` desde que empieza una navegación hasta que su página se confirma, falla o se cancela. */
+	/**
+	 * `true` desde que empieza una navegación hasta que su página se confirma, falla o se cancela.
+	 * Desde `1.10`, durante ese tiempo `<html>` lleva `data-navigating` y, si la navegación empezó
+	 * con un clic, el `<a>` pulsado lleva `data-pending`, para estilarlos desde CSS.
+	 */
 	readonly pending: ReadonlySignal<boolean>
 }
 
@@ -89,6 +94,27 @@ export interface RouteState {
 	 * ```
 	 */
 	isActive<K extends RouteId>(to: K, ...options: ActiveArguments<K>): 'page' | 'true' | false
+	/**
+	 * Vuelve a pedir todos los datos de la ruta actual (desde `1.10`): ejecuta otra vez el loader de
+	 * la página (su `load` o su código de nivel superior de `<script server>`) y recarga cada
+	 * `useApi` y `useRpcQuery` montado, también los de los layouts. Los componentes siguen montados:
+	 * la página recibe sus datos nuevos en su sitio y los recursos conservan los anteriores mientras
+	 * llegan (`refreshing` en `true`). Es la alternativa explícita a invalidar claves concretas con
+	 * `invalidate()`. Mientras hay una navegación en curso no vuelve a ejecutar el loader, porque la
+	 * navegación ya trae los datos de su página. En SSR no hace nada.
+	 *
+	 * @returns Una promesa que se cumple cuando terminan las recargas; nunca rechaza. Un fallo del
+	 * loader deja los datos anteriores y llega al observador de errores de la aplicación.
+	 * @since 1.10.0
+	 * @example
+	 * ```html
+	 * <script lang="ts">
+	 * const route = useRoute();
+	 * </script>
+	 * <template><button on:click="() => route.refresh()">Actualizar</button></template>
+	 * ```
+	 */
+	refresh(): Promise<void>
 }
 
 // The params rule of href(): required by a dynamic route, rejected by a static one and free
@@ -135,6 +161,8 @@ export function fixedRoute(snapshot: RouteSnapshot): RouteState {
 		params: read(snapshot.params),
 		search: read(snapshot.search),
 		isActive: routeIsActive(path),
+		// A server render or a dry pass loads its data once.
+		refresh: () => Promise.resolve(),
 	})
 }
 
@@ -159,7 +187,7 @@ export function liveRoute(initial: RouteSnapshot): LiveRoute {
 		})
 	let snapshot = initial
 	return {
-		state: Object.freeze({ url: read(url), path: read(path), id: read(id), params: read(params), search: read(search), isActive: routeIsActive(path) }),
+		state: Object.freeze({ url: read(url), path: read(path), id: read(id), params: read(params), search: read(search), isActive: routeIsActive(path), refresh: invalidateAll }),
 		current: () => snapshot,
 		set(next) {
 			snapshot = next

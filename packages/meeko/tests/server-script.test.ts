@@ -140,11 +140,14 @@ test('the compiler rejects the combinations top-level code cannot honour', () =>
 	assert.equal(failure(page('export const user = 1;', 'import { user } from "./other.js";')).code, 'MEEK075')
 })
 
-test('the compiled page reads each export from props.data and keeps private server code out', () => {
+test('the compiled page reads each export from the current props.data and keeps private server code out', () => {
 	const source = page('import { secretKey } from "../../../server/keys.js";\nconst token = secretKey();\nexport const user = { id: 1, name: "Ada" };\nexport const head = { title: token };', 'const name = signal(user.name);', '<h1>{user.name}</h1><p>{name.value}</p>')
 	const { code } = compile(source, file)
-	assert.match(code, /const __meeko_page_data = __meeko\.pageData\(__props\)/)
-	assert.match(code, /const user = __meeko_page_data\.user;/)
+	// Since 1.10 every read goes to the page's current data, so a refresh of the loader reaches it.
+	assert.match(code, /const __meeko_page_data = __meeko\.pageDataView\(__props\)/)
+	assert.match(code, /signal\(__meeko_page_data\.user\.name\)/)
+	assert.match(code, /__meeko\.escapeHtml\(__meeko_page_data\.user\.name\)/)
+	assert.doesNotMatch(code, /const user = /)
 	assert.match(code, /import type \* as __meeko_server from "\.\/\[id\]\.meeko\.server\.js";/)
 	assert.doesNotMatch(code, /secretKey|token|keys\.js/)
 })

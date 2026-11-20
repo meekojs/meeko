@@ -165,6 +165,7 @@ interface BodyContext {
 	readonly search: unknown
 	readonly signal: AbortSignal
 	readonly context?: RequestContext | undefined
+	readonly depends?: ((...keys: string[]) => void) | undefined
 }
 
 function thenable(value: unknown): value is PromiseLike<unknown> {
@@ -189,6 +190,7 @@ export function definePageBody(options: Record<string, unknown> | undefined, bod
 			search: context.search,
 			request: context.request,
 			signal: context.signal,
+			depends: context.depends ?? (() => {}),
 			get context(): RequestContext {
 				if (!context.context) throw new Error('usePage().context needs a request context; createServerApp provides it, createFrameworkHandler needs createContext')
 				return context.context
@@ -218,6 +220,24 @@ export function definePageBody(options: Record<string, unknown> | undefined, bod
 	// `export const layoutProps` stays out of `data`, so what only the layout reads travels once.
 	const layoutProps = (context: { readonly data: unknown }): unknown => (typeof context.data === 'object' && context.data !== null ? heads.get(context.data)?.layoutProps : undefined)
 	return { ...options, load, head, ...(exportsLayoutProps ? { layoutProps } : {}) }
+}
+
+/**
+ * @internal The exports of the page's top-level server code as pages compiled since 1.10 read them:
+ * each read goes to the page's current data, so a refresh of the loader reaches what reads it.
+ */
+export function pageDataView(props: unknown): Record<string, unknown> {
+	pageData(props)
+	const current = (): Record<string, unknown> => pageData(props)
+	return new Proxy(Object.create(null) as Record<string, unknown>, {
+		get: (_target, key) => (typeof key === 'string' ? current()[key] : undefined),
+		has: (_target, key) => key in current(),
+		ownKeys: () => Reflect.ownKeys(current()),
+		getOwnPropertyDescriptor: (_target, key) => {
+			const data = current()
+			return Object.hasOwn(data, key) ? { value: (data as Record<string | symbol, unknown>)[key], enumerable: true, configurable: true, writable: false } : undefined
+		},
+	})
 }
 
 /** @internal The exports of the page's top-level server code, as the compiled page reads them. */

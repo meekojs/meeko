@@ -31,3 +31,54 @@ html:active-view-transition-type(ui-modal-close)::view-transition-old(ui-drawer-
 		animation-timing-function: var(--ui-ease-out);
 	}
 }
+
+/*
+ * The navigation progress bar: while the router navigates, <html> has `data-navigating`. The bar waits for
+ * `--ui-navigation-progress-delay`, so a fast navigation never shows it, crawls towards the end for
+ * `--ui-navigation-progress-duration` and, when the attribute goes, fills the track and fades. It is always
+ * there, invisible, so that the fade has a start; `--ui-navigation-progress-height: 0` turns it off.
+ */
+:root::before {
+	position: fixed;
+	transform-origin: left;
+	opacity: var(--ui-opacity-hidden);
+	z-index: var(--ui-z-progress);
+	transition: opacity var(--ui-duration-base) var(--ui-ease-in);
+	inset-block-start: 0;
+	inset-inline: 0;
+	background: var(--ui-navigation-progress-color);
+	block-size: var(--ui-navigation-progress-height);
+	pointer-events: none;
+	content: '';
+}
+:root[dir='rtl']::before {
+	transform-origin: right;
+}
+:root[data-navigating]::before {
+	animation: ui-navigation-progress var(--ui-navigation-progress-duration) var(--ui-ease-out) var(--ui-navigation-progress-delay) forwards;
+}
+@keyframes ui-navigation-progress {
+	from {
+		scale: 0.1 1;
+		opacity: var(--ui-opacity-visible);
+	}
+	to {
+		scale: 0.9 1;
+		opacity: var(--ui-opacity-visible);
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	/* Without the movement: the whole bar appears after the same delay, and goes without fading. */
+	:root::before {
+		transition: none;
+	}
+	:root[data-navigating]::before {
+		animation-name: ui-navigation-progress-still;
+	}
+}
+@keyframes ui-navigation-progress-still {
+	from,
+	to {
+		opacity: var(--ui-opacity-visible);
+	}
+}

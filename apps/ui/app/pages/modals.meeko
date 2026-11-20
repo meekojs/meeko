@@ -5,6 +5,7 @@
 	const result = signal('Sin respuesta todavía.')
 	const opened = signal(false)
 	const locked = signal(false)
+	const decision = signal('Sin decidir todavía.')
 	async function ask() {
 		try {
 			const accepted = await modal.open<boolean>('ModalConfirm', { message: 'Puedes confirmar, cancelar o abrir otra instancia.' })
@@ -12,6 +13,10 @@
 		} catch {
 			result.value = 'No se pudo cargar el modal. Vuelve a intentarlo.'
 		}
+	}
+	async function askConfirm(danger: boolean) {
+		const accepted = await modal.confirm(danger ? { title: '¿Eliminar el proyecto?', description: 'Se borran sus archivos y no se puede deshacer.', confirmLabel: 'Eliminar', tone: 'danger' } : { title: '¿Publicar los cambios?', description: 'Se verán en la web en unos segundos.', confirmLabel: 'Publicar' })
+		decision.value = accepted ? 'Confirmado.' : 'Rechazado.'
 	}
 </script>
 
@@ -91,6 +96,59 @@
 		<DocsCode
 			label="app/components/Modal/Confirm.meeko"
 			bind:code="examples.modalInstance"
+		/>
+		<h2 id="confirm">Confirmación</h2>
+		<p>
+			<code>useModal().confirm()</code>
+			pide una decisión con un
+			<code>UIModal</code>
+			del paquete, sin registrar ningún componente: título, descripción y dos botones, «Cancelar» y «Confirmar» por defecto (mensajes
+			<code>modal.cancel</code>
+			y
+			<code>modal.confirm</code>). Resuelve
+			<code>true</code>
+			sólo con el botón que acepta, y
+			<code>false</code>
+			con cancelar, Esc, el fondo o el botón de cierre. Cada llamada decide una vez. Con
+			<code>tone: 'danger'</code>
+			el botón que acepta toma el tono de peligro y el foco empieza en «Cancelar»; si no, empieza en el que acepta.
+		</p>
+		<DocsPreview id="confirm-preview">
+			<UIButton
+				id="confirm-neutral"
+				variant="secondary"
+				on:click="() => askConfirm(false)"
+			>
+				Publicar
+			</UIButton>
+			<UIButton
+				id="confirm-danger"
+				tone="danger"
+				variant="secondary"
+				on:click="() => askConfirm(true)"
+			>
+				Eliminar el proyecto
+			</UIButton>
+		</DocsPreview>
+		<p
+			id="confirm-status"
+			role="status"
+		>
+			{decision.value}
+		</p>
+		<DocsCode
+			label="Dentro de un componente"
+			bind:code="examples.modalConfirm"
+		/>
+		<DocsApi
+			caption="Opciones de confirm()"
+			bind:rows="[
+				{ name: 'title', type: 'string', description: 'Obligatoria. Título y nombre accesible del diálogo.' },
+				{ name: 'description', type: 'string', description: 'Explica la decisión; se asocia con aria-describedby.' },
+				{ name: 'confirmLabel / cancelLabel', type: 'string', default: 'Confirmar / Cancelar', description: 'Textos de los botones. Por defecto, los mensajes del idioma del documento.' },
+				{ name: 'tone', type: 'neutral | danger', default: 'neutral', description: 'Acción destructiva: botón de peligro y foco en Cancelar.' },
+				{ name: 'size', type: 'sm | md | lg', default: 'sm', description: 'Ancho máximo del diálogo.' },
+			]"
 		/>
 		<h2 id="stack">Modales anidados</h2>
 		<p>

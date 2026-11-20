@@ -44,12 +44,13 @@ El módulo `@meekojs/ui` pertenece al ecosistema Meeko y tiene versión propia.
 ## Componentes por categoría
 
 - **Estructura:** `UIContainer`, `UIPage`, `UIPageHeader`, `UIHeader` y `UIFooter`.
-- **Acciones:** `UIButton`, `UILink`, `UILinkCard`, `UIBadge` y `UIThemeToggle`.
+- **Acciones:** `UIButton`, `UIIconButton`, `UICopyButton`, `UILink`, `UILinkCard`, `UIBadge` y `UIThemeToggle`.
 - **Formularios:** `UIField`, `UIInput`, `UITextarea`, `UICheckbox`, `UIRadioGroup`, `UISwitch`, `UISlider`, `UISelect` y `UICombobox`. `UIMarkdownEditor`, en su propio módulo `@meekojs/ui/editor`.
 - **Navegación:** `UINavigationTree`, `UINavigationTabs`, `UITabs`, `UIBreadcrumb`, `UIPageNavigation`, `UIPagination`, `UITableOfContents`, `UILocaleSwitcher` y `UILocaleSuggestion`.
 - **Datos y contenido:** `UICard`, `UITable`, `UIStat`, `UIDescriptionList`, `UIDisclosure`, `UIDiff`, `UICodeBlock` y `UIProse`.
 - **Avisos:** `UIAlert`, `UIToast`, `UIEmpty` y `UISkeleton`.
 - **Superposiciones:** `UIModal`, `UIDrawer`, `UIPopover`, `UITooltip`, `UICommandPalette` y el host `UIApp`.
+- **Elementos nativos:** la base da estilo con tokens a `<progress>`, `<meter>` e `<input type="file">`, y la hoja pinta una barra de progreso arriba mientras el router navega (`data-navigating` en `<html>`). Véase [Progreso, medidor y archivos nativos](ui-api.md#progreso-medidor-y-archivos-nativos) y [Barra de progreso de navegación](ui-api.md#barra-de-progreso-de-navegación).
 
 `UILink` comparte las variantes `primary`, `secondary`, `outline` y `ghost`, los tamaños `sm`, `md`, `lg` y las formas `rounded`, `pill` con `UIButton`. Requiere `to` o `href`; no simula un botón. `UILinkCard` requiere `to` o `href`, y `title`, con descripción y contenido opcionales. `UIBadge` tiene tonos `neutral`, `info`, `success`, `warning` y `danger`, y `dot`, sin añadir interacción o anuncios.
 
@@ -156,7 +157,7 @@ Define esas variables en los estilos de tu aplicación. Las referencias CSS sigu
 
 Las webs `apps/meeko`, `apps/ui`, `apps/i18n` y `apps/dashboard` usan estos componentes y tokens, sin diseño propio: mismos colores, tamaños y fuentes. Sólo pueden diferir en imágenes y efectos.
 
-Para modales, monta `<UIApp><MeekoOutlet /></UIApp>` en `app/app.meeko`. `useModal().open<R>(nombre, props)` carga un componente `Modal…` y devuelve su resultado o `undefined` al cancelar. El componente utiliza `UIModal` y `useModalInstance<R>().close(resultado)` o `.dismiss()`. Nombres y props se comprueban contra el registro generado; `R` es el contrato declarado por el consumidor. También puedes controlar `UIModal` directamente con un modelo booleano. Consulta la [API de modales](ui-api.md#modales).
+Para modales, monta `<UIApp><MeekoOutlet /></UIApp>` en `app/app.meeko`. `useModal().open<R>(nombre, props)` carga un componente `Modal…` y devuelve su resultado o `undefined` al cancelar. El componente utiliza `UIModal` y `useModalInstance<R>().close(resultado)` o `.dismiss()`. Nombres y props se comprueban contra el registro generado; `R` es el contrato declarado por el consumidor. Para una simple confirmación no hace falta un componente: `await useModal().confirm({ title, description, tone: 'danger' })` devuelve `true` o `false`. También puedes controlar `UIModal` directamente con un modelo booleano. Consulta la [API de modales](ui-api.md#modales).
 
 `UITable` genera las filas a partir de `rows`, `columns` y `rowKey` obligatorios. El genérico se infiere desde las filas; `TableColumn<T>`, importado desde `@meekojs/ui/runtime`, comprueba las claves y los formateadores de cada columna. Admite pies por columna, estado vacío, snippets opcionales para el contenido de las celdas y `layout="native|grid"` (nativo por defecto), con desplazamiento horizontal. Consulta la [API de tablas](ui-api.md#tablas).
 

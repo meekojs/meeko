@@ -4,6 +4,7 @@
 	const actions = signal(0)
 	const iconClicks = signal(0)
 	const pinned = signal(false)
+	const copies = signal(0)
 </script>
 
 <template>
@@ -282,6 +283,76 @@
 				{ name: 'size / shape / tone', type: 'sm | md | lg / rounded | pill / danger', default: 'md / rounded', description: 'Size, shape and destructive action.' },
 				{ name: 'loading', type: 'boolean', default: 'false', description: 'Swaps the icon for the spinner, announces aria-busy and blocks the action.' },
 				{ name: 'class / ui', type: 'string / { base, icon, tooltip }', description: 'Classes of the button and of its parts.' },
+			]"
+		/>
+		<h2 id="copy-button">UICopyButton</h2>
+		<p>
+			Copies
+			<code>value</code>
+			to the clipboard. With text it looks like
+			<code>UIButton</code>
+			(<code>secondary</code>
+			by default) and its text turns into “Copied” for a moment; with
+			<code>iconOnly</code>, like <code>UIIconButton</code>, with its tooltip, and the icon turns into a check mark. The result is announced in a
+			<code>role="status"</code>
+			region and comes with the
+			<code>copy</code>
+			and
+			<code>copyError</code>
+			events. Without JavaScript it cannot copy: it waits hidden, without moving anything, until the page hydrates.
+		</p>
+		<DocsPreview id="copy-buttons">
+			<UICopyButton
+				id="copy-button-text"
+				value="pnpm add @meekojs/ui"
+				on:copy="() => copies.value++"
+			/>
+			<UICopyButton
+				value="https://ui.meekojs.com"
+				label="Copy link"
+				variant="outline"
+				size="sm"
+			/>
+			<UICopyButton
+				id="copy-button-icon"
+				value="sk_test_4f8a"
+				iconOnly
+				label="Copy the token"
+				on:copy="() => copies.value++"
+			/>
+		</DocsPreview>
+		<p
+			id="copy-button-status"
+			role="status"
+		>
+			Copies in this example: {copies.value}
+		</p>
+		<DocsCode bind:code="examples.copyButton" />
+		<p>
+			The texts come from the
+			<code>copyButton.copy</code>,
+			<code>copyButton.copied</code>
+			and
+			<code>copyButton.failed</code>
+			messages (see <MeekoLink to="/theming">Theming</MeekoLink>), and the props win over them. On a solid background the text keeps its color; in the other variants, the result takes its tokens:
+		</p>
+		<DocsCode
+			label="CSS"
+			bind:code="examples.copyButtonTokens"
+		/>
+		<DocsApi
+			caption="UICopyButton props"
+			bind:rows="[
+				{ name: 'value', type: 'string', description: 'Required. The text to copy.' },
+				{ name: 'label', type: 'string', default: 'Copy', description: 'Text of the button; with iconOnly, its accessible name and its tooltip.' },
+				{ name: 'copiedLabel / failedLabel', type: 'string', default: 'Copied / Could not copy', description: 'Text and announcement of the result.' },
+				{ name: 'iconOnly', type: 'boolean', default: 'false', description: 'Icon only, with the look of UIIconButton.' },
+				{ name: 'tooltip / placement', type: 'boolean / PopoverPlacement', default: 'true / top', description: 'With iconOnly, the tooltip.' },
+				{ name: 'variant', type: 'primary | secondary | outline | ghost', default: 'secondary; ghost with iconOnly', description: 'Visual hierarchy.' },
+				{ name: 'size / shape / tone', type: 'sm | md | lg / rounded | pill / neutral | danger', default: 'md / rounded / neutral', description: 'Size, shape and tone.' },
+				{ name: 'disabled', type: 'boolean', default: 'false', description: 'Disables the native button.' },
+				{ name: 'on:copy / on:copyError', type: '(value: string) / (error: unknown)', description: 'After copying, with the copied text, or when the copy fails.' },
+				{ name: 'class / ui', type: 'string / { base, status }', description: 'Classes of the button and of the screen reader announcement.' },
 			]"
 		/>
 	</DocsPage>

@@ -288,3 +288,44 @@ test('a plain link of an application reads the tokens, in the base layer so that
 	assert.match(base, /:where\(a\) \{[^}]*color: var\(--ui-color-primary-text\);/)
 	assert.match(base, /:where\(a\):hover \{[^}]*text-decoration-color: currentColor;/)
 })
+
+test('each new family of component tokens is declared and falls back to the global tokens', () => {
+	const families = {
+		'--ui-copy-button-': ['copied-color', 'failed-color'],
+		'--ui-progress-': ['height', 'radius', 'track', 'color', 'indeterminate-width', 'duration'],
+		'--ui-meter-': ['height', 'radius', 'track', 'optimum-color', 'suboptimum-color', 'even-less-good-color'],
+		'--ui-file-': ['color', 'gap', 'button-height', 'button-padding', 'button-radius', 'button-bg', 'button-bg-hover', 'button-border', 'button-color'],
+		'--ui-navigation-progress-': ['height', 'color', 'delay', 'duration'],
+	}
+	for (const [prefix, names] of Object.entries(families))
+		for (const name of names) {
+			const value = tokens.light[prefix + name]
+			assert.ok(value, `${prefix + name} is declared`)
+			// A color reads a token of use: the dark theme and ui.tokens change it without a rule of its own.
+			if (/color|track|bg|border/.test(name)) assert.match(value, /^var\(--ui-color-[a-z-]+\)$/, `${prefix + name}: ${value}`)
+		}
+	assert.equal(tokens.light['--ui-navigation-progress-delay'], 'var(--ui-duration-fast)', 'a fast navigation never shows the bar')
+})
+
+test('native <progress>, <meter> and file inputs get the tokens at zero specificity, in the base layer', async () => {
+	const base = strip(await read('base.css'))
+	const selectors = [...base.matchAll(/^\s*([^{}@\n][^{}]*)\{/gm)].map(([, selector]) => selector.trim()).filter((selector) => !selector.startsWith('@') && /progress|meter|file/.test(selector))
+	assert.ok(selectors.length >= 15, selectors.join('\n'))
+	// Only :where() and the pseudo-elements of the element: any rule of the app wins.
+	for (const selector of selectors) for (const part of selector.split(',')) assert.match(part.trim(), /^:where\([^)]*(?:\([^)]*\))?[^)]*\)(?:::[\w-]+)?$/, part)
+	for (const piece of ['var(--ui-progress-track)', 'var(--ui-progress-color)', ':where(progress:indeterminate)', 'var(--ui-meter-optimum-color)', '::-webkit-meter-suboptimum-value', ':-moz-meter-sub-sub-optimum', '::file-selector-button', 'var(--ui-file-button-bg-hover)']) assert.ok(base.includes(piece), piece)
+	assert.match(await read('base.css'), /prefers-reduced-motion: reduce\) \{[^]*:where\(progress:indeterminate\) \{[^}]*animation: none/)
+})
+
+test('the navigation progress bar shows only while <html> has data-navigating, after its delay, and respects reduced motion', async () => {
+	const css = await read('navigation.css')
+	assert.match(css, /:root\[data-navigating\]::before \{[^}]*animation: ui-navigation-progress var\(--ui-navigation-progress-duration\) [^}]*var\(--ui-navigation-progress-delay\) forwards;/)
+	// Each declaration on its own: Prettier orders the properties of a rule.
+	assert.match(css, /:root::before \{[^}]*block-size: var\(--ui-navigation-progress-height\);/)
+	assert.match(css, /:root::before \{[^}]*background: var\(--ui-navigation-progress-color\);/)
+	// Invisible when idle: its base state is hidden, so the delay shows nothing.
+	assert.match(css, /:root::before \{[^}]*opacity: var\(--ui-opacity-hidden\);/)
+	assert.match(css, /prefers-reduced-motion: reduce\) \{[^]*animation-name: ui-navigation-progress-still;/)
+	// In the sheet of the module, so every app with @meekojs/ui gets it.
+	assert.match(await read('components.css'), /@import '\.\/navigation\.css';/)
+})

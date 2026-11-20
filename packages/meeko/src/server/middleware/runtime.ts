@@ -37,11 +37,19 @@ export interface ServerRouteMiddlewareContext<TServices = unknown, TEnv = unknow
 	readonly signal: AbortSignal
 	/**
 	 * Contexto de la petición, el mismo que `usePage().context`. Con `createFrameworkHandler` sin
-	 * `createContext`, leerlo (o `session`, `services`, `platform` y `requestId`) lanza un error.
+	 * `createContext`, leerlo (o `session`, `cookies`, `responseHeaders`, `services`, `platform` y
+	 * `requestId`) lanza un error.
 	 */
 	readonly context: RequestContext<TServices, TEnv>
 	/** Sesión de la petición, como `context.session`. */
 	readonly session: RequestContext<TServices, TEnv>['session']
+	/**
+	 * Cookies de la petición, como `context.cookies` (desde `1.10`): lo que escribe el middleware lo
+	 * leen después la página, sus llamadas a API y RPC y su respuesta, también una redirección.
+	 */
+	readonly cookies: RequestContext<TServices, TEnv>['cookies']
+	/** Cabeceras que la petición añade a su respuesta, como `context.responseHeaders` (desde `1.10`). */
+	readonly responseHeaders: RequestContext<TServices, TEnv>['responseHeaders']
 	/** Servicios de `server/runtime.ts`, como `context.services`; desde `1.7`, `AppServices` sin `TServices`. */
 	readonly services: ContextServices<TServices>
 	/** Runtime que atiende la petición, como `context.platform`. */

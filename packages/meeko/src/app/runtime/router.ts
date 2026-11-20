@@ -158,6 +158,11 @@ export function activateRouteManifest(routes: readonly RouteRecord[]): () => voi
 	}
 }
 
+/** Whether this call runs inside a server request, where browser navigation does not exist. */
+export function serverRequestActive(): boolean {
+	return serverManifest?.() !== undefined
+}
+
 /** Manifest of the running application: the current server request, else the mounted browser app. */
 export function activeRouteManifest(): readonly RouteRecord[] {
 	const routes = serverManifest?.() ?? browserManifests[browserManifests.length - 1]

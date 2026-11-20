@@ -7,7 +7,7 @@
 	import { uiTheme } from '../utils/defaults'
 	import { uiMessages } from '../utils/messages'
 	import { mountModalDialog } from '../utils/modal-dialog'
-	import { modal } from '../variants/modal'
+	import { modal, modalHeadingAlone } from '../variants/modal'
 
 	const props = defineProps<UIModalProps>()
 
@@ -17,7 +17,7 @@
 
 	const open = defineModel<boolean>({ default: false })
 
-	const snippets = defineSnippets<{ default: []; footer?: [] }>()
+	const snippets = defineSnippets<{ default?: []; footer?: [] }>()
 
 	const dialog = useElementRef('dialog')
 
@@ -56,7 +56,7 @@
 		bind:aria-labelledby="id + '-title'"
 		bind:aria-describedby="props.description ? id + '-description' : undefined"
 	>
-		<div bind:class="classes.value.heading({ class: theme.ui.heading })">
+		<div bind:class="classes.value.heading({ class: [snippets.default ? undefined : modalHeadingAlone, theme.ui.heading] })">
 			<div>
 				<h2
 					bind:id="id + '-title'"
@@ -91,7 +91,10 @@
 				</svg>
 			</button>
 		</div>
-		<div bind:class="classes.value.body({ class: theme.ui.body })">
+		<div
+			if:when="snippets.default"
+			bind:class="classes.value.body({ class: theme.ui.body })"
+		>
 			<render snippet="snippets.default" />
 		</div>
 		<footer

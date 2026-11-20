@@ -33,12 +33,14 @@ Desde `1.8`, Meeko conoce los valores que el estándar HTML admite en cada atrib
 
 Desde `1.8`, un elemento puede llevar a la vez el `class` estático y `bind:class`, o `style` y `bind:style`, y Meeko escribe un único atributo con los dos, igual en SSR, al hidratar y al actualizar. Las clases dinámicas van tras las estáticas, y las declaraciones dinámicas de `style` tras las estáticas, así que ganan. Si el valor dinámico es `undefined`, `null`, `false` o una cadena vacía, queda el texto estático tal cual. Vale también en un `<component is>` que sólo puede ser una etiqueta; en un componente, `class` y `bind:class` pasan la misma prop (`MEEK090`).
 
+Desde `1.10`, `bind:class` admite los valores de `clsx`: un texto o un número, un objeto `{ clase: condición }` que aplica cada clave cuya condición es verdadera, y arrays, también anidados, de cualquiera de ellos. Las clases se unen con espacios en su orden, sin quitar repetidas; `null`, `undefined`, `true`, `false` y los textos vacíos se omiten. Vale en los elementos HTML y SVG, en `<MeekoLink>`, en `<component is>` con etiquetas y en la clave `class` de `bind="obj"`, igual en SSR, al hidratar y al actualizar: si cambia una señal que lee el objeto, sólo se reescribe el atributo. `ClassValue`, exportado por `@meekojs/meeko`, tipa ese valor; `meeko check` y el editor rechazan en la expresión una función, un símbolo o una señal sin `.value` (`TS2345`). En un componente, `class` es una prop: declárala como `class?: ClassValue` y pásala a su elemento con `bind:class`. Hasta `1.9`, un objeto o un array se escribía `class="[object Object]"` o con comas, y `true`, `class="true"`. Meeko no fusiona clases de utilidades en conflicto (`p-2` y `p-4`): las escribe todas.
+
 `bind:style` también admite un objeto. Las claves pueden escribirse en camelCase (`backgroundColor`), kebab-case (`font-size`) o como variables CSS (`--accent`); los valores `false`, `null` y `undefined` se omiten, y los números se escriben sin añadir unidades. `StyleValue`, exportado por `@meekojs/meeko`, sirve para tipar un objeto que se guarda o se pasa entre componentes.
 
 ```html
 <article
 	class="card"
-	bind:class="open.value ? 'is-open' : undefined"
+	bind:class="{ 'is-open': open.value }"
 	bind:style="{ backgroundColor: open.value ? 'white' : undefined, '--space': 8 }"
 >
 	...

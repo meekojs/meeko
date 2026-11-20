@@ -125,6 +125,20 @@ Con `pointer: coarse` los altos crecen solos, y los inputs usan `--ui-input-font
 | Seleccionado  | `--ui-color-control-active` y peso `semibold`, o `--ui-color-primary-soft` si es el acento de la vista.                                              |
 | Fila activa   | `--ui-color-control-active` y `--ui-option-active-ring`, con `--ui-color-focus` y 3:1 o más, igual en `UISelect`, `UICombobox` y `UICommandPalette`. |
 
+## Tokens de componente
+
+Un componente con algo propio que personalizar lo lee de una familia `--ui-<componente>-*`, declarada en `tokens.css` sobre los tokens globales: cambiar la familia retoca sólo ese componente, y cambiar el token global lo cambia todo. Las props eligen comportamiento y semántica (`variant`, `size`, `tone`), nunca un color ni un tamaño.
+
+| Familia                      | Qué pinta                                                                                                     |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `--ui-copy-button-*`         | El color del resultado de `UICopyButton` (`copied-color`, `failed-color`), si el texto no va sobre un sólido. |
+| `--ui-progress-*`            | `<progress>`: `height`, `radius`, `track`, `color`, y el ancho y la vuelta de la barra indeterminada.         |
+| `--ui-meter-*`               | `<meter>`: `height`, `radius`, `track` y el color de cada región (`optimum`, `suboptimum`, `even-less-good`). |
+| `--ui-file-*`                | `<input type="file">`: el texto y el botón, con el aspecto de un `UIButton` secundario `sm`.                  |
+| `--ui-navigation-progress-*` | La barra de una navegación del router: `height` (0 la quita), `color`, `delay` y `duration`.                  |
+
+Los estilos de los elementos nativos van en la base, con `:where()`: especificidad cero, así que cualquier regla de la aplicación gana.
+
 ## Movimiento
 
 `--ui-duration-fast` 120ms (color), `--ui-duration-base` 180ms y `--ui-duration-slow` 220ms (entrada de un panel). Curvas: `--ui-ease-out` para lo que aparece, `--ui-ease-in` para lo que se va y `--ui-ease-in-out` para lo que se desplaza. Respeta siempre `prefers-reduced-motion`.

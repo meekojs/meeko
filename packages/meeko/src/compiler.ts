@@ -1355,7 +1355,8 @@ function renderNodeContent(node: TemplateNode, bindings: TemplateBindings, conte
 				continue
 			}
 			bindings.attributes.push({ id, name, expression: attr.value, offset })
-			attrs.push({ kind: 'dynamic', expression: `__meeko.renderAttribute(${quote(name)}, ${name === 'srcdoc' && tag === 'iframe' && htmlTag ? srcdocValue(attr.value, offset, context) : checkedValue(markSource(attr.value, offset), name)})` })
+			const value = name === 'srcdoc' && tag === 'iframe' && htmlTag ? srcdocValue(attr.value, offset, context) : name === 'class' ? classChecked(markSource(attr.value, offset), context) : checkedValue(markSource(attr.value, offset), name)
+			attrs.push({ kind: 'dynamic', expression: `__meeko.renderAttribute(${quote(name)}, ${value})` })
 		} else if (attr.name.startsWith(':')) {
 			throw compileError(context.source, context.filename, 'MEEK012', `Directiva de plantilla no admitida: ${attr.name}`, context.templateOffset + (node.sourceCodeLocation?.startOffset ?? 0))
 		} else if (joined.has(attr.name)) {
@@ -1611,7 +1612,7 @@ function renderDynamicTag(node: TemplateNode, bindings: TemplateBindings, contex
 					parts.push(`__meeko.renderAttribute(${quote(attributeName)}, ${build((expression, at) => markSource(expression, at))})`)
 				} else {
 					own.attributes.push({ id: element, name: attributeName, expression: value, offset, ...(accepts ? { build: (map: (expression: string, offset: number) => string) => `${accepts} ? (${map(value, offset)}) : undefined` } : {}) })
-					const checked = checkedTagValue(markSource(value, offset), attributeName)
+					const checked = attributeName === 'class' ? classChecked(markSource(value, offset), context) : checkedTagValue(markSource(value, offset), attributeName)
 					parts.push(`__meeko.renderAttribute(${quote(attributeName)}, ${accepts ? `${accepts} ? (${checked}) : undefined` : checked})`)
 				}
 			}
@@ -1889,6 +1890,14 @@ function addSpreadPart(explicit: SpreadBinding['explicit'], name: 'class' | 'sty
 	if (!previous) explicit[name] = part
 	else if ('code' in part && 'expression' in previous) explicit[name] = { ...previous, fixed: part.code }
 	else if ('expression' in part && 'code' in previous) explicit[name] = { ...part, fixed: previous.code }
+}
+
+/**
+ * The value of `bind:class` checked against `ClassValue` in the code of the type check: a function
+ * or a symbol is a type error at the expression. The run-time code passes it as it is.
+ */
+function classChecked(code: string, context: TemplateContext): string {
+	return context.narrow ? `__meeko.checkClassValue(${code})` : code
 }
 
 /** SSR code of `bind="obj"` on an element, or the read of its hydration with `map` for its expressions. */
@@ -3164,8 +3173,10 @@ export function compile(source: string, filename = 'anonymous.meeko', options: C
 				})
 				.join(', ')}];`,
 		)
-		scriptParts.setup.unshift('const __meeko_page_data = __meeko.pageData(__props) as __MeekoPageData;', ...pageData.map(({ name }) => `const ${name} = __meeko_page_data.${name};`))
-		scriptParts.names.unshift(...pageData.map(({ name }) => name))
+		// Since 1.10 each export reads the page's current data, `__meeko_page_data.user`: a refresh of
+		// the loader (`invalidate`, `useRoute().refresh()`) updates what reads it without remounting.
+		scriptParts.setup.unshift('const __meeko_page_data = __meeko.pageDataView(__props) as __MeekoPageData;')
+		scriptParts.names.unshift('__meeko_page_data')
 	}
 	context.usedRefs = scriptParts.usedRefs
 	if (scriptParts.continuationNames.size) checkTemplateNames(bindingsForTemplate, scriptParts.continuationNames, context)
@@ -3209,7 +3220,7 @@ export function compile(source: string, filename = 'anonymous.meeko', options: C
 	// Only with defaults: a component without them keeps the module it had before 1.8.
 	const defaultsType = scriptParts.defaultTexts ? `export type ComponentDefaults = ${componentDefaultsType(scriptParts.defaultTexts)};\n` : ''
 	// Lets a client navigation skip loading data when no component of the new page awaits it.
-	const children = templateChildren(bindingsForTemplate, new Set([...scriptParts.names, ...scriptParts.continuationNames.keys(), ...(scriptParts.propAliases?.keys() ?? [])]), scriptParts.propsName, scriptParts.propAliases)
+	const children = templateChildren(bindingsForTemplate, new Set([...scriptParts.names, ...scriptParts.continuationNames.keys(), ...(scriptParts.propAliases?.keys() ?? []), ...pageData.map(({ name }) => name)]), scriptParts.propsName, scriptParts.propAliases)
 	// `__meekoReactiveProps` tells a parent's binding that this module reads its props reactively,
 	// so new props reach a mounted instance in place instead of rebuilding it. A module with a
 	// top-level data await is still rebuilt: its requests were built from the props it rendered with,
@@ -3245,6 +3256,14 @@ export function compile(source: string, filename = 'anonymous.meeko', options: C
 		} catch (error) {
 			if (!(error instanceof PropAliasWriteError)) throw error
 			throw compileError(source, filename, 'MEEK125', error.message, error.offset ?? script.contentStart)
+		}
+	}
+	if (pageData.length) {
+		try {
+			;({ code, mappings } = rewritePropAliases(code, mappings, new Map(pageData.map(({ name }) => [name, name])), '__meeko_page_data'))
+		} catch (error) {
+			if (!(error instanceof PropAliasWriteError)) throw error
+			throw compileError(source, filename, 'MEEK125', `${error.binding} es un export del <script server> de la página y es de sólo lectura: no se puede asignar ni borrar con delete. Para un valor propio que empieza con él, usa signal(${error.binding})`, error.offset ?? script.contentStart)
 		}
 	}
 	// MEEK106: the project's component keeps a built-in tag's name; renaming it adopts the built-in.

@@ -264,5 +264,93 @@
 			se exportan desde
 			<code>@meekojs/ui/runtime</code>.
 		</p>
+		<h2 id="native">Progreso, medidor y archivos</h2>
+		<p>
+			Sin componente: la base de UI da estilo a
+			<code>&lt;progress&gt;</code>,
+			<code>&lt;meter&gt;</code>
+			y
+			<code>&lt;input type="file"&gt;</code>
+			con los tokens, a especificidad cero (<code>:where()</code>, en la capa
+			<code>ui-base</code>), así que cualquier regla tuya gana. Un
+			<code>&lt;progress&gt;</code>
+			sin
+			<code>value</code>
+			es indeterminado y se desplaza, salvo con
+			<code>prefers-reduced-motion</code>. El color de un
+			<code>&lt;meter&gt;</code>
+			dice la región de su valor según
+			<code>low</code>,
+			<code>high</code>
+			y
+			<code>optimum</code>: óptima, intermedia o la peor. El botón de un campo de archivos se ve como un
+			<code>UIButton</code>
+			secundario. Con
+			<code>{'ui: { base: false }'}</code>
+			no se aplican.
+		</p>
+		<DocsPreview id="native-elements">
+			<div class="docs-stack">
+				<progress
+					value="0.6"
+					aria-label="Subida"
+				></progress>
+				<progress aria-label="Cargando"></progress>
+				<meter
+					min="0"
+					max="100"
+					low="25"
+					high="75"
+					optimum="100"
+					value="90"
+					aria-label="Óptimo">90 %</meter>
+				<meter
+					min="0"
+					max="100"
+					low="25"
+					high="75"
+					optimum="100"
+					value="50"
+					aria-label="Intermedio">50 %</meter>
+				<meter
+					min="0"
+					max="100"
+					low="25"
+					high="75"
+					optimum="100"
+					value="10"
+					aria-label="El peor">10 %</meter>
+				<input
+					type="file"
+					multiple
+					aria-label="Fotos"
+				/>
+			</div>
+		</DocsPreview>
+		<DocsCode bind:code="examples.nativeElements" />
+		<p>
+			Cada elemento lee su familia de tokens, que parte de los globales:
+			<code>--ui-progress-*</code>,
+			<code>--ui-meter-*</code>
+			y
+			<code>--ui-file-*</code>.
+		</p>
+		<DocsCode
+			label="CSS"
+			bind:code="examples.nativeElementsTokens"
+		/>
+		<DocsApi
+			caption="Tokens de los elementos nativos"
+			bind:rows="[
+				{ name: '--ui-progress-height / -radius', type: 'longitud', default: '--ui-space-2 / --ui-radius-full', description: 'Alto y esquinas de la barra.' },
+				{ name: '--ui-progress-track / -color', type: 'color', default: '--ui-color-control-active / --ui-color-primary', description: 'Pista y barra.' },
+				{ name: '--ui-progress-indeterminate-width / -duration', type: 'porcentaje / tiempo', default: '40% / 1.4s', description: 'Ancho (hasta 50 %) y vuelta de la barra indeterminada.' },
+				{ name: '--ui-meter-height / -radius / -track', type: 'longitud / color', default: '--ui-space-2 / --ui-radius-full / --ui-color-control-active', description: 'Alto, esquinas y pista.' },
+				{ name: '--ui-meter-optimum-color / -suboptimum-color / -even-less-good-color', type: 'color', default: 'success / warning / danger', description: 'Barra en la región óptima, intermedia y la peor.' },
+				{ name: '--ui-file-color / -gap', type: 'color / longitud', default: '--ui-color-text-soft / --ui-space-3', description: 'Nombre de los archivos y separación del botón.' },
+				{ name: '--ui-file-button-height / -padding / -radius', type: 'longitud', default: 'los de un control sm', description: 'Tamaño del botón.' },
+				{ name: '--ui-file-button-bg / -bg-hover / -border / -color', type: 'color', default: 'los de un UIButton secondary', description: 'Colores del botón.' },
+			]"
+		/>
 	</DocsPage>
 </template>

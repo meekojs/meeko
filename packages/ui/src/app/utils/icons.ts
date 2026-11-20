@@ -7,6 +7,8 @@ export const icons = {
 	check: 'm3.5 8.5 3 3 6-7',
 	chevron: 'm5.5 6.5 2.5 2.5 2.5-2.5',
 	close: 'm4.5 4.5 7 7M11.5 4.5l-7 7',
+	/** Two sheets, one over the other: the action of <UICopyButton>. */
+	copy: 'M6.25 5.75h6a.75.75 0 0 1 .75.75v6.75a.75.75 0 0 1-.75.75h-6a.75.75 0 0 1-.75-.75V6.5a.75.75 0 0 1 .75-.75ZM3 10.25v-6.5a.75.75 0 0 1 .75-.75h6.5',
 	/** Three dots in a row, the trigger of a menu of actions: each one a circle as small as its stroke. */
 	dots: 'M2.75 8a.75.75 0 1 0 1.5 0 .75.75 0 1 0-1.5 0M7.25 8a.75.75 0 1 0 1.5 0 .75.75 0 1 0-1.5 0M11.75 8a.75.75 0 1 0 1.5 0 .75.75 0 1 0-1.5 0',
 	globe: 'M8 14.25A6.25 6.25 0 1 0 8 1.75a6.25 6.25 0 0 0 0 12.5ZM1.75 8h12.5M8 1.75c1.6 1.7 2.4 3.8 2.4 6.25S9.6 12.55 8 14.25C6.4 12.55 5.6 10.45 5.6 8S6.4 3.45 8 1.75Z',

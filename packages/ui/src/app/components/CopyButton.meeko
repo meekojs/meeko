@@ -1,0 +1,91 @@
+<script lang="ts">
+	// <UICopyButton>: copies `value` with utils/clipboard, like the button of <UICodeBlock>. It paints a <UIButton>,
+	// or a <UIIconButton> with `iconOnly`, so it has their looks; this component adds the result of the last copy
+	// (`data-copy-state`, its text or its icon, and the colors of variants/button `copyButton`) and a status region
+	// that announces it. Without the script it cannot copy: it waits hidden, keeping its place, until it mounts in a
+	// browser that can copy. It has no whitespace between the tags: it would be text inside a sentence.
+	import { computed, onMounted, signal } from '@meekojs/meeko'
+
+	import type { UICopyButtonProps } from '../types/button'
+
+	import { canCopy, copyFeedbackTime, copyText } from '../utils/clipboard'
+	import { uiTheme } from '../utils/defaults'
+	import { uiMessages } from '../utils/messages'
+	import { copyButton, copyButtonWaiting } from '../variants/button'
+	import * as Button from './Button.meeko'
+	import * as IconButton from './IconButton.meeko'
+
+	const { value, label, copiedLabel, failedLabel, iconOnly = false, tooltip = true, placement, tone, disabled = false, variant, size, shape, class: ownClass, ui, ...rest } = defineProps<UICopyButtonProps>()
+
+	const theme = uiTheme('copyButton', () => ({ class: ownClass, ui }))
+
+	const emit = defineEmits<{ copy: [value: string]; copyError: [error: unknown] }>()
+
+	const text = uiMessages().copyButton
+
+	const ready = signal(false)
+	const state = signal<'idle' | 'copied' | 'failed'>('idle')
+	let timer: ReturnType<typeof setTimeout> | undefined
+
+	const choice = computed(() => ({ variant: variant ?? theme.defaults?.variant ?? (iconOnly ? 'ghost' : 'secondary'), size: size ?? theme.defaults?.size, shape: shape ?? theme.defaults?.shape }))
+	const classes = computed(() => copyButton(choice.value))
+	const base = computed(() => classes.value.base({ class: [ready.value ? undefined : copyButtonWaiting, theme.ui.base, theme.class] }))
+	const name = computed(() => label ?? text.copy)
+	const result = computed(() => (state.value === 'copied' ? (copiedLabel ?? text.copied) : state.value === 'failed' ? (failedLabel ?? text.failed) : ''))
+	const icon = computed(() => (state.value === 'copied' ? 'check' : state.value === 'failed' ? 'close' : 'copy'))
+
+	async function copy(): Promise<void> {
+		if (timer) clearTimeout(timer)
+		const copied = value
+		try {
+			await copyText(copied)
+			state.value = 'copied'
+			emit('copy', copied)
+		} catch (error) {
+			state.value = 'failed'
+			emit('copyError', error)
+		}
+		timer = setTimeout(() => (state.value = 'idle'), copyFeedbackTime)
+	}
+
+	onMounted(() => {
+		ready.value = canCopy()
+		return () => {
+			if (timer) clearTimeout(timer)
+		}
+	})
+</script>
+
+<!-- No whitespace between the tags of this template: it would be text inside a sentence. -->
+<template><IconButton
+		if:when="iconOnly"
+		bind:label="name.value"
+		bind:icon="icon.value"
+		bind:tooltip="tooltip"
+		bind:placement="placement"
+		bind:variant="choice.value.variant"
+		bind:size="choice.value.size"
+		bind:shape="choice.value.shape"
+		bind:tone="tone"
+		bind:disabled="disabled"
+		bind:class="base.value"
+		bind:data-copy-state="state.value"
+		bind="rest"
+		on:click="copy"
+	/><Button
+		if:when="!iconOnly"
+		bind:variant="choice.value.variant"
+		bind:size="choice.value.size"
+		bind:shape="choice.value.shape"
+		bind:tone="tone"
+		bind:disabled="disabled"
+		bind:class="base.value"
+		bind:data-copy-state="state.value"
+		bind="rest"
+		on:click="copy"
+		>{state.value === 'idle' ? name.value : result.value}</Button
+	><span
+		role="status"
+		bind:class="classes.value.status({ class: theme.ui.status })"
+		>{result.value}</span
+	></template>

@@ -7,10 +7,10 @@ import type { RequestContext, ServerFetch } from './request-context'
 import type { SessionManager } from './sessions'
 
 import { dispatchApiRoute } from '../api/runtime'
-import { errorResponse, setRateLimitRoute } from '../contract-runtime'
+import { errorResponse, finish, setRateLimitRoute } from '../contract-runtime'
 import { ApiError, reportServerError } from '../errors'
 import { dispatchRpc } from '../rpc/runtime'
-import { createRequestContext, idempotencyKeyOf } from './request-context'
+import { createRequestContext, deriveContext, idempotencyKeyOf } from './request-context'
 
 /**
  * Método HTTP de un endpoint de API, el sufijo de `server/api/<ruta>.<método>.ts`.
@@ -325,7 +325,7 @@ export function createContextDispatcher<S>(options: Pick<ServerDispatcherOptions
 			if (pathname.startsWith('/_meeko/rpc/')) {
 				const endpoint = options.manifest.rpc.find((record) => record.pathname === pathname)
 				if (!endpoint) throw new ApiError('NOT_FOUND', 404)
-				if (request.method !== 'POST') return methodNotAllowed(context.requestId, ['POST'])
+				if (request.method !== 'POST') return finish(methodNotAllowed(context.requestId, ['POST']), context)
 				const definition = exportedDefinition(await load(endpoint.file)) as RpcDefinition<Schema, Schema, S>
 				setRateLimitRoute(context, `rpc ${endpoint.id}`)
 				return dispatchRpc(definition, context, options.sessions, options.onError)
@@ -342,11 +342,12 @@ export function createContextDispatcher<S>(options: Pick<ServerDispatcherOptions
 				setRateLimitRoute(context, `api ${endpoint.method} ${endpoint.pathname}`)
 				return dispatchApiRoute(definition, context, options.sessions, params, options.onError)
 			}
-			if (allowed.length) return methodNotAllowed(context.requestId, allowed)
+			if (allowed.length) return finish(methodNotAllowed(context.requestId, allowed), context)
 			throw new ApiError('NOT_FOUND', 404)
 		} catch (error) {
 			reportServerError(error, context.requestId, options.onError)
-			return errorResponse(error, context.requestId)
+			// Cookies a services factory wrote, such as a refreshed token, still reach the client.
+			return finish(errorResponse(error, context.requestId), context)
 		}
 	}
 }
@@ -418,7 +419,8 @@ export function createLocalServerFetch<S>(options: Pick<ServerDispatcherOptions<
 			}
 		}
 		// The key belongs to the request it came with, not to the one that dispatches this call.
-		const context: RequestContext<S> = { ...active, request, signal: request.signal, idempotencyKey: idempotencyKeyOf(request) } as RequestContext<S>
+		// The derived context shares the cookies and response headers of the original request.
+		const context = deriveContext(active, { request, signal: request.signal, idempotencyKey: idempotencyKeyOf(request) }) as RequestContext<S>
 		return dispatch(context)
 	}
 }

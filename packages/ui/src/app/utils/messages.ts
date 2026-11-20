@@ -17,7 +17,7 @@ const i18nKey = Symbol.for('meeko.i18n') as ContextKey<{ readonly locale: string
 
 const spanish: UIMessages = {
 	feedback: { close: 'Cerrar aviso', empty: 'No hay resultados.', loading: 'Cargando' },
-	modal: { close: 'Cerrar modal' },
+	modal: { close: 'Cerrar modal', confirm: 'Confirmar', cancel: 'Cancelar' },
 	table: { empty: 'No hay datos.' },
 	select: { empty: 'Sin resultados', clear: 'Quitar selección' },
 	themeToggle: {
@@ -83,11 +83,12 @@ const spanish: UIMessages = {
 	menu: { trigger: 'Más acciones' },
 	stat: { up: 'Sube {change}', down: 'Baja {change}', flat: 'Sin cambios', link: 'Ver detalle', linkName: '{link}: {label}' },
 	sparkline: { label: 'Tendencia: mínimo {min}, máximo {max}, último {last}', empty: 'Sin datos' },
+	copyButton: { copy: 'Copiar', copied: 'Copiado', failed: 'No se pudo copiar' },
 }
 
 const english: UIMessages = {
 	feedback: { close: 'Dismiss notification', empty: 'No results.', loading: 'Loading' },
-	modal: { close: 'Close modal' },
+	modal: { close: 'Close modal', confirm: 'Confirm', cancel: 'Cancel' },
 	table: { empty: 'No data.' },
 	select: { empty: 'No results', clear: 'Clear selection' },
 	themeToggle: {
@@ -153,6 +154,7 @@ const english: UIMessages = {
 	menu: { trigger: 'More actions' },
 	stat: { up: 'Up {change}', down: 'Down {change}', flat: 'No change', link: 'View details', linkName: '{link}: {label}' },
 	sparkline: { label: 'Trend: minimum {min}, maximum {max}, latest {last}', empty: 'No data' },
+	copyButton: { copy: 'Copy', copied: 'Copied', failed: 'Could not copy' },
 }
 
 /** The texts that come with the package. Spanish is complete and the last fallback of every locale. */
@@ -206,6 +208,7 @@ function merge(messages: UIMessages, layer: UIMessageOverrides | undefined): UIM
 		menu: { ...messages.menu, ...layer.menu },
 		stat: { ...messages.stat, ...layer.stat },
 		sparkline: { ...messages.sparkline, ...layer.sparkline },
+		copyButton: { ...messages.copyButton, ...layer.copyButton },
 	}
 }
 

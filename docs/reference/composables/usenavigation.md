@@ -16,7 +16,7 @@ related:
   - docs/framework.md#navegación-y-render-client
 ---
 
-`useNavigation()` dice si la aplicación está cambiando de página. Su `pending` vale `true` desde que empieza una navegación del cliente (un clic en un enlace, `app.navigate()`, el botón atrás) hasta que la página nueva se confirma, falla o se cancela, incluida la carga de sus `await useApi`/`await useRpcQuery` y la primera carga de una página `render: "client"`. Sirve para una barra de progreso global, un cursor de espera o atenuar el contenido mientras llega la página siguiente.
+`useNavigation()` dice si la aplicación está cambiando de página. Su `pending` vale `true` desde que empieza una navegación del cliente (un clic en un enlace, [`navigate()`](/docs/reference/navigate), `app.navigate()`, el botón atrás) hasta que la página nueva se confirma, falla o se cancela, incluida la carga de sus `await useApi`/`await useRpcQuery` y la primera carga de una página `render: "client"`. Sirve para una barra de progreso global, un cursor de espera o atenuar el contenido mientras llega la página siguiente.
 
 Se exporta desde `@meekojs/meeko/framework` y, desde `1.7`, se autoimporta como `useRoute` (un export propio llamado `useNavigation` tiene prioridad); el import explícito sigue valiendo. Puede llamarse también desde código que se ejecuta con el componente (un composable, un `computed`, un `effect`), pero no desde un manejador de eventos: ahí no hay raíz activa y devuelve un estado fijo con `pending` en `false`.
 
@@ -70,6 +70,48 @@ effect(() => {
 
 <template><div class="progress" if:when="visible.value" aria-hidden="true"></div></template>
 ```
+
+### Atributos para CSS
+
+Desde `1.10`, mientras `pending` vale `true`, `<html>` lleva el atributo `data-navigating` y, si la navegación empezó con un clic en un `<MeekoLink>` o en un `<a>` interno, ese enlace lleva `data-pending`. Atrás, adelante y `app.navigate()` marcan `<html>`, pero ningún enlace. Los dos se quitan cuando la navegación se confirma, falla o se cancela, y nunca salen en el HTML del servidor.
+
+Con ellos, una barra de progreso no necesita ningún componente ni `effect`. El retardo de la transición evita que parpadee en una navegación rápida: si termina antes de 150 ms, la barra no llega a verse.
+
+```css
+/* app/styles/main.css */
+html::before {
+	content: "";
+	position: fixed;
+	inset: 0 0 auto;
+	z-index: 1000;
+	height: 3px;
+	background: currentColor;
+	transform: scaleX(0);
+	transform-origin: left;
+	opacity: 0;
+	pointer-events: none;
+}
+
+html[data-navigating]::before {
+	opacity: 1;
+	transform: scaleX(0.8);
+	/* Empieza a los 150 ms y avanza despacio mientras dure la carga. */
+	transition: opacity 0s 150ms, transform 8s 150ms cubic-bezier(0.1, 0.7, 0.2, 1);
+}
+
+a[data-pending] {
+	cursor: progress;
+	opacity: 0.6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	html[data-navigating]::before {
+		transition: opacity 0s 150ms;
+	}
+}
+```
+
+Al quitarse `data-navigating`, la barra desaparece sin transición y vuelve a empezar desde cero en la navegación siguiente.
 
 ### Desactivar acciones durante la navegación
 
@@ -154,7 +196,7 @@ El HTML del servidor y la carga completa de una página nunca muestran ese texto
 
 ## Notas
 
-- **SSR.** Siempre `false`. La hidratación tampoco lo cambia.
+- **SSR.** Siempre `false`. La hidratación tampoco lo cambia. `data-navigating` y `data-pending` tampoco salen en el HTML del servidor.
 - **Qué cuenta.** El render previo de la página nueva que carga sus `await` de datos, la petición del payload al servidor y la carga de una ruta `render: "client"`. Una navegación sólo de fragmento (`#seccion`) no la activa: el navegador sólo desplaza la página.
 - **Cancelación.** Si el usuario inicia otra navegación mientras tanto, la anterior se cancela y `pending` sigue en `true` hasta que termina la última.
 - **Accesibilidad.** Marca la zona que cambia con `aria-busy` mientras carga, en lugar de anunciar cada navegación.

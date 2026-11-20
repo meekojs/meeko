@@ -232,6 +232,77 @@ const nav = useNavigation()
 // <p if:when="nav.pending.value">Cargando…</p>
 ```
 
+### Atributos `data-navigating` y `data-pending`
+
+Desde `1.10`, mientras `pending` vale `true`, Meeko pone también dos atributos en el documento, para estilar la navegación sólo con CSS:
+
+- **`data-navigating` en `<html>`** (`document.documentElement`), vacío, en cualquier navegación del cliente: un clic en un enlace, `app.navigate()`, una redirección, atrás y adelante, y la primera carga de una página `"client"`.
+- **`data-pending` en el `<a>` pulsado**, vacío, cuando la navegación empezó con un clic en un `<MeekoLink>` o en un `<a href>` interno que Meeko intercepta. Atrás, adelante y las navegaciones desde código no marcan ningún enlace. Si otra navegación empieza antes, el enlace anterior pierde el atributo y lo recibe el nuevo, si lo hay.
+
+Los dos se quitan cuando la navegación se confirma, falla o se cancela, y al liberar la aplicación (`dispose()`). Nunca están en el HTML del servidor, así que no afectan a la hidratación. Una navegación sólo de fragmento no los pone.
+
+```css
+/* Atenúa el enlace pulsado mientras carga su página. */
+a[data-pending] {
+	opacity: 0.6;
+	cursor: progress;
+}
+
+html[data-navigating] main {
+	transition: opacity 0.2s 0.15s;
+	opacity: 0.7;
+}
+```
+
+[`useNavigation`](reference/composables/usenavigation.md#atributos-para-css) tiene una barra de progreso con retardo.
+
+## Navegación programática
+
+Desde `1.10`, `navigate(target, options)` navega desde el código de un componente o un composable del navegador por el mismo router que `<MeekoLink>`: middleware de ruta, datos de la página, `useNavigation().pending`, historial, scroll y View Transitions. Se autoimporta en el código de `app/` que llega al navegador y, como no lee el contexto del componente, también sirve en un manejador de eventos, un temporizador o después de un `await`. Sustituye a `window.location.assign`, que recarga el documento.
+
+```html
+<script lang="ts">
+	const props = defineProps<{ userId: string }>()
+	async function save() {
+		await api.users.update.post({ body: { id: props.userId } })
+		await navigate({ to: '/users/[id]', params: { id: props.userId }, search: { saved: 1 }, hash: 'perfil' })
+	}
+</script>
+```
+
+- **Destino tipado.** Recibe lo mismo que `<MeekoLink>`: `to` (sólo rutas que existen), `params` (obligatorios en una ruta dinámica y prohibidos en las demás), `search`, `hash` (sin `#`), `hreflang` y `resolve`, que pasan por los resolvedores de enlaces como en la etiqueta. `meeko check` marca una ruta inexistente o unos `params` que faltan (`TS2769`).
+- **URL como texto.** `navigate("/users/42?tab=a")` acepta cualquier URL relativa o absoluta, sin comprobarla con las rutas. Una URL de otro origen o sin página se carga como documento (`location.assign`, o `location.replace` con `replace: true`), como un enlace. Sólo sigue `http:` y `https:`: otro esquema rechaza con `TypeError`, la misma regla que las redirecciones de middleware.
+- **Opciones.** `replace: true` sustituye la entrada del historial; `viewTransition` activa o desactiva la View Transition de esa navegación.
+- **Resultado.** Una `Promise<boolean>`, la de `app.navigate()`: `true` cuando la página nueva se confirma y `false` si se cancela (otra navegación, `beforeNavigate`, un middleware que bloquea) o la URL se carga como documento. Rechaza con el error si falla; la página anterior sigue visible.
+- **Servidor.** En SSR, en un loader, en el código de nivel superior o en un middleware de servidor, lanza un error que remite a `redirect()`. Fuera de una aplicación montada con `mountClientApp` lanza el mismo error. Una llamada durante la hidratación espera a que el router esté listo.
+
+Véase [navigate](reference/utils/navigate.md).
+
+## Parámetros de búsqueda como estado
+
+Desde `1.10`, `useSearchParam(name, initial, { schema, history })` devuelve una señal editable enlazada a un parámetro de la query string de la ruta confirmada. Se autoimporta en el código de `app/` que llega al navegador.
+
+```html
+<script lang="ts">
+	import * as v from 'valibot'
+
+	const tab = useSearchParam('tab', 'perfil')
+	const page = useSearchParam('page', 1, { schema: v.pipe(v.string(), v.toNumber(), v.integer(), v.minValue(1)) })
+</script>
+
+<template>
+	<button on:click="() => (tab.value = 'actividad')">Actividad</button>
+	<button on:click="() => page.value++">Página siguiente</button>
+</template>
+```
+
+- **Lectura.** Sale de la query de `useRoute().url`, con el mismo momento que `useRoute()`: cambia cuando una navegación se confirma, también por el historial. El `schema` (un Standard Schema síncrono) recibe el texto del parámetro, o una lista si la clave se repite, y su salida da el tipo. Sin el parámetro o con un valor que el schema rechaza, la señal vale `initial`; nunca lanza por la URL. Sin `schema`, el valor es el texto (el primero, si se repite) e `initial` debe ser un texto.
+- **Escritura.** Navega a la misma URL con el parámetro cambiado, conservando los demás parámetros y el fragmento, por el router: se ejecutan el middleware de ruta y los datos de la página, como al seguir un enlace a esa URL. Por defecto sustituye la entrada del historial; `history: "push"` añade otra. El valor igual a `initial`, `null` y `undefined` quitan el parámetro; una lista repite la clave y una fecha se escribe con `toISOString()`. La señal devuelve el valor escrito mientras la navegación está pendiente y vuelve al de la URL si falla o se cancela. Dos escrituras seguidas se acumulan en una URL.
+- **SSR e hidratación.** En SSR lee la query de la petición y es de sólo lectura: escribir lanza un error. La hidratación lee lo mismo que el servidor, sin desajustes.
+- **Lo que se vuelve a montar.** Como cualquier navegación, la página se vuelve a montar con la URL nueva y los layouts se conservan. Un campo de texto de la página que escribe en cada tecla pierde el foco: escriba al enviar o en `on:change`.
+
+`useRoute().search` sigue siendo el `search` que validó la página; `useSearchParam` lee la URL, así que también sirve para un parámetro que el schema de `definePage({ search })` no declara. Véase [useSearchParam](reference/composables/usesearchparam.md).
+
 ## Ruta actual
 
 Desde `1.2`, `useRoute()` devuelve la ruta confirmada que renderiza el componente, con una señal de sólo lectura por valor (tipo `RouteState`):

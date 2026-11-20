@@ -1,3 +1,5 @@
+import { applyInvalidation, INVALIDATE_HEADER } from './invalidation'
+
 /**
  * Descriptor público de un endpoint de API. Omite a propósito el archivo del handler y los schemas
  * del servidor, así que puede viajar al navegador.
@@ -458,13 +460,20 @@ async function responseValue(response: Response, contentType: 'json' | 'response
 		const requestId = typeof record.requestId === 'string' ? record.requestId : (response.headers.get('x-request-id') ?? undefined)
 		throw new ClientError(code, response.status, requestId, validationIssues(record.issues))
 	}
-	if (contentType === 'response') return response
-	if (response.status === 204) return undefined
+	// A successful write refreshes the mounted data that depends on its keys before it resolves.
+	const invalidated = applyInvalidation(response.headers.get(INVALIDATE_HEADER))
+	if (contentType === 'response') {
+		await invalidated
+		return response
+	}
+	let value: unknown
 	try {
-		return await response.json()
+		value = response.status === 204 ? undefined : await response.json()
 	} catch {
 		throw new ClientError('INVALID_RESPONSE', response.status, response.headers.get('x-request-id') ?? undefined)
 	}
+	await invalidated
+	return value
 }
 
 function endpointUrl(pathname: string, options: ClientOptions): string {

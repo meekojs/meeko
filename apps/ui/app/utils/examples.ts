@@ -382,6 +382,57 @@ export default defineMeekoConfig({
 <UIIconButton label="Guardando" icon="check" bind:loading="saving.value" />
 <UIIconButton label="Pequeño" icon="menu" size="sm" />
 <UIIconButton label="Sin tooltip" icon="menu" bind:tooltip="false" />`,
+	copyButton: `<script lang="ts">
+  const copies = signal(0)
+</script>
+
+<template>
+<UICopyButton value="pnpm add @meekojs/ui" on:copy="() => copies.value++" />
+<UICopyButton value="https://ui.meekojs.com" label="Copiar enlace" variant="outline" size="sm" />
+<UICopyButton value="sk_test_4f8a" iconOnly label="Copiar el token"
+  on:copyError="(error) => console.warn(error)" />
+</template>`,
+	copyButtonTokens: `/* Los colores del resultado, sólo donde el texto no va sobre un sólido */
+.billing {
+  --ui-copy-button-copied-color: var(--ui-color-info-text);
+  --ui-copy-button-failed-color: var(--ui-color-warning-text);
+}`,
+	modalConfirm: `const modal = useModal()
+
+async function remove() {
+  const confirmed = await modal.confirm({
+    title: '¿Eliminar el proyecto?',
+    description: 'Se borran sus archivos y no se puede deshacer.',
+    confirmLabel: 'Eliminar',
+    tone: 'danger',
+  })
+  if (confirmed) await deleteProject()
+}`,
+	nativeElements: `<progress value="0.6" aria-label="Subida"></progress>
+<progress aria-label="Cargando"></progress>
+
+<meter min="0" max="100" low="25" high="75" optimum="100" value="90">90 %</meter>
+<meter min="0" max="100" low="25" high="75" optimum="100" value="50">50 %</meter>
+<meter min="0" max="100" low="25" high="75" optimum="100" value="10">10 %</meter>
+
+<input type="file" accept="image/*" multiple aria-label="Fotos" />`,
+	nativeElementsTokens: `:root {
+  --ui-progress-height: 0.25rem;
+  --ui-progress-color: var(--ui-color-success);
+  --ui-meter-suboptimum-color: var(--ui-color-orange-9);
+  --ui-file-button-bg: var(--ui-color-primary-soft);
+}`,
+	navigationProgress: `/* Más gruesa, de otro color y más paciente */
+:root {
+  --ui-navigation-progress-height: 0.1875rem;
+  --ui-navigation-progress-color: var(--ui-color-info);
+  --ui-navigation-progress-delay: 250ms;
+}
+
+/* Sin barra */
+:root {
+  --ui-navigation-progress-height: 0;
+}`,
 	textarea: `<UIField id="comment" label="Comentario" bind:counter="comment.value.length + '/200'">
   <snippet name="default" params="id, describedBy">
     <UITextarea model="comment" bind:id="id" bind:describedBy="describedBy"

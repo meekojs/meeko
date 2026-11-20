@@ -255,6 +255,43 @@
 	--ui-sparkline-stroke-width: 1.5;
 	--ui-sparkline-area-opacity: 0.14;
 	--ui-sparkline-duration: 600ms;
+	/* <UICopyButton>: the color of the result of a copy, where its text is not on a solid */
+	--ui-copy-button-copied-color: var(--ui-color-success-text);
+	--ui-copy-button-failed-color: var(--ui-color-danger-text);
+	/* <progress>: its height, corners, track and bar; the indeterminate one moves a bar of this width (up to 50%) in this time */
+	--ui-progress-height: var(--ui-space-2);
+	--ui-progress-radius: var(--ui-radius-full);
+	--ui-progress-track: var(--ui-color-control-active);
+	--ui-progress-color: var(--ui-color-primary);
+	--ui-progress-indeterminate-width: 40%;
+	--ui-progress-duration: 1.4s;
+	/* <meter>: its height, corners and track, and the bar by region: optimum, suboptimum and the worst (even less good) */
+	--ui-meter-height: var(--ui-space-2);
+	--ui-meter-radius: var(--ui-radius-full);
+	--ui-meter-track: var(--ui-color-control-active);
+	--ui-meter-optimum-color: var(--ui-color-success);
+	--ui-meter-suboptimum-color: var(--ui-color-warning);
+	--ui-meter-even-less-good-color: var(--ui-color-danger);
+	/* <input type="file">: the name of the chosen files, and the button that chooses them, which looks like a secondary <UIButton> */
+	--ui-file-color: var(--ui-color-text-soft);
+	--ui-file-gap: var(--ui-space-3);
+	--ui-file-button-height: var(--ui-control-height-sm);
+	--ui-file-button-padding: var(--ui-control-padding-sm);
+	--ui-file-button-radius: var(--ui-radius-md);
+	--ui-file-button-bg: var(--ui-color-control);
+	--ui-file-button-bg-hover: var(--ui-color-control-hover);
+	--ui-file-button-border: var(--ui-color-border);
+	--ui-file-button-color: var(--ui-color-text);
+	/*
+	 * The bar at the top of the page while the router navigates (`data-navigating` on <html>). It waits for the
+	 * delay, so a fast navigation never shows it, and then crawls towards the end for the duration. A height of 0
+	 * turns it off.
+	 */
+	--ui-navigation-progress-height: 0.125rem;
+	--ui-navigation-progress-color: var(--ui-color-primary);
+	--ui-navigation-progress-delay: var(--ui-duration-fast);
+	--ui-navigation-progress-duration: 8s;
+	--ui-z-progress: 40;
 }
 
 :root[data-theme='dark'] {

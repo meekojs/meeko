@@ -2,7 +2,7 @@ import type { ElementAttributes } from '@meekojs/meeko'
 import type { MeekoLinkProps, RouteId } from '@meekojs/meeko/framework'
 
 import type { icons } from '../utils/icons'
-import type { iconButton } from '../variants/button'
+import type { copyButton, iconButton } from '../variants/button'
 import type { linkCard } from '../variants/card'
 import type { UIActionShape, UIActionSize, UIActionVariant } from './config'
 import type { PopoverPlacement } from './popover'
@@ -323,3 +323,47 @@ export type UILinkProps = (UILinkAnchorProps | UILinkRouteProps) &
 		/** Nombre accesible cuando el contenido visible no basta; equivale a `aria-label`. */
 		readonly ariaLabel?: string
 	}
+
+/**
+ * Props de `<UICopyButton>`, un `<button>` que copia `value` al portapapeles. Con texto tiene el aspecto
+ * de `<UIButton>` (`secondary` por defecto) y su texto pasa a «Copiado» o «No se pudo copiar» durante un
+ * instante; con `iconOnly`, el de `<UIIconButton>` (`ghost` por defecto), con su tooltip, y el icono pasa a
+ * una marca. El resultado se anuncia en una región `role="status"` y llega con los eventos `copy` (el texto
+ * copiado) o `copyError` (el error). Sin JavaScript no puede copiar: espera oculto, sin mover nada, hasta que
+ * el navegador lo hidrata. Los textos salen de los mensajes `copyButton.*` si no se pasan. Los colores del
+ * resultado son los tokens `--ui-copy-button-copied-color` y `--ui-copy-button-failed-color`. `ui` añade
+ * clases a sus slots: `base` (el botón; equivale a `class`) y `status` (el aviso).
+ *
+ * @since 1.11.0
+ * @example
+ * ```html
+ * <UICopyButton value="pnpm add @meekojs/ui" />
+ * <UICopyButton bind:value="token.value" iconOnly label="Copiar el token" on:copy="() => track('token')" />
+ * ```
+ */
+export type UICopyButtonProps = Omit<UIForwardedAttributes, 'aria-label' | 'title'> &
+	UIThemeProps<
+		typeof copyButton,
+		{
+			/** Obligatoria. El texto que se copia. */
+			readonly value: string
+			/** Texto del botón y, con `iconOnly`, su nombre accesible y su tooltip; por defecto, `copyButton.copy`. */
+			readonly label?: string
+			/** Texto y aviso tras copiar; por defecto, `copyButton.copied`. */
+			readonly copiedLabel?: string
+			/** Texto y aviso si la copia falla; por defecto, `copyButton.failed`. */
+			readonly failedLabel?: string
+			/** Sólo icono, con el aspecto de `<UIIconButton>`. */
+			readonly iconOnly?: boolean
+			/** Con `iconOnly` y `false`, sin tooltip. `true` por defecto. */
+			readonly tooltip?: boolean
+			/** Con `iconOnly`, dónde se abre el tooltip; `"top"` por defecto. */
+			readonly placement?: PopoverPlacement
+			/** Estado semántico de la acción; `"neutral"` por defecto. */
+			readonly tone?: 'neutral' | 'danger'
+			/** Desactiva el botón nativo. */
+			readonly disabled?: boolean
+			/** Clases adicionales del botón; equivale a `ui.base`. */
+			readonly class?: string
+		}
+	>

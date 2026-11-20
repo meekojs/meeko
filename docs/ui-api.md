@@ -112,6 +112,11 @@ export default defineMeekoConfig({
 | `themeToggle.unknown` | `Cambiar tema`                      | `Change theme`                       | `messages.unknown`            |
 | `themeToggle.group`   | `Tema`                              | `Theme`                              | `messages.group`              |
 | `themeToggle.cycle`   | `Tema: {current}. Cambiar a {next}` | `Theme: {current}. Switch to {next}` | `messages.cycle`              |
+| `modal.confirm`       | `Confirmar`                         | `Confirm`                            | `confirmLabel` de `confirm()` |
+| `modal.cancel`        | `Cancelar`                          | `Cancel`                             | `cancelLabel` de `confirm()`  |
+| `copyButton.copy`     | `Copiar`                            | `Copy`                               | `label`                       |
+| `copyButton.copied`   | `Copiado`                           | `Copied`                             | `copiedLabel`                 |
+| `copyButton.failed`   | `No se pudo copiar`                 | `Could not copy`                     | `failedLabel`                 |
 
 - **Prioridad.** Una prop o un snippet del componente ganan sobre todo lo demás. Después, `ui.messages` gana sobre los textos del paquete en ese idioma.
 - **Idiomas.** `ui.locale` y las claves de `ui.messages` se validan al cargar y se leen en su forma canónica: `EN` es `en` y `pt-br` es `pt-BR`. Una etiqueta inválida, como `en-u`, es un error de configuración.
@@ -286,6 +291,29 @@ También incluye `UIApp` y `UIModal` para [modales](#modales), `UITable` para [t
 - **Deshabilitados.** Un `<button disabled>` no recibe foco y algunos navegadores no le dan eventos de puntero, así que su tooltip puede no abrirse: si el motivo importa, explícalo fuera del botón.
 - **Defaults.** `ui.defaults.iconButton` admite `variant`, `size`, `shape`, `class` y los slots `base`, `icon` y `tooltip`; `ui.defaults.hint`, `class` y los mismos slots.
 - **Tipos.** `UIIconButtonProps`, `UIIconName`, `UIHintProps` y `HintSnippets` se importan desde `@meekojs/ui/runtime`.
+
+### UICopyButton
+
+`UICopyButton` copia `value` al portapapeles con el mismo mecanismo que el botón de `UICodeBlock` (`copyText()`, con la API del portapapeles o, sin ella, una selección). Con texto tiene el aspecto de `UIButton` (`secondary` por defecto) y su texto pasa a «Copiado» o «No se pudo copiar» durante el mismo tiempo que el de un bloque de código; con `iconOnly`, el de `UIIconButton` (`ghost` por defecto), con su tooltip y nombrado por `label`, y el icono pasa a una marca o una cruz.
+
+```html
+<UICopyButton value="pnpm add @meekojs/ui" />
+<UICopyButton
+	bind:value="token.value"
+	iconOnly
+	label="Copiar el token"
+	on:copy="() => track('token')"
+	on:copyError="(error) => console.warn(error)"
+/>
+```
+
+- **Accesible.** El resultado se anuncia en una región `role="status"` que existe desde el SSR, vacía hasta que hay algo que decir. Con `iconOnly` el nombre del botón no cambia: lo dice el aviso.
+- **Sin JavaScript.** No puede copiar, así que espera oculto (`visibility: hidden`, sin mover nada) hasta que se hidrata en un navegador que puede copiar.
+- **Eventos.** `copy` recibe el texto copiado y `copyError`, el error.
+- **Estado.** El botón lleva `data-copy-state` (`idle`, `copied` o `failed`). En `secondary`, `outline` y `ghost` el resultado toma `--ui-copy-button-copied-color` y `--ui-copy-button-failed-color` (por defecto, `--ui-color-success-text` y `--ui-color-danger-text`); sobre un sólido, el texto conserva su color.
+- **Textos.** `label`, `copiedLabel` y `failedLabel`, o los mensajes `copyButton.copy`, `copyButton.copied` y `copyButton.failed` de [los textos](#textos-e-idiomas).
+- **Props.** `variant`, `size`, `shape`, `tone`, `disabled`, `tooltip` y `placement` (con `iconOnly`), `class` y `ui` (`base`, `status`); `id`, `aria-*` y `data-*` llegan al botón. `ui.defaults.copyButton` admite `variant`, `size`, `shape` y `class`. Es contenido de frase.
+- **Tipos.** `UICopyButtonProps` se importa desde `@meekojs/ui/runtime`.
 
 ### Navegación y etiquetas
 
@@ -528,7 +556,36 @@ Sólo `useModal` y `useModalInstance` se autoimportan en componentes y código d
 | `closeButton`, `closeLabel`        | Botón de cierre visible por defecto, con `modal.close` de [los textos](#textos-e-idiomas) como etiqueta. |
 | `class`                            | Clases adicionales del diálogo.                                                                          |
 
-El snippet `default` es obligatorio y `footer` opcional. El evento `dismiss` recibe `escape`, `backdrop`, `button` o `native`; cambiar el modelo a `false` cierra sin emitir ese evento. Si desactivas las vías de cancelación, proporciona una acción explícita de cierre. La base usa `<dialog>` y `showModal()`, con nombre accesible, foco y capa modal nativos. `components/internal/ModalInstance.meeko` es infraestructura del host y sólo se importa explícitamente: no forma parte del registro ni genera nombres globales de componente o props.
+El snippet `default` es opcional desde 1.11.0 (sin él no hay cuerpo, y el título y la descripción quedan sobre el pie) y `footer` también. El evento `dismiss` recibe `escape`, `backdrop`, `button` o `native`; cambiar el modelo a `false` cierra sin emitir ese evento. Si desactivas las vías de cancelación, proporciona una acción explícita de cierre. La base usa `<dialog>` y `showModal()`, con nombre accesible, foco y capa modal nativos. `components/internal/ModalInstance.meeko` es infraestructura del host y sólo se importa explícitamente: no forma parte del registro ni genera nombres globales de componente o props.
+
+### Confirmación
+
+`useModal().confirm(options)` pide una decisión con un `UIModal` del paquete, sin registrar ningún componente `Modal…`, y devuelve `Promise<boolean>`:
+
+```ts
+const modal = useModal()
+
+async function remove() {
+	const confirmed = await modal.confirm({
+		title: '¿Eliminar el proyecto?',
+		description: 'Se borran sus archivos y no se puede deshacer.',
+		confirmLabel: 'Eliminar',
+		tone: 'danger',
+	})
+	if (confirmed) await deleteProject()
+}
+```
+
+| Opción         | Comportamiento                                                                                                       |
+| -------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `title`        | Obligatoria. Título y nombre accesible del diálogo.                                                                  |
+| `description`  | Explica la decisión; se asocia con `aria-describedby`.                                                               |
+| `confirmLabel` | Texto del botón que acepta; por defecto, `modal.confirm` de [los textos](#textos-e-idiomas) («Confirmar»).           |
+| `cancelLabel`  | Texto del botón que rechaza; por defecto, `modal.cancel` («Cancelar»).                                               |
+| `tone`         | `neutral` (por defecto) o `danger`: el botón que acepta toma el tono de peligro y el foco empieza en el que rechaza. |
+| `size`         | `sm` (por defecto), `md` o `lg`.                                                                                     |
+
+Resuelve `true` sólo con el botón que acepta. Cancelar, Escape, el clic en el fondo, el botón de cierre y el relevo o desmontaje del host resuelven `false`; nunca `undefined`. Cada llamada decide una vez: un segundo clic durante la salida no cambia el resultado. El foco inicial es nativo (`autofocus` del `<dialog>`): el botón que acepta o, con `danger`, el que rechaza. Comparte el gestor con `open()`: se apila con los demás modales en orden de apertura, espera a un modal anterior que aún carga, y sigue el relevo del host entre layouts y durante la HMR. En SSR o sin un `UIApp` montado, la promesa se rechaza como la de `open()`. El tipo `UIConfirmOptions` se exporta desde `@meekojs/ui/runtime`.
 
 `provideModal`, el gestor, los resolvers y los tipos auxiliares pertenecen a la implementación interna y no tienen una entrada pública de paquete. El plugin estático `app/plugins/modal.ts` los importa directamente. Los tipos auxiliares que describen retornos públicos siguen distribuyéndose en las declaraciones TypeScript, sin convertirse en exports nombrados de `runtime` ni autoimports.
 
@@ -1298,6 +1355,16 @@ Todo enlace de una lista acepta `href` (cualquier URL) o `to` (una ruta con `par
 - **Hojas sueltas.** `@meekojs/ui/styles/prose.css` y `@meekojs/ui/styles/code.css` son esas mismas reglas como archivos, para un documento que no recibe las de la página, como un `<iframe sandbox srcdoc>`. Leen `var(--ui-*)`: ese documento tiene que declarar sus valores.
 - **`UIDiff`** recibe un diff unificado y marca cada línea con `data-kind` (`add`, `remove`, `hunk`, `file`, `context`) y un texto para lectores de pantalla.
 
+### Barra de progreso de navegación
+
+Mientras el router navega en el cliente, `<html>` lleva `data-navigating`, y la hoja de UI pinta una barra fina arriba de la página, sólo con CSS (`:root::before`, en la capa `ui.components`). Espera `--ui-navigation-progress-delay` (`--ui-duration-fast`, 120 ms), así que una navegación rápida nunca la muestra; avanza hacia el final durante `--ui-navigation-progress-duration` (8 s) y, al quitarse el atributo, se completa y se desvanece. Con `prefers-reduced-motion` aparece entera tras la misma espera, sin moverse ni desvanecerse. `--ui-navigation-progress-color` es su color, `--ui-navigation-progress-height` (0,125rem) su alto y `--ui-z-progress` su capa. Viene con el módulo; para quitarla:
+
+```css
+:root {
+	--ui-navigation-progress-height: 0;
+}
+```
+
 ### Paneles propios y el canal de la barra
 
 La base reserva el canal de la barra de desplazamiento con `scrollbar-gutter: stable`, así que la página no se mueve al cambiar de largo. En esa franja Chromium sólo pinta el color de fondo de `<html>`: un panel `position: fixed`, un `<dialog>` modal y su `::backdrop` se recortan antes de ella aunque se extiendan con un `inset` negativo, y `100vw` ya la descuenta. Por eso el módulo mide su ancho y lo escribe en `<html>` como `--ui-scrollbar-gutter` (`0px` sin barra, con barras superpuestas, en el servidor o sin JavaScript), y lo actualiza al redimensionar, al cambiar el zoom y al aparecer o desaparecer la barra. `data-meeko-ui-scrollbar-gutter` dice en qué lado está (`right`, o `left` en un navegador que la pasa a la izquierda en una página de derecha a izquierda).
@@ -1410,6 +1477,35 @@ Los tipos de props, `UIDensity`, `UITone` y `UIToastContext` se exportan desde `
 `UIBadge` añade tonos `info`, `success`, `warning` y `dot`. `UIInput` admite `date`, `datetime-local` y atributos nativos como `autocomplete`, `autocapitalize`, `spellcheck`, `min`, `max` y `step`. `UIField` añade `hint` y `counter` (string o número); los IDs de ambos se incluyen en el `describedBy` que recibe su snippet.
 
 `UICard` y `UITable` aceptan `density="compact" | "normal" | "comfortable"`. Card añade `padding="none" | "sm" | "md" | "lg"`, que gana sobre density. Las columnas de Table admiten `numeric` (alineación al final) y `rowHeader` (`th scope="row"`), también en el layout grid. `hideCaption` oculta el título de una tabla a la vista, cuando un encabezado ya lo dice, y sigue nombrándola.
+
+### Progreso, medidor y archivos nativos
+
+La base (`base.css`, en la capa `ui-base`) da estilo a tres elementos nativos con selectores `:where()`, de especificidad cero: cualquier regla de la aplicación gana. Con `ui: { base: false }` no se aplican.
+
+- **`<progress>`.** Pista `--ui-progress-track` y barra `--ui-progress-color`, con `--ui-progress-height` y `--ui-progress-radius`. Sin `value` es indeterminado: una barra de `--ui-progress-indeterminate-width` (hasta el 50 % de la pista) la cruza cada `--ui-progress-duration`; con `prefers-reduced-motion` llena la pista, más suave, sin moverse.
+- **`<meter>`.** Pista `--ui-meter-track`, con `--ui-meter-height` y `--ui-meter-radius`. La barra toma el color de la región de su valor, según `low`, `high` y `optimum`: `--ui-meter-optimum-color` (éxito), `--ui-meter-suboptimum-color` (aviso) y `--ui-meter-even-less-good-color` (peligro).
+- **`<input type="file">`.** Los nombres en `--ui-file-color` y un `::file-selector-button` con el aspecto de un `UIButton` secundario de tamaño `sm`: `--ui-file-button-height`, `-padding`, `-radius`, `-bg`, `-bg-hover`, `-border` y `-color`, separado por `--ui-file-gap`. Deshabilitado, con `--ui-opacity-disabled`.
+
+```html
+<progress
+	value="0.6"
+	aria-label="Subida"
+></progress>
+<meter
+	min="0"
+	max="100"
+	low="25"
+	high="75"
+	optimum="100"
+	value="50"
+>
+	50 %
+</meter>
+<input
+	type="file"
+	multiple
+/>
+```
 
 ### UIStat como cifra clave y UISparkline
 
