@@ -322,6 +322,12 @@
 					"symbols": [
 						"@meekojs/meeko/server#useRequestState"
 					]
+				},
+				{
+					"name": "getRequestContext",
+					"symbols": [
+						"@meekojs/meeko/server#getRequestContext"
+					]
 				}
 			]
 		},

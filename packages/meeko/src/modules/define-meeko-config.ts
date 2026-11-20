@@ -329,6 +329,32 @@ export interface MeekoConfig {
 	 */
 	readonly alias?: Readonly<Record<string, string | false>>
 	/**
+	 * Opciones de TypeScript de los `tsconfig` que genera Meeko (`.meeko/tsconfig.app.json`,
+	 * `server` y `shared`), que usan `meeko check` y el editor. `compilerOptions` cambia el rigor y
+	 * la versión del lenguaje de la aplicación; el resto (módulos, rutas, aliases y tipos) lo sigue
+	 * decidiendo Meeko. Sirve sobre todo para adoptar Meeko en una base de código que ya existe:
+	 * Meeko activa por defecto `exactOptionalPropertyTypes` y `noUncheckedIndexedAccess`, y apunta a
+	 * `ES2022`. Admite `target`, `lib`, `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`,
+	 * `noImplicitOverride`, `noImplicitReturns`, `noFallthroughCasesInSwitch`,
+	 * `noPropertyAccessFromIndexSignature`, `noUnusedLocals`, `noUnusedParameters` y
+	 * `useUnknownInCatchVariables`; cualquier otra opción detiene `meeko check` con un error. `lib`
+	 * sustituye la lista entera: inclúyase `DOM` para el código del navegador.
+	 * @since 1.10.0
+	 * @example
+	 * ```ts
+	 * import { defineMeekoConfig } from "@meekojs/meeko/framework";
+	 *
+	 * export default defineMeekoConfig({
+	 *   typescript: {
+	 *     compilerOptions: { target: "ES2023", lib: ["ES2023", "DOM"], exactOptionalPropertyTypes: false },
+	 *   },
+	 * });
+	 * ```
+	 */
+	readonly typescript?: {
+		readonly compilerOptions?: MeekoTypeScriptCompilerOptions
+	}
+	/**
 	 * Comprobaciones de `meeko check`, `meeko build` y el editor. `attributeValues` es el modo de
 	 * `MEEK122`: `"warn"` (por defecto) avisa de cada literal de texto que un atributo nativo con
 	 * valores cerrados no admite (`"shwo"` en `popovertargetaction`); `"strict"` da además un error
@@ -493,4 +519,27 @@ export interface MeekoConfig {
  */
 export function defineMeekoConfig<const T extends MeekoConfig>(config: T & MeekoConfig): T {
 	return config
+}
+
+/**
+ * Opciones de TypeScript que una aplicación puede cambiar en los `tsconfig` generados; véase
+ * `typescript` en {@link MeekoConfig}.
+ * @since 1.10.0
+ */
+export interface MeekoTypeScriptCompilerOptions {
+	/** Versión de JavaScript del código comprobado. Por defecto, `"ES2022"`. */
+	readonly target?: string
+	/** Bibliotecas de tipos; sustituye la lista entera. Por defecto, `["ES2022", "DOM"]`. */
+	readonly lib?: readonly string[]
+	/** Por defecto, `true`. */
+	readonly exactOptionalPropertyTypes?: boolean
+	/** Por defecto, `true`. */
+	readonly noUncheckedIndexedAccess?: boolean
+	readonly noImplicitOverride?: boolean
+	readonly noImplicitReturns?: boolean
+	readonly noFallthroughCasesInSwitch?: boolean
+	readonly noPropertyAccessFromIndexSignature?: boolean
+	readonly noUnusedLocals?: boolean
+	readonly noUnusedParameters?: boolean
+	readonly useUnknownInCatchVariables?: boolean
 }

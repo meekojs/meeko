@@ -10,7 +10,7 @@ import { dispatchApiRoute } from '../api/runtime'
 import { errorResponse, finish, setRateLimitRoute } from '../contract-runtime'
 import { ApiError, reportServerError } from '../errors'
 import { dispatchRpc } from '../rpc/runtime'
-import { createRequestContext, deriveContext, idempotencyKeyOf } from './request-context'
+import { activeRequestOf, createRequestContext, deriveContext, idempotencyKeyOf, withRequestContext } from './request-context'
 
 /**
  * Método HTTP de un endpoint de API, el sufijo de `server/api/<ruta>.<método>.ts`.
@@ -318,7 +318,10 @@ export function createContextDispatcher<S>(options: Pick<ServerDispatcherOptions
 	if (typeof options.load !== 'function') throw new TypeError('Server dispatch requires a module loader')
 	const api = [...options.manifest.api].sort(compareApi)
 	const load = options.load
-	return async (context) => {
+	// Each endpoint runs with its context bound, for getRequestContext(); a local call from SSR keeps
+	// the outer page's server fetch.
+	return (context) => withRequestContext(context, activeRequestOf()?.serverFetch, () => dispatchBound(context))
+	async function dispatchBound(context: RequestContext<S>): Promise<Response> {
 		const request = context.request
 		try {
 			const pathname = new URL(request.url).pathname

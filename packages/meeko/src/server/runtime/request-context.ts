@@ -182,6 +182,38 @@ export function currentRequest(): ActiveRequest {
 	return active
 }
 
+/** The active request of this async flow, if any (no error). */
+export function activeRequestOf(): ActiveRequest | undefined {
+	return activeRequest.getStore()
+}
+
+/**
+ * Devuelve el contexto de la petición en curso desde cualquier función de servidor, sin recibirlo
+ * como argumento: el `<script server>` y el `load` de una página, el middleware de ruta y los
+ * handlers de `defineRpc` y `defineApiRoute`, también tras un `await`. Es el mismo objeto que
+ * reciben esas piezas como `context`. Fuera de una petición (al cargar un módulo, en un
+ * `setTimeout` que sobrevive a la petición o en `defineServerMiddleware`, que corre antes de crear
+ * el contexto) lanza un error.
+ *
+ * @since 1.10.0
+ * @returns El contexto de la petición en curso.
+ * @throws {Error} Si no hay ninguna petición en curso.
+ * @example
+ * ```ts
+ * import { getRequestContext, useRequestState } from "@meekojs/meeko/server";
+ *
+ * export function currentUserId(): string | undefined {
+ *   const context = getRequestContext();
+ *   return useRequestState(context, "user:id", () => context.cookies.get("uid"));
+ * }
+ * ```
+ */
+export function getRequestContext<TServices = unknown, TEnv = unknown>(): RequestContext<TServices, TEnv> {
+	const active = activeRequest.getStore()
+	if (!active) throw new Error('getRequestContext() sólo funciona durante una petición: en una página, un loader, un middleware de ruta o un handler de API o RPC.')
+	return active.context as RequestContext<TServices, TEnv>
+}
+
 /** Combined signal of each request signal and session revocation signal, built once per pair. */
 const combinedSignals = new WeakMap<AbortSignal, WeakMap<AbortSignal, AbortSignal>>()
 /**

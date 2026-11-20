@@ -140,6 +140,7 @@ test('server, node, bun, deno, cloudflare and build subpaths expose exactly thei
 		'executeApiRoute',
 		'executeRpc',
 		'generateOpenApi',
+		'getRequestContext',
 		'handleProcessErrors',
 		'loadSocketChannels',
 		'openSocketSession',

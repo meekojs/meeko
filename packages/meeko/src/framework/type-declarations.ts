@@ -153,7 +153,7 @@ export async function generateFrameworkTsconfigs(projectRoot: string): Promise<s
 		const source =
 			JSON.stringify(
 				{
-					compilerOptions: { ...compilerOptions, rootDirs: name === 'shared' ? undefined : ['..', './types'], ...(Object.keys(paths).length ? { paths } : {}) },
+					compilerOptions: { ...compilerOptions, ...config.typescript?.compilerOptions, rootDirs: name === 'shared' ? undefined : ['..', './types'], ...(Object.keys(paths).length ? { paths } : {}) },
 					include: includes,
 					...(excludes.length ? { exclude: excludes } : {}),
 				},

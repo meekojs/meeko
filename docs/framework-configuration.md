@@ -30,6 +30,7 @@ export default defineMeekoConfig({
 - `sitemap` y `robots` (desde `1.3`): `sitemap.xml` y `robots.txt` generados en el build; véase [`sitemap.xml` y `robots.txt`](framework-deployment.md#sitemapxml-y-robotstxt).
 - `theme` (desde `1.4`): el tema claro/oscuro, y temas propios, sin parpadeo, con `useTheme()`; véase [Tema claro/oscuro sin parpadeo](framework-rendering.md#tema-clarooscuro-sin-parpadeo).
 - `alias` (desde `1.5`): aliases de ruta propios, o cambios de `~/`, `@/`, `#shared/` y `#server/`, los que Meeko define por defecto; véase [Aliases de ruta](#aliases-de-ruta).
+- `typescript` (desde `1.10`): `compilerOptions` cambia el rigor y la versión del lenguaje de los `tsconfig` generados; véase [Rigor de TypeScript](#rigor-de-typescript).
 
 Desde `1.2`, `css: { scopeAttribute: "matched" }` limita el atributo de `<style scoped>` a los elementos que algún selector con ámbito puede seleccionar; con `"all"`, el valor por defecto en `1.x`, va en todos los elementos de la plantilla. `"matched"` pasará a ser el valor por defecto en `2.0`. Véase [Estilos con ámbito](api.md#qué-elementos-reciben-el-atributo), con el caso de las clases que el script añade con la API del DOM.
 
@@ -423,6 +424,30 @@ export function useCart() {
 El compilador `.meeko` y la transformación `.ts` insertan imports ESM reales. Las declaraciones por ámbito se regeneran bajo `.meeko/types/autoimports/` sólo cuando cambia el contenido, para autocompletado y navegación a definición. Los tipos genéricos reexportados conservan parámetros, restricciones y defaults; las firmas overload del mismo símbolo se registran una sola vez, mientras una colisión entre orígenes distintos sigue fallando. El servidor de lenguaje usa el mismo registro y las posiciones AST del compilador. Los proyectos app, server y shared generados por `meeko check` aplican también `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess` y `verbatimModuleSyntax`. `shared/` no puede depender de símbolos app o servidor; el bundle cliente rechaza módulos `server/`, incluidos imports transitivos. Los `*.route.ts` pertenecen al ámbito servidor.
 
 Al migrar código que no usaba esas opciones estrictas, cambie imports usados sólo como tipos a `import type`, compruebe el resultado de accesos por índice antes de usarlo y añada `| undefined` únicamente cuando la ausencia sea parte real del contrato. No silencie los diagnósticos ensanchando props o contratos públicos a `any`: Meeko usa esos tipos para generar el cliente, validar el servidor y mantener iguales CLI y editor.
+
+### Rigor de TypeScript
+
+`meeko check` y el editor comprueban los tipos con los `tsconfig` que Meeko genera en `.meeko/` (`tsconfig.app.json`, `tsconfig.server.json` y `tsconfig.shared.json`). Por defecto son estrictos: `strict`, `exactOptionalPropertyTypes` y `noUncheckedIndexedAccess`, con `target` y `lib` en `ES2022`.
+
+Desde `1.10`, `typescript.compilerOptions` en `meeko.config.ts` cambia ese rigor y la versión del lenguaje, en los tres a la vez. Sirve sobre todo para adoptar Meeko en una base de código que ya existe y se escribió con otras opciones, sin corregir cientos de archivos el primer día:
+
+```ts
+// meeko.config.ts
+import { defineMeekoConfig } from "@meekojs/meeko/framework";
+
+export default defineMeekoConfig({
+  typescript: {
+    compilerOptions: {
+      target: "ES2023",
+      lib: ["ES2023", "DOM"],
+      exactOptionalPropertyTypes: false,
+      noUncheckedIndexedAccess: false,
+    },
+  },
+});
+```
+
+Se admiten `target`, `lib`, `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`, `noImplicitOverride`, `noImplicitReturns`, `noFallthroughCasesInSwitch`, `noPropertyAccessFromIndexSignature`, `noUnusedLocals`, `noUnusedParameters` y `useUnknownInCatchVariables`. El resto (`module`, `moduleResolution`, `paths`, `types`, `strict`…) lo decide Meeko, porque de ellas depende que el código compile igual que en Vite: cambiar una detiene `meeko check`, `meeko dev` y `meeko build` con `typescript.compilerOptions.moduleResolution no se puede cambiar`. `lib` sustituye la lista entera, así que incluya `DOM` para el código del navegador. Estas opciones sólo cambian la comprobación de tipos: el código que sirve Vite es el mismo.
 
 ## Aliases de ruta
 

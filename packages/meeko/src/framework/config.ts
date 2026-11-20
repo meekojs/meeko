@@ -181,6 +181,7 @@ export async function loadMeekoConfig(projectRoot: string): Promise<MeekoConfig>
 		})
 	}
 	validateAliasOption(config.alias, file, root)
+	validateTypeScriptOption((config as { typescript?: unknown }).typescript, file)
 	const modules = config.modules as unknown
 	if (modules !== undefined) {
 		const reference = (value: unknown): boolean => (typeof value === 'string' && value !== '') || isMeekoModule(value)
@@ -295,6 +296,38 @@ function validateAliasOption(value: unknown, file: string, root: string): void {
 		if (isAbsolute(target) || !inside(root, resolve(root, target))) {
 			throw new TypeError(`${file}: alias ${JSON.stringify(prefix)} debe ser una ruta relativa dentro del proyecto (su carpeta o la de un layer): ${target}`)
 		}
+	}
+}
+
+/** The compiler options an application may change in the generated tsconfigs, by value type. */
+export const typeScriptCompilerOptionKinds = {
+	target: 'string',
+	lib: 'strings',
+	exactOptionalPropertyTypes: 'boolean',
+	noUncheckedIndexedAccess: 'boolean',
+	noImplicitOverride: 'boolean',
+	noImplicitReturns: 'boolean',
+	noFallthroughCasesInSwitch: 'boolean',
+	noPropertyAccessFromIndexSignature: 'boolean',
+	noUnusedLocals: 'boolean',
+	noUnusedParameters: 'boolean',
+	useUnknownInCatchVariables: 'boolean',
+} as const
+
+/** Checks `typescript`: only `compilerOptions`, with the options Meeko lets an application change. */
+function validateTypeScriptOption(value: unknown, file: string): void {
+	if (value === undefined) return
+	if (!isPlainObject(value)) throw new TypeError(`${file}: typescript debe ser un objeto, como { compilerOptions: { target: "ES2023" } }`)
+	onlyFields(value, ['compilerOptions'], `${file}: typescript`)
+	const options = value.compilerOptions
+	if (options === undefined) return
+	if (!isPlainObject(options)) throw new TypeError(`${file}: typescript.compilerOptions debe ser un objeto`)
+	const allowed = Object.keys(typeScriptCompilerOptionKinds)
+	for (const [name, option] of Object.entries(options)) {
+		const kind = (typeScriptCompilerOptionKinds as Record<string, string>)[name]
+		if (kind === undefined) throw new TypeError(`${file}: typescript.compilerOptions.${name} no se puede cambiar: Meeko lo necesita para compilar la aplicación. Se admiten ${allowed.join(', ')}`)
+		const valid = kind === 'boolean' ? typeof option === 'boolean' : kind === 'string' ? typeof option === 'string' && option.trim() !== '' : Array.isArray(option) && option.length > 0 && option.every((entry) => typeof entry === 'string' && entry.trim() !== '')
+		if (!valid) throw new TypeError(`${file}: typescript.compilerOptions.${name} debe ser ${kind === 'boolean' ? 'true o false' : kind === 'string' ? 'un texto no vacío' : 'un array no vacío de textos'}`)
 	}
 }
 
