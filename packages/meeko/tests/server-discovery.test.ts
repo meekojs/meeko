@@ -121,6 +121,11 @@ test('rejects ambiguous API URL and generated client names', async (t) => {
 	await assert.rejects(discoverServerManifest(sameRouteParams.root), /el segmento \[id\] y el segmento \[Id\] resuelven los dos a byId/)
 	const siblings = await fixture(t, ['api/users/index.get.ts', 'api/users/name.get.ts', 'api/users/[id].get.ts', 'api/users/[slug]/posts.get.ts'])
 	assert.deepEqual((await discoverServerManifest(siblings.root)).api.map((entry) => entry.clientKey).sort(), ['users', 'users.byId', 'users.bySlug.posts', 'users.name'])
+	// A URL allows hyphens and leading digits; the client names them as identifiers.
+	const hyphens = await fixture(t, ['api/cron/compras-meta.get.ts', 'api/auth/2fa.post.ts', 'api/mcp/oauth/client-info.get.ts'])
+	assert.deepEqual((await discoverServerManifest(hyphens.root)).api.map((entry) => entry.clientKey).sort(), ['auth._2fa', 'cron.comprasMeta', 'mcp.oauth.clientInfo'])
+	const sameName = await fixture(t, ['api/cron/compras-meta.get.ts', 'api/cron/comprasMeta.post.ts'])
+	await assert.rejects(discoverServerManifest(sameName.root), /Colisión de nombres del cliente de API: .+ \(el segmento estático (?:compras-meta|comprasMeta)\) y .+ resuelven los dos a cron\.comprasMeta/)
 	const nestedRpc = await fixture(t, ['rpc/users.ts', 'rpc/users/get.ts'])
 	await assert.rejects(discoverServerManifest(nestedRpc.root), (error: unknown) => {
 		assert.match(String(error), /Colisión de procedimientos RPC/)

@@ -11,21 +11,35 @@ function isErased(type: ts.Type): boolean {
 	return (type.flags & unsafeFlags) !== 0
 }
 
+function isNeverIndex(type: ts.Type): boolean {
+	return (type.flags & ts.TypeFlags.Never) !== 0
+}
+
+/** `Record<string, never>`: its alias argument `never` is the index signature, not an erased type. */
+function hasNeverIndex(type: ts.Type, checker: ts.TypeChecker): boolean {
+	return [ts.IndexKind.String, ts.IndexKind.Number].some((kind) => {
+		const index = checker.getIndexTypeOfType(type, kind)
+		return index !== undefined && isNeverIndex(index)
+	})
+}
+
 function isUnsafe(type: ts.Type, checker: ts.TypeChecker, location: ts.Node, seen: Set<ts.Type>): boolean {
 	if (isErased(type)) return true
 	if (seen.has(type)) return false
 	seen.add(type)
 
-	if ((type.isUnionOrIntersection() && type.types.some((part) => isUnsafe(part, checker, location, seen))) || type.aliasTypeArguments?.some((argument) => isUnsafe(argument, checker, location, seen))) return true
+	if ((type.isUnionOrIntersection() && type.types.some((part) => isUnsafe(part, checker, location, seen))) || type.aliasTypeArguments?.some((argument) => !(isNeverIndex(argument) && hasNeverIndex(type, checker)) && isUnsafe(argument, checker, location, seen))) return true
 
 	if (type.flags & ts.TypeFlags.Object) {
 		const object = type as ts.ObjectType
 		if ((object.objectFlags & ts.ObjectFlags.Reference) !== 0 && checker.getTypeArguments(object as ts.TypeReference).some((argument) => isUnsafe(argument, checker, location, seen))) return true
 
+		// `never` in an index signature is concrete: `Record<string, never>` is an object without keys,
+		// what Zod infers for `z.object({})`.
 		const numberIndex = checker.getIndexTypeOfType(type, ts.IndexKind.Number)
-		if (numberIndex && isUnsafe(numberIndex, checker, location, seen)) return true
+		if (numberIndex && !isNeverIndex(numberIndex) && isUnsafe(numberIndex, checker, location, seen)) return true
 		const stringIndex = checker.getIndexTypeOfType(type, ts.IndexKind.String)
-		if (stringIndex && isUnsafe(stringIndex, checker, location, seen)) return true
+		if (stringIndex && !isNeverIndex(stringIndex) && isUnsafe(stringIndex, checker, location, seen)) return true
 
 		// Array and tuple methods contain library-level generics that are not part
 		// of the serialized payload. Their element/type arguments above are.

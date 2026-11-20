@@ -149,9 +149,19 @@ export function clientSegment(param: string): string {
 	return `by${param[0]!.toUpperCase()}${param.slice(1)}`
 }
 
+/**
+ * The client name of a static segment: a URL allows `compras-meta` or `2fa`, a property of the
+ * client is an identifier. Hyphens become camelCase (`comprasMeta`) and a leading digit gets `_`
+ * (`_2fa`). Two segments with the same name are a collision (`assertClientSegments`).
+ */
+export function staticClientSegment(segment: string): string {
+	const camel = segment.replace(/-+([A-Za-z0-9])/g, (_, next: string) => next.toUpperCase()).replaceAll('-', '')
+	return /^[0-9]/.test(camel) ? `_${camel}` : camel
+}
+
 export function clientKey(pathname: string): string {
 	return parts(pathname)
-		.map((part) => (part.kind === 'static' ? part.value : clientSegment(part.value)))
+		.map((part) => (part.kind === 'static' ? staticClientSegment(part.value) : clientSegment(part.value)))
 		.join('.')
 }
 
@@ -160,13 +170,13 @@ export function clientKey(pathname: string): string {
  * client segment must be either static or the segment of one route parameter, in every route.
  */
 export function assertClientSegments(api: readonly Pick<ApiEndpoint, 'file' | 'pathname'>[]): void {
-	const seen = new Map<string, { file: string; segment: string }>()
+	const seen = new Map<string, { file: string; segment: string; source: string }>()
 	for (const endpoint of api) {
 		const routeParts = parts(endpoint.pathname).slice(1)
 		const params = routeParts.filter((part) => part.kind !== 'static').map((part) => part.value)
 		let path = ''
 		for (const part of routeParts) {
-			const name = part.kind === 'static' ? part.value : clientSegment(part.value)
+			const name = part.kind === 'static' ? staticClientSegment(part.value) : clientSegment(part.value)
 			const describe = (value: string) => (value === '' ? `el segmento estático ${name}` : `el segmento [${value}]`)
 			const matches = params.filter((param) => clientSegment(param) === name)
 			if (part.kind === 'static' ? matches.length > 0 : matches.length > 1) {
@@ -178,7 +188,11 @@ export function assertClientSegments(api: readonly Pick<ApiEndpoint, 'file' | 'p
 			if (previous && previous.segment !== segment) {
 				throw new Error(`Colisión de nombres del cliente de API: ${previous.file} (${describe(previous.segment)}) y ${endpoint.file} (${describe(segment)}) resuelven los dos a ${path}`)
 			}
-			if (!previous) seen.set(path, { file: endpoint.file, segment })
+			// `compras-meta` y `comprasMeta` son dos URLs, pero un solo nombre del cliente.
+			if (previous && previous.source !== part.value) {
+				throw new Error(`Colisión de nombres del cliente de API: ${previous.file} (el segmento estático ${previous.source}) y ${endpoint.file} (el segmento estático ${part.value}) resuelven los dos a ${path}`)
+			}
+			if (!previous) seen.set(path, { file: endpoint.file, segment, source: part.value })
 		}
 	}
 }

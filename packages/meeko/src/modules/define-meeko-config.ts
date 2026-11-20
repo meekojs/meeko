@@ -525,6 +525,13 @@ export function defineMeekoConfig<const T extends MeekoConfig>(config: T & Meeko
  * Opciones de TypeScript que una aplicación puede cambiar en los `tsconfig` generados; véase
  * `typescript` en {@link MeekoConfig}.
  * @since 1.10.0
+ * @example
+ * ```ts
+ * import type { MeekoTypeScriptCompilerOptions } from "@meekojs/meeko/framework";
+ *
+ * // Una base de código escrita sin noUncheckedIndexedAccess: se endurece por partes.
+ * const compilerOptions: MeekoTypeScriptCompilerOptions = { target: "ES2023", noUncheckedIndexedAccess: false };
+ * ```
  */
 export interface MeekoTypeScriptCompilerOptions {
 	/** Versión de JavaScript del código comprobado. Por defecto, `"ES2022"`. */
@@ -535,11 +542,18 @@ export interface MeekoTypeScriptCompilerOptions {
 	readonly exactOptionalPropertyTypes?: boolean
 	/** Por defecto, `true`. */
 	readonly noUncheckedIndexedAccess?: boolean
+	/** Exige `override` al redefinir un método de la clase base. Sin valor, el de TypeScript (`false`). */
 	readonly noImplicitOverride?: boolean
+	/** Error si un camino de una función no devuelve valor. Sin valor, el de TypeScript (`false`). */
 	readonly noImplicitReturns?: boolean
+	/** Error si un `case` no vacío pasa al siguiente. Sin valor, el de TypeScript (`false`). */
 	readonly noFallthroughCasesInSwitch?: boolean
+	/** Obliga a leer con corchetes las claves de una firma de índice. Sin valor, el de TypeScript (`false`). */
 	readonly noPropertyAccessFromIndexSignature?: boolean
+	/** Error por una variable local sin usar. Sin valor, el de TypeScript (`false`). */
 	readonly noUnusedLocals?: boolean
+	/** Error por un parámetro sin usar. Sin valor, el de TypeScript (`false`). */
 	readonly noUnusedParameters?: boolean
+	/** El error de un `catch` es `unknown` en vez de `any`. Sin valor, el de `strict` (`true`). */
 	readonly useUnknownInCatchVariables?: boolean
 }

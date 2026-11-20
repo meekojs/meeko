@@ -121,6 +121,8 @@ const user = await api
 - `useApi` no cambia: sigue recibiendo la ruta con corchetes y `params`, como `useApi("/api/menu/categories/[id]", { params: { id } })`.
 - El editor completa la llamada, sus parámetros y los métodos del segmento, y el hover y "ir a la definición" de `api.menu.categories({ id }).archive.post` llevan al handler.
 
+Un segmento estático de la URL puede llevar guiones o empezar por un dígito; en el cliente se nombra como identificador: `server/api/cron/compras-meta.get.ts` es `api.cron.comprasMeta.get()` y `server/api/auth/2fa.post.ts`, `api.auth._2fa.post()`. Dos segmentos que dan el mismo nombre en el mismo nivel (`compras-meta` y `comprasMeta`) son una colisión del cliente de API.
+
 En `clientKey`, el segmento dinámico de `[id]` o `[...id]` se llama `byId`: `by` seguido del nombre del parámetro con la inicial en mayúscula. El cliente reconoce así el segmento al que corresponde cada parámetro, también en un cliente explícito de `createApiClient`. Por eso el manifiesto rechaza, con las rutas en conflicto, un segmento estático que se llame igual que el segmento dinámico de su nivel (`users/byId/` junto a `users/[id]`) o de su propia ruta (`[id]/byId.get.ts`), y dos parámetros cuyo nombre sólo cambia en la inicial (`[id]` y `[Id]`) en el mismo nivel o en la misma ruta.
 
 La forma anterior, `api.menu.categories.byId.archive.post({ params: { id } })`, sigue funcionando durante toda la serie 1.x y se retirará en `2.0`. Está obsoleta desde `1.2`: el editor tacha cada método que se llama a través de `byId` y su hover indica el reemplazo; no hay aviso de consola. Sólo existe antes de la primera llamada de segmento: `api.orgs({ org }).users.byId` no existe.

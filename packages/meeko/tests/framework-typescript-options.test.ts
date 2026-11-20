@@ -3,6 +3,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import test from 'node:test'
 
+import { checkSource } from '../src/check.ts'
 import { generateFrameworkTsconfigs } from '../src/framework/type-declarations.ts'
 import { tempProject } from './helpers/temp-project.ts'
 
@@ -61,4 +62,21 @@ test('an option Meeko owns, an unknown field or a wrong value stop with a clear 
 		const root = await project(context, `export default { typescript: ${value} };\n`)
 		await assert.rejects(generateFrameworkTsconfigs(root), message, value)
 	}
+})
+
+test('a component checked alone follows typescript.compilerOptions, as the whole project does', async (context) => {
+	// Reading an index without a check is an error under Meeko's default noUncheckedIndexedAccess.
+	const source = '<script lang="ts">\n\tconst names: string[] = ["Ada"]\n\tconst first: string = names[0]\n</script>\n<template><p>{first}</p></template>\n'
+	const strict = await project(context, 'export default {};\n')
+	await generateFrameworkTsconfigs(strict)
+	const file = join(strict, 'app', 'pages', 'index.meeko')
+	await writeFile(file, source)
+	assert.ok((await checkSource(source, file)).some((diagnostic) => diagnostic.code === 'TS2322'))
+
+	const relaxed = await project(context, 'export default { typescript: { compilerOptions: { noUncheckedIndexedAccess: false } } };\n')
+	await generateFrameworkTsconfigs(relaxed)
+	const relaxedFile = join(relaxed, 'app', 'pages', 'index.meeko')
+	await writeFile(relaxedFile, source)
+	// The temporary project has no node_modules: only the index read matters here.
+	assert.equal((await checkSource(source, relaxedFile)).filter((diagnostic) => diagnostic.code === 'TS2322').length, 0)
 })

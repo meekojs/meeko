@@ -215,6 +215,8 @@ export const unsafeNestedInput = schema<{ payload: { value: any } }, string>();
 export const unsafeNestedOutput = schema<string, { items: Array<{ meta: unknown }> }>();
 export interface RecursiveContract { value: string; next?: RecursiveContract }
 export const recursiveContract = schema<undefined, RecursiveContract>();
+export const emptyObject = schema<Record<string, never>>();
+export const unsafeNeverProperty = schema<{ value: never }>();
 `,
 		)
 		const api = join(root, 'server', 'api', 'users', 'index.get.ts')
@@ -272,6 +274,22 @@ import { getUserInput, recursiveContract } from "../../../shared/schemas/user.js
 export default defineRpc({ input: getUserInput, output: recursiveContract, handler: async () => ({ value: "root" }) });`,
 		)
 		await generateServerContracts(root)
+
+		// `Record<string, never>` (Zod's `z.object({})`) is an object without keys; `never` in a property is not.
+		await writeFile(
+			rpc,
+			`import { defineRpc } from "@meekojs/meeko/server";
+import { emptyObject, userSchema } from "../../../shared/schemas/user.js";
+export default defineRpc({ input: emptyObject, output: userSchema, handler: async () => ({ id: "1", name: "Ada" }) });`,
+		)
+		await generateServerContracts(root)
+		await writeFile(
+			rpc,
+			`import { defineRpc } from "@meekojs/meeko/server";
+import { unsafeNeverProperty, userSchema } from "../../../shared/schemas/user.js";
+export default defineRpc({ input: unsafeNeverProperty, output: userSchema, handler: async () => ({ id: "1", name: "Ada" }) });`,
+		)
+		await assert.rejects(generateServerContracts(root), /input debe exponer tipos de entrada y salida de Standard Schema concretos/)
 	} finally {
 		await rm(root, { recursive: true, force: true })
 	}

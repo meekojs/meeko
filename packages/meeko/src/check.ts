@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { promisify } from 'node:util'
@@ -20,7 +20,7 @@ import { pageRouteId } from './compiler/codegen/server-script'
 import { moduleSpecifiers, replaceModuleSpecifiers } from './compiler/import-graph'
 import { originalOffset } from './compiler/mapping'
 import { compileError, locate, MeekoCompileError } from './compiler/parser/sfc'
-import { projectDeclarationFiles } from './compiler/project-declarations'
+import { generatedServicesDeclaration, projectDeclarationFiles } from './compiler/project-declarations'
 import { projectRoot } from './compiler/project-root'
 import { resolveProjectAliases, resolveProjectAliasesSync } from './framework/aliases'
 import { readMeekoConfigSync } from './framework/config'
@@ -86,6 +86,55 @@ function strictAttributeValues(root: string, options: CheckSourceOptions): boole
 async function projectAliasesFor(root: string, options: CheckSourceOptions): Promise<ProjectAliases> {
 	if (options.aliases) return options.aliases(root)
 	return options.autoImports ? resolveProjectAliasesSync(root) : resolveProjectAliases(root)
+}
+
+/** The type-checking options of a component checked alone, unless the project's generated tsconfig says otherwise. */
+const defaultCheckOptions = {
+	strict: true,
+	skipLibCheck: true,
+	noUncheckedIndexedAccess: true,
+	exactOptionalPropertyTypes: true,
+	verbatimModuleSyntax: true,
+	module: 'esnext',
+	moduleResolution: 'bundler',
+	target: 'es2022',
+	lib: ['es2022', 'dom'],
+} as const satisfies Record<string, boolean | string | readonly string[]>
+
+/** Options of the generated tsconfig that a component checked alone takes too. */
+const inheritedCheckOptions = ['target', 'lib', 'types', 'exactOptionalPropertyTypes', 'noUncheckedIndexedAccess', 'noImplicitOverride', 'noImplicitReturns', 'noFallthroughCasesInSwitch', 'noPropertyAccessFromIndexSignature', 'noUnusedLocals', 'noUnusedParameters', 'useUnknownInCatchVariables'] as const
+
+type CheckOptions = Record<string, boolean | string | readonly string[]>
+
+/**
+ * The options of `.meeko/tsconfig.app.json` (or `tsconfig.server.json` for a component of
+ * `server/`) that decide the type check, over the defaults: `typescript.compilerOptions` of
+ * `meeko.config.ts` and the `types` of the project reach a component checked alone as they reach
+ * `meeko check` of the whole project. Without a generated tsconfig, the defaults.
+ */
+function generatedCheckOptions(rootDirectory: string, filename: string): CheckOptions & { types?: readonly string[] } {
+	const file = join(rootDirectory, '.meeko', componentTarget(rootDirectory, filename) === 'server' ? 'tsconfig.server.json' : 'tsconfig.app.json')
+	const options: CheckOptions = { ...defaultCheckOptions }
+	let generated: Record<string, unknown>
+	try {
+		generated = (JSON.parse(readFileSync(file, 'utf8')) as { compilerOptions?: Record<string, unknown> }).compilerOptions ?? {}
+	} catch {
+		return options
+	}
+	for (const key of inheritedCheckOptions) {
+		const value = generated[key]
+		if (typeof value === 'boolean' || typeof value === 'string' || (Array.isArray(value) && value.every((entry) => typeof entry === 'string'))) options[key] = value as boolean | string | readonly string[]
+	}
+	return options
+}
+
+/** `options` as `tsc` flags; `types` travels in the temporary tsconfig instead. */
+function checkFlags(options: CheckOptions): string[] {
+	return Object.entries(options).flatMap(([key, value]) => {
+		if (key === 'types') return []
+		if (typeof value === 'boolean') return value ? [`--${key}`] : [`--${key}`, 'false']
+		return [`--${key}`, typeof value === 'string' ? value.toLowerCase() : value.map((entry) => entry.toLowerCase()).join(',')]
+	})
 }
 
 function componentTarget(rootDirectory: string, filename: string): 'client' | 'server' {
@@ -474,34 +523,17 @@ export async function checkSource(source: string, filename: string, options: Che
 		// command-line flags below still override every type-checking option.
 		const rootDirectory = projectRoot(absolute)
 		const projectResolution = await projectResolutionOptions(rootDirectory, await projectAliasesFor(rootDirectory, options))
-		const files = [graph.root.generated, ...(graph.root.server && !options.withinProject ? [graph.root.server.file] : []), ...generatedDeclarations(rootDirectory, absolute), ...projectDeclarationFiles(rootDirectory)]
+		const files = [graph.root.generated, ...(graph.root.server && !options.withinProject ? [graph.root.server.file] : []), ...generatedDeclarations(rootDirectory, absolute), ...projectDeclarationFiles(rootDirectory), ...generatedServicesDeclaration(rootDirectory)]
 		// The generated declarations name components by their `.meeko` path (the props of each named
 		// layout in routes.d.ts), which the declaration tree resolves as in the framework tsconfigs.
 		const declarationTree = join(rootDirectory, '.meeko', 'types')
-		const resolution = existsSync(join(declarationTree, 'routes.d.ts')) ? { ...projectResolution, rootDirs: [rootDirectory, declarationTree], allowArbitraryExtensions: true } : projectResolution
+		const checking = generatedCheckOptions(rootDirectory, absolute)
+		const withTypes = checking.types && !projectResolution?.['types'] ? { ...projectResolution, types: checking.types } : projectResolution
+		const resolution = existsSync(join(declarationTree, 'routes.d.ts')) ? { ...withTypes, rootDirs: [rootDirectory, declarationTree], allowArbitraryExtensions: true } : withTypes
 		const project = resolution ? join(graph.tempDirectory, 'tsconfig.json') : undefined
 		if (project) await writeFile(project, JSON.stringify({ compilerOptions: resolution, files }), { encoding: 'utf8', flag: 'wx' })
 		try {
-			const tsc = tscCommand([
-				...(project ? ['--project', project] : ['--ignoreConfig']),
-				'--noEmit',
-				'--pretty',
-				'false',
-				'--strict',
-				'--skipLibCheck',
-				'--noUncheckedIndexedAccess',
-				'--exactOptionalPropertyTypes',
-				'--verbatimModuleSyntax',
-				'--module',
-				'esnext',
-				'--moduleResolution',
-				'bundler',
-				'--target',
-				'es2022',
-				'--lib',
-				'es2022,dom',
-				...(project ? [] : files),
-			])
+			const tsc = tscCommand([...(project ? ['--project', project] : ['--ignoreConfig']), '--noEmit', '--pretty', 'false', ...checkFlags(checking), ...(project ? [] : files)])
 			const result = await execFileAsync(tsc.file, tsc.args, { cwd: dirname(absolute), maxBuffer: 8 * 1024 * 1024, windowsHide: true })
 			output = result.stdout + result.stderr
 		} catch (error) {
