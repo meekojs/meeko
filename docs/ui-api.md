@@ -117,6 +117,8 @@ export default defineMeekoConfig({
 | `copyButton.copy`     | `Copiar`                            | `Copy`                               | `label`                       |
 | `copyButton.copied`   | `Copiado`                           | `Copied`                             | `copiedLabel`                 |
 | `copyButton.failed`   | `No se pudo copiar`                 | `Could not copy`                     | `failedLabel`                 |
+| `input.show`          | `Mostrar contraseña`                | `Show password`                      | `showLabel` de `UIInput`      |
+| `input.hide`          | `Ocultar contraseña`                | `Hide password`                      | `hideLabel` de `UIInput`      |
 
 - **Prioridad.** Una prop o un snippet del componente ganan sobre todo lo demás. Después, `ui.messages` gana sobre los textos del paquete en ese idioma.
 - **Idiomas.** `ui.locale` y las claves de `ui.messages` se validan al cargar y se leen en su forma canónica: `EN` es `en` y `pt-br` es `pt-BR`. Una etiqueta inválida, como `en-u`, es un error de configuración.
@@ -194,11 +196,11 @@ Puedes sobrescribir `--ui-container-max-width` y `--ui-container-gutter` desde u
 
 ### Controles básicos
 
-| Componente | API                                                                                                                                                                                                                                                                                            |
-| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `UIButton` | Ruta (`to`, `params`, `search`), enlace (`href`, `target`, `rel`, `download`) o botón (`type`, `disabled`); véase [UIButton](#uibutton-ruta-enlace-o-botón). Admite `variant`, `size`, `shape`, `class`, evento `click` y snippet `default`. Por defecto `button`, `primary`, `md`, `rounded`. |
-| `UIInput`  | Modelo de texto con `model`. Props: `id`, `name`, `type`, `placeholder`, `required`, `disabled`, `invalid`, `describedBy` y `class`. Tipos admitidos: `text`, `email`, `password`, `search`, `url`, `tel`. Por defecto usa `text` y un valor vacío.                                            |
-| `UIField`  | Requiere `id`, `label` y el snippet `default(id, describedBy)`. Props opcionales: `description`, `error`, `required`, `class`. El error tiene prioridad sobre la descripción y se anuncia con `role="alert"`.                                                                                  |
+| Componente | API                                                                                                                                                                                                                                                                                                                                                                               |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `UIButton` | Ruta (`to`, `params`, `search`), enlace (`href`, `target`, `rel`, `download`) o botón (`type`, `disabled`); véase [UIButton](#uibutton-ruta-enlace-o-botón). Admite `variant`, `size`, `shape`, `class`, evento `click` y snippet `default`. Por defecto `button`, `primary`, `md`, `rounded`.                                                                                    |
+| `UIInput`  | Modelo de texto con `model`. Props: `id`, `name`, `type`, `placeholder`, `required`, `disabled`, `invalid`, `describedBy` y `class`. Tipos admitidos: `text`, `email`, `password`, `search`, `url`, `tel`. Por defecto usa `text` y un valor vacío. Con `type="password"`, `reveal` añade un botón para ver la contraseña; véase [Mostrar la contraseña](#mostrar-la-contraseña). |
+| `UIField`  | Requiere `id`, `label` y el snippet `default(id, describedBy)`. Props opcionales: `description`, `error`, `required`, `class`. El error tiene prioridad sobre la descripción y se anuncia con `role="alert"`.                                                                                                                                                                     |
 
 También incluye `UIApp` y `UIModal` para [modales](#modales), `UITable` para [tablas](#tablas), `UICard` para [cards](#cards), y los componentes de navegación y etiquetas siguientes.
 
@@ -315,6 +317,48 @@ También incluye `UIApp` y `UIModal` para [modales](#modales), `UITable` para [t
 - **Props.** `variant`, `size`, `shape`, `tone`, `disabled`, `tooltip` y `placement` (con `iconOnly`), `class` y `ui` (`base`, `status`); `id`, `aria-*` y `data-*` llegan al botón. `ui.defaults.copyButton` admite `variant`, `size`, `shape` y `class`. Es contenido de frase.
 - **Tipos.** `UICopyButtonProps` se importa desde `@meekojs/ui/runtime`.
 
+### Mostrar la contraseña
+
+`<UIInput type="password" reveal>` pone al final del campo un botón con un ojo que lo cambia entre contraseña y texto. Con otro `type`, `reveal` no hace nada, y sin `reveal` el marcado es sólo el `<input>`.
+
+```html
+<UIInput
+	id="password"
+	type="password"
+	name="password"
+	autocomplete="current-password"
+	reveal
+	model="password"
+/>
+```
+
+- **Accesible.** Es un `<button type="button">`, así que no envía el formulario, con `aria-pressed` (`true` con la contraseña a la vista) y `aria-controls` con el `id` del campo si lo tiene. Su nombre es `showLabel` o el mensaje `input.show` («Mostrar contraseña») y, a la vista, `hideLabel` o `input.hide` («Ocultar contraseña»). Al pulsarlo, el foco se queda en el botón.
+- **Sin JavaScript.** Espera invisible (`visibility: hidden`, sin mover nada) hasta hidratar; el campo sigue siendo de contraseña.
+- **Aspecto.** Un cuadrado tan alto como `--ui-control-height-md`, con el color del texto suave; el campo reserva ese hueco al final. Se deshabilita con el campo.
+- **Props.** `reveal`, `showLabel` y `hideLabel`, en `UIInputProps`.
+
+### UIAvatar
+
+`UIAvatar` pinta la foto de una persona o, sin ella, sus iniciales: la primera letra de hasta dos palabras de `name` («Ana Pérez» es «AP») y, si `name` es un correo, sólo la primera letra de lo que va antes de la `@`. Sin nombre, pinta el snippet `fallback` o el glifo de una persona.
+
+```html
+<UIAvatar name="Ana Pérez" />
+<UIAvatar
+	name="Ana Pérez"
+	bind:src="user.avatarUrl"
+	size="sm"
+	shape="rounded"
+/>
+<UIButton variant="ghost" ariaLabel="Tu cuenta"><UIAvatar bind:name="user.email" size="sm" decorative /></UIButton>
+```
+
+- **Accesible.** Con foto, su `alt` es el nombre; sin ella, la caja es `role="img"` con `aria-label`, y las iniciales no se leen. `label` sustituye a `name` como nombre accesible. Dentro de un control que ya tiene nombre, `decorative` lo oculta (`aria-hidden="true"` y `alt=""`).
+- **Imagen que falla.** Si la foto no carga, pasa a las iniciales al hidratar, también si falló antes. Otra `src` lo vuelve a intentar.
+- **Tamaños y forma.** `size` es `sm`, `md` (por defecto) o `lg`, de `--ui-avatar-size-sm` (1,5rem, cabe en un control `sm`), `-md` (2rem) y `-lg` (2,5rem), con el texto de `--ui-avatar-font-size-*`. `shape` es `circle` (por defecto) o `rounded`, con las esquinas de `--ui-avatar-radius`.
+- **Colores.** `--ui-avatar-bg` (por defecto `--ui-color-primary-soft`) y `--ui-avatar-color` (`--ui-color-primary-text`).
+- **Props.** `name`, `src`, `size`, `shape`, `label`, `decorative`, `class` y `ui` (`base`, `image`, `glyph`); snippet `fallback`. `ui.defaults.avatar` admite `size`, `shape`, `class` y `ui`. Es contenido de frase.
+- **Tipos.** `UIAvatarProps` y `AvatarSnippets` se importan desde `@meekojs/ui/runtime`.
+
 ### Navegación y etiquetas
 
 - `UILink` da apariencia de acción a un `<a>` real, con los defaults de `ui.defaults.link`. Recibe `href` (cualquier URL) o `to` (una ruta de la aplicación con `params` y `search` tipados, como en `UIButton`, con navegación del cliente y el `href` localizado con `@meekojs/i18n`); uno de los dos, no ambos. Con los dos acepta `target`, `rel`, `download`, `hreflang` y `lang`. Comparte `variant`, `size` y `shape` con `UIButton`, y admite `ariaLabel`, `class`, `id`, `title`, `aria-*`, `data-*` y evento `click`. No simula botones ni utiliza roles artificiales. Para `target="_blank"` añade `noopener noreferrer` si no se especifica `rel`.
@@ -430,7 +474,7 @@ export default defineMeekoConfig({
 ```
 
 - **`class` y `ui` se suman.** Las clases de `ui.defaults` se añaden a las de cada instancia, no las sustituyen: van primero las del componente, después las de `ui.defaults` y al final las de la instancia. `class` llega donde llega la prop de la instancia: en `UITable`, a la `<table>`. Sin fusión de clases, en un conflicto decide la cascada, como explica [Qué gana](#clases-por-slot): una regla sin capa de tu aplicación gana a las de UI, y entre dos reglas tuyas deciden su especificidad y su orden en tu hoja, no el orden de las clases en el atributo.
-- **Variantes.** Unas pocas admiten un valor de base: `variant`, `size` y `shape` en `button`, `link` e `iconButton`; `variant`, `padding`, `density` y `actionsWrap` en `card`, y `density` en `table`. La prop explícita de la instancia gana siempre. En `card`, un `padding` o una `density` de la instancia ganan a los dos de `ui.defaults`, y en cada nivel `padding` gana a `density`. Las demás variantes no tienen default porque dependen de cada instancia: el `tone` de `UIAlert`, `UIBadge` o `UIToast` dice qué es el mensaje, y `layout`, `side`, `sticky`, `size` de `UIModal` o `columns` siguen a la estructura y el contenido de cada página. Su aspecto se retoca con `class` y `ui`.
+- **Variantes.** Unas pocas admiten un valor de base: `variant`, `size` y `shape` en `button`, `link` e `iconButton`; `size` y `shape` en `avatar`; `variant`, `padding`, `density` y `actionsWrap` en `card`, y `density` en `table`. La prop explícita de la instancia gana siempre. En `card`, un `padding` o una `density` de la instancia ganan a los dos de `ui.defaults`, y en cada nivel `padding` gana a `density`. Las demás variantes no tienen default porque dependen de cada instancia: el `tone` de `UIAlert`, `UIBadge` o `UIToast` dice qué es el mensaje, y `layout`, `side`, `sticky`, `size` de `UIModal` o `columns` siguen a la estructura y el contenido de cada página. Su aspecto se retoca con `class` y `ui`.
 - **Componentes.** `UIButton`, `UILink`, `UIInput`, `UITextarea`, `UIContainer`, `UIProse`, `UIPopover` y `UITooltip` no tienen slots: sólo admiten `class`. `toast` sólo admite `ui` y también se aplica a los avisos de `useToast()`. `markdownEditor` es `UIMarkdownEditor`, de `@meekojs/ui/editor`. El tipo `UIDefaults` describe cada componente con sus slots reales, y el editor los completa.
 - **Validación.** Un componente, una opción o un slot desconocidos, una clase vacía o un valor de variante que no existe hacen fallar la carga del módulo con un error que dice qué se admite, como `ui: unknown slot head in defaults.card.ui; its slots are base, header, title, description, actions, body, footer`.
 - **Cliente.** Los defaults viajan con el JavaScript de cada página, como una copia plana de los valores validados: pon ahí clases, no datos.

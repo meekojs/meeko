@@ -285,6 +285,17 @@ export interface UIMessages {
 		/** Texto y aviso si la copia falla, si no se pasa `failedLabel`. */
 		readonly failed: string
 	}
+	/**
+	 * `<UIInput type="password" reveal>`.
+	 *
+	 * @since 1.11.0
+	 */
+	readonly input: {
+		/** Nombre accesible del botón que muestra la contraseña, si no se pasa `showLabel`. */
+		readonly show: string
+		/** Nombre accesible del botón con la contraseña a la vista, si no se pasa `hideLabel`. */
+		readonly hide: string
+	}
 }
 
 /**

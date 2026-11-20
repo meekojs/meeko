@@ -3,6 +3,7 @@
 // read the validated defaults, never this table, so the browser does not get every variant.
 import type { UIDefaults } from './app/types/config'
 
+import { avatar } from './app/variants/avatar'
 import { badge } from './app/variants/badge'
 import { button, copyButton, iconButton } from './app/variants/button'
 import { card, linkCard } from './app/variants/card'
@@ -56,6 +57,7 @@ const action = { look: button, variants: ['variant', 'size', 'shape'] } as const
 
 const components = {
 	alert: { look: alert },
+	avatar: { look: avatar, variants: ['size', 'shape'] },
 	badge: { look: badge },
 	breadcrumb: { look: breadcrumb },
 	button: action,

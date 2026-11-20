@@ -43,7 +43,7 @@ test('ui.defaults accepts class and ui for every component, and the variants of 
 		}),
 	)
 	const errors = [
-		[{ cards: {} }, /ui: unknown defaults component cards; use one of alert, badge,/],
+		[{ cards: {} }, /ui: unknown defaults component cards; use one of alert, avatar, badge,/],
 		[{ Card: {} }, /unknown defaults component Card/],
 		[{ card: 'soft' }, /ui: defaults\.card must be an object/],
 		[{ card: { ui: { head: 'x' } } }, /ui: unknown slot head in defaults\.card\.ui; its slots are base, header, title, description, actions, body, footer/],

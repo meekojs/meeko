@@ -1,18 +1,44 @@
 <script lang="ts">
+	// <UIInput>: un <input> nativo con `model`. Con `type="password"` y `reveal`, el campo va en una caja con un
+	// botón al final que lo cambia entre contraseña y texto (`aria-pressed`); el botón no envía el formulario,
+	// conserva su foco al pulsarlo y espera invisible hasta hidratar. Sin `reveal`, el marcado es sólo el <input>.
+	import { computed, onMounted, signal } from '@meekojs/meeko'
+
 	import type { UIInputProps } from '../types/forms'
 
 	import { uiTheme } from '../utils/defaults'
-	import { input } from '../variants/input'
+	import { icons } from '../utils/icons'
+	import { uiMessages } from '../utils/messages'
+	import { input, inputReveal, inputRevealWaiting } from '../variants/input'
+	import * as Icon from './internal/Icon.meeko'
 
-	const { invalid, describedBy, spellcheck, class: ownClass, type = 'text', ...rest } = defineProps<UIInputProps>()
+	const { invalid, describedBy, spellcheck, reveal, showLabel, hideLabel, class: ownClass, type = 'text', ...rest } = defineProps<UIInputProps>()
 
 	const theme = uiTheme('input', () => ({ class: ownClass }))
 
 	const value = defineModel<string>({ default: '' })
+
+	const text = uiMessages().input
+
+	const revealable = computed(() => reveal === true && type === 'password')
+	const shown = signal(false)
+	const ready = signal(false)
+	const revealClasses = inputReveal()
+	const toggleClass = computed(() => revealClasses.toggle({ class: ready.value ? undefined : inputRevealWaiting }))
+	const toggleLabel = computed(() => (shown.value ? (hideLabel ?? text.hide) : (showLabel ?? text.show)))
+
+	function toggle(): void {
+		shown.value = !shown.value
+	}
+
+	onMounted(() => {
+		ready.value = true
+	})
 </script>
 
-<template>
-	<input
+<!-- Sin espacios entre las etiquetas de esta plantilla: con `reveal` serían texto junto al <input> y, sin él, cambiarían el marcado de siempre. Prettier la deja así (htmlWhitespaceSensitivity "strict" en prettier.config.ts) y tests/templates-without-whitespace.test.mjs lo vigila. -->
+<template><input
+		if:when="!revealable.value"
 		model="value"
 		bind:spellcheck="spellcheck === undefined ? undefined : String(spellcheck)"
 		bind:type="type"
@@ -20,5 +46,23 @@
 		bind:aria-describedby="describedBy ?? rest['aria-describedby']"
 		bind:class="input({ class: theme.class })"
 		bind="rest"
-	/>
-</template>
+	/><span
+		if:when="revealable.value"
+		bind:class="revealClasses.base()"
+		><input
+			model="value"
+			bind:spellcheck="spellcheck === undefined ? undefined : String(spellcheck)"
+			bind:type="shown.value ? 'text' : 'password'"
+			bind:aria-invalid="invalid ? 'true' : undefined"
+			bind:aria-describedby="describedBy ?? rest['aria-describedby']"
+			bind:class="input({ reveal: true, class: theme.class })"
+			bind="rest" /><button
+			type="button"
+			bind:class="toggleClass.value"
+			bind:aria-label="toggleLabel.value"
+			bind:aria-pressed="shown.value ? 'true' : 'false'"
+			bind:aria-controls="rest.id"
+			bind:disabled="rest.disabled"
+			on:click="toggle"
+			><Icon bind:path="shown.value ? icons.eyeOff : icons.eye" /></button
+	></span></template>

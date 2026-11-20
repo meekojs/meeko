@@ -55,8 +55,42 @@ export const control = tv({
 	},
 })
 
-/** The look of <UIInput>. */
-export const input = tv({ base: [...look, line, end, disabled] })
+/**
+ * El aspecto de <UIInput>. Con `reveal`, el final del texto deja sitio al botón que muestra la contraseña,
+ * un cuadrado tan alto como el control.
+ */
+export const input = tv({
+	base: [...look, line, disabled],
+	variants: {
+		reveal: {
+			false: end,
+			true: 'ui:pe-(--ui-control-height-md)',
+		},
+	},
+	defaultVariants: {
+		reveal: false,
+	},
+})
+
+/**
+ * Lo que <UIInput type="password" reveal> añade alrededor del campo: una caja que lo contiene y el botón que
+ * muestra u oculta la contraseña, al final del campo y con el color del texto suave. Antes de hidratar, el
+ * botón espera invisible (`inputRevealWaiting`) sin mover nada: sin JavaScript no podría hacer nada.
+ */
+export const inputReveal = tv({
+	slots: {
+		base: 'ui:relative ui:block ui:w-full',
+		toggle: [
+			'ui:absolute ui:inset-y-0 ui:end-0 ui:inline-flex ui:w-(--ui-control-height-md) ui:cursor-pointer ui:items-center ui:justify-center',
+			'ui:rounded-md ui:[border:0] ui:bg-transparent ui:p-0 ui:text-text-soft ui:not-disabled:hover:text-text',
+			'ui:focus-visible:outline-(length:--ui-focus-ring-width) ui:focus-visible:outline-focus ui:focus-visible:-outline-offset-(--ui-focus-ring-offset) ui:focus-visible:outline-solid',
+			disabled,
+		],
+	},
+})
+
+/** El botón de `reveal` espera invisible hasta hidratar, sin mover nada. */
+export const inputRevealWaiting = 'ui:invisible'
 
 /** The look of <UITextarea>. */
 export const textarea = tv({ base: [...look, box, end, disabled] })

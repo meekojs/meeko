@@ -13,7 +13,12 @@ export type UIDensity = 'compact' | 'normal' | 'comfortable'
 /** Estado semántico de un mensaje. @example const tone: UITone = 'warning' */
 export type UITone = 'neutral' | 'info' | 'success' | 'warning' | 'danger'
 
-/** Campo de texto nativo; el valor se enlaza con `model`. @example `<UIInput type="date" name="date" />` */
+/**
+ * Campo de texto nativo; el valor se enlaza con `model`. Con `type="password"` y `reveal`, un botón al final
+ * del campo muestra u oculta la contraseña.
+ * @example `<UIInput type="date" name="date" />`
+ * @example `<UIInput type="password" name="password" autocomplete="current-password" reveal />`
+ */
 export type UIInputProps = Omit<ElementAttributes<'input'>, 'type' | 'value' | 'class'> &
 	UIThemeProps<
 		typeof input,
@@ -24,7 +29,26 @@ export type UIInputProps = Omit<ElementAttributes<'input'>, 'type' | 'value' | '
 			invalid?: boolean
 			/** Identificadores de los mensajes de ayuda. */
 			describedBy?: string
-			/** Clases adicionales. */
+			/**
+			 * Con `type="password"`, un botón (`type="button"`, con `aria-pressed`) al final del campo que lo cambia
+			 * entre contraseña y texto. Espera invisible hasta hidratar. Con otro `type` no hace nada.
+			 *
+			 * @since 1.11.0
+			 */
+			reveal?: boolean
+			/**
+			 * Nombre accesible del botón de `reveal` con la contraseña oculta; por defecto, el mensaje `input.show`.
+			 *
+			 * @since 1.11.0
+			 */
+			showLabel?: string
+			/**
+			 * Nombre accesible del botón de `reveal` con la contraseña a la vista; por defecto, el mensaje `input.hide`.
+			 *
+			 * @since 1.11.0
+			 */
+			hideLabel?: string
+			/** Clases adicionales del `<input>`. */
 			class?: string
 		}
 	>

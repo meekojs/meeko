@@ -1,6 +1,51 @@
 import type { UIDefaults, UIOptions } from '@meekojs/ui'
 import type { UIMarkdownEditorProps } from '@meekojs/ui/editor'
-import type { UIAlertProps, UIBadgeProps, UIBreadcrumbProps, UIButtonProps, UICardProps, UICheckboxProps, UICodeBlockProps, UIComboboxProps, UICommandPaletteProps, UIDescriptionListProps, UIDiffProps, UIDisclosureProps, UIDrawerProps, UIEmptyProps, UIFieldProps, UIFooterProps, UIHeaderProps, UIHintProps, UIIconButtonProps, UILinkCardProps, UILocaleSuggestionProps, UILocaleSwitcherProps, UIMenuProps, UIModalProps, UINavigationTabsProps, UINavigationTreeProps, UIPageHeaderProps, UIPageNavigationProps, UIPageProps, UIPaginationProps, UIRadioGroupProps, UISegmentedControlProps, UISelectProps, UISkeletonProps, UISliderProps, UISparklineProps, UIStatProps, UISwitchProps, UITableOfContentsProps, UITableProps, UITabsProps, UIThemeToggleProps, UIToastProps } from '@meekojs/ui/runtime'
+import type {
+	UIAlertProps,
+	UIAvatarProps,
+	UIBadgeProps,
+	UIBreadcrumbProps,
+	UIButtonProps,
+	UICardProps,
+	UICheckboxProps,
+	UICodeBlockProps,
+	UIComboboxProps,
+	UICommandPaletteProps,
+	UIDescriptionListProps,
+	UIDiffProps,
+	UIDisclosureProps,
+	UIDrawerProps,
+	UIEmptyProps,
+	UIFieldProps,
+	UIFooterProps,
+	UIHeaderProps,
+	UIHintProps,
+	UIIconButtonProps,
+	UILinkCardProps,
+	UILocaleSuggestionProps,
+	UILocaleSwitcherProps,
+	UIMenuProps,
+	UIModalProps,
+	UINavigationTabsProps,
+	UINavigationTreeProps,
+	UIPageHeaderProps,
+	UIPageNavigationProps,
+	UIPageProps,
+	UIPaginationProps,
+	UIRadioGroupProps,
+	UISegmentedControlProps,
+	UISelectProps,
+	UISkeletonProps,
+	UISliderProps,
+	UISparklineProps,
+	UIStatProps,
+	UISwitchProps,
+	UITableOfContentsProps,
+	UITableProps,
+	UITabsProps,
+	UIThemeToggleProps,
+	UIToastProps,
+} from '@meekojs/ui/runtime'
 
 import type { ComponentProps as LinkProps } from '../../dist/app/components/Link.d.meeko.ts'
 
@@ -54,6 +99,7 @@ type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ?
 type Slots<K extends keyof UIDefaults> = NonNullable<UIDefaults[K]>['ui' & keyof NonNullable<UIDefaults[K]>]
 type SameSlots = [
 	Equal<Slots<'alert'>, UIAlertProps['ui']>,
+	Equal<Slots<'avatar'>, UIAvatarProps['ui']>,
 	Equal<Slots<'badge'>, UIBadgeProps['ui']>,
 	Equal<Slots<'breadcrumb'>, UIBreadcrumbProps['ui']>,
 	Equal<Slots<'card'>, UICardProps['ui']>,

@@ -84,6 +84,7 @@ const spanish: UIMessages = {
 	stat: { up: 'Sube {change}', down: 'Baja {change}', flat: 'Sin cambios', link: 'Ver detalle', linkName: '{link}: {label}' },
 	sparkline: { label: 'Tendencia: mínimo {min}, máximo {max}, último {last}', empty: 'Sin datos' },
 	copyButton: { copy: 'Copiar', copied: 'Copiado', failed: 'No se pudo copiar' },
+	input: { show: 'Mostrar contraseña', hide: 'Ocultar contraseña' },
 }
 
 const english: UIMessages = {
@@ -155,6 +156,7 @@ const english: UIMessages = {
 	stat: { up: 'Up {change}', down: 'Down {change}', flat: 'No change', link: 'View details', linkName: '{link}: {label}' },
 	sparkline: { label: 'Trend: minimum {min}, maximum {max}, latest {last}', empty: 'No data' },
 	copyButton: { copy: 'Copy', copied: 'Copied', failed: 'Could not copy' },
+	input: { show: 'Show password', hide: 'Hide password' },
 }
 
 /** The texts that come with the package. Spanish is complete and the last fallback of every locale. */
@@ -209,6 +211,7 @@ function merge(messages: UIMessages, layer: UIMessageOverrides | undefined): UIM
 		stat: { ...messages.stat, ...layer.stat },
 		sparkline: { ...messages.sparkline, ...layer.sparkline },
 		copyButton: { ...messages.copyButton, ...layer.copyButton },
+		input: { ...messages.input, ...layer.input },
 	}
 }
 
