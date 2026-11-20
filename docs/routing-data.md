@@ -37,6 +37,10 @@ El bloque de servidor y el `<script>` del componente tienen ámbitos distintos. 
 
 `usePage()`, `redirect()` y `notFound()` pertenecen al código de servidor de una página en curso. Las APIs del componente se usan en su `<script>` y plantilla. [Ver la tabla completa](routing-data-reference.md#dónde-se-usa-cada-api).
 
+### Recargar los datos tras una escritura
+
+Desde `1.10`, `usePage().depends("orders")` (o `depends` en el contexto de `load`) declara de qué claves de datos depende la página. Cuando una mutación con `invalidates: ["orders"]` termina bien, el navegador vuelve a ejecutar el loader de la página visible y actualiza sus datos sin volver a montarla. `useRoute().refresh()` lo fuerza sin claves. [Ver claves, coincidencias y límites](routing-data-reference.md#recargar-los-datos-de-la-página-depends).
+
 ## Modos de render
 
 | `render`               | Cuándo se genera el contenido                             | Úsalo cuando                                           |

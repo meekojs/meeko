@@ -24,7 +24,10 @@ export interface SocketChannelDefinition<C extends SchemaMap, S extends SchemaMa
 	clientToServer: C
 	/** Schemas de los eventos que envía el servidor; deben venir de `shared/`. */
 	serverToClient: S
-	/** `"required"` rechaza el handshake sin sesión con `401`. */
+	/**
+	 * `"required"` rechaza el handshake sin sesión con `401`. Desde `1.10`, con `isAuthenticated` en
+	 * `server/runtime.ts`, decide éste en el handshake y en cada evento entrante.
+	 */
 	auth?: 'required' | 'optional'
 	/** Autoriza el handshake y cada entrega; `false` responde `403`. */
 	authorize?: (args: { context: RequestContext<TServices>; roomId?: string }) => boolean | Promise<boolean>

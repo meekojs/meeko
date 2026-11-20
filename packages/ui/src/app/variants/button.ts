@@ -153,3 +153,46 @@ export const disabledBusy = [
 	'ui:aria-disabled:before:border-(length:--ui-focus-ring-width) ui:aria-disabled:before:border-current ui:aria-disabled:before:border-e-transparent',
 	'ui:aria-disabled:before:animate-spin ui:motion-reduce:aria-disabled:before:animate-none',
 ].join(' ')
+
+/**
+ * What <UICopyButton> adds to the look of `button` or of `iconButton`: the color of the result of the last
+ * copy, read from `data-copy-state` and its tokens (`--ui-copy-button-copied-color`, `-failed-color`), only
+ * where the text is not on a solid; and the announcement for screen readers, which takes no room. Its
+ * variants are the ones of `button`, so that `ui.defaults.copyButton` accepts the same values.
+ */
+export const copyButton = tv({
+	slots: {
+		base: '',
+		status: 'ui:sr-only',
+	},
+	variants: {
+		variant: {
+			primary: '',
+			secondary: '',
+			outline: '',
+			ghost: '',
+		},
+		size: {
+			sm: '',
+			md: '',
+			lg: '',
+		},
+		shape: {
+			rounded: '',
+			pill: '',
+		},
+	},
+	compoundVariants: [
+		{
+			variant: ['secondary', 'outline', 'ghost'],
+			class: { base: 'ui:data-[copy-state=copied]:[color:var(--ui-copy-button-copied-color)] ui:data-[copy-state=failed]:[color:var(--ui-copy-button-failed-color)]' },
+		},
+	],
+	defaultVariants: {
+		size: 'md',
+		shape: 'rounded',
+	},
+})
+
+/** A copy button that needs the script waits for it hidden, keeping its place: without JavaScript it could not copy. */
+export const copyButtonWaiting = 'ui:invisible'

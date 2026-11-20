@@ -277,7 +277,7 @@ Desde `1.8`, **toda mutación comprueba `Origin` por defecto**, haya o no cookie
 La regla es la de las mutaciones autenticadas:
 
 - Se acepta el origen de la petición, que tras `createServerApp` es el `publicOrigin` configurado (o `MEEKO_PUBLIC_ORIGIN`), y los de `SessionManager({ allowedOrigins })`. `MEEKO_TRUST_PROXY` sólo decide qué dirección de `X-Forwarded-For` es la del cliente: ni `X-Forwarded-Host` ni `X-Forwarded-Proto` cambian el origen propio. Detrás de un proxy que termina TLS, configure `MEEKO_PUBLIC_ORIGIN`.
-- Un `Origin` ausente, `null` o de otro origen (otro esquema, host o puerto) responde `403 INVALID_ORIGIN` antes de leer o validar la entrada, de `rateLimit` y del handler. `Sec-Fetch-Site` y `Referer` no sustituyen a `Origin`: los navegadores envían `Origin` en toda petición `POST`, `PUT`, `PATCH` y `DELETE`, también en las de su propio origen, así que `Sec-Fetch-Site: same-origin` sin `Origin` también es `403`, como con sesión. Al revés, un origen de `allowedOrigins` pasa aunque el navegador lo marque como `cross-site`.
+- Un `Origin` ausente, `null` o de otro origen (otro esquema, host o puerto) responde `403 INVALID_ORIGIN` antes de leer o validar la entrada, de `rateLimit` y del handler. `Sec-Fetch-Site` y `Referer` no sustituyen a `Origin`: los navegadores envían `Origin` en toda petición `POST`, `PUT`, `PATCH` y `DELETE`, también en las de su propio origen, así que `Sec-Fetch-Site: same-origin` sin `Origin` también es `403`, como con sesión. Al revés, un origen de `allowedOrigins` pasa aunque el navegador lo marque como `cross-site`. Desde `1.10`, `Sec-Fetch-Site: cross-site` o `same-site` rechaza además una mutación cuyo `Origin` no está en `allowedOrigins` (véase [Fetch Metadata](#fetch-metadata)).
 - `GET`, `HEAD` y `OPTIONS` no se comprueban, porque una navegación no lleva `Origin`, y un callback de OAuth o un enlace mágico llegan desde otro sitio. Esos flujos deben validar su propio `state` o token de un solo uso.
 - Las llamadas de los clientes `api.*` y `rpc.*` durante el SSR envían el origen de la petición en curso, así que el despacho local sigue funcionando. `createLocalCalls` hace lo mismo desde `1.8`: envía el origen de la aplicación en lugar del `Origin` de la petición original, así que una mutación local funciona aunque la página se pidiera con `GET` (sin `Origin`); con sesión sigue necesitando el token CSRF de la petición original.
 - Una llamada desde fuera del navegador (un script, una prueba, una app nativa o un servicio) debe enviar una cabecera `Origin` permitida, o la ruta declarar `origin: "none"`.
@@ -323,6 +323,20 @@ Una API pública que otros orígenes llaman con `fetch` y CORS necesita, además
 
 Ambos son cambios incompatibles publicados en un minor como corrección de seguridad, según la [política de estabilidad](stability.md#excepciones-aprobadas): el de `1.2` para `session.create()` y el de `1.8` para todas las mutaciones. La [guía de `1.8`](migration-1.8.md#origin-en-todas-las-mutaciones) explica qué hacer con webhooks, APIs públicas y clientes de otros orígenes.
 
+### Fetch Metadata
+
+Desde `1.10`, antes de comparar `Origin`, Meeko lee la cabecera `Sec-Fetch-Site` que los navegadores actuales envían en cada petición. Se aplica donde se comprueba `Origin` (los `POST`, `PUT`, `PATCH` y `DELETE` de `defineApiRoute`, toda llamada de `defineRpc`, los formularios nativos y `session.create()`), haya o no sesión de Meeko, así que protege igual a una aplicación que autentica con sus propias cookies:
+
+| `Sec-Fetch-Site`      | Resultado                                                                                                     |
+| --------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `same-origin`         | Decide `Origin`, como hasta ahora.                                                                            |
+| `none`                | Decide `Origin` (una acción del usuario, como un marcador; los navegadores no la usan en mutaciones).         |
+| `same-site`           | `403 INVALID_ORIGIN`, salvo que `Origin` esté en `allowedOrigins` (por ejemplo, `https://admin.example.com`). |
+| `cross-site`          | `403 INVALID_ORIGIN`, salvo que `Origin` esté en `allowedOrigins`.                                            |
+| ausente (script, SSR) | Decide `Origin`, como hasta ahora.                                                                            |
+
+Es defensa en profundidad: un navegador ya envía un `Origin` que delata otra web, y `Sec-Fetch-Site` añade la palabra del navegador frente a un `Origin` reescrito por un intermediario o un proxy mal configurado. No relaja nada: `Origin` se sigue exigiendo con o sin la cabecera, y `same-site` sólo pasa con un origen que la aplicación declara, porque un subdominio hermano (otra aplicación, contenido de usuarios) no es de confianza por compartir dominio. Las rutas con `origin: "none"` (webhooks, cron, APIs públicas) siguen exentas sin sesión. Los clientes `api.*` y `rpc.*` del SSR, `createLocalCalls`, los scripts y las apps nativas no envían la cabecera y no cambian. En `meeko dev`, los orígenes de `dev.allowedHosts` cuentan como declarados.
+
 ### Revocación durante una petición
 
 Revocar una familia también detiene el trabajo que ya había pasado la autenticación:
@@ -341,3 +355,88 @@ Límites conocidos de la notificación:
 - **Avisos falsificables.** Cualquiera con permiso `PUBLISH` sobre el Redis puede publicar un `familyId` en `<prefix>revoked`. El aviso no borra datos ni concede acceso, pero aborta las peticiones en curso y cierra los sockets de esa familia en todas las instancias (denegación de servicio). Restrinja con ACL de Redis quién puede publicar en ese canal.
 
 Un almacenamiento caído propaga error y no concede acceso. No se debe usar un store en memoria en producción. `Secure` requiere HTTPS en despliegue; configure el proxy y `MEEKO_PUBLIC_ORIGIN` acorde al origen público.
+
+## Autenticación externa
+
+Desde `1.10`, una aplicación que autentica con otro proveedor (Supabase Auth, Auth.js, un IdP propio con cookies o tokens) puede prescindir de las sesiones de Meeko. Son tres piezas:
+
+- **`sessions: false`** en `server/runtime.ts`: producción arranca sin `MEEKO_REDIS_URL` ni store. Usar `context.session` (también `session` en el middleware de ruta de servidor y en Socket) lanza un error que lo explica, en lugar de devolver una sesión vacía. `rateLimit` cuenta en la memoria de cada instancia, con un aviso en producción. Las variables `MEEKO_SESSION_*` no se aplican.
+- **`services` por petición recibe `cookies`**, las mismas de `context.cookies`: el cliente del proveedor lee y escribe sus cookies durante el inicio de sesión, el cierre y la renovación del token, y lo escrito llega a la respuesta. Al ser los mismos servicios de toda la petición, el middleware, la página y sus llamadas a API y RPC comparten el cliente.
+- **`isAuthenticated(context)`** decide `auth: "required"` de API, RPC y Socket; devolver `false` responde `401 UNAUTHENTICATED`. Con `sessions: false` y sin él, `auth: "required"` es un error de configuración (`500`), nunca un `401` silencioso. Para tener el usuario en el handler, use `locals`; para reglas por recurso, `authorize`.
+
+```ts
+// server/runtime.ts
+import { createServerClient } from '@supabase/ssr'
+import { defineServerRuntime } from '@meekojs/meeko/server'
+
+export default defineServerRuntime(({ env }) => ({
+	sessions: false,
+	allowedOrigins: ['https://admin.example.com'],
+	services: (request, { cookies }) => {
+		const supabase = createServerClient(env.SUPABASE_URL!, env.SUPABASE_ANON_KEY!, {
+			cookies: {
+				getAll: () => cookies.getAll(),
+				setAll: (list) => list.forEach(({ name, value, options }) => cookies.set(name, value, options)),
+			},
+		})
+		// Una sola consulta al proveedor por petición, aunque varios sitios pregunten por el usuario.
+		let user: ReturnType<typeof supabase.auth.getUser> | undefined
+		return { supabase, user: () => (user ??= supabase.auth.getUser()) }
+	},
+	isAuthenticated: async ({ services }) => (await services.user()).data.user !== null,
+}))
+```
+
+```ts
+// server/rpc/projects/create.ts
+export default defineRpc({
+	auth: 'required',
+	input: projectInput,
+	output: projectOutput,
+	locals: async ({ services }) => (await services.user()).data.user!,
+	handler: async ({ input, locals, context }) => {
+		const { data, error } = await context.services.supabase.from('projects').insert({ ...input, owner: locals.id }).select().single()
+		if (error) throw new ApiError('PROJECT_NOT_CREATED', 409)
+		return data
+	},
+})
+```
+
+Las páginas se protegen con un middleware de ruta de servidor, que también puede renovar la sesión del proveedor antes del `<script server>`:
+
+```ts
+// app/middleware/auth.server.ts
+export default defineServerRouteMiddleware(
+	async ({ services, url }) => {
+		const { data } = await services.user()
+		if (!data.user) redirect(`/login?next=${encodeURIComponent(url.pathname)}`)
+	},
+	{ global: false },
+)
+```
+
+`allowedOrigins` del runtime sólo vale cuando Meeko crea el gestor (sin `sessions` o con `sessions: false`); con un `SessionManager` propio, declárelos en él. Sin sesión de Meeko no hay token CSRF: las mutaciones se protegen con [`Origin`](#origin-en-mutaciones-anónimas), [Fetch Metadata](#fetch-metadata) y `SameSite=Lax`, el valor por defecto de `context.cookies`. No relaje `SameSite` de las cookies de autenticación a `None` salvo que las necesite otro sitio. `isAuthenticated` también vale con sesiones de Meeko, por ejemplo para aceptar una sesión o un token en `authorization`: `({ session, services }) => session.current !== undefined || services.apiToken() !== undefined`.
+
+En Socket, `isAuthenticated` decide el handshake y cada evento entrante; las entregas de un broadcast no lo vuelven a preguntar. El handshake lee cookies, pero no puede escribirlas: no hay respuesta HTTP que las lleve.
+
+### Cookies de la petición
+
+`context.cookies` (desde `1.10`) está en todo el código de servidor que recibe un contexto: `usePage().context` del `<script server>` y del `load`, `defineApiRoute`, `defineRpc` (incluidos `authorize`, `locals` y `rateLimit.key`), `defineServerRouteMiddleware` (`cookies` y `context.cookies`), la función `services` del runtime y, sólo para leer, el handshake de Socket.
+
+```ts
+context.cookies.get('locale') // valor decodificado, o undefined
+context.cookies.getAll() // [{ name, value }], lo que espera @supabase/ssr
+context.cookies.has('sb-access-token')
+context.cookies.set('locale', 'es', { maxAge: 365 * 24 * 60 * 60 })
+context.cookies.delete('locale')
+```
+
+- **Valores seguros por defecto.** `Path=/`, `HttpOnly`, `SameSite=Lax` y `Secure` en producción (y en desarrollo sobre HTTPS); cualquiera se puede cambiar en `options`. Acepta la forma de `CookieSerializeOptions` del paquete `cookie` (`sameSite: "lax"`, `priority: "high"`, `httpOnly: false`), así que las opciones de un SDK pasan tal cual.
+- **Validación.** Un nombre que no es un _token_ de RFC 6265, una ruta que no empieza por `/`, un dominio inválido, `SameSite=None` o `Partitioned` sin `Secure`, los prefijos `__Secure-` y `__Host-` sin sus requisitos o una cookie de más de 4096 bytes lanzan un error y no se envía nada. Los valores se codifican con `encodeURIComponent` y se decodifican al leer, como hace el paquete `cookie`.
+- **Leer lo escrito.** Una lectura ve lo escrito antes en la misma petición: si un middleware renueva un token, el `load`, el `<script server>` y las llamadas `api.*` y `rpc.*` del SSR leen el nuevo. Borrar o escribir con `maxAge` `0` la quita de las lecturas.
+- **Cualquier respuesta.** Las cookies escritas se añaden como `Set-Cookie` a la respuesta que se produzca: JSON, `204`, una redirección de `redirect()` o de un middleware, un error (también uno de la página o de un `ApiError`), el `303` de un formulario nativo, una página o un stream, y el `Response` propio de un handler con `contentType: "response"`, que conserva sus propias `Set-Cookie`. Otra escritura con el mismo nombre, ruta y dominio sustituye a la anterior, así que cada cookie sale una sola vez.
+- **La sesión de Meeko** se lee como cualquier cookie, pero sólo se escribe con `context.session`: `set` y `delete` con su nombre lanzan un error. Su cookie y su token CSRF siguen igual.
+- **Streaming.** En una página `render: "stream"`, las cabeceras salen con el primer byte. Escribir una cookie o una cabecera después, por ejemplo dentro de un `defer()`, lanza `RESPONSE_LOCKED` (`500`) y sólo falla ese valor diferido, como `SESSION_LOCKED` con la sesión. Escriba en el middleware, en el `load` o en el `<script server>` antes de devolver los valores diferidos.
+- **Caché.** Una página con `cache` cuya respuesta escribe una cookie no se guarda ni se sirve como compartida, como cuando crea una sesión. Una página que sólo lee cookies de autenticación sí puede guardarse: no declare `cache` en páginas personalizadas.
+
+`context.responseHeaders` añade cabeceras de la misma forma; véase [Cabeceras de la respuesta](framework-server.md#cabeceras-de-la-respuesta). `defineServerMiddleware` no tiene contexto: lee `request.headers.get("cookie")` y modifica el `Response` que devuelve `next()`.

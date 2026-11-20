@@ -2,6 +2,7 @@ import type { AnyApiOperation, ApiRequestInput, ClientOptions, PublicServerManif
 import type { ApiQueryContract, DataResource, DataResourceOptions, UseApi } from './engine'
 
 import { requestApi } from '../../../shared/clients'
+import { apiDataKey } from '../../../shared/invalidation'
 import { createResource, readerOf, stableJson } from './engine'
 
 /**
@@ -30,6 +31,7 @@ export function createUseApi<Contract extends Record<string, Record<string, AnyA
 		return createResource(
 			{
 				label: `useApi("${path}")`,
+				dataKey: apiDataKey(path),
 				read: readerOf(input),
 				key: (value) => `GET ${path} ${stableJson(value ?? {})}`,
 				fetch: (value, signal) => requestApi(endpoint, { ...(value as ApiRequestInput | undefined), ...(signal ? { signal } : {}) }, options),

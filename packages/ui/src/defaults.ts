@@ -4,7 +4,7 @@
 import type { UIDefaults } from './app/types/config'
 
 import { badge } from './app/variants/badge'
-import { button, iconButton } from './app/variants/button'
+import { button, copyButton, iconButton } from './app/variants/button'
 import { card, linkCard } from './app/variants/card'
 import { checkbox, radioGroup, segmentedControl, toggle } from './app/variants/choice'
 import { commandPalette } from './app/variants/command-palette'
@@ -65,6 +65,7 @@ const components = {
 	combobox: { look: combobox },
 	commandPalette: { look: commandPalette },
 	container: { look: container },
+	copyButton: { look: copyButton, variants: ['variant', 'size', 'shape'] },
 	descriptionList: { look: descriptionList },
 	diff: { look: diff },
 	disclosure: { look: disclosure },

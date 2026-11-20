@@ -41,11 +41,11 @@ Con `saving.value` en `false`, el botón no lleva `disabled` ni `aria-busy`; al 
 
 ## Atributos
 
-| Atributo                         | Tipo                                 | Por defecto | Descripción                                                                                                                                                                                                                        |
-| -------------------------------- | ------------------------------------ | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bind:<atributo>` en un elemento | cualquier valor                      | ninguno     | El atributo con `String(valor)`. `null`, `undefined` y `false` lo quitan. En los atributos booleanos de HTML (`disabled`, `checked`, `hidden`, `required`, `open`…), cualquier valor verdadero lo pone vacío y uno falso lo quita. |
-| `bind:<prop>` en un componente   | el tipo de la prop                   | ninguno     | La prop del hijo, comprobada contra su `defineProps`. Una prop opcional acepta `undefined`, que equivale a no pasarla.                                                                                                             |
-| `bind="objeto"`                  | `ElementAttributes<Tag>` o las props | ninguno     | Desde `1.5`. Varios atributos, o varias props, desde un objeto. Las claves explícitas ganan; `class` y `style` se combinan.                                                                                                        |
+| Atributo                         | Tipo                                 | Por defecto | Descripción                                                                                                                                                                                                                                                                                                                              |
+| -------------------------------- | ------------------------------------ | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bind:<atributo>` en un elemento | cualquier valor                      | ninguno     | El atributo con `String(valor)`. `null`, `undefined` y `false` lo quitan. En los atributos booleanos de HTML (`disabled`, `checked`, `hidden`, `required`, `open`…), cualquier valor verdadero lo pone vacío y uno falso lo quita. `bind:class` admite además objetos y arrays (`ClassValue`), y `bind:style`, un objeto (`StyleValue`). |
+| `bind:<prop>` en un componente   | el tipo de la prop                   | ninguno     | La prop del hijo, comprobada contra su `defineProps`. Una prop opcional acepta `undefined`, que equivale a no pasarla.                                                                                                                                                                                                                   |
+| `bind="objeto"`                  | `ElementAttributes<Tag>` o las props | ninguno     | Desde `1.5`. Varios atributos, o varias props, desde un objeto. Las claves explícitas ganan; `class` y `style` se combinan.                                                                                                                                                                                                              |
 
 ## Resultado
 
@@ -57,18 +57,36 @@ Con `saving.value` en `false`, el botón no lleva `disabled` ni `aria-busy`; al 
 
 ### Clases y estilos calculados
 
-`bind:class` recibe el texto completo de la clase. Para combinar clases fijas y condicionales, construye la cadena:
+Desde `1.10`, `bind:class` admite los mismos valores que `clsx`: un texto, un objeto `{ clase: condición }` que aplica cada clave cuya condición es verdadera, y arrays, también anidados, de cualquiera de ellos. Las clases se unen con espacios en su orden; `null`, `undefined`, `true`, `false` y los textos vacíos se omiten. Junto a un `class` estático, las clases dinámicas van detrás:
 
 ```html
 <script lang="ts">
 const props = defineProps<{ active: boolean; size: "sm" | "lg" }>();
-const classes = computed(() => ["chip", `chip--${props.size}`, props.active ? "chip--active" : ""].filter(Boolean).join(" "));
 </script>
 
 <template>
-  <span bind:class="classes.value" bind:style="props.active ? 'outline: 2px solid currentColor' : null">Etiqueta</span>
+  <span class="chip" bind:class="[`chip--${props.size}`, { 'chip--active': props.active }]" bind:style="props.active ? 'outline: 2px solid currentColor' : null">Etiqueta</span>
 </template>
 ```
+
+Con `size` en `"lg"` y `active` en `true`, el `<span>` lleva `class="chip chip--lg chip--active"`; al cambiar `active`, Meeko quita sólo esa clase del atributo. El servidor y el navegador escriben el mismo texto, así que la hidratación no da un desajuste. `ClassValue`, exportado por `@meekojs/meeko`, tipa un valor de clases que se guarda en un `computed` o llega como prop:
+
+```html
+<!-- app/components/AppCard.meeko -->
+<script lang="ts">
+import type { ClassValue } from "@meekojs/meeko";
+
+const props = defineProps<{ class?: ClassValue; open: boolean; title: string }>();
+</script>
+
+<template><article class="card" bind:class="[props.class, { 'card--open': props.open }]">{props.title}</article></template>
+```
+
+```html
+<AppCard title="Pedido" bind:open="open.value" bind:class="{ 'card--urgent': urgent.value }" />
+```
+
+Meeko no fusiona clases en conflicto (como `p-2` y `p-4` de Tailwind): las escribe todas, en el orden en que llegan.
 
 ### Atributos ARIA y `data-*`
 
@@ -146,16 +164,18 @@ Una señal es un objeto, y un objeto es verdadero: `bind:disabled="saving"` desa
 <button bind:disabled="saving.value">Guardar</button>
 ```
 
-### Un objeto en `bind:class`
+### Una señal como condición de una clase
 
-`bind:class` no interpreta objetos ni arrays como Vue: escribe `String(valor)`, es decir, `class="[object Object]"`, sin ningún error.
+Una señal es un objeto, y un objeto es verdadero: `{ active: selected }` aplicaría la clase siempre. `meeko check` y el editor lo rechazan en la expresión, igual que una función o un símbolo en `bind:class`:
 
 ```html bad
-<p bind:class="{ active: selected.value }">Opción</p>
+<p bind:class="{ active: selected }">Opción</p>
 ```
 
+`TS2345: Argument of type '{ active: Signal<boolean>; }' is not assignable to parameter of type 'ClassValue'.`
+
 ```html good
-<p bind:class="selected.value ? 'active' : null">Opción</p>
+<p bind:class="{ active: selected.value }">Opción</p>
 ```
 
 ### Un manejador de eventos como atributo

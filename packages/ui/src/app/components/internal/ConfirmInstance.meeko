@@ -1,0 +1,40 @@
+<script lang="ts">
+	// The dialog of `useModal().confirm()`: a <UIModal> with its title, its description and two actions, connected to
+	// its own instance like a modal of the application, so Esc, the backdrop, the close button and the relay of the
+	// host settle it through the manager. Only the accepting button resolves `true`; the manager decides once. The
+	// native <dialog> moves the focus to the `autofocus` button when it opens: Cancel for a destructive action.
+	import type { ModalConfirmInstance } from '../../types/modal'
+
+	import { provideModalInstance } from '../../composables/useModal'
+	import { uiMessages } from '../../utils/messages'
+	import * as Button from '../Button.meeko'
+	import * as Modal from '../Modal.meeko'
+
+	const props = defineProps<{ instance: ModalConfirmInstance }>()
+
+	const modal = provideModalInstance(props.instance.id)
+	const text = uiMessages().modal
+	const options = props.instance.options
+	const danger = options.tone === 'danger'
+</script>
+
+<template>
+	<Modal
+		bind:title="options.title"
+		bind:description="options.description"
+		bind:size="options.size ?? 'sm'"
+	>
+		<snippet name="footer">
+			<Button
+				variant="secondary"
+				bind:autofocus="danger"
+				on:click="() => modal.close(false)"
+				>{options.cancelLabel ?? text.cancel}</Button><Button
+				bind:tone="danger ? 'danger' : 'neutral'"
+				bind:autofocus="!danger"
+				on:click="() => modal.close(true)"
+				>{options.confirmLabel ?? text.confirm}</Button
+			>
+		</snippet>
+	</Modal>
+</template>

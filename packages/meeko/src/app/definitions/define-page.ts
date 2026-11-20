@@ -1,3 +1,4 @@
+import type { DataKey } from '../../framework'
 import type { SitemapEntriesContext, SitemapEntry } from '../../shared/definitions/sitemap'
 import type { HeadInput } from '../../shared/head'
 import type { LayoutProps, PageLayoutOptions } from '../../shared/layout'
@@ -65,6 +66,14 @@ export interface PageLoadContext<P extends PageSchema | undefined, S extends Pag
 	readonly state: StateStore
 	/** Contexto de la petición (`RequestContext` en `createServerApp`): sesión, servicios y plataforma. */
 	readonly context?: C
+	/**
+	 * Declara las claves de datos de las que depende el loader (desde `1.10`), como
+	 * `` depends("orders", `orders.${params.id}`) ``. Cuando una mutación o `invalidate()` invalida una
+	 * que coincide, el navegador vuelve a ejecutar el loader de la página visible y actualiza sus
+	 * datos sin volver a montar sus componentes.
+	 * @since 1.10.0
+	 */
+	readonly depends: (...keys: DataKey[]) => void
 }
 
 /**
@@ -116,6 +125,14 @@ export interface ClientPageLoadContext<P extends PageSchema | undefined, S exten
 	readonly signal: AbortSignal
 	/** Estado provisional, que se aplica al confirmar la ruta. */
 	readonly state: StateStore
+	/**
+	 * Declara las claves de datos de las que depende el loader (desde `1.10`), como
+	 * `` depends("orders", `orders.${params.id}`) ``. Cuando una mutación o `invalidate()` invalida una
+	 * que coincide, el navegador vuelve a ejecutar el loader de la página visible y actualiza sus
+	 * datos sin volver a montar sus componentes.
+	 * @since 1.10.0
+	 */
+	readonly depends: (...keys: DataKey[]) => void
 }
 
 /**

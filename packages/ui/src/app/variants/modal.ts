@@ -38,7 +38,7 @@ export const modalSurface = [
 export const modal = tv({
 	slots: {
 		base: ['ui:m-auto ui:max-h-[calc(100dvh-var(--ui-space-8))]', ...modalSurface],
-		heading: 'ui:flex ui:flex-none ui:items-start ui:justify-between ui:gap-4 ui:px-5 ui:pt-5 ui:pb-0 ui:max-phone:px-4 ui:max-phone:pt-4',
+		heading: 'ui:flex ui:flex-none ui:items-start ui:justify-between ui:gap-4 ui:px-5 ui:pt-5 ui:max-phone:px-4 ui:max-phone:pt-4',
 		title: 'ui:m-0 ui:text-xl ui:leading-snug ui:font-semibold ui:tracking-tight',
 		description: 'ui:mx-0 ui:mt-1.5 ui:mb-0 ui:leading-normal ui:text-text-soft',
 		close: [
@@ -63,3 +63,6 @@ export const modal = tv({
 		size: 'md',
 	},
 })
+
+/** Without a body (a confirmation: a title, its description and the actions), the heading keeps the space the body gave. */
+export const modalHeadingAlone = 'ui:pb-5 ui:max-phone:pb-4'

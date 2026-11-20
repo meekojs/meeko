@@ -73,6 +73,8 @@ Una petición a `/users/abc` no supera el schema y responde `400` antes de ejecu
 
 Con `render: "client"`, `load` y `head` se ejecutan en el navegador y reciben `ClientPageLoadContext` (sin `request` ni `context`).
 
+Desde `1.10`, el contexto de `load` trae `depends(...claves)`: declara las claves de datos de las que depende el loader. Cuando una escritura invalida una que coincide, el navegador vuelve a ejecutarlo y entrega el nuevo `props.data` a la página montada (véase [Recargar los datos de la página](/docs/routing-data-reference#recargar-los-datos-de-la-página-depends)).
+
 ## Valor devuelto
 
 La misma definición, sin cambios en ejecución, con el tipo de su modo: `PageDefinition<P, S, D, C>` para `"ssr"`, `"stream"` y `"prerender"`, y `ClientPageDefinition<P, S, D>` para `"client"`. Si declara `load`, el tipo lo conserva como obligatorio, igual que `data` en las props de la página. Es lo que leen el servidor, `meeko build` y `meeko check`.

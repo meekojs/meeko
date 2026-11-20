@@ -1,7 +1,7 @@
 import type { VariantProps } from 'tailwind-variants/lite'
 
 import type { badge } from '../variants/badge'
-import type { button, iconButton } from '../variants/button'
+import type { button, copyButton, iconButton } from '../variants/button'
 import type { card, linkCard } from '../variants/card'
 import type { checkbox, radioGroup, segmentedControl, toggle } from '../variants/choice'
 import type { commandPalette } from '../variants/command-palette'
@@ -80,7 +80,7 @@ type UIActionDefaults = UIComponentDefaults<typeof button, Pick<VariantProps<typ
  * reglas sin capa de la aplicación ganan a las de UI.
  *
  * Además, unas pocas variantes de apariencia general admiten un valor de base: `variant`, `size` y
- * `shape` en `button`, `link` e `iconButton`; `variant`, `padding`, `density` y `actionsWrap` en `card`; `size` en `segmentedControl`, y `density` en `table`. La
+ * `shape` en `button`, `link`, `iconButton` y `copyButton`; `variant`, `padding`, `density` y `actionsWrap` en `card`; `size` en `segmentedControl`, y `density` en `table`. La
  * prop explícita de la instancia gana siempre.
  *
  * @since 1.11.0 acepta `class` y `ui` en cada componente, y `padding`, `density`, `actionsWrap` en `card` y
@@ -122,6 +122,12 @@ export interface UIDefaults {
 	readonly combobox?: UIComponentDefaults<typeof combobox>
 	readonly commandPalette?: UIComponentDefaults<typeof commandPalette>
 	readonly container?: UIComponentDefaults<typeof container>
+	/**
+	 * `UICopyButton`: `class` llega al botón, y `variant`, `size` y `shape` son sus valores de base.
+	 *
+	 * @since 1.11.0
+	 */
+	readonly copyButton?: UIComponentDefaults<typeof copyButton, Pick<VariantProps<typeof copyButton>, 'shape' | 'size' | 'variant'>>
 	readonly descriptionList?: UIComponentDefaults<typeof descriptionList>
 	readonly diff?: UIComponentDefaults<typeof diff>
 	readonly disclosure?: UIComponentDefaults<typeof disclosure>

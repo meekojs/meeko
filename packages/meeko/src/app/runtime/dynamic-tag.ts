@@ -1,4 +1,4 @@
-import type { AttributeLiteralCheck, AttributeStrictCheck, AttributeValueOf } from '../../shared/html-attribute-values'
+import type { AttributeLiteralCheck, AttributeStrictCheck, AttributeValueOf, ClassValue } from '../../shared/html-attribute-values'
 import type { AttributeNameOf, AttributeValue, HtmlTagName, Words } from '../../shared/html-attributes'
 import type { ChannelsOf, IsUnion, PropsOf, TagProps } from './channels'
 import type { ElementOf } from './element-refs'
@@ -90,6 +90,16 @@ export function checkAttributeValue<Tag extends string, Name extends string>(): 
  */
 export function checkAttributeValueStrict<Tag extends string, Name extends string>(): <const Value>(value: Value & AttributeStrictCheck<Tag, Name, Value>) => Value {
 	return (value) => value
+}
+
+/**
+ * Type check of a `bind:class` value, in the code that `meeko check` and the editor read: a string,
+ * a number, a boolean, `null`, `undefined`, an object of conditions or nested arrays of them
+ * ({@link ClassValue}). A function, a symbol or a signal without `.value` is a type error at the
+ * expression. Generated code never calls it at run time.
+ */
+export function checkClassValue(value: ClassValue): ClassValue {
+	return value
 }
 
 const voidTags = new Set(['area', 'br', 'col', 'hr', 'img', 'input', 'source', 'track', 'wbr'])
@@ -274,7 +284,7 @@ export type AttributeSpreadCheck<T, Tag extends string> = {
 
 /** Explicit `class` and `style` of an element with `bind="obj"`, which the spread combines with its own. */
 export interface SpreadExplicit {
-	readonly class?: unknown
+	readonly class?: ClassValue
 	readonly style?: unknown
 }
 
@@ -290,7 +300,7 @@ function styleText(value: string | null): string {
  * `style` writes the static declarations first, so the dynamic ones win. A dynamic value that is
  * `undefined`, `null`, `false` or empty leaves the static text as written.
  */
-export function joinAttribute(name: 'class' | 'style', fixed: string, value: unknown): string {
+export function joinAttribute<Name extends 'class' | 'style'>(name: Name, fixed: string, value: Name extends 'class' ? ClassValue : unknown): string {
 	const dynamic = attributeValue(name, value)
 	if (name === 'class') {
 		const classes = dynamic?.trim()

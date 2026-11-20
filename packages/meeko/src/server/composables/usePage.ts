@@ -1,5 +1,5 @@
 import type { PageSchema } from '../../app/definitions/define-page'
-import type { GeneratedRoutes } from '../../framework'
+import type { DataKey, GeneratedRoutes } from '../../framework'
 import type { RequestContext } from '../runtime/request-context'
 
 /**
@@ -35,6 +35,14 @@ export interface PageRequest<P = Readonly<Record<string, string>>, S = Readonly<
 	readonly context: RequestContext
 	/** Se aborta si el cliente se desconecta, se revoca la sesiÃ³n o se cancela la respuesta. */
 	readonly signal: AbortSignal
+	/**
+	 * Declara las claves de datos de las que depende el código de nivel superior (desde `1.10`),
+	 * como `` depends("orders", `orders.${params.id}`) ``. Cuando una mutación o `invalidate()`
+	 * invalida una que coincide, el navegador vuelve a ejecutar el bloque de la página visible y
+	 * actualiza sus exports sin volver a montar sus componentes.
+	 * @since 1.10.0
+	 */
+	readonly depends: (...keys: DataKey[]) => void
 }
 
 type SchemaOutput<S> = S extends PageSchema<unknown, infer O> ? O : never

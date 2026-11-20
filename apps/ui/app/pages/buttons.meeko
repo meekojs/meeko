@@ -4,6 +4,7 @@
 	const actions = signal(0)
 	const iconClicks = signal(0)
 	const pinned = signal(false)
+	const copies = signal(0)
 </script>
 
 <template>
@@ -283,6 +284,75 @@
 				{ name: 'size / shape / tone', type: 'sm | md | lg / rounded | pill / danger', default: 'md / rounded', description: 'Tamaño, forma y acción destructiva.' },
 				{ name: 'loading', type: 'boolean', default: 'false', description: 'Cambia el icono por el spinner, anuncia aria-busy y bloquea la activación.' },
 				{ name: 'class / ui', type: 'string / { base, icon, tooltip }', description: 'Clases del botón y de sus partes.' },
+			]"
+		/>
+		<h2 id="copy-button">UICopyButton</h2>
+		<p>
+			Copia
+			<code>value</code>
+			al portapapeles. Con texto tiene el aspecto de
+			<code>UIButton</code>
+			(<code>secondary</code>
+			por defecto) y su texto pasa a «Copiado» durante un instante; con
+			<code>iconOnly</code>, el de <code>UIIconButton</code>, con su tooltip, y el icono pasa a una marca. El resultado se anuncia en una región
+			<code>role="status"</code>
+			y llega con los eventos
+			<code>copy</code>
+			y
+			<code>copyError</code>. Sin JavaScript no puede copiar: espera oculto, sin mover nada, hasta que la página se hidrata.
+		</p>
+		<DocsPreview id="copy-buttons">
+			<UICopyButton
+				id="copy-button-text"
+				value="pnpm add @meekojs/ui"
+				on:copy="() => copies.value++"
+			/>
+			<UICopyButton
+				value="https://ui.meekojs.com"
+				label="Copiar enlace"
+				variant="outline"
+				size="sm"
+			/>
+			<UICopyButton
+				id="copy-button-icon"
+				value="sk_test_4f8a"
+				iconOnly
+				label="Copiar el token"
+				on:copy="() => copies.value++"
+			/>
+		</DocsPreview>
+		<p
+			id="copy-button-status"
+			role="status"
+		>
+			Copias en este ejemplo: {copies.value}
+		</p>
+		<DocsCode bind:code="examples.copyButton" />
+		<p>
+			Los textos salen de los mensajes
+			<code>copyButton.copy</code>,
+			<code>copyButton.copied</code>
+			y
+			<code>copyButton.failed</code>
+			(véase <a href="/theming#messages">Textos e idiomas</a>), y las props ganan sobre ellos. Sobre un fondo sólido el texto conserva su color; en las demás variantes, el resultado se colorea con sus tokens:
+		</p>
+		<DocsCode
+			label="CSS"
+			bind:code="examples.copyButtonTokens"
+		/>
+		<DocsApi
+			caption="Propiedades de UICopyButton"
+			bind:rows="[
+				{ name: 'value', type: 'string', description: 'Obligatoria. El texto que se copia.' },
+				{ name: 'label', type: 'string', default: 'Copiar', description: 'Texto del botón; con iconOnly, su nombre accesible y su tooltip.' },
+				{ name: 'copiedLabel / failedLabel', type: 'string', default: 'Copiado / No se pudo copiar', description: 'Texto y aviso del resultado.' },
+				{ name: 'iconOnly', type: 'boolean', default: 'false', description: 'Sólo icono, con el aspecto de UIIconButton.' },
+				{ name: 'tooltip / placement', type: 'boolean / PopoverPlacement', default: 'true / top', description: 'Con iconOnly, el tooltip.' },
+				{ name: 'variant', type: 'primary | secondary | outline | ghost', default: 'secondary; ghost con iconOnly', description: 'Jerarquía visual.' },
+				{ name: 'size / shape / tone', type: 'sm | md | lg / rounded | pill / neutral | danger', default: 'md / rounded / neutral', description: 'Tamaño, forma y tono.' },
+				{ name: 'disabled', type: 'boolean', default: 'false', description: 'Desactiva el botón nativo.' },
+				{ name: 'on:copy / on:copyError', type: '(value: string) / (error: unknown)', description: 'Tras copiar, con el texto copiado, o si la copia falla.' },
+				{ name: 'class / ui', type: 'string / { base, status }', description: 'Clases del botón y del aviso para lectores de pantalla.' },
 			]"
 		/>
 	</DocsPage>

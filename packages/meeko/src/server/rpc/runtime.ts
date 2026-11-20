@@ -7,6 +7,7 @@ import type { RpcDefinition } from './contracts'
 import { serializeJson } from '../../core/server'
 import { errorResponse, finish, guard, readJson, validate } from '../contract-runtime'
 import { ApiError, reportServerError } from '../errors'
+import { recordInvalidates } from '../invalidation'
 
 /**
  * Ejecuta un procedimiento RPC con sus guardas y validaciones y devuelve su salida validada. Es la
@@ -32,6 +33,7 @@ export async function executeRpc<I extends Schema, O extends Schema, S, L = unde
 	await guard(definition, context, sessions, true)
 	const input = await validate(definition.input, rawInput, 'input')
 	const locals = definition.locals ? await definition.locals(context) : undefined
+	recordInvalidates(definition, context, 'defineRpc')
 	const result = await definition.handler({ input, context, locals: locals as L })
 	const output = await validate(definition.output, result, 'output')
 	serializeJson(output)

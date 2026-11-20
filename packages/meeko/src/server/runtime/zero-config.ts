@@ -17,6 +17,8 @@ export interface SessionDefaultsContext {
 	readonly appName?: string | undefined
 	/** Imports the project's `redis` package; absent when it is not installed or cannot run (Workers). */
 	readonly loadRedis?: (() => Promise<unknown>) | undefined
+	/** `allowedOrigins` of server/runtime.ts, for the manager Meeko creates. */
+	readonly allowedOrigins?: readonly string[] | undefined
 }
 
 /** Sessions created by Meeko when `server/runtime.ts` omits them, and the resources to release. */
@@ -55,7 +57,7 @@ export function sessionPolicy(env: unknown): Pick<SessionOptions<unknown>, 'ttlM
 	}
 }
 
-/** Warns once when the session variables are set but server/runtime.ts declares its own sessions. */
+/** Warns once when the session variables are set but server/runtime.ts declares or disables its own sessions. */
 export function warnIgnoredSessionEnv(env: unknown): void {
 	for (const name of sessionEnvNames) {
 		if (envString(env, name) !== undefined) warnOnce(`session-env:${name}`, `[meeko] ${name} no se aplica: server/runtime.ts declara sus propias sesiones.`)
@@ -101,13 +103,13 @@ async function closeConnection(connection: RedisConnection | undefined): Promise
  * Production never starts without a persistent store.
  */
 export async function createSessionDefaults(context: SessionDefaultsContext): Promise<SessionDefaults> {
-	const policy = sessionPolicy(context.env)
+	const policy = { ...sessionPolicy(context.env), ...(context.allowedOrigins === undefined ? {} : { allowedOrigins: context.allowedOrigins }) }
 	if (!context.production || context.prerendering) {
 		return { sessions: new SessionManager({ store: new MemorySessionStore(), production: false, ...policy }) }
 	}
 	const url = envString(context.env, 'MEEKO_REDIS_URL')
 	if (url === undefined) {
-		throw new Error('Production requires a persistent session store: set MEEKO_REDIS_URL (with the redis package installed), or return { sessions } with a persistent SessionStore from server/runtime.ts')
+		throw new Error('Production requires a persistent session store: set MEEKO_REDIS_URL (with the redis package installed), return { sessions } with a persistent SessionStore from server/runtime.ts, or return { sessions: false } if the application authenticates on its own (cookies or tokens of another provider) and never uses context.session')
 	}
 	if (context.platform === 'cloudflare') {
 		throw new Error('MEEKO_REDIS_URL needs TCP connections, which Cloudflare Workers do not offer: return a SessionManager with SqlSessionStore(new D1SessionDriver(env.DB)), or RedisSessionStore over the Upstash REST API, from server/runtime.ts')

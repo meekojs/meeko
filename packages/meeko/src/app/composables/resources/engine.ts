@@ -1,8 +1,10 @@
 import type { ReadonlySignal } from '../../../core/reactivity'
+import type { DataKey } from '../../../framework'
 import type { AnyApiOperation, ApiMutationArguments, ApiMutationInput, PublicServerManifest, RpcOperation } from '../../../shared/clients'
 import type { MutationOptions, RetrySafeMutation, RetrySafeOptions } from '../../runtime/mutations'
 
 import { batch, createContext, effect, findContext, isSignal, onCleanup, provide, signal, untrack } from '../../../core/reactivity'
+import { checkDataKey, checkDataKeys, registerDataDependent } from '../../../shared/invalidation'
 /**
  * Data composables for component scripts: `useApi`, `useRpcQuery`, `useRpcMutation` and
  * `useApiMutation`.
@@ -137,6 +139,16 @@ export interface DataResourceOptions {
 	 * @since 1.7.0
 	 */
 	readonly enabled?: boolean | ReadonlySignal<boolean> | (() => boolean)
+	/**
+	 * Claves de datos que se suman a la clave por convención (desde `1.10`): el ID del procedimiento
+	 * en `useRpcQuery` (`"orders.list"`) y, en `useApi`, los segmentos estáticos de la ruta tras
+	 * `/api` unidos por puntos (`"/api/orders/[id]"` da `"orders"`). Una lista, una señal o una
+	 * función que lee señales, como `` () => [`orders.${props.id}`] ``; se lee cuando llega una
+	 * invalidación. Cuando una mutación invalida una clave que coincide, el recurso montado vuelve a
+	 * pedir sus datos conservando los anteriores (`refreshing` en `true`).
+	 * @since 1.10.0
+	 */
+	readonly keys?: readonly DataKey[] | ReadonlySignal<readonly DataKey[]> | (() => readonly DataKey[])
 }
 
 /**
@@ -576,9 +588,25 @@ export const resourceInternals: unique symbol = Symbol('meeko.resource')
 
 export interface ResourceSource {
 	readonly label: string
+	/** The key by convention: the procedure ID, or the static segments of an API path. */
+	readonly dataKey: string
 	readonly read: () => unknown
 	readonly key: (input: unknown) => string
 	readonly fetch: (input: unknown, signal: AbortSignal | undefined) => Promise<unknown>
+}
+
+/** `keys` as a function that reads its signals, checked when read. */
+function keysReader(value: unknown, label: string): () => readonly string[] {
+	if (value === undefined) return () => []
+	if (Array.isArray(value)) {
+		const keys = checkDataKeys(value, `${label} keys`)
+		return () => keys
+	}
+	if (isSignal(value) || typeof value === 'function') {
+		const read = isSignal(value) ? () => value.value : (value as () => unknown)
+		return () => checkDataKeys(read(), `${label} keys`)
+	}
+	throw new TypeError(`${label}: keys must be an array of data keys, a signal or a function that returns one`)
 }
 
 /** `enabled` as a function that reads its signals; `true` when left out. */
@@ -601,6 +629,8 @@ export function createResource<T>(source: ResourceSource, options: DataResourceO
 		throw new TypeError(`${source.label}: debounceMs must be a number of milliseconds, 0 or more`)
 	}
 	const isEnabled = enabledReader(options?.enabled, source.label)
+	const extraKeys = keysReader(options?.keys, source.label)
+	const conventionKey = checkDataKey(source.dataKey, source.label)
 	let enabled = untrack(isEnabled)
 	const data = signal<T | null>(null)
 	const error = signal<Error | null>(null)
@@ -797,9 +827,15 @@ export function createResource<T>(source: ResourceSource, options: DataResourceO
 				schedule()
 			})
 		})
-		// Without await, the browser loads the data once the component is mounted.
+		// Without await, the browser loads the data once the component is mounted. Only a mounted
+		// resource refreshes on an invalidation: one that never mounted loads fresh data when it does.
 		whenMounted(() => {
 			if (!awaited && !started && enabled) void load()
+			if (released) return
+			return registerDataDependent({
+				keys: () => [conventionKey, ...untrack(extraKeys)],
+				refresh: () => (released ? Promise.resolve() : untrack(refresh)),
+			})
 		})
 	}
 	const resource = {

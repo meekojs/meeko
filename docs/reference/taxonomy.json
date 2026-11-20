@@ -207,6 +207,12 @@
 					]
 				},
 				{
+					"name": "useSearchParam",
+					"symbols": [
+						"@meekojs/meeko/framework#useSearchParam"
+					]
+				},
+				{
 					"name": "useForm",
 					"symbols": [
 						"@meekojs/meeko/framework#useForm"
@@ -414,6 +420,12 @@
 					]
 				},
 				{
+					"name": "navigate",
+					"symbols": [
+						"@meekojs/meeko/framework#navigate"
+					]
+				},
+				{
 					"name": "createId",
 					"symbols": [
 						"@meekojs/meeko#createId"
@@ -481,6 +493,12 @@
 					"name": "isClientError",
 					"symbols": [
 						"@meekojs/meeko/framework#isClientError"
+					]
+				},
+				{
+					"name": "invalidate",
+					"symbols": [
+						"@meekojs/meeko/framework#invalidate"
 					]
 				},
 				{

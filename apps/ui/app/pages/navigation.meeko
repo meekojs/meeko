@@ -15,6 +15,12 @@
 		shown.value = Math.min(30, shown.value + 10)
 		busy.value = false
 	}
+	// Simula una navigación lenta: el router pone y quita este atributo en las navegaciones del cliente.
+	function simulateNavigation() {
+		const root = document.documentElement
+		root.setAttribute('data-navigating', '')
+		setTimeout(() => root.removeAttribute('data-navigating'), 2500)
+	}
 </script>
 
 <template>
@@ -266,6 +272,45 @@
 				{ name: 'suggested', type: 'string', description: 'UILocaleSuggestion. El código que ofrece.' },
 				{ name: 'message / goLabel / stayLabel', type: 'string', description: 'UILocaleSuggestion. Sus textos.' },
 				{ name: 'label / class', type: 'string', description: 'Nombre accesible y clases.' },
+			]"
+		/>
+		<h2 id="progress">Barra de progreso de navegación</h2>
+		<p>
+			Mientras el router navega,
+			<code>&lt;html&gt;</code>
+			lleva
+			<code>data-navigating</code>, y la hoja de UI pinta una barra fina arriba, sólo con CSS. Espera
+			<code>--ui-navigation-progress-delay</code>
+			(120 ms), así que una navegación rápida nunca la muestra; avanza hacia el final durante
+			<code>--ui-navigation-progress-duration</code>
+			y, al terminar, se completa y se desvanece. Con
+			<code>prefers-reduced-motion</code>
+			aparece entera, sin moverse. Viene con el módulo: no hay nada que activar.
+		</p>
+		<DocsPreview id="navigation-progress">
+			<UIButton
+				variant="secondary"
+				on:click="simulateNavigation"
+			>
+				Simular una navigación lenta
+			</UIButton>
+		</DocsPreview>
+		<p>
+			Se ajusta con sus tokens, y se quita con un alto de
+			<code>0</code>:
+		</p>
+		<DocsCode
+			label="CSS"
+			bind:code="examples.navigationProgress"
+		/>
+		<DocsApi
+			caption="Tokens de la barra de navegación"
+			bind:rows="[
+				{ name: '--ui-navigation-progress-height', type: 'longitud', default: '0.125rem', description: 'Alto de la barra; 0 la quita.' },
+				{ name: '--ui-navigation-progress-color', type: 'color', default: '--ui-color-primary', description: 'Color de la barra.' },
+				{ name: '--ui-navigation-progress-delay', type: 'tiempo', default: '--ui-duration-fast (120 ms)', description: 'Espera antes de mostrarse.' },
+				{ name: '--ui-navigation-progress-duration', type: 'tiempo', default: '8s', description: 'Lo que tarda en acercarse al final.' },
+				{ name: '--ui-z-progress', type: 'número', default: '40', description: 'Capa, sobre la cabecera fija y los paneles flotantes.' },
 			]"
 		/>
 		<p>

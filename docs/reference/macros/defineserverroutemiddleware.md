@@ -42,10 +42,10 @@ Cada página de `(dashboard)` redirige a `/login` sin sesión, en la carga del d
 
 ## Parámetros
 
-| Parámetro    | Tipo                                                                                       | Por defecto | Descripción                                                                                                                                                                    |
-| ------------ | ------------------------------------------------------------------------------------------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `middleware` | `(context: ServerRouteMiddlewareContext) => void \| Response \| Promise<void \| Response>` | obligatorio | La función. Recibe el contexto de `usePage()` (`url`, `params`, `search`, `request`, `signal`, `context`) y, a mano, `session`, `services`, `platform`, `requestId` y `match`. |
-| `options`    | `{ global?: boolean }`                                                                     | global      | `{ global: false }` lo hace con nombre. **Debe ser un objeto literal.**                                                                                                        |
+| Parámetro    | Tipo                                                                                       | Por defecto | Descripción                                                                                                                                                                                                                  |
+| ------------ | ------------------------------------------------------------------------------------------ | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `middleware` | `(context: ServerRouteMiddlewareContext) => void \| Response \| Promise<void \| Response>` | obligatorio | La función. Recibe el contexto de `usePage()` (`url`, `params`, `search`, `request`, `signal`, `context`) y, a mano, `session`, `services`, `platform`, `requestId`, `match` y, desde `1.10`, `cookies` y `responseHeaders`. |
+| `options`    | `{ global?: boolean }`                                                                     | global      | `{ global: false }` lo hace con nombre. **Debe ser un objeto literal.**                                                                                                                                                      |
 
 `params` y `search` son los de la URL, todavía sin validar con los schemas de la página. `defineServerRouteMiddleware<Services>` tipa `services`; desde `1.7`, sin argumento de tipo, `services` toma el tipo que Meeko infiere de `server/runtime.ts`.
 
@@ -76,6 +76,20 @@ export default defineServerRouteMiddleware<Services>(async ({ session, services 
 ```
 
 Responder `404` en lugar de `403` no revela que la página existe.
+
+### Renovar la cookie de un proveedor
+
+Desde `1.10`, lo que el middleware escribe en `cookies` lo leen después el `<script server>`, sus llamadas a API y RPC, y llega a la respuesta, también a una redirección:
+
+<!-- no-check -->
+
+```ts
+// app/middleware/refresh.server.ts
+export default defineServerRouteMiddleware(async ({ cookies }) => {
+  const token = cookies.get("access-token");
+  if (token && isExpiring(token)) cookies.set("access-token", await refreshToken(token), { maxAge: 3600 });
+});
+```
 
 ### Global: un registro de cada página
 

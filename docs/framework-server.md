@@ -23,8 +23,8 @@ export default defineServerRuntime(async ({ env, production, prerendering }) => 
 })
 ```
 
-- `sessions` es opcional desde `1.2`. Sin `server/runtime.ts`, o si no devuelve `sessions`, Meeko las crea: en memoria en desarrollo y en Redis con `MEEKO_REDIS_URL` en producción (véase [Sesiones sin configuración](framework-auth.md#sesiones-sin-configuración)). Unas `sessions` explícitas siempre ganan.
-- `services` puede ser un objeto compartido o una función por petición; llega a páginas, API, RPC y Socket como `RequestContext.services`. Desde `1.7` su tipo se infiere de este archivo, sin conversiones (véase [Tipos de los servicios](#tipos-de-los-servicios)).
+- `sessions` es opcional desde `1.2`. Sin `server/runtime.ts`, o si no devuelve `sessions`, Meeko las crea: en memoria en desarrollo y en Redis con `MEEKO_REDIS_URL` en producción (véase [Sesiones sin configuración](framework-auth.md#sesiones-sin-configuración)). Unas `sessions` explícitas siempre ganan. Desde `1.10`, `sessions: false` las desactiva para una aplicación que se autentica con otro proveedor, junto con `allowedOrigins` e `isAuthenticated` (véase [Autenticación externa](framework-auth.md#autenticación-externa)).
+- `services` puede ser un objeto compartido o una función por petición; llega a páginas, API, RPC y Socket como `RequestContext.services`. Desde `1.10`, la función recibe `{ platform, cookies }`: `cookies` son las de `context.cookies`, así que un cliente creado ahí lee y escribe las cookies de la petición (véase [Cookies de la petición](framework-auth.md#cookies-de-la-petición)). Desde `1.7` su tipo se infiere de este archivo, sin conversiones (véase [Tipos de los servicios](#tipos-de-los-servicios)).
 - `RequestContext.platform` expone `{ name, env, waitUntil(promise) }`. En Node, `serveNode` espera las tareas registradas con `waitUntil` antes de cerrar la aplicación. Las tareas registradas fuera de una petición HTTP, como en callbacks de Socket, quedan a cargo de la aplicación: `app.close()` las espera y sus fallos llegan al observador `onError` del runtime en lugar de la consola.
 - `publicOrigin` es el origen público de la aplicación, por ejemplo `https://example.com` tras un proxy que termina TLS. HTTP y Socket comparan `Origin` con ese valor; `MEEKO_PUBLIC_ORIGIN` lo sustituye en `meeko dev` y en las salidas de Node, Bun, Deno y Workers. Sin `publicOrigin`, Socket usa la dirección en la que escucha el servidor. Si esa dirección o el `publicOrigin` es de loopback, Socket acepta también los otros nombres de loopback (`localhost`, `127.0.0.1`, `[::1]`) con el mismo esquema y puerto. Esto supone que ningún otro proceso escucha en ese puerto con otra dirección de loopback; si ocurre, configure `publicOrigin` con un origen que no sea de loopback o cambie el puerto.
 - `onError` recibe los fallos internos con su ID de petición; sin él, Meeko registra el nombre del error y el ID, y en desarrollo también el error completo. También recibe los fallos de entrega de Socket, salvo que `socket.onDeliveryError` los observe por separado, y, desde `1.3`, las promesas rechazadas sin manejar y las excepciones no capturadas del proceso, con un tercer argumento (véase [Errores](#errores)).
@@ -34,6 +34,24 @@ export default defineServerRuntime(async ({ env, production, prerendering }) => 
 - `root` (desde `1.8`) es la ruta absoluta de la raíz del proyecto, para leer sus archivos desde el servidor (contenido, plantillas, un repositorio de Git). No use `import.meta.url` para eso, porque el build mueve el código de servidor a `.meeko/output/…`, ni `process.cwd()`, que sólo es la raíz cuando la CLI lanza el proceso. En `meeko dev` es la raíz del proyecto; en las salidas de Node, Bun y Deno (también con `meeko start`, con `node .meeko/output/node/index.mjs` desde cualquier carpeta y durante el prerender) es la carpeta tres niveles por encima de la salida. Si despliega la salida fuera del proyecto, `MEEKO_ROOT` (absoluta o relativa al directorio de trabajo) indica dónde está; sin ella, la ruta apuntaría a la carpeta tres niveles por encima de la nueva ubicación. En Cloudflare Workers, sin sistema de archivos, y en un `createServerApp` propio que no pasa la opción `root`, es `undefined`. Pásela a los servicios: `defineServerRuntime(({ root }) => ({ services: { docs: join(root!, "docs") } }))`.
 
 `createServerApp({ manifest, load, runtime, production })` de `@meekojs/meeko/server` crea la misma aplicación a partir de un manifiesto y un cargador de módulos, y expone `fetch(request, platform?)`, `socket`, `publicOrigin`, `reportError` y `close()`. El entry generado por `meeko build` la usa; un host propio puede servirla con `serveNode(app, { host, port, publicOrigin, handleSignals, shutdownTimeout })` de `@meekojs/meeko/node`. Si el servidor arranca pero falla la conexión de Socket, `serveNode` libera el puerto y cierra la aplicación antes de propagar el error.
+
+### Cabeceras de la respuesta
+
+Desde `1.10`, `context.responseHeaders` añade cabeceras a la respuesta que produzca la petición, sea cual sea: el JSON de una API o un RPC, el `Response` propio de un handler, una redirección, un error, el `303` de un formulario o una página. Está donde está `context.cookies`: el `<script server>` y el `load`, `defineApiRoute`, `defineRpc` y `defineServerRouteMiddleware` (también como `responseHeaders`).
+
+```ts
+// app/middleware/private.server.ts
+export default defineServerRouteMiddleware(({ responseHeaders }) => {
+	responseHeaders.set('cache-control', 'private, no-store')
+	responseHeaders.set('x-robots-tag', 'noindex')
+})
+```
+
+- `set`, `append`, `delete`, `get` y `has`, como `Headers`. Una cabecera escrita aquí sustituye a la del mismo nombre de la respuesta.
+- Las que gestiona Meeko se rechazan con `TypeError`: `set-cookie` (use `context.cookies`), `content-type`, `content-length`, `content-encoding`, `content-security-policy` (use `server.contentSecurityPolicy`), `location` (use `redirect()`), `x-request-id`, `x-meeko-csrf-token` y las de la conexión. Un nombre o un valor inválido (con saltos de línea) también.
+- Una llamada `api.*` o `rpc.*` del SSR comparte las cabeceras y las cookies de la página: lo que escribe llega a la respuesta de la página.
+- En una página `render: "stream"`, escribir después del primer byte lanza `RESPONSE_LOCKED`, como las cookies.
+- Para las cabeceras fijas de toda la aplicación, use `server.headers` de `meeko.config.ts`; `defineServerMiddleware` sigue pudiendo modificar el `Response` que devuelve `next()`.
 
 ### Tipos de los servicios
 

@@ -24,7 +24,15 @@ Configura `viewTransitions: true` en `meeko.config.ts` para animar cambios de p�
 
 ## Estado de navegación
 
-`useNavigation().pending` indica que se está cargando la próxima página. En SSR vale `false`. Para navegar desde un host propio usa `app.navigate()`; `useNavigation()` sólo expone el estado. [Ver cuándo cambia](routing-navigation-reference.md#estado-de-navegación).
+`useNavigation().pending` indica que se está cargando la próxima página. En SSR vale `false`. `useNavigation()` sólo expone el estado. [Ver cuándo cambia](routing-navigation-reference.md#estado-de-navegación).
+
+## Navegar desde el código
+
+Desde `1.10`, `navigate({ to: '/users/[id]', params: { id }, search, hash })` navega desde un componente o un composable por el mismo router que `<MeekoLink>`, con el mismo destino tipado; también acepta una URL como texto y las opciones `replace` y `viewTransition`. Devuelve `Promise<boolean>`. Sólo funciona en el navegador: en el servidor se usa `redirect()`. [Ver reglas completas](routing-navigation-reference.md#navegación-programática).
+
+`useSearchParam('tab', 'perfil')` devuelve una señal enlazada a un parámetro de la query: leerla da el valor de la URL (validado por un `schema` opcional, o `initial`), y escribirla navega a la URL con el parámetro cambiado y vuelve a cargar los datos de la página. [Ver parámetros de búsqueda como estado](routing-navigation-reference.md#parámetros-de-búsqueda-como-estado).
+
+Desde `1.10`, durante ese tiempo `<html>` lleva `data-navigating`, y el enlace pulsado (`<MeekoLink>` o `<a>` interno), `data-pending`, así que una barra de progreso o un enlace atenuado se escriben sólo con CSS (`html[data-navigating]`, `a[data-pending]`). Nunca aparecen en el HTML del servidor. [Ver los atributos](routing-navigation-reference.md#atributos-data-navigating-y-data-pending).
 
 ## Ruta actual
 

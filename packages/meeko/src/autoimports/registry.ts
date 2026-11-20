@@ -128,6 +128,8 @@ function builtins(root: string): AutoImport[] {
 		...['useState', 'href', 'useRoute', 'definePage', 'defineGroup', 'defineRouteMiddleware', 'definePlugin'].map((name): AutoImport => ({ name, imported: name, file: '@meekojs/meeko/framework', specifier: '@meekojs/meeko/framework', scope: 'shared', typeOnly: false, component: false })),
 		// Form and storage run in app component setup on both SSR and hydration; no server/ or shared/ autoimport.
 		...['useForm', 'useStorage', 'useHead', 'useSeoMeta', 'useTheme', 'useLayout'].map((name): AutoImport => ({ name, imported: name, file: '@meekojs/meeko/framework', specifier: '@meekojs/meeko/framework', scope: 'app', typeOnly: false, component: false, browserCode: true })),
+		// Since 1.10: programmatic navigation and search params as state, for browser code of app/.
+		...['navigate', 'useSearchParam'].map((name): AutoImport => ({ name, imported: name, file: '@meekojs/meeko/framework', specifier: '@meekojs/meeko/framework', scope: 'app', typeOnly: false, component: false, browserCode: true })),
 		...['Form', 'FormField', 'FormSubmission'].map((name): AutoImport => ({ name, imported: name, file: '@meekojs/meeko/framework', specifier: '@meekojs/meeko/framework', scope: 'app', typeOnly: true, component: false, browserCode: true })),
 		{ name: 'ResolvedComponent', imported: 'ResolvedComponent', file: '@meekojs/meeko', specifier: '@meekojs/meeko', scope: 'app', typeOnly: true, component: false, browserCode: true },
 		// The definitions of server/ (contract discovery reads the call by name, not by its import).
@@ -140,6 +142,8 @@ function builtins(root: string): AutoImport[] {
 		// What a component or a composable does with a failed request; server code throws ApiError instead.
 		{ name: 'ClientError', imported: 'ClientError', file: '@meekojs/meeko/framework', specifier: '@meekojs/meeko/framework', scope: 'app', typeOnly: false, component: false, alsoType: true, browserCode: true },
 		{ name: 'isClientError', imported: 'isClientError', file: '@meekojs/meeko/framework', specifier: '@meekojs/meeko/framework', scope: 'app', typeOnly: false, component: false, browserCode: true },
+		// Since 1.10: invalidates data keys from browser code, such as a socket message.
+		{ name: 'invalidate', imported: 'invalidate', file: '@meekojs/meeko/framework', specifier: '@meekojs/meeko/framework', scope: 'app', typeOnly: false, component: false, browserCode: true },
 		...coreTypes.map((name): AutoImport => ({ name, imported: name, file: '@meekojs/meeko', specifier: '@meekojs/meeko', scope: 'shared', typeOnly: true, component: false })),
 		...frameworkTypes.map((name): AutoImport => ({ name, imported: name, file: '@meekojs/meeko/framework', specifier: '@meekojs/meeko/framework', scope: 'shared', typeOnly: true, component: false })),
 		...builtinTagTypes.map((name): AutoImport => ({ name, imported: name, file: '@meekojs/meeko/framework', specifier: '@meekojs/meeko/framework', scope: 'app', typeOnly: true, component: false, componentType: true })),
@@ -164,7 +168,7 @@ function builtins(root: string): AutoImport[] {
  * the project's own export wins, instead of making the name ambiguous. `useApiMutation` comes from
  * the generated clients; the others, from `@meekojs/meeko/framework`.
  */
-const yieldingBuiltins: ReadonlySet<string> = new Set(['useRoute', 'useForm', 'useStorage', 'useApiMutation', 'useHead', 'useSeoMeta', 'useTheme', 'useId', 'createId', 'useLayout', 'defineGroup', 'defineServerRouteMiddleware', 'createRoot', 'useNavigation', 'defer', 'ClientError', 'isClientError', 'Form', 'FormField', 'FormSubmission', ...coreTypes, ...frameworkTypes])
+const yieldingBuiltins: ReadonlySet<string> = new Set(['useRoute', 'useForm', 'useStorage', 'useApiMutation', 'useHead', 'useSeoMeta', 'useTheme', 'useId', 'createId', 'useLayout', 'defineGroup', 'defineServerRouteMiddleware', 'createRoot', 'useNavigation', 'navigate', 'useSearchParam', 'defer', 'ClientError', 'isClientError', 'invalidate', 'Form', 'FormField', 'FormSubmission', ...coreTypes, ...frameworkTypes])
 
 /** `api`, `rpc`, `socket`… of `.meeko/generated/clients.client.ts` or `clients.server.ts`. */
 export function isGeneratedClient(file: string): boolean {

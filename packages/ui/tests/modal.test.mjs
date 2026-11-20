@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
-import { createModalManager, installModalPlugin, modalExitRegistration, provideModal, useModalHost } from '../dist/app/composables/useModal.js'
+import { createModalManager, installModalPlugin, modalExitRegistration, provideModal, useModalConfirms, useModalHost } from '../dist/app/composables/useModal.js'
 import { useModal, useModalInstance } from '../dist/runtime.js'
 
 const component = { renderToString: () => '' }
@@ -392,4 +392,87 @@ test('an HMR handover that never releases the previous host is reported as a dup
 	} finally {
 		console.error = consoleError
 	}
+})
+
+test('confirm resolves true only when accepted, false on cancel or any dismissal, and decides once', async () => {
+	const manager = createModalManager(async () => component)
+	const accepted = manager.confirm({ title: '¿Seguro?' })
+	assert.deepEqual([...manager.confirms.value.values()], [{ id: 1, options: { title: '¿Seguro?' } }])
+	assert.equal(manager.instances.value.size, 0, 'a confirmation loads no component')
+	manager.close(1, true)
+	manager.close(1, false)
+	manager.dismiss(1)
+	assert.equal(await accepted, true)
+	assert.equal(manager.confirms.value.size, 0)
+	const cancelled = manager.confirm({ title: 'Cancelar' })
+	manager.close(2, false)
+	assert.equal(await cancelled, false)
+	// Esc, the backdrop and the close button of UIModal dismiss the instance: `false`, never `undefined`.
+	const escaped = manager.confirm({ title: 'Esc' })
+	manager.dismiss(3)
+	assert.equal(await escaped, false)
+	// Anything but `true` from the instance is a refusal.
+	const odd = manager.confirm({ title: 'Otro' })
+	manager.close(4, 'yes')
+	assert.equal(await odd, false)
+})
+
+test('confirm waits for its exit, keeps the opening order behind a loading modal and resolves false on disposal', async () => {
+	const load = deferred()
+	const exit = deferred()
+	const manager = createModalManager(() => load.promise)
+	const modal = manager.open('ModalSlow', {})
+	const later = manager.confirm({ title: 'Después', tone: 'danger' })
+	await tick()
+	assert.equal(manager.confirms.value.size, 0, 'it does not jump over a modal that is still loading')
+	load.resolve(component)
+	await tick()
+	assert.deepEqual([...manager.instances.value.keys()], [1])
+	assert.deepEqual([...manager.confirms.value.keys()], [2])
+	manager.registerExit(2, () => exit.promise)
+	manager.close(2, true)
+	assert.equal(manager.confirms.value.size, 1, 'mounted until its exit finishes')
+	exit.resolve()
+	assert.equal(await later, true)
+	const pending = manager.confirm({ title: 'Pendiente' })
+	manager.dispose()
+	assert.equal(await pending, false)
+	assert.equal(await modal, undefined)
+	await assert.rejects(manager.confirm({ title: 'Tarde' }), /disposed/)
+})
+
+test('confirm requires the browser and a host, and an HMR host release keeps it for the next host', async () => {
+	const values = new Map()
+	installModalPlugin({ side: 'client', provide: (key, value) => values.set(key, value) }, async () => component)
+	await createRoot(async (dispose) => {
+		for (const [key, value] of values) provide(key, value)
+		const modal = useModal()
+		const early = modal.confirm({ title: 'Sin host' })
+		const host = useModalHost()
+		const confirms = useModalConfirms()
+		await assert.rejects(early, /Mount UIApp/)
+		const answer = host.confirm({ title: 'Con host' })
+		assert.equal(confirms.value.size, 1)
+		modal.dismissAll()
+		assert.equal(await answer, false)
+		dispose()
+	})
+	const server = new Map()
+	installModalPlugin({ side: 'server', provide: (key, value) => server.set(key, value) }, async () => component)
+	await createRoot(async (dispose) => {
+		for (const [key, value] of server) provide(key, value)
+		useModalHost()
+		await assert.rejects(useModal().confirm({ title: 'SSR' }), /only be opened in the browser/)
+		dispose()
+	})
+	const hot = createModalManager(async () => component, { hot: true })
+	const release = hot.attachHost()
+	const kept = hot.confirm({ title: 'HMR' })
+	release()
+	const next = hot.attachHost()
+	await tick()
+	assert.equal(hot.confirms.value.size, 1, 'the new host takes over the confirmation')
+	hot.close(1, true)
+	assert.equal(await kept, true)
+	next()
 })

@@ -25,6 +25,18 @@ export interface UIMessages {
 	readonly modal: {
 		/** `aria-label` del botón de cierre, si no se pasa `closeLabel`. */
 		readonly close: string
+		/**
+		 * Botón que acepta en `useModal().confirm()`, si no se pasa `confirmLabel`.
+		 *
+		 * @since 1.11.0
+		 */
+		readonly confirm: string
+		/**
+		 * Botón que rechaza en `useModal().confirm()`, si no se pasa `cancelLabel`.
+		 *
+		 * @since 1.11.0
+		 */
+		readonly cancel: string
 	}
 	/** `<UITable>`. */
 	readonly table: {
@@ -259,6 +271,19 @@ export interface UIMessages {
 		readonly label: string
 		/** Nombre accesible de una serie sin valores. */
 		readonly empty: string
+	}
+	/**
+	 * `<UICopyButton>`.
+	 *
+	 * @since 1.11.0
+	 */
+	readonly copyButton: {
+		/** Texto o nombre accesible del botón, si no se pasa `label`. */
+		readonly copy: string
+		/** Texto y aviso tras copiar, si no se pasa `copiedLabel`. */
+		readonly copied: string
+		/** Texto y aviso si la copia falla, si no se pasa `failedLabel`. */
+		readonly failed: string
 	}
 }
 

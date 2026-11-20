@@ -11,6 +11,7 @@ import { assertRouteBlockPlacement } from '../compiler/transforms/route-block'
 import { componentTypeDeclarationMarker, componentTypesPath, generateTypes } from '../types'
 import { checkAliasScopes, resolveProjectAliases } from './aliases'
 import { loadConfiguredModules, resolveConfigSources } from './config'
+import { unusedInvalidations } from './data-keys-check'
 
 const componentTypesManifest = 'component-types.json'
 const componentTypeSuffix = '.d.meeko.ts'
@@ -288,6 +289,8 @@ export async function checkApp(projectRoot: string): Promise<CompileDiagnostic[]
 		diagnostics.push(...(await checkSource(source, file, { withinProject: true })))
 	}
 	diagnostics.push(...(await strayGroupFiles(sourceRoots)))
+	// MEEK141: a write that invalidates a key no read depends on.
+	diagnostics.push(...(await unusedInvalidations(projectRoot, sourceRoots)))
 	// `#server/` in app/ or shared/ and `@/` in shared/: TypeScript alone would only say the module does not exist.
 	const aliases = await resolveProjectAliases(projectRoot)
 	const modules = await sourceTypeScriptFiles(sourceRoots)
