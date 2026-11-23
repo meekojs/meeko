@@ -803,8 +803,13 @@ const card = signal<{ title: string; tone?: "info" | "warn"; count?: number }>({
 		'Unknown.meeko': `<script lang="ts">import * as Card from "./Card.meeko";</script><template><Card bind="{ title: 'x', size: 2 }" /></template>`,
 		'Handler.meeko': `<script lang="ts">import * as Card from "./Card.meeko";\nconst extra = { title: "x", onSave: () => {} };</script><template><Card bind="extra" /></template>`,
 		'Missing.meeko': `<script lang="ts">import * as Card from "./Card.meeko";\nconst extra = { title: "x" };\nconst partial: { count: number } = { count: 1 };</script><template><Card bind="extra" /><Card bind="partial" /></template>`,
+		// The rest of a union of props, one member per route: each member is checked by its own keys.
+		'Members.meeko': `<script lang="ts">import * as Card from "./Card.meeko";\nconst { to, ...rest } = defineProps<{ to: "/a"; title: "a"; tone?: "info" } | { to: "/b"; title: "b"; tone?: "warn" } | { to: "/c"; title: string; count: number }>();</script><template><Card bind="rest" /></template>`,
+		'MemberKey.meeko': `<script lang="ts">import * as Card from "./Card.meeko";\nconst { to, ...rest } = defineProps<{ to: "/a"; title: string; count: number } | { to: "/b"; title: string; size: number }>();</script><template><Card bind="rest" /></template>`,
 	}
-	const result = await checkAll(files, ['Unknown', 'Handler', 'Missing'])
+	const result = await checkAll(files, ['Unknown', 'Handler', 'Missing', 'Members', 'MemberKey'])
+	assert.deepEqual(result['Members'], [])
+	assert.deepEqual(result['MemberKey'], [`MEEK113@${files['MemberKey.meeko'].indexOf('rest" />')} size no es una prop del componente`])
 	assert.deepEqual(result['Unknown'], [`MEEK113@${files['Unknown.meeko'].indexOf('size')} size no es una prop del componente`])
 	assert.deepEqual(
 		result['Handler']!.map((item) => item.replace(/@\d+/, '')),

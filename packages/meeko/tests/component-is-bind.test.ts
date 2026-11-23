@@ -221,6 +221,16 @@ test('a union of a module and tags takes the keys that any of them accepts', { t
 		expectOne(await check(nope, '<component is="props.as" bind="props.attrs" />'), /^MEEK113: nope no es una prop del componente ni un atributo de la etiqueta/)
 		const tag = `const props = defineProps<{ as: "a" | "button"; attrs: { nope: string } }>();`
 		expectOne(await check(tag, '<component is="props.as" bind="props.attrs" />'), /^MEEK113: nope no es un atributo de la etiqueta/)
+		// A union of objects, one member per route: each member is checked by its own keys.
+		const members = `const props = defineProps<{ as: typeof AppInput | "a"; attrs: { placeholder: "a"; href?: string } | { placeholder: "b"; href?: string } | { placeholder: string; size: number } }>();`
+		assert.deepEqual(await check(members, '<component is="props.as" bind="props.attrs" />'), [])
+		const memberKey = `const props = defineProps<{ as: typeof AppInput | "a"; attrs: { placeholder: string; href: string } | { placeholder: string; nope: number } }>();`
+		const memberErrors = await check(memberKey, '<component is="props.as" bind="props.attrs" />')
+		expectOne(memberErrors, /^MEEK113: nope no es una prop del componente ni un atributo de la etiqueta/)
+		assert.ok(
+			memberErrors.every((item) => /^MEEK113: nope /.test(item)),
+			JSON.stringify(memberErrors),
+		)
 	})
 })
 
