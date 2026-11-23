@@ -352,6 +352,47 @@ test('the navigation components work in a browser, with and without JavaScript',
 		await page.close()
 	})
 
+	await t.test('UIPagination numbered: buttons change the model after hydrating, by pointer and keyboard; links navigate', async () => {
+		const { page, errors } = await open()
+		const pager = page.getByRole('navigation', { name: 'Páginas', exact: true })
+		const status = pager.getByRole('status')
+		const current = () => pager.locator('[aria-current="page"]').getAttribute('aria-label')
+		assert.equal(await status.innerText(), '11–15 de 57')
+		assert.equal(await current(), 'Página 3')
+		await pager.getByRole('button', { name: 'Página siguiente' }).click()
+		assert.equal(await page.locator('#page-state').innerText(), '4:1')
+		assert.equal(await current(), 'Página 4')
+		assert.equal(await status.innerText(), '16–20 de 57')
+		// The list keeps its length: the gap moves, the buttons do not.
+		assert.equal(await pager.getByRole('listitem').count(), 11)
+		// The keyboard: the pages are buttons that Tab goes through, and Enter and Space choose.
+		await pager.getByRole('button', { name: 'Página siguiente' }).focus()
+		await page.keyboard.press('Enter')
+		assert.equal(await page.locator('#page-state').innerText(), '5:2')
+		await page.keyboard.press('Tab')
+		assert.equal(await page.evaluate(() => globalThis.document.activeElement?.getAttribute('aria-label')), 'Última página')
+		await page.keyboard.press('Space')
+		assert.equal(await page.locator('#page-state').innerText(), '12:3')
+		assert.equal(await pager.getByRole('button', { name: 'Página siguiente' }).isDisabled(), true)
+		assert.equal(await pager.getByRole('button', { name: 'Última página' }).isDisabled(), true)
+		await pager.getByRole('button', { name: 'Página 11' }).click()
+		assert.equal(await page.locator('#page-state').innerText(), '11:4')
+		// The current page does not emit again.
+		await pager.getByRole('button', { name: 'Página 11' }).click()
+		assert.equal(await page.locator('#page-state').innerText(), '11:4')
+		await pager.getByRole('button', { name: 'Primera página' }).click()
+		assert.equal(await page.locator('#page-state').innerText(), '1:5')
+		assert.equal(await pager.getByRole('button', { name: 'Página anterior' }).isDisabled(), true)
+		assert.equal(await status.innerText(), '1–5 de 57')
+		// Links: a real navigation with the page in the search.
+		const links = page.getByRole('navigation', { name: 'Páginas con enlaces' })
+		await links.getByRole('link', { name: 'Página siguiente' }).click()
+		await page.locator('#about').waitFor()
+		assert.match(page.url(), /\/about\?page=3$/)
+		assert.deepEqual(errors, [])
+		await page.close()
+	})
+
 	await t.test('UIProse dresses its own text and stops at a component inside it', async () => {
 		const { page, errors } = await open()
 		const read = (selector, property) =>

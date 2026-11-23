@@ -196,11 +196,11 @@ Puedes sobrescribir `--ui-container-max-width` y `--ui-container-gutter` desde u
 
 ### Controles básicos
 
-| Componente | API                                                                                                                                                                                                                                                                                                                                                                               |
-| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `UIButton` | Ruta (`to`, `params`, `search`), enlace (`href`, `target`, `rel`, `download`) o botón (`type`, `disabled`); véase [UIButton](#uibutton-ruta-enlace-o-botón). Admite `variant`, `size`, `shape`, `class`, evento `click` y snippet `default`. Por defecto `button`, `primary`, `md`, `rounded`.                                                                                    |
-| `UIInput`  | Modelo de texto con `model`. Props: `id`, `name`, `type`, `placeholder`, `required`, `disabled`, `invalid`, `describedBy` y `class`. Tipos admitidos: `text`, `email`, `password`, `search`, `url`, `tel`. Por defecto usa `text` y un valor vacío. Con `type="password"`, `reveal` añade un botón para ver la contraseña; véase [Mostrar la contraseña](#mostrar-la-contraseña). |
-| `UIField`  | Requiere `id`, `label` y el snippet `default(id, describedBy)`. Props opcionales: `description`, `error`, `required`, `class`. El error tiene prioridad sobre la descripción y se anuncia con `role="alert"`.                                                                                                                                                                     |
+| Componente | API                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `UIButton` | Ruta (`to`, `params`, `search`), enlace (`href`, `target`, `rel`, `download`) o botón (`type`, `disabled`); véase [UIButton](#uibutton-ruta-enlace-o-botón). Admite `variant`, `size`, `shape`, `class`, evento `click` y snippet `default`. Por defecto `button`, `primary`, `md`, `rounded`.                                                                                                                                                                                                  |
+| `UIInput`  | Modelo de texto con `model`. Props: `id`, `name`, `type`, `placeholder`, `required`, `disabled`, `invalid`, `describedBy` y `class`. Tipos admitidos: `text`, `email`, `password`, `search`, `url`, `tel`, `number`, `date`, `datetime-local`, `time` y `month`. Por defecto usa `text` y un valor vacío; véase [Números, horas y meses](#números-horas-y-meses). Con `type="password"`, `reveal` añade un botón para ver la contraseña; véase [Mostrar la contraseña](#mostrar-la-contraseña). |
+| `UIField`  | Requiere `id`, `label` y el snippet `default(id, describedBy)`. Props opcionales: `description`, `error`, `required`, `class`. El error tiene prioridad sobre la descripción y se anuncia con `role="alert"`.                                                                                                                                                                                                                                                                                   |
 
 También incluye `UIApp` y `UIModal` para [modales](#modales), `UITable` para [tablas](#tablas), `UICard` para [cards](#cards), y los componentes de navegación y etiquetas siguientes.
 
@@ -336,6 +336,36 @@ También incluye `UIApp` y `UIModal` para [modales](#modales), `UITable` para [t
 - **Sin JavaScript.** Espera invisible (`visibility: hidden`, sin mover nada) hasta hidratar; el campo sigue siendo de contraseña.
 - **Aspecto.** Un cuadrado tan alto como `--ui-control-height-md`, con el color del texto suave; el campo reserva ese hueco al final. Se deshabilita con el campo.
 - **Props.** `reveal`, `showLabel` y `hideLabel`, en `UIInputProps`.
+
+### Números, horas y meses
+
+`UIInput` admite `type="number"`, `"time"` y `"month"`, además de `date` y `datetime-local`. `min`, `max`, `step` e `inputmode` son los atributos nativos y llegan tal cual al `<input>`.
+
+```html
+<UIInput
+	type="number"
+	name="quantity"
+	min="0"
+	step="0.5"
+	inputmode="decimal"
+	model="quantity"
+/>
+<UIInput
+	type="time"
+	name="start"
+	step="900"
+	model="start"
+/>
+<UIInput
+	type="month"
+	name="period"
+	min="2026-01"
+	model="period"
+/>
+```
+
+- **El modelo es texto.** También con `number`, el modelo es un `Signal<string>` con el texto del control (`'42'`, `'09:30'`, `'2026-11'`), como el `model` de un `<input>` nativo: un campo vacío o a medio escribir (`-`, `1e`) no tiene número, y un `number` lo perdería. Conviértelo donde lo uses (`Number(quantity.value)`, o un `v.transform` en el schema de `useForm`); vacío es `''`.
+- **Aspecto.** Las cifras de `number`, `time`, `month`, `date` y `datetime-local` tienen el mismo ancho (`tabular-nums`) y, en WebKit, el valor de una fecha o una hora se alinea al principio. Los selectores y los botones de incremento son los del navegador, con el `color-scheme` del tema.
 
 ### UIAvatar
 
@@ -1379,7 +1409,7 @@ Todo enlace de una lista acepta `href` (cualquier URL) o `to` (una ruta con `par
 | `UINavigationTabs`   | `items` (con `badge`, `badgeTone`, `badgeDot`), `current`, `label`, `variant` (`underline`, `segmented`), `class`                                                                                                      | evento `select(event, item)`                                        |
 | `UIBreadcrumb`       | `items` (el último es la página actual; sin destino es texto), `label`, `class`                                                                                                                                        |                                                                     |
 | `UIPageNavigation`   | `previous`, `next`, `label`, `previousLabel`, `nextLabel`, `class`                                                                                                                                                     |                                                                     |
-| `UIPagination`       | `shown`, `total`, `countText`, `hasMore`, `busy`, `moreLink`, `loadMoreLabel`, `loadingLabel`, `label`, `class`                                                                                                        | `default`; evento `loadMore`                                        |
+| `UIPagination`       | `shown`, `total`, `countText`, `hasMore`, `busy`, `moreLink`, `loadMoreLabel`, `loadingLabel`, `label`, `class`; numerada: `pageCount`, `pageSize`, `siblings`, `edges`, `pageLink`, `disabled` y el modelo `page`     | `default`; eventos `loadMore` y `change(page)`                      |
 | `UITableOfContents`  | `entries` (`id`, `text`, `level`), `active`, `variant` (`aside`, `collapsible`), `label`, `class`                                                                                                                      |                                                                     |
 | `UILocaleSwitcher`   | `items` (`code`, `label`, `href` o `to`, `current`), `label`, `class`                                                                                                                                                  |                                                                     |
 | `UILocaleSuggestion` | `items`, `suggested`, `label`, `message`, `goLabel`, `stayLabel`, `class`                                                                                                                                              | evento `stay`                                                       |
@@ -1392,6 +1422,7 @@ Todo enlace de una lista acepta `href` (cualquier URL) o `to` (una ruta con `par
 - **`UIHeader`** tiene una altura fija, `--ui-header-height`. En pantallas estrechas sus enlaces pasan a un menú con `popover`, que flota y no mueve la página. Una imagen de `brand` declara `width` y `height` para reservar su espacio.
 - **`UIDrawer`** es un `<dialog>` modal con `command`, `commandfor` y `closedby`: abre, cierra y devuelve el foco sin JavaScript en los navegadores que los admiten; donde no, lo hace al hidratar. Ya hidratado, sale con la misma View Transition que `UIModal`, por su propio lado; al seguir un enlace se cierra al instante, porque la navegación ya es la transición.
 - **`UINavigationTabs`** son enlaces, no un `tablist`. El indicador sigue al actual con posicionamiento por ancla; sin él, el enlace se marca solo. Para paneles en la misma página, no sirve este componente. `variant="segmented"` da a la fila la forma de un `UIRadioGroup` segmentado, para filtros en la URL y sin indicador, así que varias filas conviven en una página. `badge` añade un contador junto al texto, y el evento `select` recibe el clic y la pestaña: con `event.preventDefault()`, la página filtra sin navegar.
+- **`UIPagination`** tiene dos modos. Por defecto cuenta lo mostrado y carga más (`loadMore`, o `moreLink` sin JavaScript). Con `pageCount` o `pageSize` pasa al modo numerado, descrito en [Paginación numerada](#paginación-numerada).
 - **`UITableOfContents`** pinta la entrada activa con `scroll-target-group`, sin script, donde existe. Un `IntersectionObserver` mínimo mantiene `aria-current="location"` en todos los navegadores, y es lo que se pinta donde no existe esa propiedad. `active` entrega el control a la aplicación. Usa `variant="aside"` en la columna y `variant="collapsible"` en el contenido: `UIPage` muestra cada uno sólo cuando corresponde.
 - **`UILocaleSwitcher` y `UILocaleSuggestion`** son presentación: reciben los destinos ya calculados y no leen rutas ni cookies. Con menos de dos idiomas, el selector no pinta nada. La sugerencia va escrita en el idioma que ofrece y el botón `stay`, en el actual; la aplicación decide cuándo mostrarla, tras montar, y qué guarda.
 - **`UICodeBlock`** recibe en `html` un `<pre>` ya resaltado (Shiki con `--shiki-light` y `--shiki-dark`) y en `code` lo que se copia. El botón de copiar es el único script y queda oculto hasta hidratar. `mode="log"` usa `role="log"`, parte las líneas y no muestra el botón salvo con `copy`.
@@ -1447,6 +1478,32 @@ Un panel propio sólo necesita `useScrollLock()` mientras está abierto: con `ri
 ```
 
 Un elemento fijo que no deba moverse durante el bloqueo, como una barra con `right: 0` y contenido alineado al final, puede apartar ese contenido con `padding-inline-end: var(--ui-scrollbar-gutter)` mientras el panel está abierto. Fuera de un bloqueo, el canal sigue reservado y la ventana de un elemento fijo ya lo descuenta: no le sumes la variable.
+
+### Paginación numerada
+
+Con `pageCount` (o `pageSize` y `total`), `UIPagination` pinta la página anterior y la siguiente, los números con elipsis y, con `edges`, la primera y la última. La página actual va en el modelo `page`.
+
+```html
+<UIPagination
+	model:page="page"
+	bind:total="total"
+	bind:pageSize="20"
+	edges
+/>
+<UIPagination
+	bind:page="query.page"
+	bind:pageCount="pages"
+	bind:pageLink="(page) => ({ to: '/orders', search: { page: String(page) } })"
+/>
+```
+
+- **Páginas.** La primera y la última, la actual con `siblings` vecinas a cada lado (`1` por defecto) y una elipsis donde se salta un tramo; una elipsis nunca oculta una sola página. Con más páginas que `2 * siblings + 5`, la lista tiene siempre esa longitud, así que los botones no cambian de sitio al avanzar. Con una sola página no se pinta la lista. Un `page` fuera de rango se muestra como la página más cercana.
+- **Recuento.** Con `total` y `pageSize`, el `role="status"` dice «11–20 de 57» (mensaje `pagination.range`); `countText` lo sustituye y, sin `total` ni `countText`, no se pinta.
+- **Botones o enlaces.** Sin `pageLink`, las páginas son `<button type="button">` que cambian el modelo y emiten `change` con la página; la actual no emite. Con `pageLink`, cada página es un enlace (`href`, o `to` con `params` y `search`, por `<MeekoLink>`) que funciona sin JavaScript: la URL manda, así que pasa la página con `bind:page`. La anterior y la siguiente llevan `rel="prev"` y `rel="next"`.
+- **Accesible.** La actual lleva `aria-current="page"`. Cada página se nombra «Página 3» y los controles «Página anterior», «Página siguiente», «Primera página» y «Última página» (mensajes `pagination.page`, `previous`, `next`, `first` y `last`, en español e inglés). La elipsis es `aria-hidden`. En los extremos, los controles se deshabilitan con `disabled`.
+- **Teclado.** Es una lista de botones o enlaces dentro de un `<nav>`: `Tab` los recorre y `Enter` o `Espacio` eligen, sin un foco propio con flechas.
+- **Estado.** `busy` marca la navegación con `aria-busy` y cada página con `aria-disabled`: conservan el foco e ignoran los clics. `disabled` deshabilita todas las páginas y los controles.
+- **Aspecto.** Botones `size="sm"`: la actual `primary` y el resto `ghost`. Slots nuevos `list`, `item`, `page`, `control`, `icon` y `ellipsis`; las flechas se invierten en RTL.
 
 ## Plataforma y View Transitions
 
@@ -1518,7 +1575,7 @@ Los tipos de props, `UIDensity`, `UITone` y `UIToastContext` se exportan desde `
 
 `UIButton` añade `tone="danger"`, `loading`, `iconOnly` y `ariaLabel`. Al usar sólo un icono, proporciona siempre `ariaLabel` o `aria-label`. `loading` conserva el texto y añade el spinner; anuncia `aria-busy` y `aria-disabled`, e impide activar la acción sin quitarle el foco. Con `iconOnly`, el icono mide `--ui-icon-size`. El botón de envío conserva `name`, `value` y `form`.
 
-`UIBadge` añade tonos `info`, `success`, `warning` y `dot`. `UIInput` admite `date`, `datetime-local` y atributos nativos como `autocomplete`, `autocapitalize`, `spellcheck`, `min`, `max` y `step`. `UIField` añade `hint` y `counter` (string o número); los IDs de ambos se incluyen en el `describedBy` que recibe su snippet.
+`UIBadge` añade tonos `info`, `success`, `warning` y `dot`. `UIInput` admite `number`, `date`, `datetime-local`, `time` y `month`, con el modelo siempre de texto, y atributos nativos como `inputmode`, `autocomplete`, `autocapitalize`, `spellcheck`, `min`, `max` y `step`. `UIField` añade `hint` y `counter` (string o número); los IDs de ambos se incluyen en el `describedBy` que recibe su snippet.
 
 `UICard` y `UITable` aceptan `density="compact" | "normal" | "comfortable"`. Card añade `padding="none" | "sm" | "md" | "lg"`, que gana sobre density. Las columnas de Table admiten `numeric` (alineación al final) y `rowHeader` (`th scope="row"`), también en el layout grid. `hideCaption` oculta el título de una tabla a la vista, cuando un encabezado ya lo dice, y sigue nombrándola.
 

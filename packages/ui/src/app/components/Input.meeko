@@ -2,6 +2,8 @@
 	// <UIInput>: un <input> nativo con `model`. Con `type="password"` y `reveal`, el campo va en una caja con un
 	// botón al final que lo cambia entre contraseña y texto (`aria-pressed`); el botón no envía el formulario,
 	// conserva su foco al pulsarlo y espera invisible hasta hidratar. Sin `reveal`, el marcado es sólo el <input>.
+	// El modelo es siempre el texto del control, también con `type="number"`, como el `model` de un <input>:
+	// el campo vacío o a medio escribir («-», «1e») no tiene número, y convertirlo es cosa de quien lo usa.
 	import { computed, onMounted, signal } from '@meekojs/meeko'
 
 	import type { UIInputProps } from '../types/forms'
@@ -9,7 +11,7 @@
 	import { uiTheme } from '../utils/defaults'
 	import { icons } from '../utils/icons'
 	import { uiMessages } from '../utils/messages'
-	import { input, inputReveal, inputRevealWaiting } from '../variants/input'
+	import { input, inputNumeric, inputReveal, inputRevealWaiting } from '../variants/input'
 	import * as Icon from './internal/Icon.meeko'
 
 	const { invalid, describedBy, spellcheck, reveal, showLabel, hideLabel, class: ownClass, type = 'text', ...rest } = defineProps<UIInputProps>()
@@ -19,6 +21,9 @@
 	const value = defineModel<string>({ default: '' })
 
 	const text = uiMessages().input
+
+	const numericTypes = new Set(['number', 'time', 'month', 'date', 'datetime-local'])
+	const inputClass = computed(() => input({ class: [numericTypes.has(type) ? inputNumeric : undefined, theme.class] }))
 
 	const revealable = computed(() => reveal === true && type === 'password')
 	const shown = signal(false)
@@ -44,7 +49,7 @@
 		bind:type="type"
 		bind:aria-invalid="invalid ? 'true' : undefined"
 		bind:aria-describedby="describedBy ?? rest['aria-describedby']"
-		bind:class="input({ class: theme.class })"
+		bind:class="inputClass.value"
 		bind="rest"
 	/><span
 		if:when="revealable.value"

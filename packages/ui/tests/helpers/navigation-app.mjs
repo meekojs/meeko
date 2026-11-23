@@ -58,6 +58,8 @@ const showcase = `<script lang="ts">
 	const busy = signal(false)
 	const stays = signal(0)
 	const showSuggestion = signal(false)
+	const pageNumber = signal(3)
+	const pageChanges = signal(0)
 
 	function loadMore() {
 		busy.value = true
@@ -100,6 +102,10 @@ const showcase = `<script lang="ts">
 		<output id="drawer-state">{drawerOpen.value ? 'abierto' : 'cerrado'}:{closes.value}</output>
 		<UIPagination bind:shown="shown.value" bind:total="5" bind:busy="busy.value" on:loadMore="loadMore" />
 		<UIPagination bind:total="1200" bind:hasMore="true" bind:moreLink="{ to: '/about' }" loadMoreLabel="Siguiente tanda" />
+		<UIPagination label="Páginas" model:page="pageNumber" bind:total="57" bind:pageSize="5" edges on:change="() => pageChanges.value++" />
+		<output id="page-state">{pageNumber.value}:{pageChanges.value}</output>
+		<UIPagination label="Páginas con enlaces" bind:page="2" bind:pageCount="4" bind:pageLink="(page) => ({ to: '/about', search: { page: String(page) } })" />
+		<UIPagination label="Páginas deshabilitadas" bind:pageCount="3" bind:disabled="true" />
 		<section class="tall"><h2 id="dos">Segunda sección</h2><h3 id="dos-a">Un apartado</h3></section>
 		<UICodeBlock code="pnpm add @meekojs/ui" lang="sh" label="Instalación" labelLang="es" uiLang="es" copyAriaLabel="Copiar el comando" />
 		<UICodeBlock code="const a = 1" bind:html="highlighted" lang="ts" verdict="good" />

@@ -23,8 +23,14 @@ export type UIInputProps = Omit<ElementAttributes<'input'>, 'type' | 'value' | '
 	UIThemeProps<
 		typeof input,
 		{
-			/** Tipo nativo del campo. */
-			type?: 'text' | 'email' | 'password' | 'search' | 'url' | 'tel' | 'date' | 'datetime-local'
+			/**
+			 * Tipo nativo del campo. Con `number`, `time` y `month`, el modelo sigue siendo el texto del control
+			 * (`'42'`, `'09:30'`, `'2026-11'`, o `''` vacío o a medio escribir), como el `model` de un `<input>`:
+			 * conviértelo donde lo uses. `min`, `max`, `step` e `inputmode` son los atributos nativos.
+			 *
+			 * @since 1.11.0 admite `number`, `time` y `month`.
+			 */
+			type?: 'text' | 'email' | 'password' | 'search' | 'url' | 'tel' | 'number' | 'date' | 'datetime-local' | 'time' | 'month'
 			/** Marca el campo como inválido. */
 			invalid?: boolean
 			/** Identificadores de los mensajes de ayuda. */

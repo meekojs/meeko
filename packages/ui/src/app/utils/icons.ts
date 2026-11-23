@@ -6,6 +6,14 @@ export const icons = {
 	arrowUp: 'M8 13V3M4 7l4-4 4 4',
 	check: 'm3.5 8.5 3 3 6-7',
 	chevron: 'm5.5 6.5 2.5 2.5 2.5-2.5',
+	/** Un ángulo hacia el final de la línea: la página siguiente de <UIPagination>. */
+	chevronEnd: 'm6 4 4 4-4 4',
+	/** Un ángulo hacia el principio de la línea: la página anterior de <UIPagination>. */
+	chevronStart: 'M10 4 6 8l4 4',
+	/** Dos ángulos hacia el final de la línea: la última página de <UIPagination>. */
+	chevronsEnd: 'm4 4 4 4-4 4M8 4l4 4-4 4',
+	/** Dos ángulos hacia el principio de la línea: la primera página de <UIPagination>. */
+	chevronsStart: 'M8 4 4 8l4 4M12 4 8 8l4 4',
 	close: 'm4.5 4.5 7 7M11.5 4.5l-7 7',
 	/** Two sheets, one over the other: the action of <UICopyButton>. */
 	copy: 'M6.25 5.75h6a.75.75 0 0 1 .75.75v6.75a.75.75 0 0 1-.75.75h-6a.75.75 0 0 1-.75-.75V6.5a.75.75 0 0 1 .75-.75ZM3 10.25v-6.5a.75.75 0 0 1 .75-.75h6.5',
