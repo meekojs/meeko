@@ -6,6 +6,18 @@ on:
       # Sólo etiquetas de versión del paquete (`v1.4.1`): `v*` también encajaba con
       # `vscode-v*`, que publica la extensión en su propio workflow.
       - 'v[0-9]*'
+  # Sin etiqueta, el workflow es un ensayo: pasa los gates, empaqueta, ejecuta `npm publish --dry-run`
+  # y los VSIX, pero no publica en npm ni crea la release. Se lanza a mano antes de etiquetar y en las
+  # PR que tocan la publicación, para que un fallo de la cadena no aparezca con la etiqueta ya puesta.
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/publish.yml
+      - scripts/publish-packages.ps1
+      - scripts/package-vsix-matrix.ps1
+      - scripts/release-assets.ps1
+      - packages/vscode/package-vsix.mjs
+      - packages/devtools/package-zip.ps1
 
 # Mínimo privilegio: cada job amplía sólo lo que necesita. `id-token: write` queda limitado a
 # `publish`, que no instala dependencias ni ejecuta código del proyecto, y `contents: write` a
@@ -186,6 +198,7 @@ jobs:
           # Hace falta la historia para comprobar que la etiqueta está en main.
           fetch-depth: 0
       - name: Comprobar que la etiqueta apunta a un commit de main
+        if: github.ref_type == 'tag'
         shell: pwsh
         # Una etiqueta sobre otra rama se saltaría los checks requeridos de main (lint, E2E de UI e i18n…).
         run: |
@@ -193,13 +206,16 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "$env:GITHUB_REF_NAME ($env:GITHUB_SHA) no está en main." }
       - name: Comprobar versión de la etiqueta en los seis paquetes
         shell: pwsh
+        # En un ensayo sin etiqueta, la versión es la de @meekojs/meeko y los seis deben coincidir con ella.
         run: |
+          $expected = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME.Substring(1) } else { (Get-Content -Raw 'packages/meeko/package.json' | ConvertFrom-Json).version }
           foreach ($name in @('meeko', 'i18n', 'icon', 'ui', 'eslint-plugin', 'prettier-plugin')) {
             $manifest = Get-Content -Raw "packages/$name/package.json" | ConvertFrom-Json
-            if ($env:GITHUB_REF_NAME -ne "v$($manifest.version)" -or $manifest.private) {
-              throw "La etiqueta $env:GITHUB_REF_NAME no coincide con $($manifest.name) ($($manifest.version))."
+            if ($expected -ne $manifest.version -or $manifest.private) {
+              throw "La versión $expected no coincide con $($manifest.name) ($($manifest.version))."
             }
           }
+          "RELEASE_VERSION=$expected" >> $env:GITHUB_ENV
       - uses: ./.github/actions/setup-workspace
         with:
           build: 'true'
@@ -248,7 +264,7 @@ jobs:
           ./packages/meeko/tests/fullstack-consumer.ps1 -Tarball $tarballs[0].FullName
       - name: Empaquetar y comprobar los seis tarballs
         shell: pwsh
-        run: ./scripts/publish-packages.ps1 -PackOnly -ExpectedVersion ($env:GITHUB_REF_NAME.Substring(1)) -ArtifactDirectory (Join-Path $env:RUNNER_TEMP 'npm-tarballs')
+        run: ./scripts/publish-packages.ps1 -PackOnly -ExpectedVersion $env:RELEASE_VERSION -ArtifactDirectory (Join-Path $env:RUNNER_TEMP 'npm-tarballs')
       - name: Guardar los tarballs que pasaron los gates
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -268,6 +284,7 @@ jobs:
   # no está disponible mientras se instalan dependencias o se ejecutan pruebas.
   publish:
     name: Publicar en npm
+    if: github.ref_type == 'tag'
     environment: npm
     needs: [package-gates, verify, redis-integration, bun, deno, workerd, vscode-extension]
     runs-on: windows-latest
@@ -299,9 +316,42 @@ jobs:
           Pop-Location
           ./scripts/publish-packages.ps1 -Trusted -Execute -ExpectedVersion ($env:GITHUB_REF_NAME.Substring(1)) -ArtifactDirectory (Join-Path $env:RUNNER_TEMP 'npm-tarballs')
 
+  # Ensayo del job anterior sin etiqueta: los mismos tarballs y las mismas órdenes de npm con
+  # `--dry-run`, sin environment ni token OIDC, así que no puede publicar nada.
+  publish-dry-run:
+    name: Ensayar la publicación en npm
+    if: github.ref_type != 'tag'
+    needs: [package-gates, verify, redis-integration, bun, deno, workerd, vscode-extension]
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: meeko-npm-tarballs
+          path: ${{ runner.temp }}/npm-tarballs
+      - name: Ensayar con npm publish --dry-run
+        shell: pwsh
+        run: |
+          # Outside the checkout: npm 11 refuses to run under the devEngines of its package.json.
+          Push-Location -LiteralPath $env:RUNNER_TEMP
+          npm install --global npm@11.19.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Pop-Location
+          $version = (Get-Content -Raw 'packages/meeko/package.json' | ConvertFrom-Json).version
+          ./scripts/publish-packages.ps1 -Trusted -ExpectedVersion $version -ArtifactDirectory (Join-Path $env:RUNNER_TEMP 'npm-tarballs')
+
   github-release:
     name: Release de GitHub con VSIX y ZIP
-    needs: publish
+    needs: [publish, publish-dry-run]
+    # Tras publicar en npm o, en un ensayo, tras ensayarlo: empaqueta los VSIX y el ZIP y sólo crea la release con etiqueta.
+    if: ${{ !cancelled() && (needs.publish.result == 'success' || needs.publish-dry-run.result == 'success') }}
     runs-on: windows-latest
     timeout-minutes: 30
     permissions:
@@ -316,7 +366,7 @@ jobs:
         shell: pwsh
         run: |
           $packageVersion = node -p "JSON.parse(require('node:fs').readFileSync('packages/meeko/package.json', 'utf8')).version"
-          if ($env:GITHUB_REF_NAME -ne "v$packageVersion") {
+          if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -ne "v$packageVersion") {
             throw "La etiqueta $env:GITHUB_REF_NAME no coincide con packages/meeko/package.json ($packageVersion)."
           }
           $vscodeVersion = node -p "JSON.parse(require('node:fs').readFileSync('packages/vscode/package.json', 'utf8')).version"
@@ -339,6 +389,7 @@ jobs:
           ./scripts/release-assets.ps1 -Directory $assets -VscodeVersion $env:VSCODE_VERSION -DevtoolsVersion $env:DEVTOOLS_VERSION -WriteChecksums | Out-Null
           Get-ChildItem -LiteralPath $assets -File | Format-Table Name, Length
       - name: Crear o actualizar la release
+        if: github.ref_type == 'tag'
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
