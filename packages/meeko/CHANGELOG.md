@@ -1,5 +1,9 @@
 # Cambios de Meeko
 
+## Sin publicar
+
+- **`meeko dev` conserva los contextos de los plugins al cambiar un `tsconfig.json`.** Vite invalida todos los módulos de todos sus entornos cuando se crea, edita o borra un `tsconfig.json` en cualquier carpeta bajo la raíz, sin pasar por las actualizaciones en caliente que vigila Meeko. Las páginas volvían a evaluar el módulo que crea una clave de `createContext` (como la del gestor de modales de `@meekojs/ui`) mientras el plugin de la app seguía proveyendo la clave anterior: todas las páginas respondían `500` con `Missing Meeko context` hasta reiniciar `meeko dev`. Ahora una invalidación completa del grafo de módulos del servidor vuelve a crear la app, como cuando se edita un plugin.
+
 ## 1.10.0 — 2026-11-23
 
 - **`meeko check .` descubre los autoimports una vez por proyecto.** La generación de las declaraciones de los componentes y la comprobación de los `.meeko` volvían a descubrir los autoimports (ejecutar la configuración y analizar cada carpeta de autoimports) por cada componente: 464 veces en una aplicación de 119 componentes, unos 27 de sus 50 segundos. Ahora cada una lo hace una vez por raíz de proyecto, y los `tsc` de los proyectos app, server y shared se ejecutan a la vez; si fallan varios, se sigue informando el primero en ese orden. La misma aplicación pasa a unos 21 segundos, con los mismos diagnósticos.

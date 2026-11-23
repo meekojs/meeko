@@ -40,7 +40,7 @@ import { supervisedHmrPortEnv, supervisedPortEnv } from './dev-link'
 import { recordEditorBridgeOff } from './dev-lock'
 import { devHmrHost, devPortInUse, resolveDevPorts } from './dev-port'
 import { createDevServerLogs } from './dev-server-logs'
-import { createDevAppReloader, hotFileKey, isDiscoverySource, isRouteOptionsSource, keepServerModules, reachesEagerModule, routeOptionsKey } from './dev-watch'
+import { createDevAppReloader, hotFileKey, isDiscoverySource, isRouteOptionsSource, keepServerModules, onServerGraphReset, reachesEagerModule, routeOptionsKey } from './dev-watch'
 import { editorBridgeHost, editorBridgeOffReason, startEditorBridge } from './editor-bridge'
 import { installedModulePackages, resolvedDocument, resolveSiteOrigin, setModuleDevelopmentMode } from './module-loader'
 import { prerenderForBuild } from './prerender'
@@ -672,6 +672,8 @@ async function startDevelopment(root: string): Promise<Server> {
 	let eagerFiles: ReadonlySet<string> = new Set()
 	/** Rebuilds the app when an edit reaches {@link eagerFiles}; set once the app exists. */
 	let onEagerChange: (() => void) | undefined
+	/** Whether the app's replacement invalidates the server modules itself, which needs no other rebuild. */
+	let resettingModules = false
 	// The processed global stylesheet on disk, for editor tools that read class names from CSS files.
 	const stylesheetSnapshot = createGlobalStylesheetSnapshot(root, (message) => process.stderr.write(`[meeko] ${message}\n`), modules.stylesheets)
 	const reportError = (error: unknown, requestId: string): void => {
@@ -799,6 +801,10 @@ async function startDevelopment(root: string): Promise<Server> {
 			)
 			// A full reload of the Meeko plugin (an edited page or app/utils, a component added) keeps what this app holds.
 			keepServerModules(devServer.environments.ssr.moduleGraph, eagerFiles)
+			// Vite may invalidate them anyway (a tsconfig.json added, edited or removed): the app is built again then.
+			onServerGraphReset(devServer.environments.ssr.moduleGraph, () => {
+				if (!resettingModules && eagerFiles.size) onEagerChange?.()
+			})
 			const entry = (await devServer.ssrLoadModule(`/${frameworkServerEntry}`)) as { createApp(options: Omit<ServerAppOptions, 'manifest' | 'load' | 'runtime'>): Promise<ServerApp> }
 			return entry.createApp({
 				production: false,
@@ -894,7 +900,12 @@ async function startDevelopment(root: string): Promise<Server> {
 		const reloader = createDevAppReloader(app, async (prior, superseded) => {
 			let next: ServerApp
 			try {
-				devServer.moduleGraph.invalidateAll()
+				resettingModules = true
+				try {
+					devServer.moduleGraph.invalidateAll()
+				} finally {
+					resettingModules = false
+				}
 				next = await createDevApp()
 			} catch (error) {
 				// A broken tree (two root layouts, a bad route file) keeps the previous app until it is fixed.
