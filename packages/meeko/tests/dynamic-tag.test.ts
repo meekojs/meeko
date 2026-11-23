@@ -747,8 +747,14 @@ test('bind="obj" rejects handler keys in SSR and in the type check', async () =>
 		'Value.meeko': source('', `<p bind="{ title: { text: 'x' } }">x</p>`),
 		'Valid.meeko': source(`import type { ElementAttributes } from "@meekojs/meeko";\nconst attrs: ElementAttributes<"a"> = { href: "/x", "data-id": 1, hidden: false };\nconst props = defineProps<{ to?: string }>();`, `<a bind="attrs">x</a><a bind="props.to ? { href: props.to } : undefined">y</a><x-card bind="{ anything: 'goes' }"></x-card>`),
 		'Union.meeko': source(`const props = defineProps<{ href?: string }>();`, `<component is="props.href ? 'a' : 'button'" bind="{ href: props.href, type: 'button', colspan: 2 }">x</component>`),
+		// The rest of a union of props, one member per route: each member is checked by its own keys.
+		'Members.meeko': source(`const { to, ...rest } = defineProps<{ to: "/a"; title?: string } | { to: "/b"; title?: string } | { to: "/c"; title: string; hidden?: boolean }>();`, `<a bind="rest">x</a>`),
+		'MemberKey.meeko': source(`const { to, ...rest } = defineProps<{ to: "/a"; title: string } | { to: "/b"; colspan: number }>();`, `<a bind="rest">x</a>`),
 	}
-	const result = await checkAll(files, ['Handler', 'Unknown', 'Value', 'Valid', 'Union'])
+	const result = await checkAll(files, ['Handler', 'Unknown', 'Value', 'Valid', 'Union', 'Members', 'MemberKey'])
+	assert.deepEqual(result['Members'], [])
+	assert.equal(result['MemberKey']!.length, 1, String(result['MemberKey']))
+	assert.match(result['MemberKey']![0]!, /MEEK113@\d+ colspan no es un atributo de la etiqueta/)
 	assert.deepEqual(
 		result['Handler']!.map((item) => item.replace(/@\d+/, '')),
 		['MEEK113 bind no admite claves on*; usa on:evento'],
