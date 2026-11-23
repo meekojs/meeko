@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, unlink, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
 import { checkSource } from '../src/check.ts'
 import { generateFrameworkTsconfigs } from '../src/framework/type-declarations.ts'
-import { tempProject } from './helpers/temp-project.ts'
+import { linkRepositoryPackages, tempProject } from './helpers/temp-project.ts'
 
 interface GeneratedTsconfig {
 	compilerOptions: Record<string, unknown>
@@ -79,4 +80,31 @@ test('a component checked alone follows typescript.compilerOptions, as the whole
 	await writeFile(relaxedFile, source)
 	// The temporary project has no node_modules: only the index read matters here.
 	assert.equal((await checkSource(source, relaxedFile)).filter((diagnostic) => diagnostic.code === 'TS2322').length, 0)
+})
+
+test('a component checked alone in a project without vite or @types/node gets its diagnostics, not a global TS2688', async (context) => {
+	// Outside the repository, with only @meekojs/meeko linked: the generated tsconfig lists `node`
+	// and `vite/client`, which nothing here resolves.
+	const root = await mkdtemp(join(tmpdir(), 'meeko-missing-types-'))
+	const link = join(root, 'node_modules', '@meekojs', 'meeko')
+	// The link goes first, so removing the project never walks into the package.
+	context.after(async () => {
+		await unlink(link).catch(() => undefined)
+		await rm(root, { recursive: true, force: true })
+	})
+	await linkRepositoryPackages(root)
+	await writeFile(join(root, 'package.json'), `${JSON.stringify({ name: 'missing-types', private: true, type: 'module' })}\n`)
+	await writeFile(join(root, 'meeko.config.mjs'), 'export default {};\n')
+	await mkdir(join(root, 'app', 'pages'), { recursive: true })
+	await generateFrameworkTsconfigs(root)
+	assert.deepEqual((await generated(root, 'app')).compilerOptions.types, ['node', 'vite/client'])
+	const source = '<script lang="ts">\n\tconst count: number = "one"\n</script>\n<template><p>{count}</p></template>\n'
+	const file = join(root, 'app', 'pages', 'index.meeko')
+	await writeFile(file, source)
+	const diagnostics = await checkSource(source, file)
+	assert.deepEqual(
+		diagnostics.map((diagnostic) => diagnostic.code),
+		['TS2322'],
+		JSON.stringify(diagnostics.map((diagnostic) => `${diagnostic.code} ${diagnostic.message}`)),
+	)
 })

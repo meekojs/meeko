@@ -1,3 +1,5 @@
+import type { CompilerOptions } from '@typescript/typescript6'
+
 import { execFile } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
@@ -134,6 +136,22 @@ function generatedCheckOptions(rootDirectory: string, filename: string): CheckOp
 		if (typeof value === 'boolean' || typeof value === 'string' || (Array.isArray(value) && value.every((entry) => typeof entry === 'string'))) options[key] = value as boolean | string | readonly string[]
 	}
 	return options
+}
+
+/**
+ * The entries of `types` that TypeScript resolves from `directory` (where the temporary tsconfig
+ * lives, inside the project) with the project's `typeRoots`. The generated tsconfig always lists
+ * `node` and `vite/client`; a project without `@types/node` or `vite` installed (a component
+ * library, a fixture) would otherwise stop the whole check with a global TS2688 instead of
+ * reporting the component's diagnostics. A project that has them keeps them.
+ */
+async function resolvableTypes(types: readonly string[], directory: string, resolution: Record<string, unknown> | undefined): Promise<string[]> {
+	const { default: ts } = await import('@typescript/typescript6')
+	const typeRoots = Array.isArray(resolution?.['typeRoots']) ? (resolution['typeRoots'] as unknown[]).filter((entry): entry is string => typeof entry === 'string') : undefined
+	const containingFile = join(directory, 'tsconfig.json')
+	// `configFilePath` makes the default `typeRoots` those of the temporary tsconfig, not of the process's cwd.
+	const options: CompilerOptions = { module: ts.ModuleKind.ESNext, moduleResolution: ts.ModuleResolutionKind.Bundler, configFilePath: containingFile, ...(typeRoots ? { typeRoots } : {}) }
+	return types.filter((name) => ts.resolveTypeReferenceDirective(name, containingFile, options, ts.sys).resolvedTypeReferenceDirective !== undefined)
 }
 
 /** `options` as `tsc` flags; `types` travels in the temporary tsconfig instead. */
@@ -588,7 +606,8 @@ async function typeCheckGraph(graph: CompiledGraph, roots: readonly GeneratedEnt
 		// layout in routes.d.ts), which the declaration tree resolves as in the framework tsconfigs.
 		const declarationTree = join(rootDirectory, '.meeko', 'types')
 		const checking = generatedCheckOptions(rootDirectory, first.original)
-		const withTypes = checking.types && !projectResolution?.['types'] ? { ...projectResolution, types: checking.types } : projectResolution
+		const generatedTypes = checking.types && !projectResolution?.['types'] ? await resolvableTypes(checking.types, graph.tempDirectory, projectResolution) : undefined
+		const withTypes = generatedTypes ? { ...projectResolution, types: generatedTypes } : projectResolution
 		const resolution = existsSync(join(declarationTree, 'routes.d.ts')) ? { ...withTypes, rootDirs: [rootDirectory, declarationTree], allowArbitraryExtensions: true } : withTypes
 		const project = resolution ? join(graph.tempDirectory, 'tsconfig.json') : undefined
 		if (project) await writeFile(project, JSON.stringify({ compilerOptions: resolution, files }), { encoding: 'utf8', flag: 'wx' })
