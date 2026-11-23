@@ -57,6 +57,10 @@ test('public UI documentation renders every guide, navigates, copies code and va
 		assert.equal(palette.color, palette.text)
 	}
 	await page.setViewportSize({ width: 390, height: 844 })
+	// The landing leaves the width to its sections: no sidebar, so no drawer either. A guide has both.
+	assert.equal(await page.getByRole('button', { name: 'Contenidos', exact: true }).count(), 0)
+	await page.goto(origin + '/installation')
+	await page.waitForFunction(() => globalThis.performance.getEntriesByName('meeko-hydration').length > 0)
 	await page.getByRole('button', { name: 'Contenidos', exact: true }).click()
 	await navigation.getByRole('link', { name: 'Field e Input', exact: true }).click()
 	await page.getByRole('heading', { name: 'Field e Input', level: 1 }).waitFor()

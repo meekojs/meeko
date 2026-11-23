@@ -523,6 +523,18 @@ export function createPopover(props: UIPopoverProps, open: Signal<boolean>, id: 
 					effect(() => delays(mode.value === 'hint')),
 					() => delays(false),
 				)
+				// The browser takes the delay of the trigger before `pointerover` is dispatched: a trigger replaced
+				// under the same `id` (an `if:when` in the anchor snippet) needs its delays before the pointer comes,
+				// not when it is reached. Its siblings change together, so watching the parent is enough.
+				const parent = target.parentNode
+				if (parent && typeof MutationObserver !== 'undefined') {
+					const replaced = new MutationObserver(() => {
+						const next = document.getElementById(untrack(() => triggerId.value))
+						if (next && next !== target && untrack(() => mode.value) === 'hint') triggerElement()
+					})
+					replaced.observe(parent, { childList: true })
+					own.push(() => replaced.disconnect())
+				}
 			}
 			on('keydown', (event) => {
 				const key = event as KeyboardEvent
