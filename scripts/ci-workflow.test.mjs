@@ -108,3 +108,18 @@ test('core shards execute every file exactly once and reject invalid shard indic
 		rmSync(fixture, { recursive: true, force: true })
 	}
 })
+
+test('no job of a workflow writes a log to .meeko/ci-logs before it creates the folder', () => {
+	for (const file of ['ci.yml', 'publish.yml']) {
+		const workflow = read(`.github/workflows/${file}`)
+		const body = workflow.slice(workflow.indexOf('\njobs:\n'))
+		const starts = [...body.matchAll(/^ {2}[\w-]+:\n/gm)].map((match) => match.index)
+		for (const [index, start] of starts.entries()) {
+			const job = body.slice(start, starts[index + 1])
+			const write = job.search(/(?:Tee-Object -FilePath|\| tee) \.meeko\/ci-logs\//)
+			if (write === -1) continue
+			const create = job.search(/(?:New-Item -ItemType Directory -Force|mkdir -p) \.meeko\/ci-logs\b/)
+			assert.ok(create !== -1 && create < write, `${file}, ${job.slice(2, job.indexOf(':'))}: the folder must exist before the first log`)
+		}
+	}
+})
