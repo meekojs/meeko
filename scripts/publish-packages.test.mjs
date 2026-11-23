@@ -416,6 +416,20 @@ describe('scripts de publicación', { skip: !hasPwsh && 'requiere pwsh' }, () =>
 		})
 	}
 
+	scenario('-Trusted sin -Execute ensaya la publicación desde una rama, sin procedencia', async () => {
+		for (const short of order) registry.add(`@meekojs/${short}`, '1.7.0')
+		const { repo, trusted } = await packForWorkflow()
+		const rehearsal = trusted.filter((argument) => argument !== '-Execute')
+		const result = await run(repo, 'publish-packages.ps1', rehearsal, { GITHUB_ACTIONS: 'true', GITHUB_REF_NAME: 'chore/ci-local', GITHUB_REF_TYPE: 'branch' })
+		assert.equal(result.status, 0, result.output)
+		assert.equal(result.publishes.length, order.length)
+		for (const call of result.publishes) {
+			assert.ok(call.includes('--dry-run'), call.join(' '))
+			assert.ok(call.includes('--provenance=false'), call.join(' '))
+		}
+		assert.match(result.output, /dry run of 6 packages, nothing was published/)
+	})
+
 	scenario('una prerelease se publica en next y no mueve latest', async () => {
 		for (const short of order) registry.add(`@meekojs/${short}`, '1.7.0')
 		const { repo, trusted } = await packForWorkflow('1.9.0-rc.1')
@@ -500,6 +514,21 @@ describe('workflow de publicación', () => {
 	})
 
 	test('la release de GitHub sólo sale después de publicar', () => {
-		assert.match(job('github-release'), /needs: publish/)
+		const release = job('github-release')
+		assert.match(release, /needs: \[publish, publish-dry-run\]/)
+		assert.match(release, /needs\.publish\.result == 'success'/)
+		// Un ensayo empaqueta los VSIX tras ensayar npm, pero la release sólo se crea con etiqueta.
+		const create = release.slice(release.indexOf('- name: Crear o actualizar la release'))
+		assert.match(create, /^\s+if: github\.ref_type == 'tag'$/m)
+	})
+
+	test('sin etiqueta, el workflow ensaya la publicación sin poder publicar', () => {
+		assert.match(job('publish'), /^ {4}if: github\.ref_type == 'tag'$/m)
+		const rehearsal = job('publish-dry-run')
+		assert.match(rehearsal, /^ {4}if: github\.ref_type != 'tag'$/m)
+		assert.doesNotMatch(rehearsal, /environment:|id-token|-Execute|pnpm|\.\/\.github\/actions\//)
+		assert.match(rehearsal, /publish-packages\.ps1 -Trusted -ExpectedVersion/)
+		assert.equal(/needs: \[([^\]]+)\]/.exec(rehearsal)?.[1], /needs: \[([^\]]+)\]/.exec(job('publish'))?.[1], 'it waits for the same gates')
+		assert.match(workflow, /^ {2}workflow_dispatch:$/m)
 	})
 })

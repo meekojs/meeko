@@ -32,6 +32,7 @@ Requiere Node.js 24+ y pnpm 12.14.0. En Windows usa PowerShell 7.
 - `pnpm check`: comprueba tipos de los cinco paquetes principales.
 - `pnpm test`: ejecuta las pruebas del núcleo; `pnpm verify`: amplía la validación con ejemplos, compilación y DevTools.
 - `pnpm lint` y `pnpm format:check`: revisan lint y formato.
+- `pnpm ci:local`: ejecuta en local los jobs de `.github/workflows/ci.yml` y los gates que sólo tiene `publish.yml` (`--only package-gates`) sin detenerse en el primer fallo y resume al final los fallidos y los omitidos por falta de una herramienta (`pwsh`, `bun`, `deno`, Redis). Pásalo antes de subir a una PR; `--only checks,core-tests`, `--skip performance`, `--no-build` y `--list` lo acotan.
 - `pnpm -F @meekojs/eslint-plugin test`: ejecuta las pruebas del plugin seleccionado.
 
 ## Estilo y nombres

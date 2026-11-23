@@ -103,7 +103,9 @@ function Write-RegistryInventory($Items) {
 Push-Location -LiteralPath $root
 try {
   if ($Trusted) {
-    if (!$ExpectedVersion -or $env:GITHUB_ACTIONS -ne 'true' -or $env:GITHUB_REF_TYPE -ne 'tag' -or $env:GITHUB_REF_NAME -ne "v$ExpectedVersion") {
+    # A dry run (no -Execute) also runs from a branch or a pull request: it rehearses the publish job without a tag.
+    $tagged = $env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -eq "v$ExpectedVersion"
+    if (!$ExpectedVersion -or $env:GITHUB_ACTIONS -ne 'true' -or ($Execute -and !$tagged)) {
       throw 'Trusted publishing requires GitHub Actions and the matching approved version tag.'
     }
     if (!$ArtifactDirectory) { throw 'Trusted publishing requires -ArtifactDirectory with the tarballs that passed the gates.' }
@@ -183,8 +185,9 @@ try {
 
   foreach ($artifact in $artifacts) {
     $arguments = @('publish', $artifact.path, '--access', 'public', '--tag', $distTag, '--registry', $Registry)
-    # publishConfig asks for provenance; only an explicit flag overrides it outside OIDC.
-    if ($Trusted) { $arguments += '--provenance' } else { $arguments += '--provenance=false' }
+    # publishConfig asks for provenance; only an explicit flag overrides it outside OIDC. A dry run gets no
+    # OIDC token (that job has no id-token permission), so it never asks for provenance.
+    if ($Trusted -and $Execute) { $arguments += '--provenance' } else { $arguments += '--provenance=false' }
     if (!$Execute) { $arguments += '--dry-run' }
     # npm handles interactive 2FA/OTP on the console. Never capture its output or pass credentials as arguments.
     Invoke-Npm @arguments

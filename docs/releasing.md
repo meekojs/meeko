@@ -52,6 +52,10 @@ Un paquete debe existir en npm para configurar su publicador confiable, así que
 8. Sólo con autorización, crea y sube `v1.8.0` sobre el mismo SHA, sin demora: hasta entonces los cinco piden un core `>=1.8` que aún no está en npm. El workflow publica `@meekojs/meeko` con procedencia, omite los cinco y crea la release de GitHub. Omitir no demuestra que un tarball publicado sea idéntico ni cambia sus dist-tags.
 9. Comprueba los seis con una instalación limpia fuera del repositorio.
 
+### Ensayo antes de etiquetar
+
+`publish.yml` también se ejecuta sin etiqueta: a mano (`workflow_dispatch`, «Run workflow» en Actions o `gh workflow run publish.yml --ref main`) y en cada PR que toca la cadena de publicación (`publish.yml`, `publish-packages.ps1`, el empaquetado de los VSIX y del ZIP). Sin etiqueta pasa los mismos gates, empaqueta los seis tarballs, ejecuta `npm publish --dry-run` desde el job `publish-dry-run` (sin environment `npm` ni token OIDC, así que no puede publicar) y genera los VSIX y el ZIP, pero no crea la release. Lanza el ensayo sobre el commit que vas a etiquetar: así un fallo de la cadena aparece antes de crear la etiqueta. En local, `pnpm ci:local --only package-gates` ejecuta los gates que sólo tiene `publish.yml` (`format:check` y el empaquetado de los seis tarballs).
+
 ### Publicación confiable posterior
 
 Actualiza juntos los seis manifiestos, changelogs y rangos de compatibilidad. La etiqueta debe apuntar a un commit de `main`. El job `package-gates` lo comprueba, compara `v<versión>` con **cada** manifiesto, ejecuta los gates, instala los tarballs en un consumidor externo y guarda los seis tarballs que publicará, tras comprobar su nombre, su versión y que `pnpm pack` resolvió `workspace:*`. Una versión con sufijo usa `next`; una estable usa `latest`.
