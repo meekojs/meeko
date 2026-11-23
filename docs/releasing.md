@@ -30,9 +30,9 @@ Las órdenes `pnpm run …` de la raíz reenvían al paquete `packages/meeko` (`
 
 ## Publicar los paquetes de Meeko
 
-La versión `1.9.0` ya se publicó. Los seis paquetes públicos son `@meekojs/meeko`, `@meekojs/i18n`, `@meekojs/icon`, `@meekojs/ui`, `@meekojs/eslint-plugin` y `@meekojs/prettier-plugin`, en ese orden. `meeko-docs`, `meeko-docs-content`, `meeko-language` y `meeko-devtools-extension` son privados y no se publican en npm. Las extensiones mantienen su propia versión.
+La versión `1.10.0` ya se publicó. Los seis paquetes públicos son `@meekojs/meeko`, `@meekojs/i18n`, `@meekojs/icon`, `@meekojs/ui`, `@meekojs/eslint-plugin` y `@meekojs/prettier-plugin`, en ese orden. `meeko-docs`, `meeko-docs-content`, `meeko-language` y `meeko-devtools-extension` son privados y no se publican en npm. Las extensiones mantienen su propia versión.
 
-Desde `1.8.0` se mantienen alineados los seis paquetes públicos. `getRequestContext()`, `typescript.compilerOptions` y los componentes nuevos de UI añaden API, por lo que la siguiente versión es `1.10.0` según la política de estabilidad; la migración de UI a Tailwind entra como [excepción aprobada](stability.md#excepciones-aprobadas). Se publica por la vía de «Publicación confiable posterior» después de integrar el commit en `main` y crear la etiqueta correspondiente.
+Desde `1.8.0` se mantienen alineados los seis paquetes públicos. `1.10.1` sólo corrige `meeko dev` (reconstruye la app cuando Vite invalida todo el grafo del servidor), así que es un patch según la política de estabilidad. Se publica por la vía de «Publicación confiable posterior» después de integrar el commit en `main` y crear la etiqueta correspondiente.
 
 Antes de publicar, termina e integra el programa de diseño y resuelve la pregunta abierta sobre el hash scrypt de `docs/reference/commands/meeko-auth-hash.md`. Repite todos los gates sobre el commit final: `pnpm build`, `pnpm check`, `pnpm test:packages`, `pnpm -F @meekojs/ui test`, `pnpm -F @meekojs/i18n test`, `pnpm package:smoke`, `pnpm package:workspace-smoke` y las verificaciones anteriores. `pnpm package:workspace-smoke -Offline` permite ensayar sin red si el store contiene las dependencias. Revisa los tarballs reales, incluyendo declaraciones `.d.meeko.ts`, Inter y su OFL, y ausencia de datos de prueba o rutas locales.
 

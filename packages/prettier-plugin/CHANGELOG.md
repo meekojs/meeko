@@ -1,5 +1,9 @@
 # Cambios de Prettier para Meeko
 
+## 1.10.1 — 2026-11-23
+
+- Publicación coordinada con `@meekojs/meeko` 1.10.1, sin cambios funcionales en este paquete.
+
 ## 1.10.0 — 2026-11-23
 
 - **Una línea en blanco entre las secciones de un `.meeko`.** `<script>`, `<template>` y `<style>` quedan siempre separados por una línea en blanco; un comentario sigue pegado a la sección que explica, también `prettier-ignore`.

@@ -1,5 +1,9 @@
 # Cambios de Meeko UI
 
+## 1.10.1 — 2026-11-23
+
+- Publicación coordinada con `@meekojs/meeko` 1.10.1, sin cambios funcionales en este paquete.
+
 ## 1.10.0 — 2026-11-23
 
 - **`UIPagination` numerada.** Con `pageCount`, o con `pageSize` y `total`, pinta la página anterior y la siguiente, los números con elipsis y, con `edges`, la primera y la última. La página actual va en el modelo nuevo `page` (`model:page`) y cada cambio emite `change` con la página. La lista muestra la primera y la última página y la actual con `siblings` vecinas (`1` por defecto); una elipsis nunca oculta una sola página y, con más páginas, la lista conserva su longitud para que los botones no se muevan. Con `pageLink` cada página es un enlace (`href`, o `to` con `params` y `search`) que funciona sin JavaScript, con `rel="prev"` y `rel="next"`. Con `total` y `pageSize`, el recuento es «11–20 de 57». La actual lleva `aria-current="page"`, los extremos se deshabilitan, `disabled` deshabilita todo y `busy` marca cada página con `aria-disabled`, sin perder el foco. Mensajes nuevos `pagination.range`, `page`, `previous`, `next`, `first` y `last` en español e inglés, slots nuevos `list`, `item`, `page`, `control`, `icon` y `ellipsis`, e iconos nuevos `chevronStart`, `chevronEnd`, `chevronsStart` y `chevronsEnd`. Sin `pageCount` ni `pageSize`, el modo «cargar más», su marcado y sus clases no cambian.
