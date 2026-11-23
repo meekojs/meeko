@@ -2,10 +2,11 @@ import ts from '@typescript/typescript6'
 import { access, mkdir, readdir, readFile, realpath, unlink, writeFile } from 'node:fs/promises'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 
+import type { CheckInput } from '../check'
 import type { CompileDiagnostic } from '../compiler/parser/sfc'
 
 import { discoverComponents } from '../autoimports/registry'
-import { checkSource } from '../check'
+import { checkSources } from '../check'
 import { MeekoCompileError } from '../compiler/parser/sfc'
 import { assertRouteBlockPlacement } from '../compiler/transforms/route-block'
 import { componentTypeDeclarationMarker, componentTypesPath, generateTypes } from '../types'
@@ -277,16 +278,24 @@ async function sourceTypeScriptFiles(sourceRoots: readonly string[]): Promise<st
 export async function checkApp(projectRoot: string): Promise<CompileDiagnostic[]> {
 	const diagnostics: CompileDiagnostic[] = []
 	const sourceRoots = (await resolveConfigSources(projectRoot)).map((source) => source.root)
-	for (const file of await appMeekoFiles(projectRoot)) {
+	const placements = new Map<string, CompileDiagnostic>()
+	const inputs: CheckInput[] = []
+	const files = await appMeekoFiles(projectRoot)
+	for (const file of files) {
 		const source = await readFile(file, 'utf8')
 		try {
 			assertRouteBlockPlacement(source, file, sourceRoots)
+			inputs.push({ source, filename: file })
 		} catch (error) {
 			if (!(error instanceof MeekoCompileError)) throw error
-			diagnostics.push(error.diagnostic)
-			continue
+			placements.set(file, error.diagnostic)
 		}
-		diagnostics.push(...(await checkSource(source, file, { withinProject: true })))
+	}
+	// One TypeScript program for every component: each one imported by several is checked once.
+	const checked = await checkSources(inputs, { withinProject: true })
+	for (const file of files) {
+		const placement = placements.get(file)
+		diagnostics.push(...(placement ? [placement] : (checked.get(resolve(file)) ?? [])))
 	}
 	diagnostics.push(...(await strayGroupFiles(sourceRoots)))
 	// MEEK141: a write that invalidates a key no read depends on.

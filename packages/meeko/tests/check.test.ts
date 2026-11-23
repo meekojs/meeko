@@ -5,7 +5,7 @@ import { dirname, join, relative, resolve } from 'node:path'
 import test from 'node:test'
 import { promisify } from 'node:util'
 
-import { checkSource } from '../src/check.ts'
+import { checkSource, checkSources } from '../src/check.ts'
 import { generateTypes } from '../src/types.ts'
 
 const execFileAsync = promisify(execFile)
@@ -87,6 +87,42 @@ test('checkSource acepta imports relativos sin extensión, como Vite', async () 
 			diagnostics.map((item) => `${item.code}: ${item.message}`),
 			[],
 		)
+	} finally {
+		await rm(directory, { recursive: true, force: true })
+	}
+})
+
+test('checkSources comprueba varios componentes en un programa y atribuye cada error una vez', async () => {
+	const directory = await mkdtemp(join(exampleDirectory, '.meeko-check-test-'))
+	try {
+		const child = `<script lang="ts">const broken: number = "texto";</script>\n<template><p>{broken}</p></template>`
+		const parent = (name: string): string => `<script lang="ts">import * as Child from "./Child.meeko";\nconst ${name}: string = 1;</script>\n<template><p>{${name}}</p><Child /></template>`
+		const broken = `<script lang="ts">const value = ;</script><template><p>{value}</p></template>`
+		await writeFile(join(directory, 'Child.meeko'), child)
+		const inputs = [
+			{ source: parent('first'), filename: join(directory, 'First.meeko') },
+			{ source: parent('second'), filename: join(directory, 'Second.meeko') },
+			{ source: broken, filename: join(directory, 'Broken.meeko') },
+		]
+		const results = await checkSources(inputs)
+		const summary = (filename: string): string[] => (results.get(filename) ?? []).map((item) => `${relative(directory, item.filename)}:${item.location.line} ${item.code}`).sort()
+		// The shared child's error is reported once, by the first component that imports it.
+		assert.deepEqual(summary(inputs[0]!.filename), ['Child.meeko:1 TS2322', 'First.meeko:2 TS2322'])
+		assert.deepEqual(summary(inputs[1]!.filename), ['Second.meeko:2 TS2322'])
+		// A component that does not compile reports its syntax error and does not stop the others.
+		assert.equal(results.get(inputs[2]!.filename)?.length, 1)
+		assert.equal(results.get(inputs[2]!.filename)?.[0]?.filename, inputs[2]!.filename)
+		// Checked as a root, the child keeps its own error.
+		const withChild = await checkSources([inputs[0]!, { source: child, filename: join(directory, 'Child.meeko') }])
+		assert.deepEqual(
+			(withChild.get(join(directory, 'Child.meeko')) ?? []).map((item) => item.code),
+			['TS2322'],
+		)
+		assert.deepEqual(
+			(withChild.get(inputs[0]!.filename) ?? []).map((item) => relative(directory, item.filename)),
+			['First.meeko'],
+		)
+		assert.deepEqual(await readdir(join(directory)).then((names) => names.filter((name) => name === '.meeko')), [])
 	} finally {
 		await rm(directory, { recursive: true, force: true })
 	}

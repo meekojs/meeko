@@ -42,6 +42,14 @@ interface GeneratedEntry {
 	server?: { readonly file: string; readonly code: string; readonly lines: number }
 	/** Compiler warnings of this component. */
 	warnings: readonly CompileDiagnostic[]
+	/** Components that this one imports, to attribute their errors to the first checked component that reaches them. */
+	children: GeneratedEntry[]
+}
+
+/** A component to check: its text and its path. */
+export interface CheckInput {
+	readonly source: string
+	readonly filename: string
 }
 
 /** Ajustes de `checkSource` para herramientas que no deben ejecutar la configuración del proyecto. */
@@ -152,11 +160,24 @@ function generatedDeclarations(rootDirectory: string, filename: string): string[
 	return [join(types, 'autoimports', `${componentTarget(rootDirectory, filename)}.d.ts`), join(types, 'routes.d.ts'), join(types, 'i18n.d.ts'), join(types, 'modules.d.ts')].filter((file) => existsSync(file))
 }
 
-async function compileGraph(source: string, filename: string, options: CheckSourceOptions): Promise<{ root: GeneratedEntry; entries: Map<string, GeneratedEntry>; tempDirectory: string }> {
+interface CompiledGraph {
+	/** Each input, in order: its compiled entry, or the compile error that stops its check. */
+	readonly roots: ReadonlyArray<GeneratedEntry | CompileDiagnostic>
+	readonly entries: Map<string, GeneratedEntry>
+	readonly tempDirectory: string
+}
+
+/**
+ * Compiles the components of `inputs`, all of one project, and every `.meeko` they import into one
+ * temporary tree. A component imported by several of them is compiled once. A compile error stops
+ * only the component whose graph it is in: the entries that its attempt left half done are dropped.
+ */
+async function compileGraph(inputs: readonly CheckInput[], options: CheckSourceOptions): Promise<CompiledGraph> {
 	const byOriginal = new Map<string, GeneratedEntry>()
 	const byGenerated = new Map<string, GeneratedEntry>()
 	const nonce = randomUUID()
-	const rootDirectory = projectRoot(filename)
+	const rootDirectory = projectRoot(inputs[0]!.filename)
+	const rootFiles = new Set(inputs.map((input) => input.filename))
 	const generatedDirectory = join(rootDirectory, '.meeko', 'check', nonce)
 	async function add(original: string, content: string): Promise<GeneratedEntry> {
 		const previous = byOriginal.get(original)
@@ -176,13 +197,14 @@ async function compileGraph(source: string, filename: string, options: CheckSour
 			generated: join(generatedDirectory, generatedPath),
 			mappings: compiled.mappings.map((mapping) => ({ ...mapping })),
 			warnings: compiled.warnings ?? [],
+			children: [],
 		}
 		byOriginal.set(original, entry)
 		byGenerated.set(entry.generated, entry)
 		const serverSpecifier = `./${basename(original)}.server.js`
 		// Checked alone, a page also gets the copy of a block with only route options, so TypeScript
 		// checks them (`layoutProps` against its layout, for example) as the server project does.
-		const routeOptions = !options.withinProject && original === filename && /<script\b[^>]*\bserver\b/.test(content)
+		const routeOptions = !options.withinProject && rootFiles.has(original) && /<script\b[^>]*\bserver\b/.test(content)
 		if (entry.code.includes(`from ${JSON.stringify(serverSpecifier)}`) || routeOptions) {
 			const file = entry.generated.replace(/\.ts$/, '.server.ts')
 			entry.server = { file, ...serverCopy(content, original, file, registry ?? (await discoverAutoImports(rootDirectory))) }
@@ -207,6 +229,7 @@ async function compileGraph(source: string, filename: string, options: CheckSour
 					throw compileError(content, original, 'MEEK034', `No se encuentra el componente importado: ${value}`, originalOffset(entry.mappings, start) ?? 0)
 				}
 				const child = await add(childFilename, childSource)
+				entry.children.push(child)
 				destination = child.generated.replace(/\.ts$/, '.js')
 			} else {
 				destination = resolve(dirname(original), value)
@@ -225,8 +248,22 @@ async function compileGraph(source: string, filename: string, options: CheckSour
 		}
 		return entry
 	}
-	const root = await add(filename, source)
-	return { root, entries: byGenerated, tempDirectory: generatedDirectory }
+	const roots: Array<GeneratedEntry | CompileDiagnostic> = []
+	for (const input of inputs) {
+		const known = new Set(byOriginal.keys())
+		try {
+			roots.push(await add(input.filename, input.source))
+		} catch (error) {
+			if (!(error instanceof MeekoCompileError)) throw error
+			for (const [original, entry] of byOriginal) {
+				if (known.has(original)) continue
+				byOriginal.delete(original)
+				byGenerated.delete(entry.generated)
+			}
+			roots.push(error.diagnostic)
+		}
+	}
+	return { roots, entries: byGenerated, tempDirectory: generatedDirectory }
 }
 
 /**
@@ -504,14 +541,38 @@ export async function checkSource(source: string, filename: string, options: Che
 		const placement = await prepareStandaloneCheck(source, absolute)
 		if (placement) return [placement]
 	}
-	let graph: Awaited<ReturnType<typeof compileGraph>>
-	try {
-		graph = await compileGraph(source, absolute, options)
-	} catch (error) {
-		if (error instanceof MeekoCompileError) return [error.diagnostic]
-		throw error
-	}
+	return (await checkSources([{ source, filename: absolute }], options)).get(absolute) ?? []
+}
 
+/**
+ * Comprueba varios componentes con TypeScript 7, como `checkSource` cada uno, pero con un programa
+ * por proyecto y destino (cliente o servidor): un componente que importan varios se comprueba una
+ * vez. Devuelve los diagnósticos de cada componente por su ruta absoluta. Un error en un componente
+ * importado o en un módulo `.ts` se informa una vez, en el primero de `inputs` que lo alcanza.
+ */
+export async function checkSources(inputs: readonly CheckInput[], options: CheckSourceOptions = {}): Promise<Map<string, CompileDiagnostic[]>> {
+	const groups = new Map<string, CheckInput[]>()
+	for (const input of inputs) {
+		const filename = resolve(input.filename)
+		const root = projectRoot(filename)
+		const key = `${root}\0${componentTarget(root, filename)}`
+		groups.set(key, [...(groups.get(key) ?? []), { source: input.source, filename }])
+	}
+	const results = new Map<string, CompileDiagnostic[]>()
+	for (const group of groups.values()) {
+		const graph = await compileGraph(group, options)
+		for (const [index, root] of graph.roots.entries()) if (!('original' in root)) results.set(group[index]!.filename, [root])
+		const roots = graph.roots.filter((root): root is GeneratedEntry => 'original' in root)
+		if (roots.length) for (const [filename, diagnostics] of await typeCheckGraph(graph, roots, options)) results.set(filename, diagnostics)
+		else await rm(graph.tempDirectory, { recursive: true, force: true })
+	}
+	return results
+}
+
+/** Runs one `tsc` over the compiled `roots` and maps its errors to each root's `.meeko` file. */
+async function typeCheckGraph(graph: CompiledGraph, roots: readonly GeneratedEntry[], options: CheckSourceOptions): Promise<Map<string, CompileDiagnostic[]>> {
+	const first = roots[0]!
+	const rootDirectory = projectRoot(first.original)
 	let output = ''
 	try {
 		for (const entry of graph.entries.values()) {
@@ -521,20 +582,19 @@ export async function checkSource(source: string, filename: string, options: Che
 		}
 		// Options such as `paths` only exist in a tsconfig, so they go into a temporary one; the
 		// command-line flags below still override every type-checking option.
-		const rootDirectory = projectRoot(absolute)
 		const projectResolution = await projectResolutionOptions(rootDirectory, await projectAliasesFor(rootDirectory, options))
-		const files = [graph.root.generated, ...(graph.root.server && !options.withinProject ? [graph.root.server.file] : []), ...generatedDeclarations(rootDirectory, absolute), ...projectDeclarationFiles(rootDirectory), ...generatedServicesDeclaration(rootDirectory)]
+		const files = [...roots.flatMap((root) => [root.generated, ...(root.server && !options.withinProject ? [root.server.file] : [])]), ...generatedDeclarations(rootDirectory, first.original), ...projectDeclarationFiles(rootDirectory), ...generatedServicesDeclaration(rootDirectory)]
 		// The generated declarations name components by their `.meeko` path (the props of each named
 		// layout in routes.d.ts), which the declaration tree resolves as in the framework tsconfigs.
 		const declarationTree = join(rootDirectory, '.meeko', 'types')
-		const checking = generatedCheckOptions(rootDirectory, absolute)
+		const checking = generatedCheckOptions(rootDirectory, first.original)
 		const withTypes = checking.types && !projectResolution?.['types'] ? { ...projectResolution, types: checking.types } : projectResolution
 		const resolution = existsSync(join(declarationTree, 'routes.d.ts')) ? { ...withTypes, rootDirs: [rootDirectory, declarationTree], allowArbitraryExtensions: true } : withTypes
 		const project = resolution ? join(graph.tempDirectory, 'tsconfig.json') : undefined
 		if (project) await writeFile(project, JSON.stringify({ compilerOptions: resolution, files }), { encoding: 'utf8', flag: 'wx' })
 		try {
 			const tsc = tscCommand([...(project ? ['--project', project] : ['--ignoreConfig']), '--noEmit', '--pretty', 'false', ...checkFlags(checking), ...(project ? [] : files)])
-			const result = await execFileAsync(tsc.file, tsc.args, { cwd: dirname(absolute), maxBuffer: 8 * 1024 * 1024, windowsHide: true })
+			const result = await execFileAsync(tsc.file, tsc.args, { cwd: dirname(first.original), maxBuffer: 64 * 1024 * 1024, windowsHide: true })
 			output = result.stdout + result.stderr
 		} catch (error) {
 			const failure = error as Error & { stdout?: string; stderr?: string }
@@ -544,6 +604,7 @@ export async function checkSource(source: string, filename: string, options: Che
 	} finally {
 		await rm(graph.tempDirectory, { recursive: true, force: true })
 	}
+	const cwd = dirname(first.original)
 
 	const serverCopies = new Map([...graph.entries.values()].flatMap((entry) => (entry.server ? [[entry.server.file, entry] as const] : [])))
 	const parsed = parseTypeScriptOutput(output)
@@ -552,9 +613,9 @@ export async function checkSource(source: string, filename: string, options: Che
 	// page itself. A component checked alone reports those of its own block here.
 	const serverDiagnostics: CompileDiagnostic[] = []
 	const typed = parsed.filter((diagnostic) => {
-		const page = serverCopies.get(resolve(dirname(absolute), diagnostic.file))
+		const page = serverCopies.get(resolve(cwd, diagnostic.file))
 		if (!page) return true
-		if (!options.withinProject && page === graph.root) {
+		if (!options.withinProject && roots.includes(page)) {
 			const line = Math.max(1, diagnostic.line - page.server!.lines)
 			const offset = Math.min(page.source.length, generatedOffset(page.source, line, diagnostic.column))
 			serverDiagnostics.push({ code: diagnostic.code, message: diagnostic.message, filename: page.original, location: locate(page.source, offset) })
@@ -565,7 +626,7 @@ export async function checkSource(source: string, filename: string, options: Che
 	const approximate = new Map<CompileDiagnostic, readonly [number, number]>()
 	const mapped = await Promise.all(
 		typed.map(async (diagnostic): Promise<CompileDiagnostic> => {
-			const reported = resolve(dirname(absolute), diagnostic.file)
+			const reported = resolve(cwd, diagnostic.file)
 			const entry = graph.entries.get(reported)
 			if (entry) {
 				const generated = generatedOffset(entry.code, diagnostic.line, diagnostic.column)
@@ -605,7 +666,7 @@ export async function checkSource(source: string, filename: string, options: Che
 			try {
 				imported = await readFile(reported, 'utf8')
 			} catch {
-				return { code: diagnostic.code, message: `TypeScript generado: ${diagnostic.message}`, filename: absolute, location: locate(source, 0) }
+				return { code: diagnostic.code, message: `TypeScript generado: ${diagnostic.message}`, filename: first.original, location: locate(first.source, 0) }
 			}
 			return {
 				code: diagnostic.code,
@@ -622,16 +683,38 @@ export async function checkSource(source: string, filename: string, options: Che
 	// exactly inside that span.
 	const sameError = (left: CompileDiagnostic, right: CompileDiagnostic): boolean => left.filename === right.filename && left.code === right.code && left.message === right.message
 	const seen = new Set<string>()
-	// MEEK128 and MEEK129, misuses of `onCleanup` in the script; loaded only when the script uses it.
-	const cleanup = source.includes('onCleanup') ? (await import('./language-server/cleanup')).componentCleanupDiagnostics(graph.root.source, graph.root.original) : []
-	// Warnings of the checked component only; each imported component reports its own when checked.
-	return [...mapped, ...serverDiagnostics, ...graph.root.warnings, ...cleanup].filter((item) => {
-		if (item.severity === 'warning' && item.filename !== graph.root.original) return false
+	const keep = (item: CompileDiagnostic): boolean => {
 		const span = approximate.get(item)
 		if (span && mapped.some((other) => other !== item && !approximate.has(other) && sameError(other, item) && other.location.offset >= span[0] && other.location.offset < span[1])) return false
 		const key = `${item.filename}:${item.code}:${item.location.offset}:${item.message}`
 		if (seen.has(key)) return false
 		seen.add(key)
 		return true
-	})
+	}
+	// Each error of an imported component goes to the first root that reaches it; one of a `.ts`
+	// module, whose importers TypeScript does not report, to the first root.
+	const owner = new Map<string, GeneratedEntry>(roots.map((root) => [root.original, root]))
+	for (const root of roots) {
+		const pending = [...root.children]
+		while (pending.length) {
+			const entry = pending.pop()!
+			if (owner.has(entry.original)) continue
+			owner.set(entry.original, root)
+			pending.push(...entry.children)
+		}
+	}
+	const cleanupDiagnostics = roots.some((root) => root.source.includes('onCleanup')) ? (await import('./language-server/cleanup')).componentCleanupDiagnostics : undefined
+	const results = new Map<string, CompileDiagnostic[]>()
+	for (const root of roots) {
+		const own = (item: CompileDiagnostic): boolean => (owner.get(item.filename) ?? first) === root
+		// MEEK128 and MEEK129, misuses of `onCleanup` in the script; loaded only when a script uses it.
+		const cleanup = cleanupDiagnostics && root.source.includes('onCleanup') ? cleanupDiagnostics(root.source, root.original) : []
+		// Warnings of the checked components only; each imported component reports its own when checked.
+		const items = [...mapped.filter(own), ...serverDiagnostics.filter((item) => item.filename === root.original), ...root.warnings, ...cleanup]
+		results.set(
+			root.original,
+			items.filter((item) => !(item.severity === 'warning' && item.filename !== root.original) && keep(item)),
+		)
+	}
+	return results
 }
