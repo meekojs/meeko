@@ -186,7 +186,7 @@ exports.run = async function run() {
 	}
 	const bindType = bindItems.find((item) => labelOf(item) === 'bind:type')
 	assert.equal(insertedText(bindType), 'bind:type="$1"', bindItems.map(labelOf).join(', '))
-	assert.equal(bindType.detail, "bind:type: 'submit' | 'reset' | 'button'")
+	assert.equal(bindType.detail, "bind:type: 'submit' | 'reset' | 'button' | null | undefined")
 	for (const label of ['bind', 'bind:', 'bind:class', 'bind:disabled'])
 		assert.ok(
 			bindItems.some((item) => labelOf(item) === label),
