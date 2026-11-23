@@ -1641,7 +1641,9 @@ describe('Meeko language server requests to the client', () => {
 		process.on('unhandledRejection', onRejection)
 		const client = await inProcess(root, { projectContracts: false })
 		const logs: string[] = []
-		client.connection.onNotification('window/logMessage', ({ message }: { message: string }) => logs.push(message))
+		client.connection.onNotification('window/logMessage', ({ message }: { message: string }) => {
+			logs.push(message)
+		})
 		let refreshes = 0
 		let answer: 'reject' | 'pending' = 'reject'
 		client.connection.onRequest(SemanticTokensRefreshRequest.type, () => {
