@@ -279,7 +279,8 @@ test('the English site has an English interface, hreflang, a switcher, /en links
 		const internal = await page.locator('header:not(main header) a[href^="/"]:not([hreflang]), #docs-navigation a[href^="/"], main a[href^="/"]:not([hreflang])').evaluateAll((links) => links.map((link) => link.getAttribute('href')))
 		for (const href of internal) assert.match(href, /^\/en(\/|$|\?)/, `${route} links to ${href}`)
 	}
-	await page.goto(origin + '/en/routing')
+	// The switcher remembers the language from the client router: click it once the page has hydrated.
+	await page.goto(origin + '/en/routing', { waitUntil: 'networkidle' })
 	const switcher = page.getByRole('navigation', { name: 'Language', exact: true })
 	assert.deepEqual(await switcher.getByRole('link').evaluateAll((links) => links.map((link) => [link.textContent.replace(/\s+/g, ''), link.getAttribute('href'), link.getAttribute('hreflang'), link.getAttribute('lang'), link.getAttribute('aria-current')])), [
 		['ESEspañol', '/routing', 'es', 'es', null],

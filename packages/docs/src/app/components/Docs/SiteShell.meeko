@@ -101,7 +101,7 @@
 		navigation: groups.value,
 		// A page says in which language its prose is written: <DocsPage> shows that note.
 		locale: { requested: i18n.locale, content: i18n.locale, fallback: false, suggested: suggestion.value },
-		locales: i18n.pageLocales().map((code) => ({ code, label: i18n.localeName(code), href: i18n.switchLocalePath(code), target: '_top' as const, current: code === i18n.locale })),
+		locales: i18n.pageLocales().map((code) => ({ code, label: i18n.localeName(code), href: i18n.switchLocalePath(code), current: code === i18n.locale })),
 		announcements: moderation.value.announcements,
 		search: { mode: 'filter', query: query.value },
 	}))
