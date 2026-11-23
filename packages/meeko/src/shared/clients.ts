@@ -313,6 +313,41 @@ function validationIssues(value: unknown): readonly ValidationIssue[] | undefine
 	return issues.length ? Object.freeze(issues) : undefined
 }
 
+function frozen(value: unknown): unknown {
+	if (value !== null && typeof value === 'object') {
+		for (const item of Object.values(value)) frozen(item)
+		Object.freeze(value)
+	}
+	return value
+}
+
+/** The `details` of a 4xx error body: a JSON object, frozen; anything else is ignored. */
+function errorDetails(status: number, value: unknown): unknown {
+	if (status >= 500 || value === null || typeof value !== 'object' || Array.isArray(value)) return undefined
+	return frozen(value)
+}
+
+/**
+ * Tipos de `ClientError.details` por código de error, que la aplicación amplía con
+ * `declare module`. Con un código registrado, `isClientError(error, código)` estrecha
+ * `error.details` a ese tipo (o `undefined`). El servidor no lo comprueba: debe coincidir con los
+ * `details` de los `ApiError` de ese código.
+ *
+ * @since 1.10.0
+ * @example
+ * ```ts
+ * declare module "@meekojs/meeko/framework" {
+ *   interface ClientErrorDetails {
+ *     VERSION_CONFLICT: { readonly actualVersion: number };
+ *     MODULE_DISABLED: { readonly module: string };
+ *   }
+ * }
+ * ```
+ */
+export interface ClientErrorDetails {}
+
+type DetailsOf<Code extends string> = Code extends keyof ClientErrorDetails ? ClientErrorDetails[Code] : unknown
+
 /**
  * Error que lanzan los clientes de API y RPC ante una respuesta no correcta. `message` es el
  * código. Una respuesta de error sin `code` usa `HTTP_ERROR`, y una respuesta correcta que no es
@@ -340,6 +375,17 @@ function validationIssues(value: unknown): readonly ValidationIssue[] | undefine
  *   for (const issue of error.issues) fieldErrors.set(issue.path, issue.message);
  * }
  * ```
+ * Los datos públicos de un `ApiError` con `details` (desde `1.10`):
+ * ```ts
+ * import { isClientError } from "@meekojs/meeko/framework";
+ *
+ * try {
+ *   await rpc.visits.update({ id, version, items });
+ * } catch (error) {
+ *   if (!isClientError(error, "VERSION_CONFLICT")) throw error;
+ *   const actual = (error.details as { actualVersion?: number } | undefined)?.actualVersion;
+ * }
+ * ```
  */
 export class ClientError extends Error {
 	/**
@@ -348,12 +394,16 @@ export class ClientError extends Error {
 	 * @param requestId ID de la petición (`x-request-id`), si el servidor lo envió.
 	 * @param issues Mensajes del schema de una entrada no válida (desde `1.2`), o `undefined` si la
 	 * respuesta no los trae.
+	 * @param details Datos públicos de un `ApiError` `4xx` con `details` (desde `1.10`), congelados, o
+	 * `undefined` si la respuesta no los trae. Su tipo es `unknown`: `isClientError(error, código)`
+	 * lo estrecha con {@link ClientErrorDetails}.
 	 */
 	constructor(
 		public readonly code: string,
 		public readonly status: number,
 		public readonly requestId?: string,
 		public readonly issues?: readonly ValidationIssue[],
+		public readonly details?: unknown,
 	) {
 		super(code)
 		this.name = 'ClientError'
@@ -368,6 +418,9 @@ Object.defineProperty(ClientError.prototype, clientErrorBrand, { value: true })
  * Comprueba si `error` es un {@link ClientError} y, con `code`, si tiene ese código. Sirve en los
  * observadores de errores, que reciben `unknown`, y reconoce también el `ClientError` de otra copia
  * de Meeko en la misma página, donde `instanceof` falla.
+ *
+ * Desde `1.10`, con un código registrado en {@link ClientErrorDetails}, estrecha también
+ * `error.details` a su tipo o `undefined`.
  *
  * @param error Valor que se comprueba, como el `error` de `onError`.
  * @param code Código esperado, como `UNAUTHENTICATED` o `NOT_FOUND`; sin él, cualquier código.
@@ -387,7 +440,7 @@ Object.defineProperty(ClientError.prototype, clientErrorBrand, { value: true })
  * });
  * ```
  */
-export function isClientError<const Code extends string = string>(error: unknown, code?: Code): error is ClientError & { readonly code: Code } {
+export function isClientError<const Code extends string = string>(error: unknown, code?: Code): error is ClientError & { readonly code: Code; readonly details?: DetailsOf<Code> } {
 	if (!(error instanceof ClientError) && !(typeof error === 'object' && error !== null && (error as { [clientErrorBrand]?: unknown })[clientErrorBrand] === true)) return false
 	return code === undefined || (error as ClientError).code === code
 }
@@ -458,7 +511,7 @@ async function responseValue(response: Response, contentType: 'json' | 'response
 		const record = payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : {}
 		const code = typeof record.code === 'string' ? record.code : 'HTTP_ERROR'
 		const requestId = typeof record.requestId === 'string' ? record.requestId : (response.headers.get('x-request-id') ?? undefined)
-		throw new ClientError(code, response.status, requestId, validationIssues(record.issues))
+		throw new ClientError(code, response.status, requestId, validationIssues(record.issues), errorDetails(response.status, record.details))
 	}
 	// A successful write refreshes the mounted data that depends on its keys before it resolves.
 	const invalidated = applyInvalidation(response.headers.get(INVALIDATE_HEADER))

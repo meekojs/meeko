@@ -1,5 +1,5 @@
 ---
-source-hash: 8616f075e0096822087fb75238824c77ff9b35c808a6bd1b4364abc2d7c89f2c
+source-hash: 3f12a29d2993408139998342314130b5bb7e6491e0ea4ba52bf4b1d9215fe2f3
 ---
 
 # Meeko as a full-stack framework
@@ -186,6 +186,8 @@ These links preserve published anchors and point to their new sections:
 <a id="form-validation-errors"></a>[Form validation errors](framework-api.md#form-validation-errors)
 
 <a id="field-errors-apierror-with-issues"></a>[Field errors: ApiError with issues](framework-api.md#field-errors-apierror-with-issues)
+
+<a id="public-error-data-apierror-with-details"></a>[Public error data: ApiError with details](framework-api.md#public-error-data-apierror-with-details)
 
 <a id="per-request-values-locals"></a>[Per-request values: locals](framework-api.md#per-request-values-locals)
 

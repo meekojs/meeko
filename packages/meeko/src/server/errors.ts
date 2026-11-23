@@ -1,4 +1,4 @@
-/** Marks the ApiErrors of every copy of Meeko: only theirs carry public `issues` through {@link normalizeServerError}. */
+/** Marks the ApiErrors of every copy of Meeko: only theirs carry public `issues` and `details` through {@link normalizeServerError}. */
 const apiErrorMark = Symbol.for('meeko.apiError')
 
 /**
@@ -11,6 +11,10 @@ const apiErrorMark = Symbol.for('meeko.apiError')
  * viajan en la respuesta de API y RPC (como mucho 20, y sólo con un estado `4xx`). En el cliente
  * llegan en `ClientError.issues`, y `useForm` los lleva a cada campo. `message` sigue siendo
  * interno.
+ *
+ * Desde `1.10`, `{ details }` añade datos públicos estructurados (un objeto JSON) para que el
+ * cliente reaccione al error, como la versión actual de un conflicto. Sólo viajan con un estado
+ * `4xx` y llegan en `ClientError.details`.
  *
  * @example
  * ```ts
@@ -33,6 +37,12 @@ const apiErrorMark = Symbol.for('meeko.apiError')
  *   throw new ApiError("EMAIL_TAKEN", 409, { issues: [{ path: "email", message: "Ese correo ya tiene una cuenta." }] });
  * }
  * ```
+ * Datos públicos para que el cliente reaccione, desde `1.10`:
+ * ```ts
+ * if (visit.version !== input.version) {
+ *   throw new ApiError("VERSION_CONFLICT", 409, { message: `visit ${visit.id} is stale`, details: { actualVersion: visit.version } });
+ * }
+ * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#api-y-rpc
  */
 export class ApiError extends Error {
@@ -43,11 +53,20 @@ export class ApiError extends Error {
 	declare public readonly issues?: readonly ApiErrorIssue[]
 
 	/**
+	 * Datos públicos (desde `1.10`), una copia congelada de los de las opciones, o `undefined`. Se
+	 * envían con un estado `4xx`.
+	 * @since 1.10.0
+	 */
+	declare public readonly details?: ApiErrorDetails
+
+	/**
 	 * @param code Código público, como `USER_NOT_FOUND`.
 	 * @param status Estado HTTP entre 400 y 599.
 	 * @param message Mensaje interno; no se envía al cliente. Por defecto, el código. Desde `1.5`,
-	 * también `{ message, issues }`, con los mensajes públicos por campo.
-	 * @throws {TypeError} Si un issue no tiene `path` y `message` de texto.
+	 * también `{ message, issues }`, con los mensajes públicos por campo, y desde `1.10`, `details`,
+	 * con los datos públicos.
+	 * @throws {TypeError} Si un issue no tiene `path` y `message` de texto, o si `details` no es un
+	 * objeto JSON.
 	 */
 	constructor(
 		public readonly code: string,
@@ -59,6 +78,7 @@ export class ApiError extends Error {
 		this.name = 'ApiError'
 		Object.defineProperty(this, apiErrorMark, { value: true })
 		if (options.issues !== undefined) this.issues = checkedIssues(options.issues)
+		if (options.details !== undefined) this.details = checkedDetails(options.details)
 	}
 }
 
@@ -97,6 +117,53 @@ export interface ApiErrorOptions {
 	readonly message?: string
 	/** Mensajes públicos por campo, que el cliente recibe en `ClientError.issues`. */
 	readonly issues?: readonly ApiErrorIssue[]
+	/**
+	 * Datos públicos que el cliente recibe en `ClientError.details` (desde `1.10`). Sólo viajan con
+	 * un estado `4xx`.
+	 * @since 1.10.0
+	 */
+	readonly details?: ApiErrorDetails
+}
+
+type ApiErrorJson = string | number | boolean | null | readonly ApiErrorJson[] | { readonly [key: string]: ApiErrorJson }
+
+/**
+ * Datos públicos de un {@link ApiError}: un objeto JSON (textos, números finitos, booleanos,
+ * `null`, arrays y objetos simples) que la respuesta `4xx` envía tal cual en `details`. Todo lo que
+ * contiene llega al navegador: nunca incluya datos privados.
+ *
+ * @since 1.10.0
+ * @example
+ * ```ts
+ * import { ApiError } from "@meekojs/meeko/server";
+ * import type { ApiErrorDetails } from "@meekojs/meeko/server";
+ * const details: ApiErrorDetails = { module: "discounts" };
+ * throw new ApiError("MODULE_DISABLED", 403, { details });
+ * ```
+ */
+export type ApiErrorDetails = { readonly [key: string]: ApiErrorJson }
+
+/** Nesting limit of `details`, which also stops a cyclic value. */
+const maxDetailsDepth = 32
+
+function detailsValue(value: unknown, depth: number): ApiErrorJson {
+	if (value === null || typeof value === 'string' || typeof value === 'boolean') return value
+	if (typeof value === 'number' && Number.isFinite(value)) return value
+	if (typeof value === 'object' && depth < maxDetailsDepth) {
+		if (Array.isArray(value)) return Object.freeze(value.map((item: unknown) => detailsValue(item, depth + 1)))
+		const prototype = Object.getPrototypeOf(value) as unknown
+		if (prototype === Object.prototype || prototype === null) {
+			// fromEntries defines own properties, so a `__proto__` key stays data.
+			return Object.freeze(Object.fromEntries(Object.entries(value).map(([key, item]) => [key, detailsValue(item, depth + 1)])))
+		}
+	}
+	throw new TypeError('ApiError details must be a plain JSON object: strings, finite numbers, booleans, null, arrays and plain objects')
+}
+
+/** A frozen copy of `details`, which must be a plain JSON object; anything else is a `TypeError`. */
+function checkedDetails(details: unknown): ApiErrorDetails {
+	if (details === null || typeof details !== 'object' || Array.isArray(details)) throw new TypeError('ApiError details must be a plain JSON object')
+	return detailsValue(details, 0) as ApiErrorDetails
 }
 
 function checkedIssues(issues: unknown): readonly ApiErrorIssue[] {
@@ -114,6 +181,11 @@ function checkedIssues(issues: unknown): readonly ApiErrorIssue[] {
 export function sentIssues(error: ApiError): readonly ApiErrorIssue[] | undefined {
 	if (error.status >= 500 || !error.issues?.length) return undefined
 	return error.issues.slice(0, maxPublicIssues)
+}
+
+/** The details of an `ApiError` that reach the client: only with a 4xx status. */
+export function sentDetails(error: ApiError): ApiErrorDetails | undefined {
+	return error.status < 500 ? error.details : undefined
 }
 
 /**
@@ -173,6 +245,15 @@ export function publicIssues(issues: readonly unknown[]): { path: string; messag
 	return result
 }
 
+/** A malformed public field of another copy's ApiError is dropped; the error is kept. */
+function checkedOrUndefined<T>(check: (value: unknown) => T, value: unknown): T | undefined {
+	try {
+		return check(value)
+	} catch {
+		return undefined
+	}
+}
+
 /** Preserve public errors loaded through separate Vite module graphs; hide all others. */
 export function normalizeServerError(error: unknown): ApiError {
 	if (error instanceof SessionSecurityError) return new ApiError(error.code, 403)
@@ -184,16 +265,13 @@ export function normalizeServerError(error: unknown): ApiError {
 		const candidate = error as Error & { code?: unknown; status?: unknown }
 		if (typeof candidate.code === 'string' && candidate.code.length > 0 && typeof candidate.status === 'number' && Number.isInteger(candidate.status) && candidate.status >= 400 && candidate.status <= 599) {
 			if (error instanceof ApiError) return error
-			// An ApiError of another module graph keeps its public issues, checked again here. Another
-			// error with its name (an SDK's, or a service's issues) keeps only its code and status.
+			// An ApiError of another module graph keeps its public issues and details, checked again
+			// here. Another error with its name (an SDK's, or a service's) keeps only its code and status.
 			const own = (candidate as unknown as Record<symbol, unknown>)[apiErrorMark] === true
-			let issues: readonly ApiErrorIssue[] | undefined
-			try {
-				issues = !own || (candidate as { issues?: unknown }).issues === undefined ? undefined : checkedIssues((candidate as { issues?: unknown }).issues)
-			} catch {
-				issues = undefined
-			}
-			return new ApiError(candidate.code, candidate.status, issues ? { issues } : candidate.code)
+			const fields = candidate as { issues?: unknown; details?: unknown }
+			const issues = own && fields.issues !== undefined ? checkedOrUndefined(checkedIssues, fields.issues) : undefined
+			const details = own && fields.details !== undefined ? checkedOrUndefined(checkedDetails, fields.details) : undefined
+			return new ApiError(candidate.code, candidate.status, { ...(issues ? { issues } : {}), ...(details ? { details } : {}) })
 		}
 	}
 	return new ApiError('INTERNAL_ERROR', 500)

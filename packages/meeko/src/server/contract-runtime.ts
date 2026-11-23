@@ -3,7 +3,7 @@ import type { RequestContext } from './runtime/request-context'
 import type { Output, Schema } from './schema'
 
 import { serializeJson } from '../core/server'
-import { ApiError, InvalidInputError, normalizeServerError, publicIssues, sentIssues } from './errors'
+import { ApiError, InvalidInputError, normalizeServerError, publicIssues, sentDetails, sentIssues } from './errors'
 import { setInvalidationHeader } from './invalidation'
 import { countRateLimit, rateLimitKey, rateLimitSettings, rateLimitSubject, retryAfterSeconds } from './runtime/rate-limit'
 import { applyResponseState, sessionOf } from './runtime/request-context'
@@ -132,7 +132,8 @@ export async function guard<S>(definition: Guarded<S>, context: RequestContext<S
  * `INTERNAL_ERROR`/`500`, sin su mensaje. Desde `1.2`, la entrada que no supera su schema
  * (`INVALID_PARAMS`, `INVALID_QUERY`, `INVALID_BODY`, `INVALID_INPUT`) añade
  * `issues: [{ path, message }]`, con como mucho 20 mensajes del schema, y `429 RATE_LIMITED`
- * lleva `Retry-After` con los segundos que faltan.
+ * lleva `Retry-After` con los segundos que faltan. Desde `1.10`, un `ApiError` `4xx` con `details`
+ * los añade en `details`.
  *
  * @param error Error capturado.
  * @param requestId ID de la petición.
@@ -148,9 +149,10 @@ export async function guard<S>(definition: Guarded<S>, context: RequestContext<S
 export function errorResponse(error: unknown, requestId: string): Response {
 	const known = normalizeServerError(error)
 	const issues = sentIssues(known)
+	const details = sentDetails(known)
 	const headers: Record<string, string> = { 'content-type': 'application/json; charset=utf-8', 'x-request-id': requestId }
 	if (known instanceof RateLimitedError) headers['retry-after'] = String(known.retryAfter)
-	return new Response(serializeJson({ code: known.code, status: known.status, requestId, ...(issues ? { issues } : {}) }), { status: known.status, headers })
+	return new Response(serializeJson({ code: known.code, status: known.status, requestId, ...(issues ? { issues } : {}), ...(details ? { details } : {}) }), { status: known.status, headers })
 }
 
 export function finish(response: Response, context: RequestContext): Response {

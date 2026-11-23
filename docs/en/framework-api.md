@@ -182,6 +182,53 @@ throw new ApiError('EMAIL_TAKEN', 409, {
 - An `ApiError` from another module graph (Vite) retains its `issues` during normalization. Another error with the same shape, such as an SDK's `ApiError` or a `ClientError` from another Meeko service that the handler lets escape, does not send its `issues`: Meeko only forwards those of its own `ApiError`.
 - On the client they arrive in `ClientError.issues`, and `useForm` distributes them like those of a `400`.
 
+### Public error data: `ApiError` with `details`
+
+Since `1.10`, a `4xx` error can carry structured data so the client can react, such as the current version in an optimistic concurrency conflict or the disabled module. It is sent only if the error declares it in `details`, separate from the internal `message`:
+
+```ts
+if (visit.version !== input.version) {
+	throw new ApiError('VERSION_CONFLICT', 409, {
+		message: `visit ${visit.id} is stale`, // internal: never sent
+		details: { actualVersion: visit.version },
+	})
+}
+```
+
+```json
+{ "code": "VERSION_CONFLICT", "status": 409, "requestId": "…", "details": { "actualVersion": 8 } }
+```
+
+- `details` is a JSON object: strings, finite numbers, booleans, `null`, arrays and plain objects, nested at most 32 levels. Anything else (a `Date`, a `Map`, a class instance, `undefined`, `NaN`, a cycle or an array as the root) throws a `TypeError` when creating the error. `ApiError` keeps a frozen copy, so changing the original object afterwards does not change the response.
+- It is only sent with a `4xx` status, in API and RPC responses, including local SSR dispatch. A `5xx` and any error that is not an `ApiError` respond without it. It can be combined with `issues`.
+- Everything in it reaches the browser: do not put private data or the original error there.
+- Like `issues`, an `ApiError` from another module graph (Vite) retains its `details`; another error with the same shape does not send them.
+- On the client it arrives in `ClientError.details` (frozen, typed `unknown`), from `api.*`, `rpc.*` and the `error` of `useApi`, `useRpcQuery`, `useApiMutation`, `useRpcMutation` and `useForm` (in `failure`). The client ignores it on a `5xx`. The `303` of a form without JavaScript does not carry it.
+
+To type it, extend `ClientErrorDetails` with one type per code; `isClientError(error, code)` then narrows `error.details`:
+
+```ts
+// app/types/errors.d.ts
+declare module '@meekojs/meeko/framework' {
+	interface ClientErrorDetails {
+		VERSION_CONFLICT: { readonly actualVersion: number }
+		MODULE_DISABLED: { readonly module: string }
+	}
+}
+export {}
+```
+
+```ts
+try {
+	await rpc.visits.update({ id, version, items })
+} catch (error) {
+	if (!isClientError(error, 'VERSION_CONFLICT')) throw error
+	version = error.details?.actualVersion ?? version // number | undefined
+}
+```
+
+The registry is a client-side promise: the server does not check it, so `details` remains optional in the narrowed type.
+
 ### Per-request values: `locals`
 
 Since `1.2`, `defineApiRoute` and `defineRpc` accept `locals(context)`, which computes a per-request value (for example, the current user) and passes it to the handler as `locals`, with the type inferred from its return value. Without `locals`, the handler receives `locals: undefined`. `authorize` is unchanged and still returns a boolean.

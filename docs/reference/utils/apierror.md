@@ -2,9 +2,11 @@
 title: ApiError
 group: utils
 since: 1.0.0
-description: Error público de API, RPC, Socket y loaders, que llega al cliente con su código, su estado y, desde 1.5, mensajes por campo.
+description: Error público de API, RPC, Socket y loaders, que llega al cliente con su código, su estado y, desde 1.5, mensajes por campo y, desde 1.10, datos públicos.
 symbols:
   - "@meekojs/meeko/server#ApiError"
+types:
+  - "@meekojs/meeko/server#ApiErrorDetails"
 related:
   - "@meekojs/meeko/framework#ClientError"
   - "@meekojs/meeko/framework#isClientError"
@@ -12,12 +14,13 @@ related:
   - "@meekojs/meeko/server#defineRpc"
   - "@meekojs/meeko/framework#useForm"
   - docs/framework.md#errores-de-un-campo-apierror-con-issues
+  - docs/framework.md#datos-públicos-de-un-error-apierror-con-details
   - docs/framework.md#errores
 ---
 
 `new ApiError(code, status, mensaje?)` es el error que el servidor **puede contar** al cliente. Lanzado desde un endpoint, un procedimiento RPC, un canal Socket, un loader o un `defer`, la respuesta lleva su `code` y su `status`, más el `requestId` de la petición. Cualquier otro error se responde como `INTERNAL_ERROR`/`500` sin exponer su mensaje.
 
-Desde `1.5`, el tercer argumento también acepta `{ message, issues }`: `issues` son mensajes públicos por campo, con la forma de los de un `400` de validación, que `useForm` muestra junto a cada campo. `message` siempre es interno.
+Desde `1.5`, el tercer argumento también acepta `{ message, issues }`: `issues` son mensajes públicos por campo, con la forma de los de un `400` de validación, que `useForm` muestra junto a cada campo. Desde `1.10`, `details` añade datos públicos estructurados (un objeto JSON) para que el cliente reaccione al error. `message` siempre es interno.
 
 Se autoimporta en el código de servidor.
 
@@ -45,22 +48,23 @@ La respuesta es `404` con `{ "code": "USER_NOT_FOUND", "status": 404, "requestId
 
 ## Parámetros
 
-| Parámetro | Tipo                               | Por defecto | Descripción                                                                                                           |
-| --------- | ---------------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------- |
-| `code`    | `string`                           | obligatorio | Código público, estable, que el cliente puede comparar: `"NOT_FOUND"`, `"EMAIL_TAKEN"`.                               |
-| `status`  | `number`                           | obligatorio | Estado HTTP de la respuesta, normalmente un `4xx`.                                                                    |
-| `message` | `string` o `{ message?, issues? }` | `code`      | El mensaje interno, que nunca se envía. Desde `1.5`, `issues: [{ path, message }]` añade mensajes públicos por campo. |
+| Parámetro | Tipo                                         | Por defecto | Descripción                                                                                                                                                                          |
+| --------- | -------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `code`    | `string`                                     | obligatorio | Código público, estable, que el cliente puede comparar: `"NOT_FOUND"`, `"EMAIL_TAKEN"`.                                                                                              |
+| `status`  | `number`                                     | obligatorio | Estado HTTP de la respuesta, normalmente un `4xx`.                                                                                                                                   |
+| `message` | `string` o `{ message?, issues?, details? }` | `code`      | El mensaje interno, que nunca se envía. Desde `1.5`, `issues: [{ path, message }]` añade mensajes públicos por campo, y desde `1.10`, `details` (`ApiErrorDetails`), datos públicos. |
 
-Cada issue necesita un `path` de texto (las claves unidas con `.`, o `""` para el formulario entero) y un `message` no vacío.
+Cada issue necesita un `path` de texto (las claves unidas con `.`, o `""` para el formulario entero) y un `message` no vacío. `details` es un objeto JSON (textos, números finitos, booleanos, `null`, arrays y objetos simples, como mucho 32 niveles); cualquier otro valor lanza un `TypeError`, y el error guarda una copia congelada.
 
 ## Valor devuelto
 
-Una instancia de `Error` con `name: "ApiError"`, `code`, `status`, `message` e `issues`. Lo que llega al cliente:
+Una instancia de `Error` con `name: "ApiError"`, `code`, `status`, `message`, `issues` y `details`. Lo que llega al cliente:
 
 | Campo            | Viaja                    | Notas                                         |
 | ---------------- | ------------------------ | --------------------------------------------- |
 | `code`, `status` | Sí                       | Más `requestId` y la cabecera `x-request-id`. |
 | `issues`         | Sólo con un estado `4xx` | Como mucho 20.                                |
+| `details`        | Sólo con un estado `4xx` | Desde `1.10`; en `ClientError.details`.       |
 | `message`        | Nunca                    | Úsalo para los registros del servidor.        |
 
 ## Ejemplos
@@ -91,6 +95,31 @@ export default defineApiRoute({
 ```
 
 En el cliente, `form.errors.value.email` de `useForm` es «Ese correo ya tiene una cuenta.».
+
+### Datos para que el cliente reaccione
+
+Desde `1.10`, un conflicto de concurrencia optimista envía la versión actual para que el cliente recargue o reintente:
+
+<!-- no-check -->
+
+```ts
+// server/rpc/visits/update.ts
+import { ApiError, defineRpc } from "@meekojs/meeko/server";
+
+export default defineRpc({
+  input: visitUpdate,
+  output: visitSchema,
+  handler: async ({ input }) => {
+    const visit = await visits.find(input.id);
+    if (visit.version !== input.version) {
+      throw new ApiError("VERSION_CONFLICT", 409, { message: `visit ${visit.id} is stale`, details: { actualVersion: visit.version } });
+    }
+    return visits.update(visit, input);
+  },
+});
+```
+
+La respuesta es `409` con `{ "code": "VERSION_CONFLICT", …, "details": { "actualVersion": 8 } }`, y `isClientError(error, "VERSION_CONFLICT")` da acceso a `error.details` (véase [`isClientError`](/docs/reference/isclienterror)).
 
 ### Un `404` desde un loader
 
@@ -141,6 +170,20 @@ throw new ApiError(`USER_${user.email}_LOCKED`, 403);
 throw new ApiError("ACCOUNT_LOCKED", 403, { message: `locked: ${user.email}` });
 ```
 
+### Pasar a `details` un objeto que no es JSON
+
+```ts bad
+throw new ApiError("BOOKING_TAKEN", 409, { details: { until: new Date() } });
+```
+
+`meeko check` da un `TS2322` en `until`. Sin tipos, crear el error lanza `TypeError: ApiError details must be a plain JSON object: …`. Convierta la fecha a texto, y no pase nunca a `details` el error original ni una fila completa de la base de datos: todo lo que contiene llega al navegador.
+
+<!-- no-check -->
+
+```ts good
+throw new ApiError("BOOKING_TAKEN", 409, { details: { until: booking.until.toISOString() } });
+```
+
 ### Un issue sin `message`
 
 ```ts bad
@@ -172,6 +215,7 @@ throw new ApiError("EMAIL_TAKEN", 409, { issues: [{ path: "email", message: "Ese
 ## Notas
 
 - **Seguridad.** Es la frontera entre lo que el servidor sabe y lo que cuenta. Escribe `issues` pensando en el usuario y deja los detalles en `message`, que nunca sale del servidor.
-- **`4xx` y `5xx`.** Los `issues` sólo viajan con un `4xx`: un `5xx` es un fallo del servidor y responde sin ellos. Las respuestas `4xx` no se registran como fallos internos.
-- **Otras copias.** Un `ApiError` de otro grafo de módulos (Vite) conserva sus `issues`. Un error con la misma forma de otro origen (el `ApiError` de un SDK, un `ClientError` de otro servicio) no envía sus `issues`.
+- **`4xx` y `5xx`.** Los `issues` y los `details` sólo viajan con un `4xx`: un `5xx` es un fallo del servidor y responde sin ellos. Las respuestas `4xx` no se registran como fallos internos.
+- **Otras copias.** Un `ApiError` de otro grafo de módulos (Vite) conserva sus `issues` y sus `details`. Un error con la misma forma de otro origen (el `ApiError` de un SDK, un `ClientError` de otro servicio) no envía ninguno de los dos.
+- **Formularios sin JavaScript.** El `303` de una ruta con `form` no lleva `details`, sólo el código, el estado y los `issues`.
 - **Dónde no se usa.** En un componente, `ApiError` es `MEEK108`: el navegador recibe los errores como `ClientError`.
