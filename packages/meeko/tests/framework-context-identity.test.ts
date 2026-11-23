@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
-import { type DevModuleGraph, type DevModuleNode, hotFileKey, type HotModuleNode, invalidateDevModules, isModuleScript, keepServerModules, reachesEagerModule } from '../src/framework/dev-watch.ts'
+import { type DevModuleGraph, type DevModuleNode, hotFileKey, type HotModuleNode, invalidateDevModules, isModuleScript, keepServerModules, onServerGraphReset, reachesEagerModule } from '../src/framework/dev-watch.ts'
 import { initFrameworkProject } from '../src/framework/init.ts'
 import { installedModulePackages } from '../src/framework/module-loader.ts'
 import { withSourcePackages } from '../src/framework/project.ts'
@@ -147,6 +147,22 @@ test('a full reload invalidates every server module except what the development 
 	// Registered per graph: a new graph after a restart starts without what the old app kept.
 	invalidateDevModules(server(graph(nodes).graph))
 	assert.equal(mixed, 2)
+})
+
+test('a server graph reset runs the latest listener after every module is invalidated', () => {
+	const calls: string[] = []
+	const graph = {
+		invalidateAll() {
+			calls.push('invalidate')
+		},
+	}
+	onServerGraphReset(graph, () => calls.push('first'))
+	graph.invalidateAll()
+	assert.deepEqual(calls, ['invalidate', 'first'])
+	// A rebuilt app registers again on the same graph: its listener replaces the previous one.
+	onServerGraphReset(graph, () => calls.push('second'))
+	graph.invalidateAll()
+	assert.deepEqual(calls, ['invalidate', 'first', 'invalidate', 'second'])
 })
 
 test('the scripts of a module are the scripts under its folders', () => {
@@ -614,3 +630,40 @@ for (const layout of ['linked', 'installed'] as const) {
 		assert.doesNotMatch(running.logs(), /Missing Meeko context/)
 	})
 }
+
+test('meeko dev keeps the context of a module after Vite invalidates every module for a tsconfig.json', { timeout: 120_000 }, async (context) => {
+	let running: Running | undefined
+	let hot: Awaited<ReturnType<typeof hotMessages>> | undefined
+	const root = await tempProject(context, 'context-tsconfig-dev', () => {
+		hot?.close()
+		return stopChild(running?.child)
+	})
+	await initFrameworkProject(root)
+	await linkMeeko(root)
+	await writeNamedContextModule(root, 'linked')
+	const port = await freePort()
+	const hmrPort = await freePort()
+	running = await cli(root, ['dev'], port, hmrPort)
+	const { logs } = running
+	await waitForPage(port, '/', providedTwice, logs)
+	hot = await hotMessages(hmrPort)
+	const { messages } = hot
+	const reloaded = async (edit: () => Promise<void>): Promise<void> => {
+		messages.length = 0
+		await edit()
+		await until(() => messages.some((message) => message.type === 'full-reload'), `No full reload\n${logs()}`)
+		await waitForPage(port, '/', providedTwice, logs)
+	}
+
+	// Vite invalidates the modules of every environment, the plugin's included, when a tsconfig.json
+	// is added, edited or removed anywhere under the root. The pages evaluated key.js again while the
+	// app kept the plugin that provides the first key: every page failed with "Missing Meeko context"
+	// until meeko dev restarted.
+	const nested = join(root, 'tools', 'tsconfig.json')
+	await mkdir(join(root, 'tools'), { recursive: true })
+	await reloaded(() => writeFile(nested, '{}\n'))
+	const rootConfig = join(root, 'tsconfig.json')
+	await reloaded(async () => writeFile(rootConfig, `${await readFile(rootConfig, 'utf8')}\n`))
+	await reloaded(() => rm(nested))
+	assert.doesNotMatch(logs(), /Missing Meeko context/)
+})

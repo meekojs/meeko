@@ -127,6 +127,29 @@ export function keepServerModules(graph: object, files: ReadonlySet<string>): vo
 	keptServerModules.set(graph, files)
 }
 
+/** Per server module graph, what {@link onServerGraphReset} runs after its `invalidateAll`. */
+const graphResetListeners = new WeakMap<object, () => void>()
+
+/**
+ * Runs `listener` after every `invalidateAll()` of the server module `graph`. Vite invalidates
+ * every module of every environment on its own, without a hot update that reaches the Meeko
+ * plugins: when a `tsconfig.json` is added, edited or removed anywhere under the root, or when the
+ * dependency optimizer reloads. The pages then evaluate again the modules that the development app
+ * keeps ({@link keepServerModules}), and a `createContext` key that a plugin provides would no
+ * longer be the one they read (`Missing Meeko context`), so the app must be built again. The method
+ * is wrapped once per graph; a later call replaces the listener.
+ */
+export function onServerGraphReset(graph: { invalidateAll(): void }, listener: () => void): void {
+	const wrapped = graphResetListeners.has(graph)
+	graphResetListeners.set(graph, listener)
+	if (wrapped) return
+	const invalidateAll = graph.invalidateAll.bind(graph)
+	graph.invalidateAll = () => {
+		invalidateAll()
+		graphResetListeners.get(graph)?.()
+	}
+}
+
 /**
  * Invalidates the modules of a development server before a full reload: every module of the
  * browser, and every server module except the eager files registered with {@link keepServerModules}
