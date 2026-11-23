@@ -4,10 +4,12 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 
 import type { CheckInput } from '../check'
 import type { CompileDiagnostic } from '../compiler/parser/sfc'
+import type { GenerateTypesOptions } from '../types'
 
-import { discoverComponents } from '../autoimports/registry'
+import { discoverAutoImports, discoverComponents } from '../autoimports/registry'
 import { checkSources } from '../check'
 import { MeekoCompileError } from '../compiler/parser/sfc'
+import { onceByRoot } from '../compiler/project-root'
 import { assertRouteBlockPlacement } from '../compiler/transforms/route-block'
 import { componentTypeDeclarationMarker, componentTypesPath, generateTypes } from '../types'
 import { checkAliasScopes, resolveProjectAliases } from './aliases'
@@ -326,7 +328,7 @@ export interface AppTypesOptions {
 	readonly onError?: (filename: string, error: unknown) => void
 }
 
-async function generateAppType(root: string, file: string, options: AppTypesOptions): Promise<string[]> {
+async function generateAppType(root: string, file: string, options: AppTypesOptions & Pick<GenerateTypesOptions, 'autoImports'>): Promise<string[]> {
 	const source = options.read?.(file) ?? (await readFile(file, 'utf8'))
 	try {
 		return await generateTypes(source, file, options)
@@ -364,8 +366,10 @@ export async function generateAppTypeForFile(projectRoot: string, filename: stri
 export async function generateAppTypes(projectRoot: string, options: AppTypesOptions = {}): Promise<string[]> {
 	const root = resolve(projectRoot)
 	const outputs = new Set<string>()
+	// Every component reads the same autoimports, which writing declarations does not change.
+	const shared = { ...options, autoImports: onceByRoot(discoverAutoImports) }
 	for (const file of await appMeekoFiles(root)) {
-		for (const output of await generateAppType(root, file, options)) outputs.add(output)
+		for (const output of await generateAppType(root, file, shared)) outputs.add(output)
 	}
 	const generated = [...outputs].sort()
 	await reconcileOwnedTypes(root, generated)
