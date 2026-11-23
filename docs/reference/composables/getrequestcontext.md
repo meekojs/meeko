@@ -42,9 +42,59 @@ export async function requireUser(): Promise<User> {
 
 Cualquier loader, handler o middleware de ruta puede llamar a `requireUser()` sin recibir ni pasar el `context`.
 
+## Parámetros
+
+`getRequestContext()` no recibe parámetros.
+
 ## Valor devuelto
 
 El `RequestContext` de la petición en curso: el mismo objeto que recibe como `context` la pieza que se está ejecutando. Las llamadas locales a `api.*` y `rpc.*` durante el SSR ven el contexto de esa llamada, que comparte estado, sesión, cookies y `requestId` con el de la página.
+
+## Ejemplos
+
+### Un cliente de base de datos con las cookies del usuario
+
+<!-- no-check -->
+
+```ts
+// server/utils/db.ts
+import { getRequestContext } from "@meekojs/meeko/server";
+
+export function createDb() {
+  const { cookies, services } = getRequestContext();
+  return services.database.forSession(cookies.get("session"));
+}
+```
+
+Cualquier repositorio llama a `createDb()` sin recibir el `context`, y cada petición obtiene el cliente de su propio usuario.
+
+## Errores comunes
+
+### Llamarlo tras la respuesta
+
+Un `setTimeout` o un `waitUntil` sigue ejecutándose cuando la petición ya terminó, y ahí no hay contexto.
+
+<!-- no-check -->
+
+```ts bad
+export async function notify(): Promise<void> {
+  setTimeout(() => {
+    const context = getRequestContext();
+    void context.services.mail.send(context.session);
+  }, 1000);
+}
+```
+
+`getRequestContext()` lanza dentro del temporizador. Lee lo que necesites mientras la petición sigue viva y captura sólo esos datos:
+
+<!-- no-check -->
+
+```ts good
+export async function notify(): Promise<void> {
+  const { services, session } = getRequestContext();
+  setTimeout(() => void services.mail.send(session), 1000);
+}
+```
 
 ## Notas
 

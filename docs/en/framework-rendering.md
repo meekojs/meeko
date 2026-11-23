@@ -1,4 +1,4 @@
-﻿---
+---
 source-hash: ab7cc28e8640a033d9470e894c277da7d32920bdfa2323df57ca045719d97eba
 ---
 
@@ -16,7 +16,7 @@ The explanation is in [Navigation](routing-navigation.md#meekooutlet--and-meekol
 
 ### `<MeekoTeleport>`
 
-Since `1.5`, `<MeekoTeleport to="â€¦">` renders its content elsewhere in the document while keeping it within the component that declares it. You do not import it either. A typical case is a page putting its actions in its layout's toolbar:
+Since `1.5`, `<MeekoTeleport to="…">` renders its content elsewhere in the document while keeping it within the component that declares it. You do not import it either. A typical case is a page putting its actions in its layout's toolbar:
 
 ```html
 <!-- app/layouts/default.meeko -->
@@ -32,7 +32,7 @@ Since `1.5`, `<MeekoTeleport to="â€¦">` renders its content elsewhere in the
 <script lang="ts">
 	const isMobile = signal(false)
 	async function save(): Promise<void> {
-		/* â€¦ */
+		/* … */
 	}
 </script>
 <template>
@@ -42,13 +42,13 @@ Since `1.5`, `<MeekoTeleport to="â€¦">` renders its content elsewhere in the
 	>
 		<AppButton on:click="save">Save</AppButton>
 	</MeekoTeleport>
-	<article>â€¦</article>
+	<article>…</article>
 </template>
 ```
 
 - **Target.** `to="body"` appends the content to `<body>` and `to="#id"` inserts it inside the element with that `id`, after its existing content. Only these two forms are supported: `body`, or `#` followed by a letter and ASCII letters, digits, `-` or `_`. Meeko looks up the `id` with `getElementById` and never interprets `to` as a CSS selector or HTML. A static `to` that does not match this form produces `MEEK114`; `bind:to` accepts an expression of type ``"body" | `#${string}` `` (`MeekoTeleportTarget`), validated at render time. `<MeekoTeleport>` supports `to`, `bind:to`, `disabled`, `bind:disabled`, `if:when` and `each:of`; any other attribute produces `MEEK114`.
 - **Author scope.** The content compiles in the declaring component's template, like the content of an `if:when`: it reads its signals, its events call its functions, it receives its `provide`/`inject` and error handlers, can use its snippets, and retains its `<style scoped>` attribute. It is disposed of with the component: on unmount, on page changes, or when its `if:when` or `each:of` row disappears, its nodes leave the target too.
-- **Initial HTML.** In SSR, `"stream"` and `"prerender"` (including the `static` adapter), the HTML already contains the content at its target, without shifts during hydration: `to="body"` content goes after the application and before Meeko's scripts; `to="#id"` content goes inside that element, whether it renders before or after the teleport. Multiple teleports to the same target retain their order on the page. Hydration finds the content by its markers (`<!--meeko:portal:â€¦-->`) and leaves the DOM unchanged.
+- **Initial HTML.** In SSR, `"stream"` and `"prerender"` (including the `static` adapter), the HTML already contains the content at its target, without shifts during hydration: `to="body"` content goes after the application and before Meeko's scripts; `to="#id"` content goes inside that element, whether it renders before or after the teleport. Multiple teleports to the same target retain their order on the page. Hydration finds the content by its markers (`<!--meeko:portal:…-->`) and leaves the DOM unchanged.
 - **Missing target.** If the page does not render the `#id` element (or it is a void element such as `<input>`), rendering fails with a clear error in development. In production, the content renders in place, where it hydrates, and the server warns once with `console.warn`. In the browser, a missing target leaves content in place with a warning; the next change to `to` or `disabled` looks it up again.
 - **`disabled`.** With `disabled` (or while `bind:disabled` is true), content renders in place. Changing it moves the same nodes between the target and their original position without rerendering, so they retain their state; the focused element loses focus, as with any DOM move.
 - **Browser.** Content rendered by the browser (navigation, an appearing `if:when`, a new row or a deferred child) first renders in place and moves to its target at the end of that mount, before the next paint, appending to the target. The target must live at least as long as the teleport: a layout or `app/app.meeko` element for a page, or an element of the component itself.
@@ -143,9 +143,9 @@ export default defineMeekoConfig({
 	document: {
 		lang: 'es',
 		head: {
-			// â€œShoes Â· My storeâ€ on a titled page; â€œMy storeâ€ on an untitled one.
+			// “Shoes · My store” on a titled page; “My store” on an untitled one.
 			title: 'My store',
-			titleTemplate: '%s Â· My store',
+			titleTemplate: '%s · My store',
 			link: [{ rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' }],
 			// Runs while the browser reads <head>, before painting; hydration does not repeat it.
 			// (For a light/dark theme, use theme: Meeko provides the script, cookie and useTheme().)
@@ -178,7 +178,7 @@ export default defineMeekoConfig({
 </script>
 ```
 
-`HeadInput` supports `title`, `titleTemplate` (`"%s Â· Sitio"` or `(title) => string`; in `document.head`, `meeko.addHead` and route `head`, only the string), `meta`, `link`, `script` (external with `src` or inline with `children`; `async`, `defer`, `module` and `type`), `style` (with `children` and `media`), `htmlAttrs` and `bodyAttrs` (`lang`, `dir`, `class`, `data-*`; an `undefined` value contributes nothing and `on*` attributes are rejected).
+`HeadInput` supports `title`, `titleTemplate` (`"%s · Sitio"` or `(title) => string`; in `document.head`, `meeko.addHead` and route `head`, only the string), `meta`, `link`, `script` (external with `src` or inline with `children`; `async`, `defer`, `module` and `type`), `style` (with `children` and `media`), `htmlAttrs` and `bodyAttrs` (`lang`, `dir`, `class`, `data-*`; an `undefined` value contributes nothing and `on*` attributes are rejected).
 
 **Priority.** Lowest to highest: configuration `document`, `app/app.meeko`, each layout (innermost wins), the page with its components and, finally, route `head` (`export const head`, `route.head` or `useHead` in `<script server>`). Within a level, the later call wins, so a page component mounting later (after an `if:`, for example) replaces what the page set. `<html>` and `<body>` attributes merge by name with the same priority.
 
@@ -186,13 +186,13 @@ export default defineMeekoConfig({
 
 | Page title | `<title>`           |
 | ---------- | ------------------- |
-| `"Shoes"`  | `Shoes Â· My store` |
+| `"Shoes"`  | `Shoes · My store` |
 | none       | `My store`          |
 | `""`       | `My store`          |
 
 **Deduplication.** Each tag has a key: `key` if declared, otherwise its natural key. For `meta`, `name` (case-insensitive), `property` or `httpEquiv`, together with its `media` if present (two `theme-color` tags for light and dark coexist); for `link`, `rel` and `href`, except `rel: "canonical"` and `rel: "icon"`, which are unique even if `href` changes; for `script`, `src` or the code; for `style`, the CSS. With the same key, only the highest-priority tag remains, in the position where the first appeared. Thus a `document` `icon` replaces the `<link rel="icon" href="data:,">` Meeko writes by default, and a `meta name="viewport"` replaces the default viewport.
 
-**SSR and CSP.** The server writes `<html lang="â€¦">` and attributes as real, escaped attributes. Inside `<head>`, after the CSRF meta tag and component styles, the title and managed tags go between `<!--meeko:head-->` and `<!--/meeko:head-->` comments, before trusted host HTML (`DocumentOptions.head`, which keeps its own `<title>` as the default title). Attribute values are escaped; inline `script` and `style` content is not escaped but cannot close its tag: `</` is written `<\/` (and `<!--` as `<\!--` in a script), and in JSON scripts (`application/ld+json`, `application/json`, `importmap`, `speculationrules`) each `<` is written `\u003c`. The request's CSP nonce (`DocumentOptions.nonce`) is added to managed `<script>` and `<style>` tags. A prerendered page keeps the head and receives the CSRF meta tag just after `<meta charset>` and default tags the application did not replace.
+**SSR and CSP.** The server writes `<html lang="…">` and attributes as real, escaped attributes. Inside `<head>`, after the CSRF meta tag and component styles, the title and managed tags go between `<!--meeko:head-->` and `<!--/meeko:head-->` comments, before trusted host HTML (`DocumentOptions.head`, which keeps its own `<title>` as the default title). Attribute values are escaped; inline `script` and `style` content is not escaped but cannot close its tag: `</` is written `<\/` (and `<!--` as `<\!--` in a script), and in JSON scripts (`application/ld+json`, `application/json`, `importmap`, `speculationrules`) each `<` is written `\u003c`. The request's CSP nonce (`DocumentOptions.nonce`) is added to managed `<script>` and `<style>` tags. A prerendered page keeps the head and receives the CSRF meta tag just after `<meta charset>` and default tags the application did not replace.
 
 **Browser.** On hydration, Meeko adopts SSR tags without duplicating them or rerunning scripts. When a `useHead` getter or signal changes, it updates title, attributes and tags. On navigation, unmounted components' entries disappear and what they replaced returns (for example, the layout's `canonical` or `app/app.meeko`'s `description`); going back restores the page's entries. New tags are inserted before `<!--/meeko:head-->` with the document's CSP nonce; a changed script is a new element, which the browser executes. Route `head` travels in the navigation payload, just like `title` and `description` in `1.1`. Outside a Meeko application (for example, in a unit test with `renderToString`), `useHead` does nothing. A custom host passing `DocumentOptions.config` to `createFrameworkHandler` must pass the same value to `mountClientApp({ document })`; Meeko's generated entry point already does this.
 
@@ -208,7 +208,7 @@ import { defineMeekoConfig } from '@meekojs/meeko/framework'
 
 export default defineMeekoConfig({
 	site: 'https://example.com',
-	document: { seo: true, head: { titleTemplate: '%s Â· Mi sitio' } },
+	document: { seo: true, head: { titleTemplate: '%s · Mi sitio' } },
 })
 ```
 
@@ -363,7 +363,7 @@ The shortest approach is [`<MeekoThemeToggle>`](#meekothemetoggle), which alread
 </template>
 ```
 
-<a id="data-theme-choice"></a>**`data-theme-choice`.** Since `1.4`, `<html>` also carries the choice, including `"system"`: `data-theme-choice="system"` while `data-theme` gives the effective theme (`dark`). The `<head>` script always writes it before the first paint, as does the server when it knows it from the cookie; the runtime updates it on each change. It is useful for your own CSS, whether or not you use `<MeekoThemeToggle>`: a â€œsystemâ€ icon that does not shift, or a selector's checked radio.
+<a id="data-theme-choice"></a>**`data-theme-choice`.** Since `1.4`, `<html>` also carries the choice, including `"system"`: `data-theme-choice="system"` while `data-theme` gives the effective theme (`dark`). The `<head>` script always writes it before the first paint, as does the server when it knows it from the cookie; the runtime updates it on each change. It is useful for your own CSS, whether or not you use `<MeekoThemeToggle>`: a “system” icon that does not shift, or a selector's checked radio.
 
 ```css
 .theme-toggle .icon {
@@ -387,7 +387,7 @@ Since `1.8`, `useThemeToggle()` from `@meekojs/meeko/framework` is the public AP
 | `theme`       | The same `ThemeState` as `useTheme()`: `theme`, `resolved`, `themes` and `set(choice)`.                                                                                                                                                                  |
 | `choices`     | List of configured choices, in order, including `"system"` if enabled. Read-only.                                                                                                                                                                        |
 | `system`      | `ThemeToggleSystem`: `{ light, dark }`, the theme names for `"system"`; `undefined` without system mode.                                                                                                                                                 |
-| `known`       | `ReadonlySignal<boolean>`: the server knows the choice if it received the cookie; in the browser, becomes `true` when hydration finishes. While `false`, use a neutral accessible name, such as â€œChange themeâ€, without announcing an unknown choice. |
+| `known`       | `ReadonlySignal<boolean>`: the server knows the choice if it received the cookie; in the browser, becomes `true` when hydration finishes. While `false`, use a neutral accessible name, such as “Change theme”, without announcing an unknown choice. |
 | `interactive` | `ReadonlySignal<boolean>`: `false` during SSR and hydration; `true` when browser handlers are ready. Use the native form while it is `false`.                                                                                                            |
 
 The form sends `POST /_meeko/theme` with `theme` (the valid choice) and `return` (the current URL). The endpoint validates the theme and `Origin`, saves the cookie and returns `303` to a same-origin path. The `static` adapter has no endpoint: changing the theme requires JavaScript. This example uses native submit buttons, each with its own accessible name, without implementing a radio group:
@@ -453,15 +453,15 @@ Since `1.4`, with `theme` in `meeko.config.ts`, Meeko includes its own theme sel
 | ------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `mode`        | `"cycle"`                             | `"cycle"`: a button advancing to the next choice in the list. `"select"`: a radio group.                                                                                  |
 | `themes`      | the themes and `"system"`             | Choices and their order (`bind:themes="['light', 'dark']"`).                                                                                                              |
-| `labels`      | â€œClaroâ€, â€œOscuroâ€, â€œSistemaâ€ | Each choice's name; an unlabeled custom theme uses its theme name.                                                                                                        |
-| `messages`    | in Spanish                            | Accessible text: `cycle(current, next)` (the button's `aria-label`), `unknown` (â€œCambiar temaâ€) and `group` (â€œTemaâ€), for localization. Type `ThemeToggleMessages`. |
-| `class`, `id` | â€”                                   | On the root `<form>`. Other attributes do not pass through: wrap the tag if you need them.                                                                                |
+| `labels`      | “Claro”, “Oscuro”, “Sistema” | Each choice's name; an unlabeled custom theme uses its theme name.                                                                                                        |
+| `messages`    | in Spanish                            | Accessible text: `cycle(current, next)` (the button's `aria-label`), `unknown` (“Cambiar tema”) and `group` (“Tema”), for localization. Type `ThemeToggleMessages`. |
+| `class`, `id` | —                                   | On the root `<form>`. Other attributes do not pass through: wrap the tag if you need them.                                                                                |
 
 Each snippet (`light`, `dark`, `system` or a custom theme name) is that choice's icon; without a snippet, its label renders. `meeko check` and the editor type snippets, `themes` and `labels` with the themes from `meeko.config.ts` (`system` only if enabled) and `mode` as `"cycle" | "select"`; the editor completes the tag, its props and snippets, and hovering shows the tag's reference entry. Its prop type is `MeekoThemeToggleProps`, auto-imported like `MeekoLinkProps`. It has no visual styles of its own: the button and radios are native elements styled by the application (`.toggle button`, `[role="radio"][aria-checked="true"]`, `[data-meeko-theme-option="dark"]`). To mark the selected radio before hydration too, when the choice is unknown and there is no `aria-checked`, use `data-theme-choice`, like the icons: `[data-theme-choice="dark"] [data-meeko-theme-option="dark"]`.
 
-**Icons that never shift.** The component renders all icons, each in `<span data-meeko-theme-icon="light|dark|system|â€¦">`, without selecting any: with `theme` enabled, Meeko adds a minimal CSS rule to `<head>`, only `display: none`, hiding all except the one for `data-theme-choice`. Since the `<head>` script writes that attribute before the first paint, the icon is correct from the first frame in every case (with a cookie, in `"system"` without a cookie or client hint, on a prerendered page or in `static`), without JavaScript in the component, and hydration changes no component nodes. A list without `system` (`bind:themes="['light', 'dark']"`) shows the effective theme's icon in system mode, according to `prefers-color-scheme`, like the script. In `mode="select"`, each radio has its icon and all are visible.
+**Icons that never shift.** The component renders all icons, each in `<span data-meeko-theme-icon="light|dark|system|…">`, without selecting any: with `theme` enabled, Meeko adds a minimal CSS rule to `<head>`, only `display: none`, hiding all except the one for `data-theme-choice`. Since the `<head>` script writes that attribute before the first paint, the icon is correct from the first frame in every case (with a cookie, in `"system"` without a cookie or client hint, on a prerendered page or in `static`), without JavaScript in the component, and hydration changes no component nodes. A list without `system` (`bind:themes="['light', 'dark']"`) shows the effective theme's icon in system mode, according to `prefers-color-scheme`, like the script. In `mode="select"`, each radio has its icon and all are visible.
 
-**Accessibility.** In `mode="cycle"`, it is a `<button>` whose `aria-label` announces the choice and the next one, â€œTema: oscuro. Cambiar a sistemaâ€, updating on each change. When HTML is generated without knowing the choice (without the cookie, a prerendered page), the `aria-label` is neutral, â€œCambiar temaâ€, until hydration finishes: this avoids announcing something false or causing a hydration mismatch, because hydration renders the same thing as the server. In `mode="select"`, it is a `role="radiogroup"` with an `aria-label` (â€œTemaâ€) and a `role="radio"` button per choice, with `aria-checked` and the choice's name. When HTML does not know the choice, no radio has `aria-checked`, neither `"true"` nor `"false"`: a group with all set to `"false"` would say nothing is checked, and checking `default` would tell someone who chose another theme something false, since the prerendered page is the same for everyone. When hydration finishes, each radio receives its `aria-checked` once, with visual state already supplied by CSS using `data-theme-choice`; with JavaScript, arrow keys, `Inicio` (Home) and `Fin` (End) move focus and selection, with roving `tabindex`, like a native radio group. Without JavaScript, each radio is a button reachable with Tab.
+**Accessibility.** In `mode="cycle"`, it is a `<button>` whose `aria-label` announces the choice and the next one, “Tema: oscuro. Cambiar a sistema”, updating on each change. When HTML is generated without knowing the choice (without the cookie, a prerendered page), the `aria-label` is neutral, “Cambiar tema”, until hydration finishes: this avoids announcing something false or causing a hydration mismatch, because hydration renders the same thing as the server. In `mode="select"`, it is a `role="radiogroup"` with an `aria-label` (“Tema”) and a `role="radio"` button per choice, with `aria-checked` and the choice's name. When HTML does not know the choice, no radio has `aria-checked`, neither `"true"` nor `"false"`: a group with all set to `"false"` would say nothing is checked, and checking `default` would tell someone who chose another theme something false, since the prerendered page is the same for everyone. When hydration finishes, each radio receives its `aria-checked` once, with visual state already supplied by CSS using `data-theme-choice`; with JavaScript, arrow keys, `Inicio` (Home) and `Fin` (End) move focus and selection, with roving `tabindex`, like a native radio group. Without JavaScript, each radio is a button reachable with Tab.
 
 **Without JavaScript (progressive enhancement).** The component is a `<form method="post" action="/_meeko/theme">`: the `"cycle"` button submits the next choice and each radio submits its own, together with the page URL (`return`). With JavaScript, submission is intercepted and the change is immediate, using `useTheme().set()`, without navigation. Without it, the server handles the form:
 
@@ -495,7 +495,7 @@ The script reads the cookie, then `localStorage` (so a choice saved only there, 
 
 - **SSR.** The script and `<style>` for `<MeekoThemeToggle>` icons carry the nonce from `DocumentOptions.nonce` or, since `1.7`, the one Meeko generates with `server.contentSecurityPolicy`, like any `useHead` script or style. A page with [`cache`](#ssr-page-caching) has no nonce: its hashes enter that response's CSP ([CSP and headers in server adapters](framework-deployment.md#csp-and-headers-in-server-adapters)).
 - **Prerendering and `static`.** The script and style are in each page's HTML, so their hashes enter `scriptHashes` and `styleHashes` in the prerender index and the CSP written by the `static` adapter ([CSP with hashes](framework-deployment.md#csp-with-hashes)). Their text depends only on `theme`: it is the same across pages and its hash only changes if the configuration changes.
-- **Why a hashed `<style>`.** The icon rule must precede the first paint and work without JavaScript (the `<MeekoThemeToggle>` form), so the script cannot apply it through CSSOM. An inline `<style>` with a nonce (SSR) or hash (prerendering and `static`) is allowed by a CSP without `'unsafe-inline'`, without another file to request. The hash is only added to a directive without `'unsafe-inline'`: with a hash, the browser would ignore `'unsafe-inline'` and block `style="â€¦"` attributes the policy allowed.
+- **Why a hashed `<style>`.** The icon rule must precede the first paint and work without JavaScript (the `<MeekoThemeToggle>` form), so the script cannot apply it through CSSOM. An inline `<style>` with a nonce (SSR) or hash (prerendering and `static`) is allowed by a CSP without `'unsafe-inline'`, without another file to request. The hash is only added to a directive without `'unsafe-inline'`: with a hash, the browser would ignore `'unsafe-inline'` and block `style="…"` attributes the policy allowed.
 - **`color-scheme`.** This is not an HTML `style` attribute, which a CSP without `'unsafe-inline'` in `style-src` would block: the script and runtime apply it through CSSOM (`style.colorScheme`), which CSP allows. For the page to have the right scheme without JavaScript too, declare it per theme in your CSS, as in the example above.
 
 #### Caching

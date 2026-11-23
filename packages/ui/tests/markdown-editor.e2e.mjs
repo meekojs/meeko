@@ -129,6 +129,17 @@ test('Crepe with the recipe: documents without an edit, real keys in the hard bl
 		await page.keyboard.type(text)
 	}
 
+	// `End` stops at the visual line, and a long paragraph wraps: this puts the caret at the end of the block itself.
+	const caretAtEndOfBlock = async (locator) => {
+		await locator.scrollIntoViewIfNeeded()
+		await locator.click()
+		await locator.evaluate((node) => {
+			const selection = node.ownerDocument.getSelection()
+			selection.selectAllChildren(node)
+			selection.collapseToEnd()
+		})
+		await page.waitForTimeout(150)
+	}
 	// A paragraph of the largest document, in which marks and blank lines are normalized elsewhere.
 	let result = await edited('docs/framework.md', () => typeAtEndOf(editor.locator('p').first(), ' Palabra nueva.'))
 	assertOneBlockChanged(result.source, result.after, 'framework.md, a paragraph')
@@ -173,7 +184,7 @@ test('Crepe with the recipe: documents without an edit, real keys in the hard bl
 
 	// A new paragraph: nothing else changes, in a document that is not normalized as it is written.
 	result = await edited('docs/doctor.md', async () => {
-		await typeAtEndOf(editor.locator('p').first(), '')
+		await caretAtEndOfBlock(editor.locator('p').first())
 		await page.keyboard.press('Enter')
 		await page.keyboard.type('Párrafo nuevo.')
 	})
@@ -186,7 +197,7 @@ test('Crepe with the recipe: documents without an edit, real keys in the hard bl
 	})
 	assert.equal(result.after, result.source, 'undo gives the file back')
 	result = await edited('docs/doctor.md', async () => {
-		await typeAtEndOf(editor.locator('p').first(), '')
+		await caretAtEndOfBlock(editor.locator('p').first())
 		await page.keyboard.press('Enter')
 		await page.keyboard.press('Enter')
 	})
@@ -194,7 +205,7 @@ test('Crepe with the recipe: documents without an edit, real keys in the hard bl
 
 	// A table from the menu, right before a code block: the caret goes to its first cell.
 	result = await edited('docs/doctor.md', async () => {
-		await typeAtEndOf(editor.locator('p').first(), '')
+		await caretAtEndOfBlock(editor.locator('p').first())
 		await page.keyboard.press('Enter')
 		await page.keyboard.type('/table')
 		await page.locator('.milkdown-slash-menu[data-show="true"]').getByText('table', { exact: true }).waitFor()
