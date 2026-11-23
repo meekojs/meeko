@@ -277,10 +277,23 @@ function handlerKeyError(key: string): TypeError {
  */
 type TypeMessage<Text extends string> = { readonly [Key in Text]: never }
 
-/** Type text of MEEK113 for a key of `bind="obj"` on an element. */
-export type AttributeSpreadCheck<T, Tag extends string> = {
-	readonly [K in keyof T]: K extends string ? (Lowercase<K> extends `on${string}` ? TypeMessage<'MEEK113: bind no admite claves on*; usa on:evento'> : K extends `data-meeko${string}` ? TypeMessage<'MEEK113: data-meeko* está reservado a Meeko'> : string extends K ? AttributeValue : K extends AttributeNameOf<Tag> ? AttributeValueOf<Tag, K> : TypeMessage<`MEEK113: ${K} no es un atributo de la etiqueta`>) : never
-}
+/** Type text of MEEK113 for a key of `bind="obj"` on an element, or the type its value must have. */
+type AttributeKeyCheck<K, Tag extends string> = K extends string ? (Lowercase<K> extends `on${string}` ? TypeMessage<'MEEK113: bind no admite claves on*; usa on:evento'> : K extends `data-meeko${string}` ? TypeMessage<'MEEK113: data-meeko* está reservado a Meeko'> : string extends K ? AttributeValue : K extends AttributeNameOf<Tag> ? AttributeValueOf<Tag, K> : TypeMessage<`MEEK113: ${K} no es un atributo de la etiqueta`>) : never
+
+/**
+ * The check of an object whose keys are `Required` and `Optional`. It depends only on the keys, so
+ * members of a union with the same keys share one check instead of comparing each against all.
+ */
+type AttributeKeysCheck<Required extends PropertyKey, Optional extends PropertyKey, Tag extends string> = { readonly [K in Required]: AttributeKeyCheck<K, Tag> } & { readonly [K in Optional]?: AttributeKeyCheck<K, Tag> }
+
+/**
+ * Type text of MEEK113 for the keys of `bind="obj"` on an element, member by member of a union.
+ * Each member is checked by its keys and their optionality, not by its own type: a union of props
+ * with many members (one per route) and the same keys gives a single check object. The key unions
+ * are written inline: a union from a type alias carries that alias in its identity, and two equal
+ * sets of keys would give two checks.
+ */
+export type AttributeSpreadCheck<T, Tag extends string> = T extends unknown ? AttributeKeysCheck<{ [K in keyof T]-?: T extends Record<K, unknown> ? K : never }[keyof T], { [K in keyof T]-?: T extends Record<K, unknown> ? never : K }[keyof T], Tag> : never
 
 /** Explicit `class` and `style` of an element with `bind="obj"`, which the spread combines with its own. */
 export interface SpreadExplicit {
