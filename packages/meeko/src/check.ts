@@ -23,7 +23,7 @@ import { moduleSpecifiers, replaceModuleSpecifiers } from './compiler/import-gra
 import { originalOffset } from './compiler/mapping'
 import { compileError, locate, MeekoCompileError } from './compiler/parser/sfc'
 import { generatedServicesDeclaration, projectDeclarationFiles } from './compiler/project-declarations'
-import { projectRoot } from './compiler/project-root'
+import { onceByRoot, projectRoot } from './compiler/project-root'
 import { resolveProjectAliases, resolveProjectAliasesSync } from './framework/aliases'
 import { readMeekoConfigSync } from './framework/config'
 import { modelPropName } from './shared/model-names'
@@ -190,7 +190,7 @@ interface CompiledGraph {
  * temporary tree. A component imported by several of them is compiled once. A compile error stops
  * only the component whose graph it is in: the entries that its attempt left half done are dropped.
  */
-async function compileGraph(inputs: readonly CheckInput[], options: CheckSourceOptions): Promise<CompiledGraph> {
+async function compileGraph(inputs: readonly CheckInput[], options: CheckSourceOptions, autoImports: (root: string) => Promise<readonly AutoImport[]>): Promise<CompiledGraph> {
 	const byOriginal = new Map<string, GeneratedEntry>()
 	const byGenerated = new Map<string, GeneratedEntry>()
 	const nonce = randomUUID()
@@ -201,7 +201,7 @@ async function compileGraph(inputs: readonly CheckInput[], options: CheckSourceO
 		const previous = byOriginal.get(original)
 		if (previous) return previous
 		const target = componentTarget(rootDirectory, original)
-		const registry = options.autoImports ? await options.autoImports(projectRoot(original)) : undefined
+		const registry = await autoImports(projectRoot(original))
 		const aliases = await projectAliasesFor(projectRoot(original), options)
 		const compiled = await compileWithAutoImports(content, original, { typeCheck: true, strictAttributeValues: strictAttributeValues(projectRoot(original), options) }, target, registry, aliases)
 		const location = relative(rootDirectory, original)
@@ -225,7 +225,7 @@ async function compileGraph(inputs: readonly CheckInput[], options: CheckSourceO
 		const routeOptions = !options.withinProject && rootFiles.has(original) && /<script\b[^>]*\bserver\b/.test(content)
 		if (entry.code.includes(`from ${JSON.stringify(serverSpecifier)}`) || routeOptions) {
 			const file = entry.generated.replace(/\.ts$/, '.server.ts')
-			entry.server = { file, ...serverCopy(content, original, file, registry ?? (await discoverAutoImports(rootDirectory))) }
+			entry.server = { file, ...serverCopy(content, original, file, options.autoImports ? registry : await autoImports(rootDirectory)) }
 		}
 		const edits: Array<{ start: number; end: number; text: string }> = []
 		for (const specifier of moduleSpecifiers(entry.code, entry.generated)) {
@@ -577,8 +577,10 @@ export async function checkSources(inputs: readonly CheckInput[], options: Check
 		groups.set(key, [...(groups.get(key) ?? []), { source: input.source, filename }])
 	}
 	const results = new Map<string, CompileDiagnostic[]>()
+	// Discovering the autoimports runs the configuration and parses every autoimport folder: once per project.
+	const autoImports = onceByRoot(options.autoImports ?? discoverAutoImports)
 	for (const group of groups.values()) {
-		const graph = await compileGraph(group, options)
+		const graph = await compileGraph(group, options, autoImports)
 		for (const [index, root] of graph.roots.entries()) if (!('original' in root)) results.set(group[index]!.filename, [root])
 		const roots = graph.roots.filter((root): root is GeneratedEntry => 'original' in root)
 		if (roots.length) for (const [filename, diagnostics] of await typeCheckGraph(graph, roots, options)) results.set(filename, diagnostics)

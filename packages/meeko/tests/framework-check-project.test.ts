@@ -478,3 +478,35 @@ test("a MeekoSession declaration in server/ types the session in a page's <scrip
 		await rm(root, { recursive: true, force: true })
 	}
 })
+
+test('framework project check runs the TypeScript projects together and reports the first failing one in order', async () => {
+	const parent = resolve('.meeko')
+	await mkdir(parent, { recursive: true })
+	const root = await mkdtemp(join(parent, 'check-order-'))
+	try {
+		await mkdir(join(root, 'app', 'pages'), { recursive: true })
+		await mkdir(join(root, 'app', 'lib'), { recursive: true })
+		await mkdir(join(root, 'shared', 'lib'), { recursive: true })
+		await writeFile(join(root, 'package.json'), '{"private":true,"type":"module"}\n')
+		await mkdir(join(root, 'node_modules', '@meekojs'), { recursive: true })
+		await symlink(resolve('.'), join(root, 'node_modules', '@meekojs', 'meeko'), 'junction')
+		await writeFile(join(root, 'app', 'pages', 'index.meeko'), '<template><p>Home</p></template>\n')
+		const appModule = join(root, 'app', 'lib', 'broken-app.ts')
+		const sharedModule = join(root, 'shared', 'lib', 'broken-shared.ts')
+		await writeFile(appModule, 'export const appValue: number = "app";\n')
+		await writeFile(sharedModule, 'export const sharedValue: number = "shared";\n')
+		const both = await checkFrameworkProject(root).then(
+			() => assert.fail('the app project should fail'),
+			(error: unknown) => (error as Error).message,
+		)
+		assert.match(both, /tsconfig\.app\.json/)
+		assert.match(both, /broken-app\.ts/)
+		assert.doesNotMatch(both, /broken-shared\.ts/)
+		await writeFile(appModule, 'export const appValue: number = 1;\n')
+		await assert.rejects(checkFrameworkProject(root), /tsconfig\.shared\.json[\s\S]*broken-shared\.ts/)
+		await writeFile(sharedModule, 'export const sharedValue: number = 1;\n')
+		await checkFrameworkProject(root)
+	} finally {
+		await rm(root, { recursive: true, force: true })
+	}
+})

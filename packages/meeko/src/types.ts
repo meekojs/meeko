@@ -3,6 +3,8 @@ import { existsSync } from 'node:fs'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 
+import type { AutoImport } from './autoimports/registry'
+
 import { compileWithAutoImports } from './autoimports/transform'
 import { aliasCandidates } from './compiler/aliases'
 import { moduleSpecifiers, replaceModuleSpecifiers } from './compiler/import-graph'
@@ -34,6 +36,11 @@ function projectComponent(root: string, filename: string): boolean {
 export interface GenerateTypesOptions {
 	/** Text of a `.meeko` that is not the saved one, such as a component open in the editor. */
 	readonly read?: (filename: string) => string | undefined
+	/**
+	 * Autoimports of each project root, for declarations generated together: by default each component
+	 * discovers them again, as `compileWithAutoImports` does.
+	 */
+	readonly autoImports?: (projectRoot: string) => Promise<readonly AutoImport[]>
 }
 
 /**
@@ -59,7 +66,7 @@ export async function generateTypes(source: string, filename: string, options: G
 	async function collect(content: string, path: string): Promise<void> {
 		if (declarations.has(path)) return
 		const target = relative(root, path).split(/[\\/]/)[0] === 'server' ? 'server' : 'client'
-		const generated = (await compileWithAutoImports(content, path, {}, target, undefined, aliases)).code
+		const generated = (await compileWithAutoImports(content, path, {}, target, await options.autoImports?.(projectRoot(path)), aliases)).code
 		const result = ts.transpileDeclaration(generated, {
 			fileName: `${path}.ts`,
 			compilerOptions: { declaration: true, emitDeclarationOnly: true },
