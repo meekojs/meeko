@@ -4,8 +4,10 @@
  *
  * Layers: ui.components holds the rules still written by hand, ui.utilities the ui:* classes of the
  * components. Both lose to any unlayered rule of the app, and the layer ui-base of base.css goes first.
+ * `base` is Tailwind's preflight layer: declared here, before the layers of UI, an app with Tailwind
+ * keeps its reset below the components instead of wiping their borders, padding and backgrounds.
  */
-@layer ui.components, ui.utilities;
+@layer base, ui.components, ui.utilities;
 
 @import './palette.css';
 @import './tokens.css';

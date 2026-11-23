@@ -265,9 +265,14 @@ test('every --ui-* variable a component sheet reads is declared', async () => {
 test('the base goes in a layer, so that any rule of the app wins', async () => {
 	const css = await read('base.css')
 	const stripped = strip(css).trim()
-	assert.match(stripped, /^@layer ui-base \{/)
+	// Tailwind's preflight layer (`base`) is declared before ui-base, so an app's reset stays below UI.
+	assert.match(stripped, /^@layer base, ui-base;\s*@layer ui-base \{/)
 	assert.match(stripped, /\}$/)
 	for (const piece of ['color-scheme: dark', 'background: var(--ui-color-bg)', '::selection', ':focus-visible', 'var(--ui-font-sans)']) assert.ok(css.includes(piece), piece)
+})
+
+test("the components sheet declares Tailwind's base layer before the layers of UI", async () => {
+	assert.match(strip(await read('main.css')), /@layer base, ui\.components, ui\.utilities;/)
 })
 
 test('the font and its licence ship with the package', async () => {
