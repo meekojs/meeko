@@ -54,10 +54,17 @@ function Get-RegistryState([string]$Name, [string]$Version) {
   return 'missing-version'
 }
 
+# The root package.json asks for pnpm in devEngines, and npm 11 refuses to run under it (EBADDEVENGINES):
+# every npm command runs from the temporary folder, and the tarballs travel as absolute paths.
+function Invoke-Npm {
+  Push-Location -LiteralPath ([IO.Path]::GetTempPath())
+  try { & npm @args } finally { Pop-Location }
+}
+
 # Tells "not logged in" from "could not ask". Only the npm error code is echoed, never its details.
 function Assert-NpmSession {
   $ErrorActionPreference = 'Continue'
-  $output = @(& npm whoami --registry $Registry 2>&1 | ForEach-Object { "$_" })
+  $output = @(Invoke-Npm whoami --registry $Registry 2>&1 | ForEach-Object { "$_" })
   if ($LASTEXITCODE -eq 0) {
     Write-Host "npm user: $($output[-1])"
     return
@@ -109,7 +116,7 @@ try {
     Assert-NpmSession
   }
   if (!$PackOnly) {
-    $npmVersion = & npm --version
+    $npmVersion = Invoke-Npm --version
     if ($LASTEXITCODE -ne 0 -or [version]($npmVersion -replace '-.*$', '') -lt [version]'11.5.1') { throw 'npm >=11.5.1 is required.' }
   }
 
@@ -176,7 +183,7 @@ try {
     if ($Trusted) { $arguments += '--provenance' } else { $arguments += '--provenance=false' }
     if (!$Execute) { $arguments += '--dry-run' }
     # npm handles interactive 2FA/OTP on the console. Never capture its output or pass credentials as arguments.
-    & npm @arguments
+    Invoke-Npm @arguments
     if ($LASTEXITCODE -ne 0) {
       if (!$Execute) { throw "Dry run failed: $($artifact.name)@$version. Nothing was published." }
       Write-Host 'Publication stopped. Registry state:'

@@ -292,8 +292,11 @@ jobs:
         # npm vincula el Trusted Publisher al repositorio, a este archivo (publish.yml) y al environment `npm`.
         # Configura uno por paquete tras su primera publicación interactiva.
         run: |
+          # Outside the checkout: npm 11 refuses to run under the devEngines of its package.json.
+          Push-Location -LiteralPath $env:RUNNER_TEMP
           npm install --global npm@11.19.0
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Pop-Location
           ./scripts/publish-packages.ps1 -Trusted -Execute -ExpectedVersion ($env:GITHUB_REF_NAME.Substring(1)) -ArtifactDirectory (Join-Path $env:RUNNER_TEMP 'npm-tarballs')
 
   github-release:

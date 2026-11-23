@@ -123,3 +123,17 @@ test('no job of a workflow writes a log to .meeko/ci-logs before it creates the 
 		}
 	}
 })
+
+test('npm runs outside the checkout, whose devEngines ask for pnpm', () => {
+	assert.equal(JSON.parse(read('package.json')).devEngines.packageManager.name, 'pnpm', 'the reason for this test')
+	const publish = read('.github/workflows/publish.yml')
+	const install = publish.indexOf('npm install --global npm@')
+	const before = publish.slice(publish.lastIndexOf('run: |', install), install)
+	assert.match(before, /Push-Location -LiteralPath \$env:RUNNER_TEMP/, 'npm updates itself from the runner temp folder')
+	const script = read('scripts/publish-packages.ps1')
+	assert.deepEqual(
+		script.split('\n').filter((line) => /&\s*npm\b/.test(line) && !line.includes('try { & npm @args }')),
+		[],
+		'publish-packages.ps1 calls npm only through Invoke-Npm',
+	)
+})
