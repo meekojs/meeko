@@ -26,5 +26,6 @@ import { useSocketClient } from './use-socket-client'
 export function useSocketChannel<C extends Record<string, SocketContract>, K extends keyof C & string>(contracts: C, name: K, options: SocketRegistryOptions = {}): SocketClient<C[K]> {
 	const contract = contracts[name]
 	if (!contract) throw new TypeError(`Unknown socket channel: ${name}`)
-	return useSocketClient(socketUrl(name, options), contract, options)
+	// In SSR there is no location to resolve the URL against, and useSocketClient returns its inert client.
+	return useSocketClient(typeof window === 'undefined' ? '' : socketUrl(name, options), contract, options)
 }
