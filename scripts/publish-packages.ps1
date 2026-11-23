@@ -56,9 +56,13 @@ function Get-RegistryState([string]$Name, [string]$Version) {
 
 # The root package.json asks for pnpm in devEngines, and npm 11 refuses to run under it (EBADDEVENGINES):
 # every npm command runs from the temporary folder, and the tarballs travel as absolute paths.
+# On Windows, npm.ps1 rebuilds its arguments from the text of the calling statement, and inside this
+# function it finds none: npm.cmd (an application, like npm on Linux and macOS) takes them as given.
 function Invoke-Npm {
+  $name = if ($IsWindows) { 'npm.cmd' } else { 'npm' }
+  $npm = (Get-Command $name -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
   Push-Location -LiteralPath ([IO.Path]::GetTempPath())
-  try { & npm @args } finally { Pop-Location }
+  try { & $npm @args } finally { Pop-Location }
 }
 
 # Tells "not logged in" from "could not ask". Only the npm error code is echoed, never its details.

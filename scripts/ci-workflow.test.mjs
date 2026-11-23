@@ -132,8 +132,10 @@ test('npm runs outside the checkout, whose devEngines ask for pnpm', () => {
 	assert.match(before, /Push-Location -LiteralPath \$env:RUNNER_TEMP/, 'npm updates itself from the runner temp folder')
 	const script = read('scripts/publish-packages.ps1')
 	assert.deepEqual(
-		script.split('\n').filter((line) => /&\s*npm\b/.test(line) && !line.includes('try { & npm @args }')),
+		script.split('\n').filter((line) => /&\s*npm\b/.test(line)),
 		[],
 		'publish-packages.ps1 calls npm only through Invoke-Npm',
 	)
+	// npm.ps1 rebuilds its arguments from the calling statement: inside a function it would run npm without them.
+	assert.match(script, /'npm\.cmd'[^\n]*\n[^\n]*Get-Command \$name -CommandType Application/, 'Invoke-Npm runs npm.cmd on Windows, not npm.ps1')
 })
