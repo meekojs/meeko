@@ -105,6 +105,25 @@ test('channel registry is lazy during SSR and component sockets close with their
 	}
 })
 
+test('useSocketChannel returns the inert client during SSR instead of resolving a URL', async () => {
+	const contracts = { chat: { clientToServer: { message: stringSchema }, serverToClient: { message: stringSchema } } }
+	assert.equal(typeof window, 'undefined')
+	let opened = 0
+	const client = createRoot(() =>
+		useSocketChannel(contracts, 'chat', {
+			roomId: 'general',
+			webSocketFactory: () => {
+				opened++
+				throw new Error('no socket in SSR')
+			},
+		}),
+	)
+	assert.equal(client.state.value, 'connecting')
+	assert.equal(typeof client.on('message', () => {}), 'function')
+	await assert.rejects(client.emit('message', 'hola'), /Socket is disconnected/)
+	assert.equal(opened, 0)
+})
+
 /** In SSR the client never connects nor throws: it stays `"connecting"`, `on` is a no-op and `emit` rejects. */
 async function ssrClientIsInert(contract: { clientToServer: { message: typeof stringSchema }; serverToClient: { message: typeof stringSchema } }): Promise<void> {
 	let opened = 0
