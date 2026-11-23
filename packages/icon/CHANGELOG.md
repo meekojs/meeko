@@ -1,5 +1,9 @@
 # Cambios de Meeko Icon
 
+## 1.10.1 — 2026-11-23
+
+- Publicación coordinada con `@meekojs/meeko` 1.10.1, sin cambios funcionales en este paquete.
+
 ## 1.10.0 — 2026-11-23
 
 - **`componentName` cambia el nombre del componente de iconos.** `icon: { componentName: 'AppIcon' }` autoimporta `<AppIcon>` en lugar de `<UIIcon>` y resuelve al compilar esa etiqueta; un nombre que no está en PascalCase es un error de la opción. Por defecto sigue siendo `UIIcon`.
