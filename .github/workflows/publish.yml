@@ -214,6 +214,7 @@ jobs:
       - name: Node adapter conformance
         shell: pwsh
         run: |
+          New-Item -ItemType Directory -Force .meeko/ci-logs | Out-Null
           pnpm run conformance:node 2>&1 | Tee-Object -FilePath .meeko/ci-logs/conformance-node.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - run: node packages/meeko/node_modules/playwright-core/cli.js install chromium firefox webkit
