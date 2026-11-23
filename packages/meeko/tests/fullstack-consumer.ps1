@@ -19,9 +19,10 @@ try {
   if ($Tarball) {
     $tarball = (Resolve-Path -LiteralPath $Tarball).Path
   } else {
-    $name = (& npm pack $repo --pack-destination $run --ignore-scripts --silent | Select-Object -Last 1)
+    # pnpm pack, not npm pack: it replaces the catalog: and workspace: versions, which npm cannot install.
+    $name = (& pnpm -C $repo pack --pack-destination $run | Select-Object -Last 1)
     if ($LASTEXITCODE -ne 0 -or !$name) { throw 'Meeko tarball creation failed.' }
-    $tarball = Join-Path $run $name
+    $tarball = Join-Path $run (Split-Path -Leaf $name)
   }
   foreach ($entry in Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'fixtures/fullstack-consumer')) {
     Copy-Item -LiteralPath $entry.FullName -Destination (Join-Path $consumer $entry.Name) -Recurse -Force

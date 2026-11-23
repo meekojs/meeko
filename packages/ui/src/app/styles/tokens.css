@@ -41,6 +41,12 @@
 	--ui-color-primary-border: var(--ui-color-primary-7);
 	--ui-color-primary-text: var(--ui-color-primary-11);
 
+	/* Code: cyan distinguishes literals from links and prose. */
+	--ui-color-code-soft: var(--ui-color-cyan-3);
+	--ui-color-code-header: var(--ui-color-cyan-2);
+	--ui-color-code-border: var(--ui-color-cyan-6);
+	--ui-color-code-text: var(--ui-color-cyan-12);
+
 	/* States */
 	--ui-color-info: var(--ui-color-info-9);
 	--ui-color-info-hover: var(--ui-color-info-10);
@@ -193,9 +199,11 @@
 	--ui-page-sidebar-width: 15rem;
 	--ui-page-aside-width: 13.5rem;
 	--ui-drawer-width: 19rem;
+	/* The gutter of the scrollbar of the document: the module measures it inline on <html>; without JavaScript, none. */
+	--ui-scrollbar-gutter: 0px;
 	--ui-prose-width: var(--ui-container-lg);
 	--ui-prose-measure: 75ch;
-	--ui-prose-code-size: 0.86em;
+	--ui-prose-code-size: 0.92em;
 	--ui-prose-code-padding: 0.1em 0.2em;
 	--ui-toc-max-height: 50dvh;
 	--ui-code-max-height: 36rem;
@@ -209,6 +217,11 @@
 	--ui-brand-image-height: 1.75rem;
 	--ui-icon-size: 1rem;
 	--ui-icon-size-sm: 0.8125rem;
+	/* An icon inside a sentence or a heading: the size of its text, lowered to sit on the line like a letter */
+	--ui-icon-size-text: 1em;
+	--ui-icon-text-align: -0.125em;
+	/* How far the hit area of <UIHint> reaches beyond its icon, without moving the text */
+	--ui-hint-hit-area: 0.25em;
 	--ui-icon-stroke-width: 1.4;
 	--ui-opacity-subtle: 0.7;
 	--ui-opacity-hidden: 0;
@@ -234,6 +247,61 @@
 	--ui-slider-thumb: 1rem;
 	--ui-toast-width: 24rem;
 	--ui-badge-dot-size: 0.375rem;
+	/* <UIAvatar>: el lado de cada tamaño (sm cabe en un control sm), el texto de sus iniciales, el fondo, el color y las esquinas de shape="rounded" */
+	--ui-avatar-size-sm: 1.5rem;
+	--ui-avatar-size-md: 2rem;
+	--ui-avatar-size-lg: 2.5rem;
+	--ui-avatar-font-size-sm: var(--ui-font-size-xs);
+	--ui-avatar-font-size-md: var(--ui-font-size-sm);
+	--ui-avatar-font-size-lg: var(--ui-font-size-lg);
+	--ui-avatar-bg: var(--ui-color-primary-soft);
+	--ui-avatar-color: var(--ui-color-primary-text);
+	--ui-avatar-radius: var(--ui-radius-md);
+	/* A key figure of <UIStat>: the width it takes where its content gives none, and that of its sparkline beside the value */
+	--ui-stat-intrinsic-width: 12rem;
+	--ui-stat-trend-width: 7rem;
+	/* <UISparkline>: its height, the width of its line (it does not scale with the box), its area and how long the line takes to draw */
+	--ui-sparkline-height: 2rem;
+	--ui-sparkline-stroke-width: 1.5;
+	--ui-sparkline-area-opacity: 0.14;
+	--ui-sparkline-duration: 600ms;
+	/* <UICopyButton>: the color of the result of a copy, where its text is not on a solid */
+	--ui-copy-button-copied-color: var(--ui-color-success-text);
+	--ui-copy-button-failed-color: var(--ui-color-danger-text);
+	/* <progress>: its height, corners, track and bar; the indeterminate one moves a bar of this width (up to 50%) in this time */
+	--ui-progress-height: var(--ui-space-2);
+	--ui-progress-radius: var(--ui-radius-full);
+	--ui-progress-track: var(--ui-color-control-active);
+	--ui-progress-color: var(--ui-color-primary);
+	--ui-progress-indeterminate-width: 40%;
+	--ui-progress-duration: 1.4s;
+	/* <meter>: its height, corners and track, and the bar by region: optimum, suboptimum and the worst (even less good) */
+	--ui-meter-height: var(--ui-space-2);
+	--ui-meter-radius: var(--ui-radius-full);
+	--ui-meter-track: var(--ui-color-control-active);
+	--ui-meter-optimum-color: var(--ui-color-success);
+	--ui-meter-suboptimum-color: var(--ui-color-warning);
+	--ui-meter-even-less-good-color: var(--ui-color-danger);
+	/* <input type="file">: the name of the chosen files, and the button that chooses them, which looks like a secondary <UIButton> */
+	--ui-file-color: var(--ui-color-text-soft);
+	--ui-file-gap: var(--ui-space-3);
+	--ui-file-button-height: var(--ui-control-height-sm);
+	--ui-file-button-padding: var(--ui-control-padding-sm);
+	--ui-file-button-radius: var(--ui-radius-md);
+	--ui-file-button-bg: var(--ui-color-control);
+	--ui-file-button-bg-hover: var(--ui-color-control-hover);
+	--ui-file-button-border: var(--ui-color-border);
+	--ui-file-button-color: var(--ui-color-text);
+	/*
+	 * The bar at the top of the page while the router navigates (`data-navigating` on <html>). It waits for the
+	 * delay, so a fast navigation never shows it, and then crawls towards the end for the duration. A height of 0
+	 * turns it off.
+	 */
+	--ui-navigation-progress-height: 0.125rem;
+	--ui-navigation-progress-color: var(--ui-color-primary);
+	--ui-navigation-progress-delay: var(--ui-duration-fast);
+	--ui-navigation-progress-duration: 8s;
+	--ui-z-progress: 40;
 }
 
 :root[data-theme='dark'] {

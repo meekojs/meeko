@@ -76,8 +76,7 @@
 			adds logical padding on both sides, included in the outer width. The
 			<code>md</code>
 			value grows between 16 and 64px;
-			<code>sm</code>, between 12 and 24px;
-			<code>lg</code>, between 24 and 96px. Use
+			<code>sm</code>, between 12 and 24px; <code>lg</code>, between 24 and 96px. Use
 			<code>none</code>
 			when the parent already provides that space.
 		</p>

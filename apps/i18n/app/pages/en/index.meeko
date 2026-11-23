@@ -3,6 +3,7 @@
 	const i18n = useI18n()
 	const name = signal('Meeko')
 </script>
+
 <template>
 	<DocsPage
 		product="Meeko i18n"

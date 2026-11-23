@@ -32,7 +32,7 @@ test('the navigation components work in a browser, with and without JavaScript',
 		})
 		await page.goto(origin, { waitUntil: 'networkidle' })
 		// Hydrated: the copy button of a code block only shows then.
-		await page.locator('.meeko-ui-code-copy[data-ready]').first().waitFor()
+		await page.locator('figure > figcaption > button').first().waitFor()
 		return { page, errors }
 	}
 
@@ -43,18 +43,18 @@ test('the navigation components work in a browser, with and without JavaScript',
 		await page.goto(origin)
 		assert.equal(await page.locator('main').count(), 1)
 		// Invoker commands and popover are native: no hydration here.
-		await page.locator('.meeko-ui-drawer-trigger').click()
-		await page.locator('dialog.meeko-ui-drawer[open]').waitFor()
+		await page.locator('button[aria-haspopup="dialog"]').click()
+		await page.locator('dialog#menu[open]').waitFor()
 		await page.keyboard.press('Escape')
-		await page.locator('dialog.meeko-ui-drawer:not([open])').waitFor({ state: 'attached' })
-		await page.locator('.meeko-ui-header-toggle').click()
-		await page.locator('.meeko-ui-header-menu a', { hasText: 'Acerca de' }).waitFor()
+		await page.locator('dialog#menu:not([open])').waitFor({ state: 'attached' })
+		await page.locator('header button[popovertarget]').click()
+		await page.locator('header [popover] a', { hasText: 'Acerca de' }).waitFor()
 		await page.keyboard.press('Escape')
 		// The copy button needs the script, so it does not show.
-		assert.equal(await page.locator('.meeko-ui-code-copy').first().isVisible(), false)
+		assert.equal(await page.locator('figure > figcaption > button').first().isVisible(), false)
 		// The collapsible table of contents is a native details.
-		await page.locator('.meeko-ui-toc-collapsible > summary').click()
-		await page.locator('.meeko-ui-toc-collapsible a', { hasText: 'Tercera sección' }).click()
+		await page.locator('summary', { hasText: 'En esta página' }).click()
+		await page.locator('details:has(> summary) a', { hasText: 'Tercera sección' }).click()
 		assert.match(page.url(), /#tres$/)
 		await page.close()
 	})
@@ -64,7 +64,7 @@ test('the navigation components work in a browser, with and without JavaScript',
 		t.after(() => noScript.close())
 		const ssr = await noScript.newPage()
 		await ssr.goto(origin)
-		const measure = (target) => target.locator('.meeko-ui-header').boundingBox()
+		const measure = (target) => target.getByRole('banner').boundingBox()
 		const before = await measure(ssr)
 		const beforeMain = await ssr.locator('main').boundingBox()
 		const { page, errors } = await open()
@@ -79,7 +79,7 @@ test('the navigation components work in a browser, with and without JavaScript',
 
 	await t.test('the skip link appears with the keyboard and moves the focus to main', async () => {
 		const { page, errors } = await open()
-		const link = page.locator('.meeko-ui-skip-link')
+		const link = page.getByRole('link', { name: 'Saltar al contenido', exact: true })
 		assert.ok((await link.boundingBox()).y < 0, 'off the screen')
 		await page.keyboard.press('Tab')
 		assert.equal(await link.evaluate((element) => element === element.ownerDocument.activeElement), true)
@@ -92,9 +92,9 @@ test('the navigation components work in a browser, with and without JavaScript',
 
 	await t.test('UIDrawer: model, focus, Escape, backdrop, links and animation', async () => {
 		const { page, errors } = await open({ width: 390, height: 844 })
-		const dialog = page.locator('dialog.meeko-ui-drawer')
+		const dialog = page.locator('dialog#menu')
 		const state = page.locator('#drawer-state')
-		const trigger = page.locator('.meeko-ui-drawer-trigger')
+		const trigger = page.locator('button[aria-haspopup="dialog"]')
 		// The trigger: native command, and the model follows.
 		await trigger.click()
 		await dialog.and(page.locator('[open]')).waitFor()
@@ -115,7 +115,7 @@ test('the navigation components work in a browser, with and without JavaScript',
 		// The model opens it; the button of the panel closes it.
 		await page.locator('#open-drawer').evaluate((element) => element.click())
 		await dialog.and(page.locator('[open]')).waitFor()
-		await page.locator('.meeko-ui-drawer-close').click()
+		await dialog.getByRole('button', { name: 'Cerrar panel' }).click()
 		await until(async () => (await state.innerText()) === 'cerrado:3', 'the close button did not close it')
 		// A link closes it, without leaving the page if it goes to a fragment.
 		await trigger.click()
@@ -151,7 +151,7 @@ test('the navigation components work in a browser, with and without JavaScript',
 		const { page, errors } = await open()
 		const nav = page.getByRole('navigation', { name: 'Vistas', exact: true })
 		assert.equal(await nav.getByRole('tab').count(), 0)
-		const indicator = nav.locator('.meeko-ui-nav-tabs-indicator')
+		const indicator = nav.locator(':scope > span[aria-hidden="true"]')
 		const aligned = async (name) => {
 			const [bar, link] = await Promise.all([indicator.boundingBox(), nav.getByRole('link', { name, exact: true }).boundingBox()])
 			return Math.abs(bar.x - link.x) < 1 && Math.abs(bar.width - link.width) < 1 && Math.abs(bar.y + bar.height - (link.y + link.height)) < 1
@@ -209,7 +209,8 @@ test('the navigation components work in a browser, with and without JavaScript',
 		const short = await context.newPage()
 		await short.setViewportSize({ width: 1440, height: 260 })
 		await short.goto(origin, { waitUntil: 'networkidle' })
-		const sidebar = short.locator('.meeko-ui-page-sidebar')
+		// The sidebar is the column before <main>.
+		const sidebar = short.locator('main').locator('xpath=preceding-sibling::div[1]')
 		await until(async () => (await sidebar.evaluate((element) => element.scrollTop)) > 0, 'the sidebar did not scroll to the current link')
 		const [panel, link] = await Promise.all([sidebar.boundingBox(), short.getByRole('navigation', { name: 'Documentación', exact: true }).getByRole('link', { name: 'Actual' }).boundingBox()])
 		assert.ok(link.y >= panel.y && link.y + link.height <= panel.y + panel.height, 'the current link is inside the panel')
@@ -219,11 +220,12 @@ test('the navigation components work in a browser, with and without JavaScript',
 
 	await t.test('UIPage: the column of the aside is there before the aside, so the text does not move when it arrives', async () => {
 		const html = await (await globalThis.fetch(origin + '/aside')).text()
-		const mark = html.search(/<div[^>]*class="meeko-ui-page-body"[^>]*data-ui-page-aside|<div[^>]*data-ui-page-aside[^>]*class="meeko-ui-page-body"/)
-		assert.ok(mark >= 0, 'the opening tag carries the mark')
+		// The column of the aside is a class of the body, in its opening tag.
+		const mark = html.search(/<div[^>]*class="[^"]*--ui-page-aside-width/)
+		assert.ok(mark >= 0, 'the opening tag carries the column')
 		assert.ok(mark < html.indexOf('<main'), 'before the text')
 		const dashboard = await (await globalThis.fetch(origin + '/dashboard')).text()
-		assert.equal(dashboard.includes('data-ui-page-aside'), false, 'a page without an aside has no mark')
+		assert.equal(dashboard.includes('--ui-page-aside-width'), false, 'a page without an aside has no column for it')
 
 		// The document stops right before <aside>, as a long guide does on a slow network.
 		const split = html.indexOf('<aside')
@@ -252,13 +254,13 @@ test('the navigation components work in a browser, with and without JavaScript',
 			}).observe({ type: 'layout-shift', buffered: true })
 		})
 		const navigation = page.goto(`http://127.0.0.1:${slow.address().port}/aside`, { waitUntil: 'load' })
-		await page.waitForFunction(() => globalThis.document.getElementById('long-text')?.getBoundingClientRect().width > 0 && !globalThis.document.querySelector('.meeko-ui-page-aside'))
+		await page.waitForFunction(() => globalThis.document.getElementById('long-text')?.getBoundingClientRect().width > 0 && !globalThis.document.querySelector('main ~ aside'))
 		await page.evaluate(() => new Promise((done) => globalThis.requestAnimationFrame(() => globalThis.requestAnimationFrame(done))))
 		const box = () => page.locator('#long-text').evaluate((element) => [element.getBoundingClientRect().width, element.getBoundingClientRect().height])
 		const before = await box()
 		release()
 		await navigation
-		await page.locator('.meeko-ui-page-aside').waitFor()
+		await page.locator('main ~ aside').waitFor()
 		await page.evaluate(() => new Promise((done) => globalThis.requestAnimationFrame(() => globalThis.requestAnimationFrame(done))))
 		assert.deepEqual(await box(), before, 'the text keeps its width and its lines')
 		assert.equal(await page.evaluate(() => globalThis.shifted), 0, 'and nothing moves')
@@ -276,18 +278,18 @@ test('the navigation components work in a browser, with and without JavaScript',
 		await page.waitForFunction(() => globalThis.performance.getEntriesByName('meeko-hydration').length > 0)
 		const state = () =>
 			page.evaluate(() => {
-				const body = globalThis.document.querySelector('.meeko-ui-page-body')
-				return { mark: body.hasAttribute('data-ui-page-aside'), aside: Boolean(body.querySelector(':scope > .meeko-ui-page-aside')), columns: globalThis.getComputedStyle(body).gridTemplateColumns.split(' ').length, main: Math.round(body.querySelector('main').getBoundingClientRect().width) }
+				const body = globalThis.document.querySelector('main').parentElement
+				return { mark: body.className.includes('--ui-page-aside-width'), aside: Boolean(body.querySelector(':scope > aside')), columns: globalThis.getComputedStyle(body).gridTemplateColumns.split(' ').length, main: Math.round(body.querySelector('main').getBoundingClientRect().width) }
 			})
 		const shown = await state()
 		assert.deepEqual([shown.mark, shown.aside, shown.columns], [true, true, 2])
 		await page.locator('#toggle-aside').click()
-		await page.waitForFunction(() => !globalThis.document.querySelector('.meeko-ui-page-aside'))
+		await page.waitForFunction(() => !globalThis.document.querySelector('main ~ aside'))
 		const hidden = await state()
 		assert.deepEqual([hidden.mark, hidden.aside, hidden.columns], [false, false, 1], 'the column goes with the aside')
 		assert.ok(hidden.main > shown.main, 'and the text takes its place')
 		await page.locator('#toggle-aside').click()
-		await page.locator('.meeko-ui-page-aside').waitFor()
+		await page.locator('main ~ aside').waitFor()
 		assert.deepEqual(await state(), shown, 'and comes back')
 		assert.deepEqual(errors, [])
 		await page.close()
@@ -295,7 +297,7 @@ test('the navigation components work in a browser, with and without JavaScript',
 
 	await t.test('UITableOfContents: follows the scroll with aria-current and, where it exists, scroll-target-group', async () => {
 		const { page, errors } = await open()
-		const toc = page.locator('.meeko-ui-page-aside .meeko-ui-toc')
+		const toc = page.locator('main ~ aside').getByRole('navigation', { name: 'En esta página' })
 		const current = () => toc.locator('a[aria-current="location"]').innerText()
 		await until(async () => (await toc.locator('a[aria-current="location"]').count()) === 1, 'no active entry')
 		await page.evaluate(() => globalThis.document.getElementById('tres').scrollIntoView())
@@ -316,8 +318,8 @@ test('the navigation components work in a browser, with and without JavaScript',
 		await page.close()
 		// The narrow view folds once a heading is chosen.
 		const narrow = await open({ width: 390, height: 844 })
-		const details = narrow.page.locator('.meeko-ui-toc-collapsible')
-		assert.equal(await narrow.page.locator('.meeko-ui-page-aside').isVisible(), false)
+		const details = narrow.page.locator('details', { has: narrow.page.locator('summary', { hasText: 'En esta página' }) })
+		assert.equal(await narrow.page.locator('main ~ aside').isVisible(), false)
 		await details.locator('summary').click()
 		await details.locator('a', { hasText: 'Segunda sección' }).click()
 		assert.equal(await details.evaluate((element) => element.open), false)
@@ -327,7 +329,7 @@ test('the navigation components work in a browser, with and without JavaScript',
 
 	await t.test('UIPagination: loads more, announces busy, keeps the focus and ignores clicks', async () => {
 		const { page, errors } = await open()
-		const pagination = page.locator('.meeko-ui-pagination').first()
+		const pagination = page.getByRole('navigation', { name: 'Paginación' }).first()
 		const button = pagination.getByRole('button')
 		assert.match(await pagination.locator('p').innerText(), /2 de 5/)
 		await button.focus()
@@ -346,6 +348,47 @@ test('the navigation components work in a browser, with and without JavaScript',
 		await button.click()
 		await until(async () => (await pagination.getByRole('button').count()) === 0, 'the button stays with nothing left')
 		assert.match(await pagination.locator('p').innerText(), /5 de 5/)
+		assert.deepEqual(errors, [])
+		await page.close()
+	})
+
+	await t.test('UIPagination numbered: buttons change the model after hydrating, by pointer and keyboard; links navigate', async () => {
+		const { page, errors } = await open()
+		const pager = page.getByRole('navigation', { name: 'Páginas', exact: true })
+		const status = pager.getByRole('status')
+		const current = () => pager.locator('[aria-current="page"]').getAttribute('aria-label')
+		assert.equal(await status.innerText(), '11–15 de 57')
+		assert.equal(await current(), 'Página 3')
+		await pager.getByRole('button', { name: 'Página siguiente' }).click()
+		assert.equal(await page.locator('#page-state').innerText(), '4:1')
+		assert.equal(await current(), 'Página 4')
+		assert.equal(await status.innerText(), '16–20 de 57')
+		// The list keeps its length: the gap moves, the buttons do not.
+		assert.equal(await pager.getByRole('listitem').count(), 11)
+		// The keyboard: the pages are buttons that Tab goes through, and Enter and Space choose.
+		await pager.getByRole('button', { name: 'Página siguiente' }).focus()
+		await page.keyboard.press('Enter')
+		assert.equal(await page.locator('#page-state').innerText(), '5:2')
+		await page.keyboard.press('Tab')
+		assert.equal(await page.evaluate(() => globalThis.document.activeElement?.getAttribute('aria-label')), 'Última página')
+		await page.keyboard.press('Space')
+		assert.equal(await page.locator('#page-state').innerText(), '12:3')
+		assert.equal(await pager.getByRole('button', { name: 'Página siguiente' }).isDisabled(), true)
+		assert.equal(await pager.getByRole('button', { name: 'Última página' }).isDisabled(), true)
+		await pager.getByRole('button', { name: 'Página 11' }).click()
+		assert.equal(await page.locator('#page-state').innerText(), '11:4')
+		// The current page does not emit again.
+		await pager.getByRole('button', { name: 'Página 11' }).click()
+		assert.equal(await page.locator('#page-state').innerText(), '11:4')
+		await pager.getByRole('button', { name: 'Primera página' }).click()
+		assert.equal(await page.locator('#page-state').innerText(), '1:5')
+		assert.equal(await pager.getByRole('button', { name: 'Página anterior' }).isDisabled(), true)
+		assert.equal(await status.innerText(), '1–5 de 57')
+		// Links: a real navigation with the page in the search.
+		const links = page.getByRole('navigation', { name: 'Páginas con enlaces' })
+		await links.getByRole('link', { name: 'Página siguiente' }).click()
+		await page.locator('#about').waitFor()
+		assert.match(page.url(), /\/about\?page=3$/)
 		assert.deepEqual(errors, [])
 		await page.close()
 	})
@@ -371,24 +414,24 @@ test('the navigation components work in a browser, with and without JavaScript',
 		assert.equal(await read('#snapshot code', 'fontFamily'), await read('#snapshot pre code', 'fontFamily'))
 		assert.notEqual(await read('#snapshot p code', 'backgroundColor'), 'rgba(0, 0, 0, 0)')
 		// A card keeps its own text, on a solid too: the color and margin of the prose end at it.
-		const card = page.locator('#handwritten .meeko-ui-card')
-		assert.equal(await card.locator('.meeko-ui-card-body p').evaluate((element) => globalThis.getComputedStyle(element).color), await card.evaluate((element) => globalThis.getComputedStyle(element).color))
+		const card = page.locator('#handwritten section')
+		assert.equal(await card.locator(':scope > div p').evaluate((element) => globalThis.getComputedStyle(element).color), await card.evaluate((element) => globalThis.getComputedStyle(element).color))
 		assert.deepEqual(errors, [])
 		await page.close()
 	})
 
 	await t.test('UICodeBlock and UIProse copy, say so, and come back', async () => {
 		const { page, errors } = await open()
-		const block = page.locator('.meeko-ui-code-block').first()
-		const copy = block.locator('.meeko-ui-code-copy')
+		const block = page.locator('figure:has(> figcaption)').first()
+		const copy = block.locator('figcaption > button')
 		await copy.click()
 		await until(async () => (await copy.innerText()).trim() === 'Copiado', 'the button did not confirm')
-		assert.equal(await copy.getAttribute('data-state'), 'done')
+		assert.match(await copy.getAttribute('class'), /(^| )ui:text-success-text( |$)/, 'the color of done')
 		assert.equal(await block.locator('[role="status"]').innerText(), 'Copiado')
 		assert.equal(await page.evaluate(() => globalThis.navigator.clipboard.readText()), 'pnpm add @meekojs/ui')
 		await until(async () => (await copy.innerText()).trim() === 'Copiar', 'the button did not come back')
 		// The highlighted block copies its `code`, not the markup.
-		await page.locator('.meeko-ui-code-block').nth(1).locator('.meeko-ui-code-copy').click()
+		await page.locator('figure:has(> figcaption)').nth(1).locator('figcaption > button').click()
 		await until(async () => (await page.evaluate(() => globalThis.navigator.clipboard.readText())) === 'const a = 1', 'the highlighted code')
 		// A snapshot's button: the delegated listener of UIProse.
 		const snapshot = page.locator('#snapshot .code-copy')
@@ -405,7 +448,7 @@ test('the navigation components work in a browser, with and without JavaScript',
 		const height = () => page.evaluate(() => globalThis.document.documentElement.scrollHeight)
 		const before = await height()
 		await page.locator('#suggest').click()
-		const aside = page.locator('.meeko-ui-locale-suggestion')
+		const aside = page.locator('aside[aria-label="Language suggestion"]')
 		await aside.waitFor()
 		assert.equal(await height(), before)
 		assert.equal(await aside.getAttribute('lang'), 'en')
@@ -423,11 +466,11 @@ test('the navigation components work in a browser, with and without JavaScript',
 
 	await t.test('UIHeader: the menu is a popover that closes with a link, without overflowing a phone', async () => {
 		const { page, errors } = await open({ width: 390, height: 844 })
-		assert.equal(await page.locator('.meeko-ui-header-nav').isVisible(), false)
+		assert.equal(await page.getByRole('navigation', { name: 'Navegación principal' }).isVisible(), false)
 		assert.equal(await page.evaluate(() => globalThis.document.documentElement.scrollWidth <= globalThis.innerWidth), true, 'no horizontal scroll')
 		const main = await page.locator('main').boundingBox()
-		await page.locator('.meeko-ui-header-toggle').click()
-		const menu = page.locator('.meeko-ui-header-menu')
+		await page.locator('header button[popovertarget]').click()
+		const menu = page.locator('header [popover]')
 		await menu.locator('a', { hasText: 'Acerca de' }).waitFor()
 		assert.deepEqual(await page.locator('main').boundingBox(), main, 'the menu floats')
 		// A client navigation may keep the header mounted: a chosen link closes the menu by itself.
@@ -435,7 +478,7 @@ test('the navigation components work in a browser, with and without JavaScript',
 		await github.evaluate((element) => element.addEventListener('click', (event) => event.preventDefault()))
 		await github.click()
 		assert.equal(await menu.evaluate((element) => element.matches(':popover-open')), false)
-		await page.locator('.meeko-ui-header-toggle').click()
+		await page.locator('header button[popovertarget]').click()
 		await menu.locator('a', { hasText: 'Acerca de' }).click()
 		await page.locator('#about').waitFor()
 		assert.deepEqual(errors, [])
@@ -452,7 +495,8 @@ test('the navigation components work in a browser, with and without JavaScript',
 				.locator(selector)
 				.first()
 				.evaluate((element) => globalThis.getComputedStyle(element).transitionProperty + '/' + globalThis.getComputedStyle(element).transitionDuration)
-		for (const selector of ['.meeko-ui-drawer', '.meeko-ui-skip-link', '.meeko-ui-nav-link', '.meeko-ui-nav-chevron']) assert.match(await transition(selector), /^(none|all)\/0s$/, selector)
+		// The drawer, the skip link, a link of the navigation tree and the chevron of its group.
+		for (const selector of ['dialog#menu', 'a[href="#contenido"]', 'nav[aria-label="Documentación"] a', 'nav[aria-label="Documentación"] summary > svg']) assert.match(await transition(selector), /^(none|all)\/0s$/, selector)
 		await page.close()
 	})
 })

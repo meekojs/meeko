@@ -1,16 +1,23 @@
 <script lang="ts">
 	import type { UIFieldProps } from '../types/forms'
 
+	import { uiTheme } from '../utils/defaults'
+	import { field } from '../variants/field'
+
 	const props = defineProps<UIFieldProps>()
 
+	const theme = uiTheme('field', () => props)
+
 	const snippets = defineSnippets<{ default: [id: string, describedBy: string | undefined] }>()
+
+	const classes = field()
 </script>
 
 <template>
-	<div bind:class="['meeko-ui-field', props.class].filter(Boolean).join(' ')">
+	<div bind:class="classes.base({ class: [theme.ui.base, theme.class] })">
 		<label
-			class="meeko-ui-field-label"
 			bind:for="props.id"
+			bind:class="classes.label({ class: theme.ui.label })"
 		>
 			{props.label}
 			<span
@@ -26,34 +33,34 @@
 		/>
 		<p
 			if:when="props.description && !props.error"
-			class="meeko-ui-field-description"
 			bind:id="props.id + '-description'"
+			bind:class="classes.description({ class: theme.ui.description })"
 		>
 			{props.description}
 		</p>
 		<p
 			if:when="props.error"
-			class="meeko-ui-field-error"
 			role="alert"
 			bind:id="props.id + '-error'"
+			bind:class="classes.error({ class: theme.ui.error })"
 		>
 			{props.error}
 		</p>
 		<div
 			if:when="props.hint || props.counter !== undefined"
-			class="meeko-ui-field-meta"
+			bind:class="classes.meta({ class: theme.ui.meta })"
 		>
 			<p
 				if:when="props.hint"
-				class="meeko-ui-field-description"
 				bind:id="props.id + '-hint'"
+				bind:class="classes.hint({ class: theme.ui.hint })"
 			>
 				{props.hint}
 			</p>
 			<p
 				if:when="props.counter !== undefined"
-				class="meeko-ui-field-description meeko-ui-field-counter"
 				bind:id="props.id + '-counter'"
+				bind:class="classes.counter({ class: theme.ui.counter })"
 			>
 				{props.counter}
 			</p>

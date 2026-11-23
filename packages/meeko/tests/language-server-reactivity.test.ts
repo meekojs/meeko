@@ -5,7 +5,7 @@ import { after, before, describe, test } from 'node:test'
 
 import type { LanguageProject, OpenedComponent } from './language-server-workspace.ts'
 
-import { hover, semanticTokens, semanticTokensLegend } from '../src/language-server/features.ts'
+import { hover, semanticTokens, semanticTokensEdits, semanticTokensInRange, semanticTokensLegend } from '../src/language-server/features.ts'
 import { codeLenses, showReferencesCommand } from '../src/language-server/lenses.ts'
 import { analyzeReactivity } from '../src/language-server/reactivity.ts'
 import { decodeTokens, languageProject } from './language-server-workspace.ts'
@@ -58,12 +58,30 @@ const limit = 3;
 <template><p>{count.value<limit}</p><p>{"<b>" + count.value}</p></template>
 `
 
+const badge = `<script lang="ts">
+export interface Props { variant: string; size?: string; disabled?: boolean }
+const props = defineProps<Props>()
+</script>
+<template><span>{props.variant}</span></template>
+`
+
+const tagged = `<script lang="ts">
+import { signal } from "@meekojs/meeko";
+import Badge from "./Badge.meeko";
+const count = signal(0);
+</script>
+<template>
+  <Badge variant="primary" bind:size="String(count.value)" disabled />
+  <p bind:title="count.value">{count.value}</p>
+</template>
+`
+
 describe('language server: reactive declarations', () => {
 	let workspace: LanguageProject
 	let component: OpenedComponent
 
 	before(async () => {
-		workspace = await languageProject('lsp-reactivity-', { 'Comparison.meeko': comparison, 'Counter.meeko': counter, 'Later.meeko': continuation, 'Plain.meeko': plainValues })
+		workspace = await languageProject('lsp-reactivity-', { 'Badge.meeko': badge, 'Comparison.meeko': comparison, 'Counter.meeko': counter, 'Tagged.meeko': tagged, 'Later.meeko': continuation, 'Plain.meeko': plainValues })
 		component = await workspace.open('Counter.meeko')
 	})
 
@@ -115,6 +133,66 @@ describe('language server: reactive declarations', () => {
 		assert.ok(tokenAt(component.offset('model="name"') + 7).modifiers.includes('signal'))
 		const label = tokenAt(component.offset('{label}') + 1)
 		assert.ok(!label.modifiers.includes('reactive') && !label.modifiers.includes('signal'), JSON.stringify(label))
+	})
+
+	test('semantic tokens leave tag and attribute names to the grammar and keep the expressions', async () => {
+		const opened = await workspace.open('Tagged.meeko')
+		const tokens = decodeTokens(semanticTokens(opened).data, semanticTokensLegend)
+		const tokenAt = (offset: number) => {
+			const position = opened.document.positionAt(offset)
+			return tokens.find((item) => item.line === position.line && item.character <= position.character && position.character < item.character + item.length)
+		}
+		// The prop keys of the virtual code are TypeScript properties; in the template they are attributes.
+		for (const name of ['Badge variant', 'size=', 'disabled />', 'title=']) assert.equal(tokenAt(opened.offset(name, name === 'Badge variant' ? 6 : 0)), undefined, name)
+		assert.ok(tokenAt(opened.offset('count.value)'))?.modifiers.includes('signal'), 'a quoted expression on a component')
+		assert.ok(tokenAt(opened.offset('count.value"', 0, 'title'))?.modifiers.includes('signal'), 'a quoted expression on an element')
+		assert.ok(tokenAt(opened.offset('count.value}'))?.modifiers.includes('signal'), 'a text interpolation')
+		assert.ok(tokenAt(opened.offset('const count') + 6)?.modifiers.includes('signal'), 'the script')
+	})
+
+	test('a range request returns the tokens of its lines from the whole document', () => {
+		const full = decodeTokens(semanticTokens(component).data, semanticTokensLegend)
+		const start = component.at('<template>').line
+		const end = component.at('<input ref:field').line
+		const ranged = decodeTokens(semanticTokensInRange(semanticTokens(component), { start: { line: start, character: 0 }, end: { line: end, character: 0 } }).data, semanticTokensLegend)
+		assert.ok(ranged.length > 0)
+		assert.deepEqual(
+			ranged,
+			full.filter((token) => token.line >= start && token.line <= end),
+		)
+	})
+
+	test('a delta request sends only the tokens that an edit changed', async () => {
+		const apply = (data: readonly number[], edits: ReturnType<typeof semanticTokensEdits>) => {
+			const result = [...data]
+			for (const edit of [...edits].reverse()) result.splice(edit.start, edit.deleteCount, ...(edit.data ?? []))
+			return result
+		}
+		const before = semanticTokens(component).data
+		const edited = await workspace.open('Counter.meeko', counter.replace('<p>{label}</p>', '<p>{label}</p>\n  <p>{doubled.value}</p>'))
+		const after = semanticTokens(edited).data
+		// The other tests read Counter.meeko as written.
+		component = await workspace.open('Counter.meeko', counter)
+		const edits = semanticTokensEdits(before, after)
+		assert.equal(edits.length, 1)
+		assert.deepEqual(apply(before, edits), after)
+		assert.ok(edits[0]!.data!.length < after.length / 2, 'the unchanged tokens before and after the edit are not sent')
+		assert.deepEqual(semanticTokensEdits(after, after), [])
+		// Any pair of sequences round-trips, also when one is a prefix of the other.
+		for (const [left, right] of [
+			[[], [1, 2]],
+			[
+				[1, 2, 3],
+				[1, 3],
+			],
+			[
+				[5, 5, 5],
+				[5, 5],
+			],
+			[[1, 2], []],
+		] as const) {
+			assert.deepEqual(apply(left, semanticTokensEdits(left, right)), right)
+		}
 	})
 
 	test('semantic tokens cover the names on both sides of a < inside a text interpolation', async () => {

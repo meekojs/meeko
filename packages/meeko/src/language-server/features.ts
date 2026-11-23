@@ -1,4 +1,4 @@
-import type { CodeAction, CompletionItem, CompletionList, Diagnostic, DocumentSymbol, FoldingRange, FormattingOptions, Hover, Location, ParameterInformation, Position, Range, SemanticTokens, SemanticTokensLegend, SignatureHelp, SignatureInformation, TextEdit, WorkspaceEdit } from 'vscode-languageserver/node'
+import type { CodeAction, CompletionItem, CompletionList, Diagnostic, DocumentSymbol, FoldingRange, FormattingOptions, Hover, Location, ParameterInformation, Position, Range, SemanticTokens, SemanticTokensEdit, SemanticTokensLegend, SignatureHelp, SignatureInformation, TextEdit, WorkspaceEdit } from 'vscode-languageserver/node'
 
 import ts from '@typescript/typescript6'
 import { isBuiltin } from 'node:module'
@@ -23,17 +23,19 @@ import { autoImportedValues } from '../autoimports/transform'
 import { deprecatedBuiltinTags, shadowedBuiltinTags } from '../compiler'
 import { parseSfc } from '../compiler/parser/sfc'
 import { serverOnlyCompletion } from '../compiler/transforms/client-boundary'
+import { pageHeadApis } from '../compiler/transforms/server-script'
 import { modelEventName, modelPropName } from '../shared/model-names'
 import { eachKeyActions, sidecarActions } from './actions'
 import { builtinTag, builtinTags } from './builtin-tags'
 import { builtinTagDefinition, builtinTagHover } from './builtins'
 import { componentSummary, componentSummaryMarkdown, documentationMarkdown, memberDocumentation, propSignature, tagSummary } from './components'
-import { bindAttributeCompletion, domEventCompletion, dynamicTagAttributeCompletion, dynamicTagHover, dynamicTags, htmlAttributeCompletion, specialTemplateDocumentation, tagAt } from './embedded'
+import { bindAttributeCompletion, domEventCompletion, dynamicTagAttributeCompletion, dynamicTagHover, dynamicTags, htmlAttributeCompletion, nativeTagName, specialTemplateDocumentation, tagAt } from './embedded'
 import { appTargetDefinition, appTargetHover, componentFile, componentMarkdown, componentModuleAt, componentTagName, componentTypeAt, reactiveHover } from './insights'
 import { locationOf, sourceRange, toRange } from './locations'
 import { componentFiles, htmlDirectiveDocs } from './model'
 import { meekoAutoImport, packageCompletion, pathKey } from './project'
 import { analyzeReactivity } from './reactivity'
+import { templateExpressionRanges } from './regions'
 import { refNameCompletion, typedValueCompletion, valueSiteAt } from './template-values'
 
 export { documentationMarkdown } from './components'
@@ -731,10 +733,14 @@ interface TemplateDirective {
 const snippetAttributes = [
 	{ name: 'name', detail: 'Snippet del hijo que llena', insert: 'name="$1"' },
 	{ name: 'params', detail: 'Nombres de sus parámetros, separados por comas', insert: 'params="$1"' },
+	{ name: 'if', detail: 'Pasa el snippet sólo mientras la expresión es verdadera; el hijo debe declararlo opcional', insert: 'if="$1"' },
 	{ name: 'if:when', detail: 'Pasa el snippet sólo mientras la expresión es verdadera; el hijo debe declararlo opcional', insert: 'if:when="$1"' },
 ] as const
 
 const templateDirectives: readonly TemplateDirective[] = [
+	{ name: 'if', detail: 'Primera rama de una cadena condicional', insert: 'if="$1"', on: 'all' },
+	{ name: 'else-if', detail: 'Rama alternativa si no se cumplió la anterior', insert: 'else-if="$1"', on: 'all' },
+	{ name: 'else', detail: 'Rama final cuando ninguna condición anterior se cumple', insert: 'else', on: 'all' },
 	{ name: 'if:when', detail: 'Muestra la etiqueta mientras la expresión es verdadera', insert: 'if:when="$1"', on: 'all' },
 	{ name: 'each:of', detail: 'Repite la etiqueta por cada elemento de la lista', insert: 'each:of="$1"', on: 'all' },
 	{ name: 'each:as', detail: 'Nombre de cada elemento de each:of', insert: 'each:as="$1"', on: 'all' },
@@ -748,6 +754,9 @@ const templateDirectives: readonly TemplateDirective[] = [
 	{ name: 'bind', detail: 'Atributos (o props de un componente) desde un objeto; los explícitos ganan', insert: 'bind="$1"', on: 'all' },
 	{ name: 'model:', detail: 'Enlaza un modelo del componente (defineModel) con una señal', insert: 'model:', on: 'component' },
 ]
+
+/** The conditional directives, of which a tag takes one. */
+const conditionalDirectives = ['if', 'if:when', 'else-if', 'else']
 
 /**
  * Directivas de Meeko en el nombre de un atributo de una etiqueta de la plantilla (`each:`,
@@ -768,15 +777,22 @@ export function directiveNameCompletion(document: TextDocument, position: Positi
 	const start = document.positionAt(offset - word.length)
 	const end = document.positionAt(nameEnd)
 	const present = writtenAttributes(source, context, offset - word.length)
+	// A tag takes one conditional directive (if, if:when, else-if or else): once one is written, the
+	// others would only lead to the compiler's error.
+	const conditional = conditionalDirectives.some((name) => present.has(name))
+	const offered = (name: string): boolean => !present.has(name) && !(conditional && conditionalDirectives.includes(name))
 	// Items whose range ends at the cursor (`bindAttributeCompletion`…) replace the whole name.
 	const whole = (items: CompletionItem[]): CompletionItem[] => (nameEnd === offset ? items : items.map((item) => (item.textEdit && 'range' in item.textEdit && document.offsetAt(item.textEdit.range.end) === offset ? { ...item, textEdit: { ...item.textEdit, range: { start: item.textEdit.range.start, end } } } : item)))
 	if (context.tag === 'render') {
 		return [
 			{ name: 'snippet', detail: 'Snippet que se va a renderizar', insert: 'snippet="$1"' },
 			{ name: 'args', detail: 'Argumentos del snippet, separados por comas', insert: 'args="$1"' },
+			{ name: 'if', detail: 'Primera rama condicional', insert: 'if="$1"' },
+			{ name: 'else-if', detail: 'Alternativa a la condición anterior', insert: 'else-if="$1"' },
+			{ name: 'else', detail: 'Rama final', insert: 'else' },
 			{ name: 'if:when', detail: 'Renderiza sólo si la expresión es verdadera', insert: 'if:when="$1"' },
 		]
-			.filter((attribute) => !present.has(attribute.name))
+			.filter((attribute) => offered(attribute.name))
 			.map((attribute, index): CompletionItem => ({
 				label: attribute.name,
 				kind: CompletionItemKind.Property,
@@ -790,10 +806,10 @@ export function directiveNameCompletion(document: TextDocument, position: Positi
 	// `<snippet>` only admits name, params and if:when (MEEK061).
 	if (context.tag === 'snippet') {
 		return snippetAttributes
-			.filter((attribute) => !present.has(attribute.name))
+			.filter((attribute) => offered(attribute.name))
 			.map((attribute, index): CompletionItem => ({
 				label: attribute.name,
-				kind: attribute.name === 'if:when' ? CompletionItemKind.Keyword : CompletionItemKind.Property,
+				kind: attribute.name === 'if' || attribute.name === 'if:when' ? CompletionItemKind.Keyword : CompletionItemKind.Property,
 				detail: attribute.detail,
 				documentation: { kind: MarkupKind.Markdown, value: specialTemplateDocumentation('snippet', attribute.name)! },
 				sortText: `0${String(index).padStart(2, '0')}`,
@@ -848,7 +864,7 @@ export function directiveNameCompletion(document: TextDocument, position: Positi
 					})),
 			) ?? []
 		const rejected = new Set(builtin?.rejected ?? [])
-		const html = bindAttributeCompletion(document, position, word, tags ?? [builtin?.element ?? context.tag], present, '1').filter((item) => !rejected.has(item.label.slice(5)) && !builtinProps.some((prop) => prop.label === item.label))
+		const html = bindAttributeCompletion(document, position, word, tags ?? [builtin?.element ?? nativeTagName(context)], present, '1').filter((item) => !rejected.has(item.label.slice(5)) && !builtinProps.some((prop) => prop.label === item.label))
 		return whole(nameOnly([...builtinProps, ...html], valued))
 	}
 	// `model:va`, `ref:ti`: the name after the prefix has its own completion.
@@ -856,7 +872,7 @@ export function directiveNameCompletion(document: TextDocument, position: Positi
 	const directives = templateDirectives
 		.filter((directive) => directive.on === 'all' || directive.on === (component ? 'component' : 'element'))
 		.filter((directive) => !directive.elements || directive.elements.includes((builtin?.element ?? context.tag).toLowerCase()))
-		.filter((directive) => directive.name.endsWith(':') || !present.has(directive.name))
+		.filter((directive) => directive.name.endsWith(':') || offered(directive.name))
 		// The child's own models replace the generic `model:`.
 		.filter((directive) => !(memberItems && directive.name === 'model:'))
 		.map((directive, index): CompletionItem => ({
@@ -879,7 +895,7 @@ export function directiveNameCompletion(document: TextDocument, position: Positi
 	const html = tags ? whole(nameOnly(dynamicTagAttributeCompletion(document, position, word, tags, present), valued)) : htmlAttributeCompletion(document, position, present, builtin?.element).filter((item) => !rejected.has(item.label))
 	// Then each attribute with `bind:` (`bind:class`, `bind:type`…), which `bind` filters to.
 	const builtinBound = new Set(builtin?.props.flatMap((prop) => prop.attributes) ?? [])
-	const bound = bindAttributeCompletion(document, position, word, tags ?? [builtin?.element ?? context.tag], present, '2').filter((item) => !rejected.has(item.label.slice(5)) && !builtinBound.has(item.label) && !builtinBound.has(item.label.slice(5)))
+	const bound = bindAttributeCompletion(document, position, word, tags ?? [builtin?.element ?? nativeTagName(context)], present, '2').filter((item) => !rejected.has(item.label.slice(5)) && !builtinBound.has(item.label) && !builtinBound.has(item.label.slice(5)))
 	return [...ownProps, ...directives, ...refs, ...html, ...whole(nameOnly(bound, valued))]
 }
 
@@ -938,6 +954,7 @@ export function completionList(base: FeatureContext, position: Position, trigger
 	// `<script server>` and a component under server/ (an email template) run only on the server:
 	// the virtual code and the SSR graph resolve their autoimports with the server target.
 	const serverTarget = !browser
+	const serverBlock = context.component !== base.component
 	// A type the project autoimports (`MeekoLinkProps`) needs no import: its own item stands for it.
 	const autoTypes = new Set(
 		context.project
@@ -961,7 +978,8 @@ export function completionList(base: FeatureContext, position: Position, trigger
 		if (entry.source === undefined && !entry.hasAction && generated.has(entry.name)) return false
 		const meeko = meekoAutoImport(context.project, entry, publicExports)
 		if (meeko && 'hidden' in meeko) return false
-		if (serverTarget && entry.hasAction && browserCodeNames.has(entry.name)) return false
+		// `useHead` and `useSeoMeta` are browser code, but a page's `<script server>` imports them from the framework.
+		if (serverTarget && entry.hasAction && browserCodeNames.has(entry.name) && !(serverBlock && (pageHeadApis as readonly string[]).includes(entry.name))) return false
 		if (meeko) publicImports.set(entry, meeko.specifier)
 		const module = meeko?.specifier ?? entry.data?.moduleSpecifier
 		if (!entry.hasAction || module === undefined) return true
@@ -1483,10 +1501,20 @@ export function semanticTokens(context: FeatureContext): SemanticTokens {
 	}
 	addReactiveModifiers(context, tokens)
 	tokens.sort((left, right) => left.start - right.start || left.end - right.end)
+	// Tag and attribute names keep the grammar's color: `variant` in `<Button variant="…">` is a prop
+	// key in the virtual code, and its `property` token would paint it like a TypeScript property.
+	const template = templateExpressionRanges(document.getText())
+	let range = 0
+	const painted = (start: number): boolean => {
+		if (!template || start < template.template.contentStart || start >= template.template.contentEnd) return true
+		while (range < template.ranges.length && template.ranges[range]![1] <= start) range++
+		const current = template.ranges[range]
+		return current !== undefined && current[0] <= start
+	}
 	const builder = new SemanticTokensBuilder()
 	let previousEnd = -1
 	for (const token of tokens) {
-		if (token.start < previousEnd) continue
+		if (token.start < previousEnd || !painted(token.start)) continue
 		previousEnd = token.end
 		const start = document.positionAt(token.start)
 		const end = document.positionAt(token.end)
@@ -1497,6 +1525,52 @@ export function semanticTokens(context: FeatureContext): SemanticTokens {
 		}
 	}
 	return builder.build()
+}
+
+/**
+ * Tokens semánticos de las líneas de un rango, a partir de los del documento completo (en caché por
+ * versión): el editor pinta antes lo visible sin recalcular el componente.
+ * @param tokens Tokens del documento completo.
+ * @param range Rango visible que pide el cliente.
+ * @returns Tokens que empiezan dentro de las líneas del rango.
+ */
+export function semanticTokensInRange(tokens: SemanticTokens, range: Range): SemanticTokens {
+	const data: number[] = []
+	let line = 0
+	let character = 0
+	let previousLine = 0
+	let previousCharacter = 0
+	for (let index = 0; index < tokens.data.length; index += 5) {
+		const deltaLine = tokens.data[index]!
+		line += deltaLine
+		character = deltaLine === 0 ? character + tokens.data[index + 1]! : tokens.data[index + 1]!
+		if (line < range.start.line) continue
+		if (line > range.end.line) break
+		data.push(line - previousLine, line === previousLine ? character - previousCharacter : character, tokens.data[index + 2]!, tokens.data[index + 3]!, tokens.data[index + 4]!)
+		previousLine = line
+		previousCharacter = character
+	}
+	return { data }
+}
+
+/**
+ * Diferencia entre dos resultados de tokens semánticos como una sola edición: el prefijo y el sufijo
+ * comunes no se envían. Al escribir en una línea sólo cambian sus tokens y los desplazamientos.
+ * @param previous Datos que el cliente ya tiene.
+ * @param next Datos nuevos del documento.
+ * @returns Las ediciones que convierten `previous` en `next`; vacías si son iguales.
+ */
+export function semanticTokensEdits(previous: readonly number[], next: readonly number[]): SemanticTokensEdit[] {
+	let start = 0
+	while (start < previous.length && start < next.length && previous[start] === next[start]) start++
+	let previousEnd = previous.length
+	let nextEnd = next.length
+	while (previousEnd > start && nextEnd > start && previous[previousEnd - 1] === next[nextEnd - 1]) {
+		previousEnd--
+		nextEnd--
+	}
+	if (start === previousEnd && start === nextEnd) return []
+	return [{ start, deleteCount: previousEnd - start, data: next.slice(start, nextEnd) }]
 }
 
 /**

@@ -58,6 +58,43 @@ test('configured directories, nested names and overlaps share one autoimport cat
 	)
 })
 
+test('pathPrefix false discovers recursively and names components only from their files', async () => {
+	await fixture(
+		{
+			'meeko.config.ts': 'export default { components: { pathPrefix: false, dirs: [{ path: "app/widgets", prefix: "Ui" }] } };',
+			'app/components/forms/TextInput.meeko': '<template><input /></template>',
+			'app/components/navigation/Main/MenuButton.meeko': '<template><button>Menu</button></template>',
+			'app/components/cards/Index.meeko': '<template><article>Card</article></template>',
+			'app/widgets/feedback/ToastMessage.meeko': '<template><p>Toast</p></template>',
+		},
+		async (root) => {
+			const expected = ['Index', 'MenuButton', 'TextInput', 'UiToastMessage']
+			assert.deepEqual(
+				(await discoverComponents(root)).map((component) => component.name),
+				expected,
+			)
+			assert.deepEqual(
+				discoverComponentsSync(root).map((component) => component.name),
+				expected,
+			)
+		},
+	)
+})
+
+test('pathPrefix false reports duplicate file names in different subfolders', async () => {
+	await fixture(
+		{
+			'meeko.config.ts': 'export default { components: { pathPrefix: false } };',
+			'app/components/forms/Input.meeko': '<template><input /></template>',
+			'app/components/search/Input.meeko': '<template><input /></template>',
+		},
+		async (root) => {
+			await assert.rejects(discoverComponents(root), /Nombre de componente duplicado Input/)
+			assert.throws(() => discoverComponentsSync(root), /Nombre de componente duplicado Input/)
+		},
+	)
+})
+
 test('project component takes precedence over the same name in a layer', async () => {
 	await fixture(
 		{
@@ -79,14 +116,15 @@ test('module component directories participate after project sources', async () 
 	const moduleDefinition = new URL('../src/modules/define-meeko-module.ts', import.meta.url).href
 	await fixture(
 		{
-			'meeko.config.ts': `import { defineMeekoModule } from ${JSON.stringify(moduleDefinition)}; export default { modules: [defineMeekoModule({ meta: { name: "ui" }, setup(_options, meeko) { meeko.addComponentsDir("module-components", { prefix: "Ui" }); } })] };`,
+			'meeko.config.ts': `import { defineMeekoModule } from ${JSON.stringify(moduleDefinition)}; export default { modules: [defineMeekoModule({ meta: { name: "ui" }, setup(_options, meeko) { meeko.addComponentsDir("module-components", { prefix: "Ui", rename: { Icon: "Glyph" } }); } })] };`,
 			'module-components/Badge.meeko': '<template><p>Badge</p></template>',
+			'module-components/Icon.meeko': '<template><i /></template>',
 		},
 		async (root) => {
 			const components = await discoverComponents(root)
 			assert.deepEqual(
 				components.map((component) => component.name),
-				['UiBadge'],
+				['Glyph', 'UiBadge'],
 			)
 			assert.equal(
 				(await discoverAutoImports(root)).some((entry) => entry.name === 'UiBadge' && entry.component),
@@ -159,6 +197,10 @@ test('component paths and prefixes are validated in executed and static configur
 	await fixture({ 'meeko.config.ts': `export default { components: { dirs: [{ path: "app/components", prefix: "bad prefix" }] } };` }, async (root) => {
 		await assert.rejects(loadMeekoConfig(root), /components\.dirs\[0\]\.prefix/)
 		assert.throws(() => readMeekoConfigSync(root), /components\.dirs\[0\]\.prefix/)
+	})
+	await fixture({ 'meeko.config.ts': 'export default { components: { pathPrefix: "no" } };' }, async (root) => {
+		await assert.rejects(loadMeekoConfig(root), /components\.pathPrefix/)
+		assert.throws(() => readMeekoConfigSync(root), /components\.pathPrefix/)
 	})
 })
 

@@ -138,6 +138,23 @@ export function menuItems(content: ParentNode): HTMLElement[] {
 	return [...content.querySelectorAll<HTMLElement>('[role=menuitem],[role=menuitemcheckbox],[role=menuitemradio]')]
 }
 
+/**
+ * Whether the browser itself shows `content` for `trigger`, with Interest Invokers. Asked of the element
+ * and not of the browser, because a `<span>` or a component that does not forward `interestfor` needs the
+ * script too. The property alone is not enough: a disabled `<button>` or an `<a>` without `href` report
+ * their target, but the browser ignores them while the script opens them. An SVG `<a>` does open, but in
+ * Chrome 156 the pointer that leaves it never closes it, so it stays as it was: `showPopover` takes no SVG
+ * `source`, and it opens nowhere.
+ */
+export function interestSource(trigger: Element, content: Element): boolean {
+	return (trigger as Element & { interestForElement?: Element | null }).interestForElement === content && trigger.matches('button:not(:disabled),:any-link:not(svg a)')
+}
+
+/** A delay of `mode="hint"` as a CSS time: a value that `setTimeout` would not wait for is `0ms`, which is also valid in CSS. */
+export function interestDelay(value: number | undefined, fallback: number): string {
+	const delay = value ?? fallback
+	return `${Number.isFinite(delay) && delay > 0 ? delay : 0}ms`
+}
 /** The hints of a document waiting for the pointer or the focus, by the `id` of their trigger. */
 interface TriggerWatches {
 	readonly byId: Map<string, Set<() => void>>
@@ -225,6 +242,7 @@ export function createPopover(props: UIPopoverProps, open: Signal<boolean>, id: 
 			'aria-expanded': hint ? undefined : open.value ? 'true' : 'false',
 			'aria-haspopup': role.value === 'menu' || role.value === 'dialog' ? role.value : undefined,
 			'aria-describedby': hint ? contentId : undefined,
+			interestfor: hint ? contentId : undefined,
 		}
 	})
 	let element: HTMLElement | null = null
@@ -347,12 +365,13 @@ export function createPopover(props: UIPopoverProps, open: Signal<boolean>, id: 
 			if (now !== last) apply(now)
 		}
 		const hinting = (): boolean => untrack(() => mode.value) === 'hint'
-		// Nothing else closes a hint whose trigger left the document: no pointer leaves it. From `beforetoggle`,
-		// because `toggle` comes too late for a trigger that leaves right after the opening.
+		// Nothing else closes a hint whose trigger left the document: no pointer leaves it, and the browser
+		// loses the interest without closing the content. From `beforetoggle`, because `toggle` comes too late
+		// for a trigger that leaves right after the opening.
 		let triggerWatch: MutationObserver | undefined
 		// Only while open, so that a closed tooltip costs nothing on every key of the page.
 		const closeOnEscape = (event: Event): void => {
-			if ((event as KeyboardEvent).key === 'Escape' && popoverOpen(content)) hide()
+			if ((event as KeyboardEvent).key === 'Escape' && scripted() && popoverOpen(content)) hide()
 		}
 		function watchTrigger(opening: boolean): void {
 			triggerWatch?.disconnect()
@@ -372,6 +391,10 @@ export function createPopover(props: UIPopoverProps, open: Signal<boolean>, id: 
 			watchTrigger((event as ToggleEvent).newState === 'open')
 		})
 		listen(content, 'toggle', (event) => synced((event as ToggleEvent).newState ? (event as ToggleEvent).newState === 'open' : popoverOpen(content)))
+
+		// `interestfor` needs no script, so a hint can be open already: the model follows it, not the reverse.
+		const openedBefore = hinting() && popoverOpen(content) && !untrack(() => open.value)
+		if (openedBefore) open.value = true
 
 		// The model opens and closes the content.
 		releases.push(
@@ -435,7 +458,8 @@ export function createPopover(props: UIPopoverProps, open: Signal<boolean>, id: 
 			queueMicrotask(closeToTrigger)
 		})
 
-		// Hint: hover and focus open it after a delay, without taking the focus.
+		// Hint: hover and focus open it after a delay, without taking the focus. On a source of Interest
+		// Invokers the browser does it, and this script only adds what the browser leaves out.
 		let hintTimer: ReturnType<typeof setTimeout> | undefined
 		const later = (work: () => void, delay: number): void => {
 			if (hintTimer !== undefined) clearTimeout(hintTimer)
@@ -447,15 +471,30 @@ export function createPopover(props: UIPopoverProps, open: Signal<boolean>, id: 
 		releases.push(() => {
 			if (hintTimer !== undefined) clearTimeout(hintTimer)
 		})
+		/** Whether this script opens and closes the hint of `target`. */
+		const scripted = (target: HTMLElement | null = anchor): boolean => hinting() && !(target && interestSource(target, content))
 		listen(content, 'pointerenter', () => {
-			if (hinting() && hintTimer !== undefined) clearTimeout(hintTimer)
+			if (scripted() && hintTimer !== undefined) clearTimeout(hintTimer)
 		})
 		listen(content, 'pointerleave', () => {
-			if (hinting())
+			if (scripted())
 				later(
 					hide,
 					untrack(() => props.closeDelay ?? 150),
 				)
+		})
+		// The browser only closes what it opened: a hint that the model or a touch had opened closes here,
+		// and only that one, because the event comes first and this would take over every other closing.
+		let openedByOthers = false
+		listen(content, 'interest', (event) => {
+			// An SVG `<a>` with the attribute: the browser would open a hint that no pointer can close.
+			if (scripted((event as Event & { source?: HTMLElement | null }).source ?? anchor)) event.preventDefault()
+			else openedByOthers = popoverOpen(content)
+		})
+		listen(content, 'loseinterest', () => {
+			if (!openedByOthers) return
+			openedByOthers = false
+			if (hinting()) hide()
 		})
 
 		// A declaration, because a model that starts open reaches it from the effect above, before this line.
@@ -467,6 +506,35 @@ export function createPopover(props: UIPopoverProps, open: Signal<boolean>, id: 
 			}
 			releaseTrigger = () => {
 				for (const release of own.splice(0)) release()
+			}
+			if ('interestForElement' in target) {
+				// Only the stylesheet can tell the focus from the pointer: see popover.css.
+				const delays = (hint: boolean): void => {
+					target.toggleAttribute('data-meeko-popover-interest', hint)
+					if (hint) {
+						target.style.setProperty('--popover-delay', interestDelay(props.delay, 300))
+						target.style.setProperty('--popover-close-delay', interestDelay(props.closeDelay, 150))
+					} else {
+						target.style.removeProperty('--popover-delay')
+						target.style.removeProperty('--popover-close-delay')
+					}
+				}
+				own.push(
+					effect(() => delays(mode.value === 'hint')),
+					() => delays(false),
+				)
+				// The browser takes the delay of the trigger before `pointerover` is dispatched: a trigger replaced
+				// under the same `id` (an `if:when` in the anchor snippet) needs its delays before the pointer comes,
+				// not when it is reached. Its siblings change together, so watching the parent is enough.
+				const parent = target.parentNode
+				if (parent && typeof MutationObserver !== 'undefined') {
+					const replaced = new MutationObserver(() => {
+						const next = document.getElementById(untrack(() => triggerId.value))
+						if (next && next !== target && untrack(() => mode.value) === 'hint') triggerElement()
+					})
+					replaced.observe(parent, { childList: true })
+					own.push(() => replaced.disconnect())
+				}
 			}
 			on('keydown', (event) => {
 				const key = event as KeyboardEvent
@@ -485,27 +553,32 @@ export function createPopover(props: UIPopoverProps, open: Signal<boolean>, id: 
 				} else if (key.key === 'Enter' || key.key === ' ') pending = 'first'
 			})
 			on('pointerenter', () => {
-				if (hinting())
+				if (scripted(target))
 					later(
 						show,
 						untrack(() => props.delay ?? 300),
 					)
 			})
 			on('pointerleave', () => {
-				if (hinting())
+				if (scripted(target))
 					later(
 						hide,
 						untrack(() => props.closeDelay ?? 150),
 					)
 			})
 			on('focusin', () => {
-				if (hinting()) {
+				if (scripted(target)) {
 					if (hintTimer !== undefined) clearTimeout(hintTimer)
 					show()
 				}
 			})
 			on('focusout', () => {
-				if (hinting()) hide()
+				if (scripted(target)) hide()
+			})
+			// A tap shows no interest, only a long press does: the hint would not appear where the focus opens it.
+			on('click', (event) => {
+				const kind = (event as PointerEvent).pointerType
+				if (hinting() && !scripted(target) && (kind === 'touch' || kind === 'pen')) show()
 			})
 		}
 		triggerElement()
@@ -532,6 +605,10 @@ export function createPopover(props: UIPopoverProps, open: Signal<boolean>, id: 
 			}),
 		)
 		if (untrack(() => open.value) && !popoverOpen(content)) show()
+		if (openedBefore) {
+			apply(true)
+			watchTrigger(true)
+		}
 		// A model that starts open shows the content while mounting: not a change to report.
 		started = 0
 		return () => {

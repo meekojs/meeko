@@ -16,7 +16,7 @@ related:
   - "@meekojs/meeko/framework#definePlugin"
   - docs/framework.md#routing-layouts-y-ssr
   - docs/framework.md#errores
-source-hash: 1c0e728a84f11fb377f8ff297c533ac38ff3ef60406be51c0752033d26bc7199
+source-hash: ec573f50276beee26af9e73c3d9ce09e9c2da6e12c24299c6fe3a38a81640c7c
 ---
 
 `mountClientApp` starts a Meeko application in the browser. It reads the payload left by the server in `#meeko-payload`, checks that the route and parameters match SSR, runs plugins and route middleware, and **hydrates** existing HTML (does not render it again). It then intercepts same-origin link clicks and history: on each navigation it requests page data from the server (`Accept: application/meeko+json`) or runs a `render: "client"` route's loader, replacing only the first changed outlet and retaining shared layouts with their state.
@@ -91,7 +91,7 @@ await app.navigate("/users/42");
 await app.navigate("/users/42?tab=perfil", { replace: true });
 ```
 
-In a component, typically use `useNavigation().navigate(…)` or a `<MeekoLink>`; `app.navigate` is for code outside components, such as a global keyboard shortcut.
+In a component, use a `<MeekoLink>` to link pages. `useNavigation()` only exposes the `pending` state, not a `navigate` method. `app.navigate` belongs to the instance returned by `mountClientApp` and allows navigation from code that has access to it, such as a global keyboard shortcut.
 
 ### A static site
 

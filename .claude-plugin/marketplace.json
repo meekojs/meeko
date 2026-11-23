@@ -1,0 +1,18 @@
+{
+	"name": "meeko",
+	"owner": {
+		"name": "Meeko",
+		"url": "https://meekojs.com"
+	},
+	"metadata": {
+		"description": "Official Claude Code plugins for the Meeko framework."
+	},
+	"plugins": [
+		{
+			"name": "meeko",
+			"source": "./plugins/meeko",
+			"description": "Teaches AI agents to write correct .meeko components, Meeko Framework apps and tooling commands.",
+			"category": "development"
+		}
+	]
+}

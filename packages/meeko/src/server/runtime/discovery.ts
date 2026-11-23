@@ -7,10 +7,10 @@ import type { RequestContext, ServerFetch } from './request-context'
 import type { SessionManager } from './sessions'
 
 import { dispatchApiRoute } from '../api/runtime'
-import { errorResponse, setRateLimitRoute } from '../contract-runtime'
+import { errorResponse, finish, setRateLimitRoute } from '../contract-runtime'
 import { ApiError, reportServerError } from '../errors'
 import { dispatchRpc } from '../rpc/runtime'
-import { createRequestContext, idempotencyKeyOf } from './request-context'
+import { activeRequestOf, createRequestContext, deriveContext, idempotencyKeyOf, withRequestContext } from './request-context'
 
 /**
  * Método HTTP de un endpoint de API, el sufijo de `server/api/<ruta>.<método>.ts`.
@@ -149,9 +149,19 @@ export function clientSegment(param: string): string {
 	return `by${param[0]!.toUpperCase()}${param.slice(1)}`
 }
 
+/**
+ * The client name of a static segment: a URL allows `compras-meta` or `2fa`, a property of the
+ * client is an identifier. Hyphens become camelCase (`comprasMeta`) and a leading digit gets `_`
+ * (`_2fa`). Two segments with the same name are a collision (`assertClientSegments`).
+ */
+export function staticClientSegment(segment: string): string {
+	const camel = segment.replace(/-+([A-Za-z0-9])/g, (_, next: string) => next.toUpperCase()).replaceAll('-', '')
+	return /^[0-9]/.test(camel) ? `_${camel}` : camel
+}
+
 export function clientKey(pathname: string): string {
 	return parts(pathname)
-		.map((part) => (part.kind === 'static' ? part.value : clientSegment(part.value)))
+		.map((part) => (part.kind === 'static' ? staticClientSegment(part.value) : clientSegment(part.value)))
 		.join('.')
 }
 
@@ -160,13 +170,13 @@ export function clientKey(pathname: string): string {
  * client segment must be either static or the segment of one route parameter, in every route.
  */
 export function assertClientSegments(api: readonly Pick<ApiEndpoint, 'file' | 'pathname'>[]): void {
-	const seen = new Map<string, { file: string; segment: string }>()
+	const seen = new Map<string, { file: string; segment: string; source: string }>()
 	for (const endpoint of api) {
 		const routeParts = parts(endpoint.pathname).slice(1)
 		const params = routeParts.filter((part) => part.kind !== 'static').map((part) => part.value)
 		let path = ''
 		for (const part of routeParts) {
-			const name = part.kind === 'static' ? part.value : clientSegment(part.value)
+			const name = part.kind === 'static' ? staticClientSegment(part.value) : clientSegment(part.value)
 			const describe = (value: string) => (value === '' ? `el segmento estático ${name}` : `el segmento [${value}]`)
 			const matches = params.filter((param) => clientSegment(param) === name)
 			if (part.kind === 'static' ? matches.length > 0 : matches.length > 1) {
@@ -178,7 +188,11 @@ export function assertClientSegments(api: readonly Pick<ApiEndpoint, 'file' | 'p
 			if (previous && previous.segment !== segment) {
 				throw new Error(`Colisión de nombres del cliente de API: ${previous.file} (${describe(previous.segment)}) y ${endpoint.file} (${describe(segment)}) resuelven los dos a ${path}`)
 			}
-			if (!previous) seen.set(path, { file: endpoint.file, segment })
+			// `compras-meta` y `comprasMeta` son dos URLs, pero un solo nombre del cliente.
+			if (previous && previous.source !== part.value) {
+				throw new Error(`Colisión de nombres del cliente de API: ${previous.file} (el segmento estático ${previous.source}) y ${endpoint.file} (el segmento estático ${part.value}) resuelven los dos a ${path}`)
+			}
+			if (!previous) seen.set(path, { file: endpoint.file, segment, source: part.value })
 		}
 	}
 }
@@ -318,14 +332,17 @@ export function createContextDispatcher<S>(options: Pick<ServerDispatcherOptions
 	if (typeof options.load !== 'function') throw new TypeError('Server dispatch requires a module loader')
 	const api = [...options.manifest.api].sort(compareApi)
 	const load = options.load
-	return async (context) => {
+	// Each endpoint runs with its context bound, for getRequestContext(); a local call from SSR keeps
+	// the outer page's server fetch.
+	return (context) => withRequestContext(context, activeRequestOf()?.serverFetch, () => dispatchBound(context))
+	async function dispatchBound(context: RequestContext<S>): Promise<Response> {
 		const request = context.request
 		try {
 			const pathname = new URL(request.url).pathname
 			if (pathname.startsWith('/_meeko/rpc/')) {
 				const endpoint = options.manifest.rpc.find((record) => record.pathname === pathname)
 				if (!endpoint) throw new ApiError('NOT_FOUND', 404)
-				if (request.method !== 'POST') return methodNotAllowed(context.requestId, ['POST'])
+				if (request.method !== 'POST') return finish(methodNotAllowed(context.requestId, ['POST']), context)
 				const definition = exportedDefinition(await load(endpoint.file)) as RpcDefinition<Schema, Schema, S>
 				setRateLimitRoute(context, `rpc ${endpoint.id}`)
 				return dispatchRpc(definition, context, options.sessions, options.onError)
@@ -342,11 +359,12 @@ export function createContextDispatcher<S>(options: Pick<ServerDispatcherOptions
 				setRateLimitRoute(context, `api ${endpoint.method} ${endpoint.pathname}`)
 				return dispatchApiRoute(definition, context, options.sessions, params, options.onError)
 			}
-			if (allowed.length) return methodNotAllowed(context.requestId, allowed)
+			if (allowed.length) return finish(methodNotAllowed(context.requestId, allowed), context)
 			throw new ApiError('NOT_FOUND', 404)
 		} catch (error) {
 			reportServerError(error, context.requestId, options.onError)
-			return errorResponse(error, context.requestId)
+			// Cookies a services factory wrote, such as a refreshed token, still reach the client.
+			return finish(errorResponse(error, context.requestId), context)
 		}
 	}
 }
@@ -418,7 +436,8 @@ export function createLocalServerFetch<S>(options: Pick<ServerDispatcherOptions<
 			}
 		}
 		// The key belongs to the request it came with, not to the one that dispatches this call.
-		const context: RequestContext<S> = { ...active, request, signal: request.signal, idempotencyKey: idempotencyKeyOf(request) } as RequestContext<S>
+		// The derived context shares the cookies and response headers of the original request.
+		const context = deriveContext(active, { request, signal: request.signal, idempotencyKey: idempotencyKeyOf(request) }) as RequestContext<S>
 		return dispatch(context)
 	}
 }

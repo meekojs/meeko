@@ -28,6 +28,7 @@ export function createUseRpcQuery<Contract extends Record<string, RpcOperation>>
 		return createResource(
 			{
 				label: `useRpcQuery("${procedure}")`,
+				dataKey: procedure,
 				// An RPC body is JSON: a left-out input sends `{}`.
 				read: readerOf(input === undefined ? {} : input),
 				key: (value) => `RPC ${procedure} ${stableJson(value)}`,

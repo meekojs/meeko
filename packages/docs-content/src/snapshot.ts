@@ -4,11 +4,11 @@ import type { SourceOverlay } from './sources/overlay'
 
 import { apiHref, apiIndex, apiKinds, apiPage, apiPager, apiSlugs } from './content/api'
 import { apiGroups, exportsHref, groupHref, referenceHref } from './content/api-groups'
-import { catalog, catalogLabel, catalogSection, navigation, pager } from './content/catalog'
+import { catalog, catalogLabel, catalogSection, docsIndexSlugs, navigation, pager } from './content/catalog'
 import { createHighlight, createTokenizer } from './content/highlight'
 import { codeBlockHtml, escapeHtml, renderSource } from './content/markdown'
 import { messages } from './content/messages'
-import { llmsFull, llmsIndex, referenceEntryAt, referenceIndex, referenceNavigation, referenceOnlySlugs, referencePage, referencePager, writtenPages } from './content/reference'
+import { llmsFull, llmsIndex, referenceIndex, referenceNavigation, referenceOnlySlugs, referencePage, referencePager, writtenPages } from './content/reference'
 import { groupIcons, taxonomyPath } from './content/reference-taxonomy'
 import { createSourceContext, currentLocale, githubUrl, pageLocale, readRepositoryFile, refreshSources, siteOrigin, withSourceContext } from './content/repository'
 import { docsLocales, localizedPath } from './locale'
@@ -124,14 +124,14 @@ async function renderPages(): Promise<SnapshotPage[]> {
 		countLine: exampleLines.findIndex((line) => markOf(line) === 'count') + 1,
 		doubledLine: exampleLines.findIndex((line) => markOf(line) === 'doubled') + 1,
 	}
-	const command = `pnpm exec meeko init-framework ${text.appName}`
+	const command = `npm exec --yes --package=@meekojs/meeko@1.9.0 -- meeko init-framework ${text.appName}`
 	const highlight = await createHighlight()
 	add('/', {
 		demo,
 		editorLines: demoLines.slice(9, 17).map((line, index) => ({ html: line.html, number: index + 10, count: 'mark' in line && line.mark === 'count' })),
 		command,
 		quickStart: codeBlockHtml('terminal', highlight([command, `cd ${text.appName}`, 'npm install', 'npm run dev'].join('\n'), 'shellscript')),
-		version: (JSON.parse(readRepositoryFile('package.json')) as { version: string }).version,
+		version: '1.9.0',
 		head: { title: text.homeTitle, description: text.homeDescription },
 	})
 
@@ -142,9 +142,11 @@ async function renderPages(): Promise<SnapshotPage[]> {
 			return { entry, doc, markdown: transform(readRepositoryFile(entry.source)) }
 		}),
 	)
-	const sections = [...new Set(guides.map(({ entry }) => entry.section))].map((title) => ({
+	// The map presents a few useful destinations per intent. The full inventory stays in the sidebar.
+	const mapGuides = guides.filter(({ entry }) => docsIndexSlugs.has(entry.slug))
+	const sections = [...new Set(mapGuides.map(({ entry }) => entry.section))].map((title) => ({
 		title: catalogSection(title),
-		docs: guides.filter(({ entry }) => entry.section === title).map(({ entry, doc }) => ({ href: entry.href, section: entry.section, title: doc.title, description: doc.description })),
+		docs: mapGuides.filter(({ entry }) => entry.section === title).map(({ entry, doc }) => ({ href: entry.href, section: entry.section, title: doc.title, description: doc.description })),
 	}))
 	add('/docs', { sections })
 	for (const { entry, doc } of guides) {
@@ -203,15 +205,14 @@ async function renderPages(): Promise<SnapshotPage[]> {
 		const written = (await referencePage(symbol)) ?? null
 		const page = written ? null : ((await apiPage(symbol)) ?? null)
 		if (!written && !page) throw new Error(`Missing reference page: ${symbol}`)
-		const entry = await referenceEntryAt(href)
 		const title = written?.title ?? page?.name ?? symbol
 		add(
 			href,
 			{
 				written,
 				page,
-				nav: await referenceNavigation(),
-				current: entry ? entry.href : (page?.group.href ?? referenceHref),
+				nav: await referenceNavigation(href, title),
+				current: href,
 				pages: (await referencePager(href)) ?? (await apiPager(symbol)),
 				toc: written?.toc ?? page?.toc ?? [],
 				editUrl: written?.editUrl ?? page?.editUrl ?? '',

@@ -1,7 +1,7 @@
 import type { SocketConnection, SocketHub, SocketPeer } from '../socket/runtime'
 
 import { normalizeServerError, observeErrorCallback } from '../errors'
-import { copySocketAddress } from './env'
+import { copySocketAddress, requestTargetUrl } from './env'
 
 /**
  * Opciones de {@link createSocketUpgradeHandler}.
@@ -351,7 +351,7 @@ export function createSocketUpgradeHandler(options: SocketUpgradeOptions): Socke
 		if (incoming.method !== 'GET' || incoming.headers.get('upgrade')?.toLowerCase() !== 'websocket') return { action: 'reject', status: 400 }
 		// Origin checks compare against the request URL, so it carries the public origin.
 		const base = loopbackAlias(origin, incoming.headers.get('origin')) ?? origin
-		const request = copySocketAddress(incoming, new Request(new URL(url.pathname + url.search, base), { headers: incoming.headers }))
+		const request = copySocketAddress(incoming, new Request(requestTargetUrl(url.pathname + url.search, base.origin), { headers: incoming.headers }))
 		const roomId = url.searchParams.get('room') ?? undefined
 		try {
 			await hub.preflight(name, request, roomId)

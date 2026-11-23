@@ -1,93 +1,41 @@
-/* <UIPopover>: its place, without JavaScript. The `meeko` layer lets any rule of the application win.
-   A browser without anchor positioning opens the content without an anchor: it still works. */
+/*
+ * <UIPopover>: what its classes (../variants/popover.ts) cannot reach. The items of a menu are the app's
+ * markup, a native <button> or <a>, or a <UIButton variant="ghost">, and the trigger of a tooltip that the
+ * browser opens by itself can be any element of the app.
+ */
+[data-meeko-popover] :is([role='menuitem'], [role='menuitemcheckbox'], [role='menuitemradio']) {
+	display: flex;
+	justify-content: flex-start;
+	cursor: pointer;
+	border: 0;
+	border-radius: var(--ui-radius-sm);
+	background: transparent;
+	padding: var(--ui-space-1-5) var(--ui-space-2);
+	width: 100%;
+	min-height: 0;
+	color: inherit;
+	font: inherit;
+	text-align: start;
+	text-decoration: none;
+}
+[data-meeko-popover] :is([role='menuitem'], [role='menuitemcheckbox'], [role='menuitemradio']):is(:hover, :focus) {
+	outline: none;
+	background: var(--ui-color-control-active);
+}
+[data-meeko-popover] :is([role='menuitem'], [role='menuitemcheckbox'], [role='menuitemradio']):focus-visible {
+	outline: var(--ui-focus-ring);
+	outline-offset: calc(var(--ui-focus-ring-offset) * -1);
+}
+
+/* The delays of a tooltip that the browser opens by itself, from `interestfor`: `delay` is for the pointer,
+   and the focus does not wait. ../utils/popover.ts marks the trigger and gives the delays. The `meeko` layer
+   lets any rule of the application win. */
 @layer meeko {
-	[data-meeko-popover] {
-		position-anchor: auto;
-		position-try-fallbacks: flip-block, flip-inline;
-		translate: var(--popover-from, 0 calc(var(--ui-space-1) * -1));
-		opacity: var(--ui-opacity-hidden);
-		transition:
-			opacity var(--ui-duration-base) var(--ui-ease-out),
-			translate var(--ui-duration-base) var(--ui-ease-out),
-			display var(--ui-duration-base) allow-discrete,
-			overlay var(--ui-duration-base) allow-discrete;
-		box-sizing: border-box;
-		margin: 0;
-		inset: auto;
+	[data-meeko-popover-interest] {
+		interest-delay-start: var(--popover-delay);
+		interest-delay-end: var(--popover-close-delay);
 	}
-	[data-meeko-popover]:popover-open {
-		translate: 0;
-		opacity: var(--ui-opacity-visible);
-	}
-	@starting-style {
-		[data-meeko-popover]:popover-open {
-			translate: var(--popover-from, 0 calc(var(--ui-space-1) * -1));
-			opacity: var(--ui-opacity-hidden);
-		}
-	}
-	[data-meeko-popover][data-match-width] {
-		min-width: anchor-size(width);
-	}
-
-	/* It slides out of its trigger, on the side it opens. */
-	[data-meeko-popover][data-placement^='bottom'] {
-		--popover-from: 0 calc(var(--ui-space-1) * -1);
-		margin-block-start: var(--popover-offset, 0);
-	}
-	[data-meeko-popover][data-placement^='top'] {
-		--popover-from: 0 var(--ui-space-1);
-		margin-block-end: var(--popover-offset, 0);
-	}
-	[data-meeko-popover][data-placement^='right'] {
-		--popover-from: calc(var(--ui-space-1) * -1) 0;
-		margin-inline-start: var(--popover-offset, 0);
-	}
-	[data-meeko-popover][data-placement^='left'] {
-		--popover-from: var(--ui-space-1) 0;
-		margin-inline-end: var(--popover-offset, 0);
-	}
-
-	[data-meeko-popover][data-placement='top'] {
-		position-area: top;
-	}
-	[data-meeko-popover][data-placement='top-start'] {
-		position-area: top span-right;
-	}
-	[data-meeko-popover][data-placement='top-end'] {
-		position-area: top span-left;
-	}
-	[data-meeko-popover][data-placement='bottom'] {
-		position-area: bottom;
-	}
-	[data-meeko-popover][data-placement='bottom-start'] {
-		position-area: bottom span-right;
-	}
-	[data-meeko-popover][data-placement='bottom-end'] {
-		position-area: bottom span-left;
-	}
-	[data-meeko-popover][data-placement='left'] {
-		position-area: left;
-	}
-	[data-meeko-popover][data-placement='left-start'] {
-		position-area: left span-bottom;
-	}
-	[data-meeko-popover][data-placement='left-end'] {
-		position-area: left span-top;
-	}
-	[data-meeko-popover][data-placement='right'] {
-		position-area: right;
-	}
-	[data-meeko-popover][data-placement='right-start'] {
-		position-area: right span-bottom;
-	}
-	[data-meeko-popover][data-placement='right-end'] {
-		position-area: right span-top;
-	}
-
-	@media (prefers-reduced-motion: reduce) {
-		[data-meeko-popover] {
-			translate: none;
-			transition: none;
-		}
+	[data-meeko-popover-interest]:focus-visible {
+		interest-delay-start: calc(var(--popover-delay) * 0);
 	}
 }

@@ -76,19 +76,27 @@ test('form control borders reach 3:1 against every background and control state 
 })
 
 test('every form control draws its border from --ui-color-control-border, not from a decorative border', async () => {
-	const main = await read('main.css')
-	const forms = await read('forms.css')
-	const rule = (css, selector) => {
-		const start = css.indexOf(`${selector} {`)
-		assert.notEqual(start, -1, `no ${selector} rule`)
-		return css.slice(start, css.indexOf('\n}', start))
+	const variant = (name) => readFile(new URL(`../src/app/variants/${name}.ts`, import.meta.url), 'utf8')
+	const component = (name) => readFile(new URL(`../src/app/components/${name}.meeko`, import.meta.url), 'utf8')
+	// The variants are on Tailwind: the border is the color control-border of theme.css.
+	assert.match(await read('theme.css'), /--color-control-border: var\(--ui-color-control-border\);/)
+	// <UIInput>, <UITextarea> and, through `control`, the trigger of <UISelect> and <UICombobox>.
+	assert.match(await variant('input'), /ui:border-solid ui:border-control-border /)
+	for (const name of ['Select', 'Combobox']) {
+		const source = await component(name)
+		assert.match(source, /import \{ control \} from '\.\.\/variants\/input'/, name)
+		assert.match(source, /const triggerClass = computed\(\(\) => control\(/, name)
 	}
-	// The same rule paints <UIInput>, <UITextarea> and the trigger of <UISelect> and <UICombobox>.
-	assert.match(rule(main.replaceAll('\r\n', '\n'), '.meeko-ui-input,\n[data-meeko-select-trigger]'), /border: var\(--ui-border-width\) solid var\(--ui-color-control-border\)/)
-	assert.match(rule(main, ".meeko-ui-button[data-variant='outline']"), /border-color: var\(--ui-color-control-border\)/)
-	for (const selector of ['.meeko-ui-choice:not(.meeko-ui-switch) input', '.meeko-ui-switch input', ".meeko-ui-radio-group[data-variant='segmented'] .meeko-ui-radio-options"]) assert.match(rule(forms, selector), /solid var\(--ui-color-control-border\)/, selector)
-	assert.match(rule(forms, '.meeko-ui-slider input::-webkit-slider-runnable-track'), /var\(--ui-color-control-border\)/)
-	assert.match(rule(forms, '.meeko-ui-slider input::-moz-range-track'), /var\(--ui-color-control-border\)/)
+	assert.match(await variant('button'), /variant: 'outline', tone: 'neutral', class: 'ui:border-control-border /)
+	// The box of a checkbox or a radio, the track of a switch and the frame of a segmented group.
+	const choice = await variant('choice')
+	assert.match(choice, /const boxBorder = '[^']*ui:border-solid ui:border-control-border /)
+	assert.match(choice, /'ui:border-\(length:--ui-border-width\) ui:border-solid ui:border-control-border ui:checked:border-primary ui:aria-\[invalid=true\]:border-danger'/)
+	assert.match(choice, /const track = '[^']*ui:border-solid ui:border-control-border /)
+	// The track of a slider, in WebKit and Blink and in Firefox.
+	const slider = await variant('slider')
+	assert.match(slider, /\[&::-webkit-slider-runnable-track\]:\[background:[^\]]*var\(--ui-color-control-border\)/)
+	assert.match(slider, /\[&::-moz-range-track\]:bg-control-border/)
 })
 
 /** The value of a token that points to a step, in a theme: `--ui-color-text` becomes a hex. */
@@ -172,7 +180,13 @@ test('text, soft text and focus tokens stay readable on every background', () =>
 })
 
 /** Comments, the prelude of a media query and the sheet's `@font-face` source are not values of a component. */
-const strip = (css) => css.replace(/\/\*[\s\S]*?\*\//g, '').replace(/@media[^{]+\{/g, '{')
+// A media query, a Tailwind breakpoint and a size of a container query (theme.css) take no var(): their lengths are the only raw ones.
+const strip = (css) =>
+	css
+		.replace(/\/\*[\s\S]*?\*\//g, '')
+		.replace(/@media[^{]+\{/g, '{')
+		.replace(/--breakpoint-[\w-]+:[^;]+;/g, '')
+		.replace(/--container-(?:card|stat)-narrow:[^;]+;/g, '')
 
 async function componentSheets() {
 	const names = (await readdir(styles)).filter((name) => name.endsWith('.css') && !['palette.css', 'tokens.css', 'fonts.css'].includes(name))
@@ -183,7 +197,13 @@ test('component sheets and components have no colour, size, time or weight outsi
 	const sheets = await componentSheets()
 	assert.ok(sheets.length >= 7)
 	const meeko = (await readdir(components, { recursive: true })).filter((name) => name.endsWith('.meeko'))
-	const sources = [...sheets, ...(await Promise.all(meeko.map(async (name) => [name, await readFile(new URL(name.replaceAll('\\', '/'), components), 'utf8')])))]
+	const variants = new URL('../src/app/variants/', import.meta.url)
+	const classes = (await readdir(variants)).filter((name) => name.endsWith('.ts'))
+	const sources = [
+		...sheets,
+		...(await Promise.all(meeko.map(async (name) => [name, await readFile(new URL(name.replaceAll('\\', '/'), components), 'utf8')]))),
+		...(await Promise.all(classes.map(async (name) => [name, await readFile(new URL(name, variants), 'utf8')]))),
+	]
 	for (const [name, css] of sources) {
 		assert.doesNotMatch(css, /#[0-9a-fA-F]{3,8}\b(?![\w-])(?=[\s;,)])/, `${name}: a hex colour`)
 		assert.doesNotMatch(css, /\brgba?\(|\bhsla?\(|\boklch\(/, `${name}: a colour function`)
@@ -193,12 +213,11 @@ test('component sheets and components have no colour, size, time or weight outsi
 })
 
 test('what must differ from a surface does not rest on --ui-color-control, which ui.tokens.surface also sets', async () => {
-	const card = strip(await read('card.css'))
-	const linkCard = strip(await read('link-card.css'))
-	const table = strip(await read('table.css'))
-	assert.match(card, /\[data-variant='soft'\] \{\s*--card-background: var\(--ui-color-control-hover\)/)
-	assert.match(linkCard, /:hover \{[^}]*background: var\(--ui-color-control-hover\)/)
-	assert.match(table, /--table-hover: var\(--ui-color-control-hover\)/)
+	const { card, linkCard } = await import('../dist/app/variants/card.js')
+	const { table } = await import('../dist/app/variants/table.js')
+	assert.match(card({ variant: 'soft' }).base(), /(^| )ui:bg-control-hover( |$)/)
+	assert.match(linkCard().base(), /(^| )ui:hover:bg-control-hover( |$)/)
+	assert.match(table().bodyRow(), /(^| )ui:hover:bg-control-hover( |$)/)
 })
 
 test('nothing mentions the removed --meeko-ui-* variables', async () => {
@@ -210,15 +229,30 @@ test('nothing mentions the removed --meeko-ui-* variables', async () => {
 
 test('the frame of the page does not depend on how long the page is', async () => {
 	assert.match(await read('base.css'), /:root \{[^}]*scrollbar-gutter: stable/, 'a short page and a long one keep the header in place')
-	const page = await read('page.css')
-	assert.match(page, /\.meeko-ui-page-sidebar,\s*\.meeko-ui-page-aside \{[^}]*scrollbar-gutter: stable/, 'the sidebar is as wide with a long navigation as with a short one')
-	assert.doesNotMatch(/\.meeko-ui-skip-link \{[^}]*\}/.exec(page)[0], /box-shadow/, 'the shadow of the hidden skip link would show above the header')
+	const { page } = await import('../dist/app/variants/page.js')
+	const classes = page()
+	for (const slot of ['sidebar', 'aside']) assert.match(classes[slot](), /ui:\[scrollbar-gutter:stable\]/, `the ${slot} is as wide with a long navigation as with a short one`)
+	const shadows = classes
+		.skip()
+		.split(' ')
+		.filter((name) => /shadow/.test(name))
+	assert.ok(shadows.length > 0 && shadows.every((name) => name.startsWith('ui:focus-visible:')), 'the shadow of the hidden skip link would show above the header')
 })
 
 test('inline code reads as a chip, so that its padding is not taken for a space before the punctuation', async () => {
-	assert.match(await read('prose.css'), /:not\(pre\) > code, kbd\) \{[^}]*background: var\(--ui-color-control-hover\)/)
+	assert.match(await read('prose.css'), /:not\(pre\) > code \{[^}]*background: var\(--ui-color-code-soft\)/)
 	const [, inline] = /--ui-prose-code-padding: \S+ (\d*\.?\d+)em/.exec(tokensCss)
 	assert.ok(Number(inline) <= 0.2, `${inline}em on each side`)
+})
+
+test('code text contrasts with its background in both themes', () => {
+	for (const theme of ['light', 'dark']) {
+		const text = color(theme, 'cyan', 12)
+		for (const step of [2, 3]) {
+			const ratio = contrast(text, color(theme, 'cyan', step))
+			assert.ok(ratio >= 4.5, `${theme} code on cyan-${step}: ${ratio.toFixed(2)}:1`)
+		}
+	}
 })
 
 test('every --ui-* variable a component sheet reads is declared', async () => {
@@ -231,9 +265,14 @@ test('every --ui-* variable a component sheet reads is declared', async () => {
 test('the base goes in a layer, so that any rule of the app wins', async () => {
 	const css = await read('base.css')
 	const stripped = strip(css).trim()
-	assert.match(stripped, /^@layer ui-base \{/)
+	// Tailwind's preflight layer (`base`) is declared before ui-base, so an app's reset stays below UI.
+	assert.match(stripped, /^@layer base, ui-base;\s*@layer ui-base \{/)
 	assert.match(stripped, /\}$/)
 	for (const piece of ['color-scheme: dark', 'background: var(--ui-color-bg)', '::selection', ':focus-visible', 'var(--ui-font-sans)']) assert.ok(css.includes(piece), piece)
+})
+
+test("the components sheet declares Tailwind's base layer before the layers of UI", async () => {
+	assert.match(strip(await read('main.css')), /@layer base, ui\.components, ui\.utilities;/)
 })
 
 test('the font and its licence ship with the package', async () => {
@@ -253,4 +292,45 @@ test('a plain link of an application reads the tokens, in the base layer so that
 	const base = await read('base.css')
 	assert.match(base, /:where\(a\) \{[^}]*color: var\(--ui-color-primary-text\);/)
 	assert.match(base, /:where\(a\):hover \{[^}]*text-decoration-color: currentColor;/)
+})
+
+test('each new family of component tokens is declared and falls back to the global tokens', () => {
+	const families = {
+		'--ui-copy-button-': ['copied-color', 'failed-color'],
+		'--ui-progress-': ['height', 'radius', 'track', 'color', 'indeterminate-width', 'duration'],
+		'--ui-meter-': ['height', 'radius', 'track', 'optimum-color', 'suboptimum-color', 'even-less-good-color'],
+		'--ui-file-': ['color', 'gap', 'button-height', 'button-padding', 'button-radius', 'button-bg', 'button-bg-hover', 'button-border', 'button-color'],
+		'--ui-navigation-progress-': ['height', 'color', 'delay', 'duration'],
+	}
+	for (const [prefix, names] of Object.entries(families))
+		for (const name of names) {
+			const value = tokens.light[prefix + name]
+			assert.ok(value, `${prefix + name} is declared`)
+			// A color reads a token of use: the dark theme and ui.tokens change it without a rule of its own.
+			if (/color|track|bg|border/.test(name)) assert.match(value, /^var\(--ui-color-[a-z-]+\)$/, `${prefix + name}: ${value}`)
+		}
+	assert.equal(tokens.light['--ui-navigation-progress-delay'], 'var(--ui-duration-fast)', 'a fast navigation never shows the bar')
+})
+
+test('native <progress>, <meter> and file inputs get the tokens at zero specificity, in the base layer', async () => {
+	const base = strip(await read('base.css'))
+	const selectors = [...base.matchAll(/^\s*([^{}@\n][^{}]*)\{/gm)].map(([, selector]) => selector.trim()).filter((selector) => !selector.startsWith('@') && /progress|meter|file/.test(selector))
+	assert.ok(selectors.length >= 15, selectors.join('\n'))
+	// Only :where() and the pseudo-elements of the element: any rule of the app wins.
+	for (const selector of selectors) for (const part of selector.split(',')) assert.match(part.trim(), /^:where\([^)]*(?:\([^)]*\))?[^)]*\)(?:::[\w-]+)?$/, part)
+	for (const piece of ['var(--ui-progress-track)', 'var(--ui-progress-color)', ':where(progress:indeterminate)', 'var(--ui-meter-optimum-color)', '::-webkit-meter-suboptimum-value', ':-moz-meter-sub-sub-optimum', '::file-selector-button', 'var(--ui-file-button-bg-hover)']) assert.ok(base.includes(piece), piece)
+	assert.match(await read('base.css'), /prefers-reduced-motion: reduce\) \{[^]*:where\(progress:indeterminate\) \{[^}]*animation: none/)
+})
+
+test('the navigation progress bar shows only while <html> has data-navigating, after its delay, and respects reduced motion', async () => {
+	const css = await read('navigation.css')
+	assert.match(css, /:root\[data-navigating\]::before \{[^}]*animation: ui-navigation-progress var\(--ui-navigation-progress-duration\) [^}]*var\(--ui-navigation-progress-delay\) forwards;/)
+	// Each declaration on its own: Prettier orders the properties of a rule.
+	assert.match(css, /:root::before \{[^}]*block-size: var\(--ui-navigation-progress-height\);/)
+	assert.match(css, /:root::before \{[^}]*background: var\(--ui-navigation-progress-color\);/)
+	// Invisible when idle: its base state is hidden, so the delay shows nothing.
+	assert.match(css, /:root::before \{[^}]*opacity: var\(--ui-opacity-hidden\);/)
+	assert.match(css, /prefers-reduced-motion: reduce\) \{[^]*animation-name: ui-navigation-progress-still;/)
+	// In the sheet of the module, so every app with @meekojs/ui gets it.
+	assert.match(await read('components.css'), /@import '\.\/navigation\.css';/)
 })

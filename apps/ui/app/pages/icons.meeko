@@ -38,16 +38,15 @@
 		<p>
 			Necesitas
 			<code>@meekojs/meeko</code>
-			<code>&gt;=1.8 &lt;2</code>, con el registro de módulos por su nombre. Instala el módulo y cada colección de Iconify que quieras usar como
-			<code>@iconify-json/&lt;colección&gt;</code>. El módulo se registra por su nombre y sus opciones van en la clave
-			<code>icon</code>, tipada en
-			<code>meeko.config.ts</code>.
+			<code>&gt;=1.8 &lt;2</code>, con el registro de módulos por su nombre. Instala el módulo y cada colección de Iconify que quieras usar como <code>@iconify-json/&lt;colección&gt;</code>. El módulo se registra por su nombre y sus opciones van en la clave <code>icon</code>, tipada en <code>meeko.config.ts</code>.
 		</p>
 		<DocsCode bind:code="examples.iconConfig" />
 		<p>
+			Con <code>icon.componentName</code> puedes cambiar el nombre autoimportado de <code>UIIcon</code> por cualquier nombre PascalCase, como <code>Icon</code>, <code>AppIcon</code> o <code>Glyph</code>. La resolución al compilar y los tipos usan ese mismo nombre.
+		</p>
+		<p>
 			Los nombres disponibles forman una unión de TypeScript que Meeko genera en
-			<code>.meeko/types</code>: el editor completa
-			<code>name="lucide:…"</code>, y un nombre que no existe es un error de
+			<code>.meeko/types</code>: el editor completa <code>name="lucide:…"</code>, y un nombre que no existe es un error de
 			<code>meeko check</code>
 			con la sugerencia más parecida. Si
 			<code>icon.collections</code>
@@ -116,8 +115,7 @@
 
 		<h2 id="types">Tipos</h2>
 		<p
-			>El módulo genera la unión de los nombres disponibles en
-			<code>.meeko/types/modules/%40meekojs%2Ficon/</code>, una declaración por colección más la de los SVG locales.
+			>El módulo genera la unión de los nombres disponibles en <code>.meeko/types/modules/%40meekojs%2Ficon/</code>, una declaración por colección más la de los SVG locales.
 			<code>name</code>
 			de
 			<code>&lt;UIIcon&gt;</code>
@@ -134,15 +132,10 @@
 			Cada archivo de
 			<code>app/icons</code>
 			(o de la carpeta de
-			<code>icon.local</code>) es
-			<code>local:&lt;nombre&gt;</code>, en kebab-case. Al compilar se sanea con una lista de elementos y atributos permitidos: se quitan
-			<code>&lt;foreignObject&gt;</code>,
-			<code>&lt;image&gt;</code>, enlaces, animaciones,
+			<code>icon.local</code>) es <code>local:&lt;nombre&gt;</code>, en kebab-case. Al compilar se sanea con una lista de elementos y atributos permitidos: se quitan <code>&lt;foreignObject&gt;</code>, <code>&lt;image&gt;</code>, enlaces, animaciones,
 			<code>class</code>
 			y
-			<code>&lt;script&gt;</code>,
-			<code>&lt;style&gt;</code>, manejadores
-			<code>on*</code>,
+			<code>&lt;script&gt;</code>, <code>&lt;style&gt;</code>, manejadores <code>on*</code>,
 			<code>style</code>
 			y toda referencia fuera del icono (<code>href</code>
 			y
@@ -168,8 +161,7 @@
 			<code>label</code>, el icono es decorativo:
 			<code>aria-hidden="true"</code>
 			y
-			<code>focusable="false"</code>. Con
-			<code>label</code>, el
+			<code>focusable="false"</code>. Con <code>label</code>, el
 			<code>&lt;svg&gt;</code>
 			lleva
 			<code>role="img"</code>
@@ -211,6 +203,7 @@
 		<h3 id="options">Opciones del módulo</h3>
 		<DocsApi
 			bind:rows="[
+				{ name: 'componentName', type: 'string', default: 'UIIcon', description: 'Nombre PascalCase del componente autoimportado.' },
 				{ name: 'collections', type: 'string[]', default: '[]', description: 'Colecciones de Iconify (lucide, mdi…); cada una, el paquete @iconify-json/<colección> del proyecto. El editor completa las instaladas.' },
 				{ name: 'include', type: 'IconInclude[]', default: '[]', description: 'Iconos para nombres dinámicos, o colección:* para una entera.' },
 				{ name: 'local', type: 'string | false', default: 'app/icons si existe', description: 'Carpeta de SVG propios.' },

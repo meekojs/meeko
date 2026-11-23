@@ -1,16 +1,19 @@
 import type { MeekoPopoverProps as PopoverProps } from './app/components/MeekoPopover/types'
 import type { MeekoSelectProps as SelectProps } from './app/components/MeekoSelect/types'
 import type { AwaitMessages, AwaitResource } from './app/runtime/await'
+import type { ElementAttributes } from './app/runtime/dynamic-tag'
 import type { RouteRecord } from './app/runtime/router'
 import type { MeekoTeleportProps as TeleportProps } from './app/runtime/teleport'
 import type { LayoutName as NamedLayoutName, LayoutProps as NamedLayoutProps } from './shared/layout'
 import type { ThemeChoice, ThemeToggleMessages } from './shared/theme'
 
+import { currentAppNavigation, navigateApp } from './app/runtime/navigate'
 import { activeRouteManifest, href as runtimeHref } from './app/runtime/router'
 
 export { createNavigator, createRouteManifest, matchRoute } from './app/runtime/router'
 export { defineMeekoConfig } from './modules/define-meeko-config'
-export type { MeekoConfig, MeekoDevtoolsConfig, RobotsConfig, ServerHeaders, ServerResponseConfig, SitemapConfig, SitemapEntriesContext, SitemapEntry, StaticHeaderFile } from './modules/define-meeko-config'
+export type { DevAllowedHosts } from './server/runtime/dev-hosts'
+export type { MeekoConfig, MeekoDevtoolsConfig, MeekoTypeScriptCompilerOptions, RobotsConfig, ServerHeaders, ServerResponseConfig, SitemapConfig, SitemapEntriesContext, SitemapEntry, StaticHeaderFile } from './modules/define-meeko-config'
 export { defineMeekoModule } from './modules/define-meeko-module'
 export type { MeekoHookable, MeekoHooks, MeekoModule, MeekoModuleContext, MeekoModuleDefinition, MeekoModuleEntry, MeekoModuleMeta, MeekoModuleName, MeekoModuleNames, ModulePublicFileOptions, ModuleAutoImport, ModulePlugin, ModuleServerHandler, SitemapAlternate, SitemapResolvedUrl } from './modules/define-meeko-module'
 export { sitemapXml } from './framework/sitemap-xml'
@@ -22,9 +25,15 @@ export { defineGroup } from './shared/definitions/define-group'
 export { useLayout } from './app/composables/useLayout'
 export type { GroupDefinition, LayoutHandle, LayoutName, LayoutPropsInput, PageBodyLayoutProps, PageLayout, PageLayoutOptions } from './shared/layout'
 export { mountClientApp } from './app/runtime/client'
+export { HydrationMismatchError } from './app/runtime/hydration-errors'
+export type { HydrationMismatchDetail } from './app/runtime/hydration-errors'
 export type { ClientApp, ClientAppOptions, ClientComponent, ClientRoute } from './app/runtime/client'
+export { readHydrationDocument } from './app/runtime/client-payload'
+export type { HydrationDocument } from './app/runtime/client-payload'
 export { useNavigation } from './app/composables/useNavigation'
 export { useRoute } from './app/composables/useRoute'
+export { useSearchParam } from './app/composables/useSearchParam'
+export type { SearchParamOptions } from './app/composables/useSearchParam'
 export type { NavigationState, RouteState } from './app/runtime/navigation'
 export { definePage } from './app/definitions/define-page'
 export { PageInputError } from './app/definitions/define-page'
@@ -56,7 +65,8 @@ export { defineServerRouteMiddleware } from './server/middleware/definitions'
 export type { RouteMiddleware, RouteMiddlewareContext, RouteMiddlewareName, RouteMiddlewareOptions } from './app/middleware/runtime'
 export type { ServerRouteMiddleware, ServerRouteMiddlewareContext } from './server/middleware/runtime'
 export { ClientError, createApiClient, createPublicServerManifest, createRpcClient, isClientError } from './shared/clients'
-export type { ApiClient, ApiMutationInput, ApiOperation, ClientOptions, PublicApiEndpoint, PublicRpcEndpoint, PublicServerManifest, RpcClient, RpcOperation, ValidationIssue } from './shared/clients'
+export { invalidate } from './shared/invalidation'
+export type { ApiClient, ApiMutationInput, ApiOperation, ClientErrorDetails, ClientOptions, PublicApiEndpoint, PublicRpcEndpoint, PublicServerManifest, RpcClient, RpcOperation, ValidationIssue } from './shared/clients'
 export { createBrowserClientOptions } from './app/runtime/browser-clients'
 export { createSocketClient, createSocketRegistry } from './app/runtime/socket'
 export { useSocket, useSocketClient } from './app/composables/use-socket-client'
@@ -88,6 +98,44 @@ export type { MeekoTeleportTarget } from './app/runtime/teleport'
  * ```
  */
 export interface GeneratedRoutes {}
+
+/**
+ * Clave de datos: identifica lo que carga una lectura y lo que cambia una escritura. Las claves son
+ * jerárquicas por puntos: `"orders"` cubre `"orders"`, `"orders.list"` y `"orders.42"`. Las que
+ * Meeko conoce por convención (cada procedimiento RPC y cada ruta GET de `server/api`, con sus
+ * prefijos) llegan al autocompletado mediante {@link GeneratedDataKeys}; cualquier otra cadena
+ * también vale.
+ *
+ * @since 1.10.0
+ * @example
+ * ```ts
+ * import type { DataKey } from "@meekojs/meeko/framework";
+ *
+ * const keys: DataKey[] = ["orders", `orders.${"42"}`];
+ * ```
+ */
+export type DataKey = keyof GeneratedDataKeys | (string & {})
+
+/**
+ * Claves de datos conocidas de la aplicación. Está vacía en el paquete: la amplían las
+ * declaraciones generadas en `.meeko/types/server-contracts.d.ts` con la clave por convención de
+ * cada procedimiento RPC y de cada ruta GET de `server/api`, y sus prefijos. Sólo sirve para el
+ * autocompletado: {@link DataKey} acepta además cualquier cadena, y `meeko check` avisa con
+ * `MEEK141` de una invalidación que ninguna lectura usa.
+ *
+ * @since 1.10.0
+ * @example
+ * ```ts
+ * // .meeko/types/server-contracts.d.ts (generado por meeko check y meeko dev)
+ * declare module "@meekojs/meeko/framework" {
+ *   interface GeneratedDataKeys {
+ *     "orders": true;
+ *     "orders.list": true;
+ *   }
+ * }
+ * ```
+ */
+export interface GeneratedDataKeys {}
 
 /**
  * Temas de la aplicación. Está vacía en el paquete: con `theme` en `meeko.config.ts`, la amplían
@@ -190,7 +238,21 @@ export type LayoutProps<L extends string | false = NamedLayoutName> = NamedLayou
 
 type RouteKey = keyof GeneratedRoutes extends never ? string : keyof GeneratedRoutes & string
 type RouteParams<K extends string> = K extends keyof GeneratedRoutes ? GeneratedRoutes[K] : Record<string, string>
-type HrefOptions<K extends string> = (keyof GeneratedRoutes extends never ? { params?: Record<string, string> } : keyof RouteParams<K> extends never ? { params?: never } : { params: RouteParams<K> }) & {
+type HrefOptions<K extends string> = (keyof GeneratedRoutes extends never
+	? {
+			/** Parámetros de la ruta por nombre. */
+			params?: Record<string, string>
+		}
+	: keyof RouteParams<K> extends never
+		? {
+				/** Una ruta sin segmentos dinámicos no admite parámetros. */
+				params?: never
+			}
+		: {
+				/** Parámetros de la ruta dinámica, uno por segmento. */
+				params: RouteParams<K>
+			}) & {
+	/** Query string; omite `null` y `undefined`. */
 	search?: Readonly<Record<string, string | number | boolean | null | undefined>>
 }
 type HrefArguments<K extends string> = K extends keyof GeneratedRoutes ? (keyof RouteParams<K> extends never ? [options?: HrefOptions<K>] : [options: HrefOptions<K>]) : [options?: HrefOptions<K>]
@@ -219,7 +281,8 @@ export type RouteId = RouteKey
  * Props de la etiqueta propia `<MeekoLink>`, que renderiza un `<a>` cuyo `href` construye
  * {@link href}. `to` es el ID de la ruta; `params` y `search` se escriben con `bind:`; `match`
  * elige si el enlace está activo sólo en su ruta o también por debajo (desde 1.5.0). El resto de
- * atributos (`class`, `target`, `aria-*`, `on:click`…) y el contenido pasan al `<a>`; un
+ * atributos (`class`, `target`, `aria-*`, `on:click`…) y el contenido pasan al `<a>`. El tipo
+ * incluye los atributos de `ElementAttributes<'a'>`, salvo `href`, que construye Meeko; un
  * `aria-current` propio gana a la ruta, `false` lo quita y `null` o `undefined` dejan decidir a la
  * ruta (desde 1.8.0). El editor
  * muestra estas props en el hover de la etiqueta y lleva aquí con «Ir a definición». Sólo es un
@@ -241,7 +304,7 @@ export type RouteId = RouteKey
  * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#meekooutlet--y-meekolink
  */
-export interface MeekoLinkProps<K extends RouteId = RouteId> {
+export interface MeekoLinkProps<K extends RouteId = RouteId> extends Omit<ElementAttributes<'a'>, 'href'> {
 	/**
 	 * ID de la ruta de destino, como `to="/users/[id]"`: sólo las rutas que existen. También admite
 	 * una expresión con `bind:to`.
@@ -508,4 +571,117 @@ export function href<K extends RouteKey>(routes: readonly RouteRecord[], id: K, 
 export function href(first: string | readonly RouteRecord[], ...rest: unknown[]): string {
 	if (typeof first === 'string') return runtimeHref(activeRouteManifest(), first, rest[0] as RuntimeHrefOptions | undefined)
 	return runtimeHref(first, rest[0] as string, rest[1] as RuntimeHrefOptions | undefined)
+}
+
+/**
+ * Destino tipado de {@link navigate}: el mismo que recibe `<MeekoLink>`. `to` es el ID de una ruta
+ * que existe; `params`, obligatorios en una ruta dinámica y prohibidos en las demás, y `search`,
+ * como en {@link href}.
+ *
+ * @typeParam K ID de la ruta, como `"/users/[id]"`.
+ * @since 1.10.0
+ * @example
+ * ```ts
+ * import type { NavigateTarget } from "@meekojs/meeko/framework";
+ *
+ * const target: NavigateTarget = { to: "/users/[id]", params: { id: "42" }, search: { tab: "actividad" }, hash: "bio" };
+ * ```
+ */
+export type NavigateTarget<K extends RouteId = RouteId> = NavigateRoute<K> & HrefOptions<K>
+
+/**
+ * Ruta, fragmento y resolución de enlaces de un {@link NavigateTarget}.
+ *
+ * @typeParam K ID de la ruta.
+ * @since 1.10.0
+ * @example
+ * ```ts
+ * import type { NavigateRoute } from "@meekojs/meeko/framework";
+ *
+ * const route: NavigateRoute<"/guide"> = { to: "/guide", hash: "install", hreflang: "en" };
+ * ```
+ */
+export interface NavigateRoute<K extends RouteId = RouteId> {
+	/** ID de la ruta de destino, como `"/users/[id]"`: sólo las rutas que existen. */
+	readonly to: K
+	/** Fragmento de la URL, sin `#` (`"bio"` da `#bio`). */
+	readonly hash?: string
+	/**
+	 * Idioma para los resolvedores de enlaces (`app.resolveLink`), como el atributo `hreflang` de
+	 * `<MeekoLink>`: con `@meekojs/i18n`, `"en"` lleva a la versión en inglés de la ruta.
+	 */
+	readonly hreflang?: string
+	/** `false` deja la URL tal como la construye `href()`, sin los resolvedores de enlaces, como `bind:resolve="false"`. */
+	readonly resolve?: boolean
+}
+
+/**
+ * Opciones de {@link navigate}.
+ *
+ * @since 1.10.0
+ * @example
+ * ```ts
+ * import type { NavigateOptions } from "@meekojs/meeko/framework";
+ *
+ * const options: NavigateOptions = { replace: true, viewTransition: false };
+ * ```
+ */
+export interface NavigateOptions {
+	/** `true` sustituye la entrada actual del historial en lugar de añadir otra. */
+	readonly replace?: boolean
+	/** Activa o desactiva la View Transition de esta navegación; sin ella, la de `viewTransitions` en `meeko.config.ts`. */
+	readonly viewTransition?: boolean
+}
+
+/**
+ * Navega a una URL escrita como texto, relativa a la página actual o absoluta. Una URL de la
+ * aplicación pasa por el router del cliente; otro origen o una URL sin página se cargan como
+ * documento, como un enlace. Sólo sigue URL `http:` y `https:`: otro esquema, como `javascript:`,
+ * rechaza con un `TypeError`. El texto no se comprueba con las rutas: para eso, use el destino tipado.
+ *
+ * @param url URL de destino, como `"/users/42?tab=actividad"` o `"https://example.com"`.
+ * @param options `replace` y `viewTransition`.
+ * @returns `true` cuando la página nueva se confirma; `false` si se cancela o se carga como documento.
+ * @throws {Error} En el servidor, donde se usa `redirect()`, y fuera de una aplicación montada.
+ * @since 1.10.0
+ * @example
+ * ```ts
+ * import { navigate } from "@meekojs/meeko/framework";
+ *
+ * const back = new URLSearchParams(location.search).get("next") ?? "/";
+ * await navigate(back, { replace: true });
+ * ```
+ */
+export function navigate(url: string, options?: NavigateOptions): Promise<boolean>
+/**
+ * Navega desde el código de un componente o un composable del navegador, por el mismo router que
+ * `<MeekoLink>`: ejecuta el middleware de ruta y los datos de la página, activa
+ * `useNavigation().pending` y actualiza el historial; si falla, la página anterior sigue visible.
+ * Recibe el destino tipado de `<MeekoLink>` (`to`, `params`, `search` y `hash`), que `meeko check`
+ * comprueba. Se autoimporta en `app/` y puede llamarse también en un manejador de eventos o después
+ * de un `await`.
+ *
+ * @param target Ruta de destino, con sus `params`, `search` y `hash`.
+ * @param options `replace` y `viewTransition`.
+ * @returns `true` cuando la página nueva se confirma; `false` si la navegación se cancela o la URL
+ * se carga como documento. Rechaza con el error si la navegación falla.
+ * @throws {Error} En el servidor (SSR, loaders, middleware), donde se usa `redirect()`, y fuera de
+ * una aplicación montada con `mountClientApp`.
+ * @since 1.10.0
+ * @example
+ * ```html
+ * <script lang="ts">
+ * const props = defineProps<{ userId: string }>();
+ * async function save() {
+ *   await api.users.update.post({ body: { id: props.userId } });
+ *   await navigate({ to: "/users/[id]", params: { id: props.userId }, search: { saved: 1 } });
+ * }
+ * </script>
+ * <template><button on:click="save">Guardar</button></template>
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/routing-navigation-reference.md#navegación-programática
+ */
+export function navigate<K extends RouteKey>(target: NavigateTarget<K>, options?: NavigateOptions): Promise<boolean>
+export function navigate(target: string | NavigateTarget, options?: NavigateOptions): Promise<boolean> {
+	return navigateApp(currentAppNavigation('navigate()'), target as Parameters<typeof navigateApp>[1], options)
 }

@@ -1,11 +1,11 @@
 {
 	"home": {
 		"hero": {
-			"title": "Typed <code>.meeko</code> components,",
-			"titleLine2": "from the server to the browser.",
-			"lead": "A component engine for TypeScript and a full-stack framework. One file gives the server HTML and the reactivity that updates it, without a virtual DOM.",
+			"title": "Build web apps with TypeScript and <code>.meeko</code>,",
+			"titleLine2": "with a built-in server.",
+			"lead": "Meeko compiles typed components and hydrates server HTML. Its framework adds routes, data and API contracts for a complete app; the engine also works independently with Vite.",
 			"start": "Get started",
-			"requires": "Requires Node 24 and"
+			"requires": "Requires Node.js 24+ and"
 		},
 		"flow": {
 			"title": "One typed file.",
@@ -39,6 +39,18 @@
 			"platformsTitle": "Node, Bun, Deno and Cloudflare",
 			"platformsBody": "One standalone build per adapter, checked by the same conformance suite. SemVer since 1.0, with an explicit stability policy.",
 			"platformsLink": "1.x stability"
+		},
+		"showcase": {
+			"title": "Server data, browser interaction.",
+			"subtitle": "A small end-to-end task.",
+			"lead": "This list receives two tasks from the page's server block. The filter uses a signal in the browser. It is a real example on this site, with fixed data so you can try it without external services.",
+			"file": "app/pages/index.meeko · complete example",
+			"result": "Result on this page",
+			"taskOne": "Create a page",
+			"taskTwo": "Add route data",
+			"pending": "Show pending",
+			"all": "Show all",
+			"note": "The page sends the tasks in its initial HTML; the button updates the list after hydration."
 		},
 		"tools": {
 			"title": "Tools that see the runtime.",

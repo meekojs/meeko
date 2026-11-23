@@ -7,7 +7,93 @@ allowBuilds:
   sharp: true
   workerd: true
 
-# Command shims do not add node_modules/.pnpm/node_modules to NODE_PATH: in a workspace it holds
-# every package of every project, and code outside node_modules (the tests' temporary projects)
-# would resolve packages it does not declare.
 extendNodePath: false
+
+# Every external dependency takes its version from a catalog (`catalog:` in package.json).
+# `pnpm add` only accepts versions listed here, and unused entries are removed on install.
+catalogMode: strict
+catalogPrune: true
+
+catalog:
+  '@codemirror/lang-css': ^6.3.1
+  '@codemirror/lang-html': ^6.4.12
+  '@codemirror/lang-javascript': ^6.2.5
+  '@codemirror/lang-json': ^6.0.2
+  '@codemirror/language': ^6.13.1
+  '@codemirror/view': ^6.43.15
+  '@eslint/js': 10.0.1
+  '@iconify-json/lucide': 1.2.155
+  '@iconify-json/mdi': ^1.2.3
+  '@iconify-json/tabler': 1.2.46
+  '@iconify/types': ^2.0.0
+  '@iconify/utils': ^3.1.7
+  '@lezer/highlight': ^1.2.5
+  '@mdn/browser-compat-data': 8.1.9
+  '@milkdown/crepe': 7.23.0
+  '@milkdown/kit': 7.23.0
+  '@tailwindcss/postcss': 4.3.5
+  '@tailwindcss/vite': 4.3.5
+  # Node 24 is the minimum runtime (engines), so its types stay on 24.
+  '@types/node': ^24.19.2
+  '@types/pg': 8.23.1
+  # Matches engines.vscode of packages/vscode; newer types would allow APIs it lacks.
+  '@types/vscode': 1.144.0
+  '@types/ws': 8.18.2
+  '@typescript-eslint/eslint-plugin': 8.72.2
+  '@typescript-eslint/parser': 8.72.2
+  '@typescript-eslint/utils': 8.72.2
+  '@typescript/typescript6': 6.0.2
+  '@vscode/test-electron': 3.1.0
+  csstype: ^3.2.3
+  esbuild: 0.28.2
+  eslint: 10.15.0
+  eslint-config-turbo: ^2.11.11
+  eslint-plugin-perfectionist: 5.13.0
+  eslint-plugin-unused-imports: 4.4.1
+  github-slugger: 2.0.0
+  globals: 17.14.0
+  happy-dom: ^21.0.4
+  jiti: 2.7.0
+  markdown-it: 15.0.3
+  parse5: ^8.1.1
+  pg: 8.23.1
+  playwright-core: 1.65.1
+  postcss: ^8.5.33
+  postcss-selector-parser: ^7.2.1
+  prettier: ^3.10.1
+  prettier-plugin-css-order: 2.2.0
+  prettier-plugin-packagejson: 3.1.0
+  redis: 6.3.1
+  remark-gfm: ^4.0.1
+  remark-parse: ^11.0.0
+  remark-stringify: ^11.0.0
+  sharp: 0.35.5
+  shiki: 4.6.0
+  tailwind-variants: ^4.0.2
+  tailwindcss: 4.3.5
+  tsdown: 0.23.7
+  tsx: ^4.23.15
+  turbo: ^2.11.11
+  # Native TypeScript 7 type-checks; the JavaScript API that tooling loads comes from `catalog:typescript6`.
+  typescript: 7.0.2
+  unified: ^11.0.5
+  valibot: ^1.5.0
+  vite: 8.3.8
+  vscode-css-languageservice: 6.3.10
+  vscode-html-languageservice: 5.6.2
+  vscode-languageclient: 11.0.0
+  vscode-languageserver: 11.0.0
+  vscode-languageserver-textdocument: 1.0.16
+  vscode-oniguruma: 2.0.1
+  vscode-textmate: 9.3.2
+  vue: 3.5.45
+  wrangler: 4.162.0
+  ws: 8.23.0
+
+catalogs:
+  # The `typescript` name resolved to TypeScript 6, for tools that need its JavaScript API (ESLint, Prettier).
+  typescript6:
+    typescript: npm:@typescript/typescript6@6.0.2
+permissions:
+  tsdown:
+    skills: true

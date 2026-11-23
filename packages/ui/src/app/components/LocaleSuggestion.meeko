@@ -5,13 +5,18 @@
 
 	import type { UILinkTarget, UILocaleSuggestionProps } from '../types/navigation'
 
+	import { uiTheme } from '../utils/defaults'
 	import { icons } from '../utils/icons'
 	import { fillMessage, uiMessages, uiMessagesFor } from '../utils/messages'
 	import { linkTarget } from '../utils/navigation'
+	import { button } from '../variants/button'
+	import { localeSuggestion } from '../variants/locale'
 	import * as Icon from './internal/Icon.meeko'
 	import * as ItemLink from './internal/ItemLink.meeko'
 
 	const props = defineProps<UILocaleSuggestionProps>()
+
+	const theme = uiTheme('localeSuggestion', () => props)
 
 	const emit = defineEmits<{ stay: [] }>()
 
@@ -25,32 +30,40 @@
 	// A locale without texts of its own shows a fallback, which is not in its language; the props are.
 	const speaksOffered = computed(() => texts.value?.translated === true || (props.message !== undefined && props.goLabel !== undefined))
 	const target = computed<UILinkTarget | undefined>(() => (offered.value ? { ...linkTarget(offered.value), hreflang: offered.value.hreflang ?? offered.value.code } : undefined))
+
+	const classes = localeSuggestion()
+	// Both actions are buttons of variants/button.
+	const goClass = (): string => button({ variant: 'primary', size: 'sm', class: classes.go({ class: theme.ui.go }) })
+	const stayClass = (): string => button({ variant: 'outline', size: 'sm', class: classes.stay({ class: theme.ui.stay }) })
 </script>
 
 <template>
 	<aside
 		if:when="offered.value"
 		data-pagefind-ignore
-		bind:class="['meeko-ui-locale-suggestion', props.class].filter(Boolean).join(' ')"
+		bind:class="classes.base({ class: [theme.ui.base, theme.class] })"
 		bind:lang="speaksOffered.value ? offered.value?.code : undefined"
 		bind:aria-label="props.label ?? texts.value?.messages.language.suggestion"
 	>
-		<Icon bind:path="icons.globe" />
-		<p role="status">{props.message ?? fillMessage(texts.value?.messages.language.message ?? '', language.value)}</p>
-		<div class="meeko-ui-locale-suggestion-actions">
+		<Icon
+			bind:class="classes.icon({ class: theme.ui.icon })"
+			bind:path="icons.globe"
+		/>
+		<p
+			role="status"
+			bind:class="classes.message({ class: theme.ui.message })"
+			>{props.message ?? fillMessage(texts.value?.messages.language.message ?? '', language.value)}</p
+		>
+		<div bind:class="classes.actions({ class: theme.ui.actions })">
 			<ItemLink
-				class="meeko-ui-button"
-				data-variant="primary"
-				data-size="sm"
+				bind:class="goClass()"
 				bind:link="target.value!"
 			>
 				{props.goLabel ?? fillMessage(texts.value?.messages.language.go ?? '', language.value)}
 			</ItemLink>
 			<button
 				type="button"
-				class="meeko-ui-button"
-				data-variant="outline"
-				data-size="sm"
+				bind:class="stayClass()"
 				bind:lang="speaksOffered.value ? messages.locale : undefined"
 				on:click="() => emit('stay')"
 			>

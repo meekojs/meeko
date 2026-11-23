@@ -56,12 +56,12 @@ Las páginas que lo piden con `definePage({ middleware: ["auth"] })` o un `+grou
 
 El mismo middleware, para exportarlo por defecto. Lo que hace cada resultado:
 
-| Resultado                | En el servidor                                   | En el navegador                                          |
-| ------------------------ | ------------------------------------------------ | -------------------------------------------------------- |
-| `undefined`              | Continúa con el siguiente middleware y la página | Igual                                                    |
-| `Response.redirect(url)` | Responde con la redirección                      | `location.assign` con la URL: una carga de página nueva  |
-| Otro `Response`          | Lo responde                                      | Cancela la navegación y la entrega a `onNavigationError` |
-| Un error                 | Página de error                                  | Cancela la navegación                                    |
+| Resultado                | En el servidor                                   | En el navegador                                                                                                                                                |
+| ------------------------ | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `undefined`              | Continúa con el siguiente middleware y la página | Igual                                                                                                                                                          |
+| `Response.redirect(url)` | Responde con la redirección                      | Navegación de cliente si la URL es una ruta de la aplicación; si no, `location.assign`. Otro esquema que `http:` o `https:` cancela la navegación con un error |
+| Otro `Response`          | Lo responde                                      | Cancela la navegación y la entrega a `onNavigationError`                                                                                                       |
+| Un error                 | Página de error                                  | Cancela la navegación                                                                                                                                          |
 
 ## Ejemplos
 

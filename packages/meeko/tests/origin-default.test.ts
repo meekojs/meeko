@@ -121,13 +121,16 @@ test('anonymous API mutations need an allowed Origin by default, for POST, PUT, 
 	}
 })
 
-test('Origin decides, whatever Sec-Fetch-Site says', async () => {
+test('Sec-Fetch-Site never replaces Origin, and since 1.10 refuses cross-site requests unless allowedOrigins lists them', async () => {
 	const server = await app()
 	try {
 		// An allowed origin of another site is cross-site for the browser, and still passes.
 		assert.equal((await send(server, '/api/items', 'POST', { origin: allowed, 'sec-fetch-site': 'same-site' })).status, 200)
 		assert.equal((await send(server, '/api/items', 'POST', { origin: own, 'sec-fetch-site': 'same-origin' })).status, 200)
 		assert.equal((await send(server, '/api/items', 'POST', { origin: 'https://evil.example', 'sec-fetch-site': 'same-origin' })).status, 403)
+		// The browser's word that the request is not same-origin wins over an Origin that says it is.
+		assert.equal((await send(server, '/api/items', 'POST', { origin: own, 'sec-fetch-site': 'cross-site' })).status, 403)
+		assert.equal((await send(server, '/_meeko/rpc/items/add', 'POST', { origin: own, 'sec-fetch-site': 'same-site' })).status, 403)
 	} finally {
 		await server.close()
 	}

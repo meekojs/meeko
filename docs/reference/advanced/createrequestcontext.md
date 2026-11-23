@@ -47,17 +47,19 @@ console.log(context.services.db.name); // "test"
 
 Un `RequestContext<TServices, TEnv>`:
 
-| Miembro          | Descripción                                                                                                                               |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `request`        | La petición original.                                                                                                                     |
-| `requestId`      | Un ID nuevo, el que va en `x-request-id` y llega a `onError`.                                                                             |
-| `signal`         | Se aborta si el cliente se desconecta o, con `SessionRevokedError`, si se revoca la familia de la sesión. Se combina en el primer acceso. |
-| `services`       | Los servicios recibidos. Desde `1.7`, sin argumento de tipo es `AppServices`, el tipo que `meeko check` infiere de `server/runtime.ts`.   |
-| `session`        | La sesión: `current`, `create`, `rotate`, `revoke`…                                                                                       |
-| `state`          | Un `Map` vacío para valores de esta petición (`useRequestState`).                                                                         |
-| `platform`       | La plataforma recibida.                                                                                                                   |
-| `idempotencyKey` | La cabecera `Idempotency-Key` si es un UUID, en minúsculas; si no, `undefined`.                                                           |
-| `clientAddress`  | La IP del cliente. `undefined` con un contexto creado a mano: la entregan los adaptadores.                                                |
+| Miembro           | Descripción                                                                                                                                 |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `request`         | La petición original.                                                                                                                       |
+| `requestId`       | Un ID nuevo, el que va en `x-request-id` y llega a `onError`.                                                                               |
+| `signal`          | Se aborta si el cliente se desconecta o, con `SessionRevokedError`, si se revoca la familia de la sesión. Se combina en el primer acceso.   |
+| `services`        | Los servicios recibidos. Desde `1.7`, sin argumento de tipo es `AppServices`, el tipo que `meeko check` infiere de `server/runtime.ts`.     |
+| `session`         | La sesión: `current`, `create`, `rotate`, `revoke`…; desde `1.10`, con un gestor de `sessions: false`, leerla lanza un error.               |
+| `cookies`         | Desde `1.10`. Lee las cookies de la petición y escribe las de la respuesta (`get`, `getAll`, `has`, `set`, `delete`); `Secure` por defecto. |
+| `responseHeaders` | Desde `1.10`. Cabeceras que se añaden a la respuesta que produzcan `dispatchApiRoute` y `dispatchRpc`.                                      |
+| `state`           | Un `Map` vacío para valores de esta petición (`useRequestState`).                                                                           |
+| `platform`        | La plataforma recibida.                                                                                                                     |
+| `idempotencyKey`  | La cabecera `Idempotency-Key` si es un UUID, en minúsculas; si no, `undefined`.                                                             |
+| `clientAddress`   | La IP del cliente. `undefined` con un contexto creado a mano: la entregan los adaptadores.                                                  |
 
 ## Ejemplos
 
@@ -160,5 +162,6 @@ for (const request of requests) {
 
 - **Servidor.** Es una función síncrona y portable; la sesión se carga antes, con `await sessions.load(request)`.
 - **Tipos.** `createRequestContext<TServices, TEnv>` infiere los dos tipos de sus argumentos. Desde `1.7`, un `RequestContext` escrito sin argumentos tiene `services: AppServices`; con `.meeko/types/services.d.ts` generado, es el tipo de `server/runtime.ts`. El contexto de un test con servicios falsos (`{ db: falso }`) se sigue aceptando en el handler de una ruta sin tipo de servicios, como en `1.6`: `RequestContext` compara por su tipo de servicios.
+- **Cookies.** `dispatchApiRoute` y `dispatchRpc` añaden a su respuesta lo escrito con `context.cookies` y `context.responseHeaders`. Un contexto creado con `createRequestContext` escribe las cookies con `Secure` salvo `secure: false`; `createServerApp` lo omite en desarrollo sobre HTTP.
 - **IP.** Un contexto creado a mano no tiene `clientAddress`, así que `rateLimit` sin `key` cuenta a todos los clientes juntos. Fuera de un contexto, `clientAddress(request)` (desde `1.7`) da la IP con la misma política.
 - **Seguridad.** `signal` se aborta con `SessionRevokedError` cuando la sesión se revoca a mitad de la petición: úsalo en las operaciones largas para no terminar trabajo de una sesión que ya no es válida.

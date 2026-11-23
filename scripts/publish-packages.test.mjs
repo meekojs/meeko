@@ -470,14 +470,20 @@ describe('workflow de publicación', () => {
 		const publish = job('publish')
 		assert.match(publish, /id-token: write/)
 		assert.match(publish, /environment: npm/)
-		assert.match(publish, /needs: package-gates/)
-		assert.doesNotMatch(publish, /pnpm|upload-artifact/)
+		const dependencies =
+			/needs: \[([^\]]+)\]/
+				.exec(publish)?.[1]
+				.split(',')
+				.map((name) => name.trim()) ?? []
+		assert.deepEqual(new Set(dependencies), new Set(['package-gates', 'verify', 'redis-integration', 'bun', 'deno', 'workerd', 'vscode-extension']))
+		assert.doesNotMatch(publish, /pnpm|upload-artifact|\.\/\.github\/actions\//)
 		assert.match(publish, /publish-packages\.ps1 -Trusted -Execute/)
 	})
 
-	test('los gates dependen de la matriz previa y comprueban que la etiqueta está en main', () => {
+	test('los gates avanzan en paralelo y comprueban que la etiqueta está en main', () => {
 		const gates = job('package-gates')
-		assert.match(gates, /needs: \[redis-integration, bun, deno, workerd, vscode-extension\]/)
+		assert.doesNotMatch(gates, /^ {4}needs:/m)
+		assert.match(job('verify'), /MEEKO_TEST_SHARD: \$\{\{ matrix.shard \}\}\/3/)
 		assert.match(gates, /fetch-depth: 0/)
 		assert.match(gates, /merge-base --is-ancestor \$env:GITHUB_SHA origin\/main/)
 		for (const check of ['pnpm lint', 'pnpm format:check', 'pnpm -F meeko-site run test', 'pnpm -F meeko-docs-content run test']) {

@@ -1,10 +1,15 @@
 import type { ThemeChoice, ThemeToggleMessages } from '@meekojs/meeko/framework'
 
+import type { themeToggle } from '../variants/theme-toggle'
+import type { UIVariantSlots } from './theme'
+
 /**
  * Props de `<UIThemeToggle>`, el selector de tema claro/oscuro: un botón que pasa al tema siguiente
  * (`mode="cycle"`) o un grupo de radios (`mode="select"`). Necesita `theme` en `meeko.config.ts` y
  * cambia el tema sin JavaScript con el formulario de `POST /_meeko/theme`. Sustituye a la etiqueta
- * obsoleta `<MeekoThemeToggle>` del núcleo, con las mismas props, snippets y marcado.
+ * obsoleta `<MeekoThemeToggle>` del núcleo, con las mismas props, snippets y marcado. `ui` añade clases
+ * a sus partes: `base` (el `<form>`), `button` (el botón o cada radio), `group` (el grupo de radios) e
+ * `icon` (cada icono).
  *
  * @since 1.8.0
  * @example
@@ -12,7 +17,7 @@ import type { ThemeChoice, ThemeToggleMessages } from '@meekojs/meeko/framework'
  * <UIThemeToggle mode="select" bind:labels="{ light: 'Light', dark: 'Dark', system: 'System' }" />
  * ```
  */
-export interface UIThemeToggleProps {
+export interface UIThemeToggleProps extends UIVariantSlots<typeof themeToggle> {
 	/** `"cycle"` (por defecto), un botón que pasa al tema siguiente; `"select"`, un grupo de radios. */
 	readonly mode?: 'cycle' | 'select'
 	/** Elecciones y su orden; por defecto, los temas de la configuración y `"system"` si está activo. */

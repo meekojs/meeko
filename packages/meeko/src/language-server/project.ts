@@ -8,6 +8,7 @@ import type { AppIndex } from './app-index'
 import type { ProjectCompilerOptions, VirtualComponent } from './model'
 
 import { discoverAutoImports, discoverAutoImportsSync } from '../autoimports/registry'
+import { transformTypeScriptAutoImports, typeScriptScope } from '../autoimports/typescript'
 import { generatedServicesDeclaration, projectDeclarationFiles } from '../compiler/project-declarations'
 import { projectRoot } from '../compiler/project-root'
 import { resolveProjectAliases, resolveProjectAliasesSync } from '../framework/aliases'
@@ -184,6 +185,7 @@ export class MeekoProject {
 	private invalidatedFiles = new Set<string>()
 	private registry: readonly AutoImport[] = []
 	private registryKey = ''
+	private registryVersion = 0
 	/** The path aliases in the compiler options: read statically first, then as the configuration gives them. */
 	private aliases: ProjectAliases
 	private roots: readonly string[]
@@ -202,6 +204,7 @@ export class MeekoProject {
 	constructor(
 		root: string,
 		private readonly options: WorkspaceOptions,
+		registry?: ts.DocumentRegistry,
 	) {
 		this.root = resolve(root)
 		this.aliases = resolveProjectAliasesSync(this.root)
@@ -235,7 +238,9 @@ export class MeekoProject {
 			getScriptVersion: (file) => {
 				const entry = this.virtualOwner(file)
 				if (entry) return String(entry.version)
-				return this.theme && pathKey(file) === pathKey(this.theme.file) ? `theme:${this.theme.version}` : diskVersion(file)
+				if (this.theme && pathKey(file) === pathKey(this.theme.file)) return `theme:${this.theme.version}`
+				const version = diskVersion(file)
+				return typeScriptScope(this.root, file, this.roots) ? `${version}:autoimports:${this.registryVersion}` : version
 			},
 			getScriptSnapshot: (file) => {
 				const content = this.readFile(file)
@@ -263,7 +268,7 @@ export class MeekoProject {
 				return this.resolveLiterals(host, literals, containingFile, redirectedReference, options, containingSourceFile)
 			},
 		}
-		this.service = ts.createLanguageService(host, ts.createDocumentRegistry(ts.sys.useCaseSensitiveFileNames, this.root))
+		this.service = ts.createLanguageService(host, registry ?? ts.createDocumentRegistry(ts.sys.useCaseSensitiveFileNames, this.root))
 		this.loading = this.reloadRegistry()
 	}
 
@@ -282,6 +287,18 @@ export class MeekoProject {
 			await current
 			if (current === this.loading) return
 		}
+	}
+
+	/**
+	 * Carga la configuración y crea el programa TypeScript y su checker antes de que se abra un
+	 * componente: la primera petición (tokens semánticos, hover) no paga ese coste.
+	 */
+	async warm(): Promise<void> {
+		await this.ready()
+		// Cede el turno: una petición que llegue mientras tanto se atiende antes del trabajo síncrono.
+		await new Promise((resolve) => setImmediate(resolve))
+		this.scan()
+		this.service.getProgram()?.getTypeChecker()
 	}
 
 	/** Registro de autoimports vigente, dinámico o estático según la confianza. */
@@ -404,7 +421,16 @@ export class MeekoProject {
 
 	/** Texto de un archivo del programa, virtual o real. */
 	readFile(file: string): string | undefined {
-		return this.virtualEntry(file)?.code ?? this.themeText(file) ?? ts.sys.readFile(file)
+		const generated = this.virtualEntry(file)?.code ?? this.themeText(file)
+		if (generated !== undefined) return generated
+		const source = ts.sys.readFile(file)
+		if (source === undefined || /[\\/]node_modules[\\/]/.test(file)) return source
+		try {
+			return transformTypeScriptAutoImports(source, file, this.root, this.registry, this.roots) ?? source
+		} catch {
+			// El diagnóstico del autoimport se presenta desde el componente que consume el módulo.
+			return source
+		}
 	}
 
 	/** Text of the declaration of the themes, when `file` is it. */
@@ -579,6 +605,7 @@ export class MeekoProject {
 		if (key === this.registryKey) return
 		this.registry = registry
 		this.registryKey = key
+		this.registryVersion++
 		for (const entry of this.entries.values()) this.rebuild(entry)
 	}
 
@@ -665,6 +692,8 @@ function meekoFiles(root: string): string[] {
 /** Conjunto de proyectos, uno por raíz de paquete. */
 export class MeekoWorkspace {
 	private readonly projects = new Map<string, MeekoProject>()
+	/** Compartido entre proyectos: las bibliotecas de TypeScript y las dependencias se analizan una vez. */
+	private readonly registry = ts.createDocumentRegistry(ts.sys.useCaseSensitiveFileNames)
 
 	constructor(readonly options: WorkspaceOptions) {}
 
@@ -674,7 +703,7 @@ export class MeekoWorkspace {
 		const key = pathKey(root)
 		let project = this.projects.get(key)
 		if (!project) {
-			project = new MeekoProject(root, this.options)
+			project = new MeekoProject(root, this.options, this.registry)
 			this.projects.set(key, project)
 		}
 		return project

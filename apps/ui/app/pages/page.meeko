@@ -20,8 +20,7 @@
 			y a 54rem oculta
 			<code>sidebar</code>
 			y muestra
-			<code>bar</code>, donde va el
-			<a href="/overlays">UIDrawer</a>. Esta misma guía es su ejemplo: un
+			<code>bar</code>, donde va el <a href="/overlays">UIDrawer</a>. Esta misma guía es su ejemplo: un
 			<code>UIPage</code>
 			no se puede anidar, porque una página sólo tiene un
 			<code>main</code>.
@@ -39,11 +38,7 @@
 		/>
 		<p>
 			Sus snippets son
-			<code>default</code>,
-			<code>header</code>,
-			<code>notices</code>,
-			<code>bar</code>,
-			<code>sidebar</code>,
+			<code>default</code>, <code>header</code>, <code>notices</code>, <code>bar</code>, <code>sidebar</code>,
 			<code>aside</code>
 			y
 			<code>footer</code>.
@@ -74,8 +69,7 @@
 		<h2 id="header">UIHeader y UIFooter</h2>
 		<p>
 			La cabecera tiene una altura fija,
-			<code>--ui-header-height</code>. En pantallas estrechas sus enlaces pasan a un menú con
-			<code>popover</code>, que flota y no mueve la página. Una imagen de
+			<code>--ui-header-height</code>. En pantallas estrechas sus enlaces pasan a un menú con <code>popover</code>, que flota y no mueve la página. Una imagen de
 			<code>brand</code>
 			declara
 			<code>width</code>
@@ -122,8 +116,7 @@
 		/>
 		<p>
 			Admite los snippets
-			<code>brand</code>,
-			<code>nav</code>,
+			<code>brand</code>, <code>nav</code>,
 			<code>actions</code>
 			y
 			<code>menu</code>.
@@ -141,14 +134,10 @@
 		/>
 		<p>
 			Admite los snippets
-			<code>brand</code>,
-			<code>about</code>,
+			<code>brand</code>, <code>about</code>,
 			<code>actions</code>
 			y
-			<code>legal</code>. Los tipos
-			<code>UIPageProps</code>,
-			<code>UIPageHeaderProps</code>,
-			<code>UIHeaderProps</code>,
+			<code>legal</code>. Los tipos <code>UIPageProps</code>, <code>UIPageHeaderProps</code>, <code>UIHeaderProps</code>,
 			<code>UIFooterProps</code>
 			y
 			<code>UIBrand</code>

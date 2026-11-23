@@ -1,5 +1,6 @@
 // Shared workspace rules, including .meeko scripts and templates.
 import { defineEslint } from '@meekojs/eslint-plugin'
+import turboConfig from 'eslint-config-turbo/flat'
 import globals from 'globals'
 
 export default defineEslint(
@@ -48,6 +49,16 @@ export default defineEslint(
 			'packages/devtools/types/protocol.d.ts',
 			'**/tests/fixtures/**',
 		],
+	},
+
+	...turboConfig,
+	{
+		// Variables of the operating system and the ones Vite defines on import.meta.env are not
+		// configuration of a task, so turbo.json does not list them.
+		name: 'meeko/turbo-env',
+		rules: {
+			'turbo/no-undeclared-env-vars': ['error', { allowList: ['^(PATH|LOCALAPPDATA|ComSpec)$', '^(SSR|DEV|PROD|MODE|BASE_URL)$'] }],
+		},
 	},
 
 	{
@@ -108,8 +119,13 @@ export default defineEslint(
 	},
 	{
 		name: 'meeko/tests',
-		files: ['**/tests/**'],
+		files: ['**/tests/**', 'scripts/**/*.test.{mjs,ts}'],
 		rules: {
+			// Tests set and restore the variables they read (PORT, SITE_CANONICAL_ORIGIN) or pass them to
+			// mocks; they are not inputs of a cached task.
+			'turbo/no-undeclared-env-vars': 'off',
+			// Las pruebas crean contextos de componente sintéticos dentro de callbacks de node:test.
+			'meeko/rules-of-composables': 'off',
 			// `if (false) { ... }` holds type-level assertions that tsc checks and the runtime never runs.
 			'no-constant-condition': 'off',
 			// Expected output is matched with its literal indentation.
@@ -118,6 +134,20 @@ export default defineEslint(
 	},
 
 	// Zones and their runtime globals.
+	{
+		// Implementaciones internas que eligen el contexto SSR/cliente o establecen el contexto
+		// durante el arranque. Esta excepción no forma parte del preset de los consumidores.
+		name: 'meeko/internal-composable-context',
+		files: [
+			'packages/meeko/src/app/composables/use-theme-toggle.ts',
+			'packages/meeko/src/app/composables/use-theme.ts',
+			'packages/meeko/src/app/composables/useAwaitZone.ts',
+			'packages/meeko/src/app/runtime/theme-context.ts',
+			'packages/meeko/src/app/definitions/define-plugin.ts',
+			'packages/ui/src/app/composables/useModal.ts',
+		],
+		rules: { 'meeko/rules-of-composables': 'off' },
+	},
 	{
 		name: 'meeko/ui-preferences',
 		files: ['packages/ui/**/*.{js,mjs,cjs,ts,tsx,meeko}'],
@@ -152,6 +182,26 @@ export default defineEslint(
 		name: 'meeko/design-components',
 		files: ['apps/**/*.meeko', 'packages/docs/**/*.meeko'],
 		rules: { 'meeko/prefer-ui-components': 'error' },
+	},
+	{
+		// The showcase of the home page renders the code it shows next to it (app/utils/showcase-code.ts),
+		// whose <button> is native: a <UIButton> would no longer be the result of that code.
+		name: 'meeko/showcase-result',
+		files: ['apps/meeko/app/pages/index.meeko'],
+		rules: { 'meeko/prefer-ui-components': 'off' },
+	},
+	{
+		// The native-elements demo of the controls page styles a native <input type="file"> and shows that
+		// same markup in its code block: a <UIInput> would no longer be the element the demo is about.
+		name: 'meeko/native-elements-demo',
+		files: ['apps/ui/app/pages/controls.meeko', 'apps/ui/app/pages/en/controls.meeko'],
+		rules: { 'meeko/prefer-ui-components': 'off' },
+	},
+	{
+		// Standalone example servers read PORT when run by hand; no Turborepo task runs them.
+		name: 'meeko/examples',
+		files: ['packages/meeko/examples/**'],
+		rules: { 'turbo/no-undeclared-env-vars': 'off' },
 	},
 	{
 		name: 'meeko/ui-tests',

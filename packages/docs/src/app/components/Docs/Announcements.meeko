@@ -26,7 +26,7 @@
 		const main = document.querySelector<HTMLElement>('main')
 		emit('dismiss', id)
 		requestAnimationFrame(() => {
-			const next = root.value?.querySelector<HTMLElement>('.meeko-ui-dismiss')
+			const next = root.value?.querySelector<HTMLElement>('.docs-announcement > button')
 			if (next) next.focus()
 			else main?.focus({ preventScroll: true })
 		})

@@ -16,10 +16,10 @@ import { ariaRoles } from '../shared/html-data/aria'
 import { builtinTag } from './builtin-tags'
 import { cssClassRules } from './class-rules'
 import { attributeValueType, htmlAttributeSource } from './html-data-source'
-import { styleRegion, tagAt, templateRegion } from './regions'
+import { nativeTagName, styleRegion, tagAt, templateRegion } from './regions'
 
 export type { TagContext } from './regions'
-export { styleRegion, tagAt, templateRegion } from './regions'
+export { nativeTagName, styleRegion, tagAt, templateRegion } from './regions'
 
 // HTML of the template and CSS of `<style>`, outside the TypeScript model: what the editor offers
 // while writing markup and styles. Every function reads the text, so it works while a tag or a
@@ -99,11 +99,15 @@ const specialTagDocumentation = {
 
 const specialAttributeDocumentation = {
 	render: {
+		if: '**`if`** · Pinta este `<render>` sólo cuando la expresión es verdadera.',
+		'else-if': '**`else-if`** · Alternativa a la rama anterior de la cadena.',
+		else: '**`else`** · Alternativa final de la cadena, sin valor.',
 		snippet: '**`snippet`** · Expresión de tipo `Snippet<Args> | undefined` que se pinta. Normalmente `snippets.name`, declarado con `defineSnippets`. Es obligatorio; si es `undefined`, no pinta contenido.',
 		args: '**`args`** · Expresiones separadas por comas que recibe el snippet, en el orden y con los tipos de la tupla declarada en `defineSnippets`.',
 		'if:when': '**`if:when`** · Pinta este `<render>` sólo cuando la expresión es verdadera.',
 	},
 	snippet: {
+		if: '**`if`** · Alias de `if:when`: pasa el snippet al hijo sólo mientras la expresión es verdadera.',
 		name: '**`name`** · Nombre del snippet que llena en el componente hijo; debe coincidir con una clave de su `defineSnippets`.',
 		params: '**`params`** · Nombres de los argumentos que el hijo pasa desde `<render args="…">`, separados por comas. Sus tipos se infieren de `defineSnippets`.',
 		'if:when': '**`if:when`** · Pasa el snippet al hijo sólo cuando la expresión es verdadera. El hijo debe haberlo declarado como opcional.',
@@ -356,9 +360,10 @@ export function htmlCompletion(document: TextDocument, position: Position): Comp
  */
 function staticValueCompletion(document: TextDocument, position: Position, context: TagContext): CompletionItem[] | undefined {
 	const value = context.value!
+	// SVG attributes keep their case (`gradientUnits`); HTML ones are read without it.
 	const info = htmlAttributeSource()
-		.attributes(context.tag)
-		.find((attribute) => attribute.name === value.attribute.toLowerCase())
+		.attributes(nativeTagName(context))
+		.find((attribute) => attribute.name === (context.svg ? value.attribute : value.attribute.toLowerCase()))
 	if (!info?.values?.length) return undefined
 	const source = document.getText()
 	const offset = document.offsetAt(position)

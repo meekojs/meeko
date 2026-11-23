@@ -552,3 +552,47 @@ test('<MeekoPopover> and <MeekoSelect> are built-in tags, also when they close, 
 		'bind:options is TypeScript',
 	)
 })
+
+test('reactive declarations and writes of .value get the colors of their semantic tokens before the server answers', async () => {
+	const require = createRequire(import.meta.url)
+	await loadWASM(readFileSync(require.resolve('vscode-oniguruma/release/onig.wasm')))
+	const registry = new Registry({
+		onigLib: Promise.resolve({ createOnigScanner, createOnigString }),
+		loadGrammar: async (scope) => (scope === 'source.meeko' ? parseRawGrammar(readFileSync(grammarFile, 'utf8'), grammarFile) : (fixtureGrammars.get(scope) ?? null)),
+	})
+	const grammar = await registry.loadGrammarWithConfiguration('source.meeko', 1, {
+		embeddedLanguages: { 'meta.embedded.block.typescript': 2, 'meta.embedded.inline.typescript': 2, 'meta.embedded.block.html': 3 },
+	})
+	assert.ok(grammar)
+	const lines = [
+		'<script lang="ts">',
+		'const count = signal(0);',
+		'let open = defineModel<boolean>("open");',
+		'const field = useElementRef("field");',
+		'const input = await useElementRef("field");',
+		'const doubled = computed(() => count.value * 2);',
+		'const posts = await useApi("/api/posts");',
+		'const typed: Signal<number> = signal(1);',
+		'const plain = format(count.value);',
+		'count.value = 1; count.value += 2; count.value++;',
+		'if (count.value === 1 || count.value => 2) {}',
+		'</script>',
+		'<template><button on:click="() => count.value++">{count.value}</button></template>',
+	]
+	let state = null
+	const tokens: Array<{ line: number; text: string; scopes: string[] }> = []
+	for (const [index, line] of lines.entries()) {
+		const result = grammar.tokenizeLine(line, state)
+		state = result.ruleStack
+		tokens.push(...result.tokens.map((token) => ({ line: index, text: line.slice(token.startIndex, token.endIndex), scopes: token.scopes })))
+	}
+	const named = (scope: string) => tokens.filter((token) => token.scopes.includes(scope)).map((token) => `${token.line}:${token.text}`)
+	assert.deepEqual(named('support.class.component.signal.meeko'), ['1:count', '2:open', '3:field'], 'an awaited useElementRef is the element')
+	assert.deepEqual(named('entity.name.function.computed.meeko'), ['5:doubled'])
+	assert.deepEqual(named('entity.name.type.resource.meeko'), ['6:posts'])
+	assert.deepEqual(named('keyword.control.write.meeko'), ['9:value', '9:value', '9:value', '12:value'], 'reads and comparisons are not writes')
+	// The scopes are those that package.json maps the semantic tokens to: no color change when they arrive.
+	const manifest = JSON.parse(readFileSync(join(testDirectory, '../package.json'), 'utf8')) as { contributes: { semanticTokenScopes: Array<{ scopes: Record<string, string[]> }> } }
+	const semantic = new Set(Object.values(manifest.contributes.semanticTokenScopes[0]!.scopes).flat())
+	for (const scope of ['support.class.component.signal.meeko', 'entity.name.function.computed.meeko', 'entity.name.type.resource.meeko', 'keyword.control.write.meeko']) assert.ok(semantic.has(scope), scope)
+})

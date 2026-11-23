@@ -1,21 +1,17 @@
 <script lang="ts">
-	import type { UIMarkdownEditorMode } from '../../app/types/markdown-editor'
+	import type { UIMarkdownEditorMode, UIMarkdownEditorProps } from '../../app/types/markdown-editor'
 	import type { MarkdownEditorHandle } from '../crepe'
 
+	import { uiTheme } from '../../app/utils/defaults'
 	import { uiMessages } from '../../app/utils/messages'
+	import { markdownEditor, markdownEditorDisabled, markdownEditorMarkerLines } from '../../app/variants/markdown-editor'
 	import { loadMarkdownEditor } from '../load'
 
-	interface Props {
-		label: string
-		id?: string
-		readonly?: boolean
-		disabled?: boolean
-		describedBy?: string
-		placeholder?: string
-		class?: string
-	}
+	const props = defineProps<UIMarkdownEditorProps>()
 
-	const props = defineProps<Props>()
+	const theme = uiTheme('markdownEditor', () => props)
+
+	const classes = markdownEditor()
 
 	const value = defineModel<string>({ default: '' })
 
@@ -116,84 +112,76 @@
 
 <template>
 	<div
-		bind:class="['ui-markdown-editor', props.class].filter(Boolean).join(' ')"
+		bind:class="classes.base({ class: ['ui-markdown-editor', props.disabled ? markdownEditorDisabled.base : undefined, theme.ui.base, theme.class] })"
 		bind:data-mode="mode.value"
 		bind:data-state="state.value"
-		bind:data-disabled="props.disabled ? '' : undefined"
 	>
-		<div class="ui-markdown-editor-bar">
+		<div bind:class="classes.bar({ class: theme.ui.bar })">
 			<span
-				class="ui-markdown-editor-label"
+				bind:class="classes.label({ class: theme.ui.label })"
 				bind:id="labelId"
+				>{props.label}</span
 			>
-				{props.label}
-			</span>
 			<div
 				if:when="snippets.tools"
-				class="ui-markdown-editor-tools"
+				bind:class="classes.tools({ class: theme.ui.tools })"
 			>
 				<render snippet="snippets.tools" />
 			</div>
 			<div
-				class="ui-markdown-editor-modes"
 				role="group"
+				bind:class="classes.modes({ class: theme.ui.modes })"
 				bind:aria-label="messages.mode"
 			>
 				<button
 					type="button"
+					bind:class="classes.mode({ class: theme.ui.mode })"
 					bind:aria-pressed="mode.value === 'visual' ? 'true' : 'false'"
 					on:click="() => (mode.value = 'visual')"
+					>{messages.visual}</button
 				>
-					{messages.visual}
-				</button>
 				<button
 					type="button"
+					bind:class="classes.mode({ class: theme.ui.mode })"
 					bind:aria-pressed="mode.value === 'code' ? 'true' : 'false'"
 					on:click="() => (mode.value = 'code')"
+					>{messages.code}</button
 				>
-					{messages.code}
-				</button>
 			</div>
 		</div>
 		<p
 			if:when="state.value === 'unsafe' || state.value === 'failed'"
-			class="ui-markdown-editor-notice"
 			role="status"
+			bind:class="classes.notice({ class: theme.ui.notice })"
+			>{state.value === 'unsafe' ? messages.unsafe : messages.failed}</p
 		>
-			{state.value === 'unsafe' ? messages.unsafe : messages.failed}
-		</p>
-		<div class="ui-markdown-editor-surface">
+		<div bind:class="classes.surface({ class: [props.disabled ? markdownEditorDisabled.surface : undefined, theme.ui.surface] })">
 			<div
 				if:when="mode.value === 'visual' && state.value === 'loading'"
-				class="ui-markdown-editor-marker"
 				role="status"
+				bind:class="classes.marker({ class: theme.ui.marker })"
 			>
-				<span class="ui-markdown-editor-marker-text">{messages.loading}</span>
+				<span bind:class="classes.markerText({ class: theme.ui.markerText })">{messages.loading}</span>
 				<span
-					class="ui-markdown-editor-marker-line"
+					each:of="markdownEditorMarkerLines"
+					each:as="width"
+					each:key="width"
 					aria-hidden="true"
-				/>
-				<span
-					class="ui-markdown-editor-marker-line"
-					aria-hidden="true"
-				/>
-				<span
-					class="ui-markdown-editor-marker-line"
-					aria-hidden="true"
+					bind:class="classes.markerLine({ class: [width, theme.ui.markerLine] })"
 				/>
 			</div>
 			<div
 				ref:host
-				class="ui-markdown-editor-host"
+				bind:class="classes.host({ class: theme.ui.host })"
 				bind:hidden="mode.value !== 'visual' || state.value === 'loading'"
 				on:focusout="flush"
 			/>
 			<textarea
 				if:when="mode.value === 'code'"
-				class="ui-markdown-editor-code"
 				spellcheck="false"
 				autocapitalize="off"
 				model="value"
+				bind:class="classes.code({ class: theme.ui.code })"
 				bind:id="props.id"
 				bind:aria-labelledby="labelId"
 				bind:aria-describedby="props.describedBy"

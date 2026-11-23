@@ -117,8 +117,7 @@
 		<h2 id="snippets">Customize the cells</h2>
 		<p>
 			The optional snippets are
-			<code>header(column)</code>,
-			<code>cell(row, column, value, index)</code>,
+			<code>header(column)</code>, <code>cell(row, column, value, index)</code>,
 			<code>footer(column, rows)</code>
 			and
 			<code>empty()</code>. The footer appears when there is footer content. The container allows horizontal scrolling on narrow screens.
@@ -134,8 +133,7 @@
 			wins; then
 			<code>cell</code>
 			and finally
-			<code>format</code>. In the header,
-			<code>header-&lt;key&gt;</code>,
+			<code>format</code>. In the header, <code>header-&lt;key&gt;</code>,
 			<code>header</code>
 			and the label.
 		</p>

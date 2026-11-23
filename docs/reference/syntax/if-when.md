@@ -1,5 +1,5 @@
 ---
-title: if:when
+title: if, else-if y else
 group: syntax
 since: 1.0.0
 description: Pinta una etiqueta con su contenido sólo mientras una expresión es verdadera, y estrecha los tipos dentro de ella.
@@ -14,7 +14,7 @@ related:
   - docs/api.md#condiciones-con-ifwhen-y-tipos
 ---
 
-`if:when="expresión"` hace que una etiqueta, con todo su contenido, exista sólo mientras la expresión es verdadera (en el sentido de JavaScript: `0`, `""`, `null` y `undefined` son falsos). Vale en elementos HTML, en etiquetas de componente, en `<component is>` y, desde `1.4`, en `<snippet>`.
+`if="expresión"` hace que una etiqueta, con todo su contenido, exista sólo mientras la expresión es verdadera (en el sentido de JavaScript: `0`, `""`, `null` y `undefined` son falsos). `if`, `else-if` y `else` existen desde `1.10`; hasta 1.9 la directiva es `if:when="expresión"`, que sigue disponible como alias compatible de `if`. Vale en elementos HTML, en etiquetas de componente, en `<component is>` y, desde `1.4`, en `<snippet>`.
 
 Desde `1.2`, también estrecha los tipos, como `v-if` en Vue: dentro de la etiqueta, `meeko check` y el editor comprueban los atributos, las props, los eventos y el contenido sabiendo que la condición se cumple, sin `!`.
 
@@ -39,11 +39,28 @@ Mientras `user.value` es `null`, sólo existe el segundo párrafo. Dentro del `<
 
 ## Atributos
 
-| Atributo  | Tipo                | Por defecto | Descripción                                                                                                   |
-| --------- | ------------------- | ----------- | ------------------------------------------------------------------------------------------------------------- |
-| `if:when` | cualquier expresión | obligatorio | La condición. Se evalúa como booleano de JavaScript y se vuelve a evaluar cuando cambian las señales que lee. |
+| Atributo  | Tipo                | Por defecto | Descripción                                                                                                                       |
+| --------- | ------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `if`      | cualquier expresión | obligatorio | La condición. Se evalúa como booleano de JavaScript y se vuelve a evaluar cuando cambian las señales que lee. Desde `1.10`.       |
+| `if:when` | cualquier expresión | obligatorio | Alias de `if`, disponible desde `1.0`. Puede empezar una cadena con `else-if` y `else`.                                           |
+| `else-if` | cualquier expresión | obligatorio | Condición que sólo se prueba si las ramas anteriores son falsas. Debe seguir a un `if`, `if:when` u otro `else-if`. Desde `1.10`. |
+| `else`    | sin valor           | —           | Rama final, cuando ninguna anterior se cumple. Desde `1.10`.                                                                      |
 
-No hay `if:else` ni `else-if`: escribe la condición contraria en otra etiqueta (`if:when="!user.value"`). Un atributo `if:` desconocido es `MEEK024: Directiva de plantilla incompleta` y, junto a un `if:when`, el aviso `MEEK119` (desde `1.7`), porque se escribiría como atributo HTML literal.
+## Ramas alternativas
+
+Desde `1.10`. `else-if="expresión"` prueba otra condición sólo si no se cumplió la anterior. `else`, sin valor, es la alternativa final. Sólo se pinta la primera rama verdadera; las condiciones y el contenido de las siguientes no se evalúan.
+
+```html
+<p if="loading.value">Cargando…</p>
+<p else-if="error.value">No se pudo cargar.</p>
+<p else>Contenido disponible.</p>
+```
+
+Las ramas deben ser hermanas consecutivas: entre ellas sólo se permiten espacios y comentarios. También puedes empezar la cadena con `if:when`. Para agrupar varios nodos sin añadir un elemento al DOM, usa `<template if="…">`, `<template else-if="…">` y `<template else>`.
+
+Los tipos se estrechan también por las condiciones descartadas: un `else-if` sabe que las ramas anteriores eran falsas y el `else` conoce todas sus negaciones. Al cambiar de rama se liberan sus efectos, listeners y componentes; volver a ella crea estado nuevo.
+
+Una rama huérfana, varias directivas condicionales en la misma etiqueta, `else` con valor o una rama después de `else` producen `MEEK138`. No combines condiciones con `each:of` en la misma etiqueta: coloca la cadena dentro de `<template each:of="…">`. La declaración de un `<snippet>` admite `if` o `if:when`, pero las cadenas se escriben dentro de su contenido.
 
 ## Resultado
 
@@ -145,12 +162,14 @@ Con `const visibleItems = computed(() => items.value.filter((item) => item.visib
 <p if:else>Sin sesión.</p>
 ```
 
-`MEEK024: Directiva de plantilla incompleta`, en `if:else`.
+`MEEK024: Directiva de plantilla incompleta`, en `if:else`. La alternativa es `else`, sin prefijo ni valor, en la hermana siguiente (desde `1.10`):
 
 ```html good
-<p if:when="user.value">Hola, {user.value.name}</p>
-<p if:when="!user.value">Sin sesión.</p>
+<p if="user.value">Hola, {user.value.name}</p>
+<p else>Sin sesión.</p>
 ```
+
+Hasta `1.9`, sin `else`, escribe la condición contraria: `<p if:when="!user.value">Sin sesión.</p>`.
 
 ### Perder el estrechamiento en una función flecha
 

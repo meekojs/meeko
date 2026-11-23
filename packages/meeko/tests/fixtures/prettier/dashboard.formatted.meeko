@@ -45,16 +45,13 @@ const activity = signal<
         <h1>El sistema, en vivo.</h1>
         <p
           >Una vista para comprobar el recorrido completo: HTML del servidor,
-          estado reactivo y llamadas tipadas que llegan a esta aplicación.</p
-        >
+          estado reactivo y llamadas tipadas que llegan a esta aplicación.</p>
       </div>
       <button
         class="dashboard-signout"
         type="button"
         on:click="signOut"
-        bind:disabled="pending.value !== ''"
-        >Cerrar sesión</button
-      >
+        bind:disabled="pending.value !== ''">Cerrar sesión</button>
     </header>
 
     <section class="execution-strip" aria-label="Estado de la ejecución">
@@ -74,8 +71,7 @@ const activity = signal<
         ><div
           ><h2 id="activity-title">Actividad de esta vista</h2
           ><p
-            >Resultados de tus acciones actuales, sin datos inventados.</p
-          ></div
+            >Resultados de tus acciones actuales, sin datos inventados.</p></div
         ></div
       ><p class="activity-empty" if:when="activity.value.length === 0"
         >Aún no hay operaciones. Prueba una acción para ver su resultado

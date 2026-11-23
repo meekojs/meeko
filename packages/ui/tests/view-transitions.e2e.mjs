@@ -91,6 +91,11 @@ test('native view transitions wrap client commits, history and shared elements w
 		prototype.startViewTransition = function (update) {
 			const transition = native.call(this, update)
 			globalThis.meekoViewTransitions.push(transition)
+			// Read when the animation starts, in the page: the slow CI reaches it from Node after the 220 ms are over.
+			transition.namesAtReady = transition.ready.then(
+				() => [...globalThis.document.querySelectorAll('.view-transition-demo-project')].map((element) => globalThis.getComputedStyle(element).viewTransitionName),
+				() => [],
+			)
 			return transition
 		}
 	})
@@ -101,9 +106,8 @@ test('native view transitions wrap client commits, history and shared elements w
 	await page.getByRole('link', { name: 'Ver proyecto', exact: true }).click()
 	await page.getByRole('heading', { name: 'Un proyecto, dos vistas', exact: true }).waitFor()
 	assert.equal(await count(), 1)
-	await page.evaluate(() => globalThis.meekoViewTransitions.at(-1).ready)
+	assert.deepEqual(await page.evaluate(() => globalThis.meekoViewTransitions.at(-1).namesAtReady), ['ui-demo-project'], 'the card has its name during the navigation')
 	const transitionName = () => page.locator('.view-transition-demo-project').evaluate((element) => globalThis.getComputedStyle(element).viewTransitionName)
-	assert.equal(await transitionName(), 'ui-demo-project', 'the card has its name during the navigation')
 	await page.screenshot({ path: output + '/view-transition-native.png', fullPage: true })
 	await finished()
 	assert.equal(await transitionName(), 'none', 'and only during it: no other transition of the page repeats it')

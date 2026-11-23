@@ -40,6 +40,8 @@ pnpm exec eslint . --fix
 
 ## Documentación
 
+`defineEslint()` activa `meeko/rules-of-composables` como error en JavaScript, TypeScript y `.meeko`: los `useX()` propios o del framework se llaman en el setup o en el cuerpo principal de otro composable. Para crear IDs dentro de handlers o funciones ordinarias, usa `createId()`.
+
 - [Guía completa de ESLint](https://meekojs.com/docs/eslint): opciones, Perfectionist, reglas propias, parser y límites.
 - [Guide in English](https://meekojs.com/en/docs/eslint).
 - [Cambios del plugin](CHANGELOG.md).

@@ -9,13 +9,15 @@ import type { DeferredInternals } from './deferred'
 import type { NavigationTrace } from './devtools-activity'
 import type { BrowserLayoutWriter, LayoutSlot } from './layout'
 import type { LiveRoute, NavigationState, RouteState } from './navigation'
+import type { PropsSource } from './props'
 import type { Component, DomScope } from './renderer'
 import type { ErrorPageRecord, NamedLayoutRecord, NavigationContext, Navigator, RouteMatch, RouteRecord, UnmatchedNavigationContext } from './router'
 
 import { markingObserver } from '../../core/error-observer'
-import { batch, finishWithCleanup, runDry, signal } from '../../core/reactivity'
+import { batch, finishWithCleanup, runDry, signal, untrack } from '../../core/reactivity'
 import { ClientError } from '../../shared/clients'
 import { errorTitleEntry, routeHeadInput } from '../../shared/head'
+import { checkDataKey, invalidateAll, registerDataDependent } from '../../shared/invalidation'
 import { resolveThemeConfig, THEME_STATE_KEY } from '../../shared/theme'
 import { provideResourceCache, ResourceCache, ResourceScope, withResourceScope } from '../composables/resources/engine'
 import { provideBrowserWindow } from '../composables/useStorage'
@@ -32,7 +34,9 @@ import { BrowserHead, provideHead, withHeadLevel } from './head'
 import { withIdRoot } from './ids'
 import { browserLayoutWriter, createLayoutSlot, resolveLayoutProps, withLayoutWriter } from './layout'
 import { mountBatch } from './lifecycle'
+import { activateAppNavigation } from './navigate'
 import { fixedRoute, liveRoute, provideNavigation, provideRoute, routeIsActive, routeSnapshot } from './navigation'
+import { reactiveProps } from './props'
 import { hasRegionRecoveryFailure, parseRegionHtml, provideDocumentHtmlReader } from './renderer'
 import { activateRouteManifest, createAppNavigator, matchRoute, reportNavigationError, sameDocument } from './router'
 import { hydrateWithStateStore, StateStore, withStateStore } from './state'
@@ -104,6 +108,8 @@ type ClientRouteContext = NavigationContext & {
 	params: Readonly<Record<string, unknown>>
 	search: Readonly<Record<string, unknown>>
 	state: StateStore
+	/** Declares the data keys of the loader: an invalidation of one reruns it (since 1.10). */
+	depends: (...keys: string[]) => void
 }
 
 /**
@@ -112,12 +118,13 @@ type ClientRouteContext = NavigationContext & {
  *
  * @example
  * ```ts
- * import { mountClientApp } from "@meekojs/meeko/framework";
+ * import { mountClientApp, readHydrationDocument } from "@meekojs/meeko/framework";
  * import type { ClientAppOptions, ClientComponent } from "@meekojs/meeko/framework";
  *
+ * const { root, payload } = readHydrationDocument(document);
  * const options: ClientAppOptions = {
- *   root: document.getElementById("app")!,
- *   payload: document.getElementById("meeko-payload")?.textContent,
+ *   root,
+ *   payload,
  *   routes,
  *   serverData: true,
  *   loadPage: async (file) => await pages[file]!() as ClientComponent,
@@ -137,9 +144,13 @@ export interface ClientAppOptions {
 	 * @since 1.1.0
 	 */
 	readonly errorPage?: ErrorPageRecord | undefined
-	/** Elemento raíz que contiene el HTML SSR (`#app`). */
+	/** Elemento raíz que contiene el HTML SSR (`#app`); `readHydrationDocument` lo localiza. */
 	readonly root: Element
-	/** Payload de hidratación de `#meeko-payload`, como texto JSON o ya analizado. */
+	/**
+	 * Payload de hidratación de `#meeko-payload`, como texto JSON o ya analizado. Léalo con
+	 * `readHydrationDocument`: `document.getElementById` puede devolver un elemento de la
+	 * página con el mismo `id`.
+	 */
 	readonly payload: string | unknown
 	/** Carga el módulo compilado de una página o un layout por su archivo. */
 	readonly loadPage: (file: string) => Promise<ClientComponent>
@@ -270,6 +281,20 @@ interface LayoutInstance {
 	slot?: LayoutSlot
 }
 
+/**
+ * The committed page whose data a refresh of its loader replaces: its props are a view that the
+ * refresh updates in place, so its components stay mounted.
+ */
+interface CommittedPage {
+	readonly url: URL
+	readonly route: RouteRecord | undefined
+	/** An error page, or the empty outlet of a client page before its first commit. */
+	readonly error: boolean
+	readonly props: PropsSource<Record<string, unknown>>
+	/** The data keys its loader declared with `depends`. */
+	keys: readonly string[]
+}
+
 /** The named layout of a tree: its record and the props its page declares. */
 interface TreeLayout {
 	readonly record: NamedLayoutRecord | undefined
@@ -354,14 +379,15 @@ async function createTree(chain: readonly string[], props: Record<string, unknow
  * @throws {Error} Si la ruta o sus parámetros no coinciden con los del SSR, o falla la hidratación.
  * @example
  * ```ts
- * import { mountClientApp } from "@meekojs/meeko/framework";
+ * import { mountClientApp, readHydrationDocument } from "@meekojs/meeko/framework";
  * import type { ClientComponent } from "@meekojs/meeko/framework";
  * import { modules as pages } from "virtual:meeko-client-pages";
  * import { errorPage, routes } from "virtual:meeko-manifest/client";
  *
+ * const { root, payload } = readHydrationDocument(document);
  * const app = await mountClientApp({
- *   root: document.getElementById("app")!,
- *   payload: document.getElementById("meeko-payload")?.textContent,
+ *   root,
+ *   payload,
  *   routes,
  *   errorPage,
  *   serverData: true,
@@ -400,7 +426,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
 	// The route of the plugins follows the committed route, also when a navigation replaces the
 	// whole tree (and its live route): reading it also reads `routeGeneration`.
 	const routeGeneration = signal(0)
-	const followCommitted = <K extends Exclude<keyof RouteState, 'isActive'>>(key: K): RouteState[K] =>
+	const followCommitted = <K extends Exclude<keyof RouteState, 'isActive' | 'refresh'>>(key: K): RouteState[K] =>
 		Object.freeze({
 			get value() {
 				void routeGeneration.value
@@ -415,6 +441,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
 		params: followCommitted('params'),
 		search: followCommitted('search'),
 		isActive: routeIsActive(pluginPath),
+		refresh: invalidateAll,
 	})
 	// href(id) already resolves while the plugins start.
 	const releasePluginManifest = activateRouteManifest(options.routes)
@@ -446,6 +473,22 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
 			reportNavigationError(browser, error)
 		})
 	const pending = signal(false)
+	/** The `<a>` whose click is starting a navigation, read by `run` before its first `await`. */
+	let clickedLink: Element | undefined
+	/** The link that started the pending navigation: it carries `data-pending` until that navigation settles. */
+	let pendingLink: Element | undefined
+	/**
+	 * Mirrors `pending` on the document, for CSS: `data-navigating` on `<html>` and `data-pending` on
+	 * the link that started the navigation, if a click did. Only in the browser, so never in SSR HTML.
+	 */
+	const markNavigation = (active: boolean, link?: Element): void => {
+		pendingLink?.removeAttribute('data-pending')
+		pendingLink = active ? link : undefined
+		pendingLink?.setAttribute('data-pending', '')
+		const html = (browser.document as Document | undefined)?.documentElement
+		if (active) html?.setAttribute('data-navigating', '')
+		else html?.removeAttribute('data-navigating')
+	}
 	const navigationState: NavigationState = {
 		pending: {
 			get value() {
@@ -490,6 +533,8 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
 		stopChunks = watchDeferredChunks(browser, initialReceiver.receive, initialReceiver.end, reportDeferred)
 	}
 	let first: Awaited<ReturnType<typeof createTree>>
+	// The page reads its props from a view that a refresh of its loader updates in place.
+	const initialProps = reactiveProps(payload.props)
 	let release: () => void
 	// href(id) resolves against this app's manifest from hydration until dispose.
 	const releaseManifest = activateRouteManifest(options.routes)
@@ -500,19 +545,34 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
 	// (the page state carries them) and receive the browser's once hydration ends.
 	const theme = themeConfig ? new BrowserTheme(browser, themeConfig, documentHead, payload.sharedState[THEME_STATE_KEY]) : undefined
 	const releaseTheme = theme ? registerBrowserTheme(browser, theme) : () => {}
+	// navigate() and useSearchParam() reach this app from any component, also from an event handler.
+	// An onMounted of the hydration runs before the navigator exists: its call waits for it.
+	let ready: Navigator['navigate'] | undefined
+	let resolveReady!: (navigate: Navigator['navigate']) => void
+	const whenReady = new Promise<Navigator['navigate']>((resolve) => {
+		resolveReady = resolve
+	})
+	const releaseNavigation = activateAppNavigation({
+		routes: options.routes,
+		browser,
+		navigate: (to, navigateOptions) => (ready ? ready(to, navigateOptions) : whenReady.then((navigate) => navigate(to, navigateOptions))),
+		resolveLink: plugins.resolveLink,
+		report: (error) => reportNavigationError(browser, error, observeNavigationError),
+	})
 	try {
 		// The named layout hydrates with the props the server rendered it with.
 		const initialLayout = initial ? initial.route.layout : appError!.layout
 		const named: TreeLayout = { record: initialLayout, declared: payload.layoutProps ?? { ...initialLayout?.props } }
-		first = initial ? await createTree(initial.route.layouts, payload.props, options.loadPage, 0, clientFirst ? emptyOutlet : initial.route.file, named) : await createTree(appError!.layouts, payload.props, options.loadPage, 0, appError!.file, named)
+		first = initial ? await createTree(initial.route.layouts, initialProps.props, options.loadPage, 0, clientFirst ? emptyOutlet : initial.route.file, named) : await createTree(appError!.layouts, initialProps.props, options.loadPage, 0, appError!.file, named)
 		// Awaited data comes from the payload: hydration stays synchronous and never requests it again.
 		const initialData = new ResourceScope('read', payload.resources)
 		// onMounted callbacks run once the whole tree has hydrated. The head adopts the SSR tags once,
 		// with every useHead of the hydrated tree registered.
 		release = documentHead.hold(() => {
 			// An error page without its own title has the one of its SSR error document.
-			if (payload.error) documentHead.setRoute(routeHeadInput(payload.head), undefined, errorTitleEntry(ERROR_PAGE_TITLE, appError!.layouts.length))
-			else documentHead.setRoute(routeHeadInput(payload.head), initialUrl.pathname)
+			// The document's payload only adopts the head SSR wrote: page content could forge it.
+			if (payload.error) documentHead.adoptRoute(routeHeadInput(payload.head), undefined, errorTitleEntry(ERROR_PAGE_TITLE, appError!.layouts.length))
+			else documentHead.adoptRoute(routeHeadInput(payload.head), initialUrl.pathname)
 			return withResourceScope(initialData, () => hydrateApp(committedRoute.state, () => mountBatch(() => withIdRoot(options.document?.idPrefix, () => first.component.hydrateScope({ root: options.root }, {}, payload.state)))))
 		})
 		resourceCache.merge(initialData.loadedData())
@@ -522,12 +582,16 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
 		theme?.settle()
 	} catch (error) {
 		stopChunks()
+		releaseNavigation()
 		releaseManifest()
 		releaseGlobalErrors()
 		releaseTheme()
 		throw error
 	}
 	let layouts = first.layouts
+	let committedPage: CommittedPage = { url: initialUrl, route: initial?.route, error: Boolean(payload.error) || clientFirst, props: initialProps, keys: payload.keys }
+	/** Counts the commits, so a refresh that started before one never applies its data. */
+	let commits = 0
 	initialReceiver.open()
 	/** The ndjson read of the committed stream route; the next commit cancels it. */
 	let activeStream: AbortController | undefined
@@ -615,6 +679,20 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
 			if (!stream.committed) stream.control?.abort()
 		}
 	}
+	/**
+	 * Follows the redirect of a navigation: a route of this application navigates in place, and any
+	 * other HTTP(S) URL loads as a document. The target comes from data (a middleware may redirect to
+	 * a `?next=` of the URL), so another scheme, such as `javascript:`, which would run in this page,
+	 * fails without navigating.
+	 */
+	const followRedirect = (target: URL, source: string): void => {
+		if (target.protocol !== 'http:' && target.protocol !== 'https:') throw new Error(`${source} redirected to a ${target.protocol} URL; only http: and https: redirects are followed`)
+		if (target.origin === browser.location.origin && matchRoute(options.routes, target.pathname)) {
+			queueMicrotask(() => {
+				if (!disposed) navigator.navigate(target.href).catch((error: unknown) => reportNavigationError(browser, error, observeNavigationError))
+			})
+		} else browser.location.assign(target.href)
+	}
 	const renderRouteData = async (context: RenderContext, initialLoad: boolean, stream: { control?: AbortController; committed?: boolean; data?: (phase: 'ready' | 'cancel' | 'error') => void }): Promise<void | boolean> => {
 		const match = context.match
 		if (match && hasRouteMiddleware(match.route, options) && !initialLoad) {
@@ -630,7 +708,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
 				if (response.status >= 300 && response.status < 400 && location) {
 					const target = new URL(location, context.url)
 					if (target.href === context.url.href) throw new Error('Route middleware redirected to the same URL')
-					browser.location.assign(target.href)
+					followRedirect(target, 'Route middleware')
 				} else reportNavigationError(browser, new Error(`Route middleware blocked navigation: HTTP ${response.status}`), observeNavigationError)
 				return false
 			}
@@ -644,6 +722,8 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
 		let lines: AsyncGenerator<string> | undefined
 		let navigationDeferred: ReadonlyMap<number, DeferredInternals> | undefined
 		let serverData: Record<string, unknown> = {}
+		/** The data keys the page's loader declared with `depends`. */
+		let pageKeys: readonly string[] = []
 		// useRoute() values of the target: the parameters the page receives once they are known.
 		let routeParams: Readonly<Record<string, unknown>> = match?.params ?? {}
 		let routeSearch: Readonly<Record<string, unknown>> = pageSearchObject(context.url.searchParams)
@@ -667,7 +747,11 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
 			routeParams = validated.params
 			routeSearch = validated.search
 			loaderDraft = sidecar?.load ? stateStore.navigationDraft() : undefined
-			const routeContext = { ...context, match: match!, ...validated, state: loaderDraft?.state ?? stateStore }
+			const dependencies = new Set<string>()
+			const depends = (...keys: string[]): void => {
+				for (const key of keys) dependencies.add(checkDataKey(key, 'depends'))
+			}
+			const routeContext = { ...context, match: match!, ...validated, state: loaderDraft?.state ?? stateStore, depends }
 			try {
 				const data = sidecar?.load ? await sidecar.load(routeContext) : undefined
 				if (data !== undefined) driveClientDeferred(data, reportDeferred, routeWork())
@@ -678,6 +762,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
 				}
 				head = sidecar?.head?.({ ...routeContext, data }) ?? {}
 				layoutDeclared = { ...groupLayoutProps(), ...resolveLayoutProps(sidecar?.layoutProps, { ...routeContext, data }) }
+				pageKeys = [...dependencies]
 			} catch (error) {
 				if (!onLoaderError || context.signal.aborted || disposed) throw error
 				stream.data?.('error')
@@ -736,11 +821,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
 				void response.body?.cancel().catch(() => {})
 				if (context.signal.aborted || disposed) return false
 				if (redirect.href === context.url.href) throw new Error('Route data redirected to the same URL')
-				if (redirect.origin === browser.location.origin && matchRoute(options.routes, redirect.pathname)) {
-					queueMicrotask(() => {
-						if (!disposed) navigator.navigate(redirect.href).catch((error: unknown) => reportNavigationError(browser, error, observeNavigationError))
-					})
-				} else browser.location.assign(redirect.href)
+				followRedirect(redirect, 'Route data')
 				return false
 			}
 			// notFound() in top-level server code, or a loader's 404: the nearest error page, as in SSR.
@@ -781,6 +862,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
 				navigationDeferred = placePayloadDeferred(payload.props, payload.deferred)
 				serverSharedState = payload.sharedState
 				serverData = payload.resources
+				pageKeys = payload.keys
 				props = payload.props
 				routeParams = payload.props.params as Record<string, unknown>
 				routeSearch = payload.props.search as Record<string, unknown>
@@ -795,7 +877,8 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
 		const target = routeSnapshot(context.url, route?.id ?? null, routeParams, routeSearch, true)
 		const retained = Math.min(context.retainedLayouts, layouts.length)
 		const namedLayout = (): TreeLayout => ({ record: route ? route.layout : appError?.layout, declared: layoutDeclared })
-		let next = await createTree(route ? route.layouts : appError!.layouts, props, options.loadPage, retained, errorPage ?? route!.file, namedLayout(), layouts)
+		let nextProps = reactiveProps(props)
+		let next = await createTree(route ? route.layouts : appError!.layouts, nextProps.props, options.loadPage, retained, errorPage ?? route!.file, namedLayout(), layouts)
 		if (context.signal.aborted || disposed) return
 		// The new page and its components load their top-level data awaits before the commit, while
 		// the previous page stays visible. These passes are dry, like SSR: a throwaway state keeps them
@@ -840,7 +923,8 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
 			head = {}
 			errorPage = routeError
 			layoutDeclared = groupLayoutProps()
-			next = await createTree(route ? route.layouts : appError!.layouts, props, options.loadPage, retained, routeError, namedLayout(), layouts)
+			nextProps = reactiveProps(props)
+			next = await createTree(route ? route.layouts : appError!.layouts, nextProps.props, options.loadPage, retained, routeError, namedLayout(), layouts)
 			if (context.signal.aborted || disposed) return
 			pageData = await prepare(next)
 		}
@@ -964,6 +1048,8 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
 			!initialLoad && (context.viewTransition ?? options.viewTransitions ?? false),
 		)
 		if (!committed) return false
+		committedPage = { url: context.url, route, error: errorPage !== undefined, props: nextProps, keys: errorPage === undefined ? pageKeys : [] }
+		commits++
 		resourceCache.merge(pageData.loadedData())
 		// The previous route is gone: stop reading its stream, then read this one's.
 		stream.committed = true
@@ -971,13 +1057,146 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
 		activeStream = stream.control
 		if (navigationDeferred) consumeStream(lines, navigationDeferred, stream.control?.signal)
 	}
+	/** The refresh of the committed page's data in flight; a navigation or a newer refresh aborts it. */
+	let refreshControl: AbortController | undefined
+	/**
+	 * Runs the loader of the committed page again and replaces its data in place: the page and its
+	 * components stay mounted and only what reads the data updates, together with the head. A
+	 * redirect, a `404` or a page that no longer matches loads the URL as a navigation instead.
+	 */
+	const refreshRoute = async (): Promise<void> => {
+		const page = committedPage
+		// A navigation in flight loads the data it shows; an error page has no loader to rerun.
+		if (disposed || pending.value || page.error || !page.route) return
+		refreshControl?.abort()
+		const control = new AbortController()
+		refreshControl = control
+		const generation = commits
+		const route = page.route
+		const current = (): boolean => !control.signal.aborted && !disposed && generation === commits
+		const reload = (): void => {
+			if (current()) void navigator.navigate(page.url.href, { replace: true }).catch((error: unknown) => reportNavigationError(browser, error, observeNavigationError))
+		}
+		try {
+			let props: Record<string, unknown>
+			let head: PageHead = {}
+			let keys: readonly string[] = []
+			let token: string | null = null
+			let sharedState: Record<string, unknown> | undefined
+			let draft: ReturnType<StateStore['navigationDraft']> | undefined
+			let deferred: ReadonlyMap<number, DeferredInternals> | undefined
+			let lines: AsyncGenerator<string> | undefined
+			let streamControl: AbortController | undefined
+			let resources: Record<string, unknown> = {}
+			if (route.render === 'client' || !options.serverData || options.loadRoute) {
+				const loadSidecar = route.render === 'client' ? (options.loadClientRoute ?? options.loadRoute) : options.loadRoute
+				const sidecar = route.sidecar && loadSidecar ? await loadSidecar(route.sidecar) : undefined
+				if (!current()) return
+				const match = matchRoute(options.routes, page.url.pathname)
+				if (!match || match.route.id !== route.id) return reload()
+				const validated = await validatePageInputs(sidecar, match.params, pageSearchObject(page.url.searchParams))
+				const dependencies = new Set<string>()
+				draft = sidecar?.load ? stateStore.navigationDraft() : undefined
+				const routeContext = {
+					url: page.url,
+					match,
+					signal: control.signal,
+					retainedLayouts: layouts.length,
+					...validated,
+					state: draft?.state ?? stateStore,
+					depends: (...added: string[]): void => {
+						for (const key of added) dependencies.add(checkDataKey(key, 'depends'))
+					},
+				} satisfies ClientRouteContext
+				const data = sidecar?.load ? await sidecar.load(routeContext) : undefined
+				if (!current()) return
+				if (data !== undefined) driveClientDeferred(data, reportDeferred, control.signal)
+				props = { params: validated.params, search: validated.search, ...(data === undefined ? {} : { data }) }
+				head = sidecar?.head?.({ ...routeContext, data }) ?? {}
+				keys = [...dependencies]
+			} else {
+				const response = await requestPayload(page.url, control.signal)
+				const location = response.status >= 300 && response.status < 400 ? response.headers.get('location') : null
+				const redirect = response.redirected && response.url ? new URL(response.url) : location ? new URL(location, page.url) : undefined
+				if (redirect || response.status === 404 || (response.headers.get('content-type') ?? '').toLowerCase().startsWith('text/html')) {
+					// The data now redirects (the record was deleted) or is gone: the navigation shows what the URL is now.
+					void response.body?.cancel().catch(() => {})
+					return reload()
+				}
+				if (!response.ok) throw new Error(`Route data refresh failed: HTTP ${response.status}`)
+				token = response.headers.get('x-meeko-csrf-token')
+				let payload: HydrationPayload
+				if ((response.headers.get('content-type') ?? '').startsWith('application/meeko+ndjson')) {
+					if (!response.body) throw new Error('Empty Meeko navigation stream')
+					streamControl = new AbortController()
+					const stop = (): void => streamControl!.abort()
+					control.signal.addEventListener('abort', stop, { once: true })
+					lines = ndjsonLines(response.body, streamControl.signal)
+					const line = await lines.next()
+					if (line.done) throw new Error('Empty Meeko navigation stream')
+					control.signal.removeEventListener('abort', stop)
+					payload = readPayload(line.value)
+				} else payload = readPayload(await response.text())
+				if (!current()) {
+					streamControl?.abort()
+					return
+				}
+				if (payload.route !== route.id) return reload()
+				deferred = placePayloadDeferred(payload.props, payload.deferred)
+				props = payload.props
+				head = payload.head
+				keys = payload.keys
+				sharedState = payload.sharedState
+				resources = payload.resources
+			}
+			const apply = (): void => {
+				const restoreToken = token === null ? undefined : applyCsrfToken(browser, token)
+				try {
+					// Same route, same params: the page keeps its params and search, and receives its new data.
+					const previous = untrack(() => ({ ...page.props.props }))
+					withStateStore(stateStore, () => page.props.update({ ...props, params: previous.params ?? props.params, search: previous.search ?? props.search }))
+				} catch (error) {
+					restoreToken?.()
+					throw error
+				}
+				documentHead.setRoute(routeHeadInput(head), page.url.pathname)
+			}
+			documentHead.hold(() => {
+				if (sharedState) stateStore.seedForNavigation(sharedState, apply)
+				else if (draft) draft.commit(apply)
+				else apply()
+			})
+			page.keys = keys
+			resourceCache.merge(new Map(Object.entries(resources)))
+			if (deferred) {
+				// The stream of the previous data is over: its values were replaced.
+				if (streamControl) {
+					activeStream?.abort()
+					activeStream = streamControl
+				}
+				consumeStream(lines, deferred, streamControl?.signal)
+			}
+		} catch (error) {
+			if (!current()) return
+			// The previous data stays on screen; the failure reaches the application's observer.
+			reportNavigationError(browser, error, observeNavigationError)
+		} finally {
+			if (refreshControl === control) refreshControl = undefined
+		}
+	}
+	const releaseRouteData = registerDataDependent({ keys: () => committedPage.keys, refresh: refreshRoute })
 	const run = async (context: RenderContext): Promise<void | boolean> => {
+		// A navigation brings the data of its page: a refresh of the previous one stops.
+		refreshControl?.abort()
 		viewTransitions.skip()
 		const trace = traceNavigation(browser, context.match?.route.id ?? null)
 		const token = ++navigationCount
 		const initialLoad = initialClientLoad
 		initialClientLoad = false
 		pending.value = true
+		// Only a click passes its link: a programmatic navigation or a history traversal marks no link.
+		markNavigation(true, clickedLink)
+		clickedLink = undefined
 		try {
 			if (!initialLoad && !(await plugins.beforeNavigate(context.url, context.match?.route.id ?? null))) {
 				trace?.finish('cancel')
@@ -990,10 +1209,15 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
 			trace?.finish(context.signal.aborted ? 'cancel' : 'error')
 			throw error
 		} finally {
-			if (token === navigationCount) pending.value = false
+			if (token === navigationCount) {
+				pending.value = false
+				markNavigation(false)
+			}
 		}
 	}
 	const navigator = createAppNavigator(options.routes, run, browser, observeNavigationError, appError ? { layouts: appError.layouts, hydrated: Boolean(payload.error), render: run } : undefined, syncFragment)
+	ready = navigator.navigate
+	resolveReady(ready)
 	const onClick = (event: MouseEvent) => {
 		if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
 		const target = event.target
@@ -1012,7 +1236,13 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
 		if (!matchRoute(options.routes, url.pathname)) return
 		event.preventDefault()
 		const transition = anchor.getAttribute('data-meeko-view-transition')
-		void navigator.navigate(url.href, transition === 'false' || transition === 'true' ? { viewTransition: transition === 'true' } : {}).catch((error: unknown) => reportNavigationError(browser, error, observeNavigationError))
+		// `run` reads the link synchronously; a navigation that never reaches it leaves no link behind.
+		clickedLink = anchor
+		try {
+			void navigator.navigate(url.href, transition === 'false' || transition === 'true' ? { viewTransition: transition === 'true' } : {}).catch((error: unknown) => reportNavigationError(browser, error, observeNavigationError))
+		} finally {
+			clickedLink = undefined
+		}
 	}
 	browser.document.addEventListener('click', onClick)
 	if (clientFirst) {
@@ -1030,14 +1260,18 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
 		dispose() {
 			if (disposed) return
 			disposed = true
+			releaseRouteData()
+			refreshControl?.abort()
 			viewTransitions.skip()
 			// The document keeps the head of the last page.
 			documentHead.dispose()
 			navigator.dispose()
+			markNavigation(false)
 			stopChunks()
 			activeStream?.abort()
 			recovery.dispose()
 			browser.document.removeEventListener('click', onClick)
+			releaseNavigation()
 			releaseManifest()
 			releaseGlobalErrors()
 			releaseTheme()

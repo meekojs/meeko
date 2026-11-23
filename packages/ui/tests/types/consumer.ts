@@ -1,6 +1,6 @@
 // @ts-expect-error Package internals have no public entry point.
 import type { createModalManager } from '@meekojs/ui/internal'
-import type { ModalContext, ModalDismissReason, ModalInstanceContext } from '@meekojs/ui/runtime'
+import type { ModalContext, ModalDismissReason, ModalInstanceContext, UIConfirmOptions } from '@meekojs/ui/runtime'
 // @ts-expect-error Internal registry and resolver types are not public named exports.
 import type { ModalArgs, ModalInstance, ModalName, ModalResolver } from '@meekojs/ui/runtime'
 type _PrivateManager = typeof createModalManager
@@ -46,3 +46,11 @@ instance.close('wrong')
 modal.instances.value = new Map()
 // @ts-expect-error Instance snapshots expose a read-only Map.
 modal.instances.value.clear()
+const decision: Promise<boolean> = modal.confirm({ title: 'Delete?', description: 'It cannot be undone.', tone: 'danger', confirmLabel: 'Delete', cancelLabel: 'Keep', size: 'md' })
+void decision
+const options: UIConfirmOptions = { title: 'Discard changes?' }
+void modal.confirm(options)
+// @ts-expect-error A confirmation needs its title.
+void modal.confirm({ description: 'Missing title' })
+// @ts-expect-error The tone is neutral or danger.
+void modal.confirm({ title: 'Wrong tone', tone: 'warning' })

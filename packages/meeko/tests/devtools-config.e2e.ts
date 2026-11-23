@@ -89,7 +89,7 @@ export default defineMeekoConfig({ devtools: { position: "bottom-left" } });
 	const tab = await browser.newPage()
 	const errors: string[] = []
 	tab.on('pageerror', (error) => errors.push(error.message))
-	await tab.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'networkidle' })
+	await tab.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' })
 	const panel = tab.locator('[data-meeko-devtools-panel]')
 	await panel.waitFor({ state: 'attached' })
 	assert.equal(await panel.count(), 1, 'one panel')
@@ -128,7 +128,7 @@ export default defineMeekoConfig({ devtools: { position: "bottom-left" } });
 	assert.equal(await panel.locator('.badge').innerText(), '2')
 
 	// The folded state survives a reload; the shortcut restores it.
-	await tab.reload({ waitUntil: 'networkidle' })
+	await tab.reload({ waitUntil: 'domcontentloaded' })
 	await panel.locator('.pill').waitFor()
 	assert.equal(await panel.getAttribute('data-minimized'), '')
 	await tab.keyboard.press('Alt+Shift+KeyM')
@@ -152,7 +152,7 @@ export default defineMeekoConfig({ devtools: { position: "bottom-left" } });
 	await tab.mouse.move(1000, 100, { steps: 6 })
 	await tab.mouse.up()
 	await tab.locator('[data-meeko-devtools-panel][data-position="top-right"]').waitFor({ state: 'attached' })
-	await tab.reload({ waitUntil: 'networkidle' })
+	await tab.reload({ waitUntil: 'domcontentloaded' })
 	await panel.locator('.panel').waitFor()
 	assert.equal(await panel.getAttribute('data-position'), 'top-right')
 	assert.deepEqual(errors, [])

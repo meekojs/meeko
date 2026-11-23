@@ -7,6 +7,7 @@
 	const pages = [
 		{ title: 'UIDrawer', url: '#drawer' },
 		{ title: 'UITooltip', url: '#tooltip' },
+		{ title: 'UIHint', url: '#hint' },
 		{ title: 'UICommandPalette', url: '#command-palette' },
 	]
 	const results = computed(() => pages.filter((page) => page.title.toLowerCase().includes(query.value.trim().toLowerCase())))
@@ -15,12 +16,11 @@
 <template>
 	<DocsPage
 		title="Superposiciones"
-		description="Drawer, Tooltip y CommandPalette, sobre dialog y popover nativos."
+		description="Drawer, Tooltip, Hint y CommandPalette, sobre dialog y popover nativos."
 	>
 		<p>
 			Para un diálogo con resultado, usa
-			<a href="/modals">Modal</a>; para un menú o un diálogo ligero,
-			<a href="/popover">Popover</a>. Todos usan la capa superior del navegador, y salen con una View Transition donde existe.
+			<a href="/modals">Modal</a>; para un menú o un diálogo ligero, <a href="/popover">Popover</a>. Todos usan la capa superior del navegador, y salen con una View Transition donde existe.
 		</p>
 		<h2 id="drawer">UIDrawer</h2>
 		<p>
@@ -66,8 +66,7 @@
 			<code>default</code>,
 			<code>footer</code>
 			y
-			<code>trigger(id)</code>, y el evento
-			<code>close</code>.
+			<code>trigger(id)</code>, y el evento <code>close</code>.
 		</p>
 		<h2 id="tooltip">UITooltip</h2>
 		<p>
@@ -76,7 +75,7 @@
 			con
 			<code>mode="hint"</code>
 			y el aspecto de un tooltip: se abre con el puntero o el foco, nunca toma el foco, y el disparador lo referencia con
-			<code>aria-describedby</code>. Escribe en él información complementaria: en táctil no es fiable, porque según el navegador aparece al tocar, sólo mientras se mantiene pulsado o no aparece.
+			<code>aria-describedby</code>. Escribe en él información complementaria. Donde el navegador tiene Interest Invokers, es él quien lo abre y lo cierra, sin temporizadores de JavaScript. En táctil no es fiable: según el navegador aparece al tocar, sólo mientras se mantiene pulsado o no aparece.
 		</p>
 		<DocsPreview>
 			<UITooltip text="Se publica al guardar">
@@ -101,6 +100,42 @@
 			y
 			<code>anchor(trigger)</code>, para un disparador propio.
 		</p>
+		<h2 id="hint">UIHint</h2>
+		<p>
+			Un icono de información con una ayuda en un
+			<code>UITooltip</code>, para ponerlo junto a un texto o dentro de un encabezado. Toma el tamaño y el color del texto que lo rodea, se alcanza con el teclado y es contenido de frase. Es un botón que se nombra con
+			<code>label</code>
+			(«Más información» por defecto, en el idioma del documento) y se describe con la ayuda; la ayuda se abre con el puntero, con el foco y al pulsarlo.
+		</p>
+		<DocsPreview id="hint-preview">
+			<div>
+				<h3 id="hint-revenue">
+					Ingresos
+					<UIHint text="Importe cobrado, sin impuestos ni devoluciones." />
+				</h3>
+				<p>
+					Margen bruto
+					<UIHint
+						id="hint-margin"
+						label="Qué es el margen"
+						placement="bottom"
+					>
+						Ingresos menos los
+						<em>costes directos</em>
+					</UIHint>
+				</p>
+			</div>
+		</DocsPreview>
+		<DocsCode bind:code="examples.hint" />
+		<DocsApi
+			caption="Propiedades de UIHint"
+			bind:rows="[
+				{ name: 'text', type: 'string', description: 'La ayuda; para un contenido con formato, el snippet default.' },
+				{ name: 'label', type: 'string', default: 'Más información', description: 'Nombre accesible del botón; el valor por defecto sigue el idioma del documento.' },
+				{ name: 'placement', type: 'PopoverPlacement', default: 'top', description: 'Dónde se abre la ayuda.' },
+				{ name: 'id / class / ui', type: 'string / string / { base, icon, tooltip }', description: 'Identidad del botón y clases de sus partes.' },
+			]"
+		/>
 		<h2 id="command-palette">UICommandPalette</h2>
 		<p>
 			No busca: lee
@@ -141,12 +176,10 @@
 			<code>item(item, state)</code>,
 			<code>trigger(modifier)</code>
 			y
-			<code>status(status, query)</code>, y los eventos
-			<code>open</code>,
+			<code>status(status, query)</code>, y los eventos <code>open</code>,
 			<code>close</code>
 			y
-			<code>choose</code>. Los tipos
-			<code>UIDrawerProps</code>,
+			<code>choose</code>. Los tipos <code>UIDrawerProps</code>,
 			<code>UITooltipProps</code>
 			y
 			<code>UICommandPaletteProps</code>

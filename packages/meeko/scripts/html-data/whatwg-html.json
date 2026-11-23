@@ -1,7 +1,7 @@
 {
 	"source": "https://html.spec.whatwg.org/",
-	"commit": "404b3eb14a7a936dddefb2d78e224dbeb01d2358",
-	"date": "30 October 2026",
+	"commit": "823898c0c763fb4026c1518208e1b60d7c18315e",
+	"date": "17 November 2026",
 	"elements": [
 		{ "name": "a", "description": "Hyperlink", "categories": ["flow", "phrasing", "interactive", "palpable"], "interface": "HTMLAnchorElement", "anchor": "the-a-element" },
 		{ "name": "abbr", "description": "Abbreviation", "categories": ["flow", "phrasing", "palpable"], "interface": "HTMLElement", "anchor": "the-abbr-element" },
@@ -380,6 +380,7 @@
 		{ "name": "start", "description": "Starting value of the list", "value": "Valid integer", "boolean": false, "keywords": [], "element": "ol", "anchor": "attr-ol-start" },
 		{ "name": "step", "description": "Granularity to be matched by the form control's value", "value": "Valid floating-point number greater than zero, or \"any\"", "boolean": false, "keywords": ["any"], "element": "input", "anchor": "attr-input-step" },
 		{ "name": "style", "description": "Presentational and formatting instructions", "value": "CSS declarations*", "boolean": false, "keywords": [], "element": "*", "anchor": "attr-style" },
+		{ "name": "switch", "description": "Whether the control is a switch", "value": "Boolean attribute", "boolean": true, "keywords": [], "element": "input", "anchor": "attr-input-switch" },
 		{ "name": "tabindex", "description": "Whether the element is focusable and sequentially focusable, and the relative order of the element for the purposes of sequential focus navigation", "value": "Valid integer", "boolean": false, "keywords": [], "element": "*", "anchor": "attr-tabindex" },
 		{ "name": "target", "description": "Navigable for hyperlink navigation", "value": "Valid navigable target name or keyword", "boolean": false, "keywords": [], "element": "a", "anchor": "attr-hyperlink-target" },
 		{ "name": "target", "description": "Navigable for hyperlink navigation", "value": "Valid navigable target name or keyword", "boolean": false, "keywords": [], "element": "area", "anchor": "attr-hyperlink-target" },
@@ -432,6 +433,9 @@
 		"audio/loading": ["lazy", "eager"],
 		"video/loading": ["lazy", "eager"],
 		"iframe/loading": ["lazy", "eager"],
+		"link/blocking": ["render"],
+		"script/blocking": ["render"],
+		"style/blocking": ["render"],
 		"img/fetchpriority": ["high", "low", "auto"],
 		"script/fetchpriority": ["high", "low", "auto"],
 		"link/fetchpriority": ["high", "low", "auto"],
@@ -453,7 +457,7 @@
 		"input/type": ["hidden", "text", "search", "tel", "url", "email", "password", "date", "month", "week", "time", "datetime-local", "number", "range", "color", "checkbox", "radio", "file", "submit", "image", "reset", "button"],
 		"input/colorspace": ["limited-srgb", "display-p3"],
 		"button/type": ["submit", "reset", "button"],
-		"html-global/command": ["toggle-popover", "show-popover", "hide-popover", "close", "request-close", "show-modal"],
+		"button/command": ["toggle-popover", "show-popover", "hide-popover", "close", "request-close", "show-modal"],
 		"textarea/wrap": ["soft", "hard"],
 		"form/method": ["get", "post", "dialog"],
 		"button/formmethod": ["get", "post", "dialog"],
@@ -935,7 +939,8 @@
 		"html-global/enterkeyhint": ["enter", "done", "go", "next", "previous", "search", "send"],
 		"html-global/draggable": ["true", "false"],
 		"html-global/popover": ["auto", "manual", "hint"],
-		"html-global/popovertargetaction": ["toggle", "show", "hide"],
+		"button/popovertargetaction": ["toggle", "show", "hide"],
+		"input/popovertargetaction": ["toggle", "show", "hide"],
 		"iframe/sandbox": ["allow-popups", "allow-top-navigation", "allow-top-navigation-by-user-activation", "allow-same-origin", "allow-forms", "allow-pointer-lock", "allow-scripts", "allow-popups-to-escape-sandbox", "allow-modals", "allow-orientation-lock", "allow-presentation", "allow-downloads", "allow-top-navigation-to-custom-protocols"]
 	},
 	"eventHandlers": [

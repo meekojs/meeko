@@ -1,5 +1,14 @@
-/** How long the button of a code block shows the result of a copy, in milliseconds. */
+/** How long the button of a code block or a <UICopyButton> shows the result of a copy, in milliseconds. */
 export const copyFeedbackTime = 1600
+
+/**
+ * Whether this document can copy at all: the API of the clipboard or, without it, the old selection
+ * command. False on the server, where a copy button waits hidden for the browser.
+ */
+export function canCopy(): boolean {
+	if (typeof navigator === 'undefined' || typeof document === 'undefined') return false
+	return typeof navigator.clipboard?.writeText === 'function' || typeof document.execCommand === 'function'
+}
 
 /**
  * Copia `text` al portapapeles; donde falta la API del portapapeles, recurre a una selección. La promesa

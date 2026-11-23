@@ -2,7 +2,7 @@
 title: onCleanup
 group: reactivity
 since: 1.0.0
-description: Registers synchronous resource cleanup in the active root, executed when the component unmounts or is disposed of.
+description: Registers synchronous resource cleanup in the active owner, the component or an effect run, which runs it when it is released.
 symbols:
   - "@meekojs/meeko#onCleanup"
 related:
@@ -12,10 +12,17 @@ related:
   - "@meekojs/meeko#provideErrorHandler"
   - docs/api.md#reactividad
   - docs/api.md#ciclo-de-vida
-source-hash: a675e822dd7324f02255b30bd22a023c456837ff27f09ec56a74d3538c2db59b
+source-hash: 20d2a2bd0b9352f0cd80a5f7c893cbcd1d6a3fcca69262a34912fa6c2dba40fe
 ---
 
-`onCleanup(release)` tells Meeko what to do when the component ceases to exist: stop a timer, remove a `window` listener, close a connection, destroy a library instance. The function is registered in the active root (the component whose script is running, or a [`createRoot`](/en/docs/reference/createroot) root) and runs when that root is disposed of: when the component unmounts, on page changes, when its `if:when` or `each:of` row disappears, and also if rendering or hydration fails.
+`onCleanup(release)` tells Meeko what to do when the component ceases to exist: stop a timer, remove a `window` listener, close a connection, destroy a library instance. The function is registered in the active owner and runs when that owner is released:
+
+| Where it is called                                                      | Registered on               | Runs                                                                                                                        |
+| ----------------------------------------------------------------------- | --------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Component script, a composable it calls or `onMounted` (before `await`) | The component               | When it unmounts, on page changes, when its `if:when` or `each:of` row disappears, and also if rendering or hydration fails |
+| Inside an [`effect`](/en/docs/reference/effect) (since `1.10`)          | That run of the effect      | Before the next run and when the effect stops                                                                               |
+| Inside [`createRoot`](/en/docs/reference/createroot)                    | That root                   | When its `dispose` is called                                                                                                |
+| After an `await`, in an event handler or while evaluating a module      | Nothing: it throws an error | —                                                                                                                           |
 
 Use it to write composables that clean up their resources. It is exported from `@meekojs/meeko` and auto-imported in framework applications.
 
@@ -44,7 +51,7 @@ Any component calling `useNow()` in its script has a clock that stops when it un
 
 ## Return value
 
-`void`. Without an active root it throws `Error: onCleanup() requires an active component root`.
+`void`. Without an active owner it throws `Error: onCleanup() requires an active component root: …`, with a message saying where to call it. In development (Vite's `import.meta.env.DEV`, or `NODE_ENV` other than `production`) it also writes it with `console.warn`, because in an `async` function without `catch` that error is lost.
 
 ## Examples
 
@@ -83,6 +90,24 @@ export function useTicker(url: string): ReadonlySignal<number | null> {
   return price;
 }
 ```
+
+### Clean up on each effect run
+
+Inside an `effect`, the cleanup belongs to that run: it runs before the next run and when the effect stops.
+
+```ts
+import { effect, onCleanup, signal } from "@meekojs/meeko";
+
+const room = signal("general");
+effect(() => {
+  const name = room.value;
+  console.log(`joins ${name}`);
+  onCleanup(() => console.log(`leaves ${name}`));
+});
+room.value = "random"; // "leaves general", then "joins random"
+```
+
+Returning the function from the effect is equivalent.
 
 ### Multiple cleanups
 
@@ -185,7 +210,7 @@ onMounted(async () => {
 });
 ```
 
-If the component unmounts while waiting, the socket stays open, and after `await` there is no active root. `meeko check` and the editor report warning `MEEK129`. Register cleanup before the first `await` and let it check what exists:
+After the `await` there is no active root: `onCleanup` throws `Error: onCleanup() requires an active component root…`, which in development is also warned in the console, and if the component unmounts while waiting, the socket stays open. `meeko check` and the editor report warning `MEEK129`. Register cleanup before the first `await` and let it check what exists:
 
 <!-- no-check -->
 
@@ -204,4 +229,4 @@ onMounted(async () => {
 - **Server.** In SSR, the component root is disposed of when rendering finishes, so cleanups run too: do not leave server timers open, or create them only in the browser (`typeof window`, `onMounted`). Such cleanup using browser APIs triggers warning `MEEK128`; see [Use browser APIs in cleanup that also runs in SSR](#use-browser-apis-in-cleanup-that-also-runs-in-ssr).
 - **Failed render.** If rendering or hydration fails, Meeko disposes of everything registered so far. If cleanup also fails, it delivers an `AggregateError` with both causes.
 - **Errors.** A throwing cleanup does not prevent others. A rejection from cleanup mistakenly returning a promise reaches the nearest [`provideErrorHandler`](/en/docs/reference/provideerrorhandler) with source `"cleanup"`.
-- **Effects.** You do not need `onCleanup` for the component's `effect` and `computed` calls: they belong to the same root and stop automatically.
+- **Effects.** You do not need `onCleanup` for the component's `effect` and `computed` calls: they belong to the same root and stop automatically. Inside an `effect`, `onCleanup` cleans up that run (since `1.10`; until `1.9` it registered on the component and ran only on unmount).

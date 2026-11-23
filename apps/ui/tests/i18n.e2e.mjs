@@ -10,7 +10,7 @@ import { chromium } from 'playwright-core'
 /** Spanish interface texts of the shell and of this site that an /en/ page must never contain. */
 const spanishInterface = ['Saltar al contenido', 'Buscar en la guía', 'Filtrar documentación', 'Ecosistema', 'Documentación', 'Menú', 'Paquete de Meeko', 'Licencia MIT', 'Destacado', 'No hay coincidencias', 'Copiar', 'Ejemplo .meeko', 'Propiedades', 'Tipo / valor inicial', 'Descripción', '¿Te sirvió', 'Añadir un comentario', 'Cerrar aviso', 'Cerrar modal', 'Cambiar tema', 'Tema:', 'Claro', 'Oscuro', 'Sistema', 'Idioma', 'Seguir en', 'Primeros pasos', 'Componentes', 'Integración con Meeko', 'Esta página no existe', 'Ver componentes', 'Quitar selección', 'Sin resultados', 'No hay datos']
 
-const guides = ['/', '/installation', '/theming', '/components', '/container', '/buttons', '/links', '/badges', '/icons', '/forms', '/controls', '/select', '/editor', '/cards', '/tables', '/content', '/feedback', '/page', '/navigation', '/modals', '/popover', '/overlays', '/app', '/theme-toggle', '/transitions', '/transitions/project']
+const guides = ['/', '/installation', '/theming', '/components', '/container', '/buttons', '/links', '/badges', '/icons', '/forms', '/controls', '/select', '/editor', '/cards', '/tables', '/content', '/feedback', '/page', '/navigation', '/modals', '/popover', '/menu', '/overlays', '/app', '/theme-toggle', '/transitions', '/transitions/project']
 
 async function freePort() {
 	const socket = createServer().listen(0, '127.0.0.1')
@@ -77,12 +77,13 @@ test('the English UI documentation has an English interface, hreflang, a switche
 		assert.equal(await page.locator('html').getAttribute('lang'), 'en', route)
 		assert.equal(await page.locator('main h1').count(), 1, route)
 		assert.match(await page.title(), / · Meeko UI$/, route)
-		// The examples are highlighted at build time; only the demos of UICodeBlock itself stay in plain text.
-		assert.equal(await page.locator('.meeko-ui-code-block:has(pre:not(.shiki))').count(), guide === '/content' ? 4 : 0, route)
+		// The examples are highlighted at build time; only the demos of UICodeBlock itself stay in plain text. A
+		// UICodeBlock is the only <figure> of the site.
+		assert.equal(await page.locator('figure:has(pre:not(.shiki))').count(), guide === '/content' ? 4 : 0, route)
 		const texts = await interfaceTexts()
 		for (const spanish of spanishInterface) assert.ok(!texts.includes(spanish), `${route} shows the Spanish interface text «${spanish}»`)
 		// The copiable examples speak English too: no accents of Spanish, nor its usual words. Español names a language, and the other one a person.
-		const code = (await page.locator('.meeko-ui-code-block pre').allInnerTexts()).join('\n').replaceAll('Español', '').replaceAll('Lucía Martín', '')
+		const code = (await page.locator('figure pre').allInnerTexts()).join('\n').replaceAll('Español', '').replaceAll('Lucía Martín', '')
 		assert.doesNotMatch(code, /[áíóúñ¿¡]|\b(?:Guardar|Cambios|Cancelar|Eliminar|Abrir|Cerrar|Proyectos?|Tu|Sin|Con|Para|Enlace|Contenido|Guía)\b/, route)
 		// Every page has its English prose: no untranslated notice and no Spanish prose marked as such.
 		assert.equal(await page.locator('.docs-untranslated').count(), 0, route)
@@ -157,7 +158,7 @@ test('the English UI documentation has an English interface, hreflang, a switche
 	assert.equal(await page.getByRole('link', { name: 'See components', exact: true }).getAttribute('href'), '/en/components')
 	// The components bring their own texts: English pages pass none of them, also in dynamic states.
 	await page.goto(origin + '/en/tables', { waitUntil: 'networkidle' })
-	assert.equal(await page.getByRole('table', { name: 'Empty table', exact: true }).locator('.meeko-ui-table-empty').innerText(), 'No data.')
+	assert.equal(await page.getByRole('table', { name: 'Empty table', exact: true }).getByRole('cell').innerText(), 'No data.')
 	await page.goto(origin + '/en/select', { waitUntil: 'networkidle' })
 	// The page documents the same default text that the component shows.
 	assert.equal(await page.getByText('Sin resultados').count(), 0, 'the English page does not quote the Spanish default')
@@ -169,7 +170,8 @@ test('the English UI documentation has an English interface, hreflang, a switche
 	await page.locator('#owner option:not(:disabled, [hidden])').first().click()
 	assert.equal(await page.getByRole('button', { name: 'Clear selection', exact: true }).count(), 1)
 	await page.goto(origin + '/en/modals', { waitUntil: 'networkidle' })
-	const closeButtons = page.locator('.meeko-ui-modal-close')
+	// The close button of a <UIModal>, in its heading: the dialog of the command palette has no title.
+	const closeButtons = page.locator('dialog[aria-labelledby] > div:first-child > button')
 	assert.deepEqual(await closeButtons.evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label'))), ['Close modal'], 'the declarative modal, after hydration')
 	await page.getByRole('button', { name: 'Open confirmation', exact: true }).click()
 	// A modal opened by name, mounted later under UIApp, reads the same locale.
@@ -182,7 +184,8 @@ test('the English UI documentation has an English interface, hreflang, a switche
 	assert.deepEqual(await page.locator('#theme-select').getByRole('radiogroup', { name: 'Theme', exact: true }).getByRole('radio').allInnerTexts(), ['Light', 'Dark', 'System'])
 	// UILinkCard to: localized, and a navigation of the client that keeps the document.
 	await page.goto(origin + '/en/links', { waitUntil: 'networkidle' })
-	const card = page.locator('a.meeko-ui-link-card')
+	// A UILinkCard is the link whose title is a <strong>.
+	const card = page.locator('main a:has(> strong)')
 	assert.equal(await card.getAttribute('href'), '/en/theming')
 	await page.evaluate(() => {
 		globalThis.uiDocumentMarker = 'card'
@@ -192,9 +195,9 @@ test('the English UI documentation has an English interface, hreflang, a switche
 	assert.equal(await page.evaluate(() => globalThis.uiDocumentMarker), 'card')
 	// The Spanish versions keep the Spanish texts and the route without a prefix.
 	await page.goto(origin + '/tables', { waitUntil: 'networkidle' })
-	assert.equal(await page.getByRole('table', { name: 'Tabla vacía', exact: true }).locator('.meeko-ui-table-empty').innerText(), 'No hay datos.')
+	assert.equal(await page.getByRole('table', { name: 'Tabla vacía', exact: true }).getByRole('cell').innerText(), 'No hay datos.')
 	await page.goto(origin + '/links', { waitUntil: 'networkidle' })
-	assert.equal(await page.locator('a.meeko-ui-link-card').getAttribute('href'), '/theming')
+	assert.equal(await page.locator('main a:has(> strong)').getAttribute('href'), '/theming')
 	// The guides of the new components: their demos work, in English, in both directions of each control.
 	await page.goto(origin + '/en/controls', { waitUntil: 'networkidle' })
 	await page.getByRole('checkbox', { name: /I accept the terms/ }).check()
@@ -204,8 +207,8 @@ test('the English UI documentation has an English interface, hreflang, a switche
 	await page.locator('#slider-status', { hasText: 'Volume: 100' }).waitFor()
 	await page.goto(origin + '/en/feedback', { waitUntil: 'networkidle' })
 	await page.getByRole('button', { name: 'Notify the save', exact: true }).click()
-	await page.locator('.meeko-ui-toast', { hasText: 'Changes saved' }).waitFor()
-	assert.equal(await page.locator('.meeko-ui-toast-host').getAttribute('aria-live'), 'polite')
+	// The host of the toasts is a manual popover and a polite live region.
+	await page.locator('[popover="manual"][aria-live="polite"]').getByText('Changes saved', { exact: true }).waitFor()
 	await page.getByRole('button', { name: 'Close all', exact: true }).click()
 	await page.getByRole('button', { name: 'Dismiss notification', exact: true }).first().click()
 	await page.getByRole('button', { name: 'Show the notice again', exact: true }).waitFor()
@@ -259,14 +262,14 @@ test('the English UI documentation has an English interface, hreflang, a switche
 	assert.equal(await ssr.getByRole('link', { name: 'Skip to content', exact: true }).count(), 1)
 	// The same texts the hydrated pages above show: SSR and the client choose the same ones.
 	await ssr.goto(origin + '/en/tables')
-	assert.equal(await ssr.locator('.meeko-ui-table-empty').first().innerText(), 'No data.')
+	assert.equal(await ssr.locator('td[colspan]').first().innerText(), 'No data.')
 	await ssr.goto(origin + '/en/modals')
-	assert.equal(await ssr.locator('.meeko-ui-modal-close').first().getAttribute('aria-label'), 'Close modal')
+	assert.equal(await ssr.locator('dialog[aria-labelledby] > div:first-child > button').first().getAttribute('aria-label'), 'Close modal')
 	await ssr.goto(origin + '/en/theme-toggle')
 	assert.equal(await ssr.locator('#theme-select [role="radiogroup"]').getAttribute('aria-label'), 'Theme')
 	assert.equal(await ssr.locator('#theme-cycle button').getAttribute('aria-label'), 'Change theme')
 	await ssr.goto(origin + '/en/links')
-	assert.equal(await ssr.locator('a.meeko-ui-link-card').getAttribute('href'), '/en/theming')
+	assert.equal(await ssr.locator('main a:has(> strong)').getAttribute('href'), '/en/theming')
 	await ssr.close()
 	const sitemap = await (await fetch(origin + '/sitemap.xml')).text()
 	assert.match(sitemap, /<loc>https:\/\/ui\.meekojs\.com\/en\/buttons<\/loc>/)

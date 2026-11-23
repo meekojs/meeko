@@ -1,3 +1,6 @@
+import type { commandPalette } from '../variants/command-palette'
+import type { UIVariantSlots } from './theme'
+
 /**
  * En qué punto está la búsqueda de `<UICommandPalette>`. El componente no busca: quien lo usa cambia
  * `status` y `results` según su fuente, ya sea un índice local, Pagefind o un servidor.
@@ -32,15 +35,18 @@ export interface CommandPaletteItemState {
  * @example
  * ```html
  * <UICommandPalette bind:results="found.value">
- *   <snippet name="item" params="page"><strong>{page.title}</strong><span class="meeko-ui-command-excerpt" html="page.excerpt" /></snippet>
+ *   <snippet name="item" params="page"><strong>{page.title}</strong><small html="page.excerpt" /></snippet>
  *   <snippet name="status" params="status, query">Nada para {query}</snippet>
  * </UICommandPalette>
  * ```
  */
 export interface CommandPaletteSnippets<T> {
-	/** Contenido de cada fila; sin él, su etiqueta. `<strong>` es el título, la clase `meeko-ui-command-excerpt` el extracto y `<mark>` lo encontrado. */
+	/** Contenido de cada fila; sin él, su etiqueta. `<strong>` es el título, `<small>` el extracto y `<mark>` lo encontrado. */
 	item?: [item: T, state: CommandPaletteItemState]
-	/** Contenido del botón que abre la paleta; recibe la tecla modificadora, `Ctrl` o `⌘`. */
+	/**
+	 * Contenido del botón que abre la paleta; recibe la tecla modificadora, `Ctrl` o `⌘`. Un `<svg>` hijo es el
+	 * icono, un `<span>` hijo con `<kbd>` el atajo y otro `<span>` hijo la etiqueta; en un móvil sólo queda el icono.
+	 */
 	trigger?: [modifier: string]
 	/** El aviso de cada estado salvo `ready`; sin él, los textos de `commandPalette` en `ui.messages`. */
 	status?: [status: CommandPaletteStatus, query: string]
@@ -52,7 +58,8 @@ type CommandPaletteKey<T> = T extends object ? keyof T & string : never
 /**
  * Props de `<UICommandPalette>`, un diálogo de búsqueda con teclado. No sabe de dónde salen los
  * resultados: el padre lee el modelo `query`, busca donde quiera y le pasa `results` y `status`.
- * El modelo por defecto es la apertura; `query` y `active` son modelos con nombre.
+ * El modelo por defecto es la apertura; `query` y `active` son modelos con nombre. `ui` añade clases a
+ * sus partes: `trigger`, `base` (el diálogo), `field`, `icon`, `input`, `close`, `status`, `list` y `row`.
  * @since 1.8.0
  * @example
  * ```html
@@ -67,7 +74,7 @@ type CommandPaletteKey<T> = T extends object ? keyof T & string : never
  * />
  * ```
  */
-export interface UICommandPaletteProps<T> {
+export interface UICommandPaletteProps<T> extends UIVariantSlots<typeof commandPalette> {
 	/** Las filas de primer nivel, en orden. */
 	readonly results: readonly T[]
 	/** Estado de la búsqueda; sin él, `ready` con resultados e `idle` sin ellos. */

@@ -1,8 +1,11 @@
 import type { Unsubscribe } from '../socket/runtime'
+import type { DevAllowedHosts } from './dev-hosts'
 import type { RateLimitHit } from './rate-limit'
+import type { RequestContext } from './request-context'
 
 import { ApiError, SessionRevokedError, SessionSecurityError } from '../errors'
 import { encodeBase64Url } from './base64url'
+import { isDevOriginAllowed, rejectedDevOriginMessage } from './dev-hosts'
 import { warnOnce } from './env'
 import { countRateLimit, MemoryRateCounter } from './rate-limit'
 
@@ -102,12 +105,50 @@ function validTtl(value: unknown): value is number {
 }
 
 /**
- * Whether `Origin` is the request's own origin (the public origin behind `createServerApp`) or
- * one of `allowedOrigins`. A missing Origin is never allowed.
+ * @internal The hosts of `dev.allowedHosts` and `MEEKO_ALLOWED_HOSTS`, which `createServerApp`
+ * gives the app's manager outside production (`ServerAppOptions.devAllowedHosts`). Read it from
+ * the manager; a production manager never has it.
  */
-export function isAllowedOrigin(request: Request, allowedOrigins: readonly string[]): boolean {
+export const devAllowedHosts: unique symbol = Symbol.for('meeko.session.devAllowedHosts') as never
+
+/** @internal Sets {@link devAllowedHosts} on a manager that is not in production. */
+export const allowDevHosts: unique symbol = Symbol.for('meeko.session.allowDevHosts') as never
+
+/**
+ * Whether `Origin` is the request's own origin (the public origin behind `createServerApp`) or
+ * one of `allowedOrigins`. A missing Origin is never allowed. With `dev` (only `meeko dev` passes
+ * it), an origin that `dev.allowedHosts` names also passes, and a refusal warns once per origin
+ * with the option that allows it.
+ */
+export function isAllowedOrigin(request: Request, allowedOrigins: readonly string[], dev?: DevAllowedHosts): boolean {
 	const origin = request.headers.get('origin')
-	return origin !== null && (origin === new URL(request.url).origin || allowedOrigins.includes(origin))
+	if (origin !== null && (origin === new URL(request.url).origin || allowedOrigins.includes(origin))) return true
+	if (dev === undefined) return false
+	if (origin !== null && isDevOriginAllowed(origin, request.url, dev)) return true
+	warnOnce(`dev-origin:${origin ?? ''}`, rejectedDevOriginMessage(origin))
+	return false
+}
+
+/**
+ * Whether a mutation may run: {@link isAllowedOrigin} with the allowed origins of a manager, and its
+ * dev hosts if it has them. Since 1.10 Fetch Metadata comes first: when the browser marks the
+ * request `cross-site` or `same-site` (`Sec-Fetch-Site`), only an origin the application lists
+ * (`allowedOrigins`, or `dev.allowedHosts` in `meeko dev`) passes, whatever `Origin` claims.
+ * `same-origin`, `none` and a request without the header (an older browser, a script, the SSR
+ * clients) are decided by `Origin` alone, as before.
+ */
+export function isSessionOriginAllowed(request: Request, sessions: Pick<SessionManager, 'allowedOrigins'>): boolean {
+	const allowed = sessions.allowedOrigins ?? []
+	const dev = (sessions as { [devAllowedHosts]?: DevAllowedHosts })[devAllowedHosts]
+	const site = request.headers.get('sec-fetch-site')?.trim().toLowerCase()
+	if (site === 'cross-site' || site === 'same-site') {
+		const origin = request.headers.get('origin')
+		if (origin !== null && allowed.includes(origin)) return true
+		if (dev !== undefined && origin !== null && isDevOriginAllowed(origin, request.url, dev)) return true
+		if (dev !== undefined) warnOnce(`fetch-site:${origin ?? ''}`, `[meeko] Mutación rechazada (403 INVALID_ORIGIN): el navegador la marca Sec-Fetch-Site: ${site} y su Origin (${origin ?? 'ninguno'}) no está en allowedOrigins.`)
+		return false
+	}
+	return isAllowedOrigin(request, allowed, dev)
 }
 
 /**
@@ -509,11 +550,12 @@ export class SessionHandle<T = SessionData> {
 	private assertCreateOrigin(): void {
 		const request = this.request
 		if (!request || this.origin !== 'unchecked' || safeMethods.has(request.method)) return
-		if (isAllowedOrigin(request, this.manager.allowedOrigins)) {
+		if (isSessionOriginAllowed(request, this.manager)) {
 			this.origin = 'verified'
 			return
 		}
-		if (!productionManagers.has(this.manager)) {
+		// In `meeko dev` the refusal already warned, with the option that allows the origin.
+		if (!productionManagers.has(this.manager) && this.manager[devAllowedHosts] === undefined) {
 			warnOnce('session:create-origin', '[meeko] session.create() rechazó una petición sin un Origin permitido (403 INVALID_ORIGIN): los navegadores lo envían, pero un script o una app nativa debe enviar Origin, o la ruta declarar origin: "none" (inseguro frente al login CSRF).')
 		}
 		throw new SessionSecurityError('INVALID_ORIGIN')
@@ -680,7 +722,9 @@ export class SessionManager<T = unknown> {
 	/** Nombre de la cookie de sesión. */
 	readonly cookieName: string
 	/** Orígenes adicionales aceptados en las mutaciones de API y RPC, con o sin sesión, y en los formularios nativos. */
-	readonly allowedOrigins: readonly string[]
+	readonly allowedOrigins: readonly string[];
+	/** @internal Hosts that `meeko dev` accepts (`dev.allowedHosts`); `undefined` outside `meeko dev`. */
+	[devAllowedHosts]?: DevAllowedHosts
 	private readonly secure: boolean
 	private readonly sameSite: 'Lax' | 'Strict' | 'None'
 	private readonly production: boolean
@@ -705,6 +749,14 @@ export class SessionManager<T = unknown> {
 		this.allowedOrigins = options.allowedOrigins ?? []
 		this.production = options.production === true
 		if (this.production) productionManagers.add(this)
+	}
+	/**
+	 * @internal Accepts the Origins of `dev.allowedHosts` in this manager's checks. Only
+	 * `createServerApp` calls it, outside production; a production manager ignores it.
+	 */
+	[allowDevHosts](hosts: DevAllowedHosts): void {
+		if (this.production) return
+		this[devAllowedHosts] = hosts
 	}
 	/** Serializa la cabecera `Set-Cookie` de la sesión con la política del gestor; `ttlMs` 0 la borra. */
 	serializeCookie(value: string, ttlMs: number): string {
@@ -779,9 +831,96 @@ export class SessionManager<T = unknown> {
 	 */
 	assertMutationAllowed(request: Request, session: SessionHandle<T>, mutating = !['GET', 'HEAD', 'OPTIONS'].includes(request.method)): void {
 		if (!session.current || !mutating) return
-		if (!isAllowedOrigin(request, this.allowedOrigins)) throw new SessionSecurityError('INVALID_ORIGIN')
+		if (!isSessionOriginAllowed(request, this)) throw new SessionSecurityError('INVALID_ORIGIN')
 		if (request.headers.get('x-meeko-csrf') !== session.current.csrfToken) throw new SessionSecurityError('INVALID_CSRF')
 		// This request may now replace its session: Origin and CSRF were both verified.
 		session[settleSessionOrigin]?.('verified')
 	}
+}
+
+/** Handles of a manager that stands for `sessions: false`: `context.session` throws on use. */
+const disabledHandles = new WeakSet<SessionHandle<unknown>>()
+const disabledManagers = new WeakSet<SessionManager<unknown>>()
+
+/** Whether `handle` belongs to an application that disables Meeko sessions. */
+export function isDisabledSession(handle: unknown): boolean {
+	return typeof handle === 'object' && handle !== null && disabledHandles.has(handle as SessionHandle<unknown>)
+}
+
+/** Whether `sessions` stands for `sessions: false`. */
+export function sessionsDisabled(sessions: unknown): boolean {
+	return typeof sessions === 'object' && sessions !== null && disabledManagers.has(sessions as SessionManager<unknown>)
+}
+
+/** The error of every use of `context.session` in an application without Meeko sessions. */
+export function disabledSessionError(): Error {
+	return new Error('context.session is not available: server/runtime.ts disables Meeko sessions with sessions: false. Read the user from your own authentication (context.services, context.cookies), or declare isAuthenticated in server/runtime.ts for auth: "required".')
+}
+
+function disabledStore(): SessionStore<never> {
+	const fail = (): never => {
+		throw disabledSessionError()
+	}
+	return { persistent: false, get: async () => fail(), set: async () => fail(), delete: async () => fail() }
+}
+
+/**
+ * The manager of `sessions: false`: it keeps the Origin checks of every mutation (with the
+ * runtime's `allowedOrigins`) and counts `rateLimit` in memory, but never reads a session cookie,
+ * so each request gets a handle without a session that `context.session` refuses to expose.
+ */
+class DisabledSessionManager extends SessionManager<unknown> {
+	constructor(
+		allowedOrigins: readonly string[],
+		private readonly serving: boolean,
+	) {
+		super({ store: disabledStore(), production: false, allowedOrigins })
+		disabledManagers.add(this)
+	}
+	override async load(request: Request): Promise<SessionHandle<unknown>> {
+		const handle = new SessionHandle<unknown>(this)[bindSessionRequest](request)
+		disabledHandles.add(handle)
+		return handle
+	}
+	override rateLimit(key: string, windowMs: number): Promise<RateLimitHit> {
+		if (this.serving) warnOnce('rate-limit:memory-disabled', '[meeko] Sin sesiones de Meeko (sessions: false), los límites de rateLimit se cuentan en la memoria de cada instancia.')
+		return countRateLimit(undefined, key, windowMs, false)
+	}
+}
+
+/**
+ * @internal The manager of an application whose `server/runtime.ts` returns `sessions: false`.
+ * `serving` is production outside prerendering, for the memory rate limit warning.
+ */
+export function createDisabledSessions(allowedOrigins: readonly string[], serving: boolean): SessionManager<unknown> {
+	return new DisabledSessionManager(allowedOrigins, serving)
+}
+
+/** What `auth: "required"` asks when the application declares `isAuthenticated`. */
+export type Authenticator = (context: RequestContext<unknown, unknown>) => boolean | Promise<boolean>
+
+const authenticators = new WeakMap<SessionManager<unknown>, Authenticator>()
+
+/** @internal Gives `auth: "required"` of the API, RPC and Socket of `sessions` the application's check. */
+export function setAuthenticator(sessions: SessionManager<unknown>, authenticator: Authenticator): void {
+	authenticators.set(sessions, authenticator)
+}
+
+/** Whether the application declares its own `isAuthenticated` for these sessions. */
+export function hasAuthenticator(sessions: SessionManager<unknown>): boolean {
+	return authenticators.has(sessions)
+}
+
+/**
+ * `auth: "required"`: the application's `isAuthenticated` if it declares one, or a current Meeko
+ * session. Without both, it is a configuration error, never a silent `401`.
+ */
+export async function isAuthenticated(context: RequestContext<unknown, unknown> | undefined, session: SessionHandle<unknown>, sessions: SessionManager<unknown>): Promise<boolean> {
+	const authenticator = authenticators.get(sessions)
+	if (authenticator) {
+		if (!context) throw new Error('isAuthenticated needs a request context')
+		return (await authenticator(context)) === true
+	}
+	if (sessionsDisabled(sessions) || isDisabledSession(session)) throw new Error('auth: "required" has no way to know the user: server/runtime.ts disables Meeko sessions (sessions: false) and does not declare isAuthenticated. Declare isAuthenticated, or use authorize.')
+	return session.current !== undefined
 }

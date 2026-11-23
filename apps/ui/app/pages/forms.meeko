@@ -92,8 +92,8 @@
 			caption="Propiedades de UIInput"
 			bind:rows="[
 				{ name: 'model', type: 'Signal<string>', default: 'Cadena vacía', description: 'Modelo de texto de doble vía; se actualiza con input.' },
-				{ name: 'type', type: 'text | email | password | search | url | tel | date | datetime-local', default: 'text', description: 'Tipo nativo del control. La fecha es la del navegador.' },
-				{ name: 'autocomplete / min / max / step', type: 'atributos HTML', description: 'Llegan tal cual al input, como autocapitalize y spellcheck.' },
+				{ name: 'type', type: 'text | email | password | search | url | tel | number | date | datetime-local | time | month', default: 'text', description: 'Tipo nativo del control. La fecha y la hora son las del navegador. Con number, time y month el modelo sigue siendo texto («42», «09:30», «2026-11» o vacío): conviértelo donde lo uses.' },
+				{ name: 'autocomplete / inputmode / min / max / step', type: 'atributos HTML', description: 'Llegan tal cual al input, como autocapitalize y spellcheck.' },
 				{ name: 'id / name / placeholder', type: 'string', description: 'Atributos del input.' },
 				{ name: 'describedBy', type: 'string', description: 'IDs de descripción y error para aria-describedby.' },
 				{ name: 'required / disabled / invalid', type: 'boolean', default: 'false', description: 'Estado del control. invalid activa aria-invalid.' },
@@ -103,8 +103,7 @@
 		<h2 id="other-controls">Otros controles</h2>
 		<p>
 			Área de texto, casillas, radios, interruptor y deslizador están en
-			<a href="/controls">Controles de formulario</a>. Para elegir entre opciones, usa
-			<a href="/select">UISelect</a>, un
+			<a href="/controls">Controles de formulario</a>. Para elegir entre opciones, usa <a href="/select">UISelect</a>, un
 			<code>select</code>
 			nativo, o
 			<code>UICombobox</code>

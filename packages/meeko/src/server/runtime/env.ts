@@ -211,6 +211,20 @@ export function copySocketAddress(from: Request, to: Request): Request {
 	return to
 }
 
+/**
+ * Resolves a request-target against an origin. An origin-form target (`/path?query`) is assigned
+ * as path and query, so `//other.example/x` stays on `base` instead of being read as a
+ * scheme-relative URL of another host; any other target is resolved as usual.
+ */
+export function requestTargetUrl(target: string, base: string): URL {
+	if (!target.startsWith('/')) return new URL(target, base)
+	const url = new URL(base)
+	const query = target.indexOf('?')
+	url.pathname = query < 0 ? target : target.slice(0, query)
+	url.search = query < 0 ? '' : target.slice(query)
+	return url
+}
+
 /** The connection address recorded by the adapter, if any. */
 export function socketAddressOf(request: Request): string | undefined {
 	return socketAddresses.get(request)

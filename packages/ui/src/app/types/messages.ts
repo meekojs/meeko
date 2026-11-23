@@ -25,6 +25,18 @@ export interface UIMessages {
 	readonly modal: {
 		/** `aria-label` del botón de cierre, si no se pasa `closeLabel`. */
 		readonly close: string
+		/**
+		 * Botón que acepta en `useModal().confirm()`, si no se pasa `confirmLabel`.
+		 *
+		 * @since 1.10.0
+		 */
+		readonly confirm: string
+		/**
+		 * Botón que rechaza en `useModal().confirm()`, si no se pasa `cancelLabel`.
+		 *
+		 * @since 1.10.0
+		 */
+		readonly cancel: string
 	}
 	/** `<UITable>`. */
 	readonly table: {
@@ -114,6 +126,42 @@ export interface UIMessages {
 		readonly loadMore: string
 		/** Texto de la acción con `busy`, si no se pasa `loadingLabel`. */
 		readonly loading: string
+		/**
+		 * Modo numerado: recuento con `total` y `pageSize`; `{from}`, `{to}` y `{total}` son los números ya formateados.
+		 *
+		 * @since 1.10.0
+		 */
+		readonly range: string
+		/**
+		 * Modo numerado: nombre accesible del botón o enlace de una página; `{page}` es su número ya formateado.
+		 *
+		 * @since 1.10.0
+		 */
+		readonly page: string
+		/**
+		 * Modo numerado: nombre accesible de la página anterior.
+		 *
+		 * @since 1.10.0
+		 */
+		readonly previous: string
+		/**
+		 * Modo numerado: nombre accesible de la página siguiente.
+		 *
+		 * @since 1.10.0
+		 */
+		readonly next: string
+		/**
+		 * Modo numerado con `edges`: nombre accesible de la primera página.
+		 *
+		 * @since 1.10.0
+		 */
+		readonly first: string
+		/**
+		 * Modo numerado con `edges`: nombre accesible de la última página.
+		 *
+		 * @since 1.10.0
+		 */
+		readonly last: string
 	}
 	/** `<UITableOfContents>`. */
 	readonly tableOfContents: {
@@ -214,6 +262,75 @@ export interface UIMessages {
 		readonly empty: string
 		/** Aviso si la búsqueda falla. */
 		readonly unavailable: string
+	}
+	/**
+	 * `<UIHint>`.
+	 *
+	 * @since 1.10.0
+	 */
+	readonly hint: {
+		/** `aria-label` del botón, si no se pasa `label`. */
+		readonly label: string
+	}
+	/**
+	 * Menú de acciones (`<UIMenu>`).
+	 * @since 1.10.0
+	 */
+	readonly menu: {
+		/** `aria-label` del disparador de sólo icono, si no se pasa `ariaLabel`. */
+		readonly trigger: string
+	}
+	/**
+	 * `<UIStat>` con `change`, `href` o `to`.
+	 *
+	 * @since 1.10.0
+	 */
+	readonly stat: {
+		/** Texto accesible de una subida; `{change}` es la variación sin signo, como `12,5 %`. */
+		readonly up: string
+		/** Texto accesible de una bajada; `{change}` es la variación sin signo. */
+		readonly down: string
+		/** Texto accesible de una variación nula; admite `{change}`. */
+		readonly flat: string
+		/** Texto del enlace, si no se pasa `linkLabel`. */
+		readonly link: string
+		/** Nombre accesible del enlace con el texto por defecto: `{link}` es ese texto y `{label}`, la etiqueta del dato. */
+		readonly linkName: string
+	}
+	/**
+	 * `<UISparkline>`, también dentro de `<UIStat trend>`.
+	 *
+	 * @since 1.10.0
+	 */
+	readonly sparkline: {
+		/** Resumen accesible de la serie, si no se pasa `label`: `{min}`, `{max}` y `{last}`, ya formateados. */
+		readonly label: string
+		/** Nombre accesible de una serie sin valores. */
+		readonly empty: string
+	}
+	/**
+	 * `<UICopyButton>`.
+	 *
+	 * @since 1.10.0
+	 */
+	readonly copyButton: {
+		/** Texto o nombre accesible del botón, si no se pasa `label`. */
+		readonly copy: string
+		/** Texto y aviso tras copiar, si no se pasa `copiedLabel`. */
+		readonly copied: string
+		/** Texto y aviso si la copia falla, si no se pasa `failedLabel`. */
+		readonly failed: string
+	}
+	/**
+	 * `<UIInput type="password" reveal>`.
+	 *
+	 * @since 1.10.0
+	 */
+	readonly input: {
+		/** Nombre accesible del botón que muestra la contraseña, si no se pasa `showLabel`. */
+		readonly show: string
+		/** Nombre accesible del botón con la contraseña a la vista, si no se pasa `hideLabel`. */
+		readonly hide: string
 	}
 }
 

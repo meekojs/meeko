@@ -1,8 +1,10 @@
 ---
-source-hash: 4cfc4ecc6f3979f7d50632583f1323cc61dae12d82d91e987960520159d3acdc
+source-hash: 715eed0227dc7021cd9a6d9bed99f7a58e6f1016115d45c1529a9ffa476f8c24
 ---
 
 # Upgrade from 1.0 to 1.1
+
+**From:** 1.0.x. **To:** 1.1.0. **Status:** published on npm; the latest version checked on November 5, 2026 is 1.9.0. **Who acts:** maintainers upgrading an application from 1.0.x to 1.1.0.
 
 `1.1` is a minor release: code written for `1.0` still works and new features (component tags, events, models, snippets, refs, `<script server>`, data composables, generic components…) are optional. Still, some changes are noticeable when upgrading. This guide collects them and what you should review for each. The complete list of additions and fixes is in the [CHANGELOG](../../packages/meeko/CHANGELOG.md); compatibility commitments are in the [stability policy](stability.md).
 

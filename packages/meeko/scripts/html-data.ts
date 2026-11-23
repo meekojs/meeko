@@ -12,6 +12,10 @@
  *   deprecated, and the standard-track attributes of other specifications (`part`, `exportparts`…).
  * - `scripts/html-data/meeko-1.7.json`: what Meeko accepted before these data, written from MDN.
  *   Whatever is no longer in a specification stays accepted and is marked deprecated.
+ * - `scripts/html-data/extensions.json`: written by hand from other specifications, what the two
+ *   sources above do not say: the value of the attributes outside the HTML standard (`interestfor`,
+ *   `part`, `capture`…) and the values of the SVG attributes. `@mdn/browser-compat-data` gives the
+ *   SVG elements, the attributes of each one and their status.
  *
  * The specifications are fetched once into the snapshots of `scripts/html-data/` (committed), so
  * generating is offline and reproducible: `pnpm run html-data` fetches them again and rewrites
@@ -88,6 +92,35 @@ export interface AriaSnapshot {
 	readonly sources: ReadonlyArray<{ readonly url: string; readonly date: string }>
 	readonly attributes: readonly AriaAttribute[]
 	readonly roles: ReadonlyArray<{ readonly name: string; readonly description: string; readonly abstract: boolean; readonly deprecated: boolean }>
+}
+
+/** Details of an attribute that the indices do not give, in `scripts/html-data/extensions.json`. */
+export interface ExtensionAttribute {
+	readonly name: string
+	/** Elements it applies to, `*` for every one. */
+	readonly elements?: readonly string[]
+	readonly description?: string
+	readonly value?: string
+	readonly values?: readonly string[]
+	readonly freeform?: boolean
+	readonly tokens?: boolean
+	readonly boolean?: boolean
+	readonly deprecated?: boolean
+	/** `values` are the ARIA roles. */
+	readonly roles?: boolean
+	readonly spec?: string
+}
+
+/** What `scripts/html-data/extensions.json` holds. */
+export interface ExtensionSnapshot {
+	readonly source: string
+	readonly html: readonly ExtensionAttribute[]
+	readonly svg: {
+		readonly sources: readonly string[]
+		readonly globalAttributes: readonly ExtensionAttribute[]
+		/** Values of SVG attributes, on `elements` or on every element that has the attribute. A presentation attribute also takes the CSS-wide keywords, so its values are suggestions. */
+		readonly values: ReadonlyArray<{ readonly names: readonly string[]; readonly elements?: readonly string[]; readonly value?: string; readonly values?: readonly string[]; readonly freeform?: boolean; readonly presentation?: boolean }>
+	}
 }
 
 /** What `scripts/html-data/meeko-1.7.json` holds: the attributes Meeko 1.7 accepted. */
@@ -317,6 +350,7 @@ interface CompatNode {
 
 interface CompatData {
 	readonly html: { readonly elements: Readonly<Record<string, CompatNode>>; readonly global_attributes: Readonly<Record<string, CompatNode>> }
+	readonly svg: { readonly elements: Readonly<Record<string, CompatNode>>; readonly global_attributes: Readonly<Record<string, CompatNode>> }
 	readonly api: { readonly Element: CompatNode; readonly HTMLElement: CompatNode }
 	readonly __meta: { readonly version: string }
 }
@@ -341,11 +375,21 @@ const forbiddenComponentTags = ['base', 'body', 'embed', 'fencedframe', 'head', 
 const proposedAttributes: readonly string[] = ['interestfor']
 const proposedEvents: readonly string[] = ['interest', 'loseinterest']
 
+/**
+ * What the value of an attribute is, for the types and the editor: `boolean` (present or absent),
+ * `enum` (only `values`, and what starts with one of `prefixes`), `id` and `ids` (references to
+ * elements), `tokens` (a list of words), `number`, `url`, `class`, `style` and `text`.
+ */
+type AttributeKind = 'boolean' | 'class' | 'enum' | 'id' | 'ids' | 'number' | 'style' | 'text' | 'tokens' | 'url'
+
 /** Data of one attribute in the generated modules. */
 interface AttributeData {
+	kind?: AttributeKind
 	description?: string
 	value?: string
 	values?: string[]
+	/** Besides `values`, any value that starts with one of these (`--` in `command`). */
+	prefixes?: string[]
 	freeform?: true
 	tokens?: true
 	boolean?: true
@@ -371,6 +415,49 @@ function valueShape(syntax: string, inline: boolean): Pick<AttributeData, 'freef
 	return { ...(closed ? {} : { freeform: true as const }), ...(tokens ? { tokens: true as const } : {}) }
 }
 
+/** The kind of value of an attribute, from its name, its value syntax and its values. */
+function kindOf(name: string, data: AttributeData): AttributeKind {
+	if (name === 'class' || name === 'style') return name
+	if (data.boolean) return 'boolean'
+	const syntax = data.value ?? ''
+	if (/^ID\b/.test(syntax)) return 'id'
+	if (/tokens consisting of IDs/.test(syntax)) return 'ids'
+	if (data.tokens || /(space|comma)-separated (tokens|list)/i.test(syntax)) return 'tokens'
+	if (data.values && !data.freeform) return 'enum'
+	if (/\b(integer|floating-point number)\b/.test(syntax)) return 'number'
+	if (/\bURL\b/.test(syntax)) return 'url'
+	return 'text'
+}
+
+/** `data` with its kind first. */
+function withKind(name: string, data: AttributeData): AttributeData {
+	return { kind: kindOf(name, data), ...data }
+}
+
+/** The kind of value of an `aria-*` attribute, from its value type. */
+function ariaKind(type: string, values: readonly string[]): AttributeKind {
+	if (type === 'ID reference') return 'id'
+	if (type === 'ID reference list') return 'ids'
+	if (type === 'token list') return 'tokens'
+	if (type === 'integer' || type === 'number') return 'number'
+	return values.length ? 'enum' : 'text'
+}
+
+/** The details of an entry of `extensions.json`, as data of an attribute. */
+function extensionData(entry: ExtensionAttribute, roles: readonly string[]): AttributeData {
+	const values = entry.roles ? [...roles] : entry.values ? [...entry.values] : undefined
+	return {
+		...(entry.description ? { description: entry.description } : {}),
+		...(entry.value ? { value: entry.value } : {}),
+		...(values ? { values } : {}),
+		...(entry.freeform ? { freeform: true as const } : {}),
+		...(entry.tokens || entry.roles ? { tokens: true as const } : {}),
+		...(entry.boolean ? { boolean: true as const } : {}),
+		...(entry.deprecated ? { deprecated: true as const } : {}),
+		...(entry.spec ? { spec: entry.spec } : {}),
+	}
+}
+
 function compareNames(first: string, second: string): number {
 	return first < second ? -1 : first > second ? 1 : 0
 }
@@ -388,8 +475,9 @@ function flags(status: Status): Pick<AttributeData, 'deprecated' | 'experimental
 }
 
 /** The modules of `src/shared/html-data/`, by path relative to the package, from the snapshots. */
-export async function generateHtmlData(sources: { readonly whatwg: WhatwgSnapshot; readonly aria: AriaSnapshot; readonly legacy: LegacySnapshot; readonly compat: CompatData }): Promise<Record<string, string>> {
-	const { whatwg, aria, legacy, compat } = sources
+export async function generateHtmlData(sources: { readonly whatwg: WhatwgSnapshot; readonly aria: AriaSnapshot; readonly legacy: LegacySnapshot; readonly extensions: ExtensionSnapshot; readonly compat: CompatData }): Promise<Record<string, string>> {
+	const { whatwg, aria, legacy, extensions, compat } = sources
+	const roleNames = aria.roles.filter((role) => !role.abstract).map((role) => role.name)
 	const specUrl = (anchor: string) => (anchor ? `${whatwg.source}#${anchor}` : undefined)
 
 	// Elements: the standard, the standard-track ones of other specifications, and Meeko 1.7's.
@@ -435,12 +523,14 @@ export async function generateHtmlData(sources: { readonly whatwg: WhatwgSnapsho
 		const inline = row.keywords.some((keyword) => keyword !== '')
 		const values = row.boolean ? [] : inline ? [...row.keywords] : row.name === 'referrerpolicy' ? [...whatwg.referrerPolicy.values] : [...(definitions ?? [])].filter((value) => !value.endsWith('-'))
 		// `referrerpolicy` takes exactly the values of the Referrer Policy specification.
-		const shape = row.name === 'referrerpolicy' ? {} : values.length ? valueShape(row.value, inline) : {}
+		// A custom command is any name that starts with `--`: with it, the keywords are the only values.
+		const prefixes = /a custom command keyword/.test(row.value) ? ['--'] : undefined
+		const shape = row.name === 'referrerpolicy' || prefixes ? {} : values.length ? valueShape(row.value, inline) : {}
 		const status = row.element === '*' ? statusOf(compat.html.global_attributes[row.name]) : statusOf(compat.html.elements[row.element]?.[row.name] as CompatNode | undefined)
 		const data: AttributeData = {
 			description: row.description,
 			value: row.value,
-			...(values.length ? { values, ...shape } : {}),
+			...(values.length ? { values, ...(prefixes ? { prefixes } : {}), ...shape } : {}),
 			...(row.boolean ? { boolean: true as const } : {}),
 			...flags(status),
 			...(row.anchor ? { spec: specUrl(row.anchor)! } : {}),
@@ -466,7 +556,18 @@ export async function generateHtmlData(sources: { readonly whatwg: WhatwgSnapsho
 		}
 	}
 	// `role` belongs to WAI-ARIA: a list of roles, the first one the user agent knows applies.
-	global.set('role', { description: 'ARIA role of the element, and fallback roles after it', value: 'Unordered set of unique space-separated tokens', values: aria.roles.filter((role) => !role.abstract).map((role) => role.name), tokens: true, spec: 'https://w3c.github.io/aria/#host_general_role' })
+	global.set('role', { description: 'ARIA role of the element, and fallback roles after it', value: 'Unordered set of unique space-separated tokens', values: [...roleNames], tokens: true, spec: 'https://w3c.github.io/aria/#host_general_role' })
+	// What the indices do not say about an attribute of another specification: its value and where
+	// it is defined. The status stays the one of `@mdn/browser-compat-data`.
+	for (const entry of extensions.html) {
+		for (const element of entry.elements ?? ['*']) {
+			const target = element === '*' ? global : own.get(element)
+			if (!target) throw new Error(`html-data: extensions.json names <${element}>, which is not an element of the data`)
+			const previous = target.get(entry.name)
+			if (previous?.value) continue
+			target.set(entry.name, { ...extensionData(entry, roleNames), ...(previous?.experimental ? { experimental: true as const } : {}), ...(previous?.deprecated ? { deprecated: true as const } : {}) })
+		}
+	}
 	// What Meeko 1.7 accepted and no specification has any more: accepted still, deprecated.
 	const legacyBoolean = new Set(legacy.booleanAttributes)
 	const kept = (name: string): AttributeData => ({ ...(legacyBoolean.has(name) ? { boolean: true as const } : {}), deprecated: true })
@@ -486,10 +587,49 @@ export async function generateHtmlData(sources: { readonly whatwg: WhatwgSnapsho
 		aria.attributes.map((item) => {
 			const api = ariaApi.get(item.name.replace(/-/g, ''))
 			const status = api ? statusOf(compat.api.Element[api] as CompatNode) : {}
-			return [item.name, { description: item.description, type: item.type, ...(item.values.length ? { values: [...item.values] } : {}), ...(status.experimental ? { experimental: true as const } : {}), ...(item.deprecated ? { deprecated: true as const } : {}) }] as const
+			return [item.name, { kind: ariaKind(item.type, item.values), description: item.description, type: item.type, ...(item.values.length ? { values: [...item.values] } : {}), ...(status.experimental ? { experimental: true as const } : {}), ...(item.deprecated ? { deprecated: true as const } : {}) }] as const
 		}),
 	)
 	const ariaRoles = sortedRecord(aria.roles.filter((role) => !role.abstract).map((role) => [role.name, { description: role.description, ...(role.deprecated ? { deprecated: true as const } : {}) }] as const))
+
+	for (const [name, data] of global) global.set(name, withKind(name, data))
+	for (const attributes of own.values()) for (const [name, data] of attributes) attributes.set(name, withKind(name, data))
+
+	// SVG: the elements and the attributes of each one as `@mdn/browser-compat-data` lists them, with
+	// their names as written (`viewBox`, `xlink:href`), and the values of `extensions.json`.
+	// Its other keys with `_` are notes about a value, not attributes.
+	const svgAttributeName = (key: string): string | undefined => (/^(xlink|xml)_/.test(key) ? key.replace('_', ':') : key === '__compat' || key.includes('_') ? undefined : key)
+	const svgValues = (tag: string | undefined, name: string): AttributeData => {
+		const matches = extensions.svg.values.filter((entry) => entry.names.includes(name))
+		const entry = matches.find((item) => tag !== undefined && item.elements?.includes(tag)) ?? matches.find((item) => !item.elements)
+		if (!entry) return {}
+		return { ...(entry.value ? { value: entry.value } : {}), ...(entry.values ? { values: [...entry.values] } : {}), ...(entry.freeform || entry.presentation ? { freeform: true as const } : {}) }
+	}
+	const svgElements = new Map<string, { experimental?: true; deprecated?: true; spec?: string }>()
+	const svgGlobal = new Map<string, AttributeData>()
+	const svgOwn = new Map<string, Map<string, AttributeData>>()
+	for (const [key, node] of Object.entries(compat.svg.global_attributes)) {
+		const name = svgAttributeName(key)
+		if (name) svgGlobal.set(name, withKind(name, { ...svgValues(undefined, name), ...flags(statusOf(node)) }))
+	}
+	for (const entry of extensions.svg.globalAttributes) if (!svgGlobal.has(entry.name)) svgGlobal.set(entry.name, withKind(entry.name, extensionData(entry, roleNames)))
+	for (const [tag, node] of Object.entries(compat.svg.elements)) {
+		const spec = [node.__compat?.spec_url ?? []].flat()[0]
+		svgElements.set(tag, { ...flags(statusOf(node)), ...(spec ? { spec } : {}) })
+		const attributes = new Map<string, AttributeData>()
+		for (const [key, child] of Object.entries(node)) {
+			const name = svgAttributeName(key)
+			if (!name) continue
+			// An attribute with the name of a global one stays global, unless it has values of its own (`fill` of `<animate>`).
+			if (svgGlobal.has(name) && !extensions.svg.values.some((entry) => entry.names.includes(name) && entry.elements?.includes(tag))) continue
+			attributes.set(name, withKind(name, { ...svgValues(tag, name), ...flags(statusOf(child as CompatNode)) }))
+		}
+		svgOwn.set(tag, attributes)
+	}
+	for (const entry of extensions.svg.values) {
+		for (const tag of entry.elements ?? []) if (!svgOwn.has(tag)) throw new Error(`html-data: extensions.json names <${tag}>, which is not an SVG element of the data`)
+	}
+	const svgTagNames = [...svgElements.keys()].sort(compareNames)
 
 	// Names for the runtime and the checks of the compiler.
 	const tagNames = [...elements.keys()].sort(compareNames)
@@ -568,9 +708,13 @@ export async function generateHtmlData(sources: { readonly whatwg: WhatwgSnapsho
 		'',
 		'/** Data of an HTML attribute. */',
 		'export interface HtmlAttributeData {',
+		'\t/** What the value is: a boolean attribute, closed values (`enum`), a reference to an element (`id`), a list (`ids`, `tokens`), a number, a URL, `class`, `style` or text. */',
+		"\treadonly kind: 'boolean' | 'class' | 'enum' | 'id' | 'ids' | 'number' | 'style' | 'text' | 'tokens' | 'url'",
 		'\treadonly description?: string',
 		'\treadonly value?: string',
 		'\treadonly values?: readonly string[]',
+		'\t/** Besides `values`, any value that starts with one of these (`--` in `command`). */',
+		'\treadonly prefixes?: readonly string[]',
 		'\t/** `values` are suggestions: other values are valid too. */',
 		'\treadonly freeform?: true',
 		'\t/** The value is a set of `values` separated by spaces. */',
@@ -608,6 +752,7 @@ export async function generateHtmlData(sources: { readonly whatwg: WhatwgSnapsho
 		'',
 		'/** Data of an `aria-*` attribute. */',
 		'export interface AriaAttributeData {',
+		"\treadonly kind: 'enum' | 'id' | 'ids' | 'number' | 'text' | 'tokens'",
 		'\treadonly description: string',
 		'\treadonly type: string',
 		'\treadonly values?: readonly string[]',
@@ -634,6 +779,22 @@ export async function generateHtmlData(sources: { readonly whatwg: WhatwgSnapsho
 		'',
 	].join('\n')
 
+	const svgModule = [
+		header('SVG elements and attributes in detail, for the compiler and the editor (not for the browser): the\n * elements, the attributes of each one and their status from `@mdn/browser-compat-data`, and the\n * values of the SVG specifications. Names and values are written as SVG reads them, with their\n * case (`viewBox`, `userSpaceOnUse`). `freeform` values are suggestions: a presentation attribute\n * also takes any CSS value.'),
+		'',
+		"import type { HtmlAttributeData } from './attributes'",
+		'',
+		'/** SVG elements and their status. */',
+		`export const svgElements = ${literal(Object.fromEntries(svgTagNames.map((tag) => [tag, svgElements.get(tag)])))} as const satisfies Readonly<Record<string, { readonly experimental?: true; readonly deprecated?: true; readonly spec?: string }>>`,
+		'',
+		'/** Attributes that every SVG element accepts: the core and presentation attributes. */',
+		`export const svgGlobalAttributes = ${literal(sortedRecord(svgGlobal))} as const satisfies Readonly<Record<string, HtmlAttributeData>>`,
+		'',
+		'/** Own attributes of each SVG element. */',
+		`export const svgElementAttributes = ${literal(Object.fromEntries(svgTagNames.map((tag) => [tag, sortedRecord(svgOwn.get(tag)!)])))} as const satisfies Readonly<Record<string, Readonly<Record<string, HtmlAttributeData>>>>`,
+		'',
+	].join('\n')
+
 	const options = { parser: 'typescript', printWidth: 800, semi: false, singleQuote: true, tabWidth: 2, useTabs: true } as const
 	return {
 		'src/shared/html-data/tags.ts': await format(tags, options),
@@ -641,13 +802,14 @@ export async function generateHtmlData(sources: { readonly whatwg: WhatwgSnapsho
 		'src/shared/html-data/attributes.ts': await format(details, options),
 		'src/shared/html-data/aria.ts': await format(ariaModule, options),
 		'src/shared/html-data/events.ts': await format(events, options),
+		'src/shared/html-data/svg.ts': await format(svgModule, options),
 	}
 }
 
 // ---------------------------------------------------------------------------------------------
 // Files
 
-const snapshotFiles = { whatwg: 'whatwg-html.json', aria: 'wai-aria.json', legacy: 'meeko-1.7.json' } as const
+const snapshotFiles = { whatwg: 'whatwg-html.json', aria: 'wai-aria.json', legacy: 'meeko-1.7.json', extensions: 'extensions.json' } as const
 
 /** The snapshots and `@mdn/browser-compat-data`, as {@link generateHtmlData} takes them. */
 export async function readSources(): Promise<Parameters<typeof generateHtmlData>[0]> {
@@ -656,6 +818,7 @@ export async function readSources(): Promise<Parameters<typeof generateHtmlData>
 		whatwg: await read<WhatwgSnapshot>(snapshotFiles.whatwg),
 		aria: await read<AriaSnapshot>(snapshotFiles.aria),
 		legacy: await read<LegacySnapshot>(snapshotFiles.legacy),
+		extensions: await read<ExtensionSnapshot>(snapshotFiles.extensions),
 		compat: createRequire(import.meta.url)('@mdn/browser-compat-data') as CompatData,
 	}
 }

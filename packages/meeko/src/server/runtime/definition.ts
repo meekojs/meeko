@@ -1,6 +1,8 @@
 import type { ServerErrorObserver } from '../errors'
+import type { RequestCookies } from '../runtime/cookies'
 import type { PlatformName, ServerPlatform } from '../runtime/platform'
 import type { ProcessErrorPolicy } from '../runtime/process-errors'
+import type { RequestContext } from '../runtime/request-context'
 import type { SessionManager } from '../runtime/sessions'
 import type { SocketDeliveryErrorContext, SocketPubSub } from '../socket/runtime'
 
@@ -53,7 +55,10 @@ export interface ServerRuntimeContext<Env = Readonly<Record<string, string | und
 
 /**
  * Servicios de la aplicación: un objeto compartido o una función que los crea en cada petición.
- * Llegan a páginas, API, RPC y Socket como `RequestContext.services`.
+ * Llegan a páginas, API, RPC y Socket como `RequestContext.services`. Desde `1.10`, la función
+ * recibe también `cookies`, las mismas de `RequestContext.cookies`, para crear por petición un
+ * cliente que lee y escribe sus propias cookies, como el de `@supabase/ssr`. En el handshake de
+ * Socket son de sólo lectura.
  *
  * @typeParam Services Tipo de los servicios.
  * @typeParam Env Tipo de las variables o bindings del entorno.
@@ -68,7 +73,31 @@ export interface ServerRuntimeContext<Env = Readonly<Record<string, string | und
  * });
  * ```
  */
-export type ServerServices<Services, Env = unknown> = Services | ((request: Request, context: { readonly platform: ServerPlatform<Env> }) => Services | Promise<Services>)
+export type ServerServices<Services, Env = unknown> = Services | ((request: Request, context: ServerServicesContext<Env>) => Services | Promise<Services>)
+
+/**
+ * Lo que recibe la función `services` de `server/runtime.ts` en cada petición, además de la petición.
+ *
+ * @typeParam Env Tipo de las variables o bindings del entorno.
+ * @since 1.10.0
+ * @example
+ * ```ts
+ * import type { ServerServicesContext } from "@meekojs/meeko/server";
+ *
+ * const services = (request: Request, { cookies }: ServerServicesContext) => ({
+ *   locale: cookies.get("locale") ?? "es",
+ * });
+ * ```
+ */
+export interface ServerServicesContext<Env = unknown> {
+	/** Runtime que atiende la petición. */
+	readonly platform: ServerPlatform<Env>
+	/**
+	 * Cookies de la petición, las mismas de `RequestContext.cookies` (desde `1.10`): lo que se
+	 * escribe llega a la respuesta. De sólo lectura en el handshake de Socket.
+	 */
+	readonly cookies: RequestCookies
+}
 
 /**
  * Recursos de servidor de la aplicación, creados una vez por proceso o aislado: sesiones,
@@ -96,8 +125,29 @@ export interface ServerRuntime<Services = unknown, Env = unknown> {
 	 * Gestor de sesiones. En producción necesita un store persistente. Desde `1.2` es opcional: sin
 	 * él, Meeko usa memoria en desarrollo y, en producción, Redis con `MEEKO_REDIS_URL` (véase
 	 * [Autenticación](https://github.com/meekojs/meeko/blob/main/docs/framework.md#autenticación)).
+	 *
+	 * Desde `1.10`, `false` desactiva las sesiones de Meeko, para una aplicación que autentica con su
+	 * propio proveedor (cookies propias, un token): producción arranca sin Redis, `context.session`
+	 * lanza un error al usarlo, `auth: "required"` pregunta a {@link ServerRuntime.isAuthenticated}
+	 * y `rateLimit` cuenta en la memoria de cada instancia. Las comprobaciones de `Origin` y Fetch
+	 * Metadata de las mutaciones se mantienen, con {@link ServerRuntime.allowedOrigins}.
 	 */
-	readonly sessions?: SessionManager<any>
+	readonly sessions?: SessionManager<any> | false
+	/**
+	 * Orígenes adicionales aceptados en las mutaciones de API y RPC y en los formularios nativos
+	 * (desde `1.10`), como `https://admin.example.com`, cuando Meeko crea el gestor: sin `sessions`
+	 * o con `sessions: false`. Con un `SessionManager` propio, declárelos en su `allowedOrigins`;
+	 * tener ambos detiene el arranque.
+	 */
+	readonly allowedOrigins?: readonly string[]
+	/**
+	 * Decide si la petición está autenticada para `auth: "required"` de API, RPC y Socket (desde
+	 * `1.10`), en lugar de comprobar la sesión de Meeko. Recibe el contexto completo, con
+	 * `services` y `cookies`, así que puede preguntar al proveedor de la aplicación. Devolver
+	 * `false` responde `401 UNAUTHENTICATED`. Con `sessions: false` y sin él, `auth: "required"`
+	 * falla con un error de configuración (`500`). Para el usuario en el handler, use `locals`.
+	 */
+	readonly isAuthenticated?: (context: RequestContext<Services, Env>) => boolean | Promise<boolean>
 	/** Se expone como `RequestContext.services` a páginas, API, RPC y canales Socket. */
 	readonly services?: ServerServices<Services, Env>
 	/** Política de Socket. */

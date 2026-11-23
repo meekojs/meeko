@@ -1,0 +1,67 @@
+<script lang="ts">
+	// <UIAvatar>: la foto de una persona o, sin ella, sus iniciales, el snippet `fallback` o el glifo de una
+	// persona. Con nombre es una imagen accesible: el `alt` de la foto o, sin foto, `role="img"` con
+	// `aria-label` en la caja, cuyas iniciales no se leen. Si la foto no carga, pasa a las iniciales: con el
+	// evento `error` tras hidratar y, si falló antes, al montar. No tiene espacios entre las etiquetas: serían
+	// texto dentro de una frase.
+	import { computed, onMounted, signal } from '@meekojs/meeko'
+
+	import type { AvatarSnippets, UIAvatarProps } from '../types/avatar'
+
+	import { avatarInitials } from '../utils/avatar'
+	import { uiTheme } from '../utils/defaults'
+	import { icons } from '../utils/icons'
+	import { avatar } from '../variants/avatar'
+
+	const props = defineProps<UIAvatarProps>()
+
+	const theme = uiTheme('avatar', () => props)
+
+	const snippets = defineSnippets<AvatarSnippets>()
+
+	const image = useElementRef('image')
+
+	// La URL que falló: otra `src` vuelve a intentarlo.
+	const failed = signal<string | undefined>(undefined)
+
+	const classes = computed(() => avatar({ size: props.size ?? theme.defaults?.size, shape: props.shape ?? theme.defaults?.shape }))
+	const showImage = computed(() => Boolean(props.src) && failed.value !== props.src)
+	const initials = computed(() => avatarInitials(props.name))
+	const accessibleName = computed(() => props.label?.trim() || props.name?.trim() || undefined)
+	const named = computed(() => !props.decorative && !showImage.value && accessibleName.value !== undefined)
+	const showFallback = computed(() => !showImage.value && !initials.value && Boolean(snippets.fallback))
+	const showGlyph = computed(() => !showImage.value && !initials.value && !snippets.fallback)
+
+	function fail(): void {
+		failed.value = props.src
+	}
+
+	onMounted(() => {
+		const element = image.value
+		// Una imagen que falló antes de hidratar ya no emite `error`.
+		if (element && element.complete && element.naturalWidth === 0) fail()
+	})
+</script>
+
+<!-- Sin espacios entre las etiquetas de esta plantilla: serían texto dentro de una frase. Prettier la deja así (htmlWhitespaceSensitivity "strict" en prettier.config.ts) y tests/templates-without-whitespace.test.mjs lo vigila. -->
+<template><span
+		bind:class="classes.value.base({ class: [theme.ui.base, theme.class] })"
+		bind:role="named.value ? 'img' : undefined"
+		bind:aria-label="named.value ? accessibleName.value : undefined"
+		bind:aria-hidden="props.decorative ? 'true' : undefined"
+		><img
+			ref:image
+			if:when="showImage.value"
+			bind:src="props.src"
+			bind:alt="props.decorative ? '' : (accessibleName.value ?? '')"
+			bind:class="classes.value.image({ class: theme.ui.image })"
+			on:error="fail" /><template if:when="!showImage.value && initials.value">{initials.value}</template
+		><render
+			if:when="showFallback.value"
+			snippet="snippets.fallback" /><svg
+			if:when="showGlyph.value"
+			viewBox="0 0 16 16"
+			aria-hidden="true"
+			bind:class="classes.value.glyph({ class: theme.ui.glyph })"
+			><path bind:d="icons.person" /></svg
+	></span></template>

@@ -4,7 +4,9 @@
 		"noEmit": true,
 		// tests/editor-bridge.e2e.ts also checks the client of the VS Code extension, in ../vscode.
 		"rootDir": "..",
-		"allowImportingTsExtensions": true
+		"allowImportingTsExtensions": true,
+		// Node 24 runs the tests: Promise.withResolvers and the other ES2024 APIs exist.
+		"lib": ["ES2024", "DOM"]
 	},
 	"include": ["tests/**/*.ts", "examples/counter/Counter.generated.ts"],
 	"exclude": ["tests/fixtures/**"]

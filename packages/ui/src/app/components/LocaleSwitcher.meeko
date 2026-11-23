@@ -3,32 +3,39 @@
 	// what shows; the name of the language is what a screen reader hears.
 	import type { UILinkTarget, UILocaleItem, UILocaleSwitcherProps } from '../types/navigation'
 
+	import { uiTheme } from '../utils/defaults'
 	import { uiMessages } from '../utils/messages'
 	import { linkTarget } from '../utils/navigation'
+	import { localeSwitcher } from '../variants/locale'
 	import * as ItemLink from './internal/ItemLink.meeko'
 
 	const props = defineProps<UILocaleSwitcherProps>()
 
+	const theme = uiTheme('localeSwitcher', () => props)
+
 	const text = uiMessages().language
 
 	const target = (item: UILocaleItem): UILinkTarget => ({ ...linkTarget(item), hreflang: item.hreflang ?? item.code, lang: item.lang ?? item.code, title: item.title ?? item.label })
+
+	const classes = localeSwitcher()
 </script>
 
 <template>
 	<nav
 		if:when="props.items.length > 1"
-		bind:class="['meeko-ui-locale-switcher', props.class].filter(Boolean).join(' ')"
+		bind:class="classes.base({ class: [theme.ui.base, theme.class] })"
 		bind:aria-label="props.label ?? text.label"
 	>
 		<ItemLink
 			each:of="props.items"
 			each:as="item"
 			each:key="item.code"
+			bind:class="classes.link({ class: theme.ui.link })"
 			bind:link="target(item)"
 			bind:current="item.current ? 'page' : undefined"
 		>
 			<span aria-hidden="true">{item.code.toUpperCase()}</span>
-			<span class="meeko-ui-sr-only">{item.label}</span>
+			<span class="ui:sr-only">{item.label}</span>
 		</ItemLink>
 	</nav>
 </template>

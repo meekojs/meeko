@@ -3,7 +3,7 @@ import type { AddressInfo } from 'node:net'
 
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import test from 'node:test'
 import { pathToFileURL } from 'node:url'
@@ -140,6 +140,8 @@ test('the static adapter writes a site for any static host, with 404.html, sitem
 test('with sitemap and robots, the Node output serves both from its asset manifest and the prerender index has the script hashes', { timeout: 180_000 }, async (context) => {
 	const root = await tempProject(context, 'node-sitemap')
 	await writeStaticApp(root, '{ site: "https://example.com", sitemap: true, robots: true, document: { head: { script: [{ children: "window.boot = 1" }] } } }')
+	await unlink(join(root, 'app', 'error.meeko'))
+	await writeFile(join(root, 'app', 'pages', 'broken.meeko'), '<script server lang="ts">export const value = (() => { throw new Error("private failure") })()</script><template><p>Broken</p></template>')
 	const result = await buildProject(root, { adapter: 'node' })
 	const index = JSON.parse(await readFile(join(result.output, 'prerender', 'manifest.json'), 'utf8')) as { pages: Record<string, { scriptHashes?: string[] }> }
 	assert.deepEqual(Object.keys(index.pages).sort(), ['/', '/docs/a', '/docs/b'])
@@ -148,6 +150,15 @@ test('with sitemap and robots, the Node output serves both from its asset manife
 	// Production needs a persistent session store; the asset reader is the same while prerendering.
 	const app = await createNodeApp({ prerendering: true })
 	try {
+		const missing = await app.fetch(new Request('http://localhost/missing', { headers: { accept: 'text/html' } }))
+		assert.equal(missing.status, 404)
+		assert.match(await missing.text(), /Page not found/)
+
+		const broken = await app.fetch(new Request('http://localhost/broken', { headers: { accept: 'text/html' } }))
+		assert.equal(broken.status, 500)
+		const errorHtml = await broken.text()
+		assert.match(errorHtml, /Something went wrong/)
+		assert.doesNotMatch(errorHtml, /private failure/)
 		const sitemap = await app.fetch(new Request('http://localhost/sitemap.xml'))
 		assert.equal(sitemap.status, 200)
 		assert.equal(sitemap.headers.get('content-type'), 'application/xml; charset=utf-8')
@@ -161,4 +172,16 @@ test('with sitemap and robots, the Node output serves both from its asset manife
 	} finally {
 		await app.close()
 	}
+})
+
+test('the static adapter builds a default 404 page without app/error.meeko', { timeout: 180_000 }, async (context) => {
+	const root = await tempProject(context, 'static-default-error')
+	await writeStaticApp(root, staticAppConfig)
+	await unlink(join(root, 'app', 'error.meeko'))
+
+	const result = await buildProject(root)
+	const html = await readFile(join(result.output, '404.html'), 'utf8')
+	assert.match(html, /<h1[^>]*><!--meeko:text:\d+-->Page not found<!--\/meeko:text:\d+--><\/h1>/)
+	assert.match(html, /href="\/"[^>]*>Back to home<\/a>/)
+	assert.match(html, /"error":true/)
 })

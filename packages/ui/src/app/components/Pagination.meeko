@@ -1,16 +1,40 @@
 <script lang="ts">
-	// <UIPagination>: a count and a way to load more. While busy the action stays focusable, announced
-	// with aria-disabled, so the keyboard does not lose its place when the rows arrive.
+	// <UIPagination>: a count and a way to load more or, with `pageCount` or `pageSize`, the numbered pages.
+	// While busy the action and the pages stay focusable, announced with aria-disabled, so the keyboard does
+	// not lose its place when the rows arrive. The pages are a plain list of buttons or links inside the
+	// <nav>: Tab goes through them, as through any list of links, with no roving focus of its own.
 	import { computed } from '@meekojs/meeko'
 
-	import type { UIPaginationProps } from '../types/navigation'
+	import type { UILinkTarget, UIPaginationProps } from '../types/navigation'
 
+	import { uiTheme } from '../utils/defaults'
+	import { icons } from '../utils/icons'
 	import { fillMessage, uiMessages } from '../utils/messages'
+	import { clampPage, paginationCount, paginationItems } from '../utils/pagination'
+	import { button } from '../variants/button'
+	import { pagination } from '../variants/navigation'
+	import * as Icon from './internal/Icon.meeko'
 	import * as ItemLink from './internal/ItemLink.meeko'
+
+	/** A number, a control (previous, next, first, last) or a gap (`page: null`) of the numbered mode. */
+	interface Entry {
+		readonly key: string
+		readonly page: number | null
+		readonly text: string
+		readonly label: string
+		readonly icon?: string | undefined
+		readonly current: boolean
+		readonly disabled: boolean
+		readonly link?: (UILinkTarget & { readonly current: boolean }) | undefined
+	}
 
 	const props = defineProps<UIPaginationProps>()
 
-	const emit = defineEmits<{ loadMore: [] }>()
+	const theme = uiTheme('pagination', () => props)
+
+	const emit = defineEmits<{ loadMore: []; change: [page: number] }>()
+
+	const page = defineModel<number>('page', { default: 1 })
 
 	const snippets = defineSnippets<{ default?: [] }>()
 
@@ -18,13 +42,57 @@
 	const text = messages.pagination
 	const format = new Intl.NumberFormat(messages.locale)
 
+	const numbered = computed(() => props.pageCount !== undefined || props.pageSize !== undefined)
+	const pages = computed(() => paginationCount(props.pageCount, props.total, props.pageSize))
+	const current = computed(() => clampPage(page.value, pages.value))
+
 	const count = computed(() => {
 		if (props.countText !== undefined) return props.countText
 		if (props.total === undefined) return ''
 		const total = format.format(props.total)
+		if (numbered.value && props.pageSize) {
+			const from = props.total ? (current.value - 1) * props.pageSize + 1 : 0
+			const to = Math.min(current.value * props.pageSize, props.total)
+			return fillMessage(text.range, { from: format.format(from), to: format.format(to), total })
+		}
 		return props.shown === undefined ? fillMessage(text.total, { total }) : fillMessage(text.count, { shown: format.format(props.shown), total })
 	})
-	const more = computed(() => props.hasMore ?? (props.shown !== undefined && props.total !== undefined && props.shown < props.total))
+	const more = computed(() => !numbered.value && (props.hasMore ?? (props.shown !== undefined && props.total !== undefined && props.shown < props.total)))
+
+	const entries = computed((): Entry[] => {
+		const at = current.value
+		const last = pages.value
+		const entry = (key: string, target: number, label: string, options: { text?: string; icon?: string; rel?: string; edge?: boolean } = {}): Entry => {
+			const isCurrent = options.icon === undefined && target === at
+			const disabled = props.disabled === true || options.edge === true
+			const link = props.pageLink && !disabled ? props.pageLink(target) : undefined
+			return {
+				key,
+				page: target,
+				text: options.text ?? '',
+				label,
+				icon: options.icon,
+				current: isCurrent,
+				disabled,
+				// The pages share one route: each says by itself whether it is the current one.
+				link: link && { ...link, ...(link.rel === undefined && options.rel ? { rel: options.rel } : {}), current: isCurrent },
+			}
+		}
+		const numbers = paginationItems(at, last, props.siblings).map((value, index) => (value === null ? { key: `gap-${index}`, page: null, text: '…', label: '', current: false, disabled: false } : entry(String(value), value, fillMessage(text.page, { page: format.format(value) }), { text: format.format(value) })))
+		return [
+			...(props.edges ? [entry('first', 1, text.first, { icon: icons.chevronsStart, edge: at <= 1 })] : []),
+			entry('previous', at - 1, text.previous, { icon: icons.chevronStart, rel: 'prev', edge: at <= 1 }),
+			...numbers,
+			entry('next', at + 1, text.next, { icon: icons.chevronEnd, rel: 'next', edge: at >= last }),
+			...(props.edges ? [entry('last', last, text.last, { icon: icons.chevronsEnd, edge: at >= last })] : []),
+		]
+	})
+
+	function choose(entry: Entry): void {
+		if (props.busy || entry.disabled || entry.page === null || entry.current) return
+		page.value = entry.page
+		emit('change', entry.page)
+	}
 	const action = computed(() => (props.busy ? (props.loadingLabel ?? text.loading) : (props.loadMoreLabel ?? text.loadMore)))
 
 	function load(): void {
@@ -34,18 +102,29 @@
 	function holdLink(event: MouseEvent): void {
 		if (props.busy) event.preventDefault()
 	}
+	const classes = pagination()
+	// The action goes to the end of the row, and shows a spinner while the next page loads.
+	const moreClass = (): string => button({ variant: 'outline', size: 'sm', class: classes.action({ class: theme.ui.action }) })
+	const entryClass = (entry: Entry): string =>
+		button({
+			variant: entry.current ? 'primary' : 'ghost',
+			size: 'sm',
+			iconOnly: entry.icon !== undefined,
+			class: entry.icon === undefined ? classes.page({ class: theme.ui.page }) : classes.control({ class: theme.ui.control }),
+		})
 </script>
 
 <template>
 	<nav
-		bind:class="['meeko-ui-pagination', props.class].filter(Boolean).join(' ')"
+		bind:class="classes.base({ class: [theme.ui.base, theme.class] })"
 		bind:aria-label="props.label ?? text.label"
 		bind:aria-busy="props.busy ? 'true' : undefined"
 		on:click="holdLink"
 	>
 		<p
-			class="meeko-ui-pagination-count"
+			if:when="!numbered.value || count.value"
 			role="status"
+			bind:class="classes.count({ class: theme.ui.count })"
 		>
 			{count.value}
 		</p>
@@ -55,9 +134,7 @@
 		/>
 		<ItemLink
 			if:when="more.value && props.moreLink"
-			class="meeko-ui-button"
-			data-variant="outline"
-			data-size="sm"
+			bind:class="moreClass()"
 			bind:link="props.moreLink!"
 			bind:aria-disabled="props.busy ? 'true' : undefined"
 		>
@@ -66,13 +143,61 @@
 		<button
 			if:when="more.value && !props.moreLink"
 			type="button"
-			class="meeko-ui-button"
-			data-variant="outline"
-			data-size="sm"
+			bind:class="moreClass()"
 			bind:aria-disabled="props.busy ? 'true' : undefined"
 			on:click="load"
 		>
 			{action.value}
 		</button>
+		<ul
+			if:when="numbered.value && pages.value > 1"
+			bind:class="classes.list({ class: theme.ui.list })"
+		>
+			<li
+				each:of="entries.value"
+				each:as="entry"
+				each:key="entry.key"
+				bind:class="classes.item({ class: theme.ui.item })"
+			>
+				<span
+					if:when="entry.page === null"
+					aria-hidden="true"
+					bind:class="classes.ellipsis({ class: theme.ui.ellipsis })"
+				>
+					{entry.text}
+				</span>
+				<ItemLink
+					if:when="entry.page !== null && entry.link"
+					bind:class="entryClass(entry)"
+					bind:link="entry.link!"
+					bind:aria-label="entry.label"
+					bind:aria-disabled="props.busy ? 'true' : undefined"
+				>
+					<Icon
+						if:when="entry.icon"
+						bind:class="classes.icon({ class: theme.ui.icon })"
+						bind:path="entry.icon!"
+					/>
+					{entry.text}
+				</ItemLink>
+				<button
+					if:when="entry.page !== null && !entry.link"
+					type="button"
+					bind:class="entryClass(entry)"
+					bind:disabled="entry.disabled"
+					bind:aria-label="entry.label"
+					bind:aria-current="entry.current ? 'page' : undefined"
+					bind:aria-disabled="props.busy && !entry.disabled ? 'true' : undefined"
+					on:click="() => choose(entry)"
+				>
+					<Icon
+						if:when="entry.icon"
+						bind:class="classes.icon({ class: theme.ui.icon })"
+						bind:path="entry.icon!"
+					/>
+					{entry.text}
+				</button>
+			</li>
+		</ul>
 	</nav>
 </template>

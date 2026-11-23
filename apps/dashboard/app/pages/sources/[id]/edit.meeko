@@ -662,7 +662,7 @@
 		grid-column: 1 / -1;
 	}
 	/* Without a notice, its live region takes no row of the bar. */
-	.editor-notice:not(:has(.meeko-ui-alert)) {
+	.editor-notice:not(:has(.dash-notice)) {
 		display: contents;
 	}
 	.editor-frontmatter {

@@ -48,7 +48,7 @@
 				bind:href="props.page.sourceUrl!"
 			>
 				<svg
-					class="meeko-ui-icon"
+					class="line-icon"
 					viewBox="0 0 16 16"
 					aria-hidden="true"
 				>

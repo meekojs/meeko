@@ -115,9 +115,12 @@ export const builtinTagTypes: readonly string[] = ['MeekoLinkProps', 'MeekoOutle
 /** Types of `@meekojs/meeko/framework` autoimported everywhere, like `href`: `RouteId`. */
 const frameworkTypes: readonly string[] = ['RouteId', 'LayoutProps']
 
+/** Types of `@meekojs/meeko` autoimported everywhere. */
+const coreTypes: readonly string[] = ['ElementAttributes']
+
 function builtins(root: string): AutoImport[] {
 	const entries: AutoImport[] = [
-		...['signal', 'computed', 'effect', 'batch', 'untrack', 'onCleanup', 'onMounted', 'provide', 'inject', 'createContext', 'provideErrorHandler', 'useId'].map((name): AutoImport => ({ name, imported: name, file: '@meekojs/meeko', specifier: '@meekojs/meeko', scope: 'shared', typeOnly: false, component: false })),
+		...['signal', 'computed', 'effect', 'batch', 'untrack', 'onCleanup', 'onMounted', 'provide', 'inject', 'createContext', 'provideErrorHandler', 'useId', 'createId'].map((name): AutoImport => ({ name, imported: name, file: '@meekojs/meeko', specifier: '@meekojs/meeko', scope: 'shared', typeOnly: false, component: false })),
 		// Since 1.7: `createRoot`, which its siblings of `@meekojs/meeko` already were.
 		{ name: 'createRoot', imported: 'createRoot', file: '@meekojs/meeko', specifier: '@meekojs/meeko', scope: 'shared', typeOnly: false, component: false },
 		// Since 1.7: `useNavigation`, like `useRoute`; on the server it is a fixed state with `pending` false.
@@ -125,6 +128,8 @@ function builtins(root: string): AutoImport[] {
 		...['useState', 'href', 'useRoute', 'definePage', 'defineGroup', 'defineRouteMiddleware', 'definePlugin'].map((name): AutoImport => ({ name, imported: name, file: '@meekojs/meeko/framework', specifier: '@meekojs/meeko/framework', scope: 'shared', typeOnly: false, component: false })),
 		// Form and storage run in app component setup on both SSR and hydration; no server/ or shared/ autoimport.
 		...['useForm', 'useStorage', 'useHead', 'useSeoMeta', 'useTheme', 'useLayout'].map((name): AutoImport => ({ name, imported: name, file: '@meekojs/meeko/framework', specifier: '@meekojs/meeko/framework', scope: 'app', typeOnly: false, component: false, browserCode: true })),
+		// Since 1.10: programmatic navigation and search params as state, for browser code of app/.
+		...['navigate', 'useSearchParam'].map((name): AutoImport => ({ name, imported: name, file: '@meekojs/meeko/framework', specifier: '@meekojs/meeko/framework', scope: 'app', typeOnly: false, component: false, browserCode: true })),
 		...['Form', 'FormField', 'FormSubmission'].map((name): AutoImport => ({ name, imported: name, file: '@meekojs/meeko/framework', specifier: '@meekojs/meeko/framework', scope: 'app', typeOnly: true, component: false, browserCode: true })),
 		{ name: 'ResolvedComponent', imported: 'ResolvedComponent', file: '@meekojs/meeko', specifier: '@meekojs/meeko', scope: 'app', typeOnly: true, component: false, browserCode: true },
 		// The definitions of server/ (contract discovery reads the call by name, not by its import).
@@ -137,6 +142,9 @@ function builtins(root: string): AutoImport[] {
 		// What a component or a composable does with a failed request; server code throws ApiError instead.
 		{ name: 'ClientError', imported: 'ClientError', file: '@meekojs/meeko/framework', specifier: '@meekojs/meeko/framework', scope: 'app', typeOnly: false, component: false, alsoType: true, browserCode: true },
 		{ name: 'isClientError', imported: 'isClientError', file: '@meekojs/meeko/framework', specifier: '@meekojs/meeko/framework', scope: 'app', typeOnly: false, component: false, browserCode: true },
+		// Since 1.10: invalidates data keys from browser code, such as a socket message.
+		{ name: 'invalidate', imported: 'invalidate', file: '@meekojs/meeko/framework', specifier: '@meekojs/meeko/framework', scope: 'app', typeOnly: false, component: false, browserCode: true },
+		...coreTypes.map((name): AutoImport => ({ name, imported: name, file: '@meekojs/meeko', specifier: '@meekojs/meeko', scope: 'shared', typeOnly: true, component: false })),
 		...frameworkTypes.map((name): AutoImport => ({ name, imported: name, file: '@meekojs/meeko/framework', specifier: '@meekojs/meeko/framework', scope: 'shared', typeOnly: true, component: false })),
 		...builtinTagTypes.map((name): AutoImport => ({ name, imported: name, file: '@meekojs/meeko/framework', specifier: '@meekojs/meeko/framework', scope: 'app', typeOnly: true, component: false, componentType: true })),
 	]
@@ -160,7 +168,7 @@ function builtins(root: string): AutoImport[] {
  * the project's own export wins, instead of making the name ambiguous. `useApiMutation` comes from
  * the generated clients; the others, from `@meekojs/meeko/framework`.
  */
-const yieldingBuiltins: ReadonlySet<string> = new Set(['useRoute', 'useForm', 'useStorage', 'useApiMutation', 'useHead', 'useSeoMeta', 'useTheme', 'useId', 'useLayout', 'defineGroup', 'defineServerRouteMiddleware', 'createRoot', 'useNavigation', 'defer', 'ClientError', 'isClientError', 'Form', 'FormField', 'FormSubmission', ...frameworkTypes])
+const yieldingBuiltins: ReadonlySet<string> = new Set(['useRoute', 'useForm', 'useStorage', 'useApiMutation', 'useHead', 'useSeoMeta', 'useTheme', 'useId', 'createId', 'useLayout', 'defineGroup', 'defineServerRouteMiddleware', 'createRoot', 'useNavigation', 'navigate', 'useSearchParam', 'defer', 'ClientError', 'isClientError', 'invalidate', 'Form', 'FormField', 'FormSubmission', ...coreTypes, ...frameworkTypes])
 
 /** `api`, `rpc`, `socket`… of `.meeko/generated/clients.client.ts` or `clients.server.ts`. */
 export function isGeneratedClient(file: string): boolean {
@@ -330,10 +338,12 @@ export interface DiscoveredComponent {
 interface ComponentDirectory {
 	readonly dir: string
 	readonly prefix: string
+	readonly pathPrefix: boolean
 	readonly source: string
 	readonly sourceRoot?: string
 	readonly priority: number
 	readonly exclude?: readonly string[]
+	readonly rename?: Readonly<Record<string, string>>
 }
 
 /**
@@ -342,22 +352,25 @@ interface ComponentDirectory {
  * An `Index.meeko` at the root of the directory has no folder to take the name from: it stays `Index`.
  */
 function componentName(file: string, directory: ComponentDirectory): { readonly name: string; readonly legacy?: string } {
-	const parts = relative(directory.dir, file)
+	const relativeName = relative(directory.dir, file)
 		.replace(/\.meeko$/, '')
-		.split(/[\\/]/)
+		.replaceAll('\\', '/')
+	const renamed = directory.rename?.[relativeName]
+	if (renamed !== undefined) return { name: renamed }
+	const parts = relativeName.split('/')
 	const pascal = (list: readonly string[]): string => directory.prefix + list.map((part) => part.replace(/(^|[-_])(\w)/g, (_, _dash: string, letter: string) => letter.toUpperCase())).join('')
-	const collapses = parts.length > 1 && /^[iI]ndex$/.test(parts.at(-1)!)
-	const name = pascal(collapses ? parts.slice(0, -1) : parts)
+	const collapses = directory.pathPrefix && parts.length > 1 && /^[iI]ndex$/.test(parts.at(-1)!)
+	const name = pascal(directory.pathPrefix ? (collapses ? parts.slice(0, -1) : parts) : [parts.at(-1)!])
 	if (!/^[A-Z][A-Za-z0-9]*$/.test(name)) throw new Error(`Nombre de componente no válido ${name}: ${file}`)
 	return collapses ? { name, legacy: pascal(parts) } : { name }
 }
 
-function componentDirectoriesForSources(sources: readonly { root: string; name: string }[], config: MeekoConfig, modules: readonly { dir: string; prefix: string; exclude?: readonly string[] }[] = []): ComponentDirectory[] {
+function componentDirectoriesForSources(sources: readonly { root: string; name: string }[], config: MeekoConfig, modules: readonly { dir: string; prefix: string; exclude?: readonly string[]; rename?: Readonly<Record<string, string>> }[] = []): ComponentDirectory[] {
 	const directories: ComponentDirectory[] = []
 	for (const [priority, source] of sources.entries()) {
-		for (const entry of componentDirectories(config.components)) directories.push({ dir: resolve(source.root, entry.path), prefix: entry.prefix, source: source.name, sourceRoot: source.root, priority })
+		for (const entry of componentDirectories(config.components)) directories.push({ dir: resolve(source.root, entry.path), prefix: entry.prefix, pathPrefix: entry.pathPrefix, source: source.name, sourceRoot: source.root, priority })
 	}
-	for (const [index, entry] of modules.entries()) directories.push({ dir: resolve(entry.dir), prefix: entry.prefix, ...(entry.exclude ? { exclude: entry.exclude } : {}), source: `module:${index}`, priority: sources.length + index })
+	for (const [index, entry] of modules.entries()) directories.push({ dir: resolve(entry.dir), prefix: entry.prefix, pathPrefix: true, ...(entry.exclude ? { exclude: entry.exclude } : {}), ...(entry.rename ? { rename: entry.rename } : {}), source: `module:${index}`, priority: sources.length + index })
 	return directories
 }
 

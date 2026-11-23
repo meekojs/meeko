@@ -1,17 +1,22 @@
 <script lang="ts">
 	import { effect, onMounted } from '@meekojs/meeko'
 
-	import { useModalHost } from '../composables/useModal'
+	import { useModalConfirms, useModalHost } from '../composables/useModal'
 	import { useToastHost } from '../composables/useToast'
+	import { toastHost as toastHostClass } from '../variants/feedback'
+	import * as ConfirmInstance from './internal/ConfirmInstance.meeko'
 	import * as ModalInstance from './internal/ModalInstance.meeko'
 	import * as Toast from './Toast.meeko'
 
 	const snippets = defineSnippets<{ default: [] }>()
 
 	const modals = useModalHost()
+	const confirms = useModalConfirms()
 	const toasts = useToastHost()
 	const toastHost = useElementRef('toastHost')
 
+	// The host is a popover open for the whole visit. Its inline style repeats what the variant sets, so that
+	// without the stylesheet of UI (still loading or failed) an empty host is not the default box of a popover.
 	onMounted(() => toastHost.value?.showPopover?.())
 
 	// A modal opened after the host covers it: back on top of the top layer, or the toast would not be seen.
@@ -31,11 +36,18 @@
 		each:key="instance.id"
 		bind:instance="instance"
 	/>
+	<ConfirmInstance
+		each:of="[...confirms.value.values()]"
+		each:as="entry"
+		each:key="entry.id"
+		bind:instance="entry"
+	/>
 	<div
 		ref:toastHost
 		popover="manual"
-		class="meeko-ui-toast-host"
 		aria-live="polite"
+		style="border: 0; padding: 0; background: transparent"
+		bind:class="toastHostClass"
 	>
 		<Toast
 			each:of="toasts.entries.value"
@@ -47,6 +59,7 @@
 			bind:tone="entry.tone"
 			bind:duration="entry.duration"
 			bind:closeLabel="entry.closeLabel"
+			bind:ui="entry.ui"
 			on:dismiss="() => toasts.remove(entry.id)"
 		/>
 	</div>

@@ -1,8 +1,10 @@
 ---
-source-hash: 5ba3d2898d7fecacbd22269c8b55afe6c422658e0263ca584a09c1b402cd3cf5
+source-hash: afa8dc27ff907bf6b1e7e0c16066c209f946e17d00916f2dbfcbb4d9c9dd44ad
 ---
 
 # Upgrade from 1.1 to 1.2
+
+**From:** 1.1.x. **To:** 1.2.0. **Status:** published on npm; the latest version checked on November 5, 2026 is 1.9.0. **Who acts:** maintainers upgrading an application from 1.1.x to 1.2.0.
 
 `1.2` is a minor release: new features (modules, `document` and `useHead`, `<MeekoLink>` and `<MeekoOutlet />`, zero-configuration sessions, passwords, `rateLimit`, `useForm`, `useStorage`, PostCSS utilities…) are optional. Two behavior changes are released as [approved exceptions](stability.md#approved-exceptions) to the stability policy: reactive props and protection against _login CSRF_ in `session.create()`. Some other changes are noticeable when updating. This guide collects them and what you should review for each. The complete list, including additions and fixes, is in the [CHANGELOG](../../packages/meeko/CHANGELOG.md); compatibility commitments are in the [stability policy](stability.md).
 

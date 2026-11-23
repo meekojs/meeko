@@ -281,6 +281,22 @@ function focus(): void { target.value?.focus(); }
 	assert.deepEqual(result, { Button: [], Page: [], Handlers: [] })
 })
 
+test('meeko check accepts generic is values constrained to allowed HTML tags', async () => {
+	const source = (constraint: string, template: string): string => `<script lang="ts" generic="T extends ${constraint}">
+import type { TagName } from '@meekojs/meeko'
+const { tag } = defineProps<{ tag: T }>()
+</script>
+<template>${template}</template>`
+	const result = await checkAll(
+		{
+			'Content.meeko': source("'a' | 'button'", '<component is="tag">Abrir</component>'),
+			'Empty.meeko': source('TagName', '<component is="tag" />'),
+		},
+		['Content', 'Empty'],
+	)
+	assert.deepEqual(result, { Content: [], Empty: [] })
+})
+
 test('meeko check reports attributes that no possible tag accepts and values of is that are not tags', async () => {
 	const script = `<script lang="ts">
 const props = defineProps<{ href?: string; tag: string; frame: "div" | "iframe"; media: "img" | "span" }>();
@@ -482,6 +498,111 @@ test('class and style beside bind:class and bind:style write one attribute in SS
 	}
 })
 
+test('bind:class accepts nested arrays in SSR, hydration and updates', async () => {
+	const source = `<script lang="ts">
+import { signal, type ClassValue } from "@meekojs/meeko";
+const classes = signal<ClassValue>(["card", false, ["rounded", null]]);
+</script>
+<template><div class="base" bind:class="classes.value">x</div><button on:click="() => classes.value = ['active', ['wide', undefined]]">t</button></template>`
+	const { component, cleanup } = await load({ ClassArray: source }, 'ClassArray')
+	const window = new Window()
+	try {
+		const rendered = component.renderWithState({})
+		assert.match(rendered.html, /<div class="base card rounded"/)
+		const root = window.document.createElement('main')
+		root.innerHTML = rendered.html
+		const release = component.hydrate(root as unknown as Element, {}, rendered.state)
+		const element = root.querySelector('div')!
+		assert.equal(element.getAttribute('class'), 'base card rounded')
+		;(root.querySelector('button') as unknown as HTMLElement).click()
+		assert.equal(element.getAttribute('class'), 'base active wide')
+		release()
+	} finally {
+		window.happyDOM.abort()
+		await cleanup()
+	}
+})
+
+test('bind:class accepts clsx-style objects and arrays in SSR, hydration, updates and release', async () => {
+	// Before 1.10 an object wrote class="[object Object]".
+	const source = `<script lang="ts">
+import { signal } from "@meekojs/meeko";
+const on = signal(true);
+const size = signal<"sm" | "lg">("sm");
+const attrs = signal<{ class: unknown; title: string }>({ class: { own: true }, title: "a" });
+</script>
+<template><div><p bind:class="{ active: on.value, idle: !on.value }">a</p><article class="card" bind:class="['round', { open: on.value }, [[size.value === 'lg' && 'wide']]]">b</article><span class="tag" bind:class="{ lit: on.value }" bind="attrs.value">c</span><component is="on.value ? 'em' : 'strong'" class="dyn" bind:class="{ on: on.value }">d</component><button on:click="() => { on.value = !on.value; size.value = 'lg' }">t</button></div></template>`
+	const { component, cleanup } = await load({ ClassObject: source }, 'ClassObject')
+	const window = new Window()
+	try {
+		const rendered = component.renderWithState({})
+		assert.doesNotMatch(rendered.html, /object Object/)
+		assert.match(rendered.html, /<p class="active"/)
+		assert.match(rendered.html, /<article class="card round open"/)
+		assert.match(rendered.html, /<span class="tag lit own"/)
+		assert.match(rendered.html, /<em class="dyn on"/)
+		const root = window.document.createElement('main')
+		root.innerHTML = rendered.html
+		// Hydration compares with the same value: no mismatch.
+		const release = component.hydrate(root as unknown as Element, {}, rendered.state)
+		const classes = () => ['p', 'article', 'span', 'em, strong'].map((selector) => root.querySelector(selector)!.getAttribute('class'))
+		assert.deepEqual(classes(), ['active', 'card round open', 'tag lit own', 'dyn on'])
+		const button = root.querySelector('button') as unknown as HTMLElement
+		button.click()
+		assert.deepEqual(classes(), ['idle', 'card round wide', 'tag own', 'dyn'])
+		button.click()
+		assert.deepEqual(classes(), ['active', 'card round open wide', 'tag lit own', 'dyn on'])
+		release()
+		// Released: the bindings no longer follow the signals.
+		button.click()
+		assert.deepEqual(classes(), ['active', 'card round open wide', 'tag lit own', 'dyn on'])
+	} finally {
+		window.happyDOM.abort()
+		await cleanup()
+	}
+})
+
+test('hydration compares a class object with the server HTML and reports a difference', async () => {
+	const source = `<template><p bind:class="{ server: true, client: false }">a</p></template>`
+	const { component, cleanup } = await load({ ClassMismatch: source }, 'ClassMismatch')
+	const window = new Window()
+	try {
+		const rendered = component.renderWithState({})
+		assert.match(rendered.html, /<p class="server"/)
+		const root = window.document.createElement('main')
+		root.innerHTML = rendered.html.replace('class="server"', 'class="other"')
+		assert.throws(() => component.hydrate(root as unknown as Element, {}, rendered.state), /Hydration mismatch/)
+	} finally {
+		window.happyDOM.abort()
+		await cleanup()
+	}
+})
+
+test('bind:style accepts an object in SSR, hydration and updates', async () => {
+	const source = `<script lang="ts">
+import { signal, type StyleValue } from "@meekojs/meeko";
+const styles = signal<StyleValue>({ backgroundColor: "red", "--space": "4px", opacity: 0.5, display: false });
+</script>
+<template><div style="margin: 0;" bind:style="styles.value">x</div><button on:click="() => styles.value = { color: 'blue', '--space': 8 }">t</button></template>`
+	const { component, cleanup } = await load({ StyleObject: source }, 'StyleObject')
+	const window = new Window()
+	try {
+		const rendered = component.renderWithState({})
+		assert.match(rendered.html, /<div style="margin: 0; background-color: red; --space: 4px; opacity: 0.5"/)
+		const root = window.document.createElement('main')
+		root.innerHTML = rendered.html
+		const release = component.hydrate(root as unknown as Element, {}, rendered.state)
+		const element = root.querySelector('div')!
+		assert.equal(element.getAttribute('style'), 'margin: 0; background-color: red; --space: 4px; opacity: 0.5')
+		;(root.querySelector('button') as unknown as HTMLElement).click()
+		assert.equal(element.getAttribute('style'), 'margin: 0; color: blue; --space: 8')
+		release()
+	} finally {
+		window.happyDOM.abort()
+		await cleanup()
+	}
+})
+
 /** The six orders of a static attribute, its `bind:` directive and `bind="obj"`, on any tag. */
 const everyOrder = (first: string, second: string, third: string): string[][] => [
 	[first, second, third],
@@ -626,8 +747,14 @@ test('bind="obj" rejects handler keys in SSR and in the type check', async () =>
 		'Value.meeko': source('', `<p bind="{ title: { text: 'x' } }">x</p>`),
 		'Valid.meeko': source(`import type { ElementAttributes } from "@meekojs/meeko";\nconst attrs: ElementAttributes<"a"> = { href: "/x", "data-id": 1, hidden: false };\nconst props = defineProps<{ to?: string }>();`, `<a bind="attrs">x</a><a bind="props.to ? { href: props.to } : undefined">y</a><x-card bind="{ anything: 'goes' }"></x-card>`),
 		'Union.meeko': source(`const props = defineProps<{ href?: string }>();`, `<component is="props.href ? 'a' : 'button'" bind="{ href: props.href, type: 'button', colspan: 2 }">x</component>`),
+		// The rest of a union of props, one member per route: each member is checked by its own keys.
+		'Members.meeko': source(`const { to, ...rest } = defineProps<{ to: "/a"; title?: string } | { to: "/b"; title?: string } | { to: "/c"; title: string; hidden?: boolean }>();`, `<a bind="rest">x</a>`),
+		'MemberKey.meeko': source(`const { to, ...rest } = defineProps<{ to: "/a"; title: string } | { to: "/b"; colspan: number }>();`, `<a bind="rest">x</a>`),
 	}
-	const result = await checkAll(files, ['Handler', 'Unknown', 'Value', 'Valid', 'Union'])
+	const result = await checkAll(files, ['Handler', 'Unknown', 'Value', 'Valid', 'Union', 'Members', 'MemberKey'])
+	assert.deepEqual(result['Members'], [])
+	assert.equal(result['MemberKey']!.length, 1, String(result['MemberKey']))
+	assert.match(result['MemberKey']![0]!, /MEEK113@\d+ colspan no es un atributo de la etiqueta/)
 	assert.deepEqual(
 		result['Handler']!.map((item) => item.replace(/@\d+/, '')),
 		['MEEK113 bind no admite claves on*; usa on:evento'],
@@ -676,8 +803,13 @@ const card = signal<{ title: string; tone?: "info" | "warn"; count?: number }>({
 		'Unknown.meeko': `<script lang="ts">import * as Card from "./Card.meeko";</script><template><Card bind="{ title: 'x', size: 2 }" /></template>`,
 		'Handler.meeko': `<script lang="ts">import * as Card from "./Card.meeko";\nconst extra = { title: "x", onSave: () => {} };</script><template><Card bind="extra" /></template>`,
 		'Missing.meeko': `<script lang="ts">import * as Card from "./Card.meeko";\nconst extra = { title: "x" };\nconst partial: { count: number } = { count: 1 };</script><template><Card bind="extra" /><Card bind="partial" /></template>`,
+		// The rest of a union of props, one member per route: each member is checked by its own keys.
+		'Members.meeko': `<script lang="ts">import * as Card from "./Card.meeko";\nconst { to, ...rest } = defineProps<{ to: "/a"; title: "a"; tone?: "info" } | { to: "/b"; title: "b"; tone?: "warn" } | { to: "/c"; title: string; count: number }>();</script><template><Card bind="rest" /></template>`,
+		'MemberKey.meeko': `<script lang="ts">import * as Card from "./Card.meeko";\nconst { to, ...rest } = defineProps<{ to: "/a"; title: string; count: number } | { to: "/b"; title: string; size: number }>();</script><template><Card bind="rest" /></template>`,
 	}
-	const result = await checkAll(files, ['Unknown', 'Handler', 'Missing'])
+	const result = await checkAll(files, ['Unknown', 'Handler', 'Missing', 'Members', 'MemberKey'])
+	assert.deepEqual(result['Members'], [])
+	assert.deepEqual(result['MemberKey'], [`MEEK113@${files['MemberKey.meeko'].indexOf('rest" />')} size no es una prop del componente`])
 	assert.deepEqual(result['Unknown'], [`MEEK113@${files['Unknown.meeko'].indexOf('size')} size no es una prop del componente`])
 	assert.deepEqual(
 		result['Handler']!.map((item) => item.replace(/@\d+/, '')),
@@ -832,7 +964,7 @@ import * as Panel from "./Panel.meeko";
 
 test('bind="obj" compares attribute names without case: data-meeko* stays reserved and the explicit binding wins', async () => {
 	const { spreadEntries } = (await import(pathToFileURL(resolve('src/app/runtime/dynamic-tag.ts')).href)) as typeof dynamic_tag_tsTypes
-	const spread = (value: Record<string, unknown>, excluded: readonly string[], explicit?: { class?: unknown; style?: unknown }) => spreadEntries('div', value as never, excluded, explicit)
+	const spread = (value: Record<string, unknown>, excluded: readonly string[], explicit?: { class?: string; style?: unknown }) => spreadEntries('div', value as never, excluded, explicit)
 	assert.throws(
 		() => spread({ 'Data-Meeko': '0' }, []),
 		(error: unknown) => error instanceof TypeError && /^MEEK113: .*data-meeko\* está reservado/.test(error.message),

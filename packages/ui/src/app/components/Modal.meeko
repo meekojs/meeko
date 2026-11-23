@@ -1,28 +1,23 @@
 <script lang="ts">
-	import type { ModalDismissReason } from '../types/modal'
+	import { computed } from '@meekojs/meeko'
+
+	import type { ModalDismissReason, UIModalProps } from '../types/modal'
 
 	import { modalExitRegistration, optionalModalInstance } from '../composables/useModal'
+	import { uiTheme } from '../utils/defaults'
 	import { uiMessages } from '../utils/messages'
 	import { mountModalDialog } from '../utils/modal-dialog'
+	import { modal, modalHeadingAlone } from '../variants/modal'
 
-	interface Props {
-		title: string
-		description?: string
-		size?: 'sm' | 'md' | 'lg'
-		closeOnEscape?: boolean
-		closeOnBackdrop?: boolean
-		closeButton?: boolean
-		closeLabel?: string
-		class?: string
-	}
+	const props = defineProps<UIModalProps>()
 
-	const props = defineProps<Props>()
+	const theme = uiTheme('modal', () => props)
 
 	const emit = defineEmits<{ dismiss: [reason: ModalDismissReason] }>()
 
 	const open = defineModel<boolean>({ default: false })
 
-	const snippets = defineSnippets<{ default: []; footer?: [] }>()
+	const snippets = defineSnippets<{ default?: []; footer?: [] }>()
 
 	const dialog = useElementRef('dialog')
 
@@ -30,6 +25,7 @@
 	const text = uiMessages().modal
 	const instance = optionalModalInstance()
 	const registerExit = modalExitRegistration()
+	const classes = computed(() => modal({ size: props.size }))
 	if (instance) open.value = true
 
 	function dismiss(reason: ModalDismissReason) {
@@ -55,17 +51,21 @@
 <template>
 	<dialog
 		ref:dialog
-		bind:class="['meeko-ui-modal', props.class].filter(Boolean).join(' ')"
-		bind:data-size="props.size ?? 'md'"
+		bind:class="classes.value.base({ class: [theme.ui.base, theme.class] })"
 		bind:closedby="props.closeOnEscape === false ? 'none' : props.closeOnBackdrop === false ? 'closerequest' : 'any'"
 		bind:aria-labelledby="id + '-title'"
 		bind:aria-describedby="props.description ? id + '-description' : undefined"
 	>
-		<div class="meeko-ui-modal-heading">
+		<div bind:class="classes.value.heading({ class: [snippets.default ? undefined : modalHeadingAlone, theme.ui.heading] })">
 			<div>
-				<h2 bind:id="id + '-title'">{props.title}</h2>
+				<h2
+					bind:id="id + '-title'"
+					bind:class="classes.value.title({ class: theme.ui.title })"
+					>{props.title}</h2
+				>
 				<p
 					if:when="props.description"
+					bind:class="classes.value.description({ class: theme.ui.description })"
 					bind:id="id + '-description'"
 				>
 					{props.description}
@@ -74,7 +74,7 @@
 			<button
 				if:when="props.closeButton !== false"
 				type="button"
-				class="meeko-ui-modal-close"
+				bind:class="classes.value.close({ class: theme.ui.close })"
 				bind:aria-label="props.closeLabel ?? text.close"
 				on:click="() => dismiss('button')"
 			>
@@ -91,12 +91,15 @@
 				</svg>
 			</button>
 		</div>
-		<div class="meeko-ui-modal-body">
+		<div
+			if:when="snippets.default"
+			bind:class="classes.value.body({ class: theme.ui.body })"
+		>
 			<render snippet="snippets.default" />
 		</div>
 		<footer
 			if:when="snippets.footer"
-			class="meeko-ui-modal-footer"
+			bind:class="classes.value.footer({ class: theme.ui.footer })"
 		>
 			<render snippet="snippets.footer" />
 		</footer>

@@ -2,11 +2,12 @@
 title: ClientError
 group: utils
 since: 1.0.0
-description: El error con que los clientes de API, RPC y Socket rechazan una respuesta de error del servidor, con su código, su estado, el requestId y los issues por campo.
+description: El error con que los clientes de API, RPC y Socket rechazan una respuesta de error del servidor, con su código, su estado, el requestId, los issues por campo y los datos públicos del error.
 symbols:
   - "@meekojs/meeko/framework#ClientError"
 types:
   - "@meekojs/meeko/framework#ValidationIssue"
+  - "@meekojs/meeko/framework#ClientErrorDetails"
 related:
   - "@meekojs/meeko/framework#isClientError"
   - "@meekojs/meeko/server#ApiError"
@@ -17,7 +18,7 @@ related:
   - docs/framework.md#errores
 ---
 
-`ClientError` es lo que reciben el navegador y el código de servidor cuando una llamada de `api.*`, `rpc.*`, `useApi`, `useRpcQuery`, `useApiMutation` o `useRpcMutation` termina en una respuesta de error. Es la otra cara de `ApiError`: lleva el `code` y el `status` públicos, el `requestId` de la petición y, si los hay, los `issues` por campo. Un canal Socket rechazado por sesión o autorización también entrega un `ClientError` (`401 UNAUTHENTICATED` o `403 FORBIDDEN`).
+`ClientError` es lo que reciben el navegador y el código de servidor cuando una llamada de `api.*`, `rpc.*`, `useApi`, `useRpcQuery`, `useApiMutation` o `useRpcMutation` termina en una respuesta de error. Es la otra cara de `ApiError`: lleva el `code` y el `status` públicos, el `requestId` de la petición y, si los hay, los `issues` por campo y, desde `1.10`, los `details` públicos. Un canal Socket rechazado por sesión o autorización también entrega un `ClientError` (`401 UNAUTHENTICATED` o `403 FORBIDDEN`).
 
 Su `message` es el código. Una respuesta de error sin `code` usa `HTTP_ERROR`, y una respuesta correcta que no es JSON, `INVALID_RESPONSE`.
 
@@ -40,7 +41,7 @@ export async function rename(call: () => Promise<unknown>): Promise<string | nul
 
 ## Parámetros
 
-`new ClientError(code, status, requestId?, issues?)`. Normalmente no se crea a mano: lo crean los clientes de Meeko.
+`new ClientError(code, status, requestId?, issues?, details?)`. Normalmente no se crea a mano: lo crean los clientes de Meeko.
 
 | Parámetro   | Tipo                           | Por defecto | Descripción                                                                                 |
 | ----------- | ------------------------------ | ----------- | ------------------------------------------------------------------------------------------- |
@@ -48,10 +49,11 @@ export async function rename(call: () => Promise<unknown>): Promise<string | nul
 | `status`    | `number`                       | obligatorio | El estado HTTP.                                                                             |
 | `requestId` | `string`                       | ninguno     | El ID de la petición, el mismo que la cabecera `x-request-id` y los registros del servidor. |
 | `issues`    | `readonly { path, message }[]` | ninguno     | Los mensajes por campo de un `400` de validación o de un `ApiError` con `issues`.           |
+| `details`   | `unknown`                      | ninguno     | Desde `1.10`, los datos públicos de un `ApiError` `4xx` con `details`, congelados.          |
 
 ## Valor devuelto
 
-Una instancia de `Error` con `name: "ClientError"`, `code`, `status`, `requestId` e `issues`, todos de sólo lectura. `issues` es `undefined` si la respuesta no los trae.
+Una instancia de `Error` con `name: "ClientError"`, `code`, `status`, `requestId`, `issues` y `details`, todos de sólo lectura. `issues` y `details` son `undefined` si la respuesta no los trae; `details` también en un `5xx` o si no es un objeto JSON. Su tipo es `unknown`: `isClientError(error, código)` lo estrecha con el registro `ClientErrorDetails` (véase [`isClientError`](/docs/reference/isclienterror#datos-públicos-tipados)).
 
 ## Ejemplos
 
@@ -131,6 +133,6 @@ if (isClientError(error, "UNAUTHENTICATED")) location.assign("/login");
 
 ## Notas
 
-- **Origen.** Los clientes generados lo crean a partir del JSON de error `{ code, status, requestId, issues? }`. Un `500` desconocido llega como `INTERNAL_ERROR`, sin detalles.
+- **Origen.** Los clientes generados lo crean a partir del JSON de error `{ code, status, requestId, issues?, details? }`. Un `500` desconocido llega como `INTERNAL_ERROR`, sin detalles.
 - **Observadores.** Un `ClientError` es una respuesta prevista: `useForm` no lo envía al observador de errores del componente, pero sí cualquier otro fallo.
 - **Soporte.** Muestra o registra `requestId`: es el mismo ID que el servidor escribe en sus registros, y permite encontrar el fallo.

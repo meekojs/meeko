@@ -17,9 +17,7 @@
 	<main>
 		<button
 			type="button"
-			on:click="navigate"
-			>Next view</button
-		>
+			on:click="navigate">Next view</button>
 		<section
 			if:when="props.mode === 'reuse'"
 			bind:data-view="view.value"

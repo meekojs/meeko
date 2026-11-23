@@ -32,6 +32,22 @@ export function stylesheetUrl(root: string, file: string): string {
 }
 
 /**
+ * URL of a stylesheet that development links with `<link>` (and the snapshot transforms, so that
+ * Vite's module, and the path of its hot updates, carry this URL): always `/@fs/` and the absolute
+ * path, with the direct-CSS query. Vite's client takes as the link of a `css-update` the first
+ * `<link>` whose URL contains the path of the update. With the URL relative to the project,
+ * `/app/styles/main.css` is part of a module's `/node_modules/theme/src/app/styles/main.css` (as
+ * @meekojs/ui up to 1.9 named its sheet): an edit of the application's stylesheet replaced the
+ * module's link, which comes first, and the page lost the module's rules until a reload. An
+ * absolute path is part of another only if it is a prefix of it, which two stylesheets never are
+ * unless one file name starts with the whole other one.
+ */
+export function directStylesheetUrl(file: string): string {
+	const url = `/@fs/${file.replaceAll('\\', '/').replace(/^\/+/, '')}`
+	return `${encodeURI(url).replace(/[?#]/g, (character) => encodeURIComponent(character))}?direct`
+}
+
+/**
  * Where `meeko dev` keeps the processed global stylesheet, relative to the project: imports
  * inlined, module styles included, PostCSS plugins (`@utilities` among them) applied, not minified. It exists for editor
  * tools that read class names from CSS files on disk; nothing loads it at run time. The dev
@@ -143,7 +159,7 @@ export function createGlobalStylesheetSnapshot(root: string, report: (message: s
 		try {
 			const parts: string[] = []
 			for (const file of files) {
-				const result = await environments.client.transformRequest(`${stylesheetUrl(root, file)}?direct`)
+				const result = await environments.client.transformRequest(directStylesheetUrl(file))
 				if (!result) throw new Error(`Stylesheet could not be loaded: ${file}`)
 				parts.push(result.code)
 			}

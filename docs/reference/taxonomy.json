@@ -207,6 +207,12 @@
 					]
 				},
 				{
+					"name": "useSearchParam",
+					"symbols": [
+						"@meekojs/meeko/framework#useSearchParam"
+					]
+				},
+				{
 					"name": "useForm",
 					"symbols": [
 						"@meekojs/meeko/framework#useForm"
@@ -236,7 +242,12 @@
 						"@meekojs/meeko/framework#useTheme"
 					]
 				},
-				{ "name": "useThemeToggle", "symbols": ["@meekojs/meeko/framework#useThemeToggle"] },
+				{
+					"name": "useThemeToggle",
+					"symbols": [
+						"@meekojs/meeko/framework#useThemeToggle"
+					]
+				},
 				{
 					"name": "useLayout",
 					"symbols": [
@@ -310,6 +321,12 @@
 					"name": "useRequestState",
 					"symbols": [
 						"@meekojs/meeko/server#useRequestState"
+					]
+				},
+				{
+					"name": "getRequestContext",
+					"symbols": [
+						"@meekojs/meeko/server#getRequestContext"
 					]
 				}
 			]
@@ -409,6 +426,19 @@
 					]
 				},
 				{
+					"name": "navigate",
+					"symbols": [
+						"@meekojs/meeko/framework#navigate"
+					]
+				},
+				{
+					"name": "createId",
+					"symbols": [
+						"@meekojs/meeko#createId"
+					],
+					"slug": "create-id"
+				},
+				{
 					"name": "redirect",
 					"symbols": [
 						"@meekojs/meeko/framework#redirect"
@@ -469,6 +499,12 @@
 					"name": "isClientError",
 					"symbols": [
 						"@meekojs/meeko/framework#isClientError"
+					]
+				},
+				{
+					"name": "invalidate",
+					"symbols": [
+						"@meekojs/meeko/framework#invalidate"
 					]
 				},
 				{
@@ -874,8 +910,17 @@
 						"cli:check"
 					],
 					"slug": "meeko-check",
-					"fallback": "/docs/inicio-rapido#desarrollo",
+					"fallback": "/docs/inicio-rapido#cambiar-la-primera-página",
 					"description": "Comprueba un proyecto o un componente `.meeko` con TypeScript y los diagnósticos de Meeko."
+				},
+				{
+					"name": "meeko doctor",
+					"symbols": [
+						"cli:doctor"
+					],
+					"slug": "meeko-doctor",
+					"fallback": "/docs/doctor",
+					"description": "Inspecciona Node, paquetes, configuración, artefactos de `.meeko/` y servidor de lenguaje sin ejecutar el proyecto."
 				},
 				{
 					"name": "meeko clean",
@@ -937,7 +982,7 @@
 						"cli:compile"
 					],
 					"slug": "meeko-compile",
-					"fallback": "/docs/inicio-rapido#desarrollo",
+					"fallback": "/docs/api#herramientas",
 					"description": "Compila un componente `.meeko` a un módulo TypeScript."
 				},
 				{
@@ -946,7 +991,7 @@
 						"cli:types"
 					],
 					"slug": "meeko-types",
-					"fallback": "/docs/inicio-rapido#desarrollo",
+					"fallback": "/docs/api#herramientas",
 					"description": "Genera las declaraciones de tipos de un componente `.meeko`."
 				},
 				{
@@ -955,7 +1000,7 @@
 						"cli:check-app"
 					],
 					"slug": "meeko-check-app",
-					"fallback": "/docs/inicio-rapido#desarrollo",
+					"fallback": "/docs/api#herramientas",
 					"description": "Comprueba todos los componentes de la aplicación."
 				},
 				{

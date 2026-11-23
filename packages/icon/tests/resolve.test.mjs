@@ -24,9 +24,10 @@ async function project(files) {
 }
 
 test('options are validated with errors that name the option', () => {
-	assert.deepEqual(resolveOptions({}), { collections: [], include: [], local: undefined, size: '1em' })
-	assert.deepEqual(resolveOptions({ collections: ['lucide', 'lucide'], include: ['lucide:x', 'mdi:*'], size: '20px', local: false }), { collections: ['lucide'], include: ['lucide:x', 'mdi:*'], local: false, size: '20px' })
+	assert.deepEqual(resolveOptions({}), { collections: [], componentName: 'UIIcon', include: [], local: undefined, size: '1em' })
+	assert.deepEqual(resolveOptions({ collections: ['lucide', 'lucide'], componentName: 'AppIcon', include: ['lucide:x', 'mdi:*'], size: '20px', local: false }), { collections: ['lucide'], componentName: 'AppIcon', include: ['lucide:x', 'mdi:*'], local: false, size: '20px' })
 	assert.throws(() => resolveOptions({ colections: ['lucide'] }), /icon: unknown option colections/)
+	assert.throws(() => resolveOptions({ componentName: 'app-icon' }), /invalid componentName/)
 	assert.throws(() => resolveOptions({ collections: ['Lucide'] }), /collections must be a list of Iconify prefixes/)
 	assert.throws(() => resolveOptions({ collections: ['local'] }), /"local" is reserved/)
 	assert.throws(() => resolveOptions({ include: ['search'] }), /invalid include entry "search"/)
@@ -107,6 +108,10 @@ test('the transform embeds literal names and the literals of bind:name, and noth
 	const expression = /bind:resolved="([^"]*)" name="lucide:search"/.exec(result.code)[1]
 	assert.deepEqual(new Function(`return ${expression}`)(), { 'lucide:search': icons['lucide:search'] })
 	assert.equal(transformIconTags('<template><p>none</p></template>', resolve), undefined)
+	const custom = transformIconTags('<template><Glyph name="lucide:search" /><UIIcon name="lucide:x" /></template>', resolve, 'Glyph')
+	assert.equal(custom.code.match(/bind:resolved=/g).length, 1)
+	assert.match(custom.code, /<Glyph bind:resolved=.* name="lucide:search"/)
+	assert.match(custom.code, /<UIIcon name="lucide:x"/)
 	assert.throws(
 		() => transformIconTags('<template>\n\t<UIIcon name="lucide:serch" />\n</template>', resolve),
 		(error) => {

@@ -325,6 +325,87 @@ test('useNavigation exposes pending while a navigation loads', async () => {
 	browser.happyDOM.abort()
 })
 
+test('a pending navigation marks <html> with data-navigating and the clicked link with data-pending', async () => {
+	const f = fixture()
+	const gates: Array<{ promise: Promise<void>; resolve(value: void): void }> = []
+	const original = f.sidecars['note.route.ts']!
+	f.sidecars['note.route.ts'] = {
+		...original,
+		load: async (context) => {
+			const gate = deferred<void>()
+			gates.push(gate)
+			await gate.promise
+			return original.load!(context as never)
+		},
+	}
+	const { app, browser, server } = await boot(f, 'https://example.test/ssr')
+	const html = browser.document.documentElement
+	const tick = () => new Promise((done) => setTimeout(done, 0))
+	// The server never writes them.
+	assert.doesNotMatch(await (await server(new Request('https://example.test/ssr'))).text(), /data-navigating|data-pending/)
+	assert.equal(html.hasAttribute('data-navigating'), false)
+	const body = browser.document.body
+	body.insertAdjacentHTML('beforeend', '<a id="first" href="/notes/1">1</a><a id="second" href="/notes/2">2</a>')
+	const first = browser.document.getElementById('first') as unknown as HTMLElement
+	const second = browser.document.getElementById('second') as unknown as HTMLElement
+	first.click()
+	await tick()
+	assert.equal(html.getAttribute('data-navigating'), '')
+	assert.equal(first.getAttribute('data-pending'), '')
+	// A newer navigation moves the mark to its own link.
+	second.click()
+	await tick()
+	assert.equal(first.hasAttribute('data-pending'), false)
+	assert.equal(second.getAttribute('data-pending'), '')
+	assert.equal(html.hasAttribute('data-navigating'), true)
+	// The first one settles aborted: the second one is still pending.
+	gates[0]!.resolve()
+	await tick()
+	assert.equal(second.hasAttribute('data-pending'), true)
+	assert.equal(html.hasAttribute('data-navigating'), true)
+	gates[1]!.resolve()
+	for (let attempt = 0; attempt < 20 && html.hasAttribute('data-navigating'); attempt++) await tick()
+	assert.equal(browser.location.pathname, '/notes/2')
+	assert.equal(html.hasAttribute('data-navigating'), false)
+	assert.equal(second.hasAttribute('data-pending'), false)
+	// A programmatic navigation marks <html> but no link.
+	const programmatic = app.navigate('/notes/3')
+	await tick()
+	assert.equal(html.hasAttribute('data-navigating'), true)
+	assert.equal(browser.document.querySelector('[data-pending]'), null)
+	gates[2]!.resolve()
+	assert.equal(await programmatic, true)
+	assert.equal(html.hasAttribute('data-navigating'), false)
+	// A failed navigation clears both too.
+	body.insertAdjacentHTML('beforeend', '<a id="failing" href="/notes/500">500</a>')
+	const failing = browser.document.getElementById('failing') as unknown as HTMLElement
+	failing.click()
+	await tick()
+	assert.equal(failing.hasAttribute('data-pending'), true)
+	gates[3]!.resolve()
+	for (let attempt = 0; attempt < 20 && html.hasAttribute('data-navigating'); attempt++) await tick()
+	assert.equal(html.hasAttribute('data-navigating'), false)
+	assert.equal(failing.hasAttribute('data-pending'), false)
+	// Back and forward mark <html> but no link.
+	browser.history.back()
+	await tick()
+	assert.equal(html.hasAttribute('data-navigating'), true)
+	assert.equal(browser.document.querySelector('[data-pending]'), null)
+	gates[4]!.resolve()
+	for (let attempt = 0; attempt < 20 && html.hasAttribute('data-navigating'); attempt++) await tick()
+	assert.equal(browser.location.pathname, '/notes/3')
+	assert.equal(html.hasAttribute('data-navigating'), false)
+	// A navigation in flight when the application is disposed leaves nothing behind.
+	second.click()
+	await tick()
+	assert.equal(second.hasAttribute('data-pending'), true)
+	app.dispose()
+	assert.equal(html.hasAttribute('data-navigating'), false)
+	assert.equal(second.hasAttribute('data-pending'), false)
+	for (const gate of gates) gate.resolve()
+	browser.happyDOM.abort()
+})
+
 test('useNavigation is idle outside a browser application', () => {
 	assert.equal(useNavigation().pending.value, false)
 })

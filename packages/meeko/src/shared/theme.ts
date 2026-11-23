@@ -161,7 +161,8 @@ export interface ThemeState<Name extends string = ThemeName, Choice extends stri
 	/** Temas de la configuración, sin `"system"`. */
 	readonly themes: readonly Name[]
 	/**
-	 * Cambia la elección: actualiza `<html>`, `color-scheme`, la cookie y `localStorage`.
+	 * Cambia la elección: actualiza `<html>`, `color-scheme`, la cookie y `localStorage`. Si cambia el
+	 * tema efectivo, suprime las transiciones CSS durante el frame que aplica sus nuevos valores.
 	 * @throws {TypeError} Si `theme` no es un tema ni `"system"` (con el modo sistema activo).
 	 * @throws {Error} En el servidor.
 	 */
@@ -179,6 +180,9 @@ export const THEME_STATE_KEY = 'meeko:theme'
  * writes it, and the server when the cookie tells it. `<MeekoThemeToggle>` and the user's CSS read it.
  */
 export const THEME_CHOICE_ATTRIBUTE = 'data-theme-choice'
+
+/** Attribute of `<html>` while the browser applies a different effective theme. */
+export const THEME_TRANSITION_ATTRIBUTE = 'data-meeko-theme-changing'
 
 /** Endpoint that changes the theme without JavaScript: the form of `<MeekoThemeToggle>` posts there. */
 export const THEME_ENDPOINT = '/_meeko/theme'
@@ -304,8 +308,9 @@ export function themeChoices(config: ResolvedThemeConfig): string[] {
  * the icon is right from the first frame without JavaScript in the component. Without the attribute
  * (the server did not know the choice and no script ran) the default choice counts. In `"system"`, a
  * toggle without a `system` icon marks the icons of its themes `system-light` and `system-dark`, and
- * `prefers-color-scheme` picks one, as the inline script does. Only `display: none`: nothing visual.
- * Its text depends only on the configuration, so every page has the same CSP hash.
+ * `prefers-color-scheme` picks one, as the inline script does. It also suppresses CSS transitions
+ * while the browser applies a different effective theme. Its text depends only on the configuration,
+ * so every page has the same CSP hash.
  */
 export function themeStyle(config: ResolvedThemeConfig): string {
 	const icon = '[data-meeko-theme-icon]'
@@ -315,6 +320,8 @@ export function themeStyle(config: ResolvedThemeConfig): string {
 	if (config.system) {
 		rules.push(`@media (prefers-color-scheme:light){${hide('system', ['system', 'system-light'])}}`, `@media (prefers-color-scheme:dark){${hide('system', ['system', 'system-dark'])}}`)
 	}
+	const changing = `:root[${THEME_TRANSITION_ATTRIBUTE}]`
+	rules.push(`${changing},${changing}::before,${changing}::after,${changing} *,${changing} *::before,${changing} *::after{transition:none!important}`)
 	return rules.join('\n')
 }
 

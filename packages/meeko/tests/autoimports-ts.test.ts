@@ -4,6 +4,7 @@ import { dirname, join, resolve } from 'node:path'
 import test from 'node:test'
 
 import { discoverAutoImports } from '../src/autoimports/registry.ts'
+import { applyAutoImports } from '../src/autoimports/transform.ts'
 import { generateAutoImportTypes, transformTypeScriptAutoImports, typeScriptAutoImportMap, typeScriptScope } from '../src/autoimports/typescript.ts'
 
 test('TS autoimports generate isolated client/server/shared declarations and transform real imports', async () => {
@@ -49,6 +50,7 @@ test('TS autoimports generate isolated client/server/shared declarations and tra
 		assert.doesNotMatch(client, /serverOnly/)
 		assert.match(client, /export import Label = __meeko_type_\d+\.Label/)
 		assert.match(client, /export import Box = __meeko_type_\d+\.Box/)
+		assert.match(client, /type ElementAttributes<Tag extends string = import\("@meekojs\/meeko"\)\.TagName> = import\("@meekojs\/meeko"\)\.ElementAttributes<Tag>/)
 		assert.match(client, /type ResolvedComponent<Name extends import\("@meekojs\/meeko"\)\.ComponentName = import\("@meekojs\/meeko"\)\.ComponentName>/)
 		assert.doesNotMatch(client, /export import ResolvedComponent =/)
 		assert.doesNotMatch(client, /T extends Hidden|HiddenDefault/)
@@ -59,6 +61,8 @@ test('TS autoimports generate isolated client/server/shared declarations and tra
 		assert.doesNotMatch(server, /browserOnly/)
 		assert.doesNotMatch(shared, /useCount|getSecret|browserOnly|serverOnly/)
 		const registry = await discoverAutoImports(root)
+		const component = applyAutoImports('type ButtonAttributes = ElementAttributes<"button">;', join(root, 'app', 'components', 'Button.meeko'), registry, 'client')
+		assert.match(component, /^import type \{ ElementAttributes as ElementAttributes \} from "@meekojs\/meeko";$/m)
 		const page = join(root, 'app', 'pages', 'index.ts')
 		const code = transformTypeScriptAutoImports('const count = useCount(); type Name = Label;', page, root, registry)
 		assert.match(code ?? '', /import \{ useCount as useCount \}/)
@@ -78,7 +82,11 @@ test('TS autoimports generate isolated client/server/shared declarations and tra
 		assert.equal(typeScriptScope(root, join(root, 'app', 'pages', 'page.shared.ts')), 'shared')
 		const consumer = join(root, 'consumer.ts')
 		await writeFile(consumer, `const count: number = useCount();\nconst label: Label = "ok";\nconst box: Box<{ id: string; extra: number }> = { value: { id: "ok", extra: 1 } };\nconst defaultBox: Box = { value: { id: "ok", kind: "default" } };\n// @ts-expect-error the private re-exported generic constraint must remain intact\nconst invalidBox: Box<number> = { value: 1 };\ntype Field = FormField<string>; type FormState = Form<{ name: string }, void>; type Submission = FormSubmission<void>;\nvoid count; void label; void box; void defaultBox; void invalidBox;\n`)
-		await writeFile(consumer, `export {};\ndeclare module "@meekojs/meeko" {\n  interface ComponentRegistry { Example: { renderToString(props: { id: number }): string } }\n}\ntype DefaultResolved = ResolvedComponent;\ntype NamedResolved = ResolvedComponent<"Example">;\ntype RenamedResolved = ResolvedAlias<"Example">;\n// @ts-expect-error unknown component names remain rejected\ntype UnknownResolved = ResolvedComponent<"Missing">;\n// @ts-expect-error the renamed re-export keeps the original generic constraint\ntype UnknownAlias = ResolvedAlias<"Missing">;\n// @ts-expect-error type-only autoimports never create runtime globals\nvoid ResolvedComponent;\n` + (await readFile(consumer, 'utf8')))
+		await writeFile(
+			consumer,
+			`export {};\ndeclare module "@meekojs/meeko" {\n  interface ComponentRegistry { Example: { renderToString(props: { id: number }): string } }\n}\nconst attributes: ElementAttributes<"button"> = { type: "button", disabled: true };\ntype DefaultAttributes = ElementAttributes;\ntype DefaultResolved = ResolvedComponent;\ntype NamedResolved = ResolvedComponent<"Example">;\ntype RenamedResolved = ResolvedAlias<"Example">;\n// @ts-expect-error unknown component names remain rejected\ntype UnknownResolved = ResolvedComponent<"Missing">;\n// @ts-expect-error the renamed re-export keeps the original generic constraint\ntype UnknownAlias = ResolvedAlias<"Missing">;\n// @ts-expect-error type-only autoimports never create runtime globals\nvoid ElementAttributes;\n// @ts-expect-error type-only autoimports never create runtime globals\nvoid ResolvedComponent;\nvoid attributes;\n` +
+				(await readFile(consumer, 'utf8')),
+		)
 		await writeFile(
 			join(root, 'tsconfig.json'),
 			JSON.stringify({

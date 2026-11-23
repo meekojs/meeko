@@ -115,8 +115,7 @@
 		<h2 id="snippets">Personalizar las celdas</h2>
 		<p>
 			Los snippets opcionales son
-			<code>header(column)</code>,
-			<code>cell(row, column, value, index)</code>,
+			<code>header(column)</code>, <code>cell(row, column, value, index)</code>,
 			<code>footer(column, rows)</code>
 			y
 			<code>empty()</code>. El pie aparece cuando hay contenido de footer. El contenedor permite desplazamiento horizontal en pantallas estrechas.
@@ -127,12 +126,10 @@
 			<code>cell-&lt;clave&gt;(row, value)</code>, con
 			<code>value</code>
 			del tipo de esa columna, y
-			<code>header-&lt;clave&gt;(column)</code>. Una clave que la fila no tiene da error de tipos. Gana
-			<code>cell-&lt;clave&gt;</code>; después
+			<code>header-&lt;clave&gt;(column)</code>. Una clave que la fila no tiene da error de tipos. Gana <code>cell-&lt;clave&gt;</code>; después
 			<code>cell</code>
 			y por último
-			<code>format</code>. En la cabecera,
-			<code>header-&lt;clave&gt;</code>,
+			<code>format</code>. En la cabecera, <code>header-&lt;clave&gt;</code>,
 			<code>header</code>
 			y la etiqueta.
 		</p>

@@ -198,6 +198,8 @@ export interface PluginState {
 	beforeNavigate(url: URL, routeId: string | null): Promise<boolean>
 	/** Error observers the plugins registered, in registration order. */
 	readonly errorHandlers: readonly PluginErrorHandler[]
+	/** The composed resolver of `app.resolveLink`, for links built outside a component, such as `navigate()`. */
+	readonly resolveLink?: LinkResolver | undefined
 }
 
 /** The state of an application without plugins. */
@@ -262,6 +264,7 @@ export async function runPlugins(registrations: readonly PluginRegistration[] | 
 			return true
 		},
 		errorHandlers,
+		resolveLink,
 	}
 }
 

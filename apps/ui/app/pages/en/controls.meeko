@@ -6,6 +6,21 @@
 	const notifications = signal(true)
 	const period = signal('week')
 	const volume = signal(40)
+	const days = signal('30')
+	const dayOptions = [
+		{ value: '7', label: '7 days' },
+		{ value: '30', label: '30 days' },
+		{ value: '90', label: '90 days' },
+	]
+	const range = signal('month')
+	const ranges = [
+		{ value: 'today', label: 'Today' },
+		{ value: 'week', label: 'This week' },
+		{ value: 'month', label: 'This month' },
+		{ value: 'quarter', label: 'This quarter' },
+		{ value: 'year', label: 'This year' },
+		{ value: 'all', label: 'All time' },
+	]
 	const periods = [
 		{ value: 'day', label: 'Day' },
 		{ value: 'week', label: 'Week' },
@@ -18,7 +33,7 @@
 	<DocsPage
 		locale="en"
 		title="Form controls"
-		description="Textarea, Checkbox, RadioGroup, Switch and Slider: native HTML, with its keyboard and submission, and the look of UI."
+		description="Textarea, Checkbox, RadioGroup, SegmentedControl, Switch and Slider: native HTML, with its keyboard and submission, and the look of UI."
 	>
 		<p>
 			They all keep the native control, so the keyboard, the focus and form submission are those of the browser, also without JavaScript. Their models bind to a signal:
@@ -68,8 +83,7 @@
 		<p>
 			<code>UISwitch</code>
 			has the same contract as
-			<code>UICheckbox</code>, with
-			<code>role="switch"</code>: use it for something that applies at once.
+			<code>UICheckbox</code>, with <code>role="switch"</code>: use it for something that applies at once.
 		</p>
 		<DocsPreview layout="stack">
 			<UICheckbox
@@ -142,6 +156,71 @@
 				{ name: 'class', type: 'string', description: 'Additional classes.' },
 			]"
 		/>
+		<h2 id="segmented">UISegmentedControl</h2>
+		<p>
+			A compact single choice, such as the period of a chart: the same native radios as
+			<code>UIRadioGroup</code>
+			with the look of a segmented control, so the arrows, form submission and
+			<code>required</code>
+			also work without JavaScript. Its total height is the one of a control of its size,
+			<code>sm</code>
+			or
+			<code>md</code>, and it lines up with a
+			<code>UIButton</code>
+			next to it.
+		</p>
+		<p>
+			It needs a name:
+			<code>legend</code>, which
+			<code>hideLegend</code>
+			leaves to screen readers only, or
+			<code>ariaLabel</code>. When the options do not fit, the control scrolls sideways inside its own width: no option breaks and the page does not get wider.
+		</p>
+		<DocsPreview layout="stack">
+			<UISegmentedControl
+				legend="Chart period"
+				hideLegend
+				size="sm"
+				name="days"
+				model="days"
+				bind:options="dayOptions"
+			/>
+			<p
+				id="segmented-status"
+				class="docs-status"
+				role="status"
+			>
+				Showing the last {days.value} days.
+			</p>
+			<UISegmentedControl
+				legend="Range"
+				name="range"
+				model="range"
+				bind:options="ranges"
+			/>
+		</DocsPreview>
+		<DocsCode bind:code="examples.segmented" />
+		<p>
+			<code>UIRadioGroup variant="segmented"</code>
+			is still available and wraps into several lines when it does not fit; for a compact switcher, use
+			<code>UISegmentedControl</code>. Its
+			<code>size</code>
+			takes an application value in
+			<code>ui.defaults.segmentedControl</code>.
+		</p>
+		<DocsApi
+			caption="UISegmentedControl props"
+			bind:rows="[
+				{ name: 'model', type: 'Signal<string>', description: 'Chosen value, two-way.' },
+				{ name: 'options', type: 'readonly UIRadioOption[]', description: 'Required. value, label and disabled.' },
+				{ name: 'legend', type: 'string', description: 'Name of the group, in its legend. Required without ariaLabel.' },
+				{ name: 'hideLegend', type: 'boolean', default: 'false', description: 'The legend for screen readers only.' },
+				{ name: 'ariaLabel', type: 'string', description: 'Name of the group without a legend, instead of legend.' },
+				{ name: 'size', type: 'sm | md', default: 'md', description: 'Height and text, those of a control of that size.' },
+				{ name: 'name / required / disabled', type: 'string / boolean', description: 'Native submission and state.' },
+				{ name: 'class / ui', type: 'string / object', description: 'Classes of the fieldset and of base, legend, options, option and input.' },
+			]"
+		/>
 		<h2 id="slider">UISlider</h2>
 		<p>
 			An
@@ -179,14 +258,99 @@
 		/>
 		<p>
 			The types
-			<code>UITextareaProps</code>,
-			<code>UICheckboxProps</code>,
-			<code>UISwitchProps</code>,
-			<code>UIRadioGroupProps</code>
+			<code>UITextareaProps</code>, <code>UICheckboxProps</code>, <code>UISwitchProps</code>, <code>UIRadioGroupProps</code>,
+			<code>UISegmentedControlProps</code>
 			and
 			<code>UISliderProps</code>
 			are exported from
 			<code>@meekojs/ui/runtime</code>.
 		</p>
+		<h2 id="native">Progress, meter and files</h2>
+		<p>
+			No component: the base of UI styles
+			<code>&lt;progress&gt;</code>,
+			<code>&lt;meter&gt;</code>
+			and
+			<code>&lt;input type="file"&gt;</code>
+			with the tokens, at zero specificity (<code>:where()</code>, in the
+			<code>ui-base</code>
+			layer), so any rule of yours wins. A
+			<code>&lt;progress&gt;</code>
+			without
+			<code>value</code>
+			is indeterminate and moves, except with
+			<code>prefers-reduced-motion</code>. The color of a
+			<code>&lt;meter&gt;</code>
+			tells the region of its value from
+			<code>low</code>,
+			<code>high</code>
+			and
+			<code>optimum</code>: optimum, middle or the worst. The button of a file input looks like a secondary <code>UIButton</code>. With
+			<code>{'ui: { base: false }'}</code>
+			they are not applied.
+		</p>
+		<DocsPreview id="native-elements">
+			<div class="docs-stack">
+				<progress
+					value="0.6"
+					aria-label="Upload"
+				/>
+				<progress aria-label="Loading" />
+				<meter
+					min="0"
+					max="100"
+					low="25"
+					high="75"
+					optimum="100"
+					value="90"
+					aria-label="Optimum">90%</meter>
+				<meter
+					min="0"
+					max="100"
+					low="25"
+					high="75"
+					optimum="100"
+					value="50"
+					aria-label="Middle">50%</meter>
+				<meter
+					min="0"
+					max="100"
+					low="25"
+					high="75"
+					optimum="100"
+					value="10"
+					aria-label="The worst">10%</meter>
+				<input
+					type="file"
+					multiple
+					aria-label="Photos"
+				/>
+			</div>
+		</DocsPreview>
+		<DocsCode bind:code="examples.nativeElements" />
+		<p>
+			Each element reads its own family of tokens, which starts from the global ones:
+			<code>--ui-progress-*</code>,
+			<code>--ui-meter-*</code>
+			and
+			<code>--ui-file-*</code>.
+		</p>
+		<DocsCode
+			label="CSS"
+			bind:code="examples.nativeElementsTokens"
+		/>
+		<DocsApi
+			caption="Tokens of the native elements"
+			bind:rows="[
+				{ name: '--ui-progress-height / -radius', type: 'length', default: '--ui-space-2 / --ui-radius-full', description: 'Height and corners of the bar.' },
+				{ name: '--ui-progress-track / -color', type: 'color', default: '--ui-color-control-active / --ui-color-primary', description: 'Track and bar.' },
+				{ name: '--ui-progress-indeterminate-width / -duration', type: 'percentage / time', default: '40% / 1.4s', description: 'Width (up to 50%) and loop of the indeterminate bar.' },
+				{ name: '--ui-meter-height / -radius / -track', type: 'length / color', default: '--ui-space-2 / --ui-radius-full / --ui-color-control-active', description: 'Height, corners and track.' },
+				{ name: '--ui-meter-optimum-color / -suboptimum-color / -even-less-good-color', type: 'color', default: 'success / warning / danger', description: 'Bar in the optimum, middle and worst region.' },
+				{ name: '--ui-file-color / -gap', type: 'color / length', default: '--ui-color-text-soft / --ui-space-3', description: 'Name of the files and gap before the button.' },
+				{ name: '--ui-file-button-height / -padding / -radius', type: 'length', default: 'those of an sm control', description: 'Size of the button.' },
+				{ name: '--ui-file-button-bg / -bg-hover / -border / -color', type: 'color', default: 'those of a secondary UIButton', description: 'Colors of the button.' },
+			]"
+		/>
 	</DocsPage>
 </template>

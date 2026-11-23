@@ -3,28 +3,36 @@
 
 	import type { UICheckboxProps } from '../types/forms'
 
-	const { label, description, invalid, describedBy, class: className, ...rest } = defineProps<UICheckboxProps>()
+	import { uiTheme } from '../utils/defaults'
+	import { checkbox } from '../variants/choice'
+
+	const { label, description, invalid, describedBy, class: ownClass, ui: ownUi, ...rest } = defineProps<UICheckboxProps>()
+
+	const theme = uiTheme('checkbox', () => ({ class: ownClass, ui: ownUi }))
 
 	const checked = defineModel<boolean>({ default: false })
 
 	const id = useId()
+
+	const classes = checkbox()
 </script>
 
 <template>
-	<label bind:class="['meeko-ui-choice', className].filter(Boolean).join(' ')">
+	<label bind:class="classes.base({ class: [theme.ui.base, theme.class] })">
 		<input
 			type="checkbox"
 			model="checked"
 			bind:aria-invalid="invalid ? 'true' : undefined"
 			bind:aria-describedby="[describedBy ?? rest['aria-describedby'], description ? id + '-description' : undefined].filter(Boolean).join(' ') || undefined"
+			bind:class="classes.input({ class: theme.ui.input })"
 			bind="rest"
 		/>
-		<span class="meeko-ui-choice-content">
+		<span bind:class="classes.content({ class: theme.ui.content })">
 			<span>{label}</span>
 			<span
 				if:when="description"
-				class="meeko-ui-choice-description"
 				bind:id="id + '-description'"
+				bind:class="classes.description({ class: theme.ui.description })"
 			>
 				{description}
 			</span>

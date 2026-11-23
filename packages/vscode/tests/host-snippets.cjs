@@ -163,7 +163,7 @@ exports.run = async function run() {
 	await accept('template', 'mif')
 	assert.equal(document.getText(editor.selection), 'div')
 	await vscode.commands.executeCommand('type', { text: 'section' })
-	const element = '<section if:when="visible.value">\n\t\t\n\t</section>\n'
+	const element = '<section if="visible.value">\n\t\t\n\t</section>\n'
 	assert.equal(atCursor('template', element.length), element)
 	await vscode.commands.executeCommand('jumpToNextSnippetPlaceholder')
 	assert.equal(document.getText(editor.selection), 'visible.value')

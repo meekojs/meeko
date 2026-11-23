@@ -9,8 +9,10 @@ import type { ServerMiddleware } from '../middleware/index'
 import type { ServerRouteMiddleware } from '../middleware/runtime'
 import type { SocketHub, SocketPubSub } from '../socket/runtime'
 import type { AssetManifest, AssetReader } from './assets'
+import type { RequestCookies } from './cookies'
 import type { ContentSecurityPolicy } from './csp'
-import type { ServerRuntime, ServerRuntimeDefinition } from './definition'
+import type { ServerRuntime, ServerRuntimeDefinition, ServerServicesContext } from './definition'
+import type { DevAllowedHosts } from './dev-hosts'
 import type { ServerManifest } from './discovery'
 import type { DocumentMarkup, DocumentOptions, PageHandlerOptions, PageModule, PageRoute, PrerenderSource } from './framework-render'
 import type { ServerPlatform } from './platform'
@@ -25,13 +27,15 @@ import { observeServerError, reportServerError } from '../errors'
 import { consumeFormFlash, formFlashPlugin, readFormFlash } from '../forms/index'
 import { composeServerMiddleware } from '../middleware/index'
 import { createSocketHub, withSocketHub } from '../socket/runtime'
+import { ResponseState } from './cookies'
 import { contentSecurityPolicy, JSON_CONTENT_SECURITY_POLICY } from './csp'
 import { createContextDispatcher, createLocalServerFetch, loadSocketChannels } from './discovery'
-import { copySocketAddress, setRequestEnvironment, trustProxyOf, warnOnce } from './env'
+import { copySocketAddress, requestTargetUrl, setRequestEnvironment, trustProxyOf, warnOnce } from './env'
 import { createPageHandler, withRouteManifest } from './framework-render'
 import { createDetachedPlatform } from './platform'
 import { registerProcessErrors, withRequestScope } from './process-errors'
-import { createRequestContext } from './request-context'
+import { buildRequestContext } from './request-context'
+import { allowDevHosts, type Authenticator, createDisabledSessions, sessionsDisabled, setAuthenticator } from './sessions'
 import { createSessionDefaults, warnIgnoredSessionEnv } from './zero-config'
 
 type ServerHeaders = Readonly<Record<string, string | Readonly<Record<string, string>>>>
@@ -210,6 +214,19 @@ export interface ServerAppOptions<Env = Readonly<Record<string, string | undefin
 	readonly document?: DocumentOptions
 	/** Sustituye a `ServerRuntime.publicOrigin`. */
 	readonly publicOrigin?: string
+	/**
+	 * Hosts y orígenes adicionales cuyo `Origin` aceptan, sólo en desarrollo, las comprobaciones de
+	 * API, RPC, formularios, `session.create` y Socket, además del origen de la aplicación y de
+	 * `allowedOrigins`. `meeko dev` pasa aquí `dev.allowedHosts` y `MEEKO_ALLOWED_HOSTS`; con la
+	 * opción presente, cada `Origin` rechazado avisa una vez en la consola con la opción que lo
+	 * permite. Con `production: true` se ignora: nada se relaja en producción.
+	 * @since 1.10.0
+	 * @example
+	 * ```ts
+	 * const app = await createServerApp({ manifest, load, runtime, production: false, devAllowedHosts: ["mi-pc.tailnet.ts.net"] });
+	 * ```
+	 */
+	readonly devAllowedHosts?: DevAllowedHosts
 	/** Lo activa `meeko build` mientras prerenderiza páginas. */
 	readonly prerendering?: boolean
 	/**
@@ -327,18 +344,41 @@ function defaultObserver(production: boolean): ServerErrorObserver {
 }
 
 /** The runtime with its sessions always present: the app's own, or Meeko's defaults. */
-type ResolvedRuntime<Env> = ServerRuntime<unknown, Env> & { readonly sessions: SessionManager<any> }
+type ResolvedRuntime<Env> = Omit<ServerRuntime<unknown, Env>, 'sessions'> & { readonly sessions: SessionManager<any> }
+
+/** Releases what the runtime factory created and fails startup with `error`. */
+async function closeRuntime(runtime: { readonly close?: (() => void | Promise<void>) | undefined }, error: Error): Promise<never> {
+	try {
+		await runtime.close?.()
+	} catch (cleanupError) {
+		throw new AggregateError([error, cleanupError], 'Meeko runtime validation and cleanup failed', { cause: cleanupError })
+	}
+	throw error
+}
 
 async function createRuntime<Env>(options: ServerAppOptions<Env>, platform: ServerPlatform<Env>): Promise<ResolvedRuntime<Env>> {
 	const prerendering = options.prerendering === true
 	if (options.runtime !== undefined && typeof options.runtime !== 'function') throw new TypeError('server/runtime.ts must default-export defineServerRuntime(...)')
 	const runtime: ServerRuntime<unknown, Env> = options.runtime === undefined ? {} : await options.runtime({ env: platform.env, production: options.production, platform: platform.name, prerendering, ...(options.root === undefined ? {} : { root: options.root }) })
 	if (!runtime || typeof runtime !== 'object') throw new TypeError('server/runtime.ts must return an object, such as { services } or { sessions: SessionManager }')
-	const sessions = runtime.sessions as Partial<SessionManager> | undefined
+	const sessions = runtime.sessions as Partial<SessionManager> | false | undefined
+	const allowedOrigins = runtime.allowedOrigins
+	if (allowedOrigins !== undefined && (!Array.isArray(allowedOrigins) || !allowedOrigins.every((origin) => typeof origin === 'string'))) {
+		await closeRuntime(runtime, new TypeError('server/runtime.ts: allowedOrigins must be an array of origins'))
+	}
+	if (runtime.isAuthenticated !== undefined && typeof runtime.isAuthenticated !== 'function') {
+		await closeRuntime(runtime, new TypeError('server/runtime.ts: isAuthenticated must be a function'))
+	}
+	if (sessions === false) {
+		// The application authenticates on its own: no store, so production starts without Redis.
+		warnIgnoredSessionEnv(platform.env)
+		return { ...runtime, sessions: createDisabledSessions(allowedOrigins ?? [], options.production && !prerendering) }
+	}
 	if (sessions !== undefined) {
 		if (!sessions || typeof sessions.load !== 'function' || typeof sessions.assertMutationAllowed !== 'function') {
-			throw new TypeError('server/runtime.ts must return { sessions: SessionManager } or omit sessions')
+			throw new TypeError('server/runtime.ts must return { sessions: SessionManager } or omit sessions (sessions: false disables them)')
 		}
+		if (allowedOrigins !== undefined) await closeRuntime(runtime, new TypeError('server/runtime.ts returns its own SessionManager: declare allowedOrigins in it, not next to it'))
 		warnIgnoredSessionEnv(platform.env)
 		return runtime as ResolvedRuntime<Env>
 	}
@@ -352,6 +392,7 @@ async function createRuntime<Env>(options: ServerAppOptions<Env>, platform: Serv
 			platform: platform.name,
 			appName: options.appName,
 			loadRedis: options.loadRedis,
+			...(allowedOrigins === undefined ? {} : { allowedOrigins }),
 		})
 	} catch (error) {
 		// The factory may already hold resources, such as a database pool.
@@ -398,6 +439,19 @@ function headerPattern(pattern: string): RegExp {
 	)
 }
 
+/**
+ * The path the router serves for `pathname`: without empty segments, so neither `//` nor a trailing
+ * `/`, and with each segment decoded, as `matchRoute` reads it. `undefined` when a segment does not
+ * decode, so no route answers it.
+ */
+function routedPathname(pathname: string): string | undefined {
+	try {
+		return `/${pathname.split('/').filter(Boolean).map(decodeURIComponent).join('/')}`
+	} catch {
+		return undefined
+	}
+}
+
 /** Whether a response body is JSON: API, RPC, errors and the navigation payloads. */
 function jsonResponse(pathname: string, response: Response): boolean {
 	if (pathname.startsWith('/api/') || pathname.startsWith('/_meeko/rpc/')) return true
@@ -426,7 +480,12 @@ function responseHeaders(policy: ContentSecurityPolicy | undefined, configured: 
 		// Later entries win: the global headers first, the public file, then each pattern in written order.
 		const extra = new Map<string, string>(global.map(([name, value]) => [name.toLowerCase(), value]))
 		for (const [name, value] of Object.entries(fileHeaders.get(pathname) ?? {})) extra.set(name.toLowerCase(), value)
-		for (const pattern of patterns) if (pattern.test.test(pathname)) for (const [name, value] of pattern.headers) extra.set(name.toLowerCase(), value)
+		// The router ignores empty segments and decodes the rest: `//admin/panel` and `/%61dmin/panel`
+		// serve `/admin/panel`, so a pattern applies when it matches the written path or the routed one.
+		const routed = patterns.length ? routedPathname(pathname) : undefined
+		for (const pattern of patterns) {
+			if (pattern.test.test(pathname) || (routed !== undefined && pattern.test.test(routed))) for (const [name, value] of pattern.headers) extra.set(name.toLowerCase(), value)
+		}
 		// A 304 updates the stored response's headers: a policy without the hashes of that document would replace its own.
 		const csp = basePolicy && response.status !== 304 && !response.headers.has('content-security-policy') ? (jsonResponse(pathname, response) ? JSON_CONTENT_SECURITY_POLICY : basePolicy) : undefined
 		// `public` and `s-maxage` both let a shared cache store the response, also when `headers` adds them.
@@ -502,6 +561,12 @@ export async function createServerApp<Env = Readonly<Record<string, string | und
 	trustProxyOf(basePlatform.env)
 	const runtime = await createRuntime(options, basePlatform)
 	const sessions = runtime.sessions
+	// `auth: "required"` of API, RPC and Socket asks the application when it declares how.
+	if (runtime.isAuthenticated) setAuthenticator(sessions, runtime.isAuthenticated as Authenticator)
+	// The session cookie of Meeko, which `context.cookies` cannot write; none with `sessions: false`.
+	const sessionCookieName = !sessionsDisabled(sessions) && typeof sessions.cookieName === 'string' ? sessions.cookieName : undefined
+	// Development only: the manager itself also refuses it in production.
+	if (!options.production && options.devAllowedHosts !== undefined) sessions[allowDevHosts](options.devAllowedHosts)
 	let closing: Promise<void> | undefined
 	const close = (): Promise<void> => {
 		closing ??= (async () => {
@@ -540,14 +605,18 @@ export async function createServerApp<Env = Readonly<Record<string, string | und
 		reportBackground = (error) => observeServerError(error, crypto.randomUUID(), reportError)
 		const platformStore = new AsyncLocalStorage<ServerPlatform>()
 		const currentPlatform = (): ServerPlatform => platformStore.getStore() ?? basePlatform
-		const servicesFor = async (request: Request, platform: ServerPlatform): Promise<unknown> => {
+		const servicesFor = async (request: Request, platform: ServerPlatform, cookies: RequestCookies): Promise<unknown> => {
 			const services = runtime.services
-			return typeof services === 'function' ? await (services as (request: Request, context: { platform: ServerPlatform }) => unknown)(request, { platform }) : (services ?? {})
+			return typeof services === 'function' ? await (services as (request: Request, context: ServerServicesContext) => unknown)(request, { platform, cookies }) : (services ?? {})
 		}
+		/** Cookies are `Secure` by default in production, and in development over HTTPS. */
+		const responseStateFor = (request: Request, readOnly = false): ResponseState => new ResponseState(request, { secure: options.production || new URL(request.url).protocol === 'https:', sessionCookieName, readOnly })
 		const createContext = async (request: Request): Promise<RequestContext> => {
 			const platform = currentPlatform()
 			const session = await sessions.load(request)
-			return createRequestContext(request, await servicesFor(request, platform), session, platform)
+			// One state for the services factory and the context: what one writes, the other reads.
+			const response = responseStateFor(request)
+			return buildRequestContext(request, await servicesFor(request, platform, response.cookies), session, platform, { response })
 		}
 		const dispatch = createContextDispatcher({ manifest: manifest.server, sessions, load, onError: reportError })
 		const endpoints = async (request: Request): Promise<Response> => {
@@ -600,7 +669,7 @@ export async function createServerApp<Env = Readonly<Record<string, string | und
 			plugins: [formFlashPlugin, ...(options.plugins ?? [])],
 			// The ETag of a cached page changes with every deploy; without a build, with every process.
 			buildId: manifest.buildId ?? crypto.randomUUID(),
-			...(typeof sessions.cookieName === 'string' ? { sessionCookieName: sessions.cookieName } : {}),
+			...(sessionCookieName === undefined ? {} : { sessionCookieName }),
 		}
 		// The CSP applies in production: the scripts and styles that Vite injects in development have
 		// neither a nonce nor a hash. The build renders its prerendered pages without it, so the stored
@@ -637,10 +706,7 @@ export async function createServerApp<Env = Readonly<Record<string, string | und
 			const url = new URL(request.url)
 			if (url.origin === publicOrigin) return request
 			// Assigned fields keep a `//host/...` pathname on the public origin.
-			const target = new URL(publicOrigin)
-			target.pathname = url.pathname
-			target.search = url.search
-			return copySocketAddress(request, new Request(target, request))
+			return copySocketAddress(request, new Request(requestTargetUrl(url.pathname + url.search, publicOrigin), request))
 		}
 		let socket: ServerAppSocket | undefined
 		if (manifest.server.socket?.length) {
@@ -655,7 +721,8 @@ export async function createServerApp<Env = Readonly<Record<string, string | und
 				channels,
 				sessions,
 				platform: basePlatform,
-				services: (request: Request) => servicesFor(request, currentPlatform()),
+				// The handshake reads cookies; it has no response to write them to.
+				services: (request: Request) => servicesFor(request, currentPlatform(), responseStateFor(request, true).cookies),
 				...(runtime.socket?.allowedOrigins ? { allowedOrigins: runtime.socket.allowedOrigins } : {}),
 				...(runtime.socket?.maxMessageBytes === undefined ? {} : { maxMessageBytes: runtime.socket.maxMessageBytes }),
 				...(runtime.socket?.maxBufferBytes === undefined ? {} : { maxBufferBytes: runtime.socket.maxBufferBytes }),
@@ -670,7 +737,7 @@ export async function createServerApp<Env = Readonly<Record<string, string | und
 				pathnamePrefix: '/_meeko/socket',
 				...(runtime.socket?.maxMessageBytes === undefined ? {} : { maxMessageBytes: runtime.socket.maxMessageBytes }),
 				...(pubsub ? { pubsub } : {}),
-				...(typeof sessions.cookieName === 'string' ? { sessionCookieName: sessions.cookieName } : {}),
+				...(sessionCookieName === undefined ? {} : { sessionCookieName }),
 			}
 		}
 		// href(id) in API, RPC and server middleware uses this application's manifest, and the

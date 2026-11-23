@@ -1,34 +1,128 @@
 <script lang="ts">
-	import type { UIStatProps } from '../types/feedback'
+	// <UIStat>: a value with its label and context in a <dl>. With a change, a period, a trend or a link it is a
+	// key figure: the change, with its arrow, its tone and a sentence for screen readers, the period, a
+	// <UISparkline> and a link of its own to the detail, each in a <dd> of the same term. The link is not the
+	// whole stat: its name would be all of its content, and the snippets could not hold links of their own.
+	import { computed } from '@meekojs/meeko'
+
+	import type { UIStatProps } from '../types/data'
+
+	import { uiTheme } from '../utils/defaults'
+	import { icons } from '../utils/icons'
+	import { fillMessage, uiMessages } from '../utils/messages'
+	import { statChange, statTone } from '../utils/stat'
+	import { stat } from '../variants/data'
+	import * as Hint from './Hint.meeko'
+	import * as Icon from './internal/Icon.meeko'
+	import * as Sparkline from './Sparkline.meeko'
 
 	const props = defineProps<UIStatProps>()
 
-	const snippets = defineSnippets<{ value?: []; detail?: [] }>()
+	const theme = uiTheme('stat', () => props)
+
+	const snippets = defineSnippets<{ label?: []; value?: []; detail?: [] }>()
+
+	const messages = uiMessages()
+	const text = messages.stat
+
+	const arrows = { up: icons.arrowUp, down: icons.arrowDown, flat: icons.arrowEnd }
+
+	const change = computed(() => (props.change === undefined || props.change === '' ? undefined : statChange(props.change, { locale: messages.locale, format: props.changeFormat, direction: props.changeDirection })))
+	const direction = computed(() => change.value?.direction ?? 'flat')
+	const tone = computed(() => (change.value ? statTone(change.value.direction, props.good) : 'neutral'))
+	const spoken = computed(() => (change.value ? fillMessage(text[change.value.direction], { change: change.value.magnitude }) : ''))
+	const linked = computed(() => props.href !== undefined || props.to !== undefined)
+	const kpi = computed(() => change.value !== undefined || Boolean(props.period) || props.trend !== undefined || linked.value)
+	// Without the props of a key figure, the classes of always: tv() with its default variants.
+	const classes = computed(() => (kpi.value ? stat({ kpi: true, chart: props.trend !== undefined, tone: tone.value, direction: direction.value }) : stat()))
+	const linkText = computed(() => props.linkLabel ?? text.link)
+	// The default text says nothing alone: its name adds the label, as the list of links of a screen reader shows it.
+	const linkName = computed(() => (props.linkLabel ? undefined : fillMessage(text.linkName, { link: text.link, label: props.label })))
+	const linkRel = computed(() => props.rel ?? (props.target === '_blank' ? 'noopener noreferrer' : undefined))
 </script>
 
 <template>
-	<dl bind:class="['meeko-ui-stat', props.class].filter(Boolean).join(' ')">
-		<dt>{props.label}</dt>
+	<dl bind:class="classes.value.base({ class: [theme.ui.base, theme.class] })">
+		<dt bind:class="classes.value.label({ class: theme.ui.label })"
+			><render
+				if:when="snippets.label"
+				snippet="snippets.label" /><template if:when="!snippets.label">{props.label}</template
+			><Hint
+				if:when="props.hint"
+				bind:text="props.hint"
+				bind:class="classes.value.hint({ class: theme.ui.hint })"
+		/></dt>
 		<dd
 			if:when="snippets.value"
-			class="meeko-ui-stat-value"
+			bind:class="classes.value.value({ class: theme.ui.value })"
 		>
 			<render snippet="snippets.value" />
 		</dd>
 		<template if:when="!snippets.value">
-			<dd class="meeko-ui-stat-value">{props.value}</dd>
+			<dd bind:class="classes.value.value({ class: theme.ui.value })">{props.value}</dd>
 		</template>
 		<dd
+			if:when="change.value || props.period"
+			bind:class="classes.value.change({ class: theme.ui.change })"
+		>
+			<span
+				if:when="change.value"
+				bind:class="classes.value.delta({ class: theme.ui.delta })"
+			>
+				<Icon
+					size="sm"
+					bind:path="arrows[direction.value]"
+					bind:class="classes.value.icon({ class: theme.ui.icon })"
+				/>
+				<span aria-hidden="true">{change.value?.shown}</span>
+				<span class="ui:sr-only">{spoken.value}</span>
+			</span>
+			<span
+				if:when="props.period"
+				bind:class="classes.value.period({ class: theme.ui.period }) || undefined"
+				>{props.period}</span
+			>
+		</dd>
+		<dd
 			if:when="snippets.detail"
-			class="meeko-ui-stat-detail"
+			bind:class="classes.value.detail({ class: theme.ui.detail })"
 		>
 			<render snippet="snippets.detail" />
 		</dd>
 		<dd
 			if:when="!snippets.detail && props.detail"
-			class="meeko-ui-stat-detail"
+			bind:class="classes.value.detail({ class: theme.ui.detail })"
 		>
 			{props.detail}
+		</dd>
+		<dd
+			if:when="props.trend"
+			bind:class="classes.value.trend({ class: theme.ui.trend })"
+		>
+			<Sparkline
+				area
+				bind:values="props.trend ?? []"
+				bind:tone="change.value ? tone.value : 'accent'"
+				bind:label="props.trendLabel"
+			/>
+		</dd>
+		<dd
+			if:when="linked.value"
+			bind:class="classes.value.action({ class: theme.ui.action })"
+		>
+			<component
+				is="props.to !== undefined ? 'MeekoLink' : 'a'"
+				bind:to="props.to"
+				bind:params="props.params"
+				bind:search="props.search"
+				bind:resolve="props.resolve"
+				bind:href="props.href"
+				bind:target="props.target"
+				bind:rel="linkRel.value"
+				bind:aria-label="linkName.value"
+				bind:class="classes.value.link({ class: theme.ui.link })"
+				>{linkText.value}</component
+			>
 		</dd>
 	</dl>
 </template>

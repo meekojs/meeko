@@ -35,6 +35,7 @@ import { renderWithSuspense } from '../../app/runtime/suspense'
 import { collectTeleports, TeleportCollector } from '../../app/runtime/teleport'
 import { collectRenderedHtml, escapeHtml, serializeJson } from '../../core/server'
 import { errorTitleEntry, resolveHead, resolveSeo, routeHeadInput } from '../../shared/head'
+import { checkDataKey } from '../../shared/invalidation'
 import { resolveThemeConfig, THEME_ENDPOINT, withThemeAttributes } from '../../shared/theme'
 import { providePageScope } from '../composables/usePage'
 import { errorResponse } from '../contract-runtime'
@@ -47,7 +48,7 @@ import { cookieNamed } from './cookies'
 import { createCspNonce, documentContentSecurityPolicy } from './csp'
 import { provideDocumentHtmlMarks, withMarkedHtml, withoutDocumentHtml } from './document-html'
 import { documentHeadEntries, HeadCollector, renderHeadDocument } from './head'
-import { withRequestContext } from './request-context'
+import { applyResponseState, responseStateOf, sessionOf, withRequestContext } from './request-context'
 import { lockSessionCookie } from './sessions'
 import { placeTeleports } from './teleports'
 import { addThemeHeaders, provideServerTheme, requestTheme } from './theme'
@@ -173,6 +174,14 @@ export interface PageRequestContext {
 	readonly state: StateStore
 	/** Existe cuando el host proporciona un contexto por petición. */
 	readonly context?: RequestContext
+	/**
+	 * Declara las claves de datos de las que depende el loader (desde `1.10`), como
+	 * `` depends("orders", `orders.${params.id}`) ``. Cuando una mutación o `invalidate()` invalida una
+	 * que coincide, el navegador vuelve a ejecutar el loader de la página visible y actualiza sus
+	 * datos sin volver a montar sus componentes.
+	 * @since 1.10.0
+	 */
+	readonly depends: (...keys: string[]) => void
 }
 
 /**
@@ -863,7 +872,7 @@ function warnCache(message: string): void {
 }
 
 function prerenderedResponse(page: PrerenderedPage, request: Request, context: RequestContext | undefined): Response {
-	const session = context?.session
+	const session = context ? sessionOf(context) : undefined
 	const head = request.method === 'HEAD'
 	if (session?.current || session?.cookieHeader) {
 		if (!Number.isSafeInteger(page.headOffset) || page.headOffset < 0 || page.headOffset > page.html.length) throw new Error('Invalid prerender head offset')
@@ -959,6 +968,12 @@ function runServerMiddleware(middlewares: readonly ServerRouteMiddleware[], url:
 		get session() {
 			return requireContext().session
 		},
+		get cookies() {
+			return requireContext().cookies
+		},
+		get responseHeaders() {
+			return requireContext().responseHeaders
+		},
 		get services() {
 			return requireContext().services
 		},
@@ -975,11 +990,19 @@ function runServerMiddleware(middlewares: readonly ServerRouteMiddleware[], url:
 		search,
 		request,
 		signal,
+		// A middleware loads no page data: there is nothing for the browser to rerun.
+		depends: () => {},
 		get context() {
 			return requireContext()
 		},
 	}
 	return runningPage.run(page, () => runServerRouteMiddleware(middlewares, context))
+}
+
+/** The CSRF meta tag of a document whose request has a Meeko session. */
+function csrfMetaOf(requestContext: RequestContext | undefined): string {
+	const current = requestContext ? sessionOf(requestContext).current : undefined
+	return current ? `<meta name="meeko-csrf-token" content="${escapeHtml(current.csrfToken)}">` : ''
 }
 
 export function createPageHandler(options: PageHandlerOptions): (request: Request) => Promise<Response> {
@@ -1074,8 +1097,11 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
 			if (csp !== undefined && response.status !== 304) headers.set('content-security-policy', csp)
 			headers.set('x-request-id', requestContext?.requestId ?? fallbackRequestId)
 			if (requestContext) {
-				headers.set('x-meeko-csrf-token', requestContext.session.current?.csrfToken ?? '')
-				if (requestContext.session.cookieHeader) headers.append('set-cookie', requestContext.session.cookieHeader)
+				// The cookies and headers the request wrote join those of the response, which keeps its own.
+				applyResponseState(headers, requestContext)
+				const session = sessionOf(requestContext)
+				headers.set('x-meeko-csrf-token', session.current?.csrfToken ?? '')
+				if (session.cookieHeader) headers.append('set-cookie', session.cookieHeader)
 			}
 			return new Response(response.body, { status: response.status, statusText: response.statusText, headers })
 		}
@@ -1123,7 +1149,7 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
 			const host = documentParts(options.document, request, requestNonce())
 			const styleTags = documentStyleTags(styles, host.nonceAttribute)
 			const script = options.clientEntry ? `<script type="module"${host.nonceAttribute} src="${escapeHtml(options.clientEntry)}"></script>` : ''
-			const csrfMeta = requestContext?.session.current ? `<meta name="meeko-csrf-token" content="${escapeHtml(requestContext.session.current.csrfToken)}">` : ''
+			const csrfMeta = csrfMetaOf(requestContext)
 			// Titled like the error document of a matched route; hydration resolves the same title, so
 			// it still finds the host <title> after the managed head.
 			const head = headDocument(options.document, host.nonce, collected, {}, undefined, theme, errorTitleEntry(ERROR_PAGE_TITLE, options.errorPage!.layouts.length))
@@ -1212,7 +1238,7 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
 				// response (its HTML carries the CSRF token), and never with a host nonce that Meeko's CSP does
 				// not replace by hashes. Every middleware above already ran: a guard is never skipped.
 				const cache = clientPage ? undefined : pageCacheOf(sidecar, match.route.id)
-				const session = requestContext?.session
+				const session = requestContext ? sessionOf(requestContext) : undefined
 				const sessionRequest = Boolean(session?.current || session?.cookieHeader || (options.sessionCookieName && cookieNamed(request.headers.get('cookie'), options.sessionCookieName)))
 				// A form result is one response's: no 304, no stored copy read or written (Vary: Cookie covers shared caches).
 				// A request with Authorization may be answered for its credentials: it is never cached either.
@@ -1252,7 +1278,7 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
 				 * a cookie (a loader that creates a session) is not cached after all.
 				 */
 				const cacheResult = (body: string, headers: Record<string, string>): Record<string, string> => {
-					if (cache && !sessionRequest && (session?.current || session?.cookieHeader)) {
+					if (cache && !sessionRequest && (session?.current || session?.cookieHeader || (requestContext && responseStateOf(requestContext)?.wroteCookies))) {
 						// Development has no page cache, but tells that production will not cache this page either.
 						if (!(options.production ?? true)) warnCache(`[meeko] Route ${match.route.id} declares cache, but this response sets a cookie or starts a session, so it is sent with no-store and never cached.`)
 						return headers
@@ -1262,6 +1288,8 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
 					if (memory && etag) memory.set(slot, { etag, body: new TextEncoder().encode(body), headers: Object.entries(cached) })
 					return cached
 				}
+				// The data keys the loader declares travel in the payload: the browser reruns it when one is invalidated.
+				const dependencies = new Set<string>()
 				const context: PageRequestContext = {
 					request,
 					params: validated.params,
@@ -1269,6 +1297,9 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
 					searchParams: url.searchParams,
 					signal: driverSignal,
 					state: stateStore,
+					depends: (...keys) => {
+						for (const key of keys) dependencies.add(checkDataKey(key, 'depends'))
+					},
 					...(requestContext ? { context: requestContext } : {}),
 				}
 				// A client page's loader and head run in the browser; the server only guards and validates.
@@ -1363,6 +1394,7 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
 					...(deferredEntries.length ? { deferred: deferredEntries } : {}),
 					...(resources ? { resources } : {}),
 					...(namedLayout ? { layoutProps } : {}),
+					...(dependencies.size ? { keys: [...dependencies] } : {}),
 				}
 				// Always serialized: it also checks that the data can travel, whatever the document leaves out.
 				const payload = serializeJson(payloadValue)
@@ -1374,8 +1406,10 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
 				// in flight finish first and later ones fail with SESSION_LOCKED. A session
 				// revoked while the loader ran must not receive a 200 stream.
 				if (streaming && requestContext) {
-					await requestContext.session[lockSessionCookie]?.()
-					await requestContext.session.verify()
+					await sessionOf(requestContext)[lockSessionCookie]?.()
+					await sessionOf(requestContext).verify()
+					// So are the cookies and headers of context.cookies and context.responseHeaders.
+					responseStateOf(requestContext)?.lock('the response of this render: "stream" page already started; set cookies and headers in the middleware, the loader or <script server> before any deferred work')
 				}
 				// A cacheable document is the same for every visitor and every revalidation, so it carries no
 				// nonce: Meeko's CSP allows its inline scripts and styles by their hashes.
@@ -1391,13 +1425,13 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
 				const styleTags = documentStyleTags(styles, nonceAttribute)
 				const headRequest = request.method === 'HEAD'
 				if (streaming) {
-					const sentCookie = requestContext?.session.cookieHeader
+					const sentCookie = requestContext ? sessionOf(requestContext).cookieHeader : undefined
 					let cookieChange = false
 					const line = async (id: number): Promise<string> => {
 						let outcome = await outcomes[id]!
 						// Defense in depth for a session object without the lock: the first
 						// value that settles after the change fails, the others still arrive.
-						if (!cookieChange && requestContext && requestContext.session.cookieHeader !== sentCookie) {
+						if (!cookieChange && requestContext && sessionOf(requestContext).cookieHeader !== sentCookie) {
 							cookieChange = true
 							outcome = rejectedOutcome(new ApiError('SESSION_LOCKED', 500, 'The session cookie changed after the response headers were sent; change the session in the loader, before any deferred work'))
 						}
@@ -1438,7 +1472,7 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
 						)
 					}
 					const script = options.clientEntry ? `<script type="module" async${nonceAttribute} src="${escapeHtml(options.clientEntry)}"></script>` : ''
-					const csrfMeta = requestContext?.session.current ? `<meta name="meeko-csrf-token" content="${escapeHtml(requestContext.session.current.csrfToken)}">` : ''
+					const csrfMeta = csrfMetaOf(requestContext)
 					const parts = documentHead()
 					const shellStart = `${parts.prefix}${csrfMeta}${parts.head}${host.head}${styleTags}</head>${parts.bodyOpen}<div id="app">`
 					const shellEnd = `<script id="meeko-payload" type="application/json">${sentPayload}</script>${script}`
@@ -1469,7 +1503,7 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
 					)
 				}
 				const script = options.clientEntry ? `<script type="module"${nonceAttribute} src="${escapeHtml(options.clientEntry)}"></script>` : ''
-				const csrfMeta = requestContext?.session.current ? `<meta name="meeko-csrf-token" content="${escapeHtml(requestContext.session.current.csrfToken)}">` : ''
+				const csrfMeta = csrfMetaOf(requestContext)
 				const parts = documentHead()
 				const shellStart = `${parts.prefix}${csrfMeta}${parts.head}${host.head}${styleTags}</head>${parts.bodyOpen}<div id="app">`
 				const shellEnd = `<script id="meeko-payload" type="application/json">${sentPayload}</script>${script}${host.bodyEnd}</body></html>`

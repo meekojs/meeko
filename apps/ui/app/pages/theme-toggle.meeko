@@ -20,8 +20,7 @@
 			usa la opción
 			<code>theme</code>
 			de
-			<code>meeko.config.ts</code>. Es un formulario que envía
-			<code>POST /_meeko/theme</code>: sin JavaScript, el servidor guarda la preferencia y vuelve a la misma página. Con JavaScript, el tema cambia al instante, sin navegar. Los dos ejemplos y la cabecera comparten la misma preferencia.
+			<code>meeko.config.ts</code>. Es un formulario que envía <code>POST /_meeko/theme</code>: sin JavaScript, el servidor guarda la preferencia y vuelve a la misma página. Con JavaScript, el tema cambia al instante, sin navegar. Los dos ejemplos y la cabecera comparten la misma preferencia.
 		</p>
 		<h2 id="cycle">Un botón que alterna</h2>
 		<p>

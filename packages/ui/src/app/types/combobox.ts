@@ -1,4 +1,6 @@
+import type { combobox } from '../variants/select'
 import type { SelectBaseProps, SelectField } from './select'
+import type { UIVariantSlots } from './theme'
 
 /**
  * Valor del modelo de `<UICombobox>`: la opción elegida o `null` y, con `multiple`, un array de
@@ -86,14 +88,15 @@ export interface ComboboxSnippets<T> {
  * Props de la etiqueta propia `<UICombobox>`, una lista propia sobre `<UIPopover>` para lo que el
  * `<select>` nativo de `<UISelect>` no cubre: buscar, filtrar en un servidor y elegir varias opciones.
  * `T` es el tipo de cada opción y `Multiple`, si se eligen varias; los dos se infieren de la etiqueta.
- * Se autoimporta en `app/`.
+ * `ui` añade clases a sus partes: `base` (la raíz), `trigger`, `values`, `value`, `chips`, `chip`,
+ * `placeholder`, `list`, `group`, `groupLabel`, `option`, `loading`, `empty` y `clear`. Se autoimporta en `app/`.
  * @since 1.8.0
  * @example
  * ```html
  * <UICombobox model="tags" multiple searchable bind:options="tags" groupBy="category" bind:max="3" />
  * ```
  */
-export interface UIComboboxProps<T, Multiple extends boolean = false> extends SelectBaseProps<T> {
+export interface UIComboboxProps<T, Multiple extends boolean = false> extends SelectBaseProps<T>, UIVariantSlots<typeof combobox> {
 	/** Con `true`, el modelo es un array y cada opción se alterna. */
 	readonly multiple?: Multiple
 	/** Convierte el disparador en un campo de texto que filtra las opciones. */

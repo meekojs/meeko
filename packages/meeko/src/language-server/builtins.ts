@@ -9,7 +9,7 @@ import type { ComponentTag } from './model'
 
 import { deprecatedBuiltinTags } from '../compiler'
 import { builtinTag } from './builtin-tags'
-import { componentMemberDocs, componentSignature, memberDocumentation, typeFormat } from './components'
+import { componentMemberDocs, componentSignature, htmlAttribute, memberDocumentation, typeFormat } from './components'
 import { positionLink } from './insights'
 import { locationOf } from './locations'
 
@@ -47,7 +47,7 @@ function builtinMembers(tag: BuiltinTag, props: BuiltinProps | undefined): Compo
 		let member = checker.getTypeOfSymbolAtLocation(symbol, at)
 		if (optional) member = checker.getNonNullableType(member)
 		const documentation = memberDocumentation(checker, symbol)
-		return { name: attribute(symbol.name), type: checker.typeToString(member, at, typeFormat), optional, ...(documentation ? { documentation } : {}) }
+		return { name: attribute(symbol.name), type: checker.typeToString(member, at, typeFormat), optional, ...(documentation ? { documentation } : {}), ...(htmlAttribute(symbol) ? { inherited: true as const } : {}) }
 	})
 }
 

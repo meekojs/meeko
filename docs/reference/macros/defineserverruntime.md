@@ -56,15 +56,17 @@ export default defineServerRuntime(async ({ env, production, prerendering }) => 
 
 Lo que devuelve la fábrica:
 
-| Campo           | Tipo                                                | Por defecto                                                         | Descripción                                                                                                    |
-| --------------- | --------------------------------------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `sessions`      | `SessionManager`                                    | en memoria en desarrollo, Redis con `MEEKO_REDIS_URL` en producción | Desde `1.2`, opcional. Las sesiones de la aplicación. Unas explícitas siempre ganan.                           |
-| `services`      | objeto, o `(request, { platform }) => objeto`       | ninguno                                                             | Llegan a cada petición como `RequestContext.services`: un objeto compartido o una función por petición.        |
-| `socket`        | `{ allowedOrigins?, maxMessageBytes?, pubsub?, … }` | ninguno                                                             | Política de Socket: orígenes, límites y el broker de broadcast.                                                |
-| `publicOrigin`  | URL                                                 | la dirección del servidor                                           | El origen público tras un proxy, para comprobar `Origin` en HTTP y Socket. `MEEKO_PUBLIC_ORIGIN` lo sustituye. |
-| `onError`       | `(error, requestId, info?) => void`                 | registro mínimo                                                     | Los fallos internos, con su ID de petición; desde `1.3`, también los del proceso.                              |
-| `processErrors` | política                                            | informar y, ante una excepción, cerrar                              | Desde `1.3`. Qué hacer con las promesas rechazadas y las excepciones del proceso.                              |
-| `close`         | `() => void \| Promise<void>`                       | ninguno                                                             | Se ejecuta al detener el servidor, después de cerrar las sesiones.                                             |
+| Campo             | Tipo                                                   | Por defecto                                                         | Descripción                                                                                                                                                                                                               |
+| ----------------- | ------------------------------------------------------ | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sessions`        | `SessionManager \| false`                              | en memoria en desarrollo, Redis con `MEEKO_REDIS_URL` en producción | Desde `1.2`, opcional. Las sesiones de la aplicación. Unas explícitas siempre ganan. Desde `1.10`, `false` las desactiva para una autenticación propia: producción arranca sin Redis y `context.session` lanza al usarse. |
+| `allowedOrigins`  | `string[]`                                             | ninguno                                                             | Desde `1.10`. Orígenes adicionales de las mutaciones cuando Meeko crea el gestor (sin `sessions` o con `false`). Con un `SessionManager` propio, van en él.                                                               |
+| `isAuthenticated` | `(context) => boolean \| Promise<boolean>`             | la sesión de Meeko                                                  | Desde `1.10`. Decide `auth: "required"` de API, RPC y Socket con la autenticación de la aplicación.                                                                                                                       |
+| `services`        | objeto, o `(request, { platform, cookies }) => objeto` | ninguno                                                             | Llegan a cada petición como `RequestContext.services`: un objeto compartido o una función por petición. Desde `1.10`, la función recibe `cookies`, las de `context.cookies`.                                              |
+| `socket`          | `{ allowedOrigins?, maxMessageBytes?, pubsub?, … }`    | ninguno                                                             | Política de Socket: orígenes, límites y el broker de broadcast.                                                                                                                                                           |
+| `publicOrigin`    | URL                                                    | la dirección del servidor                                           | El origen público tras un proxy, para comprobar `Origin` en HTTP y Socket. `MEEKO_PUBLIC_ORIGIN` lo sustituye.                                                                                                            |
+| `onError`         | `(error, requestId, info?) => void`                    | registro mínimo                                                     | Los fallos internos, con su ID de petición; desde `1.3`, también los del proceso.                                                                                                                                         |
+| `processErrors`   | política                                               | informar y, ante una excepción, cerrar                              | Desde `1.3`. Qué hacer con las promesas rechazadas y las excepciones del proceso.                                                                                                                                         |
+| `close`           | `() => void \| Promise<void>`                          | ninguno                                                             | Se ejecuta al detener el servidor, después de cerrar las sesiones.                                                                                                                                                        |
 
 ## Valor devuelto
 
@@ -91,6 +93,26 @@ export default defineServerRuntime(async ({ env }) => {
   };
 });
 ```
+
+### Autenticación propia sin sesiones de Meeko
+
+Desde `1.10`, con `sessions: false` la aplicación se autentica con su proveedor: el cliente se crea por petición con `cookies`, de modo que lo que escribe al renovar el token llega a la respuesta, e `isAuthenticated` decide `auth: "required"`:
+
+<!-- no-check -->
+
+```ts
+// server/runtime.ts
+import { defineServerRuntime } from "@meekojs/meeko/server";
+import { createAuthClient } from "./utils/auth";
+
+export default defineServerRuntime(({ env }) => ({
+  sessions: false,
+  services: (request, { cookies }) => ({ auth: createAuthClient(env.AUTH_URL, cookies) }),
+  isAuthenticated: async ({ services }) => (await services.auth.user()) !== null,
+}));
+```
+
+Véase [Autenticación externa](../../framework-auth.md#autenticación-externa).
 
 ### Sesiones en Redis y Socket entre instancias
 

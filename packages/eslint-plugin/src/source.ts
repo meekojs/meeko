@@ -21,6 +21,7 @@ export class Source {
 	serverRange?: [number, number]
 	/** Value exports of the server block: the compiler reads them, no JavaScript in the file does. */
 	readonly serverExports: string[] = []
+	private lists = 0
 	constructor(
 		readonly text: string,
 		readonly filename: string,
@@ -135,17 +136,21 @@ export class Source {
 		const each = find('each:of')
 		const snippet = node.tagName === 'snippet'
 		if (snippet) {
-			const condition = find('if:when')
+			const condition = find('if') ?? find('if:when')
 			if (condition) this.expression(condition)
 		}
 		if (each) {
-			this.synthetic('for (const ', node.start)
+			// The list is read before the item is declared, as in the source. Flow rules locate a read by
+			// the original offsets of the first and last identifier of each code path segment, and
+			// `for (const item of list)` would visit `item` first and leave `list` outside the segment.
+			const list = `__meeko_each_${this.lists++}`
+			this.synthetic(`{ const ${list} = (`, node.start)
+			this.attribute(each)
+			this.synthetic(');\nfor (const ', node.start)
 			const name = find('each:as')
 			if (name) this.attribute(name)
 			else this.synthetic('__meeko_item', node.start)
-			this.synthetic(' of ', node.start)
-			this.attribute(each)
-			this.synthetic(') { const ', node.start)
+			this.synthetic(` of ${list}) { const `, node.start)
 			const index = find('each:index')
 			if (index) this.attribute(index)
 			else this.synthetic('index', node.start)
@@ -165,7 +170,7 @@ export class Source {
 		for (const attribute of attributes) {
 			const name = attribute.name
 			const custom = node.tagName !== undefined && isCustomElementTag(node.tagName)
-			if (name === 'bind' || name.startsWith('bind:') || name.startsWith('on:') || (!custom && (name === 'model' || name.startsWith('model:'))) || (name === 'if:when' && !snippet) || name === 'each:key' || (node.tagName === 'component' && name === 'is') || (node.tagName === 'render' && (name === 'snippet' || name === 'args')) || (name === 'html' && !node.componentName && !custom) || (node.componentName === 'MeekoAwait' && name === 'for')) this.expression(attribute)
+			if (name === 'bind' || name.startsWith('bind:') || name.startsWith('on:') || (!custom && (name === 'model' || name.startsWith('model:'))) || (['if', 'else-if', 'if:when'].includes(name) && !snippet) || name === 'each:key' || (node.tagName === 'component' && name === 'is') || (node.tagName === 'render' && (name === 'snippet' || name === 'args')) || (name === 'html' && !node.componentName && !custom) || (node.componentName === 'MeekoAwait' && name === 'for')) this.expression(attribute)
 		}
 		if (node.nodeName === '#text') {
 			const text = this.text.slice(node.start, node.end)
@@ -177,7 +182,7 @@ export class Source {
 		}
 		for (const child of [...(node.childNodes ?? []), ...(node.content?.childNodes ?? [])]) this.node(child)
 		if (snippet) this.synthetic('});\n', node.end)
-		if (each) this.synthetic('}\n', node.end)
+		if (each) this.synthetic('}}\n', node.end)
 	}
 	/** Translate either end of a generated range into the original UTF-16 offsets. */
 	offset(position: number, end = false): number {

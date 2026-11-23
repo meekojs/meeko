@@ -1,0 +1,187 @@
+<script lang="ts">
+	import type { TableColumn, UIMenuEntry } from '@meekojs/ui/runtime'
+
+	import { examples } from '../utils/examples'
+
+	const last = signal('Ninguna acción todavía.')
+	const row = signal('Ninguna fila tocada.')
+	const actions: UIMenuEntry[] = [
+		{ label: 'Renombrar', value: 'rename', shortcut: 'F2', icon: 'M10.5 3 13 5.5 6 12.5H3.5V10Z' },
+		{ label: 'Duplicar', value: 'duplicate', icon: 'M5.5 5.5h7v7h-7ZM3.5 10.5v-7h7' },
+		{ label: 'Ver en Popover', to: '/popover' },
+		{ label: 'Archivar', value: 'archive', disabled: true },
+		{ separator: true },
+		{ label: 'Eliminar', value: 'delete', tone: 'danger', icon: 'M3.5 4.5h9M6.5 4.5v-1h3v1M4.5 4.5l.5 8h6l.5-8' },
+	]
+	const files = [
+		{ id: 1, name: 'Informe trimestral', actions: '' },
+		{ id: 2, name: 'Presupuesto 2027', actions: '' },
+	]
+	const fileColumns = [
+		{ key: 'name', label: 'Archivo', rowHeader: true },
+		{ key: 'actions', label: 'Acciones', numeric: true },
+	] satisfies TableColumn<(typeof files)[number]>[]
+	const rowActions = (file: string): UIMenuEntry[] => [
+		{ label: 'Abrir', onSelect: () => (row.value = 'Abierto: ' + file + '.') },
+		{ label: 'Descargar', onSelect: () => (row.value = 'Descargado: ' + file + '.') },
+		{ separator: true },
+		{ label: 'Eliminar', tone: 'danger', onSelect: () => (row.value = 'Eliminado: ' + file + '.') },
+	]
+</script>
+
+<template>
+	<DocsPage
+		title="Menu"
+		description="Un menú de acciones con el patrón Menu Button: disparador, ítems por datos, enlaces, separadores y teclado completo."
+	>
+		<p>
+			<code>UIMenu</code>
+			es un
+			<a href="/popover">UIPopover</a>
+			con
+			<code>role="menu"</code>: el disparador lleva
+			<code>aria-haspopup="menu"</code>
+			y
+			<code>aria-expanded</code>, la lista se abre en la capa superior con el atributo <code>popover</code>, también sin JavaScript, y se ancla con CSS. Las flechas recorren los ítems,
+			<code>Inicio</code>
+			y
+			<code>Fin</code>
+			van a los extremos, una letra salta al ítem que empieza por ella,
+			<code>Esc</code>
+			cierra,
+			<code>Tab</code>
+			sale y el foco vuelve al disparador al cerrar.
+		</p>
+		<h2 id="actions">Acciones, enlaces y separadores</h2>
+		<p>
+			Cada ítem de
+			<code>items</code>
+			es una acción, un
+			<code>button</code>
+			que llama a
+			<code>onSelect</code>, o un enlace con
+			<code>href</code>
+			o
+			<code>to</code>, que navega con MeekoLink.
+			<code>{'{ separator: true }'}</code>
+			traza una línea entre grupos,
+			<code>tone: 'danger'</code>
+			marca una acción destructiva y un ítem con
+			<code>disabled</code>
+			se ve, pero las flechas lo saltan. El evento
+			<code>select</code>
+			recibe el ítem elegido.
+		</p>
+		<DocsPreview>
+			<UIMenu
+				triggerLabel="Acciones del proyecto"
+				bind:items="actions"
+				on:select="(item) => (last.value = 'Elegido: ' + item.label + '.')"
+			/>
+			<p
+				id="menu-status"
+				class="docs-status"
+				role="status"
+			>
+				{last.value}
+			</p>
+		</DocsPreview>
+		<DocsCode bind:code="examples.menu" />
+		<h2 id="row">Menú de una fila</h2>
+		<p>
+			Sin
+			<code>triggerLabel</code>
+			ni snippet
+			<code>trigger</code>, el disparador es un botón de sólo icono con tres puntos, nombrado «Más acciones» en el idioma del documento. Dale un nombre propio con
+			<code>ariaLabel</code>
+			cuando haya varios en la página.
+		</p>
+		<DocsPreview layout="stack">
+			<UITable
+				caption="Archivos"
+				density="compact"
+				rowKey="id"
+				bind:hideCaption="true"
+				bind:rows="files"
+				bind:columns="fileColumns"
+			>
+				<snippet
+					name="cell-actions"
+					params="file"
+				>
+					<UIMenu
+						size="sm"
+						placement="bottom-end"
+						bind:ariaLabel="'Acciones de ' + file.name"
+						bind:items="rowActions(file.name)"
+					/>
+				</snippet>
+			</UITable>
+			<p
+				id="row-status"
+				class="docs-status"
+				role="status"
+			>
+				{row.value}
+			</p>
+		</DocsPreview>
+		<DocsCode bind:code="examples.menuRow" />
+		<h2 id="snippets">Disparador e ítems propios</h2>
+		<p>
+			El snippet
+			<code>trigger</code>
+			pone su contenido en el botón disparador, y
+			<code>anchor</code>
+			lo sustituye por uno propio, como en UIPopover. El snippet
+			<code>item</code>
+			pinta el interior de cada ítem de
+			<code>items</code>, y el contenido suelto se añade al final de la lista: elementos con <code>role="menuitem"</code>, que reciben el mismo teclado.
+		</p>
+		<DocsCode bind:code="examples.menuSnippets" />
+		<h2 id="api">API</h2>
+		<DocsApi
+			caption="Propiedades de UIMenu"
+			bind:rows="[
+				{ name: 'items', type: 'readonly UIMenuEntry[]', description: 'Acciones, enlaces y separadores, en orden.' },
+				{ name: 'triggerLabel', type: 'string', description: 'Texto del disparador, seguido de un chevron. Sin él ni snippet trigger, un botón de tres puntos.' },
+				{ name: 'ariaLabel', type: 'string', default: 'Más acciones', description: 'Nombre accesible del disparador; el texto por defecto sólo en el de sólo icono.' },
+				{ name: 'label', type: 'string', description: 'aria-label de la lista. Sin ella, se nombra con el disparador.' },
+				{ name: 'variant / size', type: 'UIButton', default: 'secondary (ghost sin texto) / md', description: 'Aspecto del disparador.' },
+				{ name: 'disabled', type: 'boolean', default: 'false', description: 'Desactiva el disparador.' },
+				{ name: 'placement / offset', type: 'PopoverPlacement / number', default: 'bottom-start / 4', description: 'Dónde se abre la lista y a qué distancia.' },
+				{ name: 'model', type: 'Signal<boolean>', default: 'false', description: 'Apertura de la lista, de doble vía.' },
+				{ name: 'triggerId', type: 'string', description: 'id del disparador. Por defecto, uno estable entre SSR e hidratación.' },
+				{ name: 'class / ui', type: 'string / objeto', description: 'Clases de la lista y de base, trigger, chevron, item, icon, label, shortcut y separator.' },
+			]"
+		/>
+		<DocsApi
+			caption="Campos de un ítem (UIMenuItem)"
+			bind:rows="[
+				{ name: 'label', type: 'string', description: 'Obligatorio. Texto visible, también para saltar escribiendo.' },
+				{ name: 'onSelect', type: '(item) => void', description: 'Acción al elegirlo. Excluye href y to.' },
+				{ name: 'href / to', type: 'string / ruta', description: 'Destino de un enlace; to navega con MeekoLink, con params y search tipados.' },
+				{ name: 'value', type: 'string', description: 'Identificador libre, para reconocerlo en select.' },
+				{ name: 'tone', type: 'neutral | danger', default: 'neutral', description: 'danger para una acción destructiva.' },
+				{ name: 'disabled', type: 'boolean', default: 'false', description: 'Visible pero no elegible.' },
+				{ name: 'icon', type: 'string', description: 'Trazo SVG decorativo, en una rejilla de 16 por 16.' },
+				{ name: 'shortcut', type: 'string', description: 'Atajo que se muestra tras el texto; lo implementa la aplicación.' },
+			]"
+		/>
+		<p>
+			El evento
+			<code>select</code>
+			recibe el ítem, tras su
+			<code>onSelect</code>. Los tipos <code>UIMenuProps</code>, <code>UIMenuEntry</code>,
+			<code>UIMenuItem</code>
+			y
+			<code>MenuSnippets</code>
+			se exportan desde
+			<code>@meekojs/ui/runtime</code>, y
+			<code>ui.defaults.menu</code>
+			acepta
+			<code>class</code>
+			y
+			<code>ui</code>.
+		</p>
+	</DocsPage>
+</template>

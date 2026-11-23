@@ -145,7 +145,19 @@ test('the moderation screen hides, features and announces, and asks first', { sk
 		const preview = page.locator('.moderation-preview .docs-announcement')
 		await preview.filter({ hasText: 'La búsqueda falla de forma intermitente.' }).waitFor()
 		assert.equal(await preview.getAttribute('role'), 'alert', 'a danger announcement interrupts')
-		assert.equal(await preview.getAttribute('data-tone'), 'danger')
+		assert.equal(
+			await preview.evaluate((element) => {
+				// The tone is its colors: the border of the danger tone, as the browser resolves the token.
+				const probe = globalThis.document.createElement('i')
+				probe.style.color = 'var(--ui-color-danger-border)'
+				element.append(probe)
+				const expected = globalThis.getComputedStyle(probe).color
+				probe.remove()
+				return globalThis.getComputedStyle(element).borderTopColor === expected
+			}),
+			true,
+			'the danger tone',
+		)
 		await page.locator('#announcement-end').fill('2030-01-01T10:00')
 		await page.locator('#announcement-start').fill('2030-01-02T10:00')
 		await page.getByRole('button', { name: 'Crear aviso' }).click()

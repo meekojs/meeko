@@ -187,6 +187,32 @@ export default defineMeekoConfig({
   <button role="menuitem">Perfil</button>
   <button role="menuitem">Cerrar sesión</button>
 </UIPopover>`,
+	menu: `<script lang="ts">
+  import type { UIMenuEntry } from '@meekojs/ui/runtime'
+
+  const items: UIMenuEntry[] = [
+    { label: 'Renombrar', shortcut: 'F2', onSelect: () => rename() },
+    { label: 'Duplicar', onSelect: () => duplicate() },
+    { label: 'Ver en Popover', to: '/popover' },
+    { label: 'Archivar', disabled: true },
+    { separator: true },
+    { label: 'Eliminar', tone: 'danger', onSelect: () => remove() },
+  ]
+</script>
+
+<template>
+  <UIMenu triggerLabel="Acciones del proyecto" bind:items="items" on:select="(item) => console.log(item.label)" />
+</template>`,
+	menuRow: `<UITable caption="Archivos" bind:hideCaption="true" rowKey="id" bind:rows="files" bind:columns="columns">
+  <snippet name="cell-actions" params="file">
+    <UIMenu bind:ariaLabel="'Acciones de ' + file.name" size="sm" placement="bottom-end" bind:items="actionsOf(file)" />
+  </snippet>
+</UITable>`,
+	menuSnippets: `<UIMenu label="Cuenta" bind:items="[{ label: 'Perfil', to: '/profile' }, { label: 'Salir', onSelect: logout }]">
+  <snippet name="trigger"><img src="/me.png" alt="Mi cuenta" width="24" height="24" /></snippet>
+  <snippet name="item" params="item"><strong>{item.label}</strong></snippet>
+  <button type="button" role="menuitem" on:click="openHelp">Ayuda</button>
+</UIMenu>`,
 	themeToggle: `// meeko.config.ts
 export default defineMeekoConfig({
   modules: ['@meekojs/ui'],
@@ -274,6 +300,16 @@ export default defineMeekoConfig({
     },
   },
 })`,
+	themeDefaults: `export default defineMeekoConfig({
+  modules: ['@meekojs/ui'],
+  ui: {
+    defaults: {
+      card: { padding: 'sm', ui: { header: 'panel-card-header' } },
+      table: { density: 'compact', class: 'panel-table' },
+      stat: { ui: { value: 'panel-stat-value' } },
+    },
+  },
+})`,
 	messages: `// meeko.config.ts
 export default defineMeekoConfig({
   modules: ['@meekojs/ui'],
@@ -314,12 +350,89 @@ export default defineMeekoConfig({
   color: var(--ui-color-text-soft);
   font-size: var(--ui-font-size-md);
 }`,
+	themeSlots: `<!-- class llega a la raíz; ui, a cada parte por el nombre de su slot -->
+<UICard title="Plan Pro" class="pricing-card"
+  bind:ui="{ header: 'pricing-header', title: 'pricing-title' }">
+  <p>Todo lo del plan básico, sin límites.</p>
+</UICard>
+<UIBadge tone="success" dot bind:ui="{ dot: 'pulse' }">Publicado</UIBadge>`,
+	themeSlotsCss: `/* app/styles/main.css: sin @layer, gana a las clases del componente */
+.pricing-card {
+  border-color: var(--ui-color-primary-border);
+}
+.pricing-title {
+  color: var(--ui-color-primary-text);
+}`,
 	buttonStates: `<UIButton tone="danger">Eliminar</UIButton>
 <UIButton tone="danger" variant="outline">Revocar</UIButton>
 <UIButton bind:loading="saving.value">Guardar</UIButton>
 <UIButton iconOnly ariaLabel="Eliminar" variant="outline">
   <UIIcon name="lucide:trash-2" />
 </UIButton>`,
+	iconButton: `<UIIconButton label="Abrir el menú" icon="menu" />
+<UIIconButton label="Cerrar" icon="close" variant="outline" />
+<UIIconButton label="Confirmar" icon="check" variant="primary" on:click="confirm" />
+<UIIconButton label="Ver enlaces" icon="arrowEnd" to="/links" />
+<UIIconButton label="Eliminar">
+  <UIIcon name="lucide:trash-2" />
+</UIIconButton>`,
+	iconButtonStates: `<UIIconButton label="Fijar el panel" icon="check" variant="outline"
+  bind:pressed="pinned.value" on:click="() => (pinned.value = !pinned.value)" />
+<UIIconButton label="Borrar" icon="close" tone="danger" />
+<UIIconButton label="Guardando" icon="check" bind:loading="saving.value" />
+<UIIconButton label="Pequeño" icon="menu" size="sm" />
+<UIIconButton label="Sin tooltip" icon="menu" bind:tooltip="false" />`,
+	copyButton: `<script lang="ts">
+  const copies = signal(0)
+</script>
+
+<template>
+<UICopyButton value="pnpm add @meekojs/ui" on:copy="() => copies.value++" />
+<UICopyButton value="https://ui.meekojs.com" label="Copiar enlace" variant="outline" size="sm" />
+<UICopyButton value="sk_test_4f8a" iconOnly label="Copiar el token"
+  on:copyError="(error) => console.warn(error)" />
+</template>`,
+	copyButtonTokens: `/* Los colores del resultado, sólo donde el texto no va sobre un sólido */
+.billing {
+  --ui-copy-button-copied-color: var(--ui-color-info-text);
+  --ui-copy-button-failed-color: var(--ui-color-warning-text);
+}`,
+	modalConfirm: `const modal = useModal()
+
+async function remove() {
+  const confirmed = await modal.confirm({
+    title: '¿Eliminar el proyecto?',
+    description: 'Se borran sus archivos y no se puede deshacer.',
+    confirmLabel: 'Eliminar',
+    tone: 'danger',
+  })
+  if (confirmed) await deleteProject()
+}`,
+	nativeElements: `<progress value="0.6" aria-label="Subida"></progress>
+<progress aria-label="Cargando"></progress>
+
+<meter min="0" max="100" low="25" high="75" optimum="100" value="90">90 %</meter>
+<meter min="0" max="100" low="25" high="75" optimum="100" value="50">50 %</meter>
+<meter min="0" max="100" low="25" high="75" optimum="100" value="10">10 %</meter>
+
+<input type="file" accept="image/*" multiple aria-label="Fotos" />`,
+	nativeElementsTokens: `:root {
+  --ui-progress-height: 0.25rem;
+  --ui-progress-color: var(--ui-color-success);
+  --ui-meter-suboptimum-color: var(--ui-color-orange-9);
+  --ui-file-button-bg: var(--ui-color-primary-soft);
+}`,
+	navigationProgress: `/* Más gruesa, de otro color y más paciente */
+:root {
+  --ui-navigation-progress-height: 0.1875rem;
+  --ui-navigation-progress-color: var(--ui-color-info);
+  --ui-navigation-progress-delay: 250ms;
+}
+
+/* Sin barra */
+:root {
+  --ui-navigation-progress-height: 0;
+}`,
 	textarea: `<UIField id="comment" label="Comentario" bind:counter="comment.value.length + '/200'">
   <snippet name="default" params="id, describedBy">
     <UITextarea model="comment" bind:id="id" bind:describedBy="describedBy"
@@ -341,6 +454,20 @@ export default defineMeekoConfig({
 <template>
   <UIRadioGroup model="period" legend="Periodo" name="period" bind:options="periods" />
   <UIRadioGroup model="period" legend="Periodo" variant="segmented" bind:options="periods" />
+</template>`,
+	segmented: `<script lang="ts">
+  const days = signal('30')
+  const options = [
+    { value: '7', label: '7 días' },
+    { value: '30', label: '30 días' },
+    { value: '90', label: '90 días' },
+  ]
+</script>
+
+<template>
+  <form method="get">
+    <UISegmentedControl legend="Periodo del gráfico" hideLegend size="sm" name="days" model="days" bind:options="options" />
+  </form>
 </template>`,
 	slider: `<UISlider model="volume" label="Volumen" name="volume" bind:min="0" bind:max="100" bind:step="5" />`,
 	alert: `<UIAlert tone="success" title="Cambios guardados" description="Ya están publicados." />
@@ -367,6 +494,19 @@ export default defineMeekoConfig({
   { label: 'Autor', value: 'Equipo Meeko' },
 ]" />
 <UIDisclosure summary="Detalles técnicos"><p>Se abre sin JavaScript.</p></UIDisclosure>`,
+	kpi: `<!-- Una cifra clave: variación con tono, periodo, tendencia y enlace al detalle -->
+<UIStat label="Ingresos" value="12 400 €" bind:change="12.5"
+  period="frente a los 30 días anteriores"
+  bind:trend="[8.2, 9.1, 8.7, 10.4, 11.2, 10.9, 12.4]" to="/ingresos" />
+
+<!-- Bajar es bueno: un tiempo de respuesta que baja es de éxito -->
+<UIStat label="Tiempo de respuesta" value="180 ms" bind:change="-8" good="down" />
+
+<!-- Un texto ya formateado: su signo da la dirección -->
+<UIStat label="Pedidos" bind:value="320" change="−8 pedidos" period="este mes" />
+
+<!-- Un sparkline suelto, con área -->
+<UISparkline bind:values="visits" area tone="accent" />`,
 	diff: `<UIDiff label="Cambios en la guía" bind:diff="patch" />`,
 	diffSample: `--- a/guide.md
 +++ b/guide.md
@@ -422,7 +562,12 @@ export default defineMeekoConfig({
 	pagers: `<UIBreadcrumb bind:items="[{ label: 'Inicio', href: '/' }, { label: 'Guías', href: '/guides' }, { label: 'Tablas' }]" />
 <UIPageNavigation bind:previous="{ label: 'Modal', to: '/modals' }" bind:next="{ label: 'Popover', to: '/popover' }" />
 <UIPagination bind:shown="rows.value.length" bind:total="total" bind:hasMore="more.value"
-  bind:busy="loading.value" on:loadMore="load" />`,
+  bind:busy="loading.value" on:loadMore="load" />
+
+<!-- Numerada: la página en el modelo, o en la URL con pageLink -->
+<UIPagination model:page="page" bind:total="total" bind:pageSize="20" edges />
+<UIPagination bind:page="query.page" bind:pageCount="pages"
+  bind:pageLink="(page) => ({ to: '/orders', search: { page: String(page) } })" />`,
 	toc: `<UITableOfContents variant="collapsible"
   bind:entries="[{ id: 'usage', text: 'Uso', level: 2 }, { id: 'api', text: 'API', level: 2 }]" />`,
 	locale: `<UILocaleSwitcher bind:items="[
@@ -437,6 +582,11 @@ export default defineMeekoConfig({
 	tooltip: `<UITooltip text="Se publica al guardar" placement="top">
   <snippet name="trigger">¿Cuándo se publica?</snippet>
 </UITooltip>`,
+	hint: `<h3>Ingresos <UIHint text="Importe cobrado, sin impuestos ni devoluciones." /></h3>
+<p>
+  Margen bruto
+  <UIHint label="Qué es el margen" placement="bottom">Ingresos menos los <em>costes directos</em></UIHint>
+</p>`,
 	commandPalette: `<script lang="ts">
   const query = signal('')
   const pages = [{ title: 'Instalación', url: '/installation' }, { title: 'Temas', url: '/theming' }]
@@ -482,21 +632,22 @@ export default defineMeekoConfig({
   modules: ['@meekojs/icon'],
   icon: {
     collections: ['lucide'], // @iconify-json/lucide del proyecto
+    componentName: 'AppIcon', // UIIcon por defecto
     local: 'app/icons', // SVG propios: 'local:<nombre>'
     size: '1em',
     include: ['lucide:sun', 'lucide:moon'], // para bind:name
   },
 })`,
 	iconDynamic: `<!-- Literales de la expresión: se resuelven al compilar -->
-<UIIcon
+<AppIcon
   bind:name="open.value ? 'lucide:x' : 'lucide:menu'"
   bind:label="open.value ? 'Cerrar menú' : 'Abrir menú'" />
 
 <!-- Un valor que llega de datos: el icono debe estar en icon.include -->
-<UIIcon bind:name="mode.value" />`,
+<AppIcon bind:name="mode.value" />`,
 	iconTypes: `import type { IconName } from '@meekojs/icon'
 
 const close: IconName = 'lucide:x'`,
 	iconLocal: `<!-- app/icons/paw.svg -->
-<UIIcon name="local:paw" label="Meeko" size="1.5em" />`,
+<AppIcon name="local:paw" label="Meeko" size="1.5em" />`,
 } as const

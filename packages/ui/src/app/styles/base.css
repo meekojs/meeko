@@ -2,6 +2,9 @@
  * The global base of a Meeko app: reset, body and browser surfaces. In a layer, so any unlayered rule
  * of the app wins without a fight. The module loads it unless `ui: { base: false }`.
  */
+/* Tailwind's preflight layer goes first, below this base and the components (see main.css). */
+@layer base, ui-base;
+
 @layer ui-base {
 	*,
 	::before,
@@ -26,26 +29,6 @@
 	}
 	:root[data-theme='dark'] {
 		color-scheme: dark;
-	}
-	/*
-	 * Neither a dialog nor its ::backdrop reach the gutter kept for the scrollbar, which only takes the
-	 * background color of the root. So the root takes the color of the overlay, or of the drawer that
-	 * touches the gutter, and the body covers the screen so that the overlay does not darken the root twice.
-	 */
-	:root:has(.meeko-ui-modal:modal, .meeko-ui-drawer:modal) {
-		transition: background-color var(--ui-duration-slow) linear;
-		background-color: var(--ui-color-overlay-solid);
-	}
-	:root:has(.meeko-ui-drawer[data-side='end']:modal) {
-		background-color: var(--ui-color-surface-raised);
-	}
-	:root:has(.meeko-ui-modal:modal, .meeko-ui-drawer:modal) body {
-		min-block-size: 100dvh;
-	}
-	@media (prefers-reduced-motion: reduce) {
-		:root:has(.meeko-ui-modal:modal, .meeko-ui-drawer:modal) {
-			transition: none;
-		}
 	}
 	body {
 		margin: 0;
@@ -93,5 +76,135 @@
 	:focus-visible {
 		outline: var(--ui-focus-ring);
 		outline-offset: var(--ui-focus-ring-offset);
+	}
+
+	/*
+	 * Native elements with the tokens, at zero specificity: any rule of the app wins. Each one reads its own
+	 * family (`--ui-progress-*`, `--ui-meter-*`, `--ui-file-*`), which falls back to the global tokens.
+	 */
+
+	/* <progress>: a track and its bar; without `value`, a bar that crosses the track. */
+	:where(progress) {
+		-webkit-appearance: none;
+		vertical-align: middle;
+		appearance: none;
+		border: 0;
+		border-radius: var(--ui-progress-radius);
+		background-color: var(--ui-progress-track);
+		block-size: var(--ui-progress-height);
+		overflow: hidden;
+		color: var(--ui-progress-color);
+	}
+	:where(progress)::-webkit-progress-bar {
+		background: transparent;
+	}
+	:where(progress)::-webkit-progress-value {
+		transition: inline-size var(--ui-duration-base) var(--ui-ease-out);
+		border-radius: inherit;
+		background: var(--ui-progress-color);
+	}
+	:where(progress)::-moz-progress-bar {
+		border-radius: inherit;
+		background: var(--ui-progress-color);
+	}
+	:where(progress:indeterminate) {
+		animation: ui-progress-indeterminate var(--ui-progress-duration) var(--ui-ease-in-out) infinite;
+		background-image: linear-gradient(var(--ui-progress-color), var(--ui-progress-color));
+		background-position: -100% 0;
+		background-size: var(--ui-progress-indeterminate-width) 100%;
+		background-repeat: no-repeat;
+	}
+	:where(progress:indeterminate)::-webkit-progress-value {
+		background: transparent;
+	}
+	:where(progress:indeterminate)::-moz-progress-bar {
+		background: transparent;
+	}
+
+	/* <meter>: the color of its bar says the region of its value, from `low`, `high` and `optimum`. */
+	:where(meter) {
+		vertical-align: middle;
+		border: 0;
+		border-radius: var(--ui-meter-radius);
+		background: var(--ui-meter-track);
+		block-size: var(--ui-meter-height);
+		overflow: hidden;
+	}
+	:where(meter)::-webkit-meter-bar {
+		border: 0;
+		border-radius: inherit;
+		background: var(--ui-meter-track);
+		block-size: 100%;
+	}
+	:where(meter)::-webkit-meter-optimum-value {
+		background: var(--ui-meter-optimum-color);
+	}
+	:where(meter)::-webkit-meter-suboptimum-value {
+		background: var(--ui-meter-suboptimum-color);
+	}
+	:where(meter)::-webkit-meter-even-less-good-value {
+		background: var(--ui-meter-even-less-good-color);
+	}
+	:where(meter)::-moz-meter-bar {
+		background: var(--ui-meter-optimum-color);
+	}
+	:where(meter:-moz-meter-sub-optimum)::-moz-meter-bar {
+		background: var(--ui-meter-suboptimum-color);
+	}
+	:where(meter:-moz-meter-sub-sub-optimum)::-moz-meter-bar {
+		background: var(--ui-meter-even-less-good-color);
+	}
+
+	/* <input type="file">: the names in soft text, and a button that looks like a secondary <UIButton>. */
+	:where(input[type='file']) {
+		max-inline-size: 100%;
+		color: var(--ui-file-color);
+		font-size: var(--ui-control-font-size);
+	}
+	:where(input[type='file'])::file-selector-button {
+		transition: background-color var(--ui-duration-fast);
+		cursor: pointer;
+		margin-inline-end: var(--ui-file-gap);
+		border: var(--ui-border-width) solid var(--ui-file-button-border);
+		border-radius: var(--ui-file-button-radius);
+		background: var(--ui-file-button-bg);
+		padding: var(--ui-file-button-padding);
+		min-block-size: var(--ui-file-button-height);
+		color: var(--ui-file-button-color);
+		font: inherit;
+		font-weight: var(--ui-control-font-weight);
+	}
+	:where(input[type='file']:not(:disabled):hover)::file-selector-button {
+		background: var(--ui-file-button-bg-hover);
+	}
+	:where(input[type='file']:disabled) {
+		opacity: var(--ui-opacity-disabled);
+		cursor: not-allowed;
+	}
+	:where(input[type='file']:disabled)::file-selector-button {
+		cursor: not-allowed;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		/* Without the movement, the indeterminate bar fills the track, softened. */
+		:where(progress:indeterminate) {
+			opacity: var(--ui-opacity-subtle);
+			animation: none;
+			background-size: 100% 100%;
+		}
+		/* One rule each: a pseudo-element that a browser does not know drops its whole rule. */
+		:where(progress)::-webkit-progress-value {
+			transition: none;
+		}
+		:where(input[type='file'])::file-selector-button {
+			transition: none;
+		}
+	}
+
+	/* From outside the start of the track to outside its end, for a bar up to half as wide as the track. */
+	@keyframes ui-progress-indeterminate {
+		to {
+			background-position: 200% 0;
+		}
 	}
 }

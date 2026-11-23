@@ -1,17 +1,26 @@
+import type { AttributeData } from '../compiler/attribute-values'
 import type { HtmlAttributeData } from '../shared/html-data/attributes'
 
+import { attributeTypeText, isSvgTag, plainTagName, svgAttributes, svgTagNames, svgTagPrefix } from '../compiler/attribute-values'
 import { ariaAttributes } from '../shared/html-data/aria'
 import { elementAttributeNames, globalAttributeNames } from '../shared/html-data/attribute-names'
 import { htmlElementAttributes, htmlGlobalAttributes } from '../shared/html-data/attributes'
 
-// What the editor knows about the attributes of each HTML element: the names that `bind:` offers,
-// their values and the type that a `bind:attr` expression should have. Completion reads it through
-// `htmlAttributeSource()`; by default it is Meeko's HTML data (`shared/html-data`: WHATWG, WAI-ARIA
-// and browser-compat-data), and `setHtmlAttributeSource` may replace it in a single place.
+// What the editor knows about the attributes of each native element, HTML and SVG: the names that
+// `bind:` offers, their values and the type that a `bind:attr` expression should have. Completion
+// reads it through `htmlAttributeSource()`; by default it is Meeko's data (`shared/html-data`:
+// WHATWG, WAI-ARIA, browser-compat-data and the SVG specifications), the same that the compiler and
+// `meeko check` read through `compiler/attribute-values`, and `setHtmlAttributeSource` may replace
+// it in a single place. A tag inside `<svg>` is asked with the prefix `svg:` (`svg:a`); a name that
+// only SVG has (`circle`) is found without it.
 
 /** Un atributo HTML de un elemento, como lo usa el completado de la plantilla. */
 export interface HtmlAttributeInfo {
 	readonly name: string
+	/** Qué es su valor: booleano, valores cerrados (`enum`), ID, lista, número, URL o texto. */
+	readonly kind?: HtmlAttributeData['kind']
+	/** Además de `values`, cualquier valor que empiece por uno de ellos (`--` en `command`). */
+	readonly prefixes?: readonly string[]
 	readonly description?: string
 	/** Valores enumerados (`button`, `submit` y `reset` en `type` de `<button>`). */
 	readonly values?: readonly string[]
@@ -40,12 +49,14 @@ const globalNames = words(globalAttributeNames)
 const elementNames = elementAttributeNames as Readonly<Record<string, string>>
 const elementData = htmlElementAttributes as Readonly<Record<string, Readonly<Record<string, HtmlAttributeData>>>>
 const globalData = htmlGlobalAttributes as Readonly<Record<string, HtmlAttributeData>>
-const ariaData = ariaAttributes as Readonly<Record<string, { readonly description: string; readonly type: string; readonly values?: readonly string[]; readonly experimental?: true; readonly deprecated?: true }>>
+const ariaData = ariaAttributes as Readonly<Record<string, { readonly kind: HtmlAttributeData['kind']; readonly description: string; readonly type: string; readonly values?: readonly string[]; readonly experimental?: true; readonly deprecated?: true }>>
 
-function info(name: string, data: HtmlAttributeData | undefined, global: boolean): HtmlAttributeInfo {
+function info(name: string, data: AttributeData | undefined, global: boolean): HtmlAttributeInfo {
 	return {
 		name,
 		global,
+		...(data?.kind ? { kind: data.kind } : {}),
+		...(data?.prefixes?.length ? { prefixes: data.prefixes } : {}),
 		...(data?.description ? { description: data.description } : {}),
 		...(data?.values?.length ? { values: data.values } : {}),
 		...(data?.freeform ? { freeform: true } : {}),
@@ -64,22 +75,42 @@ function info(name: string, data: HtmlAttributeData | undefined, global: boolean
  */
 const htmlDataSource: HtmlAttributeSource = {
 	attributes(tag) {
+		if (isSvgTag(tag)) return [...svgAttributes(tag).map(([name, data, global]) => info(name, data, global)), ...ariaInfo()]
 		const own = elementNames[tag]
 		const found: HtmlAttributeInfo[] = (own ? words(own) : []).map((name) => info(name, elementData[tag]?.[name] ?? globalData[name], false))
 		for (const name of globalNames) found.push(info(name, elementData[tag]?.[name] ?? globalData[name], true))
-		for (const [name, data] of Object.entries(ariaData)) {
-			found.push({
-				name,
-				global: true,
-				description: data.description,
-				...(data.values?.length ? { values: data.values } : {}),
-				...(data.type.includes('list') ? { tokens: true } : {}),
-				...(data.deprecated ? { deprecated: true } : {}),
-				...(data.experimental ? { experimental: true } : {}),
-			})
-		}
+		found.push(...ariaInfo())
 		return found
 	},
+}
+
+/** The `aria-*` states and properties, which every element accepts. */
+function ariaInfo(): HtmlAttributeInfo[] {
+	return Object.entries(ariaData).map(([name, data]) => ({
+		name,
+		global: true,
+		kind: data.kind,
+		description: data.description,
+		...(data.values?.length ? { values: data.values } : {}),
+		...(data.type.includes('list') ? { tokens: true } : {}),
+		...(data.deprecated ? { deprecated: true } : {}),
+		...(data.experimental ? { experimental: true } : {}),
+	}))
+}
+
+let svgNames: ReadonlyMap<string, string> | undefined
+
+/**
+ * The key of a tag in the source: an SVG element keeps its case (`linearGradient`, also written
+ * `lineargradient`) and its prefix; any other tag is lowercase, as HTML reads it.
+ */
+function sourceKey(tag: string): string {
+	svgNames ??= new Map(svgTagNames().map((name) => [name.toLowerCase(), name]))
+	const plain = plainTagName(tag)
+	const lower = plain.toLowerCase()
+	if (tag.startsWith(svgTagPrefix)) return `${svgTagPrefix}${svgNames.get(lower) ?? plain}`
+	const named = svgNames.get(lower)
+	return named !== undefined && isSvgTag(named) ? named : lower
 }
 
 let current: HtmlAttributeSource = htmlDataSource
@@ -96,7 +127,7 @@ const cache = new Map<string, readonly HtmlAttributeInfo[]>()
 export function htmlAttributeSource(): HtmlAttributeSource {
 	return {
 		attributes: (tag) => {
-			const key = tag.toLowerCase()
+			const key = sourceKey(tag)
 			let found = cache.get(key)
 			if (!found) cache.set(key, (found = current.attributes(key)))
 			return found
@@ -122,21 +153,17 @@ export function closedValues(attribute: HtmlAttributeInfo): readonly string[] | 
 }
 
 /**
- * Tipo, como texto, de la expresión de `bind:attr` para un atributo: `boolean` para un atributo
- * booleano; la unión de sus valores cuando son los únicos válidos (hasta ocho; con más, `string`),
- * con `boolean` si admite la cadena vacía (`true` la escribe), y `string` en los demás. `null`,
- * `undefined` y `false` no escriben el atributo.
+ * Tipo, como texto, de la expresión de `bind:attr` para un atributo, el mismo que comprueba
+ * `meeko check`: `boolean` para un atributo booleano; la unión de sus valores cuando son los únicos
+ * válidos (hasta ocho; con más, `string`), con `boolean` si `"true"` y `"false"` están entre ellos;
+ * `string | number` para un número o un `aria-*`, y `string` en los demás. Todos acaban en
+ * `| null | undefined`, que omiten cualquier atributo.
  *
  * @example
- * attributeValueType({ name: "type", values: ["submit", "reset", "button"], global: false }) // "'submit' | 'reset' | 'button'"
+ * attributeValueType({ name: "popovertargetaction", kind: "enum", values: ["toggle", "show", "hide"], global: false })
+ * // "'toggle' | 'show' | 'hide' | null | undefined"
  */
 export function attributeValueType(attribute: HtmlAttributeInfo): string {
-	if (attribute.boolean) return 'boolean'
-	const values = closedValues(attribute)
-	// A long list (`input` `type`) reads as `string`; its values go in the documentation.
-	if (values && values.length <= 8) {
-		const named = values.filter((value) => value !== '').map((value) => `'${value}'`)
-		return [...(values.includes('') ? ['boolean'] : []), ...named].join(' | ')
-	}
-	return attribute.name.startsWith('aria-') || attribute.name === 'tabindex' ? 'string | number' : 'string'
+	const kind = attribute.kind ?? (attribute.boolean ? 'boolean' : closedValues(attribute) ? 'enum' : 'text')
+	return attributeTypeText(attribute.name, { kind, ...(attribute.values ? { values: attribute.values } : {}), ...(attribute.prefixes ? { prefixes: attribute.prefixes } : {}) })
 }

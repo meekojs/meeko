@@ -5,6 +5,7 @@
 	const result = signal('No answer yet.')
 	const opened = signal(false)
 	const locked = signal(false)
+	const decision = signal('No decision yet.')
 	async function ask() {
 		try {
 			const accepted = await modal.open<boolean>('ModalConfirm', { message: 'You can confirm, cancel or open another instance.' })
@@ -12,6 +13,10 @@
 		} catch {
 			result.value = 'The modal could not be loaded. Try again.'
 		}
+	}
+	async function askConfirm(danger: boolean) {
+		const accepted = await modal.confirm(danger ? { title: 'Delete the project?', description: 'Its files are deleted and it cannot be undone.', confirmLabel: 'Delete', tone: 'danger' } : { title: 'Publish the changes?', description: 'They show on the site in a few seconds.', confirmLabel: 'Publish' })
+		decision.value = accepted ? 'Confirmed.' : 'Refused.'
 	}
 </script>
 
@@ -93,6 +98,60 @@
 			label="app/components/Modal/Confirm.meeko"
 			bind:code="examples.modalInstance"
 		/>
+		<h2 id="confirm">Confirmation</h2>
+		<p>
+			<code>useModal().confirm()</code>
+			asks for a decision with a
+			<code>UIModal</code>
+			of the package, without registering any component: a title, a description and two buttons, “Cancel” and “Confirm” by default (the
+			<code>modal.cancel</code>
+			and
+			<code>modal.confirm</code>
+			messages). It resolves
+			<code>true</code>
+			only with the accepting button, and
+			<code>false</code>
+			with cancel, Esc, the backdrop or the close button. Each call decides once. With
+			<code>tone: 'danger'</code>
+			the accepting button takes the danger tone and the focus starts on “Cancel”; otherwise it starts on the accepting one.
+		</p>
+		<DocsPreview id="confirm-preview">
+			<UIButton
+				id="confirm-neutral"
+				variant="secondary"
+				on:click="() => askConfirm(false)"
+			>
+				Publish
+			</UIButton>
+			<UIButton
+				id="confirm-danger"
+				tone="danger"
+				variant="secondary"
+				on:click="() => askConfirm(true)"
+			>
+				Delete the project
+			</UIButton>
+		</DocsPreview>
+		<p
+			id="confirm-status"
+			role="status"
+		>
+			{decision.value}
+		</p>
+		<DocsCode
+			label="Inside a component"
+			bind:code="examples.modalConfirm"
+		/>
+		<DocsApi
+			caption="confirm() options"
+			bind:rows="[
+				{ name: 'title', type: 'string', description: 'Required. Title and accessible name of the dialog.' },
+				{ name: 'description', type: 'string', description: 'Explains the decision; linked with aria-describedby.' },
+				{ name: 'confirmLabel / cancelLabel', type: 'string', default: 'Confirm / Cancel', description: 'Texts of the buttons. By default, the messages of the language of the document.' },
+				{ name: 'tone', type: 'neutral | danger', default: 'neutral', description: 'Destructive action: danger button and focus on Cancel.' },
+				{ name: 'size', type: 'sm | md | lg', default: 'sm', description: 'Maximum width of the dialog.' },
+			]"
+		/>
 		<h2 id="stack">Nested modals</h2>
 		<p>
 			Open the confirmation and then another modal to try the
@@ -121,8 +180,7 @@
 			<code>footer</code>. The
 			<code>dismiss</code>
 			event receives
-			<code>escape</code>,
-			<code>backdrop</code>,
+			<code>escape</code>, <code>backdrop</code>,
 			<code>button</code>
 			or
 			<code>native</code>. Do not use a modal for tasks that can be solved within the page.

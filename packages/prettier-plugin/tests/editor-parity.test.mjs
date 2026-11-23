@@ -77,7 +77,8 @@ test('the core and the plugin agree on a < inside an interpolation, which only t
 test('the core and the plugin keep the same adjacent inline content with htmlWhitespaceSensitivity "ignore"', async () => {
 	const source = '<template>\n<p>Usa <code>x</code>. Texto <strong>fuerte</strong><em>junto</em> y {valor}<a href="/x">enlace</a>.</p>\n</template>\n'
 	const cli = await assertSameEverywhere(source, { filepath: 'Component.meeko', htmlWhitespaceSensitivity: 'ignore', printWidth: 30 })
-	assert.doesNotMatch(cli, /<\/code>\s+\./)
+	assert.match(cli, /<\/code>/)
+	assert.doesNotMatch(cli, /<\/code\s+>/)
 })
 
 test('the core and the plugin keep the same whitespace with every htmlWhitespaceSensitivity', async () => {

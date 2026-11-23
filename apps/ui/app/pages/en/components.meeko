@@ -5,7 +5,7 @@
 		{
 			title: 'Actions and navigation',
 			items: [
-				{ href: '/buttons', name: 'Button', description: 'Actions with variants, sizes and states.' },
+				{ href: '/buttons', name: 'Button', description: 'Actions with variants, sizes and states; IconButton and CopyButton.' },
 				{ href: '/links', name: 'Link and LinkCard', description: 'Real links and navigation surfaces.' },
 				{ href: '/badges', name: 'Badge', description: 'Metadata and states without interaction.' },
 				{ href: '/theme-toggle', name: 'ThemeToggle', description: 'Light, dark or system theme, also without JavaScript.' },
@@ -23,7 +23,7 @@
 			title: 'Forms',
 			items: [
 				{ href: '/forms', name: 'Field and Input', description: 'Labels, text models and error messages.' },
-				{ href: '/controls', name: 'Form controls', description: 'Textarea, Checkbox, RadioGroup, Switch and Slider.' },
+				{ href: '/controls', name: 'Form controls', description: 'Textarea, Checkbox, RadioGroup, SegmentedControl, Switch, Slider, and native progress, meter and files.' },
 				{ href: '/select', name: 'Select and Combobox', description: 'One or several typed options, with search and form submission.' },
 				{ href: '/editor', name: 'Markdown editor', description: 'Visual and code editing, with block-level saving.' },
 			],
@@ -41,8 +41,9 @@
 		{
 			title: 'Overlays',
 			items: [
-				{ href: '/modals', name: 'Modal', description: 'Declarative or programmatic, with nesting support.' },
+				{ href: '/modals', name: 'Modal', description: 'Declarative or programmatic, with confirmations and nesting support.' },
 				{ href: '/popover', name: 'Popover', description: 'Menus, lightweight dialogs and tooltips anchored to their trigger.' },
+				{ href: '/menu', name: 'Menu', description: 'Action menu with links, separators and full keyboard support.' },
 				{ href: '/overlays', name: 'Overlays', description: 'Drawer, Tooltip and CommandPalette.' },
 				{ href: '/app', name: 'App', description: 'The host of programmatic modals.' },
 			],

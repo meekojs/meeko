@@ -12,7 +12,7 @@ import { formFlashKey } from '../../app/runtime/form-flash'
 import { actionPathname, formFlashCookies, parseFormFlash } from '../../shared/form-flash'
 import { encodeBase64Url } from '../runtime/base64url'
 import { cookieNamed } from '../runtime/cookies'
-import { currentRequest } from '../runtime/request-context'
+import { currentRequest, sessionOf } from '../runtime/request-context'
 import { themeReturnPath } from '../runtime/theme-endpoint'
 
 /** A field of a native form: text, a file (only when the route accepts them) or a list of them. */
@@ -289,7 +289,7 @@ export const formFlashPlugin: PluginRegistration = {
 		const request = app.request
 		let csrfToken: string | undefined
 		try {
-			csrfToken = currentRequest().context.session.current?.csrfToken
+			csrfToken = sessionOf(currentRequest().context).current?.csrfToken
 		} catch {
 			csrfToken = undefined
 		}

@@ -287,7 +287,9 @@ const value = "a";
 
 	test('interestfor is in the HTML data as experimental, with its events', () => {
 		for (const tag of ['a', 'area', 'button'] as const) {
-			assert.deepEqual(htmlElementAttributes[tag].interestfor, { experimental: true }, tag)
+			// An ID, experimental: its value comes from scripts/html-data/extensions.json.
+			assert.equal(htmlElementAttributes[tag].interestfor.kind, 'id', tag)
+			assert.equal(htmlElementAttributes[tag].interestfor.experimental, true, tag)
 			assert.ok(elementAttributeNames[tag].split(' ').includes('interestfor'), tag)
 		}
 		assert.ok(elementEventNames.split(' ').includes('interest'))

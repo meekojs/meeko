@@ -4,7 +4,7 @@ import { page, routes } from "./page.ts";
 interface Report { readonly message: string; readonly source: string }
 
 declare global {
-  interface Window { __reports: Report[]; __lastReported: unknown; __ready: boolean }
+  interface Window { __reports: Report[]; __lastReported: unknown; __repeatFinished?: boolean; __ready: boolean }
 }
 
 window.__reports = [];
@@ -29,7 +29,11 @@ document.getElementById("reject")!.addEventListener("click", () => {
 // The app throws again a failure that the observer already received: no second report.
 document.getElementById("reported")!.addEventListener("click", () => {
   const again = window.__lastReported;
-  setTimeout(() => { throw again; }, 0);
+  setTimeout(() => {
+    // The next task runs after the browser has dispatched the error from this one.
+    setTimeout(() => { window.__repeatFinished = true; }, 0);
+    throw again;
+  }, 0);
 });
 document.getElementById("dispose")!.addEventListener("click", () => {
   app.dispose();

@@ -14,7 +14,7 @@ export type AttributeGroup = (typeof groups)[number]
 function group(name: string, node: TemplateNode): AttributeGroup {
 	if ((node.tagName === 'snippet' && ['name', 'params'].includes(name)) || (node.tagName === 'render' && ['snippet', 'args'].includes(name)) || name === 'html') return 'content'
 	if (node.tagName === 'component' && name === 'is') return 'definition'
-	if (name === 'if:when') return 'conditional'
+	if (['if', 'else-if', 'else', 'if:when'].includes(name)) return 'conditional'
 	if (name.startsWith('each:')) return 'list'
 	if (name.startsWith('ref:')) return 'ref'
 	if (name === 'model' || name.startsWith('model:')) return 'model'
@@ -26,7 +26,7 @@ function group(name: string, node: TemplateNode): AttributeGroup {
 
 // References name a target; other directives may evaluate user code, including getters.
 function expression(attribute: TemplateAttribute, node: TemplateNode): boolean {
-	return !attribute.name.startsWith('ref:') && (attribute.name.includes(':') || ['bind', 'model', 'html', 'is', 'args', 'snippet', 'params', 'for'].includes(attribute.name) || Boolean(node.componentName && attribute.name.startsWith('on')))
+	return !attribute.name.startsWith('ref:') && (attribute.name.includes(':') || ['if', 'else-if', 'bind', 'model', 'html', 'is', 'args', 'snippet', 'params', 'for'].includes(attribute.name) || Boolean(node.componentName && attribute.name.startsWith('on')))
 }
 
 // Reads count as free of effects, as a signal's `.value` is; creating a function runs none of its body.

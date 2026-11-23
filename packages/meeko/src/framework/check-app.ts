@@ -2,15 +2,19 @@ import ts from '@typescript/typescript6'
 import { access, mkdir, readdir, readFile, realpath, unlink, writeFile } from 'node:fs/promises'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 
+import type { CheckInput } from '../check'
 import type { CompileDiagnostic } from '../compiler/parser/sfc'
+import type { GenerateTypesOptions } from '../types'
 
-import { discoverComponents } from '../autoimports/registry'
-import { checkSource } from '../check'
+import { discoverAutoImports, discoverComponents } from '../autoimports/registry'
+import { checkSources } from '../check'
 import { MeekoCompileError } from '../compiler/parser/sfc'
+import { onceByRoot } from '../compiler/project-root'
 import { assertRouteBlockPlacement } from '../compiler/transforms/route-block'
 import { componentTypeDeclarationMarker, componentTypesPath, generateTypes } from '../types'
 import { checkAliasScopes, resolveProjectAliases } from './aliases'
 import { loadConfiguredModules, resolveConfigSources } from './config'
+import { unusedInvalidations } from './data-keys-check'
 
 const componentTypesManifest = 'component-types.json'
 const componentTypeSuffix = '.d.meeko.ts'
@@ -276,18 +280,28 @@ async function sourceTypeScriptFiles(sourceRoots: readonly string[]): Promise<st
 export async function checkApp(projectRoot: string): Promise<CompileDiagnostic[]> {
 	const diagnostics: CompileDiagnostic[] = []
 	const sourceRoots = (await resolveConfigSources(projectRoot)).map((source) => source.root)
-	for (const file of await appMeekoFiles(projectRoot)) {
+	const placements = new Map<string, CompileDiagnostic>()
+	const inputs: CheckInput[] = []
+	const files = await appMeekoFiles(projectRoot)
+	for (const file of files) {
 		const source = await readFile(file, 'utf8')
 		try {
 			assertRouteBlockPlacement(source, file, sourceRoots)
+			inputs.push({ source, filename: file })
 		} catch (error) {
 			if (!(error instanceof MeekoCompileError)) throw error
-			diagnostics.push(error.diagnostic)
-			continue
+			placements.set(file, error.diagnostic)
 		}
-		diagnostics.push(...(await checkSource(source, file, { withinProject: true })))
+	}
+	// One TypeScript program for every component: each one imported by several is checked once.
+	const checked = await checkSources(inputs, { withinProject: true })
+	for (const file of files) {
+		const placement = placements.get(file)
+		diagnostics.push(...(placement ? [placement] : (checked.get(resolve(file)) ?? [])))
 	}
 	diagnostics.push(...(await strayGroupFiles(sourceRoots)))
+	// MEEK141: a write that invalidates a key no read depends on.
+	diagnostics.push(...(await unusedInvalidations(projectRoot, sourceRoots)))
 	// `#server/` in app/ or shared/ and `@/` in shared/: TypeScript alone would only say the module does not exist.
 	const aliases = await resolveProjectAliases(projectRoot)
 	const modules = await sourceTypeScriptFiles(sourceRoots)
@@ -314,7 +328,7 @@ export interface AppTypesOptions {
 	readonly onError?: (filename: string, error: unknown) => void
 }
 
-async function generateAppType(root: string, file: string, options: AppTypesOptions): Promise<string[]> {
+async function generateAppType(root: string, file: string, options: AppTypesOptions & Pick<GenerateTypesOptions, 'autoImports'>): Promise<string[]> {
 	const source = options.read?.(file) ?? (await readFile(file, 'utf8'))
 	try {
 		return await generateTypes(source, file, options)
@@ -352,8 +366,10 @@ export async function generateAppTypeForFile(projectRoot: string, filename: stri
 export async function generateAppTypes(projectRoot: string, options: AppTypesOptions = {}): Promise<string[]> {
 	const root = resolve(projectRoot)
 	const outputs = new Set<string>()
+	// Every component reads the same autoimports, which writing declarations does not change.
+	const shared = { ...options, autoImports: onceByRoot(discoverAutoImports) }
 	for (const file of await appMeekoFiles(root)) {
-		for (const output of await generateAppType(root, file, options)) outputs.add(output)
+		for (const output of await generateAppType(root, file, shared)) outputs.add(output)
 	}
 	const generated = [...outputs].sort()
 	await reconcileOwnedTypes(root, generated)

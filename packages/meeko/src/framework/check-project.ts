@@ -43,24 +43,32 @@ function withoutAppModules(output: string, root: string, sourceRoots: readonly s
 	return kept.join('\n')
 }
 
+/**
+ * Runs `tsc` over the app, server and shared projects at once: they are independent processes, and
+ * the first failing project in that order is still the one reported.
+ */
 async function checkTypeScript(root: string, routeBlocks: ReadonlyMap<string, string>): Promise<void> {
 	const sourceRoots = (await resolveConfigSources(root)).map((source) => source.root)
-	for (const name of projectNames) {
-		const config = join(root, '.meeko', `tsconfig.${name}.json`)
-		const tsc = tscCommand(['-p', config, '--noEmit', '--pretty', 'false'])
-		try {
+	const configs = projectNames.map((name) => join(root, '.meeko', `tsconfig.${name}.json`))
+	const results = await Promise.allSettled(
+		configs.map(async (config) => {
+			const tsc = tscCommand(['-p', config, '--noEmit', '--pretty', 'false'])
 			await execute(tsc.file, tsc.args, { windowsHide: true, maxBuffer: 64 * 1024 * 1024 })
-		} catch (error) {
-			const failure = error as Error & { code?: unknown; stdout?: string; stderr?: string }
-			let output = `${failure.stdout ?? ''}${failure.stderr ?? ''}`
-			// A numeric code is tsc reporting diagnostics; anything else (it did not run) always fails.
-			if (name === 'server' && typeof failure.code === 'number') {
-				output = withoutAppModules(output, root, sourceRoots)
-				if (!output) continue
-			}
-			// Diagnostics in a `<script server>` copy point at the page, on the same line and column.
-			throw new Error(mapRouteBlockPaths(`Falló la comprobación con TypeScript (${config}):\n${output}`, routeBlocks), { cause: error })
+		}),
+	)
+	for (const [index, name] of projectNames.entries()) {
+		const result = results[index]!
+		if (result.status === 'fulfilled') continue
+		const config = configs[index]!
+		const failure = result.reason as Error & { code?: unknown; stdout?: string; stderr?: string }
+		let output = `${failure.stdout ?? ''}${failure.stderr ?? ''}`
+		// A numeric code is tsc reporting diagnostics; anything else (it did not run) always fails.
+		if (name === 'server' && typeof failure.code === 'number') {
+			output = withoutAppModules(output, root, sourceRoots)
+			if (!output) continue
 		}
+		// Diagnostics in a `<script server>` copy point at the page, on the same line and column.
+		throw new Error(mapRouteBlockPaths(`Falló la comprobación con TypeScript (${config}):\n${output}`, routeBlocks), { cause: failure })
 	}
 }
 

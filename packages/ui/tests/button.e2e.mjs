@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
+import { button as buttonClasses } from '../dist/app/variants/button.js'
 import { startDemo } from './helpers/demo.mjs'
 
 /** The opening tag of the element with the given id in the HTML. */
@@ -46,26 +47,27 @@ test('UIButton renders a route, a link or a button with the same look, roles, fo
 	const route = attributes(openingTag(html, 'button-kind-route'))
 	assert.match(openingTag(html, 'button-kind-route'), /^<a\b/)
 	assert.equal(route.href, '/links')
-	assert.equal(route.class, 'meeko-ui-button')
-	assert.deepEqual([route['data-variant'], route['data-size'], route['data-shape']], ['primary', 'md', 'rounded'])
+	// The three take the default look of variants/button: primary, md and rounded, and nothing else.
+	assert.equal(route.class, buttonClasses())
+	for (const name of ['data-variant', 'data-size', 'data-shape']) assert.ok(!(name in route), `the route has no ${name}`)
 	for (const name of ['type', 'disabled', 'target', 'rel']) assert.ok(!(name in route), `the route has no ${name}`)
 	const anchor = attributes(openingTag(html, 'button-kind-anchor'))
 	assert.match(openingTag(html, 'button-kind-anchor'), /^<a\b/)
 	assert.equal(anchor.href, 'https://github.com/meekojs/meeko')
 	assert.equal(anchor.target, '_blank')
 	assert.equal(anchor.rel, 'noopener noreferrer')
-	assert.equal(anchor.class, 'meeko-ui-button')
+	assert.equal(anchor.class, buttonClasses())
 	for (const name of ['type', 'disabled']) assert.ok(!(name in anchor), `the link has no ${name}`)
 	const button = attributes(openingTag(html, 'button-kind-button'))
 	assert.match(openingTag(html, 'button-kind-button'), /^<button\b/)
 	assert.equal(button.type, 'button')
-	assert.equal(button.class, 'meeko-ui-button')
+	assert.equal(button.class, buttonClasses())
 	for (const name of ['href', 'target', 'rel', 'disabled']) assert.ok(!(name in button), `the button has no ${name}`)
 	// UILink keeps its look with `to` and with `href`.
 	const links = await (await fetch(`${origin}/links`)).text()
 	assert.match(openingTag(links, 'link-route'), /^<a\b/)
 	assert.equal(attributes(openingTag(links, 'link-route')).href, '/installation')
-	assert.equal(attributes(openingTag(links, 'link-route')).class, 'meeko-ui-button meeko-ui-link')
+	assert.equal(attributes(openingTag(links, 'link-route')).class, buttonClasses())
 	assert.equal(attributes(openingTag(links, 'link-anchor')).href, '/theming')
 
 	const page = await browser.newPage({ viewport: { width: 1280, height: 1000 }, colorScheme: 'light' })

@@ -65,13 +65,15 @@ assert.match(formatted, /Save/);
 console.log('All public package entry points, ESLint and Prettier work from installed tarballs.');
 '@ | Set-Content -LiteralPath (Join-Path $consumer 'smoke.mjs') -Encoding utf8
   @'
-import { readdir, writeFile } from 'node:fs/promises';
+import { readdir, realpath, writeFile } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
 async function declarations(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
   return (await Promise.all(entries.map((entry) => entry.isDirectory() ? declarations(resolve(directory, entry.name)) : entry.name.endsWith('.d.meeko.ts') ? [resolve(directory, entry.name)] : []))).flat();
 }
-const files = await declarations(resolve('node_modules/@meekojs/ui/dist/app/components'));
+// Meeko references a module's components by their real path, where pnpm puts the module's own dependencies
+// (tailwind-variants): through the node_modules/@meekojs/ui link, TypeScript would look for them next to the consumer.
+const files = await declarations(await realpath('node_modules/@meekojs/ui/dist/app/components'));
 if (!files.length) throw new Error('Installed UI contains no component declarations');
 const imports = files.map((file, index) => `import type * as Component${index} from './${relative(process.cwd(), file).replaceAll('\\', '/')}';`);
 await writeFile('component-declarations.ts', imports.join('\n') + '\nexport type Components = [' + files.map((_file, index) => `typeof Component${index}`).join(', ') + '];\n');
@@ -120,9 +122,10 @@ const directory = '.meeko/output/node/client/assets';
 const files = (await readdir(directory)).filter((file) => file.endsWith('.css'));
 assert.ok(files.length, 'UI emits production CSS');
 const css = (await Promise.all(files.map((file) => readFile(`${directory}/${file}`, 'utf8')))).join('\n');
-assert.match(css, /\.meeko-ui-button/);
-assert.match(css, /\.meeko-ui-table/);
-assert.match(css, /\.meeko-ui-card/);
+// Since the Tailwind migration, UI ships one precompiled sheet: its layers and the utilities of a button and a table.
+assert.match(css, /@layer ui\.utilities/);
+assert.match(css, /\.ui\\:aria-busy\\:before\\:animate-spin/);
+assert.match(css, /\.ui\\:\\\[overflow-wrap\\:normal\\\]/);
 assert.match(css, /--ui-color-info-9:\s*#123456/);
 assert.match(css, /--ui-color-primary:\s*var\(--consumer-primary\)/);
 assert.doesNotMatch(css, /@import/);

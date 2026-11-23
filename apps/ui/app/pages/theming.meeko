@@ -135,9 +135,7 @@
 		<h2 id="tokens">Tokens de uso</h2>
 		<p>
 			Lee el token de uso, no el paso:
-			<code>--ui-color-border</code>, no
-			<code>--ui-color-surface-6</code>. Ningún hex, tamaño o fuente suelto: si te falta algo, se añade a UI. El contrato completo está en
-			<code>packages/ui/DESIGN.md</code>.
+			<code>--ui-color-border</code>, no <code>--ui-color-surface-6</code>. Ningún hex, tamaño o fuente suelto: si te falta algo, se añade a UI. El contrato completo está en <code>packages/ui/DESIGN.md</code>.
 		</p>
 		<DocsCode
 			label="app/styles/main.css"
@@ -204,14 +202,106 @@
 				{ name: 'controlWeight / controlFontSize', type: 'string', description: 'Peso y tamaño de texto de las acciones.' },
 			]"
 		/>
+		<h2 id="classes">Clases de cada componente</h2>
+		<p>
+			Los componentes se pintan con clases de Tailwind 4 con el prefijo
+			<code>ui:</code>, que UI compila por su cuenta: tu aplicación no necesita Tailwind. Esas clases leen los tokens, así que todo lo anterior también cambia los componentes. Para retocar uno concreto,
+			<code>class</code>
+			llega a su elemento raíz y la prop
+			<code>ui</code>
+			añade clases a cada parte, por el nombre de su slot;
+			<code>class</code>
+			equivale a
+			<code>ui.base</code>. Los nombres de los slots están en el tipo de props de cada componente, y el editor los completa.
+		</p>
+		<DocsCode bind:code="examples.themeSlots" />
+		<p>
+			Tus clases se suman a las del componente, sin quitar ninguna. La hoja de UI va en las capas
+			<code>ui-base</code>,
+			<code>ui.components</code>
+			y
+			<code>ui.utilities</code>
+			y se carga antes que la tuya, así que cualquier regla sin capa de tu aplicación gana, sea cual sea su especificidad. También una regla sobre un elemento, como
+			<code>{'a { color: … }'}</code>: limítala a tu contenido si no quieres cambiar los enlaces de UI.
+		</p>
+		<DocsCode
+			label="app/styles/main.css"
+			bind:code="examples.themeSlotsCss"
+		/>
+		<h3 id="migration">Desde las clases meeko-ui-*</h3>
+		<p>
+			Las clases
+			<code>.meeko-ui-*</code>
+			de los componentes y los atributos
+			<code>data-*</code>
+			que sólo daban estilo ya no existen: una regla que los seleccionaba deja de aplicarse sin dar error. Pon un nombre tuyo con
+			<code>class</code>
+			o
+			<code>ui</code>
+			y cambia el selector por ese nombre. Si la regla dependía de una variante, como
+			<code>[data-variant='outline']</code>, pon la clase donde usas esa variante. Siguen ahí los atributos que lee JavaScript (<code>data-meeko-*</code>) y el ARIA.
+		</p>
+		<DocsApi
+			caption="Equivalencias más usadas"
+			bind:rows="[
+				{ name: '.meeko-ui-button[data-variant]', type: 'class + variant', description: 'UIButton y UILink: la prop variant (y size, shape, tone) y tu clase.' },
+				{ name: '.meeko-ui-badge / -badge-dot', type: 'ui.base / ui.dot', description: 'UIBadge.' },
+				{ name: '.meeko-ui-input / -textarea', type: 'class', description: 'UIInput y UITextarea.' },
+				{ name: '.meeko-ui-field-label / -error / -description', type: 'ui.label / ui.error / ui.description', description: 'UIField; también ui.meta y ui.counter.' },
+				{ name: '.meeko-ui-choice / -choice-content', type: 'ui.base / ui.content', description: 'UICheckbox y UISwitch; el control es ui.input.' },
+				{ name: '.meeko-ui-card-header / -title / -body / -footer', type: 'ui.header / ui.title / ui.body / ui.footer', description: 'UICard; class es ui.base.' },
+				{ name: '.meeko-ui-table-scroll / .meeko-ui-table', type: 'ui.base / class', description: 'UITable; también ui.cell, ui.headerCell, ui.bodyRow. Sustituye a --table-border, --table-background y --table-hover.' },
+				{ name: '.meeko-ui-modal-heading / -body / -footer', type: 'ui.heading / ui.body / ui.footer', description: 'UIModal; class es ui.base, el <dialog>.' },
+				{ name: '.meeko-ui-alert-title / -description', type: 'ui.title / ui.description', description: 'UIAlert; la prop tone sustituye a data-tone.' },
+				{ name: '.meeko-ui-page-main / -sidebar / -aside', type: 'ui.main / ui.sidebar / ui.aside', description: 'UIPage.' },
+				{ name: '.meeko-ui-header-nav / -actions', type: 'ui.nav / ui.actions', description: 'UIHeader.' },
+				{ name: '.meeko-ui-command-row / -excerpt', type: 'ui.row / <small>', description: 'UICommandPalette; la fila activa lleva aria-selected.' },
+				{ name: '.meeko-ui-tooltip / -tooltip-trigger', type: 'class / triggerClass', description: 'UITooltip y UIPopover.' },
+			]"
+		/>
+		<p>
+			<code>MeekoSelect</code>,
+			<code>MeekoPopover</code>
+			y
+			<code>MeekoThemeToggle</code>, obsoletos en el núcleo, ya no reciben aspecto de UI: usa <code>UISelect</code>,
+			<code>UIPopover</code>
+			y
+			<a href="/theme-toggle">UIThemeToggle</a>. Siguen siendo API pública la clase <code>meeko-ui-prose</code>, que viste Markdown en cualquier elemento, y la utilidad <code>meeko-ui-sr-only</code>, porque una aplicación no compila Tailwind.
+		</p>
 		<h2 id="defaults">Valores por defecto</h2>
 		<p>
 			<code>ui.defaults</code>
-			admite
-			<code>button</code>,
-			<code>link</code>
+			da a todas las instancias de un componente las mismas clases. La clave es su nombre sin el prefijo, en camelCase, como
+			<code>card</code>, <code>table</code>, <code>descriptionList</code>…; cada componente que acepta
+			<code>class</code>
+			o
+			<code>ui</code>
+			admite aquí las dos. Se suman a las de cada instancia: primero las del componente, después las de
+			<code>ui.defaults</code>
+			y al final las de la instancia. Sin fusión de clases, en un conflicto decide la cascada: tu CSS sin capa gana.
+		</p>
+		<DocsCode
+			label="meeko.config.ts"
+			bind:code="examples.themeDefaults"
+		/>
+		<p>
+			Algunas variantes admiten también un valor de base:
+			<code>variant</code>,
+			<code>size</code>
 			y
-			<code>card</code>. La prioridad es: props explícitas, defaults de aplicación y valores de base. Los defaults se aíslan por aplicación y petición SSR.
+			<code>shape</code>
+			en
+			<code>button</code>
+			y
+			<code>link</code>; <code>variant</code>,
+			<code>padding</code>
+			y
+			<code>density</code>
+			en
+			<code>card</code>, y
+			<code>density</code>
+			en
+			<code>table</code>. La prop explícita de la instancia gana siempre. Los defaults se validan al cargar el módulo y se aíslan por aplicación y petición SSR.
 		</p>
 		<h2 id="messages">Textos e idiomas</h2>
 		<p>
@@ -219,8 +309,7 @@
 			<code>UIModal</code>, el estado vacío de
 			<code>UITable</code>
 			y de
-			<code>UICombobox</code>, los nombres de
-			<code>UIThemeToggle</code>) vienen en español e inglés. Con
+			<code>UICombobox</code>, los nombres de <code>UIThemeToggle</code>) vienen en español e inglés. Con
 			<code>@meekojs/i18n</code>
 			siguen el idioma del documento, sin configurar nada. Sin ese módulo,
 			<code>ui.locale</code>

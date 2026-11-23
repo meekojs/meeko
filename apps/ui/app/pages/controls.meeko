@@ -6,6 +6,21 @@
 	const notifications = signal(true)
 	const period = signal('week')
 	const volume = signal(40)
+	const days = signal('30')
+	const dayOptions = [
+		{ value: '7', label: '7 días' },
+		{ value: '30', label: '30 días' },
+		{ value: '90', label: '90 días' },
+	]
+	const range = signal('month')
+	const ranges = [
+		{ value: 'today', label: 'Hoy' },
+		{ value: 'week', label: 'Esta semana' },
+		{ value: 'month', label: 'Este mes' },
+		{ value: 'quarter', label: 'Este trimestre' },
+		{ value: 'year', label: 'Este año' },
+		{ value: 'all', label: 'Todo el histórico' },
+	]
 	const periods = [
 		{ value: 'day', label: 'Día' },
 		{ value: 'week', label: 'Semana' },
@@ -17,7 +32,7 @@
 <template>
 	<DocsPage
 		title="Controles de formulario"
-		description="Textarea, Checkbox, RadioGroup, Switch y Slider: HTML nativo, con su teclado y su envío, y el aspecto de UI."
+		description="Textarea, Checkbox, RadioGroup, SegmentedControl, Switch y Slider: HTML nativo, con su teclado y su envío, y el aspecto de UI."
 	>
 		<p>
 			Todos conservan el control nativo, así que el teclado, el foco y el envío de un formulario son los del navegador, también sin JavaScript. Sus modelos se enlazan con una señal:
@@ -67,8 +82,7 @@
 		<p>
 			<code>UISwitch</code>
 			tiene el mismo contrato que
-			<code>UICheckbox</code>, con
-			<code>role="switch"</code>: úsalo para algo que se aplica al instante.
+			<code>UICheckbox</code>, con <code>role="switch"</code>: úsalo para algo que se aplica al instante.
 		</p>
 		<DocsPreview layout="stack">
 			<UICheckbox
@@ -141,6 +155,71 @@
 				{ name: 'class', type: 'string', description: 'Clases adicionales.' },
 			]"
 		/>
+		<h2 id="segmented">UISegmentedControl</h2>
+		<p>
+			Una selección única compacta, como el periodo de un gráfico: los mismos radios nativos de
+			<code>UIRadioGroup</code>
+			con el aspecto de un control segmentado, así que las flechas, el envío del formulario y
+			<code>required</code>
+			funcionan también sin JavaScript. Su altura total es la de un control de su tamaño,
+			<code>sm</code>
+			o
+			<code>md</code>, y se alinea con un
+			<code>UIButton</code>
+			a su lado.
+		</p>
+		<p>
+			Necesita un nombre:
+			<code>legend</code>, que
+			<code>hideLegend</code>
+			deja sólo para los lectores de pantalla, o
+			<code>ariaLabel</code>. Si las opciones no caben, el control se desplaza en horizontal dentro de su ancho: ninguna opción se parte y la página no se ensancha.
+		</p>
+		<DocsPreview layout="stack">
+			<UISegmentedControl
+				legend="Periodo del gráfico"
+				hideLegend
+				size="sm"
+				name="days"
+				model="days"
+				bind:options="dayOptions"
+			/>
+			<p
+				id="segmented-status"
+				class="docs-status"
+				role="status"
+			>
+				Mostrando los últimos {days.value} días.
+			</p>
+			<UISegmentedControl
+				legend="Intervalo"
+				name="range"
+				model="range"
+				bind:options="ranges"
+			/>
+		</DocsPreview>
+		<DocsCode bind:code="examples.segmented" />
+		<p>
+			<code>UIRadioGroup variant="segmented"</code>
+			sigue disponible y se parte en varias líneas cuando no cabe; para un conmutador compacto, usa
+			<code>UISegmentedControl</code>. Su
+			<code>size</code>
+			admite un valor por aplicación en
+			<code>ui.defaults.segmentedControl</code>.
+		</p>
+		<DocsApi
+			caption="Propiedades de UISegmentedControl"
+			bind:rows="[
+				{ name: 'model', type: 'Signal<string>', description: 'Valor elegido, de doble vía.' },
+				{ name: 'options', type: 'readonly UIRadioOption[]', description: 'Obligatoria. value, label y disabled.' },
+				{ name: 'legend', type: 'string', description: 'Nombre del grupo, en su legend. Obligatoria sin ariaLabel.' },
+				{ name: 'hideLegend', type: 'boolean', default: 'false', description: 'La leyenda sólo para lectores de pantalla.' },
+				{ name: 'ariaLabel', type: 'string', description: 'Nombre del grupo sin leyenda, en lugar de legend.' },
+				{ name: 'size', type: 'sm | md', default: 'md', description: 'Altura y texto, los de un control de ese tamaño.' },
+				{ name: 'name / required / disabled', type: 'string / boolean', description: 'Envío y estado nativos.' },
+				{ name: 'class / ui', type: 'string / objeto', description: 'Clases del fieldset y de base, legend, options, option e input.' },
+			]"
+		/>
 		<h2 id="slider">UISlider</h2>
 		<p>
 			Un
@@ -178,14 +257,100 @@
 		/>
 		<p>
 			Los tipos
-			<code>UITextareaProps</code>,
-			<code>UICheckboxProps</code>,
-			<code>UISwitchProps</code>,
-			<code>UIRadioGroupProps</code>
+			<code>UITextareaProps</code>, <code>UICheckboxProps</code>, <code>UISwitchProps</code>, <code>UIRadioGroupProps</code>,
+			<code>UISegmentedControlProps</code>
 			y
 			<code>UISliderProps</code>
 			se exportan desde
 			<code>@meekojs/ui/runtime</code>.
 		</p>
+		<h2 id="native">Progreso, medidor y archivos</h2>
+		<p>
+			Sin componente: la base de UI da estilo a
+			<code>&lt;progress&gt;</code>,
+			<code>&lt;meter&gt;</code>
+			y
+			<code>&lt;input type="file"&gt;</code>
+			con los tokens, a especificidad cero (<code>:where()</code>, en la capa
+			<code>ui-base</code>), así que cualquier regla tuya gana. Un
+			<code>&lt;progress&gt;</code>
+			sin
+			<code>value</code>
+			es indeterminado y se desplaza, salvo con
+			<code>prefers-reduced-motion</code>. El color de un
+			<code>&lt;meter&gt;</code>
+			dice la región de su valor según
+			<code>low</code>,
+			<code>high</code>
+			y
+			<code>optimum</code>: óptima, intermedia o la peor. El botón de un campo de archivos se ve como un
+			<code>UIButton</code>
+			secundario. Con
+			<code>{'ui: { base: false }'}</code>
+			no se aplican.
+		</p>
+		<DocsPreview id="native-elements">
+			<div class="docs-stack">
+				<progress
+					value="0.6"
+					aria-label="Subida"
+				/>
+				<progress aria-label="Cargando" />
+				<meter
+					min="0"
+					max="100"
+					low="25"
+					high="75"
+					optimum="100"
+					value="90"
+					aria-label="Óptimo">90 %</meter>
+				<meter
+					min="0"
+					max="100"
+					low="25"
+					high="75"
+					optimum="100"
+					value="50"
+					aria-label="Intermedio">50 %</meter>
+				<meter
+					min="0"
+					max="100"
+					low="25"
+					high="75"
+					optimum="100"
+					value="10"
+					aria-label="El peor">10 %</meter>
+				<input
+					type="file"
+					multiple
+					aria-label="Fotos"
+				/>
+			</div>
+		</DocsPreview>
+		<DocsCode bind:code="examples.nativeElements" />
+		<p>
+			Cada elemento lee su familia de tokens, que parte de los globales:
+			<code>--ui-progress-*</code>,
+			<code>--ui-meter-*</code>
+			y
+			<code>--ui-file-*</code>.
+		</p>
+		<DocsCode
+			label="CSS"
+			bind:code="examples.nativeElementsTokens"
+		/>
+		<DocsApi
+			caption="Tokens de los elementos nativos"
+			bind:rows="[
+				{ name: '--ui-progress-height / -radius', type: 'longitud', default: '--ui-space-2 / --ui-radius-full', description: 'Alto y esquinas de la barra.' },
+				{ name: '--ui-progress-track / -color', type: 'color', default: '--ui-color-control-active / --ui-color-primary', description: 'Pista y barra.' },
+				{ name: '--ui-progress-indeterminate-width / -duration', type: 'porcentaje / tiempo', default: '40% / 1.4s', description: 'Ancho (hasta 50 %) y vuelta de la barra indeterminada.' },
+				{ name: '--ui-meter-height / -radius / -track', type: 'longitud / color', default: '--ui-space-2 / --ui-radius-full / --ui-color-control-active', description: 'Alto, esquinas y pista.' },
+				{ name: '--ui-meter-optimum-color / -suboptimum-color / -even-less-good-color', type: 'color', default: 'success / warning / danger', description: 'Barra en la región óptima, intermedia y la peor.' },
+				{ name: '--ui-file-color / -gap', type: 'color / longitud', default: '--ui-color-text-soft / --ui-space-3', description: 'Nombre de los archivos y separación del botón.' },
+				{ name: '--ui-file-button-height / -padding / -radius', type: 'longitud', default: 'los de un control sm', description: 'Tamaño del botón.' },
+				{ name: '--ui-file-button-bg / -bg-hover / -border / -color', type: 'color', default: 'los de un UIButton secondary', description: 'Colores del botón.' },
+			]"
+		/>
 	</DocsPage>
 </template>

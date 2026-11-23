@@ -14,9 +14,7 @@
 	<section>
 		<button
 			type="button"
-			on:click="rotate"
-			>Rotate</button
-		>
+			on:click="rotate">Rotate</button>
 		<ul>
 			<li
 				each:of="items.value"

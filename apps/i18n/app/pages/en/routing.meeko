@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { englishExamples as examples } from '../../utils/examples.en'
 </script>
+
 <template>
 	<DocsPage
 		product="Meeko i18n"
@@ -53,9 +54,7 @@
 			and one
 			<code>link rel="alternate"</code>
 			per language plus
-			<code>x-default</code>, with absolute URLs based on
-			<code>site</code>. With
-			<code>sitemap: true</code>, Meeko's
+			<code>x-default</code>, with absolute URLs based on <code>site</code>. With <code>sitemap: true</code>, Meeko's
 			<code>sitemap.xml</code>
 			lists each version with its alternates.
 		</p>

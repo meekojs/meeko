@@ -17,7 +17,7 @@ const i18nKey = Symbol.for('meeko.i18n') as ContextKey<{ readonly locale: string
 
 const spanish: UIMessages = {
 	feedback: { close: 'Cerrar aviso', empty: 'No hay resultados.', loading: 'Cargando' },
-	modal: { close: 'Cerrar modal' },
+	modal: { close: 'Cerrar modal', confirm: 'Confirmar', cancel: 'Cancelar' },
 	table: { empty: 'No hay datos.' },
 	select: { empty: 'Sin resultados', clear: 'Quitar selección' },
 	themeToggle: {
@@ -34,7 +34,19 @@ const spanish: UIMessages = {
 	navigationTabs: { label: 'Secciones' },
 	breadcrumb: { label: 'Ruta de navegación' },
 	pageNavigation: { label: 'Páginas anterior y siguiente', previous: 'Anterior', next: 'Siguiente' },
-	pagination: { label: 'Paginación', count: '{shown} de {total}', total: '{total} en total', loadMore: 'Cargar más', loading: 'Cargando…' },
+	pagination: {
+		label: 'Paginación',
+		count: '{shown} de {total}',
+		total: '{total} en total',
+		loadMore: 'Cargar más',
+		loading: 'Cargando…',
+		range: '{from}–{to} de {total}',
+		page: 'Página {page}',
+		previous: 'Página anterior',
+		next: 'Página siguiente',
+		first: 'Primera página',
+		last: 'Última página',
+	},
 	tableOfContents: { label: 'En esta página' },
 	language: { label: 'Idioma', suggestion: 'Sugerencia de idioma', message: 'Esta página también está en {language}.', go: 'Leer en {language}', stay: 'Seguir en {language}' },
 	code: { label: 'Código', log: 'Registro', copy: 'Copiar', copied: 'Copiado', copyFailed: 'No se pudo copiar', good: 'Correcto', bad: 'Incorrecto' },
@@ -79,11 +91,17 @@ const spanish: UIMessages = {
 		empty: 'Sin resultados para «{query}».',
 		unavailable: 'La búsqueda no está disponible ahora mismo.',
 	},
+	hint: { label: 'Más información' },
+	menu: { trigger: 'Más acciones' },
+	stat: { up: 'Sube {change}', down: 'Baja {change}', flat: 'Sin cambios', link: 'Ver detalle', linkName: '{link}: {label}' },
+	sparkline: { label: 'Tendencia: mínimo {min}, máximo {max}, último {last}', empty: 'Sin datos' },
+	copyButton: { copy: 'Copiar', copied: 'Copiado', failed: 'No se pudo copiar' },
+	input: { show: 'Mostrar contraseña', hide: 'Ocultar contraseña' },
 }
 
 const english: UIMessages = {
 	feedback: { close: 'Dismiss notification', empty: 'No results.', loading: 'Loading' },
-	modal: { close: 'Close modal' },
+	modal: { close: 'Close modal', confirm: 'Confirm', cancel: 'Cancel' },
 	table: { empty: 'No data.' },
 	select: { empty: 'No results', clear: 'Clear selection' },
 	themeToggle: {
@@ -100,7 +118,19 @@ const english: UIMessages = {
 	navigationTabs: { label: 'Sections' },
 	breadcrumb: { label: 'Breadcrumb' },
 	pageNavigation: { label: 'Previous and next pages', previous: 'Previous', next: 'Next' },
-	pagination: { label: 'Pagination', count: '{shown} of {total}', total: '{total} in total', loadMore: 'Load more', loading: 'Loading…' },
+	pagination: {
+		label: 'Pagination',
+		count: '{shown} of {total}',
+		total: '{total} in total',
+		loadMore: 'Load more',
+		loading: 'Loading…',
+		range: '{from}–{to} of {total}',
+		page: 'Page {page}',
+		previous: 'Previous page',
+		next: 'Next page',
+		first: 'First page',
+		last: 'Last page',
+	},
 	tableOfContents: { label: 'On this page' },
 	language: { label: 'Language', suggestion: 'Language suggestion', message: 'This page is also available in {language}.', go: 'Read in {language}', stay: 'Stay in {language}' },
 	code: { label: 'Code', log: 'Log', copy: 'Copy', copied: 'Copied', copyFailed: 'Could not copy', good: 'Correct', bad: 'Incorrect' },
@@ -145,6 +175,12 @@ const english: UIMessages = {
 		empty: 'No results for “{query}”.',
 		unavailable: 'Search is not available right now.',
 	},
+	hint: { label: 'More information' },
+	menu: { trigger: 'More actions' },
+	stat: { up: 'Up {change}', down: 'Down {change}', flat: 'No change', link: 'View details', linkName: '{link}: {label}' },
+	sparkline: { label: 'Trend: minimum {min}, maximum {max}, latest {last}', empty: 'No data' },
+	copyButton: { copy: 'Copy', copied: 'Copied', failed: 'Could not copy' },
+	input: { show: 'Show password', hide: 'Hide password' },
 }
 
 /** The texts that come with the package. Spanish is complete and the last fallback of every locale. */
@@ -194,6 +230,12 @@ function merge(messages: UIMessages, layer: UIMessageOverrides | undefined): UIM
 		diff: { ...messages.diff, ...layer.diff },
 		markdownEditor: { ...messages.markdownEditor, ...layer.markdownEditor },
 		commandPalette: { ...messages.commandPalette, ...layer.commandPalette },
+		hint: { ...messages.hint, ...layer.hint },
+		menu: { ...messages.menu, ...layer.menu },
+		stat: { ...messages.stat, ...layer.stat },
+		sparkline: { ...messages.sparkline, ...layer.sparkline },
+		copyButton: { ...messages.copyButton, ...layer.copyButton },
+		input: { ...messages.input, ...layer.input },
 	}
 }
 

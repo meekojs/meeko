@@ -1,6 +1,6 @@
 {
 	"name": "@meekojs/icon",
-	"version": "1.9.0",
+	"version": "1.10.0",
 	"description": "Typed Iconify icons for Meeko, resolved at build time.",
 	"keywords": [
 		"meeko",
@@ -47,17 +47,17 @@
 		"test:e2e": "pnpm run build && node --test --test-concurrency=1 tests/*.e2e.mjs"
 	},
 	"dependencies": {
-		"@iconify/types": "^2.0.0",
-		"@iconify/utils": "^3.1.7"
+		"@iconify/types": "catalog:",
+		"@iconify/utils": "catalog:"
 	},
 	"devDependencies": {
-		"@iconify-json/lucide": "^1.2.149",
-		"@iconify-json/mdi": "^1.2.3",
-		"@iconify-json/tabler": "^1.2.43",
+		"@iconify-json/lucide": "catalog:",
+		"@iconify-json/mdi": "catalog:",
+		"@iconify-json/tabler": "catalog:",
 		"@meekojs/meeko": "workspace:*",
-		"@types/node": "^24.0.0",
-		"typescript": "7.0.2",
-		"vite": "8.3.5"
+		"@types/node": "catalog:",
+		"typescript": "catalog:",
+		"vite": "catalog:"
 	},
 	"peerDependencies": {
 		"@meekojs/meeko": ">=1.8 <2"

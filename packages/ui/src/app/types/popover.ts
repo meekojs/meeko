@@ -65,6 +65,13 @@ export interface PopoverTrigger {
 	readonly 'aria-haspopup': 'menu' | 'dialog' | undefined
 	/** `aria-describedby` de un tooltip (`mode="hint"`): el `id` del contenido. */
 	readonly 'aria-describedby': string | undefined
+	/**
+	 * `interestfor` de un tooltip (`mode="hint"`): el `id` del contenido. En un `<button>` o un enlace, el
+	 * navegador que lo admite abre y cierra el tooltip por su cuenta; sin este atributo, o en otro elemento,
+	 * lo hace `<UIPopover>`, con el mismo resultado.
+	 * @since 1.8.0
+	 */
+	readonly interestfor: string | undefined
 }
 
 /**

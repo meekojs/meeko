@@ -255,7 +255,8 @@ async function renderApp(context, name, config, links, paths) {
 }
 
 const ariaLabels = (html) => [...html.matchAll(/aria-label="([^"]*)"/g)].map((match) => match[1])
-const cards = (html) => [...html.matchAll(/<a\b[^>]*class="meeko-ui-link-card[^"]*"[^>]*>/g)].map((match) => match[0])
+// A <UILinkCard> is the link with its padding token.
+const cards = (html) => [...html.matchAll(/<a\b[^>]*class="[^"]*--ui-link-card-padding[^"]*"[^>]*>/g)].map((match) => match[0])
 const attribute = (tag, name) => new RegExp(`\\s${name}="([^"]*)"`).exec(tag)?.[1]
 
 /** The props and the snippets win in every locale. */
@@ -265,7 +266,7 @@ function assertOverrides(html) {
 	assert.ok(ariaLabels(html).includes('Clear from the prop'), 'clearLabel')
 	assert.ok(ariaLabels(html).includes('Close from the prop'), 'closeLabel')
 	assert.ok(html.includes('Night'), 'the labels of UIThemeToggle')
-	assert.match(html, /data-meeko-theme-icon="dark"[^>]*>\s*<svg[^>]*class="meeko-ui-icon"/, 'UIThemeToggle icons paints the icon')
+	assert.match(html, /data-meeko-theme-icon="dark"[^>]*>\s*<svg[^>]*class="ui:flex-none /, 'UIThemeToggle icons paints the icon')
 }
 
 function assertApp(html, { empty, clear, close, unknown, group, light }) {
@@ -300,9 +301,9 @@ test('SSR with i18n follows the locale of the URL, and UILinkCard to behaves as 
 	assert.equal(attribute(user, 'target'), '_blank')
 	assert.equal(attribute(user, 'rel'), 'noopener noreferrer')
 	assert.equal(attribute(user, 'data-testid'), 'user')
-	assert.match(attribute(user, 'class'), /^meeko-ui-link-card wide/)
+	assert.match(attribute(user, 'class'), /--ui-link-card-padding.* wide$/, 'the class of the app goes after those of the card')
 	// `title` is the text of the card, not an attribute of the link.
 	assert.equal(attribute(user, 'title'), undefined)
-	assert.ok(pages['/en'].includes('<strong class="meeko-ui-link-card-title">Dynamic</strong>'))
+	assert.match(pages['/en'], /<strong class="[^"]*ui:font-medium[^"]*"[^>]*>Dynamic<\/strong>/)
 	assert.ok(pages['/en'].includes('With params'))
 })

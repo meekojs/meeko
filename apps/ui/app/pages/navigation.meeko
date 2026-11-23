@@ -4,6 +4,7 @@
 	const tab = signal<'account' | 'team'>('account')
 	const shown = signal(10)
 	const busy = signal(false)
+	const pageNumber = signal(4)
 	const suggesting = signal(false)
 	const locales = [
 		{ code: 'es', label: 'Español', href: '#locale', current: true },
@@ -14,6 +15,12 @@
 		await new Promise((done) => setTimeout(done, 400))
 		shown.value = Math.min(30, shown.value + 10)
 		busy.value = false
+	}
+	// Simula una navigación lenta: el router pone y quita este atributo en las navegaciones del cliente.
+	function simulateNavigation() {
+		const root = document.documentElement
+		root.setAttribute('data-navigating', '')
+		setTimeout(() => root.removeAttribute('data-navigating'), 2500)
 	}
 </script>
 
@@ -32,10 +39,7 @@
 			y
 			<code>search</code>
 			tipados), además de
-			<code>target</code>,
-			<code>rel</code>,
-			<code>download</code>,
-			<code>hreflang</code>,
+			<code>target</code>, <code>rel</code>, <code>download</code>, <code>hreflang</code>,
 			<code>lang</code>
 			y
 			<code>title</code>. Con
@@ -45,8 +49,7 @@
 			y
 			<code>aria-current</code>
 			lo decide la ruta activa. Con
-			<code>href</code>, es el actual si coincide con la prop
-			<code>current</code>.
+			<code>href</code>, es el actual si coincide con la prop <code>current</code>.
 		</p>
 		<h2 id="tree">UINavigationTree</h2>
 		<p>
@@ -140,8 +143,7 @@
 			<code>panel-&lt;valor&gt;</code>,
 			<code>panel(item)</code>
 			y
-			<code>tab(item)</code>, y el evento
-			<code>change</code>.
+			<code>tab(item)</code>, y el evento <code>change</code>.
 		</p>
 		<h2 id="pagers">UIBreadcrumb, UIPageNavigation y UIPagination</h2>
 		<p>
@@ -153,7 +155,12 @@
 			<code>UIPagination</code>
 			cuenta lo mostrado y carga más: con
 			<code>moreLink</code>
-			es un enlace que funciona sin JavaScript.
+			es un enlace que funciona sin JavaScript. Con
+			<code>pageCount</code>
+			o
+			<code>pageSize</code>
+			pasa al modo numerado: página anterior y siguiente, los números con elipsis y la página actual en
+			<code>model:page</code>; con <code>pageLink</code>, cada página es un enlace.
 		</p>
 		<DocsPreview layout="stack">
 			<UIBreadcrumb
@@ -172,6 +179,13 @@
 				bind:hasMore="shown.value < 30"
 				bind:busy="busy.value"
 				on:loadMore="more"
+			/>
+			<UIPagination
+				label="Paginación numerada de ejemplo"
+				edges
+				model:page="pageNumber"
+				bind:total="137"
+				bind:pageSize="10"
 			/>
 		</DocsPreview>
 		<DocsCode bind:code="examples.pagers" />
@@ -192,14 +206,21 @@
 				{ name: 'hasMore / busy', type: 'boolean', default: 'false', description: 'Si queda más y si está cargando.' },
 				{ name: 'moreLink', type: 'UILinkTarget', description: 'Un enlace en lugar del botón: funciona sin JavaScript.' },
 				{ name: 'loadMoreLabel / loadingLabel', type: 'string', description: 'Textos del botón.' },
+				{ name: 'page', type: 'number', default: '1', description: 'Modo numerado. La página actual; con model:page, el modelo que cambian los botones.' },
+				{ name: 'pageCount / pageSize', type: 'number', description: 'Activan el modo numerado. Sin pageCount, las páginas salen de total entre pageSize, con el recuento «11–20 de 57».' },
+				{ name: 'siblings', type: 'number', default: '1', description: 'Modo numerado. Páginas vecinas de la actual antes de una elipsis.' },
+				{ name: 'edges / disabled', type: 'boolean', default: 'false', description: 'Modo numerado. Añade la primera y la última página, o deshabilita todo.' },
+				{ name: 'pageLink', type: '(page: number) => UILinkTarget', description: 'Modo numerado. Las páginas son enlaces (href o to con search): funcionan sin JavaScript.' },
 				{ name: 'label / class', type: 'string', description: 'Nombre de la navegación y clases.' },
 			]"
 		/>
 		<p>
 			Admite el snippet
 			<code>default</code>
-			y el evento
-			<code>loadMore</code>.
+			y los eventos
+			<code>loadMore</code>
+			y
+			<code>change(page)</code>, éste en el modo numerado.
 		</p>
 		<h2 id="toc">UITableOfContents</h2>
 		<p>
@@ -273,15 +294,48 @@
 				{ name: 'label / class', type: 'string', description: 'Nombre accesible y clases.' },
 			]"
 		/>
+		<h2 id="progress">Barra de progreso de navegación</h2>
+		<p>
+			Mientras el router navega,
+			<code>&lt;html&gt;</code>
+			lleva
+			<code>data-navigating</code>, y la hoja de UI pinta una barra fina arriba, sólo con CSS. Espera
+			<code>--ui-navigation-progress-delay</code>
+			(120 ms), así que una navegación rápida nunca la muestra; avanza hacia el final durante
+			<code>--ui-navigation-progress-duration</code>
+			y, al terminar, se completa y se desvanece. Con
+			<code>prefers-reduced-motion</code>
+			aparece entera, sin moverse. Viene con el módulo: no hay nada que activar.
+		</p>
+		<DocsPreview id="navigation-progress">
+			<UIButton
+				variant="secondary"
+				on:click="simulateNavigation"
+			>
+				Simular una navigación lenta
+			</UIButton>
+		</DocsPreview>
+		<p>
+			Se ajusta con sus tokens, y se quita con un alto de
+			<code>0</code>:
+		</p>
+		<DocsCode
+			label="CSS"
+			bind:code="examples.navigationProgress"
+		/>
+		<DocsApi
+			caption="Tokens de la barra de navegación"
+			bind:rows="[
+				{ name: '--ui-navigation-progress-height', type: 'longitud', default: '0.125rem', description: 'Alto de la barra; 0 la quita.' },
+				{ name: '--ui-navigation-progress-color', type: 'color', default: '--ui-color-primary', description: 'Color de la barra.' },
+				{ name: '--ui-navigation-progress-delay', type: 'tiempo', default: '--ui-duration-fast (120 ms)', description: 'Espera antes de mostrarse.' },
+				{ name: '--ui-navigation-progress-duration', type: 'tiempo', default: '8s', description: 'Lo que tarda en acercarse al final.' },
+				{ name: '--ui-z-progress', type: 'número', default: '40', description: 'Capa, sobre la cabecera fija y los paneles flotantes.' },
+			]"
+		/>
 		<p>
 			Los tipos
-			<code>UINavigationTreeProps</code>,
-			<code>UINavigationTabsProps</code>,
-			<code>UITabsProps</code>,
-			<code>UIBreadcrumbProps</code>,
-			<code>UIPageNavigationProps</code>,
-			<code>UIPaginationProps</code>,
-			<code>UITableOfContentsProps</code>,
+			<code>UINavigationTreeProps</code>, <code>UINavigationTabsProps</code>, <code>UITabsProps</code>, <code>UIBreadcrumbProps</code>, <code>UIPageNavigationProps</code>, <code>UIPaginationProps</code>, <code>UITableOfContentsProps</code>,
 			<code>UILocaleSwitcherProps</code>
 			y
 			<code>UILocaleSuggestionProps</code>

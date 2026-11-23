@@ -13,6 +13,7 @@ import type { ResolvedModules } from './module-loader'
 import { createRouteManifest } from '../app/runtime/router'
 import { isMeekoModule } from '../modules/define-meeko-module'
 import { contentSecurityPolicy } from '../server/runtime/csp'
+import { normalizeDevAllowedHost } from '../server/runtime/dev-hosts'
 import { normalizeDocumentConfig, siteOrigin } from '../shared/head'
 import { resolveThemeConfig } from '../shared/theme'
 import { resolveDevtoolsConfig } from './dev-devtools'
@@ -77,12 +78,14 @@ export function normalizeComponentDirectory(raw: string): string | undefined {
 }
 
 /** Validate component directories from both executed and statically read configuration. */
-export function componentDirectories(config: MeekoConfig['components']): readonly { path: string; prefix: string }[] {
+export function componentDirectories(config: MeekoConfig['components']): readonly { path: string; prefix: string; pathPrefix: boolean }[] {
 	if (config !== undefined && (!isPlainObject(config) || (config.dirs !== undefined && !Array.isArray(config.dirs)))) {
 		throw new TypeError('components.dirs debe ser un array de directorios')
 	}
+	if (config?.pathPrefix !== undefined && typeof config.pathPrefix !== 'boolean') throw new TypeError('components.pathPrefix debe ser un booleano')
+	const pathPrefix = config?.pathPrefix ?? true
 	return [
-		{ path: 'app/components', prefix: '' },
+		{ path: 'app/components', prefix: '', pathPrefix },
 		...(config?.dirs ?? []).map((entry, index) => {
 			if (!isPlainObject(entry) || typeof entry.path !== 'string' || normalizeComponentDirectory(entry.path) === undefined) {
 				throw new TypeError(`components.dirs[${index}].path debe ser una ruta relativa segura`)
@@ -91,7 +94,7 @@ export function componentDirectories(config: MeekoConfig['components']): readonl
 			if (typeof prefix !== 'string' || (prefix !== '' && !/^[A-Z][A-Za-z0-9]*$/.test(prefix))) {
 				throw new TypeError(`components.dirs[${index}].prefix debe ser un nombre PascalCase o una cadena vacía`)
 			}
-			return { path: normalizeComponentDirectory(entry.path)!, prefix }
+			return { path: normalizeComponentDirectory(entry.path)!, prefix, pathPrefix }
 		}),
 	]
 }
@@ -178,6 +181,7 @@ export async function loadMeekoConfig(projectRoot: string): Promise<MeekoConfig>
 		})
 	}
 	validateAliasOption(config.alias, file, root)
+	validateTypeScriptOption((config as { typescript?: unknown }).typescript, file)
 	const modules = config.modules as unknown
 	if (modules !== undefined) {
 		const reference = (value: unknown): boolean => (typeof value === 'string' && value !== '') || isMeekoModule(value)
@@ -188,6 +192,11 @@ export async function loadMeekoConfig(projectRoot: string): Promise<MeekoConfig>
 	}
 	const document = config.document as Record<string, unknown> | undefined
 	if (config.viewTransitions !== undefined && typeof config.viewTransitions !== 'boolean') throw new TypeError(`${file}: viewTransitions debe ser un booleano`)
+	const check = config.check as Record<string, unknown> | undefined
+	if (check !== undefined) {
+		if (!check || typeof check !== 'object' || Array.isArray(check)) throw new TypeError(`${file}: check debe ser un objeto`)
+		if (check.attributeValues !== undefined && check.attributeValues !== 'warn' && check.attributeValues !== 'strict') throw new TypeError(`${file}: check.attributeValues debe ser "warn" o "strict"`)
+	}
 	if (document !== undefined) {
 		if (!document || typeof document !== 'object' || Array.isArray(document)) throw new TypeError(`${file}: document debe ser un objeto`)
 		if (document.lang !== undefined && typeof document.lang !== 'string') throw new TypeError(`${file}: document.lang debe ser una cadena`)
@@ -206,6 +215,13 @@ export async function loadMeekoConfig(projectRoot: string): Promise<MeekoConfig>
 	if (dev !== undefined) {
 		if (!dev || typeof dev !== 'object' || Array.isArray(dev)) throw new TypeError(`${file}: dev debe ser un objeto`)
 		if (dev.serverLogs !== undefined && typeof dev.serverLogs !== 'boolean') throw new TypeError(`${file}: dev.serverLogs debe ser un booleano`)
+		if (dev.allowedHosts !== undefined && dev.allowedHosts !== true) {
+			if (!Array.isArray(dev.allowedHosts)) throw new TypeError(`${file}: dev.allowedHosts debe ser true o una lista de hosts`)
+			for (const [index, entry] of (dev.allowedHosts as unknown[]).entries()) {
+				const result = normalizeDevAllowedHost(entry)
+				if ('error' in result) throw new TypeError(`${file}: dev.allowedHosts[${index}] ${result.error}`)
+			}
+		}
 	}
 	resolveDevtoolsConfig(config.devtools, `${file}: devtools`)
 	// `document.theme` is what the build bakes from `theme`; the configuration has one place for it.
@@ -280,6 +296,38 @@ function validateAliasOption(value: unknown, file: string, root: string): void {
 		if (isAbsolute(target) || !inside(root, resolve(root, target))) {
 			throw new TypeError(`${file}: alias ${JSON.stringify(prefix)} debe ser una ruta relativa dentro del proyecto (su carpeta o la de un layer): ${target}`)
 		}
+	}
+}
+
+/** The compiler options an application may change in the generated tsconfigs, by value type. */
+export const typeScriptCompilerOptionKinds = {
+	target: 'string',
+	lib: 'strings',
+	exactOptionalPropertyTypes: 'boolean',
+	noUncheckedIndexedAccess: 'boolean',
+	noImplicitOverride: 'boolean',
+	noImplicitReturns: 'boolean',
+	noFallthroughCasesInSwitch: 'boolean',
+	noPropertyAccessFromIndexSignature: 'boolean',
+	noUnusedLocals: 'boolean',
+	noUnusedParameters: 'boolean',
+	useUnknownInCatchVariables: 'boolean',
+} as const
+
+/** Checks `typescript`: only `compilerOptions`, with the options Meeko lets an application change. */
+function validateTypeScriptOption(value: unknown, file: string): void {
+	if (value === undefined) return
+	if (!isPlainObject(value)) throw new TypeError(`${file}: typescript debe ser un objeto, como { compilerOptions: { target: "ES2023" } }`)
+	onlyFields(value, ['compilerOptions'], `${file}: typescript`)
+	const options = value.compilerOptions
+	if (options === undefined) return
+	if (!isPlainObject(options)) throw new TypeError(`${file}: typescript.compilerOptions debe ser un objeto`)
+	const allowed = Object.keys(typeScriptCompilerOptionKinds)
+	for (const [name, option] of Object.entries(options)) {
+		const kind = (typeScriptCompilerOptionKinds as Record<string, string>)[name]
+		if (kind === undefined) throw new TypeError(`${file}: typescript.compilerOptions.${name} no se puede cambiar: Meeko lo necesita para compilar la aplicación. Se admiten ${allowed.join(', ')}`)
+		const valid = kind === 'boolean' ? typeof option === 'boolean' : kind === 'string' ? typeof option === 'string' && option.trim() !== '' : Array.isArray(option) && option.length > 0 && option.every((entry) => typeof entry === 'string' && entry.trim() !== '')
+		if (!valid) throw new TypeError(`${file}: typescript.compilerOptions.${name} debe ser ${kind === 'boolean' ? 'true o false' : kind === 'string' ? 'un texto no vacío' : 'un array no vacío de textos'}`)
 	}
 }
 
@@ -419,10 +467,15 @@ export function readMeekoConfigSync(projectRoot: string): MeekoConfig {
 	let componentDirs: MeekoConfig['components']
 	if (components !== undefined) {
 		if (!ts.isObjectLiteralExpression(components)) throw new TypeError(`${file}: components debe ser un objeto literal para que el editor lo lea`)
+		const pathPrefix = property(components, 'pathPrefix')
+		if (pathPrefix !== undefined && pathPrefix.kind !== ts.SyntaxKind.TrueKeyword && pathPrefix.kind !== ts.SyntaxKind.FalseKeyword) {
+			throw new TypeError(`${file}: components.pathPrefix debe ser un booleano literal para que el editor lo lea`)
+		}
 		const dirs = property(components, 'dirs')
 		if (dirs !== undefined) {
 			if (!ts.isArrayLiteralExpression(dirs)) throw new TypeError(`${file}: components.dirs debe ser un array literal para que el editor lo lea`)
 			componentDirs = {
+				...(pathPrefix ? { pathPrefix: pathPrefix.kind === ts.SyntaxKind.TrueKeyword } : {}),
 				dirs: dirs.elements.map((element, index) => {
 					if (!ts.isObjectLiteralExpression(element)) throw new TypeError(`${file}: components.dirs[${index}] debe ser un objeto literal`)
 					const path = property(element, 'path')
@@ -434,7 +487,7 @@ export function readMeekoConfigSync(projectRoot: string): MeekoConfig {
 				}),
 			}
 			componentDirectories(componentDirs)
-		} else componentDirs = {}
+		} else componentDirs = pathPrefix ? { pathPrefix: pathPrefix.kind === ts.SyntaxKind.TrueKeyword } : {}
 	}
 	const importDirs: { -readonly [Option in ImportDirectoryOption]?: readonly string[] } = {}
 	for (const option of importDirectoryOptions) {
@@ -448,7 +501,12 @@ export function readMeekoConfigSync(projectRoot: string): MeekoConfig {
 	const modules = moduleList && ts.isArrayLiteralExpression(moduleList) ? moduleList.elements.filter(ts.isStringLiteral).map((entry) => entry.text) : undefined
 	// Only a literal object is known; otherwise the editor uses the default aliases.
 	const alias = staticAliasOption(config)
+	// `check.attributeValues`: the mode of MEEK122, a string literal.
+	const checkOption = property(config, 'check')
+	const attributeValues = checkOption && ts.isObjectLiteralExpression(checkOption) ? property(checkOption, 'attributeValues') : undefined
+	const attributeMode = attributeValues && ts.isStringLiteralLike(attributeValues) && (attributeValues.text === 'strict' || attributeValues.text === 'warn') ? attributeValues.text : undefined
 	return {
+		...(attributeMode ? { check: { attributeValues: attributeMode } } : {}),
 		...(alias ? { alias } : {}),
 		...(layers ? { layers } : {}),
 		...(extensions ? { extends: extensions } : {}),

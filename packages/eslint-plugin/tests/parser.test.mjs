@@ -9,6 +9,11 @@ import parser from '../dist/parser.js'
 const lint = (source, rules = {}) => new Linter().verify(source, [...plugin.configs.recommended, { files: ['**/*.meeko'], rules }], { filename: 'App.meeko' })
 const unused = (source) => lint(source).filter((message) => message.ruleId === '@typescript-eslint/no-unused-vars')
 
+test('if and else-if expressions count as template reads while else remains a boolean directive', () => {
+	const source = '<script lang="ts">const loading=true;const failed=false;</script><template><p if="loading">Cargando</p><p else-if="failed">Error</p><p else>Listo</p></template>'
+	assert.deepEqual(lint(source), [])
+})
+
 test('script variables, imported components and type-only imports are read by the template', () => {
 	const messages = lint(`<script lang="ts">
 import Card from './Card.meeko';
@@ -135,6 +140,17 @@ test('server exports read by the compiler are not useless assignments', () => {
 		['local', 'local'],
 	)
 	assert.deepEqual(lint(`<script server lang="ts">export const route = definePage({});</script><template></template>`, rules), [])
+})
+
+test('a list read only by each:of is used after a branching template expression', () => {
+	const rules = { 'no-useless-assignment': 'error' }
+	for (const template of ['<p>{ready ? 1 : 2}</p><p each:of="columns" each:as="column" each:key="column">{column}</p>', '<div if:when="a && b"><p each:as="column" each:of="columns">{column}<i each:of="column" each:as="cell">{cell}</i></p></div>']) {
+		const messages = lint(`<script lang="ts">const columns = [[1]]</script><template>${template}</template>`, rules)
+		assert.deepEqual(
+			messages.filter((message) => message.ruleId === 'no-useless-assignment' || message.ruleId === '@typescript-eslint/no-unused-vars' || message.fatal),
+			[],
+		)
+	}
 })
 
 test('entity references in interpolations are decoded like the compiler does', () => {

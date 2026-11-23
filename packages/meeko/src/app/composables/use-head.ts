@@ -55,6 +55,8 @@ export function useHead(input: HeadSource<HeadInput>): void {
 		return
 	}
 	const entry = manager.register!(level)
-	effect(() => manager.update!(entry, normalizeHeadInput(read(), 'useHead')))
+	effect(() => {
+		manager.update!(entry, normalizeHeadInput(read(), 'useHead'))
+	})
 	onCleanup(() => manager.remove!(entry))
 }

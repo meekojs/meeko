@@ -2,6 +2,7 @@ import type { UIDefaults, UIOptions, UITokens } from './app/types/config'
 import type { UIMessageOverrides, UIMessages, UIMessagesConfig } from './app/types/messages'
 
 import { builtinMessages, canonicalLocale } from './app/utils/messages'
+import { validateDefaults } from './defaults'
 
 /**
  * The variables each option sets. `surface` and `surfaceHover` predate the split into surfaces and
@@ -85,17 +86,7 @@ export function validateOptions(options: UIOptions): void {
 			if (typeof value !== 'string' || !value.trim() || /[;{}\r\n]/.test(value)) throw new TypeError(`ui: invalid CSS value for tokens.${key}`)
 		}
 	}
-	if (options.defaults !== undefined) {
-		object(options.defaults, 'defaults')
-		for (const [component, settings] of Object.entries(options.defaults)) {
-			if (!['button', 'link', 'card'].includes(component)) throw new TypeError(`ui: unknown defaults component ${component}`)
-			object(settings, `defaults.${component}`)
-			for (const [key, value] of Object.entries(settings)) {
-				const allowed = key === 'variant' ? (component === 'card' ? ['outline', 'soft', 'solid', 'elevated'] : ['primary', 'secondary', 'outline', 'ghost']) : component !== 'card' && key === 'size' ? ['sm', 'md', 'lg'] : component !== 'card' && key === 'shape' ? ['rounded', 'pill'] : []
-				if (!allowed.includes(value as string)) throw new TypeError(`ui: invalid defaults.${component}.${key}`)
-			}
-		}
-	}
+	if (options.defaults !== undefined) validateDefaults(options.defaults)
 }
 
 /**

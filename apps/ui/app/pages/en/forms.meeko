@@ -93,8 +93,8 @@
 			caption="UIInput props"
 			bind:rows="[
 				{ name: 'model', type: 'Signal<string>', default: 'Empty string', description: 'Two-way text model; it updates on input.' },
-				{ name: 'type', type: 'text | email | password | search | url | tel | date | datetime-local', default: 'text', description: 'Native type of the control. The date picker is the browser one.' },
-				{ name: 'autocomplete / min / max / step', type: 'HTML attributes', description: 'They reach the input as they are, like autocapitalize and spellcheck.' },
+				{ name: 'type', type: 'text | email | password | search | url | tel | number | date | datetime-local | time | month', default: 'text', description: 'Native type of the control. The date and time pickers are the browser ones. With number, time and month the model is still text (“42”, “09:30”, “2026-11” or empty): convert it where you use it.' },
+				{ name: 'autocomplete / inputmode / min / max / step', type: 'HTML attributes', description: 'They reach the input as they are, like autocapitalize and spellcheck.' },
 				{ name: 'id / name / placeholder', type: 'string', description: 'Attributes of the input.' },
 				{ name: 'describedBy', type: 'string', description: 'IDs of the description and the error for aria-describedby.' },
 				{ name: 'required / disabled / invalid', type: 'boolean', default: 'false', description: 'State of the control. invalid sets aria-invalid.' },
@@ -104,9 +104,7 @@
 		<h2 id="other-controls">Other controls</h2>
 		<p>
 			The text area, checkboxes, radios, switch and slider are in
-			<MeekoLink to="/controls">Form controls</MeekoLink>. To choose between options, use
-			<MeekoLink to="/select">UISelect</MeekoLink>, a native
-			<code>select</code>, or
+			<MeekoLink to="/controls">Form controls</MeekoLink>. To choose between options, use <MeekoLink to="/select">UISelect</MeekoLink>, a native <code>select</code>, or
 			<code>UICombobox</code>
 			when you need search or multiple selection. They replace the deprecated core tag
 			<code>MeekoSelect</code>.

@@ -2,14 +2,15 @@ import type { Connection, Diagnostic, InitializeResult, Position, Range, Semanti
 
 import ts from '@typescript/typescript6'
 import { createHash } from 'node:crypto'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, dirname, isAbsolute, join, relative, sep } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { TextDocument } from 'vscode-languageserver-textdocument'
-import { CodeActionKind, CodeLensRefreshRequest, createConnection, DiagnosticSeverity, DidChangeConfigurationNotification, DidChangeWatchedFilesNotification, RequestType, TextDocuments, TextDocumentSyncKind, WatchKind } from 'vscode-languageserver/node'
+import { CodeActionKind, CodeLensRefreshRequest, CompletionRequest, createConnection, DefinitionRequest, DiagnosticSeverity, DidChangeConfigurationNotification, DidChangeTextDocumentNotification, DidChangeWatchedFilesNotification, DidCloseTextDocumentNotification, DidOpenTextDocumentNotification, HoverRequest, ReferencesRequest, RenameRequest, RequestType, TextDocuments, TextDocumentSyncKind, WatchKind } from 'vscode-languageserver/node'
 
 import type { ClassSettings } from './classes'
+import type { CssVariableSettings } from './css-variables'
 import type { CompletionData, FeatureContext, LocatedDocument, MeekoFormatSettings } from './features'
 import type { ExecutionZoneKind, ExecutionZoneReason } from './zones'
 
@@ -17,10 +18,11 @@ import { MeekoCompileError } from '../compiler/parser/sfc'
 import { projectRoot } from '../compiler/project-root'
 import { checkFrameworkPageContracts } from '../framework/page-contracts-check'
 import { classCompletion, classDefinition, classHover, ClassIndex, classView, configuredClassView, isClassCompletionData, resolveClassCompletion, withItemDefaults } from './classes'
-import { cssVariableCompletion, cssVariableDefinition, cssVariableHover, isCssVariableCompletionData, resolveCssVariableCompletion } from './css-variables'
+import { collectCssVariableProject, cssVariableReferences, prepareCssVariableRename, renameCssVariable } from './css-variable-refactor'
+import { cssVariableCompletion, cssVariableDefinition, cssVariableHover, cssVariableTokenAt, isCssVariableCompletionData, resolveCssVariableCompletion } from './css-variables'
 import { componentDiagnostics, contractRange, frameworkContractRoot, projectCheckRoot, tokenEnd } from './diagnostics'
 import { colorPresentations, cssCompletion, cssHover, documentColors, htmlCompletion, htmlHover, linkedEditingRanges, specialTemplateHover, styleDiagnostics, tagCompletion } from './embedded'
-import { codeActions, completionList, componentNameCompletion, componentTagMembers, definition, directiveNameCompletion, documentSymbols, foldingRanges, formatting, hover, prepareRename, references, rename, resolveCompletion, semanticTokens, semanticTokensLegend, shadowedTagsOf, signatureHelp } from './features'
+import { codeActions, completionList, componentNameCompletion, componentTagMembers, definition, directiveNameCompletion, documentSymbols, foldingRanges, formatting, hover, prepareRename, references, rename, resolveCompletion, semanticTokens, semanticTokensEdits, semanticTokensInRange, semanticTokensLegend, shadowedTagsOf, signatureHelp } from './features'
 import { codeLenses } from './lenses'
 import { documentLinks, inlayHints, linkRouteCompletion, workspaceSymbols } from './nav'
 import { MeekoProject, MeekoWorkspace, pathKey } from './project'
@@ -62,12 +64,25 @@ export interface LanguageServerInitializationOptions {
 	/** Espera en milisegundos antes de comprobar un documento editado. Por defecto 300. */
 	readonly diagnosticsDelay?: number
 	/**
+	 * Prepara en segundo plano las aplicaciones de las carpetas del workspace al iniciar, para que
+	 * el primer componente abierto reciba colores y hover sin esperar al programa TypeScript.
+	 * Por defecto es `true`.
+	 */
+	readonly warmup?: boolean
+	/**
+	 * Componentes abiertos en el editor al iniciar (rutas de archivo): sus proyectos se preparan
+	 * primero. Sin ellos se preparan las aplicaciones que se encuentren en las carpetas.
+	 */
+	readonly warmupFiles?: readonly string[]
+	/**
 	 * Opciones de formato para clientes sin `workspace/configuration`. Si el cliente la admite,
 	 * prevalece su sección `meeko.format`.
 	 */
 	readonly format?: MeekoFormatSettings
 	/** Ajustes de clases para clientes sin workspace/configuration. */
 	readonly classes?: ClassSettings
+	/** Controles independientes de completado, hover y definición de variables CSS. */
+	readonly cssVariables?: CssVariableSettings
 }
 
 /** Normaliza la sección `meeko.format`; `undefined` si el cliente no la define. */
@@ -106,6 +121,37 @@ function uriToPath(uri: string): string | undefined {
 	} catch {
 		return undefined
 	}
+}
+
+/** Most applications prepared on start: each TypeScript program holds memory until the server stops. */
+const warmupLimit = 2
+const skippedFolders = new Set(['node_modules', 'dist', 'build', 'out', 'coverage'])
+
+/**
+ * Aplicaciones Meeko (carpetas con `meeko.config.*`) de las carpetas del workspace: primero las
+ * propias carpetas y después hasta dos niveles por debajo (`apps/web`), como mucho {@link warmupLimit}.
+ * @param folders Carpetas del workspace.
+ * @returns Raíces de las aplicaciones que se preparan al iniciar.
+ */
+export function applicationRoots(folders: readonly string[]): string[] {
+	const found: string[] = []
+	const isApplication = (folder: string): boolean => ['ts', 'mts', 'js', 'mjs'].some((extension) => existsSync(join(folder, `meeko.config.${extension}`)))
+	const children = (folder: string): string[] => {
+		try {
+			return readdirSync(folder, { withFileTypes: true })
+				.filter((entry) => entry.isDirectory() && !entry.name.startsWith('.') && !skippedFolders.has(entry.name))
+				.map((entry) => join(folder, entry.name))
+				.sort()
+		} catch {
+			return []
+		}
+	}
+	let level = [...folders]
+	for (let depth = 0; depth <= 2 && level.length && found.length < warmupLimit; depth++) {
+		for (const folder of level) if (found.length < warmupLimit && isApplication(folder)) found.push(folder)
+		level = level.filter((folder) => !isApplication(folder)).flatMap(children)
+	}
+	return found
 }
 
 /**
@@ -168,12 +214,20 @@ export function startLanguageServer(connection: Connection): void {
 	let configurationSupport = false
 	let configurationRegistration = false
 	let codeLensRefresh = false
+	/** Prepares the applications of the workspace folders before a component opens; see {@link warmProjects}. */
+	let warmup = true
+	/** The running warm-up: shutdown awaits it, since loading a configuration writes under `.meeko/`. */
+	let warming: Promise<void> = Promise.resolve()
+	let warmupFiles: readonly string[] = []
 	let deleteFiles = false
 	let createFiles = false
+	let versionedEdits = false
 	/** The client reads `editRange` and `data` from `itemDefaults` of a completion list (LSP 3.17). */
 	let completionDefaults = false
 	let formatFallback: MeekoFormatSettings = {}
 	let classesFallback: ClassSettings = {}
+	let variablesFallback: CssVariableSettings = {}
+	let cssRegistration: { completion: boolean; hover: boolean; definition: boolean; references: boolean; rename: boolean } | undefined
 	/** Workspace folders of the client, the reference of {@link ignoredChange}. */
 	let folders: string[] = []
 	/** After `shutdown` nothing reaches the client: late results of running work are dropped. */
@@ -202,14 +256,27 @@ export function startLanguageServer(connection: Connection): void {
 	const semanticCache = new Map<string, { version: number; tokens: SemanticTokens }>()
 	/** CSS classes of each project, by {@link pathKey} of its root. */
 	const classIndexes = new Map<string, ClassIndex>()
-	const classesOf = (project: MeekoProject): ClassIndex => {
-		const key = pathKey(project.root)
+	const indexOf = (root: string): ClassIndex => {
+		const key = pathKey(root)
 		let index = classIndexes.get(key)
 		if (!index) {
-			index = new ClassIndex(project.root)
+			index = new ClassIndex(root)
 			classIndexes.set(key, index)
 		}
 		return index
+	}
+	const classesOf = (project: MeekoProject): ClassIndex => indexOf(project.root)
+	/** CSS sólo aporta variables: no crea un proyecto TypeScript ni ejecuta configuración. */
+	const stylesheetIndex = (uri: string): ClassIndex | undefined => {
+		const filename = uriToPath(uri)
+		if (!filename?.toLowerCase().endsWith('.css') || ignoredChange(filename, folders)) return undefined
+		const root = projectRoot(filename)
+		if (!['ts', 'js', 'mts', 'mjs', 'cts', 'cjs'].some((extension) => existsSync(join(root, `meeko.config.${extension}`)))) return undefined
+		return indexOf(root)
+	}
+	const syncStylesheet = (document: TextDocument): void => {
+		const filename = uriToPath(document.uri)
+		if (filename) stylesheetIndex(document.uri)?.setStylesheet(filename, document.getText())
 	}
 	/** An open component with its project ready, for the features that read classes. */
 	const componentOf = async (uri: string): Promise<{ document: TextDocument; filename: string; project: MeekoProject } | undefined> => {
@@ -219,6 +286,27 @@ export function startLanguageServer(connection: Connection): void {
 		const project = documentProject(uri, filename)
 		await project.ready()
 		return { document, filename, project }
+	}
+	const variableViewOf = async (uri: string) => {
+		const document = documents.get(uri)
+		const filename = documentPath(uri)
+		if (!document || !filename) return undefined
+		if (filename.toLowerCase().endsWith('.css')) {
+			const index = stylesheetIndex(uri)
+			return index ? { document, view: () => index.view(filename, document.getText(), []) } : undefined
+		}
+		const open = await componentOf(uri)
+		return open ? { document, view: () => classView(document, filename, classesOf(open.project), open.project.componentSources()) } : undefined
+	}
+	/** La búsqueda de variables no inicializa TypeScript ni ejecuta configuración de la app. */
+	const variableProjectOf = (uri: string, position: Position) => {
+		const document = documents.get(uri)
+		const filename = documentPath(uri)
+		if (!document || !filename || !cssVariableTokenAt(document.getText(), document.offsetAt(position), document.languageId)) return undefined
+		const css = filename.toLowerCase().endsWith('.css')
+		const index = css ? stylesheetIndex(uri) : indexOf(projectRoot(filename))
+		if (!index) return undefined
+		return { document, project: collectCssVariableProject(index.root, document, documents.all(), index.view(filename, document.getText(), []).sources) }
 	}
 
 	const openDocument = (filename: string): TextDocument | undefined => {
@@ -403,7 +491,7 @@ export function startLanguageServer(connection: Connection): void {
 
 	const contractRootOf = (document: TextDocument): string | undefined => {
 		const filename = uriToPath(document.uri)
-		return filename ? frameworkContractRoot(filename) : undefined
+		return filename?.endsWith('.meeko') ? frameworkContractRoot(filename) : undefined
 	}
 
 	connection.onInitialize((params): InitializeResult => {
@@ -412,16 +500,30 @@ export function startLanguageServer(connection: Connection): void {
 		folders = (params.workspaceFolders?.map((folder) => folder.uri) ?? (params.rootUri ? [params.rootUri] : [])).flatMap((uri) => uriToPath(uri) ?? [])
 		contracts = options.projectContracts !== false
 		if (typeof options.diagnosticsDelay === 'number' && options.diagnosticsDelay >= 0) delay = options.diagnosticsDelay
+		warmup = options.warmup !== false
+		warmupFiles = Array.isArray(options.warmupFiles) ? options.warmupFiles.filter((file): file is string => typeof file === 'string' && file.endsWith('.meeko')) : []
 		semanticRefresh = params.capabilities.workspace?.semanticTokens?.refreshSupport === true
 		watchedRegistration = params.capabilities.workspace?.didChangeWatchedFiles?.dynamicRegistration === true
 		configurationSupport = params.capabilities.workspace?.configuration === true
 		configurationRegistration = params.capabilities.workspace?.didChangeConfiguration?.dynamicRegistration === true
 		codeLensRefresh = params.capabilities.workspace?.codeLens?.refreshSupport === true
 		const workspaceEdit = params.capabilities.workspace?.workspaceEdit
+		versionedEdits = workspaceEdit?.documentChanges === true
 		deleteFiles = workspaceEdit?.documentChanges === true && (workspaceEdit.resourceOperations ?? []).includes('delete')
 		createFiles = workspaceEdit?.documentChanges === true && (workspaceEdit.resourceOperations ?? []).includes('create')
 		formatFallback = formatSettingsOf(options.format) ?? {}
 		classesFallback = options.classes ?? {}
+		variablesFallback = options.cssVariables ?? {}
+		cssRegistration =
+			params.capabilities.textDocument?.synchronization?.dynamicRegistration === true
+				? {
+						completion: params.capabilities.textDocument?.completion?.dynamicRegistration === true,
+						hover: params.capabilities.textDocument?.hover?.dynamicRegistration === true,
+						definition: params.capabilities.textDocument?.definition?.dynamicRegistration === true,
+						references: params.capabilities.textDocument?.references?.dynamicRegistration === true,
+						rename: params.capabilities.textDocument?.rename?.dynamicRegistration === true,
+					}
+				: undefined
 		const defaults = params.capabilities.textDocument?.completion?.completionList?.itemDefaults ?? []
 		completionDefaults = defaults.includes('editRange') && defaults.includes('data')
 		const version = packageVersion()
@@ -444,16 +546,57 @@ export function startLanguageServer(connection: Connection): void {
 				documentFormattingProvider: true,
 				codeActionProvider: { codeActionKinds: [CodeActionKind.QuickFix, CodeActionKind.RefactorRewrite] },
 				codeLensProvider: { resolveProvider: false },
-				semanticTokensProvider: { legend: semanticTokensLegend, full: true },
+				semanticTokensProvider: { legend: semanticTokensLegend, full: { delta: true }, range: true },
 			},
 			serverInfo: { name: 'meeko-language-server', ...(version ? { version } : {}) },
 		}
 	})
 
+	/**
+	 * Builds the TypeScript program of the workspace applications in the background. Without it the
+	 * first semantic tokens of a component wait ~1 s and the editor first paints it without colors.
+	 */
+	const warmProjects = async (): Promise<void> => {
+		// The open tabs say which applications the user works on; in a monorepo the folder search
+		// alone would pick the first ones by name.
+		const projects = new Map<string, MeekoProject>()
+		for (const file of warmupFiles.slice(0, warmupLimit * 4)) {
+			const project = workspace.projectFor(file)
+			projects.set(pathKey(project.root), project)
+		}
+		if (!projects.size) for (const root of applicationRoots(folders)) projects.set(pathKey(root), workspace.projectFor(join(root, 'app', 'app.meeko')))
+		for (const project of [...projects.values()].slice(0, warmupLimit)) {
+			if (stopped) return
+			const started = performance.now()
+			try {
+				await project.warm()
+				log(`${project.root}: proyecto preparado en ${Math.round(performance.now() - started)} ms`)
+			} catch (error) {
+				log(`${project.root}: no se pudo preparar el proyecto: ${error instanceof Error ? error.message : String(error)}`)
+			}
+		}
+	}
+
 	connection.onInitialized(() => {
+		// Registros específicos: CSS no recibe formato, diagnósticos ni otras funciones de .meeko.
+		if (cssRegistration) {
+			const patterns = folders.length ? folders.map((folder) => `${folder.replaceAll('\\', '/').replace(/\/$/, '')}/**/*.css`) : ['**/*.css']
+			const documentSelector = patterns.flatMap((pattern) => ['css', 'tailwindcss'].map((language) => ({ language, scheme: 'file', pattern })))
+			void Promise.all([
+				connection.client.register(DidOpenTextDocumentNotification.type, { documentSelector }),
+				connection.client.register(DidChangeTextDocumentNotification.type, { documentSelector, syncKind: TextDocumentSyncKind.Incremental }),
+				connection.client.register(DidCloseTextDocumentNotification.type, { documentSelector }),
+				...(cssRegistration.completion ? [connection.client.register(CompletionRequest.type, { documentSelector, triggerCharacters: ['-'], resolveProvider: true })] : []),
+				...(cssRegistration.hover ? [connection.client.register(HoverRequest.type, { documentSelector })] : []),
+				...(cssRegistration.definition ? [connection.client.register(DefinitionRequest.type, { documentSelector })] : []),
+				...(cssRegistration.references ? [connection.client.register(ReferencesRequest.type, { documentSelector })] : []),
+				...(cssRegistration.rename ? [connection.client.register(RenameRequest.type, { documentSelector, prepareProvider: true })] : []),
+			]).catch((error: unknown) => log(`No se pudieron registrar las funciones de variables CSS: ${String(error)}`))
+		}
 		// A pull-model client (VS Code) only notifies setting changes for a registered section; the
 		// notification clears the cached meeko.classes settings of each document.
 		if (configurationSupport && configurationRegistration) void connection.client.register(DidChangeConfigurationNotification.type, { section: 'meeko' })
+		if (warmup) warming = warmProjects()
 		if (!watchedRegistration) return
 		void connection.client.register(DidChangeWatchedFilesNotification.type, {
 			watchers: [
@@ -471,6 +614,7 @@ export function startLanguageServer(connection: Connection): void {
 	})
 
 	documents.onDidOpen(({ document }) => {
+		syncStylesheet(document)
 		openVersions.set(document.uri, document.version)
 		const entry = virtualDocument(document.uri)
 		const filename = entry?.filename ?? uriToPath(document.uri)
@@ -480,6 +624,7 @@ export function startLanguageServer(connection: Connection): void {
 	})
 
 	documents.onDidChangeContent(({ document }) => {
+		syncStylesheet(document)
 		if (openVersions.get(document.uri) !== document.version && contractDiagnostics.delete(document.uri)) publish(document.uri)
 		scheduleCheck(document)
 	})
@@ -488,19 +633,25 @@ export function startLanguageServer(connection: Connection): void {
 		scheduleCheck(document)
 		// Any component or module of the application: a component's declaration feeds the pages' contracts.
 		const filename = uriToPath(document.uri)
-		const root = filename && projectCheckRoot(filename)
+		const root = filename?.endsWith('.meeko') && projectCheckRoot(filename)
 		if (root) scheduleContractCheck(root, document)
 	})
 
 	documents.onDidClose(({ document }) => {
 		classSettingsCache.delete(document.uri)
+		variableSettingsCache.delete(document.uri)
 		clearTimeout(timers.get(document.uri))
 		timers.delete(document.uri)
 		const edited = openVersions.get(document.uri) !== document.version
 		openVersions.delete(document.uri)
 		semanticCache.delete(document.uri)
+		sentTokens.delete(document.uri)
 		const virtual = virtualProjects.get(document.uri)
 		const filename = virtual?.filename ?? uriToPath(document.uri)
+		if (filename?.toLowerCase().endsWith('.css')) {
+			stylesheetIndex(document.uri)?.closeStylesheet(filename)
+			return
+		}
 		if (virtual) {
 			virtual.project.dispose()
 			virtualProjects.delete(document.uri)
@@ -551,7 +702,9 @@ export function startLanguageServer(connection: Connection): void {
 		const pushed = formatSettingsOf((settings as { meeko?: { format?: unknown } } | null | undefined)?.meeko?.format)
 		if (pushed) formatFallback = pushed
 		classesFallback = (settings as { meeko?: { classes?: ClassSettings } } | undefined)?.meeko?.classes ?? classesFallback
+		variablesFallback = (settings as { meeko?: { cssVariables?: CssVariableSettings } } | undefined)?.meeko?.cssVariables ?? variablesFallback
 		classSettingsCache.clear()
+		variableSettingsCache.clear()
 	})
 
 	/** Opciones `meeko.format` vigentes para un documento, pedidas al cliente en cada formateo. */
@@ -573,6 +726,19 @@ export function startLanguageServer(connection: Connection): void {
 	 * later, and that sends no notification.
 	 */
 	const classSettingsCache = new Map<string, { readonly settings: Promise<ClassSettings>; readonly until: number }>()
+	const variableSettingsCache = new Map<string, Promise<CssVariableSettings>>()
+	const variableSettingsFor = (uri: string): Promise<CssVariableSettings> => {
+		if (!configurationSupport) return Promise.resolve(variablesFallback)
+		let cached = variableSettingsCache.get(uri)
+		if (!cached) {
+			cached = Promise.resolve(connection.workspace.getConfiguration({ scopeUri: uri, section: 'meeko.cssVariables' }) as Promise<CssVariableSettings | null | undefined>).then(
+				(value) => value ?? variablesFallback,
+				() => variablesFallback,
+			)
+			variableSettingsCache.set(uri, cached)
+		}
+		return cached
+	}
 	const classSettingsFor = async (uri: string): Promise<ClassSettings> => {
 		if (!configurationSupport) return classesFallback
 		const cached = classSettingsCache.get(uri)
@@ -591,6 +757,14 @@ export function startLanguageServer(connection: Connection): void {
 		// `<A` in the template: the component is usually unparsable while the tag is being typed.
 		const document = documents.get(textDocument.uri)
 		const filename = documentPath(textDocument.uri)
+		const variableSettings = await variableSettingsFor(textDocument.uri)
+		if (document && variableSettings.completion === false && cssVariableTokenAt(document.getText(), document.offsetAt(position), document.languageId)) return null
+		if (document && filename?.toLowerCase().endsWith('.css')) {
+			if (variableSettings.completion === false) return null
+			const open = await variableViewOf(textDocument.uri)
+			const items = open && cssVariableCompletion(document, position, open.view)
+			return items ? (completionDefaults ? withItemDefaults(items) : items) : null
+		}
 		if (document && filename?.endsWith('.meeko')) {
 			const project = documentProject(textDocument.uri, filename)
 			await project.ready()
@@ -612,7 +786,7 @@ export function startLanguageServer(connection: Connection): void {
 			const members = await withContext(textDocument.uri, (context) => componentTagMembers(context, position))
 			const directives = directiveNameCompletion(document, position, shadowed, members ?? undefined)
 			if (directives) return directives
-			const variables = cssVariableCompletion(document, position, () => classView(document, filename, classesOf(project), project.componentSources()))
+			const variables = variableSettings.completion === false ? undefined : cssVariableCompletion(document, position, () => classView(document, filename, classesOf(project), project.componentSources()))
 			if (variables) return completionDefaults ? withItemDefaults(variables) : variables
 			const classes = classCompletion(document, position, filename, classesOf(project), project.componentSources(), await classSettingsFor(textDocument.uri))
 			if (classes) return completionDefaults ? withItemDefaults(classes) : classes
@@ -626,8 +800,9 @@ export function startLanguageServer(connection: Connection): void {
 	})
 	connection.onCompletionResolve(async (item) => {
 		if (isCssVariableCompletionData(item.data)) {
-			const open = await componentOf(item.data.meekoCssVariable)
-			return open ? resolveCssVariableCompletion(item, classView(open.document, open.filename, classesOf(open.project), open.project.componentSources())) : item
+			if ((await variableSettingsFor(item.data.meekoCssVariable)).completion === false) return item
+			const open = await variableViewOf(item.data.meekoCssVariable)
+			return open ? resolveCssVariableCompletion(item, open.view()) : item
 		}
 		if (isClassCompletionData(item.data)) {
 			const open = await componentOf(item.data.meekoClass)
@@ -639,9 +814,14 @@ export function startLanguageServer(connection: Connection): void {
 		return (await withContext(data.uri, (context) => resolveCompletion(context, item))) ?? item
 	})
 	connection.onHover(async ({ textDocument, position }) => {
-		const open = await componentOf(textDocument.uri)
-		const variables = open && cssVariableHover(open.document, position, () => classView(open.document, open.filename, classesOf(open.project), open.project.componentSources()))
+		const document = documents.get(textDocument.uri)
+		const variableSettings = await variableSettingsFor(textDocument.uri)
+		if (document && variableSettings.hover === false && cssVariableTokenAt(document.getText(), document.offsetAt(position), document.languageId)) return null
+		const variableDocument = variableSettings.hover === false ? undefined : await variableViewOf(textDocument.uri)
+		const variables = variableDocument && cssVariableHover(variableDocument.document, position, variableDocument.view)
 		if (variables) return variables
+		if (documentPath(textDocument.uri)?.toLowerCase().endsWith('.css')) return null
+		const open = await componentOf(textDocument.uri)
 		const classes = open && classHover(open.document, position, open.filename, classesOf(open.project), open.project.componentSources(), await classSettingsFor(textDocument.uri))
 		if (classes) return classes
 		const teleport = open && teleportHover(open.document, position, shadowedTagsOf(open.project, open.document.getText()))
@@ -649,16 +829,17 @@ export function startLanguageServer(connection: Connection): void {
 		const special = open && specialTemplateHover(open.document, position)
 		if (special) return special
 		const typed = await withContext(textDocument.uri, (context) => hover(context, position), true)
-		const document = documents.get(textDocument.uri)
 		if (typed || !document) return typed
 		return htmlHover(document, position) ?? cssHover(document, position) ?? null
 	})
 	connection.onDefinition(async ({ textDocument, position }) => {
 		// A class in `class="…"` or `bind:class` goes to its selectors in <style> and the stylesheets.
-		const open = await componentOf(textDocument.uri)
-		const variables = open && cssVariableDefinition(open.document, position, () => classView(open.document, open.filename, classesOf(open.project), open.project.componentSources()))
+		const variableDocument = (await variableSettingsFor(textDocument.uri)).definition === false ? undefined : await variableViewOf(textDocument.uri)
+		const variables = variableDocument && cssVariableDefinition(variableDocument.document, position, variableDocument.view)
 		if (variables) return variables
-		const classes = open && classDefinition(open.document, position, open.filename, classesOf(open.project), open.project.componentSources())
+		if (documentPath(textDocument.uri)?.toLowerCase().endsWith('.css')) return null
+		const open = await componentOf(textDocument.uri)
+		const classes = open && classDefinition(open.document, position, open.filename, classesOf(open.project), open.project.componentSources(), await classSettingsFor(textDocument.uri))
 		if (classes) return classes
 		return withContext(textDocument.uri, (context) => definition(context, position), true)
 	})
@@ -688,9 +869,27 @@ export function startLanguageServer(connection: Connection): void {
 		const document = documents.get(textDocument.uri)
 		return document ? colorPresentations(document, color, range) : []
 	})
-	connection.onReferences(({ textDocument, position, context: options }) => withContext(textDocument.uri, (context) => references(context, position, options.includeDeclaration)))
-	connection.onPrepareRename(({ textDocument, position }) => withContext(textDocument.uri, (context) => prepareRename(context, position)))
-	connection.onRenameRequest(({ textDocument, position, newName }) => withContext(textDocument.uri, (context) => rename(context, position, newName)))
+	connection.onReferences(async ({ textDocument, position, context: options }) => {
+		if ((await variableSettingsFor(textDocument.uri)).references !== false) {
+			const variable = variableProjectOf(textDocument.uri, position)
+			if (variable) return cssVariableReferences(variable.project, variable.document, position, options.includeDeclaration) ?? null
+		}
+		return withContext(textDocument.uri, (context) => references(context, position, options.includeDeclaration))
+	})
+	connection.onPrepareRename(async ({ textDocument, position }) => {
+		if ((await variableSettingsFor(textDocument.uri)).rename !== false) {
+			const variable = variableProjectOf(textDocument.uri, position)
+			if (variable) return prepareCssVariableRename(variable.project, variable.document, position) ?? null
+		}
+		return withContext(textDocument.uri, (context) => prepareRename(context, position))
+	})
+	connection.onRenameRequest(async ({ textDocument, position, newName }) => {
+		if ((await variableSettingsFor(textDocument.uri)).rename !== false) {
+			const variable = variableProjectOf(textDocument.uri, position)
+			if (variable) return renameCssVariable(variable.project, variable.document, position, newName, versionedEdits) ?? null
+		}
+		return withContext(textDocument.uri, (context) => rename(context, position, newName))
+	})
 	connection.onSignatureHelp(({ textDocument, position }) => withContext(textDocument.uri, (context) => signatureHelp(context, position)))
 	connection.onDocumentSymbol(({ textDocument }) => withContext(textDocument.uri, (context) => documentSymbols(context)))
 	connection.onFoldingRanges(({ textDocument }) => withContext(textDocument.uri, (context) => foldingRanges(context)))
@@ -726,17 +925,35 @@ export function startLanguageServer(connection: Connection): void {
 			})),
 		})),
 	)
-	connection.languages.semanticTokens.on(async ({ textDocument }) => {
+	/** Tokens of the whole document, cached per version: the full and range requests share them. */
+	const documentTokens = async (uri: string): Promise<SemanticTokens> => {
 		const empty: SemanticTokens = { data: [] }
-		const document = documents.get(textDocument.uri)
+		const document = documents.get(uri)
 		if (!document) return empty
-		const cached = semanticCache.get(textDocument.uri)
+		const cached = semanticCache.get(uri)
 		if (cached && cached.version === document.version) return cached.tokens
-		const tokens = await withContext(textDocument.uri, (context) => semanticTokens(context))
+		const tokens = await withContext(uri, (context) => semanticTokens(context))
 		if (!tokens) return empty
-		if (documents.get(textDocument.uri)?.version === document.version) semanticCache.set(textDocument.uri, { version: document.version, tokens })
+		if (documents.get(uri)?.version === document.version) semanticCache.set(uri, { version: document.version, tokens })
 		return tokens
+	}
+	/** The last full or delta result sent per document: a delta request names it by its `resultId`. */
+	const sentTokens = new Map<string, { resultId: string; data: number[] }>()
+	let resultIds = 0
+	const sent = (uri: string, tokens: SemanticTokens): SemanticTokens & { resultId: string } => {
+		const resultId = String(++resultIds)
+		sentTokens.set(uri, { resultId, data: tokens.data })
+		return { resultId, data: tokens.data }
+	}
+	connection.languages.semanticTokens.on(async ({ textDocument }) => sent(textDocument.uri, await documentTokens(textDocument.uri)))
+	connection.languages.semanticTokens.onDelta(async ({ textDocument, previousResultId }) => {
+		const previous = sentTokens.get(textDocument.uri)
+		const tokens = sent(textDocument.uri, await documentTokens(textDocument.uri))
+		// An unknown result (another server, a restart) gets the whole document.
+		if (previous?.resultId !== previousResultId) return tokens
+		return { resultId: tokens.resultId, edits: semanticTokensEdits(previous.data, tokens.data) }
 	})
+	connection.languages.semanticTokens.onRange(async ({ textDocument, range }) => semanticTokensInRange(await documentTokens(textDocument.uri), range))
 
 	// Pending checks are cancelled and running project checks are awaited, not abandoned: they
 	// load configuration and write under `.meeko/`, so after the reply nothing touches the workspace.
@@ -745,7 +962,7 @@ export function startLanguageServer(connection: Connection): void {
 		for (const timer of [...timers.values(), ...contractTimers.values()]) clearTimeout(timer)
 		timers.clear()
 		contractTimers.clear()
-		await Promise.allSettled([...contractRuns.values()])
+		await Promise.allSettled([...contractRuns.values(), warming])
 		workspace.dispose()
 		for (const entry of virtualProjects.values()) entry.project.dispose()
 		virtualProjects.clear()

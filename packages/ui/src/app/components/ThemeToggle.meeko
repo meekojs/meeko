@@ -4,21 +4,25 @@
 
 	// <UIThemeToggle>: the successor of the deprecated <MeekoThemeToggle> of the core, with the same
 	// contract and markup, over the public useThemeToggle(). The theme itself (the cookie, the inline
-	// script, the icon rule of <head> and POST /_meeko/theme) stays in the core. Its template has no
-	// whitespace between the tags: it would be text.
+	// script, the icon rule of <head> and POST /_meeko/theme) stays in the core; the look lives in
+	// ../variants/theme-toggle.ts. Its template has no whitespace between the tags: it would be text.
 	import { computed } from '@meekojs/meeko'
 	import { useRoute, useThemeToggle } from '@meekojs/meeko/framework'
 
 	import type { UIThemeToggleProps } from '../types/theme-toggle'
 	import type { ThemeToggleItem } from '../utils/theme-toggle'
 
+	import { uiTheme } from '../utils/defaults'
 	import { icons } from '../utils/icons'
 	import { uiMessages } from '../utils/messages'
 	import { themeToggleGroupLabel, themeToggleItems, themeToggleKeyTarget, themeToggleMode, themeToggleStatus } from '../utils/theme-toggle'
 	import { withViewTransition } from '../utils/view-transition'
+	import { themeToggle } from '../variants/theme-toggle'
 	import * as Icon from './internal/Icon.meeko'
 
 	const props = defineProps<UIThemeToggleProps>()
+
+	const theme = uiTheme('themeToggle', () => props)
 
 	const snippets = defineSnippets<ThemeToggleSnippets>()
 
@@ -44,6 +48,7 @@
 	const checked = computed(() => status.value.checked)
 	const focused = computed(() => status.value.focused)
 	const group = computed(() => themeToggleGroupLabel(props.messages, text))
+	const classes = computed(() => themeToggle({ mode: mode.value }))
 
 	/** The theme writes `data-theme` synchronously, so the fade captures the page before and after it. */
 	const choose = (choice: string): void => {
@@ -69,13 +74,13 @@
 	}
 </script>
 
-<!-- No whitespace between the tags of this template: it would be text inside the button and the group. Prettier keeps it that way; tests/templates-without-whitespace.test.mjs guards it. -->
+<!-- No whitespace between the tags of this template: it would be text inside the button and the group. Prettier keeps it that way (htmlWhitespaceSensitivity "strict" in prettier.config.ts); tests/templates-without-whitespace.test.mjs guards it. -->
 <template><form
 		if:when="mode.value === 'cycle'"
 		method="post"
 		action="/_meeko/theme"
 		data-meeko-theme-toggle="cycle"
-		bind:class="props.class"
+		bind:class="classes.value.base({ class: [theme.ui.base, theme.class] })"
 		bind:id="props.id"
 		on:submit="submit"
 		><input
@@ -89,12 +94,14 @@
 		/><button
 			type="submit"
 			bind:aria-label="label.value"
+			bind:class="classes.value.button({ class: theme.ui.button })"
 			><span
 				each:of="items.value"
 				each:as="item"
 				each:key="item.name"
 				bind:data-meeko-theme-icon="item.icon"
 				aria-hidden="true"
+				bind:class="classes.value.icon({ class: theme.ui.icon })"
 				><render
 					if:when="named[item.name]"
 					snippet="named[item.name]"
@@ -109,7 +116,7 @@
 		method="post"
 		action="/_meeko/theme"
 		data-meeko-theme-toggle="select"
-		bind:class="props.class"
+		bind:class="classes.value.base({ class: [theme.ui.base, theme.class] })"
 		bind:id="props.id"
 		on:submit="submit"
 		><input
@@ -119,6 +126,7 @@
 		/><div
 			role="radiogroup"
 			bind:aria-label="group.value"
+			bind:class="classes.value.group({ class: theme.ui.group })"
 			on:keydown="keydown"
 			><button
 				each:of="items.value"
@@ -132,6 +140,7 @@
 				bind:tabindex="focused.value === undefined ? undefined : focused.value === item.name ? '0' : '-1'"
 				bind:aria-label="named[item.name] ? item.label : undefined"
 				bind:data-meeko-theme-option="item.name"
+				bind:class="classes.value.button({ class: theme.ui.button })"
 				><render
 					if:when="named[item.name]"
 					snippet="named[item.name]"

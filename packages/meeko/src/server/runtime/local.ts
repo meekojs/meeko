@@ -12,7 +12,7 @@ import { errorResponse, setRateLimitRoute } from '../contract-runtime'
 import { ApiError, reportServerError } from '../errors'
 import { dispatchRpc } from '../rpc/runtime'
 import { copySocketAddress } from './env'
-import { idempotencyKeyOf } from './request-context'
+import { deriveContext, idempotencyKeyOf } from './request-context'
 
 /**
  * Opciones de {@link createLocalCalls}.
@@ -125,7 +125,7 @@ function routeModule(module: unknown): unknown {
 export function createLocalCalls<S>(options: LocalCallOptions<S>) {
 	if (typeof options.load !== 'function') throw new TypeError('Local calls require a module loader')
 	const load = options.load
-	const derived = (request: Request): RequestContext<S> => ({ ...options.context, request, idempotencyKey: idempotencyKeyOf(request) })
+	const derived = (request: Request): RequestContext<S> => deriveContext(options.context, { request, idempotencyKey: idempotencyKeyOf(request) })
 	return {
 		async api(clientKey: string, method: ApiMethod, input: LocalApiInput = {}): Promise<Response> {
 			try {
