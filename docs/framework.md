@@ -183,6 +183,8 @@ Estos enlaces conservan las anclas publicadas y llevan al apartado correspondien
 
 <a id="errores-de-un-campo-apierror-con-issues"></a>[Errores de un campo: ApiError con issues](framework-api.md#errores-de-un-campo-apierror-con-issues)
 
+<a id="datos-públicos-de-un-error-apierror-con-details"></a>[Datos públicos de un error: ApiError con details](framework-api.md#datos-públicos-de-un-error-apierror-con-details)
+
 <a id="valores-por-petición-locals"></a>[Valores por petición: locals](framework-api.md#valores-por-petición-locals)
 
 <a id="estado-de-la-respuesta-status"></a>[Estado de la respuesta: status](framework-api.md#estado-de-la-respuesta-status)

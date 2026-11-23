@@ -5,16 +5,18 @@ since: 1.3.0
 description: Checks whether an unknown value is a ClientError and optionally has a specific code, including across two copies of Meeko.
 symbols:
   - "@meekojs/meeko/framework#isClientError"
+types:
+  - "@meekojs/meeko/framework#ClientErrorDetails"
 related:
   - "@meekojs/meeko/framework#ClientError"
   - "@meekojs/meeko/server#ApiError"
   - "@meekojs/meeko#provideErrorHandler"
   - "@meekojs/meeko/framework#mountClientApp"
   - docs/framework.md#errores
-source-hash: 3245110a1cefe3fa46b9978f8f66ea460cdaed54172b89f9a996883a8a817946
+source-hash: ef6c29ba253c24aef76dc1d9becbe6544fc986c178154931ea65381b61b48a9e
 ---
 
-`isClientError(error, code?)` checks whether `error` is a [`ClientError`](/en/docs/reference/clienterror) and, with `code`, whether it has that code. It is a _type guard_: in the true branch, TypeScript knows that `error` is a `ClientError` (and, with `code`, that `error.code` is that literal).
+`isClientError(error, code?)` checks whether `error` is a [`ClientError`](/en/docs/reference/clienterror) and, with `code`, whether it has that code. It is a _type guard_: in the true branch, TypeScript knows that `error` is a `ClientError` (and, with `code`, that `error.code` is that literal and, since `1.10`, that `error.details` has the type registered for that code).
 
 Use it where an error arrives as `unknown`: a `catch`, `provideErrorHandler`, `mountClientApp`'s `onError` or `useForm`'s `errorMessage`. Unlike `instanceof`, it also recognizes a `ClientError` from another copy of Meeko on the same page.
 
@@ -36,6 +38,8 @@ export function describe(error: unknown): string {
 | --------- | --------- | -------- | ----------------------------------------------------------------------------------------------- |
 | `error`   | `unknown` | required | The value to check.                                                                             |
 | `code`    | `string`  | any      | The expected code, such as `"NOT_FOUND"`. With a literal, narrows `error.code` to that literal. |
+
+With a code registered in `ClientErrorDetails`, `error.details` is that type or `undefined`; with another code or no code, `unknown`.
 
 ## Return value
 
@@ -97,6 +101,40 @@ const missing = computed(() => isClientError(user.error.value, "NOT_FOUND"));
   <p if:when="missing.value">That user does not exist.</p>
 </template>
 ```
+
+### Typed public data
+
+Since `1.10`, an `ApiError` can send `details` with a `4xx`. Register their type per code by extending `ClientErrorDetails`, once, in an application `.d.ts`:
+
+<!-- no-check -->
+
+```ts
+// app/types/errors.d.ts
+declare module "@meekojs/meeko/framework" {
+  interface ClientErrorDetails {
+    VERSION_CONFLICT: { readonly actualVersion: number };
+  }
+}
+export {};
+```
+
+<!-- no-check -->
+
+```ts
+const save = useRpcMutation("visits.update");
+
+async function submit(items: Item[]) {
+  try {
+    await save.mutate({ id: visit.id, version: visit.version, items });
+  } catch (error) {
+    if (!isClientError(error, "VERSION_CONFLICT")) throw error;
+    const actual = error.details?.actualVersion; // number | undefined
+    if (actual !== undefined) await reload(actual);
+  }
+}
+```
+
+The server does not check the registry: it describes what the `ApiError` instances with that code send, which is why `details` remains optional.
 
 ## Common mistakes
 

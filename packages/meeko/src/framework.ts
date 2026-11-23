@@ -66,7 +66,7 @@ export type { RouteMiddleware, RouteMiddlewareContext, RouteMiddlewareName, Rout
 export type { ServerRouteMiddleware, ServerRouteMiddlewareContext } from './server/middleware/runtime'
 export { ClientError, createApiClient, createPublicServerManifest, createRpcClient, isClientError } from './shared/clients'
 export { invalidate } from './shared/invalidation'
-export type { ApiClient, ApiMutationInput, ApiOperation, ClientOptions, PublicApiEndpoint, PublicRpcEndpoint, PublicServerManifest, RpcClient, RpcOperation, ValidationIssue } from './shared/clients'
+export type { ApiClient, ApiMutationInput, ApiOperation, ClientErrorDetails, ClientOptions, PublicApiEndpoint, PublicRpcEndpoint, PublicServerManifest, RpcClient, RpcOperation, ValidationIssue } from './shared/clients'
 export { createBrowserClientOptions } from './app/runtime/browser-clients'
 export { createSocketClient, createSocketRegistry } from './app/runtime/socket'
 export { useSocket, useSocketClient } from './app/composables/use-socket-client'
