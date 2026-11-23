@@ -142,6 +142,17 @@ test('server exports read by the compiler are not useless assignments', () => {
 	assert.deepEqual(lint(`<script server lang="ts">export const route = definePage({});</script><template></template>`, rules), [])
 })
 
+test('a list read only by each:of is used after a branching template expression', () => {
+	const rules = { 'no-useless-assignment': 'error' }
+	for (const template of ['<p>{ready ? 1 : 2}</p><p each:of="columns" each:as="column" each:key="column">{column}</p>', '<div if:when="a && b"><p each:as="column" each:of="columns">{column}<i each:of="column" each:as="cell">{cell}</i></p></div>']) {
+		const messages = lint(`<script lang="ts">const columns = [[1]]</script><template>${template}</template>`, rules)
+		assert.deepEqual(
+			messages.filter((message) => message.ruleId === 'no-useless-assignment' || message.ruleId === '@typescript-eslint/no-unused-vars' || message.fatal),
+			[],
+		)
+	}
+})
+
 test('entity references in interpolations are decoded like the compiler does', () => {
 	const source = readFileSync(new URL('../../meeko/tests/fixtures/EntityInterpolation.meeko', import.meta.url), 'utf8')
 	const messages = new Linter().verify(source, [...plugin.configs.base, { files: ['**/*.meeko'], rules: {} }], { filename: 'EntityInterpolation.meeko' })

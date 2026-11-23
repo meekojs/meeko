@@ -26,6 +26,8 @@ tester.run('rules-of-composables', rule, {
 		{ code: component('const id = useAnything();'), languageOptions: { parser: meekoParser } },
 		{ code: component('function useCustom() { return useAnything(); } const value = useCustom();'), languageOptions: { parser: meekoParser } },
 		{ code: '<script server lang="ts">const value = await useApi();</script>' + component('const id = useId();'), languageOptions: { parser: meekoParser } },
+		{ code: component('const session=await useApi();const items=await useRpcQuery("items");const realtime=useRealtime(session.data.value);'), languageOptions: { parser: meekoParser } },
+		{ code: component('import { useApi as load } from "#app"; const session=await load();const next=useAnything();'), languageOptions: { parser: meekoParser } },
 	],
 	invalid: [
 		invalid('const value = useAnything();'),
@@ -54,7 +56,9 @@ tester.run('rules-of-composables', rule, {
 		{ ...invalid(component('', '<button on:click="useAnything()">Abrir</button>')), languageOptions: { parser: meekoParser } },
 		{ ...invalid(component('', '<p>{useAnything()}</p>')), languageOptions: { parser: meekoParser } },
 		{ ...invalid(component('if (ready) useAnything();'), 'conditional'), languageOptions: { parser: meekoParser } },
-		{ ...invalid(component('const result=await useApi();const next=useAnything();'), 'late'), languageOptions: { parser: meekoParser } },
+		{ ...invalid(component('const element=await useElementRef("box");const next=useAnything();'), 'late'), languageOptions: { parser: meekoParser } },
+		{ ...invalid(component('const channel=await useSocket("chat");const next=useAnything();'), 'late'), languageOptions: { parser: meekoParser } },
+		{ ...invalid(component('async function useCustom() { await useApi(); return useAnything(); } const value = useCustom();'), 'late'), languageOptions: { parser: meekoParser } },
 	],
 })
 

@@ -1,5 +1,10 @@
 # Cambios de ESLint para Meeko
 
+## Sin publicar
+
+- `meeko/rules-of-composables` ya no marca los composables posteriores a un `await useApi()` o `await useRpcQuery()` de nivel superior en un `.meeko`, el patrón que documenta el framework para cargar varios datos y usar el resultado. Los `await` de navegador y los de un composable propio siguen contando como suspensión.
+- El parser evalúa la lista de `each:of` antes de declarar `each:as`, como el código fuente: `no-useless-assignment` ya no marca como inútil una constante leída sólo por un `each:of` que aparece después de un `&&`, `||` o ternario de la plantilla.
+
 ## 1.9.0 — 2026-11-05
 
 - Publicación coordinada con `@meekojs/meeko` 1.9.0, sin cambios funcionales en este paquete.

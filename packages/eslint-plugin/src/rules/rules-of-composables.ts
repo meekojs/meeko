@@ -9,6 +9,8 @@ type Owner = TSESTree.Node | number
 
 /** Convención abierta `useX`: no depende de un catálogo de API del framework. */
 const isComposable = (name: string): boolean => /^use[A-Z0-9_]/.test(name)
+/** Composables de datos cuyo `await` de nivel superior resuelve el render del framework. */
+const dataComposables = new Set(['useApi', 'useRpcQuery'])
 const isFunction = (node: TSESTree.Node): node is FunctionNode => ['ArrowFunctionExpression', 'FunctionDeclaration', 'FunctionExpression'].includes(node.type)
 
 function propertyName(node: TSESTree.Node): string | undefined {
@@ -93,7 +95,11 @@ export default ESLintUtils.RuleCreator((name) => `https://github.com/meekojs/mee
 				if (name) calls.push({ node, name })
 			},
 			'AwaitExpression, ReturnStatement'(node: TSESTree.AwaitExpression | TSESTree.ReturnStatement) {
-				boundaries.push({ node, owner: scopeOf(node).owner })
+				const { fn, owner } = scopeOf(node)
+				// En la raíz de un .meeko, `await useApi()`/`await useRpcQuery()` no corta el setup: el render del
+				// framework lo repite con los datos y el resto del script sigue corriendo de forma síncrona.
+				if (services.isMeeko && !fn && node.type === 'AwaitExpression' && node.argument.type === 'CallExpression' && dataComposables.has(calleeName(node.argument.callee) ?? '')) return
+				boundaries.push({ node, owner })
 			},
 			'Program:exit'() {
 				for (const { node, name } of calls) {
