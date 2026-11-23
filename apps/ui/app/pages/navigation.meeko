@@ -4,6 +4,7 @@
 	const tab = signal<'account' | 'team'>('account')
 	const shown = signal(10)
 	const busy = signal(false)
+	const pageNumber = signal(4)
 	const suggesting = signal(false)
 	const locales = [
 		{ code: 'es', label: 'Español', href: '#locale', current: true },
@@ -154,7 +155,12 @@
 			<code>UIPagination</code>
 			cuenta lo mostrado y carga más: con
 			<code>moreLink</code>
-			es un enlace que funciona sin JavaScript.
+			es un enlace que funciona sin JavaScript. Con
+			<code>pageCount</code>
+			o
+			<code>pageSize</code>
+			pasa al modo numerado: página anterior y siguiente, los números con elipsis y la página actual en
+			<code>model:page</code>; con <code>pageLink</code>, cada página es un enlace.
 		</p>
 		<DocsPreview layout="stack">
 			<UIBreadcrumb
@@ -173,6 +179,13 @@
 				bind:hasMore="shown.value < 30"
 				bind:busy="busy.value"
 				on:loadMore="more"
+			/>
+			<UIPagination
+				label="Paginación numerada de ejemplo"
+				edges
+				model:page="pageNumber"
+				bind:total="137"
+				bind:pageSize="10"
 			/>
 		</DocsPreview>
 		<DocsCode bind:code="examples.pagers" />
@@ -193,14 +206,21 @@
 				{ name: 'hasMore / busy', type: 'boolean', default: 'false', description: 'Si queda más y si está cargando.' },
 				{ name: 'moreLink', type: 'UILinkTarget', description: 'Un enlace en lugar del botón: funciona sin JavaScript.' },
 				{ name: 'loadMoreLabel / loadingLabel', type: 'string', description: 'Textos del botón.' },
+				{ name: 'page', type: 'number', default: '1', description: 'Modo numerado. La página actual; con model:page, el modelo que cambian los botones.' },
+				{ name: 'pageCount / pageSize', type: 'number', description: 'Activan el modo numerado. Sin pageCount, las páginas salen de total entre pageSize, con el recuento «11–20 de 57».' },
+				{ name: 'siblings', type: 'number', default: '1', description: 'Modo numerado. Páginas vecinas de la actual antes de una elipsis.' },
+				{ name: 'edges / disabled', type: 'boolean', default: 'false', description: 'Modo numerado. Añade la primera y la última página, o deshabilita todo.' },
+				{ name: 'pageLink', type: '(page: number) => UILinkTarget', description: 'Modo numerado. Las páginas son enlaces (href o to con search): funcionan sin JavaScript.' },
 				{ name: 'label / class', type: 'string', description: 'Nombre de la navegación y clases.' },
 			]"
 		/>
 		<p>
 			Admite el snippet
 			<code>default</code>
-			y el evento
-			<code>loadMore</code>.
+			y los eventos
+			<code>loadMore</code>
+			y
+			<code>change(page)</code>, éste en el modo numerado.
 		</p>
 		<h2 id="toc">UITableOfContents</h2>
 		<p>

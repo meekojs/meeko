@@ -520,7 +520,12 @@ async function remove() {
 	pagers: `<UIBreadcrumb bind:items="[{ label: 'Home', href: '/' }, { label: 'Guides', href: '/guides' }, { label: 'Tables' }]" />
 <UIPageNavigation bind:previous="{ label: 'Modal', to: '/modals' }" bind:next="{ label: 'Popover', to: '/popover' }" />
 <UIPagination bind:shown="rows.value.length" bind:total="total" bind:hasMore="more.value"
-  bind:busy="loading.value" on:loadMore="load" />`,
+  bind:busy="loading.value" on:loadMore="load" />
+
+<!-- Numbered: the page in the model, or in the URL with pageLink -->
+<UIPagination model:page="page" bind:total="total" bind:pageSize="20" edges />
+<UIPagination bind:page="query.page" bind:pageCount="pages"
+  bind:pageLink="(page) => ({ to: '/orders', search: { page: String(page) } })" />`,
 	toc: `<UITableOfContents variant="collapsible"
   bind:entries="[{ id: 'usage', text: 'Usage', level: 2 }, { id: 'api', text: 'API', level: 2 }]" />`,
 	drawer: `<UIDrawer title="Filters" triggerLabel="Open filters" side="end" model="open">

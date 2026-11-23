@@ -193,13 +193,43 @@ You can override `--ui-container-max-width` and `--ui-container-gutter` from a c
 
 ### Basic controls
 
-| Component  | API                                                                                                                                                                                                                                                                                             |
-| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `UIButton` | Route (`to`, `params`, `search`), link (`href`, `target`, `rel`, `download`) or button (`type`, `disabled`); see [UIButton](#uibutton-route-link-or-button). Accepts `variant`, `size`, `shape`, `class`, `click` event and `default` snippet. By default `button`, `primary`, `md`, `rounded`. |
-| `UIInput`  | Text model with `model`. Props: `id`, `name`, `type`, `placeholder`, `required`, `disabled`, `invalid`, `describedBy` and `class`. Accepted types: `text`, `email`, `password`, `search`, `url`, `tel`. By default it uses `text` and an empty value.                                           |
-| `UIField`  | Requires `id`, `label` and the `default(id, describedBy)` snippet. Optional props: `description`, `error`, `required`, `class`. The error takes priority over the description and is announced with `role="alert"`.                                                                             |
+| Component  | API                                                                                                                                                                                                                                                                                                                                                                       |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `UIButton` | Route (`to`, `params`, `search`), link (`href`, `target`, `rel`, `download`) or button (`type`, `disabled`); see [UIButton](#uibutton-route-link-or-button). Accepts `variant`, `size`, `shape`, `class`, `click` event and `default` snippet. By default `button`, `primary`, `md`, `rounded`.                                                                           |
+| `UIInput`  | Text model with `model`. Props: `id`, `name`, `type`, `placeholder`, `required`, `disabled`, `invalid`, `describedBy` and `class`. Accepted types: `text`, `email`, `password`, `search`, `url`, `tel`, `number`, `date`, `datetime-local`, `time` and `month`. By default it uses `text` and an empty value; see [Numbers, times and months](#numbers-times-and-months). |
+| `UIField`  | Requires `id`, `label` and the `default(id, describedBy)` snippet. Optional props: `description`, `error`, `required`, `class`. The error takes priority over the description and is announced with `role="alert"`.                                                                                                                                                       |
 
 It also includes `UIApp` and `UIModal` for [modals](#modals), `UITable` for [tables](#tables), `UICard` for [cards](#cards), and the navigation and label components below.
+
+### Numbers, times and months
+
+`UIInput` accepts `type="number"`, `"time"` and `"month"`, besides `date` and `datetime-local`. `min`, `max`, `step` and `inputmode` are the native attributes and reach the `<input>` as they are.
+
+```html
+<UIInput
+	type="number"
+	name="quantity"
+	min="0"
+	step="0.5"
+	inputmode="decimal"
+	model="quantity"
+/>
+<UIInput
+	type="time"
+	name="start"
+	step="900"
+	model="start"
+/>
+<UIInput
+	type="month"
+	name="period"
+	min="2026-01"
+	model="period"
+/>
+```
+
+- **The model is text.** Also with `number`, the model is a `Signal<string>` with the text of the control (`'42'`, `'09:30'`, `'2026-11'`), as the `model` of a native `<input>`: an empty or half-typed field (`-`, `1e`) has no number, and a `number` would lose it. Convert it where you use it (`Number(quantity.value)`, or a `v.transform` in the schema of `useForm`); empty is `''`.
+- **Look.** The figures of `number`, `time`, `month`, `date` and `datetime-local` have the same width (`tabular-nums`) and, in WebKit, the value of a date or a time aligns to the start. The pickers and the step buttons are the browser ones, with the `color-scheme` of the theme.
 
 ### UIButton: route, link or button
 
@@ -1282,7 +1312,7 @@ Every link in a list accepts `href` (any URL) or `to` (a route with typed `param
 | `UINavigationTabs`   | `items` (with `badge`, `badgeTone`, `badgeDot`), `current`, `label`, `variant` (`underline`, `segmented`), `class`                                                                                                     | `select(event, item)` event                                         |
 | `UIBreadcrumb`       | `items` (the last one is the current page; without a destination it is text), `label`, `class`                                                                                                                         |                                                                     |
 | `UIPageNavigation`   | `previous`, `next`, `label`, `previousLabel`, `nextLabel`, `class`                                                                                                                                                     |                                                                     |
-| `UIPagination`       | `shown`, `total`, `countText`, `hasMore`, `busy`, `moreLink`, `loadMoreLabel`, `loadingLabel`, `label`, `class`                                                                                                        | `default`; `loadMore` event                                         |
+| `UIPagination`       | `shown`, `total`, `countText`, `hasMore`, `busy`, `moreLink`, `loadMoreLabel`, `loadingLabel`, `label`, `class`; numbered: `pageCount`, `pageSize`, `siblings`, `edges`, `pageLink`, `disabled` and the `page` model   | `default`; `loadMore` and `change(page)` events                     |
 | `UITableOfContents`  | `entries` (`id`, `text`, `level`), `active`, `variant` (`aside`, `collapsible`), `label`, `class`                                                                                                                      |                                                                     |
 | `UILocaleSwitcher`   | `items` (`code`, `label`, `href` or `to`, `current`), `label`, `class`                                                                                                                                                 |                                                                     |
 | `UILocaleSuggestion` | `items`, `suggested`, `label`, `message`, `goLabel`, `stayLabel`, `class`                                                                                                                                              | `stay` event                                                        |
@@ -1295,6 +1325,7 @@ Every link in a list accepts `href` (any URL) or `to` (a route with typed `param
 - **`UIHeader`** has a fixed height, `--ui-header-height`. On narrow screens its links move to a menu with `popover`, which floats and does not move the page. A `brand` image declares `width` and `height` to reserve its space.
 - **`UIDrawer`** is a modal `<dialog>` with `command`, `commandfor` and `closedby`: it opens, closes and returns focus without JavaScript in browsers that support them; elsewhere, it does so on hydrating. Once hydrated, it leaves with the same View Transition as `UIModal`, on its own side; when following a link it closes instantly, because the navigation already is the transition.
 - **`UINavigationTabs`** are links, not a `tablist`. The indicator follows the current one with anchor positioning; without it, the link marks itself. This component does not serve for panels on the same page. `variant="segmented"` gives the row the shape of a segmented `UIRadioGroup`, for filters in the URL and without an indicator, so several rows can coexist on a page. `badge` adds a counter next to the text, and the `select` event receives the click and the tab: with `event.preventDefault()`, the page filters without navigating.
+- **`UIPagination`** has two modes. By default it counts what is shown and loads more (`loadMore`, or `moreLink` without JavaScript). With `pageCount` or `pageSize` it switches to the numbered mode, described in [Numbered pagination](#numbered-pagination).
 - **`UITableOfContents`** paints the active entry with `scroll-target-group`, with no script, where it exists. A minimal `IntersectionObserver` keeps `aria-current="location"` in all browsers, and that is what is painted where that property does not exist. `active` hands control to the application. Use `variant="aside"` in the column and `variant="collapsible"` in the content: `UIPage` shows each one only when appropriate.
 - **`UILocaleSwitcher` and `UILocaleSuggestion`** are presentation: they receive the destinations already calculated and read no routes or cookies. With fewer than two languages, the switcher renders nothing. The suggestion is written in the language it offers and the `stay` button, in the current one; the application decides when to show it, after mounting, and what it saves.
 - **`UICodeBlock`** receives in `html` an already highlighted `<pre>` (Shiki with `--shiki-light` and `--shiki-dark`) and in `code` what gets copied. The copy button is the only script and stays hidden until hydration. `mode="log"` uses `role="log"`, wraps the lines and does not show the button except with `copy`.
@@ -1340,6 +1371,32 @@ An own panel only needs `useScrollLock()` while it is open: with `right: 0` or `
 ```
 
 A fixed element that must not move during the lock, such as a bar with `right: 0` and content aligned to the end, can move that content aside with `padding-inline-end: var(--ui-scrollbar-gutter)` while the panel is open. Outside a lock, the gutter stays reserved and the box of a fixed element already leaves it out: do not add the variable to it.
+
+### Numbered pagination
+
+With `pageCount` (or `pageSize` and `total`), `UIPagination` renders the previous and the next page, the numbers with an ellipsis and, with `edges`, the first and the last. The current page goes in the `page` model.
+
+```html
+<UIPagination
+	model:page="page"
+	bind:total="total"
+	bind:pageSize="20"
+	edges
+/>
+<UIPagination
+	bind:page="query.page"
+	bind:pageCount="pages"
+	bind:pageLink="(page) => ({ to: '/orders', search: { page: String(page) } })"
+/>
+```
+
+- **Pages.** The first and the last, the current one with `siblings` neighbors on each side (`1` by default) and an ellipsis where a stretch is skipped; an ellipsis never hides a single page. With more pages than `2 * siblings + 5`, the list always has that length, so the buttons do not move as you go forward. With a single page the list is not rendered. A `page` out of range shows as the nearest page.
+- **Count.** With `total` and `pageSize`, the `role="status"` says “11–20 of 57” (message `pagination.range`); `countText` replaces it and, without `total` or `countText`, it is not rendered.
+- **Buttons or links.** Without `pageLink`, the pages are `<button type="button">` that change the model and emit `change` with the page; the current one does not emit. With `pageLink`, each page is a link (`href`, or `to` with `params` and `search`, through `<MeekoLink>`) that works without JavaScript: the URL rules, so pass the page with `bind:page`. Previous and next carry `rel="prev"` and `rel="next"`.
+- **Accessible.** The current one carries `aria-current="page"`. Each page is named “Page 3” and the controls “Previous page”, “Next page”, “First page” and “Last page” (messages `pagination.page`, `previous`, `next`, `first` and `last`, in Spanish and English). The ellipsis is `aria-hidden`. At the ends, the controls are `disabled`.
+- **Keyboard.** It is a list of buttons or links inside a `<nav>`: `Tab` goes through them and `Enter` or `Space` choose, with no roving focus of its own.
+- **State.** `busy` marks the navigation with `aria-busy` and each page with `aria-disabled`: they keep the focus and ignore clicks. `disabled` disables every page and control.
+- **Look.** `size="sm"` buttons: the current one `primary` and the rest `ghost`. New slots `list`, `item`, `page`, `control`, `icon` and `ellipsis`; the arrows flip in RTL.
 
 ## Platform and View Transitions
 
@@ -1411,7 +1468,7 @@ The prop types, `UIDensity`, `UITone` and `UIToastContext` are exported from `@m
 
 `UIButton` adds `tone="danger"`, `loading`, `iconOnly` and `ariaLabel`. When using only an icon, always provide `ariaLabel` or `aria-label`. `loading` keeps the text and adds the spinner; it announces `aria-busy` and `aria-disabled`, and prevents activating the action without taking its focus away. With `iconOnly`, the icon measures `--ui-icon-size`. The submit button keeps `name`, `value` and `form`.
 
-`UIBadge` adds the tones `info`, `success`, `warning` and `dot`. `UIInput` accepts `date`, `datetime-local` and native attributes such as `autocomplete`, `autocapitalize`, `spellcheck`, `min`, `max` and `step`. `UIField` adds `hint` and `counter` (string or number); the IDs of both are included in the `describedBy` its snippet receives.
+`UIBadge` adds the tones `info`, `success`, `warning` and `dot`. `UIInput` accepts `number`, `date`, `datetime-local`, `time` and `month`, with a model that is always text, and native attributes such as `inputmode`, `autocomplete`, `autocapitalize`, `spellcheck`, `min`, `max` and `step`. `UIField` adds `hint` and `counter` (string or number); the IDs of both are included in the `describedBy` its snippet receives.
 
 `UICard` and `UITable` accept `density="compact" | "normal" | "comfortable"`. Card adds `padding="none" | "sm" | "md" | "lg"`, which wins over density. Table columns accept `numeric` (end alignment) and `rowHeader` (`th scope="row"`), also in the grid layout. `hideCaption` hides a table's title from view, when a heading already says it, and it still names the table.
 

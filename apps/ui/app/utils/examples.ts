@@ -562,7 +562,12 @@ async function remove() {
 	pagers: `<UIBreadcrumb bind:items="[{ label: 'Inicio', href: '/' }, { label: 'Guías', href: '/guides' }, { label: 'Tablas' }]" />
 <UIPageNavigation bind:previous="{ label: 'Modal', to: '/modals' }" bind:next="{ label: 'Popover', to: '/popover' }" />
 <UIPagination bind:shown="rows.value.length" bind:total="total" bind:hasMore="more.value"
-  bind:busy="loading.value" on:loadMore="load" />`,
+  bind:busy="loading.value" on:loadMore="load" />
+
+<!-- Numerada: la página en el modelo, o en la URL con pageLink -->
+<UIPagination model:page="page" bind:total="total" bind:pageSize="20" edges />
+<UIPagination bind:page="query.page" bind:pageCount="pages"
+  bind:pageLink="(page) => ({ to: '/orders', search: { page: String(page) } })" />`,
 	toc: `<UITableOfContents variant="collapsible"
   bind:entries="[{ id: 'usage', text: 'Uso', level: 2 }, { id: 'api', text: 'API', level: 2 }]" />`,
 	locale: `<UILocaleSwitcher bind:items="[

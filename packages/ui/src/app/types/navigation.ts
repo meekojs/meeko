@@ -507,14 +507,22 @@ export type UIPageNavigationProps = UIThemeProps<
 >
 
 /**
- * Props de `<UIPagination>`: recuento de una lista y acción de cargar más, con estado ocupado. Sin
- * `moreLink` emite `loadMore`; con él es un enlace, que funciona sin JavaScript (un cursor en la URL).
- * `ui` añade clases a sus slots: `base`, `count` y `action`.
+ * Props de `<UIPagination>`. Tiene dos modos:
+ *
+ * - **Cargar más** (por defecto): recuento de una lista y acción de cargar más, con estado ocupado. Sin
+ *   `moreLink` emite `loadMore`; con él es un enlace, que funciona sin JavaScript (un cursor en la URL).
+ * - **Numerado**, con `pageCount` o `pageSize`: página anterior y siguiente, los números con elipsis y,
+ *   con `edges`, la primera y la última. La página actual va en el modelo `page` (`model:page`) y cada
+ *   cambio emite `change`; con `pageLink`, las páginas son enlaces, que funcionan sin JavaScript.
+ *
+ * `ui` añade clases a sus slots: `base`, `count`, `action`, `list`, `item`, `page`, `control`, `icon` y
+ * `ellipsis`.
  *
  * @since 1.8.0
  * @example
  * ```html
  * <UIPagination bind:shown="rows.value.length" bind:total="total" bind:busy="loading.value" on:loadMore="load" />
+ * <UIPagination model:page="page" bind:total="total" bind:pageSize="20" />
  * ```
  */
 export type UIPaginationProps = UIThemeProps<
@@ -528,7 +536,10 @@ export type UIPaginationProps = UIThemeProps<
 		readonly countText?: string
 		/** Hay más que cargar; por defecto, si `shown` es menor que `total`. */
 		readonly hasMore?: boolean
-		/** Hay una carga en curso: la acción se anuncia ocupada, conserva el foco e ignora los clics. */
+		/**
+		 * Hay una carga en curso: la acción (o, en el modo numerado, cada página y control) se anuncia ocupada
+		 * con `aria-disabled`, conserva el foco e ignora los clics.
+		 */
 		readonly busy?: boolean
 		/** Destino de la acción, si es un enlace. */
 		readonly moreLink?: UILinkTarget
@@ -536,6 +547,44 @@ export type UIPaginationProps = UIThemeProps<
 		readonly loadMoreLabel?: string
 		/** Texto de la acción con `busy`. */
 		readonly loadingLabel?: string
+		/**
+		 * Número de páginas; activa el modo numerado. Sin él, con `pageSize`, se calcula de `total`.
+		 *
+		 * @since 1.11.0
+		 */
+		readonly pageCount?: number
+		/**
+		 * Elementos por página; activa el modo numerado. Con `total`, da el número de páginas y el recuento
+		 * «11–20 de 57».
+		 *
+		 * @since 1.11.0
+		 */
+		readonly pageSize?: number
+		/**
+		 * Modo numerado: páginas vecinas de la actual a cada lado, antes de una elipsis. Por defecto, `1`.
+		 *
+		 * @since 1.11.0
+		 */
+		readonly siblings?: number
+		/**
+		 * Modo numerado: añade los controles de la primera y la última página.
+		 *
+		 * @since 1.11.0
+		 */
+		readonly edges?: boolean
+		/**
+		 * Modo numerado: el destino de cada página. Con él, las páginas son enlaces (`href` o `to` con
+		 * `params` y `search`), que navegan sin JavaScript; sin él, son botones que cambian el modelo `page`.
+		 *
+		 * @since 1.11.0
+		 */
+		readonly pageLink?: (page: number) => UILinkTarget
+		/**
+		 * Modo numerado: deshabilita las páginas y los controles.
+		 *
+		 * @since 1.11.0
+		 */
+		readonly disabled?: boolean
 		/** `aria-label` de la navegación. */
 		readonly label?: string
 		/** Clases adicionales del elemento raíz; equivale a `ui.base`. */

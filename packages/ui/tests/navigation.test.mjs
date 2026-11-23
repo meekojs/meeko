@@ -241,6 +241,52 @@ test('the navigation components render on the server with their semantics', { ti
 		assert.ok(en.includes('Load more'))
 	})
 
+	await t.test('UIPagination numbered: range, numbers with a gap, controls with their names, and the current page', () => {
+		const pager = block(es, 'aria-label="Páginas"', '</nav>')
+		assert.match(pager, /<p\b[^>]*role="status"[^>]*>11–15 de 57<\/p>/)
+		const buttons = [...pager.matchAll(/<button\b[^>]*>/g)].map(([value]) => value)
+		assert.deepEqual(
+			buttons.map((value) => attribute(value, 'aria-label')),
+			['Primera página', 'Página anterior', 'Página 1', 'Página 2', 'Página 3', 'Página 4', 'Página 5', 'Página 12', 'Página siguiente', 'Última página'],
+		)
+		for (const value of buttons) assert.equal(attribute(value, 'type'), 'button')
+		assert.deepEqual(
+			buttons.filter((value) => attribute(value, 'aria-current') === 'page').map((value) => attribute(value, 'aria-label')),
+			['Página 3'],
+		)
+		assert.ok(!buttons.some((value) => /\sdisabled/.test(value)), 'nothing is disabled in the middle')
+		assert.equal(count(pager, /<span\b[^>]*aria-hidden="true"[^>]*>…<\/span>/g), 1, 'one gap, between 5 and 12')
+		assert.match(pager, /<ul\b[^>]*>(<li\b[^>]*>.*?<\/li>){11}<\/ul>/)
+		assert.equal(count(pager, /<svg\b[^>]*aria-hidden="true"/g), 4, 'the controls draw their icon')
+		assert.match(en, /aria-label="Next page"/)
+		assert.match(en, /11–15 of 57/)
+	})
+
+	await t.test('UIPagination numbered with pageLink: real links, the current one marked, prev and next', () => {
+		const pager = block(es, 'aria-label="Páginas con enlaces"', '</nav>')
+		const links = [...pager.matchAll(/<a\b[^>]*>/g)].map(([value]) => value)
+		assert.deepEqual(
+			links.map((value) => attribute(value, 'href')),
+			['/about?page=1', '/about?page=1', '/about?page=2', '/about?page=3', '/about?page=4', '/about?page=3'],
+		)
+		assert.equal(attribute(links[0], 'rel'), 'prev')
+		assert.equal(attribute(links.at(-1), 'rel'), 'next')
+		assert.deepEqual(
+			links.map((value) => attribute(value, 'aria-current')),
+			[undefined, undefined, 'page', undefined, undefined, undefined],
+			'the pages share a route: only the current one is marked',
+		)
+		assert.doesNotMatch(pager, /<p\b[^>]*role="status"/, 'without a total there is no count')
+		assert.doesNotMatch(pager, /<button\b/)
+	})
+
+	await t.test('UIPagination numbered disabled: every page and control is a disabled button', () => {
+		const pager = block(es, 'aria-label="Páginas deshabilitadas"', '</nav>')
+		const buttons = [...pager.matchAll(/<button\b[^>]*>/g)].map(([value]) => value)
+		assert.equal(buttons.length, 5)
+		for (const value of buttons) assert.match(value, /\sdisabled/)
+	})
+
 	await t.test('UITableOfContents: links without a script, in both views, or nothing', () => {
 		// The aside is the <nav> that the page search ignores; the collapsible view puts that on its <details>.
 		const asideTag = tag(es, /<nav\b(?=[^>]*data-pagefind-ignore)(?=[^>]*aria-label="En esta página")/)

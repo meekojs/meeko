@@ -153,13 +153,26 @@ export const pageNavigationNext = {
 	hint: 'ui:justify-end',
 }
 
-/** The look of <UIPagination>: the count, and the action at the end of the row. */
+/**
+ * The look of <UIPagination>: the count, and at the end of the row the action that loads more or, in the
+ * numbered mode, the list of pages. Pages and controls are buttons of `size: 'sm'` (variants/button): the
+ * current page `primary`, the rest `ghost`; these slots only add what the button does not decide.
+ */
 export const pagination = tv({
 	slots: {
 		base: 'ui:flex ui:flex-wrap ui:items-center ui:justify-between ui:gap-x-4 ui:gap-y-2 ui:font-sans',
 		count: 'ui:m-0 ui:text-sm ui:text-text-soft ui:[font-variant-numeric:tabular-nums]',
 		// An outline button (variants/button) at the end of the row, with a spinner while the next page loads.
 		action: ['ui:ms-auto', disabledBusy],
+		list: 'ui:my-0 ui:me-0 ui:ms-auto ui:flex ui:list-none ui:flex-wrap ui:items-center ui:gap-1 ui:p-0',
+		item: 'ui:flex',
+		// A number is at least a square, and its figures keep their width from one page to the next.
+		page: 'ui:min-w-(--ui-control-height-sm) ui:[font-variant-numeric:tabular-nums] ui:aria-disabled:cursor-progress',
+		// Previous, next, first and last: a square with its icon.
+		control: 'ui:aria-disabled:cursor-progress',
+		// The arrows point the way of the reading.
+		icon: 'ui:rtl:[scale:-1_1]',
+		ellipsis: 'ui:inline-flex ui:min-w-(--ui-control-height-sm) ui:justify-center ui:text-sm ui:text-text-soft ui:select-none',
 	},
 })
 

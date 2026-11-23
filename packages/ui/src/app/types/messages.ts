@@ -126,6 +126,42 @@ export interface UIMessages {
 		readonly loadMore: string
 		/** Texto de la acción con `busy`, si no se pasa `loadingLabel`. */
 		readonly loading: string
+		/**
+		 * Modo numerado: recuento con `total` y `pageSize`; `{from}`, `{to}` y `{total}` son los números ya formateados.
+		 *
+		 * @since 1.11.0
+		 */
+		readonly range: string
+		/**
+		 * Modo numerado: nombre accesible del botón o enlace de una página; `{page}` es su número ya formateado.
+		 *
+		 * @since 1.11.0
+		 */
+		readonly page: string
+		/**
+		 * Modo numerado: nombre accesible de la página anterior.
+		 *
+		 * @since 1.11.0
+		 */
+		readonly previous: string
+		/**
+		 * Modo numerado: nombre accesible de la página siguiente.
+		 *
+		 * @since 1.11.0
+		 */
+		readonly next: string
+		/**
+		 * Modo numerado con `edges`: nombre accesible de la primera página.
+		 *
+		 * @since 1.11.0
+		 */
+		readonly first: string
+		/**
+		 * Modo numerado con `edges`: nombre accesible de la última página.
+		 *
+		 * @since 1.11.0
+		 */
+		readonly last: string
 	}
 	/** `<UITableOfContents>`. */
 	readonly tableOfContents: {

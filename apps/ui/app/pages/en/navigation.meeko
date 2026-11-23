@@ -4,6 +4,7 @@
 	const tab = signal<'account' | 'team'>('account')
 	const shown = signal(10)
 	const busy = signal(false)
+	const pageNumber = signal(4)
 	const suggesting = signal(false)
 	const locales = [
 		{ code: 'es', label: 'Español', href: '#locale' },
@@ -157,7 +158,12 @@
 			<code>UIPagination</code>
 			counts what is shown and loads more: with
 			<code>moreLink</code>
-			it is a link that works without JavaScript.
+			it is a link that works without JavaScript. With
+			<code>pageCount</code>
+			or
+			<code>pageSize</code>
+			it switches to the numbered mode: previous and next page, the numbers with an ellipsis and the current page in
+			<code>model:page</code>; with <code>pageLink</code>, each page is a link.
 		</p>
 		<DocsPreview layout="stack">
 			<UIBreadcrumb
@@ -176,6 +182,13 @@
 				bind:hasMore="shown.value < 30"
 				bind:busy="busy.value"
 				on:loadMore="more"
+			/>
+			<UIPagination
+				label="Sample numbered pagination"
+				edges
+				model:page="pageNumber"
+				bind:total="137"
+				bind:pageSize="10"
 			/>
 		</DocsPreview>
 		<DocsCode bind:code="examples.pagers" />
@@ -196,6 +209,11 @@
 				{ name: 'hasMore / busy', type: 'boolean', default: 'false', description: 'Whether there is more and whether it is loading.' },
 				{ name: 'moreLink', type: 'UILinkTarget', description: 'A link instead of the button: it works without JavaScript.' },
 				{ name: 'loadMoreLabel / loadingLabel', type: 'string', description: 'Texts of the button.' },
+				{ name: 'page', type: 'number', default: '1', description: 'Numbered mode. The current page; with model:page, the model that the buttons change.' },
+				{ name: 'pageCount / pageSize', type: 'number', description: 'Turn on the numbered mode. Without pageCount, the pages come from total over pageSize, with the count “11–20 of 57”.' },
+				{ name: 'siblings', type: 'number', default: '1', description: 'Numbered mode. Pages next to the current one before an ellipsis.' },
+				{ name: 'edges / disabled', type: 'boolean', default: 'false', description: 'Numbered mode. Adds the first and last page, or disables everything.' },
+				{ name: 'pageLink', type: '(page: number) => UILinkTarget', description: 'Numbered mode. The pages are links (href, or to with search): they work without JavaScript.' },
 				{ name: 'label / class', type: 'string', description: 'Name of the navigation and classes.' },
 			]"
 		/>
@@ -204,7 +222,9 @@
 			<code>default</code>
 			snippet and the
 			<code>loadMore</code>
-			event.
+			and
+			<code>change(page)</code>
+			events, the latter in the numbered mode.
 		</p>
 		<h2 id="toc">UITableOfContents</h2>
 		<p>

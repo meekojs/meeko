@@ -89,6 +89,13 @@ export const inputReveal = tv({
 	},
 })
 
+/**
+ * Lo que <UIInput> añade a un campo de números, horas o fechas (`number`, `time`, `month`, `date` y
+ * `datetime-local`): cifras del mismo ancho, que no bailan al escribir ni al cambiar con las flechas, y, en
+ * WebKit, el valor de una fecha o una hora alineado al principio, como el texto, en lugar de centrado.
+ */
+export const inputNumeric = 'ui:[font-variant-numeric:tabular-nums] ui:[&::-webkit-date-and-time-value]:text-start'
+
 /** El botón de `reveal` espera invisible hasta hidratar, sin mover nada. */
 export const inputRevealWaiting = 'ui:invisible'
 
