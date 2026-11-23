@@ -2,6 +2,9 @@
  * The global base of a Meeko app: reset, body and browser surfaces. In a layer, so any unlayered rule
  * of the app wins without a fight. The module loads it unless `ui: { base: false }`.
  */
+/* Tailwind's preflight layer goes first, below this base and the components (see main.css). */
+@layer base, ui-base;
+
 @layer ui-base {
 	*,
 	::before,
