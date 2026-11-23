@@ -2,10 +2,10 @@ import type { descriptionList, sparkline, stat } from '../variants/data'
 import type { UIRouteTarget } from './button'
 import type { UIThemeProps } from './theme'
 
-/** Dirección de la variación de `<UIStat>`: sube, baja o se queda igual. @since 1.11.0 @example const direction: UIStatDirection = 'up' */
+/** Dirección de la variación de `<UIStat>`: sube, baja o se queda igual. @since 1.10.0 @example const direction: UIStatDirection = 'up' */
 export type UIStatDirection = 'up' | 'down' | 'flat'
 
-/** Tono de `<UISparkline>`: el color de la línea. Sin él, el color del texto (`currentColor`). @since 1.11.0 */
+/** Tono de `<UISparkline>`: el color de la línea. Sin él, el color del texto (`currentColor`). @since 1.10.0 */
 export type UISparklineTone = 'neutral' | 'accent' | 'info' | 'success' | 'warning' | 'danger'
 
 /** `target` y `rel` del enlace de `<UIStat>`, y su texto. */
@@ -62,7 +62,7 @@ type UIStatRouteLink = UIRouteTarget &
  * por debajo del tamaño de contenedor `stat-narrow` del tema (20rem) el valor se reduce y el sparkline baja
  * bajo la variación. Sin esas props, el marcado y las clases son los de siempre.
  *
- * @since 1.11.0 `change`, `changeFormat`, `changeDirection`, `good`, `period`, `trend`, `trendLabel`, `href`, `to`, `linkLabel`, `hint` y el snippet `label`.
+ * @since 1.10.0 `change`, `changeFormat`, `changeDirection`, `good`, `period`, `trend`, `trendLabel`, `href`, `to`, `linkLabel`, `hint` y el snippet `label`.
  * @example `<UIStat label="Ingresos" hint="Ventas cobradas, sin impuestos" value="12 400 €" />`
  * @example `<UIStat label="Visitas" bind:value="1400" detail="Esta semana" />`
  * @example `<UIStat label="Ingresos" value="12 400 €" bind:change="12.5" period="frente a los 30 días anteriores" bind:trend="[8, 9, 12, 11, 14]" to="/ingresos" />`
@@ -80,7 +80,7 @@ export type UIStatProps = (UIStatWithoutLink | UIStatAnchorLink | UIStatRouteLin
 				/**
 				 * Ayuda junto a la etiqueta: un `UIHint` (ⓘ) con este texto, que se abre con el puntero, el foco o al
 				 * pulsarlo. Su clase extra va en `ui.hint`.
-				 * @since 1.11.0
+				 * @since 1.10.0
 				 */
 				hint?: string
 				/** Valor presentado por la aplicación; el snippet `value` lo sustituye. */
@@ -93,46 +93,46 @@ export type UIStatProps = (UIStatWithoutLink | UIStatAnchorLink | UIStatRouteLin
 				 * signo inicial da la dirección (`-` o `−` baja, `+` o cualquier cifra distinta de cero sube); si no
 				 * basta, usa `changeDirection`. Pinta una flecha y un texto accesible («Sube 12,5 %»).
 				 *
-				 * @since 1.11.0
+				 * @since 1.10.0
 				 */
 				change?: number | string
 				/**
 				 * Cómo se formatea un `change` numérico: `"percent"` (por defecto), en puntos porcentuales sobre 100
 				 * (`12.5` es «12,5 %»), o `"number"`, el número tal cual.
 				 *
-				 * @since 1.11.0
+				 * @since 1.10.0
 				 */
 				changeFormat?: 'percent' | 'number'
 				/**
 				 * Dirección de la variación cuando su signo no la dice, como en un texto sin signo; gana sobre el signo.
 				 *
-				 * @since 1.11.0
+				 * @since 1.10.0
 				 */
 				changeDirection?: UIStatDirection
 				/**
 				 * Qué dirección es buena: `"up"` (por defecto) o `"down"`, como en un tiempo de respuesta. Con la
 				 * dirección de `change` da el tono: la buena, de éxito; la otra, de peligro; sin cambio, neutro.
 				 *
-				 * @since 1.11.0
+				 * @since 1.10.0
 				 */
 				good?: 'up' | 'down'
 				/**
 				 * Periodo de la comparación, tras la variación: «frente a los 30 días anteriores».
 				 *
-				 * @since 1.11.0
+				 * @since 1.10.0
 				 */
 				period?: string
 				/**
 				 * Serie para un `<UISparkline>` junto al valor, de la más antigua a la más reciente. Toma el tono de
 				 * `change` (sin él, el de acento) y su resumen accesible.
 				 *
-				 * @since 1.11.0
+				 * @since 1.10.0
 				 */
 				trend?: readonly number[]
 				/**
 				 * Nombre accesible del sparkline, en lugar del resumen del mensaje `sparkline.label`.
 				 *
-				 * @since 1.11.0
+				 * @since 1.10.0
 				 */
 				trendLabel?: string
 				/** Clases adicionales del elemento raíz; equivale a `ui.base`. */
@@ -150,7 +150,7 @@ export type UIStatProps = (UIStatWithoutLink | UIStatAnchorLink | UIStatRouteLin
  * último valor, con el formato del idioma del documento) o es `label`. La línea se dibuja una vez al
  * aparecer, salvo con `prefers-reduced-motion`. `ui` añade clases a sus slots: `base`, `area` y `line`.
  *
- * @since 1.11.0
+ * @since 1.10.0
  * @example `<UISparkline bind:values="[3, 5, 4, 8, 7]" area tone="success" />`
  */
 export type UISparklineProps = UIThemeProps<

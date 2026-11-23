@@ -630,7 +630,7 @@ Sólo `useModal` y `useModalInstance` se autoimportan en componentes y código d
 | `closeButton`, `closeLabel`        | Botón de cierre visible por defecto, con `modal.close` de [los textos](#textos-e-idiomas) como etiqueta. |
 | `class`                            | Clases adicionales del diálogo.                                                                          |
 
-El snippet `default` es opcional desde 1.11.0 (sin él no hay cuerpo, y el título y la descripción quedan sobre el pie) y `footer` también. El evento `dismiss` recibe `escape`, `backdrop`, `button` o `native`; cambiar el modelo a `false` cierra sin emitir ese evento. Si desactivas las vías de cancelación, proporciona una acción explícita de cierre. La base usa `<dialog>` y `showModal()`, con nombre accesible, foco y capa modal nativos. `components/internal/ModalInstance.meeko` es infraestructura del host y sólo se importa explícitamente: no forma parte del registro ni genera nombres globales de componente o props.
+El snippet `default` es opcional desde 1.10.0 (sin él no hay cuerpo, y el título y la descripción quedan sobre el pie) y `footer` también. El evento `dismiss` recibe `escape`, `backdrop`, `button` o `native`; cambiar el modelo a `false` cierra sin emitir ese evento. Si desactivas las vías de cancelación, proporciona una acción explícita de cierre. La base usa `<dialog>` y `showModal()`, con nombre accesible, foco y capa modal nativos. `components/internal/ModalInstance.meeko` es infraestructura del host y sólo se importa explícitamente: no forma parte del registro ni genera nombres globales de componente o props.
 
 ### Confirmación
 

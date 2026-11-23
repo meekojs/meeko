@@ -22,7 +22,7 @@ export interface ModalContext {
 	 * resuelve `true` sólo con el botón que acepta y `false` con cualquier otro cierre (cancelar, Esc,
 	 * el fondo o el botón de cierre). Cada llamada decide una sola vez.
 	 *
-	 * @since 1.11.0
+	 * @since 1.10.0
 	 * @example
 	 * ```ts
 	 * const modal = useModal()
@@ -43,7 +43,7 @@ export interface ModalInstanceContext<R = unknown> {
  * Opciones de `useModal().confirm()`. Los textos de los botones salen de los mensajes de UI
  * (`modal.confirm` y `modal.cancel`) si no se pasan.
  *
- * @since 1.11.0
+ * @since 1.10.0
  * @example
  * ```ts
  * const options: UIConfirmOptions = { title: '¿Descartar los cambios?', description: 'No se pueden recuperar.', tone: 'danger' }

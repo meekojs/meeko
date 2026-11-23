@@ -1,5 +1,9 @@
 # Cambios de Meeko i18n
 
+## 1.10.0 — 2026-11-23
+
+- Publicación coordinada con `@meekojs/meeko` 1.10.0. `<I18nT>` vuelve a sus plantillas sin espacios añadidos por el formato; no cambia lo que se renderiza.
+
 ## 1.9.0 — 2026-11-05
 
 - Publicación coordinada con `@meekojs/meeko` 1.9.0, sin cambios funcionales en este paquete.

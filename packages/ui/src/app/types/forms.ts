@@ -28,7 +28,7 @@ export type UIInputProps = Omit<ElementAttributes<'input'>, 'type' | 'value' | '
 			 * (`'42'`, `'09:30'`, `'2026-11'`, o `''` vacío o a medio escribir), como el `model` de un `<input>`:
 			 * conviértelo donde lo uses. `min`, `max`, `step` e `inputmode` son los atributos nativos.
 			 *
-			 * @since 1.11.0 admite `number`, `time` y `month`.
+			 * @since 1.10.0 admite `number`, `time` y `month`.
 			 */
 			type?: 'text' | 'email' | 'password' | 'search' | 'url' | 'tel' | 'number' | 'date' | 'datetime-local' | 'time' | 'month'
 			/** Marca el campo como inválido. */
@@ -39,19 +39,19 @@ export type UIInputProps = Omit<ElementAttributes<'input'>, 'type' | 'value' | '
 			 * Con `type="password"`, un botón (`type="button"`, con `aria-pressed`) al final del campo que lo cambia
 			 * entre contraseña y texto. Espera invisible hasta hidratar. Con otro `type` no hace nada.
 			 *
-			 * @since 1.11.0
+			 * @since 1.10.0
 			 */
 			reveal?: boolean
 			/**
 			 * Nombre accesible del botón de `reveal` con la contraseña oculta; por defecto, el mensaje `input.show`.
 			 *
-			 * @since 1.11.0
+			 * @since 1.10.0
 			 */
 			showLabel?: string
 			/**
 			 * Nombre accesible del botón de `reveal` con la contraseña a la vista; por defecto, el mensaje `input.hide`.
 			 *
-			 * @since 1.11.0
+			 * @since 1.10.0
 			 */
 			hideLabel?: string
 			/** Clases adicionales del `<input>`. */
@@ -157,7 +157,7 @@ type UISegmentedControlName =
  * dentro de su ancho, sin partir ninguna opción ni ensanchar la página. Necesita un nombre: `legend` (que
  * `hideLegend` deja sólo para lectores de pantalla) o `ariaLabel`. `ui` añade clases a sus slots: `base` (el
  * `<fieldset>`), `legend`, `options` (la pista que se desplaza), `option` (cada `<label>`) e `input`.
- * @since 1.11.0
+ * @since 1.10.0
  * @example `<UISegmentedControl legend="Periodo" hideLegend size="sm" model="days" bind:options="[{ value: '7', label: '7 días' }, { value: '30', label: '30 días' }, { value: '90', label: '90 días' }]" />`
  */
 export type UISegmentedControlProps = Omit<ElementAttributes<'fieldset'>, 'class' | 'aria-label'> &

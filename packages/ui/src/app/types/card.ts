@@ -37,7 +37,7 @@ export type UICardProps = Omit<ElementAttributes<'section'>, 'class' | 'title'> 
 				 * así que no salta al hidratar, y el orden del DOM no cambia: título, descripción y acciones. Con
 				 * `auto` la cabecera no aporta ancho intrínseco a la card. Admite `ui.defaults.card.actionsWrap`.
 				 *
-				 * @since 1.11.0
+				 * @since 1.10.0
 				 * @example
 				 * ```meeko
 				 * <UICard title="Pedidos" actionsWrap="auto">

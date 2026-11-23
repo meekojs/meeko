@@ -1,5 +1,13 @@
 # Cambios de Prettier para Meeko
 
+## 1.10.0 — 2026-11-23
+
+- **Una línea en blanco entre las secciones de un `.meeko`.** `<script>`, `<template>` y `<style>` quedan siempre separados por una línea en blanco; un comentario sigue pegado a la sección que explica, también `prettier-ignore`.
+- **Un comentario en su propia línea queda pegado al elemento que sigue** en la plantilla: se quitan las líneas en blanco entre ambos.
+- **`if` y `else-if` se formatean como expresiones**, como ya lo hacían `if:when` y `each:of`.
+- **`htmlWhitespaceSensitivity: "ignore"` explícito deja los espacios al printer HTML**, también en los bordes de las etiquetas y los snippets. `css` y `strict` siguen sin añadir ni quitar nodos de texto.
+- Un elemento con sólo texto conserva `>texto</Tag>` junto aunque sus atributos ocupen varias líneas.
+
 ## 1.9.0 — 2026-11-05
 
 - Publicación coordinada con `@meekojs/meeko` 1.9.0, sin cambios funcionales en este paquete.

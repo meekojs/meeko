@@ -4,7 +4,7 @@ import type { UIThemeProps } from './theme'
 /**
  * Snippets de `<UIAvatar>`.
  *
- * @since 1.11.0
+ * @since 1.10.0
  * @example
  * ```html
  * <UIAvatar><snippet name="fallback">?</snippet></UIAvatar>
@@ -22,7 +22,7 @@ export interface AvatarSnippets {
  * al hidratar. El tamaño, el fondo, el color y las esquinas salen de los tokens `--ui-avatar-*`. `ui` añade
  * clases a sus slots: `base`, `image` y `glyph`.
  *
- * @since 1.11.0
+ * @since 1.10.0
  * @example `<UIAvatar name="Ana Pérez" src="/avatars/ana.webp" size="sm" />`
  */
 export type UIAvatarProps = UIThemeProps<

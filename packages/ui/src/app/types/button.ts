@@ -185,7 +185,7 @@ export type UIButtonProps = (UIButtonAnchorProps | UIButtonNativeProps | UIButto
  * Nombre de un icono propio del paquete para `<UIIconButton icon>`: los trazos que pintan sus componentes, en
  * una rejilla de 16 por 16 (`close`, `menu`, `check`, `info`…).
  *
- * @since 1.11.0
+ * @since 1.10.0
  * @example
  * ```ts
  * const icon: UIIconName = 'close'
@@ -217,7 +217,7 @@ interface UIIconButtonNativeState {
  * propio. Sin `variant` es `ghost`. Es contenido de frase: vale dentro de un párrafo o de un encabezado. `ui`
  * añade clases a sus slots: `base` (el botón o el enlace; equivale a `class`), `icon` y `tooltip`.
  *
- * @since 1.11.0
+ * @since 1.10.0
  * @example
  * ```html
  * <UIIconButton label="Cerrar" icon="close" on:click="close" />
@@ -334,7 +334,7 @@ export type UILinkProps = (UILinkAnchorProps | UILinkRouteProps) &
  * resultado son los tokens `--ui-copy-button-copied-color` y `--ui-copy-button-failed-color`. `ui` añade
  * clases a sus slots: `base` (el botón; equivale a `class`) y `status` (el aviso).
  *
- * @since 1.11.0
+ * @since 1.10.0
  * @example
  * ```html
  * <UICopyButton value="pnpm add @meekojs/ui" />

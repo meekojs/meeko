@@ -43,7 +43,7 @@ const join = (first: string | undefined, second: string | undefined): string | u
  * Lee `ui.defaults` de un componente y lo combina con sus props. `own` devuelve las props de la instancia
  * y se lee en cada acceso, así que sigue sus cambios. Se llama una vez, al crear el componente.
  *
- * @since 1.11.0
+ * @since 1.10.0
  * @example
  * ```ts
  * const props = defineProps<UIStatProps>()

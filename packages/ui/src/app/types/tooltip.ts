@@ -55,7 +55,7 @@ export interface UITooltipProps {
 
 /**
  * Snippets de `<UIHint>`: `default` es una ayuda con formato, en lugar de `text`.
- * @since 1.11.0
+ * @since 1.10.0
  * @example
  * ```html
  * <UIHint>Se calcula con los pedidos <strong>pagados</strong>.</UIHint>
@@ -74,7 +74,7 @@ export interface HintSnippets {
  * tooltip se abre con el puntero, con el foco y al pulsarlo, también en táctil. Como en `<UITooltip>`, no
  * pongas en él nada imprescindible ni interactivo. `ui` añade clases a sus slots: `base` (el botón; equivale a
  * `class`), `icon` y `tooltip`.
- * @since 1.11.0
+ * @since 1.10.0
  * @example
  * ```html
  * <h2>Ingresos <UIHint text="Importe cobrado, sin impuestos ni devoluciones." /></h2>

@@ -550,39 +550,39 @@ export type UIPaginationProps = UIThemeProps<
 		/**
 		 * Número de páginas; activa el modo numerado. Sin él, con `pageSize`, se calcula de `total`.
 		 *
-		 * @since 1.11.0
+		 * @since 1.10.0
 		 */
 		readonly pageCount?: number
 		/**
 		 * Elementos por página; activa el modo numerado. Con `total`, da el número de páginas y el recuento
 		 * «11–20 de 57».
 		 *
-		 * @since 1.11.0
+		 * @since 1.10.0
 		 */
 		readonly pageSize?: number
 		/**
 		 * Modo numerado: páginas vecinas de la actual a cada lado, antes de una elipsis. Por defecto, `1`.
 		 *
-		 * @since 1.11.0
+		 * @since 1.10.0
 		 */
 		readonly siblings?: number
 		/**
 		 * Modo numerado: añade los controles de la primera y la última página.
 		 *
-		 * @since 1.11.0
+		 * @since 1.10.0
 		 */
 		readonly edges?: boolean
 		/**
 		 * Modo numerado: el destino de cada página. Con él, las páginas son enlaces (`href` o `to` con
 		 * `params` y `search`), que navegan sin JavaScript; sin él, son botones que cambian el modelo `page`.
 		 *
-		 * @since 1.11.0
+		 * @since 1.10.0
 		 */
 		readonly pageLink?: (page: number) => UILinkTarget
 		/**
 		 * Modo numerado: deshabilita las páginas y los controles.
 		 *
-		 * @since 1.11.0
+		 * @since 1.10.0
 		 */
 		readonly disabled?: boolean
 		/** `aria-label` de la navegación. */

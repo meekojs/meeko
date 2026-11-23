@@ -6,7 +6,7 @@ import type { UIThemeProps } from './theme'
 
 /**
  * Lo que comparten la acción y el enlace de un menú: texto, tono, estado, icono y atajo.
- * @since 1.11.0
+ * @since 1.10.0
  */
 interface UIMenuItemBase {
 	/** Texto visible, que también sirve para saltar al ítem escribiendo su primera letra. */
@@ -29,7 +29,7 @@ interface UIMenuItemBase {
 
 /**
  * Una acción de `<UIMenu>`: un `<button role="menuitem">` que llama a `onSelect` al elegirse.
- * @since 1.11.0
+ * @since 1.10.0
  * @example
  * ```ts
  * const rename: UIMenuAction = { label: 'Renombrar', shortcut: 'F2', onSelect: () => startRename() }
@@ -45,7 +45,7 @@ export type UIMenuAction = UIMenuItemBase & {
 /**
  * Un enlace de `<UIMenu>`: un `<a role="menuitem">` con `href`, o con `to` para una ruta de la aplicación,
  * que navega con `<MeekoLink>`. Funciona sin JavaScript.
- * @since 1.11.0
+ * @since 1.10.0
  * @example
  * ```ts
  * const settings: UIMenuLink = { label: 'Ajustes', to: '/settings' }
@@ -59,7 +59,7 @@ export type UIMenuLink = UIMenuItemBase &
 
 /**
  * Un ítem elegible de `<UIMenu>`: una acción o un enlace.
- * @since 1.11.0
+ * @since 1.10.0
  * @example
  * ```ts
  * const remove: UIMenuItem = { label: 'Eliminar', tone: 'danger', onSelect: () => removeRow() }
@@ -69,7 +69,7 @@ export type UIMenuItem = UIMenuAction | UIMenuLink
 
 /**
  * Una línea entre dos grupos de ítems, con `role="separator"`.
- * @since 1.11.0
+ * @since 1.10.0
  * @example
  * ```ts
  * const line: UIMenuSeparator = { separator: true }
@@ -81,7 +81,7 @@ export interface UIMenuSeparator {
 
 /**
  * Una entrada de `items` de `<UIMenu>`: un ítem o un separador.
- * @since 1.11.0
+ * @since 1.10.0
  * @example
  * ```ts
  * const items: UIMenuEntry[] = [{ label: 'Duplicar', onSelect: duplicate }, { separator: true }, { label: 'Eliminar', tone: 'danger', onSelect: remove }]
@@ -93,7 +93,7 @@ export type UIMenuEntry = UIMenuItem | UIMenuSeparator
  * Snippets de `<UIMenu>`: `trigger` es el contenido del botón disparador, `anchor` lo sustituye por un
  * disparador propio (como en `<UIPopover>`), `item` pinta el interior de cada ítem de `items` y `default`
  * añade ítems propios tras los de `items`, con `role="menuitem"`.
- * @since 1.11.0
+ * @since 1.10.0
  * @example
  * ```html
  * <UIMenu bind:items="items">
@@ -121,7 +121,7 @@ export interface MenuSnippets {
  * apertura. Sin `triggerLabel` ni snippet `trigger`, el disparador es un botón de sólo icono, con tres puntos,
  * para el menú de una fila. `ui` añade clases a sus slots: `base` (la lista), `trigger`, `chevron`, `item`,
  * `icon`, `label`, `shortcut` y `separator`.
- * @since 1.11.0
+ * @since 1.10.0
  * @example
  * ```html
  * <UIMenu triggerLabel="Acciones" bind:items="[

@@ -43,7 +43,7 @@ export type UICardVariant = 'outline' | 'soft' | 'solid' | 'elevated'
  * Dónde van las acciones de una `UICard` respecto a su título: `inline` a su lado, `below` siempre debajo y
  * `auto` debajo cuando la cabecera de la card es estrecha.
  *
- * @since 1.11.0
+ * @since 1.10.0
  * @example `<UICard title="Pedidos" actionsWrap="auto">…</UICard>`
  */
 export type UICardActionsWrap = 'inline' | 'below' | 'auto'
@@ -54,7 +54,7 @@ export type UICardActionsWrap = 'inline' | 'below' | 'auto'
  * valor de base de ciertas variantes (`V`). `T` es la función que devuelve `tv()`; un componente sin ella
  * (`UIProse`, `UITooltip`) sólo admite `class`.
  *
- * @since 1.11.0
+ * @since 1.10.0
  * @example
  * ```ts
  * import type { stat } from '../variants/data'
@@ -84,7 +84,7 @@ type UIActionDefaults = UIComponentDefaults<typeof button, Pick<VariantProps<typ
  * `shape` en `button`, `link`, `iconButton` y `copyButton`; `size` y `shape` en `avatar`; `variant`, `padding`, `density` y `actionsWrap` en `card`; `size` en `segmentedControl`, y `density` en `table`. La
  * prop explícita de la instancia gana siempre.
  *
- * @since 1.11.0 acepta `class` y `ui` en cada componente, y `padding`, `density`, `actionsWrap` en `card` y
+ * @since 1.10.0 acepta `class` y `ui` en cada componente, y `padding`, `density`, `actionsWrap` en `card` y
  * `density` en `table`. Antes sólo admitía las variantes de `button`, `link` y `card`.
  * @example
  * ```ts
@@ -105,7 +105,7 @@ export interface UIDefaults {
 	/**
 	 * `UIAvatar`: `class` llega a la caja, y `size` y `shape` son sus valores de base.
 	 *
-	 * @since 1.11.0
+	 * @since 1.10.0
 	 */
 	readonly avatar?: UIComponentDefaults<typeof avatar, Pick<VariantProps<typeof avatar>, 'shape' | 'size'>>
 	readonly badge?: UIComponentDefaults<typeof badge>
@@ -119,7 +119,7 @@ export interface UIDefaults {
 			/**
 			 * Posición de base de las acciones; la prop `actionsWrap` de la instancia gana sobre ella.
 			 *
-			 * @since 1.11.0
+			 * @since 1.10.0
 			 */
 			readonly actionsWrap?: UICardActionsWrap
 		}
@@ -132,7 +132,7 @@ export interface UIDefaults {
 	/**
 	 * `UICopyButton`: `class` llega al botón, y `variant`, `size` y `shape` son sus valores de base.
 	 *
-	 * @since 1.11.0
+	 * @since 1.10.0
 	 */
 	readonly copyButton?: UIComponentDefaults<typeof copyButton, Pick<VariantProps<typeof copyButton>, 'shape' | 'size' | 'variant'>>
 	readonly descriptionList?: UIComponentDefaults<typeof descriptionList>
@@ -146,13 +146,13 @@ export interface UIDefaults {
 	/**
 	 * `UIHint`: `class` llega al botón, como la prop de la instancia.
 	 *
-	 * @since 1.11.0
+	 * @since 1.10.0
 	 */
 	readonly hint?: UIComponentDefaults<typeof hint>
 	/**
 	 * `UIIconButton`: `class` llega al botón o al enlace, y `variant`, `size` y `shape` son sus valores de base.
 	 *
-	 * @since 1.11.0
+	 * @since 1.10.0
 	 */
 	readonly iconButton?: UIComponentDefaults<typeof iconButton, Pick<VariantProps<typeof iconButton>, 'shape' | 'size' | 'variant'>>
 	readonly input?: UIComponentDefaults<typeof input>
@@ -165,7 +165,7 @@ export interface UIDefaults {
 	/**
 	 * `class` llega a la lista del menú, como la prop de la instancia.
 	 *
-	 * @since 1.11.0
+	 * @since 1.10.0
 	 */
 	readonly menu?: UIComponentDefaults<typeof menu>
 	readonly modal?: UIComponentDefaults<typeof modal>
@@ -182,7 +182,7 @@ export interface UIDefaults {
 	/**
 	 * `size` de base; la prop de la instancia gana sobre él.
 	 *
-	 * @since 1.11.0
+	 * @since 1.10.0
 	 */
 	readonly segmentedControl?: UIComponentDefaults<typeof segmentedControl, Pick<VariantProps<typeof segmentedControl>, 'size'>>
 	readonly select?: UIComponentDefaults<typeof select>
@@ -191,7 +191,7 @@ export interface UIDefaults {
 	/**
 	 * `UISparkline`, también el de `UIStat trend`: `class` llega al `<svg>`, y `ui` a `base`, `area` y `line`.
 	 *
-	 * @since 1.11.0
+	 * @since 1.10.0
 	 */
 	readonly sparkline?: UIComponentDefaults<typeof sparkline>
 	readonly stat?: UIComponentDefaults<typeof stat>
