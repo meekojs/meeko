@@ -191,6 +191,13 @@ export default defineEslint(
 		rules: { 'meeko/prefer-ui-components': 'off' },
 	},
 	{
+		// The native-elements demo of the controls page styles a native <input type="file"> and shows that
+		// same markup in its code block: a <UIInput> would no longer be the element the demo is about.
+		name: 'meeko/native-elements-demo',
+		files: ['apps/ui/app/pages/controls.meeko', 'apps/ui/app/pages/en/controls.meeko'],
+		rules: { 'meeko/prefer-ui-components': 'off' },
+	},
+	{
 		// Standalone example servers read PORT when run by hand; no Turborepo task runs them.
 		name: 'meeko/examples',
 		files: ['packages/meeko/examples/**'],
