@@ -122,9 +122,10 @@ const directory = '.meeko/output/node/client/assets';
 const files = (await readdir(directory)).filter((file) => file.endsWith('.css'));
 assert.ok(files.length, 'UI emits production CSS');
 const css = (await Promise.all(files.map((file) => readFile(`${directory}/${file}`, 'utf8')))).join('\n');
-assert.match(css, /\.meeko-ui-button/);
-assert.match(css, /\.meeko-ui-table/);
-assert.match(css, /\.meeko-ui-card/);
+// Since the Tailwind migration, UI ships one precompiled sheet: its layers and the utilities of a button and a table.
+assert.match(css, /@layer ui\.utilities/);
+assert.match(css, /\.ui\\:aria-busy\\:before\\:animate-spin/);
+assert.match(css, /\.ui\\:\\\[overflow-wrap\\:normal\\\]/);
 assert.match(css, /--ui-color-info-9:\s*#123456/);
 assert.match(css, /--ui-color-primary:\s*var\(--consumer-primary\)/);
 assert.doesNotMatch(css, /@import/);
