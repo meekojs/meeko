@@ -22,6 +22,6 @@ function createItem() {
 }
 ```
 
-También rechaza llamadas dentro de condiciones, bucles, `try/catch`, callbacks, parámetros por defecto o expresiones de plantilla, y llamadas posteriores a un `await` o a un retorno anticipado. `await useApi()` sí es válido si es la primera suspensión. Un guard que lanza una excepción antes del composable es válido: aborta la ejecución completa.
+También rechaza llamadas dentro de condiciones, bucles, `try/catch`, callbacks, parámetros por defecto o expresiones de plantilla, y llamadas posteriores a un `await` o a un retorno anticipado. En la raíz del `<script>` de un `.meeko`, `await useApi()` y `await useRpcQuery()` no cuentan como suspensión: el render del framework repite el setup con los datos, así que los composables posteriores siguen en el setup síncrono. Los `await` de navegador (`useElementRef`, `useSocket`, `useSocketClient`) sí la cuentan, igual que cualquier `await` dentro de un composable propio. Un guard que lanza una excepción antes del composable es válido: aborta la ejecución completa.
 
 No tiene opciones ni autofix. Se puede ajustar con `rules: { 'meeko/rules-of-composables': 'warn' }`. La comprobación es estática: no demuestra que quien invoque un composable lo haga durante un setup, ni sigue aliases dinámicos, retornados o reasignados. El runtime mantiene sus comprobaciones de contexto.
