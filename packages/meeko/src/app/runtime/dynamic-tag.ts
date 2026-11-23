@@ -378,9 +378,16 @@ export function tagAccepts(tag: string, name: string): boolean {
 type PropNameOf<M> = 0 extends 1 & M ? string : [M] extends [never] ? string : [M] extends [{ readonly renderToString: (props: infer Props, ...rest: never[]) => unknown }] ? (Props extends unknown ? keyof Props : never) : string
 
 /** Type text of MEEK113 for a key of `bind="obj"` on a component. */
-export type PropsSpreadCheck<T, M> = {
-	readonly [K in keyof T]: K extends string ? (Lowercase<K> extends `on${string}` ? TypeMessage<'MEEK113: bind no admite claves on*; usa on:evento'> : string extends K ? unknown : K extends PropNameOf<M> ? unknown : TypeMessage<`MEEK113: ${K} no es una prop del componente`>) : never
-}
+type PropKeyCheck<K, M> = K extends string ? (Lowercase<K> extends `on${string}` ? TypeMessage<'MEEK113: bind no admite claves on*; usa on:evento'> : string extends K ? unknown : K extends PropNameOf<M> ? unknown : TypeMessage<`MEEK113: ${K} no es una prop del componente`>) : never
+
+/** {@link AttributeKeysCheck} for the props of a component. */
+type PropKeysCheck<Required extends PropertyKey, Optional extends PropertyKey, M> = { readonly [K in Required]: PropKeyCheck<K, M> } & { readonly [K in Optional]?: PropKeyCheck<K, M> }
+
+/**
+ * Type text of MEEK113 for the keys of `bind="obj"` on a component, member by member of a union
+ * and by its keys only, as {@link AttributeSpreadCheck} does.
+ */
+export type PropsSpreadCheck<T, M> = T extends unknown ? PropKeysCheck<{ [K in keyof T]-?: T extends Record<K, unknown> ? K : never }[keyof T], { [K in keyof T]-?: T extends Record<K, unknown> ? never : K }[keyof T], M> : never
 
 /**
  * Props of `bind="obj"` on a component tag or a `<component is>` with a component: a copy of the
@@ -408,18 +415,19 @@ type RenderableTag<Is> = Extract<TagPart<Is>, TagName>
 /** Type text of MEEK113 for a key of `bind="obj"` on `<component is>`, by what `is` can be. */
 type DynamicKeyMessage<K extends string, M, Tag extends string> = [Tag] extends [never] ? `MEEK113: ${K} no es una prop del componente` : [M] extends [never] ? `MEEK113: ${K} no es un atributo de la etiqueta` : `MEEK113: ${K} no es una prop del componente ni un atributo de la etiqueta`
 
+/** Type text of MEEK113 for a key of `bind="obj"` on `<component is>`, or the type its value must have. */
+type DynamicKeyCheck<K, M, Tag extends string> = K extends string ? (Lowercase<K> extends `on${string}` ? TypeMessage<'MEEK113: bind no admite claves on*; usa on:evento'> : string extends K ? ([M] extends [never] ? AttributeValue : unknown) : K extends DynamicPropName<M> ? unknown : K extends `data-meeko${string}` ? TypeMessage<'MEEK113: data-meeko* está reservado a Meeko'> : K extends AttributeNameOf<Tag> ? AttributeValueOf<Tag, K> : TypeMessage<DynamicKeyMessage<K, M, Tag>>) : never
+
+/** {@link AttributeKeysCheck} for what the value of `<component is>` can be. */
+type DynamicKeysCheck<Required extends PropertyKey, Optional extends PropertyKey, M, Tag extends string> = { readonly [K in Required]: DynamicKeyCheck<K, M, Tag> } & { readonly [K in Optional]?: DynamicKeyCheck<K, M, Tag> }
+
 /**
  * Check of `bind="obj"` on a `<component is>` whose value decides at run time: each key must be
  * taken by what `is` can be, a prop of its components or an attribute of its tags. Without any
- * value that can render, MEEK112 on `is` says so and nothing is checked here.
+ * value that can render, MEEK112 on `is` says so and nothing is checked here. Each member of a
+ * union is checked by its keys only, as {@link AttributeSpreadCheck} does.
  */
-export type DynamicSpreadCheck<T, Is, M = ComponentPart<Is>, Tag extends string = RenderableTag<Is>> = 0 extends 1 & Is
-	? unknown
-	: [M | Tag] extends [never]
-		? unknown
-		: {
-				readonly [K in keyof T]: K extends string ? (Lowercase<K> extends `on${string}` ? TypeMessage<'MEEK113: bind no admite claves on*; usa on:evento'> : string extends K ? ([M] extends [never] ? AttributeValue : unknown) : K extends DynamicPropName<M> ? unknown : K extends `data-meeko${string}` ? TypeMessage<'MEEK113: data-meeko* está reservado a Meeko'> : K extends AttributeNameOf<Tag> ? AttributeValueOf<Tag, K> : TypeMessage<DynamicKeyMessage<K, M, Tag>>) : never
-			}
+export type DynamicSpreadCheck<T, Is, M = ComponentPart<Is>, Tag extends string = RenderableTag<Is>> = 0 extends 1 & Is ? unknown : [M | Tag] extends [never] ? unknown : T extends unknown ? DynamicKeysCheck<{ [K in keyof T]-?: T extends Record<K, unknown> ? K : never }[keyof T], { [K in keyof T]-?: T extends Record<K, unknown> ? never : K }[keyof T], M, Tag> : never
 
 /**
  * Type-only check of `bind="obj"` on the element of a `<component is>` that may be a tag or a
