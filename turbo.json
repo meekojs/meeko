@@ -22,7 +22,7 @@
 				"$TURBO_ROOT$/packages/docs/assets/**",
 				"$TURBO_ROOT$/assets/brand/**"
 			],
-			"outputs": ["dist/**", ".meeko/output/**", "public/brand/**", "public/fonts/**", "src/app/components/**/*.d.meeko.ts"]
+			"outputs": ["dist/**", ".meeko/output/**", "public/brand/**", "public/fonts/**", "src/app/components/**/*.d.meeko.ts", "src/**/*.generated.ts"]
 		},
 		"check": {
 			"dependsOn": ["^build"],
