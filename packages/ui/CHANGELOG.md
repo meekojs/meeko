@@ -2,6 +2,7 @@
 
 ## 1.10.2 — 2026-11-24
 
+- **`UIButton` como conmutador con texto: `pressed`.** Como en `UIIconButton`, `bind:pressed` convierte el `<button>` en un conmutador: pinta `aria-pressed` y el aspecto de activo de su `variant`, sin alternar `variant` a mano. Sin `pressed` no lleva `aria-pressed`, y un enlace o una ruta con `pressed` es un error de tipos. El aspecto de activo pasa de las variantes de `UIIconButton` a las de `button`, compartidas, sin cambiar cómo se ve.
 - **`UICombobox` crea sus opciones al abrirse.** Una lista cerrada no tiene opciones en el DOM ni en el HTML del servidor: se crean la primera vez que se abre y se conservan al cerrarla. Cada opción llevaba unos 255 caracteres de clases, así que una página con varias listas largas cerradas enviaba e hidrataba cientos de KB de `role="option"` que nadie veía (en una aplicación, 690 opciones y unos 300 KB sólo de clases en una página de 1,07 MB). El valor del disparador, los `<input type="hidden">` del formulario, el teclado, el typeahead, `aria-controls` y `aria-activedescendant` no cambian; la opción activa se desplaza a la vista también en la primera apertura. Sin JavaScript la lista no se abre, así que no se pierde nada. `UISelect` no cambia: es un `<select>` nativo y sus `<option>` no llevan clases.
 
 ## 1.10.1 — 2026-11-23

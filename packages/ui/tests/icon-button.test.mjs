@@ -11,7 +11,7 @@ import { uiDefaultsKey } from '../dist/app/utils/defaults.js'
 import { icons } from '../dist/app/utils/icons.js'
 import { validateDefaults } from '../dist/defaults.js'
 
-const components = ['Popover', 'Tooltip', 'IconButton', 'Hint']
+const components = ['Popover', 'Tooltip', 'IconButton', 'Hint', 'Button']
 const i18nKey = Symbol.for('meeko.i18n')
 
 /** Compiles the real components and a page with `template`, and renders it in SSR with the given contexts. */
@@ -76,6 +76,18 @@ test('UIIconButton variants, tone, size and shape are those of UIButton', async 
 	const { classes } = element(html, 'button')
 	for (const name of ['ui:bg-danger', 'ui:min-w-(--ui-control-height-lg)', 'ui:rounded-full', 'ui:aria-pressed:bg-danger-hover']) assert.ok(classes.includes(name), name)
 	assert.ok(!classes.includes('ui:bg-transparent'))
+})
+
+test('UIButton pressed is aria-pressed of a toggle with text, with the pressed look, and a link never takes it', async (context) => {
+	const html = await render(context, '<UIButton variant="outline" bind:pressed="true">Pagadas</UIButton><UIButton variant="outline" bind:pressed="false">Pendientes</UIButton><UIButton>Guardar</UIButton>')
+	const [on, off, plain] = [...html.matchAll(/<button[^>]*>/g)].map(([tag]) => tag)
+	assert.match(on, /aria-pressed="true"/)
+	assert.match(off, /aria-pressed="false"/)
+	assert.doesNotMatch(plain, /\saria-pressed=/, 'not a toggle without pressed')
+	// The pressed look is read from aria-pressed: the same classes as <UIIconButton>.
+	assert.ok(on.includes('ui:aria-pressed:bg-primary-soft'), on)
+	const link = await render(context, '<UIButton href="/docs">Docs</UIButton>')
+	assert.equal(element(link, 'a').attributes['aria-pressed'], undefined)
 })
 
 test('UIIconButton pressed is aria-pressed of a toggle, and a link never takes it', async (context) => {

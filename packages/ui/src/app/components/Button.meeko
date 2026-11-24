@@ -9,7 +9,7 @@
 	import { uiTheme } from '../utils/defaults'
 	import { button } from '../variants/button'
 
-	const { to, params, search, resolve, href, target, rel, download, type = 'button', disabled = false, tone, loading, iconOnly, ariaLabel, variant, size, shape, class: ownClass, ...rest } = defineProps<UIButtonProps>()
+	const { to, params, search, resolve, href, target, rel, download, type = 'button', disabled = false, pressed, tone, loading, iconOnly, ariaLabel, variant, size, shape, class: ownClass, ...rest } = defineProps<UIButtonProps>()
 
 	const theme = uiTheme('button', () => ({ class: ownClass }))
 
@@ -19,6 +19,8 @@
 
 	// A disabled button drops the focus: while busy it stays focusable, and the click handler stops it.
 	const nativeDisabled = computed(() => (to === undefined && href === undefined ? disabled : undefined))
+	// `pressed` makes a toggle of a <button>; without it, the button is not one. Its look reads aria-pressed.
+	const ariaPressed = computed(() => (to === undefined && href === undefined && pressed !== undefined ? String(pressed) : undefined))
 	const classes = computed(() =>
 		button({
 			variant: variant ?? theme.defaults?.variant,
@@ -45,6 +47,7 @@
 		bind:download="download"
 		bind:type="type"
 		bind:disabled="nativeDisabled.value"
+		bind:aria-pressed="ariaPressed.value"
 		bind:aria-busy="loading ? 'true' : undefined"
 		bind:aria-disabled="loading ? 'true' : undefined"
 		bind:aria-label="ariaLabel ?? rest['aria-label']"

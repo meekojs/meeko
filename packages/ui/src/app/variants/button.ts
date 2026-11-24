@@ -79,6 +79,16 @@ export const button = tv({
 		{ variant: 'secondary', tone: 'danger', class: 'ui:border-danger-border ui:bg-danger-soft' },
 		{ variant: 'outline', tone: 'danger', class: 'ui:border-danger-border ui:bg-transparent' },
 		{ variant: 'ghost', tone: 'danger', class: 'ui:border-transparent ui:bg-transparent' },
+		// Pressed (a toggle with `pressed`): a deeper solid, or the soft accent with its border, which the pointer
+		// does not take away. It reads aria-pressed, so <UIButton> and <UIIconButton> need no class of their own.
+		{ variant: 'primary', tone: 'neutral', class: 'ui:aria-pressed:bg-primary-active ui:aria-pressed:not-disabled:hover:bg-primary-active' },
+		{
+			variant: ['secondary', 'outline', 'ghost'],
+			tone: 'neutral',
+			class: 'ui:aria-pressed:border-primary-border ui:aria-pressed:bg-primary-soft ui:aria-pressed:text-primary-text ui:aria-pressed:not-disabled:hover:bg-primary-soft-hover',
+		},
+		{ variant: 'primary', tone: 'danger', class: 'ui:aria-pressed:bg-danger-hover ui:aria-pressed:text-danger-contrast-hover ui:aria-pressed:not-disabled:hover:bg-danger-hover' },
+		{ variant: ['secondary', 'outline', 'ghost'], tone: 'danger', class: 'ui:aria-pressed:border-danger-text ui:aria-pressed:bg-danger-soft ui:aria-pressed:not-disabled:hover:bg-danger-soft' },
 	],
 	defaultVariants: {
 		variant: 'primary',
@@ -92,8 +102,8 @@ export const button = tv({
 export type ButtonVariants = VariantProps<typeof button>
 
 /**
- * What <UIIconButton> adds to the look of `button` with `iconOnly`: the pressed state of a toggle, read from
- * `aria-pressed` so that it needs no class of its own, and the slots of its icon and of its tooltip. Its
+ * What <UIIconButton> adds to the look of `button` with `iconOnly`: the slots of its icon and of its tooltip
+ * (the pressed state of a toggle is in `button`, read from `aria-pressed`). Its
  * variants are the ones of `button`, so that `ui.defaults.iconButton` accepts the same values: the component
  * passes them to both. Its default variant is `ghost`, the usual one of a toolbar.
  */
@@ -124,17 +134,6 @@ export const iconButton = tv({
 			pill: '',
 		},
 	},
-	compoundVariants: [
-		// Pressed: a deeper solid, or the soft accent with its border, which the pointer does not take away.
-		{ variant: 'primary', tone: 'neutral', class: { base: 'ui:aria-pressed:bg-primary-active ui:aria-pressed:not-disabled:hover:bg-primary-active' } },
-		{
-			variant: ['secondary', 'outline', 'ghost'],
-			tone: 'neutral',
-			class: { base: 'ui:aria-pressed:border-primary-border ui:aria-pressed:bg-primary-soft ui:aria-pressed:text-primary-text ui:aria-pressed:not-disabled:hover:bg-primary-soft-hover' },
-		},
-		{ variant: 'primary', tone: 'danger', class: { base: 'ui:aria-pressed:bg-danger-hover ui:aria-pressed:text-danger-contrast-hover ui:aria-pressed:not-disabled:hover:bg-danger-hover' } },
-		{ variant: ['secondary', 'outline', 'ghost'], tone: 'danger', class: { base: 'ui:aria-pressed:border-danger-text ui:aria-pressed:bg-danger-soft ui:aria-pressed:not-disabled:hover:bg-danger-soft' } },
-	],
 	defaultVariants: {
 		variant: 'ghost',
 		tone: 'neutral',
