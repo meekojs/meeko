@@ -16,6 +16,7 @@
 <template>
 	<div bind:class="classes.base({ class: [theme.ui.base, theme.class] })">
 		<label
+			bind:id="props.id + '-label'"
 			bind:for="props.id"
 			bind:class="classes.label({ class: theme.ui.label })"
 		>

@@ -9,6 +9,7 @@ import type { commandPalette } from '../variants/command-palette'
 import type { container } from '../variants/container'
 import type { codeBlock, diff } from '../variants/content'
 import type { descriptionList, sparkline, stat } from '../variants/data'
+import type { dateRange } from '../variants/date-range'
 import type { drawer } from '../variants/drawer'
 import type { alert, disclosure, empty, skeleton, toast } from '../variants/feedback'
 import type { field } from '../variants/field'
@@ -135,6 +136,12 @@ export interface UIDefaults {
 	 * @since 1.10.0
 	 */
 	readonly copyButton?: UIComponentDefaults<typeof copyButton, Pick<VariantProps<typeof copyButton>, 'shape' | 'size' | 'variant'>>
+	/**
+	 * `UIDateRange`: `class` llega al `<fieldset>`, como la prop de la instancia.
+	 *
+	 * @since 1.11.0
+	 */
+	readonly dateRange?: UIComponentDefaults<typeof dateRange>
 	readonly descriptionList?: UIComponentDefaults<typeof descriptionList>
 	readonly diff?: UIComponentDefaults<typeof diff>
 	readonly disclosure?: UIComponentDefaults<typeof disclosure>

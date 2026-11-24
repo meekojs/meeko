@@ -12,6 +12,7 @@ import { commandPalette } from './app/variants/command-palette'
 import { container } from './app/variants/container'
 import { codeBlock, diff } from './app/variants/content'
 import { descriptionList, sparkline, stat } from './app/variants/data'
+import { dateRange } from './app/variants/date-range'
 import { drawer } from './app/variants/drawer'
 import { alert, disclosure, empty, skeleton, toast } from './app/variants/feedback'
 import { field } from './app/variants/field'
@@ -68,6 +69,7 @@ const components = {
 	commandPalette: { look: commandPalette },
 	container: { look: container },
 	copyButton: { look: copyButton, variants: ['variant', 'size', 'shape'] },
+	dateRange: { look: dateRange },
 	descriptionList: { look: descriptionList },
 	diff: { look: diff },
 	disclosure: { look: disclosure },

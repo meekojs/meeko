@@ -469,6 +469,29 @@ async function remove() {
     <UISegmentedControl legend="Periodo del gráfico" hideLegend size="sm" name="days" model="days" bind:options="options" />
   </form>
 </template>`,
+	dateRange: `<script lang="ts">
+  import type { UIDateRangeValue } from '@meekojs/ui/runtime'
+
+  const from = signal('')
+  const to = signal('')
+  // «Hoy» del servidor: los atajos salen activos en el HTML y coinciden al hidratar.
+  const today = '2026-11-24'
+  function load(range: UIDateRangeValue) {
+    // Sólo llega un rango completo y válido.
+  }
+</script>
+
+<template>
+  <UIDateRange label="Periodo" model:from="from" model:to="to"
+    fromName="desde" toName="hasta" bind:today="today"
+    min="2020-01-01" bind:max="today" bind:maxDays="366" on:change="load" />
+</template>`,
+	dateRangeField: `<UIField id="period" label="Periodo de ventas" hint="Hasta 366 días">
+  <snippet name="default" params="id, describedBy">
+    <UIDateRange bind:id="id" bind:describedBy="describedBy"
+      model:from="from" model:to="to" bind:maxDays="366" bind:presets="[]" />
+  </snippet>
+</UIField>`,
 	slider: `<UISlider model="volume" label="Volumen" name="volume" bind:min="0" bind:max="100" bind:step="5" />`,
 	alert: `<UIAlert tone="success" title="Cambios guardados" description="Ya están publicados." />
 <UIAlert tone="danger" title="No se pudo publicar" dismiss on:dismiss="clear">
