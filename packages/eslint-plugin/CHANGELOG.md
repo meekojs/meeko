@@ -1,5 +1,9 @@
 # Cambios de ESLint para Meeko
 
+## 1.10.2 — 2026-11-24
+
+- Publicación coordinada con `@meekojs/ui` y `@meekojs/icon` 1.10.2, sin cambios funcionales en este paquete.
+
 ## 1.10.1 — 2026-11-23
 
 - Publicación coordinada con `@meekojs/meeko` 1.10.1, sin cambios funcionales en este paquete.

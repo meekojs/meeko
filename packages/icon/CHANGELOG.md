@@ -1,6 +1,6 @@
 # Cambios de Meeko Icon
 
-## Sin publicar
+## 1.10.2 — 2026-11-24
 
 - **El icono deja su sitio al indicador de un botón ocupado.** Un `<UIButton loading>` con un `<UIIcon>` dentro, también con `iconOnly`, mostraba a la vez el indicador de carga y el icono: la hoja del icono no tiene capa, así que su `display` ganaba a la utilidad de `@meekojs/ui` que lo oculta. Ahora un botón o enlace con `aria-busy="true"` oculta el icono que contiene directamente. La regla usa `:where(button, a)` para que la aplicación la cambie con un selector sencillo.
 
