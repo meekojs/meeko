@@ -100,3 +100,25 @@ test('UIIcon on the UI site: visible in light and dark, accessible label, client
 
 	assert.deepEqual(problems, [])
 })
+
+test('UIIcon gives way to the spinner of a busy UIButton, in an icon-only button too', { timeout: 120_000 }, async (context) => {
+	const { browser, origin } = await startDemo(context)
+	const page = await browser.newPage({ viewport: { width: 1280, height: 900 } })
+	await page.goto(`${origin}/buttons`, { waitUntil: 'networkidle' })
+	// The icon-only <UIButton> of the states example: its <UIIcon> is a direct child.
+	const button = page.locator('button[aria-label="Eliminar"]:has(> svg.meeko-icon)').first()
+	const paint = () =>
+		button.evaluate((element) => ({
+			icon: globalThis.getComputedStyle(element.querySelector('svg.meeko-icon')).display,
+			spinner: globalThis.getComputedStyle(element, '::before').animationName,
+		}))
+	const idle = await paint()
+	assert.notEqual(idle.icon, 'none', 'the icon shows while the button is idle')
+	assert.equal(idle.spinner, 'none')
+	// <UIButton loading> sets aria-busy; the spinner takes the place of the icon instead of sitting next to it.
+	await button.evaluate((element) => element.setAttribute('aria-busy', 'true'))
+	const busy = await paint()
+	assert.equal(busy.icon, 'none')
+	assert.notEqual(busy.spinner, 'none')
+	await page.close()
+})
