@@ -46,6 +46,12 @@ export function createCombobox<T>(props: ComboboxSettings<T>, model: Signal<unkn
 	/** The signal that holds the value: the form field's, or the model. */
 	const target = (): { value: unknown } => props.field?.value ?? model
 	const open = signal(false)
+	/**
+	 * Whether the options are in the DOM: from the first opening on. A closed list holds none, in SSR
+	 * either: a page with long lists would send and hydrate every option of every closed one. They stay
+	 * after closing, so the next opening does not rebuild them and the closing animation keeps its content.
+	 */
+	const rendered = signal(false)
 	const active = signal(-1)
 	const query = signal('')
 	const typing = signal(false)
@@ -101,6 +107,7 @@ export function createCombobox<T>(props: ComboboxSettings<T>, model: Signal<unkn
 	effect(() => {
 		const isOpen = open.value
 		untrack(() => {
+			if (isOpen && !rendered.value) rendered.value = true
 			if (!isOpen) {
 				if (active.value !== -1) active.value = -1
 				if (typing.value) typing.value = false
@@ -344,11 +351,16 @@ export function createCombobox<T>(props: ComboboxSettings<T>, model: Signal<unkn
 		}
 		document.addEventListener('pointerdown', outside, true)
 		root.addEventListener('focusout', focusout)
+		const reveal = (current: string): boolean => {
+			const option = document.getElementById(current)
+			if (option && typeof option.scrollIntoView === 'function') option.scrollIntoView({ block: 'nearest' })
+			return option !== null
+		}
 		const stop = effect(() => {
 			const current = activeId.value
 			if (current === undefined) return
-			const option = document.getElementById(current)
-			if (option && typeof option.scrollIntoView === 'function') option.scrollIntoView({ block: 'nearest' })
+			// On the first opening the options are not in the DOM yet: they arrive with the same update.
+			if (!reveal(current)) queueMicrotask(() => reveal(current))
 		})
 		return () => {
 			stop()
@@ -366,6 +378,7 @@ export function createCombobox<T>(props: ComboboxSettings<T>, model: Signal<unkn
 		triggerAttributes,
 		listOption,
 		open,
+		rendered,
 		active,
 		loading,
 		groups,
