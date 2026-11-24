@@ -306,6 +306,9 @@ for (const [name, start] of engines) {
 				await page.locator('#select-out', { hasText: '|Ana' }).waitFor()
 				await rich.locator('[data-meeko-select-value]', { hasText: 'Ana' }).waitFor()
 			}
+			// In a flex row it fills the row, like <UIInput>, instead of shrinking to its value.
+			const row = page.locator('#select-row')
+			assert.deepEqual(await row.evaluate((element) => [element.querySelector('[data-meeko-select]'), element.querySelector('select')].map((part) => part.getBoundingClientRect().width)), [400, 400])
 			assert.deepEqual(errors, [])
 			await page.close()
 		})

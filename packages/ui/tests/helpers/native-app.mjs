@@ -122,6 +122,7 @@ const showcase = `<script lang="ts">
 				<snippet name="option" params="option, state"><span class="dot" bind:data-color="option.color" /><span>{option.name}</span><em if:when="state.selected"> (elegida)</em></snippet>
 			</UISelect>
 			<p id="select-out">{plan.value}|{person.value?.name}</p>
+			<div id="select-row" style="display: flex; width: 400px;"><UISelect aria-label="En una fila" name="row" bind:options="['Uno']" /></div>
 		</section>
 	</main>
 </template>

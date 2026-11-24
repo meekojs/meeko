@@ -10,10 +10,14 @@ const insetRing = 'ui:focus-visible:outline-(length:--ui-focus-ring-width) ui:fo
 /** A line of soft text in the list: the name of a group, nothing found or loading. */
 const note = 'ui:px-2 ui:py-1.5 ui:text-sm ui:text-text-soft'
 
-/** What both share: the root dims itself when disabled, and holds the clear button over the trigger. */
+/**
+ * What both share: the root dims itself when disabled, and holds the clear button over the trigger. It is as
+ * wide as its container, like <UIInput>: in a flex row or a grid it would otherwise shrink to its content, and
+ * the `w-full` of the trigger would only fill that.
+ */
 const root = {
 	slots: {
-		base: 'ui:font-sans',
+		base: 'ui:block ui:w-full ui:font-sans',
 		/** What the trigger adds to `control`: it is a button, whose text starts at the start. */
 		trigger: 'ui:cursor-pointer ui:text-start',
 		groupLabel: note,

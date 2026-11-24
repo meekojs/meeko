@@ -8,6 +8,7 @@ import { createPopover, interestDelay, interestSource, listKeyTarget, normalizeT
 import { groupOptions, sameOption, selectDisabled, selectLabel, selectValue } from '../dist/app/utils/select-options.js'
 import { themeToggleItems, themeToggleKeyTarget, themeToggleMode, themeToggleStatus } from '../dist/app/utils/theme-toggle.js'
 import { popover } from '../dist/app/variants/popover.js'
+import { combobox, select } from '../dist/app/variants/select.js'
 
 test('an unknown placement falls back to bottom-start, and the variants of popover place each one', () => {
 	assert.equal(popoverPlacement('top-end'), 'top-end')
@@ -20,6 +21,15 @@ test('an unknown placement falls back to bottom-start, and the variants of popov
 				.includes(`ui:[position-area:${area.replace(' ', '_')}]`),
 			placement,
 		)
+	}
+})
+
+test('the root of a select and a combobox is as wide as its container, also in a flex row or a grid', () => {
+	for (const [name, look] of Object.entries({ select, combobox })) {
+		for (const clearable of [false, true]) {
+			const classes = look({ clearable }).base().split(' ')
+			assert.ok(classes.includes('ui:w-full') && classes.includes('ui:block'), `${name} clearable=${clearable}: ${classes.join(' ')}`)
+		}
 	}
 })
 
