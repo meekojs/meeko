@@ -19,8 +19,8 @@ const config: Config & MeekoPrettierOptions & { cssDeclarationSorterKeepOverride
 		// the whitespace as written and only breaks inside the tags.
 		// The same holds for the core components (their compiled copies in src/builtins/ are generated from
 		// these sources) and for the example whose list items render their text without whitespace.
-		{ files: ['packages/meeko/src/app/components/{MeekoAwait,MeekoLink,MeekoPopover,MeekoSelect,MeekoThemeToggle}/*.meeko', 'packages/meeko/examples/primitives/Primitives.meeko'], options: { htmlWhitespaceSensitivity: 'strict' } },
-		{ files: '**/src/{app/components/{Avatar,CodeBlock,Combobox,CommandPalette,CopyButton,DescriptionList,Diff,Drawer,Hint,IconButton,Input,LocaleSuggestion,Menu,Modal,PageHeader,Popover,SegmentedControl,Select,Stat,Tabs,ThemeToggle,Tooltip},editor/components/MarkdownEditor}.meeko', options: { htmlWhitespaceSensitivity: 'strict' } },
+		{ files: ['packages/meeko/src/app/components/{MeekoAwait,MeekoLink,MeekoPopover,MeekoSelect,MeekoThemeToggle}/*.meeko', 'packages/meeko/examples/primitives/Primitives.meeko'], options: { htmlWhitespaceSensitivity: 'ignore' } },
+		{ files: '**/src/{app/components/{Avatar,CodeBlock,Combobox,CommandPalette,CopyButton,DescriptionList,Diff,Drawer,Hint,IconButton,Input,LocaleSuggestion,Menu,Modal,PageHeader,Popover,SegmentedControl,Select,Stat,Tabs,ThemeToggle,Tooltip},editor/components/MarkdownEditor}.meeko', options: { htmlWhitespaceSensitivity: 'ignore' } },
 	],
 	printWidth: 800,
 	semi: false,

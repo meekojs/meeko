@@ -35,84 +35,109 @@
 	const triggerClass = computed(() => control({ clearable: props.clearable === true, class: [classes.value.trigger(), theme.ui.trigger, props.listClass] }))
 </script>
 
-<!-- No whitespace between the tags of this template: it would be text inside the trigger and the options. Prettier keeps it that way (htmlWhitespaceSensitivity "strict" in prettier.config.ts); tests/templates-without-whitespace.test.mjs guards it. -->
-<template><div
+<template>
+	<div
 		ref:root
 		data-meeko-select
 		bind:class="classes.value.base({ class: [theme.ui.base, theme.class] })"
 		bind:data-disabled="props.disabled ? '' : undefined"
-		><select
+	>
+		<select
 			data-meeko-select-trigger
 			bind:class="triggerClass.value"
 			bind="select.attributes.value"
 			on:change="select.change"
 			on:invalid="select.reportInvalid"
-			><button type="button"
-				><span
+		>
+			<button type="button">
+				<span
 					if:when="snippets.value && select.chosen.value"
 					data-meeko-select-value
 					bind:class="classes.value.value({ class: theme.ui.value })"
-					><render
+				>
+					<render
 						snippet="snippets.value"
-						args="select.value.value" /></span
-				><span
+						args="select.value.value"
+					/>
+				</span>
+				<span
 					if:when="!snippets.value && snippets.option && select.chosen.value"
 					data-meeko-select-value
 					bind:class="classes.value.value({ class: theme.ui.value })"
-					>{select.label.value}</span
-				><selectedcontent if:when="(!snippets.value && !snippets.option) || !select.chosen.value" /></button
-			><option
+				>
+					{select.label.value}
+				</span>
+				<selectedcontent if:when="(!snippets.value && !snippets.option) || !select.chosen.value" />
+			</button>
+			<option
 				if:when="select.nativeIndex.value === 0"
 				hidden
 				selected
 				bind:value="select.blankValue.value"
 				data-meeko-select-placeholder
-				>{select.blankLabel.value}</option
-			><template
+			>
+				{select.blankLabel.value}
+			</option>
+			<template
 				each:of="select.groups.value"
 				each:as="group"
 				each:key="group.key"
-				><template if:when="group.name === undefined"
-					><option
+			>
+				<template if:when="group.name === undefined">
+					<option
 						each:of="group.entries"
 						each:as="entry"
 						each:key="entry.key"
 						bind="select.option(entry)"
-						><render
+					>
+						<render
 							if:when="snippets.option"
 							snippet="snippets.option"
 							args="entry.option, select.stateOf(entry)"
-						/><template if:when="!snippets.option">{entry.label}</template></option
-					></template
-				><optgroup
+						/>
+						<template if:when="!snippets.option">{entry.label}</template>
+					</option>
+				</template>
+				<optgroup
 					if:when="group.name !== undefined"
 					bind:label="group.name"
-					><legend
+				>
+					<legend
 						data-meeko-select-group-label
 						bind:class="classes.value.groupLabel({ class: theme.ui.groupLabel })"
-						><render
+					>
+						<render
 							if:when="snippets.group"
 							snippet="snippets.group"
 							args="group.name ?? ''"
-						/><template if:when="!snippets.group">{group.name}</template></legend
-					><option
+						/>
+						<template if:when="!snippets.group">{group.name}</template>
+					</legend>
+					<option
 						each:of="group.entries"
 						each:as="entry"
 						each:key="entry.key"
 						bind="select.option(entry)"
-						><render
+					>
+						<render
 							if:when="snippets.option"
 							snippet="snippets.option"
 							args="entry.option, select.stateOf(entry)"
-						/><template if:when="!snippets.option">{entry.label}</template></option
-					></optgroup
-				></template
-			></select
-		><button
+						/>
+						<template if:when="!snippets.option">{entry.label}</template>
+					</option>
+				</optgroup>
+			</template>
+		</select>
+		<button
 			if:when="select.showClear.value"
 			type="button"
 			data-meeko-select-clear
 			bind:class="classes.value.clear({ class: theme.ui.clear })"
 			bind:aria-label="props.clearLabel ?? text.clear"
-			on:click="select.clear">×</button></div
-	></template>
+			on:click="select.clear"
+		>
+			×
+		</button>
+	</div>
+</template>
