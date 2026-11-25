@@ -97,6 +97,20 @@ const spanish: UIMessages = {
 	sparkline: { label: 'Tendencia: mínimo {min}, máximo {max}, último {last}', empty: 'Sin datos' },
 	copyButton: { copy: 'Copiar', copied: 'Copiado', failed: 'No se pudo copiar' },
 	input: { show: 'Mostrar contraseña', hide: 'Ocultar contraseña' },
+	dateRange: {
+		label: 'Periodo',
+		from: 'Desde',
+		to: 'Hasta',
+		presets: 'Atajos',
+		today: 'Hoy',
+		last7Days: '7 días',
+		thisMonth: 'Este mes',
+		previousMonth: 'Mes anterior',
+		order: 'La fecha «Desde» no puede ser posterior a la fecha «Hasta».',
+		tooLong: 'El rango no puede tener más de {days} días.',
+		beforeMin: 'Elige fechas a partir del {min}.',
+		afterMax: 'Elige fechas hasta el {max}.',
+	},
 }
 
 const english: UIMessages = {
@@ -181,6 +195,20 @@ const english: UIMessages = {
 	sparkline: { label: 'Trend: minimum {min}, maximum {max}, latest {last}', empty: 'No data' },
 	copyButton: { copy: 'Copy', copied: 'Copied', failed: 'Could not copy' },
 	input: { show: 'Show password', hide: 'Hide password' },
+	dateRange: {
+		label: 'Date range',
+		from: 'From',
+		to: 'To',
+		presets: 'Shortcuts',
+		today: 'Today',
+		last7Days: '7 days',
+		thisMonth: 'This month',
+		previousMonth: 'Last month',
+		order: 'The “From” date cannot be after the “To” date.',
+		tooLong: 'The range cannot be longer than {days} days.',
+		beforeMin: 'Choose dates from {min} onwards.',
+		afterMax: 'Choose dates up to {max}.',
+	},
 }
 
 /** The texts that come with the package. Spanish is complete and the last fallback of every locale. */
@@ -236,6 +264,7 @@ function merge(messages: UIMessages, layer: UIMessageOverrides | undefined): UIM
 		sparkline: { ...messages.sparkline, ...layer.sparkline },
 		copyButton: { ...messages.copyButton, ...layer.copyButton },
 		input: { ...messages.input, ...layer.input },
+		dateRange: { ...messages.dateRange, ...layer.dateRange },
 	}
 }
 
