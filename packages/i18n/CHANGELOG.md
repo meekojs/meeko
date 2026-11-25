@@ -1,5 +1,9 @@
 # Cambios de Meeko i18n
 
+## 1.11.0 — 2026-11-24
+
+- Publicación coordinada con `@meekojs/ui` 1.11.0, sin cambios funcionales en este paquete.
+
 ## 1.10.2 — 2026-11-24
 
 - Publicación coordinada con `@meekojs/ui` y `@meekojs/icon` 1.10.2, sin cambios funcionales en este paquete.
