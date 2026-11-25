@@ -1,6 +1,6 @@
 # Cambios de Meeko
 
-## 1.11.0 — 2026-11-24
+## 1.11.0 — 2026-11-25
 
 - Publicación coordinada con `@meekojs/ui` 1.11.0, sin cambios funcionales en este paquete.
 
