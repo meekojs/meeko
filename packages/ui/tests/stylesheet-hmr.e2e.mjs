@@ -9,12 +9,14 @@ import { startDevServer } from '../../../scripts/test-support/dev-server.ts'
 import { createFixture } from '../../../scripts/test-support/fixture.ts'
 
 const packageRoot = fileURLToPath(new URL('..', import.meta.url))
+/** How development links a stylesheet of the package: `/@fs/` and its real path, with a final `/`. */
+const packageHref = `/@fs/${packageRoot.replaceAll('\\', '/').replace(/^\/+/, '')}`
 const viteRoot = fileURLToPath(new URL('../../meeko/node_modules/vite', import.meta.url))
 const cli = fileURLToPath(new URL('../../meeko/dist/cli.js', import.meta.url))
 
 const page = `<template>
 	<main>
-		<UIButton id="action" variant="primary">Guardar</UIButton>
+		<UIButton id="action" variant="solid" color="primary">Guardar</UIButton>
 		<p class="theme-mark">Tema</p>
 		<Note />
 	</main>
@@ -26,7 +28,8 @@ const note = (color) => `<template><p class="note">Nota</p></template>
 .note { color: ${color}; }
 </style>
 `
-const appStyles = (color) => `body { outline-color: ${color}; }\n`
+// The app compiles the entry of UI with its Tailwind, in its own sheet: each edit compiles UI again.
+const appStyles = (color) => `@import 'tailwindcss';\n@import '@meekojs/ui';\n\nbody { outline-color: ${color}; }\n`
 
 /**
  * A module packaged as @meekojs/ui was until 1.9, with its stylesheet at `src/app/styles/main.css`: the
@@ -121,7 +124,17 @@ for (const tokens of [undefined, { primary: 'rgb(10, 120, 30)' }]) {
 
 		const settle = async (selector, property, value) => {
 			await tab.waitForFunction(([selector, property, value]) => globalThis.getComputedStyle(globalThis.document.querySelector(selector))[property] === value, [selector, property, value], { timeout: 20_000 })
-			// A link that Vite replaced may still be loading: the old one goes once the new one loads.
+			// A link that Vite replaced may still be loading: the old one goes once the new one loads. The app's
+			// sheet scans the whole fixture for Tailwind, the theme module included, so an edit of another sheet
+			// also compiles it again, with UI, and its new link may arrive after the edited one applies.
+			await tab.waitForFunction(
+				() => {
+					const paths = [...globalThis.document.querySelectorAll('link[rel=stylesheet]')].map((node) => new URL(node.href).pathname)
+					return new Set(paths).size === paths.length
+				},
+				null,
+				{ timeout: 20_000 },
+			)
 			await tab.waitForTimeout(300)
 		}
 		const styled = async (step) => {
@@ -130,7 +143,8 @@ for (const tokens of [undefined, { primary: 'rgb(10, 120, 30)' }]) {
 			assert.equal(await computed(tab, '#action', 'backgroundColor'), expected.button, `${step}: @meekojs/ui after the update`)
 			assert.equal(await computed(tab, '.theme-mark', 'color'), expected.theme, `${step}: the theme module after the update`)
 			const hrefs = await tab.evaluate(() => [...globalThis.document.querySelectorAll('link[rel=stylesheet]')].map((node) => new URL(node.href).pathname))
-			assert.equal(hrefs.filter((href) => href.endsWith('/dist/styles/main.css')).length, 1, `${step}: one link to the stylesheet of @meekojs/ui`)
+			assert.equal(hrefs.filter((href) => /^(?:dist|src)\/.*\/main\.css$/.test(href.slice(packageHref.length)) && href.startsWith(packageHref)).length, 0, `${step}: no precompiled stylesheet of @meekojs/ui`)
+			assert.equal(hrefs.filter((href) => href.endsWith('/app/styles/main.css') && !href.includes('/theme-fixture/')).length, 1, `${step}: one link to the app's stylesheet, which carries UI`)
 			assert.equal(hrefs.filter((href) => href.endsWith('/theme-fixture/src/app/styles/main.css')).length, 1, `${step}: one link to the theme stylesheet`)
 		}
 

@@ -14,6 +14,10 @@
 			<code>&gt;=1.8 &lt;2</code>. UI belongs to the Meeko ecosystem and ships as a separate package.
 		</p>
 		<h2 id="install">Install the package</h2>
+		<p>
+			Install UI together with
+			<code>tailwindcss</code>: your application compiles the styles of UI with its own Tailwind 4.
+		</p>
 		<DocsCode
 			label="Terminal"
 			bind:code="examples.install"
@@ -30,7 +34,54 @@
 			label="meeko.config.ts"
 			bind:code="examples.config"
 		/>
-		<p>The module registers its CSS and Vite processes it with your project's PostCSS. You do not need to import a stylesheet by hand or add another processor.</p>
+		<h2 id="styles">Import the styles</h2>
+		<p>
+			Start
+			<code>app/styles/main.css</code>, the global stylesheet that Meeko loads by itself, with Tailwind and the CSS entry of UI. They compile in one pass together with your classes: the theme of UI adds to Tailwind's, so you keep
+			<code>bg-red-500</code>
+			or
+			<code>md:</code>
+			and gain
+			<code>bg-primary-9</code>,
+			<code>text-danger-11</code>
+			and the other steps of the semantic colors.
+		</p>
+		<DocsCode
+			label="app/styles/main.css"
+			bind:code="examples.styles"
+		/>
+		<p>
+			The module registers
+			<code>@tailwindcss/vite</code>, unless your application already registers it, and serves the Inter font: you do not need another processor or to copy the font. Without these imports the components have no styles, and
+			<code>meeko dev</code>
+			warns you.
+		</p>
+		<p>
+			For the 31 scales of Radix Colors (<code>bg-crimson-9</code>…) and the combinations of raw hues, add the optional entry
+			<code>@meekojs/ui/hues</code>
+			after them.
+		</p>
+		<DocsCode
+			label="app/styles/main.css"
+			bind:code="examples.hues"
+		/>
+		<h3 id="preflight">With or without Tailwind's preflight</h3>
+		<p>
+			<code>@import 'tailwindcss'</code>
+			brings the preflight, Tailwind's reset: it removes the margins of every element, the bullets of lists and the size and weight of headings. The UI components do not depend on it, but if your application did not use Tailwind it will change its look. To keep the previous one, import only Tailwind's theme and utilities, in the layers of its own entry.
+		</p>
+		<DocsCode
+			label="app/styles/main.css"
+			bind:code="examples.stylesWithoutPreflight"
+		/>
+		<p>
+			The UI base stays in place, and
+			<code>ui.tokens</code>,
+			<code>@meekojs/ui/hues</code>
+			and the warning of
+			<code>meeko dev</code>
+			work the same with both forms.
+		</p>
 		<h2 id="host">Add UIApp</h2>
 		<p>
 			Wrap your application to host the modals opened with
@@ -45,7 +96,9 @@
 		<h2 id="first-component">Use a component</h2>
 		<DocsPreview>
 			<UIButton>Save changes</UIButton>
-			<UIButton variant="outline">Cancel</UIButton>
+			<UIButton
+				variant="outline"
+				color="neutral">Cancel</UIButton>
 		</DocsPreview>
 		<DocsCode bind:code="examples.button" />
 		<UIAlert tone="info">Signals, macros and UI components are discovered in your application. The types you need explicitly are imported from the package's public exports.</UIAlert>

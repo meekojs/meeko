@@ -1,8 +1,7 @@
 // The look of the frame of <UIMarkdownEditor>: its bar, the notice, the surface and what fills it before Crepe
 // arrives. The theme of Crepe and the rules for its DOM stay in markdown-editor.css, under the class
 // `ui-markdown-editor` of the root: that HTML is Milkdown's, and its own sheets, without a layer, arrive later.
-import { tv } from 'tailwind-variants/lite'
-
+import { tv } from '../utils/theme'
 import { focusRing } from './focus'
 
 /** The look of <UIMarkdownEditor>. A disabled editor adds `markdownEditorDisabled`. */

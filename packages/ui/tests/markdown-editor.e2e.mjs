@@ -318,6 +318,8 @@ async function startConsumer(context) {
 		'package.json': JSON.stringify({ name: 'markdown-editor-consumer', private: true, type: 'module', dependencies: { '@meekojs/meeko': '*', '@meekojs/ui': '*' } }),
 		'meeko.config.mjs': `export default { modules: ['@meekojs/ui', '@meekojs/ui/editor'], server: { adapter: 'node' } }\n`,
 		'app/app.meeko': '<template><MeekoOutlet /></template>\n',
+		// The app compiles the entry of UI with its Tailwind: without it the components have no styles.
+		'app/styles/main.css': "@import 'tailwindcss';\n@import '@meekojs/ui';\n",
 		'app/pages/index.meeko': page,
 	}
 	for (const [file, source] of Object.entries(files)) {

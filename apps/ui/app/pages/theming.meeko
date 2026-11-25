@@ -11,8 +11,7 @@
 	>
 		<h2 id="appearance">Motor de apariencia</h2>
 		<p>
-			Usa <code>appearance</code> en <code>UIButton</code>, <code>UIBadge</code>, <code>UIInput</code> y <code>UICard</code> para elegir entre las variantes y paletas de cada componente.
-			Para crear tus propias recetas, importa <code>appearance()</code> desde <code>@meekojs/ui/theme</code> y extiende su resultado en <code>tv()</code>.
+			<code>UIButton</code> y <code>UICard</code> eligen su aspecto con las props <code>variant</code> (el tratamiento) y <code>color</code> (el color semántico), más <code>radius</code> y <code>elevation</code>; <code>UIBadge</code> y <code>UIInput</code>, con <code>appearance</code>. Para crear tus propias recetas, importa <code>appearance()</code> desde <code>@meekojs/ui/theme</code> y extiende su resultado en <code>tv()</code>.
 		</p>
 		<AppearanceVariants />
 		<AppearancePlayground />
@@ -179,13 +178,34 @@
 		</p>
 		<h2 id="brand">Tu marca</h2>
 		<p>
-			Las hojas de
-			<code>app/styles</code>
-			se cargan después del módulo: sobrescribe los pasos de una escala y todo lo que los lee cambia con ellos.
+			Los tokens de UI llegan con
+			<code>@import '@meekojs/ui'</code>
+			en tu
+			<code>app/styles/main.css</code>, y las reglas que escribes después de los imports ganan: sobrescribe los pasos de una escala y todo lo que los lee cambia con ellos.
 		</p>
 		<DocsCode
 			label="app/styles/main.css"
 			bind:code="examples.themeCss"
+		/>
+		<h3 id="semantic-color">Cambiar un color semántico</h3>
+		<p>
+			Cada color semántico (<code>primary</code>, <code>secondary</code>, <code>neutral</code>, <code>success</code>, <code>info</code>, <code>warning</code> y <code>danger</code>) lee los doce pasos de su escala,
+			<code>--ui-color-primary-1</code>
+			a
+			<code>-12</code>, y su texto de contraste, <code>--ui-color-primary-contrast</code>. Para que lea otra escala, apunta esos pasos a ella. La entrada opcional
+			<code>@meekojs/ui/hues</code>
+			trae las escalas de Radix Colors, en claro y oscuro, como
+			<code>--color-crimson-1</code>
+			a
+			<code>-12</code>
+			y
+			<code>--color-crimson-contrast</code>. El selector
+			<code>:root[data-theme]</code>
+			hace que la regla gane también a los pasos del tema oscuro de UI; las escalas de Radix ya cambian solas con el tema.
+		</p>
+		<DocsCode
+			label="app/styles/main.css"
+			bind:code="examples.themeColor"
 		/>
 		<p>
 			Si tu web ya tiene sus variables,
@@ -201,12 +221,12 @@
 		<DocsApi
 			caption="Claves de ui.tokens"
 			bind:rows="[
-				{ name: 'primary / primaryHover / onPrimary', type: 'string', description: '--ui-color-primary, su hover y el texto sobre ella.' },
-				{ name: 'accentSoft / accentText', type: 'string', description: 'Fondos y texto de estados activos: --ui-color-primary-soft y -text.' },
+				{ name: 'primary / primaryHover / onPrimary', type: 'string', description: '--ui-color-primary y el paso 9 de su escala, su hover y el paso 10, y el texto sobre ella.' },
+				{ name: 'accentSoft / accentText', type: 'string', description: 'Fondos y texto de estados activos: --ui-color-primary-soft y -text, y los pasos 3 y 11.' },
 				{ name: 'surface / surfaceHover', type: 'string', description: 'Superficies y controles, y sus estados.' },
 				{ name: 'text / textSoft / muted', type: 'string', description: 'Texto principal y secundario.' },
 				{ name: 'border / borderStrong', type: 'string', description: 'Separadores y contornos.' },
-				{ name: 'focus / danger', type: 'string', description: 'Foco de teclado y errores.' },
+				{ name: 'focus / danger', type: 'string', description: 'Foco de teclado y errores: danger asigna también los pasos 9 y 11 de su escala.' },
 				{ name: 'font / radius', type: 'string', description: 'Familia tipográfica y radio base.' },
 				{ name: 'controlHeight / controlPadding', type: 'string', description: 'Dimensiones de las acciones.' },
 				{ name: 'controlWeight / controlFontSize', type: 'string', description: 'Peso y tamaño de texto de las acciones.' },
@@ -214,25 +234,26 @@
 		/>
 		<h2 id="classes">Clases de cada componente</h2>
 		<p>
-			Los componentes se pintan con clases de Tailwind 4 con el prefijo
-			<code>ui:</code>, que UI compila por su cuenta: tu aplicación no necesita Tailwind. Esas clases leen los tokens, así que todo lo anterior también cambia los componentes. Para retocar uno concreto,
+			Los componentes se pintan con clases de Tailwind 4, sin prefijo, que tu aplicación compila junto con las suyas en
+			<code>app/styles/main.css</code>. Esas clases leen los tokens, así que todo lo anterior también cambia los componentes. Para retocar uno concreto,
 			<code>class</code>
 			llega a su elemento raíz y la prop
 			<code>ui</code>
 			añade clases a cada parte, por el nombre de su slot;
 			<code>class</code>
 			equivale a
-			<code>ui.base</code>. Los nombres de los slots están en el tipo de props de cada componente, y el editor los completa.
+			<code>ui.base</code>. Los nombres de los slots están en el tipo de props de cada componente, y el editor los completa. <code>UIButton</code>, <code>UILink</code>, <code>UIIconButton</code>, <code>UICopyButton</code>,
+			<code>UICard</code>
+			y
+			<code>UILinkCard</code>
+			fusionan
+			<code>class</code>
+			con Tailwind Merge: tu utilidad sustituye a la de la receta que fija la misma propiedad.
 		</p>
 		<DocsCode bind:code="examples.themeSlots" />
 		<p>
-			Tus clases se suman a las del componente, sin quitar ninguna. La hoja de UI va en las capas
-			<code>ui-base</code>,
-			<code>ui.components</code>
-			y
-			<code>ui.utilities</code>
-			y se carga antes que la tuya, así que cualquier regla sin capa de tu aplicación gana, sea cual sea su especificidad. También una regla sobre un elemento, como
-			<code>{'a { color: … }'}</code>: limítala a tu contenido si no quieres cambiar los enlaces de UI.
+			En el resto, tus clases se suman a las del componente, sin quitar ninguna. Los estilos de UI siguen las capas de Tailwind: la base global va en
+			<code>ui-base</code>, justo encima del preflight; lo escrito a mano, en <code>components</code>, y las utilidades, en <code>utilities</code>, junto a las tuyas. Cualquier regla sin capa de tu aplicación gana a todas, sea cual sea su especificidad. También una regla sobre un elemento, como <code>{'a { color: … }'}</code>: limítala a tu contenido si no quieres cambiar los enlaces de UI.
 		</p>
 		<DocsCode
 			label="app/styles/main.css"
@@ -254,7 +275,7 @@
 		<DocsApi
 			caption="Equivalencias más usadas"
 			bind:rows="[
-				{ name: '.meeko-ui-button[data-variant]', type: 'class + variant', description: 'UIButton y UILink: la prop variant (y size, shape, tone) y tu clase.' },
+				{ name: '.meeko-ui-button[data-variant]', type: 'class + variant', description: 'UIButton y UILink: las props variant y color (y size, radius) y tu clase.' },
 				{ name: '.meeko-ui-badge / -badge-dot', type: 'ui.base / ui.dot', description: 'UIBadge.' },
 				{ name: '.meeko-ui-input / -textarea', type: 'class', description: 'UIInput y UITextarea.' },
 				{ name: '.meeko-ui-field-label / -error / -description', type: 'ui.label / ui.error / ui.description', description: 'UIField; también ui.meta y ui.counter.' },
@@ -276,7 +297,7 @@
 			<code>MeekoThemeToggle</code>, obsoletos en el núcleo, ya no reciben aspecto de UI: usa <code>UISelect</code>,
 			<code>UIPopover</code>
 			y
-			<a href="/theme-toggle">UIThemeToggle</a>. Siguen siendo API pública la clase <code>meeko-ui-prose</code>, que viste Markdown en cualquier elemento, y la utilidad <code>meeko-ui-sr-only</code>, porque una aplicación no compila Tailwind.
+			<a href="/theme-toggle">UIThemeToggle</a>. Siguen siendo API pública la clase <code>meeko-ui-prose</code>, que viste Markdown en cualquier elemento, y la utilidad <code>meeko-ui-sr-only</code>, que no dependen de las clases de Tailwind.
 		</p>
 		<h2 id="defaults">Valores por defecto</h2>
 		<p>
@@ -296,14 +317,15 @@
 		/>
 		<p>
 			Algunas variantes admiten también un valor de base:
-			<code>variant</code>,
+			<code>variant</code>, <code>color</code>,
 			<code>size</code>
 			y
-			<code>shape</code>
+			<code>radius</code>
 			en
-			<code>button</code>
+			<code>button</code>, <code>link</code>,
+			<code>iconButton</code>
 			y
-			<code>link</code>; <code>variant</code>,
+			<code>copyButton</code>; <code>variant</code>, <code>color</code>, <code>radius</code>, <code>elevation</code>,
 			<code>padding</code>
 			y
 			<code>density</code>

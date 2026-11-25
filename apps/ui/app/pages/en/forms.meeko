@@ -54,6 +54,7 @@
 					<UIButton type="submit">Save name</UIButton>
 					<UIButton
 						variant="outline"
+						color="neutral"
 						on:click="reset"
 					>
 						Reset

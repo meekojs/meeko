@@ -1,21 +1,21 @@
 <script lang="ts">
 	// <UIIconButton>: an action with only an icon. Like <UIButton>, a route with <MeekoLink> when it gets `to`, an
-	// <a> with `href`, otherwise a <button>, with the look of variants/button with `iconOnly` and the pressed state
-	// of `iconButton`. `label` is its accessible name (aria-label) and the text of its <UITooltip>, whose `anchor`
-	// is the action itself. The action never takes the `aria-describedby` of the tooltip: the tooltip says the
+	// <a> with `href`, otherwise a <button>, with the look of theme/components/icon-button: the one of a button as a
+	// square, with the pressed state of a toggle. `label` is its accessible name (aria-label) and the text of its
+	// <UITooltip>, whose `anchor` is the action itself. The action never takes the `aria-describedby` of the tooltip: the tooltip says the
 	// label again, and it would be read twice. The template paints the action twice, inside the tooltip and
 	// without it; keep both alike. It has no whitespace between the tags: it would be text inside a sentence.
 	import { computed } from '@meekojs/meeko'
 
 	import type { UIIconButtonProps } from '../types/button'
 
+	import { iconButtonTheme } from '../theme/components/icon-button'
 	import { uiTheme } from '../utils/defaults'
 	import { icons } from '../utils/icons'
-	import { button, iconButton } from '../variants/button'
 	import * as Icon from './internal/Icon.meeko'
 	import * as Tooltip from './Tooltip.meeko'
 
-	const { label, icon, tooltip = true, placement, pressed, to, params, search, resolve, href, target, rel, download, type = 'button', disabled = false, loading, variant, tone, size, shape, class: ownClass, ui, ...rest } = defineProps<UIIconButtonProps>()
+	const { label, icon, tooltip = true, placement, pressed, to, params, search, resolve, href, target, rel, download, type = 'button', disabled = false, loading, variant, color, size, radius, elevation, class: ownClass, ui, ...rest } = defineProps<UIIconButtonProps>()
 
 	const theme = uiTheme('iconButton', () => ({ class: ownClass, ui }))
 
@@ -24,10 +24,15 @@
 	const snippets = defineSnippets<{ default?: [] }>()
 
 	const look = computed(() => {
-		const choice = { variant: variant ?? theme.defaults?.variant ?? 'ghost', tone, size: size ?? theme.defaults?.size, shape: shape ?? theme.defaults?.shape }
-		const slots = iconButton(choice)
+		const slots = iconButtonTheme({
+			variant: variant ?? theme.defaults?.variant,
+			color: color ?? theme.defaults?.color,
+			size: size ?? theme.defaults?.size,
+			radius: radius ?? theme.defaults?.radius,
+			elevation,
+		})
 		return {
-			base: button({ ...choice, iconOnly: true, class: slots.base({ class: [theme.ui.base, theme.class] }) }),
+			base: slots.base({ class: [theme.ui.base, theme.class] }),
 			icon: slots.icon({ class: theme.ui.icon }),
 			tooltip: slots.tooltip({ class: theme.ui.tooltip }),
 		}

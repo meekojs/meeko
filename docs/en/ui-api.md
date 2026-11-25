@@ -32,7 +32,7 @@ export default defineMeekoConfig({
 })
 ```
 
-The module registers the components with the `UI` prefix and its stylesheet through `meeko.addStylesheet`. That stylesheet comes already compiled with Tailwind 4 (`dist/styles/main.css`), so the application does not need Tailwind. Vite processes it with the project's PostCSS, resolves its imports and generates the build assets. In development, CSS changes use HMR. You do not need to import the CSS manually or link a fixed URL. `theme: true` enables the framework's themes; the UI module can also be used without that option.
+The module registers the components with the `UI` prefix, the global base and `@tailwindcss/vite`. The application compiles the styles of UI with its own Tailwind 4, in a single pass with its classes: install `tailwindcss` and start `app/styles/main.css` with `@import 'tailwindcss';` and `@import '@meekojs/ui';`. That entry brings the tokens, the theme and the `@source` of the components; Vite processes it with the project's PostCSS and generates the build assets, and in development CSS changes use HMR. `theme: true` enables the framework's themes; the UI module can also be used without that option.
 
 ### Typed options and an existing brand
 
@@ -58,8 +58,8 @@ export default defineMeekoConfig({
 			font: 'var(--font-ui)',
 		},
 		defaults: {
-			button: { shape: 'pill' },
-			link: { shape: 'pill', variant: 'outline' },
+			button: { radius: 'full' },
+			link: { radius: 'full', variant: 'outline', color: 'neutral' },
 			card: { variant: 'soft' },
 		},
 	},
@@ -68,7 +68,7 @@ export default defineMeekoConfig({
 
 `UIOptions`, `UITokens` and `UIDefaults` are exported as types from `@meekojs/ui`. Defaults are per application and per SSR request; there is no global mutable state. Explicit props win over `ui.defaults`, and those over the base values. Each component accepts `class` and `ui`, which add up to those of its instances, and a few accept variants: see [Default classes and variants](#default-classes-and-variants). Without options, the original configuration is kept and the defaults plugin is not installed.
 
-`tokens` accepts `primary`, `primaryHover`, `onPrimary`, `accentSoft`, `accentText`, `surface`, `surfaceHover`, `text`, `textSoft`, `muted`, `border`, `borderStrong`, `danger`, `focus`, `radius`, `font`, `controlHeight`, `controlPadding`, `controlWeight` and `controlFontSize`. Each key assigns `--ui-*` tokens: `primary` is `--ui-color-primary`, `text` is `--ui-color-text`, and `surface` covers both surfaces and controls. `var(...)` references follow the application's themes without duplicating their colors.
+`tokens` accepts `primary`, `primaryHover`, `onPrimary`, `accentSoft`, `accentText`, `surface`, `surfaceHover`, `text`, `textSoft`, `muted`, `border`, `borderStrong`, `danger`, `focus`, `radius`, `font`, `controlHeight`, `controlPadding`, `controlWeight` and `controlFontSize`. Each key assigns `--ui-*` tokens: `primary` is `--ui-color-primary` and the step `--ui-color-primary-9` that a solid button paints with (`primaryHover`, step 10; `accentSoft` and `accentText`, steps 3 and 11; `danger`, steps 9 and 11 of its scale), `text` is `--ui-color-text`, and `surface` covers both surfaces and controls. `var(...)` references follow the application's themes without duplicating their colors.
 
 `base: false` omits the global UI base (see [Customization](#customization)).
 
@@ -195,7 +195,7 @@ You can override `--ui-container-max-width` and `--ui-container-gutter` from a c
 
 | Component  | API                                                                                                                                                                                                                                                                                                                                                                       |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `UIButton` | Route (`to`, `params`, `search`), link (`href`, `target`, `rel`, `download`) or button (`type`, `disabled`); see [UIButton](#uibutton-route-link-or-button). Accepts `variant`, `size`, `shape`, `class`, `click` event and `default` snippet. By default `button`, `primary`, `md`, `rounded`.                                                                           |
+| `UIButton` | Route (`to`, `params`, `search`), link (`href`, `target`, `rel`, `download`) or button (`type`, `disabled`); see [UIButton](#uibutton-route-link-or-button). Accepts `variant`, `color`, `size`, `radius`, `width`, `elevation`, `class`, `click` event and `default` snippet. By default `button`, `solid`, `primary`, `md` and radius `md`.                             |
 | `UIInput`  | Text model with `model`. Props: `id`, `name`, `type`, `placeholder`, `required`, `disabled`, `invalid`, `describedBy` and `class`. Accepted types: `text`, `email`, `password`, `search`, `url`, `tel`, `number`, `date`, `datetime-local`, `time` and `month`. By default it uses `text` and an empty value; see [Numbers, times and months](#numbers-times-and-months). |
 | `UIField`  | Requires `id`, `label` and the `default(id, describedBy)` snippet. Optional props: `description`, `error`, `required`, `class`. The error takes priority over the description and is announced with `role="alert"`.                                                                                                                                                       |
 
@@ -233,7 +233,7 @@ It also includes `UIApp` and `UIModal` for [modals](#modals), `UITable` for [tab
 
 ### UIButton: route, link or button
 
-`UIButton` renders the element that matches what it does, with the same appearance (that of `variant`, `size`, `shape` and `tone`, plus your `class`), also on hover, on focus and with the application's link styles:
+`UIButton` renders the element that matches what it does, with the same appearance (that of `variant`, `color`, `size` and `radius`, plus your `class`), also on hover, on focus and with the application's link styles:
 
 - **With `to`**, a `<MeekoLink>`: a link to a route of the application that navigates without reloading. `to` only accepts routes that exist; `params` is required on a dynamic route, with its keys, and not accepted on a static one; `search` is the query string.
 - **With `href`**, an `<a>` to any URL, with `target`, `rel` and `download`. With `target="_blank"` and no `rel`, it adds `rel="noopener noreferrer"`.
@@ -251,6 +251,7 @@ It also includes `UIApp` and `UIModal` for [modals](#modals), `UITable` for [tab
 	href="https://github.com/meekojs/meeko"
 	target="_blank"
 	variant="outline"
+	color="neutral"
 >
 	GitHub
 </UIButton>
@@ -267,11 +268,13 @@ It also includes `UIApp` and `UIModal` for [modals](#modals), `UITable` for [tab
 - **A link cannot be disabled.** `<a>` has no native `disabled`, and emulating it with `aria-disabled` leaves the `href` navigable with the keyboard, the middle click or without JavaScript; removing the `href` takes it out of the tab order. That is why `disabled` only exists without `to` or `href`: if the action is unavailable, do not render the link, or use a disabled button.
 - **Attributes.** `id`, `title`, `lang`, `tabindex`, `aria-*` and `data-*` reach the element in all three forms (`UIForwardedAttributes`: those common to `<a>` and `<button>`). A link, with `to` or with `href`, also accepts `target`, `rel`, `download` and the attributes of `<a>` itself (`UIAnchorAttributes`: `hreflang`, `ping`, `referrerpolicy`…). `on:click` receives the `MouseEvent` in all three; on a link, `event.preventDefault()` cancels the navigation.
 - **Localized links.** With `to`, the `href` goes through the application's link resolvers, like `<MeekoLink>`: with `@meekojs/i18n`, `<UIButton to="/guide">` points to `/en/guide` on a page in English, `hreflang="es"` chooses another language and `bind:resolve="false"` leaves the route as it is.
-- **Types.** `UIButtonProps`, `UILinkProps`, `UIRouteTarget`, `UIForwardedAttributes`, `UIAnchorAttributes` and `UIActionAppearance` are imported from `@meekojs/ui/runtime`.
+- **Look.** It is the `buttonTheme` recipe of `@meekojs/ui/theme`, on the shared catalog: `variant` is the treatment (`solid`, `soft`, `surface`, `outline`, `subtle`, `ghost` or `link`) and `color`, the semantic color (`primary`, `secondary`, `neutral`, `success`, `info`, `warning` or `danger`); each pair paints with the steps of its scale. `size` goes from `xs` to `xl` on the `--ui-control-*` tokens, `radius` from `none` to `full`, `width` is `auto` or `full` and `elevation` adds a shadow. Without them it is `solid`, `primary`, `md` and radius `md`. `class` is merged with Tailwind Merge: a utility of yours wins over the one of the recipe that sets the same property (`class="rounded-none"` removes the radius). A `neutral` `outline` keeps the border of the controls (`--ui-color-control-border`), with a 3:1 contrast.
+- **From the previous API.** `tone`, `shape` and the `primary` and `secondary` values of `variant` are gone: `variant="primary"` is `variant="solid" color="primary"` (the default look); `variant="secondary"`, `variant="surface" color="neutral"`; `variant="outline"` and `variant="ghost"`, the same with `color="neutral"`; `tone="danger"`, `color="danger"`, and `shape="pill"`, `radius="full"`. The `appearance` prop is gone: its keys are props.
+- **Types.** `UIButtonProps`, `UILinkProps`, `UIRouteTarget`, `UIForwardedAttributes`, `UIAnchorAttributes`, `UIActionAppearance` and the values of the look (`UIButtonVariant`, `UIButtonColor`, `UIButtonSize`, `UIButtonRadius`, `UIButtonWidth` and `UIButtonElevation`) are imported from `@meekojs/ui/runtime`.
 
 ### UIIconButton and UIHint
 
-`UIIconButton` is an icon-only action with the three forms of `UIButton` (`to`, `href` or a `<button>`), its `variant`, `size`, `shape`, `tone`, `loading`, `disabled`, `type` and `click` event. It is square and `ghost` by default. `label` is required: it is its accessible name (`aria-label`) and the text of its `UITooltip`, which is not announced as a description so that it is not read twice; `tooltip="false"` removes it when the context already explains the action. The icon is `icon`, the name of an icon of the package (`UIIconName`: `close`, `menu`, `check`, `info`…) or the `d` stroke of a `<path>` on a 16 by 16 grid, or the `default` snippet, with your own `<svg aria-hidden="true">`.
+`UIIconButton` is an icon-only action with the three forms of `UIButton` (`to`, `href` or a `<button>`), its `variant` (but `link`), `color`, `size`, `radius`, `elevation`, `loading`, `disabled`, `type` and `click` event. It is square, `ghost` and `neutral` by default. `label` is required: it is its accessible name (`aria-label`) and the text of its `UITooltip`, which is not announced as a description so that it is not read twice; `tooltip="false"` removes it when the context already explains the action. The icon is `icon`, the name of an icon of the package (`UIIconName`: `close`, `menu`, `check`, `info`…) or the `d` stroke of a `<path>` on a 16 by 16 grid, or the `default` snippet, with your own `<svg aria-hidden="true">`.
 
 ```html
 <UIIconButton
@@ -318,19 +321,20 @@ It also includes `UIApp` and `UIModal` for [modals](#modals), `UITable` for [tab
 - **Phrasing content.** Both render only a button or a link and a `<span>` with `popover`, so they fit inside `<p>`, `<h2>` or `<label>` without breaking hydration.
 - **Toggles.** `pressed` only exists on a `<button>`: it renders `aria-pressed` and the active look. A link with `pressed` is a type error.
 - **Disabled.** A `<button disabled>` takes no focus and some browsers give it no pointer events, so its tooltip may not open: if the reason matters, explain it outside the button.
-- **Defaults.** `ui.defaults.iconButton` accepts `variant`, `size`, `shape`, `class` and the `base`, `icon` and `tooltip` slots; `ui.defaults.hint`, `class` and the same slots.
+- **Defaults.** `ui.defaults.iconButton` accepts `variant`, `color`, `size`, `radius`, `class` and the `base`, `icon` and `tooltip` slots; `ui.defaults.hint`, `class` and the same slots.
 - **Types.** `UIIconButtonProps`, `UIIconName`, `UIHintProps` and `HintSnippets` are imported from `@meekojs/ui/runtime`.
 
 ### Navigation and labels
 
-- `UILink` gives a real `<a>` the appearance of an action, with the defaults of `ui.defaults.link`. It receives `href` (any URL) or `to` (a route of the application with typed `params` and `search`, as in `UIButton`, with client navigation and the `href` localized with `@meekojs/i18n`); one of the two, not both. With either it accepts `target`, `rel`, `download`, `hreflang` and `lang`. It shares `variant`, `size` and `shape` with `UIButton`, and accepts `ariaLabel`, `class`, `id`, `title`, `aria-*`, `data-*` and the `click` event. It does not simulate buttons or use artificial roles. For `target="_blank"` it adds `noopener noreferrer` if `rel` is not specified.
-- `UILinkCard` is a linked surface: it requires `title` and a destination, `href` (any URL) or `to` (a route of the application with `params`, `search` and `resolve`, as in `UILink`, with client navigation and the `href` localized with `@meekojs/i18n`), with optional `description`, `class` and `default` snippet. It accepts `target`, `rel`, `download`, `hreflang`, `lang`, `id`, `aria-*`, `data-*` and the `click` event; `title` is the card's text, not the HTML attribute. The content must not include other links or buttons, because the whole card is a single link.
+- `UILink` gives a real `<a>` the appearance of an action, with the defaults of `ui.defaults.link`. It receives `href` (any URL) or `to` (a route of the application with typed `params` and `search`, as in `UIButton`, with client navigation and the `href` localized with `@meekojs/i18n`); one of the two, not both. With either it accepts `target`, `rel`, `download`, `hreflang` and `lang`. It shares `variant`, `color`, `size`, `radius`, `width` and `elevation` with `UIButton`, and accepts `ariaLabel`, `class`, `id`, `title`, `aria-*`, `data-*` and the `click` event. It does not simulate buttons or use artificial roles. For `target="_blank"` it adds `noopener noreferrer` if `rel` is not specified.
+- `UILinkCard` is a linked surface: it requires `title` and a destination, `href` (any URL) or `to` (a route of the application with `params`, `search` and `resolve`, as in `UILink`, with client navigation and the `href` localized with `@meekojs/i18n`), with optional `description`, `class` and `default` snippet. Its look is the `linkCardTheme` recipe, with the `variant`, `color`, `radius` and `elevation` of `UICard` and its defaults, plus the pointer states; `ui.defaults.linkCard` accepts those four. It accepts `target`, `rel`, `download`, `hreflang`, `lang`, `id`, `aria-*`, `data-*` and the `click` event; `title` is the card's text, not the HTML attribute. The content must not include other links or buttons, because the whole card is a single link.
 - `UIBadge` shows metadata, with `tone="neutral|info|success|warning|danger"` (`neutral` by default), `dot`, `class` and a required `default` snippet. It keeps text semantics; it adds no announcements or interaction.
 
 ```html
 <UILink
 	to="/docs"
-	variant="primary"
+	variant="solid"
+	color="primary"
 >
 	Get started
 </UILink>
@@ -369,7 +373,7 @@ The module also loads the global base in the `ui-base` layer: the root's [fluid 
 
 ### Classes per slot
 
-The components are painted with Tailwind 4 classes compiled by UI. Your application can use the package without installing Tailwind. They read the `--ui-*` tokens, so `ui.tokens`, the dark theme and redefining a token also change the components.
+The components are painted with Tailwind 4 classes that your application compiles together with its own in `app/styles/main.css` (see [Start in an application](ui.md#start-in-an-application)): it needs `tailwindcss` installed. They read the `--ui-*` tokens, so `ui.tokens`, the dark theme and redefining a token also change the components.
 
 To adjust a particular component, give it your classes:
 
@@ -406,7 +410,7 @@ useToast().add({ text: 'Guardado', ui: { base: 'toast-wide' } })
 
 The slot names are in the JSDoc of each props type (`UICardProps`, `UIFieldProps`…), and the editor completes them. `UIThemeProps` and `UIVariantSlots`, from `@meekojs/ui/runtime`, describe the props of a component with its variants and its `ui`.
 
-**What wins.** Your classes are added to those of the component, without merging them or removing any: the cascade decides. The UI stylesheet has three layers, `ui-base` (the global base), `ui.components` (what is still written by hand, such as the View Transitions) and `ui.utilities` (the Tailwind utilities), and it loads before the application's stylesheets. So any unlayered rule of your CSS wins over all three, whatever its specificity, and so does a rule in a layer your application declares. The stylesheet declares Tailwind's `base` layer before its own: the preflight of an application that also uses Tailwind stays below the components and does not remove their borders, padding or background, while its `utilities` still win. A rule on an element, such as `a { color: … }`, also wins over a UI link: scope it to your content if you do not want to change the components.
+**What wins.** Your classes are merged with those of the component with Tailwind Merge, in every component: a utility of yours replaces the recipe's one that sets the same property with the same modifiers (`class="bg-amber-500"` on `UIInput` removes `bg-control`, but not `not-disabled:hover:bg-control-hover`), and the other classes stay. It holds for `class`, for each slot of `ui` and for `ui.defaults`, whose classes go before those of the instance, which win. A class that is not Tailwind's (`pricing-title`) conflicts with none and is added. A font size (`text-sm`) does not remove the recipe's line height (`leading-*`): in Tailwind 4 they add up in any order. `mergeClasses` and `themeMergeConfig`, from `@meekojs/ui/theme`, are that same merge, for your own recipes. The styles of UI follow Tailwind's layers, because your `app/styles/main.css` compiles them together with yours (`@import 'tailwindcss';` and `@import '@meekojs/ui';`): `ui-base` (the global base, in its own stylesheet) sits right above the preflight (`base`), what is still written by hand, such as the View Transitions, goes in `components`, and the utilities of UI go in `utilities`, next to those of your application; between two conflicting utilities it is not the layer that decides but the merge, which keeps only yours. So any unlayered rule of your CSS wins over all of them, whatever its specificity, and the preflight does not remove the components' borders, padding or background. A rule on an element, such as `a { color: … }`, also wins over a UI link: scope it to your content if you do not want to change the components.
 
 ```css
 /* app/styles/main.css, sin @layer */
@@ -436,7 +440,7 @@ export default defineMeekoConfig({
 ```
 
 - **`class` and `ui` add up.** The classes of `ui.defaults` are added to those of each instance, they do not replace them: first those of the component, then those of `ui.defaults` and last those of the instance. `class` reaches where the prop of the instance does: in `UITable`, the `<table>`. Without class merging, the cascade decides a conflict, as [What wins](#classes-per-slot) explains: an unlayered rule of your application wins over those of UI, and between two rules of yours their specificity and their order in your stylesheet decide, not the order of the classes in the attribute.
-- **Variants.** A few accept a base value: `variant`, `size` and `shape` in `button`, `link` and `iconButton`; `variant`, `padding`, `density` and `actionsWrap` in `card`, and `density` in `table`. The explicit prop of the instance always wins. In `card`, a `padding` or a `density` of the instance wins over both of `ui.defaults`, and at each level `padding` wins over `density`. The other variants have no default because they depend on each instance: the `tone` of `UIAlert`, `UIBadge` or `UIToast` says what the message is, and `layout`, `side`, `sticky`, the `size` of `UIModal` or `columns` follow the structure and the content of each page. Adjust their look with `class` and `ui`.
+- **Variants.** A few accept a base value: `variant`, `color`, `size` and `radius` in `button`, `link`, `iconButton` and `copyButton`; `variant`, `color`, `radius`, `elevation`, `padding`, `density` and `actionsWrap` in `card`; `variant`, `color`, `radius` and `elevation` in `linkCard`, and `density` in `table`. The explicit prop of the instance always wins. In `card`, a `padding` or a `density` of the instance wins over both of `ui.defaults`, and at each level `padding` wins over `density`. The other variants have no default because they depend on each instance: the `tone` of `UIAlert`, `UIBadge` or `UIToast` says what the message is, and `layout`, `side`, `sticky`, the `size` of `UIModal` or `columns` follow the structure and the content of each page. Adjust their look with `class` and `ui`.
 - **Components.** `UIButton`, `UILink`, `UIInput`, `UITextarea`, `UIContainer`, `UIProse`, `UIPopover` and `UITooltip` have no slots: they only accept `class`. `toast` only accepts `ui`, and it also applies to the notices of `useToast()`. `markdownEditor` is `UIMarkdownEditor`, from `@meekojs/ui/editor`. The `UIDefaults` type describes each component with its real slots, and the editor completes them.
 - **Validation.** An unknown component, option or slot, an empty class or a variant value that does not exist make the module fail to load with an error that says what is accepted, such as `ui: unknown slot head in defaults.card.ui; its slots are base, header, title, description, actions, body, footer`.
 - **Client.** The defaults travel with the JavaScript of every page, as a plain copy of the validated values: put classes there, not data.
@@ -452,14 +456,14 @@ The components used to carry `.meeko-ui-*` classes and `data-*` attributes that 
 
 | Removed class or attribute                                                                                                                             | Now                                                                                                                                                       |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `.meeko-ui-button` and its `data-variant`, `data-size`, `data-shape`, `data-tone`                                                                      | `class` of `UIButton` or `UILink`; the variant, with the `variant`, `size`, `shape` and `tone` props.                                                     |
+| `.meeko-ui-button` and its `data-variant`, `data-size`, `data-shape`, `data-tone`                                                                      | `class` of `UIButton` or `UILink`; the variant, with the `variant`, `color`, `size` and `radius` props.                                                   |
 | `.meeko-ui-badge`, `-badge-dot`                                                                                                                        | `UIBadge`: `class` (or `ui.base`) and `ui.dot`.                                                                                                           |
 | `.meeko-ui-input`, `-textarea`                                                                                                                         | `class` of `UIInput` or `UITextarea`.                                                                                                                     |
 | `.meeko-ui-field`, `-field-label`, `-field-description`, `-field-error`, `-field-meta`, `-counter`                                                     | `UIField`: `ui.base`, `ui.label`, `ui.description`, `ui.error`, `ui.meta`, `ui.counter`.                                                                  |
 | `.meeko-ui-choice`, `-choice-content`, `-choice-description`, `-switch`                                                                                | `UICheckbox` or `UISwitch`: `ui.base`, `ui.content`, `ui.description`; the control, `ui.input`.                                                           |
 | `.meeko-ui-radio-group`, `-radio-options` and its `data-variant`                                                                                       | `UIRadioGroup`: `ui.base`, `ui.options`, `ui.option`, `ui.legend`, `ui.input`; the `variant` prop.                                                        |
 | `.meeko-ui-slider`                                                                                                                                     | `UISlider`: `ui.base` and `ui.input`.                                                                                                                     |
-| `.meeko-ui-card`, `-card-header`, `-card-title`, `-card-description`, `-card-actions`, `-card-body`, `-card-footer` and `data-variant`, `data-padding` | `UICard`: `ui.base`, `ui.header`, `ui.title`, `ui.description`, `ui.actions`, `ui.body`, `ui.footer`; the `variant` and `padding` props.                  |
+| `.meeko-ui-card`, `-card-header`, `-card-title`, `-card-description`, `-card-actions`, `-card-body`, `-card-footer` and `data-variant`, `data-padding` | `UICard`: `ui.base`, `ui.header`, `ui.title`, `ui.description`, `ui.actions`, `ui.body`, `ui.footer`; the `variant`, `color` and `padding` props.         |
 | `.meeko-ui-link-card`, `-link-card-title`, `-link-card-description`                                                                                    | `UILinkCard`: `ui.base`, `ui.title`, `ui.description`.                                                                                                    |
 | `.meeko-ui-table-scroll`, `.meeko-ui-table`, `-table-empty` and `data-layout`, `data-density`, `data-numeric`                                          | `UITable`: `ui.base` (the container), `class` or `ui.table`, `ui.empty`, `ui.headerCell`, `ui.cell`, `ui.footerCell`, `ui.bodyRow`.                       |
 | `--table-border`, `--table-background`, `--table-hover`                                                                                                | A rule of your own on `ui.table`, `ui.cell` or `ui.bodyRow`.                                                                                              |
@@ -491,7 +495,7 @@ The attributes that JavaScript reads are still there and you can keep using them
 
 `MeekoSelect`, `MeekoPopover` and `MeekoThemeToggle`, deprecated in the core, no longer get their look from the UI stylesheet: replace them with `UISelect` or `UICombobox`, `UIPopover` and `UIThemeToggle` ([Migration to 1.8](migration-1.8.md)).
 
-`UICodeBlock`, `UIDiff`, the icons and the frame of `UIMarkdownEditor` also drop their classes (`.meeko-ui-code-block` and the `.meeko-ui-code-*` ones, `.meeko-ui-diff*`, `.meeko-ui-icon` and the `ui-markdown-editor-*` ones of the frame) and their styling `data-*`: customize them with `class` and `ui`. The `meeko-ui-prose` class, which dresses Markdown on any element, and the `meeko-ui-sr-only` utility stay public API, because an application does not compile Tailwind; so do `data-kind` on each line of `UIDiff` and the `ui-markdown-editor` class, which the Crepe theme hangs from.
+`UICodeBlock`, `UIDiff`, the icons and the frame of `UIMarkdownEditor` also drop their classes (`.meeko-ui-code-block` and the `.meeko-ui-code-*` ones, `.meeko-ui-diff*`, `.meeko-ui-icon` and the `ui-markdown-editor-*` ones of the frame) and their styling `data-*`: customize them with `class` and `ui`. The `meeko-ui-prose` class, which dresses Markdown on any element, and the `meeko-ui-sr-only` utility stay public API, since they do not depend on Tailwind's classes; so do `data-kind` on each line of `UIDiff` and the `ui-markdown-editor` class, which the Crepe theme hangs from.
 
 ## Modals
 
@@ -530,7 +534,8 @@ Inside the modal component, use `UIModal` and the context of its instance:
 		<p>Organization {props.organizationId}</p>
 		<snippet name="footer">
 			<UIButton
-				variant="secondary"
+				variant="surface"
+				color="neutral"
 				on:click="() => modal.dismiss()"
 			>
 				Cancel
@@ -678,13 +683,14 @@ The container supports focus and horizontal scrolling with the keyboard. `class`
 
 ## Cards
 
-`UICard` composes a header, a body and a footer with four typed variants. The body is the `default` snippet, required; `header` and `footer` are optional.
+`UICard` composes a header, a body and a footer with the look of the `cardTheme` recipe of `@meekojs/ui/theme`. The body is the `default` snippet, required; `header` and `footer` are optional.
 
 ```html
 <UICard
 	title="Project details"
 	description="Information shared with your team."
-	variant="outline"
+	variant="soft"
+	color="primary"
 >
 	<p>Card content.</p>
 	<snippet name="footer">
@@ -693,14 +699,18 @@ The container supports focus and horizontal scrolling with the keyboard. `class`
 </UICard>
 ```
 
-| Prop          | Behavior                                                                        |
-| ------------- | ------------------------------------------------------------------------------- |
-| `variant`     | `outline` by default, `soft`, `solid` or `elevated`.                            |
-| `title`       | Optional title, rendered as `<h2>` and accessible name of the section.          |
-| `description` | Optional text under the title.                                                  |
-| `headingId`   | `id` of the title, which receives `tabindex="-1"` so code can move focus to it. |
-| `actionsWrap` | Where the actions go: `inline` by default, `below` or `auto`.                   |
-| `class`       | Additional classes on the section.                                              |
+| Prop                  | Behavior                                                                                                  |
+| --------------------- | --------------------------------------------------------------------------------------------------------- |
+| `variant`             | `surface` by default, `outline`, `soft`, `subtle`, `solid`, `glass` or `plain`.                           |
+| `color`               | `neutral` by default, `primary`, `secondary`, `success`, `info`, `warning` or `danger`.                   |
+| `radius`              | From `none` to `full`; `lg` by default.                                                                   |
+| `elevation`           | Shadow, from `none` to `2xl`; none without it.                                                            |
+| `padding` / `density` | `none`, `sm`, `md` (default) or `lg`; `density` (`compact`, `normal`, `comfortable`) gives it if missing. |
+| `title`               | Optional title, rendered as `<h2>` and accessible name of the section.                                    |
+| `description`         | Optional text under the title.                                                                            |
+| `headingId`           | `id` of the title, which receives `tabindex="-1"` so code can move focus to it.                           |
+| `actionsWrap`         | Where the actions go: `inline` by default, `below` or `auto`.                                             |
+| `class`               | Additional classes on the section, merged with Tailwind Merge: they win over the utility of the recipe.   |
 
 Other attributes, such as `id` or `aria-label`, reach the `<section>`. The `actions` snippet goes next to the title, and a `UITable` alone in the body reaches the edge of the card, which frames it.
 
@@ -713,14 +723,27 @@ Other attributes, such as `id` or `aria-label`, reach the `<section>`. The `acti
 	actionsWrap="auto"
 >
 	<snippet name="actions">
-		<UIButton variant="secondary">Export</UIButton>
+		<UIButton variant="surface" color="neutral">Export</UIButton>
 		<UIButton>New order</UIButton>
 	</snippet>
 	<p>Card content.</p>
 </UICard>
 ```
 
-`outline` uses a surface and a border; `soft`, a faint background with no visible border; `solid`, the accent color and its contrast text; `elevated`, a surface with a shadow and no visible border. All respond to the tokens and the UI theme. `--card-padding` lets you adjust the inner spacing through a class; `--ui-card-shadow` customizes the shadow.
+- **Look.** `variant` is the treatment and `color`, the semantic color; each pair paints the `<section>` with the steps of its scale, from the shared catalog, as in `UIButton`, but without the pointer states: a card is not a control. `surface` is a surface with a border; `outline`, only the border; `soft` and `subtle`, a faint background with no visible border; `solid`, the full color and its contrast text; `glass`, the alpha gray (`bg-gray-a3`, `border-gray-a6`) with a backdrop blur, and `plain` paints no background, border or color. All of them have the same border, transparent where it does not show, so they do not change size. A `neutral` card reads the semantic tokens (`--ui-color-surface`, `--ui-color-border`, `--ui-color-text`, `--ui-color-text-soft` and, in `soft`, `--ui-color-control-hover`), so it follows `ui.tokens`. `radius` goes from `none` to `full` (`lg` by default) and `elevation` adds a theme shadow (`shadow-md` reads `--ui-shadow-md`). `class` is merged with Tailwind Merge: `class="rounded-none shadow-xl"` wins over the recipe. `--card-padding` lets you adjust the inner spacing through a class. `ui.defaults.card` accepts `variant`, `color`, `radius`, `elevation`, `padding`, `density` and `actionsWrap`.
+- **From the previous API.** Without `variant` or `color` the card looks as before. The removed values are type errors and `ui.defaults` errors:
+
+| Before                                                      | Now                                                                                                                       |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `variant="outline"` (the default look)                      | No `variant` (`surface`). `outline` is now only the border, without a background.                                         |
+| `variant="soft"`                                            | `variant="soft"`, the same.                                                                                               |
+| `variant="solid"`                                           | `variant="solid" color="primary"`; without `color` it is `neutral`.                                                       |
+| `variant="elevated"`                                        | `elevation="md"`; the background is `--ui-color-surface` instead of `--ui-color-surface-raised`.                          |
+| `bind:appearance="{ variant, color, radius, elevation }"`   | The same keys as props: `variant="glass" color="primary" radius="xl"`.                                                    |
+| `cardAppearance`, `CardAppearance` from `@meekojs/ui/theme` | `cardTheme` and `CardThemeProps`.                                                                                         |
+| —                                                           | New types `UICardVariant`, `UICardColor`, `UICardRadius`, `UICardElevation` and `UICardPadding` in `@meekojs/ui/runtime`. |
+| `--ui-card-shadow`                                          | `elevation` or a `shadow-*` class.                                                                                        |
+| `ui.defaults.card.variant: 'elevated'`                      | `ui.defaults.card.elevation: 'md'`.                                                                                       |
 
 The `header` snippet entirely replaces `title` and `description`; provide a heading at the right level for your page if you use it. The footer only appears when you supply `footer`. Without a title, description or header snippet, the `<header>` is not generated. The container keeps its section semantics and adds no button behavior: use links and buttons in its content for actions. The `/cards` guide shows the variants and the composition.
 
@@ -813,7 +836,7 @@ src/
   runtime.ts
 ```
 
-The UI build generates ESM, TypeScript declarations and the components with their adjacent declarations in `dist/app/components`. The module registers the static plugin `dist/app/plugins/modal.js` and links its private alias `virtual:meeko-ui-components` to the component registry Meeko generates for the consumer; UI writes no plugin in `.meeko/generated`. `scripts/build-styles.mjs` compiles `src/app/styles/main.css` with Tailwind 4 into `dist/styles/main.css`, the stylesheet the module adds: it takes the classes from `src/app/components` and `src/app/variants`, never from the application. In the workspace, `pnpm -F @meekojs/ui run build:styles` recompiles it when a component, a variant or a stylesheet changes, and the UI site receives it through HMR. Consumers do not need to generate files inside `node_modules`.
+The UI build generates ESM, TypeScript declarations and the components with their adjacent declarations in `dist/app/components`. The module registers the static plugin `dist/app/plugins/modal.js` and links its private alias `virtual:meeko-ui-components` to the component registry Meeko generates for the consumer; UI writes no plugin in `.meeko/generated`. UI does not publish a precompiled stylesheet: it exports its CSS entry, `src/app/styles/main.css`, which the application compiles with its own Tailwind 4 by importing it after `@import 'tailwindcss'`. Its `@source` rules take the classes from the components, the variants and the recipes, from `src/` in the workspace and from `dist/` in the published package. The module registers `@tailwindcss/vite`, which steps aside if the application already registers one, and in development each edit recompiles the stylesheet through HMR. Consumers do not need to generate files inside `node_modules`.
 
 More information in the [UI guide](ui.md) and on the [public Meeko UI site](https://ui.meekojs.com), with installation, customization, API and interactive examples. In the monorepo it starts with `pnpm dev:ui`.
 
@@ -889,7 +912,7 @@ An enabled `<button>` or a link with `href` also carries `interestfor`: where th
 </UIPopover>
 ```
 
-**Position.** The content uses `position-anchor: auto`, `position-area` and `position-try-fallbacks: flip-block, flip-inline`, so it moves to the other side if it does not fit, without JavaScript. Those rules are Tailwind utilities in the `ui.utilities` layer, so any unlayered rule of your CSS wins. A browser without anchor positioning opens it unanchored. Open content carries `data-open`.
+**Position.** The content uses `position-anchor: auto`, `position-area` and `position-try-fallbacks: flip-block, flip-inline`, so it moves to the other side if it does not fit, without JavaScript. Those rules are Tailwind utilities in the `utilities` layer, so any unlayered rule of your CSS wins. A browser without anchor positioning opens it unanchored. Open content carries `data-open`.
 
 **Custom trigger.** The `anchor` snippet replaces the button: it receives in `trigger` (type `PopoverTrigger`) the attributes the trigger must carry, with each attribute's name as the key, so [`bind="trigger"`](api.md) is enough. `<UIPopover>` finds the element by its `id` on mounting and adds the keyboard handling and anchoring:
 
@@ -966,20 +989,21 @@ Each entry of `items` (`UIMenuEntry`) is an action (`UIMenuAction`: a `<button r
 
 Without `triggerLabel` or a `trigger` snippet, the trigger is an icon-only button with three dots, for a row menu, named with `menu.trigger` of the messages (“Más acciones”, “More actions”) unless `ariaLabel` is given. The snippets are `trigger` (content of the button), `anchor` (a custom trigger, as in `UIPopover`), `item` (inside of each item of `items`) and `default` (custom items with `role="menuitem"` after those of `items`). The list only paints phrasing content, so the component is valid inside a `<p>`.
 
-| Prop           | Type                     | Description                                                                                          |
-| -------------- | ------------------------ | ---------------------------------------------------------------------------------------------------- |
-| `items`        | `readonly UIMenuEntry[]` | Items and separators, in order.                                                                      |
-| `triggerLabel` | `string`                 | Text of the trigger, followed by a chevron.                                                          |
-| `ariaLabel`    | `string`                 | Accessible name of the trigger; on the icon-only one, “More actions” by default.                     |
-| `label`        | `string`                 | `aria-label` of the list. Without it, the menu is named by its trigger.                              |
-| `variant`      | `UIActionVariant`        | Variant of the trigger: `"secondary"` by default, `"ghost"` on the icon-only one.                    |
-| `size`         | `UIActionSize`           | Size of the trigger; `"md"` by default.                                                              |
-| `disabled`     | `boolean`                | Disables the trigger.                                                                                |
-| `placement`    | `PopoverPlacement`       | Where it opens; `"bottom-start"` by default.                                                         |
-| `offset`       | `number`                 | Distance in pixels from the trigger; `4` by default.                                                 |
-| `triggerId`    | `string`                 | `id` of the trigger; by default, one from `useId`.                                                   |
-| `class`        | `string`                 | Classes of the list; same as `ui.base`.                                                              |
-| `ui`           | object                   | Classes per slot: `base`, `trigger`, `chevron`, `item`, `icon`, `label`, `shortcut` and `separator`. |
+| Prop           | Type                     | Description                                                                                           |
+| -------------- | ------------------------ | ----------------------------------------------------------------------------------------------------- |
+| `items`        | `readonly UIMenuEntry[]` | Items and separators, in order.                                                                       |
+| `triggerLabel` | `string`                 | Text of the trigger, followed by a chevron.                                                           |
+| `ariaLabel`    | `string`                 | Accessible name of the trigger; on the icon-only one, “More actions” by default.                      |
+| `label`        | `string`                 | `aria-label` of the list. Without it, the menu is named by its trigger.                               |
+| `variant`      | `UIButtonVariant`        | Treatment of the trigger, that of `UIButton`: `"surface"` by default, `"ghost"` on the icon-only one. |
+| `color`        | `UIButtonColor`          | Color of the trigger; `"neutral"` by default.                                                         |
+| `size`         | `UIButtonSize`           | Size of the trigger; `"md"` by default.                                                               |
+| `disabled`     | `boolean`                | Disables the trigger.                                                                                 |
+| `placement`    | `PopoverPlacement`       | Where it opens; `"bottom-start"` by default.                                                          |
+| `offset`       | `number`                 | Distance in pixels from the trigger; `4` by default.                                                  |
+| `triggerId`    | `string`                 | `id` of the trigger; by default, one from `useId`.                                                    |
+| `class`        | `string`                 | Classes of the list; same as `ui.base`.                                                               |
+| `ui`           | object                   | Classes per slot: `base`, `trigger`, `chevron`, `item`, `icon`, `label`, `shortcut` and `separator`.  |
 
 The default model (`model="open"`) is whether it is open. `ui.defaults.menu` takes `class` and `ui`. The types `UIMenuProps`, `UIMenuEntry`, `UIMenuItem`, `UIMenuAction`, `UIMenuLink`, `UIMenuSeparator` and `MenuSnippets` are exported from `@meekojs/ui/runtime`.
 
@@ -1396,7 +1420,7 @@ With `pageCount` (or `pageSize` and `total`), `UIPagination` renders the previou
 - **Accessible.** The current one carries `aria-current="page"`. Each page is named “Page 3” and the controls “Previous page”, “Next page”, “First page” and “Last page” (messages `pagination.page`, `previous`, `next`, `first` and `last`, in Spanish and English). The ellipsis is `aria-hidden`. At the ends, the controls are `disabled`.
 - **Keyboard.** It is a list of buttons or links inside a `<nav>`: `Tab` goes through them and `Enter` or `Space` choose, with no roving focus of its own.
 - **State.** `busy` marks the navigation with `aria-busy` and each page with `aria-disabled`: they keep the focus and ignore clicks. `disabled` disables every page and control.
-- **Look.** `size="sm"` buttons: the current one `primary` and the rest `ghost`. New slots `list`, `item`, `page`, `control`, `icon` and `ellipsis`; the arrows flip in RTL.
+- **Look.** `size="sm"` buttons: the current one `solid` and `primary`, and the rest `ghost` and `neutral`. New slots `list`, `item`, `page`, `control`, `icon` and `ellipsis`; the arrows flip in RTL.
 
 ## Platform and View Transitions
 
@@ -1466,7 +1490,7 @@ The new controls keep native HTML, the keyboard and form submission. All models 
 
 The prop types, `UIDensity`, `UITone` and `UIToastContext` are exported from `@meekojs/ui/runtime`. The default texts are configured in `ui.messages.<locale>.feedback` (`close`, `empty`, `loading`); there is Spanish and English.
 
-`UIButton` adds `tone="danger"`, `loading`, `iconOnly` and `ariaLabel`. When using only an icon, always provide `ariaLabel` or `aria-label`. `loading` keeps the text and adds the spinner; it announces `aria-busy` and `aria-disabled`, and prevents activating the action without taking its focus away. With `iconOnly`, the icon measures `--ui-icon-size`. The submit button keeps `name`, `value` and `form`.
+`UIButton` adds `color="danger"` for a destructive action, `loading`, `iconOnly` and `ariaLabel`. When using only an icon, always provide `ariaLabel` or `aria-label`. `loading` keeps the text and adds the spinner; it announces `aria-busy` and `aria-disabled`, and prevents activating the action without taking its focus away. With `iconOnly`, the icon measures `--ui-icon-size`. The submit button keeps `name`, `value` and `form`.
 
 `UIBadge` adds the tones `info`, `success`, `warning` and `dot`. `UIInput` accepts `number`, `date`, `datetime-local`, `time` and `month`, with a model that is always text, and native attributes such as `inputmode`, `autocomplete`, `autocapitalize`, `spellcheck`, `min`, `max` and `step`. `UIField` adds `hint` and `counter` (string or number); the IDs of both are included in the `describedBy` its snippet receives.
 

@@ -22,7 +22,7 @@ async function render(context, template, defaults) {
 			.code.replaceAll('from "@meekojs/meeko/internal"', `from ${runtime('internal.js')}`)
 			.replaceAll('from "@meekojs/meeko"', `from ${runtime('index.js')}`)
 			.replace(/from ["']\.\/(\w+)\.meeko["']/g, 'from "./$1.ts"')
-			.replace(/from ["'](?:\.\.\/)+(utils|variants)\/([\w-]+)["']/g, (_, folder, utility) => `from ${JSON.stringify(new URL(`../dist/app/${folder}/${utility}.js`, import.meta.url).href)}`)
+			.replace(/from ["'](?:\.\.\/)+(utils|variants|theme(?:\/components)?)\/([\w-]+)["']/g, (_, folder, utility) => `from ${JSON.stringify(new URL(`../dist/app/${folder}/${utility}.js`, import.meta.url).href)}`)
 			.replace(/from ["']\.\/internal\/Icon\.meeko["']/g, 'from "./Icon.ts"')
 		await writeFile(`${directory}/${file}.ts`, code)
 	}
@@ -50,7 +50,7 @@ const defaults = {
 	table: { density: 'compact', class: 'app-table', ui: { base: 'app-table-scroll', cell: 'app-cell' } },
 	stat: { ui: { value: 'app-stat-value' } },
 	alert: { class: 'app-alert', ui: { title: 'app-alert-title' } },
-	button: { variant: 'ghost', class: 'app-button' },
+	button: { variant: 'ghost', color: 'neutral', radius: 'full', class: 'app-button' },
 }
 
 test('an instance without props gets the classes and variants of ui.defaults', async (context) => {
@@ -70,7 +70,8 @@ test('an instance without props gets the classes and variants of ui.defaults', a
 	assert.match(html, /class="[^"]*app-alert-title[^"]*"[^>]*>\s*Saved/)
 	const button = classOf(html, '<button')
 	assert.ok(button.includes('app-button'))
-	assert.ok(button.includes('bg-transparent'), 'the variant of ui.defaults: ghost')
+	assert.ok(button.includes('bg-transparent') && button.includes('text-neutral-11'), 'the variant and the color of ui.defaults: a neutral ghost')
+	assert.ok(button.includes('rounded-full') && !button.includes('rounded-md'), 'the radius of ui.defaults')
 	assert.doesNotMatch(html, /undefined/)
 })
 
@@ -90,15 +91,18 @@ test('the classes of an instance are added after those of ui.defaults, which com
 })
 
 test('an explicit prop wins over a variant of ui.defaults', async (context) => {
-	const html = await render(context, '<UICard title="A" padding="lg">A</UICard><UICard title="B" density="compact">B</UICard><UITable bind:rows="rows" bind:columns="columns" rowKey="id" density="comfortable" /><UIButton variant="primary">Go</UIButton>', { ...defaults, card: { padding: 'none', variant: 'soft' } })
+	const html = await render(context, '<UICard title="A" padding="lg">A</UICard><UICard title="B" density="compact">B</UICard><UITable bind:rows="rows" bind:columns="columns" rowKey="id" density="comfortable" /><UIButton variant="solid" color="primary" radius="sm">Go</UIButton>', { ...defaults, card: { padding: 'none', variant: 'soft' } })
 	const cards = [...html.matchAll(/<section[^>]*?class="([^"]*)"/g)].map((match) => match[1].split(' '))
 	assert.ok(cards[0].includes('[--card-padding:var(--ui-space-6)]'), 'padding of the instance')
 	assert.ok(cards[1].includes('[--card-padding:var(--ui-space-3)]'), 'the density of the instance wins over the padding of ui.defaults')
 	assert.ok(cards[0].includes('bg-control-hover'), 'while the variant of ui.defaults still applies')
+	assert.ok(!cards[0].includes('bg-surface'), 'the soft of ui.defaults replaces the surface')
 	const cell = classOf(html, '<td')
 	assert.ok(cell.includes('py-4') && !cell.includes('py-1'))
 	const button = classOf(html, '<button')
-	assert.ok(button.includes('bg-primary') && !button.includes('bg-transparent'))
+	assert.ok(button.includes('bg-primary-9') && !button.includes('bg-transparent') && !button.includes('text-neutral-11'))
+	assert.ok(button.includes('rounded-sm') && !button.includes('rounded-full'))
+	assert.ok(button.includes('app-button'), 'the class of ui.defaults stays')
 })
 
 test('a density of ui.defaults gives the padding of a card, and without defaults nothing changes', async (context) => {

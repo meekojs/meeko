@@ -20,7 +20,7 @@ async function render(context, name, template) {
 			.code.replaceAll('from "@meekojs/meeko/internal"', `from ${runtime('internal.js')}`)
 			.replaceAll('from "@meekojs/meeko"', `from ${runtime('index.js')}`)
 			.replace(/from ["']\.\/(\w+)\.meeko["']/g, 'from "./$1.ts"')
-			.replace(/from ["'](?:\.\.\/)+(utils|variants|theme)\/([\w-]+)["']/g, (_, folder, utility) => `from ${JSON.stringify(new URL(`../dist/app/${folder}/${utility}.js`, import.meta.url).href)}`)
+			.replace(/from ["'](?:\.\.\/)+(utils|variants|theme(?:\/components)?)\/([\w-]+)["']/g, (_, folder, utility) => `from ${JSON.stringify(new URL(`../dist/app/${folder}/${utility}.js`, import.meta.url).href)}`)
 			.replace(/from ["']\.\/internal\/Icon\.meeko["']/g, 'from "./Icon.ts"')
 		await writeFile(`${directory}/${file}.ts`, code)
 	}
@@ -82,13 +82,13 @@ const cases = [
 	['Field', '<Component id="comment" label="Comment" hint="Optional" counter="10/200" error="Too long"><snippet name="default" params="id, describedBy"><input bind:id="id" bind:aria-describedby="describedBy" /></snippet></Component>', [/aria-describedby="comment-error comment-hint comment-counter"/, /id="comment-hint"/, /id="comment-counter"/, /10\/200/, /role="alert"/]],
 	['Badge', '<Component tone="warning" bind:dot="true">Pending</Component>', [/class="[^"]*bg-warning-soft[^"]*"/, /<span(?=[^>]*aria-hidden="true")[^>]*class="[^"]*bg-current/, /Pending/]],
 	['Badge', '<Component bind:dot="true" bind:ui="{ base: \'my-base\', dot: \'my-dot\' }" class="my-class">Ok</Component>', [/<span class="[^"]*rounded-full[^"]* my-base my-class"/, /class="[^"]*bg-current[^"]* my-dot"/]],
-	['Button', '<Component type="submit" name="intent" value="save" form="editor" tone="danger" bind:loading="true" ariaLabel="Save" bind:iconOnly="true">Save</Component>', [/type="submit"/, /name="intent"/, /value="save"/, /form="editor"/, /aria-busy="true"/, /aria-disabled="true"/, /aria-label="Save"/, /class="[^"]*p-0 [^"]*bg-danger /]],
+	['Button', '<Component type="submit" name="intent" value="save" form="editor" color="danger" bind:loading="true" ariaLabel="Save" bind:iconOnly="true">Save</Component>', [/type="submit"/, /name="intent"/, /value="save"/, /form="editor"/, /aria-busy="true"/, /aria-disabled="true"/, /aria-label="Save"/, /class="[^"]*bg-danger-9 [^"]*p-0[ "]/]],
 	['Card', '<Component title="Summary" density="compact" padding="none">Details</Component>', [/<section class="[^"]*\[--card-padding:var\(--ui-space-0\)\]/, /^(?![\s\S]*--ui-space-3)/, /Summary/, /Details/]],
 	['Card', '<Component id="box" title="Summary" headingId="summary-title" description="Why"><snippet name="actions"><button>Go</button></snippet>Details</Component>', [/<section[^>]*id="box"/, /<section[^>]*aria-labelledby="summary-title"/, /<h2[^>]*id="summary-title"[^>]*tabindex="-1"/, /<header class="[^"]*grid-cols-\[minmax\(0,1fr\)_auto\]/, /<div class="[^"]*col-\[2\][^"]*"[^>]*>\s*<button>Go<\/button>/]],
-	['Button', `<Component type="submit" bind:appearance="{ variant: 'ghost', color: 'rose', radius: 'full' }">Save</Component>`, [/type="submit"/, /class="[^"]*ui-rose[^"]*rounded-full/, /^(?![\s\S]* appearance=)/]],
-	['Badge', `<Component bind:appearance="{ variant: 'solid', color: 'success', radius: 'sm' }" dot>Ready</Component>`, [/class="[^"]*ui-success[^"]*rounded-sm/, /aria-hidden="true"/, /Ready/]],
-	['Input', `<Component bind:appearance="{ color: 'error', size: 'lg' }" bind:invalid="true" name="email" />`, [/name="email"/, /aria-invalid="true"/, /class="[^"]*ui-error[^"]*--ui-control-height-lg/, /^(?![\s\S]* appearance=)/]],
-	['Card', `<Component title="Summary" bind:appearance="{ variant: 'glass', color: 'primary', elevation: 'lg' }">Details</Component>`, [/class="[^"]*backdrop-blur-md[^"]*ui-primary[^"]*shadow-lg/, /aria-labelledby=/, /Details/]],
+	['Button', '<Component type="submit" variant="ghost" color="danger" radius="full">Save</Component>', [/type="submit"/, /class="[^"]*rounded-full[^"]*text-danger-11/, /^(?![\s\S]* (?:variant|color|radius)=)/]],
+	['Badge', `<Component bind:appearance="{ variant: 'solid', color: 'success', radius: 'sm' }" dot>Ready</Component>`, [/class="[^"]*rounded-sm[^"]*bg-success-9/, /aria-hidden="true"/, /Ready/]],
+	['Input', `<Component bind:appearance="{ color: 'danger', size: 'lg' }" bind:invalid="true" name="email" />`, [/name="email"/, /aria-invalid="true"/, /class="[^"]*--ui-control-height-lg[^"]*border-danger-7/, /^(?![\s\S]* appearance=)/]],
+	['Card', '<Component title="Summary" variant="glass" color="primary" elevation="lg">Details</Component>', [/<section class="(?=[^"]*\bshadow-lg\b)(?=[^"]*\bbg-gray-a3\b)(?=[^"]*\btext-primary-11\b)(?=[^"]*\bbackdrop-blur-md\b)/, /^(?![\s\S]*\s(?:variant|color|elevation)=)/, /aria-labelledby=/, /Details/]],
 	['Card', '<Component aria-label="Totals">Details</Component>', [/<section[^>]*aria-label="Totals"/, /^(?![\s\S]*aria-labelledby)/, /^(?![\s\S]*<header)/]],
 	['Stat', '<Component label="Snapshot"><snippet name="value"><a href="/snapshots">#7</a></snippet><snippet name="detail"><em>Today</em></snippet></Component>', [/<dd class="[^"]*text-2xl[^"]*"[^>]*>\s*<a href="\/snapshots">#7<\/a>/, /<dd class="[^"]*text-sm[^"]*"[^>]*>\s*<em>Today<\/em>/]],
 	['DescriptionList', "<Component bind:items=\"[{ label: 'Hash', value: 'abc123', code: true, title: 'abc123def456' }, { label: 'Note', value: 'Plain' }]\" />", [/<code[^>]*title="abc123def456"[^>]*>\s*abc123\s*<\/code>/, /<dd[^>]*>Plain<\/dd>/]],
@@ -102,6 +102,29 @@ for (const [name, template, patterns] of cases) {
 		for (const pattern of patterns) assert.match(html, pattern)
 	})
 }
+
+/** The classes of the first element that matches `tag`. */
+const classesOf = (html, tag) => (html.match(new RegExp(`<${tag}\\b[^>]*?class="([^"]*)"`))?.[1] ?? '').split(' ')
+
+test('the class of the consumer replaces the conflicting classes of a recipe of variants/, and keeps the rest', { timeout: 30_000 }, async (context) => {
+	// The utilities of UI and those of the app share the layer `utilities`: without the merge, the order of the sheet would decide.
+	const field = classesOf(await render(context, 'Input', '<Component name="q" class="bg-amber-500 text-blue-600 rounded-none my-field" />'), 'input')
+	for (const name of ['bg-amber-500', 'text-blue-600', 'rounded-none', 'my-field', 'border-control-border', 'not-disabled:hover:bg-control-hover', 'placeholder:text-text-soft', 'min-h-(--ui-control-height-md)']) assert.ok(field.includes(name), `${name} in ${field.join(' ')}`)
+	for (const name of ['bg-control', 'text-text', 'rounded-md']) assert.ok(!field.includes(name), `${name} gives way to the class of the consumer`)
+	const themed = classesOf(await render(context, 'Input', `<Component name="q" bind:appearance="{ color: 'danger' }" class="border-amber-500 px-6" />`), 'input')
+	assert.ok(themed.includes('border-amber-500') && !themed.includes('border-danger-7'), themed.join(' '))
+	assert.ok(themed.includes('px-6') && !themed.includes('ps-3') && !themed.includes('pe-3'), themed.join(' '))
+	const badgeHtml = await render(context, 'Badge', `<Component tone="warning" bind:dot="true" class="bg-amber-500 text-sm" bind:ui="{ dot: 'bg-red-500' }">Pending</Component>`)
+	const badge = classesOf(badgeHtml, 'span')
+	for (const name of ['bg-amber-500', 'text-sm', 'text-warning-text', 'rounded-full', 'leading-snug']) assert.ok(badge.includes(name), `${name} in ${badge.join(' ')}`)
+	for (const name of ['bg-warning-soft', 'text-xs']) assert.ok(!badge.includes(name), `${name} gives way to the class of the consumer`)
+	const dot = badgeHtml.match(/<span[^>]*aria-hidden="true"[^>]*class="([^"]*)"|<span[^>]*class="([^"]*)"[^>]*aria-hidden="true"/)
+	const dotClasses = (dot[1] ?? dot[2]).split(' ')
+	assert.ok(dotClasses.includes('bg-red-500') && !dotClasses.includes('bg-current') && dotClasses.includes('rounded-full'), dotClasses.join(' '))
+	const alert = await render(context, 'Alert', '<Component title="Hi" class="rounded-none p-1" />')
+	const box = classesOf(alert, 'section')
+	assert.ok(box.includes('rounded-none') && !box.includes('rounded-lg') && box.includes('p-1') && !box.includes('p-4'), box.join(' '))
+})
 
 test('no native control links its value by hand: model is what takes what was edited before hydration', async () => {
 	const handmade = []

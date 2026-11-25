@@ -5,11 +5,11 @@
 
 	import type { UILinkTarget, UILocaleSuggestionProps } from '../types/navigation'
 
+	import { buttonTheme } from '../theme/components/button'
 	import { uiTheme } from '../utils/defaults'
 	import { icons } from '../utils/icons'
 	import { fillMessage, uiMessages, uiMessagesFor } from '../utils/messages'
 	import { linkTarget } from '../utils/navigation'
-	import { button } from '../variants/button'
 	import { localeSuggestion } from '../variants/locale'
 	import * as Icon from './internal/Icon.meeko'
 	import * as ItemLink from './internal/ItemLink.meeko'
@@ -32,9 +32,9 @@
 	const target = computed<UILinkTarget | undefined>(() => (offered.value ? { ...linkTarget(offered.value), hreflang: offered.value.hreflang ?? offered.value.code } : undefined))
 
 	const classes = localeSuggestion()
-	// Both actions are buttons of variants/button.
-	const goClass = (): string => button({ variant: 'primary', size: 'sm', class: classes.go({ class: theme.ui.go }) })
-	const stayClass = (): string => button({ variant: 'outline', size: 'sm', class: classes.stay({ class: theme.ui.stay }) })
+	// Both actions are buttons of theme/components/button: a solid primary one to go, a neutral outline one to stay.
+	const goClass = (): string => buttonTheme({ variant: 'solid', color: 'primary', size: 'sm', class: classes.go({ class: theme.ui.go }) })
+	const stayClass = (): string => buttonTheme({ variant: 'outline', color: 'neutral', size: 'sm', class: classes.stay({ class: theme.ui.stay }) })
 </script>
 
 <template>

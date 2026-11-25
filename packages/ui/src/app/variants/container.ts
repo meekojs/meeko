@@ -1,6 +1,6 @@
 // The look of <UIContainer>, also the width of the bars of <UIHeader> and <UIFooter>. An app widens or narrows
 // every container with --ui-container-max-width and --ui-container-gutter, over the preset of `size` and `gutter`.
-import { tv } from 'tailwind-variants/lite'
+import { tv } from '../utils/theme'
 
 export const container = tv({
 	base: 'mx-auto box-border w-full min-w-0',

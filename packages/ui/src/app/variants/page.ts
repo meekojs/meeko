@@ -1,7 +1,6 @@
 // The look of <UIPage> and <UIPageHeader>. Each property is set by one part only: what changes with the
 // layout lives in each value of `layout`, and the columns of the body in one compound variant per set of zones.
-import { tv } from 'tailwind-variants/lite'
-
+import { tv } from '../utils/theme'
 import { focusRing } from './focus'
 
 /** No transition when the reader asks for less motion. */

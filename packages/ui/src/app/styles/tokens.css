@@ -70,6 +70,37 @@
 	--ui-color-danger-text: var(--ui-color-danger-11);
 
 	/*
+	 * The scales of secondary and neutral in the appearance catalog (theme.css). Neither has a palette of its
+	 * own: secondary is the pink scale, apart from primary and the states, and neutral is the surface one.
+	 */
+	--ui-color-secondary-1: var(--ui-color-pink-1);
+	--ui-color-secondary-2: var(--ui-color-pink-2);
+	--ui-color-secondary-3: var(--ui-color-pink-3);
+	--ui-color-secondary-4: var(--ui-color-pink-4);
+	--ui-color-secondary-5: var(--ui-color-pink-5);
+	--ui-color-secondary-6: var(--ui-color-pink-6);
+	--ui-color-secondary-7: var(--ui-color-pink-7);
+	--ui-color-secondary-8: var(--ui-color-pink-8);
+	--ui-color-secondary-9: var(--ui-color-pink-9);
+	--ui-color-secondary-10: var(--ui-color-pink-10);
+	--ui-color-secondary-11: var(--ui-color-pink-11);
+	--ui-color-secondary-12: var(--ui-color-pink-12);
+	--ui-color-secondary-contrast: var(--ui-color-pink-contrast);
+	--ui-color-neutral-1: var(--ui-color-surface-1);
+	--ui-color-neutral-2: var(--ui-color-surface-2);
+	--ui-color-neutral-3: var(--ui-color-surface-3);
+	--ui-color-neutral-4: var(--ui-color-surface-4);
+	--ui-color-neutral-5: var(--ui-color-surface-5);
+	--ui-color-neutral-6: var(--ui-color-surface-6);
+	--ui-color-neutral-7: var(--ui-color-surface-7);
+	--ui-color-neutral-8: var(--ui-color-surface-8);
+	--ui-color-neutral-9: var(--ui-color-surface-9);
+	--ui-color-neutral-10: var(--ui-color-surface-10);
+	--ui-color-neutral-11: var(--ui-color-surface-11);
+	--ui-color-neutral-12: var(--ui-color-surface-12);
+	--ui-color-neutral-contrast: var(--ui-color-surface-contrast);
+
+	/*
 	 * Text on a solid: white when it reaches 4.5:1, black otherwise. Light step 10 is darker than 9,
 	 * so the text on a hovered solid is a token of its own. tests/tokens.test.mjs computes them all.
 	 */
@@ -156,15 +187,21 @@
 	--ui-focus-ring: var(--ui-focus-ring-width) solid var(--ui-color-focus);
 
 	/* Controls: touch screens get taller ones and a text size that does not make iOS zoom in */
+	--ui-control-height-xs: 1.5rem;
 	--ui-control-height-sm: 1.75rem;
 	--ui-control-height-md: 2.25rem;
 	--ui-control-height-lg: 2.75rem;
+	--ui-control-height-xl: 3.25rem;
+	--ui-control-padding-xs: 0 var(--ui-space-1-5);
 	--ui-control-padding-sm: 0 var(--ui-space-2);
 	--ui-control-padding-md: 0 var(--ui-space-3);
 	--ui-control-padding-lg: 0 var(--ui-space-4);
+	--ui-control-padding-xl: 0 var(--ui-space-5);
+	--ui-control-font-size-xs: var(--ui-font-size-xs);
 	--ui-control-font-size-sm: var(--ui-font-size-md);
 	--ui-control-font-size: var(--ui-font-size-md);
 	--ui-control-font-size-lg: var(--ui-font-size-md);
+	--ui-control-font-size-xl: var(--ui-font-size-lg);
 	--ui-control-font-weight: var(--ui-font-weight-medium);
 	--ui-input-font-size: var(--ui-font-size-md);
 	--ui-opacity-disabled: 0.55;
@@ -348,9 +385,11 @@
 
 @media (pointer: coarse) {
 	:root {
+		--ui-control-height-xs: 2rem;
 		--ui-control-height-sm: 2.25rem;
 		--ui-control-height-md: 2.5rem;
 		--ui-control-height-lg: 2.75rem;
+		--ui-control-height-xl: 3.25rem;
 		--ui-input-font-size: var(--ui-font-size-lg);
 	}
 }

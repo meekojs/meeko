@@ -9,7 +9,7 @@ source-hash: 8fe2ed7ba0aa854772c89fd6ba699f70823f301e18bedf4f88a4817169147a55
 Install the published packages in a Meeko application running Node.js 24 or later:
 
 ```sh
-pnpm add @meekojs/meeko @meekojs/ui
+pnpm add @meekojs/meeko @meekojs/ui tailwindcss
 ```
 
 Enable the module in `meeko.config.ts`:
@@ -22,6 +22,26 @@ export default defineMeekoConfig({
 	theme: true,
 })
 ```
+
+Import Tailwind and the CSS entry of UI at the top of **`app/styles/main.css`**, the global stylesheet that Meeko loads by itself:
+
+```css
+@import 'tailwindcss';
+@import '@meekojs/ui';
+```
+
+The application compiles the styles of UI with Tailwind 4 together with its own classes, in a single pass. The module registers `@tailwindcss/vite`, unless the application already registers it, and the entry brings the tokens, the theme and the `@source` of the UI components. That theme adds to Tailwind's default one: the semantic colors come with their twelve steps (`bg-surface`, `text-text-soft`, `bg-primary-9`, `text-danger-11`…), the breakpoints `phone`, `compact`, `tablet`, `sidebar` and `desktop` join those of Tailwind, and the application keeps its colors (`bg-red-500`…), its breakpoints (`md:`…) and the rest of its names. But UI redefines some values of Tailwind's theme so that they read the `--ui-*` tokens, and with them the classes of the application that use them change too: `--spacing` (the grid of `p-4`, `gap-2`…, on `--ui-space-1`), `--font-sans` and `--font-mono`, the sizes `--text-xs` to `--text-6xl` (with `--text-base` equal to `--text-md`), the line heights `--leading-none`, `-tight`, `-snug`, `-normal` and `-relaxed`, the weights `--font-weight-thin` to `--font-weight-black` (`normal` is `regular`), `--tracking-normal` and `--tracking-tight`, the radii `--radius-xs` to `--radius-3xl`, the shadows `--shadow-xs` to `--shadow-2xl`, `--blur-md`, the easings `--ease-in`, `--ease-out` and `--ease-in-out`, the containers `--container-sm` to `--container-3xl` (`max-w-xl`…) and `--animate-spin`. It also leaves without a value (`initial`) the line height of each size (`--text-*--line-height`: `text-sm` sets only the size, and the line height goes with `leading-*`), the default duration and easing of `transition-*` (UI gives them with `duration-*` and `ease-*`) and the default fonts of the preflight (`--default-font-family`, `--default-mono-font-family` and their settings; the UI base sets the font of the page). Add your own with a `@theme` after both imports. `@import '@meekojs/ui/hues';`, optional and after them, also brings the Radix Colors scales (`bg-crimson-9`…) and generates the classes of the raw hue combinations. Without this stylesheet, `meeko dev` warns that the components will have no styles; the warning also follows the local imports of the stylesheet (`@import './ui.css'`, if that one imports UI).
+
+**Mind Tailwind's preflight.** `@import 'tailwindcss'` includes the preflight, Tailwind's reset: it removes the margins of every element, the bullets of lists and the size and weight of headings (`h1`…`h6`), and makes images blocks. The UI components do not depend on it, but an application that did not use Tailwind before changes its look with it. To keep the previous one, import only Tailwind's theme and utilities, in the layers of its own entry, as [Tailwind's documentation](https://tailwindcss.com/docs/preflight#disabling-preflight) shows:
+
+```css
+@layer theme, base, components, utilities;
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities);
+@import '@meekojs/ui';
+```
+
+The UI base stays in place (`ui: { base: false }` removes it), and `ui.tokens`, the warning of `meeko dev` and `@meekojs/ui/hues` work the same with both forms. The sites of this repository use the second one.
 
 Then, **file `app/pages/index.meeko`** in a new application:
 
@@ -55,9 +75,9 @@ The `@meekojs/ui` module belongs to the Meeko ecosystem and has its own version.
 - **Feedback:** `UIAlert`, `UIToast`, `UIEmpty` and `UISkeleton`.
 - **Overlays:** `UIModal`, `UIDrawer`, `UIPopover`, `UITooltip`, `UICommandPalette` and the `UIApp` host.
 
-`UILink` shares the `primary`, `secondary`, `outline` and `ghost` variants, `sm`, `md`, `lg` sizes and `rounded`, `pill` shapes with `UIButton`. It requires `to` or `href`; it does not simulate a button. `UILinkCard` requires `to` or `href`, and `title`, with optional description and content. `UIBadge` has `neutral`, `info`, `success`, `warning` and `danger` tones, and `dot`, without adding interaction or announcements.
+`UILink` shares with `UIButton` the treatment (`variant`: `solid`, `soft`, `surface`, `outline`, `subtle`, `ghost` or `link`), the semantic color (`color`: `primary`, `secondary`, `neutral`, `success`, `info`, `warning` or `danger`), the `xs` to `xl` sizes and the radius (`radius`, from `none` to `full`). It requires `to` or `href`; it does not simulate a button. `UILinkCard` requires `to` or `href`, and `title`, with optional description and content. `UIBadge` has `neutral`, `info`, `success`, `warning` and `danger` tones, and `dot`, without adding interaction or announcements.
 
-It registers all these components, except `UIMarkdownEditor`, and adds its CSS through `meeko.addStylesheet`, plus the global base and the Inter font. The stylesheet comes already compiled with Tailwind 4, so the application does not need Tailwind, and goes through Vite and the project's PostCSS configuration, with imports, assets, HMR in development and hashed asset names in production. It loads before `app/styles/main.css`, where the application can override the styles: any unlayered rule wins over a component's, and `class` and the `ui` prop give each part classes of your own (see [Classes per slot](ui-api.md#classes-per-slot)). Since core 1.8, `MeekoSelect`, `MeekoPopover` and `MeekoThemeToggle` are deprecated (`MEEK121`, removal in 2.0): UI 1.9 registers `UISelect`, `UICombobox`, `UIPopover` and `UIThemeToggle`. `UISelect` is a native `<select>`; to search or choose several options, `UICombobox`. `useTheme`, `useThemeToggle`, the theme configuration and `POST /_meeko/theme` remain in the framework. UI 1.9 needs Meeko `>=1.8 <2`. See [Migration to 1.8](migration-1.8.md).
+It registers all these components, except `UIMarkdownEditor`, the global base (`ui: { base: false }` leaves it out) and the Inter font. The rest of its CSS is the `@import '@meekojs/ui'` entry, which `app/styles/main.css` compiles with Tailwind 4 through Vite and the project's PostCSS configuration, with HMR in development and hashed asset names in production. The layers follow Tailwind's order: the preflight (`base`), if the stylesheet imports it, stays below the UI base and the components, so it does not wipe their borders or backgrounds; the hand-written rules of UI go in `components`, and its utilities, together with the application's, in `utilities`. `ui.tokens` is inserted after the imports of that stylesheet, before its rules, also when it reaches UI through a local stylesheet of its own (`@import './ui.css'`, up to eight levels). The application can override the styles in that same stylesheet: any unlayered rule wins over a component's, and `class` and the `ui` prop give each part classes of your own, which are merged with Tailwind Merge and replace the conflicting ones of the recipe (see [Classes per slot](ui-api.md#classes-per-slot)). Since core 1.8, `MeekoSelect`, `MeekoPopover` and `MeekoThemeToggle` are deprecated (`MEEK121`, removal in 2.0): UI 1.9 registers `UISelect`, `UICombobox`, `UIPopover` and `UIThemeToggle`. `UISelect` is a native `<select>`; to search or choose several options, `UICombobox`. `useTheme`, `useThemeToggle`, the theme configuration and `POST /_meeko/theme` remain in the framework. UI 1.9 needs Meeko `>=1.8 <2`. See [Migration to 1.8](migration-1.8.md).
 
 ```html
 <script lang="ts">
@@ -85,7 +105,7 @@ It registers all these components, except `UIMarkdownEditor`, and adds its CSS t
 </template>
 ```
 
-`UIButton` supports `type`, `disabled`, `class`, `variant="primary|secondary|outline|ghost"` and the `click` event; its default type is `button`. `UIInput` shares a text model and supports `id`, `name`, `type`, `placeholder`, `required`, `disabled`, `invalid`, `describedBy` and `class`. `UIField` requires `id` and `label`, supports `description`, `error`, `required` and `class`, and passes the control ID and its description to the snippet. The control must also receive `invalid` when it has an error and `required` when it is mandatory.
+`UIButton` supports `type`, `disabled`, `class`, `variant` (`solid`, `soft`, `surface`, `outline`, `subtle`, `ghost` or `link`), `color` (`primary`, `secondary`, `neutral`, `success`, `info`, `warning` or `danger`), `size`, `radius` and the `click` event; its default type is `button` and its look, `solid` and `primary`. `UIInput` shares a text model and supports `id`, `name`, `type`, `placeholder`, `required`, `disabled`, `invalid`, `describedBy` and `class`. `UIField` requires `id` and `label`, supports `description`, `error`, `required` and `class`, and passes the control ID and its description to the snippet. The control must also receive `invalid` when it has an error and `required` when it is mandatory.
 
 Customize the `--ui-*` tokens from the application's CSS: `--ui-color-primary-9`, `--ui-radius-md`, `--ui-font-sans`… The [visual contract](../../packages/ui/DESIGN.md) says which token to use for each thing. The dark theme uses `data-theme="dark"` and the tokens change by themselves. The global base (`ui: { base: false }` omits it) brings the reset, the `body`, the fluid scale and the focus; the application defines its layout.
 
@@ -151,7 +171,7 @@ export default defineMeekoConfig({
 			text: 'var(--ink)',
 			font: 'var(--font-ui)',
 		},
-		defaults: { link: { shape: 'pill' }, button: { shape: 'pill' } },
+		defaults: { link: { radius: 'full' }, button: { radius: 'full' } },
 	},
 })
 ```
@@ -164,8 +184,8 @@ For modals, mount `<UIApp><MeekoOutlet /></UIApp>` in `app/app.meeko`. `useModal
 
 `UITable` generates rows from the required `rows`, `columns` and `rowKey`. The generic is inferred from the rows; `TableColumn<T>`, imported from `@meekojs/ui/runtime`, checks each column's keys and formatters. It supports per-column footers, an empty state, optional snippets for cell content and `layout="native|grid"` (native by default), with horizontal scrolling. See the [table API](ui-api.md#tables).
 
-`UICard` offers `outline`, `soft`, `solid` and `elevated` variants, with title and description props, and header, body and footer snippets. See the [card API](ui-api.md#cards).
+`UICard` combines a treatment (`surface`, `outline`, `soft`, `subtle`, `solid`, `glass` or `plain`) with a semantic color, a radius and a shadow, the `cardTheme` recipe of `@meekojs/ui/theme`, with title and description props, and header, body and footer snippets. See the [card API](ui-api.md#cards).
 
 The public Meeko UI site is published at <https://ui.meekojs.com> and lives in `apps/ui`. It includes installation, themes, a catalog by category and, in Spanish and English, a guide with a demo, API and copyable code for each component: `/forms`, `/controls`, `/select` (also `UICombobox`), `/editor`, `/cards`, `/tables`, `/content`, `/feedback`, `/page`, `/navigation`, `/modals`, `/popover`, `/overlays`, `/container`, `/buttons`, `/links`, `/badges`, `/icons`, `/theme-toggle`, `/app` and `/transitions`. From the root, run `pnpm dev:ui`; to generate the production site use `pnpm build --filter=meeko-ui-site`. It does not require a database.
 
-UI sources are in `src/app/components` and `src/app/styles`. Components and declarations are included in `dist/app/components` when building `@meekojs/ui`, and `scripts/build-styles.mjs` compiles the stylesheet of `src/app/styles` with Tailwind 4 into `dist/styles/main.css`, which the consumer processes with Vite/PostCSS. The integration plugin lives in `src/app/plugins/modal.ts`: the module registers its compiled file and connects a private alias to the consumer's component registry. UI does not generate plugin code in the project or write inside the Meeko installation.
+UI sources are in `src/app/components` and `src/app/styles`. Components and declarations are included in `dist/app/components` when building `@meekojs/ui`. `src/app/styles/main.css` is the CSS entry that the package exports (the `style` condition of `exports`): its `@source` point to the components, variants and recipes of `src/` and of `dist/`, so it works in the workspace and published, and the package compiles no stylesheet. The integration plugin lives in `src/app/plugins/modal.ts`: the module registers its compiled file and connects a private alias to the consumer's component registry. UI does not generate plugin code in the project or write inside the Meeko installation.

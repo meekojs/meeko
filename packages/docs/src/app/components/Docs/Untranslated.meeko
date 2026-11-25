@@ -30,6 +30,7 @@
 			<snippet name="actions">
 				<UILink
 					variant="outline"
+					color="neutral"
 					size="sm"
 					bind:href="props.href"
 					bind:hreflang="props.hreflang"

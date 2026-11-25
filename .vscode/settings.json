@@ -4,7 +4,7 @@
 		"meeko": "html"
 	},
 	"tailwindCSS.experimental.configFile": {
-		"packages/ui/src/app/styles/main.css": "packages/ui/src/**",
+		"apps/ui/app/styles/main.css": ["packages/ui/src/**", "packages/docs/src/**", "apps/**"],
 		"packages/meeko/tests/fixtures/tailwind-app/app/styles/main.css": "packages/meeko/tests/fixtures/tailwind-app/**"
 	},
 	"files.associations": {

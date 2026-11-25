@@ -1,6 +1,5 @@
 // The look of <UILocaleSwitcher> and <UILocaleSuggestion>. Each property is set by one part only.
-import { tv } from 'tailwind-variants/lite'
-
+import { tv } from '../utils/theme'
 import { focusRingInset } from './focus'
 
 /** The look of <UILocaleSwitcher>: the codes of the languages in a frame as tall as a control. */
@@ -42,7 +41,7 @@ export const localeSuggestion = tv({
 			'max-phone:absolute max-phone:size-(--ui-border-width) max-phone:overflow-hidden max-phone:whitespace-nowrap max-phone:[clip-path:inset(50%)]',
 		],
 		actions: 'col-start-2 mt-1.5 flex flex-wrap gap-2 max-phone:col-start-1 max-phone:mt-0',
-		// The two choices, buttons of variants/button: on a phone they share the row, at a smaller text size.
+		// The two choices, buttons of theme/components/button: on a phone they share the row, at a smaller text size.
 		go: 'max-phone:flex-auto max-phone:text-sm',
 		stay: 'max-phone:flex-auto max-phone:text-sm',
 	},

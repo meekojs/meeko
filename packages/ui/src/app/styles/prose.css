@@ -19,7 +19,7 @@
  * A component inside the text is the end of its scope, so it keeps its own look. Inside @scope a selector
  * without :scope gets it as an implied ancestor: `.meeko-ui-prose h2` would look for a nested prose. A
  * component using Tailwind can end it with meeko-ui-component, and sets its own margin in the prose (`inProse` of
- * variants/card); a nested prose or a `meeko-ui-sr-only` of the app, by their public class.
+ * theme/components/card); a nested prose or a `meeko-ui-sr-only` of the app, by their public class.
  */
 .meeko-ui-prose > :first-child {
 	margin-top: 0;

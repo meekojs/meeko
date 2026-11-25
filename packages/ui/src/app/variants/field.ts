@@ -1,5 +1,5 @@
 // The look of <UIField>: a label, the control the app renders, and its description, error, hint and counter.
-import { tv } from 'tailwind-variants/lite'
+import { tv } from '../utils/theme'
 
 /** A line of help under the control, in soft text. */
 const help = 'm-0 text-sm text-text-soft'

@@ -23,7 +23,7 @@ Pasos de cada escala: 1-2 fondos, 3-5 controles, 6-8 bordes, 9-10 sólidos, 11-1
 | Fondo de la página                | `--ui-color-bg`                                                         | surface 1             |
 | Banda o zona discreta             | `--ui-color-bg-subtle`                                                  | surface 2             |
 | Card, panel, tabla                | `--ui-color-surface`                                                    | surface 2             |
-| Popover, modal, card elevada      | `--ui-color-surface-raised`                                             | 1 claro, 3 oscuro     |
+| Popover, modal                    | `--ui-color-surface-raised`                                             | 1 claro, 3 oscuro     |
 | Fondo de control                  | `--ui-color-control`, `-hover`, `-active`                               | surface 3, 4, 5       |
 | Separador, borde de card          | `--ui-color-border`                                                     | surface 6             |
 | Borde de control de formulario    | `--ui-color-control-border`, con 3:1 o más                              | surface 9, 10 oscuro  |
@@ -97,7 +97,7 @@ La interfaz crece con la pantalla en un solo sitio, la base global: `html { font
 - **Espacio:** `--ui-space-<n>`, en pasos de 0,25rem: `0`, `0-5`, `1`, `1-5`, `2`, `3`, `4`, `5`, `6`, `8`, `10`, `12`, `16`, `20`, `24`. Junta lo relacionado (`1-5`, `2`) y separa los grupos (`5` en adelante).
 - **Radios:** `--ui-radius-xs` 3px, `-sm` 4px (opción de una lista), `-md` 6px (controles), `-lg` 8px (cards, popovers), `-xl` 12px (modales), `-full` (badges, `pill`).
 - **Bordes:** `--ui-border-width` (1px). No uses bordes de color gruesos en un lateral.
-- **Sombras:** `--ui-shadow-sm`, `-md` (popover, card elevada), `-lg` (modal). En oscuro un panel se eleva con `--ui-color-surface-raised`; la sombra sólo separa lo que se solapa.
+- **Sombras:** `--ui-shadow-sm`, `-md` (popover, card con `elevation="md"`), `-lg` (modal). En oscuro un panel se eleva con `--ui-color-surface-raised`; la sombra sólo separa lo que se solapa.
 - **Página:** `--ui-page-width` (`--ui-container-2xl`, 96rem) es el ancho de `UIPage`, y `UIHeader` y `UIFooter` lo siguen. El texto se limita a `--ui-prose-measure` (75ch), y el código, las tablas y las demos, a `--ui-prose-width` (`--ui-container-lg`). Así no queda media pantalla vacía en 2K ni hay líneas interminables.
 - **Contenedor:** `--ui-container-sm` 40rem, `-md` 48rem, `-lg` 64rem, `-xl` 80rem, `-2xl` 96rem, `-3xl` 120rem, `-4k` 240rem. Márgenes: `--ui-container-gutter-sm`, `-md`, `-lg`. Mejor `<UIContainer>` que leerlos a mano.
 
@@ -168,10 +168,10 @@ Los estilos de los elementos nativos van en la base, con `:where()`: especificid
 
 ## Carga
 
-El módulo lo hace todo con `modules: ['@meekojs/ui']`:
+El módulo hace el resto con `modules: ['@meekojs/ui']`; la app sólo empieza `app/styles/main.css` con `@import 'tailwindcss';` y `@import '@meekojs/ui';`:
 
-- **`main.css`:** paleta, tokens, `@font-face` y componentes, compilada con Tailwind 4 por `scripts/build-styles.mjs` en `dist/styles/main.css`; la app no necesita Tailwind. Las clases de los componentes viven en `src/app/variants/` (`tv()` de `tailwind-variants/lite`) y leen los tokens a través de `theme.css`. Capas: `ui.components`, lo que aún se escribe a mano, y `ui.utilities`, las utilidades Tailwind, por encima. Cualquier regla sin capa de la app gana a ambas.
-- **`base.css`:** reset, `body`, `color-scheme`, `::selection`, barras de desplazamiento y foco, en la capa `@layer ui-base`. Cualquier regla sin capa de la app gana, y también cualquier capa que declare, porque ésta se registra primero. Se omite con `ui: { base: false }`.
+- **`main.css`:** la entrada CSS del paquete (`@import '@meekojs/ui'`): paleta, tokens, `@font-face`, componentes y el tema de `theme.css`, con los `@source` de los componentes, variantes y recetas en `src/` y `dist/`. La app la compila con su Tailwind 4, en una pasada con sus propias clases; el módulo registra `@tailwindcss/vite`. Las clases de los componentes viven en `src/app/variants/` (`tv()` de `tailwind-variants/lite`) y leen los tokens a través de `theme.css`. Capas, en el orden de Tailwind: `components`, lo que aún se escribe a mano, y `utilities`, las utilidades de UI y de la app, por encima. Cualquier regla sin capa de la app gana a ambas. El tema se suma al de Tailwind por defecto: `theme.css` sólo retira, con `initial`, los valores por defecto que cambiarían una utilidad de UI (el interlineado de los `text-*` y la duración y la curva de los `transition-*`). `hues.css` (`@import '@meekojs/ui/hues'`) añade, opcional, las escalas de Radix Colors y las combinaciones de tonos crudos, que `main.css` excluye; las genera `pnpm -F @meekojs/ui run generate:hues` desde `@radix-ui/colors`, y `generate:appearance` regenera el catálogo `theme/base/colors.ts` y `hues.ts`.
+- **`base.css`:** reset, `body`, `color-scheme`, `::selection`, barras de desplazamiento y foco, en la capa `@layer ui-base`, justo después del preflight de Tailwind (`base`). Cualquier regla sin capa de la app gana, y también cualquier capa que declare, porque ésta se registra primero. Se omite con `ui: { base: false }`.
 - **La fuente:** se sirve en `/_meeko-ui/fonts/inter-latin-opsz-normal.woff2`, con su `preload`. La app no copia archivos ni escribe `@font-face`. La CSP sólo necesita `font-src 'self'`, y se sirve con CORS, así que también la carga un `<iframe sandbox srcdoc>` que lea `@meekojs/ui/styles/fonts.css`.
 
 Una app no debe escribir su propio reset ni su `body`: borra los suyos al migrar.

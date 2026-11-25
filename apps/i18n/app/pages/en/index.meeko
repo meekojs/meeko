@@ -17,6 +17,7 @@
 			<UILink
 				to="/playground"
 				variant="outline"
+				color="neutral"
 			>
 				Open the playground
 			</UILink>

@@ -26,6 +26,7 @@
 		"eslint": "catalog:",
 		"jiti": "catalog:",
 		"playwright-core": "catalog:",
+		"tailwindcss": "catalog:",
 		"typescript": "catalog:",
 		"vite": "catalog:"
 	}

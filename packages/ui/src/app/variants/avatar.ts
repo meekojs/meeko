@@ -1,7 +1,7 @@
 // El aspecto de <UIAvatar>: una caja cuadrada con el tamaño de `--ui-avatar-size-*`, el fondo y el texto de
 // `--ui-avatar-bg` y `--ui-avatar-color`, y la forma de un círculo o de un cuadrado con las esquinas de
 // `--ui-avatar-radius`. La imagen la llena y recorta; las iniciales y el glifo van centrados.
-import { tv } from 'tailwind-variants/lite'
+import { tv } from '../utils/theme'
 
 export const avatar = tv({
 	slots: {

@@ -7,6 +7,7 @@
 			<UILink
 				to="/transitions"
 				variant="ghost"
+				color="neutral"
 			>
 				Volver a proyectos
 			</UILink>
@@ -29,6 +30,7 @@
 				<UILink
 					to="/transitions"
 					variant="outline"
+					color="neutral"
 				>
 					Ver todos los proyectos
 				</UILink>

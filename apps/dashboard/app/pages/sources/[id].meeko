@@ -234,6 +234,7 @@
 		<snippet name="actions">
 			<UILink
 				variant="ghost"
+				color="neutral"
 				bind:href="localePath('/sources')"
 			>
 				{t('source.allSources')}
@@ -241,6 +242,7 @@
 			<UILink
 				if:when="canTranslate.value"
 				variant="outline"
+				color="neutral"
 				bind:href="localePath('/translations/' + props.params.id)"
 			>
 				{isTranslation.value ? t('source.compareOriginal') : t('source.seeTranslation')}
@@ -287,6 +289,7 @@
 					<UILink
 						size="sm"
 						variant="outline"
+						color="neutral"
 						bind:href="localePath('/snapshots')"
 					>
 						{t('source.publishDocs')}
@@ -382,6 +385,7 @@
 								if:when="data.value?.editable"
 								size="sm"
 								variant="ghost"
+								color="neutral"
 								bind:href="localePath('/sources/' + props.params.id + '/edit?revision=' + revision.id)"
 								bind:ariaLabel="revision.status === 'draft' ? t('source.row.editDraft', { id: revision.id }) : t('source.row.fromRevision', { id: revision.id })"
 							>
@@ -391,6 +395,7 @@
 								if:when="revision.status !== 'published'"
 								size="sm"
 								variant="outline"
+								color="neutral"
 								bind:disabled="busyRow.value"
 								on:click="() => ask('publish', revision)"
 							>
@@ -401,6 +406,7 @@
 								if:when="revision.status !== 'archived'"
 								size="sm"
 								variant="ghost"
+								color="neutral"
 								bind:disabled="busyRow.value"
 								on:click="() => ask('archive', revision)"
 							>
@@ -410,6 +416,7 @@
 							<UIButton
 								size="sm"
 								variant="ghost"
+								color="neutral"
 								on:click="() => exportMarkdown(revision)"
 							>
 								<span class="meeko-ui-sr-only">{t('source.row.export', { id: revision.id })}</span>
@@ -419,6 +426,7 @@
 								if:when="revision.conflict"
 								size="sm"
 								variant="outline"
+								color="neutral"
 								bind:disabled="loadingConflict.value !== null"
 								on:click="() => openConflict(revision)"
 							>
@@ -438,6 +446,7 @@
 					<UIButton
 						size="sm"
 						variant="ghost"
+						color="neutral"
 						on:click="
 							() => {
 								conflict.value = null
@@ -595,7 +604,8 @@
 						</UIField>
 						<UIButton
 							type="submit"
-							variant="secondary"
+							variant="surface"
+							color="neutral"
 							bind:disabled="comparing.value || !fromSide.value || !toSide.value"
 						>
 							{comparing.value ? t('source.compare.running') : t('source.compare.submit')}
@@ -663,6 +673,7 @@
 			<snippet name="footer">
 				<UIButton
 					variant="ghost"
+					color="neutral"
 					on:click="() => (confirming.value = false)"
 				>
 					{t('actions.cancel')}

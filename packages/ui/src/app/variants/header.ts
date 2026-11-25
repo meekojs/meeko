@@ -1,6 +1,5 @@
 // The look of <UIHeader>, <UIFooter> and the brand they share. Each property is set by one part only.
-import { tv } from 'tailwind-variants/lite'
-
+import { tv } from '../utils/theme'
 import { focusRing } from './focus'
 
 /** The link to the home page: logo, name and product. On a narrow phone the name can give way. */

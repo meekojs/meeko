@@ -2,7 +2,7 @@
 // (`select`). The `<head>` rule of the core shows the icon of the current choice; this only centres it.
 // Each property is set by one part only: the border, the background and the height of a button change
 // with the mode, so they live in `mode` and not in the base.
-import { tv } from 'tailwind-variants/lite'
+import { tv } from '../utils/theme'
 
 export const themeToggle = tv({
 	slots: {

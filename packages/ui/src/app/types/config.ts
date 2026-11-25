@@ -1,9 +1,11 @@
 import type { VariantProps } from 'tailwind-variants/lite'
 
+import type { buttonTheme } from '../theme/components/button'
+import type { cardTheme, linkCardTheme } from '../theme/components/card'
+import type { copyButtonTheme } from '../theme/components/copy-button'
+import type { iconButtonTheme } from '../theme/components/icon-button'
 import type { avatar } from '../variants/avatar'
 import type { badge } from '../variants/badge'
-import type { button, copyButton, iconButton } from '../variants/button'
-import type { card, linkCard } from '../variants/card'
 import type { checkbox, radioGroup, segmentedControl, toggle } from '../variants/choice'
 import type { commandPalette } from '../variants/command-palette'
 import type { container } from '../variants/container'
@@ -32,12 +34,6 @@ import type { UIVariantSlots } from './theme'
 
 /** Aplana una intersección para que el editor muestre las claves como un solo objeto. */
 type Simplify<T> = { [K in keyof T]: T[K] } & {}
-
-/** Variantes de acciones visuales; los enlaces conservan su semántica de navegación. */
-export type UIActionVariant = 'primary' | 'secondary' | 'outline' | 'ghost'
-export type UIActionSize = 'sm' | 'md' | 'lg'
-export type UIActionShape = 'rounded' | 'pill'
-export type UICardVariant = 'outline' | 'soft' | 'solid' | 'elevated'
 
 /**
  * Dónde van las acciones de una `UICard` respecto a su título: `inline` a su lado, `below` siempre debajo y
@@ -70,8 +66,17 @@ export type UIComponentDefaults<T extends ((...args: never[]) => unknown) | unde
 		Readonly<V>
 >
 
+/** Las variantes de botón que admiten un valor por aplicación: tratamiento, color, tamaño y radio. */
+type UIActionChoices = 'color' | 'radius' | 'size' | 'variant'
+
+/** Las variantes de una card enlazada que admiten un valor por aplicación: tratamiento, color, radio y sombra. */
+type UILinkCardChoices = 'color' | 'elevation' | 'radius' | 'variant'
+
+/** Las variantes de `UICard` que admiten un valor por aplicación: las de `UILinkCard` y el padding. */
+type UICardChoices = 'padding' | UILinkCardChoices
+
 /** Variantes de una acción (`UIButton`, `UILink`) que admiten un valor por aplicación. */
-type UIActionDefaults = UIComponentDefaults<typeof button, Pick<VariantProps<typeof button>, 'shape' | 'size' | 'variant'>>
+type UIActionDefaults = UIComponentDefaults<typeof buttonTheme, Pick<VariantProps<typeof buttonTheme>, UIActionChoices>>
 
 /**
  * Valores por defecto por aplicación, por componente: la clave es su nombre en camelCase sin el prefijo
@@ -80,8 +85,8 @@ type UIActionDefaults = UIComponentDefaults<typeof button, Pick<VariantProps<typ
  * `ui.defaults` y al final las de la instancia, sin fusionarlas. En un conflicto decide la cascada: las
  * reglas sin capa de la aplicación ganan a las de UI.
  *
- * Además, unas pocas variantes de apariencia general admiten un valor de base: `variant`, `size` y
- * `shape` en `button`, `link`, `iconButton` y `copyButton`; `size` y `shape` en `avatar`; `variant`, `padding`, `density` y `actionsWrap` en `card`; `size` en `segmentedControl`, y `density` en `table`. La
+ * Además, unas pocas variantes de apariencia general admiten un valor de base: `variant`, `color`, `size` y
+ * `radius` en `button`, `link`, `iconButton` y `copyButton`; `size` y `shape` en `avatar`; `variant`, `color`, `radius`, `elevation`, `padding`, `density` y `actionsWrap` en `card`; `variant`, `color`, `radius` y `elevation` en `linkCard`; `size` en `segmentedControl`, y `density` en `table`. La
  * prop explícita de la instancia gana siempre.
  *
  * @since 1.10.0 acepta `class` y `ui` en cada componente, y `padding`, `density`, `actionsWrap` en `card` y
@@ -111,9 +116,10 @@ export interface UIDefaults {
 	readonly badge?: UIComponentDefaults<typeof badge>
 	readonly breadcrumb?: UIComponentDefaults<typeof breadcrumb>
 	readonly button?: UIActionDefaults
+	/** `UICard`: `variant`, `color`, `radius`, `elevation` y `padding` son valores de base de su receta (`cardTheme`). */
 	readonly card?: UIComponentDefaults<
-		typeof card,
-		Pick<VariantProps<typeof card>, 'padding' | 'variant'> & {
+		typeof cardTheme,
+		Pick<VariantProps<typeof cardTheme>, UICardChoices> & {
 			/** Densidad de base; un `padding` de `ui.defaults` o de la instancia gana sobre ella. */
 			readonly density?: UIDensity
 			/**
@@ -130,11 +136,11 @@ export interface UIDefaults {
 	readonly commandPalette?: UIComponentDefaults<typeof commandPalette>
 	readonly container?: UIComponentDefaults<typeof container>
 	/**
-	 * `UICopyButton`: `class` llega al botón, y `variant`, `size` y `shape` son sus valores de base.
+	 * `UICopyButton`: `class` llega al botón, y `variant`, `color`, `size` y `radius` son sus valores de base.
 	 *
 	 * @since 1.10.0
 	 */
-	readonly copyButton?: UIComponentDefaults<typeof copyButton, Pick<VariantProps<typeof copyButton>, 'shape' | 'size' | 'variant'>>
+	readonly copyButton?: UIComponentDefaults<typeof copyButtonTheme, Pick<VariantProps<typeof copyButtonTheme>, UIActionChoices>>
 	readonly descriptionList?: UIComponentDefaults<typeof descriptionList>
 	readonly diff?: UIComponentDefaults<typeof diff>
 	readonly disclosure?: UIComponentDefaults<typeof disclosure>
@@ -150,14 +156,15 @@ export interface UIDefaults {
 	 */
 	readonly hint?: UIComponentDefaults<typeof hint>
 	/**
-	 * `UIIconButton`: `class` llega al botón o al enlace, y `variant`, `size` y `shape` son sus valores de base.
+	 * `UIIconButton`: `class` llega al botón o al enlace, y `variant`, `color`, `size` y `radius` son sus valores de base.
 	 *
 	 * @since 1.10.0
 	 */
-	readonly iconButton?: UIComponentDefaults<typeof iconButton, Pick<VariantProps<typeof iconButton>, 'shape' | 'size' | 'variant'>>
+	readonly iconButton?: UIComponentDefaults<typeof iconButtonTheme, Pick<VariantProps<typeof iconButtonTheme>, UIActionChoices>>
 	readonly input?: UIComponentDefaults<typeof input>
 	readonly link?: UIActionDefaults
-	readonly linkCard?: UIComponentDefaults<typeof linkCard>
+	/** `UILinkCard`: `variant`, `color`, `radius` y `elevation` son valores de base de su receta (`linkCardTheme`). */
+	readonly linkCard?: UIComponentDefaults<typeof linkCardTheme, Pick<VariantProps<typeof linkCardTheme>, UILinkCardChoices>>
 	readonly localeSuggestion?: UIComponentDefaults<typeof localeSuggestion>
 	readonly localeSwitcher?: UIComponentDefaults<typeof localeSwitcher>
 	/** `UIMarkdownEditor`, del módulo `@meekojs/ui/editor`. */

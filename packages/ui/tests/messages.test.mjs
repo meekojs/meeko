@@ -172,7 +172,7 @@ test('the module options are validated and only installed when they are given', 
 		return plugins.filter((plugin) => /plugins\/messages\.js$/.test(String(plugin.src ?? plugin)))
 	}
 	assert.deepEqual(setup({}), [])
-	assert.deepEqual(setup({ defaults: { link: { shape: 'pill' } } }), [])
+	assert.deepEqual(setup({ defaults: { link: { radius: 'full' } } }), [])
 	assert.deepEqual(setup({ locale: 'en' })[0].options, { locale: 'en' })
 	assert.deepEqual(setup({ messages: { fr: { modal: { close: 'Fermer' } } } })[0].options, { messages: { fr: { modal: { close: 'Fermer' } } } })
 	// The components find the texts by the canonical tag, however the configuration writes it.

@@ -1,7 +1,6 @@
 // The look of <UIStat>, <UISparkline> and <UIDescriptionList>: a term in small soft text over its value, in the
 // text of the page. A value never widens its column: it breaks anywhere.
-import { tv } from 'tailwind-variants/lite'
-
+import { tv } from '../utils/theme'
 import { focusRing } from './focus'
 
 /** A <dl> in the text of the page. */

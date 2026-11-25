@@ -1,8 +1,7 @@
+import { badgeAppearance, type BadgeAppearance } from '../theme/recipes'
 // The look of <UIBadge>, also used by NavigationTree for the label of a featured item. A badge never
 // breaks: it is a pill, and inside a table the column grows instead.
-import { tv } from 'tailwind-variants/lite'
-
-import { badgeAppearance, type BadgeAppearance } from '../theme/recipes'
+import { tv } from '../utils/theme'
 
 export const badge = tv({
 	slots: {

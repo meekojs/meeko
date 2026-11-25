@@ -2,8 +2,7 @@
 // and leaves with a View Transition (modal.css keeps its pseudo-elements and keyframes). utils/modal-dialog
 // writes the stack: `--ui-modal-depth`, `data-meeko-ui-modal-top`, `-behind` and `-state`. Each property is set
 // by one part only.
-import { tv } from 'tailwind-variants/lite'
-
+import { tv } from '../utils/theme'
 import { focusRing } from './focus'
 
 /**

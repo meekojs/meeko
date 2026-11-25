@@ -1,8 +1,7 @@
 // The look of <UIDrawer>: a native modal <dialog> against one edge of the screen. Closed, the UA hides it;
 // it enters by sliding from its edge with @starting-style, and leaves with the View Transition of <UIModal>
 // (navigation.css). Each property is set by one part only.
-import { tv } from 'tailwind-variants/lite'
-
+import { tv } from '../utils/theme'
 import { focusRing } from './focus'
 
 /**
@@ -50,7 +49,7 @@ export const drawer = tv({
 			...slide,
 			...root,
 		],
-		// The button that opens it is an outline button of variants/button: `ui.trigger` adds to it.
+		// The button that opens it is a neutral outline button of theme/components/button: `ui.trigger` adds to it.
 		trigger: '',
 		panel: 'flex h-full flex-col',
 		heading: 'flex flex-none items-center justify-between gap-3 border-b-(length:--ui-border-width) border-b-border px-4 py-3',

@@ -28,7 +28,7 @@ async function render(context, template, defaults) {
 			.replaceAll('from "@meekojs/meeko"', `from ${runtime('index.js')}`)
 			.replace(/from ["']\.\/internal\/Icon\.meeko["']/g, 'from "./Icon.ts"')
 			.replace(/from ["']\.\/(\w+)\.meeko["']/g, 'from "./$1.ts"')
-			.replace(/from ["'](?:\.\.\/)+(utils|variants)\/([\w-]+)["']/g, (_, folder, utility) => `from ${JSON.stringify(new URL(`../dist/app/${folder}/${utility}.js`, import.meta.url).href)}`)
+			.replace(/from ["'](?:\.\.\/)+(utils|variants|theme(?:\/components)?)\/([\w-]+)["']/g, (_, folder, utility) => `from ${JSON.stringify(new URL(`../dist/app/${folder}/${utility}.js`, import.meta.url).href)}`)
 		await writeFile(`${directory}/${file}.ts`, code)
 	}
 	await write('Icon', await readFile(new URL('../src/app/components/internal/Icon.meeko', import.meta.url), 'utf8'))
@@ -82,7 +82,7 @@ test('UIMenu renders the Menu Button pattern on the server: trigger, menu, items
 	assert.match(menu, /^<span/, 'the content is phrasing content, valid inside a <p>')
 	assert.equal(attribute(trigger, 'aria-label'), undefined, 'a trigger with text is named by its text')
 	assert.match(html, /<button[^>]*aria-haspopup="menu"[^>]*>Acciones\s*<svg[^>]*aria-hidden="true"/, 'the text and a chevron')
-	assert.ok(classes(trigger).includes('bg-control'), 'a trigger with text is a secondary button')
+	assert.ok(classes(trigger).includes('bg-neutral-2') && classes(trigger).includes('border-neutral-6'), 'a trigger with text is a neutral surface button')
 
 	const menuitems = tags(html, /role="menuitem"/)
 	assert.equal(menuitems.length, 7, 'six items of the data and one of the snippet')

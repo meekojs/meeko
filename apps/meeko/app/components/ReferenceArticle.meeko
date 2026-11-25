@@ -43,6 +43,7 @@
 			<UILink
 				if:when="props.page.sourceUrl"
 				variant="ghost"
+				color="neutral"
 				size="sm"
 				rel="noopener"
 				bind:href="props.page.sourceUrl!"

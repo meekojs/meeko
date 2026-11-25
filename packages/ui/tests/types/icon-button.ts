@@ -21,7 +21,7 @@ iconButton({ label: 'Perfil', to: '/users/[id]', params: { id: '7' }, icon: 'arr
 iconButton({ label: 'GitHub', href: 'https://github.com', target: '_blank', icon: 'M2 2h12v12H2Z' })
 iconButton({ label: 'Enviar', type: 'submit', disabled: true, loading: false })
 // Appearance, a toggle, the tooltip and the slots.
-iconButton({ label: 'Fijar', pressed: true, variant: 'outline', tone: 'danger', size: 'sm', shape: 'pill', tooltip: false, placement: 'bottom', class: 'pin', ui: { base: 'a', icon: 'b', tooltip: 'c' } })
+iconButton({ label: 'Fijar', pressed: true, variant: 'outline', color: 'danger', size: 'sm', radius: 'full', elevation: 'sm', tooltip: false, placement: 'bottom', class: 'pin', ui: { base: 'a', icon: 'b', tooltip: 'c' } })
 iconButton({ label: 'Ayuda', id: 'help', 'aria-describedby': 'more', 'data-testid': 'help' })
 const name: UIIconName = 'info'
 void name
@@ -38,8 +38,16 @@ iconButton({ label: 'Docs', href: '/docs', disabled: true })
 iconButton({ label: 'Cerrar', 'aria-label': 'Close' })
 // @ts-expect-error The label is the tooltip: title would add a second one.
 iconButton({ label: 'Cerrar', title: 'Cerrar' })
-// @ts-expect-error The variants of an action.
+// @ts-expect-error The treatments of a button but link: an icon has no text to underline.
 iconButton({ label: 'Cerrar', variant: 'link' })
+// @ts-expect-error The old values of variant are gone: solid and primary.
+iconButton({ label: 'Cerrar', variant: 'primary' })
+// @ts-expect-error tone is now color.
+iconButton({ label: 'Cerrar', tone: 'danger' })
+// @ts-expect-error shape is now radius.
+iconButton({ label: 'Cerrar', shape: 'pill' })
+// @ts-expect-error Only the semantic colors.
+iconButton({ label: 'Cerrar', color: 'crimson' })
 // @ts-expect-error A slot that it does not have.
 iconButton({ label: 'Cerrar', ui: { label: 'x' } })
 
@@ -54,10 +62,12 @@ hint({ placement: 'center' })
 hint({ text: 3 })
 
 // ui.defaults: the variants of an icon button, and the slots of both.
-const defaults: UIDefaults = { iconButton: { variant: 'outline', size: 'sm', shape: 'pill', class: 'x', ui: { icon: 'y' } }, hint: { class: 'z', ui: { tooltip: 'w' } } }
+const defaults: UIDefaults = { iconButton: { variant: 'outline', color: 'neutral', size: 'sm', radius: 'full', class: 'x', ui: { icon: 'y' } }, hint: { class: 'z', ui: { tooltip: 'w' } } }
 void defaults
 // @ts-expect-error A hint has no variants.
 const hintVariant: UIDefaults = { hint: { size: 'sm' } }
-// @ts-expect-error The tone of an icon button says what it does: it has no default.
+// @ts-expect-error tone is gone: the color of an icon button is color.
 const toneDefault: UIDefaults = { iconButton: { tone: 'danger' } }
-void [hintVariant, toneDefault]
+// @ts-expect-error shape is gone: radius.
+const shapeDefault: UIDefaults = { iconButton: { shape: 'pill' } }
+void [hintVariant, toneDefault, shapeDefault]

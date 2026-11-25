@@ -3,10 +3,12 @@
 // read the validated defaults, never this table, so the browser does not get every variant.
 import type { UIDefaults } from './app/types/config'
 
+import { buttonTheme } from './app/theme/components/button'
+import { cardTheme, linkCardTheme } from './app/theme/components/card'
+import { copyButtonTheme } from './app/theme/components/copy-button'
+import { iconButtonTheme } from './app/theme/components/icon-button'
 import { avatar } from './app/variants/avatar'
 import { badge } from './app/variants/badge'
-import { button, copyButton, iconButton } from './app/variants/button'
-import { card, linkCard } from './app/variants/card'
 import { checkbox, radioGroup, segmentedControl, toggle } from './app/variants/choice'
 import { commandPalette } from './app/variants/command-palette'
 import { container } from './app/variants/container'
@@ -53,7 +55,10 @@ interface Choices<K extends keyof UIDefaults> {
 	readonly props?: Readonly<Partial<Record<Option<K>, readonly string[]>>>
 }
 
-const action = { look: button, variants: ['variant', 'size', 'shape'] } as const
+/** The variants of a button that take an application default. */
+const buttonChoices = ['variant', 'color', 'size', 'radius'] as const
+
+const action = { look: buttonTheme, variants: buttonChoices } as const
 
 const components = {
 	alert: { look: alert },
@@ -61,13 +66,13 @@ const components = {
 	badge: { look: badge },
 	breadcrumb: { look: breadcrumb },
 	button: action,
-	card: { look: card, variants: ['variant', 'padding', 'actionsWrap'], props: { density: ['compact', 'normal', 'comfortable'] } },
+	card: { look: cardTheme, variants: ['variant', 'color', 'radius', 'elevation', 'padding', 'actionsWrap'], props: { density: ['compact', 'normal', 'comfortable'] } },
 	checkbox: { look: checkbox },
 	codeBlock: { look: codeBlock },
 	combobox: { look: combobox },
 	commandPalette: { look: commandPalette },
 	container: { look: container },
-	copyButton: { look: copyButton, variants: ['variant', 'size', 'shape'] },
+	copyButton: { look: copyButtonTheme, variants: buttonChoices },
 	descriptionList: { look: descriptionList },
 	diff: { look: diff },
 	disclosure: { look: disclosure },
@@ -77,10 +82,10 @@ const components = {
 	footer: { look: footer },
 	header: { look: header },
 	hint: { look: hint },
-	iconButton: { look: iconButton, variants: ['variant', 'size', 'shape'] },
+	iconButton: { look: iconButtonTheme, variants: buttonChoices },
 	input: { look: input },
 	link: action,
-	linkCard: { look: linkCard },
+	linkCard: { look: linkCardTheme, variants: ['variant', 'color', 'radius', 'elevation'] },
 	localeSuggestion: { look: localeSuggestion },
 	localeSwitcher: { look: localeSwitcher },
 	markdownEditor: { look: markdownEditor },

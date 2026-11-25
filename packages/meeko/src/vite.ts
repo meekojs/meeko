@@ -569,7 +569,7 @@ export function meeko(): Plugin {
 			])
 			await refreshComponentRegistry()
 		},
-		async handleHotUpdate({ file, server }) {
+		async handleHotUpdate({ file, modules, server }) {
 			const normalized = normalizePath(file)
 			const configFile = normalized.startsWith(`${normalizePath(root)}/meeko.config.`)
 			if (configFile) {
@@ -579,7 +579,16 @@ export function meeko(): Plugin {
 			}
 			if (isComponentSource(file, activeComponentDirectories)) {
 				await registryUpdate
-				// Keep the compiler's own component HMR and CSS update path for an edit.
+				// Keep the compiler's own component HMR and CSS update path for an edit, without the stylesheets of
+				// an earlier <style>: each edit of the CSS changes the hash of `?meeko-style=`, and the modules of
+				// the previous hash stay in the graph of the file once the new version of the component in the
+				// browser stops importing them. Its `&inline` string accepts no update, so Vite would take it for a
+				// dead end and reload the page; its CSS would be fetched again and put back the old rules. The
+				// importers are those of the browser's graph: these mixed nodes also count the SSR version of the
+				// component, which still imports the old hash until the next render on the server. The component
+				// itself stays in the update, so the server compiles it again and drops the old hash as well.
+				const client = server.environments?.client.moduleGraph
+				if (client) return modules.filter((node) => !(node.id && styleQuery.test(node.id) && !client.getModuleById(node.id)?.importers.size))
 				return
 			}
 			// A script of a module that the browser imported reloads it, as Meeko's own runtime does (see

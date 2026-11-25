@@ -3,7 +3,7 @@
 // of its trigger on the side it opens: --popover-from is where it starts, and the script of ../utils/popover.ts
 // gives --popover-offset, the only free number. Each property is set by one part only: the padding, the
 // shadow, the radius and the text change with the role, so they live in `role` and not in the base.
-import { tv } from 'tailwind-variants/lite'
+import { tv } from '../utils/theme'
 
 /** The focus ring of the trigger. */
 const focusRing = 'focus-visible:outline-(length:--ui-focus-ring-width) focus-visible:outline-focus focus-visible:outline-offset-(--ui-focus-ring-offset) focus-visible:outline-solid'

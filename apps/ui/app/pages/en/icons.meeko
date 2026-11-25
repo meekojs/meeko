@@ -20,7 +20,10 @@
 				<UIIcon name="lucide:search" />
 				Search the project
 			</p>
-			<UIButton variant="outline">
+			<UIButton
+				variant="outline"
+				color="neutral"
+			>
 				<UIIcon
 					name="lucide:trash-2"
 					label="Delete"
@@ -75,7 +78,8 @@
 		</p>
 		<DocsPreview>
 			<UIButton
-				variant="secondary"
+				variant="surface"
+				color="neutral"
 				on:click="() => (open.value = !open.value)"
 			>
 				<UIIcon
@@ -84,7 +88,8 @@
 				/>
 			</UIButton>
 			<UIButton
-				variant="secondary"
+				variant="surface"
+				color="neutral"
 				on:click="toggleMode"
 			>
 				<UIIcon

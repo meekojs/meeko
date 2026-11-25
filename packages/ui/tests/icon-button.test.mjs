@@ -26,7 +26,7 @@ async function render(context, template, { defaults, locale } = {}) {
 			.code.replaceAll('from "@meekojs/meeko/internal"', `from ${runtime('internal.js')}`)
 			.replaceAll('from "@meekojs/meeko"', `from ${runtime('index.js')}`)
 			.replace(/from ["']\.\/(\w+)\.meeko["']/g, 'from "./$1.ts"')
-			.replace(/from ["'](?:\.\.\/)+(utils|variants)\/([\w-]+)["']/g, (_, folder, utility) => `from ${JSON.stringify(new URL(`../dist/app/${folder}/${utility}.js`, import.meta.url).href)}`)
+			.replace(/from ["'](?:\.\.\/)+(utils|variants|theme(?:\/components)?)\/([\w-]+)["']/g, (_, folder, utility) => `from ${JSON.stringify(new URL(`../dist/app/${folder}/${utility}.js`, import.meta.url).href)}`)
 			.replace(/from ["']\.\/internal\/Icon\.meeko["']/g, 'from "./Icon.ts"')
 		await writeFile(`${directory}/${file}.ts`, code)
 	}
@@ -66,16 +66,19 @@ test('UIIconButton is a <button> named by its label, with its icon and a tooltip
 	assert.match(html, /role="tooltip"[^>]*>Cerrar<\/span>/)
 	// The icon of the package, hidden from the accessibility tree.
 	assert.match(html, new RegExp(`<svg[^>]*aria-hidden="true"[^>]*>\\s*<path d="${icons.close}"`))
-	// Ghost by default, square, of the size md.
-	for (const name of ['bg-transparent', 'border-transparent', 'p-0', 'min-w-(--ui-control-height-md)', 'min-h-(--ui-control-height-md)', 'aria-pressed:bg-primary-soft']) assert.ok(button.classes.includes(name), name)
+	// Neutral ghost by default, square, of the size md, with the primary accent when pressed.
+	for (const name of ['bg-transparent', 'border-transparent', 'text-neutral-11', 'p-0', 'rounded-md', 'min-w-(--ui-control-height-md)', 'min-h-(--ui-control-height-md)', 'leading-tight', 'aria-pressed:bg-primary-3']) assert.ok(button.classes.includes(name), name)
+	assert.ok(!button.classes.some((name) => name.startsWith('p-(')), 'no padding of a button with text')
 	assert.doesNotMatch(html, /undefined/)
 })
 
-test('UIIconButton variants, tone, size and shape are those of UIButton', async (context) => {
-	const html = await render(context, '<UIIconButton label="Borrar" icon="close" variant="primary" tone="danger" size="lg" shape="pill" />')
+test('UIIconButton variant, color, size and radius are those of UIButton', async (context) => {
+	const html = await render(context, '<UIIconButton label="Borrar" icon="close" variant="solid" color="danger" size="lg" radius="full" />')
 	const { classes } = element(html, 'button')
-	for (const name of ['bg-danger', 'min-w-(--ui-control-height-lg)', 'rounded-full', 'aria-pressed:bg-danger-hover']) assert.ok(classes.includes(name), name)
-	assert.ok(!classes.includes('bg-transparent'))
+	for (const name of ['bg-danger-9', 'text-danger-contrast', 'min-w-(--ui-control-height-lg)', 'min-h-(--ui-control-height-lg)', 'rounded-full', 'aria-pressed:bg-danger-10']) assert.ok(classes.includes(name), name)
+	for (const name of ['bg-transparent', 'rounded-md', 'aria-pressed:bg-primary-3']) assert.ok(!classes.includes(name), name)
+	const soft = element(await render(context, '<UIIconButton label="Avisar" icon="info" variant="soft" color="warning" size="xs" />'), 'button')
+	for (const name of ['bg-warning-3', 'text-warning-11', 'min-w-(--ui-control-height-xs)', 'aria-pressed:bg-warning-3', 'aria-pressed:border-warning-7']) assert.ok(soft.classes.includes(name), name)
 })
 
 test('UIIconButton pressed is aria-pressed of a toggle, and a link never takes it', async (context) => {
@@ -91,6 +94,22 @@ test('UIIconButton pressed is aria-pressed of a toggle, and a link never takes i
 	assert.equal(anchor.attributes['aria-pressed'], undefined)
 	assert.equal(anchor.attributes['aria-label'], 'Docs')
 	assert.equal(anchor.attributes.interestfor, element(link, 'span[^>]*role="tooltip"').attributes.id)
+})
+
+test('UIIconButton pressed keeps the accent border under the pointer, also in outline and surface', async (context) => {
+	const html = await render(context, '<UIIconButton label="A" icon="check" variant="outline" bind:pressed="true" /><UIIconButton label="B" icon="check" variant="surface" color="danger" bind:pressed="true" />')
+	const [outline, surface] = [...html.matchAll(/<button[^>]*class="([^"]*)"/g)].map(([, value]) => value.split(' '))
+	// `not-disabled:hover:border-*` of the catalog is more specific than `aria-pressed:border-*`: the pressed hover sets it again.
+	assert.ok(outline.includes('not-disabled:hover:border-control-border') && outline.includes('aria-pressed:border-primary-7'))
+	assert.ok(outline.includes('aria-pressed:not-disabled:hover:border-primary-7'), outline.join(' '))
+	assert.ok(surface.includes('not-disabled:hover:border-danger-7') && surface.includes('aria-pressed:not-disabled:hover:border-danger-7'), surface.join(' '))
+})
+
+test('UIIconButton keeps the line height of the recipe with a font size of the instance', async (context) => {
+	const html = await render(context, '<UIIconButton label="A" icon="check" class="text-sm" /><UIIconButton label="B" icon="check" class="leading-none" />')
+	const [sized, spaced] = [...html.matchAll(/<button[^>]*class="([^"]*)"/g)].map(([, value]) => value.split(' '))
+	assert.ok(sized.includes('text-sm') && !sized.includes('text-control-md') && sized.includes('leading-tight'), sized.join(' '))
+	assert.ok(spaced.includes('leading-none') && !spaced.includes('leading-tight'), spaced.join(' '))
 })
 
 test('UIIconButton loading and disabled: busy keeps the focus, disabled is the native state', async (context) => {
@@ -120,19 +139,23 @@ test('UIIconButton without tooltip keeps its name; its own id, icon path and sni
 test('UIIconButton takes class, ui and the variants of ui.defaults.iconButton; the instance wins', async (context) => {
 	const defaults = { iconButton: { variant: 'outline', size: 'sm', class: 'app-icon', ui: { icon: 'app-glyph', tooltip: 'app-tip' } } }
 	validateDefaults(defaults)
-	const html = await render(context, '<UIIconButton label="Uno" icon="close" /><UIIconButton label="Dos" icon="close" variant="secondary" class="mine" bind:ui="{ base: \'my-base\', icon: \'my-glyph\' }" />', { defaults })
+	const html = await render(context, '<UIIconButton label="Uno" icon="close" /><UIIconButton label="Dos" icon="close" variant="surface" class="mine" bind:ui="{ base: \'my-base\', icon: \'my-glyph\' }" />', { defaults })
 	const [first, second] = [...html.matchAll(/<button[^>]*class="([^"]*)"/g)].map(([, value]) => value.split(' '))
 	assert.ok(first.includes('border-control-border'), 'outline of ui.defaults')
 	assert.ok(first.includes('min-w-(--ui-control-height-sm)'), 'size of ui.defaults')
 	assert.ok(first.includes('app-icon'))
-	assert.ok(second.includes('bg-control'), 'the variant of the instance wins')
+	assert.ok(second.includes('bg-neutral-2'), 'the variant of the instance wins')
+	assert.ok(!second.includes('border-control-border'))
 	// As in every component: the slot base first, then the class of ui.defaults and the one of the instance.
 	assert.ok(second.includes('my-base'))
 	assert.ok(second.indexOf('app-icon') < second.indexOf('mine'), second.join(' '))
 	assert.match(html, /<svg[^>]*class="[^"]*app-glyph my-glyph"/)
 	assert.match(html, /role="tooltip"[^>]*class="[^"]*app-tip/)
-	assert.throws(() => validateDefaults({ iconButton: { tone: 'danger' } }), /unknown option defaults\.iconButton\.tone/)
-	assert.throws(() => validateDefaults({ iconButton: { variant: 'link' } }), /invalid defaults\.iconButton\.variant/)
+	assert.throws(() => validateDefaults({ iconButton: { tone: 'danger' } }), /unknown option defaults\.iconButton\.tone; iconButton accepts class, ui, variant, color, size, radius/)
+	assert.throws(() => validateDefaults({ iconButton: { shape: 'pill' } }), /unknown option defaults\.iconButton\.shape/)
+	assert.throws(() => validateDefaults({ iconButton: { variant: 'link' } }), /invalid defaults\.iconButton\.variant; use one of solid, soft, surface, outline, subtle, ghost/)
+	assert.throws(() => validateDefaults({ iconButton: { color: 'crimson' } }), /invalid defaults\.iconButton\.color/)
+	validateDefaults({ iconButton: { color: 'danger', radius: 'full', size: 'xl' } })
 	assert.throws(() => validateDefaults({ hint: { ui: { label: 'x' } } }), /unknown slot label in defaults\.hint\.ui; its slots are base, icon, tooltip/)
 })
 

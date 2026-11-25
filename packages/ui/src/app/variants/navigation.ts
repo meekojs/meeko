@@ -2,9 +2,8 @@
 // <UIPagination> and <UITableOfContents>. Each property is set by one part only; what a component decides
 // by itself (a group that folds, the next page, a nested entry…) lives in its own constant or tv(), so that
 // it never becomes a prop.
-import { tv } from 'tailwind-variants/lite'
-
-import { disabledBusy } from './button'
+import { disabledBusy } from '../theme/components/button'
+import { tv } from '../utils/theme'
 import { focusRing, focusRingInset } from './focus'
 
 /** No transition when the reader asks for less motion. */
@@ -155,14 +154,15 @@ export const pageNavigationNext = {
 
 /**
  * The look of <UIPagination>: the count, and at the end of the row the action that loads more or, in the
- * numbered mode, the list of pages. Pages and controls are buttons of `size: 'sm'` (variants/button): the
- * current page `primary`, the rest `ghost`; these slots only add what the button does not decide.
+ * numbered mode, the list of pages. Pages and controls are buttons of `size: 'sm'` (theme/components/button):
+ * the current page `solid` and `primary`, the rest `ghost` and `neutral`; these slots only add what the button
+ * does not decide.
  */
 export const pagination = tv({
 	slots: {
 		base: 'flex flex-wrap items-center justify-between gap-x-4 gap-y-2 font-sans',
 		count: 'm-0 text-sm text-text-soft [font-variant-numeric:tabular-nums]',
-		// An outline button (variants/button) at the end of the row, with a spinner while the next page loads.
+		// A neutral outline button (theme/components/button) at the end of the row, with a spinner while the next page loads.
 		action: ['ms-auto', disabledBusy],
 		list: 'my-0 me-0 ms-auto flex list-none flex-wrap items-center gap-1 p-0',
 		item: 'flex',

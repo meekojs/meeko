@@ -21,11 +21,16 @@
 	"exports": {
 		".": {
 			"types": "./dist/index.d.ts",
+			"style": "./src/app/styles/main.css",
 			"default": "./dist/index.js"
 		},
 		"./theme": {
 			"types": "./dist/app/theme/index.d.ts",
 			"default": "./dist/app/theme/index.js"
+		},
+		"./theme/hues": {
+			"types": "./dist/app/theme/base/hues.d.ts",
+			"default": "./dist/app/theme/base/hues.js"
 		},
 		"./runtime": {
 			"types": "./dist/runtime.d.ts",
@@ -39,9 +44,11 @@
 			"types": "./dist/editor/module.d.ts",
 			"default": "./dist/editor/module.js"
 		},
+		"./hues": "./src/app/styles/hues.css",
 		"./styles/code.css": "./src/app/styles/code.css",
 		"./styles/fonts.css": "./src/app/styles/fonts.css",
-		"./styles/prose.css": "./src/app/styles/prose.css"
+		"./styles/prose.css": "./src/app/styles/prose.css",
+		"./package.json": "./package.json"
 	},
 	"types": "./dist/index.d.ts",
 	"files": [
@@ -54,14 +61,16 @@
 		"THIRD_PARTY_NOTICES.md"
 	],
 	"scripts": {
-		"build": "node ../../scripts/build-package.mjs && node scripts/copy-components.mjs && node scripts/build-styles.mjs",
-		"build:styles": "node scripts/build-styles.mjs --watch",
+		"build": "node ../../scripts/build-package.mjs && node scripts/copy-components.mjs",
 		"check": "tsc -p tsconfig.json --noEmit",
+		"generate:appearance": "node scripts/build-appearance.mjs",
+		"generate:hues": "node scripts/build-hues.mjs",
 		"prepack": "pnpm run build",
 		"test": "pnpm run build && node --test tests/*.test.mjs",
 		"test:e2e": "pnpm run build && pnpm -F meeko-ui-site build && pnpm -F meeko-i18n-site build && node --test --test-concurrency=1 tests/*.e2e.mjs"
 	},
 	"dependencies": {
+		"@tailwindcss/vite": "catalog:",
 		"tailwind-variants": "catalog:"
 	},
 	"devDependencies": {
@@ -77,13 +86,11 @@
 		"@meekojs/prettier-plugin": "workspace:*",
 		"@milkdown/crepe": "catalog:",
 		"@milkdown/kit": "catalog:",
-		"@tailwindcss/postcss": "catalog:",
-		"@tailwindcss/vite": "catalog:",
+		"@radix-ui/colors": "catalog:",
 		"@types/node": "catalog:",
 		"eslint": "catalog:",
 		"jiti": "catalog:",
 		"playwright-core": "catalog:",
-		"postcss": "catalog:",
 		"prettier": "catalog:",
 		"prettier-plugin-css-order": "catalog:",
 		"prettier-plugin-packagejson": "catalog:",
@@ -104,7 +111,8 @@
 		"@lezer/highlight": "^1.2.5",
 		"@meekojs/meeko": ">=1.8 <2",
 		"@milkdown/crepe": "^7.23.0",
-		"@milkdown/kit": "^7.23.0"
+		"@milkdown/kit": "^7.23.0",
+		"tailwindcss": "^4.3.5"
 	},
 	"peerDependenciesMeta": {
 		"@codemirror/lang-css": {

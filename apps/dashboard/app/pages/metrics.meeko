@@ -310,6 +310,7 @@
 					<UIButton
 						type="submit"
 						variant="outline"
+						color="neutral"
 					>
 						{t('metrics.apply')}
 					</UIButton>
@@ -583,6 +584,7 @@
 									<UIButton
 										size="sm"
 										variant="outline"
+										color="neutral"
 										on:click="() => void toggleReviewed(item)"
 									>
 										{item.reviewedAt ? t('metrics.comments.reopen') : t('metrics.comments.review')}
@@ -591,6 +593,7 @@
 									<UIButton
 										size="sm"
 										variant="ghost"
+										color="neutral"
 										on:click="() => askDelete(item)"
 									>
 										{t('metrics.comments.delete')}
@@ -607,6 +610,7 @@
 							<UIButton
 								size="sm"
 								variant="outline"
+								color="neutral"
 								bind:disabled="page.value <= 1 || loadingComments.value"
 								on:click="() => goTo(page.value - 1)"
 							>
@@ -616,6 +620,7 @@
 							<UIButton
 								size="sm"
 								variant="outline"
+								color="neutral"
 								bind:disabled="page.value >= pages.value || loadingComments.value"
 								on:click="() => goTo(page.value + 1)"
 							>
@@ -647,12 +652,13 @@
 			<snippet name="footer">
 				<UIButton
 					variant="ghost"
+					color="neutral"
 					on:click="() => (confirming.value = false)"
 				>
 					{t('actions.cancel')}
 				</UIButton>
 				<UIButton
-					tone="danger"
+					color="danger"
 					bind:disabled="answering.value"
 					on:click="confirmDelete"
 				>

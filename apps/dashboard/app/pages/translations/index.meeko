@@ -214,6 +214,7 @@
 								<UILink
 									size="sm"
 									variant="outline"
+									color="neutral"
 									bind:href="localePath('/translations/' + row.original.id)"
 								>
 									{t('translations.compare')}
@@ -223,6 +224,7 @@
 									if:when="row.translation && row.translation.removedAt === null"
 									size="sm"
 									variant="ghost"
+									color="neutral"
 									bind:href="localePath('/sources/' + row.translation?.id + '/edit')"
 								>
 									{t('translations.editShort')}

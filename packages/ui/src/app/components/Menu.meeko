@@ -8,10 +8,10 @@
 
 	import type { MenuSnippets, UIMenuItem, UIMenuLink, UIMenuProps } from '../types/menu'
 
+	import { buttonTheme } from '../theme/components/button'
 	import { uiTheme } from '../utils/defaults'
 	import { icons } from '../utils/icons'
 	import { uiMessages } from '../utils/messages'
-	import { button } from '../variants/button'
 	import { menu } from '../variants/menu'
 	import * as Icon from './internal/Icon.meeko'
 	import * as Popover from './Popover.meeko'
@@ -64,9 +64,11 @@
 	/** A trigger without text or content of its own is a square button with three dots. */
 	const iconOnly = computed(() => props.triggerLabel === undefined && !snippets.trigger)
 
+	// The trigger is a neutral button: a surface one with text, a ghost one with only the icon.
 	const triggerClass = computed(() =>
-		button({
-			variant: props.variant ?? (iconOnly.value ? 'ghost' : 'secondary'),
+		buttonTheme({
+			variant: props.variant ?? (iconOnly.value ? 'ghost' : 'surface'),
+			color: props.color ?? 'neutral',
 			size: props.size,
 			iconOnly: iconOnly.value,
 			class: [classes.trigger(), theme.ui.trigger],

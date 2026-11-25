@@ -1,9 +1,8 @@
 // The look of <UITable>. Each property is set by one part only: the padding of the cells by `density`, the grid
-// by `layout`. A <UICard> also reaches the cells of a table in its body (variants/card), with selectors more
+// by `layout`. A <UICard> also reaches the cells of a table in its body (theme/components/card), with selectors more
 // specific than these.
-import { tv } from 'tailwind-variants/lite'
-
-import { inProse } from './card'
+import { inProse } from '../theme/components/card'
+import { tv } from '../utils/theme'
 import { focusRing } from './focus'
 
 /** The line under a row; the last row of the body, and the foot, have none. */

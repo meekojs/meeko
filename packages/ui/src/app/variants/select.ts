@@ -2,7 +2,7 @@
 // of ./input.ts, which takes `clearable` for the room of the clear button. The list of <UICombobox> is the
 // content of a <UIPopover>; the list of <UISelect> is the browser's own, which select.css paints where the
 // browser lets it (`appearance: base-select`), placeholder included. Each property is set by one part only.
-import { tv } from 'tailwind-variants/lite'
+import { tv } from '../utils/theme'
 
 /** The focus ring inside a box that clips it, such as the clear button at the end of the trigger. */
 const insetRing = 'focus-visible:outline-(length:--ui-focus-ring-width) focus-visible:outline-focus focus-visible:-outline-offset-(--ui-focus-ring-offset) focus-visible:outline-solid'

@@ -1,7 +1,7 @@
 // The look of <UITabs>: a row of tabs over a line, with an indicator under the chosen one, and its panels.
 // The ring is inside, since the row clips its overflow. What stays in tabs.css: the pseudo-elements of the
 // View Transition that moves the indicator, which belong to the document. Each property is set by one part only.
-import { tv } from 'tailwind-variants/lite'
+import { tv } from '../utils/theme'
 
 /** The keyboard ring, inside the element. */
 const ring = 'focus-visible:outline-(length:--ui-focus-ring-width) focus-visible:outline-solid focus-visible:outline-focus focus-visible:-outline-offset-(--ui-focus-ring-offset)'

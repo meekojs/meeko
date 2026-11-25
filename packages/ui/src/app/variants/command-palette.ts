@@ -3,8 +3,7 @@
 // `trigger` and `item` snippets are the app's markup: the trigger paints a direct <svg> as the icon, a direct
 // <span> with <kbd> as the shortcut and any other direct <span> as the label; a row paints <strong> as the title
 // and <small> as the excerpt; the dialog paints every <mark> as what was found.
-import { tv } from 'tailwind-variants/lite'
-
+import { tv } from '../utils/theme'
 import { modalSurface } from './modal'
 
 /** The focus ring of the trigger and the close button. */

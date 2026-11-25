@@ -50,6 +50,7 @@
 					<UIButton
 						size="sm"
 						variant="outline"
+						color="neutral"
 					>
 						Reintentar
 					</UIButton>
@@ -58,6 +59,7 @@
 			<UIButton
 				if:when="dismissed.value"
 				variant="outline"
+				color="neutral"
 				on:click="() => (dismissed.value = false)"
 			>
 				Volver a mostrar el aviso
@@ -96,12 +98,14 @@
 			<UIButton on:click="() => toast.add({ text: 'Cambios guardados', tone: 'success', duration: 5000 })">Avisar del guardado</UIButton>
 			<UIButton
 				variant="outline"
+				color="neutral"
 				on:click="() => toast.add({ text: 'No se pudo publicar', tone: 'danger', duration: 0 })"
 			>
 				Avisar de un error
 			</UIButton>
 			<UIButton
 				variant="ghost"
+				color="neutral"
 				on:click="() => toast.clear()"
 			>
 				Cerrar todos

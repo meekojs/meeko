@@ -1,5 +1,5 @@
 import { defineMeekoModule } from '@meekojs/meeko/framework'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -8,6 +8,7 @@ import type { UIOptions } from './options'
 
 import { normalizeDefaults } from './defaults'
 import { messagesConfig, tokenStyles, validateOptions } from './options'
+import { importsEntry, insertTokens, tailwindPlugins } from './styles'
 
 declare module '@meekojs/meeko/framework' {
 	interface MeekoConfig {
@@ -34,7 +35,6 @@ export default defineMeekoModule<UIOptions>({
 		const source = new URL('../src/', import.meta.url)
 		const useSource = meeko.dev && existsSync(new URL('app/components', source))
 		const app = new URL('app/', useSource ? source : import.meta.url)
-		const styles = useSource ? new URL('styles/main.css', app) : new URL('./styles/main.css', import.meta.url)
 		const plugin = (name: string) => new URL(`plugins/${name}.${useSource ? 'ts' : 'js'}`, app)
 
 		if (useSource) {
@@ -47,6 +47,13 @@ export default defineMeekoModule<UIOptions>({
 				}),
 			})
 		}
+		// Meeko keeps module packages out of the optimizer, so Vite would find the recipes' runtime only on the
+		// first visit, optimize it then and reload the page in the middle of it.
+		if (meeko.dev)
+			meeko.addVitePlugin({
+				name: 'meeko-ui:optimize-deps',
+				config: () => ({ optimizeDeps: { include: ['@meekojs/ui > tailwind-variants/lite', '@meekojs/ui > tailwind-variants/config'] } }),
+			})
 
 		meeko.addComponentsDir(new URL('components', app), {
 			prefix: 'UI',
@@ -54,21 +61,31 @@ export default defineMeekoModule<UIOptions>({
 			generateTypesInDev: useSource,
 		})
 
-		// Registered first so that its layer goes before any layer of the app, and loses to it.
+		// Plain CSS, registered first: its `@layer base, ui-base` puts the base right after Tailwind's preflight
+		// and before the layers of the app's sheet, which wins over it.
 		if (options.base !== false) meeko.addStylesheet(new URL('../src/app/styles/base.css', import.meta.url))
-		// Vite compiles the source during workspace development. Published UI ships plain CSS.
-		meeko.addStylesheet(styles)
+		// The rest of the CSS of UI is the entry `@import '@meekojs/ui'`, which the app's sheet compiles with Tailwind.
+		const appStyles = join(meeko.rootDir, 'app', 'styles', 'main.css')
+		// The sheet may import UI through a local sheet of its own (`@import './ui.css'`), which is followed too.
+		if (meeko.dev && !importsEntry(existsSync(appStyles) ? readFileSync(appStyles, 'utf8') : undefined, appStyles)) meeko.warn("app/styles/main.css no importa @meekojs/ui: los componentes no tendrán estilos. Empiece la hoja con @import 'tailwindcss'; @import '@meekojs/ui';")
 		// With CORS: fonts always load with it, and a document with an opaque origin, such as a sandboxed preview, is another origin.
 		meeko.addPublicFile(fontPath, () => readFile(new URL(`../src/app/styles/fonts/${fontFile}`, import.meta.url)), { headers: { 'Access-Control-Allow-Origin': '*' } })
 		meeko.addHead({ link: [{ rel: 'preload', href: `/${fontPath}`, as: 'font', type: 'font/woff2', crossorigin: 'anonymous' }] })
-		const tokensFile = fileURLToPath(styles).replaceAll('\\', '/').toLowerCase()
 		const customTokens = tokenStyles(options.tokens)
+		// Before Tailwind inlines the imports: in the sheet that imports UI, directly or through its local imports,
+		// after its imports and before its rules. Tailwind reads the imported sheets itself, so only the sheet that
+		// Vite loads passes through this transform.
 		if (customTokens)
 			meeko.addVitePlugin({
 				name: 'meeko-ui:tokens',
 				enforce: 'pre',
-				transform(code: string, id: string) {
-					if (id.split('?')[0]?.replaceAll('\\', '/').toLowerCase() === tokensFile) return { code: code + customTokens, map: null }
+				transform: {
+					order: 'pre',
+					handler(code: string, id: string) {
+						if (!/\.css(?:$|\?)/.test(id)) return
+						const css = insertTokens(code, customTokens, id.replace(/[?#].*$/, ''))
+						if (css !== undefined) return { code: css, map: null }
+					},
 				},
 			})
 		// Only the validated plain values reach the client, where every page reads them.
@@ -94,6 +111,8 @@ export default defineMeekoModule<UIOptions>({
 		meeko.addPlugin(plugin('toast'))
 		// The width of the gutter of the scrollbar, `--ui-scrollbar-gutter`, for the locks of the page and for the app.
 		meeko.addPlugin(plugin('scrollbar-gutter'))
-		if (useSource) return import('@tailwindcss/vite').then(({ default: tailwind }) => meeko.addVitePlugin(tailwind()))
+		// The one compilation of the app's sheet, with the classes of UI and those of the app. Loaded only when
+		// Vite resolves its configuration; it steps aside if the app already registers @tailwindcss/vite.
+		meeko.addVitePlugin(tailwindPlugins())
 	},
 })

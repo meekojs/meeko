@@ -4,14 +4,40 @@
  * `reference` emits no variable: the tokens are already in tokens.css. Each section follows a group of
  * tokens.css; the last one names the tokens of the controls. A token without a Tailwind namespace
  * (durations, control heights…) is read with `prop-(--ui-token)`.
+ *
+ * It adds to Tailwind's default theme instead of replacing it: the app keeps bg-red-500, md: and the rest.
+ * Where a default would change a utility of UI, it is removed with `initial` below.
  */
 @theme inline reference {
-	--*: initial;
+	/*
+	 * What the defaults of Tailwind would add to the utilities of UI: a line height in each text-* size (UI sets
+	 * the size alone, and the line height with leading-*), and a duration and an easing in every transition-*
+	 * (UI gives them with duration-(--ui-duration-*) and ease-*). The default fonts of the preflight stay those of
+	 * Tailwind: base.css sets the font of the page.
+	 */
+	--text-xs--line-height: initial;
+	--text-sm--line-height: initial;
+	--text-base--line-height: initial;
+	--text-lg--line-height: initial;
+	--text-xl--line-height: initial;
+	--text-2xl--line-height: initial;
+	--text-3xl--line-height: initial;
+	--text-4xl--line-height: initial;
+	--text-5xl--line-height: initial;
+	--text-6xl--line-height: initial;
+	--default-transition-duration: initial;
+	--default-transition-timing-function: initial;
+	--default-font-family: initial;
+	--default-font-feature-settings: initial;
+	--default-font-variation-settings: initial;
+	--default-mono-font-family: initial;
+	--default-mono-font-feature-settings: initial;
+	--default-mono-font-variation-settings: initial;
 
 	/* Space: tokens.css sits on a 0.25rem grid, so p-1.5 is --ui-space-1-5 */
 	--spacing: var(--ui-space-1);
 
-	/* Colors: the semantic tokens of tokens.css, never the palette steps */
+	/* Colors: the semantic tokens of tokens.css */
 	--color-bg: var(--ui-color-bg);
 	--color-bg-subtle: var(--ui-color-bg-subtle);
 	--color-surface: var(--ui-color-surface);
@@ -71,12 +97,111 @@
 	--color-warning-contrast-hover: var(--ui-color-warning-contrast-hover);
 	--color-danger-contrast: var(--ui-color-danger-contrast);
 	--color-danger-contrast-hover: var(--ui-color-danger-contrast-hover);
-	--color-cyan-contrast: var(--ui-color-cyan-contrast);
-	--color-cyan-contrast-hover: var(--ui-color-cyan-contrast-hover);
-	--color-orange-contrast: var(--ui-color-orange-contrast);
-	--color-orange-contrast-hover: var(--ui-color-orange-contrast-hover);
-	--color-pink-contrast: var(--ui-color-pink-contrast);
-	--color-pink-contrast-hover: var(--ui-color-pink-contrast-hover);
+
+	/*
+	 * The twelve steps of each semantic color of the appearance catalog (theme/base): bg-primary-9,
+	 * text-danger-11… --color-<color>-contrast, the text on step 9, is above for the scales that had it.
+	 */
+	--color-primary-1: var(--ui-color-primary-1);
+	--color-primary-2: var(--ui-color-primary-2);
+	--color-primary-3: var(--ui-color-primary-3);
+	--color-primary-4: var(--ui-color-primary-4);
+	--color-primary-5: var(--ui-color-primary-5);
+	--color-primary-6: var(--ui-color-primary-6);
+	--color-primary-7: var(--ui-color-primary-7);
+	--color-primary-8: var(--ui-color-primary-8);
+	--color-primary-9: var(--ui-color-primary-9);
+	--color-primary-10: var(--ui-color-primary-10);
+	--color-primary-11: var(--ui-color-primary-11);
+	--color-primary-12: var(--ui-color-primary-12);
+	--color-secondary-1: var(--ui-color-secondary-1);
+	--color-secondary-2: var(--ui-color-secondary-2);
+	--color-secondary-3: var(--ui-color-secondary-3);
+	--color-secondary-4: var(--ui-color-secondary-4);
+	--color-secondary-5: var(--ui-color-secondary-5);
+	--color-secondary-6: var(--ui-color-secondary-6);
+	--color-secondary-7: var(--ui-color-secondary-7);
+	--color-secondary-8: var(--ui-color-secondary-8);
+	--color-secondary-9: var(--ui-color-secondary-9);
+	--color-secondary-10: var(--ui-color-secondary-10);
+	--color-secondary-11: var(--ui-color-secondary-11);
+	--color-secondary-12: var(--ui-color-secondary-12);
+	--color-secondary-contrast: var(--ui-color-secondary-contrast);
+	--color-neutral-1: var(--ui-color-neutral-1);
+	--color-neutral-2: var(--ui-color-neutral-2);
+	--color-neutral-3: var(--ui-color-neutral-3);
+	--color-neutral-4: var(--ui-color-neutral-4);
+	--color-neutral-5: var(--ui-color-neutral-5);
+	--color-neutral-6: var(--ui-color-neutral-6);
+	--color-neutral-7: var(--ui-color-neutral-7);
+	--color-neutral-8: var(--ui-color-neutral-8);
+	--color-neutral-9: var(--ui-color-neutral-9);
+	--color-neutral-10: var(--ui-color-neutral-10);
+	--color-neutral-11: var(--ui-color-neutral-11);
+	--color-neutral-12: var(--ui-color-neutral-12);
+	--color-neutral-contrast: var(--ui-color-neutral-contrast);
+	--color-success-1: var(--ui-color-success-1);
+	--color-success-2: var(--ui-color-success-2);
+	--color-success-3: var(--ui-color-success-3);
+	--color-success-4: var(--ui-color-success-4);
+	--color-success-5: var(--ui-color-success-5);
+	--color-success-6: var(--ui-color-success-6);
+	--color-success-7: var(--ui-color-success-7);
+	--color-success-8: var(--ui-color-success-8);
+	--color-success-9: var(--ui-color-success-9);
+	--color-success-10: var(--ui-color-success-10);
+	--color-success-11: var(--ui-color-success-11);
+	--color-success-12: var(--ui-color-success-12);
+	--color-info-1: var(--ui-color-info-1);
+	--color-info-2: var(--ui-color-info-2);
+	--color-info-3: var(--ui-color-info-3);
+	--color-info-4: var(--ui-color-info-4);
+	--color-info-5: var(--ui-color-info-5);
+	--color-info-6: var(--ui-color-info-6);
+	--color-info-7: var(--ui-color-info-7);
+	--color-info-8: var(--ui-color-info-8);
+	--color-info-9: var(--ui-color-info-9);
+	--color-info-10: var(--ui-color-info-10);
+	--color-info-11: var(--ui-color-info-11);
+	--color-info-12: var(--ui-color-info-12);
+	--color-warning-1: var(--ui-color-warning-1);
+	--color-warning-2: var(--ui-color-warning-2);
+	--color-warning-3: var(--ui-color-warning-3);
+	--color-warning-4: var(--ui-color-warning-4);
+	--color-warning-5: var(--ui-color-warning-5);
+	--color-warning-6: var(--ui-color-warning-6);
+	--color-warning-7: var(--ui-color-warning-7);
+	--color-warning-8: var(--ui-color-warning-8);
+	--color-warning-9: var(--ui-color-warning-9);
+	--color-warning-10: var(--ui-color-warning-10);
+	--color-warning-11: var(--ui-color-warning-11);
+	--color-warning-12: var(--ui-color-warning-12);
+	--color-danger-1: var(--ui-color-danger-1);
+	--color-danger-2: var(--ui-color-danger-2);
+	--color-danger-3: var(--ui-color-danger-3);
+	--color-danger-4: var(--ui-color-danger-4);
+	--color-danger-5: var(--ui-color-danger-5);
+	--color-danger-6: var(--ui-color-danger-6);
+	--color-danger-7: var(--ui-color-danger-7);
+	--color-danger-8: var(--ui-color-danger-8);
+	--color-danger-9: var(--ui-color-danger-9);
+	--color-danger-10: var(--ui-color-danger-10);
+	--color-danger-11: var(--ui-color-danger-11);
+	--color-danger-12: var(--ui-color-danger-12);
+
+	/* The alpha gray of Radix, over any background: the glass variant. The raw hues are in hues.css. */
+	--color-gray-a1: var(--ui-color-gray-a1);
+	--color-gray-a2: var(--ui-color-gray-a2);
+	--color-gray-a3: var(--ui-color-gray-a3);
+	--color-gray-a4: var(--ui-color-gray-a4);
+	--color-gray-a5: var(--ui-color-gray-a5);
+	--color-gray-a6: var(--ui-color-gray-a6);
+	--color-gray-a7: var(--ui-color-gray-a7);
+	--color-gray-a8: var(--ui-color-gray-a8);
+	--color-gray-a9: var(--ui-color-gray-a9);
+	--color-gray-a10: var(--ui-color-gray-a10);
+	--color-gray-a11: var(--ui-color-gray-a11);
+	--color-gray-a12: var(--ui-color-gray-a12);
 
 	/* Families */
 	--font-sans: var(--ui-font-sans);
@@ -153,9 +278,11 @@
 	--container-4k: var(--ui-container-4k);
 
 	/* Controls: the text of buttons and inputs (`-md`: text-control is the color --ui-color-control), and the busy spinner */
+	--text-control-xs: var(--ui-control-font-size-xs);
 	--text-control-sm: var(--ui-control-font-size-sm);
 	--text-control-md: var(--ui-control-font-size);
 	--text-control-lg: var(--ui-control-font-size-lg);
+	--text-control-xl: var(--ui-control-font-size-xl);
 	--font-weight-control: var(--ui-control-font-weight);
 	--animate-spin: meeko-ui-spin var(--ui-duration-spin) linear infinite;
 

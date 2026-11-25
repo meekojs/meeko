@@ -2,8 +2,10 @@
 	import { englishExamples as examples } from '../../utils/examples.en'
 
 	const count = signal(0)
-	const variants = ['outline', 'soft', 'solid', 'elevated'] as const
-	const variant = signal<(typeof variants)[number] | null>('outline')
+	const variants = ['surface', 'outline', 'soft', 'subtle', 'solid', 'glass', 'plain'] as const
+	const colors = ['neutral', 'primary', 'secondary', 'success', 'info', 'warning', 'danger'] as const
+	const variant = signal<(typeof variants)[number] | null>('surface')
+	const color = signal<(typeof colors)[number] | null>('neutral')
 </script>
 
 <template>
@@ -29,16 +31,34 @@
 					/>
 				</snippet>
 			</UIField>
+			<UIField
+				id="card-color"
+				label="Color"
+			>
+				<snippet
+					name="default"
+					params="id, describedBy"
+				>
+					<UISelect
+						model="color"
+						bind:options="colors"
+						bind:id="id"
+						bind:describedBy="describedBy"
+					/>
+				</snippet>
+			</UIField>
 		</div>
 		<UICard
 			title="Your workspace"
 			description="A card controlled by props, with reactive content."
-			bind:variant="variant.value ?? 'outline'"
+			bind:variant="variant.value ?? 'surface'"
+			bind:color="color.value ?? 'neutral'"
 		>
 			<p role="status">Saved changes: {count.value}</p>
 			<snippet name="footer">
 				<UIButton
-					variant="secondary"
+					variant="surface"
+					color="neutral"
 					on:click="() => count.value++"
 				>
 					Save change
@@ -47,9 +67,8 @@
 		</UICard>
 		<div class="docs-grid">
 			<UICard
-				title="Outline"
-				description="A defined border to separate content."
-				variant="outline"
+				title="Surface"
+				description="The default surface, with a border."
 			>
 				<p>Project details and related content.</p>
 			</UICard>
@@ -64,13 +83,14 @@
 				title="Solid"
 				description="The accent color to highlight content."
 				variant="solid"
+				color="primary"
 			>
 				<p>A relevant message for the team.</p>
 			</UICard>
 			<UICard
-				title="Elevated"
+				title="Elevation"
 				description="A surface raised with a shadow."
-				variant="elevated"
+				elevation="md"
 			>
 				<p>Content that needs to stand out from the background.</p>
 			</UICard>
@@ -98,40 +118,79 @@
 			the actions.
 		</p>
 		<h2 id="appearance">Appearance</h2>
+		<p>
+			The look combines a treatment,
+			<code>variant</code>
+			(<code>surface</code>,
+			<code>outline</code>, <code>soft</code>, <code>subtle</code>, <code>solid</code>,
+			<code>glass</code>
+			or
+			<code>plain</code>), with a semantic color,
+			<code>color</code>
+			(<code>primary</code>,
+			<code>secondary</code>, <code>neutral</code>, <code>success</code>, <code>info</code>,
+			<code>warning</code>
+			or
+			<code>danger</code>). Without them it is
+			<code>surface</code>
+			and
+			<code>neutral</code>.
+			<code>radius</code>
+			goes from
+			<code>none</code>
+			to
+			<code>full</code>
+			(<code>lg</code>
+			by default) and
+			<code>elevation</code>
+			adds a shadow. It is the
+			<code>cardTheme</code>
+			recipe of
+			<code>@meekojs/ui/theme</code>: your
+			<code>class</code>
+			is merged with Tailwind Merge and wins over the utility of the recipe that sets the same property.
+		</p>
 		<DocsPreview>
 			<UICard
 				title="Weekly summary"
-				bind:appearance="{ variant: 'surface', color: 'primary', radius: 'xl', elevation: 'md' }"
+				color="primary"
+				radius="xl"
+				elevation="md"
 			>
 				3 projects updated
 			</UICard>
 			<UICard
 				title="outline"
-				bind:appearance="{ variant: 'outline', color: 'primary' }"
+				variant="outline"
+				color="primary"
 			>
 				3 projects updated
 			</UICard>
 			<UICard
 				title="glass"
-				bind:appearance="{ variant: 'glass', color: 'primary' }"
+				variant="glass"
+				color="primary"
 			>
 				3 projects updated
 			</UICard>
 			<UICard
 				title="plain"
-				bind:appearance="{ variant: 'plain', color: 'primary' }"
+				variant="plain"
+				color="primary"
 			>
 				3 projects updated
 			</UICard>
 		</DocsPreview>
-		<DocsCode bind:code="examples.cardAppearance" />
+		<DocsCode bind:code="examples.cardTheme" />
 		<DocsApi
 			bind:rows="[
 				{ name: 'title / description', type: 'string', description: 'Optional header text.' },
-				{ name: 'appearance', type: 'CardAppearance', default: '—', description: 'Variant, color, radius and elevation from the appearance catalog.' },
-				{ name: 'variant', type: 'outline | soft | solid | elevated', default: 'outline', description: 'Visual variant; supports ui.defaults.card.' },
+				{ name: 'variant', type: 'surface | outline | soft | subtle | solid | glass | plain', default: 'surface', description: 'Visual treatment; plain paints no background, border or color. Supports ui.defaults.card.' },
+				{ name: 'color', type: 'primary | secondary | neutral | success | info | warning | danger', default: 'neutral', description: 'Semantic color; supports ui.defaults.card.' },
+				{ name: 'radius / elevation', type: 'none … full / none … 2xl', default: 'lg / —', description: 'Corner radius and shadow; support ui.defaults.card.' },
+				{ name: 'padding / density', type: 'none | sm | md | lg / compact | normal | comfortable', default: 'md / normal', description: 'Space between the content and the edge; padding wins over density.' },
 				{ name: 'actionsWrap', type: 'inline | below | auto', default: 'inline', description: 'Where the actions go; auto moves them down in a narrow card and supports ui.defaults.card.' },
-				{ name: 'class', type: 'string', description: 'Additional classes.' },
+				{ name: 'class', type: 'string', description: 'Additional classes, merged with Tailwind Merge after those of the recipe.' },
 			]"
 		/>
 		<p>
@@ -162,7 +221,8 @@
 		>
 			<snippet name="actions">
 				<UIButton
-					variant="secondary"
+					variant="surface"
+					color="neutral"
 					size="sm"
 				>
 					Export
@@ -179,7 +239,8 @@
 			>
 				<snippet name="actions">
 					<UIButton
-						variant="secondary"
+						variant="surface"
+						color="neutral"
 						size="sm"
 					>
 						Export
@@ -195,7 +256,8 @@
 			>
 				<snippet name="actions">
 					<UIButton
-						variant="secondary"
+						variant="surface"
+						color="neutral"
 						size="sm"
 					>
 						Export

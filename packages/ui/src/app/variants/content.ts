@@ -2,9 +2,8 @@
 // What dresses HTML they do not write (a snapshot inside <UIProse>, the spans of Shiki) stays in prose.css and
 // code.css. Each property is set by one part only; what a component decides by itself (its verdict, the state of
 // the copy button, the kind of a line) lives in its own constant, so that it never becomes a prop.
-import { tv } from 'tailwind-variants/lite'
-
-import { inProse } from './card'
+import { inProse } from '../theme/components/card'
+import { tv } from '../utils/theme'
 import { focusRing, focusRingInset } from './focus'
 
 /** No transition when the reader asks for less motion. */

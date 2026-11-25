@@ -1,7 +1,7 @@
 // The look of <UISlider>: a label over a native range. WebKit and Blink have no pseudo-element for the
 // filled part of the track, so the component gives its position in --slider-fill and the track paints it
 // with a gradient; Firefox has ::-moz-range-progress.
-import { tv } from 'tailwind-variants/lite'
+import { tv } from '../utils/theme'
 
 export const slider = tv({
 	slots: {

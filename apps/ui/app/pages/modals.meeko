@@ -28,13 +28,15 @@
 		<div class="docs-actions">
 			<UIButton on:click="ask">Abrir confirmación</UIButton>
 			<UIButton
-				variant="secondary"
+				variant="surface"
+				color="neutral"
 				on:click="() => (opened.value = true)"
 			>
 				Modal declarativo
 			</UIButton>
 			<UIButton
-				variant="secondary"
+				variant="surface"
+				color="neutral"
 				on:click="() => (locked.value = true)"
 			>
 				Cierre protegido
@@ -116,15 +118,16 @@
 		<DocsPreview id="confirm-preview">
 			<UIButton
 				id="confirm-neutral"
-				variant="secondary"
+				variant="surface"
+				color="neutral"
 				on:click="() => askConfirm(false)"
 			>
 				Publicar
 			</UIButton>
 			<UIButton
 				id="confirm-danger"
-				tone="danger"
-				variant="secondary"
+				color="danger"
+				variant="surface"
 				on:click="() => askConfirm(true)"
 			>
 				Eliminar el proyecto

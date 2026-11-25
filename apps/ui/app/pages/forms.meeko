@@ -53,6 +53,7 @@
 					<UIButton type="submit">Guardar nombre</UIButton>
 					<UIButton
 						variant="outline"
+						color="neutral"
 						on:click="reset"
 					>
 						Restablecer

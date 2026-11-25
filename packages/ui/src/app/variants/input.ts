@@ -2,9 +2,8 @@
 // <UICombobox>. Each property is set by one part only: the height is the only one that changes between a
 // line and a box of text, so it lives in `multiline` and not in the base, and the end padding makes room for
 // the clear button of a `clearable` trigger, so it lives out of the base too.
-import { tv } from 'tailwind-variants/lite'
-
 import { inputAppearance, type InputAppearance } from '../theme/recipes'
+import { mergeClasses, tv } from '../utils/theme'
 
 /** Border, background, text, hover, placeholder, invalid and focus of every control that looks like a field. */
 const structure = [
@@ -94,16 +93,7 @@ export const inputReveal = tv({
 
 /** Aplica el catálogo a un campo sin cambiar el espacio reservado para reveal. */
 export function inputWithAppearance(appearance: InputAppearance, reveal: boolean, className?: string): string {
-	return [
-		...structure,
-		disabled,
-		'border-solid not-aria-[invalid=true]:border-control-border',
-		appearance.variant === 'ghost' ? 'border-x-0 border-t-0' : undefined,
-		reveal ? '[padding-inline-end:var(--ui-control-height-md)]' : end,
-		inputAppearance(appearance),
-		'placeholder:text-(color:--ui-12) placeholder:opacity-100',
-		className,
-	].filter(Boolean).join(' ')
+	return mergeClasses(structure, disabled, 'border-solid not-aria-[invalid=true]:border-control-border', appearance.variant === 'ghost' ? 'border-x-0 border-t-0' : undefined, reveal ? '[padding-inline-end:var(--ui-control-height-md)]' : end, inputAppearance(appearance), 'placeholder:text-text-soft placeholder:opacity-100', className)
 }
 
 /**

@@ -172,7 +172,8 @@
 				<div class="dash-tight">
 					<div class="dash-actions">
 						<UIButton
-							variant="secondary"
+							variant="surface"
+							color="neutral"
 							bind:disabled="busy.value"
 							on:click="importSources"
 						>
@@ -303,6 +304,7 @@
 							if:when="column.key === 'active' && !row.active"
 							size="sm"
 							variant="outline"
+							color="neutral"
 							bind:disabled="busy.value || activating.value"
 							on:click="() => askActivate(row)"
 						>
@@ -333,6 +335,7 @@
 			<snippet name="footer">
 				<UIButton
 					variant="ghost"
+					color="neutral"
 					on:click="() => (confirming.value = false)"
 				>
 					{t('actions.cancel')}
@@ -387,6 +390,7 @@
 			<snippet name="footer">
 				<UIButton
 					variant="ghost"
+					color="neutral"
 					on:click="() => (publishing.value = false)"
 				>
 					{t('actions.cancel')}

@@ -51,6 +51,7 @@
 					<UIButton
 						size="sm"
 						variant="outline"
+						color="neutral"
 					>
 						Retry
 					</UIButton>
@@ -59,6 +60,7 @@
 			<UIButton
 				if:when="dismissed.value"
 				variant="outline"
+				color="neutral"
 				on:click="() => (dismissed.value = false)"
 			>
 				Show the notice again
@@ -99,12 +101,14 @@
 			<UIButton on:click="() => toast.add({ text: 'Changes saved', tone: 'success', duration: 5000 })">Notify the save</UIButton>
 			<UIButton
 				variant="outline"
+				color="neutral"
 				on:click="() => toast.add({ text: 'Could not publish', tone: 'danger', duration: 0 })"
 			>
 				Notify an error
 			</UIButton>
 			<UIButton
 				variant="ghost"
+				color="neutral"
 				on:click="() => toast.clear()"
 			>
 				Close all

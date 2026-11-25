@@ -15,30 +15,26 @@ test('the appearance playground hydrates, copies its recipe and follows the them
 
 	const ssr = await browser.newPage({ javaScriptEnabled: false, colorScheme: 'light' })
 	await ssr.goto(`${origin}/theming`)
-	assert.match(await ssr.getByRole('button', { name: 'Botón de ejemplo' }).getAttribute('class'), /ui-neutral/)
+	assert.match(await ssr.getByRole('button', { name: 'Botón de ejemplo' }).getAttribute('class'), /\bbg-neutral-9\b/)
 	await ssr.close()
 
 	const page = await browser.newPage({ colorScheme: 'light', reducedMotion: 'reduce', permissions: ['clipboard-read', 'clipboard-write'], viewport: { width: 390, height: 844 } })
 	const errors = []
 	page.on('pageerror', (error) => errors.push(error.message))
 	const samples = [
-		['buttons', '.ui-primary', '--ui-9'],
-		['badges', '.ui-cyan', '--ui-9'],
-		['forms', '.ui-primary', '--ui-2'],
-		['cards', '.ui-primary', '--ui-2'],
+		['buttons', '[class~="bg-primary-9"]'],
+		['badges', '[class~="bg-info-9"]'],
+		['forms', '[class~="bg-primary-2"]'],
+		['cards', '[class~="bg-primary-2"]'],
 	]
-	for (const [route, selector, step] of samples) {
+	for (const [route, selector] of samples) {
 		await page.goto(`${origin}/${route}`)
 		const sample = page.locator(`#appearance ~ * ${selector}`).first()
-		const colors = await sample.evaluate((element, property) => {
-			const style = globalThis.getComputedStyle(element)
-			return { background: style.backgroundColor, step: style.getPropertyValue(property).trim() }
-		}, step)
-		assert.ok(colors.step, `${route} resolves ${step}`)
-		assert.notEqual(colors.background, 'rgba(0, 0, 0, 0)', `${route} paints the preview`)
+		const background = await sample.evaluate((element) => globalThis.getComputedStyle(element).backgroundColor)
+		assert.notEqual(background, 'rgba(0, 0, 0, 0)', `${route} paints the preview`)
 	}
 	await page.goto(`${origin}/forms`)
-	const fields = page.locator('#appearance ~ * input.ui-primary')
+	const fields = page.locator('#appearance ~ * input[class~="text-primary-11"]')
 	assert.equal(await fields.count(), 4)
 	for (const field of await fields.all()) {
 		const styles = await field.evaluate((element) => {
@@ -67,7 +63,6 @@ test('the appearance playground hydrates, copies its recipe and follows the them
 			'subtle',
 			'link',
 			'plain',
-			'gradient',
 			'glass',
 		],
 	)
@@ -86,22 +81,20 @@ test('the appearance playground hydrates, copies its recipe and follows the them
 			.then((items) => items.map((item) => item.trim())),
 		[
 			'primary',
-			'surface',
-			'info',
+			'secondary',
+			'neutral',
 			'success',
+			'info',
 			'warning',
 			'danger',
-			'cyan',
-			'orange',
-			'pink',
 		],
 	)
-	await color.selectOption('pink')
-	const pink = await background()
-	assert.notEqual(pink, neutral)
+	await color.selectOption('danger')
+	const danger = await background()
+	assert.notEqual(danger, neutral)
 	await playground.getByLabel('Variante').selectOption('soft')
 	const soft = await background()
-	assert.notEqual(soft, pink)
+	assert.notEqual(soft, danger)
 	await playground.getByLabel('Radio').selectOption('full')
 	assert.match(await preview.getAttribute('class'), /rounded-full/)
 	await playground.getByRole('radio', { name: 'Oscuro' }).click()
@@ -109,9 +102,13 @@ test('the appearance playground hydrates, copies its recipe and follows the them
 	assert.notEqual(await background(), soft)
 
 	const code = await playground.locator('pre code').textContent()
-	assert.match(code, /"color": "pink"/)
+	assert.match(code, /"color": "danger"/)
 	assert.match(code, /"variant": "soft"/)
 	await playground.getByRole('button', { name: 'Copiar', exact: true }).click()
 	await page.waitForFunction(async (expected) => (await globalThis.navigator.clipboard.readText()) === expected, code)
+
+	// glass paints with the alpha gray of the main entry, which the site has without @meekojs/ui/hues.
+	const glass = page.locator('.appearance-variants .appearance-sample', { hasText: 'glass' })
+	assert.match(await glass.evaluate((element) => globalThis.getComputedStyle(element).backgroundColor), /^rgba\(255, 255, 255, 0\.0\d+\)$/, 'the dark alpha gray')
 	assert.deepEqual(errors, [])
 })

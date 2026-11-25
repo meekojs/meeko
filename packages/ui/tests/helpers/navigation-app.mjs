@@ -89,7 +89,7 @@ const showcase = `<script lang="ts">
 		<UITableOfContents bind:entries="toc" variant="collapsible" />
 		<UIPageHeader title="Navegación" description="Todos los componentes de navegación juntos.">
 			<snippet name="breadcrumb"><UIBreadcrumb bind:items="crumbs" /></snippet>
-			<snippet name="actions"><UIButton variant="outline" size="sm">Editar</UIButton></snippet>
+			<snippet name="actions"><UIButton variant="outline" color="neutral" size="sm">Editar</UIButton></snippet>
 		</UIPageHeader>
 		<h2 id="uno">Primera sección</h2>
 		<UINavigationTabs bind:items="[{ label: 'Uno', href: '#one', current: tabsCurrent.value === '/one' }, { label: 'Dos más largo', href: '#two', current: tabsCurrent.value === '/two' }, { label: 'Tres', to: '/about' }, { label: 'Hijos', to: '/users/[id]', params: { id: '7' }, match: 'prefix' }, { label: 'Cuarto enlace al final', href: '#four', current: tabsCurrent.value === '/four' }]" label="Vistas" />
@@ -114,7 +114,7 @@ const showcase = `<script lang="ts">
 		<UIDiff bind:diff="diff" label="Cambios en la guía" />
 		<UIDiff diff="" label="Sin cambios" />
 		<UIProse as="article" id="snapshot" bind:html="snapshot" />
-		<UIProse id="handwritten"><h2>A mano</h2><p>Con marcado propio.</p><UICard title="Dentro del texto" variant="solid"><p>Texto de la card.</p></UICard></UIProse>
+		<UIProse id="handwritten"><h2>A mano</h2><p>Con marcado propio.</p><UICard title="Dentro del texto" variant="solid" color="primary"><p>Texto de la card.</p></UICard></UIProse>
 		<section class="tall"><h2 id="tres">Tercera sección</h2></section>
 		<UIPageNavigation bind:previous="{ label: 'Inicio', to: '/' }" bind:next="{ label: 'Acerca de', to: '/about' }" />
 		<button type="button" id="suggest" on:click="() => (showSuggestion.value = true)">Sugerir</button>
@@ -167,6 +167,8 @@ export async function createNavigationApp(context) {
 		'meeko.config.mjs': `export default ${JSON.stringify(config)}\n`,
 		'public/logo.svg': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="currentColor"/></svg>',
 		'app/app.meeko': '<template><UIApp><MeekoOutlet /></UIApp></template>\n',
+		// The app compiles the entry of UI with its Tailwind: without it the components have no styles.
+		'app/styles/main.css': "@import 'tailwindcss';\n@import '@meekojs/ui';\n",
 		'app/pages/index.meeko': showcase,
 		'app/pages/index.route.ts': route(),
 		'app/pages/dashboard.meeko': dashboard,

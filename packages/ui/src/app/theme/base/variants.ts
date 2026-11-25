@@ -1,55 +1,39 @@
+/**
+ * Catálogo de variantes compartidas. Solo contiene utilidades de Tailwind sobre los tokens del tema.
+ *
+ * `variant` y `color` no llevan clases por sí solos: cada pareja es una entrada de `compoundVariants`
+ * (`colors.ts` para los colores semánticos y `hues.ts` para los tonos crudos opcionales).
+ */
 export const variants = {
 	variant: {
-		solid: 'border-transparent bg-(--ui-9) text-(color:--ui-contrast) not-disabled:hover:bg-(--ui-10) not-disabled:hover:text-(color:--ui-contrast-hover) not-disabled:active:bg-(--ui-10) not-disabled:active:text-(color:--ui-contrast-hover)',
-		soft: 'border-transparent bg-(--ui-3) text-(color:--ui-12) not-disabled:hover:bg-(--ui-4) not-disabled:active:bg-(--ui-5)',
-		outline: 'border-(length:--ui-border-width) border-(color:--ui-8) text-(color:--ui-12) not-disabled:hover:bg-(--ui-3)',
-		ghost: 'border-transparent text-(color:--ui-12) not-disabled:hover:bg-(--ui-3) not-disabled:active:bg-(--ui-4)',
-		surface: 'border-(length:--ui-border-width) border-(color:--ui-6) bg-(--ui-2) text-(color:--ui-12) not-disabled:hover:bg-(--ui-3)',
-		subtle: 'border-transparent bg-(--ui-2) text-(color:--ui-12) not-disabled:hover:bg-(--ui-3)',
-		link: 'border-transparent text-(color:--ui-12) not-disabled:hover:underline',
+		solid: '',
+		soft: '',
+		outline: '',
+		ghost: '',
+		surface: '',
+		subtle: '',
+		link: '',
 		plain: '',
-		gradient: 'border-transparent bg-linear-to-r from-(--ui-9) to-(--ui-gradient-end) text-(color:--ui-contrast)',
-		glass: 'border-(length:--ui-border-width) border-(color:--ui-6) bg-(--ui-3)/50 backdrop-blur-md text-(color:--ui-12)',
+		glass: '',
 	},
 
 	color: {
-		primary: 'ui-primary',
-		secondary: 'ui-secondary',
-		neutral: 'ui-neutral',
-		success: 'ui-success',
-		info: 'ui-info',
-		warning: 'ui-warning',
-		error: 'ui-error',
-		accent: 'ui-accent',
-		danger: 'ui-danger',
-		gray: 'ui-gray',
-		red: 'ui-red',
-		orange: 'ui-orange',
-		amber: 'ui-amber',
-		yellow: 'ui-yellow',
-		lime: 'ui-lime',
-		green: 'ui-green',
-		emerald: 'ui-emerald',
-		teal: 'ui-teal',
-		cyan: 'ui-cyan',
-		sky: 'ui-sky',
-		blue: 'ui-blue',
-		indigo: 'ui-indigo',
-		violet: 'ui-violet',
-		purple: 'ui-purple',
-		fuchsia: 'ui-fuchsia',
-		pink: 'ui-pink',
-		rose: 'ui-rose',
+		primary: '',
+		secondary: '',
+		neutral: '',
+		success: '',
+		info: '',
+		warning: '',
+		danger: '',
 	},
 
+	/** Tamaños de controles: alto mínimo, relleno y texto de los tokens `--ui-control-*`. */
 	size: {
-		'2xs': 'h-5 px-1.5 text-[10px]',
-		xs: 'h-6 px-2 text-xs',
-		sm: 'h-7 px-2.5 text-xs',
-		md: 'h-[34px] px-3 text-sm',
-		lg: 'h-10 px-4 text-sm',
-		xl: 'h-12 px-5 text-base',
-		'2xl': 'h-14 px-6 text-lg',
+		xs: 'min-h-(--ui-control-height-xs) p-(--ui-control-padding-xs) text-control-xs',
+		sm: 'min-h-(--ui-control-height-sm) p-(--ui-control-padding-sm) text-control-sm',
+		md: 'min-h-(--ui-control-height-md) p-(--ui-control-padding-md) text-control-md',
+		lg: 'min-h-(--ui-control-height-lg) p-(--ui-control-padding-lg) text-control-lg',
+		xl: 'min-h-(--ui-control-height-xl) p-(--ui-control-padding-xl) text-control-xl',
 	},
 
 	radius: {

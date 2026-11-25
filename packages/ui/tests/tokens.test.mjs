@@ -1,6 +1,11 @@
+import * as radix from '@radix-ui/colors'
 import assert from 'node:assert/strict'
 import { readdir, readFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
+import { dirname, resolve as resolvePath } from 'node:path'
 import test from 'node:test'
+import { fileURLToPath } from 'node:url'
+import { compile } from 'tailwindcss'
 
 const styles = new URL('../src/app/styles/', import.meta.url)
 const components = new URL('../src/app/components/', import.meta.url)
@@ -87,7 +92,8 @@ test('every form control draws its border from --ui-color-control-border, not fr
 		assert.match(source, /import \{ control \} from '\.\.\/variants\/input'/, name)
 		assert.match(source, /const triggerClass = computed\(\(\) => control\(/, name)
 	}
-	assert.match(await variant('button'), /variant: 'outline', tone: 'neutral', class: 'border-control-border /)
+	// A neutral outline button (theme/components/button), and through it the one of <UIIconButton>.
+	assert.match(await readFile(new URL('../src/app/theme/components/button.ts', import.meta.url), 'utf8'), /controlBorder = \{ variant: 'outline', color: 'neutral', class: 'border-control-border /)
 	// The box of a checkbox or a radio, the track of a switch and the frame of a segmented group.
 	const choice = await variant('choice')
 	assert.match(choice, /const boxBorder = '[^']*border-solid border-control-border /)
@@ -213,7 +219,7 @@ const strip = (css) =>
 		.replace(/--container-(?:card|stat)-narrow:[^;]+;/g, '')
 
 async function componentSheets() {
-	const names = (await readdir(styles)).filter((name) => name.endsWith('.css') && !['appearance-palette.css', 'palette.css', 'tokens.css', 'fonts.css'].includes(name))
+	const names = (await readdir(styles)).filter((name) => name.endsWith('.css') && !['hues.css', 'palette.css', 'tokens.css', 'fonts.css'].includes(name))
 	return Promise.all(names.map(async (name) => [name, strip(await read(name))]))
 }
 
@@ -221,13 +227,15 @@ test('component sheets and components have no colour, size, time or weight outsi
 	const sheets = await componentSheets()
 	assert.ok(sheets.length >= 7)
 	const meeko = (await readdir(components, { recursive: true })).filter((name) => name.endsWith('.meeko'))
-	const variants = new URL('../src/app/variants/', import.meta.url)
-	const classes = (await readdir(variants)).filter((name) => name.endsWith('.ts'))
-	const sources = [
-		...sheets,
-		...(await Promise.all(meeko.map(async (name) => [name, await readFile(new URL(name.replaceAll('\\', '/'), components), 'utf8')]))),
-		...(await Promise.all(classes.map(async (name) => [name, await readFile(new URL(name, variants), 'utf8')]))),
-	]
+	// The recipes of the old variants and those of the theme.
+	const recipes = await Promise.all(
+		['../src/app/variants/', '../src/app/theme/components/'].map(async (path) => {
+			const folder = new URL(path, import.meta.url)
+			const names = (await readdir(folder)).filter((name) => name.endsWith('.ts'))
+			return Promise.all(names.map(async (name) => [name, await readFile(new URL(name, folder), 'utf8')]))
+		}),
+	)
+	const sources = [...sheets, ...(await Promise.all(meeko.map(async (name) => [name, await readFile(new URL(name.replaceAll('\\', '/'), components), 'utf8')]))), ...recipes.flat()]
 	for (const [name, css] of sources) {
 		assert.doesNotMatch(css, /#[0-9a-fA-F]{3,8}\b(?![\w-])(?=[\s;,)])/, `${name}: a hex colour`)
 		assert.doesNotMatch(css, /\brgba?\(|\bhsla?\(|\boklch\(/, `${name}: a colour function`)
@@ -237,10 +245,10 @@ test('component sheets and components have no colour, size, time or weight outsi
 })
 
 test('what must differ from a surface does not rest on --ui-color-control, which ui.tokens.surface also sets', async () => {
-	const { card, linkCard } = await import('../dist/app/variants/card.js')
+	const { cardTheme, linkCardTheme } = await import('../dist/app/theme/components/card.js')
 	const { table } = await import('../dist/app/variants/table.js')
-	assert.match(card({ variant: 'soft' }).base(), /(^| )bg-control-hover( |$)/)
-	assert.match(linkCard().base(), /(^| )hover:bg-control-hover( |$)/)
+	assert.match(cardTheme({ variant: 'soft' }).base(), /(^| )bg-control-hover( |$)/)
+	assert.match(linkCardTheme().base(), /(^| )not-disabled:hover:bg-control-hover( |$)/)
 	assert.match(table().bodyRow(), /(^| )hover:bg-control-hover( |$)/)
 })
 
@@ -282,7 +290,7 @@ test('code text contrasts with its background in both themes', () => {
 test('every --ui-* variable a component sheet reads is declared', async () => {
 	const declared = new Set([...Object.keys(palette.light), ...Object.keys(palette.dark), ...Object.keys(declarations(tokensCss))])
 	// Hooks a consumer can set: they always go with a fallback in the sheets.
-	const local = new Set(['--ui-button-color', '--ui-container-size', '--ui-container-padding', '--ui-container-max-width', '--ui-container-gutter', '--ui-card-shadow', '--ui-link-card-padding', '--ui-modal-depth', '--ui-markdown-editor-height'])
+	const local = new Set(['--ui-button-color', '--ui-container-size', '--ui-container-padding', '--ui-container-max-width', '--ui-container-gutter', '--ui-link-card-padding', '--ui-modal-depth', '--ui-markdown-editor-height'])
 	for (const [name, css] of await componentSheets()) for (const [, variable] of css.matchAll(/var\((--ui-[\w-]+)/g)) assert.ok(declared.has(variable) || local.has(variable), `${name} reads ${variable}, which nothing declares`)
 })
 
@@ -295,8 +303,122 @@ test('the base goes in a layer, so that any rule of the app wins', async () => {
 	for (const piece of ['color-scheme: dark', 'background: var(--ui-color-bg)', '::selection', ':focus-visible', 'var(--ui-font-sans)']) assert.ok(css.includes(piece), piece)
 })
 
-test("the components sheet declares Tailwind's base layer before the layers of UI", async () => {
-	assert.match(strip(await read('main.css')), /@layer base, ui\.components, ui\.utilities;/)
+test("the entry of UI keeps Tailwind's order of layers and its hand-written rules under every utility", async () => {
+	const css = strip(await read('main.css'))
+	assert.match(css, /^\s*@layer theme, base, components, utilities;/, 'whatever the app imports first, the preflight stays under the components')
+	assert.match(css, /@import '\.\/components\.css' layer\(components\);/)
+	assert.doesNotMatch(css, /@import ['"]tailwindcss/, 'the app imports Tailwind once, before UI')
+	// Published, the components are in dist/; in the workspace, in src/.
+	for (const folder of ['../components', '../variants', '../theme', '../../editor/components', '../../../dist/app/components', '../../../dist/app/variants', '../../../dist/app/theme', '../../../dist/editor/components']) assert.ok(css.includes(`@source '${folder}';`), folder)
+})
+
+test('the raw combinations of hues generate CSS only through their own entry', async () => {
+	const main = strip(await read('main.css'))
+	assert.match(main, /@source not '\.\.\/theme\/base\/hues\.ts';/)
+	assert.match(main, /@source not '\.\.\/\.\.\/\.\.\/dist\/app\/theme\/base\/hues\.\*';/)
+	assert.deepEqual(
+		[...strip(await read('hues.css')).matchAll(/@source '([^']+)';/g)].map(([, path]) => path),
+		['../theme/base/hues.ts', '../../../dist/app/theme/base/hues.js'],
+	)
+	const { exports } = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'))
+	assert.equal(exports['.'].style, './src/app/styles/main.css')
+	assert.deepEqual(Object.keys(exports['.']), ['types', 'style', 'default'], 'style goes before default, which matches any condition')
+	assert.equal(exports['./hues'], './src/app/styles/hues.css')
+})
+
+/** Compiles a sheet of a consumer with the Tailwind of the package, resolving its imports, and builds the candidates. */
+async function consumerCss(imports, candidates) {
+	const require = createRequire(import.meta.url)
+	const entries = {
+		tailwindcss: require.resolve('tailwindcss/index.css'),
+		'@meekojs/ui': fileURLToPath(new URL('main.css', styles)),
+		'@meekojs/ui/hues': fileURLToPath(new URL('hues.css', styles)),
+	}
+	const loadStylesheet = async (id, base) => {
+		const path = entries[id] ?? resolvePath(base, id)
+		return { path, base: dirname(path), content: await readFile(path, 'utf8') }
+	}
+	const css = ['tailwindcss', ...imports].map((id) => `@import '${id}';`).join('\n')
+	const compiler = await compile(css, { base: fileURLToPath(styles), loadStylesheet })
+	return compiler.build(candidates)
+}
+
+/** The declarations of the rule of one class in compiled CSS. */
+const rule = (css, name) => css.match(new RegExp(`\\.${name.replace(/[:()]/g, '\\\\$&')} \\{([^}]*)\\}`))?.[1].trim()
+
+test("the consumer keeps Tailwind's default theme next to the one of UI", async () => {
+	const css = await consumerCss(['@meekojs/ui'], ['bg-red-500', 'md:flex', 'max-w-7xl', 'text-white', 'bg-primary-9', 'text-control-md'])
+	assert.equal(rule(css, 'bg-red-500'), 'background-color: var(--color-red-500);')
+	assert.match(css, /--color-red-500: oklch\(/)
+	assert.match(css, /@media \(width >= 48rem\) \{\s*\.md\\:flex \{\s*display: flex;/, 'the md: breakpoint of Tailwind')
+	assert.ok(rule(css, 'max-w-7xl'))
+	assert.ok(rule(css, 'text-white'))
+	assert.equal(rule(css, 'bg-primary-9'), 'background-color: var(--ui-color-primary-9);')
+})
+
+test('the defaults of Tailwind do not change the utilities of UI', async () => {
+	const css = await consumerCss(['@meekojs/ui'], ['text-xs', 'text-sm', 'text-base', 'text-lg', 'text-6xl', 'text-control-sm', 'transition-colors', 'transition'])
+	for (const size of ['xs', 'sm', 'lg', '6xl']) assert.equal(rule(css, `text-${size}`), `font-size: var(--ui-font-size-${size});`, `text-${size} sets the size alone`)
+	assert.equal(rule(css, 'text-base'), 'font-size: var(--ui-font-size-md);')
+	assert.equal(rule(css, 'text-control-sm'), 'font-size: var(--ui-control-font-size-sm);')
+	for (const name of ['transition-colors', 'transition']) {
+		assert.match(rule(css, name), /transition-timing-function: var\(--tw-ease, ease\);/, name)
+		assert.match(rule(css, name), /transition-duration: var\(--tw-duration, 0s\);/, name)
+	}
+	assert.doesNotMatch(css, /--default-transition-|--text-xs--line-height/)
+})
+
+test('the semantic scales, the alpha gray and the five control sizes are utilities of the main entry', async () => {
+	const semantic = ['primary', 'secondary', 'neutral', 'success', 'info', 'warning', 'danger']
+	const candidates = [...semantic.flatMap((color) => [...steps.map((step) => `bg-${color}-${step}`), `text-${color}-contrast`]), ...steps.map((step) => `border-gray-a${step}`), ...['xs', 'sm', 'md', 'lg', 'xl'].map((size) => `text-control-${size}`)]
+	const css = await consumerCss(['@meekojs/ui'], candidates)
+	for (const color of semantic) {
+		for (const step of steps) assert.equal(rule(css, `bg-${color}-${step}`), `background-color: var(--ui-color-${color}-${step});`)
+		assert.equal(rule(css, `text-${color}-contrast`), `color: var(--ui-color-${color}-contrast);`)
+	}
+	for (const step of steps) assert.equal(rule(css, `border-gray-a${step}`), `border-color: var(--ui-color-gray-a${step});`)
+	for (const size of ['xs', 'sm', 'lg', 'xl']) assert.equal(rule(css, `text-control-${size}`), `font-size: var(--ui-control-font-size-${size});`)
+	for (const size of ['xs', 'sm', 'md', 'lg', 'xl']) for (const token of ['height', 'padding']) assert.ok(tokens.light[`--ui-control-${token}-${size}`], `--ui-control-${token}-${size}`)
+	const coarse = tokensCss.slice(tokensCss.indexOf('@media (pointer: coarse)'))
+	for (const size of ['xs', 'sm', 'md', 'lg', 'xl']) assert.match(coarse, new RegExp(`--ui-control-height-${size}: `), `a touch screen gets a taller ${size} control`)
+})
+
+test('the raw hues reach the CSS only through @meekojs/ui/hues', async () => {
+	const candidates = ['bg-crimson-9', 'text-crimson-contrast', 'bg-gray-5', 'bg-sky-9']
+	const main = await consumerCss(['@meekojs/ui'], candidates)
+	for (const name of candidates) assert.equal(rule(main, name), undefined, name)
+	assert.doesNotMatch(main, /--color-(?:crimson|sky)-|--color-gray-\d/)
+
+	const css = await consumerCss(['@meekojs/ui', '@meekojs/ui/hues'], candidates)
+	assert.equal(rule(css, 'bg-crimson-9'), 'background-color: var(--color-crimson-9);')
+	assert.equal(rule(css, 'text-crimson-contrast'), 'color: var(--color-crimson-contrast);')
+	assert.match(css, new RegExp(`--color-crimson-9: ${radix.crimson.crimson9};`))
+	const dark = css.slice(css.indexOf(":root[data-theme='dark']"))
+	assert.match(dark, new RegExp(`--color-crimson-9: ${radix.crimsonDark.crimson9};`))
+})
+
+test('the raw hues and the alpha gray are the values of @radix-ui/colors', async () => {
+	const hues = await read('hues.css')
+	const { hueNames } = await import('@meekojs/ui/theme/hues')
+	const light = declarations(hues.slice(hues.indexOf('@theme {'), hues.indexOf(':root[')))
+	const dark = declarations(hues.slice(hues.indexOf(":root[data-theme='dark'] {")))
+	const darkText = { sky: 'slate', mint: 'sage', lime: 'olive', yellow: 'sand', amber: 'sand' }
+	for (const hue of hueNames) {
+		for (const step of steps) {
+			assert.equal(light[`--color-${hue}-${step}`], radix[hue][`${hue}${step}`], `${hue}-${step}`)
+			assert.equal(dark[`--color-${hue}-${step}`], radix[`${hue}Dark`][`${hue}${step}`], `dark ${hue}-${step}`)
+		}
+		// Dark text on the bright solids of Radix, white on the rest; the same in both themes.
+		const text = darkText[hue] ? radix[darkText[hue]][`${darkText[hue]}12`] : WHITE
+		assert.equal(light[`--color-${hue}-contrast`], text, `${hue}-contrast`)
+		assert.equal(dark[`--color-${hue}-contrast`], text, `dark ${hue}-contrast`)
+	}
+	assert.equal(Object.keys(light).length, hueNames.length * 13)
+	assert.equal(Object.keys(dark).length, hueNames.length * 13)
+	for (const step of steps) {
+		assert.equal(palette.light[`--ui-color-gray-a${step}`], radix.grayA[`grayA${step}`], `gray-a${step}`)
+		assert.equal(palette.dark[`--ui-color-gray-a${step}`], radix.grayDarkA[`grayA${step}`], `dark gray-a${step}`)
+	}
 })
 
 test('the font and its licence ship with the package', async () => {

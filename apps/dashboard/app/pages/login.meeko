@@ -57,7 +57,7 @@
 <template>
 	<div class="dash-login">
 		<UICard
-			variant="elevated"
+			elevation="md"
 			padding="lg"
 			class="dash-login-card"
 			bind:aria-label="t('login.title')"

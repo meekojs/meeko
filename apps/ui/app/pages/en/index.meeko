@@ -16,6 +16,7 @@
 			<UILink
 				to="/components"
 				variant="outline"
+				color="neutral"
 			>
 				See components
 			</UILink>

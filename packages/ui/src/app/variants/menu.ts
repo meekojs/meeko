@@ -4,13 +4,13 @@
 // and the separator. They are in the utilities layer, after popover.css, so they win over it without a
 // higher specificity. Each property is set by one part only: the background of a disabled item and the one of
 // a danger item answer to selectors that never meet.
-import { tv } from 'tailwind-variants/lite'
+import { tv } from '../utils/theme'
 
 export const menu = tv({
 	slots: {
 		/** The content, the element with `popover`: its look is the `menu` role of <UIPopover>. */
 		base: '',
-		/** The trigger that <UIMenu> paints; its look is the one of `button` in ../variants/button.ts. */
+		/** The trigger that <UIMenu> paints; its look is the one of `buttonTheme` in ../theme/components/button.ts. */
 		trigger: '',
 		/** The chevron after the text of a trigger with `triggerLabel`. */
 		chevron: 'motion-safe:transition-[rotate] duration-(--ui-duration-fast) in-aria-expanded:rotate-180',

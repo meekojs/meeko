@@ -9,7 +9,7 @@ import { startDevServer } from '../../../scripts/test-support/dev-server.ts'
 const demo = fileURLToPath(new URL('../../../apps/ui/', import.meta.url))
 const output = fileURLToPath(new URL('../.meeko/', import.meta.url))
 
-test('UICard hydrates snippets, changes variants and supports both themes and mobile', { timeout: 90_000 }, async (context) => {
+test('UICard hydrates snippets, changes variant and color and supports both themes and mobile', { timeout: 90_000 }, async (context) => {
 	const cli = fileURLToPath(new URL('../../meeko/dist/cli.js', import.meta.url))
 	const { origin, stop } = await startDevServer({ root: demo, cli, path: '/cards', startupTimeout: 30_000 })
 	context.after(stop)
@@ -17,8 +17,9 @@ test('UICard hydrates snippets, changes variants and supports both themes and mo
 	context.after(() => browser.close())
 	const ssr = await browser.newPage({ javaScriptEnabled: false })
 	await ssr.goto(`${origin}/cards`)
-	// A card is the <section> that groups its parts for the table in its body.
-	assert.equal(await ssr.locator('section[class~="group/card"]').count(), 10)
+	// A card is the <section> that groups its parts for the table in its body: the demo, the four of the grid, the
+	// two of the snippets, the frame of the preview and its four, and the three of the actions.
+	assert.equal(await ssr.locator('section[class~="group/card"]').count(), 15)
 	assert.equal(await ssr.getByRole('region', { name: 'Tu espacio de trabajo', exact: true }).getByRole('button', { name: 'Guardar cambio' }).count(), 1)
 	await ssr.close()
 	const page = await browser.newPage({ viewport: { width: 1280, height: 1000 }, colorScheme: 'light' })
@@ -33,23 +34,38 @@ test('UICard hydrates snippets, changes variants and supports both themes and mo
 	await card.getByRole('button', { name: 'Guardar cambio' }).click()
 	assert.match(await card.getByRole('status').innerText(), /1/)
 	const styles = {}
-	const backgrounds = { outline: 'bg-surface', soft: 'bg-control-hover', solid: 'bg-primary', elevated: 'bg-surface-raised' }
-	for (const variant of ['outline', 'soft', 'solid', 'elevated']) {
+	// The treatment and the color are two selects: each pair paints the root with the classes of the catalog.
+	const backgrounds = { surface: 'bg-surface', soft: 'bg-control-hover', solid: 'bg-neutral-9', glass: 'bg-gray-a3', plain: null }
+	for (const variant of Object.keys(backgrounds)) {
 		await page.getByLabel('Variante', { exact: true }).selectOption(variant)
-		assert.ok((await card.getAttribute('class')).split(' ').includes(backgrounds[variant]), variant)
+		const classes = (await card.getAttribute('class')).split(' ')
+		if (backgrounds[variant]) assert.ok(classes.includes(backgrounds[variant]), variant)
+		else assert.ok(!classes.some((name) => name.startsWith('bg-')), 'plain does not paint')
 		styles[variant] = await card.evaluate((element) => {
 			const css = globalThis.getComputedStyle(element)
 			return { background: css.backgroundColor, color: css.color, shadow: css.boxShadow }
 		})
 	}
-	assert.notEqual(styles.outline.background, styles.soft.background)
-	assert.notEqual(styles.outline.background, styles.solid.background)
-	assert.notEqual(styles.outline.color, styles.solid.color)
-	assert.equal(styles.outline.shadow, 'none')
-	assert.notEqual(styles.elevated.shadow, 'none')
+	await page.getByLabel('Variante', { exact: true }).selectOption('solid')
+	await page.getByLabel('Color', { exact: true }).selectOption('primary')
+	assert.ok((await card.getAttribute('class')).split(' ').includes('bg-primary-9'), 'solid primary')
+	styles.primary = await card.evaluate((element) => globalThis.getComputedStyle(element).backgroundColor)
+	assert.notEqual(styles.primary, styles.solid.background, 'the color changes the solid')
+	assert.notEqual(styles.surface.background, styles.soft.background)
+	assert.notEqual(styles.surface.background, styles.solid.background)
+	assert.notEqual(styles.surface.color, styles.solid.color)
+	assert.equal(styles.plain.background, 'rgba(0, 0, 0, 0)')
+	assert.equal(styles.surface.shadow, 'none')
+	const elevated = await page.getByRole('region', { name: 'Elevation', exact: true }).evaluate((element) => globalThis.getComputedStyle(element).boxShadow)
+	assert.notEqual(elevated, 'none', 'elevation adds a shadow')
+	// A card does not react to the pointer: hovering keeps its background.
+	await page.getByLabel('Color', { exact: true }).selectOption('neutral')
+	await page.getByLabel('Variante', { exact: true }).selectOption('surface')
+	await card.hover()
+	assert.equal(await card.evaluate((element) => globalThis.getComputedStyle(element).backgroundColor), styles.surface.background, 'no hover state')
 	// The reading styles of the page's <UIProse> stop at the card: on a solid, the text must still be the card's.
 	const solidText = await page
-		.locator('section[class~="bg-primary"]')
+		.locator('section[class~="bg-primary-9"]')
 		.last()
 		.evaluate((element) => {
 			const color = (selector) => globalThis.getComputedStyle(element.querySelector(selector)).color
@@ -61,7 +77,6 @@ test('UICard hydrates snippets, changes variants and supports both themes and mo
 	assert.equal(await page.locator('.card-demo-custom > header h2').innerText(), 'Cabecera personalizada')
 	assert.equal(await page.locator('.card-demo-minimal header, .card-demo-minimal footer').count(), 0)
 	assert.equal(await page.locator('.card-demo-custom footer').count(), 0)
-	await page.getByLabel('Variante', { exact: true }).selectOption('outline')
 	await mkdir(output, { recursive: true })
 	await page.screenshot({ path: output + '/card-desktop.png', fullPage: true })
 	await page.setViewportSize({ width: 390, height: 844 })

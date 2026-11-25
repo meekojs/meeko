@@ -1,5 +1,5 @@
+import type { UIButtonColor, UIButtonSize, UIButtonVariant } from '../theme/components/button'
 import type { menu } from '../variants/menu'
-import type { UIActionSize, UIActionVariant } from './config'
 import type { UILinkTarget } from './navigation'
 import type { PopoverPlacement, PopoverTrigger } from './popover'
 import type { UIThemeProps } from './theme'
@@ -147,10 +147,12 @@ export type UIMenuProps = Omit<
 			readonly ariaLabel?: string
 			/** `aria-label` de la lista. Sin ella, el menú se nombra con su disparador. */
 			readonly label?: string
-			/** Variante del disparador: `"secondary"` por defecto, `"ghost"` en el de sólo icono. */
-			readonly variant?: UIActionVariant
+			/** Tratamiento del disparador, el de `<UIButton>`: `"surface"` por defecto, `"ghost"` en el de sólo icono. */
+			readonly variant?: UIButtonVariant
+			/** Color del disparador, el de `<UIButton>`; `"neutral"` por defecto. */
+			readonly color?: UIButtonColor
 			/** Tamaño del disparador; `"md"` por defecto. */
-			readonly size?: UIActionSize
+			readonly size?: UIButtonSize
 			/** Desactiva el disparador. */
 			readonly disabled?: boolean
 			/** Dónde se abre respecto al disparador; `"bottom-start"` por defecto. */

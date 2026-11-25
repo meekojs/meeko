@@ -274,6 +274,7 @@
 			/>
 			<UIButton
 				variant="outline"
+				color="neutral"
 				on:click="() => (suggesting.value = true)"
 			>
 				Show the suggestion
@@ -314,7 +315,8 @@
 		</p>
 		<DocsPreview id="navigation-progress">
 			<UIButton
-				variant="secondary"
+				variant="surface"
+				color="neutral"
 				on:click="simulateNavigation"
 			>
 				Simulate a slow navigation

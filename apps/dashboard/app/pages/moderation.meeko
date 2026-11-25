@@ -567,6 +567,7 @@
 							<UIButton
 								if:when="page.value || reason.value"
 								variant="ghost"
+								color="neutral"
 								on:click="resetRule"
 							>
 								{t('moderation.rule.clear')}
@@ -635,6 +636,7 @@
 								<UIButton
 									size="sm"
 									variant="outline"
+									color="neutral"
 									on:click="() => editRule(row)"
 								>
 									{t('moderation.rule.edit')}
@@ -643,6 +645,7 @@
 								<UIButton
 									size="sm"
 									variant="ghost"
+									color="neutral"
 									on:click="() => askRemoveRule(row)"
 								>
 									{t('moderation.rule.remove')}
@@ -791,6 +794,7 @@
 								<UIButton
 									if:when="editing.value !== null || message.value"
 									variant="ghost"
+									color="neutral"
 									on:click="resetAnnouncement"
 								>
 									{editing.value === null ? t('moderation.announcement.empty') : t('moderation.announcement.cancelEdit')}
@@ -868,6 +872,7 @@
 								<UIButton
 									size="sm"
 									variant="outline"
+									color="neutral"
 									on:click="() => editAnnouncement(row)"
 								>
 									{t('moderation.announcement.edit')}
@@ -876,6 +881,7 @@
 								<UIButton
 									size="sm"
 									variant="ghost"
+									color="neutral"
 									on:click="() => void toggleAnnouncement(row)"
 								>
 									{row.active ? t('moderation.announcement.deactivate') : t('moderation.announcement.activate')}
@@ -884,6 +890,7 @@
 								<UIButton
 									size="sm"
 									variant="ghost"
+									color="neutral"
 									on:click="() => askRemoveAnnouncement(row)"
 								>
 									{t('moderation.announcement.delete')}
@@ -909,12 +916,13 @@
 			<snippet name="footer">
 				<UIButton
 					variant="ghost"
+					color="neutral"
 					on:click="() => (confirming.value = false)"
 				>
 					{t('actions.cancel')}
 				</UIButton>
 				<UIButton
-					tone="danger"
+					color="danger"
 					bind:disabled="answering.value"
 					on:click="answer"
 				>

@@ -1,7 +1,8 @@
 <script lang="ts">
-	import { variants } from '@meekojs/ui/theme'
+	import { appearance, defineTheme, type ThemeVariants } from '@meekojs/ui/theme'
 
-	const treatments = Object.entries(variants.variant)
+	const sample = defineTheme(appearance({ variant: true, color: ['primary'] }))
+	const treatments = Object.keys(sample.variants.variant) as NonNullable<ThemeVariants<typeof sample>['variant']>[]
 </script>
 
 <template>
@@ -9,9 +10,9 @@
 		<li
 			each:of="treatments"
 			each:as="treatment"
-			each:key="treatment[0]"
+			each:key="treatment"
 		>
-			<span bind:class="['appearance-sample', variants.color.primary, treatment[1]]">{treatment[0]}</span>
+			<span bind:class="['appearance-sample', sample({ variant: treatment, color: 'primary' })]">{treatment}</span>
 		</li>
 	</ul>
 </template>

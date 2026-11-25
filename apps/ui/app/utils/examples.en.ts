@@ -3,6 +3,11 @@ import { examples as spanish } from './examples'
 /** Copiable examples of the English pages: the same keys, with their texts and comments in English. What has none is shared. */
 export const englishExamples = {
 	...spanish,
+	stylesWithoutPreflight: `/* Tailwind without its preflight: its theme and its utilities, in their layers */
+@layer theme, base, components, utilities;
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities);
+@import '@meekojs/ui';`,
 	container: `<UIContainer as="section" size="4k" gutter="md" ariaLabel="Projects">
   <h2>Team projects</h2>
   <p>Centered content, with responsive side spacing.</p>
@@ -20,16 +25,16 @@ export const englishExamples = {
 
 <template>
 <UIButton on:click="() => count.value++">Save changes</UIButton>
-<UIButton variant="outline">Cancel</UIButton>
+<UIButton variant="outline" color="neutral">Cancel</UIButton>
 <UIButton size="sm" disabled>Unavailable</UIButton>
 <p role="status">Changes: {count.value}</p>
 </template>`,
-	buttonAppearance: `<UIButton bind:appearance="{ variant: 'solid', color: 'primary', size: 'lg', radius: 'full', elevation: 'sm' }">Save</UIButton>
-<UIButton bind:appearance="{ variant: 'soft', color: 'success', size: 'sm' }">Publish</UIButton>
-<UIButton bind:appearance="{ variant: 'outline', color: 'info' }">outline</UIButton>
-<UIButton bind:appearance="{ variant: 'ghost', color: 'primary' }">ghost</UIButton>
-<UIButton bind:appearance="{ variant: 'link', color: 'primary' }">link</UIButton>`,
-	badgeAppearance: `<UIBadge bind:appearance="{ variant: 'solid', color: 'cyan', radius: 'sm' }">Published</UIBadge>
+	buttonAppearance: `<UIButton variant="solid" color="primary" size="lg" radius="full" elevation="sm">Save</UIButton>
+<UIButton variant="soft" color="success" size="sm">Publish</UIButton>
+<UIButton variant="outline" color="info">outline</UIButton>
+<UIButton variant="ghost" color="primary">ghost</UIButton>
+<UIButton variant="link" color="primary">link</UIButton>`,
+	badgeAppearance: `<UIBadge bind:appearance="{ variant: 'solid', color: 'info', radius: 'sm' }">Published</UIBadge>
 <UIBadge
 	dot
 	bind:appearance="{ variant: 'outline', color: 'warning', radius: 'full' }"
@@ -60,27 +65,32 @@ export const englishExamples = {
 	id="appearance-input-soft"
 	bind:appearance="{ variant: 'soft', color: 'primary' }"
 />`,
-	cardAppearance: `<UICard
+	cardTheme: `<UICard
 	title="Weekly summary"
-	bind:appearance="{ variant: 'surface', color: 'primary', radius: 'xl', elevation: 'md' }"
+	color="primary"
+	radius="xl"
+	elevation="md"
 >
 	3 projects updated
 </UICard>
 <UICard
 	title="outline"
-	bind:appearance="{ variant: 'outline', color: 'primary' }"
+	variant="outline"
+	color="primary"
 >
 	3 projects updated
 </UICard>
 <UICard
 	title="glass"
-	bind:appearance="{ variant: 'glass', color: 'primary' }"
+	variant="glass"
+	color="primary"
 >
 	3 projects updated
 </UICard>
 <UICard
 	title="plain"
-	bind:appearance="{ variant: 'plain', color: 'primary' }"
+	variant="plain"
+	color="primary"
 >
 	3 projects updated
 </UICard>`,
@@ -91,7 +101,8 @@ export const englishExamples = {
 
 <!-- Any URL: an <a>; with target="_blank" it adds rel="noopener noreferrer" -->
 <UIButton href="https://github.com/meekojs/meeko" target="_blank"
-  variant="outline">GitHub</UIButton>
+  variant="outline"
+  color="neutral">GitHub</UIButton>
 <UIButton href="/report.pdf" download="report.pdf">Download</UIButton>
 
 <!-- Without to or href: a <button type="button"> -->
@@ -104,7 +115,7 @@ export const englishExamples = {
 </script>
 
 <template>
-<UICard title="Your workspace" variant="outline">
+<UICard title="Your workspace">
   <p role="status">Saved changes: {count.value}</p>
   <snippet name="footer">
     <UIButton on:click="() => count.value++">Save change</UIButton>
@@ -114,7 +125,7 @@ export const englishExamples = {
 	link: `<UILink to="/installation">Get started</UILink>
 <UILink to="/users/[id]" bind:params="{ id: user.id }">Profile</UILink>
 <UILink href="https://github.com/meekojs/meeko"
-  target="_blank" variant="outline">GitHub</UILink>
+  target="_blank" variant="outline" color="neutral">GitHub</UILink>
 
 <UILinkCard to="/theming" title="Customization"
   description="Connect the tokens to your brand." />`,
@@ -210,9 +221,9 @@ export const englishExamples = {
 <template>
   <UIPopover role="menu" placement="bottom-start" bind:offset="6">
     <snippet name="trigger">Project actions</snippet>
-    <UIButton variant="ghost" role="menuitem" on:click="() => (action.value = 'rename')">Rename</UIButton>
-    <UIButton variant="ghost" role="menuitem" on:click="() => (action.value = 'duplicate')">Duplicate</UIButton>
-    <UIButton variant="ghost" role="menuitem" on:click="() => (action.value = 'archive')">Archive</UIButton>
+    <UIButton variant="ghost" color="neutral" role="menuitem" on:click="() => (action.value = 'rename')">Rename</UIButton>
+    <UIButton variant="ghost" color="neutral" role="menuitem" on:click="() => (action.value = 'duplicate')">Duplicate</UIButton>
+    <UIButton variant="ghost" color="neutral" role="menuitem" on:click="() => (action.value = 'archive')">Archive</UIButton>
   </UIPopover>
 </template>`,
 	popoverDialog: `<script lang="ts">
@@ -298,7 +309,7 @@ async function confirm() {
 <template>
   <UIModal title="Confirm" bind:description="props.message">
     <snippet name="footer">
-      <UIButton variant="outline" on:click="() => modal.dismiss()">Cancel</UIButton>
+      <UIButton variant="outline" color="neutral" on:click="() => modal.dismiss()">Cancel</UIButton>
       <UIButton on:click="() => modal.close(true)">Confirm</UIButton>
     </snippet>
   </UIModal>
@@ -320,8 +331,8 @@ export default defineMeekoConfig({
       border: 'var(--brand-border)',
     },
     defaults: {
-      button: { shape: 'pill', size: 'md' },
-      link: { variant: 'outline' },
+      button: { radius: 'full', size: 'md' },
+      link: { variant: 'outline', color: 'neutral' },
       card: { variant: 'soft' },
     },
   },
@@ -368,6 +379,28 @@ export default defineMeekoConfig({
   --ui-color-primary-9: #3b96ff;
   --ui-color-primary-10: #66adff;
 }`,
+	themeColor: `/* app/styles/main.css: primary reads the crimson scale */
+@import 'tailwindcss';
+@import '@meekojs/ui';
+@import '@meekojs/ui/hues';
+
+/* With [data-theme] it also wins over the steps of UI's dark theme */
+:root,
+:root[data-theme] {
+  --ui-color-primary-1: var(--color-crimson-1);
+  --ui-color-primary-2: var(--color-crimson-2);
+  --ui-color-primary-3: var(--color-crimson-3);
+  --ui-color-primary-4: var(--color-crimson-4);
+  --ui-color-primary-5: var(--color-crimson-5);
+  --ui-color-primary-6: var(--color-crimson-6);
+  --ui-color-primary-7: var(--color-crimson-7);
+  --ui-color-primary-8: var(--color-crimson-8);
+  --ui-color-primary-9: var(--color-crimson-9);
+  --ui-color-primary-10: var(--color-crimson-10);
+  --ui-color-primary-11: var(--color-crimson-11);
+  --ui-color-primary-12: var(--color-crimson-12);
+  --ui-color-primary-contrast: var(--color-crimson-contrast);
+}`,
 	themeSlots: `<!-- class reaches the root; ui, each part by the name of its slot -->
 <UICard title="Pro plan" class="pricing-card"
   bind:ui="{ header: 'pricing-header', title: 'pricing-title' }">
@@ -381,22 +414,22 @@ export default defineMeekoConfig({
 .pricing-title {
   color: var(--ui-color-primary-text);
 }`,
-	buttonStates: `<UIButton tone="danger">Delete</UIButton>
-<UIButton tone="danger" variant="outline">Revoke</UIButton>
+	buttonStates: `<UIButton color="danger">Delete</UIButton>
+<UIButton color="danger" variant="outline">Revoke</UIButton>
 <UIButton bind:loading="saving.value">Save</UIButton>
-<UIButton iconOnly ariaLabel="Delete" variant="outline">
+<UIButton iconOnly ariaLabel="Delete" variant="outline" color="neutral">
   <UIIcon name="lucide:trash-2" />
 </UIButton>`,
 	iconButton: `<UIIconButton label="Open the menu" icon="menu" />
 <UIIconButton label="Close" icon="close" variant="outline" />
-<UIIconButton label="Confirm" icon="check" variant="primary" on:click="confirm" />
+<UIIconButton label="Confirm" icon="check" variant="solid" color="primary" on:click="confirm" />
 <UIIconButton label="See links" icon="arrowEnd" to="/links" />
 <UIIconButton label="Delete">
   <UIIcon name="lucide:trash-2" />
 </UIIconButton>`,
 	iconButtonStates: `<UIIconButton label="Pin the panel" icon="check" variant="outline"
   bind:pressed="pinned.value" on:click="() => (pinned.value = !pinned.value)" />
-<UIIconButton label="Remove" icon="close" tone="danger" />
+<UIIconButton label="Remove" icon="close" color="danger" />
 <UIIconButton label="Saving" icon="check" bind:loading="saving.value" />
 <UIIconButton label="Small" icon="menu" size="sm" />
 <UIIconButton label="No tooltip" icon="menu" bind:tooltip="false" />`,
@@ -630,7 +663,7 @@ html:active-view-transition-type(meeko-route) .project-card { view-transition-na
 <MeekoLink to="/transitions/project"
   data-meeko-view-transition="false">Open without a transition</MeekoLink>`,
 	icon: `<p><UIIcon name="lucide:search" /> Search the project</p>
-<UIButton variant="outline">
+<UIButton variant="outline" color="neutral">
   <UIIcon name="lucide:trash-2" label="Delete" />
 </UIButton>`,
 	iconConfig: `// pnpm add @meekojs/icon && pnpm add -D @iconify-json/lucide

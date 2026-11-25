@@ -1,8 +1,7 @@
 // The look of the messages: <UIAlert>, <UIToast> and the host of the toasts in <UIApp>, <UIEmpty>,
 // <UISkeleton> and <UIDisclosure>. Each property is set by one part only. What stays in feedback.css: the
 // pseudo-elements of the View Transition that closes a toast, which belong to the document, and the keyframes.
-import { tv } from 'tailwind-variants/lite'
-
+import { tv } from '../utils/theme'
 import { focusRing } from './focus'
 
 /** No transition or animation when the reader asks for less motion. */

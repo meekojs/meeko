@@ -2,7 +2,7 @@
 // input and its text. The browser's own box has a border of its own colour, and only --ui-color-control-border
 // reaches 3:1 in both themes: the inputs drop their appearance and draw the box, except in forced colours, where
 // the native control keeps every state visible. Each property is set by one part only.
-import { tv } from 'tailwind-variants/lite'
+import { tv } from '../utils/theme'
 
 /** The label: the whole row takes the click, and dims when its input is disabled. */
 const labelLayout = 'group flex items-center gap-2'

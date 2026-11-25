@@ -111,6 +111,7 @@
 					<UILink href="#inicio-rápido">{t('home.hero.start')}</UILink>
 					<UIButton
 						variant="outline"
+						color="neutral"
 						class="copy-command"
 						on:click="copyCommand"
 					>
@@ -810,6 +811,7 @@
 						<UILink bind:href="quickStartPage">{t('home.start.full')}</UILink>
 						<UILink
 							variant="outline"
+							color="neutral"
 							bind:href="framework"
 						>
 							{t('home.start.guide')}

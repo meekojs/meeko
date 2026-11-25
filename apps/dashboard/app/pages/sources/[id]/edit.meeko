@@ -320,12 +320,14 @@
 			<UILink
 				if:when="original"
 				variant="outline"
+				color="neutral"
 				bind:href="localePath('/translations/' + props.params.id)"
 			>
 				{t('editor.compareOriginal')}
 			</UILink>
 			<UILink
 				variant="ghost"
+				color="neutral"
 				bind:href="localePath('/sources/' + props.params.id)"
 			>
 				{t('editor.back')}
@@ -412,6 +414,7 @@
 								<UIButton
 									size="sm"
 									variant="outline"
+									color="neutral"
 									bind:disabled="stamping.value || !original?.baseHash"
 									on:click="markTranslated"
 								>
@@ -580,6 +583,7 @@
 							<UIButton
 								size="sm"
 								variant="outline"
+								color="neutral"
 								bind:disabled="previewing.value || tooLarge.value"
 								on:click="refreshPreview"
 							>
@@ -616,6 +620,7 @@
 									if:when="issue.line !== null"
 									size="sm"
 									variant="ghost"
+									color="neutral"
 									on:click="() => void goToLine(issue.line ?? 1)"
 								>
 									{t('editor.preview.line', { line: String(issue.line) })}

@@ -4,12 +4,12 @@
 	// handlers take over from the native close. The platform traps the focus and gives the focus back.
 	import type { UIDrawerProps } from '../types/navigation'
 
+	import { buttonTheme } from '../theme/components/button'
 	import { uiTheme } from '../utils/defaults'
 	import { icons } from '../utils/icons'
 	import { uiMessages } from '../utils/messages'
 	import { mountModalDialog } from '../utils/modal-dialog'
 	import { followsLink } from '../utils/navigation'
-	import { button } from '../variants/button'
 	import { drawer } from '../variants/drawer'
 	import * as Icon from './internal/Icon.meeko'
 
@@ -72,8 +72,8 @@
 	})
 
 	const classes = (): ReturnType<typeof drawer> => drawer({ side: props.side })
-	// The trigger is an outline button of variants/button, whose gap already leaves room for the icon.
-	const triggerClass = (): string => button({ variant: 'outline', size: 'sm', class: theme.ui.trigger })
+	// The trigger is a neutral outline button of theme/components/button, whose gap already leaves room for the icon.
+	const triggerClass = (): string => buttonTheme({ variant: 'outline', color: 'neutral', size: 'sm', class: theme.ui.trigger })
 </script>
 
 <template>

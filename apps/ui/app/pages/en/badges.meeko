@@ -25,7 +25,7 @@
 		<DocsCode bind:code="examples.badge" />
 		<h2 id="appearance">Appearance</h2>
 		<DocsPreview>
-			<UIBadge bind:appearance="{ variant: 'solid', color: 'cyan', radius: 'sm' }">Published</UIBadge>
+			<UIBadge bind:appearance="{ variant: 'solid', color: 'info', radius: 'sm' }">Published</UIBadge>
 			<UIBadge
 				dot
 				bind:appearance="{ variant: 'outline', color: 'warning', radius: 'full' }"
