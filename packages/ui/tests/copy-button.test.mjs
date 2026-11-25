@@ -57,12 +57,12 @@ test('UICopyButton waits hidden in SSR, as a secondary <button> with the UI text
 	assert.equal(button.attributes.type, 'button')
 	assert.equal(button.attributes['data-copy-state'], 'idle')
 	// Without the script it cannot copy: hidden, keeping its place, so hydration moves nothing.
-	assert.ok(button.classes.includes('ui:invisible'), button.tag)
+	assert.ok(button.classes.includes('invisible'), button.tag)
 	// The look of a secondary UIButton, and the colors of the result where the text is not on a solid.
-	for (const name of ['ui:bg-control', 'ui:border-border', 'ui:data-[copy-state=copied]:[color:var(--ui-copy-button-copied-color)]', 'ui:data-[copy-state=failed]:[color:var(--ui-copy-button-failed-color)]']) assert.ok(button.classes.includes(name), name)
+	for (const name of ['bg-control', 'border-border', 'data-[copy-state=copied]:[color:var(--ui-copy-button-copied-color)]', 'data-[copy-state=failed]:[color:var(--ui-copy-button-failed-color)]']) assert.ok(button.classes.includes(name), name)
 	assert.match(html, /<button[^>]*>\s*Copiar\s*<\/button>/)
 	// The live region exists from the first paint, empty: only a result is announced.
-	assert.match(html, /<span role="status" class="ui:sr-only"[^>]*><\/span>/)
+	assert.match(html, /<span role="status" class="sr-only"[^>]*><\/span>/)
 	assert.doesNotMatch(html, /undefined/)
 })
 
@@ -71,7 +71,7 @@ test('UICopyButton with iconOnly is a ghost UIIconButton named by its label, wit
 	const button = element(html, 'button')
 	assert.equal(button.attributes['aria-label'], 'Copiar el token')
 	assert.equal(button.attributes['data-copy-state'], 'idle')
-	for (const name of ['ui:bg-transparent', 'ui:p-0', 'ui:invisible']) assert.ok(button.classes.includes(name), name)
+	for (const name of ['bg-transparent', 'p-0', 'invisible']) assert.ok(button.classes.includes(name), name)
 	assert.match(html, new RegExp(`<path d="${icons.copy}"`))
 	assert.match(html, /role="tooltip"[^>]*>Copiar el token<\/span>/)
 	// The colors of the result read the tokens, never a value of their own.
@@ -92,15 +92,15 @@ test('UICopyButton takes variant, size, shape, tone, disabled, attributes, class
 	const button = element(html, 'button')
 	assert.equal(button.attributes.id, 'copy')
 	assert.match(button.tag, /\sdisabled(?:=""|\s|>)/)
-	for (const name of ['ui:bg-danger', 'ui:min-h-(--ui-control-height-sm)', 'ui:rounded-full', 'mine']) assert.ok(button.classes.includes(name), name)
+	for (const name of ['bg-danger', 'min-h-(--ui-control-height-sm)', 'rounded-full', 'mine']) assert.ok(button.classes.includes(name), name)
 	// On a solid the result keeps the color of the solid: no state color.
 	assert.ok(!button.classes.some((name) => name.includes('--ui-copy-button-copied-color')))
-	assert.match(html, /<span role="status" class="ui:sr-only my-status"[^>]*>/)
+	assert.match(html, /<span role="status" class="sr-only my-status"[^>]*>/)
 	const defaults = { copyButton: { variant: 'outline', class: 'app-copy' } }
 	validateDefaults(defaults)
 	const themed = await render(context, '<UICopyButton value="x" />', { defaults })
 	const outline = element(themed, 'button')
-	assert.ok(outline.classes.includes('ui:border-control-border'), 'outline of ui.defaults')
+	assert.ok(outline.classes.includes('border-control-border'), 'outline of ui.defaults')
 	assert.ok(outline.classes.includes('app-copy'))
 	assert.throws(() => validateDefaults({ copyButton: { variant: 'link' } }), /invalid defaults\.copyButton\.variant/)
 	assert.throws(() => validateDefaults({ copyButton: { ui: { icon: 'x' } } }), /unknown slot icon in defaults\.copyButton\.ui/)

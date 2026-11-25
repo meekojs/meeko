@@ -266,7 +266,7 @@ function assertOverrides(html) {
 	assert.ok(ariaLabels(html).includes('Clear from the prop'), 'clearLabel')
 	assert.ok(ariaLabels(html).includes('Close from the prop'), 'closeLabel')
 	assert.ok(html.includes('Night'), 'the labels of UIThemeToggle')
-	assert.match(html, /data-meeko-theme-icon="dark"[^>]*>\s*<svg[^>]*class="ui:flex-none /, 'UIThemeToggle icons paints the icon')
+	assert.match(html, /data-meeko-theme-icon="dark"[^>]*>\s*<svg[^>]*class="flex-none /, 'UIThemeToggle icons paints the icon')
 }
 
 function assertApp(html, { empty, clear, close, unknown, group, light }) {
@@ -304,6 +304,6 @@ test('SSR with i18n follows the locale of the URL, and UILinkCard to behaves as 
 	assert.match(attribute(user, 'class'), /--ui-link-card-padding.* wide$/, 'the class of the app goes after those of the card')
 	// `title` is the text of the card, not an attribute of the link.
 	assert.equal(attribute(user, 'title'), undefined)
-	assert.match(pages['/en'], /<strong class="[^"]*ui:font-medium[^"]*"[^>]*>Dynamic<\/strong>/)
+	assert.match(pages['/en'], /<strong class="[^"]*font-medium[^"]*"[^>]*>Dynamic<\/strong>/)
 	assert.ok(pages['/en'].includes('With params'))
 })

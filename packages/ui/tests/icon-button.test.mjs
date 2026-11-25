@@ -67,15 +67,15 @@ test('UIIconButton is a <button> named by its label, with its icon and a tooltip
 	// The icon of the package, hidden from the accessibility tree.
 	assert.match(html, new RegExp(`<svg[^>]*aria-hidden="true"[^>]*>\\s*<path d="${icons.close}"`))
 	// Ghost by default, square, of the size md.
-	for (const name of ['ui:bg-transparent', 'ui:border-transparent', 'ui:p-0', 'ui:min-w-(--ui-control-height-md)', 'ui:min-h-(--ui-control-height-md)', 'ui:aria-pressed:bg-primary-soft']) assert.ok(button.classes.includes(name), name)
+	for (const name of ['bg-transparent', 'border-transparent', 'p-0', 'min-w-(--ui-control-height-md)', 'min-h-(--ui-control-height-md)', 'aria-pressed:bg-primary-soft']) assert.ok(button.classes.includes(name), name)
 	assert.doesNotMatch(html, /undefined/)
 })
 
 test('UIIconButton variants, tone, size and shape are those of UIButton', async (context) => {
 	const html = await render(context, '<UIIconButton label="Borrar" icon="close" variant="primary" tone="danger" size="lg" shape="pill" />')
 	const { classes } = element(html, 'button')
-	for (const name of ['ui:bg-danger', 'ui:min-w-(--ui-control-height-lg)', 'ui:rounded-full', 'ui:aria-pressed:bg-danger-hover']) assert.ok(classes.includes(name), name)
-	assert.ok(!classes.includes('ui:bg-transparent'))
+	for (const name of ['bg-danger', 'min-w-(--ui-control-height-lg)', 'rounded-full', 'aria-pressed:bg-danger-hover']) assert.ok(classes.includes(name), name)
+	assert.ok(!classes.includes('bg-transparent'))
 })
 
 test('UIIconButton pressed is aria-pressed of a toggle, and a link never takes it', async (context) => {
@@ -98,7 +98,7 @@ test('UIIconButton loading and disabled: busy keeps the focus, disabled is the n
 	const [busy, disabled] = [...html.matchAll(/<button[^>]*>/g)].map(([tag]) => tag)
 	assert.match(busy, /aria-busy="true"/)
 	assert.match(busy, /aria-disabled="true"/)
-	assert.doesNotMatch(busy, /\sdisabled/)
+	assert.doesNotMatch(busy, /\sdisabled(?=[\s=>])/)
 	assert.match(disabled, /\sdisabled(?:=""|\s|>)/)
 	assert.match(disabled, /type="submit"/)
 })
@@ -122,10 +122,10 @@ test('UIIconButton takes class, ui and the variants of ui.defaults.iconButton; t
 	validateDefaults(defaults)
 	const html = await render(context, '<UIIconButton label="Uno" icon="close" /><UIIconButton label="Dos" icon="close" variant="secondary" class="mine" bind:ui="{ base: \'my-base\', icon: \'my-glyph\' }" />', { defaults })
 	const [first, second] = [...html.matchAll(/<button[^>]*class="([^"]*)"/g)].map(([, value]) => value.split(' '))
-	assert.ok(first.includes('ui:border-control-border'), 'outline of ui.defaults')
-	assert.ok(first.includes('ui:min-w-(--ui-control-height-sm)'), 'size of ui.defaults')
+	assert.ok(first.includes('border-control-border'), 'outline of ui.defaults')
+	assert.ok(first.includes('min-w-(--ui-control-height-sm)'), 'size of ui.defaults')
 	assert.ok(first.includes('app-icon'))
-	assert.ok(second.includes('ui:bg-control'), 'the variant of the instance wins')
+	assert.ok(second.includes('bg-control'), 'the variant of the instance wins')
 	// As in every component: the slot base first, then the class of ui.defaults and the one of the instance.
 	assert.ok(second.includes('my-base'))
 	assert.ok(second.indexOf('app-icon') < second.indexOf('mine'), second.join(' '))
@@ -145,8 +145,8 @@ test('UIHint is a button named by the UI texts and described by its help, of the
 	assert.equal(button.attributes.interestfor, tooltip.attributes.id)
 	assert.equal(button.attributes.type, 'button')
 	assert.match(html, /role="tooltip"[^>]*>Sin impuestos ni devoluciones\.<\/span>/)
-	assert.match(html, new RegExp(`<svg[^>]*class="[^"]*ui:size-\\(--ui-icon-size-text\\)[^"]*"[^>]*>\\s*<path d="${icons.info.replace(/\./g, '\\.')}"`))
-	for (const name of ['ui:align-(--ui-icon-text-align)', 'ui:cursor-help', 'ui:text-text-soft', 'ui:before:-inset-(--ui-hint-hit-area)']) assert.ok(button.classes.includes(name), name)
+	assert.match(html, new RegExp(`<svg[^>]*class="[^"]*size-\\(--ui-icon-size-text\\)[^"]*"[^>]*>\\s*<path d="${icons.info.replace(/\./g, '\\.')}"`))
+	for (const name of ['align-(--ui-icon-text-align)', 'cursor-help', 'text-text-soft', 'before:-inset-(--ui-hint-hit-area)']) assert.ok(button.classes.includes(name), name)
 	// Phrasing content: the heading keeps the button and the tooltip inside it.
 	assert.match(html, /^<h2>Ingresos <button[^>]*>[\s\S]*<\/button><span[^>]*>[^<]*<\/span><\/h2>$/)
 })
@@ -160,7 +160,7 @@ test('UIHint takes a label, a placement, a snippet, its id, the texts of the loc
 	assert.match(html, /<svg[^>]*class="[^"]*app-glyph"/)
 	const tooltip = element(html, 'span[^>]*role="tooltip"')
 	assert.ok(tooltip.classes.includes('my-tip'))
-	assert.ok(tooltip.classes.includes('ui:[position-area:right]'))
+	assert.ok(tooltip.classes.includes('[position-area:right]'))
 	assert.match(html, /role="tooltip"[^>]*>Ingresos menos <em>costes<\/em>\.<\/span>/)
 	const english = await render(context, '<UIHint text="Before taxes" />', { locale: 'en' })
 	assert.equal(element(english, 'button').attributes['aria-label'], 'More information')

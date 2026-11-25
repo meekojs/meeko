@@ -1,4 +1,6 @@
 <script lang="ts">
+	import * as AppearancePlayground from '../components/AppearancePlayground.meeko'
+	import * as AppearanceVariants from '../components/AppearanceVariants.meeko'
 	import { examples } from '../utils/examples'
 </script>
 
@@ -7,6 +9,14 @@
 		title="Temas y personalización"
 		description="Una sola fuente de diseño: tokens --ui-* para color, tamaño y forma, que puedes conectar con tu marca."
 	>
+		<h2 id="appearance">Motor de apariencia</h2>
+		<p>
+			Usa <code>appearance</code> en <code>UIButton</code>, <code>UIBadge</code>, <code>UIInput</code> y <code>UICard</code> para elegir entre las variantes y paletas de cada componente.
+			Para crear tus propias recetas, importa <code>appearance()</code> desde <code>@meekojs/ui/theme</code> y extiende su resultado en <code>tv()</code>.
+		</p>
+		<AppearanceVariants />
+		<AppearancePlayground />
+
 		<h2 id="theme">Claro, oscuro y sistema</h2>
 		<p>
 			<code>theme</code>

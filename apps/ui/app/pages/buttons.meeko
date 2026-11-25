@@ -21,6 +21,16 @@
 		</DocsPreview>
 		<p role="status">Cambios en este ejemplo: {count.value}</p>
 		<DocsCode bind:code="examples.button" />
+		<h2 id="appearance">Apariencia</h2>
+		<p>Usa <code>bind:appearance</code> para configurar juntos la variante, la paleta, el tamaño, el radio y la elevación.</p>
+		<DocsPreview>
+			<UIButton bind:appearance="{ variant: 'solid', color: 'primary', size: 'lg', radius: 'full', elevation: 'sm' }">Guardar</UIButton>
+			<UIButton bind:appearance="{ variant: 'soft', color: 'success', size: 'sm' }">Publicar</UIButton>
+			<UIButton bind:appearance="{ variant: 'outline', color: 'info' }">outline</UIButton>
+			<UIButton bind:appearance="{ variant: 'ghost', color: 'primary' }">ghost</UIButton>
+			<UIButton bind:appearance="{ variant: 'link', color: 'primary' }">link</UIButton>
+		</DocsPreview>
+		<DocsCode bind:code="examples.buttonAppearance" />
 		<h2 id="kinds">Ruta, enlace o botón</h2>
 		<p>
 			<code>UIButton</code>
@@ -129,6 +139,7 @@
 				{ name: 'target / rel / download', type: 'string', description: 'Con href. Para _blank se añade noopener noreferrer cuando rel no está definido.' },
 				{ name: 'type', type: 'button | submit | reset', default: 'button', description: 'Sin to ni href. Comportamiento nativo en formularios.' },
 				{ name: 'disabled', type: 'boolean', default: 'false', description: 'Sin to ni href. Desactiva el botón nativo.' },
+				{ name: 'appearance', type: 'ButtonAppearance', default: '—', description: 'Variante, color, tamaño, radio, ancho y elevación del catálogo de apariencia.' },
 				{ name: 'variant', type: 'primary | secondary | outline | ghost', default: 'primary', description: 'Jerarquía visual de la acción.' },
 				{ name: 'size', type: 'sm | md | lg', default: 'md', description: 'Tamaño del control.' },
 				{ name: 'shape', type: 'rounded | pill', default: 'rounded', description: 'Forma del contorno.' },

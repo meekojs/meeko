@@ -3,12 +3,12 @@
  * the dark theme and an app that redefines a token keep working. `inline` puts the var() in the utility and
  * `reference` emits no variable: the tokens are already in tokens.css. Each section follows a group of
  * tokens.css; the last one names the tokens of the controls. A token without a Tailwind namespace
- * (durations, control heights…) is read with `ui:prop-(--ui-token)`.
+ * (durations, control heights…) is read with `prop-(--ui-token)`.
  */
 @theme inline reference {
 	--*: initial;
 
-	/* Space: tokens.css sits on a 0.25rem grid, so ui:p-1.5 is --ui-space-1-5 */
+	/* Space: tokens.css sits on a 0.25rem grid, so p-1.5 is --ui-space-1-5 */
 	--spacing: var(--ui-space-1);
 
 	/* Colors: the semantic tokens of tokens.css, never the palette steps */
@@ -86,6 +86,7 @@
 	--text-xs: var(--ui-font-size-xs);
 	--text-sm: var(--ui-font-size-sm);
 	--text-md: var(--ui-font-size-md);
+	--text-base: var(--ui-font-size-md);
 	--text-lg: var(--ui-font-size-lg);
 	--text-xl: var(--ui-font-size-xl);
 	--text-2xl: var(--ui-font-size-2xl);
@@ -103,9 +104,14 @@
 
 	/* Weights */
 	--font-weight-regular: var(--ui-font-weight-regular);
+	--font-weight-thin: var(--ui-font-weight-thin);
+	--font-weight-light: var(--ui-font-weight-light);
+	--font-weight-normal: var(--ui-font-weight-regular);
 	--font-weight-medium: var(--ui-font-weight-medium);
 	--font-weight-semibold: var(--ui-font-weight-semibold);
 	--font-weight-bold: var(--ui-font-weight-bold);
+	--font-weight-extrabold: var(--ui-font-weight-extrabold);
+	--font-weight-black: var(--ui-font-weight-black);
 
 	/* Tracking */
 	--tracking-normal: var(--ui-tracking-normal);
@@ -119,12 +125,18 @@
 	--radius-md: var(--ui-radius-md);
 	--radius-lg: var(--ui-radius-lg);
 	--radius-xl: var(--ui-radius-xl);
+	--radius-2xl: var(--ui-radius-2xl);
+	--radius-3xl: var(--ui-radius-3xl);
 	--radius-full: var(--ui-radius-full);
 
 	/* Shadows */
 	--shadow-sm: var(--ui-shadow-sm);
 	--shadow-md: var(--ui-shadow-md);
 	--shadow-lg: var(--ui-shadow-lg);
+	--shadow-xs: var(--ui-shadow-xs);
+	--shadow-xl: var(--ui-shadow-xl);
+	--shadow-2xl: var(--ui-shadow-2xl);
+	--blur-md: var(--ui-blur-md);
 
 	/* Easings */
 	--ease-out: var(--ui-ease-out);
@@ -140,7 +152,7 @@
 	--container-3xl: var(--ui-container-3xl);
 	--container-4k: var(--ui-container-4k);
 
-	/* Controls: the text of buttons and inputs (`-md`: ui:text-control is the color --ui-color-control), and the busy spinner */
+	/* Controls: the text of buttons and inputs (`-md`: text-control is the color --ui-color-control), and the busy spinner */
 	--text-control-sm: var(--ui-control-font-size-sm);
 	--text-control-md: var(--ui-control-font-size);
 	--text-control-lg: var(--ui-control-font-size-lg);
@@ -154,8 +166,8 @@
 	/* Below it <UIPage> folds its sidebar into the bar above the content. */
 	--breakpoint-sidebar: 54rem;
 	--breakpoint-desktop: 75rem;
-	/* Of a container query (ui:@max-card-narrow:): below this width of its header, <UICard actionsWrap="auto"> puts its actions under the title. */
+	/* Of a container query (@max-card-narrow:): below this width of its header, <UICard actionsWrap="auto"> puts its actions under the title. */
 	--container-card-narrow: 24rem;
-	/* Of a container query (ui:@max-stat-narrow:): below this width, a key figure of <UIStat> puts its sparkline under the value and makes the value smaller. */
+	/* Of a container query (@max-stat-narrow:): below this width, a key figure of <UIStat> puts its sparkline under the value and makes the value smaller. */
 	--container-stat-narrow: 20rem;
 }

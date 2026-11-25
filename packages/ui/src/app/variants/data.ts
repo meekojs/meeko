@@ -5,13 +5,13 @@ import { tv } from 'tailwind-variants/lite'
 import { focusRing } from './focus'
 
 /** A <dl> in the text of the page. */
-const list = 'ui:m-0 ui:grid ui:min-w-0 ui:font-sans ui:text-md ui:leading-normal ui:font-regular ui:text-text ui:[overflow-wrap:anywhere]'
+const list = 'm-0 grid min-w-0 font-sans text-md leading-normal font-regular text-text [overflow-wrap:anywhere]'
 
 /** The term of a <dl>. */
-const term = 'ui:text-sm ui:text-text-soft'
+const term = 'text-sm text-text-soft'
 
 /** A value, and its figures in columns. */
-const value = 'ui:m-0 ui:tabular-nums'
+const value = 'm-0 tabular-nums'
 
 /** The context under a value. */
 const detail = [value, term]
@@ -24,21 +24,21 @@ const detail = [value, term]
  */
 export const stat = tv({
 	slots: {
-		base: [list, 'ui:content-start ui:gap-1'],
+		base: [list, 'content-start gap-1'],
 		label: term,
 		/** The <UIHint> after the label, a space away from its text. */
-		hint: 'ui:ms-1',
-		value: [value, 'ui:text-2xl ui:font-semibold ui:tracking-tight'],
+		hint: 'ms-1',
+		value: [value, 'text-2xl font-semibold tracking-tight'],
 		detail,
 		/** The change and its period, on one line that wraps. */
-		change: 'ui:m-0 ui:flex ui:flex-wrap ui:items-baseline ui:gap-x-1.5 ui:text-sm ui:text-text-soft',
+		change: 'm-0 flex flex-wrap items-baseline gap-x-1.5 text-sm text-text-soft',
 		/** The arrow and the signed change, in the colour of its tone. */
-		delta: 'ui:inline-flex ui:items-center ui:gap-0.5 ui:self-center ui:font-medium ui:tabular-nums',
+		delta: 'inline-flex items-center gap-0.5 self-center font-medium tabular-nums',
 		icon: '',
 		period: '',
-		trend: 'ui:m-0 ui:min-w-0',
-		action: 'ui:m-0 ui:text-sm',
-		link: ['ui:rounded-xs ui:font-medium ui:text-primary-text ui:underline ui:decoration-current ui:underline-offset-(--ui-underline-offset) ui:hover:text-text', focusRing],
+		trend: 'm-0 min-w-0',
+		action: 'm-0 text-sm',
+		link: ['rounded-xs font-medium text-primary-text underline decoration-current underline-offset-(--ui-underline-offset) hover:text-text', focusRing],
 	},
 	variants: {
 		/**
@@ -48,8 +48,8 @@ export const stat = tv({
 		kpi: {
 			false: {},
 			true: {
-				base: 'ui:@container ui:[contain-intrinsic-inline-size:var(--ui-stat-intrinsic-width)]',
-				value: 'ui:@max-stat-narrow:text-xl',
+				base: '@container [contain-intrinsic-inline-size:var(--ui-stat-intrinsic-width)]',
+				value: '@max-stat-narrow:text-xl',
 			},
 		},
 		/**
@@ -60,29 +60,29 @@ export const stat = tv({
 		chart: {
 			false: {},
 			true: {
-				base: 'ui:grid-cols-[minmax(0,1fr)_auto]',
-				label: 'ui:col-span-full',
-				value: 'ui:col-[1]',
-				change: 'ui:col-span-full',
-				detail: 'ui:col-span-full',
+				base: 'grid-cols-[minmax(0,1fr)_auto]',
+				label: 'col-span-full',
+				value: 'col-[1]',
+				change: 'col-span-full',
+				detail: 'col-span-full',
 				trend: [
-					'ui:col-[2] ui:row-[2] ui:ms-4 ui:w-(--ui-stat-trend-width) ui:self-center',
-					'ui:@max-stat-narrow:col-span-full ui:@max-stat-narrow:row-auto ui:@max-stat-narrow:ms-0 ui:@max-stat-narrow:w-auto',
+					'col-[2] row-[2] ms-4 w-(--ui-stat-trend-width) self-center',
+					'@max-stat-narrow:col-span-full @max-stat-narrow:row-auto @max-stat-narrow:ms-0 @max-stat-narrow:w-auto',
 				],
-				action: 'ui:col-span-full',
+				action: 'col-span-full',
 			},
 		},
 		/** Good, bad or neither: the direction of the change against the one that is good. */
 		tone: {
-			neutral: { delta: 'ui:text-text' },
-			success: { delta: 'ui:text-success-text' },
-			danger: { delta: 'ui:text-danger-text' },
+			neutral: { delta: 'text-text' },
+			success: { delta: 'text-success-text' },
+			danger: { delta: 'text-danger-text' },
 		},
 		/** The arrow of a flat change points to the end of the line, in either direction of the text. */
 		direction: {
 			up: {},
 			down: {},
-			flat: { icon: 'ui:rtl:[scale:-1_1]' },
+			flat: { icon: 'rtl:[scale:-1_1]' },
 		},
 	},
 	defaultVariants: {
@@ -103,20 +103,20 @@ export const stat = tv({
 export const sparkline = tv({
 	slots: {
 		base: [
-			'ui:block ui:h-(--ui-sparkline-height) ui:w-full ui:max-w-full ui:overflow-visible',
-			'ui:animate-[ui-sparkline-draw_var(--ui-sparkline-duration)_var(--ui-ease-out)_backwards] ui:motion-reduce:animate-none',
+			'block h-(--ui-sparkline-height) w-full max-w-full overflow-visible',
+			'animate-[ui-sparkline-draw_var(--ui-sparkline-duration)_var(--ui-ease-out)_backwards] motion-reduce:animate-none',
 		],
-		area: 'ui:fill-current ui:[fill-opacity:var(--ui-sparkline-area-opacity)] ui:stroke-none',
-		line: 'ui:fill-none ui:stroke-current ui:[stroke-linecap:round] ui:[stroke-linejoin:round] ui:[stroke-width:var(--ui-sparkline-stroke-width)] ui:[vector-effect:non-scaling-stroke]',
+		area: 'fill-current [fill-opacity:var(--ui-sparkline-area-opacity)] stroke-none',
+		line: 'fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:var(--ui-sparkline-stroke-width)] [vector-effect:non-scaling-stroke]',
 	},
 	variants: {
 		tone: {
-			neutral: { base: 'ui:text-text-soft' },
-			accent: { base: 'ui:text-primary-text' },
-			info: { base: 'ui:text-info-text' },
-			success: { base: 'ui:text-success-text' },
-			warning: { base: 'ui:text-warning-text' },
-			danger: { base: 'ui:text-danger-text' },
+			neutral: { base: 'text-text-soft' },
+			accent: { base: 'text-primary-text' },
+			info: { base: 'text-info-text' },
+			success: { base: 'text-success-text' },
+			warning: { base: 'text-warning-text' },
+			danger: { base: 'text-danger-text' },
 		},
 	},
 })
@@ -124,18 +124,18 @@ export const sparkline = tv({
 /** The look of <UIDescriptionList>: one column, or up to three from a `compact` screen. */
 export const descriptionList = tv({
 	slots: {
-		base: [list, 'ui:gap-5'],
-		item: 'ui:grid ui:content-start ui:gap-1',
+		base: [list, 'gap-5'],
+		item: 'grid content-start gap-1',
 		label: term,
 		value,
-		code: 'ui:font-mono ui:text-(length:--ui-prose-code-size) ui:[overflow-wrap:anywhere]',
+		code: 'font-mono text-(length:--ui-prose-code-size) [overflow-wrap:anywhere]',
 		detail,
 	},
 	variants: {
 		columns: {
 			1: '',
-			2: { base: 'ui:compact:grid-cols-2' },
-			3: { base: 'ui:compact:grid-cols-3' },
+			2: { base: 'compact:grid-cols-2' },
+			3: { base: 'compact:grid-cols-3' },
 		},
 	},
 	defaultVariants: {

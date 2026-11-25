@@ -22,6 +22,16 @@
 		</DocsPreview>
 		<p role="status">Changes in this example: {count.value}</p>
 		<DocsCode bind:code="examples.button" />
+		<h2 id="appearance">Appearance</h2>
+		<p>Use <code>bind:appearance</code> to set the variant, palette, size, radius and elevation together.</p>
+		<DocsPreview>
+			<UIButton bind:appearance="{ variant: 'solid', color: 'primary', size: 'lg', radius: 'full', elevation: 'sm' }">Save</UIButton>
+			<UIButton bind:appearance="{ variant: 'soft', color: 'success', size: 'sm' }">Publish</UIButton>
+			<UIButton bind:appearance="{ variant: 'outline', color: 'info' }">outline</UIButton>
+			<UIButton bind:appearance="{ variant: 'ghost', color: 'primary' }">ghost</UIButton>
+			<UIButton bind:appearance="{ variant: 'link', color: 'primary' }">link</UIButton>
+		</DocsPreview>
+		<DocsCode bind:code="examples.buttonAppearance" />
 		<h2 id="kinds">Route, link or button</h2>
 		<p>
 			<code>UIButton</code>
@@ -130,6 +140,7 @@
 				{ name: 'target / rel / download', type: 'string', description: 'With to or href. For _blank, noopener noreferrer is added when rel is not set.' },
 				{ name: 'type', type: 'button | submit | reset', default: 'button', description: 'Without to or href. Native behavior in forms.' },
 				{ name: 'disabled', type: 'boolean', default: 'false', description: 'Without to or href. Disables the native button.' },
+				{ name: 'appearance', type: 'ButtonAppearance', default: '—', description: 'Variant, color, size, radius, width and elevation from the appearance catalog.' },
 				{ name: 'variant', type: 'primary | secondary | outline | ghost', default: 'primary', description: 'Visual hierarchy of the action.' },
 				{ name: 'size', type: 'sm | md | lg', default: 'md', description: 'Size of the control.' },
 				{ name: 'shape', type: 'rounded | pill', default: 'rounded', description: 'Shape of the outline.' },

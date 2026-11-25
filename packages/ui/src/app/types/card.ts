@@ -1,5 +1,6 @@
 import type { ElementAttributes } from '@meekojs/meeko'
 
+import type { CardAppearance } from '../theme/recipes'
 import type { card } from '../variants/card'
 import type { UICardActionsWrap, UICardVariant } from './config'
 import type { UIDensity } from './forms'
@@ -24,6 +25,8 @@ export type UICardProps = Omit<ElementAttributes<'section'>, 'class' | 'title'> 
 				headingId?: string
 				/** Descripción de la sección. */
 				description?: string
+				/** Apariencia basada en el catálogo de Meeko UI. */
+				appearance?: CardAppearance
 				/** Tratamiento visual. */
 				variant?: UICardVariant
 				/** Espacio predeterminado entre el contenido y el borde. */

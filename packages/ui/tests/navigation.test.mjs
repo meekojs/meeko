@@ -53,40 +53,40 @@ test('the navigation components render on the server with their semantics', { ti
 	await t.test('UIPage: one main, focusable, with its skip link, in every layout', () => {
 		assert.equal(count(es, /<main\b/g), 1)
 		// The wrapper of the notices is the one that hides when it is empty.
-		assert.ok(block(es, 'ui:not-has-[*]:hidden', '</section>').includes('Aviso de la página'), 'the notices have their place under the header')
-		assert.ok(!landing.includes('ui:not-has-[*]:hidden'), 'without the snippet there is no wrapper')
+		assert.ok(block(es, 'not-has-[*]:hidden', '</section>').includes('Aviso de la página'), 'the notices have their place under the header')
+		assert.ok(!landing.includes('not-has-[*]:hidden'), 'without the snippet there is no wrapper')
 		const main = tag(es, /<main\b/)
 		assert.equal(attribute(main, 'id'), 'contenido')
 		assert.equal(attribute(main, 'tabindex'), '-1')
 		// The skip link is the first link of the page, fixed off the screen.
-		const skip = /<a\b[^>]*class="ui:fixed /
+		const skip = /<a\b[^>]*class="fixed /
 		assert.equal(attribute(tag(es, skip), 'href'), '#contenido')
 		assert.ok(es.includes('Saltar al contenido'))
 		assert.ok(en.includes('Skip to content'), 'the skip link follows the locale of the document')
 		// The layout sets the padding of <main>: 10 and 20 for docs, 8 and 12 for a dashboard, none for a landing page.
-		assert.match(tag(es, /<main\b/), /ui:pt-10 ui:pb-20/)
-		const custom = tag(dashboard, /class="ui:group\/page /)
+		assert.match(tag(es, /<main\b/), /pt-10 pb-20/)
+		const custom = tag(dashboard, /class="group\/page /)
 		assert.equal(attribute(custom, 'lang'), 'es')
 		const customMain = tag(dashboard, /<main\b/)
 		assert.equal(attribute(customMain, 'id'), 'principal')
 		assert.equal(attribute(customMain, 'lang'), 'en')
-		assert.match(customMain, /ui:pt-8 ui:pb-12/)
+		assert.match(customMain, /pt-8 pb-12/)
 		assert.equal(attribute(tag(dashboard, skip), 'href'), '#principal')
 		assert.ok(dashboard.includes('Ir al panel'))
-		assert.match(tag(landing, /<main\b/), /ui:pt-0 ui:pb-0/)
+		assert.match(tag(landing, /<main\b/), /pt-0 pb-0/)
 		// The sidebar hides below `sidebar`, where the bar shows.
-		assert.equal(count(dashboard, /<aside\b|ui:max-sidebar:hidden|ui:max-sidebar:sticky/g), 0, 'a zone without its snippet paints nothing')
+		assert.equal(count(dashboard, /<aside\b|max-sidebar:hidden|max-sidebar:sticky/g), 0, 'a zone without its snippet paints nothing')
 		for (const html of [es, dashboard, landing]) assert.equal(count(html, /<h1\b/g), 1)
 	})
 
 	await t.test('UIPageHeader: title, description, breadcrumb and actions', () => {
-		const pageHeader = '<header class="ui:grid ui:gap-4 '
+		const pageHeader = '<header class="grid gap-4 '
 		const header = block(es, pageHeader, '</header>')
 		assert.match(header, /<h1[^>]*><span>Navegación<\/span><\/h1>/)
 		assert.ok(header.includes('Todos los componentes de navegación juntos.'))
 		assert.ok(header.includes('aria-label="Ruta de navegación"'))
 		assert.ok(header.includes('Editar'))
-		assert.match(block(dashboard, pageHeader, '</header>'), /^<header class="[^"]*ui:mb-6 ui:pb-0/, 'a dashboard header has no border')
+		assert.match(block(dashboard, pageHeader, '</header>'), /^<header class="[^"]*mb-6 pb-0/, 'a dashboard header has no border')
 		const landingHeader = block(landing, pageHeader, '</header>')
 		assert.equal(attribute(tag(landingHeader, /<h1\b/), 'id'), 'portada')
 		assert.match(landingHeader, /Portada<code>\.meeko<\/code>/)
@@ -96,8 +96,8 @@ test('the navigation components render on the server with their semantics', { ti
 		const header = block(landing, '<header', '</header>')
 		// The brand is the first link of the bar.
 		assert.equal(attribute(tag(header, /<a\b/), 'aria-label'), 'Meeko, inicio')
-		assert.match(header, /<span class="[^"]*ui:max-phone:hidden[^"]*"[^>]*>Meeko<\/span>/)
-		assert.doesNotMatch(block(es, '<header', '</header>'), /<span(?![^>]*ui:max-phone:hidden)[^>]*>Meeko<\/span>\s*<strong/, 'a product still has its hidden name')
+		assert.match(header, /<span class="[^"]*max-phone:hidden[^"]*"[^>]*>Meeko<\/span>/)
+		assert.doesNotMatch(block(es, '<header', '</header>'), /<span(?![^>]*max-phone:hidden)[^>]*>Meeko<\/span>\s*<strong/, 'a product still has its hidden name')
 	})
 
 	await t.test('UIHeader: brand, links with to and href, current page and a native menu', () => {
@@ -151,11 +151,11 @@ test('the navigation components render on the server with their semantics', { ti
 		assert.equal(count(tree, /<summary/g), 3)
 		assert.ok(tag(tree, /<details/).includes(' open'), 'open by default')
 		assert.equal(attribute(tag(tree, /aria-current="/), 'href'), '/current-page')
-		assert.match(tree, /<span class="[^"]*ui:font-mono[^"]*"/, 'code goes in monospace')
+		assert.match(tree, /<span class="[^"]*font-mono[^"]*"/, 'code goes in monospace')
 		assert.ok(tree.includes('Destacado'))
 		assert.match(tree, /<path d="M2\.5 4\.5h11M2\.5 8h11M2\.5 11\.5h7"/)
 		const closed = [...tree.matchAll(/<details[^>]*>/g)].map(([value]) => value)
-		assert.equal(closed.filter((value) => /\sopen/.test(value)).length, 2, 'open: false folds a group, unless it holds the current link')
+		assert.equal(closed.filter((value) => /\sopen(?=[\s=>])/.test(value)).length, 2, 'open: false folds a group, unless it holds the current link')
 		const flat = block(landing, 'aria-label="Navegación de la sección"', '</nav>')
 		assert.equal(count(flat, /<details|<summary/g), 0, 'not collapsible, without a title')
 		assert.ok(block(dashboard, 'aria-label="Navegación de la sección"', '</nav>').includes('Sin resultados'), 'no groups')
@@ -167,9 +167,9 @@ test('the navigation components render on the server with their semantics', { ti
 		assert.equal(attribute(dialog, 'id'), 'menu')
 		assert.equal(attribute(dialog, 'closedby'), 'any')
 		assert.equal(attribute(dialog, 'data-side'), undefined, 'the side is in its classes')
-		assert.match(attribute(dialog, 'class'), /ui:start-0/)
+		assert.match(attribute(dialog, 'class'), /start-0/)
 		assert.equal(attribute(dialog, 'aria-labelledby'), 'menu-title')
-		assert.doesNotMatch(dialog, /\sopen/)
+		assert.doesNotMatch(dialog, /\sopen(?=[\s=>])/)
 		const trigger = tag(es, /command="show-modal"/)
 		assert.equal(attribute(trigger, 'command'), 'show-modal')
 		assert.equal(attribute(trigger, 'commandfor'), 'menu')
@@ -195,8 +195,8 @@ test('the navigation components render on the server with their semantics', { ti
 		const filter = block(es, 'aria-label="Filtro"', '</nav>')
 		assert.ok(!filter.includes('position-anchor'), 'a segmented row has no indicator: its View Transition name never repeats')
 		assert.equal(attribute(tag(filter, /aria-current="/), 'href'), '#todas')
-		assert.match(filter, /Activas<span[^>]*class="[^"]*ui:bg-success-soft[^"]*"/, 'the counter is a badge next to the text')
-		assert.match(filter, /<span(?=[^>]*aria-hidden="true")[^>]*class="[^"]*ui:bg-current/)
+		assert.match(filter, /Activas<span[^>]*class="[^"]*bg-success-soft[^"]*"/, 'the counter is a badge next to the text')
+		assert.match(filter, /<span(?=[^>]*aria-hidden="true")[^>]*class="[^"]*bg-current/)
 	})
 
 	await t.test('a link with to: its own current wins over the route, and without it the route decides', () => {
@@ -254,7 +254,7 @@ test('the navigation components render on the server with their semantics', { ti
 			buttons.filter((value) => attribute(value, 'aria-current') === 'page').map((value) => attribute(value, 'aria-label')),
 			['Página 3'],
 		)
-		assert.ok(!buttons.some((value) => /\sdisabled/.test(value)), 'nothing is disabled in the middle')
+		assert.ok(!buttons.some((value) => /\sdisabled(?=[\s=>])/.test(value)), 'nothing is disabled in the middle')
 		assert.equal(count(pager, /<span\b[^>]*aria-hidden="true"[^>]*>…<\/span>/g), 1, 'one gap, between 5 and 12')
 		assert.match(pager, /<ul\b[^>]*>(<li\b[^>]*>.*?<\/li>){11}<\/ul>/)
 		assert.equal(count(pager, /<svg\b[^>]*aria-hidden="true"/g), 4, 'the controls draw their icon')
@@ -284,7 +284,7 @@ test('the navigation components render on the server with their semantics', { ti
 		const pager = block(es, 'aria-label="Páginas deshabilitadas"', '</nav>')
 		const buttons = [...pager.matchAll(/<button\b[^>]*>/g)].map(([value]) => value)
 		assert.equal(buttons.length, 5)
-		for (const value of buttons) assert.match(value, /\sdisabled/)
+		for (const value of buttons) assert.match(value, /\sdisabled(?=[\s=>])/)
 	})
 
 	await t.test('UITableOfContents: links without a script, in both views, or nothing', () => {
@@ -295,7 +295,7 @@ test('the navigation components render on the server with their semantics', { ti
 			[...aside.matchAll(/href="([^"]*)"/g)].map((match) => match[1]),
 			['#uno', '#dos', '#dos-a', '#tres'],
 		)
-		assert.match(attribute(tag(aside, /href="#dos-a"/), 'class'), /ui:ps-6/, 'a level 3 entry is indented')
+		assert.match(attribute(tag(aside, /href="#dos-a"/), 'class'), /ps-6/, 'a level 3 entry is indented')
 		assert.match(attribute(asideTag, 'class'), /\[scroll-target-group:auto\]/, 'the browser follows the active entry')
 		assert.ok(block(es, '<details data-pagefind-ignore', '</summary>').includes('En esta página'))
 		assert.ok(en.includes('On this page'))
@@ -310,7 +310,7 @@ test('the navigation components render on the server with their semantics', { ti
 		assert.equal(attribute(english, 'title'), 'English')
 		assert.equal(attribute(tag(switcher, /hreflang="es"/), 'aria-current'), 'page')
 		assert.match(switcher, /<span aria-hidden="true">EN<\/span>/)
-		assert.match(switcher, /<span class="ui:sr-only">English<\/span>/)
+		assert.match(switcher, /<span class="sr-only">English<\/span>/)
 		assert.match(tag(es, /aria-label="Idioma"/), /^<nav\b/)
 		assert.doesNotMatch(dashboard, /aria-label="Idioma"/)
 	})
@@ -329,13 +329,13 @@ test('the navigation components render on the server with their semantics', { ti
 		assert.ok(plain.includes('sh'))
 		assert.match(plain, /<pre[^>]*tabindex="0"[^>]*><code>pnpm add @meekojs\/ui<\/code><\/pre>/)
 		assert.ok(plain.includes('Copiar'))
-		assert.match(attribute(tag(plain, /^<button/), 'class'), /(^| )ui:invisible( |$)/, 'the button waits for the script')
-		assert.match(highlighted, /^[^>]*ui:border-success-border/, 'the frame of a good example')
+		assert.match(attribute(tag(plain, /^<button/), 'class'), /(^| )invisible( |$)/, 'the button waits for the script')
+		assert.match(highlighted, /^[^>]*border-success-border/, 'the frame of a good example')
 		assert.ok(highlighted.includes('Correcto'))
 		assert.match(highlighted, /class="shiki"/)
 		assert.ok(bad.includes('Incorrecto'))
-		assert.match(bad, /^[^>]*ui:border-danger-border/, 'the frame of a wrong example')
-		assert.match(attribute(tag(log, /^<pre/), 'class'), /(^| )ui:whitespace-pre-wrap( |$)/, 'a log breaks its lines')
+		assert.match(bad, /^[^>]*border-danger-border/, 'the frame of a wrong example')
+		assert.match(attribute(tag(log, /^<pre/), 'class'), /(^| )whitespace-pre-wrap( |$)/, 'a log breaks its lines')
 		assert.match(log, /<pre[^>]*role="log"/)
 		assert.match(log, /aria-label="Salida"/)
 		assert.doesNotMatch(log, /<button/, 'a log has no copy button by default')
@@ -356,12 +356,12 @@ test('the navigation components render on the server with their semantics', { ti
 			[...diff.matchAll(/data-kind="(\w+)"/g)].map((match) => match[1]),
 			['file', 'file', 'hunk', 'context', 'remove', 'add'],
 		)
-		assert.ok(diff.includes('<span class="ui:sr-only">Añadido:</span>+después'))
-		assert.ok(diff.includes('<span class="ui:sr-only">Eliminado:</span>-antes'))
+		assert.ok(diff.includes('<span class="sr-only">Añadido:</span>+después'))
+		assert.ok(diff.includes('<span class="sr-only">Eliminado:</span>-antes'))
 		assert.match(tag(es, /aria-label="Cambios en la guía"/), /^<pre\b/)
 		assert.ok(es.includes('Sin cambios.'))
 		assert.ok(en.includes('No changes.'))
-		assert.ok(en.includes('<span class="ui:sr-only">Added:</span>+después'))
+		assert.ok(en.includes('<span class="sr-only">Added:</span>+después'))
 	})
 })
 

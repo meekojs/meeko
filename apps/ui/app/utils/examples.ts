@@ -32,6 +32,66 @@ export default defineMeekoConfig({
 <UIButton size="sm" disabled>No disponible</UIButton>
 <p role="status">Cambios: {count.value}</p>
 </template>`,
+	buttonAppearance: `<UIButton bind:appearance="{ variant: 'solid', color: 'primary', size: 'lg', radius: 'full', elevation: 'sm' }">Guardar</UIButton>
+<UIButton bind:appearance="{ variant: 'soft', color: 'success', size: 'sm' }">Publicar</UIButton>
+<UIButton bind:appearance="{ variant: 'outline', color: 'info' }">outline</UIButton>
+<UIButton bind:appearance="{ variant: 'ghost', color: 'primary' }">ghost</UIButton>
+<UIButton bind:appearance="{ variant: 'link', color: 'primary' }">link</UIButton>`,
+	badgeAppearance: `<UIBadge bind:appearance="{ variant: 'solid', color: 'cyan', radius: 'sm' }">Publicado</UIBadge>
+<UIBadge
+	dot
+	bind:appearance="{ variant: 'outline', color: 'warning', radius: 'full' }"
+>
+	Pendiente
+</UIBadge>
+<UIBadge bind:appearance="{ variant: 'soft', color: 'success' }">soft</UIBadge>
+<UIBadge bind:appearance="{ variant: 'surface', color: 'info' }">surface</UIBadge>`,
+	inputAppearance: `<label for="appearance-email">Correo de trabajo</label>
+<UIInput
+	id="appearance-email"
+	type="email"
+	placeholder="name@example.com"
+	bind:appearance="{ variant: 'surface', color: 'primary', size: 'lg', radius: 'lg' }"
+/>
+<label for="appearance-input-outline">outline</label>
+<UIInput
+	id="appearance-input-outline"
+	bind:appearance="{ variant: 'outline', color: 'primary' }"
+/>
+<label for="appearance-input-ghost">ghost</label>
+<UIInput
+	id="appearance-input-ghost"
+	bind:appearance="{ variant: 'ghost', color: 'primary' }"
+/>
+<label for="appearance-input-soft">soft</label>
+<UIInput
+	id="appearance-input-soft"
+	bind:appearance="{ variant: 'soft', color: 'primary' }"
+/>`,
+	cardAppearance: `<UICard
+	title="Resumen semanal"
+	bind:appearance="{ variant: 'surface', color: 'primary', radius: 'xl', elevation: 'md' }"
+>
+	3 proyectos actualizados
+</UICard>
+<UICard
+	title="outline"
+	bind:appearance="{ variant: 'outline', color: 'primary' }"
+>
+	3 proyectos actualizados
+</UICard>
+<UICard
+	title="glass"
+	bind:appearance="{ variant: 'glass', color: 'primary' }"
+>
+	3 proyectos actualizados
+</UICard>
+<UICard
+	title="plain"
+	bind:appearance="{ variant: 'plain', color: 'primary' }"
+>
+	3 proyectos actualizados
+</UICard>`,
 	buttonKinds: `<!-- Una ruta de la aplicación: navega sin recargar, con params y search tipados -->
 <UIButton to="/links">Ver enlaces</UIButton>
 <UIButton to="/users/[id]" bind:params="{ id: user.id }"

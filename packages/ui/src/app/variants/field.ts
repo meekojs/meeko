@@ -2,17 +2,17 @@
 import { tv } from 'tailwind-variants/lite'
 
 /** A line of help under the control, in soft text. */
-const help = 'ui:m-0 ui:text-sm ui:text-text-soft'
+const help = 'm-0 text-sm text-text-soft'
 
 export const field = tv({
 	slots: {
-		base: 'ui:grid ui:gap-1.5 ui:font-sans ui:text-text',
-		label: 'ui:text-sm ui:font-medium',
+		base: 'grid gap-1.5 font-sans text-text',
+		label: 'text-sm font-medium',
 		description: help,
-		error: 'ui:m-0 ui:text-sm ui:text-danger-text',
+		error: 'm-0 text-sm text-danger-text',
 		// The hint and the counter share a row, one at each end; a counter without a hint stays at the start.
-		meta: 'ui:flex ui:justify-between ui:gap-3',
+		meta: 'flex justify-between gap-3',
 		hint: help,
-		counter: [help, 'ui:flex-none ui:tabular-nums'],
+		counter: [help, 'flex-none tabular-nums'],
 	},
 })

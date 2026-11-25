@@ -8,15 +8,16 @@ Desde la raíz del repositorio, con Node.js 24+ y pnpm 12:
 
 ```powershell
 pnpm install
-pnpm build
-pnpm ui:dev
+pnpm dev:ui
 ```
 
-Esta web escucha en `http://127.0.0.1:4174`. `pnpm dev` inicia los cuatro sitios en paralelo; `pnpm ui:dev` inicia solo esta web.
+Esta web escucha en `http://127.0.0.1:4174`. `pnpm dev` inicia los cuatro sitios en paralelo; `pnpm dev:ui` inicia solo esta web.
+
+En desarrollo, Meeko observa los componentes en `packages/ui/src` y Vite recompila Tailwind al editar sus clases. El servidor se mantiene activo mientras editas.
 
 ```powershell
 pnpm -F meeko-ui-site check
-pnpm ui:build
+pnpm build --filter=meeko-ui-site
 pnpm -F meeko-ui-site start
 ```
 

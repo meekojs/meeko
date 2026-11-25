@@ -4,11 +4,13 @@ import { tv } from 'tailwind-variants/lite'
 
 import { focusRing } from './focus'
 
+export { cardAppearance } from '../theme/recipes'
+
 /**
  * A component written straight in a <UIProse> keeps the rhythm of its blocks: no space above it and the gap of a
- * paragraph below, except as the last one. The prose's own rules stop at any element with a ui:* class.
+ * paragraph below, except as the last one. The prose's own rules stop at elements marked with meeko-ui-component.
  */
-export const inProse = 'ui:[.meeko-ui-prose>&]:mt-0 ui:[.meeko-ui-prose>&]:mb-6 ui:[.meeko-ui-prose>&:last-child]:mb-0'
+export const inProse = 'meeko-ui-component [.meeko-ui-prose>&]:mt-0 [.meeko-ui-prose>&]:mb-6 [.meeko-ui-prose>&:last-child]:mb-0'
 
 /**
  * The look of <UICard>. Its padding lives in --card-padding, which a <UITable> inside the body also reads: a
@@ -18,45 +20,46 @@ export const inProse = 'ui:[.meeko-ui-prose>&]:mt-0 ui:[.meeko-ui-prose>&]:mb-6 
 export const card = tv({
 	slots: {
 		base: [
-			'ui:group/card ui:box-border ui:flex ui:min-w-0 ui:flex-col',
-			'ui:rounded-lg ui:border-(length:--ui-border-width) ui:font-sans ui:leading-normal',
+			'group/card box-border flex min-w-0 flex-col',
+			'font-sans leading-normal',
 			inProse,
 		],
 		header: [
-			'ui:grid ui:gap-y-1.5 ui:px-(--card-padding) ui:pt-(--card-padding) ui:pb-0 ui:[overflow-wrap:anywhere]',
-			'ui:group-has-[>div>:only-child>table[role=table]]/card:pb-3',
+			'grid gap-y-1.5 px-(--card-padding) pt-(--card-padding) pb-0 [overflow-wrap:anywhere]',
+			'group-has-[>div>:only-child>table[role=table]]/card:pb-3',
 			// The title, or the headings of the `header` snippet.
-			'ui:[&_:is(h1,h2,h3,h4)]:m-0 ui:[&_:is(h1,h2,h3,h4)]:text-xl ui:[&_:is(h1,h2,h3,h4)]:leading-snug ui:[&_:is(h1,h2,h3,h4)]:font-semibold ui:[&_:is(h1,h2,h3,h4)]:tracking-tight ui:[&_:is(h1,h2,h3,h4)]:text-inherit',
+			'[&_:is(h1,h2,h3,h4)]:m-0 [&_:is(h1,h2,h3,h4)]:text-xl [&_:is(h1,h2,h3,h4)]:leading-snug [&_:is(h1,h2,h3,h4)]:font-semibold [&_:is(h1,h2,h3,h4)]:tracking-tight [&_:is(h1,h2,h3,h4)]:text-inherit',
 		],
 		title: '',
-		description: 'ui:m-0 ui:text-md',
-		actions: 'ui:flex ui:min-h-lh ui:flex-wrap ui:items-center ui:[align-self:start] ui:gap-2',
+		description: 'm-0 text-md',
+		actions: 'flex min-h-lh flex-wrap items-center [align-self:start] gap-2',
 		body: [
-			'ui:flex-1 ui:p-(--card-padding) ui:[overflow-wrap:anywhere] ui:[&>:first-child]:mt-0 ui:[&>:last-child]:mb-0',
-			'ui:[&_table[role=table]>*>tr>:first-child]:ps-0 ui:[&_table[role=table]>*>tr>:last-child]:pe-0',
-			'ui:has-[>:only-child>table[role=table]]:p-0 ui:[&>:only-child:has(>table[role=table])]:rounded-[inherit] ui:[&>:only-child>table[role=table]]:bg-transparent',
-			'ui:[&>:only-child>table[role=table]>*>tr>:first-child]:ps-(--card-padding) ui:[&>:only-child>table[role=table]>*>tr>:last-child]:pe-(--card-padding)',
+			'flex-1 p-(--card-padding) [overflow-wrap:anywhere] [&>:first-child]:mt-0 [&>:last-child]:mb-0',
+			'[&_table[role=table]>*>tr>:first-child]:ps-0 [&_table[role=table]>*>tr>:last-child]:pe-0',
+			'has-[>:only-child>table[role=table]]:p-0 [&>:only-child:has(>table[role=table])]:rounded-[inherit] [&>:only-child>table[role=table]]:bg-transparent',
+			'[&>:only-child>table[role=table]>*>tr>:first-child]:ps-(--card-padding) [&>:only-child>table[role=table]>*>tr>:last-child]:pe-(--card-padding)',
 		],
-		footer: 'ui:px-(--card-padding) ui:pt-0 ui:pb-(--card-padding) ui:[overflow-wrap:anywhere] ui:[&>:first-child]:mt-0 ui:[&>:last-child]:mb-0',
+		footer: 'px-(--card-padding) pt-0 pb-(--card-padding) [overflow-wrap:anywhere] [&>:first-child]:mt-0 [&>:last-child]:mb-0',
 	},
 	variants: {
 		variant: {
-			outline: { base: 'ui:border-border ui:bg-surface ui:text-text', description: 'ui:text-text-soft' },
-			soft: { base: 'ui:border-transparent ui:bg-control-hover ui:text-text', description: 'ui:text-text-soft' },
+			custom: { description: 'opacity-80' },
+			outline: { base: 'rounded-lg border-(length:--ui-border-width) border-border bg-surface text-text', description: 'text-text-soft' },
+			soft: { base: 'rounded-lg border-(length:--ui-border-width) border-transparent bg-control-hover text-text', description: 'text-text-soft' },
 			// An app rule such as `.page p { color }` would leave the text of a solid unreadable.
-			solid: { base: 'ui:border-transparent ui:bg-primary ui:text-primary-contrast ui:[&_:where(p,li):not([class])]:text-inherit', description: 'ui:text-primary-contrast' },
-			elevated: { base: 'ui:border-border ui:bg-surface-raised ui:text-text ui:[box-shadow:var(--ui-card-shadow,var(--ui-shadow-md))]', description: 'ui:text-text-soft' },
+			solid: { base: 'rounded-lg border-(length:--ui-border-width) border-transparent bg-primary text-primary-contrast [&_:where(p,li):not([class])]:text-inherit', description: 'text-primary-contrast' },
+			elevated: { base: 'rounded-lg border-(length:--ui-border-width) border-border bg-surface-raised text-text [box-shadow:var(--ui-card-shadow,var(--ui-shadow-md))]', description: 'text-text-soft' },
 		},
 		padding: {
-			none: { base: 'ui:[--card-padding:var(--ui-space-0)]' },
-			sm: { base: 'ui:[--card-padding:var(--ui-space-3)]' },
-			md: { base: 'ui:[--card-padding:var(--ui-space-5)]' },
-			lg: { base: 'ui:[--card-padding:var(--ui-space-6)]' },
+			none: { base: '[--card-padding:var(--ui-space-0)]' },
+			sm: { base: '[--card-padding:var(--ui-space-3)]' },
+			md: { base: '[--card-padding:var(--ui-space-5)]' },
+			lg: { base: '[--card-padding:var(--ui-space-6)]' },
 		},
 		/** With actions the text stays in the first column; `actionsWrap` places the actions. */
 		actions: {
-			true: { header: 'ui:[&>:not(:last-child)]:col-[1]' },
-			false: { header: 'ui:gap-x-1.5' },
+			true: { header: '[&>:not(:last-child)]:col-[1]' },
+			false: { header: 'gap-x-1.5' },
 		},
 		/** Where the actions go: it only applies with actions, in the compound variants below. */
 		actionsWrap: {
@@ -67,19 +70,19 @@ export const card = tv({
 	},
 	compoundVariants: [
 		// Two columns: the text, and the actions beside the title and description.
-		{ actions: true, actionsWrap: 'inline', class: { header: 'ui:grid-cols-[minmax(0,1fr)_auto] ui:gap-x-4', actions: 'ui:col-[2] ui:row-[1/span_2] ui:justify-end' } },
+		{ actions: true, actionsWrap: 'inline', class: { header: 'grid-cols-[minmax(0,1fr)_auto] gap-x-4', actions: 'col-[2] row-[1/span_2] justify-end' } },
 		// One column: the actions follow the text, in the order of the DOM.
-		{ actions: true, actionsWrap: 'below', class: { actions: 'ui:pt-1.5' } },
+		{ actions: true, actionsWrap: 'below', class: { actions: 'pt-1.5' } },
 		// The header is the container: below the width of --container-card-narrow the actions leave the second
 		// column for a row of their own, and the empty column takes no space because the gap is their margin.
 		{
 			actions: true,
 			actionsWrap: 'auto',
 			class: {
-				header: 'ui:@container ui:grid-cols-[minmax(0,1fr)_auto]',
+				header: '@container grid-cols-[minmax(0,1fr)_auto]',
 				actions: [
-					'ui:col-[2] ui:row-[1/span_2] ui:ms-4 ui:justify-end',
-					'ui:@max-card-narrow:col-[1] ui:@max-card-narrow:row-auto ui:@max-card-narrow:ms-0 ui:@max-card-narrow:justify-start ui:@max-card-narrow:pt-1.5',
+					'col-[2] row-[1/span_2] ms-4 justify-end',
+					'@max-card-narrow:col-[1] @max-card-narrow:row-auto @max-card-narrow:ms-0 @max-card-narrow:justify-start @max-card-narrow:pt-1.5',
 				],
 			},
 		},
@@ -96,13 +99,13 @@ export const card = tv({
 export const linkCard = tv({
 	slots: {
 		base: [
-			'ui:box-border ui:flex ui:h-full ui:min-w-0 ui:flex-col ui:gap-1.5 ui:p-[var(--ui-link-card-padding,var(--ui-space-4))]',
-			'ui:rounded-lg ui:border-(length:--ui-border-width) ui:border-border ui:bg-surface ui:font-sans ui:text-text ui:no-underline ui:decoration-current ui:[overflow-wrap:anywhere]',
-			'ui:hover:border-border-strong ui:hover:bg-control-hover',
-			'ui:transition-[border-color,background-color] ui:duration-(--ui-duration-fast) ui:motion-reduce:transition-none ui:motion-reduce:duration-0',
+			'box-border flex h-full min-w-0 flex-col gap-1.5 p-[var(--ui-link-card-padding,var(--ui-space-4))]',
+			'rounded-lg border-(length:--ui-border-width) border-border bg-surface font-sans text-text no-underline decoration-current [overflow-wrap:anywhere]',
+			'hover:border-border-strong hover:bg-control-hover',
+			'transition-[border-color,background-color] duration-(--ui-duration-fast) motion-reduce:transition-none motion-reduce:duration-0',
 			focusRing,
 		],
-		title: 'ui:text-lg ui:leading-snug ui:font-medium ui:tracking-tight',
-		description: 'ui:text-sm ui:leading-normal ui:text-text-soft',
+		title: 'text-lg leading-snug font-medium tracking-tight',
+		description: 'text-sm leading-normal text-text-soft',
 	},
 })

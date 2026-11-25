@@ -81,18 +81,18 @@ test('every form control draws its border from --ui-color-control-border, not fr
 	// The variants are on Tailwind: the border is the color control-border of theme.css.
 	assert.match(await read('theme.css'), /--color-control-border: var\(--ui-color-control-border\);/)
 	// <UIInput>, <UITextarea> and, through `control`, the trigger of <UISelect> and <UICombobox>.
-	assert.match(await variant('input'), /ui:border-solid ui:border-control-border /)
+	assert.match(await variant('input'), /border-solid border-control-border /)
 	for (const name of ['Select', 'Combobox']) {
 		const source = await component(name)
 		assert.match(source, /import \{ control \} from '\.\.\/variants\/input'/, name)
 		assert.match(source, /const triggerClass = computed\(\(\) => control\(/, name)
 	}
-	assert.match(await variant('button'), /variant: 'outline', tone: 'neutral', class: 'ui:border-control-border /)
+	assert.match(await variant('button'), /variant: 'outline', tone: 'neutral', class: 'border-control-border /)
 	// The box of a checkbox or a radio, the track of a switch and the frame of a segmented group.
 	const choice = await variant('choice')
-	assert.match(choice, /const boxBorder = '[^']*ui:border-solid ui:border-control-border /)
-	assert.match(choice, /'ui:border-\(length:--ui-border-width\) ui:border-solid ui:border-control-border ui:checked:border-primary ui:aria-\[invalid=true\]:border-danger'/)
-	assert.match(choice, /const track = '[^']*ui:border-solid ui:border-control-border /)
+	assert.match(choice, /const boxBorder = '[^']*border-solid border-control-border /)
+	assert.match(choice, /'border-\(length:--ui-border-width\) border-solid border-control-border checked:border-primary aria-\[invalid=true\]:border-danger'/)
+	assert.match(choice, /const track = '[^']*border-solid border-control-border /)
 	// The track of a slider, in WebKit and Blink and in Firefox.
 	const slider = await variant('slider')
 	assert.match(slider, /\[&::-webkit-slider-runnable-track\]:\[background:[^\]]*var\(--ui-color-control-border\)/)
@@ -147,7 +147,7 @@ test('dark primary reaches the contrast each step promises', () => {
 	assert.ok(contrast(primary(12), color('dark', 'surface', 1)) >= 7, 'step 12 on surface-1')
 })
 
-test('each scale declares the text with 4.5:1 or more on its solid and on its hover, in both themes', () => {
+test('each official scale reaches 5:1 on its solid and on hover in both themes', () => {
 	for (const theme of ['light', 'dark'])
 		for (const scale of scales) {
 			for (const [suffix, step] of [
@@ -157,9 +157,33 @@ test('each scale declares the text with 4.5:1 or more on its solid and on its ho
 				const solid = color(theme, scale, step)
 				const declared = tokens[theme][`--ui-color-${scale}-${suffix}`]
 				assert.equal(declared, expectedContrast(solid), `${theme} ${scale}-${suffix} on ${solid}`)
-				assert.ok(contrast(declared, solid) >= 4.5, `${theme} ${scale}-${suffix}: ${contrast(declared, solid).toFixed(2)}`)
+				assert.ok(contrast(declared, solid) >= 5, `${theme} ${scale}-${suffix}: ${contrast(declared, solid).toFixed(2)}`)
 			}
 		}
+})
+
+test('appearance text stays readable on the official palettes and their interactive backgrounds', () => {
+	for (const theme of ['light', 'dark']) {
+		const surfaces = [1, 2, 3, 4, 5].map((step) => color(theme, 'surface', step))
+		for (const scale of scales) {
+			const text = color(theme, scale, 12)
+			const backgrounds = [...surfaces, ...[2, 3, 4, 5].map((step) => color(theme, scale, step))]
+			for (const background of backgrounds) {
+				const ratio = contrast(text, background)
+				assert.ok(ratio >= 4.5, `${theme} ${scale} text on ${background}: ${ratio.toFixed(2)}:1`)
+			}
+		}
+
+		const border = resolve(theme, '--ui-color-control-border')
+		const focus = resolve(theme, '--ui-color-focus')
+		for (const scale of ['surface', 'primary', 'success', 'danger']) {
+			for (const step of [2, 3, 4]) {
+				const background = color(theme, scale, step)
+				assert.ok(contrast(border, background) >= 3, `${theme} input border on ${scale}-${step}`)
+				assert.ok(contrast(focus, background) >= 3, `${theme} input focus on ${scale}-${step}`)
+			}
+		}
+	}
 })
 
 test('text, soft text and focus tokens stay readable on every background', () => {
@@ -189,7 +213,7 @@ const strip = (css) =>
 		.replace(/--container-(?:card|stat)-narrow:[^;]+;/g, '')
 
 async function componentSheets() {
-	const names = (await readdir(styles)).filter((name) => name.endsWith('.css') && !['palette.css', 'tokens.css', 'fonts.css'].includes(name))
+	const names = (await readdir(styles)).filter((name) => name.endsWith('.css') && !['appearance-palette.css', 'palette.css', 'tokens.css', 'fonts.css'].includes(name))
 	return Promise.all(names.map(async (name) => [name, strip(await read(name))]))
 }
 
@@ -215,9 +239,9 @@ test('component sheets and components have no colour, size, time or weight outsi
 test('what must differ from a surface does not rest on --ui-color-control, which ui.tokens.surface also sets', async () => {
 	const { card, linkCard } = await import('../dist/app/variants/card.js')
 	const { table } = await import('../dist/app/variants/table.js')
-	assert.match(card({ variant: 'soft' }).base(), /(^| )ui:bg-control-hover( |$)/)
-	assert.match(linkCard().base(), /(^| )ui:hover:bg-control-hover( |$)/)
-	assert.match(table().bodyRow(), /(^| )ui:hover:bg-control-hover( |$)/)
+	assert.match(card({ variant: 'soft' }).base(), /(^| )bg-control-hover( |$)/)
+	assert.match(linkCard().base(), /(^| )hover:bg-control-hover( |$)/)
+	assert.match(table().bodyRow(), /(^| )hover:bg-control-hover( |$)/)
 })
 
 test('nothing mentions the removed --meeko-ui-* variables', async () => {
@@ -231,12 +255,12 @@ test('the frame of the page does not depend on how long the page is', async () =
 	assert.match(await read('base.css'), /:root \{[^}]*scrollbar-gutter: stable/, 'a short page and a long one keep the header in place')
 	const { page } = await import('../dist/app/variants/page.js')
 	const classes = page()
-	for (const slot of ['sidebar', 'aside']) assert.match(classes[slot](), /ui:\[scrollbar-gutter:stable\]/, `the ${slot} is as wide with a long navigation as with a short one`)
+	for (const slot of ['sidebar', 'aside']) assert.match(classes[slot](), /\[scrollbar-gutter:stable\]/, `the ${slot} is as wide with a long navigation as with a short one`)
 	const shadows = classes
 		.skip()
 		.split(' ')
 		.filter((name) => /shadow/.test(name))
-	assert.ok(shadows.length > 0 && shadows.every((name) => name.startsWith('ui:focus-visible:')), 'the shadow of the hidden skip link would show above the header')
+	assert.ok(shadows.length > 0 && shadows.every((name) => name.startsWith('focus-visible:')), 'the shadow of the hidden skip link would show above the header')
 })
 
 test('inline code reads as a chip, so that its padding is not taken for a space before the punctuation', async () => {

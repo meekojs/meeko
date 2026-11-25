@@ -88,10 +88,37 @@
 				{ name: 'class', type: 'string', description: 'Clases adicionales.' },
 			]"
 		/>
+		<h2 id="appearance">Apariencia de Input</h2>
+		<DocsPreview>
+			<label for="appearance-email">Correo de trabajo</label>
+			<UIInput
+				id="appearance-email"
+				type="email"
+				placeholder="name@example.com"
+				bind:appearance="{ variant: 'surface', color: 'primary', size: 'lg', radius: 'lg' }"
+			/>
+			<label for="appearance-input-outline">outline</label>
+			<UIInput
+				id="appearance-input-outline"
+				bind:appearance="{ variant: 'outline', color: 'primary' }"
+			/>
+			<label for="appearance-input-ghost">ghost</label>
+			<UIInput
+				id="appearance-input-ghost"
+				bind:appearance="{ variant: 'ghost', color: 'primary' }"
+			/>
+			<label for="appearance-input-soft">soft</label>
+			<UIInput
+				id="appearance-input-soft"
+				bind:appearance="{ variant: 'soft', color: 'primary' }"
+			/>
+		</DocsPreview>
+		<DocsCode bind:code="examples.inputAppearance" />
 		<DocsApi
 			caption="Propiedades de UIInput"
 			bind:rows="[
 				{ name: 'model', type: 'Signal<string>', default: 'Cadena vacía', description: 'Modelo de texto de doble vía; se actualiza con input.' },
+				{ name: 'appearance', type: 'InputAppearance', default: '—', description: 'Variante, color, tamaño y radio del catálogo de apariencia.' },
 				{ name: 'type', type: 'text | email | password | search | url | tel | number | date | datetime-local | time | month', default: 'text', description: 'Tipo nativo del control. La fecha y la hora son las del navegador. Con number, time y month el modelo sigue siendo texto («42», «09:30», «2026-11» o vacío): conviértelo donde lo uses.' },
 				{ name: 'autocomplete / inputmode / min / max / step', type: 'atributos HTML', description: 'Llegan tal cual al input, como autocapitalize y spellcheck.' },
 				{ name: 'id / name / placeholder', type: 'string', description: 'Atributos del input.' },

@@ -586,7 +586,7 @@
 										on:click="() => void toggleReviewed(item)"
 									>
 										{item.reviewedAt ? t('metrics.comments.reopen') : t('metrics.comments.review')}
-										<span class="meeko-ui-sr-only">{t('metrics.comments.about', { path: pagePath(item.path, item.locale), date: formatDate(item.createdAt) })}</span>
+										<span class="sr-only">{t('metrics.comments.about', { path: pagePath(item.path, item.locale), date: formatDate(item.createdAt) })}</span>
 									</UIButton>
 									<UIButton
 										size="sm"
@@ -594,7 +594,7 @@
 										on:click="() => askDelete(item)"
 									>
 										{t('metrics.comments.delete')}
-										<span class="meeko-ui-sr-only">{t('metrics.comments.about', { path: pagePath(item.path, item.locale), date: formatDate(item.createdAt) })}</span>
+										<span class="sr-only">{t('metrics.comments.about', { path: pagePath(item.path, item.locale), date: formatDate(item.createdAt) })}</span>
 									</UIButton>
 								</div>
 							</li>

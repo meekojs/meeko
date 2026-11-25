@@ -4,27 +4,30 @@
 // the clear button of a `clearable` trigger, so it lives out of the base too.
 import { tv } from 'tailwind-variants/lite'
 
+import { inputAppearance, type InputAppearance } from '../theme/recipes'
+
 /** Border, background, text, hover, placeholder, invalid and focus of every control that looks like a field. */
-const look = [
-	'ui:box-border ui:block ui:w-full ui:ps-3 ui:py-1.5',
-	'ui:rounded-md ui:border-(length:--ui-border-width) ui:border-solid ui:border-control-border ui:aria-[invalid=true]:border-danger',
-	'ui:bg-control ui:not-disabled:hover:bg-control-hover',
-	'ui:font-sans ui:text-(length:--ui-input-font-size) ui:leading-snug ui:font-regular ui:text-text ui:placeholder:text-text-soft',
-	'ui:transition-[background-color] ui:duration-(--ui-duration-fast) ui:motion-reduce:transition-none ui:motion-reduce:duration-0',
-	'ui:focus-visible:outline-(length:--ui-focus-ring-width) ui:focus-visible:outline-focus ui:focus-visible:outline-offset-(--ui-focus-ring-offset) ui:focus-visible:outline-solid',
+const structure = [
+	'box-border block w-full ps-3 py-1.5',
+	'border-(length:--ui-border-width) aria-[invalid=true]:border-danger',
+	'font-sans text-(length:--ui-input-font-size) leading-snug font-regular',
+	'transition-[background-color] duration-(--ui-duration-fast) motion-reduce:transition-none motion-reduce:duration-0',
+	'focus-visible:outline-(length:--ui-focus-ring-width) focus-visible:outline-focus focus-visible:outline-offset-(--ui-focus-ring-offset) focus-visible:outline-solid',
 ]
 
+const look = [...structure, 'rounded-md border-solid border-control-border bg-control not-disabled:hover:bg-control-hover text-text placeholder:text-text-soft']
+
 /** A line of text, as tall as a button. */
-const line = 'ui:min-h-(--ui-control-height-md)'
+const line = 'min-h-(--ui-control-height-md)'
 
 /** A box of text, which the user can make taller. */
-const box = 'ui:min-h-24 ui:resize-y'
+const box = 'min-h-24 resize-y'
 
 /** The padding at the end of the text, as at its start. */
-const end = 'ui:pe-3'
+const end = 'pe-3'
 
 /** A disabled field: the element itself has the `disabled` attribute. */
-const disabled = 'ui:disabled:cursor-not-allowed ui:disabled:opacity-(--ui-opacity-disabled)'
+const disabled = 'disabled:cursor-not-allowed disabled:opacity-(--ui-opacity-disabled)'
 
 /**
  * The look of a field without its disabled state, for a control that is not an <input> or a <textarea>: the
@@ -33,7 +36,7 @@ const disabled = 'ui:disabled:cursor-not-allowed ui:disabled:opacity-(--ui-opaci
  *
  * @example
  * ```ts
- * const triggerClass = control({ class: 'ui:cursor-pointer ui:text-start' })
+ * const triggerClass = control({ class: 'cursor-pointer text-start' })
  * ```
  */
 export const control = tv({
@@ -46,7 +49,7 @@ export const control = tv({
 		/** The trigger leaves room at its end for the clear button, a square as tall as the control. */
 		clearable: {
 			false: end,
-			true: 'ui:pe-(--ui-control-height-md)',
+			true: 'pe-(--ui-control-height-md)',
 		},
 	},
 	defaultVariants: {
@@ -64,7 +67,7 @@ export const input = tv({
 	variants: {
 		reveal: {
 			false: end,
-			true: 'ui:pe-(--ui-control-height-md)',
+			true: 'pe-(--ui-control-height-md)',
 		},
 	},
 	defaultVariants: {
@@ -79,25 +82,39 @@ export const input = tv({
  */
 export const inputReveal = tv({
 	slots: {
-		base: 'ui:relative ui:block ui:w-full',
+		base: 'relative block w-full',
 		toggle: [
-			'ui:absolute ui:inset-y-0 ui:end-0 ui:inline-flex ui:w-(--ui-control-height-md) ui:cursor-pointer ui:items-center ui:justify-center',
-			'ui:rounded-md ui:[border:0] ui:bg-transparent ui:p-0 ui:text-text-soft ui:not-disabled:hover:text-text',
-			'ui:focus-visible:outline-(length:--ui-focus-ring-width) ui:focus-visible:outline-focus ui:focus-visible:-outline-offset-(--ui-focus-ring-offset) ui:focus-visible:outline-solid',
+			'absolute inset-y-0 end-0 inline-flex w-(--ui-control-height-md) cursor-pointer items-center justify-center',
+			'rounded-md [border:0] bg-transparent p-0 text-text-soft not-disabled:hover:text-text',
+			'focus-visible:outline-(length:--ui-focus-ring-width) focus-visible:outline-focus focus-visible:-outline-offset-(--ui-focus-ring-offset) focus-visible:outline-solid',
 			disabled,
 		],
 	},
 })
+
+/** Aplica el catálogo a un campo sin cambiar el espacio reservado para reveal. */
+export function inputWithAppearance(appearance: InputAppearance, reveal: boolean, className?: string): string {
+	return [
+		...structure,
+		disabled,
+		'border-solid not-aria-[invalid=true]:border-control-border',
+		appearance.variant === 'ghost' ? 'border-x-0 border-t-0' : undefined,
+		reveal ? '[padding-inline-end:var(--ui-control-height-md)]' : end,
+		inputAppearance(appearance),
+		'placeholder:text-(color:--ui-12) placeholder:opacity-100',
+		className,
+	].filter(Boolean).join(' ')
+}
 
 /**
  * Lo que <UIInput> añade a un campo de números, horas o fechas (`number`, `time`, `month`, `date` y
  * `datetime-local`): cifras del mismo ancho, que no bailan al escribir ni al cambiar con las flechas, y, en
  * WebKit, el valor de una fecha o una hora alineado al principio, como el texto, en lugar de centrado.
  */
-export const inputNumeric = 'ui:[font-variant-numeric:tabular-nums] ui:[&::-webkit-date-and-time-value]:text-start'
+export const inputNumeric = '[font-variant-numeric:tabular-nums] [&::-webkit-date-and-time-value]:text-start'
 
 /** El botón de `reveal` espera invisible hasta hidratar, sin mover nada. */
-export const inputRevealWaiting = 'ui:invisible'
+export const inputRevealWaiting = 'invisible'
 
 /** The look of <UITextarea>. */
 export const textarea = tv({ base: [...look, box, end, disabled] })

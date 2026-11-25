@@ -1,5 +1,6 @@
 import type { ElementAttributes } from '@meekojs/meeko'
 
+import type { BadgeAppearance, InputAppearance } from '../theme/recipes'
 import type { badge } from '../variants/badge'
 import type { checkbox, radioGroup, segmentedControl, toggle } from '../variants/choice'
 import type { field } from '../variants/field'
@@ -31,6 +32,8 @@ export type UIInputProps = Omit<ElementAttributes<'input'>, 'type' | 'value' | '
 			 * @since 1.10.0 admite `number`, `time` y `month`.
 			 */
 			type?: 'text' | 'email' | 'password' | 'search' | 'url' | 'tel' | 'number' | 'date' | 'datetime-local' | 'time' | 'month'
+			/** Apariencia basada en el catálogo de Meeko UI. */
+			appearance?: InputAppearance
 			/** Marca el campo como inválido. */
 			invalid?: boolean
 			/** Identificadores de los mensajes de ayuda. */
@@ -227,6 +230,8 @@ export type UIFieldProps = UIThemeProps<
 export type UIBadgeProps = UIThemeProps<
 	typeof badge,
 	{
+		/** Apariencia basada en el catálogo de Meeko UI. */
+		appearance?: BadgeAppearance
 		/** Color semántico. */
 		tone?: UITone | 'accent'
 		/** Indicador circular decorativo. */

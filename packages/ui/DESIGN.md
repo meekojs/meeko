@@ -170,7 +170,7 @@ Los estilos de los elementos nativos van en la base, con `:where()`: especificid
 
 El módulo lo hace todo con `modules: ['@meekojs/ui']`:
 
-- **`main.css`:** paleta, tokens, `@font-face` y componentes, compilada con Tailwind 4 por `scripts/build-styles.mjs` en `dist/styles/main.css`; la app no necesita Tailwind. Las clases de los componentes llevan el prefijo `ui:`, viven en `src/app/variants/` (`tv()` de `tailwind-variants/lite`) y leen los tokens a través de `theme.css`. Capas: `ui.components`, lo que aún se escribe a mano, y `ui.utilities`, las clases `ui:*`, por encima. Cualquier regla sin capa de la app gana a ambas.
+- **`main.css`:** paleta, tokens, `@font-face` y componentes, compilada con Tailwind 4 por `scripts/build-styles.mjs` en `dist/styles/main.css`; la app no necesita Tailwind. Las clases de los componentes viven en `src/app/variants/` (`tv()` de `tailwind-variants/lite`) y leen los tokens a través de `theme.css`. Capas: `ui.components`, lo que aún se escribe a mano, y `ui.utilities`, las utilidades Tailwind, por encima. Cualquier regla sin capa de la app gana a ambas.
 - **`base.css`:** reset, `body`, `color-scheme`, `::selection`, barras de desplazamiento y foco, en la capa `@layer ui-base`. Cualquier regla sin capa de la app gana, y también cualquier capa que declare, porque ésta se registra primero. Se omite con `ui: { base: false }`.
 - **La fuente:** se sirve en `/_meeko-ui/fonts/inter-latin-opsz-normal.woff2`, con su `preload`. La app no copia archivos ni escribe `@font-face`. La CSP sólo necesita `font-src 'self'`, y se sirve con CORS, así que también la carga un `<iframe sandbox srcdoc>` que lea `@meekojs/ui/styles/fonts.css`.
 

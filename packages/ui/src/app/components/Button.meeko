@@ -7,9 +7,9 @@
 	import type { UIButtonProps } from '../types/button'
 
 	import { uiTheme } from '../utils/defaults'
-	import { button } from '../variants/button'
+	import { button, buttonWithAppearance } from '../variants/button'
 
-	const { to, params, search, resolve, href, target, rel, download, type = 'button', disabled = false, tone, loading, iconOnly, ariaLabel, variant, size, shape, class: ownClass, ...rest } = defineProps<UIButtonProps>()
+	const { to, params, search, resolve, href, target, rel, download, type = 'button', disabled = false, tone, loading, iconOnly, ariaLabel, appearance, variant, size, shape, class: ownClass, ...rest } = defineProps<UIButtonProps>()
 
 	const theme = uiTheme('button', () => ({ class: ownClass }))
 
@@ -20,7 +20,7 @@
 	// A disabled button drops the focus: while busy it stays focusable, and the click handler stops it.
 	const nativeDisabled = computed(() => (to === undefined && href === undefined ? disabled : undefined))
 	const classes = computed(() =>
-		button({
+		appearance ? buttonWithAppearance(appearance, Boolean(iconOnly), theme.class) : button({
 			variant: variant ?? theme.defaults?.variant,
 			tone,
 			size: size ?? theme.defaults?.size,

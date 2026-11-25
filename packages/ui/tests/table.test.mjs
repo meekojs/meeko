@@ -107,14 +107,14 @@ const columns = [
 <template><UITable bind:rows="rows" bind:columns="columns" rowKey="id" layout="${layout}" /></template>`
 	const html = await renderTablePage(context, page('native'))
 	const cell = (text) => html.match(new RegExp(`<t[dh][^>]*class="([^"]*)"[^>]*>\\s*<span>${text}</span>`))?.[1] ?? ''
-	assert.match(cell('P-1048'), /(?:^| )ui:whitespace-nowrap(?: |$)/, 'nowrap keeps a code whole')
-	assert.match(cell('Bs 18.500'), /(?:^| )ui:whitespace-nowrap(?: |$)/, 'a numeric column is nowrap by default')
-	assert.doesNotMatch(cell('1'), /ui:whitespace-nowrap/, 'nowrap: false wins over numeric')
-	assert.doesNotMatch(cell('Entrega en la puerta trasera'), /ui:whitespace-nowrap/)
+	assert.match(cell('P-1048'), /(?:^| )whitespace-nowrap(?: |$)/, 'nowrap keeps a code whole')
+	assert.match(cell('Bs 18.500'), /(?:^| )whitespace-nowrap(?: |$)/, 'a numeric column is nowrap by default')
+	assert.doesNotMatch(cell('1'), /whitespace-nowrap/, 'nowrap: false wins over numeric')
+	assert.doesNotMatch(cell('Entrega en la puerta trasera'), /whitespace-nowrap/)
 	const footer = html.match(/<tfoot[\s\S]*?<\/tfoot>/)?.[0] ?? ''
 	const total = footer.match(/<td[^>]*class="([^"]*)"[^>]*>\s*(?:<span>)?Bs 89\.000/)?.[1] ?? ''
-	assert.match(total, /(?:^| )ui:text-end(?: |$)/, 'the total of a numeric column ends at the right edge, like its cells')
-	assert.match(total, /(?:^| )ui:whitespace-nowrap(?: |$)/, 'and does not break')
+	assert.match(total, /(?:^| )text-end(?: |$)/, 'the total of a numeric column ends at the right edge, like its cells')
+	assert.match(total, /(?:^| )whitespace-nowrap(?: |$)/, 'and does not break')
 	assert.match(html, /<th[^>]*style="min-inline-size: 20rem"[^>]*>(?:(?!<\/th>)[\s\S])*Notes/, 'minWidth sizes the header of its column')
 	const grid = await renderTablePage(context, page('grid'))
 	assert.match(grid, /--table-columns: minmax\(var\(--ui-table-column-min\), 1fr\) minmax\(var\(--ui-table-column-min\), 1fr\) minmax\(var\(--ui-table-column-min\), 1fr\) minmax\(20rem, 1fr\)/)

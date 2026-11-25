@@ -66,7 +66,7 @@ export async function startDevServer({ root, cli, path = '/', port, timeout = 36
 		const child = spawn(process.execPath, [cli, 'dev', root], {
 			cwd: root,
 			detached: process.platform !== 'win32',
-			env: { ...process.env, NODE_OPTIONS: '--max-old-space-size=8192', PORT: String(httpPort), MEEKO_HMR_PORT: String(hmrPort), MEEKO_EDITOR_BRIDGE: '0' },
+			env: { ...process.env, NODE_OPTIONS: '--max-old-space-size=8192', PORT: String(httpPort), MEEKO_PORT: String(httpPort), MEEKO_HMR_PORT: String(hmrPort), MEEKO_EDITOR_BRIDGE: '0' },
 			windowsHide: true,
 			stdio: ['ignore', 'pipe', 'pipe'],
 		})

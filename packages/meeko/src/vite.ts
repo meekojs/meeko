@@ -26,7 +26,7 @@ import { builtinOptimizeInclude, devScanIgnored, invalidateDevModules, isCompone
 import { editorBridgeDirectory } from './framework/editor-bridge'
 import { extractRouteRender } from './framework/routes-discovery'
 import { frameworkStylesheets, globalStylesheetFile, globalStylesheetsModule, stylesheetUrl } from './framework/styles'
-import { generateComponentRegistryTypes } from './framework/type-declarations'
+import { developmentComponentDirectories, generateComponentRegistryTypes, generateDevelopmentComponentType } from './framework/type-declarations'
 
 /**
  * A component's CSS is the module `Card.meeko?meeko-style=<hash>&lang.css`: a real path, as Vue
@@ -155,6 +155,7 @@ export function meeko(): Plugin {
 	const styles = new Map<string, string>()
 	const fileStyles = new Map<string, string[]>()
 	let activeComponentDirectories: string[] = []
+	let developmentTypesDirectories: string[] = []
 	/** Folders of the modules' files outside the project, for {@link isModuleScript}. */
 	let activeModuleDirectories: string[] = []
 	let registeredComponentFiles = new Set<string>()
@@ -167,13 +168,20 @@ export function meeko(): Plugin {
 	let registryUpdate: Promise<unknown> = Promise.resolve()
 	const refreshComponentRegistry = (editedFile?: string): Promise<string | undefined> => {
 		const update = registryUpdate.then(async () => {
-			if (editedFile && projectOwnedComponent(editedFile) && registeredComponentFiles.has(normalizePath(resolve(editedFile)))) {
-				await generateAppTypeForFile(root, editedFile, { onError: (file, error) => console.error(`[meeko] Cannot update types for ${file}:`, error) })
-				return
+			const options = { onError: (file: string, error: unknown) => console.error(`[meeko] Cannot update types for ${file}:`, error) }
+			if (editedFile && registeredComponentFiles.has(normalizePath(resolve(editedFile)))) {
+				if (isComponentSource(editedFile, developmentTypesDirectories)) {
+					await generateDevelopmentComponentType(editedFile, options)
+					return
+				}
+				if (projectOwnedComponent(editedFile)) {
+					await generateAppTypeForFile(root, editedFile, options)
+					return
+				}
 			}
 			const registry = await generateComponentRegistry(root)
-			await generateAppTypes(root, { onError: (file, error) => console.error(`[meeko] Cannot update types for ${file}:`, error) })
-			await generateComponentRegistryTypes(root)
+			await generateComponentRegistryTypes(root, options)
+			await generateAppTypes(root, options)
 			registeredComponentFiles = new Set((await discoverComponents(root)).map(({ file }) => normalizePath(resolve(file))))
 			return registry
 		})
@@ -494,6 +502,7 @@ export function meeko(): Plugin {
 		async configureServer(server) {
 			const directories = await componentWatchDirectories()
 			activeComponentDirectories = directories
+			developmentTypesDirectories = await developmentComponentDirectories(root)
 			// The folders of the modules' files, except the project's own: a module file at its root.
 			const moduleScriptDirectories = async (): Promise<string[]> =>
 				(await loadConfiguredModules(root)).modules.ownedDirectories.filter((directory) => {
@@ -506,6 +515,7 @@ export function meeko(): Plugin {
 				aliasState = undefined
 				const updated = await componentWatchDirectories()
 				activeComponentDirectories = updated
+				developmentTypesDirectories = await developmentComponentDirectories(root)
 				activeModuleDirectories = await moduleScriptDirectories()
 				server.watcher.add(updated)
 				await refreshComponentRegistry()

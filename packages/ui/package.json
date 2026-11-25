@@ -23,6 +23,10 @@
 			"types": "./dist/index.d.ts",
 			"default": "./dist/index.js"
 		},
+		"./theme": {
+			"types": "./dist/app/theme/index.d.ts",
+			"default": "./dist/app/theme/index.js"
+		},
 		"./runtime": {
 			"types": "./dist/runtime.d.ts",
 			"default": "./dist/runtime.js"
@@ -74,6 +78,7 @@
 		"@milkdown/crepe": "catalog:",
 		"@milkdown/kit": "catalog:",
 		"@tailwindcss/postcss": "catalog:",
+		"@tailwindcss/vite": "catalog:",
 		"@types/node": "catalog:",
 		"eslint": "catalog:",
 		"jiti": "catalog:",

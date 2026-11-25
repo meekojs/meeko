@@ -437,7 +437,7 @@ El módulo carga además la base global en la capa `ui-base`: la [escala fluida]
 
 ### Clases por slot
 
-Los componentes se pintan con clases de Tailwind 4 con el prefijo `ui:`, compiladas por UI: tu aplicación no necesita Tailwind y esas clases no chocan con las suyas. Leen los tokens `--ui-*`, así que `ui.tokens`, el tema oscuro y redefinir un token cambian también los componentes.
+Los componentes se pintan con clases de Tailwind 4 compiladas por UI. Tu aplicación puede usar el paquete sin instalar Tailwind. Leen los tokens `--ui-*`, así que `ui.tokens`, el tema oscuro y redefinir un token cambian también los componentes.
 
 Para retocar un componente concreto, dale tus clases:
 
@@ -474,7 +474,7 @@ useToast().add({ text: 'Guardado', ui: { base: 'toast-wide' } })
 
 Los nombres de los slots están en el JSDoc de cada tipo de props (`UICardProps`, `UIFieldProps`…), y el editor los completa. `UIThemeProps` y `UIVariantSlots`, de `@meekojs/ui/runtime`, describen las props de un componente con sus variantes y su `ui`.
 
-**Qué gana.** Tus clases se suman a las del componente, sin fusionarlas ni quitar ninguna: decide la cascada. La hoja de UI tiene tres capas, `ui-base` (la base global), `ui.components` (lo que aún se escribe a mano, como las View Transitions) y `ui.utilities` (las clases `ui:*`), y se carga antes que las hojas de la aplicación. Por eso cualquier regla sin capa de tu CSS gana a las tres, sea cual sea su especificidad, y también la de una capa que declare tu aplicación. La hoja declara antes que las suyas la capa `base` de Tailwind: el preflight de una aplicación que también usa Tailwind queda por debajo de los componentes y no les quita bordes, relleno ni fondo, mientras que sus utilidades (`utilities`) siguen ganando. Una regla sobre un elemento, como `a { color: … }`, también gana a un enlace de UI: limítala a tu contenido si no quieres cambiar los componentes.
+**Qué gana.** Tus clases se suman a las del componente, sin fusionarlas ni quitar ninguna: decide la cascada. La hoja de UI tiene tres capas, `ui-base` (la base global), `ui.components` (lo que aún se escribe a mano, como las View Transitions) y `ui.utilities` (las utilidades Tailwind), y se carga antes que las hojas de la aplicación. Por eso cualquier regla sin capa de tu CSS gana a las tres, sea cual sea su especificidad, y también la de una capa que declare tu aplicación. La hoja declara antes que las suyas la capa `base` de Tailwind: el preflight de una aplicación que también usa Tailwind queda por debajo de los componentes y no les quita bordes, relleno ni fondo, mientras que sus utilidades (`utilities`) siguen ganando. Una regla sobre un elemento, como `a { color: … }`, también gana a un enlace de UI: limítala a tu contenido si no quieres cambiar los componentes.
 
 ```css
 /* app/styles/main.css, sin @layer */
@@ -883,7 +883,7 @@ Desde la raíz del monorepo:
 ```sh
 pnpm build
 pnpm -F @meekojs/ui run check
-pnpm -F meeko-ui-site run dev
+pnpm dev:ui
 ```
 
 Las fuentes de la aplicación del módulo se organizan así:
@@ -912,7 +912,7 @@ src/
 
 El build de UI genera ESM, declaraciones TypeScript y los componentes con sus declaraciones adyacentes en `dist/app/components`. El módulo registra el plugin estático `dist/app/plugins/modal.js` y enlaza su alias privado `virtual:meeko-ui-components` con el registro de componentes que genera Meeko para el consumidor; UI no escribe un plugin en `.meeko/generated`. `scripts/build-styles.mjs` compila `src/app/styles/main.css` con Tailwind 4 en `dist/styles/main.css`, la hoja que añade el módulo: toma las clases de `src/app/components` y `src/app/variants`, nunca de la aplicación. En el workspace, `pnpm -F @meekojs/ui run build:styles` la recompila al editar un componente, una variante o una hoja, y la web de UI la recibe por HMR. Los consumidores no necesitan generar archivos dentro de `node_modules`.
 
-Más información en la [guía de UI](ui.md) y en la [web pública de Meeko UI](https://ui.meekojs.com), con instalación, personalización, API y ejemplos interactivos. En el monorepo se inicia mediante `pnpm ui:dev`.
+Más información en la [guía de UI](ui.md) y en la [web pública de Meeko UI](https://ui.meekojs.com), con instalación, personalización, API y ejemplos interactivos. En el monorepo se inicia mediante `pnpm dev:ui`.
 
 ## UIPopover
 
@@ -986,7 +986,7 @@ Un `<button>` activo o un enlace con `href` llevan además `interestfor`: donde 
 </UIPopover>
 ```
 
-**Posición.** El contenido usa `position-anchor: auto`, `position-area` y `position-try-fallbacks: flip-block, flip-inline`, así que se coloca al otro lado si no cabe, sin JavaScript. Esas reglas son clases `ui:*` de la capa `ui.utilities`, así que cualquier regla sin capa de tu CSS gana. Un navegador sin anchor positioning lo abre sin anclar. El contenido abierto lleva `data-open`.
+**Posición.** El contenido usa `position-anchor: auto`, `position-area` y `position-try-fallbacks: flip-block, flip-inline`, así que se coloca al otro lado si no cabe, sin JavaScript. Esas reglas son utilidades Tailwind de la capa `ui.utilities`, así que cualquier regla sin capa de tu CSS gana. Un navegador sin anchor positioning lo abre sin anclar. El contenido abierto lleva `data-open`.
 
 **Disparador propio.** El snippet `anchor` sustituye el botón: recibe en `trigger` (tipo `PopoverTrigger`) los atributos que el disparador debe llevar, con el nombre de cada atributo como clave, así que basta con [`bind="trigger"`](api.md). `<UIPopover>` encuentra el elemento por su `id` al montarse y le añade el teclado y el anclaje:
 

@@ -1,0 +1,162 @@
+<script lang="ts">
+	/* eslint-disable meeko/prefer-ui-components -- Los controles nativos permiten probar el catálogo con el teclado sin añadir otra receta a la demostración. */
+	import { buttonAppearance, type ButtonAppearance } from '@meekojs/ui/theme'
+
+	const { english = false } = defineProps<{ english?: boolean }>()
+
+	const id = useId()
+	const variant = signal<NonNullable<ButtonAppearance['variant']>>('solid')
+	const color = signal<NonNullable<ButtonAppearance['color']>>('neutral')
+	const size = signal<NonNullable<ButtonAppearance['size']>>('md')
+	const radius = signal<NonNullable<ButtonAppearance['radius']>>('md')
+	const elevation = signal<NonNullable<ButtonAppearance['elevation']>>('sm')
+
+	const options = {
+		variant: Object.keys(buttonAppearance.variants.variant),
+		color: ['primary', 'neutral', 'info', 'success', 'warning', 'danger', 'cyan', 'orange', 'pink'] satisfies NonNullable<ButtonAppearance['color']>[],
+		size: Object.keys(buttonAppearance.variants.size),
+		radius: Object.keys(buttonAppearance.variants.radius),
+		elevation: Object.keys(buttonAppearance.variants.elevation),
+	}
+	const appearance = computed(() => ({ variant: variant.value, color: color.value, size: size.value, radius: radius.value, elevation: elevation.value }))
+	const code = computed(() => `buttonAppearance(${JSON.stringify(appearance.value, null, 2)})`)
+</script>
+
+<template>
+	<div class="appearance-playground">
+		<UIThemeToggle
+			mode="select"
+			bind:themes="['light', 'dark']"
+		/>
+		<div class="appearance-controls">
+			<div class="appearance-control">
+				<label bind:for="id + '-variant'">
+					{english ? 'Variant' : 'Variante'}
+				</label>
+				<select
+					model="variant"
+					bind:id="id + '-variant'"
+				>
+					<option
+						each:of="options.variant"
+						each:as="value"
+						each:key="value"
+						bind:value="value"
+						>{value}</option
+					>
+				</select>
+			</div>
+			<div class="appearance-control">
+				<label bind:for="id + '-color'">
+					Color
+				</label>
+				<select
+					model="color"
+					bind:id="id + '-color'"
+				>
+					<option
+						each:of="options.color"
+						each:as="value"
+						each:key="value"
+						bind:value="value"
+						>{value === 'neutral' ? 'surface' : value}</option
+					>
+				</select>
+			</div>
+			<div class="appearance-control">
+				<label bind:for="id + '-size'">
+					{english ? 'Size' : 'Tamaño'}
+				</label>
+				<select
+					model="size"
+					bind:id="id + '-size'"
+				>
+					<option
+						each:of="options.size"
+						each:as="value"
+						each:key="value"
+						bind:value="value"
+						>{value}</option
+					>
+				</select>
+			</div>
+			<div class="appearance-control">
+				<label bind:for="id + '-radius'">
+					{english ? 'Radius' : 'Radio'}
+				</label>
+				<select
+					model="radius"
+					bind:id="id + '-radius'"
+				>
+					<option
+						each:of="options.radius"
+						each:as="value"
+						each:key="value"
+						bind:value="value"
+						>{value}</option
+					>
+				</select>
+			</div>
+			<div class="appearance-control">
+				<label bind:for="id + '-elevation'">
+					{english ? 'Elevation' : 'Elevación'}
+				</label>
+				<select
+					model="elevation"
+					bind:id="id + '-elevation'"
+				>
+					<option
+						each:of="options.elevation"
+						each:as="value"
+						each:key="value"
+						bind:value="value"
+						>{value}</option
+					>
+				</select>
+			</div>
+		</div>
+		<div class="appearance-preview">
+			<UIButton bind:appearance="appearance.value">{english ? 'Preview button' : 'Botón de ejemplo'}</UIButton>
+		</div>
+		<pre><code>{code.value}</code></pre>
+		<UICopyButton bind:value="code.value" />
+	</div>
+</template>
+
+<style>
+	.appearance-playground {
+		display: grid;
+		justify-items: start;
+		gap: var(--ui-space-4);
+	}
+
+	.appearance-controls {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--ui-space-3);
+	}
+
+	.appearance-control {
+		display: grid;
+		gap: var(--ui-space-1);
+	}
+
+	.appearance-controls select {
+		border: 1px solid var(--ui-color-control-border);
+		border-radius: var(--ui-radius-md);
+		background: var(--ui-color-control);
+		padding: var(--ui-space-1) var(--ui-space-2);
+		color: var(--ui-color-text);
+		font: inherit;
+	}
+
+	.appearance-preview {
+		display: grid;
+		place-items: center;
+		border: 1px solid var(--ui-color-border);
+		border-radius: var(--ui-radius-lg);
+		background: var(--ui-color-surface);
+		width: 100%;
+		min-height: 6rem;
+	}
+</style>

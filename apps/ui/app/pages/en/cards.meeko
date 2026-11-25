@@ -97,9 +97,38 @@
 			<code>footer</code>
 			the actions.
 		</p>
+		<h2 id="appearance">Appearance</h2>
+		<DocsPreview>
+			<UICard
+				title="Weekly summary"
+				bind:appearance="{ variant: 'surface', color: 'primary', radius: 'xl', elevation: 'md' }"
+			>
+				3 projects updated
+			</UICard>
+			<UICard
+				title="outline"
+				bind:appearance="{ variant: 'outline', color: 'primary' }"
+			>
+				3 projects updated
+			</UICard>
+			<UICard
+				title="glass"
+				bind:appearance="{ variant: 'glass', color: 'primary' }"
+			>
+				3 projects updated
+			</UICard>
+			<UICard
+				title="plain"
+				bind:appearance="{ variant: 'plain', color: 'primary' }"
+			>
+				3 projects updated
+			</UICard>
+		</DocsPreview>
+		<DocsCode bind:code="examples.cardAppearance" />
 		<DocsApi
 			bind:rows="[
 				{ name: 'title / description', type: 'string', description: 'Optional header text.' },
+				{ name: 'appearance', type: 'CardAppearance', default: '—', description: 'Variant, color, radius and elevation from the appearance catalog.' },
 				{ name: 'variant', type: 'outline | soft | solid | elevated', default: 'outline', description: 'Visual variant; supports ui.defaults.card.' },
 				{ name: 'actionsWrap', type: 'inline | below | auto', default: 'inline', description: 'Where the actions go; auto moves them down in a narrow card and supports ui.defaults.card.' },
 				{ name: 'class', type: 'string', description: 'Additional classes.' },

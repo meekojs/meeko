@@ -20,7 +20,7 @@ test('Container preserves semantics and fits mobile, 4K, wider and nested layout
 	await ssr.goto(origin + '/container')
 	const html = await ssr.locator('.container-example').evaluate((element) => element.outerHTML)
 	assert.match(html, /--ui-container-xl\)/)
-	// The compiled sheet of UI: its tokens and the ui:* classes of the variants.
+	// The compiled sheet of UI: its tokens and the * classes of the variants.
 	const stylesheet = await readFile(new URL('../dist/styles/main.css', import.meta.url), 'utf8')
 	// Exercise the shipped SSR markup and stylesheet outside the documentation's constrained column.
 	const isolated = await browser.newPage()

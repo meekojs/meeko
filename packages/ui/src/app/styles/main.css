@@ -2,7 +2,7 @@
  * The stylesheet of @meekojs/ui, the entry that scripts/build-styles.mjs compiles with Tailwind 4 into
  * dist/styles/main.css. The app gets the compiled sheet: it needs no Tailwind of its own.
  *
- * Layers: ui.components holds the rules still written by hand, ui.utilities the ui:* classes of the
+ * Layers: ui.components holds the rules still written by hand, ui.utilities the Tailwind utilities of the
  * components. Both lose to any unlayered rule of the app, and the layer ui-base of base.css goes first.
  * `base` is Tailwind's preflight layer: declared here, before the layers of UI, an app with Tailwind
  * keeps its reset below the components instead of wiping their borders, padding and backgrounds.
@@ -11,15 +11,17 @@
 
 @import './palette.css';
 @import './tokens.css';
+/* La paleta generada forma parte de la entrada que compilan Vite y el build del paquete. */
+@import './appearance-palette.css';
 @import './fonts.css';
 @import './components.css' layer(ui.components);
 
-/* The prefix keeps the classes of UI apart from those of an app that also uses Tailwind. */
-@import 'tailwindcss/theme.css' layer(ui.theme) prefix(ui) theme(reference);
+@import 'tailwindcss/theme.css' layer(ui.theme);
 @import './theme.css';
 @import 'tailwindcss/utilities.css' layer(ui.utilities) source(none);
 
-/* The classes come only from the components and their variants, never from the app. */
-@source '../components';
+/* The classes come from the UI components, variants and theme recipes. */
+@source '../components/**';
 @source '../variants';
+@source '../theme';
 @source '../../editor/components';

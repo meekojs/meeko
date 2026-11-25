@@ -89,10 +89,37 @@
 				{ name: 'class', type: 'string', description: 'Additional classes.' },
 			]"
 		/>
+		<h2 id="appearance">Input appearance</h2>
+		<DocsPreview>
+			<label for="appearance-email">Work email</label>
+			<UIInput
+				id="appearance-email"
+				type="email"
+				placeholder="name@example.com"
+				bind:appearance="{ variant: 'surface', color: 'primary', size: 'lg', radius: 'lg' }"
+			/>
+			<label for="appearance-input-outline">outline</label>
+			<UIInput
+				id="appearance-input-outline"
+				bind:appearance="{ variant: 'outline', color: 'primary' }"
+			/>
+			<label for="appearance-input-ghost">ghost</label>
+			<UIInput
+				id="appearance-input-ghost"
+				bind:appearance="{ variant: 'ghost', color: 'primary' }"
+			/>
+			<label for="appearance-input-soft">soft</label>
+			<UIInput
+				id="appearance-input-soft"
+				bind:appearance="{ variant: 'soft', color: 'primary' }"
+			/>
+		</DocsPreview>
+		<DocsCode bind:code="examples.inputAppearance" />
 		<DocsApi
 			caption="UIInput props"
 			bind:rows="[
 				{ name: 'model', type: 'Signal<string>', default: 'Empty string', description: 'Two-way text model; it updates on input.' },
+				{ name: 'appearance', type: 'InputAppearance', default: '—', description: 'Variant, color, size and radius from the appearance catalog.' },
 				{ name: 'type', type: 'text | email | password | search | url | tel | number | date | datetime-local | time | month', default: 'text', description: 'Native type of the control. The date and time pickers are the browser ones. With number, time and month the model is still text (“42”, “09:30”, “2026-11” or empty): convert it where you use it.' },
 				{ name: 'autocomplete / inputmode / min / max / step', type: 'HTML attributes', description: 'They reach the input as they are, like autocapitalize and spellcheck.' },
 				{ name: 'id / name / placeholder', type: 'string', description: 'Attributes of the input.' },

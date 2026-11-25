@@ -2,26 +2,35 @@
 // breaks: it is a pill, and inside a table the column grows instead.
 import { tv } from 'tailwind-variants/lite'
 
+import { badgeAppearance, type BadgeAppearance } from '../theme/recipes'
+
 export const badge = tv({
 	slots: {
 		base: [
-			'ui:inline-flex ui:items-center ui:gap-1.5 ui:[justify-self:start] ui:align-middle ui:whitespace-nowrap',
-			'ui:rounded-full ui:border-(length:--ui-border-width) ui:px-2 ui:py-0.5',
-			'ui:font-sans ui:text-xs ui:leading-snug ui:font-medium',
+			'meeko-ui-component',
+			'inline-flex items-center gap-1.5 [justify-self:start] align-middle whitespace-nowrap',
+			'border-(length:--ui-border-width) px-2 py-0.5',
+			'font-sans text-xs leading-snug font-medium',
 		],
-		dot: 'ui:size-(--ui-badge-dot-size) ui:rounded-full ui:bg-current',
+		dot: 'size-(--ui-badge-dot-size) rounded-full bg-current',
 	},
 	variants: {
 		tone: {
-			neutral: { base: 'ui:border-border ui:bg-control ui:text-text-soft' },
-			accent: { base: 'ui:border-transparent ui:bg-primary-soft ui:text-primary-text' },
-			info: { base: 'ui:border-transparent ui:bg-info-soft ui:text-info-text' },
-			success: { base: 'ui:border-transparent ui:bg-success-soft ui:text-success-text' },
-			warning: { base: 'ui:border-transparent ui:bg-warning-soft ui:text-warning-text' },
-			danger: { base: 'ui:border-transparent ui:bg-danger-soft ui:text-danger-text' },
+			custom: '',
+			neutral: { base: 'rounded-full border-border bg-control text-text-soft' },
+			accent: { base: 'rounded-full border-transparent bg-primary-soft text-primary-text' },
+			info: { base: 'rounded-full border-transparent bg-info-soft text-info-text' },
+			success: { base: 'rounded-full border-transparent bg-success-soft text-success-text' },
+			warning: { base: 'rounded-full border-transparent bg-warning-soft text-warning-text' },
+			danger: { base: 'rounded-full border-transparent bg-danger-soft text-danger-text' },
 		},
 	},
 	defaultVariants: {
 		tone: 'neutral',
 	},
 })
+
+/** Mantiene el indicador del badge al cambiar su apariencia. */
+export function badgeWithAppearance(appearance: BadgeAppearance) {
+	return { slots: badge({ tone: 'custom' }), className: badgeAppearance(appearance) }
+}

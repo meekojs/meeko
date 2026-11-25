@@ -42,7 +42,7 @@
 
 	const classes = navigationTree()
 	// The badge of a featured item goes to the end of its link.
-	const featuredClass = badge({ tone: 'accent' }).base({ class: 'ui:ms-auto ui:flex-none' })
+	const featuredClass = badge({ tone: 'accent' }).base({ class: 'ms-auto flex-none' })
 </script>
 
 <template>

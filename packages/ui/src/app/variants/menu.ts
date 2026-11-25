@@ -13,26 +13,26 @@ export const menu = tv({
 		/** The trigger that <UIMenu> paints; its look is the one of `button` in ../variants/button.ts. */
 		trigger: '',
 		/** The chevron after the text of a trigger with `triggerLabel`. */
-		chevron: 'ui:motion-safe:transition-[rotate] ui:duration-(--ui-duration-fast) ui:in-aria-expanded:rotate-180',
+		chevron: 'motion-safe:transition-[rotate] duration-(--ui-duration-fast) in-aria-expanded:rotate-180',
 		/** An item of the data: an action (<button>) or a link (<a>, <MeekoLink>). */
 		item: [
-			'ui:box-border ui:items-center ui:gap-2 ui:leading-snug',
-			'ui:aria-disabled:cursor-not-allowed ui:aria-disabled:bg-transparent ui:aria-disabled:opacity-(--ui-opacity-disabled)',
+			'box-border items-center gap-2 leading-snug',
+			'aria-disabled:cursor-not-allowed aria-disabled:bg-transparent aria-disabled:opacity-(--ui-opacity-disabled)',
 		],
 		/** The icon of an item: it takes the colour of its text. */
 		icon: '',
 		/** The text of an item: it takes the free width, so the shortcut goes to the end. */
-		label: 'ui:min-w-0 ui:flex-1',
+		label: 'min-w-0 flex-1',
 		/** The shortcut of an item, after its text: a reminder, the app is the one that listens to it. */
-		shortcut: 'ui:ms-4 ui:rounded-none ui:[border:0] ui:bg-transparent ui:p-0 ui:font-sans ui:text-sm ui:leading-snug ui:font-regular ui:text-text-soft',
+		shortcut: 'ms-4 rounded-none [border:0] bg-transparent p-0 font-sans text-sm leading-snug font-regular text-text-soft',
 		/** A line between two groups of items. */
-		separator: 'ui:my-1 ui:block ui:h-(--ui-border-width) ui:bg-border',
+		separator: 'my-1 block h-(--ui-border-width) bg-border',
 	},
 	variants: {
 		/** The tone of an item: `danger` for an action that destroys or cannot be undone. */
 		tone: {
 			neutral: '',
-			danger: { item: 'ui:text-danger-text ui:not-aria-disabled:hover:bg-danger-soft ui:not-aria-disabled:focus:bg-danger-soft' },
+			danger: { item: 'text-danger-text not-aria-disabled:hover:bg-danger-soft not-aria-disabled:focus:bg-danger-soft' },
 		},
 	},
 	defaultVariants: {

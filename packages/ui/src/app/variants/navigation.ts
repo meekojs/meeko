@@ -8,53 +8,53 @@ import { disabledBusy } from './button'
 import { focusRing, focusRingInset } from './focus'
 
 /** No transition when the reader asks for less motion. */
-const still = 'ui:motion-reduce:transition-none ui:motion-reduce:duration-0'
+const still = 'motion-reduce:transition-none motion-reduce:duration-0'
 
 /**
  * The chevron of a <details> that folds: it points to the text while closed, and down when open. Also used
  * by <UIDisclosure>.
  */
 export const chevron = [
-	'ui:-rotate-90 ui:rtl:rotate-90 ui:[details[open]>summary>&]:rotate-0 ui:text-text-soft',
-	'ui:transition-[rotate] ui:duration-(--ui-duration-base) ui:ease-out',
+	'-rotate-90 rtl:rotate-90 [details[open]>summary>&]:rotate-0 text-text-soft',
+	'transition-[rotate] duration-(--ui-duration-base) ease-out',
 	still,
 ].join(' ')
 
 /** The look of <UINavigationTree>: groups that fold with a native <details>, and their links. */
 export const navigationTree = tv({
 	slots: {
-		base: 'ui:grid ui:grid-cols-[minmax(0,1fr)] ui:gap-5 ui:font-sans ui:text-md ui:text-text-soft',
+		base: 'grid grid-cols-[minmax(0,1fr)] gap-5 font-sans text-md text-text-soft',
 		// Where the browser animates to `auto`, a group opens and closes by its height.
 		group: [
-			'ui:supports-[interpolate-size:allow-keywords]:[interpolate-size:allow-keywords]',
-			'ui:supports-[interpolate-size:allow-keywords]:details-content:[block-size:0] ui:supports-[interpolate-size:allow-keywords]:details-content:overflow-clip',
-			'ui:supports-[interpolate-size:allow-keywords]:details-content:[transition:block-size_var(--ui-duration-base)_var(--ui-ease-out),content-visibility_var(--ui-duration-base)_allow-discrete]',
-			'ui:supports-[interpolate-size:allow-keywords]:open:details-content:[block-size:auto]',
-			'ui:motion-reduce:details-content:[transition:none]',
+			'supports-[interpolate-size:allow-keywords]:[interpolate-size:allow-keywords]',
+			'supports-[interpolate-size:allow-keywords]:details-content:[block-size:0] supports-[interpolate-size:allow-keywords]:details-content:overflow-clip',
+			'supports-[interpolate-size:allow-keywords]:details-content:[transition:block-size_var(--ui-duration-base)_var(--ui-ease-out),content-visibility_var(--ui-duration-base)_allow-discrete]',
+			'supports-[interpolate-size:allow-keywords]:open:details-content:[block-size:auto]',
+			'motion-reduce:details-content:[transition:none]',
 		],
 		// The title of a group: a <summary> when the group folds (`foldingTitle`), a <p> otherwise.
-		title: 'ui:m-0 ui:flex ui:items-center ui:justify-between ui:gap-2 ui:rounded-sm ui:px-2 ui:py-1 ui:text-md ui:font-medium ui:text-text',
-		titleText: 'ui:inline-flex ui:min-w-0 ui:items-center ui:gap-2',
+		title: 'm-0 flex items-center justify-between gap-2 rounded-sm px-2 py-1 text-md font-medium text-text',
+		titleText: 'inline-flex min-w-0 items-center gap-2',
 		chevron,
-		list: 'ui:mx-0 ui:mt-1 ui:mb-0 ui:grid ui:list-none ui:grid-cols-[minmax(0,1fr)] ui:gap-0.5 ui:p-0',
+		list: 'mx-0 mt-1 mb-0 grid list-none grid-cols-[minmax(0,1fr)] gap-0.5 p-0',
 		link: [
-			'ui:flex ui:items-center ui:gap-2 ui:rounded-sm ui:px-2 ui:py-1 ui:text-md ui:leading-normal ui:text-inherit ui:no-underline ui:decoration-current',
-			'ui:hover:bg-control-hover ui:hover:text-text',
-			'ui:[&[aria-current]]:bg-primary-soft ui:[&[aria-current]]:font-medium ui:[&[aria-current]]:text-primary-text',
-			'ui:transition-[background-color,color] ui:duration-(--ui-duration-fast)',
+			'flex items-center gap-2 rounded-sm px-2 py-1 text-md leading-normal text-inherit no-underline decoration-current',
+			'hover:bg-control-hover hover:text-text',
+			'[&[aria-current]]:bg-primary-soft [&[aria-current]]:font-medium [&[aria-current]]:text-primary-text',
+			'transition-[background-color,color] duration-(--ui-duration-fast)',
 			still,
 			focusRingInset,
 		],
-		label: 'ui:min-w-0',
-		empty: 'ui:px-2 ui:py-1 ui:text-md',
+		label: 'min-w-0',
+		empty: 'px-2 py-1 text-md',
 	},
 })
 
 /** The title of a group of <UINavigationTree> that folds: its <summary>, without the marker. */
-export const foldingTitle = ['ui:cursor-pointer ui:list-none ui:[&::-webkit-details-marker]:hidden ui:hover:bg-control-hover', focusRingInset].join(' ')
+export const foldingTitle = ['cursor-pointer list-none [&::-webkit-details-marker]:hidden hover:bg-control-hover', focusRingInset].join(' ')
 
 /** The text of a link of <UINavigationTree> whose label is code: one line of monospace. */
-export const codeLabel = 'ui:overflow-hidden ui:font-mono ui:text-md ui:text-ellipsis ui:whitespace-nowrap'
+export const codeLabel = 'overflow-hidden font-mono text-md text-ellipsis whitespace-nowrap'
 
 /**
  * The look of <UINavigationTabs>. `underline`: a row whose indicator follows the current link with CSS
@@ -64,46 +64,46 @@ export const codeLabel = 'ui:overflow-hidden ui:font-mono ui:text-md ui:text-ell
  */
 export const navigationTabs = tv({
 	slots: {
-		base: 'ui:group/tabs ui:relative ui:overflow-x-auto ui:font-sans ui:[anchor-scope:--tabs-current] ui:[scrollbar-width:none]',
+		base: 'group/tabs relative overflow-x-auto font-sans [anchor-scope:--tabs-current] [scrollbar-width:none]',
 		link: [
-			'ui:flex ui:flex-none ui:items-center ui:gap-2 ui:font-control ui:text-control-md ui:whitespace-nowrap ui:no-underline ui:decoration-current',
-			'ui:text-text-soft ui:hover:not-[[aria-current]]:text-text',
+			'flex flex-none items-center gap-2 font-control text-control-md whitespace-nowrap no-underline decoration-current',
+			'text-text-soft hover:not-[[aria-current]]:text-text',
 			still,
 			focusRingInset,
 		],
-		indicator: 'ui:hidden',
+		indicator: 'hidden',
 	},
 	variants: {
 		variant: {
 			underline: {
-				base: 'ui:flex ui:gap-1 ui:border-b-(length:--ui-border-width) ui:border-b-border',
+				base: 'flex gap-1 border-b-(length:--ui-border-width) border-b-border',
 				link: [
-					'ui:min-h-(--ui-control-height-lg) ui:rounded-t-md ui:rounded-b-none ui:p-(--ui-control-padding-md) ui:transition-[color] ui:duration-(--ui-duration-fast)',
-					'ui:[&[aria-current]]:text-text',
-					'ui:[&[aria-current]]:[box-shadow:inset_0_calc(var(--ui-tabs-indicator-height)*-1)_var(--ui-color-primary)]',
-					'ui:supports-[anchor-name:--tabs-current]:[&[aria-current]]:[anchor-name:--tabs-current] ui:supports-[anchor-name:--tabs-current]:[&[aria-current]]:[box-shadow:none]',
+					'min-h-(--ui-control-height-lg) rounded-t-md rounded-b-none p-(--ui-control-padding-md) transition-[color] duration-(--ui-duration-fast)',
+					'[&[aria-current]]:text-text',
+					'[&[aria-current]]:[box-shadow:inset_0_calc(var(--ui-tabs-indicator-height)*-1)_var(--ui-color-primary)]',
+					'supports-[anchor-name:--tabs-current]:[&[aria-current]]:[anchor-name:--tabs-current] supports-[anchor-name:--tabs-current]:[&[aria-current]]:[box-shadow:none]',
 				],
 				indicator: [
-					'ui:supports-[anchor-name:--tabs-current]:group-has-[a[aria-current]]/tabs:block',
-					'ui:supports-[anchor-name:--tabs-current]:absolute ui:supports-[anchor-name:--tabs-current]:[position-anchor:--tabs-current]',
-					'ui:supports-[anchor-name:--tabs-current]:top-[calc(anchor(bottom)-var(--ui-tabs-indicator-height))] ui:supports-[anchor-name:--tabs-current]:left-[anchor(left)]',
-					'ui:supports-[anchor-name:--tabs-current]:w-[anchor-size(width)] ui:supports-[anchor-name:--tabs-current]:h-(--ui-tabs-indicator-height)',
-					'ui:supports-[anchor-name:--tabs-current]:bg-primary ui:supports-[anchor-name:--tabs-current]:pointer-events-none',
-					'ui:supports-[anchor-name:--tabs-current]:transition-[left,width] ui:supports-[anchor-name:--tabs-current]:duration-(--ui-duration-base) ui:supports-[anchor-name:--tabs-current]:ease-out',
+					'supports-[anchor-name:--tabs-current]:group-has-[a[aria-current]]/tabs:block',
+					'supports-[anchor-name:--tabs-current]:absolute supports-[anchor-name:--tabs-current]:[position-anchor:--tabs-current]',
+					'supports-[anchor-name:--tabs-current]:top-[calc(anchor(bottom)-var(--ui-tabs-indicator-height))] supports-[anchor-name:--tabs-current]:left-[anchor(left)]',
+					'supports-[anchor-name:--tabs-current]:w-[anchor-size(width)] supports-[anchor-name:--tabs-current]:h-(--ui-tabs-indicator-height)',
+					'supports-[anchor-name:--tabs-current]:bg-primary supports-[anchor-name:--tabs-current]:pointer-events-none',
+					'supports-[anchor-name:--tabs-current]:transition-[left,width] supports-[anchor-name:--tabs-current]:duration-(--ui-duration-base) supports-[anchor-name:--tabs-current]:ease-out',
 					// A navigation moves it with its View Transition, also when each page mounts its own tabs: the
 					// `left` transition would still be at the old place when the new page is captured.
-					'ui:supports-[anchor-name:--tabs-current]:[html:active-view-transition-type(meeko-route)_&]:group-has-[a[aria-current]]/tabs:[view-transition-name:ui-navigation-tabs-indicator]',
-					'ui:supports-[anchor-name:--tabs-current]:[html:active-view-transition-type(meeko-route)_&]:group-has-[a[aria-current]]/tabs:transition-none',
+					'supports-[anchor-name:--tabs-current]:[html:active-view-transition-type(meeko-route)_&]:group-has-[a[aria-current]]/tabs:[view-transition-name:ui-navigation-tabs-indicator]',
+					'supports-[anchor-name:--tabs-current]:[html:active-view-transition-type(meeko-route)_&]:group-has-[a[aria-current]]/tabs:transition-none',
 					still,
 				],
 			},
 			segmented: {
-				base: 'ui:inline-flex ui:max-w-full ui:gap-0.5 ui:rounded-lg ui:border-(length:--ui-border-width) ui:border-control-border ui:bg-control ui:p-0.5',
+				base: 'inline-flex max-w-full gap-0.5 rounded-lg border-(length:--ui-border-width) border-control-border bg-control p-0.5',
 				link: [
-					'ui:min-h-(--ui-control-height-sm) ui:rounded-md ui:px-3 ui:py-0',
-					'ui:transition-[background-color,color] ui:duration-(--ui-duration-fast)',
-					'ui:hover:not-[[aria-current]]:bg-control-hover',
-					'ui:[&[aria-current]]:bg-primary-soft ui:[&[aria-current]]:font-semibold ui:[&[aria-current]]:text-primary-text',
+					'min-h-(--ui-control-height-sm) rounded-md px-3 py-0',
+					'transition-[background-color,color] duration-(--ui-duration-fast)',
+					'hover:not-[[aria-current]]:bg-control-hover',
+					'[&[aria-current]]:bg-primary-soft [&[aria-current]]:font-semibold [&[aria-current]]:text-primary-text',
 				],
 			},
 		},
@@ -116,41 +116,41 @@ export const navigationTabs = tv({
 /** The look of <UIBreadcrumb>: an ordered list whose steps a slash divides. */
 export const breadcrumb = tv({
 	slots: {
-		base: 'ui:font-sans ui:text-sm ui:text-text-soft',
-		list: 'ui:m-0 ui:flex ui:list-none ui:flex-wrap ui:items-center ui:gap-x-1.5 ui:gap-y-1 ui:p-0',
-		item: "ui:inline-flex ui:min-w-0 ui:items-center ui:gap-1.5 ui:not-first:before:opacity-(--ui-opacity-subtle) ui:not-first:before:content-['/'_/_'']",
+		base: 'font-sans text-sm text-text-soft',
+		list: 'm-0 flex list-none flex-wrap items-center gap-x-1.5 gap-y-1 p-0',
+		item: "inline-flex min-w-0 items-center gap-1.5 not-first:before:opacity-(--ui-opacity-subtle) not-first:before:content-['/'_/_'']",
 		link: [
-			'ui:rounded-xs ui:text-inherit ui:no-underline ui:decoration-current ui:hover:text-text ui:hover:underline ui:hover:underline-offset-(--ui-underline-offset)',
-			'ui:transition-[color] ui:duration-(--ui-duration-fast)',
+			'rounded-xs text-inherit no-underline decoration-current hover:text-text hover:underline hover:underline-offset-(--ui-underline-offset)',
+			'transition-[color] duration-(--ui-duration-fast)',
 			still,
 			focusRing,
 		],
-		current: 'ui:aria-[current=page]:font-medium ui:aria-[current=page]:text-text',
+		current: 'aria-[current=page]:font-medium aria-[current=page]:text-text',
 	},
 })
 
 /** The look of <UIPageNavigation>: the previous page and the next one, in one column on a phone. */
 export const pageNavigation = tv({
 	slots: {
-		base: 'ui:grid ui:grid-cols-2 ui:gap-3 ui:font-sans ui:max-phone:grid-cols-1',
+		base: 'grid grid-cols-2 gap-3 font-sans max-phone:grid-cols-1',
 		link: [
-			'ui:grid ui:gap-1 ui:rounded-lg ui:border-(length:--ui-border-width) ui:border-border ui:px-4 ui:py-3 ui:text-text ui:no-underline ui:decoration-current ui:wrap-anywhere',
-			'ui:hover:border-border-strong ui:hover:bg-control-hover',
-			'ui:transition-[border-color,background-color] ui:duration-(--ui-duration-fast)',
+			'grid gap-1 rounded-lg border-(length:--ui-border-width) border-border px-4 py-3 text-text no-underline decoration-current wrap-anywhere',
+			'hover:border-border-strong hover:bg-control-hover',
+			'transition-[border-color,background-color] duration-(--ui-duration-fast)',
 			still,
 			focusRing,
 		],
-		hint: 'ui:flex ui:items-center ui:gap-1.5 ui:text-sm ui:text-text-soft',
-		label: 'ui:text-md ui:font-medium',
+		hint: 'flex items-center gap-1.5 text-sm text-text-soft',
+		label: 'text-md font-medium',
 		// The arrows point the way of the reading.
-		icon: 'ui:rtl:[scale:-1_1]',
+		icon: 'rtl:[scale:-1_1]',
 	},
 })
 
 /** What the link to the next page adds: the second column, and its text at the end. */
 export const pageNavigationNext = {
-	link: 'ui:col-start-2 ui:text-end ui:max-phone:col-start-auto',
-	hint: 'ui:justify-end',
+	link: 'col-start-2 text-end max-phone:col-start-auto',
+	hint: 'justify-end',
 }
 
 /**
@@ -160,44 +160,44 @@ export const pageNavigationNext = {
  */
 export const pagination = tv({
 	slots: {
-		base: 'ui:flex ui:flex-wrap ui:items-center ui:justify-between ui:gap-x-4 ui:gap-y-2 ui:font-sans',
-		count: 'ui:m-0 ui:text-sm ui:text-text-soft ui:[font-variant-numeric:tabular-nums]',
+		base: 'flex flex-wrap items-center justify-between gap-x-4 gap-y-2 font-sans',
+		count: 'm-0 text-sm text-text-soft [font-variant-numeric:tabular-nums]',
 		// An outline button (variants/button) at the end of the row, with a spinner while the next page loads.
-		action: ['ui:ms-auto', disabledBusy],
-		list: 'ui:my-0 ui:me-0 ui:ms-auto ui:flex ui:list-none ui:flex-wrap ui:items-center ui:gap-1 ui:p-0',
-		item: 'ui:flex',
+		action: ['ms-auto', disabledBusy],
+		list: 'my-0 me-0 ms-auto flex list-none flex-wrap items-center gap-1 p-0',
+		item: 'flex',
 		// A number is at least a square, and its figures keep their width from one page to the next.
-		page: 'ui:min-w-(--ui-control-height-sm) ui:[font-variant-numeric:tabular-nums] ui:aria-disabled:cursor-progress',
+		page: 'min-w-(--ui-control-height-sm) [font-variant-numeric:tabular-nums] aria-disabled:cursor-progress',
 		// Previous, next, first and last: a square with its icon.
-		control: 'ui:aria-disabled:cursor-progress',
+		control: 'aria-disabled:cursor-progress',
 		// The arrows point the way of the reading.
-		icon: 'ui:rtl:[scale:-1_1]',
-		ellipsis: 'ui:inline-flex ui:min-w-(--ui-control-height-sm) ui:justify-center ui:text-sm ui:text-text-soft ui:select-none',
+		icon: 'rtl:[scale:-1_1]',
+		ellipsis: 'inline-flex min-w-(--ui-control-height-sm) justify-center text-sm text-text-soft select-none',
 	},
 })
 
 /** The look of <UITableOfContents>: a column of links, or a <details> that holds them. */
 export const tableOfContents = tv({
 	slots: {
-		base: 'ui:font-sans ui:text-md ui:leading-normal ui:text-text-soft',
-		title: 'ui:mx-0 ui:mt-0 ui:mb-2 ui:font-medium ui:text-text',
-		list: 'ui:m-0 ui:list-none ui:p-0',
+		base: 'font-sans text-md leading-normal text-text-soft',
+		title: 'mx-0 mt-0 mb-2 font-medium text-text',
+		list: 'm-0 list-none p-0',
 		// The collapsible view: inside <UIPage> (its `group/page`), only below `desktop`, where variants/page
 		// hides the aside with the same breakpoint.
 		collapsible: [
-			'ui:rounded-lg ui:border-(length:--ui-border-width) ui:border-border ui:font-sans ui:text-md',
-			'ui:group-[&]/page:mb-8 ui:group-[&]/page:hidden ui:max-desktop:group-[&]/page:block',
+			'rounded-lg border-(length:--ui-border-width) border-border font-sans text-md',
+			'group-[&]/page:mb-8 group-[&]/page:hidden max-desktop:group-[&]/page:block',
 		],
 		summary: [
-			'ui:flex ui:cursor-pointer ui:list-none ui:items-center ui:justify-between ui:rounded-lg ui:px-3 ui:py-2 ui:font-medium ui:text-text',
-			'ui:[&::-webkit-details-marker]:hidden',
+			'flex cursor-pointer list-none items-center justify-between rounded-lg px-3 py-2 font-medium text-text',
+			'[&::-webkit-details-marker]:hidden',
 			focusRingInset,
 		],
 		chevron,
-		panel: 'ui:max-h-(--ui-toc-max-height) ui:overflow-y-auto ui:border-t-(length:--ui-border-width) ui:border-t-border ui:px-3 ui:pt-2 ui:pb-3',
+		panel: 'max-h-(--ui-toc-max-height) overflow-y-auto border-t-(length:--ui-border-width) border-t-border px-3 pt-2 pb-3',
 		link: [
-			'ui:block ui:border-s-(length:--ui-border-width) ui:border-s-border ui:py-1 ui:text-inherit ui:no-underline ui:decoration-current ui:hover:text-text',
-			'ui:transition-[color,border-color] ui:duration-(--ui-duration-fast)',
+			'block border-s-(length:--ui-border-width) border-s-border py-1 text-inherit no-underline decoration-current hover:text-text',
+			'transition-[color,border-color] duration-(--ui-duration-fast)',
 			still,
 			focusRingInset,
 		],
@@ -213,13 +213,13 @@ export const tableOfContents = tv({
 export const tableOfContentsLink = tv({
 	variants: {
 		nested: {
-			0: 'ui:ps-3',
-			1: 'ui:ps-6',
-			2: 'ui:ps-8',
+			0: 'ps-3',
+			1: 'ps-6',
+			2: 'ps-8',
 		},
 		tracking: {
-			auto: 'ui:aria-[current=location]:border-s-primary ui:aria-[current=location]:text-text',
-			manual: 'ui:aria-[current=location]:border-s-primary ui:aria-[current=location]:text-text',
+			auto: 'aria-[current=location]:border-s-primary aria-[current=location]:text-text',
+			manual: 'aria-[current=location]:border-s-primary aria-[current=location]:text-text',
 		},
 	},
 	defaultVariants: {
@@ -229,4 +229,4 @@ export const tableOfContentsLink = tv({
 })
 
 /** The list of <UITableOfContents> in `tracking: auto`, the group whose current target the browser follows. */
-export const tableOfContentsTracking = 'ui:supports-[scroll-target-group:auto]:[scroll-target-group:auto]'
+export const tableOfContentsTracking = 'supports-[scroll-target-group:auto]:[scroll-target-group:auto]'

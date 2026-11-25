@@ -32,7 +32,8 @@
 </script>
 
 <!-- No whitespace between the tags of this template: it would be text inside the button and the content. Prettier keeps it that way (htmlWhitespaceSensitivity "strict" in prettier.config.ts); tests/templates-without-whitespace.test.mjs guards it. -->
-<template><button
+<template>
+	<button
 		if:when="!snippets.anchor && snippets.trigger"
 		type="button"
 		data-meeko-popover-trigger
@@ -44,12 +45,15 @@
 		bind:aria-haspopup="popover.trigger.value['aria-haspopup']"
 		bind:aria-describedby="popover.trigger.value['aria-describedby']"
 		bind:interestfor="popover.trigger.value.interestfor"
-		><render snippet="snippets.trigger" /></button
-	><render
+	>
+		<render snippet="snippets.trigger" />
+	</button>
+	<render
 		if:when="snippets.anchor"
 		snippet="snippets.anchor"
 		args="popover.trigger.value"
-	/><span
+	/>
+	<span
 		ref:content
 		data-meeko-popover
 		bind:id="popover.contentId"
@@ -59,5 +63,7 @@
 		bind:aria-labelledby="popover.labelledBy.value"
 		bind:tabindex="popover.role.value === 'dialog' ? '-1' : undefined"
 		bind:class="contentClass.value"
-		><render snippet="snippets.default"
-	/></span></template>
+	>
+		<render snippet="snippets.default" />
+	</span>
+</template>

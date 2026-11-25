@@ -6,24 +6,24 @@ import { tv } from 'tailwind-variants/lite'
 export const avatar = tv({
 	slots: {
 		base: [
-			'ui:relative ui:inline-flex ui:flex-none ui:items-center ui:justify-center ui:overflow-hidden ui:align-middle ui:select-none',
-			'ui:bg-(color:--ui-avatar-bg) ui:text-(color:--ui-avatar-color)',
-			'ui:font-sans ui:leading-none ui:font-semibold ui:whitespace-nowrap',
+			'relative inline-flex flex-none items-center justify-center overflow-hidden align-middle select-none',
+			'bg-(color:--ui-avatar-bg) text-(color:--ui-avatar-color)',
+			'font-sans leading-none font-semibold whitespace-nowrap',
 		],
 		/** La foto: llena la caja y se recorta sin deformarse. */
-		image: 'ui:block ui:size-full ui:object-cover',
+		image: 'block size-full object-cover',
 		/** La persona genérica, sin imagen ni nombre: proporcional a la caja. */
-		glyph: 'ui:size-3/5 ui:flex-none ui:fill-none ui:stroke-current ui:[stroke-linecap:round] ui:[stroke-linejoin:round] ui:[stroke-width:var(--ui-icon-stroke-width)]',
+		glyph: 'size-3/5 flex-none fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:var(--ui-icon-stroke-width)]',
 	},
 	variants: {
 		size: {
-			sm: { base: 'ui:size-(--ui-avatar-size-sm) ui:text-(length:--ui-avatar-font-size-sm)' },
-			md: { base: 'ui:size-(--ui-avatar-size-md) ui:text-(length:--ui-avatar-font-size-md)' },
-			lg: { base: 'ui:size-(--ui-avatar-size-lg) ui:text-(length:--ui-avatar-font-size-lg)' },
+			sm: { base: 'size-(--ui-avatar-size-sm) text-(length:--ui-avatar-font-size-sm)' },
+			md: { base: 'size-(--ui-avatar-size-md) text-(length:--ui-avatar-font-size-md)' },
+			lg: { base: 'size-(--ui-avatar-size-lg) text-(length:--ui-avatar-font-size-lg)' },
 		},
 		shape: {
-			circle: { base: 'ui:rounded-full' },
-			rounded: { base: 'ui:rounded-(--ui-avatar-radius)' },
+			circle: { base: 'rounded-full' },
+			rounded: { base: 'rounded-(--ui-avatar-radius)' },
 		},
 	},
 	defaultVariants: {

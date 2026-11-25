@@ -1,6 +1,7 @@
 import type { ElementAttributes } from '@meekojs/meeko'
 import type { MeekoLinkProps, RouteId } from '@meekojs/meeko/framework'
 
+import type { ButtonAppearance } from '../theme/recipes'
 import type { icons } from '../utils/icons'
 import type { copyButton, iconButton } from '../variants/button'
 import type { linkCard } from '../variants/card'
@@ -171,6 +172,8 @@ interface UIButtonNativeProps extends NoAnchorAttributes {
 export type UIButtonProps = (UIButtonAnchorProps | UIButtonNativeProps | UIButtonRouteProps) &
 	UIActionAppearance &
 	UIForwardedAttributes & {
+		/** Apariencia basada en el catálogo de Meeko UI. */
+		readonly appearance?: ButtonAppearance
 		/** Estado semántico de una acción destructiva. */
 		readonly tone?: 'neutral' | 'danger'
 		/** Ocupado: anuncia el estado y bloquea la activación. Conserva el texto visible. */

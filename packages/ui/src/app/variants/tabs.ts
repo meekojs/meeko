@@ -4,19 +4,19 @@
 import { tv } from 'tailwind-variants/lite'
 
 /** The keyboard ring, inside the element. */
-const ring = 'ui:focus-visible:outline-(length:--ui-focus-ring-width) ui:focus-visible:outline-solid ui:focus-visible:outline-focus ui:focus-visible:-outline-offset-(--ui-focus-ring-offset)'
+const ring = 'focus-visible:outline-(length:--ui-focus-ring-width) focus-visible:outline-solid focus-visible:outline-focus focus-visible:-outline-offset-(--ui-focus-ring-offset)'
 
 export const tabs = tv({
 	slots: {
-		base: 'ui:font-sans ui:text-md ui:text-text',
-		list: 'ui:flex ui:gap-1 ui:overflow-x-auto ui:[scrollbar-width:none] ui:[box-shadow:inset_0_calc(var(--ui-border-width)*-1)_var(--ui-color-border)]',
+		base: 'font-sans text-md text-text',
+		list: 'flex gap-1 overflow-x-auto [scrollbar-width:none] [box-shadow:inset_0_calc(var(--ui-border-width)*-1)_var(--ui-color-border)]',
 		tab: [
-			'ui:relative ui:m-0 ui:min-h-(--ui-control-height-lg) ui:flex-none ui:cursor-pointer ui:p-(--ui-control-padding-md)',
-			'ui:rounded-t-sm ui:rounded-b-none ui:[border:0] ui:bg-transparent',
-			'ui:font-sans ui:text-control-md ui:leading-tight ui:font-control ui:tracking-snug',
-			'ui:text-text-soft ui:enabled:hover:text-text ui:aria-selected:text-text',
-			'ui:disabled:cursor-not-allowed ui:disabled:opacity-(--ui-opacity-disabled)',
-			'ui:transition-[color] ui:duration-(--ui-duration-fast) ui:motion-reduce:transition-none ui:motion-reduce:duration-0',
+			'relative m-0 min-h-(--ui-control-height-lg) flex-none cursor-pointer p-(--ui-control-padding-md)',
+			'rounded-t-sm rounded-b-none [border:0] bg-transparent',
+			'font-sans text-control-md leading-tight font-control tracking-snug',
+			'text-text-soft enabled:hover:text-text aria-selected:text-text',
+			'disabled:cursor-not-allowed disabled:opacity-(--ui-opacity-disabled)',
+			'transition-[color] duration-(--ui-duration-fast) motion-reduce:transition-none motion-reduce:duration-0',
 			ring,
 		],
 		/**
@@ -25,9 +25,9 @@ export const tabs = tv({
 		 * cancels the animation. `ui-navigation-tabs-indicator` is reserved for the route tabs.
 		 */
 		indicator: [
-			'ui:absolute ui:inset-x-0 ui:top-auto ui:bottom-0 ui:hidden ui:h-(--ui-tabs-indicator-height) ui:bg-primary ui:[[aria-selected=true]>&]:block',
-			'ui:[html:active-view-transition-type(ui-tab)_[data-ui-tabs-active]_[aria-selected=true]>&]:[view-transition-name:ui-tabs-indicator]',
+			'absolute inset-x-0 top-auto bottom-0 hidden h-(--ui-tabs-indicator-height) bg-primary [[aria-selected=true]>&]:block',
+			'[html:active-view-transition-type(ui-tab)_[data-ui-tabs-active]_[aria-selected=true]>&]:[view-transition-name:ui-tabs-indicator]',
 		],
-		panel: ['ui:py-4 ui:[&[hidden]]:hidden', ring],
+		panel: ['py-4 [&[hidden]]:hidden', ring],
 	},
 })

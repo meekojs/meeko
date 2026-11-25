@@ -4,7 +4,7 @@
 	import type { UIBadgeProps } from '../types/forms'
 
 	import { uiTheme } from '../utils/defaults'
-	import { badge } from '../variants/badge'
+	import { badge, badgeWithAppearance } from '../variants/badge'
 
 	const props = defineProps<UIBadgeProps>({ tone: 'neutral' })
 
@@ -12,11 +12,12 @@
 
 	const snippets = defineSnippets<{ default: [] }>()
 
-	const classes = computed(() => badge({ tone: props.tone }))
+	const custom = computed(() => (props.appearance ? badgeWithAppearance(props.appearance) : undefined))
+	const classes = computed(() => custom.value?.slots ?? badge({ tone: props.tone }))
 </script>
 
 <template>
-	<span bind:class="classes.value.base({ class: [theme.ui.base, theme.class] })">
+	<span bind:class="classes.value.base({ class: [custom.value?.className, theme.ui.base, theme.class] })">
 		<span
 			if:when="props.dot"
 			aria-hidden="true"

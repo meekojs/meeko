@@ -6,43 +6,43 @@
 import { tv } from 'tailwind-variants/lite'
 
 /** The focus ring of the trigger. */
-const focusRing = 'ui:focus-visible:outline-(length:--ui-focus-ring-width) ui:focus-visible:outline-focus ui:focus-visible:outline-offset-(--ui-focus-ring-offset) ui:focus-visible:outline-solid'
+const focusRing = 'focus-visible:outline-(length:--ui-focus-ring-width) focus-visible:outline-focus focus-visible:outline-offset-(--ui-focus-ring-offset) focus-visible:outline-solid'
 
 /** The look of the content, the element with `popover`. */
 export const popover = tv({
 	base: [
 		// Its place: on its trigger, flipped to the other side when it does not fit.
-		'ui:m-0 ui:box-border ui:inset-auto ui:[position-anchor:auto] ui:[position-try-fallbacks:flip-block,flip-inline]',
+		'm-0 box-border inset-auto [position-anchor:auto] [position-try-fallbacks:flip-block,flip-inline]',
 		// It fades and slides in from --popover-from, and back out; with reduced motion it only appears.
-		'ui:[translate:var(--popover-from,0_calc(var(--ui-space-1)*-1))] ui:opacity-(--ui-opacity-hidden) ui:open:[translate:0] ui:open:opacity-(--ui-opacity-visible)',
-		'ui:starting:open:[translate:var(--popover-from,0_calc(var(--ui-space-1)*-1))] ui:starting:open:opacity-(--ui-opacity-hidden)',
-		'ui:transition-[opacity,translate,display,overlay] ui:transition-discrete ui:duration-(--ui-duration-base) ui:ease-out',
-		'ui:motion-reduce:[translate:none] ui:motion-reduce:transition-none ui:motion-reduce:duration-0',
-		'ui:border-(length:--ui-border-width) ui:border-solid ui:border-border ui:bg-surface-raised ui:font-sans ui:text-text',
+		'[translate:var(--popover-from,0_calc(var(--ui-space-1)*-1))] opacity-(--ui-opacity-hidden) open:[translate:0] open:opacity-(--ui-opacity-visible)',
+		'starting:open:[translate:var(--popover-from,0_calc(var(--ui-space-1)*-1))] starting:open:opacity-(--ui-opacity-hidden)',
+		'transition-[opacity,translate,display,overlay] transition-discrete duration-(--ui-duration-base) ease-out',
+		'motion-reduce:[translate:none] motion-reduce:transition-none motion-reduce:duration-0',
+		'border-(length:--ui-border-width) border-solid border-border bg-surface-raised font-sans text-text',
 	],
 	variants: {
 		/** The ARIA pattern of the content: `none` for a list that names its own role, such as <UICombobox>. */
 		role: {
-			none: 'ui:max-h-(--ui-popover-max-height) ui:overflow-auto ui:rounded-lg ui:p-1 ui:text-md ui:[box-shadow:var(--ui-shadow-md)]',
-			menu: 'ui:max-h-(--ui-popover-max-height) ui:min-w-(--ui-page-aside-width) ui:overflow-auto ui:rounded-lg ui:p-1 ui:text-md ui:[box-shadow:var(--ui-shadow-md)]',
-			dialog: 'ui:max-h-(--ui-popover-max-height) ui:w-[min(var(--ui-floating-panel-width),calc(100vw-var(--ui-space-8)))] ui:overflow-auto ui:rounded-lg ui:p-4 ui:text-md ui:[box-shadow:var(--ui-shadow-md)]',
+			none: 'max-h-(--ui-popover-max-height) overflow-auto rounded-lg p-1 text-md [box-shadow:var(--ui-shadow-md)]',
+			menu: 'max-h-(--ui-popover-max-height) min-w-(--ui-page-aside-width) overflow-auto rounded-lg p-1 text-md [box-shadow:var(--ui-shadow-md)]',
+			dialog: 'max-h-(--ui-popover-max-height) w-[min(var(--ui-floating-panel-width),calc(100vw-var(--ui-space-8)))] overflow-auto rounded-lg p-4 text-md [box-shadow:var(--ui-shadow-md)]',
 			// A tooltip is smaller than a panel, and its text wraps instead of scrolling.
-			tooltip: 'ui:max-h-(--ui-popover-max-height) ui:max-w-(--ui-tooltip-max-width) ui:overflow-visible ui:rounded-md ui:px-2 ui:py-1 ui:text-sm ui:leading-snug ui:[box-shadow:var(--ui-shadow-sm)]',
+			tooltip: 'max-h-(--ui-popover-max-height) max-w-(--ui-tooltip-max-width) overflow-visible rounded-md px-2 py-1 text-sm leading-snug [box-shadow:var(--ui-shadow-sm)]',
 		},
 		/** Where it opens: the side gives the margin and where it slides from, the alignment its `position-area`. */
 		placement: {
-			top: 'ui:[--popover-from:0_var(--ui-space-1)] ui:[margin-block-end:var(--popover-offset,0)] ui:[position-area:top]',
-			'top-start': 'ui:[--popover-from:0_var(--ui-space-1)] ui:[margin-block-end:var(--popover-offset,0)] ui:[position-area:top_span-right]',
-			'top-end': 'ui:[--popover-from:0_var(--ui-space-1)] ui:[margin-block-end:var(--popover-offset,0)] ui:[position-area:top_span-left]',
-			bottom: 'ui:[--popover-from:0_calc(var(--ui-space-1)*-1)] ui:[margin-block-start:var(--popover-offset,0)] ui:[position-area:bottom]',
-			'bottom-start': 'ui:[--popover-from:0_calc(var(--ui-space-1)*-1)] ui:[margin-block-start:var(--popover-offset,0)] ui:[position-area:bottom_span-right]',
-			'bottom-end': 'ui:[--popover-from:0_calc(var(--ui-space-1)*-1)] ui:[margin-block-start:var(--popover-offset,0)] ui:[position-area:bottom_span-left]',
-			left: 'ui:[--popover-from:var(--ui-space-1)_0] ui:[margin-inline-end:var(--popover-offset,0)] ui:[position-area:left]',
-			'left-start': 'ui:[--popover-from:var(--ui-space-1)_0] ui:[margin-inline-end:var(--popover-offset,0)] ui:[position-area:left_span-bottom]',
-			'left-end': 'ui:[--popover-from:var(--ui-space-1)_0] ui:[margin-inline-end:var(--popover-offset,0)] ui:[position-area:left_span-top]',
-			right: 'ui:[--popover-from:calc(var(--ui-space-1)*-1)_0] ui:[margin-inline-start:var(--popover-offset,0)] ui:[position-area:right]',
-			'right-start': 'ui:[--popover-from:calc(var(--ui-space-1)*-1)_0] ui:[margin-inline-start:var(--popover-offset,0)] ui:[position-area:right_span-bottom]',
-			'right-end': 'ui:[--popover-from:calc(var(--ui-space-1)*-1)_0] ui:[margin-inline-start:var(--popover-offset,0)] ui:[position-area:right_span-top]',
+			top: '[--popover-from:0_var(--ui-space-1)] [margin-block-end:var(--popover-offset,0)] [position-area:top]',
+			'top-start': '[--popover-from:0_var(--ui-space-1)] [margin-block-end:var(--popover-offset,0)] [position-area:top_span-right]',
+			'top-end': '[--popover-from:0_var(--ui-space-1)] [margin-block-end:var(--popover-offset,0)] [position-area:top_span-left]',
+			bottom: '[--popover-from:0_calc(var(--ui-space-1)*-1)] [margin-block-start:var(--popover-offset,0)] [position-area:bottom]',
+			'bottom-start': '[--popover-from:0_calc(var(--ui-space-1)*-1)] [margin-block-start:var(--popover-offset,0)] [position-area:bottom_span-right]',
+			'bottom-end': '[--popover-from:0_calc(var(--ui-space-1)*-1)] [margin-block-start:var(--popover-offset,0)] [position-area:bottom_span-left]',
+			left: '[--popover-from:var(--ui-space-1)_0] [margin-inline-end:var(--popover-offset,0)] [position-area:left]',
+			'left-start': '[--popover-from:var(--ui-space-1)_0] [margin-inline-end:var(--popover-offset,0)] [position-area:left_span-bottom]',
+			'left-end': '[--popover-from:var(--ui-space-1)_0] [margin-inline-end:var(--popover-offset,0)] [position-area:left_span-top]',
+			right: '[--popover-from:calc(var(--ui-space-1)*-1)_0] [margin-inline-start:var(--popover-offset,0)] [position-area:right]',
+			'right-start': '[--popover-from:calc(var(--ui-space-1)*-1)_0] [margin-inline-start:var(--popover-offset,0)] [position-area:right_span-bottom]',
+			'right-end': '[--popover-from:calc(var(--ui-space-1)*-1)_0] [margin-inline-start:var(--popover-offset,0)] [position-area:right_span-top]',
 		},
 		/** At least as wide as its trigger; a menu keeps its own minimum. */
 		matchWidth: {
@@ -50,7 +50,7 @@ export const popover = tv({
 			false: '',
 		},
 	},
-	compoundVariants: [{ role: ['none', 'dialog', 'tooltip'], matchWidth: true, class: 'ui:min-w-[anchor-size(width)]' }],
+	compoundVariants: [{ role: ['none', 'dialog', 'tooltip'], matchWidth: true, class: 'min-w-[anchor-size(width)]' }],
 	defaultVariants: {
 		role: 'none',
 		placement: 'bottom-start',
@@ -61,18 +61,18 @@ export const popover = tv({
 /** The trigger that <UIPopover> paints, with the look of a control; `triggerClass` adds to it. */
 export const popoverTrigger = tv({
 	base: [
-		'ui:inline-flex ui:min-h-(--ui-control-height-md) ui:cursor-pointer ui:items-center ui:p-(--ui-control-padding-md)',
-		'ui:rounded-md ui:border-(length:--ui-border-width) ui:border-solid ui:border-border-strong',
-		'ui:bg-control ui:hover:bg-control-hover ui:aria-expanded:bg-control-hover',
-		'ui:font-sans ui:text-control-md ui:leading-tight ui:font-control ui:tracking-snug ui:text-text',
-		'ui:transition-[background-color] ui:duration-(--ui-duration-fast) ui:motion-reduce:transition-none ui:motion-reduce:duration-0',
+		'inline-flex min-h-(--ui-control-height-md) cursor-pointer items-center p-(--ui-control-padding-md)',
+		'rounded-md border-(length:--ui-border-width) border-solid border-border-strong',
+		'bg-control hover:bg-control-hover aria-expanded:bg-control-hover',
+		'font-sans text-control-md leading-tight font-control tracking-snug text-text',
+		'transition-[background-color] duration-(--ui-duration-fast) motion-reduce:transition-none motion-reduce:duration-0',
 		focusRing,
 	],
 })
 
 /** The trigger that <UITooltip> paints: it keeps the text around it, and the pointer says there is help. */
 export const tooltipTrigger = tv({
-	base: ['ui:cursor-help ui:[border:0] ui:bg-transparent ui:p-0 ui:[color:inherit] ui:[font:inherit]', focusRing],
+	base: ['cursor-help [border:0] bg-transparent p-0 [color:inherit] [font:inherit]', focusRing],
 })
 
 /**
@@ -82,10 +82,10 @@ export const tooltipTrigger = tv({
 export const hint = tv({
 	slots: {
 		base: [
-			'ui:relative ui:m-0 ui:inline-flex ui:cursor-help ui:items-center ui:justify-center ui:rounded-full ui:[border:0] ui:bg-transparent ui:p-0 ui:align-(--ui-icon-text-align)',
-			'ui:text-text-soft ui:hover:text-text ui:[font:inherit] ui:leading-none',
-			'ui:transition-[color] ui:duration-(--ui-duration-fast) ui:motion-reduce:transition-none ui:motion-reduce:duration-0',
-			'ui:before:absolute ui:before:-inset-(--ui-hint-hit-area) ui:before:rounded-full',
+			'relative m-0 inline-flex cursor-help items-center justify-center rounded-full [border:0] bg-transparent p-0 align-(--ui-icon-text-align)',
+			'text-text-soft hover:text-text [font:inherit] leading-none',
+			'transition-[color] duration-(--ui-duration-fast) motion-reduce:transition-none motion-reduce:duration-0',
+			'before:absolute before:-inset-(--ui-hint-hit-area) before:rounded-full',
 			focusRing,
 		],
 		icon: '',

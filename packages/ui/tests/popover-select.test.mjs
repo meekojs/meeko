@@ -17,7 +17,7 @@ test('an unknown placement falls back to bottom-start, and the variants of popov
 		assert.ok(
 			popover({ placement })
 				.split(' ')
-				.includes(`ui:[position-area:${area.replace(' ', '_')}]`),
+				.includes(`[position-area:${area.replace(' ', '_')}]`),
 			placement,
 		)
 	}

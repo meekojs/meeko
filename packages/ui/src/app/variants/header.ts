@@ -7,19 +7,19 @@ import { focusRing } from './focus'
 export const brand = tv({
 	slots: {
 		base: [
-			'ui:inline-flex ui:flex-none ui:items-center ui:gap-2 ui:rounded-md',
-			'ui:text-md ui:font-semibold ui:tracking-snug ui:text-text ui:no-underline ui:decoration-current',
+			'inline-flex flex-none items-center gap-2 rounded-md',
+			'text-md font-semibold tracking-snug text-text no-underline decoration-current',
 			focusRing,
 		],
 		// It grows with the text beside it; the width and height attributes keep its proportion.
-		image: 'ui:block ui:h-(--ui-brand-image-height) ui:w-auto',
+		image: 'block h-(--ui-brand-image-height) w-auto',
 		name: '',
-		product: 'ui:font-semibold ui:text-primary-text',
+		product: 'font-semibold text-primary-text',
 	},
 	variants: {
 		/** The name hides on a narrow phone, when a product or the logo still say whose site it is. */
 		yields: {
-			true: { name: 'ui:max-phone:hidden' },
+			true: { name: 'max-phone:hidden' },
 			false: '',
 		},
 	},
@@ -30,11 +30,11 @@ export const brand = tv({
 
 /** A link of the bar and of its menu: soft text, a background on hover and on the current page. */
 const headerLink = [
-	'ui:flex ui:items-center ui:rounded-md ui:p-(--ui-control-padding-md) ui:min-h-(--ui-control-height-md)',
-	'ui:font-control ui:text-control-md ui:whitespace-nowrap ui:no-underline ui:decoration-current',
-	'ui:text-text-soft ui:hover:bg-control-hover ui:hover:text-text',
-	'ui:[&[aria-current]]:bg-control-active ui:[&[aria-current]]:text-text',
-	'ui:transition-[background-color,color] ui:duration-(--ui-duration-fast) ui:motion-reduce:transition-none ui:motion-reduce:duration-0',
+	'flex items-center rounded-md p-(--ui-control-padding-md) min-h-(--ui-control-height-md)',
+	'font-control text-control-md whitespace-nowrap no-underline decoration-current',
+	'text-text-soft hover:bg-control-hover hover:text-text',
+	'[&[aria-current]]:bg-control-active [&[aria-current]]:text-text',
+	'transition-[background-color,color] duration-(--ui-duration-fast) motion-reduce:transition-none motion-reduce:duration-0',
 	focusRing,
 ]
 
@@ -44,31 +44,31 @@ const headerLink = [
  */
 export const header = tv({
 	slots: {
-		base: 'ui:z-(--ui-z-sticky) ui:border-b-(length:--ui-border-width) ui:border-b-border ui:bg-bg ui:font-sans ui:text-text',
+		base: 'z-(--ui-z-sticky) border-b-(length:--ui-border-width) border-b-border bg-bg font-sans text-text',
 		// The bar shares its element with a <UIContainer>, which sets its width.
-		bar: 'ui:flex ui:h-(--ui-header-height) ui:items-center ui:gap-6',
+		bar: 'flex h-(--ui-header-height) items-center gap-6',
 		// When the links do not fit next to the actions they scroll sideways, and never overlap them. The
 		// padding keeps the focus ring inside the scroll box.
-		nav: 'ui:flex ui:min-w-0 ui:flex-1 ui:items-center ui:gap-1 ui:overflow-x-auto ui:py-1 ui:[scrollbar-width:none] ui:max-tablet:hidden',
+		nav: 'flex min-w-0 flex-1 items-center gap-1 overflow-x-auto py-1 [scrollbar-width:none] max-tablet:hidden',
 		link: headerLink,
-		actions: 'ui:ms-auto ui:flex ui:flex-none ui:items-center ui:gap-2',
+		actions: 'ms-auto flex flex-none items-center gap-2',
 		toggle: [
-			'ui:hidden ui:max-tablet:inline-flex ui:size-(--ui-control-height-md) ui:cursor-pointer ui:items-center ui:justify-center',
-			'ui:rounded-md ui:border-(length:--ui-border-width) ui:border-border ui:bg-transparent ui:text-text ui:hover:bg-control-hover',
+			'hidden max-tablet:inline-flex size-(--ui-control-height-md) cursor-pointer items-center justify-center',
+			'rounded-md border-(length:--ui-border-width) border-border bg-transparent text-text hover:bg-control-hover',
 			focusRing,
 		],
 		// A popover the width of the screen, under the bar. Only its bottom edge has a border.
 		menu: [
-			'ui:fixed ui:inset-x-0 ui:top-(--ui-header-height) ui:bottom-auto ui:m-0 ui:w-full ui:max-h-[calc(100dvh-var(--ui-header-height))] ui:overflow-y-auto',
-			'ui:[border-width:0_0_var(--ui-border-width)] ui:[border-style:none_none_solid] ui:border-b-border ui:bg-surface-raised ui:text-text ui:[box-shadow:var(--ui-shadow-md)]',
-			'ui:px-(--ui-container-gutter-md) ui:pt-2 ui:pb-4',
+			'fixed inset-x-0 top-(--ui-header-height) bottom-auto m-0 w-full max-h-[calc(100dvh-var(--ui-header-height))] overflow-y-auto',
+			'[border-width:0_0_var(--ui-border-width)] [border-style:none_none_solid] border-b-border bg-surface-raised text-text [box-shadow:var(--ui-shadow-md)]',
+			'px-(--ui-container-gutter-md) pt-2 pb-4',
 		],
-		menuNav: 'ui:grid ui:gap-0.5',
+		menuNav: 'grid gap-0.5',
 	},
 	variants: {
 		sticky: {
 			// It stays on top, and a heading reached by an anchor stays clear of it.
-			true: { base: 'ui:sticky ui:top-0 ui:[:root:has(&)]:[scroll-padding-block-start:calc(var(--ui-header-height)+var(--ui-space-4))]' },
+			true: { base: 'sticky top-0 [:root:has(&)]:[scroll-padding-block-start:calc(var(--ui-header-height)+var(--ui-space-4))]' },
 			false: '',
 		},
 	},
@@ -79,8 +79,8 @@ export const header = tv({
 
 /** A plain link of the footer: its text color until the pointer is on it. */
 const footerLink = [
-	'ui:text-inherit ui:no-underline ui:decoration-current ui:hover:text-text ui:hover:underline ui:hover:underline-offset-(--ui-underline-offset)',
-	'ui:transition-[color] ui:duration-(--ui-duration-fast) ui:motion-reduce:transition-none ui:motion-reduce:duration-0',
+	'text-inherit no-underline decoration-current hover:text-text hover:underline hover:underline-offset-(--ui-underline-offset)',
+	'transition-[color] duration-(--ui-duration-fast) motion-reduce:transition-none motion-reduce:duration-0',
 	focusRing,
 ]
 
@@ -88,26 +88,26 @@ const footerLink = [
 export const footer = tv({
 	slots: {
 		base: [
-			'ui:border-t-(length:--ui-border-width) ui:border-t-border ui:font-sans ui:text-sm ui:leading-normal ui:text-text-soft',
+			'border-t-(length:--ui-border-width) border-t-border font-sans text-sm leading-normal text-text-soft',
 			// The links an application writes in the snippets, without a class of their own, look like the footer's.
-			'ui:[&_a:not([class])]:text-inherit ui:[&_a:not([class])]:no-underline ui:[&_a:not([class])]:decoration-current ui:[&_a:not([class]):hover]:text-text ui:[&_a:not([class]):hover]:underline ui:[&_a:not([class]):hover]:underline-offset-(--ui-underline-offset)',
-			'ui:[&_a:not([class])]:transition-[color] ui:[&_a:not([class])]:duration-(--ui-duration-fast) ui:motion-reduce:[&_a:not([class])]:transition-none ui:motion-reduce:[&_a:not([class])]:duration-0',
-			'ui:[&_a:not([class]):focus-visible]:outline-(length:--ui-focus-ring-width) ui:[&_a:not([class]):focus-visible]:outline-solid ui:[&_a:not([class]):focus-visible]:outline-focus ui:[&_a:not([class]):focus-visible]:outline-offset-(--ui-focus-ring-offset)',
+			'[&_a:not([class])]:text-inherit [&_a:not([class])]:no-underline [&_a:not([class])]:decoration-current [&_a:not([class]):hover]:text-text [&_a:not([class]):hover]:underline [&_a:not([class]):hover]:underline-offset-(--ui-underline-offset)',
+			'[&_a:not([class])]:transition-[color] [&_a:not([class])]:duration-(--ui-duration-fast) motion-reduce:[&_a:not([class])]:transition-none motion-reduce:[&_a:not([class])]:duration-0',
+			'[&_a:not([class]):focus-visible]:outline-(length:--ui-focus-ring-width) [&_a:not([class]):focus-visible]:outline-solid [&_a:not([class]):focus-visible]:outline-focus [&_a:not([class]):focus-visible]:outline-offset-(--ui-focus-ring-offset)',
 		],
 		// The inner row shares its element with a <UIContainer>, which sets its width.
-		inner: 'ui:grid ui:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] ui:gap-x-8 ui:gap-y-10 ui:py-10 ui:max-tablet:grid-cols-[minmax(0,1fr)]',
+		inner: 'grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-x-8 gap-y-10 py-10 max-tablet:grid-cols-[minmax(0,1fr)]',
 		// Its paragraphs, the description or those of the `about` snippet, keep a measure.
-		about: 'ui:grid ui:[align-content:start] ui:justify-items-start ui:gap-3 ui:[&_p]:m-0 ui:[&_p]:max-w-(--ui-prose-measure)',
-		actions: 'ui:flex ui:flex-wrap ui:items-center ui:gap-2',
-		groups: 'ui:grid ui:grid-cols-[repeat(auto-fit,minmax(var(--ui-table-column-min),1fr))] ui:gap-8',
-		title: 'ui:mx-0 ui:mt-0 ui:mb-3 ui:font-medium ui:text-text',
-		list: 'ui:m-0 ui:grid ui:list-none ui:gap-2 ui:p-0',
+		about: 'grid [align-content:start] justify-items-start gap-3 [&_p]:m-0 [&_p]:max-w-(--ui-prose-measure)',
+		actions: 'flex flex-wrap items-center gap-2',
+		groups: 'grid grid-cols-[repeat(auto-fit,minmax(var(--ui-table-column-min),1fr))] gap-8',
+		title: 'mx-0 mt-0 mb-3 font-medium text-text',
+		list: 'm-0 grid list-none gap-2 p-0',
 		link: footerLink,
 		// Alone, the legal row needs no line above it.
 		legal: [
-			'ui:col-span-full ui:flex ui:flex-wrap ui:items-center ui:justify-between ui:gap-x-6 ui:gap-y-3 ui:text-sm',
-			'ui:[border-top:var(--ui-border-width)_solid_var(--ui-color-border)] ui:pt-5 ui:only:[border-top:0] ui:only:pt-0',
+			'col-span-full flex flex-wrap items-center justify-between gap-x-6 gap-y-3 text-sm',
+			'[border-top:var(--ui-border-width)_solid_var(--ui-color-border)] pt-5 only:[border-top:0] only:pt-0',
 		],
-		legalNav: 'ui:flex ui:flex-wrap ui:gap-x-4 ui:gap-y-2',
+		legalNav: 'flex flex-wrap gap-x-4 gap-y-2',
 	},
 })

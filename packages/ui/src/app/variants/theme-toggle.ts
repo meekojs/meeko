@@ -6,26 +6,26 @@ import { tv } from 'tailwind-variants/lite'
 
 export const themeToggle = tv({
 	slots: {
-		base: 'ui:font-sans',
+		base: 'font-sans',
 		/** The button of `cycle` and each radio of `select`. */
 		button: [
-			'ui:inline-flex ui:cursor-pointer ui:items-center ui:justify-center ui:px-2 ui:py-1',
-			'ui:rounded-md ui:border-(length:--ui-border-width) ui:border-solid ui:text-sm ui:text-text',
-			'ui:focus-visible:outline-(length:--ui-focus-ring-width) ui:focus-visible:outline-focus ui:focus-visible:outline-offset-(--ui-focus-ring-offset) ui:focus-visible:outline-solid',
+			'inline-flex cursor-pointer items-center justify-center px-2 py-1',
+			'rounded-md border-(length:--ui-border-width) border-solid text-sm text-text',
+			'focus-visible:outline-(length:--ui-focus-ring-width) focus-visible:outline-focus focus-visible:outline-offset-(--ui-focus-ring-offset) focus-visible:outline-solid',
 		],
 		/** The radio group of `select`. */
-		group: 'ui:inline-flex ui:gap-1 ui:rounded-lg ui:border-(length:--ui-border-width) ui:border-solid ui:border-border ui:p-0.5',
+		group: 'inline-flex gap-1 rounded-lg border-(length:--ui-border-width) border-solid border-border p-0.5',
 		/** An icon sits on the middle of the button, not on the baseline of a line of text. */
-		icon: 'ui:[&>svg]:block',
+		icon: '[&>svg]:block',
 	},
 	variants: {
 		mode: {
 			cycle: {
-				button: 'ui:min-h-(--ui-control-height-md) ui:border-border ui:bg-control ui:hover:bg-control-hover',
+				button: 'min-h-(--ui-control-height-md) border-border bg-control hover:bg-control-hover',
 			},
 			// The radios are flat until the pointer is over them; the chosen one stands out.
 			select: {
-				button: 'ui:min-h-(--ui-control-height-sm) ui:border-transparent ui:bg-transparent ui:hover:bg-control-hover ui:aria-checked:border-border-strong ui:aria-checked:bg-control-active ui:aria-checked:font-semibold',
+				button: 'min-h-(--ui-control-height-sm) border-transparent bg-transparent hover:bg-control-hover aria-checked:border-border-strong aria-checked:bg-control-active aria-checked:font-semibold',
 			},
 		},
 	},

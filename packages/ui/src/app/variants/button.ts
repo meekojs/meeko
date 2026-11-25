@@ -5,20 +5,34 @@ import type { VariantProps } from 'tailwind-variants/lite'
 // tailwind-merge two classes of the same property would be decided by the order of the stylesheet.
 import { tv } from 'tailwind-variants/lite'
 
+import { buttonAppearance, type ButtonAppearance } from '../theme/recipes'
+
+const base = [
+	'meeko-ui-component m-0 box-border inline-flex cursor-pointer items-center justify-center gap-1.5',
+	'border-(length:--ui-border-width) font-sans font-control leading-tight tracking-snug',
+	'indent-0 text-center whitespace-nowrap normal-case no-underline [text-shadow:none] [word-spacing:normal]',
+	'transition-[background-color,border-color] duration-(--ui-duration-fast) motion-reduce:transition-none',
+	'focus-visible:outline-(length:--ui-focus-ring-width) focus-visible:outline-focus focus-visible:outline-offset-(--ui-focus-ring-offset) focus-visible:outline-solid',
+	'disabled:cursor-not-allowed disabled:opacity-(--ui-opacity-disabled)',
+	// Busy: a spinner before the text, and the pointer says so.
+	'aria-busy:cursor-progress',
+	'aria-busy:before:box-border aria-busy:before:size-(--ui-icon-size-sm) aria-busy:before:flex-none aria-busy:before:rounded-full',
+	'aria-busy:before:border-(length:--ui-focus-ring-width) aria-busy:before:border-current aria-busy:before:border-e-transparent',
+	'aria-busy:before:animate-spin motion-reduce:aria-busy:before:animate-none',
+]
+
+/** Aplica la apariencia al botón sin perder sus estados nativos ni el indicador de carga. */
+export function buttonWithAppearance(appearance: ButtonAppearance, iconOnly: boolean, className?: string): string {
+	return [
+	...base,
+	buttonAppearance(appearance),
+	iconOnly ? 'aspect-square px-0! [&>svg]:size-(--ui-icon-size) [&>svg]:flex-none aria-busy:*:hidden' : undefined,
+	className,
+	].filter(Boolean).join(' ')
+}
+
 export const button = tv({
-	base: [
-		'ui:m-0 ui:box-border ui:inline-flex ui:cursor-pointer ui:items-center ui:justify-center ui:gap-1.5',
-		'ui:border-(length:--ui-border-width) ui:font-sans ui:font-control ui:leading-tight ui:tracking-snug',
-		'ui:indent-0 ui:text-center ui:whitespace-nowrap ui:normal-case ui:no-underline ui:[text-shadow:none] ui:[word-spacing:normal]',
-		'ui:transition-[background-color,border-color] ui:duration-(--ui-duration-fast) ui:motion-reduce:transition-none',
-		'ui:focus-visible:outline-(length:--ui-focus-ring-width) ui:focus-visible:outline-focus ui:focus-visible:outline-offset-(--ui-focus-ring-offset) ui:focus-visible:outline-solid',
-		'ui:disabled:cursor-not-allowed ui:disabled:opacity-(--ui-opacity-disabled)',
-		// Busy: a spinner before the text, and the pointer says so.
-		'ui:aria-busy:cursor-progress',
-		'ui:aria-busy:before:box-border ui:aria-busy:before:size-(--ui-icon-size-sm) ui:aria-busy:before:flex-none ui:aria-busy:before:rounded-full',
-		'ui:aria-busy:before:border-(length:--ui-focus-ring-width) ui:aria-busy:before:border-current ui:aria-busy:before:border-e-transparent',
-		'ui:aria-busy:before:animate-spin ui:motion-reduce:aria-busy:before:animate-none',
-	],
+	base,
 	variants: {
 		variant: {
 			primary: '',
@@ -31,54 +45,54 @@ export const button = tv({
 			danger: '',
 		},
 		size: {
-			sm: 'ui:min-h-(--ui-control-height-sm) ui:text-control-sm',
-			md: 'ui:min-h-(--ui-control-height-md) ui:text-control-md',
-			lg: 'ui:min-h-(--ui-control-height-lg) ui:text-control-lg',
+			sm: 'min-h-(--ui-control-height-sm) text-control-sm',
+			md: 'min-h-(--ui-control-height-md) text-control-md',
+			lg: 'min-h-(--ui-control-height-lg) text-control-lg',
 		},
 		shape: {
-			rounded: 'ui:rounded-md',
-			pill: 'ui:rounded-full',
+			rounded: 'rounded-md',
+			pill: 'rounded-full',
 		},
 		iconOnly: {
-			true: 'ui:p-0 ui:[&>svg]:size-(--ui-icon-size) ui:[&>svg]:flex-none ui:aria-busy:*:hidden',
+			true: 'p-0 [&>svg]:size-(--ui-icon-size) [&>svg]:flex-none aria-busy:*:hidden',
 			false: '',
 		},
 	},
 	compoundVariants: [
 		// Padding and width: a button with text grows with it, an icon is a square.
-		{ iconOnly: false, size: 'sm', class: 'ui:p-(--ui-control-padding-sm)' },
-		{ iconOnly: false, size: 'md', class: 'ui:p-(--ui-control-padding-md)' },
-		{ iconOnly: false, size: 'lg', class: 'ui:p-(--ui-control-padding-lg)' },
-		{ iconOnly: true, size: 'sm', class: 'ui:min-w-(--ui-control-height-sm)' },
-		{ iconOnly: true, size: 'md', class: 'ui:min-w-(--ui-control-height-md)' },
-		{ iconOnly: true, size: 'lg', class: 'ui:min-w-(--ui-control-height-lg)' },
+		{ iconOnly: false, size: 'sm', class: 'p-(--ui-control-padding-sm)' },
+		{ iconOnly: false, size: 'md', class: 'p-(--ui-control-padding-md)' },
+		{ iconOnly: false, size: 'lg', class: 'p-(--ui-control-padding-lg)' },
+		{ iconOnly: true, size: 'sm', class: 'min-w-(--ui-control-height-sm)' },
+		{ iconOnly: true, size: 'md', class: 'min-w-(--ui-control-height-md)' },
+		{ iconOnly: true, size: 'lg', class: 'min-w-(--ui-control-height-lg)' },
 		// Colors: one combination of variant and tone each.
 		{
 			variant: 'primary',
 			tone: 'neutral',
-			class: 'ui:border-transparent ui:bg-primary ui:text-primary-contrast ui:not-disabled:hover:bg-primary-hover ui:not-disabled:active:bg-primary-active',
+			class: 'border-transparent bg-primary text-primary-contrast not-disabled:hover:bg-primary-hover not-disabled:active:bg-primary-active',
 		},
 		{
 			variant: ['secondary', 'outline', 'ghost'],
 			tone: 'neutral',
-			class: 'ui:text-text ui:not-disabled:hover:bg-control-hover ui:not-disabled:active:bg-control-active',
+			class: 'text-text not-disabled:hover:bg-control-hover not-disabled:active:bg-control-active',
 		},
-		{ variant: 'secondary', tone: 'neutral', class: 'ui:border-border ui:bg-control' },
-		{ variant: 'outline', tone: 'neutral', class: 'ui:border-control-border ui:bg-transparent' },
-		{ variant: 'ghost', tone: 'neutral', class: 'ui:border-transparent ui:bg-transparent' },
+		{ variant: 'secondary', tone: 'neutral', class: 'border-border bg-control' },
+		{ variant: 'outline', tone: 'neutral', class: 'border-control-border bg-transparent' },
+		{ variant: 'ghost', tone: 'neutral', class: 'border-transparent bg-transparent' },
 		{
 			variant: 'primary',
 			tone: 'danger',
-			class: 'ui:border-transparent ui:bg-danger ui:text-danger-contrast ui:not-disabled:hover:bg-danger-hover ui:not-disabled:hover:text-danger-contrast-hover ui:not-disabled:active:bg-danger-hover ui:not-disabled:active:text-danger-contrast-hover',
+			class: 'border-transparent bg-danger text-danger-contrast not-disabled:hover:bg-danger-hover not-disabled:hover:text-danger-contrast-hover not-disabled:active:bg-danger-hover not-disabled:active:text-danger-contrast-hover',
 		},
 		{
 			variant: ['secondary', 'outline', 'ghost'],
 			tone: 'danger',
-			class: 'ui:text-danger-text ui:not-disabled:hover:bg-danger-soft ui:not-disabled:active:bg-danger-soft',
+			class: 'text-danger-text not-disabled:hover:bg-danger-soft not-disabled:active:bg-danger-soft',
 		},
-		{ variant: 'secondary', tone: 'danger', class: 'ui:border-danger-border ui:bg-danger-soft' },
-		{ variant: 'outline', tone: 'danger', class: 'ui:border-danger-border ui:bg-transparent' },
-		{ variant: 'ghost', tone: 'danger', class: 'ui:border-transparent ui:bg-transparent' },
+		{ variant: 'secondary', tone: 'danger', class: 'border-danger-border bg-danger-soft' },
+		{ variant: 'outline', tone: 'danger', class: 'border-danger-border bg-transparent' },
+		{ variant: 'ghost', tone: 'danger', class: 'border-transparent bg-transparent' },
 	],
 	defaultVariants: {
 		variant: 'primary',
@@ -126,14 +140,14 @@ export const iconButton = tv({
 	},
 	compoundVariants: [
 		// Pressed: a deeper solid, or the soft accent with its border, which the pointer does not take away.
-		{ variant: 'primary', tone: 'neutral', class: { base: 'ui:aria-pressed:bg-primary-active ui:aria-pressed:not-disabled:hover:bg-primary-active' } },
+		{ variant: 'primary', tone: 'neutral', class: { base: 'aria-pressed:bg-primary-active aria-pressed:not-disabled:hover:bg-primary-active' } },
 		{
 			variant: ['secondary', 'outline', 'ghost'],
 			tone: 'neutral',
-			class: { base: 'ui:aria-pressed:border-primary-border ui:aria-pressed:bg-primary-soft ui:aria-pressed:text-primary-text ui:aria-pressed:not-disabled:hover:bg-primary-soft-hover' },
+			class: { base: 'aria-pressed:border-primary-border aria-pressed:bg-primary-soft aria-pressed:text-primary-text aria-pressed:not-disabled:hover:bg-primary-soft-hover' },
 		},
-		{ variant: 'primary', tone: 'danger', class: { base: 'ui:aria-pressed:bg-danger-hover ui:aria-pressed:text-danger-contrast-hover ui:aria-pressed:not-disabled:hover:bg-danger-hover' } },
-		{ variant: ['secondary', 'outline', 'ghost'], tone: 'danger', class: { base: 'ui:aria-pressed:border-danger-text ui:aria-pressed:bg-danger-soft ui:aria-pressed:not-disabled:hover:bg-danger-soft' } },
+		{ variant: 'primary', tone: 'danger', class: { base: 'aria-pressed:bg-danger-hover aria-pressed:text-danger-contrast-hover aria-pressed:not-disabled:hover:bg-danger-hover' } },
+		{ variant: ['secondary', 'outline', 'ghost'], tone: 'danger', class: { base: 'aria-pressed:border-danger-text aria-pressed:bg-danger-soft aria-pressed:not-disabled:hover:bg-danger-soft' } },
 	],
 	defaultVariants: {
 		variant: 'ghost',
@@ -148,10 +162,10 @@ export const iconButton = tv({
  * Pagination, which marks itself with `aria-disabled` while the next page loads.
  */
 export const disabledBusy = [
-	'ui:aria-disabled:cursor-progress',
-	'ui:aria-disabled:before:box-border ui:aria-disabled:before:size-(--ui-icon-size-sm) ui:aria-disabled:before:flex-none ui:aria-disabled:before:rounded-full',
-	'ui:aria-disabled:before:border-(length:--ui-focus-ring-width) ui:aria-disabled:before:border-current ui:aria-disabled:before:border-e-transparent',
-	'ui:aria-disabled:before:animate-spin ui:motion-reduce:aria-disabled:before:animate-none',
+	'aria-disabled:cursor-progress',
+	'aria-disabled:before:box-border aria-disabled:before:size-(--ui-icon-size-sm) aria-disabled:before:flex-none aria-disabled:before:rounded-full',
+	'aria-disabled:before:border-(length:--ui-focus-ring-width) aria-disabled:before:border-current aria-disabled:before:border-e-transparent',
+	'aria-disabled:before:animate-spin motion-reduce:aria-disabled:before:animate-none',
 ].join(' ')
 
 /**
@@ -163,7 +177,7 @@ export const disabledBusy = [
 export const copyButton = tv({
 	slots: {
 		base: '',
-		status: 'ui:sr-only',
+		status: 'sr-only',
 	},
 	variants: {
 		variant: {
@@ -185,7 +199,7 @@ export const copyButton = tv({
 	compoundVariants: [
 		{
 			variant: ['secondary', 'outline', 'ghost'],
-			class: { base: 'ui:data-[copy-state=copied]:[color:var(--ui-copy-button-copied-color)] ui:data-[copy-state=failed]:[color:var(--ui-copy-button-failed-color)]' },
+			class: { base: 'data-[copy-state=copied]:[color:var(--ui-copy-button-copied-color)] data-[copy-state=failed]:[color:var(--ui-copy-button-failed-color)]' },
 		},
 	],
 	defaultVariants: {
@@ -195,4 +209,4 @@ export const copyButton = tv({
 })
 
 /** A copy button that needs the script waits for it hidden, keeping its place: without JavaScript it could not copy. */
-export const copyButtonWaiting = 'ui:invisible'
+export const copyButtonWaiting = 'invisible'

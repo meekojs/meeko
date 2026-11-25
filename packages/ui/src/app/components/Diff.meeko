@@ -42,6 +42,6 @@
 		tabindex="0"
 		bind:class="classes.base({ class: [theme.ui.base, theme.class] })"
 		bind:aria-label="props.label"
-	><span each:of="lines.value" each:as="line" each:key="line.index" bind:class="line.class" bind:data-kind="line.kind"><span class="ui:sr-only">{labelOf(line.kind)}</span>{line.text}
+	><span each:of="lines.value" each:as="line" each:key="line.index" bind:class="line.class" bind:data-kind="line.kind"><span class="sr-only">{labelOf(line.kind)}</span>{line.text}
 </span></pre>
 </template>

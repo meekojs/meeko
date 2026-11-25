@@ -625,7 +625,7 @@ test('edit a source with its preview, save the draft and publish it; rejections,
 		element.value = value
 		element.dispatchEvent(new Event('input', { bubbles: true }))
 	}, over)
-	await page.locator('span[class~="ui:bg-danger-soft"]').filter({ hasText: 'kB' }).waitFor()
+	await page.locator('span[class~="bg-danger-soft"]').filter({ hasText: 'kB' }).waitFor()
 	assert.equal(await page.getByRole('button', { name: /^(Crear|Guardar) borrador$/ }).isDisabled(), true)
 
 	// Expected in the console: the refused publication of the reference page (422), the failed save

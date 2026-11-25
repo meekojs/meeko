@@ -1,0 +1,120 @@
+<script lang="ts">
+	import { computed, signal, useId } from '@meekojs/meeko'
+
+	import { selectTheme } from '../../../theme/select'
+
+	interface Option {
+		label: string
+		value: string
+		disabled?: boolean
+	}
+
+	interface Props {
+		name?: string
+		placeholder?: string
+		disabled?: boolean
+		options: Option[]
+	}
+
+	const { name, placeholder, disabled, options } = defineProps<Props>()
+
+	const model = defineModel<string | null>({ default: null })
+
+	const trigger = useElementRef('trigger')
+
+	const popover = useElementRef('popover')
+
+	const isOpen = signal(false)
+
+	const selected = computed(() => options.find((option) => option.value === model.value))
+
+	const classes = computed(() => selectTheme())
+
+	const id = useId()
+
+	function select(option: Option) {
+		if (option.disabled) return
+
+		model.value = option.value
+
+		popover.value?.hidePopover()
+		trigger.value?.focus()
+	}
+
+	function onToggle(event: ToggleEvent) {
+		isOpen.value = event.newState === 'open'
+	}
+</script>
+
+<template>
+	<div bind:class="classes.value.base()">
+		<input
+			if:when="name"
+			type="hidden"
+			bind:value="model.value ?? ''"
+			bind:name="name"
+			bind:disabled="disabled"
+		/>
+
+		<button
+			ref:trigger
+			type="button"
+			aria-haspopup="listbox"
+			class="flex h-9 w-full items-center justify-between gap-2 rounded-md border border-solid border-control-border bg-control text-text px-3 text-sm outline-none transition-colors hover:bg-control-hover focus-visible:outline-(length:--ui-focus-ring-width) focus-visible:outline-focus focus-visible:outline-offset-(--ui-focus-ring-offset) focus-visible:outline-solid disabled:opacity-50"
+			bind:popovertarget="id"
+			bind:disabled="disabled"
+			bind:aria-expanded="isOpen"
+			bind:aria-controls="id"
+		>
+			<span class="truncate">
+				{selected.value?.label ?? placeholder ?? 'Seleccionar'}
+			</span>
+
+			<svg
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				class="size-4 shrink-0 transition-transform"
+				bind:class="{ 'rotate-180': isOpen.value }"
+			>
+				<path d="m6 9 6 6 6-6" />
+			</svg>
+		</button>
+
+		<div
+			ref:popover
+			popover="auto"
+			role="listbox"
+			aria-label="Opciones"
+			class="fixed inset-auto mx-0 my-1 max-h-72 w-[anchor-size(width)] overflow-y-auto overscroll-contain rounded-md border border-solid border-border bg-overlay-solid p-1 text-text shadow-lg [position-area:bottom_span-right] [position-try-fallbacks:flip-block] scale-95 opacity-0 transition-[opacity,scale,display,overlay] transition-discrete duration-150 open:scale-100 open:opacity-100 starting:open:scale-95 starting:open:opacity-0"
+			bind:id="id"
+			on:toggle="onToggle"
+		>
+			<button
+				each:of="options"
+				each:as="option"
+				each:key="option.value"
+				type="button"
+				role="option"
+				class="flex min-h-8 w-full items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-none transition-colors hover:bg-control-hover focus-visible:bg-control-hover disabled:pointer-events-none disabled:opacity-40 aria-selected:bg-primary-soft aria-selected:text-primary-text"
+				bind:aria-selected="model.value === option.value"
+				bind:disabled="option.disabled"
+				on:click="() => select(option)"
+			>
+				<span>{option.label}</span>
+
+				<svg
+					if:when="model.value === option.value"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+					class="size-4 shrink-0"
+				>
+					<path d="m5 12 4 4L19 6" />
+				</svg>
+			</button>
+		</div>
+	</div>
+</template>

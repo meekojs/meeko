@@ -96,7 +96,7 @@
 			>
 			<span
 				if:when="showsCopy.value"
-				class="ui:sr-only"
+				class="sr-only"
 				role="status"
 				bind:lang="props.uiLang"
 				>{state.value === 'idle' ? '' : copyState.value}</span

@@ -75,13 +75,13 @@
 	 */
 	--ui-color-primary-contrast: #ffffff;
 	--ui-color-primary-contrast-hover: #ffffff;
-	--ui-color-surface-contrast: #000000;
-	--ui-color-surface-contrast-hover: #000000;
+	--ui-color-surface-contrast: #ffffff;
+	--ui-color-surface-contrast-hover: #ffffff;
 	--ui-color-info-contrast: #000000;
 	--ui-color-info-contrast-hover: #ffffff;
 	--ui-color-success-contrast: #000000;
 	--ui-color-success-contrast-hover: #ffffff;
-	--ui-color-warning-contrast: #000000;
+	--ui-color-warning-contrast: #ffffff;
 	--ui-color-warning-contrast-hover: #ffffff;
 	--ui-color-danger-contrast: #ffffff;
 	--ui-color-danger-contrast-hover: #ffffff;
@@ -110,10 +110,14 @@
 	--ui-line-height-snug: 1.35;
 	--ui-line-height-normal: 1.5;
 	--ui-line-height-relaxed: 1.65;
+	--ui-font-weight-thin: 100;
+	--ui-font-weight-light: 300;
 	--ui-font-weight-regular: 400;
 	--ui-font-weight-medium: 500;
 	--ui-font-weight-semibold: 600;
 	--ui-font-weight-bold: 700;
+	--ui-font-weight-extrabold: 800;
+	--ui-font-weight-black: 900;
 	--ui-tracking-normal: 0;
 	--ui-tracking-snug: -0.006em;
 	--ui-tracking-tight: -0.014em;
@@ -143,6 +147,8 @@
 	--ui-radius-md: 0.375rem;
 	--ui-radius-lg: 0.5rem;
 	--ui-radius-xl: 0.75rem;
+	--ui-radius-2xl: 1rem;
+	--ui-radius-3xl: 1.5rem;
 	--ui-radius-full: 999px;
 	--ui-border-width: 1px;
 	--ui-focus-ring-width: 2px;
@@ -164,9 +170,13 @@
 	--ui-opacity-disabled: 0.55;
 
 	/* Depth */
+	--ui-shadow-xs: 0 1px 2px rgb(0 0 0 / 5%);
 	--ui-shadow-sm: 0 1px 2px rgb(0 0 0 / 8%);
 	--ui-shadow-md: 0 2px 4px rgb(0 0 0 / 6%), 0 6px 16px rgb(0 0 0 / 10%);
 	--ui-shadow-lg: 0 4px 8px rgb(0 0 0 / 8%), 0 16px 40px rgb(0 0 0 / 16%);
+	--ui-shadow-xl: 0 10px 24px rgb(0 0 0 / 18%);
+	--ui-shadow-2xl: 0 20px 48px rgb(0 0 0 / 24%);
+	--ui-blur-md: 12px;
 
 	/* Motion */
 	--ui-duration-fast: 120ms;
@@ -305,17 +315,21 @@
 }
 
 :root[data-theme='dark'] {
+	--ui-color-focus: var(--ui-color-primary-11);
 	/* On pure black, panels rise by getting lighter; shadows only separate what overlaps. */
 	--ui-color-surface-raised: var(--ui-color-surface-3);
 	--ui-color-control-border: var(--ui-color-surface-10);
+	--ui-shadow-xs: 0 1px 2px rgb(0 0 0 / 45%);
 	--ui-shadow-sm: 0 1px 2px rgb(0 0 0 / 60%);
 	--ui-shadow-md: 0 2px 4px rgb(0 0 0 / 50%), 0 6px 16px rgb(0 0 0 / 60%);
 	--ui-shadow-lg: 0 4px 8px rgb(0 0 0 / 50%), 0 16px 40px rgb(0 0 0 / 70%);
+	--ui-shadow-xl: 0 10px 24px rgb(0 0 0 / 75%);
+	--ui-shadow-2xl: 0 20px 48px rgb(0 0 0 / 80%);
 
 	--ui-color-primary-contrast: #ffffff;
 	--ui-color-primary-contrast-hover: #ffffff;
-	--ui-color-surface-contrast: #ffffff;
-	--ui-color-surface-contrast-hover: #ffffff;
+	--ui-color-surface-contrast: #000000;
+	--ui-color-surface-contrast-hover: #000000;
 	--ui-color-info-contrast: #000000;
 	--ui-color-info-contrast-hover: #000000;
 	--ui-color-success-contrast: #000000;

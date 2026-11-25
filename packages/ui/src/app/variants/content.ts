@@ -8,17 +8,17 @@ import { inProse } from './card'
 import { focusRing, focusRingInset } from './focus'
 
 /** No transition when the reader asks for less motion. */
-const still = 'ui:motion-reduce:transition-none ui:motion-reduce:duration-0'
+const still = 'motion-reduce:transition-none motion-reduce:duration-0'
 
 /** The icons of the package: lines of the current color, of a size of the tokens. */
 export const icon = tv({
-	base: 'ui:flex-none ui:fill-none ui:stroke-current ui:[stroke-linecap:round] ui:[stroke-linejoin:round] ui:[stroke-width:var(--ui-icon-stroke-width)]',
+	base: 'flex-none fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:var(--ui-icon-stroke-width)]',
 	variants: {
 		size: {
-			md: 'ui:size-(--ui-icon-size)',
-			sm: 'ui:size-(--ui-icon-size-sm)',
+			md: 'size-(--ui-icon-size)',
+			sm: 'size-(--ui-icon-size-sm)',
 			// The size of the text around it, for an icon inside a sentence or a heading.
-			text: 'ui:size-(--ui-icon-size-text)',
+			text: 'size-(--ui-icon-size-text)',
 		},
 	},
 	defaultVariants: {
@@ -28,8 +28,8 @@ export const icon = tv({
 
 /** The <pre> of a block, whether the component paints it or it comes in `html` or the snippet. */
 const pre = [
-	'ui:m-0 ui:rounded-none ui:px-4 ui:py-3 ui:max-phone:px-3 ui:overflow-auto',
-	'ui:font-mono ui:text-sm ui:leading-relaxed ui:text-text ui:[tab-size:2] ui:[&_:is(code,span)]:[font-family:inherit]',
+	'm-0 rounded-none px-4 py-3 max-phone:px-3 overflow-auto',
+	'font-mono text-sm leading-relaxed text-text [tab-size:2] [&_:is(code,span)]:[font-family:inherit]',
 	focusRingInset,
 ].join(' ')
 
@@ -40,31 +40,31 @@ const pre = [
 export const codeBlock = tv({
 	slots: {
 		base: [
-			'ui:m-0 ui:min-w-0 ui:overflow-hidden ui:rounded-lg ui:border-(length:--ui-border-width) ui:bg-bg-subtle ui:font-sans ui:text-text',
+			'm-0 min-w-0 overflow-hidden rounded-lg border-(length:--ui-border-width) bg-bg-subtle font-sans text-text',
 			// Shiki writes its own background on the <pre>.
-			'ui:[&_.shiki]:bg-transparent!',
+			'[&_.shiki]:bg-transparent!',
 			inProse,
 		],
-		head: 'ui:flex ui:min-h-(--ui-control-height-md) ui:items-center ui:gap-2 ui:border-b-(length:--ui-border-width) ui:py-1 ui:ps-4 ui:pe-1.5 ui:text-sm',
-		verdict: 'ui:inline-flex ui:items-center ui:gap-1 ui:font-semibold',
-		label: 'ui:font-medium',
-		lang: 'ui:font-mono',
+		head: 'flex min-h-(--ui-control-height-md) items-center gap-2 border-b-(length:--ui-border-width) py-1 ps-4 pe-1.5 text-sm',
+		verdict: 'inline-flex items-center gap-1 font-semibold',
+		label: 'font-medium',
+		lang: 'font-mono',
 		// A button that needs the script waits for it (`codeBlockCopy.waiting`), in a header whose height is reserved.
 		copy: [
-			'ui:ms-auto ui:cursor-pointer ui:rounded-sm ui:[border:0] ui:bg-transparent ui:px-2 ui:py-0.5 ui:hover:bg-control-hover',
-			'ui:font-sans ui:text-xs ui:leading-normal ui:font-medium',
-			'ui:transition-[color,background-color] ui:duration-(--ui-duration-fast)',
+			'ms-auto cursor-pointer rounded-sm [border:0] bg-transparent px-2 py-0.5 hover:bg-control-hover',
+			'font-sans text-xs leading-normal font-medium',
+			'transition-[color,background-color] duration-(--ui-duration-fast)',
 			still,
 			focusRingInset,
 		],
 		/** The <pre> that the component paints from `code`. */
-		code: ['ui:block ui:min-w-0', pre],
+		code: ['block min-w-0', pre],
 		/** The <div> around the `html` or the snippet: its <pre> gets the look of `code`. */
 		content: [
-			'ui:m-0 ui:block ui:min-w-0 ui:[&_:is(code,span)]:[font-family:inherit]',
-			'ui:[&>pre]:m-0 ui:[&>pre]:rounded-none ui:[&>pre]:px-4 ui:[&>pre]:py-3 ui:max-phone:[&>pre]:px-3 ui:[&>pre]:overflow-auto ui:[&>pre]:max-h-(--ui-code-max-height)',
-			'ui:[&>pre]:font-mono ui:[&>pre]:text-sm ui:[&>pre]:leading-relaxed ui:[&>pre]:text-text ui:[&>pre]:[tab-size:2]',
-			'ui:[&_pre]:focus-visible:outline-(length:--ui-focus-ring-width) ui:[&_pre]:focus-visible:outline-solid ui:[&_pre]:focus-visible:outline-focus ui:[&_pre]:focus-visible:-outline-offset-(--ui-focus-ring-width)',
+			'm-0 block min-w-0 [&_:is(code,span)]:[font-family:inherit]',
+			'[&>pre]:m-0 [&>pre]:rounded-none [&>pre]:px-4 [&>pre]:py-3 max-phone:[&>pre]:px-3 [&>pre]:overflow-auto [&>pre]:max-h-(--ui-code-max-height)',
+			'[&>pre]:font-mono [&>pre]:text-sm [&>pre]:leading-relaxed [&>pre]:text-text [&>pre]:[tab-size:2]',
+			'[&_pre]:focus-visible:outline-(length:--ui-focus-ring-width) [&_pre]:focus-visible:outline-solid [&_pre]:focus-visible:outline-focus [&_pre]:focus-visible:-outline-offset-(--ui-focus-ring-width)',
 		],
 	},
 })
@@ -72,19 +72,19 @@ export const codeBlock = tv({
 /** The colors of the frame, of its header and of the texts that follow it, by the verdict of the example. */
 export const codeBlockTone = {
 	none: {
-		base: 'ui:border-code-border',
-		head: 'ui:border-b-code-border ui:bg-code-header ui:text-text-soft',
-		label: 'ui:text-text',
+		base: 'border-code-border',
+		head: 'border-b-code-border bg-code-header text-text-soft',
+		label: 'text-text',
 	},
 	good: {
-		base: 'ui:border-success-border',
-		head: 'ui:border-success-border ui:bg-success-soft ui:text-success-text',
-		label: 'ui:text-inherit',
+		base: 'border-success-border',
+		head: 'border-success-border bg-success-soft text-success-text',
+		label: 'text-inherit',
 	},
 	bad: {
-		base: 'ui:border-danger-border',
-		head: 'ui:border-danger-border ui:bg-danger-soft ui:text-danger-text',
-		label: 'ui:text-inherit',
+		base: 'border-danger-border',
+		head: 'border-danger-border bg-danger-soft text-danger-text',
+		label: 'text-inherit',
 	},
 } as const
 
@@ -93,38 +93,38 @@ export const codeBlockTone = {
  * that is waiting for the script is hidden.
  */
 export const codeBlockCopy = {
-	verdict: 'ui:text-inherit',
-	idle: 'ui:text-text-soft ui:hover:text-text',
-	done: 'ui:text-success-text',
-	error: 'ui:text-danger-text',
-	waiting: 'ui:invisible',
+	verdict: 'text-inherit',
+	idle: 'text-text-soft hover:text-text',
+	done: 'text-success-text',
+	error: 'text-danger-text',
+	waiting: 'invisible',
 } as const
 
 /** How tall the painted code gets: a log is shorter and breaks its lines. */
 export const codeBlockMode = {
-	code: 'ui:max-h-(--ui-code-max-height)',
-	log: 'ui:max-h-(--ui-log-max-height) ui:whitespace-pre-wrap ui:wrap-anywhere',
+	code: 'max-h-(--ui-code-max-height)',
+	log: 'max-h-(--ui-log-max-height) whitespace-pre-wrap wrap-anywhere',
 } as const
 
 /** The look of <UIDiff>: one line per row, as wide as the longest, with the colour of its kind (`diffLine`). */
 export const diff = tv({
 	slots: {
 		base: [
-			'ui:m-0 ui:max-h-(--ui-code-max-height) ui:overflow-auto ui:rounded-lg ui:border-(length:--ui-border-width) ui:border-border ui:bg-bg-subtle ui:py-2',
-			'ui:font-mono ui:text-sm ui:leading-normal ui:whitespace-pre ui:text-text-soft',
+			'm-0 max-h-(--ui-code-max-height) overflow-auto rounded-lg border-(length:--ui-border-width) border-border bg-bg-subtle py-2',
+			'font-mono text-sm leading-normal whitespace-pre text-text-soft',
 			focusRing,
 			inProse,
 		],
-		line: 'ui:block ui:min-h-lh ui:w-fit ui:min-w-full ui:px-4',
-		empty: 'ui:m-0 ui:font-sans ui:text-md ui:text-text-soft',
+		line: 'block min-h-lh w-fit min-w-full px-4',
+		empty: 'm-0 font-sans text-md text-text-soft',
 	},
 })
 
 /** The colour of each kind of line of a diff; the context keeps the text of the block. */
 export const diffLine = {
-	add: 'ui:bg-success-soft ui:text-text',
-	remove: 'ui:bg-danger-soft ui:text-text',
-	hunk: 'ui:bg-primary-soft ui:text-primary-text',
-	file: 'ui:font-medium ui:text-text-soft',
+	add: 'bg-success-soft text-text',
+	remove: 'bg-danger-soft text-text',
+	hunk: 'bg-primary-soft text-primary-text',
+	file: 'font-medium text-text-soft',
 	context: '',
 } as const

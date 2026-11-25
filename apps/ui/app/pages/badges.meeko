@@ -22,8 +22,22 @@
 			<UIBadge tone="danger">Revisar</UIBadge>
 		</DocsPreview>
 		<DocsCode bind:code="examples.badge" />
+		<h2 id="appearance">Apariencia</h2>
+		<DocsPreview>
+			<UIBadge bind:appearance="{ variant: 'solid', color: 'cyan', radius: 'sm' }">Publicado</UIBadge>
+			<UIBadge
+				dot
+				bind:appearance="{ variant: 'outline', color: 'warning', radius: 'full' }"
+			>
+				Pendiente
+			</UIBadge>
+			<UIBadge bind:appearance="{ variant: 'soft', color: 'success' }">soft</UIBadge>
+			<UIBadge bind:appearance="{ variant: 'surface', color: 'info' }">surface</UIBadge>
+		</DocsPreview>
+		<DocsCode bind:code="examples.badgeAppearance" />
 		<DocsApi
 			bind:rows="[
+				{ name: 'appearance', type: 'BadgeAppearance', default: '—', description: 'Variante, color y radio del catálogo de apariencia.' },
 				{ name: 'tone', type: 'neutral | accent | info | success | warning | danger', default: 'neutral', description: 'Tratamiento visual de la etiqueta.' },
 				{ name: 'dot', type: 'boolean', default: 'false', description: 'Añade un punto del color del tono, decorativo.' },
 				{ name: 'class', type: 'string', description: 'Clases adicionales.' },

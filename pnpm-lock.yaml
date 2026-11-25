@@ -944,6 +944,9 @@ importers:
       '@tailwindcss/postcss':
         specifier: 'catalog:'
         version: 4.3.5
+      '@tailwindcss/vite':
+        specifier: 'catalog:'
+        version: 4.3.5(vite@8.3.8(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
       '@types/node':
         specifier: 'catalog:'
         version: 24.19.2

@@ -24,6 +24,66 @@ export const englishExamples = {
 <UIButton size="sm" disabled>Unavailable</UIButton>
 <p role="status">Changes: {count.value}</p>
 </template>`,
+	buttonAppearance: `<UIButton bind:appearance="{ variant: 'solid', color: 'primary', size: 'lg', radius: 'full', elevation: 'sm' }">Save</UIButton>
+<UIButton bind:appearance="{ variant: 'soft', color: 'success', size: 'sm' }">Publish</UIButton>
+<UIButton bind:appearance="{ variant: 'outline', color: 'info' }">outline</UIButton>
+<UIButton bind:appearance="{ variant: 'ghost', color: 'primary' }">ghost</UIButton>
+<UIButton bind:appearance="{ variant: 'link', color: 'primary' }">link</UIButton>`,
+	badgeAppearance: `<UIBadge bind:appearance="{ variant: 'solid', color: 'cyan', radius: 'sm' }">Published</UIBadge>
+<UIBadge
+	dot
+	bind:appearance="{ variant: 'outline', color: 'warning', radius: 'full' }"
+>
+	Pending
+</UIBadge>
+<UIBadge bind:appearance="{ variant: 'soft', color: 'success' }">soft</UIBadge>
+<UIBadge bind:appearance="{ variant: 'surface', color: 'info' }">surface</UIBadge>`,
+	inputAppearance: `<label for="appearance-email">Work email</label>
+<UIInput
+	id="appearance-email"
+	type="email"
+	placeholder="name@example.com"
+	bind:appearance="{ variant: 'surface', color: 'primary', size: 'lg', radius: 'lg' }"
+/>
+<label for="appearance-input-outline">outline</label>
+<UIInput
+	id="appearance-input-outline"
+	bind:appearance="{ variant: 'outline', color: 'primary' }"
+/>
+<label for="appearance-input-ghost">ghost</label>
+<UIInput
+	id="appearance-input-ghost"
+	bind:appearance="{ variant: 'ghost', color: 'primary' }"
+/>
+<label for="appearance-input-soft">soft</label>
+<UIInput
+	id="appearance-input-soft"
+	bind:appearance="{ variant: 'soft', color: 'primary' }"
+/>`,
+	cardAppearance: `<UICard
+	title="Weekly summary"
+	bind:appearance="{ variant: 'surface', color: 'primary', radius: 'xl', elevation: 'md' }"
+>
+	3 projects updated
+</UICard>
+<UICard
+	title="outline"
+	bind:appearance="{ variant: 'outline', color: 'primary' }"
+>
+	3 projects updated
+</UICard>
+<UICard
+	title="glass"
+	bind:appearance="{ variant: 'glass', color: 'primary' }"
+>
+	3 projects updated
+</UICard>
+<UICard
+	title="plain"
+	bind:appearance="{ variant: 'plain', color: 'primary' }"
+>
+	3 projects updated
+</UICard>`,
 	buttonKinds: `<!-- A route of the application: navigates without reloading, with typed params and search -->
 <UIButton to="/links">See links</UIButton>
 <UIButton to="/users/[id]" bind:params="{ id: user.id }"

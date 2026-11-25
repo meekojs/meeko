@@ -18,7 +18,7 @@ test('UICard hydrates snippets, changes variants and supports both themes and mo
 	const ssr = await browser.newPage({ javaScriptEnabled: false })
 	await ssr.goto(`${origin}/cards`)
 	// A card is the <section> that groups its parts for the table in its body.
-	assert.equal(await ssr.locator('section[class~="ui:group/card"]').count(), 10)
+	assert.equal(await ssr.locator('section[class~="group/card"]').count(), 10)
 	assert.equal(await ssr.getByRole('region', { name: 'Tu espacio de trabajo', exact: true }).getByRole('button', { name: 'Guardar cambio' }).count(), 1)
 	await ssr.close()
 	const page = await browser.newPage({ viewport: { width: 1280, height: 1000 }, colorScheme: 'light' })
@@ -33,7 +33,7 @@ test('UICard hydrates snippets, changes variants and supports both themes and mo
 	await card.getByRole('button', { name: 'Guardar cambio' }).click()
 	assert.match(await card.getByRole('status').innerText(), /1/)
 	const styles = {}
-	const backgrounds = { outline: 'ui:bg-surface', soft: 'ui:bg-control-hover', solid: 'ui:bg-primary', elevated: 'ui:bg-surface-raised' }
+	const backgrounds = { outline: 'bg-surface', soft: 'bg-control-hover', solid: 'bg-primary', elevated: 'bg-surface-raised' }
 	for (const variant of ['outline', 'soft', 'solid', 'elevated']) {
 		await page.getByLabel('Variante', { exact: true }).selectOption(variant)
 		assert.ok((await card.getAttribute('class')).split(' ').includes(backgrounds[variant]), variant)
@@ -49,7 +49,7 @@ test('UICard hydrates snippets, changes variants and supports both themes and mo
 	assert.notEqual(styles.elevated.shadow, 'none')
 	// The reading styles of the page's <UIProse> stop at the card: on a solid, the text must still be the card's.
 	const solidText = await page
-		.locator('section[class~="ui:bg-primary"]')
+		.locator('section[class~="bg-primary"]')
 		.last()
 		.evaluate((element) => {
 			const color = (selector) => globalThis.getComputedStyle(element.querySelector(selector)).color

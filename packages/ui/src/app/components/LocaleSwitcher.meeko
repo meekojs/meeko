@@ -35,7 +35,7 @@
 			bind:current="item.current ? 'page' : undefined"
 		>
 			<span aria-hidden="true">{item.code.toUpperCase()}</span>
-			<span class="ui:sr-only">{item.label}</span>
+			<span class="sr-only">{item.label}</span>
 		</ItemLink>
 	</nav>
 </template>

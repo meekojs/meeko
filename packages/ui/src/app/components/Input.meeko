@@ -11,10 +11,10 @@
 	import { uiTheme } from '../utils/defaults'
 	import { icons } from '../utils/icons'
 	import { uiMessages } from '../utils/messages'
-	import { input, inputNumeric, inputReveal, inputRevealWaiting } from '../variants/input'
+	import { input, inputNumeric, inputReveal, inputRevealWaiting, inputWithAppearance } from '../variants/input'
 	import * as Icon from './internal/Icon.meeko'
 
-	const { invalid, describedBy, spellcheck, reveal, showLabel, hideLabel, class: ownClass, type = 'text', ...rest } = defineProps<UIInputProps>()
+	const { appearance, invalid, describedBy, spellcheck, reveal, showLabel, hideLabel, class: ownClass, type = 'text', ...rest } = defineProps<UIInputProps>()
 
 	const theme = uiTheme('input', () => ({ class: ownClass }))
 
@@ -23,7 +23,11 @@
 	const text = uiMessages().input
 
 	const numericTypes = new Set(['number', 'time', 'month', 'date', 'datetime-local'])
-	const inputClass = computed(() => input({ class: [numericTypes.has(type) ? inputNumeric : undefined, theme.class] }))
+	const fieldClass = (reveal: boolean) => {
+		const className = [numericTypes.has(type) ? inputNumeric : undefined, theme.class].filter(Boolean).join(' ')
+		return appearance ? inputWithAppearance(appearance, reveal, className) : input({ reveal, class: className })
+	}
+	const inputClass = computed(() => fieldClass(false))
 
 	const revealable = computed(() => reveal === true && type === 'password')
 	const shown = signal(false)
@@ -60,7 +64,7 @@
 			bind:type="shown.value ? 'text' : 'password'"
 			bind:aria-invalid="invalid ? 'true' : undefined"
 			bind:aria-describedby="describedBy ?? rest['aria-describedby']"
-			bind:class="input({ reveal: true, class: theme.class })"
+			bind:class="fieldClass(true)"
 			bind="rest" /><button
 			type="button"
 			bind:class="toggleClass.value"

@@ -75,7 +75,7 @@
 					bind:class="classes.value.icon({ class: theme.ui.icon })"
 				/>
 				<span aria-hidden="true">{change.value?.shown}</span>
-				<span class="ui:sr-only">{spoken.value}</span>
+				<span class="sr-only">{spoken.value}</span>
 			</span>
 			<span
 				if:when="props.period"
