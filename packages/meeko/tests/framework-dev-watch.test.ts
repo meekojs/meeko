@@ -515,6 +515,53 @@ test('a Vite restart waits for the requests in flight and later requests wait fo
 	assert.equal(await stuck.current, 1)
 })
 
+test('a rebuild waits for the requests in flight before replacing the app, and later requests wait for it', async () => {
+	let release!: () => void
+	const inFlight = new Promise<void>((done) => {
+		release = done
+	})
+	const tick = () => new Promise((done) => setTimeout(done, 5))
+	const events: string[] = []
+	const reloader = createDevAppReloader(
+		'old',
+		async () => {
+			events.push('replace')
+			return 'new'
+		},
+		1,
+	)
+	const first = reloader.use(async (app) => {
+		await inFlight
+		events.push(`first:${app}`)
+		return app
+	})
+	await tick()
+	// A reset of the server module graph while the first request renders: the replacement invalidates
+	// the modules that request still imports, so it waits for it.
+	reloader.rebuild()
+	const later = reloader.use(async (app) => {
+		events.push(`later:${app}`)
+		return app
+	})
+	await tick()
+	assert.deepEqual(events, [])
+	release()
+	assert.equal(await first, 'old')
+	assert.equal(await later, 'new')
+	assert.deepEqual(events, ['first:old', 'replace', 'later:new'])
+
+	// A request that never settles delays the rebuild only up to the drain timeout.
+	const stuck = createDevAppReloader(0, async (prior) => prior + 1, 1, 20)
+	void stuck.use(() => new Promise<never>(() => {}))
+	await tick()
+	stuck.rebuild()
+	assert.equal(await stuck.current, 1)
+	// A failed build keeps the previous app: the requests that waited are answered by it.
+	const failing = createDevAppReloader('old', async (prior) => prior, 1)
+	failing.rebuild()
+	assert.equal(await failing.use(async (app) => app), 'old')
+})
+
 test('meeko dev serves a page added or removed while it runs', { timeout: 60_000 }, async (context) => {
 	let child: ChildProcess | undefined
 	const root = await tempProject(context, 'dev-watch', () => stopChild(child))
