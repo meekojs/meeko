@@ -1,8 +1,8 @@
 <script lang="ts">
 	import type { UIContainerProps } from '../types/container'
 
-	import { uiTheme } from '../utils/defaults'
 	import { containerTheme } from '../theme/components/container'
+	import { uiTheme } from '../utils/defaults'
 
 	const props = defineProps<UIContainerProps>({ as: 'div', size: 'xl', gutter: 'md' })
 

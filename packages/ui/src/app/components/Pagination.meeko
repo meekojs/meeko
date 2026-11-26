@@ -8,11 +8,11 @@
 	import type { UILinkTarget, UIPaginationProps } from '../types/navigation'
 
 	import { buttonTheme } from '../theme/components/button'
+	import { paginationTheme } from '../theme/components/navigation'
 	import { uiTheme } from '../utils/defaults'
 	import { icons } from '../utils/icons'
 	import { fillMessage, uiMessages } from '../utils/messages'
 	import { clampPage, paginationCount, paginationItems } from '../utils/pagination'
-	import { paginationTheme } from '../theme/components/navigation'
 	import * as Icon from './internal/Icon.meeko'
 	import * as ItemLink from './internal/ItemLink.meeko'
 

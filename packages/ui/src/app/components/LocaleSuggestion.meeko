@@ -6,11 +6,11 @@
 	import type { UILinkTarget, UILocaleSuggestionProps } from '../types/navigation'
 
 	import { buttonTheme } from '../theme/components/button'
+	import { localeSuggestionTheme } from '../theme/components/locale'
 	import { uiTheme } from '../utils/defaults'
 	import { icons } from '../utils/icons'
 	import { fillMessage, uiMessages, uiMessagesFor } from '../utils/messages'
 	import { linkTarget } from '../utils/navigation'
-	import { localeSuggestionTheme } from '../theme/components/locale'
 	import * as Icon from './internal/Icon.meeko'
 	import * as ItemLink from './internal/ItemLink.meeko'
 

@@ -1,8 +1,8 @@
 <script lang="ts">
 	import type { UIBrand } from '../../types/navigation'
 
-	import { linkTarget } from '../../utils/navigation'
 	import { brandTheme } from '../../theme/components/header'
+	import { linkTarget } from '../../utils/navigation'
 	import * as ItemLink from './ItemLink.meeko'
 
 	const props = defineProps<{ brand: UIBrand }>()

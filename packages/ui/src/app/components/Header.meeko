@@ -3,12 +3,12 @@
 	// Escape and on a click outside without JavaScript, and it floats, so it never moves the page.
 	import type { UIHeaderProps } from '../types/navigation'
 
+	import { containerTheme } from '../theme/components/container'
+	import { headerTheme } from '../theme/components/header'
 	import { uiTheme } from '../utils/defaults'
 	import { icons } from '../utils/icons'
 	import { uiMessages } from '../utils/messages'
 	import { followsLink, isCurrentLink, linkTarget } from '../utils/navigation'
-	import { containerTheme } from '../theme/components/container'
-	import { headerTheme } from '../theme/components/header'
 	import * as Brand from './internal/Brand.meeko'
 	import * as Icon from './internal/Icon.meeko'
 	import * as ItemLink from './internal/ItemLink.meeko'

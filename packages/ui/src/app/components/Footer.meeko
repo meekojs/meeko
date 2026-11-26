@@ -1,11 +1,11 @@
 <script lang="ts">
 	import type { UIFooterProps } from '../types/navigation'
 
+	import { containerTheme } from '../theme/components/container'
+	import { footerTheme } from '../theme/components/header'
 	import { uiTheme } from '../utils/defaults'
 	import { uiMessages } from '../utils/messages'
 	import { linkTarget } from '../utils/navigation'
-	import { containerTheme } from '../theme/components/container'
-	import { footerTheme } from '../theme/components/header'
 	import * as Brand from './internal/Brand.meeko'
 	import * as ItemLink from './internal/ItemLink.meeko'
 

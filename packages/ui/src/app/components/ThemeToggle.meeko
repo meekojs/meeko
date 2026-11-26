@@ -12,12 +12,12 @@
 	import type { UIThemeToggleProps } from '../types/theme-toggle'
 	import type { ThemeToggleItem } from '../utils/theme-toggle'
 
+	import { themeToggleTheme } from '../theme/components/theme-toggle'
 	import { uiTheme } from '../utils/defaults'
 	import { icons } from '../utils/icons'
 	import { uiMessages } from '../utils/messages'
 	import { themeToggleGroupLabel, themeToggleItems, themeToggleKeyTarget, themeToggleMode, themeToggleStatus } from '../utils/theme-toggle'
 	import { withViewTransition } from '../utils/view-transition'
-	import { themeToggleTheme } from '../theme/components/theme-toggle'
 	import * as Icon from './internal/Icon.meeko'
 
 	const props = defineProps<UIThemeToggleProps>()

@@ -1,11 +1,11 @@
 <script lang="ts">
 	import type { UILinkTarget, UINavigationLink, UIPageNavigationProps } from '../types/navigation'
 
+	import { pageNavigationNext, pageNavigationTheme } from '../theme/components/navigation'
 	import { uiTheme } from '../utils/defaults'
 	import { icons } from '../utils/icons'
 	import { uiMessages } from '../utils/messages'
 	import { linkTarget } from '../utils/navigation'
-	import { pageNavigationNext, pageNavigationTheme } from '../theme/components/navigation'
 	import * as Icon from './internal/Icon.meeko'
 	import * as ItemLink from './internal/ItemLink.meeko'
 

@@ -2,9 +2,9 @@
 	// <UIPage>: the structure every site shares, one <main> and its skip link; what goes inside is the app's.
 	import type { UIPageProps } from '../types/navigation'
 
+	import { pageColumnsTheme, pageTheme } from '../theme/components/page'
 	import { uiTheme } from '../utils/defaults'
 	import { uiMessages } from '../utils/messages'
-	import { pageColumnsTheme, pageTheme } from '../theme/components/page'
 
 	const { layout = 'docs', mainId = 'contenido', mainLang, skipLabel, ui: ownUi, class: ownClass, ...rest } = defineProps<UIPageProps>()
 

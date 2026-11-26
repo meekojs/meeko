@@ -5,11 +5,11 @@
 
 	import type { UITableOfContentsProps } from '../types/navigation'
 
+	import { tableOfContentsLinkTheme, tableOfContentsTheme, tableOfContentsTracking } from '../theme/components/navigation'
 	import { uiTheme } from '../utils/defaults'
 	import { icons } from '../utils/icons'
 	import { uiMessages } from '../utils/messages'
 	import { followsLink } from '../utils/navigation'
-	import { tableOfContentsLinkTheme, tableOfContentsTheme, tableOfContentsTracking } from '../theme/components/navigation'
 	import * as Icon from './internal/Icon.meeko'
 
 	const props = defineProps<UITableOfContentsProps>({ variant: 'aside' })

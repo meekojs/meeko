@@ -1,8 +1,8 @@
 <script lang="ts">
 	import type { UIPageHeaderProps } from '../types/navigation'
 
-	import { uiTheme } from '../utils/defaults'
 	import { pageHeaderTheme } from '../theme/components/page'
+	import { uiTheme } from '../utils/defaults'
 
 	const props = defineProps<UIPageHeaderProps>({ layout: 'docs' })
 
