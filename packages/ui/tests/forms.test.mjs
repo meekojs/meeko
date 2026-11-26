@@ -51,11 +51,6 @@ async function render(context, name, template) {
 }
 
 const cases = [
-	[
-		'Form/Select/Select',
-		`<Component name="plan" model="signal<string | null>('personal')" bind:options="[{ value: 'personal', label: 'Personal' }, { value: 'team', label: 'Equipo', disabled: true }]" />`,
-		[/<input(?=[^>]*type="hidden")(?=[^>]*name="plan")(?=[^>]*value="personal")/, /aria-haspopup="listbox"/, /popovertarget="([^"]+)"[\s\S]*role="listbox"[^>]*id="\1"/, /role="option"[^>]*aria-selected="true"[^>]*>\s*<span>Personal<\/span>/, /role="option"[^>]*\sdisabled[^>]*>\s*<span>Equipo<\/span>/],
-	],
 	['Textarea', '<Component name="comment" bind:rows="4" bind:maxlength="200" describedBy="hint" bind:invalid="true" model="signal(\'Initial\')" />', [/name="comment"/, /rows="4"/, /maxlength="200"/, /aria-invalid="true"/, /aria-describedby="hint"/, />Initial<\/textarea>/]],
 	['Checkbox', '<Component label="Accept" name="accepted" value="yes" bind:required="true" model="signal(true)" description="Terms" />', [/type="checkbox"/, /checked/, /required/, /name="accepted"/, /value="yes"/, /Terms/]],
 	['RadioGroup', '<Component legend="Period" name="period" variant="segmented" model="signal(\'week\')" bind:options="[{ value: \'day\', label: \'Day\' }, { value: \'week\', label: \'Week\' }]" />', [/<fieldset/, /<legend[^>]*>Period<\/legend>/, /type="radio"/, /name="period"/, /<div class="[^"]*w-fit[^"]*"/, /<input(?=[^>]*\svalue="week")(?=[^>]*\schecked)/]],

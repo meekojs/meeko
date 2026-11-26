@@ -311,9 +311,7 @@ test('a closed UICombobox sends no options in its HTML and builds them when it o
 	assert.ok(controls, 'the trigger names its listbox')
 	// Only the hydration markers of the `if` that holds the options.
 	assert.match(html, new RegExp(`<div[^>]*\\bid="${controls}"[^>]*>(?:\\s|<!--[^>]*-->)*</div>`), 'the listbox is there, without options')
-	// The options of a combobox carry `data-index`; the page also shows UIFormSelectSelect, which paints its own.
-	const comboboxOptions = [...html.matchAll(/<[a-z][^>]*>/g)].filter(([tag]) => /\srole="option"/.test(tag) && /\sdata-index="/.test(tag))
-	assert.equal(comboboxOptions.length, 0, 'no option of a closed combobox in the HTML')
+	assert.equal((html.match(/role="option"/g) ?? []).length, 0, 'no option of a closed combobox in the HTML')
 
 	const { errors, page } = await open(browser, origin, '/select')
 	const topics = page.locator('#topics')
