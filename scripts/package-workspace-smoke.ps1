@@ -53,7 +53,8 @@ for (const name of ['meeko', 'ui', 'i18n', 'icon', 'prettier-plugin', 'eslint-pl
     if (key.includes('*')) continue;
     const specifier = '@meekojs/' + name + (key === '.' ? '' : key.slice(1));
     // Node cannot import a stylesheet (`@meekojs/ui/hues` included): it must resolve to a file of the tarball, for the bundler.
-    if (key.endsWith('.css') || String(metadata.exports[key]).endsWith('.css')) assert.ok(existsSync(require.resolve(specifier)), specifier);
+    // Nor a JSON file without an import attribute (`@meekojs/ui/package.json`, which the Prettier plugin reads).
+    if (key.endsWith('.css') || key.endsWith('.json') || String(metadata.exports[key]).endsWith('.css')) assert.ok(existsSync(require.resolve(specifier)), specifier);
     else await import(specifier);
   }
 }
