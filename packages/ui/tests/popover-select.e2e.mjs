@@ -302,6 +302,47 @@ test('UISelect documents keyboard and mouse choice, search, multiple with max an
 	assert.deepEqual(errors, [])
 })
 
+test('a closed UICombobox sends no options in its HTML and builds them when it opens with the keyboard', { timeout: 120_000 }, async (context) => {
+	const { browser, origin } = await startDemo(context)
+	// The SSR of a closed list: the listbox that aria-controls names, empty. A page with long lists sent and
+	// hydrated every option of every closed one (hundreds of KB of `role="option"` rows).
+	const html = await (await fetch(origin + '/select')).text()
+	const controls = /<input[^>]*\bid="topics"[^>]*>/.exec(html)?.[0].match(/aria-controls="([^"]+)"/)?.[1]
+	assert.ok(controls, 'the trigger names its listbox')
+	// Only the hydration markers of the `if` that holds the options.
+	assert.match(html, new RegExp(`<div[^>]*\\bid="${controls}"[^>]*>(?:\\s|<!--[^>]*-->)*</div>`), 'the listbox is there, without options')
+	// The options of a combobox carry `data-index`; the page also shows UIFormSelectSelect, which paints its own.
+	const comboboxOptions = [...html.matchAll(/<[a-z][^>]*>/g)].filter(([tag]) => /\srole="option"/.test(tag) && /\sdata-index="/.test(tag))
+	assert.equal(comboboxOptions.length, 0, 'no option of a closed combobox in the HTML')
+
+	const { errors, page } = await open(browser, origin, '/select')
+	const topics = page.locator('#topics')
+	const list = page.locator('#' + controls)
+	assert.equal(await list.locator('[role="option"]').count(), 0, 'still none after hydration')
+	assert.equal(await topics.getAttribute('aria-expanded'), 'false')
+	assert.equal(await topics.getAttribute('aria-activedescendant'), null)
+	// The keyboard opens it: the options arrive with the opening, and the active one exists.
+	await topics.focus()
+	await page.keyboard.press('ArrowDown')
+	await list.locator('[role="option"]').first().waitFor()
+	assert.equal(await topics.getAttribute('aria-expanded'), 'true')
+	const active = await topics.getAttribute('aria-activedescendant')
+	assert.ok(active, 'an active option')
+	assert.equal(await page.locator('#' + active).getAttribute('role'), 'option')
+	await page.keyboard.press('ArrowDown')
+	const next = await topics.getAttribute('aria-activedescendant')
+	assert.notEqual(next, active, 'the arrows move the active option')
+	const label = (await page.locator('#' + next).innerText()).trim()
+	await page.keyboard.press('Enter')
+	await page.keyboard.press('Escape')
+	assert.equal(await topics.getAttribute('aria-expanded'), 'false')
+	// The chosen value is in the trigger and in the form; the options stay for the next opening.
+	assert.deepEqual(await page.locator('#select-form [data-meeko-select] > [data-meeko-select-values] [data-meeko-select-value]').allInnerTexts(), [label])
+	assert.equal(await page.locator('#select-form input[type="hidden"][name="topics"]').count(), 1)
+	assert.ok((await list.locator('[role="option"]').count()) > 1)
+	assert.deepEqual(errors, [])
+})
+
 test('UIThemeToggle cycles with the keyboard, moves a radio group with the arrows and works without JavaScript', { timeout: 120_000 }, async (context) => {
 	const { browser, origin, output } = await startDemo(context)
 	const { errors, page } = await open(browser, origin, '/theme-toggle')

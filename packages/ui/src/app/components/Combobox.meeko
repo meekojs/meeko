@@ -132,53 +132,55 @@
 				on:mousedown="combobox.keepFocus"
 				on:click="combobox.optionClick"
 				on:pointermove="combobox.optionHover"
-				><div
-					each:of="combobox.groups.value"
-					each:as="group"
-					each:key="group.key"
-					data-meeko-select-group
-					bind:class="classes.value.group({ class: theme.ui.group })"
-					bind:role="group.name === undefined ? 'presentation' : 'group'"
-					bind:aria-labelledby="group.id"
+				><template if:when="combobox.rendered.value"
 					><div
-						if:when="group.name !== undefined"
+						each:of="combobox.groups.value"
+						each:as="group"
+						each:key="group.key"
+						data-meeko-select-group
+						bind:class="classes.value.group({ class: theme.ui.group })"
+						bind:role="group.name === undefined ? 'presentation' : 'group'"
+						bind:aria-labelledby="group.id"
+						><div
+							if:when="group.name !== undefined"
+							role="presentation"
+							data-meeko-select-group-label
+							bind:class="classes.value.groupLabel({ class: theme.ui.groupLabel })"
+							bind:id="group.id"
+							><render
+								if:when="snippets.group"
+								snippet="snippets.group"
+								args="group.name ?? ''"
+							/><template if:when="!snippets.group">{group.name}</template></div
+						><div
+							each:of="group.entries"
+							each:as="entry"
+							each:key="entry.key"
+							role="option"
+							bind:class="classes.value.option({ class: theme.ui.option })"
+							bind="combobox.listOption(entry)"
+							><render
+								if:when="snippets.option"
+								snippet="snippets.option"
+								args="entry.option, combobox.stateOf(entry)"
+							/><template if:when="!snippets.option">{entry.label}</template></div
+						></div
+					><div
+						if:when="combobox.loading.value"
 						role="presentation"
-						data-meeko-select-group-label
-						bind:class="classes.value.groupLabel({ class: theme.ui.groupLabel })"
-						bind:id="group.id"
-						><render
-							if:when="snippets.group"
-							snippet="snippets.group"
-							args="group.name ?? ''"
-						/><template if:when="!snippets.group">{group.name}</template></div
+						data-meeko-select-loading
+						bind:class="classes.value.loading({ class: theme.ui.loading })"
+						><render snippet="snippets.loading" /></div
 					><div
-						each:of="group.entries"
-						each:as="entry"
-						each:key="entry.key"
-						role="option"
-						bind:class="classes.value.option({ class: theme.ui.option })"
-						bind="combobox.listOption(entry)"
+						if:when="!combobox.loading.value && !combobox.entries.value.length"
+						role="presentation"
+						data-meeko-select-empty
+						bind:class="classes.value.empty({ class: theme.ui.empty })"
 						><render
-							if:when="snippets.option"
-							snippet="snippets.option"
-							args="entry.option, combobox.stateOf(entry)"
-						/><template if:when="!snippets.option">{entry.label}</template></div
-					></div
-				><div
-					if:when="combobox.loading.value"
-					role="presentation"
-					data-meeko-select-loading
-					bind:class="classes.value.loading({ class: theme.ui.loading })"
-					><render snippet="snippets.loading" /></div
-				><div
-					if:when="!combobox.loading.value && !combobox.entries.value.length"
-					role="presentation"
-					data-meeko-select-empty
-					bind:class="classes.value.empty({ class: theme.ui.empty })"
-					><render
-						if:when="snippets.empty"
-						snippet="snippets.empty"
-					/><template if:when="!snippets.empty">{text.empty}</template></div
+							if:when="snippets.empty"
+							snippet="snippets.empty"
+						/><template if:when="!snippets.empty">{text.empty}</template></div
+					></template
 				></div
 			></Popover
 		><button

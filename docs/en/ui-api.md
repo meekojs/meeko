@@ -108,16 +108,18 @@ export default defineMeekoConfig({
 })
 ```
 
-| Text                  | Spanish                             | English                              | Overridden in a component by |
-| --------------------- | ----------------------------------- | ------------------------------------ | ---------------------------- |
-| `modal.close`         | `Cerrar modal`                      | `Close modal`                        | `closeLabel`                 |
-| `table.empty`         | `No hay datos.`                     | `No data.`                           | `emptyText`, snippet `empty` |
-| `select.empty`        | `Sin resultados`                    | `No results`                         | snippet `empty`              |
-| `select.clear`        | `Quitar selección`                  | `Clear selection`                    | `clearLabel`                 |
-| `themeToggle.labels`  | `Claro`, `Oscuro`, `Sistema`        | `Light`, `Dark`, `System`            | `labels`                     |
-| `themeToggle.unknown` | `Cambiar tema`                      | `Change theme`                       | `messages.unknown`           |
-| `themeToggle.group`   | `Tema`                              | `Theme`                              | `messages.group`             |
-| `themeToggle.cycle`   | `Tema: {current}. Cambiar a {next}` | `Theme: {current}. Switch to {next}` | `messages.cycle`             |
+| Text                                                         | Spanish                                     | English                                       | Overridden in a component by            |
+| ------------------------------------------------------------ | ------------------------------------------- | --------------------------------------------- | --------------------------------------- |
+| `modal.close`                                                | `Cerrar modal`                              | `Close modal`                                 | `closeLabel`                            |
+| `table.empty`                                                | `No hay datos.`                             | `No data.`                                    | `emptyText`, snippet `empty`            |
+| `select.empty`                                               | `Sin resultados`                            | `No results`                                  | snippet `empty`                         |
+| `select.clear`                                               | `Quitar selección`                          | `Clear selection`                             | `clearLabel`                            |
+| `themeToggle.labels`                                         | `Claro`, `Oscuro`, `Sistema`                | `Light`, `Dark`, `System`                     | `labels`                                |
+| `themeToggle.unknown`                                        | `Cambiar tema`                              | `Change theme`                                | `messages.unknown`                      |
+| `themeToggle.group`                                          | `Tema`                                      | `Theme`                                       | `messages.group`                        |
+| `themeToggle.cycle`                                          | `Tema: {current}. Cambiar a {next}`         | `Theme: {current}. Switch to {next}`          | `messages.cycle`                        |
+| `dateRange.from`, `dateRange.to`                             | `Desde`, `Hasta`                            | `From`, `To`                                  | `fromLabel`, `toLabel` of `UIDateRange` |
+| `dateRange.today`, `last7Days`, `thisMonth`, `previousMonth` | `Hoy`, `7 días`, `Este mes`, `Mes anterior` | `Today`, `7 days`, `This month`, `Last month` | `presets` of `UIDateRange`              |
 
 - **Priority.** A prop or a snippet of the component wins over everything else. After that, `ui.messages` wins over the package's texts in that language.
 - **Languages.** `ui.locale` and the keys of `ui.messages` are validated on load and read in their canonical form: `EN` is `en` and `pt-br` is `pt-BR`. An invalid tag, such as `en-u`, is a configuration error.
@@ -195,11 +197,12 @@ You can override `--ui-container-max-width` and `--ui-container-gutter` from a c
 
 ### Basic controls
 
-| Component  | API                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `UIButton` | Route (`to`, `params`, `search`), link (`href`, `target`, `rel`, `download`) or button (`type`, `disabled`); see [UIButton](#uibutton-route-link-or-button). Accepts `variant`, `color`, `size`, `radius`, `width`, `elevation`, `class`, `click` event and `default` snippet. By default `button`, `solid`, `primary`, `md` and radius `md`.                                                                                                  |
-| `UIInput`  | Text model with `model`. Props: `id`, `name`, `type`, `placeholder`, `required`, `disabled`, `invalid`, `describedBy`, `variant`, `color`, `size`, `radius` and `class`; see [Field look](#field-look). Accepted types: `text`, `email`, `password`, `search`, `url`, `tel`, `number`, `date`, `datetime-local`, `time` and `month`. By default it uses `text` and an empty value; see [Numbers, times and months](#numbers-times-and-months). |
-| `UIField`  | Requires `id`, `label` and the `default(id, describedBy)` snippet. Optional props: `description`, `error`, `required`, `class`. The error takes priority over the description and is announced with `role="alert"`.                                                                                                                                                                                                                            |
+| Component     | API                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `UIButton`    | Route (`to`, `params`, `search`), link (`href`, `target`, `rel`, `download`) or button (`type`, `disabled`, `pressed`); see [UIButton](#uibutton-route-link-or-button). Accepts `variant`, `color`, `size`, `radius`, `width`, `elevation`, `class`, `click` event and `default` snippet. By default `button`, `solid`, `primary`, `md` and radius `md`.                                                                                       |
+| `UIInput`     | Text model with `model`. Props: `id`, `name`, `type`, `placeholder`, `required`, `disabled`, `invalid`, `describedBy`, `variant`, `color`, `size`, `radius` and `class`; see [Field look](#field-look). Accepted types: `text`, `email`, `password`, `search`, `url`, `tel`, `number`, `date`, `datetime-local`, `time` and `month`. By default it uses `text` and an empty value; see [Numbers, times and months](#numbers-times-and-months). |
+| `UIDateRange` | Two native dates with `model:from` and `model:to`, shortcuts (`presets`, `today`), `min`, `max`, `maxDays` and a `change` event with a valid range; see [Date range](#date-range-uidaterange).                                                                                                                                                                                                                                                 |
+| `UIField`     | Requires `id`, `label` and the `default(id, describedBy)` snippet. Optional props: `description`, `error`, `required`, `class`. The error takes priority over the description and is announced with `role="alert"`.                                                                                                                                                                                                                            |
 
 It also includes `UIApp` and `UIModal` for [modals](#modals), `UITable` for [tables](#tables), `UICard` for [cards](#cards), and the navigation and label components below.
 
@@ -255,6 +258,46 @@ It also includes `UIApp` and `UIModal` for [modals](#modals), `UITable` for [tab
 - **From the previous API.** The `appearance` prop is gone: its keys are props (`bind:appearance="{ variant: 'soft' }"` is `variant="soft"`), and `color` now takes the seven colors. `<UIInput size="20">` no longer sets the native width: use a class.
 - **Types.** `UIInputVariant`, `UIInputColor`, `UIInputSize` and `UIInputRadius` are imported from `@meekojs/ui/runtime`; `InputThemeProps`, from `@meekojs/ui/theme`.
 
+### Date range: UIDateRange
+
+`UIDateRange` groups two native `<input type="date">`, “From” and “To”, in a named `<fieldset>`, with shortcuts and the validation of the range: what a filter page builds by hand with two `UIInput type="date"`.
+
+```html
+<script lang="ts">
+	import type { UIDateRangeValue } from '@meekojs/ui/runtime'
+
+	const from = signal('')
+	const to = signal('')
+	function load(range: UIDateRangeValue) {
+		// Only a complete and valid range arrives.
+	}
+</script>
+
+<template>
+	<UIDateRange
+		label="Period"
+		model:from="from"
+		model:to="to"
+		fromName="from"
+		toName="to"
+		today="2026-11-24"
+		min="2020-01-01"
+		bind:maxDays="366"
+		on:change="load"
+	/>
+</template>
+```
+
+- **Models.** `model:from` and `model:to`, two `Signal<string>` with `YYYY-MM-DD` or `''`, like the `model` of `UIInput type="date"`. They follow what the user types, also an invalid or half range, so the field never undoes an edit. They also accept `bind:from` and `on:update:from`.
+- **`change`.** It receives `{ from, to }` only when the user (typing or with a shortcut) leaves a complete, valid range different from the last one in place, whether that is the last one emitted or one the parent wrote. A reversed range, one too long, out of bounds or with a half-typed date does not emit it: load the data on `change`, not by watching the models.
+- **Shortcuts.** `presets` is a list of `{ label, range(today) }`, where `today` is `YYYY-MM-DD` and `range` returns `{ from, to }`. By default: “Today”, “7 days” (today and the six before), “This month” (from the 1st to today) and “Last month” (all of it; in January, December of the year before), with the texts `dateRange.today`, `last7Days`, `thisMonth` and `previousMonth`. `bind:presets="[]"` removes them. The one that matches the range has `aria-pressed="true"`; they are `type="button"` buttons in a group named `dateRange.presets` (“Shortcuts”).
+- **“Today”, SSR and hydration.** The component never reads the clock while rendering. With `today` (pass it from the server, in the business time zone) the HTML already brings the shortcuts active and the hydration finds the same. Without `today`, the shortcuts render disabled on the server and on hydration, and turn on when mounted with the local date of the browser: there is no mismatch. Dates are computed as calendar days in UTC, independent of the time zone, with month ends and leap years.
+- **Validation.** `min` and `max` (`YYYY-MM-DD`) reach both fields and are checked on each date, even while the other is missing. `maxDays` counts both ends: with `366` a whole leap year fits. An invalid range marks the culprit dates with `aria-invalid` (and the danger border), and a message with `role="alert"`, referenced by their `aria-describedby`, gives the reason: `dateRange.order`, `tooLong` (`{days}`), `beforeMin` (`{min}`) or `afterMax` (`{max}`), with the dates formatted in the language of the document. An empty date is not an error; use `required` to demand them. `invalid` marks both dates for a validation of your own, without a message.
+- **Name and `UIField`.** `label` renders a visible `<legend>`; `ariaLabel` names the group without it. Inside `UIField`, pass it `bind:id="id"` and `bind:describedBy="describedBy"`: the group takes its name from the label of the field (`aria-labelledby="<id>-label"`; `UIField` gives that `id` to its `<label>`) and both dates its description. Without any of that, the group is named `dateRange.label` (“Date range”). The labels of the dates are `fromLabel` and `toLabel`, or `dateRange.from` and `dateRange.to`.
+- **Forms.** `fromName`, `toName`, `form`, `required` and `disabled` (which also disables the shortcuts, as it is the one of the `<fieldset>`).
+- **Look.** It is the `dateRangeTheme` recipe of `@meekojs/ui/theme`, without variants. The dates have the look of `UIInput type="date"` (`inputTheme`), and the shortcuts that of an `outline` `neutral` `sm` `UIButton` (`buttonTheme`), with the soft primary accent when pressed. Both dates share a row and stack when they do not fit. `class` reaches the `<fieldset>` and `ui`, `base`, `legend`, `presets`, `preset`, `fields`, `field`, `fieldLabel`, `input` and `error`; `ui.defaults.dateRange` takes `class` and `ui`.
+- **Types.** `UIDateRangeProps`, `UIDateRangeValue`, `UIDateRangePreset` and `UIDateRangeIssue`, from `@meekojs/ui/runtime`.
+
 ### UIButton: route, link or button
 
 `UIButton` renders the element that matches what it does, with the same appearance (that of `variant`, `color`, `size` and `radius`, plus your `class`), also on hover, on focus and with the application's link styles:
@@ -262,6 +305,7 @@ It also includes `UIApp` and `UIModal` for [modals](#modals), `UITable` for [tab
 - **With `to`**, a `<MeekoLink>`: a link to a route of the application that navigates without reloading. `to` only accepts routes that exist; `params` is required on a dynamic route, with its keys, and not accepted on a static one; `search` is the query string.
 - **With `href`**, an `<a>` to any URL, with `target`, `rel` and `download`. With `target="_blank"` and no `rel`, it adds `rel="noopener noreferrer"`.
 - **With neither**, a `<button>` with `type` (`button` by default, so it never submits a form without being asked to) and `disabled`.
+- **Toggle with text.** Since `1.11`, `pressed` makes the `<button>` a toggle, as in `UIIconButton`: it renders `aria-pressed` (`"true"` or `"false"`) and the active look of its `variant`. Without `pressed` it has no `aria-pressed`, and on a link or a route it is a type error: `<UIButton variant="outline" bind:pressed="paid.value" on:click="() => (paid.value = !paid.value)">Paid</UIButton>`.
 
 ```html
 <UIButton
@@ -1147,6 +1191,8 @@ What the native `<select>` of `UISelect` does not cover: searching, filtering on
 **Types.** `meeko check` and the editor infer from the tag the type of the options (`T`) and whether it is multiple: the model of a single select is a `Signal<T | null>` and that of a multiple one, `Signal<T[]>`; `by`, `labelBy` and `groupBy` only accept keys of `T`, and the snippets' parameters have type `T`. The type `ComboboxModel<T, Multiple>` describes the value.
 
 **ARIA and keyboard.** The trigger is a `role="combobox"` (a `<button>` or, with `searchable`, an `<input>` with `aria-autocomplete="list"`) with `aria-expanded`, `aria-controls`, `aria-haspopup="listbox"` and `aria-activedescendant`: focus never leaves it. The list is a `role="listbox"` (with `aria-multiselectable` in a multiple select) of `role="option"` with `aria-selected` and `aria-disabled`, grouped in `role="group"` with `groupBy`. An external `<label for>` names the trigger by its `id`. The ARIA combobox pattern does not define how to empty the selection, so `clearable` adds, outside the combobox, a `<button type="button">` with `aria-label` ("Quitar selección"): it enters the tab order right after the trigger, only exists while something is chosen, and activating it closes the list, emits `change` with `null` (or `[]`) and returns focus to the trigger.
+
+**Options on opening.** A closed list has no options in the DOM, nor in the server HTML: they are created the first time it opens and kept after it closes. The trigger, the form's `<input type="hidden">`, typeahead and `aria-controls` do not need them, so a page with many long lists no longer sends and hydrates every option of every closed list. Without JavaScript the list does not open, so nothing is lost. Tests that look for a `role="option"` must open the list first.
 
 - `↓`, `↑`, `Enter` or `Space` open the list on the chosen option (or the first); `Home` and `End` open at an end; letters open and search.
 - With the list open, the arrows, `Home`, `End`, `PageUp` and `PageDown` move the active option (without wrapping around, skipping disabled ones) and scroll it into view; letters search by the start of the label, ignoring accents.

@@ -332,6 +332,37 @@ export interface UIMessages {
 		/** Nombre accesible del botón con la contraseña a la vista, si no se pasa `hideLabel`. */
 		readonly hide: string
 	}
+	/**
+	 * `<UIDateRange>`.
+	 *
+	 * @since 1.11.0
+	 */
+	readonly dateRange: {
+		/** `aria-label` del grupo sin `label`, `ariaLabel` ni la etiqueta de `UIField`. */
+		readonly label: string
+		/** Etiqueta de la primera fecha, si no se pasa `fromLabel`. */
+		readonly from: string
+		/** Etiqueta de la última fecha, si no se pasa `toLabel`. */
+		readonly to: string
+		/** `aria-label` del grupo de atajos. */
+		readonly presets: string
+		/** Atajo por defecto: hoy. */
+		readonly today: string
+		/** Atajo por defecto: los últimos 7 días, hoy incluido. */
+		readonly last7Days: string
+		/** Atajo por defecto: del día 1 del mes hasta hoy. */
+		readonly thisMonth: string
+		/** Atajo por defecto: el mes anterior entero. */
+		readonly previousMonth: string
+		/** Error: la primera fecha va después de la última. */
+		readonly order: string
+		/** Error: el rango tiene más días que `maxDays`; `{days}` es ese número ya formateado. */
+		readonly tooLong: string
+		/** Error: una fecha es anterior a `min`; `{min}` es esa fecha ya formateada. */
+		readonly beforeMin: string
+		/** Error: una fecha es posterior a `max`; `{max}` es esa fecha ya formateada. */
+		readonly afterMax: string
+	}
 }
 
 /**

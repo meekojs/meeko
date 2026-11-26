@@ -528,6 +528,29 @@ async function remove() {
     <UISegmentedControl legend="Chart period" hideLegend size="sm" name="days" model="days" bind:options="options" />
   </form>
 </template>`,
+	dateRange: `<script lang="ts">
+  import type { UIDateRangeValue } from '@meekojs/ui/runtime'
+
+  const from = signal('')
+  const to = signal('')
+  // The server's “today”: the shortcuts are active in the HTML and match on hydration.
+  const today = '2026-11-24'
+  function load(range: UIDateRangeValue) {
+    // Only a complete and valid range arrives.
+  }
+</script>
+
+<template>
+  <UIDateRange label="Period" model:from="from" model:to="to"
+    fromName="from" toName="to" bind:today="today"
+    min="2020-01-01" bind:max="today" bind:maxDays="366" on:change="load" />
+</template>`,
+	dateRangeField: `<UIField id="period" label="Sales period" hint="Up to 366 days">
+  <snippet name="default" params="id, describedBy">
+    <UIDateRange bind:id="id" bind:describedBy="describedBy"
+      model:from="from" model:to="to" bind:maxDays="366" bind:presets="[]" />
+  </snippet>
+</UIField>`,
 	slider: `<UISlider model="volume" label="Volume" name="volume" bind:min="0" bind:max="100" bind:step="5" />`,
 	alert: `<UIAlert color="success" title="Changes saved" description="They are already published." />
 <UIAlert color="danger" title="Could not publish" dismiss on:dismiss="clear">

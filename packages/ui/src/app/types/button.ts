@@ -160,11 +160,27 @@ interface UIButtonNativeProps extends NoAnchorAttributes {
 	readonly download?: never
 }
 
+/** `pressed` sólo existe en un `<button>`: un enlace no es un conmutador. */
+interface UIToggleLinkState {
+	readonly pressed?: never
+}
+
+/** `pressed` de un `<button>` conmutador. */
+interface UIToggleState {
+	/**
+	 * Estado de un conmutador: pinta `aria-pressed` (`"true"` o `"false"`) y el aspecto de activo. Sin ella,
+	 * el botón no es un conmutador y no lleva `aria-pressed`.
+	 *
+	 * @since 1.11.0 en `<UIButton>`; en `<UIIconButton>`, desde 1.10.0.
+	 */
+	readonly pressed?: boolean
+}
+
 /**
  * Props de `<UIButton>`, una acción con tres formas y el mismo aspecto: con `to` navega a una ruta
  * de la aplicación con `<MeekoLink>` (navegación del cliente, `params` y `search` tipados), con
  * `href` es un `<a>` (`target`, `rel` y `download`) y sin ninguno es un `<button>` (`type`, por
- * defecto `"button"`, y `disabled`). Las combinaciones que no tienen sentido son errores de tipos:
+ * defecto `"button"`, `disabled` y, en un conmutador, `pressed`). Las combinaciones que no tienen sentido son errores de tipos:
  * `to` con `href`, `type` o `disabled` en un enlace, `target` o `hreflang` en un botón. Un enlace
  * no se puede deshabilitar: no lo pinte, o use un `<button disabled>`. Los atributos de
  * {@link UIForwardedAttributes} (`id`, `title`, `aria-*`, `data-*`…) llegan al elemento, y los de
@@ -177,9 +193,10 @@ interface UIButtonNativeProps extends NoAnchorAttributes {
  * <UIButton to="/users/[id]" bind:params="{ id: user.id }">Perfil</UIButton>
  * <UIButton href="https://github.com/meekojs/meeko" target="_blank" variant="outline" color="neutral">GitHub</UIButton>
  * <UIButton type="submit" bind:disabled="saving.value" on:click="save">Guardar</UIButton>
+ * <UIButton variant="outline" bind:pressed="paid.value" on:click="() => (paid.value = !paid.value)">Pagadas</UIButton>
  * ```
  */
-export type UIButtonProps = (UIButtonAnchorProps | UIButtonNativeProps | UIButtonRouteProps) &
+export type UIButtonProps = ((UIButtonAnchorProps & UIToggleLinkState) | (UIButtonNativeProps & UIToggleState) | (UIButtonRouteProps & UIToggleLinkState)) &
 	UIActionAppearance &
 	UIForwardedAttributes & {
 		/** Ocupado: anuncia el estado y bloquea la activación. Conserva el texto visible. */
@@ -201,20 +218,6 @@ export type UIButtonProps = (UIButtonAnchorProps | UIButtonNativeProps | UIButto
  * ```
  */
 export type UIIconName = keyof typeof icons
-
-/** `pressed` sólo existe en un `<button>`: un enlace no es un conmutador. */
-interface UIIconButtonLinkState {
-	readonly pressed?: never
-}
-
-/** `pressed` de un `<button>` conmutador. */
-interface UIIconButtonNativeState {
-	/**
-	 * Estado de un conmutador: pinta `aria-pressed` (`"true"` o `"false"`) y el aspecto de activo. Sin ella,
-	 * el botón no es un conmutador y no lleva `aria-pressed`.
-	 */
-	readonly pressed?: boolean
-}
 
 /**
  * Props de `<UIIconButton>`, una acción de sólo icono con las tres formas de `<UIButton>`: con `to` navega a
@@ -238,7 +241,7 @@ interface UIIconButtonNativeState {
  * <UIIconButton label="Eliminar" color="danger" bind:loading="removing.value" icon="close" />
  * ```
  */
-export type UIIconButtonProps = ((UIButtonAnchorProps & UIIconButtonLinkState) | (UIButtonNativeProps & UIIconButtonNativeState) | (UIButtonRouteProps & UIIconButtonLinkState)) &
+export type UIIconButtonProps = ((UIButtonAnchorProps & UIToggleLinkState) | (UIButtonNativeProps & UIToggleState) | (UIButtonRouteProps & UIToggleLinkState)) &
 	Omit<UIForwardedAttributes, 'aria-label' | 'title'> &
 	UIThemeProps<
 		typeof iconButtonTheme,

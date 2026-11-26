@@ -4,3 +4,9 @@
 	flex-shrink: 0;
 	vertical-align: -0.125em;
 }
+
+/* A busy button or link (aria-busy, as <UIButton loading>) shows its spinner in place of the icon. This sheet
+   has no layer, so a layered rule (the utilities of @meekojs/ui) cannot hide the icon; :where keeps it easy to override. */
+:where(button, a)[aria-busy='true'] > .meeko-icon {
+	display: none;
+}

@@ -104,23 +104,25 @@ export default defineMeekoConfig({
 })
 ```
 
-| Texto                 | Español                             | Inglés                               | Lo sustituye en un componente |
-| --------------------- | ----------------------------------- | ------------------------------------ | ----------------------------- |
-| `modal.close`         | `Cerrar modal`                      | `Close modal`                        | `closeLabel`                  |
-| `table.empty`         | `No hay datos.`                     | `No data.`                           | `emptyText`, snippet `empty`  |
-| `select.empty`        | `Sin resultados`                    | `No results`                         | snippet `empty`               |
-| `select.clear`        | `Quitar selección`                  | `Clear selection`                    | `clearLabel`                  |
-| `themeToggle.labels`  | `Claro`, `Oscuro`, `Sistema`        | `Light`, `Dark`, `System`            | `labels`                      |
-| `themeToggle.unknown` | `Cambiar tema`                      | `Change theme`                       | `messages.unknown`            |
-| `themeToggle.group`   | `Tema`                              | `Theme`                              | `messages.group`              |
-| `themeToggle.cycle`   | `Tema: {current}. Cambiar a {next}` | `Theme: {current}. Switch to {next}` | `messages.cycle`              |
-| `modal.confirm`       | `Confirmar`                         | `Confirm`                            | `confirmLabel` de `confirm()` |
-| `modal.cancel`        | `Cancelar`                          | `Cancel`                             | `cancelLabel` de `confirm()`  |
-| `copyButton.copy`     | `Copiar`                            | `Copy`                               | `label`                       |
-| `copyButton.copied`   | `Copiado`                           | `Copied`                             | `copiedLabel`                 |
-| `copyButton.failed`   | `No se pudo copiar`                 | `Could not copy`                     | `failedLabel`                 |
-| `input.show`          | `Mostrar contraseña`                | `Show password`                      | `showLabel` de `UIInput`      |
-| `input.hide`          | `Ocultar contraseña`                | `Hide password`                      | `hideLabel` de `UIInput`      |
+| Texto                                                        | Español                                     | Inglés                                        | Lo sustituye en un componente           |
+| ------------------------------------------------------------ | ------------------------------------------- | --------------------------------------------- | --------------------------------------- |
+| `modal.close`                                                | `Cerrar modal`                              | `Close modal`                                 | `closeLabel`                            |
+| `table.empty`                                                | `No hay datos.`                             | `No data.`                                    | `emptyText`, snippet `empty`            |
+| `select.empty`                                               | `Sin resultados`                            | `No results`                                  | snippet `empty`                         |
+| `select.clear`                                               | `Quitar selección`                          | `Clear selection`                             | `clearLabel`                            |
+| `themeToggle.labels`                                         | `Claro`, `Oscuro`, `Sistema`                | `Light`, `Dark`, `System`                     | `labels`                                |
+| `themeToggle.unknown`                                        | `Cambiar tema`                              | `Change theme`                                | `messages.unknown`                      |
+| `themeToggle.group`                                          | `Tema`                                      | `Theme`                                       | `messages.group`                        |
+| `themeToggle.cycle`                                          | `Tema: {current}. Cambiar a {next}`         | `Theme: {current}. Switch to {next}`          | `messages.cycle`                        |
+| `modal.confirm`                                              | `Confirmar`                                 | `Confirm`                                     | `confirmLabel` de `confirm()`           |
+| `modal.cancel`                                               | `Cancelar`                                  | `Cancel`                                      | `cancelLabel` de `confirm()`            |
+| `copyButton.copy`                                            | `Copiar`                                    | `Copy`                                        | `label`                                 |
+| `copyButton.copied`                                          | `Copiado`                                   | `Copied`                                      | `copiedLabel`                           |
+| `copyButton.failed`                                          | `No se pudo copiar`                         | `Could not copy`                              | `failedLabel`                           |
+| `input.show`                                                 | `Mostrar contraseña`                        | `Show password`                               | `showLabel` de `UIInput`                |
+| `input.hide`                                                 | `Ocultar contraseña`                        | `Hide password`                               | `hideLabel` de `UIInput`                |
+| `dateRange.from`, `dateRange.to`                             | `Desde`, `Hasta`                            | `From`, `To`                                  | `fromLabel`, `toLabel` de `UIDateRange` |
+| `dateRange.today`, `last7Days`, `thisMonth`, `previousMonth` | `Hoy`, `7 días`, `Este mes`, `Mes anterior` | `Today`, `7 days`, `This month`, `Last month` | `presets` de `UIDateRange`              |
 
 - **Prioridad.** Una prop o un snippet del componente ganan sobre todo lo demás. Después, `ui.messages` gana sobre los textos del paquete en ese idioma.
 - **Idiomas.** `ui.locale` y las claves de `ui.messages` se validan al cargar y se leen en su forma canónica: `EN` es `en` y `pt-br` es `pt-BR`. Una etiqueta inválida, como `en-u`, es un error de configuración.
@@ -198,11 +200,12 @@ Puedes sobrescribir `--ui-container-max-width` y `--ui-container-gutter` desde u
 
 ### Controles básicos
 
-| Componente | API                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `UIButton` | Ruta (`to`, `params`, `search`), enlace (`href`, `target`, `rel`, `download`) o botón (`type`, `disabled`); véase [UIButton](#uibutton-ruta-enlace-o-botón). Admite `variant`, `color`, `size`, `radius`, `width`, `elevation`, `class`, evento `click` y snippet `default`. Por defecto `button`, `solid`, `primary`, `md` y radio `md`.                                                                                                                                                                                                                                            |
-| `UIInput`  | Modelo de texto con `model`. Props: `id`, `name`, `type`, `placeholder`, `required`, `disabled`, `invalid`, `describedBy`, `variant`, `color`, `size`, `radius` y `class`; véase [Aspecto del campo](#aspecto-del-campo). Tipos admitidos: `text`, `email`, `password`, `search`, `url`, `tel`, `number`, `date`, `datetime-local`, `time` y `month`. Por defecto usa `text` y un valor vacío; véase [Números, horas y meses](#números-horas-y-meses). Con `type="password"`, `reveal` añade un botón para ver la contraseña; véase [Mostrar la contraseña](#mostrar-la-contraseña). |
-| `UIField`  | Requiere `id`, `label` y el snippet `default(id, describedBy)`. Props opcionales: `description`, `error`, `required`, `class`. El error tiene prioridad sobre la descripción y se anuncia con `role="alert"`.                                                                                                                                                                                                                                                                                                                                                                        |
+| Componente    | API                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `UIButton`    | Ruta (`to`, `params`, `search`), enlace (`href`, `target`, `rel`, `download`) o botón (`type`, `disabled`, `pressed`); véase [UIButton](#uibutton-ruta-enlace-o-botón). Admite `variant`, `color`, `size`, `radius`, `width`, `elevation`, `class`, evento `click` y snippet `default`. Por defecto `button`, `solid`, `primary`, `md` y radio `md`.                                                                                                                                                                                                                                 |
+| `UIInput`     | Modelo de texto con `model`. Props: `id`, `name`, `type`, `placeholder`, `required`, `disabled`, `invalid`, `describedBy`, `variant`, `color`, `size`, `radius` y `class`; véase [Aspecto del campo](#aspecto-del-campo). Tipos admitidos: `text`, `email`, `password`, `search`, `url`, `tel`, `number`, `date`, `datetime-local`, `time` y `month`. Por defecto usa `text` y un valor vacío; véase [Números, horas y meses](#números-horas-y-meses). Con `type="password"`, `reveal` añade un botón para ver la contraseña; véase [Mostrar la contraseña](#mostrar-la-contraseña). |
+| `UIDateRange` | Dos fechas nativas con `model:from` y `model:to`, atajos (`presets`, `today`), `min`, `max`, `maxDays` y evento `change` con un rango válido; véase [Rango de fechas](#rango-de-fechas-uidaterange).                                                                                                                                                                                                                                                                                                                                                                                 |
+| `UIField`     | Requiere `id`, `label` y el snippet `default(id, describedBy)`. Props opcionales: `description`, `error`, `required`, `class`. El error tiene prioridad sobre la descripción y se anuncia con `role="alert"`.                                                                                                                                                                                                                                                                                                                                                                        |
 
 También incluye `UIApp` y `UIModal` para [modales](#modales), `UITable` para [tablas](#tablas), `UICard` para [cards](#cards), y los componentes de navegación y etiquetas siguientes.
 
@@ -213,6 +216,7 @@ También incluye `UIApp` y `UIModal` para [modales](#modales), `UITable` para [t
 - **Con `to`**, un `<MeekoLink>`: un enlace a una ruta de la aplicación que navega sin recargar. `to` sólo admite rutas que existen; `params` es obligatorio en una ruta dinámica, con sus claves, y no se admite en una estática; `search` es la query string.
 - **Con `href`**, un `<a>` a cualquier URL, con `target`, `rel` y `download`. Con `target="_blank"` y sin `rel`, añade `rel="noopener noreferrer"`.
 - **Sin ninguno**, un `<button>` con `type` (`button` por defecto, así que nunca envía un formulario sin pedirlo) y `disabled`.
+- **Conmutador con texto.** Desde `1.11`, `pressed` convierte el `<button>` en un conmutador, como en `UIIconButton`: pinta `aria-pressed` (`"true"` o `"false"`) y el aspecto de activo de su `variant`. Sin `pressed` no lleva `aria-pressed`, y en un enlace o una ruta es un error de tipos: `<UIButton variant="outline" bind:pressed="paid.value" on:click="() => (paid.value = !paid.value)">Pagadas</UIButton>`.
 
 ```html
 <UIButton
@@ -393,6 +397,46 @@ También incluye `UIApp` y `UIModal` para [modales](#modales), `UITable` para [t
 - **Por aplicación.** `ui.defaults.input` admite `variant`, `color`, `size`, `radius` y `class`; la prop de la instancia gana.
 - **Desde la API anterior.** La prop `appearance` desaparece: sus claves son props (`bind:appearance="{ variant: 'soft' }"` es `variant="soft"`), y `color` admite ahora los siete colores. `<UIInput size="20">` ya no fija el ancho nativo: usa una clase.
 - **Tipos.** `UIInputVariant`, `UIInputColor`, `UIInputSize` y `UIInputRadius` se importan desde `@meekojs/ui/runtime`; `InputThemeProps`, desde `@meekojs/ui/theme`.
+
+### Rango de fechas: UIDateRange
+
+`UIDateRange` agrupa dos `<input type="date">` nativos, «Desde» y «Hasta», en un `<fieldset>` con nombre, con atajos y la validación del rango: lo que una página de filtros arma a mano con dos `UIInput type="date"`.
+
+```html
+<script lang="ts">
+	import type { UIDateRangeValue } from '@meekojs/ui/runtime'
+
+	const from = signal('')
+	const to = signal('')
+	function load(range: UIDateRangeValue) {
+		// Sólo llega un rango completo y válido.
+	}
+</script>
+
+<template>
+	<UIDateRange
+		label="Periodo"
+		model:from="from"
+		model:to="to"
+		fromName="desde"
+		toName="hasta"
+		today="2026-11-24"
+		min="2020-01-01"
+		bind:maxDays="366"
+		on:change="load"
+	/>
+</template>
+```
+
+- **Modelos.** `model:from` y `model:to`, dos `Signal<string>` con `YYYY-MM-DD` o `''`, como el `model` de `UIInput type="date"`. Reflejan lo que escribe el usuario, también un rango inválido o a medias, para que el campo nunca deshaga su edición. También admiten `bind:from` y `on:update:from`.
+- **`change`.** Recibe `{ from, to }` sólo cuando el usuario (al escribir o con un atajo) deja un rango completo, válido y distinto del último en vigor, sea el último emitido o el que haya escrito el padre. Un rango al revés, demasiado largo, fuera de límites o con una fecha a medias no lo emite: carga los datos en `change`, no al observar los modelos.
+- **Atajos.** `presets` es una lista de `{ label, range(today) }`, donde `today` es `YYYY-MM-DD` y `range` devuelve `{ from, to }`. Por defecto: «Hoy», «7 días» (hoy y los seis anteriores), «Este mes» (del día 1 a hoy) y «Mes anterior» (entero; en enero, diciembre del año anterior), con los textos `dateRange.today`, `last7Days`, `thisMonth` y `previousMonth`. `bind:presets="[]"` los quita. El que coincide con el rango lleva `aria-pressed="true"`; son botones `type="button"` en un grupo llamado `dateRange.presets` («Atajos»).
+- **«Hoy», SSR e hidratación.** El componente nunca lee el reloj al pintar. Con `today` (pásalo desde el servidor, en la zona horaria del negocio) el HTML ya trae los atajos activos y la hidratación encuentra lo mismo. Sin `today`, los atajos se pintan deshabilitados en el servidor y al hidratar, y se activan al montar con la fecha local del navegador: no hay desajuste. Las fechas se calculan como días del calendario en UTC, sin depender de la zona horaria, con fines de mes y años bisiestos.
+- **Validación.** `min` y `max` (`YYYY-MM-DD`) llegan a los dos campos y se comprueban en cada fecha, aunque falte la otra. `maxDays` cuenta los dos extremos: con `366` cabe un año bisiesto entero. Un rango inválido marca con `aria-invalid` (y el borde de peligro) las fechas culpables, y un mensaje con `role="alert"`, referido por su `aria-describedby`, dice el motivo: `dateRange.order`, `tooLong` (`{days}`), `beforeMin` (`{min}`) o `afterMax` (`{max}`), con las fechas formateadas en el idioma del documento. Una fecha vacía no es un error; usa `required` para exigirlas. `invalid` marca las dos fechas por una validación propia, sin mensaje.
+- **Nombre y `UIField`.** `label` pinta una `<legend>` visible; `ariaLabel` nombra el grupo sin ella. Dentro de `UIField`, pásale `bind:id="id"` y `bind:describedBy="describedBy"`: el grupo toma su nombre de la etiqueta del campo (`aria-labelledby="<id>-label"`; `UIField` da ese `id` a su `<label>`) y las dos fechas, su descripción. Sin nada de eso, el grupo se llama `dateRange.label` («Periodo»). Las etiquetas de las fechas son `fromLabel` y `toLabel`, o `dateRange.from` y `dateRange.to`.
+- **Formularios.** `fromName`, `toName`, `form`, `required` y `disabled` (que deshabilita también los atajos, por ser el del `<fieldset>`).
+- **Aspecto.** Es la receta `dateRangeTheme` de `@meekojs/ui/theme`, sin variantes. Las fechas tienen el aspecto de `UIInput type="date"` (`inputTheme`), y los atajos, el de un `UIButton` `outline` `neutral` `sm` (`buttonTheme`), con el acento suave del color primario al estar pulsados. Las dos fechas comparten fila y bajan una bajo otra si no caben. `class` llega al `<fieldset>` y `ui`, a `base`, `legend`, `presets`, `preset`, `fields`, `field`, `fieldLabel`, `input` y `error`; `ui.defaults.dateRange` admite `class` y `ui`.
+- **Tipos.** `UIDateRangeProps`, `UIDateRangeValue`, `UIDateRangePreset` y `UIDateRangeIssue`, desde `@meekojs/ui/runtime`.
 
 ### UIAvatar
 
@@ -1245,6 +1289,8 @@ Lo que el `<select>` nativo de `UISelect` no cubre: buscar, filtrar en un servid
 **Tipos.** `meeko check` y el editor infieren de la etiqueta el tipo de las opciones (`T`) y si es múltiple: el modelo de un select simple es una `Signal<T | null>` y el de uno múltiple, `Signal<T[]>`; `by`, `labelBy` y `groupBy` sólo admiten claves de `T`, y los parámetros de los snippets tienen el tipo `T`. El tipo `ComboboxModel<T, Multiple>` describe el valor.
 
 **ARIA y teclado.** El disparador es un `role="combobox"` (un `<button>` o, con `searchable`, un `<input>` con `aria-autocomplete="list"`) con `aria-expanded`, `aria-controls`, `aria-haspopup="listbox"` y `aria-activedescendant`: el foco nunca sale de él. La lista es un `role="listbox"` (con `aria-multiselectable` en un select múltiple) de `role="option"` con `aria-selected` y `aria-disabled`, agrupadas en `role="group"` con `groupBy`. Un `<label for>` externo nombra el disparador por su `id`. El patrón ARIA del combobox no define cómo vaciar la selección, así que `clearable` añade, fuera del combobox, un `<button type="button">` con `aria-label` («Quitar selección»): entra en el orden de tabulación justo después del disparador, sólo existe mientras hay algo elegido y al activarlo cierra la lista, emite `change` con `null` (o `[]`) y devuelve el foco al disparador.
+
+**Opciones al abrir.** Una lista cerrada no tiene opciones en el DOM, tampoco en el HTML del servidor: se crean la primera vez que se abre y se conservan al cerrarla. El disparador, los `<input type="hidden">` del formulario, el typeahead y `aria-controls` no las necesitan, así que una página con muchas listas largas ya no envía ni hidrata cada opción de cada lista cerrada. Sin JavaScript la lista no se abre, de modo que no se pierde nada. Las pruebas que busquen un `role="option"` deben abrir antes la lista.
 
 - `↓`, `↑`, `Intro` o `Espacio` abren la lista sobre la opción elegida (o la primera); `Inicio` y `Fin` abren en un extremo; las letras abren y buscan.
 - Con la lista abierta, las flechas, `Inicio`, `Fin`, `RePág` y `AvPág` mueven la opción activa (sin dar la vuelta, saltando las deshabilitadas) y la desplazan hasta verla; las letras buscan por el principio de la etiqueta, sin distinguir acentos.

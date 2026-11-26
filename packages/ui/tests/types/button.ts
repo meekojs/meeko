@@ -112,3 +112,11 @@ button({ iconOnly: true, ariaLabel: 'Close' })
 button({ iconOnly: true, 'aria-label': 'Close' })
 // @ts-expect-error An icon-only action requires an accessible name.
 button({ iconOnly: true })
+
+// A toggle with text: `pressed` is for a <button>, never for a link or a route.
+button({ variant: 'outline', pressed: true })
+button({ type: 'button', pressed: false })
+// @ts-expect-error A link is not a toggle.
+button({ href: '/docs', pressed: true })
+// @ts-expect-error A route is not a toggle either.
+button({ to: '/', pressed: false })

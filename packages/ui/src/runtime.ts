@@ -15,6 +15,7 @@ export type { CommandPaletteItemState, CommandPaletteSnippets, CommandPaletteSta
 export { useScrollLock } from './app/composables/useScrollLock'
 export { useToast } from './app/composables/useToast'
 export type { UIThemeProps, UIVariantSlots } from './app/types/theme'
+export type { UIDateRangeIssue, UIDateRangePreset, UIDateRangeProps, UIDateRangeValue } from './app/types/date-range'
 export type { UIBadgeColor, UIBadgeProps, UIBadgeRadius, UIBadgeVariant, UICheckboxProps, UIDensity, UIFieldProps, UIInputColor, UIInputProps, UIInputRadius, UIInputSize, UIInputVariant, UIRadioGroupProps, UIRadioOption, UISegmentedControlProps, UISliderProps, UISwitchProps, UITextareaProps } from './app/types/forms'
 export type { UIAlertProps, UIDescriptionItem, UIDescriptionListProps, UIDisclosureProps, UIEmptyProps, UIMessageColor, UIMessageVariant, UISkeletonProps, UISparklineColor, UISparklineProps, UIStatDirection, UIStatProps, UIToastContext, UIToastEntry, UIToastProps } from './app/types/feedback'
 export type { UICardColor, UICardElevation, UICardPadding, UICardProps, UICardRadius, UICardVariant } from './app/types/card'

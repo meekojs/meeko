@@ -11,6 +11,7 @@ import type { comboboxTheme } from '../theme/components/combobox'
 import type { commandPaletteTheme } from '../theme/components/command-palette'
 import type { containerTheme } from '../theme/components/container'
 import type { copyButtonTheme } from '../theme/components/copy-button'
+import type { dateRangeTheme } from '../theme/components/date-range'
 import type { descriptionListTheme } from '../theme/components/description-list'
 import type { diffTheme } from '../theme/components/diff'
 import type { disclosureTheme } from '../theme/components/disclosure'
@@ -164,6 +165,12 @@ export interface UIDefaults {
 	 * @since 1.10.0
 	 */
 	readonly copyButton?: UIComponentDefaults<typeof copyButtonTheme, Pick<VariantProps<typeof copyButtonTheme>, UIActionChoices>>
+	/**
+	 * `UIDateRange`: `class` llega al `<fieldset>`, como la prop de la instancia.
+	 *
+	 * @since 1.11.0
+	 */
+	readonly dateRange?: UIComponentDefaults<typeof dateRangeTheme>
 	readonly descriptionList?: UIComponentDefaults<typeof descriptionListTheme>
 	readonly diff?: UIComponentDefaults<typeof diffTheme>
 	readonly disclosure?: UIComponentDefaults<typeof disclosureTheme>

@@ -14,6 +14,7 @@ import { comboboxTheme } from './app/theme/components/combobox'
 import { commandPaletteTheme } from './app/theme/components/command-palette'
 import { containerTheme } from './app/theme/components/container'
 import { copyButtonTheme } from './app/theme/components/copy-button'
+import { dateRangeTheme } from './app/theme/components/date-range'
 import { descriptionListTheme } from './app/theme/components/description-list'
 import { diffTheme } from './app/theme/components/diff'
 import { disclosureTheme } from './app/theme/components/disclosure'
@@ -88,6 +89,7 @@ const components = {
 	commandPalette: { look: commandPaletteTheme },
 	container: { look: containerTheme },
 	copyButton: { look: copyButtonTheme, variants: buttonChoices },
+	dateRange: { look: dateRangeTheme },
 	descriptionList: { look: descriptionListTheme },
 	diff: { look: diffTheme },
 	disclosure: { look: disclosureTheme },

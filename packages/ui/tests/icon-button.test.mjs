@@ -11,7 +11,7 @@ import { uiDefaultsKey } from '../dist/app/utils/defaults.js'
 import { icons } from '../dist/app/utils/icons.js'
 import { validateDefaults } from '../dist/defaults.js'
 
-const components = ['Popover', 'Tooltip', 'IconButton', 'Hint']
+const components = ['Popover', 'Tooltip', 'IconButton', 'Hint', 'Button']
 const i18nKey = Symbol.for('meeko.i18n')
 
 /** Compiles the real components and a page with `template`, and renders it in SSR with the given contexts. */
@@ -79,6 +79,19 @@ test('UIIconButton variant, color, size and radius are those of UIButton', async
 	for (const name of ['bg-transparent', 'rounded-md', 'aria-pressed:bg-primary-3']) assert.ok(!classes.includes(name), name)
 	const soft = element(await render(context, '<UIIconButton label="Avisar" icon="info" variant="soft" color="warning" size="xs" />'), 'button')
 	for (const name of ['bg-warning-3', 'text-warning-11', 'min-w-(--ui-control-height-xs)', 'aria-pressed:bg-warning-3', 'aria-pressed:border-warning-7']) assert.ok(soft.classes.includes(name), name)
+})
+
+test('UIButton pressed is aria-pressed of a toggle with text, with the pressed look, and a link never takes it', async (context) => {
+	const html = await render(context, '<UIButton variant="outline" bind:pressed="true">Pagadas</UIButton><UIButton variant="outline" bind:pressed="false">Pendientes</UIButton><UIButton>Guardar</UIButton>')
+	const [on, off, plain] = [...html.matchAll(/<button[^>]*>/g)].map(([tag]) => tag)
+	assert.match(on, /aria-pressed="true"/)
+	assert.match(off, /aria-pressed="false"/)
+	assert.doesNotMatch(plain, /\saria-pressed=/, 'not a toggle without pressed')
+	// The pressed look is read from aria-pressed: the same classes as <UIIconButton>.
+	for (const name of ['aria-pressed:bg-primary-3', 'aria-pressed:border-primary-7', 'aria-pressed:not-disabled:hover:border-primary-7']) assert.ok(on.includes(name), `${name} in ${on}`)
+	assert.ok(plain.includes('aria-pressed:bg-primary-10'), 'a solid toggle takes a deeper solid')
+	const link = await render(context, '<UIButton href="/docs">Docs</UIButton>')
+	assert.equal(element(link, 'a').attributes['aria-pressed'], undefined)
 })
 
 test('UIIconButton pressed is aria-pressed of a toggle, and a link never takes it', async (context) => {

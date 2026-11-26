@@ -29,7 +29,7 @@ export const navigation = [
 		title: 'Formularios',
 		en: { title: 'Forms' },
 		items: [
-			{ label: 'Field e Input', href: '/forms', description: 'Formularios, modelos y errores', en: { label: 'Field and Input', description: 'Forms, models and errors' } },
+			{ label: 'Field e Input', href: '/forms', description: 'Formularios, modelos, errores y rangos de fechas', en: { label: 'Field and Input', description: 'Forms, models, errors and date ranges' } },
 			{ label: 'Controles de formulario', href: '/controls', description: 'Textarea, Checkbox, RadioGroup, SegmentedControl, Switch, Slider y elementos nativos', en: { label: 'Form controls', description: 'Textarea, Checkbox, RadioGroup, SegmentedControl, Switch, Slider and native elements' } },
 			{ label: 'Select', href: '/select', description: 'Select nativo y Combobox con búsqueda y selección múltiple', en: { label: 'Select', description: 'Native Select and Combobox with search and multiple selection' } },
 			{ label: 'Editor de Markdown', href: '/editor', description: 'Edición visual y de código con Crepe', en: { label: 'Markdown editor', description: 'Visual and code editing with Crepe' } },

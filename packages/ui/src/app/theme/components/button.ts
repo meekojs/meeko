@@ -2,8 +2,9 @@
 // that look (UIMenu, UIPagination, UIDrawer, UILocaleSuggestion, the confirmation of useModal). The color comes
 // from the shared catalog (`appearance()`): each pair of `variant` and `color` is one compound variant with the
 // steps of its scale. This recipe only adds what a button needs whatever its color: the native states (focus,
-// disabled), the spinner of `aria-busy` and the square of `iconOnly`. `defineTheme` merges the classes with
-// Tailwind Merge, so the `class` of the consumer wins over the one of the recipe.
+// disabled), the spinner of `aria-busy`, the pressed state of a toggle (`aria-pressed`) and the square of
+// `iconOnly`. `defineTheme` merges the classes with Tailwind Merge, so the `class` of the consumer wins over the
+// one of the recipe.
 import type { ThemeVariants } from '../../utils/theme'
 
 import { defineTheme } from '../../utils/theme'
@@ -55,6 +56,38 @@ const lineHeight = { size: ['xs', 'sm', 'md', 'lg', 'xl'], class: 'leading-tight
  */
 export const controlBorder = { variant: 'outline', color: 'neutral', class: 'border-control-border not-disabled:hover:border-control-border' } as const
 
+/**
+ * The pressed state of a toggle (`pressed`, read from `aria-pressed`, so it needs no class of its own), shared
+ * with <UIIconButton>: a deeper solid. Each recipe adds its own `variant` and slot.
+ */
+export const pressedSolid = [
+	{ color: 'primary', class: 'aria-pressed:bg-primary-10 aria-pressed:not-disabled:hover:bg-primary-10' },
+	{ color: 'secondary', class: 'aria-pressed:bg-secondary-10 aria-pressed:not-disabled:hover:bg-secondary-10' },
+	{ color: 'neutral', class: 'aria-pressed:bg-neutral-10 aria-pressed:not-disabled:hover:bg-neutral-10' },
+	{ color: 'success', class: 'aria-pressed:bg-success-10 aria-pressed:not-disabled:hover:bg-success-10' },
+	{ color: 'info', class: 'aria-pressed:bg-info-10 aria-pressed:not-disabled:hover:bg-info-10' },
+	{ color: 'warning', class: 'aria-pressed:bg-warning-10 aria-pressed:not-disabled:hover:bg-warning-10' },
+	{ color: 'danger', class: 'aria-pressed:bg-danger-10 aria-pressed:not-disabled:hover:bg-danger-10' },
+] as const
+
+/**
+ * The pressed state of every treatment but `solid`: the soft background of the color with its border. A neutral
+ * toggle takes the primary accent. The pointer keeps the border: without `aria-pressed:not-disabled:hover:`, the
+ * hover border of `outline` and `surface` (`not-disabled:hover:border-*`, more specific than `aria-pressed:`)
+ * would replace it.
+ */
+export const pressedSoft = [
+	{ color: ['neutral', 'primary'], class: 'aria-pressed:border-primary-7 aria-pressed:not-disabled:hover:border-primary-7 aria-pressed:bg-primary-3 aria-pressed:text-primary-11 aria-pressed:not-disabled:hover:bg-primary-4' },
+	{ color: 'secondary', class: 'aria-pressed:border-secondary-7 aria-pressed:not-disabled:hover:border-secondary-7 aria-pressed:bg-secondary-3 aria-pressed:text-secondary-11 aria-pressed:not-disabled:hover:bg-secondary-4' },
+	{ color: 'success', class: 'aria-pressed:border-success-7 aria-pressed:not-disabled:hover:border-success-7 aria-pressed:bg-success-3 aria-pressed:text-success-11 aria-pressed:not-disabled:hover:bg-success-4' },
+	{ color: 'info', class: 'aria-pressed:border-info-7 aria-pressed:not-disabled:hover:border-info-7 aria-pressed:bg-info-3 aria-pressed:text-info-11 aria-pressed:not-disabled:hover:bg-info-4' },
+	{ color: 'warning', class: 'aria-pressed:border-warning-7 aria-pressed:not-disabled:hover:border-warning-7 aria-pressed:bg-warning-3 aria-pressed:text-warning-11 aria-pressed:not-disabled:hover:bg-warning-4' },
+	{ color: 'danger', class: 'aria-pressed:border-danger-7 aria-pressed:not-disabled:hover:border-danger-7 aria-pressed:bg-danger-3 aria-pressed:text-danger-11 aria-pressed:not-disabled:hover:bg-danger-4' },
+] as const
+
+/** Every treatment of a button but `solid`, whose pressed state is the one of {@link pressedSoft}. */
+const unfilled = buttonVariants.filter((variant) => variant !== 'solid')
+
 /** A button with only an icon: a square as tall as its size, without padding, whose icon hides while busy. */
 const iconOnlyBase = '[&>svg]:size-(--ui-icon-size) [&>svg]:flex-none aria-busy:*:hidden'
 
@@ -69,8 +102,9 @@ const iconOnlySizes = [
 
 /**
  * Receta de `UIButton` y `UILink`: `variant`, `color`, `size`, `radius`, `width`, `elevation` e `iconOnly`.
- * Sin ellas es un botón sólido del color primario, de tamaño `md` y radio `md`. Sirve también para dar el
- * aspecto de un botón a un elemento propio.
+ * Sin ellas es un botón sólido del color primario, de tamaño `md` y radio `md`. Con `aria-pressed` (la prop
+ * `pressed` de `UIButton`) tiene el aspecto de activo: un sólido más intenso o el fondo suave de su color.
+ * Sirve también para dar el aspecto de un botón a un elemento propio.
  *
  * @example
  * ```ts
@@ -88,7 +122,14 @@ export const buttonTheme = defineTheme({
 			false: '',
 		},
 	},
-	compoundVariants: [...selection.compoundVariants, controlBorder, lineHeight, ...iconOnlySizes],
+	compoundVariants: [
+		...selection.compoundVariants,
+		controlBorder,
+		lineHeight,
+		...iconOnlySizes,
+		...pressedSolid.map((pressed) => ({ ...pressed, variant: 'solid' as const })),
+		...pressedSoft.map((pressed) => ({ ...pressed, variant: unfilled })),
+	],
 	defaultVariants: { variant: 'solid', color: 'primary', size: 'md', radius: 'md', iconOnly: false },
 })
 
