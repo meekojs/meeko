@@ -34,7 +34,7 @@ export const themeMergeConfig = {
  * conflicto gana la última, así que las clases del consumidor, puestas al final, sustituyen a las de la
  * receta en lugar de competir con ellas por el orden de la hoja.
  *
- * @since 1.12.0
+ * @since 2.0.0
  * @example
  * ```ts
  * mergeClasses('bg-control text-text', 'bg-amber-500') // 'text-text bg-amber-500'

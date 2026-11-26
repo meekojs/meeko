@@ -24,7 +24,7 @@ export interface AvatarSnippets {
  * `image` y `glyph`.
  *
  * @since 1.10.0
- * @since 1.12.0 `variant`, `color` y `radius` sustituyen a `shape` (`circle` es `radius="full"`, el valor por defecto, y `rounded`, `radius="md"`).
+ * @since 2.0.0 `variant`, `color` y `radius` sustituyen a `shape` (`circle` es `radius="full"`, el valor por defecto, y `rounded`, `radius="md"`).
  * @example `<UIAvatar name="Ana Pérez" src="/avatars/ana.webp" size="sm" />`
  */
 export type UIAvatarProps = UIThemeProps<
