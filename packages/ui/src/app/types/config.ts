@@ -107,7 +107,7 @@ type UIActionDefaults = UIComponentDefaults<typeof buttonTheme, Pick<VariantProp
  *
  * @since 1.10.0 acepta `class` y `ui` en cada componente, y `padding`, `density`, `actionsWrap` en `card` y
  * `density` en `table`. Antes sólo admitía las variantes de `button`, `link` y `card`.
- * @since 1.11.0 acepta `variant`, `color`, `size` y `radius` en `input`, `variant`, `color` y `radius` en
+ * @since 1.12.0 acepta `variant`, `color`, `size` y `radius` en `input`, `variant`, `color` y `radius` en
  * `badge` y `avatar` (que deja `shape`), y ya no `appearance` ni `tone`.
  * @example
  * ```ts
@@ -129,13 +129,13 @@ export interface UIDefaults {
 	 * `UIAvatar`: `class` llega a la caja, y `size`, `variant`, `color` y `radius` son sus valores de base.
 	 *
 	 * @since 1.10.0
-	 * @since 1.11.0 `variant`, `color` y `radius` sustituyen a `shape`.
+	 * @since 1.12.0 `variant`, `color` y `radius` sustituyen a `shape`.
 	 */
 	readonly avatar?: UIComponentDefaults<typeof avatarTheme, Pick<VariantProps<typeof avatarTheme>, 'color' | 'radius' | 'size' | 'variant'>>
 	/**
 	 * `UIBadge`: `class` llega a la etiqueta, y `variant`, `color` y `radius` son sus valores de base.
 	 *
-	 * @since 1.11.0 `variant`, `color` y `radius`.
+	 * @since 1.12.0 `variant`, `color` y `radius`.
 	 */
 	readonly badge?: UIComponentDefaults<typeof badgeTheme, Pick<VariantProps<typeof badgeTheme>, 'color' | 'radius' | 'variant'>>
 	readonly breadcrumb?: UIComponentDefaults<typeof breadcrumbTheme>

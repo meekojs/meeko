@@ -18,7 +18,7 @@ interface UIMenuItemBase {
 	/**
 	 * `"danger"` para una acción destructiva o que no se puede deshacer; `"neutral"` por defecto.
 	 *
-	 * @since 1.11.0 sustituye a `tone`.
+	 * @since 1.12.0 sustituye a `tone`.
 	 */
 	readonly color?: UIMenuItemColor
 	/** Desactiva el ítem: se ve, pero las flechas lo saltan y no se puede elegir. */

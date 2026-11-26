@@ -249,7 +249,7 @@ export type UIFieldProps = UIThemeProps<
  * color semántico (`color`) y radio. Sin ellas, se usan los valores de `ui.defaults` y, después, una píldora
  * `soft` y `neutral` de radio `full`. `ui` añade clases a sus slots: `base` y `dot`.
  *
- * @since 1.11.0 `variant`, `color` y `radius` sustituyen a `tone` (`accent` es `color="primary"`) y a `appearance`.
+ * @since 1.12.0 `variant`, `color` y `radius` sustituyen a `tone` (`accent` es `color="primary"`) y a `appearance`.
  * @example `<UIBadge color="success" dot>Publicado</UIBadge>`
  */
 export type UIBadgeProps = UIThemeProps<

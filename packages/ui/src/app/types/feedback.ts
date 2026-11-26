@@ -11,7 +11,7 @@ import type { UIThemeProps } from './theme'
  * Aviso con acciones y cierre opcionales, con la receta `alertTheme` de `@meekojs/ui/theme`: tratamiento (`variant`) y
  * color semántico (`color`). Sin ellas es `soft` y `neutral`, la superficie de la página con su borde.
  *
- * @since 1.11.0 `variant` y `color` sustituyen a `tone`.
+ * @since 1.12.0 `variant` y `color` sustituyen a `tone`.
  * @example `<UIAlert color="warning" title="Sin conexión" description="Vuelve a intentarlo." />`
  */
 export type UIAlertProps = Omit<ElementAttributes<'section'>, 'title' | 'role' | 'class'> &
@@ -100,7 +100,7 @@ export type { UIDescriptionItem, UIDescriptionListProps, UISparklineColor, UISpa
  * Notificación breve presentada por el host de UIApp, con los `variant` y `color` de `UIAlert` (receta `toastTheme`).
  * Sin ellos es `soft` y `neutral`, la superficie elevada.
  *
- * @since 1.11.0 `variant` y `color` sustituyen a `tone`.
+ * @since 1.12.0 `variant` y `color` sustituyen a `tone`.
  * @example `<UIToast text="Cambios guardados" color="success" />`
  */
 export type UIToastProps = UIThemeProps<

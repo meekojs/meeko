@@ -63,7 +63,7 @@ export interface UIConfirmOptions {
 	 * Color del botón que acepta, el de `<UIButton>`; `"primary"` por defecto. Con `danger`, para una acción
 	 * destructiva, el foco empieza en el botón que rechaza; con cualquier otro, en el que acepta.
 	 *
-	 * @since 1.11.0 sustituye a `tone` (`tone: 'danger'` es `color: 'danger'`).
+	 * @since 1.12.0 sustituye a `tone` (`tone: 'danger'` es `color: 'danger'`).
 	 */
 	readonly color?: UIButtonColor
 	/** Ancho máximo del diálogo; `sm` por defecto. */
