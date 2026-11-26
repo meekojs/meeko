@@ -128,8 +128,10 @@ const files = (await readdir(directory)).filter((file) => file.endsWith('.css'))
 assert.ok(files.length, 'UI emits production CSS');
 const css = (await Promise.all(files.map((file) => readFile(`${directory}/${file}`, 'utf8')))).join('\n');
 // The consumer's Tailwind compiles the entry of UI from the tarball: its layers and the utilities of a button and a table.
-assert.match(css, /@layer ui\.utilities/);
-assert.match(css, /\.aria-busy\\:before\\:animate-spin/);
+// UI follows Tailwind's layers: its base in ui-base, its hand-written rules in components and its classes in utilities.
+assert.match(css, /@layer ui-base\{/);
+assert.match(css, /@layer components\{[\s\S]*\.meeko-ui-sr-only\{/);
+assert.match(css, /@layer utilities\{[\s\S]*\.aria-busy\\:before\\:animate-spin/);
 assert.match(css, /\.\\\[overflow-wrap\\:normal\\\]/);
 assert.match(css, /--ui-color-info-9:\s*#123456/);
 assert.match(css, /--ui-color-primary:\s*var\(--consumer-primary\)/);

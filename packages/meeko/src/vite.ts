@@ -180,8 +180,10 @@ export function meeko(): Plugin {
 				}
 			}
 			const registry = await generateComponentRegistry(root)
-			await generateComponentRegistryTypes(root, options)
+			// components.d.ts goes last: it imports the declarations of the project's components, which
+			// generateAppTypes writes under .meeko/types, so it never names one that does not exist yet.
 			await generateAppTypes(root, options)
+			await generateComponentRegistryTypes(root, options)
 			registeredComponentFiles = new Set((await discoverComponents(root)).map(({ file }) => normalizePath(resolve(file))))
 			return registry
 		})
