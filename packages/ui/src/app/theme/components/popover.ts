@@ -79,7 +79,7 @@ export const popoverTriggerTheme = defineTheme({
 		'rounded-md border-(length:--ui-border-width) border-solid border-border-strong',
 		'bg-control hover:bg-control-hover aria-expanded:bg-control-hover',
 		'font-sans text-control-md leading-tight font-control tracking-snug text-text',
-		'transition-[background-color] duration-(--ui-duration-fast) motion-reduce:transition-none motion-reduce:duration-0',
+		'transition-[background-color] duration-(--ui-duration-fast) ease-[ease] motion-reduce:transition-none motion-reduce:duration-0',
 		focusRing,
 	],
 })

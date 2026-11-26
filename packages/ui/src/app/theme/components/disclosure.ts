@@ -22,7 +22,7 @@ export const disclosureTheme = defineTheme({
 		summary: [
 			'inline-flex cursor-pointer list-none items-center gap-1 rounded-sm',
 			'text-md text-text-soft hover:text-text [&::-webkit-details-marker]:hidden',
-			'transition-[color] duration-(--ui-duration-fast)',
+			'transition-[color] duration-(--ui-duration-fast) ease-[ease]',
 			'motion-reduce:transition-none motion-reduce:duration-0',
 			focusRing,
 		],

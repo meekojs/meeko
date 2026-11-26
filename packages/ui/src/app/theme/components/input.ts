@@ -22,7 +22,7 @@ export const fieldStructure = [
 	'box-border block w-full py-1.5',
 	'border-(length:--ui-border-width) border-solid border-control-border aria-[invalid=true]:border-danger',
 	'font-sans text-(length:--ui-input-font-size) leading-snug font-regular text-text placeholder:text-text-soft',
-	'transition-[background-color] duration-(--ui-duration-fast) motion-reduce:transition-none motion-reduce:duration-0',
+	'transition-[background-color] duration-(--ui-duration-fast) ease-[ease] motion-reduce:transition-none motion-reduce:duration-0',
 	'focus-visible:outline-(length:--ui-focus-ring-width) focus-visible:outline-focus focus-visible:outline-offset-(--ui-focus-ring-offset) focus-visible:outline-solid',
 ]
 

@@ -15,7 +15,7 @@ export const localeSwitcherTheme = defineTheme({
 			'grid h-full min-w-8 place-items-center rounded-sm px-1.5',
 			'text-md font-medium text-text-soft no-underline decoration-current hover:text-text',
 			'[&[aria-current]]:bg-control-active [&[aria-current]]:text-text',
-			'transition-[background-color,color] duration-(--ui-duration-fast) motion-reduce:transition-none motion-reduce:duration-0',
+			'transition-[background-color,color] duration-(--ui-duration-fast) ease-[ease] motion-reduce:transition-none motion-reduce:duration-0',
 			focusRingInset,
 		],
 	},

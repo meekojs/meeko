@@ -27,7 +27,7 @@ export const menuTheme = defineTheme({
 		/** The trigger that <UIMenu> paints; its look is the one of `buttonTheme` in ./button.ts. */
 		trigger: '',
 		/** The chevron after the text of a trigger with `triggerLabel`. */
-		chevron: 'motion-safe:transition-[rotate] duration-(--ui-duration-fast) in-aria-expanded:rotate-180',
+		chevron: 'motion-safe:transition-[rotate] duration-(--ui-duration-fast) ease-[ease] in-aria-expanded:rotate-180',
 		/** An item of the data: an action (<button>) or a link (<a>, <MeekoLink>). */
 		item: [
 			'box-border items-center gap-2 leading-snug',

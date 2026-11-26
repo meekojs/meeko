@@ -54,13 +54,16 @@ const classesOf = (html, tag) => [...html.matchAll(new RegExp(`<${tag}\\b[^>]*?c
 
 const sorted = (classes) => [...new Set(typeof classes === 'string' ? classes.split(' ') : classes)].sort()
 
-/** The classes of the field before the migration to `inputTheme`: the look a field without props must keep. */
+/**
+ * The classes of the field before the migration to `inputTheme`: the look a field without props must keep. Only
+ * `ease-[ease]` is new: the easing of CSS, which the transition had by default before Tailwind's came back.
+ */
 const before = {
 	structure: [
 		'box-border block w-full ps-3 py-1.5',
 		'border-(length:--ui-border-width) aria-[invalid=true]:border-danger',
 		'font-sans text-(length:--ui-input-font-size) leading-snug font-regular',
-		'transition-[background-color] duration-(--ui-duration-fast) motion-reduce:transition-none motion-reduce:duration-0',
+		'transition-[background-color] duration-(--ui-duration-fast) ease-[ease] motion-reduce:transition-none motion-reduce:duration-0',
 		'focus-visible:outline-(length:--ui-focus-ring-width) focus-visible:outline-focus focus-visible:outline-offset-(--ui-focus-ring-offset) focus-visible:outline-solid',
 		'rounded-md border-solid border-control-border bg-control not-disabled:hover:bg-control-hover text-text placeholder:text-text-soft',
 	].join(' '),
@@ -175,7 +178,7 @@ test('the class of the instance is merged with Tailwind Merge and wins over the 
 		[switchTheme().input({ class: 'bg-red-500' }), 'bg-red-500', 'bg-control'],
 		[radioGroupTheme().options({ class: 'gap-6' }), 'gap-6', 'gap-2'],
 		[segmentedControlTheme().options({ class: 'rounded-none' }), 'rounded-none', 'rounded-lg'],
-		[fieldTheme().label({ class: 'text-lg' }), 'text-lg', 'text-sm'],
+		[fieldTheme().label({ class: 'text-lg' }), 'text-lg', 'text-sm/[inherit]'],
 		[sliderTheme().base({ class: 'gap-4' }), 'gap-4', 'gap-2'],
 		[selectTheme().clear({ class: 'rounded-none' }), 'rounded-none', 'rounded-md'],
 		[comboboxTheme().chip({ class: 'rounded-sm' }), 'rounded-sm', 'rounded-full'],

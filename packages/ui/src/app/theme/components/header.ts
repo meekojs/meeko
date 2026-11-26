@@ -35,7 +35,7 @@ const headerLink = [
 	'font-control text-control-md whitespace-nowrap no-underline decoration-current',
 	'text-text-soft hover:bg-control-hover hover:text-text',
 	'[&[aria-current]]:bg-control-active [&[aria-current]]:text-text',
-	'transition-[background-color,color] duration-(--ui-duration-fast) motion-reduce:transition-none motion-reduce:duration-0',
+	'transition-[background-color,color] duration-(--ui-duration-fast) ease-[ease] motion-reduce:transition-none motion-reduce:duration-0',
 	focusRing,
 ]
 
@@ -81,7 +81,7 @@ export const headerTheme = defineTheme({
 /** A plain link of the footer: its text color until the pointer is on it. */
 const footerLink = [
 	'text-inherit no-underline decoration-current hover:text-text hover:underline hover:underline-offset-(--ui-underline-offset)',
-	'transition-[color] duration-(--ui-duration-fast) motion-reduce:transition-none motion-reduce:duration-0',
+	'transition-[color] duration-(--ui-duration-fast) ease-[ease] motion-reduce:transition-none motion-reduce:duration-0',
 	focusRing,
 ]
 
@@ -92,7 +92,7 @@ export const footerTheme = defineTheme({
 			'border-t-(length:--ui-border-width) border-t-border font-sans text-sm leading-normal text-text-soft',
 			// The links an application writes in the snippets, without a class of their own, look like the footer's.
 			'[&_a:not([class])]:text-inherit [&_a:not([class])]:no-underline [&_a:not([class])]:decoration-current [&_a:not([class]):hover]:text-text [&_a:not([class]):hover]:underline [&_a:not([class]):hover]:underline-offset-(--ui-underline-offset)',
-			'[&_a:not([class])]:transition-[color] [&_a:not([class])]:duration-(--ui-duration-fast) motion-reduce:[&_a:not([class])]:transition-none motion-reduce:[&_a:not([class])]:duration-0',
+			'[&_a:not([class])]:transition-[color] [&_a:not([class])]:duration-(--ui-duration-fast) [&_a:not([class])]:ease-[ease] motion-reduce:[&_a:not([class])]:transition-none motion-reduce:[&_a:not([class])]:duration-0',
 			'[&_a:not([class]):focus-visible]:outline-(length:--ui-focus-ring-width) [&_a:not([class]):focus-visible]:outline-solid [&_a:not([class]):focus-visible]:outline-focus [&_a:not([class]):focus-visible]:outline-offset-(--ui-focus-ring-offset)',
 		],
 		// The inner row shares its element with a <UIContainer>, which sets its width.
@@ -106,7 +106,7 @@ export const footerTheme = defineTheme({
 		link: footerLink,
 		// Alone, the legal row needs no line above it.
 		legal: [
-			'col-span-full flex flex-wrap items-center justify-between gap-x-6 gap-y-3 text-sm',
+			'col-span-full flex flex-wrap items-center justify-between gap-x-6 gap-y-3 text-sm/[inherit]',
 			'[border-top:var(--ui-border-width)_solid_var(--ui-color-border)] pt-5 only:[border-top:0] only:pt-0',
 		],
 		legalNav: 'flex flex-wrap gap-x-4 gap-y-2',

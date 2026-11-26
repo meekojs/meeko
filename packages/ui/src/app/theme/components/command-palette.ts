@@ -38,7 +38,7 @@ export const commandPaletteTheme = defineTheme({
 			'box-border inline-flex min-h-(--ui-control-height-md) min-w-(--ui-command-trigger-width) cursor-pointer items-center gap-2 py-0 pr-1 pl-2',
 			'rounded-md border-(length:--ui-border-width) border-solid border-border-strong bg-control hover:bg-control-hover',
 			'font-sans text-control-md leading-snug font-regular text-text-soft hover:text-text',
-			'transition-[background-color,color] duration-(--ui-duration-fast) motion-reduce:transition-none motion-reduce:duration-0',
+			'transition-[background-color,color] duration-(--ui-duration-fast) ease-[ease] motion-reduce:transition-none motion-reduce:duration-0',
 			focusRing,
 			...kbd,
 			'[&>svg]:size-(--ui-command-icon-size) [&>svg]:flex-none [&>svg]:fill-none [&>svg]:stroke-current [&>svg]:[stroke-linecap:round] [&>svg]:[stroke-width:var(--ui-command-icon-stroke)]',
@@ -57,7 +57,7 @@ export const commandPaletteTheme = defineTheme({
 		field: [
 			'flex flex-none items-center gap-3 px-4 py-3 text-text-soft',
 			'border-b-(length:--ui-border-width) [border-bottom-style:solid] border-b-border has-[input:focus-visible]:border-b-primary',
-			'transition-[border-color] duration-(--ui-duration-fast) motion-reduce:transition-none motion-reduce:duration-0',
+			'transition-[border-color] duration-(--ui-duration-fast) ease-[ease] motion-reduce:transition-none motion-reduce:duration-0',
 		],
 		icon,
 		input: [
