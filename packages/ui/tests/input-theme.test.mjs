@@ -107,6 +107,20 @@ test('every pair of variant and color paints the background and the text of the 
 	assert.doesNotMatch(html, /\s(?:variant|color)=/, 'the look is classes, not attributes')
 })
 
+test('every pair of variant and color has exactly one resting background, transparent when the catalog gives none', () => {
+	for (const variant of treatments) {
+		for (const color of colors) {
+			const classes = inputTheme({ variant, color }).split(' ')
+			const label = `${variant}/${color}`
+			const resting = classes.filter((name) => /^bg-/.test(name))
+			assert.equal(resting.length, 1, `${label}: one resting background in ${classes.join(' ')}`)
+			if (variant === 'outline' && color === 'neutral') assert.deepEqual(resting, ['bg-control'], label)
+			else if (variant === 'outline' || variant === 'ghost') assert.deepEqual(resting, ['bg-transparent'], label)
+			else assert.notEqual(resting[0], 'bg-transparent', label)
+		}
+	}
+})
+
 test('size and radius are classes, and the button of reveal is as wide as the field of its size is tall', async (context) => {
 	const html = await render(context, '<UIInput size="xs" radius="none" /><UIInput size="xl" radius="full" /><UIInput type="password" reveal size="lg" />')
 	const [small, large, secret] = classesOf(html, 'input')

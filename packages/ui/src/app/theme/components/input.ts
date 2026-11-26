@@ -36,12 +36,15 @@ export const fieldDisabled = 'disabled:cursor-not-allowed disabled:opacity-(--ui
  * The classes of a pair of the catalog for a field: without its borders, which are the ones of the controls, nor
  * the pressed background, since a click only places the caret; a neutral field writes with the text of the page.
  */
-const forField = (classes: string, color: string): string =>
-	classes
+const forField = (classes: string, color: string): string => {
+	const names = classes
 		.split(' ')
 		.filter((name) => !name.startsWith('border-') && !name.startsWith('not-disabled:hover:border-') && !name.startsWith('not-disabled:active:'))
 		.map((name) => (color === 'neutral' && name === 'text-neutral-11' ? 'text-text' : name))
-		.join(' ')
+	// The catalog gives `outline` and `ghost` no resting background: a field has no preflight to clear the one of the
+	// browser, so it is set transparent (a neutral outline takes the one of the controls in `neutralOutline`).
+	return (names.some((name) => name.startsWith('bg-')) ? names : [...names, 'bg-transparent']).join(' ')
+}
 
 const fieldCompounds = selection.compoundVariants.map((entry) => ({ ...entry, class: forField(entry.class, entry.color) }))
 
