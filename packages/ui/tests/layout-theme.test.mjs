@@ -39,7 +39,7 @@ test('header recipes keep their slots and merge the class of the consumer', () =
 test('navigation recipes keep their base classes and merge the class of the consumer', () => {
 	has(navigationTreeTheme().base(), 'grid', 'text-text-soft')
 	has(navigationTabsTheme().base(), 'group/tabs', 'border-b-border')
-	has(navigationTabsTheme({ variant: 'segmented' }).base(), 'rounded-lg', 'bg-control')
+	has(navigationTabsTheme({ layout: 'segmented' }).base(), 'rounded-lg', 'bg-control')
 	has(breadcrumbTheme().list(), 'flex', 'list-none')
 	has(pageNavigationTheme().base(), 'grid-cols-2')
 	has(paginationTheme().base(), 'justify-between')

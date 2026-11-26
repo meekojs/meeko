@@ -1,5 +1,5 @@
 // The look of <UIEmpty>: a title, its help and the actions of the `actions` snippet, inline in the content or as a
-// panel with the surface of the page. It has no color of its own: `variant` is where it sits, not a treatment of
+// panel with the surface of the page. It has no color of its own: `layout` is where it sits, not a treatment of
 // the catalog.
 import type { ThemeVariants } from '../../utils/theme'
 
@@ -7,14 +7,14 @@ import { defineTheme } from '../../utils/theme'
 import { messageActions } from './alert'
 
 /**
- * Receta de `UIEmpty`: `variant` (`inline` o `panel`), con los slots `base`, `title`, `description` y `actions`.
+ * Receta de `UIEmpty`: `layout` (`inline` o `panel`), con los slots `base`, `title`, `description` y `actions`.
  * Sin ella es `inline`.
  *
  * @example
  * ```ts
  * import { emptyTheme } from '@meekojs/ui/theme'
  *
- * const { base } = emptyTheme({ variant: 'panel' })
+ * const { base } = emptyTheme({ layout: 'panel' })
  * ```
  */
 export const emptyTheme = defineTheme({
@@ -25,13 +25,13 @@ export const emptyTheme = defineTheme({
 		actions: messageActions,
 	},
 	variants: {
-		variant: {
+		layout: {
 			inline: { base: 'py-4' },
 			panel: { base: 'rounded-lg border-(length:--ui-border-width) border-solid border-border bg-surface p-6' },
 		},
 	},
 	defaultVariants: {
-		variant: 'inline',
+		layout: 'inline',
 	},
 })
 

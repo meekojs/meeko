@@ -30,14 +30,14 @@ export const segmentInput = 'absolute inset-0 size-full [border:0] opacity-(--ui
 
 /**
  * Receta de `UIRadioGroup`, con los slots `base` (el `<fieldset>`), `legend`, `options`, `option` (cada `<label>`)
- * e `input`. `variant` elige la presentación, no un tratamiento de color: `default` es una lista de radios y
+ * e `input`. `layout` elige la presentación, no un tratamiento de color: `default` es una lista de radios y
  * `segmented`, un control segmentado cuyas opciones son las etiquetas.
  *
  * @example
  * ```ts
  * import { radioGroupTheme } from '@meekojs/ui/theme'
  *
- * const { options, option } = radioGroupTheme({ variant: 'segmented' })
+ * const { options, option } = radioGroupTheme({ layout: 'segmented' })
  * ```
  */
 export const radioGroupTheme = defineTheme({
@@ -49,7 +49,7 @@ export const radioGroupTheme = defineTheme({
 		input: [...choiceInput, choiceBox, dot],
 	},
 	variants: {
-		variant: {
+		layout: {
 			default: {
 				options: 'gap-2',
 				option: choiceRow,
@@ -63,7 +63,7 @@ export const radioGroupTheme = defineTheme({
 		},
 	},
 	defaultVariants: {
-		variant: 'default',
+		layout: 'default',
 	},
 })
 

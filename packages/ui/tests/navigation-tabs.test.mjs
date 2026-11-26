@@ -44,6 +44,21 @@ const badges = (html) => [...html.matchAll(/<a\b[^>]*>[^<]*<span\b[^>]*class="([
 
 const template = `<UINavigationTabs label="Filtro" bind:items="[{ label: 'Todas', href: '#todas', badge: '3' }, { label: 'Activas', href: '#activas', badge: '2', badgeColor: 'success' }]" />`
 
+/** The classes of the <nav> of the row. */
+const rowClasses = (html) => html.match(/<nav\b[^>]*?class="([^"]*)"/)[1].split(' ')
+
+test('layout="segmented" is the segmented row, and the removed variant does not change it', async (context) => {
+	// The types reject `variant` (tests/types/ui-options.ts): it is a treatment of the catalog, not a layout.
+	const html = await render(context, template + template.replace('<UINavigationTabs', '<UINavigationTabs variant="segmented"') + template.replace('<UINavigationTabs', '<UINavigationTabs layout="segmented"'))
+	const [plain, legacy, segmented] = html.split('</nav>')
+	assert.deepEqual(rowClasses(legacy), rowClasses(plain), 'variant="segmented" adds no class: the row stays underlined')
+	assert.ok(rowClasses(legacy).includes('border-b-border') && !rowClasses(legacy).includes('rounded-lg'))
+	assert.match(legacy, /<span aria-hidden="true" class="[^"]*position-anchor/, 'and keeps its indicator')
+	assert.ok(rowClasses(segmented).includes('rounded-lg') && rowClasses(segmented).includes('bg-control'), rowClasses(segmented).join(' '))
+	assert.doesNotMatch(segmented, /position-anchor/, 'a segmented row has no indicator')
+	assert.doesNotMatch(html, /\s(?:layout|variant)=/, 'neither reaches the element')
+})
+
 test('a counter without badgeColor takes the color of ui.defaults.badge, and badgeColor wins over it', async (context) => {
 	const defaults = { badge: { color: 'primary' } }
 	validateDefaults(defaults)

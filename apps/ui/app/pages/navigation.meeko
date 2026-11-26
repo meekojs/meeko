@@ -230,9 +230,9 @@
 			mínimo mantiene
 			<code>aria-current="location"</code>
 			en todos los navegadores. Usa
-			<code>variant="aside"</code>
+			<code>layout="aside"</code>
 			en la columna y
-			<code>variant="collapsible"</code>
+			<code>layout="collapsible"</code>
 			en el contenido:
 			<code>UIPage</code>
 			muestra cada uno sólo cuando corresponde.
@@ -253,7 +253,7 @@
 			bind:rows="[
 				{ name: 'entries', type: 'readonly UITableOfContentsEntry[]', description: 'Obligatoria. id, text y level.' },
 				{ name: 'active', type: 'string', description: 'Entrega a la aplicación el control de la entrada activa.' },
-				{ name: 'variant', type: 'aside | collapsible', default: 'aside', description: 'En la columna o plegable en el contenido.' },
+				{ name: 'layout', type: 'aside | collapsible', default: 'aside', description: 'En la columna o plegable en el contenido.' },
 				{ name: 'label / class', type: 'string', description: 'Nombre de la navegación y clases.' },
 			]"
 		/>

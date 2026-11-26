@@ -1,5 +1,5 @@
 <script lang="ts">
-	// <UISegmentedControl>: the native radios of <UIRadioGroup variant="segmented">, with a name that can be
+	// <UISegmentedControl>: the native radios of <UIRadioGroup layout="segmented">, with a name that can be
 	// hidden, a size and a track that scrolls instead of wrapping. The browser does everything else: the
 	// arrows, the form and `required`. Its look is `segmentedControlTheme` in ../theme/components/segmented-control.ts.
 	import { useId } from '@meekojs/meeko'

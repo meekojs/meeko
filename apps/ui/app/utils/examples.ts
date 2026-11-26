@@ -559,7 +559,7 @@ async function remove() {
 
 <template>
   <UIRadioGroup model="period" legend="Periodo" name="period" bind:options="periods" />
-  <UIRadioGroup model="period" legend="Periodo" variant="segmented" bind:options="periods" />
+  <UIRadioGroup model="period" legend="Periodo" layout="segmented" bind:options="periods" />
 </template>`,
 	segmented: `<script lang="ts">
   const days = signal('30')
@@ -613,7 +613,7 @@ async function remove() {
     Guardar
   </UIButton>
 </template>`,
-	empty: `<UIEmpty variant="panel" title="Sin proyectos" description="Crea el primero para empezar.">
+	empty: `<UIEmpty layout="panel" title="Sin proyectos" description="Crea el primero para empezar.">
   <snippet name="actions"><UIButton>Crear proyecto</UIButton></snippet>
 </UIEmpty>
 <UISkeleton bind:lines="3" bind:widths="['full', 'long', 'short']" />`,
@@ -697,7 +697,7 @@ async function remove() {
 <UIPagination model:page="page" bind:total="total" bind:pageSize="20" edges />
 <UIPagination bind:page="query.page" bind:pageCount="pages"
   bind:pageLink="(page) => ({ to: '/orders', search: { page: String(page) } })" />`,
-	toc: `<UITableOfContents variant="collapsible"
+	toc: `<UITableOfContents layout="collapsible"
   bind:entries="[{ id: 'usage', text: 'Uso', level: 2 }, { id: 'api', text: 'API', level: 2 }]" />`,
 	locale: `<UILocaleSwitcher bind:items="[
   { code: 'es', label: 'Español', href: '/guide', current: true },

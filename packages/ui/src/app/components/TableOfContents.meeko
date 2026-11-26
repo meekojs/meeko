@@ -12,7 +12,7 @@
 	import { followsLink } from '../utils/navigation'
 	import * as Icon from './internal/Icon.meeko'
 
-	const props = defineProps<UITableOfContentsProps>({ variant: 'aside' })
+	const props = defineProps<UITableOfContentsProps>({ layout: 'aside' })
 
 	const theme = uiTheme('tableOfContents', () => props)
 
@@ -30,7 +30,7 @@
 	// The <nav> is the root of the aside; in the collapsible view, the panel of its <details>.
 	const navClass = (): string =>
 		classes.base({
-			class: [tracking() === 'auto' ? tableOfContentsTracking : undefined, theme.ui.base, props.variant === 'aside' ? theme.class : classes.panel({ class: theme.ui.panel })],
+			class: [tracking() === 'auto' ? tableOfContentsTracking : undefined, theme.ui.base, props.layout === 'aside' ? theme.class : classes.panel({ class: theme.ui.panel })],
 		})
 
 	function closeOnChoice(event: MouseEvent): void {
@@ -85,7 +85,7 @@
 
 <template>
 	<nav
-		if:when="props.variant === 'aside' && props.entries.length"
+		if:when="props.layout === 'aside' && props.entries.length"
 		data-pagefind-ignore
 		bind:class="navClass()"
 		bind:aria-label="props.label ?? text.label"
@@ -109,7 +109,7 @@
 	</nav>
 	<details
 		ref:panel
-		if:when="props.variant === 'collapsible' && props.entries.length"
+		if:when="props.layout === 'collapsible' && props.entries.length"
 		data-pagefind-ignore
 		bind:class="classes.collapsible({ class: [theme.ui.collapsible, theme.class] })"
 	>

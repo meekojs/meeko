@@ -95,6 +95,22 @@ const solidInput: UIInputProps = { variant: 'solid' }
 const solidInputDefault: UIOptions = { defaults: { input: { variant: 'solid' } } }
 void [appearanceInput, solidInput, solidInputDefault]
 
+// Where a component sits is its `layout`: `variant` is only a treatment of the catalog.
+const panelEmpty: UIEmptyProps = { layout: 'panel' }
+const segmentedRadios: UIRadioGroupProps = { legend: 'Periodo', options: [], layout: 'segmented' }
+const segmentedTabs: UINavigationTabsProps = { items: [], layout: 'segmented' }
+const collapsibleToc: UITableOfContentsProps = { entries: [], layout: 'collapsible' }
+void [panelEmpty, segmentedRadios, segmentedTabs, collapsibleToc]
+// @ts-expect-error `variant="panel"` is now `layout="panel"`.
+const variantEmpty: UIEmptyProps = { variant: 'panel' }
+// @ts-expect-error `variant="segmented"` is now `layout="segmented"`.
+const variantRadios: UIRadioGroupProps = { legend: 'Periodo', options: [], variant: 'segmented' }
+// @ts-expect-error `variant="segmented"` is now `layout="segmented"`.
+const variantTabs: UINavigationTabsProps = { items: [], variant: 'segmented' }
+// @ts-expect-error `variant="collapsible"` is now `layout="collapsible"`.
+const variantToc: UITableOfContentsProps = { entries: [], variant: 'collapsible' }
+void [variantEmpty, variantRadios, variantTabs, variantToc]
+
 // ui.defaults: class and ui for each component, with the slots of its own `ui` prop.
 const panel = {
 	defaults: {

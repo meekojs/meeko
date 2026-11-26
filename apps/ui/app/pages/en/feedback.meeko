@@ -148,7 +148,7 @@
 		</p>
 		<DocsPreview layout="stack">
 			<UIEmpty
-				variant="panel"
+				layout="panel"
 				title="No projects"
 				description="Create the first one to start."
 			>
@@ -161,7 +161,7 @@
 			bind:rows="[
 				{ name: 'title', type: 'string', default: 'No results.', description: 'Title. The default value follows the language of the document.' },
 				{ name: 'description', type: 'string', description: 'What to do next.' },
-				{ name: 'variant', type: 'inline | panel', default: 'inline', description: 'Size of the empty space.' },
+				{ name: 'layout', type: 'inline | panel', default: 'inline', description: 'Size of the empty space.' },
 				{ name: 'class', type: 'string', description: 'Additional classes.' },
 			]"
 		/>

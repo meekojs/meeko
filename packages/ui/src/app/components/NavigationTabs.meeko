@@ -39,7 +39,7 @@
 		if (item) emit('select', event, item)
 	}
 
-	const classes = (): ReturnType<typeof navigationTabsTheme> => navigationTabsTheme({ variant: props.variant })
+	const classes = (): ReturnType<typeof navigationTabsTheme> => navigationTabsTheme({ layout: props.layout })
 </script>
 
 <template>
@@ -67,7 +67,7 @@
 			</Badge>
 		</ItemLink>
 		<span
-			if:when="props.variant !== 'segmented'"
+			if:when="props.layout !== 'segmented'"
 			aria-hidden="true"
 			bind:class="classes().indicator({ class: theme.ui.indicator })"
 		/>

@@ -14,7 +14,7 @@
 	const snippets = defineSnippets<{ default?: []; title?: []; actions?: [] }>()
 
 	const text = uiMessages().feedback
-	const classes = computed(() => emptyTheme({ variant: props.variant }))
+	const classes = computed(() => emptyTheme({ layout: props.layout }))
 </script>
 
 <template>

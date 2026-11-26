@@ -63,7 +63,7 @@ export type UIDisclosureProps = UIThemeProps<
 	}
 >
 
-/** Estado vacío con snippet de acciones. @example `<UIEmpty title="Sin resultados" variant="panel" />` */
+/** Estado vacío con snippet de acciones. @example `<UIEmpty title="Sin resultados" layout="panel" />` */
 export type UIEmptyProps = UIThemeProps<
 	typeof emptyTheme,
 	{
@@ -71,8 +71,12 @@ export type UIEmptyProps = UIThemeProps<
 		title?: string
 		/** Ayuda para continuar. */
 		description?: string
-		/** Presentación dentro de contenido o como panel. */
-		variant?: 'inline' | 'panel'
+		/**
+		 * Disposición: dentro del contenido (`inline`, por defecto) o como panel (`panel`).
+		 *
+		 * @since 2.0.0 sustituye a `variant`, que queda para el tratamiento visual del catálogo.
+		 */
+		layout?: 'inline' | 'panel'
 		/** Clases adicionales del elemento raíz; equivale a `ui.base`. */
 		class?: string
 	}
