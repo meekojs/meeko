@@ -1,6 +1,6 @@
 /*
  * The code blocks of a Markdown snapshot inside a `meeko-ui-prose`, whose classes come from the renderer,
- * with the look of <UICodeBlock> (variants/content). They stay CSS: no component writes this HTML, and the
+ * with the look of <UICodeBlock> (theme/components/code-block). They stay CSS: no component writes this HTML, and the
  * <iframe sandbox> of the dashboard reads this sheet on its own (`@meekojs/ui/styles/code.css`). Shiki
  * writes both themes as variables on each span.
  */

@@ -69,7 +69,7 @@
 			</form>
 		</DocsPreview>
 		<DocsCode bind:code="examples.form" />
-		<UIAlert tone="info">
+		<UIAlert color="info">
 			UIField passes
 			<code>id</code>
 			and
@@ -97,22 +97,28 @@
 				id="appearance-email"
 				type="email"
 				placeholder="name@example.com"
-				bind:appearance="{ variant: 'surface', color: 'primary', size: 'lg', radius: 'lg' }"
+				variant="surface"
+				color="primary"
+				size="lg"
+				radius="lg"
 			/>
 			<label for="appearance-input-outline">outline</label>
 			<UIInput
 				id="appearance-input-outline"
-				bind:appearance="{ variant: 'outline', color: 'primary' }"
+				variant="outline"
+				color="primary"
 			/>
 			<label for="appearance-input-ghost">ghost</label>
 			<UIInput
 				id="appearance-input-ghost"
-				bind:appearance="{ variant: 'ghost', color: 'primary' }"
+				variant="ghost"
+				color="primary"
 			/>
 			<label for="appearance-input-soft">soft</label>
 			<UIInput
 				id="appearance-input-soft"
-				bind:appearance="{ variant: 'soft', color: 'primary' }"
+				variant="soft"
+				color="primary"
 			/>
 		</DocsPreview>
 		<DocsCode bind:code="examples.inputAppearance" />
@@ -120,7 +126,10 @@
 			caption="UIInput props"
 			bind:rows="[
 				{ name: 'model', type: 'Signal<string>', default: 'Empty string', description: 'Two-way text model; it updates on input.' },
-				{ name: 'appearance', type: 'InputAppearance', default: '—', description: 'Variant, color, size and radius from the appearance catalog.' },
+				{ name: 'variant', type: 'outline | surface | soft | ghost', default: 'outline', description: 'Visual treatment. outline is the usual field and ghost keeps only the bottom line.' },
+				{ name: 'color', type: 'primary | secondary | neutral | success | info | warning | danger', default: 'neutral', description: 'Semantic color of the background and the text. The border stays the one of the controls, or the danger one with invalid.' },
+				{ name: 'size', type: 'xs | sm | md | lg | xl', default: 'md', description: 'Height and padding of the control, on the --ui-control-* tokens.' },
+				{ name: 'radius', type: 'none | xs | sm | md | lg | xl | 2xl | 3xl | full', default: 'md', description: 'Radius of the outline.' },
 				{ name: 'type', type: 'text | email | password | search | url | tel | number | date | datetime-local | time | month', default: 'text', description: 'Native type of the control. The date and time pickers are the browser ones. With number, time and month the model is still text (“42”, “09:30”, “2026-11” or empty): convert it where you use it.' },
 				{ name: 'autocomplete / inputmode / min / max / step', type: 'HTML attributes', description: 'They reach the input as they are, like autocapitalize and spellcheck.' },
 				{ name: 'id / name / placeholder', type: 'string', description: 'Attributes of the input.' },

@@ -5,12 +5,12 @@
 
 	import type { UINavigationTreeGroup, UINavigationTreeItem, UINavigationTreeProps } from '../types/navigation'
 
+	import { badgeTheme } from '../theme/components/badge'
+	import { codeLabel, foldingTitle, navigationTreeTheme } from '../theme/components/navigation'
 	import { uiTheme } from '../utils/defaults'
 	import { icons } from '../utils/icons'
 	import { uiMessages } from '../utils/messages'
 	import { isCurrentLink, linkTarget, revealInScroller, scrollingAncestor } from '../utils/navigation'
-	import { badge } from '../variants/badge'
-	import { codeLabel, foldingTitle, navigationTree } from '../variants/navigation'
 	import * as Icon from './internal/Icon.meeko'
 	import * as ItemLink from './internal/ItemLink.meeko'
 
@@ -40,9 +40,9 @@
 		}),
 	)
 
-	const classes = navigationTree()
+	const classes = navigationTreeTheme()
 	// The badge of a featured item goes to the end of its link.
-	const featuredClass = badge({ tone: 'accent' }).base({ class: 'ms-auto flex-none' })
+	const featuredClass = badgeTheme({ variant: 'soft', color: 'primary' }).base({ class: 'ms-auto flex-none' })
 </script>
 
 <template>

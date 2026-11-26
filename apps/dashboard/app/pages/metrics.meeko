@@ -417,7 +417,7 @@
 							>
 								<UIBadge
 									if:when="row.results === 0"
-									tone="danger"
+									color="danger"
 								>
 									{t('metrics.none')}
 								</UIBadge>
@@ -565,7 +565,7 @@
 							>
 								<div class="dash-badges">
 									<code>{pagePath(item.path, item.locale)}</code>
-									<UIBadge bind:tone="item.helpful ? 'neutral' : 'danger'">{item.helpful ? t('metrics.comments.helped') : t('metrics.comments.notHelped')}</UIBadge>
+									<UIBadge bind:color="item.helpful ? 'neutral' : 'danger'">{item.helpful ? t('metrics.comments.helped') : t('metrics.comments.notHelped')}</UIBadge>
 									<span class="dash-meta">{formatDate(item.createdAt)}</span>
 									<span
 										if:when="item.reviewedAt"

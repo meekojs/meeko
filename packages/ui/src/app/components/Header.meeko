@@ -7,8 +7,8 @@
 	import { icons } from '../utils/icons'
 	import { uiMessages } from '../utils/messages'
 	import { followsLink, isCurrentLink, linkTarget } from '../utils/navigation'
-	import { container } from '../variants/container'
-	import { header } from '../variants/header'
+	import { containerTheme } from '../theme/components/container'
+	import { headerTheme } from '../theme/components/header'
 	import * as Brand from './internal/Brand.meeko'
 	import * as Icon from './internal/Icon.meeko'
 	import * as ItemLink from './internal/ItemLink.meeko'
@@ -23,7 +23,7 @@
 	const text = uiMessages().header
 	const panel = useElementRef('panel')
 
-	const classes = header()
+	const classes = headerTheme()
 
 	/** A client navigation keeps the header mounted: the chosen link closes the menu. */
 	function closeMenu(event: MouseEvent): void {
@@ -36,7 +36,7 @@
 		data-pagefind-ignore
 		bind:class="classes.base({ sticky: props.sticky, class: [theme.ui.base, theme.class] })"
 	>
-		<div bind:class="classes.bar({ class: [container({ size: props.size, gutter: 'md' }), theme.ui.bar] })">
+		<div bind:class="classes.bar({ class: [containerTheme({ size: props.size, gutter: 'md' }), theme.ui.bar] })">
 			<render
 				if:when="snippets.brand"
 				snippet="snippets.brand"

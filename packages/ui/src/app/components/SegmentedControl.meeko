@@ -1,13 +1,13 @@
 <script lang="ts">
 	// <UISegmentedControl>: the native radios of <UIRadioGroup variant="segmented">, with a name that can be
 	// hidden, a size and a track that scrolls instead of wrapping. The browser does everything else: the
-	// arrows, the form and `required`. Its look is `segmentedControl` in ../variants/choice.ts.
+	// arrows, the form and `required`. Its look is `segmentedControlTheme` in ../theme/components/segmented-control.ts.
 	import { useId } from '@meekojs/meeko'
 
 	import type { UISegmentedControlProps } from '../types/forms'
 
+	import { segmentedControlTheme } from '../theme/components/segmented-control'
 	import { uiTheme } from '../utils/defaults'
-	import { segmentedControl } from '../variants/choice'
 
 	const { legend, hideLegend, ariaLabel, options, name, required, size, class: ownClass, ui: ownUi, ...rest } = defineProps<UISegmentedControlProps>()
 
@@ -17,7 +17,7 @@
 
 	const id = useId()
 
-	const classes = segmentedControl({ size: size ?? theme.defaults?.size, hideLegend: Boolean(hideLegend) })
+	const classes = segmentedControlTheme({ size: size ?? theme.defaults?.size, hideLegend: Boolean(hideLegend) })
 </script>
 
 <template>

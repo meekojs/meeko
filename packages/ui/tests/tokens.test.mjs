@@ -81,26 +81,29 @@ test('form control borders reach 3:1 against every background and control state 
 })
 
 test('every form control draws its border from --ui-color-control-border, not from a decorative border', async () => {
-	const variant = (name) => readFile(new URL(`../src/app/variants/${name}.ts`, import.meta.url), 'utf8')
+	const recipe = (name) => readFile(new URL(`../src/app/theme/components/${name}.ts`, import.meta.url), 'utf8')
 	const component = (name) => readFile(new URL(`../src/app/components/${name}.meeko`, import.meta.url), 'utf8')
-	// The variants are on Tailwind: the border is the color control-border of theme.css.
+	// The recipes are on Tailwind: the border is the color control-border of theme.css.
 	assert.match(await read('theme.css'), /--color-control-border: var\(--ui-color-control-border\);/)
-	// <UIInput>, <UITextarea> and, through `control`, the trigger of <UISelect> and <UICombobox>.
-	assert.match(await variant('input'), /border-solid border-control-border /)
+	// <UIInput>, <UITextarea> and, through `inputControlTheme`, the trigger of <UISelect> and <UICombobox>. Whatever
+	// the pair of variant and color of a field, its border is the one of the controls (tests/input-theme.test.mjs).
+	const input = await recipe('input')
+	assert.match(input, /border-solid border-control-border /)
+	assert.match(input, /!name\.startsWith\('border-'\)/, 'the pairs of the catalog lose their borders')
+	assert.match(await recipe('textarea'), /fieldLook/)
 	for (const name of ['Select', 'Combobox']) {
 		const source = await component(name)
-		assert.match(source, /import \{ control \} from '\.\.\/variants\/input'/, name)
-		assert.match(source, /const triggerClass = computed\(\(\) => control\(/, name)
+		assert.match(source, /import \{ inputControlTheme \} from '\.\.\/theme\/components\/input'/, name)
+		assert.match(source, /const triggerClass = computed\(\(\) => inputControlTheme\(/, name)
 	}
 	// A neutral outline button (theme/components/button), and through it the one of <UIIconButton>.
-	assert.match(await readFile(new URL('../src/app/theme/components/button.ts', import.meta.url), 'utf8'), /controlBorder = \{ variant: 'outline', color: 'neutral', class: 'border-control-border /)
+	assert.match(await recipe('button'), /controlBorder = \{ variant: 'outline', color: 'neutral', class: 'border-control-border /)
 	// The box of a checkbox or a radio, the track of a switch and the frame of a segmented group.
-	const choice = await variant('choice')
-	assert.match(choice, /const boxBorder = '[^']*border-solid border-control-border /)
-	assert.match(choice, /'border-\(length:--ui-border-width\) border-solid border-control-border checked:border-primary aria-\[invalid=true\]:border-danger'/)
-	assert.match(choice, /const track = '[^']*border-solid border-control-border /)
+	assert.match(await recipe('checkbox'), /const choiceBoxBorder = '[^']*border-solid border-control-border /)
+	assert.match(await recipe('switch'), /'border-\(length:--ui-border-width\) border-solid border-control-border checked:border-primary aria-\[invalid=true\]:border-danger'/)
+	assert.match(await recipe('radio-group'), /const segmentTrack = '[^']*border-solid border-control-border /)
 	// The track of a slider, in WebKit and Blink and in Firefox.
-	const slider = await variant('slider')
+	const slider = await recipe('slider')
 	assert.match(slider, /\[&::-webkit-slider-runnable-track\]:\[background:[^\]]*var\(--ui-color-control-border\)/)
 	assert.match(slider, /\[&::-moz-range-track\]:bg-control-border/)
 })
@@ -227,9 +230,9 @@ test('component sheets and components have no colour, size, time or weight outsi
 	const sheets = await componentSheets()
 	assert.ok(sheets.length >= 7)
 	const meeko = (await readdir(components, { recursive: true })).filter((name) => name.endsWith('.meeko'))
-	// The recipes of the old variants and those of the theme.
+	// The recipes of the theme and the classes they share.
 	const recipes = await Promise.all(
-		['../src/app/variants/', '../src/app/theme/components/'].map(async (path) => {
+		['../src/app/theme/base/', '../src/app/theme/components/'].map(async (path) => {
 			const folder = new URL(path, import.meta.url)
 			const names = (await readdir(folder)).filter((name) => name.endsWith('.ts'))
 			return Promise.all(names.map(async (name) => [name, await readFile(new URL(name, folder), 'utf8')]))
@@ -246,7 +249,7 @@ test('component sheets and components have no colour, size, time or weight outsi
 
 test('what must differ from a surface does not rest on --ui-color-control, which ui.tokens.surface also sets', async () => {
 	const { cardTheme, linkCardTheme } = await import('../dist/app/theme/components/card.js')
-	const { table } = await import('../dist/app/variants/table.js')
+	const { tableTheme: table } = await import('../dist/app/theme/components/table.js')
 	assert.match(cardTheme({ variant: 'soft' }).base(), /(^| )bg-control-hover( |$)/)
 	assert.match(linkCardTheme().base(), /(^| )not-disabled:hover:bg-control-hover( |$)/)
 	assert.match(table().bodyRow(), /(^| )hover:bg-control-hover( |$)/)
@@ -261,7 +264,7 @@ test('nothing mentions the removed --meeko-ui-* variables', async () => {
 
 test('the frame of the page does not depend on how long the page is', async () => {
 	assert.match(await read('base.css'), /:root \{[^}]*scrollbar-gutter: stable/, 'a short page and a long one keep the header in place')
-	const { page } = await import('../dist/app/variants/page.js')
+	const { pageTheme: page } = await import('../dist/app/theme/components/page.js')
 	const classes = page()
 	for (const slot of ['sidebar', 'aside']) assert.match(classes[slot](), /\[scrollbar-gutter:stable\]/, `the ${slot} is as wide with a long navigation as with a short one`)
 	const shadows = classes
@@ -309,7 +312,7 @@ test("the entry of UI keeps Tailwind's order of layers and its hand-written rule
 	assert.match(css, /@import '\.\/components\.css' layer\(components\);/)
 	assert.doesNotMatch(css, /@import ['"]tailwindcss/, 'the app imports Tailwind once, before UI')
 	// Published, the components are in dist/; in the workspace, in src/.
-	for (const folder of ['../components', '../variants', '../theme', '../../editor/components', '../../../dist/app/components', '../../../dist/app/variants', '../../../dist/app/theme', '../../../dist/editor/components']) assert.ok(css.includes(`@source '${folder}';`), folder)
+	for (const folder of ['../components', '../theme', '../../editor/components', '../../../dist/app/components', '../../../dist/app/theme', '../../../dist/editor/components']) assert.ok(css.includes(`@source '${folder}';`), folder)
 })
 
 test('the raw combinations of hues generate CSS only through their own entry', async () => {

@@ -96,7 +96,7 @@
 				color="neutral">Cancelar</UIButton>
 		</DocsPreview>
 		<DocsCode bind:code="examples.button" />
-		<UIAlert tone="info">Las señales, los macros y los componentes UI se descubren en tu aplicación. Los tipos que necesites explícitamente se importan desde los exports públicos del paquete.</UIAlert>
+		<UIAlert color="info">Las señales, los macros y los componentes UI se descubren en tu aplicación. Los tipos que necesites explícitamente se importan desde los exports públicos del paquete.</UIAlert>
 		<p>
 			Continúa con
 			<a href="/theming">temas y personalización</a>

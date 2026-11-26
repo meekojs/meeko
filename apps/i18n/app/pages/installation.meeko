@@ -49,7 +49,7 @@
 			se autoimporta en los componentes al registrar el módulo. También admite import explícito desde
 			<code>@meekojs/i18n</code>. El plugin proporciona una instancia por aplicación y petición SSR.
 		</p>
-		<UIAlert tone="info">
+		<UIAlert color="info">
 			Tras cambiar los catálogos, ejecuta
 			<code>meeko check</code>
 			para comprobar el contrato generado. No edites los tipos de

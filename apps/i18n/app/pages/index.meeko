@@ -49,7 +49,7 @@
 							>
 								{i18n.t('greeting', { name: name.value })}
 							</p>
-							<UIBadge tone="accent">{i18n.locale}</UIBadge>
+							<UIBadge color="primary">{i18n.locale}</UIBadge>
 						</div>
 					</UICard>
 				</section>

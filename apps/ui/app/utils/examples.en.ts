@@ -34,36 +34,44 @@ export const englishExamples = {
 <UIButton variant="outline" color="info">outline</UIButton>
 <UIButton variant="ghost" color="primary">ghost</UIButton>
 <UIButton variant="link" color="primary">link</UIButton>`,
-	badgeAppearance: `<UIBadge bind:appearance="{ variant: 'solid', color: 'info', radius: 'sm' }">Published</UIBadge>
+	badgeAppearance: `<UIBadge variant="solid" color="info" radius="sm">Published</UIBadge>
 <UIBadge
 	dot
-	bind:appearance="{ variant: 'outline', color: 'warning', radius: 'full' }"
+	variant="outline"
+	color="warning"
+	radius="full"
 >
 	Pending
 </UIBadge>
-<UIBadge bind:appearance="{ variant: 'soft', color: 'success' }">soft</UIBadge>
-<UIBadge bind:appearance="{ variant: 'surface', color: 'info' }">surface</UIBadge>`,
+<UIBadge variant="soft" color="success">soft</UIBadge>
+<UIBadge variant="surface" color="info">surface</UIBadge>`,
 	inputAppearance: `<label for="appearance-email">Work email</label>
 <UIInput
 	id="appearance-email"
 	type="email"
 	placeholder="name@example.com"
-	bind:appearance="{ variant: 'surface', color: 'primary', size: 'lg', radius: 'lg' }"
+	variant="surface"
+	color="primary"
+	size="lg"
+	radius="lg"
 />
 <label for="appearance-input-outline">outline</label>
 <UIInput
 	id="appearance-input-outline"
-	bind:appearance="{ variant: 'outline', color: 'primary' }"
+	variant="outline"
+	color="primary"
 />
 <label for="appearance-input-ghost">ghost</label>
 <UIInput
 	id="appearance-input-ghost"
-	bind:appearance="{ variant: 'ghost', color: 'primary' }"
+	variant="ghost"
+	color="primary"
 />
 <label for="appearance-input-soft">soft</label>
 <UIInput
 	id="appearance-input-soft"
-	bind:appearance="{ variant: 'soft', color: 'primary' }"
+	variant="soft"
+	color="primary"
 />`,
 	cardTheme: `<UICard
 	title="Weekly summary"
@@ -130,8 +138,8 @@ export const englishExamples = {
 <UILinkCard to="/theming" title="Customization"
   description="Connect the tokens to your brand." />`,
 	badge: `<UIBadge>Information</UIBadge>
-<UIBadge tone="accent">Published</UIBadge>
-<UIBadge tone="danger">Review</UIBadge>`,
+<UIBadge color="primary">Published</UIBadge>
+<UIBadge color="danger">Review</UIBadge>`,
 	form: `<script lang="ts">
   const name = signal('')
   const error = signal<string | undefined>(undefined)
@@ -169,7 +177,7 @@ export const englishExamples = {
 	tableColumnSnippets: `<UITable bind:columns="columns" bind:rows="rows.value" rowKey="id">
   <!-- value is a string: the type of Project['status']. -->
   <snippet name="cell-status" params="row, value">
-    <UIBadge bind:tone="value === 'Published' ? 'accent' : 'neutral'">{value}</UIBadge>
+    <UIBadge bind:color="value === 'Published' ? 'primary' : 'neutral'">{value}</UIBadge>
   </snippet>
   <snippet name="header-name" params="column">
     <abbr title="Project name">{column.label}</abbr>
@@ -259,7 +267,7 @@ export const englishExamples = {
     { label: 'See Popover', to: '/popover' },
     { label: 'Archive', disabled: true },
     { separator: true },
-    { label: 'Delete', tone: 'danger', onSelect: () => remove() },
+    { label: 'Delete', color: 'danger', onSelect: () => remove() },
   ]
 </script>
 
@@ -406,7 +414,7 @@ export default defineMeekoConfig({
   bind:ui="{ header: 'pricing-header', title: 'pricing-title' }">
   <p>Everything in the basic plan, with no limits.</p>
 </UICard>
-<UIBadge tone="success" dot bind:ui="{ dot: 'pulse' }">Published</UIBadge>`,
+<UIBadge color="success" dot bind:ui="{ dot: 'pulse' }">Published</UIBadge>`,
 	themeSlotsCss: `/* app/styles/main.css: without @layer, it wins over the component's classes */
 .pricing-card {
   border-color: var(--ui-color-primary-border);
@@ -455,7 +463,7 @@ async function remove() {
     title: 'Delete the project?',
     description: 'Its files are deleted and it cannot be undone.',
     confirmLabel: 'Delete',
-    tone: 'danger',
+    color: 'danger',
   })
   if (confirmed) await deleteProject()
 }`,
@@ -521,8 +529,8 @@ async function remove() {
   </form>
 </template>`,
 	slider: `<UISlider model="volume" label="Volume" name="volume" bind:min="0" bind:max="100" bind:step="5" />`,
-	alert: `<UIAlert tone="success" title="Changes saved" description="They are already published." />
-<UIAlert tone="danger" title="Could not publish" dismiss on:dismiss="clear">
+	alert: `<UIAlert color="success" title="Changes saved" description="They are already published." />
+<UIAlert color="danger" title="Could not publish" dismiss on:dismiss="clear">
   <p>The database does not respond.</p>
   <snippet name="actions"><UIButton size="sm" on:click="retry">Retry</UIButton></snippet>
 </UIAlert>`,
@@ -531,7 +539,7 @@ async function remove() {
 </script>
 
 <template>
-  <UIButton on:click="() => toast.add({ text: 'Changes saved', tone: 'success', duration: 5000 })">
+  <UIButton on:click="() => toast.add({ text: 'Changes saved', color: 'success', duration: 5000 })">
     Save
   </UIButton>
 </template>`,
@@ -545,7 +553,7 @@ async function remove() {
   { label: 'Author', value: 'Meeko team' },
 ]" />
 <UIDisclosure summary="Technical details"><p>It opens without JavaScript.</p></UIDisclosure>`,
-	kpi: `<!-- A key figure: change with its tone, period, trend and a link to the detail -->
+	kpi: `<!-- A key figure: change with its color, period, trend and a link to the detail -->
 <UIStat label="Revenue" value="€12,400" bind:change="12.5"
   period="vs. the previous 30 days"
   bind:trend="[8.2, 9.1, 8.7, 10.4, 11.2, 10.9, 12.4]" to="/revenue" />
@@ -557,7 +565,7 @@ async function remove() {
 <UIStat label="Orders" bind:value="320" change="−8 orders" period="this month" />
 
 <!-- A sparkline on its own, with an area -->
-<UISparkline bind:values="visits" area tone="accent" />`,
+<UISparkline bind:values="visits" area color="primary" />`,
 	diff: `<UIDiff label="Changes to the guide" bind:diff="patch" />`,
 	diffSample: `--- a/guide.md
 +++ b/guide.md

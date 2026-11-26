@@ -100,7 +100,7 @@
 				<snippet name="actions">
 					<UIBadge
 						bind:dot="true"
-						bind:tone="data ? translationTones[data.status] : 'neutral'"
+						bind:color="data ? translationTones[data.status] : 'neutral'"
 					>
 						{data ? t(`labels.translation.${data.status}`) : ''}
 					</UIBadge>
@@ -113,7 +113,7 @@
 
 			<UIAlert
 				if:when="data?.status === 'missing'"
-				tone="info"
+				color="info"
 				bind:title="t('translations.detail.missingTitle')"
 				bind:description="t('translations.detail.missingText', { file: data?.file ?? '' })"
 			>

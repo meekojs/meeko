@@ -4,7 +4,7 @@
 
 	import { uiTheme } from '../utils/defaults'
 	import { uiMessages } from '../utils/messages'
-	import { page, pageColumns } from '../variants/page'
+	import { pageColumnsTheme, pageTheme } from '../theme/components/page'
 
 	const { layout = 'docs', mainId = 'contenido', mainLang, skipLabel, ui: ownUi, class: ownClass, ...rest } = defineProps<UIPageProps>()
 
@@ -13,7 +13,7 @@
 	const snippets = defineSnippets<{ default: []; header?: []; notices?: []; bar?: []; sidebar?: []; aside?: []; footer?: [] }>()
 
 	const text = uiMessages().page
-	const classes = page()
+	const classes = pageTheme()
 </script>
 
 <template>
@@ -44,7 +44,7 @@
 		>
 			<render snippet="snippets.bar" />
 		</div>
-		<div bind:class="classes.body({ layout, class: [pageColumns({ sidebar: Boolean(snippets.sidebar), aside: Boolean(snippets.aside) }), theme.ui.body] })">
+		<div bind:class="classes.body({ layout, class: [pageColumnsTheme({ sidebar: Boolean(snippets.sidebar), aside: Boolean(snippets.aside) }), theme.ui.body] })">
 			<div
 				if:when="snippets.sidebar"
 				data-pagefind-ignore

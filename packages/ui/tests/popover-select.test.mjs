@@ -3,11 +3,11 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 
+import { popoverTheme as popover } from '../dist/app/theme/components/popover.js'
 import { createCombobox, defaultComboboxFilter, toggleSelection } from '../dist/app/utils/combobox.js'
 import { createPopover, interestDelay, interestSource, listKeyTarget, normalizeText, popoverPlacement, typeaheadIndex, watchTriggerId } from '../dist/app/utils/popover.js'
 import { groupOptions, sameOption, selectDisabled, selectLabel, selectValue } from '../dist/app/utils/select-options.js'
 import { themeToggleItems, themeToggleKeyTarget, themeToggleMode, themeToggleStatus } from '../dist/app/utils/theme-toggle.js'
-import { popover } from '../dist/app/variants/popover.js'
 
 test('an unknown placement falls back to bottom-start, and the variants of popover place each one', () => {
 	assert.equal(popoverPlacement('top-end'), 'top-end')

@@ -12,7 +12,7 @@
 	import { icons } from '../utils/icons'
 	import { fillMessage, uiMessages } from '../utils/messages'
 	import { clampPage, paginationCount, paginationItems } from '../utils/pagination'
-	import { pagination } from '../variants/navigation'
+	import { paginationTheme } from '../theme/components/navigation'
 	import * as Icon from './internal/Icon.meeko'
 	import * as ItemLink from './internal/ItemLink.meeko'
 
@@ -102,7 +102,7 @@
 	function holdLink(event: MouseEvent): void {
 		if (props.busy) event.preventDefault()
 	}
-	const classes = pagination()
+	const classes = paginationTheme()
 	// The action goes to the end of the row, and shows a spinner while the next page loads.
 	const moreClass = (): string => buttonTheme({ variant: 'outline', color: 'neutral', size: 'sm', class: classes.action({ class: theme.ui.action }) })
 	// The current page is a solid primary button, the others neutral ghosts.

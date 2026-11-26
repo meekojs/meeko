@@ -77,13 +77,13 @@
 				/>
 				<UIAlert
 					if:when="!configured"
-					tone="warning"
+					color="warning"
 					role="status"
 					bind:description="t('login.errors.LOGIN_NOT_CONFIGURED')"
 				/>
 				<UIAlert
 					if:when="form.error.value"
-					tone="danger"
+					color="danger"
 					bind:description="form.error.value ?? ''"
 				/>
 				<form

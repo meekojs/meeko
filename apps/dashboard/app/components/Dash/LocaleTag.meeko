@@ -9,6 +9,6 @@
 		bind:data-locale="props.locale"
 		bind:title="props.name"
 	>
-		<UIBadge bind:tone="props.locale === 'en' ? 'accent' : 'neutral'">{props.short}</UIBadge>
+		<UIBadge bind:color="props.locale === 'en' ? 'primary' : 'neutral'">{props.short}</UIBadge>
 	</abbr>
 </template>

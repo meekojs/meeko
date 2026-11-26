@@ -14,7 +14,7 @@
 		bind:lang="t('shell.meta.lang')"
 	>
 		<UIAlert
-			bind:tone="props.kind === 'outdated' ? 'warning' : 'info'"
+			bind:color="props.kind === 'outdated' ? 'warning' : 'info'"
 			bind:aria-label="props.kind === 'outdated' ? t('shell.outdated.title') : t('shell.untranslated.title')"
 			bind:title="props.kind === 'outdated' ? t('shell.outdated.title') : t('shell.untranslated.title')"
 			bind:description="props.kind === 'outdated' ? t('shell.outdated.message') : t('shell.untranslated.message')"

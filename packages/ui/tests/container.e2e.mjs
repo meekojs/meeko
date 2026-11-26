@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { container } from '../dist/app/variants/container.js'
+import { containerTheme as container } from '../dist/app/theme/components/container.js'
 import { startDemo } from './helpers/demo.mjs'
 
 test('Container preserves semantics and fits mobile, 4K, wider and nested layouts with logical gutters', { timeout: 90_000 }, async (context) => {

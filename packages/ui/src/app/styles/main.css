@@ -20,15 +20,13 @@
 @import './theme.css';
 
 /*
- * The classes come from the components, variants and theme recipes of UI: from src/ in the workspace and from
+ * The classes come from the components and the theme recipes of UI: from src/ in the workspace and from
  * dist/ in the published package. Tailwind skips a folder that does not exist.
  */
 @source '../components';
-@source '../variants';
 @source '../theme';
 @source '../../editor/components';
 @source '../../../dist/app/components';
-@source '../../../dist/app/variants';
 @source '../../../dist/app/theme';
 @source '../../../dist/editor/components';
 

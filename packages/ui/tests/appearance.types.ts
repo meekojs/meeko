@@ -1,4 +1,4 @@
-import { appearance, type ButtonThemeProps, defineTheme, type IconButtonThemeProps, type InputAppearance, type ThemeVariants } from '@meekojs/ui/theme'
+import { appearance, type BadgeThemeProps, type ButtonThemeProps, defineTheme, type IconButtonThemeProps, type InputThemeProps, type ThemeVariants } from '@meekojs/ui/theme'
 import { hues } from '@meekojs/ui/theme/hues'
 
 const recipe = defineTheme({
@@ -56,8 +56,11 @@ void sizeClass
 // @ts-expect-error El slot debe existir en la receta.
 defineTheme({ slots: { base: 'relative' }, ...appearance({ size: ['sm'] }, { slot: 'missing' }) })
 
-// @ts-expect-error Input solo habilita cuatro colores.
-const invalidInput: InputAppearance = { color: 'info' }
+// @ts-expect-error Input no habilita solid: un campo relleno se confundiría con un botón.
+const invalidInput: InputThemeProps = { variant: 'solid' }
+// @ts-expect-error Badge usa solo colores semánticos.
+const rawBadge: BadgeThemeProps = { color: 'crimson' }
+const input: InputThemeProps = { variant: 'soft', color: 'info', size: 'xl', radius: 'full' }
 // @ts-expect-error Button no habilita glass ni plain.
 const invalidButton: ButtonThemeProps = { variant: 'glass' }
 // @ts-expect-error Button usa solo colores semánticos.
@@ -65,4 +68,4 @@ const rawButton: ButtonThemeProps = { color: 'crimson' }
 // @ts-expect-error IconButton no tiene link: un icono no tiene texto que subrayar.
 const linkIcon: IconButtonThemeProps = { variant: 'link' }
 const button: ButtonThemeProps = { variant: 'surface', color: 'neutral', size: 'xl', radius: 'full', width: 'full', elevation: 'sm', iconOnly: true }
-void [invalidInput, invalidButton, rawButton, linkIcon, button]
+void [invalidInput, rawBadge, input, invalidButton, rawButton, linkIcon, button]

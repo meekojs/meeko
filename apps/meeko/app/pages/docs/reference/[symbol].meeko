@@ -73,11 +73,11 @@
 			<code>{page.name}</code>
 		</h1>
 		<p class="badges">
-			<UIBadge tone="accent">{page.kindLabel}</UIBadge>
+			<UIBadge color="primary">{page.kindLabel}</UIBadge>
 			<UIBadge if:when="page.since">{t('docs.reference.since', { version: page.since ?? '' })}</UIBadge>
 			<UIBadge
 				if:when="page.deprecated !== null"
-				tone="neutral"
+				color="neutral"
 			>
 				{t('docs.reference.deprecated')}
 			</UIBadge>
@@ -85,7 +85,7 @@
 		</p>
 		<UIAlert
 			if:when="page.deprecated !== null"
-			tone="warning"
+			color="warning"
 			bind:title="t('docs.reference.deprecatedNote')"
 		>
 			<div html="page.deprecated" />

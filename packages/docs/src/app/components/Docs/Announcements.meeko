@@ -44,7 +44,7 @@
 			each:key="item.id"
 			class="docs-announcement"
 			bind:dismiss="true"
-			bind:tone="item.tone"
+			bind:color="item.tone"
 			bind:role="announcementRole(item.tone)"
 			bind:description="item.message"
 			bind:closeLabel="t('shell.announcements.close')"

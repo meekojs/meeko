@@ -4,8 +4,8 @@
 	import { uiTheme } from '../utils/defaults'
 	import { uiMessages } from '../utils/messages'
 	import { linkTarget } from '../utils/navigation'
-	import { container } from '../variants/container'
-	import { footer } from '../variants/header'
+	import { containerTheme } from '../theme/components/container'
+	import { footerTheme } from '../theme/components/header'
 	import * as Brand from './internal/Brand.meeko'
 	import * as ItemLink from './internal/ItemLink.meeko'
 
@@ -17,7 +17,7 @@
 
 	const text = uiMessages().footer
 
-	const classes = footer()
+	const classes = footerTheme()
 </script>
 
 <template>
@@ -25,7 +25,7 @@
 		data-pagefind-ignore
 		bind:class="classes.base({ class: [theme.ui.base, theme.class] })"
 	>
-		<div bind:class="classes.inner({ class: [container({ size: props.size, gutter: 'md' }), theme.ui.inner] })">
+		<div bind:class="classes.inner({ class: [containerTheme({ size: props.size, gutter: 'md' }), theme.ui.inner] })">
 			<div
 				if:when="snippets.brand || props.brand || snippets.about || props.description || snippets.actions"
 				bind:class="classes.about({ class: theme.ui.about })"

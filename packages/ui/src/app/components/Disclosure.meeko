@@ -2,10 +2,10 @@
 	// <UIDisclosure>: a native <details>, so it opens with the keyboard and without JavaScript.
 	import type { UIDisclosureProps } from '../types/feedback'
 
+	import { disclosureTheme } from '../theme/components/disclosure'
+	import { chevron } from '../theme/components/navigation'
 	import { uiTheme } from '../utils/defaults'
 	import { icons } from '../utils/icons'
-	import { disclosure } from '../variants/feedback'
-	import { chevron } from '../variants/navigation'
 	import * as Icon from './internal/Icon.meeko'
 
 	const props = defineProps<UIDisclosureProps>()
@@ -14,7 +14,7 @@
 
 	const snippets = defineSnippets<{ default: [] }>()
 
-	const classes = disclosure()
+	const classes = disclosureTheme()
 </script>
 
 <template>

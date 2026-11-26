@@ -3,8 +3,8 @@
 
 	import type { UICheckboxProps } from '../types/forms'
 
+	import { checkboxTheme } from '../theme/components/checkbox'
 	import { uiTheme } from '../utils/defaults'
-	import { checkbox } from '../variants/choice'
 
 	const { label, description, invalid, describedBy, class: ownClass, ui: ownUi, ...rest } = defineProps<UICheckboxProps>()
 
@@ -14,7 +14,7 @@
 
 	const id = useId()
 
-	const classes = checkbox()
+	const classes = checkboxTheme()
 </script>
 
 <template>

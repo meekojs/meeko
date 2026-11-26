@@ -50,7 +50,7 @@
 			is auto-imported in components once the module is registered. It also supports an explicit import from
 			<code>@meekojs/i18n</code>. The plugin provides one instance per application and SSR request.
 		</p>
-		<UIAlert tone="info">
+		<UIAlert color="info">
 			After changing the catalogs, run
 			<code>meeko check</code>
 			to verify the generated contract. Do not edit the types in

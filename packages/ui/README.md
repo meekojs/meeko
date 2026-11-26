@@ -40,7 +40,7 @@ y añade, si las usa, `@import '@meekojs/ui/hues';` para las combinaciones de to
 @import '@meekojs/ui';
 ```
 
-Para adaptarlo a tu marca, redefine los tokens `--ui-*` o usa `ui.tokens`. Para retocar un componente, `class` llega a su elemento raíz y la prop `ui` añade clases a cada parte: `<UICard bind:ui="{ title: 'pricing-title' }">`. Se fusionan con Tailwind Merge, así que tu utilidad sustituye a la del componente que fija la misma propiedad, y cualquier regla sin capa de tu CSS gana a la del componente. Consulta las [clases por slot](https://meekojs.com/docs/ui-api#clases-por-slot) y cómo [migrar desde las clases `.meeko-ui-*`](https://meekojs.com/docs/ui-api#migración-desde-las-clases-retiradas).
+Para adaptarlo a tu marca, redefine los tokens `--ui-*` o usa `ui.tokens`. Para retocar un componente, `class` llega a su elemento raíz y la prop `ui` añade clases a cada parte: `<UICard bind:ui="{ title: 'pricing-title' }">`. El aspecto se elige con `variant` y `color` (`primary`, `secondary`, `neutral`, `success`, `info`, `warning` o `danger`), más `size` y `radius` donde aplican: `<UIBadge variant="solid" color="success">`; cada componente es una receta de `@meekojs/ui/theme` (`buttonTheme`, `badgeTheme`, `inputTheme`…) que puedes reutilizar. Las clases se fusionan con Tailwind Merge, así que tu utilidad sustituye a la del componente que fija la misma propiedad, y cualquier regla sin capa de tu CSS gana a la del componente. Consulta las [clases por slot](https://meekojs.com/docs/ui-api#clases-por-slot) y cómo [migrar desde las clases `.meeko-ui-*`](https://meekojs.com/docs/ui-api#migración-desde-las-clases-retiradas).
 
 ## Ejemplo mínimo
 

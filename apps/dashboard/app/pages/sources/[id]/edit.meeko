@@ -380,7 +380,7 @@
 						>
 							<UIBadge
 								bind:dot="true"
-								bind:tone="dirty.value ? 'accent' : 'neutral'"
+								bind:color="dirty.value ? 'primary' : 'neutral'"
 							>
 								{status.value}
 							</UIBadge>
@@ -397,7 +397,7 @@
 						class="editor-wide"
 					>
 						<UIAlert
-							tone="warning"
+							color="warning"
 							bind:description="t('editor.importStale')"
 						/>
 					</div>
@@ -406,7 +406,7 @@
 						class="editor-wide"
 					>
 						<UIAlert
-							tone="info"
+							color="info"
 							bind:title="t('editor.translation.title', { title: original?.title ?? '' })"
 							bind:description="t('editor.translation.text')"
 						>
@@ -542,7 +542,7 @@
 							bind:label="t('editor.markdownLabel')"
 						>
 							<snippet name="tools">
-								<UIBadge bind:tone="tooLarge.value ? 'danger' : 'neutral'">{sizeLabel.value}</UIBadge>
+								<UIBadge bind:color="tooLarge.value ? 'danger' : 'neutral'">{sizeLabel.value}</UIBadge>
 							</snippet>
 						</UIMarkdownEditor>
 					</div>
@@ -614,7 +614,7 @@
 								each:index="index"
 								each:key="index"
 							>
-								<UIBadge bind:tone="issue.kind === 'link' ? 'accent' : 'danger'">{issueKind(issue.kind)}</UIBadge>
+								<UIBadge bind:color="issue.kind === 'link' ? 'primary' : 'danger'">{issueKind(issue.kind)}</UIBadge>
 								<code lang="en">{issue.message}</code>
 								<UIButton
 									if:when="issue.line !== null"

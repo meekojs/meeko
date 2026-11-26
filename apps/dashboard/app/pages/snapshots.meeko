@@ -194,7 +194,7 @@
 					/>
 					<UIAlert
 						if:when="conflict.value"
-						tone="danger"
+						color="danger"
 						bind:title="t('snapshots.conflict')"
 						bind:description="conflictSummary.value ?? ''"
 					>
@@ -296,7 +296,7 @@
 						<span if:when="column.key === 'note'">{row.note ?? '—'}</span>
 						<UIBadge
 							if:when="column.key === 'active' && row.active"
-							tone="accent"
+							color="primary"
 						>
 							{t('snapshots.activeBadge')}
 						</UIBadge>

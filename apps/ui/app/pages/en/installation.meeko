@@ -101,7 +101,7 @@
 				color="neutral">Cancel</UIButton>
 		</DocsPreview>
 		<DocsCode bind:code="examples.button" />
-		<UIAlert tone="info">Signals, macros and UI components are discovered in your application. The types you need explicitly are imported from the package's public exports.</UIAlert>
+		<UIAlert color="info">Signals, macros and UI components are discovered in your application. The types you need explicitly are imported from the package's public exports.</UIAlert>
 		<p>
 			Continue with
 			<MeekoLink to="/theming">theming and customization</MeekoLink>

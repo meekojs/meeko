@@ -1,11 +1,13 @@
 import type { UIButtonColor, UIButtonSize, UIButtonVariant } from '../theme/components/button'
-import type { menu } from '../variants/menu'
+import type { menuTheme, UIMenuItemColor } from '../theme/components/menu'
 import type { UILinkTarget } from './navigation'
 import type { PopoverPlacement, PopoverTrigger } from './popover'
-import type { UIThemeProps } from './theme'
+import type { UIVariantSlots } from './theme'
+
+export type { UIMenuItemColor }
 
 /**
- * Lo que comparten la acción y el enlace de un menú: texto, tono, estado, icono y atajo.
+ * Lo que comparten la acción y el enlace de un menú: texto, color, estado, icono y atajo.
  * @since 1.10.0
  */
 interface UIMenuItemBase {
@@ -13,8 +15,12 @@ interface UIMenuItemBase {
 	readonly label: string
 	/** Identificador libre del ítem, para reconocerlo en el evento `select`. */
 	readonly value?: string
-	/** `"danger"` para una acción destructiva o que no se puede deshacer; `"neutral"` por defecto. */
-	readonly tone?: 'neutral' | 'danger'
+	/**
+	 * `"danger"` para una acción destructiva o que no se puede deshacer; `"neutral"` por defecto.
+	 *
+	 * @since 1.11.0 sustituye a `tone`.
+	 */
+	readonly color?: UIMenuItemColor
 	/** Desactiva el ítem: se ve, pero las flechas lo saltan y no se puede elegir. */
 	readonly disabled?: boolean
 	/** Trazo SVG de un icono decorativo, en una rejilla de 16 por 16. */
@@ -62,7 +68,7 @@ export type UIMenuLink = UIMenuItemBase &
  * @since 1.10.0
  * @example
  * ```ts
- * const remove: UIMenuItem = { label: 'Eliminar', tone: 'danger', onSelect: () => removeRow() }
+ * const remove: UIMenuItem = { label: 'Eliminar', color: 'danger', onSelect: () => removeRow() }
  * ```
  */
 export type UIMenuItem = UIMenuAction | UIMenuLink
@@ -84,7 +90,7 @@ export interface UIMenuSeparator {
  * @since 1.10.0
  * @example
  * ```ts
- * const items: UIMenuEntry[] = [{ label: 'Duplicar', onSelect: duplicate }, { separator: true }, { label: 'Eliminar', tone: 'danger', onSelect: remove }]
+ * const items: UIMenuEntry[] = [{ label: 'Duplicar', onSelect: duplicate }, { separator: true }, { label: 'Eliminar', color: 'danger', onSelect: remove }]
  * ```
  */
 export type UIMenuEntry = UIMenuItem | UIMenuSeparator
@@ -128,42 +134,37 @@ export interface MenuSnippets {
  *   { label: 'Renombrar', onSelect: rename },
  *   { label: 'Ajustes', to: '/settings' },
  *   { separator: true },
- *   { label: 'Eliminar', tone: 'danger', onSelect: remove },
+ *   { label: 'Eliminar', color: 'danger', onSelect: remove },
  * ]" on:select="(item) => log(item.label)" />
  * ```
  */
-export type UIMenuProps = Omit<
-	UIThemeProps<
-		typeof menu,
-		{
-			/** Ítems y separadores, en orden; los del snippet `default` van detrás. */
-			readonly items?: readonly UIMenuEntry[]
-			/** Texto del botón disparador, seguido de un chevron. */
-			readonly triggerLabel?: string
-			/**
-			 * Nombre accesible del disparador. Sin `triggerLabel` ni snippet `trigger`, por defecto el texto
-			 * `menu.trigger` de los mensajes («Más acciones»).
-			 */
-			readonly ariaLabel?: string
-			/** `aria-label` de la lista. Sin ella, el menú se nombra con su disparador. */
-			readonly label?: string
-			/** Tratamiento del disparador, el de `<UIButton>`: `"surface"` por defecto, `"ghost"` en el de sólo icono. */
-			readonly variant?: UIButtonVariant
-			/** Color del disparador, el de `<UIButton>`; `"neutral"` por defecto. */
-			readonly color?: UIButtonColor
-			/** Tamaño del disparador; `"md"` por defecto. */
-			readonly size?: UIButtonSize
-			/** Desactiva el disparador. */
-			readonly disabled?: boolean
-			/** Dónde se abre respecto al disparador; `"bottom-start"` por defecto. */
-			readonly placement?: PopoverPlacement
-			/** Separación en píxeles entre el disparador y la lista; `4` por defecto. */
-			readonly offset?: number
-			/** `id` del disparador; por defecto, uno de `useId`. Con el snippet `anchor`, el `id` que lleva. */
-			readonly triggerId?: string
-			/** Clases adicionales de la lista, el elemento con `popover`; equivale a `ui.base`. */
-			readonly class?: string
-		}
-	>,
-	'tone'
->
+// The `color` of the recipe is the one of an item, in `items`; the prop `color` is the one of the trigger.
+export type UIMenuProps = UIVariantSlots<typeof menuTheme> & {
+	/** Ítems y separadores, en orden; los del snippet `default` van detrás. */
+	readonly items?: readonly UIMenuEntry[]
+	/** Texto del botón disparador, seguido de un chevron. */
+	readonly triggerLabel?: string
+	/**
+	 * Nombre accesible del disparador. Sin `triggerLabel` ni snippet `trigger`, por defecto el texto
+	 * `menu.trigger` de los mensajes («Más acciones»).
+	 */
+	readonly ariaLabel?: string
+	/** `aria-label` de la lista. Sin ella, el menú se nombra con su disparador. */
+	readonly label?: string
+	/** Tratamiento del disparador, el de `<UIButton>`: `"surface"` por defecto, `"ghost"` en el de sólo icono. */
+	readonly variant?: UIButtonVariant
+	/** Color del disparador, el de `<UIButton>`; `"neutral"` por defecto. */
+	readonly color?: UIButtonColor
+	/** Tamaño del disparador; `"md"` por defecto. */
+	readonly size?: UIButtonSize
+	/** Desactiva el disparador. */
+	readonly disabled?: boolean
+	/** Dónde se abre respecto al disparador; `"bottom-start"` por defecto. */
+	readonly placement?: PopoverPlacement
+	/** Separación en píxeles entre el disparador y la lista; `4` por defecto. */
+	readonly offset?: number
+	/** `id` del disparador; por defecto, uno de `useId`. Con el snippet `anchor`, el `id` que lleva. */
+	readonly triggerId?: string
+	/** Clases adicionales de la lista, el elemento con `popover`; equivale a `ui.base`. */
+	readonly class?: string
+}

@@ -5,12 +5,12 @@
 	import type { UIDrawerProps } from '../types/navigation'
 
 	import { buttonTheme } from '../theme/components/button'
+	import { drawerTheme } from '../theme/components/drawer'
 	import { uiTheme } from '../utils/defaults'
 	import { icons } from '../utils/icons'
 	import { uiMessages } from '../utils/messages'
 	import { mountModalDialog } from '../utils/modal-dialog'
 	import { followsLink } from '../utils/navigation'
-	import { drawer } from '../variants/drawer'
 	import * as Icon from './internal/Icon.meeko'
 
 	const props = defineProps<UIDrawerProps>({ side: 'start', closedBy: 'any', closeOnNavigate: true })
@@ -71,7 +71,7 @@
 		return controller.dispose
 	})
 
-	const classes = (): ReturnType<typeof drawer> => drawer({ side: props.side })
+	const classes = (): ReturnType<typeof drawerTheme> => drawerTheme({ side: props.side })
 	// The trigger is a neutral outline button of theme/components/button, whose gap already leaves room for the icon.
 	const triggerClass = (): string => buttonTheme({ variant: 'outline', color: 'neutral', size: 'sm', class: theme.ui.trigger })
 </script>

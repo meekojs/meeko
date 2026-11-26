@@ -195,7 +195,7 @@ test('the navigation components render on the server with their semantics', { ti
 		const filter = block(es, 'aria-label="Filtro"', '</nav>')
 		assert.ok(!filter.includes('position-anchor'), 'a segmented row has no indicator: its View Transition name never repeats')
 		assert.equal(attribute(tag(filter, /aria-current="/), 'href'), '#todas')
-		assert.match(filter, /Activas<span[^>]*class="[^"]*bg-success-soft[^"]*"/, 'the counter is a badge next to the text')
+		assert.match(filter, /Activas<span[^>]*class="[^"]*bg-success-3[^"]*"/, 'the counter is a badge next to the text')
 		assert.match(filter, /<span(?=[^>]*aria-hidden="true")[^>]*class="[^"]*bg-current/)
 	})
 

@@ -1,14 +1,14 @@
 <script lang="ts">
 	// <UITooltip>: a <UIPopover mode="hint"> with the look of a tooltip. The browser opens and closes it where
 	// it has Interest Invokers (`interestfor`: Chromium since 142, neither Firefox nor Safari yet), and the script
-	// of <UIPopover> everywhere else. Its look is the `tooltip` role of ../variants/popover.ts. Its template has
+	// of <UIPopover> everywhere else. Its look is the `tooltip` role of ../theme/components/popover.ts. Its template has
 	// no whitespace between the tags: it would be text in the tooltip.
 	import { computed } from '@meekojs/meeko'
 
 	import type { TooltipSnippets, UITooltipProps } from '../types/tooltip'
 
+	import { tooltipTriggerTheme } from '../theme/components/tooltip'
 	import { uiTheme } from '../utils/defaults'
-	import { tooltipTrigger } from '../variants/popover'
 	import * as Popover from './Popover.meeko'
 
 	const props = defineProps<UITooltipProps>()
@@ -19,7 +19,7 @@
 
 	const snippets = defineSnippets<TooltipSnippets>()
 
-	const triggerClass = computed(() => tooltipTrigger({ class: props.triggerClass }))
+	const triggerClass = computed(() => tooltipTriggerTheme({ class: props.triggerClass }))
 </script>
 
 <!-- No whitespace between the tags of this template: it would be text inside the tooltip and the trigger. Prettier keeps it that way (htmlWhitespaceSensitivity "strict" in prettier.config.ts); tests/templates-without-whitespace.test.mjs guards it. -->

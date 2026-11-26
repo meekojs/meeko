@@ -1,5 +1,4 @@
 import { createTV, createTwMerge, type TWMergeConfig } from 'tailwind-variants/config'
-import { createTV as createLiteTV } from 'tailwind-variants/lite'
 
 export type { VariantProps as ThemeVariants } from 'tailwind-variants/config'
 
@@ -45,10 +44,3 @@ export const mergeClasses = createTwMerge(themeMergeConfig)
 
 /** Crea recetas de tema tipadas y resuelve conflictos entre utilidades de Tailwind, incluidas las propias. */
 export const defineTheme = createTV({ twMergeConfig: themeMergeConfig })
-
-/**
- * El `tv` de las recetas de `variants/`: el de `tailwind-variants/lite` con {@link mergeClasses}, de modo
- * que el `class` que recibe cada slot (el `class` y el `ui` del consumidor, o de `ui.defaults`) sustituye a
- * las clases de la receta con las que choca.
- */
-export const tv = createLiteTV({ twMerge: mergeClasses })

@@ -122,7 +122,7 @@
 							$
 						</span>
 						<code>{command}</code>
-						<UIBadge bind:tone="copied.value === 'done' ? 'success' : copied.value === 'error' ? 'danger' : 'neutral'">{copied.value === 'done' ? t('actions.copied') : copied.value === 'error' ? t('actions.copyFailed') : t('actions.copy')}</UIBadge>
+						<UIBadge bind:color="copied.value === 'done' ? 'success' : copied.value === 'error' ? 'danger' : 'neutral'">{copied.value === 'done' ? t('actions.copied') : copied.value === 'error' ? t('actions.copyFailed') : t('actions.copy')}</UIBadge>
 					</UIButton>
 				</div>
 				<p class="meta">

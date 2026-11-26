@@ -6,11 +6,12 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { routeKey } from '../../meeko/dist/app/runtime/navigation.js'
 import { compile } from '../../meeko/dist/compiler.js'
 import { createRoot, provide } from '../../meeko/dist/index.js'
+import { sparklineTheme as sparkline } from '../dist/app/theme/components/sparkline.js'
+import { statTheme as stat } from '../dist/app/theme/components/stat.js'
 import { uiDefaultsKey } from '../dist/app/utils/defaults.js'
 import { icons } from '../dist/app/utils/icons.js'
 import { sparklineShape } from '../dist/app/utils/sparkline.js'
 import { statChange, statTone } from '../dist/app/utils/stat.js'
-import { sparkline, stat } from '../dist/app/variants/data.js'
 import { validateDefaults } from '../dist/defaults.js'
 
 const components = ['Popover', 'Tooltip', 'Hint', 'Sparkline', 'Stat']
@@ -28,7 +29,7 @@ async function render(context, template, { defaults, locale } = {}) {
 			.code.replaceAll('from "@meekojs/meeko/internal"', `from ${runtime('internal.js')}`)
 			.replaceAll('from "@meekojs/meeko"', `from ${runtime('index.js')}`)
 			.replace(/from ["']\.\/(\w+)\.meeko["']/g, 'from "./$1.ts"')
-			.replace(/from ["'](?:\.\.\/)+(utils|variants|theme(?:\/components)?)\/([\w-]+)["']/g, (_, folder, utility) => `from ${JSON.stringify(new URL(`../dist/app/${folder}/${utility}.js`, import.meta.url).href)}`)
+			.replace(/from ["'](?:\.\.\/)+(utils|theme(?:\/components)?)\/([\w-]+)["']/g, (_, folder, utility) => `from ${JSON.stringify(new URL(`../dist/app/${folder}/${utility}.js`, import.meta.url).href)}`)
 			.replace(/from ["']\.\/internal\/Icon\.meeko["']/g, 'from "./Icon.ts"')
 		await writeFile(`${directory}/${file}.ts`, code)
 	}
@@ -93,7 +94,7 @@ test('UIStat with a change formats it in the locale, with its arrow, its tone an
 	assert.ok(!root.classes.includes('grid-cols-[minmax(0,1fr)_auto]'), 'one column without a trend')
 	const [, change] = definitions(html)
 	assert.ok(change.classes.includes('text-sm'))
-	assert.match(change.content, /<span class="[^"]*text-success-text[^"]*">/, 'up is good by default')
+	assert.match(change.content, /<span class="[^"]*text-success-11[^"]*">/, 'up is good by default')
 	assert.match(change.content, new RegExp(`<path d="${icons.arrowUp}"`))
 	assert.match(change.content, /<span aria-hidden="true">\+12,5\u00a0%<\/span>/)
 	assert.match(change.content, /<span class="sr-only">Sube 12,5\u00a0%<\/span>/)
@@ -101,11 +102,11 @@ test('UIStat with a change formats it in the locale, with its arrow, its tone an
 
 	// Down is bad, unless down is good; zero is neutral, with the arrow to the end of the line.
 	const down = await render(context, '<UIStat label="Conversión" value="3 %" bind:change="-3" />')
-	assert.match(down, /text-danger-text/)
+	assert.match(down, /text-danger-11/)
 	assert.match(down, new RegExp(`<path d="${icons.arrowDown}"`))
 	assert.match(down, /<span aria-hidden="true">-3\u00a0%<\/span><span class="sr-only">Baja 3\u00a0%<\/span>/)
 	const faster = await render(context, '<UIStat label="Tiempo de respuesta" value="180 ms" bind:change="-12" good="down" changeFormat="number" />')
-	assert.match(faster, /text-success-text/)
+	assert.match(faster, /text-success-11/)
 	assert.match(faster, /<span aria-hidden="true">-12<\/span><span class="sr-only">Baja 12<\/span>/)
 	const flat = await render(context, '<UIStat label="Errores" value="0" bind:change="0" />')
 	assert.match(flat, /<span class="[^"]*text-text[ "]/)
@@ -119,10 +120,10 @@ test('UIStat with a change formats it in the locale, with its arrow, its tone an
 
 test('UIStat takes a change already formatted, whose sign gives the direction, and changeDirection when it does not', async (context) => {
 	const html = await render(context, '<UIStat label="Pedidos" value="320" change="−8 pedidos" />')
-	assert.match(html, /text-danger-text/)
+	assert.match(html, /text-danger-11/)
 	assert.match(html, /<span aria-hidden="true">−8 pedidos<\/span><span class="sr-only">Baja 8 pedidos<\/span>/)
 	const unsigned = await render(context, '<UIStat label="Puesto" value="3.º" change="2 puestos" changeDirection="down" good="down" />')
-	assert.match(unsigned, /text-success-text/)
+	assert.match(unsigned, /text-success-11/)
 	assert.match(unsigned, /<span class="sr-only">Baja 2 puestos<\/span>/)
 })
 
@@ -155,13 +156,13 @@ test('UIStat draws its trend with a sparkline beside the value, in the tone of t
 	assert.ok(trend.classes.includes('col-[2]') && trend.classes.includes('w-(--ui-stat-trend-width)'))
 	assert.ok(trend.classes.includes('@max-stat-narrow:col-span-full'), 'below the narrow size of the container, a row of its own')
 	const svg = element(html, 'svg role="img"')
-	assert.ok(svg.classes.includes('text-danger-text'), 'the tone of the change')
+	assert.ok(svg.classes.includes('text-danger-11'), 'the color of the change')
 	assert.equal(svg.attributes['aria-label'], 'Tendencia: mínimo 3, máximo 8, último 8')
 	assert.match(html, /<path d="M[^"]+Z" class="[^"]*fill-current/, 'the area under the line')
 	assert.ok(element(html, 'dd').classes.includes('@max-stat-narrow:text-xl'), 'a smaller value in compact mode')
 	// Without a change, the accent; with trendLabel, a name of its own.
 	const accent = await render(context, '<UIStat label="Visitas" bind:value="1400" bind:trend="[1, 2]" trendLabel="Visitas de la semana, al alza" />')
-	assert.ok(element(accent, 'svg role="img"').classes.includes('text-primary-text'))
+	assert.ok(element(accent, 'svg role="img"').classes.includes('text-primary-11'))
 	assert.equal(element(accent, 'svg role="img"').attributes['aria-label'], 'Visitas de la semana, al alza')
 })
 
@@ -180,9 +181,9 @@ test('UISparkline is an image named by a summary of its series, as wide as its c
 	assert.ok(svg.classes.includes('motion-reduce:animate-none'), 'no animation with reduced motion')
 	assert.equal(html.match(/<path/g).length, 1, 'no area by default')
 
-	const custom = await render(context, '<UISparkline bind:values="[]" label="Sin visitas todavía" tone="success" area class="mine" bind:ui="{ line: \'my-line\' }" />')
+	const custom = await render(context, '<UISparkline bind:values="[]" label="Sin visitas todavía" color="success" area class="mine" bind:ui="{ line: \'my-line\' }" />')
 	assert.equal(element(custom, 'svg').attributes['aria-label'], 'Sin visitas todavía')
-	assert.ok(element(custom, 'svg').classes.includes('text-success-text') && element(custom, 'svg').classes.includes('mine'))
+	assert.ok(element(custom, 'svg').classes.includes('text-success-11') && element(custom, 'svg').classes.includes('mine'))
 	assert.doesNotMatch(custom, /<path/, 'no paths without values')
 	assert.equal(element(await render(context, '<UISparkline bind:values="[]" />'), 'svg').attributes['aria-label'], 'Sin datos')
 	const styled = await render(context, '<UISparkline bind:values="[1, 2]" area bind:ui="{ line: \'my-line\' }" />', { defaults: { sparkline: { class: 'app-spark', ui: { area: 'app-area' } } } })

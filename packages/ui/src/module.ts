@@ -52,7 +52,7 @@ export default defineMeekoModule<UIOptions>({
 		if (meeko.dev)
 			meeko.addVitePlugin({
 				name: 'meeko-ui:optimize-deps',
-				config: () => ({ optimizeDeps: { include: ['@meekojs/ui > tailwind-variants/lite', '@meekojs/ui > tailwind-variants/config'] } }),
+				config: () => ({ optimizeDeps: { include: ['@meekojs/ui > tailwind-variants/config'] } }),
 			})
 
 		meeko.addComponentsDir(new URL('components', app), {

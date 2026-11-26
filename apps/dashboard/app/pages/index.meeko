@@ -145,7 +145,7 @@
 							>
 								<UIBadge
 									bind:dot="true"
-									bind:tone="translationTones[status]"
+									bind:color="translationTones[status]"
 								>
 									{format.number(translationCounts[status])}
 								</UIBadge>
@@ -242,7 +242,7 @@
 						</span>
 						<UIBadge
 							if:when="column.key === 'attention' && attention(row)"
-							tone="accent"
+							color="primary"
 						>
 							{t('overview.toReview', { count: format.number(attention(row)) })}
 						</UIBadge>

@@ -21,6 +21,7 @@ import type {
 	UIHeaderProps,
 	UIHintProps,
 	UIIconButtonProps,
+	UIInputProps,
 	UILinkCardProps,
 	UILocaleSuggestionProps,
 	UILocaleSwitcherProps,
@@ -81,6 +82,18 @@ const appearanceCard: UICardProps = { appearance: { variant: 'surface' } }
 const paddedLinkCard: UIOptions = { defaults: { linkCard: { padding: 'sm' } } }
 void [elevatedCard, ghostCard, appearanceCard, paddedLinkCard]
 
+// UIInput: the look of the theme recipe, with variant, color, size and radius.
+const inputLook = { defaults: { input: { variant: 'soft', color: 'primary', size: 'lg', radius: 'full', class: 'app-field' } } } satisfies UIOptions
+const ghostInput: UIInputProps = { variant: 'ghost', color: 'danger', size: 'xs', radius: 'none' }
+void [inputLook, ghostInput]
+// @ts-expect-error The `appearance` prop of UIInput is gone: its keys are props.
+const appearanceInput: UIInputProps = { appearance: { variant: 'soft' } }
+// @ts-expect-error A field has no `solid`: it is a treatment of actions.
+const solidInput: UIInputProps = { variant: 'solid' }
+// @ts-expect-error Nor does ui.defaults.input take it.
+const solidInputDefault: UIOptions = { defaults: { input: { variant: 'solid' } } }
+void [appearanceInput, solidInput, solidInputDefault]
+
 // ui.defaults: class and ui for each component, with the slots of its own `ui` prop.
 const panel = {
 	defaults: {
@@ -112,6 +125,25 @@ const prefixed: UIOptions = { defaults: { UICard: { class: 'x' } } }
 // @ts-expect-error Classes are a string.
 const classList: UIOptions = { defaults: { stat: { class: ['a'] } } }
 void [unknownSlot, wrapDefault, toneDefault, layoutDefault, buttonSlots, toastClass, prefixed, classList]
+
+// The badge, the avatar and the messages take `variant` and `color`; `tone`, `appearance` and `shape` are gone.
+const badgeDefaults: UIOptions = { defaults: { badge: { variant: 'solid', color: 'success', radius: 'sm' }, avatar: { size: 'lg', variant: 'surface', color: 'neutral', radius: 'md' } } }
+const coloredBadge: UIBadgeProps = { variant: 'outline', color: 'danger', radius: 'full', dot: true }
+const coloredAlert: UIAlertProps = { variant: 'solid', color: 'warning', title: 'x' }
+const coloredToast: UIToastProps = { text: 'x', variant: 'outline', color: 'info' }
+const coloredLine: UISparklineProps = { values: [1, 2], color: 'primary' }
+const coloredAvatar: UIAvatarProps = { name: 'Ana', variant: 'solid', color: 'secondary', radius: 'md', size: 'sm' }
+// @ts-expect-error tone is gone from UIBadge: color="primary".
+const badgeTone: UIBadgeProps = { tone: 'accent' }
+// @ts-expect-error appearance is gone from UIBadge: its keys are props.
+const badgeAppearance: UIBadgeProps = { appearance: { variant: 'solid' } }
+// @ts-expect-error tone is gone from UIAlert: color="danger".
+const alertTone: UIAlertProps = { tone: 'danger' }
+// @ts-expect-error accent is primary.
+const lineAccent: UISparklineProps = { values: [1], color: 'accent' }
+// @ts-expect-error shape is now radius.
+const avatarShape: UIOptions = { defaults: { avatar: { shape: 'rounded' } } }
+void [badgeDefaults, coloredBadge, coloredAlert, coloredToast, coloredLine, coloredAvatar, badgeTone, badgeAppearance, alertTone, lineAccent, avatarShape]
 
 /** The `ui` of each component in ui.defaults is exactly the `ui` prop of the component. */
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false

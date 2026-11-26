@@ -2,7 +2,7 @@
 	import type { UIContainerProps } from '../types/container'
 
 	import { uiTheme } from '../utils/defaults'
-	import { container } from '../variants/container'
+	import { containerTheme } from '../theme/components/container'
 
 	const props = defineProps<UIContainerProps>({ as: 'div', size: 'xl', gutter: 'md' })
 
@@ -16,7 +16,7 @@
 		is="props.as"
 		bind:id="props.id"
 		bind:aria-label="props.ariaLabel"
-		bind:class="container({ size: props.size, gutter: props.gutter, class: theme.class })"
+		bind:class="containerTheme({ size: props.size, gutter: props.gutter, class: theme.class })"
 	>
 		<render snippet="snippets.default" />
 	</component>

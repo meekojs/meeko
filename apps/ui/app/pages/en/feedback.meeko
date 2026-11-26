@@ -14,7 +14,7 @@
 	>
 		<h2 id="alert">UIAlert</h2>
 		<p>
-			A notice inside the page, in four tones besides the neutral one.
+			A notice inside the page: <code>variant</code> chooses the treatment and <code>color</code>, its meaning.
 			<code>danger</code>
 			uses
 			<code>role="alert"</code>; the others, <code>note</code>. Choose
@@ -25,23 +25,23 @@
 		</p>
 		<DocsPreview layout="stack">
 			<UIAlert
-				tone="info"
+				color="info"
 				title="New version"
 				description="UI 1.8 uses the --ui-* tokens."
 			/>
 			<UIAlert
-				tone="success"
+				color="success"
 				title="Changes saved"
 				description="They are already published."
 			/>
 			<UIAlert
-				tone="warning"
+				color="warning"
 				title="Translation pending"
 				description="This page is not in English yet."
 			/>
 			<UIAlert
 				if:when="!dismissed.value"
-				tone="danger"
+				color="danger"
 				title="Could not publish"
 				description="The database does not respond."
 				dismiss
@@ -70,7 +70,8 @@
 		<DocsApi
 			caption="UIAlert props"
 			bind:rows="[
-				{ name: 'tone', type: 'neutral | info | success | warning | danger', default: 'neutral', description: 'Meaning of the notice.' },
+				{ name: 'variant', type: 'soft | surface | outline | solid', default: 'soft', description: 'Visual treatment.' },
+				{ name: 'color', type: 'primary | secondary | neutral | success | info | warning | danger', default: 'neutral', description: 'Meaning of the notice.' },
 				{ name: 'title / description', type: 'string', description: 'Title and text.' },
 				{ name: 'role', type: 'alert | status | note | none', default: 'alert with danger; note', description: 'How a screen reader announces it.' },
 				{ name: 'dismiss / closeLabel', type: 'boolean / string', default: 'false', description: 'Close button, with its accessible name.' },
@@ -98,11 +99,11 @@
 			at the root.
 		</p>
 		<DocsPreview>
-			<UIButton on:click="() => toast.add({ text: 'Changes saved', tone: 'success', duration: 5000 })">Notify the save</UIButton>
+			<UIButton on:click="() => toast.add({ text: 'Changes saved', color: 'success', duration: 5000 })">Notify the save</UIButton>
 			<UIButton
 				variant="outline"
 				color="neutral"
-				on:click="() => toast.add({ text: 'Could not publish', tone: 'danger', duration: 0 })"
+				on:click="() => toast.add({ text: 'Could not publish', color: 'danger', duration: 0 })"
 			>
 				Notify an error
 			</UIButton>
@@ -119,7 +120,8 @@
 			caption="toast.add options and UIToast props"
 			bind:rows="[
 				{ name: 'text', type: 'string', description: 'Required. The notice.' },
-				{ name: 'tone', type: 'neutral | info | success | warning | danger', default: 'neutral', description: 'Meaning of the notice.' },
+				{ name: 'variant', type: 'soft | surface | outline | solid', default: 'soft', description: 'Visual treatment.' },
+				{ name: 'color', type: 'primary | secondary | neutral | success | info | warning | danger', default: 'neutral', description: 'Meaning of the notice.' },
 				{ name: 'duration', type: 'number', default: '5000', description: 'Milliseconds before it closes; 0 keeps it until it is closed. The count pauses with the pointer or the focus inside.' },
 				{ name: 'closeLabel', type: 'string', description: 'Accessible name of the close button.' },
 				{ name: 'actions', type: 'Snippet', description: 'Actions of the notice.' },

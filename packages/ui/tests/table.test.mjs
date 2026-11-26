@@ -64,7 +64,7 @@ async function renderTablePage(context, pageSource) {
 			.code.replace(`from "@meekojs/meeko/internal"`, `from ${runtime('internal.js')}`)
 			.replaceAll(`from "@meekojs/meeko"`, `from ${runtime('index.js')}`)
 			.replace(`from "./Table.meeko"`, `from "./Table.ts"`)
-			.replace(/from ["'](?:\.\.\/)+(utils|variants|theme(?:\/components)?)\/([\w-]+)["']/g, (_, folder, file) => `from ${JSON.stringify(new URL(`../dist/app/${folder}/${file}.js`, import.meta.url).href)}`)
+			.replace(/from ["'](?:\.\.\/)+(utils|theme(?:\/components)?)\/([\w-]+)["']/g, (_, folder, file) => `from ${JSON.stringify(new URL(`../dist/app/${folder}/${file}.js`, import.meta.url).href)}`)
 		await writeFile(`${directory}/${name}.ts`, code)
 	}
 	const table = await readFile(new URL('../src/app/components/Table.meeko', import.meta.url), 'utf8')

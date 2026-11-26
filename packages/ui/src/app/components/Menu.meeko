@@ -2,17 +2,17 @@
 	// <UIMenu>: the Menu Button pattern of the APG on top of <UIPopover role="menu">, which already has the
 	// keys of a menu (arrows, Home, End, typeahead, Esc, Tab), closes it when an item is chosen and gives the
 	// focus back to the trigger. This component only paints the trigger, through the `anchor` snippet of the
-	// popover, and the items of `items`; their look is ../variants/menu.ts. Its template has no whitespace
+	// popover, and the items of `items`; their look is ../theme/components/menu.ts. Its template has no whitespace
 	// between the tags: it would be text in the trigger and in the items, which typeahead reads.
 	import { computed } from '@meekojs/meeko'
 
 	import type { MenuSnippets, UIMenuItem, UIMenuLink, UIMenuProps } from '../types/menu'
 
 	import { buttonTheme } from '../theme/components/button'
+	import { menuTheme } from '../theme/components/menu'
 	import { uiTheme } from '../utils/defaults'
 	import { icons } from '../utils/icons'
 	import { uiMessages } from '../utils/messages'
-	import { menu } from '../variants/menu'
 	import * as Icon from './internal/Icon.meeko'
 	import * as Popover from './Popover.meeko'
 
@@ -28,7 +28,7 @@
 
 	const text = uiMessages().menu
 
-	const classes = menu()
+	const classes = menuTheme()
 
 	/** An entry of `items` ready for the template: every field is there, whatever its kind. */
 	interface Row {
@@ -151,7 +151,7 @@
 			bind:lang="row.link?.lang"
 			bind:title="row.link?.title"
 			bind:data-value="row.item.value"
-			bind:class="row.separator ? classes.separator({ class: theme.ui.separator }) : classes.item({ tone: row.item.tone, class: theme.ui.item })"
+			bind:class="row.separator ? classes.separator({ class: theme.ui.separator }) : classes.item({ color: row.item.color, class: theme.ui.item })"
 			on:click="(event) => choose(row, event)"
 			><render
 				if:when="!row.separator && snippets.item"

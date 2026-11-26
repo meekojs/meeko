@@ -6,7 +6,7 @@
 	import { uiTheme } from '../utils/defaults'
 	import { uiMessages } from '../utils/messages'
 	import { linkTarget } from '../utils/navigation'
-	import { localeSwitcher } from '../variants/locale'
+	import { localeSwitcherTheme } from '../theme/components/locale'
 	import * as ItemLink from './internal/ItemLink.meeko'
 
 	const props = defineProps<UILocaleSwitcherProps>()
@@ -17,7 +17,7 @@
 
 	const target = (item: UILocaleItem): UILinkTarget => ({ ...linkTarget(item), hreflang: item.hreflang ?? item.code, lang: item.lang ?? item.code, title: item.title ?? item.label })
 
-	const classes = localeSwitcher()
+	const classes = localeSwitcherTheme()
 </script>
 
 <template>

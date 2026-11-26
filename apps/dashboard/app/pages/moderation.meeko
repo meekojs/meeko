@@ -582,7 +582,7 @@
 					</p>
 					<UIAlert
 						if:when="ruleError.value"
-						tone="danger"
+						color="danger"
 						bind:description="ruleError.value"
 					/>
 					<DashFailure
@@ -617,7 +617,7 @@
 							/>
 							<UIBadge
 								if:when="column.key === 'action'"
-								bind:tone="row.action === 'hide' ? 'danger' : 'accent'"
+								bind:color="row.action === 'hide' ? 'danger' : 'primary'"
 							>
 								{actionLabel(row.action)}
 							</UIBadge>
@@ -776,7 +776,7 @@
 							/>
 							<UIAlert
 								if:when="formError.value"
-								tone="danger"
+								color="danger"
 								bind:description="formError.value"
 							/>
 							<DashFailure
@@ -848,7 +848,7 @@
 							<UIBadge
 								if:when="column.key === 'tone'"
 								bind:dot="true"
-								bind:tone="row.tone"
+								bind:color="row.tone"
 							>
 								{toneLabel(row.tone)}
 							</UIBadge>
@@ -860,7 +860,7 @@
 							</span>
 							<UIBadge
 								if:when="column.key === 'state'"
-								bind:tone="announcementStateTones[row.state]"
+								bind:color="announcementStateTones[row.state]"
 							>
 								{stateLabel(row.state)}
 							</UIBadge>

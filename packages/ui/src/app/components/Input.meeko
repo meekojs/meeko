@@ -8,13 +8,13 @@
 
 	import type { UIInputProps } from '../types/forms'
 
+	import { inputNumeric, inputRevealTheme, inputRevealWaiting, inputTheme } from '../theme/components/input'
 	import { uiTheme } from '../utils/defaults'
 	import { icons } from '../utils/icons'
 	import { uiMessages } from '../utils/messages'
-	import { input, inputNumeric, inputReveal, inputRevealWaiting, inputWithAppearance } from '../variants/input'
 	import * as Icon from './internal/Icon.meeko'
 
-	const { appearance, invalid, describedBy, spellcheck, reveal, showLabel, hideLabel, class: ownClass, type = 'text', ...rest } = defineProps<UIInputProps>()
+	const { variant, color, size, radius, invalid, describedBy, spellcheck, reveal, showLabel, hideLabel, class: ownClass, type = 'text', ...rest } = defineProps<UIInputProps>()
 
 	const theme = uiTheme('input', () => ({ class: ownClass }))
 
@@ -22,18 +22,19 @@
 
 	const text = uiMessages().input
 
+	const fieldSize = () => size ?? theme.defaults?.size
 	const numericTypes = new Set(['number', 'time', 'month', 'date', 'datetime-local'])
 	const fieldClass = (reveal: boolean) => {
 		const className = [numericTypes.has(type) ? inputNumeric : undefined, theme.class].filter(Boolean).join(' ')
-		return appearance ? inputWithAppearance(appearance, reveal, className) : input({ reveal, class: className })
+		return inputTheme({ variant: variant ?? theme.defaults?.variant, color: color ?? theme.defaults?.color, size: fieldSize(), radius: radius ?? theme.defaults?.radius, reveal, class: className })
 	}
 	const inputClass = computed(() => fieldClass(false))
 
 	const revealable = computed(() => reveal === true && type === 'password')
 	const shown = signal(false)
 	const ready = signal(false)
-	const revealClasses = inputReveal()
-	const toggleClass = computed(() => revealClasses.toggle({ class: ready.value ? undefined : inputRevealWaiting }))
+	const revealClasses = computed(() => inputRevealTheme({ size: fieldSize() }))
+	const toggleClass = computed(() => revealClasses.value.toggle({ class: ready.value ? undefined : inputRevealWaiting }))
 	const toggleLabel = computed(() => (shown.value ? (hideLabel ?? text.hide) : (showLabel ?? text.show)))
 
 	function toggle(): void {
@@ -57,7 +58,7 @@
 		bind="rest"
 	/><span
 		if:when="revealable.value"
-		bind:class="revealClasses.base()"
+		bind:class="revealClasses.value.base()"
 		><input
 			model="value"
 			bind:spellcheck="spellcheck === undefined ? undefined : String(spellcheck)"

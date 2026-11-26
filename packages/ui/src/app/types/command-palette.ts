@@ -1,4 +1,4 @@
-import type { commandPalette } from '../variants/command-palette'
+import type { commandPaletteTheme } from '../theme/components/command-palette'
 import type { UIVariantSlots } from './theme'
 
 /**
@@ -74,7 +74,7 @@ type CommandPaletteKey<T> = T extends object ? keyof T & string : never
  * />
  * ```
  */
-export interface UICommandPaletteProps<T> extends UIVariantSlots<typeof commandPalette> {
+export interface UICommandPaletteProps<T> extends UIVariantSlots<typeof commandPaletteTheme> {
 	/** Las filas de primer nivel, en orden. */
 	readonly results: readonly T[]
 	/** Estado de la búsqueda; sin él, `ready` con resultados e `idle` sin ellos. */

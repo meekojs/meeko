@@ -4,7 +4,7 @@
 	import { uiTheme } from '../utils/defaults'
 	import { uiMessages } from '../utils/messages'
 	import { linkTarget } from '../utils/navigation'
-	import { breadcrumb } from '../variants/navigation'
+	import { breadcrumbTheme } from '../theme/components/navigation'
 	import * as ItemLink from './internal/ItemLink.meeko'
 
 	const props = defineProps<UIBreadcrumbProps>()
@@ -16,7 +16,7 @@
 	const isCurrent = (item: UIBreadcrumbItem, index: number): boolean => item.current ?? index === props.items.length - 1
 	const hasTarget = (item: UIBreadcrumbItem): boolean => item.href !== undefined || item.to !== undefined
 
-	const classes = breadcrumb()
+	const classes = breadcrumbTheme()
 </script>
 
 <template>

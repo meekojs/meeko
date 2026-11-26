@@ -77,7 +77,7 @@ const showcase = `<script lang="ts">
 				<snippet name="actions"><UILocaleSwitcher bind:items="locales" /></snippet>
 			</UIHeader>
 		</snippet>
-		<snippet name="notices"><UIAlert tone="info" description="Aviso de la página" /></snippet>
+		<snippet name="notices"><UIAlert color="info" description="Aviso de la página" /></snippet>
 		<snippet name="bar">
 			<UIDrawer id="menu" title="Contenidos" triggerLabel="Contenidos" model="drawerOpen" on:close="() => closes.value++">
 				<UINavigationTree bind:groups="groups" label="Contenidos" />
@@ -96,7 +96,7 @@ const showcase = `<script lang="ts">
 		<button type="button" id="tab-two" on:click="() => (tabsCurrent.value = '/two')">Tab dos</button>
 		<button type="button" id="tab-four" on:click="() => (tabsCurrent.value = '/four')">Tab cuatro</button>
 		<UINavigationTabs bind:items="[{ label: 'Forzado', to: '/about', current: forced.value }, { label: 'Quitado', to: '/', current: false }, { label: 'Según la ruta', to: '/' }, { label: 'Otra ruta', to: '/about' }]" label="Estados" />
-		<UINavigationTabs variant="segmented" label="Filtro" bind:items="[{ label: 'Todas', href: '#todas', current: filter.value === 'Todas', badge: '3' }, { label: 'Activas', href: '#activas', current: filter.value === 'Activas', badge: '2', badgeTone: 'success', badgeDot: true }]" on:select="(event, item) => { event.preventDefault(); filter.value = item.label }" />
+		<UINavigationTabs variant="segmented" label="Filtro" bind:items="[{ label: 'Todas', href: '#todas', current: filter.value === 'Todas', badge: '3' }, { label: 'Activas', href: '#activas', current: filter.value === 'Activas', badge: '2', badgeColor: 'success', badgeDot: true }]" on:select="(event, item) => { event.preventDefault(); filter.value = item.label }" />
 		<button type="button" id="toggle-forced" on:click="() => (forced.value = !forced.value)">Forzar</button>
 		<button type="button" id="open-drawer" on:click="() => (drawerOpen.value = true)">Abrir panel</button>
 		<output id="drawer-state">{drawerOpen.value ? 'abierto' : 'cerrado'}:{closes.value}</output>

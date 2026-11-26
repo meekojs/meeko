@@ -12,7 +12,7 @@
 	>
 		<h2 id="appearance">Appearance engine</h2>
 		<p>
-			<code>UIButton</code> and <code>UICard</code> choose their look with the <code>variant</code> (the treatment) and <code>color</code> (the semantic color) props, plus <code>radius</code> and <code>elevation</code>; <code>UIBadge</code> and <code>UIInput</code>, with <code>appearance</code>. To make your own recipes, import <code>appearance()</code> from <code>@meekojs/ui/theme</code> and spread its result into <code>tv()</code>.
+			Each component chooses its look with the <code>variant</code> (the treatment) and <code>color</code> (the semantic color) props, plus <code>size</code>, <code>radius</code> and <code>elevation</code> where they apply: <code>UIButton</code>, <code>UICard</code>, <code>UIBadge</code>, <code>UIInput</code>, <code>UIAvatar</code>, <code>UIAlert</code> and <code>UIToast</code>, among others. Their recipes (<code>buttonTheme</code>, <code>badgeTheme</code>, <code>inputTheme</code>…) are exported from <code>@meekojs/ui/theme</code>. To make your own, import <code>appearance()</code> from there and spread its result into <code>defineTheme()</code>.
 		</p>
 		<AppearanceVariants />
 		<AppearancePlayground english />
@@ -160,7 +160,7 @@
 				{ name: '--ui-color-text / -text-soft', type: 'color', description: 'Text and secondary text.' },
 				{ name: '--ui-color-border / -border-strong / -control-border', type: 'color', description: 'Separators, quiet borders and the border of a field at 3:1 or more.' },
 				{ name: '--ui-color-primary / -hover / -contrast', type: 'color', description: 'Main action and the text on it.' },
-				{ name: '--ui-color-primary-soft / -text / -border', type: 'color', description: 'A label or a quiet active background, with its text and its border.' },
+				{ name: '--ui-color-primary-soft / -text / -border', type: 'color', description: 'A quiet active background, with its text and its border. Badge, Alert, Toast and Avatar paint with the steps -3, -11 and -7 of the scale.' },
 				{ name: '--ui-color-danger / -soft / -border / -text', type: 'color', description: 'Info, success and warning have the same shape.' },
 				{ name: '--ui-font-size-xs … -6xl', type: 'rem', description: 'Text sizes: reading at lg, controls at md, titles from 2xl up.' },
 				{ name: '--ui-space-* / --ui-radius-*', type: 'rem', description: 'Space in steps of 0.25rem and radii from xs to xl.' },
@@ -284,7 +284,7 @@
 				{ name: '.meeko-ui-card-header / -title / -body / -footer', type: 'ui.header / ui.title / ui.body / ui.footer', description: 'UICard; class is ui.base.' },
 				{ name: '.meeko-ui-table-scroll / .meeko-ui-table', type: 'ui.base / class', description: 'UITable; also ui.cell, ui.headerCell, ui.bodyRow. Replaces --table-border, --table-background and --table-hover.' },
 				{ name: '.meeko-ui-modal-heading / -body / -footer', type: 'ui.heading / ui.body / ui.footer', description: 'UIModal; class is ui.base, the <dialog>.' },
-				{ name: '.meeko-ui-alert-title / -description', type: 'ui.title / ui.description', description: 'UIAlert; the tone prop replaces data-tone.' },
+				{ name: '.meeko-ui-alert-title / -description', type: 'ui.title / ui.description', description: 'UIAlert; the variant and color props replace data-tone.' },
 				{ name: '.meeko-ui-page-main / -sidebar / -aside', type: 'ui.main / ui.sidebar / ui.aside', description: 'UIPage.' },
 				{ name: '.meeko-ui-header-nav / -actions', type: 'ui.nav / ui.actions', description: 'UIHeader.' },
 				{ name: '.meeko-ui-command-row / -excerpt', type: 'ui.row / <small>', description: 'UICommandPalette; the active row has aria-selected.' },

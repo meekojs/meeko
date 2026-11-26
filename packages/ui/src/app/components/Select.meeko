@@ -1,17 +1,17 @@
 <script lang="ts" generic="T">
 	// <UISelect>: a native <select>. For a search, an asynchronous filter or several values, <UICombobox>.
-	// The behavior lives in ../utils/select.ts and the look in ../variants/select.ts. Its template has no whitespace between the
+	// The behavior lives in ../utils/select.ts and the look in ../theme/components/select.ts. Its template has no whitespace between the
 	// tags: it would be text in the options. <selectedcontent> copies
 	// the whole option, so with an `option` snippet the trigger paints `value`, or the label, by itself.
 	import { computed, onMounted, useId } from '@meekojs/meeko'
 
 	import type { SelectModel, SelectSettings, SelectSnippets, UISelectProps } from '../types/select'
 
+	import { inputControlTheme } from '../theme/components/input'
+	import { selectTheme as look } from '../theme/components/select'
 	import { uiTheme } from '../utils/defaults'
 	import { uiMessages } from '../utils/messages'
 	import { createSelect } from '../utils/select'
-	import { control } from '../variants/input'
-	import { select as look } from '../variants/select'
 
 	const props = defineProps<UISelectProps<T>>()
 
@@ -32,7 +32,7 @@
 
 	const classes = computed(() => look({ disabled: props.disabled === true, clearable: props.clearable === true }))
 	// The <select> is the trigger and, with `appearance: base-select`, also holds the list: `listClass` goes on it.
-	const triggerClass = computed(() => control({ clearable: props.clearable === true, class: [classes.value.trigger(), theme.ui.trigger, props.listClass] }))
+	const triggerClass = computed(() => inputControlTheme({ clearable: props.clearable === true, class: [classes.value.trigger(), theme.ui.trigger, props.listClass] }))
 </script>
 
 <template>

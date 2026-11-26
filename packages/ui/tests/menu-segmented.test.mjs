@@ -8,9 +8,10 @@ import { routeKey } from '../../meeko/dist/app/runtime/navigation.js'
 import { checkSource } from '../../meeko/dist/check.js'
 import { compile } from '../../meeko/dist/compiler.js'
 import { createRoot, provide } from '../../meeko/dist/index.js'
+import { radioGroupTheme as radioGroup } from '../dist/app/theme/components/radio-group.js'
+import { segmentedControlTheme as segmentedControl } from '../dist/app/theme/components/segmented-control.js'
 import { uiDefaultsKey } from '../dist/app/utils/defaults.js'
 import { builtinMessages } from '../dist/app/utils/messages.js'
-import { radioGroup, segmentedControl } from '../dist/app/variants/choice.js'
 import { validateDefaults } from '../dist/defaults.js'
 
 const components = ['Popover', 'Menu', 'SegmentedControl', 'RadioGroup']
@@ -28,7 +29,7 @@ async function render(context, template, defaults) {
 			.replaceAll('from "@meekojs/meeko"', `from ${runtime('index.js')}`)
 			.replace(/from ["']\.\/internal\/Icon\.meeko["']/g, 'from "./Icon.ts"')
 			.replace(/from ["']\.\/(\w+)\.meeko["']/g, 'from "./$1.ts"')
-			.replace(/from ["'](?:\.\.\/)+(utils|variants|theme(?:\/components)?)\/([\w-]+)["']/g, (_, folder, utility) => `from ${JSON.stringify(new URL(`../dist/app/${folder}/${utility}.js`, import.meta.url).href)}`)
+			.replace(/from ["'](?:\.\.\/)+(utils|theme(?:\/components)?)\/([\w-]+)["']/g, (_, folder, utility) => `from ${JSON.stringify(new URL(`../dist/app/${folder}/${utility}.js`, import.meta.url).href)}`)
 		await writeFile(`${directory}/${file}.ts`, code)
 	}
 	await write('Icon', await readFile(new URL('../src/app/components/internal/Icon.meeko', import.meta.url), 'utf8'))
@@ -64,7 +65,7 @@ const items = `[
 	{ label: 'Archivar', disabled: true },
 	{ label: 'Perdido', href: '/gone', disabled: true },
 	{ separator: true },
-	{ label: 'Eliminar', tone: 'danger' },
+	{ label: 'Eliminar', color: 'danger' },
 ]`
 
 test('UIMenu renders the Menu Button pattern on the server: trigger, menu, items, links and separators', { timeout: 60_000 }, async (context) => {
@@ -100,8 +101,8 @@ test('UIMenu renders the Menu Button pattern on the server: trigger, menu, items
 	assert.match(lost, /^<a/)
 	assert.equal(attribute(lost, 'href'), undefined, 'a disabled link goes nowhere')
 	assert.equal(attribute(lost, 'aria-disabled'), 'true')
-	assert.ok(classes(remove).includes('text-danger-text'), 'the danger tone')
-	assert.ok(!classes(rename).includes('text-danger-text'))
+	assert.ok(classes(remove).includes('text-danger-11') && classes(remove).includes('not-aria-disabled:hover:bg-danger-3'), 'the danger color')
+	assert.ok(!classes(rename).includes('text-danger-11'))
 	assert.equal(own, '<button type="button" role="menuitem">', 'the items of the snippet go after those of the data')
 	const separator = tag(html, /role="separator"/)
 	assert.match(separator, /^<span/)
@@ -178,6 +179,7 @@ test('an explicit size wins over the one of ui.defaults, and ui.defaults validat
 	assert.throws(() => validateDefaults({ segmentedControl: { size: 'lg' } }), /use one of sm, md/)
 	assert.throws(() => validateDefaults({ menu: { ui: { list: 'x' } } }), /its slots are base, trigger, chevron, item, icon, label, shortcut, separator/)
 	assert.throws(() => validateDefaults({ menu: { tone: 'danger' } }), /unknown option defaults.menu.tone/)
+	assert.throws(() => validateDefaults({ menu: { color: 'danger' } }), /unknown option defaults.menu.color/)
 })
 
 test('the segments of UIRadioGroup keep their classes, which UISegmentedControl shares', () => {
@@ -213,12 +215,13 @@ const days = signal('7');
 const open = signal(false);
 const chosen = signal('');
 </script>
-<template><UIMenu triggerLabel="Acciones" placement="bottom-end" model="open" bind:items="[{ label: 'Uno', onSelect: (item) => (chosen.value = item.label) }, { label: 'Dos', href: '/dos' }, { separator: true }, { label: 'Tres', tone: 'danger', shortcut: 'Supr' }]" on:select="(item) => (chosen.value = item.label.toUpperCase())"><snippet name="item" params="item"><b>{item.label.toUpperCase()}</b></snippet></UIMenu><UISegmentedControl legend="Periodo" hideLegend size="sm" model="days" bind:options="[{ value: '7', label: '7 días' }]" /><UISegmentedControl ariaLabel="Vista" bind:options="[]" /></template>`
+<template><UIMenu triggerLabel="Acciones" placement="bottom-end" model="open" bind:items="[{ label: 'Uno', onSelect: (item) => (chosen.value = item.label) }, { label: 'Dos', href: '/dos' }, { separator: true }, { label: 'Tres', color: 'danger', shortcut: 'Supr' }]" on:select="(item) => (chosen.value = item.label.toUpperCase())"><snippet name="item" params="item"><b>{item.label.toUpperCase()}</b></snippet></UIMenu><UISegmentedControl legend="Periodo" hideLegend size="sm" model="days" bind:options="[{ value: '7', label: '7 días' }]" /><UISegmentedControl ariaLabel="Vista" bind:options="[]" /></template>`
 	const errors = (diagnostics) => diagnostics.filter((item) => item.severity !== 'warning')
 	assert.deepEqual(errors(await checkSource(source, filename)), [])
 	for (const [broken, pattern] of [
 		[source.replace('placement="bottom-end"', 'placement="sideways"'), /sideways/],
-		[source.replace("tone: 'danger'", "tone: 'warning'"), /warning/],
+		[source.replace("color: 'danger'", "color: 'warning'"), /warning/],
+		[source.replace("color: 'danger'", "tone: 'danger'"), /tone/],
 		[source.replace("href: '/dos' }", "href: '/dos', onSelect: () => {} }"), /onSelect|never/],
 		[source.replace('item.label.toUpperCase())"', 'item.missing)"'), /missing/],
 		[source.replace('{item.label.toUpperCase()}', '{item.label.toFixed()}'), /toFixed/],

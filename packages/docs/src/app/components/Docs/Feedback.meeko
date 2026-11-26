@@ -48,7 +48,7 @@
 		<div role="status">
 			<UIAlert
 				if:when="answered.value"
-				tone="success"
+				color="success"
 				role="none"
 				bind:description="t('shell.feedback.thanks')"
 			/>
@@ -132,12 +132,12 @@
 			</UIDisclosure>
 			<UIAlert
 				if:when="helpfulError.value"
-				tone="danger"
+				color="danger"
 				bind:description="helpfulError.value"
 			/>
 			<UIAlert
 				if:when="form.error.value"
-				tone="danger"
+				color="danger"
 				bind:description="form.error.value"
 			/>
 		</form>

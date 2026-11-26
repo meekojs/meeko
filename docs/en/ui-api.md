@@ -70,6 +70,8 @@ export default defineMeekoConfig({
 
 `tokens` accepts `primary`, `primaryHover`, `onPrimary`, `accentSoft`, `accentText`, `surface`, `surfaceHover`, `text`, `textSoft`, `muted`, `border`, `borderStrong`, `danger`, `focus`, `radius`, `font`, `controlHeight`, `controlPadding`, `controlWeight` and `controlFontSize`. Each key assigns `--ui-*` tokens: `primary` is `--ui-color-primary` and the step `--ui-color-primary-9` that a solid button paints with (`primaryHover`, step 10; `accentSoft` and `accentText`, steps 3 and 11; `danger`, steps 9 and 11 of its scale), `text` is `--ui-color-text`, and `surface` covers both surfaces and controls. `var(...)` references follow the application's themes without duplicating their colors.
 
+`UIBadge`, `UIAlert`, `UIToast`, `UIAvatar`, `UISparkline`, the link of `UIStat`, the `danger` item of `UIMenu` and the highlighted label of `UINavigationTree` paint with the steps of their color's scale (`--ui-color-<color>-3` for the background, `-11` for the text and `-7` for the border), not with the semantic tokens `--ui-color-<color>-soft`, `-text` and `-border`: redefining those in a stylesheet does not change their color. `ui.tokens` does, because it also assigns the steps; in CSS, redefine the steps or give the component a class.
+
 `base: false` omits the global UI base (see [Customization](#customization)).
 
 Options are validated when the module loads. Tokens are added to the UI stylesheet before it goes through PostCSS; no inline styles or files in `node_modules` are generated. The application's stylesheets load afterwards and can override them.
@@ -193,11 +195,11 @@ You can override `--ui-container-max-width` and `--ui-container-gutter` from a c
 
 ### Basic controls
 
-| Component  | API                                                                                                                                                                                                                                                                                                                                                                       |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `UIButton` | Route (`to`, `params`, `search`), link (`href`, `target`, `rel`, `download`) or button (`type`, `disabled`); see [UIButton](#uibutton-route-link-or-button). Accepts `variant`, `color`, `size`, `radius`, `width`, `elevation`, `class`, `click` event and `default` snippet. By default `button`, `solid`, `primary`, `md` and radius `md`.                             |
-| `UIInput`  | Text model with `model`. Props: `id`, `name`, `type`, `placeholder`, `required`, `disabled`, `invalid`, `describedBy` and `class`. Accepted types: `text`, `email`, `password`, `search`, `url`, `tel`, `number`, `date`, `datetime-local`, `time` and `month`. By default it uses `text` and an empty value; see [Numbers, times and months](#numbers-times-and-months). |
-| `UIField`  | Requires `id`, `label` and the `default(id, describedBy)` snippet. Optional props: `description`, `error`, `required`, `class`. The error takes priority over the description and is announced with `role="alert"`.                                                                                                                                                       |
+| Component  | API                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `UIButton` | Route (`to`, `params`, `search`), link (`href`, `target`, `rel`, `download`) or button (`type`, `disabled`); see [UIButton](#uibutton-route-link-or-button). Accepts `variant`, `color`, `size`, `radius`, `width`, `elevation`, `class`, `click` event and `default` snippet. By default `button`, `solid`, `primary`, `md` and radius `md`.                                                                                                  |
+| `UIInput`  | Text model with `model`. Props: `id`, `name`, `type`, `placeholder`, `required`, `disabled`, `invalid`, `describedBy`, `variant`, `color`, `size`, `radius` and `class`; see [Field look](#field-look). Accepted types: `text`, `email`, `password`, `search`, `url`, `tel`, `number`, `date`, `datetime-local`, `time` and `month`. By default it uses `text` and an empty value; see [Numbers, times and months](#numbers-times-and-months). |
+| `UIField`  | Requires `id`, `label` and the `default(id, describedBy)` snippet. Optional props: `description`, `error`, `required`, `class`. The error takes priority over the description and is announced with `role="alert"`.                                                                                                                                                                                                                            |
 
 It also includes `UIApp` and `UIModal` for [modals](#modals), `UITable` for [tables](#tables), `UICard` for [cards](#cards), and the navigation and label components below.
 
@@ -230,6 +232,28 @@ It also includes `UIApp` and `UIModal` for [modals](#modals), `UITable` for [tab
 
 - **The model is text.** Also with `number`, the model is a `Signal<string>` with the text of the control (`'42'`, `'09:30'`, `'2026-11'`), as the `model` of a native `<input>`: an empty or half-typed field (`-`, `1e`) has no number, and a `number` would lose it. Convert it where you use it (`Number(quantity.value)`, or a `v.transform` in the schema of `useForm`); empty is `''`.
 - **Look.** The figures of `number`, `time`, `month`, `date` and `datetime-local` have the same width (`tabular-nums`) and, in WebKit, the value of a date or a time aligns to the start. The pickers and the step buttons are the browser ones, with the `color-scheme` of the theme.
+
+### Field look
+
+`UIInput` is the `inputTheme` recipe of `@meekojs/ui/theme`, on the shared catalog: `variant` is the treatment (`outline`, `surface`, `soft` or `ghost`, only the bottom line) and `color`, the semantic color (`primary`, `secondary`, `neutral`, `success`, `info`, `warning` or `danger`) of the background and the text. `size` goes from `xs` to `xl` on the `--ui-control-*` tokens and `radius`, from `none` to `full`. Without them it is the field of always: `outline`, `neutral`, `md` and radius `md`.
+
+```html
+<UIInput
+	name="q"
+	type="search"
+	variant="soft"
+	color="primary"
+	size="lg"
+	radius="full"
+	model="query"
+/>
+```
+
+- **Border and error.** Whatever its color, the border is the one of the controls (`--ui-color-control-border`, with a 3:1 contrast), and `invalid` turns it to the danger one.
+- **Size.** Each `size` is as tall as its `--ui-control-height-*` token, like a `UIButton` of the same size: `xs` and `sm` also take the text of that button (`text-control-xs`, `text-control-sm`) and a thinner vertical padding; from `md` up the text is `--ui-input-font-size`. `size` is the variant, not the native attribute: it no longer reaches the `<input>`, so set a width in characters with a class (`class="w-48"` or `class="max-w-[20ch]"`).
+- **Per application.** `ui.defaults.input` accepts `variant`, `color`, `size`, `radius` and `class`; the prop of the instance wins.
+- **From the previous API.** The `appearance` prop is gone: its keys are props (`bind:appearance="{ variant: 'soft' }"` is `variant="soft"`), and `color` now takes the seven colors. `<UIInput size="20">` no longer sets the native width: use a class.
+- **Types.** `UIInputVariant`, `UIInputColor`, `UIInputSize` and `UIInputRadius` are imported from `@meekojs/ui/runtime`; `InputThemeProps`, from `@meekojs/ui/theme`.
 
 ### UIButton: route, link or button
 
@@ -328,7 +352,7 @@ It also includes `UIApp` and `UIModal` for [modals](#modals), `UITable` for [tab
 
 - `UILink` gives a real `<a>` the appearance of an action, with the defaults of `ui.defaults.link`. It receives `href` (any URL) or `to` (a route of the application with typed `params` and `search`, as in `UIButton`, with client navigation and the `href` localized with `@meekojs/i18n`); one of the two, not both. With either it accepts `target`, `rel`, `download`, `hreflang` and `lang`. It shares `variant`, `color`, `size`, `radius`, `width` and `elevation` with `UIButton`, and accepts `ariaLabel`, `class`, `id`, `title`, `aria-*`, `data-*` and the `click` event. It does not simulate buttons or use artificial roles. For `target="_blank"` it adds `noopener noreferrer` if `rel` is not specified.
 - `UILinkCard` is a linked surface: it requires `title` and a destination, `href` (any URL) or `to` (a route of the application with `params`, `search` and `resolve`, as in `UILink`, with client navigation and the `href` localized with `@meekojs/i18n`), with optional `description`, `class` and `default` snippet. Its look is the `linkCardTheme` recipe, with the `variant`, `color`, `radius` and `elevation` of `UICard` and its defaults, plus the pointer states; `ui.defaults.linkCard` accepts those four. It accepts `target`, `rel`, `download`, `hreflang`, `lang`, `id`, `aria-*`, `data-*` and the `click` event; `title` is the card's text, not the HTML attribute. The content must not include other links or buttons, because the whole card is a single link.
-- `UIBadge` shows metadata, with `tone="neutral|info|success|warning|danger"` (`neutral` by default), `dot`, `class` and a required `default` snippet. It keeps text semantics; it adds no announcements or interaction.
+- `UIBadge` shows metadata with the `badgeTheme` recipe: `variant` (`soft` by default, `solid`, `surface` or `outline`), `color` (`primary`, `secondary`, `neutral`, `success`, `info`, `warning` or `danger`; `neutral` by default) and `radius` (from `none` to `full`; `full` by default), with `dot`, `class`, `ui` (`base`, `dot`) and a required `default` snippet. `ui.defaults.badge` accepts `variant`, `color`, `radius`, `class` and `ui`. It keeps text semantics; it adds no announcements or interaction. `tone` and `appearance` are gone: `tone="success"` is `color="success"`, `tone="accent"` is `color="primary"`, and the keys of `appearance` are props. The values `UIBadgeVariant`, `UIBadgeColor` and `UIBadgeRadius` are imported from `@meekojs/ui/runtime`.
 
 ```html
 <UILink
@@ -343,7 +367,7 @@ It also includes `UIApp` and `UIModal` for [modals](#modals), `UITable` for [tab
 	title="Framework"
 	description="Routes, SSR and data."
 />
-<UIBadge tone="info">Feature</UIBadge>
+<UIBadge color="info">Feature</UIBadge>
 ```
 
 The public site `apps/meeko` uses these actions in its home page, header and errors; `UILinkCard` makes up the documentation index and `UIBadge` the reference metadata. Its `meeko.config.ts` links the tokens to the current palette, including the neutral actions and the blue focus.
@@ -396,7 +420,7 @@ To adjust a particular component, give it your classes:
 	…
 </UIField>
 <UIBadge
-	tone="success"
+	color="success"
 	dot
 	bind:ui="{ dot: 'pulse' }"
 >
@@ -440,7 +464,7 @@ export default defineMeekoConfig({
 ```
 
 - **`class` and `ui` add up.** The classes of `ui.defaults` are added to those of each instance, they do not replace them: first those of the component, then those of `ui.defaults` and last those of the instance. `class` reaches where the prop of the instance does: in `UITable`, the `<table>`. Without class merging, the cascade decides a conflict, as [What wins](#classes-per-slot) explains: an unlayered rule of your application wins over those of UI, and between two rules of yours their specificity and their order in your stylesheet decide, not the order of the classes in the attribute.
-- **Variants.** A few accept a base value: `variant`, `color`, `size` and `radius` in `button`, `link`, `iconButton` and `copyButton`; `variant`, `color`, `radius`, `elevation`, `padding`, `density` and `actionsWrap` in `card`; `variant`, `color`, `radius` and `elevation` in `linkCard`, and `density` in `table`. The explicit prop of the instance always wins. In `card`, a `padding` or a `density` of the instance wins over both of `ui.defaults`, and at each level `padding` wins over `density`. The other variants have no default because they depend on each instance: the `tone` of `UIAlert`, `UIBadge` or `UIToast` says what the message is, and `layout`, `side`, `sticky`, the `size` of `UIModal` or `columns` follow the structure and the content of each page. Adjust their look with `class` and `ui`.
+- **Variants.** A few accept a base value: `variant`, `color`, `size` and `radius` in `button`, `link`, `iconButton`, `copyButton` and `input`; `size`, `variant`, `color` and `radius` in `avatar`; `variant`, `color` and `radius` in `badge`; `variant`, `color`, `radius`, `elevation`, `padding`, `density` and `actionsWrap` in `card`; `variant`, `color`, `radius` and `elevation` in `linkCard`, and `density` in `table`. The explicit prop of the instance always wins. In `card`, a `padding` or a `density` of the instance wins over both of `ui.defaults`, and at each level `padding` wins over `density`. The other variants have no default because they depend on each instance: the `variant` and `color` of `UIAlert` or `UIToast` say what the message is, and `layout`, `side`, `sticky`, the `size` of `UIModal` or `columns` follow the structure and the content of each page. Adjust their look with `class` and `ui`.
 - **Components.** `UIButton`, `UILink`, `UIInput`, `UITextarea`, `UIContainer`, `UIProse`, `UIPopover` and `UITooltip` have no slots: they only accept `class`. `toast` only accepts `ui`, and it also applies to the notices of `useToast()`. `markdownEditor` is `UIMarkdownEditor`, from `@meekojs/ui/editor`. The `UIDefaults` type describes each component with its real slots, and the editor completes them.
 - **Validation.** An unknown component, option or slot, an empty class or a variant value that does not exist make the module fail to load with an error that says what is accepted, such as `ui: unknown slot head in defaults.card.ui; its slots are base, header, title, description, actions, body, footer`.
 - **Client.** The defaults travel with the JavaScript of every page, as a plain copy of the validated values: put classes there, not data.
@@ -471,7 +495,7 @@ The components used to carry `.meeko-ui-*` classes and `data-*` attributes that 
 | `.meeko-ui-description-list` and `data-columns`                                                                                                        | `UIDescriptionList`: `ui.base`, `ui.item`, `ui.label`, `ui.value`, `ui.code`, `ui.detail`; the `columns` prop.                                            |
 | `.meeko-ui-modal`, `-modal-heading`, `-modal-body`, `-modal-footer`, `-modal-close` and `data-size`                                                    | `UIModal`: `ui.base`, `ui.heading`, `ui.title`, `ui.description`, `ui.body`, `ui.footer`, `ui.close`; the `size` prop.                                    |
 | `.meeko-ui-drawer`, `-drawer-trigger`, `-drawer-panel`, `-drawer-heading`, `-drawer-body`, `-drawer-footer`, `-drawer-close` and `data-side`           | `UIDrawer`: `ui.base`, `ui.trigger`, `ui.panel`, `ui.heading`, `ui.title`, `ui.body`, `ui.footer`, `ui.close`.                                            |
-| `.meeko-ui-alert`, `-alert-icon`, `-alert-content`, `-alert-title`, `-alert-description`, `-feedback-actions`, `-dismiss` and `data-tone`              | `UIAlert`: `ui.base`, `ui.icon`, `ui.content`, `ui.title`, `ui.description`, `ui.actions`, `ui.dismiss`; the `tone` prop.                                 |
+| `.meeko-ui-alert`, `-alert-icon`, `-alert-content`, `-alert-title`, `-alert-description`, `-feedback-actions`, `-dismiss` and `data-tone`              | `UIAlert`: `ui.base`, `ui.icon`, `ui.content`, `ui.title`, `ui.description`, `ui.actions`, `ui.dismiss`; the `variant` and `color` props.                 |
 | `.meeko-ui-toast`, `-toast-content`, `-toast-message`                                                                                                  | `UIToast` or `useToast().add()`: `ui.base`, `ui.content`, `ui.message`, `ui.actions`, `ui.dismiss`.                                                       |
 | `.meeko-ui-empty`, `-empty-title`, `-empty-description`                                                                                                | `UIEmpty`: `ui.base`, `ui.title`, `ui.description`, `ui.actions`.                                                                                         |
 | `.meeko-ui-skeleton`; `.meeko-ui-disclosure`, `-disclosure-body`                                                                                       | `UISkeleton`: `ui.base`, `ui.line`. `UIDisclosure`: `ui.base`, `ui.summary`, `ui.body`.                                                                   |
@@ -648,7 +672,7 @@ Each key of the row has its own snippets, `cell-<clave>` and `header-<clave>`. A
 		name="cell-status"
 		params="row, value"
 	>
-		<UIBadge bind:tone="value === 'Publicado' ? 'success' : 'neutral'">{value}</UIBadge>
+		<UIBadge bind:color="value === 'Publicado' ? 'success' : 'neutral'">{value}</UIBadge>
 	</snippet>
 	<snippet
 		name="header-name"
@@ -977,7 +1001,7 @@ Public types from `@meekojs/ui/runtime`.
 		{ label: 'Rename', shortcut: 'F2', onSelect: rename },
 		{ label: 'Settings', to: '/settings' },
 		{ separator: true },
-		{ label: 'Delete', tone: 'danger', onSelect: remove },
+		{ label: 'Delete', color: 'danger', onSelect: remove },
 	]"
 	on:select="(item) => log(item.label)"
 />
@@ -985,7 +1009,7 @@ Public types from `@meekojs/ui/runtime`.
 
 **A panel that is not a menu.** Notifications, the user account or a set of filters hold controls, links or text, not a list of actions: they do not belong in `UIMenu`, whose `role="menu"` makes every element a `menuitem` and takes away navigation with `Tab`. Use `<UIPopover role="dialog" label="Notifications">` with the trigger you want (for example a `UIIconButton` in the `anchor` snippet): the focus moves into the panel, `Tab` goes through its controls and `Esc` closes it and gives the focus back.
 
-Each entry of `items` (`UIMenuEntry`) is an action (`UIMenuAction`: a `<button role="menuitem">` with `onSelect`), a link (`UIMenuLink`: an `<a role="menuitem">` with `href`, or with typed `to`, `params` and `search`, which navigates with `<MeekoLink>`) or a separator (`{ separator: true }`, with `role="separator"`). An item also takes `value`, `tone: 'danger'`, `disabled` (still visible, with `aria-disabled`, and not choosable), `icon` (a 16 by 16 SVG path) and `shortcut` (a reminder after the text; the application implements the shortcut). The `select` event receives the chosen item, after its `onSelect`.
+Each entry of `items` (`UIMenuEntry`) is an action (`UIMenuAction`: a `<button role="menuitem">` with `onSelect`), a link (`UIMenuLink`: an `<a role="menuitem">` with `href`, or with typed `to`, `params` and `search`, which navigates with `<MeekoLink>`) or a separator (`{ separator: true }`, with `role="separator"`). An item also takes `value`, `color` (`neutral` by default or `danger`, which replaces `tone: 'danger'`), `disabled` (still visible, with `aria-disabled`, and not choosable), `icon` (a 16 by 16 SVG path) and `shortcut` (a reminder after the text; the application implements the shortcut). The `select` event receives the chosen item, after its `onSelect`.
 
 Without `triggerLabel` or a `trigger` snippet, the trigger is an icon-only button with three dots, for a row menu, named with `menu.trigger` of the messages (“Más acciones”, “More actions”) unless `ariaLabel` is given. The snippets are `trigger` (content of the button), `anchor` (a custom trigger, as in `UIPopover`), `item` (inside of each item of `items`) and `default` (custom items with `role="menuitem"` after those of `items`). The list only paints phrasing content, so the component is valid inside a `<p>`.
 
@@ -1333,7 +1357,7 @@ Every link in a list accepts `href` (any URL) or `to` (a route with typed `param
 | `UIFooter`           | `brand`, `description`, `groups`, `items`, `label`, `size` (`2xl`), `class`                                                                                                                                            | `brand`, `about`, `actions`, `legal`                                |
 | `UINavigationTree`   | `groups` (`title`, `icon`, `open`, `items` with `icon`, `code`, `featured`, `aliases`), `current`, `label`, `collapsible` (`true`), `featuredLabel`, `emptyText`, `class`                                              | `item(item, current)`, `icon(entry)`, `empty`                       |
 | `UIDrawer`           | `title`, `id`, `side` (`start`, `end`), `triggerLabel`, `closeLabel`, `closedBy` (`any`, `closerequest`, `none`), `closeOnNavigate` (`true`), `class`; `open` model with `model`                                       | `default`, `footer`, `trigger(id)`; `close` event                   |
-| `UINavigationTabs`   | `items` (with `badge`, `badgeTone`, `badgeDot`), `current`, `label`, `variant` (`underline`, `segmented`), `class`                                                                                                     | `select(event, item)` event                                         |
+| `UINavigationTabs`   | `items` (with `badge`, `badgeColor`, `badgeDot`), `current`, `label`, `variant` (`underline`, `segmented`), `class`                                                                                                    | `select(event, item)` event                                         |
 | `UIBreadcrumb`       | `items` (the last one is the current page; without a destination it is text), `label`, `class`                                                                                                                         |                                                                     |
 | `UIPageNavigation`   | `previous`, `next`, `label`, `previousLabel`, `nextLabel`, `class`                                                                                                                                                     |                                                                     |
 | `UIPagination`       | `shown`, `total`, `countText`, `hasMore`, `busy`, `moreLink`, `loadMoreLabel`, `loadingLabel`, `label`, `class`; numbered: `pageCount`, `pageSize`, `siblings`, `edges`, `pageLink`, `disabled` and the `page` model   | `default`; `loadMore` and `change(page)` events                     |
@@ -1471,28 +1495,28 @@ To open or close it from the parent, assign its `model` or call `show()` and `hi
 
 The new controls keep native HTML, the keyboard and form submission. All models bind to a signal (`model="field"`), not with `bind:model`.
 
-| Component           | Contract                                                                                                                                                                                                                 |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `UITextarea`        | String model; native attributes `rows`, `name`, `maxlength`, `required`, `disabled`; `invalid`, `describedBy`.                                                                                                           |
-| `UICheckbox`        | Boolean model; `label`, `description`, `name`, `value`, `required`, `disabled`, `invalid`, `describedBy`.                                                                                                                |
-| `UIRadioGroup`      | String model; `legend`, `options` (`value`, `label`, `disabled`), `name`, `required`, `disabled`; `variant="default"` or `"segmented"`. Native arrows and selection.                                                     |
-| `UISwitch`          | Boolean model and the Checkbox contract, with `role="switch"`.                                                                                                                                                           |
-| `UISlider`          | Numeric model; `label`, `name`, `min`, `max`, `step`, `disabled` and native attributes.                                                                                                                                  |
-| `UIAlert`           | `tone`, `title`, `description`, `icon` (snippet), `dismiss`, `closeLabel`, `role`; snippets `default`, `icon`, `actions`; `dismiss` event. Danger uses `alert`; the others, `note`; `status` can be chosen.              |
-| `UIDisclosure`      | `summary`, `open`, `class`; `default` snippet. Native `<details>`: opens with the keyboard and without JavaScript.                                                                                                       |
-| `UIEmpty`           | `title`, `description`, `variant="inline"` or `"panel"`; snippets `default` and `actions`.                                                                                                                               |
-| `UISkeleton`        | `lines`, `widths` (`full`, `long`, `short`), `label`; announces loading once and respects reduced motion.                                                                                                                |
-| `UIStat`            | `label`, `value`, `detail`, with `dl/dt/dd`; the `value` and `detail` snippets accept markup, such as a link. With `change`, `period`, `trend`, `href` or `to`, a [key figure](#uistat-as-a-key-figure-and-uisparkline). |
-| `UIDescriptionList` | `items` (`label`, `labelLang`, `value`, `detail`, `code`, `title`), `columns` (1, 2 or 3), one column on mobile. `code` renders the value in `<code>`.                                                                   |
-| `UIToast`           | `text`, `tone`, `duration`, `closeLabel`, `actions` (snippet or prop); `dismiss` event. Manual native popover, without taking focus.                                                                                     |
+| Component           | Contract                                                                                                                                                                                                                                                                                                                                              |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `UITextarea`        | String model; native attributes `rows`, `name`, `maxlength`, `required`, `disabled`; `invalid`, `describedBy`.                                                                                                                                                                                                                                        |
+| `UICheckbox`        | Boolean model; `label`, `description`, `name`, `value`, `required`, `disabled`, `invalid`, `describedBy`.                                                                                                                                                                                                                                             |
+| `UIRadioGroup`      | String model; `legend`, `options` (`value`, `label`, `disabled`), `name`, `required`, `disabled`; `variant="default"` or `"segmented"`. Native arrows and selection.                                                                                                                                                                                  |
+| `UISwitch`          | Boolean model and the Checkbox contract, with `role="switch"`.                                                                                                                                                                                                                                                                                        |
+| `UISlider`          | Numeric model; `label`, `name`, `min`, `max`, `step`, `disabled` and native attributes.                                                                                                                                                                                                                                                               |
+| `UIAlert`           | `variant` (`soft` by default, `surface`, `outline`, `solid`), `color` (seven semantic ones; `neutral` by default), `title`, `description`, `icon` (snippet), `dismiss`, `closeLabel`, `role`; snippets `default`, `icon`, `actions`; `dismiss` event. `color="danger"` uses `alert`; the others, `note`; `status` can be chosen. They replace `tone`. |
+| `UIDisclosure`      | `summary`, `open`, `class`; `default` snippet. Native `<details>`: opens with the keyboard and without JavaScript.                                                                                                                                                                                                                                    |
+| `UIEmpty`           | `title`, `description`, `variant="inline"` or `"panel"`; snippets `default` and `actions`.                                                                                                                                                                                                                                                            |
+| `UISkeleton`        | `lines`, `widths` (`full`, `long`, `short`), `label`; announces loading once and respects reduced motion.                                                                                                                                                                                                                                             |
+| `UIStat`            | `label`, `value`, `detail`, with `dl/dt/dd`; the `value` and `detail` snippets accept markup, such as a link. With `change`, `period`, `trend`, `href` or `to`, a [key figure](#uistat-as-a-key-figure-and-uisparkline).                                                                                                                              |
+| `UIDescriptionList` | `items` (`label`, `labelLang`, `value`, `detail`, `code`, `title`), `columns` (1, 2 or 3), one column on mobile. `code` renders the value in `<code>`.                                                                                                                                                                                                |
+| `UIToast`           | `text`, `variant` and `color` (those of `UIAlert`, `soft` and `neutral` by default), `duration`, `closeLabel`, `actions` (snippet or prop); `dismiss` event. Manual native popover, without taking focus. They replace `tone`.                                                                                                                        |
 
 `UISegmentedControl` is a compact single choice with native radios, which works without JavaScript: string model; `options`, `legend` with `hideLegend` (for screen readers only) or `ariaLabel`, `size="sm"` or `"md"` (the height of a control of that size), `name`, `required` and `disabled`. When the options do not fit, it scrolls sideways without breaking them or widening the page. `ui.defaults.segmentedControl` takes `size`, and `ui`, its slots `base`, `legend`, `options`, `option` and `input`. For a compact switcher, prefer it to `UIRadioGroup variant="segmented"`, which wraps into several lines.
 
-The prop types, `UIDensity`, `UITone` and `UIToastContext` are exported from `@meekojs/ui/runtime`. The default texts are configured in `ui.messages.<locale>.feedback` (`close`, `empty`, `loading`); there is Spanish and English.
+The prop types, `UIDensity`, `UIMessageVariant`, `UIMessageColor` (the values of `variant` and `color` of `UIAlert` and `UIToast`) and `UIToastContext` are exported from `@meekojs/ui/runtime`; `UITone` is gone. The default texts are configured in `ui.messages.<locale>.feedback` (`close`, `empty`, `loading`); there is Spanish and English.
 
 `UIButton` adds `color="danger"` for a destructive action, `loading`, `iconOnly` and `ariaLabel`. When using only an icon, always provide `ariaLabel` or `aria-label`. `loading` keeps the text and adds the spinner; it announces `aria-busy` and `aria-disabled`, and prevents activating the action without taking its focus away. With `iconOnly`, the icon measures `--ui-icon-size`. The submit button keeps `name`, `value` and `form`.
 
-`UIBadge` adds the tones `info`, `success`, `warning` and `dot`. `UIInput` accepts `number`, `date`, `datetime-local`, `time` and `month`, with a model that is always text, and native attributes such as `inputmode`, `autocomplete`, `autocapitalize`, `spellcheck`, `min`, `max` and `step`. `UIField` adds `hint` and `counter` (string or number); the IDs of both are included in the `describedBy` its snippet receives.
+`UIBadge` adds the colors `info`, `success` and `warning`, and `dot`. `UIInput` accepts `number`, `date`, `datetime-local`, `time` and `month`, with a model that is always text, and native attributes such as `inputmode`, `autocomplete`, `autocapitalize`, `spellcheck`, `min`, `max` and `step`. `UIField` adds `hint` and `counter` (string or number); the IDs of both are included in the `describedBy` its snippet receives.
 
 `UICard` and `UITable` accept `density="compact" | "normal" | "comfortable"`. Card adds `padding="none" | "sm" | "md" | "lg"`, which wins over density. Table columns accept `numeric` (end alignment) and `rowHeader` (`th scope="row"`), also in the grid layout. `hideCaption` hides a table's title from view, when a heading already says it, and it still names the table.
 
@@ -1526,25 +1550,25 @@ With `change`, `period`, `trend`, `href` or `to`, `UIStat` is a key figure (a "K
 - **Change.** `change` is a number, formatted with `Intl.NumberFormat` in the language of the document and with its sign: with `changeFormat="percent"` (the default) `12.5` is "+12.5%"; with `"number"`, the number as it is. It can also be a text already formatted: it is painted as it is, and its leading sign gives the direction (`-` or `−` goes down; `+` or any digit other than zero goes up; otherwise it does not change). `changeDirection` (`up`, `down` or `flat`) wins over the sign. A number that rounds to zero does not change.
 - **Tone.** `good` says which direction is good: `up` by default, `down` for a response time or an error rate. The good direction has the success tone, the other one the danger tone, and a change of zero is neutral. The arrow (↑, ↓ or →) is a decorative icon; the signed figure is hidden from screen readers, which read "Up 12.5%", "Down 3%" or "No change" instead (messages `stat.up`, `stat.down` and `stat.flat`, with `{change}` without its sign). The tone is not announced: the label already says what is measured.
 - **Period.** `period` follows the change, in soft text: "vs. the previous 30 days".
-- **Trend.** `trend` draws a `UISparkline` with an area beside the value, in the tone of the change (without one, the accent). Its accessible name sums up the series; `trendLabel` replaces it.
+- **Trend.** `trend` draws a `UISparkline` with an area beside the value, in the color of the change (without one, `primary`). Its accessible name sums up the series; `trendLabel` replaces it.
 - **Link.** `href` (any URL) or `to` (a route with `params`, `search` and `resolve`, with `<MeekoLink>`), with `target` and `rel`, render a link of its own, "View details" (message `stat.link`) or `linkLabel`. With the default text, its accessible name adds the label of the figure (`stat.linkName`: "View details: Revenue"), because a page with several figures would have several identical "View details" in the list of links; a `linkLabel` is the name as it is. It is not the whole card: its name would be all of its content, the `value` and `detail` snippets could not hold links of their own and the text could no longer be selected.
 - **Compact mode.** The `<dl>` of a key figure is a container (`container-type: inline-size`): below the `stat-narrow` container size of the theme (`--container-stat-narrow`, 20rem) the sparkline leaves the column beside the value and moves under the change, full width, and the value goes from `2xl` to `xl`. It follows the width of the figure, not that of the window, and it is pure CSS: no jumps on hydration. As a container does not give the width of its content, the figure takes `--ui-stat-intrinsic-width` (12rem) where nothing gives it a width, such as a flex row without `flex-basis`; in a grid or a block it fills its space. The width of the sparkline beside the value is `--ui-stat-trend-width` (7rem).
-- **Slots.** Besides `base`, `label`, `value` and `detail`, `ui` takes `change` (the `<dd>` of the change), `delta` (arrow and figure), `icon`, `period`, `trend` (the `<dd>` of the sparkline), `action` (the `<dd>` of the link) and `link`. `tone`, `direction`, `kpi` and `chart` are not props: the component sets them.
+- **Slots.** Besides `base`, `label`, `value` and `detail`, `ui` takes `change` (the `<dd>` of the change), `delta` (arrow and figure), `icon`, `period`, `trend` (the `<dd>` of the sparkline), `action` (the `<dd>` of the link) and `link`. `color`, `direction`, `kpi` and `chart` are not props: the component sets them.
 
-`UISparkline` draws a series (`values`) as a line, with an optional `area`, in an `<svg>` without dependencies. It takes the width of its container and the height of `--ui-sparkline-height` (2rem) with a `viewBox` of 100 by 32 and `preserveAspectRatio="none"`; the stroke is not distorted (`vector-effect: non-scaling-stroke`, of `--ui-sparkline-stroke-width`). Its size does not depend on JavaScript, so SSR does not jump. It is `role="img"` and its `aria-label` sums up the series with the format of the language: "Trend: minimum 8.2, maximum 12.4, latest 12.4" (message `sparkline.label`, or `sparkline.empty` without values); `label` replaces it and `format` (options of `Intl.NumberFormat`) formats those numbers. `tone` (`neutral`, `accent`, `info`, `success`, `warning` or `danger`) colours the line; without it, `currentColor`. `min` and `max` set the vertical axis, such as `bind:min="0"`. Values that are not finite numbers are left out. When it appears, the series uncovers itself from left to right once, except with `prefers-reduced-motion`. It is an `<svg>` with `display: block`: inside a sentence, give it your own width and `display: inline-block`.
+`UISparkline` draws a series (`values`) as a line, with an optional `area`, in an `<svg>` without dependencies. It takes the width of its container and the height of `--ui-sparkline-height` (2rem) with a `viewBox` of 100 by 32 and `preserveAspectRatio="none"`; the stroke is not distorted (`vector-effect: non-scaling-stroke`, of `--ui-sparkline-stroke-width`). Its size does not depend on JavaScript, so SSR does not jump. It is `role="img"` and its `aria-label` sums up the series with the format of the language: "Trend: minimum 8.2, maximum 12.4, latest 12.4" (message `sparkline.label`, or `sparkline.empty` without values); `label` replaces it and `format` (options of `Intl.NumberFormat`) formats those numbers. `color` (`primary`, `secondary`, `neutral`, `success`, `info`, `warning` or `danger`) colours the line with step 11 of its scale (`neutral`, the soft text); without it, `currentColor`. It replaces `tone`: `tone="accent"` is `color="primary"`. `min` and `max` set the vertical axis, such as `bind:min="0"`. Values that are not finite numbers are left out. When it appears, the series uncovers itself from left to right once, except with `prefers-reduced-motion`. It is an `<svg>` with `display: block`: inside a sentence, give it your own width and `display: inline-block`.
 
 ```html
 <UISparkline
 	bind:values="visits"
 	area
-	tone="accent"
+	color="primary"
 	bind:min="0"
 />
 ```
 
 - **Defaults.** `ui.defaults.stat` takes the new slots, and `ui.defaults.sparkline` takes `class` and the slots `base`, `area` and `line`; the sparkline of `UIStat trend` gets them too.
 - **Help next to the label.** `hint` draws a `UIHint` (ⓘ) after the label, with its extra class in `ui.hint`: `<UIStat label="Revenue" hint="Paid sales, before tax" … />`. The `label` snippet replaces the text of the label on screen; `label` still names the link and the sparkline.
-- **Types.** `UISparklineProps`, `UISparklineTone` and `UIStatDirection` are imported from `@meekojs/ui/runtime`, as `UIStatProps`.
+- **Types.** `UISparklineProps`, `UISparklineColor` and `UIStatDirection` are imported from `@meekojs/ui/runtime`, as `UIStatProps`.
 
 ### Notifications from a page
 
@@ -1556,7 +1580,7 @@ The module installs one provider per application; `<UIApp>` hosts the notificati
 	const toast = useToast()
 </script>
 <template>
-	<UIButton on:click="() => toast.add({ text: 'Changes saved', tone: 'success', duration: 5000 })">Save</UIButton>
+	<UIButton on:click="() => toast.add({ text: 'Changes saved', color: 'success', duration: 5000 })">Save</UIButton>
 </template>
 ```
 

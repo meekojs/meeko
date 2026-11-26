@@ -10,7 +10,7 @@
 	import { icons } from '../utils/icons'
 	import { fillMessage, uiMessages, uiMessagesFor } from '../utils/messages'
 	import { linkTarget } from '../utils/navigation'
-	import { localeSuggestion } from '../variants/locale'
+	import { localeSuggestionTheme } from '../theme/components/locale'
 	import * as Icon from './internal/Icon.meeko'
 	import * as ItemLink from './internal/ItemLink.meeko'
 
@@ -31,7 +31,7 @@
 	const speaksOffered = computed(() => texts.value?.translated === true || (props.message !== undefined && props.goLabel !== undefined))
 	const target = computed<UILinkTarget | undefined>(() => (offered.value ? { ...linkTarget(offered.value), hreflang: offered.value.hreflang ?? offered.value.code } : undefined))
 
-	const classes = localeSuggestion()
+	const classes = localeSuggestionTheme()
 	// Both actions are buttons of theme/components/button: a solid primary one to go, a neutral outline one to stay.
 	const goClass = (): string => buttonTheme({ variant: 'solid', color: 'primary', size: 'sm', class: classes.go({ class: theme.ui.go }) })
 	const stayClass = (): string => buttonTheme({ variant: 'outline', color: 'neutral', size: 'sm', class: classes.stay({ class: theme.ui.stay }) })

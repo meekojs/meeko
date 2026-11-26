@@ -1,5 +1,5 @@
 /*
- * What the messages cannot say with utilities (variants/feedback.ts): the pseudo-elements of the View
+ * What the messages cannot say with utilities (theme/components/alert.ts and toast.ts): the pseudo-elements of the View
  * Transition that closes a toast, which belong to the document, and the keyframes.
  */
 

@@ -1,12 +1,13 @@
-import type { descriptionList, sparkline, stat } from '../variants/data'
+import type { descriptionListTheme } from '../theme/components/description-list'
+import type { sparklineTheme, UISparklineColor } from '../theme/components/sparkline'
+import type { statTheme } from '../theme/components/stat'
 import type { UIRouteTarget } from './button'
 import type { UIThemeProps } from './theme'
 
 /** Dirección de la variación de `<UIStat>`: sube, baja o se queda igual. @since 1.10.0 @example const direction: UIStatDirection = 'up' */
 export type UIStatDirection = 'up' | 'down' | 'flat'
 
-/** Tono de `<UISparkline>`: el color de la línea. Sin él, el color del texto (`currentColor`). @since 1.10.0 */
-export type UISparklineTone = 'neutral' | 'accent' | 'info' | 'success' | 'warning' | 'danger'
+export type { UISparklineColor }
 
 /** `target` y `rel` del enlace de `<UIStat>`, y su texto. */
 interface UIStatLinkOptions {
@@ -70,7 +71,7 @@ type UIStatRouteLink = UIRouteTarget &
 export type UIStatProps = (UIStatWithoutLink | UIStatAnchorLink | UIStatRouteLink) &
 	Omit<
 		UIThemeProps<
-			typeof stat,
+			typeof statTheme,
 			{
 				/**
 				 * Nombre del dato. El snippet `label` sustituye su texto en pantalla (por ejemplo, con un icono); el nombre
@@ -140,7 +141,7 @@ export type UIStatProps = (UIStatWithoutLink | UIStatAnchorLink | UIStatRouteLin
 			}
 		>,
 		// Set by the component from its content: they are not props.
-		'kpi' | 'chart' | 'tone' | 'direction'
+		'kpi' | 'chart' | 'color' | 'direction'
 	>
 
 /**
@@ -151,17 +152,18 @@ export type UIStatProps = (UIStatWithoutLink | UIStatAnchorLink | UIStatRouteLin
  * aparecer, salvo con `prefers-reduced-motion`. `ui` añade clases a sus slots: `base`, `area` y `line`.
  *
  * @since 1.10.0
- * @example `<UISparkline bind:values="[3, 5, 4, 8, 7]" area tone="success" />`
+ * @since 1.11.0 `color` sustituye a `tone` (`accent` es `color="primary"`).
+ * @example `<UISparkline bind:values="[3, 5, 4, 8, 7]" area color="success" />`
  */
 export type UISparklineProps = UIThemeProps<
-	typeof sparkline,
+	typeof sparklineTheme,
 	{
 		/** Valores en orden, del más antiguo al más reciente; los que no son números finitos se omiten. */
 		values: readonly number[]
 		/** Rellena el área bajo la línea, en el mismo color con poca opacidad. */
 		area?: boolean
-		/** Color de la línea; sin él, `currentColor`. */
-		tone?: UISparklineTone
+		/** Color semántico de la línea, el paso 11 de su escala (`neutral`, el texto suave); sin él, `currentColor`. */
+		color?: UISparklineColor
 		/** Mínimo del eje vertical, como `0`; por defecto, el menor valor. */
 		min?: number
 		/** Máximo del eje vertical; por defecto, el mayor valor. */
@@ -197,7 +199,7 @@ export interface UIDescriptionItem {
  * @example `<UIDescriptionList bind:items="facts" bind:columns="2" />`
  */
 export type UIDescriptionListProps = UIThemeProps<
-	typeof descriptionList,
+	typeof descriptionListTheme,
 	{
 		/** Datos en orden de lectura. */
 		items: readonly UIDescriptionItem[]

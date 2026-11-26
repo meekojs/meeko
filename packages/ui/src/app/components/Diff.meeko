@@ -3,16 +3,16 @@
 
 	import type { UIDiffLineKind, UIDiffProps } from '../types/navigation'
 
+	import { diffLine, diffTheme } from '../theme/components/diff'
 	import { uiTheme } from '../utils/defaults'
 	import { uiMessages } from '../utils/messages'
-	import { diff, diffLine } from '../variants/content'
 
 	const props = defineProps<UIDiffProps>()
 
 	const theme = uiTheme('diff', () => props)
 
 	const text = uiMessages().diff
-	const classes = diff()
+	const classes = diffTheme()
 
 	/** The lines of a unified diff, each with its kind for the colors and the screen reader. */
 	const kindOf = (line: string): UIDiffLineKind => (line.startsWith('@@') ? 'hunk' : line.startsWith('+++') || line.startsWith('---') ? 'file' : line.startsWith('+') ? 'add' : line.startsWith('-') ? 'remove' : 'context')

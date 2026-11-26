@@ -1,6 +1,6 @@
 import type { ReadonlySignal, Signal } from '@meekojs/meeko'
 
-import type { select } from '../variants/select'
+import type { selectTheme } from '../theme/components/select'
 import type { PopoverPlacement } from './popover'
 import type { UIVariantSlots } from './theme'
 
@@ -141,7 +141,7 @@ type OnlyInCombobox<Prop extends string> = `UISelect es un <select> nativo y no 
  * <UISelect model="color" bind:options="colors" placeholder="Elige un color" name="color" />
  * ```
  */
-export interface UISelectProps<T> extends SelectBaseProps<T>, UIVariantSlots<typeof select> {
+export interface UISelectProps<T> extends SelectBaseProps<T>, UIVariantSlots<typeof selectTheme> {
 	/** El campo de `useForm` (`form.field('x')`): su `id`, su `name`, su valor, `aria-invalid` y `aria-describedby`. */
 	readonly field?: SelectField<SelectModel<T>>
 	/** No existe aquí: usa `<UICombobox multiple>`. */

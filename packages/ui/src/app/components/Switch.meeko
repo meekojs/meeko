@@ -3,8 +3,8 @@
 
 	import type { UISwitchProps } from '../types/forms'
 
+	import { switchTheme } from '../theme/components/switch'
 	import { uiTheme } from '../utils/defaults'
-	import { toggle } from '../variants/choice'
 
 	const { label, description, invalid, describedBy, class: ownClass, ui: ownUi, ...rest } = defineProps<UISwitchProps>()
 
@@ -14,7 +14,7 @@
 
 	const id = useId()
 
-	const classes = toggle()
+	const classes = switchTheme()
 </script>
 
 <template>

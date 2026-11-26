@@ -281,7 +281,7 @@
 
 			<UIAlert
 				if:when="pending.value.length"
-				tone="info"
+				color="info"
 				bind:title="pendingTitle.value"
 				bind:description="pendingText.value"
 			>
@@ -349,18 +349,18 @@
 							if:when="column.key === 'status'"
 							class="dash-badges"
 						>
-							<UIBadge bind:tone="revision.status === 'published' ? 'accent' : 'neutral'">{revisionStatus(revision.status)}</UIBadge>
+							<UIBadge bind:color="revision.status === 'published' ? 'primary' : 'neutral'">{revisionStatus(revision.status)}</UIBadge>
 							<span
 								if:when="revision.pending"
 								bind:title="revision.status === 'archived' ? t('source.badges.archivedAfter') : t('source.badges.publishedAfter')"
 							>
-								<UIBadge tone="accent">{t('source.badges.noSnapshot')}</UIBadge>
+								<UIBadge color="primary">{t('source.badges.noSnapshot')}</UIBadge>
 							</span>
 							<span
 								if:when="revision.conflict"
 								bind:title="t('source.badges.conflictHelp')"
 							>
-								<UIBadge tone="danger">{t('source.badges.conflict')}</UIBadge>
+								<UIBadge color="danger">{t('source.badges.conflict')}</UIBadge>
 							</span>
 						</span>
 						<span if:when="column.key === 'author'">{revision.author}</span>
@@ -472,7 +472,7 @@
 					<UIAlert
 						if:when="conflict.value?.merge"
 						role="note"
-						bind:tone="conflict.value?.merge?.clean ? 'info' : 'danger'"
+						bind:color="conflict.value?.merge?.clean ? 'info' : 'danger'"
 						bind:title="conflict.value?.merge?.clean ? t('source.conflict.trivial') : t('source.conflict.zones', { count: conflict.value?.merge?.conflicts ?? 0 })"
 						bind:description="conflict.value?.merge?.clean ? t('source.conflict.trivialText') : t('source.conflict.manual')"
 					>
@@ -554,8 +554,8 @@
 					if:when="comparison.value && !comparison.value.tooLarge"
 					name="actions"
 				>
-					<UIBadge tone="success">+{String(comparison.value?.added ?? 0)}</UIBadge>
-					<UIBadge tone="danger">−{String(comparison.value?.removed ?? 0)}</UIBadge>
+					<UIBadge color="success">+{String(comparison.value?.added ?? 0)}</UIBadge>
+					<UIBadge color="danger">−{String(comparison.value?.removed ?? 0)}</UIBadge>
 				</snippet>
 				<div class="dash-tight">
 					<form
@@ -637,8 +637,8 @@
 					if:when="data.value?.diff"
 					name="actions"
 				>
-					<UIBadge tone="success">+{String(data.value?.source.added ?? 0)}</UIBadge>
-					<UIBadge tone="danger">−{String(data.value?.source.removed ?? 0)}</UIBadge>
+					<UIBadge color="success">+{String(data.value?.source.added ?? 0)}</UIBadge>
+					<UIBadge color="danger">−{String(data.value?.source.removed ?? 0)}</UIBadge>
 				</snippet>
 				<UIDiff
 					bind:label="t('source.gitDiff.label')"
@@ -661,7 +661,7 @@
 				/>
 				<UIAlert
 					if:when="action.value?.kind === 'publish' && action.value?.revision.conflict"
-					tone="warning"
+					color="warning"
 					bind:description="t('source.confirm.conflictWarning')"
 				/>
 				<DashFailure

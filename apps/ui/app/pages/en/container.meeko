@@ -81,7 +81,7 @@
 			when the parent already provides that space.
 		</p>
 		<DocsCode bind:code="examples.containerNested" />
-		<UIAlert tone="info">A 4K container does not make all the text 3840px wide. Combine a wide surface with smaller containers for reading, forms and details.</UIAlert>
+		<UIAlert color="info">A 4K container does not make all the text 3840px wide. Combine a wide surface with smaller containers for reading, forms and details.</UIAlert>
 		<h2 id="api">API</h2>
 		<DocsApi
 			bind:rows="[
