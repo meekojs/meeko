@@ -1,5 +1,10 @@
 # Cambios de Meeko
 
+## Sin publicar
+
+- **`meeko dev` y `meeko build` descubren los autoimports una vez, no en cada módulo.** El plugin de Vite repetía el descubrimiento completo (leer y analizar cada archivo de las carpetas de autoimports) por cada `.ts` y cada `.meeko` que transformaba. En una aplicación de unos 960 componentes, la primera petición de `meeko dev` tardaba unos 50 s y cada página nueva entre 5 y 6 s en el servidor; ahora, unos 3 s y menos de 1 s, y la compilación de componentes de `meeko build` baja de unos 58 s a unos 14 s. El registro se vuelve a leer cuando el observador de archivos informa de un alta, una baja o una edición, al regenerar el registro de componentes y al empezar cada build.
+- **La navegación descarga el código de la página mientras pide sus datos.** El router del navegador esperaba la respuesta con los datos de la ruta antes de importar el módulo de la página y de los layouts nuevos, así que la primera visita a cada página pagaba dos viajes seguidos. Ahora los pide a la vez; los layouts que la navegación conserva no se vuelven a pedir.
+
 ## 1.11.0 — 2026-11-25
 
 - Publicación coordinada con `@meekojs/ui` 1.11.0, sin cambios funcionales en este paquete.
