@@ -5,7 +5,7 @@ import { pathToFileURL } from 'node:url'
 import postcss from 'postcss'
 import selectorParser from 'postcss-selector-parser'
 
-import { isMeekoProject } from '../../framework/clean'
+import { isMeekoProject } from './packaging'
 
 /** Valores de `meekoSortClasses`. */
 export type ClassSortMode = 'off' | 'stylesheet' | 'alphabetical'

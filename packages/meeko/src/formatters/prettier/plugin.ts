@@ -3,13 +3,12 @@ import type { AstPath, Doc, Options, Parser, ParserOptions, Plugin, Printer, Sup
 import ts from '@typescript/typescript6'
 import { builders, utils } from 'prettier/doc'
 
-import type { SfcSection } from '../../compiler/parser/sfc'
 import type { ClassOrder } from './classes'
+import type { SfcSection } from './packaging'
 
-import { compile } from '../../compiler'
-import { locate, MeekoCompileError, parseSfc } from '../../compiler/parser/sfc'
 import { preserveArrayBreaksPrinter } from './arrays'
 import { appendClassOrder, classOrderOption, stylesheetClassOrder } from './classes'
+import { compile, locate, MeekoCompileError, parseSfc } from './packaging'
 import { templateParserName, templatePlugin } from './template'
 
 const { hardline, indent } = builders
@@ -331,7 +330,7 @@ export const parsers: Record<string, Parser> = {
  * cargado (archivos `.ts`, `.js`, `.tsx`, `.mjs`, el script de los `.meeko` y las expresiones de la
  * plantilla) y delega, al formatear, en el printer `estree` del Prettier que lo ejecuta o en el de
  * un plugin anterior de la lista. Si otro plugin posterior también define `estree`, Prettier usa el
- * del último de la lista de `plugins`.
+ * del último de la lista de `plugins`. Desde 1.8.0, el mismo printer aplica `meekoClassFunctions`.
  *
  * @since 1.1.0
  * @example
@@ -351,7 +350,9 @@ export const printers: Record<string, Printer> = {
  * Opciones propias del plugin para Prettier: `meekoIndentSections` (booleana, `false` por
  * defecto) y, desde 1.3.0, `meekoPreserveArrayBreaks` (booleana, `true` por defecto) y
  * `meekoSortClasses` (`"off"` por defecto, `"stylesheet"` o `"alphabetical"`; en la CLI,
- * `--meeko-sort-classes`). Los nombres de las opciones son estables.
+ * `--meeko-sort-classes`) y `meekoClassFunctions` (lista de nombres, `[]`
+ * por defecto; en la CLI, `--meeko-class-functions`, una vez por nombre). Los nombres de las
+ * opciones son estables.
  *
  * @since 1.1.0
  * @example
@@ -364,7 +365,7 @@ export const printers: Record<string, Printer> = {
  * ```
  * @example
  * ```json
- * { "plugins": ["@meekojs/meeko/prettier"], "meekoSortClasses": "alphabetical" }
+ * { "plugins": ["@meekojs/meeko/prettier"], "meekoSortClasses": "alphabetical", "meekoClassFunctions": ["tv", "clsx", "cn"] }
  * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/editors.md#formato-con-prettier
  */

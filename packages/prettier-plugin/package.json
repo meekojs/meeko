@@ -33,8 +33,9 @@
 		"CHANGELOG.md"
 	],
 	"scripts": {
-		"build": "tsdown -c ../../tsdown.config.ts",
-		"check": "tsc -p tsconfig.json --noEmit",
+		"build": "pnpm run formatter:generate && tsdown -c ../../tsdown.config.ts",
+		"check": "pnpm run formatter:generate && tsc -p tsconfig.json --noEmit",
+		"formatter:generate": "node scripts/generate-formatter.mjs",
 		"prepack": "pnpm run build",
 		"test": "node --test tests/*.test.mjs"
 	},

@@ -11,8 +11,11 @@ import { formatWithPrettier } from '../../meeko/dist/formatters/prettier/editor.
 import plugin from '../dist/index.js'
 import { templateTree } from './template-tree.mjs'
 
-// Saving in the editor formats with the plugin of the core, and `prettier --check` with this one:
-// they must agree, or the check fails right after saving.
+// Smoke tests of the two entry points. Both are built from one source (packages/meeko/src/formatters/
+// prettier, copied by scripts/generate-formatter.mjs and checked by generated-formatter.test.mjs), so
+// they agree by construction; these check what the copy does not decide: each package's packaging.ts,
+// the printer markers that let both run together in any order of `plugins`, and that saving in the
+// editor (the core) gives what `prettier --check` (this plugin) expects right after.
 const pluginFile = fileURLToPath(new URL('../dist/index.js', import.meta.url))
 
 const component = `<script lang="ts">
@@ -67,7 +70,7 @@ for (const [mode, expected] of [
 	})
 }
 
-test('the core and the plugin agree on a < inside an interpolation, which only the core hides from the HTML parser', async () => {
+test('the core and the plugin agree on a < inside an interpolation, hidden from the HTML parser through packaging.ts', async () => {
 	for (const source of ['<template><p>{a < b}</p></template>\n', `<template><p>{'<b>'}</p></template>\n`, '<template><p>{a<b ? 1 : 2} text</p></template>\n', '<template><section><p>{list.length < 3 && "few"}</p></section></template>\n']) {
 		await assertSameEverywhere(source, { filepath: 'Component.meeko' })
 	}
@@ -119,7 +122,7 @@ test('the core and the plugin both reject the removed meekoSortClasses "tailwind
 })
 
 test('saving in the editor gives what prettier --check expects, with or without this plugin in the configuration', async () => {
-	const root = await mkdtemp(join(tmpdir(), 'meeko-editor-parity-'))
+	const root = await mkdtemp(join(tmpdir(), 'meeko-editor-check-'))
 	try {
 		await mkdir(join(root, 'app', 'styles'), { recursive: true })
 		await writeFile(join(root, 'meeko.config.ts'), 'export default {}\n')
