@@ -14,11 +14,13 @@ export const selectNote = 'px-2 py-1.5 text-sm/[inherit] text-text-soft'
 
 /**
  * What <UISelect> and <UICombobox> share: the root dims itself when disabled and holds the clear button over the
- * trigger, and the list has groups and options that are elements.
+ * trigger, and the list has groups and options that are elements. The root is as wide as its container, like
+ * <UIInput>: in a flex row or a grid it would otherwise shrink to its content, and the `w-full` of the trigger
+ * would only fill that.
  */
 export const selectRoot = {
 	slots: {
-		base: 'font-sans',
+		base: 'block w-full font-sans',
 		/** What the trigger adds to `inputControlTheme`: it is a button, whose text starts at the start. */
 		trigger: 'cursor-pointer text-start',
 		/** The value in the trigger, or the placeholder without a value. */

@@ -138,6 +138,7 @@ const showcase = `<script lang="ts">
 				<button id="select-send" type="submit">Enviar</button>
 				<button id="select-reset" type="reset">Restablecer</button>
 			</form>
+			<div id="select-row" style="display: flex; width: 400px;"><UISelect label="En una fila" name="row" bind:options="['Uno']" /></div>
 			<p id="select-out">{plan.value}|{person.value?.name}</p>
 			<p id="form-out">{String(size.value)}|{shade.value}|{sizeChanges.value.join()}|{sent.value}</p>
 		</section>

@@ -9,6 +9,7 @@ import type { ExecutionZoneItem } from './zones'
 
 import { registerAutoClosingTags } from './auto-close'
 import { registerScaffoldCommands } from './commands'
+import { setupHotReload } from './dev/hot-reload'
 import { setTranslator, t } from './l10n'
 import { LanguageServers } from './language-servers'
 import { registerLiveValues } from './live/controller'
@@ -81,6 +82,8 @@ function registerServerStatus(state: (uri: vscode.Uri) => ServerState | undefine
 
 /** Arranca el cliente del servidor de lenguaje Meeko; la lógica del lenguaje vive en el servidor. */
 export async function activate(context: vscode.ExtensionContext): Promise<MeekoExtensionApi> {
+	setupHotReload(context)
+
 	// Before any text is shown: the pure modules translate through `t`, which has no `vscode` import.
 	setTranslator(vscode.l10n.t)
 	const output = vscode.window.createOutputChannel('Meeko', { log: true })
