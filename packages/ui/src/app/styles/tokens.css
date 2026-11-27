@@ -204,6 +204,8 @@
 	--ui-control-font-size-xl: var(--ui-font-size-lg);
 	--ui-control-font-weight: var(--ui-font-weight-medium);
 	--ui-input-font-size: var(--ui-font-size-md);
+	--ui-input-font-size-xs: var(--ui-control-font-size-xs);
+	--ui-input-font-size-sm: var(--ui-control-font-size-sm);
 	--ui-opacity-disabled: 0.55;
 
 	/* Depth */
@@ -388,5 +390,7 @@
 		--ui-control-height-lg: 2.75rem;
 		--ui-control-height-xl: 3.25rem;
 		--ui-input-font-size: var(--ui-font-size-lg);
+		--ui-input-font-size-xs: var(--ui-input-font-size);
+		--ui-input-font-size-sm: var(--ui-input-font-size);
 	}
 }

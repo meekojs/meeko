@@ -84,11 +84,13 @@ export const inputTheme = defineTheme({
 		/**
 		 * The height of a control of that size and its inline padding. From `md` up the text keeps the size of a field
 		 * and its vertical padding; `xs` and `sm` take the text of a button of their size and a thinner padding, so the
-		 * line, the padding and the border fit in the height of the token and the field is as tall as that button.
+		 * line, the padding and the border fit in the height of the token and the field is as tall as that button. Their
+		 * text is `--ui-input-font-size-xs` and `-sm`, which with a coarse pointer match `--ui-input-font-size`, so
+		 * iOS does not zoom in on focus; the field then grows past the token to fit the line.
 		 */
 		size: {
-			xs: 'min-h-(--ui-control-height-xs) ps-1.5 pe-1.5 py-0.5 text-control-xs',
-			sm: 'min-h-(--ui-control-height-sm) ps-2 pe-2 py-0.5 text-control-sm',
+			xs: 'min-h-(--ui-control-height-xs) ps-1.5 pe-1.5 py-0.5 text-(length:--ui-input-font-size-xs)',
+			sm: 'min-h-(--ui-control-height-sm) ps-2 pe-2 py-0.5 text-(length:--ui-input-font-size-sm)',
 			md: 'min-h-(--ui-control-height-md) ps-3 pe-3',
 			lg: 'min-h-(--ui-control-height-lg) ps-4 pe-4',
 			xl: 'min-h-(--ui-control-height-xl) ps-5 pe-5 text-control-xl',
