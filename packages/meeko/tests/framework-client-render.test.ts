@@ -143,14 +143,14 @@ test('definePage accepts render: client with a browser loader context', () => {
 	})
 	assert.equal(route.render, 'client')
 	assert.throws(() => definePage({ render: 'client', prerenderEntries: [{}] } as never), /render: "client" cannot be prerendered/)
-	if (false) {
+	void (() => {
 		// @ts-expect-error A client loader runs in the browser and has no Request.
 		definePage({ render: 'client', load: ({ request }) => request.url })
 		// @ts-expect-error A client loader has no server request context.
 		definePage({ render: 'client', load: ({ context }) => context })
 		// @ts-expect-error Client pages cannot be prerendered.
 		definePage({ render: 'client', prerenderEntries: [{}] })
-	}
+	})
 })
 
 test('render extraction accepts client and discovery rejects prerendering it', async () => {

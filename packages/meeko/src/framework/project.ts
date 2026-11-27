@@ -491,7 +491,7 @@ export function withSourcePackages(config: InlineConfig, packages: readonly stri
  */
 function withModules(modules: ResolvedModules, base: InlineConfig, command: 'serve' | 'build'): InlineConfig {
 	const sourced = withSourcePackages(base, installedModulePackages(modules.ownedDirectories))
-	let config: Record<string, any> = modules.vitePlugins.length ? { ...sourced, plugins: [...(sourced.plugins ?? []), ...modules.vitePlugins] } : sourced
+	let config: Parameters<ResolvedModules['viteExtenders'][number]>[0] = modules.vitePlugins.length ? { ...sourced, plugins: [...(sourced.plugins ?? []), ...modules.vitePlugins] } : sourced
 	const ssr = Boolean((base.build as { ssr?: unknown } | undefined)?.ssr)
 	for (const extend of modules.viteExtenders) config = extend(config, { command, ssr }) ?? config
 	return config as InlineConfig

@@ -35,14 +35,14 @@ test('API and RPC clients use only public paths and preserve params, query, body
 	const options = { baseUrl: 'https://example.test', fetch: fetcher, csrfToken: () => 'token' }
 	const api = createApiClient<ApiContract>(publicManifest, options)
 	const rpc = createRpcClient<RpcContract>(publicManifest, options)
-	if (false) {
+	void (() => {
 		// @ts-expect-error dynamic endpoint requires params
 		void api.users.byId.get({ query: {} })
 		// @ts-expect-error body follows the public contract
 		void api.users.post({ body: { invalid: true } })
 		// @ts-expect-error RPC input follows the public contract
 		void rpc.users.get({ id: 42 })
-	}
+	})
 	assert.deepEqual(await api.users.byId.get({ params: { id: 'a b' }, query: { tab: 'profile' } }), { id: '1' })
 	assert.deepEqual(await api.users.post({ body: { name: 'Ada' } }), { id: '2' })
 	assert.deepEqual(await rpc.users.get({ id: '123' }), { id: '3' })
@@ -165,7 +165,7 @@ test('clients and composables accept union-typed body, query and input values', 
 	// Values typed as the whole union, as a form or a parsed payload produces them.
 	const body = JSON.parse('{"method":"staff","restaurant":"r1","username":"ada","password":"x"}') as Login
 	const search = JSON.parse('{"kind":"tag","tag":"new"}') as Search
-	if (false) {
+	void (() => {
 		void api.session.post({ body })
 		void api.session.post({ body: { method: 'email', email: 'a@b.c', password: 'x' } })
 		void api.search.get({ query: search })
@@ -219,7 +219,7 @@ test('clients and composables accept union-typed body, query and input values', 
 		void useRpcMutation('session.start').mutate({ method: 'staff', email: 'a@b.c', password: 'x' })
 		// @ts-expect-error a body is not accepted without a body contract
 		void api.plain.get({ body: {} })
-	}
+	})
 	assert.deepEqual(await api.session.post({ body }), { ok: true })
 	assert.deepEqual(await api.search.get({ query: search }), { ok: true })
 	assert.deepEqual(await rpc.session.start(body), { ok: true })
@@ -249,10 +249,10 @@ test('clients expose the schema issues of a rejected input as readonly ClientErr
 		{ path: '', message: 'Entrada no válida.' },
 	])
 	assert.ok(Object.isFrozen(error.issues) && Object.isFrozen(error.issues?.[0]))
-	if (false) {
+	void (() => {
 		// @ts-expect-error issues are readonly
 		error.issues![0]!.message = 'changed'
-	}
+	})
 	const api = createApiClient<ApiContract>(
 		{ api: [{ clientKey: 'users', pathname: '/api/users', method: 'POST' }] },
 		{
@@ -297,7 +297,7 @@ test('API client calls dynamic segments with named params and keeps the byId ali
 	}
 	const api = createApiClient<SegmentContract>(segmentManifest, { baseUrl: 'https://example.test', fetch: fetcher, csrfToken: 'token' })
 	const id = 'a b'
-	if (false) {
+	void (() => {
 		const archived: Promise<Category> = api.menu.categories({ id }).archive.post()
 		const renamed: Promise<Category> = api.menu.categories({ id }).patch({ body: { name: 'Bebidas' } })
 		const removed: Promise<undefined> = api.menu.categories({ id }).delete()
@@ -332,7 +332,7 @@ test('API client calls dynamic segments with named params and keeps the byId ali
 		void api.menu({ id })
 		// @ts-expect-error the body still follows the contract after a segment call
 		void api.menu.categories({ id }).patch({ body: { name: 1 } })
-	}
+	})
 	assert.equal(typeof api.menu.categories, 'function')
 	assert.equal(await api.menu.categories({ id }).archive.post(), 'ok')
 	assert.equal(await api.menu.categories({ id }).patch({ body: { name: 'Bebidas' } }), 'ok')

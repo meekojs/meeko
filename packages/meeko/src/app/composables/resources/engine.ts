@@ -235,7 +235,7 @@ type ReactiveFields<T> = T extends readonly unknown[] ? T : T extends object ? {
 
 type ParamsOption<P> = [P] extends [undefined] ? { readonly params?: never } : { readonly params: Reactive<ReactiveFields<P>> }
 /** A query whose fields are all optional (it accepts `{}`) may be left out. */
-type QueryOption<Q> = [Q] extends [undefined] ? { readonly query?: never } : {} extends Q ? { readonly query?: Reactive<ReactiveFields<Q>> } : { readonly query: Reactive<ReactiveFields<Q>> }
+type QueryOption<Q> = [Q] extends [undefined] ? { readonly query?: never } : NonNullable<unknown> extends Q ? { readonly query?: Reactive<ReactiveFields<Q>> } : { readonly query: Reactive<ReactiveFields<Q>> }
 /**
  * Opciones de `useApi` para una operación GET: `params` y `query`, cuyos campos pueden ser señales.
  * `params` es obligatorio en las rutas dinámicas y `query`, cuando el contrato exige algún campo.
@@ -256,10 +256,10 @@ type QueryOption<Q> = [Q] extends [undefined] ? { readonly query?: never } : {} 
  */
 export type ApiQueryOptions<O extends AnyApiOperation> = ParamsOption<O['params']> & QueryOption<O['query']>
 type ApiQueryInput<O extends AnyApiOperation> = ApiQueryOptions<O> | (() => ApiQueryOptions<O>)
-type ApiQueryArguments<O extends AnyApiOperation> = [O['params']] extends [undefined] ? ([O['query']] extends [undefined] ? [options?: ApiQueryInput<O>, resource?: DataResourceOptions] : {} extends O['query'] ? [options?: ApiQueryInput<O>, resource?: DataResourceOptions] : [options: ApiQueryInput<O>, resource?: DataResourceOptions]) : [options: ApiQueryInput<O>, resource?: DataResourceOptions]
+type ApiQueryArguments<O extends AnyApiOperation> = [O['params']] extends [undefined] ? ([O['query']] extends [undefined] ? [options?: ApiQueryInput<O>, resource?: DataResourceOptions] : NonNullable<unknown> extends O['query'] ? [options?: ApiQueryInput<O>, resource?: DataResourceOptions] : [options: ApiQueryInput<O>, resource?: DataResourceOptions]) : [options: ApiQueryInput<O>, resource?: DataResourceOptions]
 type RpcQueryInput<I> = Reactive<ReactiveFields<I>> | (() => I)
 /** An input that accepts `{}` may be left out; the request then sends `{}`. */
-type RpcQueryArguments<I> = {} extends I ? [input?: RpcQueryInput<I>, resource?: DataResourceOptions] : [input: RpcQueryInput<I>, resource?: DataResourceOptions]
+type RpcQueryArguments<I> = NonNullable<unknown> extends I ? [input?: RpcQueryInput<I>, resource?: DataResourceOptions] : [input: RpcQueryInput<I>, resource?: DataResourceOptions]
 
 type GetEndpoint<M> = M extends { readonly api: readonly (infer E)[] } ? Extract<E, { readonly method: 'GET'; readonly pathname: string; readonly clientKey: string }> : never
 type GetOperation<C, K> = K extends keyof C ? (C[K] extends { readonly get: infer O extends AnyApiOperation } ? O : never) : never

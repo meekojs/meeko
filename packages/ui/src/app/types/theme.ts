@@ -13,7 +13,7 @@ type Simplify<T> = { [K in keyof T]: T[K] } & {}
  * <UIBadge color="success" dot bind:ui="{ dot: 'my-dot' }">Publicado</UIBadge>
  * ```
  */
-export type UIVariantSlots<T extends (...args: never[]) => unknown> = OmitUndefined<ReturnType<T>> extends string ? {} : { ui?: { [Key in keyof OmitUndefined<ReturnType<T>>]?: string } }
+export type UIVariantSlots<T extends (...args: never[]) => unknown> = OmitUndefined<ReturnType<T>> extends string ? NonNullable<unknown> : { ui?: { [Key in keyof OmitUndefined<ReturnType<T>>]?: string } }
 
 /**
  * Las props de un componente con sus variantes de `tailwind-variants` y, si tiene slots, la prop `ui`.

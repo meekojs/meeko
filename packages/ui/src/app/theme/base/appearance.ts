@@ -19,7 +19,7 @@ import { variants } from './variants'
  * })
  * ```
  */
-export function appearance<const T extends AppearanceOptions<HasHues<C>>, const C extends AppearanceConfig = {}>(options: T & Record<Exclude<keyof T, VariantKey>, never>, config?: C): Appearance<T, SlotOf<C>, HasHues<C>> {
+export function appearance<const T extends AppearanceOptions<HasHues<C>>, const C extends AppearanceConfig = NonNullable<unknown>>(options: T & Record<Exclude<keyof T, VariantKey>, never>, config?: C): Appearance<T, SlotOf<C>, HasHues<C>> {
 	const slot = config?.slot
 	const target = (className: string) => (slot && className ? { [slot]: className } : className)
 	const catalog = (key: VariantKey): Readonly<Record<string, string>> => (key === 'color' && config?.hues ? { ...variants.color, ...Object.fromEntries(config.hues.names.map((hue) => [hue, ''])) } : variants[key])

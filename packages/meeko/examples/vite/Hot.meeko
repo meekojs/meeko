@@ -9,7 +9,11 @@
 </script>
 
 <template>
-	<button on:click="increment">Hot v3 {count.value}</button>
+	<button
+		type="button"
+		on:click="increment"
+		>Hot v3 {count.value}</button
+	>
 </template>
 
 <style scoped>

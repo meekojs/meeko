@@ -84,7 +84,8 @@ export type TagModels<Models, Bound extends PropertyKey> = [Bound] extends [neve
 export type SnippetInputs<Module> = 0 extends 1 & Module ? LooseChannel : [Module] extends [never] ? LooseChannel : ChannelsOf<Module> extends { readonly snippets: infer Snippets } ? ([Snippets] extends [null] ? NoSnippets : Snippets) : never
 
 /** Cualquier valor de prop; el tipo función da `any` a los parámetros de un manejador sin tipo propio. */
-type AnyPropValue = ((...args: any[]) => unknown) | {} | null | undefined
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- `any` parameters type the arguments of an untyped `on:` handler contextually; `never[]` would make them `never` and `unknown[]` rejects handlers with typed parameters
+type AnyPropValue = ((...args: any[]) => unknown) | NonNullable<unknown> | null | undefined
 
 /**
  * Props cuyo nombre empieza por `on` que una etiqueta de componente puede pasar además de las
@@ -101,7 +102,7 @@ export type ExtraProps = { readonly [name: `on${string}`]: AnyPropValue }
  * admitiría en `bind:label="cond ? 'x' : undefined"`). Las props obligatorias y las firmas de índice
  * no cambian, así que una prop desconocida sigue siendo una propiedad sobrante.
  */
-export type TagProps<Props> = Props extends unknown ? { [K in keyof Props]: {} extends Record<K, unknown> ? Props[K] : {} extends Pick<Props, K> ? Props[K] | undefined : Props[K] } : never
+export type TagProps<Props> = Props extends unknown ? { [K in keyof Props]: NonNullable<unknown> extends Record<K, unknown> ? Props[K] : NonNullable<unknown> extends Pick<Props, K> ? Props[K] | undefined : Props[K] } : never
 
 /** Todos los nombres de prop de un tipo de props, también de cada miembro de una unión. */
 type PropNames<Props> = Props extends unknown ? keyof Props : never
@@ -141,7 +142,7 @@ type DefaultModelProp<Module, Bound> = [DefaultModelValue<Module>] extends [neve
 type ModuleTag<Module> = <Bound = ModelUnbound>(props: TagProps<PropsOf<Module>> & ExtraProps & DefaultModelProp<Module, Bound>, events: NoInfer<EventNames<PropsOf<Module>>>, models: NoInfer<TagModels<ModelInputs<Module>, BoundModel<Bound, DefaultModelValue<Module>, 'default'>>>, snippets: NoInfer<SnippetInputs<Module>>) => TagInput<ExposedOf<Module>>
 
 /** Comprobación de etiqueta de un componente `any`: todo pasa y los manejadores reciben parámetros `any`. */
-type LooseTag = (props: { readonly [name: string]: AnyPropValue }, events: any, models: any, snippets: any) => TagInput<any>
+type LooseTag = (props: { readonly [name: string]: AnyPropValue }, events: unknown, models: unknown, snippets: unknown) => TagInput<unknown>
 
 /**
  * Comprobación de una etiqueta de componente. Un módulo compilado declara la suya en `__meekoTag`,
@@ -183,7 +184,7 @@ export function correlatedTag<Module, const Is>(component: () => Module, is: () 
 }
 
 /** Modelos, snippets o nombres de evento vacíos de una etiqueta; entonces la etiqueta no pasa canales. */
-export const noChannels: {} = Object.freeze({})
+export const noChannels: NonNullable<unknown> = Object.freeze({})
 
 function tagInput(props: object, _events: object, models: Record<string, unknown>, snippets: Record<string, unknown>): object {
 	return withChannels(props, models === noChannels ? undefined : models, snippets === noChannels ? undefined : snippets)
@@ -224,7 +225,7 @@ export type RequiredSnippetMessage<Name extends string> = `MEEK110: ${Name} es o
  * `unknown` when `<snippet name="Name" if:when>` may stop passing that snippet: the child declares it
  * optional (`Name?:`), or it is not a snippet of the child, which the tag check already reports.
  */
-export type SnippetConditionCheck<Module, Name extends string> = 0 extends 1 & Module ? unknown : [Module] extends [never] ? unknown : ChannelsOf<Module> extends { readonly snippets: infer Snippets } ? (Snippets extends object ? (Name extends keyof Snippets ? ({} extends Pick<Snippets, Name> ? unknown : RequiredSnippetMessage<Name>) : unknown) : unknown) : unknown
+export type SnippetConditionCheck<Module, Name extends string> = 0 extends 1 & Module ? unknown : [Module] extends [never] ? unknown : ChannelsOf<Module> extends { readonly snippets: infer Snippets } ? (Snippets extends object ? (Name extends keyof Snippets ? (NonNullable<unknown> extends Pick<Snippets, Name> ? unknown : RequiredSnippetMessage<Name>) : unknown) : unknown) : unknown
 
 /**
  * Type-only check of a conditional `<snippet name if:when>`; generated code never calls it. `true`

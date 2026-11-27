@@ -110,13 +110,13 @@ test('a destructured defineProps reads each prop where it is used, keeps shadowe
 	assert.match(setup, /computed\(\(\) => __meeko_props\.label\.toUpperCase\(\)\)/)
 	assert.match(setup, /emit\("press", __meeko_props\.label\)/)
 	// A parameter with the same name is another variable.
-	assert.match(setup, /function echo\(label: string\): string \{\n  return label;\n\}/)
+	assert.match(setup, /function echo\(label: string\): string \{\n {2}return label;\n\}/)
 	// The template reads the props view; the list item keeps its own name.
 	assert.match(code, /bindText\(__scope, \d+, \(\) => \(__meeko_props\.label\)/)
 	assert.match(code, /\(label, index\) => "<i"/)
 	assert.match(code, /__meeko\.tagAttribute\([^)]*"class"[^)]*\)|__meeko_props\.class/)
 	// The defaults are evaluated for each instance, with the constants they read.
-	assert.match(code, /function __meeko_defaultProps\(\) \{\nconst SIZES = \["sm", "md", "lg"\] as const;\nconst DEFAULT_SIZE = SIZES\[1\];\n  return \(\(\(\{ "size": DEFAULT_SIZE, "tags": \[\] \}/)
+	assert.match(code, /function __meeko_defaultProps\(\) \{\nconst SIZES = \["sm", "md", "lg"\] as const;\nconst DEFAULT_SIZE = SIZES\[1\];\n {2}return \(\(\(\{ "size": DEFAULT_SIZE, "tags": \[\] \}/)
 	// Neither default is a literal: each is checked against the members that require its prop (MEEK131).
 	assert.match(code, / satisfies __MeekoDefaultFit<"size">\) satisfies __MeekoDefaultFit<"tags">\);/)
 	assert.doesNotMatch(code, /const \{ label/)
@@ -652,7 +652,7 @@ test("a type query of a destructured prop reads the props' type, unless a closer
 	assert.match(code, /const n: typeof __meeko_props\.x\.length = y\.length;/)
 	assert.match(code, /const label: typeof __meeko_props\["aria-label"\] = __meeko_props\["aria-label"\];/)
 	assert.match(code, /const size: \(typeof __meeko_props\)\["aria-label"\]\["length"\] = label\.length;/)
-	assert.match(code, /function g\(x: number\): typeof x \{\n  return x;\n\}/)
+	assert.match(code, /function g\(x: number\): typeof x \{\n {2}return x;\n\}/)
 	const { root, cleanup } = await typeProject()
 	try {
 		assert.deepEqual(await checkSource(typeQueries, join(root, 'Typed.meeko')), [])

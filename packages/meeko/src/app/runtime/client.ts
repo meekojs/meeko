@@ -632,7 +632,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
 		try {
 			browser.location.replace(stableUrl)
 		} catch (recoveryError) {
-			throw new AggregateError([error, recoveryError], 'Meeko navigation failed and could not restore the previous route')
+			throw new AggregateError([error, recoveryError], 'Meeko navigation failed and could not restore the previous route', { cause: recoveryError })
 		}
 		throw error
 	}
@@ -1032,7 +1032,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
 					try {
 						restoreToken?.()
 					} catch (restoreError) {
-						throw new AggregateError([error, restoreError], 'Meeko navigation and CSRF recovery failed')
+						throw new AggregateError([error, restoreError], 'Meeko navigation and CSRF recovery failed', { cause: restoreError })
 					}
 					throw error
 				}

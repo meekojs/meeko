@@ -679,7 +679,7 @@ function observe(fn: () => unknown, source?: EffectSource, order = nextObserverI
 		observer.run()
 	} catch (error) {
 		const failures = stopObserver()
-		if (failures.length > 0) throw new AggregateError([error, ...failures], 'Meeko effect setup and cleanup failed')
+		if (failures.length > 0) throw new AggregateError([error, ...failures], 'Meeko effect setup and cleanup failed', { cause: error })
 		throw error
 	}
 	return stop
@@ -903,7 +903,7 @@ export function createRoot<T>(fn: (dispose: () => void) => T): T {
 		try {
 			dispose()
 		} catch (cleanupError) {
-			throw new AggregateError([error, cleanupError], 'Meeko root setup and cleanup failed')
+			throw new AggregateError([error, cleanupError], 'Meeko root setup and cleanup failed', { cause: cleanupError })
 		}
 		throw error
 	} finally {
@@ -925,7 +925,7 @@ export function finishWithCleanup<T>(work: () => T, cleanup: () => void): T {
 	try {
 		cleanup()
 	} catch (error) {
-		if (failed) throw new AggregateError([failure, error], 'Meeko work and cleanup failed')
+		if (failed) throw new AggregateError([failure, error], 'Meeko work and cleanup failed', { cause: error })
 		throw error
 	}
 	if (failed) throw failure

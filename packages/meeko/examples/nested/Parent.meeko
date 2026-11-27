@@ -28,8 +28,12 @@
 			bind:label="'Fixed'"
 		/>
 		<p>{label.value}</p>
-		<button on:click="() => (label.value = 'Updated')">Update</button>
-		<button on:click="() => (visible.value = !visible.value)">Toggle</button>
+		<button
+			type="button"
+			on:click="() => (label.value = 'Updated')">Update</button>
+		<button
+			type="button"
+			on:click="() => (visible.value = !visible.value)">Toggle</button>
 		<div if:when="visible.value"
 			><component
 				is="Child"
@@ -48,6 +52,8 @@
 				/>
 			</li>
 		</ul>
-		<button on:click="reverse">Reverse</button>
+		<button
+			type="button"
+			on:click="reverse">Reverse</button>
 	</section>
 </template>

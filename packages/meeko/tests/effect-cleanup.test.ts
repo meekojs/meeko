@@ -5,7 +5,7 @@ import type { EffectResult } from '../src/index.ts'
 
 import { bindingEffect, computed, createContext, createRoot, effect, inject, onCleanup, provide, runDry, signal, untrack } from '../src/core/reactivity.ts'
 
-if (false) {
+void (() => {
 	// A cleanup returned from an effect is accepted, with or without an annotation.
 	effect(() => () => undefined)
 	effect((): EffectResult => undefined)
@@ -14,7 +14,7 @@ if (false) {
 	effect(() => 1)
 	// @ts-expect-error a returned cleanup must be synchronous
 	effect(() => async () => undefined)
-}
+})
 
 /** Captures `console.warn` while `work` runs, with `NODE_ENV` set to `mode`. */
 async function withWarnings(mode: string | undefined, work: () => unknown): Promise<unknown[][]> {

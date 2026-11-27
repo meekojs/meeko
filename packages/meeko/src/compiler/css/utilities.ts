@@ -607,7 +607,7 @@ class Expander {
 	private selector(selector: unknown): string {
 		if (typeof selector !== 'string' || !selector.trim()) throw new UtilityError(`una regla tiene el selector ${describe(selector)}; use una cadena no vacía`)
 		const trimmed = selector.trim()
-		let valid = false
+		let valid: boolean
 		try {
 			selectorParser().astSync(trimmed)
 			const probe = this.postcss.parse(`${trimmed}{}`)
@@ -628,7 +628,7 @@ class Expander {
 	private atRuleParams(name: string, params: unknown): string {
 		if (typeof params !== 'string') throw new UtilityError(`@${name} tiene los parámetros ${describe(params)}; use una cadena`)
 		const trimmed = params.trim()
-		let valid = false
+		let valid: boolean
 		try {
 			const probe = this.postcss.parse(`@${name} ${trimmed}{}`)
 			valid = probe.nodes.length === 1 && probe.first?.type === 'atrule' && probe.first.params === trimmed

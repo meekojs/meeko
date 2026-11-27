@@ -151,5 +151,5 @@ type SnippetParameters<Entry> = Entry extends readonly unknown[] ? Entry : Entry
 /** Snippets of a `defineSnippets` type, with its optional names; a `Snippet` entry stays as it is. */
 export type SnippetMap<T> = { [K in keyof T]: Snippet<SnippetParameters<T[K]>> }
 
-/** Parameters of the snippet `name` of a compiled component, or `any[]` if it has none by that name. */
-export type SnippetArgs<Module, Name extends string> = ChannelsOf<Module> extends { readonly snippets: infer Snippets } ? (Snippets extends object ? (Name extends keyof Snippets ? (NonNullable<Snippets[Name]> extends Snippet<infer Args> ? Args : any[]) : any[]) : any[]) : any[]
+/** Parameters of the snippet `name` of a compiled component, or `unknown[]` if it has none by that name. */
+export type SnippetArgs<Module, Name extends string> = ChannelsOf<Module> extends { readonly snippets: infer Snippets } ? (Snippets extends object ? (Name extends keyof Snippets ? (NonNullable<Snippets[Name]> extends Snippet<infer Args> ? Args : unknown[]) : unknown[]) : unknown[]) : unknown[]

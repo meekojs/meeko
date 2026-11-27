@@ -79,7 +79,7 @@ function withObserver<T>(work: () => T): { value: T; reported: unknown[]; dispos
 }
 
 test('useForm types its fields from the schema input and the submitted values from its output', () => {
-	if (false) {
+	void (() => {
 		const form = useForm({
 			schema: category,
 			initial: { name: '', price: '' },
@@ -140,7 +140,7 @@ test('useForm types its fields from the schema input and the submitted values fr
 		void login.fields.password
 		const typed: Form<{ email: string; remember: boolean }, void> = login
 		void [remember, typed]
-	}
+	})
 })
 
 test('useForm validates on submit, maps the issues to fields and sends the schema output', async () => {

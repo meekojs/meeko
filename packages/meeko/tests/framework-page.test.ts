@@ -30,14 +30,14 @@ const searchSchema: PageSchema<unknown, { tab: string }> = {
 	},
 }
 
-if (false) {
+void (() => {
 	createFrameworkHandler({
 		routes: [],
 		loadPage: async () => ({ renderWithState: () => ({ html: '', state: {} }) }),
 		// @ts-expect-error The handler cannot accept a non-route from loadRoute.
 		loadRoute: async () => 42,
 	})
-}
+})
 
 test('definePage validates external params/search before loader and keeps typed output', async () => {
 	let calls = 0

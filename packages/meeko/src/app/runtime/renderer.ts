@@ -1199,7 +1199,7 @@ export function bindIf(scope: DomScope, id: number, read: () => unknown, render:
 						clearRegion(inner)
 					} catch (cleanupError) {
 						stop()
-						throw new AggregateError([error, cleanupError], `Meeko condition ${id} update and cleanup failed`)
+						throw new AggregateError([error, cleanupError], `Meeko condition ${id} update and cleanup failed`, { cause: cleanupError })
 					}
 					throw error
 				}
@@ -1392,7 +1392,7 @@ function moveRange(start: Comment, end: Comment, before: Node): void {
 		try {
 			parent.insertBefore(fragment, originalNext)
 		} catch (restoreError) {
-			throw new AggregateError([error, restoreError], 'Meeko list move and restoration failed')
+			throw new AggregateError([error, restoreError], 'Meeko list move and restoration failed', { cause: restoreError })
 		}
 		throw error
 	}
@@ -1568,7 +1568,7 @@ export function bindFor<T>(scope: DomScope, id: number, read: () => Iterable<T>,
 				}
 				if (failures.length > 1) {
 					stop()
-					throw new AggregateError(failures, `Meeko list ${id} update and cleanup failed`)
+					throw new AggregateError(failures, `Meeko list ${id} update and cleanup failed`, { cause: error })
 				}
 				throw error
 			}

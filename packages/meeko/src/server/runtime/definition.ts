@@ -132,7 +132,7 @@ export interface ServerRuntime<Services = unknown, Env = unknown> {
 	 * y `rateLimit` cuenta en la memoria de cada instancia. Las comprobaciones de `Origin` y Fetch
 	 * Metadata de las mutaciones se mantienen, con {@link ServerRuntime.allowedOrigins}.
 	 */
-	readonly sessions?: SessionManager<any> | false
+	readonly sessions?: SessionManager<unknown> | false
 	/**
 	 * Orígenes adicionales aceptados en las mutaciones de API y RPC y en los formularios nativos
 	 * (desde `1.10`), como `https://admin.example.com`, cuando Meeko crea el gestor: sin `sessions`

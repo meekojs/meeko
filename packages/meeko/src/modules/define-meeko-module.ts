@@ -375,6 +375,7 @@ export interface MeekoModuleContext {
 	 * Modifica la configuración inline de Vite de `meeko dev` y de cada build de `meeko build` antes
 	 * de usarla. La función recibe la configuración y puede cambiarla o devolver una nueva.
 	 */
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- the Vite config is handed over untyped so modules can edit nested options without a Vite type dependency; `unknown` would reject `config.build.minify = true`
 	extendViteConfig(extend: (config: Record<string, any>, context: { readonly command: 'serve' | 'build'; readonly ssr: boolean }) => void | Record<string, any>): void
 	/** Escribe un aviso en la salida de errores con el nombre del módulo. */
 	warn(message: string): void
@@ -474,6 +475,7 @@ export type MeekoModuleName = Extract<keyof MeekoModuleNames, string> | (string 
  * const modules: MeekoModuleEntry[] = ["@meekojs/i18n", "./modules/hello"];
  * ```
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- `Options` is invariant in `MeekoModule` (read by `setup`, written by `defaults`), so only `any` accepts a module of any options type
 export type MeekoModuleEntry = MeekoModuleName | MeekoModule<any> | readonly [MeekoModuleName | MeekoModule<any>, object?]
 
 /**

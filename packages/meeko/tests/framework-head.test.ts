@@ -688,7 +688,7 @@ test('client navigation applies the same title rule to the document', async () =
 })
 
 // Type-level checks, compiled by `tsc -p tsconfig.test.json` and never run.
-if (false) {
+void (() => {
 	const module = undefined as unknown as MeekoModuleContext
 	defineMeekoConfig({ document: { head: { title: 'Mi Sitio', titleTemplate: '%s - Mi Sitio' } } })
 	// @ts-expect-error document is baked into the build as JSON: titleTemplate is only a string.
@@ -710,7 +710,7 @@ if (false) {
 	module.addHead({ title: 'Módulo', meta: [{ name: 'generator', content: 'x' }] })
 	// @ts-expect-error A module head joins document: titleTemplate is only a string.
 	module.addHead({ titleTemplate: (title: string) => title })
-}
+})
 
 test('useHead at the top level of <script server> gives the block top-level code', () => {
 	const source = '<script server lang="ts">\nuseHead({ meta: [{ name: "robots", content: "noindex" }] });\n</script>\n<template><p>x</p></template>\n'
@@ -756,7 +756,7 @@ test('meeko check reports a function titleTemplate of document.head as a type er
 		assert.ok(lines[0]!.startsWith(`${file}:7:7 TS2322: `), error.message)
 		assert.match(error.message, /document\.head: titleTemplate must be a string here, since it is serialized$/)
 		// A valid configuration loads as before.
-		await writeFile(file, config.replace(/titleTemplate\(title\) \{[\s\S]*?\n      \},/, "titleTemplate: '%s - Mi Sitio',"))
+		await writeFile(file, config.replace(/titleTemplate\(title\) \{[\s\S]*?\n {6}\},/, "titleTemplate: '%s - Mi Sitio',"))
 		const later = new Date(Date.now() + 5_000)
 		await utimes(file, later, later)
 		assert.deepEqual((await loadCheckedMeekoConfig(root)).document, { head: { title: 'Mi Sitio', titleTemplate: '%s - Mi Sitio' } })

@@ -593,7 +593,7 @@ export async function checkSources(inputs: readonly CheckInput[], options: Check
 async function typeCheckGraph(graph: CompiledGraph, roots: readonly GeneratedEntry[], options: CheckSourceOptions): Promise<Map<string, CompileDiagnostic[]>> {
 	const first = roots[0]!
 	const rootDirectory = projectRoot(first.original)
-	let output = ''
+	let output: string
 	try {
 		for (const entry of graph.entries.values()) {
 			await mkdir(dirname(entry.generated), { recursive: true })

@@ -39,7 +39,7 @@ test('a PascalCase tag is <component is> for an identifier of the script', () =>
 
 test('<Name /> closes itself and keeps the following nodes as siblings', () => {
 	const code = render(`<div><AppButton bind:label="'a'" /><p>after</p><AppButton/><span>{x}</span></div><em>tail</em>`)
-	assert.match(code, /"<div" \+ ">" \+ __meeko\.renderComponent<any>\(0, AppButton, __meeko\.componentTag\(\(\) => AppButton\)\(\{ "label": 'a' \}, __meeko\.noChannels, __meeko\.noChannels, __meeko\.noChannels\), __meeko_transfer\) \+ "<p" \+ ">" \+ __meeko\.escapeHtml\("after"\) \+ "<\/p>" \+ __meeko\.renderComponent<any>\(1, AppButton, __meeko\.componentTag\(\(\) => AppButton\)\(\{  \}, __meeko\.noChannels, __meeko\.noChannels, __meeko\.noChannels\), __meeko_transfer\) \+ "<span"/)
+	assert.match(code, /"<div" \+ ">" \+ __meeko\.renderComponent<any>\(0, AppButton, __meeko\.componentTag\(\(\) => AppButton\)\(\{ "label": 'a' \}, __meeko\.noChannels, __meeko\.noChannels, __meeko\.noChannels\), __meeko_transfer\) \+ "<p" \+ ">" \+ __meeko\.escapeHtml\("after"\) \+ "<\/p>" \+ __meeko\.renderComponent<any>\(1, AppButton, __meeko\.componentTag\(\(\) => AppButton\)\(\{ {2}\}, __meeko\.noChannels, __meeko\.noChannels, __meeko\.noChannels\), __meeko_transfer\) \+ "<span"/)
 	assert.match(code, /"<\/div>" \+ "<em"/)
 	// At the end of the template and inside a nested <template>.
 	assert.match(render(`<AppButton />`), /renderComponent<any>\(0, AppButton/)
@@ -99,7 +99,7 @@ test('PascalCase tags accept if:when and each:of', () => {
 
 test('PascalCase tags report bad closing and unsupported attributes', () => {
 	// Since 1.1 children are snippets: the type check rejects them for a child without defineSnippets.
-	assert.match(render(`<AppButton>text</AppButton>`), /__meeko\.componentTag\(\(\) => AppButton\)\(\{  \}, __meeko\.noChannels, __meeko\.noChannels, \{ "default": __meeko\.snippet\(/)
+	assert.match(render(`<AppButton>text</AppButton>`), /__meeko\.componentTag\(\(\) => AppButton\)\(\{ {2}\}, __meeko\.noChannels, __meeko\.noChannels, \{ "default": __meeko\.snippet\(/)
 	assert.doesNotThrow(() => render(`<div><AppButton><span></span></AppButton></div>`))
 	assertCompileError(`<AppButton></Table>`, 'MEEK008', '</Table>')
 	assertCompileError(`<div><AppButton></div>`, 'MEEK008', '<AppButton>')

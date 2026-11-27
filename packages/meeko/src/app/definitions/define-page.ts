@@ -537,7 +537,7 @@ type ExactProps<Written, Declared> = { readonly [K in keyof Written]: K extends 
  * export const route = define({ head: ({ data }) => ({ title: data.title }) });
  * ```
  */
-export type PageBodyDefinePage<D> = <const P extends PageSchema | undefined = undefined, const S extends PageSchema | undefined = undefined, C = unknown, const T extends WrittenOptions = {}>(definition: T & AnyPageDefinition<P, S, D, C> & ExactLayoutProps<T>) => DefinedPage<P, S, D, C, T>
+export type PageBodyDefinePage<D> = <const P extends PageSchema | undefined = undefined, const S extends PageSchema | undefined = undefined, C = unknown, const T extends WrittenOptions = NonNullable<unknown>>(definition: T & AnyPageDefinition<P, S, D, C> & ExactLayoutProps<T>) => DefinedPage<P, S, D, C, T>
 
 declare const typeArgumentsNotWritten: unique symbol
 /**
@@ -638,7 +638,7 @@ export function definePage<const P extends PageSchema | undefined = undefined, c
  * Declara las opciones de ruta de una página; véase la primera firma.
  * @see {@link PageDefinition}
  */
-export function definePage<const P extends PageSchema | undefined = undefined, const S extends PageSchema | undefined = undefined, D = unknown, C = unknown, const T extends WrittenOptions = {}>(definition: T & AnyPageDefinition<P, S, D, C> & ExactLayoutProps<T>): DefinedPage<P, S, D, C, T>
+export function definePage<const P extends PageSchema | undefined = undefined, const S extends PageSchema | undefined = undefined, D = unknown, C = unknown, const T extends WrittenOptions = NonNullable<unknown>>(definition: T & AnyPageDefinition<P, S, D, C> & ExactLayoutProps<T>): DefinedPage<P, S, D, C, T>
 export function definePage(definition: unknown): unknown {
 	if (typeof definition === 'object' && definition !== null && 'render' in definition && definition.render === 'client' && 'prerenderEntries' in definition && definition.prerenderEntries !== undefined) {
 		throw new TypeError('render: "client" cannot be prerendered; remove prerenderEntries or use render: "prerender"')

@@ -328,7 +328,7 @@ export interface ResolvedModules {
 	/** `<head>` entries of the modules, before `document.head` of the configuration. */
 	readonly head: HeadInput | undefined
 	readonly vitePlugins: readonly object[]
-	readonly viteExtenders: readonly ((config: Record<string, any>, context: { readonly command: 'serve' | 'build'; readonly ssr: boolean }) => void | Record<string, any>)[]
+	readonly viteExtenders: readonly Parameters<MeekoModuleContext['extendViteConfig']>[0][]
 	/** Directories a module owns, for the client boundary of their `.server.ts` files. */
 	readonly ownedDirectories: readonly string[]
 	callHook<Name extends keyof MeekoHooks>(name: Name, ...context: Parameters<MeekoHooks[Name]>): Promise<void>

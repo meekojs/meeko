@@ -23,7 +23,7 @@ export interface SessionDefaultsContext {
 
 /** Sessions created by Meeko when `server/runtime.ts` omits them, and the resources to release. */
 export interface SessionDefaults {
-	readonly sessions: SessionManager<any>
+	readonly sessions: SessionManager<unknown>
 	readonly close?: () => Promise<void>
 }
 

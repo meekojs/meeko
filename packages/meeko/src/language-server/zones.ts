@@ -391,7 +391,7 @@ export function executionZones(component: VirtualComponent, sourceRoots: readonl
 		else {
 			mark(script.start, script.end, 'setup')
 			const split = continuationStart(component)
-			let ranges: BrowserRange[] = []
+			let ranges: BrowserRange[]
 			// The use analysis is best effort: without it, the setup keeps its zones.
 			try {
 				ranges = browserRanges(component, document, split)

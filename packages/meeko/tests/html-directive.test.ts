@@ -565,6 +565,6 @@ test('Prettier formats the html value as an expression', async () => {
 	const source = `<script lang="ts">\nconst a = "x";\n</script>\n<template><div html="a+  'b'"></div><p data-html="a+  'b'"></p></template>\n`
 	const formatted = await prettier.format(source, { filepath: 'Html.meeko', plugins: [plugin] })
 	assert.match(formatted, /<div html="a \+ 'b'"><\/div>/)
-	assert.match(formatted, /data-html="a\+  'b'"/)
+	assert.match(formatted, /data-html="a\+ {2}'b'"/)
 	assert.equal(await prettier.format(formatted, { filepath: 'Html.meeko', plugins: [plugin] }), formatted)
 })

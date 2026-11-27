@@ -587,7 +587,7 @@ export class MeekoProject {
 	}
 
 	private async reloadRegistry(): Promise<void> {
-		let registry: readonly AutoImport[] = []
+		let registry: readonly AutoImport[]
 		this.configError = undefined
 		if (this.options.trusted) this.writeConfigTypes()
 		if (this.options.trusted) {

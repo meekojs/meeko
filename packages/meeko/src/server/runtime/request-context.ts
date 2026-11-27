@@ -258,7 +258,7 @@ function combinedSignal(request: AbortSignal, revocation: AbortSignal): AbortSig
  * const response = await dispatchApiRoute(usersRoute, context, sessions);
  * ```
  */
-export function createRequestContext<TServices, TEnv = unknown>(request: Request, services: TServices, session: SessionHandle<any>, platform?: ServerPlatform<TEnv>): RequestContext<TServices, TEnv> {
+export function createRequestContext<TServices, TEnv = unknown>(request: Request, services: TServices, session: SessionHandle<unknown>, platform?: ServerPlatform<TEnv>): RequestContext<TServices, TEnv> {
 	return buildRequestContext(request, services, session, platform)
 }
 
@@ -267,10 +267,10 @@ export const contextSession: unique symbol = Symbol.for('meeko.context.session')
 /** The cookies and response headers of a context, shared by the contexts derived from it. Internal. */
 export const contextResponse: unique symbol = Symbol.for('meeko.context.response') as never
 
-type InternalContext = RequestContext<unknown, unknown> & { readonly [contextSession]?: SessionHandle<any>; readonly [contextResponse]?: ResponseState }
+type InternalContext = RequestContext<unknown, unknown> & { readonly [contextSession]?: SessionHandle<unknown>; readonly [contextResponse]?: ResponseState }
 
 /** The session handle of a context for Meeko's own reads: it never throws, also with `sessions: false`. */
-export function sessionOf(context: RequestContext<unknown, unknown>): SessionHandle<any> {
+export function sessionOf(context: RequestContext<unknown, unknown>): SessionHandle<unknown> {
 	return (context as InternalContext)[contextSession] ?? context.session
 }
 
@@ -319,7 +319,7 @@ export interface RequestContextInit {
 }
 
 /** {@link createRequestContext} with the response state Meeko's hosts share with their services. */
-export function buildRequestContext<TServices, TEnv = unknown>(request: Request, services: TServices, session: SessionHandle<any>, platform?: ServerPlatform<TEnv>, init: RequestContextInit = {}): RequestContext<TServices, TEnv> {
+export function buildRequestContext<TServices, TEnv = unknown>(request: Request, services: TServices, session: SessionHandle<unknown>, platform?: ServerPlatform<TEnv>, init: RequestContextInit = {}): RequestContext<TServices, TEnv> {
 	const revocation = (session as Partial<SessionHandle> | undefined)?.signal
 	let signal: AbortSignal | undefined
 	const resolvedPlatform = platform ?? (defaultPlatform() as ServerPlatform<TEnv>)

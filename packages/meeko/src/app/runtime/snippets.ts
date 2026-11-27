@@ -50,9 +50,9 @@ export interface SnippetData {
 /**
  * Crea un snippet en la raíz reactiva actual del padre. Interno a los componentes compilados: sólo
  * la etiqueta del componente tipa `Args`, así que unos `params` de más fallan en la función; un
- * nombre que el hijo no declara recibe `any[]` además de su propio error.
+ * nombre que el hijo no declara recibe `unknown[]` además de su propio error.
  */
-export function snippet<Args extends readonly unknown[] = any[]>(render: NoInfer<(...args: Args) => string>, hydrate?: NoInfer<(args: ReadonlySignal<Args>, scope: DomScope) => () => void>): Snippet<Args> {
+export function snippet<Args extends readonly unknown[] = unknown[]>(render: NoInfer<(...args: Args) => string>, hydrate?: NoInfer<(args: ReadonlySignal<Args>, scope: DomScope) => () => void>): Snippet<Args> {
 	const data: SnippetData = {
 		render: render as unknown as SnippetData['render'],
 		hydrate: hydrate as SnippetData['hydrate'],
