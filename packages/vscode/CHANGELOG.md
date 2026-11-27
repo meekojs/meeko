@@ -2,6 +2,7 @@
 
 ## Sin publicar
 
+- Las pruebas de host aisladas (`test:host:isolated`) se ejecutan con Node en Windows, macOS y Linux sin PowerShell, y `test:host:untrusted` descarga VS Code si no encuentra uno en vez de depender de una ruta de Windows.
 - Los archivos `.meeko` abiertos fuera de las carpetas del workspace ya no muestran diagnósticos duplicados: los atiende sólo el servidor global, y los que ya había publicado un servidor de carpeta se retiran cuando el global arranca.
 - Las zonas de ejecución se vuelven a pintar al cambiar el modo de lenguaje de un editor visible a `meeko`, y se limpian al pasar a otro lenguaje.
 - La extensión pide al servidor los proveedores de clases del proyecto (`meeko/classProviders`) y le comunica cuáles de sus extensiones están activas (`activeExtensions`). Con un servidor anterior se comporta como hasta ahora, porque sigue enviando `tailwindActive`. Las descripciones de `meeko.classes.completion` y `meeko.classes.hover` hablan ahora del proveedor declarado. `tailwindCSS.includeLanguages` no cambia.

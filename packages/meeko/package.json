@@ -133,7 +133,7 @@
 		"example:serve": "pnpm run example:bundle && tsx examples/counter/server.ts",
 		"html-data": "tsx scripts/html-data.ts",
 		"prepack": "pnpm run build",
-		"package:smoke": "pwsh -NoProfile -File tests/package-consumer.ps1",
+		"package:smoke": "node tests/package-consumer.mjs",
 		"pilot:build": "tsx examples/pilot/build.ts",
 		"pilot:check": "pnpm run build && pnpm run pilot:check:prepared",
 		"pilot:check:prepared": "node dist/cli.js check examples/pilot/App.meeko && node dist/cli.js types examples/pilot/App.meeko && tsc -p examples/pilot/tsconfig.json --noEmit",

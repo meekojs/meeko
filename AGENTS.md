@@ -35,6 +35,7 @@ Requiere Node.js 24+ y pnpm 12.14.0. En Windows usa PowerShell 7.
 - `pnpm test:changed`: ejecuta sólo las pruebas asociadas a los archivos editados (`--base <ref>` para una rama, `--list` para ver el plan, `--no-build`, `--timeout <s>`, `--max-transitive <n>`); nunca lanza `*.e2e.*` ni la suite completa.
 - `pnpm lint` y `pnpm format:check`: revisan lint y formato.
 - `pnpm ci:local`: ejecuta en local los jobs de `.github/workflows/ci.yml` y los gates de publicación (`--only package-gates`) sin detenerse en el primer fallo y resume al final los fallidos y los omitidos por falta de una herramienta (`pwsh`, `bun`, `deno`, Redis). Ejecútalo sólo cuando se pida, normalmente antes de una PR; `--only checks,core-tests`, `--skip performance`, `--no-build` y `--list` lo acotan.
+- `pnpm package:smoke`, `pnpm package:workspace-smoke` y `pnpm -F meeko-language run test:host:isolated` son scripts de Node y no necesitan `pwsh`; los `.ps1` homónimos son envoltorios por compatibilidad. En Linux, `test:host:isolated` y `test:host:untrusted` necesitan `xvfb-run -a`; con `MEEKO_HOST_VSCODE=<ruta a code>` reutilizan un VS Code ya descargado.
 - `pnpm -F @meekojs/eslint-plugin test`: ejecuta las pruebas del plugin seleccionado.
 
 ## Estilo y nombres

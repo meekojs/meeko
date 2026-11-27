@@ -1,4 +1,6 @@
+import { downloadAndUnzipVSCode } from '@vscode/test-electron'
 import { spawn } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -34,7 +36,10 @@ try {
 
 	// @vscode/test-electron 3.1.0 always adds --disable-workspace-trust.
 	// Launch the same extension test host through the public VS Code CLI instead.
-	const executable = process.env.MEEKO_HOST_VSCODE ?? join(process.env.LOCALAPPDATA ?? '', 'Programs', 'Microsoft VS Code', 'Code.exe')
+	// MEEKO_HOST_VSCODE, then the usual Windows installation, then the stable build that @vscode/test-electron downloads
+	// (the only option on Linux and macOS, where there is no fixed install path).
+	const windowsInstall = process.platform === 'win32' && process.env.LOCALAPPDATA ? join(process.env.LOCALAPPDATA, 'Programs', 'Microsoft VS Code', 'Code.exe') : undefined
+	const executable = process.env.MEEKO_HOST_VSCODE ?? (windowsInstall && existsSync(windowsInstall) ? windowsInstall : await downloadAndUnzipVSCode({ version: 'stable' }))
 	const args = [
 		workspace,
 		'--no-sandbox',
