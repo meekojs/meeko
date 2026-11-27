@@ -3,11 +3,11 @@
 
 	import type { UIToastProps } from '../types/feedback'
 
+	import { toastPlacement, toastTheme } from '../theme/components/toast'
 	import { uiTheme } from '../utils/defaults'
 	import { icons } from '../utils/icons'
 	import { uiMessages } from '../utils/messages'
 	import { withViewTransition } from '../utils/view-transition'
-	import { toast, toastPlacement } from '../variants/feedback'
 	import * as Icon from './internal/Icon.meeko'
 
 	const props = defineProps<UIToastProps & { hosted?: boolean }>()
@@ -21,7 +21,7 @@
 	const element = useElementRef('element')
 
 	const text = uiMessages().feedback
-	const classes = computed(() => toast({ tone: props.tone }))
+	const classes = computed(() => toastTheme({ variant: props.variant, color: props.color }))
 	const visible = signal(true)
 	let timer: ReturnType<typeof setTimeout> | undefined
 	let remaining = 0
@@ -102,7 +102,7 @@
 		<div bind:class="classes.value.content({ class: theme.ui.content })">
 			<p
 				bind:class="classes.value.message({ class: theme.ui.message })"
-				bind:role="props.tone === 'danger' ? 'alert' : props.hosted ? undefined : 'status'"
+				bind:role="props.color === 'danger' ? 'alert' : props.hosted ? undefined : 'status'"
 			>
 				{props.text}
 			</p>

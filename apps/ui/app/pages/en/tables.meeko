@@ -147,7 +147,7 @@
 				name="cell-status"
 				params="_row, value"
 			>
-				<UIBadge bind:tone="value === 'Published' ? 'accent' : 'neutral'">{value}</UIBadge>
+				<UIBadge bind:color="value === 'Published' ? 'primary' : 'neutral'">{value}</UIBadge>
 			</snippet>
 			<snippet
 				name="header-name"

@@ -74,6 +74,12 @@ test('UIIconButton and UIHint render without JavaScript, and they are named, des
 	assert.equal(await pin.getAttribute('aria-pressed'), 'true')
 	await page.mouse.move(0, 0)
 	assert.notEqual(await background(), off, 'a pressed toggle looks pressed')
+	// The pointer keeps the accent border of a pressed outline toggle, which the hover border of `outline` would replace.
+	const border = () => pin.evaluate((element) => globalThis.getComputedStyle(element).borderTopColor)
+	const pressedBorder = await border()
+	await pin.hover()
+	assert.equal(await border(), pressedBorder, 'a pressed toggle keeps its border under the pointer')
+	await page.mouse.move(0, 0)
 	assert.deepEqual(await accessible(page, '#icon-button-pin'), { role: 'button', name: 'Fijar el panel', description: '' })
 	await pin.press('Enter')
 	assert.equal(await pin.getAttribute('aria-pressed'), 'false')

@@ -6,10 +6,10 @@
 
 	import type { UISparklineProps } from '../types/data'
 
+	import { sparklineTheme } from '../theme/components/sparkline'
 	import { uiTheme } from '../utils/defaults'
 	import { fillMessage, uiMessages } from '../utils/messages'
 	import { sparklineShape } from '../utils/sparkline'
-	import { sparkline } from '../variants/data'
 
 	const props = defineProps<UISparklineProps>()
 
@@ -26,7 +26,7 @@
 		const format = new Intl.NumberFormat(messages.locale, props.format)
 		return fillMessage(text.label, { min: format.format(summary.min), max: format.format(summary.max), last: format.format(summary.last) })
 	})
-	const classes = computed(() => sparkline({ tone: props.tone }))
+	const classes = computed(() => sparklineTheme({ color: props.color }))
 </script>
 
 <template>

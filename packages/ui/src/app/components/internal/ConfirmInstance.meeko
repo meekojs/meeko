@@ -15,7 +15,7 @@
 	const modal = provideModalInstance(props.instance.id)
 	const text = uiMessages().modal
 	const options = props.instance.options
-	const danger = options.tone === 'danger'
+	const danger = options.color === 'danger'
 </script>
 
 <template>
@@ -26,11 +26,12 @@
 	>
 		<snippet name="footer">
 			<Button
-				variant="secondary"
+				variant="surface"
+				color="neutral"
 				bind:autofocus="danger"
 				on:click="() => modal.close(false)"
 				>{options.cancelLabel ?? text.cancel}</Button><Button
-				bind:tone="danger ? 'danger' : 'neutral'"
+				bind:color="options.color ?? 'primary'"
 				bind:autofocus="!danger"
 				on:click="() => modal.close(true)"
 				>{options.confirmLabel ?? text.confirm}</Button

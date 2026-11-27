@@ -47,12 +47,14 @@
 					<UILink bind:href="home">{t('error.home')}</UILink>
 					<UILink
 						variant="outline"
+						color="neutral"
 						bind:href="guide"
 					>
 						{t('error.guide')}
 					</UILink>
 					<UILink
 						variant="outline"
+						color="neutral"
 						bind:href="reference"
 					>
 						{t('error.reference')}

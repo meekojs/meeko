@@ -1,10 +1,10 @@
 /*
  * What the navigation cannot say with utilities: the pseudo-elements of a View Transition, which belong to
- * the document and not to a component, and their keyframes. The components are in variants/header.ts,
+ * the document and not to a component, and their keyframes. The components are in theme/components/header.ts,
  * navigation.ts, drawer.ts and locale.ts.
  */
 
-/* <UIDrawer> leaves with the View Transition of <UIModal>: variants/drawer names the panel by the edge it
+/* <UIDrawer> leaves with the View Transition of <UIModal>: theme/components/drawer.ts names the panel by the edge it
    leaves through, only during this type. No `display` or `overlay allow-discrete`: they would keep it in
    the new capture. */
 html:active-view-transition-type(ui-modal-close)::view-transition-old(ui-drawer-left) {

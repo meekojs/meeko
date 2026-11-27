@@ -26,7 +26,7 @@ button({ href: 'https://example.com', target: '_blank', rel: 'external', downloa
 button({ type: 'submit', disabled: true })
 button({})
 // Appearance and forwarded attributes on every branch.
-button({ to: '/', variant: 'outline', size: 'sm', shape: 'pill', class: 'wide', id: 'home', title: 'Home', 'aria-label': 'Home', 'aria-current': 'page', 'data-testid': 'home' })
+button({ to: '/', variant: 'outline', color: 'neutral', size: 'sm', radius: 'full', width: 'full', elevation: 'sm', class: 'wide', id: 'home', title: 'Home', 'aria-label': 'Home', 'aria-current': 'page', 'data-testid': 'home' })
 button({ href: '/file.pdf', tabindex: 0, 'aria-describedby': 'hint', 'data-state': 'idle' })
 button({ type: 'reset', id: 'reset', 'aria-busy': true, 'data-count': 3 })
 // The attributes of <a> on a link, with `to` or `href`; `resolve` only with `to`.
@@ -63,8 +63,28 @@ button({ download: true })
 button({ type: 'menu' })
 // @ts-expect-error Event handlers are not forwarded attributes: use on:click.
 button({ onclick: 'alert(1)' })
-// @ts-expect-error Only the variants of UIActionVariant.
+// @ts-expect-error Only the treatments of the catalog that a button takes.
 button({ variant: 'danger' })
+// @ts-expect-error primary is a color now: variant="solid" color="primary".
+button({ variant: 'primary' })
+// @ts-expect-error secondary is a color now: variant="surface" color="neutral" for the old look.
+button({ variant: 'secondary' })
+// @ts-expect-error tone is gone: color="danger".
+button({ tone: 'danger' })
+// @ts-expect-error shape is gone: radius="full".
+button({ shape: 'pill' })
+// @ts-expect-error Only the semantic colors.
+button({ color: 'crimson' })
+// @ts-expect-error The sizes of the controls.
+button({ size: '2xl' })
+// @ts-expect-error appearance is gone: its options are props.
+button({ appearance: { variant: 'solid' } })
+// Every treatment, color and size of a button.
+button({ variant: 'soft', color: 'success', size: 'xs', radius: 'none' })
+button({ variant: 'link', color: 'info', size: 'xl' })
+link({ href: '/', variant: 'subtle', color: 'warning', radius: '2xl' })
+// @ts-expect-error UILink has no tone either.
+link({ href: '/', tone: 'danger' })
 
 // UILink keeps `href` and accepts `to`.
 link({ href: '/installation' })
@@ -87,7 +107,7 @@ link({ href: '/', resolve: false })
 // @ts-expect-error Not an attribute of <a>.
 link({ to: '/', autocomplete: 'off' })
 
-button({ type: 'submit', name: 'intent', value: 'save', form: 'editor', loading: true, tone: 'danger' })
+button({ type: 'submit', name: 'intent', value: 'save', form: 'editor', loading: true, color: 'danger' })
 button({ iconOnly: true, ariaLabel: 'Close' })
 button({ iconOnly: true, 'aria-label': 'Close' })
 // @ts-expect-error An icon-only action requires an accessible name.

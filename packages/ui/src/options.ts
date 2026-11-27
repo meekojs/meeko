@@ -6,11 +6,13 @@ import { validateDefaults } from './defaults'
 
 /**
  * The variables each option sets. `surface` and `surfaceHover` predate the split into surfaces and
- * controls, so they set every one of them.
+ * controls, so they set every one of them. The colors also set the steps of their scale that the recipes
+ * paint with (`bg-primary-9`, `hover:bg-primary-10`, `bg-primary-3`, `text-primary-11`, `bg-danger-9`…):
+ * otherwise a solid button would keep the palette's primary.
  */
 const tokenNames = {
-	primary: ['--ui-color-primary'],
-	primaryHover: ['--ui-color-primary-hover'],
+	primary: ['--ui-color-primary', '--ui-color-primary-9'],
+	primaryHover: ['--ui-color-primary-hover', '--ui-color-primary-10'],
 	onPrimary: ['--ui-color-primary-contrast'],
 	surface: ['--ui-color-surface', '--ui-color-surface-raised', '--ui-color-control'],
 	surfaceHover: ['--ui-color-control-hover', '--ui-color-control-active'],
@@ -19,7 +21,7 @@ const tokenNames = {
 	muted: ['--ui-color-text-soft'],
 	border: ['--ui-color-border'],
 	borderStrong: ['--ui-color-border-strong'],
-	danger: ['--ui-color-danger', '--ui-color-danger-text'],
+	danger: ['--ui-color-danger', '--ui-color-danger-text', '--ui-color-danger-9', '--ui-color-danger-11'],
 	focus: ['--ui-color-focus'],
 	radius: ['--ui-radius-md'],
 	font: ['--ui-font-sans'],
@@ -27,8 +29,8 @@ const tokenNames = {
 	controlHeight: ['--ui-control-height-md'],
 	controlWeight: ['--ui-control-font-weight'],
 	controlFontSize: ['--ui-control-font-size'],
-	accentSoft: ['--ui-color-primary-soft'],
-	accentText: ['--ui-color-primary-text'],
+	accentSoft: ['--ui-color-primary-soft', '--ui-color-primary-3'],
+	accentText: ['--ui-color-primary-text', '--ui-color-primary-11'],
 } satisfies Record<keyof UITokens, readonly string[]>
 
 function object(value: unknown, name: string): asserts value is Record<string, unknown> {

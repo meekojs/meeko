@@ -172,7 +172,8 @@
 				<div class="dash-tight">
 					<div class="dash-actions">
 						<UIButton
-							variant="secondary"
+							variant="surface"
+							color="neutral"
 							bind:disabled="busy.value"
 							on:click="importSources"
 						>
@@ -193,7 +194,7 @@
 					/>
 					<UIAlert
 						if:when="conflict.value"
-						tone="danger"
+						color="danger"
 						bind:title="t('snapshots.conflict')"
 						bind:description="conflictSummary.value ?? ''"
 					>
@@ -295,7 +296,7 @@
 						<span if:when="column.key === 'note'">{row.note ?? '—'}</span>
 						<UIBadge
 							if:when="column.key === 'active' && row.active"
-							tone="accent"
+							color="primary"
 						>
 							{t('snapshots.activeBadge')}
 						</UIBadge>
@@ -303,6 +304,7 @@
 							if:when="column.key === 'active' && !row.active"
 							size="sm"
 							variant="outline"
+							color="neutral"
 							bind:disabled="busy.value || activating.value"
 							on:click="() => askActivate(row)"
 						>
@@ -333,6 +335,7 @@
 			<snippet name="footer">
 				<UIButton
 					variant="ghost"
+					color="neutral"
 					on:click="() => (confirming.value = false)"
 				>
 					{t('actions.cancel')}
@@ -387,6 +390,7 @@
 			<snippet name="footer">
 				<UIButton
 					variant="ghost"
+					color="neutral"
 					on:click="() => (publishing.value = false)"
 				>
 					{t('actions.cancel')}

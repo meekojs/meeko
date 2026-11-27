@@ -1,4 +1,4 @@
-import type { hint } from '../variants/popover'
+import type { hintTheme } from '../theme/components/hint'
 import type { PopoverPlacement, PopoverTrigger } from './popover'
 import type { UIThemeProps } from './theme'
 
@@ -82,7 +82,7 @@ export interface HintSnippets {
  * ```
  */
 export type UIHintProps = UIThemeProps<
-	typeof hint,
+	typeof hintTheme,
 	{
 		/** El texto de la ayuda; o el snippet `default`, para un contenido con formato. */
 		readonly text?: string

@@ -8,14 +8,13 @@ Desde la raíz del monorepo, con Node.js 24+ y pnpm 12:
 
 ```powershell
 pnpm install
-pnpm build
-pnpm i18n:dev
+pnpm dev:i18n
 ```
 
 La web escucha en `http://127.0.0.1:4175`. Para generar y servir el build Node:
 
 ```powershell
-pnpm i18n:build
+pnpm build --filter=meeko-i18n-site
 pnpm -F meeko-i18n-site start
 ```
 

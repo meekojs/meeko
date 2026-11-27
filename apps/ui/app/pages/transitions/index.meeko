@@ -19,6 +19,7 @@
 					<UILink
 						to="/transitions/project"
 						variant="outline"
+						color="neutral"
 					>
 						Ver proyecto
 					</UILink>

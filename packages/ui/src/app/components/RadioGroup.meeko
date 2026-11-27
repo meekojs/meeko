@@ -3,10 +3,10 @@
 
 	import type { UIRadioGroupProps } from '../types/forms'
 
+	import { radioGroupTheme } from '../theme/components/radio-group'
 	import { uiTheme } from '../utils/defaults'
-	import { radioGroup } from '../variants/choice'
 
-	const { legend, options, name, required, variant = 'default', class: ownClass, ui: ownUi, ...rest } = defineProps<UIRadioGroupProps>()
+	const { legend, options, name, required, layout = 'default', class: ownClass, ui: ownUi, ...rest } = defineProps<UIRadioGroupProps>()
 
 	const theme = uiTheme('radioGroup', () => ({ class: ownClass, ui: ownUi }))
 
@@ -14,7 +14,7 @@
 
 	const id = useId()
 
-	const classes = radioGroup({ variant })
+	const classes = radioGroupTheme({ layout })
 </script>
 
 <template>

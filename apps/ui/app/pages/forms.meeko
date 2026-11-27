@@ -59,6 +59,7 @@
 					<UIButton type="submit">Guardar nombre</UIButton>
 					<UIButton
 						variant="outline"
+						color="neutral"
 						on:click="reset"
 					>
 						Restablecer
@@ -73,7 +74,7 @@
 			</form>
 		</DocsPreview>
 		<DocsCode bind:code="examples.form" />
-		<UIAlert tone="info">
+		<UIAlert color="info">
 			UIField entrega
 			<code>id</code>
 			y
@@ -94,10 +95,46 @@
 				{ name: 'class', type: 'string', description: 'Clases adicionales.' },
 			]"
 		/>
+		<h2 id="appearance">Apariencia de Input</h2>
+		<DocsPreview>
+			<label for="appearance-email">Correo de trabajo</label>
+			<UIInput
+				id="appearance-email"
+				type="email"
+				placeholder="name@example.com"
+				variant="surface"
+				color="primary"
+				size="lg"
+				radius="lg"
+			/>
+			<label for="appearance-input-outline">outline</label>
+			<UIInput
+				id="appearance-input-outline"
+				variant="outline"
+				color="primary"
+			/>
+			<label for="appearance-input-ghost">ghost</label>
+			<UIInput
+				id="appearance-input-ghost"
+				variant="ghost"
+				color="primary"
+			/>
+			<label for="appearance-input-soft">soft</label>
+			<UIInput
+				id="appearance-input-soft"
+				variant="soft"
+				color="primary"
+			/>
+		</DocsPreview>
+		<DocsCode bind:code="examples.inputAppearance" />
 		<DocsApi
 			caption="Propiedades de UIInput"
 			bind:rows="[
 				{ name: 'model', type: 'Signal<string>', default: 'Cadena vacía', description: 'Modelo de texto de doble vía; se actualiza con input.' },
+				{ name: 'variant', type: 'outline | surface | soft | ghost', default: 'outline', description: 'Tratamiento visual. outline es el campo de siempre y ghost deja sólo la línea inferior.' },
+				{ name: 'color', type: 'primary | secondary | neutral | success | info | warning | danger', default: 'neutral', description: 'Color semántico del fondo y del texto. El borde sigue siendo el de los controles, o el de peligro con invalid.' },
+				{ name: 'size', type: 'xs | sm | md | lg | xl', default: 'md', description: 'Alto y relleno del control, sobre los tokens --ui-control-*.' },
+				{ name: 'radius', type: 'none | xs | sm | md | lg | xl | 2xl | 3xl | full', default: 'md', description: 'Radio del contorno.' },
 				{ name: 'type', type: 'text | email | password | search | url | tel | number | date | datetime-local | time | month', default: 'text', description: 'Tipo nativo del control. La fecha y la hora son las del navegador. Con number, time y month el modelo sigue siendo texto («42», «09:30», «2026-11» o vacío): conviértelo donde lo uses.' },
 				{ name: 'autocomplete / inputmode / min / max / step', type: 'atributos HTML', description: 'Llegan tal cual al input, como autocapitalize y spellcheck.' },
 				{ name: 'id / name / placeholder', type: 'string', description: 'Atributos del input.' },

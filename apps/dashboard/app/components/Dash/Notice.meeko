@@ -16,7 +16,7 @@
 			if:when="props.text"
 			class="dash-notice"
 			role="none"
-			tone="success"
+			color="success"
 			bind:description="props.text"
 		>
 			<render

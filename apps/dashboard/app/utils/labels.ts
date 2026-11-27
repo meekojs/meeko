@@ -4,13 +4,13 @@ import type { DivergenceState, DocsSite, Job, SourceKind, TranslationStatus } fr
 export const siteLabels: Readonly<Record<DocsSite, string>> = { site: 'Framework', ui: 'UI', i18n: 'i18n' }
 
 /** Badge tone of each state: attention for the ones that need a decision. */
-export const stateTones: Readonly<Record<DivergenceState, 'accent' | 'danger' | 'neutral'>> = { git: 'neutral', same: 'neutral', edited: 'accent', conflict: 'danger', missing: 'danger' }
+export const stateTones: Readonly<Record<DivergenceState, 'danger' | 'neutral' | 'primary'>> = { git: 'neutral', same: 'neutral', edited: 'primary', conflict: 'danger', missing: 'danger' }
 
 /** Badge tone of each status of a translation. */
 export const translationTones: Readonly<Record<TranslationStatus, 'neutral' | 'success' | 'warning'>> = { translated: 'success', outdated: 'warning', missing: 'neutral' }
 
 /** Badge tone of each status of a job. */
-export const jobTones: Readonly<Record<Job['status'], 'accent' | 'danger' | 'success'>> = { running: 'accent', succeeded: 'success', failed: 'danger' }
+export const jobTones: Readonly<Record<Job['status'], 'danger' | 'primary' | 'success'>> = { running: 'primary', succeeded: 'success', failed: 'danger' }
 
 // Their names and descriptions are the catalog keys `labels.state.<state>`, `labels.stateHelp.<state>`,
 // `labels.kind.<kind>` and `labels.job.<kind>` of app/locales/<locale>/common.json.

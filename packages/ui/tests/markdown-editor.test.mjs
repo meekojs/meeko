@@ -111,16 +111,25 @@ test('UIMarkdownEditor belongs to its own module: the main one does not register
 	const directories = []
 	const stylesheets = []
 	const plugins = []
-	editorModule.setup(
-		{},
-		{
-			addComponentsDir: (directory, options) => directories.push([fileURLToPath(directory).replaceAll('\\', '/'), options]),
-			addStylesheet: (file) => stylesheets.push(fileURLToPath(file).replaceAll('\\', '/')),
-			addVitePlugin: (plugin) => plugins.push(plugin),
-		},
-	)
+	const setup = (dev) =>
+		editorModule.setup(
+			{},
+			{
+				dev,
+				addComponentsDir: (directory, options) => directories.push([fileURLToPath(directory).replaceAll('\\', '/'), options]),
+				addStylesheet: (file) => stylesheets.push(fileURLToPath(file).replaceAll('\\', '/')),
+				addVitePlugin: (plugin) => plugins.push(plugin),
+			},
+		)
+	// A build registers the compiled components; `meeko dev` in the workspace, the sources, with their declarations.
+	setup(true)
+	assert.match(directories[0][0], /\/src\/editor\/components\/?$/)
+	assert.deepEqual(directories[0][1], { prefix: 'UI', generateTypesInDev: true })
+	directories.length = 0
+	plugins.length = 0
+	setup(false)
 	assert.match(directories[0][0], /\/dist\/editor\/components\/?$/)
-	assert.deepEqual(directories[0][1], { prefix: 'UI' })
+	assert.deepEqual(directories[0][1], { prefix: 'UI', generateTypesInDev: false })
 	assert.match(stylesheets[0], /\/src\/app\/styles\/markdown-editor\.css$/)
 	const { define, optimizeDeps } = plugins[0].config()
 	assert.equal(define.__VUE_OPTIONS_API__, 'false')

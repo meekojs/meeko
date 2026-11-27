@@ -1,16 +1,16 @@
 <script lang="ts" generic="T">
 	// <UICommandPalette>: a search dialog that knows nothing about where the results come from. The parent
 	// reads `query` and passes `results` and `status`. The dialog is the one of <UIModal>, with its entrance,
-	// exit and backdrop; the look lives in ../variants/command-palette.ts. Its template has no whitespace between the tags: it would be
+	// exit and backdrop; the look lives in ../theme/components/command-palette.ts. Its template has no whitespace between the tags: it would be
 	// text inside the trigger and the rows.
 	import { onMounted, useId } from '@meekojs/meeko'
 
 	import type { CommandPaletteSnippets, UICommandPaletteProps } from '../types/command-palette'
 
+	import { commandPaletteTheme } from '../theme/components/command-palette'
 	import { createCommandPalette } from '../utils/command-palette'
 	import { uiTheme } from '../utils/defaults'
 	import { commandPaletteStatusText, uiMessages } from '../utils/messages'
-	import { commandPalette } from '../variants/command-palette'
 
 	const props = defineProps<UICommandPaletteProps<T>>()
 
@@ -34,7 +34,7 @@
 	const palette = createCommandPalette<T>(props, { open, query, active }, useId(), { open: () => emit('open'), close: () => emit('close'), choose: (item) => emit('choose', item) })
 	onMounted(() => palette.mount(dialog.value, input.value))
 
-	const classes = commandPalette()
+	const classes = commandPaletteTheme()
 	defineExpose({ show: palette.show, hide: palette.hide })
 </script>
 

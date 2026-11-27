@@ -422,7 +422,7 @@ test('confirm waits for its exit, keeps the opening order behind a loading modal
 	const exit = deferred()
 	const manager = createModalManager(() => load.promise)
 	const modal = manager.open('ModalSlow', {})
-	const later = manager.confirm({ title: 'Después', tone: 'danger' })
+	const later = manager.confirm({ title: 'Después', color: 'danger' })
 	await tick()
 	assert.equal(manager.confirms.value.size, 0, 'it does not jump over a modal that is still loading')
 	load.resolve(component)

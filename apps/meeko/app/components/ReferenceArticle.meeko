@@ -36,13 +36,14 @@
 			class="meta"
 			data-pagefind-ignore
 		>
-			<UIBadge tone="accent">{props.page.kindLabel}</UIBadge>
+			<UIBadge color="primary">{props.page.kindLabel}</UIBadge>
 			<UIBadge if:when="props.page.since">{t('docs.reference.since', { version: props.page.since ?? '' })}</UIBadge>
 			<UIBadge if:when="props.page.autoImport">{t('docs.reference.noImport')}</UIBadge>
 			<code if:when="props.page.specifier">{props.page.specifier}</code>
 			<UILink
 				if:when="props.page.sourceUrl"
 				variant="ghost"
+				color="neutral"
 				size="sm"
 				rel="noopener"
 				bind:href="props.page.sourceUrl!"

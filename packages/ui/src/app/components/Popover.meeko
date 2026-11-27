@@ -1,14 +1,14 @@
 <script lang="ts">
 	// <UIPopover>: the successor of the deprecated <MeekoPopover> of the core, with the same contract
-	// and markup. The behavior lives in ../utils/popover.ts and the look in ../variants/popover.ts. Its
+	// and markup. The behavior lives in ../utils/popover.ts and the look in ../theme/components/popover.ts. Its
 	// template has no whitespace between the tags: it would be text in the trigger.
 	import { computed, onMounted, useId } from '@meekojs/meeko'
 
 	import type { PopoverSnippets, PopoverToggleEvent, UIPopoverProps } from '../types/popover'
 
+	import { popoverTheme, popoverTriggerTheme } from '../theme/components/popover'
 	import { uiTheme } from '../utils/defaults'
 	import { createPopover } from '../utils/popover'
-	import { popover as look, popoverTrigger } from '../variants/popover'
 
 	const props = defineProps<UIPopoverProps>()
 
@@ -26,8 +26,8 @@
 	const popover = createPopover(props, open, useId(), (now) => emit('toggle', { open: now }))
 	onMounted(() => popover.mount(content.value))
 
-	const contentClass = computed(() => look({ role: popover.role.value ?? 'none', placement: popover.placement.value, matchWidth: props.matchWidth === true, class: theme.class }))
-	const triggerClass = computed(() => popoverTrigger({ class: props.triggerClass }))
+	const contentClass = computed(() => popoverTheme({ role: popover.role.value ?? 'none', placement: popover.placement.value, matchWidth: props.matchWidth === true, class: theme.class }))
+	const triggerClass = computed(() => popoverTriggerTheme({ class: props.triggerClass }))
 	defineExpose({ show: popover.show, hide: popover.hide, toggle: popover.toggle })
 </script>
 

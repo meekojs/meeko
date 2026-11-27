@@ -3,33 +3,47 @@
 // read the validated defaults, never this table, so the browser does not get every variant.
 import type { UIDefaults } from './app/types/config'
 
-import { avatar } from './app/variants/avatar'
-import { badge } from './app/variants/badge'
-import { button, copyButton, iconButton } from './app/variants/button'
-import { card, linkCard } from './app/variants/card'
-import { checkbox, radioGroup, segmentedControl, toggle } from './app/variants/choice'
-import { commandPalette } from './app/variants/command-palette'
-import { container } from './app/variants/container'
-import { codeBlock, diff } from './app/variants/content'
-import { descriptionList, sparkline, stat } from './app/variants/data'
-import { dateRange } from './app/variants/date-range'
-import { drawer } from './app/variants/drawer'
-import { alert, disclosure, empty, skeleton, toast } from './app/variants/feedback'
-import { field } from './app/variants/field'
-import { footer, header } from './app/variants/header'
-import { input, textarea } from './app/variants/input'
-import { localeSuggestion, localeSwitcher } from './app/variants/locale'
-import { markdownEditor } from './app/variants/markdown-editor'
-import { menu } from './app/variants/menu'
-import { modal } from './app/variants/modal'
-import { breadcrumb, navigationTabs, navigationTree, pageNavigation, pagination, tableOfContents } from './app/variants/navigation'
-import { page, pageHeader } from './app/variants/page'
-import { hint } from './app/variants/popover'
-import { combobox, select } from './app/variants/select'
-import { slider } from './app/variants/slider'
-import { table } from './app/variants/table'
-import { tabs } from './app/variants/tabs'
-import { themeToggle } from './app/variants/theme-toggle'
+import { alertTheme } from './app/theme/components/alert'
+import { avatarTheme } from './app/theme/components/avatar'
+import { badgeTheme } from './app/theme/components/badge'
+import { buttonTheme } from './app/theme/components/button'
+import { cardTheme, linkCardTheme } from './app/theme/components/card'
+import { checkboxTheme } from './app/theme/components/checkbox'
+import { codeBlockTheme } from './app/theme/components/code-block'
+import { comboboxTheme } from './app/theme/components/combobox'
+import { commandPaletteTheme } from './app/theme/components/command-palette'
+import { containerTheme } from './app/theme/components/container'
+import { copyButtonTheme } from './app/theme/components/copy-button'
+import { dateRangeTheme } from './app/theme/components/date-range'
+import { descriptionListTheme } from './app/theme/components/description-list'
+import { diffTheme } from './app/theme/components/diff'
+import { disclosureTheme } from './app/theme/components/disclosure'
+import { drawerTheme } from './app/theme/components/drawer'
+import { emptyTheme } from './app/theme/components/empty'
+import { fieldTheme } from './app/theme/components/field'
+import { footerTheme, headerTheme } from './app/theme/components/header'
+import { hintTheme } from './app/theme/components/hint'
+import { iconButtonTheme } from './app/theme/components/icon-button'
+import { inputTheme } from './app/theme/components/input'
+import { localeSuggestionTheme, localeSwitcherTheme } from './app/theme/components/locale'
+import { markdownEditorTheme } from './app/theme/components/markdown-editor'
+import { menuTheme } from './app/theme/components/menu'
+import { modalTheme } from './app/theme/components/modal'
+import { breadcrumbTheme, navigationTabsTheme, navigationTreeTheme, pageNavigationTheme, paginationTheme, tableOfContentsTheme } from './app/theme/components/navigation'
+import { pageHeaderTheme, pageTheme } from './app/theme/components/page'
+import { radioGroupTheme } from './app/theme/components/radio-group'
+import { segmentedControlTheme } from './app/theme/components/segmented-control'
+import { selectTheme } from './app/theme/components/select'
+import { skeletonTheme } from './app/theme/components/skeleton'
+import { sliderTheme } from './app/theme/components/slider'
+import { sparklineTheme } from './app/theme/components/sparkline'
+import { statTheme } from './app/theme/components/stat'
+import { switchTheme } from './app/theme/components/switch'
+import { tableTheme } from './app/theme/components/table'
+import { tabsTheme } from './app/theme/components/tabs'
+import { textareaTheme } from './app/theme/components/textarea'
+import { themeToggleTheme } from './app/theme/components/theme-toggle'
+import { toastTheme } from './app/theme/components/toast'
 
 /** The part of a tv() that the validation reads. */
 interface Look {
@@ -54,62 +68,68 @@ interface Choices<K extends keyof UIDefaults> {
 	readonly props?: Readonly<Partial<Record<Option<K>, readonly string[]>>>
 }
 
-const action = { look: button, variants: ['variant', 'size', 'shape'] } as const
+/** The variants of a button that take an application default. */
+const buttonChoices = ['variant', 'color', 'size', 'radius'] as const
+
+const action = { look: buttonTheme, variants: buttonChoices } as const
+
+/** The variants of a text field that take an application default: the same as those of a button. */
+const inputChoices = buttonChoices
 
 const components = {
-	alert: { look: alert },
-	avatar: { look: avatar, variants: ['size', 'shape'] },
-	badge: { look: badge },
-	breadcrumb: { look: breadcrumb },
+	alert: { look: alertTheme },
+	avatar: { look: avatarTheme, variants: ['size', 'variant', 'color', 'radius'] },
+	badge: { look: badgeTheme, variants: ['variant', 'color', 'radius'] },
+	breadcrumb: { look: breadcrumbTheme },
 	button: action,
-	card: { look: card, variants: ['variant', 'padding', 'actionsWrap'], props: { density: ['compact', 'normal', 'comfortable'] } },
-	checkbox: { look: checkbox },
-	codeBlock: { look: codeBlock },
-	combobox: { look: combobox },
-	commandPalette: { look: commandPalette },
-	container: { look: container },
-	copyButton: { look: copyButton, variants: ['variant', 'size', 'shape'] },
-	dateRange: { look: dateRange },
-	descriptionList: { look: descriptionList },
-	diff: { look: diff },
-	disclosure: { look: disclosure },
-	drawer: { look: drawer },
-	empty: { look: empty },
-	field: { look: field },
-	footer: { look: footer },
-	header: { look: header },
-	hint: { look: hint },
-	iconButton: { look: iconButton, variants: ['variant', 'size', 'shape'] },
-	input: { look: input },
+	card: { look: cardTheme, variants: ['variant', 'color', 'radius', 'elevation', 'padding', 'actionsWrap'], props: { density: ['compact', 'normal', 'comfortable'] } },
+	checkbox: { look: checkboxTheme },
+	codeBlock: { look: codeBlockTheme },
+	combobox: { look: comboboxTheme },
+	commandPalette: { look: commandPaletteTheme },
+	container: { look: containerTheme },
+	copyButton: { look: copyButtonTheme, variants: buttonChoices },
+	dateRange: { look: dateRangeTheme },
+	descriptionList: { look: descriptionListTheme },
+	diff: { look: diffTheme },
+	disclosure: { look: disclosureTheme },
+	drawer: { look: drawerTheme },
+	empty: { look: emptyTheme },
+	field: { look: fieldTheme },
+	footer: { look: footerTheme },
+	header: { look: headerTheme },
+	hint: { look: hintTheme },
+	iconButton: { look: iconButtonTheme, variants: buttonChoices },
+	input: { look: inputTheme, variants: inputChoices },
 	link: action,
-	linkCard: { look: linkCard },
-	localeSuggestion: { look: localeSuggestion },
-	localeSwitcher: { look: localeSwitcher },
-	markdownEditor: { look: markdownEditor },
-	menu: { look: menu },
-	modal: { look: modal },
-	navigationTabs: { look: navigationTabs },
-	navigationTree: { look: navigationTree },
-	page: { look: page },
-	pageHeader: { look: pageHeader },
-	pageNavigation: { look: pageNavigation },
-	pagination: { look: pagination },
+	linkCard: { look: linkCardTheme, variants: ['variant', 'color', 'radius', 'elevation'] },
+	localeSuggestion: { look: localeSuggestionTheme },
+	localeSwitcher: { look: localeSwitcherTheme },
+	markdownEditor: { look: markdownEditorTheme },
+	menu: { look: menuTheme },
+	modal: { look: modalTheme },
+	navigationTabs: { look: navigationTabsTheme },
+	navigationTree: { look: navigationTreeTheme },
+	page: { look: pageTheme },
+	pageHeader: { look: pageHeaderTheme },
+	pageNavigation: { look: pageNavigationTheme },
+	pagination: { look: paginationTheme },
 	popover: {},
 	prose: {},
-	radioGroup: { look: radioGroup },
-	segmentedControl: { look: segmentedControl, variants: ['size'] },
-	select: { look: select },
-	skeleton: { look: skeleton },
-	slider: { look: slider },
-	sparkline: { look: sparkline },
-	stat: { look: stat },
-	switch: { look: toggle },
-	table: { look: table, variants: ['density'] },
-	tableOfContents: { look: tableOfContents },
-	tabs: { look: tabs },
-	textarea: { look: textarea },
-	themeToggle: { look: themeToggle },
-	toast: { look: toast, noClass: true },
+	radioGroup: { look: radioGroupTheme },
+	segmentedControl: { look: segmentedControlTheme, variants: ['size'] },
+	select: { look: selectTheme },
+	skeleton: { look: skeletonTheme },
+	slider: { look: sliderTheme },
+	sparkline: { look: sparklineTheme },
+	stat: { look: statTheme },
+	switch: { look: switchTheme },
+	table: { look: tableTheme, variants: ['density'] },
+	tableOfContents: { look: tableOfContentsTheme },
+	tabs: { look: tabsTheme },
+	textarea: { look: textareaTheme },
+	themeToggle: { look: themeToggleTheme },
+	toast: { look: toastTheme, noClass: true },
 	tooltip: {},
 } satisfies { readonly [K in keyof Required<UIDefaults>]: Entry & Choices<K> }
 

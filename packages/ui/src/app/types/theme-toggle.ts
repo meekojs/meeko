@@ -1,6 +1,6 @@
 import type { ThemeChoice, ThemeToggleMessages } from '@meekojs/meeko/framework'
 
-import type { themeToggle } from '../variants/theme-toggle'
+import type { themeToggleTheme } from '../theme/components/theme-toggle'
 import type { UIVariantSlots } from './theme'
 
 /**
@@ -17,7 +17,7 @@ import type { UIVariantSlots } from './theme'
  * <UIThemeToggle mode="select" bind:labels="{ light: 'Light', dark: 'Dark', system: 'System' }" />
  * ```
  */
-export interface UIThemeToggleProps extends UIVariantSlots<typeof themeToggle> {
+export interface UIThemeToggleProps extends UIVariantSlots<typeof themeToggleTheme> {
 	/** `"cycle"` (por defecto), un botón que pasa al tema siguiente; `"select"`, un grupo de radios. */
 	readonly mode?: 'cycle' | 'select'
 	/** Elecciones y su orden; por defecto, los temas de la configuración y `"system"` si está activo. */

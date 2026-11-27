@@ -63,6 +63,7 @@
 				</p>
 				<UIButton
 					variant="outline"
+					color="neutral"
 					size="sm"
 					bind:disabled="events.value.length === 0"
 					on:click="reset"
@@ -114,6 +115,7 @@
 					<div class="stage">
 						<UIButton
 							variant="outline"
+							color="neutral"
 							size="lg"
 							on:click="increment"
 						>

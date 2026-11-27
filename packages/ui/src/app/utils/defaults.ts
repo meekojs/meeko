@@ -2,6 +2,8 @@ import { createContext, inject } from '@meekojs/meeko'
 
 import type { UIDefaults } from '../types/config'
 
+import { mergeClasses } from './theme'
+
 export const uiDefaultsKey = createContext<UIDefaults>('@meekojs/ui/defaults')
 const empty: UIDefaults = Object.freeze({})
 const noSlots: Readonly<Record<string, string | undefined>> = Object.freeze({})
@@ -26,7 +28,9 @@ export interface UIOwnClasses {
 
 /**
  * Las clases de una instancia sumadas a las de `ui.defaults` de su componente, y sus defaults de
- * variantes. Las clases no se fusionan: van primero las de los defaults y después las de la instancia.
+ * variantes. Van primero las de los defaults y después las de la instancia, fusionadas con Tailwind
+ * Merge: ante dos utilidades en conflicto gana la de la instancia. La receta del componente vuelve a
+ * fusionarlas con las suyas, de modo que ambas ganan a las de la receta.
  */
 export interface UITheme<K extends keyof UIDefaults> {
 	/** `ui.defaults` del componente, para sus defaults de variantes: la prop explícita gana sobre ellos. */
@@ -37,7 +41,7 @@ export interface UITheme<K extends keyof UIDefaults> {
 	readonly ui: Slots<K>
 }
 
-const join = (first: string | undefined, second: string | undefined): string | undefined => (first && second ? first + ' ' + second : first || second || undefined)
+const join = (first: string | undefined, second: string | undefined): string | undefined => (first && second ? mergeClasses(first, second) : first || second || undefined)
 
 /**
  * Lee `ui.defaults` de un componente y lo combina con sus props. `own` devuelve las props de la instancia

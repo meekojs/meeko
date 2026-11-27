@@ -10,7 +10,7 @@ type Simplify<T> = { [K in keyof T]: T[K] } & {}
  * @since 1.10.0
  * @example
  * ```meeko
- * <UIBadge tone="success" dot bind:ui="{ dot: 'my-dot' }">Publicado</UIBadge>
+ * <UIBadge color="success" dot bind:ui="{ dot: 'my-dot' }">Publicado</UIBadge>
  * ```
  */
 export type UIVariantSlots<T extends (...args: never[]) => unknown> = OmitUndefined<ReturnType<T>> extends string ? {} : { ui?: { [Key in keyof OmitUndefined<ReturnType<T>>]?: string } }
@@ -22,9 +22,9 @@ export type UIVariantSlots<T extends (...args: never[]) => unknown> = OmitUndefi
  * @since 1.10.0
  * @example
  * ```ts
- * import { badge } from '../variants/badge'
+ * import { badgeTheme } from '../theme/components/badge'
  *
- * export type UIBadgeProps = UIThemeProps<typeof badge, { dot?: boolean; class?: string }>
+ * export type UIBadgeProps = UIThemeProps<typeof badgeTheme, { dot?: boolean; class?: string }>
  * ```
  */
 export type UIThemeProps<T extends (...args: never[]) => unknown, P> = Simplify<P & VariantProps<T> & UIVariantSlots<T>>

@@ -18,7 +18,7 @@ const menuPage = `<script lang="ts">
 		{ separator: true as const },
 		{ label: 'Descargar', value: 'download' },
 		{ label: 'Otra página', to: '/other' },
-		{ label: 'Eliminar', value: 'delete', tone: 'danger' as const },
+		{ label: 'Eliminar', value: 'delete', color: 'danger' as const },
 	]
 </script>
 

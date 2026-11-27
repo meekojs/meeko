@@ -11,7 +11,7 @@
 
 <template>
 	<UIAlert
-		tone="danger"
+		color="danger"
 		bind:title="props.title ?? i18n.t('errors.title')"
 		bind:description="failureMessage(i18n, props.failure)"
 	>

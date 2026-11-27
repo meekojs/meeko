@@ -128,7 +128,7 @@
 			</form>
 		</DocsPreview>
 		<DocsCode bind:code="examples.select" />
-		<UIAlert tone="info">
+		<UIAlert color="info">
 			With
 			<code>required</code>, a form without a value is not sent: the
 			<code>select</code>

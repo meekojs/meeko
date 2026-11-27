@@ -6,11 +6,12 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { routeKey } from '../../meeko/dist/app/runtime/navigation.js'
 import { compile } from '../../meeko/dist/compiler.js'
 import { createRoot, provide } from '../../meeko/dist/index.js'
+import { sparklineTheme as sparkline } from '../dist/app/theme/components/sparkline.js'
+import { statTheme as stat } from '../dist/app/theme/components/stat.js'
 import { uiDefaultsKey } from '../dist/app/utils/defaults.js'
 import { icons } from '../dist/app/utils/icons.js'
 import { sparklineShape } from '../dist/app/utils/sparkline.js'
 import { statChange, statTone } from '../dist/app/utils/stat.js'
-import { sparkline, stat } from '../dist/app/variants/data.js'
 import { validateDefaults } from '../dist/defaults.js'
 
 const components = ['Popover', 'Tooltip', 'Hint', 'Sparkline', 'Stat']
@@ -28,7 +29,7 @@ async function render(context, template, { defaults, locale } = {}) {
 			.code.replaceAll('from "@meekojs/meeko/internal"', `from ${runtime('internal.js')}`)
 			.replaceAll('from "@meekojs/meeko"', `from ${runtime('index.js')}`)
 			.replace(/from ["']\.\/(\w+)\.meeko["']/g, 'from "./$1.ts"')
-			.replace(/from ["'](?:\.\.\/)+(utils|variants)\/([\w-]+)["']/g, (_, folder, utility) => `from ${JSON.stringify(new URL(`../dist/app/${folder}/${utility}.js`, import.meta.url).href)}`)
+			.replace(/from ["'](?:\.\.\/)+(utils|theme(?:\/components)?)\/([\w-]+)["']/g, (_, folder, utility) => `from ${JSON.stringify(new URL(`../dist/app/${folder}/${utility}.js`, import.meta.url).href)}`)
 			.replace(/from ["']\.\/internal\/Icon\.meeko["']/g, 'from "./Icon.ts"')
 		await writeFile(`${directory}/${file}.ts`, code)
 	}
@@ -70,14 +71,15 @@ const textOf = (html) =>
 const definitions = (html) => [...html.matchAll(/<dd class="([^"]*)">([\s\S]*?)<\/dd>/g)].map(([, classes, content]) => ({ classes: classes.split(' '), content }))
 
 test('UIStat without the props of a key figure keeps its markup and its classes', async (context) => {
-	// The classes of 1.10: the look of a stat does not change for the apps that already use it.
+	// The classes of 1.10: the look of a stat does not change for the apps that already use it. `/[inherit]` keeps
+	// the line height of the list, which the size of 1.10 inherited: Tailwind's text-* now brings one of its own.
 	assert.deepEqual(
 		{ base: stat().base(), label: stat().label(), value: stat().value(), detail: stat().detail() },
 		{
-			base: 'ui:m-0 ui:grid ui:min-w-0 ui:font-sans ui:text-md ui:leading-normal ui:font-regular ui:text-text ui:[overflow-wrap:anywhere] ui:content-start ui:gap-1',
-			label: 'ui:text-sm ui:text-text-soft',
-			value: 'ui:m-0 ui:tabular-nums ui:text-2xl ui:font-semibold ui:tracking-tight',
-			detail: 'ui:m-0 ui:tabular-nums ui:text-sm ui:text-text-soft',
+			base: 'm-0 grid min-w-0 font-sans text-md leading-normal font-regular text-text [overflow-wrap:anywhere] content-start gap-1',
+			label: 'text-sm/[inherit] text-text-soft',
+			value: 'm-0 tabular-nums text-2xl/[inherit] font-semibold tracking-tight',
+			detail: 'm-0 tabular-nums text-sm/[inherit] text-text-soft',
 		},
 	)
 	const html = await render(context, '<UIStat label="Visitas" bind:value="1400" detail="Esta semana" />')
@@ -88,42 +90,42 @@ test('UIStat without the props of a key figure keeps its markup and its classes'
 test('UIStat with a change formats it in the locale, with its arrow, its tone and a sentence for screen readers', async (context) => {
 	const html = await render(context, '<UIStat label="Ingresos" value="12 400 €" bind:change="12.5" period="frente a los 30 días anteriores" />')
 	const root = element(html, 'dl')
-	assert.ok(root.classes.includes('ui:@container'), 'a key figure is the container of its compact mode')
-	assert.ok(root.classes.includes('ui:[contain-intrinsic-inline-size:var(--ui-stat-intrinsic-width)]'))
-	assert.ok(!root.classes.includes('ui:grid-cols-[minmax(0,1fr)_auto]'), 'one column without a trend')
+	assert.ok(root.classes.includes('@container'), 'a key figure is the container of its compact mode')
+	assert.ok(root.classes.includes('[contain-intrinsic-inline-size:var(--ui-stat-intrinsic-width)]'))
+	assert.ok(!root.classes.includes('grid-cols-[minmax(0,1fr)_auto]'), 'one column without a trend')
 	const [, change] = definitions(html)
-	assert.ok(change.classes.includes('ui:text-sm'))
-	assert.match(change.content, /<span class="[^"]*ui:text-success-text[^"]*">/, 'up is good by default')
+	assert.ok(change.classes.includes('text-sm/[inherit]'))
+	assert.match(change.content, /<span class="[^"]*text-success-11[^"]*">/, 'up is good by default')
 	assert.match(change.content, new RegExp(`<path d="${icons.arrowUp}"`))
 	assert.match(change.content, /<span aria-hidden="true">\+12,5\u00a0%<\/span>/)
-	assert.match(change.content, /<span class="ui:sr-only">Sube 12,5\u00a0%<\/span>/)
+	assert.match(change.content, /<span class="sr-only">Sube 12,5\u00a0%<\/span>/)
 	assert.match(change.content, /<span>frente a los 30 días anteriores<\/span>/, 'the period, without a class of its own')
 
 	// Down is bad, unless down is good; zero is neutral, with the arrow to the end of the line.
 	const down = await render(context, '<UIStat label="Conversión" value="3 %" bind:change="-3" />')
-	assert.match(down, /ui:text-danger-text/)
+	assert.match(down, /text-danger-11/)
 	assert.match(down, new RegExp(`<path d="${icons.arrowDown}"`))
-	assert.match(down, /<span aria-hidden="true">-3\u00a0%<\/span><span class="ui:sr-only">Baja 3\u00a0%<\/span>/)
+	assert.match(down, /<span aria-hidden="true">-3\u00a0%<\/span><span class="sr-only">Baja 3\u00a0%<\/span>/)
 	const faster = await render(context, '<UIStat label="Tiempo de respuesta" value="180 ms" bind:change="-12" good="down" changeFormat="number" />')
-	assert.match(faster, /ui:text-success-text/)
-	assert.match(faster, /<span aria-hidden="true">-12<\/span><span class="ui:sr-only">Baja 12<\/span>/)
+	assert.match(faster, /text-success-11/)
+	assert.match(faster, /<span aria-hidden="true">-12<\/span><span class="sr-only">Baja 12<\/span>/)
 	const flat = await render(context, '<UIStat label="Errores" value="0" bind:change="0" />')
-	assert.match(flat, /<span class="[^"]*ui:text-text[ "]/)
-	assert.match(flat, new RegExp(`<svg[^>]*class="[^"]*ui:rtl:\\[scale:-1_1\\][^"]*"[^>]*><path d="${icons.arrowEnd}"`))
-	assert.match(flat, /<span aria-hidden="true">0\u00a0%<\/span><span class="ui:sr-only">Sin cambios<\/span>/)
+	assert.match(flat, /<span class="[^"]*text-text[ "]/)
+	assert.match(flat, new RegExp(`<svg[^>]*class="[^"]*rtl:\\[scale:-1_1\\][^"]*"[^>]*><path d="${icons.arrowEnd}"`))
+	assert.match(flat, /<span aria-hidden="true">0\u00a0%<\/span><span class="sr-only">Sin cambios<\/span>/)
 
 	// In English, the texts and the numbers of English.
 	const english = await render(context, '<UIStat label="Revenue" value="$12,400" bind:change="1234.5" changeFormat="number" />', { locale: 'en' })
-	assert.match(english, /<span aria-hidden="true">\+1,234\.5<\/span><span class="ui:sr-only">Up 1,234\.5<\/span>/)
+	assert.match(english, /<span aria-hidden="true">\+1,234\.5<\/span><span class="sr-only">Up 1,234\.5<\/span>/)
 })
 
 test('UIStat takes a change already formatted, whose sign gives the direction, and changeDirection when it does not', async (context) => {
 	const html = await render(context, '<UIStat label="Pedidos" value="320" change="−8 pedidos" />')
-	assert.match(html, /ui:text-danger-text/)
-	assert.match(html, /<span aria-hidden="true">−8 pedidos<\/span><span class="ui:sr-only">Baja 8 pedidos<\/span>/)
+	assert.match(html, /text-danger-11/)
+	assert.match(html, /<span aria-hidden="true">−8 pedidos<\/span><span class="sr-only">Baja 8 pedidos<\/span>/)
 	const unsigned = await render(context, '<UIStat label="Puesto" value="3.º" change="2 puestos" changeDirection="down" good="down" />')
-	assert.match(unsigned, /ui:text-success-text/)
-	assert.match(unsigned, /<span class="ui:sr-only">Baja 2 puestos<\/span>/)
+	assert.match(unsigned, /text-success-11/)
+	assert.match(unsigned, /<span class="sr-only">Baja 2 puestos<\/span>/)
 })
 
 test('UIStat links its detail with a text of its own, named with the label, and keeps the links of its snippets apart', async (context) => {
@@ -132,9 +134,9 @@ test('UIStat links its detail with a text of its own, named with the label, and 
 	assert.equal(link.attributes.href, '/visitas')
 	assert.equal(link.attributes.rel, 'noopener noreferrer')
 	assert.equal(link.attributes['aria-label'], 'Ver detalle: Visitas', 'the default text says nothing alone in a list of links')
-	assert.ok(link.classes.includes('ui:focus-visible:outline-solid'))
+	assert.ok(link.classes.includes('focus-visible:outline-solid'))
 	assert.equal(textOf(html.slice(html.indexOf('<a'))), 'Ver detalle')
-	assert.ok(element(html, 'dl').classes.includes('ui:@container'), 'a link alone makes it a key figure')
+	assert.ok(element(html, 'dl').classes.includes('@container'), 'a link alone makes it a key figure')
 	// Only the link is a link: the <dl> keeps its terms and the snippets can hold links of their own.
 	assert.equal(html.match(/<a\b/g).length, 1)
 	assert.ok(html.indexOf('<a') > html.indexOf('</dt>'))
@@ -150,18 +152,18 @@ test('UIStat links its detail with a text of its own, named with the label, and 
 test('UIStat draws its trend with a sparkline beside the value, in the tone of the change, and stacks it in a narrow container', async (context) => {
 	const html = await render(context, '<UIStat label="Visitas" bind:value="1400" bind:change="-4" bind:trend="[3, 5, 4, 8]" />')
 	const root = element(html, 'dl')
-	assert.ok(root.classes.includes('ui:grid-cols-[minmax(0,1fr)_auto]'))
+	assert.ok(root.classes.includes('grid-cols-[minmax(0,1fr)_auto]'))
 	const trend = definitions(html).find(({ content }) => content.includes('<svg role="img"'))
-	assert.ok(trend.classes.includes('ui:col-[2]') && trend.classes.includes('ui:w-(--ui-stat-trend-width)'))
-	assert.ok(trend.classes.includes('ui:@max-stat-narrow:col-span-full'), 'below the narrow size of the container, a row of its own')
+	assert.ok(trend.classes.includes('col-[2]') && trend.classes.includes('w-(--ui-stat-trend-width)'))
+	assert.ok(trend.classes.includes('@max-stat-narrow:col-span-full'), 'below the narrow size of the container, a row of its own')
 	const svg = element(html, 'svg role="img"')
-	assert.ok(svg.classes.includes('ui:text-danger-text'), 'the tone of the change')
+	assert.ok(svg.classes.includes('text-danger-11'), 'the color of the change')
 	assert.equal(svg.attributes['aria-label'], 'Tendencia: mínimo 3, máximo 8, último 8')
-	assert.match(html, /<path d="M[^"]+Z" class="[^"]*ui:fill-current/, 'the area under the line')
-	assert.ok(element(html, 'dd').classes.includes('ui:@max-stat-narrow:text-xl'), 'a smaller value in compact mode')
+	assert.match(html, /<path d="M[^"]+Z" class="[^"]*fill-current/, 'the area under the line')
+	assert.ok(element(html, 'dd').classes.includes('@max-stat-narrow:text-xl/[inherit]'), 'a smaller value in compact mode')
 	// Without a change, the accent; with trendLabel, a name of its own.
 	const accent = await render(context, '<UIStat label="Visitas" bind:value="1400" bind:trend="[1, 2]" trendLabel="Visitas de la semana, al alza" />')
-	assert.ok(element(accent, 'svg role="img"').classes.includes('ui:text-primary-text'))
+	assert.ok(element(accent, 'svg role="img"').classes.includes('text-primary-11'))
 	assert.equal(element(accent, 'svg role="img"').attributes['aria-label'], 'Visitas de la semana, al alza')
 })
 
@@ -173,16 +175,16 @@ test('UISparkline is an image named by a summary of its series, as wide as its c
 	assert.equal(svg.attributes.viewBox, '0 0 100 32')
 	assert.equal(svg.attributes.preserveAspectRatio, 'none')
 	assert.deepEqual(svg.classes, sparkline().base().split(' '))
-	assert.ok(svg.classes.includes('ui:w-full') && svg.classes.includes('ui:h-(--ui-sparkline-height)'), 'its size comes from CSS')
+	assert.ok(svg.classes.includes('w-full') && svg.classes.includes('h-(--ui-sparkline-height)'), 'its size comes from CSS')
 	const line = element(html, 'path')
 	assert.equal(line.attributes.d, sparklineShape([1200, 900.5, 1500]).line)
-	assert.ok(line.classes.includes('ui:[vector-effect:non-scaling-stroke]'), 'the stroke keeps its width when the box stretches')
-	assert.ok(svg.classes.includes('ui:motion-reduce:animate-none'), 'no animation with reduced motion')
+	assert.ok(line.classes.includes('[vector-effect:non-scaling-stroke]'), 'the stroke keeps its width when the box stretches')
+	assert.ok(svg.classes.includes('motion-reduce:animate-none'), 'no animation with reduced motion')
 	assert.equal(html.match(/<path/g).length, 1, 'no area by default')
 
-	const custom = await render(context, '<UISparkline bind:values="[]" label="Sin visitas todavía" tone="success" area class="mine" bind:ui="{ line: \'my-line\' }" />')
+	const custom = await render(context, '<UISparkline bind:values="[]" label="Sin visitas todavía" color="success" area class="mine" bind:ui="{ line: \'my-line\' }" />')
 	assert.equal(element(custom, 'svg').attributes['aria-label'], 'Sin visitas todavía')
-	assert.ok(element(custom, 'svg').classes.includes('ui:text-success-text') && element(custom, 'svg').classes.includes('mine'))
+	assert.ok(element(custom, 'svg').classes.includes('text-success-11') && element(custom, 'svg').classes.includes('mine'))
 	assert.doesNotMatch(custom, /<path/, 'no paths without values')
 	assert.equal(element(await render(context, '<UISparkline bind:values="[]" />'), 'svg').attributes['aria-label'], 'Sin datos')
 	const styled = await render(context, '<UISparkline bind:values="[1, 2]" area bind:ui="{ line: \'my-line\' }" />', { defaults: { sparkline: { class: 'app-spark', ui: { area: 'app-area' } } } })
@@ -228,7 +230,7 @@ test('UIStat puts a UIHint after its label with hint, and the label snippet repl
 	const term = html.match(/<dt[^>]*>([\s\S]*?)<\/dt>/)?.[1] ?? ''
 	assert.match(term, /^Ingresos<button/, 'the label first, with no line break before its hint')
 	assert.match(term, /<button[^>]*aria-label="Más información"/, 'the hint is a UIHint, named by its default text')
-	assert.match(term, /class="[^"]*ui:ms-1[^"]* my-hint/, 'a space away from the label, with ui.hint')
+	assert.match(term, /class="[^"]*ms-1[^"]* my-hint/, 'a space away from the label, with ui.hint')
 	assert.match(term, /Ventas cobradas, sin impuestos/)
 	const custom = await render(context, '<UIStat label="Ingresos" value="12 400 €"><snippet name="label"><strong>Ingresos</strong> netos</snippet></UIStat>')
 	assert.match(custom, /<dt[^>]*><strong>Ingresos<\/strong> netos<\/dt>/)

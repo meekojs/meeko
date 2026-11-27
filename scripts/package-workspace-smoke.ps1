@@ -17,6 +17,8 @@ try {
     typescript = '7.0.2'
     '@types/node' = '24.19.2'
     '@iconify-json/lucide' = '1.2.149'
+    # The consumer compiles the entry of UI with its own Tailwind: `@import 'tailwindcss'` resolves from it.
+    tailwindcss = '4.3.5'
   }
   foreach ($name in @('meeko', 'ui', 'i18n', 'icon', 'prettier-plugin', 'eslint-plugin')) {
     & pnpm --dir (Join-Path $workspace "packages/$name") pack --pack-destination $tarballs
@@ -50,8 +52,9 @@ for (const name of ['meeko', 'ui', 'i18n', 'icon', 'prettier-plugin', 'eslint-pl
   for (const key of Object.keys(metadata.exports)) {
     if (key.includes('*')) continue;
     const specifier = '@meekojs/' + name + (key === '.' ? '' : key.slice(1));
-    // Node cannot import a stylesheet: it must resolve to a file of the tarball, for the bundler.
-    if (key.endsWith('.css')) assert.ok(existsSync(require.resolve(specifier)), specifier);
+    // Node cannot import a stylesheet (`@meekojs/ui/hues` included): it must resolve to a file of the tarball, for the bundler.
+    // Nor a JSON file without an import attribute (`@meekojs/ui/package.json`, which the Prettier plugin reads).
+    if (key.endsWith('.css') || key.endsWith('.json') || String(metadata.exports[key]).endsWith('.css')) assert.ok(existsSync(require.resolve(specifier)), specifier);
     else await import(specifier);
   }
 }
@@ -91,8 +94,10 @@ export const smoke = { state: signal(1), ui, i18n, useModal, formatting, lint: d
 '@ | Set-Content -LiteralPath (Join-Path $consumer 'main.ts') -Encoding utf8
   New-Item -ItemType Directory -Path (Join-Path $consumer 'app/pages') -Force | Out-Null
   New-Item -ItemType Directory -Path (Join-Path $consumer 'app/locales') -Force | Out-Null
+  New-Item -ItemType Directory -Path (Join-Path $consumer 'app/styles') -Force | Out-Null
+  "@import 'tailwindcss';`n@import '@meekojs/ui';`n" | Set-Content -LiteralPath (Join-Path $consumer 'app/styles/main.css') -Encoding utf8
   '{"hello":"Hello"}' | Set-Content -LiteralPath (Join-Path $consumer 'app/locales/en.json') -Encoding utf8
-  'export default { modules: ["@meekojs/ui", "@meekojs/i18n", "@meekojs/ui/editor", "@meekojs/icon"], viewTransitions: true, icon: { collections: ["lucide"] }, i18n: { defaultLocale: "en", catalogs: { en: "app/locales/en.json" } }, ui: { tokens: { primary: "var(--consumer-primary)" }, defaults: { link: { shape: "pill" } } } };' | Set-Content -LiteralPath (Join-Path $consumer 'meeko.config.mjs') -Encoding utf8
+  'export default { modules: ["@meekojs/ui", "@meekojs/i18n", "@meekojs/ui/editor", "@meekojs/icon"], viewTransitions: true, icon: { collections: ["lucide"] }, i18n: { defaultLocale: "en", catalogs: { en: "app/locales/en.json" } }, ui: { tokens: { primary: "var(--consumer-primary)" }, defaults: { link: { radius: "full" } } } };' | Set-Content -LiteralPath (Join-Path $consumer 'meeko.config.mjs') -Encoding utf8
   @'
 <script lang="ts">
   import { signal } from '@meekojs/meeko';
@@ -122,10 +127,12 @@ const directory = '.meeko/output/node/client/assets';
 const files = (await readdir(directory)).filter((file) => file.endsWith('.css'));
 assert.ok(files.length, 'UI emits production CSS');
 const css = (await Promise.all(files.map((file) => readFile(`${directory}/${file}`, 'utf8')))).join('\n');
-// Since the Tailwind migration, UI ships one precompiled sheet: its layers and the utilities of a button and a table.
-assert.match(css, /@layer ui\.utilities/);
-assert.match(css, /\.ui\\:aria-busy\\:before\\:animate-spin/);
-assert.match(css, /\.ui\\:\\\[overflow-wrap\\:normal\\\]/);
+// The consumer's Tailwind compiles the entry of UI from the tarball: its layers and the utilities of a button and a table.
+// UI follows Tailwind's layers: its base in ui-base, its hand-written rules in components and its classes in utilities.
+assert.match(css, /@layer ui-base\{/);
+assert.match(css, /@layer components\{[\s\S]*\.meeko-ui-sr-only\{/);
+assert.match(css, /@layer utilities\{[\s\S]*\.aria-busy\\:before\\:animate-spin/);
+assert.match(css, /\.\\\[overflow-wrap\\:normal\\\]/);
 assert.match(css, /--ui-color-info-9:\s*#123456/);
 assert.match(css, /--ui-color-primary:\s*var\(--consumer-primary\)/);
 assert.doesNotMatch(css, /@import/);

@@ -5,19 +5,19 @@
 	// <UIThemeToggle>: the successor of the deprecated <MeekoThemeToggle> of the core, with the same
 	// contract and markup, over the public useThemeToggle(). The theme itself (the cookie, the inline
 	// script, the icon rule of <head> and POST /_meeko/theme) stays in the core; the look lives in
-	// ../variants/theme-toggle.ts. Its template has no whitespace between the tags: it would be text.
+	// ../theme/components/theme-toggle.ts. Its template has no whitespace between the tags: it would be text.
 	import { computed } from '@meekojs/meeko'
 	import { useRoute, useThemeToggle } from '@meekojs/meeko/framework'
 
 	import type { UIThemeToggleProps } from '../types/theme-toggle'
 	import type { ThemeToggleItem } from '../utils/theme-toggle'
 
+	import { themeToggleTheme } from '../theme/components/theme-toggle'
 	import { uiTheme } from '../utils/defaults'
 	import { icons } from '../utils/icons'
 	import { uiMessages } from '../utils/messages'
 	import { themeToggleGroupLabel, themeToggleItems, themeToggleKeyTarget, themeToggleMode, themeToggleStatus } from '../utils/theme-toggle'
 	import { withViewTransition } from '../utils/view-transition'
-	import { themeToggle } from '../variants/theme-toggle'
 	import * as Icon from './internal/Icon.meeko'
 
 	const props = defineProps<UIThemeToggleProps>()
@@ -48,7 +48,7 @@
 	const checked = computed(() => status.value.checked)
 	const focused = computed(() => status.value.focused)
 	const group = computed(() => themeToggleGroupLabel(props.messages, text))
-	const classes = computed(() => themeToggle({ mode: mode.value }))
+	const classes = computed(() => themeToggleTheme({ mode: mode.value }))
 
 	/** The theme writes `data-theme` synchronously, so the fade captures the page before and after it. */
 	const choose = (choice: string): void => {

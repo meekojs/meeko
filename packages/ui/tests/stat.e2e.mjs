@@ -28,7 +28,7 @@ const layout = (page, group, index) =>
 				return { left, top, right, bottom, width, height }
 			}
 			const value = stat.querySelector('dt + dd')
-			const change = [...stat.querySelectorAll('dd')].find((dd) => dd.querySelector('.ui\\:sr-only'))
+			const change = [...stat.querySelectorAll('dd')].find((dd) => dd.querySelector('.sr-only'))
 			const trend = [...stat.querySelectorAll('dd')].find((dd) => dd.querySelector('svg[role="img"]'))
 			const svg = trend?.querySelector('svg')
 			const line = svg?.querySelector('path:last-child')
@@ -55,7 +55,7 @@ test('UIStat as a key figure and UISparkline: SSR without JavaScript, compact by
 	const wide = ssr.locator('#kpi-wide')
 	assert.equal(await wide.getByRole('link', { name: 'Ver detalle: Ingresos', exact: true }).getAttribute('href'), '/tables')
 	assert.equal(await wide.getByRole('img', { name: 'Tendencia: mínimo 8,2, máximo 12,4, último 12,4', exact: true }).count(), 1)
-	assert.equal(await wide.locator('.ui\\:sr-only').first().textContent(), 'Sube 12,5\u00a0%')
+	assert.equal(await wide.locator('.sr-only').first().textContent(), 'Sube 12,5\u00a0%')
 	const before = await layout(ssr, 'kpi-wide', 0)
 	assert.equal(before.svg.height, 2 * before.rem, 'the height of --ui-sparkline-height comes from CSS')
 	await ssr.close()
@@ -89,7 +89,7 @@ test('UIStat as a key figure and UISparkline: SSR without JavaScript, compact by
 	assert.ok(parseFloat(small.valueSize) < parseFloat(large.valueSize), `a smaller value: ${small.valueSize} < ${large.valueSize}`)
 
 	// The tones: up is good by default, down is good with good="down", and zero is neutral.
-	const tones = await page.locator('#kpi-wide > dl').evaluateAll((stats) => stats.map((stat) => globalThis.getComputedStyle(stat.querySelector('.ui\\:sr-only').parentElement).color))
+	const tones = await page.locator('#kpi-wide > dl').evaluateAll((stats) => stats.map((stat) => globalThis.getComputedStyle(stat.querySelector('.sr-only').parentElement).color))
 	const expected = await page.evaluate(() =>
 		['--ui-color-success-text', '--ui-color-success-text', '--ui-color-text'].map((name) => {
 			const probe = globalThis.document.createElement('span')
@@ -101,8 +101,8 @@ test('UIStat as a key figure and UISparkline: SSR without JavaScript, compact by
 		}),
 	)
 	assert.deepEqual(tones, expected)
-	assert.equal(await page.locator('#kpi-wide .ui\\:sr-only').nth(1).textContent(), 'Baja 8\u00a0%')
-	assert.equal(await page.locator('#kpi-wide .ui\\:sr-only').nth(2).textContent(), 'Sin cambios')
+	assert.equal(await page.locator('#kpi-wide .sr-only').nth(1).textContent(), 'Baja 8\u00a0%')
+	assert.equal(await page.locator('#kpi-wide .sr-only').nth(2).textContent(), 'Sin cambios')
 
 	// The names that Chromium computes, and the link reached with the keyboard with a visible ring.
 	assert.deepEqual(await accessible(page, '#sparkline-visits svg'), { role: 'image', name: 'Tendencia: mínimo 1200, máximo 1890, último 1890' })
@@ -146,7 +146,7 @@ test('UIStat as a key figure and UISparkline: SSR without JavaScript, compact by
 	// In English, the texts and the numbers of English.
 	const english = await browser.newPage({ viewport: { width: 1280, height: 900 } })
 	await english.goto(`${origin}/en/content`, { waitUntil: 'networkidle' })
-	assert.equal(await english.locator('#kpi-wide .ui\\:sr-only').first().textContent(), 'Up 12.5%')
+	assert.equal(await english.locator('#kpi-wide .sr-only').first().textContent(), 'Up 12.5%')
 	assert.equal(await english.locator('#kpi-wide').getByRole('link', { name: 'View details: Revenue', exact: true }).getAttribute('href'), '/en/tables')
 	assert.equal(await english.locator('#kpi-wide').getByRole('img', { name: 'Trend: minimum 8.2, maximum 12.4, latest 12.4', exact: true }).count(), 1)
 	await english.close()

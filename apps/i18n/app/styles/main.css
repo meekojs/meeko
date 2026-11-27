@@ -1,0 +1,10 @@
+/* The site adds no CSS of its own: Tailwind compiles the stylesheet of UI with the classes of its pages. */
+/*
+ * Tailwind without its preflight, the reset of lists, headings and margins: only its theme and its utilities, in
+ * the layers of Tailwind's own entry (https://tailwindcss.com/docs/preflight#disabling-preflight). The base of
+ * the page is that of @meekojs/ui, as it was before the site compiled Tailwind.
+ */
+@layer theme, base, components, utilities;
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities);
+@import '@meekojs/ui';

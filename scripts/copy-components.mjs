@@ -51,7 +51,7 @@ export async function copyComponents(root, folders, cli) {
 		await clean()
 		try {
 			await mkdir(dirname(target), { recursive: true })
-			await cp(join(root, 'src', ...folder), building, { recursive: true })
+			await cp(join(root, 'src', ...folder), building, { recursive: true, filter: (file) => !file.endsWith('.d.meeko.ts') })
 			const sources = (await filesIn(building)).filter((file) => file.endsWith('.meeko'))
 			for (const file of sources) {
 				const { stdout } = await run(process.execPath, [cli, 'types', file], { cwd: root, windowsHide: true })

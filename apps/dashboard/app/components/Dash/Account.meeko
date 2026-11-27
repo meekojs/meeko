@@ -30,6 +30,7 @@
 		<UIButton
 			type="submit"
 			variant="outline"
+			color="neutral"
 			bind:title="t('account.logoutTitle', { user: props.user })"
 		>
 			{t('account.logout')}

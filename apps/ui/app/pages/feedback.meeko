@@ -13,7 +13,7 @@
 	>
 		<h2 id="alert">UIAlert</h2>
 		<p>
-			Un aviso dentro de la página, en cuatro tonos además del neutro.
+			Un aviso dentro de la página: <code>variant</code> elige el tratamiento y <code>color</code>, su significado.
 			<code>danger</code>
 			usa
 			<code>role="alert"</code>; los demás, <code>note</code>. Elige
@@ -24,23 +24,23 @@
 		</p>
 		<DocsPreview layout="stack">
 			<UIAlert
-				tone="info"
+				color="info"
 				title="Versión nueva"
 				description="UI 1.8 usa los tokens --ui-*."
 			/>
 			<UIAlert
-				tone="success"
+				color="success"
 				title="Cambios guardados"
 				description="Ya están publicados."
 			/>
 			<UIAlert
-				tone="warning"
+				color="warning"
 				title="Traducción pendiente"
 				description="Esta página aún no está en inglés."
 			/>
 			<UIAlert
 				if:when="!dismissed.value"
-				tone="danger"
+				color="danger"
 				title="No se pudo publicar"
 				description="La base de datos no responde."
 				dismiss
@@ -50,6 +50,7 @@
 					<UIButton
 						size="sm"
 						variant="outline"
+						color="neutral"
 					>
 						Reintentar
 					</UIButton>
@@ -58,6 +59,7 @@
 			<UIButton
 				if:when="dismissed.value"
 				variant="outline"
+				color="neutral"
 				on:click="() => (dismissed.value = false)"
 			>
 				Volver a mostrar el aviso
@@ -67,7 +69,8 @@
 		<DocsApi
 			caption="Propiedades de UIAlert"
 			bind:rows="[
-				{ name: 'tone', type: 'neutral | info | success | warning | danger', default: 'neutral', description: 'Significado del aviso.' },
+				{ name: 'variant', type: 'soft | surface | outline | solid', default: 'soft', description: 'Tratamiento visual.' },
+				{ name: 'color', type: 'primary | secondary | neutral | success | info | warning | danger', default: 'neutral', description: 'Significado del aviso.' },
 				{ name: 'title / description', type: 'string', description: 'Título y texto.' },
 				{ name: 'role', type: 'alert | status | note | none', default: 'alert con danger; note', description: 'Cómo lo anuncia un lector de pantalla.' },
 				{ name: 'dismiss / closeLabel', type: 'boolean / string', default: 'false', description: 'Botón de cierre, con su nombre accesible.' },
@@ -93,15 +96,17 @@
 			en la raíz.
 		</p>
 		<DocsPreview>
-			<UIButton on:click="() => toast.add({ text: 'Cambios guardados', tone: 'success', duration: 5000 })">Avisar del guardado</UIButton>
+			<UIButton on:click="() => toast.add({ text: 'Cambios guardados', color: 'success', duration: 5000 })">Avisar del guardado</UIButton>
 			<UIButton
 				variant="outline"
-				on:click="() => toast.add({ text: 'No se pudo publicar', tone: 'danger', duration: 0 })"
+				color="neutral"
+				on:click="() => toast.add({ text: 'No se pudo publicar', color: 'danger', duration: 0 })"
 			>
 				Avisar de un error
 			</UIButton>
 			<UIButton
 				variant="ghost"
+				color="neutral"
 				on:click="() => toast.clear()"
 			>
 				Cerrar todos
@@ -112,7 +117,8 @@
 			caption="Opciones de toast.add y propiedades de UIToast"
 			bind:rows="[
 				{ name: 'text', type: 'string', description: 'Obligatoria. El aviso.' },
-				{ name: 'tone', type: 'neutral | info | success | warning | danger', default: 'neutral', description: 'Significado del aviso.' },
+				{ name: 'variant', type: 'soft | surface | outline | solid', default: 'soft', description: 'Tratamiento visual.' },
+				{ name: 'color', type: 'primary | secondary | neutral | success | info | warning | danger', default: 'neutral', description: 'Significado del aviso.' },
 				{ name: 'duration', type: 'number', default: '5000', description: 'Milisegundos antes de cerrarse; 0 lo conserva hasta cerrarlo. La cuenta se pausa con el cursor o el foco dentro.' },
 				{ name: 'closeLabel', type: 'string', description: 'Nombre accesible del botón de cierre.' },
 				{ name: 'actions', type: 'Snippet', description: 'Acciones del aviso.' },
@@ -138,7 +144,7 @@
 		</p>
 		<DocsPreview layout="stack">
 			<UIEmpty
-				variant="panel"
+				layout="panel"
 				title="Sin proyectos"
 				description="Crea el primero para empezar."
 			>
@@ -151,7 +157,7 @@
 			bind:rows="[
 				{ name: 'title', type: 'string', default: 'No hay resultados.', description: 'Título. El valor por defecto sigue el idioma del documento.' },
 				{ name: 'description', type: 'string', description: 'Qué hacer a continuación.' },
-				{ name: 'variant', type: 'inline | panel', default: 'inline', description: 'Tamaño del espacio vacío.' },
+				{ name: 'layout', type: 'inline | panel', default: 'inline', description: 'Tamaño del espacio vacío.' },
 				{ name: 'class', type: 'string', description: 'Clases adicionales.' },
 			]"
 		/>

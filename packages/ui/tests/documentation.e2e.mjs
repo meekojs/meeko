@@ -19,7 +19,7 @@ test('public UI documentation renders every guide, navigates, copies code and va
 	await page.context().grantPermissions(['clipboard-read', 'clipboard-write'], { origin })
 	await page.getByRole('button', { name: 'Copiar código' }).first().click()
 	await page.getByRole('status').filter({ hasText: 'Copiado' }).waitFor()
-	assert.equal(await page.evaluate(() => navigator.clipboard.readText()), 'pnpm add @meekojs/ui')
+	assert.equal(await page.evaluate(() => navigator.clipboard.readText()), 'pnpm add @meekojs/ui tailwindcss')
 	await page.getByRole('searchbox', { name: 'Buscar en la guía', exact: true }).fill('badge')
 	const navigation = page.getByRole('navigation', { name: 'Documentación de UI', exact: true })
 	assert.equal(await navigation.getByRole('link').count(), 1)

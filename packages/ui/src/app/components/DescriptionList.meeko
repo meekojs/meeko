@@ -1,14 +1,14 @@
 <script lang="ts">
 	import type { UIDescriptionListProps } from '../types/data'
 
+	import { descriptionListTheme } from '../theme/components/description-list'
 	import { uiTheme } from '../utils/defaults'
-	import { descriptionList } from '../variants/data'
 
 	const props = defineProps<UIDescriptionListProps>()
 
 	const theme = uiTheme('descriptionList', () => props)
 
-	const classes = descriptionList()
+	const classes = descriptionListTheme()
 </script>
 
 <template>

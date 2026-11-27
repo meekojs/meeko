@@ -1,6 +1,6 @@
 /*
- * What <UITabs> cannot say with utilities (variants/tabs.ts): the pseudo-elements of the View Transition
- * of a change of tab, which belong to the document. Only the indicator moves, and variants/tabs names it
+ * What <UITabs> cannot say with utilities (theme/components/tabs.ts): the pseudo-elements of the View Transition
+ * of a change of tab, which belong to the document. Only the indicator moves, and theme/components/tabs names it
  * only in the group that changed; the rest of the page does not animate.
  */
 html:active-view-transition-type(ui-tab)::view-transition-group(ui-tabs-indicator) {

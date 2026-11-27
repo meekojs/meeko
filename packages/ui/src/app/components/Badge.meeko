@@ -1,18 +1,25 @@
 <script lang="ts">
+	// <UIBadge>: a label of state. Its look is the recipe of theme/components/badge.
 	import { computed } from '@meekojs/meeko'
 
 	import type { UIBadgeProps } from '../types/forms'
 
+	import { badgeTheme } from '../theme/components/badge'
 	import { uiTheme } from '../utils/defaults'
-	import { badge } from '../variants/badge'
 
-	const props = defineProps<UIBadgeProps>({ tone: 'neutral' })
+	const props = defineProps<UIBadgeProps>()
 
 	const theme = uiTheme('badge', () => props)
 
 	const snippets = defineSnippets<{ default: [] }>()
 
-	const classes = computed(() => badge({ tone: props.tone }))
+	const classes = computed(() =>
+		badgeTheme({
+			variant: props.variant ?? theme.defaults?.variant,
+			color: props.color ?? theme.defaults?.color,
+			radius: props.radius ?? theme.defaults?.radius,
+		}),
+	)
 </script>
 
 <template>

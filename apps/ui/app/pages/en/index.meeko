@@ -16,6 +16,7 @@
 			<UILink
 				to="/components"
 				variant="outline"
+				color="neutral"
 			>
 				See components
 			</UILink>
@@ -46,7 +47,7 @@
 					<p role="status">{saved.value ? 'Changes saved in this example.' : 'Edit the name and save the change.'}</p>
 					<snippet name="footer">
 						<UIButton on:click="() => (saved.value = true)">Save project</UIButton>
-						<UIBadge bind:tone="saved.value ? 'accent' : 'neutral'">{saved.value ? 'Saved' : 'Draft'}</UIBadge>
+						<UIBadge bind:color="saved.value ? 'primary' : 'neutral'">{saved.value ? 'Saved' : 'Draft'}</UIBadge>
 					</snippet>
 				</UICard>
 			</div>

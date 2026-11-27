@@ -3,13 +3,13 @@
 
 	import type { UIAlertProps } from '../types/feedback'
 
+	import { alertTheme } from '../theme/components/alert'
 	import { uiTheme } from '../utils/defaults'
 	import { icons } from '../utils/icons'
 	import { uiMessages } from '../utils/messages'
-	import { alert } from '../variants/feedback'
 	import * as Icon from './internal/Icon.meeko'
 
-	const { tone = 'neutral', title, description, icon, dismiss, closeLabel, role, class: ownClass, ui: ownUi, ...rest } = defineProps<UIAlertProps>()
+	const { variant, color, title, description, icon, dismiss, closeLabel, role, class: ownClass, ui: ownUi, ...rest } = defineProps<UIAlertProps>()
 
 	const theme = uiTheme('alert', () => ({ class: ownClass, ui: ownUi }))
 
@@ -19,14 +19,14 @@
 
 	const visible = signal(true)
 	const text = uiMessages().feedback
-	const classes = computed(() => alert({ tone }))
+	const classes = computed(() => alertTheme({ variant, color }))
 </script>
 
 <template>
 	<section
 		if:when="visible.value"
 		bind:class="classes.value.base({ class: [theme.ui.base, theme.class] })"
-		bind:role="role ?? (tone === 'danger' ? 'alert' : 'note')"
+		bind:role="role ?? (color === 'danger' ? 'alert' : 'note')"
 		bind="rest"
 	>
 		<span

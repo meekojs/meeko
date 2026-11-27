@@ -77,7 +77,7 @@ const showcase = `<script lang="ts">
 				<snippet name="actions"><UILocaleSwitcher bind:items="locales" /></snippet>
 			</UIHeader>
 		</snippet>
-		<snippet name="notices"><UIAlert tone="info" description="Aviso de la página" /></snippet>
+		<snippet name="notices"><UIAlert color="info" description="Aviso de la página" /></snippet>
 		<snippet name="bar">
 			<UIDrawer id="menu" title="Contenidos" triggerLabel="Contenidos" model="drawerOpen" on:close="() => closes.value++">
 				<UINavigationTree bind:groups="groups" label="Contenidos" />
@@ -86,17 +86,17 @@ const showcase = `<script lang="ts">
 		</snippet>
 		<snippet name="sidebar"><UINavigationTree bind:groups="groups" current="/current-page" label="Documentación" /></snippet>
 		<snippet name="aside"><UITableOfContents bind:entries="toc" /></snippet>
-		<UITableOfContents bind:entries="toc" variant="collapsible" />
+		<UITableOfContents bind:entries="toc" layout="collapsible" />
 		<UIPageHeader title="Navegación" description="Todos los componentes de navegación juntos.">
 			<snippet name="breadcrumb"><UIBreadcrumb bind:items="crumbs" /></snippet>
-			<snippet name="actions"><UIButton variant="outline" size="sm">Editar</UIButton></snippet>
+			<snippet name="actions"><UIButton variant="outline" color="neutral" size="sm">Editar</UIButton></snippet>
 		</UIPageHeader>
 		<h2 id="uno">Primera sección</h2>
 		<UINavigationTabs bind:items="[{ label: 'Uno', href: '#one', current: tabsCurrent.value === '/one' }, { label: 'Dos más largo', href: '#two', current: tabsCurrent.value === '/two' }, { label: 'Tres', to: '/about' }, { label: 'Hijos', to: '/users/[id]', params: { id: '7' }, match: 'prefix' }, { label: 'Cuarto enlace al final', href: '#four', current: tabsCurrent.value === '/four' }]" label="Vistas" />
 		<button type="button" id="tab-two" on:click="() => (tabsCurrent.value = '/two')">Tab dos</button>
 		<button type="button" id="tab-four" on:click="() => (tabsCurrent.value = '/four')">Tab cuatro</button>
 		<UINavigationTabs bind:items="[{ label: 'Forzado', to: '/about', current: forced.value }, { label: 'Quitado', to: '/', current: false }, { label: 'Según la ruta', to: '/' }, { label: 'Otra ruta', to: '/about' }]" label="Estados" />
-		<UINavigationTabs variant="segmented" label="Filtro" bind:items="[{ label: 'Todas', href: '#todas', current: filter.value === 'Todas', badge: '3' }, { label: 'Activas', href: '#activas', current: filter.value === 'Activas', badge: '2', badgeTone: 'success', badgeDot: true }]" on:select="(event, item) => { event.preventDefault(); filter.value = item.label }" />
+		<UINavigationTabs layout="segmented" label="Filtro" bind:items="[{ label: 'Todas', href: '#todas', current: filter.value === 'Todas', badge: '3' }, { label: 'Activas', href: '#activas', current: filter.value === 'Activas', badge: '2', badgeColor: 'success', badgeDot: true }]" on:select="(event, item) => { event.preventDefault(); filter.value = item.label }" />
 		<button type="button" id="toggle-forced" on:click="() => (forced.value = !forced.value)">Forzar</button>
 		<button type="button" id="open-drawer" on:click="() => (drawerOpen.value = true)">Abrir panel</button>
 		<output id="drawer-state">{drawerOpen.value ? 'abierto' : 'cerrado'}:{closes.value}</output>
@@ -114,7 +114,7 @@ const showcase = `<script lang="ts">
 		<UIDiff bind:diff="diff" label="Cambios en la guía" />
 		<UIDiff diff="" label="Sin cambios" />
 		<UIProse as="article" id="snapshot" bind:html="snapshot" />
-		<UIProse id="handwritten"><h2>A mano</h2><p>Con marcado propio.</p><UICard title="Dentro del texto" variant="solid"><p>Texto de la card.</p></UICard></UIProse>
+		<UIProse id="handwritten"><h2>A mano</h2><p>Con marcado propio.</p><UICard title="Dentro del texto" variant="solid" color="primary"><p>Texto de la card.</p></UICard></UIProse>
 		<section class="tall"><h2 id="tres">Tercera sección</h2></section>
 		<UIPageNavigation bind:previous="{ label: 'Inicio', to: '/' }" bind:next="{ label: 'Acerca de', to: '/about' }" />
 		<button type="button" id="suggest" on:click="() => (showSuggestion.value = true)">Sugerir</button>
@@ -167,6 +167,8 @@ export async function createNavigationApp(context) {
 		'meeko.config.mjs': `export default ${JSON.stringify(config)}\n`,
 		'public/logo.svg': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="currentColor"/></svg>',
 		'app/app.meeko': '<template><UIApp><MeekoOutlet /></UIApp></template>\n',
+		// The app compiles the entry of UI with its Tailwind: without it the components have no styles.
+		'app/styles/main.css': "@import 'tailwindcss';\n@import '@meekojs/ui';\n",
 		'app/pages/index.meeko': showcase,
 		'app/pages/index.route.ts': route(),
 		'app/pages/dashboard.meeko': dashboard,

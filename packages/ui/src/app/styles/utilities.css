@@ -1,6 +1,6 @@
 /*
- * The public utility of the package, for an app's own markup: the apps do not compile Tailwind, so they
- * cannot write ui:sr-only. The components of UI use ui:sr-only instead.
+ * The public utility of the package, for an app's own markup: the apps do not compile Tailwind, and
+ * can use this public class. UI components use the compiled sr-only utility.
  */
 .meeko-ui-sr-only {
 	position: absolute;

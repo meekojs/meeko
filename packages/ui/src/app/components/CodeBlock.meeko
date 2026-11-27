@@ -5,11 +5,11 @@
 
 	import type { UICodeBlockProps } from '../types/navigation'
 
+	import { codeBlockCopy, codeBlockMode, codeBlockTheme, codeBlockTone } from '../theme/components/code-block'
 	import { copyFeedbackTime, copyText } from '../utils/clipboard'
 	import { uiTheme } from '../utils/defaults'
 	import { icons } from '../utils/icons'
 	import { uiMessages } from '../utils/messages'
-	import { codeBlock, codeBlockCopy, codeBlockMode, codeBlockTone } from '../variants/content'
 	import * as Icon from './internal/Icon.meeko'
 
 	const props = defineProps<UICodeBlockProps>({ mode: 'code' })
@@ -25,7 +25,7 @@
 	const state = signal<'idle' | 'done' | 'error'>('idle')
 	let timer: ReturnType<typeof setTimeout> | undefined
 
-	const classes = codeBlock()
+	const classes = codeBlockTheme()
 	const tone = computed(() => codeBlockTone[props.verdict ?? 'none'])
 	// A verdict's header keeps its own color; otherwise the button says its state with it.
 	const copyColor = computed(() => (props.verdict ? codeBlockCopy.verdict : codeBlockCopy[state.value]))
@@ -96,7 +96,7 @@
 			>
 			<span
 				if:when="showsCopy.value"
-				class="ui:sr-only"
+				class="sr-only"
 				role="status"
 				bind:lang="props.uiLang"
 				>{state.value === 'idle' ? '' : copyState.value}</span

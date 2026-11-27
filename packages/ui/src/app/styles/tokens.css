@@ -70,18 +70,49 @@
 	--ui-color-danger-text: var(--ui-color-danger-11);
 
 	/*
+	 * The scales of secondary and neutral in the appearance catalog (theme.css). Neither has a palette of its
+	 * own: secondary is the pink scale, apart from primary and the states, and neutral is the surface one.
+	 */
+	--ui-color-secondary-1: var(--ui-color-pink-1);
+	--ui-color-secondary-2: var(--ui-color-pink-2);
+	--ui-color-secondary-3: var(--ui-color-pink-3);
+	--ui-color-secondary-4: var(--ui-color-pink-4);
+	--ui-color-secondary-5: var(--ui-color-pink-5);
+	--ui-color-secondary-6: var(--ui-color-pink-6);
+	--ui-color-secondary-7: var(--ui-color-pink-7);
+	--ui-color-secondary-8: var(--ui-color-pink-8);
+	--ui-color-secondary-9: var(--ui-color-pink-9);
+	--ui-color-secondary-10: var(--ui-color-pink-10);
+	--ui-color-secondary-11: var(--ui-color-pink-11);
+	--ui-color-secondary-12: var(--ui-color-pink-12);
+	--ui-color-secondary-contrast: var(--ui-color-pink-contrast);
+	--ui-color-neutral-1: var(--ui-color-surface-1);
+	--ui-color-neutral-2: var(--ui-color-surface-2);
+	--ui-color-neutral-3: var(--ui-color-surface-3);
+	--ui-color-neutral-4: var(--ui-color-surface-4);
+	--ui-color-neutral-5: var(--ui-color-surface-5);
+	--ui-color-neutral-6: var(--ui-color-surface-6);
+	--ui-color-neutral-7: var(--ui-color-surface-7);
+	--ui-color-neutral-8: var(--ui-color-surface-8);
+	--ui-color-neutral-9: var(--ui-color-surface-9);
+	--ui-color-neutral-10: var(--ui-color-surface-10);
+	--ui-color-neutral-11: var(--ui-color-surface-11);
+	--ui-color-neutral-12: var(--ui-color-surface-12);
+	--ui-color-neutral-contrast: var(--ui-color-surface-contrast);
+
+	/*
 	 * Text on a solid: white when it reaches 4.5:1, black otherwise. Light step 10 is darker than 9,
 	 * so the text on a hovered solid is a token of its own. tests/tokens.test.mjs computes them all.
 	 */
 	--ui-color-primary-contrast: #ffffff;
 	--ui-color-primary-contrast-hover: #ffffff;
-	--ui-color-surface-contrast: #000000;
-	--ui-color-surface-contrast-hover: #000000;
+	--ui-color-surface-contrast: #ffffff;
+	--ui-color-surface-contrast-hover: #ffffff;
 	--ui-color-info-contrast: #000000;
 	--ui-color-info-contrast-hover: #ffffff;
 	--ui-color-success-contrast: #000000;
 	--ui-color-success-contrast-hover: #ffffff;
-	--ui-color-warning-contrast: #000000;
+	--ui-color-warning-contrast: #ffffff;
 	--ui-color-warning-contrast-hover: #ffffff;
 	--ui-color-danger-contrast: #ffffff;
 	--ui-color-danger-contrast-hover: #ffffff;
@@ -110,10 +141,14 @@
 	--ui-line-height-snug: 1.35;
 	--ui-line-height-normal: 1.5;
 	--ui-line-height-relaxed: 1.65;
+	--ui-font-weight-thin: 100;
+	--ui-font-weight-light: 300;
 	--ui-font-weight-regular: 400;
 	--ui-font-weight-medium: 500;
 	--ui-font-weight-semibold: 600;
 	--ui-font-weight-bold: 700;
+	--ui-font-weight-extrabold: 800;
+	--ui-font-weight-black: 900;
 	--ui-tracking-normal: 0;
 	--ui-tracking-snug: -0.006em;
 	--ui-tracking-tight: -0.014em;
@@ -143,6 +178,8 @@
 	--ui-radius-md: 0.375rem;
 	--ui-radius-lg: 0.5rem;
 	--ui-radius-xl: 0.75rem;
+	--ui-radius-2xl: 1rem;
+	--ui-radius-3xl: 1.5rem;
 	--ui-radius-full: 999px;
 	--ui-border-width: 1px;
 	--ui-focus-ring-width: 2px;
@@ -150,23 +187,35 @@
 	--ui-focus-ring: var(--ui-focus-ring-width) solid var(--ui-color-focus);
 
 	/* Controls: touch screens get taller ones and a text size that does not make iOS zoom in */
+	--ui-control-height-xs: 1.5rem;
 	--ui-control-height-sm: 1.75rem;
 	--ui-control-height-md: 2.25rem;
 	--ui-control-height-lg: 2.75rem;
+	--ui-control-height-xl: 3.25rem;
+	--ui-control-padding-xs: 0 var(--ui-space-1-5);
 	--ui-control-padding-sm: 0 var(--ui-space-2);
 	--ui-control-padding-md: 0 var(--ui-space-3);
 	--ui-control-padding-lg: 0 var(--ui-space-4);
+	--ui-control-padding-xl: 0 var(--ui-space-5);
+	--ui-control-font-size-xs: var(--ui-font-size-xs);
 	--ui-control-font-size-sm: var(--ui-font-size-md);
 	--ui-control-font-size: var(--ui-font-size-md);
 	--ui-control-font-size-lg: var(--ui-font-size-md);
+	--ui-control-font-size-xl: var(--ui-font-size-lg);
 	--ui-control-font-weight: var(--ui-font-weight-medium);
 	--ui-input-font-size: var(--ui-font-size-md);
+	--ui-input-font-size-xs: var(--ui-control-font-size-xs);
+	--ui-input-font-size-sm: var(--ui-control-font-size-sm);
 	--ui-opacity-disabled: 0.55;
 
 	/* Depth */
+	--ui-shadow-xs: 0 1px 2px rgb(0 0 0 / 5%);
 	--ui-shadow-sm: 0 1px 2px rgb(0 0 0 / 8%);
 	--ui-shadow-md: 0 2px 4px rgb(0 0 0 / 6%), 0 6px 16px rgb(0 0 0 / 10%);
 	--ui-shadow-lg: 0 4px 8px rgb(0 0 0 / 8%), 0 16px 40px rgb(0 0 0 / 16%);
+	--ui-shadow-xl: 0 10px 24px rgb(0 0 0 / 18%);
+	--ui-shadow-2xl: 0 20px 48px rgb(0 0 0 / 24%);
+	--ui-blur-md: 12px;
 
 	/* Motion */
 	--ui-duration-fast: 120ms;
@@ -247,16 +296,13 @@
 	--ui-slider-thumb: 1rem;
 	--ui-toast-width: 24rem;
 	--ui-badge-dot-size: 0.375rem;
-	/* <UIAvatar>: el lado de cada tamaño (sm cabe en un control sm), el texto de sus iniciales, el fondo, el color y las esquinas de shape="rounded" */
+	/* <UIAvatar>: el lado de cada tamaño (sm cabe en un control sm) y el texto de sus iniciales */
 	--ui-avatar-size-sm: 1.5rem;
 	--ui-avatar-size-md: 2rem;
 	--ui-avatar-size-lg: 2.5rem;
 	--ui-avatar-font-size-sm: var(--ui-font-size-xs);
 	--ui-avatar-font-size-md: var(--ui-font-size-sm);
 	--ui-avatar-font-size-lg: var(--ui-font-size-lg);
-	--ui-avatar-bg: var(--ui-color-primary-soft);
-	--ui-avatar-color: var(--ui-color-primary-text);
-	--ui-avatar-radius: var(--ui-radius-md);
 	/* A key figure of <UIStat>: the width it takes where its content gives none, and that of its sparkline beside the value */
 	--ui-stat-intrinsic-width: 12rem;
 	--ui-stat-trend-width: 7rem;
@@ -305,17 +351,21 @@
 }
 
 :root[data-theme='dark'] {
+	--ui-color-focus: var(--ui-color-primary-11);
 	/* On pure black, panels rise by getting lighter; shadows only separate what overlaps. */
 	--ui-color-surface-raised: var(--ui-color-surface-3);
 	--ui-color-control-border: var(--ui-color-surface-10);
+	--ui-shadow-xs: 0 1px 2px rgb(0 0 0 / 45%);
 	--ui-shadow-sm: 0 1px 2px rgb(0 0 0 / 60%);
 	--ui-shadow-md: 0 2px 4px rgb(0 0 0 / 50%), 0 6px 16px rgb(0 0 0 / 60%);
 	--ui-shadow-lg: 0 4px 8px rgb(0 0 0 / 50%), 0 16px 40px rgb(0 0 0 / 70%);
+	--ui-shadow-xl: 0 10px 24px rgb(0 0 0 / 75%);
+	--ui-shadow-2xl: 0 20px 48px rgb(0 0 0 / 80%);
 
 	--ui-color-primary-contrast: #ffffff;
 	--ui-color-primary-contrast-hover: #ffffff;
-	--ui-color-surface-contrast: #ffffff;
-	--ui-color-surface-contrast-hover: #ffffff;
+	--ui-color-surface-contrast: #000000;
+	--ui-color-surface-contrast-hover: #000000;
 	--ui-color-info-contrast: #000000;
 	--ui-color-info-contrast-hover: #000000;
 	--ui-color-success-contrast: #000000;
@@ -334,9 +384,13 @@
 
 @media (pointer: coarse) {
 	:root {
+		--ui-control-height-xs: 2rem;
 		--ui-control-height-sm: 2.25rem;
 		--ui-control-height-md: 2.5rem;
 		--ui-control-height-lg: 2.75rem;
+		--ui-control-height-xl: 3.25rem;
 		--ui-input-font-size: var(--ui-font-size-lg);
+		--ui-input-font-size-xs: var(--ui-input-font-size);
+		--ui-input-font-size-sm: var(--ui-input-font-size);
 	}
 }

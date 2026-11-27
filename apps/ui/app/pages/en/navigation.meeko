@@ -234,9 +234,9 @@
 			keeps
 			<code>aria-current="location"</code>
 			in every browser. Use
-			<code>variant="aside"</code>
+			<code>layout="aside"</code>
 			in the column and
-			<code>variant="collapsible"</code>
+			<code>layout="collapsible"</code>
 			in the content:
 			<code>UIPage</code>
 			shows each one only when it applies.
@@ -257,7 +257,7 @@
 			bind:rows="[
 				{ name: 'entries', type: 'readonly UITableOfContentsEntry[]', description: 'Required. id, text and level.' },
 				{ name: 'active', type: 'string', description: 'Hands the control of the active entry to the application.' },
-				{ name: 'variant', type: 'aside | collapsible', default: 'aside', description: 'In the column or folding in the content.' },
+				{ name: 'layout', type: 'aside | collapsible', default: 'aside', description: 'In the column or folding in the content.' },
 				{ name: 'label / class', type: 'string', description: 'Name of the navigation and classes.' },
 			]"
 		/>
@@ -274,6 +274,7 @@
 			/>
 			<UIButton
 				variant="outline"
+				color="neutral"
 				on:click="() => (suggesting.value = true)"
 			>
 				Show the suggestion
@@ -314,7 +315,8 @@
 		</p>
 		<DocsPreview id="navigation-progress">
 			<UIButton
-				variant="secondary"
+				variant="surface"
+				color="neutral"
 				on:click="simulateNavigation"
 			>
 				Simulate a slow navigation

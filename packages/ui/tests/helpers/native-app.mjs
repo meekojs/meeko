@@ -138,6 +138,8 @@ export async function createNativeApp(context, extraFiles = {}) {
 		'package.json': JSON.stringify({ name: 'native-fixture', private: true, type: 'module' }),
 		'meeko.config.mjs': `export default ${JSON.stringify(config)}\n`,
 		'app/app.meeko': '<template><UIApp><MeekoOutlet /></UIApp></template>\n',
+		// The app compiles the entry of UI with its Tailwind: without it the components have no styles.
+		'app/styles/main.css': "@import 'tailwindcss';\n@import '@meekojs/ui';\n",
 		'app/pages/index.meeko': showcase,
 		'app/pages/index.route.ts': route,
 		'app/pages/other.meeko': '<template><main><h1 id="other">Otra página</h1><MeekoLink id="back" to="/">Volver</MeekoLink></main></template>\n',

@@ -1,4 +1,5 @@
 import { defineMeekoModule } from '@meekojs/meeko/framework'
+import { existsSync } from 'node:fs'
 
 /** What the browser imports from the editor chunk: `meeko dev` prebundles them before the first visit. */
 const browserDependencies = [
@@ -49,7 +50,9 @@ export default defineMeekoModule({
 		},
 	},
 	setup(_options, meeko) {
-		meeko.addComponentsDir(new URL('./components', import.meta.url), { prefix: 'UI' })
+		const source = new URL('../../src/editor/components', import.meta.url)
+		const useSource = meeko.dev && existsSync(source)
+		meeko.addComponentsDir(useSource ? source : new URL('./components', import.meta.url), { prefix: 'UI', generateTypesInDev: useSource })
 		// The theme and the shell, without Crepe: they keep the marker of the first paint in its place.
 		meeko.addStylesheet(new URL('../../src/app/styles/markdown-editor.css', import.meta.url))
 		meeko.addVitePlugin({

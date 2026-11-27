@@ -15,7 +15,7 @@
 		}
 	}
 	async function askConfirm(danger: boolean) {
-		const accepted = await modal.confirm(danger ? { title: '¿Eliminar el proyecto?', description: 'Se borran sus archivos y no se puede deshacer.', confirmLabel: 'Eliminar', tone: 'danger' } : { title: '¿Publicar los cambios?', description: 'Se verán en la web en unos segundos.', confirmLabel: 'Publicar' })
+		const accepted = await modal.confirm(danger ? { title: '¿Eliminar el proyecto?', description: 'Se borran sus archivos y no se puede deshacer.', confirmLabel: 'Eliminar', color: 'danger' } : { title: '¿Publicar los cambios?', description: 'Se verán en la web en unos segundos.', confirmLabel: 'Publicar' })
 		decision.value = accepted ? 'Confirmado.' : 'Rechazado.'
 	}
 </script>
@@ -28,13 +28,15 @@
 		<div class="docs-actions">
 			<UIButton on:click="ask">Abrir confirmación</UIButton>
 			<UIButton
-				variant="secondary"
+				variant="surface"
+				color="neutral"
 				on:click="() => (opened.value = true)"
 			>
 				Modal declarativo
 			</UIButton>
 			<UIButton
-				variant="secondary"
+				variant="surface"
+				color="neutral"
 				on:click="() => (locked.value = true)"
 			>
 				Cierre protegido
@@ -110,21 +112,24 @@
 			sólo con el botón que acepta, y
 			<code>false</code>
 			con cancelar, Esc, el fondo o el botón de cierre. Cada llamada decide una vez. Con
-			<code>tone: 'danger'</code>
-			el botón que acepta toma el tono de peligro y el foco empieza en «Cancelar»; si no, empieza en el que acepta.
+			<code>color</code>
+			se elige el color del botón que acepta (<code>primary</code> por defecto); con
+			<code>color: 'danger'</code>
+			el foco empieza en «Cancelar» y, con cualquier otro, en el que acepta.
 		</p>
 		<DocsPreview id="confirm-preview">
 			<UIButton
 				id="confirm-neutral"
-				variant="secondary"
+				variant="surface"
+				color="neutral"
 				on:click="() => askConfirm(false)"
 			>
 				Publicar
 			</UIButton>
 			<UIButton
 				id="confirm-danger"
-				tone="danger"
-				variant="secondary"
+				color="danger"
+				variant="surface"
 				on:click="() => askConfirm(true)"
 			>
 				Eliminar el proyecto
@@ -146,7 +151,7 @@
 				{ name: 'title', type: 'string', description: 'Obligatoria. Título y nombre accesible del diálogo.' },
 				{ name: 'description', type: 'string', description: 'Explica la decisión; se asocia con aria-describedby.' },
 				{ name: 'confirmLabel / cancelLabel', type: 'string', default: 'Confirmar / Cancelar', description: 'Textos de los botones. Por defecto, los mensajes del idioma del documento.' },
-				{ name: 'tone', type: 'neutral | danger', default: 'neutral', description: 'Acción destructiva: botón de peligro y foco en Cancelar.' },
+				{ name: 'color', type: 'primary | secondary | neutral | success | info | warning | danger', default: 'primary', description: 'Color del botón que acepta; danger, para una acción destructiva, pone el foco en Cancelar.' },
 				{ name: 'size', type: 'sm | md | lg', default: 'sm', description: 'Ancho máximo del diálogo.' },
 			]"
 		/>

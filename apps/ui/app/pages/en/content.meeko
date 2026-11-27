@@ -68,7 +68,7 @@
 		<h2 id="kpi">UIStat as a key figure and UISparkline</h2>
 		<p>
 			With
-			<code>change</code>, UIStat adds the change with its arrow and its tone (up is good unless <code>good="down"</code>), the period, a sparkline with
+			<code>change</code>, UIStat adds the change with its arrow and its color (up is good unless <code>good="down"</code>), the period, a sparkline with
 			<code>trend</code>
 			and a link to the detail with
 			<code>to</code>
@@ -139,7 +139,7 @@
 				<p>Visits this week</p>
 				<UISparkline
 					area
-					tone="accent"
+					color="primary"
 					bind:values="[1200, 1350, 1280, 1500, 1720, 1610, 1890]"
 				/>
 			</div>
@@ -151,7 +151,7 @@
 				{ name: 'change', type: 'number | string', description: 'The change. A number is formatted in the language of the document, with its sign; a text is painted as it is and its sign gives the direction.' },
 				{ name: 'changeFormat', type: `'percent' | 'number'`, default: `'percent'`, description: 'How a numeric change is formatted: 12.5 is 12.5% or 12.5.' },
 				{ name: 'changeDirection', type: `'up' | 'down' | 'flat'`, description: 'The direction when the sign does not say it.' },
-				{ name: 'good', type: `'up' | 'down'`, default: `'up'`, description: 'Which direction is good: it gives the success or danger tone.' },
+				{ name: 'good', type: `'up' | 'down'`, default: `'up'`, description: 'Which direction is good: it gives the success or danger color.' },
 				{ name: 'period', type: 'string', description: 'The period of the comparison, after the change.' },
 				{ name: 'trend', type: 'readonly number[]', description: 'A series for a UISparkline beside the value.' },
 				{ name: 'trendLabel', type: 'string', description: 'Accessible name of the sparkline; by default, minimum, maximum and latest.' },
@@ -164,7 +164,7 @@
 			bind:rows="[
 				{ name: 'values', type: 'readonly number[]', description: 'Required. The series, from the oldest to the latest.' },
 				{ name: 'area', type: 'boolean', default: 'false', description: 'Fills the area under the line.' },
-				{ name: 'tone', type: `'neutral' | 'accent' | 'info' | 'success' | 'warning' | 'danger'`, description: 'Colour of the line; without it, currentColor.' },
+				{ name: 'color', type: `'primary' | 'secondary' | 'neutral' | 'success' | 'info' | 'warning' | 'danger'`, description: 'Colour of the line; without it, currentColor.' },
 				{ name: 'min / max', type: 'number', description: 'Bounds of the vertical axis; by default, those of the series.' },
 				{ name: 'label', type: 'string', description: 'Accessible name; by default, minimum, maximum and latest.' },
 				{ name: 'format', type: 'Intl.NumberFormatOptions', description: 'Format of the numbers of the summary.' },

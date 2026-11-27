@@ -1,0 +1,34 @@
+<script lang="ts">
+	import { appearance, defineTheme, type ThemeVariants } from '@meekojs/ui/theme'
+
+	const sample = defineTheme(appearance({ variant: true, color: ['primary'] }))
+	const treatments = Object.keys(sample.variants.variant) as NonNullable<ThemeVariants<typeof sample>['variant']>[]
+</script>
+
+<template>
+	<ul class="appearance-variants">
+		<li
+			each:of="treatments"
+			each:as="treatment"
+			each:key="treatment"
+		>
+			<span bind:class="['appearance-sample', sample({ variant: treatment, color: 'primary' })]">{treatment}</span>
+		</li>
+	</ul>
+</template>
+
+<style>
+	.appearance-variants {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--ui-space-3);
+		padding: 0;
+		list-style: none;
+	}
+
+	.appearance-sample {
+		display: inline-block;
+		border-radius: var(--ui-radius-md);
+		padding: var(--ui-space-2) var(--ui-space-3);
+	}
+</style>

@@ -5,10 +5,10 @@
 
 	import type { UINavigationTabsItem, UINavigationTabsProps } from '../types/navigation'
 
+	import { navigationTabsTheme } from '../theme/components/navigation'
 	import { uiTheme } from '../utils/defaults'
 	import { uiMessages } from '../utils/messages'
 	import { isCurrentLink, linkTarget, revealInScroller } from '../utils/navigation'
-	import { navigationTabs } from '../variants/navigation'
 	import * as Badge from './Badge.meeko'
 	import * as ItemLink from './internal/ItemLink.meeko'
 
@@ -39,7 +39,7 @@
 		if (item) emit('select', event, item)
 	}
 
-	const classes = (): ReturnType<typeof navigationTabs> => navigationTabs({ variant: props.variant })
+	const classes = (): ReturnType<typeof navigationTabsTheme> => navigationTabsTheme({ layout: props.layout })
 </script>
 
 <template>
@@ -60,14 +60,14 @@
 			{item.label}
 			<Badge
 				if:when="item.badge !== undefined"
-				bind:tone="item.badgeTone ?? 'neutral'"
+				bind:color="item.badgeColor"
 				bind:dot="item.badgeDot"
 			>
 				{item.badge}
 			</Badge>
 		</ItemLink>
 		<span
-			if:when="props.variant !== 'segmented'"
+			if:when="props.layout !== 'segmented'"
 			aria-hidden="true"
 			bind:class="classes().indicator({ class: theme.ui.indicator })"
 		/>

@@ -31,8 +31,11 @@ catalog:
   '@mdn/browser-compat-data': 8.1.9
   '@milkdown/crepe': 7.23.0
   '@milkdown/kit': 7.23.0
+  # Source of the raw hues and the alpha gray of @meekojs/ui (scripts/build-hues.mjs).
+  '@radix-ui/colors': 3.0.0
   '@tailwindcss/postcss': 4.3.5
-  '@tailwindcss/vite': 4.3.5
+  # A range: @meekojs/ui publishes it as a dependency, and `pnpm pack` writes this value in its package.json.
+  '@tailwindcss/vite': ^4.3.5
   # Node 24 is the minimum runtime (engines), so its types stay on 24.
   '@types/node': ^24.19.2
   '@types/pg': 8.23.1

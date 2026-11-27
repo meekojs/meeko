@@ -23,7 +23,7 @@ Después de `actions/checkout`, los jobs que usan el workspace invocan `.github/
 
 Los comandos terminados en `:prepared` son fases internas que requieren el build previo. `pnpm verify` prepara el workspace y después ejecuta `verify:prepared`; CI utiliza directamente la fase preparada tras `setup-workspace` con `build: 'true'`. Esto evita reconstruir el núcleo cuando la caché ya restauró un build válido. Los comandos autónomos conservan la preparación necesaria para ejecutarlos desde un clon limpio.
 
-`site:build`, `ui:build`, `i18n:build` y `tooling:build` seleccionan el paquete destino y sus dependencias con los filtros `...` de pnpm. Los atajos de sitios excluyen `meeko-docs` del recorrido porque cada app ya lo construye en su propio script `build`. Los filtros de los scripts no llevan comillas simples: en Windows se pasarían como parte del nombre del paquete. Los hooks `prepack` siguen construyendo antes de empaquetar.
+Turbo sigue el grafo de dependencias al ejecutar `pnpm build`, `pnpm build:packages`, `pnpm build:apps` o `pnpm build --filter=meeko-ui-site`. Los hooks `prepack` construyen cada paquete antes de empaquetarlo.
 
 ## Publicación y artefactos
 
