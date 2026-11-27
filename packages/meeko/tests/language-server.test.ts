@@ -140,6 +140,11 @@ class Client {
 		}
 	}
 
+	/**
+	 * Cierra como un editor: `shutdown` y después la conexión. Una petición del servidor al
+	 * cliente aún en vuelo (un refresco tras un cambio de archivos) se rechaza al cerrar; el
+	 * servidor la descarta de forma explícita y cualquier otro rechazo sin manejar falla la prueba.
+	 */
 	async close(): Promise<void> {
 		await this.connection.sendRequest(ShutdownRequest.type)
 		this.onDispose()
@@ -1623,6 +1628,54 @@ describe('Meeko language server project check', () => {
 			await client.close()
 			await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 		}
+	})
+})
+
+describe('Meeko language server requests to the client', () => {
+	test('a refresh the client rejects is logged and one still pending at shutdown is dropped, never an unhandled rejection', async () => {
+		const root = await project('lsp-pending-refresh-', { 'lib/value.ts': 'export const value = 1;\n', 'A.meeko': '<script lang="ts">\nimport { value } from "./lib/value.js";\n</script>\n<template><p>{value}</p></template>\n' }, false)
+		const rejections: unknown[] = []
+		const onRejection = (reason: unknown): void => {
+			rejections.push(reason)
+		}
+		process.on('unhandledRejection', onRejection)
+		const client = await inProcess(root, { projectContracts: false })
+		const logs: string[] = []
+		client.connection.onNotification('window/logMessage', ({ message }: { message: string }) => {
+			logs.push(message)
+		})
+		let refreshes = 0
+		let answer: 'reject' | 'pending' = 'reject'
+		client.connection.onRequest(SemanticTokensRefreshRequest.type, () => {
+			refreshes++
+			if (answer === 'reject') throw new Error('refresh refused by the client')
+			// Never answered: the reply is still pending when the server's connection is disposed.
+			return new Promise<void>(() => undefined)
+		})
+		const changed = (): Promise<void> => client.connection.sendNotification(DidChangeWatchedFilesNotification.type, { changes: [{ uri: pathToFileURL(join(root, 'lib', 'value.ts')).href, type: FileChangeType.Changed }] })
+		try {
+			const uri = await client.open(join(root, 'A.meeko'))
+			await client.waitForDiagnostics(uri, () => true)
+			// A real failure of the request reaches the client log.
+			await changed()
+			await eventually(
+				() => logs.some((message) => message.includes('refresh refused by the client')),
+				() => `The rejected refresh was not logged: ${JSON.stringify(logs)}`,
+			)
+			answer = 'pending'
+			await changed()
+			await eventually(
+				() => refreshes === 2,
+				() => `The server sent ${refreshes} refreshes`,
+			)
+		} finally {
+			await client.close()
+			// Unhandled rejections are reported after the microtask queue drains.
+			await new Promise((done) => setTimeout(done, 50))
+			process.off('unhandledRejection', onRejection)
+			await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+		}
+		assert.deepEqual(rejections, [])
 	})
 })
 
