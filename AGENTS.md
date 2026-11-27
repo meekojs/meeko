@@ -28,7 +28,8 @@ Requiere Node.js 24+ y pnpm 12.14.0. En Windows usa PowerShell 7.
 - `pnpm build`: construye el workspace. `pnpm build:packages` y `pnpm build:apps` seleccionan paquetes o apps.
 - `pnpm tooling:build`: prepara los paquetes usados por ESLint y Prettier.
 - `pnpm dev`: inicia en paralelo los sitios del framework (4173), UI (4174), i18n (4175) y dashboard (4310) con Turbo; `pnpm dev:site`, `pnpm dev:ui`, `pnpm dev:i18n` y `pnpm dev:dashboard` inician cada uno por separado.
-- `pnpm dev:portless`: como `pnpm dev`, detrás de portless: cada sitio tiene una URL con nombre (`https://ui.meeko.localhost`) en vez de un puerto; los nombres viven en `portless.json`.
+- Con el proxy de portless en marcha (`pnpm exec portless proxy start`), `pnpm dev` y `dev:site`, `dev:ui`, `dev:i18n` y `dev:dashboard` responden también por nombre (`https://ui.meeko.localhost`): cada app lo declara con `dev.portless` en su `meeko.config.ts`, así que no hace falta envolver el script ni mantener una lista de nombres. `PORTLESS=0` lo desactiva.
+- `pnpm exec meeko styles <app>` escribe `.meeko/styles/main.css` sin arrancar el servidor, con el mismo contenido que `meeko dev`: ejecútalo antes de `prettier --check` en una copia limpia o en CI para que `meekoSortClasses: "stylesheet"` ordene como en local. `meeko check` también la escribe.
 - `pnpm dev:i18n`: inicia la web de i18n; `pnpm build --filter=meeko-i18n-site` genera su build Node.
 - `pnpm check`: comprueba tipos de los cinco paquetes principales.
 - `pnpm test`: ejecuta las pruebas del núcleo; `pnpm verify`: amplía la validación con ejemplos, compilación y DevTools.

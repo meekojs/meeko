@@ -7,6 +7,8 @@ export default defineMeekoConfig({
 		adapter: 'node',
 		port: 4175,
 	},
+	// URL con nombre de portless (https://i18n.meeko.localhost) sin envolver el script; ver dev.portless.
+	dev: { portless: { name: 'i18n.meeko' } },
 	// meeko-docs sirve /sitemap.xml con la moderación vigente: un `sitemap: true` estático lo taparía.
 	modules: ['@meekojs/ui', 'meeko-docs', '@meekojs/i18n'],
 	i18n: {

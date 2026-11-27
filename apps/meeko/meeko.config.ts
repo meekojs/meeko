@@ -27,6 +27,8 @@ const permissions = [
 ].join(', ')
 
 export default defineMeekoConfig({
+	// URL con nombre de portless (https://meeko.localhost) sin envolver el script; ver dev.portless.
+	dev: { portless: { name: 'meeko' } },
 	// meeko-docs without `docs.site`: only its components. The moderation and the sitemap of this site come
 	// from the snapshot.
 	modules: ['@meekojs/ui', 'meeko-docs', '@meekojs/i18n'],

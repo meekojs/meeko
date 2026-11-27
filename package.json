@@ -25,7 +25,6 @@
 		"dev:apps": "turbo watch dev --filter=./apps/*",
 		"dev:dashboard": "turbo watch dev --filter=meeko-dashboard",
 		"dev:i18n": "turbo watch dev --filter=meeko-i18n-site",
-		"dev:portless": "portless",
 		"dev:site": "turbo watch dev --filter=meeko-site",
 		"dev:ui": "turbo watch dev --filter=meeko-ui-site",
 		"devtools:check": "pnpm -F meeko-devtools-extension run check",

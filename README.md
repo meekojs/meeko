@@ -64,13 +64,19 @@ workspace, Turbo actualiza sus builds. En `apps/ui`, Meeko lee los componentes f
 mientras el servidor sigue activo. Usa `dev:site`, `dev:ui`, `dev:i18n` o `dev:dashboard` para
 iniciar una sola aplicación.
 
-`pnpm dev:portless` hace lo mismo detrás de [portless](https://portless.sh), que da a cada sitio una
-URL con nombre en vez de un puerto: `https://meeko.localhost`, `https://ui.meeko.localhost`,
-`https://i18n.meeko.localhost` y `https://dashboard.meeko.localhost` (los nombres están en
-`portless.json`). La primera vez portless crea una autoridad de certificación local y pide permisos
-para escuchar en el puerto 443; `PORTLESS_HTTPS=0` sirve HTTP y `PORTLESS_PORT=<puerto>` elige otro
-puerto. Dos avisos: un `MEEKO_PORT` en el `.env` de una app gana al puerto que asigna portless, así
-que quítalo para usarlo; y el dashboard sólo responde en loopback, de modo que necesita
-`DASHBOARD_ALLOWED_HOSTS=dashboard.meeko.localhost`.
+Con [portless](https://portless.sh) en marcha, esos mismos sitios también responden por nombre, sin
+cambiar el comando: `https://meeko.localhost`, `https://ui.meeko.localhost`,
+`https://i18n.meeko.localhost` y `https://dashboard.meeko.localhost`. Cada app lo declara con
+`dev.portless` en su `meeko.config.ts`, así que `pnpm dev` y `dev:site`, `dev:ui`, `dev:i18n` y
+`dev:dashboard` registran su ruta (`portless alias`) con el puerto que `meeko dev` ha elegido de
+verdad, también si un `MEEKO_PORT` del `.env` de la app lo cambia, y la quitan al cerrar. No hay que
+envolver ningún script con `portless` (envolverlo inyecta `HOST`, obsoleta, y asigna un puerto que un
+`MEEKO_PORT` del `.env` puede ignorar) ni mantener una lista de nombres aparte. Meeko no arranca el
+proxy: hazlo una vez con `pnpm exec portless proxy start`, que la primera vez crea una autoridad de
+certificación local y pide permisos para escuchar en el puerto 443; `PORTLESS_HTTPS=0` sirve HTTP y
+`PORTLESS_PORT=<puerto>` elige otro puerto, y `PORTLESS=0` desactiva el registro. Los nombres son los
+mismos en todos los worktrees de git: si dos ejecutan la misma app a la vez, la ruta es la del último
+que arrancó y desaparece cuando cualquiera de los dos se cierra. El dashboard acepta en desarrollo cualquier nombre `*.localhost` (véase
+`apps/dashboard/README.md`); en producción sigue exigiendo `DASHBOARD_ALLOWED_HOSTS`.
 
 [CONTRIBUTING.md](CONTRIBUTING.md) recoge las convenciones y [SECURITY.md](SECURITY.md) cómo informar de una vulnerabilidad. El código se distribuye bajo la [licencia MIT](LICENSE).

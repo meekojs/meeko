@@ -1,8 +1,0 @@
-{
-	"apps": {
-		"apps/meeko": { "name": "meeko" },
-		"apps/ui": { "name": "ui.meeko" },
-		"apps/i18n": { "name": "i18n.meeko" },
-		"apps/dashboard": { "name": "dashboard.meeko" }
-	}
-}
