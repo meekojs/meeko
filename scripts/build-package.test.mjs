@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import test from 'node:test'
 import { pathToFileURL } from 'node:url'
@@ -24,6 +24,12 @@ test('esbuild preserves module identity, runtime resources, CLI headers and Node
 		await writeFile(join(root, 'src/nested/index.ts'), 'import { state } from "../state"; export { state }; export const resource = new URL("./resource.txt", import.meta.url);')
 		await writeFile(join(root, 'src/cli.ts'), '#!/usr/bin/env node\nexport { state } from "./state.js";')
 		execFileSync(process.execPath, [resolve('scripts/build-package.mjs'), root], { stdio: 'pipe', windowsHide: true })
+		// A removed source leaves its stale output and, once that is deleted, an empty folder: the build prunes it.
+		await mkdir(join(root, 'dist/removed/deep'), { recursive: true })
+		await writeFile(join(root, 'dist/removed/deep/old.js'), '')
+		await mkdir(join(root, 'dist/empty/leaf'), { recursive: true })
+		execFileSync(process.execPath, [resolve('scripts/build-package.mjs'), root], { stdio: 'pipe', windowsHide: true })
+		assert.deepEqual((await readdir(join(root, 'dist'))).sort(), ['cli.d.ts', 'cli.js', 'cli.js.map', 'index.d.ts', 'index.js', 'index.js.map', 'nested', 'state.d.ts', 'state.js', 'state.js.map'])
 		await writeFile(join(root, 'dist/nested/resource.txt'), 'resource')
 		const entry = await import(pathToFileURL(join(root, 'dist/index.js')).href)
 		const nested = await import(pathToFileURL(join(root, 'dist/nested/index.js')).href)

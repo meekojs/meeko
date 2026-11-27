@@ -32,6 +32,7 @@ Requiere Node.js 24+ y pnpm 12.14.0. En Windows usa PowerShell 7.
 - `pnpm dev:i18n`: inicia la web de i18n; `pnpm build --filter=meeko-i18n-site` genera su build Node.
 - `pnpm check`: comprueba tipos de los cinco paquetes principales.
 - `pnpm test`: ejecuta las pruebas del núcleo; `pnpm verify`: amplía la validación con ejemplos, compilación y DevTools.
+- `pnpm test:changed`: ejecuta sólo las pruebas asociadas a los archivos editados (`--base <ref>` para una rama, `--list` para ver el plan, `--no-build`, `--timeout <s>`, `--max-transitive <n>`); nunca lanza `*.e2e.*` ni la suite completa.
 - `pnpm lint` y `pnpm format:check`: revisan lint y formato.
 - `pnpm ci:local`: ejecuta en local los jobs de `.github/workflows/ci.yml` y los gates que sólo tiene `publish.yml` (`--only package-gates`) sin detenerse en el primer fallo y resume al final los fallidos y los omitidos por falta de una herramienta (`pwsh`, `bun`, `deno`, Redis). Ejecútalo sólo cuando se pida, normalmente antes de una PR; `--only checks,core-tests`, `--skip performance`, `--no-build` y `--list` lo acotan.
 - `pnpm -F @meekojs/eslint-plugin test`: ejecuta las pruebas del plugin seleccionado.
@@ -48,7 +49,7 @@ Predomina `node:test`, con `tsx` para TypeScript; las reglas ESLint también usa
 
 Añade regresiones de comportamiento. Para cambios del compilador, cubre SSR, hidratación, actualizaciones y liberación de recursos cuando corresponda. No hay un umbral numérico de cobertura configurado.
 
-Ejecuta sólo las pruebas de lo que editaste: los archivos de prueba que tocaste o añadiste y los que cubren directamente el código modificado (`node --import tsx --test tests/<archivo>.test.ts`). No ejecutes la suite completa de un paquete, `pnpm test`, `pnpm verify`, `pnpm e2e` ni `pnpm ci:local` salvo que se pida explícitamente; si un cambio puede afectar a algo que no probaste, dilo en el resumen en vez de ejecutarlo todo.
+Ejecuta sólo las pruebas de lo que editaste: los archivos de prueba que tocaste o añadiste y los que cubren directamente el código modificado. `pnpm test:changed` las elige y las ejecuta; a mano, `node --import tsx --test tests/<archivo>.test.ts`. No ejecutes la suite completa de un paquete, `pnpm test`, `pnpm verify`, `pnpm e2e` ni `pnpm ci:local` salvo que se pida explícitamente; si un cambio puede afectar a algo que no probaste, dilo en el resumen en vez de ejecutarlo todo.
 
 ## Trabajo con varios agentes
 
