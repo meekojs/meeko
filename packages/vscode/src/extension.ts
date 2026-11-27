@@ -8,6 +8,7 @@ import type { ExecutionZoneItem } from './zones'
 
 import { registerAutoClosingTags } from './auto-close'
 import { registerScaffoldCommands } from './commands'
+import { setupHotReload } from './dev/hot-reload'
 import { LanguageServers } from './language-servers'
 import { registerLiveValues } from './live/controller'
 import { registerSnippetCompletion } from './snippets'
@@ -48,6 +49,8 @@ function referenceLens(lens: vscode.CodeLens, current: LanguageClient): vscode.C
 
 /** Arranca el cliente del servidor de lenguaje Meeko; la lógica del lenguaje vive en el servidor. */
 export async function activate(context: vscode.ExtensionContext): Promise<MeekoExtensionApi> {
+	setupHotReload(context)
+
 	const output = vscode.window.createOutputChannel('Meeko', { log: true })
 	context.subscriptions.push(output)
 	// Before the servers start: the snippets do not depend on them.
