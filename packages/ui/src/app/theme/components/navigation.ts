@@ -58,7 +58,7 @@ export const foldingTitle = ['cursor-pointer list-none [&::-webkit-details-marke
 export const codeLabel = 'overflow-hidden font-mono text-md text-ellipsis whitespace-nowrap'
 
 /**
- * The look of <UINavigationTabs>. `underline`: a row whose indicator follows the current link with CSS
+ * The look of <UINavigationTabs>, by its `layout`. `underline`: a row whose indicator follows the current link with CSS
  * anchor positioning, and where that is missing the link marks itself; `position` makes the row the box of
  * the indicator, which scrolls with it. `segmented`: the look of a segmented <UIRadioGroup>, without the
  * indicator.
@@ -75,7 +75,7 @@ export const navigationTabsTheme = defineTheme({
 		indicator: 'hidden',
 	},
 	variants: {
-		variant: {
+		layout: {
 			underline: {
 				base: 'flex gap-1 border-b-(length:--ui-border-width) border-b-border',
 				link: [
@@ -110,7 +110,7 @@ export const navigationTabsTheme = defineTheme({
 		},
 	},
 	defaultVariants: {
-		variant: 'underline',
+		layout: 'underline',
 	},
 })
 

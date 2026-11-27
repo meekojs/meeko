@@ -23,7 +23,7 @@ const toast = useToast()
 <UIInput aria-label="Fecha" name="date" type="date" min="2026-01-01" max="2026-12-31" />
 <UICheckbox label="Aceptar condiciones" name="accepted" value="yes" model="accepted" />
 <UISwitch label="Notificaciones" name="notifications" model="notifications" />
-<UIRadioGroup legend="Periodo" name="period" variant="segmented" model="period" bind:options="[{value:'day',label:'Día'},{value:'week',label:'Semana'},{value:'month',label:'Mes',disabled:true}]" />
+<UIRadioGroup legend="Periodo" name="period" layout="segmented" model="period" bind:options="[{value:'day',label:'Día'},{value:'week',label:'Semana'},{value:'month',label:'Mes',disabled:true}]" />
 <UISlider label="Volumen" name="volume" bind:min="0" bind:max="10" bind:step="2" model="volume" />
 <output id="values">{comment.value}|{accepted.value}|{notifications.value}|{period.value}|{volume.value}</output>
 <UIButton id="save" type="submit" name="intent" value="save" form="editor" color="danger" bind:loading="busy.value">Guardar cambios</UIButton>
@@ -35,7 +35,7 @@ const toast = useToast()
 <UICard title="Resumen" density="compact" padding="md"><UIStat label="Visitas" bind:value="1200" detail="Esta semana" /></UICard>
 <UIDescriptionList bind:columns="2" bind:items="[{label:'Estado',value:'Activo'},{label:'Actualizado',value:'Hoy'}]" />
 <UITable caption="Resultados" density="compact" rowKey="id" bind:rows="[{id:1,name:'Ana',count:5}]" bind:columns="[{key:'name',label:'Nombre',rowHeader:true},{key:'count',label:'Cantidad',numeric:true}]" />
-<UIEmpty title="Sin resultados" description="Añade un elemento para comenzar." variant="panel"><snippet name="actions"><UIButton variant="outline" color="neutral">Añadir elemento</UIButton></snippet></UIEmpty>
+<UIEmpty title="Sin resultados" description="Añade un elemento para comenzar." layout="panel"><snippet name="actions"><UIButton variant="outline" color="neutral">Añadir elemento</UIButton></snippet></UIEmpty>
 <UISkeleton bind:lines="3" bind:widths="['full','long','short']" />
 <UIButton id="notify" on:click="() => toast.add({text:'Cambios guardados',color:'success',duration:0})">Mostrar aviso</UIButton>
 <UIButton id="timed" on:click="() => toast.add({text:'Aviso temporal',duration:800})">Aviso temporal</UIButton>

@@ -26,6 +26,8 @@ async function render(context, name, template) {
 	}
 	let source = await readFile(new URL(`../src/app/components/${name}.meeko`, import.meta.url), 'utf8')
 	if (name === 'Card' || name === 'Table') source = source.replace('<script lang="ts"', '<script lang="ts"').replace(/(<script[^>]*>)/, '$1\nimport { useId } from "@meekojs/meeko"')
+	// onMounted is an auto-import of the app; this compilation has no app, so it imports it.
+	if (name === 'TableOfContents') source = source.replace(/(<script[^>]*>)/, '$1\nimport { onMounted } from "@meekojs/meeko"')
 	if (source.includes('./internal/Icon.meeko')) await write('Icon', await readFile(new URL('../src/app/components/internal/Icon.meeko', import.meta.url), 'utf8'))
 	// The components it renders, and theirs: the <UISparkline> and the <UIHint> of <UIStat>, whose <UITooltip> renders a <UIPopover>.
 	const siblings = new Set()
@@ -53,7 +55,7 @@ async function render(context, name, template) {
 const cases = [
 	['Textarea', '<Component name="comment" bind:rows="4" bind:maxlength="200" describedBy="hint" bind:invalid="true" model="signal(\'Initial\')" />', [/name="comment"/, /rows="4"/, /maxlength="200"/, /aria-invalid="true"/, /aria-describedby="hint"/, />Initial<\/textarea>/]],
 	['Checkbox', '<Component label="Accept" name="accepted" value="yes" bind:required="true" model="signal(true)" description="Terms" />', [/type="checkbox"/, /checked/, /required/, /name="accepted"/, /value="yes"/, /Terms/]],
-	['RadioGroup', '<Component legend="Period" name="period" variant="segmented" model="signal(\'week\')" bind:options="[{ value: \'day\', label: \'Day\' }, { value: \'week\', label: \'Week\' }]" />', [/<fieldset/, /<legend[^>]*>Period<\/legend>/, /type="radio"/, /name="period"/, /<div class="[^"]*w-fit[^"]*"/, /<input(?=[^>]*\svalue="week")(?=[^>]*\schecked)/]],
+	['RadioGroup', '<Component legend="Period" name="period" layout="segmented" model="signal(\'week\')" bind:options="[{ value: \'day\', label: \'Day\' }, { value: \'week\', label: \'Week\' }]" />', [/<fieldset/, /<legend[^>]*>Period<\/legend>/, /type="radio"/, /name="period"/, /<div class="[^"]*w-fit[^"]*"/, /<input(?=[^>]*\svalue="week")(?=[^>]*\schecked)/]],
 	['Switch', '<Component label="Notifications" name="notifications" model="signal(true)" />', [/type="checkbox"/, /role="switch"/, /checked/, /Notifications/]],
 	['Slider', '<Component label="Volume" name="volume" bind:min="0" bind:max="10" bind:step="2" model="signal(4)" />', [/type="range"/, /min="0"/, /max="10"/, /step="2"/, /value="4"/]],
 	['Alert', '<Component title="Failed" description="Try again" color="danger" bind:dismiss="true"><snippet name="actions"><a href="/retry">Retry</a></snippet></Component>', [/role="alert"/, /Failed/, /Try again/, /href="\/retry"/, /aria-label="Cerrar aviso"/]],
@@ -63,7 +65,7 @@ const cases = [
 	['Disclosure', '<Component summary="More"><p>Inside</p></Component>', [/<details(?![^>]*open)/, /<p>Inside<\/p>/]],
 	['Table', `<Component rowKey="id" bind:rows="[{ id: 1 }]" bind:columns="[{ key: 'id', label: 'Id' }]"><snippet name="caption"><span lang="es">Título</span></snippet></Component>`, [/role="region"/, /aria-labelledby="[^"]*-caption"/, /<caption[^>]*>\s*<span lang="es">Título<\/span>/]],
 	['Empty', '<Component><snippet name="title">Nothing for <kbd>x</kbd></snippet></Component>', [/<p class="[^"]*font-semibold[^"]*"[^>]*>[\s\S]*Nothing for[\s\S]*<kbd[^>]*>x<\/kbd>/, /^(?![\s\S]*No hay resultados)/]],
-	['Empty', '<Component description="Add an item" variant="panel"><snippet name="actions"><button>Add</button></snippet></Component>', [/No hay resultados\./, /class="[^"]*p-6[^"]*"/, /Add an item/, /<button>Add<\/button>/]],
+	['Empty', '<Component description="Add an item" layout="panel"><snippet name="actions"><button>Add</button></snippet></Component>', [/No hay resultados\./, /class="[^"]*p-6[^"]*"/, /Add an item/, /<button>Add<\/button>/]],
 	['Skeleton', '<Component bind:lines="2" bind:widths="[\'long\', \'short\']" />', [/role="status"/, /aria-label="Cargando"/, /class="[^"]*w-\(--ui-skeleton-width-long\)/, /class="[^"]*w-\(--ui-skeleton-width-short\)/]],
 	['Alert', '<Component title="Hi" class="my-class" bind:ui="{ base: \'my-base\', title: \'my-title\' }" />', [/<section class="[^"]*rounded-lg[^"]* my-base my-class"/, /<p class="[^"]*font-semibold[^"]* my-title"/]],
 	['Stat', '<Component label="Visits" bind:value="1200" detail="This week" />', [/<dl/, /<dt[^>]*>Visits<\/dt>/, />1200<\/dd>/, /This week/]],
@@ -104,6 +106,34 @@ for (const [name, template, patterns] of cases) {
 
 /** The classes of the first element that matches `tag`. */
 const classesOf = (html, tag) => (html.match(new RegExp(`<${tag}\\b[^>]*?class="([^"]*)"`))?.[1] ?? '').split(' ')
+
+test('the removed variant of UIEmpty and UIRadioGroup does not change their layout', { timeout: 30_000 }, async (context) => {
+	// The types reject it (tests/types/ui-options.ts); `layout` is where they sit, `variant` a treatment of the catalog.
+	const empty = async (attribute) => classesOf(await render(context, 'Empty', `<Component title="Nada" ${attribute} />`), 'div')
+	const [plainEmpty, legacyEmpty, panel] = [await empty(''), await empty('variant="panel"'), await empty('layout="panel"')]
+	assert.deepEqual(legacyEmpty, plainEmpty, 'variant="panel" adds no class: the layout is still inline')
+	assert.ok(!legacyEmpty.includes('p-6') && legacyEmpty.includes('py-4'))
+	assert.ok(panel.includes('p-6') && panel.includes('bg-surface') && !panel.includes('py-4'), panel.join(' '))
+	const options = `bind:options="[{ value: 'day', label: 'Day' }]"`
+	const radios = (attribute) => render(context, 'RadioGroup', `<Component legend="Period" ${attribute} ${options} />`)
+	const [plainRadios, legacyRadios, segmented] = [await radios(''), await radios('variant="segmented"'), await radios('layout="segmented"')]
+	assert.deepEqual(classesOf(legacyRadios, 'div'), classesOf(plainRadios, 'div'), 'variant="segmented" adds no class: the radios stay a list')
+	assert.deepEqual(classesOf(legacyRadios, 'label'), classesOf(plainRadios, 'label'))
+	assert.ok(!classesOf(legacyRadios, 'div').includes('w-fit'))
+	assert.ok(classesOf(segmented, 'div').includes('w-fit'), 'layout="segmented" is the track')
+	assert.doesNotMatch(segmented, /\slayout=/, 'the layout is classes, not an attribute')
+})
+
+test('layout="collapsible" folds UITableOfContents, and the removed variant leaves it in the aside', { timeout: 30_000 }, async (context) => {
+	// The build of an app rejects `variant` with the types; the compiled component ignores it.
+	const toc = (attribute) => render(context, 'TableOfContents', `<Component label="Índice" ${attribute} bind:entries="[{ id: 'x', text: 'X', level: 2 }]" />`)
+	const [plain, legacy, collapsible] = [await toc(''), await toc('variant="collapsible"'), await toc('layout="collapsible"')]
+	assert.equal(legacy, plain, 'variant="collapsible" changes nothing')
+	assert.match(legacy, /<nav\b[^>]*aria-label="Índice"/)
+	assert.doesNotMatch(legacy, /<details|\svariant=/)
+	assert.match(collapsible, /^\s*<details\b/, 'layout="collapsible" is a <details>')
+	assert.doesNotMatch(collapsible, /\slayout=/)
+})
 
 test('the class of the consumer replaces the conflicting classes of a theme recipe, and keeps the rest', { timeout: 30_000 }, async (context) => {
 	// The utilities of UI and those of the app share the layer `utilities`: without the merge, the order of the sheet would decide.

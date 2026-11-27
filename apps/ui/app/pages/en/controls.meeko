@@ -126,7 +126,7 @@
 			with its
 			<code>legend</code>
 			and a native radio per option: the arrows move the selection.
-			<code>variant="segmented"</code>
+			<code>layout="segmented"</code>
 			paints it as a compact switcher.
 		</p>
 		<DocsPreview layout="stack">
@@ -139,7 +139,7 @@
 			<UIRadioGroup
 				legend="Period, segmented"
 				name="period-segmented"
-				variant="segmented"
+				layout="segmented"
 				model="period"
 				bind:options="periods"
 			/>
@@ -152,7 +152,7 @@
 				{ name: 'legend', type: 'string', description: 'Required. Name of the group.' },
 				{ name: 'options', type: 'readonly UIRadioOption[]', description: 'Required. value, label and disabled.' },
 				{ name: 'name / required / disabled', type: 'string / boolean', description: 'Native submission and state.' },
-				{ name: 'variant', type: 'default | segmented', default: 'default', description: 'A list of radios or a compact switcher.' },
+				{ name: 'layout', type: 'default | segmented', default: 'default', description: 'A list of radios or a compact switcher.' },
 				{ name: 'class', type: 'string', description: 'Additional classes.' },
 			]"
 		/>
@@ -201,7 +201,7 @@
 		</DocsPreview>
 		<DocsCode bind:code="examples.segmented" />
 		<p>
-			<code>UIRadioGroup variant="segmented"</code>
+			<code>UIRadioGroup layout="segmented"</code>
 			is still available and wraps into several lines when it does not fit; for a compact switcher, use
 			<code>UISegmentedControl</code>. Its
 			<code>size</code>

@@ -125,7 +125,7 @@
 			con su
 			<code>legend</code>
 			y un radio nativo por opción: las flechas mueven la selección.
-			<code>variant="segmented"</code>
+			<code>layout="segmented"</code>
 			lo pinta como un conmutador compacto.
 		</p>
 		<DocsPreview layout="stack">
@@ -138,7 +138,7 @@
 			<UIRadioGroup
 				legend="Periodo, segmentado"
 				name="period-segmented"
-				variant="segmented"
+				layout="segmented"
 				model="period"
 				bind:options="periods"
 			/>
@@ -151,7 +151,7 @@
 				{ name: 'legend', type: 'string', description: 'Obligatoria. Nombre del grupo.' },
 				{ name: 'options', type: 'readonly UIRadioOption[]', description: 'Obligatoria. value, label y disabled.' },
 				{ name: 'name / required / disabled', type: 'string / boolean', description: 'Envío y estado nativos.' },
-				{ name: 'variant', type: 'default | segmented', default: 'default', description: 'Lista de radios o conmutador compacto.' },
+				{ name: 'layout', type: 'default | segmented', default: 'default', description: 'Lista de radios o conmutador compacto.' },
 				{ name: 'class', type: 'string', description: 'Clases adicionales.' },
 			]"
 		/>
@@ -200,7 +200,7 @@
 		</DocsPreview>
 		<DocsCode bind:code="examples.segmented" />
 		<p>
-			<code>UIRadioGroup variant="segmented"</code>
+			<code>UIRadioGroup layout="segmented"</code>
 			sigue disponible y se parte en varias líneas cuando no cabe; para un conmutador compacto, usa
 			<code>UISegmentedControl</code>. Su
 			<code>size</code>
