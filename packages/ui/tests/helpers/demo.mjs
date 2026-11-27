@@ -4,6 +4,12 @@ import { chromium } from 'playwright-core'
 
 import { startDevServer } from '../../../../scripts/test-support/dev-server.ts'
 
+/** Chooses an option of a <UISelect> by its text: its list opens with a click and the option is an element of the page. */
+export async function chooseOption(page, select, name) {
+	await select.click()
+	await page.getByRole('option', { name, exact: true }).click()
+}
+
 export async function startDemo(context) {
 	const demo = fileURLToPath(new URL('../../../../apps/ui/', import.meta.url))
 	const output = fileURLToPath(new URL('../../.meeko/', import.meta.url))

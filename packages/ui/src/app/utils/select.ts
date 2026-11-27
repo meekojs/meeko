@@ -1,99 +1,95 @@
 import type { Signal } from '@meekojs/meeko'
 
 /**
- * `<UISelect>`: what `Select.meeko` needs besides its template. The browser brings the list, the keyboard
- * and the form value; only the model, objects as values and what the copy of `<selectedcontent>` does not
- * do by itself are left here.
+ * `<UISelect>`: what `Select.meeko` needs besides its template. It is a combobox that only selects, so its
+ * state, its keyboard and its list are the ones of `createCombobox` (./combobox.ts) with one value and no
+ * search. What is its own stays here: a trigger that the browser opens by itself until the script arrives
+ * (`popovertarget`), the focus back on the trigger after a choice, and the reset of its form.
  */
-import { computed, effect, signal, untrack } from '@meekojs/meeko'
+import { computed, untrack } from '@meekojs/meeko'
 
+import type { ComboboxSettings } from '../types/combobox'
 import type { SelectEntry, SelectOptionState, SelectSettings } from '../types/select'
 
-import { groupOptions, sameOption, selectLabel, selectValue } from './select-options'
+import { createCombobox } from './combobox'
 
 /** What the template of `<UISelect>` reads and the component runs. */
 export function createSelect<T>(props: SelectSettings<T>, model: Signal<unknown>, id: string, emit: (value: unknown) => void) {
-	const triggerId = computed(() => props.id ?? props.field?.id ?? `${id}-trigger`)
-	/** The signal that holds the value: the form field's, or the model. */
-	const target = (): { value: unknown } => props.field?.value ?? model
-	/** A required select that the form found empty, until it gets a value. */
-	const failed = signal(false)
-	/** Whether there is a value: `""`, the usual initial value of a form field, is no choice unless an option is `""`. */
-	const chosen = computed(() => {
-		const value = target().value
-		return value !== null && value !== undefined && (value !== '' || props.options.some((option) => sameOption(option, '' as T, props.by)))
-	})
-	const value = computed(() => target().value as T)
-	const groups = computed(() => groupOptions(props.options, props, `${id}-list`))
-	const entries = computed(() => groups.value.flatMap((group) => group.entries))
-	const isSelected = (entry: SelectEntry<T>): boolean => chosen.value && sameOption(value.value, entry.option, props.by)
+	// The props that belong to <UICombobox> are a type error here; without the types they would still arrive.
+	const settings = Object.create(props, { multiple: { value: false }, searchable: { value: false }, filter: { value: undefined }, max: { value: undefined } }) as ComboboxSettings<T>
+	const list = createCombobox<T>(settings, model, id, emit)
+	const chosen = computed(() => list.selected.value.length > 0)
+	/** The chosen option, for the `value` snippet; only read while there is one. */
+	const value = computed(() => list.selected.value[0] as T)
+	const stateOf = (entry: SelectEntry<T>): SelectOptionState => ({ selected: list.isSelected(entry), disabled: entry.disabled })
+
+	let root: HTMLElement | null = null
+	const focusTrigger = (): void => root?.querySelector<HTMLElement>('[data-meeko-select-trigger]')?.focus()
 	/**
-	 * One plus the chosen option; `0` when the options do not hold it. Then, and only then, the `<select>`
-	 * starts with a hidden option that stands for it: nothing chosen (the placeholder, so the browser does
-	 * not pick an option on its own) or a value outside them, which the model keeps until the application
-	 * changes it. Browsers still expose a hidden option to assistive technology.
+	 * `popovertarget` opens the list while there is no script, and tells the browser that a press on the
+	 * trigger is not a press outside the list. Once the script is here it opens and closes, with its state.
 	 */
-	const nativeIndex = computed(() => entries.value.findIndex(isSelected) + 1)
-	const blankValue = computed(() => (chosen.value ? selectValue(value.value, props) : ''))
-	const label = computed(() => (chosen.value ? selectLabel(value.value, props.labelBy) : ''))
-	const blankLabel = computed(() => (chosen.value ? label.value : (props.placeholder ?? '')))
-	const showClear = computed(() => props.clearable === true && props.disabled !== true && chosen.value)
-	const attributes = computed(() => ({
-		id: triggerId.value,
-		name: props.name ?? props.field?.name,
-		required: props.required,
-		disabled: props.disabled,
-		'aria-label': props.label,
-		'aria-describedby': props.describedBy ?? props.field?.describedBy.value,
-		'aria-invalid': props.invalid === true || props.field?.invalid.value === true || (failed.value && !chosen.value) ? ('true' as const) : undefined,
-		'data-placement': props.placement ?? 'bottom-start',
-	}))
-	const option = (entry: SelectEntry<T>) => ({ value: selectValue(entry.option, props), disabled: entry.disabled, selected: isSelected(entry) })
-	const stateOf = (entry: SelectEntry<T>): SelectOptionState => ({ selected: isSelected(entry), disabled: entry.disabled })
-	const write = (next: unknown): void => {
-		target().value = next
-		failed.value = false
-		emit(next)
-	}
-	/** The option at a position of `select.options`, which holds the hidden one first when it is there. */
-	const choose = (position: number): void => {
-		const entry = entries.value[position - (nativeIndex.value === 0 ? 1 : 0)]
-		if (entry && !isSelected(entry)) write(entry.option)
-	}
-	const change = (event: Event): void => choose((event.currentTarget as HTMLSelectElement).selectedIndex)
-	/** The form found it empty: the select shows the error and takes the focus, without the browser's bubble. */
-	const reportInvalid = (event: Event): void => {
+	const triggerClick = (event: Event): void => {
 		event.preventDefault()
-		failed.value = true
-		;(event.currentTarget as HTMLElement).focus()
+		list.triggerClick()
 	}
-	let element: HTMLSelectElement | null = null
-	const clear = (): void => {
-		if (!showClear.value) return
-		write(null)
-		element?.focus()
+	/** A choice closes the list: the focus goes back to the trigger, also where a press does not focus a button. */
+	const optionClick = (event: Event): void => {
+		list.optionClick(event)
+		if (!list.open.value) focusTrigger()
 	}
-	/**
-	 * A choice made before hydration wins over the model. After that the model leads, and setting
-	 * `selectedIndex` also rebuilds the copy of `<selectedcontent>`, which is not reactive.
-	 */
-	const mount = (root: HTMLElement | null): (() => void) => {
-		element = root?.querySelector('select') ?? null
-		const position = (): number => Math.max(0, nativeIndex.value - 1)
-		const early = element?.selectedIndex
-		if (early !== undefined && early !== untrack(position)) choose(early)
-		return effect(() => {
-			const index = position()
-			void entries.value
-			const offset = props.offset
-			// After this flush, which also renders the new options.
-			queueMicrotask(() => {
-				if (!element) return
-				element.selectedIndex = index
-				if (offset === undefined) element.style.removeProperty('--select-offset')
-				else element.style.setProperty('--select-offset', `${offset}px`)
-			})
-		})
+
+	/** In the browser: what `createCombobox` attaches, and the reset of the form that holds the select. */
+	const mount = (element: HTMLElement | null): (() => void) => {
+		const release = list.mount(element)
+		if (!element) return release
+		root = element
+		// A reset goes back to the value the select was mounted with, as in a native control, and tells the model.
+		const initial = untrack(list.current)
+		const form = element.closest('form')
+		const reset = (event: Event): void => {
+			if (event.defaultPrevented) return
+			list.close()
+			list.failed.value = false
+			if (!Object.is(untrack(list.current), initial)) list.write(initial)
+		}
+		form?.addEventListener('reset', reset)
+		return () => {
+			form?.removeEventListener('reset', reset)
+			release()
+			root = null
+		}
 	}
-	return { chosen, value, label, groups, nativeIndex, blankValue, blankLabel, showClear, attributes, option, stateOf, change, reportInvalid, clear, mount }
+
+	return {
+		listboxId: list.listboxId,
+		triggerId: list.triggerId,
+		triggerAttributes: list.triggerAttributes,
+		listOption: list.listOption,
+		open: list.open,
+		rendered: list.rendered,
+		active: list.active,
+		groups: list.groups,
+		entries: list.entries,
+		chosen,
+		value,
+		label: list.valueText,
+		hiddenValues: list.hiddenValues,
+		name: list.name,
+		showClear: list.showClear,
+		isSelected: list.isSelected,
+		stateOf,
+		keydown: list.keydown,
+		keyup: list.keyup,
+		triggerClick,
+		keepFocus: list.keepFocus,
+		optionClick,
+		optionHover: list.optionHover,
+		reportInvalid: list.reportInvalid,
+		clear: list.clear,
+		mount,
+		openList: list.openList,
+		close: list.close,
+		choose: list.choose,
+	}
 }

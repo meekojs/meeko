@@ -16,10 +16,10 @@ related:
   - '@meekojs/meeko#useId'
   - docs/api.md#select-meekoselect
   - docs/api.md#componentes-integrados
-source-hash: 21e096ce54121fc10e7612f8a836ef143abd898b67f001efbb5761267a8b64dd
+source-hash: 6d9862cb6203d63c8713cdf5f0339e491d3bdf45074ea936ba29dc8ff7e1ae35
 ---
 
-> **Deprecated since 1.8; removed in 2.0.** `<MeekoSelect>` still works in 1.x and emits `MEEK121`. Use `<UICombobox>` from `@meekojs/ui` 1.8 or later with its module active, which keeps props, snippets and `data-meeko-*` markup, or `<UISelect>`, a native `<select>`, if you do not need `multiple`, `searchable`, `filter` or `max`. See [Migrating to 1.8](../../migration-1.8.md).
+> **Deprecated since 1.8; removed in 2.0.** `<MeekoSelect>` still works in 1.x and emits `MEEK121`. Use `<UICombobox>` from `@meekojs/ui` 1.8 or later with its module active, which keeps props, snippets and `data-meeko-*` markup, or `<UISelect>`, that same list for a single option and without search, if you do not need `multiple`, `searchable`, `filter` or `max`. See [Migrating to 1.8](../../migration-1.8.md).
 
 A native `<select>` does not support options with custom content, search or styled groups. `<MeekoSelect>` is a select built on [`<MeekoPopover>`](/en/docs/reference/meekopopover) using the ARIA _combobox_ and _listbox_ pattern: focus stays on the trigger and `aria-activedescendant` marks the active option. `model` is the value and its type comes from `options`, which can be primitives or objects.
 

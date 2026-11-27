@@ -215,7 +215,7 @@ Parent never writes type args: `T` is inferred **from props only**. Script-level
 | Deprecated           | Use (from `@meekojs/ui` ≥ 0.2, module enabled)                                                         |
 | -------------------- | ------------------------------------------------------------------------------------------------------ |
 | `<MeekoPopover>`     | `<UIPopover>` (same props, snippets, `data-meeko-*` markup)                                            |
-| `<MeekoSelect>`      | `<UICombobox>` for `multiple`/`searchable`/`filter`/`max` parity; `<UISelect>` for a native `<select>` |
+| `<MeekoSelect>`      | `<UICombobox>` for `multiple`/`searchable`/`filter`/`max` parity; `<UISelect>` for single-choice lists |
 | `<MeekoThemeToggle>` | `<UIThemeToggle>`; custom: `useThemeToggle()` / `useTheme()`                                           |
 
 Don't write new code with the `Meeko*` versions. For simple cases a native `<select model="x">` is lightest.

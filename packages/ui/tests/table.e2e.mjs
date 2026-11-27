@@ -7,6 +7,8 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright-core'
 
+import { chooseOption } from './helpers/demo.mjs'
+
 const demo = fileURLToPath(new URL('../../../apps/ui/', import.meta.url))
 const output = fileURLToPath(new URL('../.meeko/', import.meta.url))
 async function port() {
@@ -90,7 +92,7 @@ test('UITable keeps sections, reactive rows and accessible table semantics in na
 	assert.equal(await table.locator('tbody tr').first().locator('td').last().innerText(), 'PUBLICADO', 'column formatter controls presentation')
 	const empty = page.getByRole('table', { name: 'Tabla vacía', exact: true })
 	assert.equal(await empty.locator('tbody td').innerText(), 'No hay datos.')
-	await page.getByLabel('Distribución', { exact: true }).selectOption('grid')
+	await chooseOption(page, page.getByLabel('Distribución', { exact: true }), 'grid')
 	assert.equal(await table.evaluate((element) => globalThis.getComputedStyle(element).display), 'grid')
 	const xs = await table.evaluate((element) => [...element.querySelectorAll('thead tr > *, tbody tr:first-child > *, tfoot tr > *')].map((cell) => cell.getBoundingClientRect().x))
 	for (let index = 0; index < 3; index++) {

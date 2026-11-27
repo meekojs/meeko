@@ -373,7 +373,7 @@ export const builtins: readonly BuiltinEntry[] = [
 		signatureLang: 'meeko',
 		signature: ['<MeekoSelect model="user" bind:options="users.value" by="id" placeholder="Elige" name="user">', '  <snippet name="option" params="user, state">{user.name}</snippet>', '</MeekoSelect>'].join('\n'),
 		description: [
-			'**Obsoleto desde 1.8; retirada en 2.0.** Usa `<UISelect>` de `@meekojs/ui` 0.2 con su módulo activo. Mismas props, snippets y marcado. El compilador emite `MEEK121` y el editor tacha la etiqueta. Véase [Migración a 1.8](/docs/migration-1.8).',
+			'**Obsoleto desde 1.8; retirada en 2.0.** Usa `<UICombobox>` de `@meekojs/ui` 1.8 o posterior con su módulo activo, que conserva props, snippets y marcado, o `<UISelect>`, esa misma lista para una sola opción y sin búsqueda. El compilador emite `MEEK121` y el editor tacha la etiqueta. Véase [Migración a 1.8](/docs/migration-1.8).',
 			'',
 			'Select accesible sobre `<MeekoPopover>`, sin estilos visuales. Un `role="combobox"` con `aria-activedescendant` (el foco se queda en el disparador, o en el `<input>` con `searchable`) controla un `role="listbox"`; las opciones llevan `data-active`, `data-selected` y `data-disabled`, y la raíz `data-open`. No se importa, y sólo los componentes que la usan cargan su código.',
 			'',

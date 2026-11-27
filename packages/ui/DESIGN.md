@@ -124,7 +124,7 @@ Con `pointer: coarse` los altos crecen solos, y los inputs usan `--ui-input-font
 | Foco          | Siempre `:focus-visible` con `--ui-focus-ring`. No lo quites sin dar otro igual de claro.                                                            |
 | Deshabilitado | `opacity: var(--ui-opacity-disabled)` y `cursor: not-allowed`.                                                                                       |
 | Inválido      | `aria-invalid="true"`, borde `--ui-color-danger` y mensaje en `--ui-color-danger-text`.                                                              |
-| Seleccionado  | `--ui-color-control-active` y peso `semibold`, o `--ui-color-primary-soft` si es el acento de la vista.                                              |
+| Seleccionado  | `--ui-color-control-active` y peso `semibold`, o `--ui-color-primary-soft` si es el acento de la vista. La elegida de `UISelect` lleva una marca.    |
 | Fila activa   | `--ui-color-control-active` y `--ui-option-active-ring`, con `--ui-color-focus` y 3:1 o más, igual en `UISelect`, `UICombobox` y `UICommandPalette`. |
 
 ## Tokens de componente

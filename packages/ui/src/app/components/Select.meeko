@@ -1,17 +1,21 @@
 <script lang="ts" generic="T">
-	// <UISelect>: a native <select>. For a search, an asynchronous filter or several values, <UICombobox>.
-	// The behavior lives in ../utils/select.ts and the look in ../theme/components/select.ts. Its template has no whitespace between the
-	// tags: it would be text in the options. <selectedcontent> copies
-	// the whole option, so with an `option` snippet the trigger paints `value`, or the label, by itself.
+	// <UISelect>: a combobox that only selects (the pattern of the APG), a button and a list of its own on
+	// <UIPopover>, the same in every browser. For a search, an asynchronous filter or several values, <UICombobox>,
+	// whose list and keyboard this one shares. The behavior lives in ../utils/select.ts and the look in
+	// ../theme/components/select.ts. Its template has no whitespace between the tags: it would be text in the
+	// trigger and in the options.
 	import { computed, onMounted, useId } from '@meekojs/meeko'
 
 	import type { SelectModel, SelectSettings, SelectSnippets, UISelectProps } from '../types/select'
 
 	import { inputControlTheme } from '../theme/components/input'
-	import { selectTheme as look } from '../theme/components/select'
+	import { selectTheme as look, selectPopover } from '../theme/components/select'
 	import { uiTheme } from '../utils/defaults'
+	import { icons } from '../utils/icons'
 	import { uiMessages } from '../utils/messages'
 	import { createSelect } from '../utils/select'
+	import * as Icon from './internal/Icon.meeko'
+	import * as Popover from './Popover.meeko'
 
 	const props = defineProps<UISelectProps<T>>()
 
@@ -27,12 +31,14 @@
 
 	const text = uiMessages().select
 
+	// The IDs of the trigger, the list and each option come from useId: the same in SSR and hydration.
 	const select = createSelect<T>(props as SelectSettings<T>, model, useId(), (value) => emit('change', value as SelectModel<T>))
 	onMounted(() => select.mount(root.value))
 
 	const classes = computed(() => look({ disabled: props.disabled === true, clearable: props.clearable === true }))
-	// The <select> is the trigger and, with `appearance: base-select`, also holds the list: `listClass` goes on it.
-	const triggerClass = computed(() => inputControlTheme({ clearable: props.clearable === true, class: [classes.value.trigger(), theme.ui.trigger, props.listClass] }))
+	const triggerClass = computed(() => inputControlTheme({ clearable: props.clearable === true, class: [classes.value.trigger(), theme.ui.trigger] }))
+	// `listClass` goes on the box of the list, the content of the popover; `ui.list`, on the listbox inside it.
+	const popoverClass = computed(() => (props.listClass ? `${selectPopover} ${props.listClass}` : selectPopover))
 </script>
 
 <!-- No whitespace between the tags of this template: it would be text inside the trigger and the options. Prettier keeps it that way (htmlWhitespaceSensitivity "strict" in prettier.config.ts); tests/templates-without-whitespace.test.mjs guards it. -->
@@ -41,78 +47,116 @@
 		data-meeko-select
 		bind:class="classes.value.base({ class: [theme.ui.base, theme.class] })"
 		bind:data-disabled="props.disabled ? '' : undefined"
-		><select
-			data-meeko-select-trigger
-			bind:class="triggerClass.value"
-			bind="select.attributes.value"
-			on:change="select.change"
-			on:invalid="select.reportInvalid"
-			><button type="button"
-				><span
-					if:when="snippets.value && select.chosen.value"
-					data-meeko-select-value
-					bind:class="classes.value.value({ class: theme.ui.value })"
-					><render
-						snippet="snippets.value"
-						args="select.value.value" /></span
-				><span
-					if:when="!snippets.value && snippets.option && select.chosen.value"
-					data-meeko-select-value
-					bind:class="classes.value.value({ class: theme.ui.value })"
-					>{select.label.value}</span
-				><selectedcontent if:when="(!snippets.value && !snippets.option) || !select.chosen.value" /></button
-			><option
-				if:when="select.nativeIndex.value === 0"
-				hidden
-				selected
-				bind:value="select.blankValue.value"
-				data-meeko-select-placeholder
-				>{select.blankLabel.value}</option
-			><template
-				each:of="select.groups.value"
-				each:as="group"
-				each:key="group.key"
-				><template if:when="group.name === undefined"
-					><option
-						each:of="group.entries"
-						each:as="entry"
-						each:key="entry.key"
-						bind="select.option(entry)"
+		><Popover
+			matchWidth
+			model="select.open"
+			bind:placement="props.placement ?? 'bottom-start'"
+			bind:offset="props.offset ?? 4"
+			bind:triggerId="select.triggerId.value"
+			bind:class="popoverClass.value"
+			><snippet
+				name="anchor"
+				params="popover"
+			>
+				<button
+					type="button"
+					role="combobox"
+					data-meeko-select-trigger
+					aria-haspopup="listbox"
+					bind:class="triggerClass.value"
+					bind:popovertarget="popover.popovertarget"
+					bind="select.triggerAttributes.value"
+					on:click="select.triggerClick"
+					on:keydown="select.keydown"
+					on:keyup="select.keyup"
+					><span
+						if:when="select.chosen.value"
+						data-meeko-select-value
+						bind:class="classes.value.value({ class: theme.ui.value })"
 						><render
-							if:when="snippets.option"
-							snippet="snippets.option"
-							args="entry.option, select.stateOf(entry)"
-						/><template if:when="!snippets.option">{entry.label}</template></option
-					></template
-				><optgroup
-					if:when="group.name !== undefined"
-					bind:label="group.name"
-					><legend
-						data-meeko-select-group-label
-						bind:class="classes.value.groupLabel({ class: theme.ui.groupLabel })"
-						><render
-							if:when="snippets.group"
-							snippet="snippets.group"
-							args="group.name ?? ''"
-						/><template if:when="!snippets.group">{group.name}</template></legend
-					><option
-						each:of="group.entries"
-						each:as="entry"
-						each:key="entry.key"
-						bind="select.option(entry)"
-						><render
-							if:when="snippets.option"
-							snippet="snippets.option"
-							args="entry.option, select.stateOf(entry)"
-						/><template if:when="!snippets.option">{entry.label}</template></option
-					></optgroup
-				></template
-			></select
+							if:when="snippets.value"
+							snippet="snippets.value"
+							args="select.value.value"
+						/><template if:when="!snippets.value">{select.label.value}</template></span
+					><span
+						if:when="!select.chosen.value"
+						data-meeko-select-placeholder
+						bind:class="classes.value.placeholder({ class: theme.ui.placeholder })"
+						>{props.placeholder ?? ''}</span
+					><Icon
+						size="sm"
+						bind:path="icons.chevron"
+						bind:class="classes.value.chevron({ class: theme.ui.chevron })"
+				/></button></snippet
+			><div
+				role="listbox"
+				data-meeko-select-list
+				bind:class="classes.value.list({ class: theme.ui.list })"
+				bind:id="select.listboxId"
+				bind:aria-label="props.label"
+				bind:aria-labelledby="props.label === undefined ? select.triggerId.value : undefined"
+				on:mousedown="select.keepFocus"
+				on:click="select.optionClick"
+				on:pointermove="select.optionHover"
+				><template if:when="select.rendered.value"
+					><div
+						each:of="select.groups.value"
+						each:as="group"
+						each:key="group.key"
+						data-meeko-select-group
+						bind:class="classes.value.group({ class: theme.ui.group })"
+						bind:role="group.name === undefined ? 'presentation' : 'group'"
+						bind:aria-labelledby="group.id"
+						><div
+							if:when="group.name !== undefined"
+							role="presentation"
+							data-meeko-select-group-label
+							bind:class="classes.value.groupLabel({ class: theme.ui.groupLabel })"
+							bind:id="group.id"
+							><render
+								if:when="snippets.group"
+								snippet="snippets.group"
+								args="group.name ?? ''"
+							/><template if:when="!snippets.group">{group.name}</template></div
+						><div
+							each:of="group.entries"
+							each:as="entry"
+							each:key="entry.key"
+							role="option"
+							bind:class="classes.value.option({ class: theme.ui.option })"
+							bind="select.listOption(entry)"
+							><render
+								if:when="snippets.option"
+								snippet="snippets.option"
+								args="entry.option, select.stateOf(entry)" /><template if:when="!snippets.option">{entry.label}</template
+							><Icon
+								if:when="select.isSelected(entry)"
+								size="sm"
+								bind:path="icons.check"
+								bind:class="classes.value.indicator({ class: theme.ui.indicator })" /></div></div></template></div></Popover
 		><button
 			if:when="select.showClear.value"
 			type="button"
 			data-meeko-select-clear
 			bind:class="classes.value.clear({ class: theme.ui.clear })"
 			bind:aria-label="props.clearLabel ?? text.clear"
-			on:click="select.clear">×</button></div
-	></template>
+			on:click="select.clear"
+			>×</button
+		><input
+			each:of="select.hiddenValues.value"
+			each:as="value"
+			type="hidden"
+			bind:name="select.name.value"
+			bind:value="value"
+			bind:disabled="props.disabled" /><input
+			if:when="props.required"
+			type="text"
+			hidden
+			required
+			tabindex="-1"
+			aria-hidden="true"
+			data-meeko-select-validity
+			bind:value="select.chosen.value ? 'selected' : ''"
+			bind:disabled="props.disabled"
+			on:invalid="select.reportInvalid"
+	/></div></template>

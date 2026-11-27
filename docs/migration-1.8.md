@@ -51,7 +51,7 @@ Conserva el resto de tu configuración. `theme` sólo es necesario para el selec
 <UIThemeToggle mode="select" />
 ```
 
-`UICombobox` es la misma lista propia que `<MeekoSelect>`. Un select sin `multiple`, `searchable`, `filter` ni `max` puede pasar además a `UISelect`, un `<select>` nativo con mucho menos JavaScript y con menos marcado propio: véase [su documentación](ui-api.md#uiselect).
+`UICombobox` es la misma lista propia que `<MeekoSelect>`. Un select sin `multiple`, `searchable`, `filter` ni `max` puede pasar además a `UISelect`: en UI 1.x, un `<select>` nativo con mucho menos JavaScript y con menos marcado propio; desde UI 2.0, esa misma lista propia para una sola opción y sin búsqueda. Véase [su documentación](ui-api.md#uiselect).
 
 Renombra también las etiquetas de cierre. Props, modelos, snippets, eventos, teclado, accesibilidad y marcado `data-meeko-*` conservan su contrato: los selectores CSS existentes siguen encontrando los mismos atributos. `UICombobox<T, Multiple>` infiere sus tipos de `options` y `multiple` como antes.
 
