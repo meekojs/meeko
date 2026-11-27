@@ -1,0 +1,12 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "meeko-language: build",
+			"type": "shell",
+			"command": "pnpm -F meeko-language build",
+			"problemMatcher": [],
+			"group": "build"
+		}
+	]
+}

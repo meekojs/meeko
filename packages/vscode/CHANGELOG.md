@@ -2,6 +2,8 @@
 
 ## Sin publicar
 
+- Un `<script>` con los atributos en varias líneas, como lo deja Prettier (`<script`, `server`, `lang="ts"` y `>` cada uno en su línea), se colorea como TypeScript. Antes la gramática sólo reconocía la etiqueta de apertura en una línea y el bloque quedaba sin colores.
+- `pnpm run install:local` desde una terminal de WSL ya no falla tras instalar: el `code` de Windows instala en WSL pero localiza las extensiones de Windows, así que allí se usa el `code-server` de `~/.vscode-server`.
 - Los colores llegan casi al abrir un componente. El servidor prepara al iniciar, en segundo plano, el programa TypeScript de los proyectos de las pestañas `.meeko` abiertas (o de las aplicaciones de las carpetas): los primeros tokens semánticos pasan de alrededor de 1,2 s a menos de 0,2 s. El ajuste `meeko.languageServer.warmup` lo desactiva.
 - Las declaraciones `const x = signal(…)`, `computed(…)` y `useApi(…)` y las escrituras `x.value = …`, `+=` o `++` tienen su color desde el primer pintado: la gramática les da los mismos scopes que los tokens semánticos, que al llegar ya no cambian el color.
 - Los nombres de atributo de un componente (`variant`, `size`, `disabled`) ya no se vuelven blancos al llegar los tokens semánticos: el servidor sólo emite tokens donde la gramática pinta TypeScript.
