@@ -25,7 +25,7 @@ exports.run = async function run() {
 		'CSS gets variables from imported @theme',
 	)
 	const hovers = await vscode.commands.executeCommand('vscode.executeHoverProvider', uri, position)
-	assert.ok(hovers.some((hover) => hover.contents.some((content) => content.value?.includes('variable CSS'))))
+	assert.ok(hovers.some((hover) => hover.contents.some((content) => content.value?.includes('CSS variable'))))
 	const definitions = await vscode.commands.executeCommand('vscode.executeDefinitionProvider', uri, position)
 	assert.ok(definitions.some((location) => (location.uri ?? location.targetUri).fsPath.endsWith('tokens.css')))
 	const config = vscode.workspace.getConfiguration('meeko', uri)
