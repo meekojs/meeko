@@ -263,6 +263,8 @@ for (const [name, start] of engines) {
 
 		await t.test('UISelect: a list of its own in every engine, with late options, placement, snippets, groups, the keyboard and a form', async () => {
 			const { page, errors } = await open(browser, origin)
+			// In a flex row it fills the row, like <UIInput>, instead of shrinking to its value.
+			assert.deepEqual(await page.locator('#select-row').evaluate((element) => [element.querySelector('[data-meeko-select]'), element.querySelector('[data-meeko-select-trigger]')].map((part) => part.getBoundingClientRect().width)), [400, 400])
 			const listOf = async (select) => page.locator('#' + (await select.getAttribute('aria-controls')))
 			/** The box of an element, or of the popover that holds it. */
 			const rect = (locator, popover = false) =>
