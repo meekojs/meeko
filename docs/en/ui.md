@@ -1,5 +1,5 @@
 ---
-source-hash: 656a5a587ddfb64e60daf14de1231ee9d8681268d083dae02e29091428b7adcd
+source-hash: 20c00c35e0d27b9d3d45964acfa658309c0b295afdb6e1cecaeb7637f04149ef
 ---
 
 # Meeko UI
@@ -57,7 +57,7 @@ export const route = definePage({ render: "prerender" });
 </template>
 ```
 
-You will see the heading, a badge and a button styled by UI. `UIButton` uses `<MeekoLink>` with `to`, an `<a>` with `href`, and a `<button>` without a destination. `UILink` also accepts `to` or `href`, always as a link. `UISelect` is native; use `UICombobox` for search or multiple selection. The [UI reference](ui-api.md) details the props.
+You will see the heading, a badge and a button styled by UI. `UIButton` uses `<MeekoLink>` with `to`, an `<a>` with `href`, and a `<button>` without a destination. `UILink` also accepts `to` or `href`, always as a link. `UISelect` chooses one option from a list of its own; use `UICombobox` for search or multiple selection. The [UI reference](ui-api.md) details the props.
 
 The `@meekojs/ui` module belongs to the Meeko ecosystem and has its own version.
 

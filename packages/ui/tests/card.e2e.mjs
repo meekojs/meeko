@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright-core'
 
 import { startDevServer } from '../../../scripts/test-support/dev-server.ts'
+import { chooseOption } from './helpers/demo.mjs'
 
 const demo = fileURLToPath(new URL('../../../apps/ui/', import.meta.url))
 const output = fileURLToPath(new URL('../.meeko/', import.meta.url))
@@ -37,7 +38,7 @@ test('UICard hydrates snippets, changes variant and color and supports both them
 	// The treatment and the color are two selects: each pair paints the root with the classes of the catalog.
 	const backgrounds = { surface: 'bg-surface', soft: 'bg-control-hover', solid: 'bg-neutral-9', glass: 'bg-gray-a3', plain: null }
 	for (const variant of Object.keys(backgrounds)) {
-		await page.getByLabel('Variante', { exact: true }).selectOption(variant)
+		await chooseOption(page, page.getByLabel('Variante', { exact: true }), variant)
 		const classes = (await card.getAttribute('class')).split(' ')
 		if (backgrounds[variant]) assert.ok(classes.includes(backgrounds[variant]), variant)
 		else assert.ok(!classes.some((name) => name.startsWith('bg-')), 'plain does not paint')
@@ -46,8 +47,8 @@ test('UICard hydrates snippets, changes variant and color and supports both them
 			return { background: css.backgroundColor, color: css.color, shadow: css.boxShadow }
 		})
 	}
-	await page.getByLabel('Variante', { exact: true }).selectOption('solid')
-	await page.getByLabel('Color', { exact: true }).selectOption('primary')
+	await chooseOption(page, page.getByLabel('Variante', { exact: true }), 'solid')
+	await chooseOption(page, page.getByLabel('Color', { exact: true }), 'primary')
 	assert.ok((await card.getAttribute('class')).split(' ').includes('bg-primary-9'), 'solid primary')
 	styles.primary = await card.evaluate((element) => globalThis.getComputedStyle(element).backgroundColor)
 	assert.notEqual(styles.primary, styles.solid.background, 'the color changes the solid')
@@ -59,8 +60,8 @@ test('UICard hydrates snippets, changes variant and color and supports both them
 	const elevated = await page.getByRole('region', { name: 'Elevation', exact: true }).evaluate((element) => globalThis.getComputedStyle(element).boxShadow)
 	assert.notEqual(elevated, 'none', 'elevation adds a shadow')
 	// A card does not react to the pointer: hovering keeps its background.
-	await page.getByLabel('Color', { exact: true }).selectOption('neutral')
-	await page.getByLabel('Variante', { exact: true }).selectOption('surface')
+	await chooseOption(page, page.getByLabel('Color', { exact: true }), 'neutral')
+	await chooseOption(page, page.getByLabel('Variante', { exact: true }), 'surface')
 	await card.hover()
 	assert.equal(await card.evaluate((element) => globalThis.getComputedStyle(element).backgroundColor), styles.surface.background, 'no hover state')
 	// The reading styles of the page's <UIProse> stop at the card: on a solid, the text must still be the card's.

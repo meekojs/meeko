@@ -40,24 +40,21 @@
 	<DocsPage
 		locale="en"
 		title="Select"
-		description="Choose one option with the native select or, to search or choose several, with UICombobox."
+		description="Choose one option from a list with UISelect or, to search or choose several, with UICombobox."
 	>
 		<p>
 			<code>UISelect</code>
-			is a native
-			<code>select</code>
-			with
-			<code>appearance: base-select</code>: the browser brings the list, the keyboard and the form value, and UI paints it with its tokens.
+			is a button that opens a list of its own, with the select-only combobox pattern: it looks and behaves the same in every browser, with the tokens of UI, and a hidden field sends its value with the form.
 			<code>UICombobox</code>
-			covers what the native one cannot: searching, filtering on a server and choosing several options. The type of the model is inferred from
+			adds to that same list what a simple choice does not need: searching, filtering on a server and choosing several options. The type of the model is inferred from
 			<code>options</code>.
 		</p>
 		<h2 id="usage">One option in a form</h2>
 		<p>
 			With
-			<code>name</code>, a native form sends the value without extra code. Open the list with <code>Enter</code>,
-			<code>Space</code>
-			or a click and type a letter to jump to the option that starts with it: it is the keyboard of the browser.
+			<code>name</code>, a native form sends the value without extra code. Open the list with <code>Enter</code>, <code>Space</code>, the arrows or a click; move with the arrows, <code>Home</code> and <code>End</code>, or type to jump to the option that starts with that text, and choose with <code>Enter</code> or <code>Space</code>. <code>Esc</code> and <code>Tab</code> close without choosing. The focus never leaves the trigger:
+			<code>aria-activedescendant</code>
+			walks the list.
 		</p>
 		<DocsPreview>
 			<form
@@ -130,22 +127,25 @@
 		<DocsCode bind:code="examples.select" />
 		<UIAlert color="info">
 			With
-			<code>required</code>, a form without a value is not sent: the
-			<code>select</code>
-			receives the focus and
-			<code>aria-invalid</code>, without the browser message. Write a visible message too with <code>UIField</code>, as in the example. With <code>useForm</code>, pass
+			<code>required</code>, a form without a value is not sent: the trigger receives the focus and <code>aria-invalid</code>, without the browser message. Write a visible message too with <code>UIField</code>, as in the example. With <code>useForm</code>, pass
 			<code>bind:field="form.field('plan')"</code>
 			and the field brings the id, the name, the value and the error state.
 		</UIAlert>
-		<h2 id="browsers">Browsers</h2>
+		<h2 id="behavior">List, form and loading</h2>
 		<p>
-			Chrome, Edge and Safari 27 paint the list with the tokens of UI, with an animated entrance. Firefox and older browsers show their own list: they work the same, and there
-			<code>value</code>,
-			<code>group</code>
-			and the rich content of
-			<code>option</code>
-			stay as their text. A hidden option at the start stands for the
-			<code>placeholder</code>, or for a value that is no longer in <code>options</code>: the model keeps it and the form keeps sending it.
+			The list is a
+			<code>role="listbox"</code>
+			inside a
+			<MeekoLink to="/popover">UIPopover</MeekoLink>, with an animated entrance that respects <code>prefers-reduced-motion</code>. Its options are created the first time it opens and kept afterwards: a closed list sends no options in the HTML of the server. The trigger opens its popover with
+			<code>popovertarget</code>
+			before the JavaScript arrives, and the options appear on hydration; without JavaScript nothing can be chosen, but the form sends the value the page was served with.
+		</p>
+		<p>
+			A value that is no longer in
+			<code>options</code>
+			stays in the model, in the trigger and in the form. Without a value, the form sends the name with an empty text. A
+			<code>reset</code>
+			of the form takes the select back to the value it was mounted with and emits <code>change</code>.
 		</p>
 		<h2 id="objects">Objects, groups and custom options</h2>
 		<p>
@@ -157,11 +157,12 @@
 			<code>groupBy</code>
 			adds a heading per group and an option with
 			<code>disabled: true</code>
-			cannot be chosen. The
+			cannot be chosen: the keyboard skips it. The
 			<code>option</code>
 			and
 			<code>value</code>
-			snippets receive the option with its type.
+			snippets receive the option with its type, and
+			<code>group</code>, the name of the group; the three paint the same in every browser. The chosen option carries a mark at its end.
 		</p>
 		<DocsPreview>
 			<div class="docs-stack">
@@ -191,6 +192,12 @@
 								{member.name}
 								<UIBadge>{member.role}</UIBadge>
 							</snippet>
+							<snippet
+								name="value"
+								params="member"
+							>
+								{member.name} · {member.team}
+							</snippet>
 						</UISelect>
 					</snippet>
 				</UIField>
@@ -211,13 +218,14 @@
 				{ name: 'options', type: 'readonly T[]', description: 'Required. Primitives or objects.' },
 				{ name: 'model', type: 'Signal<T | null>', default: 'null', description: 'Chosen value.' },
 				{ name: 'by / labelBy / disabledBy / groupBy', type: 'key or function', description: 'Comparison, label, disabled state and group of each option.' },
-				{ name: 'clearable / clearLabel', type: 'boolean / string', default: 'false / Clear selection', description: 'Accessible button that clears the selection and returns focus to the select. The default label follows the language of the document (see Theming).' },
+				{ name: 'clearable / clearLabel', type: 'boolean / string', default: 'false / Clear selection', description: 'Accessible button that clears the selection and returns focus to the trigger. The default label follows the language of the document (see Theming).' },
 				{ name: 'name / required / disabled', type: 'string / boolean', description: 'Form submission and validation.' },
 				{ name: 'field', type: 'SelectField', description: 'A useForm field: id, name, value, aria-invalid and aria-describedby.' },
-				{ name: 'id / label / describedBy / invalid', type: 'string / boolean', description: 'Identity and accessible state of the select.' },
+				{ name: 'id / label / describedBy / invalid', type: 'string / boolean', description: 'Identity and accessible state of the trigger.' },
 				{ name: 'placeholder', type: 'string', description: 'Text without a value.' },
-				{ name: 'placement / offset', type: 'PopoverPlacement / number', default: 'bottom-start', description: 'Position of the list, where the browser paints it with the tokens.' },
-				{ name: 'class / listClass', type: 'string', description: 'Classes of the root and of the select; style the list with .my-class::picker(select).' },
+				{ name: 'placement / offset', type: 'PopoverPlacement / number', default: 'bottom-start / 4', description: 'Position of the list relative to the trigger and gap in pixels.' },
+				{ name: 'class / listClass', type: 'string', description: 'Classes of the root and of the floating box of the list.' },
+				{ name: 'ui', type: 'object of classes', description: 'Classes per part: base, trigger, value, placeholder, chevron, list, group, groupLabel, option, indicator and clear.' },
 			]"
 		/>
 		<p>
@@ -238,14 +246,11 @@
 		</p>
 		<h2 id="combobox">UICombobox</h2>
 		<p>
-			A list of its own on top of
-			<MeekoLink to="/popover">UIPopover</MeekoLink>, with more JavaScript: use it only if you need <code>searchable</code>, <code>filter</code>,
+			The same list on top of
+			<MeekoLink to="/popover">UIPopover</MeekoLink>, with a search field as its trigger: use it if you need <code>searchable</code>, <code>filter</code>,
 			<code>multiple</code>
 			or
-			<code>max</code>. The focus stays on the trigger while
-			<code>aria-activedescendant</code>
-			walks the list. The Topics field of the first example is a
-			<code>UICombobox</code>. With <code>multiple</code>, each option toggles, the list stays open and the model is an array;
+			<code>max</code>. The Topics field of the first example is a <code>UICombobox</code>. With <code>multiple</code>, each option toggles, the list stays open and the model is an array;
 			<code>max</code>
 			disables the rest at the limit.
 		</p>

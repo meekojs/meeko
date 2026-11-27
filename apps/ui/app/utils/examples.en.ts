@@ -220,6 +220,8 @@ export const englishExamples = {
       <strong>{member.name}</strong>
       <small>{state.disabled ? 'Unavailable' : member.role}</small>
     </snippet>
+    <snippet name="value" params="member">{member.name} · {member.team}</snippet>
+    <snippet name="group" params="team">{team.toUpperCase()}</snippet>
   </UISelect>
 </template>`,
 	popoverMenu: `<script lang="ts">

@@ -15,11 +15,12 @@ import type { UIVariantSlots } from './theme'
 export type SelectModel<T> = T | null
 
 /**
- * Estado de una opción de `<UISelect>`, el segundo parámetro del snippet `option`.
+ * Estado de una opción de `<UISelect>`, el segundo parámetro del snippet `option`. La opción elegida ya lleva
+ * su marca al final: `state.selected` sirve para cambiar su contenido.
  * @since 1.8.0
  * @example
  * ```html
- * <snippet name="option" params="user, state">{user.name} <span if:when="state.selected">✓</span></snippet>
+ * <snippet name="option" params="user, state">{user.name} <small if:when="state.disabled">No disponible</small></snippet>
  * ```
  */
 export interface SelectOptionState {
@@ -32,6 +33,7 @@ export interface SelectOptionState {
 /**
  * Snippets de `<UISelect>`, tipados con el tipo de sus opciones.
  * @since 1.8.0
+ * @since 2.0.0 `value` y `group` pintan lo mismo en todos los navegadores: la lista ya no es la del navegador.
  * @example
  * ```html
  * <UISelect model="user" bind:options="users.value" by="id">
@@ -43,9 +45,9 @@ export interface SelectOptionState {
 export interface SelectSnippets<T> {
 	/** Contenido de cada opción de la lista; sin él, su etiqueta. */
 	option?: [option: T, state: SelectOptionState]
-	/** Cómo se muestra el valor elegido en el disparador; sin él, su etiqueta. Firefox muestra siempre el texto de la opción. */
+	/** Cómo se muestra el valor elegido en el disparador; sin él, su etiqueta. */
 	value?: [option: T]
-	/** Encabezado de un grupo de `groupBy`; sin él, su nombre. Firefox muestra siempre el nombre. */
+	/** Encabezado de un grupo de `groupBy`; sin él, su nombre. */
 	group?: [name: string]
 }
 
@@ -118,24 +120,29 @@ export interface SelectBaseProps<T> {
 	readonly invalid?: boolean
 	/** Clases del elemento raíz. */
 	readonly class?: string
-	/** Clases de la lista. En `<UISelect>` van en el `<select>`: `.mi-clase::picker(select)`. */
+	/** Clases de la caja flotante de la lista, el contenido del `<UIPopover>`. */
 	readonly listClass?: string
 	/** Dónde se abre la lista; `"bottom-start"` por defecto. */
 	readonly placement?: PopoverPlacement
-	/** Separación en píxeles entre el disparador y la lista. */
+	/** Separación en píxeles entre el disparador y la lista; por defecto, 4 en `<UISelect>` y 0 en `<UICombobox>`. */
 	readonly offset?: number
 }
 
 /** The message of the type error for a prop of `<UICombobox>` on `<UISelect>`: a string nobody passes by chance. */
-type OnlyInCombobox<Prop extends string> = `UISelect es un <select> nativo y no admite ${Prop}: usa <UICombobox ${Prop}>`
+type OnlyInCombobox<Prop extends string> = `UISelect elige una sola opción, sin búsqueda, y no admite ${Prop}: usa <UICombobox ${Prop}>`
 
 /**
- * Props de la etiqueta propia `<UISelect>`, un `<select>` nativo con `appearance: base-select`: el
- * navegador trae su lista, su teclado y su valor de formulario. `T` es el tipo de cada opción y se infiere
- * de la etiqueta. Para buscar, filtrar en un servidor o elegir varias opciones, usa `<UICombobox>`: esas
- * props aquí son un error de tipos. `ui` añade clases a sus partes: `base` (la raíz), `trigger` (el
- * `<select>`), `value`, `groupLabel` y `clear`. Se autoimporta en `app/`.
+ * Props de la etiqueta propia `<UISelect>`, un botón que abre una lista propia (`role="listbox"`) sobre
+ * `<UIPopover>`, con el patrón de combobox de sólo selección: se ve y se maneja igual en todos los
+ * navegadores, y un `<input type="hidden">` envía su valor con el `<form>`. `T` es el tipo de cada opción y
+ * se infiere de la etiqueta. Para buscar, filtrar en un servidor o elegir varias opciones, usa
+ * `<UICombobox>`: esas props aquí son un error de tipos. `ui` añade clases a sus partes: `base` (la raíz),
+ * `trigger` (el botón), `value`, `placeholder`, `chevron` (la flecha), `list` (el `role="listbox"`), `group`,
+ * `groupLabel`, `option`, `indicator` (la marca de la opción elegida) y `clear`. Se autoimporta en `app/`.
  * @since 1.8.0
+ * @since 2.0.0 Deja de ser un `<select>` nativo: la lista es propia y sus opciones se crean al abrirla, `ui`
+ * gana los slots `placeholder`, `chevron`, `list`, `group`, `option` e `indicator`, `listClass` va en la caja
+ * flotante de la lista y un `reset` del formulario devuelve el valor con el que se montó.
  * @example
  * ```html
  * <UISelect model="color" bind:options="colors" placeholder="Elige un color" name="color" />

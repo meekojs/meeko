@@ -166,10 +166,9 @@ test('the active row looks the same in UISelect, UICombobox and UICommandPalette
 	const look = (row) =>
 		row.evaluate((element) => {
 			const style = globalThis.getComputedStyle(element)
-			const select = element.closest('select')
 			let holder = element.parentElement
 			while (holder && /^(?:transparent|rgba\(.*, 0\))$/.test(globalThis.getComputedStyle(holder).backgroundColor)) holder = holder.parentElement
-			return { background: style.backgroundColor, ring: style.boxShadow, around: (select ? globalThis.getComputedStyle(select, '::picker(select)') : globalThis.getComputedStyle(holder)).backgroundColor }
+			return { background: style.backgroundColor, ring: style.boxShadow, around: globalThis.getComputedStyle(holder).backgroundColor }
 		})
 	const setTheme = (page, theme) => page.evaluate((value) => globalThis.document.documentElement.setAttribute('data-theme', value), theme)
 	for (const theme of ['light', 'dark']) {
@@ -177,9 +176,8 @@ test('the active row looks the same in UISelect, UICombobox and UICommandPalette
 		await setTheme(page, theme)
 		await page.locator('#plan').focus()
 		await page.keyboard.press('Enter')
-		await page.waitForFunction(() => globalThis.document.getElementById('plan').matches(':open'))
 		await page.keyboard.press('ArrowDown')
-		const select = await look(page.locator('#plan option:focus'))
+		const select = await look(page.locator('[data-meeko-select-list] [role="option"][data-active]'))
 		await page.keyboard.press('Escape')
 
 		await page.getByRole('combobox', { name: 'Temas', exact: true }).click()
@@ -207,7 +205,7 @@ test('the active row looks the same in UISelect, UICombobox and UICommandPalette
 	}
 })
 
-test('UISelect documents keyboard and mouse choice, search, multiple with max and native form submission', { timeout: 120_000 }, async (context) => {
+test('UISelect documents keyboard and mouse choice, search, multiple with max, native form submission and its reset', { timeout: 120_000 }, async (context) => {
 	const { browser, origin, output } = await startDemo(context)
 	const { errors, page } = await open(browser, origin, '/select')
 	const sent = page.locator('#select-sent')
@@ -224,35 +222,56 @@ test('UISelect documents keyboard and mouse choice, search, multiple with max an
 	assert.equal(await plan.getAttribute('aria-describedby'), 'plan-error')
 	assert.equal(await page.evaluate(() => globalThis.document.activeElement?.id), 'plan')
 
-	// 2. A native select: the browser brings the keyboard, the list and the form value.
-	const chosen = (select) => select.evaluate((element) => element.selectedOptions[0]?.textContent?.trim())
-	const opened = (select) => select.evaluate((element) => element.matches(':open'))
-	assert.equal(await plan.evaluate((element) => element.localName), 'select')
-	assert.equal(await chosen(plan), 'Elige un plan', 'the placeholder, so the browser does not pick an option')
+	// 2. A list of its own: a button with the pattern of a combobox that only selects, and the keyboard of one.
+	const chosen = async (select) => (await select.innerText()).trim()
+	const planList = page.locator('#' + (await plan.getAttribute('aria-controls')))
+	/** The text of the option that `aria-activedescendant` names. */
+	const active = async (select) => (await page.locator('#' + (await select.getAttribute('aria-activedescendant'))).innerText()).trim()
+	assert.deepEqual(await plan.evaluate((element) => [element.localName, element.getAttribute('role'), element.getAttribute('aria-haspopup'), element.getAttribute('aria-expanded')]), ['button', 'combobox', 'listbox', 'false'])
+	assert.equal(await planList.getAttribute('role'), 'listbox')
+	assert.equal(await chosen(plan), 'Elige un plan', 'the placeholder')
 	await page.keyboard.press('Enter')
-	await page.waitForFunction(() => globalThis.document.getElementById('plan').matches(':open'))
+	await planList.getByRole('option', { name: 'Personal', exact: true }).waitFor()
+	assert.equal(await plan.getAttribute('aria-expanded'), 'true')
+	assert.equal(await active(plan), 'Personal', 'without a value, the list opens on its first option')
 	await page.keyboard.press('End')
-	assert.equal(await focusedText(page), 'Educación')
+	assert.equal(await active(plan), 'Educación')
+	await page.keyboard.press('e')
+	assert.equal(await active(plan), 'Equipo', 'typing jumps to the next option that starts with the letter')
+	await page.keyboard.press('ArrowUp')
+	assert.equal(await active(plan), 'Personal')
+	await page.keyboard.press('End')
 	await page.screenshot({ path: output + '/select-open.png' })
 	await page.keyboard.press('Enter')
-	await page.waitForFunction(() => !globalThis.document.getElementById('plan').matches(':open'))
+	await planList.waitFor({ state: 'hidden' })
 	assert.equal(await chosen(plan), 'Educación')
-	assert.equal(await plan.locator('selectedcontent').innerText(), 'Educación', 'the copy of the option is up to date')
+	assert.equal(await plan.getAttribute('aria-expanded'), 'false')
 	assert.equal(await plan.getAttribute('aria-invalid'), null, 'a value clears the error')
 	assert.equal(await page.getByRole('alert').count(), 0)
-	assert.equal(await page.evaluate(() => globalThis.document.activeElement?.id), 'plan')
-	// And with the mouse. The list matches the width of its trigger, below it.
+	assert.equal(await page.evaluate(() => globalThis.document.activeElement?.id), 'plan', 'the focus never left the trigger')
+	// And with the mouse. The list is at least as wide as its trigger, below it, aligned to its start.
 	await plan.click()
-	// The same role query as the applications' tests: the option of a native select is still an `option`.
-	const option = page.getByRole('option', { name: 'Empresa', exact: true })
+	const option = planList.getByRole('option', { name: 'Empresa', exact: true })
 	await option.waitFor()
-	await plan.evaluate(() => globalThis.document.getAnimations().find((animation) => animation.effect?.pseudoElement === '::picker(select)')?.finished)
+	assert.equal(await planList.getByRole('option', { name: 'Educación', exact: true }).getAttribute('aria-selected'), 'true')
+	assert.equal(await active(plan), 'Educación', 'with a value, the list opens on it')
+	await planList.evaluate((element) =>
+		Promise.all(
+			element
+				.closest('[data-meeko-popover]')
+				.getAnimations()
+				.map((animation) => animation.finished),
+		),
+	)
 	const trigger = await rect(plan)
-	const entry = await rect(option)
-	assert.ok(entry.top >= trigger.bottom - 1 && entry.width <= trigger.width, JSON.stringify({ trigger, entry }))
+	const list = await rect(planList, true)
+	// Below with the 4 px of its default offset, or above when it does not fit below.
+	assert.ok((Math.abs(list.top - trigger.bottom - 4) <= 1 || Math.abs(trigger.top - list.bottom - 4) <= 1) && Math.abs(list.left - trigger.left) <= 1 && list.width >= trigger.width, JSON.stringify({ trigger, list }))
 	await option.click()
+	await planList.waitFor({ state: 'hidden' })
 	assert.equal(await chosen(plan), 'Empresa')
-	assert.equal(await opened(plan), false)
+	assert.equal(await plan.getAttribute('aria-expanded'), 'false')
+	assert.equal(await page.evaluate(() => globalThis.document.activeElement?.id), 'plan', 'a choice gives the focus back to the trigger')
 
 	// 3. Search and multiple with max: typing filters without accents, Enter adds, max blocks the rest.
 	const topics = page.locator('#topics')
@@ -279,21 +298,31 @@ test('UISelect documents keyboard and mouse choice, search, multiple with max an
 	await sent.filter({ hasText: 'plan=' }).waitFor()
 	assert.equal(await sent.innerText(), 'Enviado en este ejemplo: plan=Empresa · topics=Diseño · topics=Accesibilidad')
 
-	// 5. Objects: groups, a disabled option and a typed option snippet.
+	// The reset of the form takes the select back to the value it was rendered with, and tells the model.
+	await page.locator('#select-form').evaluate((form) => form.reset())
+	await page.waitForFunction(() => globalThis.document.getElementById('plan').textContent.trim() === 'Elige un plan')
+	assert.equal(await page.locator('#select-form input[type="hidden"][name="plan"]').inputValue(), '')
+	await send.click()
+	assert.equal(await plan.getAttribute('aria-invalid'), 'true', 'and it is required again')
+	assert.equal(await sent.innerText(), 'Enviado en este ejemplo: plan=Empresa · topics=Diseño · topics=Accesibilidad', 'nothing new was sent')
+
+	// 5. Objects: groups, a disabled option and typed option and value snippets.
 	const owner = page.locator('#owner')
+	const ownerList = page.locator('#' + (await owner.getAttribute('aria-controls')))
 	await owner.click()
-	await page.locator('#owner option', { hasText: 'Sofía Ramos' }).waitFor()
-	assert.deepEqual(await owner.locator('[data-meeko-select-group-label]').allInnerTexts(), ['Diseño', 'Ingeniería'])
-	assert.equal(await owner.locator('option', { hasText: 'Mateo Gil' }).evaluate((option) => option.disabled), true)
-	await owner.locator('option', { hasText: 'Sofía Ramos' }).click()
+	await ownerList.getByRole('option', { name: /Sofía Ramos/ }).waitFor()
+	assert.deepEqual(await ownerList.locator('[data-meeko-select-group-label]').allInnerTexts(), ['Diseño', 'Ingeniería'])
+	assert.equal(await ownerList.getByRole('group', { name: 'Diseño', exact: true }).getByRole('option').count(), 2)
+	assert.equal(await ownerList.getByRole('option', { name: /Mateo Gil/ }).getAttribute('aria-disabled'), 'true')
+	await ownerList.getByRole('option', { name: /Sofía Ramos/ }).click()
 	await page.locator('#owner-status', { hasText: 'Sofía Ramos es responsable de ingeniería.' }).waitFor()
-	await owner.locator('[data-meeko-select-value]', { hasText: 'Sofía Ramos' }).waitFor()
+	await owner.locator('[data-meeko-select-value]', { hasText: 'Sofía Ramos · Ingeniería' }).waitFor()
 	// 6. Clearable: the button appears with a value, is named for assistive technology and empties the select.
 	const clear = page.getByRole('button', { name: 'Quitar selección', exact: true })
 	assert.equal(await clear.count(), 1)
 	await clear.click()
 	await page.locator('#owner-status', { hasText: 'Sin responsable asignado.' }).waitFor()
-	await page.waitForFunction(() => /Asigna una persona/.test(globalThis.document.querySelector('#owner selectedcontent')?.textContent ?? ''))
+	await owner.locator('[data-meeko-select-placeholder]', { hasText: 'Asigna una persona' }).waitFor()
 	assert.equal(await clear.count(), 0, 'nothing left to clear')
 	assert.equal(await page.evaluate(() => globalThis.document.activeElement?.id), 'owner', 'the focus goes back to the trigger')
 
@@ -302,7 +331,7 @@ test('UISelect documents keyboard and mouse choice, search, multiple with max an
 	assert.deepEqual(errors, [])
 })
 
-test('a closed UICombobox sends no options in its HTML and builds them when it opens with the keyboard', { timeout: 120_000 }, async (context) => {
+test('a closed UISelect or UICombobox sends no options in its HTML and builds them when it opens with the keyboard', { timeout: 120_000 }, async (context) => {
 	const { browser, origin } = await startDemo(context)
 	// The SSR of a closed list: the listbox that aria-controls names, empty. A page with long lists sent and
 	// hydrated every option of every closed one (hundreds of KB of `role="option"` rows).
@@ -311,7 +340,14 @@ test('a closed UICombobox sends no options in its HTML and builds them when it o
 	assert.ok(controls, 'the trigger names its listbox')
 	// Only the hydration markers of the `if` that holds the options.
 	assert.match(html, new RegExp(`<div[^>]*\\bid="${controls}"[^>]*>(?:\\s|<!--[^>]*-->)*</div>`), 'the listbox is there, without options')
-	assert.equal((html.match(/role="option"/g) ?? []).length, 0, 'no option of a closed combobox in the HTML')
+	assert.equal((html.match(/role="option"/g) ?? []).length, 0, 'no option of a closed select or combobox in the HTML')
+	// The same for <UISelect>, whose trigger is a button that opens its popover without a script.
+	const planTrigger = /<button[^>]*\bid="plan"[^>]*>/.exec(html)?.[0]
+	const planControls = planTrigger?.match(/aria-controls="([^"]+)"/)?.[1]
+	assert.ok(planControls, 'the trigger of the select names its listbox')
+	assert.match(html, new RegExp(`<div[^>]*\\bid="${planControls}"[^>]*>(?:\\s|<!--[^>]*-->)*</div>`), 'the listbox of the select is there, without options')
+	assert.match(html, new RegExp(`<span[^>]*\\bid="${planTrigger.match(/popovertarget="([^"]+)"/)?.[1]}"[^>]*\\bpopover="auto"`), 'popovertarget names the popover of the list')
+	assert.doesNotMatch(html, /<select\b|<option\b|selectedcontent/, 'no native select in the page')
 
 	const { errors, page } = await open(browser, origin, '/select')
 	const topics = page.locator('#topics')
@@ -338,7 +374,30 @@ test('a closed UICombobox sends no options in its HTML and builds them when it o
 	assert.deepEqual(await page.locator('#select-form [data-meeko-select] > [data-meeko-select-values] [data-meeko-select-value]').allInnerTexts(), [label])
 	assert.equal(await page.locator('#select-form input[type="hidden"][name="topics"]').count(), 1)
 	assert.ok((await list.locator('[role="option"]').count()) > 1)
+	// <UISelect>: none until it opens, and they stay after it closes.
+	const plan = page.locator('#plan')
+	const planList = page.locator('#' + planControls)
+	assert.equal(await planList.locator('[role="option"]').count(), 0)
+	await plan.focus()
+	await page.keyboard.press('ArrowDown')
+	await planList.locator('[role="option"]').first().waitFor()
+	assert.equal(await page.locator('#' + (await plan.getAttribute('aria-activedescendant'))).getAttribute('role'), 'option')
+	await page.keyboard.press('Escape')
+	await planList.waitFor({ state: 'hidden' })
+	assert.equal(await planList.locator('[role="option"]').count(), 4)
 	assert.deepEqual(errors, [])
+
+	// Without JavaScript the trigger still opens its popover, which paints nothing while it has no options,
+	// and the form sends the value of the server.
+	const ssr = await browser.newPage({ javaScriptEnabled: false })
+	await ssr.goto(origin + '/select')
+	const popover = ssr.locator('#' + (await ssr.locator('#plan').getAttribute('popovertarget')))
+	assert.equal(await popover.evaluate((element) => element.matches(':popover-open')), false)
+	await ssr.locator('#plan').click()
+	assert.equal(await popover.evaluate((element) => element.matches(':popover-open')), true, 'the declarative popover opens')
+	assert.equal(await popover.evaluate((element) => globalThis.getComputedStyle(element).display), 'none', 'an empty list paints no box')
+	assert.equal(await ssr.locator('#select-form').evaluate((form) => new globalThis.FormData(form).get('plan')), '')
+	await ssr.close()
 })
 
 test('UIThemeToggle cycles with the keyboard, moves a radio group with the arrows and works without JavaScript', { timeout: 120_000 }, async (context) => {

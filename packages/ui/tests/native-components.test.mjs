@@ -8,7 +8,6 @@ import { fileURLToPath } from 'node:url'
 import { checkSource } from '../../meeko/dist/check.js'
 import { commandKeyTarget, commandRows, commandShortcut } from '../dist/app/utils/command-palette.js'
 import { builtinMessages, commandPaletteStatusText } from '../dist/app/utils/messages.js'
-import { createSelect } from '../dist/app/utils/select.js'
 import { createTabs, selectedTab, tabsKeyTarget } from '../dist/app/utils/tabs.js'
 import { withViewTransition } from '../dist/app/utils/view-transition.js'
 
@@ -218,61 +217,6 @@ test('command palette: each status has its notice, and the query is inserted lit
 	assert.equal(commandPaletteStatusText(builtinMessages.es.commandPalette, 'empty', '$& <b>'), 'Sin resultados para «$& <b>».')
 })
 
-test('select: a hidden first option stands for no choice and for a value outside the options, only then', () => {
-	createRoot((dispose) => {
-		const model = signal(null)
-		const options = signal([
-			{ id: 1, name: 'Ana' },
-			{ id: 2, name: 'Bea' },
-		])
-		const select = createSelect(
-			{
-				get options() {
-					return options.value
-				},
-				by: 'id',
-				placeholder: 'Elige',
-			},
-			model,
-			'id',
-			() => {},
-		)
-		assert.deepEqual([select.nativeIndex.value, select.blankValue.value, select.blankLabel.value], [0, '', 'Elige'])
-		model.value = { id: 2, name: 'Bea' }
-		assert.equal(select.nativeIndex.value, 2, 'by finds the option')
-		// The options change: the model keeps the value, and the form still sends it.
-		options.value = [{ id: 1, name: 'Ana' }]
-		assert.deepEqual([select.nativeIndex.value, select.blankValue.value, select.blankLabel.value], [0, '2', 'Bea'])
-		assert.deepEqual(model.value, { id: 2, name: 'Bea' })
-		dispose()
-	})
-})
-
-test('select: a native change chooses by position, which also works for objects and groups', () => {
-	createRoot((dispose) => {
-		const model = signal(null)
-		const emitted = []
-		const options = [
-			{ id: 1, name: 'Ana', team: 'B' },
-			{ id: 2, name: 'Bea', team: 'A' },
-			{ id: 3, name: 'Carla', team: 'B' },
-		]
-		const select = createSelect({ options, by: 'id', groupBy: 'team' }, model, 'id', (value) => emitted.push(value))
-		// In the DOM, the groups in the order of their first option: Ana, Carla, Bea, after the hidden one.
-		select.change({ currentTarget: { selectedIndex: 2 } })
-		assert.equal(model.value, options[2])
-		assert.equal(select.nativeIndex.value, 2)
-		// With a value chosen, the hidden option is gone and the positions move.
-		select.change({ currentTarget: { selectedIndex: 2 } })
-		assert.equal(model.value, options[1])
-		assert.deepEqual(emitted, [options[2], options[1]])
-		model.value = null
-		select.change({ currentTarget: { selectedIndex: 0 } })
-		assert.equal(model.value, null, 'the hidden option is never a choice')
-		dispose()
-	})
-})
-
 test('the new components type their props and snippets in a template', async (context) => {
 	const parent = fileURLToPath(new URL('../.meeko/', import.meta.url))
 	await mkdir(parent, { recursive: true })
@@ -301,7 +245,7 @@ const many = signal<string[]>([]);
 		[source.replace('status="ready"', 'status="done"'), /done/],
 		[source.replace('page.title.toUpperCase()', 'page.missing'), /missing/],
 		[source.replace('hrefBy="url"', 'hrefBy="missing"'), /missing/],
-		// A prop of the combobox on the native select says what to use instead.
+		// A prop of the combobox on the select says what to use instead; its own controller is in select.test.mjs.
 		[source.replace('clearable>', 'clearable searchable>'), /usa <UICombobox searchable>/],
 		[source.replace('clearable>', 'clearable multiple>'), /usa <UICombobox multiple>/],
 		[source.replace('clearable>', 'clearable bind:max="2">'), /usa <UICombobox max>/],

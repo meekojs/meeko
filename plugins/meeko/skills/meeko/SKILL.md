@@ -132,4 +132,4 @@ In a Framework app `signal`, `computed`, etc. are auto-imported; in engine-only 
 | `withDefaults(defineProps…)`                            | `defineProps<P>({ size: 'md' })` or destructuring defaults                                                          |
 | `@submit.prevent`                                       | `on:submit="(e) => { e.preventDefault(); … }"`                                                                      |
 | `useRouter().push()`                                    | `<MeekoLink>` / `<a href>` / `location.assign()`                                                                    |
-| `<MeekoSelect>`, `<MeekoPopover>`, `<MeekoThemeToggle>` | `@meekojs/ui` `UICombobox` (same contract; `UISelect` is a native select), `UIPopover`, `UIThemeToggle` (`MEEK121`) |
+| `<MeekoSelect>`, `<MeekoPopover>`, `<MeekoThemeToggle>` | `@meekojs/ui` `UICombobox` (same contract; `UISelect` is one-choice only), `UIPopover`, `UIThemeToggle` (`MEEK121`) |

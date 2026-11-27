@@ -167,7 +167,8 @@ test('the English UI documentation has an English interface, hreflang, a switche
 	assert.equal(await page.locator('[data-meeko-popover]:popover-open [data-meeko-select-empty]').innerText(), 'No results')
 	await page.keyboard.press('Escape')
 	await page.locator('#owner').click()
-	await page.locator('#owner option:not(:disabled, [hidden])').first().click()
+	// The list of a <UISelect> is its own: its options are elements of the page, created when it opens.
+	await page.locator('[data-meeko-popover]:popover-open [role="option"]:not([aria-disabled="true"])').first().click()
 	assert.equal(await page.getByRole('button', { name: 'Clear selection', exact: true }).count(), 1)
 	await page.goto(origin + '/en/modals', { waitUntil: 'networkidle' })
 	// The close button of a <UIModal>, in its heading: the dialog of the command palette has no title.
