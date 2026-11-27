@@ -53,6 +53,9 @@ export class ExecutionZoneDecorations implements vscode.Disposable {
 			vscode.workspace.onDidChangeTextDocument(({ document }) => this.schedule(document)),
 			vscode.workspace.onDidSaveTextDocument((document) => this.schedule(document)),
 			vscode.workspace.onDidCloseTextDocument((document) => this.forget(document.uri.toString())),
+			// Changing the language mode of a visible editor closes and opens the document: the close
+			// drops its state, so the open paints it again, or clears it when it is no longer Meeko.
+			vscode.workspace.onDidOpenTextDocument((document) => (document.languageId === 'meeko' ? this.schedule(document) : this.clear(document))),
 			vscode.workspace.onDidChangeConfiguration((event) => {
 				if (event.affectsConfiguration(executionZonesSetting)) this.refreshVisible()
 			}),
@@ -82,6 +85,15 @@ export class ExecutionZoneDecorations implements vscode.Disposable {
 				if (vscode.window.visibleTextEditors.some((editor) => editor.document.uri.toString() === key)) void this.refresh(document)
 			}, this.delay),
 		)
+	}
+
+	/** Removes the decorations of the visible editors of a document that is not `.meeko` (anymore). */
+	private clear(document: vscode.TextDocument): void {
+		const key = document.uri.toString()
+		for (const editor of vscode.window.visibleTextEditors) {
+			if (editor.document.uri.toString() !== key) continue
+			for (const kind of executionZoneKinds) editor.setDecorations(this.types[kind], [])
+		}
 	}
 
 	/** Drops the state of a closed document; a request in flight for it is discarded when it answers. */

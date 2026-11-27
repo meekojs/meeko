@@ -9,6 +9,7 @@ import type { ResolvedLanguageServer } from './server-resolution'
 import type { ServerState } from './status'
 
 import { classProvidersMethod, classSettingsForServer, legacyTailwindExtension, requestClassProviders } from './class-providers'
+import { LooseDiagnostics, routeDiagnostics } from './diagnostic-owner'
 import { freeSlot, globalKey, planClients, reconcileClients } from './folder-plan'
 import { t } from './l10n'
 import { resolveLanguageServer } from './server-resolution'
@@ -180,6 +181,8 @@ function openComponents(key: string): string[] {
  */
 export class LanguageServers {
 	private readonly entries = new Map<string, ClientEntry>()
+	/** Archivos sin carpeta cuyos diagnósticos publicó un servidor de carpeta antes de que existiera el global. */
+	private readonly looseDiagnostics = new LooseDiagnostics()
 	private pending: Promise<void> = Promise.resolve()
 	private disposed = false
 
@@ -293,6 +296,7 @@ export class LanguageServers {
 			disposables: [],
 		}
 		this.entries.set(entry.key, entry)
+		if (entry.key === globalKey) this.dropLooseDiagnostics()
 		let failure: string
 		try {
 			await this.launch(entry, target)
@@ -319,6 +323,20 @@ export class LanguageServers {
 		entry.state = 'failed'
 		entry.error = failure
 		this.notify('error', t('The Meeko language server failed to start in "{0}": {1}', entry.name, failure))
+	}
+
+	/** Whether the global client exists and has not failed, so it attends the files outside the folders. */
+	private globalActive(): boolean {
+		const global = this.entries.get(globalKey)
+		return global !== undefined && global.state !== 'failed'
+	}
+
+	/** The global client takes over the loose files: the folder clients stop showing theirs. */
+	private dropLooseDiagnostics(): void {
+		for (const [key, uris] of this.looseDiagnostics.takeAll()) {
+			const diagnostics = this.entries.get(key)?.client?.diagnostics
+			for (const uri of uris) diagnostics?.delete(vscode.Uri.parse(uri))
+		}
 	}
 
 	private notify(kind: 'warning' | 'error', message: string): void {
@@ -379,10 +397,18 @@ export class LanguageServers {
 		return {
 			...ownedDocuments(owns),
 			// A server also reports files it did not open; those of another folder have their own server.
+			// A file outside every folder is attended only by the global client once it exists.
 			handleDiagnostics: (uri, diagnostics, next) => {
-				const owner = ownerOf(uri)
-				if (owner === entry.key || owner === globalKey) next(uri, diagnostics)
+				const route = routeDiagnostics({ client: entry.key, owner: ownerOf(uri), globalActive: this.globalActive() })
+				if (route === 'drop') return
+				if (route === 'publish-loose') this.looseDiagnostics.record(entry.key, uri.toString())
+				next(uri, diagnostics)
 			},
+			// `workspace/didChangeWatchedFiles` is not filtered by owner: the client sends every event of
+			// its watchers to its server and the middleware cannot intercept them. Each server keeps only
+			// the paths under the roots of its projects (`MeekoProject.filesChanged`), and it needs the
+			// files of other folders too: an outer folder resolves imports into a nested one and the
+			// other way round, so dropping them would leave stale programs.
 			workspace: {
 				configuration: async (params, token, next) => {
 					const values = await next(params, token)
@@ -447,6 +473,7 @@ export class LanguageServers {
 		if (!entry) return
 		entry.stopping = true
 		this.entries.delete(key)
+		this.looseDiagnostics.forget(key)
 		await this.release(entry)
 	}
 
