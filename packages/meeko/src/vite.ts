@@ -9,7 +9,7 @@ import { normalizePath, resolveConfig, transformWithOxc } from 'vite'
 import type { ProjectAliases } from './framework/aliases'
 
 import { generateComponentRegistry } from './autoimports/components'
-import { autoImportDirectories, discoverAutoImports, discoverComponents } from './autoimports/registry'
+import { type AutoImport, autoImportDirectories, discoverAutoImports, discoverComponents } from './autoimports/registry'
 import { autoImportedValues, checkComponentBoundary, transformAutoImports } from './autoimports/transform'
 import { transformTypeScriptAutoImports, typeScriptAutoImportMap } from './autoimports/typescript'
 import { compile } from './compiler'
@@ -149,6 +149,21 @@ export function meeko(): Plugin {
 		(aliasState ??= resolveProjectAliases(root, undefined, { viteAlias })
 			// A configuration that fails is reported where it is loaded; resolution keeps the static reading.
 			.catch(() => resolveProjectAliasesSync(root)))
+	// The autoimport registry reads and parses every file of the autoimport folders. One discovery
+	// serves every transform until a watched file is added, removed or edited; without it, each
+	// transformed module repeated the whole discovery (most of a cold page load in `meeko dev`).
+	let autoImportState: Promise<AutoImport[]> | undefined
+	const autoImportRegistry = (): Promise<AutoImport[]> => {
+		const state = (autoImportState ??= discoverAutoImports(root))
+		// A failed discovery is not kept: the next transform reads again, as it did before.
+		state.catch(() => {
+			if (autoImportState === state) autoImportState = undefined
+		})
+		return state
+	}
+	const resetAutoImportRegistry = (): void => {
+		autoImportState = undefined
+	}
 	// The CSS of each compiled component by hash, and the hashes of each file, newest last. Only the
 	// last two of a file are kept: the browser and SSR transforms of one edit may finish in either
 	// order, and older stylesheets would otherwise pile up for as long as `meeko dev` runs.
@@ -177,7 +192,8 @@ export function meeko(): Plugin {
 			registeredComponentFiles = new Set((await discoverComponents(root)).map(({ file }) => normalizePath(resolve(file))))
 			return registry
 		})
-		registryUpdate = update.catch(() => undefined)
+		// The generated component loader is part of the registry.
+		registryUpdate = update.then(resetAutoImportRegistry, resetAutoImportRegistry)
 		return update
 	}
 	const componentWatchDirectories = async (): Promise<string[]> => {
@@ -338,6 +354,13 @@ export function meeko(): Plugin {
 			this.warn(`[meeko] ${id.replace(/\?.*$/, '')}: la hoja de estilos ${style.slice(0, 8)} ya no existe (una pestaña anterior al reinicio de meeko dev o a una edición) y se sirve vacía; recarga la página.`)
 			return '/* meeko: stylesheet from an earlier version of this component */\n'
 		},
+		// A new build, or a file changed under `vite build --watch`: the next transform reads again.
+		buildStart() {
+			resetAutoImportRegistry()
+		},
+		watchChange() {
+			resetAutoImportRegistry()
+		},
 		async transform(source, id, options) {
 			const serverTransform = Boolean(options?.ssr || ssrBuild)
 			const normalizedId = normalizePath(resolve(id))
@@ -383,7 +406,7 @@ export function meeko(): Plugin {
 				if (/\.[cm]?[jt]sx?$/.test(id) && clientModule) await checkBoundary(source)
 				const routeBlock = routeBlockFile(id) !== undefined
 				if (/\.[cm]?tsx?$/.test(id) && normalizedId.startsWith(`${normalizedRoot}/`)) {
-					const registry = await discoverAutoImports(root)
+					const registry = await autoImportRegistry()
 					// Only `render: "client"` sidecars reach the browser graph; they get browser autoimports.
 					const clientSidecar = clientModule && (routeBlock || (/\.route\.[cm]?tsx?$/.test(id) && /\/app\/pages\//.test(normalizedId)))
 					let transformed: string | undefined
@@ -421,7 +444,7 @@ export function meeko(): Plugin {
 				sources.map((entry) => entry.root),
 			)
 			const scopeAttribute = config?.css?.scopeAttribute
-			const registry = await discoverAutoImports(root)
+			const registry = await autoImportRegistry()
 			// `<MeekoThemeToggle>` exists only with `theme` (MEEK111).
 			const theme = config ? config.theme !== undefined && config.theme !== false : undefined
 			const styleHashOf = (css: string): string => createHash('sha256').update(filename).update('\0').update(css).digest('hex')
@@ -492,6 +515,8 @@ export function meeko(): Plugin {
 			},
 		},
 		async configureServer(server) {
+			// Registered before any other listener: a transform after the event reads the registry again.
+			server.watcher.on('all', resetAutoImportRegistry)
 			const directories = await componentWatchDirectories()
 			activeComponentDirectories = directories
 			// The folders of the modules' files, except the project's own: a module file at its root.
@@ -560,6 +585,7 @@ export function meeko(): Plugin {
 			await refreshComponentRegistry()
 		},
 		async handleHotUpdate({ file, server }) {
+			resetAutoImportRegistry()
 			const normalized = normalizePath(file)
 			const configFile = normalized.startsWith(`${normalizePath(root)}/meeko.config.`)
 			if (configFile) {
