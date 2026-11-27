@@ -46,6 +46,23 @@ test('syncs, checks and prunes only generated agents', async () => {
 	}
 })
 
+test('a repository without Codex agents is in sync and prunes the generated ones', async () => {
+	const root = await mkdtemp(join(tmpdir(), 'meeko-sync-agents-'))
+	try {
+		assert.deepEqual(await syncAgents({ check: true, root }), [])
+		await mkdir(join(root, '.claude/agents'), { recursive: true })
+		await writeFile(join(root, '.claude/agents/manual.md'), '---\nname: manual\n---\n')
+		await writeFile(join(root, '.claude/agents/old.md'), '---\n# Generado por scripts/sync-agents.mjs desde .codex/agents/old.toml\n---\n')
+
+		assert.deepEqual(await syncAgents({ check: true, root }), [join('.claude/agents', 'old.md')])
+		await syncAgents({ root })
+		assert.deepEqual(await syncAgents({ check: true, root }), [])
+		assert.equal(await readFile(join(root, '.claude/agents/manual.md'), 'utf8'), '---\nname: manual\n---\n')
+	} finally {
+		await rm(root, { force: true, recursive: true })
+	}
+})
+
 test('repository Claude agents match the Codex definitions', async () => {
 	assert.deepEqual(await syncAgents({ check: true }), [])
 })
