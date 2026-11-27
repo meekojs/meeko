@@ -323,3 +323,29 @@ test('Vite reloads routes and autoimports in a configured source directory', asy
 		await rm(root, { recursive: true, force: true })
 	}
 })
+
+test('Vite discovers the autoimports once per change, not once per transformed module', async () => {
+	const project = await createTempProject('vite-autoimport-cache-')
+	const { root } = project
+	await linkRepositoryPackages(root)
+	await mkdir(join(root, 'app', 'composables'), { recursive: true })
+	await mkdir(join(root, 'app', 'lib'), { recursive: true })
+	await writeFile(join(root, 'app', 'composables', 'useFirst.ts'), 'export function useFirst(): number {\n\treturn 1\n}\n')
+	await writeFile(join(root, 'app', 'lib', 'first.ts'), 'export const first = useFirst()\n')
+	await writeFile(join(root, 'app', 'lib', 'second.ts'), 'export const second = useSecond()\n')
+	const server = await createServer({ root, configFile: false, logLevel: 'silent', plugins: [meeko()], server: { middlewareMode: true, hmr: false, watch: null } })
+	try {
+		assert.match((await server.transformRequest(join(root, 'app', 'lib', 'first.ts')))?.code ?? '', /import \{[^}]*useFirst[^}]*\}/)
+		// A file written behind the watcher's back is not read: the registry of the first transform is reused.
+		const added = join(root, 'app', 'composables', 'useSecond.ts')
+		await writeFile(added, 'export function useSecond(): number {\n\treturn 2\n}\n')
+		assert.doesNotMatch((await server.transformRequest(join(root, 'app', 'lib', 'second.ts')))?.code ?? '', /import \{[^}]*useSecond[^}]*\}/)
+		// The change is reported: the next transform discovers the autoimports again.
+		await server.pluginContainer.watchChange(added, { event: 'create' })
+		server.moduleGraph.invalidateAll()
+		assert.match((await server.transformRequest(join(root, 'app', 'lib', 'second.ts')))?.code ?? '', /import \{[^}]*useSecond[^}]*\}/)
+	} finally {
+		await server.close()
+		await project.remove()
+	}
+})
