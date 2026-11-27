@@ -2,7 +2,7 @@
 
 ## Estilos del componente: `<style>` y `<style scoped>`
 
-Un `.meeko` admite un bloque de estilos, con o sin `scoped`. Los dos pasan por el mismo PostCSS que `app/styles/main.css` (`postcss.config.*`, Tailwind, `@utilities`) y Vite los empaqueta junto al componente: el SSR enlaza el CSS de los componentes de la página y la navegación cliente carga el de cada ruta al entrar en ella.
+Un `.meeko` admite un bloque de estilos, con o sin `scoped`. Los dos pasan por el mismo PostCSS que `app/styles/main.css` (`postcss.config.*` y los plugins de Vite que el proyecto registre, como Tailwind) y Vite los empaqueta junto al componente: el SSR enlaza el CSS de los componentes de la página y la navegación cliente carga el de cada ruta al entrar en ella.
 
 |                                   | `<style scoped>`                                                                               | `<style>`                                                           |
 | --------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |

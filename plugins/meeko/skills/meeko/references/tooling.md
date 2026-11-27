@@ -169,8 +169,9 @@ export default defineMeekoConfig({
 
 `pnpm add @meekojs/ui`; enable `modules: ['@meekojs/ui']` (`theme: true` only for theme
 switching). The module auto-registers components with the **`UI` prefix** (no imports),
-adds its stylesheet via Vite/PostCSS before `app/styles/main.css` (app CSS wins), a
-global base in layer `ui-base` (`ui: { base: false }` to omit) and the Inter font.
+adds its stylesheet via Vite/PostCSS before `app/styles/main.css` (app CSS wins), registers
+`@tailwindcss/vite` (the app imports `tailwindcss/theme.css`, `tailwindcss/utilities.css` and
+`@meekojs/ui` in `app/styles/main.css`), a global base in layer `ui-base` (`ui: { base: false }` to omit) and the Inter font.
 
 - Components: structure `UIContainer`, `UIPage`, `UIPageHeader`, `UIHeader`, `UIFooter`;
   actions `UIButton`, `UILink`, `UILinkCard`, `UIBadge`, `UIThemeToggle`; forms `UIField`,
@@ -253,7 +254,9 @@ Run: `pnpm exec eslint .`.
 `pnpm add -D prettier @meekojs/prettier-plugin`;
 `prettier.config.mjs`: `export default { plugins: ['@meekojs/prettier-plugin'] }`.
 Formats script, `<script server>`, template and style. Options: `meekoIndentSections`
-(default `false`), `meekoPreserveArrayBreaks` (default `true`), `meekoSortClasses`,
+(default `false`), `meekoPreserveArrayBreaks` (default `true`), `meekoSortClasses`
+(`off`, `stylesheet` or `alphabetical`; `stylesheet` follows `app/styles/main.css` processed
+with the project's `postcss.config`, without Vite plugins; the `tailwind` mode was removed),
 `meekoClassFunctions` (`tv`, `clsx`, `cn`…). Formatting never changes rendered whitespace.
 The editor's formatter uses the same rules and respects `.prettierignore`/`.gitignore`.
 `@meekojs/meeko/prettier` is the legacy 1.x entry (kept for compatibility).

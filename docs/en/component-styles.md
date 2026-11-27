@@ -1,12 +1,12 @@
 ---
-source-hash: 77be5e57789fb8c8a454ed256c946d2a1e1f4a55cfaa317a6cec7b781a8c0ebe
+source-hash: 297935cc838f69d38e1a9b9c6817e2cdab548a8e65d856c76017a5c4c5d4a426
 ---
 
 # Component styles
 
 ## Component styles: `<style>` and `<style scoped>`
 
-A `.meeko` allows one style block, with or without `scoped`. Both pass through the same PostCSS as `app/styles/main.css` (`postcss.config.*`, Tailwind, `@utilities`) and Vite bundles them with the component: SSR links the CSS of the page's components and client navigation loads each route's CSS on entry.
+A `.meeko` allows one style block, with or without `scoped`. Both pass through the same PostCSS as `app/styles/main.css` (`postcss.config.*` and the Vite plugins the project registers, such as Tailwind) and Vite bundles them with the component: SSR links the CSS of the page's components and client navigation loads each route's CSS on entry.
 
 |                                   | `<style scoped>`                                                                        | `<style>`                                                      |
 | --------------------------------- | --------------------------------------------------------------------------------------- | -------------------------------------------------------------- |

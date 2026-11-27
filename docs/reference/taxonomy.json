@@ -1237,12 +1237,6 @@
 					]
 				},
 				{
-					"name": "meekoUtilities",
-					"symbols": [
-						"@meekojs/meeko/postcss#meekoUtilities"
-					]
-				},
-				{
 					"name": "mountDevtoolsPanel",
 					"symbols": [
 						"@meekojs/meeko/devtools-ui#mountDevtoolsPanel"
