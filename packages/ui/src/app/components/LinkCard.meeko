@@ -4,10 +4,10 @@
 
 	import type { UILinkCardProps } from '../types/button'
 
+	import { linkCardTheme } from '../theme/components/card'
 	import { uiTheme } from '../utils/defaults'
-	import { linkCard } from '../variants/card'
 
-	const { to, params, search, resolve, href, target, rel, title, description, ui: ownUi, class: ownClass, ...rest } = defineProps<UILinkCardProps>()
+	const { to, params, search, resolve, href, target, rel, title, description, variant, color, radius, elevation, ui: ownUi, class: ownClass, ...rest } = defineProps<UILinkCardProps>()
 
 	const theme = uiTheme('linkCard', () => ({ class: ownClass, ui: ownUi }))
 
@@ -15,7 +15,13 @@
 
 	const snippets = defineSnippets<{ default?: [] }>()
 
-	const classes = linkCard()
+	const classes = linkCardTheme()
+	const variants = () => ({
+		variant: variant ?? theme.defaults?.variant,
+		color: color ?? theme.defaults?.color,
+		radius: radius ?? theme.defaults?.radius,
+		elevation: elevation ?? theme.defaults?.elevation,
+	})
 	const linkRel = computed(() => rel ?? (target === '_blank' ? 'noopener noreferrer' : undefined))
 </script>
 
@@ -29,14 +35,14 @@
 		bind:href="href"
 		bind:target="target"
 		bind:rel="linkRel.value"
-		bind:class="classes.base({ class: [theme.ui.base, theme.class] })"
+		bind:class="classes.base({ ...variants(), class: [theme.ui.base, theme.class] })"
 		bind="rest"
 		on:click="(event) => emit('click', event)"
 	>
-		<strong bind:class="classes.title({ class: theme.ui.title })">{title}</strong>
+		<strong bind:class="classes.title({ ...variants(), class: theme.ui.title })">{title}</strong>
 		<span
 			if:when="description"
-			bind:class="classes.description({ class: theme.ui.description })"
+			bind:class="classes.description({ ...variants(), class: theme.ui.description })"
 		>
 			{description}
 		</span>

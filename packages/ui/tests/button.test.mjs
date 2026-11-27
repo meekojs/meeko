@@ -49,10 +49,10 @@ const valid = `<script lang="ts">
 	const clicks = signal(0)
 </script>
 <template>
-	<UIButton to="/about" variant="outline" on:click="(event) => clicks.value += event.button">About</UIButton>
+	<UIButton to="/about" variant="outline" color="neutral" on:click="(event) => clicks.value += event.button">About</UIButton>
 	<UIButton to="/users/[id]" bind:params="{ id: user.id }" bind:search="{ tab: 'activity' }" aria-label="Profile" data-testid="profile">Profile</UIButton>
 	<UIButton href="https://example.com" target="_blank" id="docs" title="Docs">Docs</UIButton>
-	<UIButton href="/report.pdf" download="report.pdf" size="sm" shape="pill">Download</UIButton>
+	<UIButton href="/report.pdf" download="report.pdf" size="sm" radius="full" color="neutral" variant="soft">Download</UIButton>
 	<UIButton type="submit" bind:disabled="saving.value" bind:aria-busy="saving.value">Save</UIButton>
 	<UIButton class="wide" tabindex="0" on:click="() => clicks.value++">Count</UIButton>
 	<UILink href="/about" ariaLabel="About">About</UILink>

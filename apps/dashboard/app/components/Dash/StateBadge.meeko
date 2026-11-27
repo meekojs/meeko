@@ -12,7 +12,7 @@
 	<span class="dash-badges">
 		<UIBadge
 			if:when="props.removed"
-			tone="danger"
+			color="danger"
 		>
 			{t('badge.removed')}
 		</UIBadge>
@@ -20,7 +20,7 @@
 			if:when="props.state"
 			bind:title="props.state ? t(`labels.stateHelp.${props.state}`) : undefined"
 		>
-			<UIBadge bind:tone="props.state ? stateTones[props.state] : 'neutral'">{props.state ? t(`labels.state.${props.state}`) : ''}</UIBadge>
+			<UIBadge bind:color="props.state ? stateTones[props.state] : 'neutral'">{props.state ? t(`labels.state.${props.state}`) : ''}</UIBadge>
 		</span>
 		<span
 			if:when="!props.state && !props.removed"
@@ -33,7 +33,7 @@
 			if:when="props.importStale"
 			bind:title="t('badge.importStaleHelp')"
 		>
-			<UIBadge tone="accent">{t('badge.importStale')}</UIBadge>
+			<UIBadge color="primary">{t('badge.importStale')}</UIBadge>
 		</span>
 	</span>
 </template>

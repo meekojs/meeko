@@ -70,3 +70,68 @@ test('UIInput number, time and month keep the text of the control in the model, 
 	assert.deepEqual(errors, [])
 	await tab.close()
 })
+
+const sizes = `<template>
+<main id="contenido">
+<div id="sizes">
+<UIInput aria-label="Campo xs" size="xs" /><UIButton id="button-xs" size="xs">Botón</UIButton>
+<UIInput aria-label="Campo sm" size="sm" /><UIButton id="button-sm" size="sm">Botón</UIButton>
+<UIInput aria-label="Campo md" /><UIButton id="button-md">Botón</UIButton>
+<UIInput aria-label="Clave sm" type="password" reveal size="sm" />
+</div>
+</main>
+</template>`
+
+test('UIInput of each size is as tall as its control height token and as a UIButton of the same size', { timeout: 180_000 }, async (context) => {
+	const { origin } = await startForms(context, { port: 4734, page: sizes })
+	const browser = await chromium.launch({ ...(process.env.MEEKO_CHROME_PATH ? { executablePath: process.env.MEEKO_CHROME_PATH } : { channel: 'chrome' }), headless: true })
+	context.after(() => browser.close())
+	const tab = await browser.newPage()
+	await tab.goto(origin)
+	const height = (locator) => locator.evaluate((element) => element.getBoundingClientRect().height)
+	const token = (size) => tab.evaluate((name) => Number.parseFloat(globalThis.getComputedStyle(globalThis.document.documentElement).getPropertyValue(name)) * 16, `--ui-control-height-${size}`)
+	for (const size of ['xs', 'sm', 'md']) {
+		const field = await height(tab.getByLabel(`Campo ${size}`))
+		assert.equal(field, await token(size), `${size}: the height of the token`)
+		assert.equal(field, await height(tab.locator(`#button-${size}`)), `${size}: the height of a button of that size`)
+	}
+	const secret = tab.getByLabel('Clave sm')
+	const toggle = tab.locator('#sizes button[type="button"]').last()
+	assert.equal(await height(secret), await token('sm'))
+	const box = await toggle.boundingBox()
+	assert.deepEqual([box.width, box.height], [await token('sm'), await token('sm')], 'the button of reveal is a square as tall as the field')
+	await tab.close()
+})
+
+test('UIInput xs and sm keep 12px and 14px with a fine pointer and use 16px with a coarse one, with the reveal button aligned', { timeout: 180_000 }, async (context) => {
+	const { origin } = await startForms(context, { port: 4735, page: sizes })
+	const browser = await chromium.launch({ ...(process.env.MEEKO_CHROME_PATH ? { executablePath: process.env.MEEKO_CHROME_PATH } : { channel: 'chrome' }), headless: true })
+	context.after(() => browser.close())
+	const measure = async (tab) => {
+		const font = (label) => tab.getByLabel(label).evaluate((element) => Number.parseFloat(globalThis.getComputedStyle(element).fontSize))
+		const height = (locator) => locator.evaluate((element) => element.getBoundingClientRect().height)
+		const secret = tab.getByLabel('Clave sm')
+		const toggle = await tab.locator('#sizes button[type="button"]').last().boundingBox()
+		const field = await secret.boundingBox()
+		return {
+			fonts: { xs: await font('Campo xs'), sm: await font('Campo sm'), md: await font('Campo md') },
+			heights: { xs: await height(tab.getByLabel('Campo xs')), sm: await height(tab.getByLabel('Campo sm')), md: await height(tab.getByLabel('Campo md')) },
+			aligned: toggle.height === field.height && toggle.y === field.y && toggle.x + toggle.width === field.x + field.width,
+		}
+	}
+	const fine = await browser.newPage()
+	await fine.goto(origin)
+	assert.equal(await fine.evaluate(() => globalThis.matchMedia('(pointer: coarse)').matches), false)
+	const resting = await measure(fine)
+	assert.deepEqual(resting.fonts, { xs: 12, sm: 14, md: 14 }, 'fine pointer: 12px, 14px and 14px')
+	assert.ok(resting.aligned, 'fine pointer: the reveal button is aligned')
+	await fine.close()
+	const touch = await (await browser.newContext({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } })).newPage()
+	await touch.goto(origin)
+	assert.equal(await touch.evaluate(() => globalThis.matchMedia('(pointer: coarse)').matches), true, 'the emulation matches pointer: coarse')
+	const coarse = await measure(touch)
+	for (const size of ['xs', 'sm', 'md']) assert.ok(coarse.fonts[size] >= 16, `${size}: ${coarse.fonts[size]}px with a coarse pointer`)
+	assert.ok(coarse.aligned, 'coarse pointer: the reveal button is aligned')
+	context.diagnostic(`heights fine ${JSON.stringify(resting.heights)} coarse ${JSON.stringify(coarse.heights)}`)
+	await touch.close()
+})

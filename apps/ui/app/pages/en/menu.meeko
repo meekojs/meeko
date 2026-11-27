@@ -11,7 +11,7 @@
 		{ label: 'See Popover', to: '/popover' },
 		{ label: 'Archive', value: 'archive', disabled: true },
 		{ separator: true },
-		{ label: 'Delete', value: 'delete', tone: 'danger', icon: 'M3.5 4.5h9M6.5 4.5v-1h3v1M4.5 4.5l.5 8h6l.5-8' },
+		{ label: 'Delete', value: 'delete', color: 'danger', icon: 'M3.5 4.5h9M6.5 4.5v-1h3v1M4.5 4.5l.5 8h6l.5-8' },
 	]
 	const files = [
 		{ id: 1, name: 'Quarterly report', actions: '' },
@@ -25,7 +25,7 @@
 		{ label: 'Open', onSelect: () => (row.value = 'Opened: ' + file + '.') },
 		{ label: 'Download', onSelect: () => (row.value = 'Downloaded: ' + file + '.') },
 		{ separator: true },
-		{ label: 'Delete', tone: 'danger', onSelect: () => (row.value = 'Deleted: ' + file + '.') },
+		{ label: 'Delete', color: 'danger', onSelect: () => (row.value = 'Deleted: ' + file + '.') },
 	]
 </script>
 
@@ -68,7 +68,7 @@
 			<code>to</code>, which navigates with MeekoLink.
 			<code>{'{ separator: true }'}</code>
 			draws a line between groups,
-			<code>tone: 'danger'</code>
+			<code>color: 'danger'</code>
 			marks a destructive action and an item with
 			<code>disabled</code>
 			is shown, but the arrows skip it. The
@@ -165,7 +165,7 @@
 				{ name: 'onSelect', type: '(item) => void', description: 'Action when chosen. Excludes href and to.' },
 				{ name: 'href / to', type: 'string / route', description: 'Destination of a link; to navigates with MeekoLink, with typed params and search.' },
 				{ name: 'value', type: 'string', description: 'Free identifier, to recognize it in select.' },
-				{ name: 'tone', type: 'neutral | danger', default: 'neutral', description: 'danger for a destructive action.' },
+				{ name: 'color', type: 'neutral | danger', default: 'neutral', description: 'danger for a destructive action.' },
 				{ name: 'disabled', type: 'boolean', default: 'false', description: 'Visible but not choosable.' },
 				{ name: 'icon', type: 'string', description: 'Decorative SVG path, on a 16 by 16 grid.' },
 				{ name: 'shortcut', type: 'string', description: 'Shortcut shown after the text; the application implements it.' },

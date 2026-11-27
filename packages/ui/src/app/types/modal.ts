@@ -1,6 +1,7 @@
 import type { ComponentArgs, ComponentName, ReadonlySignal, ResolvedComponent } from '@meekojs/meeko'
 
-import type { modal } from '../variants/modal'
+import type { UIButtonColor } from '../theme/components/button'
+import type { modalTheme } from '../theme/components/modal'
 import type { UIThemeProps } from './theme'
 
 /** Nombres de componentes de aplicación que pueden abrirse como modales. */
@@ -26,7 +27,7 @@ export interface ModalContext {
 	 * @example
 	 * ```ts
 	 * const modal = useModal()
-	 * if (await modal.confirm({ title: '¿Eliminar el proyecto?', tone: 'danger', confirmLabel: 'Eliminar' })) remove()
+	 * if (await modal.confirm({ title: '¿Eliminar el proyecto?', color: 'danger', confirmLabel: 'Eliminar' })) remove()
 	 * ```
 	 */
 	confirm(options: UIConfirmOptions): Promise<boolean>
@@ -46,7 +47,7 @@ export interface ModalInstanceContext<R = unknown> {
  * @since 1.10.0
  * @example
  * ```ts
- * const options: UIConfirmOptions = { title: '¿Descartar los cambios?', description: 'No se pueden recuperar.', tone: 'danger' }
+ * const options: UIConfirmOptions = { title: '¿Descartar los cambios?', description: 'No se pueden recuperar.', color: 'danger' }
  * ```
  */
 export interface UIConfirmOptions {
@@ -59,10 +60,12 @@ export interface UIConfirmOptions {
 	/** Texto del botón que rechaza; por defecto, el mensaje `modal.cancel`. */
 	readonly cancelLabel?: string
 	/**
-	 * `danger` para una acción destructiva: el botón que acepta toma el tono de peligro y el foco empieza
-	 * en el que rechaza. Con `neutral`, el valor por defecto, empieza en el que acepta.
+	 * Color del botón que acepta, el de `<UIButton>`; `"primary"` por defecto. Con `danger`, para una acción
+	 * destructiva, el foco empieza en el botón que rechaza; con cualquier otro, en el que acepta.
+	 *
+	 * @since 2.0.0 sustituye a `tone` (`tone: 'danger'` es `color: 'danger'`).
 	 */
-	readonly tone?: 'neutral' | 'danger'
+	readonly color?: UIButtonColor
 	/** Ancho máximo del diálogo; `sm` por defecto. */
 	readonly size?: 'sm' | 'md' | 'lg'
 }
@@ -87,7 +90,7 @@ export type ModalDismissReason = 'escape' | 'backdrop' | 'button' | 'native'
  * ```
  */
 export type UIModalProps = UIThemeProps<
-	typeof modal,
+	typeof modalTheme,
 	{
 		/** Obligatoria. Nombre accesible del diálogo. */
 		title: string

@@ -3,16 +3,16 @@
 
 	import type { UIDiffLineKind, UIDiffProps } from '../types/navigation'
 
+	import { diffLine, diffTheme } from '../theme/components/diff'
 	import { uiTheme } from '../utils/defaults'
 	import { uiMessages } from '../utils/messages'
-	import { diff, diffLine } from '../variants/content'
 
 	const props = defineProps<UIDiffProps>()
 
 	const theme = uiTheme('diff', () => props)
 
 	const text = uiMessages().diff
-	const classes = diff()
+	const classes = diffTheme()
 
 	/** The lines of a unified diff, each with its kind for the colors and the screen reader. */
 	const kindOf = (line: string): UIDiffLineKind => (line.startsWith('@@') ? 'hunk' : line.startsWith('+++') || line.startsWith('---') ? 'file' : line.startsWith('+') ? 'add' : line.startsWith('-') ? 'remove' : 'context')
@@ -42,6 +42,6 @@
 		tabindex="0"
 		bind:class="classes.base({ class: [theme.ui.base, theme.class] })"
 		bind:aria-label="props.label"
-	><span each:of="lines.value" each:as="line" each:key="line.index" bind:class="line.class" bind:data-kind="line.kind"><span class="ui:sr-only">{labelOf(line.kind)}</span>{line.text}
+	><span each:of="lines.value" each:as="line" each:key="line.index" bind:class="line.class" bind:data-kind="line.kind"><span class="sr-only">{labelOf(line.kind)}</span>{line.text}
 </span></pre>
 </template>

@@ -70,7 +70,7 @@
 						>
 							<UIBadge
 								if:when="doc.featured"
-								tone="accent"
+								color="primary"
 								class="featured"
 							>
 								{t('docs.layout.featured')}

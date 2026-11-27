@@ -77,14 +77,14 @@
 				>
 					<UIBadge
 						if:when="item.featured"
-						tone="accent"
+						color="primary"
 					>
 						Destacado
 					</UIBadge>
 				</UILinkCard>
 			</div>
 		</section>
-		<UIAlert tone="info">
+		<UIAlert color="info">
 			Las etiquetas del núcleo
 			<code>MeekoSelect</code>,
 			<code>MeekoPopover</code>

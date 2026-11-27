@@ -8,6 +8,12 @@
 		error.value = name.value.trim() ? undefined : 'Enter a name.'
 		saved.value = !error.value
 	}
+	const from = signal('')
+	const to = signal('')
+	const applied = signal('')
+	const changes = signal(0)
+	const salesFrom = signal('')
+	const salesTo = signal('')
 	function reset() {
 		name.value = ''
 		error.value = undefined
@@ -54,6 +60,7 @@
 					<UIButton type="submit">Save name</UIButton>
 					<UIButton
 						variant="outline"
+						color="neutral"
 						on:click="reset"
 					>
 						Reset
@@ -68,7 +75,7 @@
 			</form>
 		</DocsPreview>
 		<DocsCode bind:code="examples.form" />
-		<UIAlert tone="info">
+		<UIAlert color="info">
 			UIField passes
 			<code>id</code>
 			and
@@ -89,16 +96,144 @@
 				{ name: 'class', type: 'string', description: 'Additional classes.' },
 			]"
 		/>
+		<h2 id="appearance">Input appearance</h2>
+		<DocsPreview>
+			<label for="appearance-email">Work email</label>
+			<UIInput
+				id="appearance-email"
+				type="email"
+				placeholder="name@example.com"
+				variant="surface"
+				color="primary"
+				size="lg"
+				radius="lg"
+			/>
+			<label for="appearance-input-outline">outline</label>
+			<UIInput
+				id="appearance-input-outline"
+				variant="outline"
+				color="primary"
+			/>
+			<label for="appearance-input-ghost">ghost</label>
+			<UIInput
+				id="appearance-input-ghost"
+				variant="ghost"
+				color="primary"
+			/>
+			<label for="appearance-input-soft">soft</label>
+			<UIInput
+				id="appearance-input-soft"
+				variant="soft"
+				color="primary"
+			/>
+		</DocsPreview>
+		<DocsCode bind:code="examples.inputAppearance" />
 		<DocsApi
 			caption="UIInput props"
 			bind:rows="[
 				{ name: 'model', type: 'Signal<string>', default: 'Empty string', description: 'Two-way text model; it updates on input.' },
+				{ name: 'variant', type: 'outline | surface | soft | ghost', default: 'outline', description: 'Visual treatment. outline is the usual field and ghost keeps only the bottom line.' },
+				{ name: 'color', type: 'primary | secondary | neutral | success | info | warning | danger', default: 'neutral', description: 'Semantic color of the background and the text. The border stays the one of the controls, or the danger one with invalid.' },
+				{ name: 'size', type: 'xs | sm | md | lg | xl', default: 'md', description: 'Height and padding of the control, on the --ui-control-* tokens.' },
+				{ name: 'radius', type: 'none | xs | sm | md | lg | xl | 2xl | 3xl | full', default: 'md', description: 'Radius of the outline.' },
 				{ name: 'type', type: 'text | email | password | search | url | tel | number | date | datetime-local | time | month', default: 'text', description: 'Native type of the control. The date and time pickers are the browser ones. With number, time and month the model is still text (“42”, “09:30”, “2026-11” or empty): convert it where you use it.' },
 				{ name: 'autocomplete / inputmode / min / max / step', type: 'HTML attributes', description: 'They reach the input as they are, like autocapitalize and spellcheck.' },
 				{ name: 'id / name / placeholder', type: 'string', description: 'Attributes of the input.' },
 				{ name: 'describedBy', type: 'string', description: 'IDs of the description and the error for aria-describedby.' },
 				{ name: 'required / disabled / invalid', type: 'boolean', default: 'false', description: 'State of the control. invalid sets aria-invalid.' },
 				{ name: 'class', type: 'string', description: 'Additional classes.' },
+			]"
+		/>
+		<h2 id="date-range">Date range: UIDateRange</h2>
+		<p>
+			Two native
+			<code>input type="date"</code>, “From” and “To”, in a named <code>fieldset</code>, with shortcuts. The models
+			<code>model:from</code>
+			and
+			<code>model:to</code>
+			are
+			<code>YYYY-MM-DD</code>
+			text (or empty) and follow what the user types; the
+			<code>change</code>
+			event only arrives with a complete, valid and new range. Try a reversed range or one longer than 31 days.
+		</p>
+		<DocsPreview layout="stack">
+			<UIDateRange
+				id="date-range-demo"
+				label="Period"
+				fromName="from"
+				toName="to"
+				min="2020-01-01"
+				model:from="from"
+				model:to="to"
+				bind:maxDays="31"
+				on:change="
+					(range) => {
+						applied.value = range.from + ' → ' + range.to
+						changes.value++
+					}
+				"
+			/>
+			<p
+				id="date-range-status"
+				class="docs-status"
+				role="status"
+			>
+				{applied.value ? 'Range applied: ' + applied.value + ' (' + changes.value + ')' : 'No range applied.'}
+			</p>
+		</DocsPreview>
+		<DocsCode bind:code="examples.dateRange" />
+		<p>
+			The default shortcuts are “Today”, “7 days” (today and the six before), “This month” (from the 1st to today) and “Last month”, with the texts of
+			<code>ui.messages</code>; the one that matches the range has <code>aria-pressed="true"</code>.
+			<code>presets</code>
+			replaces them and
+			<code>bind:presets="[]"</code>
+			removes them. For the server HTML to bring them active, pass
+			<code>today</code>: without that prop the component never reads the clock while rendering, so the shortcuts wait disabled and turn on when mounted, with the local date of the browser.
+		</p>
+		<p>
+			Inside
+			<code>UIField</code>
+			it takes the id and the description like the other controls, and the group takes its name from the label of the field.
+		</p>
+		<DocsPreview layout="stack">
+			<UIField
+				id="sales-period"
+				label="Sales period"
+				hint="Up to 366 days"
+			>
+				<snippet
+					name="default"
+					params="id, describedBy"
+				>
+					<UIDateRange
+						model:from="salesFrom"
+						model:to="salesTo"
+						bind:id="id"
+						bind:describedBy="describedBy"
+						bind:maxDays="366"
+						bind:presets="[]"
+					/>
+				</snippet>
+			</UIField>
+		</DocsPreview>
+		<DocsCode bind:code="examples.dateRangeField" />
+		<DocsApi
+			caption="Props of UIDateRange"
+			bind:rows="[
+				{ name: 'model:from / model:to', type: 'Signal<string>', default: 'Empty string', description: 'The two dates, YYYY-MM-DD or empty, two-way.' },
+				{ name: 'label / ariaLabel', type: 'string', description: 'Visible legend or accessible name of the group; without either, the label of UIField or “Date range”.' },
+				{ name: 'fromLabel / toLabel', type: 'string', default: 'From / To', description: 'Labels of the two dates.' },
+				{ name: 'fromName / toName / form', type: 'string', description: 'Submission in a form.' },
+				{ name: 'min / max', type: 'YYYY-MM-DD', description: 'Native limits of both fields and of the validation.' },
+				{ name: 'maxDays', type: 'number', description: 'Days the range may have, counting both ends.' },
+				{ name: 'today', type: 'YYYY-MM-DD', description: 'Today for the shortcuts; without it, they turn on when mounted.' },
+				{ name: 'presets', type: 'readonly UIDateRangePreset[]', default: 'Today, 7 days, This month, Last month', description: 'label and range(today) → { from, to }. [] removes them.' },
+				{ name: 'required / disabled / invalid', type: 'boolean', default: 'false', description: 'State of the dates; disabled also disables the shortcuts.' },
+				{ name: 'id / describedBy', type: 'string', description: 'The ones UIField hands over.' },
+				{ name: 'change', type: 'event: UIDateRangeValue', description: 'A complete, valid range, different from the previous one.' },
+				{ name: 'class / ui', type: 'string / object', description: 'Classes of the fieldset and of base, legend, presets, preset, fields, field, fieldLabel, input and error.' },
 			]"
 		/>
 		<h2 id="other-controls">Other controls</h2>

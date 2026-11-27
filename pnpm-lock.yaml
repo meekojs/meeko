@@ -237,11 +237,14 @@ catalogs:
     '@milkdown/kit':
       specifier: 7.23.0
       version: 7.23.0
+    '@radix-ui/colors':
+      specifier: 3.0.0
+      version: 3.0.0
     '@tailwindcss/postcss':
       specifier: 4.3.5
       version: 4.3.5
     '@tailwindcss/vite':
-      specifier: 4.3.5
+      specifier: ^4.3.5
       version: 4.3.5
     '@types/node':
       specifier: ^24.19.2
@@ -478,6 +481,9 @@ importers:
       playwright-core:
         specifier: 'catalog:'
         version: 1.65.1
+      tailwindcss:
+        specifier: 'catalog:'
+        version: 4.3.5
       tsx:
         specifier: 'catalog:'
         version: 4.23.15
@@ -524,6 +530,9 @@ importers:
       playwright-core:
         specifier: 'catalog:'
         version: 1.65.1
+      tailwindcss:
+        specifier: 'catalog:'
+        version: 4.3.5
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -576,6 +585,9 @@ importers:
       sharp:
         specifier: 'catalog:'
         version: 0.35.5(@types/node@24.19.2)
+      tailwindcss:
+        specifier: 'catalog:'
+        version: 4.3.5
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -625,6 +637,9 @@ importers:
       playwright-core:
         specifier: 'catalog:'
         version: 1.65.1
+      tailwindcss:
+        specifier: 'catalog:'
+        version: 4.3.5
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -901,6 +916,9 @@ importers:
 
   packages/ui:
     dependencies:
+      '@tailwindcss/vite':
+        specifier: 'catalog:'
+        version: 4.3.5(vite@8.3.8(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
       tailwind-variants:
         specifier: 'catalog:'
         version: 4.0.2
@@ -941,9 +959,9 @@ importers:
       '@milkdown/kit':
         specifier: 'catalog:'
         version: 7.23.0(@codemirror/language@6.13.1)(@codemirror/state@6.7.6)(@codemirror/view@6.43.15)(supports-color@10.2.2)(typescript@7.0.2)
-      '@tailwindcss/postcss':
+      '@radix-ui/colors':
         specifier: 'catalog:'
-        version: 4.3.5
+        version: 3.0.0
       '@types/node':
         specifier: 'catalog:'
         version: 24.19.2
@@ -956,9 +974,6 @@ importers:
       playwright-core:
         specifier: 'catalog:'
         version: 1.65.1
-      postcss:
-        specifier: 'catalog:'
-        version: 8.5.33
       prettier:
         specifier: 'catalog:'
         version: 3.10.1
@@ -1819,6 +1834,9 @@ packages:
 
   '@quansync/fs@1.1.0':
     resolution: {integrity: sha512-qAPG/t3HqML1TlN7sY/pTbEjzFVAKsMjNNMGheyDosro+kT4iw2KCUoHcVdmliwWjorm4elZbgNQyU2eD97eDg==}
+
+  '@radix-ui/colors@3.0.0':
+    resolution: {integrity: sha512-FUOsGBkHrYJwCSEtWRCIfQbZG7q1e6DgxCIOe1SUQzDe/7rXXeA47s8yCn6fuTNQAj1Zq4oTFi9Yjp3wzElcxg==}
 
   '@redis/bloom@6.3.1':
     resolution: {integrity: sha512-dpF9j2yJDoPzSCaZn0MSB3xzmnXQVJeTSAWJcQVcgbmluwhpFeemmII0cF1t+WYfoVS+shEFq79+MmUItgzJLg==}
@@ -5118,6 +5136,8 @@ snapshots:
   '@quansync/fs@1.1.0':
     dependencies:
       quansync: 1.0.0
+
+  '@radix-ui/colors@3.0.0': {}
 
   '@redis/bloom@6.3.1(@redis/client@6.3.1)':
     dependencies:

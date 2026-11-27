@@ -3,7 +3,7 @@
 
 	import { useModalConfirms, useModalHost } from '../composables/useModal'
 	import { useToastHost } from '../composables/useToast'
-	import { toastHost as toastHostClass } from '../variants/feedback'
+	import { toastHost as toastHostClass } from '../theme/components/toast'
 	import * as ConfirmInstance from './internal/ConfirmInstance.meeko'
 	import * as ModalInstance from './internal/ModalInstance.meeko'
 	import * as Toast from './Toast.meeko'
@@ -56,7 +56,8 @@
 			bind:hosted="true"
 			bind:text="entry.text"
 			bind:actions="entry.actions"
-			bind:tone="entry.tone"
+			bind:variant="entry.variant"
+			bind:color="entry.color"
 			bind:duration="entry.duration"
 			bind:closeLabel="entry.closeLabel"
 			bind:ui="entry.ui"

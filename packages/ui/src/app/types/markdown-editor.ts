@@ -1,4 +1,4 @@
-import type { markdownEditor } from '../variants/markdown-editor'
+import type { markdownEditorTheme } from '../theme/components/markdown-editor'
 import type { UIThemeProps } from './theme'
 
 /**
@@ -29,7 +29,7 @@ export type UIMarkdownEditorMode = 'code' | 'visual'
  * ```
  */
 export type UIMarkdownEditorProps = UIThemeProps<
-	typeof markdownEditor,
+	typeof markdownEditorTheme,
 	{
 		/** Nombre accesible y etiqueta visible del editor. */
 		label: string

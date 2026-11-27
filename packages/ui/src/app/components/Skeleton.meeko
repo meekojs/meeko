@@ -1,16 +1,16 @@
 <script lang="ts">
 	import type { UISkeletonProps } from '../types/feedback'
 
+	import { skeletonTheme, skeletonWidths } from '../theme/components/skeleton'
 	import { uiTheme } from '../utils/defaults'
 	import { uiMessages } from '../utils/messages'
-	import { skeleton, skeletonWidths } from '../variants/feedback'
 
 	const props = defineProps<UISkeletonProps>()
 
 	const theme = uiTheme('skeleton', () => props)
 
 	const text = uiMessages().feedback
-	const classes = skeleton()
+	const classes = skeletonTheme()
 </script>
 
 <template>

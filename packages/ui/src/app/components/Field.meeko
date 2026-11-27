@@ -1,8 +1,8 @@
 <script lang="ts">
 	import type { UIFieldProps } from '../types/forms'
 
+	import { fieldTheme } from '../theme/components/field'
 	import { uiTheme } from '../utils/defaults'
-	import { field } from '../variants/field'
 
 	const props = defineProps<UIFieldProps>()
 
@@ -10,12 +10,13 @@
 
 	const snippets = defineSnippets<{ default: [id: string, describedBy: string | undefined] }>()
 
-	const classes = field()
+	const classes = fieldTheme()
 </script>
 
 <template>
 	<div bind:class="classes.base({ class: [theme.ui.base, theme.class] })">
 		<label
+			bind:id="props.id + '-label'"
 			bind:for="props.id"
 			bind:class="classes.label({ class: theme.ui.label })"
 		>

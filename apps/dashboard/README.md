@@ -11,7 +11,7 @@ pnpm install
 pnpm build                     # núcleo, UI y meeko-docs, la primera vez
 Copy-Item apps/dashboard/.env.example apps/dashboard/.env   # y rellena DATABASE_URL
 pnpm -F meeko-dashboard exec meeko auth hash                # ADMIN_PASSWORD_HASH=…; añade también ADMIN_USERNAME
-pnpm dashboard:dev             # http://127.0.0.1:4310, que pide iniciar sesión
+pnpm dev:dashboard             # http://127.0.0.1:4310, que pide iniciar sesión
 ```
 
 Todas las pantallas exigen la sesión del administrador (véase «F5: autenticación»). Sin `ADMIN_USERNAME` y `ADMIN_PASSWORD_HASH`, el desarrollo arranca pero nadie puede entrar, y la página de inicio de sesión lo explica.

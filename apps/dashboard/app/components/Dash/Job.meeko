@@ -49,7 +49,7 @@
 			<span role="status">
 				<UIBadge
 					bind:dot="true"
-					bind:tone="props.job ? jobTones[props.job.status] : 'neutral'"
+					bind:color="props.job ? jobTones[props.job.status] : 'neutral'"
 				>
 					{props.job ? t(`labels.jobStatus.${props.job.status}`) : ''}
 				</UIBadge>

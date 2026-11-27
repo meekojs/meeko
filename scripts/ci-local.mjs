@@ -214,7 +214,7 @@ async function main() {
 	const logs = join(root, '.meeko/ci-local')
 	await rm(logs, { force: true, recursive: true })
 	await mkdir(logs, { recursive: true })
-	const setup = [...(options.install ? [{ name: 'pnpm install --frozen-lockfile', command: pnpm('install', '--frozen-lockfile') }] : []), ...(options.build ? [{ name: 'pnpm build', command: pnpm('build'), timeout: 30 }] : [])]
+	const setup = [...(options.install ? [{ name: 'pnpm install --frozen-lockfile', command: pnpm('install', '--frozen-lockfile') }] : []), ...(options.build ? [{ name: 'pnpm build:packages', command: pnpm('build:packages'), timeout: 30 }] : [])]
 	const plan = [...setup.map((step) => ({ job: 'setup', step })), ...selected.flatMap((job) => job.steps.map((step) => ({ job: job.id, step })))]
 	const results = []
 	const done = new Set()

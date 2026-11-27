@@ -1,3 +1,13 @@
+/*
+ * Tailwind without its preflight, the reset of lists, headings and margins: only its theme and its utilities, in
+ * the layers of Tailwind's own entry (https://tailwindcss.com/docs/preflight#disabling-preflight). The base of
+ * the page is that of @meekojs/ui, as it was before the site compiled Tailwind.
+ */
+@layer theme, base, components, utilities;
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities);
+@import '@meekojs/ui';
+
 /* Two-tone titles of the home page: the statement in text, its continuation soft. */
 .tone-soft {
 	color: var(--ui-color-text-soft);

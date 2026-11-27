@@ -11,22 +11,46 @@
 		<h2 id="usage">Usage</h2>
 		<DocsPreview>
 			<UIBadge>Information</UIBadge>
-			<UIBadge tone="accent">Published</UIBadge>
-			<UIBadge tone="info">Beta</UIBadge>
-			<UIBadge tone="success">Active</UIBadge>
+			<UIBadge color="primary">Published</UIBadge>
+			<UIBadge color="info">Beta</UIBadge>
+			<UIBadge color="success">Active</UIBadge>
 			<UIBadge
-				tone="warning"
+				color="warning"
 				dot
 			>
 				Pending
 			</UIBadge>
-			<UIBadge tone="danger">Review</UIBadge>
+			<UIBadge color="danger">Review</UIBadge>
 		</DocsPreview>
 		<DocsCode bind:code="examples.badge" />
+		<h2 id="appearance">Appearance</h2>
+		<DocsPreview>
+			<UIBadge
+				variant="solid"
+				color="info"
+				radius="sm">Published</UIBadge>
+			<UIBadge
+				dot
+				variant="outline"
+				color="warning"
+				radius="full"
+			>
+				Pending
+			</UIBadge>
+			<UIBadge
+				variant="soft"
+				color="success">soft</UIBadge>
+			<UIBadge
+				variant="surface"
+				color="info">surface</UIBadge>
+		</DocsPreview>
+		<DocsCode bind:code="examples.badgeAppearance" />
 		<DocsApi
 			bind:rows="[
-				{ name: 'tone', type: 'neutral | accent | info | success | warning | danger', default: 'neutral', description: 'Visual treatment of the label.' },
-				{ name: 'dot', type: 'boolean', default: 'false', description: 'Adds a decorative dot in the color of the tone.' },
+				{ name: 'variant', type: 'soft | solid | surface | outline', default: 'soft', description: 'Visual treatment of the label.' },
+				{ name: 'color', type: 'primary | secondary | neutral | success | info | warning | danger', default: 'neutral', description: 'Semantic color.' },
+				{ name: 'radius', type: 'none | xs | sm | md | lg | xl | 2xl | 3xl | full', default: 'full', description: 'Radius of the outline.' },
+				{ name: 'dot', type: 'boolean', default: 'false', description: 'Adds a decorative dot in its color.' },
 				{ name: 'class', type: 'string', description: 'Additional classes.' },
 			]"
 		/>

@@ -1,14 +1,15 @@
 import type { ElementAttributes, TrustedHtml } from '@meekojs/meeko'
 
-import type { codeBlock, diff } from '../variants/content'
-import type { drawer } from '../variants/drawer'
-import type { footer, header } from '../variants/header'
-import type { localeSuggestion, localeSwitcher } from '../variants/locale'
-import type { breadcrumb, navigationTabs, navigationTree, pageNavigation, pagination, tableOfContents } from '../variants/navigation'
-import type { page, pageHeader } from '../variants/page'
+import type { codeBlockTheme } from '../theme/components/code-block'
+import type { diffTheme } from '../theme/components/diff'
+import type { drawerTheme } from '../theme/components/drawer'
+import type { footerTheme, headerTheme } from '../theme/components/header'
+import type { localeSuggestionTheme, localeSwitcherTheme } from '../theme/components/locale'
+import type { breadcrumbTheme, navigationTabsTheme, navigationTreeTheme, pageNavigationTheme, paginationTheme, tableOfContentsTheme } from '../theme/components/navigation'
+import type { pageHeaderTheme, pageTheme } from '../theme/components/page'
 import type { UIRouteTarget } from './button'
 import type { UIContainerSize } from './container'
-import type { UITone } from './forms'
+import type { UIBadgeColor } from './forms'
 import type { UIThemeProps } from './theme'
 
 /** `href` o `to`, excluyentes. */
@@ -106,7 +107,7 @@ export type UIBrand = UILinkTarget & {
  * ```
  */
 export type UIHeaderProps = UIThemeProps<
-	typeof header,
+	typeof headerTheme,
 	{
 		/** Marca; el snippet `brand` la sustituye. */
 		readonly brand?: UIBrand
@@ -158,7 +159,7 @@ export interface UIFooterGroup {
  * ```
  */
 export type UIFooterProps = UIThemeProps<
-	typeof footer,
+	typeof footerTheme,
 	{
 		/** Marca; el snippet `brand` la sustituye. */
 		readonly brand?: UIBrand
@@ -208,7 +209,7 @@ export type UIPageLayout = 'docs' | 'dashboard' | 'landing'
  */
 export type UIPageProps = Omit<ElementAttributes<'div'>, 'class'> &
 	UIThemeProps<
-		typeof page,
+		typeof pageTheme,
 		{
 			/** Disposición; `"docs"` por defecto. */
 			readonly layout?: UIPageLayout
@@ -238,7 +239,7 @@ export type UIPageProps = Omit<ElementAttributes<'div'>, 'class'> &
  * ```
  */
 export type UIPageHeaderProps = UIThemeProps<
-	typeof pageHeader,
+	typeof pageHeaderTheme,
 	{
 		/** Título de la página; puede sustituirse por el snippet `title`. */
 		readonly title?: string
@@ -305,7 +306,7 @@ export interface UINavigationTreeGroup {
  * ```
  */
 export type UINavigationTreeProps = UIThemeProps<
-	typeof navigationTree,
+	typeof navigationTreeTheme,
 	{
 		/** Grupos de enlaces. */
 		readonly groups: readonly UINavigationTreeGroup[]
@@ -365,7 +366,7 @@ export type UIDrawerSide = 'start' | 'end'
  * ```
  */
 export type UIDrawerProps = UIThemeProps<
-	typeof drawer,
+	typeof drawerTheme,
 	{
 		/** Título visible y nombre accesible del panel. */
 		readonly title: string
@@ -392,14 +393,14 @@ export type UIDrawerProps = UIThemeProps<
  * @since 1.8.0
  * @example
  * ```ts
- * const item: UINavigationTabsItem = { label: 'Traducidas', href: '/translations?status=translated', badge: '12', badgeTone: 'success', badgeDot: true }
+ * const item: UINavigationTabsItem = { label: 'Traducidas', href: '/translations?status=translated', badge: '12', badgeColor: 'success', badgeDot: true }
  * ```
  */
 export type UINavigationTabsItem = UINavigationLink & {
 	/** Contador o dato breve, en un `<UIBadge>` junto al texto. */
 	readonly badge?: string
-	/** Tono del contador; `"neutral"` por defecto. */
-	readonly badgeTone?: UITone
+	/** Color del contador; `"neutral"` por defecto. */
+	readonly badgeColor?: UIBadgeColor
 	/** Añade el punto de color al contador. */
 	readonly badgeDot?: boolean
 }
@@ -407,7 +408,7 @@ export type UINavigationTabsItem = UINavigationLink & {
 /**
  * Props de `<UINavigationTabs>`: enlaces entre páginas con aspecto de pestañas, con `aria-current` y un
  * indicador que se desplaza con CSS. Son navegación, no un `tablist`: cada uno lleva a otra URL.
- * `variant="segmented"` da a la fila la forma de un `<UIRadioGroup variant="segmented">`, para filtros en
+ * `layout="segmented"` da a la fila la forma de un `<UIRadioGroup layout="segmented">`, para filtros en
  * la URL, sin indicador: varias filas conviven en una página sin repetir su View Transition. El evento
  * `select` recibe el clic y la pestaña; `event.preventDefault()` cancela la navegación. `ui` añade
  * clases a sus slots: `base`, `link` e `indicator`.
@@ -416,16 +417,20 @@ export type UINavigationTabsItem = UINavigationLink & {
  * @example
  * ```html
  * <UINavigationTabs bind:items="[{ label: 'Hoy', to: '/metrics' }, { label: 'Mes', to: '/metrics/month' }]" current="/metrics" />
- * <UINavigationTabs variant="segmented" label="Rango" bind:items="[{ label: '7 días', href: '?days=7', current: true }]" />
+ * <UINavigationTabs layout="segmented" label="Rango" bind:items="[{ label: '7 días', href: '?days=7', current: true }]" />
  * ```
  */
 export type UINavigationTabsProps = UIThemeProps<
-	typeof navigationTabs,
+	typeof navigationTabsTheme,
 	{
 		/** Enlaces. */
 		readonly items: readonly UINavigationTabsItem[]
-		/** Aspecto; `"underline"` por defecto. */
-		readonly variant?: 'underline' | 'segmented'
+		/**
+		 * Disposición: una fila subrayada (`underline`, por defecto) o un control segmentado (`segmented`).
+		 *
+		 * @since 2.0.0 sustituye a `variant`, que queda para el tratamiento visual del catálogo.
+		 */
+		readonly layout?: 'underline' | 'segmented'
 		/** Ruta actual, para marcar el enlace con `aria-current="page"`. */
 		readonly current?: string
 		/** `aria-label` de la navegación. */
@@ -466,7 +471,7 @@ export type UIBreadcrumbItem =
  * ```
  */
 export type UIBreadcrumbProps = UIThemeProps<
-	typeof breadcrumb,
+	typeof breadcrumbTheme,
 	{
 		/** Pasos, del más general al actual. */
 		readonly items: readonly UIBreadcrumbItem[]
@@ -489,7 +494,7 @@ export type UIBreadcrumbProps = UIThemeProps<
  * ```
  */
 export type UIPageNavigationProps = UIThemeProps<
-	typeof pageNavigation,
+	typeof pageNavigationTheme,
 	{
 		/** Página anterior. */
 		readonly previous?: UINavigationLink
@@ -526,7 +531,7 @@ export type UIPageNavigationProps = UIThemeProps<
  * ```
  */
 export type UIPaginationProps = UIThemeProps<
-	typeof pagination,
+	typeof paginationTheme,
 	{
 		/** Elementos visibles. */
 		readonly shown?: number
@@ -615,12 +620,13 @@ export interface UITableOfContentsEntry {
  * `<details>` para la columna de contenido, que `<UIPage>` sólo muestra cuando el lateral se oculta.
  *
  * @since 1.8.0
+ * @since 2.0.0 se llama `UITableOfContentsLayout`; antes, `UITableOfContentsVariant`.
  * @example
  * ```ts
- * const variant: UITableOfContentsVariant = 'collapsible'
+ * const layout: UITableOfContentsLayout = 'collapsible'
  * ```
  */
-export type UITableOfContentsVariant = 'aside' | 'collapsible'
+export type UITableOfContentsLayout = 'aside' | 'collapsible'
 
 /**
  * Props de `<UITableOfContents>`: el índice de la página. Los enlaces funcionan sin JavaScript. La
@@ -633,18 +639,22 @@ export type UITableOfContentsVariant = 'aside' | 'collapsible'
  * @example
  * ```html
  * <UITableOfContents bind:entries="toc" />
- * <UITableOfContents bind:entries="toc" variant="collapsible" />
+ * <UITableOfContents bind:entries="toc" layout="collapsible" />
  * ```
  */
 export type UITableOfContentsProps = UIThemeProps<
-	typeof tableOfContents,
+	typeof tableOfContentsTheme,
 	{
 		/** Entradas, en el orden de la página. */
 		readonly entries: readonly UITableOfContentsEntry[]
 		/** `id` de la entrada activa, si la controla la aplicación; desactiva el seguimiento del scroll. */
 		readonly active?: string
-		/** Vista; `"aside"` por defecto. */
-		readonly variant?: UITableOfContentsVariant
+		/**
+		 * Vista; `"aside"` por defecto.
+		 *
+		 * @since 2.0.0 sustituye a `variant`, que queda para el tratamiento visual del catálogo.
+		 */
+		readonly layout?: UITableOfContentsLayout
 		/** Título y `aria-label`. */
 		readonly label?: string
 		/** Clases adicionales del elemento raíz: el `<nav>` (`ui.base`) o, en la vista `collapsible`, el `<details>` (`ui.collapsible`). */
@@ -685,7 +695,7 @@ export type UILocaleItem = UILinkTarget & {
  * ```
  */
 export type UILocaleSwitcherProps = UIThemeProps<
-	typeof localeSwitcher,
+	typeof localeSwitcherTheme,
 	{
 		/** Idiomas. */
 		readonly items: readonly UILocaleItem[]
@@ -709,7 +719,7 @@ export type UILocaleSwitcherProps = UIThemeProps<
  * ```
  */
 export type UILocaleSuggestionProps = UIThemeProps<
-	typeof localeSuggestion,
+	typeof localeSuggestionTheme,
 	{
 		/** Idiomas. */
 		readonly items: readonly UILocaleItem[]
@@ -754,7 +764,7 @@ export type UICodeBlockVerdict = 'bad' | 'good'
  * ```
  */
 export type UICodeBlockProps = UIThemeProps<
-	typeof codeBlock,
+	typeof codeBlockTheme,
 	{
 		/** Texto del bloque y lo que se copia. Sin él, se copia el texto pintado. */
 		readonly code?: string
@@ -836,7 +846,7 @@ export type UIDiffLineKind = 'add' | 'context' | 'file' | 'hunk' | 'remove'
  * ```
  */
 export type UIDiffProps = UIThemeProps<
-	typeof diff,
+	typeof diffTheme,
 	{
 		/** El diff unificado, tal cual. */
 		readonly diff: string

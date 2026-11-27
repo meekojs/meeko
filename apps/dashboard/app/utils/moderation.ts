@@ -5,7 +5,7 @@ export const tones: readonly AnnouncementTone[] = ['info', 'success', 'warning',
 // The names of the actions, tones and states are the catalog keys `moderation.actions.*`,
 // `moderation.tones.*` and `moderation.states.*`; `danger` interrupts screen readers (`role="alert"`).
 
-export const announcementStateTones: Readonly<Record<AnnouncementState, 'accent' | 'danger' | 'neutral'>> = { live: 'accent', scheduled: 'neutral', ended: 'neutral', inactive: 'neutral' }
+export const announcementStateTones: Readonly<Record<AnnouncementState, 'danger' | 'neutral' | 'primary'>> = { live: 'primary', scheduled: 'neutral', ended: 'neutral', inactive: 'neutral' }
 
 const pad = (value: number) => String(value).padStart(2, '0')
 

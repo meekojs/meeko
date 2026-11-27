@@ -22,7 +22,7 @@ async function render(context, template, defaults) {
 			.code.replaceAll('from "@meekojs/meeko/internal"', `from ${runtime('internal.js')}`)
 			.replaceAll('from "@meekojs/meeko"', `from ${runtime('index.js')}`)
 			.replace(/from ["']\.\/(\w+)\.meeko["']/g, 'from "./$1.ts"')
-			.replace(/from ["'](?:\.\.\/)+(utils|variants)\/([\w-]+)["']/g, (_, folder, utility) => `from ${JSON.stringify(new URL(`../dist/app/${folder}/${utility}.js`, import.meta.url).href)}`)
+			.replace(/from ["'](?:\.\.\/)+(utils|theme(?:\/components)?)\/([\w-]+)["']/g, (_, folder, utility) => `from ${JSON.stringify(new URL(`../dist/app/${folder}/${utility}.js`, import.meta.url).href)}`)
 			.replace(/from ["']\.\/internal\/Icon\.meeko["']/g, 'from "./Icon.ts"')
 		await writeFile(`${directory}/${file}.ts`, code)
 	}
@@ -50,34 +50,35 @@ const defaults = {
 	table: { density: 'compact', class: 'app-table', ui: { base: 'app-table-scroll', cell: 'app-cell' } },
 	stat: { ui: { value: 'app-stat-value' } },
 	alert: { class: 'app-alert', ui: { title: 'app-alert-title' } },
-	button: { variant: 'ghost', class: 'app-button' },
+	button: { variant: 'ghost', color: 'neutral', radius: 'full', class: 'app-button' },
 }
 
 test('an instance without props gets the classes and variants of ui.defaults', async (context) => {
 	const html = await render(context, '<UICard title="Plan">Body</UICard><UITable bind:rows="rows" bind:columns="columns" rowKey="id" /><UIStat label="Sales" value="12" /><UIAlert title="Saved" /><UIButton>Go</UIButton>', defaults)
 	const card = classOf(html, '<section')
 	assert.ok(card.includes('app-card'), 'class reaches the root of the card')
-	assert.ok(card.includes('ui:[--card-padding:var(--ui-space-3)]'), 'the padding of ui.defaults')
+	assert.ok(card.includes('[--card-padding:var(--ui-space-3)]'), 'the padding of ui.defaults')
 	assert.ok(classOf(html, '<header').includes('app-card-header'))
 	assert.match(html, /<div class="[^"]*app-card-body"[^>]*>Body<\/div>/)
 	assert.ok(classOf(html, '<table').includes('app-table'), 'the class of a table reaches the <table>, as its prop does')
 	assert.ok(classOf(html, '<div tabindex="0"').includes('app-table-scroll'), 'ui.base reaches the scroll container')
 	const cell = classOf(html, '<td')
 	assert.ok(cell.includes('app-cell'))
-	assert.ok(cell.includes('ui:py-1'), 'the density of ui.defaults')
+	assert.ok(cell.includes('py-1'), 'the density of ui.defaults')
 	assert.match(html, /<dd[^>]*class="[^"]*app-stat-value[^"]*"[^>]*>12<\/dd>/)
 	assert.match(html, /class="[^"]*app-alert[^"]*"/)
 	assert.match(html, /class="[^"]*app-alert-title[^"]*"[^>]*>\s*Saved/)
 	const button = classOf(html, '<button')
 	assert.ok(button.includes('app-button'))
-	assert.ok(button.includes('ui:bg-transparent'), 'the variant of ui.defaults: ghost')
+	assert.ok(button.includes('bg-transparent') && button.includes('text-neutral-11'), 'the variant and the color of ui.defaults: a neutral ghost')
+	assert.ok(button.includes('rounded-full') && !button.includes('rounded-md'), 'the radius of ui.defaults')
 	assert.doesNotMatch(html, /undefined/)
 })
 
 test('the classes of an instance are added after those of ui.defaults, which come after those of the component', async (context) => {
 	const html = await render(context, '<UICard title="Plan" class="mine" bind:ui="{ header: \'my-header\', footer: \'my-footer\' }">Body<snippet name="footer">End</snippet></UICard><UITable bind:rows="rows" bind:columns="columns" rowKey="id" class="my-table" bind:ui="{ cell: \'my-cell\' }" /><UIStat label="Sales" value="12" bind:ui="{ value: \'my-value\', label: \'my-label\' }" />', defaults)
 	const card = classOf(html, '<section')
-	assert.ok(card.indexOf('ui:flex') < card.indexOf('app-card') && card.indexOf('app-card') < card.indexOf('mine'), `component, defaults and instance, in that order: ${card.join(' ')}`)
+	assert.ok(card.indexOf('flex') < card.indexOf('app-card') && card.indexOf('app-card') < card.indexOf('mine'), `component, defaults and instance, in that order: ${card.join(' ')}`)
 	const header = classOf(html, '<header')
 	assert.ok(header.indexOf('app-card-header') < header.indexOf('my-header') && header.indexOf('app-card-header') > 0)
 	assert.ok(classOf(html, '<footer').includes('my-footer'), 'a slot without defaults keeps the classes of the instance')
@@ -90,23 +91,26 @@ test('the classes of an instance are added after those of ui.defaults, which com
 })
 
 test('an explicit prop wins over a variant of ui.defaults', async (context) => {
-	const html = await render(context, '<UICard title="A" padding="lg">A</UICard><UICard title="B" density="compact">B</UICard><UITable bind:rows="rows" bind:columns="columns" rowKey="id" density="comfortable" /><UIButton variant="primary">Go</UIButton>', { ...defaults, card: { padding: 'none', variant: 'soft' } })
+	const html = await render(context, '<UICard title="A" padding="lg">A</UICard><UICard title="B" density="compact">B</UICard><UITable bind:rows="rows" bind:columns="columns" rowKey="id" density="comfortable" /><UIButton variant="solid" color="primary" radius="sm">Go</UIButton>', { ...defaults, card: { padding: 'none', variant: 'soft' } })
 	const cards = [...html.matchAll(/<section[^>]*?class="([^"]*)"/g)].map((match) => match[1].split(' '))
-	assert.ok(cards[0].includes('ui:[--card-padding:var(--ui-space-6)]'), 'padding of the instance')
-	assert.ok(cards[1].includes('ui:[--card-padding:var(--ui-space-3)]'), 'the density of the instance wins over the padding of ui.defaults')
-	assert.ok(cards[0].includes('ui:bg-control-hover'), 'while the variant of ui.defaults still applies')
+	assert.ok(cards[0].includes('[--card-padding:var(--ui-space-6)]'), 'padding of the instance')
+	assert.ok(cards[1].includes('[--card-padding:var(--ui-space-3)]'), 'the density of the instance wins over the padding of ui.defaults')
+	assert.ok(cards[0].includes('bg-control-hover'), 'while the variant of ui.defaults still applies')
+	assert.ok(!cards[0].includes('bg-surface'), 'the soft of ui.defaults replaces the surface')
 	const cell = classOf(html, '<td')
-	assert.ok(cell.includes('ui:py-4') && !cell.includes('ui:py-1'))
+	assert.ok(cell.includes('py-4') && !cell.includes('py-1'))
 	const button = classOf(html, '<button')
-	assert.ok(button.includes('ui:bg-primary') && !button.includes('ui:bg-transparent'))
+	assert.ok(button.includes('bg-primary-9') && !button.includes('bg-transparent') && !button.includes('text-neutral-11'))
+	assert.ok(button.includes('rounded-sm') && !button.includes('rounded-full'))
+	assert.ok(button.includes('app-button'), 'the class of ui.defaults stays')
 })
 
 test('a density of ui.defaults gives the padding of a card, and without defaults nothing changes', async (context) => {
 	const dense = await render(context, '<UICard title="A">A</UICard>', { card: { density: 'comfortable' } })
-	assert.ok(classOf(dense, '<section').includes('ui:[--card-padding:var(--ui-space-6)]'))
+	assert.ok(classOf(dense, '<section').includes('[--card-padding:var(--ui-space-6)]'))
 	const plain = await render(context, '<UICard title="A" class="mine">A</UICard><UIStat label="Sales" value="12" />')
 	const card = classOf(plain, '<section')
-	assert.ok(card.includes('ui:[--card-padding:var(--ui-space-5)]') && card.includes('mine'))
+	assert.ok(card.includes('[--card-padding:var(--ui-space-5)]') && card.includes('mine'))
 	assert.doesNotMatch(plain, /undefined|app-/)
 })
 
@@ -118,13 +122,13 @@ test('actionsWrap places the actions of a card beside, below or by the width of 
 	const html = await render(context, [actionCard(), actionCard(' actionsWrap="inline"'), actionCard(' actionsWrap="below"'), actionCard(' actionsWrap="auto"'), '<UICard title="Plain" actionsWrap="auto">Body</UICard>'].join(''))
 	const [plain, inline, below, auto] = headerParts(html)
 	assert.deepEqual(plain, inline, 'inline is the default: a card without the prop does not change')
-	assert.ok(inline.header.includes('ui:grid-cols-[minmax(0,1fr)_auto]') && inline.header.includes('ui:gap-x-4'))
-	assert.ok(inline.actions.includes('ui:col-[2]') && inline.actions.includes('ui:row-[1/span_2]') && inline.actions.includes('ui:justify-end'))
-	assert.ok(!inline.header.includes('ui:@container'), 'only auto makes the header a container')
-	assert.ok(!below.header.some((name) => name.startsWith('ui:grid-cols-')), 'below has a single column')
-	assert.ok(!below.actions.some((name) => /col-|row-|justify-end/.test(name)) && below.actions.includes('ui:pt-1.5'))
-	assert.ok(auto.header.includes('ui:@container') && auto.header.includes('ui:grid-cols-[minmax(0,1fr)_auto]') && !auto.header.includes('ui:gap-x-4'))
-	for (const name of ['ui:col-[2]', 'ui:ms-4', 'ui:@max-card-narrow:col-[1]', 'ui:@max-card-narrow:row-auto', 'ui:@max-card-narrow:ms-0', 'ui:@max-card-narrow:justify-start']) assert.ok(auto.actions.includes(name), `auto: ${name}`)
+	assert.ok(inline.header.includes('grid-cols-[minmax(0,1fr)_auto]') && inline.header.includes('gap-x-4'))
+	assert.ok(inline.actions.includes('col-[2]') && inline.actions.includes('row-[1/span_2]') && inline.actions.includes('justify-end'))
+	assert.ok(!inline.header.includes('@container'), 'only auto makes the header a container')
+	assert.ok(!below.header.some((name) => name.startsWith('grid-cols-')), 'below has a single column')
+	assert.ok(!below.actions.some((name) => /col-|row-|justify-end/.test(name)) && below.actions.includes('pt-1.5'))
+	assert.ok(auto.header.includes('@container') && auto.header.includes('grid-cols-[minmax(0,1fr)_auto]') && !auto.header.includes('gap-x-4'))
+	for (const name of ['col-[2]', 'ms-4', '@max-card-narrow:col-[1]', '@max-card-narrow:row-auto', '@max-card-narrow:ms-0', '@max-card-narrow:justify-start']) assert.ok(auto.actions.includes(name), `auto: ${name}`)
 	// The order of the DOM does not change: the title, the description and then the actions.
 	for (const match of html.matchAll(/<header[\s\S]*?<\/header>/g)) if (match[0].includes('Export')) assert.match(match[0], /<h2[\s\S]*Orders[\s\S]*<p[\s\S]*Today[\s\S]*Export/)
 	const header = [...html.matchAll(/<header[^>]*?class="([^"]*)"/g)].at(-1)[1]
@@ -135,10 +139,10 @@ test('actionsWrap places the actions of a card beside, below or by the width of 
 test('actionsWrap takes a default from ui.defaults, and the prop of the instance wins over it', async (context) => {
 	const html = await render(context, actionCard() + actionCard(' actionsWrap="inline"'), { card: { actionsWrap: 'auto' } })
 	const [fromDefaults, own] = headerParts(html)
-	assert.ok(fromDefaults.header.includes('ui:@container') && fromDefaults.actions.includes('ui:@max-card-narrow:col-[1]'))
-	assert.ok(!own.header.includes('ui:@container') && own.header.includes('ui:gap-x-4'))
+	assert.ok(fromDefaults.header.includes('@container') && fromDefaults.actions.includes('@max-card-narrow:col-[1]'))
+	assert.ok(!own.header.includes('@container') && own.header.includes('gap-x-4'))
 	const below = headerParts(await render(context, actionCard(), { card: { actionsWrap: 'below' } }))[0]
-	assert.ok(below.actions.includes('ui:pt-1.5') && !below.actions.includes('ui:col-[2]'))
+	assert.ok(below.actions.includes('pt-1.5') && !below.actions.includes('col-[2]'))
 })
 
 test('uiTheme sums the classes slot by slot, follows the props and reuses the merge of the same ui', () => {

@@ -46,11 +46,13 @@ instance.close('wrong')
 modal.instances.value = new Map()
 // @ts-expect-error Instance snapshots expose a read-only Map.
 modal.instances.value.clear()
-const decision: Promise<boolean> = modal.confirm({ title: 'Delete?', description: 'It cannot be undone.', tone: 'danger', confirmLabel: 'Delete', cancelLabel: 'Keep', size: 'md' })
+const decision: Promise<boolean> = modal.confirm({ title: 'Delete?', description: 'It cannot be undone.', color: 'danger', confirmLabel: 'Delete', cancelLabel: 'Keep', size: 'md' })
 void decision
 const options: UIConfirmOptions = { title: 'Discard changes?' }
 void modal.confirm(options)
 // @ts-expect-error A confirmation needs its title.
 void modal.confirm({ description: 'Missing title' })
-// @ts-expect-error The tone is neutral or danger.
-void modal.confirm({ title: 'Wrong tone', tone: 'warning' })
+// @ts-expect-error The color is one of a button.
+void modal.confirm({ title: 'Wrong color', color: 'accent' })
+// @ts-expect-error tone is gone: color: 'danger'.
+void modal.confirm({ title: 'Old tone', tone: 'danger' })

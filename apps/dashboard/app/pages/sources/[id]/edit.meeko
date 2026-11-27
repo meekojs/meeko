@@ -320,12 +320,14 @@
 			<UILink
 				if:when="original"
 				variant="outline"
+				color="neutral"
 				bind:href="localePath('/translations/' + props.params.id)"
 			>
 				{t('editor.compareOriginal')}
 			</UILink>
 			<UILink
 				variant="ghost"
+				color="neutral"
 				bind:href="localePath('/sources/' + props.params.id)"
 			>
 				{t('editor.back')}
@@ -378,7 +380,7 @@
 						>
 							<UIBadge
 								bind:dot="true"
-								bind:tone="dirty.value ? 'accent' : 'neutral'"
+								bind:color="dirty.value ? 'primary' : 'neutral'"
 							>
 								{status.value}
 							</UIBadge>
@@ -395,7 +397,7 @@
 						class="editor-wide"
 					>
 						<UIAlert
-							tone="warning"
+							color="warning"
 							bind:description="t('editor.importStale')"
 						/>
 					</div>
@@ -404,7 +406,7 @@
 						class="editor-wide"
 					>
 						<UIAlert
-							tone="info"
+							color="info"
 							bind:title="t('editor.translation.title', { title: original?.title ?? '' })"
 							bind:description="t('editor.translation.text')"
 						>
@@ -412,6 +414,7 @@
 								<UIButton
 									size="sm"
 									variant="outline"
+									color="neutral"
 									bind:disabled="stamping.value || !original?.baseHash"
 									on:click="markTranslated"
 								>
@@ -539,7 +542,7 @@
 							bind:label="t('editor.markdownLabel')"
 						>
 							<snippet name="tools">
-								<UIBadge bind:tone="tooLarge.value ? 'danger' : 'neutral'">{sizeLabel.value}</UIBadge>
+								<UIBadge bind:color="tooLarge.value ? 'danger' : 'neutral'">{sizeLabel.value}</UIBadge>
 							</snippet>
 						</UIMarkdownEditor>
 					</div>
@@ -580,6 +583,7 @@
 							<UIButton
 								size="sm"
 								variant="outline"
+								color="neutral"
 								bind:disabled="previewing.value || tooLarge.value"
 								on:click="refreshPreview"
 							>
@@ -610,12 +614,13 @@
 								each:index="index"
 								each:key="index"
 							>
-								<UIBadge bind:tone="issue.kind === 'link' ? 'accent' : 'danger'">{issueKind(issue.kind)}</UIBadge>
+								<UIBadge bind:color="issue.kind === 'link' ? 'primary' : 'danger'">{issueKind(issue.kind)}</UIBadge>
 								<code lang="en">{issue.message}</code>
 								<UIButton
 									if:when="issue.line !== null"
 									size="sm"
 									variant="ghost"
+									color="neutral"
 									on:click="() => void goToLine(issue.line ?? 1)"
 								>
 									{t('editor.preview.line', { line: String(issue.line) })}

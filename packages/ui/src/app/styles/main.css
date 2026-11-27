@@ -1,25 +1,35 @@
 /*
- * The stylesheet of @meekojs/ui, the entry that scripts/build-styles.mjs compiles with Tailwind 4 into
- * dist/styles/main.css. The app gets the compiled sheet: it needs no Tailwind of its own.
+ * The stylesheet of @meekojs/ui, the CSS entry of the package. The app compiles it with its own Tailwind 4,
+ * in one pass with its classes:
  *
- * Layers: ui.components holds the rules still written by hand, ui.utilities the ui:* classes of the
- * components. Both lose to any unlayered rule of the app, and the layer ui-base of base.css goes first.
- * `base` is Tailwind's preflight layer: declared here, before the layers of UI, an app with Tailwind
- * keeps its reset below the components instead of wiping their borders, padding and backgrounds.
+ *   @import 'tailwindcss';
+ *   @import '@meekojs/ui';
+ *
+ * Layers: the order of Tailwind, repeated here so that it holds whatever the app imports first. Tailwind's
+ * preflight (base) goes first, under the layer ui-base of base.css and under the components: it does not
+ * wipe their borders, padding or backgrounds. components holds the rules of UI still written by hand, under
+ * every utility; utilities, those of UI and those of the app. Any unlayered rule of the app wins over all of
+ * them. The tokens are unlayered, as before: an app that redefines one in its :root wins by coming later.
  */
-@layer base, ui.components, ui.utilities;
+@layer theme, base, components, utilities;
 
 @import './palette.css';
 @import './tokens.css';
 @import './fonts.css';
-@import './components.css' layer(ui.components);
-
-/* The prefix keeps the classes of UI apart from those of an app that also uses Tailwind. */
-@import 'tailwindcss/theme.css' layer(ui.theme) prefix(ui) theme(reference);
+@import './components.css' layer(components);
 @import './theme.css';
-@import 'tailwindcss/utilities.css' layer(ui.utilities) source(none);
 
-/* The classes come only from the components and their variants, never from the app. */
+/*
+ * The classes come from the components and the theme recipes of UI: from src/ in the workspace and from
+ * dist/ in the published package. Tailwind skips a folder that does not exist.
+ */
 @source '../components';
-@source '../variants';
+@source '../theme';
 @source '../../editor/components';
+@source '../../../dist/app/components';
+@source '../../../dist/app/theme';
+@source '../../../dist/editor/components';
+
+/* The raw combinations of hues generate CSS only in an app that asks for them: @import '@meekojs/ui/hues'. */
+@source not '../theme/base/hues.ts';
+@source not '../../../dist/app/theme/base/hues.*';

@@ -426,7 +426,7 @@ test('the navigation components work in a browser, with and without JavaScript',
 		const copy = block.locator('figcaption > button')
 		await copy.click()
 		await until(async () => (await copy.innerText()).trim() === 'Copiado', 'the button did not confirm')
-		assert.match(await copy.getAttribute('class'), /(^| )ui:text-success-text( |$)/, 'the color of done')
+		assert.match(await copy.getAttribute('class'), /(^| )text-success-text( |$)/, 'the color of done')
 		assert.equal(await block.locator('[role="status"]').innerText(), 'Copiado')
 		assert.equal(await page.evaluate(() => globalThis.navigator.clipboard.readText()), 'pnpm add @meekojs/ui')
 		await until(async () => (await copy.innerText()).trim() === 'Copiar', 'the button did not come back')

@@ -13,6 +13,7 @@
 			<UILink bind:href="localePath('/')">{t('errors.backHome')}</UILink>
 			<UILink
 				variant="ghost"
+				color="neutral"
 				bind:href="localePath('/sources')"
 			>
 				{t('errors.seeSources')}

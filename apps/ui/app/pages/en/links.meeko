@@ -21,6 +21,7 @@
 			<UILink
 				id="link-anchor"
 				variant="outline"
+				color="neutral"
 				bind:href="i18n.localePath('/theming')"
 			>
 				Customization
@@ -33,7 +34,7 @@
 				{ name: 'to', type: 'RouteId', description: 'A route of the application, with client-side navigation. Excludes href; with @meekojs/i18n it points to the version in the current language.' },
 				{ name: 'params / search', type: 'route params / object', description: 'With to: the params of a dynamic route (required there) and the query string.' },
 				{ name: 'href', type: 'string', description: 'Any URL. Excludes to; one of the two is required.' },
-				{ name: 'variant / size / shape', type: 'UIActionVariant / UIActionSize / UIActionShape', default: 'primary / md / rounded', description: 'The same visual API as UIButton.' },
+				{ name: 'variant / color / size / radius', type: 'UIButtonVariant / UIButtonColor / UIButtonSize / UIButtonRadius', default: 'solid / primary / md / md', description: 'The same visual API as UIButton, with width and elevation too.' },
 				{ name: 'target / rel / hreflang / download', type: 'string', description: 'Native attributes of the link. For _blank, noopener noreferrer is added when rel is not set.' },
 				{ name: 'ariaLabel', type: 'string', description: 'Accessible name when the visible content is not enough; wins over aria-label.' },
 				{ name: 'id / title / aria-* / data-*', type: 'HTML attributes', description: 'Reach the link as they are.' },

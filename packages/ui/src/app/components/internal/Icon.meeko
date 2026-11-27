@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { icon } from '../../variants/content'
+	import { iconTheme } from '../../theme/components/icon'
 
 	const props = defineProps<{ path: string; size?: 'md' | 'sm' | 'text'; class?: string }>()
 </script>
@@ -8,7 +8,7 @@
 	<svg
 		viewBox="0 0 16 16"
 		aria-hidden="true"
-		bind:class="icon({ size: props.size, class: props.class })"
+		bind:class="iconTheme({ size: props.size, class: props.class })"
 	>
 		<path bind:d="props.path" />
 	</svg>

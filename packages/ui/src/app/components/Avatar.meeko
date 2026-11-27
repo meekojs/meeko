@@ -8,10 +8,10 @@
 
 	import type { AvatarSnippets, UIAvatarProps } from '../types/avatar'
 
+	import { avatarTheme } from '../theme/components/avatar'
 	import { avatarInitials } from '../utils/avatar'
 	import { uiTheme } from '../utils/defaults'
 	import { icons } from '../utils/icons'
-	import { avatar } from '../variants/avatar'
 
 	const props = defineProps<UIAvatarProps>()
 
@@ -24,7 +24,14 @@
 	// La URL que falló: otra `src` vuelve a intentarlo.
 	const failed = signal<string | undefined>(undefined)
 
-	const classes = computed(() => avatar({ size: props.size ?? theme.defaults?.size, shape: props.shape ?? theme.defaults?.shape }))
+	const classes = computed(() =>
+		avatarTheme({
+			variant: props.variant ?? theme.defaults?.variant,
+			color: props.color ?? theme.defaults?.color,
+			radius: props.radius ?? theme.defaults?.radius,
+			size: props.size ?? theme.defaults?.size,
+		}),
+	)
 	const showImage = computed(() => Boolean(props.src) && failed.value !== props.src)
 	const initials = computed(() => avatarInitials(props.name))
 	const accessibleName = computed(() => props.label?.trim() || props.name?.trim() || undefined)

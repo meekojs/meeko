@@ -2,16 +2,16 @@
 	import type { UIMarkdownEditorMode, UIMarkdownEditorProps } from '../../app/types/markdown-editor'
 	import type { MarkdownEditorHandle } from '../crepe'
 
+	import { markdownEditorDisabled, markdownEditorMarkerLines, markdownEditorTheme } from '../../app/theme/components/markdown-editor'
 	import { uiTheme } from '../../app/utils/defaults'
 	import { uiMessages } from '../../app/utils/messages'
-	import { markdownEditor, markdownEditorDisabled, markdownEditorMarkerLines } from '../../app/variants/markdown-editor'
 	import { loadMarkdownEditor } from '../load'
 
 	const props = defineProps<UIMarkdownEditorProps>()
 
 	const theme = uiTheme('markdownEditor', () => props)
 
-	const classes = markdownEditor()
+	const classes = markdownEditorTheme()
 
 	const value = defineModel<string>({ default: '' })
 

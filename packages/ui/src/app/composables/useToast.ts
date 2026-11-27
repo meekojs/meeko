@@ -13,7 +13,7 @@ const toastKey = createContext<UIToastContext>('@meekojs/ui/toast')
  * ```ts
  * import { useToast } from '@meekojs/ui/runtime'
  * const toast = useToast()
- * toast.add({ text: 'Cambios guardados', tone: 'success', duration: 5000 })
+ * toast.add({ text: 'Cambios guardados', color: 'success', duration: 5000 })
  * ```
  */
 export function useToast(): UIToastContext {

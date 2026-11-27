@@ -8,9 +8,10 @@ import { routeKey } from '../../meeko/dist/app/runtime/navigation.js'
 import { checkSource } from '../../meeko/dist/check.js'
 import { compile } from '../../meeko/dist/compiler.js'
 import { createRoot, provide } from '../../meeko/dist/index.js'
+import { radioGroupTheme as radioGroup } from '../dist/app/theme/components/radio-group.js'
+import { segmentedControlTheme as segmentedControl } from '../dist/app/theme/components/segmented-control.js'
 import { uiDefaultsKey } from '../dist/app/utils/defaults.js'
 import { builtinMessages } from '../dist/app/utils/messages.js'
-import { radioGroup, segmentedControl } from '../dist/app/variants/choice.js'
 import { validateDefaults } from '../dist/defaults.js'
 
 const components = ['Popover', 'Menu', 'SegmentedControl', 'RadioGroup']
@@ -28,7 +29,7 @@ async function render(context, template, defaults) {
 			.replaceAll('from "@meekojs/meeko"', `from ${runtime('index.js')}`)
 			.replace(/from ["']\.\/internal\/Icon\.meeko["']/g, 'from "./Icon.ts"')
 			.replace(/from ["']\.\/(\w+)\.meeko["']/g, 'from "./$1.ts"')
-			.replace(/from ["'](?:\.\.\/)+(utils|variants)\/([\w-]+)["']/g, (_, folder, utility) => `from ${JSON.stringify(new URL(`../dist/app/${folder}/${utility}.js`, import.meta.url).href)}`)
+			.replace(/from ["'](?:\.\.\/)+(utils|theme(?:\/components)?)\/([\w-]+)["']/g, (_, folder, utility) => `from ${JSON.stringify(new URL(`../dist/app/${folder}/${utility}.js`, import.meta.url).href)}`)
 		await writeFile(`${directory}/${file}.ts`, code)
 	}
 	await write('Icon', await readFile(new URL('../src/app/components/internal/Icon.meeko', import.meta.url), 'utf8'))
@@ -64,7 +65,7 @@ const items = `[
 	{ label: 'Archivar', disabled: true },
 	{ label: 'Perdido', href: '/gone', disabled: true },
 	{ separator: true },
-	{ label: 'Eliminar', tone: 'danger' },
+	{ label: 'Eliminar', color: 'danger' },
 ]`
 
 test('UIMenu renders the Menu Button pattern on the server: trigger, menu, items, links and separators', { timeout: 60_000 }, async (context) => {
@@ -82,7 +83,7 @@ test('UIMenu renders the Menu Button pattern on the server: trigger, menu, items
 	assert.match(menu, /^<span/, 'the content is phrasing content, valid inside a <p>')
 	assert.equal(attribute(trigger, 'aria-label'), undefined, 'a trigger with text is named by its text')
 	assert.match(html, /<button[^>]*aria-haspopup="menu"[^>]*>Acciones\s*<svg[^>]*aria-hidden="true"/, 'the text and a chevron')
-	assert.ok(classes(trigger).includes('ui:bg-control'), 'a trigger with text is a secondary button')
+	assert.ok(classes(trigger).includes('bg-neutral-2') && classes(trigger).includes('border-neutral-6'), 'a trigger with text is a neutral surface button')
 
 	const menuitems = tags(html, /role="menuitem"/)
 	assert.equal(menuitems.length, 7, 'six items of the data and one of the snippet')
@@ -100,12 +101,12 @@ test('UIMenu renders the Menu Button pattern on the server: trigger, menu, items
 	assert.match(lost, /^<a/)
 	assert.equal(attribute(lost, 'href'), undefined, 'a disabled link goes nowhere')
 	assert.equal(attribute(lost, 'aria-disabled'), 'true')
-	assert.ok(classes(remove).includes('ui:text-danger-text'), 'the danger tone')
-	assert.ok(!classes(rename).includes('ui:text-danger-text'))
+	assert.ok(classes(remove).includes('text-danger-11') && classes(remove).includes('not-aria-disabled:hover:bg-danger-3'), 'the danger color')
+	assert.ok(!classes(rename).includes('text-danger-11'))
 	assert.equal(own, '<button type="button" role="menuitem">', 'the items of the snippet go after those of the data')
 	const separator = tag(html, /role="separator"/)
 	assert.match(separator, /^<span/)
-	assert.ok(classes(separator).includes('ui:bg-border'))
+	assert.ok(classes(separator).includes('bg-border'))
 	assert.doesNotMatch(html, /undefined|\bto="/)
 })
 
@@ -113,13 +114,13 @@ test('UIMenu without a text or a trigger is an icon button named by the messages
 	const html = await render(context, `<UIMenu bind:items="[{ label: 'Uno' }]" /><UIMenu ariaLabel="Acciones de la fila" size="sm" variant="outline" placement="bottom-end" bind:items="[{ label: 'Dos' }]" /><UIMenu label="Cuenta" bind:disabled="true"><snippet name="trigger"><img alt="Mi cuenta" src="/me.png"></snippet></UIMenu>`)
 	const [plain, named, custom] = tags(html, /aria-haspopup=/)
 	assert.equal(attribute(plain, 'aria-label'), builtinMessages.es.menu.trigger)
-	assert.ok(classes(plain).includes('ui:p-0') && classes(plain).includes('ui:bg-transparent'), 'a square ghost button')
+	assert.ok(classes(plain).includes('p-0') && classes(plain).includes('bg-transparent'), 'a square ghost button')
 	assert.match(html, /aria-label="Más acciones"[^>]*>\s*<svg[^>]*>\s*<path d="M2\.75 8a/, 'the three dots')
 	assert.equal(attribute(named, 'aria-label'), 'Acciones de la fila')
-	assert.ok(classes(named).includes('ui:min-h-(--ui-control-height-sm)'))
-	assert.ok(classes(named).includes('ui:border-control-border'), 'the variant of the trigger')
+	assert.ok(classes(named).includes('min-h-(--ui-control-height-sm)'))
+	assert.ok(classes(named).includes('border-control-border'), 'the variant of the trigger')
 	const menus = tags(html, /role="menu"/)
-	assert.ok(classes(menus[1]).includes('ui:[position-area:bottom_span-left]'), 'placement')
+	assert.ok(classes(menus[1]).includes('[position-area:bottom_span-left]'), 'placement')
 	assert.equal(attribute(custom, 'aria-label'), undefined, 'the content of the snippet names it')
 	assert.match(custom, /\sdisabled(?:=""|\s|>)/)
 	assert.match(html, /<button[^>]*aria-haspopup="menu"[^>]*><img alt="Mi cuenta" src="\/me.png"><\/button>/)
@@ -130,7 +131,7 @@ test('UIMenu without a text or a trigger is an icon button named by the messages
 test('UIMenu takes class and ui, after those of ui.defaults, and paints an item snippet', { timeout: 60_000 }, async (context) => {
 	const html = await render(context, `<UIMenu triggerLabel="Más" class="my-menu" bind:ui="{ item: 'my-item', trigger: 'my-trigger', separator: 'my-line' }" bind:items="[{ label: 'Uno', value: 'one' }, { separator: true }]"><snippet name="item" params="item"><strong>{item.label}!</strong></snippet></UIMenu>`, { menu: { class: 'app-menu', ui: { item: 'app-item' } } })
 	const menu = classes(tag(html, /role="menu"/))
-	assert.ok(menu.includes('ui:min-w-(--ui-page-aside-width)'), 'the look of a menu of <UIPopover>')
+	assert.ok(menu.includes('min-w-(--ui-page-aside-width)'), 'the look of a menu of <UIPopover>')
 	assert.ok(menu.indexOf('app-menu') < menu.indexOf('my-menu') && menu.indexOf('app-menu') >= 0)
 	const item = classes(tag(html, /role="menuitem"/))
 	assert.ok(item.indexOf('app-item') < item.indexOf('my-item') && item.indexOf('app-item') >= 0)
@@ -145,7 +146,7 @@ test('UISegmentedControl renders native radios with a hidden legend, a size, a t
 	assert.equal(fieldsets.length, 3)
 	assert.match(html, /<legend[^>]*>Periodo<\/legend>/, 'the legend names the group, without whitespace')
 	const legend = classes(tag(html, /<legend/))
-	assert.ok(legend.includes('ui:[clip-path:inset(50%)]'), 'only for screen readers')
+	assert.ok(legend.includes('[clip-path:inset(50%)]'), 'only for screen readers')
 	const radios = tags(html, /type="radio"/)
 	assert.equal(radios.length, 9)
 	assert.ok(
@@ -156,14 +157,14 @@ test('UISegmentedControl renders native radios with a hidden legend, a size, a t
 	assert.match(radios[2], /\sdisabled/)
 	assert.notEqual(attribute(radios[3], 'name'), attribute(radios[6], 'name'), 'a generated name per group')
 	const options = tags(html, /<label/)
-	assert.ok(classes(options[0]).includes('ui:text-control-sm'))
-	assert.ok(classes(options[0]).includes('ui:whitespace-nowrap') && classes(options[0]).includes('ui:shrink-0'), 'an option never breaks')
+	assert.ok(classes(options[0]).includes('text-control-sm'))
+	assert.ok(classes(options[0]).includes('whitespace-nowrap') && classes(options[0]).includes('shrink-0'), 'an option never breaks')
 	const track = classes(tags(html, /<div/)[0])
-	assert.ok(track.includes('ui:overflow-x-auto') && track.includes('ui:flex-nowrap') && track.includes('ui:max-w-full'), 'the track scrolls inside its width')
+	assert.ok(track.includes('overflow-x-auto') && track.includes('flex-nowrap') && track.includes('max-w-full'), 'the track scrolls inside its width')
 	assert.equal(attribute(fieldsets[0], 'aria-label'), undefined)
 	assert.equal(attribute(fieldsets[1], 'aria-label'), 'Vista')
 	assert.equal(tags(html, /<legend/).length, 2, 'ariaLabel instead of a legend')
-	assert.ok(classes(options[3]).includes('ui:text-control-sm'), 'the size of ui.defaults')
+	assert.ok(classes(options[3]).includes('text-control-sm'), 'the size of ui.defaults')
 	const last = classes(fieldsets[2])
 	assert.ok(last.indexOf('app-segmented') < last.indexOf('mine') && last.indexOf('app-segmented') >= 0)
 	assert.ok(classes(tags(html, /<div/)[2]).includes('app-track'))
@@ -173,24 +174,25 @@ test('UISegmentedControl renders native radios with a hidden legend, a size, a t
 
 test('an explicit size wins over the one of ui.defaults, and ui.defaults validates both components', { timeout: 60_000 }, async (context) => {
 	const html = await render(context, `<UISegmentedControl legend="P" size="md" bind:options="days" />`, { segmentedControl: { size: 'sm' } })
-	assert.ok(classes(tag(html, /<label/)).includes('ui:text-control-md'))
+	assert.ok(classes(tag(html, /<label/)).includes('text-control-md'))
 	validateDefaults({ menu: { class: 'a', ui: { item: 'b', shortcut: 'c' } }, segmentedControl: { size: 'md', ui: { legend: 'd' } } })
 	assert.throws(() => validateDefaults({ segmentedControl: { size: 'lg' } }), /use one of sm, md/)
 	assert.throws(() => validateDefaults({ menu: { ui: { list: 'x' } } }), /its slots are base, trigger, chevron, item, icon, label, shortcut, separator/)
 	assert.throws(() => validateDefaults({ menu: { tone: 'danger' } }), /unknown option defaults.menu.tone/)
+	assert.throws(() => validateDefaults({ menu: { color: 'danger' } }), /unknown option defaults.menu.color/)
 })
 
 test('the segments of UIRadioGroup keep their classes, which UISegmentedControl shares', () => {
-	const group = radioGroup({ variant: 'segmented' })
+	const group = radioGroup({ layout: 'segmented' })
 	for (const slot of ['options', 'option']) {
 		for (const name of group[slot]()
 			.split(' ')
-			.filter((name) => !/min-h|px-3|outline-offset|w-fit|flex-wrap|ui:text-md|leading-normal/.test(name))) {
+			.filter((name) => !/min-h|px-3|outline-offset|w-fit|flex-wrap|text-md|leading-normal/.test(name))) {
 			assert.ok(segmentedControl()[slot]().split(' ').includes(name), `${slot}: ${name}`)
 		}
 	}
-	assert.ok(segmentedControl().input().includes('ui:opacity-(--ui-opacity-hidden)'), 'the input covers its segment, unseen')
-	assert.match(group.options(), /ui:flex-wrap/, 'a radio group still wraps')
+	assert.ok(segmentedControl().input().includes('opacity-(--ui-opacity-hidden)'), 'the input covers its segment, unseen')
+	assert.match(group.options(), /flex-wrap/, 'a radio group still wraps')
 })
 
 test('every text of the menu has Spanish and English', () => {
@@ -213,12 +215,13 @@ const days = signal('7');
 const open = signal(false);
 const chosen = signal('');
 </script>
-<template><UIMenu triggerLabel="Acciones" placement="bottom-end" model="open" bind:items="[{ label: 'Uno', onSelect: (item) => (chosen.value = item.label) }, { label: 'Dos', href: '/dos' }, { separator: true }, { label: 'Tres', tone: 'danger', shortcut: 'Supr' }]" on:select="(item) => (chosen.value = item.label.toUpperCase())"><snippet name="item" params="item"><b>{item.label.toUpperCase()}</b></snippet></UIMenu><UISegmentedControl legend="Periodo" hideLegend size="sm" model="days" bind:options="[{ value: '7', label: '7 días' }]" /><UISegmentedControl ariaLabel="Vista" bind:options="[]" /></template>`
+<template><UIMenu triggerLabel="Acciones" placement="bottom-end" model="open" bind:items="[{ label: 'Uno', onSelect: (item) => (chosen.value = item.label) }, { label: 'Dos', href: '/dos' }, { separator: true }, { label: 'Tres', color: 'danger', shortcut: 'Supr' }]" on:select="(item) => (chosen.value = item.label.toUpperCase())"><snippet name="item" params="item"><b>{item.label.toUpperCase()}</b></snippet></UIMenu><UISegmentedControl legend="Periodo" hideLegend size="sm" model="days" bind:options="[{ value: '7', label: '7 días' }]" /><UISegmentedControl ariaLabel="Vista" bind:options="[]" /></template>`
 	const errors = (diagnostics) => diagnostics.filter((item) => item.severity !== 'warning')
 	assert.deepEqual(errors(await checkSource(source, filename)), [])
 	for (const [broken, pattern] of [
 		[source.replace('placement="bottom-end"', 'placement="sideways"'), /sideways/],
-		[source.replace("tone: 'danger'", "tone: 'warning'"), /warning/],
+		[source.replace("color: 'danger'", "color: 'warning'"), /warning/],
+		[source.replace("color: 'danger'", "tone: 'danger'"), /tone/],
 		[source.replace("href: '/dos' }", "href: '/dos', onSelect: () => {} }"), /onSelect|never/],
 		[source.replace('item.label.toUpperCase())"', 'item.missing)"'), /missing/],
 		[source.replace('{item.label.toUpperCase()}', '{item.label.toFixed()}'), /toFixed/],

@@ -8,6 +8,12 @@
 		error.value = name.value.trim() ? undefined : 'Escribe un nombre.'
 		saved.value = !error.value
 	}
+	const from = signal('')
+	const to = signal('')
+	const applied = signal('')
+	const changes = signal(0)
+	const salesFrom = signal('')
+	const salesTo = signal('')
 	function reset() {
 		name.value = ''
 		error.value = undefined
@@ -53,6 +59,7 @@
 					<UIButton type="submit">Guardar nombre</UIButton>
 					<UIButton
 						variant="outline"
+						color="neutral"
 						on:click="reset"
 					>
 						Restablecer
@@ -67,7 +74,7 @@
 			</form>
 		</DocsPreview>
 		<DocsCode bind:code="examples.form" />
-		<UIAlert tone="info">
+		<UIAlert color="info">
 			UIField entrega
 			<code>id</code>
 			y
@@ -88,16 +95,147 @@
 				{ name: 'class', type: 'string', description: 'Clases adicionales.' },
 			]"
 		/>
+		<h2 id="appearance">Apariencia de Input</h2>
+		<DocsPreview>
+			<label for="appearance-email">Correo de trabajo</label>
+			<UIInput
+				id="appearance-email"
+				type="email"
+				placeholder="name@example.com"
+				variant="surface"
+				color="primary"
+				size="lg"
+				radius="lg"
+			/>
+			<label for="appearance-input-outline">outline</label>
+			<UIInput
+				id="appearance-input-outline"
+				variant="outline"
+				color="primary"
+			/>
+			<label for="appearance-input-ghost">ghost</label>
+			<UIInput
+				id="appearance-input-ghost"
+				variant="ghost"
+				color="primary"
+			/>
+			<label for="appearance-input-soft">soft</label>
+			<UIInput
+				id="appearance-input-soft"
+				variant="soft"
+				color="primary"
+			/>
+		</DocsPreview>
+		<DocsCode bind:code="examples.inputAppearance" />
 		<DocsApi
 			caption="Propiedades de UIInput"
 			bind:rows="[
 				{ name: 'model', type: 'Signal<string>', default: 'Cadena vacía', description: 'Modelo de texto de doble vía; se actualiza con input.' },
+				{ name: 'variant', type: 'outline | surface | soft | ghost', default: 'outline', description: 'Tratamiento visual. outline es el campo de siempre y ghost deja sólo la línea inferior.' },
+				{ name: 'color', type: 'primary | secondary | neutral | success | info | warning | danger', default: 'neutral', description: 'Color semántico del fondo y del texto. El borde sigue siendo el de los controles, o el de peligro con invalid.' },
+				{ name: 'size', type: 'xs | sm | md | lg | xl', default: 'md', description: 'Alto y relleno del control, sobre los tokens --ui-control-*.' },
+				{ name: 'radius', type: 'none | xs | sm | md | lg | xl | 2xl | 3xl | full', default: 'md', description: 'Radio del contorno.' },
 				{ name: 'type', type: 'text | email | password | search | url | tel | number | date | datetime-local | time | month', default: 'text', description: 'Tipo nativo del control. La fecha y la hora son las del navegador. Con number, time y month el modelo sigue siendo texto («42», «09:30», «2026-11» o vacío): conviértelo donde lo uses.' },
 				{ name: 'autocomplete / inputmode / min / max / step', type: 'atributos HTML', description: 'Llegan tal cual al input, como autocapitalize y spellcheck.' },
 				{ name: 'id / name / placeholder', type: 'string', description: 'Atributos del input.' },
 				{ name: 'describedBy', type: 'string', description: 'IDs de descripción y error para aria-describedby.' },
 				{ name: 'required / disabled / invalid', type: 'boolean', default: 'false', description: 'Estado del control. invalid activa aria-invalid.' },
 				{ name: 'class', type: 'string', description: 'Clases adicionales.' },
+			]"
+		/>
+		<h2 id="date-range">Rango de fechas: UIDateRange</h2>
+		<p>
+			Dos
+			<code>input type="date"</code>
+			nativos, «Desde» y «Hasta», en un
+			<code>fieldset</code>
+			con nombre, y unos atajos. Los modelos
+			<code>model:from</code>
+			y
+			<code>model:to</code>
+			son texto
+			<code>YYYY-MM-DD</code>
+			(o vacío) y siguen a lo que escribe el usuario; el evento
+			<code>change</code>
+			sólo llega con un rango completo, válido y nuevo. Prueba un rango al revés o de más de 31 días.
+		</p>
+		<DocsPreview layout="stack">
+			<UIDateRange
+				id="date-range-demo"
+				label="Periodo"
+				fromName="desde"
+				toName="hasta"
+				min="2020-01-01"
+				model:from="from"
+				model:to="to"
+				bind:maxDays="31"
+				on:change="
+					(range) => {
+						applied.value = range.from + ' → ' + range.to
+						changes.value++
+					}
+				"
+			/>
+			<p
+				id="date-range-status"
+				class="docs-status"
+				role="status"
+			>
+				{applied.value ? 'Rango aplicado: ' + applied.value + ' (' + changes.value + ')' : 'Sin rango aplicado.'}
+			</p>
+		</DocsPreview>
+		<DocsCode bind:code="examples.dateRange" />
+		<p>
+			Los atajos por defecto son «Hoy», «7 días» (hoy y los seis anteriores), «Este mes» (del día 1 a hoy) y «Mes anterior», con los textos de
+			<code>ui.messages</code>; el que coincide con el rango lleva <code>aria-pressed="true"</code>.
+			<code>presets</code>
+			los sustituye y
+			<code>bind:presets="[]"</code>
+			los quita. Para que el HTML del servidor ya los traiga activos, pasa
+			<code>today</code>: sin esa prop el componente nunca lee el reloj al pintar, así que los atajos esperan deshabilitados y se activan al montar con la fecha local del navegador.
+		</p>
+		<p>
+			Dentro de
+			<code>UIField</code>
+			recibe el id y la descripción como los demás controles, y el grupo toma su nombre de la etiqueta del campo.
+		</p>
+		<DocsPreview layout="stack">
+			<UIField
+				id="sales-period"
+				label="Periodo de ventas"
+				hint="Hasta 366 días"
+			>
+				<snippet
+					name="default"
+					params="id, describedBy"
+				>
+					<UIDateRange
+						model:from="salesFrom"
+						model:to="salesTo"
+						bind:id="id"
+						bind:describedBy="describedBy"
+						bind:maxDays="366"
+						bind:presets="[]"
+					/>
+				</snippet>
+			</UIField>
+		</DocsPreview>
+		<DocsCode bind:code="examples.dateRangeField" />
+		<DocsApi
+			caption="Propiedades de UIDateRange"
+			bind:rows="[
+				{ name: 'model:from / model:to', type: 'Signal<string>', default: 'Cadena vacía', description: 'Las dos fechas, YYYY-MM-DD o vacías, de doble vía.' },
+				{ name: 'label / ariaLabel', type: 'string', description: 'Leyenda visible o nombre accesible del grupo; sin ninguno, la etiqueta de UIField o «Periodo».' },
+				{ name: 'fromLabel / toLabel', type: 'string', default: 'Desde / Hasta', description: 'Etiquetas de las dos fechas.' },
+				{ name: 'fromName / toName / form', type: 'string', description: 'Envío en un formulario.' },
+				{ name: 'min / max', type: 'YYYY-MM-DD', description: 'Límites nativos de los dos campos y de la validación.' },
+				{ name: 'maxDays', type: 'number', description: 'Días que puede tener el rango, contando ambos extremos.' },
+				{ name: 'today', type: 'YYYY-MM-DD', description: 'Hoy para los atajos; sin ella, se activan al montar.' },
+				{ name: 'presets', type: 'readonly UIDateRangePreset[]', default: 'Hoy, 7 días, Este mes, Mes anterior', description: 'label y range(today) → { from, to }. [] los quita.' },
+				{ name: 'required / disabled / invalid', type: 'boolean', default: 'false', description: 'Estado de las fechas; disabled también deshabilita los atajos.' },
+				{ name: 'id / describedBy', type: 'string', description: 'Los que entrega UIField.' },
+				{ name: 'change', type: 'evento: UIDateRangeValue', description: 'Un rango completo, válido y distinto del anterior.' },
+				{ name: 'class / ui', type: 'string / objeto', description: 'Clases del fieldset y de base, legend, presets, preset, fields, field, fieldLabel, input y error.' },
 			]"
 		/>
 		<h2 id="other-controls">Otros controles</h2>

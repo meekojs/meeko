@@ -1,6 +1,6 @@
 /*
- * What <UIModal> cannot say with utilities (variants/modal.ts): the pseudo-elements of the View Transition
- * of its exit, which belong to the document, and its keyframes. variants/modal names the closing dialog
+ * What <UIModal> cannot say with utilities (theme/components/modal.ts): the pseudo-elements of the View Transition
+ * of its exit, which belong to the document, and its keyframes. theme/components/modal names the closing dialog
  * `ui-modal` only during this type, and <UICommandPalette> shares it.
  */
 html:active-view-transition-type(ui-modal-close)::view-transition-group(root) {

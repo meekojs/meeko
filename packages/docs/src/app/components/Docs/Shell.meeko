@@ -117,7 +117,7 @@
 				</snippet>
 				<UITableOfContents
 					if:when="hasToc.value"
-					variant="collapsible"
+					layout="collapsible"
 					bind:entries="props.view.toc ?? []"
 				/>
 				<DocsUntranslated

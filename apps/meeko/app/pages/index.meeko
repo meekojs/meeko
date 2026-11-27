@@ -111,6 +111,7 @@
 					<UILink href="#inicio-rápido">{t('home.hero.start')}</UILink>
 					<UIButton
 						variant="outline"
+						color="neutral"
 						class="copy-command"
 						on:click="copyCommand"
 					>
@@ -121,7 +122,7 @@
 							$
 						</span>
 						<code>{command}</code>
-						<UIBadge bind:tone="copied.value === 'done' ? 'success' : copied.value === 'error' ? 'danger' : 'neutral'">{copied.value === 'done' ? t('actions.copied') : copied.value === 'error' ? t('actions.copyFailed') : t('actions.copy')}</UIBadge>
+						<UIBadge bind:color="copied.value === 'done' ? 'success' : copied.value === 'error' ? 'danger' : 'neutral'">{copied.value === 'done' ? t('actions.copied') : copied.value === 'error' ? t('actions.copyFailed') : t('actions.copy')}</UIBadge>
 					</UIButton>
 				</div>
 				<p class="meta">
@@ -810,6 +811,7 @@
 						<UILink bind:href="quickStartPage">{t('home.start.full')}</UILink>
 						<UILink
 							variant="outline"
+							color="neutral"
 							bind:href="framework"
 						>
 							{t('home.start.guide')}

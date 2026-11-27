@@ -23,7 +23,7 @@ async function render(context, template, { defaults } = {}) {
 			.code.replaceAll('from "@meekojs/meeko/internal"', `from ${runtime('internal.js')}`)
 			.replaceAll('from "@meekojs/meeko"', `from ${runtime('index.js')}`)
 			.replace(/from ["']\.\/(\w+)\.meeko["']/g, 'from "./$1.ts"')
-			.replace(/from ["'](?:\.\.\/)+(utils|variants)\/([\w-]+)["']/g, (_, folder, utility) => `from ${JSON.stringify(new URL(`../dist/app/${folder}/${utility}.js`, import.meta.url).href)}`)
+			.replace(/from ["'](?:\.\.\/)+(utils|theme(?:\/components)?)\/([\w-]+)["']/g, (_, folder, utility) => `from ${JSON.stringify(new URL(`../dist/app/${folder}/${utility}.js`, import.meta.url).href)}`)
 		await writeFile(`${directory}/${file}.ts`, code)
 	}
 	await write('Avatar', await readFile(new URL('../src/app/components/Avatar.meeko', import.meta.url), 'utf8'))
@@ -57,23 +57,24 @@ test('avatarInitials takes the first letter of up to two words, and only the fir
 	assert.equal(avatarInitials(undefined), '')
 })
 
-test('UIAvatar without src paints the initials as an image named by name, with the tokens of its size and shape', async (context) => {
+test('UIAvatar without src paints the initials as an image named by name, with the tokens of its size and a soft primary circle', async (context) => {
 	const html = await render(context, '<UIAvatar name="Ana Pérez" />')
 	const box = element(html, 'span')
 	assert.equal(box.attributes.role, 'img')
 	assert.equal(box.attributes['aria-label'], 'Ana Pérez')
 	assert.equal(box.attributes['aria-hidden'], undefined)
-	for (const name of ['ui:size-(--ui-avatar-size-md)', 'ui:text-(length:--ui-avatar-font-size-md)', 'ui:rounded-full', 'ui:bg-(color:--ui-avatar-bg)', 'ui:text-(color:--ui-avatar-color)']) assert.ok(box.classes.includes(name), name)
+	for (const name of ['size-(--ui-avatar-size-md)', 'text-(length:--ui-avatar-font-size-md)', 'rounded-full', 'bg-primary-3', 'text-primary-11']) assert.ok(box.classes.includes(name), name)
+	assert.ok(!box.classes.some((name) => name.startsWith('not-disabled:')), 'an avatar does not react to the pointer')
 	assert.match(html, /<span[^>]*>AP<\/span>$/)
 	assert.doesNotMatch(html, /<img|<svg|undefined/)
 })
 
-test('UIAvatar of an email shows one letter; label wins as the accessible name; size and shape change the box', async (context) => {
-	const html = await render(context, '<UIAvatar name="ana@example.com" label="Tu cuenta" size="sm" shape="rounded" class="mine" bind:ui="{ base: \'my-base\' }" />')
+test('UIAvatar of an email shows one letter; label wins as the accessible name; size, radius, variant and color change the box', async (context) => {
+	const html = await render(context, '<UIAvatar name="ana@example.com" label="Tu cuenta" size="sm" radius="md" variant="solid" color="success" class="mine" bind:ui="{ base: \'my-base\' }" />')
 	const box = element(html, 'span')
 	assert.equal(box.attributes['aria-label'], 'Tu cuenta')
-	for (const name of ['ui:size-(--ui-avatar-size-sm)', 'ui:rounded-(--ui-avatar-radius)', 'my-base', 'mine']) assert.ok(box.classes.includes(name), name)
-	assert.ok(!box.classes.includes('ui:rounded-full'))
+	for (const name of ['size-(--ui-avatar-size-sm)', 'rounded-md', 'bg-success-9', 'text-success-contrast', 'my-base', 'mine']) assert.ok(box.classes.includes(name), name)
+	for (const name of ['rounded-full', 'bg-primary-3']) assert.ok(!box.classes.includes(name), name)
 	assert.match(html, />A<\/span>$/)
 })
 
@@ -82,10 +83,10 @@ test('UIAvatar without name paints the person glyph, hidden, or the fallback sni
 	const box = element(glyph, 'span')
 	assert.equal(box.attributes.role, undefined)
 	assert.equal(box.attributes['aria-label'], undefined)
-	assert.ok(box.classes.includes('ui:size-(--ui-avatar-size-lg)'))
+	assert.ok(box.classes.includes('size-(--ui-avatar-size-lg)'))
 	const svg = element(glyph, 'svg')
 	assert.equal(svg.attributes['aria-hidden'], 'true')
-	assert.ok(svg.classes.includes('ui:size-3/5'))
+	assert.ok(svg.classes.includes('size-3/5'))
 	assert.match(glyph, new RegExp(`<path d="${icons.person}"`))
 	const fallback = await render(context, '<UIAvatar label="Invitado"><snippet name="fallback"><b>?</b></snippet></UIAvatar>')
 	assert.equal(element(fallback, 'span').attributes['aria-label'], 'Invitado')
@@ -105,7 +106,7 @@ test('UIAvatar with src paints an <img> whose alt is the name, without a role on
 	const image = element(html, 'img')
 	assert.equal(image.attributes.src, '/ana.webp')
 	assert.equal(image.attributes.alt, 'Ana Pérez')
-	for (const name of ['ui:object-cover', 'ui:size-full', 'my-image']) assert.ok(image.classes.includes(name), name)
+	for (const name of ['object-cover', 'size-full', 'my-image']) assert.ok(image.classes.includes(name), name)
 	// Las iniciales sólo llegan si la imagen falla, al hidratar.
 	assert.doesNotMatch(html, />AP</)
 	const nameless = await render(context, '<UIAvatar src="/x.webp" />')
@@ -124,16 +125,18 @@ test('UIAvatar decorative is aria-hidden, with an empty alt and no role', async 
 	assert.equal(element(image, 'img').attributes.alt, '')
 })
 
-test('ui.defaults.avatar gives size, shape, class and ui; the instance wins; it is validated', async (context) => {
-	const defaults = { avatar: { size: 'lg', shape: 'rounded', class: 'app-avatar', ui: { glyph: 'app-glyph' } } }
+test('ui.defaults.avatar gives size, radius, variant, color, class and ui; the instance wins; it is validated', async (context) => {
+	const defaults = { avatar: { size: 'lg', radius: 'md', variant: 'surface', color: 'neutral', class: 'app-avatar', ui: { glyph: 'app-glyph' } } }
 	validateDefaults(defaults)
 	const themed = await render(context, '<UIAvatar />', { defaults })
 	const box = element(themed, 'span')
-	for (const name of ['ui:size-(--ui-avatar-size-lg)', 'ui:rounded-(--ui-avatar-radius)', 'app-avatar']) assert.ok(box.classes.includes(name), name)
+	for (const name of ['size-(--ui-avatar-size-lg)', 'rounded-md', 'bg-neutral-2', 'border-neutral-6', 'app-avatar']) assert.ok(box.classes.includes(name), name)
 	assert.ok(element(themed, 'svg').classes.includes('app-glyph'))
-	const own = await render(context, '<UIAvatar name="Ana" size="sm" shape="circle" />', { defaults })
-	assert.ok(element(own, 'span').classes.includes('ui:size-(--ui-avatar-size-sm)'))
-	assert.ok(element(own, 'span').classes.includes('ui:rounded-full'))
+	const own = await render(context, '<UIAvatar name="Ana" size="sm" radius="full" color="danger" />', { defaults })
+	assert.ok(element(own, 'span').classes.includes('size-(--ui-avatar-size-sm)'))
+	assert.ok(element(own, 'span').classes.includes('rounded-full'))
+	assert.ok(element(own, 'span').classes.includes('bg-danger-2'), 'the color of the instance with the variant of ui.defaults')
+	assert.throws(() => validateDefaults({ avatar: { shape: 'rounded' } }), /unknown option defaults\.avatar\.shape/)
 	assert.throws(() => validateDefaults({ avatar: { size: 'xl' } }), /invalid defaults\.avatar\.size/)
 	assert.throws(() => validateDefaults({ avatar: { ui: { initials: 'x' } } }), /unknown slot initials in defaults\.avatar\.ui/)
 })

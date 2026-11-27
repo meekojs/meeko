@@ -3,6 +3,11 @@ import { examples as spanish } from './examples'
 /** Copiable examples of the English pages: the same keys, with their texts and comments in English. What has none is shared. */
 export const englishExamples = {
 	...spanish,
+	stylesWithoutPreflight: `/* Tailwind without its preflight: its theme and its utilities, in their layers */
+@layer theme, base, components, utilities;
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities);
+@import '@meekojs/ui';`,
 	container: `<UIContainer as="section" size="4k" gutter="md" ariaLabel="Projects">
   <h2>Team projects</h2>
   <p>Centered content, with responsive side spacing.</p>
@@ -20,10 +25,83 @@ export const englishExamples = {
 
 <template>
 <UIButton on:click="() => count.value++">Save changes</UIButton>
-<UIButton variant="outline">Cancel</UIButton>
+<UIButton variant="outline" color="neutral">Cancel</UIButton>
 <UIButton size="sm" disabled>Unavailable</UIButton>
 <p role="status">Changes: {count.value}</p>
 </template>`,
+	buttonAppearance: `<UIButton variant="solid" color="primary" size="lg" radius="full" elevation="sm">Save</UIButton>
+<UIButton variant="soft" color="success" size="sm">Publish</UIButton>
+<UIButton variant="outline" color="info">outline</UIButton>
+<UIButton variant="ghost" color="primary">ghost</UIButton>
+<UIButton variant="link" color="primary">link</UIButton>`,
+	badgeAppearance: `<UIBadge variant="solid" color="info" radius="sm">Published</UIBadge>
+<UIBadge
+	dot
+	variant="outline"
+	color="warning"
+	radius="full"
+>
+	Pending
+</UIBadge>
+<UIBadge variant="soft" color="success">soft</UIBadge>
+<UIBadge variant="surface" color="info">surface</UIBadge>`,
+	inputAppearance: `<label for="appearance-email">Work email</label>
+<UIInput
+	id="appearance-email"
+	type="email"
+	placeholder="name@example.com"
+	variant="surface"
+	color="primary"
+	size="lg"
+	radius="lg"
+/>
+<label for="appearance-input-outline">outline</label>
+<UIInput
+	id="appearance-input-outline"
+	variant="outline"
+	color="primary"
+/>
+<label for="appearance-input-ghost">ghost</label>
+<UIInput
+	id="appearance-input-ghost"
+	variant="ghost"
+	color="primary"
+/>
+<label for="appearance-input-soft">soft</label>
+<UIInput
+	id="appearance-input-soft"
+	variant="soft"
+	color="primary"
+/>`,
+	cardTheme: `<UICard
+	title="Weekly summary"
+	color="primary"
+	radius="xl"
+	elevation="md"
+>
+	3 projects updated
+</UICard>
+<UICard
+	title="outline"
+	variant="outline"
+	color="primary"
+>
+	3 projects updated
+</UICard>
+<UICard
+	title="glass"
+	variant="glass"
+	color="primary"
+>
+	3 projects updated
+</UICard>
+<UICard
+	title="plain"
+	variant="plain"
+	color="primary"
+>
+	3 projects updated
+</UICard>`,
 	buttonKinds: `<!-- A route of the application: navigates without reloading, with typed params and search -->
 <UIButton to="/links">See links</UIButton>
 <UIButton to="/users/[id]" bind:params="{ id: user.id }"
@@ -31,7 +109,8 @@ export const englishExamples = {
 
 <!-- Any URL: an <a>; with target="_blank" it adds rel="noopener noreferrer" -->
 <UIButton href="https://github.com/meekojs/meeko" target="_blank"
-  variant="outline">GitHub</UIButton>
+  variant="outline"
+  color="neutral">GitHub</UIButton>
 <UIButton href="/report.pdf" download="report.pdf">Download</UIButton>
 
 <!-- Without to or href: a <button type="button"> -->
@@ -44,7 +123,7 @@ export const englishExamples = {
 </script>
 
 <template>
-<UICard title="Your workspace" variant="outline">
+<UICard title="Your workspace">
   <p role="status">Saved changes: {count.value}</p>
   <snippet name="footer">
     <UIButton on:click="() => count.value++">Save change</UIButton>
@@ -54,13 +133,13 @@ export const englishExamples = {
 	link: `<UILink to="/installation">Get started</UILink>
 <UILink to="/users/[id]" bind:params="{ id: user.id }">Profile</UILink>
 <UILink href="https://github.com/meekojs/meeko"
-  target="_blank" variant="outline">GitHub</UILink>
+  target="_blank" variant="outline" color="neutral">GitHub</UILink>
 
 <UILinkCard to="/theming" title="Customization"
   description="Connect the tokens to your brand." />`,
 	badge: `<UIBadge>Information</UIBadge>
-<UIBadge tone="accent">Published</UIBadge>
-<UIBadge tone="danger">Review</UIBadge>`,
+<UIBadge color="primary">Published</UIBadge>
+<UIBadge color="danger">Review</UIBadge>`,
 	form: `<script lang="ts">
   const name = signal('')
   const error = signal<string | undefined>(undefined)
@@ -98,7 +177,7 @@ export const englishExamples = {
 	tableColumnSnippets: `<UITable bind:columns="columns" bind:rows="rows.value" rowKey="id">
   <!-- value is a string: the type of Project['status']. -->
   <snippet name="cell-status" params="row, value">
-    <UIBadge bind:tone="value === 'Published' ? 'accent' : 'neutral'">{value}</UIBadge>
+    <UIBadge bind:color="value === 'Published' ? 'primary' : 'neutral'">{value}</UIBadge>
   </snippet>
   <snippet name="header-name" params="column">
     <abbr title="Project name">{column.label}</abbr>
@@ -150,9 +229,9 @@ export const englishExamples = {
 <template>
   <UIPopover role="menu" placement="bottom-start" bind:offset="6">
     <snippet name="trigger">Project actions</snippet>
-    <UIButton variant="ghost" role="menuitem" on:click="() => (action.value = 'rename')">Rename</UIButton>
-    <UIButton variant="ghost" role="menuitem" on:click="() => (action.value = 'duplicate')">Duplicate</UIButton>
-    <UIButton variant="ghost" role="menuitem" on:click="() => (action.value = 'archive')">Archive</UIButton>
+    <UIButton variant="ghost" color="neutral" role="menuitem" on:click="() => (action.value = 'rename')">Rename</UIButton>
+    <UIButton variant="ghost" color="neutral" role="menuitem" on:click="() => (action.value = 'duplicate')">Duplicate</UIButton>
+    <UIButton variant="ghost" color="neutral" role="menuitem" on:click="() => (action.value = 'archive')">Archive</UIButton>
   </UIPopover>
 </template>`,
 	popoverDialog: `<script lang="ts">
@@ -188,7 +267,7 @@ export const englishExamples = {
     { label: 'See Popover', to: '/popover' },
     { label: 'Archive', disabled: true },
     { separator: true },
-    { label: 'Delete', tone: 'danger', onSelect: () => remove() },
+    { label: 'Delete', color: 'danger', onSelect: () => remove() },
   ]
 </script>
 
@@ -238,7 +317,7 @@ async function confirm() {
 <template>
   <UIModal title="Confirm" bind:description="props.message">
     <snippet name="footer">
-      <UIButton variant="outline" on:click="() => modal.dismiss()">Cancel</UIButton>
+      <UIButton variant="outline" color="neutral" on:click="() => modal.dismiss()">Cancel</UIButton>
       <UIButton on:click="() => modal.close(true)">Confirm</UIButton>
     </snippet>
   </UIModal>
@@ -260,8 +339,8 @@ export default defineMeekoConfig({
       border: 'var(--brand-border)',
     },
     defaults: {
-      button: { shape: 'pill', size: 'md' },
-      link: { variant: 'outline' },
+      button: { radius: 'full', size: 'md' },
+      link: { variant: 'outline', color: 'neutral' },
       card: { variant: 'soft' },
     },
   },
@@ -308,12 +387,34 @@ export default defineMeekoConfig({
   --ui-color-primary-9: #3b96ff;
   --ui-color-primary-10: #66adff;
 }`,
+	themeColor: `/* app/styles/main.css: primary reads the crimson scale */
+@import 'tailwindcss';
+@import '@meekojs/ui';
+@import '@meekojs/ui/hues';
+
+/* With [data-theme] it also wins over the steps of UI's dark theme */
+:root,
+:root[data-theme] {
+  --ui-color-primary-1: var(--color-crimson-1);
+  --ui-color-primary-2: var(--color-crimson-2);
+  --ui-color-primary-3: var(--color-crimson-3);
+  --ui-color-primary-4: var(--color-crimson-4);
+  --ui-color-primary-5: var(--color-crimson-5);
+  --ui-color-primary-6: var(--color-crimson-6);
+  --ui-color-primary-7: var(--color-crimson-7);
+  --ui-color-primary-8: var(--color-crimson-8);
+  --ui-color-primary-9: var(--color-crimson-9);
+  --ui-color-primary-10: var(--color-crimson-10);
+  --ui-color-primary-11: var(--color-crimson-11);
+  --ui-color-primary-12: var(--color-crimson-12);
+  --ui-color-primary-contrast: var(--color-crimson-contrast);
+}`,
 	themeSlots: `<!-- class reaches the root; ui, each part by the name of its slot -->
 <UICard title="Pro plan" class="pricing-card"
   bind:ui="{ header: 'pricing-header', title: 'pricing-title' }">
   <p>Everything in the basic plan, with no limits.</p>
 </UICard>
-<UIBadge tone="success" dot bind:ui="{ dot: 'pulse' }">Published</UIBadge>`,
+<UIBadge color="success" dot bind:ui="{ dot: 'pulse' }">Published</UIBadge>`,
 	themeSlotsCss: `/* app/styles/main.css: without @layer, it wins over the component's classes */
 .pricing-card {
   border-color: var(--ui-color-primary-border);
@@ -321,22 +422,22 @@ export default defineMeekoConfig({
 .pricing-title {
   color: var(--ui-color-primary-text);
 }`,
-	buttonStates: `<UIButton tone="danger">Delete</UIButton>
-<UIButton tone="danger" variant="outline">Revoke</UIButton>
+	buttonStates: `<UIButton color="danger">Delete</UIButton>
+<UIButton color="danger" variant="outline">Revoke</UIButton>
 <UIButton bind:loading="saving.value">Save</UIButton>
-<UIButton iconOnly ariaLabel="Delete" variant="outline">
+<UIButton iconOnly ariaLabel="Delete" variant="outline" color="neutral">
   <UIIcon name="lucide:trash-2" />
 </UIButton>`,
 	iconButton: `<UIIconButton label="Open the menu" icon="menu" />
 <UIIconButton label="Close" icon="close" variant="outline" />
-<UIIconButton label="Confirm" icon="check" variant="primary" on:click="confirm" />
+<UIIconButton label="Confirm" icon="check" variant="solid" color="primary" on:click="confirm" />
 <UIIconButton label="See links" icon="arrowEnd" to="/links" />
 <UIIconButton label="Delete">
   <UIIcon name="lucide:trash-2" />
 </UIIconButton>`,
 	iconButtonStates: `<UIIconButton label="Pin the panel" icon="check" variant="outline"
   bind:pressed="pinned.value" on:click="() => (pinned.value = !pinned.value)" />
-<UIIconButton label="Remove" icon="close" tone="danger" />
+<UIIconButton label="Remove" icon="close" color="danger" />
 <UIIconButton label="Saving" icon="check" bind:loading="saving.value" />
 <UIIconButton label="Small" icon="menu" size="sm" />
 <UIIconButton label="No tooltip" icon="menu" bind:tooltip="false" />`,
@@ -362,7 +463,7 @@ async function remove() {
     title: 'Delete the project?',
     description: 'Its files are deleted and it cannot be undone.',
     confirmLabel: 'Delete',
-    tone: 'danger',
+    color: 'danger',
   })
   if (confirmed) await deleteProject()
 }`,
@@ -411,7 +512,7 @@ async function remove() {
 
 <template>
   <UIRadioGroup model="period" legend="Period" name="period" bind:options="periods" />
-  <UIRadioGroup model="period" legend="Period" variant="segmented" bind:options="periods" />
+  <UIRadioGroup model="period" legend="Period" layout="segmented" bind:options="periods" />
 </template>`,
 	segmented: `<script lang="ts">
   const days = signal('30')
@@ -427,9 +528,32 @@ async function remove() {
     <UISegmentedControl legend="Chart period" hideLegend size="sm" name="days" model="days" bind:options="options" />
   </form>
 </template>`,
+	dateRange: `<script lang="ts">
+  import type { UIDateRangeValue } from '@meekojs/ui/runtime'
+
+  const from = signal('')
+  const to = signal('')
+  // The server's “today”: the shortcuts are active in the HTML and match on hydration.
+  const today = '2026-11-24'
+  function load(range: UIDateRangeValue) {
+    // Only a complete and valid range arrives.
+  }
+</script>
+
+<template>
+  <UIDateRange label="Period" model:from="from" model:to="to"
+    fromName="from" toName="to" bind:today="today"
+    min="2020-01-01" bind:max="today" bind:maxDays="366" on:change="load" />
+</template>`,
+	dateRangeField: `<UIField id="period" label="Sales period" hint="Up to 366 days">
+  <snippet name="default" params="id, describedBy">
+    <UIDateRange bind:id="id" bind:describedBy="describedBy"
+      model:from="from" model:to="to" bind:maxDays="366" bind:presets="[]" />
+  </snippet>
+</UIField>`,
 	slider: `<UISlider model="volume" label="Volume" name="volume" bind:min="0" bind:max="100" bind:step="5" />`,
-	alert: `<UIAlert tone="success" title="Changes saved" description="They are already published." />
-<UIAlert tone="danger" title="Could not publish" dismiss on:dismiss="clear">
+	alert: `<UIAlert color="success" title="Changes saved" description="They are already published." />
+<UIAlert color="danger" title="Could not publish" dismiss on:dismiss="clear">
   <p>The database does not respond.</p>
   <snippet name="actions"><UIButton size="sm" on:click="retry">Retry</UIButton></snippet>
 </UIAlert>`,
@@ -438,11 +562,11 @@ async function remove() {
 </script>
 
 <template>
-  <UIButton on:click="() => toast.add({ text: 'Changes saved', tone: 'success', duration: 5000 })">
+  <UIButton on:click="() => toast.add({ text: 'Changes saved', color: 'success', duration: 5000 })">
     Save
   </UIButton>
 </template>`,
-	empty: `<UIEmpty variant="panel" title="No projects" description="Create the first one to get started.">
+	empty: `<UIEmpty layout="panel" title="No projects" description="Create the first one to get started.">
   <snippet name="actions"><UIButton>Create project</UIButton></snippet>
 </UIEmpty>
 <UISkeleton bind:lines="3" bind:widths="['full', 'long', 'short']" />`,
@@ -452,7 +576,7 @@ async function remove() {
   { label: 'Author', value: 'Meeko team' },
 ]" />
 <UIDisclosure summary="Technical details"><p>It opens without JavaScript.</p></UIDisclosure>`,
-	kpi: `<!-- A key figure: change with its tone, period, trend and a link to the detail -->
+	kpi: `<!-- A key figure: change with its color, period, trend and a link to the detail -->
 <UIStat label="Revenue" value="€12,400" bind:change="12.5"
   period="vs. the previous 30 days"
   bind:trend="[8.2, 9.1, 8.7, 10.4, 11.2, 10.9, 12.4]" to="/revenue" />
@@ -464,7 +588,7 @@ async function remove() {
 <UIStat label="Orders" bind:value="320" change="−8 orders" period="this month" />
 
 <!-- A sparkline on its own, with an area -->
-<UISparkline bind:values="visits" area tone="accent" />`,
+<UISparkline bind:values="visits" area color="primary" />`,
 	diff: `<UIDiff label="Changes to the guide" bind:diff="patch" />`,
 	diffSample: `--- a/guide.md
 +++ b/guide.md
@@ -526,7 +650,7 @@ async function remove() {
 <UIPagination model:page="page" bind:total="total" bind:pageSize="20" edges />
 <UIPagination bind:page="query.page" bind:pageCount="pages"
   bind:pageLink="(page) => ({ to: '/orders', search: { page: String(page) } })" />`,
-	toc: `<UITableOfContents variant="collapsible"
+	toc: `<UITableOfContents layout="collapsible"
   bind:entries="[{ id: 'usage', text: 'Usage', level: 2 }, { id: 'api', text: 'API', level: 2 }]" />`,
 	drawer: `<UIDrawer title="Filters" triggerLabel="Open filters" side="end" model="open">
   <UICheckbox model="drafts" label="Include drafts" />
@@ -570,7 +694,7 @@ html:active-view-transition-type(meeko-route) .project-card { view-transition-na
 <MeekoLink to="/transitions/project"
   data-meeko-view-transition="false">Open without a transition</MeekoLink>`,
 	icon: `<p><UIIcon name="lucide:search" /> Search the project</p>
-<UIButton variant="outline">
+<UIButton variant="outline" color="neutral">
   <UIIcon name="lucide:trash-2" label="Delete" />
 </UIButton>`,
 	iconConfig: `// pnpm add @meekojs/icon && pnpm add -D @iconify-json/lucide

@@ -47,6 +47,7 @@
 				<snippet name="trigger">Project actions</snippet>
 				<UIButton
 					variant="ghost"
+					color="neutral"
 					role="menuitem"
 					on:click="() => (action.value = 'Project renamed.')"
 				>
@@ -54,6 +55,7 @@
 				</UIButton>
 				<UIButton
 					variant="ghost"
+					color="neutral"
 					role="menuitem"
 					on:click="() => (action.value = 'Project duplicated.')"
 				>
@@ -61,6 +63,7 @@
 				</UIButton>
 				<UIButton
 					variant="ghost"
+					color="neutral"
 					role="menuitem"
 					on:click="() => (action.value = 'Project archived.')"
 				>

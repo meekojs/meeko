@@ -1,43 +1,52 @@
 import type { VariantProps } from 'tailwind-variants/lite'
 
-import type { avatar } from '../variants/avatar'
-import type { badge } from '../variants/badge'
-import type { button, copyButton, iconButton } from '../variants/button'
-import type { card, linkCard } from '../variants/card'
-import type { checkbox, radioGroup, segmentedControl, toggle } from '../variants/choice'
-import type { commandPalette } from '../variants/command-palette'
-import type { container } from '../variants/container'
-import type { codeBlock, diff } from '../variants/content'
-import type { descriptionList, sparkline, stat } from '../variants/data'
-import type { drawer } from '../variants/drawer'
-import type { alert, disclosure, empty, skeleton, toast } from '../variants/feedback'
-import type { field } from '../variants/field'
-import type { footer, header } from '../variants/header'
-import type { input, textarea } from '../variants/input'
-import type { localeSuggestion, localeSwitcher } from '../variants/locale'
-import type { markdownEditor } from '../variants/markdown-editor'
-import type { menu } from '../variants/menu'
-import type { modal } from '../variants/modal'
-import type { breadcrumb, navigationTabs, navigationTree, pageNavigation, pagination, tableOfContents } from '../variants/navigation'
-import type { page, pageHeader } from '../variants/page'
-import type { hint } from '../variants/popover'
-import type { combobox, select } from '../variants/select'
-import type { slider } from '../variants/slider'
-import type { table } from '../variants/table'
-import type { tabs } from '../variants/tabs'
-import type { themeToggle } from '../variants/theme-toggle'
+import type { alertTheme } from '../theme/components/alert'
+import type { avatarTheme } from '../theme/components/avatar'
+import type { badgeTheme } from '../theme/components/badge'
+import type { buttonTheme } from '../theme/components/button'
+import type { cardTheme, linkCardTheme } from '../theme/components/card'
+import type { checkboxTheme } from '../theme/components/checkbox'
+import type { codeBlockTheme } from '../theme/components/code-block'
+import type { comboboxTheme } from '../theme/components/combobox'
+import type { commandPaletteTheme } from '../theme/components/command-palette'
+import type { containerTheme } from '../theme/components/container'
+import type { copyButtonTheme } from '../theme/components/copy-button'
+import type { dateRangeTheme } from '../theme/components/date-range'
+import type { descriptionListTheme } from '../theme/components/description-list'
+import type { diffTheme } from '../theme/components/diff'
+import type { disclosureTheme } from '../theme/components/disclosure'
+import type { drawerTheme } from '../theme/components/drawer'
+import type { emptyTheme } from '../theme/components/empty'
+import type { fieldTheme } from '../theme/components/field'
+import type { footerTheme, headerTheme } from '../theme/components/header'
+import type { hintTheme } from '../theme/components/hint'
+import type { iconButtonTheme } from '../theme/components/icon-button'
+import type { inputTheme } from '../theme/components/input'
+import type { localeSuggestionTheme, localeSwitcherTheme } from '../theme/components/locale'
+import type { markdownEditorTheme } from '../theme/components/markdown-editor'
+import type { menuTheme } from '../theme/components/menu'
+import type { modalTheme } from '../theme/components/modal'
+import type { breadcrumbTheme, navigationTabsTheme, navigationTreeTheme, pageNavigationTheme, paginationTheme, tableOfContentsTheme } from '../theme/components/navigation'
+import type { pageHeaderTheme, pageTheme } from '../theme/components/page'
+import type { radioGroupTheme } from '../theme/components/radio-group'
+import type { segmentedControlTheme } from '../theme/components/segmented-control'
+import type { selectTheme } from '../theme/components/select'
+import type { skeletonTheme } from '../theme/components/skeleton'
+import type { sliderTheme } from '../theme/components/slider'
+import type { sparklineTheme } from '../theme/components/sparkline'
+import type { statTheme } from '../theme/components/stat'
+import type { switchTheme } from '../theme/components/switch'
+import type { tableTheme } from '../theme/components/table'
+import type { tabsTheme } from '../theme/components/tabs'
+import type { textareaTheme } from '../theme/components/textarea'
+import type { themeToggleTheme } from '../theme/components/theme-toggle'
+import type { toastTheme } from '../theme/components/toast'
 import type { UIDensity } from './forms'
 import type { UIMessageOverrides } from './messages'
 import type { UIVariantSlots } from './theme'
 
 /** Aplana una intersección para que el editor muestre las claves como un solo objeto. */
 type Simplify<T> = { [K in keyof T]: T[K] } & {}
-
-/** Variantes de acciones visuales; los enlaces conservan su semántica de navegación. */
-export type UIActionVariant = 'primary' | 'secondary' | 'outline' | 'ghost'
-export type UIActionSize = 'sm' | 'md' | 'lg'
-export type UIActionShape = 'rounded' | 'pill'
-export type UICardVariant = 'outline' | 'soft' | 'solid' | 'elevated'
 
 /**
  * Dónde van las acciones de una `UICard` respecto a su título: `inline` a su lado, `below` siempre debajo y
@@ -57,9 +66,9 @@ export type UICardActionsWrap = 'inline' | 'below' | 'auto'
  * @since 1.10.0
  * @example
  * ```ts
- * import type { stat } from '../variants/data'
+ * import type { statTheme } from '../theme/components/stat'
  *
- * type StatDefaults = UIComponentDefaults<typeof stat> // { class?: string; ui?: { base?, label?, value?, detail?, change?, … } }
+ * type StatDefaults = UIComponentDefaults<typeof statTheme> // { class?: string; ui?: { base?, label?, value?, detail?, change?, … } }
  * ```
  */
 export type UIComponentDefaults<T extends ((...args: never[]) => unknown) | undefined = undefined, V = {}> = Simplify<
@@ -70,8 +79,17 @@ export type UIComponentDefaults<T extends ((...args: never[]) => unknown) | unde
 		Readonly<V>
 >
 
+/** Las variantes de botón que admiten un valor por aplicación: tratamiento, color, tamaño y radio. */
+type UIActionChoices = 'color' | 'radius' | 'size' | 'variant'
+
+/** Las variantes de una card enlazada que admiten un valor por aplicación: tratamiento, color, radio y sombra. */
+type UILinkCardChoices = 'color' | 'elevation' | 'radius' | 'variant'
+
+/** Las variantes de `UICard` que admiten un valor por aplicación: las de `UILinkCard` y el padding. */
+type UICardChoices = 'padding' | UILinkCardChoices
+
 /** Variantes de una acción (`UIButton`, `UILink`) que admiten un valor por aplicación. */
-type UIActionDefaults = UIComponentDefaults<typeof button, Pick<VariantProps<typeof button>, 'shape' | 'size' | 'variant'>>
+type UIActionDefaults = UIComponentDefaults<typeof buttonTheme, Pick<VariantProps<typeof buttonTheme>, UIActionChoices>>
 
 /**
  * Valores por defecto por aplicación, por componente: la clave es su nombre en camelCase sin el prefijo
@@ -80,12 +98,17 @@ type UIActionDefaults = UIComponentDefaults<typeof button, Pick<VariantProps<typ
  * `ui.defaults` y al final las de la instancia, sin fusionarlas. En un conflicto decide la cascada: las
  * reglas sin capa de la aplicación ganan a las de UI.
  *
- * Además, unas pocas variantes de apariencia general admiten un valor de base: `variant`, `size` y
- * `shape` en `button`, `link`, `iconButton` y `copyButton`; `size` y `shape` en `avatar`; `variant`, `padding`, `density` y `actionsWrap` en `card`; `size` en `segmentedControl`, y `density` en `table`. La
- * prop explícita de la instancia gana siempre.
+ * Además, unas pocas variantes de apariencia general admiten un valor de base: `variant`, `color`, `size` y
+ * `radius` en `button`, `link`, `iconButton`, `copyButton` e `input`; `size`, `variant`, `color` y `radius` en
+ * `avatar`; `variant`, `color` y `radius` en `badge`; `variant`, `color`, `radius`, `elevation`, `padding`,
+ * `density` y `actionsWrap` en `card`; `variant`, `color`, `radius` y `elevation` en `linkCard`; `size` en
+ * `segmentedControl`, y `density` en `table`. La prop explícita de la instancia gana siempre. Los mensajes
+ * (`alert`, `toast`) toman `variant` y `color` sólo por instancia.
  *
  * @since 1.10.0 acepta `class` y `ui` en cada componente, y `padding`, `density`, `actionsWrap` en `card` y
  * `density` en `table`. Antes sólo admitía las variantes de `button`, `link` y `card`.
+ * @since 2.0.0 acepta `variant`, `color`, `size` y `radius` en `input`, `variant`, `color` y `radius` en
+ * `badge` y `avatar` (que deja `shape`), y ya no `appearance` ni `tone`.
  * @example
  * ```ts
  * export default defineMeekoConfig({
@@ -101,19 +124,26 @@ type UIActionDefaults = UIComponentDefaults<typeof button, Pick<VariantProps<typ
  * ```
  */
 export interface UIDefaults {
-	readonly alert?: UIComponentDefaults<typeof alert>
+	readonly alert?: UIComponentDefaults<typeof alertTheme>
 	/**
-	 * `UIAvatar`: `class` llega a la caja, y `size` y `shape` son sus valores de base.
+	 * `UIAvatar`: `class` llega a la caja, y `size`, `variant`, `color` y `radius` son sus valores de base.
 	 *
 	 * @since 1.10.0
+	 * @since 2.0.0 `variant`, `color` y `radius` sustituyen a `shape`.
 	 */
-	readonly avatar?: UIComponentDefaults<typeof avatar, Pick<VariantProps<typeof avatar>, 'shape' | 'size'>>
-	readonly badge?: UIComponentDefaults<typeof badge>
-	readonly breadcrumb?: UIComponentDefaults<typeof breadcrumb>
+	readonly avatar?: UIComponentDefaults<typeof avatarTheme, Pick<VariantProps<typeof avatarTheme>, 'color' | 'radius' | 'size' | 'variant'>>
+	/**
+	 * `UIBadge`: `class` llega a la etiqueta, y `variant`, `color` y `radius` son sus valores de base.
+	 *
+	 * @since 2.0.0 `variant`, `color` y `radius`.
+	 */
+	readonly badge?: UIComponentDefaults<typeof badgeTheme, Pick<VariantProps<typeof badgeTheme>, 'color' | 'radius' | 'variant'>>
+	readonly breadcrumb?: UIComponentDefaults<typeof breadcrumbTheme>
 	readonly button?: UIActionDefaults
+	/** `UICard`: `variant`, `color`, `radius`, `elevation` y `padding` son valores de base de su receta (`cardTheme`). */
 	readonly card?: UIComponentDefaults<
-		typeof card,
-		Pick<VariantProps<typeof card>, 'padding' | 'variant'> & {
+		typeof cardTheme,
+		Pick<VariantProps<typeof cardTheme>, UICardChoices> & {
 			/** Densidad de base; un `padding` de `ui.defaults` o de la instancia gana sobre ella. */
 			readonly density?: UIDensity
 			/**
@@ -124,86 +154,94 @@ export interface UIDefaults {
 			readonly actionsWrap?: UICardActionsWrap
 		}
 	>
-	readonly checkbox?: UIComponentDefaults<typeof checkbox>
-	readonly codeBlock?: UIComponentDefaults<typeof codeBlock>
-	readonly combobox?: UIComponentDefaults<typeof combobox>
-	readonly commandPalette?: UIComponentDefaults<typeof commandPalette>
-	readonly container?: UIComponentDefaults<typeof container>
+	readonly checkbox?: UIComponentDefaults<typeof checkboxTheme>
+	readonly codeBlock?: UIComponentDefaults<typeof codeBlockTheme>
+	readonly combobox?: UIComponentDefaults<typeof comboboxTheme>
+	readonly commandPalette?: UIComponentDefaults<typeof commandPaletteTheme>
+	readonly container?: UIComponentDefaults<typeof containerTheme>
 	/**
-	 * `UICopyButton`: `class` llega al botón, y `variant`, `size` y `shape` son sus valores de base.
+	 * `UICopyButton`: `class` llega al botón, y `variant`, `color`, `size` y `radius` son sus valores de base.
 	 *
 	 * @since 1.10.0
 	 */
-	readonly copyButton?: UIComponentDefaults<typeof copyButton, Pick<VariantProps<typeof copyButton>, 'shape' | 'size' | 'variant'>>
-	readonly descriptionList?: UIComponentDefaults<typeof descriptionList>
-	readonly diff?: UIComponentDefaults<typeof diff>
-	readonly disclosure?: UIComponentDefaults<typeof disclosure>
-	readonly drawer?: UIComponentDefaults<typeof drawer>
-	readonly empty?: UIComponentDefaults<typeof empty>
-	readonly field?: UIComponentDefaults<typeof field>
-	readonly footer?: UIComponentDefaults<typeof footer>
-	readonly header?: UIComponentDefaults<typeof header>
+	readonly copyButton?: UIComponentDefaults<typeof copyButtonTheme, Pick<VariantProps<typeof copyButtonTheme>, UIActionChoices>>
+	/**
+	 * `UIDateRange`: `class` llega al `<fieldset>`, como la prop de la instancia.
+	 *
+	 * @since 1.11.0
+	 */
+	readonly dateRange?: UIComponentDefaults<typeof dateRangeTheme>
+	readonly descriptionList?: UIComponentDefaults<typeof descriptionListTheme>
+	readonly diff?: UIComponentDefaults<typeof diffTheme>
+	readonly disclosure?: UIComponentDefaults<typeof disclosureTheme>
+	readonly drawer?: UIComponentDefaults<typeof drawerTheme>
+	readonly empty?: UIComponentDefaults<typeof emptyTheme>
+	readonly field?: UIComponentDefaults<typeof fieldTheme>
+	readonly footer?: UIComponentDefaults<typeof footerTheme>
+	readonly header?: UIComponentDefaults<typeof headerTheme>
 	/**
 	 * `UIHint`: `class` llega al botón, como la prop de la instancia.
 	 *
 	 * @since 1.10.0
 	 */
-	readonly hint?: UIComponentDefaults<typeof hint>
+	readonly hint?: UIComponentDefaults<typeof hintTheme>
 	/**
-	 * `UIIconButton`: `class` llega al botón o al enlace, y `variant`, `size` y `shape` son sus valores de base.
+	 * `UIIconButton`: `class` llega al botón o al enlace, y `variant`, `color`, `size` y `radius` son sus valores de base.
 	 *
 	 * @since 1.10.0
 	 */
-	readonly iconButton?: UIComponentDefaults<typeof iconButton, Pick<VariantProps<typeof iconButton>, 'shape' | 'size' | 'variant'>>
-	readonly input?: UIComponentDefaults<typeof input>
+	readonly iconButton?: UIComponentDefaults<typeof iconButtonTheme, Pick<VariantProps<typeof iconButtonTheme>, UIActionChoices>>
+	/** `UIInput`: `class` llega al `<input>`, y `variant`, `color`, `size` y `radius` son sus valores de base. */
+	readonly input?: UIComponentDefaults<typeof inputTheme, Pick<VariantProps<typeof inputTheme>, UIActionChoices>>
 	readonly link?: UIActionDefaults
-	readonly linkCard?: UIComponentDefaults<typeof linkCard>
-	readonly localeSuggestion?: UIComponentDefaults<typeof localeSuggestion>
-	readonly localeSwitcher?: UIComponentDefaults<typeof localeSwitcher>
+	/** `UILinkCard`: `variant`, `color`, `radius` y `elevation` son valores de base de su receta (`linkCardTheme`). */
+	readonly linkCard?: UIComponentDefaults<typeof linkCardTheme, Pick<VariantProps<typeof linkCardTheme>, UILinkCardChoices>>
+	readonly localeSuggestion?: UIComponentDefaults<typeof localeSuggestionTheme>
+	readonly localeSwitcher?: UIComponentDefaults<typeof localeSwitcherTheme>
 	/** `UIMarkdownEditor`, del módulo `@meekojs/ui/editor`. */
-	readonly markdownEditor?: UIComponentDefaults<typeof markdownEditor>
+	readonly markdownEditor?: UIComponentDefaults<typeof markdownEditorTheme>
 	/**
 	 * `class` llega a la lista del menú, como la prop de la instancia.
 	 *
 	 * @since 1.10.0
 	 */
-	readonly menu?: UIComponentDefaults<typeof menu>
-	readonly modal?: UIComponentDefaults<typeof modal>
-	readonly navigationTabs?: UIComponentDefaults<typeof navigationTabs>
-	readonly navigationTree?: UIComponentDefaults<typeof navigationTree>
-	readonly page?: UIComponentDefaults<typeof page>
-	readonly pageHeader?: UIComponentDefaults<typeof pageHeader>
-	readonly pageNavigation?: UIComponentDefaults<typeof pageNavigation>
-	readonly pagination?: UIComponentDefaults<typeof pagination>
+	readonly menu?: UIComponentDefaults<typeof menuTheme>
+	readonly modal?: UIComponentDefaults<typeof modalTheme>
+	readonly navigationTabs?: UIComponentDefaults<typeof navigationTabsTheme>
+	readonly navigationTree?: UIComponentDefaults<typeof navigationTreeTheme>
+	readonly page?: UIComponentDefaults<typeof pageTheme>
+	readonly pageHeader?: UIComponentDefaults<typeof pageHeaderTheme>
+	readonly pageNavigation?: UIComponentDefaults<typeof pageNavigationTheme>
+	readonly pagination?: UIComponentDefaults<typeof paginationTheme>
 	/** `class` llega al contenido del popover, como la prop de la instancia. */
 	readonly popover?: UIComponentDefaults
 	readonly prose?: UIComponentDefaults
-	readonly radioGroup?: UIComponentDefaults<typeof radioGroup>
+	readonly radioGroup?: UIComponentDefaults<typeof radioGroupTheme>
 	/**
 	 * `size` de base; la prop de la instancia gana sobre él.
 	 *
 	 * @since 1.10.0
 	 */
-	readonly segmentedControl?: UIComponentDefaults<typeof segmentedControl, Pick<VariantProps<typeof segmentedControl>, 'size'>>
-	readonly select?: UIComponentDefaults<typeof select>
-	readonly skeleton?: UIComponentDefaults<typeof skeleton>
-	readonly slider?: UIComponentDefaults<typeof slider>
+	readonly segmentedControl?: UIComponentDefaults<typeof segmentedControlTheme, Pick<VariantProps<typeof segmentedControlTheme>, 'size'>>
+	readonly select?: UIComponentDefaults<typeof selectTheme>
+	readonly skeleton?: UIComponentDefaults<typeof skeletonTheme>
+	readonly slider?: UIComponentDefaults<typeof sliderTheme>
 	/**
 	 * `UISparkline`, también el de `UIStat trend`: `class` llega al `<svg>`, y `ui` a `base`, `area` y `line`.
 	 *
 	 * @since 1.10.0
 	 */
-	readonly sparkline?: UIComponentDefaults<typeof sparkline>
-	readonly stat?: UIComponentDefaults<typeof stat>
-	readonly switch?: UIComponentDefaults<typeof toggle>
+	readonly sparkline?: UIComponentDefaults<typeof sparklineTheme>
+	readonly stat?: UIComponentDefaults<typeof statTheme>
+	readonly switch?: UIComponentDefaults<typeof switchTheme>
 	/** `class` llega a la `<table>`, como la prop de la instancia; el contenedor es `ui.base`. */
-	readonly table?: UIComponentDefaults<typeof table, Pick<VariantProps<typeof table>, 'density'>>
-	readonly tableOfContents?: UIComponentDefaults<typeof tableOfContents>
-	readonly tabs?: UIComponentDefaults<typeof tabs>
-	readonly textarea?: UIComponentDefaults<typeof textarea>
-	readonly themeToggle?: UIComponentDefaults<typeof themeToggle>
+	readonly table?: UIComponentDefaults<typeof tableTheme, Pick<VariantProps<typeof tableTheme>, 'density'>>
+	readonly tableOfContents?: UIComponentDefaults<typeof tableOfContentsTheme>
+	readonly tabs?: UIComponentDefaults<typeof tabsTheme>
+	readonly textarea?: UIComponentDefaults<typeof textareaTheme>
+	readonly themeToggle?: UIComponentDefaults<typeof themeToggleTheme>
 	/** Sólo `ui`: un `UIToast` no recibe `class`. También se aplica a los avisos de `useToast()`. */
-	readonly toast?: Omit<UIComponentDefaults<typeof toast>, 'class'>
+	readonly toast?: Omit<UIComponentDefaults<typeof toastTheme>, 'class'>
 	readonly tooltip?: UIComponentDefaults
 }
 

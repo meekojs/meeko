@@ -1,15 +1,15 @@
 <script lang="ts">
 	// <UIButton>: a route with <MeekoLink> when it gets `to`, an <a> with `href`, otherwise a
-	// <button>. The three share the classes of variants/button, so they look the same. The types
+	// <button>. The three share the classes of theme/components/button, so they look the same. The types
 	// (UIButtonProps) forbid the props of the other branches.
 	import { computed } from '@meekojs/meeko'
 
 	import type { UIButtonProps } from '../types/button'
 
+	import { buttonTheme } from '../theme/components/button'
 	import { uiTheme } from '../utils/defaults'
-	import { button } from '../variants/button'
 
-	const { to, params, search, resolve, href, target, rel, download, type = 'button', disabled = false, tone, loading, iconOnly, ariaLabel, variant, size, shape, class: ownClass, ...rest } = defineProps<UIButtonProps>()
+	const { to, params, search, resolve, href, target, rel, download, type = 'button', disabled = false, pressed, loading, iconOnly, ariaLabel, variant, color, size, radius, width, elevation, class: ownClass, ...rest } = defineProps<UIButtonProps>()
 
 	const theme = uiTheme('button', () => ({ class: ownClass }))
 
@@ -19,12 +19,16 @@
 
 	// A disabled button drops the focus: while busy it stays focusable, and the click handler stops it.
 	const nativeDisabled = computed(() => (to === undefined && href === undefined ? disabled : undefined))
+	// `pressed` makes a toggle of a <button>; without it, the button is not one. Its look reads aria-pressed.
+	const ariaPressed = computed(() => (to === undefined && href === undefined && pressed !== undefined ? String(pressed) : undefined))
 	const classes = computed(() =>
-		button({
+		buttonTheme({
 			variant: variant ?? theme.defaults?.variant,
-			tone,
+			color: color ?? theme.defaults?.color,
 			size: size ?? theme.defaults?.size,
-			shape: shape ?? theme.defaults?.shape,
+			radius: radius ?? theme.defaults?.radius,
+			width,
+			elevation,
 			iconOnly: Boolean(iconOnly),
 			class: theme.class,
 		}),
@@ -45,6 +49,7 @@
 		bind:download="download"
 		bind:type="type"
 		bind:disabled="nativeDisabled.value"
+		bind:aria-pressed="ariaPressed.value"
 		bind:aria-busy="loading ? 'true' : undefined"
 		bind:aria-disabled="loading ? 'true' : undefined"
 		bind:aria-label="ariaLabel ?? rest['aria-label']"

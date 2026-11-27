@@ -1,4 +1,6 @@
 <script lang="ts">
+	import * as AppearancePlayground from '../../components/AppearancePlayground.meeko'
+	import * as AppearanceVariants from '../../components/AppearanceVariants.meeko'
 	import { englishExamples as examples } from '../../utils/examples.en'
 </script>
 
@@ -8,6 +10,13 @@
 		title="Theming and customization"
 		description="One source of design: --ui-* tokens for color, size and shape, which you can connect to your brand."
 	>
+		<h2 id="appearance">Appearance engine</h2>
+		<p>
+			Each component chooses its look with the <code>variant</code> (the treatment) and <code>color</code> (the semantic color) props, plus <code>size</code>, <code>radius</code> and <code>elevation</code> where they apply: <code>UIButton</code>, <code>UICard</code>, <code>UIBadge</code>, <code>UIInput</code>, <code>UIAvatar</code>, <code>UIAlert</code> and <code>UIToast</code>, among others. Their recipes (<code>buttonTheme</code>, <code>badgeTheme</code>, <code>inputTheme</code>…) are exported from <code>@meekojs/ui/theme</code>. To make your own, import <code>appearance()</code> from there and spread its result into <code>defineTheme()</code>.
+		</p>
+		<AppearanceVariants />
+		<AppearancePlayground english />
+
 		<h2 id="theme">Light, dark and system</h2>
 		<p>
 			<code>theme</code>
@@ -151,7 +160,7 @@
 				{ name: '--ui-color-text / -text-soft', type: 'color', description: 'Text and secondary text.' },
 				{ name: '--ui-color-border / -border-strong / -control-border', type: 'color', description: 'Separators, quiet borders and the border of a field at 3:1 or more.' },
 				{ name: '--ui-color-primary / -hover / -contrast', type: 'color', description: 'Main action and the text on it.' },
-				{ name: '--ui-color-primary-soft / -text / -border', type: 'color', description: 'A label or a quiet active background, with its text and its border.' },
+				{ name: '--ui-color-primary-soft / -text / -border', type: 'color', description: 'A quiet active background, with its text and its border. Badge, Alert, Toast and Avatar paint with the steps -3, -11 and -7 of the scale.' },
 				{ name: '--ui-color-danger / -soft / -border / -text', type: 'color', description: 'Info, success and warning have the same shape.' },
 				{ name: '--ui-font-size-xs … -6xl', type: 'rem', description: 'Text sizes: reading at lg, controls at md, titles from 2xl up.' },
 				{ name: '--ui-space-* / --ui-radius-*', type: 'rem', description: 'Space in steps of 0.25rem and radii from xs to xl.' },
@@ -170,13 +179,34 @@
 		</p>
 		<h2 id="brand">Your brand</h2>
 		<p>
-			The sheets of
-			<code>app/styles</code>
-			load after the module: override the steps of a scale and everything that reads them changes with them.
+			The tokens of UI come with
+			<code>@import '@meekojs/ui'</code>
+			in your
+			<code>app/styles/main.css</code>, and the rules you write after the imports win: override the steps of a scale and everything that reads them changes with them.
 		</p>
 		<DocsCode
 			label="app/styles/main.css"
 			bind:code="examples.themeCss"
+		/>
+		<h3 id="semantic-color">Change a semantic color</h3>
+		<p>
+			Each semantic color (<code>primary</code>, <code>secondary</code>, <code>neutral</code>, <code>success</code>, <code>info</code>, <code>warning</code> and <code>danger</code>) reads the twelve steps of its scale,
+			<code>--ui-color-primary-1</code>
+			to
+			<code>-12</code>, and its contrast text, <code>--ui-color-primary-contrast</code>. To make it read another scale, point those steps at it. The optional entry
+			<code>@meekojs/ui/hues</code>
+			brings the scales of Radix Colors, light and dark, as
+			<code>--color-crimson-1</code>
+			to
+			<code>-12</code>
+			and
+			<code>--color-crimson-contrast</code>. The
+			<code>:root[data-theme]</code>
+			selector makes the rule also win over the steps of UI's dark theme; the Radix scales already follow the theme.
+		</p>
+		<DocsCode
+			label="app/styles/main.css"
+			bind:code="examples.themeColor"
 		/>
 		<p>
 			If your site already has its variables,
@@ -192,12 +222,12 @@
 		<DocsApi
 			caption="Keys of ui.tokens"
 			bind:rows="[
-				{ name: 'primary / primaryHover / onPrimary', type: 'string', description: '--ui-color-primary, its hover and the text on it.' },
-				{ name: 'accentSoft / accentText', type: 'string', description: 'Backgrounds and text of active states: --ui-color-primary-soft and -text.' },
+				{ name: 'primary / primaryHover / onPrimary', type: 'string', description: '--ui-color-primary and step 9 of its scale, its hover and step 10, and the text on it.' },
+				{ name: 'accentSoft / accentText', type: 'string', description: 'Backgrounds and text of active states: --ui-color-primary-soft and -text, and steps 3 and 11.' },
 				{ name: 'surface / surfaceHover', type: 'string', description: 'Surfaces and controls, and their states.' },
 				{ name: 'text / textSoft / muted', type: 'string', description: 'Main and secondary text.' },
 				{ name: 'border / borderStrong', type: 'string', description: 'Separators and outlines.' },
-				{ name: 'focus / danger', type: 'string', description: 'Keyboard focus and errors.' },
+				{ name: 'focus / danger', type: 'string', description: 'Keyboard focus and errors: danger also sets steps 9 and 11 of its scale.' },
 				{ name: 'font / radius', type: 'string', description: 'Font family and base radius.' },
 				{ name: 'controlHeight / controlPadding', type: 'string', description: 'Dimensions of the actions.' },
 				{ name: 'controlWeight / controlFontSize', type: 'string', description: 'Weight and text size of the actions.' },
@@ -205,26 +235,26 @@
 		/>
 		<h2 id="classes">Classes of each component</h2>
 		<p>
-			The components are painted with Tailwind 4 classes with the
-			<code>ui:</code>
-			prefix, which UI compiles by itself: your application does not need Tailwind. Those classes read the tokens, so everything above also changes the components. To adjust a particular one,
+			The components are painted with Tailwind 4 classes, without a prefix, which your application compiles together with its own in
+			<code>app/styles/main.css</code>. Those classes read the tokens, so everything above also changes the components. To adjust a particular one,
 			<code>class</code>
 			reaches its root element and the
 			<code>ui</code>
 			prop adds classes to each part, by the name of its slot;
 			<code>class</code>
 			is the same as
-			<code>ui.base</code>. The slot names are in the props type of each component, and the editor completes them.
+			<code>ui.base</code>. The slot names are in the props type of each component, and the editor completes them. <code>UIButton</code>, <code>UILink</code>, <code>UIIconButton</code>, <code>UICopyButton</code>,
+			<code>UICard</code>
+			and
+			<code>UILinkCard</code>
+			merge
+			<code>class</code>
+			with Tailwind Merge: your utility replaces the recipe's one that sets the same property.
 		</p>
 		<DocsCode bind:code="examples.themeSlots" />
 		<p>
-			Your classes are added to those of the component, without removing any. The UI stylesheet sits in the
-			<code>ui-base</code>,
-			<code>ui.components</code>
-			and
-			<code>ui.utilities</code>
-			layers and loads before yours, so any unlayered rule of your application wins, whatever its specificity. So does a rule on an element, such as
-			<code>{'a { color: … }'}</code>: scope it to your content if you do not want to change the UI links.
+			In the rest, your classes are added to those of the component, without removing any. The styles of UI follow Tailwind's layers: the global base goes in
+			<code>ui-base</code>, right above the preflight; what is written by hand, in <code>components</code>, and the utilities, in <code>utilities</code>, next to yours. Any unlayered rule of your application wins over all of them, whatever its specificity. So does a rule on an element, such as <code>{'a { color: … }'}</code>: scope it to your content if you do not want to change the UI links.
 		</p>
 		<DocsCode
 			label="app/styles/main.css"
@@ -246,7 +276,7 @@
 		<DocsApi
 			caption="Most common equivalents"
 			bind:rows="[
-				{ name: '.meeko-ui-button[data-variant]', type: 'class + variant', description: 'UIButton and UILink: the variant prop (and size, shape, tone) and your class.' },
+				{ name: '.meeko-ui-button[data-variant]', type: 'class + variant', description: 'UIButton and UILink: the variant and color props (and size, radius) and your class.' },
 				{ name: '.meeko-ui-badge / -badge-dot', type: 'ui.base / ui.dot', description: 'UIBadge.' },
 				{ name: '.meeko-ui-input / -textarea', type: 'class', description: 'UIInput and UITextarea.' },
 				{ name: '.meeko-ui-field-label / -error / -description', type: 'ui.label / ui.error / ui.description', description: 'UIField; also ui.meta and ui.counter.' },
@@ -254,7 +284,7 @@
 				{ name: '.meeko-ui-card-header / -title / -body / -footer', type: 'ui.header / ui.title / ui.body / ui.footer', description: 'UICard; class is ui.base.' },
 				{ name: '.meeko-ui-table-scroll / .meeko-ui-table', type: 'ui.base / class', description: 'UITable; also ui.cell, ui.headerCell, ui.bodyRow. Replaces --table-border, --table-background and --table-hover.' },
 				{ name: '.meeko-ui-modal-heading / -body / -footer', type: 'ui.heading / ui.body / ui.footer', description: 'UIModal; class is ui.base, the <dialog>.' },
-				{ name: '.meeko-ui-alert-title / -description', type: 'ui.title / ui.description', description: 'UIAlert; the tone prop replaces data-tone.' },
+				{ name: '.meeko-ui-alert-title / -description', type: 'ui.title / ui.description', description: 'UIAlert; the variant and color props replace data-tone.' },
 				{ name: '.meeko-ui-page-main / -sidebar / -aside', type: 'ui.main / ui.sidebar / ui.aside', description: 'UIPage.' },
 				{ name: '.meeko-ui-header-nav / -actions', type: 'ui.nav / ui.actions', description: 'UIHeader.' },
 				{ name: '.meeko-ui-command-row / -excerpt', type: 'ui.row / <small>', description: 'UICommandPalette; the active row has aria-selected.' },
@@ -272,7 +302,7 @@
 			<code>meeko-ui-prose</code>
 			class, which dresses Markdown on any element, and the
 			<code>meeko-ui-sr-only</code>
-			utility stay public API, because an application does not compile Tailwind.
+			utility stay public API, since they do not depend on Tailwind's classes.
 		</p>
 		<h2 id="defaults">Default values</h2>
 		<p>
@@ -292,14 +322,15 @@
 		/>
 		<p>
 			A few variants also accept a base value:
-			<code>variant</code>,
+			<code>variant</code>, <code>color</code>,
 			<code>size</code>
 			and
-			<code>shape</code>
+			<code>radius</code>
 			in
-			<code>button</code>
+			<code>button</code>, <code>link</code>,
+			<code>iconButton</code>
 			and
-			<code>link</code>; <code>variant</code>,
+			<code>copyButton</code>; <code>variant</code>, <code>color</code>, <code>radius</code>, <code>elevation</code>,
 			<code>padding</code>
 			and
 			<code>density</code>

@@ -15,12 +15,102 @@
 		<h2 id="usage">Uso</h2>
 		<DocsPreview>
 			<UIButton on:click="() => count.value++">Guardar cambio</UIButton>
-			<UIButton variant="secondary">Secundario</UIButton>
-			<UIButton variant="outline">Outline</UIButton>
-			<UIButton variant="ghost">Ghost</UIButton>
+			<UIButton
+				variant="surface"
+				color="neutral"
+			>
+				Secundario
+			</UIButton>
+			<UIButton
+				variant="outline"
+				color="neutral"
+			>
+				Outline
+			</UIButton>
+			<UIButton
+				variant="ghost"
+				color="neutral"
+			>
+				Ghost
+			</UIButton>
 		</DocsPreview>
 		<p role="status">Cambios en este ejemplo: {count.value}</p>
 		<DocsCode bind:code="examples.button" />
+		<h2 id="appearance">Apariencia</h2>
+		<p>
+			El aspecto combina un tratamiento,
+			<code>variant</code>
+			(<code>solid</code>,
+			<code>soft</code>, <code>surface</code>, <code>outline</code>, <code>subtle</code>,
+			<code>ghost</code>
+			o
+			<code>link</code>), con un color semántico,
+			<code>color</code>
+			(<code>primary</code>,
+			<code>secondary</code>, <code>neutral</code>, <code>success</code>, <code>info</code>,
+			<code>warning</code>
+			o
+			<code>danger</code>). Sin ellos es
+			<code>solid</code>
+			y
+			<code>primary</code>.
+			<code>size</code>
+			va de
+			<code>xs</code>
+			a
+			<code>xl</code>,
+			<code>radius</code>
+			de
+			<code>none</code>
+			a
+			<code>full</code>, y
+			<code>width="full"</code>
+			y
+			<code>elevation</code>
+			completan el catálogo. Es la receta
+			<code>buttonTheme</code>
+			de
+			<code>@meekojs/ui/theme</code>: tu
+			<code>class</code>
+			se fusiona con Tailwind Merge y gana a la utilidad de la receta que fija la misma propiedad.
+		</p>
+		<DocsPreview>
+			<UIButton
+				variant="solid"
+				color="primary"
+				size="lg"
+				radius="full"
+				elevation="sm"
+			>
+				Guardar
+			</UIButton>
+			<UIButton
+				variant="soft"
+				color="success"
+				size="sm"
+			>
+				Publicar
+			</UIButton>
+			<UIButton
+				variant="outline"
+				color="info"
+			>
+				outline
+			</UIButton>
+			<UIButton
+				variant="ghost"
+				color="primary"
+			>
+				ghost
+			</UIButton>
+			<UIButton
+				variant="link"
+				color="primary"
+			>
+				link
+			</UIButton>
+		</DocsPreview>
+		<DocsCode bind:code="examples.buttonAppearance" />
 		<h2 id="kinds">Ruta, enlace o botón</h2>
 		<p>
 			<code>UIButton</code>
@@ -82,21 +172,24 @@
 		</p>
 		<h2 id="sizes">Tamaños y estados</h2>
 		<DocsPreview>
+			<UIButton size="xs">Mínimo</UIButton>
 			<UIButton size="sm">Pequeño</UIButton>
 			<UIButton size="md">Mediano</UIButton>
 			<UIButton size="lg">Grande</UIButton>
+			<UIButton size="xl">Enorme</UIButton>
 			<UIButton
-				shape="pill"
+				radius="full"
 				variant="outline"
+				color="neutral"
 			>
-				Pill
+				Redondo
 			</UIButton>
 			<UIButton disabled>No disponible</UIButton>
 		</DocsPreview>
 		<h2 id="tone">Peligro, carga e icono</h2>
 		<p>
-			<code>tone="danger"</code>
-			marca una acción destructiva.
+			<code>color="danger"</code>
+			marca una acción destructiva, con cualquier variante.
 			<code>loading</code>
 			conserva el texto, añade el spinner, anuncia
 			<code>aria-busy</code>
@@ -104,9 +197,9 @@
 			<code>iconOnly</code>, el botón es cuadrado: da siempre su nombre con <code>ariaLabel</code>.
 		</p>
 		<DocsPreview>
-			<UIButton tone="danger">Eliminar</UIButton>
+			<UIButton color="danger">Eliminar</UIButton>
 			<UIButton
-				tone="danger"
+				color="danger"
 				variant="outline"
 			>
 				Revocar
@@ -116,6 +209,7 @@
 				iconOnly
 				ariaLabel="Eliminar"
 				variant="outline"
+				color="neutral"
 			>
 				<UIIcon name="lucide:trash-2" />
 			</UIButton>
@@ -129,14 +223,15 @@
 				{ name: 'target / rel / download', type: 'string', description: 'Con href. Para _blank se añade noopener noreferrer cuando rel no está definido.' },
 				{ name: 'type', type: 'button | submit | reset', default: 'button', description: 'Sin to ni href. Comportamiento nativo en formularios.' },
 				{ name: 'disabled', type: 'boolean', default: 'false', description: 'Sin to ni href. Desactiva el botón nativo.' },
-				{ name: 'variant', type: 'primary | secondary | outline | ghost', default: 'primary', description: 'Jerarquía visual de la acción.' },
-				{ name: 'size', type: 'sm | md | lg', default: 'md', description: 'Tamaño del control.' },
-				{ name: 'shape', type: 'rounded | pill', default: 'rounded', description: 'Forma del contorno.' },
-				{ name: 'tone', type: 'danger', description: 'Marca una acción destructiva, con cualquier variante.' },
+				{ name: 'variant', type: 'solid | soft | surface | outline | subtle | ghost | link', default: 'solid', description: 'Tratamiento visual de la acción.' },
+				{ name: 'color', type: 'primary | secondary | neutral | success | info | warning | danger', default: 'primary', description: 'Color semántico; danger marca una acción destructiva.' },
+				{ name: 'size', type: 'xs | sm | md | lg | xl', default: 'md', description: 'Tamaño del control.' },
+				{ name: 'radius', type: 'none | xs | sm | md | lg | xl | 2xl | 3xl | full', default: 'md', description: 'Radio del contorno.' },
+				{ name: 'width / elevation', type: 'auto | full / none … 2xl', description: 'Ancho del contenido o del contenedor, y sombra.' },
 				{ name: 'loading', type: 'boolean', default: 'false', description: 'Añade el spinner, anuncia aria-busy e impide activarla sin quitarle el foco.' },
 				{ name: 'iconOnly / ariaLabel', type: 'boolean / string', default: 'false', description: 'Botón cuadrado con un icono; ariaLabel le da su nombre accesible.' },
 				{ name: 'name / value / form', type: 'string', description: 'Sin to ni href. Los atributos nativos de un botón de envío.' },
-				{ name: 'class', type: 'string', description: 'Clases adicionales.' },
+				{ name: 'class', type: 'string', description: 'Clases adicionales, fusionadas con Tailwind Merge: ganan a las de la receta.' },
 				{ name: 'id / title / aria-* / data-*', type: 'atributos HTML', description: 'Llegan tal cual al elemento.' },
 			]"
 		/>
@@ -161,8 +256,14 @@
 			<code>UIButton</code>
 			(<code>to</code>,
 			<code>href</code>
-			o un botón) y su mismo aspecto, cuadrada y
+			o un botón) y su mismo aspecto (<code>variant</code>, salvo
+			<code>link</code>, <code>color</code>, <code>size</code>,
+			<code>radius</code>
+			y
+			<code>elevation</code>), cuadrada y
 			<code>ghost</code>
+			y
+			<code>neutral</code>
 			por defecto.
 			<code>label</code>
 			es obligatorio: es su nombre accesible y el texto de su tooltip, que no se anuncia otra vez como descripción. El icono es
@@ -186,14 +287,15 @@
 			<UIIconButton
 				label="Confirmar"
 				icon="check"
-				variant="primary"
+				variant="solid"
+				color="primary"
 				on:click="() => iconClicks.value++"
 			/>
 			<UIIconButton
 				label="Idiomas"
 				icon="globe"
-				variant="secondary"
-				shape="pill"
+				variant="surface"
+				radius="full"
 			/>
 			<UIIconButton
 				label="Ver enlaces"
@@ -233,24 +335,24 @@
 			<UIIconButton
 				label="Borrar"
 				icon="close"
-				tone="danger"
+				color="danger"
 			/>
 			<UIIconButton
 				label="Borrar todo"
 				icon="close"
-				tone="danger"
-				variant="primary"
+				color="danger"
+				variant="solid"
 			/>
 			<UIIconButton
 				label="Guardando"
 				icon="check"
-				variant="secondary"
+				variant="surface"
 				bind:loading="true"
 			/>
 			<UIIconButton
 				label="Archivar (no disponible)"
 				icon="check"
-				variant="secondary"
+				variant="surface"
 				disabled
 			/>
 			<UIIconButton
@@ -280,8 +382,9 @@
 				{ name: 'pressed', type: 'boolean', description: 'Sin to ni href. Conmutador: pinta aria-pressed y el aspecto de activo.' },
 				{ name: 'to / params / search / href / target / rel / download', type: 'como UIButton', description: 'Una ruta o un enlace.' },
 				{ name: 'type / disabled', type: 'button | submit | reset / boolean', default: 'button / false', description: 'Sin to ni href. El botón nativo.' },
-				{ name: 'variant', type: 'primary | secondary | outline | ghost', default: 'ghost', description: 'Jerarquía visual.' },
-				{ name: 'size / shape / tone', type: 'sm | md | lg / rounded | pill / danger', default: 'md / rounded', description: 'Tamaño, forma y acción destructiva.' },
+				{ name: 'variant', type: 'solid | soft | surface | outline | subtle | ghost', default: 'ghost', description: 'Tratamiento visual.' },
+				{ name: 'color', type: 'primary | secondary | neutral | success | info | warning | danger', default: 'neutral', description: 'Color semántico; danger marca una acción destructiva.' },
+				{ name: 'size / radius / elevation', type: 'xs … xl / none … full / none … 2xl', default: 'md / md', description: 'Tamaño, radio del contorno y sombra.' },
 				{ name: 'loading', type: 'boolean', default: 'false', description: 'Cambia el icono por el spinner, anuncia aria-busy y bloquea la activación.' },
 				{ name: 'class / ui', type: 'string / { base, icon, tooltip }', description: 'Clases del botón y de sus partes.' },
 			]"
@@ -292,7 +395,9 @@
 			<code>value</code>
 			al portapapeles. Con texto tiene el aspecto de
 			<code>UIButton</code>
-			(<code>secondary</code>
+			(<code>surface</code>
+			y
+			<code>neutral</code>
 			por defecto) y su texto pasa a «Copiado» durante un instante; con
 			<code>iconOnly</code>, el de <code>UIIconButton</code>, con su tooltip, y el icono pasa a una marca. El resultado se anuncia en una región
 			<code>role="status"</code>
@@ -348,8 +453,8 @@
 				{ name: 'copiedLabel / failedLabel', type: 'string', default: 'Copiado / No se pudo copiar', description: 'Texto y aviso del resultado.' },
 				{ name: 'iconOnly', type: 'boolean', default: 'false', description: 'Sólo icono, con el aspecto de UIIconButton.' },
 				{ name: 'tooltip / placement', type: 'boolean / PopoverPlacement', default: 'true / top', description: 'Con iconOnly, el tooltip.' },
-				{ name: 'variant', type: 'primary | secondary | outline | ghost', default: 'secondary; ghost con iconOnly', description: 'Jerarquía visual.' },
-				{ name: 'size / shape / tone', type: 'sm | md | lg / rounded | pill / neutral | danger', default: 'md / rounded / neutral', description: 'Tamaño, forma y tono.' },
+				{ name: 'variant', type: 'solid | soft | surface | outline | subtle | ghost', default: 'surface; ghost con iconOnly', description: 'Tratamiento visual.' },
+				{ name: 'color / size / radius', type: 'primary … danger / xs … xl / none … full', default: 'neutral / md / md', description: 'Color semántico, tamaño y radio.' },
 				{ name: 'disabled', type: 'boolean', default: 'false', description: 'Desactiva el botón nativo.' },
 				{ name: 'on:copy / on:copyError', type: '(value: string) / (error: unknown)', description: 'Tras copiar, con el texto copiado, o si la copia falla.' },
 				{ name: 'class / ui', type: 'string / { base, status }', description: 'Clases del botón y del aviso para lectores de pantalla.' },
