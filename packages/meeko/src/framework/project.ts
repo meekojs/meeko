@@ -39,6 +39,7 @@ import { devtoolsPanelPlugin, devtoolsPanelScript, resolveDevtoolsConfig } from 
 import { supervisedHmrPortEnv, supervisedPortEnv } from './dev-link'
 import { recordEditorBridgeOff } from './dev-lock'
 import { devHmrHost, devPortInUse, resolveDevPorts } from './dev-port'
+import { startPortless } from './dev-portless'
 import { createDevServerLogs } from './dev-server-logs'
 import { createDevAppReloader, hotFileKey, isDiscoverySource, isRouteOptionsSource, keepServerModules, onServerGraphReset, reachesEagerModule, routeOptionsKey } from './dev-watch'
 import { editorBridgeHost, editorBridgeOffReason, startEditorBridge } from './editor-bridge'
@@ -635,6 +636,16 @@ export function devViteAllowedHosts(allowedHosts: DevAllowedHosts, host: string,
 	return [...new Set([...patterns, ...extra.map((name) => name.toLowerCase())])]
 }
 
+/** `name` of the project's `package.json`, or `undefined` when it is missing or unreadable. */
+async function readPackageName(root: string): Promise<string | undefined> {
+	try {
+		const name = (JSON.parse(await readFile(join(root, 'package.json'), 'utf8')) as { name?: unknown }).name
+		return typeof name === 'string' ? name : undefined
+	} catch {
+		return undefined
+	}
+}
+
 async function startDevelopment(root: string): Promise<Server> {
 	assertNoLegacySessionFile(root)
 	// Every module resolution of this process (Vite plugin, autoimports, discovery) runs with dev: true.
@@ -642,9 +653,6 @@ async function startDevelopment(root: string): Promise<Server> {
 	const { config, modules } = await loadConfiguredModules(root)
 	const server = config.server?.adapter === 'node' ? config.server : undefined
 	const host = meekoEnv(process.env, 'HOST') || server?.host || '127.0.0.1'
-	// `dev.allowedHosts` and MEEKO_ALLOWED_HOSTS open `meeko dev` to a proxy, a tunnel or a LAN name:
-	// Vite's host check and, through the app's SessionManager, the Origin checks.
-	const allowedHosts = mergeDevAllowedHosts(config.dev?.allowedHosts, parseAllowedHostsEnv(process.env[allowedHostsEnv]))
 	// A port named by MEEKO_PORT, PORT or server.port (or the one a supervisor's first server took) is
 	// kept, and listening reports it when in use; otherwise dev takes the first free one from 4173 up.
 	const named = process.env[supervisedPortEnv] || meekoEnv(process.env, 'PORT') || server?.port
@@ -655,7 +663,17 @@ async function startDevelopment(root: string): Promise<Server> {
 		...(namedHmr ? { hmrPort: Number(namedHmr) } : {}),
 	})
 	if (busy !== undefined) process.stdout.write(`[meeko] El puerto ${busy} está en uso; meeko dev usa el ${port}\n`)
-	await prepareProject(root)
+	// `dev.portless` registers a portless route to the port just chosen; a failure only warns.
+	const portless = await startPortless({ root, option: config.dev?.portless, packageName: await readPackageName(root), port, warn: (message) => process.stderr.write(`[meeko] ${message}\n`) })
+	// `dev.allowedHosts`, MEEKO_ALLOWED_HOSTS and the portless host open `meeko dev` to a proxy, a tunnel
+	// or a LAN name: Vite's host check and, through the app's SessionManager, the Origin checks.
+	const allowedHosts = mergeDevAllowedHosts(config.dev?.allowedHosts, parseAllowedHostsEnv(process.env[allowedHostsEnv]), portless ? [portless.host] : [])
+	try {
+		await prepareProject(root)
+	} catch (error) {
+		await portless?.release()
+		throw error
+	}
 	let vite: ViteDevServer | undefined
 	let app: ServerApp | undefined
 	let socketServer: ReturnType<typeof attachNodeWebSocketServer> | undefined
@@ -1004,6 +1022,7 @@ async function startDevelopment(root: string): Promise<Server> {
 					async () => (await reloader.current).close(),
 					() => devServer.close(),
 					async () => serverLogs?.close(),
+					() => portless?.release() ?? Promise.resolve(),
 				]
 				for (const close of steps) {
 					try {
@@ -1027,6 +1046,7 @@ async function startDevelopment(root: string): Promise<Server> {
 		process.once('SIGINT', shutdown)
 		process.once('SIGTERM', shutdown)
 		process.stdout.write(listeningMessage(host, port, networkInterfaces))
+		if (portless) process.stdout.write(`  Portless: ${portless.url}\n`)
 		if (bridgeOff) {
 			process.stderr.write(`Valores en vivo del editor desactivados (${bridgeOff})\n`)
 			recordEditorBridgeOff(root, bridgeOff)
@@ -1034,7 +1054,7 @@ async function startDevelopment(root: string): Promise<Server> {
 		return httpServer
 	} catch (error) {
 		serverLogs?.close()
-		const cleanup = await Promise.allSettled([stylesheetSnapshot.close(), bridge?.close(), socketServer?.close(), app?.close(), vite?.close()])
+		const cleanup = await Promise.allSettled([stylesheetSnapshot.close(), bridge?.close(), socketServer?.close(), app?.close(), vite?.close(), portless?.release()])
 		for (const result of cleanup) {
 			if (result.status === 'rejected') reportError(result.reason, randomUUID())
 		}

@@ -102,6 +102,28 @@ test('loadMeekoConfig validates the dev options', async () => {
 	}
 })
 
+test('loadMeekoConfig validates dev.portless', async () => {
+	const root = await mkdtemp(join(tmpdir(), 'meeko-config-portless-'))
+	try {
+		const file = join(root, 'meeko.config.mjs')
+		for (const portless of ['true', 'false', '{ name: "ui.meeko" }']) {
+			await writeFile(file, `export default { dev: { portless: ${portless} } };\n`)
+			assert.deepEqual((await loadMeekoConfig(root)).dev?.portless, JSON.parse(portless.replace('name', '"name"')))
+		}
+		for (const [portless, error] of [
+			['"ui"', /dev\.portless debe ser un booleano o un objeto \{ name \}/],
+			['{}', /dev\.portless\.name debe ser una cadena no vacía/],
+			['{ name: "Mi_App" }', /dev\.portless\.name "Mi_App" no es un nombre válido/],
+			['{ name: "ui", port: 1 }', /dev\.portless\.port no es una opción/],
+		] as const) {
+			await writeFile(file, `export default { dev: { portless: ${portless} } };\n`)
+			await assert.rejects(loadMeekoConfig(root), error)
+		}
+	} finally {
+		await rm(root, { recursive: true, force: true })
+	}
+})
+
 /** Runs `run` and returns what it wrote to stderr. */
 async function stderrOf(run: () => Promise<unknown>): Promise<string> {
 	const original = process.stderr.write

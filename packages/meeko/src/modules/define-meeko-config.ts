@@ -436,6 +436,27 @@ export interface MeekoConfig {
 		 * @see https://github.com/meekojs/meeko/blob/main/docs/reference/config/config-dev.md#abrir-meeko-dev-desde-otro-dispositivo
 		 */
 		readonly allowedHosts?: DevAllowedHosts
+		/**
+		 * Publica `meeko dev` en una URL con nombre de [portless](https://portless.sh)
+		 * (`https://<name>.localhost`) sin envolver el script con `portless`. `true` deriva el nombre
+		 * del `name` del `package.json` (sin ámbito, saneado como etiqueta DNS); `{ name }` lo fija y
+		 * admite subdominios (`ui.meeko`). `meeko dev` sigue en su puerto y registra la ruta con
+		 * `portless alias <name> <puerto>`, que quita al cerrar; el proxy de portless debe estar en
+		 * marcha. El host de portless se añade a `allowedHosts` y la URL se muestra al arrancar.
+		 * `portless` no es dependencia de Meeko: se usa el del proyecto (`node_modules/.bin`) o el del
+		 * PATH, y si falta o falla `meeko dev` avisa y sigue sin él. `PORTLESS=0` lo desactiva y, con
+		 * `PORTLESS_URL` (ya dentro de `portless <name> meeko dev`), sólo se acepta su host. Por
+		 * defecto, desactivado.
+		 * @since 1.12.0
+		 * @example
+		 * ```ts
+		 * import { defineMeekoConfig } from "@meekojs/meeko/framework";
+		 *
+		 * export default defineMeekoConfig({ dev: { portless: { name: "ui.meeko" } } });
+		 * ```
+		 * @see https://github.com/meekojs/meeko/blob/main/docs/reference/config/config-dev.md#url-con-nombre-con-portless
+		 */
+		readonly portless?: boolean | { readonly name: string }
 	}
 	/**
 	 * Meeko DevTools en `meeko dev`: con `true` (o un objeto con `panel` distinto de `false`),

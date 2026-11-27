@@ -17,6 +17,7 @@ import { normalizeDevAllowedHost } from '../server/runtime/dev-hosts'
 import { normalizeDocumentConfig, siteOrigin } from '../shared/head'
 import { resolveThemeConfig } from '../shared/theme'
 import { resolveDevtoolsConfig } from './dev-devtools'
+import { portlessConfigError } from './dev-portless'
 import { validateHeaderValues } from './header-values'
 import { classifyModuleEntry, resolvedDocument, resolveMeekoModules } from './module-loader'
 import { composeFrameworkRoutes } from './modules'
@@ -215,6 +216,8 @@ export async function loadMeekoConfig(projectRoot: string): Promise<MeekoConfig>
 	if (dev !== undefined) {
 		if (!dev || typeof dev !== 'object' || Array.isArray(dev)) throw new TypeError(`${file}: dev debe ser un objeto`)
 		if (dev.serverLogs !== undefined && typeof dev.serverLogs !== 'boolean') throw new TypeError(`${file}: dev.serverLogs debe ser un booleano`)
+		const portlessError = portlessConfigError(dev.portless, `${file}: dev.portless`)
+		if (portlessError) throw new TypeError(portlessError)
 		if (dev.allowedHosts !== undefined && dev.allowedHosts !== true) {
 			if (!Array.isArray(dev.allowedHosts)) throw new TypeError(`${file}: dev.allowedHosts debe ser true o una lista de hosts`)
 			for (const [index, entry] of (dev.allowedHosts as unknown[]).entries()) {
