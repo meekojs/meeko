@@ -242,7 +242,7 @@ async function shown(session: Session) {
 	const brace = found.find((item) => item.message === doubleBracesMessage)!
 	const actions = await session.request<CodeAction[]>(CodeActionRequest.method, { textDocument: { uri }, range: brace.range, context: { diagnostics: [brace] } })
 	return {
-		zones: zones.map((zone) => [zone.label, zone.detail]),
+		zones: zones.map((zone): [string, string] => [zone.label, zone.detail]),
 		hover: hover?.contents.value ?? '',
 		directive: items.find((item) => item.label === 'if')?.detail,
 		lenses: lenses.map((lens) => lens.command?.title),
@@ -279,7 +279,7 @@ describe('the language server speaks the language of the client', { timeout: 300
 	})
 
 	test('with locale es, or without locale, everything is Spanish as before', async () => {
-		const results = []
+		const results: Array<Awaited<ReturnType<typeof shown>>> = []
 		for (const locale of ['es-ES', undefined]) {
 			await withServer(locale, component, async (session) => {
 				results.push(await shown(session))
@@ -308,7 +308,7 @@ describe('the language server speaks the language of the client', { timeout: 300
 			[undefined, 'bind:class necesita un valor: bind:class="expresión"'],
 		] as const) {
 			await withServer(locale, unvalued, async (session) => {
-				const found = await settled(session, (items) => items.some((item) => item.message.includes('bind:class')))
+				const found = await settled(session, (items) => items.some((item) => String(item.message).includes('bind:class')))
 				assert.deepEqual(
 					found.map((item) => item.message),
 					[expected],

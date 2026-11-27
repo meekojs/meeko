@@ -108,14 +108,14 @@ test('saving in the editor without a project configuration keeps the text nodes'
 test('the core and the plugin both reject the removed meekoSortClasses "tailwind", in every plugin order', async () => {
 	const options = { filepath: 'Component.meeko', meekoClassFunctions: classFunctions, meekoSortClasses: 'tailwind' }
 	for (const plugins of [[plugin], [corePlugin], [plugin, corePlugin], [corePlugin, plugin]]) {
-		await assert.rejects(format(component, { ...options, plugins }), /Invalid meekoSortClasses value/)
+		await assert.rejects(format(component, { ...options, plugins }), /Invalid \S*meekoSortClasses\S* value/)
 	}
 	// An editor save with that configuration fails the same way: it is not silently another mode.
 	const root = await mkdtemp(join(tmpdir(), 'meeko-editor-removed-mode-'))
 	try {
 		await writeFile(join(root, 'meeko.config.ts'), 'export default {}\n')
 		await writeFile(join(root, '.prettierrc.json'), JSON.stringify({ meekoSortClasses: 'tailwind' }))
-		await assert.rejects(formatWithPrettier({ text: component, filename: join(root, 'Component.meeko'), tabSize: 2, insertSpaces: true, trusted: true }), /Invalid meekoSortClasses value/)
+		await assert.rejects(formatWithPrettier({ text: component, filename: join(root, 'Component.meeko'), tabSize: 2, insertSpaces: true, trusted: true }), /Invalid \S*meekoSortClasses\S* value/)
 	} finally {
 		await rm(root, { recursive: true, force: true })
 	}

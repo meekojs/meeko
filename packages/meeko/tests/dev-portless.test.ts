@@ -78,7 +78,8 @@ const base = { root: resolve('/work/app'), packageName: '@acme/site', port: 4180
 test('startPortless registers the alias with the real port, reports the host and removes the route once', async () => {
 	const calls: Call[] = []
 	const warnings: string[] = []
-	const command = resolve('/work/node_modules/.bin/portless')
+	// The binary of the parent folder, with the name of this platform (`portless.cmd` on Windows).
+	const command = portlessBinaryCandidates(base.root)[1]!
 	const session = await startPortless({ ...base, option: true, env: {}, warn: (message) => warnings.push(message), exists: (file) => file === command, run: fakeRunner({ get: ok('https://site.localhost\n') }, calls) })
 	assert.ok(session)
 	assert.equal(session.url, 'https://site.localhost')

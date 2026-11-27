@@ -91,7 +91,9 @@ async function stylesProject(context: { after(fn: () => Promise<void>): void }, 
 }
 
 test('meeko styles writes the processed global stylesheet without a server', { timeout: 120_000 }, async (context) => {
-	const root = await stylesProject(context)
+	// The server stops before the project is removed: Windows cannot delete the working directory of a live process.
+	let child: ChildProcess | undefined
+	const root = await stylesProject(context, () => stopChild(child))
 	const file = join(root, globalStylesheetSnapshotFile)
 	await put(root, globalStylesheetSnapshotFile, '.stale {}\n')
 
@@ -111,8 +113,6 @@ test('meeko styles writes the processed global stylesheet without a server', { t
 
 	// The same stylesheet, byte for byte, as the one `meeko dev` keeps for the same project.
 	await rm(file)
-	let child: ChildProcess | undefined
-	context.after(() => stopChild(child))
 	const port = await freePort()
 	let logs = ''
 	child = spawn(process.execPath, [cli, 'dev', root], {

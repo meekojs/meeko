@@ -191,7 +191,7 @@ test('escapes the quotes of a sorted bind:class as any other expression', async 
 
 test('the removed "tailwind" mode is rejected as an invalid option value, never mapped to another mode', async () => {
 	for (const filepath of ['styles.ts', 'Component.meeko']) {
-		await assert.rejects(format(filepath === 'styles.ts' ? 'cn("b a");\n' : component, { meekoClassFunctions: ['cn'], meekoSortClasses: 'tailwind', filepath, plugins: [plugin] }), /Invalid meekoSortClasses value/)
+		await assert.rejects(format(filepath === 'styles.ts' ? 'cn("b a");\n' : component, { meekoClassFunctions: ['cn'], meekoSortClasses: 'tailwind', filepath, plugins: [plugin] }), /Invalid \S*meekoSortClasses\S* value/)
 	}
 	assert.deepEqual(
 		plugin.options.meekoSortClasses.choices.map((choice) => choice.value),
