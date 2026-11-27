@@ -583,3 +583,12 @@ test('a reset of the form goes back to the value the select was mounted with, an
 		release()
 	})
 })
+
+test('the root of a select and a combobox is as wide as its container, also in a flex row or a grid', () => {
+	for (const [name, look] of Object.entries({ select: selectTheme, combobox: comboboxTheme })) {
+		for (const clearable of [false, true]) {
+			const classes = look({ clearable }).base().split(' ')
+			assert.ok(classes.includes('w-full') && classes.includes('block'), `${name} clearable=${clearable}: ${classes.join(' ')}`)
+		}
+	}
+})
