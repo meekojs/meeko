@@ -10,13 +10,13 @@ export const showOutputCommand = 'meeko.showOutput'
 
 /** Estado del servidor que atiende un documento. */
 export interface ServerState {
-	/** `failed` si no arrancó o se detuvo sin que nadie lo pidiera. */
-	readonly state: 'starting' | 'running' | 'failed'
+	/** `failed` si no arrancó; `stopped` si arrancó y después se detuvo sin que nadie lo pidiera. */
+	readonly state: 'starting' | 'running' | 'failed' | 'stopped'
 	/** Servidor elegido para la carpeta. */
 	readonly resolution: ResolvedLanguageServer
 	/** Nombre de la carpeta, o `global` para los archivos fuera del workspace. */
 	readonly folder: string
-	/** Error del arranque. */
+	/** Error del arranque, sólo en `failed`. */
 	readonly error?: string
 }
 
@@ -44,6 +44,10 @@ export function serverStatus(state: ServerState | undefined): ServerStatus {
 	const restart = { command: restartCommand, title: t('Restart') }
 	if (!state) return { text: t('Meeko: no server'), detail: t('No language server handles this file'), severity: 'information', busy: false, command: restart }
 	const label = serverLabel(state.resolution)
+	if (state.state === 'stopped') {
+		// It did start: the click brings it back, and the output is one command away.
+		return { text: `Meeko: error (${label})`, detail: t('The language server for "{0}" stopped unexpectedly', state.folder), severity: 'error', busy: false, command: restart }
+	}
 	if (state.state === 'failed') {
 		return {
 			text: `Meeko: error (${label})`,
