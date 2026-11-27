@@ -7,7 +7,8 @@ const common = {
 	bundle: true,
 	platform: 'node',
 	format: 'esm',
-	target: 'node20',
+	// engines.vscode ^1.144.0: VS Code 1.144 ships Electron 43.8.3 (Node 24.22.0) and its remote server runs Node 24.22.1.
+	target: 'node24',
 	mainFields: ['module', 'main'],
 	// Bundled CommonJS dependencies call `require`. The import is renamed: bundled modules of the
 	// server import `createRequire` themselves, and a second top-level binding fails to load.

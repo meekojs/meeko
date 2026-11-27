@@ -48,6 +48,19 @@ exports.run = async function run() {
 		)
 		const hover = await vscode.commands.executeCommand('vscode.executeHoverProvider', uri, document.positionAt(source.indexOf('count:') + 2))
 		assert.ok(hover?.length, 'Hover must work for a virtual Meeko document')
+		// Execution zones come from the open text, so a document that is not on disk has them too.
+		await vscode.window.showTextDocument(document)
+		let zones
+		for (let attempt = 0; attempt < 60; attempt++) {
+			zones = api.executionZones(uri)
+			if (zones?.length) break
+			await new Promise((resolve) => setTimeout(resolve, 100))
+		}
+		assert.deepEqual(
+			zones?.map((zone) => [zone.kind, zone.range.start.line, zone.range.end.line]),
+			[['shared', 0, 0]],
+			`Execution zones must work for a virtual Meeko document: ${JSON.stringify(zones)}`,
+		)
 		let diagnostics = []
 		for (let attempt = 0; attempt < 60; attempt++) {
 			diagnostics = vscode.languages.getDiagnostics(uri)

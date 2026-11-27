@@ -77,14 +77,14 @@ test('formatea la decoración, el hover y los valores recortados', () => {
 	assert.equal(inlineText(single), 'count = {"a":1,"b":[true,null]}')
 	const [many] = groupSignals([signal({}), signal({ id: 'tab2/meeko-1/count', tab: 'tab2', json: '9' }), signal({ id: 'tab1/meeko-5/count', instanceId: 'meeko-5', json: '4' })], 'D:/app/pages/Counter.meeko', true)
 	assert.ok(many)
-	assert.equal(inlineText(many), 'count = 3 · 3 instancias')
+	assert.equal(inlineText(many), 'count = 3 · 3 instances')
 	assert.equal(previewValue(signal({ json: JSON.stringify('x'.repeat(100)) }), 20).length, 20)
 	assert.equal(previewValue(signal({ json: '[1,2', truncated: true })), '[1,2…')
 	assert.equal(formatValue(signal({ json: '{"a":1}' })), '{\n  "a": 1\n}')
 	assert.equal(formatValue(signal({ json: '[1,2', truncated: true })), '[1,2…')
 	const markdown = hoverMarkdown(many, (item) => `command:edit?${item.id}`)
-	assert.match(markdown, /3 instancias/)
-	assert.match(markdown, /\[Editar valor\]\(command:edit\?tab1\/meeko-1\/count\)/)
+	assert.match(markdown, /3 instances/)
+	assert.match(markdown, /\[Edit value\]\(command:edit\?tab1\/meeko-1\/count\)/)
 	assert.equal(markdown.match(/```json/g)?.length, 3)
 	const hostile = hoverMarkdown({ name: 'x', line: 1, column: 1, signals: [signal({ component: '[x](command:evil)', json: JSON.stringify('```\n[link](command:evil)') })] })
 	const header = hostile.split('\n\n')[1] ?? ''
@@ -99,12 +99,12 @@ test('marca los alias de defineModel en la decoración y en el hover', () => {
 	assert.ok(group)
 	assert.equal(inlineText(group), 'open = true (= dialogOpen)')
 	// Markdown renders `lab\.meeko:5` as «lab.meeko:5».
-	assert.equal(aliasDescription(alias), 'alias de `dialogOpen` (lab\\.meeko:5)')
+	assert.equal(aliasDescription(alias), 'alias of `dialogOpen` (lab\\.meeko:5)')
 	const { line: _line, column: _column, ...unsited } = alias
-	assert.equal(aliasDescription(unsited), 'alias de `dialogOpen` (lab\\.meeko)')
-	assert.equal(aliasDescription({ ...alias, name: 'a`b', file: 'C:\\app\\[x].meeko' }), 'alias de `` a`b `` (\\[x\\]\\.meeko:5)', 'El nombre y el archivo no pueden inyectar Markdown')
+	assert.equal(aliasDescription(unsited), 'alias of `dialogOpen` (lab\\.meeko)')
+	assert.equal(aliasDescription({ ...alias, name: 'a`b', file: 'C:\\app\\[x].meeko' }), 'alias of `` a`b `` (\\[x\\]\\.meeko:5)', 'El nombre y el archivo no pueden inyectar Markdown')
 	const markdown = hoverMarkdown(group, (item) => `command:edit?${item.id}`)
-	assert.match(markdown, /Modal · meeko\\-4 · tab1 · alias de `dialogOpen` \(lab\\\.meeko:5\)/)
+	assert.match(markdown, /Modal · meeko\\-4 · tab1 · alias of `dialogOpen` \(lab\\\.meeko:5\)/)
 	const [principal] = groupSignals([signal({ id: alias.id, instanceId: 'meeko-5', component: 'lab', name: 'dialogOpen', file: alias.file, line: 5, column: 8, json: 'true' })], alias.file, true)
 	assert.ok(principal)
 	assert.equal(inlineText(principal), 'dialogOpen = true', 'La principal no lleva marca')
@@ -183,7 +183,7 @@ test('el registro de meeko dev dice si se arrancó sin puente, sólo en proyecto
 	// Un meeko dev con puente, o anterior a 1.7.1, no escribe editorBridge.
 	assert.equal(bridgeOffFromRecord(JSON.stringify({ pid: 42, startedAt: '2026-10-29T00:00:00.000Z' })), undefined)
 	assert.deepEqual(bridgeOffFromRecord(JSON.stringify({ pid: 42, startedAt: 'x', editorBridge: false, editorBridgeReason: 'MEEKO_EDITOR_BRIDGE=0' })), { pid: 42, reason: 'MEEKO_EDITOR_BRIDGE=0' })
-	assert.deepEqual(bridgeOffFromRecord(JSON.stringify({ pid: 42, editorBridge: false })), { pid: 42, reason: 'sin motivo registrado' })
+	assert.deepEqual(bridgeOffFromRecord(JSON.stringify({ pid: 42, editorBridge: false })), { pid: 42, reason: 'no reason recorded' })
 	for (const invalid of ['', 'null', '{', JSON.stringify({ pid: -1, editorBridge: false }), JSON.stringify({ pid: '42', editorBridge: false })]) {
 		assert.equal(bridgeOffFromRecord(invalid), undefined, invalid)
 	}
@@ -192,10 +192,10 @@ test('el registro de meeko dev dice si se arrancó sin puente, sólo en proyecto
 test('la barra de estado explica un meeko dev sin puente; una conexión gana', () => {
 	const off = [{ pid: 42, reason: 'MEEKO_EDITOR_BRIDGE=0' }]
 	const disabled = liveStatus([], 0, off)
-	assert.equal(disabled.text, '$(circle-slash) Meeko live: desactivado en meeko dev')
+	assert.equal(disabled.text, '$(circle-slash) Meeko live: disabled in meeko dev')
 	assert.match(disabled.tooltip, /meeko dev \(PID 42\): MEEKO_EDITOR_BRIDGE=0/)
-	assert.match(disabled.tooltip, /MEEKO_EDITOR_BRIDGE=0 \(en el entorno o en el \.env del proyecto\)/)
-	assert.equal(liveStatus(['http://127.0.0.1:4173/__meeko/editor-bridge'], 1, off).text, '$(pulse) Meeko live: conectado')
-	assert.deepEqual(liveStatus([], 1, []), { text: '$(debug-disconnect) Meeko live: desconectado', tooltip: 'meeko dev no responde. Pulsa para reconectar.' })
-	assert.equal(liveStatus([], 0, []).tooltip, 'Arranca meeko dev para ver los valores de las señales junto al código.')
+	assert.match(disabled.tooltip, /MEEKO_EDITOR_BRIDGE=0 \(in the environment or in the project \.env file\)/)
+	assert.equal(liveStatus(['http://127.0.0.1:4173/__meeko/editor-bridge'], 1, off).text, '$(pulse) Meeko live: connected')
+	assert.deepEqual(liveStatus([], 1, []), { text: '$(debug-disconnect) Meeko live: disconnected', tooltip: 'meeko dev is not responding. Click to reconnect.' })
+	assert.equal(liveStatus([], 0, []).tooltip, 'Start meeko dev to see signal values next to the code.')
 })
