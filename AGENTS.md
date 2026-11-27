@@ -55,7 +55,7 @@ Claude Code y Codex leen este archivo. Una sola sesión coordina: reparte tareas
 - Elige la plantilla por complejidad: `*-quick` para cambios acotados y mecánicos; `*-impl` para features y bugs normales; `claude-impl` para compilador, runtime, hidratación o cambios entre paquetes; `*-review` para revisión independiente de sólo lectura. Revisa con el agente contrario al que implementó. Codex se lanza siempre con `--no-daemon` y su sandbox no puede usar `hc send`: recoge su informe con `hc read` cuando `hc wait` indique `done`.
 - Usa un worktree por tarea, siempre bajo `.claude/worktrees/<tarea>`. Claude los crea solo (`claude -w <tarea>` o subagentes con `isolation: worktree`); para Codex u otros, `git worktree add .claude/worktrees/<tarea> -b <rama>` y `pnpm install` dentro. Nunca asignes los mismos archivos a dos agentes y elimina el worktree con `git worktree remove` al integrar.
 - En un worktree no uses Serena: está ligada al checkout principal y editaría `main`. Las plantillas de `hc` ya la desactivan.
-- Los especialistas viven en `.codex/agents/*.toml`, que es la fuente única. `pnpm agents:sync` genera `.claude/agents/*.md` y `pnpm agents:check` (incluido en `pnpm verify`) detecta desajustes; no edites los archivos generados.
+- El repositorio no define especialistas ahora mismo. Si se añade alguno, vive en `.codex/agents/*.toml`, que es la fuente única: `pnpm agents:sync` genera `.claude/agents/*.md` y `pnpm agents:check` (incluido en `pnpm verify`) detecta desajustes; no edites los archivos generados.
 
 ### Git y recursos seguros
 
