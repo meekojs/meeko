@@ -143,6 +143,9 @@ test('with the installed VS Code grammar, a script tag split over several lines 
 	assert.ok(scopesOf('server').includes('entity.other.attribute-name.meeko'), JSON.stringify(scopesOf('server')))
 	assert.ok(scopesOf('lang').includes('entity.other.attribute-name.meeko'), JSON.stringify(scopesOf('lang')))
 	assert.ok(!scopesOf('server').includes('meta.embedded.block.typescript'), 'the attributes are not TypeScript')
+	// The opening tag is HTML for the editor, like the one of <template> and <style>: the root snippets are not offered among its attributes.
+	assert.ok(scopesOf('server').includes('meta.embedded.block.html'), JSON.stringify(scopesOf('server')))
+	assert.ok(scopesOf('lang').includes('meta.embedded.block.html'), JSON.stringify(scopesOf('lang')))
 	assert.ok(scopesOf('import').includes('meta.embedded.block.typescript'), JSON.stringify(scopesOf('import')))
 	assert.ok(scopesOf('import').includes('keyword.control.import.ts'), JSON.stringify(scopesOf('import')))
 	assert.ok(scopesOf('await').includes('keyword.control.flow.ts'), JSON.stringify(scopesOf('await')))

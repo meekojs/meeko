@@ -158,6 +158,7 @@
 			},
 			"patterns": [
 				{
+					"name": "meta.embedded.block.html",
 					"begin": "(?<=<script)",
 					"end": "(>)",
 					"endCaptures": {
