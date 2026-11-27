@@ -149,20 +149,31 @@ test('a full reload invalidates every server module except what the development 
 	assert.equal(mixed, 2)
 })
 
-test('a server graph reset runs the latest listener after every module is invalidated', () => {
+test('a server graph reset runs the latest listener, which may take the invalidation over', () => {
 	const calls: string[] = []
 	const graph = {
 		invalidateAll() {
 			calls.push('invalidate')
 		},
 	}
-	onServerGraphReset(graph, () => calls.push('first'))
+	onServerGraphReset(graph, () => {
+		calls.push('first')
+		return false
+	})
 	graph.invalidateAll()
-	assert.deepEqual(calls, ['invalidate', 'first'])
-	// A rebuilt app registers again on the same graph: its listener replaces the previous one.
-	onServerGraphReset(graph, () => calls.push('second'))
+	assert.deepEqual(calls, ['first', 'invalidate'])
+	// A rebuilt app registers again on the same graph: its listener replaces the previous one. It
+	// defers the invalidation until the requests in flight finish, and does it then itself.
+	let deferring = true
+	onServerGraphReset(graph, () => {
+		calls.push('second')
+		return deferring
+	})
 	graph.invalidateAll()
-	assert.deepEqual(calls, ['invalidate', 'first', 'invalidate', 'second'])
+	assert.deepEqual(calls, ['first', 'invalidate', 'second'])
+	deferring = false
+	graph.invalidateAll()
+	assert.deepEqual(calls, ['first', 'invalidate', 'second', 'second', 'invalidate'])
 })
 
 test('the scripts of a module are the scripts under its folders', () => {
@@ -665,5 +676,57 @@ test('meeko dev keeps the context of a module after Vite invalidates every modul
 	const rootConfig = join(root, 'tsconfig.json')
 	await reloaded(async () => writeFile(rootConfig, `${await readFile(rootConfig, 'utf8')}\n`))
 	await reloaded(() => rm(nested))
+	assert.doesNotMatch(logs(), /Missing Meeko context/)
+})
+
+test('meeko dev answers a request in flight when Vite invalidates every module for a tsconfig.json', { timeout: 120_000 }, async (context) => {
+	let running: Running | undefined
+	let hot: Awaited<ReturnType<typeof hotMessages>> | undefined
+	const root = await tempProject(context, 'context-tsconfig-inflight', () => {
+		hot?.close()
+		return stopChild(running?.child)
+	})
+	await initFrameworkProject(root)
+	await linkMeeko(root)
+	await writeNamedContextModule(root, 'linked')
+	// A request to `/?slow` stops before its page is loaded until the test creates `release`.
+	const release = join(root, 'release')
+	await mkdir(join(root, 'server', 'middleware'), { recursive: true })
+	await writeFile(
+		join(root, 'server', 'middleware', 'slow.ts'),
+		`import { existsSync } from "node:fs";
+import { defineServerMiddleware } from "@meekojs/meeko/server";
+
+export default defineServerMiddleware(async (request, next) => {
+  if (new URL(request.url).searchParams.has("slow")) {
+    console.log("[slow-start]");
+    while (!existsSync(${JSON.stringify(release)})) await new Promise((done) => setTimeout(done, 20));
+  }
+  return next();
+});
+`,
+	)
+	const port = await freePort()
+	const hmrPort = await freePort()
+	running = await cli(root, ['dev'], port, hmrPort)
+	const { logs } = running
+	await waitForPage(port, '/', providedTwice, logs)
+	hot = await hotMessages(hmrPort)
+	const { messages } = hot
+
+	// Vite invalidated every server module while the request was rendered by the current app: it
+	// imported its page from the invalidated graph, a new evaluation of key.js, while the app's
+	// plugin provided the previous key. That request failed with "Missing Meeko context".
+	const slow = html(port, '/?slow')
+	await until(() => logs().includes('[slow-start]'), `The slow request did not start\n${logs()}`)
+	messages.length = 0
+	await writeFile(join(root, 'tsconfig.json'), `${await readFile(join(root, 'tsconfig.json'), 'utf8')}\n`)
+	await until(() => messages.some((message) => message.type === 'full-reload'), `No full reload\n${logs()}`)
+	await writeFile(release, '')
+	const answered = await slow
+	assert.equal(answered.status, 200, `${answered.body.slice(0, 500)}\n${logs()}`)
+	assert.match(answered.body, providedTwice)
+	// The app built after the reset answers the next requests.
+	await waitForPage(port, '/', providedTwice, logs)
 	assert.doesNotMatch(logs(), /Missing Meeko context/)
 })

@@ -1,5 +1,9 @@
 # Cambios de Meeko
 
+## Sin publicar
+
+- **`meeko dev` responde las peticiones en vuelo cuando Vite invalida todo el grafo del servidor.** Desde 1.10.1 una invalidación completa (al crear, editar o borrar un `tsconfig.json`, o cuando el optimizador de dependencias recarga) vuelve a crear la app, pero una petición que la app anterior ya estaba atendiendo importaba su página del grafo recién invalidado: una evaluación nueva del módulo que crea una clave de `createContext` (como la del gestor de modales de `@meekojs/ui`), mientras los plugins de esa app proveían la anterior. Esa petición respondía `500` con `Missing Meeko context`, y las siguientes ya `200`. Ahora la invalidación del grafo del servidor se aplaza hasta que terminan las peticiones en vuelo (como mucho 5 segundos, igual que en un reinicio de Vite): la reconstrucción de la app invalida los módulos justo antes de crear la nueva, y las peticiones que llegan mientras tanto esperan a esa app. Lo mismo vale para cualquier reconstrucción (añadir o quitar una página, editar un plugin). Si la app nueva no compila, se informa el error y las peticiones siguen respondiéndose con la anterior, como hasta ahora.
+
 ## 1.11.0 — 2026-11-25
 
 - Publicación coordinada con `@meekojs/ui` 1.11.0, sin cambios funcionales en este paquete.
