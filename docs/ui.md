@@ -53,7 +53,7 @@ export const route = definePage({ render: "prerender" });
 </template>
 ```
 
-Verás el título, un badge y un botón con los estilos de UI. `UIButton` usa `<MeekoLink>` con `to`, un `<a>` con `href` y un `<button>` sin destino. `UILink` también acepta `to` o `href`, siempre como enlace. `UISelect` es nativo; usa `UICombobox` para búsqueda o selección múltiple. La [referencia de UI](ui-api.md) detalla las props.
+Verás el título, un badge y un botón con los estilos de UI. `UIButton` usa `<MeekoLink>` con `to`, un `<a>` con `href` y un `<button>` sin destino. `UILink` también acepta `to` o `href`, siempre como enlace. `UISelect` elige una opción de una lista propia; usa `UICombobox` para búsqueda o selección múltiple. La [referencia de UI](ui-api.md) detalla las props.
 
 El módulo `@meekojs/ui` pertenece al ecosistema Meeko y tiene versión propia.
 

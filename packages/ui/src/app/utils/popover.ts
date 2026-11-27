@@ -392,8 +392,9 @@ export function createPopover(props: UIPopoverProps, open: Signal<boolean>, id: 
 		})
 		listen(content, 'toggle', (event) => synced((event as ToggleEvent).newState ? (event as ToggleEvent).newState === 'open' : popoverOpen(content)))
 
-		// `interestfor` needs no script, so a hint can be open already: the model follows it, not the reverse.
-		const openedBefore = hinting() && popoverOpen(content) && !untrack(() => open.value)
+		// `interestfor` and `popovertarget` need no script, so the content can be open already, from before
+		// hydration: the model follows it, not the reverse.
+		const openedBefore = popoverOpen(content) && !untrack(() => open.value)
 		if (openedBefore) open.value = true
 
 		// The model opens and closes the content.

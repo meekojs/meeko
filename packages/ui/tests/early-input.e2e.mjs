@@ -49,19 +49,36 @@ test('what is edited before hydration reaches the model and the submission of ev
 	await page.getByRole('switch', { name: 'Avisos' }).check()
 	await page.getByRole('radio', { name: 'Semana' }).check()
 	await page.getByRole('slider', { name: 'Volumen' }).fill('8')
-	await page.getByLabel('Fruta').selectOption('Pera')
+	// A select has no value to edit without the script, but its trigger already opens its list: `popovertarget`.
+	const fruit = page.getByRole('combobox', { name: 'Fruta', exact: true })
+	const fruitList = page.getByRole('listbox', { name: 'Fruta', exact: true })
+	const fruitOpen = () => fruit.evaluate((trigger) => globalThis.document.getElementById(trigger.getAttribute('popovertarget')).matches(':popover-open'))
+	await fruit.click()
+	assert.equal(await fruitOpen(), true, 'the browser opens the popover of the list')
+	assert.equal(await fruit.getAttribute('aria-expanded'), 'false', 'and nothing else knows yet')
+	assert.equal(await page.locator('[role=option]').count(), 0)
 	assert.equal(await page.locator('#values').textContent(), '|||false|false|day|4||', 'nothing has run yet')
 
 	await hydrate()
+	const edited = 'Ana|s3creta|Hola|true|true|week|8||'
+	await page.waitForFunction((text) => globalThis.document.querySelector('#values').textContent === text, edited, { timeout: 10_000 }).catch(() => undefined)
+	assert.equal(await page.locator('#values').textContent(), edited, JSON.stringify(errors))
+	// The list that was open stays open, now with its options and its state, and a choice reaches the model.
+	await fruitList.getByRole('option', { name: 'Pera', exact: true }).waitFor()
+	assert.equal(await fruitOpen(), true, 'hydration keeps the list open')
+	assert.equal(await fruit.getAttribute('aria-expanded'), 'true')
+	assert.equal(await fruitList.getByRole('option').count(), 3)
+	await fruitList.getByRole('option', { name: 'Pera', exact: true }).click()
 	const expected = 'Ana|s3creta|Hola|true|true|week|8|Pera|'
-	await page.waitForFunction((text) => globalThis.document.querySelector('#values').textContent === text, expected, { timeout: 10_000 }).catch(() => undefined)
-	assert.equal(await page.locator('#values').textContent(), expected, JSON.stringify(errors))
+	assert.equal(await page.locator('#values').textContent(), expected)
+	assert.equal(await fruitOpen(), false)
+	assert.equal(await fruit.getAttribute('aria-expanded'), 'false')
 	// The controls keep what the user sees.
 	assert.equal(await page.getByLabel('Nombre').inputValue(), 'Ana')
 	assert.equal(await page.getByRole('checkbox', { name: 'Aceptar' }).isChecked(), true)
 	assert.equal(await page.getByRole('radio', { name: 'Semana' }).isChecked(), true)
 	assert.equal(await page.getByRole('slider', { name: 'Volumen' }).inputValue(), '8')
-	assert.equal(await page.getByLabel('Fruta').inputValue(), 'Pera')
+	assert.equal((await fruit.innerText()).trim(), 'Pera')
 	// The track of the slider follows the value that was there before hydrating.
 	assert.match((await page.getByRole('slider', { name: 'Volumen' }).getAttribute('style')) ?? '', /--slider-fill: 80%/)
 
@@ -95,7 +112,7 @@ test('what is edited before hydration reaches the model and the submission of ev
 	const city = searching.page.getByRole('combobox', { name: 'Ciudad' })
 	await city.fill('qui')
 	await searching.hydrate()
-	const list = searching.page.locator('[role=listbox]')
+	const list = searching.page.getByRole('listbox', { name: 'Ciudad', exact: true })
 	await list.getByRole('option', { name: 'Quito' }).waitFor()
 	assert.equal(await list.getByRole('option').count(), 1, 'the list is filtered by what was typed')
 	assert.equal(await city.inputValue(), 'qui')
@@ -110,7 +127,7 @@ test('what is edited before hydration reaches the model and the submission of ev
 	await left.page.getByLabel('Nombre').focus()
 	await left.hydrate()
 	await left.page.waitForFunction(() => globalThis.document.querySelector('input[role=combobox]').value === '', undefined, { timeout: 10_000 })
-	assert.equal(await left.page.locator('[role=listbox]').isVisible(), false)
+	assert.equal(await left.page.locator('[role=listbox][aria-label="Ciudad"]').isVisible(), false)
 	await left.page.close()
 	assert.deepEqual(errors, [])
 })

@@ -85,8 +85,8 @@ export interface ComboboxSnippets<T> {
 }
 
 /**
- * Props de la etiqueta propia `<UICombobox>`, una lista propia sobre `<UIPopover>` para lo que el
- * `<select>` nativo de `<UISelect>` no cubre: buscar, filtrar en un servidor y elegir varias opciones.
+ * Props de la etiqueta propia `<UICombobox>`, la lista de `<UISelect>` sobre `<UIPopover>` con lo que
+ * `<UISelect>` no cubre: buscar, filtrar en un servidor y elegir varias opciones.
  * `T` es el tipo de cada opción y `Multiple`, si se eligen varias; los dos se infieren de la etiqueta.
  * `ui` añade clases a sus partes: `base` (la raíz), `trigger`, `values`, `value`, `chips`, `chip`,
  * `placeholder`, `list`, `group`, `groupLabel`, `option`, `loading`, `empty` y `clear`. Se autoimporta en `app/`.

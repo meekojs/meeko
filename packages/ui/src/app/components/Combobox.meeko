@@ -1,6 +1,6 @@
 <script lang="ts" generic="T, Multiple extends boolean = false">
-	// <UICombobox>: what the native <select> of <UISelect> cannot do, a search, an asynchronous filter and
-	// several values, on <UIPopover>. The behavior lives in ../utils/combobox.ts and the look in ../theme/components/combobox.ts. Its template has no
+	// <UICombobox>: what <UISelect> leaves out, a search, an asynchronous filter and several values, with the
+	// same list on <UIPopover>. The behavior lives in ../utils/combobox.ts and the look in ../theme/components/combobox.ts. Its template has no
 	// whitespace between the tags: it would be text in the options.
 	import { computed, onMounted, useId } from '@meekojs/meeko'
 

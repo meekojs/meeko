@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { containerTheme as container } from '../dist/app/theme/components/container.js'
-import { startDemo } from './helpers/demo.mjs'
+import { chooseOption, startDemo } from './helpers/demo.mjs'
 
 test('Container preserves semantics and fits mobile, 4K, wider and nested layouts with logical gutters', { timeout: 90_000 }, async (context) => {
 	const { browser, origin, output } = await startDemo(context)
@@ -12,7 +12,7 @@ test('Container preserves semantics and fits mobile, 4K, wider and nested layout
 	await page.goto(origin + '/container', { waitUntil: 'networkidle' })
 	const preview = page.getByRole('region', { name: 'Vista previa del contenedor', exact: true })
 	assert.equal(await preview.evaluate((element) => element.tagName), 'SECTION')
-	await page.getByLabel('Ancho máximo', { exact: true }).selectOption('4k')
+	await chooseOption(page, page.getByLabel('Ancho máximo', { exact: true }), '4k')
 	await page.waitForFunction(() => globalThis.document.querySelector('.container-example')?.className.includes('--ui-container-4k'))
 	assert.match(await preview.innerText(), /size=4k/)
 	const ssr = await browser.newPage({ javaScriptEnabled: false })

@@ -801,9 +801,14 @@ async function startDevelopment(root: string): Promise<Server> {
 			)
 			// A full reload of the Meeko plugin (an edited page or app/utils, a component added) keeps what this app holds.
 			keepServerModules(devServer.environments.ssr.moduleGraph, eagerFiles)
-			// Vite may invalidate them anyway (a tsconfig.json added, edited or removed): the app is built again then.
+			// Vite may invalidate them anyway (a tsconfig.json added, edited or removed): the app is built
+			// again then. The rebuild invalidates the graph itself once the requests in flight finish: one
+			// that the current app renders would otherwise import its page from the invalidated graph, a
+			// new `createContext` key that the app's plugins do not provide (`Missing Meeko context`).
 			onServerGraphReset(devServer.environments.ssr.moduleGraph, () => {
-				if (!resettingModules && eagerFiles.size) onEagerChange?.()
+				if (resettingModules || !eagerFiles.size || !onEagerChange) return false
+				onEagerChange()
+				return true
 			})
 			const entry = (await devServer.ssrLoadModule(`/${frameworkServerEntry}`)) as { createApp(options: Omit<ServerAppOptions, 'manifest' | 'load' | 'runtime'>): Promise<ServerApp> }
 			return entry.createApp({

@@ -49,8 +49,16 @@ const showcase = `<script lang="ts">
 
 	const plan = signal<string | null>('Equipo')
 	const late = signal<string[]>(['Equipo'])
-	const rich = [{ id: 1, name: 'Ana', color: 'violeta' }, { id: 2, name: 'Bea', color: 'cian', disabled: true }, { id: 3, name: 'Carla', color: 'rosa' }]
+	const rich = [{ id: 1, name: 'Ana', color: 'violeta', team: 'Diseño' }, { id: 2, name: 'Bea', color: 'cian', team: 'Diseño', disabled: true }, { id: 3, name: 'Carla', color: 'rosa', team: 'Ingeniería' }]
 	const person = signal<(typeof rich)[number] | null>(rich[2]!)
+	const size = signal<string | null>(null)
+	const shade = signal<string | null>('Verde')
+	const sizeChanges = signal<string[]>([])
+	const sent = signal('')
+	function sendSelects(event: SubmitEvent) {
+		event.preventDefault()
+		sent.value = [...new FormData(event.currentTarget as HTMLFormElement)].map(([name, value]) => name + '=' + String(value)).join('&')
+	}
 	const selectOpen = signal(false)
 	const exposedPalette = useElementRef('exposedPalette')
 	const drawer = signal(false)
@@ -118,10 +126,20 @@ const showcase = `<script lang="ts">
 			<button id="more" type="button" on:click="() => (late.value = ['Personal', 'Equipo', 'Empresa'])">Más opciones</button>
 			<button id="none" type="button" on:click="() => (late.value = ['Personal'])">Quitar la elegida</button>
 			<label for="rich">Persona</label>
-			<UISelect id="rich" by="id" labelBy="name" placement="top-start" bind:offset="10" model="person" bind:options="rich">
+			<UISelect id="rich" by="id" labelBy="name" groupBy="team" placement="top-start" bind:offset="10" model="person" bind:options="rich">
 				<snippet name="option" params="option, state"><span class="dot" bind:data-color="option.color" /><span>{option.name}</span><em if:when="state.selected"> (elegida)</em></snippet>
+				<snippet name="value" params="option"><strong bind:data-color="option.color">{option.name}</strong></snippet>
+				<snippet name="group" params="name"><b>Equipo de {name}</b></snippet>
 			</UISelect>
+			<form id="select-form" on:submit="sendSelects">
+				<UISelect label="Talla" name="size" required placeholder="Elige una talla" model="size" bind:options="['S', 'M', 'L']" on:change="(value) => (sizeChanges.value = [...sizeChanges.value, String(value)])" />
+				<UISelect label="Color" name="shade" model="shade" bind:options="['Rojo', 'Verde', 'Azul']" />
+				<UISelect label="Fijo" name="locked" disabled modelValue="Fijo" bind:options="['Fijo']" />
+				<button id="select-send" type="submit">Enviar</button>
+				<button id="select-reset" type="reset">Restablecer</button>
+			</form>
 			<p id="select-out">{plan.value}|{person.value?.name}</p>
+			<p id="form-out">{String(size.value)}|{shade.value}|{sizeChanges.value.join()}|{sent.value}</p>
 		</section>
 	</main>
 </template>

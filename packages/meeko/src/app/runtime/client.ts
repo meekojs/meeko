@@ -804,6 +804,9 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
 					: undefined,
 			)
 		} else if (options.serverData && !options.loadRoute) {
+			// The code of the page and of the layouts it adds downloads while its data is requested, not
+			// after it: `createTree` awaits the same imports below, where a failed one is reported.
+			for (const file of [route.file, ...route.layouts.slice(Math.min(context.retainedLayouts, layouts.length))]) void options.loadPage(file).catch(() => {})
 			// A static host serves each page's payload as a file next to its index.html.
 			const response = await requestPayload(context.url, context.signal)
 			// A loader or middleware redirect: follow it instead of this navigation. A browser fetch

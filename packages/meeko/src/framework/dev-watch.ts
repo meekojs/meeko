@@ -127,26 +127,31 @@ export function keepServerModules(graph: object, files: ReadonlySet<string>): vo
 	keptServerModules.set(graph, files)
 }
 
-/** Per server module graph, what {@link onServerGraphReset} runs after its `invalidateAll`. */
-const graphResetListeners = new WeakMap<object, () => void>()
+/** Per server module graph, what {@link onServerGraphReset} runs on its `invalidateAll`. */
+const graphResetListeners = new WeakMap<object, () => boolean>()
 
 /**
- * Runs `listener` after every `invalidateAll()` of the server module `graph`. Vite invalidates
- * every module of every environment on its own, without a hot update that reaches the Meeko
- * plugins: when a `tsconfig.json` is added, edited or removed anywhere under the root, or when the
+ * Runs `listener` on every `invalidateAll()` of the server module `graph`. Vite invalidates every
+ * module of every environment on its own, without a hot update that reaches the Meeko plugins:
+ * when a `tsconfig.json` is added, edited or removed anywhere under the root, or when the
  * dependency optimizer reloads. The pages then evaluate again the modules that the development app
  * keeps ({@link keepServerModules}), and a `createContext` key that a plugin provides would no
- * longer be the one they read (`Missing Meeko context`), so the app must be built again. The method
- * is wrapped once per graph; a later call replaces the listener.
+ * longer be the one they read (`Missing Meeko context`), so the app must be built again.
+ *
+ * When `listener` returns `true` it takes the invalidation over: the graph stays as it is until
+ * the listener invalidates it itself (the development app does so before it is built again, once
+ * the requests in flight finish). A request that the current app was rendering would otherwise
+ * import its page from the invalidated graph, a new evaluation of the key, while the app's plugins
+ * provide the previous one. When it returns `false` the graph is invalidated at once. The method is
+ * wrapped once per graph; a later call replaces the listener.
  */
-export function onServerGraphReset(graph: { invalidateAll(): void }, listener: () => void): void {
+export function onServerGraphReset(graph: { invalidateAll(): void }, listener: () => boolean): void {
 	const wrapped = graphResetListeners.has(graph)
 	graphResetListeners.set(graph, listener)
 	if (wrapped) return
 	const invalidateAll = graph.invalidateAll.bind(graph)
 	graph.invalidateAll = () => {
-		invalidateAll()
-		graphResetListeners.get(graph)?.()
+		if (!graphResetListeners.get(graph)?.()) invalidateAll()
 	}
 }
 
@@ -230,7 +235,12 @@ export interface DevAppReloader<T> {
 	 * settles: a restart lets it finish on the module runner it started on before closing that runner.
 	 */
 	use<R>(run: (app: T) => Promise<R>): Promise<R>
-	/** Replaces the app after a discovery change. Changes within the coalescing delay make one replacement. */
+	/**
+	 * Replaces the app after a discovery change or a reset of the server module graph. Changes within
+	 * the coalescing delay make one replacement. Requests wait from this call on, and the replacement
+	 * waits for the requests in flight (up to the drain timeout): it invalidates the server modules
+	 * that those requests, rendered by the previous app, still import.
+	 */
 	rebuild(): void
 	/**
 	 * Runs the Vite restart `start` once the requests and the replacement in flight have finished
@@ -252,7 +262,10 @@ export interface DevAppReloader<T> {
  * A restart closes the module runner of the old Vite server. A request or a replacement that
  * started before it still loads modules through that runner ("transport was disconnected",
  * "module runner has been closed"), so the restart waits for them, up to `drainTimeout`
- * milliseconds; requests that arrive meanwhile wait for the app built after the restart.
+ * milliseconds; requests that arrive meanwhile wait for the app built after the restart. A
+ * replacement waits for the requests in flight too, up to the same timeout, before `replace`
+ * runs: it invalidates the server modules, and a request of the previous app that imported its
+ * page afterwards would evaluate a `createContext` key again (`Missing Meeko context`).
  */
 export function createDevAppReloader<T>(initial: T, replace: (prior: T, superseded: () => boolean) => Promise<T>, delay = 25, drainTimeout = 5_000): DevAppReloader<T> {
 	let current: Promise<T> = Promise.resolve(initial)
@@ -288,6 +301,8 @@ export function createDevAppReloader<T>(initial: T, replace: (prior: T, supersed
 			const prior = await previous
 			// Coalesces the events of a file tree created or removed at once.
 			await new Promise((done) => setTimeout(done, delay))
+			// The requests of the previous app finish on the modules they started with.
+			await drained()
 			// The app must load through the module runner of the server that results from the restart.
 			while (restarting) {
 				const waiting = restarting

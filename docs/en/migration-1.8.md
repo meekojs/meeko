@@ -1,5 +1,5 @@
 ---
-source-hash: e4c094f08dcff4d3102dd0aadba3f4039b8cc596980de4dd3f2d78f6913bcc06
+source-hash: e5e41a1b0c65eabb4ffa48992080b2ddbd452270e0bfffa7353c00e402402fc7
 ---
 
 # Upgrade from 1.7 to 1.8
@@ -55,7 +55,7 @@ Keep the rest of your configuration. `theme` is only needed for the theme select
 <UIThemeToggle mode="select" />
 ```
 
-`UICombobox` is the same custom list as `<MeekoSelect>`. A select without `multiple`, `searchable`, `filter` or `max` can also move to `UISelect`, a native `<select>` with much less JavaScript and less markup of its own: see [its documentation](ui-api.md#uiselect).
+`UICombobox` is the same custom list as `<MeekoSelect>`. A select without `multiple`, `searchable`, `filter` or `max` can also move to `UISelect`: in UI 1.x, a native `<select>` with much less JavaScript and less markup of its own; since UI 2.0, that same custom list for a single option and without search. See [its documentation](ui-api.md#uiselect).
 
 Rename closing tags too. Props, models, snippets, events, keyboard behavior, accessibility and `data-meeko-*` markup keep their contract: existing CSS selectors still find the same attributes. `UICombobox<T, Multiple>` infers its types from `options` and `multiple` as before.
 
