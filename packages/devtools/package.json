@@ -5,6 +5,7 @@
 	"type": "module",
 	"scripts": {
 		"check": "node --test tests/*.test.js && tsc -p tsconfig.json --noEmit",
+		"lint": "eslint .",
 		"package:zip": "pwsh -NoProfile -File package-zip.ps1",
 		"test:installed": "node --test tests/installed.e2e.js",
 		"types": "node scripts/protocol-types.mjs --write"

@@ -42,6 +42,7 @@
 	"scripts": {
 		"build": "node ../../scripts/build-package.mjs && node scripts/copy-components.mjs",
 		"check": "tsc -p tsconfig.json --noEmit",
+		"lint": "eslint .",
 		"prepack": "pnpm run build",
 		"test": "pnpm run build && node --test --test-concurrency=1 tests/*.test.mjs",
 		"test:e2e": "pnpm run build && node --test --test-concurrency=1 tests/*.e2e.mjs"
