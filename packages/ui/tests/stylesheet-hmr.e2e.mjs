@@ -142,7 +142,18 @@ for (const tokens of [undefined, { primary: 'rgb(10, 120, 30)' }]) {
 			assert.deepEqual(found.slice(0, 2), [], `${step}: the module stylesheets never stopped applying`)
 			assert.equal(await computed(tab, '#action', 'backgroundColor'), expected.button, `${step}: @meekojs/ui after the update`)
 			assert.equal(await computed(tab, '.theme-mark', 'color'), expected.theme, `${step}: the theme module after the update`)
-			const hrefs = await tab.evaluate(() => [...globalThis.document.querySelectorAll('link[rel=stylesheet]')].map((node) => new URL(node.href).pathname))
+			// Vite swaps a link by adding its clone and removing the old one once the clone loads, and a late
+			// update (Tailwind compiling the app's sheet again after another edit) can start a swap after `settle`:
+			// the links are read in the same task that sees no swap in flight. One that never ends times out here.
+			const settled = await tab.waitForFunction(
+				() => {
+					const paths = [...globalThis.document.querySelectorAll('link[rel=stylesheet]')].map((node) => new URL(node.href).pathname)
+					return new Set(paths).size === paths.length ? paths : false
+				},
+				null,
+				{ timeout: 20_000 },
+			)
+			const hrefs = await settled.jsonValue()
 			assert.equal(hrefs.filter((href) => /^(?:dist|src)\/.*\/main\.css$/.test(href.slice(packageHref.length)) && href.startsWith(packageHref)).length, 0, `${step}: no precompiled stylesheet of @meekojs/ui`)
 			assert.equal(hrefs.filter((href) => href.endsWith('/app/styles/main.css') && !href.includes('/theme-fixture/')).length, 1, `${step}: one link to the app's stylesheet, which carries UI`)
 			assert.equal(hrefs.filter((href) => href.endsWith('/theme-fixture/src/app/styles/main.css')).length, 1, `${step}: one link to the theme stylesheet`)

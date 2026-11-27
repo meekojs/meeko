@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os'
 import { basename, dirname, isAbsolute, join, relative, sep } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { TextDocument } from 'vscode-languageserver-textdocument'
-import { CodeActionKind, CodeLensRefreshRequest, CompletionRequest, createConnection, DefinitionRequest, DiagnosticSeverity, DidChangeConfigurationNotification, DidChangeTextDocumentNotification, DidChangeWatchedFilesNotification, DidCloseTextDocumentNotification, DidOpenTextDocumentNotification, HoverRequest, ReferencesRequest, RenameRequest, RequestType, TextDocuments, TextDocumentSyncKind, WatchKind } from 'vscode-languageserver/node'
+import { CodeActionKind, CodeLensRefreshRequest, CompletionRequest, createConnection, DefinitionRequest, DiagnosticSeverity, DidChangeConfigurationNotification, DidChangeTextDocumentNotification, DidChangeWatchedFilesNotification, DidCloseTextDocumentNotification, DidOpenTextDocumentNotification, ErrorCodes, HoverRequest, ReferencesRequest, RenameRequest, RequestType, ResponseError, TextDocuments, TextDocumentSyncKind, WatchKind } from 'vscode-languageserver/node'
 
 import type { ClassSettings } from './classes'
 import type { CssVariableSettings } from './css-variables'
@@ -240,6 +240,17 @@ export function startLanguageServer(connection: Connection): void {
 		} catch {
 			/* The client closed the connection: there is nobody to tell. */
 		}
+	}
+	/**
+	 * Lleva al registro el fallo de una petición del servidor al cliente cuya respuesta nadie
+	 * espera, para que nunca quede como rechazo sin manejar. Al cerrarse la conexión (tras
+	 * `shutdown`, o si el cliente se va) sus respuestas pendientes se rechazan: eso no es un error.
+	 */
+	const settle = (request: Promise<unknown>, what: string): void => {
+		request.catch((error: unknown) => {
+			if (error instanceof ResponseError && (error.code === ErrorCodes.PendingResponseRejected || error.code === ErrorCodes.ConnectionInactive)) return
+			log(`${what}: ${error instanceof Error ? error.message : String(error)}`)
+		})
 	}
 	const timers = new Map<string, ReturnType<typeof setTimeout>>()
 	const openVersions = new Map<string, number>()
@@ -595,22 +606,25 @@ export function startLanguageServer(connection: Connection): void {
 		}
 		// A pull-model client (VS Code) only notifies setting changes for a registered section; the
 		// notification clears the cached meeko.classes settings of each document.
-		if (configurationSupport && configurationRegistration) void connection.client.register(DidChangeConfigurationNotification.type, { section: 'meeko' })
+		if (configurationSupport && configurationRegistration) settle(connection.client.register(DidChangeConfigurationNotification.type, { section: 'meeko' }), 'No se pudo registrar meeko en workspace/didChangeConfiguration')
 		if (warmup) warming = warmProjects()
 		if (!watchedRegistration) return
-		void connection.client.register(DidChangeWatchedFilesNotification.type, {
-			watchers: [
-				{ globPattern: '**/*.{ts,mts,cts,meeko}' },
-				// Class completion: app/styles/main.css, its imports and the processed .meeko/styles/main.css.
-				{ globPattern: '**/*.css' },
-				{ globPattern: '**/{tsconfig*.json,meeko.config.*}' },
-				// Installing or removing a dependency changes where imports resolve (see MeekoProject).
-				{ globPattern: '**/{package.json,package-lock.json,pnpm-lock.yaml,yarn.lock,bun.lock}' },
-				// Folders of an application created, removed or renamed: the watcher may report only the
-				// folder (`app/components/Layout`), not each component inside.
-				{ globPattern: '**/{app,server,shared}/**', kind: WatchKind.Create | WatchKind.Delete },
-			],
-		})
+		settle(
+			connection.client.register(DidChangeWatchedFilesNotification.type, {
+				watchers: [
+					{ globPattern: '**/*.{ts,mts,cts,meeko}' },
+					// Class completion: app/styles/main.css, its imports and the processed .meeko/styles/main.css.
+					{ globPattern: '**/*.css' },
+					{ globPattern: '**/{tsconfig*.json,meeko.config.*}' },
+					// Installing or removing a dependency changes where imports resolve (see MeekoProject).
+					{ globPattern: '**/{package.json,package-lock.json,pnpm-lock.yaml,yarn.lock,bun.lock}' },
+					// Folders of an application created, removed or renamed: the watcher may report only the
+					// folder (`app/components/Layout`), not each component inside.
+					{ globPattern: '**/{app,server,shared}/**', kind: WatchKind.Create | WatchKind.Delete },
+				],
+			}),
+			'No se pudo registrar la vigilancia de archivos',
+		)
 	})
 
 	documents.onDidOpen(({ document }) => {
@@ -693,8 +707,8 @@ export function startLanguageServer(connection: Connection): void {
 		const fallbackRoot = contractDocument && contractRootOf(contractDocument)
 		if (!changedRoots.size && fallbackRoot) changedRoots.set(pathKey(fallbackRoot), fallbackRoot)
 		for (const root of changedRoots.values()) scheduleContractCheck(root, contractDocument)
-		if (semanticRefresh) void connection.languages.semanticTokens.refresh()
-		if (codeLensRefresh) void connection.sendRequest(CodeLensRefreshRequest.type).catch(() => undefined)
+		if (semanticRefresh) settle(connection.languages.semanticTokens.refresh(), 'No se pudieron refrescar los tokens semánticos')
+		if (codeLensRefresh) settle(connection.sendRequest(CodeLensRefreshRequest.type), 'No se pudieron refrescar los code lenses')
 	})
 
 	// Clients without workspace/configuration may push `{ meeko: { format: {...} } }` instead.
