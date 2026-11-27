@@ -47,24 +47,17 @@ if (typeof mountDevtoolsPanel !== "function") {
 }
 '@
 
-  Set-Content -LiteralPath (Join-Path $consumer 'palette.ts') -Encoding utf8 -Value 'export const names: readonly string[] = ["gray", "blue"];'
-  Set-Content -LiteralPath (Join-Path $consumer 'utilities.ts') -Encoding utf8 -Value @'
-import { defineUtilities } from "@meekojs/meeko/postcss";
-import { names } from "./palette";
-export default defineUtilities(({ rule }) => names.map((name) => rule(`.color[data-color='${name}']`, { "--color-1": `var(--${name}-1)` })));
-'@
-  Set-Content -LiteralPath (Join-Path $consumer 'postcss-smoke.mjs') -Encoding utf8 -Value @'
-import postcss from "postcss";
-import { meekoUtilities } from "@meekojs/meeko/postcss";
-import { resolve } from "node:path";
-const result = await postcss([meekoUtilities()]).process('@utilities "./utilities.ts" layer(utilities);', { from: resolve("styles.css") });
-if (!/@layer utilities[^]*data-color='blue'[^]*var\(--blue-1\)/.test(result.css)) {
-  throw new Error("@utilities del paquete instalado produjo un resultado inesperado:\n" + result.css);
-}
-const dependencies = result.messages.filter((message) => message.type === "dependency").length;
-if (dependencies !== 2 || result.warnings().length) {
-  throw new Error(`@utilities no empaquetó el módulo con rolldown (dependencias: ${dependencies}, avisos: ${result.warnings().length})`);
-}
+  # Meeko no publica utilidades de PostCSS ni depende de Tailwind: el consumidor elige su CSS.
+  Set-Content -LiteralPath (Join-Path $consumer 'css-boundary-smoke.mjs') -Encoding utf8 -Value @'
+import { readFileSync } from "node:fs";
+const exported = await import("@meekojs/meeko/postcss").then(() => true, (error) => {
+  if (error?.code !== "ERR_PACKAGE_PATH_NOT_EXPORTED") throw error;
+  return false;
+});
+if (exported) throw new Error("El paquete instalado todavía exporta @meekojs/meeko/postcss");
+const manifest = JSON.parse(readFileSync("node_modules/@meekojs/meeko/package.json", "utf8"));
+const tailwind = Object.keys({ ...manifest.dependencies, ...manifest.peerDependencies }).filter((name) => /tailwind/i.test(name));
+if (tailwind.length) throw new Error("El paquete instalado depende de " + tailwind.join(", "));
 '@
 
   & npm install --prefix $consumer --ignore-scripts --no-audit --no-fund $tarball 'vite@8.3.5'
@@ -80,8 +73,8 @@ if (dependencies !== 2 || result.warnings().length) {
     if ($LASTEXITCODE -ne 0) { throw 'Falló meeko compile desde el paquete instalado.' }
     & node smoke.mjs
     if ($LASTEXITCODE -ne 0) { throw 'Falló SSR desde el paquete instalado.' }
-    & node postcss-smoke.mjs
-    if ($LASTEXITCODE -ne 0) { throw 'Falló @meekojs/meeko/postcss desde el paquete instalado.' }
+    & node css-boundary-smoke.mjs
+    if ($LASTEXITCODE -ne 0) { throw 'El paquete instalado publica utilidades de PostCSS o depende de Tailwind.' }
     & $cli types Counter.meeko
     if ($LASTEXITCODE -ne 0) { throw 'Falló meeko types desde el paquete instalado.' }
     & node node_modules/typescript/bin/tsc -p tsconfig.json --noEmit

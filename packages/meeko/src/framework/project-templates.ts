@@ -22,7 +22,7 @@ const loadNamedMiddleware = async (file: string): Promise<RouteMiddleware> => {
   return routeMiddleware(file, await load());
 };
 
-// Module stylesheets followed by the optional application stylesheet, processed by Vite/PostCSS.
+// Module stylesheets followed by the optional application stylesheet, processed by Vite's CSS pipeline.
 import "virtual:meeko-global-styles";
 
 // The server's root and payload, not an element of the page content with the same id.

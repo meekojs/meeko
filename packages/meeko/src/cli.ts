@@ -107,8 +107,9 @@ async function assertDirectory(path: string): Promise<void> {
 
 /**
  * Makes the project root the working directory of this process and returns its absolute path.
- * Tools that take the cwd as their base (`@tailwindcss/postcss` scans it for sources) would
- * otherwise work on the folder `meeko` was launched from. A relative path is resolved first,
+ * Tools that take the cwd as their base (configuration loaders, CSS plugins that scan for
+ * sources, the project's own scripts) would otherwise work on the folder `meeko` was launched
+ * from. A relative path is resolved first,
  * against the original cwd; the arguments a supervised `dev` relaunches itself with are
  * rewritten so the child, which inherits the new cwd, still finds the project.
  */

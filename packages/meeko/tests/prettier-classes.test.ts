@@ -131,17 +131,26 @@ describe('meekoSortClasses stylesheet', () => {
 
 	const stylesheetProject: Record<string, string> = {
 		// The configuration a project writes; the counter shows how often the stylesheet is processed.
-		'postcss.config.ts': `import { meekoUtilities } from "@meekojs/meeko/postcss";
+		'postcss.config.ts': `import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 const counter = { postcssPlugin: "count", Once() { (globalThis as Record<string, number>).__meekoStylesheetRuns = ((globalThis as Record<string, number>).__meekoStylesheetRuns ?? 0) + 1; } };
-export default { plugins: [meekoUtilities(), counter] };
+// A plugin of the project that writes rules from a file it reads, and declares it as a dependency.
+const tones = {
+	postcssPlugin: "tones",
+	AtRule: {
+		tones(rule: any, { result, Rule, Declaration }: any) {
+			const file = resolve(dirname(rule.source.input.file), rule.params.slice(1, -1));
+			result.messages.push({ type: "dependency", plugin: "tones", file, parent: rule.source.input.file });
+			const names: string[] = JSON.parse(readFileSync(file, "utf8"));
+			rule.replaceWith(names.map((name) => new Rule({ selector: "." + name, nodes: [new Declaration({ prop: "color", value: "green" })] })));
+		},
+	},
+};
+export default { plugins: [tones, counter] };
 `,
-		'app/styles/main.css': `@import "./base.css";\n.zeta { color: red; }\n@utilities "./utilities/tone.ts";\n.alpha { color: blue; }\n`,
+		'app/styles/main.css': `@import "./base.css";\n.zeta { color: red; }\n@tones "./tones/names.json";\n.alpha { color: blue; }\n`,
 		'app/styles/base.css': `.stack { display: grid; }\n.card .title { margin: 0; }\n`,
-		'app/styles/utilities/names.ts': `export const names = ["tone-b", "tone-a"];\n`,
-		'app/styles/utilities/tone.ts': `import { defineUtilities } from "@meekojs/meeko/postcss";
-import { names } from "./names.ts";
-export default defineUtilities(({ rule }) => names.map((name) => rule(\`.\${name}\`, { color: "green" })));
-`,
+		'app/styles/tones/names.json': `["tone-b", "tone-a"]\n`,
 	}
 
 	const component = [
@@ -169,9 +178,9 @@ export default defineUtilities(({ rule }) => names.map((name) => rule(\`.\${name
 		assert.equal(runs() - before, 1, 'the stylesheet is processed once')
 		assert.equal(templateOf(await formatStable(component, { filepath })), '<div class="extra alpha tone-a local stack zeta other card tone-b">x</div>', 'off keeps the order')
 
-		// A module that an @utilities module imports changes: the order follows it.
-		const names = join(root, 'app/styles/utilities/names.ts')
-		await writeFile(names, `export const names = ["tone-a", "tone-b"];\n`)
+		// A file that a PostCSS plugin of the project declares as a dependency changes: the order follows it.
+		const names = join(root, 'app/styles/tones/names.json')
+		await writeFile(names, `["tone-a", "tone-b"]\n`)
 		const later = new Date(Date.now() + 2_000)
 		await utimes(names, later, later)
 		assert.equal(templateOf(await formatStable(component, options)), '<div class="extra other stack card zeta tone-a tone-b alpha local">x</div>')
@@ -241,13 +250,13 @@ export default defineUtilities(({ rule }) => names.map((name) => rule(\`.\${name
 	test('a stylesheet that does not process only normalizes, and warns once', async () => {
 		const root = await project('prettier-classes-broken-', {
 			'postcss.config.ts': stylesheetProject['postcss.config.ts']!,
-			'app/styles/main.css': `.stack { display: grid; }\n@utilities "./utilities/missing.ts";\n`,
+			'app/styles/main.css': `.stack { display: grid; }\n@tones "./tones/missing.json";\n`,
 		})
 		const options: FormatOptions = { filepath: join(root, 'app', 'Box.meeko'), meekoSortClasses: 'stylesheet' }
 		assert.equal(templateOf(await formatStable(component, options)), '<div class="extra alpha tone-a local stack zeta other card tone-b">x</div>')
 		const own = warnings.filter((warning) => warning.includes(root))
 		assert.equal(own.length, 1, own.join(''))
-		assert.match(own[0]!, /no se pudo procesar app\/styles\/main\.css en .*@utilities no encuentra "\.\/utilities\/missing\.ts"/)
+		assert.match(own[0]!, /no se pudo procesar app\/styles\/main\.css en .*ENOENT.*missing\.json/)
 		// Once the stylesheet is fixed, the next format sorts.
 		const stylesheet = join(root, 'app/styles/main.css')
 		await writeFile(stylesheet, '.zeta { color: red; }\n.stack { display: grid; }\n')

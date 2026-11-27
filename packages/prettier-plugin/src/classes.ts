@@ -116,7 +116,7 @@ const postcssConfigNames = [
 	'postcss.config.mts',
 ] as const
 const globalStylesheet = join('app', 'styles', 'main.css')
-/** A failed stylesheet is retried after this long even if none of its known files changed (a fixed `@utilities` module). */
+/** A failed stylesheet is retried after this long even if none of its known files changed (a fixed file that a PostCSS plugin reads). */
 const failureRetryMs = 2000
 
 interface StylesheetEntry {
@@ -186,7 +186,7 @@ async function processStylesheet(root: string): Promise<StylesheetEntry> {
 	try {
 		const vite = await importVite(root)
 		const code = await readFile(file, 'utf8')
-		// The pipeline of `meeko dev`: the project's postcss.config, Vite's `@import` and `@utilities`.
+		// The pipeline of `meeko dev`: the project's postcss.config, and Vite's `@import`.
 		const config = await vite.resolveConfig({ root, configFile: false, envDir: false, logLevel: 'silent', mode: 'development' }, 'serve')
 		const result = await vite.preprocessCSS(code, file, config as never)
 		for (const dependency of result.deps ?? []) {

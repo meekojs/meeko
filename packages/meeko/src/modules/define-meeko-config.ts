@@ -315,7 +315,7 @@ export interface MeekoConfig {
 	 * toma el ámbito de la carpeta a la que apunta, como los autoimports: dentro de `server/`, sólo
 	 * en el servidor; dentro de `app/`, en `app/` y `server/` pero no en `shared/`; en otro lugar, en
 	 * todo el proyecto. Se aplica en Vite (`meeko dev`, `meeko build` y todos los adaptadores), en los
-	 * `tsconfig` generados, en el editor y en los módulos de `@utilities`.
+	 * `tsconfig` generados y en el editor.
 	 * @since 1.5.0
 	 * @example
 	 * ```ts

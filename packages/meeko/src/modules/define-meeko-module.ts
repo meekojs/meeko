@@ -355,7 +355,7 @@ export interface MeekoModuleContext {
 	 */
 	addPublicFile(path: string, contents: string | Uint8Array | (() => string | Uint8Array | Promise<string | Uint8Array>), options?: ModulePublicFileOptions): void
 	/**
-	 * Registers a CSS file in Vite's client graph, processed with the project's PostCSS config.
+	 * Registers a CSS file in Vite's client graph, processed with the project's Vite CSS config.
 	 * Relative paths resolve from rootDir; use a file URL for a stylesheet shipped by a module.
 	 * Files are deduplicated in registration order, before app/styles/main.css.
 	 */

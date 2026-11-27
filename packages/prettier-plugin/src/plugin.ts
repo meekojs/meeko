@@ -63,8 +63,8 @@ export interface MeekoPrettierOptions {
 	/**
 	 * Ordena las clases de cada atributo estático `class="…"` de la plantilla. Con `"off"` (por
 	 * defecto) conserva su orden; con `"stylesheet"`, el de la primera aparición de cada clase en
-	 * `app/styles/main.css` procesada como en `meeko dev` (con el `postcss.config` del proyecto, sus
-	 * `@import` y sus `@utilities`) y, después, en el `<style>` del componente: las clases que no
+	 * `app/styles/main.css` procesada como en `meeko dev` (con el `postcss.config` del proyecto y sus
+	 * `@import`) y, después, en el `<style>` del componente: las clases que no
 	 * aparecen en ninguno van primero, en su orden. Con `"alphabetical"`, por orden de código. Si la
 	 * hoja no existe o no se puede procesar, no se ordena y se avisa una vez. En un workspace no
 	 * confiable de VS Code no se aplica `"stylesheet"`. En un atributo estático de un elemento, haya o no

@@ -49,7 +49,7 @@ export function directStylesheetUrl(file: string): string {
 
 /**
  * Where `meeko dev` keeps the processed global stylesheet, relative to the project: imports
- * inlined, module styles included, PostCSS plugins (`@utilities` among them) applied, not minified. It exists for editor
+ * inlined, module styles included, the project's CSS plugins applied, not minified. It exists for editor
  * tools that read class names from CSS files on disk; nothing loads it at run time. The dev
  * watcher skips `.meeko/` (see `isDevWatchIgnored`), so writing it never reaches Vite.
  */
@@ -129,7 +129,7 @@ function reachesStylesheet(graph: EnvironmentModuleGraph, file: string, targets:
 /**
  * Writes the global stylesheet, as development serves it, to {@link globalStylesheetSnapshotFile}
  * and rewrites it whenever the stylesheet or one of its dependencies changes: files it imports and
- * the modules of its `@utilities` at-rules, which PostCSS reports to Vite as dependencies. The file is
+ * any other file the project's CSS plugins report to Vite as a dependency. The file is
  * replaced atomically and only when its contents change. A stylesheet that fails to compile keeps the
  * last good snapshot and is reported once through `report`. Without module styles or an application
  * stylesheet there is no snapshot.

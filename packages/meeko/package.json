@@ -85,10 +85,6 @@
 			"types": "./dist/prettier.d.ts",
 			"default": "./dist/prettier.js"
 		},
-		"./postcss": {
-			"types": "./dist/postcss.d.ts",
-			"default": "./dist/postcss.js"
-		},
 		"./internal": {
 			"types": "./dist/internal.d.ts",
 			"default": "./dist/internal.js"
@@ -155,7 +151,6 @@
 	},
 	"dependencies": {
 		"@typescript/typescript6": "catalog:",
-		"csstype": "catalog:",
 		"parse5": "catalog:",
 		"postcss": "catalog:",
 		"postcss-selector-parser": "catalog:",
@@ -169,28 +164,21 @@
 	},
 	"devDependencies": {
 		"@mdn/browser-compat-data": "catalog:",
-		"@tailwindcss/postcss": "catalog:",
-		"@tailwindcss/vite": "catalog:",
 		"@types/node": "catalog:",
 		"@types/ws": "catalog:",
 		"esbuild": "catalog:",
 		"happy-dom": "catalog:",
 		"playwright-core": "catalog:",
 		"redis": "catalog:",
-		"tailwindcss": "catalog:",
 		"tsx": "catalog:",
 		"vite": "catalog:",
 		"vue": "catalog:",
 		"wrangler": "catalog:"
 	},
 	"peerDependencies": {
-		"tailwindcss": "^4.0.0",
 		"vite": "^8.3.5"
 	},
 	"peerDependenciesMeta": {
-		"tailwindcss": {
-			"optional": true
-		},
 		"vite": {
 			"optional": true
 		}
