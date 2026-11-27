@@ -21,6 +21,7 @@ import { projectRoot } from '../compiler/project-root'
 import { assertRouteBlockPlacement } from '../compiler/transforms/route-block'
 import { configWarnings } from './config-diagnostics'
 import { documentationMarkdown, identifierRange, virtualDocuments } from './features'
+import { t } from './l10n'
 import { sourceRange } from './locations'
 import { pathKey } from './project'
 
@@ -133,7 +134,7 @@ function serverBlockDiagnostics(project: MeekoProject, component: VirtualCompone
 		const message = ts.flattenDiagnosticMessageText(item.messageText, '\n')
 		result.push({
 			range: range ? toRange(document, range[0], range[1] > range[0] ? range[1] : tokenEnd(document.getText(), range[0])) : fallback,
-			message: range ? message : `TypeScript generado: ${message}`,
+			message: range ? message : t('Generated TypeScript: {0}', message),
 			code: `TS${item.code}`,
 			source: 'Meeko',
 			severity,
@@ -175,7 +176,7 @@ function deprecatedDiagnostics(project: MeekoProject, component: VirtualComponen
 			} catch {
 				reason = undefined
 			}
-			const subject = item.code === 6387 ? `Esta firma de «${name}» está obsoleta` : `«${name}» está obsoleto`
+			const subject = item.code === 6387 ? t("This signature of '{0}' is deprecated", name) : t("'{0}' is deprecated", name)
 			result.push({
 				range: toRange(document, range[0], range[1]),
 				message: reason ? `${subject}: ${reason}` : `${subject}.`,
@@ -286,7 +287,7 @@ function configDiagnostic(message: string, locate: (filename: string) => Located
 	const loadFailure = failure[1] !== undefined
 	const detail = failure[3]!.trim()
 	const [start, end] = configErrorRange(target.document.getText(), filename, loadFailure ? '' : detail)
-	const text = loadFailure ? `No se puede cargar la configuración: ${detail}` : detail
+	const text = loadFailure ? t('Cannot load the configuration: {0}', detail) : detail
 	return {
 		filename,
 		uri: target.uri,
@@ -386,7 +387,7 @@ export async function componentDiagnostics(project: MeekoProject, document: Text
 			const offset = item.location.offset
 			// `bind` without a value is usually `bind:attr` being written: name both forms.
 			if (item.code === 'MEEK113' && /^bind(?![\w$:.-])\s*(?!=)/.test(source.slice(offset, offset + 64))) {
-				diagnostic.message = '`bind` sin valor: escribe `bind:atributo="expresión"` para un atributo o una prop, o `bind="obj"` para pasar un objeto'
+				diagnostic.message = t('`bind` without a value: write `bind:attribute="expression"` for an attribute or a prop, or `bind="obj"` to pass an object')
 			}
 			// `{{ expr }}`: the whole interpolation, both pairs of braces.
 			if (item.code === 'MEEK020' && item.message === doubleBracesMessage && source[offset] === '{') {
@@ -398,14 +399,14 @@ export async function componentDiagnostics(project: MeekoProject, document: Text
 			}
 			// A directive without its value yet (`bind:class`): what it needs, instead of TypeScript's words.
 			const unvalued = item.code === 'MEEK020' ? /^((?:bind|on|model|if|each):[\w$.:-]+)(?![\w$.:-]|\s*=)/.exec(source.slice(offset, offset + 128)) : null
-			if (unvalued) diagnostic.message = `${unvalued[1]} necesita un valor: ${unvalued[1]}="expresión"`
+			if (unvalued) diagnostic.message = t('{0} needs a value: {1}="expression"', unvalued[1]!, unvalued[1]!)
 			// MEEK012 is reported at the tag: mark the attribute itself (`bind:` while it is written).
 			const invalid = item.code === 'MEEK012' ? /^(?:Atributo dinámico no válido: (.*)|Directiva de plantilla no admitida: (.*))$/.exec(item.message) : null
 			if (invalid && source[offset] === '<') {
 				const name = invalid[1] === undefined ? invalid[2]! : `bind:${invalid[1]}`
 				const range = attributeInTag(source, offset, name)
 				if (range) {
-					if (name === 'bind:') diagnostic.message = '`bind:` necesita el nombre de un atributo o una prop: bind:class="expresión"'
+					if (name === 'bind:') diagnostic.message = t('`bind:` needs the name of an attribute or a prop: bind:class="expression"')
 					diagnostic.range = toRange(document, range[0], range[1])
 					return diagnostic
 				}

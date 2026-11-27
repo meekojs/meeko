@@ -31,6 +31,7 @@ import { builtinTagDefinition, builtinTagHover } from './builtins'
 import { componentSummary, componentSummaryMarkdown, documentationMarkdown, memberDocumentation, propSignature, tagSummary } from './components'
 import { bindAttributeCompletion, domEventCompletion, dynamicTagAttributeCompletion, dynamicTagHover, dynamicTags, htmlAttributeCompletion, nativeTagName, specialTemplateDocumentation, tagAt } from './embedded'
 import { appTargetDefinition, appTargetHover, componentFile, componentMarkdown, componentModuleAt, componentTagName, componentTypeAt, reactiveHover } from './insights'
+import { localized, t } from './l10n'
 import { locationOf, sourceRange, toRange } from './locations'
 import { componentFiles, htmlDirectiveDocs } from './model'
 import { meekoAutoImport, packageCompletion, pathKey } from './project'
@@ -730,30 +731,33 @@ interface TemplateDirective {
 }
 
 /** What a `<snippet>` admits: the child's snippet it fills, its parameters and its condition. */
-const snippetAttributes = [
-	{ name: 'name', detail: 'Snippet del hijo que llena', insert: 'name="$1"' },
-	{ name: 'params', detail: 'Nombres de sus parámetros, separados por comas', insert: 'params="$1"' },
-	{ name: 'if', detail: 'Pasa el snippet sólo mientras la expresión es verdadera; el hijo debe declararlo opcional', insert: 'if="$1"' },
-	{ name: 'if:when', detail: 'Pasa el snippet sólo mientras la expresión es verdadera; el hijo debe declararlo opcional', insert: 'if:when="$1"' },
-] as const
+const snippetAttributes = localized(
+	() =>
+		[
+			{ name: 'name', detail: t('Child snippet it fills'), insert: 'name="$1"' },
+			{ name: 'params', detail: t('Names of its parameters, separated by commas'), insert: 'params="$1"' },
+			{ name: 'if', detail: t('Passes the snippet only while the expression is true; the child must declare it optional'), insert: 'if="$1"' },
+			{ name: 'if:when', detail: t('Passes the snippet only while the expression is true; the child must declare it optional'), insert: 'if:when="$1"' },
+		] as const,
+)
 
-const templateDirectives: readonly TemplateDirective[] = [
-	{ name: 'if', detail: 'Primera rama de una cadena condicional', insert: 'if="$1"', on: 'all' },
-	{ name: 'else-if', detail: 'Rama alternativa si no se cumplió la anterior', insert: 'else-if="$1"', on: 'all' },
-	{ name: 'else', detail: 'Rama final cuando ninguna condición anterior se cumple', insert: 'else', on: 'all' },
-	{ name: 'if:when', detail: 'Muestra la etiqueta mientras la expresión es verdadera', insert: 'if:when="$1"', on: 'all' },
-	{ name: 'each:of', detail: 'Repite la etiqueta por cada elemento de la lista', insert: 'each:of="$1"', on: 'all' },
-	{ name: 'each:as', detail: 'Nombre de cada elemento de each:of', insert: 'each:as="$1"', on: 'all' },
-	{ name: 'each:key', detail: 'Clave única de cada elemento de each:of (cadena o número)', insert: 'each:key="$1"', on: 'all' },
-	{ name: 'each:index', detail: 'Nombre del índice de each:of (por defecto, index)', insert: 'each:index="$1"', on: 'all' },
-	{ name: 'bind:', detail: 'Atributo o prop con el valor de una expresión', insert: 'bind:', on: 'all' },
-	{ name: 'on:', detail: 'Manejador de un evento', insert: 'on:', on: 'all' },
-	{ name: 'ref:', detail: 'Referencia a la etiqueta para useElementRef', insert: 'ref:$1', on: 'all' },
-	{ name: 'model', detail: 'Enlaza el valor del control con una señal', insert: 'model="$1"', on: 'element', elements: ['input', 'textarea', 'select'] },
-	{ name: 'html', detail: 'Inserta la expresión como HTML sin escapar', insert: 'html="$1"', on: 'element' },
-	{ name: 'bind', detail: 'Atributos (o props de un componente) desde un objeto; los explícitos ganan', insert: 'bind="$1"', on: 'all' },
-	{ name: 'model:', detail: 'Enlaza un modelo del componente (defineModel) con una señal', insert: 'model:', on: 'component' },
-]
+const templateDirectives = localized((): readonly TemplateDirective[] => [
+	{ name: 'if', detail: t('First branch of a conditional chain'), insert: 'if="$1"', on: 'all' },
+	{ name: 'else-if', detail: t('Alternative branch if the previous one was not met'), insert: 'else-if="$1"', on: 'all' },
+	{ name: 'else', detail: t('Final branch when no previous condition is met'), insert: 'else', on: 'all' },
+	{ name: 'if:when', detail: t('Shows the tag while the expression is true'), insert: 'if:when="$1"', on: 'all' },
+	{ name: 'each:of', detail: t('Repeats the tag for each item in the list'), insert: 'each:of="$1"', on: 'all' },
+	{ name: 'each:as', detail: t('Name of each each:of item'), insert: 'each:as="$1"', on: 'all' },
+	{ name: 'each:key', detail: t('Unique key of each each:of item (string or number)'), insert: 'each:key="$1"', on: 'all' },
+	{ name: 'each:index', detail: t('Name of the each:of index (default: index)'), insert: 'each:index="$1"', on: 'all' },
+	{ name: 'bind:', detail: t('Attribute or prop with the value of an expression'), insert: 'bind:', on: 'all' },
+	{ name: 'on:', detail: t('Event handler'), insert: 'on:', on: 'all' },
+	{ name: 'ref:', detail: t('Reference to the tag for useElementRef'), insert: 'ref:$1', on: 'all' },
+	{ name: 'model', detail: t('Binds the control value to a signal'), insert: 'model="$1"', on: 'element', elements: ['input', 'textarea', 'select'] },
+	{ name: 'html', detail: t('Inserts the expression as unescaped HTML'), insert: 'html="$1"', on: 'element' },
+	{ name: 'bind', detail: t('Attributes (or component props) from an object; explicit ones win'), insert: 'bind="$1"', on: 'all' },
+	{ name: 'model:', detail: t('Binds a component model (defineModel) to a signal'), insert: 'model:', on: 'component' },
+])
 
 /** The conditional directives, of which a tag takes one. */
 const conditionalDirectives = ['if', 'if:when', 'else-if', 'else']
@@ -785,12 +789,12 @@ export function directiveNameCompletion(document: TextDocument, position: Positi
 	const whole = (items: CompletionItem[]): CompletionItem[] => (nameEnd === offset ? items : items.map((item) => (item.textEdit && 'range' in item.textEdit && document.offsetAt(item.textEdit.range.end) === offset ? { ...item, textEdit: { ...item.textEdit, range: { start: item.textEdit.range.start, end } } } : item)))
 	if (context.tag === 'render') {
 		return [
-			{ name: 'snippet', detail: 'Snippet que se va a renderizar', insert: 'snippet="$1"' },
-			{ name: 'args', detail: 'Argumentos del snippet, separados por comas', insert: 'args="$1"' },
-			{ name: 'if', detail: 'Primera rama condicional', insert: 'if="$1"' },
-			{ name: 'else-if', detail: 'Alternativa a la condición anterior', insert: 'else-if="$1"' },
-			{ name: 'else', detail: 'Rama final', insert: 'else' },
-			{ name: 'if:when', detail: 'Renderiza sólo si la expresión es verdadera', insert: 'if:when="$1"' },
+			{ name: 'snippet', detail: t('Snippet to render'), insert: 'snippet="$1"' },
+			{ name: 'args', detail: t('Arguments of the snippet, separated by commas'), insert: 'args="$1"' },
+			{ name: 'if', detail: t('First conditional branch'), insert: 'if="$1"' },
+			{ name: 'else-if', detail: t('Alternative to the previous condition'), insert: 'else-if="$1"' },
+			{ name: 'else', detail: t('Final branch'), insert: 'else' },
+			{ name: 'if:when', detail: t('Renders only if the expression is true'), insert: 'if:when="$1"' },
 		]
 			.filter((attribute) => offered(attribute.name))
 			.map((attribute, index): CompletionItem => ({
@@ -805,7 +809,7 @@ export function directiveNameCompletion(document: TextDocument, position: Positi
 	}
 	// `<snippet>` only admits name, params and if:when (MEEK061).
 	if (context.tag === 'snippet') {
-		return snippetAttributes
+		return snippetAttributes()
 			.filter((attribute) => offered(attribute.name))
 			.map((attribute, index): CompletionItem => ({
 				label: attribute.name,
@@ -869,7 +873,7 @@ export function directiveNameCompletion(document: TextDocument, position: Positi
 	}
 	// `model:va`, `ref:ti`: the name after the prefix has its own completion.
 	if (/^(?:model|ref):./.test(word) || (component && /^bind:./.test(word))) return undefined
-	const directives = templateDirectives
+	const directives = templateDirectives()
 		.filter((directive) => directive.on === 'all' || directive.on === (component ? 'component' : 'element'))
 		.filter((directive) => !directive.elements || directive.elements.includes((builtin?.element ?? context.tag).toLowerCase()))
 		.filter((directive) => directive.name.endsWith(':') || offered(directive.name))
@@ -1134,7 +1138,7 @@ function autoImportDetail(program: ts.Program | undefined, name: string, autoImp
 
 /** Note of an autoimported name in its completion. */
 function autoImportNote(project: MeekoProject, file: string): string {
-	return `Autoimportado de \`${relative(project.root, file).replaceAll('\\', '/')}\`: no necesita import.`
+	return t('Auto-imported from `{0}`: it needs no import.', relative(project.root, file).replaceAll('\\', '/'))
 }
 
 /**
@@ -1164,7 +1168,7 @@ function componentTypeCompletion(context: FeatureContext, result: ts.CompletionI
 				sortText: '15',
 				labelDetails: { description: path },
 				detail: `type ${entry.name} = ${entry.imported}`,
-				documentation: { kind: MarkupKind.Markdown, value: `\`${entry.imported}\` de \`${path}\`, autoimportado.` },
+				documentation: { kind: MarkupKind.Markdown, value: t('`{0}` from `{1}`, auto-imported.', entry.imported, path) },
 			}
 		})
 }
@@ -1231,7 +1235,7 @@ export function hover(base: FeatureContext, position: Position): Hover | undefin
 		const summary = genericTagMarkdown(base, tag) ?? (child && componentMarkdown(base, child, tag.name))
 		const file = componentFile(base, tag.file)
 		return {
-			contents: { kind: MarkupKind.Markdown, value: summary ?? ['```ts', `<${tag.name} />`, '```', '', `Componente · [${file.label}](${file.uri})`].join('\n') },
+			contents: { kind: MarkupKind.Markdown, value: summary ?? ['```ts', `<${tag.name} />`, '```', '', t('Component · [{0}]({1})', file.label, file.uri)].join('\n') },
 			range: toRange(base.document, tagStart!, tagStart! + tag.name.length),
 		}
 	}
@@ -1241,7 +1245,7 @@ export function hover(base: FeatureContext, position: Position): Hover | undefin
 	// The `html` directive inserts unescaped HTML: its hover carries the safety warning.
 	const htmlDirective = base.component.htmlDirectives?.find((span) => sourceOffset >= span.start && sourceOffset < span.end)
 	if (htmlDirective) {
-		return { contents: { kind: MarkupKind.Markdown, value: htmlDirectiveDocs }, range: toRange(base.document, htmlDirective.start, htmlDirective.end) }
+		return { contents: { kind: MarkupKind.Markdown, value: htmlDirectiveDocs() }, range: toRange(base.document, htmlDirective.start, htmlDirective.end) }
 	}
 	const snippet = snippetTagAt(base.component, sourceOffset, 'name')
 	const snippetSignature = snippet ? snippetParameters(base, snippet) : undefined
@@ -1272,7 +1276,7 @@ export function hover(base: FeatureContext, position: Position): Hover | undefin
 		const typedSummary = typed && componentMarkdown(context, typed.component, componentTagName(context, typed.component), false)
 		if (typed) {
 			const file = componentFile(context, typed.component.filename)
-			sections.push({ markdown: [`\`${typed.type}\` de [${file.label}](${file.uri})`, ...(typedSummary ? ['', typedSummary] : [])].join('\n') })
+			sections.push({ markdown: [t('`{0}` from [{1}]({2})', typed.type, file.label, file.uri), ...(typedSummary ? ['', typedSummary] : [])].join('\n') })
 		}
 		const reactive = reactiveHover(context, sourceOffset)
 		if (reactive) sections.push(reactive)
@@ -1783,7 +1787,7 @@ export async function formatting(context: FeatureContext, options: FormattingOpt
 	try {
 		editor = await import('../formatters/prettier/editor')
 	} catch (error) {
-		environment.log?.(`Prettier no está disponible; se usa el formateador incluido: ${describe(error)}`)
+		environment.log?.(t('Prettier is not available; using the bundled formatter: {0}', describe(error)))
 	}
 	if (editor) {
 		try {
@@ -1797,9 +1801,9 @@ export async function formatting(context: FeatureContext, options: FormattingOpt
 			})
 			if (result?.ignored) return []
 			if (result) return result.text === source ? [] : [{ range: toRange(document, 0, source.length), newText: result.text }]
-			environment.log?.('Prettier no está instalado; se usa el formateador incluido')
+			environment.log?.(t('Prettier is not installed; using the bundled formatter'))
 		} catch (error) {
-			environment.log?.(`${component.filename}: no se pudo formatear: ${describe(error)}`)
+			environment.log?.(t('{0}: could not format: {1}', component.filename, describe(error)))
 			return []
 		}
 	}
@@ -2010,7 +2014,7 @@ function autoImportActions(context: FeatureContext, range: Range, diagnostics: r
 			const statement = importStatement(context, candidate)
 			const newline = context.document.getText().includes('\r\n') ? '\r\n' : '\n'
 			actions.push({
-				title: `Importar ${problem.name} desde ${candidate.specifier ?? relative(dirname(context.component.filename), candidate.file).replaceAll('\\', '/')}`,
+				title: t('Import {0} from {1}', problem.name, candidate.specifier ?? relative(dirname(context.component.filename), candidate.file).replaceAll('\\', '/')),
 				kind: CodeActionKind.QuickFix,
 				...(related.length ? { diagnostics: related } : {}),
 				edit: {
@@ -2084,7 +2088,7 @@ function staticHrefActions(context: FeatureContext, range: Range, diagnostics: r
 						const related = diagnostics.filter((item) => overlaps(item.range, callRange))
 						if (overlaps(callRange, range) || related.length) {
 							actions.push({
-								title: `Quitar params de la ruta estática ${JSON.stringify(id.text)}`,
+								title: t('Remove params from the static route {0}', JSON.stringify(id.text)),
 								kind: CodeActionKind.QuickFix,
 								...(related.length ? { diagnostics: related, isPreferred: true } : {}),
 								edit: { changes: { [document.uri]: [{ range: target, newText: '' }] } },

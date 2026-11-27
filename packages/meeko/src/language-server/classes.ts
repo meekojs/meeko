@@ -11,6 +11,7 @@ import type { ClassRule } from './class-rules'
 
 import { classRuleSnippet, cssClassRules, cssImports } from './class-rules'
 import { styleRegion, tagAt } from './embedded'
+import { t } from './l10n'
 import { pathKey } from './project'
 
 // CSS classes of a project for `class="…"` and the string literals of `bind:class`: the
@@ -376,19 +377,19 @@ export function classTokenAt(source: string, offset: number): ClassToken | undef
 
 const origins: Record<ClassOrigin, string> = { own: '0', component: '1', stylesheet: '2', snapshot: '3' }
 
-/** The short origin of a class, the detail of its completion: `este componente`, `Card.meeko`, `main.css (global)`. */
+/** The short origin of a class, the detail of its completion: `this component`, `Card.meeko`, `main.css (global)`. */
 function originLabel(source: ClassSource): string {
-	if (source.origin === 'own') return 'este componente'
+	if (source.origin === 'own') return t('this component')
 	const name = source.filename ? basename(source.filename) : ''
 	if (source.origin === 'component') return name
-	return source.origin === 'snapshot' ? `${name} (global, procesada)` : `${name} (global)`
+	return source.origin === 'snapshot' ? t('{0} (global, processed)', name) : `${name} (global)`
 }
 
 function originPlace(source: ClassSource, root: string | undefined): string {
-	if (source.origin === 'own') return 'el `<style>` de este componente'
+	if (source.origin === 'own') return t('the `<style>` of this component')
 	const path = source.filename && root ? relative(root, source.filename).replaceAll('\\', '/') : (source.filename ?? '')
-	if (source.origin === 'snapshot') return `\`${path}\`, la hoja global que procesa \`meeko dev\``
-	return source.origin === 'component' ? `el \`<style>\` de \`${path}\`` : `\`${path}\``
+	if (source.origin === 'snapshot') return t('`{0}`, the global stylesheet that `meeko dev` processes', path)
+	return source.origin === 'component' ? t('the `<style>` of `{0}`', path) : `\`${path}\``
 }
 
 /** Sources of a class, own first. */
@@ -401,9 +402,9 @@ function classMarkdown(view: ClassView, name: string): MarkupContent | undefined
 	const [first, ...others] = sourcesOf(view, name)
 	const rule = first?.byName.get(name)?.[0]
 	if (!first || !rule) return undefined
-	const lines = [`Clase \`.${name}\` de ${originPlace(first, view.root)}.`, '', '```css', classRuleSnippet(first.text, rule), '```']
+	const lines = [t('Class `.{0}` defined in {1}.', name, originPlace(first, view.root)), '', '```css', classRuleSnippet(first.text, rule), '```']
 	const more = [...new Set(others.map(originLabel))]
-	if (more.length) lines.push('', `También en: ${more.slice(0, 4).join(', ')}${more.length > 4 ? '…' : ''}`)
+	if (more.length) lines.push('', t('Also in: {0}{1}', more.slice(0, 4).join(', '), more.length > 4 ? '…' : ''))
 	return { kind: MarkupKind.Markdown, value: lines.join('\n') }
 }
 

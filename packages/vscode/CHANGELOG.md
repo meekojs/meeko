@@ -2,6 +2,7 @@
 
 ## Sin publicar
 
+- Con VS Code en un idioma distinto del español, los hovers, el completado, las acciones rápidas, las lentes y las zonas de ejecución del servidor de lenguaje se muestran en inglés; el servidor recibe el idioma del editor. Los diagnósticos del compilador y la documentación del JSDoc de la API siguen en español.
 - Las pruebas de host aisladas (`test:host:isolated`) se ejecutan con Node en Windows, macOS y Linux sin PowerShell, y `test:host:untrusted` descarga VS Code si no encuentra uno en vez de depender de una ruta de Windows.
 - Los archivos `.meeko` abiertos fuera de las carpetas del workspace ya no muestran diagnósticos duplicados: los atiende sólo el servidor global, y los que ya había publicado un servidor de carpeta se retiran cuando el global arranca.
 - Las zonas de ejecución se vuelven a pintar al cambiar el modo de lenguaje de un editor visible a `meeko`, y se limpian al pasar a otro lenguaje.
@@ -13,7 +14,7 @@
 - Comandos «Meeko: Reiniciar servidor de lenguaje» y «Meeko: Mostrar salida». El indicador de estado del lenguaje muestra el servidor del editor activo, del workspace con su versión o el incluido, con el motivo en el detalle, y pasa a error si no arrancó.
 - «Nuevo componente», «Nueva página» y «Nuevo endpoint de API» están en un submenú «Meeko» del menú contextual de las carpetas del explorador. El proyecto se toma de la carpeta pulsada y el cuadro de entrada se abre con su ruta ya escrita (`app/pages/users` → `/users/`, `app/components/App` → `App/`).
 - Las zonas de ejecución también se muestran en documentos `.meeko` que no están en disco (workspaces virtuales), liberan su estado al cerrar el documento y una respuesta tardía de un documento cerrado y reabierto ya no sustituye a la más reciente.
-- La extensión está localizada: inglés por defecto y español como traducción (`package.nls*.json` y `l10n/bundle.l10n.es.json`). Con VS Code en un idioma distinto del español, los comandos, ajustes, avisos, el indicador de estado y Meeko live se muestran en inglés; los diagnósticos y hovers del servidor de lenguaje y las descripciones de los fragmentos siguen sólo en español.
+- La extensión está localizada: inglés por defecto y español como traducción (`package.nls*.json` y `l10n/bundle.l10n.es.json`). Con VS Code en un idioma distinto del español, los comandos, ajustes, avisos, el indicador de estado y Meeko live se muestran en inglés; las descripciones de los fragmentos siguen sólo en español.
 - La extensión declara `onLanguage:meeko` como evento de activación y su bundle se compila para Node 24, el de VS Code 1.144 (Electron 43), en lugar de Node 20.
 - Un `<script>` con los atributos en varias líneas, como lo deja Prettier (`<script`, `server`, `lang="ts"` y `>` cada uno en su línea), se colorea como TypeScript. Antes la gramática sólo reconocía la etiqueta de apertura en una línea y el bloque quedaba sin colores.
 - `pnpm run install:local` desde una terminal de WSL ya no falla tras instalar: el `code` de Windows instala en WSL pero localiza las extensiones de Windows, así que allí se usa el `code-server` de `~/.vscode-server`.

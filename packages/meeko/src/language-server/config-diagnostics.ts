@@ -4,6 +4,8 @@ import type { Diagnostic } from 'vscode-languageserver/node'
 import ts from '@typescript/typescript6'
 import { DiagnosticSeverity, DiagnosticTag } from 'vscode-languageserver/node'
 
+import { t } from './l10n'
+
 /** An entry of `modules` in a deprecated form, found without running the configuration. */
 export interface DeprecatedModuleEntry {
 	readonly start: number
@@ -82,14 +84,14 @@ export function deprecatedModuleEntries(text: string, filename: string): Depreca
 							return from === undefined ? undefined : entryName(from)
 						})()
 					: undefined
-		const written = name === undefined ? 'el nombre de su paquete o su ruta' : JSON.stringify(name)
-		const form = tuple ? '[módulo, opciones]' : 'un módulo importado'
+		const written = name === undefined ? t('its package name or its path') : JSON.stringify(name)
+		const form = tuple ? t('[module, options]') : t('an imported module')
 		result.push({
 			start: element.getStart(source),
 			end: element.getEnd(),
 			index,
 			...(name === undefined ? {} : { name }),
-			message: `MEEK126: modules[${index}] usa ${form}, obsoleto desde 1.8. Escríbalo por su nombre, modules: [${written}], y pase sus opciones en la clave de meeko.config que declara su meta.configKey. Sigue funcionando en 1.x y dejará de hacerlo en Meeko 2.0.`,
+			message: t('MEEK126: modules[{0}] uses {1}, deprecated since 1.8. Write it by its name, modules: [{2}], and pass its options under the meeko.config key that its meta.configKey declares. It keeps working in 1.x and will stop working in Meeko 2.0.', index, form, written),
 		})
 	})
 	return result

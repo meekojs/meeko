@@ -19,6 +19,7 @@ import { writeConfigTypesSync } from '../framework/config-types'
 import { generatedThemeLines } from '../framework/generate'
 import { resolveThemeConfig } from '../shared/theme'
 import { emptyAppIndex, loadAppIndex } from './app-index'
+import { t } from './l10n'
 import { createVirtualComponent, diskVersion, resolveProjectCompilerOptions, serverVirtualSuffix, virtualFilenameOf } from './model'
 
 /** Políticas comunes a todos los proyectos de un servidor de lenguaje. */
@@ -609,7 +610,7 @@ export class MeekoProject {
 				registry = await discoverAutoImports(this.root)
 			} catch (error) {
 				this.configError = error instanceof Error ? error.message : String(error)
-				this.options.log?.(`${this.root}: falló la configuración dinámica de Meeko; se usa el lector estático: ${this.configError}`)
+				this.options.log?.(t('{0}: Meeko dynamic configuration failed; using the static reader: {1}', this.root, this.configError))
 				registry = this.staticRegistry()
 			}
 		} else registry = this.staticRegistry()
@@ -651,7 +652,7 @@ export class MeekoProject {
 		try {
 			writeConfigTypesSync(this.root, readMeekoConfigSync(this.root))
 		} catch (error) {
-			this.options.log?.(`${this.root}: no se pudieron escribir los tipos de meeko.config: ${error instanceof Error ? error.message : String(error)}`)
+			this.options.log?.(t('{0}: could not write the meeko.config types: {1}', this.root, error instanceof Error ? error.message : String(error)))
 		}
 	}
 
@@ -677,7 +678,7 @@ export class MeekoProject {
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error)
 			this.configError ??= message
-			this.options.log?.(`${this.root}: falló la configuración estática de Meeko: ${message}`)
+			this.options.log?.(t('{0}: Meeko static configuration failed: {1}', this.root, message))
 			return []
 		}
 	}

@@ -10,22 +10,21 @@ import type { ReactiveDeclaration } from './reactivity'
 
 import { isPageFile } from '../compiler/transforms/route-block'
 import { extractRouteRender } from '../framework/routes-discovery'
+import { t } from './l10n'
 import { pathKey } from './project'
 import { analyzeReactivity } from './reactivity'
 
 /** VS Code's command to show a list of locations next to a position. */
 export const showReferencesCommand = 'editor.action.showReferences'
 
-function plural(count: number, word: string): string {
-	return `${count} ${word}${count === 1 ? '' : 's'}`
-}
-
-/** Title of the lens of a reactive declaration, such as `3 lecturas · 1 escritura · en la plantilla`. */
+/** Title of the lens of a reactive declaration, such as `3 reads · 1 write · in the template`. */
 export function reactiveLensTitle(declaration: ReactiveDeclaration): string {
 	const reads = declaration.accesses.filter((access) => access.read).length
 	const writes = declaration.accesses.filter((access) => access.write).length
 	const template = declaration.accesses.some((access) => access.template)
-	return `${plural(reads, 'lectura')} · ${plural(writes, 'escritura')} · ${template ? 'en la plantilla' : 'fuera de la plantilla'}`
+	const readsText = reads === 1 ? t('{0} read', reads) : t('{0} reads', reads)
+	const writesText = writes === 1 ? t('{0} write', writes) : t('{0} writes', writes)
+	return `${readsText} · ${writesText} · ${template ? t('in the template') : t('outside the template')}`
 }
 
 function reactiveLenses(context: FeatureContext): CodeLens[] {
@@ -113,7 +112,7 @@ export function checkPayload(checker: ts.TypeChecker, type: ts.Type, at: ts.Node
 	let fields = 0
 	const seen = new Set<ts.Type>()
 	const report = (path: string, problem: string): void => {
-		if (issues.length < 3) issues.push(`${path} es ${problem}`)
+		if (issues.length < 3) issues.push(t('{0} is {1}', path, problem))
 	}
 	const visit = (current: ts.Type, path: string, depth: number): void => {
 		if (depth > 8 || issues.length >= 3 || fields > largePayloadFields * 4) return
@@ -121,19 +120,19 @@ export function checkPayload(checker: ts.TypeChecker, type: ts.Type, at: ts.Node
 			for (const part of current.types) visit(part, path, depth)
 			return
 		}
-		if (current.flags & ts.TypeFlags.BigIntLike) return report(path, 'un bigint')
-		if (current.flags & ts.TypeFlags.ESSymbolLike) return report(path, 'un symbol')
+		if (current.flags & ts.TypeFlags.BigIntLike) return report(path, t('a bigint'))
+		if (current.flags & ts.TypeFlags.ESSymbolLike) return report(path, t('a symbol'))
 		if (!(current.flags & ts.TypeFlags.Object) && !current.isIntersection()) return
 		if (seen.has(current)) return
 		seen.add(current)
 		const symbol = current.aliasSymbol && nonPlain.has(current.aliasSymbol.name) ? current.aliasSymbol : current.getSymbol()
-		if (current.getCallSignatures().length) return report(path, 'una función')
-		if (symbol && nonPlain.has(symbol.name)) return report(path, `un ${symbol.name}`)
+		if (current.getCallSignatures().length) return report(path, t('a function'))
+		if (symbol && nonPlain.has(symbol.name)) return report(path, t('an instance of {0}', symbol.name))
 		if (checker.isArrayType(current) || checker.isTupleType(current)) {
 			for (const element of checker.getTypeArguments(current as ts.TypeReference)) visit(element, `${path}[]`, depth + 1)
 			return
 		}
-		if (symbol && symbol.flags & ts.SymbolFlags.Class) return report(path, `una instancia de la clase ${symbol.name}`)
+		if (symbol && symbol.flags & ts.SymbolFlags.Class) return report(path, t('an instance of the class {0}', symbol.name))
 		for (const property of checker.getPropertiesOfType(current)) {
 			fields++
 			visit(checker.getTypeOfSymbolAtLocation(property, at), `${path}.${property.name}`, depth + 1)
@@ -226,7 +225,7 @@ function pageLenses(context: FeatureContext): CodeLens[] {
 		{
 			range,
 			command: {
-				title: `Ruta ${id} · render ${render ?? 'ssr'} · layouts: ${layouts === undefined ? 'desconocidos' : layouts.length ? layouts.join(' › ') : 'ninguno'}`,
+				title: layouts === undefined ? t('Route {0} · render {1} · layouts: unknown', id, render ?? 'ssr') : layouts.length ? t('Route {0} · render {1} · layouts: {2}', id, render ?? 'ssr', layouts.join(' › ')) : t('Route {0} · render {1} · layouts: none', id, render ?? 'ssr'),
 				command: '',
 			},
 		},
@@ -235,12 +234,12 @@ function pageLenses(context: FeatureContext): CodeLens[] {
 	if (component.server && program) {
 		const payload = pagePayload(program, component.server)
 		let title: string
-		if (!payload) title = 'No envía datos al cliente'
-		else if (render === 'client') title = `El loader se ejecuta en el navegador: ${payload.type}`
+		if (!payload) title = t('Sends no data to the client')
+		else if (render === 'client') title = t('The loader runs in the browser: {0}', payload.type)
 		else {
-			title = `Envía al cliente: ${payload.type}`
-			if (payload.check.issues.length) title += ` · ⚠ no serializable: ${payload.check.issues.join('; ')}`
-			else if (payload.check.fields > largePayloadFields) title += ` · ⚠ tipo de payload grande (${payload.check.fields} campos)`
+			title = t('Sends to the client: {0}', payload.type)
+			if (payload.check.issues.length) title += ` · ${t('⚠ not serializable: {0}', payload.check.issues.join('; '))}`
+			else if (payload.check.fields > largePayloadFields) title += ` · ${t('⚠ large payload type ({0} fields)', payload.check.fields)}`
 		}
 		lenses.push({ range, command: { title, command: '' } })
 	}

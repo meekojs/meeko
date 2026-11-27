@@ -25,6 +25,7 @@ import { cssVariableCompletion, cssVariableDefinition, cssVariableHover, cssVari
 import { componentDiagnostics, contractRange, frameworkContractRoot, projectCheckRoot, tokenEnd } from './diagnostics'
 import { colorPresentations, cssCompletion, cssHover, documentColors, htmlCompletion, htmlHover, linkedEditingRanges, specialTemplateHover, styleDiagnostics, tagCompletion } from './embedded'
 import { codeActions, completionList, componentNameCompletion, componentTagMembers, definition, directiveNameCompletion, documentSymbols, foldingRanges, formatting, hover, prepareRename, references, rename, resolveCompletion, semanticTokens, semanticTokensEdits, semanticTokensInRange, semanticTokensLegend, shadowedTagsOf, signatureHelp } from './features'
+import { setLocale, t } from './l10n'
 import { codeLenses } from './lenses'
 import { documentLinks, inlayHints, linkRouteCompletion, workspaceSymbols } from './nav'
 import { MeekoProject, MeekoWorkspace, pathKey, staticClassProviders } from './project'
@@ -332,7 +333,7 @@ export function startLanguageServer(connection: Connection): void {
 			...(registration.definition ? [connection.client.register(DefinitionRequest.type, { documentSelector })] : []),
 			...(registration.references ? [connection.client.register(ReferencesRequest.type, { documentSelector })] : []),
 			...(registration.rename ? [connection.client.register(RenameRequest.type, { documentSelector, prepareProvider: true })] : []),
-		]).catch((error: unknown) => log(`No se pudieron registrar las funciones de variables CSS: ${String(error)}`))
+		]).catch((error: unknown) => log(t('Could not register the CSS variable features: {0}', String(error))))
 	}
 	/** The class providers of a project, once its configuration is known; their languages get the CSS functions. */
 	const providersOf = (project: MeekoProject): readonly ResolvedClassProvider[] => {
@@ -390,7 +391,7 @@ export function startLanguageServer(connection: Connection): void {
 
 	const publish = (uri: string): void => {
 		if (stopped) return
-		const failed = (error: unknown): void => log(`${uri}: no se pudieron publicar los diagnósticos: ${error instanceof Error ? error.message : String(error)}`)
+		const failed = (error: unknown): void => log(t('{0}: could not publish the diagnostics: {1}', uri, error instanceof Error ? error.message : String(error)))
 		try {
 			connection.sendDiagnostics({ uri, diagnostics: [...(ownDiagnostics.get(uri) ?? []), ...(contractDiagnostics.get(uri) ?? []), ...(configDiagnostics.get(uri) ?? [])] }).catch(failed)
 		} catch (error) {
@@ -529,7 +530,7 @@ export function startLanguageServer(connection: Connection): void {
 						// A check stopped by shutdown fails on its own (its project may be gone): nobody reads it.
 						if (stopped || contractVersions.get(key) !== version) return
 						const message = error instanceof Error ? error.message : String(error)
-						log(`${root}: falló la comprobación de contratos del proyecto: ${message}`)
+						log(t('{0}: the project contract check failed: {1}', root, message))
 						// A file that breaks the check (a page that does not compile) gets the error; otherwise the
 						// document that started the check, or one open component of the project. Never all of them.
 						const compile = error instanceof MeekoCompileError ? error.diagnostic : undefined
@@ -540,7 +541,7 @@ export function startLanguageServer(connection: Connection): void {
 						// An open file already reports its own compile error.
 						const target = compile ? (openDocument(compile.filename) ? undefined : locate(compile.filename)) : fallback && { uri: fallback.uri, document: fallback }
 						if (target && compile) add(target, compile.location.offset, tokenEnd(target.document.getText(), compile.location.offset), compile.message, compile.code)
-						else if (target) add(target, 0, 1, `Falló la comprobación de contratos del proyecto: ${message}`, 'MEEK_PROJECT_CHECK')
+						else if (target) add(target, 0, 1, t('The project contract check failed: {0}', message), 'MEEK_PROJECT_CHECK')
 						apply()
 					})
 				contractRuns.set(key, run)
@@ -557,6 +558,8 @@ export function startLanguageServer(connection: Connection): void {
 	}
 
 	connection.onInitialize((params): InitializeResult => {
+		// The language of every user-facing text: the client's `locale`; Spanish (the original language) without one.
+		setLocale(params.locale)
 		const options = (params.initializationOptions ?? {}) as LanguageServerInitializationOptions
 		workspace = new MeekoWorkspace({ trusted: options.trusted !== false, log })
 		folders = (params.workspaceFolders?.map((folder) => folder.uri) ?? (params.rootUri ? [params.rootUri] : [])).flatMap((uri) => uriToPath(uri) ?? [])
@@ -633,9 +636,9 @@ export function startLanguageServer(connection: Connection): void {
 			try {
 				await project.warm()
 				providersOf(project)
-				log(`${project.root}: proyecto preparado en ${Math.round(performance.now() - started)} ms`)
+				log(t('{0}: project ready in {1} ms', project.root, Math.round(performance.now() - started)))
 			} catch (error) {
-				log(`${project.root}: no se pudo preparar el proyecto: ${error instanceof Error ? error.message : String(error)}`)
+				log(t('{0}: could not prepare the project: {1}', project.root, error instanceof Error ? error.message : String(error)))
 			}
 		}
 	}
@@ -648,7 +651,7 @@ export function startLanguageServer(connection: Connection): void {
 		registerStylesheetLanguages(['css', ...applicationRoots(folders, providerScanLimit).flatMap((root) => staticClassProviders(root).flatMap((provider) => provider.languages))])
 		// A pull-model client (VS Code) only notifies setting changes for a registered section; the
 		// notification clears the cached meeko.classes settings of each document.
-		if (configurationSupport && configurationRegistration) settle(connection.client.register(DidChangeConfigurationNotification.type, { section: 'meeko' }), 'No se pudo registrar meeko en workspace/didChangeConfiguration')
+		if (configurationSupport && configurationRegistration) settle(connection.client.register(DidChangeConfigurationNotification.type, { section: 'meeko' }), t('Could not register meeko in workspace/didChangeConfiguration'))
 		if (warmup) warming = warmProjects()
 		if (!watchedRegistration) return
 		settle(
@@ -665,7 +668,7 @@ export function startLanguageServer(connection: Connection): void {
 					{ globPattern: '**/{app,server,shared}/**', kind: WatchKind.Create | WatchKind.Delete },
 				],
 			}),
-			'No se pudo registrar la vigilancia de archivos',
+			t('Could not register the file watchers'),
 		)
 	})
 
@@ -751,8 +754,8 @@ export function startLanguageServer(connection: Connection): void {
 		const fallbackRoot = contractDocument && contractRootOf(contractDocument)
 		if (!changedRoots.size && fallbackRoot) changedRoots.set(pathKey(fallbackRoot), fallbackRoot)
 		for (const root of changedRoots.values()) scheduleContractCheck(root, contractDocument)
-		if (semanticRefresh) settle(connection.languages.semanticTokens.refresh(), 'No se pudieron refrescar los tokens semánticos')
-		if (codeLensRefresh) settle(connection.sendRequest(CodeLensRefreshRequest.type), 'No se pudieron refrescar los code lenses')
+		if (semanticRefresh) settle(connection.languages.semanticTokens.refresh(), t('Could not refresh the semantic tokens'))
+		if (codeLensRefresh) settle(connection.sendRequest(CodeLensRefreshRequest.type), t('Could not refresh the code lenses'))
 	})
 
 	// Clients without workspace/configuration may push `{ meeko: { format: {...} } }` instead.
@@ -772,7 +775,7 @@ export function startLanguageServer(connection: Connection): void {
 			const value: unknown = await connection.workspace.getConfiguration({ scopeUri: uri, section: 'meeko.format' })
 			return formatSettingsOf(value) ?? formatFallback
 		} catch (error) {
-			log(`${uri}: no se pudo leer meeko.format: ${error instanceof Error ? error.message : String(error)}`)
+			log(t('{0}: could not read meeko.format: {1}', uri, error instanceof Error ? error.message : String(error)))
 			return formatFallback
 		}
 	}

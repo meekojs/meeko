@@ -5,6 +5,7 @@ import type { SetupFunctionZone } from './zones'
 
 import { analyzeComposables } from '../compiler/composables'
 import { locate, parseSfc } from '../compiler/parser/sfc'
+import { joinList, t } from './l10n'
 import { createVirtualComponent } from './model'
 import { setupFunctionZones } from './zones'
 
@@ -66,16 +67,25 @@ export const cleanupReference = 'https://meekojs.com/docs/reference/oncleanup'
 
 /** Message of `MEEK128`: a cleanup that also runs during SSR uses `apis`, which only exist in the browser. */
 export function cleanupBrowserApiMessage(apis: readonly string[]): string {
-	const named = apis.map((api) => `\`${api}\``)
-	const list = named.length === 1 ? named[0]! : `${named.slice(0, -1).join(', ')} y ${named.at(-1)}`
-	return `\`onCleanup\` se ejecuta también en el servidor (SSR) y usa ${list}, que solo ${named.length === 1 ? 'existe' : 'existen'} en el navegador: crea el recurso y su limpieza dentro de \`onMounted\`. Es un aviso en 1.x y será un error en 2.0. Consulta ${cleanupReference}`
+	const list = joinList(apis.map((api) => `\`${api}\``))
+	return apis.length === 1 ? t('`onCleanup` also runs on the server (SSR) and uses {0}, which only exists in the browser: create the resource and its cleanup inside `onMounted`. It is a warning in 1.x and will be an error in 2.0. See {1}', list, cleanupReference) : t('`onCleanup` also runs on the server (SSR) and uses {0}, which only exist in the browser: create the resource and its cleanup inside `onMounted`. It is a warning in 1.x and will be an error in 2.0. See {1}', list, cleanupReference)
 }
 
-/** Message of `MEEK129`: `onCleanup` after an `await` of the same function. */
-export const cleanupAfterAwaitMessage = '`onCleanup` se registra después de un `await`: cuando la función continúa ya no hay una raíz activa, así que lanza «onCleanup() requires an active component root» o registra la limpieza en otro componente, y si el componente se desmonta mientras espera, el recurso queda abierto. Regístrala antes del primer `await` y deja que compruebe lo que haya. Es un aviso en 1.x y será un error en 2.0. Consulta ' + cleanupReference
+/** Message of `MEEK129` in the language of the connection: `onCleanup` after an `await` of the same function. */
+export function cleanupAfterAwaitText(): string {
+	return t('`onCleanup` is registered after an `await`: when the function continues there is no active root, so it throws "onCleanup() requires an active component root" or registers the cleanup in another component, and if the component unmounts while waiting, the resource stays open. Register it before the first `await` and let it check whatever is there. It is a warning in 1.x and will be an error in 2.0. See {0}', cleanupReference)
+}
 
-/** Message of `MEEK130`: `onCleanup` while a module is evaluated, outside any root. */
-export const cleanupOutsideRootMessage = '`onCleanup` se llama al evaluar el módulo, fuera de una raíz: al importarlo lanza «onCleanup() requires an active component root», porque un módulo no se desmonta. Llámalo dentro de un composable que invoque el script del componente, o dentro de `createRoot`. Es un aviso en 1.x y será un error en 2.0. Consulta ' + cleanupReference
+/** `MEEK129` in the default language (Spanish), for tests and for clients that compare the text. */
+export const cleanupAfterAwaitMessage = cleanupAfterAwaitText()
+
+/** Message of `MEEK130` in the language of the connection: `onCleanup` while a module is evaluated, outside any root. */
+export function cleanupOutsideRootText(): string {
+	return t('`onCleanup` is called while the module is evaluated, outside a root: importing it throws "onCleanup() requires an active component root", because a module is never unmounted. Call it inside a composable that the component script invokes, or inside `createRoot`. It is a warning in 1.x and will be an error in 2.0. See {0}', cleanupReference)
+}
+
+/** `MEEK130` in the default language (Spanish), for tests and for clients that compare the text. */
+export const cleanupOutsideRootMessage = cleanupOutsideRootText()
 
 type FunctionScope = ts.FunctionLikeDeclaration
 
@@ -298,7 +308,7 @@ export function componentCleanupDiagnostics(source: string, filename: string): C
 	for (const call of cleanupCalls(file, checker)) {
 		const offset = script.contentStart + call.expression.getStart(file)
 		if (afterAwait(call)) {
-			diagnostics.push({ code: 'MEEK129', message: cleanupAfterAwaitMessage, filename, location: locate(source, offset), severity: 'warning' })
+			diagnostics.push({ code: 'MEEK129', message: cleanupAfterAwaitText(), filename, location: locate(source, offset), severity: 'warning' })
 			continue
 		}
 		const apis = unguardedBrowserApis(call, checker)
@@ -328,8 +338,8 @@ export function moduleCleanupDiagnostics(text: string, filename: string): Compil
 				break
 			}
 		}
-		if (outside) diagnostics.push({ code: 'MEEK130', message: cleanupOutsideRootMessage, filename, location: locate(text, offset), severity: 'warning' })
-		else if (afterAwait(call)) diagnostics.push({ code: 'MEEK129', message: cleanupAfterAwaitMessage, filename, location: locate(text, offset), severity: 'warning' })
+		if (outside) diagnostics.push({ code: 'MEEK130', message: cleanupOutsideRootText(), filename, location: locate(text, offset), severity: 'warning' })
+		else if (afterAwait(call)) diagnostics.push({ code: 'MEEK129', message: cleanupAfterAwaitText(), filename, location: locate(text, offset), severity: 'warning' })
 	}
 	return diagnostics
 }
@@ -427,7 +437,7 @@ export function cleanupFixes(source: string, filename: string, offset: number): 
 			.join(newline)
 	const fixes: CleanupFix[] = [
 		{
-			title: 'Mover a `onMounted`',
+			title: t('Move to `onMounted`'),
 			edits: [
 				{
 					start: script.contentStart + start,
@@ -457,7 +467,7 @@ export function cleanupFixes(source: string, filename: string, offset: number): 
 		const owns = !script.content.slice(lineStart, start).trim() && !script.content.slice(end, lineEnd < 0 ? undefined : lineEnd).trim()
 		const removal = owns ? { start: script.contentStart + lineStart, end: script.contentStart + (lineEnd < 0 ? script.content.length : lineEnd + 1) } : { start: script.contentStart + start, end: script.contentStart + end }
 		fixes.push({
-			title: 'Mover dentro del `onMounted` existente',
+			title: t('Move into the existing `onMounted`'),
 			edits: [
 				{ start: insertAt, end: insertAt, text: moved },
 				{ ...removal, text: '' },
