@@ -315,6 +315,9 @@ catalogs:
     playwright-core:
       specifier: 1.65.1
       version: 1.65.1
+    portless:
+      specifier: 0.18.1
+      version: 0.18.1
     postcss:
       specifier: ^8.5.33
       version: 8.5.33
@@ -435,6 +438,9 @@ importers:
       jiti:
         specifier: 'catalog:'
         version: 2.7.0
+      portless:
+        specifier: 'catalog:'
+        version: 0.18.1
       prettier:
         specifier: 'catalog:'
         version: 3.10.1
@@ -3427,6 +3433,12 @@ packages:
   playwright-core@1.65.1:
     resolution: {integrity: sha512-hqPpz7blSMPxWVdoeE1yiBSzXsKiVOd2k+kjCvmUywD2GPO2Dd9HfcWnq9NN0GHbNZDFgZ9JfBFr+X5/BLo0qw==}
     engines: {node: '>=20'}
+    hasBin: true
+
+  portless@0.18.1:
+    resolution: {integrity: sha512-3gfeicAvS5kwFUbZrsZpt1oU1MUBvfiy2S0MT/n8mwWEp/ZjQsWI0mC353GEi/q8JUVgdx7lBGDzCcMI9O1MXg==}
+    engines: {node: '>=24'}
+    os: [darwin, linux, win32]
     hasBin: true
 
   postcss-less@6.0.0:
@@ -6768,6 +6780,8 @@ snapshots:
   picomatch@4.0.7: {}
 
   playwright-core@1.65.1: {}
+
+  portless@0.18.1: {}
 
   postcss-less@6.0.0(postcss@8.5.33):
     dependencies:

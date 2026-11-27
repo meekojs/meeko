@@ -64,4 +64,13 @@ workspace, Turbo actualiza sus builds. En `apps/ui`, Meeko lee los componentes f
 mientras el servidor sigue activo. Usa `dev:site`, `dev:ui`, `dev:i18n` o `dev:dashboard` para
 iniciar una sola aplicación.
 
+`pnpm dev:portless` hace lo mismo detrás de [portless](https://portless.sh), que da a cada sitio una
+URL con nombre en vez de un puerto: `https://meeko.localhost`, `https://ui.meeko.localhost`,
+`https://i18n.meeko.localhost` y `https://dashboard.meeko.localhost` (los nombres están en
+`portless.json`). La primera vez portless crea una autoridad de certificación local y pide permisos
+para escuchar en el puerto 443; `PORTLESS_HTTPS=0` sirve HTTP y `PORTLESS_PORT=<puerto>` elige otro
+puerto. Dos avisos: un `MEEKO_PORT` en el `.env` de una app gana al puerto que asigna portless, así
+que quítalo para usarlo; y el dashboard sólo responde en loopback, de modo que necesita
+`DASHBOARD_ALLOWED_HOSTS=dashboard.meeko.localhost`.
+
 [CONTRIBUTING.md](CONTRIBUTING.md) recoge las convenciones y [SECURITY.md](SECURITY.md) cómo informar de una vulnerabilidad. El código se distribuye bajo la [licencia MIT](LICENSE).

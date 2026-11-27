@@ -767,8 +767,9 @@ async function startDevelopment(root: string): Promise<Server> {
 					server: {
 						middlewareMode: true,
 						// Middleware mode opens a separate Vite WebSocket server, on a port derived
-						// from the app port so concurrent projects do not share 24678.
-						hmr: { host: devHmrHost, port: hmrPort },
+						// from the app port so concurrent projects do not share 24678. It speaks plain `ws`
+						// on loopback: without `protocol`, a page served through an HTTPS proxy asks for `wss`.
+						hmr: { protocol: 'ws', host: devHmrHost, port: hmrPort },
 						// Like Vite's own `server.host` and `server.origin`, the listening host and the public
 						// origin are allowed too. Meeko checks the result first, with its own message (below).
 						allowedHosts: devViteAllowedHosts(allowedHosts, host, publicOrigin),

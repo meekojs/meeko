@@ -28,6 +28,7 @@ Requiere Node.js 24+ y pnpm 12.14.0. En Windows usa PowerShell 7.
 - `pnpm build`: construye el workspace. `pnpm build:packages` y `pnpm build:apps` seleccionan paquetes o apps.
 - `pnpm tooling:build`: prepara los paquetes usados por ESLint y Prettier.
 - `pnpm dev`: inicia en paralelo los sitios del framework (4173), UI (4174), i18n (4175) y dashboard (4310) con Turbo; `pnpm dev:site`, `pnpm dev:ui`, `pnpm dev:i18n` y `pnpm dev:dashboard` inician cada uno por separado.
+- `pnpm dev:portless`: como `pnpm dev`, detrás de portless: cada sitio tiene una URL con nombre (`https://ui.meeko.localhost`) en vez de un puerto; los nombres viven en `portless.json`.
 - `pnpm dev:i18n`: inicia la web de i18n; `pnpm build --filter=meeko-i18n-site` genera su build Node.
 - `pnpm check`: comprueba tipos de los cinco paquetes principales.
 - `pnpm test`: ejecuta las pruebas del núcleo; `pnpm verify`: amplía la validación con ejemplos, compilación y DevTools.
