@@ -88,12 +88,15 @@ export const classOrderWarnings = {
 }
 const warned = new Set<string>()
 
-/** Reports once per `key` why `meekoSortClasses: "stylesheet"` does not sort. */
+/** Reports once per `key` a problem of `meekoSortClasses: "stylesheet"`; `message` starts with what the mode does. */
 function warnOnce(key: string, message: string): void {
 	if (warned.has(key)) return
 	warned.add(key)
-	classOrderWarnings.write(`[meeko] Aviso: meekoSortClasses "stylesheet" no ordena las clases: ${message}\n`)
+	classOrderWarnings.write(`[meeko] Aviso: ${message}\n`)
 }
+
+/** What the mode does when it finds no stylesheet to order by. */
+const notSorting = 'meekoSortClasses "stylesheet" no ordena las clases: '
 
 /** Files whose presence or contents change which PostCSS configuration Vite loads for the root. */
 const postcssConfigNames = [
@@ -116,11 +119,18 @@ const postcssConfigNames = [
 	'postcss.config.mts',
 ] as const
 const globalStylesheet = join('app', 'styles', 'main.css')
+/**
+ * The global stylesheet as `meeko dev` writes it after the whole Vite pipeline, plugins included
+ * (`globalStylesheetSnapshotFile` in `framework/styles.ts`; the literal is repeated here so that this
+ * file reads it without importing the framework). Only `meeko dev` writes it, and it stays on disk
+ * after dev stops; `meeko clean` removes it.
+ */
+const devStylesheet = join('.meeko', 'styles', 'main.css')
 /** A failed stylesheet is retried after this long even if none of its known files changed (a fixed file that a PostCSS plugin reads). */
 const failureRetryMs = 2000
 
 interface StylesheetEntry {
-	/** `mtimeMs:size` (or `missing`) of the stylesheet, its dependencies and the PostCSS configuration files. */
+	/** `mtimeMs:size` (or `missing`) of the dev stylesheet, the stylesheet, its dependencies and the PostCSS configuration files. */
 	readonly stamps: ReadonlyMap<string, string>
 	readonly order: ReadonlyMap<string, number> | undefined
 	readonly retryAt?: number
@@ -136,6 +146,11 @@ async function stampOf(file: string): Promise<string> {
 	} catch {
 		return 'missing'
 	}
+}
+
+/** The modification time in the `mtimeMs:size` stamp of a file that exists. */
+function modifiedAt(stamp: string): number {
+	return Number.parseFloat(stamp)
 }
 
 async function isCurrent(entry: StylesheetEntry): Promise<boolean> {
@@ -171,13 +186,58 @@ async function importVite(root: string): Promise<ViteApi> {
 	return (path ? await import(pathToFileURL(path).href) : await import('vite')) as ViteApi
 }
 
+/** The order of first appearance of the classes in `css`; `undefined` if the CSS does not parse. */
+function orderOf(css: string): Map<string, number> | undefined {
+	try {
+		const order = new Map<string, number>()
+		for (const name of classNamesOf(css)) if (!order.has(name)) order.set(name, order.size)
+		return order
+	} catch {
+		return undefined
+	}
+}
+
+/**
+ * The order of the stylesheet `meeko dev` wrote to {@link devStylesheet}, which went through the
+ * whole Vite pipeline, plugins included; only read, nothing of the project runs. `undefined` if there
+ * is none, it does not parse or names no class. `stamps` are those taken before reading. It is used
+ * even when it is older than the application stylesheet, whose stamp is `source`: it still orders
+ * every class it names, and a warning says that new ones count as unknown until `meeko dev` writes it again.
+ */
+async function devStylesheetOrder(root: string, stamps: ReadonlyMap<string, string>, source: string): Promise<ReadonlyMap<string, number> | undefined> {
+	const file = join(root, devStylesheet)
+	const stamp = stamps.get(file)!
+	if (stamp === 'missing') return undefined
+	const name = devStylesheet.replaceAll('\\', '/')
+	let order: Map<string, number> | undefined
+	try {
+		order = orderOf(await readFile(file, 'utf8'))
+	} catch (error) {
+		const reason = error instanceof Error ? error.message.split('\n')[0] : String(error)
+		warnOnce(`${root}\0devfailed`, `meekoSortClasses "stylesheet" no pudo leer ${name} en ${root} (${reason}); se procesa ${globalStylesheet.replaceAll('\\', '/')}`)
+		return undefined
+	}
+	if (!order) {
+		warnOnce(`${root}\0devfailed`, `meekoSortClasses "stylesheet" no pudo usar ${name} en ${root}: no es CSS válido; se procesa ${globalStylesheet.replaceAll('\\', '/')}`)
+		return undefined
+	}
+	if (!order.size) return undefined
+	const sourceStamp = stamps.get(source)!
+	if (sourceStamp !== 'missing' && modifiedAt(sourceStamp) > modifiedAt(stamp)) {
+		warnOnce(`${root}\0stale`, `meekoSortClasses "stylesheet" ordena con ${name} en ${root}, que es anterior a ${globalStylesheet.replaceAll('\\', '/')}: las clases nuevas contarán como desconocidas hasta que meeko dev la escriba de nuevo`)
+	}
+	return order
+}
+
 async function processStylesheet(root: string): Promise<StylesheetEntry> {
 	const file = join(root, globalStylesheet)
 	const stamps = new Map<string, string>()
 	// Stamped before reading: a change while the stylesheet is processed reprocesses it next time.
-	for (const watched of [file, ...postcssConfigNames.map((name) => join(root, name))]) stamps.set(watched, await stampOf(watched))
+	for (const watched of [join(root, devStylesheet), file, ...postcssConfigNames.map((name) => join(root, name))]) stamps.set(watched, await stampOf(watched))
+	const fromDev = await devStylesheetOrder(root, stamps, file)
+	if (fromDev) return { stamps, order: fromDev }
 	if (stamps.get(file) === 'missing') {
-		warnOnce(`${root}\0missing`, `no existe ${globalStylesheet.replaceAll('\\', '/')} en ${root}`)
+		warnOnce(`${root}\0missing`, `${notSorting}no existe ${globalStylesheet.replaceAll('\\', '/')} en ${root}`)
 		return { stamps, order: undefined }
 	}
 	// Vite and postcss-load-config set NODE_ENV when it is unset; Prettier's process keeps its own.
@@ -198,7 +258,7 @@ async function processStylesheet(root: string): Promise<StylesheetEntry> {
 		return { stamps, order }
 	} catch (error) {
 		const reason = error instanceof Error ? error.message.split('\n')[0] : String(error)
-		warnOnce(`${root}\0failed`, `no se pudo procesar ${relative(root, file).replaceAll('\\', '/')} en ${root} (${reason})`)
+		warnOnce(`${root}\0failed`, `${notSorting}no se pudo procesar ${relative(root, file).replaceAll('\\', '/')} en ${root} (${reason})`)
 		return { stamps, order: undefined, retryAt: Date.now() + failureRetryMs }
 	} finally {
 		if (hadNodeEnv) process.env.NODE_ENV = nodeEnv
@@ -207,19 +267,21 @@ async function processStylesheet(root: string): Promise<StylesheetEntry> {
 }
 
 /**
- * Order of the classes of the project's global stylesheet (`app/styles/main.css` processed as
- * `meeko dev` does), by first appearance. `undefined` when there is no project, no stylesheet or
- * it does not process; a warning says so once. Cached per project while none of the files it was
- * computed from changes.
+ * Order of the classes of the project's global stylesheet, by first appearance: that of the
+ * stylesheet `meeko dev` keeps in `.meeko/styles/main.css` (the whole Vite pipeline, plugins
+ * included) when it exists and has classes; otherwise that of `app/styles/main.css` processed here
+ * with the project's PostCSS configuration and Vite's `@import`. `undefined` when there is no
+ * project, no stylesheet or it does not process; a warning says so once. Cached per project while
+ * none of the files it was computed from changes, `.meeko/styles/main.css` included.
  */
 export async function stylesheetClassOrder(filepath: string | undefined): Promise<ReadonlyMap<string, number> | undefined> {
 	if (!filepath) {
-		warnOnce('\0nofile', 'Prettier no recibió la ruta del archivo (filepath)')
+		warnOnce('\0nofile', `${notSorting}Prettier no recibió la ruta del archivo (filepath)`)
 		return undefined
 	}
 	const root = await projectRootOf(filepath)
 	if (!root) {
-		warnOnce('\0noroot', `${filepath} no está en un proyecto Meeko (meeko.config.* o package.json con @meekojs/meeko)`)
+		warnOnce('\0noroot', `${notSorting}${filepath} no está en un proyecto Meeko (meeko.config.* o package.json con @meekojs/meeko)`)
 		return undefined
 	}
 	for (;;) {

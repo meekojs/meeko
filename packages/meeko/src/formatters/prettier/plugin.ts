@@ -63,10 +63,14 @@ export interface MeekoPrettierOptions {
 	/**
 	 * Ordena las clases de cada atributo estático `class="…"` de la plantilla. Con `"off"` (por
 	 * defecto) conserva su orden; con `"stylesheet"`, el de la primera aparición de cada clase en
-	 * `app/styles/main.css` procesada como en `meeko dev` (con el `postcss.config` del proyecto y sus
-	 * `@import`) y, después, en el `<style>` del componente: las clases que no
-	 * aparecen en ninguno van primero, en su orden. Con `"alphabetical"`, por orden de código. Si la
-	 * hoja no existe o no se puede procesar, no se ordena y se avisa una vez. En un workspace no
+	 * la hoja global del proyecto y, después, en el `<style>` del componente: las clases que no
+	 * aparecen en ninguno van primero, en su orden. La hoja global es `.meeko/styles/main.css`, la que
+	 * `meeko dev` escribe con todo el pipeline de Vite y sus plugins (es la única que contiene las
+	 * utilidades de una herramienta que se registra como plugin de Vite), si existe; si no, `app/styles/main.css`
+	 * procesada con el `postcss.config` del proyecto y sus `@import`. La hoja de `meeko dev` se usa aunque sea
+	 * anterior a `app/styles/main.css` (se avisa una vez: las clases nuevas cuentan como desconocidas hasta que
+	 * `meeko dev` la escriba de nuevo). Con `"alphabetical"`, por orden de código. Si ninguna hoja existe o se
+	 * puede procesar, no se ordena y se avisa una vez. En un workspace no
 	 * confiable de VS Code no se aplica `"stylesheet"`. En un atributo estático de un elemento, haya o no
 	 * orden, el valor se normaliza siempre: espacios colapsados y sin clases repetidas. Desde 1.8.0,
 	 * con un orden elegido también se aplica al `class` de una etiqueta de componente, a las cadenas
@@ -384,7 +388,7 @@ export const options: SupportOptions = {
 		description: 'Sort the classes of static class attributes in .meeko templates.',
 		choices: [
 			{ value: 'off', description: 'Keep the order of the classes.' },
-			{ value: 'stylesheet', description: "Order of first appearance in app/styles/main.css, processed as meeko dev does, then in the component's <style>; unknown classes first." },
+			{ value: 'stylesheet', description: "Order of first appearance in the global stylesheet (.meeko/styles/main.css, written by meeko dev, or else app/styles/main.css processed as meeko dev does), then in the component's <style>; unknown classes first." },
 			{ value: 'alphabetical', description: 'Code unit order.' },
 		],
 	},

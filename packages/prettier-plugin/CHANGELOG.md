@@ -2,6 +2,7 @@
 
 ## Sin publicar
 
+- `meekoSortClasses: "stylesheet"` ordena por `.meeko/styles/main.css` (la hoja que `meeko dev` escribe con todo el pipeline de Vite y sus plugins) cuando existe y nombra alguna clase, y recurre a procesar `app/styles/main.css` si no. Una hoja anterior a `app/styles/main.css` se usa igualmente y avisa una vez; la caché se invalida cuando la hoja cambia. Mismo comportamiento que el formateador de `@meekojs/meeko`.
 - **Rompe compatibilidad: se retiran `meekoSortClasses: "tailwind"` y la opción `meekoTailwindStylesheet`.** `tailwindcss` deja de ser dependencia par opcional y Prettier rechaza `"tailwind"` como valor inválido. **Migración:** cambia a `meekoSortClasses: "stylesheet"` (orden de la hoja `app/styles/main.css` ya procesada) y elimina `meekoTailwindStylesheet`. `meekoClassFunctions` conserva su comportamiento con los tres modos restantes.
 
 ## 1.11.0 — 2026-11-25
