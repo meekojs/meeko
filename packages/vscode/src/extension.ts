@@ -111,6 +111,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<MeekoE
 		vscode.workspace.onDidGrantWorkspaceTrust(() => void refresh()),
 		vscode.workspace.onDidChangeWorkspaceFolders(() => void refresh()),
 		vscode.workspace.onDidOpenTextDocument((document) => current.documentOpened(document)),
+		vscode.workspace.onDidCloseTextDocument((document) => current.documentClosed(document)),
+		// One formatter for every `.meeko`: each client would register its own for documents of another.
+		vscode.languages.registerDocumentFormattingEditProvider({ language: 'meeko' }, { provideDocumentFormattingEdits: (document, options, token) => current.formattingEdits(document, options, token) }),
 		vscode.workspace.onDidChangeConfiguration((event) => {
 			if (event.affectsConfiguration('meeko.languageServer')) void refresh()
 		}),

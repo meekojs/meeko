@@ -1,7 +1,7 @@
-import type { ErrorHandler, InitializeParams, LanguageClientOptions, Middleware, ServerOptions } from 'vscode-languageclient/node'
+import type { DocumentFormattingParams, DynamicFeature, ErrorHandler, InitializeParams, LanguageClientOptions, Middleware, ServerOptions, StaticFeature } from 'vscode-languageclient/node'
 
 import * as vscode from 'vscode'
-import { CloseAction, ErrorAction, LanguageClient, State, Trace, TransportKind } from 'vscode-languageclient/node'
+import { CloseAction, DocumentFormattingRequest, ErrorAction, LanguageClient, State, Trace, TransportKind } from 'vscode-languageclient/node'
 
 import type { ClassProviderInfo } from './class-providers'
 import type { PlannedClient } from './folder-plan'
@@ -9,10 +9,23 @@ import type { ResolvedLanguageServer } from './server-resolution'
 import type { ServerState } from './status'
 
 import { classProvidersMethod, classSettingsForServer, legacyTailwindExtension, requestClassProviders } from './class-providers'
-import { LooseDiagnostics, routeDiagnostics } from './diagnostic-owner'
+import { withDeadline } from './deadline'
+import { DiagnosticOwners } from './diagnostic-owners'
 import { freeSlot, globalKey, planClients, reconcileClients } from './folder-plan'
 import { t } from './l10n'
 import { resolveLanguageServer } from './server-resolution'
+
+/**
+ * Longest wait for a server to answer `initialize`. A server that hangs counts as one that failed
+ * to start; without a limit its folder would stay as `starting` forever.
+ */
+const startTimeout = 30_000
+
+/**
+ * Wait before the global client stops once its last document closes: closing a tab and opening
+ * another loose file right after keeps the same server.
+ */
+const idleGlobalDelay = 2_000
 
 /** A client that exists for a folder; `failed` ones stay so a refresh does not retry them. */
 interface ClientEntry {
@@ -25,10 +38,14 @@ interface ClientEntry {
 	resolution: ResolvedLanguageServer
 	state: ServerState['state']
 	error: string | undefined
-	client: LanguageClient | undefined
+	client: MeekoLanguageClient | undefined
+	/** Documents the client attends, before the middleware drops those of another client. */
+	selector: vscode.DocumentSelector
 	/** The first start finished: from then on a closed connection restarts the server. */
 	started: boolean
 	stopping: boolean
+	/** Settles when the first start ends, its fallback to the bundled server included. */
+	ready: Promise<void>
 	disposables: vscode.Disposable[]
 }
 
@@ -112,8 +129,31 @@ function ownedDocuments(owns: (uri: vscode.Uri) => boolean): Middleware {
 	return middleware as Middleware
 }
 
+/**
+ * A client whose document formatter is the single one of {@link LanguageServers.formattingEdits}.
+ * VS Code runs one formatter per document and does not try the next one when it answers nothing,
+ * and the selector of a client also matches documents of another: those of a folder nested in its
+ * own or, for the global client, every file.
+ */
+class MeekoLanguageClient extends LanguageClient {
+	override registerFeature(feature: StaticFeature | DynamicFeature<unknown>): void {
+		// The capability is still announced; only the provider of the static capability is left out.
+		if ('registrationType' in feature && feature.registrationType.method === DocumentFormattingRequest.method) feature.initialize = () => undefined
+		super.registerFeature(feature)
+	}
+
+	/**
+	 * Ends a start that did not finish. `stop()` rejects before the client runs, so only the death
+	 * of the process ends the wait for `initialize`.
+	 */
+	abortStart(): void {
+		// The library keeps the process private and has no other way to end a start.
+		;(this as unknown as { _serverProcess?: { kill(): boolean } })._serverProcess?.kill()
+	}
+}
+
 /** Client of the documents outside the workspace folders: its server gets no folder of the workspace. */
-class DetachedLanguageClient extends LanguageClient {
+class DetachedLanguageClient extends MeekoLanguageClient {
 	protected override fillInitializeParams(params: InitializeParams): void {
 		super.fillInitializeParams(params)
 		params.rootPath = null
@@ -156,6 +196,11 @@ function initializationOptions(target: ClientTarget): Record<string, unknown> {
 	}
 }
 
+/** A server that is not there to ask: it never started, or it stopped and was not restarted. */
+function down(entry: ClientEntry): boolean {
+	return entry.state === 'failed' || entry.state === 'stopped'
+}
+
 function ownerOf(uri: vscode.Uri): string {
 	return vscode.workspace.getWorkspaceFolder(uri)?.uri.toString() ?? globalKey
 }
@@ -181,9 +226,9 @@ function openComponents(key: string): string[] {
  */
 export class LanguageServers {
 	private readonly entries = new Map<string, ClientEntry>()
-	/** Archivos sin carpeta cuyos diagnósticos publicó un servidor de carpeta antes de que existiera el global. */
-	private readonly looseDiagnostics = new LooseDiagnostics()
+	private readonly diagnosticOwners = new DiagnosticOwners()
 	private pending: Promise<void> = Promise.resolve()
+	private idleGlobal: ReturnType<typeof setTimeout> | undefined
 	private disposed = false
 
 	constructor(
@@ -199,19 +244,47 @@ export class LanguageServers {
 		const keys = [...(vscode.workspace.workspaceFolders ?? []).map((folder) => folder.uri.toString()), globalKey]
 		for (const key of keys) {
 			const entry = this.entries.get(key)
-			if (entry && entry.state !== 'failed') return entry.resolution
+			if (entry && !down(entry)) return entry.resolution
 		}
 		return undefined
 	}
 
 	clientFor(uri: vscode.Uri): LanguageClient | undefined {
 		const entry = this.entries.get(ownerOf(uri))
-		return entry?.state === 'failed' ? undefined : entry?.client
+		return entry && !down(entry) ? entry.client : undefined
 	}
 
 	resolutionFor(uri: vscode.Uri): ResolvedLanguageServer | undefined {
 		const entry = this.entries.get(ownerOf(uri))
-		return entry?.state === 'failed' ? undefined : entry?.resolution
+		return entry && !down(entry) ? entry.resolution : undefined
+	}
+
+	/**
+	 * Formats a document with the server of its client. It is the only formatter of the extension:
+	 * the clients register none, see {@link MeekoLanguageClient}.
+	 */
+	async formattingEdits(document: vscode.TextDocument, options: vscode.FormattingOptions, token: vscode.CancellationToken): Promise<vscode.TextEdit[] | undefined> {
+		const entry = this.entries.get(ownerOf(document.uri))
+		const client = entry && !down(entry) ? entry.client : undefined
+		// A document the client never opened in its server, or a server without formatting.
+		if (!entry || !client?.initializeResult?.capabilities.documentFormattingProvider || !vscode.languages.match(entry.selector, document)) return undefined
+		const files = vscode.workspace.getConfiguration('files', document)
+		const fileOptions = Object.fromEntries(
+			['trimTrailingWhitespace', 'trimFinalNewlines', 'insertFinalNewline'].flatMap((name) => {
+				const value = files.get<boolean>(name)
+				return value === undefined ? [] : [[name, value]]
+			}),
+		) as Record<string, boolean>
+		const params: DocumentFormattingParams = {
+			textDocument: client.code2ProtocolConverter.asTextDocumentIdentifier(document),
+			options: client.code2ProtocolConverter.asFormattingOptions(options, fileOptions),
+		}
+		try {
+			const edits = await client.sendRequest(DocumentFormattingRequest.type, params, token)
+			return token.isCancellationRequested ? undefined : await client.protocol2CodeConverter.asTextEdits(edits, token)
+		} catch (error) {
+			return client.handleFailedRequest(DocumentFormattingRequest.type, token, error, undefined)
+		}
 	}
 
 	/** State of the server that attends a document, also when it failed to start. */
@@ -222,23 +295,44 @@ export class LanguageServers {
 
 	/** The global client starts with the first `.meeko` opened outside the workspace folders. */
 	documentOpened(document: vscode.TextDocument): void {
-		if (this.disposed || this.entries.has(globalKey) || !looseComponent(document)) return
-		void this.refresh()
+		// Also with a global client: the refresh that stops it may be queued, and it runs first.
+		if (this.disposed || !looseComponent(document)) return
+		void this.refresh().catch(() => undefined)
+	}
+
+	/**
+	 * The global client stops once no `.meeko` outside the workspace folders stays open. The refresh
+	 * reads the open documents when its turn comes, so one reopened meanwhile keeps the client.
+	 */
+	documentClosed(document: vscode.TextDocument): void {
+		if (this.disposed || !this.entries.has(globalKey) || !looseComponent(document)) return
+		clearTimeout(this.idleGlobal)
+		this.idleGlobal = setTimeout(() => {
+			this.idleGlobal = undefined
+			void this.refresh().catch(() => undefined)
+		}, idleGlobalDelay)
 	}
 
 	/**
 	 * Serializes the changes caused by trust, configuration and workspace folders. Only the clients
 	 * whose folder, server or options changed restart; `force` restarts all of them. A server that
 	 * fails to start does not reject: it stays as `failed` for {@link stateFor}.
+	 *
+	 * The queue only holds the stops and the creation of the clients: the returned promise also
+	 * waits for the servers to start, but the next refresh does not, and it stops a start that hangs.
 	 */
 	refresh(force = false): Promise<void> {
 		if (this.disposed) return this.pending
-		this.pending = this.pending
-			.catch((error: unknown) => {
+		const reconciled = this.pending.then(() => this.reconcile(force))
+		this.pending = reconciled.then(
+			() => undefined,
+			(error: unknown) => {
 				this.output.error(`No se pudo iniciar el servidor de Meeko: ${String(error)}`)
-			})
-			.then(() => this.reconcile(force))
-		return this.pending
+			},
+		)
+		return reconciled.then(async (starting) => {
+			await Promise.all(starting)
+		})
 	}
 
 	private targets(): ClientTarget[] {
@@ -262,26 +356,27 @@ export class LanguageServers {
 		})
 	}
 
-	private async reconcile(force: boolean): Promise<void> {
-		if (this.disposed) return
+	/** Stops and creates the clients that changed; returns the starts under way, which never reject. */
+	private async reconcile(force: boolean): Promise<Promise<void>[]> {
+		if (this.disposed) return []
 		const targets = this.targets()
 		const wanted = new Map(targets.map((target) => [target.plan.key, target.signature]))
 		const running = new Map([...this.entries].map(([key, entry]) => [key, entry.signature]))
 		const changes = reconcileClients(running, wanted, force)
-		if (!changes.stop.length && !changes.start.length) return
+		if (!changes.stop.length && !changes.start.length) return []
+		let starting: Promise<void>[] = []
 		try {
 			await Promise.all(changes.stop.map((key) => this.stop(key)))
-			if (this.disposed) return
-			// Independent: the failure of a folder does not stop the others.
-			const starting = targets.filter((target) => changes.start.includes(target.plan.key)).map((target) => this.start(target))
-			if (starting.length) this.changed(false)
-			await Promise.all(starting)
+			// Independent: neither the failure nor the wait of a folder holds the others.
+			if (!this.disposed) starting = targets.filter((target) => changes.start.includes(target.plan.key)).map((target) => this.start(target))
 		} finally {
-			this.changed(true)
+			this.changed(starting.length === 0)
 		}
+		return starting
 	}
 
-	private async start(target: ClientTarget): Promise<void> {
+	/** Creates the entry of a client and starts it; the promise settles with its first start. */
+	private start(target: ClientTarget): Promise<void> {
 		const entry: ClientEntry = {
 			key: target.plan.key,
 			name: target.name,
@@ -291,21 +386,43 @@ export class LanguageServers {
 			state: 'starting',
 			error: undefined,
 			client: undefined,
+			selector: [],
 			started: false,
 			stopping: false,
+			ready: Promise.resolve(),
 			disposables: [],
 		}
 		this.entries.set(entry.key, entry)
-		if (entry.key === globalKey) this.dropLooseDiagnostics()
+		entry.ready = this.bringUp(entry, target).then(
+			() => this.settled(entry),
+			(error: unknown) => {
+				this.output.error(`No se pudo iniciar el servidor de Meeko [${entry.name}]: ${describe(error)}`)
+				if (!entry.stopping) entry.state = 'failed'
+				this.settled(entry)
+			},
+		)
+		return entry.ready
+	}
+
+	/** The start of a client ended, well or not: the editors of its documents can ask it now. */
+	private settled(entry: ClientEntry): void {
+		if (!entry.stopping && !this.disposed) this.changed(true)
+	}
+
+	/** Starts the server of an entry, and the bundled one when that of the workspace does not start. */
+	private async bringUp(entry: ClientEntry, target: ClientTarget): Promise<void> {
 		let failure: string
 		try {
 			await this.launch(entry, target)
 			return
 		} catch (error) {
+			// `stop` ended the start and releases the client.
+			if (entry.stopping) return
 			failure = describe(error)
 			this.output.error(`No se pudo iniciar el servidor de Meeko [${entry.name}] (${entry.resolution.source} ${entry.resolution.module}): ${failure}`)
 			await this.release(entry)
 		}
+		if (entry.stopping) return
 		if (entry.resolution.source === 'workspace' && !this.disposed) {
 			const workspacePackage = entry.resolution.version ? `@meekojs/meeko ${entry.resolution.version}` : '@meekojs/meeko'
 			entry.resolution = { module: this.context.asAbsolutePath('dist/server.js'), source: 'bundled', reason: t('the workspace server of {0} failed to start: {1}', workspacePackage, failure) }
@@ -315,28 +432,16 @@ export class LanguageServers {
 				this.notify('warning', t('The language server of {0} in "{1}" failed to start; Meeko is using the one bundled with the extension.', workspacePackage, entry.name))
 				return
 			} catch (error) {
+				if (entry.stopping) return
 				failure = describe(error)
 				this.output.error(`Tampoco arrancó el servidor incluido de Meeko [${entry.name}]: ${failure}`)
 				await this.release(entry)
 			}
+			if (entry.stopping) return
 		}
 		entry.state = 'failed'
 		entry.error = failure
 		this.notify('error', t('The Meeko language server failed to start in "{0}": {1}', entry.name, failure))
-	}
-
-	/** Whether the global client exists and has not failed, so it attends the files outside the folders. */
-	private globalActive(): boolean {
-		const global = this.entries.get(globalKey)
-		return global !== undefined && global.state !== 'failed'
-	}
-
-	/** The global client takes over the loose files: the folder clients stop showing theirs. */
-	private dropLooseDiagnostics(): void {
-		for (const [key, uris] of this.looseDiagnostics.takeAll()) {
-			const diagnostics = this.entries.get(key)?.client?.diagnostics
-			for (const uri of uris) diagnostics?.delete(vscode.Uri.parse(uri))
-		}
 	}
 
 	private notify(kind: 'warning' | 'error', message: string): void {
@@ -354,6 +459,7 @@ export class LanguageServers {
 			debug: { module: resolution.module, transport: TransportKind.ipc, options: { execArgv: ['--nolazy', `--inspect=${6009 + entry.slot}`] } },
 		}
 		let fallback: ErrorHandler | undefined
+		entry.selector = target.schemes.map((scheme) => ({ language: 'meeko', scheme, ...(folder ? { pattern: new vscode.RelativePattern(folder, '**/*.meeko') } : {}) }))
 		const clientOptions: LanguageClientOptions = {
 			documentSelector: target.schemes.map((scheme) => ({ language: 'meeko', scheme, ...(folder ? { pattern: { baseUri: folder.uri.toString(), pattern: '**/*.meeko' } } : {}) })),
 			...(folder ? { workspaceFolder: folder } : {}),
@@ -368,11 +474,19 @@ export class LanguageServers {
 			},
 			middleware: this.middleware(entry, folder === undefined),
 		}
-		const client = new (folder ? LanguageClient : DetachedLanguageClient)('meeko', `Meeko (${entry.name})`, serverOptions, clientOptions)
+		const client = new (folder ? MeekoLanguageClient : DetachedLanguageClient)('meeko', `Meeko (${entry.name})`, serverOptions, clientOptions)
 		fallback = client.createDefaultErrorHandler()
 		entry.client = client
 		this.output.info(`Servidor de Meeko [${entry.name}]: ${resolution.source} ${resolution.module}${resolution.version ? ` (${resolution.version})` : ''}${resolution.reason ? `; ${resolution.reason}` : ''}`)
-		await client.start()
+		const starting = client.start()
+		try {
+			await withDeadline(starting, startTimeout, () => new Error(t('it did not answer within {0} seconds', startTimeout / 1000)))
+		} catch (error) {
+			client.abortStart()
+			// Without a process to end, a start that still finishes must not leave its server running.
+			void starting.then(() => client.stop()).catch(() => undefined)
+			throw error
+		}
 		const configuredTrace = (): Trace => Trace.fromString(vscode.workspace.getConfiguration('meeko').get<string>('trace.server', 'off'))
 		await client.setTrace(configuredTrace())
 		entry.disposables.push(
@@ -383,8 +497,9 @@ export class LanguageServers {
 			// The server restarts itself after a crash, and gives up after several in a row.
 			client.onDidChangeState(({ newState }) => {
 				if (entry.stopping || entry.client !== client) return
-				entry.state = newState === State.Running ? 'running' : newState === State.Starting ? 'starting' : 'failed'
-				entry.error = entry.state === 'failed' ? 'el servidor se detuvo de forma inesperada' : undefined
+				// It did start, so this is not `failed`: the status tells a server that stopped from one that never ran.
+				entry.state = newState === State.Running ? 'running' : newState === State.Starting ? 'starting' : 'stopped'
+				entry.error = undefined
 				this.changed(newState === State.Running)
 			}),
 		)
@@ -396,13 +511,12 @@ export class LanguageServers {
 		const owns = (uri: vscode.Uri): boolean => ownerOf(uri) === entry.key
 		return {
 			...ownedDocuments(owns),
-			// A server also reports files it did not open; those of another folder have their own server.
-			// A file outside every folder is attended only by the global client once it exists.
+			// A server also reports files it did not open; those of another folder have their own server,
+			// and those outside every folder are shown by one client at a time.
 			handleDiagnostics: (uri, diagnostics, next) => {
-				const route = routeDiagnostics({ client: entry.key, owner: ownerOf(uri), globalActive: this.globalActive() })
-				if (route === 'drop') return
-				if (route === 'publish-loose') this.looseDiagnostics.record(entry.key, uri.toString())
-				next(uri, diagnostics)
+				const route = this.diagnosticOwners.route(entry.key, ownerOf(uri), uri.toString(), diagnostics.length)
+				if (route.evict !== undefined) this.entries.get(route.evict)?.client?.diagnostics?.delete(uri)
+				if (route.accept) next(uri, diagnostics)
 			},
 			// `workspace/didChangeWatchedFiles` is not filtered by owner: the client sends every event of
 			// its watchers to its server and the middleware cannot intercept them. Each server keeps only
@@ -446,6 +560,7 @@ export class LanguageServers {
 		const client = entry.client
 		entry.client = undefined
 		entry.started = false
+		this.diagnosticOwners.forget(entry.key)
 		for (const disposable of entry.disposables.splice(0)) disposable.dispose()
 		if (!client) return
 		// A client that restarts after a crash cannot stop until it is running again.
@@ -473,12 +588,15 @@ export class LanguageServers {
 		if (!entry) return
 		entry.stopping = true
 		this.entries.delete(key)
-		this.looseDiagnostics.forget(key)
+		// A first start under way ends here instead of holding the stop until its deadline.
+		if (!entry.started) entry.client?.abortStart()
+		await entry.ready
 		await this.release(entry)
 	}
 
 	async dispose(): Promise<void> {
 		this.disposed = true
+		clearTimeout(this.idleGlobal)
 		await this.pending.catch(() => undefined)
 		await Promise.all([...this.entries.keys()].map((key) => this.stop(key)))
 	}

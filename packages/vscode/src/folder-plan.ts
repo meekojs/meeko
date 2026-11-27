@@ -20,6 +20,8 @@ export interface ClientPlanInput {
 	readonly folders: readonly string[]
 	/** Hay algún documento abierto que no pertenece a ninguna carpeta. */
 	readonly looseDocuments: boolean
+	/** Compara las rutas `file:` sin distinguir mayúsculas; por defecto, sólo en Windows. */
+	readonly ignoreCase?: boolean
 }
 
 /** Clientes por arrancar, detener y conservar al reconciliar. */
@@ -33,26 +35,41 @@ function withSlash(uri: string): string {
 	return uri.endsWith('/') ? uri : `${uri}/`
 }
 
-/** `true` si `uri` es la carpeta o está dentro de ella. */
-export function insideFolder(folder: string, uri: string): boolean {
-	return withSlash(uri).startsWith(withSlash(folder))
+/** Windows compares the paths of `file:` URIs without case, as `workspace.getWorkspaceFolder` does. */
+const windows = process.platform === 'win32'
+
+/** Form of a folder URI to compare with: with a final slash, and lowercase where the case does not count. */
+function comparable(uri: string, ignoreCase: boolean): string {
+	const folder = withSlash(uri)
+	return ignoreCase && /^file:/i.test(folder) ? folder.toLowerCase() : folder
+}
+
+/**
+ * `true` si `uri` es la carpeta o está dentro de ella.
+ *
+ * @param folder URI de la carpeta.
+ * @param uri URI de un documento o de otra carpeta.
+ * @param ignoreCase Compara las rutas `file:` sin distinguir mayúsculas; por defecto, sólo en Windows.
+ */
+export function insideFolder(folder: string, uri: string, ignoreCase = windows): boolean {
+	return comparable(uri, ignoreCase).startsWith(comparable(folder, ignoreCase))
 }
 
 /**
  * Carpeta más interna que contiene `uri`, la misma que devuelve `workspace.getWorkspaceFolder`
  * de VS Code con carpetas anidadas.
  */
-export function innermostFolder(folders: readonly string[], uri: string): string | undefined {
+export function innermostFolder(folders: readonly string[], uri: string, ignoreCase = windows): string | undefined {
 	let found: string | undefined
 	for (const folder of folders) {
-		if (insideFolder(folder, uri) && (found === undefined || withSlash(folder).length > withSlash(found).length)) found = folder
+		if (insideFolder(folder, uri, ignoreCase) && (found === undefined || withSlash(folder).length > withSlash(found).length)) found = folder
 	}
 	return found
 }
 
 /** Clave del cliente al que pertenece un documento: su carpeta más interna o el global. */
-export function ownerKey(folders: readonly string[], uri: string): string {
-	return innermostFolder(folders, uri) ?? globalKey
+export function ownerKey(folders: readonly string[], uri: string, ignoreCase = windows): string {
+	return innermostFolder(folders, uri, ignoreCase) ?? globalKey
 }
 
 /**
@@ -60,10 +77,11 @@ export function ownerKey(folders: readonly string[], uri: string): string {
  * abiertos fuera de ellas.
  */
 export function planClients(input: ClientPlanInput): PlannedClient[] {
+	const ignoreCase = input.ignoreCase ?? windows
 	const planned: PlannedClient[] = input.folders.map((folder) => ({
 		key: folder,
 		folder,
-		excluded: input.folders.filter((other) => withSlash(other) !== withSlash(folder) && insideFolder(folder, other)),
+		excluded: input.folders.filter((other) => comparable(other, ignoreCase) !== comparable(folder, ignoreCase) && insideFolder(folder, other, ignoreCase)),
 	}))
 	if (!input.folders.length || input.looseDocuments) planned.push({ key: globalKey, excluded: [...input.folders] })
 	return planned
