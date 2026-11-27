@@ -14,10 +14,10 @@ related:
   - "@meekojs/meeko/framework#mountClientApp"
   - docs/framework.md#estado-de-navegación
   - docs/framework.md#navegación-y-render-client
-source-hash: 6714267db56b479ba1f3dbe848c5eb0ad5939e63818869e435cc0dc24d149997
+source-hash: 1d9924053bf47ac3434a2efd5f9011747f6b0f4770453092b73b17b13648148c
 ---
 
-`useNavigation()` tells you whether the application is changing pages. Its `pending` is `true` from the start of a client navigation (a link click, `app.navigate()`, the back button) until the new page is committed, fails or is canceled, including loading its `await useApi`/`await useRpcQuery` calls and the first load of a `render: "client"` page. Use it for a global progress bar, a wait cursor or dimming content while the next page arrives.
+`useNavigation()` tells you whether the application is changing pages. Its `pending` is `true` from the start of a client navigation (a link click, [`navigate()`](/docs/reference/navigate), `app.navigate()`, the back button) until the new page is committed, fails or is canceled, including loading its `await useApi`/`await useRpcQuery` calls and the first load of a `render: "client"` page. Use it for a global progress bar, a wait cursor or dimming content while the next page arrives.
 
 It is exported from `@meekojs/meeko/framework` and, since `1.7`, auto-imported like `useRoute` (a project export called `useNavigation` takes precedence); explicit imports still work. You can also call it from code running with the component (a composable, a `computed`, an `effect`), but not from an event handler: there is no active root there, and it returns a fixed state with `pending` set to `false`.
 
@@ -71,6 +71,48 @@ effect(() => {
 
 <template><div class="progress" if:when="visible.value" aria-hidden="true"></div></template>
 ```
+
+### Attributes for CSS
+
+Since `1.10`, while `pending` is `true`, `<html>` carries the `data-navigating` attribute and, if the navigation started with a click on a `<MeekoLink>` or an internal `<a>`, that link carries `data-pending`. Back, forward and `app.navigate()` mark `<html>`, but no link. Both are removed when the navigation is confirmed, fails or is cancelled, and they never appear in the server HTML.
+
+With them, a progress bar needs no component or `effect`. The transition's delay keeps it from flickering on a fast navigation: if it ends within 150 ms, the bar is never seen.
+
+```css
+/* app/styles/main.css */
+html::before {
+	content: "";
+	position: fixed;
+	inset: 0 0 auto;
+	z-index: 1000;
+	height: 3px;
+	background: currentColor;
+	transform: scaleX(0);
+	transform-origin: left;
+	opacity: 0;
+	pointer-events: none;
+}
+
+html[data-navigating]::before {
+	opacity: 1;
+	transform: scaleX(0.8);
+	/* Empieza a los 150 ms y avanza despacio mientras dure la carga. */
+	transition: opacity 0s 150ms, transform 8s 150ms cubic-bezier(0.1, 0.7, 0.2, 1);
+}
+
+a[data-pending] {
+	cursor: progress;
+	opacity: 0.6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	html[data-navigating]::before {
+		transition: opacity 0s 150ms;
+	}
+}
+```
+
+When `data-navigating` is removed, the bar disappears without a transition and starts again from zero on the next navigation.
 
 ### Disabling actions during navigation
 
@@ -155,7 +197,7 @@ Server HTML and a full page load never display this text: `pending` only activat
 
 ## Notes
 
-- **SSR.** Always `false`. Hydration does not change it either.
+- **SSR.** Always `false`. Hydration does not change it either. `data-navigating` and `data-pending` do not appear in the server HTML either.
 - **What counts.** The new page's preliminary render that loads its data `await` calls, the server payload request and loading a `render: "client"` route. Fragment-only navigation (`#seccion`) does not activate it: the browser only scrolls the page.
 - **Cancellation.** If the user starts another navigation meanwhile, the previous one is canceled and `pending` stays `true` until the latest one finishes.
 - **Accessibility.** Mark the changing area with `aria-busy` while loading instead of announcing every navigation.

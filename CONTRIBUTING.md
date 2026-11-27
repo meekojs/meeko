@@ -22,6 +22,8 @@ pnpm run example:bundle
 
 `pnpm lint` ejecuta ESLint sobre todo el workspace con la configuración de `eslint.config.ts` (las reglas recomendadas de ESLint y typescript-eslint, sin información de tipos) y debe terminar sin errores; los avisos señalan deuda conocida. `pnpm lint:fix` aplica las correcciones automáticas. Los componentes `.meeko` no pasan por ESLint: los validan el compilador y `meeko check`.
 
+Mientras desarrollas, `pnpm test:changed` ejecuta sólo las pruebas asociadas a los archivos que has editado (`--list` muestra el plan, `--base <ref>` compara con una rama); nunca lanza la suite completa ni los E2E. El CI de cada PR ejecuta `ci.yml`, que sólo corre los jobs cuyas rutas cambiaron (todos, en `push` a `main`); `pnpm ci:local` los ejecuta en local. Los humos de paquete (`pnpm package:smoke`, `pnpm package:workspace-smoke`) y el host aislado de VS Code (`pnpm -F meeko-language run test:host:isolated`) son scripts de Node y no necesitan PowerShell. Véase [Contribuir a Meeko](docs/contributing.md) y [Tiempos de CI y publicación](docs/ci-performance.md).
+
 Las órdenes de la raíz reenvían al paquete (`pnpm -F @meekojs/meeko run <orden>`); para otra pieza usa su filtro, por ejemplo `pnpm -F meeko-language run test`. `verify` comprueba el código fuente y el ejemplo con TypeScript 7, ejecuta las pruebas y genera el componente de ejemplo. Una prueba de compilador debe demostrar también la salida SSR, la hidratación y un diagnóstico relevante cuando corresponda.
 
 ## Cambios al formato `.meeko`

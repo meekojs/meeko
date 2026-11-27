@@ -1,5 +1,5 @@
 ---
-source-hash: 33f341a69138aca2ec81af248315ddd7346018c667dfbfb441549184fa5a636b
+source-hash: 5ef2a3236898d2341a3e43355c979b05a39af4146ce37a7d4cf7ce8bc9168137
 ---
 
 # Build APIs and RPC
@@ -124,6 +124,8 @@ const user = await api
 - A catch-all `[...path]` receives, as in `params`, a string with segments joined by `/`: `api.files({ path: "docs/a b.txt" }).get()` requests `/api/files/docs/a%20b.txt`, with each segment encoded separately.
 - `useApi` is unchanged: it still receives the bracketed path and `params`, such as `useApi("/api/menu/categories/[id]", { params: { id } })`.
 - The editor completes the call, its parameters and the segment's methods, and hover and “go to definition” on `api.menu.categories({ id }).archive.post` lead to the handler.
+
+A static URL segment may contain hyphens or start with a number; on the client it is named as an identifier: `server/api/cron/compras-meta.get.ts` is `api.cron.comprasMeta.get()` and `server/api/auth/2fa.post.ts`, `api.auth._2fa.post()`. Two segments that give the same name at the same level (`compras-meta` and `comprasMeta`) are an API client collision.
 
 In `clientKey`, the dynamic segment for `[id]` or `[...id]` is named `byId`: `by` followed by the parameter name with its first letter capitalized. This lets the client recognize which segment each parameter belongs to, including in an explicit `createApiClient` client. That is why the manifest rejects, with the conflicting paths, a static segment named the same as the dynamic segment at its level (`users/byId/` alongside `users/[id]`) or in its own route (`[id]/byId.get.ts`), and two parameters whose names differ only in the initial letter's case (`[id]` and `[Id]`) at the same level or in the same route.
 
@@ -757,7 +759,7 @@ A card whose data arrives after the first render is empty in the HTML and grows 
 
 #### Mutations
 
-`useRpcMutation(procedimiento)` makes no request until `mutate(input)` is called, never in SSR. `mutate` sends the CSRF token like `rpc.*`, updates `pending`, `data` and `error` and returns the procedure's output, or rejects with its error. You cannot use `await` on it at the top level (`MEEK055`): await `mutate` inside a handler.
+`useRpcMutation(procedimiento)` makes no request until `mutate(input)` is called, never in SSR. Since `1.10`, a write that declares `invalidates` reloads by itself the mounted data that depends on it before `mutate` resolves (see [Data keys and invalidation](#data-keys-and-invalidation)); the manual `refresh()` in the examples still works. `mutate` sends the CSRF token like `rpc.*`, updates `pending`, `data` and `error` and returns the procedure's output, or rejects with its error. You cannot use `await` on it at the top level (`MEEK055`): await `mutate` inside a handler.
 
 Since `1.2`, each submission starts with `pending` set to `true` and `error` to `null` in a single update, and ends by writing `data` or `error` and `pending` set to `false` together: an `effect` reading several of these signals never sees a mixture of the previous attempt and the new one. The options `onSuccess(output, intento)` and `onError(error, intento)` are called afterward, with state already updated, once per attempt (see [Per-attempt notifications](#per-attempt-notifications-onsuccess-and-onerror)).
 
@@ -911,6 +913,101 @@ A non-UUID value rejects with `TypeError` without sending the request. The key i
 | Non-component code (a script, your own queue, a service worker) or a key that already exists outside Meeko, such as an offline order ID | `api.*` / `rpc.*` with `idempotencyKey`: you store the key and repeat the call with it                        |
 | Testing server deduplication                                                                                                            | `api.*` / `rpc.*` with `idempotencyKey`, without writing the header manually                                  |
 
+#### Data keys and invalidation
+
+Since `1.10`, data has identity. Each read depends on **data keys** and each write declares the ones it changes. After a successful write, Meeko requests again only the mounted data that depends on those keys: there is no need to call `refresh()` on each resource after `mutate`, or to reload the whole page.
+
+```ts
+// server/rpc/orders/add.ts
+export default defineRpc({
+	input: newOrder,
+	output: orderSchema,
+	// Cambia los pedidos; la respuesta lo dice al navegador.
+	invalidates: ['orders'],
+	handler: async ({ input, context }) => {
+		const order = await db.orders.insert(input)
+		// Una clave que depende de la entrada.
+		context.invalidate(`customers.${order.customerId}`)
+		return order
+	},
+})
+```
+
+```html
+<!-- app/pages/orders.meeko -->
+<script lang="ts">
+	const orders = await useApi('/api/orders') // clave "orders"
+	const count = await useRpcQuery('orders.count') // clave "orders.count"
+	const stats = useRpcQuery('stats.summary') // clave "stats.summary": no cambia
+	const add = useRpcMutation('orders.add')
+</script>
+<template>
+	<button
+		bind:disabled="add.pending.value"
+		on:click="() => add.mutate({ item: 'café' })"
+	>
+		Añadir
+	</button>
+	<p>{count.data.value} pedidos</p>
+</template>
+```
+
+`add.mutate()` resolves when `orders` and `count` already have their new data; `stats` is not requested again. Meanwhile, the list stays on screen with `refreshing` set to `true` and the button stays disabled, because the mutation's `pending` also waits for the reloads.
+
+##### The key of each read
+
+| Read                         | Key by convention                                                                                                                                                                                                            |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `useRpcQuery("orders.list")` | The procedure ID: `"orders.list"`.                                                                                                                                                                                           |
+| `useApi("/api/orders")`      | The static segments after `/api`, joined by dots and without the dynamic ones: `/api/orders` and `/api/orders/[id]` give `"orders"`, `/api/orders/[id]/items` gives `"orders.items"`, `/api/admin/orders`, `"admin.orders"`. |
+| The page's loader            | None: it declares its own with `depends` (see [Reloading page data](routing-data-reference.md#reloading-page-data-depends)).                                                                                                 |
+
+A dot inside a route segment becomes `-` and a route without static segments has the key `"api"`. The `keys` option in the last argument of `useApi` and `useRpcQuery` **adds** keys to the one from the convention. It is a list, a signal or a function that reads signals, and it is read when an invalidation arrives, so it can depend on props:
+
+```ts
+const order = useApi('/api/orders/[id]', () => ({ params: { id: props.id } }), { keys: () => [`orders.${props.id}`] })
+const kpis = useRpcQuery('reports.kpis', {}, { keys: ['orders', 'stats'] })
+```
+
+Keys are hierarchical by dots: invalidating `"orders"` refreshes what depends on `"orders"`, `"orders.count"` or `"orders.42"`, never `"ordersArchive"`. A more specific key does not go up: invalidating `"orders.42"` refreshes the detail that declared `"orders.42"`, not the `"orders"` list. A key is a string of up to 200 characters with no control characters or empty segments (`"orders..x"` or `".orders"` throw `TypeError`).
+
+##### What happens after a write
+
+- **On the server.** `invalidates` in `defineRpc` and in a `POST`, `PUT`, `PATCH` or `DELETE` `defineApiRoute` declares the fixed keys; `context.invalidate(...keys)` in the handler adds the ones that depend on the input. Only a successful (`2xx`) response sends them. An error (an `ApiError`, an exception, an output that does not meet its schema) invalidates nothing, even if the handler called `invalidate` before failing. A `GET` never invalidates.
+- **In the browser.** `api.*`, `rpc.*`, `useRpcMutation`, `useApiMutation` and, through them, the `submit` of [`useForm`](#forms-useform) apply the response's keys before resolving. Each mounted `useApi` and `useRpcQuery` whose key matches reloads as with `refresh()`: it keeps `data`, sets `pending` and `refreshing` to `true` and a failure only updates its `error`. A resource with `enabled` set to `false` requests nothing. The visible page's loader runs again if it declared a matching key.
+- **Without mounting again.** The page and its components stay mounted: `props.data` and the `<script server>` exports change in place and only what reads them updates, with the focus, what is being typed and the components' state intact. The route's `head` updates too.
+- **One reload per task.** Invalidations of the same task, such as two mutations that finish together, are grouped: each piece of data is requested once. A later invalidation restarts the reload in progress, so that the data also reflects the last write.
+- **Only what is mounted.** A resource that is not mounted, such as one on a page already left or in a closed `if:` region, is not requested: it loads its data when it mounts.
+- **SSR.** Nothing changes: the server render registers no resources and a document never carries keys. A call to `api.*` or `rpc.*` on the server ignores the header.
+- **Forms without JavaScript.** A native submission to an endpoint with `form` responds `303` without keys: the page it returns to loads again with its data.
+
+##### Invalidating from the browser: `invalidate`
+
+`invalidate(...keys)`, from `@meekojs/meeko/framework` and auto-imported in `app/`, invalidates keys without a mutation, for example when a socket reports a change made by someone else. It returns a promise that is fulfilled when the reloads finish and never rejects; on the server it does nothing. Without keys it throws `TypeError`.
+
+```html
+<script lang="ts">
+	const orders = await useApi('/api/orders')
+	const feed = useSocket('orders')
+	// Otra persona cambió un pedido: se recargan la lista y su ficha, si están montadas.
+	feed.on('changed', ({ id }) => invalidate('orders', `orders.${id}`))
+</script>
+```
+
+##### Reload the whole route: `useRoute().refresh()`
+
+`useRoute().refresh()` is the explicit alternative when there is no key: it runs the page's loader again and reloads each mounted `useApi` and `useRpcQuery`, also those of the layouts, without mounting anything again. Use it for an "Update" button or after a change the server does not know about; for a mutation, prefer `invalidates`, which requests only what changed.
+
+##### Check: `MEEK141` and completion
+
+`meeko check` warns with `MEEK141` about an `invalidates` or `invalidate()` key in `server/api` or `server/rpc` that no read can use: neither the conventional key of a `GET` endpoint or a procedure, nor a `keys` or `depends` one written in `app/`. It is usually a typo (`"ordres"`) or a key that is too specific (`"orders.42"` when the list depends on `"orders"`). It is a warning: a key the read builds with a variable cannot be seen from there.
+
+The `DataKey` type accepts any string; the application's conventional keys, with their prefixes, reach the completion of `invalidates`, `invalidate()`, `keys` and `depends()` through `GeneratedDataKeys`, which `meeko check` and `meeko dev` generate in `.meeko/types/server-contracts.d.ts`.
+
+##### The protocol
+
+A successful response carries the `x-meeko-invalidate` header with the keys separated by commas, each encoded as a URL component (`orders, customers.7`); at most 64 keys. It travels in a header, not in the body, so the procedure's output, the contract and the OpenAPI do not change and it works the same with `204` and with `contentType: "response"`. A custom client can read it; if it calls from another origin with CORS, add `x-meeko-invalidate` to `Access-Control-Expose-Headers`.
+
 #### `load` or composables
 
 | Need                                                                               | Use                                                                                          |
@@ -921,6 +1018,7 @@ A non-UUID value rejects with `TypeError` without sending the request. The key i
 | Data depending on component signals and reloading when they change                 | `useApi` / `useRpcQuery`, with or without `await`                                            |
 | Data that can arrive after the first render, with a loading indicator              | `useApi` / `useRpcQuery` without `await`, with [`<MeekoAwait>`](#meekoawait) to avoid shifts |
 | Writes                                                                             | `useRpcMutation` / `useApiMutation`, or `api.*`/`rpc.*` in a handler                         |
+| Data that must update after a write                                                | `invalidates` on the write and the read's key (since `1.10`)                                 |
 | Writes that must not apply twice if the response is lost (payments, kitchen steps) | `useRpcMutation` / `useApiMutation` with `retrySafe`                                         |
 | Browser state that must survive a reload (an open ticket, the selected register)   | [`useStorage`](#persistent-state-usestorage)                                                 |
 | Forms submitting data, with validation and per-field errors                        | `useForm` with `api.*`/`rpc.*` in its `submit`                                               |

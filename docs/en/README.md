@@ -1,5 +1,5 @@
 ---
-source-hash: 98db1aafbbf9ee2980133a1abbc6d397762e92d3fa9fa6054539ca2639a02e43
+source-hash: f3717fd43a73ebf3244fbd3b7a4f909a1973ae6b1ac698c8aa50852f8339efc5
 ---
 
 # Documentation map
@@ -29,4 +29,4 @@ After [Quick start](inicio-rapido.md), follow [Your first application](primeros-
 
 ## To look something up
 
-Use the header search to find a symbol or task from any page. The [curated reference](reference/README.md) explains common usage; the [module catalog](/docs/reference/exports) keeps every package export. For compatibility, read [stability](stability.md) and the [changelog](../packages/meeko/CHANGELOG.md).
+Use the header search to find a symbol or task from any page. The [curated reference](reference/README.md) explains common usage; the [module catalog](/docs/reference/exports) keeps every package export. For compatibility, read [stability](stability.md) and the [changelog](../../packages/meeko/CHANGELOG.md).

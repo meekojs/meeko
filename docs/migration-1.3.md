@@ -17,7 +17,7 @@
 
 ### Declaraciones de `@meekojs/meeko/postcss` tipadas con csstype
 
-> **Retirado después:** `@meekojs/meeko/postcss`, `meekoUtilities()` y `@utilities` ya no existen; véase el [CHANGELOG](../packages/meeko/CHANGELOG.md).
+> **Retirado después:** `@meekojs/meeko/postcss`, `meekoUtilities()` y `@utilities` ya no existen; véase [Actualizar de 1.11 a 1.12](migration-1.12.md#retirada-de-meekojsmeekopostcss-y-de-tailwindcss-del-framework) y el [CHANGELOG](../packages/meeko/CHANGELOG.md).
 
 El objeto de declaraciones de `rule()` y `atRule()` (`UtilityDeclarations`) usa los tipos de [csstype](https://github.com/frenic/csstype) en lugar de aceptar cualquier clave con una cadena o un número. El editor autocompleta las propiedades estándar y con prefijo de proveedor, en camelCase y en kebab-case, y las palabras clave de cada valor. El CSS que genera el plugin no cambia: es una corrección sólo de tipos, y casi todo lo que ahora se rechaza ya fallaba en el navegador, que descarta en silencio una propiedad desconocida o un `padding: 4`. `csstype` pasa a ser una dependencia del paquete, sólo de tipos.
 

@@ -234,7 +234,7 @@ El CSS del `<style>` de un componente es ahora el módulo `Componente.meeko?meek
 
 Para generar utilidades con TypeScript, el nuevo `@meekojs/meeko/postcss` ofrece el plugin `meekoUtilities()` y la at-rule `@utilities`, que va antes de `@tailwindcss/postcss`. Es opcional. Véase [Utilidades generadas con TypeScript](framework.md#utilidades-generadas-con-typescript).
 
-> **Retirado después:** `@meekojs/meeko/postcss`, `meekoUtilities()` y `@utilities` ya no existen; véase el [CHANGELOG](../packages/meeko/CHANGELOG.md).
+> **Retirado después:** `@meekojs/meeko/postcss`, `meekoUtilities()` y `@utilities` ya no existen; véase [Actualizar de 1.11 a 1.12](migration-1.12.md#retirada-de-meekojsmeekopostcss-y-de-tailwindcss-del-framework) y el [CHANGELOG](../packages/meeko/CHANGELOG.md).
 
 ### Errores del prerender
 

@@ -1,5 +1,5 @@
 ---
-source-hash: 86c62c160d12173a8a2562a0648c46f9c402faa07d22da53971a3585a1741534
+source-hash: 16cb7358f99475f8bf3ae7df7cfdff8f94e61aaf56742bc03acb9339668f38dd
 ---
 
 # Configure and extend an application
@@ -617,7 +617,7 @@ During SSR and prerendering, Meeko embeds component `<style>` CSS already proces
 - It only replaces the file when its contents change, atomically (writing a temporary file and renaming it), so a reader never sees half a stylesheet. Vite does not watch `.meeko/`: writing it does not reload the page or trigger another regeneration.
 - If the stylesheet does not compile (a PostCSS or plugin error), the file keeps the last good version, the server continues working and the console reports it once: `[meeko] .meeko/styles/main.css conserva la versión anterior: app/styles/main.css no compila (…)`. The next change that fixes it regenerates it.
 - Without `app/styles/main.css`, there is no file; if the stylesheet is deleted while `meeko dev` is running, the file is also deleted.
-- `meeko build` does not write it: build CSS is minified and combines the global stylesheet with component `<style>` blocks. The file remains when you stop `meeko dev`, so running it once is enough; `meeko clean` removes it along with the rest of `.meeko/`. Without a server (in CI, after cloning) `meeko styles` writes it, and so does `meeko check`, with the same contents: see [`meeko check`](reference/commands/meeko-check.md#the-stylesheet-for-the-editor-and-prettier).
+- `meeko build` does not write it: build CSS is minified and combines the global stylesheet with component `<style>` blocks. The file remains when you stop `meeko dev`, so running it once is enough; `meeko clean` removes it along with the rest of `.meeko/`. Without a server (in CI, after cloning) [`meeko styles`](reference/commands/meeko-styles.md) writes it, and so does `meeko check`, with the same contents: see [`meeko check`](reference/commands/meeko-check.md#the-stylesheet-for-the-editor-and-prettier).
 - Nothing loads it at runtime, and you must not edit it manually. `url()` values appear as rewritten by Vite during development.
 
 It serves editor extensions that complete classes from CSS stylesheets on disk. With [HTML CSS Support](https://marketplace.visualstudio.com/items?itemName=ecmel.vscode-html-css) (`ecmel.vscode-html-css`) in VS Code:

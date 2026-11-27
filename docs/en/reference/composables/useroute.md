@@ -14,7 +14,7 @@ related:
   - "@meekojs/meeko/framework#usePage"
   - docs/framework.md#ruta-actual
   - docs/framework.md#enlaces-anclas-y-scroll
-source-hash: c97ac0c1dbde72db275a3a0c04b38beee9a995c43acca35ebdec6e888c55bf04
+source-hash: 5ba7386c3dbc7f9159194717a46448695373b75fb026184584a7095397a60679
 ---
 
 `useRoute()` gives the component the route it is rendering: the request's route in SSR and the last **committed** navigation's route in the browser. Each value is a read-only signal, so a template, `computed` or `effect` reading it updates on navigation, including in a layout retained between pages. `isActive(to, options)` applies the same rule as [`<MeekoLink match>`](/en/docs/reference/meekolink) to custom links and components.
@@ -55,14 +55,15 @@ const route = useRoute();
 
 A `RouteState`, the same object throughout the application tree:
 
-| Property                 | Type                                                | Description                                                                                                                                                                         |
-| ------------------------ | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `url`                    | `ReadonlySignal<string>`                            | Origin-relative URL: `pathname`, `search` and, in the browser, fragment (`/users/42?tab=a#bio`). In SSR it never contains a fragment because the browser does not send it.          |
-| `path`                   | `ReadonlySignal<string>`                            | `pathname`, encoded as in `location.pathname` (`/users/42`).                                                                                                                        |
-| `id`                     | `ReadonlySignal<string \| null>`                    | Route ID in the manifest (`"/users/[id]"`), or `null` in the `app/error.meeko` `404` page for a URL without a route.                                                                |
-| `params`                 | `ReadonlySignal<Readonly<Record<string, unknown>>>` | Route parameters as received by the page (validated by its schema).                                                                                                                 |
-| `search`                 | `ReadonlySignal<Readonly<Record<string, unknown>>>` | Search parameters as received by the page; in the `404`, the query string with repeated keys as arrays.                                                                             |
-| `isActive(to, options?)` | `"page" \| "true" \| false`                         | Since `1.5`. A function, not a signal. `"page"` if the committed route is `to` (with its `params`); with `prefix: true`, `"true"` if below it by whole segments; otherwise `false`. |
+| Property                 | Type                                                | Description                                                                                                                                                                                                                                                          |
+| ------------------------ | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `url`                    | `ReadonlySignal<string>`                            | Origin-relative URL: `pathname`, `search` and, in the browser, fragment (`/users/42?tab=a#bio`). In SSR it never contains a fragment because the browser does not send it.                                                                                           |
+| `path`                   | `ReadonlySignal<string>`                            | `pathname`, encoded as in `location.pathname` (`/users/42`).                                                                                                                                                                                                         |
+| `id`                     | `ReadonlySignal<string \| null>`                    | Route ID in the manifest (`"/users/[id]"`), or `null` in the `app/error.meeko` `404` page for a URL without a route.                                                                                                                                                 |
+| `params`                 | `ReadonlySignal<Readonly<Record<string, unknown>>>` | Route parameters as received by the page (validated by its schema).                                                                                                                                                                                                  |
+| `search`                 | `ReadonlySignal<Readonly<Record<string, unknown>>>` | Search parameters as received by the page; in the `404`, the query string with repeated keys as arrays.                                                                                                                                                              |
+| `isActive(to, options?)` | `"page" \| "true" \| false`                         | Since `1.5`. A function, not a signal. `"page"` if the committed route is `to` (with its `params`); with `prefix: true`, `"true"` if below it by whole segments; otherwise `false`.                                                                                  |
+| `refresh()`              | `Promise<void>`                                     | Since `1.10`. Runs the page's loader again and reloads each mounted `useApi` and `useRpcQuery`, without mounting anything again. It never rejects; in SSR it does nothing. See [Reload the whole route](/docs/framework-api#reload-the-whole-route-userouterefresh). |
 
 `useRoute()` takes no arguments. Outside a Meeko application (a framework render or `mountClientApp`), it throws `Error: useRoute() necesita una aplicación de Meeko en ejecución…`.
 

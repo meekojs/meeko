@@ -1,5 +1,5 @@
 ---
-source-hash: 5bce4fcc10bf82d5fdbd978f71bc9d177ae2aeb71985d70f3cae6246153f0514
+source-hash: a36fbb4a97dee97a95b010eb2fd066df548f8bc2dcc625db967de9b6df7aa66e
 ---
 
 # Upgrade from 1.1 to 1.2
@@ -238,7 +238,7 @@ A component's `<style>` CSS is now the module `Componente.meeko?meeko-style=<has
 
 To generate utilities with TypeScript, the new `@meekojs/meeko/postcss` provides the `meekoUtilities()` plugin and `@utilities` at-rule, which goes before `@tailwindcss/postcss`. It is optional. See [TypeScript-generated utilities](framework.md#generated-utilities-with-typescript).
 
-> **Removed later:** `@meekojs/meeko/postcss`, `meekoUtilities()` and `@utilities` no longer exist; see the [CHANGELOG](../../packages/meeko/CHANGELOG.md).
+> **Removed later:** `@meekojs/meeko/postcss`, `meekoUtilities()` and `@utilities` no longer exist; see [Upgrade from 1.11 to 1.12](migration-1.12.md#removal-of-meekojsmeekopostcss-and-tailwindcss-from-the-framework) and the [CHANGELOG](../../packages/meeko/CHANGELOG.md).
 
 ### Prerendering errors
 

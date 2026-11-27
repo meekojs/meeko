@@ -1,5 +1,5 @@
 ---
-source-hash: cec76c0aa304233c20fcc8094e8a71186597e2a6df214a5d48fbbafdd184b9e7
+source-hash: efea4ba256aa40b85f4bac52eb357cc7c1c73e55570df46d26efa5a826a2ce6a
 ---
 
 # Upgrade from 1.2 to 1.3
@@ -21,7 +21,7 @@ source-hash: cec76c0aa304233c20fcc8094e8a71186597e2a6df214a5d48fbbafdd184b9e7
 
 ### `@meekojs/meeko/postcss` declarations typed with csstype
 
-> **Removed later:** `@meekojs/meeko/postcss`, `meekoUtilities()` and `@utilities` no longer exist; see the [CHANGELOG](../../packages/meeko/CHANGELOG.md).
+> **Removed later:** `@meekojs/meeko/postcss`, `meekoUtilities()` and `@utilities` no longer exist; see [Upgrade from 1.11 to 1.12](migration-1.12.md#removal-of-meekojsmeekopostcss-and-tailwindcss-from-the-framework) and the [CHANGELOG](../../packages/meeko/CHANGELOG.md).
 
 The declarations object of `rule()` and `atRule()` (`UtilityDeclarations`) uses [csstype](https://github.com/frenic/csstype) types instead of accepting any key with a string or number. The editor completes standard and vendor-prefixed properties, in camelCase and kebab-case, and each value's keywords. Plugin-generated CSS is unchanged: this is a type-only fix, and almost everything now rejected already failed in the browser, which silently discards an unknown property or `padding: 4`. `csstype` becomes a type-only package dependency.
 

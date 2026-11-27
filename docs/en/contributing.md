@@ -1,5 +1,5 @@
 ---
-source-hash: 615643ab64da1dead6494e3caaace66319c429af2d1405aea51a34b11d47f2a1
+source-hash: 57bb8a03a45849745106f7e0877b34112a8a1335887de306d7f51d383af1a2bd
 ---
 
 # Contributing to Meeko: tests, tooling and performance
@@ -26,6 +26,7 @@ The build prepares the six public packages, the private documentation base and t
 
 | Category              | Command                                                             | Scope                                                              |
 | --------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Only what you edited  | `pnpm test:changed`                                                 | The tests associated with the files you changed.                   |
 | Core                  | `pnpm test`                                                         | Compiler, SSR, hydration, framework and runtime.                   |
 | Packages              | `pnpm test:packages`                                                | UI, i18n and ESLint/Prettier plugins, using the previous build.    |
 | Extended verification | `pnpm verify`                                                       | Core, examples, test types, Vite and DevTools.                     |
@@ -35,19 +36,21 @@ The build prepares the six public packages, the private documentation base and t
 | Public website        | `pnpm -F meeko-site test`                                           | Site reference and content.                                        |
 | Distribution          | `pnpm package:workspace-smoke`                                      | All packages installed from tarballs.                              |
 
+`pnpm test:changed` is what you want while developing: it picks tests by what the edited files import (directly or transitively), by name or from a manual map, and runs them with a time limit per package. It never launches the full suite or the `*.e2e.*` files. `--list` shows the plan without running it, `--base <ref>` compares with a whole branch instead of `HEAD`, `--no-build` skips the build the tests need, `--timeout <s>` sets the limit per package and `--max-transitive <n>` limits the tests per transitive dependency. It does not follow imports by package name: a change in a package that another one depends on does not launch the dependent's tests.
+
 UI tests use installed Chrome by default. CI uses Playwright's Chromium through `MEEKO_CHROME_PATH`; you can set this variable to choose another compatible executable. UI scenarios run sequentially because some test HMR by modifying and restoring artifacts.
 
 ### Declarations and installed consumer
 
 The UI build generates declarations alongside each `.meeko` file. When moving them from `.meeko/types`, it adjusts their relative imports and adds ESM extensions for NodeNext; component references keep their `.meeko` extension.
 
-Regression tests check all distributed declarations without `skipLibCheck`. The smoke test creates the consumer in the system temporary directory, outside the workspace, to prevent it from resolving undeclared dependencies from the repository's `node_modules`. It checks exports, types, ESLint/Prettier, components and CSS processed by the consumer's PostCSS. It does not publish packages and keeps its temporary folder for diagnostics.
+Regression tests check all distributed declarations without `skipLibCheck`. The smoke test creates the consumer in the system temporary directory, outside the workspace, to prevent it from resolving undeclared dependencies from the repository's `node_modules`. It checks exports, types, ESLint/Prettier, components and CSS processed by the consumer's PostCSS. It does not publish packages and keeps its temporary folder for diagnostics. `pnpm package:smoke` (consumer of the core tarball), `pnpm package:workspace-smoke` (the six packages) and `pnpm -F meeko-language run test:host:isolated` (the VSIX in a real VS Code) are Node scripts and do not need PowerShell; the `.ps1` files with the same names are compatibility wrappers. On Linux, `test:host:isolated` and `test:host:untrusted` need `xvfb-run -a`; with `MEEKO_HOST_VSCODE=<path to code>` they reuse a VS Code that is already downloaded and, if there is none, they download the stable one.
 
 The consumer installation uses `--prefer-offline --ignore-scripts`: it reuses the store and downloads anything missing from the registry, without running third-party installation scripts. An incomplete local cache must not be confused with a dependency available through the workspace.
 
 ### CI
 
-The main verification builds before linting, checks packages and applications, runs ecosystem and core tests and validates installed consumers. The existing Redis, Node/Bun/Deno/workerd and VS Code jobs keep their specific scenarios. Failure logs are kept as artifacts; local tests are not equivalent to a remote Actions run.
+`.github/workflows/ci.yml` is the only verification of each commit of a PR (`publish.yml` runs only with tags and by hand). It builds before linting, checks packages and applications, runs ecosystem and core tests and validates installed consumers; the Redis, Node/Bun/Deno/workerd and VS Code jobs keep their specific scenarios. On a PR, the `changes` job looks at the files of the whole PR and each expensive job runs only if something it tests changed (with prose only in `docs/` or `*.md`, just the documentation tests); on `push` to `main` everything runs. The required checks of `main` are `test` and `redis-integration`, which always run and count a skipped job as success. A change in the publication chain also activates `package-gates`, the publication rehearsal (the six tarballs, `npm publish --dry-run`, the VSIX files and the DevTools ZIP). `pnpm ci:local` runs those jobs locally and summarizes the failed ones and those skipped for lack of a tool (`pwsh`, `bun`, `deno`, Redis); `--only`, `--skip`, `--no-build` and `--list` narrow it. Failure logs are kept as artifacts; local tests are not equivalent to a remote Actions run. Details of what runs on each event are in [CI and publication times](../ci-performance.md) (Spanish only).
 
 ## Workspace tooling
 

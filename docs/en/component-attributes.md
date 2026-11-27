@@ -1,5 +1,5 @@
 ---
-source-hash: 245097551e6a1ab66b30451425d04715c94f4ba4acae944b765ea43d62411aac
+source-hash: b5f6d4fdd0a00a8a091e8723aca8cc31aebef6d67056e7571fc358edce92e99b
 ---
 
 # Attributes and static props
@@ -37,12 +37,14 @@ Since `1.8`, Meeko knows the values the HTML standard allows for each attribute 
 
 Since `1.8`, an element can carry both static `class` and `bind:class`, or `style` and `bind:style`, and Meeko writes a single attribute with both, identically in SSR, hydration and updates. Dynamic classes follow static ones, and dynamic `style` declarations follow static ones, so they win. If the dynamic value is `undefined`, `null`, `false` or an empty string, the static text remains as is. This also applies to a `<component is>` that can only be a tag; on a component, `class` and `bind:class` pass the same prop (`MEEK090`).
 
+Since `1.10`, `bind:class` accepts the values of `clsx`: a text or a number, a `{ class: condition }` object that applies each key whose condition is true, and arrays, also nested, of any of them. Classes are joined with spaces in their order, without removing duplicates; `null`, `undefined`, `true`, `false` and empty texts are omitted. It works on HTML and SVG elements, on `<MeekoLink>`, on `<component is>` with tags and on the `class` key of `bind="obj"`, the same in SSR, on hydration and on update: if a signal the object reads changes, only the attribute is rewritten. `ClassValue`, exported by `@meekojs/meeko`, types that value; `meeko check` and the editor reject a function, a symbol or a signal without `.value` in the expression (`TS2345`). In a component, `class` is a prop: declare it as `class?: ClassValue` and pass it to its element with `bind:class`. Up to `1.9`, an object or an array was written as `class="[object Object]"` or with commas, and `true` as `class="true"`. Meeko does not merge conflicting utility classes (`p-2` and `p-4`): it writes them all.
+
 `bind:style` also accepts an object. Keys may use camelCase (`backgroundColor`), kebab-case (`font-size`) or CSS custom-property syntax (`--accent`); `false`, `null` and `undefined` values are omitted, and numbers are written without adding units. `StyleValue`, exported by `@meekojs/meeko`, types an object stored or passed between components.
 
 ```html
 <article
 	class="card"
-	bind:class="open.value ? 'is-open' : undefined"
+	bind:class="{ 'is-open': open.value }"
 	bind:style="{ backgroundColor: open.value ? 'white' : undefined, '--space': 8 }"
 >
 	...

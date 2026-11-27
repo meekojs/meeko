@@ -1,5 +1,5 @@
 ---
-source-hash: 9951a806622a7486beef1759534aad4ed82a903b7b53ee0fa030ae0b8350e90a
+source-hash: 098e98263b00f2a5e7644121938b63cfa4b1b3a586e7f34a72aed038bc7b4650
 ---
 
 # Router: pages and navigation
@@ -88,7 +88,7 @@ Replace the starter layout's contents with:
 
 `<MeekoOutlet />` displays the page or next layout. Moving from `/users` to `/users/42` retains shared layouts and their state and disposes the outgoing page. The indicator only appears if navigation is still pending when the browser paints; a fast transition may finish without displaying it.
 
-`useRoute()` offers the `url`, `path`, `id`, `params` and `search` signals and the `isActive()` method. It describes the committed page; while the next one loads it still shows the previous one. `useNavigation()` only offers the `pending` signal, which is `false` during SSR: it has no `navigate` method. Obtain both composables in the script and use their results in events. For precise page data, use its exports or props; `useRoute()` parameters are general and their values are `unknown`.
+`useRoute()` offers the `url`, `path`, `id`, `params` and `search` signals and the `isActive()` method. It describes the committed page; while the next one loads it still shows the previous one. `useNavigation()` only offers the `pending` signal, which is `false` during SSR; to navigate from code, use `navigate()` (since `1.10`). Obtain both composables in the script and use their results in events. For precise page data, use its exports or props; `useRoute()` parameters are general and their values are `unknown`.
 
 `match="prefix"` marks “Usuarios” in `/users/42` with `aria-current="true"`; in `/users` it uses `"page"`. The query and fragment do not affect this comparison. See [MeekoLink](reference/components/meekolink.md), [useRoute](reference/composables/useroute.md) and [useNavigation](reference/composables/usenavigation.md).
 
@@ -157,13 +157,15 @@ Modified clicks, external links, downloads and targets in another tab keep the b
 
 ## APIs for code and integrations
 
-| API                               | Responsibility                                                                                |
-| --------------------------------- | --------------------------------------------------------------------------------------------- |
-| `href(id, options)`               | Build a typed URL without navigating                                                          |
-| `app.navigate(url, { replace? })` | Navigate from the instance returned by `mountClientApp`; `replace` replaces the history entry |
-| `createRouteManifest(records)`    | Validate, sort and freeze routes                                                              |
-| `matchRoute(routes, pathname)`    | Find the route and its parameters, without query or fragment                                  |
-| `createNavigator(routes, render)` | Manage history and cancellation with a custom render callback                                 |
-| `mountClientApp(options)`         | Hydrate and connect links, data, layouts and navigation                                       |
+| API                               | Responsibility                                                                                         |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `href(id, options)`               | Build a typed URL without navigating                                                                   |
+| `navigate(target, options)`       | Navigate from a component or composable, with the typed destination of `<MeekoLink>` or a URL (`1.10`) |
+| `useSearchParam(name, initial)`   | Editable signal for a query parameter; writing it navigates and reloads the data (`1.10`)              |
+| `app.navigate(url, { replace? })` | Navigate from the instance returned by `mountClientApp`; `replace` replaces the history entry          |
+| `createRouteManifest(records)`    | Validate, sort and freeze routes                                                                       |
+| `matchRoute(routes, pathname)`    | Find the route and its parameters, without query or fragment                                           |
+| `createNavigator(routes, render)` | Manage history and cancellation with a custom render callback                                          |
+| `mountClientApp(options)`         | Hydrate and connect links, data, layouts and navigation                                                |
 
-In a starter application, startup is already generated; you do not need to mount another client. Inside components, use links to navigate. `useNavigation()` reads loading state. For custom integrations, `app.navigate` allows programmatic navigation; call `app.dispose()` when unmounting the host to release resources. `createNavigator` alone does not hydrate or load data. See [href](reference/utils/href.md), [createNavigator](reference/advanced/createnavigator.md), [matchRoute](reference/advanced/matchroute.md) and [mountClientApp](reference/advanced/mountclientapp.md).
+In a starter application, startup is already generated; you do not need to mount another client. Inside components, use links or `navigate()` to navigate and `useSearchParam()` for state that lives in the query. `useNavigation()` reads loading state. For custom integrations, `app.navigate` allows programmatic navigation from the host; call `app.dispose()` when unmounting the host to release resources. `createNavigator` alone does not hydrate or load data. See [href](reference/utils/href.md), [createNavigator](reference/advanced/createnavigator.md), [matchRoute](reference/advanced/matchroute.md) and [mountClientApp](reference/advanced/mountclientapp.md).

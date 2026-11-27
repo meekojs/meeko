@@ -11,6 +11,7 @@ related:
   - "cli:routes"
   - "cli:types"
   - "cli:lsp"
+  - "cli:styles"
   - docs/framework.md#autoimports-y-typescript
   - docs/framework.md#tipos-de-los-servicios
   - docs/editors.md#comprobación-del-proyecto
@@ -79,7 +80,7 @@ Un módulo normal de `app/` se comprueba con `tsconfig.app.json`, y por eso pued
 
 Con `meekoSortClasses: "stylesheet"`, `prettier --check` ordena las clases por `.meeko/styles/main.css`, que `.gitignore` deja fuera del repositorio y sólo escribía `meeko dev`. `meeko check` la escribe al terminar bien, con el mismo contenido que `meeko dev` (la misma canalización de Vite, con los plugins de los módulos, sin servidor ni vigilantes), de modo que un trabajo de CI que ya ejecuta `meeko check` antes de Prettier ordena como en local. Medio segundo más en `apps/ui`. Si las hojas no compilan, `meeko check` avisa en la salida de errores (`[meeko] .meeko/styles/main.css conserva la versión anterior: …`) y su código de salida no cambia.
 
-Para un trabajo que sólo formatea, el comando explícito y barato es `meeko styles [directorio]`: escribe esa hoja y nada más (ni tipos ni TypeScript), imprime su ruta y no escribe nada si el proyecto no tiene hojas de estilos. Si no compilan, sale con `1`.
+Para un trabajo que sólo formatea, el comando explícito y barato es [`meeko styles [directorio]`](meeko-styles.md): escribe esa hoja y nada más (ni tipos ni TypeScript), imprime su ruta y no escribe nada si el proyecto no tiene hojas de estilos. Si no compilan, sale con `1`.
 
 ```sh
 meeko styles . && prettier --check .
