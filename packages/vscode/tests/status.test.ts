@@ -50,6 +50,16 @@ test('a server that did not start is an error that opens the output', () => {
 	assert.equal(serverStatus({ state: 'failed', resolution: bundled, folder: 'site' }).detail, 'The language server for "site" failed to start')
 })
 
+test('a server that started and then stopped is not reported as one that failed to start', () => {
+	assert.deepEqual(serverStatus({ state: 'stopped', resolution: workspace, folder: 'site' }), {
+		text: 'Meeko: error (workspace 1.8.0)',
+		detail: 'The language server for "site" stopped unexpectedly',
+		severity: 'error',
+		busy: false,
+		command: { command: restartCommand, title: 'Restart' },
+	})
+})
+
 test('a document without a server says so', () => {
 	const status = serverStatus(undefined)
 	assert.equal(status.text, 'Meeko: no server')

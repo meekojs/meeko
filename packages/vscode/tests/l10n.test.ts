@@ -98,8 +98,13 @@ test('every message passed to t(...) has a Spanish translation, with no unused e
 	}
 })
 
+test('no user text of the language servers skips t(...)', () => {
+	// The state shown by the status item is built from these fields: a literal would stay untranslated.
+	assert.doesNotMatch(readFileSync(join(root, 'src', 'language-servers.ts'), 'utf8'), /\.error = ['"`]/)
+})
+
 test('the pure modules stay free of vscode and translate through src/l10n.ts', () => {
-	for (const name of ['l10n', 'scaffold', 'status', 'server-resolution', 'folder-plan', 'zone-ranges', 'auto-close-trigger', 'live/model', 'live/client', 'live/workspace']) {
+	for (const name of ['l10n', 'scaffold', 'status', 'server-resolution', 'folder-plan', 'deadline', 'diagnostic-owners', 'zone-ranges', 'auto-close-trigger', 'live/model', 'live/client', 'live/workspace']) {
 		assert.doesNotMatch(readFileSync(join(root, 'src', `${name}.ts`), 'utf8'), /from 'vscode'/, name)
 	}
 	assert.match(readFileSync(join(root, 'src', 'extension.ts'), 'utf8'), /setTranslator\(vscode\.l10n\.t\)/)
@@ -117,6 +122,7 @@ test('the installed translator, like vscode.l10n.t, receives the English message
 	assert.equal(serverStatus(undefined).text, 'Meeko: sin servidor')
 	const failed = serverStatus({ state: 'failed', resolution: { module: '/extension/dist/server.js', source: 'bundled' }, folder: 'site', error: 'spawn ENOENT' })
 	assert.deepEqual([failed.text, failed.detail, failed.command.title], ['Meeko: error (incluido)', 'El servidor de «site» no arrancó: spawn ENOENT', 'Mostrar salida'])
+	assert.equal(serverStatus({ state: 'stopped', resolution: { module: '/extension/dist/server.js', source: 'bundled' }, folder: 'site' }).detail, 'El servidor de «site» se detuvo de forma inesperada')
 	setTranslator()
 	assert.equal(serverStatus(undefined).text, 'Meeko: no server')
 })

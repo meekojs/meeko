@@ -132,6 +132,13 @@ exports.run = async function run() {
 	assert.match(hoverText, /```json\n5\n```/)
 	assert.match(hoverText, /command:meeko\.live\.editSignal/)
 
+	// The single formatter of the extension reaches the server of the document: the clients register none.
+	const edits = await waitFor(async () => {
+		const result = await vscode.commands.executeCommand('vscode.executeFormatDocumentProvider', uri, { insertSpaces: false, tabSize: 4 })
+		return Array.isArray(result) && result.length > 0 && result
+	}, 'El formateador de Meeko no devolvió cambios para un documento sin formatear')
+	assert.ok(edits.every((edit) => edit.range && typeof edit.newText === 'string'))
+
 	await vscode.commands.executeCommand('meeko.live.editSignal', { id: 'tab1/meeko-1/count', json: '42' })
 	assert.deepEqual(
 		dev.commands.map((command) => [command.instanceId, command.name, command.value]),

@@ -25,6 +25,24 @@ test('a folder contains itself with or without the final slash', () => {
 	assert.ok(!insideFolder(inner, outer))
 })
 
+test('on Windows a nested folder is found whatever the case of its file path', () => {
+	const upper = 'file:///c%3A/Work/Repo'
+	const nested = 'file:///c%3A/work/repo/apps/site'
+	assert.ok(insideFolder(upper, nested, true))
+	assert.ok(!insideFolder(upper, nested, false))
+	assert.ok(!insideFolder(upper, 'file:///c%3A/work/repository', true))
+	assert.equal(innermostFolder([upper, nested], 'file:///C%3A/WORK/repo/apps/site/App.meeko', true), nested)
+	assert.equal(ownerKey([upper, nested], `${nested}/App.meeko`, false), nested)
+	assert.equal(ownerKey([upper], `${nested}/App.meeko`, false), globalKey)
+	assert.deepEqual(planClients({ folders: [upper, nested], looseDocuments: false, ignoreCase: true }), [
+		{ key: upper, folder: upper, excluded: [nested] },
+		{ key: nested, folder: nested, excluded: [] },
+	])
+	assert.deepEqual(planClients({ folders: [upper, nested], looseDocuments: false, ignoreCase: false })[0]?.excluded, [])
+	// Only file paths lose their case: another scheme may tell `Repo` from `repo`.
+	assert.ok(!insideFolder('memfs:/Work/Repo', 'memfs:/work/repo/apps', true))
+})
+
 test('documents outside every folder belong to the global client', () => {
 	assert.equal(ownerKey([outer, inner], 'file:///tmp/Loose.meeko'), globalKey)
 	assert.equal(ownerKey([outer, inner], 'untitled:Untitled-1'), globalKey)
