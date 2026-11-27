@@ -183,7 +183,7 @@ test('an explicit size wins over the one of ui.defaults, and ui.defaults validat
 })
 
 test('the segments of UIRadioGroup keep their classes, which UISegmentedControl shares', () => {
-	const group = radioGroup({ variant: 'segmented' })
+	const group = radioGroup({ layout: 'segmented' })
 	for (const slot of ['options', 'option']) {
 		for (const name of group[slot]()
 			.split(' ')

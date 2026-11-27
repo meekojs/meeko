@@ -20,7 +20,7 @@ export const hintTheme = defineTheme({
 		base: [
 			'relative m-0 inline-flex cursor-help items-center justify-center rounded-full [border:0] bg-transparent p-0 align-(--ui-icon-text-align)',
 			'text-text-soft hover:text-text [font:inherit] leading-none',
-			'transition-[color] duration-(--ui-duration-fast) motion-reduce:transition-none motion-reduce:duration-0',
+			'transition-[color] duration-(--ui-duration-fast) ease-[ease] motion-reduce:transition-none motion-reduce:duration-0',
 			'before:absolute before:-inset-(--ui-hint-hit-area) before:rounded-full',
 			triggerFocusRing,
 		],

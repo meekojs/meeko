@@ -1,4 +1,4 @@
-import type { UIBreadcrumbItem, UICodeBlockProps, UIDrawerProps, UILinkTarget, UILocaleItem, UINavigationLink, UINavigationTreeGroup, UIPageProps, UIPaginationProps, UIProseProps, UITableOfContentsEntry } from '@meekojs/ui/runtime'
+import type { UIBreadcrumbItem, UICodeBlockProps, UIDrawerProps, UILinkTarget, UILocaleItem, UINavigationLink, UINavigationTreeGroup, UIPageProps, UIPaginationProps, UIProseProps, UITableOfContentsEntry, UITableOfContentsLayout } from '@meekojs/ui/runtime'
 
 import type { ComponentProps as BreadcrumbProps } from '../../dist/app/components/Breadcrumb.d.meeko.ts'
 import type { ComponentProps as CodeBlockProps } from '../../dist/app/components/CodeBlock.d.meeko.ts'
@@ -56,5 +56,9 @@ const proseLinkAttribute: UIProseProps = { href: '/a' }
 const pageLink: UIPaginationProps = { pageCount: 3, pageLink: () => ({ to: '/missing' }) }
 // @ts-expect-error A layout of the list.
 const layout: UIPageProps = { layout: 'wide' }
+// The view of a table of contents is its layout, and its type is named after it.
+const tocLayout: UITableOfContentsLayout = 'collapsible'
+// @ts-expect-error A view of the list.
+const tocWide: UITableOfContentsLayout = 'wide'
 
-void [links, header, breadcrumb, group, entry, locale, drawer, code, pagination, numbered, pageLink, page, linkAttribute, proseLinkAttribute, missing, noParams, both, noLabel, verdict, closedBy, noLevel, layout]
+void [links, header, breadcrumb, group, entry, locale, drawer, code, pagination, numbered, pageLink, page, linkAttribute, proseLinkAttribute, missing, noParams, both, noLabel, verdict, closedBy, noLevel, layout, tocLayout, tocWide]

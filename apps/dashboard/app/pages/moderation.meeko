@@ -532,7 +532,7 @@
 						</UIField>
 						<UIRadioGroup
 							name="rule-action"
-							variant="segmented"
+							layout="segmented"
 							model="action"
 							bind:legend="t('moderation.columns.rule')"
 							bind:options="[

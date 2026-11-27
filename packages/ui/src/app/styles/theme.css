@@ -5,28 +5,14 @@
  * tokens.css; the last one names the tokens of the controls. A token without a Tailwind namespace
  * (durations, control heights…) is read with `prop-(--ui-token)`.
  *
- * It adds to Tailwind's default theme instead of replacing it: the app keeps bg-red-500, md: and the rest.
- * Where a default would change a utility of UI, it is removed with `initial` below.
+ * It adds to Tailwind's default theme instead of replacing it: the app keeps bg-red-500, md: and the rest,
+ * and each text-* size keeps the line height of Tailwind, as each transition-* keeps its duration and easing.
+ * The recipes of UI do not depend on those defaults: a text-* of UI carries its own leading-*, or
+ * `text-<size>/[inherit]` when it keeps the line height of its parent, and a transition-* of UI carries its
+ * duration-* and ease-* (`ease-[ease]`, the easing of CSS, where it had none).
  */
 @theme inline reference {
-	/*
-	 * What the defaults of Tailwind would add to the utilities of UI: a line height in each text-* size (UI sets
-	 * the size alone, and the line height with leading-*), and a duration and an easing in every transition-*
-	 * (UI gives them with duration-(--ui-duration-*) and ease-*). The default fonts of the preflight stay those of
-	 * Tailwind: base.css sets the font of the page.
-	 */
-	--text-xs--line-height: initial;
-	--text-sm--line-height: initial;
-	--text-base--line-height: initial;
-	--text-lg--line-height: initial;
-	--text-xl--line-height: initial;
-	--text-2xl--line-height: initial;
-	--text-3xl--line-height: initial;
-	--text-4xl--line-height: initial;
-	--text-5xl--line-height: initial;
-	--text-6xl--line-height: initial;
-	--default-transition-duration: initial;
-	--default-transition-timing-function: initial;
+	/* The default fonts of the preflight stay those of Tailwind: base.css sets the font of the page. */
 	--default-font-family: initial;
 	--default-font-feature-settings: initial;
 	--default-font-variation-settings: initial;

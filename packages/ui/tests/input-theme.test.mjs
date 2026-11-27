@@ -54,13 +54,16 @@ const classesOf = (html, tag) => [...html.matchAll(new RegExp(`<${tag}\\b[^>]*?c
 
 const sorted = (classes) => [...new Set(typeof classes === 'string' ? classes.split(' ') : classes)].sort()
 
-/** The classes of the field before the migration to `inputTheme`: the look a field without props must keep. */
+/**
+ * The classes of the field before the migration to `inputTheme`: the look a field without props must keep. Only
+ * `ease-[ease]` is new: the easing of CSS, which the transition had by default before Tailwind's came back.
+ */
 const before = {
 	structure: [
 		'box-border block w-full ps-3 py-1.5',
 		'border-(length:--ui-border-width) aria-[invalid=true]:border-danger',
 		'font-sans text-(length:--ui-input-font-size) leading-snug font-regular',
-		'transition-[background-color] duration-(--ui-duration-fast) motion-reduce:transition-none motion-reduce:duration-0',
+		'transition-[background-color] duration-(--ui-duration-fast) ease-[ease] motion-reduce:transition-none motion-reduce:duration-0',
 		'focus-visible:outline-(length:--ui-focus-ring-width) focus-visible:outline-focus focus-visible:outline-offset-(--ui-focus-ring-offset) focus-visible:outline-solid',
 		'rounded-md border-solid border-control-border bg-control not-disabled:hover:bg-control-hover text-text placeholder:text-text-soft',
 	].join(' '),
@@ -136,11 +139,25 @@ test('size and radius are classes, and the button of reveal is as wide as the fi
 	assert.doesNotMatch(html, /\s(?:size|radius)=/)
 })
 
+test('xs and sm read the text of a field from tokens that a coarse pointer raises to the one of the other sizes', async (context) => {
+	const css = await readFile(new URL('../src/app/styles/tokens.css', import.meta.url), 'utf8')
+	const coarse = css.match(/@media \(pointer: coarse\) \{([\s\S]*?)\n\}/)[1]
+	assert.match(css, /--ui-input-font-size-xs: var\(--ui-control-font-size-xs\)/)
+	assert.match(css, /--ui-input-font-size-sm: var\(--ui-control-font-size-sm\)/)
+	for (const name of ['--ui-input-font-size-xs', '--ui-input-font-size-sm']) assert.ok(coarse.includes(`${name}: var(--ui-input-font-size)`), `${name} follows the field in a coarse pointer`)
+	assert.ok(!inputTheme({ size: 'xs' }).includes('text-control-xs') && !inputTheme({ size: 'sm' }).includes('text-control-sm'))
+	// The class of the consumer still wins over the font size of the size, and the size keeps the rest.
+	const merged = inputTheme({ size: 'xs', class: 'text-lg' }).split(' ')
+	assert.ok(merged.includes('text-lg') && !merged.some((name) => name.startsWith('text-(length:')), merged.join(' '))
+	const html = await render(context, '<UIInput size="sm" />')
+	assert.ok(classesOf(html, 'input')[0].includes('text-(length:--ui-input-font-size-sm)'))
+})
+
 test('each size fits its line, padding and border in the height of its token, the one of a button of that size', () => {
 	// The vertical padding and the font of each size; md is the field of always (checked class by class above).
 	const expected = {
-		xs: ['min-h-(--ui-control-height-xs)', 'py-0.5', 'text-control-xs'],
-		sm: ['min-h-(--ui-control-height-sm)', 'py-0.5', 'text-control-sm'],
+		xs: ['min-h-(--ui-control-height-xs)', 'py-0.5', 'text-(length:--ui-input-font-size-xs)'],
+		sm: ['min-h-(--ui-control-height-sm)', 'py-0.5', 'text-(length:--ui-input-font-size-sm)'],
 		md: ['min-h-(--ui-control-height-md)', 'py-1.5', 'text-(length:--ui-input-font-size)'],
 		lg: ['min-h-(--ui-control-height-lg)', 'py-1.5', 'text-(length:--ui-input-font-size)'],
 		xl: ['min-h-(--ui-control-height-xl)', 'py-1.5', 'text-control-xl'],
@@ -175,7 +192,7 @@ test('the class of the instance is merged with Tailwind Merge and wins over the 
 		[switchTheme().input({ class: 'bg-red-500' }), 'bg-red-500', 'bg-control'],
 		[radioGroupTheme().options({ class: 'gap-6' }), 'gap-6', 'gap-2'],
 		[segmentedControlTheme().options({ class: 'rounded-none' }), 'rounded-none', 'rounded-lg'],
-		[fieldTheme().label({ class: 'text-lg' }), 'text-lg', 'text-sm'],
+		[fieldTheme().label({ class: 'text-lg' }), 'text-lg', 'text-sm/[inherit]'],
 		[sliderTheme().base({ class: 'gap-4' }), 'gap-4', 'gap-2'],
 		[selectTheme().clear({ class: 'rounded-none' }), 'rounded-none', 'rounded-md'],
 		[comboboxTheme().chip({ class: 'rounded-sm' }), 'rounded-sm', 'rounded-full'],

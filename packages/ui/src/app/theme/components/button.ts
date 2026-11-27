@@ -33,7 +33,7 @@ export const buttonBase = [
 	'meeko-ui-component m-0 box-border inline-flex cursor-pointer items-center justify-center gap-1.5',
 	'border-(length:--ui-border-width) border-transparent bg-transparent font-sans font-control tracking-snug',
 	'indent-0 text-center whitespace-nowrap normal-case no-underline [text-shadow:none] [word-spacing:normal]',
-	'transition-[background-color,border-color,color] duration-(--ui-duration-fast) motion-reduce:transition-none',
+	'transition-[background-color,border-color,color] duration-(--ui-duration-fast) ease-[ease] motion-reduce:transition-none',
 	'focus-visible:outline-(length:--ui-focus-ring-width) focus-visible:outline-focus focus-visible:outline-offset-(--ui-focus-ring-offset) focus-visible:outline-solid',
 	'disabled:cursor-not-allowed disabled:opacity-(--ui-opacity-disabled)',
 	// Busy: a spinner before the text, and the pointer says so.

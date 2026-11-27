@@ -37,7 +37,7 @@ export const codeBlockTheme = defineTheme({
 			'[&_.shiki]:bg-transparent!',
 			inProse,
 		],
-		head: 'flex min-h-(--ui-control-height-md) items-center gap-2 border-b-(length:--ui-border-width) py-1 ps-4 pe-1.5 text-sm',
+		head: 'flex min-h-(--ui-control-height-md) items-center gap-2 border-b-(length:--ui-border-width) py-1 ps-4 pe-1.5 text-sm/[inherit]',
 		verdict: 'inline-flex items-center gap-1 font-semibold',
 		label: 'font-medium',
 		lang: 'font-mono',
@@ -45,7 +45,7 @@ export const codeBlockTheme = defineTheme({
 		copy: [
 			'ms-auto cursor-pointer rounded-sm [border:0] bg-transparent px-2 py-0.5 hover:bg-control-hover',
 			'font-sans text-xs leading-normal font-medium',
-			'transition-[color,background-color] duration-(--ui-duration-fast)',
+			'transition-[color,background-color] duration-(--ui-duration-fast) ease-[ease]',
 			still,
 			focusRingInset,
 		],

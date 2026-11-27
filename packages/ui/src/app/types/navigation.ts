@@ -408,7 +408,7 @@ export type UINavigationTabsItem = UINavigationLink & {
 /**
  * Props de `<UINavigationTabs>`: enlaces entre páginas con aspecto de pestañas, con `aria-current` y un
  * indicador que se desplaza con CSS. Son navegación, no un `tablist`: cada uno lleva a otra URL.
- * `variant="segmented"` da a la fila la forma de un `<UIRadioGroup variant="segmented">`, para filtros en
+ * `layout="segmented"` da a la fila la forma de un `<UIRadioGroup layout="segmented">`, para filtros en
  * la URL, sin indicador: varias filas conviven en una página sin repetir su View Transition. El evento
  * `select` recibe el clic y la pestaña; `event.preventDefault()` cancela la navegación. `ui` añade
  * clases a sus slots: `base`, `link` e `indicator`.
@@ -417,7 +417,7 @@ export type UINavigationTabsItem = UINavigationLink & {
  * @example
  * ```html
  * <UINavigationTabs bind:items="[{ label: 'Hoy', to: '/metrics' }, { label: 'Mes', to: '/metrics/month' }]" current="/metrics" />
- * <UINavigationTabs variant="segmented" label="Rango" bind:items="[{ label: '7 días', href: '?days=7', current: true }]" />
+ * <UINavigationTabs layout="segmented" label="Rango" bind:items="[{ label: '7 días', href: '?days=7', current: true }]" />
  * ```
  */
 export type UINavigationTabsProps = UIThemeProps<
@@ -425,8 +425,12 @@ export type UINavigationTabsProps = UIThemeProps<
 	{
 		/** Enlaces. */
 		readonly items: readonly UINavigationTabsItem[]
-		/** Aspecto; `"underline"` por defecto. */
-		readonly variant?: 'underline' | 'segmented'
+		/**
+		 * Disposición: una fila subrayada (`underline`, por defecto) o un control segmentado (`segmented`).
+		 *
+		 * @since 2.0.0 sustituye a `variant`, que queda para el tratamiento visual del catálogo.
+		 */
+		readonly layout?: 'underline' | 'segmented'
 		/** Ruta actual, para marcar el enlace con `aria-current="page"`. */
 		readonly current?: string
 		/** `aria-label` de la navegación. */
@@ -616,12 +620,13 @@ export interface UITableOfContentsEntry {
  * `<details>` para la columna de contenido, que `<UIPage>` sólo muestra cuando el lateral se oculta.
  *
  * @since 1.8.0
+ * @since 2.0.0 se llama `UITableOfContentsLayout`; antes, `UITableOfContentsVariant`.
  * @example
  * ```ts
- * const variant: UITableOfContentsVariant = 'collapsible'
+ * const layout: UITableOfContentsLayout = 'collapsible'
  * ```
  */
-export type UITableOfContentsVariant = 'aside' | 'collapsible'
+export type UITableOfContentsLayout = 'aside' | 'collapsible'
 
 /**
  * Props de `<UITableOfContents>`: el índice de la página. Los enlaces funcionan sin JavaScript. La
@@ -634,7 +639,7 @@ export type UITableOfContentsVariant = 'aside' | 'collapsible'
  * @example
  * ```html
  * <UITableOfContents bind:entries="toc" />
- * <UITableOfContents bind:entries="toc" variant="collapsible" />
+ * <UITableOfContents bind:entries="toc" layout="collapsible" />
  * ```
  */
 export type UITableOfContentsProps = UIThemeProps<
@@ -644,8 +649,12 @@ export type UITableOfContentsProps = UIThemeProps<
 		readonly entries: readonly UITableOfContentsEntry[]
 		/** `id` de la entrada activa, si la controla la aplicación; desactiva el seguimiento del scroll. */
 		readonly active?: string
-		/** Vista; `"aside"` por defecto. */
-		readonly variant?: UITableOfContentsVariant
+		/**
+		 * Vista; `"aside"` por defecto.
+		 *
+		 * @since 2.0.0 sustituye a `variant`, que queda para el tratamiento visual del catálogo.
+		 */
+		readonly layout?: UITableOfContentsLayout
 		/** Título y `aria-label`. */
 		readonly label?: string
 		/** Clases adicionales del elemento raíz: el `<nav>` (`ui.base`) o, en la vista `collapsible`, el `<details>` (`ui.collapsible`). */

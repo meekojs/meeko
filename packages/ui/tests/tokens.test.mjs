@@ -359,16 +359,81 @@ test("the consumer keeps Tailwind's default theme next to the one of UI", async 
 	assert.equal(rule(css, 'bg-primary-9'), 'background-color: var(--ui-color-primary-9);')
 })
 
-test('the defaults of Tailwind do not change the utilities of UI', async () => {
+test('the consumer keeps the line height of each text-* size and the duration and easing of transition-* of Tailwind', async () => {
 	const css = await consumerCss(['@meekojs/ui'], ['text-xs', 'text-sm', 'text-base', 'text-lg', 'text-6xl', 'text-control-sm', 'transition-colors', 'transition'])
-	for (const size of ['xs', 'sm', 'lg', '6xl']) assert.equal(rule(css, `text-${size}`), `font-size: var(--ui-font-size-${size});`, `text-${size} sets the size alone`)
-	assert.equal(rule(css, 'text-base'), 'font-size: var(--ui-font-size-md);')
-	assert.equal(rule(css, 'text-control-sm'), 'font-size: var(--ui-control-font-size-sm);')
-	for (const name of ['transition-colors', 'transition']) {
-		assert.match(rule(css, name), /transition-timing-function: var\(--tw-ease, ease\);/, name)
-		assert.match(rule(css, name), /transition-duration: var\(--tw-duration, 0s\);/, name)
+	for (const size of ['xs', 'sm', 'lg', '6xl']) {
+		assert.equal(rule(css, `text-${size}`), `font-size: var(--ui-font-size-${size});\n    line-height: var(--tw-leading, var(--text-${size}--line-height));`, `text-${size}`)
 	}
-	assert.doesNotMatch(css, /--default-transition-|--text-xs--line-height/)
+	assert.equal(rule(css, 'text-base'), 'font-size: var(--ui-font-size-md);\n    line-height: var(--tw-leading, var(--text-base--line-height));')
+	// The line heights of Tailwind's theme: a ratio to the size, which UI does not redefine.
+	assert.match(css, /--text-xs--line-height: calc\(1 \/ 0\.75\);/)
+	assert.match(css, /--text-sm--line-height: calc\(1\.25 \/ 0\.875\);/)
+	assert.match(css, /--text-base--line-height: calc\(1\.5 \/ 1\);/)
+	assert.match(css, /--text-6xl--line-height: 1;/)
+	assert.equal(rule(css, 'text-control-sm'), 'font-size: var(--ui-control-font-size-sm);', 'a size of UI without a line height of Tailwind sets the size alone')
+	for (const name of ['transition-colors', 'transition']) {
+		assert.match(rule(css, name), /transition-timing-function: var\(--tw-ease, var\(--default-transition-timing-function\)\);/, name)
+		assert.match(rule(css, name), /transition-duration: var\(--tw-duration, var\(--default-transition-duration\)\);/, name)
+	}
+	assert.match(css, /--default-transition-duration: 150ms;/)
+	assert.match(css, /--default-transition-timing-function: cubic-bezier\(0\.4, 0, 0\.2, 1\);/)
+})
+
+/** Every list of classes of a recipe made with `defineTheme()`: its base or slots, each variant and each compound variant. */
+function recipeClassLists(recipe) {
+	const lists = []
+	const add = (value, where) => {
+		if (typeof value === 'string' || Array.isArray(value)) lists.push({ where, classes: [value].flat(Infinity).join(' ').split(/\s+/).filter(Boolean) })
+		else if (value && typeof value === 'object') for (const [slot, classes] of Object.entries(value)) add(classes, `${where}.${slot}`)
+	}
+	add(recipe.base, 'base')
+	add(recipe.slots, 'slots')
+	for (const [name, values] of Object.entries(recipe.variants ?? {})) for (const [value, classes] of Object.entries(values)) add(classes, `variants.${name}.${value}`)
+	for (const [index, compound] of (recipe.compoundVariants ?? []).entries()) add(compound.class ?? compound.className, `compoundVariants[${index}]`)
+	return lists
+}
+
+/** The variants of a utility (`hover:`, `[&_a]:`…), without splitting inside brackets, and its name. */
+function utility(name) {
+	let depth = 0
+	let end = 0
+	for (let index = 0; index < name.length; index++) {
+		const char = name[index]
+		if (char === '[' || char === '(') depth++
+		else if (char === ']' || char === ')') depth--
+		else if (char === ':' && depth === 0) end = index + 1
+	}
+	return { prefix: name.slice(0, end), base: name.slice(end) }
+}
+
+test('a text-* or a transition-* of UI does not read the defaults of Tailwind', async () => {
+	const theme = await import('../dist/app/theme/index.js')
+	// The two choices are buttons: their line height is the leading-tight of the button.
+	const exceptions = new Set(['localeSuggestionTheme slots.go', 'localeSuggestionTheme slots.stay'])
+	const problems = []
+	let checked = 0
+	for (const [name, recipe] of Object.entries(theme)) {
+		if (typeof recipe !== 'function' || !('variantKeys' in recipe)) continue
+		for (const { where, classes } of recipeClassLists(recipe)) {
+			if (exceptions.has(`${name} ${where}`)) continue
+			const parsed = classes.map(utility)
+			const has = (prefix, pattern) => parsed.some((other) => (other.prefix === prefix || other.prefix === '') && pattern.test(other.base))
+			for (const { prefix, base } of parsed) {
+				// A size of Tailwind with a line height of its own: it keeps the line height of its parent with /[inherit], or takes a leading-*.
+				if (/^text-(?:xs|sm|base|lg|[2-6]?xl)$/.test(base)) {
+					checked++
+					if (!has(prefix, /^leading-/)) problems.push(`${name} ${where}: ${prefix}${base} without a leading-* or /[inherit]`)
+				}
+				if (/^transition(?:$|-(?!none$|discrete$|normal$))/.test(base)) {
+					checked++
+					if (!has(prefix, /^duration-/)) problems.push(`${name} ${where}: ${prefix}${base} without a duration-*`)
+					if (!has(prefix, /^ease-/)) problems.push(`${name} ${where}: ${prefix}${base} without an ease-*`)
+				}
+			}
+		}
+	}
+	assert.ok(checked > 30, `checked ${checked} utilities`)
+	assert.deepEqual(problems, [])
 })
 
 test('the semantic scales, the alpha gray and the five control sizes are utilities of the main entry', async () => {

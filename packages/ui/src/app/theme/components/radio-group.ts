@@ -12,7 +12,7 @@ const dot = 'rounded-full checked:before:size-1.5 checked:before:rounded-full'
 export const radioFieldset = 'm-0 min-w-0 p-0 [border:0] font-sans text-text disabled:cursor-not-allowed disabled:opacity-(--ui-opacity-disabled)'
 
 /** The visible <legend> of a group. */
-export const radioLegend = 'mb-2 p-0 text-sm font-medium'
+export const radioLegend = 'mb-2 p-0 text-sm/[inherit] font-medium'
 
 /** The track of a segmented control: a framed row whose segments are the labels. */
 export const segmentTrack = 'gap-0.5 rounded-lg border-(length:--ui-border-width) border-solid border-control-border bg-control p-0.5'
@@ -20,7 +20,7 @@ export const segmentTrack = 'gap-0.5 rounded-lg border-(length:--ui-border-width
 /** A segment: the label of a radio, filled when checked. Its height and its text come from its size. */
 export const segment = [
 	'relative rounded-md',
-	'transition-[background-color,color] duration-(--ui-duration-fast) motion-reduce:transition-none motion-reduce:duration-0',
+	'transition-[background-color,color] duration-(--ui-duration-fast) ease-[ease] motion-reduce:transition-none motion-reduce:duration-0',
 	'[&:hover:not(:has(:disabled,:checked))]:bg-control-hover has-checked:bg-primary-soft has-checked:font-semibold has-checked:text-primary-text',
 	'has-focus-visible:outline-(length:--ui-focus-ring-width) has-focus-visible:outline-focus has-focus-visible:outline-solid',
 ]
@@ -30,14 +30,14 @@ export const segmentInput = 'absolute inset-0 size-full [border:0] opacity-(--ui
 
 /**
  * Receta de `UIRadioGroup`, con los slots `base` (el `<fieldset>`), `legend`, `options`, `option` (cada `<label>`)
- * e `input`. `variant` elige la presentación, no un tratamiento de color: `default` es una lista de radios y
+ * e `input`. `layout` elige la presentación, no un tratamiento de color: `default` es una lista de radios y
  * `segmented`, un control segmentado cuyas opciones son las etiquetas.
  *
  * @example
  * ```ts
  * import { radioGroupTheme } from '@meekojs/ui/theme'
  *
- * const { options, option } = radioGroupTheme({ variant: 'segmented' })
+ * const { options, option } = radioGroupTheme({ layout: 'segmented' })
  * ```
  */
 export const radioGroupTheme = defineTheme({
@@ -49,7 +49,7 @@ export const radioGroupTheme = defineTheme({
 		input: [...choiceInput, choiceBox, dot],
 	},
 	variants: {
-		variant: {
+		layout: {
 			default: {
 				options: 'gap-2',
 				option: choiceRow,
@@ -63,7 +63,7 @@ export const radioGroupTheme = defineTheme({
 		},
 	},
 	defaultVariants: {
-		variant: 'default',
+		layout: 'default',
 	},
 })
 

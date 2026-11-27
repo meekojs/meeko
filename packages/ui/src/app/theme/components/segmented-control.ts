@@ -1,4 +1,4 @@
-// The look of <UISegmentedControl>: the segments of <UIRadioGroup variant="segmented"> (./radio-group.ts) on a
+// The look of <UISegmentedControl>: the segments of <UIRadioGroup layout="segmented"> (./radio-group.ts) on a
 // track that never wraps.
 import type { ThemeVariants } from '../../utils/theme'
 

@@ -86,7 +86,7 @@ const showcase = `<script lang="ts">
 		</snippet>
 		<snippet name="sidebar"><UINavigationTree bind:groups="groups" current="/current-page" label="Documentación" /></snippet>
 		<snippet name="aside"><UITableOfContents bind:entries="toc" /></snippet>
-		<UITableOfContents bind:entries="toc" variant="collapsible" />
+		<UITableOfContents bind:entries="toc" layout="collapsible" />
 		<UIPageHeader title="Navegación" description="Todos los componentes de navegación juntos.">
 			<snippet name="breadcrumb"><UIBreadcrumb bind:items="crumbs" /></snippet>
 			<snippet name="actions"><UIButton variant="outline" color="neutral" size="sm">Editar</UIButton></snippet>
@@ -96,7 +96,7 @@ const showcase = `<script lang="ts">
 		<button type="button" id="tab-two" on:click="() => (tabsCurrent.value = '/two')">Tab dos</button>
 		<button type="button" id="tab-four" on:click="() => (tabsCurrent.value = '/four')">Tab cuatro</button>
 		<UINavigationTabs bind:items="[{ label: 'Forzado', to: '/about', current: forced.value }, { label: 'Quitado', to: '/', current: false }, { label: 'Según la ruta', to: '/' }, { label: 'Otra ruta', to: '/about' }]" label="Estados" />
-		<UINavigationTabs variant="segmented" label="Filtro" bind:items="[{ label: 'Todas', href: '#todas', current: filter.value === 'Todas', badge: '3' }, { label: 'Activas', href: '#activas', current: filter.value === 'Activas', badge: '2', badgeColor: 'success', badgeDot: true }]" on:select="(event, item) => { event.preventDefault(); filter.value = item.label }" />
+		<UINavigationTabs layout="segmented" label="Filtro" bind:items="[{ label: 'Todas', href: '#todas', current: filter.value === 'Todas', badge: '3' }, { label: 'Activas', href: '#activas', current: filter.value === 'Activas', badge: '2', badgeColor: 'success', badgeDot: true }]" on:select="(event, item) => { event.preventDefault(); filter.value = item.label }" />
 		<button type="button" id="toggle-forced" on:click="() => (forced.value = !forced.value)">Forzar</button>
 		<button type="button" id="open-drawer" on:click="() => (drawerOpen.value = true)">Abrir panel</button>
 		<output id="drawer-state">{drawerOpen.value ? 'abierto' : 'cerrado'}:{closes.value}</output>

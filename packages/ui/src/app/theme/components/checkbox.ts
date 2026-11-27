@@ -18,7 +18,7 @@ export const choiceRow = 'min-h-(--ui-control-height-md) pointer-coarse:min-h-(-
 /** What every input of a choice shares. */
 export const choiceInput = [
 	'm-0 box-border shrink-0 appearance-none accent-primary cursor-[inherit]',
-	'transition-[background-color,border-color] duration-(--ui-duration-fast) motion-reduce:transition-none motion-reduce:duration-0',
+	'transition-[background-color,border-color] duration-(--ui-duration-fast) ease-[ease] motion-reduce:transition-none motion-reduce:duration-0',
 	'focus-visible:outline-(length:--ui-focus-ring-width) focus-visible:outline-focus focus-visible:outline-offset-(--ui-focus-ring-offset) focus-visible:outline-solid',
 	'forced-colors:appearance-auto forced-colors:before:hidden',
 ]
@@ -35,7 +35,7 @@ const tick = 'rounded-xs checked:before:size-3 checked:before:[clip-path:polygon
 /** The text next to the input, and its description in soft text. */
 export const choiceText = {
 	content: 'grid gap-0.5',
-	description: 'text-sm text-text-soft',
+	description: 'text-sm/[inherit] text-text-soft',
 }
 
 /**

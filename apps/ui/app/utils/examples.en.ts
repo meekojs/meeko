@@ -514,7 +514,7 @@ async function remove() {
 
 <template>
   <UIRadioGroup model="period" legend="Period" name="period" bind:options="periods" />
-  <UIRadioGroup model="period" legend="Period" variant="segmented" bind:options="periods" />
+  <UIRadioGroup model="period" legend="Period" layout="segmented" bind:options="periods" />
 </template>`,
 	segmented: `<script lang="ts">
   const days = signal('30')
@@ -568,7 +568,7 @@ async function remove() {
     Save
   </UIButton>
 </template>`,
-	empty: `<UIEmpty variant="panel" title="No projects" description="Create the first one to get started.">
+	empty: `<UIEmpty layout="panel" title="No projects" description="Create the first one to get started.">
   <snippet name="actions"><UIButton>Create project</UIButton></snippet>
 </UIEmpty>
 <UISkeleton bind:lines="3" bind:widths="['full', 'long', 'short']" />`,
@@ -652,7 +652,7 @@ async function remove() {
 <UIPagination model:page="page" bind:total="total" bind:pageSize="20" edges />
 <UIPagination bind:page="query.page" bind:pageCount="pages"
   bind:pageLink="(page) => ({ to: '/orders', search: { page: String(page) } })" />`,
-	toc: `<UITableOfContents variant="collapsible"
+	toc: `<UITableOfContents layout="collapsible"
   bind:entries="[{ id: 'usage', text: 'Usage', level: 2 }, { id: 'api', text: 'API', level: 2 }]" />`,
 	drawer: `<UIDrawer title="Filters" triggerLabel="Open filters" side="end" model="open">
   <UICheckbox model="drafts" label="Include drafts" />

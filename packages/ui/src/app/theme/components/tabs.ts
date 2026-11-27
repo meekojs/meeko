@@ -28,7 +28,7 @@ export const tabsTheme = defineTheme({
 			'font-sans text-control-md leading-tight font-control tracking-snug',
 			'text-text-soft enabled:hover:text-text aria-selected:text-text',
 			'disabled:cursor-not-allowed disabled:opacity-(--ui-opacity-disabled)',
-			'transition-[color] duration-(--ui-duration-fast) motion-reduce:transition-none motion-reduce:duration-0',
+			'transition-[color] duration-(--ui-duration-fast) ease-[ease] motion-reduce:transition-none motion-reduce:duration-0',
 			ring,
 		],
 		/**

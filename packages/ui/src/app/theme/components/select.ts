@@ -10,7 +10,7 @@ import { defineTheme } from '../../utils/theme'
 const insetRing = 'focus-visible:outline-(length:--ui-focus-ring-width) focus-visible:outline-focus focus-visible:-outline-offset-(--ui-focus-ring-offset) focus-visible:outline-solid'
 
 /** A line of soft text in the list: the name of a group, nothing found or loading. */
-export const selectNote = 'px-2 py-1.5 text-sm text-text-soft'
+export const selectNote = 'px-2 py-1.5 text-sm/[inherit] text-text-soft'
 
 /**
  * What <UISelect> and <UICombobox> share: the root dims itself when disabled and holds the clear button over the

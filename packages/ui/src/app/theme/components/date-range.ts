@@ -24,14 +24,14 @@ import { defineTheme } from '../../utils/theme'
 export const dateRangeTheme = defineTheme({
 	slots: {
 		base: 'm-0 grid min-w-0 gap-3 [border:0] p-0 font-sans text-text',
-		legend: 'mb-2 p-0 text-sm font-medium',
+		legend: 'mb-2 p-0 text-sm/[inherit] font-medium',
 		presets: 'flex flex-wrap gap-2',
 		preset: '',
 		fields: 'flex flex-wrap items-end gap-3',
 		field: 'grid min-w-0 flex-[1_1_10rem] gap-1.5',
-		fieldLabel: 'text-sm font-medium',
+		fieldLabel: 'text-sm/[inherit] font-medium',
 		input: '',
-		error: 'm-0 text-sm text-danger-text',
+		error: 'm-0 text-sm/[inherit] text-danger-text',
 	},
 })
 

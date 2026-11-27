@@ -137,7 +137,7 @@ export interface UIRadioOption {
 /**
  * Grupo de radios nativos, con `model` y navegación de flechas del navegador. `ui` añade clases a sus slots:
  * `base` (el `<fieldset>`), `legend`, `options`, `option` (cada `<label>`) e `input`.
- * @example `<UIRadioGroup legend="Periodo" bind:options="periods" variant="segmented" />`
+ * @example `<UIRadioGroup legend="Periodo" bind:options="periods" layout="segmented" />`
  */
 export type UIRadioGroupProps = Omit<ElementAttributes<'fieldset'>, 'class'> &
 	UIThemeProps<
@@ -151,8 +151,12 @@ export type UIRadioGroupProps = Omit<ElementAttributes<'fieldset'>, 'class'> &
 			name?: string
 			/** Selección obligatoria. */
 			required?: boolean
-			/** Presentación simple o segmentada. */
-			variant?: 'default' | 'segmented'
+			/**
+			 * Disposición: una lista de radios (`default`, por defecto) o un control segmentado (`segmented`).
+			 *
+			 * @since 2.0.0 sustituye a `variant`, que queda para el tratamiento visual del catálogo.
+			 */
+			layout?: 'default' | 'segmented'
 			/** Clases adicionales del `<fieldset>`; equivale a `ui.base`. */
 			class?: string
 		}

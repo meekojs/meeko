@@ -244,12 +244,12 @@
 
 			<div class="metrics-filters">
 				<UINavigationTabs
-					variant="segmented"
+					layout="segmented"
 					bind:items="localeLinks"
 					bind:label="t('metrics.locale')"
 				/>
 				<UINavigationTabs
-					variant="segmented"
+					layout="segmented"
 					bind:items="presetLinks"
 					bind:label="t('metrics.range')"
 				/>
@@ -505,14 +505,14 @@
 					<div class="dash-filters">
 						<UIRadioGroup
 							name="comment-status"
-							variant="segmented"
+							layout="segmented"
 							model="status"
 							bind:legend="t('metrics.comments.status')"
 							bind:options="statusOptions"
 						/>
 						<UIRadioGroup
 							name="comment-answer"
-							variant="segmented"
+							layout="segmented"
 							model="answer"
 							bind:legend="t('metrics.helpful')"
 							bind:options="answerOptions"
