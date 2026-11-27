@@ -14,9 +14,9 @@ const extensionRoot = fileURLToPath(new URL('.', import.meta.url))
 const grammarPath = 'syntaxes/meeko.tmLanguage.json'
 
 /** Un ejecutable de `PATH`; en Windows, `code` es `code.cmd`. */
-function onPath(name) {
+function onPath(name, env) {
 	const extensions = process.platform === 'win32' ? ['.exe', '.cmd', '.bat', ''] : ['']
-	for (const folder of (process.env.PATH ?? '').split(delimiter).filter(Boolean)) {
+	for (const folder of (env.PATH ?? '').split(delimiter).filter(Boolean)) {
 		for (const extension of extensions) {
 			const candidate = join(folder, name + extension)
 			if (existsSync(candidate) && statSync(candidate).isFile()) return candidate
@@ -25,20 +25,43 @@ function onPath(name) {
 	return undefined
 }
 
-/**
- * El CLI de VS Code: el indicado, `code` del `PATH` o, en WSL y SSH fuera de una terminal de VS Code,
- * el `code-server` más reciente de `~/.vscode-server`, que instala en el servidor remoto.
- */
-export function codeCli(command) {
-	if (command) return onPath(command) ?? (existsSync(command) ? command : undefined)
-	const found = onPath('code')
-	if (found) return found
-	const servers = join(homedir(), '.vscode-server', 'bin')
+/** El `code-server` más reciente de `~/.vscode-server`, que instala en el servidor remoto. */
+function latestCodeServer(home) {
+	const servers = join(home, '.vscode-server', 'bin')
 	if (!existsSync(servers)) return undefined
 	return readdirSync(servers)
 		.map((name) => join(servers, name, 'bin', 'code-server'))
 		.filter((path) => existsSync(path))
 		.sort((left, right) => statSync(right).mtimeMs - statSync(left).mtimeMs)[0]
+}
+
+/**
+ * El CLI de VS Code: el indicado, `code` del `PATH` o, en WSL y SSH fuera de una terminal de VS Code,
+ * el `code-server` más reciente de `~/.vscode-server`. En WSL el `code` de Windows (bajo `/mnt/`)
+ * instala en WSL, pero `--locate-extension` responde con las extensiones de Windows; por eso allí se
+ * prefiere `code-server`, que instala y localiza en el mismo servidor.
+ * @param {string} [command] CLI indicado con `--code`.
+ * @param {NodeJS.ProcessEnv} [env] Entorno con `PATH` y `WSL_DISTRO_NAME`.
+ * @param {string} [home] Carpeta personal donde buscar `.vscode-server`.
+ */
+export function codeCli(command, env = process.env, home = homedir()) {
+	if (command) return onPath(command, env) ?? (existsSync(command) ? command : undefined)
+	const found = onPath('code', env)
+	return pickCodeCli(found, found && !isWindowsCliInWsl(found, env) ? undefined : latestCodeServer(home), env)
+}
+
+/** En WSL, el `code` de Windows se monta bajo `/mnt/<unidad>/`. */
+const isWindowsCliInWsl = (path, env) => Boolean(env.WSL_DISTRO_NAME) && path.startsWith('/mnt/')
+
+/**
+ * Elige entre el `code` del `PATH` y el `code-server` remoto.
+ * @param {string | undefined} found `code` del `PATH`.
+ * @param {string | undefined} server `code-server` más reciente.
+ * @param {NodeJS.ProcessEnv} env Entorno con `WSL_DISTRO_NAME`.
+ */
+export function pickCodeCli(found, server, env) {
+	if (found && !isWindowsCliInWsl(found, env)) return found
+	return server ?? found
 }
 
 /** JSON normalizado: el mismo contenido con otro formato no cuenta como diferencia. */
