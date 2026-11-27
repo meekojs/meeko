@@ -5,6 +5,7 @@ import type { VirtualComponent } from './model'
 
 import { analyzeComposables } from '../compiler/composables'
 import { parseSfc } from '../compiler/parser/sfc'
+import { t } from './l10n'
 
 /** Family of a reactive declaration of the script, as the editor colors and summarizes it. */
 export type ReactiveKind = 'signal' | 'computed' | 'resource'
@@ -352,28 +353,28 @@ export function reactiveDeclarationAt(analysis: ReactivityAnalysis, offset: numb
 
 /** How the value of a reactive declaration reaches the browser, in one sentence. */
 export function crossing(declaration: ReactiveDeclaration): string {
-	if (declaration.browserOnly) return 'Sólo navegador: se declara después del primer `await` de navegador, en la continuación del setup; nunca llega desde el servidor.'
+	if (declaration.browserOnly) return t('Browser only: declared after the first browser `await`, in the setup continuation; it never comes from the server.')
 	switch (declaration.origin) {
 		case 'useState':
-			return `Pasa al cliente en el estado de la aplicación${declaration.stateKey === undefined ? '' : ` con la clave \`${declaration.stateKey}\``}; un valor por petición, compartido por todos los componentes que usan la clave.`
+			return declaration.stateKey === undefined ? t('Sent to the client in the application state; one value per request, shared by every component that uses the key.') : t('Sent to the client in the application state with the key `{0}`; one value per request, shared by every component that uses the key.', declaration.stateKey)
 		case 'defineModel':
-			return `Modelo \`${declaration.modelName ?? 'default'}\` del padre: el padre lo enlaza con \`${declaration.modelName && declaration.modelName !== 'default' ? `model:${declaration.modelName}` : 'model'}\` y el valor pertenece a su estado.`
+			return t('Model `{0}` of the parent: the parent binds it with `{1}`, and the value belongs to its state.', declaration.modelName ?? 'default', declaration.modelName && declaration.modelName !== 'default' ? `model:${declaration.modelName}` : 'model')
 		case 'useElementRef':
-			return 'Sólo navegador: una referencia a un elemento de esta plantilla, `null` durante el SSR.'
+			return t('Browser only: a reference to an element of this template, `null` during SSR.')
 		case 'computed':
-			return declaration.readsProps ? 'No pasa al cliente: se recalcula en el navegador a partir de sus dependencias, que incluyen props como los datos que el servidor envía a una página.' : 'No pasa al cliente: se recalcula en el navegador a partir de sus dependencias.'
+			return declaration.readsProps ? t('Not sent to the client: recomputed in the browser from its dependencies, which include props such as the data the server sends to a page.') : t('Not sent to the client: recomputed in the browser from its dependencies.')
 		case 'useApi':
 		case 'useRpcQuery':
-			return declaration.awaited ? 'Datos del servidor: se cargan antes del render, también durante el SSR, y viajan en el payload de la página, así que la hidratación los reutiliza sin una segunda petición.' : 'Se carga en el navegador después de montar el componente; el SSR lo renderiza mientras está pendiente.'
+			return declaration.awaited ? t('Server data: loaded before rendering, also during SSR, and carried in the page payload, so hydration reuses it without a second request.') : t('Loaded in the browser after the component mounts; SSR renders it while it is pending.')
 		case 'useRpcMutation':
-			return 'Sólo navegador: llama al procedimiento bajo demanda y nunca se ejecuta durante el SSR.'
+			return t('Browser only: calls the procedure on demand and never runs during SSR.')
 		case 'useApiMutation':
-			return 'Sólo navegador: llama al endpoint bajo demanda y nunca se ejecuta durante el SSR.'
+			return t('Browser only: calls the endpoint on demand and never runs during SSR.')
 		case 'useStorage':
-			return 'No pasa al cliente: el SSR y la hidratación usan el valor inicial, y el navegador aplica el valor guardado en su almacenamiento justo después de hidratar.'
+			return t('Not sent to the client: SSR and hydration use the initial value, and the browser applies the stored value right after hydrating.')
 		case 'signal':
-			return 'Pasa al cliente: su valor se serializa en el estado del componente tras el SSR y se restaura al hidratar, así que debe ser serializable en JSON.'
+			return t('Sent to the client: its value is serialized into the component state after SSR and restored on hydration, so it must be JSON-serializable.')
 		default:
-			return declaration.kind === 'signal' ? 'Pasa al cliente si es una señal editable del setup: su valor se serializa en el estado del componente tras el SSR.' : declaration.kind === 'computed' ? 'No pasa al cliente: una señal de sólo lectura se recalcula en el navegador.' : 'Un recurso de datos de un composable.'
+			return declaration.kind === 'signal' ? t('Sent to the client if it is a writable setup signal: its value is serialized into the component state after SSR.') : declaration.kind === 'computed' ? t('Not sent to the client: a read-only signal is recomputed in the browser.') : t('A data resource from a composable.')
 	}
 }

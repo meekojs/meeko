@@ -11,9 +11,10 @@ import { CompletionRequest, CompletionResolveRequest, createConnection, createPr
 
 import type { ComponentText } from '../src/language-server/classes.ts'
 
+import { writeClassProvidersManifest } from '../src/framework/class-providers.ts'
 import { classRuleSnippet, cssClassRules, cssImports } from '../src/language-server/class-rules.ts'
 import { classCompletion, classDefinition, classHover, ClassIndex, classTokenAt, classView, resolveClassCompletion } from '../src/language-server/classes.ts'
-import { startLanguageServer } from '../src/language-server/server.ts'
+import { ClassProvidersRequest, startLanguageServer } from '../src/language-server/server.ts'
 import { createTempProject } from './helpers/temp-project.ts'
 
 /** A text and the offset of `|` in it. */
@@ -287,29 +288,41 @@ describe('CSS classes in the language server', () => {
 			assert.equal(definition[0]!.range.start.line, 7)
 
 			// Configuration changes are applied without restarting the server.
-			const configure = async (completion: 'auto' | 'on' | 'off', tailwindActive: boolean, hover: 'auto' | 'on' | 'off' = 'auto', definition = true): Promise<void> => {
-				await client.sendNotification(DidChangeConfigurationNotification.type, { settings: { meeko: { classes: { completion, hover, definition, tailwindActive } } } })
+			// `activeExtensions` is what a client from 1.12 sends; without it, `tailwindActive` is the signal of an older one.
+			const configure = async (completion: 'auto' | 'on' | 'off', activeExtensions: readonly string[] | undefined, hover: 'auto' | 'on' | 'off' = 'auto', definition = true, tailwindActive?: boolean): Promise<void> => {
+				const classes = { completion, hover, definition, ...(activeExtensions ? { activeExtensions } : {}), ...(tailwindActive === undefined ? {} : { tailwindActive }) }
+				await client.sendNotification(DidChangeConfigurationNotification.type, { settings: { meeko: { classes } } })
 			}
-			await configure('off', true)
+			const tailwind = ['bradlc.vscode-tailwindcss']
+			await configure('off', tailwind)
 			const off = await client.sendRequest(CompletionRequest.type, { textDocument: { uri }, position })
 			assert.ok(!JSON.stringify(off).includes('"meekoClass"'))
 			assert.ok(await client.sendRequest(HoverRequest.type, { textDocument: { uri }, position }), 'completion off does not disable hover')
 			assert.ok(await client.sendRequest(DefinitionRequest.type, { textDocument: { uri }, position }), 'completion off does not disable definition')
-			await configure('on', false, 'off', false)
+			await configure('on', [], 'off', false)
 			assert.ok(labels((await complete('button u-7"', 'button '.length)).items).includes('u-1'), 'hover and definition off do not disable completion')
 			assert.equal(await client.sendRequest(HoverRequest.type, { textDocument: { uri }, position }), null)
 			assert.equal(await client.sendRequest(DefinitionRequest.type, { textDocument: { uri }, position }), null)
-			await configure('auto', true)
-			assert.ok(labels((await complete('button u-7"', 'button '.length)).items).includes('u-1'), 'without Tailwind the snapshot remains available')
-			await writeFile(join(root, 'package.json'), '{"dependencies":{"tailwindcss":"4"}}')
-			for (const [mode, active, generated] of [
-				['auto', true, false],
-				['auto', false, true],
-				['on', true, true],
+			// No declared provider: the server does not look for one in package.json or in the stylesheets.
+			await writeFile(join(root, 'package.json'), '{"private":true,"type":"module","dependencies":{"tailwindcss":"4"}}')
+			await configure('auto', tailwind, 'auto', true, true)
+			assert.ok(labels((await complete('button u-7"', 'button '.length)).items).includes('u-1'), 'without a declared provider the snapshot remains available')
+			assert.deepEqual(await client.sendRequest(ClassProvidersRequest, { textDocument: { uri } }), { providers: [] })
+			// The manifest that `meeko dev` writes from the modules declares one; an untrusted server reads it.
+			await writeClassProvidersManifest(root, [{ name: 'Tailwind CSS', vscode: tailwind, languages: ['tailwindcss'] }])
+			assert.deepEqual(await client.sendRequest(ClassProvidersRequest, { textDocument: { uri } }), { providers: [{ name: 'Tailwind CSS', vscode: tailwind, languages: ['tailwindcss'] }] })
+			for (const [mode, active, legacy, generated] of [
+				['auto', tailwind, undefined, false],
+				['auto', [], true, true],
+				['auto', ['antfu.unocss'], undefined, true],
+				['on', tailwind, undefined, true],
+				// A client before 1.12 sends only `tailwindActive`.
+				['auto', undefined, true, false],
+				['auto', undefined, false, true],
 			] as const) {
-				await configure(mode, active, mode)
+				await configure(mode, active, mode, true, legacy)
 				const names = labels((await complete('button u-7"', 'button '.length)).items)
-				assert.equal(names.includes('u-1'), generated, `${mode}, Tailwind active=${active}`)
+				assert.equal(names.includes('u-1'), generated, `${mode}, active=${String(active)}, tailwindActive=${String(legacy)}`)
 				assert.ok(names.includes('page0'), 'component classes remain available')
 				const dynamicNames = labels((await complete("'is-'", "'is-".length)).items)
 				assert.equal(dynamicNames.includes('u-1'), generated)

@@ -10,7 +10,6 @@ related:
   - "cli:dev"
   - "cli:compile"
   - "@meekojs/meeko/framework#defineMeekoModule"
-  - "@meekojs/meeko/postcss#meekoUtilities"
   - docs/framework.md#escribir-un-módulo
   - docs/api.md#herramientas
 ---

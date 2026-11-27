@@ -3,7 +3,6 @@ import type { ParserOptions } from 'prettier'
 import type { ClassOrder, ClassSortMode } from './classes'
 
 import { classOrderOption, classTokens, sortClassTokens, stylesheetClassOrder } from './classes'
-import { tailwindClassSorter } from './tailwind'
 
 /** Internal option the template printer sets on the expression of a `bind:class`. */
 export const classExpressionOption = '__meekoClassExpression'
@@ -180,7 +179,6 @@ async function orderFor(options: ParserOptions, mode: ClassSortMode): Promise<Cl
 	const passed = (options as unknown as Record<string, unknown>)[classOrderOption] as ClassOrder | undefined
 	if (passed) return passed
 	if (mode === 'stylesheet') return stylesheetClassOrder(options.filepath)
-	if (mode === 'tailwind') return tailwindClassSorter(options.filepath, (options as { meekoTailwindStylesheet?: string }).meekoTailwindStylesheet)
 	return undefined
 }
 

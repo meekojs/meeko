@@ -1,5 +1,20 @@
 name: Verificación
 
+# Esta es la única verificación de cada commit de una PR. `publish.yml` sólo corre con etiquetas, a mano y,
+# en las PR que tocan la cadena de publicación, para ensayarla: ya no repite aquí los jobs de abajo.
+#
+# Qué corre en cada evento:
+#   - `push` a `main`: todo, sin filtros. Es la red de seguridad: cualquier hueco de los filtros de las PR
+#     (una dependencia entre paquetes que no previmos) se descubre aquí, sobre el árbol que se integra.
+#   - `pull_request`: el job `changes` mira los archivos de la PR entera (no sólo del último commit) y cada
+#     job caro corre sólo si cambió algo que prueba. Ante la duda, el job corre: los filtros de exclusión
+#     (`**` menos lo que sabemos que no le afecta) pasan a ser inclusión sólo donde la dependencia es clara.
+#
+# El filtrado vive DENTRO del workflow, nunca en `on.pull_request.paths`: un check obligatorio de un
+# workflow que no arranca por sus rutas no se informa y deja la PR esperando para siempre. Los checks
+# obligatorios de `main` (`test` y `redis-integration`) se ejecutan siempre y informan verde cuando sus
+# jobs se omiten (`skipped` cuenta como éxito; `failure` y `cancelled`, no).
+
 on:
   push:
     branches: [main]
@@ -17,7 +32,150 @@ permissions:
   contents: read
 
 jobs:
+  # Decide qué jobs corren. En `push` a `main` todas las salidas valen `true` y no se mira ningún archivo;
+  # en una PR salen de los archivos que cambia la PR entera (API de GitHub, sin checkout). Si este job falla,
+  # `test` falla con él: un filtro roto nunca deja pasar una PR en silencio.
+  changes:
+    name: Detectar cambios
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      # Tipos y lint, y los contratos de soporte de pruebas: todo lo que no sea prosa.
+      checks: ${{ github.event_name != 'pull_request' || steps.filter.outputs.global == 'true' || steps.filter.outputs.code == 'true' }}
+      # Pruebas pesadas de core-tests (navegador, empaquetado, conformidad Node).
+      core: ${{ github.event_name != 'pull_request' || steps.filter.outputs.global == 'true' || steps.filter.outputs.core == 'true' || steps.filter.outputs.vscode_live == 'true' }}
+      # Cambios sólo de documentación: core-tests ejecuta únicamente las pruebas que leen esos archivos.
+      prose: ${{ github.event_name != 'pull_request' || steps.filter.outputs.prose == 'true' }}
+      verify: ${{ github.event_name != 'pull_request' || steps.filter.outputs.global == 'true' || steps.filter.outputs.verify == 'true' || steps.filter.outputs.verify_extra == 'true' }}
+      ui_browser: ${{ github.event_name != 'pull_request' || steps.filter.outputs.global == 'true' || steps.filter.outputs.ui_browser == 'true' }}
+      # Redis, Bun, Deno y workerd: runtimes y adaptadores del servidor.
+      runtimes: ${{ github.event_name != 'pull_request' || steps.filter.outputs.global == 'true' || steps.filter.outputs.runtimes == 'true' }}
+      vscode: ${{ github.event_name != 'pull_request' || steps.filter.outputs.global == 'true' || steps.filter.outputs.vscode == 'true' }}
+      performance: ${{ github.event_name != 'pull_request' || steps.filter.outputs.global == 'true' || steps.filter.outputs.performance == 'true' }}
+      # Ensayo de la publicación (tarballs, `npm publish --dry-run`, VSIX y ZIP).
+      publish: ${{ github.event_name != 'pull_request' || steps.filter.outputs.global == 'true' || steps.filter.outputs.publish == 'true' }}
+    steps:
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        id: filter
+        if: github.event_name == 'pull_request'
+        with:
+          # Con `some-with-excludes` un archivo cuenta si encaja con algún patrón y con ningún `!patrón`;
+          # una exclusión es definitiva. Los filtros sólo con patrones positivos (inclusión) no cambian.
+          predicate-quantifier: some-with-excludes
+          filters: |
+            # Cualquier cambio aquí lo dispara todo: la instalación, la construcción, los scripts de CI y
+            # la propia configuración de los workflows afectan a todos los jobs.
+            global:
+              - '.github/**'
+              - '.gitattributes'
+              - '.prettierignore'
+              - 'eslint.config.ts'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'prettier.config.ts'
+              - 'scripts/**'
+              - 'tsconfig.base.json'
+              - 'tsdown.config.ts'
+              - 'turbo.json'
+
+            # Exclusiones compartidas (el filtro `*_ignored` por sí solo no encaja con nada).
+            prose_ignored: &prose_ignored
+              - '!docs/**'
+              - '!*.md'
+              - '!LICENSE'
+            tooling_ignored: &tooling_ignored
+              - '!.claude/**'
+              - '!.claude-plugin/**'
+              - '!.codex/**'
+              - '!.vscode/**'
+              - '!.woodpecker/**'
+              - '!plugins/**'
+              - '!skills-lock.json'
+              - '!sonar-project.properties'
+
+            # Prosa: lo leen las pruebas de contenido de documentación (core-tests) y poco más.
+            prose:
+              - 'docs/**'
+              - '*.md'
+              - 'LICENSE'
+            # Todo lo que no es prosa raíz: lint, tipos y contratos de soporte.
+            code:
+              - '**'
+              - *prose_ignored
+            # Pruebas pesadas: todo salvo la prosa, la extensión de VS Code (no la leen) y el despliegue.
+            core:
+              - '**'
+              - *prose_ignored
+              - *tooling_ignored
+              - '!packages/vscode/**'
+              - '!deploy/**'
+            # El E2E del puente de editor importa el cliente en vivo de la extensión.
+            vscode_live:
+              - 'packages/vscode/src/live/**'
+            # Núcleo, scripts, DevTools, despliegue y diseño. `docs/framework-api.md` y los hooks de
+            # `.claude` los lee alguna prueba. La extensión de VS Code ya tiene sus propios jobs.
+            verify:
+              - '**'
+              - *prose_ignored
+              - *tooling_ignored
+              - '!packages/vscode/**'
+            verify_extra:
+              - 'docs/framework-api.md'
+              - '.claude/hooks/**'
+            # E2E de UI e icon: construyen los sitios de apps/ui y apps/i18n con sus paquetes y el núcleo.
+            ui_browser:
+              - 'apps/i18n/**'
+              - 'apps/ui/**'
+              - 'assets/**'
+              - 'packages/docs/**'
+              - 'packages/docs-content/**'
+              - 'packages/eslint-plugin/**'
+              - 'packages/i18n/**'
+              - 'packages/icon/**'
+              - 'packages/meeko/package.json'
+              - 'packages/meeko/scripts/**'
+              - 'packages/meeko/src/**'
+              - 'packages/meeko/tsconfig*.json'
+              - 'packages/ui/**'
+              - 'packages/utils/**'
+            # Redis, Bun, Deno y workerd: el servidor del núcleo y sus pruebas de conformidad.
+            runtimes:
+              - 'packages/meeko/package.json'
+              - 'packages/meeko/scripts/**'
+              - 'packages/meeko/src/**'
+              - 'packages/meeko/tests/conformance/**'
+              - 'packages/meeko/tests/helpers/**'
+              - 'packages/meeko/tests/redis.integration.ts'
+              - 'packages/meeko/tsconfig*.json'
+            # La extensión empaqueta el servidor de lenguaje (importa casi todo `packages/meeko/src`) y
+            # prepara su host instalando el tarball del núcleo.
+            vscode:
+              - 'packages/meeko/package.json'
+              - 'packages/meeko/scripts/**'
+              - 'packages/meeko/src/**'
+              - 'packages/meeko/tsconfig*.json'
+              - 'packages/vscode/**'
+            performance:
+              - 'packages/meeko/benchmarks/**'
+              - 'packages/meeko/examples/**'
+              - 'packages/meeko/package.json'
+              - 'packages/meeko/scripts/**'
+              - 'packages/meeko/src/**'
+              - 'packages/meeko/tsconfig*.json'
+            # Cadena de publicación que `publish.yml` ensayaba en las PR (ahora lo hace `package-gates`).
+            publish:
+              - 'packages/devtools/package-zip.ps1'
+              - 'packages/vscode/package-vsix.mjs'
+              - 'packages/vscode/package-vsix.ps1'
+
   core-tests:
+    needs: changes
+    # Sin cambios que pruebe, no arranca; con sólo prosa, ejecuta únicamente las pruebas de documentación.
+    if: needs.changes.outputs.core == 'true' || needs.changes.outputs.prose == 'true'
     runs-on: windows-latest
     timeout-minutes: 90
     steps:
@@ -26,6 +184,7 @@ jobs:
         with:
           build: 'true'
       - name: Test UI, i18n, icon, ESLint and Prettier
+        if: needs.changes.outputs.core == 'true'
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force .meeko/ci-logs | Out-Null
@@ -41,12 +200,16 @@ jobs:
       - name: Check and test the documentation dashboard
         run: pnpm -F meeko-dashboard run check && pnpm -F meeko-dashboard run test
       - name: Node adapter conformance
+        if: needs.changes.outputs.core == 'true'
         shell: pwsh
         run: |
+          New-Item -ItemType Directory -Force .meeko/ci-logs | Out-Null
           pnpm run conformance:node 2>&1 | Tee-Object -FilePath .meeko/ci-logs/conformance-node.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - run: node packages/meeko/node_modules/playwright-core/cli.js install chromium firefox webkit
+      - if: needs.changes.outputs.core == 'true'
+        run: node packages/meeko/node_modules/playwright-core/cli.js install chromium firefox webkit
       - name: i18n public site E2E
+        if: needs.changes.outputs.core == 'true'
         shell: pwsh
         run: |
           pnpm -F meeko-i18n-site run build
@@ -55,24 +218,29 @@ jobs:
           pnpm -F meeko-i18n-site run test:e2e 2>&1 | Tee-Object -FilePath .meeko/ci-logs/i18n-site-e2e.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Core browser E2E
+        if: needs.changes.outputs.core == 'true'
         shell: pwsh
         run: |
           $env:MEEKO_E2E_ARTIFACTS = Join-Path $PWD '.meeko/ci-logs/browser-artifacts'
           pnpm -F @meekojs/meeko run e2e:prepared 2>&1 | Tee-Object -FilePath .meeko/ci-logs/browser-e2e.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Pilot multimotor E2E
+        if: needs.changes.outputs.core == 'true'
         shell: pwsh
         run: |
           $env:MEEKO_E2E_ARTIFACTS = Join-Path $PWD '.meeko/ci-logs/browser-artifacts'
           pnpm run pilot:e2e 2>&1 | Tee-Object -FilePath .meeko/ci-logs/pilot-e2e.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - run: pnpm run package:smoke
+      - if: needs.changes.outputs.core == 'true'
+        run: pnpm run package:smoke
       - name: Installed workspace packages consumer
+        if: needs.changes.outputs.core == 'true'
         shell: pwsh
         run: |
           pnpm run package:workspace-smoke 2>&1 | Tee-Object -FilePath .meeko/ci-logs/workspace-consumer.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Pack public artifact
+        if: needs.changes.outputs.core == 'true'
         shell: pwsh
         working-directory: packages/meeko
         run: |
@@ -80,6 +248,7 @@ jobs:
           pnpm pack --pack-destination .meeko/ci-artifacts
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Full-stack tarball consumer and browser
+        if: needs.changes.outputs.core == 'true'
         shell: pwsh
         env:
           MEEKO_BROWSER_CHANNEL: chromium
@@ -104,6 +273,8 @@ jobs:
 
   checks:
     name: Types and lint
+    needs: changes
+    if: needs.changes.outputs.checks == 'true'
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
@@ -122,6 +293,8 @@ jobs:
 
   test-support:
     name: Test support (${{ matrix.os }})
+    needs: changes
+    if: needs.changes.outputs.checks == 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     strategy:
@@ -138,6 +311,8 @@ jobs:
 
   verify:
     name: Verify package and DevTools (${{ matrix.shard }}/3)
+    needs: changes
+    if: needs.changes.outputs.verify == 'true'
     runs-on: windows-latest
     timeout-minutes: 90
     strategy:
@@ -168,6 +343,8 @@ jobs:
 
   ui-browser:
     name: UI browser E2E (${{ matrix.shard }}/3)
+    needs: changes
+    if: needs.changes.outputs.ui_browser == 'true'
     runs-on: windows-latest
     timeout-minutes: 45
     strategy:
@@ -202,29 +379,40 @@ jobs:
           path: .meeko/ci-logs/ui-e2e.log
           if-no-files-found: ignore
 
-  # Conserva el check `test` como resultado único de todos los gates anteriores.
+  # Conserva el check `test` como resultado único de todos los gates anteriores. Es obligatorio en `main`,
+  # así que se ejecuta siempre (`always()`): un job omitido por los filtros de `changes` cuenta como éxito,
+  # mientras que `failure` y `cancelled` fallan. `changes` debe terminar en `success`: si falla, el resto
+  # queda omitido y sin esta comprobación `test` daría verde sin haber probado nada.
   test:
-    needs: [core-tests, checks, test-support, verify, ui-browser]
+    needs: [changes, core-tests, checks, test-support, verify, ui-browser]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Require every test job to pass
         env:
+          CHANGES: ${{ needs.changes.result }}
           CHECKS: ${{ needs.checks.result }}
           TEST_SUPPORT: ${{ needs.test-support.result }}
           CORE: ${{ needs.core-tests.result }}
           VERIFY: ${{ needs.verify.result }}
           UI_BROWSER: ${{ needs.ui-browser.result }}
         run: |
-          test "$CHECKS" = success
-          test "$TEST_SUPPORT" = success
-          test "$CORE" = success
-          test "$VERIFY" = success
-          test "$UI_BROWSER" = success
+          failed=0
+          test "$CHANGES" = success || { echo "::error::changes ended as $CHANGES"; failed=1; }
+          for job in CHECKS TEST_SUPPORT CORE VERIFY UI_BROWSER; do
+            result="${!job}"
+            case "$result" in
+              success | skipped) ;;
+              *) echo "::error::$job ended as $result"; failed=1 ;;
+            esac
+          done
+          exit "$failed"
 
   performance:
     name: Performance budgets
+    needs: changes
+    if: needs.changes.outputs.performance == 'true'
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
@@ -245,7 +433,9 @@ jobs:
             packages/meeko/.meeko/performance/comparison.json
           if-no-files-found: ignore
 
+  # Check obligatorio de `main`: el job arranca siempre y informa verde; sólo sus pasos dependen del filtro.
   redis-integration:
+    needs: changes
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     services:
@@ -260,8 +450,11 @@ jobs:
           --health-retries 10
     steps:
       - uses: actions/checkout@v7
+        if: needs.changes.outputs.runtimes == 'true'
       - uses: ./.github/actions/setup-workspace
+        if: needs.changes.outputs.runtimes == 'true'
       - name: Redis real session integration
+        if: needs.changes.outputs.runtimes == 'true'
         run: |
           mkdir -p .meeko/ci-logs
           set -o pipefail
@@ -278,6 +471,8 @@ jobs:
 
   bun:
     name: Conformidad Bun
+    needs: changes
+    if: needs.changes.outputs.runtimes == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -303,6 +498,8 @@ jobs:
 
   deno:
     name: Conformidad Deno
+    needs: changes
+    if: needs.changes.outputs.runtimes == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -328,6 +525,8 @@ jobs:
 
   workerd:
     name: Conformidad workerd
+    needs: changes
+    if: needs.changes.outputs.runtimes == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -352,6 +551,8 @@ jobs:
 
   vscode-extension:
     name: VS Code (${{ matrix.os }})
+    needs: changes
+    if: needs.changes.outputs.vscode == 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
@@ -371,3 +572,62 @@ jobs:
       - run: xvfb-run -a pnpm run test:host:isolated
         working-directory: packages/vscode
         if: runner.os == 'Linux'
+
+  # Ensayo de publicación en una PR: lo que `publish.yml` hace sin etiqueta (versiones, formato, los seis
+  # tarballs, `npm publish --dry-run`, los seis VSIX y el ZIP de DevTools), sin repetir las pruebas que ya
+  # corren los demás jobs de este workflow sobre el mismo commit. No publica nada: no tiene `id-token` ni
+  # environment. `publish.yml` conserva el flujo completo para etiquetas y para el lanzamiento a mano; antes
+  # de etiquetar, `gh workflow run publish.yml --ref <rama>` lo ejecuta entero sobre la rama.
+  package-gates:
+    name: Ensayo de publicación
+    needs: changes
+    if: needs.changes.outputs.publish == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - name: Comprobar versión en los seis paquetes
+        shell: pwsh
+        # Sin etiqueta, la versión es la de @meekojs/meeko y los seis deben coincidir con ella.
+        run: |
+          $expected = (Get-Content -Raw 'packages/meeko/package.json' | ConvertFrom-Json).version
+          foreach ($name in @('meeko', 'i18n', 'icon', 'ui', 'eslint-plugin', 'prettier-plugin')) {
+            $manifest = Get-Content -Raw "packages/$name/package.json" | ConvertFrom-Json
+            if ($expected -ne $manifest.version -or $manifest.private) {
+              throw "La versión $expected no coincide con $($manifest.name) ($($manifest.version))."
+            }
+          }
+          "RELEASE_VERSION=$expected" >> $env:GITHUB_ENV
+      - uses: ./.github/actions/setup-workspace
+        with:
+          build: 'true'
+          npm-cache: 'true'
+      - run: pnpm format:check
+      - name: Empaquetar y comprobar los seis tarballs
+        shell: pwsh
+        run: ./scripts/publish-packages.ps1 -PackOnly -ExpectedVersion $env:RELEASE_VERSION -ArtifactDirectory (Join-Path $env:RUNNER_TEMP 'npm-tarballs')
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+      - name: Ensayar con npm publish --dry-run
+        shell: pwsh
+        run: |
+          # Outside the checkout: npm 11 refuses to run under the devEngines of its package.json.
+          Push-Location -LiteralPath $env:RUNNER_TEMP
+          npm install --global npm@11.19.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Pop-Location
+          ./scripts/publish-packages.ps1 -Trusted -ExpectedVersion $env:RELEASE_VERSION -ArtifactDirectory (Join-Path $env:RUNNER_TEMP 'npm-tarballs')
+      - name: Empaquetar los seis VSIX y el ZIP de Chrome
+        shell: pwsh
+        run: |
+          $vscodeVersion = node -p "JSON.parse(require('node:fs').readFileSync('packages/vscode/package.json', 'utf8')).version"
+          $devtoolsVersion = node -p "JSON.parse(require('node:fs').readFileSync('packages/devtools/manifest.json', 'utf8')).version"
+          $assets = Join-Path $env:RUNNER_TEMP 'release-assets'
+          New-Item -ItemType Directory -Force $assets | Out-Null
+          ./scripts/package-vsix-matrix.ps1 -ExpectedVersion $vscodeVersion -OutputDirectory $assets
+          pwsh -NoProfile -File packages/devtools/package-zip.ps1 -OutputPath (Join-Path $assets "meeko-devtools-$devtoolsVersion.zip")
+          if ($LASTEXITCODE -ne 0) { throw 'Falló el ZIP de Chrome DevTools.' }
+          ./scripts/release-assets.ps1 -Directory $assets -VscodeVersion $vscodeVersion -DevtoolsVersion $devtoolsVersion -WriteChecksums | Out-Null
+          Get-ChildItem -LiteralPath $assets -File | Format-Table Name, Length

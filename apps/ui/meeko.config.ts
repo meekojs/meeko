@@ -4,6 +4,8 @@ import { docsLocaleDefaults, docsShellCatalog, docsSiteDefaults } from 'meeko-do
 export default defineMeekoConfig({
 	...docsSiteDefaults('ui', 'Componentes tipados, temas y documentación para construir interfaces con Meeko.'),
 	server: { adapter: 'node', port: 4174 },
+	// URL con nombre de portless (https://ui.meeko.localhost) sin envolver el script; ver dev.portless.
+	dev: { portless: { name: 'ui.meeko' } },
 	modules: ['@meekojs/ui', '@meekojs/ui/editor', '@meekojs/icon', 'meeko-docs', '@meekojs/i18n'],
 	// Iconos de Lucide resueltos al compilar; include, los que la guía de /icons alterna con bind:name.
 	icon: { collections: ['lucide'], include: ['lucide:sun', 'lucide:moon'] },

@@ -240,9 +240,6 @@ catalogs:
     '@radix-ui/colors':
       specifier: 3.0.0
       version: 3.0.0
-    '@tailwindcss/postcss':
-      specifier: 4.3.5
-      version: 4.3.5
     '@tailwindcss/vite':
       specifier: ^4.3.5
       version: 4.3.5
@@ -273,9 +270,6 @@ catalogs:
     '@vscode/test-electron':
       specifier: 3.1.0
       version: 3.1.0
-    csstype:
-      specifier: ^3.2.3
-      version: 3.2.3
     esbuild:
       specifier: 0.28.2
       version: 0.28.2
@@ -315,6 +309,9 @@ catalogs:
     playwright-core:
       specifier: 1.65.1
       version: 1.65.1
+    portless:
+      specifier: 0.18.1
+      version: 0.18.1
     postcss:
       specifier: ^8.5.33
       version: 8.5.33
@@ -435,6 +432,9 @@ importers:
       jiti:
         specifier: 'catalog:'
         version: 2.7.0
+      portless:
+        specifier: 'catalog:'
+        version: 0.18.1
       prettier:
         specifier: 'catalog:'
         version: 3.10.1
@@ -806,9 +806,6 @@ importers:
       '@typescript/typescript6':
         specifier: 'catalog:'
         version: 6.0.2
-      csstype:
-        specifier: 'catalog:'
-        version: 3.2.3
       parse5:
         specifier: 'catalog:'
         version: 8.1.1
@@ -843,12 +840,6 @@ importers:
       '@mdn/browser-compat-data':
         specifier: 'catalog:'
         version: 8.1.9
-      '@tailwindcss/postcss':
-        specifier: 'catalog:'
-        version: 4.3.5
-      '@tailwindcss/vite':
-        specifier: 'catalog:'
-        version: 4.3.5(vite@8.3.8(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
       '@types/node':
         specifier: 'catalog:'
         version: 24.19.2
@@ -867,9 +858,6 @@ importers:
       redis:
         specifier: 'catalog:'
         version: 6.3.1
-      tailwindcss:
-        specifier: 'catalog:'
-        version: 4.3.5
       tsx:
         specifier: 'catalog:'
         version: 4.23.15
@@ -894,9 +882,6 @@ importers:
       postcss-selector-parser:
         specifier: 'catalog:'
         version: 7.2.1
-      tailwindcss:
-        specifier: ^4.0.0
-        version: 4.3.5
     devDependencies:
       '@meekojs/meeko':
         specifier: workspace:*
@@ -1046,10 +1031,6 @@ importers:
         version: 9.3.2
 
 packages:
-
-  '@alloc/quick-lru@5.3.0':
-    resolution: {integrity: sha512-U4+70Pc5ZS9osnCBCE5Jha/ciHM+Yp+CNMNC/7HvYbNRk1Ldd+f7qO65W5qfhu/TCv+/ozljlXXe9Nj8419DMA==}
-    engines: {node: '>=10'}
 
   '@antfu/install-pkg@2.1.0':
     resolution: {integrity: sha512-sdg9NxU3zR4Mnawfbc/x6GB5Wf17WYud5qOuEuxXjaKpYpMkISSJEjItGebXJ2bQ4DIcly4NYH23mtkGJjvKUw==}
@@ -2204,9 +2185,6 @@ packages:
   '@tailwindcss/oxide@4.3.5':
     resolution: {integrity: sha512-PynqGLZsZvwM9tqD/CUxkOIfyd6K5elZ2MooauzJryP/UqXYgi3yYbtt3N0Xe+MHV/eFKPFQCEfIKAqlAS1CBg==}
     engines: {node: '>= 20'}
-
-  '@tailwindcss/postcss@4.3.5':
-    resolution: {integrity: sha512-FAV37Tlx9wBiT/hkfgVD0Q6CWsP2oUX3lf28nrfjW8+ksILjnpuFulUqWDfNR4/ZiEHHDRBX8DUTzD1Rys687A==}
 
   '@tailwindcss/vite@4.3.5':
     resolution: {integrity: sha512-BCNiY0a1ZjdOHVqw7kyb7U72BwfMF3dfUuN+tQsLWky/J5JOI/r7abibglXfygrZhVO/3u3V+E25kkKTeMkXaQ==}
@@ -3429,6 +3407,12 @@ packages:
     engines: {node: '>=20'}
     hasBin: true
 
+  portless@0.18.1:
+    resolution: {integrity: sha512-3gfeicAvS5kwFUbZrsZpt1oU1MUBvfiy2S0MT/n8mwWEp/ZjQsWI0mC353GEi/q8JUVgdx7lBGDzCcMI9O1MXg==}
+    engines: {node: '>=24'}
+    os: [darwin, linux, win32]
+    hasBin: true
+
   postcss-less@6.0.0:
     resolution: {integrity: sha512-FPX16mQLyEjLzEuuJtxA8X3ejDLNGGEG503d2YGZR5Ask1SpDN8KmZUMpzCvyalWRywAn1n1VOA5dcqfCLo5rg==}
     engines: {node: '>=12'}
@@ -3444,10 +3428,6 @@ packages:
   postcss-selector-parser@7.2.1:
     resolution: {integrity: sha512-GwxlMgTTXwIom+ebC7an3k6RaJDwklRQQnfiXsLPGicu8FYV/k/+1/9YY2OU2+r938H2t4X0TDxoif+HP2rjzQ==}
     engines: {node: '>=4'}
-
-  postcss@8.5.31:
-    resolution: {integrity: sha512-YUbWYCgErwnMAVkjUnYa+KlMBzGpHwiIt/DE7f0G33AuX2LH9UcTk6KgWxd3zRU+pN3u/C+Xl3EnMLM4Hea7Sg==}
-    engines: {node: ^10 || ^12 || >=14}
 
   postcss@8.5.33:
     resolution: {integrity: sha512-RVHEU9/Pp1Fnjr/MpAJsZoADukCKhfIi15OunEYiGktIkYLkPVvC1sioWolGDS7XByMTx9m/IGbro0Js13zhnQ==}
@@ -4076,8 +4056,6 @@ packages:
     resolution: {integrity: sha512-bXE4cR/kVZhKZX/RjPEflHaKVhUVl85noU3v6b8apfQEc1x4A+zBxjZ4lN8LqGd6WZ3dl98pY4o717VFmoPp+A==}
 
 snapshots:
-
-  '@alloc/quick-lru@5.3.0': {}
 
   '@antfu/install-pkg@2.1.0':
     dependencies:
@@ -5367,14 +5345,6 @@ snapshots:
       '@tailwindcss/oxide-wasm32-wasi': 4.3.5
       '@tailwindcss/oxide-win32-arm64-msvc': 4.3.5
       '@tailwindcss/oxide-win32-x64-msvc': 4.3.5
-
-  '@tailwindcss/postcss@4.3.5':
-    dependencies:
-      '@alloc/quick-lru': 5.3.0
-      '@tailwindcss/node': 4.3.5
-      '@tailwindcss/oxide': 4.3.5
-      postcss: 8.5.31
-      tailwindcss: 4.3.5
 
   '@tailwindcss/vite@4.3.5(vite@8.3.8(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))':
     dependencies:
@@ -6769,6 +6739,8 @@ snapshots:
 
   playwright-core@1.65.1: {}
 
+  portless@0.18.1: {}
+
   postcss-less@6.0.0(postcss@8.5.33):
     dependencies:
       postcss: 8.5.33
@@ -6780,12 +6752,6 @@ snapshots:
   postcss-selector-parser@7.2.1:
     dependencies:
       util-deprecate: 1.0.2
-
-  postcss@8.5.31:
-    dependencies:
-      nanoid: 3.3.20
-      picocolors: 1.1.1
-      source-map-js: 1.2.2
 
   postcss@8.5.33:
     dependencies:

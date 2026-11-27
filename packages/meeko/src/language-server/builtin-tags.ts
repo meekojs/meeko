@@ -7,6 +7,7 @@ import { builtinComponentModules } from '../compiler'
  * `builtinTagTypes` of `autoimports/registry.ts`, which autoimports it.
  */
 import { readThemeEnabledSync } from '../framework/config'
+import { t } from './l10n'
 
 /** A prop of a built-in tag, as the template writes it. */
 export interface BuiltinTagProp {
@@ -106,12 +107,16 @@ const selectGuide = 'https://github.com/meekojs/meeko/blob/main/docs/api.md#sele
 const placements = 'top,top-start,top-end,bottom,bottom-start,bottom-end,left,left-start,left-end,right,right-start,right-end'
 
 /** A prop of the table, for the props that `<MeekoPopover>` and `<MeekoSelect>` share. */
-function prop(name: string, type: string, documentation: string, detail: string, options: { attributes?: readonly string[]; insert?: string; optional?: boolean } = {}): BuiltinTagProp {
+function prop(name: string, type: string, documentation: () => string, detail: string | (() => string), options: { attributes?: readonly string[]; insert?: string; optional?: boolean } = {}): BuiltinTagProp {
 	return {
 		name,
 		type,
-		documentation,
-		detail,
+		get documentation() {
+			return documentation()
+		},
+		get detail() {
+			return typeof detail === 'function' ? detail() : detail
+		},
 		attributes: options.attributes ?? [`bind:${name}`],
 		optional: options.optional ?? true,
 		insert: options.insert ?? `${options.attributes?.[0] ?? `bind:${name}`}="$1"`,
@@ -156,9 +161,13 @@ export const builtinTags: readonly BuiltinTag[] = [
 				attributes: ['to', 'bind:to'],
 				type: 'string',
 				optional: false,
-				documentation: 'ID de la ruta de destino, como `to="/users/[id]"`: sólo las rutas que existen.',
+				get documentation() {
+					return t('Route ID of the target, like `to="/users/[id]"`: only routes that exist.')
+				},
 				insert: 'to="$1"',
-				detail: 'Ruta de la página, como /users/[id]: sólo las que existen',
+				get detail() {
+					return t('Page route, like /users/[id]: only existing ones')
+				},
 				suggest: true,
 			},
 			{
@@ -166,53 +175,86 @@ export const builtinTags: readonly BuiltinTag[] = [
 				attributes: ['bind:params'],
 				type: 'Record<string, string>',
 				optional: true,
-				documentation: 'Parámetros de una ruta dinámica, como `bind:params="{ id: user.id }"`; obligatorios en las rutas dinámicas.',
+				get documentation() {
+					return t('Parameters of a dynamic route, like `bind:params="{ id: user.id }"`; required on dynamic routes.')
+				},
 				insert: 'bind:params="{ $1 }"',
-				detail: 'Parámetros de una ruta dinámica, como { id: user.id }',
+				get detail() {
+					return t('Parameters of a dynamic route, like { id: user.id }')
+				},
 			},
 			{
 				name: 'search',
 				attributes: ['bind:search'],
 				type: 'Readonly<Record<string, string | number | boolean | null | undefined>>',
 				optional: true,
-				documentation: 'Query string, como `bind:search="{ tab: \'perfil\' }"`. Omite `null` y `undefined`.',
+				get documentation() {
+					return t('Query string, like `bind:search="{ tab: \'profile\' }"`. Omits `null` and `undefined`.')
+				},
 				insert: 'bind:search="{ $1 }"',
-				detail: 'Query string, como { tab: "perfil" }',
+				get detail() {
+					return t('Query string, like { tab: "profile" }')
+				},
 			},
 			{
 				name: 'match',
 				attributes: ['match', 'bind:match'],
 				type: '"exact" | "prefix"',
 				optional: true,
-				documentation: '`"exact"` (por defecto), activo sólo en su ruta, con `aria-current="page"`; `"prefix"`, también en las rutas por debajo ' + '(`/dashboard` cubre `/dashboard/stats`), con `aria-current="true"`. `to="/"` sólo coincide exacta.',
+				get documentation() {
+					return t('`"exact"` (default), active only on its own route, with `aria-current="page"`; `"prefix"`, also on the routes below it (`/dashboard` covers `/dashboard/stats`), with `aria-current="true"`. `to="/"` only matches exactly.')
+				},
 				insert: 'match="${1|exact,prefix|}"',
-				detail: '"exact" (por defecto), sólo su ruta, o "prefix", también las rutas por debajo',
+				get detail() {
+					return t('"exact" (default), only its own route, or "prefix", also the routes below it')
+				},
 			},
 			{
 				name: 'resolve',
 				attributes: ['bind:resolve'],
 				type: 'boolean',
 				optional: true,
-				documentation: 'Si el `href` pasa por los resolvedores de enlaces de la aplicación (`app.resolveLink`, como el prefijo de idioma de `@meekojs/i18n`). ' + '`true` por defecto; `bind:resolve="false"` deja el `href` de `href()`.',
+				get documentation() {
+					return t('Whether the `href` goes through the application link resolvers (`app.resolveLink`, like the language prefix of `@meekojs/i18n`). `true` by default; `bind:resolve="false"` leaves the `href` of `href()`.')
+				},
 				insert: 'bind:resolve="false"',
-				detail: 'false: el href sin resolvedores de enlaces, como el prefijo de idioma',
+				get detail() {
+					return t('false: the href without link resolvers, like the language prefix')
+				},
 			},
 		],
-		snippets: [{ name: 'default', parameters: '', optional: true, documentation: 'El contenido del enlace, dentro del `<a>`.' }],
+		snippets: [
+			{
+				name: 'default',
+				parameters: '',
+				optional: true,
+				get documentation() {
+					return t('The content of the link, inside the `<a>`.')
+				},
+			},
+		],
 		element: 'a',
 		rejected: ['href', 'bind:href', 'params', 'search', 'resolve'],
-		summary: 'Enlace a una página de la aplicación: renderiza un `<a>` cuyo `href` construye `href()` con `to`, `bind:params` y `bind:search`, ' + 'y añade `aria-current="page"` en la ruta activa; con `match="prefix"`, también `aria-current="true"` en las rutas por debajo. El `href` pasa por los resolvedores de enlaces de la aplicación ' + '(como el prefijo de idioma de `@meekojs/i18n`), salvo con `bind:resolve="false"`. El resto de atributos (`class`, `target`, `hreflang`, `aria-*`, `on:click`…) y el contenido pasan al `<a>`.',
+		get summary() {
+			return t('Link to a page of the application: it renders an `<a>` whose `href` is built by `href()` from `to`, `bind:params` and `bind:search`, and adds `aria-current="page"` on the active route; with `match="prefix"`, also `aria-current="true"` on the routes below it. The `href` goes through the application link resolvers (like the language prefix of `@meekojs/i18n`), except with `bind:resolve="false"`. The remaining attributes (`class`, `target`, `hreflang`, `aria-*`, `on:click`…) and the content go to the `<a>`.')
+		},
 		guide,
-		completion: 'Enlace a una ruta tipada: <MeekoLink to="/users/[id]" bind:params="{ id }">',
+		get completion() {
+			return t('Link to a typed route: <MeekoLink to="/users/[id]" bind:params="{ id }">')
+		},
 	},
 	{
 		name: 'MeekoOutlet',
 		propsType: 'MeekoOutletProps',
 		props: [],
 		snippets: [],
-		summary: 'Pinta el layout o la página que van dentro, a partir de la prop `outlet` que Meeko pasa. Sólo en `app/app.meeko` y en los layouts, ' + 'sin atributos ni contenido (`MEEK104`).',
+		get summary() {
+			return t('Renders the layout or page that goes inside, from the `outlet` prop that Meeko passes. Only in `app/app.meeko` and in layouts, with no attributes or content (`MEEK104`).')
+		},
 		guide,
-		completion: 'La página o el layout de dentro: <MeekoOutlet />',
+		get completion() {
+			return t('The page or layout inside: <MeekoOutlet />')
+		},
 		allowedIn: isOutletHost,
 	},
 	{
@@ -224,64 +266,99 @@ export const builtinTags: readonly BuiltinTag[] = [
 				attributes: ['mode', 'bind:mode'],
 				type: '"cycle" | "select"',
 				optional: true,
-				documentation: '`"cycle"` (por defecto), un botón que pasa a la elección siguiente; `"select"`, un grupo de radios.',
+				get documentation() {
+					return t('`"cycle"` (default), a button that moves to the next choice; `"select"`, a radio group.')
+				},
 				insert: 'mode="${1|cycle,select|}"',
-				detail: '"cycle" (por defecto), un botón que pasa al tema siguiente, o "select", un grupo de radios',
+				get detail() {
+					return t('"cycle" (default), a button that moves to the next theme, or "select", a radio group')
+				},
 			},
 			{
 				name: 'themes',
 				attributes: ['bind:themes'],
 				type: 'readonly string[]',
 				optional: true,
-				documentation: 'Elecciones y su orden, como `bind:themes="[\'light\', \'dark\']"`; por defecto, los temas de la configuración y `"system"` si está activo.',
+				get documentation() {
+					return t('Choices and their order, like `bind:themes="[\'light\', \'dark\']"`; by default, the themes of the configuration and `"system"` if enabled.')
+				},
 				insert: 'bind:themes="[$1]"',
-				detail: "Elecciones y su orden, como ['light', 'dark']",
+				get detail() {
+					return t("Choices and their order, like ['light', 'dark']")
+				},
 			},
 			{
 				name: 'labels',
 				attributes: ['bind:labels'],
 				type: 'Partial<Record<string, string>>',
 				optional: true,
-				documentation: 'Nombre de cada elección, como `bind:labels="{ dark: \'Oscuro\' }"`; por defecto, «Claro», «Oscuro», «Sistema» y el nombre de los demás temas.',
+				get documentation() {
+					return t('Name of each choice, like `bind:labels="{ dark: \'Oscuro\' }"`; by default, "Claro", "Oscuro", "Sistema" and the name of the other themes.')
+				},
 				insert: 'bind:labels="{ $1 }"',
-				detail: "Nombre de cada elección, como { dark: 'Oscuro' }",
+				get detail() {
+					return t("Name of each choice, like { dark: 'Oscuro' }")
+				},
 			},
 			{
 				name: 'messages',
 				attributes: ['bind:messages'],
 				type: 'ThemeToggleMessages',
 				optional: true,
-				documentation: 'Textos accesibles del botón y del grupo (`cycle(current, next)`, `unknown` y `group`), para traducirlos.',
+				get documentation() {
+					return t('Accessible texts of the button and the group (`cycle(current, next)`, `unknown` and `group`), so you can translate them.')
+				},
 				insert: 'bind:messages="{ $1 }"',
-				detail: 'Textos accesibles: cycle(current, next), unknown y group',
+				get detail() {
+					return t('Accessible texts: cycle(current, next), unknown and group')
+				},
 			},
 			{
 				name: 'class',
 				attributes: ['class', 'bind:class'],
 				type: 'string',
 				optional: true,
-				documentation: 'Clases del elemento raíz, el `<form>`.',
+				get documentation() {
+					return t('Classes of the root element, the `<form>`.')
+				},
 				insert: 'class="$1"',
-				detail: 'Clases del <form> raíz',
+				get detail() {
+					return t('Classes of the root <form>')
+				},
 			},
 			{
 				name: 'id',
 				attributes: ['id', 'bind:id'],
 				type: 'string',
 				optional: true,
-				documentation: '`id` del elemento raíz, el `<form>`.',
+				get documentation() {
+					return t('`id` of the root element, the `<form>`.')
+				},
 				insert: 'id="$1"',
-				detail: 'id del <form> raíz',
+				get detail() {
+					return t('id of the root <form>')
+				},
 			},
 		],
 		// Without the generated declarations of the themes: the choices of `theme: true`.
-		snippets: ['light', 'dark', 'system'].map((name) => ({ name, parameters: '', optional: true, documentation: `Icono de la elección \`${name}\`; sin él se pinta su nombre.` })),
+		snippets: ['light', 'dark', 'system'].map((name) => ({
+			name,
+			parameters: '',
+			optional: true,
+			get documentation() {
+				return t('Icon of the choice `{0}`; without it, its name is rendered.', name)
+			},
+		})),
 		snippetsType: 'ThemeToggleSnippets',
 		component: true,
 		module: builtinComponentModules.MeekoThemeToggle!.specifier,
-		summary: 'Selector de tema claro/oscuro de `theme` en `meeko.config.ts`, un componente que Meeko compila y distribuye: un `<form method="post" action="/_meeko/theme">` ' + 'que funciona sin JavaScript. Pinta un icono por elección, el snippet con su nombre, y la regla que Meeko añade a `<head>` muestra el de `data-theme-choice` de `<html>`, ' + 'así que nunca salta. `mode="cycle"` es un botón que pasa al tema siguiente y `mode="select"`, un grupo de radios. Sin `theme` es el error `MEEK111`.',
+		get summary() {
+			return t('Light/dark theme selector for `theme` in `meeko.config.ts`, a component that Meeko compiles and ships: a `<form method="post" action="/_meeko/theme">` that works without JavaScript. It renders an icon per choice, the snippet with its name, and the rule that Meeko adds to `<head>` shows the one of `data-theme-choice` on `<html>`, so it never jumps. `mode="cycle"` is a button that moves to the next theme and `mode="select"`, a radio group. Without `theme` it is the error `MEEK111`.')
+		},
 		guide: themeGuide,
-		completion: 'Cambia el tema claro/oscuro sin parpadeo: <MeekoThemeToggle mode="cycle">',
+		get completion() {
+			return t('Switches the light/dark theme without flicker: <MeekoThemeToggle mode="cycle">')
+		},
 		enabled: (projectRoot) => readThemeEnabledSync(projectRoot) !== false,
 	},
 	{
@@ -293,57 +370,102 @@ export const builtinTags: readonly BuiltinTag[] = [
 				attributes: ['for', 'bind:for'],
 				type: 'AwaitResource | readonly AwaitResource[]',
 				optional: false,
-				documentation: 'Recurso que espera, como expresión: el resultado de `useApi` o `useRpcQuery` sin `await` (`for="items"`) o una lista (`for="[items, stats]"`). ' + 'Dentro del contenido, `items.data.value` ya no es `null`.',
+				get documentation() {
+					return t('Resource to wait for, as an expression: the result of `useApi` or `useRpcQuery` without `await` (`for="items"`) or a list (`for="[items, stats]"`). Inside the content, `items.data.value` is no longer `null`.')
+				},
 				insert: 'for="$1"',
-				detail: 'Recurso de useApi o useRpcQuery sin await, o una lista: for="items"',
+				get detail() {
+					return t('Resource from useApi or useRpcQuery without await, or a list: for="items"')
+				},
 			},
 			{
 				name: 'reserve',
 				attributes: ['reserve', 'bind:reserve'],
 				type: 'boolean | string',
 				optional: true,
-				documentation: 'Mientras espera, la zona ocupa la altura que tuvo con datos la última vez (por ruta, petición e instancia, en `sessionStorage`). ' + '`reserve="320px"` fija además un mínimo, también en la primera visita.',
+				get documentation() {
+					return t('While waiting, the zone takes the height it had with data last time (per route, request and instance, in `sessionStorage`). `reserve="320px"` also sets a minimum, even on the first visit.')
+				},
 				insert: 'reserve',
-				detail: 'Reserva la altura que tuvo con datos; reserve="320px" añade un mínimo',
+				get detail() {
+					return t('Reserves the height it had with data; reserve="320px" adds a minimum')
+				},
 			},
 			{
 				name: 'messages',
 				attributes: ['bind:messages'],
 				type: 'AwaitMessages',
 				optional: true,
-				documentation: 'Textos del aviso de error por defecto (`error` y `retry`), sin el snippet `error`, para traducirlos.',
+				get documentation() {
+					return t('Texts of the default error notice (`error` and `retry`), without the `error` snippet, so you can translate them.')
+				},
 				insert: 'bind:messages="{ $1 }"',
-				detail: 'Textos del aviso de error por defecto: error y retry',
+				get detail() {
+					return t('Texts of the default error notice: error and retry')
+				},
 			},
 			{
 				name: 'class',
 				attributes: ['class', 'bind:class'],
 				type: 'string',
 				optional: true,
-				documentation: 'Clases del contenedor, un `<div>`.',
+				get documentation() {
+					return t('Classes of the container, a `<div>`.')
+				},
 				insert: 'class="$1"',
-				detail: 'Clases del <div> contenedor',
+				get detail() {
+					return t('Classes of the container <div>')
+				},
 			},
 			{
 				name: 'id',
 				attributes: ['id', 'bind:id'],
 				type: 'string',
 				optional: true,
-				documentation: '`id` del contenedor.',
+				get documentation() {
+					return t('`id` of the container.')
+				},
 				insert: 'id="$1"',
-				detail: 'id del <div> contenedor',
+				get detail() {
+					return t('id of the container <div>')
+				},
 			},
 		],
 		snippets: [
-			{ name: 'default', parameters: 'refreshing: boolean', optional: false, documentation: 'El contenido con datos; `refreshing` es `true` durante una recarga, que lo conserva.' },
-			{ name: 'pending', parameters: '', optional: true, documentation: 'La primera carga: un esqueleto con la altura del contenido.' },
-			{ name: 'error', parameters: 'error: Error, retry: () => void', optional: true, documentation: 'Un fallo sin datos: `error` y `retry`, que vuelve a pedirlos. Sin él, un aviso con `role="alert"` y un botón.' },
+			{
+				name: 'default',
+				parameters: 'refreshing: boolean',
+				optional: false,
+				get documentation() {
+					return t('The content with data; `refreshing` is `true` during a reload, which keeps it.')
+				},
+			},
+			{
+				name: 'pending',
+				parameters: '',
+				optional: true,
+				get documentation() {
+					return t('The first load: a skeleton with the height of the content.')
+				},
+			},
+			{
+				name: 'error',
+				parameters: 'error: Error, retry: () => void',
+				optional: true,
+				get documentation() {
+					return t('A failure with no data: `error` and `retry`, which requests it again. Without it, a notice with `role="alert"` and a button.')
+				},
+			},
 		],
 		component: true,
 		module: builtinComponentModules.MeekoAwait!.specifier,
-		summary: 'Zona de unos datos que llegan después del primer pintado (`useApi` o `useRpcQuery` sin `await`), un componente que Meeko compila y distribuye: ' + 'pinta `pending` en la primera carga, `error` (con `retry`) si falla y su contenido cuando hay datos, que conserva durante las recargas. ' + 'Con `reserve`, mientras espera ocupa la altura que tuvo con datos, así que la card no salta. Marca `aria-busy` mientras carga.',
+		get summary() {
+			return t('Zone of data that arrives after the first paint (`useApi` or `useRpcQuery` without `await`), a component that Meeko compiles and ships: it renders `pending` on the first load, `error` (with `retry`) if it fails and its content when there is data, which it keeps during reloads. With `reserve`, while waiting it takes the height it had with data, so the card does not jump. It sets `aria-busy` while loading.')
+		},
 		guide: 'https://github.com/meekojs/meeko/blob/main/docs/framework.md#meekoawait',
-		completion: 'Datos que llegan después del primer pintado, sin saltos: <MeekoAwait for="items" reserve>',
+		get completion() {
+			return t('Data that arrives after the first paint, without jumps: <MeekoAwait for="items" reserve>')
+		},
 	},
 	{
 		name: 'MeekoTeleport',
@@ -354,9 +476,13 @@ export const builtinTags: readonly BuiltinTag[] = [
 				attributes: ['to', 'bind:to'],
 				type: 'MeekoTeleportTarget',
 				optional: false,
-				documentation: 'Destino: `"body"`, al final de `<body>`, o `"#id"`, dentro del elemento con ese `id`, después de lo que ya tiene.',
+				get documentation() {
+					return t('Target: `"body"`, at the end of `<body>`, or `"#id"`, inside the element with that `id`, after what it already has.')
+				},
 				insert: 'to="$1"',
-				detail: 'Destino: "body" o "#id" de un elemento del documento',
+				get detail() {
+					return t('Target: "body" or the "#id" of an element in the document')
+				},
 				suggest: true,
 			},
 			{
@@ -364,42 +490,148 @@ export const builtinTags: readonly BuiltinTag[] = [
 				attributes: ['disabled', 'bind:disabled'],
 				type: 'boolean',
 				optional: true,
-				documentation: 'Con `true`, el contenido se pinta en su sitio, sin moverse; cambiarlo mueve los mismos nodos.',
+				get documentation() {
+					return t('With `true`, the content renders in place, without moving; changing it moves the same nodes.')
+				},
 				insert: 'disabled',
-				detail: 'Pinta el contenido en su sitio, sin moverlo',
+				get detail() {
+					return t('Renders the content in place, without moving it')
+				},
 			},
 		],
-		snippets: [{ name: 'default', parameters: '', optional: true, documentation: 'El contenido que se pinta en el destino.' }],
-		summary: 'Pinta su contenido en otro lugar del documento (`to="body"` o `to="#id"`) sin sacarlo del componente, que conserva su ámbito reactivo, ' + 'sus eventos, sus snippets, `provide`/`inject`, sus manejadores de errores y el CSS `scoped`. El HTML del servidor ya lo trae en su destino. ' + 'Con `disabled` se pinta en su sitio. Un atributo que no admite es el error `MEEK114`.',
+		snippets: [
+			{
+				name: 'default',
+				parameters: '',
+				optional: true,
+				get documentation() {
+					return t('The content that renders at the target.')
+				},
+			},
+		],
+		get summary() {
+			return t('Renders its content elsewhere in the document (`to="body"` or `to="#id"`) without taking it out of the component, which keeps its reactive scope, events, snippets, `provide`/`inject`, error handlers and `scoped` CSS. The server HTML already carries it at its target. With `disabled` it renders in place. An attribute it does not admit is the error `MEEK114`.')
+		},
 		guide: 'https://github.com/meekojs/meeko/blob/main/docs/framework.md#meekoteleport',
-		completion: 'Contenido en otro lugar del documento: <MeekoTeleport to="#toolbar">',
+		get completion() {
+			return t('Content elsewhere in the document: <MeekoTeleport to="#toolbar">')
+		},
 	},
 	{
 		name: 'MeekoPopover',
 		propsType: 'MeekoPopoverProps',
 		props: [
-			prop('mode', '"auto" | "manual" | "hint"', '`"auto"` (por defecto) se cierra al pulsar fuera; `"manual"`, sólo desde el disparador, `Esc` o el modelo; `"hint"` es un tooltip que se abre con el puntero o el foco.', '"auto", "manual" o "hint" (tooltip)', { attributes: ['mode', 'bind:mode'], insert: 'mode="${1|auto,manual,hint|}"' }),
-			prop('placement', 'PopoverPlacement', 'Dónde se abre respecto al disparador: `top`, `bottom`, `left` o `right`, con `-start` o `-end`; `"bottom-start"` por defecto.', 'Lado y alineación, como bottom-start', { attributes: ['placement', 'bind:placement'], insert: `placement="\${1|${placements}|}"` }),
-			prop('offset', 'number', 'Separación en píxeles entre el disparador y el contenido.', 'Separación en píxeles', { insert: 'bind:offset="${1:8}"' }),
-			prop('role', '"menu" | "dialog" | "tooltip"', 'Patrón ARIA del contenido: un menú con flechas y búsqueda por letras, un diálogo o un tooltip.', 'menu, dialog o tooltip', { attributes: ['role', 'bind:role'], insert: 'role="${1|menu,dialog,tooltip|}"' }),
-			prop('label', 'string', '`aria-label` del contenido; sin ella, un menú o un diálogo se nombran con el disparador.', 'aria-label del contenido', { attributes: ['label', 'bind:label'] }),
-			prop('class', 'string', 'Clases del contenido, el elemento con `popover`.', 'Clases del contenido', { attributes: ['class', 'bind:class'] }),
-			prop('triggerClass', 'string', 'Clases del `<button>` disparador.', 'Clases del botón disparador', { attributes: ['triggerClass', 'bind:triggerClass'] }),
-			prop('triggerId', 'string', '`id` del disparador; con un disparador propio, el `id` que lleva.', 'id del disparador', { attributes: ['triggerId', 'bind:triggerId'] }),
-			prop('matchWidth', 'boolean', 'El contenido mide al menos lo que el disparador.', 'Ancho mínimo del disparador', { attributes: ['matchWidth', 'bind:matchWidth'], insert: 'matchWidth' }),
-			prop('delay', 'number', 'Con `mode="hint"`, milisegundos antes de abrir con el puntero (300).', 'Retardo del tooltip en ms'),
-			prop('closeDelay', 'number', 'Con `mode="hint"`, milisegundos antes de cerrar al salir el puntero (150).', 'Retardo de cierre del tooltip en ms'),
+			prop(
+				'mode',
+				'"auto" | "manual" | "hint"',
+				() => t('`"auto"` (default) closes when clicking outside; `"manual"`, only from the trigger, `Esc` or the model; `"hint"` is a tooltip that opens with the pointer or focus.'),
+				() => t('"auto", "manual" or "hint" (tooltip)'),
+				{ attributes: ['mode', 'bind:mode'], insert: 'mode="${1|auto,manual,hint|}"' },
+			),
+			prop(
+				'placement',
+				'PopoverPlacement',
+				() => t('Where it opens relative to the trigger: `top`, `bottom`, `left` or `right`, with `-start` or `-end`; `"bottom-start"` by default.'),
+				() => t('Side and alignment, like bottom-start'),
+				{ attributes: ['placement', 'bind:placement'], insert: `placement="\${1|${placements}|}"` },
+			),
+			prop(
+				'offset',
+				'number',
+				() => t('Distance in pixels between the trigger and the content.'),
+				() => t('Distance in pixels'),
+				{ insert: 'bind:offset="${1:8}"' },
+			),
+			prop(
+				'role',
+				'"menu" | "dialog" | "tooltip"',
+				() => t('ARIA pattern of the content: a menu with arrows and type-ahead, a dialog or a tooltip.'),
+				() => t('menu, dialog or tooltip'),
+				{ attributes: ['role', 'bind:role'], insert: 'role="${1|menu,dialog,tooltip|}"' },
+			),
+			prop(
+				'label',
+				'string',
+				() => t('`aria-label` of the content; without it, a menu or dialog is named by the trigger.'),
+				() => t('aria-label of the content'),
+				{ attributes: ['label', 'bind:label'] },
+			),
+			prop(
+				'class',
+				'string',
+				() => t('Classes of the content, the element with `popover`.'),
+				() => t('Classes of the content'),
+				{ attributes: ['class', 'bind:class'] },
+			),
+			prop(
+				'triggerClass',
+				'string',
+				() => t('Classes of the trigger `<button>`.'),
+				() => t('Classes of the trigger button'),
+				{ attributes: ['triggerClass', 'bind:triggerClass'] },
+			),
+			prop(
+				'triggerId',
+				'string',
+				() => t('`id` of the trigger; with a custom trigger, the `id` it carries.'),
+				() => t('id of the trigger'),
+				{ attributes: ['triggerId', 'bind:triggerId'] },
+			),
+			prop(
+				'matchWidth',
+				'boolean',
+				() => t('The content is at least as wide as the trigger.'),
+				() => t('Minimum width of the trigger'),
+				{ attributes: ['matchWidth', 'bind:matchWidth'], insert: 'matchWidth' },
+			),
+			prop(
+				'delay',
+				'number',
+				() => t('With `mode="hint"`, milliseconds before opening with the pointer (300).'),
+				() => t('Tooltip delay in ms'),
+			),
+			prop(
+				'closeDelay',
+				'number',
+				() => t('With `mode="hint"`, milliseconds before closing when the pointer leaves (150).'),
+				() => t('Tooltip close delay in ms'),
+			),
 		],
 		snippets: [
-			{ name: 'default', parameters: '', optional: true, documentation: 'El contenido del popover.' },
-			{ name: 'trigger', parameters: '', optional: true, documentation: 'El contenido del `<button>` disparador que pinta Meeko.' },
-			{ name: 'anchor', parameters: 'trigger: PopoverTrigger', optional: true, documentation: 'Un disparador propio en lugar del botón; aplique los atributos de `trigger` (`id`, `aria-expanded`…).' },
+			{
+				name: 'default',
+				parameters: '',
+				optional: true,
+				get documentation() {
+					return t('The content of the popover.')
+				},
+			},
+			{
+				name: 'trigger',
+				parameters: '',
+				optional: true,
+				get documentation() {
+					return t('The content of the trigger `<button>` that Meeko renders.')
+				},
+			},
+			{
+				name: 'anchor',
+				parameters: 'trigger: PopoverTrigger',
+				optional: true,
+				get documentation() {
+					return t('A custom trigger instead of the button; apply the attributes of `trigger` (`id`, `aria-expanded`…).')
+				},
+			},
 		],
 		component: true,
 		module: builtinComponentModules.MeekoPopover!.specifier,
-		summary: 'Popover anclado sobre la API nativa `popover` y *CSS anchor positioning* (con un cálculo en JavaScript donde no existe): el contenido está en la capa superior, ' + 'oculto desde el HTML del servidor. Pinta un `<button>` con `popovertarget`, `aria-expanded`, `aria-controls` y `aria-haspopup`; `model` es la señal de apertura y `on:toggle` emite `{ open }`. ' + '`Esc` cierra y devuelve el foco; con `role="menu"`, flechas, `Inicio`/`Fin` y búsqueda por letras.',
+		get summary() {
+			return t('Popover anchored with the native `popover` API and *CSS anchor positioning* (with a JavaScript calculation where it does not exist): the content is in the top layer, hidden from the server HTML. It renders a `<button>` with `popovertarget`, `aria-expanded`, `aria-controls` and `aria-haspopup`; `model` is the open signal and `on:toggle` emits `{ open }`. `Esc` closes and returns focus; with `role="menu"`, arrows, `Home`/`End` and type-ahead search.')
+		},
 		guide: popoverGuide,
-		completion: 'Popover anclado (menú, diálogo o tooltip): <MeekoPopover placement="bottom-start">',
+		get completion() {
+			return t('Anchored popover (menu, dialog or tooltip): <MeekoPopover placement="bottom-start">')
+		},
 	},
 	{
 		name: 'MeekoSelect',
@@ -407,41 +639,191 @@ export const builtinTags: readonly BuiltinTag[] = [
 		// The hover of a tag that does not know the type of its options.
 		typeArguments: () => '<unknown>',
 		props: [
-			prop('options', 'readonly T[]', 'Las opciones, primitivos u objetos; su tipo da el del modelo y el de los snippets.', 'Opciones, como colors o users.value', { optional: false, insert: 'bind:options="$1"' }),
-			prop('multiple', 'boolean', 'El modelo es un array y cada opción se alterna.', 'Elegir varias opciones', { attributes: ['multiple', 'bind:multiple'], insert: 'multiple' }),
-			prop('by', 'keyof T | ((a: T, b: T) => boolean)', 'Cómo se comparan las opciones con el valor: una clave (`by="id"`) o una función.', 'Clave o función de comparación', { attributes: ['by', 'bind:by'] }),
-			prop('labelBy', 'keyof T | ((option: T) => string)', 'Etiqueta de cada opción; por defecto, el texto del primitivo o `label`/`name`.', 'Clave o función de la etiqueta', { attributes: ['labelBy', 'bind:labelBy'] }),
-			prop('disabledBy', 'keyof T | ((option: T) => boolean)', 'Qué opciones están deshabilitadas; por defecto, las que tienen `disabled: true`.', 'Clave o función de deshabilitada', { attributes: ['disabledBy', 'bind:disabledBy'] }),
-			prop('groupBy', 'keyof T | ((option: T) => string | undefined)', 'Grupo de cada opción, con un encabezado por grupo.', 'Clave o función del grupo', { attributes: ['groupBy', 'bind:groupBy'] }),
-			prop('placeholder', 'string', 'Texto del disparador sin valor elegido.', 'Texto sin valor', { attributes: ['placeholder', 'bind:placeholder'] }),
-			prop('name', 'string', '`name` de los `<input type="hidden">` que se envían con el `<form>`.', 'name del formulario', { attributes: ['name', 'bind:name'] }),
-			prop('required', 'boolean', 'Exige un valor al enviar el `<form>`.', 'Valor obligatorio', { attributes: ['required', 'bind:required'], insert: 'required' }),
-			prop('disabled', 'boolean', 'Deshabilita el disparador; los valores no se envían.', 'Deshabilitado', { attributes: ['disabled', 'bind:disabled'], insert: 'disabled' }),
-			prop('searchable', 'boolean', 'El disparador es un combobox con `<input>` que filtra las opciones.', 'Con búsqueda', { attributes: ['searchable', 'bind:searchable'], insert: 'searchable' }),
-			prop('filter', 'SelectFilter<T>', 'Búsqueda propia, síncrona o asíncrona (`(query, { options, signal }) => …`).', 'Búsqueda propia, también async'),
-			prop('max', 'number', 'Con `multiple`, cuántas opciones se pueden elegir como mucho.', 'Máximo de opciones elegidas'),
-			prop('field', 'SelectField<…>', "El campo de `useForm`, `form.field('x')`: `id`, `name`, valor, `aria-invalid` y `aria-describedby`.", 'Campo de useForm', { insert: 'bind:field="form.field(\'$1\')"' }),
-			prop('id', 'string', '`id` del disparador, para un `<label for>`.', 'id del disparador', { attributes: ['id', 'bind:id'] }),
-			prop('label', 'string', '`aria-label` del disparador y de la lista, sin `<label>`.', 'aria-label', { attributes: ['label', 'bind:label'] }),
-			prop('describedBy', 'string', '`aria-describedby` del disparador.', 'aria-describedby', { attributes: ['describedBy', 'bind:describedBy'] }),
-			prop('invalid', 'boolean', 'Marca el disparador con `aria-invalid="true"`.', 'aria-invalid'),
-			prop('class', 'string', 'Clases del elemento raíz.', 'Clases de la raíz', { attributes: ['class', 'bind:class'] }),
-			prop('listClass', 'string', 'Clases de la lista, el elemento con `popover`.', 'Clases de la lista', { attributes: ['listClass', 'bind:listClass'] }),
-			prop('placement', 'PopoverPlacement', 'Dónde se abre la lista; `"bottom-start"` por defecto.', 'Lado y alineación de la lista', { attributes: ['placement', 'bind:placement'], insert: `placement="\${1|${placements}|}"` }),
-			prop('offset', 'number', 'Separación en píxeles entre el disparador y la lista.', 'Separación en píxeles'),
+			prop(
+				'options',
+				'readonly T[]',
+				() => t('The options, primitives or objects; their type gives that of the model and of the snippets.'),
+				() => t('Options, like colors or users.value'),
+				{ optional: false, insert: 'bind:options="$1"' },
+			),
+			prop(
+				'multiple',
+				'boolean',
+				() => t('The model is an array and each option is toggled.'),
+				() => t('Choose several options'),
+				{ attributes: ['multiple', 'bind:multiple'], insert: 'multiple' },
+			),
+			prop(
+				'by',
+				'keyof T | ((a: T, b: T) => boolean)',
+				() => t('How options are compared with the value: a key (`by="id"`) or a function.'),
+				() => t('Key or comparison function'),
+				{ attributes: ['by', 'bind:by'] },
+			),
+			prop(
+				'labelBy',
+				'keyof T | ((option: T) => string)',
+				() => t('Label of each option; by default, the text of the primitive or `label`/`name`.'),
+				() => t('Key or label function'),
+				{ attributes: ['labelBy', 'bind:labelBy'] },
+			),
+			prop(
+				'disabledBy',
+				'keyof T | ((option: T) => boolean)',
+				() => t('Which options are disabled; by default, those with `disabled: true`.'),
+				() => t('Key or disabled function'),
+				{ attributes: ['disabledBy', 'bind:disabledBy'] },
+			),
+			prop(
+				'groupBy',
+				'keyof T | ((option: T) => string | undefined)',
+				() => t('Group of each option, with a heading per group.'),
+				() => t('Key or group function'),
+				{ attributes: ['groupBy', 'bind:groupBy'] },
+			),
+			prop(
+				'placeholder',
+				'string',
+				() => t('Text of the trigger when no value is chosen.'),
+				() => t('Text without a value'),
+				{ attributes: ['placeholder', 'bind:placeholder'] },
+			),
+			prop(
+				'name',
+				'string',
+				() => t('`name` of the `<input type="hidden">` elements sent with the `<form>`.'),
+				() => t('name in the form'),
+				{ attributes: ['name', 'bind:name'] },
+			),
+			prop(
+				'required',
+				'boolean',
+				() => t('Requires a value when submitting the `<form>`.'),
+				() => t('Required value'),
+				{ attributes: ['required', 'bind:required'], insert: 'required' },
+			),
+			prop(
+				'disabled',
+				'boolean',
+				() => t('Disables the trigger; the values are not sent.'),
+				() => t('Disabled'),
+				{ attributes: ['disabled', 'bind:disabled'], insert: 'disabled' },
+			),
+			prop(
+				'searchable',
+				'boolean',
+				() => t('The trigger is a combobox with an `<input>` that filters the options.'),
+				() => t('Searchable'),
+				{ attributes: ['searchable', 'bind:searchable'], insert: 'searchable' },
+			),
+			prop(
+				'filter',
+				'SelectFilter<T>',
+				() => t('Custom search, synchronous or asynchronous (`(query, { options, signal }) => …`).'),
+				() => t('Custom search, also async'),
+			),
+			prop(
+				'max',
+				'number',
+				() => t('With `multiple`, how many options can be chosen at most.'),
+				() => t('Maximum chosen options'),
+			),
+			prop(
+				'field',
+				'SelectField<…>',
+				() => t("The `useForm` field, `form.field('x')`: `id`, `name`, value, `aria-invalid` and `aria-describedby`."),
+				() => t('useForm field'),
+				{ insert: 'bind:field="form.field(\'$1\')"' },
+			),
+			prop(
+				'id',
+				'string',
+				() => t('`id` of the trigger, for a `<label for>`.'),
+				() => t('id of the trigger'),
+				{ attributes: ['id', 'bind:id'] },
+			),
+			prop('label', 'string', () => t('`aria-label` of the trigger and the list, without `<label>`.'), 'aria-label', { attributes: ['label', 'bind:label'] }),
+			prop('describedBy', 'string', () => t('`aria-describedby` of the trigger.'), 'aria-describedby', { attributes: ['describedBy', 'bind:describedBy'] }),
+			prop('invalid', 'boolean', () => t('Marks the trigger with `aria-invalid="true"`.'), 'aria-invalid'),
+			prop(
+				'class',
+				'string',
+				() => t('Classes of the root element.'),
+				() => t('Classes of the root'),
+				{ attributes: ['class', 'bind:class'] },
+			),
+			prop(
+				'listClass',
+				'string',
+				() => t('Classes of the list, the element with `popover`.'),
+				() => t('Classes of the list'),
+				{ attributes: ['listClass', 'bind:listClass'] },
+			),
+			prop(
+				'placement',
+				'PopoverPlacement',
+				() => t('Where the list opens; `"bottom-start"` by default.'),
+				() => t('Side and alignment of the list'),
+				{ attributes: ['placement', 'bind:placement'], insert: `placement="\${1|${placements}|}"` },
+			),
+			prop(
+				'offset',
+				'number',
+				() => t('Distance in pixels between the trigger and the list.'),
+				() => t('Distance in pixels'),
+			),
 		],
 		snippets: [
-			{ name: 'option', parameters: 'option: T, state: SelectOptionState', optional: true, documentation: 'Contenido de cada opción; `state` dice si está elegida, activa o deshabilitada.' },
-			{ name: 'value', parameters: 'option: T', optional: true, documentation: 'Cómo se muestra cada valor elegido en el disparador.' },
-			{ name: 'group', parameters: 'name: string', optional: true, documentation: 'Encabezado de un grupo de `groupBy`.' },
-			{ name: 'empty', parameters: '', optional: true, documentation: 'Lo que se muestra sin opciones; por defecto, «Sin resultados».' },
-			{ name: 'loading', parameters: '', optional: true, documentation: 'Lo que se muestra mientras una búsqueda asíncrona carga.' },
+			{
+				name: 'option',
+				parameters: 'option: T, state: SelectOptionState',
+				optional: true,
+				get documentation() {
+					return t('Content of each option; `state` says whether it is chosen, active or disabled.')
+				},
+			},
+			{
+				name: 'value',
+				parameters: 'option: T',
+				optional: true,
+				get documentation() {
+					return t('How each chosen value is shown in the trigger.')
+				},
+			},
+			{
+				name: 'group',
+				parameters: 'name: string',
+				optional: true,
+				get documentation() {
+					return t('Heading of a `groupBy` group.')
+				},
+			},
+			{
+				name: 'empty',
+				parameters: '',
+				optional: true,
+				get documentation() {
+					return t('What is shown when there are no options; by default, "Sin resultados".')
+				},
+			},
+			{
+				name: 'loading',
+				parameters: '',
+				optional: true,
+				get documentation() {
+					return t('What is shown while an asynchronous search loads.')
+				},
+			},
 		],
 		component: true,
 		module: builtinComponentModules.MeekoSelect!.specifier,
-		summary: 'Select accesible sobre `<MeekoPopover>`: un `role="combobox"` con `aria-activedescendant` (el foco se queda en el disparador o el `<input>` de `searchable`) y un `role="listbox"`. ' + '`model` es el valor (un array con `multiple`), tipado por `options`; `by` compara objetos, `groupBy` agrupa, `max` limita y `name` envía `<input type="hidden">`. ' + 'Sin estilos visuales: `data-active`, `data-selected` y `data-disabled` en las opciones y `data-open` en la raíz.',
+		get summary() {
+			return t('Accessible select on `<MeekoPopover>`: a `role="combobox"` with `aria-activedescendant` (focus stays on the trigger or the `<input>` of `searchable`) and a `role="listbox"`. `model` is the value (an array with `multiple`), typed by `options`; `by` compares objects, `groupBy` groups, `max` limits and `name` sends `<input type="hidden">`. No visual styles: `data-active`, `data-selected` and `data-disabled` on the options and `data-open` on the root.')
+		},
 		guide: selectGuide,
-		completion: 'Select accesible con búsqueda y múltiple: <MeekoSelect model="value" bind:options="options">',
+		get completion() {
+			return t('Accessible select with search and multiple: <MeekoSelect model="value" bind:options="options">')
+		},
 	},
 ]
 

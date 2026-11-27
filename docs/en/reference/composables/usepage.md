@@ -16,7 +16,7 @@ related:
   - "@meekojs/meeko/server#useRequestState"
   - docs/framework.md#código-de-nivel-superior-y-datos-exportados
   - docs/framework.md#dónde-se-usa-cada-api
-source-hash: 5c60414df65fc01c4fa118bc2c7aa8c63d9a42fe5b6a04f660b75e6161a34791
+source-hash: d16278be0ab3049209703b1134cd66236d61841ce40c3bb8ab8e6f9d1d472ffa
 ---
 
 `usePage()` provides access to the current request from top-level code in a page's `<script server>`: the URL, `params` and `search` already validated by [`definePage`](/en/docs/reference/definepage) schemas, the original `Request`, request context (session, services, platform) and a cancellation signal. The block can then read the database, check the session, redirect or respond with `404`, and export data the page receives.
@@ -48,14 +48,15 @@ Without a schema, `params.id` is `string` because the file is `[id].meeko`. `db`
 
 A `PageRequest`:
 
-| Property  | Type                                                                             | Description                                                                                                                 |
-| --------- | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `url`     | `URL`                                                                            | Full request URL.                                                                                                           |
-| `params`  | output of the `params` schema, or `Readonly<Record<string, string>>`             | Dynamic segments, validated before running the block. Without a schema, one key per `[segmento]` in the file.               |
-| `search`  | output of the `search` schema, or `Readonly<Record<string, string \| string[]>>` | Validated query string; without a schema, a repeated key is an array.                                                       |
-| `request` | `Request`                                                                        | Original HTTP request: headers, cookies, method.                                                                            |
-| `context` | `RequestContext`                                                                 | Request context: `session`, `services`, `platform`, `state`, `requestId`, `clientAddress`.                                  |
-| `signal`  | `AbortSignal`                                                                    | Aborted if the client disconnects, the session is revoked or the response is canceled. Pass it to `fetch` and long queries. |
+| Property  | Type                                                                             | Description                                                                                                                                                                                                                                         |
+| --------- | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `url`     | `URL`                                                                            | Full request URL.                                                                                                                                                                                                                                   |
+| `params`  | output of the `params` schema, or `Readonly<Record<string, string>>`             | Dynamic segments, validated before running the block. Without a schema, one key per `[segmento]` in the file.                                                                                                                                       |
+| `search`  | output of the `search` schema, or `Readonly<Record<string, string \| string[]>>` | Validated query string; without a schema, a repeated key is an array.                                                                                                                                                                               |
+| `request` | `Request`                                                                        | Original HTTP request: headers, cookies, method.                                                                                                                                                                                                    |
+| `context` | `RequestContext`                                                                 | Request context: `session`, `services`, `platform`, `state`, `requestId`, `clientAddress`.                                                                                                                                                          |
+| `signal`  | `AbortSignal`                                                                    | Aborted if the client disconnects, the session is revoked or the response is canceled. Pass it to `fetch` and long queries.                                                                                                                         |
+| `depends` | `(...keys) => void`                                                              | Since `1.10`. Declares the data keys the block depends on, as in ``depends(`orders.${params.id}`)``. A matching invalidation runs it again in the browser and updates its exports without mounting the page again. In a middleware it does nothing. |
 
 Outside the top-level code of a `<script server>` (or, since `1.6`, server route middleware), it throws `Error: MEEK073: usePage() sólo está disponible mientras se ejecuta el código de nivel superior del <script server> de una página…`.
 

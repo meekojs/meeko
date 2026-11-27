@@ -49,7 +49,7 @@ export function directStylesheetUrl(file: string): string {
 
 /**
  * Where `meeko dev` keeps the processed global stylesheet, relative to the project: imports
- * inlined, module styles included, PostCSS plugins (`@utilities` among them) applied, not minified. It exists for editor
+ * inlined, module styles included, the project's CSS plugins applied, not minified. It exists for editor
  * tools that read class names from CSS files on disk; nothing loads it at run time. The dev
  * watcher skips `.meeko/` (see `isDevWatchIgnored`), so writing it never reaches Vite.
  */
@@ -75,6 +75,13 @@ export interface GlobalStylesheetSnapshot {
 	refresh(): void
 	/** Stops following changes; resolves once a write in progress has finished. */
 	close(): Promise<void>
+	/**
+	 * Writes the snapshot once, without following changes: `open` creates the Vite server only when
+	 * there are stylesheets to process, and it is closed before this resolves. `failed` when the
+	 * stylesheets do not compile (reported through `report`, the previous snapshot kept); a write
+	 * that fails throws.
+	 */
+	generate(open: () => Promise<ViteDevServer>): Promise<'written' | 'none' | 'failed'>
 }
 
 /** Windows reports a file another process holds open (an editor, an indexer) with these codes. */
@@ -129,7 +136,7 @@ function reachesStylesheet(graph: EnvironmentModuleGraph, file: string, targets:
 /**
  * Writes the global stylesheet, as development serves it, to {@link globalStylesheetSnapshotFile}
  * and rewrites it whenever the stylesheet or one of its dependencies changes: files it imports and
- * the modules of its `@utilities` at-rules, which PostCSS reports to Vite as dependencies. The file is
+ * any other file the project's CSS plugins report to Vite as a dependency. The file is
  * replaced atomically and only when its contents change. A stylesheet that fails to compile keeps the
  * last good snapshot and is reported once through `report`. Without module styles or an application
  * stylesheet there is no snapshot.
@@ -146,7 +153,7 @@ export function createGlobalStylesheetSnapshot(root: string, report: (message: s
 	let running: Promise<void> | undefined
 	let again = false
 
-	const write = async (vite: ViteDevServer): Promise<void> => {
+	const write = async (getVite: () => ViteDevServer | Promise<ViteDevServer>): Promise<void> => {
 		const files = frameworkStylesheets(root, registered)
 		if (!files.length) {
 			if (written !== null) await rm(target, { force: true })
@@ -155,6 +162,7 @@ export function createGlobalStylesheetSnapshot(root: string, report: (message: s
 			return
 		}
 		let css: string
+		const vite = await getVite()
 		const environments = vite.environments
 		try {
 			const parts: string[] = []
@@ -168,7 +176,7 @@ export function createGlobalStylesheetSnapshot(root: string, report: (message: s
 			// A Vite restart closed the environment midway; the restart writes the snapshot again.
 			if (closed || vite.environments !== environments) return
 			const message = (error instanceof Error ? error.message : String(error)).split('\n', 1)[0]!
-			if (message !== failure) report(`${globalStylesheetSnapshotFile} conserva la versión anterior: las hojas de estilos no compilan (${message})`)
+			if (message !== failure) report(`${globalStylesheetSnapshotFile} ${existsSync(target) ? 'conserva la versión anterior' : 'no se escribió'}: las hojas de estilos no compilan (${message})`)
 			failure = message
 			return
 		}
@@ -196,7 +204,7 @@ export function createGlobalStylesheetSnapshot(root: string, report: (message: s
 			do {
 				again = false
 				try {
-					await write(vite)
+					await write(() => vite)
 				} catch (error) {
 					report(`${globalStylesheetSnapshotFile} no se pudo escribir: ${error instanceof Error ? error.message : String(error)}`)
 				}
@@ -237,6 +245,16 @@ export function createGlobalStylesheetSnapshot(root: string, report: (message: s
 		async close() {
 			closed = true
 			await running
+		},
+		async generate(open) {
+			let vite: ViteDevServer | undefined
+			try {
+				await write(async () => (vite ??= await open()))
+			} finally {
+				await vite?.close()
+			}
+			if (failure !== undefined) return 'failed'
+			return written === null ? 'none' : 'written'
 		},
 	}
 }

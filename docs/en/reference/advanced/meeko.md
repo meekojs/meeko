@@ -10,10 +10,9 @@ related:
   - "cli:dev"
   - "cli:compile"
   - "@meekojs/meeko/framework#defineMeekoModule"
-  - "@meekojs/meeko/postcss#meekoUtilities"
   - docs/framework.md#escribir-un-módulo
   - docs/api.md#herramientas
-source-hash: 33cfbb5bf53f3a145e1f073ea6085b5ede9cae17417552674e9f7e25c169e571
+source-hash: 960ce03df0de60e5522e4009514684c4e10bd232a9353277dc93727bdbd1f649
 ---
 
 `meeko()` is the Vite plugin that understands `.meeko` components. When you import a `.meeko` (in the browser or SSR), it compiles it to a module with its render, hydration and CSS; in development it adds HMR, which replaces hydrated instances while preserving their signals, and DevTools code. It applies Meeko auto-imports to the project's `.meeko` and `.ts` files and, in a framework application, generates virtual modules for routes, pages, the server and each `<script server>`.

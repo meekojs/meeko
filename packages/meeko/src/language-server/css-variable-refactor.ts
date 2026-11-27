@@ -11,6 +11,7 @@ import { LSPErrorCodes, ResponseError } from 'vscode-languageserver/node'
 import type { ClassSource } from './classes'
 
 import { cssVariableTokenAt } from './css-variables'
+import { t } from './l10n'
 import { pathKey } from './project'
 import { sectionAt, templateRegion } from './regions'
 
@@ -306,7 +307,7 @@ const failure = (message: string): never => {
 export function cssVariableReferences(project: CssVariableProject, document: TextDocument, position: Position, includeDeclaration: boolean): Location[] | undefined {
 	const target = targetAt(project, document, position)
 	if (!target) return undefined
-	if (target.local ? !target.file.complete : !project.complete || project.files.some((file) => !file.complete)) return failure('La búsqueda de variables CSS excede los límites del paquete, tiene CSS incompleto o no pudo leer todas sus fuentes.')
+	if (target.local ? !target.file.complete : !project.complete || project.files.some((file) => !file.complete)) return failure(t('The CSS variable search exceeds the package limits, has incomplete CSS or could not read all its sources.'))
 	return project.files.flatMap((file) => file.occurrences.filter((item) => matches(file, item, target) && (includeDeclaration || !item.declaration)).map((item) => ({ uri: file.document.uri, range: rangeOf(file.document, item) })))
 }
 
@@ -314,8 +315,8 @@ export function cssVariableReferences(project: CssVariableProject, document: Tex
 export function prepareCssVariableRename(project: CssVariableProject, document: TextDocument, position: Position): { range: Range; placeholder: string } | undefined {
 	const target = targetAt(project, document, position)
 	if (!target) return undefined
-	if (target.local ? !target.file.complete : !project.complete || project.files.some((file) => !file.complete)) return failure('No se puede renombrar: hay CSS incompleto, identificadores escapados o fuentes que no pudieron revisarse completamente.')
-	if (!project.files.some((file) => file.occurrences.some((item) => item.declaration && matches(file, item, target)))) return failure('No se encontró una declaración editable de esta variable CSS en el paquete.')
+	if (target.local ? !target.file.complete : !project.complete || project.files.some((file) => !file.complete)) return failure(t('Cannot rename: there is incomplete CSS, escaped identifiers or sources that could not be fully reviewed.'))
+	if (!project.files.some((file) => file.occurrences.some((item) => item.declaration && matches(file, item, target)))) return failure(t('No editable declaration of this CSS variable was found in the package.'))
 	return { range: rangeOf(document, target.occurrence), placeholder: target.occurrence.name }
 }
 
@@ -324,11 +325,11 @@ export function renameCssVariable(project: CssVariableProject, document: TextDoc
 	const prepared = prepareCssVariableRename(project, document, position)
 	const target = targetAt(project, document, position)
 	if (!prepared || !target) return undefined
-	if (!namePattern.test(newName)) return failure('El nombre debe ser una variable CSS completa, como --color-accent, sin espacios ni escapes.')
+	if (!namePattern.test(newName)) return failure(t('The name must be a full CSS variable, like --color-accent, without spaces or escapes.'))
 	if (newName === prepared.placeholder) return { changes: {} }
 	const affected = project.files.filter((file) => file.occurrences.some((item) => matches(file, item, target)))
 	const collision = project.files.some((file) => file.occurrences.some((item) => item.name === newName && (target.local ? file === target.file : !item.private || !file.local.has(newName) || affected.includes(file))))
-	if (collision) return failure(`No se puede renombrar: ${newName} ya aparece en el ámbito de la variable y podría cambiar su significado.`)
+	if (collision) return failure(t('Cannot rename: {0} already appears in the variable scope and could change its meaning.', newName))
 	const edits = affected.map((file) => ({
 		file,
 		edits: file.occurrences

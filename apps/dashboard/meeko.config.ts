@@ -10,6 +10,8 @@ function catalogs(locale: 'en' | 'es'): Record<string, string> {
 }
 
 export default defineMeekoConfig({
+	// URL con nombre de portless (https://dashboard.meeko.localhost) sin envolver el script; ver dev.portless.
+	dev: { portless: { name: 'dashboard.meeko' } },
 	// The identity of Meeko's documentation webs: the tokens of @meekojs/ui and the same themes.
 	theme: { default: 'dark' },
 	viewTransitions: true,

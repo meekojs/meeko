@@ -3,6 +3,7 @@ import type { AstPath, Doc, ParserOptions, Printer } from 'prettier'
 import { printers as estreePrinters } from 'prettier/plugins/estree'
 
 import { sortClassLiterals } from './class-literals'
+import { foreignPrinterMarkers, ownPrinterMarker } from './packaging'
 
 /** Nodo ESTree con lo que necesita la regla: posiciones, decoradores y elementos. */
 interface ArrayLikeNode {
@@ -133,8 +134,6 @@ interface EstreePrinter {
 	readonly getVisitorKeys?: (node: unknown, nonTraversableKeys: unknown) => readonly string[]
 }
 
-/** Marca del printer de Meeko, para no delegar en sí mismo ni en otra copia de Meeko cargada. */
-const ownMarker = Symbol.for('meeko.prettier.estree')
 /** Printer `estree` del Prettier del que depende Meeko: sólo se usa si el Prettier que ejecuta el plugin no trae otro. */
 const bundledPrinter = estreePrinters.estree as unknown as EstreePrinter
 
@@ -155,8 +154,10 @@ const hostByRoot = new WeakMap<object, EstreePrinter>()
  */
 let recentHost: EstreePrinter | undefined
 
+/** Si la entrada es el printer de Meeko (la marca de `packaging`) o el de otra copia que no delega. */
 function isOwn(entry: PrinterEntry): boolean {
-	return (entry as { [ownMarker]?: boolean })[ownMarker] === true
+	const marks = entry as unknown as Partial<Record<symbol, boolean>>
+	return marks[ownPrinterMarker] === true || foreignPrinterMarkers.some((marker) => marks[marker] === true)
 }
 
 /**
@@ -220,10 +221,11 @@ function commentHandler(placement: 'ownLine' | 'endOfLine' | 'remaining', args: 
  * `options.plugins` que lo define, sin contar el de Meeko) y sólo rompe el grupo de corchetes de un
  * array cuyo código fuente salta de línea tras `[`. Así un proyecto con otra versión 3.x de
  * Prettier imprime con la suya, y con `meekoPreserveArrayBreaks: false` la salida es la de su
- * Prettier. Sólo un Prettier sin printer `estree` propio usa el del Prettier de Meeko.
+ * Prettier. Sólo un Prettier sin printer `estree` propio usa el del Prettier de Meeko. Antes de
+ * imprimir, ordena las cadenas de `meekoClassFunctions` y de `bind:class`.
  */
 export const preserveArrayBreaksPrinter = {
-	[ownMarker]: true,
+	[ownPrinterMarker]: true,
 	// Prettier reads `features` once per printer object, before any options exist.
 	...(bundledPrinter.features ? { features: bundledPrinter.features } : {}),
 	async preprocess(ast: unknown, options: ParserOptions) {

@@ -1,10 +1,19 @@
 # Tiempos de CI y publicación
 
-La verificación se reparte entre tipos/lint, pruebas y consumidores, tres shards del núcleo y tres shards de navegador de UI. El check `test` espera todos los grupos y falla si alguno falla o se cancela. Cada shard tiene un runner propio; dentro de él los archivos siguen ejecutándose en serie para evitar conflictos entre fixtures.
+La verificación se reparte entre tipos/lint, pruebas y consumidores, tres shards del núcleo y tres shards de navegador de UI. El check `test` espera todos esos grupos (`changes`, `core-tests`, `checks`, `test-support`, `verify` y `ui-browser`) y falla si alguno falla o se cancela; un grupo omitido cuenta como éxito. Cada shard tiene un runner propio; dentro de él los archivos siguen ejecutándose en serie para evitar conflictos entre fixtures.
 
 `MEEKO_TEST_SHARD=1/3` selecciona un tercio de los archivos del núcleo mediante `--test-shard` de Node. Sin esa variable, `pnpm test` ejecuta la suite completa. Todos los grupos de `verify` ejecutan también sus comprobaciones de ejemplos, tipos y DevTools.
 
-CI se ejecuta en los pull requests y en los pushes a `main`. Un nuevo commit cancela la verificación anterior del mismo PR o rama. Las etiquetas ejecutan sus workflows de publicación; no disparan otra copia de CI. Las publicaciones nunca se cancelan automáticamente y npm sigue esperando sus gates de runtimes, Redis, VS Code, tarballs y todos los shards de `verify`.
+CI se ejecuta en los pull requests y en los pushes a `main`. Un nuevo commit cancela la verificación anterior del mismo PR o rama. Las etiquetas ejecutan sus workflows de publicación; no disparan otra copia de CI, y `publish.yml` tampoco se dispara en los PR (sólo con etiquetas y a mano): `ci.yml` es la única verificación de cada commit. Las publicaciones nunca se cancelan automáticamente y npm sigue esperando sus gates de runtimes, Redis, VS Code, tarballs y todos los shards de `verify`.
+
+## Qué corre en cada evento
+
+- **`push` a `main`:** todos los jobs, sin filtros. Es la red de seguridad: cualquier hueco de los filtros de los PR (una dependencia entre paquetes que no se previó) se descubre sobre el árbol que se integra.
+- **`pull_request`:** el job `changes` obtiene, con la API de GitHub y sin checkout, los archivos de la PR entera (no sólo del último commit) y publica una salida por grupo: `checks`, `core`, `prose`, `verify`, `ui_browser`, `runtimes`, `vscode`, `performance` y `publish`. Cada job caro corre sólo si su salida es `true`. Un cambio en `.github/**`, `scripts/**`, `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `turbo.json` o la configuración raíz de lint, formato y TypeScript lo dispara todo. Los filtros de exclusión (`**` menos lo que se sabe que no afecta) pasan a ser de inclusión sólo donde la dependencia es clara; ante la duda, el job corre.
+- **Sólo prosa** (`docs/**`, `*.md`, `LICENSE`): `core-tests` ejecuta únicamente las pruebas que leen esos archivos (las de la web pública, los paquetes documentales y el panel de documentación), sin navegadores ni empaquetado.
+- **`publish`:** los cambios en `packages/devtools/package-zip.ps1` y en `packages/vscode/package-vsix.*` (además de los globales) activan `package-gates`, el ensayo de publicación: versiones de los seis paquetes, `pnpm format:check`, los seis tarballs, `npm publish --dry-run`, los seis VSIX y el ZIP de DevTools, sin repetir las pruebas de los demás jobs.
+
+El filtrado vive dentro del workflow, nunca en `on.pull_request.paths`: un check obligatorio de un workflow que no arranca por sus rutas no se informa y deja la PR esperando para siempre. Los checks obligatorios de `main` son `test` y `redis-integration`: se ejecutan siempre e informan verde cuando sus jobs se omiten, y `test` falla si `changes` no termina en `success`, para que un filtro roto nunca deje pasar un PR en silencio. En local, `pnpm ci:local` ejecuta esos jobs y `pnpm test:changed` sólo las pruebas asociadas a los archivos editados (`--list` muestra el plan, `--base <ref>` compara con una rama y `--no-build` omite el build); nunca lanza la suite completa ni los E2E.
 
 ## Cachés
 
@@ -26,6 +35,8 @@ Los comandos terminados en `:prepared` son fases internas que requieren el build
 Turbo sigue el grafo de dependencias al ejecutar `pnpm build`, `pnpm build:packages`, `pnpm build:apps` o `pnpm build --filter=meeko-ui-site`. Los hooks `prepack` construyen cada paquete antes de empaquetarlo.
 
 ## Publicación y artefactos
+
+Los humos de paquete (`pnpm package:smoke` y `pnpm package:workspace-smoke`) y el host aislado de VS Code (`test:host:isolated` y `test:host:untrusted`) son scripts de Node que no necesitan PowerShell, y los `.ps1` homónimos son envoltorios por compatibilidad. En Linux, el host de VS Code necesita `xvfb-run -a`.
 
 `scripts/package-vsix-matrix.ps1` comprueba la versión, valida y compila la extensión una vez y reutiliza `packages/vscode/package-vsix.ps1` para cada destino. Los destinos se declaran en `scripts/vsix-targets.ps1`. Los workflows de npm y de VS Code consumen esta misma preparación.
 

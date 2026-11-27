@@ -11,12 +11,13 @@ related:
   - "cli:routes"
   - "cli:types"
   - "cli:lsp"
+  - "cli:styles"
   - docs/framework.md#autoimports-y-typescript
   - docs/framework.md#tipos-de-los-servicios
   - docs/editors.md#comprobación-del-proyecto
 ---
 
-`meeko check` es la comprobación completa de una aplicación: la que debe pasar en CI antes de `meeko build`. Con un directorio (por defecto, el actual) genera lo mismo que `meeko dev` en `.meeko/` (entradas, manifiestos, declaraciones de rutas, contratos, autoimports, componentes y, desde `1.7`, `.meeko/types/services.d.ts`), comprueba cada `.meeko` de la aplicación y sus contratos de props y después ejecuta TypeScript sobre los tres proyectos generados: `app`, `server` y `shared`.
+`meeko check` es la comprobación completa de una aplicación: la que debe pasar en CI antes de `meeko build`. Con un directorio (por defecto, el actual) genera lo mismo que `meeko dev` en `.meeko/` (entradas, manifiestos, declaraciones de rutas, contratos, autoimports, componentes y, desde `1.7`, `.meeko/types/services.d.ts`), comprueba cada `.meeko` de la aplicación y sus contratos de props y después ejecuta TypeScript sobre los tres proyectos generados: `app`, `server` y `shared`. Si todo pasa, escribe además `.meeko/styles/main.css` (desde `1.12`), la hoja global procesada que mantiene `meeko dev` (véase [la hoja de estilos para el editor y Prettier](#la-hoja-de-estilos-para-el-editor-y-prettier)); un fallo al procesarla sólo avisa.
 
 Con un archivo `.meeko` comprueba sólo ese componente: su sintaxis, sus directivas y sus tipos, como el editor. Desde `1.7`, en una aplicación da también lo que antes sólo daba el proyecto: `MEEK044` (un `<script server>` fuera de `app/pages`), `MEEK100` (`generic` en una página o un layout) y los errores de tipos de su `<script server>`, opciones de ruta incluidas. Si el proyecto ya tiene `.meeko/types`, los regenera antes, así que ve un layout creado después del último `meeko check .`.
 
@@ -74,6 +75,16 @@ Un módulo normal de `app/` se comprueba con `tsconfig.app.json`, y por eso pued
 ```
 
 `.meeko/` está en el `.gitignore` del starter: `meeko check` lo genera en cada ejecución, así que no hace falta versionarlo ni cachearlo. `meeko build` vuelve a comprobar el proyecto antes de construir; con los dos pasos separados, el log dice en qué fase falló.
+
+### La hoja de estilos para el editor y Prettier
+
+Con `meekoSortClasses: "stylesheet"`, `prettier --check` ordena las clases por `.meeko/styles/main.css`, que `.gitignore` deja fuera del repositorio y sólo escribía `meeko dev`. `meeko check` la escribe al terminar bien, con el mismo contenido que `meeko dev` (la misma canalización de Vite, con los plugins de los módulos, sin servidor ni vigilantes), de modo que un trabajo de CI que ya ejecuta `meeko check` antes de Prettier ordena como en local. Medio segundo más en `apps/ui`. Si las hojas no compilan, `meeko check` avisa en la salida de errores (`[meeko] .meeko/styles/main.css conserva la versión anterior: …`) y su código de salida no cambia.
+
+Para un trabajo que sólo formatea, el comando explícito y barato es [`meeko styles [directorio]`](meeko-styles.md): escribe esa hoja y nada más (ni tipos ni TypeScript), imprime su ruta y no escribe nada si el proyecto no tiene hojas de estilos. Si no compilan, sale con `1`.
+
+```sh
+meeko styles . && prettier --check .
+```
 
 ### Diagnósticos en JSON para una herramienta
 

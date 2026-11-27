@@ -12,6 +12,7 @@ import type { ReactiveAccess, ReactiveDeclaration } from './reactivity'
 import { isServerRouteMiddleware } from '../framework/route-middleware-discovery'
 import { appTargetAt, handlerContract, routeParams } from './app-index'
 import { componentSummary, componentSummaryMarkdown } from './components'
+import { t } from './l10n'
 import { projectPath } from './lenses'
 import { analyzeReactivity, crossing, nodeAt, reactiveDeclarationAt } from './reactivity'
 
@@ -38,32 +39,37 @@ function accessList(context: FeatureContext, accesses: readonly ReactiveAccess[]
 	const lines = accesses.slice(0, maximumListed).map((access) => {
 		const position = document.positionAt(access.start)
 		// `where` names code (`computed`, `on:click`, `setup`); only the words around it are translated.
-		const where = access.template ? `plantilla \`${access.where}\`` : access.where.replace(/^function\b/, 'función')
-		return `- [línea ${position.line + 1}](${positionLink(document.uri, position.line, position.character)}) ${where}`
+		const where = access.template ? t('template `{0}`', access.where) : access.where.replace(/^function\b/, t('function'))
+		return t('- [line {0}]({1}) {2}', position.line + 1, positionLink(document.uri, position.line, position.character), where)
 	})
-	if (accesses.length > maximumListed) lines.push(`- … y ${accesses.length - maximumListed} más`)
+	if (accesses.length > maximumListed) lines.push(t('- … and {0} more', accesses.length - maximumListed))
 	return lines
 }
 
-/** Spanish name of a reactive declaration family. */
-const kindNames: Readonly<Record<ReactiveDeclaration['kind'], string>> = {
-	signal: 'señal',
-	computed: 'valor derivado',
-	resource: 'recurso',
+/** Name of a reactive declaration family. */
+function kindName(kind: ReactiveDeclaration['kind']): string {
+	switch (kind) {
+		case 'signal':
+			return t('signal')
+		case 'computed':
+			return t('computed value')
+		case 'resource':
+			return t('resource')
+	}
 }
 
 /** Summary of a reactive declaration: its type, where it is read and written and whether it crosses to the client. */
 export function reactiveMarkdown(context: FeatureContext, declaration: ReactiveDeclaration): string {
 	const reads = declaration.accesses.filter((access) => access.read)
 	const writes = declaration.accesses.filter((access) => access.write)
-	const origin = declaration.origin === 'composable' ? '' : ` de \`${declaration.origin}\``
+	const kind = kindName(declaration.kind)
 	return [
-		`**${kindNames[declaration.kind]}** \`${declaration.name}\`${origin}: \`${declaration.type}\``,
+		declaration.origin === 'composable' ? `**${kind}** \`${declaration.name}\`: \`${declaration.type}\`` : t('**{0}** `{1}` from `{2}`: `{3}`', kind, declaration.name, declaration.origin, declaration.type),
 		'',
-		`**Lecturas (${reads.length})**${reads.length ? '' : ': ninguna'}`,
+		reads.length ? t('**Reads ({0})**', reads.length) : t('**Reads ({0})**: none', reads.length),
 		...accessList(context, reads),
 		'',
-		`**Escrituras (${writes.length})**${writes.length ? '' : ': ninguna'}`,
+		writes.length ? t('**Writes ({0})**', writes.length) : t('**Writes ({0})**: none', writes.length),
 		...accessList(context, writes),
 		'',
 		crossing(declaration),
@@ -157,37 +163,37 @@ function nodeRange(context: FeatureContext, node: ts.Node): readonly [number, nu
 }
 
 function schemaLines(schemas: ReturnType<typeof handlerContract>): string[] {
-	return (schemas?.schemas ?? []).map((schema) => `- ${schema.name}: \`${schema.text}\`${schema.from ? ` de \`${schema.from}\`` : ''}`)
+	return (schemas?.schemas ?? []).map((schema) => (schema.from ? t('- {0}: `{1}` from `{2}`', schema.name, schema.text, schema.from) : `- ${schema.name}: \`${schema.text}\``))
 }
 
 function targetMarkdown(context: FeatureContext, target: AppTarget): string {
 	const root = context.project.root
 	if (target.kind === 'route') {
-		if (!target.route) return `**Ruta** \`${target.id}\` no es una página de este proyecto.`
+		if (!target.route) return t('**Route** `{0}` is not a page of this project.', target.id)
 		const route = target.route
 		const params = routeParams(target.id)
 		return [
-			`**Ruta** \`${target.id}\` → [${projectPath(root, route.file)}](${fileUri(context, route.file)})`,
+			t('**Route** `{0}` → [{1}]({2})', target.id, projectPath(root, route.file), fileUri(context, route.file)),
 			'',
-			`- params: ${params.length ? `\`{ ${params.map((param) => `${param.name}: string`).join('; ')} }\`` : 'ninguno'}`,
+			params.length ? `- params: \`{ ${params.map((param) => `${param.name}: string`).join('; ')} }\`` : t('- params: none'),
 			`- render: ${route.render ?? 'ssr'}`,
-			`- layout: ${route.layout ? `\`${route.layout.name}\`` : 'ninguno'}`,
-			`- layouts: ${route.layouts.length ? route.layouts.map((layout) => projectPath(root, layout)).join(' › ') : 'ninguno'}`,
+			route.layout ? `- layout: \`${route.layout.name}\`` : t('- layout: none'),
+			route.layouts.length ? `- layouts: ${route.layouts.map((layout) => projectPath(root, layout)).join(' › ')}` : t('- layouts: none'),
 		].join('\n')
 	}
 	if (target.kind === 'layout') {
-		if (!target.file) return `**Layout** \`${target.name}\` no existe: crea \`app/layouts/${target.name}.meeko\`.`
+		if (!target.file) return t('**Layout** `{0}` does not exist: create `app/layouts/{0}.meeko`.', target.name)
 		const pages = (context.app?.routes ?? []).filter((route) => route.layout?.name === target.name).map((route) => `\`${route.id}\``)
 		return [
 			`**Layout** \`${target.name}\` → [${projectPath(root, target.file)}](${fileUri(context, target.file)})`,
 			'',
-			`- páginas: ${pages.length ? pages.join(', ') : 'ninguna'}`,
+			pages.length ? t('- pages: {0}', pages.join(', ')) : t('- pages: none'),
 		].join('\n')
 	}
 	if (target.kind === 'middleware') {
 		if (!target.file) {
 			const global = context.app?.middleware?.global.get(target.name)
-			return global ? `**Middleware** \`${target.name}\` es global ([${projectPath(root, global)}](${fileUri(context, global)})): ya se ejecuta en todas las rutas.` : `**Middleware** \`${target.name}\` no existe: crea \`app/middleware/${target.name}.ts\` con \`defineRouteMiddleware(..., { global: false })\`, o \`app/middleware/${target.name}.server.ts\` con \`defineServerRouteMiddleware\` para uno de servidor.`
+			return global ? t('**Middleware** `{0}` is global ([{1}]({2})): it already runs on every route.', target.name, projectPath(root, global), fileUri(context, global)) : t('**Middleware** `{0}` does not exist: create `app/middleware/{0}.ts` with `defineRouteMiddleware(..., { global: false })`, or `app/middleware/{0}.server.ts` with `defineServerRouteMiddleware` for a server one.', target.name)
 		}
 		const file = target.file
 		const pages = (context.app?.routes ?? []).filter((route) => route.middleware?.includes(file) || route.serverMiddleware?.includes(file)).map((route) => `\`${route.id}\``)
@@ -195,12 +201,12 @@ function targetMarkdown(context: FeatureContext, target: AppTarget): string {
 			`**Middleware** \`${target.name}\` → [${projectPath(root, file)}](${fileUri(context, file)})`,
 			'',
 			// Since 1.6, `*.server.ts` route middleware runs only on the server.
-			...(isServerRouteMiddleware(file) ? ['- sólo servidor: se ejecuta en el servidor, con la sesión de la petición, y nunca llega al navegador'] : []),
-			`- páginas: ${pages.length ? pages.join(', ') : 'ninguna'}`,
+			...(isServerRouteMiddleware(file) ? [t('- server only: it runs on the server, with the request session, and never reaches the browser')] : []),
+			pages.length ? t('- pages: {0}', pages.join(', ')) : t('- pages: none'),
 		].join('\n')
 	}
 	if (target.kind === 'api') {
-		if (!target.endpoints.length) return `**API** \`${target.label}\` no tiene un handler GET en \`server/api\`.`
+		if (!target.endpoints.length) return t('**API** `{0}` has no GET handler in `server/api`.', target.label)
 		return target.endpoints
 			.map((endpoint) => {
 				const contract = handlerContract(endpoint.file, 'api')
@@ -214,7 +220,7 @@ function targetMarkdown(context: FeatureContext, target: AppTarget): string {
 			})
 			.join('\n\n')
 	}
-	if (!target.endpoint) return `**RPC** \`${target.id}\` no tiene un procedimiento en \`server/rpc\`.`
+	if (!target.endpoint) return t('**RPC** `{0}` has no procedure in `server/rpc`.', target.id)
 	const contract = handlerContract(target.endpoint.file, 'rpc')
 	const link = contract ? positionLink(fileUri(context, target.endpoint.file), contract.line, contract.character) : fileUri(context, target.endpoint.file)
 	return [

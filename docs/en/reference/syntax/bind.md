@@ -15,7 +15,7 @@ related:
   - docs/api.md#componentes-meeko
   - docs/api.md#atributos-en-bloque-con-bind
   - docs/api.md#props-estáticas
-source-hash: 425c3d2bc6b6f50357cbdafc6d180acd49e1a56b32bf2a6102855e9110485fad
+source-hash: 43d31d5197bf6a1ea07e1f3562c025b1660e965e1d79757010839e0e2cf3c975
 ---
 
 `bind:nombre="expresión"` sets attribute `nombre` to a TypeScript expression's value and keeps it up to date when the signals it reads change. On a component tag or `<component is>`, `bind:prop` passes a typed prop to the child.
@@ -42,11 +42,11 @@ With `saving.value` set to `false`, the button has neither `disabled` nor `aria-
 
 ## Attributes
 
-| Attribute                       | Type                              | Default | Description                                                                                                                                                                                                                        |
-| ------------------------------- | --------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bind:<atributo>` on an element | any value                         | none    | The attribute with `String(valor)`. `null`, `undefined` and `false` remove it. For HTML boolean attributes (`disabled`, `checked`, `hidden`, `required`, `open`…), any truthy value sets it to empty and a falsy value removes it. |
-| `bind:<prop>` on a component    | the prop's type                   | none    | The child's prop, checked against its `defineProps`. An optional prop accepts `undefined`, equivalent to not passing it.                                                                                                           |
-| `bind="objeto"`                 | `ElementAttributes<Tag>` or props | none    | Since `1.5`. Multiple attributes or props from an object. Explicit keys take precedence; `class` and `style` are merged.                                                                                                           |
+| Attribute                       | Type                              | Default | Description                                                                                                                                                                                                                                                                                                                                 |
+| ------------------------------- | --------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bind:<atributo>` on an element | any value                         | none    | The attribute with `String(valor)`. `null`, `undefined` and `false` remove it. For HTML boolean attributes (`disabled`, `checked`, `hidden`, `required`, `open`…), any truthy value sets it to empty and a falsy value removes it. `bind:class` also accepts objects and arrays (`ClassValue`), and `bind:style`, an object (`StyleValue`). |
+| `bind:<prop>` on a component    | the prop's type                   | none    | The child's prop, checked against its `defineProps`. An optional prop accepts `undefined`, equivalent to not passing it.                                                                                                                                                                                                                    |
+| `bind="objeto"`                 | `ElementAttributes<Tag>` or props | none    | Since `1.5`. Multiple attributes or props from an object. Explicit keys take precedence; `class` and `style` are merged.                                                                                                                                                                                                                    |
 
 ## Result
 
@@ -58,18 +58,36 @@ With `saving.value` set to `false`, the button has neither `disabled` nor `aria-
 
 ### Computed classes and styles
 
-`bind:class` takes the full class string. To combine fixed and conditional classes, construct the string:
+Since `1.10`, `bind:class` accepts the same values as `clsx`: a text, a `{ class: condition }` object that applies each key whose condition is true, and arrays, also nested, of any of them. Classes are joined with spaces in their order; `null`, `undefined`, `true`, `false` and empty texts are omitted. Next to a static `class`, the dynamic classes go after it:
 
 ```html
 <script lang="ts">
 const props = defineProps<{ active: boolean; size: "sm" | "lg" }>();
-const classes = computed(() => ["chip", `chip--${props.size}`, props.active ? "chip--active" : ""].filter(Boolean).join(" "));
 </script>
 
 <template>
-  <span bind:class="classes.value" bind:style="props.active ? 'outline: 2px solid currentColor' : null">Label</span>
+  <span class="chip" bind:class="[`chip--${props.size}`, { 'chip--active': props.active }]" bind:style="props.active ? 'outline: 2px solid currentColor' : null">Label</span>
 </template>
 ```
+
+With `size` set to `"lg"` and `active` set to `true`, the `<span>` carries `class="chip chip--lg chip--active"`; when `active` changes, Meeko removes only that class from the attribute. The server and the browser write the same text, so hydration gives no mismatch. `ClassValue`, exported by `@meekojs/meeko`, types a class value that is stored in a `computed` or arrives as a prop:
+
+```html
+<!-- app/components/AppCard.meeko -->
+<script lang="ts">
+import type { ClassValue } from "@meekojs/meeko";
+
+const props = defineProps<{ class?: ClassValue; open: boolean; title: string }>();
+</script>
+
+<template><article class="card" bind:class="[props.class, { 'card--open': props.open }]">{props.title}</article></template>
+```
+
+```html
+<AppCard title="Pedido" bind:open="open.value" bind:class="{ 'card--urgent': urgent.value }" />
+```
+
+Meeko does not merge conflicting classes (such as Tailwind's `p-2` and `p-4`): it writes them all, in the order they arrive.
 
 ### ARIA and `data-*` attributes
 
@@ -147,16 +165,18 @@ A signal is an object, and an object is truthy: `bind:disabled="saving"` always 
 <button bind:disabled="saving.value">Save</button>
 ```
 
-### An object in `bind:class`
+### A signal as a class condition
 
-`bind:class` does not interpret objects or arrays like Vue: it writes `String(valor)`, that is, `class="[object Object]"`, without any error.
+A signal is an object, and an object is truthy: `{ active: selected }` would apply the class always. `meeko check` and the editor reject it in the expression, just like a function or a symbol in `bind:class`:
 
 ```html bad
-<p bind:class="{ active: selected.value }">Option</p>
+<p bind:class="{ active: selected }">Option</p>
 ```
 
+`TS2345: Argument of type '{ active: Signal<boolean>; }' is not assignable to parameter of type 'ClassValue'.`
+
 ```html good
-<p bind:class="selected.value ? 'active' : null">Option</p>
+<p bind:class="{ active: selected.value }">Option</p>
 ```
 
 ### An event handler as an attribute

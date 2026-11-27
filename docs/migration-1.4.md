@@ -111,6 +111,8 @@ Cada componente autoimportado aporta sin import `<Nombre>Props`, `<Nombre>Snippe
 
 ### Autoimports en `@utilities`
 
+> **Retirado después:** `@meekojs/meeko/postcss`, `meekoUtilities()` y `@utilities` ya no existen; véase [Actualizar de 1.11 a 1.12](migration-1.12.md#retirada-de-meekojsmeekopostcss-y-de-tailwindcss-del-framework) y el [CHANGELOG](../packages/meeko/CHANGELOG.md).
+
 En un proyecto Meeko (una carpeta con `meeko.config.*` o un `package.json` que depende de `@meekojs/meeko`), `meekoUtilities()` aplica al módulo de `@utilities` y a los módulos locales en TypeScript que importa los autoimports de valores de `app/` y `shared/` (con `imports.appDirs`, `imports.sharedDirs`, los layers y los módulos), cuando el módulo se empaqueta con rolldown (Vite 8). Qué revisar:
 
 - **Un nombre libre que antes era un global** (por ejemplo, una constante leída con `typeof NOMBRE === "undefined"`) se resuelve ahora al export del proyecto con ese nombre, si lo hay.

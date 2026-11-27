@@ -35,8 +35,8 @@ test('Vite carga el mismo componente .meeko en el entorno SSR', async () => {
 })
 
 test("a component's CSS is a module beside its file, so PostCSS resolves relative imports", async () => {
-	// Tailwind's `@reference` and `@import` resolve from the module id: a virtual id with a null
-	// byte made them fail with "path must be … without null bytes".
+	// A relative `@import`, or any at-rule of a CSS plugin that names a file, resolves from the module
+	// id: a virtual id with a null byte made them fail with "path must be … without null bytes".
 	const project = await createTempProject('vite-style-')
 	const root = project.root
 	await linkRepositoryPackages(root)
@@ -59,8 +59,8 @@ test("a component's CSS is a module beside its file, so PostCSS resolves relativ
 })
 
 test("a component's css export is its stylesheet after PostCSS, in the SSR graph and in the browser", async () => {
-	// The SSR document embeds `css` before the client bundle loads: a PostCSS transform (Tailwind's
-	// @apply, @utilities) missing there would only apply after hydration.
+	// The SSR document embeds `css` before the client bundle loads: a PostCSS transform of the
+	// project missing there would only apply after hydration.
 	const project = await createTempProject('vite-style-inline-')
 	const root = project.root
 	await linkRepositoryPackages(root)

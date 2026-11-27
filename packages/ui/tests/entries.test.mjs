@@ -19,9 +19,8 @@ for (const entry of Object.keys(manifest.exports).filter((name) => !data(name)))
 	})
 }
 
-// Tools that resolve the CSS entry by hand read the manifest, as the class sorter of
-// `meekoSortClasses: "tailwind"` (packages/prettier-plugin/src/tailwind.ts) does: `@meekojs/ui/package.json`
-// must be exported, and its `style` condition must name the sheet.
+// Tools that resolve the CSS entry by hand read the manifest: `@meekojs/ui/package.json` must be
+// exported, and its `style` condition must name the sheet.
 test(`${manifest.name}/package.json is exported, and its style condition names the CSS entry`, async () => {
 	const require = createRequire(import.meta.url)
 	const path = require.resolve(`${manifest.name}/package.json`)

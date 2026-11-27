@@ -12,7 +12,8 @@ import { onceByRoot } from '../compiler/project-root'
 import { generateTypes } from '../types'
 import { frameworkTsconfigPaths, resolveProjectAliases } from './aliases'
 import { generateAppTypes } from './check-app'
-import { discoverConfiguredRoutes, loadConfiguredModules, loadMeekoConfig, resolveConfigSources } from './config'
+import { writeClassProvidersManifest } from './class-providers'
+import { configuredClassProviders, discoverConfiguredRoutes, loadConfiguredModules, loadMeekoConfig, resolveConfigSources } from './config'
 import { writeConfigTypesSync } from './config-types'
 import { generateServerContracts } from './contracts-generate'
 import { isComponentSource } from './dev-watch'
@@ -203,6 +204,8 @@ export async function prepareFrameworkTypeDeclarations(projectRoot: string, opti
 	const configTypes = writeConfigTypesSync(root, await loadMeekoConfig(root))
 	const { modules } = await loadConfiguredModules(root)
 	const moduleTypes = await generateModuleTypes(root, modules.typeTemplates)
+	// For the editor of an untrusted workspace, which does not run the modules.
+	await writeClassProvidersManifest(root, await configuredClassProviders(root))
 	if (!modules.names.includes('@meekojs/meeko/i18n')) {
 		const existing = await readFile(i18nTypes, 'utf8').catch((error: NodeJS.ErrnoException) => {
 			if (error.code !== 'ENOENT') throw error

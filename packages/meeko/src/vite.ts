@@ -30,8 +30,8 @@ import { developmentComponentDirectories, generateComponentRegistryTypes, genera
 
 /**
  * A component's CSS is the module `Card.meeko?meeko-style=<hash>&lang.css`: a real path, as Vue
- * names its style blocks, so PostCSS plugins resolve files (Tailwind's `@reference`, a relative
- * `@import`) from the component's folder. The hash changes with the CSS, for hot updates. The same
+ * names its style blocks, so CSS plugins resolve files (a relative `@import`, for instance) from
+ * the component's folder. The hash changes with the CSS, for hot updates. The same
  * module with `&inline` is the processed CSS as a string: the component's `css` export.
  */
 const styleQuery = /[?&]meeko-style=([0-9a-f]{64})(?:&inline)?&lang\.css$/
@@ -459,7 +459,7 @@ export function meeko(): Plugin {
 			const theme = config ? config.theme !== undefined && config.theme !== false : undefined
 			const styleHashOf = (css: string): string => createHash('sha256').update(filename).update('\0').update(css).digest('hex')
 			// In the SSR graph and in dev, `css` is the stylesheet after PostCSS, as Vite inlines it: the
-			// SSR document embeds it before the client bundle loads (Tailwind's @apply, @utilities) and
+			// SSR document embeds it before the client bundle loads (what the project's CSS plugins add) and
 			// hot updates reapply it. The production client bundle reads `css` nowhere, since the CSS
 			// asset that Vite bundles styles the page: it keeps the compiler's string, without a second
 			// PostCSS pass per component nor the processed copy as dead weight in the page chunks.
@@ -620,7 +620,7 @@ export function meeko(): Plugin {
 				return
 			}
 			// A script of a module that the browser imported reloads it, as Meeko's own runtime does (see
-			// isModuleScript). A file only watched for a stylesheet (its @utilities) has no module id.
+			// isModuleScript). A file only watched as a dependency of a stylesheet has no module id.
 			const moduleScript = isModuleScript(file, activeModuleDirectories) && [...(server.environments?.client.moduleGraph.getModulesByFile(normalized) ?? [])].some((node) => node.id !== null)
 			if (!normalized.startsWith(runtimeDirectory) && !moduleScript && !(await watchedSource(file))) return
 			invalidateDevModules(server)

@@ -3,7 +3,7 @@ import type { ContentSecurityPolicy } from '../server/runtime/csp'
 import type { DevAllowedHosts } from '../server/runtime/dev-hosts'
 import type { DocumentConfig } from '../shared/head'
 import type { ThemeConfig } from '../shared/theme'
-import type { MeekoModuleEntry } from './define-meeko-module'
+import type { ClassProvider, MeekoModuleEntry } from './define-meeko-module'
 
 /**
  * Archivo de cabeceras que escribe el adaptador `static` en su salida: `"_headers"` es el formato
@@ -315,7 +315,7 @@ export interface MeekoConfig {
 	 * toma el ámbito de la carpeta a la que apunta, como los autoimports: dentro de `server/`, sólo
 	 * en el servidor; dentro de `app/`, en `app/` y `server/` pero no en `shared/`; en otro lugar, en
 	 * todo el proyecto. Se aplica en Vite (`meeko dev`, `meeko build` y todos los adaptadores), en los
-	 * `tsconfig` generados, en el editor y en los módulos de `@utilities`.
+	 * `tsconfig` generados y en el editor.
 	 * @since 1.5.0
 	 * @example
 	 * ```ts
@@ -384,8 +384,13 @@ export interface MeekoConfig {
 	 * clase o un atributo que el script añade con la API del DOM a un elemento sin `ref:` ni `on:`
 	 * no recibe los estilos con ámbito si ese elemento quedó sin atributo. En `2.0`, `"matched"`
 	 * pasará a ser el valor por defecto.
+	 *
+	 * `classProviders` (desde `1.12`) declara las herramientas que generan clases y cuya extensión
+	 * de editor las atiende (véase {@link ClassProvider}), cuando ningún módulo lo hace: un proyecto
+	 * con Tailwind sin `@meekojs/ui`. Para que el editor la lea en un workspace no confiable, escríbala
+	 * como un array literal.
 	 */
-	readonly css?: { readonly scopeAttribute?: 'all' | 'matched' }
+	readonly css?: { readonly scopeAttribute?: 'all' | 'matched'; readonly classProviders?: readonly ClassProvider[] }
 	/**
 	 * Documento HTML de la aplicación: `lang` de `<html>` y etiquetas y atributos comunes de
 	 * `<head>`, con la menor prioridad frente a `useHead` y al `head` de las páginas. Los módulos
@@ -436,6 +441,27 @@ export interface MeekoConfig {
 		 * @see https://github.com/meekojs/meeko/blob/main/docs/reference/config/config-dev.md#abrir-meeko-dev-desde-otro-dispositivo
 		 */
 		readonly allowedHosts?: DevAllowedHosts
+		/**
+		 * Publica `meeko dev` en una URL con nombre de [portless](https://portless.sh)
+		 * (`https://<name>.localhost`) sin envolver el script con `portless`. `true` deriva el nombre
+		 * del `name` del `package.json` (sin ámbito, saneado como etiqueta DNS); `{ name }` lo fija y
+		 * admite subdominios (`ui.meeko`). `meeko dev` sigue en su puerto y registra la ruta con
+		 * `portless alias <name> <puerto>`, que quita al cerrar; el proxy de portless debe estar en
+		 * marcha. El host de portless se añade a `allowedHosts` y la URL se muestra al arrancar.
+		 * `portless` no es dependencia de Meeko: se usa el del proyecto (`node_modules/.bin`) o el del
+		 * PATH, y si falta o falla `meeko dev` avisa y sigue sin él. `PORTLESS=0` lo desactiva y, con
+		 * `PORTLESS_URL` (ya dentro de `portless <name> meeko dev`), sólo se acepta su host. Por
+		 * defecto, desactivado.
+		 * @since 1.12.0
+		 * @example
+		 * ```ts
+		 * import { defineMeekoConfig } from "@meekojs/meeko/framework";
+		 *
+		 * export default defineMeekoConfig({ dev: { portless: { name: "ui.meeko" } } });
+		 * ```
+		 * @see https://github.com/meekojs/meeko/blob/main/docs/reference/config/config-dev.md#url-con-nombre-con-portless
+		 */
+		readonly portless?: boolean | { readonly name: string }
 	}
 	/**
 	 * Meeko DevTools en `meeko dev`: con `true` (o un objeto con `panel` distinto de `false`),

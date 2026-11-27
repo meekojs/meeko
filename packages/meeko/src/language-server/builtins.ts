@@ -11,6 +11,7 @@ import { deprecatedBuiltinTags } from '../compiler'
 import { builtinTag } from './builtin-tags'
 import { componentMemberDocs, componentSignature, htmlAttribute, memberDocumentation, typeFormat } from './components'
 import { positionLink } from './insights'
+import { t } from './l10n'
 import { locationOf } from './locations'
 
 /** The props type of a built-in tag in the virtual code (`MeekoLinkProps<"/users/[id]">`) and the interface that declares it. */
@@ -67,7 +68,7 @@ function builtinSnippets(context: FeatureContext, tag: ComponentTag, builtin: Bu
 			name: symbol.name,
 			type: '[]',
 			optional: (symbol.flags & ts.SymbolFlags.Optional) !== 0,
-			documentation: known?.documentation ?? `Icono de la elección \`${symbol.name}\`; sin él se pinta su nombre.`,
+			documentation: known?.documentation ?? t('Icon of the choice `{0}`; without it, its name is rendered.', symbol.name),
 		}
 	})
 }
@@ -88,14 +89,14 @@ export function builtinTagHover(context: FeatureContext, tag: ComponentTag): str
 		snippets: builtinSnippets(context, tag, builtin),
 	}
 	const location = props && builtinTagDefinition(context, tag)?.[0]
-	const kind = builtin.element ? `Etiqueta de Meeko · renderiza \`<${builtin.element}>\`` : builtin.component ? 'Etiqueta de Meeko · componente' : 'Etiqueta de Meeko'
+	const kind = builtin.element ? t('Meeko tag · renders `<{0}>`', builtin.element) : builtin.component ? t('Meeko tag · component') : t('Meeko tag')
 	return [
 		['```ts', componentSignature(summary, builtin.name), '```'].join('\n'),
 		location ? `${kind} · props: [\`${builtin.propsType}\`](${positionLink(location.uri, location.range.start.line, location.range.start.character)})` : kind,
-		...(deprecatedBuiltinTags[builtin.name] ? [`**Obsoleta desde Meeko 1.8** (MEEK121): se retira en 2.0. Usa \`<${deprecatedBuiltinTags[builtin.name]}>\` de \`@meekojs/ui\`, con las mismas props, snippets y marcado.`] : []),
+		...(deprecatedBuiltinTags[builtin.name] ? [t('**Deprecated since Meeko 1.8** (MEEK121): removed in 2.0. Use `<{0}>` from `@meekojs/ui`, with the same props, snippets and markup.', deprecatedBuiltinTags[builtin.name]!)] : []),
 		builtin.summary,
 		...componentMemberDocs(summary),
-		`[Guía de \`<${builtin.name}>\`](${builtin.guide})`,
+		t('[Guide to `<{0}>`]({1})', builtin.name, builtin.guide),
 	].join('\n\n')
 }
 

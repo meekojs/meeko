@@ -86,6 +86,7 @@ export const catalog: readonly CatalogEntry[] = [
 	{ slug: 'migration-1.6', href: '/docs/migration-1.6', source: 'docs/migration-1.6.md', label: 'Actualizar a 1.6', section: 'Referencia' },
 	{ slug: 'migration-1.7', href: '/docs/migration-1.7', source: 'docs/migration-1.7.md', label: 'Actualizar a 1.7', section: 'Referencia' },
 	{ slug: 'migration-1.8', href: '/docs/migration-1.8', source: 'docs/migration-1.8.md', label: 'Actualizar a 1.8', section: 'Referencia' },
+	{ slug: 'migration-1.12', href: '/docs/migration-1.12', source: 'docs/migration-1.12.md', label: 'Actualizar a 1.12', section: 'Referencia' },
 	{ slug: 'benchmarks', href: '/docs/benchmarks', source: 'docs/benchmarks.md', label: 'Rendimiento', section: 'Referencia' },
 	{ slug: 'contributing', href: '/docs/contributing', source: 'docs/contributing.md', label: 'Contribuir a Meeko', section: 'Proyecto' },
 	{ slug: 'roadmap', href: '/docs/roadmap', source: 'docs/roadmap.md', label: 'Plan de desarrollo', section: 'Proyecto' },

@@ -61,6 +61,17 @@ exports.run = async function run() {
 			[['shared', 0, 0]],
 			`Execution zones must work for a virtual Meeko document: ${JSON.stringify(zones)}`,
 		)
+		// Changing the language mode closes and opens the document: the zones come back without an edit.
+		const plain = await vscode.languages.setTextDocumentLanguage(document, 'plaintext')
+		for (let attempt = 0; attempt < 60 && api.executionZones(uri)?.length; attempt++) await new Promise((resolve) => setTimeout(resolve, 100))
+		assert.ok(!api.executionZones(uri)?.length, 'A document that is no longer Meeko keeps no zones')
+		await vscode.languages.setTextDocumentLanguage(plain, 'meeko')
+		zones = undefined
+		for (let attempt = 0; attempt < 60 && !zones?.length; attempt++) {
+			zones = api.executionZones(uri)
+			await new Promise((resolve) => setTimeout(resolve, 100))
+		}
+		assert.ok(zones?.length, 'The zones must be painted again after the language mode returns to Meeko')
 		let diagnostics = []
 		for (let attempt = 0; attempt < 60; attempt++) {
 			diagnostics = vscode.languages.getDiagnostics(uri)

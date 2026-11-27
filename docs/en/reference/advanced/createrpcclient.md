@@ -15,7 +15,7 @@ related:
   - "@meekojs/meeko/framework#ClientError"
   - "@meekojs/meeko/server#defineRpc"
   - docs/framework.md#api-y-rpc
-source-hash: 072368b816993a3efc1c62193a42ebcf76f2407a49739ed052425adf5e9d514e
+source-hash: 972cded24f9ac5cfad2bff5aa7a22f370383f0feb2b84d0ed1e333e6ed6f61bc
 ---
 
 `createRpcClient` builds a client like the [`rpc`](/en/docs/reference/client-rpc) auto-import: one method per procedure, nested by ID (`"users.get"` → `rpc.users.get(input)`). Each call is a `POST` to its path (`/_meeko/rpc/users/get`) with JSON input and the CSRF token in `x-meeko-csrf`, and returns the parsed output or rejects with `ClientError`. It only needs the public procedure list; it never imports server code.

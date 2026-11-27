@@ -17,6 +17,7 @@ import { appTargetAt } from './app-index'
 import { tagAt } from './embedded'
 import { snippetParameters, virtualDocuments } from './features'
 import { appTargetDefinition } from './insights'
+import { t } from './l10n'
 import { sourceRange, toRange } from './locations'
 import { nodeAt } from './reactivity'
 
@@ -45,7 +46,7 @@ export function documentLinks(context: FeatureContext): DocumentLink[] {
 					links.push({
 						range: toRange(context.document, range[0], range[1]),
 						target: line > 1 ? `${target.uri}#L${line},${target.range.start.character + 1}` : target.uri,
-						tooltip: `Abrir ${relative(context.project.root, fileURLToPath(target.uri)).replaceAll('\\', '/')}`,
+						tooltip: t('Open {0}', relative(context.project.root, fileURLToPath(target.uri)).replaceAll('\\', '/')),
 					})
 				}
 			}
@@ -95,12 +96,12 @@ export async function workspaceSymbols(projects: readonly MeekoProject[], query:
 		const container = (file: string) => relative(project.root, file).replaceAll('\\', '/')
 		for (const entry of project.autoImports()) {
 			if (entry.component && entry.file.endsWith('.meeko')) {
-				symbols.push({ name: entry.name, kind: SymbolKind.Class, location: at(entry.file), containerName: `componente · ${container(entry.file)}` })
+				symbols.push({ name: entry.name, kind: SymbolKind.Class, location: at(entry.file), containerName: t('component · {0}', container(entry.file)) })
 			}
 		}
 		const index = await project.appIndex()
 		for (const route of index.routes) {
-			symbols.push({ name: route.id, kind: SymbolKind.File, location: at(route.file), containerName: `página · ${container(route.file)}` })
+			symbols.push({ name: route.id, kind: SymbolKind.File, location: at(route.file), containerName: t('page · {0}', container(route.file)) })
 		}
 		for (const endpoint of index.api) {
 			symbols.push({ name: `${endpoint.method} ${endpoint.pathname}`, kind: SymbolKind.Function, location: at(endpoint.file), containerName: `API · ${container(endpoint.file)}` })

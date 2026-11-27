@@ -12,7 +12,7 @@ related:
   - docs/api.md#estilos-del-componente-style-y-style-scoped
 ---
 
-`<style>` sin `scoped` es CSS **global** que vive en el `.meeko` del componente que lo necesita. Pasa por el mismo PostCSS que `app/styles/main.css` (`postcss.config.*`, Tailwind, las utilidades de Meeko) y Vite lo empaqueta con el componente, pero sus reglas se aplican a **toda la página**: a los hijos, al contenido de `html="…"` y a cualquier otro componente con la misma clase.
+`<style>` sin `scoped` es CSS **global** que vive en el `.meeko` del componente que lo necesita. Pasa por el mismo PostCSS que `app/styles/main.css` (`postcss.config.*` y los plugins de Vite que el proyecto registre, como Tailwind) y Vite lo empaqueta con el componente, pero sus reglas se aplican a **toda la página**: a los hijos, al contenido de `html="…"` y a cualquier otro componente con la misma clase.
 
 Úsalo para estilos globales a propósito, con un prefijo propio. Para casi todo lo demás, [`<style scoped>`](/docs/reference/style-scoped) es la opción por defecto.
 
@@ -75,7 +75,7 @@ const props = defineProps<{ highlighted: TrustedHtml }>();
 
 ### Tailwind y capas
 
-El bloque pasa por el PostCSS de la aplicación, así que admite las directivas de Tailwind si el proyecto lo usa:
+El bloque pasa por el pipeline de CSS del proyecto (su PostCSS y sus plugins de Vite), así que admite las directivas de Tailwind si el proyecto lo usa:
 
 ```html
 <template><nav class="site-nav">…</nav></template>

@@ -36,15 +36,36 @@ test('the UI browser step builds every application whose output its tests read',
 	}
 })
 
-test('the required CI test check waits for every parallel test job', () => {
+test('the required CI test check waits for every parallel test job and for the path filter', () => {
 	const workflow = read('.github/workflows/ci.yml')
 	const gate = workflow.split('\n  test:\n')[1]?.split('\n  performance:\n')[0]
 	assert.ok(gate, 'the workflow keeps the required test check')
-	assert.match(gate, /needs: \[core-tests, checks, test-support, verify, ui-browser\]/)
+	assert.match(gate, /needs: \[changes, core-tests, checks, test-support, verify, ui-browser\]/)
 	assert.match(gate, /if: always\(\)/)
-	for (const result of ['core-tests', 'checks', 'test-support', 'verify', 'ui-browser']) {
+	for (const result of ['changes', 'core-tests', 'checks', 'test-support', 'verify', 'ui-browser']) {
 		assert.ok(gate.includes(`needs.${result}.result`), `${result} must contribute to the test result`)
 	}
+	// A job skipped by the path filter passes; a failed or cancelled one does not. The filter itself must succeed:
+	// if it fails every other job is skipped, and `test` would turn green without having tested anything.
+	assert.match(gate, /test "\$CHANGES" = success/)
+	assert.match(gate, /success \| skipped\) ;;/)
+})
+
+test('the checks that main requires report on every pull request', () => {
+	const workflow = read('.github/workflows/ci.yml')
+	/** The text of a job, up to the next one. */
+	const job = (name) => workflow.slice(workflow.indexOf(`\n  ${name}:\n`) + 1).split(/\n {2}[\w-]+:\n/)[0]
+	// No workflow-level path filter: a required check of a workflow that never starts is never reported.
+	assert.doesNotMatch(workflow.slice(0, workflow.indexOf('\njobs:\n')), /^\s+paths(?:-ignore)?:/m)
+	assert.match(job('test'), /^ {4}if: always\(\)$/m)
+	// `redis-integration` is required too: the job always starts and only its steps follow the filter.
+	assert.doesNotMatch(job('redis-integration'), /^ {4}if:/m)
+	assert.match(job('redis-integration'), /if: needs\.changes\.outputs\.runtimes == 'true'/)
+})
+
+test('a pull request runs the verification once: publish.yml does not run on pull_request', () => {
+	assert.doesNotMatch(read('.github/workflows/publish.yml'), /^\s+pull_request:/m)
+	assert.match(read('.github/workflows/ci.yml'), /^ {2}pull_request:$/m)
 })
 
 test('workspace setup keeps frozen installs and reusable build/cache behind explicit inputs', () => {

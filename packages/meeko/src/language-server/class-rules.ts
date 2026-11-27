@@ -34,7 +34,7 @@ const header = (node: Container): string | undefined => {
 /**
  * The class selectors of `css`, with offsets shifted by `base` (where `css` starts in its file).
  * They include the classes in nested rules (`&.open`), at-rules (`@media`, `@layer`), pseudo-class
- * arguments (`:is()`, `:not()`, `:global()`) and Tailwind's `@utility name`. `undefined` while the
+ * arguments (`:is()`, `:not()`, `:global()`) and `@utility name` at-rules. `undefined` while the
  * CSS does not parse, as when a rule is being typed.
  */
 export function cssClassRules(css: string, base = 0): ClassRule[] | undefined {
@@ -61,7 +61,7 @@ export function cssClassRules(css: string, base = 0): ClassRule[] | undefined {
 		const end = node.source?.end?.offset
 		if (start === undefined || end === undefined) return
 		if (node.type === 'atrule' && node.name === 'utility') {
-			// Tailwind 4: `@utility tab-4 {}` is the class `tab-4`; a functional `tab-*` is not one class.
+			// `@utility tab-4 {}` declares the class `tab-4`; a functional `tab-*` is not one class.
 			const name = node.params.trim()
 			if (!/^[\w-]+$/.test(name)) return
 			const at = base + css.indexOf(name, start + node.name.length + 1)
@@ -99,7 +99,7 @@ export function cssClassRules(css: string, base = 0): ClassRule[] | undefined {
 
 /**
  * The local files that `@import` names in `css` (`"./tokens.css"`, `url(./x.css)`), as written.
- * Packages (`"tailwindcss"`) and remote URLs are left for the caller to discard when they do not
+ * Packages (`"some-package"`) and remote URLs are left for the caller to discard when they do not
  * resolve to a file.
  */
 export function cssImports(css: string): string[] {

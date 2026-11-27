@@ -3,10 +3,12 @@ import type { DocumentFormattingParams, DynamicFeature, ErrorHandler, Initialize
 import * as vscode from 'vscode'
 import { CloseAction, DocumentFormattingRequest, ErrorAction, LanguageClient, State, Trace, TransportKind } from 'vscode-languageclient/node'
 
+import type { ClassProviderInfo } from './class-providers'
 import type { PlannedClient } from './folder-plan'
 import type { ResolvedLanguageServer } from './server-resolution'
 import type { ServerState } from './status'
 
+import { classProvidersMethod, classSettingsForServer, legacyTailwindExtension, requestClassProviders } from './class-providers'
 import { withDeadline } from './deadline'
 import { DiagnosticOwners } from './diagnostic-owners'
 import { freeSlot, globalKey, planClients, reconcileClients } from './folder-plan'
@@ -160,8 +162,9 @@ class DetachedLanguageClient extends MeekoLanguageClient {
 	}
 }
 
-function tailwindActive(): boolean {
-	return vscode.extensions.getExtension('bradlc.vscode-tailwindcss')?.isActive === true
+/** Whether the VS Code extension `id` is installed and active, as a class provider names it. */
+function extensionActive(id: string): boolean {
+	return vscode.extensions.getExtension(id)?.isActive === true
 }
 
 function describe(error: unknown): string {
@@ -180,7 +183,8 @@ function initializationOptions(target: ClientTarget): Record<string, unknown> {
 			completion: configuration.get<string>('classes.completion', 'auto'),
 			hover: configuration.get<string>('classes.hover', 'auto'),
 			definition: enabled('classes.definition'),
-			tailwindActive: tailwindActive(),
+			// The class providers are not known before the server starts: workspace/configuration adds activeExtensions.
+			tailwindActive: extensionActive(legacyTailwindExtension),
 		},
 		cssVariables: {
 			completion: enabled('cssVariables.completion'),
@@ -514,11 +518,22 @@ export class LanguageServers {
 				if (route.evict !== undefined) this.entries.get(route.evict)?.client?.diagnostics?.delete(uri)
 				if (route.accept) next(uri, diagnostics)
 			},
+			// `workspace/didChangeWatchedFiles` is not filtered by owner: the client sends every event of
+			// its watchers to its server and the middleware cannot intercept them. Each server keeps only
+			// the paths under the roots of its projects (`MeekoProject.filesChanged`), and it needs the
+			// files of other folders too: an outer folder resolves imports into a nested one and the
+			// other way round, so dropping them would leave stale programs.
 			workspace: {
 				configuration: async (params, token, next) => {
 					const values = await next(params, token)
 					if (!Array.isArray(values)) return values
-					return values.map((value: unknown, index: number) => (params.items[index]?.section === 'meeko.classes' ? { ...(value && typeof value === 'object' ? value : {}), tailwindActive: tailwindActive() } : value))
+					return Promise.all(
+						values.map(async (value: unknown, index: number) => {
+							const item = params.items[index]
+							if (item?.section !== 'meeko.classes') return value
+							return classSettingsForServer(value, await this.classProviders(entry, item.scopeUri), extensionActive)
+						}),
+					)
 				},
 				...(detached ? { workspaceFolders: () => null, didChangeWorkspaceFolders: () => Promise.resolve() } : {}),
 			},
@@ -528,6 +543,16 @@ export class LanguageServers {
 				return lenses && entry.client ? this.codeLenses(lenses, entry.client) : lenses
 			},
 		}
+	}
+
+	/**
+	 * The class providers that the project of `uri` declares, asked to its server: they say which
+	 * extensions attend the classes that a tool generates. A server before 1.12 has none.
+	 */
+	private classProviders(entry: ClientEntry, uri: string | undefined): Promise<ClassProviderInfo[]> {
+		const client = entry.client
+		if (!client) return Promise.resolve([])
+		return requestClassProviders(() => client.sendRequest(classProvidersMethod, uri === undefined ? null : { textDocument: { uri } }))
 	}
 
 	/** Disposes the client of an entry, which stays in the map. */

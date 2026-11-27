@@ -15,7 +15,7 @@ related:
   - "@meekojs/meeko/framework#ClientError"
   - "@meekojs/meeko/server#defineApiRoute"
   - docs/framework.md#api-y-rpc
-source-hash: baec21d3bba1cd7ff97bc04cf96320a0968a4b5d3383e801b72edfd69ec13e43
+source-hash: e8f78765952a126da84c422f1dfa3eaa701c7137b5b91f8e0a10afc7f47b1776
 ---
 
 `createApiClient` builds a client like an application's [`api`](/en/docs/reference/client-api) auto-import: an object with one method per endpoint (`api.users.byId.get(…)`) that builds the URL with parameters and query, sends the JSON body with the CSRF token on mutations and returns the parsed response, or throws a `ClientError` with the server's code. It only needs the public endpoint list (key, path and method); it never imports server code.

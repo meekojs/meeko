@@ -1,5 +1,5 @@
 ---
-source-hash: 04942a42d304076e82b3174749d6482d199cb7bcf3b9a08d66b4afc93a4ba6e6
+source-hash: 3f2fd3b1b8db232f34b1570109d1cbb133b108f34caee215acd218bcf0a23162
 ---
 
 # Upgrade from 1.3 to 1.4
@@ -114,6 +114,8 @@ Each auto-imported component provides `<Nombre>Props`, `<Nombre>Snippets`, `<Nom
 ## Configuration and build
 
 ### Auto-imports in `@utilities`
+
+> **Removed later:** `@meekojs/meeko/postcss`, `meekoUtilities()` and `@utilities` no longer exist; see [Upgrade from 1.11 to 1.12](migration-1.12.md#removal-of-meekojsmeekopostcss-and-tailwindcss-from-the-framework) and the [CHANGELOG](../../packages/meeko/CHANGELOG.md).
 
 In a Meeko project (a directory with `meeko.config.*` or a `package.json` depending on `@meekojs/meeko`), `meekoUtilities()` applies value auto-imports from `app/` and `shared/` (with `imports.appDirs`, `imports.sharedDirs`, layers and modules) to the `@utilities` module and its imported local TypeScript modules when bundling with rolldown (Vite 8). What to review:
 

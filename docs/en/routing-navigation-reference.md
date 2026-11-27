@@ -1,5 +1,5 @@
 ---
-source-hash: 9dd93711078582394872cb3206a42ff1e537e2c545df9b81ada118b545ee9d8a
+source-hash: cd143f62b5c3b696f866ced3a9e1589cacf149a0ea1935499fd468bd3fc35019
 ---
 
 # Navigation: technical details
@@ -235,6 +235,77 @@ import { useNavigation } from '@meekojs/meeko/framework'
 const nav = useNavigation()
 // <p if:when="nav.pending.value">Loading…</p>
 ```
+
+### `data-navigating` and `data-pending` attributes
+
+Since `1.10`, while `pending` is `true`, Meeko also sets two attributes on the document, so navigation can be styled with CSS alone:
+
+- **`data-navigating` on `<html>`** (`document.documentElement`), empty, on any client navigation: a link click, `app.navigate()`, a redirect, back and forward, and the first load of a `"client"` page.
+- **`data-pending` on the clicked `<a>`**, empty, when the navigation started with a click on a `<MeekoLink>` or an internal `<a href>` that Meeko intercepts. Back, forward and navigations from code mark no link. If another navigation starts first, the previous link loses the attribute and the new one receives it, if there is one.
+
+Both are removed when the navigation is confirmed, fails or is cancelled, and when the application is disposed of (`dispose()`). They are never in the server HTML, so they do not affect hydration. A fragment-only navigation does not set them.
+
+```css
+/* Atenúa el enlace pulsado mientras carga su página. */
+a[data-pending] {
+	opacity: 0.6;
+	cursor: progress;
+}
+
+html[data-navigating] main {
+	transition: opacity 0.2s 0.15s;
+	opacity: 0.7;
+}
+```
+
+[`useNavigation`](reference/composables/usenavigation.md#attributes-for-css) has a progress bar with a delay.
+
+## Programmatic navigation
+
+Since `1.10`, `navigate(target, options)` navigates from the code of a component or a browser composable through the same router as `<MeekoLink>`: route middleware, page data, `useNavigation().pending`, history, scroll and View Transitions. It is auto-imported in `app/` code that reaches the browser and, since it does not read the component context, it also works in an event handler, a timer or after an `await`. It replaces `window.location.assign`, which reloads the document.
+
+```html
+<script lang="ts">
+	const props = defineProps<{ userId: string }>()
+	async function save() {
+		await api.users.update.post({ body: { id: props.userId } })
+		await navigate({ to: '/users/[id]', params: { id: props.userId }, search: { saved: 1 }, hash: 'perfil' })
+	}
+</script>
+```
+
+- **Typed destination.** It receives the same as `<MeekoLink>`: `to` (only routes that exist), `params` (required on a dynamic route and forbidden on the others), `search`, `hash` (without `#`), `hreflang` and `resolve`, which go through the link resolvers as in the tag. `meeko check` flags a nonexistent route or missing `params` (`TS2769`).
+- **URL as text.** `navigate("/users/42?tab=a")` accepts any relative or absolute URL, without checking it against the routes. A URL from another origin or without a page loads as a document (`location.assign`, or `location.replace` with `replace: true`), like a link. Only `http:` and `https:` are followed: another scheme rejects with `TypeError`, the same rule as middleware redirects.
+- **Options.** `replace: true` replaces the history entry; `viewTransition` enables or disables the View Transition for that navigation.
+- **Result.** A `Promise<boolean>`, that of `app.navigate()`: `true` when the new page is confirmed and `false` if it is cancelled (another navigation, `beforeNavigate`, a middleware that blocks) or the URL loads as a document. It rejects with the error if it fails; the previous page stays visible.
+- **Server.** In SSR, in a loader, in top-level code or in a server middleware, it throws an error that points to `redirect()`. Outside an application mounted with `mountClientApp` it throws the same error. A call during hydration waits for the router to be ready.
+
+See [navigate](reference/utils/navigate.md).
+
+## Search parameters as state
+
+Since `1.10`, `useSearchParam(name, initial, { schema, history })` returns an editable signal bound to a query string parameter of the confirmed route. It is auto-imported in `app/` code that reaches the browser.
+
+```html
+<script lang="ts">
+	import * as v from 'valibot'
+
+	const tab = useSearchParam('tab', 'perfil')
+	const page = useSearchParam('page', 1, { schema: v.pipe(v.string(), v.toNumber(), v.integer(), v.minValue(1)) })
+</script>
+
+<template>
+	<button on:click="() => (tab.value = 'actividad')">Actividad</button>
+	<button on:click="() => page.value++">Página siguiente</button>
+</template>
+```
+
+- **Reading.** It comes from the query of `useRoute().url`, with the same timing as `useRoute()`: it changes when a navigation is confirmed, also through history. The `schema` (a synchronous Standard Schema) receives the parameter's text, or a list if the key is repeated, and its output gives the type. Without the parameter or with a value the schema rejects, the signal is `initial`; it never throws because of the URL. Without a `schema`, the value is the text (the first one, if repeated) and `initial` must be a text.
+- **Writing.** It navigates to the same URL with the parameter changed, keeping the other parameters and the fragment, through the router: the route middleware and the page's data run, as when following a link to that URL. By default it replaces the history entry; `history: "push"` adds another. A value equal to `initial`, `null` and `undefined` remove the parameter; a list repeats the key and a date is written with `toISOString()`. The signal returns the written value while the navigation is pending and returns to the URL's if it fails or is cancelled. Two consecutive writes accumulate in one URL.
+- **SSR and hydration.** In SSR it reads the request's query and is read-only: writing throws an error. Hydration reads the same as the server, without mismatches.
+- **What is mounted again.** Like any navigation, the page is mounted again with the new URL and the layouts are kept. A text field on the page that writes on every keystroke loses focus: write on submit or in `on:change`.
+
+`useRoute().search` is still the `search` the page validated; `useSearchParam` reads the URL, so it also works for a parameter that the `definePage({ search })` schema does not declare. See [useSearchParam](reference/composables/usesearchparam.md).
 
 ## Current route
 

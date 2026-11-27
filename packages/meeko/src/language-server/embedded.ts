@@ -16,6 +16,7 @@ import { ariaRoles } from '../shared/html-data/aria'
 import { builtinTag } from './builtin-tags'
 import { cssClassRules } from './class-rules'
 import { attributeValueType, htmlAttributeSource } from './html-data-source'
+import { localized, t } from './l10n'
 import { nativeTagName, styleRegion, tagAt, templateRegion } from './regions'
 
 export type { TagContext } from './regions'
@@ -46,8 +47,8 @@ const meekoHtmlData: IHTMLDataProvider = {
 			.attributes(tag)
 			.map((info): IAttributeData => {
 				const mdn = known.get(info.name)
-				const status = [info.deprecated ? '**Obsoleto.**' : undefined, info.experimental ? '**Experimental.**' : undefined].filter(Boolean).join(' ')
-				const description = [status, markup(mdn?.description) ?? info.description, info.spec && `[Especificación](${info.spec})`].filter(Boolean).join('\n\n')
+				const status = [info.deprecated ? t('**Deprecated.**') : undefined, info.experimental ? '**Experimental.**' : undefined].filter(Boolean).join(' ')
+				const description = [status, markup(mdn?.description) ?? info.description, info.spec && t('[Specification]({0})', info.spec)].filter(Boolean).join('\n\n')
 				return {
 					name: info.name,
 					...(description ? { description: { kind: MarkupKind.Markdown, value: description } } : {}),
@@ -82,40 +83,46 @@ function markDeprecated(items: CompletionItem[], tag: string): CompletionItem[] 
 // `@layer` and nesting are standard; an unknown at-rule (a PostCSS plugin's) is not an error here.
 cssService.configure({ validate: true, lint: { unknownAtRules: 'ignore' } })
 
-const specialTagDocumentation = {
-	render: [
-		'```html',
-		'<render snippet="snippets.name" args="value, action" />',
-		'```',
-		'Pinta un snippet que recibió este componente. `snippet` es una expresión, normalmente una clave de `defineSnippets`; `args` pasa valores al contenido del padre. Un snippet opcional ausente no pinta nada. No admite contenido dentro de `<render>`.',
-	].join('\n\n'),
-	snippet: [
-		'```html',
-		'<snippet name="title" params="item, index">…</snippet>',
-		'```',
-		'Llena un snippet declarado por el componente hijo. Debe ser hijo directo de su etiqueta. El contenido pertenece al padre; `params` nombra los argumentos que el hijo envía desde `<render>`.',
-	].join('\n\n'),
-} as const
+const specialTagDocumentation = localized(
+	() =>
+		({
+			render: [
+				'```html',
+				'<render snippet="snippets.name" args="value, action" />',
+				'```',
+				t("Renders a snippet this component received. `snippet` is an expression, normally a key of `defineSnippets`; `args` passes values to the parent's content. An absent optional snippet renders nothing. `<render>` admits no content inside."),
+			].join('\n\n'),
+			snippet: [
+				'```html',
+				'<snippet name="title" params="item, index">…</snippet>',
+				'```',
+				t('Fills a snippet declared by the child component. It must be a direct child of its tag. The content belongs to the parent; `params` names the arguments the child sends from `<render>`.'),
+			].join('\n\n'),
+		}) as const,
+)
 
-const specialAttributeDocumentation = {
-	render: {
-		if: '**`if`** · Pinta este `<render>` sólo cuando la expresión es verdadera.',
-		'else-if': '**`else-if`** · Alternativa a la rama anterior de la cadena.',
-		else: '**`else`** · Alternativa final de la cadena, sin valor.',
-		snippet: '**`snippet`** · Expresión de tipo `Snippet<Args> | undefined` que se pinta. Normalmente `snippets.name`, declarado con `defineSnippets`. Es obligatorio; si es `undefined`, no pinta contenido.',
-		args: '**`args`** · Expresiones separadas por comas que recibe el snippet, en el orden y con los tipos de la tupla declarada en `defineSnippets`.',
-		'if:when': '**`if:when`** · Pinta este `<render>` sólo cuando la expresión es verdadera.',
-	},
-	snippet: {
-		if: '**`if`** · Alias de `if:when`: pasa el snippet al hijo sólo mientras la expresión es verdadera.',
-		name: '**`name`** · Nombre del snippet que llena en el componente hijo; debe coincidir con una clave de su `defineSnippets`.',
-		params: '**`params`** · Nombres de los argumentos que el hijo pasa desde `<render args="…">`, separados por comas. Sus tipos se infieren de `defineSnippets`.',
-		'if:when': '**`if:when`** · Pasa el snippet al hijo sólo cuando la expresión es verdadera. El hijo debe haberlo declarado como opcional.',
-	},
-} as const
+const specialAttributeDocumentation = localized(
+	() =>
+		({
+			render: {
+				if: t('**`if`** · Renders this `<render>` only when the expression is true.'),
+				'else-if': t('**`else-if`** · Alternative to the previous branch of the chain.'),
+				else: t('**`else`** · Final alternative of the chain, without a value.'),
+				snippet: t('**`snippet`** · Expression of type `Snippet<Args> | undefined` to render. Normally `snippets.name`, declared with `defineSnippets`. It is required; if it is `undefined`, nothing renders.'),
+				args: t('**`args`** · Comma-separated expressions the snippet receives, in the order and with the types of the tuple declared in `defineSnippets`.'),
+				'if:when': t('**`if:when`** · Renders this `<render>` only when the expression is true.'),
+			},
+			snippet: {
+				if: t('**`if`** · Alias of `if:when`: passes the snippet to the child only while the expression is true.'),
+				name: t('**`name`** · Name of the snippet it fills in the child component; it must match a key of its `defineSnippets`.'),
+				params: t('**`params`** · Comma-separated names of the arguments the child passes from `<render args="…">`. Their types are inferred from `defineSnippets`.'),
+				'if:when': t('**`if:when`** · Passes the snippet to the child only when the expression is true. The child must have declared it optional.'),
+			},
+		}) as const,
+)
 
 export function specialTemplateDocumentation(tag: 'render' | 'snippet', attribute?: string): string | undefined {
-	return attribute === undefined ? specialTagDocumentation[tag] : (specialAttributeDocumentation[tag] as Record<string, string>)[attribute]
+	return attribute === undefined ? specialTagDocumentation()[tag] : (specialAttributeDocumentation()[tag] as Record<string, string>)[attribute]
 }
 
 /** The document with only `region` kept: positions and offsets stay those of the `.meeko`. */
@@ -180,7 +187,7 @@ export function dynamicTagAttributeCompletion(document: TextDocument, position: 
 		label: name,
 		kind: CompletionItemKind.Property,
 		// Global attributes apply to every tag; the others say which ones they apply to.
-		...(entry.tags.length < tags.length ? { detail: `Sólo en ${entry.tags.map((tag) => `<${tag}>`).join(', ')}` } : {}),
+		...(entry.tags.length < tags.length ? { detail: t('Only on {0}', entry.tags.map((tag) => `<${tag}>`).join(', ')) } : {}),
 		...(entry.description ? { documentation: entry.description } : {}),
 		sortText: `1${entry.tags.length < tags.length ? '0' : '1'}${name}`,
 		insertTextFormat: InsertTextFormat.Snippet,
@@ -214,23 +221,23 @@ export function bindAttributeCompletion(document: TextDocument, position: Positi
 			const label = `bind:${info.name}`
 			const signature = `${label}: ${attributeValueType(info)}`
 			const description = info.description
-			const only = accepting.length < tags.length ? `Sólo en ${accepting.map((tag) => `<${tag}>`).join(', ')}.` : undefined
+			const only = accepting.length < tags.length ? t('Only on {0}.', accepting.map((tag) => `<${tag}>`).join(', ')) : undefined
 			// Values that the type does not list: many, suggestions only (`autocomplete`) or a token list (`role`).
-			const listed = info.values?.length && (info.values.length > 8 || info.freeform || info.tokens) ? `${info.tokens ? 'Valores, separados por espacios' : info.freeform ? 'Valores sugeridos' : 'Valores'}: ${info.values.map((value) => `\`${value}\``).join(', ')}.` : undefined
-			const status = [info.deprecated ? '**Obsoleto.**' : undefined, info.experimental ? '**Experimental.**' : undefined].filter(Boolean).join(' ') || undefined
+			const listed = info.values?.length && (info.values.length > 8 || info.freeform || info.tokens) ? `${info.tokens ? t('Values, separated by spaces') : info.freeform ? t('Suggested values') : t('Values')}: ${info.values.map((value) => `\`${value}\``).join(', ')}.` : undefined
+			const status = [info.deprecated ? t('**Deprecated.**') : undefined, info.experimental ? '**Experimental.**' : undefined].filter(Boolean).join(' ') || undefined
 			const rank = !info.global ? 0 : commonGlobalAttributes.has(info.name) ? 1 : info.name.startsWith('aria-') ? 3 : 2
 			return {
 				label,
 				kind: CompletionItemKind.Property,
 				detail: signature,
-				documentation: { kind: MarkupKind.Markdown, value: bindDocumentation(signature, [status, only, description, listed, info.spec && `[Especificación](${info.spec})`]) },
+				documentation: { kind: MarkupKind.Markdown, value: bindDocumentation(signature, [status, only, description, listed, info.spec && t('[Specification]({0})', info.spec)]) },
 				...(info.deprecated ? { tags: [CompletionItemTag.Deprecated] } : {}),
 				sortText: `${order}${rank}${info.name}`,
 				filterText: label,
 				insertTextFormat: InsertTextFormat.Snippet,
 				textEdit: { range, newText: `${label}="$1"` },
 				// Enumerated values open inside the quotes, before the expressions.
-				...(info.values?.length ? { command: { title: 'Valores', command: 'editor.action.triggerSuggest' } } : {}),
+				...(info.values?.length ? { command: { title: t('Values'), command: 'editor.action.triggerSuggest' } } : {}),
 			}
 		})
 	if (!present.has('bind:data-')) {
@@ -238,7 +245,7 @@ export function bindAttributeCompletion(document: TextDocument, position: Positi
 			label: 'bind:data-',
 			kind: CompletionItemKind.Property,
 			detail: 'bind:data-*: string',
-			documentation: { kind: MarkupKind.Markdown, value: bindDocumentation('bind:data-*: string', ['Atributo `data-*` propio, que se lee con `dataset`.']) },
+			documentation: { kind: MarkupKind.Markdown, value: bindDocumentation('bind:data-*: string', [t('Own `data-*` attribute, read with `dataset`.')]) },
 			sortText: `${order}4data-`,
 			filterText: 'bind:data-',
 			insertTextFormat: InsertTextFormat.Snippet,
@@ -250,7 +257,7 @@ export function bindAttributeCompletion(document: TextDocument, position: Positi
 
 /** The documentation of `bind:attr`: its signature, notes and the rule of empty values. */
 function bindDocumentation(signature: string, notes: ReadonlyArray<string | undefined>): string {
-	return ['```ts', signature, '```', ...notes.filter((note): note is string => Boolean(note)).flatMap((note) => ['', note]), '', '`null`, `undefined` o `false` no escriben el atributo.'].join('\n')
+	return ['```ts', signature, '```', ...notes.filter((note): note is string => Boolean(note)).flatMap((note) => ['', note]), '', t('`null`, `undefined` or `false` do not write the attribute.')].join('\n')
 }
 
 /**
@@ -275,10 +282,10 @@ export function dynamicTagHover(document: TextDocument, position: Position): Hov
 			kind: MarkupKind.Markdown,
 			value: [
 				'```typescript',
-				`(elemento) ${tags.map((tag) => `<${tag}>`).join(' | ')}`,
+				t('(element) {0}', tags.map((tag) => `<${tag}>`).join(' | ')),
 				'```',
 				'',
-				'`<component is>` renderiza una de estas etiquetas según `is`. Un atributo que la etiqueta del momento no admite no se escribe; los globales (`class`, `id`, `aria-*`, `data-*`…) y los eventos, siempre. Al cambiar la etiqueta, el contenido pasa al elemento nuevo con su estado.',
+				t('`<component is>` renders one of these tags according to `is`. An attribute that the current tag does not admit is not written; global ones (`class`, `id`, `aria-*`, `data-*`…) and events always are. When the tag changes, the content moves to the new element with its state.'),
 				'',
 				...lines,
 			].join('\n'),
@@ -343,8 +350,8 @@ export function htmlCompletion(document: TextDocument, position: Position): Comp
 		items.unshift({
 			label: 'render',
 			kind: CompletionItemKind.Property,
-			detail: 'Renderiza un snippet con sus argumentos',
-			documentation: { kind: MarkupKind.Markdown, value: specialTagDocumentation.render },
+			detail: t('Renders a snippet with its arguments'),
+			documentation: { kind: MarkupKind.Markdown, value: specialTagDocumentation().render },
 			sortText: '0',
 			insertTextFormat: InsertTextFormat.Snippet,
 			textEdit: { range: { start: document.positionAt(tagStart + 1), end: position }, newText: 'render snippet="$1" />' },
@@ -410,8 +417,8 @@ function snippetTagCompletion(document: TextDocument, position: Position, parsed
 	return {
 		label: 'snippet',
 		kind: CompletionItemKind.Property,
-		detail: `Snippet de <${parent}>: <snippet name="…">`,
-		documentation: { kind: MarkupKind.Markdown, value: specialTagDocumentation.snippet },
+		detail: t('Snippet of <{0}>: <snippet name="…">', parent),
+		documentation: { kind: MarkupKind.Markdown, value: specialTagDocumentation().snippet },
 		sortText: '0',
 		insertTextFormat: InsertTextFormat.Snippet,
 		textEdit: { range: { start: document.positionAt(tagStart + 1), end: position }, newText: 'snippet name="$1">$0</snippet>' },
@@ -449,7 +456,7 @@ export function specialTemplateHover(document: TextDocument, position: Position)
 		contents: { kind: MarkupKind.Markdown, value: markdown },
 		range: { start: document.positionAt(start), end: document.positionAt(end) },
 	})
-	if (offset >= nameStart && offset < nameEnd) return makeHover(nameStart, nameEnd, specialTagDocumentation[tag])
+	if (offset >= nameStart && offset < nameEnd) return makeHover(nameStart, nameEnd, specialTagDocumentation()[tag])
 	if (!opening) return undefined
 	const context = tagAt(source, offset)
 	if (!context || context.tag !== tag || context.tagStart !== tagStart || context.value) return undefined
@@ -570,7 +577,7 @@ export function styleDiagnostics(document: TextDocument): Diagnostic[] {
 		if (entry.global || used(entry.name)) continue
 		diagnostics.push({
 			range: { start: document.positionAt(entry.start), end: document.positionAt(entry.end) },
-			message: `Ni la plantilla ni el script usan la clase .${entry.name}: <style scoped> sólo alcanza a las etiquetas de este componente`,
+			message: t('Neither the template nor the script uses the class .{0}: <style scoped> only reaches the tags of this component', entry.name),
 			code: 'MEEK_UNUSED_CLASS',
 			source: 'Meeko',
 			severity: DiagnosticSeverity.Hint,

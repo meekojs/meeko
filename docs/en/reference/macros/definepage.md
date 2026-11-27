@@ -26,7 +26,7 @@ related:
   - docs/framework.md#caché-de-páginas-ssr
   - docs/framework.md#rutas-dinámicas-en-el-sitemap-sitemapentries
   - docs/framework.md#dónde-se-usa-cada-api
-source-hash: 1e04b2ed3fb8022d72726b7e6e9a17338ba03af4aeddeb8d6720f5b40c503ae8
+source-hash: 49d7df00b63d158a36c909125b77a9531531cdd460c205eb7cf838e7b6b7bb86
 ---
 
 `definePage` declares route options for an `app/pages` page: schemas validating `params` and `search`, how it reaches the browser (`render`), prerendered URLs, the loader, `<head>`, named layout and its props, named middleware and, since `1.7`, page HTTP cache (`cache`) and URLs in `sitemap.xml` (`sitemapEntries`). It returns the same definition with types flowing through it: `params` comes from the schema, `load` receives it and `head` receives what `load` returns.
@@ -73,6 +73,8 @@ A request to `/users/abc` fails the schema and responds with `400` before runnin
 | `sitemapEntries`   | `SitemapEntry[]` or `(context) => SitemapEntry[] \| Promise<…>`   | none                           | Since `1.7`. Route URLs in `sitemap.xml`: `{ params, lastmod?, changefreq?, priority? }`. `meeko build` evaluates it once after prerendering with `{ env, prerendering: true }`. With `"prerender"`, only adds fields to prerendered pages. Unavailable with `"client"`.                                                                                                                                                                                                                                                         |
 
 With `render: "client"`, `load` and `head` run in the browser and receive `ClientPageLoadContext` (without `request` or `context`).
+
+Since `1.10`, the `load` context carries `depends(...keys)`: it declares the data keys the loader depends on. When a write invalidates a matching one, the browser runs it again and hands the new `props.data` to the mounted page (see [Reloading page data](/docs/routing-data-reference#reloading-page-data-depends)).
 
 ## Return value
 

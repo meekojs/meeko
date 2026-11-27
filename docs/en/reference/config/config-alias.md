@@ -2,7 +2,7 @@
 title: alias
 group: config
 since: 1.5.0
-description: Custom path aliases, or changes to ~/, @/, #shared/ and #server/, used in Vite, generated tsconfig files, the editor and @utilities.
+description: Custom path aliases, or changes to ~/, @/, #shared/ and #server/, used in Vite, generated tsconfig files, and the editor.
 symbols:
   - "config:alias"
 related:
@@ -12,7 +12,7 @@ related:
   - docs/framework.md#aliases-propios-alias
   - docs/framework.md#ámbitos-de-los-aliases
   - docs/framework.md#prioridad-y-conflictos-de-los-aliases
-source-hash: 0ce36edbc60791882c13fbff2b38e6c52264506025a3aad9e140d620cd3db9fb
+source-hash: 837370a6f86b5a6146b2bfa67e5c3b6b35b07785edc78013b1b5b632b97933db
 ---
 
 Without configuration, Meeko defines four path aliases: `~/` (the project root), `@/` (`app/`), `#shared/` (`shared/`) and `#server/` (`server/`, only in server code). `alias` adds your own or changes these: each key is a prefix ending in `/` and each value is a project folder or `false` to remove the alias.
@@ -58,7 +58,7 @@ import { Button } from "ui/Button";
 | Inside `app/`                                | In `app/` and on the server; in `shared/`, `MEEK118`.     |
 | Another folder (`shared/`, the root, `lib/`) | Throughout the project.                                   |
 
-It applies in Vite (`meeko dev`, `meeko build` and all adapters), the `tsconfig` files Meeko generates (used by `meeko check` and the editor), the language server and `@utilities` modules. A custom alias points exactly to its folder; it does not search layers like Meeko's aliases. Changing a Meeko alias (`"@/": "src/"`) makes it a custom alias, with the scope of its new folder.
+It applies in Vite (`meeko dev`, `meeko build` and all adapters), the `tsconfig` files Meeko generates (used by `meeko check` and the editor), and the language server. A custom alias points exactly to its folder; it does not search layers like Meeko's aliases. Changing a Meeko alias (`"@/": "src/"`) makes it a custom alias, with the scope of its new folder.
 
 ## Examples
 

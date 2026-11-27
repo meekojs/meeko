@@ -14,7 +14,7 @@ related:
   - "@meekojs/meeko/server#contentSecurityPolicy"
   - docs/framework.md#middleware-de-servidor
   - docs/framework.md#ip-del-cliente-tras-un-proxy
-source-hash: 45bd0dd924bdb1f9fc4e28059e8acde91104c2610c393f85b614e7d7c1a9288e
+source-hash: 945738316bc41897592ef57d5a4a9c5c9253222163d4d5cabde4b265c33b4f3b
 ---
 
 `defineServerMiddleware` declares the middleware exported by default from a `server/middleware/` file. It receives the `Request` and `next(request?)`, and returns a `Response`: it can continue, modify the rest of the chain's response or short-circuit with its own.
@@ -160,6 +160,6 @@ const ip = clientAddress(request); // applies MEEKO_TRUST_PROXY
 
 - **Order.** `server/middleware` files run by name (use numeric prefixes: `10-…`, `20-…`). Those added by modules with `meeko.addServerMiddleware` run before project middleware.
 - **What it wraps.** SSR pages, `/api` and `/_meeko/rpc`. Public build files are served before middleware; the development Vite server and WebSocket upgrades have their own handlers.
-- **No session.** Runs before creating request context: there is no `context`, `session` or `services`. To check a page's session, use `defineServerRouteMiddleware`; for the API, `auth` and `authorize`.
+- **No session.** Runs before creating request context: there is no `context`, `session`, `services` or `context.cookies`. To check a page's session, use `defineServerRouteMiddleware`; for the API, `auth` and `authorize`. To renew an authentication provider's cookies, use the `services` function of `server/runtime.ts`, which receives `cookies` since `1.10` and works for pages, API and RPC; here there is only `request.headers.get("cookie")` and the `Response` from `next()`.
 - **Security.** Built-in API and RPC checks (authentication, authorization, contracts and CSRF) remain inside the handler: middleware neither replaces nor bypasses them. For CSP and security headers, `server.contentSecurityPolicy` and `server.headers` exist in all adapters since `1.7`.
 - **Development.** Editing middleware reloads the browser; adding or removing it makes `meeko dev` recreate the application without restarting. Only the project's `server/middleware` counts, not layers'. Excludes `*.test.ts`, `*.spec.ts`, `*.d.ts` and `*.client.ts`.

@@ -1,5 +1,5 @@
 ---
-source-hash: afa8dc27ff907bf6b1e7e0c16066c209f946e17d00916f2dbfcbb4d9c9dd44ad
+source-hash: a36fbb4a97dee97a95b010eb2fd066df548f8bc2dcc625db967de9b6df7aa66e
 ---
 
 # Upgrade from 1.1 to 1.2
@@ -237,6 +237,8 @@ If that directory has a `package.json` with an entry point or an `index.ts` (or 
 A component's `<style>` CSS is now the module `Componente.meeko?meeko-style=<hash>&lang.css`, alongside the component file, instead of a virtual module with an ID starting with a null byte (`\0virtual:meeko-style:…`). This lets PostCSS plugins resolve `@reference` and relative `@import` paths from the component's directory, as Tailwind 4 does with `@apply`. The ID is internal ([outside the contract](stability.md#outside-the-contract)), but a Vite plugin recognizing the old prefix must recognize the `meeko-style` query, and one filtering by `.meeko` may also receive these CSS modules.
 
 To generate utilities with TypeScript, the new `@meekojs/meeko/postcss` provides the `meekoUtilities()` plugin and `@utilities` at-rule, which goes before `@tailwindcss/postcss`. It is optional. See [TypeScript-generated utilities](framework.md#generated-utilities-with-typescript).
+
+> **Removed later:** `@meekojs/meeko/postcss`, `meekoUtilities()` and `@utilities` no longer exist; see [Upgrade from 1.11 to 1.12](migration-1.12.md#removal-of-meekojsmeekopostcss-and-tailwindcss-from-the-framework) and the [CHANGELOG](../../packages/meeko/CHANGELOG.md).
 
 ### Prerendering errors
 

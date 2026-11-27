@@ -5,13 +5,9 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import { fileURLToPath } from 'node:url'
 import { format } from 'prettier'
 
 import plugin from '../dist/index.js'
-
-// The fixture resolves tailwindcss and @tailwindcss/postcss from packages/meeko, as a project would.
-const fixture = fileURLToPath(new URL('../../meeko/tests/fixtures/tailwind-app/', import.meta.url))
 
 const alphabetical = { meekoClassFunctions: ['tv', 'clsx', 'cn', 'styles.cn'], meekoSortClasses: 'alphabetical', plugins: [plugin] }
 
@@ -193,13 +189,15 @@ test('escapes the quotes of a sorted bind:class as any other expression', async 
 	assert.equal(formatted, `<template>\n<p bind:class="on ? 'a b' : 'c d'"></p>\n</template>\n`)
 })
 
-test('orders with the design system of the project in a component and a .ts file', async () => {
-	const options = { meekoClassFunctions: ['tv'], meekoSortClasses: 'tailwind', plugins: [plugin], printWidth: 200 }
-	const source = 'const a = tv({ base: "text-white custom bg-brand flex custom", variants: { "p-gutter flex": { x: "text-white flex" } } });\n'
-	const sorted = 'const a = tv({ base: "custom flex bg-brand text-white", variants: { "p-gutter flex": { x: "flex text-white" } } });\n'
-	assert.equal(await formatStable(source, { ...options, filepath: `${fixture}app/styles.ts` }), sorted)
-	const formatted = await formatStable(`<script lang="ts">\n${source}</script>\n\n<template>\n<Card class="text-white flex" />\n<p bind:class="on ? 'text-white flex' : ''"></p>\n</template>\n`, { ...options, filepath: `${fixture}app/components/Probe.meeko` })
-	assert.equal(formatted, `<script lang="ts">\n${sorted}</script>\n\n<template>\n<Card class="flex text-white" />\n<p bind:class="on ? 'flex text-white' : ''"></p>\n</template>\n`)
+test('the removed "tailwind" mode is rejected as an invalid option value, never mapped to another mode', async () => {
+	for (const filepath of ['styles.ts', 'Component.meeko']) {
+		await assert.rejects(format(filepath === 'styles.ts' ? 'cn("b a");\n' : component, { meekoClassFunctions: ['cn'], meekoSortClasses: 'tailwind', filepath, plugins: [plugin] }), /Invalid \S*meekoSortClasses\S* value/)
+	}
+	assert.deepEqual(
+		plugin.options.meekoSortClasses.choices.map((choice) => choice.value),
+		['off', 'stylesheet', 'alphabetical'],
+	)
+	assert.equal('meekoTailwindStylesheet' in plugin.options, false)
 })
 
 test('the stylesheet mode knows the classes of the component in its script and only the global ones in a .ts file', async () => {

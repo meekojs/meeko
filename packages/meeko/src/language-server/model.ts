@@ -40,6 +40,7 @@ import { analyzeServerScript } from '../compiler/transforms/server-script'
 import { aliasesForScope, resolveProjectAliasesSync } from '../framework/aliases'
 import { extractRouteRender } from '../framework/routes-discovery'
 import { builtinTag, builtinTagProp } from './builtin-tags'
+import { localized, t } from './l10n'
 
 /** Tramo equivalente entre el componente y el archivo TypeScript virtual. */
 export interface SourceSpan {
@@ -262,32 +263,31 @@ function serverScriptOf(source: string, filename: string, section: SfcSection): 
  * JSDoc of `<MeekoThemeToggle>`. The virtual document declares it as the compiled component that
  * Meeko ships, so its props, its snippets and its hover come from that module, as for any tag.
  */
-const themeToggleDocs = jsdoc(
-	'Etiqueta propia de Meeko (desde 1.4, con `theme` en `meeko.config.ts`): cambia el tema claro/oscuro.',
-	'Pinta un icono por elección en `<span data-meeko-theme-icon>` y el CSS que Meeko añade a `<head>`',
-	'muestra el de `data-theme-choice` de `<html>`, así que nunca salta. Sin JavaScript es un formulario',
-	'que envía `POST /_meeko/theme`.',
-	'',
-	'- `mode="cycle"` (por defecto): un botón que pasa al tema siguiente.',
-	'- `mode="select"`: un grupo de radios accesible con el teclado.',
-	'- `bind:themes`, `bind:labels` y `bind:messages`: la lista, sus nombres y los textos accesibles.',
-	'- Un snippet por elección (`light`, `dark`, `system`…) con su icono.',
-	'',
-	'@example',
-	'```html',
-	'<MeekoThemeToggle>',
-	'  <snippet name="light"><IconSun /></snippet>',
-	'  <snippet name="dark"><IconMoon /></snippet>',
-	'  <snippet name="system"><IconMonitor /></snippet>',
-	'</MeekoThemeToggle>',
-	'```',
-	'@see https://github.com/meekojs/meeko/blob/main/docs/framework.md#meekothemetoggle',
+const themeToggleDocs = localized(() =>
+	jsdoc(
+		...t('Meeko built-in tag (since 1.4, with `theme` in `meeko.config.ts`): switches the light/dark theme.\nIt renders an icon per choice in `<span data-meeko-theme-icon>` and the CSS that Meeko adds to `<head>`\nshows the one of `data-theme-choice` on `<html>`, so it never jumps. Without JavaScript it is a form\nthat sends `POST /_meeko/theme`.').split('\n'),
+		'',
+		t('- `mode="cycle"` (default): a button that switches to the next theme.'),
+		t('- `mode="select"`: a radio group accessible with the keyboard.'),
+		t('- `bind:themes`, `bind:labels` and `bind:messages`: the list, their names and the accessible texts.'),
+		t('- One snippet per choice (`light`, `dark`, `system`…) with its icon.'),
+		'',
+		'@example',
+		'```html',
+		'<MeekoThemeToggle>',
+		'  <snippet name="light"><IconSun /></snippet>',
+		'  <snippet name="dark"><IconMoon /></snippet>',
+		'  <snippet name="system"><IconMonitor /></snippet>',
+		'</MeekoThemeToggle>',
+		'```',
+		'@see https://github.com/meekojs/meeko/blob/main/docs/framework.md#meekothemetoggle',
+	),
 )
 
 /** JSDoc of a built-in component with a module of its own, its own or from the editor's table. */
 function shippedTagDeclaration(tag: string): string {
-	if (tag === 'MeekoThemeToggle') return themeToggleDocs
-	if (tag === 'MeekoAwait') return awaitDocs
+	if (tag === 'MeekoThemeToggle') return themeToggleDocs()
+	if (tag === 'MeekoAwait') return awaitDocs()
 	const entry = builtinTag(tag)
 	return entry ? jsdoc(entry.summary, '', `@see ${entry.guide}`) : ''
 }
@@ -296,23 +296,22 @@ function shippedTagDeclaration(tag: string): string {
  * JSDoc of `<MeekoAwait>`: like `<MeekoThemeToggle>`, the compiled component that Meeko ships. Its
  * `for` is an expression, and its content reads the data of `for` as loaded.
  */
-const awaitDocs = jsdoc(
-	'Etiqueta propia de Meeko (desde 1.5): la zona de unos datos que llegan después del primer pintado,',
-	'el resultado de `useApi` o `useRpcQuery` sin `await`. Pinta el snippet `pending` en la primera carga,',
-	'`error` (con `error` y `retry`) si falla, y su contenido cuando hay datos, que conserva durante las',
-	'recargas (`refreshing`). `aria-busy` marca la zona mientras carga.',
-	'',
-	'- `for="items"` o `for="[items, stats]"`: los recursos, como expresión.',
-	'- `reserve`: mientras espera, la altura que tuvo con datos; `reserve="320px"` añade un mínimo.',
-	'',
-	'@example',
-	'```html',
-	'<MeekoAwait for="items" reserve>',
-	'  <snippet name="pending"><ItemsSkeleton /></snippet>',
-	'  <ItemsList bind:items="items.data.value" />',
-	'</MeekoAwait>',
-	'```',
-	'@see https://github.com/meekojs/meeko/blob/main/docs/framework.md#meekoawait',
+const awaitDocs = localized(() =>
+	jsdoc(
+		...t('Meeko built-in tag (since 1.5): the zone of data that arrives after the first paint,\nthe result of `useApi` or `useRpcQuery` without `await`. It renders the `pending` snippet on the first load,\n`error` (with `error` and `retry`) if it fails, and its content when there is data, which it keeps during\nreloads (`refreshing`). `aria-busy` marks the zone while it loads.').split('\n'),
+		'',
+		t('- `for="items"` or `for="[items, stats]"`: the resources, as an expression.'),
+		t('- `reserve`: while waiting, the height it had with data; `reserve="320px"` adds a minimum.'),
+		'',
+		'@example',
+		'```html',
+		'<MeekoAwait for="items" reserve>',
+		'  <snippet name="pending"><ItemsSkeleton /></snippet>',
+		'  <ItemsList bind:items="items.data.value" />',
+		'</MeekoAwait>',
+		'```',
+		'@see https://github.com/meekojs/meeko/blob/main/docs/framework.md#meekoawait',
+	),
 )
 
 /** JSDoc of the component compile-time macros, each owned by its own module. */
@@ -329,23 +328,21 @@ const macroDocs = {
  * Documentación de la directiva `html`, para el hover de su nombre y el JSDoc de su comprobación.
  * Advierte que es insegura con contenido no confiable.
  */
-export const htmlDirectiveDocs = [
-	'**`html="expresión"`**: el contenido del elemento es el HTML de la expresión, **sin escapar**.',
-	'',
-	'La expresión es un `string` (o `null`/`undefined`, que dejan el elemento vacío). En SSR se escribe tal cual;',
-	'la hidratación no toca el DOM si coincide y sustituye `innerHTML` si difiere o cuando el valor cambia.',
-	'',
-	'**Inseguro con contenido no confiable**: el HTML de usuarios o terceros puede ejecutar scripts (XSS).',
-	'Sanéelo antes o use `{expresión}`, que escapa el texto.',
-	'',
-	'Desde 1.3 el valor debe ser un `TrustedHtml`: un `string` sin marcar (o `any`) da el aviso `MEEK107`.',
-	'Sanee el HTML ajeno (por ejemplo, con DOMPurify) y márquelo con `trustHtml(…)`, que no sanea: sólo declara.',
-	'',
-	'El elemento no admite hijos y `html` no va en elementos vacíos (`<img>`), de texto (`<textarea>`, `<script>`),',
-	'en `<template>` ni junto a `model` (`MEEK095`).',
-	'',
-	`@see ${apiDocs}#html-sin-escapar-con-html`,
-].join('\n')
+export const htmlDirectiveDocs = localized(() =>
+	[
+		t('**`html="expression"`**: the element content is the HTML of the expression, **unescaped**.'),
+		'',
+		t('The expression is a `string` (or `null`/`undefined`, which leave the element empty). In SSR it is written as is;\nhydration does not touch the DOM if it matches and replaces `innerHTML` if it differs or when the value changes.'),
+		'',
+		t('**Unsafe with untrusted content**: HTML from users or third parties can run scripts (XSS).\nSanitize it first or use `{expression}`, which escapes the text.'),
+		'',
+		t('Since 1.3 the value must be a `TrustedHtml`: an unmarked `string` (or `any`) gives the `MEEK107` warning.\nSanitize third-party HTML (for example, with DOMPurify) and mark it with `trustHtml(…)`, which does not sanitize: it only declares.'),
+		'',
+		t('The element admits no children and `html` does not go on void elements (`<img>`), text elements (`<textarea>`, `<script>`),\non `<template>` or together with `model` (`MEEK095`).'),
+		'',
+		`@see ${apiDocs}#html-sin-escapar-con-html`,
+	].join('\n'),
+)
 
 /** Type check of `html="..."`, declared only where the template has one. */
 /** Attributes of a component tag that are no static prop: `is`, `ref` and `html` (MEEK032), the model `model` and `bind="obj"`. */
@@ -370,7 +367,7 @@ const spreadDeclarations = [
 	'',
 ].join('\n')
 
-const htmlDeclaration = `${jsdoc(...htmlDirectiveDocs.split('\n'))}\ndeclare function __meeko_html(html: string | null | undefined): void;\n`
+const htmlDeclaration = (): string => `${jsdoc(...htmlDirectiveDocs().split('\n'))}\ndeclare function __meeko_html(html: string | null | undefined): void;\n`
 
 /** Construye el TypeScript virtual que relaciona script y plantilla. */
 export function createVirtualComponent(source: string, filename: string, options: VirtualComponentOptions = {}): VirtualComponent {
@@ -1151,7 +1148,7 @@ export function createVirtualComponent(source: string, filename: string, options
 	code += [...builtinChecks.values()].join('')
 	code += channelDeclarations
 	if (code.includes('__meeko_snippet(') || code.includes('__meeko_render(')) code += snippetDeclarations
-	if (code.includes('__meeko_html(')) code += htmlDeclaration
+	if (code.includes('__meeko_html(')) code += htmlDeclaration()
 	if (dynamicTags) code += `type __MeekoIsName = ${[...isNames()].map((name) => JSON.stringify(name)).join(' | ')};\n${dynamicTagDeclarations}`
 	if (spreads) code += spreadDeclarations
 	// `<MeekoThemeToggle>`, `<MeekoAwait>`, `<MeekoPopover>` and `<MeekoSelect>` are the compiled modules that the component imports.

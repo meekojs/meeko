@@ -1,6 +1,7 @@
 import { build } from 'esbuild'
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import test from 'node:test'
@@ -40,7 +41,6 @@ test('package.json exports exactly the public subpaths', async () => {
 		'./cloudflare',
 		'./build',
 		'./prettier',
-		'./postcss',
 		'./internal',
 		'./builtins/*',
 		'./devtools-ui',
@@ -66,7 +66,7 @@ test('the runtime entries do not carry <MeekoPopover> nor <MeekoSelect>: only a 
 	assert.ok(!selectInputs.some((input) => /\/dist\/framework\//.test(input)), 'no framework code in the select')
 })
 
-test('runtime entries never load the build-time PostCSS plugin', async () => {
+test('PostCSS stays an internal parser of the compiler: no runtime entry loads it and no entry publishes a plugin', async () => {
 	const runtimeEntries = ['index', 'framework', 'framework-server', 'node', 'bun', 'deno', 'cloudflare', 'internal']
 	const result = await build({
 		entryPoints: runtimeEntries.map((entry) => resolve(`dist/${entry}.js`)),
@@ -78,10 +78,12 @@ test('runtime entries never load the build-time PostCSS plugin', async () => {
 		metafile: true,
 		outdir: 'out',
 	})
-	const inputs = Object.keys(result.metafile.inputs).map((input) => input.replaceAll('\\', '/'))
-	assert.ok(!inputs.some((input) => /(?:^|\/)dist\/postcss(?:\/|\.js$)/.test(input)), inputs.join('\n'))
-	const postcssEntry = await import(pathToFileURL(resolve('dist/postcss.js')).href)
-	assert.deepEqual(Object.keys(postcssEntry).sort(), ['default', 'defineUtilities', 'meekoUtilities'])
+	const importers = Object.entries(result.metafile.inputs)
+		.filter(([, input]) => input.imports.some((imported) => /^postcss(?:$|-|\/)/.test(imported.path)))
+		.map(([file]) => file.replaceAll('\\', '/'))
+	assert.deepEqual(importers, [])
+	assert.equal(existsSync(resolve('dist/postcss.js')), false)
+	assert.equal(existsSync(resolve('dist/compiler/css')), false)
 })
 
 test('the root entry exposes only the documented public runtime', async () => {

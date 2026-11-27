@@ -914,6 +914,15 @@
 					"description": "Comprueba un proyecto o un componente `.meeko` con TypeScript y los diagnósticos de Meeko."
 				},
 				{
+					"name": "meeko styles",
+					"symbols": [
+						"cli:styles"
+					],
+					"slug": "meeko-styles",
+					"fallback": "/docs/framework-configuration#hoja-global-procesada-para-el-editor",
+					"description": "Escribe `.meeko/styles/main.css` sin arrancar `meeko dev`, para el editor y para ordenar clases en CI."
+				},
+				{
 					"name": "meeko doctor",
 					"symbols": [
 						"cli:doctor"
@@ -1234,12 +1243,6 @@
 					"name": "meeko (Vite)",
 					"symbols": [
 						"@meekojs/meeko/vite#meeko"
-					]
-				},
-				{
-					"name": "meekoUtilities",
-					"symbols": [
-						"@meekojs/meeko/postcss#meekoUtilities"
 					]
 				},
 				{

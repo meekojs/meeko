@@ -6,32 +6,35 @@ import { join, relative } from 'node:path'
 import { CompletionItemKind, InsertTextFormat, MarkupKind } from 'vscode-languageserver/node'
 
 import { tagAt } from './embedded'
+import { localized, t } from './l10n'
 
 const teleportTag = 'MeekoTeleport'
 
 /** What `<MeekoTeleport>` admits, besides `if:when` and `each:of`. */
-const teleportAttributes = [
-	{ name: 'if', detail: 'Primera rama de una cadena condicional', insert: 'if="$1"', trigger: false },
-	{ name: 'else-if', detail: 'Alternativa a la rama anterior', insert: 'else-if="$1"', trigger: false },
-	{ name: 'else', detail: 'Alternativa final, sin valor', insert: 'else', trigger: false },
-	{ name: 'to', detail: 'Destino: "body" o "#id" de un elemento del documento', insert: 'to="$1"', trigger: true },
-	{ name: 'bind:to', detail: 'Destino calculado: una expresión de tipo "body" | `#${string}`', insert: 'bind:to="$1"', trigger: false },
-	{ name: 'disabled', detail: 'Pinta el contenido en su sitio, sin moverlo', insert: 'disabled', trigger: false },
-	{ name: 'bind:disabled', detail: 'Mientras es verdadera, el contenido se pinta en su sitio; cambiarla mueve los mismos nodos', insert: 'bind:disabled="$1"', trigger: false },
-	{ name: 'if:when', detail: 'Muestra la etiqueta mientras la expresión es verdadera', insert: 'if:when="$1"', trigger: false },
-	{ name: 'each:of', detail: 'Repite la etiqueta por cada elemento de la lista', insert: 'each:of="$1"', trigger: false },
-] as const
+const teleportAttributes = localized(() => [
+	{ name: 'if', detail: t('First branch of a conditional chain'), insert: 'if="$1"', trigger: false },
+	{ name: 'else-if', detail: t('Alternative to the previous branch'), insert: 'else-if="$1"', trigger: false },
+	{ name: 'else', detail: t('Final alternative, without a value'), insert: 'else', trigger: false },
+	{ name: 'to', detail: t('Target: "body" or the "#id" of an element in the document'), insert: 'to="$1"', trigger: true },
+	{ name: 'bind:to', detail: t('Computed target: an expression of type "body" | `#${string}`'), insert: 'bind:to="$1"', trigger: false },
+	{ name: 'disabled', detail: t('Renders the content in place, without moving it'), insert: 'disabled', trigger: false },
+	{ name: 'bind:disabled', detail: t('While true, the content renders in place; changing it moves the same nodes'), insert: 'bind:disabled="$1"', trigger: false },
+	{ name: 'if:when', detail: t('Shows the tag while the expression is true'), insert: 'if:when="$1"', trigger: false },
+	{ name: 'each:of', detail: t('Repeats the tag for each item in the list'), insert: 'each:of="$1"', trigger: false },
+])
 
 /** Markdown of the hover on `<MeekoTeleport>`. */
-const teleportDocs = [
-	'```html',
-	'<MeekoTeleport to="#toolbar" bind:disabled="…">…</MeekoTeleport>',
-	'```',
-	'',
-	'Etiqueta propia de Meeko: pinta su contenido en otro lugar del documento (`to="body"` o `to="#id"`) sin sacarlo de este componente, que conserva su ámbito reactivo, sus eventos, sus snippets, `provide`/`inject`, sus manejadores de errores y el CSS `scoped`. El HTML del servidor ya lo trae en su destino.',
-	'',
-	'Con `disabled` (o `bind:disabled`) se pinta en su sitio. Para modales y menús, `<dialog>` y `popover` ya van en la capa superior del navegador.',
-].join('\n')
+const teleportDocs = localized(() =>
+	[
+		'```html',
+		'<MeekoTeleport to="#toolbar" bind:disabled="…">…</MeekoTeleport>',
+		'```',
+		'',
+		t('Meeko built-in tag: renders its content elsewhere in the document (`to="body"` or `to="#id"`) without taking it out of this component, which keeps its reactive scope, events, snippets, `provide`/`inject`, error handlers and `scoped` CSS. The server HTML already carries it at its target.'),
+		'',
+		t('With `disabled` (or `bind:disabled`) it renders in place. For modals and menus, `<dialog>` and `popover` already go in the browser top layer.'),
+	].join('\n'),
+)
 
 /** `id="…"` of the elements of a `.meeko` template: the ids a teleport can name without escaping. */
 function templateIds(source: string): string[] {
@@ -66,7 +69,7 @@ export function teleportCompletion(document: TextDocument, position: Position, s
 		if (context.value.attribute !== 'to') return undefined
 		const range = { start: document.positionAt(context.value.start), end: position }
 		const seen = new Set<string>()
-		const items: CompletionItem[] = [{ label: 'body', kind: CompletionItemKind.Value, detail: 'Al final de <body>', sortText: '0', textEdit: { range, newText: 'body' } }]
+		const items: CompletionItem[] = [{ label: 'body', kind: CompletionItemKind.Value, detail: t('At the end of <body>'), sortText: '0', textEdit: { range, newText: 'body' } }]
 		const add = (ids: readonly string[], detail: string): void => {
 			for (const id of ids) {
 				if (seen.has(id)) continue
@@ -74,7 +77,7 @@ export function teleportCompletion(document: TextDocument, position: Position, s
 				items.push({ label: `#${id}`, kind: CompletionItemKind.Reference, detail, sortText: `1${id}`, textEdit: { range, newText: `#${id}` } })
 			}
 		}
-		add(templateIds(source), 'Este componente')
+		add(templateIds(source), t('This component'))
 		if (root) {
 			for (const file of shellFiles(root)) {
 				let text: string
@@ -94,7 +97,7 @@ export function teleportCompletion(document: TextDocument, position: Position, s
 	present.delete(word)
 	const has = (name: string): boolean => present.has(name) || present.has(name.startsWith('bind:') ? name.slice(5) : `bind:${name}`)
 	const range = { start: document.positionAt(offset - word.length), end: position }
-	return teleportAttributes
+	return teleportAttributes()
 		.filter((attribute) => !has(attribute.name))
 		.map((attribute, index): CompletionItem => ({
 			label: attribute.name,
@@ -103,7 +106,7 @@ export function teleportCompletion(document: TextDocument, position: Position, s
 			sortText: `0${index}`,
 			insertTextFormat: InsertTextFormat.Snippet,
 			textEdit: { range, newText: attribute.insert },
-			...(attribute.trigger ? { command: { title: 'Destinos', command: 'editor.action.triggerSuggest' } } : {}),
+			...(attribute.trigger ? { command: { title: t('Targets'), command: 'editor.action.triggerSuggest' } } : {}),
 		}))
 }
 
@@ -120,7 +123,7 @@ export function teleportHover(document: TextDocument, position: Position, shadow
 	if (offset < start || offset > start + teleportTag.length) return undefined
 	if (!tagAt(source, start + 1) && !/^<\//.test(name[0])) return undefined
 	return {
-		contents: { kind: MarkupKind.Markdown, value: teleportDocs },
+		contents: { kind: MarkupKind.Markdown, value: teleportDocs() },
 		range: { start: document.positionAt(start), end: document.positionAt(start + teleportTag.length) },
 	}
 }

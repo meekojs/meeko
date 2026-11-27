@@ -1,5 +1,5 @@
 ---
-source-hash: 4a0d52130a9797a845bedf13965ffbabd9926210347fd9db2bba3f2b41f88598
+source-hash: 96430c5a6e12cbc4dd8c6db73f96ae9f0eec8d6eda875068a0fb25b01c21d7ef
 ---
 
 # Data and rendering
@@ -40,6 +40,10 @@ The server block and the component's `<script>` have different scopes. Server co
 ### Where each API is used
 
 `usePage()`, `redirect()` and `notFound()` belong to the server code of an active page. Component APIs are used in its `<script>` and template. [See the full table](routing-data-reference.md#where-each-api-is-used).
+
+### Reloading data after a write
+
+Since `1.10`, `usePage().depends("orders")` (or `depends` in the `load` context) declares which data keys the page depends on. When a mutation with `invalidates: ["orders"]` finishes successfully, the browser runs the visible page's loader again and updates its data without mounting it again. `useRoute().refresh()` forces it without keys. [See keys, matches and limits](routing-data-reference.md#reloading-page-data-depends).
 
 ## Rendering modes
 

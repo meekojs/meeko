@@ -4,6 +4,7 @@ import type { VirtualComponent } from './model'
 
 import { emitPropName } from '../app/runtime/emits'
 import { modelEventName, modelPropName } from '../shared/model-names'
+import { t } from './l10n'
 
 /** A member of a component channel with its display type. */
 export interface ComponentMember {
@@ -272,7 +273,7 @@ export function componentSignature(summary: ComponentSummary, name: string): str
 	const inherited = summary.props.filter((prop) => prop.inherited).length
 	const attributes = [
 		...summary.props.filter((prop) => !prop.inherited).map(propSignature),
-		...(inherited ? [`// …y ${inherited} atributos HTML`] : []),
+		...(inherited ? [t('// …and {0} HTML attributes', inherited)] : []),
 		...summary.events.map((event) => `on:${event.name}(${parameters(event.type)})`),
 		...summary.models.map((model) => `${model.name === 'default' ? 'model' : `model:${model.name}`}${optional(model)}: ${model.type}`),
 	]
@@ -282,7 +283,7 @@ export function componentSignature(summary: ComponentSummary, name: string): str
 		lines.push(...summary.snippets.map((snippet) => `  ${snippet.name}${optional(snippet)}(${parameters(snippet.type)})`), `</${name}>`)
 	}
 	if (summary.exposed) {
-		lines.push('// ref: expone', ...(summary.exposed.length ? summary.exposed.map((member) => `${member.name}${optional(member)}: ${member.type}`) : ['{}']))
+		lines.push(t('// ref: exposes'), ...(summary.exposed.length ? summary.exposed.map((member) => `${member.name}${optional(member)}: ${member.type}`) : ['{}']))
 	}
 	return lines.join('\n')
 }
@@ -291,10 +292,10 @@ export function componentSignature(summary: ComponentSummary, name: string): str
 export function componentMemberDocs(summary: ComponentSummary): string[] {
 	const groups: Array<[string, readonly ComponentMember[], (member: ComponentMember) => string]> = [
 		['Props', summary.props, (member) => member.name],
-		['Eventos', summary.events, (member) => `on:${member.name}`],
-		['Modelos', summary.models, (member) => (member.name === 'default' ? 'model' : `model:${member.name}`)],
+		[t('Events'), summary.events, (member) => `on:${member.name}`],
+		[t('Models'), summary.models, (member) => (member.name === 'default' ? 'model' : `model:${member.name}`)],
 		['Snippets', summary.snippets, (member) => member.name],
-		['Expone', summary.exposed ?? [], (member) => member.name],
+		[t('Exposes'), summary.exposed ?? [], (member) => member.name],
 	]
 	return groups.flatMap(([title, members, label]) => {
 		const documented = members.filter((member) => member.documentation)
@@ -310,7 +311,7 @@ export function componentMemberDocs(summary: ComponentSummary): string[] {
 export function componentSummaryMarkdown(summary: ComponentSummary, name: string, file?: { readonly label: string; readonly uri: string }): string {
 	return [
 		['```ts', componentSignature(summary, name), '```'].join('\n'),
-		...(file ? [`Componente · [${file.label}](${file.uri})`] : []),
+		...(file ? [t('Component · [{0}]({1})', file.label, file.uri)] : []),
 		...componentMemberDocs(summary),
 	].join('\n\n')
 }

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import test from 'node:test'
 
-import { discoverConfiguredRoutes, loadMeekoConfig, readMeekoConfigSync, resolveConfigSources } from '../src/framework/config.ts'
+import { configuredClassProviders, discoverConfiguredRoutes, loadMeekoConfig, readClassProvidersSync, readMeekoConfigSync, resolveConfigSources } from '../src/framework/config.ts'
 import { generateRoutes } from '../src/framework/generate.ts'
 import { resolveMeekoModules } from '../src/framework/module-loader.ts'
 
@@ -102,6 +102,28 @@ test('loadMeekoConfig validates the dev options', async () => {
 	}
 })
 
+test('loadMeekoConfig validates dev.portless', async () => {
+	const root = await mkdtemp(join(tmpdir(), 'meeko-config-portless-'))
+	try {
+		const file = join(root, 'meeko.config.mjs')
+		for (const portless of ['true', 'false', '{ name: "ui.meeko" }']) {
+			await writeFile(file, `export default { dev: { portless: ${portless} } };\n`)
+			assert.deepEqual((await loadMeekoConfig(root)).dev?.portless, JSON.parse(portless.replace('name', '"name"')))
+		}
+		for (const [portless, error] of [
+			['"ui"', /dev\.portless debe ser un booleano o un objeto \{ name \}/],
+			['{}', /dev\.portless\.name debe ser una cadena no vacía/],
+			['{ name: "Mi_App" }', /dev\.portless\.name "Mi_App" no es un nombre válido/],
+			['{ name: "ui", port: 1 }', /dev\.portless\.port no es una opción/],
+		] as const) {
+			await writeFile(file, `export default { dev: { portless: ${portless} } };\n`)
+			await assert.rejects(loadMeekoConfig(root), error)
+		}
+	} finally {
+		await rm(root, { recursive: true, force: true })
+	}
+})
+
 /** Runs `run` and returns what it wrote to stderr. */
 async function stderrOf(run: () => Promise<unknown>): Promise<string> {
 	const original = process.stderr.write
@@ -139,6 +161,37 @@ test('an unknown key of meeko.config warns once with the closest key, and module
 		await put(root, 'meeko.config.mjs', `export default { modules: ["./modules/hello"], hello: { greeting: "Hola" }, helo: {}, alias: { "lib/": "app/lib/" } };\n`)
 		const modules = await stderrOf(async () => resolveMeekoModules(root, await loadMeekoConfig(root)))
 		assert.equal(modules, `[meeko] Aviso: meeko.config.mjs tiene la clave desconocida "helo", que Meeko ignora. ¿Quisiste decir "hello"?\n`)
+	} finally {
+		await rm(root, { recursive: true, force: true })
+	}
+})
+
+test('css.classProviders and addClassProvider declare class providers for the editor, validated in Spanish', async () => {
+	const root = await mkdtemp(join(tmpdir(), 'meeko-config-class-providers-'))
+	const tailwind = { name: 'Tailwind CSS', vscode: ['bradlc.vscode-tailwindcss'], languages: ['tailwindcss'] }
+	const uno = { name: 'UnoCSS', vscode: ['antfu.unocss'], languages: [] }
+	try {
+		await put(root, 'modules/engine/index.mjs', `export default { [Symbol.for("meeko.module")]: true, meta: { name: "engine" }, setup(_options, meeko) { meeko.addClassProvider({ name: "Tailwind CSS", vscode: ["bradlc.vscode-tailwindcss", "bradlc.vscode-tailwindcss"], languages: ["tailwindcss"] }) } };\n`)
+		await put(root, 'meeko.config.mjs', `export default { modules: ["./modules/engine"], css: { scopeAttribute: "matched", classProviders: [{ name: "UnoCSS", vscode: ["antfu.unocss"] }] } };\n`)
+		const config = await loadMeekoConfig(root)
+		assert.deepEqual((await resolveMeekoModules(root, config)).classProviders, [tailwind], 'repeated ids once')
+		assert.deepEqual(await configuredClassProviders(root), [tailwind, uno], 'the modules first, then the configuration')
+		assert.deepEqual(readClassProvidersSync(root), [uno], 'without running it, only the literal of the configuration')
+		for (const [value, message] of [
+			['{}', /css\.classProviders debe ser un array de proveedores/],
+			['[{ vscode: ["a.b"] }]', /css\.classProviders\[0\]\.name debe ser un texto no vacío/],
+			['[{ name: "x", vscode: "a.b" }]', /css\.classProviders\[0\]\.vscode debe ser un array de ids como "bradlc\.vscode-tailwindcss"/],
+			['[{ name: "x", vscode: ["no-dot"] }]', /css\.classProviders\[0\]\.vscode debe ser un array de ids/],
+			['[{ name: "x", languages: ["meeko"] }]', /css\.classProviders\[0\]\.languages no puede incluir "meeko"/],
+			['[{ name: "x", command: "run" }]', /css\.classProviders\[0\]: campo desconocido command; se admiten name, vscode, languages/],
+		] as const) {
+			await put(root, 'meeko.config.mjs', `export default { css: { classProviders: ${value} } };\n`)
+			await assert.rejects(loadMeekoConfig(root), message)
+		}
+		// Node caches an imported module by its URL: the invalid one is another file.
+		await put(root, 'modules/broken/index.mjs', `export default { [Symbol.for("meeko.module")]: true, meta: { name: "broken" }, setup(_options, meeko) { meeko.addClassProvider({ name: "Tailwind CSS", languages: "tailwindcss" }) } };\n`)
+		await put(root, 'meeko.config.mjs', `export default { modules: ["./modules/broken"] };\n`)
+		await assert.rejects(resolveMeekoModules(root, await loadMeekoConfig(root)), /El módulo de Meeko broken falló en setup: Módulo de Meeko broken: addClassProvider\.languages debe ser un array de ids/)
 	} finally {
 		await rm(root, { recursive: true, force: true })
 	}
