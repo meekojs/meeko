@@ -10,7 +10,7 @@ import { focusRing } from '../base/focus'
 export const dataList = 'm-0 grid min-w-0 font-sans text-md leading-normal font-regular text-text [overflow-wrap:anywhere]'
 
 /** The term of a <dl>. */
-export const dataTerm = 'text-sm text-text-soft'
+export const dataTerm = 'text-sm/[inherit] text-text-soft'
 
 /** A value, and its figures in columns. */
 export const dataValue = 'm-0 tabular-nums'
@@ -38,16 +38,16 @@ export const statTheme = defineTheme({
 		label: dataTerm,
 		/** The <UIHint> after the label, a space away from its text. */
 		hint: 'ms-1',
-		value: [dataValue, 'text-2xl font-semibold tracking-tight'],
+		value: [dataValue, 'text-2xl/[inherit] font-semibold tracking-tight'],
 		detail: dataDetail,
 		/** The change and its period, on one line that wraps. */
-		change: 'm-0 flex flex-wrap items-baseline gap-x-1.5 text-sm text-text-soft',
+		change: 'm-0 flex flex-wrap items-baseline gap-x-1.5 text-sm/[inherit] text-text-soft',
 		/** The arrow and the signed change, in the colour of its direction. */
 		delta: 'inline-flex items-center gap-0.5 self-center font-medium tabular-nums',
 		icon: '',
 		period: '',
 		trend: 'm-0 min-w-0',
-		action: 'm-0 text-sm',
+		action: 'm-0 text-sm/[inherit]',
 		link: ['rounded-xs font-medium text-primary-11 underline decoration-current underline-offset-(--ui-underline-offset) hover:text-text', focusRing],
 	},
 	variants: {
@@ -59,7 +59,7 @@ export const statTheme = defineTheme({
 			false: {},
 			true: {
 				base: '@container [contain-intrinsic-inline-size:var(--ui-stat-intrinsic-width)]',
-				value: '@max-stat-narrow:text-xl',
+				value: '@max-stat-narrow:text-xl/[inherit]',
 			},
 		},
 		/**

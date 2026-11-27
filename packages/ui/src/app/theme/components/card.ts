@@ -167,7 +167,7 @@ export const linkCardTheme = defineTheme({
 			'box-border flex h-full min-w-0 flex-col gap-1.5 p-[var(--ui-link-card-padding,var(--ui-space-4))]',
 			frame,
 			'font-sans no-underline decoration-current [overflow-wrap:anywhere]',
-			'transition-[border-color,background-color] duration-(--ui-duration-fast) motion-reduce:transition-none motion-reduce:duration-0',
+			'transition-[border-color,background-color] duration-(--ui-duration-fast) ease-[ease] motion-reduce:transition-none motion-reduce:duration-0',
 			'focus-visible:outline-(length:--ui-focus-ring-width) focus-visible:outline-solid focus-visible:outline-focus focus-visible:outline-offset-(--ui-focus-ring-offset)',
 		],
 		title: 'text-lg leading-snug font-medium tracking-tight',

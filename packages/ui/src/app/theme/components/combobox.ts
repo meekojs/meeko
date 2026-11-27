@@ -28,7 +28,7 @@ export const comboboxTheme = defineTheme({
 		values: 'flex flex-wrap gap-1.5',
 		/** The chips of a searchable multiple combobox, over its field. */
 		chips: 'mb-1.5 flex flex-wrap gap-1.5',
-		chip: 'rounded-full border-(length:--ui-border-width) border-solid border-border bg-control px-2 py-0.5 text-sm',
+		chip: 'rounded-full border-(length:--ui-border-width) border-solid border-border bg-control px-2 py-0.5 text-sm/[inherit]',
 		/** The value in the trigger, without a `value` snippet, or the placeholder without a value. */
 		value: '',
 		placeholder: 'text-text-soft',

@@ -71,14 +71,15 @@ const textOf = (html) =>
 const definitions = (html) => [...html.matchAll(/<dd class="([^"]*)">([\s\S]*?)<\/dd>/g)].map(([, classes, content]) => ({ classes: classes.split(' '), content }))
 
 test('UIStat without the props of a key figure keeps its markup and its classes', async (context) => {
-	// The classes of 1.10: the look of a stat does not change for the apps that already use it.
+	// The classes of 1.10: the look of a stat does not change for the apps that already use it. `/[inherit]` keeps
+	// the line height of the list, which the size of 1.10 inherited: Tailwind's text-* now brings one of its own.
 	assert.deepEqual(
 		{ base: stat().base(), label: stat().label(), value: stat().value(), detail: stat().detail() },
 		{
 			base: 'm-0 grid min-w-0 font-sans text-md leading-normal font-regular text-text [overflow-wrap:anywhere] content-start gap-1',
-			label: 'text-sm text-text-soft',
-			value: 'm-0 tabular-nums text-2xl font-semibold tracking-tight',
-			detail: 'm-0 tabular-nums text-sm text-text-soft',
+			label: 'text-sm/[inherit] text-text-soft',
+			value: 'm-0 tabular-nums text-2xl/[inherit] font-semibold tracking-tight',
+			detail: 'm-0 tabular-nums text-sm/[inherit] text-text-soft',
 		},
 	)
 	const html = await render(context, '<UIStat label="Visitas" bind:value="1400" detail="Esta semana" />')
@@ -93,7 +94,7 @@ test('UIStat with a change formats it in the locale, with its arrow, its tone an
 	assert.ok(root.classes.includes('[contain-intrinsic-inline-size:var(--ui-stat-intrinsic-width)]'))
 	assert.ok(!root.classes.includes('grid-cols-[minmax(0,1fr)_auto]'), 'one column without a trend')
 	const [, change] = definitions(html)
-	assert.ok(change.classes.includes('text-sm'))
+	assert.ok(change.classes.includes('text-sm/[inherit]'))
 	assert.match(change.content, /<span class="[^"]*text-success-11[^"]*">/, 'up is good by default')
 	assert.match(change.content, new RegExp(`<path d="${icons.arrowUp}"`))
 	assert.match(change.content, /<span aria-hidden="true">\+12,5\u00a0%<\/span>/)
@@ -159,7 +160,7 @@ test('UIStat draws its trend with a sparkline beside the value, in the tone of t
 	assert.ok(svg.classes.includes('text-danger-11'), 'the color of the change')
 	assert.equal(svg.attributes['aria-label'], 'Tendencia: mínimo 3, máximo 8, último 8')
 	assert.match(html, /<path d="M[^"]+Z" class="[^"]*fill-current/, 'the area under the line')
-	assert.ok(element(html, 'dd').classes.includes('@max-stat-narrow:text-xl'), 'a smaller value in compact mode')
+	assert.ok(element(html, 'dd').classes.includes('@max-stat-narrow:text-xl/[inherit]'), 'a smaller value in compact mode')
 	// Without a change, the accent; with trendLabel, a name of its own.
 	const accent = await render(context, '<UIStat label="Visitas" bind:value="1400" bind:trend="[1, 2]" trendLabel="Visitas de la semana, al alza" />')
 	assert.ok(element(accent, 'svg role="img"').classes.includes('text-primary-11'))

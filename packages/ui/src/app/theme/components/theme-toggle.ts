@@ -12,7 +12,7 @@ export const themeToggleTheme = defineTheme({
 		/** The button of `cycle` and each radio of `select`. */
 		button: [
 			'inline-flex cursor-pointer items-center justify-center px-2 py-1',
-			'rounded-md border-(length:--ui-border-width) border-solid text-sm text-text',
+			'rounded-md border-(length:--ui-border-width) border-solid text-sm/[inherit] text-text',
 			'focus-visible:outline-(length:--ui-focus-ring-width) focus-visible:outline-focus focus-visible:outline-offset-(--ui-focus-ring-offset) focus-visible:outline-solid',
 		],
 		/** The radio group of `select`. */

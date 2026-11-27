@@ -42,7 +42,7 @@ export const navigationTreeTheme = defineTheme({
 			'flex items-center gap-2 rounded-sm px-2 py-1 text-md leading-normal text-inherit no-underline decoration-current',
 			'hover:bg-control-hover hover:text-text',
 			'[&[aria-current]]:bg-primary-soft [&[aria-current]]:font-medium [&[aria-current]]:text-primary-text',
-			'transition-[background-color,color] duration-(--ui-duration-fast)',
+			'transition-[background-color,color] duration-(--ui-duration-fast) ease-[ease]',
 			still,
 			focusRingInset,
 		],
@@ -79,7 +79,7 @@ export const navigationTabsTheme = defineTheme({
 			underline: {
 				base: 'flex gap-1 border-b-(length:--ui-border-width) border-b-border',
 				link: [
-					'min-h-(--ui-control-height-lg) rounded-t-md rounded-b-none p-(--ui-control-padding-md) transition-[color] duration-(--ui-duration-fast)',
+					'min-h-(--ui-control-height-lg) rounded-t-md rounded-b-none p-(--ui-control-padding-md) transition-[color] duration-(--ui-duration-fast) ease-[ease]',
 					'[&[aria-current]]:text-text',
 					'[&[aria-current]]:[box-shadow:inset_0_calc(var(--ui-tabs-indicator-height)*-1)_var(--ui-color-primary)]',
 					'supports-[anchor-name:--tabs-current]:[&[aria-current]]:[anchor-name:--tabs-current] supports-[anchor-name:--tabs-current]:[&[aria-current]]:[box-shadow:none]',
@@ -102,7 +102,7 @@ export const navigationTabsTheme = defineTheme({
 				base: 'inline-flex max-w-full gap-0.5 rounded-lg border-(length:--ui-border-width) border-control-border bg-control p-0.5',
 				link: [
 					'min-h-(--ui-control-height-sm) rounded-md px-3 py-0',
-					'transition-[background-color,color] duration-(--ui-duration-fast)',
+					'transition-[background-color,color] duration-(--ui-duration-fast) ease-[ease]',
 					'hover:not-[[aria-current]]:bg-control-hover',
 					'[&[aria-current]]:bg-primary-soft [&[aria-current]]:font-semibold [&[aria-current]]:text-primary-text',
 				],
@@ -117,12 +117,12 @@ export const navigationTabsTheme = defineTheme({
 /** The look of <UIBreadcrumb>: an ordered list whose steps a slash divides. */
 export const breadcrumbTheme = defineTheme({
 	slots: {
-		base: 'font-sans text-sm text-text-soft',
+		base: 'font-sans text-sm/[inherit] text-text-soft',
 		list: 'm-0 flex list-none flex-wrap items-center gap-x-1.5 gap-y-1 p-0',
 		item: "inline-flex min-w-0 items-center gap-1.5 not-first:before:opacity-(--ui-opacity-subtle) not-first:before:content-['/'_/_'']",
 		link: [
 			'rounded-xs text-inherit no-underline decoration-current hover:text-text hover:underline hover:underline-offset-(--ui-underline-offset)',
-			'transition-[color] duration-(--ui-duration-fast)',
+			'transition-[color] duration-(--ui-duration-fast) ease-[ease]',
 			still,
 			focusRing,
 		],
@@ -137,11 +137,11 @@ export const pageNavigationTheme = defineTheme({
 		link: [
 			'grid gap-1 rounded-lg border-(length:--ui-border-width) border-border px-4 py-3 text-text no-underline decoration-current wrap-anywhere',
 			'hover:border-border-strong hover:bg-control-hover',
-			'transition-[border-color,background-color] duration-(--ui-duration-fast)',
+			'transition-[border-color,background-color] duration-(--ui-duration-fast) ease-[ease]',
 			still,
 			focusRing,
 		],
-		hint: 'flex items-center gap-1.5 text-sm text-text-soft',
+		hint: 'flex items-center gap-1.5 text-sm/[inherit] text-text-soft',
 		label: 'text-md font-medium',
 		// The arrows point the way of the reading.
 		icon: 'rtl:[scale:-1_1]',
@@ -163,7 +163,7 @@ export const pageNavigationNext = {
 export const paginationTheme = defineTheme({
 	slots: {
 		base: 'flex flex-wrap items-center justify-between gap-x-4 gap-y-2 font-sans',
-		count: 'm-0 text-sm text-text-soft [font-variant-numeric:tabular-nums]',
+		count: 'm-0 text-sm/[inherit] text-text-soft [font-variant-numeric:tabular-nums]',
 		// A neutral outline button (theme/components/button) at the end of the row, with a spinner while the next page loads.
 		action: ['ms-auto', disabledBusy],
 		list: 'my-0 me-0 ms-auto flex list-none flex-wrap items-center gap-1 p-0',
@@ -174,7 +174,7 @@ export const paginationTheme = defineTheme({
 		control: 'aria-disabled:cursor-progress',
 		// The arrows point the way of the reading.
 		icon: 'rtl:[scale:-1_1]',
-		ellipsis: 'inline-flex min-w-(--ui-control-height-sm) justify-center text-sm text-text-soft select-none',
+		ellipsis: 'inline-flex min-w-(--ui-control-height-sm) justify-center text-sm/[inherit] text-text-soft select-none',
 	},
 })
 
@@ -199,7 +199,7 @@ export const tableOfContentsTheme = defineTheme({
 		panel: 'max-h-(--ui-toc-max-height) overflow-y-auto border-t-(length:--ui-border-width) border-t-border px-3 pt-2 pb-3',
 		link: [
 			'block border-s-(length:--ui-border-width) border-s-border py-1 text-inherit no-underline decoration-current hover:text-text',
-			'transition-[color,border-color] duration-(--ui-duration-fast)',
+			'transition-[color,border-color] duration-(--ui-duration-fast) ease-[ease]',
 			still,
 			focusRingInset,
 		],
