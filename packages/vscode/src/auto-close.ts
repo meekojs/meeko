@@ -2,6 +2,8 @@ import type { LanguageClient } from 'vscode-languageclient/node'
 
 import * as vscode from 'vscode'
 
+import { tagCloseApplies, tagClosePosition, tagCloseTrigger } from './auto-close-trigger'
+
 /** Petición del servidor de Meeko que devuelve la etiqueta de cierre como snippet (`$0</div>`). */
 export const tagCompletionRequest = 'meeko/tagComplete'
 
@@ -14,14 +16,14 @@ export function registerAutoClosingTags(client: (uri: vscode.Uri) => LanguageCli
 	let timer: ReturnType<typeof setTimeout> | undefined
 	const listener = vscode.workspace.onDidChangeTextDocument((event) => {
 		const { document } = event
-		if (document.languageId !== 'meeko' || event.contentChanges.length === 0) return
-		if (event.reason === vscode.TextDocumentChangeReason.Undo || event.reason === vscode.TextDocumentChangeReason.Redo) return
-		const change = event.contentChanges[event.contentChanges.length - 1]!
-		if ((change.text !== '>' && change.text !== '/') || change.rangeLength !== 0) return
+		const reason = event.reason === vscode.TextDocumentChangeReason.Undo ? 'undo' : event.reason === vscode.TextDocumentChangeReason.Redo ? 'redo' : undefined
+		const change = tagCloseTrigger({ languageId: document.languageId, reason, changes: event.contentChanges })
+		if (!change) return
 		const editor = vscode.window.activeTextEditor
 		if (!editor || editor.document !== document) return
 		if (!vscode.workspace.getConfiguration('meeko', document).get<boolean>('autoClosingTags', true)) return
-		const position = change.range.start.translate(0, 1)
+		const start = tagClosePosition(change.range.start)
+		const position = new vscode.Position(start.line, start.character)
 		const version = document.version
 		if (timer) clearTimeout(timer)
 		timer = setTimeout(() => {
@@ -37,7 +39,15 @@ export function registerAutoClosingTags(client: (uri: vscode.Uri) => LanguageCli
 					async (snippet) => {
 						const active = vscode.window.activeTextEditor
 						// Typing went on, or the cursor left the tag: the closing tag would land in the wrong place.
-						if (!snippet || !active || active.document !== document || document.version !== version || !active.selection.active.isEqual(position)) return
+						const applies = tagCloseApplies({
+							snippet,
+							sameDocument: active?.document === document,
+							requestedVersion: version,
+							currentVersion: document.version,
+							requestedPosition: position,
+							cursor: active?.selection.active,
+						})
+						if (!snippet || !active || !applies) return
 						await active.insertSnippet(new vscode.SnippetString(snippet), position)
 					},
 					() => undefined,

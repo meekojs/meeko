@@ -233,6 +233,8 @@ export default defineMeekoConfig({
       <strong>{member.name}</strong>
       <small>{state.disabled ? 'No disponible' : member.role}</small>
     </snippet>
+    <snippet name="value" params="member">{member.name} · {member.team}</snippet>
+    <snippet name="group" params="team">{team.toUpperCase()}</snippet>
   </UISelect>
 </template>`,
 	popoverMenu: `<script lang="ts">

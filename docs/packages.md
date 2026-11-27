@@ -14,7 +14,7 @@ Desde la raíz, `pnpm build` construye los paquetes en orden de dependencias y `
 
 Las entradas `@meekojs/meeko/i18n`, `/i18n/module` y `/prettier` conservan sus implementaciones anteriores para aplicaciones existentes. Los nuevos paquetes son la ubicación para nuevas funciones. Esta compatibilidad transitoria evita una dependencia de runtime del núcleo hacia los paquetes opcionales; se retirará con una migración explícita en una versión major.
 
-Desde core 1.8, `MeekoSelect`, `MeekoPopover` y `MeekoThemeToggle` están obsoletos (aviso `MEEK121`) y se retiran en 2.0. UI 1.8 proporciona `UICombobox`, `UIPopover` y `UIThemeToggle` con el mismo contrato y marcado. `UISelect` es otro componente, un `<select>` nativo, al que sólo puede pasar un `<MeekoSelect>` sin `multiple`, `searchable`, `filter` ni `max`. Activa el módulo `@meekojs/ui`; el sistema de temas y `useThemeToggle()` permanecen en core. Véase [Migración a 1.8](migration-1.8.md).
+Desde core 1.8, `MeekoSelect`, `MeekoPopover` y `MeekoThemeToggle` están obsoletos (aviso `MEEK121`) y se retiran en 2.0. UI 1.8 proporciona `UICombobox`, `UIPopover` y `UIThemeToggle` con el mismo contrato y marcado. `UISelect` es otro componente, para elegir una sola opción sin búsqueda (un `<select>` nativo en UI 1.x; la misma lista propia desde UI 2.0), al que sólo puede pasar un `<MeekoSelect>` sin `multiple`, `searchable`, `filter` ni `max`. Activa el módulo `@meekojs/ui`; el sistema de temas y `useThemeToggle()` permanecen en core. Véase [Migración a 1.8](migration-1.8.md).
 
 ## API de herramientas y tipos de módulos
 

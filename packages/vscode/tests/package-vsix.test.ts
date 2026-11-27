@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { test } from 'node:test'
 
@@ -53,6 +53,23 @@ test('every file that contributes declares is copied into the VSIX', () => {
 		const first = path.replace(/^\.\//, '').split('/')[0]!
 		assert.ok(staged.includes(first), `${path} is declared in contributes but package-vsix.mjs does not copy ${first}`)
 	}
+})
+
+test('the manifest translations and the l10n bundles are copied into the VSIX', () => {
+	const translations = readdirSync(root).filter((name) => /^package\.nls(?:\.[\w-]+)?\.json$/.test(name))
+	assert.deepEqual(translations.sort(), ['package.nls.es.json', 'package.nls.json'])
+	for (const name of translations) assert.ok(stagedFiles.includes(name), `package-vsix.mjs does not copy ${name}`)
+	const bundles = (manifest as unknown as { l10n?: string }).l10n
+	assert.equal(bundles, './l10n')
+	assert.ok(stagedFolders.includes('l10n'), 'package-vsix.mjs does not copy l10n')
+	assert.ok(readdirSync(join(root, 'l10n')).includes('bundle.l10n.es.json'))
+	// .vscodeignore excludes sources and tests, never the translations.
+	const ignored = readFileSync(join(root, '.vscodeignore'), 'utf8').split(/\r?\n/)
+	assert.deepEqual(
+		ignored.filter((line) => /^(?:l10n|package\.nls)/.test(line)),
+		[],
+	)
+	assert.match(script, /que necesita la localización/)
 })
 
 test('the staged manifest has no pnpm protocols that npm and vsce reject', () => {

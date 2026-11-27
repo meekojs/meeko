@@ -4,13 +4,17 @@ import * as vscode from 'vscode'
 
 import type { MeekoLiveApi } from './live/controller'
 import type { ResolvedLanguageServer } from './server-resolution'
+import type { ServerState, ServerStatus } from './status'
 import type { ExecutionZoneItem } from './zones'
 
 import { registerAutoClosingTags } from './auto-close'
 import { registerScaffoldCommands } from './commands'
+import { setupHotReload } from './dev/hot-reload'
+import { setTranslator, t } from './l10n'
 import { LanguageServers } from './language-servers'
 import { registerLiveValues } from './live/controller'
 import { registerSnippetCompletion } from './snippets'
+import { restartCommand, serverStatus, showOutputCommand } from './status'
 import { ExecutionZoneDecorations, executionZonesRequest } from './zones'
 
 /** API que devuelve la activación; las pruebas la usan para saber qué servidor se eligió. */
@@ -18,6 +22,10 @@ export interface MeekoExtensionApi {
 	readonly server: ResolvedLanguageServer | undefined
 	/** Server selected for a file in a multi-root workspace. */
 	serverFor(uri: vscode.Uri): ResolvedLanguageServer | undefined
+	/** Estado del servidor que atiende un archivo, también si no arrancó. */
+	serverState(uri: vscode.Uri): ServerState | undefined
+	/** Lo que muestra el indicador de estado del lenguaje para el editor activo. */
+	readonly status: ServerStatus | undefined
 	/** Zonas de ejecución decoradas en un documento, o `undefined` si aún no se pidieron. */
 	executionZones(uri: vscode.Uri): readonly ExecutionZoneItem[] | undefined
 	/** Valores en vivo de `meeko dev`. */
@@ -46,51 +54,92 @@ function referenceLens(lens: vscode.CodeLens, current: LanguageClient): vscode.C
 	return lens
 }
 
+/** Indicador del lenguaje con el servidor que atiende el editor activo. */
+function registerServerStatus(state: (uri: vscode.Uri) => ServerState | undefined): { readonly current: () => ServerStatus | undefined; readonly update: () => void } & vscode.Disposable {
+	const item = vscode.languages.createLanguageStatusItem('meeko.languageServer', { language: 'meeko' })
+	item.name = t('Meeko Language Server')
+	let shown: ServerStatus | undefined
+	const update = (): void => {
+		const document = vscode.window.activeTextEditor?.document
+		shown = serverStatus(document?.languageId === 'meeko' ? state(document.uri) : undefined)
+		item.text = shown.text
+		item.detail = shown.detail
+		item.severity = shown.severity === 'error' ? vscode.LanguageStatusSeverity.Error : vscode.LanguageStatusSeverity.Information
+		item.busy = shown.busy
+		item.command = shown.command
+	}
+	update()
+	const listener = vscode.window.onDidChangeActiveTextEditor(update)
+	return {
+		current: () => shown,
+		update,
+		dispose: () => {
+			listener.dispose()
+			item.dispose()
+		},
+	}
+}
+
 /** Arranca el cliente del servidor de lenguaje Meeko; la lógica del lenguaje vive en el servidor. */
 export async function activate(context: vscode.ExtensionContext): Promise<MeekoExtensionApi> {
+	setupHotReload(context)
+
+	// Before any text is shown: the pure modules translate through `t`, which has no `vscode` import.
+	setTranslator(vscode.l10n.t)
 	const output = vscode.window.createOutputChannel('Meeko', { log: true })
 	context.subscriptions.push(output)
-	// Before the servers start: the snippets do not depend on them.
-	context.subscriptions.push(registerSnippetCompletion())
+	const current = new LanguageServers(
+		context,
+		output,
+		(lenses, client) => lenses.map((lens) => referenceLens(lens, client)),
+		(settled) => {
+			if (settled) zones?.refreshVisible()
+			status.update()
+		},
+	)
+	servers = current
+	const status = registerServerStatus((uri) => current.stateFor(uri))
+	const refresh = (force = false): Promise<void> => current.refresh(force).catch((error: unknown) => output.error(`No se pudo reiniciar Meeko: ${String(error)}`))
+	// Nothing below needs a running server: a server that fails to start leaves all of it working.
+	context.subscriptions.push(
+		status,
+		registerSnippetCompletion(),
+		registerAutoClosingTags((uri) => servers?.clientFor(uri)),
+		registerScaffoldCommands(),
+		vscode.commands.registerCommand(restartCommand, () => refresh(true)),
+		vscode.commands.registerCommand(showOutputCommand, () => output.show()),
+		vscode.workspace.onDidGrantWorkspaceTrust(() => void refresh()),
+		vscode.workspace.onDidChangeWorkspaceFolders(() => void refresh()),
+		vscode.workspace.onDidOpenTextDocument((document) => current.documentOpened(document)),
+		vscode.workspace.onDidChangeConfiguration((event) => {
+			if (event.affectsConfiguration('meeko.languageServer')) void refresh()
+		}),
+		{
+			dispose: () => {
+				zones?.dispose()
+				zones = undefined
+			},
+		},
+	)
 	const api: MeekoExtensionApi = {
 		get server() {
 			return servers?.first
 		},
 		serverFor: (uri) => servers?.resolutionFor(uri),
+		serverState: (uri) => servers?.stateFor(uri),
+		get status() {
+			return status.current()
+		},
 		executionZones: (uri) => zones?.applied.get(uri.toString()),
 		live: registerLiveValues(context, output),
 	}
-	servers = new LanguageServers(
-		context,
-		output,
-		(lenses, current) => lenses.map((lens) => referenceLens(lens, current)),
-		() => zones?.refreshVisible(),
-	)
-	await servers.refresh()
 	// An older workspace server has no zones; it answers the request with an error, shown as no zones.
 	zones = new ExecutionZoneDecorations(context.extensionUri, (uri) => {
-		const current = servers?.clientFor(vscode.Uri.parse(uri))
-		return current ? current.sendRequest<{ zones: ExecutionZoneItem[] } | null>(executionZonesRequest, { textDocument: { uri } }) : Promise.resolve(null)
+		const client = servers?.clientFor(vscode.Uri.parse(uri))
+		return client ? client.sendRequest<{ zones: ExecutionZoneItem[] } | null>(executionZonesRequest, { textDocument: { uri } }) : Promise.resolve(null)
 	})
-	context.subscriptions.push(registerAutoClosingTags((uri) => servers?.clientFor(uri)))
-	context.subscriptions.push(registerScaffoldCommands())
-	context.subscriptions.push({
-		dispose: () => {
-			zones?.dispose()
-			zones = undefined
-		},
-	})
-	const refresh = (): void => {
-		void servers?.refresh().catch((error: unknown) => output.error(`No se pudo reiniciar Meeko: ${String(error)}`))
-	}
-	context.subscriptions.push(vscode.workspace.onDidGrantWorkspaceTrust(refresh))
-	context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(refresh))
-	context.subscriptions.push(
-		vscode.workspace.onDidChangeConfiguration((event) => {
-			if (!event.affectsConfiguration('meeko.languageServer')) return
-			refresh()
-		}),
-	)
+	// A failed start is reported by `LanguageServers` and never rejects the activation.
+	await refresh()
 	return api
 }
 

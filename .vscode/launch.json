@@ -5,6 +5,7 @@
 			"name": "Meeko: Debug Language",
 			"type": "extensionHost",
 			"request": "launch",
+			"preLaunchTask": "meeko-language: build",
 			"runtimeExecutable": "${execPath}",
 			"args": ["--extensionDevelopmentPath=${workspaceFolder}/packages/vscode", "${workspaceFolder}/packages/meeko/examples"]
 		}

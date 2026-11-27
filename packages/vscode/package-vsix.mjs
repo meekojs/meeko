@@ -13,8 +13,8 @@ import { setExecutable, zipEntries } from './scripts/vsix-archive.mjs'
 /** Destinos con ejecutable nativo de TypeScript 7 y host de extensión de VS Code. */
 export const targets = ['win32-x64', 'win32-arm64', 'linux-x64', 'linux-arm64', 'darwin-x64', 'darwin-arm64']
 /** Lo que se copia a la carpeta aislada que empaqueta vsce: vsce sólo ve esa carpeta. */
-export const stagedFiles = ['package.json', 'README.md', 'CHANGELOG.md', 'language-configuration.json', '.vscodeignore']
-export const stagedFolders = ['dist', 'syntaxes', 'icons', 'snippets']
+export const stagedFiles = ['package.json', 'package.nls.json', 'package.nls.es.json', 'README.md', 'CHANGELOG.md', 'language-configuration.json', '.vscodeignore']
+export const stagedFolders = ['dist', 'l10n', 'syntaxes', 'icons', 'snippets']
 const vsce = '@vscode/vsce@4.1.0'
 const extensionRoot = fileURLToPath(new URL('.', import.meta.url))
 
@@ -113,6 +113,11 @@ export function packageVsix({ target = hostTarget(), skipBuild = false } = {}) {
 		for (const path of contributed) {
 			const entry = `extension/${path.replace(/^\.\//, '')}`
 			if (!entries.some((item) => item.name === entry)) throw new Error(`El VSIX no contiene ${entry}, que declara contributes.`)
+		}
+		// Sin las traducciones VS Code muestra las `%claves%` del manifiesto o sólo el inglés.
+		const localized = [...stagedFiles.filter((name) => name.startsWith('package.nls.')), ...readdirSync(join(extensionRoot, 'l10n')).map((name) => `l10n/${name}`)]
+		for (const path of localized) {
+			if (!entries.some((item) => item.name === `extension/${path}`)) throw new Error(`El VSIX no contiene extension/${path}, que necesita la localización.`)
 		}
 		return output
 	} finally {

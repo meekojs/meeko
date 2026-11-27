@@ -39,24 +39,21 @@
 <template>
 	<DocsPage
 		title="Select"
-		description="Elige una opción con el select nativo o, para buscar o elegir varias, con UICombobox."
+		description="Elige una opción de una lista con UISelect o, para buscar o elegir varias, con UICombobox."
 	>
 		<p>
 			<code>UISelect</code>
-			es un
-			<code>select</code>
-			nativo con
-			<code>appearance: base-select</code>: el navegador trae la lista, el teclado y el valor de formulario, y UI la pinta con sus tokens.
+			es un botón que abre una lista propia, con el patrón de combobox de sólo selección: se ve y se maneja igual en todos los navegadores, con los tokens de UI, y un campo oculto envía su valor con el formulario.
 			<code>UICombobox</code>
-			cubre lo que el nativo no puede: buscar, filtrar en un servidor y elegir varias opciones. El tipo del modelo se infiere de
+			añade a esa misma lista lo que una selección simple no necesita: buscar, filtrar en un servidor y elegir varias opciones. El tipo del modelo se infiere de
 			<code>options</code>.
 		</p>
 		<h2 id="usage">Una opción en un formulario</h2>
 		<p>
 			Con
-			<code>name</code>, el valor se envía con un formulario nativo sin código adicional. Abre la lista con <code>Intro</code>,
-			<code>Espacio</code>
-			o un clic y escribe una letra para saltar a la opción que empieza por ella: es el teclado del navegador.
+			<code>name</code>, el valor se envía con un formulario nativo sin código adicional. Abre la lista con <code>Intro</code>, <code>Espacio</code>, las flechas o un clic; muévete con las flechas, <code>Inicio</code> y <code>Fin</code>, o escribe para saltar a la opción que empieza por ese texto, y elige con <code>Intro</code> o <code>Espacio</code>. <code>Esc</code> y <code>Tab</code> cierran sin elegir. El foco no sale del disparador:
+			<code>aria-activedescendant</code>
+			recorre la lista.
 		</p>
 		<DocsPreview>
 			<form
@@ -129,22 +126,25 @@
 		<DocsCode bind:code="examples.select" />
 		<UIAlert color="info">
 			Con
-			<code>required</code>, un formulario sin valor no se envía: el
-			<code>select</code>
-			recibe el foco y
-			<code>aria-invalid</code>, sin el aviso del navegador. Escribe además un mensaje visible con <code>UIField</code>, como en el ejemplo. Con <code>useForm</code>, pasa
+			<code>required</code>, un formulario sin valor no se envía: el disparador recibe el foco y <code>aria-invalid</code>, sin el aviso del navegador. Escribe además un mensaje visible con <code>UIField</code>, como en el ejemplo. Con <code>useForm</code>, pasa
 			<code>bind:field="form.field('plan')"</code>
 			y el campo aporta el id, el nombre, el valor y el estado de error.
 		</UIAlert>
-		<h2 id="browsers">Navegadores</h2>
+		<h2 id="behavior">Lista, formulario y carga</h2>
 		<p>
-			Chrome, Edge y Safari 27 pintan la lista con los tokens de UI, con entrada animada. Firefox y los navegadores antiguos muestran su lista propia: funcionan igual, y en ellos
-			<code>value</code>,
-			<code>group</code>
-			y el contenido rico de
-			<code>option</code>
-			quedan en su texto. Una opción oculta al principio representa el
-			<code>placeholder</code>, o un valor que ya no está en <code>options</code>: el modelo lo conserva y el formulario lo sigue enviando.
+			La lista es un
+			<code>role="listbox"</code>
+			dentro de un
+			<a href="/popover">UIPopover</a>, con entrada animada que respeta <code>prefers-reduced-motion</code>. Sus opciones se crean la primera vez que se abre y se conservan después: una lista cerrada no envía opciones en el HTML del servidor. El disparador abre su popover con
+			<code>popovertarget</code>
+			antes de que llegue el JavaScript, y las opciones aparecen al hidratar; sin JavaScript no se puede elegir, pero el formulario envía el valor con el que se sirvió la página.
+		</p>
+		<p>
+			Un valor que ya no está en
+			<code>options</code>
+			sigue en el modelo, en el disparador y en el formulario. Sin valor, el formulario envía el nombre con un texto vacío. Un
+			<code>reset</code>
+			del formulario devuelve el select al valor con el que se montó y emite <code>change</code>.
 		</p>
 		<h2 id="objects">Objetos, grupos y opciones propias</h2>
 		<p>
@@ -156,11 +156,12 @@
 			<code>groupBy</code>
 			añade un encabezado por grupo y una opción con
 			<code>disabled: true</code>
-			no se puede elegir. Los snippets
+			no se puede elegir: el teclado la salta. Los snippets
 			<code>option</code>
 			y
 			<code>value</code>
-			reciben la opción con su tipo.
+			reciben la opción con su tipo, y
+			<code>group</code>, el nombre del grupo; los tres pintan lo mismo en todos los navegadores. La opción elegida lleva una marca al final.
 		</p>
 		<DocsPreview>
 			<div class="docs-stack">
@@ -190,6 +191,12 @@
 								{member.name}
 								<UIBadge>{member.role}</UIBadge>
 							</snippet>
+							<snippet
+								name="value"
+								params="member"
+							>
+								{member.name} · {member.team}
+							</snippet>
 						</UISelect>
 					</snippet>
 				</UIField>
@@ -210,13 +217,14 @@
 				{ name: 'options', type: 'readonly T[]', description: 'Obligatoria. Primitivos u objetos.' },
 				{ name: 'model', type: 'Signal<T | null>', default: 'null', description: 'Valor elegido.' },
 				{ name: 'by / labelBy / disabledBy / groupBy', type: 'clave o función', description: 'Comparación, etiqueta, deshabilitado y grupo de cada opción.' },
-				{ name: 'clearable / clearLabel', type: 'boolean / string', default: 'false / Quitar selección', description: 'Botón accesible que quita la selección y devuelve el foco al select. La etiqueta por defecto sigue el idioma del documento (véase Temas).' },
+				{ name: 'clearable / clearLabel', type: 'boolean / string', default: 'false / Quitar selección', description: 'Botón accesible que quita la selección y devuelve el foco al disparador. La etiqueta por defecto sigue el idioma del documento (véase Temas).' },
 				{ name: 'name / required / disabled', type: 'string / boolean', description: 'Envío y validación del formulario.' },
 				{ name: 'field', type: 'SelectField', description: 'Un campo de useForm: id, name, valor, aria-invalid y aria-describedby.' },
-				{ name: 'id / label / describedBy / invalid', type: 'string / boolean', description: 'Identidad y estado accesible del select.' },
+				{ name: 'id / label / describedBy / invalid', type: 'string / boolean', description: 'Identidad y estado accesible del disparador.' },
 				{ name: 'placeholder', type: 'string', description: 'Texto sin valor.' },
-				{ name: 'placement / offset', type: 'PopoverPlacement / number', default: 'bottom-start', description: 'Posición de la lista, donde el navegador la pinta con los tokens.' },
-				{ name: 'class / listClass', type: 'string', description: 'Clases de la raíz y del select; dale estilo a la lista con .mi-clase::picker(select).' },
+				{ name: 'placement / offset', type: 'PopoverPlacement / number', default: 'bottom-start / 4', description: 'Posición de la lista respecto al disparador y separación en píxeles.' },
+				{ name: 'class / listClass', type: 'string', description: 'Clases de la raíz y de la caja flotante de la lista.' },
+				{ name: 'ui', type: 'objeto de clases', description: 'Clases por parte: base, trigger, value, placeholder, chevron, list, group, groupLabel, option, indicator y clear.' },
 			]"
 		/>
 		<p>
@@ -233,14 +241,11 @@
 		</p>
 		<h2 id="combobox">UICombobox</h2>
 		<p>
-			Una lista propia sobre
-			<a href="/popover">UIPopover</a>, con más JavaScript: úsala sólo si necesitas <code>searchable</code>, <code>filter</code>,
+			La misma lista sobre
+			<a href="/popover">UIPopover</a>, con un campo de búsqueda como disparador: úsala si necesitas <code>searchable</code>, <code>filter</code>,
 			<code>multiple</code>
 			o
-			<code>max</code>. El foco permanece en el disparador mientras
-			<code>aria-activedescendant</code>
-			recorre la lista. El campo Temas del primer ejemplo es un
-			<code>UICombobox</code>. Con <code>multiple</code>, cada opción se alterna, la lista sigue abierta y el modelo es un array;
+			<code>max</code>. El campo Temas del primer ejemplo es un <code>UICombobox</code>. Con <code>multiple</code>, cada opción se alterna, la lista sigue abierta y el modelo es un array;
 			<code>max</code>
 			deshabilita el resto al llegar al límite.
 		</p>

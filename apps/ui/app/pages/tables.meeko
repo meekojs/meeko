@@ -47,6 +47,7 @@
 					params="id, describedBy"
 				>
 					<UISelect
+						class="min-w-36"
 						model="layout"
 						bind:options="layouts"
 						bind:id="id"

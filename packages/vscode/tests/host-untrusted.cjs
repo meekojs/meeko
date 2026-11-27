@@ -17,7 +17,7 @@ exports.run = async function run() {
 	assert.equal(selected?.source, 'bundled', JSON.stringify(selected))
 	const bundledPath = path.join(extension.extensionPath, 'dist', 'server.js')
 	assert.equal(process.platform === 'win32' ? selected.module.toLowerCase() : selected.module, process.platform === 'win32' ? bundledPath.toLowerCase() : bundledPath)
-	assert.match(selected.reason, /workspace no es de confianza/)
+	assert.match(selected.reason, /workspace is not trusted/)
 
 	await vscode.window.showTextDocument(document)
 	for (let attempt = 0; attempt < 60; attempt++) {

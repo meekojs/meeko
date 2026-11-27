@@ -23,6 +23,7 @@
 					params="id, describedBy"
 				>
 					<UISelect
+						class="min-w-36"
 						model="variant"
 						bind:options="variants"
 						bind:id="id"
@@ -39,6 +40,7 @@
 					params="id, describedBy"
 				>
 					<UISelect
+						class="min-w-36"
 						model="color"
 						bind:options="colors"
 						bind:id="id"

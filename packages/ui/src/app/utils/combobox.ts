@@ -4,7 +4,7 @@ import type { Signal } from '@meekojs/meeko'
  * `<UICombobox>`: what `Combobox.meeko` needs besides its template. The pure helpers (search with
  * accents removed, selection with `max`) are tested on their own; `createCombobox` keeps the state that
  * the template renders, the same in SSR and hydration, and attaches the keyboard and the pointer in the
- * browser.
+ * browser. `<UISelect>` is the same list with one value and no search: `createSelect` (./select.ts) wraps it.
  */
 import { computed, effect, onCleanup, signal, untrack } from '@meekojs/meeko'
 
@@ -180,16 +180,17 @@ export function createCombobox<T>(props: ComboboxSettings<T>, model: Signal<unkn
 	const close = (): void => {
 		open.value = false
 	}
+	/** A new value: on the form field or the model, without the error of `required`, and in the `change` event. */
+	const write = (value: unknown): void => {
+		target().value = value
+		failed.value = false
+		emit(value)
+	}
 	const choose = (index: number): void => {
 		const entry = entries.value[index]
 		if (!entry || isBlocked(entry)) return
 		const next = toggleSelection(selected.value, entry.option, { multiple: multiple.value, max: props.max, by: props.by })
-		if (next) {
-			const value = multiple.value ? next : (next[0] ?? null)
-			target().value = value
-			failed.value = false
-			emit(value)
-		}
+		if (next) write(multiple.value ? next : (next[0] ?? null))
 		if (multiple.value) {
 			if (typing.value) {
 				typing.value = false
@@ -203,10 +204,7 @@ export function createCombobox<T>(props: ComboboxSettings<T>, model: Signal<unkn
 	let rootElement: HTMLElement | null = null
 	const clear = (): void => {
 		if (!showClear.value) return
-		const value = multiple.value ? [] : null
-		target().value = value
-		failed.value = false
-		emit(value)
+		write(multiple.value ? [] : null)
 		if (typing.value) typing.value = false
 		close()
 		rootElement?.querySelector<HTMLElement>('[data-meeko-select-trigger]')?.focus()
@@ -410,5 +408,9 @@ export function createCombobox<T>(props: ComboboxSettings<T>, model: Signal<unkn
 		openList,
 		close,
 		choose,
+		write,
+		/** The value as the model or the form field holds it. */
+		current: (): unknown => target().value,
+		failed,
 	}
 }

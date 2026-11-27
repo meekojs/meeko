@@ -241,9 +241,7 @@
 		<h2 id="other-controls">Otros controles</h2>
 		<p>
 			Área de texto, casillas, radios, interruptor y deslizador están en
-			<a href="/controls">Controles de formulario</a>. Para elegir entre opciones, usa <a href="/select">UISelect</a>, un
-			<code>select</code>
-			nativo, o
+			<a href="/controls">Controles de formulario</a>. Para elegir entre opciones, usa <a href="/select">UISelect</a>, o
 			<code>UICombobox</code>
 			si necesitas búsqueda o selección múltiple. Sustituyen a la etiqueta obsoleta
 			<code>MeekoSelect</code>

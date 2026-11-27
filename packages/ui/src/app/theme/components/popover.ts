@@ -35,7 +35,7 @@ export const popoverTheme = defineTheme({
 		'border-(length:--ui-border-width) border-solid border-border bg-surface-raised font-sans text-text',
 	],
 	variants: {
-		/** The ARIA pattern of the content: `none` for a list that names its own role, such as <UICombobox>. */
+		/** The ARIA pattern of the content: `none` for a list that names its own role, such as <UISelect> and <UICombobox>. */
 		role: {
 			none: 'max-h-(--ui-popover-max-height) overflow-auto rounded-lg p-1 text-md [box-shadow:var(--ui-shadow-md)]',
 			menu: 'max-h-(--ui-popover-max-height) min-w-(--ui-page-aside-width) overflow-auto rounded-lg p-1 text-md [box-shadow:var(--ui-shadow-md)]',

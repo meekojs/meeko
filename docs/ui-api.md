@@ -485,7 +485,7 @@ También incluye `UIApp` y `UIModal` para [modales](#modales), `UITable` para [t
 
 La web pública `apps/meeko` consume estas acciones en su portada, cabecera y errores; `UILinkCard` compone el índice documental y `UIBadge` los metadatos de referencia. Su `meeko.config.ts` enlaza los tokens con la paleta actual, incluidas las acciones neutras y el foco azul.
 
-Desde UI 1.8, `UIPopover`, `UISelect`, `UICombobox` y `UIThemeToggle` están en el módulo UI. `MeekoPopover`, `MeekoSelect` y `MeekoThemeToggle` quedaron obsoletos en core 1.8 y se retirarán en 2.0. Para sustituir `MeekoSelect`, usa `UISelect` si necesitas un `<select>` nativo o `UICombobox` si necesitas búsqueda o selección múltiple; no tienen el mismo contrato. Véase [Migración a 1.8](migration-1.8.md).
+Desde UI 1.8, `UIPopover`, `UISelect`, `UICombobox` y `UIThemeToggle` están en el módulo UI. `MeekoPopover`, `MeekoSelect` y `MeekoThemeToggle` quedaron obsoletos en core 1.8 y se retirarán en 2.0. Para sustituir `MeekoSelect`, usa `UISelect` para elegir una opción o `UICombobox` si necesitas búsqueda o selección múltiple; no tienen el mismo contrato. Véase [Migración a 1.8](migration-1.8.md).
 
 ## Personalización
 
@@ -1175,7 +1175,7 @@ El modelo por defecto (`model="open"`) es la apertura. `ui.defaults.menu` acepta
 
 ## UISelect
 
-Un `<select>` nativo con `appearance: base-select`: el navegador trae la lista, el teclado y el valor de formulario. Para buscar, filtrar en un servidor o elegir varias opciones, usa [`UICombobox`](#uicombobox); `multiple`, `searchable`, `filter` y `max` en `UISelect` son un error de tipos que lo indica.
+Un botón que abre una lista propia (`role="listbox"`) sobre `<UIPopover>`, con el patrón de combobox de sólo selección: se ve y se maneja igual en todos los navegadores, con los tokens de UI, y un `<input type="hidden">` envía su valor con el `<form>`. Comparte la lista, el teclado y el marcado `data-meeko-select-*` con [`UICombobox`](#uicombobox), que añade la búsqueda, el filtro en un servidor y la selección múltiple; `multiple`, `searchable`, `filter` y `max` en `UISelect` son un error de tipos que lo indica.
 
 ```html
 <UISelect
@@ -1194,23 +1194,36 @@ Un `<select>` nativo con `appearance: base-select`: el navegador trae la lista, 
 		params="member, state"
 	>
 		{member.name}
-		<em if:when="state.selected">(elegida)</em>
+		<small if:when="state.disabled">No disponible</small>
+	</snippet>
+	<snippet
+		name="value"
+		params="member"
+	>
+		{member.name} · {member.team}
+	</snippet>
+	<snippet
+		name="group"
+		params="team"
+	>
+		Equipo de {team}
 	</snippet>
 </UISelect>
 ```
 
-Acepta `options`, `by`, `labelBy`, `disabledBy`, `groupBy`, `placeholder`, `name`, `required`, `disabled`, `clearable`, `clearLabel`, `field`, `id`, `label`, `describedBy`, `invalid`, `class`, `listClass`, `placement` y `offset`; emite `change`. Los snippets son `option` (`[option, state]`, con `selected` y `disabled`), `value` y `group`.
+Acepta `options`, `by`, `labelBy`, `disabledBy`, `groupBy`, `placeholder`, `name`, `required`, `disabled`, `clearable`, `clearLabel`, `field`, `id`, `label`, `describedBy`, `invalid`, `class`, `listClass`, `placement`, `offset` y `ui`; emite `change`. Los snippets son `option` (`[option, state]`, con `selected` y `disabled`), `value` (`[option]`, cómo se ve el valor en el disparador) y `group` (`[name]`, el encabezado de un grupo), y pintan lo mismo en todos los navegadores. El modelo es la opción entera o `null` (`SelectModel<T>`).
 
-- **Navegadores.** Chrome, Edge y Safari 27 pintan la lista con los tokens de UI, con entrada animada. Firefox y los navegadores antiguos muestran su lista propia, y en ellos `value`, `group` y el contenido rico de `option` quedan en su texto.
-- **Disparador.** Usa `<selectedcontent>`. Con el snippet `option`, muestra `value` o la etiqueta, porque `<selectedcontent>` copiaría toda la opción. No pongas `id` dentro de `option`, porque la copia lo duplicaría.
-- **Teclado.** Es el del navegador. `Intro` o `Espacio` abren la lista, y las flechas y las letras se mueven por ella. Con la lista cerrada varía según el motor: en WebKit, las flechas no abren.
-- **Sin elegir.** Una opción oculta al principio representa el `placeholder`, o un valor que ya no está en `options`: el modelo lo conserva y el formulario lo sigue enviando.
-- **`required`.** Un formulario sin valor no se envía: el `<select>` recibe el foco y `aria-invalid="true"`, sin el aviso del navegador.
-- **`listClass`.** Va en el `<select>`: dale estilo con `.mi-clase::picker(select)`.
+- **Disparador.** Un `<button role="combobox">` con `aria-haspopup="listbox"`, `aria-expanded`, `aria-controls` y `aria-activedescendant`, con el aspecto de un campo y una flecha que gira mientras la lista está abierta. Muestra el snippet `value`, o la etiqueta de la opción elegida, o el `placeholder`. Un `<label for>` lo nombra por su `id`; un clic en esa etiqueta activa el botón y abre la lista.
+- **Lista.** Un `role="listbox"` de `role="option"` con `aria-selected` y `aria-disabled`, agrupadas en `role="group"` con `groupBy`. La opción elegida va en negrita y lleva una marca al final. Se abre donde diga `placement` (`bottom-start` por defecto, y al otro lado si no cabe), separada `offset` píxeles (4 por defecto), mide al menos lo que el disparador y entra con una animación que respeta `prefers-reduced-motion`.
+- **Teclado.** El de [`UICombobox`](#uicombobox) sin búsqueda, con el foco siempre en el disparador. `↓`, `↑`, `Intro` o `Espacio` abren la lista sobre la opción elegida (o la primera); `Inicio` y `Fin` abren en un extremo, y una letra abre y busca. Con la lista abierta, las flechas, `Inicio`, `Fin`, `RePág` y `AvPág` mueven la opción activa, sin dar la vuelta y saltando las deshabilitadas; escribir salta a la opción que empieza por ese texto, sin distinguir acentos; `Intro` o `Espacio` eligen y cierran; `Esc` y `Tab` cierran sin elegir. Elegir con el ratón devuelve el foco al disparador.
+- **Opciones al abrir.** Una lista cerrada no tiene opciones en el DOM ni en el HTML del servidor: se crean la primera vez que se abre y se conservan al cerrarla. El disparador abre su popover con `popovertarget` antes de que llegue el JavaScript, y una lista abierta así sigue abierta al hidratar, ya con sus opciones; mientras no las tiene no pinta su caja. Sin JavaScript no se puede elegir, pero el formulario envía el valor con el que se sirvió la página. Las pruebas que busquen un `role="option"` deben abrir antes la lista.
+- **Sin elegir y valores ajenos.** Sin valor se muestra el `placeholder`. Un valor que ya no está en `options` sigue en el modelo, en el disparador y en el formulario. El valor inicial `""` de un campo cuenta como «sin valor», salvo que una opción sea `""`.
+- **Formulario.** Con `name` (o `field`), un `<input type="hidden">` envía la clave de `by` de la opción, el propio primitivo o su etiqueta, y un texto vacío sin elegir; con `disabled` no envía nada. Con `required`, un formulario sin valor no se envía: el disparador recibe el foco y `aria-invalid="true"` hasta que se elige una opción, sin el aviso del navegador. Un `reset` del formulario devuelve el select al valor con el que se montó y emite `change`.
+- **Aspecto.** El disparador toma el aspecto de campo de `inputControlTheme`, y el resto es la receta `selectTheme` de `@meekojs/ui/theme`. `ui` añade clases a cada parte: `base` (la raíz), `trigger`, `value`, `placeholder`, `chevron` (la flecha), `list` (el `role="listbox"`), `group`, `groupLabel`, `option`, `indicator` (la marca de la opción elegida) y `clear`. `listClass` va en la caja flotante de la lista, el contenido del `<UIPopover>`. Las opciones llevan `data-active`, `data-selected` y `data-disabled`, y la raíz (`data-meeko-select`), `data-disabled`.
 
 ## UICombobox
 
-Lo que el `<select>` nativo de `UISelect` no cubre: buscar, filtrar en un servidor y elegir varias opciones. Es una lista propia sobre `<UIPopover>`, con más JavaScript: úsalo sólo si necesitas `searchable`, `filter`, `multiple` o `max`. `model` es el valor y su tipo sale de `options`:
+Lo que [`UISelect`](#uiselect) no cubre: buscar, filtrar en un servidor y elegir varias opciones. Es la misma lista sobre `<UIPopover>`, con un campo de búsqueda como disparador: úsalo si necesitas `searchable`, `filter`, `multiple` o `max`. `model` es el valor y su tipo sale de `options`:
 
 ```html
 <script lang="ts">
@@ -1290,7 +1303,7 @@ Lo que el `<select>` nativo de `UISelect` no cubre: buscar, filtrar en un servid
 
 **ARIA y teclado.** El disparador es un `role="combobox"` (un `<button>` o, con `searchable`, un `<input>` con `aria-autocomplete="list"`) con `aria-expanded`, `aria-controls`, `aria-haspopup="listbox"` y `aria-activedescendant`: el foco nunca sale de él. La lista es un `role="listbox"` (con `aria-multiselectable` en un select múltiple) de `role="option"` con `aria-selected` y `aria-disabled`, agrupadas en `role="group"` con `groupBy`. Un `<label for>` externo nombra el disparador por su `id`. El patrón ARIA del combobox no define cómo vaciar la selección, así que `clearable` añade, fuera del combobox, un `<button type="button">` con `aria-label` («Quitar selección»): entra en el orden de tabulación justo después del disparador, sólo existe mientras hay algo elegido y al activarlo cierra la lista, emite `change` con `null` (o `[]`) y devuelve el foco al disparador.
 
-**Opciones al abrir.** Una lista cerrada no tiene opciones en el DOM, tampoco en el HTML del servidor: se crean la primera vez que se abre y se conservan al cerrarla. El disparador, los `<input type="hidden">` del formulario, el typeahead y `aria-controls` no las necesitan, así que una página con muchas listas largas ya no envía ni hidrata cada opción de cada lista cerrada. Sin JavaScript la lista no se abre, de modo que no se pierde nada. Las pruebas que busquen un `role="option"` deben abrir antes la lista.
+**Opciones al abrir.** Una lista cerrada no tiene opciones en el DOM, tampoco en el HTML del servidor: se crean la primera vez que se abre y se conservan al cerrarla. El disparador, los `<input type="hidden">` del formulario, el typeahead y `aria-controls` no las necesitan, así que una página con muchas listas largas ya no envía ni hidrata cada opción de cada lista cerrada. Sin JavaScript la lista de `UICombobox` no se abre, de modo que no se pierde nada. Las pruebas que busquen un `role="option"` deben abrir antes la lista.
 
 - `↓`, `↑`, `Intro` o `Espacio` abren la lista sobre la opción elegida (o la primera); `Inicio` y `Fin` abren en un extremo; las letras abren y buscan.
 - Con la lista abierta, las flechas, `Inicio`, `Fin`, `RePág` y `AvPág` mueven la opción activa (sin dar la vuelta, saltando las deshabilitadas) y la desplazan hasta verla; las letras buscan por el principio de la etiqueta, sin distinguir acentos.
@@ -1340,7 +1353,7 @@ Con `max`, en cuanto hay `max` opciones elegidas las demás quedan `aria-disable
 </template>
 ```
 
-**Formularios.** Con `name`, el `<select>` nativo envía su valor (vacío sin elegir) y la lista propia, un `<input type="hidden">` por valor (ninguno en uno múltiple vacío); con `disabled` no envía nada. El valor de cada opción es su clave de `by`, el propio primitivo o su etiqueta. `required` impide enviar el `<form>` sin valor: el disparador recibe el foco y `aria-invalid="true"` hasta que se elige una opción. Con `useForm`, `model="form.fields.color"` funciona como en cualquier control, y `bind:field="form.field('color')"` da además el valor, el `id` del campo (para su `<label for>`), el `name`, `aria-invalid` y `aria-describedby` con el mensaje de error; `focusInvalid` lleva el foco al select cuando falla la validación. El valor inicial `""` de un campo cuenta como «sin valor» (salvo que una opción sea `""`).
+**Formularios.** Con `name`, un `<input type="hidden">` por valor envía la selección: uno vacío en un select simple sin elegir y ninguno en uno múltiple vacío; con `disabled` no envía nada. El valor de cada opción es su clave de `by`, el propio primitivo o su etiqueta. `required` impide enviar el `<form>` sin valor: el disparador recibe el foco y `aria-invalid="true"` hasta que se elige una opción. Con `useForm`, `model="form.fields.color"` funciona como en cualquier control, y `bind:field="form.field('color')"` da además el valor, el `id` del campo (para su `<label for>`), el `name`, `aria-invalid` y `aria-describedby` con el mensaje de error; `focusInvalid` lleva el foco al select cuando falla la validación. El valor inicial `""` de un campo cuenta como «sin valor» (salvo que una opción sea `""`).
 
 ```html
 <form
@@ -1365,7 +1378,7 @@ Con `max`, en cuanto hay `max` opciones elegidas las demás quedan `aria-disable
 
 **Listas largas.** `<UICombobox>` pinta todas las opciones (en el HTML del servidor también). Para miles de opciones, use `searchable` con un `filter` que devuelva sólo las primeras coincidencias; una lista virtual que sólo pinte las visibles (`virtual`) no está disponible en UI `1.8`.
 
-**Alternativa nativa.** Para un caso simple, sin búsqueda ni opciones con contenido propio, un `<select>` nativo con `model` sigue siendo la opción más ligera. En los navegadores que lo admiten, `appearance: base-select` permite estilizarlo por completo y conserva el teclado, la accesibilidad y el envío del formulario del navegador:
+**Alternativa nativa.** Para un caso simple, sin búsqueda ni opciones con contenido propio, un `<select>` de HTML con `model` sigue siendo la opción más ligera, sin `UISelect`. En los navegadores que lo admiten, `appearance: base-select` permite estilizarlo por completo y conserva el teclado, la accesibilidad y el envío del formulario del navegador:
 
 ```css
 select,
@@ -1602,7 +1615,7 @@ Con `pageCount` (o `pageSize` y `total`), `UIPagination` pinta la página anteri
 
 ## Plataforma y View Transitions
 
-`UIModal`, `UIDrawer`, `UIPopover`, `UITabs`, `UIThemeToggle` y `UISelect` usan `<dialog>`, `popover`, anclaje CSS, `appearance: base-select`, `@starting-style` y View Transitions. Los navegadores antiguos funcionan sin animación y con el `<select>` más básico, igual que Firefox, que aún muestra su lista nativa. Lo que la plataforma no cubre está en `UICombobox`, sobre `UIPopover`.
+`UIModal`, `UIDrawer`, `UIPopover`, `UITabs`, `UIThemeToggle`, `UISelect` y `UICombobox` usan `<dialog>`, `popover`, anclaje CSS, `@starting-style` y View Transitions. Los navegadores antiguos funcionan sin animación, y sin anclaje CSS un popover, como la lista de `UISelect`, se abre sin anclar.
 
 Para tus propias transiciones, usa `withViewTransition()`:
 

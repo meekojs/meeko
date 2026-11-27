@@ -408,3 +408,49 @@ test('useSearchParam rejects an asynchronous schema and a value it cannot write'
 	app.dispose()
 	browser.happyDOM.abort()
 })
+
+test('a navigation loads the code of the page while its data is requested', async () => {
+	const f = fixture()
+	const gate = deferred<void>()
+	f.sidecars['user.route.ts'] = {
+		load: async () => {
+			await gate.promise
+			return {}
+		},
+	}
+	const url = 'https://example.test/'
+	const server = createFrameworkHandler({
+		routes: f.routes,
+		loadPage: async (file) => f.modules[file]!,
+		loadRoute: async (file) => f.sidecars[file]!,
+	})
+	const browser = new HappyWindow({ url })
+	browser.document.write(await (await server(new Request(url))).text())
+	const root = browser.document.getElementById('app')!
+	const requested: string[] = []
+	const app = await mountClientApp({
+		routes: f.routes,
+		root: root as unknown as Element,
+		payload: browser.document.getElementById('meeko-payload')!.textContent!,
+		loadPage: async (file) => {
+			requested.push(file)
+			return f.modules[file]!
+		},
+		serverData: true,
+		fetch: ((input: RequestInfo | URL, init?: RequestInit) => server(new Request(input, init))) as typeof fetch,
+		browser: browser as unknown as Window,
+	})
+	try {
+		requested.length = 0
+		const navigation = app.navigate('https://example.test/users/7')
+		await new Promise((done) => setTimeout(done, 0))
+		// The loader has not answered: the page's module is already requested, and the layout that stays is not.
+		assert.deepEqual(requested, ['user.meeko'])
+		gate.resolve()
+		assert.equal(await navigation, true)
+		assert.equal(root.querySelector('#user')?.textContent, '7:{}')
+	} finally {
+		app.dispose()
+		browser.close()
+	}
+})

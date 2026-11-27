@@ -84,6 +84,8 @@ Con `meeko dev` en marcha y la página abierta en el navegador, la extensión mu
 2. Abre tu proyecto Meeko y un archivo con extensión `.meeko`.
 3. Usa completado, hover, ir a definición, referencias, renombrado y **Format Document** desde el editor.
 
+Los comandos, los ajustes, los avisos y los indicadores de la extensión están en inglés y en español: VS Code usa el español cuando es su idioma de presentación (**Configure Display Language**) y el inglés en los demás. Los diagnósticos, los hovers y las zonas que publica el servidor de lenguaje, y las descripciones de los fragmentos, están sólo en español.
+
 Consulta el panel **Problemas** para ver los diagnósticos de compilación y TypeScript. En un workspace de confianza, al abrir o guardar una página, un layout o su sidecar, el servidor comprueba los contratos de props del proyecto y señala los errores `MEEK_PAGE_PROPS`, `MEEK_LAYOUT_PROPS` y `MEEK_ERROR_PROPS` sobre el tipo de `defineProps` en el `.meeko`. Esta comprobación usa los archivos guardados y no se ejecuta por cada pulsación.
 
 Al guardar un módulo TypeScript del mismo proyecto, el servidor vuelve a comprobar los componentes `.meeko` abiertos, actualiza sus tokens semánticos y recalcula los contratos de páginas y layouts abiertos.

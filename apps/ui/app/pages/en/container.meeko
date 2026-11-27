@@ -25,6 +25,7 @@
 					params="id, describedBy"
 				>
 					<UISelect
+						class="min-w-36"
 						model="size"
 						bind:options="sizes"
 						bind:id="id"

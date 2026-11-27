@@ -83,7 +83,12 @@ export function renderClaudeAgent(agent, sourceFile) {
 export async function syncAgents({ check = false, root = process.cwd() } = {}) {
 	const sourceDir = join(root, '.codex/agents')
 	const targetDir = join(root, '.claude/agents')
-	const sources = (await readdir(sourceDir)).filter((file) => file.endsWith('.toml')).sort()
+	// Sin especialistas no hay carpeta: equivale a una lista vacía, y los generados que queden sobran.
+	const sourceFiles = await readdir(sourceDir).catch((error) => {
+		if (error?.code === 'ENOENT') return []
+		throw error
+	})
+	const sources = sourceFiles.filter((file) => file.endsWith('.toml')).sort()
 	const expected = new Map()
 	for (const file of sources) {
 		const agent = parseCodexAgent(await readFile(join(sourceDir, file), 'utf8'), file)

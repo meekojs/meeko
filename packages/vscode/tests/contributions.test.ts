@@ -4,6 +4,8 @@ import { join, resolve } from 'node:path'
 import { test } from 'node:test'
 import { pathToFileURL } from 'node:url'
 
+import { scaffoldContextKey } from '../src/scaffold'
+
 interface Manifest {
 	activationEvents: string[]
 	contributes: {
@@ -12,6 +14,9 @@ interface Manifest {
 		semanticTokenModifiers: Array<{ id: string }>
 		semanticTokenScopes: Array<{ language: string; scopes: Record<string, string[]> }>
 		colors: Array<{ id: string; defaults: Record<string, string> }>
+		commands: Array<{ command: string }>
+		menus: Record<string, Array<{ command?: string; submenu?: string; when?: string; group?: string }> | undefined>
+		submenus: Array<{ id: string; label: string }>
 	}
 }
 
@@ -111,4 +116,24 @@ test('CSS features have independent resource settings and activate in CSS-only M
 	}
 	assert.equal(manifest.contributes.configuration.properties['meeko.classes.hover']?.default, 'auto')
 	assert.ok(manifest.activationEvents.includes('workspaceContains:**/meeko.config.{ts,js,mts,mjs,cts,cjs}'))
+})
+
+test('the extension activates for .meeko files as well as for Meeko workspaces', () => {
+	assert.ok(manifest.activationEvents.includes('onLanguage:meeko'))
+})
+
+test('the scaffold commands are in a Meeko submenu of the explorer menu of folders while the extension is active', () => {
+	const [entry, ...rest] = manifest.contributes.menus['explorer/context'] ?? []
+	assert.equal(rest.length, 0)
+	assert.equal(entry?.submenu, 'meeko.explorer')
+	// The commands write to disk, and the extension sets the key when it activates.
+	assert.equal(entry?.when, `explorerResourceIsFolder && resourceScheme == file && ${scaffoldContextKey}`)
+	assert.deepEqual(manifest.contributes.submenus, [{ id: 'meeko.explorer', label: 'Meeko' }])
+	const entries = manifest.contributes.menus['meeko.explorer'] ?? []
+	assert.deepEqual(
+		entries.map((item) => item.command),
+		['meeko.newComponent', 'meeko.newPage', 'meeko.newEndpoint'],
+	)
+	const declared = new Set(manifest.contributes.commands.map((item) => item.command))
+	for (const item of entries) assert.ok(item.command && declared.has(item.command), `${item.command} is not a declared command`)
 })

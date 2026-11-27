@@ -1,4 +1,6 @@
 {
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "Meeko",
 	"scopeName": "source.meeko",
 	"injections": {
 		"L:meta.embedded.block.typescript -comment -string, L:meta.embedded.inline.typescript -comment -string": {
@@ -132,28 +134,55 @@
 			]
 		},
 		"script": {
-			"begin": "(<)(script)(\\b(?:[^>\"']|\"[^\"]*\"|'[^']*')*>)",
+			"name": "meta.section.script.meeko",
+			"begin": "(<)(script)(?=[\\s>])",
 			"end": "(</)(script)(>)",
 			"beginCaptures": {
+				"1": {
+					"name": "punctuation.definition.tag.begin.meeko"
+				},
 				"2": {
-					"name": "entity.name.tag.meeko"
+					"name": "entity.name.tag.script.meeko"
+				}
+			},
+			"endCaptures": {
+				"1": {
+					"name": "punctuation.definition.tag.begin.meeko"
+				},
+				"2": {
+					"name": "entity.name.tag.script.meeko"
 				},
 				"3": {
+					"name": "punctuation.definition.tag.end.meeko"
+				}
+			},
+			"patterns": [
+				{
 					"name": "meta.embedded.block.html",
+					"begin": "(?<=<script)",
+					"end": "(>)",
+					"endCaptures": {
+						"1": {
+							"name": "punctuation.definition.tag.end.meeko"
+						}
+					},
 					"patterns": [
 						{
 							"include": "#sectionAttributes"
 						}
 					]
+				},
+				{
+					"begin": "(?<=>)",
+					"end": "(?=</script>)",
+					"contentName": "meta.embedded.block.typescript",
+					"patterns": [
+						{
+							"include": "source.ts"
+						}
+					]
 				}
-			},
-			"endCaptures": {
-				"2": {
-					"name": "entity.name.tag.meeko"
-				}
-			},
-			"contentName": "meta.embedded.block.typescript",
-			"patterns": [{ "include": "source.ts" }]
+			]
 		},
 		"template": {
 			"begin": "(<)(template)(\\b[^>]*>)",

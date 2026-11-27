@@ -33,7 +33,10 @@ test('UIInput, UISelect and UIModal take their model by prop and event, without 
 	assert.match(section('input'), /<input[^>]*value="Ada"/)
 	assert.match(section('spread'), /<input[^>]*value="Desde objeto"/)
 	assert.match(section('spread'), /placeholder="Pista"/)
-	assert.match(section('select'), /Pera/)
+	// The value in the trigger and in the hidden input that sends it, without the hydration markers.
+	const select = section('select').replace(/<!--.*?-->/g, '')
+	assert.match(select, /<span[^>]*data-meeko-select-value[^>]*>Pera<\/span>/)
+	assert.match(select, /<input[^>]*type="hidden"[^>]*value="Pera"/)
 	assert.doesNotMatch(html, /modelvalue|onupdate/i)
 
 	const browser = await chromium.launch({ ...(process.env.MEEKO_CHROME_PATH ? { executablePath: process.env.MEEKO_CHROME_PATH } : { channel: 'chrome' }), headless: true })
@@ -59,10 +62,14 @@ test('UIInput, UISelect and UIModal take their model by prop and event, without 
 	await tab.getByLabel('Objeto').fill('local')
 	assert.equal(await tab.getByLabel('Objeto').inputValue(), 'local')
 
-	assert.equal(await tab.getByLabel('Fruta').inputValue(), 'Pera')
-	await tab.getByLabel('Fruta').selectOption('Ciruela')
+	const fruit = tab.getByRole('combobox', { name: 'Fruta', exact: true })
+	assert.equal((await fruit.innerText()).trim(), 'Pera')
+	assert.equal(await tab.locator('#select input[type=hidden][name=fruit]').inputValue(), 'Pera')
+	await fruit.click()
+	await tab.getByRole('option', { name: 'Ciruela', exact: true }).click()
 	assert.equal(await tab.locator('#select output').textContent(), 'Ciruela')
-	assert.equal(await tab.getByLabel('Fruta').inputValue(), 'Ciruela')
+	assert.equal((await fruit.innerText()).trim(), 'Ciruela')
+	assert.equal(await tab.locator('#select input[type=hidden][name=fruit]').inputValue(), 'Ciruela')
 
 	await tab.locator('#open').click()
 	await tab.waitForFunction(() => globalThis.document.querySelector('#modal dialog')?.open === true)

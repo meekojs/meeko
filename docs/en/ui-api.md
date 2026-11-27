@@ -1,5 +1,5 @@
 ---
-source-hash: 9ab94a5b8c66d96219a590167810d942354b6ab8fd41f4b60b3af4d0657ed8be
+source-hash: 6f09e628db067e92da28531d46a9c742402ce13b03bbcc1d39aad6dde0e1a55b
 ---
 
 # Meeko UI API
@@ -416,7 +416,7 @@ It also includes `UIApp` and `UIModal` for [modals](#modals), `UITable` for [tab
 
 The public site `apps/meeko` uses these actions in its home page, header and errors; `UILinkCard` makes up the documentation index and `UIBadge` the reference metadata. Its `meeko.config.ts` links the tokens to the current palette, including the neutral actions and the blue focus.
 
-Since UI 1.8, `UIPopover`, `UISelect`, `UICombobox` and `UIThemeToggle` belong to the UI module. `MeekoPopover`, `MeekoSelect` and `MeekoThemeToggle` were deprecated in core 1.8 and are due for removal in 2.0. To replace `MeekoSelect`, use `UISelect` for a native `<select>` or `UICombobox` for search or multiple selection; they do not share the same contract. See [Migration to 1.8](migration-1.8.md).
+Since UI 1.8, `UIPopover`, `UISelect`, `UICombobox` and `UIThemeToggle` belong to the UI module. `MeekoPopover`, `MeekoSelect` and `MeekoThemeToggle` were deprecated in core 1.8 and are due for removal in 2.0. To replace `MeekoSelect`, use `UISelect` to choose one option or `UICombobox` for search or multiple selection; they do not share the same contract. See [Migration to 1.8](migration-1.8.md).
 
 ## Customization
 
@@ -1077,7 +1077,7 @@ The default model (`model="open"`) is whether it is open. `ui.defaults.menu` tak
 
 ## UISelect
 
-A native `<select>` with `appearance: base-select`: the browser brings the list, the keyboard and the form value. To search, filter on a server or choose several options, use [`UICombobox`](#uicombobox); `multiple`, `searchable`, `filter` and `max` on `UISelect` are a type error that says so.
+A button that opens a list of its own (`role="listbox"`) on top of `<UIPopover>`, with the select-only combobox pattern: it looks and behaves the same in every browser, with the UI tokens, and an `<input type="hidden">` sends its value with the `<form>`. It shares the list, the keyboard and the `data-meeko-select-*` markup with [`UICombobox`](#uicombobox), which adds search, filtering on a server and multiple selection; `multiple`, `searchable`, `filter` and `max` on `UISelect` are a type error that says so.
 
 ```html
 <UISelect
@@ -1096,23 +1096,36 @@ A native `<select>` with `appearance: base-select`: the browser brings the list,
 		params="member, state"
 	>
 		{member.name}
-		<em if:when="state.selected">(selected)</em>
+		<small if:when="state.disabled">Unavailable</small>
+	</snippet>
+	<snippet
+		name="value"
+		params="member"
+	>
+		{member.name} · {member.team}
+	</snippet>
+	<snippet
+		name="group"
+		params="team"
+	>
+		{team} team
 	</snippet>
 </UISelect>
 ```
 
-It accepts `options`, `by`, `labelBy`, `disabledBy`, `groupBy`, `placeholder`, `name`, `required`, `disabled`, `clearable`, `clearLabel`, `field`, `id`, `label`, `describedBy`, `invalid`, `class`, `listClass`, `placement` and `offset`; it emits `change`. The snippets are `option` (`[option, state]`, with `selected` and `disabled`), `value` and `group`.
+It accepts `options`, `by`, `labelBy`, `disabledBy`, `groupBy`, `placeholder`, `name`, `required`, `disabled`, `clearable`, `clearLabel`, `field`, `id`, `label`, `describedBy`, `invalid`, `class`, `listClass`, `placement`, `offset` and `ui`; it emits `change`. The snippets are `option` (`[option, state]`, with `selected` and `disabled`), `value` (`[option]`, how the value looks in the trigger) and `group` (`[name]`, the heading of a group), and they paint the same in every browser. The model is the whole option or `null` (`SelectModel<T>`).
 
-- **Browsers.** Chrome, Edge and Safari 27 paint the list with the UI tokens, with an animated entrance. Firefox and older browsers show their own list, and in them `value`, `group` and the rich content of `option` remain as their text.
-- **Trigger.** It uses `<selectedcontent>`. With the `option` snippet, it shows `value` or the label, because `<selectedcontent>` would copy the whole option. Do not put an `id` inside `option`, because the copy would duplicate it.
-- **Keyboard.** It is the browser's. `Enter` or `Space` open the list, and the arrows and letters move through it. With the list closed it varies by engine: in WebKit, the arrows do not open it.
-- **Nothing chosen.** A hidden option at the start represents the `placeholder`, or a value no longer in `options`: the model keeps it and the form still sends it.
-- **`required`.** A form without a value is not submitted: the `<select>` receives focus and `aria-invalid="true"`, without the browser's notice.
-- **`listClass`.** It goes on the `<select>`: style it with `.mi-clase::picker(select)`.
+- **Trigger.** A `<button role="combobox">` with `aria-haspopup="listbox"`, `aria-expanded`, `aria-controls` and `aria-activedescendant`, with the look of a field and an arrow that turns while the list is open. It shows the `value` snippet, or the label of the chosen option, or the `placeholder`. A `<label for>` names it by its `id`; a click on that label activates the button and opens the list.
+- **List.** A `role="listbox"` of `role="option"` with `aria-selected` and `aria-disabled`, grouped in `role="group"` with `groupBy`. The chosen option is bold and carries a mark at its end. It opens where `placement` says (`bottom-start` by default, and on the other side if it does not fit), `offset` pixels away (4 by default), is at least as wide as the trigger and enters with an animation that respects `prefers-reduced-motion`.
+- **Keyboard.** That of [`UICombobox`](#uicombobox) without search, with the focus always on the trigger. `↓`, `↑`, `Enter` or `Space` open the list on the chosen option (or the first); `Home` and `End` open at one end, and a letter opens and searches. With the list open, the arrows, `Home`, `End`, `PageUp` and `PageDown` move the active option, without wrapping and skipping the disabled ones; typing jumps to the option that starts with that text, ignoring accents; `Enter` or `Space` choose and close; `Esc` and `Tab` close without choosing. Choosing with the mouse gives the focus back to the trigger.
+- **Options on opening.** A closed list has no options in the DOM, nor in the server HTML: they are created the first time it opens and kept after it closes. The trigger opens its popover with `popovertarget` before the JavaScript arrives, and a list opened that way stays open on hydration, now with its options; while it has none it does not paint its box. Without JavaScript nothing can be chosen, but the form sends the value the page was served with. Tests that look for a `role="option"` must open the list first.
+- **Nothing chosen and foreign values.** Without a value it shows the `placeholder`. A value no longer in `options` stays in the model, in the trigger and in the form. The initial value `""` of a field counts as "no value", unless an option is `""`.
+- **Form.** With `name` (or `field`), an `<input type="hidden">` sends the `by` key of the option, the primitive itself or its label, and an empty text with nothing chosen; with `disabled` it sends nothing. With `required`, a form without a value is not submitted: the trigger receives focus and `aria-invalid="true"` until an option is chosen, without the browser's notice. A `reset` of the form takes the select back to the value it was mounted with and emits `change`.
+- **Look.** The trigger takes the field look of `inputControlTheme`, and the rest is the `selectTheme` recipe of `@meekojs/ui/theme`. `ui` adds classes to each part: `base` (the root), `trigger`, `value`, `placeholder`, `chevron` (the arrow), `list` (the `role="listbox"`), `group`, `groupLabel`, `option`, `indicator` (the mark of the chosen option) and `clear`. `listClass` goes on the floating box of the list, the content of the `<UIPopover>`. The options carry `data-active`, `data-selected` and `data-disabled`, and the root (`data-meeko-select`), `data-disabled`.
 
 ## UICombobox
 
-What the native `<select>` of `UISelect` does not cover: searching, filtering on a server and choosing several options. It is a custom list on top of `<UIPopover>`, with more JavaScript: use it only if you need `searchable`, `filter`, `multiple` or `max`. `model` is the value and its type comes from `options`:
+What [`UISelect`](#uiselect) does not cover: searching, filtering on a server and choosing several options. It is the same list on top of `<UIPopover>`, with a search field as its trigger: use it if you need `searchable`, `filter`, `multiple` or `max`. `model` is the value and its type comes from `options`:
 
 ```html
 <script lang="ts">
@@ -1192,7 +1205,7 @@ What the native `<select>` of `UISelect` does not cover: searching, filtering on
 
 **ARIA and keyboard.** The trigger is a `role="combobox"` (a `<button>` or, with `searchable`, an `<input>` with `aria-autocomplete="list"`) with `aria-expanded`, `aria-controls`, `aria-haspopup="listbox"` and `aria-activedescendant`: focus never leaves it. The list is a `role="listbox"` (with `aria-multiselectable` in a multiple select) of `role="option"` with `aria-selected` and `aria-disabled`, grouped in `role="group"` with `groupBy`. An external `<label for>` names the trigger by its `id`. The ARIA combobox pattern does not define how to empty the selection, so `clearable` adds, outside the combobox, a `<button type="button">` with `aria-label` ("Quitar selección"): it enters the tab order right after the trigger, only exists while something is chosen, and activating it closes the list, emits `change` with `null` (or `[]`) and returns focus to the trigger.
 
-**Options on opening.** A closed list has no options in the DOM, nor in the server HTML: they are created the first time it opens and kept after it closes. The trigger, the form's `<input type="hidden">`, typeahead and `aria-controls` do not need them, so a page with many long lists no longer sends and hydrates every option of every closed list. Without JavaScript the list does not open, so nothing is lost. Tests that look for a `role="option"` must open the list first.
+**Options on opening.** A closed list has no options in the DOM, nor in the server HTML: they are created the first time it opens and kept after it closes. The trigger, the form's `<input type="hidden">`, typeahead and `aria-controls` do not need them, so a page with many long lists no longer sends and hydrates every option of every closed list. Without JavaScript the list of `UICombobox` does not open, so nothing is lost. Tests that look for a `role="option"` must open the list first.
 
 - `↓`, `↑`, `Enter` or `Space` open the list on the chosen option (or the first); `Home` and `End` open at an end; letters open and search.
 - With the list open, the arrows, `Home`, `End`, `PageUp` and `PageDown` move the active option (without wrapping around, skipping disabled ones) and scroll it into view; letters search by the start of the label, ignoring accents.
@@ -1242,7 +1255,7 @@ With `max`, as soon as `max` options are chosen the rest become `aria-disabled="
 </template>
 ```
 
-**Forms.** With `name`, the native `<select>` sends its value (empty with nothing chosen) and the custom list, one `<input type="hidden">` per value (none in an empty multiple one); with `disabled` it sends nothing. The value of each option is its `by` key, the primitive itself or its label. `required` prevents submitting the `<form>` without a value: the trigger receives focus and `aria-invalid="true"` until an option is chosen. With `useForm`, `model="form.fields.color"` works as in any control, and `bind:field="form.field('color')"` also gives the value, the field's `id` (for its `<label for>`), the `name`, `aria-invalid` and `aria-describedby` with the error message; `focusInvalid` moves focus to the select when validation fails. The initial value `""` of a field counts as "no value" (unless an option is `""`).
+**Forms.** With `name`, one `<input type="hidden">` per value sends the selection: an empty one in a single select with nothing chosen and none in an empty multiple one; with `disabled` it sends nothing. The value of each option is its `by` key, the primitive itself or its label. `required` prevents submitting the `<form>` without a value: the trigger receives focus and `aria-invalid="true"` until an option is chosen. With `useForm`, `model="form.fields.color"` works as in any control, and `bind:field="form.field('color')"` also gives the value, the field's `id` (for its `<label for>`), the `name`, `aria-invalid` and `aria-describedby` with the error message; `focusInvalid` moves focus to the select when validation fails. The initial value `""` of a field counts as "no value" (unless an option is `""`).
 
 ```html
 <form
@@ -1267,7 +1280,7 @@ With `max`, as soon as `max` options are chosen the rest become `aria-disabled="
 
 **Long lists.** `<UICombobox>` renders all the options (in the server's HTML too). For thousands of options, use `searchable` with a `filter` that returns only the first matches; a virtual list that only renders the visible ones (`virtual`) is not available in UI `1.8`.
 
-**Native alternative.** For a simple case, with no search or options with custom content, a native `<select>` with `model` remains the lightest option. In browsers that support it, `appearance: base-select` lets you style it completely and keeps the browser's keyboard, accessibility and form submission:
+**Native alternative.** For a simple case, with no search or options with custom content, an HTML `<select>` with `model` remains the lightest option, without `UISelect`. In browsers that support it, `appearance: base-select` lets you style it completely and keeps the browser's keyboard, accessibility and form submission:
 
 ```css
 select,
@@ -1494,7 +1507,7 @@ With `pageCount` (or `pageSize` and `total`), `UIPagination` renders the previou
 
 ## Platform and View Transitions
 
-`UIModal`, `UIDrawer`, `UIPopover`, `UITabs`, `UIThemeToggle` and `UISelect` use `<dialog>`, `popover`, CSS anchoring, `appearance: base-select`, `@starting-style` and View Transitions. Older browsers work without animation and with the most basic `<select>`, as does Firefox, which still shows its native list. What the platform does not cover is in `UICombobox`, on top of `UIPopover`.
+`UIModal`, `UIDrawer`, `UIPopover`, `UITabs`, `UIThemeToggle`, `UISelect` and `UICombobox` use `<dialog>`, `popover`, CSS anchoring, `@starting-style` and View Transitions. Older browsers work without animation, and without CSS anchoring a popover, such as the list of `UISelect`, opens unanchored.
 
 For your own transitions, use `withViewTransition()`:
 
