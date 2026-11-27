@@ -113,3 +113,39 @@ test('with the installed VS Code grammar, reactive declarations keep the rest of
 	assert.ok(tokens.some((token) => token.text === 'value' && token.scopes.includes('keyword.control.write.meeko')))
 	assert.ok(scopesOf('reset').includes('entity.name.function.ts'), 'the statements after the declarations keep their scopes')
 })
+
+test('with the installed VS Code grammar, a script tag split over several lines keeps its attributes and TypeScript body', { skip: !app }, async () => {
+	const require = createRequire(import.meta.url)
+	await loadWASM(readFileSync(require.resolve('vscode-oniguruma/release/onig.wasm')))
+	const files: Record<string, string> = {
+		'source.meeko': join(directory, 'syntaxes', 'meeko.tmLanguage.json'),
+		'source.ts': join(app!, 'extensions', 'typescript-basics', 'syntaxes', 'TypeScript.tmLanguage.json'),
+		'text.html.basic': join(app!, 'extensions', 'html', 'syntaxes', 'html.tmLanguage.json'),
+	}
+	const registry = new Registry({
+		onigLib: Promise.resolve({ createOnigScanner, createOnigString }),
+		loadGrammar: async (scope) => (files[scope] ? parseRawGrammar(readFileSync(files[scope], 'utf8'), files[scope]) : null),
+	})
+	const grammar = await registry.loadGrammarWithConfiguration('source.meeko', 1, {
+		embeddedLanguages: { 'meta.embedded.block.typescript': 2, 'meta.embedded.inline.typescript': 2, 'meta.embedded.block.html': 3 },
+	})
+	assert.ok(grammar)
+	// Prettier writes one attribute per line, so the opening tag spans several lines.
+	const lines = ['<script', '\tserver', '\tlang="ts"', '>', "\timport { loadContact } from './contact'", '\texport const contact = await loadContact()', '</script>', '<template><p>ok</p></template>']
+	let state = null
+	const tokens: { text: string; scopes: readonly string[] }[] = []
+	for (const line of lines) {
+		const result = grammar.tokenizeLine(line, state)
+		state = result.ruleStack
+		tokens.push(...result.tokens.map((token) => ({ text: line.slice(token.startIndex, token.endIndex).trim(), scopes: token.scopes })))
+	}
+	const scopesOf = (text: string) => tokens.find((token) => token.text === text)?.scopes ?? []
+	assert.ok(scopesOf('server').includes('entity.other.attribute-name.meeko'), JSON.stringify(scopesOf('server')))
+	assert.ok(scopesOf('lang').includes('entity.other.attribute-name.meeko'), JSON.stringify(scopesOf('lang')))
+	assert.ok(!scopesOf('server').includes('meta.embedded.block.typescript'), 'the attributes are not TypeScript')
+	assert.ok(scopesOf('import').includes('meta.embedded.block.typescript'), JSON.stringify(scopesOf('import')))
+	assert.ok(scopesOf('import').includes('keyword.control.import.ts'), JSON.stringify(scopesOf('import')))
+	assert.ok(scopesOf('await').includes('keyword.control.flow.ts'), JSON.stringify(scopesOf('await')))
+	// The section closes: the template after it is not TypeScript.
+	assert.ok(!scopesOf('ok').includes('meta.embedded.block.typescript'), JSON.stringify(scopesOf('ok')))
+})
