@@ -33,7 +33,7 @@ Requiere Node.js 24+ y pnpm 12.14.0. En Windows usa PowerShell 7.
 - `pnpm check`: comprueba tipos de los cinco paquetes principales.
 - `pnpm test`: ejecuta las pruebas del núcleo; `pnpm verify`: amplía la validación con ejemplos, compilación y DevTools.
 - `pnpm lint` y `pnpm format:check`: revisan lint y formato.
-- `pnpm ci:local`: ejecuta en local los jobs de `.github/workflows/ci.yml` y los gates que sólo tiene `publish.yml` (`--only package-gates`) sin detenerse en el primer fallo y resume al final los fallidos y los omitidos por falta de una herramienta (`pwsh`, `bun`, `deno`, Redis). Pásalo antes de subir a una PR; `--only checks,core-tests`, `--skip performance`, `--no-build` y `--list` lo acotan.
+- `pnpm ci:local`: ejecuta en local los jobs de `.github/workflows/ci.yml` y los gates que sólo tiene `publish.yml` (`--only package-gates`) sin detenerse en el primer fallo y resume al final los fallidos y los omitidos por falta de una herramienta (`pwsh`, `bun`, `deno`, Redis). Ejecútalo sólo cuando se pida, normalmente antes de una PR; `--only checks,core-tests`, `--skip performance`, `--no-build` y `--list` lo acotan.
 - `pnpm -F @meekojs/eslint-plugin test`: ejecuta las pruebas del plugin seleccionado.
 
 ## Estilo y nombres
@@ -46,7 +46,9 @@ La configuración raíz usa `defineEslint`, Perfectionist y unused-imports. Los 
 
 Predomina `node:test`, con `tsx` para TypeScript; las reglas ESLint también usan RuleTester. Nombra pruebas unitarias `*.test.ts` o `*.test.mjs`; los escenarios de navegador usan `*.e2e.ts`.
 
-Añade regresiones de comportamiento. Para cambios del compilador, cubre SSR, hidratación, actualizaciones y liberación de recursos cuando corresponda. Ejecuta pruebas del paquete afectado y `pnpm e2e` para cambios de navegador. No hay un umbral numérico de cobertura configurado.
+Añade regresiones de comportamiento. Para cambios del compilador, cubre SSR, hidratación, actualizaciones y liberación de recursos cuando corresponda. No hay un umbral numérico de cobertura configurado.
+
+Ejecuta sólo las pruebas de lo que editaste: los archivos de prueba que tocaste o añadiste y los que cubren directamente el código modificado (`node --import tsx --test tests/<archivo>.test.ts`). No ejecutes la suite completa de un paquete, `pnpm test`, `pnpm verify`, `pnpm e2e` ni `pnpm ci:local` salvo que se pida explícitamente; si un cambio puede afectar a algo que no probaste, dilo en el resumen en vez de ejecutarlo todo.
 
 ## Trabajo con varios agentes
 
@@ -73,4 +75,8 @@ Los hooks de `.claude/settings.json` (`.claude/hooks/`) aplican parte de estas r
 
 El historial usa prefijos como `feat(scope):`, `fix:` y `chore(release):`; `CONTRIBUTING.md` pide descripciones concretas en español e imperativo.
 
-Mantén cada cambio enfocado. En la PR explica problema, comportamiento resultante, pruebas ejecutadas e incidencias relacionadas. Añade capturas para cambios visuales. Conserva cambios ajenos y excluye secretos, cachés y artefactos locales.
+Trabaja en local. No hagas `git push`, no abras ni actualices una PR y no lances CI hasta que se pida explícitamente; una petición anterior no autoriza las siguientes. No propongas abrir una PR al terminar cada tarea.
+
+Haz un commit al terminar cada tarea, en cuanto sus pruebas afectadas pasen, sin esperar a que se pida: un commit por tarea, sólo con los archivos de esa tarea.
+
+Mantén cada cambio enfocado. Cuando se pida una PR, explica problema, comportamiento resultante, pruebas ejecutadas e incidencias relacionadas. Añade capturas para cambios visuales. Conserva cambios ajenos y excluye secretos, cachés y artefactos locales.
