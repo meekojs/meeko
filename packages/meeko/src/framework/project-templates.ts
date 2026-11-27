@@ -189,7 +189,7 @@ export const defaultErrorPageSource = `<script lang="ts">
 	.error {
 		box-sizing: border-box;
 		display: grid;
-		min-height: 95vh;
+		min-height: 100dvh;
 		place-items: center;
 		padding: 2rem 1rem;
 		font: 1rem/1.5 system-ui, sans-serif;
