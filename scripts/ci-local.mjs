@@ -124,8 +124,10 @@ export const jobs = [
 		],
 	},
 	{
-		// Only publish.yml runs these, so CI passes without them and the release stops on them. The rest of its gates are
-		// the jobs above; `--only package-gates` runs these two before tagging.
+		// The publication rehearsal of ci.yml (`package-gates`, only in a PR that touches the publication chain) and
+		// publish.yml run these, so the rest of CI passes without them and the release stops on them. The rest of
+		// the gates of publish.yml are the jobs above; `--only package-gates` runs these two before tagging.
+		// The `changes` job of ci.yml (which jobs a PR needs) has no local job: locally everything runs.
 		id: 'package-gates',
 		steps: [
 			{ name: 'formato (format:check)', command: pnpm('run', 'format:check') },
