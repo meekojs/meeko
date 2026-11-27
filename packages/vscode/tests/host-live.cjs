@@ -92,14 +92,14 @@ exports.run = async function run() {
 	assert.ok(api.live, 'La extensión expone el estado de los valores en vivo')
 	assert.deepEqual(
 		extension.packageJSON.contributes.commands.map((command) => `${command.category}: ${command.title}`),
-		['Meeko: Editar valor de la señal', 'Meeko: Reconectar valores en vivo', 'Meeko: Nuevo componente', 'Meeko: Nueva página', 'Meeko: Nuevo endpoint de API'],
+		['Meeko: Edit Signal Value', 'Meeko: Reconnect Live Values', 'Meeko: New Component', 'Meeko: New Page', 'Meeko: New API Endpoint', 'Meeko: Restart Language Server', 'Meeko: Show Output'],
 	)
 
 	const uri = vscode.Uri.file(file)
 	const document = await vscode.workspace.openTextDocument(uri)
 	await vscode.window.showTextDocument(document)
 	await waitFor(
-		() => api.live.status === '$(debug-disconnect) Meeko live: desconectado',
+		() => api.live.status === '$(debug-disconnect) Meeko live: disconnected',
 		() => `Estado sin meeko dev: ${api.live.status}`,
 	)
 
@@ -111,7 +111,7 @@ exports.run = async function run() {
 	]
 	let dev = await startDevBridge(consumer, signals)
 	await waitFor(() => api.live.connected, 'La extensión no detectó .meeko/dev/editor-bridge-<puerto>.json')
-	assert.equal(api.live.status, '$(pulse) Meeko live: conectado')
+	assert.equal(api.live.status, '$(pulse) Meeko live: connected')
 	const decorations = await waitFor(
 		() => api.live.decorations(uri).length === 2 && api.live.decorations(uri),
 		() => `Decoraciones: ${JSON.stringify(api.live.decorations(uri))}`,
@@ -119,7 +119,7 @@ exports.run = async function run() {
 	assert.deepEqual(
 		decorations.map((item) => [item.line, item.text]),
 		[
-			[2, 'count = 3 · 2 instancias'],
+			[2, 'count = 3 · 2 instances'],
 			[3, 'profile = {"name":"Ada"}'],
 		],
 	)
@@ -127,7 +127,7 @@ exports.run = async function run() {
 	const hovers = await vscode.commands.executeCommand('vscode.executeHoverProvider', uri, new vscode.Position(5, document.lineAt(5).text.indexOf('count') + 1))
 	const hoverText = hovers.flatMap((hover) => hover.contents.map((content) => (typeof content === 'string' ? content : content.value))).join('\n')
 	assert.match(hoverText, /Meeko live/)
-	assert.match(hoverText, /2 instancias/)
+	assert.match(hoverText, /2 instances/)
 	assert.match(hoverText, /```json\n3\n```/)
 	assert.match(hoverText, /```json\n5\n```/)
 	assert.match(hoverText, /command:meeko\.live\.editSignal/)
@@ -138,7 +138,7 @@ exports.run = async function run() {
 		[['meeko-1', 'count', 42]],
 	)
 	await waitFor(
-		() => api.live.decorations(uri).some((item) => item.text === 'count = 42 · 2 instancias' && item.flashing),
+		() => api.live.decorations(uri).some((item) => item.text === 'count = 42 · 2 instances' && item.flashing),
 		() => `Sin resaltado del cambio: ${JSON.stringify(api.live.decorations(uri))}`,
 	)
 	await waitFor(() => api.live.decorations(uri).every((item) => !item.flashing), 'El resaltado debe ser breve')
@@ -153,7 +153,7 @@ exports.run = async function run() {
 	assert.equal(existsSync(dev.bridge.file), false)
 	await waitFor(() => !api.live.connected && api.live.decorations(uri).length === 0, 'Al parar meeko dev desaparecen los valores')
 	await waitFor(
-		() => api.live.status === '$(debug-disconnect) Meeko live: desconectado',
+		() => api.live.status === '$(debug-disconnect) Meeko live: disconnected',
 		() => `Estado tras parar: ${api.live.status}`,
 	)
 

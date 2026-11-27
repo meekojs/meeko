@@ -1,5 +1,7 @@
 import type { DevelopmentServerRecord, EditorLiveAlias, EditorLiveSignal } from '../../../meeko/src/shared/devtools-bridge-protocol'
 
+import { t } from '../l10n'
+
 export type { EditorBridgeDescriptor, EditorBridgeEvent, EditorCommandResult, EditorLiveAlias, EditorLiveSignal } from '../../../meeko/src/shared/devtools-bridge-protocol'
 
 /** Descriptores del puente: cada `meeko dev` en marcha escribe el suyo, con su puerto en el nombre. */
@@ -51,7 +53,7 @@ export function bridgeOffFromRecord(text: string): BridgeOff | undefined {
 		return undefined
 	}
 	if (record === null || typeof record !== 'object' || !Number.isSafeInteger(record.pid) || (record.pid ?? 0) <= 0 || record.editorBridge !== false) return undefined
-	return { pid: record.pid!, reason: typeof record.editorBridgeReason === 'string' && record.editorBridgeReason ? record.editorBridgeReason : 'sin motivo registrado' }
+	return { pid: record.pid!, reason: typeof record.editorBridgeReason === 'string' && record.editorBridgeReason ? record.editorBridgeReason : t('no reason recorded') }
 }
 
 /** Texto y tooltip de la barra de estado de «Meeko live». */
@@ -66,17 +68,17 @@ export interface LiveStatus {
  * explica por qué no hay valores en vivo en lugar de mostrar sólo «desconectado».
  */
 export function liveStatus(connected: readonly string[], descriptors: number, off: readonly BridgeOff[]): LiveStatus {
-	if (connected.length) return { text: '$(pulse) Meeko live: conectado', tooltip: `Valores en vivo de ${connected.join(', ')}. Pulsa para reconectar.` }
+	if (connected.length) return { text: t('$(pulse) Meeko live: connected'), tooltip: t('Live values from {0}. Click to reconnect.', connected.join(', ')) }
 	if (off.length) {
 		const servers = off.map((item) => `meeko dev (PID ${item.pid}): ${item.reason}`).join('\n')
 		return {
-			text: '$(circle-slash) Meeko live: desactivado en meeko dev',
-			tooltip: `${servers}\n\nEse meeko dev no publica valores en vivo. MEEKO_EDITOR_BRIDGE=0 (en el entorno o en el .env del proyecto) desactiva el puente con el editor: quítalo y reinicia meeko dev. El puente sólo arranca cuando meeko dev escucha en loopback o en todas las interfaces.`,
+			text: t('$(circle-slash) Meeko live: disabled in meeko dev'),
+			tooltip: `${servers}\n\n${t('That meeko dev does not publish live values. MEEKO_EDITOR_BRIDGE=0 (in the environment or in the project .env file) disables the editor bridge: remove it and restart meeko dev. The bridge only starts when meeko dev listens on loopback or on all interfaces.')}`,
 		}
 	}
 	return {
-		text: '$(debug-disconnect) Meeko live: desconectado',
-		tooltip: descriptors ? 'meeko dev no responde. Pulsa para reconectar.' : 'Arranca meeko dev para ver los valores de las señales junto al código.',
+		text: t('$(debug-disconnect) Meeko live: disconnected'),
+		tooltip: descriptors ? t('meeko dev is not responding. Click to reconnect.') : t('Start meeko dev to see signal values next to the code.'),
 	}
 }
 
@@ -163,7 +165,7 @@ export function previewValue(signal: EditorLiveSignal, limit = 60): string {
 }
 
 /**
- * Texto de la decoración al final de la línea: `count = 3`, `count = 3 · 3 instancias` o, si la
+ * Texto de la decoración al final de la línea: `count = 3`, `count = 3 · 3 instances` o, si la
  * señal es la del padre recibida con `defineModel`, `open = true (= dialogOpen)`.
  */
 export function inlineText(group: LiveGroup, limit = 60): string {
@@ -171,7 +173,7 @@ export function inlineText(group: LiveGroup, limit = 60): string {
 	if (!first) return ''
 	const count = group.signals.length
 	const alias = first.alias ? ` (= ${first.alias.name})` : ''
-	return `${group.name} = ${previewValue(first, limit)}${alias}${count > 1 ? ` · ${count} instancias` : ''}`
+	return `${group.name} = ${previewValue(first, limit)}${alias}${count > 1 ? ` · ${t('{0} instances', count)}` : ''}`
 }
 
 /** Nombre del archivo de una ruta con barras `/` o `\`. */
@@ -186,10 +188,10 @@ function inlineCode(text: string): string {
 	return longest ? `${marks} ${text} ${marks}` : `${marks}${text}${marks}`
 }
 
-/** Descripción de un alias para el hover: «alias de `dialogOpen` (lab.meeko:5)». */
+/** Descripción de un alias para el hover: «alias of `dialogOpen` (lab.meeko:5)». */
 export function aliasDescription(alias: EditorLiveAlias): string {
 	const place = `${baseName(alias.file)}${alias.line === undefined ? '' : `:${alias.line}`}`
-	return `alias de ${inlineCode(alias.name)} (${escapeMarkdown(place)})`
+	return t('alias of {0} ({1})', inlineCode(alias.name), escapeMarkdown(place))
 }
 
 /** JSON con sangría para el hover; un valor recortado se muestra tal como llegó. */
@@ -224,14 +226,14 @@ export function escapeMarkdown(text: string): string {
 export function hoverMarkdown(group: LiveGroup, editLink?: (signal: EditorLiveSignal) => string, maxInstances = 10): string {
 	const parts: string[] = []
 	const count = group.signals.length
-	parts.push(`**Meeko live** · \`${group.name}\`${count > 1 ? ` · ${count} instancias` : ''}`)
+	parts.push(`**Meeko live** · \`${group.name}\`${count > 1 ? ` · ${t('{0} instances', count)}` : ''}`)
 	for (const signal of group.signals.slice(0, maxInstances)) {
 		const header = `${escapeMarkdown(signal.component)} · ${escapeMarkdown(signal.instanceId)} · ${escapeMarkdown(signal.tab)}`
 		const alias = signal.alias ? ` · ${aliasDescription(signal.alias)}` : ''
-		const edit = editLink ? ` · [Editar valor](${editLink(signal)})` : ''
-		parts.push(`${header}${alias}${edit}${signal.truncated ? ' · *recortado*' : ''}\n\n${fence(formatValue(signal), 'json')}`)
+		const edit = editLink ? ` · [${t('Edit value')}](${editLink(signal)})` : ''
+		parts.push(`${header}${alias}${edit}${signal.truncated ? ` · *${t('truncated')}*` : ''}\n\n${fence(formatValue(signal), 'json')}`)
 	}
-	if (count > maxInstances) parts.push(`… y ${count - maxInstances} instancias más`)
+	if (count > maxInstances) parts.push(t('… and {0} more instances', count - maxInstances))
 	return parts.join('\n\n')
 }
 
@@ -239,11 +241,11 @@ export type ParsedValue = { ok: true; value: unknown } | { ok: false; error: str
 
 /** Valida el JSON que escribe el usuario para `setSignal`. */
 export function parseEditedValue(text: string): ParsedValue {
-	if (!text.trim()) return { ok: false, error: 'Escribe un valor JSON, por ejemplo 3, "texto", true o null' }
+	if (!text.trim()) return { ok: false, error: t('Enter a JSON value, for example 3, "text", true or null') }
 	try {
 		return { ok: true, value: JSON.parse(text) as unknown }
 	} catch (error) {
-		return { ok: false, error: `JSON no válido: ${error instanceof Error ? error.message : String(error)}` }
+		return { ok: false, error: t('Invalid JSON: {0}', error instanceof Error ? error.message : String(error)) }
 	}
 }
 

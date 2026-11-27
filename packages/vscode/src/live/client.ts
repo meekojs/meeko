@@ -5,6 +5,7 @@ import { request as httpRequest } from 'node:http'
 
 import type { EditorBridgeDescriptor, EditorBridgeEvent, EditorCommandResult, EditorLiveSignal } from './model'
 
+import { t } from '../l10n'
 import { loopbackBridgeUrl, SseParser } from './model'
 
 /** `true` si el proceso existe; un error de permisos también indica que existe. */
@@ -208,7 +209,7 @@ export class BridgeConnection {
 	/** Envía `setSignal` al navegador que tiene montada la señal. */
 	async setSignal(id: string, value: unknown): Promise<EditorCommandResult> {
 		const current = this.current
-		if (!current || !this.connected) return { ok: false, error: 'Meeko live no está conectado' }
+		if (!current || !this.connected) return { ok: false, error: t('Meeko live is not connected') }
 		const body = JSON.stringify({ type: 'setSignal', id, value })
 		return new Promise<EditorCommandResult>((done) => {
 			const request = httpRequest(
@@ -234,7 +235,7 @@ export class BridgeConnection {
 				},
 			)
 			request.on('error', (error) => done({ ok: false, error: error.message }))
-			request.setTimeout(10_000, () => request.destroy(new Error('Tiempo de espera agotado')))
+			request.setTimeout(10_000, () => request.destroy(new Error(t('The request timed out'))))
 			request.end(body)
 		})
 	}

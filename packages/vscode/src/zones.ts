@@ -1,16 +1,10 @@
 import * as vscode from 'vscode'
 
-/** Where lines of a `.meeko` run, as the language server reports them. */
-export type ExecutionZoneKind = 'server' | 'shared' | 'browser'
+import type { ExecutionZoneItem, ExecutionZoneKind } from './zone-ranges'
 
-/** A zone of the `meeko/executionZones` response. */
-export interface ExecutionZoneItem {
-	readonly kind: ExecutionZoneKind
-	readonly reason: string
-	readonly label: string
-	readonly detail: string
-	readonly range: { readonly start: { readonly line: number; readonly character: number }; readonly end: { readonly line: number; readonly character: number } }
-}
+import { executionZoneKinds, LatestRequests, zoneDecorationRanges } from './zone-ranges'
+
+export type { ExecutionZoneItem, ExecutionZoneKind } from './zone-ranges'
 
 /** Custom request of the Meeko language server. */
 export const executionZonesRequest = 'meeko/executionZones'
@@ -20,8 +14,6 @@ export const executionZonesSetting = 'meeko.editor.executionZones'
 
 /** Sends `meeko/executionZones`; `null` for a document the server does not model. */
 export type ZoneSource = (uri: string) => Promise<{ zones: ExecutionZoneItem[] } | null>
-
-const kinds: readonly ExecutionZoneKind[] = ['server', 'shared', 'browser']
 
 /** Decorations of the zone kinds, from the colors that the extension contributes to themes. */
 function decorationTypes(extension: vscode.Uri): Record<ExecutionZoneKind, vscode.TextEditorDecorationType> {
@@ -46,8 +38,8 @@ export class ExecutionZoneDecorations implements vscode.Disposable {
 	private readonly types: Record<ExecutionZoneKind, vscode.TextEditorDecorationType>
 	private readonly subscriptions: vscode.Disposable[] = []
 	private readonly timers = new Map<string, ReturnType<typeof setTimeout>>()
-	private readonly versions = new Map<string, number>()
-	/** Zones applied to each document, by URI; the tests read them. */
+	private readonly requests = new LatestRequests()
+	/** Zones applied to each open document, by URI; the tests read them. */
 	readonly applied = new Map<string, readonly ExecutionZoneItem[]>()
 
 	constructor(
@@ -60,6 +52,7 @@ export class ExecutionZoneDecorations implements vscode.Disposable {
 			vscode.window.onDidChangeVisibleTextEditors(() => this.refreshVisible()),
 			vscode.workspace.onDidChangeTextDocument(({ document }) => this.schedule(document)),
 			vscode.workspace.onDidSaveTextDocument((document) => this.schedule(document)),
+			vscode.workspace.onDidCloseTextDocument((document) => this.forget(document.uri.toString())),
 			vscode.workspace.onDidChangeConfiguration((event) => {
 				if (event.affectsConfiguration(executionZonesSetting)) this.refreshVisible()
 			}),
@@ -91,42 +84,43 @@ export class ExecutionZoneDecorations implements vscode.Disposable {
 		)
 	}
 
+	/** Drops the state of a closed document; a request in flight for it is discarded when it answers. */
+	private forget(key: string): void {
+		clearTimeout(this.timers.get(key))
+		this.timers.delete(key)
+		this.requests.forget(key)
+		this.applied.delete(key)
+	}
+
 	/** Requests the zones of one document and decorates its visible editors. */
 	async refresh(document: vscode.TextDocument): Promise<void> {
+		// A closed document has no editors, and its state would never be dropped again.
+		if (document.isClosed) return
 		const key = document.uri.toString()
-		const version = (this.versions.get(key) ?? 0) + 1
-		this.versions.set(key, version)
+		const turn = this.requests.begin(key)
 		let zones: readonly ExecutionZoneItem[] = []
-		if (this.enabled(document) && document.uri.scheme === 'file') {
+		// The server models open documents of any scheme, not only files on disk; without a client
+		// for the document, or when the server does not model it, the answer is no zones.
+		if (this.enabled(document)) {
 			try {
 				zones = (await this.source(key))?.zones ?? []
 			} catch {
 				zones = []
 			}
 		}
-		// A newer request for the same document wins.
-		if (this.versions.get(key) !== version) return
+		// A newer request for the same document wins, and a document closed meanwhile keeps no state.
+		if (!this.requests.isCurrent(key, turn)) return
 		this.applied.set(key, zones)
+		const lines = { lineCount: document.lineCount, lineLength: (line: number) => document.lineAt(line).range.end.character }
 		for (const editor of vscode.window.visibleTextEditors) {
 			if (editor.document.uri.toString() !== key) continue
-			for (const kind of kinds) {
+			for (const kind of executionZoneKinds) {
 				editor.setDecorations(
 					this.types[kind],
-					zones
-						.filter((zone) => zone.kind === kind)
-						.flatMap((zone): vscode.DecorationOptions[] => {
-							const last = Math.min(zone.range.end.line, document.lineCount - 1)
-							const first = Math.min(zone.range.start.line, last)
-							// The explanation is attached to the first line of the zone only, not to every hover inside it.
-							const options: vscode.DecorationOptions[] = [
-								{
-									range: document.lineAt(first).range,
-									hoverMessage: new vscode.MarkdownString(`**${zone.label}** · ${zone.detail}`),
-								},
-							]
-							if (last > first) options.push({ range: new vscode.Range(first + 1, 0, last, document.lineAt(last).range.end.character) })
-							return options
-						}),
+					zoneDecorationRanges(zones, kind, lines).map((range): vscode.DecorationOptions => ({
+						range: new vscode.Range(range.startLine, range.startCharacter, range.endLine, range.endCharacter),
+						...(range.hover === undefined ? {} : { hoverMessage: new vscode.MarkdownString(range.hover) }),
+					})),
 				)
 			}
 		}
@@ -135,6 +129,7 @@ export class ExecutionZoneDecorations implements vscode.Disposable {
 	dispose(): void {
 		for (const timer of this.timers.values()) clearTimeout(timer)
 		this.timers.clear()
+		this.requests.clear()
 		for (const subscription of this.subscriptions) subscription.dispose()
 		for (const type of Object.values(this.types)) type.dispose()
 	}
