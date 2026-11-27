@@ -78,14 +78,14 @@
 				>
 					<UIBadge
 						if:when="item.featured"
-						tone="accent"
+						color="primary"
 					>
 						Featured
 					</UIBadge>
 				</UILinkCard>
 			</div>
 		</section>
-		<UIAlert tone="info">
+		<UIAlert color="info">
 			The core tags
 			<code>MeekoSelect</code>,
 			<code>MeekoPopover</code>

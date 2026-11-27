@@ -1,4 +1,4 @@
-import type { dateRange } from '../variants/date-range'
+import type { dateRangeTheme } from '../theme/components/date-range'
 import type { UIThemeProps } from './theme'
 
 /**
@@ -69,7 +69,7 @@ type UIDateRangeName =
  * @example `<UIDateRange label="Periodo" model:from="from" model:to="to" fromName="desde" toName="hasta" bind:maxDays="366" on:change="load" />`
  */
 export type UIDateRangeProps = UIThemeProps<
-	typeof dateRange,
+	typeof dateRangeTheme,
 	{
 		/**
 		 * `id` del `<fieldset>`. Dentro de `UIField`, pásale el `id` del snippet: el grupo toma su nombre de la

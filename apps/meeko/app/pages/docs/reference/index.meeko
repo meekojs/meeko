@@ -168,7 +168,7 @@
 						</a>
 						<UIBadge
 							if:when="entry.featured"
-							tone="accent"
+							color="primary"
 							class="featured"
 						>
 							{t('docs.layout.featured')}

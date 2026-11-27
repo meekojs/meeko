@@ -1,16 +1,16 @@
 <script lang="ts" generic="T, Multiple extends boolean = false">
 	// <UICombobox>: what the native <select> of <UISelect> cannot do, a search, an asynchronous filter and
-	// several values, on <UIPopover>. The behavior lives in ../utils/combobox.ts and the look in ../variants/select.ts. Its template has no
+	// several values, on <UIPopover>. The behavior lives in ../utils/combobox.ts and the look in ../theme/components/combobox.ts. Its template has no
 	// whitespace between the tags: it would be text in the options.
 	import { computed, onMounted, useId } from '@meekojs/meeko'
 
 	import type { ComboboxModel, ComboboxSettings, ComboboxSnippets, UIComboboxProps } from '../types/combobox'
 
+	import { comboboxTheme as look } from '../theme/components/combobox'
+	import { inputControlTheme } from '../theme/components/input'
 	import { createCombobox } from '../utils/combobox'
 	import { uiTheme } from '../utils/defaults'
 	import { uiMessages } from '../utils/messages'
-	import { control } from '../variants/input'
-	import { combobox as look } from '../variants/select'
 	import * as Popover from './Popover.meeko'
 
 	const props = defineProps<UIComboboxProps<T, Multiple>>()
@@ -32,7 +32,7 @@
 	onMounted(() => combobox.mount(root.value))
 
 	const classes = computed(() => look({ disabled: props.disabled === true, clearable: props.clearable === true }))
-	const triggerClass = computed(() => control({ clearable: props.clearable === true, class: [classes.value.trigger(), theme.ui.trigger] }))
+	const triggerClass = computed(() => inputControlTheme({ clearable: props.clearable === true, class: [classes.value.trigger(), theme.ui.trigger] }))
 </script>
 
 <!-- No whitespace between the tags of this template: it would be text inside the trigger and the options. Prettier keeps it that way (htmlWhitespaceSensitivity "strict" in prettier.config.ts); tests/templates-without-whitespace.test.mjs guards it. -->

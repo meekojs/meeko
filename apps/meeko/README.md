@@ -14,7 +14,7 @@ DATABASE_URL=postgresql://USUARIO:CLAVE@HOST:5432/BASE_DE_DATOS
 
 Desde la raíz del repositorio:
 
-`pnpm dev` inicia los cuatro sitios en paralelo. Este sitio escucha en `http://127.0.0.1:4173`; para iniciarlo solo usa `pnpm site:dev`.
+`pnpm dev` inicia los cuatro sitios en paralelo. Este sitio escucha en `http://127.0.0.1:4173`; para iniciarlo solo usa `pnpm dev:site`.
 
 ```powershell
 pnpm install
@@ -77,7 +77,7 @@ El site cuenta vistas y búsquedas y recoge el «¿Te sirvió?» de cada página
 ## Build y publicación
 
 ```powershell
-pnpm run site:build
+pnpm build --filter=meeko-site
 pnpm -F meeko-site run docs:sync
 pnpm -F meeko-site run start
 ```

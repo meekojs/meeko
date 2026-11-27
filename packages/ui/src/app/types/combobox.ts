@@ -1,4 +1,4 @@
-import type { combobox } from '../variants/select'
+import type { comboboxTheme } from '../theme/components/combobox'
 import type { SelectBaseProps, SelectField } from './select'
 import type { UIVariantSlots } from './theme'
 
@@ -96,7 +96,7 @@ export interface ComboboxSnippets<T> {
  * <UICombobox model="tags" multiple searchable bind:options="tags" groupBy="category" bind:max="3" />
  * ```
  */
-export interface UIComboboxProps<T, Multiple extends boolean = false> extends SelectBaseProps<T>, UIVariantSlots<typeof combobox> {
+export interface UIComboboxProps<T, Multiple extends boolean = false> extends SelectBaseProps<T>, UIVariantSlots<typeof comboboxTheme> {
 	/** Con `true`, el modelo es un array y cada opción se alterna. */
 	readonly multiple?: Multiple
 	/** Convierte el disparador en un campo de texto que filtra las opciones. */

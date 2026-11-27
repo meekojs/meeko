@@ -286,9 +286,10 @@ export interface MeekoModuleContext {
 	/**
 	 * Añade componentes al autoimport. `exclude` son globs relativos a esta carpeta; los imports
 	 * explícitos siguen funcionando. `rename` asigna a una ruta relativa sin `.meeko` un nombre
-	 * exacto, por ejemplo `{ Icon: 'AppIcon' }`.
+	 * exacto, por ejemplo `{ Icon: 'AppIcon' }`. `generateTypesInDev` genera declaraciones
+	 * junto a los componentes de un módulo local durante el desarrollo.
 	 */
-	addComponentsDir(dir: string | URL, options?: { readonly prefix?: string; readonly exclude?: readonly string[]; readonly rename?: Readonly<Record<string, string>> }): void
+	addComponentsDir(dir: string | URL, options?: { readonly prefix?: string; readonly exclude?: readonly string[]; readonly rename?: Readonly<Record<string, string>>; readonly generateTypesInDev?: boolean }): void
 	/**
 	 * Añade un layout con nombre, como un archivo de `app/layouts`: las páginas lo eligen con
 	 * `definePage({ layout: name })` o un `+group.ts`. Un layout del proyecto o de un layer con el

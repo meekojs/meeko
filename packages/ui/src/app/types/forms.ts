@@ -1,27 +1,33 @@
 import type { ElementAttributes } from '@meekojs/meeko'
 
-import type { badge } from '../variants/badge'
-import type { checkbox, radioGroup, segmentedControl, toggle } from '../variants/choice'
-import type { field } from '../variants/field'
-import type { input, textarea } from '../variants/input'
-import type { slider } from '../variants/slider'
+import type { badgeTheme, UIBadgeColor, UIBadgeRadius, UIBadgeVariant } from '../theme/components/badge'
+import type { checkboxTheme } from '../theme/components/checkbox'
+import type { fieldTheme } from '../theme/components/field'
+import type { inputTheme, UIInputColor, UIInputRadius, UIInputSize, UIInputVariant } from '../theme/components/input'
+import type { radioGroupTheme } from '../theme/components/radio-group'
+import type { segmentedControlTheme } from '../theme/components/segmented-control'
+import type { sliderTheme } from '../theme/components/slider'
+import type { switchTheme } from '../theme/components/switch'
+import type { textareaTheme } from '../theme/components/textarea'
 import type { UIThemeProps } from './theme'
 
 /** Densidad de controles y superficies. @example const density: UIDensity = 'compact' */
 export type UIDensity = 'compact' | 'normal' | 'comfortable'
 
-/** Estado semántico de un mensaje. @example const tone: UITone = 'warning' */
-export type UITone = 'neutral' | 'info' | 'success' | 'warning' | 'danger'
+export type { UIBadgeColor, UIBadgeRadius, UIBadgeVariant, UIInputColor, UIInputRadius, UIInputSize, UIInputVariant }
 
 /**
  * Campo de texto nativo; el valor se enlaza con `model`. Con `type="password"` y `reveal`, un botón al final
- * del campo muestra u oculta la contraseña.
+ * del campo muestra u oculta la contraseña. Su aspecto es la receta `inputTheme` de `@meekojs/ui/theme`:
+ * `variant`, `color`, `size` y `radius`, y sin ellas (ni `ui.defaults.input`) es el campo de siempre, `outline` y
+ * `neutral`, de tamaño `md` y radio `md`. El borde es siempre el de los controles, salvo con `invalid`.
  * @example `<UIInput type="date" name="date" />`
  * @example `<UIInput type="password" name="password" autocomplete="current-password" reveal />`
+ * @example `<UIInput name="q" variant="soft" color="primary" size="lg" radius="full" />`
  */
 export type UIInputProps = Omit<ElementAttributes<'input'>, 'type' | 'value' | 'class'> &
 	UIThemeProps<
-		typeof input,
+		typeof inputTheme,
 		{
 			/**
 			 * Tipo nativo del campo. Con `number`, `time` y `month`, el modelo sigue siendo el texto del control
@@ -31,6 +37,24 @@ export type UIInputProps = Omit<ElementAttributes<'input'>, 'type' | 'value' | '
 			 * @since 1.10.0 admite `number`, `time` y `month`.
 			 */
 			type?: 'text' | 'email' | 'password' | 'search' | 'url' | 'tel' | 'number' | 'date' | 'datetime-local' | 'time' | 'month'
+			/**
+			 * Tratamiento visual: `outline` (el campo de siempre), `surface`, `soft` o `ghost` (sólo la línea inferior);
+			 * `"outline"` por defecto.
+			 */
+			variant?: UIInputVariant
+			/**
+			 * Color semántico del fondo y del texto: `primary`, `secondary`, `neutral`, `success`, `info`, `warning` o
+			 * `danger`; `"neutral"` por defecto. El borde sigue siendo el de los controles.
+			 */
+			color?: UIInputColor
+			/**
+			 * Alto y relleno del control, de `xs` a `xl`, sobre los tokens `--ui-control-*`; `"md"` por defecto.
+			 */
+			size?: UIInputSize
+			/**
+			 * Radio del contorno, de `none` a `full`; `"md"` por defecto.
+			 */
+			radius?: UIInputRadius
 			/** Marca el campo como inválido. */
 			invalid?: boolean
 			/** Identificadores de los mensajes de ayuda. */
@@ -62,7 +86,7 @@ export type UIInputProps = Omit<ElementAttributes<'input'>, 'type' | 'value' | '
 /** Área de texto nativa con `model`. @example `<UITextarea name="comment" rows="4" />` */
 export type UITextareaProps = Omit<ElementAttributes<'textarea'>, 'value' | 'class'> &
 	UIThemeProps<
-		typeof textarea,
+		typeof textareaTheme,
 		{
 			/** Estado de validación. */
 			invalid?: boolean
@@ -91,14 +115,14 @@ interface UIChoiceOwnProps {
  * Casilla nativa con modelo booleano. `ui` añade clases a sus slots: `base`, `input`, `content` y `description`.
  * @example `<UICheckbox label="Aceptar" name="accepted" />`
  */
-export type UICheckboxProps = Omit<ElementAttributes<'input'>, 'type' | 'checked' | 'class'> & UIThemeProps<typeof checkbox, UIChoiceOwnProps>
+export type UICheckboxProps = Omit<ElementAttributes<'input'>, 'type' | 'checked' | 'class'> & UIThemeProps<typeof checkboxTheme, UIChoiceOwnProps>
 
 /**
  * Interruptor con el mismo contrato booleano que Checkbox. `ui` añade clases a sus slots: `base`, `input`,
  * `content` y `description`.
  * @example `<UISwitch label="Notificaciones" />`
  */
-export type UISwitchProps = Omit<ElementAttributes<'input'>, 'type' | 'checked' | 'class'> & UIThemeProps<typeof toggle, UIChoiceOwnProps>
+export type UISwitchProps = Omit<ElementAttributes<'input'>, 'type' | 'checked' | 'class'> & UIThemeProps<typeof switchTheme, UIChoiceOwnProps>
 
 /** Opción de un grupo de radios. @example const option: UIRadioOption = { value: 'week', label: 'Semana' } */
 export interface UIRadioOption {
@@ -117,7 +141,7 @@ export interface UIRadioOption {
  */
 export type UIRadioGroupProps = Omit<ElementAttributes<'fieldset'>, 'class'> &
 	UIThemeProps<
-		typeof radioGroup,
+		typeof radioGroupTheme,
 		{
 			/** Etiqueta del grupo. */
 			legend: string
@@ -162,7 +186,7 @@ type UISegmentedControlName =
  */
 export type UISegmentedControlProps = Omit<ElementAttributes<'fieldset'>, 'class' | 'aria-label'> &
 	UIThemeProps<
-		typeof segmentedControl,
+		typeof segmentedControlTheme,
 		{
 			/** Opciones en orden de lectura. */
 			options: readonly UIRadioOption[]
@@ -184,7 +208,7 @@ export type UISegmentedControlProps = Omit<ElementAttributes<'fieldset'>, 'class
  */
 export type UISliderProps = Omit<ElementAttributes<'input'>, 'type' | 'value' | 'class'> &
 	UIThemeProps<
-		typeof slider,
+		typeof sliderTheme,
 		{
 			/** Nombre visible del rango. */
 			label: string
@@ -199,7 +223,7 @@ export type UISliderProps = Omit<ElementAttributes<'input'>, 'type' | 'value' | 
  * @example `<UIField id="comment" label="Comentario" hint="Opcional" counter="10/200" />`
  */
 export type UIFieldProps = UIThemeProps<
-	typeof field,
+	typeof fieldTheme,
 	{
 		/** ID del control. */
 		id: string
@@ -221,14 +245,22 @@ export type UIFieldProps = UIThemeProps<
 >
 
 /**
- * Props de una etiqueta de estado. `ui` añade clases a sus slots: `base` y `dot`.
- * @example `<UIBadge tone="success" dot>Publicado</UIBadge>`
+ * Props de una etiqueta de estado, con la receta `badgeTheme` de `@meekojs/ui/theme`: tratamiento (`variant`),
+ * color semántico (`color`) y radio. Sin ellas, se usan los valores de `ui.defaults` y, después, una píldora
+ * `soft` y `neutral` de radio `full`. `ui` añade clases a sus slots: `base` y `dot`.
+ *
+ * @since 2.0.0 `variant`, `color` y `radius` sustituyen a `tone` (`accent` es `color="primary"`) y a `appearance`.
+ * @example `<UIBadge color="success" dot>Publicado</UIBadge>`
  */
 export type UIBadgeProps = UIThemeProps<
-	typeof badge,
+	typeof badgeTheme,
 	{
-		/** Color semántico. */
-		tone?: UITone | 'accent'
+		/** Tratamiento visual: `soft`, `solid`, `surface` u `outline`; `"soft"` por defecto. */
+		variant?: UIBadgeVariant
+		/** Color semántico: `primary`, `secondary`, `neutral`, `success`, `info`, `warning` o `danger`; `"neutral"` por defecto. */
+		color?: UIBadgeColor
+		/** Radio del contorno, de `none` a `full`; `"full"` por defecto. */
+		radius?: UIBadgeRadius
 		/** Indicador circular decorativo. */
 		dot?: boolean
 		/** Clases adicionales del elemento raíz; equivale a `ui.base`. */

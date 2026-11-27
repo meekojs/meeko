@@ -159,7 +159,7 @@ import { defineMeekoConfig } from '@meekojs/meeko/framework'
 export default defineMeekoConfig({
 	modules: ['@meekojs/ui', '@meekojs/i18n', '@meekojs/icon'],
 	theme: true,
-	ui: { defaults: { button: { shape: 'pill' } } },
+	ui: { defaults: { button: { radius: 'full' } } },
 	i18n: { defaultLocale: 'es', catalogs: { es: { common: 'i18n/es/common.json' }, en: { common: 'i18n/en/common.json' } } },
 	icon: { collections: ['lucide'] },
 })

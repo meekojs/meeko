@@ -4,10 +4,10 @@
 
 	import type { UILinkProps } from '../types/button'
 
+	import { buttonTheme } from '../theme/components/button'
 	import { uiTheme } from '../utils/defaults'
-	import { button } from '../variants/button'
 
-	const { to, params, search, resolve, href, target, rel, ariaLabel, variant, size, shape, class: ownClass, ...rest } = defineProps<UILinkProps>()
+	const { to, params, search, resolve, href, target, rel, ariaLabel, variant, color, size, radius, width, elevation, class: ownClass, ...rest } = defineProps<UILinkProps>()
 
 	const theme = uiTheme('link', () => ({ class: ownClass }))
 
@@ -15,7 +15,17 @@
 
 	const snippets = defineSnippets<{ default: [] }>()
 
-	const classes = computed(() => button({ variant: variant ?? theme.defaults?.variant, size: size ?? theme.defaults?.size, shape: shape ?? theme.defaults?.shape, class: theme.class }))
+	const classes = computed(() =>
+		buttonTheme({
+			variant: variant ?? theme.defaults?.variant,
+			color: color ?? theme.defaults?.color,
+			size: size ?? theme.defaults?.size,
+			radius: radius ?? theme.defaults?.radius,
+			width,
+			elevation,
+			class: theme.class,
+		}),
+	)
 	const linkRel = computed(() => rel ?? (target === '_blank' ? 'noopener noreferrer' : undefined))
 	// `ariaLabel` predates the forwarded `aria-label`; when both are given, `ariaLabel` wins.
 	const label = computed(() => ariaLabel ?? rest['aria-label'])

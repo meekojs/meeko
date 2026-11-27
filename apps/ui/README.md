@@ -8,15 +8,16 @@ Desde la raíz del repositorio, con Node.js 24+ y pnpm 12:
 
 ```powershell
 pnpm install
-pnpm build
-pnpm ui:dev
+pnpm dev:ui
 ```
 
-Esta web escucha en `http://127.0.0.1:4174`. `pnpm dev` inicia los cuatro sitios en paralelo; `pnpm ui:dev` inicia solo esta web.
+Esta web escucha en `http://127.0.0.1:4174`. `pnpm dev` inicia los cuatro sitios en paralelo; `pnpm dev:ui` inicia solo esta web.
+
+En desarrollo, Meeko observa los componentes en `packages/ui/src` y Vite recompila Tailwind al editar sus clases. El servidor se mantiene activo mientras editas.
 
 ```powershell
 pnpm -F meeko-ui-site check
-pnpm ui:build
+pnpm build --filter=meeko-ui-site
 pnpm -F meeko-ui-site start
 ```
 
@@ -52,7 +53,7 @@ Con `DATABASE_URL`, la web cuenta vistas, registra las búsquedas del filtro de 
 - `packages/docs/`: módulo privado compartido con i18n: shell, navegación, página documental, bloques de código copiables y tablas de API. Las declaraciones de sus componentes se preparan antes de dev, build y check.
 - `app/utils/navigation.ts`: catálogo de navegación y filtro local por nombre o descripción; no es búsqueda de texto completo.
 - `app/utils/examples.ts` y `examples.en.ts`: código copiable de las guías, en cada idioma: sus textos y comentarios se traducen, y los identificadores no cambian.
-- `app/styles/main.css`: sólo la coreografía de la demo de View Transitions, un efecto. Todo lo demás viene de `packages/ui`, y la disposición de las demos, de `packages/docs/src/app/styles/docs.css`.
+- `app/styles/main.css`: los dos imports de cualquier app con UI (`@import 'tailwindcss';` y `@import '@meekojs/ui';`), con los que Tailwind compila UI y las clases de la web en una pasada, y la coreografía de la demo de View Transitions, un efecto. Todo lo demás viene de `packages/ui`, y la disposición de las demos, de `packages/docs/src/app/styles/docs.css`.
 - `public/`: logo copiado desde `packages/docs/assets` por los scripts de dev/build; se ignora en Git. La fuente la sirve el módulo de UI.
 
 Cada guía debe explicar el contrato real, mostrar un ejemplo interactivo, incluir código copiable y documentar props, snippets y eventos relevantes. Mantén los ejemplos sincronizados con `packages/ui/src/app` y actualiza el catálogo al añadir una ruta. Las comprobaciones de tipos validan los componentes vivos; las pruebas de navegador de UI cubren navegación, formularios, modales, tablas, temas y View Transitions.

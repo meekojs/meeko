@@ -2,10 +2,12 @@ import assert from 'node:assert/strict'
 import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import test from 'node:test'
+import { pathToFileURL } from 'node:url'
 
 import { generateAppTypes } from '../src/framework/check-app.ts'
 import { checkFrameworkProject } from '../src/framework/check-project.ts'
-import { generateComponentRegistryTypes } from '../src/framework/type-declarations.ts'
+import { setModuleDevelopmentMode } from '../src/framework/module-loader.ts'
+import { generateComponentRegistryTypes, generateDevelopmentComponentType } from '../src/framework/type-declarations.ts'
 import { linkRepositoryPackages, tempProject } from './helpers/temp-project.ts'
 
 const button = `<script lang="ts">
@@ -364,4 +366,36 @@ export declare function hydrateScope(scope: import("@meekojs/meeko").DomScope, p
 	await writeFile(page, source.replace('value="ready"', 'value="other"'))
 	await assert.rejects(checkFrameworkProject(root), /TS2322|other/)
 	assert.deepEqual((await readdir(root)).filter((name) => name !== 'node_modules').sort(), ['.meeko', 'app', 'package.json'])
+})
+
+test('a workspace module generates adjacent component declarations during development', async (context) => {
+	const workspace = await tempProject(context, 'workspace-component-registry-types')
+	const root = join(workspace, 'app')
+	const directory = join(workspace, 'library', 'components')
+	await mkdir(root)
+	await mkdir(directory, { recursive: true })
+	await linkRepositoryPackages(root)
+	await writeFile(join(root, 'package.json'), '{"private":true,"type":"module"}')
+	await writeFile(join(workspace, 'library', 'package.json'), '{"private":true,"type":"module"}')
+	await writeFile(
+		join(root, 'meeko.config.ts'),
+		`import { defineMeekoModule } from '@meekojs/meeko/framework'
+		export default { modules: [defineMeekoModule({ meta: { name: 'workspace-library' }, setup(_options, meeko) {
+			meeko.addComponentsDir(new URL(${JSON.stringify(pathToFileURL(directory).href)}), { prefix: 'Local', generateTypesInDev: true })
+		} })] }`,
+	)
+	const file = join(directory, 'Button.meeko')
+	const declaration = join(directory, 'Button.d.meeko.ts')
+	await writeFile(file, button)
+	await assert.rejects(generateComponentRegistryTypes(root), /componente externo LocalButton necesita una declaración adyacente/)
+	setModuleDevelopmentMode(true)
+	try {
+		assert.match(await readFile(await generateComponentRegistryTypes(root), 'utf8'), /LocalButton.*library\/components\/Button\.meeko/)
+		assert.match(await readFile(declaration, 'utf8'), /label: string/)
+		await writeFile(file, button.replace('label: string', 'label: number'))
+		await generateDevelopmentComponentType(file)
+		assert.match(await readFile(declaration, 'utf8'), /label: number/)
+	} finally {
+		setModuleDevelopmentMode(false)
+	}
 })

@@ -70,3 +70,35 @@ test('UIInput number, time and month keep the text of the control in the model, 
 	assert.deepEqual(errors, [])
 	await tab.close()
 })
+
+const sizes = `<template>
+<main id="contenido">
+<div id="sizes">
+<UIInput aria-label="Campo xs" size="xs" /><UIButton id="button-xs" size="xs">Botón</UIButton>
+<UIInput aria-label="Campo sm" size="sm" /><UIButton id="button-sm" size="sm">Botón</UIButton>
+<UIInput aria-label="Campo md" /><UIButton id="button-md">Botón</UIButton>
+<UIInput aria-label="Clave sm" type="password" reveal size="sm" />
+</div>
+</main>
+</template>`
+
+test('UIInput of each size is as tall as its control height token and as a UIButton of the same size', { timeout: 180_000 }, async (context) => {
+	const { origin } = await startForms(context, { port: 4734, page: sizes })
+	const browser = await chromium.launch({ ...(process.env.MEEKO_CHROME_PATH ? { executablePath: process.env.MEEKO_CHROME_PATH } : { channel: 'chrome' }), headless: true })
+	context.after(() => browser.close())
+	const tab = await browser.newPage()
+	await tab.goto(origin)
+	const height = (locator) => locator.evaluate((element) => element.getBoundingClientRect().height)
+	const token = (size) => tab.evaluate((name) => Number.parseFloat(globalThis.getComputedStyle(globalThis.document.documentElement).getPropertyValue(name)) * 16, `--ui-control-height-${size}`)
+	for (const size of ['xs', 'sm', 'md']) {
+		const field = await height(tab.getByLabel(`Campo ${size}`))
+		assert.equal(field, await token(size), `${size}: the height of the token`)
+		assert.equal(field, await height(tab.locator(`#button-${size}`)), `${size}: the height of a button of that size`)
+	}
+	const secret = tab.getByLabel('Clave sm')
+	const toggle = tab.locator('#sizes button[type="button"]').last()
+	assert.equal(await height(secret), await token('sm'))
+	const box = await toggle.boundingBox()
+	assert.deepEqual([box.width, box.height], [await token('sm'), await token('sm')], 'the button of reveal is a square as tall as the field')
+	await tab.close()
+})

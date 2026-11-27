@@ -7,12 +7,12 @@
 
 	import type { UILinkTarget, UIPaginationProps } from '../types/navigation'
 
+	import { buttonTheme } from '../theme/components/button'
+	import { paginationTheme } from '../theme/components/navigation'
 	import { uiTheme } from '../utils/defaults'
 	import { icons } from '../utils/icons'
 	import { fillMessage, uiMessages } from '../utils/messages'
 	import { clampPage, paginationCount, paginationItems } from '../utils/pagination'
-	import { button } from '../variants/button'
-	import { pagination } from '../variants/navigation'
 	import * as Icon from './internal/Icon.meeko'
 	import * as ItemLink from './internal/ItemLink.meeko'
 
@@ -102,12 +102,14 @@
 	function holdLink(event: MouseEvent): void {
 		if (props.busy) event.preventDefault()
 	}
-	const classes = pagination()
+	const classes = paginationTheme()
 	// The action goes to the end of the row, and shows a spinner while the next page loads.
-	const moreClass = (): string => button({ variant: 'outline', size: 'sm', class: classes.action({ class: theme.ui.action }) })
+	const moreClass = (): string => buttonTheme({ variant: 'outline', color: 'neutral', size: 'sm', class: classes.action({ class: theme.ui.action }) })
+	// The current page is a solid primary button, the others neutral ghosts.
 	const entryClass = (entry: Entry): string =>
-		button({
-			variant: entry.current ? 'primary' : 'ghost',
+		buttonTheme({
+			variant: entry.current ? 'solid' : 'ghost',
+			color: entry.current ? 'primary' : 'neutral',
 			size: 'sm',
 			iconOnly: entry.icon !== undefined,
 			class: entry.icon === undefined ? classes.page({ class: theme.ui.page }) : classes.control({ class: theme.ui.control }),

@@ -4,10 +4,10 @@
 	import type { ModalDismissReason, UIModalProps } from '../types/modal'
 
 	import { modalExitRegistration, optionalModalInstance } from '../composables/useModal'
+	import { modalHeadingAlone, modalTheme } from '../theme/components/modal'
 	import { uiTheme } from '../utils/defaults'
 	import { uiMessages } from '../utils/messages'
 	import { mountModalDialog } from '../utils/modal-dialog'
-	import { modal, modalHeadingAlone } from '../variants/modal'
 
 	const props = defineProps<UIModalProps>()
 
@@ -25,7 +25,7 @@
 	const text = uiMessages().modal
 	const instance = optionalModalInstance()
 	const registerExit = modalExitRegistration()
-	const classes = computed(() => modal({ size: props.size }))
+	const classes = computed(() => modalTheme({ size: props.size }))
 	if (instance) open.value = true
 
 	function dismiss(reason: ModalDismissReason) {

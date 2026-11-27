@@ -11,7 +11,7 @@
 		{ label: 'Ver en Popover', to: '/popover' },
 		{ label: 'Archivar', value: 'archive', disabled: true },
 		{ separator: true },
-		{ label: 'Eliminar', value: 'delete', tone: 'danger', icon: 'M3.5 4.5h9M6.5 4.5v-1h3v1M4.5 4.5l.5 8h6l.5-8' },
+		{ label: 'Eliminar', value: 'delete', color: 'danger', icon: 'M3.5 4.5h9M6.5 4.5v-1h3v1M4.5 4.5l.5 8h6l.5-8' },
 	]
 	const files = [
 		{ id: 1, name: 'Informe trimestral', actions: '' },
@@ -25,7 +25,7 @@
 		{ label: 'Abrir', onSelect: () => (row.value = 'Abierto: ' + file + '.') },
 		{ label: 'Descargar', onSelect: () => (row.value = 'Descargado: ' + file + '.') },
 		{ separator: true },
-		{ label: 'Eliminar', tone: 'danger', onSelect: () => (row.value = 'Eliminado: ' + file + '.') },
+		{ label: 'Eliminar', color: 'danger', onSelect: () => (row.value = 'Eliminado: ' + file + '.') },
 	]
 </script>
 
@@ -65,7 +65,7 @@
 			<code>to</code>, que navega con MeekoLink.
 			<code>{'{ separator: true }'}</code>
 			traza una línea entre grupos,
-			<code>tone: 'danger'</code>
+			<code>color: 'danger'</code>
 			marca una acción destructiva y un ítem con
 			<code>disabled</code>
 			se ve, pero las flechas lo saltan. El evento
@@ -161,7 +161,7 @@
 				{ name: 'onSelect', type: '(item) => void', description: 'Acción al elegirlo. Excluye href y to.' },
 				{ name: 'href / to', type: 'string / ruta', description: 'Destino de un enlace; to navega con MeekoLink, con params y search tipados.' },
 				{ name: 'value', type: 'string', description: 'Identificador libre, para reconocerlo en select.' },
-				{ name: 'tone', type: 'neutral | danger', default: 'neutral', description: 'danger para una acción destructiva.' },
+				{ name: 'color', type: 'neutral | danger', default: 'neutral', description: 'danger para una acción destructiva.' },
 				{ name: 'disabled', type: 'boolean', default: 'false', description: 'Visible pero no elegible.' },
 				{ name: 'icon', type: 'string', description: 'Trazo SVG decorativo, en una rejilla de 16 por 16.' },
 				{ name: 'shortcut', type: 'string', description: 'Atajo que se muestra tras el texto; lo implementa la aplicación.' },

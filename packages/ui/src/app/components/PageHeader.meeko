@@ -1,8 +1,8 @@
 <script lang="ts">
 	import type { UIPageHeaderProps } from '../types/navigation'
 
+	import { pageHeaderTheme } from '../theme/components/page'
 	import { uiTheme } from '../utils/defaults'
-	import { pageHeader } from '../variants/page'
 
 	const props = defineProps<UIPageHeaderProps>({ layout: 'docs' })
 
@@ -10,7 +10,7 @@
 
 	const snippets = defineSnippets<{ default?: []; title?: []; breadcrumb?: []; actions?: [] }>()
 
-	const classes = pageHeader()
+	const classes = pageHeaderTheme()
 </script>
 
 <template>

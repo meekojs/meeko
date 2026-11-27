@@ -1,4 +1,14 @@
 /*
+ * Tailwind without its preflight, the reset of lists, headings and margins: only its theme and its utilities, in
+ * the layers of Tailwind's own entry (https://tailwindcss.com/docs/preflight#disabling-preflight). The base of
+ * the page is that of @meekojs/ui, as it was before the site compiled Tailwind.
+ */
+@layer theme, base, components, utilities;
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities);
+@import '@meekojs/ui';
+
+/*
  * What @meekojs/ui cannot know: how this app arranges its screens. Layout only, on the tokens of UI: the
  * look of everything is in its components, and a page keeps the drawing of its own data in its scoped styles.
  */

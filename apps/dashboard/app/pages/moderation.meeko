@@ -567,6 +567,7 @@
 							<UIButton
 								if:when="page.value || reason.value"
 								variant="ghost"
+								color="neutral"
 								on:click="resetRule"
 							>
 								{t('moderation.rule.clear')}
@@ -581,7 +582,7 @@
 					</p>
 					<UIAlert
 						if:when="ruleError.value"
-						tone="danger"
+						color="danger"
 						bind:description="ruleError.value"
 					/>
 					<DashFailure
@@ -616,7 +617,7 @@
 							/>
 							<UIBadge
 								if:when="column.key === 'action'"
-								bind:tone="row.action === 'hide' ? 'danger' : 'accent'"
+								bind:color="row.action === 'hide' ? 'danger' : 'primary'"
 							>
 								{actionLabel(row.action)}
 							</UIBadge>
@@ -635,6 +636,7 @@
 								<UIButton
 									size="sm"
 									variant="outline"
+									color="neutral"
 									on:click="() => editRule(row)"
 								>
 									{t('moderation.rule.edit')}
@@ -643,6 +645,7 @@
 								<UIButton
 									size="sm"
 									variant="ghost"
+									color="neutral"
 									on:click="() => askRemoveRule(row)"
 								>
 									{t('moderation.rule.remove')}
@@ -773,7 +776,7 @@
 							/>
 							<UIAlert
 								if:when="formError.value"
-								tone="danger"
+								color="danger"
 								bind:description="formError.value"
 							/>
 							<DashFailure
@@ -791,6 +794,7 @@
 								<UIButton
 									if:when="editing.value !== null || message.value"
 									variant="ghost"
+									color="neutral"
 									on:click="resetAnnouncement"
 								>
 									{editing.value === null ? t('moderation.announcement.empty') : t('moderation.announcement.cancelEdit')}
@@ -844,7 +848,7 @@
 							<UIBadge
 								if:when="column.key === 'tone'"
 								bind:dot="true"
-								bind:tone="row.tone"
+								bind:color="row.tone"
 							>
 								{toneLabel(row.tone)}
 							</UIBadge>
@@ -856,7 +860,7 @@
 							</span>
 							<UIBadge
 								if:when="column.key === 'state'"
-								bind:tone="announcementStateTones[row.state]"
+								bind:color="announcementStateTones[row.state]"
 							>
 								{stateLabel(row.state)}
 							</UIBadge>
@@ -868,6 +872,7 @@
 								<UIButton
 									size="sm"
 									variant="outline"
+									color="neutral"
 									on:click="() => editAnnouncement(row)"
 								>
 									{t('moderation.announcement.edit')}
@@ -876,6 +881,7 @@
 								<UIButton
 									size="sm"
 									variant="ghost"
+									color="neutral"
 									on:click="() => void toggleAnnouncement(row)"
 								>
 									{row.active ? t('moderation.announcement.deactivate') : t('moderation.announcement.activate')}
@@ -884,6 +890,7 @@
 								<UIButton
 									size="sm"
 									variant="ghost"
+									color="neutral"
 									on:click="() => askRemoveAnnouncement(row)"
 								>
 									{t('moderation.announcement.delete')}
@@ -909,12 +916,13 @@
 			<snippet name="footer">
 				<UIButton
 					variant="ghost"
+					color="neutral"
 					on:click="() => (confirming.value = false)"
 				>
 					{t('actions.cancel')}
 				</UIButton>
 				<UIButton
-					tone="danger"
+					color="danger"
 					bind:disabled="answering.value"
 					on:click="answer"
 				>

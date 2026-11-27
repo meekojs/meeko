@@ -1,6 +1,7 @@
 import ts from '@typescript/typescript6'
+import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 
 import type { AutoImport } from './autoimports/registry'
@@ -34,6 +35,8 @@ function projectComponent(root: string, filename: string): boolean {
 
 /** Options of {@link generateTypes}. */
 export interface GenerateTypesOptions {
+	/** Escribe las declaraciones junto a fuentes de un módulo local durante el desarrollo. */
+	readonly adjacent?: boolean
 	/** Text of a `.meeko` that is not the saved one, such as a component open in the editor. */
 	readonly read?: (filename: string) => string | undefined
 	/**
@@ -92,7 +95,7 @@ export async function generateTypes(source: string, filename: string, options: G
 	await collect(source, resolve(filename))
 	const outputs: string[] = []
 	for (const [path, declaration] of declarations) {
-		const output = componentTypesPath(root, path)
+		const output = options.adjacent ? path.replace(/\.meeko$/, '.d.meeko.ts') : componentTypesPath(root, path)
 		const rewritten = replaceModuleSpecifiers(declaration, output, ({ value }) => {
 			if (!value.startsWith('.') || value.endsWith('.meeko')) return value
 			const original = resolve(dirname(path), value)
@@ -106,7 +109,18 @@ export async function generateTypes(source: string, filename: string, options: G
 		} catch (error) {
 			if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
 		}
-		if (previous !== rewritten) await writeFile(output, rewritten, 'utf8')
+		if (options.adjacent && previous !== undefined && !previous.startsWith(componentTypeDeclarationMarker)) continue
+		if (previous !== rewritten) {
+			if (options.adjacent) {
+				const temporary = `${output}.${randomUUID()}.tmp`
+				try {
+					await writeFile(temporary, rewritten, 'utf8')
+					await rename(temporary, output)
+				} finally {
+					await rm(temporary, { force: true })
+				}
+			} else await writeFile(output, rewritten, 'utf8')
+		}
 		outputs.push(output)
 	}
 	return outputs

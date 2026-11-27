@@ -8,9 +8,9 @@
 
 	import type { TabsSnippets, UITabsProps } from '../types/tabs'
 
+	import { tabsTheme } from '../theme/components/tabs'
 	import { uiTheme } from '../utils/defaults'
 	import { createTabs } from '../utils/tabs'
-	import { tabs as tabsVariant } from '../variants/tabs'
 
 	const props = defineProps<UITabsProps<Value>>()
 
@@ -30,7 +30,7 @@
 	const tabs = createTabs<Value>(props, model, useId(), (value) => emit('change', value))
 	onMounted(() => tabs.mount(root.value))
 
-	const classes = tabsVariant()
+	const classes = tabsTheme()
 </script>
 
 <!-- No whitespace between the tags of this template: it would be text inside the tabs. Prettier keeps it that way (htmlWhitespaceSensitivity "strict" in prettier.config.ts); tests/templates-without-whitespace.test.mjs guards it. -->

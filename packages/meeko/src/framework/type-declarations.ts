@@ -5,14 +5,17 @@ import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type { AppTypesOptions } from './check-app'
 
 import { generateComponentRegistry, linkComponentName, linkComponentSpecifier } from '../autoimports/components'
-import { discoverComponents } from '../autoimports/registry'
+import { discoverAutoImports, discoverComponents } from '../autoimports/registry'
 import { generateTypeScriptAutoImports } from '../autoimports/typescript'
 import { generateRouteBlockTypes, routeBlockTypesDirectory } from '../compiler/codegen/route-block-types'
+import { onceByRoot } from '../compiler/project-root'
+import { generateTypes } from '../types'
 import { frameworkTsconfigPaths, resolveProjectAliases } from './aliases'
 import { generateAppTypes } from './check-app'
 import { discoverConfiguredRoutes, loadConfiguredModules, loadMeekoConfig, resolveConfigSources } from './config'
 import { writeConfigTypesSync } from './config-types'
 import { generateServerContracts } from './contracts-generate'
+import { isComponentSource } from './dev-watch'
 import { generateRoutes } from './generate'
 import { generateModuleTypes } from './module-types'
 import { generatePageContracts } from './page-contracts-generate'
@@ -79,16 +82,39 @@ export async function writeIfChanged(file: string, source: string): Promise<void
 	await writeFile(file, source, 'utf8')
 }
 
+export async function developmentComponentDirectories(root: string): Promise<string[]> {
+	const { modules } = await loadConfiguredModules(root)
+	return modules.componentsDirs.filter(({ dir, generateTypesInDev }) => generateTypesInDev && !dir.split(sep).includes('node_modules')).map(({ dir }) => dir)
+}
+
+/** Updates a declaration next to a workspace component without invoking the CLI. */
+export async function generateDevelopmentComponentType(file: string, options: AppTypesOptions = {}, autoImports = onceByRoot(discoverAutoImports)): Promise<void> {
+	try {
+		await generateTypes(options.read?.(file) ?? (await readFile(file, 'utf8')), file, { ...options, adjacent: true, autoImports })
+	} catch (error) {
+		if (!options.onError) throw error
+		options.onError(file, error)
+	}
+}
+
 /** Augments the public module with the modules discovered for one project. */
-export async function generateComponentRegistryTypes(projectRoot: string): Promise<string> {
+export async function generateComponentRegistryTypes(projectRoot: string, options: AppTypesOptions = {}): Promise<string> {
 	const root = resolve(projectRoot)
 	const output = join(root, '.meeko', 'types', 'components.d.ts')
 	const names = new Map<string, string>()
 	const deprecated = new Map<string, string>()
+	const developmentDirectories = await developmentComponentDirectories(root)
+	const autoImports = onceByRoot(discoverAutoImports)
+	const typed = new Set<string>()
 	for (const entry of await discoverComponents(root)) {
 		const location = relative(root, entry.file)
 		const external = location === '..' || location.startsWith(`..${sep}`) || isAbsolute(location) || location.split(sep).includes('node_modules')
-		if (external && !existsSync(entry.file.replace(/\.meeko$/, '.d.meeko.ts'))) {
+		const developmentSource = isComponentSource(entry.file, developmentDirectories)
+		if (developmentSource && !typed.has(entry.file)) {
+			await generateDevelopmentComponentType(entry.file, options, autoImports)
+			typed.add(entry.file)
+		}
+		if (external && !developmentSource && !existsSync(entry.file.replace(/\.meeko$/, '.d.meeko.ts'))) {
 			throw new Error(`El componente externo ${entry.name} necesita una declaración adyacente .d.meeko.ts: ${entry.file}`)
 		}
 		const previous = names.get(entry.name)
@@ -187,7 +213,7 @@ export async function prepareFrameworkTypeDeclarations(projectRoot: string, opti
 	const routes = await generateRoutes(root)
 	const server = await generateServerContracts(root)
 	const componentRegistry = await generateComponentRegistry(root)
-	const componentRegistryTypes = await generateComponentRegistryTypes(root)
+	const componentRegistryTypes = await generateComponentRegistryTypes(root, options)
 	const components = await generateAppTypes(root, options)
 	await generateRouteBlockTypes(root, await discoverConfiguredRoutes(root))
 	const pageContracts = await generatePageContracts(root)

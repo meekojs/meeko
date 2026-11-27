@@ -1,6 +1,6 @@
 /*
  * <UISelect>: the list of its <select>, which the browser draws. The trigger is on Tailwind
- * (../variants/select.ts); what stays here are the parts the browser makes and only CSS reaches: the
+ * (../theme/components/select.ts); what stays here are the parts the browser makes and only CSS reaches: the
  * ::picker(select) of a customizable select, its ::picker-icon, the <selectedcontent> it copies, the
  * ::checkmark of each option and their entrance, all behind @supports (appearance: base-select).
  */

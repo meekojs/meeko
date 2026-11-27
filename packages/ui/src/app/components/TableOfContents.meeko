@@ -5,11 +5,11 @@
 
 	import type { UITableOfContentsProps } from '../types/navigation'
 
+	import { tableOfContentsLinkTheme, tableOfContentsTheme, tableOfContentsTracking } from '../theme/components/navigation'
 	import { uiTheme } from '../utils/defaults'
 	import { icons } from '../utils/icons'
 	import { uiMessages } from '../utils/messages'
 	import { followsLink } from '../utils/navigation'
-	import { tableOfContents, tableOfContentsLink, tableOfContentsTracking } from '../variants/navigation'
 	import * as Icon from './internal/Icon.meeko'
 
 	const props = defineProps<UITableOfContentsProps>({ variant: 'aside' })
@@ -22,11 +22,11 @@
 	const panel = useElementRef('panel')
 
 	const activeId = (): string | undefined => props.active ?? spied.value
-	const classes = tableOfContents()
+	const classes = tableOfContentsTheme()
 	const tracking = (): 'auto' | 'manual' => (props.active === undefined ? 'auto' : 'manual')
 	/** Levels 3 and 4 are indented; deeper ones are not, as before. */
 	const nested = (level: number): 0 | 1 | 2 => (level === 3 ? 1 : level === 4 ? 2 : 0)
-	const linkClass = (level: number): string => classes.link({ class: [tableOfContentsLink({ nested: nested(level), tracking: tracking() }), theme.ui.link] })
+	const linkClass = (level: number): string => classes.link({ class: [tableOfContentsLinkTheme({ nested: nested(level), tracking: tracking() }), theme.ui.link] })
 	// The <nav> is the root of the aside; in the collapsible view, the panel of its <details>.
 	const navClass = (): string =>
 		classes.base({

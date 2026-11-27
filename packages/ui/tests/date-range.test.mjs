@@ -26,7 +26,7 @@ async function render(context, template, { defaults, script = '' } = {}) {
 			.code.replaceAll('from "@meekojs/meeko/internal"', `from ${runtime('internal.js')}`)
 			.replaceAll('from "@meekojs/meeko"', `from ${runtime('index.js')}`)
 			.replace(/from ["']\.\/(\w+)\.meeko["']/g, 'from "./$1.ts"')
-			.replace(/from ["'](?:\.\.\/)+(utils|variants)\/([\w-]+)["']/g, (_, folder, utility) => `from ${JSON.stringify(new URL(`../dist/app/${folder}/${utility}.js`, import.meta.url).href)}`)
+			.replace(/from ["'](?:\.\.\/)+(utils|theme(?:\/components)?)\/([\w-]+)["']/g, (_, folder, utility) => `from ${JSON.stringify(new URL(`../dist/app/${folder}/${utility}.js`, import.meta.url).href)}`)
 		await writeFile(`${directory}/${file}.ts`, code)
 	}
 	for (const name of components) await write(name, await readFile(new URL(`../src/app/components/${name}.meeko`, import.meta.url), 'utf8'))
@@ -63,7 +63,7 @@ async function renderWithoutClock(context, template, options) {
 const tags = (html, pattern) => [...html.matchAll(/<[a-z][^>]*>/g)].map(([value]) => value).filter((value) => pattern.test(value))
 const attribute = (markup, name) => new RegExp(`\\s${name}="([^"]*)"`).exec(markup)?.[1]
 const classes = (markup) => (attribute(markup, 'class') ?? '').split(' ')
-const presetsOf = (html) => [...html.matchAll(/<button([^>]*)>([^<]*)<\/button>/g)].map(([, attributes, label]) => ({ label: label.trim(), pressed: attribute(attributes, 'aria-pressed'), disabled: /\sdisabled/.test(attributes) }))
+const presetsOf = (html) => [...html.matchAll(/<button([^>]*)>([^<]*)<\/button>/g)].map(([, attributes, label]) => ({ label: label.trim(), pressed: attribute(attributes, 'aria-pressed'), disabled: /\sdisabled(?=[\s=]|$)/.test(attributes) }))
 
 const text = builtinMessages.es.dateRange
 const apply = (today) => defaultDateRangePresets(text).map((preset) => [preset.label, preset.range(today)])
@@ -204,7 +204,9 @@ test('UIDateRange renders on the server without reading the clock: a named group
 			['hasta', '2026-11-24', '2025-01-01', '2026-12-31', true],
 		],
 	)
-	assert.ok(classes(dates[0]).includes('ui:[font-variant-numeric:tabular-nums]'), 'the look of <UIInput type="date">')
+	for (const name of ['[font-variant-numeric:tabular-nums]', 'bg-control', 'border-control-border']) assert.ok(classes(dates[0]).includes(name), `the look of <UIInput type="date">: ${name}`)
+	// The shortcuts are outline buttons of size `sm`, pressed with the soft primary accent read from aria-pressed.
+	for (const name of ['border-control-border', 'min-h-(--ui-control-height-sm)', 'aria-pressed:bg-primary-3', 'aria-pressed:border-primary-7']) assert.ok(classes(tags(html, /<button/)[0]).includes(name), `the look of a shortcut: ${name}`)
 	assert.match(html, /<label[^>]*>\s*<span[^>]*>Desde<\/span>\s*<input/, 'each date inside its own label')
 	assert.match(html, /<span[^>]*>Hasta<\/span>/)
 	// Without `today` the shortcuts cannot know their ranges: they wait disabled and unpressed.
@@ -248,7 +250,7 @@ test('an invalid range marks its dates and describes them with a message', { tim
 		assert.equal(attribute(date, 'aria-invalid'), 'true')
 		assert.equal(attribute(date, 'aria-describedby'), `help ${id}`)
 	}
-	assert.ok(classes(tags(order, /type="date"/)[0]).includes('ui:aria-[invalid=true]:border-danger'), 'the look of an invalid field')
+	assert.ok(classes(tags(order, /type="date"/)[0]).includes('aria-[invalid=true]:border-danger'), 'the look of an invalid field')
 	const long = await render(context, `<UIDateRange bind:maxDays="366" model:from="signal('2024-01-01')" model:to="signal('2025-01-01')" />`)
 	assert.match(long, /El rango no puede tener más de 366 días\./)
 	const below = await render(context, `<UIDateRange min="2026-01-01" model:from="signal('2025-12-31')" />`)
@@ -278,7 +280,7 @@ test('inside UIField the group is named by the label of the field and its dates 
 	assert.match(legend, />Fin<\/span>/)
 	const named = await render(context, `<UIDateRange ariaLabel="Fechas del informe" bind:disabled="true" form="filters" />`)
 	assert.equal(attribute(tags(named, /<fieldset/)[0], 'aria-label'), 'Fechas del informe')
-	assert.match(tags(named, /<fieldset/)[0], /\sdisabled/, 'a disabled fieldset disables its dates and its shortcuts')
+	assert.match(tags(named, /<fieldset/)[0], /\sdisabled(?=[\s=>])/, 'a disabled fieldset disables its dates and its shortcuts')
 	assert.ok(tags(named, /type="date"/).every((date) => attribute(date, 'form') === 'filters'))
 })
 

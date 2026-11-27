@@ -80,7 +80,7 @@
 			cuando el padre ya aporta ese espacio.
 		</p>
 		<DocsCode bind:code="examples.containerNested" />
-		<UIAlert tone="info">Un contenedor 4K no obliga a que todo el texto mida 3840px. Combina una superficie amplia con contenedores menores para lectura, formularios y detalles.</UIAlert>
+		<UIAlert color="info">Un contenedor 4K no obliga a que todo el texto mida 3840px. Combina una superficie amplia con contenedores menores para lectura, formularios y detalles.</UIAlert>
 		<h2 id="api">API</h2>
 		<DocsApi
 			bind:rows="[

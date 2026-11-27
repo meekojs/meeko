@@ -184,7 +184,7 @@
 					if:when="report.value?.brokenLinks.length"
 					name="actions"
 				>
-					<UIBadge tone="danger">{formatNumber(report.value?.brokenLinks.length ?? 0)}</UIBadge>
+					<UIBadge color="danger">{formatNumber(report.value?.brokenLinks.length ?? 0)}</UIBadge>
 				</snippet>
 				<UITable
 					bind:hideCaption="true"
@@ -277,7 +277,7 @@
 								<code>{row.name}</code>
 								<UIBadge
 									if:when="row.deprecated"
-									tone="danger"
+									color="danger"
 								>
 									{t('health.deprecated')}
 								</UIBadge>
@@ -322,7 +322,7 @@
 							<a bind:href="localePath('/sources/' + row.id)">{row.title}</a>
 							<UIBadge
 								if:when="row.removedAt"
-								tone="danger"
+								color="danger"
 							>
 								{t('badge.removed')}
 							</UIBadge>

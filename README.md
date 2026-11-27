@@ -49,7 +49,7 @@ Las órdenes de la raíz reenvían al paquete (`pnpm -F @meekojs/meeko run <orde
 ```powershell
 pnpm -F meeko-language run check          # extensión de VS Code; también test, build y package:vsix
 pnpm -F meeko-devtools-extension run check
-pnpm run site:build                       # compila el paquete y después el sitio
+pnpm build --filter=meeko-site           # compila el paquete y después el sitio
 ```
 
 Los comandos `build`, `check`, `tooling:build` y los builds/servidores de las aplicaciones usan
@@ -60,7 +60,8 @@ La caché local vive en `.turbo/`; CI la conserva entre ejecuciones. Los comando
 `pnpm dev` ejecuta los cuatro sitios en paralelo con `turbo watch`: framework en
 `http://127.0.0.1:4173`, UI en `http://127.0.0.1:4174`, i18n en `http://127.0.0.1:4175` y dashboard en
 `http://127.0.0.1:4310`. Prepara sus dependencias y, cuando cambia el código de un paquete del
-workspace, reconstruye su `dist` y reinicia los servidores afectados. Los comandos `site:dev`,
-`ui:dev`, `i18n:dev` y `dashboard:dev` ofrecen el mismo flujo para cada aplicación por separado.
+workspace, Turbo actualiza sus builds. En `apps/ui`, Meeko lee los componentes fuente y aplica HMR
+mientras el servidor sigue activo. Usa `dev:site`, `dev:ui`, `dev:i18n` o `dev:dashboard` para
+iniciar una sola aplicación.
 
 [CONTRIBUTING.md](CONTRIBUTING.md) recoge las convenciones y [SECURITY.md](SECURITY.md) cómo informar de una vulnerabilidad. El código se distribuye bajo la [licencia MIT](LICENSE).

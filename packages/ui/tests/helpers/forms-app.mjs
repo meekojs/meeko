@@ -26,18 +26,18 @@ const toast = useToast()
 <UIRadioGroup legend="Periodo" name="period" variant="segmented" model="period" bind:options="[{value:'day',label:'Día'},{value:'week',label:'Semana'},{value:'month',label:'Mes',disabled:true}]" />
 <UISlider label="Volumen" name="volume" bind:min="0" bind:max="10" bind:step="2" model="volume" />
 <output id="values">{comment.value}|{accepted.value}|{notifications.value}|{period.value}|{volume.value}</output>
-<UIButton id="save" type="submit" name="intent" value="save" form="editor" tone="danger" bind:loading="busy.value">Guardar cambios</UIButton>
+<UIButton id="save" type="submit" name="intent" value="save" form="editor" color="danger" bind:loading="busy.value">Guardar cambios</UIButton>
 <UIButton id="busy" on:click="() => (busy.value = !busy.value)">Cambiar carga</UIButton>
 </form>
-<UIAlert title="No se pudo guardar" description="Comprueba la conexión y vuelve a intentarlo." tone="danger" bind:dismiss="true"><snippet name="actions"><UIButton variant="outline">Reintentar</UIButton></snippet></UIAlert>
-<UIAlert title="Traducción pendiente" description="Se muestra el contenido original." tone="info" />
-<div style="display:flex;gap:var(--ui-space-2)"><UIBadge tone="info" bind:dot="true">Información</UIBadge><UIBadge tone="success" bind:dot="true">Publicado</UIBadge><UIBadge tone="warning" bind:dot="true">Pendiente</UIBadge></div>
+<UIAlert title="No se pudo guardar" description="Comprueba la conexión y vuelve a intentarlo." color="danger" bind:dismiss="true"><snippet name="actions"><UIButton variant="outline" color="neutral">Reintentar</UIButton></snippet></UIAlert>
+<UIAlert title="Traducción pendiente" description="Se muestra el contenido original." color="info" />
+<div style="display:flex;gap:var(--ui-space-2)"><UIBadge color="info" bind:dot="true">Información</UIBadge><UIBadge color="success" bind:dot="true">Publicado</UIBadge><UIBadge color="warning" bind:dot="true">Pendiente</UIBadge></div>
 <UICard title="Resumen" density="compact" padding="md"><UIStat label="Visitas" bind:value="1200" detail="Esta semana" /></UICard>
 <UIDescriptionList bind:columns="2" bind:items="[{label:'Estado',value:'Activo'},{label:'Actualizado',value:'Hoy'}]" />
 <UITable caption="Resultados" density="compact" rowKey="id" bind:rows="[{id:1,name:'Ana',count:5}]" bind:columns="[{key:'name',label:'Nombre',rowHeader:true},{key:'count',label:'Cantidad',numeric:true}]" />
-<UIEmpty title="Sin resultados" description="Añade un elemento para comenzar." variant="panel"><snippet name="actions"><UIButton variant="outline">Añadir elemento</UIButton></snippet></UIEmpty>
+<UIEmpty title="Sin resultados" description="Añade un elemento para comenzar." variant="panel"><snippet name="actions"><UIButton variant="outline" color="neutral">Añadir elemento</UIButton></snippet></UIEmpty>
 <UISkeleton bind:lines="3" bind:widths="['full','long','short']" />
-<UIButton id="notify" on:click="() => toast.add({text:'Cambios guardados',tone:'success',duration:0})">Mostrar aviso</UIButton>
+<UIButton id="notify" on:click="() => toast.add({text:'Cambios guardados',color:'success',duration:0})">Mostrar aviso</UIButton>
 <UIButton id="timed" on:click="() => toast.add({text:'Aviso temporal',duration:800})">Aviso temporal</UIButton>
 <UIButton id="clear" on:click="() => toast.clear()">Limpiar avisos</UIButton>
 </main>
@@ -89,6 +89,8 @@ export async function startForms(context, { port = 4568, timeout = 120_000, page
 		'package.json': JSON.stringify({ name: 'ui-forms-test', private: true, type: 'module' }),
 		'meeko.config.ts': `import { defineMeekoConfig } from '@meekojs/meeko/framework'\nexport default defineMeekoConfig({ modules: ['@meekojs/ui'] })\n`,
 		'app/app.meeko': '<template><UIApp><MeekoOutlet /></UIApp></template>',
+		// The app compiles the entry of UI with its Tailwind: without it the components have no styles.
+		'app/styles/main.css': "@import 'tailwindcss';\n@import '@meekojs/ui';\n",
 		'app/pages/index.meeko': page,
 	}
 	const fixture = await createFixture(context, parent, 'd1-forms-', { files, links: { '@meekojs/ui': packageRoot } })

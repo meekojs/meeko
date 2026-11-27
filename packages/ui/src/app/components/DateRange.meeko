@@ -7,11 +7,12 @@
 
 	import type { UIDateRangeProps, UIDateRangeValue } from '../types/date-range'
 
+	import { buttonTheme } from '../theme/components/button'
+	import { dateRangeTheme } from '../theme/components/date-range'
+	import { inputNumeric, inputTheme } from '../theme/components/input'
 	import { createDateRange } from '../utils/date-range'
 	import { uiTheme } from '../utils/defaults'
 	import { uiMessages } from '../utils/messages'
-	import { dateRange } from '../variants/date-range'
-	import { input, inputNumeric } from '../variants/input'
 
 	const props = defineProps<UIDateRangeProps>()
 
@@ -40,8 +41,10 @@
 	const ariaLabel = computed(() => (props.label === undefined ? (props.ariaLabel ?? text.label) : undefined))
 	const describedBy = (invalid: boolean): string | undefined => [props.describedBy, invalid && range.problem.value ? errorId : undefined].filter(Boolean).join(' ') || undefined
 
-	const classes = dateRange()
-	const inputClass = computed(() => input({ class: [inputNumeric, classes.input({ class: theme.ui.input })] }))
+	// The shortcuts are outline buttons of size `sm`, pressed with the soft accent; the fields, those of <UIInput type="date">.
+	const classes = dateRangeTheme()
+	const presetClass = computed(() => buttonTheme({ variant: 'outline', color: 'neutral', size: 'sm', class: classes.preset({ class: theme.ui.preset }) }))
+	const inputClass = computed(() => inputTheme({ class: [inputNumeric, classes.input({ class: theme.ui.input })].join(' ') }))
 </script>
 
 <template>
@@ -71,7 +74,7 @@
 				type="button"
 				bind:aria-pressed="preset.pressed ? 'true' : 'false'"
 				bind:disabled="range.today.value === undefined"
-				bind:class="classes.preset({ class: theme.ui.preset })"
+				bind:class="presetClass.value"
 				on:click="preset.apply"
 				>{preset.label}</button
 			>

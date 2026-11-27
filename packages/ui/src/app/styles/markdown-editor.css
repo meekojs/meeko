@@ -1,6 +1,6 @@
 /*
  * <UIMarkdownEditor>: the theme of Crepe, in the sheet of `@meekojs/ui/editor`. Its frame (bar, notice,
- * surface, marker and text area) is on Tailwind, in variants/markdown-editor. This stays CSS because it
+ * surface, marker and text area) is on Tailwind, in theme/components/markdown-editor. This stays CSS because it
  * dresses Milkdown's DOM, which the component does not write, under the class `ui-markdown-editor` of
  * its root. Crepe's own sheets, without a layer, arrive later with its chunk, so this sheet has no layer
  * either, and a rule that must win over one of them is more specific. Theme by tokens only: data-theme
@@ -31,7 +31,7 @@
 	--crepe-font-code: var(--ui-font-mono);
 	--crepe-shadow-1: var(--ui-shadow-sm);
 	--crepe-shadow-2: var(--ui-shadow-md);
-	/* The height of the surface (variants/markdown-editor), from the first paint. */
+	/* The height of the surface (theme/components/markdown-editor), from the first paint. */
 	--ui-editor-surface-height: var(--ui-markdown-editor-height, calc(var(--ui-space-24) * 5));
 }
 

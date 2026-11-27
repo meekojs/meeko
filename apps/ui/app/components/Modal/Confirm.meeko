@@ -23,7 +23,8 @@
 		<p if:when="props.level === 0">{t('demo.confirm.stack')}</p>
 		<UIButton
 			if:when="props.level < 2"
-			variant="secondary"
+			variant="surface"
+			color="neutral"
 			on:click="openNested"
 		>
 			{t('demo.confirm.openNested')}
@@ -31,7 +32,8 @@
 		<p role="status">{nested.value}</p>
 		<snippet name="footer">
 			<UIButton
-				variant="secondary"
+				variant="surface"
+				color="neutral"
 				on:click="() => modal.dismiss()"
 			>
 				{t('demo.confirm.cancel')}

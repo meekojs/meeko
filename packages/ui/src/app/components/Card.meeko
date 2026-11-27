@@ -1,10 +1,11 @@
 <script lang="ts">
+	// <UICard>: a <section> with header, body and footer. Its look is the recipe of theme/components/card.
 	import type { UICardProps } from '../types/card'
 
+	import { cardTheme } from '../theme/components/card'
 	import { uiTheme } from '../utils/defaults'
-	import { card } from '../variants/card'
 
-	const { title, headingId, description, variant, density, padding, actionsWrap, ui: ownUi, class: ownClass, ...rest } = defineProps<UICardProps>()
+	const { title, headingId, description, variant, color, radius, elevation, density, padding, actionsWrap, ui: ownUi, class: ownClass, ...rest } = defineProps<UICardProps>()
 
 	const theme = uiTheme('card', () => ({ class: ownClass, ui: ownUi }))
 
@@ -18,8 +19,16 @@
 	/** The props of the card win over `ui.defaults`, and `padding` over `density` at each level. */
 	const paddingOf = () => padding ?? (density ? densityPadding[density] : (theme.defaults?.padding ?? densityPadding[theme.defaults?.density ?? 'normal']))
 
-	const classes = card()
-	const variants = () => ({ variant: variant ?? theme.defaults?.variant ?? 'outline', padding: paddingOf(), actions: Boolean(snippets.actions), actionsWrap: actionsWrap ?? theme.defaults?.actionsWrap ?? 'inline' })
+	const classes = cardTheme()
+	const variants = () => ({
+		variant: variant ?? theme.defaults?.variant,
+		color: color ?? theme.defaults?.color,
+		radius: radius ?? theme.defaults?.radius,
+		elevation: elevation ?? theme.defaults?.elevation,
+		padding: paddingOf(),
+		actions: Boolean(snippets.actions),
+		actionsWrap: actionsWrap ?? theme.defaults?.actionsWrap,
+	})
 </script>
 
 <template>
@@ -40,7 +49,7 @@
 				if:when="!snippets.header && title"
 				bind:id="titleId"
 				bind:tabindex="headingId ? -1 : undefined"
-				bind:class="classes.title({ class: theme.ui.title })"
+				bind:class="classes.title({ ...variants(), class: theme.ui.title })"
 			>
 				{title}
 			</h2>
@@ -57,10 +66,10 @@
 				<render snippet="snippets.actions" />
 			</div>
 		</header>
-		<div bind:class="classes.body({ class: theme.ui.body })"><render snippet="snippets.default" /></div>
+		<div bind:class="classes.body({ ...variants(), class: theme.ui.body })"><render snippet="snippets.default" /></div>
 		<footer
 			if:when="snippets.footer"
-			bind:class="classes.footer({ class: theme.ui.footer })"
+			bind:class="classes.footer({ ...variants(), class: theme.ui.footer })"
 		>
 			<render snippet="snippets.footer" />
 		</footer>

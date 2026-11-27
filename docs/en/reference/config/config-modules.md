@@ -32,7 +32,7 @@ import { defineMeekoConfig } from "@meekojs/meeko/framework";
 export default defineMeekoConfig({
   modules: ["@meekojs/i18n", "@meekojs/ui"],
   i18n: { defaultLocale: "es", catalogs: { es: "app/locales/es.json", en: "app/locales/en.json" } },
-  ui: { defaults: { button: { shape: "pill" } } },
+  ui: { defaults: { button: { radius: "full" } } },
 });
 ```
 

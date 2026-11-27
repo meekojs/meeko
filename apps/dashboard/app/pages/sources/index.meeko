@@ -209,6 +209,7 @@
 				<UIButton
 					if:when="filtered.value"
 					variant="ghost"
+					color="neutral"
 					on:click="clear"
 				>
 					{t('actions.clearFilters')}

@@ -36,7 +36,7 @@ export default defineMeekoConfig({
 	site: 'https://example.com', // origin for sitemap/robots/SEO absolute URLs (not Origin checks)
 	modules: ['@meekojs/ui', '@meekojs/i18n', './modules/accent'], // names/paths only, never imports
 	i18n: { defaultLocale: 'es', catalogs: { es: 'app/locales/es.json', en: 'app/locales/en.json' } },
-	ui: { defaults: { button: { shape: 'pill' } } },
+	ui: { defaults: { button: { radius: 'full' } } },
 	layers: ['./layers/base'], // folders with app/pages, components, server/utils...
 	imports: { serverDirs: ['server/services'], sharedDirs: ['shared/validators'], appDirs: ['app/services'] },
 	alias: { '#db/': './server/db/' },

@@ -1,4 +1,4 @@
-import type { tabs } from '../variants/tabs'
+import type { tabsTheme } from '../theme/components/tabs'
 import type { UIThemeProps } from './theme'
 
 /**
@@ -50,7 +50,7 @@ export interface TabsSnippets<Value extends string = string> {
  * ```
  */
 export type UITabsProps<Value extends string = string> = UIThemeProps<
-	typeof tabs,
+	typeof tabsTheme,
 	{
 		/** Las pestañas, en orden. */
 		readonly items: readonly UITabsItem<Value>[]

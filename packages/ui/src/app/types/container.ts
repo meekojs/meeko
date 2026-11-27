@@ -1,4 +1,4 @@
-import type { container } from '../variants/container'
+import type { containerTheme } from '../theme/components/container'
 import type { UIThemeProps } from './theme'
 
 /** Anchos máximos del contenedor, en rem, desde contenido compacto hasta 4K. */
@@ -18,7 +18,7 @@ export type UIContainerTag = 'div' | 'section' | 'main' | 'article' | 'header' |
  * @example `<UIContainer as="section" size="2xl" gutter="lg" ariaLabel="Novedades">…</UIContainer>`
  */
 export type UIContainerProps = UIThemeProps<
-	typeof container,
+	typeof containerTheme,
 	{
 		/** Etiqueta del elemento; `"div"` por defecto. */
 		as?: UIContainerTag

@@ -368,6 +368,9 @@ test('changing component directories in meeko.config.ts reconciles the registry'
 	}
 	await waitFor(true)
 	assert.match(await readFile(badgeType, 'utf8'), /component-declaration/)
+	// components.d.ts imports the declaration of Badge: it is written after it, not before. Otherwise
+	// the read above only fails when the declaration is slow to generate, as on Windows.
+	assert.ok((await stat(types)).mtimeMs >= (await stat(badgeType)).mtimeMs, 'components.d.ts names Badge only after its declaration exists')
 	// Native watchers may coalesce writes to the same file within one Windows timestamp tick.
 	await new Promise((done) => setTimeout(done, 150))
 	await writeFile(config, 'export default {};\n')

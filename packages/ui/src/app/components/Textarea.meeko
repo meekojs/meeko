@@ -1,8 +1,8 @@
 <script lang="ts">
 	import type { UITextareaProps } from '../types/forms'
 
+	import { textareaTheme } from '../theme/components/textarea'
 	import { uiTheme } from '../utils/defaults'
-	import { textarea } from '../variants/input'
 
 	const { invalid, describedBy, spellcheck, class: ownClass, ...rest } = defineProps<UITextareaProps>()
 
@@ -17,7 +17,7 @@
 		bind:spellcheck="spellcheck === undefined ? undefined : String(spellcheck)"
 		bind:aria-invalid="invalid ? 'true' : undefined"
 		bind:aria-describedby="describedBy ?? rest['aria-describedby']"
-		bind:class="textarea({ class: theme.class })"
+		bind:class="textareaTheme({ class: theme.class })"
 		bind="rest"
 	/>
 </template>

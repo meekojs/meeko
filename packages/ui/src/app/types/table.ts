@@ -1,4 +1,4 @@
-import type { table } from '../variants/table'
+import type { tableTheme } from '../theme/components/table'
 import type { UIDensity } from './forms'
 import type { UIThemeProps } from './theme'
 
@@ -10,7 +10,7 @@ import type { UIThemeProps } from './theme'
  */
 export type UITableProps<T extends object> = Omit<
 	UIThemeProps<
-		typeof table,
+		typeof tableTheme,
 		{
 			/** Filas de datos. */
 			rows: readonly T[]

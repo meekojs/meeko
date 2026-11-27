@@ -2,9 +2,9 @@
 	import type { Snippet } from '@meekojs/meeko'
 	import type { TableCellValue, TableColumn, UITableProps } from '@meekojs/ui/runtime'
 
+	import { tableTheme } from '../theme/components/table'
 	import { uiTheme } from '../utils/defaults'
 	import { uiMessages } from '../utils/messages'
-	import { table } from '../variants/table'
 
 	const props = defineProps<UITableProps<T>>({ layout: 'native', hideHeader: false })
 
@@ -36,7 +36,7 @@
 
 	const id = useId()
 	const text = uiMessages().table
-	const classes = table()
+	const classes = tableTheme()
 
 	/** The variants that the whole table shares. */
 	const variants = () => ({ layout: props.layout, density: props.density ?? theme.defaults?.density ?? 'normal', hideCaption: Boolean(props.hideCaption) })

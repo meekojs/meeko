@@ -1,5 +1,5 @@
 /*
- * <UIPopover>: what its classes (../variants/popover.ts) cannot reach. The items of a menu are the app's
+ * <UIPopover>: what its classes (../theme/components/popover.ts) cannot reach. The items of a menu are the app's
  * markup, a native <button> or <a>, or a <UIButton variant="ghost">, and the trigger of a tooltip that the
  * browser opens by itself can be any element of the app.
  */

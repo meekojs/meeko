@@ -1,13 +1,13 @@
 <script lang="ts">
 	import type { UIBrand } from '../../types/navigation'
 
+	import { brandTheme } from '../../theme/components/header'
 	import { linkTarget } from '../../utils/navigation'
-	import { brand } from '../../variants/header'
 	import * as ItemLink from './ItemLink.meeko'
 
 	const props = defineProps<{ brand: UIBrand }>()
 
-	const classes = brand()
+	const classes = brandTheme()
 </script>
 
 <template>

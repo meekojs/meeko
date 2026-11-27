@@ -65,6 +65,7 @@
 		<snippet name="actions">
 			<UILink
 				variant="ghost"
+				color="neutral"
 				bind:href="localePath('/translations')"
 			>
 				{t('translations.detail.all')}
@@ -72,6 +73,7 @@
 			<UILink
 				if:when="data"
 				variant="outline"
+				color="neutral"
 				bind:href="localePath('/sources/' + data?.original.id)"
 			>
 				{t('translations.detail.original')}
@@ -98,7 +100,7 @@
 				<snippet name="actions">
 					<UIBadge
 						bind:dot="true"
-						bind:tone="data ? translationTones[data.status] : 'neutral'"
+						bind:color="data ? translationTones[data.status] : 'neutral'"
 					>
 						{data ? t(`labels.translation.${data.status}`) : ''}
 					</UIBadge>
@@ -111,7 +113,7 @@
 
 			<UIAlert
 				if:when="data?.status === 'missing'"
-				tone="info"
+				color="info"
 				bind:title="t('translations.detail.missingTitle')"
 				bind:description="t('translations.detail.missingText', { file: data?.file ?? '' })"
 			>
@@ -119,6 +121,7 @@
 					<UIButton
 						size="sm"
 						variant="outline"
+						color="neutral"
 						bind:disabled="!data?.originalMarkdown"
 						on:click="downloadOriginal"
 					>

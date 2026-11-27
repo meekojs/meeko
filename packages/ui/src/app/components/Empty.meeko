@@ -3,9 +3,9 @@
 
 	import type { UIEmptyProps } from '../types/feedback'
 
+	import { emptyTheme } from '../theme/components/empty'
 	import { uiTheme } from '../utils/defaults'
 	import { uiMessages } from '../utils/messages'
-	import { empty } from '../variants/feedback'
 
 	const props = defineProps<UIEmptyProps>()
 
@@ -14,7 +14,7 @@
 	const snippets = defineSnippets<{ default?: []; title?: []; actions?: [] }>()
 
 	const text = uiMessages().feedback
-	const classes = computed(() => empty({ variant: props.variant }))
+	const classes = computed(() => emptyTheme({ variant: props.variant }))
 </script>
 
 <template>

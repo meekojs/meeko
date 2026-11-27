@@ -15,6 +15,7 @@
 			<UILink
 				href="/components"
 				variant="outline"
+				color="neutral"
 			>
 				Ver componentes
 			</UILink>
@@ -45,7 +46,7 @@
 					<p role="status">{saved.value ? 'Cambios guardados en este ejemplo.' : 'Edita el nombre y guarda el cambio.'}</p>
 					<snippet name="footer">
 						<UIButton on:click="() => (saved.value = true)">Guardar proyecto</UIButton>
-						<UIBadge bind:tone="saved.value ? 'accent' : 'neutral'">{saved.value ? 'Guardado' : 'Borrador'}</UIBadge>
+						<UIBadge bind:color="saved.value ? 'primary' : 'neutral'">{saved.value ? 'Guardado' : 'Borrador'}</UIBadge>
 					</snippet>
 				</UICard>
 			</div>
