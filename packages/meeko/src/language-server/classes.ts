@@ -6,6 +6,7 @@ import { pathToFileURL } from 'node:url'
 import { TextDocument } from 'vscode-languageserver-textdocument'
 import { CompletionItemKind, MarkupKind } from 'vscode-languageserver/node'
 
+import type { ClassProvider } from '../modules/define-meeko-module'
 import type { ClassRule } from './class-rules'
 
 import { classRuleSnippet, cssClassRules, cssImports } from './class-rules'
@@ -41,7 +42,7 @@ export interface ComponentText {
 	readonly source: string
 }
 
-/** The global stylesheet that `meeko dev` writes processed (imports resolved, `@utilities` expanded). */
+/** The global stylesheet that `meeko dev` writes processed (imports resolved, CSS plugins applied). */
 export const processedStylesheet = join('.meeko', 'styles', 'main.css')
 /** The global stylesheet of the application, read when there is no processed one. */
 export const applicationStylesheet = join('app', 'styles', 'main.css')
@@ -229,55 +230,56 @@ export class ClassIndex {
 	}
 }
 
-/** Ajustes del proveedor de clases y estado de Tailwind comunicado por el editor. */
+/**
+ * Ajustes `meeko.classes` del editor y el estado de las extensiones que atienden las clases de los
+ * proveedores externos que declara el proyecto (véase `ClassProvider`).
+ */
 export interface ClassSettings {
 	readonly completion?: 'auto' | 'on' | 'off'
 	readonly hover?: 'auto' | 'on' | 'off'
 	readonly definition?: boolean
+	/**
+	 * Ids de las extensiones del editor que están activas entre las que nombran los proveedores
+	 * declarados (`vscode` de cada uno), como `["bradlc.vscode-tailwindcss"]`. Lo envían los
+	 * clientes desde `1.12`, también vacío: su presencia indica un cliente que conoce los
+	 * proveedores, y entonces se ignora `tailwindActive`.
+	 * @since 1.12.0
+	 */
+	readonly activeExtensions?: readonly string[]
+	/**
+	 * Señal de los clientes anteriores a `1.12`: la extensión Tailwind CSS IntelliSense está activa.
+	 * Sólo cuenta sin `activeExtensions`; véase {@link classProviderActive}.
+	 * @deprecated Use `activeExtensions`.
+	 */
 	readonly tailwindActive?: boolean
 }
 
-/** Whether each project's package.json declares tailwindcss, by its `mtimeMs:size` stamp. */
-const tailwindManifests = new Map<string, { readonly stamp: string; readonly tailwind: boolean }>()
+/** The extension that the `tailwindActive` of a client before 1.12 stands for. */
+const legacyExtension = 'bradlc.vscode-tailwindcss'
 
 /**
- * Whether the project's package.json declares `tailwindcss` in any dependency field. Completion
- * and hover ask on every request: the manifest is only read again when its stamp changes.
+ * Whether an external class provider of the project attends its generated classes in the editor:
+ * one of `providers` names an extension that the client reports active. A client before 1.12 only
+ * sends `tailwindActive`, which stands for the Tailwind CSS IntelliSense extension: it counts for a
+ * provider that names that extension and, so that such a client keeps the delegation it had, also
+ * when the project declares no provider at all (the server no longer looks for Tailwind in the
+ * project). A project that declares other providers only gets what they name.
  */
-function declaresTailwind(root: string): boolean {
-	const file = join(root, 'package.json')
-	let stamp: string
-	try {
-		const stat = statSync(file, { throwIfNoEntry: false })
-		// A project without a manifest may still import Tailwind from its CSS.
-		if (!stat?.isFile()) {
-			tailwindManifests.delete(root)
-			return false
-		}
-		stamp = `${stat.mtimeMs}:${stat.size}`
-	} catch {
-		return false
-	}
-	const cached = tailwindManifests.get(root)
-	if (cached?.stamp === stamp) return cached.tailwind
-	let tailwind = false
-	try {
-		const manifest = JSON.parse(readFileSync(file, 'utf8')) as Record<string, Record<string, unknown> | undefined>
-		tailwind = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'].some((key) => manifest[key]?.tailwindcss !== undefined)
-	} catch {
-		/* An unreadable or invalid manifest declares nothing until it changes. */
-	}
-	tailwindManifests.set(root, { stamp, tailwind })
-	return tailwind
+export function classProviderActive(settings: ClassSettings, providers: readonly ClassProvider[]): boolean {
+	const active = Array.isArray(settings.activeExtensions) ? settings.activeExtensions.filter((id): id is string => typeof id === 'string').map((id) => id.toLowerCase()) : undefined
+	if (active) return providers.some((provider) => provider.vscode?.some((id) => active.includes(id.toLowerCase())))
+	if (settings.tailwindActive !== true) return false
+	return !providers.length || providers.some((provider) => provider.vscode?.some((id) => id.toLowerCase() === legacyExtension))
 }
 
-/** Filtra la hoja generada cuando Tailwind aporta sus propias sugerencias. */
-export function configuredClassView(view: ClassView, settings: ClassSettings = {}): ClassView {
+/**
+ * The classes Meeko offers with these settings: none with `off`; in `auto`, when a declared class
+ * provider is active ({@link classProviderActive}), only the classes written in components and
+ * source stylesheets, leaving those that only the processed stylesheet has to that provider.
+ */
+export function configuredClassView(view: ClassView, settings: ClassSettings = {}, providers: readonly ClassProvider[] = []): ClassView {
 	if (settings.completion === 'off') return { ...view, own: undefined, global: new Map(), sources: [] }
-	if (settings.completion === 'on' || !settings.tailwindActive) return view
-	let tailwind = view.sources.some((source) => source.origin !== 'snapshot' && cssImports(source.text).some((target) => target === 'tailwindcss' || target.startsWith('tailwindcss/')))
-	if (!tailwind && view.root) tailwind = declaresTailwind(view.root)
-	if (!tailwind) return view
+	if (settings.completion === 'on' || !classProviderActive(settings, providers)) return view
 	const global = new Map<string, readonly ClassSource[]>()
 	for (const [name, sources] of view.global) {
 		const written = sources.filter((source) => source.origin !== 'snapshot')
@@ -425,12 +427,12 @@ export function classView(document: TextDocument, filename?: string, index?: Cla
  * each and without those already written. `undefined` elsewhere; in `bind:class`, also when
  * there are none, so that TypeScript answers.
  */
-export function classCompletion(document: TextDocument, position: Position, filename?: string, index?: ClassIndex, components?: readonly ComponentText[], settings?: ClassSettings): CompletionItem[] | undefined {
+export function classCompletion(document: TextDocument, position: Position, filename?: string, index?: ClassIndex, components?: readonly ComponentText[], settings?: ClassSettings, providers?: readonly ClassProvider[]): CompletionItem[] | undefined {
 	const source = document.getText()
 	const offset = document.offsetAt(position)
 	const token = classTokenAt(source, offset)
 	if (!token) return undefined
-	const view = configuredClassView(classView(document, filename, index, components), settings)
+	const view = configuredClassView(classView(document, filename, index, components), settings, providers)
 	const start = document.positionAt(token.start)
 	const items: CompletionItem[] = []
 	const add = (name: string, source: ClassSource): void => {
@@ -472,11 +474,11 @@ export function resolveClassCompletion(item: CompletionItem, view: ClassView): C
 }
 
 /** Hover of a class in `class="…"` or `bind:class`: where it is defined and its rule. */
-export function classHover(document: TextDocument, position: Position, filename?: string, index?: ClassIndex, components?: readonly ComponentText[], settings?: ClassSettings): Hover | undefined {
+export function classHover(document: TextDocument, position: Position, filename?: string, index?: ClassIndex, components?: readonly ComponentText[], settings?: ClassSettings, providers?: readonly ClassProvider[]): Hover | undefined {
 	const source = document.getText()
 	const token = classTokenAt(source, document.offsetAt(position))
 	if (!token || token.start === token.end) return undefined
-	const contents = classMarkdown(configuredClassView(classView(document, filename, index, components), { ...settings, completion: settings?.hover ?? 'auto' }), source.slice(token.start, token.end))
+	const contents = classMarkdown(configuredClassView(classView(document, filename, index, components), { ...settings, completion: settings?.hover ?? 'auto' }, providers), source.slice(token.start, token.end))
 	return contents && { contents, range: { start: document.positionAt(token.start), end: document.positionAt(token.end) } }
 }
 
@@ -499,7 +501,7 @@ function locationsIn(source: ClassSource, name: string, own: TextDocument): Loca
 /**
  * From a class in `class="…"` or `bind:class` to its selectors: in the component, in the
  * `<style>` of other components and in the project's stylesheets. A class that only the
- * processed stylesheet defines (generated by `@utilities` or Tailwind) leads to its rule there.
+ * processed stylesheet defines (generated by a CSS plugin or a class provider) leads to its rule there.
  */
 export function classDefinition(document: TextDocument, position: Position, filename?: string, index?: ClassIndex, components?: readonly ComponentText[], settings?: ClassSettings): Location[] | undefined {
 	if (settings?.definition === false) return undefined

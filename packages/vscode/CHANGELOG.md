@@ -2,6 +2,7 @@
 
 ## Sin publicar
 
+- La extensión pide al servidor los proveedores de clases del proyecto (`meeko/classProviders`) y le comunica cuáles de sus extensiones están activas (`activeExtensions`). Con un servidor anterior se comporta como hasta ahora, porque sigue enviando `tailwindActive`. Las descripciones de `meeko.classes.completion` y `meeko.classes.hover` hablan ahora del proveedor declarado. `tailwindCSS.includeLanguages` no cambia.
 - La extensión sigue funcionando cuando un servidor de lenguaje no arranca: los fragmentos, el cierre de etiquetas, las zonas de ejecución y los comandos de scaffold se registran antes de arrancarlo. Si falla el servidor de `@meekojs/meeko` del proyecto, esa carpeta usa el incluido en la extensión y un aviso lo explica; el fallo de una carpeta ya no detiene los servidores de las demás.
 - Un `.meeko` abierto fuera de las carpetas del workspace, o sin guardar, tiene servidor: un cliente global arranca con el primero de esos archivos y se retira cuando no queda ninguno.
 - En un workspace con carpetas anidadas, cada documento lo atiende sólo el servidor de su carpeta más interna; antes el de la carpeta exterior también respondía y duplicaba diagnósticos, completado y hover.

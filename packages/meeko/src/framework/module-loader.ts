@@ -7,10 +7,12 @@ import type { RouteRecord } from '../app/runtime/router'
 import type { MeekoConfig } from '../modules/define-meeko-config'
 import type { MeekoHooks, MeekoModule, MeekoModuleContext, ModuleAutoImport, ModulePlugin, ModulePublicFileOptions } from '../modules/define-meeko-module'
 import type { DocumentConfig, DocumentHead, HeadInput } from '../shared/head'
+import type { ResolvedClassProvider } from './class-providers'
 
 import { isMeekoModule } from '../modules/define-meeko-module'
 import { meekoEnv } from '../server/runtime/env'
 import { normalizeHeadInput, resolveDocumentConfig, siteOrigin } from '../shared/head'
+import { mergeClassProviders, normalizeClassProvider } from './class-providers'
 import { normalizeComponentExcludes } from './component-exclusions'
 import { validateHeaderValues } from './header-values'
 
@@ -324,6 +326,8 @@ export interface ResolvedModules {
 	/** The response headers of the public files that `addPublicFile` gives some, by path. */
 	readonly publicFileHeaders: ReadonlyMap<string, Readonly<Record<string, string>>>
 	readonly stylesheets: readonly string[]
+	/** External class providers of `addClassProvider`, joined by name, for the editor. */
+	readonly classProviders: readonly ResolvedClassProvider[]
 	readonly typeTemplates: ReadonlyMap<string, string>
 	/** `<head>` entries of the modules, before `document.head` of the configuration. */
 	readonly head: HeadInput | undefined
@@ -349,6 +353,7 @@ const emptyModules: ResolvedModules = Object.freeze({
 	publicFiles: new Map(),
 	publicFileHeaders: new Map(),
 	stylesheets: [],
+	classProviders: [],
 	typeTemplates: new Map(),
 	head: undefined,
 	vitePlugins: [],
@@ -590,6 +595,7 @@ async function runModules(root: string, config: MeekoConfig, dev: boolean): Prom
 	const publicFiles = new Map<string, PublicFileContents>()
 	const publicFileHeaders = new Map<string, Readonly<Record<string, string>>>()
 	const stylesheets: string[] = []
+	const classProviders: ResolvedClassProvider[] = []
 	const typeTemplates = new Map<string, string>()
 	let head: HeadInput | undefined
 	const vitePlugins: object[] = []
@@ -743,6 +749,9 @@ async function runModules(root: string, config: MeekoConfig, dev: boolean): Prom
 				if (!stylesheets.includes(file)) stylesheets.push(file)
 				ownedDirectories.add(dirname(file))
 			},
+			addClassProvider(provider) {
+				classProviders.push(normalizeClassProvider(provider, `Módulo de Meeko ${name}: addClassProvider`))
+			},
 			addHead(input: DocumentHead) {
 				if (!input || typeof input !== 'object') throw new TypeError(`Módulo de Meeko ${name}: addHead necesita un objeto de head`)
 				// It joins `document`, which the build bakes as JSON: fail here, naming the module.
@@ -780,6 +789,7 @@ async function runModules(root: string, config: MeekoConfig, dev: boolean): Prom
 		publicFiles,
 		publicFileHeaders,
 		stylesheets,
+		classProviders: mergeClassProviders(classProviders),
 		typeTemplates,
 		head,
 		vitePlugins,

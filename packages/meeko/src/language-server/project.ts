@@ -4,6 +4,7 @@ import { basename, dirname, join, relative, resolve } from 'node:path'
 
 import type { AutoImport } from '../autoimports/registry'
 import type { ProjectAliases } from '../framework/aliases'
+import type { ResolvedClassProvider } from '../framework/class-providers'
 import type { AppIndex } from './app-index'
 import type { ProjectCompilerOptions, VirtualComponent } from './model'
 
@@ -12,7 +13,8 @@ import { transformTypeScriptAutoImports, typeScriptScope } from '../autoimports/
 import { generatedServicesDeclaration, projectDeclarationFiles } from '../compiler/project-declarations'
 import { projectRoot } from '../compiler/project-root'
 import { resolveProjectAliases, resolveProjectAliasesSync } from '../framework/aliases'
-import { readMeekoConfigSync, readThemeOptionSync, resolveConfigSources } from '../framework/config'
+import { classProvidersManifestFile, mergeClassProviders, readClassProvidersManifestSync } from '../framework/class-providers'
+import { configuredClassProviders, readClassProvidersSync, readMeekoConfigSync, readThemeOptionSync, resolveConfigSources } from '../framework/config'
 import { writeConfigTypesSync } from '../framework/config-types'
 import { generatedThemeLines } from '../framework/generate'
 import { resolveThemeConfig } from '../shared/theme'
@@ -200,6 +202,8 @@ export class MeekoProject {
 	configError: string | undefined
 	/** The themes of `meeko.config.*` that the program declares; see {@link editorThemeDeclaration}. */
 	private theme: EditorTheme | undefined
+	/** Class providers of the executed configuration and its modules; `undefined` until known or after a failure. */
+	private liveClassProviders: readonly ResolvedClassProvider[] | undefined
 
 	constructor(
 		root: string,
@@ -308,6 +312,16 @@ export class MeekoProject {
 
 	get trusted(): boolean {
 		return this.options.trusted
+	}
+
+	/**
+	 * Proveedores externos de clases que declara el proyecto (`addClassProvider` de sus módulos y
+	 * `css.classProviders`). En un workspace de confianza, los de la configuración ejecutada; si no,
+	 * o mientras no se conocen, los que se leen sin ejecutar nada: `css.classProviders` literal y el
+	 * manifiesto que escriben `meeko dev` y `meeko check`.
+	 */
+	classProviders(): readonly ResolvedClassProvider[] {
+		return this.liveClassProviders ?? staticClassProviders(this.root)
 	}
 
 	get compilerOptions(): ts.CompilerOptions {
@@ -599,6 +613,8 @@ export class MeekoProject {
 				registry = this.staticRegistry()
 			}
 		} else registry = this.staticRegistry()
+		// The modules already ran for the registry: their resolution is cached by configuration.
+		this.liveClassProviders = this.options.trusted && this.configError === undefined ? await configuredClassProviders(this.root).catch(() => undefined) : undefined
 		this.roots = await this.resolveSourceRoots()
 		await this.reloadAliases()
 		const key = JSON.stringify(registry)
@@ -665,6 +681,40 @@ export class MeekoProject {
 			return []
 		}
 	}
+}
+
+/** Static class providers by project root, with the `mtimeMs:size` stamps of the files they come from. */
+const staticProviders = new Map<string, { readonly stamp: string; readonly providers: readonly ResolvedClassProvider[] }>()
+
+function fileStamp(file: string): string {
+	try {
+		const stat = statSync(file, { throwIfNoEntry: false })
+		return stat?.isFile() ? `${stat.mtimeMs}:${stat.size}` : '-'
+	} catch {
+		return '-'
+	}
+}
+
+/**
+ * The class providers of a project read without running anything: `css.classProviders` when it is
+ * a literal, joined with the manifest of the modules. Completion and hover ask on every request:
+ * the files are only read again when their stamps change.
+ */
+export function staticClassProviders(root: string): readonly ResolvedClassProvider[] {
+	const configs = ['meeko.config.ts', 'meeko.config.mts', 'meeko.config.js', 'meeko.config.mjs'].map((name) => join(root, name))
+	const stamp = [...configs, join(root, classProvidersManifestFile)].map(fileStamp).join('|')
+	const key = pathKey(root)
+	const cached = staticProviders.get(key)
+	if (cached?.stamp === stamp) return cached.providers
+	let fromConfig: readonly ResolvedClassProvider[] = []
+	try {
+		fromConfig = readClassProvidersSync(root)
+	} catch {
+		/* A configuration that does not parse declares nothing until it changes. */
+	}
+	const providers = mergeClassProviders(readClassProvidersManifestSync(root), fromConfig)
+	staticProviders.set(key, { stamp, providers })
+	return providers
 }
 
 /** The saved `.meeko` files under a folder, without dependencies, build output or hidden folders. */

@@ -1,5 +1,5 @@
 ---
-source-hash: de79ac758818acb91fcf97ebc5f50c6b62c054b721e873db06d677c750d1a658
+source-hash: 8a184a0a3d853e00d764388ac5abc647549cc895ed50547f4dc28f589c65d81c
 ---
 
 # Configure and extend an application
@@ -303,6 +303,7 @@ A module's runtime files (plugins, components, auto-imports, middleware and hand
 | `addServerHandler({ route, handler })`         | Handles an exact route with the default export of `handler`, `(request) => Response`, after server middleware.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `addPublicFile(path, contents, options?)`      | Adds a public file. Since `1.8`, `options.headers` adds headers to its response in `meeko dev` and on the adapters with a server; for example, `Access-Control-Allow-Origin` on a font that an `<iframe sandbox srcdoc>` uses. In production they act like `server.headers` for that path, which wins if it sets the same one. In `meeko dev`, public files do not go through the application: they carry only these headers, and `server.headers` does not affect them. The `static` adapter does not write them. `meeko build` writes it to client output before calculating the asset manifest; `meeko dev` serves it. It conflicts with a `public/` file of the same name. |
 | `addStylesheet(file)`                          | Registers a `.css` file processed by Vite and the project's PostCSS. It accepts a path relative to `rootDir` or a module file URL. Stylesheets are deduplicated by real file and keep registration order; `app/styles/main.css` loads last. Includes HMR, import and asset resolution, CSS in SSR HTML and hashed production assets.                                                                                                                                                                                                                                                                                                                                           |
+| `addClassProvider(provider)`                   | Since `1.12`, declares an [external class provider](editors.md#class-providers) for the editor: `{ name, vscode?, languages? }`, such as `{ name: "Tailwind CSS", vscode: ["bradlc.vscode-tailwindcss"], languages: ["tailwindcss"] }`. It is data: it does not change what `meeko dev` or `meeko build` compile. In `auto`, while that extension is active, the editor leaves to it the classes that only the processed stylesheet has. `meeko dev` and `meeko check` store the declaration in `.meeko/manifests/class-providers.json` for the editor of an untrusted workspace. A module that supports earlier Meeko versions calls it only if it exists.                    |
 | `addHead(input)`                               | Adds entries to `document.head`: `meta`, `link`, `script` and `style` concatenate in module order; `title`, `titleTemplate`, `htmlAttrs` and `bodyAttrs` keep the last value; the project's `document.head` applies last. It receives a `DocumentHead`: `titleTemplate` is a string, and `title` is the site title without a template.                                                                                                                                                                                                                                                                                                                                         |
 | `addVitePlugin(plugin)`                        | Adds a Vite plugin to `meeko dev` and each `meeko build` build step, after Meeko's plugin.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `extendViteConfig(fn)`                         | Modifies each step's inline Vite configuration; `fn(config, { command, ssr })` changes the object or returns another one.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
@@ -567,6 +568,8 @@ export default defineMeekoModule({
 	meta: { name: 'tailwind' },
 	setup(_options, meeko) {
 		meeko.addVitePlugin(tailwindcss())
+		// Since 1.12: the editor leaves the classes Tailwind generates to Tailwind CSS IntelliSense.
+		meeko.addClassProvider({ name: 'Tailwind CSS', vscode: ['bradlc.vscode-tailwindcss'], languages: ['tailwindcss'] })
 	},
 })
 ```
@@ -594,6 +597,8 @@ export default { plugins: { '@tailwindcss/postcss': {} } }
 /* app/styles/main.css */
 @import 'tailwindcss';
 ```
+
+Without a module, the project declares Tailwind to the editor in `css.classProviders` of `meeko.config.ts` (see [`css`](reference/config/config-css.md)), so that it leaves the classes Tailwind generates to Tailwind CSS IntelliSense.
 
 In a `<style scoped>`, `@apply` requires `@reference "tailwindcss";` (or the stylesheet path with your theme) at the start of the block. Since `1.2`, each component's CSS is the module `Componente.meeko?meeko-style=…&lang.css`, next to its file, so PostCSS plugins resolve `@reference` and relative `@import` paths from the component folder. The selector already has the scope attribute when Tailwind expands `@apply`, so the declarations inherit the scope:
 

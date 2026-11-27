@@ -8,6 +8,7 @@ import { pathToFileURL } from 'node:url'
 import type { RouteRecord } from '../app/runtime/router'
 import type { MeekoConfig } from '../modules/define-meeko-config'
 import type { ContentSecurityPolicy } from '../server/runtime/csp'
+import type { ResolvedClassProvider } from './class-providers'
 import type { ResolvedModules } from './module-loader'
 
 import { createRouteManifest } from '../app/runtime/router'
@@ -16,6 +17,7 @@ import { contentSecurityPolicy } from '../server/runtime/csp'
 import { normalizeDevAllowedHost } from '../server/runtime/dev-hosts'
 import { normalizeDocumentConfig, siteOrigin } from '../shared/head'
 import { resolveThemeConfig } from '../shared/theme'
+import { mergeClassProviders, normalizeClassProviders } from './class-providers'
 import { resolveDevtoolsConfig } from './dev-devtools'
 import { portlessConfigError } from './dev-portless'
 import { validateHeaderValues } from './header-values'
@@ -211,6 +213,7 @@ export async function loadMeekoConfig(projectRoot: string): Promise<MeekoConfig>
 		if (css.scopeAttribute !== undefined && css.scopeAttribute !== 'all' && css.scopeAttribute !== 'matched') {
 			throw new TypeError(`${file}: css.scopeAttribute debe ser "all" o "matched"`)
 		}
+		normalizeClassProviders(css.classProviders, `${file}: css.classProviders`)
 	}
 	const dev = config.dev as Record<string, unknown> | undefined
 	if (dev !== undefined) {
@@ -600,6 +603,35 @@ export function readThemeOptionSync(projectRoot: string): unknown {
 	const config = file ? staticConfigObject(file) : undefined
 	const value = config && property(config, 'theme')
 	return value ? literalValue(value)?.value : undefined
+}
+
+/**
+ * `css.classProviders` of `meeko.config.*`, read without running it, as the editor needs it in an
+ * untrusted workspace: the providers when it is an array literal of object literals, `[]` otherwise
+ * (no configuration, an expression only running it tells, or an invalid declaration, which the
+ * executed configuration reports).
+ */
+export function readClassProvidersSync(projectRoot: string): ResolvedClassProvider[] {
+	const file = configFileOf(projectRoot)
+	const config = file ? staticConfigObject(file) : undefined
+	const css = config && property(config, 'css')
+	const value = css && ts.isObjectLiteralExpression(css) ? property(css, 'classProviders') : undefined
+	const literal = value && literalValue(value)
+	if (!literal) return []
+	try {
+		return normalizeClassProviders(literal.value, 'css.classProviders')
+	} catch {
+		return []
+	}
+}
+
+/**
+ * The external class providers of a project: those its modules declare with `addClassProvider`,
+ * then those of `css.classProviders`, joined by name. It runs the configuration and its modules.
+ */
+export async function configuredClassProviders(projectRoot: string): Promise<ResolvedClassProvider[]> {
+	const { config, modules } = await loadConfiguredModules(projectRoot)
+	return mergeClassProviders(modules.classProviders, normalizeClassProviders(config.css?.classProviders, 'css.classProviders'))
 }
 
 /**

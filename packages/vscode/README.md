@@ -195,7 +195,7 @@ pnpm run test:host:isolated
 
 ## Variables CSS y controles independientes
 
-Meeko ofrece completado, hover, «Ir a definición», búsqueda de referencias y renombrado de variables CSS en `<style>` y estilos inline de `.meeko`, y en archivos `.css` de paquetes con `meeko.config.*`. Funciona sin Tailwind y también con el lenguaje `tailwindcss`. Abrir sólo una hoja CSS activa la extensión en un workspace Meeko; el soporte CSS registra únicamente esas funciones de variables, sin hacerse cargo del formato ni de los diagnósticos de CSS.
+Meeko ofrece completado, hover, «Ir a definición», búsqueda de referencias y renombrado de variables CSS en `<style>` y estilos inline de `.meeko`, y en archivos `.css` de paquetes con `meeko.config.*`. Atiende las hojas con el lenguaje `css` y con los que declaran los [proveedores de clases](#proveedores-de-clases) del proyecto, como `tailwindcss` con `@meekojs/ui`. Abrir sólo una hoja CSS activa la extensión en un workspace Meeko; el soporte CSS registra únicamente esas funciones de variables, sin hacerse cargo del formato ni de los diagnósticos de CSS.
 
 Las fuentes son la hoja abierta, `app/styles/main.css`, sus imports locales y la hoja procesada `.meeko/styles/main.css` cuando existe. Los cambios sin guardar en hojas importadas se reflejan entre documentos y al cerrarlas vuelve a contar la versión guardada. El hover muestra el valor y su archivo; la definición prioriza las fuentes escritas frente al CSS generado. Las hojas CSS se leen sin ejecutar la configuración ni plugins del proyecto, también en workspaces no confiables. No se escanea todo el disco: los imports quedan dentro del paquete y tienen un límite de 64 archivos. Los componentes `.meeko` conservan además sus fuentes de estilos globales y las reglas de visibilidad de `scoped`.
 
@@ -226,7 +226,7 @@ Meeko Language registra automáticamente `tailwindCSS.includeLanguages: { "meeko
 
 `meeko.classes.completion` y `meeko.classes.hover` controlan por separado sus funciones de clases de Meeko:
 
-- `auto` (predeterminado): si Tailwind IntelliSense está activo y el proyecto declara `tailwindcss` como dependencia o lo importa desde sus hojas fuente, delega las clases de la hoja procesada `.meeko/styles/main.css` a Tailwind. Conserva las clases escritas en componentes y hojas fuente.
+- `auto` (predeterminado): si el proyecto declara un [proveedor de clases](#proveedores-de-clases) y la extensión que lo atiende (como Tailwind CSS IntelliSense) está activa, le deja las clases que sólo tiene la hoja procesada `.meeko/styles/main.css`. Conserva las clases escritas en componentes y hojas fuente. Sin proveedor declarado, o con su extensión inactiva, Meeko las ofrece todas.
 - `on`: incluye también las clases de la hoja procesada.
 - `off`: desactiva sólo la función elegida. La definición se controla con `meeko.classes.definition`; las variables tienen sus propios ajustes.
 
@@ -240,4 +240,19 @@ Para funciones como `clsx` y `cn` dentro del `<script>`, configura las funciones
 }
 ```
 
-La detección de Meeko lee el manifiesto del paquete del componente y las hojas fuente indexadas, sin ejecutar plugins CSS. No clasifica individualmente la hoja procesada: en `auto` también delega sus clases de terceros que no tienen una definición fuente indexada. En otros clientes LSP, comunica `meeko.classes` mediante `workspace/configuration` (o `initializationOptions.classes`), incluido `tailwindActive: true` si el cliente tiene un proveedor Tailwind activo.
+### Proveedores de clases
+
+Meeko no sabe de Tailwind ni de otra herramienta de CSS: quien la trae declara que genera clases y qué extensión de editor las atiende. `@meekojs/ui` declara Tailwind CSS (extensión `bradlc.vscode-tailwindcss`, lenguaje de hojas `tailwindcss`) con `meeko.addClassProvider`. Un proyecto que usa Tailwind sin `@meekojs/ui` lo declara en su configuración:
+
+```ts
+// meeko.config.ts
+import { defineMeekoConfig } from '@meekojs/meeko/framework'
+
+export default defineMeekoConfig({
+	css: { classProviders: [{ name: 'Tailwind CSS', vscode: ['bradlc.vscode-tailwindcss'], languages: ['tailwindcss'] }] },
+})
+```
+
+Hasta que lo declare, Meeko ofrece también las clases generadas, junto a las de Tailwind IntelliSense: el servidor ya no busca `tailwindcss` en el `package.json` ni en los `@import` de las hojas. En un workspace de confianza el servidor ejecuta la configuración y sus módulos, así que conoce la declaración sin `meeko dev`. En uno no confiable no ejecuta nada: lee `css.classProviders` cuando es un array literal y el manifiesto `.meeko/manifests/class-providers.json`, que `meeko dev` y `meeko check` escriben con lo que declaran los módulos. Las clases que se dejan al proveedor son las de `.meeko/styles/main.css`, que también escribe `meeko dev`. Meeko no clasifica individualmente esa hoja: en `auto`, con el proveedor activo, también deja sus clases de terceros que no tienen una definición fuente indexada.
+
+La extensión pide al servidor los proveedores del proyecto de cada componente (`meeko/classProviders`) y le comunica cuáles de sus extensiones están activas. En otros clientes LSP, envía `meeko.classes` mediante `workspace/configuration` (o `initializationOptions.classes`) con `activeExtensions`, los ids de las extensiones activas entre las que nombran los proveedores; la petición `meeko/classProviders`, con `{ textDocument: { uri } }`, devuelve `{ providers: [{ name, vscode, languages }] }`. Un cliente que sólo envía `tailwindActive: true`, como los anteriores a 1.12, cuenta como si `bradlc.vscode-tailwindcss` estuviera activa; si el proyecto no declara ningún proveedor, el servidor respeta esa señal y deja igualmente las clases generadas.

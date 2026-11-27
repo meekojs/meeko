@@ -263,6 +263,15 @@ test('UI registers @tailwindcss/vite once, lazily, and no precompiled sheet', as
 	assert.match(warnings[0], /app\/styles\/main\.css no importa @meekojs\/ui/)
 })
 
+test('UI declares Tailwind as the class provider of the editor, also on a Meeko without class providers', async () => {
+	const providers = []
+	const context = { rootDir: '/consumer', addComponentsDir() {}, addStylesheet() {}, addAutoImports() {}, addPlugin() {}, addVitePlugin() {}, addPublicFile() {}, addHead() {} }
+	await ui.setup({}, { ...context, addClassProvider: (provider) => providers.push(provider) })
+	assert.deepEqual(providers, [{ name: 'Tailwind CSS', vscode: ['bradlc.vscode-tailwindcss'], languages: ['tailwindcss'] }])
+	// Meeko 1.8 to 1.11, which UI supports, has no addClassProvider.
+	await assert.doesNotReject(async () => ui.setup({}, context))
+})
+
 test('the plugins of Tailwind step aside when the configuration of Vite already has another instance', () => {
 	const calls = []
 	const original = [

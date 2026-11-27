@@ -1,5 +1,5 @@
 ---
-source-hash: 7508fce6b7b1ebc7ac28ac215ecc6f70636290951cf1157a0e0ea41192d41484
+source-hash: 57011a6e21491079183998891b082c893dea8faf25c3340f5e667cd7f2d0695e
 ---
 
 # Editors
@@ -564,7 +564,7 @@ Then add the client in **Preferences → Package Settings → LSP → Settings**
 
 ## CSS variables and independent controls
 
-Meeko provides CSS variable completion, hover, Go to Definition, reference lookup and rename in `.meeko` `<style>` blocks and inline styles, and in `.css` files of packages with `meeko.config.*`. It works without Tailwind and also with the `tailwindcss` language. Opening only a stylesheet activates the extension in a Meeko workspace; CSS support registers only these variable features, without taking over CSS formatting or diagnostics.
+Meeko provides CSS variable completion, hover, Go to Definition, reference lookup and rename in `.meeko` `<style>` blocks and inline styles, and in `.css` files of packages with `meeko.config.*`. It serves stylesheets with the `css` language and with those that the project's [class providers](#class-providers) declare, such as `tailwindcss` with `@meekojs/ui`. Opening only a stylesheet activates the extension in a Meeko workspace; CSS support registers only these variable features, without taking over CSS formatting or diagnostics.
 
 Sources include the open stylesheet, `app/styles/main.css`, its local imports and the processed `.meeko/styles/main.css` when present. Unsaved changes in imported stylesheets update other documents; closing them restores the saved version. Hover shows values and source files; definition prefers authored sources over generated CSS. Stylesheets are read without executing project configuration or plugins, including in untrusted workspaces. The entire disk is not scanned: imports stay inside the package and have a limit of 64 files. `.meeko` components additionally retain global component styles and `scoped` visibility rules.
 
@@ -595,7 +595,7 @@ Meeko Language automatically registers `tailwindCSS.includeLanguages: { "meeko":
 
 `meeko.classes.completion` and `meeko.classes.hover` independently control their Meeko class features:
 
-- `auto` (default): if Tailwind IntelliSense is active and the project declares `tailwindcss` as a dependency or imports it from source stylesheets, delegates classes from the processed `.meeko/styles/main.css` stylesheet to Tailwind. Retains classes written in components and source stylesheets.
+- `auto` (default): if the project declares a [class provider](#class-providers) and the extension that serves it (such as Tailwind CSS IntelliSense) is active, leaves to it the classes that only the processed stylesheet `.meeko/styles/main.css` has. Retains classes written in components and source stylesheets. Without a declared provider, or with its extension inactive, Meeko offers them all.
 - `on`: also includes classes from the processed stylesheet.
 - `off`: disables only the selected feature. Definition is controlled by `meeko.classes.definition`; variables have their own settings.
 
@@ -609,4 +609,23 @@ For functions such as `clsx` and `cn` inside `<script>`, configure the functions
 }
 ```
 
-Meeko detection reads the component's package manifest and indexed source stylesheets, without executing CSS plugins. It does not classify the processed stylesheet individually: in `auto`, it also delegates its third-party classes without an indexed source definition. In other LSP clients, communicate `meeko.classes` through `workspace/configuration` (or `initializationOptions.classes`), including `tailwindActive: true` if the client has an active Tailwind provider.
+### Class providers
+
+Meeko knows nothing about Tailwind or any other CSS tool: whoever brings the tool declares that it generates classes and which editor extension serves them. `@meekojs/ui` declares Tailwind CSS (extension `bradlc.vscode-tailwindcss`, stylesheet language `tailwindcss`) with [`meeko.addClassProvider`](framework-configuration.md#the-meeko-object). A project that uses Tailwind without `@meekojs/ui` declares it in [`css.classProviders`](reference/config/config-css.md):
+
+```ts
+// meeko.config.ts
+import { defineMeekoConfig } from '@meekojs/meeko/framework'
+
+export default defineMeekoConfig({
+	css: { classProviders: [{ name: 'Tailwind CSS', vscode: ['bradlc.vscode-tailwindcss'], languages: ['tailwindcss'] }] },
+})
+```
+
+Until it does, Meeko also offers the generated classes, next to those of Tailwind IntelliSense: since `1.12` the server no longer looks for `tailwindcss` in `package.json` or in the `@import`s of the stylesheets. In a trusted workspace the server runs the configuration and its modules, so it knows the declaration without `meeko dev`. In an untrusted one it runs nothing: it reads `css.classProviders` when it is an array literal and the manifest `.meeko/manifests/class-providers.json`, which `meeko dev` and `meeko check` write with what the modules declare. The classes left to the provider are those of `.meeko/styles/main.css`, which `meeko dev` also writes. Meeko does not classify that stylesheet class by class: in `auto`, with the provider active, it also leaves its third-party classes that have no indexed source definition. The `languages` of each provider get, besides `css`, the [CSS variable](#css-variables-and-independent-controls) features in `.css` files.
+
+The VS Code extension asks the server for the providers of each component's project and tells it which of their extensions are active. In other LSP clients:
+
+- The `meeko/classProviders` request, with `{ textDocument: { uri } }` (or without parameters, for every known project), returns `{ providers: [{ name, vscode, languages }] }`. A server before `1.12` answers `MethodNotFound`: it counts as a project without providers.
+- The `meeko.classes` section of `workspace/configuration` (or `initializationOptions.classes`) carries `activeExtensions`: the ids of the active extensions among those the providers name, also when empty.
+- A client that only sends `tailwindActive: true`, like those before `1.12`, counts as if `bradlc.vscode-tailwindcss` were active; if the project declares no provider, the server respects that signal and still leaves the generated classes. The current extension keeps sending `tailwindActive` for older servers.

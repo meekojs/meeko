@@ -1694,7 +1694,8 @@ test('meeko.classes settings are asked once per document, until a configuration 
 		params.items.map((item) => {
 			if (item.section !== 'meeko.classes') return null
 			asked++
-			return { completion: 'on', tailwindActive: true }
+			// What a client from 1.12 sends with an active class provider extension, which keeps them cached.
+			return { completion: 'on', activeExtensions: ['bradlc.vscode-tailwindcss'], tailwindActive: true }
 		}),
 	)
 	try {

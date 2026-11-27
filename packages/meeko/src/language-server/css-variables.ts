@@ -26,7 +26,7 @@ export interface CssVariableRule {
 const identifier = /^--[\w\u0080-\uffff-]+$/u
 const word = /[\w\u0080-\uffff-]/u
 
-/** Cada función de variables se configura de forma independiente de las clases y de Tailwind. */
+/** Cada función de variables se configura de forma independiente de las clases y de los proveedores de clases. */
 export interface CssVariableSettings {
 	readonly completion?: boolean
 	readonly hover?: boolean
@@ -136,11 +136,15 @@ interface VariableToken {
 	readonly declaration: boolean
 }
 
-/** Nombre dentro de var(…), o una propiedad --nombre, en CSS o estilos inline literales. */
+/**
+ * Nombre dentro de var(…), o una propiedad --nombre, en CSS o estilos inline literales. Con un
+ * lenguaje distinto de `meeko`, el documento entero es una hoja: el servidor sólo abre, además de
+ * los `.meeko`, archivos `.css` con el lenguaje `css` o uno que declara un proveedor de clases.
+ */
 export function cssVariableTokenAt(source: string, offset: number, language = 'meeko'): VariableToken | undefined {
 	const region = styleRegion(source)
 	let start: number, end: number
-	if (language === 'css' || language === 'tailwindcss') {
+	if (language !== 'meeko') {
 		start = 0
 		end = source.length
 	} else if (region && offset >= region.contentStart && offset <= region.contentEnd) {

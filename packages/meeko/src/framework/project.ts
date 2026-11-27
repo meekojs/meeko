@@ -31,8 +31,9 @@ import { handleProcessErrors, processErrorObserver } from '../server/runtime/pro
 import { bunEntrySource, cloudflareEntrySource, denoEntrySource } from './adapter-templates'
 import { buildDataFile, defaultErrorPageFile, discoverAppPlugins, findRuntimeFile, frameworkClientEntry, frameworkNodeEntry, frameworkServerEntry } from './app-manifest'
 import { assetKey } from './asset-key'
+import { classProvidersManifestFile, writeClassProvidersManifest } from './class-providers'
 import { cloudflareAssetsDirectory, cloudflarePrerenderDirectory, resolveWrangler, wranglerConfig, wranglerSource } from './cloudflare-build'
-import { discoverConfiguredRoutes, loadConfiguredModules, loadMeekoConfig, resolveConfigSources } from './config'
+import { configuredClassProviders, discoverConfiguredRoutes, loadConfiguredModules, loadMeekoConfig, resolveConfigSources } from './config'
 import { contentTypes } from './content-types'
 import { defaultErrorLogo } from './default-error-logo'
 import { devtoolsPanelPlugin, devtoolsPanelScript, resolveDevtoolsConfig } from './dev-devtools'
@@ -692,6 +693,8 @@ async function startDevelopment(root: string): Promise<Server> {
 	let onEagerChange: (() => void) | undefined
 	/** Whether the app's replacement invalidates the server modules itself, which needs no other rebuild. */
 	let resettingModules = false
+	// The class providers next to it, for the editor of an untrusted workspace, which does not run the modules.
+	await writeClassProvidersManifest(root, await configuredClassProviders(root)).catch((error: unknown) => process.stderr.write(`[meeko] ${classProvidersManifestFile} no se pudo escribir: ${error instanceof Error ? error.message : String(error)}\n`))
 	// The processed global stylesheet on disk, for editor tools that read class names from CSS files.
 	const stylesheetSnapshot = createGlobalStylesheetSnapshot(root, (message) => process.stderr.write(`[meeko] ${message}\n`), modules.stylesheets)
 	const reportError = (error: unknown, requestId: string): void => {

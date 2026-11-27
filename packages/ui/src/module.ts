@@ -1,3 +1,5 @@
+import type { ClassProvider, MeekoModuleContext } from '@meekojs/meeko/framework'
+
 import { defineMeekoModule } from '@meekojs/meeko/framework'
 import { existsSync, readFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
@@ -15,6 +17,9 @@ declare module '@meekojs/meeko/framework' {
 		readonly ui?: UIOptions
 	}
 }
+
+/** Tailwind CSS and its editor extension, Tailwind CSS IntelliSense, which names the language of its stylesheets `tailwindcss`. */
+const tailwindClassProvider: ClassProvider = { name: 'Tailwind CSS', vscode: ['bradlc.vscode-tailwindcss'], languages: ['tailwindcss'] }
 
 const fontFile = 'inter-latin-opsz-normal.woff2'
 /** A path of its own: a module's public file that collides with an app's `public/` breaks `meeko build`. */
@@ -114,5 +119,9 @@ export default defineMeekoModule<UIOptions>({
 		// The one compilation of the app's sheet, with the classes of UI and those of the app. Loaded only when
 		// Vite resolves its configuration; it steps aside if the app already registers @tailwindcss/vite.
 		meeko.addVitePlugin(tailwindPlugins())
+		// Tailwind generates those classes and its editor extension offers them: the editor of Meeko leaves them to it.
+		// Meeko before 1.12 has no class providers, and the module runs from 1.8.
+		const providers: Partial<Pick<MeekoModuleContext, 'addClassProvider'>> = meeko
+		providers.addClassProvider?.(tailwindClassProvider)
 	},
 })

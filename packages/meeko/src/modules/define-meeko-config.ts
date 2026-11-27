@@ -3,7 +3,7 @@ import type { ContentSecurityPolicy } from '../server/runtime/csp'
 import type { DevAllowedHosts } from '../server/runtime/dev-hosts'
 import type { DocumentConfig } from '../shared/head'
 import type { ThemeConfig } from '../shared/theme'
-import type { MeekoModuleEntry } from './define-meeko-module'
+import type { ClassProvider, MeekoModuleEntry } from './define-meeko-module'
 
 /**
  * Archivo de cabeceras que escribe el adaptador `static` en su salida: `"_headers"` es el formato
@@ -384,8 +384,13 @@ export interface MeekoConfig {
 	 * clase o un atributo que el script añade con la API del DOM a un elemento sin `ref:` ni `on:`
 	 * no recibe los estilos con ámbito si ese elemento quedó sin atributo. En `2.0`, `"matched"`
 	 * pasará a ser el valor por defecto.
+	 *
+	 * `classProviders` (desde `1.12`) declara las herramientas que generan clases y cuya extensión
+	 * de editor las atiende (véase {@link ClassProvider}), cuando ningún módulo lo hace: un proyecto
+	 * con Tailwind sin `@meekojs/ui`. Para que el editor la lea en un workspace no confiable, escríbala
+	 * como un array literal.
 	 */
-	readonly css?: { readonly scopeAttribute?: 'all' | 'matched' }
+	readonly css?: { readonly scopeAttribute?: 'all' | 'matched'; readonly classProviders?: readonly ClassProvider[] }
 	/**
 	 * Documento HTML de la aplicación: `lang` de `<html>` y etiquetas y atributos comunes de
 	 * `<head>`, con la menor prioridad frente a `useHead` y al `head` de las páginas. Los módulos
