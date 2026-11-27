@@ -146,7 +146,7 @@ export async function formatWithPrettier(request: EditorFormatRequest): Promise<
 		endOfLine: 'auto',
 		meekoIndentSections: request.indentSections === true,
 		...projectOptions,
-		// Sorting by the stylesheet or Tailwind runs the project's PostCSS configuration, `@utilities` modules and Tailwind plugins.
+		// Sorting by the stylesheet runs the project's PostCSS configuration and `@utilities` modules.
 		...(request.trusted ? {} : { meekoSortClasses: 'off' }),
 		filepath: request.filename,
 		parser: 'meeko',

@@ -900,9 +900,6 @@ importers:
       postcss-selector-parser:
         specifier: 'catalog:'
         version: 7.2.1
-      tailwindcss:
-        specifier: ^4.0.0
-        version: 4.3.5
     devDependencies:
       '@meekojs/meeko':
         specifier: workspace:*

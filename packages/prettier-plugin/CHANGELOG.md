@@ -1,5 +1,9 @@
 # Cambios de Prettier para Meeko
 
+## Sin publicar
+
+- **Rompe compatibilidad: se retiran `meekoSortClasses: "tailwind"` y la opción `meekoTailwindStylesheet`.** `tailwindcss` deja de ser dependencia par opcional y Prettier rechaza `"tailwind"` como valor inválido. **Migración:** cambia a `meekoSortClasses: "stylesheet"` (orden de la hoja `app/styles/main.css` ya procesada) y elimina `meekoTailwindStylesheet`. `meekoClassFunctions` conserva su comportamiento con los tres modos restantes.
+
 ## 1.11.0 — 2026-11-25
 
 - Publicación coordinada con `@meekojs/ui` 1.11.0, sin cambios funcionales en este paquete.

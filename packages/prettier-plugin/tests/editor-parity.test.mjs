@@ -13,7 +13,6 @@ import { templateTree } from './template-tree.mjs'
 
 // Saving in the editor formats with the plugin of the core, and `prettier --check` with this one:
 // they must agree, or the check fails right after saving.
-const fixture = fileURLToPath(new URL('../../meeko/tests/fixtures/tailwind-app/', import.meta.url))
 const pluginFile = fileURLToPath(new URL('../dist/index.js', import.meta.url))
 
 const component = `<script lang="ts">
@@ -103,12 +102,20 @@ test('saving in the editor without a project configuration keeps the text nodes'
 	}
 })
 
-test('the core and the plugin give the same result with the design system of the project', async () => {
-	const source = `<script lang="ts">\nconst a = tv({ base: "text-white custom bg-brand flex" });\n</script>\n\n<template>\n<Card class="text-white flex" />\n<p bind:class="on ? 'text-white flex' : ''"></p>\n</template>\n`
-	const cli = await assertSameEverywhere(source, { filepath: `${fixture}app/components/Probe.meeko`, meekoClassFunctions: classFunctions, meekoSortClasses: 'tailwind', printWidth: 200 })
-	assert.match(cli, /<Card class="flex text-white" \/>/)
-	assert.match(cli, /bind:class="on \? 'flex text-white' : ''"/)
-	assert.match(cli, /tv\(\{ base: "custom flex bg-brand text-white" \}\)/)
+test('the core and the plugin both reject the removed meekoSortClasses "tailwind", in every plugin order', async () => {
+	const options = { filepath: 'Component.meeko', meekoClassFunctions: classFunctions, meekoSortClasses: 'tailwind' }
+	for (const plugins of [[plugin], [corePlugin], [plugin, corePlugin], [corePlugin, plugin]]) {
+		await assert.rejects(format(component, { ...options, plugins }), /Invalid meekoSortClasses value/)
+	}
+	// An editor save with that configuration fails the same way: it is not silently another mode.
+	const root = await mkdtemp(join(tmpdir(), 'meeko-editor-removed-mode-'))
+	try {
+		await writeFile(join(root, 'meeko.config.ts'), 'export default {}\n')
+		await writeFile(join(root, '.prettierrc.json'), JSON.stringify({ meekoSortClasses: 'tailwind' }))
+		await assert.rejects(formatWithPrettier({ text: component, filename: join(root, 'Component.meeko'), tabSize: 2, insertSpaces: true, trusted: true }), /Invalid meekoSortClasses value/)
+	} finally {
+		await rm(root, { recursive: true, force: true })
+	}
 })
 
 test('saving in the editor gives what prettier --check expects, with or without this plugin in the configuration', async () => {

@@ -10,7 +10,6 @@ import type { ClassOrder } from './classes'
 
 import { preserveArrayBreaksPrinter } from './arrays'
 import { appendClassOrder, classOrderOption, stylesheetClassOrder } from './classes'
-import { tailwindClassSorter } from './tailwind'
 import { templateParserName, templatePlugin } from './template'
 
 const { hardline, indent } = builders
@@ -66,13 +65,9 @@ export interface MeekoPrettierOptions {
 	 * defecto) conserva su orden; con `"stylesheet"`, el de la primera aparición de cada clase en
 	 * `app/styles/main.css` procesada como en `meeko dev` (con el `postcss.config` del proyecto, sus
 	 * `@import` y sus `@utilities`) y, después, en el `<style>` del componente: las clases que no
-	 * aparecen en ninguno van primero, en su orden. Con `"tailwind"` (desde 1.8.0), el orden oficial
-	 * de Tailwind CSS 4, el mismo que `prettier-plugin-tailwindcss`, calculado con el design system
-	 * de la hoja `meekoTailwindStylesheet` y el `tailwindcss` instalado en el proyecto: las clases que
-	 * Tailwind no conoce van primero, en su orden. Con `"alphabetical"`, por orden de código. Si la
-	 * hoja no existe o no se puede procesar (o, con `"tailwind"`, si `tailwindcss` 4 no está
-	 * instalado), no se ordena y se avisa una vez. En un workspace no confiable de VS Code no se
-	 * aplica ni `"stylesheet"` ni `"tailwind"`. En un atributo estático de un elemento, haya o no
+	 * aparecen en ninguno van primero, en su orden. Con `"alphabetical"`, por orden de código. Si la
+	 * hoja no existe o no se puede procesar, no se ordena y se avisa una vez. En un workspace no
+	 * confiable de VS Code no se aplica `"stylesheet"`. En un atributo estático de un elemento, haya o no
 	 * orden, el valor se normaliza siempre: espacios colapsados y sin clases repetidas. Desde 1.8.0,
 	 * con un orden elegido también se aplica al `class` de una etiqueta de componente, a las cadenas
 	 * de `bind:class` y a las de `meekoClassFunctions`; con `"off"` esos valores no se tocan.
@@ -93,22 +88,9 @@ export interface MeekoPrettierOptions {
 	 * // <div class="card  stack  extra card">  →  <div class="extra stack card">
 	 * ```
 	 */
-	meekoSortClasses?: 'off' | 'stylesheet' | 'tailwind' | 'alphabetical'
+	meekoSortClasses?: 'off' | 'stylesheet' | 'alphabetical'
 	/**
-	 * Hoja de entrada de Tailwind con la que `meekoSortClasses: "tailwind"` carga el design system
-	 * (sus `@import`, `@theme`, `@plugin`, `@utility` y `@custom-variant`), relativa a la raíz del
-	 * proyecto Meeko. Por defecto `app/styles/main.css`.
-	 *
-	 * @since 1.8.0
-	 * @example
-	 * ```json
-	 * { "plugins": ["@meekojs/prettier-plugin"], "meekoSortClasses": "tailwind", "meekoTailwindStylesheet": "app/styles/tailwind.css" }
-	 * ```
-	 */
-	meekoTailwindStylesheet?: string
-	/**
-	 * Funciones cuyas cadenas son listas de clases, como `tailwindFunctions` de
-	 * `prettier-plugin-tailwindcss`. Con un `meekoSortClasses` distinto de `"off"`, ordena con ese modo
+	 * Funciones cuyas cadenas son listas de clases, como `tv`, `clsx` o `cn`. Con un `meekoSortClasses` distinto de `"off"`, ordena con ese modo
 	 * los literales de cadena de sus argumentos a cualquier profundidad (objetos, arrays, ternarios,
 	 * `&&`, `||`, `??`, `+`, plantillas de cadena), en cualquier JavaScript o TypeScript que formatee
 	 * Prettier con el plugin cargado: `<script>`, `<script server>`, expresiones de la plantilla y
@@ -125,7 +107,7 @@ export interface MeekoPrettierOptions {
 	 *
 	 * const config: Config & MeekoPrettierOptions = {
 	 *   plugins: ["@meekojs/prettier-plugin"],
-	 *   meekoSortClasses: "tailwind",
+	 *   meekoSortClasses: "alphabetical",
 	 *   meekoClassFunctions: ["tv", "clsx", "cn"],
 	 * };
 	 * export default config;
@@ -157,7 +139,7 @@ interface MeekoRootNode {
 	start: number
 	end: number
 	children: Array<MeekoSectionNode | MeekoCommentNode>
-	/** Order of the classes for `meekoSortClasses: "stylesheet"` or `"tailwind"`, when it loaded. */
+	/** Order of the classes for `meekoSortClasses: "stylesheet"`, when it loaded. */
 	classOrder?: ClassOrder
 }
 
@@ -223,14 +205,11 @@ async function parse(text: string, options: ParserOptions<MeekoNode>): Promise<M
 	}
 	comments(previous, text.length)
 	const root: MeekoRootNode = { type: 'root', start: 0, end: text.length, children }
-	const { meekoSortClasses: sortClasses, meekoTailwindStylesheet: tailwindStylesheet } = options as MeekoPrettierOptions
+	const { meekoSortClasses: sortClasses } = options as MeekoPrettierOptions
 	if (sortClasses === 'stylesheet') {
 		// The component's own classes count as defined after the global stylesheet.
 		const global = await stylesheetClassOrder(options.filepath)
 		if (global) root.classOrder = document.style ? appendClassOrder(global, document.style.content) : global
-	} else if (sortClasses === 'tailwind') {
-		const sorter = await tailwindClassSorter(options.filepath, tailwindStylesheet)
-		if (sorter) root.classOrder = sorter
 	}
 	return root
 }
@@ -367,9 +346,8 @@ export const printers: Record<string, Printer> = {
 /**
  * Opciones propias del plugin para Prettier: `meekoIndentSections` (booleana, `false` por
  * defecto) y, desde 1.3.0, `meekoPreserveArrayBreaks` (booleana, `true` por defecto) y
- * `meekoSortClasses` (`"off"` por defecto, `"stylesheet"`, `"tailwind"` desde 1.8.0 o
- * `"alphabetical"`; en la CLI, `--meeko-sort-classes`) y, desde 1.8.0, `meekoTailwindStylesheet`
- * (ruta; en la CLI, `--meeko-tailwind-stylesheet`) y `meekoClassFunctions` (lista de nombres, `[]`
+ * `meekoSortClasses` (`"off"` por defecto, `"stylesheet"` o `"alphabetical"`; en la CLI,
+ * `--meeko-sort-classes`) y `meekoClassFunctions` (lista de nombres, `[]`
  * por defecto; en la CLI, `--meeko-class-functions`, una vez por nombre). Los nombres de las
  * opciones son estables.
  *
@@ -384,7 +362,7 @@ export const printers: Record<string, Printer> = {
  * ```
  * @example
  * ```json
- * { "plugins": ["@meekojs/prettier-plugin"], "meekoSortClasses": "tailwind", "meekoClassFunctions": ["tv", "clsx", "cn"] }
+ * { "plugins": ["@meekojs/prettier-plugin"], "meekoSortClasses": "alphabetical", "meekoClassFunctions": ["tv", "clsx", "cn"] }
  * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/editors.md#formato-con-prettier
  */
@@ -409,14 +387,8 @@ export const options: SupportOptions = {
 		choices: [
 			{ value: 'off', description: 'Keep the order of the classes.' },
 			{ value: 'stylesheet', description: "Order of first appearance in app/styles/main.css, processed as meeko dev does, then in the component's <style>; unknown classes first." },
-			{ value: 'tailwind', description: "Tailwind CSS 4 order, as prettier-plugin-tailwindcss, from the project's tailwindcss and meekoTailwindStylesheet; unknown classes first." },
 			{ value: 'alphabetical', description: 'Code unit order.' },
 		],
-	},
-	meekoTailwindStylesheet: {
-		type: 'string',
-		category: 'Meeko',
-		description: 'Tailwind CSS entry stylesheet for meekoSortClasses "tailwind", relative to the Meeko project root. Default: app/styles/main.css.',
 	},
 	meekoClassFunctions: {
 		type: 'string',

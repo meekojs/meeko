@@ -34,6 +34,12 @@ Los comentarios de bloque quedan junto al elemento o sección que explican; la s
 
 `htmlWhitespaceSensitivity: 'ignore'` permite que Prettier reorganice los espacios y saltos de toda la plantilla, incluidos los bloques `snippet`, con etiquetas completas e indentación normal. Puede cambiar los espacios visibles entre elementos inline. Sin esa opción, Meeko conserva los límites de los nodos de texto y los espacios propios de `snippet`. El contenido literal de `pre` y `textarea` se conserva en ambos casos.
 
-- [Orden de las clases](https://meekojs.com/docs/editors#orden-de-las-clases): `meekoSortClasses`, con los órdenes `stylesheet`, `tailwind` y `alphabetical`.
+- [Orden de las clases](https://meekojs.com/docs/editors#orden-de-las-clases): `meekoSortClasses`, con los órdenes `off` (por defecto), `stylesheet` y `alphabetical`.
 - [Cadenas en expresiones](https://meekojs.com/docs/editors#cadenas-en-expresiones): `meekoClassFunctions`, para `tv()`, `clsx()` o `cn()`.
 - [Junto a `prettier-plugin-tailwindcss`](https://meekojs.com/docs/editors#junto-a-prettier-plugin-tailwindcss).
+
+## Clases de Tailwind CSS
+
+El plugin no incluye ni carga Tailwind CSS. Para ordenar las clases de Tailwind en `.meeko`, usa `meekoSortClasses: 'stylesheet'`: ordena según `app/styles/main.css` ya procesada con el `postcss.config` del proyecto, de modo que, si Tailwind está en él (`@tailwindcss/postcss`), sigue el orden que Tailwind genera. Las clases que esa hoja no contiene, como las que Tailwind todavía no ha detectado en un archivo sin guardar, van primero y en su orden. El formateador no carga los plugins de Vite del proyecto: si Tailwind sólo se registra como `@tailwindcss/vite`, la hoja procesada no incluye sus utilidades y no hay orden que seguir.
+
+El valor `meekoSortClasses: 'tailwind'` y la opción `meekoTailwindStylesheet` de versiones anteriores ya no existen: Prettier rechaza el valor `"tailwind"` como una opción inválida e ignora `meekoTailwindStylesheet` como desconocida.

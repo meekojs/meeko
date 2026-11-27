@@ -8,14 +8,13 @@ import selectorParser from 'postcss-selector-parser'
 import { isMeekoProject } from './project'
 
 /** Valores de `meekoSortClasses`. */
-export type ClassSortMode = 'off' | 'stylesheet' | 'tailwind' | 'alphabetical'
+export type ClassSortMode = 'off' | 'stylesheet' | 'alphabetical'
 
 /**
  * Orden de las clases que el parser `meeko` pasa a la plantilla: con `stylesheet`, la posición de
- * cada clase en la hoja global del proyecto y, después, en el `<style>` del componente; con
- * `tailwind`, la función que ordena una lista con el design system de Tailwind del proyecto.
+ * cada clase en la hoja global del proyecto y, después, en el `<style>` del componente.
  */
-export type ClassOrder = ReadonlyMap<string, number> | ((tokens: readonly string[]) => string[])
+export type ClassOrder = ReadonlyMap<string, number>
 
 /** Opción interna con la que el parser `meeko` pasa a la plantilla el {@link ClassOrder}. */
 export const classOrderOption = '__meekoClassOrder'
@@ -32,13 +31,12 @@ export function classTokens(value: string): string[] {
 
 /**
  * Orders the tokens of one `class` value. `stylesheet` keeps the classes the order does not know
- * first, in their order, and then the known ones by their position; `tailwind` delegates to the
- * project's design system; `alphabetical` compares code units, independent of the locale.
+ * first, in their order, and then the known ones by their position; `alphabetical` compares code
+ * units, independent of the locale.
  */
 export function sortClassTokens(tokens: readonly string[], mode: ClassSortMode | undefined, order: ClassOrder | undefined): string[] {
 	if (mode === 'alphabetical') return [...tokens].sort((left, right) => (left < right ? -1 : left > right ? 1 : 0))
-	if (mode === 'tailwind') return typeof order === 'function' ? order(tokens) : [...tokens]
-	if (mode !== 'stylesheet' || !order || typeof order === 'function') return [...tokens]
+	if (mode !== 'stylesheet' || !order) return [...tokens]
 	const unknown = tokens.filter((token) => !order.has(token))
 	const known = tokens.filter((token) => order.has(token)).sort((left, right) => order.get(left)! - order.get(right)!)
 	return [...unknown, ...known]
@@ -90,12 +88,11 @@ export const classOrderWarnings = {
 }
 const warned = new Set<string>()
 
-/** Reports once per mode and `key` why `mode` does not sort. */
-export function warnOnce(key: string, message: string, mode: ClassSortMode = 'stylesheet'): void {
-	const id = `${mode}\0${key}`
-	if (warned.has(id)) return
-	warned.add(id)
-	classOrderWarnings.write(`[meeko] Aviso: meekoSortClasses "${mode}" no ordena las clases: ${message}\n`)
+/** Reports once per `key` why `meekoSortClasses: "stylesheet"` does not sort. */
+function warnOnce(key: string, message: string): void {
+	if (warned.has(key)) return
+	warned.add(key)
+	classOrderWarnings.write(`[meeko] Aviso: meekoSortClasses "stylesheet" no ordena las clases: ${message}\n`)
 }
 
 /** Files whose presence or contents change which PostCSS configuration Vite loads for the root. */
@@ -132,7 +129,7 @@ interface StylesheetEntry {
 const entries = new Map<string, Promise<StylesheetEntry>>()
 
 /** `mtimeMs:size` of `file`, or `missing`. */
-export async function stampOf(file: string): Promise<string> {
+async function stampOf(file: string): Promise<string> {
 	try {
 		const stats = await stat(file)
 		return `${stats.mtimeMs}:${stats.size}`
@@ -148,7 +145,7 @@ async function isCurrent(entry: StylesheetEntry): Promise<boolean> {
 }
 
 /** The first folder above `filepath` with `meeko.config.*` or a `package.json` that depends on `@meekojs/meeko`. */
-export async function projectRootOf(filepath: string): Promise<string | undefined> {
+async function projectRootOf(filepath: string): Promise<string | undefined> {
 	let directory = dirname(resolve(filepath))
 	for (;;) {
 		if (await isMeekoProject(directory)) return directory

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
-import { mkdir, utimes, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, utimes, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { after, before, describe, test } from 'node:test'
 import * as prettier from 'prettier'
@@ -90,9 +91,23 @@ describe('static class attributes', () => {
 			{
 				type: 'choice',
 				default: 'off',
-				choices: ['off', 'stylesheet', 'tailwind', 'alphabetical'],
+				choices: ['off', 'stylesheet', 'alphabetical'],
 			},
 		)
+		assert.equal('meekoTailwindStylesheet' in (plugin.options ?? {}), false)
+	})
+
+	test('the removed "tailwind" mode is rejected as an invalid option value, never mapped to another mode', async () => {
+		const source = '<template>\n<p class="b a">x</p>\n</template>\n'
+		await assert.rejects(prettier.format(source, { filepath: 'Component.meeko', plugins: [plugin], meekoSortClasses: 'tailwind' } as unknown as FormatOptions), /Invalid meekoSortClasses value/)
+		const root = await mkdtemp(join(tmpdir(), 'meeko-removed-sort-mode-'))
+		try {
+			await writeFile(join(root, 'meeko.config.ts'), 'export default {}\n')
+			await writeFile(join(root, '.prettierrc.json'), JSON.stringify({ meekoSortClasses: 'tailwind' }))
+			await assert.rejects(formatWithPrettier({ text: source, filename: join(root, 'Component.meeko'), tabSize: 2, insertSpaces: true, trusted: true }), /Invalid meekoSortClasses value/)
+		} finally {
+			await rm(root, { recursive: true, force: true })
+		}
 	})
 })
 
