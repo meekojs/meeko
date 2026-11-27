@@ -3,7 +3,7 @@
 	"displayName": "Meeko Language",
 	"version": "1.7.6",
 	"private": true,
-	"description": "Syntax highlighting and the Meeko language server for .meeko components",
+	"description": "%description%",
 	"categories": [
 		"Programming Languages"
 	],
@@ -40,11 +40,12 @@
 		"test:host:untrusted": "node tests/run-host-untrusted.mjs",
 		"test:host:virtual": "node tests/run-host-virtual.mjs"
 	},
+	"l10n": "./l10n",
 	"contributes": {
 		"colors": [
 			{
 				"id": "meeko.executionZone.serverBackground",
-				"description": "Fondo de las líneas de un .meeko que se ejecutan sólo en el servidor (<script server>).",
+				"description": "%color.executionZone.serverBackground.description%",
 				"defaults": {
 					"dark": "#A371F710",
 					"light": "#8250DF0C",
@@ -54,7 +55,7 @@
 			},
 			{
 				"id": "meeko.executionZone.sharedBackground",
-				"description": "Fondo de las líneas de un .meeko que se ejecutan en el servidor y en el navegador (el setup del componente).",
+				"description": "%color.executionZone.sharedBackground.description%",
 				"defaults": {
 					"dark": "#00000000",
 					"light": "#00000000",
@@ -64,7 +65,7 @@
 			},
 			{
 				"id": "meeko.executionZone.browserBackground",
-				"description": "Fondo de las líneas de un .meeko que se ejecutan sólo en el navegador (después del primer await de navegador y dentro de onMounted).",
+				"description": "%color.executionZone.browserBackground.description%",
 				"defaults": {
 					"dark": "#39C5CF10",
 					"light": "#1B7C830C",
@@ -76,27 +77,37 @@
 		"commands": [
 			{
 				"command": "meeko.live.editSignal",
-				"title": "Editar valor de la señal",
+				"title": "%command.live.editSignal.title%",
 				"category": "Meeko"
 			},
 			{
 				"command": "meeko.live.reconnect",
-				"title": "Reconectar valores en vivo",
+				"title": "%command.live.reconnect.title%",
 				"category": "Meeko"
 			},
 			{
 				"command": "meeko.newComponent",
-				"title": "Nuevo componente",
+				"title": "%command.newComponent.title%",
 				"category": "Meeko"
 			},
 			{
 				"command": "meeko.newPage",
-				"title": "Nueva página",
+				"title": "%command.newPage.title%",
 				"category": "Meeko"
 			},
 			{
 				"command": "meeko.newEndpoint",
-				"title": "Nuevo endpoint de API",
+				"title": "%command.newEndpoint.title%",
+				"category": "Meeko"
+			},
+			{
+				"command": "meeko.restartLanguageServer",
+				"title": "%command.restartLanguageServer.title%",
+				"category": "Meeko"
+			},
+			{
+				"command": "meeko.showOutput",
+				"title": "%command.showOutput.title%",
 				"category": "Meeko"
 			}
 		],
@@ -112,7 +123,7 @@
 					],
 					"default": "auto",
 					"scope": "resource",
-					"description": "Completado de clases CSS: auto delega las clases generadas a Tailwind CSS IntelliSense cuando está activo y el proyecto usa Tailwind; on incluye todas; off desactiva sólo este completado. No afecta al hover, la definición ni las variables CSS."
+					"description": "%config.classes.completion.description%"
 				},
 				"meeko.classes.hover": {
 					"type": "string",
@@ -123,83 +134,83 @@
 					],
 					"default": "auto",
 					"scope": "resource",
-					"description": "Hover de clases CSS: auto omite las clases generadas cuando Tailwind está activo; on incluye todas; off desactiva sólo este hover."
+					"description": "%config.classes.hover.description%"
 				},
 				"meeko.classes.definition": {
 					"type": "boolean",
 					"default": true,
 					"scope": "resource",
-					"description": "Ir a definición de clases CSS, independiente del completado, el hover y las variables."
+					"description": "%config.classes.definition.description%"
 				},
 				"meeko.cssVariables.completion": {
 					"type": "boolean",
 					"default": true,
 					"scope": "resource",
-					"description": "Completado de variables CSS en .meeko y hojas .css del proyecto Meeko. No afecta al hover, la definición ni las clases."
+					"description": "%config.cssVariables.completion.description%"
 				},
 				"meeko.cssVariables.hover": {
 					"type": "boolean",
 					"default": true,
 					"scope": "resource",
-					"description": "Hover de variables CSS con sus valores y archivos de origen, independiente del completado y las clases."
+					"description": "%config.cssVariables.hover.description%"
 				},
 				"meeko.cssVariables.definition": {
 					"type": "boolean",
 					"default": true,
 					"scope": "resource",
-					"description": "Ir a definición de variables CSS, independiente del completado, el hover y las clases."
+					"description": "%config.cssVariables.definition.description%"
 				},
 				"meeko.cssVariables.references": {
 					"type": "boolean",
 					"default": true,
 					"scope": "resource",
-					"description": "Buscar referencias de variables CSS en las fuentes del paquete, independiente del completado, el hover, la definición y el renombrado."
+					"description": "%config.cssVariables.references.description%"
 				},
 				"meeko.cssVariables.rename": {
 					"type": "boolean",
 					"default": true,
 					"scope": "resource",
-					"description": "Renombrar variables CSS en las fuentes del paquete con comprobación de ámbito y colisiones. No afecta a referencias ni a las otras funciones."
+					"description": "%config.cssVariables.rename.description%"
 				},
 				"meeko.languageServer.preferWorkspace": {
 					"type": "boolean",
 					"default": true,
 					"scope": "resource",
-					"description": "Usa el servidor de lenguaje del paquete @meekojs/meeko del workspace, para que el editor coincida con el compilador del proyecto. Se usa el servidor incluido si ese paquete no está, si este ajuste está desactivado o si el workspace no es de confianza."
+					"description": "%config.languageServer.preferWorkspace.description%"
 				},
 				"meeko.languageServer.warmup": {
 					"type": "boolean",
 					"default": true,
 					"scope": "resource",
-					"description": "Prepara al iniciar, en segundo plano, el programa TypeScript de los proyectos de las pestañas .meeko abiertas (o de hasta dos aplicaciones de la carpeta), para que el primer componente reciba colores y hover sin esperar alrededor de un segundo. Desactívalo para ahorrar memoria en workspaces con muchas aplicaciones."
+					"description": "%config.languageServer.warmup.description%"
 				},
 				"meeko.format.indentSections": {
 					"type": "boolean",
 					"default": false,
 					"scope": "resource",
-					"description": "Al formatear, sangra un nivel el contenido de cada sección (<script>, <script server>, <template> y <style>), como vueIndentScriptAndStyle de Prettier y además la plantilla. Si está desactivado, el formateo quita esa sangría base."
+					"description": "%config.format.indentSections.description%"
 				},
 				"meeko.editor.executionZones": {
 					"type": "boolean",
 					"default": true,
 					"scope": "resource",
-					"description": "Marca dónde se ejecuta el código de un componente .meeko: sólo en el servidor (<script server>), en el servidor y en el navegador (el setup) o sólo en el navegador (después del primer await de navegador y dentro de onMounted). Las zonas se muestran como una barra en el margen y un color de línea tenue; pasa el cursor por la primera línea de una zona para ver la explicación."
+					"description": "%config.editor.executionZones.description%"
 				},
 				"meeko.autoClosingTags": {
 					"type": "boolean",
 					"default": true,
 					"scope": "resource",
-					"description": "Cierra las etiquetas de la plantilla al escribir > o </, como la extensión de HTML de VS Code."
+					"description": "%config.autoClosingTags.description%"
 				},
 				"meeko.live.enabled": {
 					"type": "boolean",
 					"default": true,
-					"description": "Se conecta a cada `meeko dev` del workspace mediante .meeko/dev/editor-bridge-<puerto>.json, muestra el valor actual de cada señal junto a su declaración y en el hover, y permite editarlo. Sólo en workspaces de confianza y sólo con un servidor de desarrollo en loopback."
+					"description": "%config.live.enabled.description%"
 				},
 				"meeko.live.inlineValues": {
 					"type": "boolean",
 					"default": true,
-					"description": "Muestra el valor en vivo de cada señal al final de la línea de su declaración mientras `meeko dev` se ejecuta. Si está desactivado, el hover sigue mostrando los valores."
+					"description": "%config.live.inlineValues.description%"
 				},
 				"meeko.trace.server": {
 					"type": "string",
@@ -209,7 +220,7 @@
 						"verbose"
 					],
 					"default": "off",
-					"description": "Activa el trace LSP de todos los servidores de Meeko. Para ver los mensajes, cambia el nivel del canal Meeko a Trace."
+					"description": "%config.trace.server.description%"
 				}
 			}
 		},
@@ -263,24 +274,45 @@
 					"command": "meeko.live.editSignal",
 					"when": "editorLangId == meeko"
 				}
+			],
+			"explorer/context": [
+				{
+					"submenu": "meeko.explorer",
+					"when": "explorerResourceIsFolder && resourceScheme == file && meeko.scaffold",
+					"group": "1_meeko"
+				}
+			],
+			"meeko.explorer": [
+				{
+					"command": "meeko.newComponent",
+					"group": "1_new@1"
+				},
+				{
+					"command": "meeko.newPage",
+					"group": "1_new@2"
+				},
+				{
+					"command": "meeko.newEndpoint",
+					"group": "1_new@3"
+				}
 			]
 		},
 		"semanticTokenModifiers": [
 			{
 				"id": "signal",
-				"description": "Una señal de Meeko (signal, useState, defineModel, useElementRef) y sus usos."
+				"description": "%semanticTokenModifier.signal.description%"
 			},
 			{
 				"id": "computed",
-				"description": "Un valor derivado (computed) o una señal de sólo lectura de Meeko y sus usos."
+				"description": "%semanticTokenModifier.computed.description%"
 			},
 			{
 				"id": "resource",
-				"description": "Un recurso de datos de Meeko (useApi, useRpcQuery, useRpcMutation) y sus usos."
+				"description": "%semanticTokenModifier.resource.description%"
 			},
 			{
 				"id": "reactive",
-				"description": "Un token de una expresión de plantilla que lee un valor reactivo."
+				"description": "%semanticTokenModifier.reactive.description%"
 			}
 		],
 		"semanticTokenScopes": [
@@ -347,9 +379,16 @@
 				"language": "typescript",
 				"path": "./snippets/typescript.json"
 			}
+		],
+		"submenus": [
+			{
+				"id": "meeko.explorer",
+				"label": "Meeko"
+			}
 		]
 	},
 	"activationEvents": [
+		"onLanguage:meeko",
 		"workspaceContains:**/meeko.config.{ts,js,mts,mjs,cts,cjs}"
 	],
 	"dependencies": {
@@ -374,11 +413,11 @@
 	"capabilities": {
 		"virtualWorkspaces": {
 			"supported": "limited",
-			"description": "En documentos virtuales, Meeko analiza el archivo abierto y ofrece completado, hover, diagnósticos y símbolos. Las funciones que requieren archivos del proyecto en disco, como navegación y referencias entre archivos, no están disponibles."
+			"description": "%capabilities.virtualWorkspaces.description%"
 		},
 		"untrustedWorkspaces": {
 			"supported": "limited",
-			"description": "En modo restringido, Meeko usa su servidor de lenguaje incluido, lee la configuración del proyecto de forma estática, omite la comprobación de los contratos de páginas del proyecto y no se conecta a meeko dev para mostrar valores en vivo.",
+			"description": "%capabilities.untrustedWorkspaces.description%",
 			"restrictedConfigurations": [
 				"meeko.languageServer.preferWorkspace"
 			]

@@ -4,6 +4,7 @@ import * as vscode from 'vscode'
 import type { LiveChange } from './client'
 import type { BridgeOff, EditorLiveSignal, LiveGroup } from './model'
 
+import { t } from '../l10n'
 import { BridgeConnection, isAlive } from './client'
 import { bridgeDescriptorGlob, bridgeOffFromRecord, devServerRecordGlob, editableValue, groupSignals, hoverMarkdown, inlineText, isWorkspaceBridgeDescriptor, isWorkspaceDevServerRecord, liveStatus, parseEditedValue, placeGroups } from './model'
 import { localWorkspacePath, reconcileWatchedFolders } from './workspace'
@@ -377,7 +378,7 @@ export function registerLiveValues(context: vscode.ExtensionContext, output: vsc
 			const editor = vscode.window.activeTextEditor
 			const group = editor ? groupAt(editor.document, editor.selection.active) : undefined
 			if (!group) {
-				void vscode.window.showInformationMessage('Coloca el cursor sobre una señal con valor en vivo de meeko dev.')
+				void vscode.window.showInformationMessage(t('Place the cursor on a signal that has a live value from meeko dev.'))
 				return
 			}
 			let signal = group.signals[0]
@@ -389,7 +390,7 @@ export function registerLiveValues(context: vscode.ExtensionContext, output: vsc
 						detail: inlineText({ ...group, signals: [candidate] }),
 						signal: candidate,
 					})),
-					{ placeHolder: `Instancia de ${group.name} que quieres editar` },
+					{ placeHolder: t('Instance of {0} to edit', group.name) },
 				)
 				if (!picked) return
 				signal = picked.signal
@@ -397,7 +398,7 @@ export function registerLiveValues(context: vscode.ExtensionContext, output: vsc
 			entry = signal ? entryOf(signal) : undefined
 		}
 		if (!entry) {
-			void vscode.window.showWarningMessage('Esa señal ya no está montada en el navegador.')
+			void vscode.window.showWarningMessage(t('That signal is no longer mounted in the browser.'))
 			return
 		}
 		const target = principalOf(entry)
@@ -406,7 +407,7 @@ export function registerLiveValues(context: vscode.ExtensionContext, output: vsc
 				? argument.json
 				: await vscode.window.showInputBox({
 						title: `Meeko: ${target.signal.component}.${target.signal.name} (${target.signal.instanceId})`,
-						prompt: 'Nuevo valor en JSON',
+						prompt: t('New value as JSON'),
 						value: editableValue(target.signal),
 						validateInput: (value) => {
 							const parsed = parseEditedValue(value)
@@ -420,14 +421,14 @@ export function registerLiveValues(context: vscode.ExtensionContext, output: vsc
 			return
 		}
 		const result = await target.connection.setSignal(target.signal.id, parsed.value)
-		if (!result.ok) void vscode.window.showErrorMessage(`Meeko: no se pudo editar ${target.signal.name}: ${result.error}`)
+		if (!result.ok) void vscode.window.showErrorMessage(t('Meeko: could not edit {0}: {1}', target.signal.name, result.error))
 	}
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand(editCommand, editSignal),
 		vscode.commands.registerCommand(reconnectCommand, async () => {
 			if (!settings().enabled) {
-				void vscode.window.showInformationMessage('Meeko live está desactivado (meeko.live.enabled) o el workspace no es de confianza.')
+				void vscode.window.showInformationMessage(t('Meeko live is disabled (meeko.live.enabled) or the workspace is not trusted.'))
 				return
 			}
 			for (const connection of connections.values()) connection.reload()

@@ -1,6 +1,8 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 
+import { t } from './l10n'
+
 /** Servidor de lenguaje elegido para un workspace. */
 export interface ResolvedLanguageServer {
 	/** Módulo Node que arranca el servidor. */
@@ -34,7 +36,7 @@ interface PackageManifest {
  */
 export function resolveLanguageServer(search: LanguageServerSearch): ResolvedLanguageServer {
 	const bundled = (reason: string): ResolvedLanguageServer => ({ module: search.bundled, source: 'bundled', reason })
-	if (!search.preferWorkspace) return bundled('el workspace no es de confianza o el servidor del workspace está desactivado')
+	if (!search.preferWorkspace) return bundled(t('the workspace is not trusted or the workspace server is disabled'))
 	let outdated: string | undefined
 	for (const folder of search.folders) {
 		let directory = resolve(folder)
@@ -52,7 +54,7 @@ export function resolveLanguageServer(search: LanguageServerSearch): ResolvedLan
 				if (module && existsSync(module)) {
 					return { module, source: 'workspace', ...(manifest.version ? { version: manifest.version } : {}) }
 				}
-				outdated ??= `@meekojs/meeko ${manifest.version ?? '(versión desconocida)'} en ${dirname(manifestPath)} no incluye servidor de lenguaje`
+				outdated ??= t('@meekojs/meeko {0} in {1} does not include a language server', manifest.version ?? t('(unknown version)'), dirname(manifestPath))
 				break
 			}
 			const parent = dirname(directory)
@@ -60,5 +62,5 @@ export function resolveLanguageServer(search: LanguageServerSearch): ResolvedLan
 			directory = parent
 		}
 	}
-	return bundled(outdated ?? 'no se encontró el paquete @meekojs/meeko en el workspace')
+	return bundled(outdated ?? t('the @meekojs/meeko package was not found in the workspace'))
 }

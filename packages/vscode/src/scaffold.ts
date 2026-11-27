@@ -1,5 +1,7 @@
-import { existsSync, readFileSync } from 'node:fs'
-import { dirname, join, relative } from 'node:path'
+import { existsSync, readFileSync, statSync } from 'node:fs'
+import { dirname, isAbsolute, join, relative } from 'node:path'
+
+import { t } from './l10n'
 
 /** A file that a «Meeko: nuevo…» command writes; `append` adds to an existing file instead. */
 export interface ScaffoldFile {
@@ -22,13 +24,16 @@ const camel = (text: string): string => {
 	return value.charAt(0).toLowerCase() + value.slice(1)
 }
 
+const routeSegment = /^(?:[a-z0-9][a-z0-9-]*|\[(?:\.\.\.)?[A-Za-z_$][\w$]*\])$/
+const componentSegment = /^[A-Z][A-Za-z0-9]*$/
+
 /** Segments of a route such as `/users/[id]`, or a message when it is not one. */
 function routeSegments(route: string): string[] | string {
 	const path = route.trim().replace(/^\/api(?=\/|$)/, '')
-	if (!path.startsWith('/')) return 'La ruta empieza por /, por ejemplo /users/[id]'
+	if (!path.startsWith('/')) return t('The route starts with /, for example /users/[id]')
 	const segments = path.split('/').filter(Boolean)
-	const invalid = segments.find((segment) => !/^(?:[a-z0-9][a-z0-9-]*|\[(?:\.\.\.)?[A-Za-z_$][\w$]*\])$/.test(segment))
-	return invalid ? `«${invalid}» no es un segmento válido: minúsculas, dígitos y guiones, o [param]` : segments
+	const invalid = segments.find((segment) => !routeSegment.test(segment))
+	return invalid ? t('"{0}" is not a valid segment: use lowercase letters, digits and hyphens, or [param]', invalid) : segments
 }
 
 /**
@@ -37,7 +42,7 @@ function routeSegments(route: string): string[] | string {
  */
 export function componentFile(root: string, name: string, indent = '  '): ScaffoldFile | string {
 	const trimmed = name.trim().replace(/\.meeko$/, '')
-	if (!/^[A-Z][A-Za-z0-9]*(?:\/[A-Z][A-Za-z0-9]*)*$/.test(trimmed)) return 'Usa PascalCase, por ejemplo AppCard o App/Card'
+	if (!/^[A-Z][A-Za-z0-9]*(?:\/[A-Z][A-Za-z0-9]*)*$/.test(trimmed)) return t('Use PascalCase, for example AppCard or App/Card')
 	const components = join(root, 'app', 'components')
 	let path: string
 	if (trimmed.includes('/')) path = join(components, `${trimmed}.meeko`)
@@ -86,7 +91,7 @@ export type EndpointMethod = (typeof methods)[number]
 export function endpointFiles(root: string, method: EndpointMethod, route: string, library: 'valibot' | 'zod', indent = '  '): ScaffoldFile[] | string {
 	const segments = routeSegments(route)
 	if (typeof segments === 'string') return segments
-	if (!segments.length) return 'Indica la ruta del endpoint, por ejemplo /users'
+	if (!segments.length) return t('Enter the endpoint route, for example /users')
 	const verb = method.toLowerCase()
 	const last = segments.at(-1)!
 	const endpoint = last.startsWith('[') ? join(root, 'server', 'api', ...segments.slice(0, -1), `${last}.${verb}.ts`) : join(root, 'server', 'api', ...segments, `index.${verb}.ts`)
@@ -110,7 +115,7 @@ export function endpointFiles(root: string, method: EndpointMethod, route: strin
 	]
 	const existing = existsSync(schemas) ? readFileSync(schemas, 'utf8') : undefined
 	if (existing && exported.some((line) => existing.includes(line.slice(0, line.indexOf(' =')) + ' '))) {
-		return `${relative(root, schemas).replaceAll('\\', '/')} ya exporta un schema de ${method} ${route}`
+		return t('{0} already exports a schema for {1} {2}', relative(root, schemas).replaceAll('\\', '/'), method, route)
 	}
 	const header = library === 'valibot' ? `import * as v from "valibot";\n` : `import { z } from "zod";\n`
 	const schemaFile: ScaffoldFile = existing === undefined ? { path: schemas, content: `${header}\n${exported.join('\n')}\n` } : { path: schemas, content: `${existing.endsWith('\n') ? '' : '\n'}\n${exported.join('\n')}\n`, append: true }
@@ -129,3 +134,50 @@ export function endpointFiles(root: string, method: EndpointMethod, route: strin
 }
 
 export const endpointMethods: readonly EndpointMethod[] = methods
+
+/** Clave de contexto que la extensión activa y que muestra los comandos «Meeko: nuevo…» en el menú del explorador. */
+export const scaffoldContextKey = 'meeko.scaffold'
+
+/** Qué crea un comando «Meeko: nuevo…». */
+export type ScaffoldKind = 'component' | 'endpoint' | 'page'
+
+/** La carpeta sobre la que actúa un clic del explorador: el propio recurso si es una carpeta, o la que lo contiene. */
+export function clickedFolder(path: string): string {
+	try {
+		return statSync(path).isDirectory() ? path : dirname(path)
+	} catch {
+		return dirname(path)
+	}
+}
+
+/**
+ * Valor inicial del cuadro de entrada cuando el comando se lanza sobre una carpeta del explorador:
+ * `app/pages/users` → `/users/` para una página, `server/api/users` → `/users/` para un endpoint y
+ * `app/components/App/Forms` → `App/Forms/` para un componente. Devuelve `undefined` si la carpeta
+ * no pertenece a la raíz de ese tipo, si es la propia `app/components` o si algún tramo no es un
+ * segmento que el comando acepte, porque el valor propuesto no podría completarse.
+ */
+export function scaffoldPrefill(kind: ScaffoldKind, root: string, folder: string): string | undefined {
+	const base = kind === 'component' ? join(root, 'app', 'components') : kind === 'page' ? join(root, 'app', 'pages') : join(root, 'server', 'api')
+	const inside = relative(base, folder)
+	if (inside === '..' || /^\.\.[\\/]/.test(inside) || isAbsolute(inside)) return undefined
+	const segments = inside.split(/[\\/]/).filter(Boolean)
+	if (kind === 'component') return segments.length && segments.every((segment) => componentSegment.test(segment)) ? `${segments.join('/')}/` : undefined
+	if (!segments.every((segment) => routeSegment.test(segment))) return undefined
+	return segments.length ? `/${segments.join('/')}/` : '/'
+}
+
+/** La unidad de sangría de los archivos generados: un tabulador, o `tabSize` espacios si el editor inserta espacios. */
+export function indentUnit(insertSpaces: boolean, tabSize: number): string {
+	return insertSpaces ? ' '.repeat(tabSize) : '\t'
+}
+
+/** El primer archivo que ya existe y se sobrescribiría: los que se añaden (`append`) no cuentan. */
+export function takenFile(files: readonly ScaffoldFile[], exists: (path: string) => boolean = existsSync): ScaffoldFile | undefined {
+	return files.find((file) => !file.append && exists(file.path))
+}
+
+/** El contenido que se escribe en disco: el del archivo, tras el contenido previo cuando se añade a uno existente. */
+export function writtenContent(file: ScaffoldFile, previous: string): string {
+	return (file.append ? previous : '') + file.content
+}
