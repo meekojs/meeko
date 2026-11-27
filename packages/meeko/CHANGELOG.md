@@ -1,5 +1,9 @@
 # Cambios de Meeko
 
+## Sin publicar
+
+- La página de error por defecto ocupa toda la ventana visible (`min-height: 100dvh` en lugar de `95vh`): ya no deja una franja abajo y, en móvil, no se desplaza al mostrarse u ocultarse la barra del navegador.
+
 ## 1.11.0 — 2026-11-25
 
 - Publicación coordinada con `@meekojs/ui` 1.11.0, sin cambios funcionales en este paquete.
