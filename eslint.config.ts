@@ -10,9 +10,10 @@ export default defineEslint(
 			'meeko/order-macros': 'error',
 			'meeko/padding-line-between-macros': 'error',
 			'meeko/order-sections': 'error',
-			'meeko/prefer-static-bindings': 'warn',
+			'meeko/prefer-static-bindings': 'error',
 			'meeko/attributes-order': 'error',
 			'meeko/html-self-closing': 'error',
+			'meeko/button-has-type': 'error',
 			// Only imports are kept in order: without the option defineEslint sorts them and nothing else, because
 			// the rest of the preset gave 21766 warnings here and its fixes can change behaviour. They warn in 1.x
 			// and this repository already treats them as errors (the 2.0 default).
@@ -29,7 +30,7 @@ export default defineEslint(
 			'**/coverage/**',
 			'**/artifacts/**',
 			'apps/meeko/dist-static/**',
-			'apps/meeko/public/**',
+			'apps/meeko/public/brand/**',
 			'packages/vscode/.vscode-test/**',
 			'.claude/**',
 			'.codex/**',
@@ -62,9 +63,8 @@ export default defineEslint(
 	},
 
 	{
-		// ESLint's defaults already parse the latest syntax, .js/.mjs as modules and .cjs as CommonJS.
+		// No `files`: these rules hold for every linted file, TypeScript, .meeko and plain JavaScript alike.
 		name: 'meeko/defaults',
-		files: ['**/*.{ts,tsx,mts,cts,meeko}'],
 		linterOptions: {
 			// Stale eslint-disable comments fail, so every exception stays justified.
 			reportUnusedDisableDirectives: 'error',
@@ -87,17 +87,16 @@ export default defineEslint(
 			'prefer-const': ['error', { ignoreReadBeforeAssign: true }],
 			// Sanitizers and validators match control characters on purpose (`[\x00-\x1f]`).
 			'no-control-regex': 'off',
-			// `{} extends T` is the type-level test for "every key of T is optional", and the empty
-			// interfaces (MeekoSession, GeneratedRoutes) are augmentation points for applications.
-			'@typescript-eslint/no-empty-object-type': 'off',
-			// `any` remains in variance positions (SessionManager<any>, Vite configs); kept visible as a
-			// warning instead of blocking.
-			'@typescript-eslint/no-explicit-any': 'warn',
-			// Rethrowing without `cause` loses the original stack; worth fixing, but each case changes the
-			// thrown error, so it is a warning until it is reviewed one by one.
-			'preserve-caught-error': 'warn',
-			// Defensive initial values before a try/catch that assigns on every path; harmless.
-			'no-useless-assignment': 'warn',
+		},
+	},
+	{
+		// typescript-eslint only registers its plugin for these files, so its rules cannot go above.
+		name: 'meeko/typescript',
+		files: ['**/*.{ts,tsx,mts,cts,meeko}'],
+		rules: {
+			// Empty interfaces (MeekoSession, GeneratedRoutes) are augmentation points for applications; an
+			// empty object type anywhere else is still an error.
+			'@typescript-eslint/no-empty-object-type': ['error', { allowInterfaces: 'always' }],
 		},
 	},
 	{
@@ -124,19 +123,14 @@ export default defineEslint(
 			// Tests set and restore the variables they read (PORT, SITE_CANONICAL_ORIGIN) or pass them to
 			// mocks; they are not inputs of a cached task.
 			'turbo/no-undeclared-env-vars': 'off',
-			// Las pruebas crean contextos de componente sintéticos dentro de callbacks de node:test.
+			// Tests create synthetic component contexts inside node:test callbacks.
 			'meeko/rules-of-composables': 'off',
-			// `if (false) { ... }` holds type-level assertions that tsc checks and the runtime never runs.
-			'no-constant-condition': 'off',
-			// Expected output is matched with its literal indentation.
-			'no-regex-spaces': 'off',
 		},
 	},
 
-	// Zones and their runtime globals.
 	{
-		// Implementaciones internas que eligen el contexto SSR/cliente o establecen el contexto
-		// durante el arranque. Esta excepción no forma parte del preset de los consumidores.
+		// Internal implementations that choose the SSR or client context, or set the context during
+		// startup. This exception is not part of the preset consumers get.
 		name: 'meeko/internal-composable-context',
 		files: [
 			'packages/meeko/src/app/composables/use-theme-toggle.ts',
@@ -151,16 +145,12 @@ export default defineEslint(
 	{
 		name: 'meeko/ui-preferences',
 		files: ['packages/ui/**/*.{js,mjs,cjs,ts,tsx,meeko}'],
-		rules: {
-			'no-debugger': 'error',
-			'no-console': ['warn', { allow: ['warn', 'error'] }],
-			'prefer-const': 'error',
-		},
+		rules: { 'no-console': ['error', { allow: ['warn', 'error'] }] },
 	},
 	{
 		name: 'meeko/ui-templates',
 		files: ['packages/ui/**/*.meeko', 'apps/ui/**/*.meeko', 'apps/i18n/**/*.meeko', 'packages/docs/**/*.meeko'],
-		rules: { 'meeko/button-has-type': 'error', 'meeko/no-autofocus': 'warn' },
+		rules: { 'meeko/button-has-type': 'error', 'meeko/no-autofocus': 'error' },
 	},
 	{
 		// One-line templates whose rendered markup, attribute order included, is a contract: the core
@@ -204,15 +194,12 @@ export default defineEslint(
 		rules: { 'turbo/no-undeclared-env-vars': 'off' },
 	},
 	{
-		name: 'meeko/ui-tests',
-		files: ['packages/ui/tests/**/*.ts'],
-		rules: { '@typescript-eslint/no-explicit-any': 'off' },
-	},
-	{
 		name: 'meeko/ui-scripts',
 		files: ['packages/ui/scripts/**/*.{js,mjs,cjs,ts}'],
 		rules: { 'no-console': 'off' },
 	},
+	// Runtime globals. Only JavaScript files need them: typescript-eslint turns `no-undef` off for
+	// TypeScript and .meeko, where the compiler already resolves every name.
 	{
 		name: 'meeko/node',
 		files: [
@@ -221,24 +208,9 @@ export default defineEslint(
 			'**/tests/**',
 			'**/benchmarks/**',
 			'**/examples/**',
-			'**/*.config.ts',
 			'packages/vscode/**',
-			'apps/meeko/server/**',
-			'apps/meeko/shared/**',
 		],
 		languageOptions: { globals: { ...globals.node } },
-	},
-	{
-		// The package is isomorphic: the same sources hold the server, the CLI and the client runtime
-		// (DOM, hydration, DevTools UI), and its tsconfig includes both the DOM and Node types.
-		name: 'meeko/package',
-		files: ['packages/meeko/src/**'],
-		languageOptions: { globals: { ...globals.node, ...globals.browser } },
-	},
-	{
-		name: 'meeko/browser',
-		files: ['apps/meeko/app/**', 'packages/meeko/examples/**/client.ts', 'packages/meeko/benchmarks/*-client.ts'],
-		languageOptions: { globals: { ...globals.browser } },
 	},
 	{
 		// Node scripts that also hold callbacks evaluated in a browser page (Playwright `evaluate`).
@@ -262,6 +234,5 @@ export default defineEslint(
 		files: ['**/*.cjs'],
 		// typescript-eslint's base config sets sourceType "module" for every file.
 		languageOptions: { sourceType: 'commonjs' },
-		rules: { '@typescript-eslint/no-require-imports': 'off' },
 	},
 )

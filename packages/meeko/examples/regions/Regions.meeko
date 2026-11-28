@@ -38,11 +38,21 @@
 
 <template>
 	<section>
-		<button on:click="reverse">Reverse</button>
-		<button on:click="prepend">Prepend</button>
-		<button on:click="remove">Remove</button>
-		<button on:click="rename">Rename</button>
-		<button on:click="toggle">Toggle</button>
+		<button
+			type="button"
+			on:click="reverse">Reverse</button>
+		<button
+			type="button"
+			on:click="prepend">Prepend</button>
+		<button
+			type="button"
+			on:click="remove">Remove</button>
+		<button
+			type="button"
+			on:click="rename">Rename</button>
+		<button
+			type="button"
+			on:click="toggle">Toggle</button>
 		<p if:when="visible.value">Selected: {selected.value}</p>
 		<ul>
 			<li
@@ -51,7 +61,11 @@
 				each:key="item.id"
 				bind:data-id="item.id"
 			>
-				<button on:click="() => select(item.id)">{item.label}</button>
+				<button
+					type="button"
+					on:click="() => select(item.id)"
+					>{item.label}</button
+				>
 				<small>{index}</small>
 				<strong if:when="index === 0">first</strong>
 				<span if:when="selected.value === item.id"> selected</span>

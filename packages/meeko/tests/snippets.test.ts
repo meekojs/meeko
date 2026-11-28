@@ -204,7 +204,7 @@ test('removing the formatting edges of a <snippet> leaves <pre>, spaces, &nbsp; 
 	}
 	const compact = (source: string): string => compile(`<script lang="ts">import * as Child from "./Child.meeko";</script><template><Child>${source}</Child></template>`, '/project/Page.meeko').code
 	assert.match(compact('<snippet name="a"><pre>\n\n\n</pre></snippet>'), /"<pre" \+ ">" \+ __meeko\.escapeHtml\("\\n\\n\\n"\) \+ "<\/pre>"/, 'a <pre> with line breaks alone keeps them')
-	assert.match(compact('\n  <b>x</b>\n'), /"default": __meeko\.snippet\(\(\) => __meeko\.escapeHtml\("\\n  "\) \+ "<b" \+ ">" \+ __meeko\.escapeHtml\("x"\) \+ "<\/b>" \+ __meeko\.escapeHtml\("\\n"\)\)/, 'loose content keeps its whitespace')
+	assert.match(compact('\n  <b>x</b>\n'), /"default": __meeko\.snippet\(\(\) => __meeko\.escapeHtml\("\\n {2}"\) \+ "<b" \+ ">" \+ __meeko\.escapeHtml\("x"\) \+ "<\/b>" \+ __meeko\.escapeHtml\("\\n"\)\)/, 'loose content keeps its whitespace')
 })
 
 test('snippets compile into the child channel and <render> regions', () => {
@@ -216,7 +216,7 @@ test('snippets compile into the child channel and <render> regions', () => {
 	assert.match(child, /__meeko\.bindSnippet\(__scope, 2, \(\) => \(snippets\.actions\), \(\) => \[close, label\.value\]\)/)
 	const parent = compile(page, 'Page.meeko').code
 	// The tag call types each snippet: the child's defineSnippets gives the parameters.
-	assert.match(parent, /__meeko\.componentTag\(\(\) => AppDialog\)\(\{  \}, __meeko\.noChannels, __meeko\.noChannels, \{ "default": __meeko\.snippet\(\(\) => /)
+	assert.match(parent, /__meeko\.componentTag\(\(\) => AppDialog\)\(\{ {2}\}, __meeko\.noChannels, __meeko\.noChannels, \{ "default": __meeko\.snippet\(\(\) => /)
 	assert.match(parent, /"actions": __meeko\.snippet\(\(close, label\) => /)
 	// In the hydration, parameters read the arguments signal of their snippet.
 	assert.match(parent, /\(\(__meeko_args_1\.value\[1\]\)\)/)

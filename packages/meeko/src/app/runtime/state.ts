@@ -170,7 +170,7 @@ export class StateStore {
 							}
 						}
 					}
-					if (failures.length > 1) throw new AggregateError(failures, 'Meeko navigation state recovery failed')
+					if (failures.length > 1) throw new AggregateError(failures, 'Meeko navigation state recovery failed', { cause: error })
 					throw error
 				}
 			},

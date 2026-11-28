@@ -6,7 +6,7 @@ import { bindFor, releaseAll, renderFor } from '../src/app/runtime/renderer.ts'
 import { checkSource } from '../src/check.ts'
 import { batch, createRoot, effect, onCleanup, signal } from '../src/core/reactivity.ts'
 
-if (false) {
+void (async () => {
 	// @ts-expect-error reactive effects cannot track work after an await
 	effect(async () => undefined)
 	// @ts-expect-error a conditional promise is still an asynchronous effect
@@ -15,7 +15,7 @@ if (false) {
 	onCleanup(async () => undefined)
 	// @ts-expect-error a conditional Promise still makes the cleanup asynchronous
 	onCleanup(() => (Math.random() > 0.5 ? Promise.resolve() : undefined))
-}
+})
 
 test('an async reactive effect is rejected without an unhandled rejection', async () => {
 	const logged: unknown[][] = []

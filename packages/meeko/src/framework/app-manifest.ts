@@ -334,7 +334,7 @@ export async function readBuildAppData(projectRoot: string): Promise<BuildAppDat
 	try {
 		return JSON.parse(await readFile(resolve(projectRoot, buildDataFile), 'utf8')) as BuildAppData
 	} catch (error) {
-		if ((error as NodeJS.ErrnoException).code === 'ENOENT') throw new Error('Client build data is missing; run meeko build')
+		if ((error as NodeJS.ErrnoException).code === 'ENOENT') throw new Error('Client build data is missing; run meeko build', { cause: error })
 		throw error
 	}
 }

@@ -7,7 +7,6 @@
 		"check": "pnpm -F meeko-docs run build && meeko check .",
 		"dev": "node ../../packages/docs/scripts/assets.mjs && meeko dev .",
 		"lint": "eslint .",
-		"lint:fix": "eslint . --fix",
 		"preview": "meeko preview .",
 		"start": "meeko start .",
 		"test:e2e": "node --test tests/*.e2e.mjs"

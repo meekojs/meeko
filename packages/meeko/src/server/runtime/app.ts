@@ -188,6 +188,7 @@ export interface ServerAppOptions<Env = Readonly<Record<string, string | undefin
 	 * Export por defecto de `server/runtime.ts`. Si falta, o no devuelve `sessions`, Meeko crea las
 	 * sesiones: en memoria en desarrollo y, en producción, en Redis con `MEEKO_REDIS_URL`.
 	 */
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- `Services` is invariant in `ServerRuntime` (it types the `RequestContext` its callbacks receive), so only `any` accepts the runtime of any services type
 	readonly runtime?: ServerRuntimeDefinition<Env, any> | undefined
 	/** Modo producción: exige un store de sesiones persistente y oculta los detalles de los errores. */
 	readonly production: boolean
@@ -344,7 +345,7 @@ function defaultObserver(production: boolean): ServerErrorObserver {
 }
 
 /** The runtime with its sessions always present: the app's own, or Meeko's defaults. */
-type ResolvedRuntime<Env> = Omit<ServerRuntime<unknown, Env>, 'sessions'> & { readonly sessions: SessionManager<any> }
+type ResolvedRuntime<Env> = Omit<ServerRuntime<unknown, Env>, 'sessions'> & { readonly sessions: SessionManager<unknown> }
 
 /** Releases what the runtime factory created and fails startup with `error`. */
 async function closeRuntime(runtime: { readonly close?: (() => void | Promise<void>) | undefined }, error: Error): Promise<never> {
@@ -399,7 +400,7 @@ async function createRuntime<Env>(options: ServerAppOptions<Env>, platform: Serv
 		try {
 			await runtime.close?.()
 		} catch (cleanupError) {
-			throw new AggregateError([error, cleanupError], 'Meeko session defaults and runtime cleanup failed')
+			throw new AggregateError([error, cleanupError], 'Meeko session defaults and runtime cleanup failed', { cause: cleanupError })
 		}
 		throw error
 	}
@@ -792,7 +793,7 @@ export async function createServerApp<Env = Readonly<Record<string, string | und
 		try {
 			await close()
 		} catch (cleanupError) {
-			throw new AggregateError([error, cleanupError], 'Meeko application startup and cleanup failed')
+			throw new AggregateError([error, cleanupError], 'Meeko application startup and cleanup failed', { cause: cleanupError })
 		}
 		throw error
 	}

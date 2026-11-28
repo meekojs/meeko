@@ -450,9 +450,9 @@ export function dynamicProps<const Is, T extends object | null | undefined>(is: 
  * With several possible values, {@link checkCorrelatedBind} checks the object against the value of
  * its own entry, so the props of the tag call are only the explicit ones.
  */
-export function correlatedProps<const Is, T extends object | null | undefined>(is: () => Is, value: T & NoInfer<T extends object ? DynamicSpreadCheck<T, Is> : unknown>): true extends IsUnion<Is> ? {} : T {
+export function correlatedProps<const Is, T extends object | null | undefined>(is: () => Is, value: T & NoInfer<T extends object ? DynamicSpreadCheck<T, Is> : unknown>): true extends IsUnion<Is> ? NonNullable<unknown> : T {
 	void is
-	return value as true extends IsUnion<Is> ? {} : T
+	return value as true extends IsUnion<Is> ? NonNullable<unknown> : T
 }
 
 /** Type of a property path, in each member of a union. */
@@ -468,7 +468,7 @@ type EntryKeyErrors<S, M, Tag extends string> = {
 
 /** Text of MEEK113 for each prop of the component of one entry that its object leaves out. */
 type EntryMissingProps<S, Props> = {
-	[K in keyof Props]-?: K extends string ? (K extends keyof S ? never : {} extends Pick<Props, K> ? never : `MEEK113: falta la prop obligatoria ${K} del componente de esa entrada`) : never
+	[K in keyof Props]-?: K extends string ? (K extends keyof S ? never : NonNullable<unknown> extends Pick<Props, K> ? never : `MEEK113: falta la prop obligatoria ${K} del componente de esa entrada`) : never
 }[keyof Props]
 
 /** Text of MEEK113 for each prop of the component of one entry that its object gets wrong. */
@@ -487,7 +487,7 @@ type EntryPropErrors<S, Props, Accepted = TagProps<Props>> = [S] extends [Accept
 type EntryComponentErrors<S, M> = [M] extends [{ readonly __meekoGeneric: true }] ? EntryMissingProps<S, PropsOf<M>> : EntryPropErrors<S, PropsOf<M>>
 
 /** Props of the required models of a component: `modelValue` for the unnamed one. */
-type RequiredModelProps<M> = ChannelsOf<M> extends { readonly models: infer Models } ? (Models extends object ? { [K in keyof Models]-?: {} extends Pick<Models, K> ? never : K extends 'default' ? 'modelValue' : K }[keyof Models] : never) : never
+type RequiredModelProps<M> = ChannelsOf<M> extends { readonly models: infer Models } ? (Models extends object ? { [K in keyof Models]-?: NonNullable<unknown> extends Pick<Models, K> ? never : K extends 'default' ? 'modelValue' : K }[keyof Models] : never) : never
 
 /** Text of MEEK113 for each required model of the component of one entry that neither its object nor the tag passes. */
 type EntryModelErrors<S, M, Given extends string> = { [K in Exclude<RequiredModelProps<M>, keyof S | Given> & string]: `MEEK113: falta el modelo obligatorio ${K} del componente de esa entrada` }[Exclude<RequiredModelProps<M>, keyof S | Given> & string]
@@ -496,7 +496,7 @@ type EntryModelErrors<S, M, Given extends string> = { [K in Exclude<RequiredMode
 type EntryBoundErrors<S, Is, Given extends string, M = ComponentPart<Is>, Tag extends string = RenderableTag<Is>> = [M | Tag] extends [never] ? never : EntryKeyErrors<S, M, Tag> | ([M] extends [never] ? never : [TagPart<Is>] extends [never] ? EntryComponentErrors<S & Record<Given, never>, M> | EntryModelErrors<S, M, Given> : never)
 
 /** Errors of one entry: `any` checks nothing, and an absent object passes no props. */
-type EntryErrors<Is, Bound, Given extends string> = 0 extends 1 & Is ? never : 0 extends 1 & Bound ? never : Bound extends object ? EntryBoundErrors<PresentKeys<Bound>, Is, Given> : EntryBoundErrors<{}, Is, Given>
+type EntryErrors<Is, Bound, Given extends string> = 0 extends 1 & Is ? never : 0 extends 1 & Bound ? never : Bound extends object ? EntryBoundErrors<PresentKeys<Bound>, Is, Given> : EntryBoundErrors<NonNullable<unknown>, Is, Given>
 
 /** Errors of every member of a union of entries, each against its own value of `is`. */
 type CorrelatedBindErrors<Entry, IsPath extends readonly string[], BindPath extends readonly string[], Given extends string> = Entry extends unknown ? EntryErrors<PathValue<Entry, IsPath>, PathValue<Entry, BindPath>, Given> : never

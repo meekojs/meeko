@@ -107,7 +107,7 @@ export async function generateOpenApi(options: OpenApiOptions): Promise<Record<s
 			try {
 				converted = options.toJsonSchema(schema)
 			} catch (error) {
-				throw new Error(`OpenAPI schema ${name} cannot be converted: ${error instanceof Error ? error.message : String(error)}`)
+				throw new Error(`OpenAPI schema ${name} cannot be converted: ${error instanceof Error ? error.message : String(error)}`, { cause: error })
 			}
 			schemas[name] = asSchema(converted, name)
 		}

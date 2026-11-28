@@ -440,9 +440,9 @@ class RevocationRegistry {
 	}
 }
 
-const registries = new WeakMap<SessionManager<any>, RevocationRegistry>()
+const registries = new WeakMap<SessionManager<unknown>, RevocationRegistry>()
 
-function revocationRegistry(manager: SessionManager<any>): RevocationRegistry {
+function revocationRegistry(manager: SessionManager<unknown>): RevocationRegistry {
 	let registry = registries.get(manager)
 	if (!registry) {
 		registry = new RevocationRegistry()
@@ -477,14 +477,14 @@ export const settleSessionOrigin = Symbol('meeko.session.settleOrigin')
 const safeMethods: ReadonlySet<string> = new Set(['GET', 'HEAD', 'OPTIONS'])
 
 /** Managers created with `production: true`, which skip the development hints. */
-const productionManagers = new WeakSet<SessionManager<any>>()
+const productionManagers = new WeakSet<SessionManager<unknown>>()
 
 function sessionLockedError(): ApiError {
 	return new ApiError('SESSION_LOCKED', 500, 'SESSION_LOCKED: the session cookie was already sent with the response headers; create, rotate or revoke the session in the loader, before any deferred work')
 }
 
 /** Revocation handles a manager still holds, including collected ones not yet swept. Internal; for tests. */
-export function trackedSessionHandles(manager: SessionManager<any>): number {
+export function trackedSessionHandles(manager: SessionManager<unknown>): number {
 	return registries.get(manager)?.handleCount ?? 0
 }
 

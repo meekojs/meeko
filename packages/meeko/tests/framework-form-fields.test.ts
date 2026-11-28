@@ -272,7 +272,7 @@ test('form.field gives a typed signal, the error state and IDs for a field compo
 	const other = useForm({ initial: { password: '' }, submit: () => {} })
 	assert.notEqual(other.field('password').id, password.id, 'two forms never share IDs')
 
-	if (false) {
+	void (() => {
 		const field: FormField<string> = form.field('password')
 		const value: Signal<string> = field.value
 		const message: ReadonlySignal<string | undefined> = field.error
@@ -283,7 +283,7 @@ test('form.field gives a typed signal, the error state and IDs for a field compo
 		// @ts-expect-error the field keeps its type
 		const wrong: FormField<string> = flag.field('accepted')
 		void [value, message, accepted, wrong]
-	}
+	})
 })
 
 test('focusInvalid focuses the first invalid control of the submitted form after the messages render', async () => {

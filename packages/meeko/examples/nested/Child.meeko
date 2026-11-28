@@ -9,7 +9,11 @@
 </script>
 
 <template>
-	<button on:click="() => count.value++">{props.label}: {count.value}</button>
+	<button
+		type="button"
+		on:click="() => count.value++"
+		>{props.label}: {count.value}</button
+	>
 	<component
 		is="Grandchild"
 		bind:label="props.label"

@@ -159,7 +159,7 @@ type StrictValue<Data, Tag extends string, Name extends string> = Data extends {
 type TypeMessage<Text extends string> = { readonly [Key in Text]: never }
 
 /** The members of `Value` that are string literals: `"a"`, not `string` nor `${number}px`. Distributive. */
-type LiteralMembers<Value> = Value extends string ? (string extends Value ? never : {} extends Record<Value, 1> ? never : Value) : never
+type LiteralMembers<Value> = Value extends string ? (string extends Value ? never : NonNullable<unknown> extends Record<Value, 1> ? never : Value) : never
 
 /** `Text` as the attribute compares it: without case in HTML, as written in SVG. */
 type Compared<Text extends string, Tag extends string> = [SvgTagOf<Tag>] extends [never] ? Lowercase<Text> : Text

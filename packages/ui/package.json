@@ -65,6 +65,7 @@
 		"check": "tsc -p tsconfig.json --noEmit",
 		"generate:appearance": "node scripts/build-appearance.mjs",
 		"generate:hues": "node scripts/build-hues.mjs",
+		"lint": "eslint .",
 		"prepack": "pnpm run build",
 		"test": "pnpm run build && node --test tests/*.test.mjs",
 		"test:e2e": "pnpm run build && pnpm -F meeko-ui-site build && pnpm -F meeko-i18n-site build && node --test --test-concurrency=1 tests/*.e2e.mjs"

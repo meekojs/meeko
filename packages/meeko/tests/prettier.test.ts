@@ -155,7 +155,7 @@ describe('Prettier plugin for .meeko', () => {
 		assert.match(formatted, /is="count\.value > 1 \? 'a' : 'button'"/)
 		assert.match(formatted, /bind:href="count\.value > 1 \? '\/x' : undefined"/)
 		// On a custom element `bind` is an HTML attribute: its text stays as written.
-		assert.match(formatted, /<x-card bind="raw   text"><\/x-card>/)
+		assert.match(formatted, /<x-card bind="raw {3}text"><\/x-card>/)
 	})
 
 	test('uses single quotes in attribute expressions and keeps strings with double quotes valid', async () => {

@@ -20,6 +20,7 @@
 	},
 	"scripts": {
 		"build": "node scripts/build.mjs",
+		"lint": "eslint .",
 		"test": "tsx --test tests/*.test.ts"
 	},
 	"dependencies": {

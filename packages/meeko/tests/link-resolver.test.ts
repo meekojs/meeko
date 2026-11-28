@@ -69,7 +69,7 @@ test("<MeekoLink> passes its route, hreflang and bind:resolve to the application
 	assert.match(spread, /bindAttribute\(__scope, 0, "href"/, 'a spread can change the hreflang')
 	// The type check reads only bind:resolve, at its own offset.
 	const checked = compile('<template><MeekoLink to="/docs" bind:resolve="false">Docs</MeekoLink></template>', layout, { typeCheck: true }).code
-	assert.match(checked, /__meeko\.linkHref\(__meeko_links, "", __meeko_href\("\/docs", \{  \}\), undefined, false\)/)
+	assert.match(checked, /__meeko\.linkHref\(__meeko_links, "", __meeko_href\("\/docs", \{ {2}\}\), undefined, false\)/)
 	assert.equal(errorCode('<template><MeekoLink to="/docs" resolve="false">x</MeekoLink></template>'), 'MEEK105')
 	// `<component is>` with 'MeekoLink' gives bind:resolve to the link branch only.
 	const branch = compile('<script lang="ts">\nconst to = signal<string | undefined>("/docs");\n</script>\n<template><component is="to.value ? \'MeekoLink\' : \'a\'" bind:to="to.value" bind:resolve="false">x</component></template>', layout).code

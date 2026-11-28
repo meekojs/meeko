@@ -121,7 +121,7 @@ test('preserves literal content, ignored subtrees, inline comments and comment b
 	const result = await stable(source, { printWidth: 800, htmlWhitespaceSensitivity: 'css' })
 	assert.ok(result.includes(literal))
 	assert.ok(result.includes(ignored))
-	assert.match(result, /<textarea>\n?  una\n\n  nota  <\/textarea>/)
+	assert.match(result, /<textarea>\n? {2}una\n\n {2}nota {2}<\/textarea>/)
 	assert.ok(result.includes(comment))
 	assert.match(result, /<!-- prettier-ignore -->\n\s*<div {3}class="raw">/)
 	assert.match(result, /<!-- Inline -->\n\n/)

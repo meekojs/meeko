@@ -165,9 +165,9 @@ type RequestOptions = {
 type ContractOption<Key extends string, T, Optional extends boolean = false> = 0 extends 1 & T ? { readonly [K in Key]?: T } : [T] extends [undefined] ? { readonly [K in Key]?: never } : unknown extends T ? { readonly [K in Key]: T } : undefined extends T ? { readonly [K in Key]?: Exclude<T, undefined> } : Optional extends true ? { readonly [K in Key]?: T } : { readonly [K in Key]: T }
 type ParamOption<T> = ContractOption<'params', T>
 /** A query whose fields are all optional (it accepts `{}`) may be left out. */
-type QueryOption<T> = ContractOption<'query', T, {} extends T ? true : false>
+type QueryOption<T> = ContractOption<'query', T, NonNullable<unknown> extends T ? true : false>
 type BodyOption<T> = ContractOption<'body', T>
-type OptionalQuery<Q> = [Q] extends [undefined] ? true : {} extends Q ? true : false
+type OptionalQuery<Q> = [Q] extends [undefined] ? true : NonNullable<unknown> extends Q ? true : false
 type ApiArguments<O extends AnyApiOperation> = O['params'] extends undefined ? (OptionalQuery<O['query']> extends true ? (O['body'] extends undefined ? [options?: ParamOption<O['params']> & QueryOption<O['query']> & BodyOption<O['body']> & RequestOptions] : [options: ParamOption<O['params']> & QueryOption<O['query']> & BodyOption<O['body']> & RequestOptions]) : [options: ParamOption<O['params']> & QueryOption<O['query']> & BodyOption<O['body']> & RequestOptions]) : [options: ParamOption<O['params']> & QueryOption<O['query']> & BodyOption<O['body']> & RequestOptions]
 /**
  * Entrada de una operación de API que no es `GET`, sin `signal`: `params`, `query` y `body` según

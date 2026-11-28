@@ -7,6 +7,7 @@
 		"build": "pnpm run assets && meeko build .",
 		"check": "pnpm run assets && meeko check .",
 		"dev": "node ../../packages/docs/scripts/assets.mjs && meeko dev .",
+		"lint": "eslint .",
 		"start": "meeko start .",
 		"test": "tsx --test --test-concurrency=1 tests/*.test.ts",
 		"test:e2e": "pnpm run assets && node --test --test-concurrency=1 tests/*.e2e.mjs"

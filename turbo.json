@@ -30,7 +30,13 @@
 			"outputs": []
 		},
 		"lint": {
-			"dependsOn": ["^build"],
+			"dependsOn": ["@meekojs/eslint-plugin#build"],
+			"inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/eslint.config.ts", "$TURBO_ROOT$/turbo.json"],
+			"outputs": []
+		},
+		"//#lint:root": {
+			"dependsOn": ["@meekojs/eslint-plugin#build"],
+			"inputs": ["$TURBO_DEFAULT$", "!apps/**", "!packages/**"],
 			"outputs": []
 		},
 		"test": {

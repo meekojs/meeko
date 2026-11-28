@@ -22,6 +22,7 @@
 	"scripts": {
 		"check": "tsc -p tsconfig.json --noEmit",
 		"inventory": "tsx scripts/inventory.ts",
+		"lint": "eslint .",
 		"test": "tsx --test --test-concurrency=1 tests/*.test.ts",
 		"translations": "tsx scripts/translations.ts"
 	},

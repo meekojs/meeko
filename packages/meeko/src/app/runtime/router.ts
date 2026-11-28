@@ -508,7 +508,7 @@ export function createAppNavigator(routes: readonly RouteRecord[], render: (cont
 					try {
 						browser.location.replace(currentUrl)
 					} catch (recoveryError) {
-						throw new AggregateError([historyError, recoveryError], 'Meeko history and URL recovery failed')
+						throw new AggregateError([historyError, recoveryError], 'Meeko history and URL recovery failed', { cause: recoveryError })
 					}
 					throw historyError
 				}
@@ -546,9 +546,9 @@ export function createAppNavigator(routes: readonly RouteRecord[], render: (cont
 					try {
 						browser.location.replace(currentUrl)
 					} catch (recoveryError) {
-						throw new AggregateError([error, historyError, recoveryError], 'Meeko navigation and URL recovery failed')
+						throw new AggregateError([error, historyError, recoveryError], 'Meeko navigation and URL recovery failed', { cause: recoveryError })
 					}
-					throw new AggregateError([error, historyError], 'Meeko navigation and history recovery failed')
+					throw new AggregateError([error, historyError], 'Meeko navigation and history recovery failed', { cause: historyError })
 				}
 			}
 			throw error
@@ -562,7 +562,7 @@ export function createAppNavigator(routes: readonly RouteRecord[], render: (cont
 					try {
 						browser.location.replace(currentUrl)
 					} catch (recoveryError) {
-						throw new AggregateError([historyError, recoveryError], 'Meeko history and URL recovery failed')
+						throw new AggregateError([historyError, recoveryError], 'Meeko history and URL recovery failed', { cause: recoveryError })
 					}
 					throw historyError
 				}
@@ -581,7 +581,7 @@ export function createAppNavigator(routes: readonly RouteRecord[], render: (cont
 			try {
 				browser.location.replace(currentUrl)
 			} catch (recoveryError) {
-				throw new AggregateError([error, recoveryError], 'Meeko history update and navigation recovery failed')
+				throw new AggregateError([error, recoveryError], 'Meeko history update and navigation recovery failed', { cause: recoveryError })
 			}
 			throw error
 		}

@@ -63,7 +63,7 @@ test('ClassValue accepts clsx-style objects and rejects functions, symbols and s
 	const classes: ClassValue = ['card', { 'card--active': active, hidden: false, count: 0, label: 'yes' }, [[{ deep: null }], 2]]
 	const attribute: AttributeValueOf<'div', 'class'> = { on: active }
 	assert.ok(classes && attribute)
-	if (false) {
+	void (() => {
 		// @ts-expect-error A function is not a class.
 		const fn: ClassValue = () => 'x'
 		// @ts-expect-error A symbol is not a class.
@@ -73,7 +73,7 @@ test('ClassValue accepts clsx-style objects and rejects functions, symbols and s
 		// @ts-expect-error The condition of a class is a value, not an object.
 		const nested: ClassValue = { on: { value: true } }
 		void [fn, symbol, signalValue, nested]
-	}
+	})
 })
 
 test('StyleValue and AttributeValueOf accept style objects', () => {

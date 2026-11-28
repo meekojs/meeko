@@ -14,7 +14,9 @@
 
 <template>
 	<div>
-		<button on:click="toggle">Update</button>
+		<button
+			type="button"
+			on:click="toggle">Update</button>
 		<input
 			bind:value="message.value"
 			bind:disabled="!enabled.value"

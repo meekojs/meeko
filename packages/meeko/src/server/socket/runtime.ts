@@ -428,7 +428,7 @@ export function createSocketHub<TServices>(options: SocketHubOptions<TServices>)
 					try {
 						close(1011, 'Send failed')
 					} catch (closeError) {
-						throw new AggregateError([error, closeError], 'Socket send and close failed')
+						throw new AggregateError([error, closeError], 'Socket send and close failed', { cause: closeError })
 					}
 					throw error
 				}

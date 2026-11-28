@@ -93,7 +93,7 @@ export type UntrustedSrcdocMessage = 'MEEK107: srcdoc crea un documento con un s
  * record has a required key. Other members (numbers, objects, `unknown`) are left to the `string`
  * type of `rawHtml`, which already reports them as errors.
  */
-type UntrustedHtmlMembers<T> = T extends TrustedHtml | null | undefined ? never : T extends string ? ({} extends Record<T, 1> ? T : never) : never
+type UntrustedHtmlMembers<T> = T extends TrustedHtml | null | undefined ? never : T extends string ? (NonNullable<unknown> extends Record<T, 1> ? T : never) : never
 
 /**
  * `unknown` when the value of `html="expression"` may be inserted without a warning, and

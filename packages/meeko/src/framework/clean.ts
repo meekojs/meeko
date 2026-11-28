@@ -102,7 +102,7 @@ export async function resolveCleanRoot(projectRoot: string): Promise<string> {
 	try {
 		root = await realpath(requested)
 	} catch (error) {
-		throw new Error(`No se puede limpiar ${requested}: ${errorCode(error) === 'ENOENT' ? 'el directorio no existe' : (error as Error).message}`)
+		throw new Error(`No se puede limpiar ${requested}: ${errorCode(error) === 'ENOENT' ? 'el directorio no existe' : (error as Error).message}`, { cause: error })
 	}
 	if (!(await stat(root)).isDirectory()) throw new Error(`No se puede limpiar ${root}: no es un directorio`)
 	if (dirname(root) === root) throw new Error(`Meeko no limpia ${root}: es la raíz del sistema de archivos`)

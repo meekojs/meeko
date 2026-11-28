@@ -71,11 +71,11 @@ export type UICardActionsWrap = 'inline' | 'below' | 'auto'
  * type StatDefaults = UIComponentDefaults<typeof statTheme> // { class?: string; ui?: { base?, label?, value?, detail?, change?, … } }
  * ```
  */
-export type UIComponentDefaults<T extends ((...args: never[]) => unknown) | undefined = undefined, V = {}> = Simplify<
+export type UIComponentDefaults<T extends ((...args: never[]) => unknown) | undefined = undefined, V = NonNullable<unknown>> = Simplify<
 	{
 		/** Clases que se suman a las de cada instancia en su elemento raíz (allí donde llega su `class`). */
 		readonly class?: string
-	} & (T extends (...args: never[]) => unknown ? Readonly<UIVariantSlots<T>> : {}) &
+	} & (T extends (...args: never[]) => unknown ? Readonly<UIVariantSlots<T>> : NonNullable<unknown>) &
 		Readonly<V>
 >
 

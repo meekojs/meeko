@@ -39,6 +39,7 @@
 	"scripts": {
 		"build": "pnpm run types:generate && tsdown -c ../../tsdown.config.ts",
 		"check": "pnpm run types:generate && tsc6 -p tsconfig.json --noEmit",
+		"lint": "eslint .",
 		"prepack": "pnpm run build",
 		"test": "pnpm run build && node --test tests/*.test.mjs",
 		"types:generate": "node scripts/generate-rule-types.mjs"

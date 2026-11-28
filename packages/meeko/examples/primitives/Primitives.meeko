@@ -9,7 +9,9 @@
 </script>
 
 <template>
-	<button on:click="update">Update</button>
+	<button
+		type="button"
+		on:click="update">Update</button>
 	<ul
 		><li
 			each:of="labels.value"

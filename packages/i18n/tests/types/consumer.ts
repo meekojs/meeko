@@ -5,9 +5,9 @@ declare module '@meekojs/i18n' {
 	interface GeneratedI18nMessages {
 		welcome: { readonly name: I18nValue }
 		items: { readonly total: number; readonly owner: I18nValue }
-		ready: {}
+		ready: NonNullable<unknown>
 		legacy: true
-		linked: {}
+		linked: NonNullable<unknown>
 	}
 	interface GeneratedI18nTags {
 		linked: 'code' | 'a'
