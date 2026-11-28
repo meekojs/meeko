@@ -428,7 +428,7 @@ export type UINavigationTabsProps = UIThemeProps<
 		/**
 		 * Disposición: una fila subrayada (`underline`, por defecto) o un control segmentado (`segmented`).
 		 *
-		 * @since 2.0.0 sustituye a `variant`, que queda para el tratamiento visual del catálogo.
+		 * @since 1.12.0 sustituye a `variant`, que queda para el tratamiento visual del catálogo.
 		 */
 		readonly layout?: 'underline' | 'segmented'
 		/** Ruta actual, para marcar el enlace con `aria-current="page"`. */
@@ -620,7 +620,7 @@ export interface UITableOfContentsEntry {
  * `<details>` para la columna de contenido, que `<UIPage>` sólo muestra cuando el lateral se oculta.
  *
  * @since 1.8.0
- * @since 2.0.0 se llama `UITableOfContentsLayout`; antes, `UITableOfContentsVariant`.
+ * @since 1.12.0 se llama `UITableOfContentsLayout`; antes, `UITableOfContentsVariant`.
  * @example
  * ```ts
  * const layout: UITableOfContentsLayout = 'collapsible'
@@ -652,7 +652,7 @@ export type UITableOfContentsProps = UIThemeProps<
 		/**
 		 * Vista; `"aside"` por defecto.
 		 *
-		 * @since 2.0.0 sustituye a `variant`, que queda para el tratamiento visual del catálogo.
+		 * @since 1.12.0 sustituye a `variant`, que queda para el tratamiento visual del catálogo.
 		 */
 		readonly layout?: UITableOfContentsLayout
 		/** Título y `aria-label`. */
