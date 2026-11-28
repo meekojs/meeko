@@ -1,6 +1,6 @@
 # Cambios de Prettier para Meeko
 
-## Sin publicar
+## 1.12.0 — 2026-11-28
 
 - El formateador se genera en el build a partir del de `@meekojs/meeko` (`packages/meeko/src/formatters/prettier`), que pasa a ser su única fuente: los dos dan siempre el mismo resultado. Sin cambios de salida ni de API; cambian los nombres de los módulos internos de `dist/`.
 - `meekoSortClasses: "stylesheet"` ordena por `.meeko/styles/main.css` (la hoja que `meeko dev` escribe con todo el pipeline de Vite y sus plugins) cuando existe y nombra alguna clase, y recurre a procesar `app/styles/main.css` si no. Una hoja anterior a `app/styles/main.css` se usa igualmente y avisa una vez; la caché se invalida cuando la hoja cambia. Mismo comportamiento que el formateador de `@meekojs/meeko`.
