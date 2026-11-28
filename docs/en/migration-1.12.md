@@ -1,10 +1,10 @@
 ---
-source-hash: 2da1b475dc00d8b7287bde0b38eb955270a10c444359416485701e16cf18b6da
+source-hash: 14e48ca029f10477f0d4a01a752cf394729ccb59a0517eba8e58e2c21ac8260c
 ---
 
 # Upgrade from 1.11 to 1.12
 
-**From:** 1.11.x. **To:** 1.12.0. **Status:** unpublished; the latest published version is 1.11.0 (tag `v1.11.0`), and this guide collects what the branch accumulates for `1.12.0`. **Who acts:** maintainers upgrading an application from 1.11.x to 1.12.0.
+**From:** 1.11.x. **To:** 1.12.0. **Status:** published on npm on November 28, 2026 (tag `v1.12.0`). **Who acts:** maintainers upgrading an application from 1.11.x to 1.12.0.
 
 `1.12` is a minor release with two breaking changes approved as [exceptions](stability.md#approved-exceptions): Meeko stops publishing PostCSS utilities and stops depending on Tailwind CSS, and the Prettier formatter stops sorting classes with `meekoSortClasses: "tailwind"`. They are removed without a deprecation period because Meeko stops being coupled to a CSS solution: the project chooses its own. At the same time, the editor no longer detects Tailwind on its own: a module or the project declares which tools generate classes. The new features (`meeko styles`, `dev.portless` and HMR behind an HTTPS proxy) are optional. In addition, `@meekojs/ui` 1.12 changes the look of its components and how its styles are loaded (see [Changes in `@meekojs/ui`](#changes-in-meekojsui)). Consult the [CHANGELOG](../../packages/meeko/CHANGELOG.md) and the [stability policy](stability.md) as well.
 

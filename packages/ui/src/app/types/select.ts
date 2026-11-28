@@ -33,7 +33,7 @@ export interface SelectOptionState {
 /**
  * Snippets de `<UISelect>`, tipados con el tipo de sus opciones.
  * @since 1.8.0
- * @since 2.0.0 `value` y `group` pintan lo mismo en todos los navegadores: la lista ya no es la del navegador.
+ * @since 1.12.0 `value` y `group` pintan lo mismo en todos los navegadores: la lista ya no es la del navegador.
  * @example
  * ```html
  * <UISelect model="user" bind:options="users.value" by="id">
@@ -140,7 +140,7 @@ type OnlyInCombobox<Prop extends string> = `UISelect elige una sola opción, sin
  * `trigger` (el botón), `value`, `placeholder`, `chevron` (la flecha), `list` (el `role="listbox"`), `group`,
  * `groupLabel`, `option`, `indicator` (la marca de la opción elegida) y `clear`. Se autoimporta en `app/`.
  * @since 1.8.0
- * @since 2.0.0 Deja de ser un `<select>` nativo: la lista es propia y sus opciones se crean al abrirla, `ui`
+ * @since 1.12.0 Deja de ser un `<select>` nativo: la lista es propia y sus opciones se crean al abrirla, `ui`
  * gana los slots `placeholder`, `chevron`, `list`, `group`, `option` e `indicator`, `listClass` va en la caja
  * flotante de la lista y un `reset` del formulario devuelve el valor con el que se montó.
  * @example

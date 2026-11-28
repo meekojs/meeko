@@ -154,7 +154,7 @@ export type UIRadioGroupProps = Omit<ElementAttributes<'fieldset'>, 'class'> &
 			/**
 			 * Disposición: una lista de radios (`default`, por defecto) o un control segmentado (`segmented`).
 			 *
-			 * @since 2.0.0 sustituye a `variant`, que queda para el tratamiento visual del catálogo.
+			 * @since 1.12.0 sustituye a `variant`, que queda para el tratamiento visual del catálogo.
 			 */
 			layout?: 'default' | 'segmented'
 			/** Clases adicionales del `<fieldset>`; equivale a `ui.base`. */
@@ -253,7 +253,7 @@ export type UIFieldProps = UIThemeProps<
  * color semántico (`color`) y radio. Sin ellas, se usan los valores de `ui.defaults` y, después, una píldora
  * `soft` y `neutral` de radio `full`. `ui` añade clases a sus slots: `base` y `dot`.
  *
- * @since 2.0.0 `variant`, `color` y `radius` sustituyen a `tone` (`accent` es `color="primary"`) y a `appearance`.
+ * @since 1.12.0 `variant`, `color` y `radius` sustituyen a `tone` (`accent` es `color="primary"`) y a `appearance`.
  * @example `<UIBadge color="success" dot>Publicado</UIBadge>`
  */
 export type UIBadgeProps = UIThemeProps<

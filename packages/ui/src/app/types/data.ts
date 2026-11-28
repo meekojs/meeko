@@ -152,7 +152,7 @@ export type UIStatProps = (UIStatWithoutLink | UIStatAnchorLink | UIStatRouteLin
  * aparecer, salvo con `prefers-reduced-motion`. `ui` añade clases a sus slots: `base`, `area` y `line`.
  *
  * @since 1.10.0
- * @since 2.0.0 `color` sustituye a `tone` (`accent` es `color="primary"`).
+ * @since 1.12.0 `color` sustituye a `tone` (`accent` es `color="primary"`).
  * @example `<UISparkline bind:values="[3, 5, 4, 8, 7]" area color="success" />`
  */
 export type UISparklineProps = UIThemeProps<

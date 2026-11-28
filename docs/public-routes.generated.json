@@ -219,7 +219,7 @@
 			"translation": "original",
 			"status": "current",
 			"title": "Cambios de Meeko · Meeko",
-			"purpose": "Nuevo meeko styles [directorio]: la hoja global procesada sin arrancar meeko dev. Escribe .meeko/styles/main.css con el mismo contenido que meeko dev (la misma…",
+			"purpose": "El servidor de lenguaje habla el idioma del cliente. Lee locale de initialize: uno que empiece por es, o ninguno, da español como hasta ahora; cualquier otro…",
 			"links": [
 				"/docs/api#atributos-en-bloque-con-bind",
 				"/docs/api#atributos-seg%C3%BAn-la-etiqueta",
@@ -336,7 +336,7 @@
 			],
 			"anchors": [
 				"cambios-de-meeko",
-				"sin-publicar",
+				"1120--2026-11-28",
 				"1110--2026-11-25",
 				"1102--2026-11-24",
 				"1101--2026-11-23",
@@ -1733,7 +1733,7 @@
 			"translation": "original",
 			"status": "historical",
 			"title": "Actualizar de 1.11 a 1.12 · Meeko",
-			"purpose": "Origen: 1.11.x. Destino: 1.12.0. Estado: sin publicar; la versión más reciente publicada es 1.11.0 (etiqueta v1.11.0) y esta guía recoge lo que acumula la rama…",
+			"purpose": "Origen: 1.11.x. Destino: 1.12.0. Estado: publicado en npm el 28 de noviembre de 2026 (etiqueta v1.12.0). Quién actúa: quien mantenga una aplicación que…",
 			"links": [
 				"/docs/changelog",
 				"/docs/editors#orden-por-la-hoja-global",
@@ -16057,7 +16057,7 @@
 			"translation": "missing",
 			"status": "current",
 			"title": "Cambios de Meeko · Meeko",
-			"purpose": "Nuevo meeko styles [directorio]: la hoja global procesada sin arrancar meeko dev. Escribe .meeko/styles/main.css con el mismo contenido que meeko dev (la misma…",
+			"purpose": "El servidor de lenguaje habla el idioma del cliente. Lee locale de initialize: uno que empiece por es, o ninguno, da español como hasta ahora; cualquier otro…",
 			"links": [
 				"/en/docs/api#a-button-that-is-a-route-link-or-button",
 				"/en/docs/api#attribute-values",
@@ -16125,7 +16125,7 @@
 			],
 			"anchors": [
 				"cambios-de-meeko",
-				"sin-publicar",
+				"1120--2026-11-28",
 				"1110--2026-11-25",
 				"1102--2026-11-24",
 				"1101--2026-11-23",
@@ -16544,6 +16544,7 @@
 			"purpose": "Find an answer by what you want to do. Guides teach a path; the reference keeps signatures, types, limits and source links.",
 			"links": [
 				"/en/docs/api",
+				"/en/docs/changelog",
 				"/en/docs/como-elegir",
 				"/en/docs/doctor",
 				"/en/docs/editors",
@@ -17521,7 +17522,7 @@
 			"translation": "translated",
 			"status": "historical",
 			"title": "Upgrade from 1.11 to 1.12 · Meeko",
-			"purpose": "From: 1.11.x. To: 1.12.0. Status: unpublished; the latest published version is 1.11.0 (tag v1.11.0), and this guide collects what the branch accumulates for…",
+			"purpose": "From: 1.11.x. To: 1.12.0. Status: published on npm on November 28, 2026 (tag v1.12.0). Who acts: maintainers upgrading an application from 1.11.x to 1.12.0.",
 			"links": [
 				"/en/docs/changelog",
 				"/en/docs/editors#class-providers",

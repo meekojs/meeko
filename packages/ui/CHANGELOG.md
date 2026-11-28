@@ -1,6 +1,6 @@
 # Cambios de Meeko UI
 
-## Sin publicar
+## 1.12.0 — 2026-11-28
 
 - **El módulo declara Tailwind CSS como proveedor de clases del editor** (`bradlc.vscode-tailwindcss`, lenguaje `tailwindcss`), para que Meeko no repita las clases que ofrece Tailwind CSS IntelliSense. Con Meeko anterior a 1.12 no hace nada.
 - **`UISelect` y `UICombobox` ocupan el ancho de su contenedor.** Su raíz es `block w-full`, como la de `UIInput`: en una fila flex o en una rejilla se encogían hasta su contenido, y el `w-full` del disparador sólo llenaba eso. Para un ancho fijo, una clase en el componente (`class="w-48"`).

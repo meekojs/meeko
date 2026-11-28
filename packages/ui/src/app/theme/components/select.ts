@@ -74,7 +74,7 @@ export const selectPopover = 'has-[[role=listbox]:empty]:hidden'
  * teclado, una elegida va en negrita y con su marca, y una deshabilitada se atenúa. La caja flotante de la lista es
  * el contenido de un `UIPopover` (`popoverTheme`).
  *
- * @since 2.0.0 Los slots `placeholder`, `chevron`, `list`, `group`, `option` e `indicator`: la lista es propia.
+ * @since 1.12.0 Los slots `placeholder`, `chevron`, `list`, `group`, `option` e `indicator`: la lista es propia.
  * @example
  * ```ts
  * import { selectTheme } from '@meekojs/ui/theme'

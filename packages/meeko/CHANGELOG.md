@@ -1,6 +1,6 @@
 # Cambios de Meeko
 
-## Sin publicar
+## 1.12.0 — 2026-11-28
 
 - **El servidor de lenguaje habla el idioma del cliente.** Lee `locale` de `initialize`: uno que empiece por `es`, o ninguno, da español como hasta ahora; cualquier otro da inglés. Cubre hovers, completado, acciones rápidas, lentes, zonas de ejecución, logs y los diagnósticos que genera el propio servidor. Los mensajes del compilador y de `meeko check`, y los docs del JSDoc de la API, siguen en español.
 - **Nuevo `meeko styles [directorio]`: la hoja global procesada sin arrancar `meeko dev`.** Escribe `.meeko/styles/main.css` con el mismo contenido que `meeko dev` (la misma canalización de Vite, con los plugins y `extendViteConfig` de los módulos), en un servidor sin puerto, WebSocket ni vigilantes que se cierra al terminar, y de forma atómica. Sirve para que `meekoSortClasses: "stylesheet"` ordene en CI y tras clonar igual que en local, y para el editor antes del primer `meeko dev`. Sin hojas no escribe nada (borra una antigua); si no compilan, avisa, conserva la anterior y sale con 1.
