@@ -1,5 +1,5 @@
 ---
-source-hash: 8c2ee787dfdeef5716e212d65928b17daa2a0c3fc3812d345a3bf0d704072cf8
+source-hash: f2dd57af52d7614bceccaacd47897496e5e87529a6ea28807591877fcc83e131
 ---
 
 # Build and deploy
@@ -232,7 +232,7 @@ Meeko never adds a nonce or hash to a directive with `'unsafe-inline'`: with one
 
 With an `on*` attribute or a `javascript:` URL in HTML, the browser blocks them with a nonce just as with hashes; move them to a script or the component's `on:`. Calculating hashes for a cached page reads its HTML with the same parser as the build (`parse5`), once per render; with `cache.memory`, once per page version. CSP only applies in production (`meeko start`, `meeko preview` and each adapter's outputs): in `meeko dev`, Vite injects scripts and styles without a nonce or hash.
 
-**Headers.** Each `headers` key with a header name applies to all responses; a key starting with `/` is a route pattern (`pathname`, without a query) with its own headers, applied after global ones and in written order, so the last one wins. In a pattern, `*` matches any sequence of characters, including `/`: `"/docs/*"` matches `/docs/api` but not `/docs`. A header already on the response (from Meeko, a handler or middleware) is not replaced: a page's or file's `Cache-Control`, for example, takes precedence over `headers`. `Content-Security-Policy` is not accepted in `headers`, and with `adapter: "static"`, pattern keys are an error, because `headerFiles` writes a single block for all routes. Unlike CSP, `headers` also applies in `meeko dev` to responses handled by the application (pages, API and RPC); files served by Vite do not include them.
+**Headers.** Each `headers` key with a header name applies to all responses; a key starting with `/` is a route pattern (`pathname`, without a query) with its own headers, applied after global ones and in written order, so the last one wins. In a pattern, `*` matches any sequence of characters, including `/`: `"/docs/*"` matches `/docs/api` but not `/docs`. The pattern is compared with the written `pathname` and with the path the router serves (without empty segments and with each segment decoded), so `//docs/api`, `/%64ocs/api` and `/docs/api/` receive the headers of `"/docs/*"` just like `/docs/api`. A header already on the response (from Meeko, a handler or middleware) is not replaced: a page's or file's `Cache-Control`, for example, takes precedence over `headers`. `Content-Security-Policy` is not accepted in `headers`, and with `adapter: "static"`, pattern keys are an error, because `headerFiles` writes a single block for all routes. Unlike CSP, `headers` also applies in `meeko dev` to responses handled by the application (pages, API and RPC); files served by Vite do not include them.
 
 **Workers.** Cloudflare Workers applies CSP and headers just like Node, Bun and Deno: hashes and the nonce use Web Crypto, and the assets' prerender index includes each page's hashes.
 

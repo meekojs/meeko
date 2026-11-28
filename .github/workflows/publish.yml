@@ -7,17 +7,13 @@ on:
       # `vscode-v*`, que publica la extensión en su propio workflow.
       - 'v[0-9]*'
   # Sin etiqueta, el workflow es un ensayo: pasa los gates, empaqueta, ejecuta `npm publish --dry-run`
-  # y los VSIX, pero no publica en npm ni crea la release. Se lanza a mano antes de etiquetar y en las
-  # PR que tocan la publicación, para que un fallo de la cadena no aparezca con la etiqueta ya puesta.
+  # y los VSIX, pero no publica en npm ni crea la release. Se lanza a mano antes de etiquetar
+  # (`gh workflow run publish.yml --ref <rama>`), para que un fallo de la cadena no aparezca con la etiqueta ya puesta.
+  # No se dispara en `pull_request`: `ci.yml` ya ejecuta en cada PR los mismos gates (verify, Redis, Bun, Deno,
+  # workerd, VS Code) y, si la PR toca la cadena de publicación, su job `package-gates` ensaya los tarballs, el
+  # `--dry-run` y los VSIX. Dispararlo también aquí repetía todos esos jobs sobre el mismo commit (los checks
+  # aparecían dos veces, con el mismo nombre).
   workflow_dispatch:
-  pull_request:
-    paths:
-      - .github/workflows/publish.yml
-      - scripts/publish-packages.ps1
-      - scripts/package-vsix-matrix.ps1
-      - scripts/release-assets.ps1
-      - packages/vscode/package-vsix.mjs
-      - packages/devtools/package-zip.ps1
 
 # Mínimo privilegio: cada job amplía sólo lo que necesita. `id-token: write` queda limitado a
 # `publish`, que no instala dependencias ni ejecuta código del proyecto, y `contents: write` a

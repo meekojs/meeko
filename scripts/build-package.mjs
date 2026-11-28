@@ -101,6 +101,17 @@ for (const file of (await filesIn(building)).filter((file) => file.endsWith('.d.
 	if (output !== text) await writeFile(file, output)
 }
 
+/** Removes empty directories below `directory`, leaves first; `directory` itself stays. Returns whether it ended up empty. */
+async function pruneEmptyDirectories(directory) {
+	let empty = true
+	for (const entry of await readdir(directory, { withFileTypes: true })) {
+		const path = join(directory, entry.name)
+		if (entry.isDirectory() && (await pruneEmptyDirectories(path))) await rm(path, { recursive: true, force: true, maxRetries: 5 })
+		else empty = false
+	}
+	return empty
+}
+
 /** Windows refuses a rename over a file that something holds open for a moment. */
 async function moveWithRetries(from, to) {
 	for (let attempt = 0; ; attempt++) {
@@ -135,4 +146,5 @@ const expected = new Set(
 for (const file of await filesIn(outdir)) {
 	if (/\.(?:js(?:\.map)?|d\.ts)$/.test(file) && !file.includes(`${sep}components${sep}`) && !expected.has(file)) await rm(file)
 }
+await pruneEmptyDirectories(outdir)
 console.log(`Built ${sources.length} ESM modules and declarations in ${relative(process.cwd(), outdir) || 'dist'}`)

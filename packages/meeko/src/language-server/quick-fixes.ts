@@ -17,6 +17,7 @@ import { parseSfc } from '../compiler/parser/sfc'
 import { cleanupFixes } from './cleanup'
 import { tagAt, templateRegion } from './embedded'
 import { usageEdits } from './features'
+import { t } from './l10n'
 import { nodeAt } from './reactivity'
 
 /** The top-level statement of the script that contains `node`. */
@@ -59,7 +60,7 @@ export function propsReadActions(context: FeatureContext, diagnostics: readonly 
 			const uses = usageEdits(context, at(declaration.name.getStart(file)), (used) => `${used}.value`)
 			if (uses) {
 				actions.push({
-					title: `Convertir ${name} en computed para que siga a la prop`,
+					title: t('Convert {0} to computed so it follows the prop', name),
 					kind: CodeActionKind.QuickFix,
 					diagnostics: [diagnostic],
 					isPreferred: true,
@@ -86,7 +87,7 @@ export function propsReadActions(context: FeatureContext, diagnostics: readonly 
 			})
 			const uses = pattern.elements.flatMap((element) => usageEdits(context, at(element.name.getStart(file)), (used) => `${used}.value`) ?? [])
 			actions.push({
-				title: `Convertir la desestructuración de ${node.text} en computed`,
+				title: t('Convert the destructuring of {0} to computed', node.text),
 				kind: CodeActionKind.QuickFix,
 				diagnostics: [diagnostic],
 				isPreferred: true,
@@ -103,10 +104,11 @@ export function propsReadActions(context: FeatureContext, diagnostics: readonly 
 		// A read in the setup (not in onMounted, not a destructuring): only the first value matters.
 		const parent = node.parent
 		const access = parent && (ts.isPropertyAccessExpression(parent) || ts.isElementAccessExpression(parent)) && parent.expression === node ? parent : undefined
+		// The two MEEK101 cases tell apart by their message, which the compiler writes in Spanish (see l10n.ts).
 		if (access && /el setup se ejecuta/.test(String(diagnostic.message))) {
 			const text = access.getText(file)
 			actions.push({
-				title: `Leer ${text} sólo una vez con untrack`,
+				title: t('Read {0} only once with untrack', text),
 				kind: CodeActionKind.QuickFix,
 				diagnostics: [diagnostic],
 				edit: { changes: { [document.uri]: [{ range: { start: at(access.getStart(file)), end: at(access.end) }, newText: `untrack(() => ${text})` }] } },
@@ -144,7 +146,7 @@ export function listItemActions(document: TextDocument, diagnostics: readonly Di
 		const item = itemName(list[2] ?? list[3] ?? '')
 		const at = document.positionAt(context.tagStart + list.index + list[0].length)
 		actions.push({
-			title: `Añadir each:as="${item}"`,
+			title: t('Add each:as="{0}"', item),
 			kind: CodeActionKind.QuickFix,
 			diagnostics: [diagnostic],
 			isPreferred: true,
@@ -213,12 +215,12 @@ export function doubleBraceActions(document: TextDocument, diagnostics: readonly
 		const span = spans.find((candidate) => candidate.start === start)
 		if (!span) continue
 		if (span.fix.interpolation) {
-			actions.push({ title: `Convertir a ${span.fix.interpolation}`, kind: CodeActionKind.QuickFix, diagnostics: [diagnostic], isPreferred: true, edit: { changes: { [document.uri]: [edit(span, span.fix.interpolation)] } } })
+			actions.push({ title: t('Convert to {0}', span.fix.interpolation), kind: CodeActionKind.QuickFix, diagnostics: [diagnostic], isPreferred: true, edit: { changes: { [document.uri]: [edit(span, span.fix.interpolation)] } } })
 		}
-		actions.push({ title: 'Mostrar las llaves como texto', kind: CodeActionKind.QuickFix, diagnostics: [diagnostic], edit: { changes: { [document.uri]: [edit(span, span.fix.text)] } } })
+		actions.push({ title: t('Show the braces as text'), kind: CodeActionKind.QuickFix, diagnostics: [diagnostic], edit: { changes: { [document.uri]: [edit(span, span.fix.text)] } } })
 		if (spans.length > 1) {
 			actions.push({
-				title: 'Corregir todas las del archivo',
+				title: t('Fix all in the file'),
 				kind: CodeActionKind.QuickFix,
 				diagnostics: [diagnostic],
 				edit: { changes: { [document.uri]: spans.map((each) => edit(each, each.fix.interpolation ?? each.fix.text)) } },
@@ -297,7 +299,7 @@ export function createComponentActions(context: FeatureContext, diagnostics: rea
 		const content = `${script}<template>\n${indent}<div></div>\n</template>\n`
 		const uri = pathToFileURL(target).href
 		actions.push({
-			title: `Crear el componente ${name} en ${relative(root, target).replaceAll('\\', '/')}`,
+			title: t('Create component {0} in {1}', name, relative(root, target).replaceAll('\\', '/')),
 			kind: CodeActionKind.QuickFix,
 			diagnostics: [diagnostic],
 			edit: {

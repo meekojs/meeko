@@ -1,5 +1,5 @@
 ---
-source-hash: 7f12cb04b52afa5b1df7fcec82eef2bf4fa81dd46ea8e98ddb7046c1d1999d60
+source-hash: 63508ff98abf494f9e4b3028a0fe2192d0031f2ae4ac921c76205f3b117e14c5
 ---
 
 # Data and rendering: technical details
@@ -55,7 +55,7 @@ A page declares its server code in a `<script server lang="ts">` block inside th
 
 - **When it runs.** Block statements other than imports, types and `export const route` run on each request: in SSR and each client navigation's data request, after middleware and validation of `params` and `search` with `route`, just like `load`. They support top-level `await`. Imports, types and route options evaluate once per module.
 - **Exports.** Each `export const` or `export let` (including destructuring, `export const { a, b } = ...`) except `route` and `head` is a page data field. Only exported names cross the boundary: the rest of the block, its imports and private variables do not reach the client bundle or payload. An export that is a promise is awaited before rendering.
-- **In the page.** `<script>` and the template see each export as a normal, deeply read-only value, with the already-awaited export type. It is not a signal: it arrives in the payload and is replaced on each navigation when the block runs again. For editable state, create a signal from it (`signal(user.name)`). Declaring a name in `<script>` that the block already exports produces `MEEK075`. The page does not need to declare `data` in `defineProps`; if it does, `meeko check` checks compatibility with the exports.
+- **In the page.** `<script>` and the template see each export as a normal, deeply read-only value, with the already-awaited export type. It is not a signal: it arrives in the payload and is replaced on each navigation when the block runs again. Since `1.10`, each read of the export sees the page's current data: if the block runs again because of an invalidation (see [Reloading page data](#reloading-page-data-depends)), the template, the `computed` values and the `effect`s that read it update without mounting the page again; what was copied in the setup (`signal(user.name)`) keeps its initial value. For editable state, create a signal from it (`signal(user.name)`). Declaring a name in `<script>` that the block already exports produces `MEEK075`. The page does not need to declare `data` in `defineProps`; if it does, `meeko check` checks compatibility with the exports.
 - **`export const head`.** Sets the page's `<head>` like `route.head`: a `{ title, description }` object or a zero-argument function returning it, calculated on the server from block values. It is not part of the data. Declaring both `export const head` and `route.head` produces `MEEK072`. Since `1.2`, top-level `useHead` and `useSeoMeta` in the block are an alternative, with `export const head` taking priority (see [Document head](framework.md#document-head-document-usehead-and-useseometa)).
 - **Request API.** `usePage()` returns `{ url, params, search, request, context, signal }`: `params` and `search` come from `route` schemas or, without a schema, from the route ID segments; `context` is the request context (session, services, platform) and `signal` aborts if the client disconnects, the session is revoked or the response is canceled. `redirect(url, status?)` stops the block and responds with a redirect (`302` by default; supports `301`, `302`, `303`, `307` and `308`), which client navigation follows like a loader redirect. `notFound()` stops the block and responds `404` with the nearest error page (`+error.meeko` or `app/error.meeko`). All three are imported from `@meekojs/meeko/framework` or used without an import inside the block. They work while top-level code runs: also inside a block helper called by that code (`function requireAdmin() { … redirect("/login") }`), even if it is `async`. Where no page is in progress, they produce `MEEK073`, and at runtime throw an error with that code: in route options, in a block without top-level code, in the component's `<script>` (since `1.3`, also without an import in `<script>` and the template) and, since `1.7`, in a function Meeko calls to calculate the head after top-level code has finished (`export const head = () => …` and the function passed to `useHead(() => …)` or `useSeoMeta(() => …)`); read values obtained by top-level code there. `meeko check` cannot know whether a block function is called later (from a timer, for example): in that case, the error only appears at runtime.
 - **Serialization.** Exports travel in JSON, like `load` data. `meeko check` produces a type error for a non-serializable export: functions, `undefined`, `bigint`, symbols and class instances such as `Date` or `Map`. At runtime, a value rejected by `serializeJson` fails the response with `500`, like a loader.
@@ -141,6 +141,43 @@ Since `1.6`, [server route middleware](routing-middleware.md#server-route-middle
 With `render: "client"`, the block or sidecar runs in the browser (see [Rendering modes](#rendering-modes)) and cannot use the table's server APIs: a server auto-import, an import from `server/` or a `*.server.*` import stops the build, and the editor flags the auto-import with `MEEK_AUTOIMPORT`. A component inside `server/` (an email template, for example) only renders on the server, so it can use server APIs. The build and `meeko dev` only apply `MEEK108` to the browser bundle: a component outside `server/` imported only by server code (a template in `app/emails/` rendered by an API route) still compiles, as in `1.2`. `meeko check` and the editor, which do not know the import graph, check every component outside `server/` as browser code, just as in `1.2`; put those components in `server/` for them to be accepted.
 
 `MEEK108` flags code that already failed before `1.3`: the server auto-import did not resolve in the browser bundle, `@meekojs/meeko/server` and `/cloudflare` cannot load there, a `server/` import stopped `meeko build`, and macros and `onMounted` do not exist outside `<script>`. `MEEK109` is a warning because that code compiles and loads: `definePage` in a component does not configure the route, and `/node`, `/bun`, `/deno`, `/password` and `/build` functions only fail when called in the browser (see [Stability policy](stability.md#deprecated-apis)).
+
+## Reloading page data: `depends`
+
+Since `1.10`, a page's loader (its `load` or the top-level code of `<script server>`) declares the [data keys](framework-api.md#data-keys-and-invalidation) it depends on with `depends`. When a write invalidates a matching key (with `invalidates` in `defineRpc` or `defineApiRoute`, or with `invalidate()` in the browser), the browser runs the visible page's loader again and hands it the new data **without mounting it again**: `props.data` and the exports change in place, and the focus, what is being typed and the state of the page, its layouts and its components are kept.
+
+```html
+<!-- app/pages/orders/[id].meeko -->
+<script
+	server
+	lang="ts"
+>
+	const { params, depends } = usePage()
+	// La ficha depende de su pedido y de la lista de pedidos.
+	depends(`orders.${params.id}`)
+	export const order = await db.orders.find(params.id)
+</script>
+
+<template><h1>Pedido {order.id}: {order.status}</h1></template>
+```
+
+```ts
+// La misma dependencia con load: depends llega en su contexto.
+export const route = definePage({
+	load: async ({ params, depends }) => {
+		depends('orders', `customers.${params.customerId}`)
+		return { orders: await db.orders.byCustomer(params.customerId) }
+	},
+})
+```
+
+- **What matches.** Keys are hierarchical by dots: the loader that declared `orders.42` runs again when `orders` or `orders.42` is invalidated, not `orders.7`. A loader without `depends` does not run again by keys; [`useRoute().refresh()`](framework-api.md#reload-the-whole-route-userouterefresh) forces it.
+- **How they travel.** The keys the loader declares in that request travel in the page's payload, also in that of an SSR document and in that of a `prerender` route. They may depend on `params`, `search` or the data read, because they are computed on every run.
+- **The reload.** It requests the payload of the current URL, like a navigation, with the server middleware, the session and the validation of `params` and `search`; the browser's route middleware is not repeated, because the route does not change. The page receives the new data and `head`; the `defer`s of a `stream` route arrive again through the stream. A `render: "client"` route runs its loader in the browser. The server renders the page again for the payload, as in a navigation, even though the browser only uses its data.
+- **When it does not reload in place.** If the request redirects (the order was deleted and the loader calls `redirect()`), responds `404` or the URL already belongs to another route, Meeko navigates to the current URL, which shows what corresponds. A loader failure leaves the previous data and reaches the application's error observer (`onError` of `mountClientApp`) with the `"navigation"` source.
+- **During a navigation.** An invalidation does not reload a page that is being left: the navigation in progress already requests the next page's data, and a navigation that starts cancels the reload in progress.
+- **Layouts.** Layouts have no loader. Their mounted `useApi` and `useRpcQuery` reload by their own key. The named layout's props that the page computes on the server (`layoutProps`) do not change on a reload.
+- **Where it is called.** `depends` exists while the loader runs. In a server route middleware, `usePage().depends` does nothing: the middleware does not load page data.
 
 ## Rendering modes
 

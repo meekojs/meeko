@@ -20,7 +20,7 @@ related:
   - docs/framework.md#csp-y-cabeceras-en-los-adaptadores-con-servidor
   - docs/framework.md#sitio-estático
   - docs/framework.md#cloudflare-workers
-source-hash: 36add3c56b069526e0ab5e431310ed4195173667951fe261de2ca92981c36605
+source-hash: 47c2ab1831522373439110cdfb04c1444632e5957066265835b04768d0107558
 ---
 
 `server` chooses where the built application runs: a discriminated union keyed by `adapter`. `meeko build` writes output to `.meeko/output/<adapter>/`; the CLI's `--adapter` takes precedence over configuration. Without `server`, the adapter is `node`.
@@ -57,10 +57,10 @@ export default defineMeekoConfig({
 
 ### Shared by `node`, `bun`, `deno` and `cloudflare` (since 1.7)
 
-| Option                  | Type                                               | Default | Description                                                                                                                                                                                                                             |
-| ----------------------- | -------------------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `contentSecurityPolicy` | `Record<string, readonly string[]>`                | none    | Policy by directive. Depending on the response, Meeko adds hashes or a nonce (to `script-src-elem` and `style-src-elem` if present), and never to a directive with `'unsafe-inline'` unless it has `'strict-dynamic'`. Production only. |
-| `headers`               | `Record<string, string \| Record<string, string>>` | none    | A header-name key applies to all responses; a key starting with `/` is a `pathname` pattern with its own headers, applied after global ones in the written order. `*` matches any sequence, including `/`. Also applies in `meeko dev`. |
+| Option                  | Type                                               | Default | Description                                                                                                                                                                                                                                                                                                                              |
+| ----------------------- | -------------------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `contentSecurityPolicy` | `Record<string, readonly string[]>`                | none    | Policy by directive. Depending on the response, Meeko adds hashes or a nonce (to `script-src-elem` and `style-src-elem` if present), and never to a directive with `'unsafe-inline'` unless it has `'strict-dynamic'`. Production only.                                                                                                  |
+| `headers`               | `Record<string, string \| Record<string, string>>` | none    | A header-name key applies to all responses; a key starting with `/` is a `pathname` pattern with its own headers, applied after global ones in the written order. `*` matches any sequence, including `/`. It is also compared with the path the router serves, without `//` or a trailing `/` and decoded. Also applies in `meeko dev`. |
 
 ### By adapter
 

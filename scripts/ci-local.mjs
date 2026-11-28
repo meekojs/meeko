@@ -81,8 +81,8 @@ export const jobs = [
 			{ name: 'E2E del sitio i18n', command: pnpm('-F', 'meeko-i18n-site', 'run', 'test:e2e'), env: i18nChrome, timeout: 45 },
 			{ name: 'E2E de navegador del núcleo', command: pnpm('-F', '@meekojs/meeko', 'run', 'e2e:prepared'), timeout: 60 },
 			{ name: 'E2E multimotor (pilot)', command: pnpm('run', 'pilot:e2e'), timeout: 45 },
-			{ name: 'consumidor del tarball (package:smoke)', command: pnpm('run', 'package:smoke'), needs: ['pwsh'], timeout: 45 },
-			{ name: 'consumidor de los paquetes del workspace', command: pnpm('run', 'package:workspace-smoke'), needs: ['pwsh'], timeout: 45 },
+			{ name: 'consumidor del tarball (package:smoke)', command: pnpm('run', 'package:smoke'), timeout: 45 },
+			{ name: 'consumidor de los paquetes del workspace', command: pnpm('run', 'package:workspace-smoke'), timeout: 45 },
 			{ name: 'empaquetar @meekojs/meeko', command: pnpm('pack', '--pack-destination', ciArtifacts), cwd: 'packages/meeko', before: () => rm(ciArtifacts, { force: true, recursive: true }) },
 			{
 				name: 'consumidor full-stack y navegador',
@@ -120,12 +120,14 @@ export const jobs = [
 		id: 'vscode-extension',
 		steps: [
 			{ name: 'empaquetar el VSIX', command: pnpm('run', 'package:vsix'), cwd: 'packages/vscode' },
-			{ name: 'host de VS Code', command: [...(process.platform === 'linux' ? ['xvfb-run', '-a'] : []), ...pnpm('run', 'test:host:isolated')], cwd: 'packages/vscode', needs: ['pwsh', 'xvfb'], timeout: 30 },
+			{ name: 'host de VS Code', command: [...(process.platform === 'linux' ? ['xvfb-run', '-a'] : []), ...pnpm('run', 'test:host:isolated')], cwd: 'packages/vscode', needs: ['xvfb'], timeout: 30 },
 		],
 	},
 	{
-		// Only publish.yml runs these, so CI passes without them and the release stops on them. The rest of its gates are
-		// the jobs above; `--only package-gates` runs these two before tagging.
+		// The publication rehearsal of ci.yml (`package-gates`, only in a PR that touches the publication chain) and
+		// publish.yml run these, so the rest of CI passes without them and the release stops on them. The rest of
+		// the gates of publish.yml are the jobs above; `--only package-gates` runs these two before tagging.
+		// The `changes` job of ci.yml (which jobs a PR needs) has no local job: locally everything runs.
 		id: 'package-gates',
 		steps: [
 			{ name: 'formato (format:check)', command: pnpm('run', 'format:check') },

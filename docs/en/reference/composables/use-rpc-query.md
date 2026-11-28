@@ -18,7 +18,7 @@ related:
   - "@meekojs/meeko/framework#createUseRpcQuery"
   - docs/framework.md#datos-en-componentes-useapi-userpcquery-y-userpcmutation
   - docs/framework.md#búsqueda-mientras-se-escribe-debouncems-y-enabled
-source-hash: 3866f13d5c029f7432cd4cc274a541f4c3ef9950ee844eb052d0d7ad47fb1075
+source-hash: 77a19a898fa44a7c8c8cbc50402e6118eb231d510602000acc1a6ffe031cc13a
 ---
 
 `useRpcQuery(procedimiento, input?, recarga?)` is [`useApi`](/en/docs/reference/use-api) for `server/rpc` procedures: it calls the procedure with `input` and returns the same resource, with `data`, `error`, `pending`, `refreshing` and `refresh`. Name the procedure by its dotted ID (`server/rpc/users/activity.ts` is `"users.activity"`) and TypeScript checks `input` and the shape of `data` against its contract.
@@ -45,13 +45,14 @@ Changing `tab` calls the procedure again; meanwhile, the previous list remains o
 
 ## Parameters
 
-| Parameter              | Type                                                               | Default                        | Description                                                                                                                          |
-| ---------------------- | ------------------------------------------------------------------ | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `procedimiento`        | a procedure ID                                                     | required                       | Such as `"users.activity"`. The editor completes application procedures.                                                             |
-| `input`                | procedure input, with fields that can be signals, or `() => input` | `{}` if accepted by the schema | Validated against the procedure's `input` schema. If the schema accepts `{}`, you can omit it and `{}` is sent.                      |
-| `recarga.keepPrevious` | `boolean`                                                          | `true`                         | Since `1.5`. With `false`, an input change clears `data`.                                                                            |
-| `recarga.debounceMs`   | `number`                                                           | `0`                            | Since `1.7`. Waits for input to settle before requesting; does not delay initial loading, `refresh()` or SSR.                        |
-| `recarga.enabled`      | `boolean`, signal or `() => boolean`                               | `true`                         | Since `1.7`. While `false`, no request is made and any in-flight request is canceled. A resource with `await` cannot start disabled. |
+| Parameter              | Type                                                               | Default                        | Description                                                                                                                                                                                                         |
+| ---------------------- | ------------------------------------------------------------------ | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `procedimiento`        | a procedure ID                                                     | required                       | Such as `"users.activity"`. The editor completes application procedures.                                                                                                                                            |
+| `input`                | procedure input, with fields that can be signals, or `() => input` | `{}` if accepted by the schema | Validated against the procedure's `input` schema. If the schema accepts `{}`, you can omit it and `{}` is sent.                                                                                                     |
+| `recarga.keepPrevious` | `boolean`                                                          | `true`                         | Since `1.5`. With `false`, an input change clears `data`.                                                                                                                                                           |
+| `recarga.debounceMs`   | `number`                                                           | `0`                            | Since `1.7`. Waits for input to settle before requesting; does not delay initial loading, `refresh()` or SSR.                                                                                                       |
+| `recarga.enabled`      | `boolean`, signal or `() => boolean`                               | `true`                         | Since `1.7`. While `false`, no request is made and any in-flight request is canceled. A resource with `await` cannot start disabled.                                                                                |
+| `recarga.keys`         | list of keys, signal or `() => keys`                               | none                           | Since `1.10`. Data keys added to the one from the convention, the procedure ID (`"users.activity"`). A mutation that invalidates a matching key (`"users"` covers `"users.activity"`) reloads the mounted resource. |
 
 ## Return value
 

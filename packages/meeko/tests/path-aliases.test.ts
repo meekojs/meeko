@@ -4,7 +4,6 @@ import assert from 'node:assert/strict'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import test from 'node:test'
-import postcss from 'postcss'
 import { createServer } from 'vite'
 
 import { buildProjectAliases, checkAliasScopes, resolveProjectAliases, viteAliasShadow } from '../src/framework/aliases.ts'
@@ -14,7 +13,6 @@ import { loadMeekoConfig, readMeekoConfigSync } from '../src/framework/config.ts
 import { buildProject } from '../src/framework/project.ts'
 import { componentDiagnostics } from '../src/language-server/diagnostics.ts'
 import { completionList, definition } from '../src/language-server/features.ts'
-import { meekoUtilities } from '../src/postcss.ts'
 import { meeko } from '../src/vite.ts'
 import { linkRepositoryPackages, tempProject } from './helpers/temp-project.ts'
 import { languageProject } from './language-server-workspace.ts'
@@ -199,26 +197,6 @@ test('meeko build resolves the aliases with the static and bun adapters, and #se
 
 	await write(root, { 'app/pages/leak.meeko': '<script lang="ts">\nimport { secretName } from "#server/secret";\n</script>\n<template><p>{secretName}</p></template>\n' })
 	await assert.rejects(buildProject(root, { adapter: 'node' }), /MEEK108[^]*#server\/secret/)
-})
-
-test('@utilities modules resolve the aliases, also in the modules they import', { timeout: 120_000 }, async (context) => {
-	const root = await aliasApp(context, 'alias-utilities', {
-		'app/styles/utilities/tokens.ts': [
-			'import { defineUtilities } from "@meekojs/meeko/postcss";',
-			'import { palette } from "#shared/palette";',
-			'import { gap } from "@/styles/utilities/gap";',
-			'',
-			'export default defineUtilities(({ rule }) => palette.map((color) => rule(`.text-${color}`, { color, padding: gap })));',
-			'',
-		].join('\n'),
-		'app/styles/utilities/gap.ts': 'import { scale } from "~/app/lib/scale";\n\nexport const gap = scale(2);\n',
-		'app/styles/utilities/leak.ts': 'import { secretName } from "#server/secret";\n\nexport default ({ rule }: import("@meekojs/meeko/postcss").UtilityHelpers) => rule(".leak", { content: `"${secretName}"` });\n',
-	})
-	const generate = (css: string) => postcss([meekoUtilities()]).process(css, { from: join(root, 'app', 'styles', 'main.css') })
-	const { css } = await generate('@utilities "./utilities/tokens.ts";\n')
-	assert.match(css, /\.text-red \{\s*color: red;\s*padding: 8px/)
-	assert.match(css, /\.text-blue \{\s*color: blue;/)
-	await assert.rejects(generate('@utilities "./utilities/leak.ts";\n'), /MEEK108: app\/styles\/utilities\/leak\.ts: #server\/secret/)
 })
 
 test('the editor completes the folders after an alias, goes to the aliased module and marks #server/ in a component with MEEK108', { timeout: 60_000 }, async () => {

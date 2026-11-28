@@ -2,19 +2,22 @@
 title: css
 group: config
 since: 1.2.0
-description: Opciones de los estilos de los componentes, como qué elementos reciben el atributo de style scoped, todos o sólo los que algún selector puede seleccionar.
+description: Opciones de los estilos de los componentes, como qué elementos reciben el atributo de style scoped, y los proveedores externos de clases que el editor deja a su extensión.
 symbols:
   - "config:css"
 related:
   - "syntax:style-scoped"
   - "syntax:style"
   - docs/framework.md#configuración
+  - docs/editors.md#proveedores-de-clases
 ---
 
-`css` agrupa las opciones de los estilos de los componentes. Hoy tiene una: `scopeAttribute`, que decide qué elementos de la plantilla reciben el atributo de ámbito de `<style scoped>`.
+`css` agrupa las opciones de los estilos de los componentes. `scopeAttribute` decide qué elementos de la plantilla reciben el atributo de ámbito de `<style scoped>`:
 
 - `"all"`, el valor por defecto en `1.x`: todos los elementos de la plantilla lo reciben.
 - `"matched"` (desde `1.2`): sólo los que algún selector con ámbito del componente puede seleccionar. El HTML es más pequeño y las diferencias entre SSR e hidratación, menores. Pasará a ser el valor por defecto en `2.0`.
+
+`classProviders` (desde `1.12`) declara al editor las herramientas que generan clases y la extensión que las atiende, cuando ningún módulo lo hace: un proyecto con Tailwind sin `@meekojs/ui`, o con UnoCSS. Son datos, que Meeko no ejecuta ni interpreta: en el modo `auto` de `meeko.classes.completion` y `meeko.classes.hover`, el editor deja a esa extensión, mientras está activa, las clases que sólo tiene la hoja procesada `.meeko/styles/main.css`, y sigue ofreciendo las escritas en los `<style>` y en las hojas fuente (véase [Proveedores de clases](../../editors.md#proveedores-de-clases)). No cambia lo que compilan `meeko dev` ni `meeko build`.
 
 ## Uso
 
@@ -29,9 +32,18 @@ export default defineMeekoConfig({
 
 ## Opciones
 
-| Opción           | Tipo                 | Por defecto | Descripción                                            |
-| ---------------- | -------------------- | ----------- | ------------------------------------------------------ |
-| `scopeAttribute` | `"all" \| "matched"` | `"all"`     | Qué elementos reciben el atributo de `<style scoped>`. |
+| Opción           | Tipo                 | Por defecto | Descripción                                                                             |
+| ---------------- | -------------------- | ----------- | --------------------------------------------------------------------------------------- |
+| `scopeAttribute` | `"all" \| "matched"` | `"all"`     | Qué elementos reciben el atributo de `<style scoped>`.                                  |
+| `classProviders` | `ClassProvider[]`    | `[]`        | Desde `1.12`, herramientas que generan clases y extensiones de editor que las atienden. |
+
+Cada `ClassProvider` tiene:
+
+| Campo       | Tipo       | Descripción                                                                                                             |
+| ----------- | ---------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `name`      | `string`   | Nombre legible de la herramienta, como `"Tailwind CSS"`. Dos con el mismo nombre (del proyecto y de un módulo) son uno. |
+| `vscode`    | `string[]` | Ids de las extensiones de VS Code que atienden sus clases (`editor.nombre`). Basta con que una esté activa.             |
+| `languages` | `string[]` | Ids de lenguaje de sus hojas `.css` en el editor, como `"tailwindcss"`: reciben, además de `css`, las variables CSS.    |
 
 ## Resultado
 
@@ -64,6 +76,20 @@ export default defineMeekoConfig({ css: { scopeAttribute: "matched" } });
 ```
 
 Revise los componentes que añaden clases o atributos con la API del DOM (véase «Errores comunes»): es el único caso que cambia.
+
+### Declarar Tailwind sin `@meekojs/ui`
+
+```ts
+import { defineMeekoConfig } from "@meekojs/meeko/framework";
+
+export default defineMeekoConfig({
+  css: {
+    classProviders: [{ name: "Tailwind CSS", vscode: ["bradlc.vscode-tailwindcss"], languages: ["tailwindcss"] }],
+  },
+});
+```
+
+Con `@meekojs/ui` no hace falta: su módulo declara lo mismo con `meeko.addClassProvider`. Escriba el array como un literal: en un workspace no confiable el editor lo lee sin ejecutar la configuración.
 
 ### Una clase que añade el script, con `"matched"`
 
@@ -116,6 +142,19 @@ onMounted(() => { hot.value = true; });
 <style scoped>
 .hot { color: red; }
 </style>
+```
+
+### Un proveedor mal escrito
+
+```ts bad
+export default defineMeekoConfig({ css: { classProviders: [{ name: "Tailwind CSS", vscode: "bradlc.vscode-tailwindcss" }] } as never });
+```
+
+`meeko dev`, `meeko build` y `meeko check` se detienen con `…/meeko.config.ts: css.classProviders[0].vscode debe ser un array de ids como "bradlc.vscode-tailwindcss"`. Un campo desconocido, un `name` vacío o `"meeko"` en `languages` también son errores.
+
+```ts good
+import { defineMeekoConfig } from "@meekojs/meeko/framework";
+export default defineMeekoConfig({ css: { classProviders: [{ name: "Tailwind CSS", vscode: ["bradlc.vscode-tailwindcss"] }] } });
 ```
 
 ## Notas

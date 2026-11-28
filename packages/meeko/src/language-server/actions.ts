@@ -11,6 +11,7 @@ import type { FeatureContext } from './features'
 import { parseSfc } from '../compiler/parser/sfc'
 import { attributeValueStart, parseTemplate } from '../compiler/parser/template'
 import { isPageFile } from '../compiler/transforms/route-block'
+import { t } from './l10n'
 import { nodeAt } from './reactivity'
 
 /** What the client can apply in a workspace edit. */
@@ -54,7 +55,7 @@ export function sidecarActions(context: FeatureContext, range: Range, capabiliti
 	const block = `<script server lang="ts">${newline}${content}${newline}</script>${newline}${newline}`
 	return [
 		{
-			title: `Mover ${basename(sidecar)} a <script server>`,
+			title: t('Move {0} to <script server>', basename(sidecar)),
 			kind: CodeActionKind.RefactorRewrite,
 			edit: {
 				documentChanges: [
@@ -127,7 +128,7 @@ export function eachKeyActions(context: FeatureContext, range: Range): CodeActio
 		if (!key) continue
 		const at = document.positionAt(list.end)
 		actions.push({
-			title: `Añadir each:key="${key}"`,
+			title: t('Add each:key="{0}"', key),
 			kind: CodeActionKind.QuickFix,
 			edit: { changes: { [document.uri]: [{ range: { start: at, end: at }, newText: ` each:key="${key}"` }] } },
 		})

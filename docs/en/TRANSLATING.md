@@ -235,7 +235,6 @@ Balance is based on UTF-8 source bytes, including code, at allocation time. File
 - `docs/reference/advanced/createserverapp.md`
 - `docs/reference/advanced/createserverdispatcher.md`
 - `docs/reference/advanced/matchroute.md`
-- `docs/reference/advanced/meekoutilities.md`
 - `docs/reference/commands/meeko-build.md`
 - `docs/reference/commands/meeko-check-app.md`
 - `docs/reference/commands/meeko-check.md`

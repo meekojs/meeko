@@ -215,7 +215,7 @@ exports.run = async function run() {
 	assert.equal(braces.length, 1, JSON.stringify(vscode.languages.getDiagnostics(bracesUri).map((item) => item.message)))
 	const braceFixes = await vscode.commands.executeCommand('vscode.executeCodeActionProvider', bracesUri, braces[0].range)
 	const fixTitles = braceFixes.map((action) => action.title)
-	for (const title of ['Convertir a {props.label}', 'Mostrar las llaves como texto']) assert.ok(fixTitles.includes(title), `${title}: ${fixTitles.join(', ')}`)
+	for (const title of ['Convert to {props.label}', 'Show the braces as text']) assert.ok(fixTitles.includes(title), `${title}: ${fixTitles.join(', ')}`)
 	await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor')
 
 	const references = await vscode.commands.executeCommand('vscode.executeReferenceProvider', uri, position)
@@ -378,7 +378,8 @@ exports.run = async function run() {
 			['shared', 11, 11],
 		],
 	)
-	assert.equal(zones[0].label, 'Sólo servidor')
+	// The test host runs in English, and the server answers in the language of the editor.
+	assert.equal(zones[0].label, 'Server only')
 	const zonesSetting = vscode.workspace.getConfiguration('meeko')
 	assert.equal(zonesSetting.get('editor.executionZones'), true)
 	await zonesSetting.update('editor.executionZones', false, vscode.ConfigurationTarget.Global)
@@ -389,19 +390,19 @@ exports.run = async function run() {
 	let lenses = []
 	for (let attempt = 0; attempt < 60; attempt++) {
 		lenses = await vscode.commands.executeCommand('vscode.executeCodeLensProvider', zonesUri)
-		if (lenses?.some((lens) => lens.command?.title.startsWith('Ruta /zones'))) break
+		if (lenses?.some((lens) => lens.command?.title.startsWith('Route /zones'))) break
 		await new Promise((resolve) => setTimeout(resolve, 250))
 	}
 	assert.ok(
-		lenses.some((lens) => lens.command?.title === 'Ruta /zones · render ssr · layouts: app/layouts/default.meeko'),
+		lenses.some((lens) => lens.command?.title === 'Route /zones · render ssr · layouts: app/layouts/default.meeko'),
 		JSON.stringify(lenses.map((lens) => lens.command?.title)),
 	)
 	assert.ok(
-		lenses.some((lens) => lens.command?.title === 'Envía al cliente: { title: string; }'),
+		lenses.some((lens) => lens.command?.title === 'Sends to the client: { title: string; }'),
 		JSON.stringify(lenses.map((lens) => lens.command?.title)),
 	)
 	const countLens = lenses.find((lens) => lens.command?.command === 'editor.action.showReferences')
-	assert.equal(countLens?.command.title, '1 lectura · 1 escritura · en la plantilla')
+	assert.equal(countLens?.command.title, '1 read · 1 write · in the template')
 	const [lensUri, lensPosition, lensLocations] = countLens.command.arguments
 	assert.ok(lensUri instanceof vscode.Uri && lensPosition instanceof vscode.Position, 'La lente debe convertir sus argumentos a tipos de VS Code')
 	assert.ok(Array.isArray(lensLocations) && lensLocations.length === 2 && lensLocations.every((item) => item instanceof vscode.Location))

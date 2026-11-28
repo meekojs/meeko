@@ -12,7 +12,7 @@ related:
   - "syntax:interpolation"
   - "syntax:meekoawait"
   - docs/api.md#condiciones-con-ifwhen-y-tipos
-source-hash: 0b70f385aceeff94dae620dae47b15c26757ff40eb6b91f814de0c363edc2eb3
+source-hash: 7bc948454f757a86e45f22c545489e06c4d633a66a4f1fa59ceb32cca5c305e7
 ---
 
 `if="expresión"` makes a tag and all its content exist only while the expression is truthy (in the JavaScript sense: `0`, `""`, `null` and `undefined` are falsy). `if`, `else-if` and `else` exist since `1.10`; up to 1.9 the directive is `if:when="expresión"`, which remains available as a compatible alias of `if`. Valid on HTML elements, component tags, `<component is>` and, since `1.4`, `<snippet>`.

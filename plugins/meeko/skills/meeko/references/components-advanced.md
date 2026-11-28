@@ -4,7 +4,9 @@ Meeko 1.9. Built-in tags (`<MeekoAwait>`, `<MeekoTeleport>`, `<MeekoLink>`, `<Me
 
 ## Styles
 
-One style block per `.meeko`, processed by the project's PostCSS (Tailwind works) and bundled per component/route.
+One style block per `.meeko`, processed by the project's CSS pipeline (its `postcss.config`, plus any Vite plugin it
+registers, such as Tailwind) and bundled per component/route. Meeko ships no CSS engine of
+its own: the project picks plain CSS, Tailwind, UnoCSS… (`@meekojs/ui` already sets up Tailwind).
 
 |                               | `<style scoped>` (default choice)                          | `<style>` (global)                              |
 | ----------------------------- | ---------------------------------------------------------- | ----------------------------------------------- |

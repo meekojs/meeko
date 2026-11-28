@@ -85,10 +85,6 @@
 			"types": "./dist/prettier.d.ts",
 			"default": "./dist/prettier.js"
 		},
-		"./postcss": {
-			"types": "./dist/postcss.d.ts",
-			"default": "./dist/postcss.js"
-		},
 		"./internal": {
 			"types": "./dist/internal.d.ts",
 			"default": "./dist/internal.js"
@@ -138,7 +134,7 @@
 		"html-data": "tsx scripts/html-data.ts",
 		"lint": "eslint .",
 		"prepack": "pnpm run build",
-		"package:smoke": "pwsh -NoProfile -File tests/package-consumer.ps1",
+		"package:smoke": "node tests/package-consumer.mjs",
 		"pilot:build": "tsx examples/pilot/build.ts",
 		"pilot:check:prepared": "node dist/cli.js check examples/pilot/App.meeko && node dist/cli.js types examples/pilot/App.meeko && tsc -p examples/pilot/tsconfig.json --noEmit",
 		"pilot:dev": "tsx examples/pilot/server.ts",
@@ -154,7 +150,6 @@
 	},
 	"dependencies": {
 		"@typescript/typescript6": "catalog:",
-		"csstype": "catalog:",
 		"parse5": "catalog:",
 		"postcss": "catalog:",
 		"postcss-selector-parser": "catalog:",
@@ -168,28 +163,21 @@
 	},
 	"devDependencies": {
 		"@mdn/browser-compat-data": "catalog:",
-		"@tailwindcss/postcss": "catalog:",
-		"@tailwindcss/vite": "catalog:",
 		"@types/node": "catalog:",
 		"@types/ws": "catalog:",
 		"esbuild": "catalog:",
 		"happy-dom": "catalog:",
 		"playwright-core": "catalog:",
 		"redis": "catalog:",
-		"tailwindcss": "catalog:",
 		"tsx": "catalog:",
 		"vite": "catalog:",
 		"vue": "catalog:",
 		"wrangler": "catalog:"
 	},
 	"peerDependencies": {
-		"tailwindcss": "^4.0.0",
 		"vite": "^8.3.5"
 	},
 	"peerDependenciesMeta": {
-		"tailwindcss": {
-			"optional": true
-		},
 		"vite": {
 			"optional": true
 		}

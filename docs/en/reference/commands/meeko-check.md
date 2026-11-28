@@ -11,13 +11,14 @@ related:
   - "cli:routes"
   - "cli:types"
   - "cli:lsp"
+  - "cli:styles"
   - docs/framework.md#autoimports-y-typescript
   - docs/framework.md#tipos-de-los-servicios
   - docs/editors.md#comprobación-del-proyecto
-source-hash: 9d977d58789ef0e48252b5cd3f7a15e38fb27fe618f7aa4e21954cc59eb7b23f
+source-hash: 27f6f9cd49ae77185472c445b770b8b5efef7b6508330d354289950ae2b16661
 ---
 
-`meeko check` is the complete application check: the one that must pass in CI before `meeko build`. With a directory (the current one by default), it generates the same files as `meeko dev` in `.meeko/` (entry points, manifests, declarations for routes, contracts, auto-imports, components and, since `1.7`, `.meeko/types/services.d.ts`), checks each application `.meeko` and its prop contracts, then runs TypeScript on the three generated projects: `app`, `server` and `shared`.
+`meeko check` is the complete application check: the one that must pass in CI before `meeko build`. With a directory (the current one by default), it generates the same files as `meeko dev` in `.meeko/` (entry points, manifests, declarations for routes, contracts, auto-imports, components and, since `1.7`, `.meeko/types/services.d.ts`), checks each application `.meeko` and its prop contracts, then runs TypeScript on the three generated projects: `app`, `server` and `shared`. If everything passes, it also writes `.meeko/styles/main.css` (since `1.12`), the processed global stylesheet that `meeko dev` maintains (see [the stylesheet for the editor and Prettier](#the-stylesheet-for-the-editor-and-prettier)); a failure to process it only warns.
 
 With a `.meeko` file, it checks only that component: its syntax, directives and types, like the editor. Since `1.7`, in an application it also reports what previously only the project check reported: `MEEK044` (a `<script server>` outside `app/pages`), `MEEK100` (`generic` in a page or layout) and type errors in its `<script server>`, including route options. If the project already has `.meeko/types`, it regenerates them first, so it sees a layout created after the last `meeko check .`.
 
@@ -75,6 +76,16 @@ A plain `app/` module is checked with `tsconfig.app.json`, so it can use the aut
 ```
 
 `.meeko/` is in the starter's `.gitignore`: `meeko check` generates it on every run, so you do not need to version or cache it. `meeko build` checks the project again before building; with two separate steps, the log shows which phase failed.
+
+### The stylesheet for the editor and Prettier
+
+With `meekoSortClasses: "stylesheet"`, `prettier --check` orders classes by `.meeko/styles/main.css`, which `.gitignore` keeps out of the repository and only `meeko dev` used to write. `meeko check` writes it when it succeeds, with the same contents as `meeko dev` (the same Vite pipeline, with the modules' plugins, without a server or watchers), so a CI job that already runs `meeko check` before Prettier orders like local. Half a second more in `apps/ui`. If the stylesheets do not compile, `meeko check` warns on the error output (`[meeko] .meeko/styles/main.css conserva la versión anterior: …`) and its exit code does not change.
+
+For a job that only formats, the explicit and cheap command is [`meeko styles [directory]`](meeko-styles.md): it writes that stylesheet and nothing else (no types, no TypeScript), prints its path and writes nothing if the project has no stylesheets. If they do not compile, it exits with `1`.
+
+```sh
+meeko styles . && prettier --check .
+```
 
 ### JSON diagnostics for a tool
 

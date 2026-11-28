@@ -22,6 +22,7 @@ El build prepara los seis paquetes públicos, la base documental privada y sus e
 
 | Categoría             | Comando                                                             | Alcance                                                        |
 | --------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------- |
+| Sólo lo editado       | `pnpm test:changed`                                                 | Las pruebas asociadas a los archivos que has cambiado.         |
 | Núcleo                | `pnpm test`                                                         | Compilador, SSR, hidratación, framework y runtime.             |
 | Paquetes              | `pnpm test:packages`                                                | UI, i18n y plugins ESLint/Prettier, usando el build previo.    |
 | Verificación ampliada | `pnpm verify`                                                       | Núcleo, ejemplos, tipos de pruebas, Vite y DevTools.           |
@@ -31,19 +32,21 @@ El build prepara los seis paquetes públicos, la base documental privada y sus e
 | Web pública           | `pnpm -F meeko-site test`                                           | Referencias y contenido del sitio.                             |
 | Distribución          | `pnpm package:workspace-smoke`                                      | Todos los paquetes instalados desde tarballs.                  |
 
+`pnpm test:changed` es lo que conviene mientras desarrollas: elige las pruebas por lo que importan los archivos editados (directa o transitivamente), por su nombre o por un mapa manual, y las ejecuta con un tope de tiempo por paquete. Nunca lanza la suite completa ni los `*.e2e.*`. `--list` muestra el plan sin ejecutarlo, `--base <ref>` compara con una rama entera en lugar de con `HEAD`, `--no-build` omite el build que necesiten las pruebas, `--timeout <s>` fija el tope por paquete y `--max-transitive <n>` limita las pruebas por dependencia transitiva. No sigue imports por nombre de paquete: un cambio en un paquete del que depende otro no lanza las pruebas del dependiente.
+
 Las pruebas UI usan Chrome instalado por defecto. En CI se usa Chromium de Playwright mediante `MEEKO_CHROME_PATH`; puedes establecer esa variable para elegir otro ejecutable compatible. Los escenarios UI se ejecutan secuencialmente porque algunos prueban HMR modificando y restaurando artefactos.
 
 ### Declaraciones y consumidor instalado
 
 El build de UI genera declaraciones junto a cada `.meeko`. Al moverlas desde `.meeko/types`, reajusta sus imports relativos y añade extensiones ESM para NodeNext; las referencias a componentes conservan su extensión `.meeko`.
 
-Las regresiones comprueban todas las declaraciones distribuidas sin `skipLibCheck`. El smoke crea el consumidor en el directorio temporal del sistema, fuera del workspace, para impedir que resuelva dependencias no declaradas desde el `node_modules` del repositorio. Comprueba exports, tipos, ESLint/Prettier, componentes y CSS procesado por el PostCSS del consumidor. No publica paquetes y conserva su carpeta temporal para diagnóstico.
+Las regresiones comprueban todas las declaraciones distribuidas sin `skipLibCheck`. El smoke crea el consumidor en el directorio temporal del sistema, fuera del workspace, para impedir que resuelva dependencias no declaradas desde el `node_modules` del repositorio. Comprueba exports, tipos, ESLint/Prettier, componentes y CSS procesado por el PostCSS del consumidor. No publica paquetes y conserva su carpeta temporal para diagnóstico. `pnpm package:smoke` (consumidor del tarball del núcleo), `pnpm package:workspace-smoke` (los seis paquetes) y `pnpm -F meeko-language run test:host:isolated` (el VSIX en un VS Code real) son scripts de Node y no necesitan PowerShell; los `.ps1` homónimos son envoltorios por compatibilidad. En Linux, `test:host:isolated` y `test:host:untrusted` necesitan `xvfb-run -a`; con `MEEKO_HOST_VSCODE=<ruta a code>` reutilizan un VS Code ya descargado y, si no hay ninguno, descargan el estable.
 
 La instalación del consumidor usa `--prefer-offline --ignore-scripts`: reutiliza el store y descarga lo que falte del registro, sin ejecutar scripts de instalación de terceros. Una caché local incompleta no debe confundirse con una dependencia disponible gracias al workspace.
 
 ### CI
 
-La verificación principal construye antes de lint, comprueba paquetes y aplicaciones, ejecuta las pruebas del ecosistema y del núcleo y valida consumidores instalados. Los jobs existentes de Redis, Node/Bun/Deno/workerd y VS Code mantienen sus escenarios específicos. Los logs de fallo se conservan como artefactos; las pruebas locales no equivalen a una ejecución remota de Actions.
+`.github/workflows/ci.yml` es la única verificación de cada commit de una PR (`publish.yml` sólo corre con etiquetas y a mano). Construye antes de lint, comprueba paquetes y aplicaciones, ejecuta las pruebas del ecosistema y del núcleo y valida consumidores instalados; los jobs de Redis, Node/Bun/Deno/workerd y VS Code mantienen sus escenarios específicos. En una PR, el job `changes` mira los archivos de la PR entera y cada job caro corre sólo si cambió algo que prueba (con sólo prosa en `docs/` o `*.md`, únicamente las pruebas de documentación); en `push` a `main` corre todo. Los checks obligatorios de `main` son `test` y `redis-integration`, que se ejecutan siempre y cuentan un job omitido como éxito. Un cambio en la cadena de publicación activa además `package-gates`, el ensayo de publicación (los seis tarballs, `npm publish --dry-run`, los VSIX y el ZIP de DevTools). `pnpm ci:local` ejecuta esos jobs en local y resume los fallidos y los omitidos por falta de una herramienta (`pwsh`, `bun`, `deno`, Redis); `--only`, `--skip`, `--no-build` y `--list` lo acotan. Los logs de fallo se conservan como artefactos; las pruebas locales no equivalen a una ejecución remota de Actions. Los detalles de qué corre en cada evento están en [Tiempos de CI y publicación](ci-performance.md).
 
 ## Herramientas del workspace
 

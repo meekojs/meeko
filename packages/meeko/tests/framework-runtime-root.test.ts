@@ -94,6 +94,25 @@ test('meeko dev gives the runtime the project root, whatever the working directo
 	assert.equal(await servedRoot(child, port), resolve(root))
 })
 
+test('meeko dev tells the HMR client to use plain ws, also for a page behind an HTTPS proxy', { timeout: 120_000 }, async (context) => {
+	let child: ChildProcess | undefined
+	const root = await tempProject(context, 'hmr-protocol-dev', () => stopChild(child))
+	await rootApp(root)
+	const port = await freePort()
+	const hmrPort = await freePort()
+	child = spawn(process.execPath, [join(repositoryRoot, 'dist', 'cli.js'), 'dev', root], {
+		cwd: repositoryRoot,
+		env: { ...process.env, PORT: String(port), MEEKO_HMR_PORT: String(hmrPort), MEEKO_LINK_WATCH: '0', MEEKO_EDITOR_BRIDGE: '0' },
+		stdio: ['ignore', 'pipe', 'pipe'],
+		windowsHide: true,
+	})
+	await servedRoot(child, port)
+	const client = await (await fetch(`http://127.0.0.1:${port}/@vite/client`)).text()
+	// Vite's default follows the page: `https:` gives `wss`, which the plain HMR server on loopback refuses.
+	assert.match(client, /const socketProtocol = "ws" \|\|/)
+	assert.match(client, new RegExp(`const hmrPort = ${hmrPort};`))
+})
+
 test('the Node output gives the runtime the project root, and MEEKO_ROOT when the output moves', { timeout: 180_000 }, async (context) => {
 	let child: ChildProcess | undefined
 	const root = await tempProject(context, 'runtime-root-build', () => stopChild(child, 'SIGTERM'))

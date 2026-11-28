@@ -4,11 +4,9 @@ import { builders, utils } from 'prettier/doc'
 
 import type { ClassOrder, ClassSortMode } from './classes'
 
-import { scanInterpolations } from '../../compiler/parser/interpolation'
-import { maskComponentTags } from '../../compiler/parser/sfc'
-import { isCustomElementTag } from '../../compiler/parser/template'
 import { classExpressionOption } from './class-literals'
 import { classOrderOption, classTokens, sortClassTokens } from './classes'
+import { isCustomElementTag, maskComponentTags, scanInterpolations } from './packaging'
 
 const { group, indent, label, softline } = builders
 const { mapDoc } = utils
@@ -139,10 +137,12 @@ const interpolatedLessThan = ''
 
 /**
  * Oculta al parser HTML cada `<` de una interpolación del texto (`{a < b}`, `{"<b>"}`) con las
- * mismas posiciones que el compilador, para que no abra una etiqueta.
+ * mismas posiciones que el compilador, para que no abra una etiqueta. Un Meeko anterior a 1.8 no
+ * exporta `maskComponentTags` (sólo puede faltar en `@meekojs/prettier-plugin`): el texto queda
+ * como antes.
  */
 function maskInterpolatedLessThan(text: string): string {
-	if (text.includes(interpolatedLessThan)) return text
+	if (!maskComponentTags || text.includes(interpolatedLessThan)) return text
 	const { interpolated } = maskComponentTags(text)
 	if (!interpolated.length) return text
 	const chars = text.split('')

@@ -16,7 +16,7 @@ related:
   - docs/framework.md#runtime-de-servidor
   - docs/framework.md#tipos-de-los-servicios
   - docs/framework.md#sesiones-sin-configuración
-source-hash: 115618f207386d4cd7be411904e3f432e8ed4e22d3b68d6e82ae9e2bb4576415
+source-hash: 566cef715ba12f346ef17a240f0a077b840b0f03a90c9c52694c1c7b0f68f74c
 ---
 
 `defineServerRuntime(factory)` is the default export of `server/runtime.ts`: it declares application resources that live for the process's lifetime. Meeko calls the factory **once per process** with `{ env, production, platform, prerendering, root }` and uses its result: sessions, services available to each request as `context.services`, Socket policy, public origin, error observer and shutdown.
@@ -57,15 +57,17 @@ export default defineServerRuntime(async ({ env, production, prerendering }) => 
 
 The factory's return value:
 
-| Field           | Type                                                | Default                                                              | Description                                                                                             |
-| --------------- | --------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `sessions`      | `SessionManager`                                    | in memory in development, Redis with `MEEKO_REDIS_URL` in production | Optional since `1.2`. Application sessions. Explicit sessions always take priority.                     |
-| `services`      | object, or `(request, { platform }) => objeto`      | none                                                                 | Available to each request as `RequestContext.services`: a shared object or a per-request function.      |
-| `socket`        | `{ allowedOrigins?, maxMessageBytes?, pubsub?, … }` | none                                                                 | Socket policy: origins, limits and broadcast broker.                                                    |
-| `publicOrigin`  | URL                                                 | server address                                                       | Public origin behind a proxy, for HTTP and Socket `Origin` checks. Overridden by `MEEKO_PUBLIC_ORIGIN`. |
-| `onError`       | `(error, requestId, info?) => void`                 | minimal logging                                                      | Internal failures, with request ID; since `1.3`, also process failures.                                 |
-| `processErrors` | policy                                              | report and shut down on exception                                    | Since `1.3`. What to do with rejected promises and process exceptions.                                  |
-| `close`         | `() => void \| Promise<void>`                       | none                                                                 | Runs when stopping the server, after closing sessions.                                                  |
+| Field             | Type                                                    | Default                                                              | Description                                                                                                                                                                                                                  |
+| ----------------- | ------------------------------------------------------- | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sessions`        | `SessionManager \| false`                               | in memory in development, Redis with `MEEKO_REDIS_URL` in production | Optional since `1.2`. Application sessions. Explicit sessions always take priority. Since `1.10`, `false` disables them for your own authentication: production starts without Redis and `context.session` throws when used. |
+| `allowedOrigins`  | `string[]`                                              | none                                                                 | Since `1.10`. Additional mutation origins when Meeko creates the manager (without `sessions` or with `false`). With your own `SessionManager`, they go in it.                                                                |
+| `isAuthenticated` | `(context) => boolean \| Promise<boolean>`              | the Meeko session                                                    | Since `1.10`. Decides `auth: "required"` for API, RPC and Socket with the application's authentication.                                                                                                                      |
+| `services`        | object, or `(request, { platform, cookies }) => objeto` | none                                                                 | Available to each request as `RequestContext.services`: a shared object or a per-request function. Since `1.10`, the function receives `cookies`, those of `context.cookies`.                                                |
+| `socket`          | `{ allowedOrigins?, maxMessageBytes?, pubsub?, … }`     | none                                                                 | Socket policy: origins, limits and broadcast broker.                                                                                                                                                                         |
+| `publicOrigin`    | URL                                                     | server address                                                       | Public origin behind a proxy, for HTTP and Socket `Origin` checks. Overridden by `MEEKO_PUBLIC_ORIGIN`.                                                                                                                      |
+| `onError`         | `(error, requestId, info?) => void`                     | minimal logging                                                      | Internal failures, with request ID; since `1.3`, also process failures.                                                                                                                                                      |
+| `processErrors`   | policy                                                  | report and shut down on exception                                    | Since `1.3`. What to do with rejected promises and process exceptions.                                                                                                                                                       |
+| `close`           | `() => void \| Promise<void>`                           | none                                                                 | Runs when stopping the server, after closing sessions.                                                                                                                                                                       |
 
 ## Return value
 
@@ -92,6 +94,26 @@ export default defineServerRuntime(async ({ env }) => {
   };
 });
 ```
+
+### Your own authentication without Meeko sessions
+
+Since `1.10`, with `sessions: false` the application authenticates with its provider: the client is created per request with `cookies`, so what it writes when renewing the token reaches the response, and `isAuthenticated` decides `auth: "required"`:
+
+<!-- no-check -->
+
+```ts
+// server/runtime.ts
+import { defineServerRuntime } from "@meekojs/meeko/server";
+import { createAuthClient } from "./utils/auth";
+
+export default defineServerRuntime(({ env }) => ({
+  sessions: false,
+  services: (request, { cookies }) => ({ auth: createAuthClient(env.AUTH_URL, cookies) }),
+  isAuthenticated: async ({ services }) => (await services.auth.user()) !== null,
+}));
+```
+
+See [External authentication](../../framework-auth.md#external-authentication).
 
 ### Redis sessions and Socket across instances
 

@@ -14,7 +14,7 @@ related:
   - "@meekojs/meeko/framework#notFound"
   - "@meekojs/meeko/server#defineServerMiddleware"
   - docs/framework.md#middleware-de-ruta-de-servidor
-source-hash: bd5c7fdd7ba0e8703bb93e896aa320d3ee29637e24659264e829e73dd31a70fe
+source-hash: e3c78cd68b985d5054a615c42b47d9b65dd67aea8db69d0b8b3f4b0805893779
 ---
 
 `defineServerRouteMiddleware` declares the route middleware exported by default from an `app/middleware/*.server.ts` file. It only runs on the server, with the request's session, and never reaches the browser bundle: it can import `server/`, read secrets and query the database.
@@ -43,10 +43,10 @@ Each `(dashboard)` page redirects to `/login` without a session, on document loa
 
 ## Parameters
 
-| Parameter    | Type                                                                                       | Default  | Description                                                                                                                                                                                 |
-| ------------ | ------------------------------------------------------------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `middleware` | `(context: ServerRouteMiddlewareContext) => void \| Response \| Promise<void \| Response>` | required | The function. Receives the `usePage()` context (`url`, `params`, `search`, `request`, `signal`, `context`) and direct access to `session`, `services`, `platform`, `requestId` and `match`. |
-| `options`    | `{ global?: boolean }`                                                                     | global   | `{ global: false }` makes it named. **Must be an object literal.**                                                                                                                          |
+| Parameter    | Type                                                                                       | Default  | Description                                                                                                                                                                                                                                 |
+| ------------ | ------------------------------------------------------------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `middleware` | `(context: ServerRouteMiddlewareContext) => void \| Response \| Promise<void \| Response>` | required | The function. Receives the `usePage()` context (`url`, `params`, `search`, `request`, `signal`, `context`) and direct access to `session`, `services`, `platform`, `requestId`, `match` and, since `1.10`, `cookies` and `responseHeaders`. |
+| `options`    | `{ global?: boolean }`                                                                     | global   | `{ global: false }` makes it named. **Must be an object literal.**                                                                                                                                                                          |
 
 `params` and `search` come from the URL, not yet validated by page schemas. `defineServerRouteMiddleware<Services>` types `services`; since `1.7`, without a type argument, `services` uses the type Meeko infers from `server/runtime.ts`.
 
@@ -77,6 +77,20 @@ export default defineServerRouteMiddleware<Services>(async ({ session, services 
 ```
 
 Responding with `404` instead of `403` does not reveal that the page exists.
+
+### Renewing a provider's cookie
+
+Since `1.10`, what the middleware writes to `cookies` is read afterwards by the `<script server>` and its API and RPC calls, and reaches the response, also a redirect:
+
+<!-- no-check -->
+
+```ts
+// app/middleware/refresh.server.ts
+export default defineServerRouteMiddleware(async ({ cookies }) => {
+  const token = cookies.get("access-token");
+  if (token && isExpiring(token)) cookies.set("access-token", await refreshToken(token), { maxAge: 3600 });
+});
+```
 
 ### Global: log every page
 

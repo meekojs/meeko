@@ -11,6 +11,7 @@ import type { ClassSource, ClassView } from './classes'
 
 import { literalAt } from './classes'
 import { styleRegion, tagAt } from './embedded'
+import { t } from './l10n'
 
 /** Una declaración o un registro @property, conservando posiciones del CSS original. */
 export interface CssVariableRule {
@@ -26,7 +27,7 @@ export interface CssVariableRule {
 const identifier = /^--[\w\u0080-\uffff-]+$/u
 const word = /[\w\u0080-\uffff-]/u
 
-/** Cada función de variables se configura de forma independiente de las clases y de Tailwind. */
+/** Cada función de variables se configura de forma independiente de las clases y de los proveedores de clases. */
 export interface CssVariableSettings {
 	readonly completion?: boolean
 	readonly hover?: boolean
@@ -136,11 +137,15 @@ interface VariableToken {
 	readonly declaration: boolean
 }
 
-/** Nombre dentro de var(…), o una propiedad --nombre, en CSS o estilos inline literales. */
+/**
+ * Nombre dentro de var(…), o una propiedad --nombre, en CSS o estilos inline literales. Con un
+ * lenguaje distinto de `meeko`, el documento entero es una hoja: el servidor sólo abre, además de
+ * los `.meeko`, archivos `.css` con el lenguaje `css` o uno que declara un proveedor de clases.
+ */
 export function cssVariableTokenAt(source: string, offset: number, language = 'meeko'): VariableToken | undefined {
 	const region = styleRegion(source)
 	let start: number, end: number
-	if (language === 'css' || language === 'tailwindcss') {
+	if (language !== 'meeko') {
 		start = 0
 		end = source.length
 	} else if (region && offset >= region.contentStart && offset <= region.contentEnd) {
@@ -230,9 +235,9 @@ function definitions(view: ClassView): Map<string, VariableDefinition[]> {
 }
 
 function origin(source: ClassSource, root?: string): string {
-	if (source.origin === 'own') return 'este componente'
+	if (source.origin === 'own') return t('this component')
 	const name = root && source.filename ? relative(root, source.filename).replaceAll('\\', '/') : source.filename ? basename(source.filename) : 'CSS'
-	return `${name}${source.origin === 'snapshot' ? ' (procesado)' : ''}`
+	return `${name}${source.origin === 'snapshot' ? ` (${t('processed')})` : ''}`
 }
 
 function markdown(view: ClassView, name: string) {
@@ -240,11 +245,11 @@ function markdown(view: ClassView, name: string) {
 	if (!entries?.length) return undefined
 	const snippets = entries.slice(0, 8).map(({ source, rule }) => {
 		const contexts = rule.context
-		const declaration = rule.registered ? `initial-value: ${rule.value || '(sin valor inicial)'};` : `${rule.name}: ${rule.value};`
+		const declaration = rule.registered ? `initial-value: ${rule.value || t('(no initial value)')};` : `${rule.name}: ${rule.value};`
 		const css = [...contexts.map((line, index) => `${'  '.repeat(index)}${line} {`), `${'  '.repeat(contexts.length)}${declaration}`, ...contexts.map((_, index) => `${'  '.repeat(contexts.length - index - 1)}}`)].join('\n')
-		return `**${origin(source, view.root)}**${source.stale ? (recovered.has(source) ? ' · declaraciones recuperadas de CSS incompleto' : ' · última versión CSS válida') : ''}\n\n\`\`\`css\n${css}\n\`\`\``
+		return `**${origin(source, view.root)}**${source.stale ? (recovered.has(source) ? ` · ${t('declarations recovered from incomplete CSS')}` : ` · ${t('last valid CSS version')}`) : ''}\n\n\`\`\`css\n${css}\n\`\`\``
 	})
-	return { kind: MarkupKind.Markdown, value: [`**${name}** · variable CSS`, ...snippets, ...(entries.length > 8 ? [`${entries.length - 8} definiciones más.`] : [])].join('\n\n') }
+	return { kind: MarkupKind.Markdown, value: [t('**{0}** · CSS variable', name), ...snippets, ...(entries.length > 8 ? [t('{0} more definitions.', entries.length - 8)] : [])].join('\n\n') }
 }
 
 export function isCssVariableCompletionData(data: unknown): data is { meekoCssVariable: string } {

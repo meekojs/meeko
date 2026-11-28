@@ -1,5 +1,5 @@
 ---
-source-hash: 40bcf706f56717f6f5439e98d3eb329f2daf28bb7a1649b6f44259f63d693a82
+source-hash: 26ce36958f3c3c1db84ab13b70d65ce61e635d93b46f52c3f86f426483cfe949
 ---
 
 # Runtimes, compatibility and limits
@@ -34,7 +34,7 @@ Meeko follows SemVer since `1.0`: the public contract, what is not public and th
 - Redis has an integration test with a real server configured in CI; local execution depends on an accessible server. The SQL adapter was tested with real SQLite. `RedisSocketPubSub` is tested in the same integration with two processes.
 - Socket channels are discovered as files with simple names under `server/socket/`.
 - Configuration or auto-import registry changes force a full reload in Vite.
-- Production requires a persistent session store: `MEEKO_REDIS_URL` in Node, Bun and Deno, or custom `sessions` in `server/runtime.ts` (in Workers, D1 or Upstash).
+- Meeko sessions in production require a persistent store: `MEEKO_REDIS_URL` in Node, Bun and Deno, or custom `sessions` in `server/runtime.ts` (in Workers, D1 or Upstash). Since `1.10`, an application that authenticates with another provider declares `sessions: false` and starts without a store; its `rateLimit` limits are then counted in each instance's memory.
 - Family revocation invalidates the active ID under concurrent rotations, aborts `RequestContext.signal` for that family's in-flight requests and closes its sockets. On other instances, this requires a store with `subscribeRevocations`. Aborting is cooperative: code not observing `context.signal` keeps running until its next check, and cross-instance notification arrives with broker latency. Call `context.session.verify()` before irreversible effects. If the application requires strict ordering between in-flight operations, it must coordinate them. Meeko prevents an earlier response from restoring an already changed CSRF token.
 - Client navigation is transactional. Without shared layouts, the new view hydrates alongside the current one between private markers and the previous one is only removed and disposed after successful hydration. With a retained layout, the outlet restores and rehydrates its previous page if the new one fails. In both cases the visible route, its URL and state remain active and `navigate()` rejects with the original error. Only if that restoration also fails does Meeko request a full load of the last confirmed URL. During hydration of the new view, the previous one remains in the document: an `id` repeated across both pages may resolve to the old element until commit.
 - If the browser history API fails after rendering, Meeko requests a reload of the last confirmed URL and propagates the original error. If that recovery also fails, it preserves both causes in `AggregateError`.

@@ -98,7 +98,7 @@ test('CSS registers only variable providers, follows unsaved imports and keeps e
 		const options = registration.registerOptions as { documentSelector: { language: string; scheme: string; pattern: string }[] }
 		assert.deepEqual(
 			options.documentSelector.map(({ language }) => language),
-			['css', 'tailwindcss'],
+			['css'],
 		)
 		assert.ok(options.documentSelector.every(({ scheme, pattern }) => scheme === 'file' && pattern === `${root.replaceAll('\\', '/')}/**/*.css`))
 	}
@@ -210,4 +210,67 @@ test('variable settings from initialization and push notifications do not disabl
 	await client.sendNotification(DidChangeConfigurationNotification.type, { settings: { meeko: { cssVariables: { references: true, rename: false } } } })
 	assert.equal((await references())!.length, 2)
 	assert.equal(await rename(), null)
+})
+
+test('CSS variable functions also register the stylesheet languages that the class providers declare', { timeout: 30_000 }, async (context) => {
+	const root = await tempProject(context, 'lsp-stylesheet-languages')
+	await mkdir(join(root, 'app/pages'), { recursive: true })
+	await writeFile(join(root, 'package.json'), '{"private":true,"type":"module"}')
+	// Read without running it, as in an untrusted workspace.
+	await writeFile(join(root, 'meeko.config.ts'), 'throw new Error("never runs"); export default { css: { classProviders: [{ name: "Tailwind CSS", vscode: ["bradlc.vscode-tailwindcss"], languages: ["tailwindcss"] }] } }')
+	const page = join(root, 'app/pages/index.meeko')
+	const text = '<template><p class="x">Hi</p></template>'
+	await writeFile(page, text)
+	const toServer = new PassThrough(),
+		toClient = new PassThrough()
+	const server = createConnection(new StreamMessageReader(toServer), new StreamMessageWriter(toClient))
+	startLanguageServer(server)
+	server.listen()
+	const client = createProtocolConnection(new StreamMessageReader(toClient), new StreamMessageWriter(toServer))
+	const registrations: Registration[] = []
+	client.onRequest(RegistrationRequest.type, (params) => {
+		registrations.push(...params.registrations)
+	})
+	client.onNotification('window/logMessage', () => undefined)
+	client.onNotification('textDocument/publishDiagnostics', () => undefined)
+	client.listen()
+	context.after(async () => {
+		await client.sendRequest(ShutdownRequest.type)
+		client.dispose()
+		server.dispose()
+	})
+	await client.sendRequest(InitializeRequest.type, {
+		processId: null,
+		rootUri: pathToFileURL(root).href,
+		workspaceFolders: [{ uri: pathToFileURL(root).href, name: 'languages' }],
+		capabilities: { textDocument: { synchronization: { dynamicRegistration: true }, hover: { dynamicRegistration: true } } },
+		initializationOptions: { trusted: false, projectContracts: false, warmup: false, diagnosticsDelay: 60_000 },
+	})
+	await client.sendNotification(InitializedNotification.type, {})
+	const languagesOf = (method: string): string[][] => registrations.filter((registration) => registration.method === method).map((registration) => (registration.registerOptions as { documentSelector: { language: string }[] }).documentSelector.map(({ language }) => language))
+	// The registrations are requests from the server; a round trip lets them arrive.
+	await client.sendRequest('meeko/classProviders', null)
+	assert.deepEqual(languagesOf('textDocument/didOpen'), [['css', 'tailwindcss']])
+	assert.deepEqual(languagesOf('textDocument/hover'), [['css', 'tailwindcss']])
+	// A provider known later (here, the manifest that `meeko dev` writes from the modules) registers only its new language.
+	await mkdir(join(root, '.meeko/manifests'), { recursive: true })
+	await writeFile(
+		join(root, '.meeko/manifests/class-providers.json'),
+		JSON.stringify({
+			version: 1,
+			providers: [
+				{ name: 'Tailwind CSS', vscode: [], languages: ['tailwindcss'] },
+				{ name: 'Other', vscode: [], languages: ['postcss'] },
+			],
+		}),
+	)
+	const uri = pathToFileURL(page).href
+	await client.sendNotification(DidOpenTextDocumentNotification.type, { textDocument: { uri, languageId: 'meeko', version: 1, text } })
+	const { providers } = (await client.sendRequest('meeko/classProviders', { textDocument: { uri } })) as { providers: { name: string; vscode: string[]; languages: string[] }[] }
+	assert.deepEqual(providers, [
+		{ name: 'Tailwind CSS', vscode: ['bradlc.vscode-tailwindcss'], languages: ['tailwindcss'] },
+		{ name: 'Other', vscode: [], languages: ['postcss'] },
+	])
+	await client.sendRequest('meeko/classProviders', null)
+	assert.deepEqual(languagesOf('textDocument/didOpen'), [['css', 'tailwindcss'], ['postcss']])
 })

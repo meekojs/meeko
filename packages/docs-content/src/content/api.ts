@@ -711,6 +711,27 @@ function readSourceDocs(ts: Ts): SourceDocs {
 	const model = parse(modelPath)
 	const modelConstants = constants(ts, model)
 	const values = new Map<string, string>()
+	// The language server writes its texts in English and translates them with `t`; the reference is
+	// written in Spanish, so a `t("…")` is read through the Spanish catalog.
+	const catalogPath = `${packageFolder}/src/language-server/l10n-es.ts`
+	const catalogObject = constants(ts, parse(catalogPath)).get('spanishMessages')
+	const catalogLiteral = catalogObject && unwrap(ts, catalogObject)
+	if (!catalogLiteral || !ts.isObjectLiteralExpression(catalogLiteral)) throw new Error(`${catalogPath}: spanishMessages not found; update packages/docs-content/src/content/api.ts`)
+	const spanish = new Map<string, string>()
+	for (const entry of catalogLiteral.properties) {
+		if (!ts.isPropertyAssignment(entry) || !(ts.isStringLiteral(entry.name) || ts.isNoSubstitutionTemplateLiteral(entry.name) || ts.isIdentifier(entry.name))) continue
+		if (ts.isStringLiteral(entry.initializer) || ts.isNoSubstitutionTemplateLiteral(entry.initializer)) spanish.set(entry.name.text, entry.initializer.text)
+	}
+	/** The Spanish text of `t("…")` without arguments, or `undefined` for any other expression. */
+	const translated = (node: TS.Expression): string | undefined => {
+		if (!ts.isCallExpression(node) || !ts.isIdentifier(node.expression) || node.expression.text !== 't' || node.arguments.length !== 1) return undefined
+		const message = node.arguments[0]!
+		if (!ts.isStringLiteral(message) && !ts.isNoSubstitutionTemplateLiteral(message)) return undefined
+		const text = spanish.get(message.text)
+		if (text === undefined) throw new Error(`${catalogPath}: no translation of ${JSON.stringify(message.text)}; update the catalog`)
+		return text
+	}
+	const sourceText = (node: TS.Expression, file: string): string => translated(node) ?? stringValue(ts, node, values, file)
 	const compilerDocsPath = `${packageFolder}/src/app/definitions/compiler-docs.ts`
 	const apiDocs = constants(ts, parse(compilerDocsPath)).get('apiDocs')
 	if (apiDocs) values.set('apiDocs', stringValue(ts, apiDocs, values, compilerDocsPath))
@@ -738,10 +759,13 @@ function readSourceDocs(ts: Ts): SourceDocs {
 		macroFiles.set(property.name.getText(), sourcePath)
 	}
 	const htmlDocs = modelConstants.get('htmlDirectiveDocs')
-	const htmlCall = htmlDocs && unwrap(ts, htmlDocs)
+	// `localized(() => […].join("\n"))`: the array is the body of the function.
+	const htmlLocalized = htmlDocs && unwrap(ts, htmlDocs)
+	const htmlFactory = htmlLocalized && ts.isCallExpression(htmlLocalized) && ts.isIdentifier(htmlLocalized.expression) && htmlLocalized.expression.text === 'localized' ? htmlLocalized.arguments[0] : undefined
+	const htmlCall = htmlFactory && ts.isArrowFunction(htmlFactory) && !ts.isBlock(htmlFactory.body) ? unwrap(ts, htmlFactory.body) : htmlLocalized
 	const htmlArray = htmlCall && ts.isCallExpression(htmlCall) && ts.isPropertyAccessExpression(htmlCall.expression) && htmlCall.expression.name.text === 'join' ? unwrap(ts, htmlCall.expression.expression) : undefined
 	if (!htmlArray || !ts.isArrayLiteralExpression(htmlArray)) throw new Error(`${modelPath}: htmlDirectiveDocs not found; update packages/docs-content/src/content/api.ts`)
-	const html = parseDocLines(htmlArray.elements.map((element) => stringValue(ts, element, values, modelPath)).join('\n'))
+	const html = parseDocLines(htmlArray.elements.map((element) => sourceText(element, modelPath)).join('\n'))
 
 	// `{ name: "if:when", detail: "…" }` of the completions of the template.
 	const details = new Map<string, string>()
@@ -750,7 +774,8 @@ function readSourceDocs(ts: Ts): SourceDocs {
 		if (ts.isObjectLiteralExpression(node)) {
 			const text = (key: string): string | undefined => {
 				const property = node.properties.find((candidate): candidate is TS.PropertyAssignment => ts.isPropertyAssignment(candidate) && candidate.name.getText() === key)
-				return property && ts.isStringLiteral(property.initializer) ? property.initializer.text : undefined
+				if (!property) return undefined
+				return ts.isStringLiteral(property.initializer) ? property.initializer.text : translated(property.initializer)
 			}
 			const name = text('name')
 			const detail = text('detail')

@@ -56,7 +56,6 @@ const known: Readonly<Record<string, { readonly label: string; readonly descript
 	},
 	'./vite': { label: 'Vite', description: 'El plugin de Vite: compila los imports `.meeko` en cliente y SSR y añade HMR y CSS en desarrollo.' },
 	'./prettier': { label: 'Prettier', description: 'El plugin de Prettier para `.meeko`: script, `<script server>`, plantilla y estilo.' },
-	'./postcss': { label: 'PostCSS', description: 'El plugin de PostCSS de las utilidades de CSS: `@utilities` y `defineUtilities`.' },
 	'./devtools-ui': { label: 'DevTools', description: 'El panel de DevTools que se monta dentro de la página.' },
 }
 

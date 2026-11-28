@@ -1,5 +1,5 @@
 ---
-source-hash: 6f67af223eee903db681761f2e7e919ad3687637bc3052b848a4ce5d909f3e0e
+source-hash: e7dce4bfd4fd21fbd949894707c6b8057a5197c8cf511a4f6ddbfb1209908e7e
 ---
 
 # Reactivity and lifecycle
@@ -64,7 +64,7 @@ There is no `onUpdated`: use `effect` to react to changes.
 
 `createContext<T>()` creates a unique typed key. `provide(key, value)` publishes a value in the active instance; `inject(key)` finds the nearest provider and fails explicitly if missing. Independent roots do not share values. If the value is a signal, descendants can read it reactively.
 
-Observers created during `hydrate` belong to that instance. During Vite HMR, writable script signals are preserved by name; computed values are recalculated. This in-memory HMR state is independent of JSON transfer between server and browser.
+Observers created during `hydrate` belong to that instance. During Vite HMR, writable script signals are preserved by name; computed values are recalculated. Each instance is mounted again in the browser with the client's state, so an `if:when` over `useStorage` or other state that only exists in the browser shows the same as before the change; a change to only a `<style>` replaces the stylesheet without mounting anything again. If the new version fails, the previous one stays mounted and the error appears in the console; if it cannot be restored, the page reloads. This in-memory HMR state is independent of JSON transfer between server and browser.
 
 The `@meekojs/meeko` root exports exactly `signal`, `computed`, `effect`, `batch`, `untrack`, `createRoot`, `onCleanup`, `onMounted`, `createContext`, `provide`, `inject`, `provideErrorHandler`, `serializeJson`, since `1.3`, `trustHtml`, since `1.5`, `useId` and, since `1.8`, `createId` and `isTooLargeToAnimate`, plus signal, effect (`EffectResult`, since `1.10`), context, component error, component, snippet, HTML tag and attribute value, `HotState`, DevTools and, since `1.3`, `TrustedHtml` types. This engine also documents `@meekojs/meeko/vite` and `@meekojs/meeko/devtools-ui`. Framework and adapter subpaths (`/framework`, `/server`, `/node`, `/bun`, `/deno`, `/cloudflare` and `/build`) are described in the [framework guide](framework.md). The compiler imports its DOM, HMR and DevTools registration functions from `@meekojs/meeko/internal`. That path is a contract between the compiler and its runtime of the **exact same version**, and is not intended for manual imports. A generated module must be compiled with the same package version that executes it, so it must be recompiled when updating Meeko.
 

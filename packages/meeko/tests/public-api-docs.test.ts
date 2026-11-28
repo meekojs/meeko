@@ -23,7 +23,6 @@ const entries: Readonly<Record<string, string>> = {
 	'./build': 'src/build.ts',
 	'./devtools-ui': 'src/devtools-ui/index.ts',
 	'./prettier': 'src/prettier.ts',
-	'./postcss': 'src/postcss.ts',
 }
 
 /**

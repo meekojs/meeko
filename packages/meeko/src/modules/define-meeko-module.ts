@@ -117,6 +117,41 @@ export interface ModulePublicFileOptions {
 }
 
 /**
+ * Declaración de un proveedor externo de clases: otra herramienta (Tailwind CSS, UnoCSS…) genera
+ * clases en la hoja global y una extensión de editor las sugiere y documenta. Es sólo datos: Meeko
+ * no la ejecuta ni sabe qué herramienta es. La declara un módulo con `meeko.addClassProvider` o el
+ * proyecto en `css.classProviders` de `meeko.config.ts`.
+ *
+ * Con ella, el servidor de lenguaje de Meeko, en el modo `auto` de `meeko.classes.completion` y
+ * `meeko.classes.hover`, deja a esa extensión las clases que sólo están en la hoja procesada
+ * (`.meeko/styles/main.css`) cuando el editor informa de que está activa, y sigue ofreciendo las
+ * escritas en los `<style>` y en las hojas fuente. Sin declaración, Meeko las ofrece todas.
+ *
+ * @since 1.12.0
+ * @example
+ * ```ts
+ * import type { ClassProvider } from "@meekojs/meeko/framework";
+ *
+ * const tailwind: ClassProvider = { name: "Tailwind CSS", vscode: ["bradlc.vscode-tailwindcss"], languages: ["tailwindcss"] };
+ * ```
+ */
+export interface ClassProvider {
+	/** Nombre legible de la herramienta, como `"Tailwind CSS"`; no vacío. */
+	readonly name: string
+	/**
+	 * Ids de las extensiones de VS Code (`editor.nombre`) que atienden sus clases, como
+	 * `"bradlc.vscode-tailwindcss"`. Basta con que una esté activa. Sin ids, ninguna extensión
+	 * cuenta como activa y Meeko sigue ofreciendo todas las clases.
+	 */
+	readonly vscode?: readonly string[]
+	/**
+	 * Ids de lenguaje que el editor da a sus hojas `.css`, como `"tailwindcss"`. El servidor registra
+	 * para ellos, además de `css`, las funciones de variables CSS.
+	 */
+	readonly languages?: readonly string[]
+}
+
+/**
  * Handler HTTP de servidor que añade un módulo con `meeko.addServerHandler`.
  *
  * @since 1.2.0
@@ -355,11 +390,25 @@ export interface MeekoModuleContext {
 	 */
 	addPublicFile(path: string, contents: string | Uint8Array | (() => string | Uint8Array | Promise<string | Uint8Array>), options?: ModulePublicFileOptions): void
 	/**
-	 * Registers a CSS file in Vite's client graph, processed with the project's PostCSS config.
+	 * Registers a CSS file in Vite's client graph, processed with the project's Vite CSS config.
 	 * Relative paths resolve from rootDir; use a file URL for a stylesheet shipped by a module.
 	 * Files are deduplicated in registration order, before app/styles/main.css.
 	 */
 	addStylesheet(file: string | URL): void
+	/**
+	 * Declara un {@link ClassProvider}: una herramienta que genera clases y una extensión de editor
+	 * que las atiende, para que el editor no las ofrezca dos veces. No cambia lo que compilan
+	 * `meeko dev` ni `meeko build`. `meeko dev` y `meeko check` la guardan en
+	 * `.meeko/manifests/class-providers.json`, que el editor lee en un workspace no confiable, donde
+	 * no ejecuta los módulos.
+	 *
+	 * @since 1.12.0
+	 * @example
+	 * ```ts
+	 * meeko.addClassProvider({ name: "Tailwind CSS", vscode: ["bradlc.vscode-tailwindcss"], languages: ["tailwindcss"] });
+	 * ```
+	 */
+	addClassProvider(provider: ClassProvider): void
 	/** Registers a declaration in .meeko/types/modules; removed when the module is disabled. */
 	addTypeTemplate(filename: string, contents: string): void
 	/**

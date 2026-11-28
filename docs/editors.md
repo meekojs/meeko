@@ -225,9 +225,9 @@ El servidor completa los nombres de clase sin depender de otra extensión (como 
 
 1. **El `<style>` del componente**, con o sin `scoped`, con el texto del editor aunque no esté guardado. Mientras su CSS no se puede leer se conservan las últimas clases.
 2. **Los `<style>` sin `scoped` de los demás `.meeko` del proyecto**, que son globales. De un `<style scoped>` ajeno sólo cuentan las clases dentro de `:global(…)`, que también son globales; las demás no se sugieren.
-3. **La hoja global.** Mientras se ejecuta, `meeko dev` escribe en `.meeko/styles/main.css` la hoja `app/styles/main.css` ya procesada por Vite y PostCSS: con los `@import` resueltos, los `@utilities` expandidos y lo que generen los plugins, como Tailwind. Si ese archivo existe, sus clases se ofrecen como `main.css (global, procesada)`. Además se lee siempre `app/styles/main.css` tal cual, con los `@import` de archivos locales (`./tokens.css`, `url(./base.css)`; los paquetes como `"tailwindcss"` se ignoran) y las `@utility nombre` de Tailwind 4, sin ejecutar PostCSS. Sin la hoja procesada, las clases que sólo generan `@utilities` o Tailwind no aparecen hasta la próxima vez que se ejecute `meeko dev`, y una hoja procesada antigua puede ofrecer clases que ya no existen hasta que `meeko dev` la reescriba.
+3. **La hoja global.** Mientras se ejecuta, `meeko dev` escribe en `.meeko/styles/main.css` la hoja `app/styles/main.css` ya procesada por Vite y PostCSS: con los `@import` resueltos y lo que generen los plugins de PostCSS y de Vite, como Tailwind. Si ese archivo existe, sus clases se ofrecen como `main.css (global, procesada)`. Además se lee siempre `app/styles/main.css` tal cual, con los `@import` de archivos locales (`./tokens.css`, `url(./base.css)`; los paquetes como `"tailwindcss"` se ignoran) y las `@utility nombre` de Tailwind 4, sin ejecutar PostCSS. Sin la hoja procesada, las clases que sólo genera un plugin, como Tailwind, no aparecen hasta la próxima vez que se ejecute `meeko dev`, y una hoja procesada antigua puede ofrecer clases que ya no existen hasta que `meeko dev` la reescriba.
 
-Se leen las clases de las reglas anidadas (`&.open`, `.a .b`), de `@media` y `@layer` y de los argumentos de `:is()`, `:where()`, `:not()` y `:global()`. El hover sobre una clase muestra su origen y su regla, e ir a definición lleva a sus selectores en el componente, en los `<style>` de otros componentes y en las hojas del proyecto. Una clase que sólo existe en la hoja procesada lleva a su regla en `.meeko/styles/main.css`: no hay forma barata de saber qué `@utilities` la generó, y esa regla es la que llega al navegador.
+Se leen las clases de las reglas anidadas (`&.open`, `.a .b`), de `@media` y `@layer` y de los argumentos de `:is()`, `:where()`, `:not()` y `:global()`. El hover sobre una clase muestra su origen y su regla, e ir a definición lleva a sus selectores en el componente, en los `<style>` de otros componentes y en las hojas del proyecto. Una clase que sólo existe en la hoja procesada lleva a su regla en `.meeko/styles/main.css`: no hay forma barata de saber qué plugin la generó, y esa regla es la que llega al navegador.
 
 El índice se guarda por archivo: un componente se vuelve a leer cuando cambia su texto y una hoja cuando cambian su fecha o su tamaño, o cuando el observador de archivos (`**/*.css`, también bajo `.meeko/`) avisa de un cambio. Al escribir sólo se vuelve a leer el `<style>` del componente editado; con 300 componentes y 3000 clases generadas, el completado responde en pocos milisegundos. Como sólo se lee CSS y nunca se ejecuta código del proyecto, funciona igual en un workspace sin confianza.
 
@@ -304,12 +304,16 @@ npx prettier --check "app/**/*.meeko"
 
 Con `"meekoSortClasses": "stylesheet"` (en la CLI, `--plugin @meekojs/meeko/prettier --meeko-sort-classes stylesheet`; la CLI sólo reconoce la opción si el plugin se pasa con `--plugin`), cada clase toma la posición de su primera aparición en un selector de la hoja global, y después en el `<style>` del componente (con o sin `scoped`), en su orden: las del componente cuentan como definidas después de las globales. Las clases que no aparecen en ninguna de las dos van primero, en el orden en que estaban; después, las conocidas por su posición. Con `.stack` antes que `.card` en la hoja, `class="extra card stack"` queda `class="extra stack card"`.
 
-- **Qué hoja.** `app/styles/main.css` de la raíz del proyecto: la primera carpeta, subiendo desde el archivo, con `meeko.config.*` o con un `package.json` que tiene `@meekojs/meeko` en `dependencies` o `devDependencies` (el mismo criterio que `meeko clean`). Se procesa con la API de Vite (`resolveConfig` y `preprocessCSS`, con el Vite que resuelve el proyecto) igual que en `meeko dev`: con el `postcss.config.*` del proyecto, resolviendo los `@import` y expandiendo los `@utilities` de `meekoUtilities()`. La configuración de Vite que añaden los módulos de `meeko.config.ts` no se aplica.
-- **Determinismo.** El resultado no depende de que `meeko dev` esté en marcha: el plugin procesa la hoja él mismo, así que el editor, la CLI y la CI ordenan igual con los mismos archivos.
-- **Caché.** La hoja procesada se reutiliza durante todo el proceso (una ejecución de la CLI, el servidor de lenguaje) mientras no cambien la fecha de modificación ni el tamaño de `main.css`, de los archivos que importa, de los módulos de `@utilities` y los que estos importan, ni de los archivos de configuración de PostCSS de la raíz. Al cambiar cualquiera de ellos, el siguiente formateo vuelve a procesarla. La caché propia de Prettier (`prettier --cache`, desactivada por defecto) no conoce la hoja: tras cambiarla, ejecute la CLI sin `--cache` o borre esa caché.
-- **Si no hay hoja.** Si no se encuentra el proyecto, no existe `app/styles/main.css` o falla al procesarse, las clases no se ordenan (sólo se normalizan) y el formateo sigue. Se avisa una vez por proyecto en la salida de errores (`[meeko] Aviso: meekoSortClasses "stylesheet" no ordena las clases: …`), nunca en la salida estándar donde la CLI escribe el código. Una hoja que falló se reintenta cuando cambia uno de sus archivos o, como mucho, dos segundos después.
-- **Workspaces no confiables.** Procesar la hoja ejecuta código del proyecto (la configuración de PostCSS y los módulos de `@utilities`). La CLI de Prettier ya ejecuta código del proyecto al cargar su configuración; en VS Code, en un workspace no confiable el servidor no lee esa configuración y fuerza `"off"`: sólo se normaliza.
-- **Rendimiento.** En un proyecto real con dos módulos `@utilities` y ocho `@import`, la primera vez que se procesa la hoja tarda unos 220-260 ms (cargar Vite y los módulos incluidos); cada formateo siguiente sólo comprueba las fechas de los archivos, en torno a 1,5-2 ms.
+- **Qué hoja.** La del proyecto: la primera carpeta, subiendo desde el archivo, con `meeko.config.*` o con un `package.json` que tiene `@meekojs/meeko` en `dependencies` o `devDependencies` (el mismo criterio que `meeko clean`). Por prioridad:
+  1. `.meeko/styles/main.css`, si existe y nombra alguna clase. Es la hoja global que `meeko dev` escribe con el pipeline completo de Vite: los módulos, los `@import`, el `postcss.config.*` y los plugins de Vite (como `@tailwindcss/vite`, que registra `@meekojs/ui`), de modo que contiene las utilidades de esas herramientas en el orden en que las emiten. Sólo se lee: no se ejecuta nada del proyecto. La escribe `meeko dev` y, sin servidor, `meeko styles` y `meeko check` (no `meeko build`); `meeko dev` la reescribe al guardar `app/styles/main.css`, sus dependencias o un archivo cuyas clases detecta una herramienta de la hoja, y no se borra al cerrar `meeko dev`; `meeko clean` la elimina. Tampoco depende de que `app/styles/main.css` exista: la escribe también con sólo los estilos de los módulos.
+  2. Si no hay hoja de `meeko dev` o no es utilizable, `app/styles/main.css` procesada con la API de Vite (`resolveConfig` y `preprocessCSS`, con el Vite que resuelve el proyecto): con el `postcss.config.*` del proyecto y resolviendo los `@import`. No se aplica la configuración de Vite que añaden los módulos de `meeko.config.ts`, así que los plugins de Vite no se ejecutan y sus utilidades no están en la hoja. Con Tailwind sólo como plugin de Vite, ejecute `meeko styles` (o `meeko dev` al menos una vez; o use `"alphabetical"` u `"off"`); con `@tailwindcss/postcss` en el `postcss.config.*`, esta hoja sí las ve.
+- **Determinismo.** Con la hoja de `meeko dev`, el resultado es el de la hoja que haya en disco: el editor, la CLI y la CI ordenan igual si ven el mismo archivo, pero `.meeko/` está en `.gitignore`, así que en una CI limpia no existe y se procesa `app/styles/main.css`. Sin ella, el plugin procesa la hoja él mismo y no depende de que `meeko dev` esté en marcha. Para que la CI ordene como el editor, genera la hoja antes de formatear (véase «En CI y tras clonar»).
+- **En CI y tras clonar.** [`meeko styles`](reference/commands/meeko-styles.md) escribe `.meeko/styles/main.css` sin arrancar el servidor, con el mismo contenido que `meeko dev` para el mismo proyecto: la misma canalización de Vite, con los plugins de los módulos, en un servidor sin puerto ni vigilantes que se cierra al terminar. Ejecútalo antes de `prettier --check` y el orden es el de local: `pnpm exec meeko styles && pnpm exec prettier --check .`. Cuesta una carga de la configuración y un arranque de Vite sin servidor (medio segundo en `apps/ui`). Sin hojas de estilos no escribe nada y borra una hoja antigua; si no compilan, sale con código `1`, avisa y conserva la anterior. `meeko check` escribe la misma hoja al terminar bien, pero allí un fallo sólo avisa y el código de salida no cambia, así que un trabajo que ya ejecuta `meeko check` no necesita otro paso. El editor también la necesita antes del primer `meeko dev`: ejecuta `meeko styles` una vez tras clonar.
+- **Frescura.** La hoja de `meeko dev` sólo contiene las utilidades que la herramienta detecta en los archivos del proyecto: una clase recién escrita que todavía no está en la hoja cuenta como desconocida y va primera hasta que `meeko dev` la regenere, lo que hace al guardar el archivo con `meeko dev` en marcha. La regla es sencilla: si existe, se usa; y si es anterior a `app/styles/main.css` (se compara la fecha de modificación) se usa igualmente pero se avisa una vez (`[meeko] Aviso: meekoSortClasses "stylesheet" ordena con .meeko/styles/main.css …, que es anterior a app/styles/main.css: …`), porque las clases que se hayan añadido a `main.css` desde entonces cuentan como desconocidas. No se compara con los demás archivos de los que depende. Si `meeko dev` reescribe la hoja con el mismo contenido, conserva su fecha, de modo que el aviso puede salir tras editar `main.css` sin cambios en el resultado.
+- **Caché.** La hoja se reutiliza durante todo el proceso (una ejecución de la CLI, el servidor de lenguaje) mientras no cambien la fecha de modificación ni el tamaño de `.meeko/styles/main.css`, de `app/styles/main.css`, de los archivos que ésta importa ni de los archivos de configuración de PostCSS de la raíz. Al cambiar cualquiera de ellos, o al aparecer o desaparecer la hoja de `meeko dev`, el siguiente formateo vuelve a calcularla. La caché propia de Prettier (`prettier --cache`, desactivada por defecto) no conoce la hoja: tras cambiarla, ejecute la CLI sin `--cache` o borre esa caché.
+- **Si no hay hoja.** Si no se encuentra el proyecto, ni existe la hoja de `meeko dev` ni `app/styles/main.css`, o esta última falla al procesarse, las clases no se ordenan (sólo se normalizan) y el formateo sigue. Se avisa una vez por proyecto en la salida de errores (`[meeko] Aviso: meekoSortClasses "stylesheet" no ordena las clases: …`), nunca en la salida estándar donde la CLI escribe el código. Una hoja de `meeko dev` ilegible o que no es CSS válido avisa igual y se recurre a `app/styles/main.css`; una sin clases se ignora sin aviso. Una hoja que falló al procesarse se reintenta cuando cambia uno de sus archivos o, como mucho, dos segundos después.
+- **Workspaces no confiables.** Procesar `app/styles/main.css` ejecuta código del proyecto (la configuración de PostCSS y sus plugins), pero leer la hoja de `meeko dev` no. Aun así, en VS Code, en un workspace no confiable el servidor no carga la configuración de Prettier del proyecto (también ejecuta código), de modo que no sabe si el usuario eligió `"stylesheet"`, y fuerza `"off"`: sólo se normaliza. Ordenar ahí sin esa elección reordenaría las clases de quien no lo ha pedido, así que no se hace.
+- **Rendimiento.** La primera vez que se procesa la hoja se carga Vite y los plugins de PostCSS del proyecto; cada formateo siguiente sólo comprueba las fechas de los archivos, en torno a 1,5-2 ms.
 
 ### El paquete `@meekojs/prettier-plugin`
 
@@ -328,25 +332,20 @@ Requiere Prettier 3 y Meeko. Conserva el contrato de formato de la entrada anter
 
 `meekoSortClasses` ordena las clases de cada atributo estático `class="…"` de la plantilla. En un elemento, el valor se normaliza siempre: espacios colapsados y sin clases repetidas. Con un orden elegido (cualquier valor menos `"off"`), también ordena y normaliza el `class` de una etiqueta de componente, que es la prop `class`, y las cadenas de `bind:class` (véase [Cadenas en expresiones](#cadenas-en-expresiones)); con `"off"`, esos valores se quedan como están.
 
-| Valor            | Orden                                                                                                                                                  |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `"off"`          | El del código (por defecto).                                                                                                                           |
-| `"stylesheet"`   | Primera aparición en `app/styles/main.css`, procesada como en `meeko dev`, y después en el `<style>` del componente; las clases desconocidas, primero. |
-| `"tailwind"`     | El oficial de Tailwind CSS 4, el mismo de `prettier-plugin-tailwindcss`; las clases que Tailwind no conoce, primero y en su orden.                     |
-| `"alphabetical"` | Por código de carácter.                                                                                                                                |
+| Valor            | Orden                                                                                                                                                                                                             |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `"off"`          | El del código (por defecto).                                                                                                                                                                                      |
+| `"stylesheet"`   | Primera aparición en la hoja global (`.meeko/styles/main.css` de `meeko dev`, o `app/styles/main.css` procesada como en `meeko dev`), y después en el `<style>` del componente; las clases desconocidas, primero. |
+| `"alphabetical"` | Por código de carácter.                                                                                                                                                                                           |
 
 ```js
 export default {
 	plugins: ['@meekojs/prettier-plugin'],
-	meekoSortClasses: 'tailwind',
-	// Opcional; relativa a la raíz del proyecto Meeko. Por defecto, app/styles/main.css.
-	meekoTailwindStylesheet: 'app/styles/main.css',
+	meekoSortClasses: 'stylesheet',
 }
 ```
 
-Con `"tailwind"`, el plugin carga el design system de la hoja `meekoTailwindStylesheet` con sus `@import`, `@theme`, `@plugin`, `@utility` y `@custom-variant`, usando el `tailwindcss` 4 instalado en el proyecto (es una dependencia opcional: no se instala con el plugin). Los módulos de `@plugin` se cargan con `@tailwindcss/node` (también en TypeScript) si el proyecto tiene `@tailwindcss/postcss` o `@tailwindcss/vite`; sin ellos, sólo módulos JavaScript. El design system se reutiliza entre archivos y se recarga cuando cambia la hoja o algo que importa. Si falta `tailwindcss`, la hoja no existe o Tailwind la rechaza, las clases no se ordenan y se avisa una vez. En un workspace no confiable del editor, `"stylesheet"` y `"tailwind"` se comportan como `"off"`, porque ejecutarían código del proyecto.
-
-`prettier-plugin-tailwindcss` no reconoce el parser `meeko`; con `"tailwind"` no hace falta.
+`prettier-plugin-tailwindcss` no reconoce el parser `meeko`. Si el proyecto usa Tailwind con `@tailwindcss/postcss`, `"stylesheet"` sigue el orden en que Tailwind emite las utilidades en la hoja que `meeko dev` escribe en `.meeko/styles/main.css` o, sin ella, en la hoja procesada con `@tailwindcss/postcss`; con Tailwind sólo como plugin de Vite, la segunda no las contiene y hace falta haber ejecutado `meeko styles` o `meeko dev` (véase [Orden por la hoja global](#orden-por-la-hoja-global)). En un workspace no confiable del editor, `"stylesheet"` se comporta como `"off"`. El valor `"tailwind"` y la opción `meekoTailwindStylesheet` se retiraron: Prettier rechaza `"tailwind"` como valor inválido.
 
 ### Cadenas en expresiones
 
@@ -355,7 +354,7 @@ Con `"tailwind"`, el plugin carga el design system de la hoja `meekoTailwindStyl
 ```js
 export default {
 	plugins: ['@meekojs/prettier-plugin'],
-	meekoSortClasses: 'tailwind',
+	meekoSortClasses: 'stylesheet',
 	meekoClassFunctions: ['tv', 'clsx', 'cn'],
 }
 ```
@@ -385,7 +384,7 @@ El servidor de lenguaje formatea con el plugin del núcleo (`@meekojs/meeko/pret
 
 #### Junto a `prettier-plugin-tailwindcss`
 
-Pueden convivir en un proyecto, en cualquier orden de `plugins`. El de Tailwind ordena al analizar y este al imprimir, así que, si ambos ven la misma cadena, gana `meekoSortClasses`. No repitas una función en `tailwindFunctions` y `meekoClassFunctions`: con `"tailwind"` el orden es el mismo, pero ese plugin también ordena las claves de los objetos y no quita las clases desconocidas repetidas, mientras que este sí las quita.
+Pueden convivir en un proyecto, en cualquier orden de `plugins`. El de Tailwind ordena al analizar y este al imprimir, así que, si ambos ven la misma cadena, gana `meekoSortClasses`. No repitas una función en `tailwindFunctions` y `meekoClassFunctions`: ese plugin también ordena las claves de los objetos y no quita las clases desconocidas repetidas, mientras que este sí las quita.
 
 `pnpm -F @meekojs/prettier-plugin test` comprueba el resultado esperado, la idempotencia y la compilación de componentes reales.
 
@@ -562,7 +561,7 @@ Después añade el cliente en **Preferences → Package Settings → LSP → Set
 
 ## Variables CSS y controles independientes
 
-Meeko ofrece completado, hover, «Ir a definición», búsqueda de referencias y renombrado de variables CSS en `<style>` y estilos inline de `.meeko`, y en archivos `.css` de paquetes con `meeko.config.*`. Funciona sin Tailwind y también con el lenguaje `tailwindcss`. Abrir sólo una hoja CSS activa la extensión en un workspace Meeko; el soporte CSS registra únicamente esas funciones de variables, sin hacerse cargo del formato ni de los diagnósticos de CSS.
+Meeko ofrece completado, hover, «Ir a definición», búsqueda de referencias y renombrado de variables CSS en `<style>` y estilos inline de `.meeko`, y en archivos `.css` de paquetes con `meeko.config.*`. Atiende las hojas con el lenguaje `css` y con los que declaran los [proveedores de clases](#proveedores-de-clases) del proyecto, como `tailwindcss` con `@meekojs/ui`. Abrir sólo una hoja CSS activa la extensión en un workspace Meeko; el soporte CSS registra únicamente esas funciones de variables, sin hacerse cargo del formato ni de los diagnósticos de CSS.
 
 Las fuentes son la hoja abierta, `app/styles/main.css`, sus imports locales y la hoja procesada `.meeko/styles/main.css` cuando existe. Los cambios sin guardar en hojas importadas se reflejan entre documentos y al cerrarlas vuelve a contar la versión guardada. El hover muestra el valor y su archivo; la definición prioriza las fuentes escritas frente al CSS generado. Las hojas CSS se leen sin ejecutar la configuración ni plugins del proyecto, también en workspaces no confiables. No se escanea todo el disco: los imports quedan dentro del paquete y tienen un límite de 64 archivos. Los componentes `.meeko` conservan además sus fuentes de estilos globales y las reglas de visibilidad de `scoped`.
 
@@ -593,7 +592,7 @@ Meeko Language registra automáticamente `tailwindCSS.includeLanguages: { "meeko
 
 `meeko.classes.completion` y `meeko.classes.hover` controlan por separado sus funciones de clases de Meeko:
 
-- `auto` (predeterminado): si Tailwind IntelliSense está activo y el proyecto declara `tailwindcss` como dependencia o lo importa desde sus hojas fuente, delega las clases de la hoja procesada `.meeko/styles/main.css` a Tailwind. Conserva las clases escritas en componentes y hojas fuente.
+- `auto` (predeterminado): si el proyecto declara un [proveedor de clases](#proveedores-de-clases) y la extensión que lo atiende (como Tailwind CSS IntelliSense) está activa, le deja las clases que sólo tiene la hoja procesada `.meeko/styles/main.css`. Conserva las clases escritas en componentes y hojas fuente. Sin proveedor declarado, o con su extensión inactiva, Meeko las ofrece todas.
 - `on`: incluye también las clases de la hoja procesada.
 - `off`: desactiva sólo la función elegida. La definición se controla con `meeko.classes.definition`; las variables tienen sus propios ajustes.
 
@@ -607,4 +606,23 @@ Para funciones como `clsx` y `cn` dentro del `<script>`, configura las funciones
 }
 ```
 
-La detección de Meeko lee el manifiesto del paquete del componente y las hojas fuente indexadas, sin ejecutar plugins CSS. No clasifica individualmente la hoja procesada: en `auto` también delega sus clases de terceros que no tienen una definición fuente indexada. En otros clientes LSP, comunica `meeko.classes` mediante `workspace/configuration` (o `initializationOptions.classes`), incluido `tailwindActive: true` si el cliente tiene un proveedor Tailwind activo.
+### Proveedores de clases
+
+Meeko no sabe de Tailwind ni de otra herramienta de CSS: quien la trae declara que genera clases y qué extensión de editor las atiende. `@meekojs/ui` declara Tailwind CSS (extensión `bradlc.vscode-tailwindcss`, lenguaje de hojas `tailwindcss`) con [`meeko.addClassProvider`](framework-configuration.md#el-objeto-meeko). Un proyecto que usa Tailwind sin `@meekojs/ui` lo declara en [`css.classProviders`](reference/config/config-css.md):
+
+```ts
+// meeko.config.ts
+import { defineMeekoConfig } from '@meekojs/meeko/framework'
+
+export default defineMeekoConfig({
+	css: { classProviders: [{ name: 'Tailwind CSS', vscode: ['bradlc.vscode-tailwindcss'], languages: ['tailwindcss'] }] },
+})
+```
+
+Hasta que lo declare, Meeko ofrece también las clases generadas, junto a las de Tailwind IntelliSense: desde `1.12` el servidor ya no busca `tailwindcss` en el `package.json` ni en los `@import` de las hojas. En un workspace de confianza el servidor ejecuta la configuración y sus módulos, así que conoce la declaración sin `meeko dev`. En uno no confiable no ejecuta nada: lee `css.classProviders` cuando es un array literal y el manifiesto `.meeko/manifests/class-providers.json`, que `meeko dev` y `meeko check` escriben con lo que declaran los módulos. Las clases que se dejan al proveedor son las de `.meeko/styles/main.css`, que también escribe `meeko dev`. Meeko no clasifica individualmente esa hoja: en `auto`, con el proveedor activo, también deja sus clases de terceros que no tienen una definición fuente indexada. Los `languages` de cada proveedor reciben, además de `css`, las funciones de [variables CSS](#variables-css-y-controles-independientes) en los archivos `.css`.
+
+La extensión de VS Code pide al servidor los proveedores del proyecto de cada componente y le comunica cuáles de sus extensiones están activas. En otros clientes LSP:
+
+- La petición `meeko/classProviders`, con `{ textDocument: { uri } }` (o sin parámetros, para todos los proyectos conocidos), devuelve `{ providers: [{ name, vscode, languages }] }`. Un servidor anterior a `1.12` responde `MethodNotFound`: cuenta como un proyecto sin proveedores.
+- La sección `meeko.classes` de `workspace/configuration` (o `initializationOptions.classes`) lleva `activeExtensions`: los ids de las extensiones activas entre las que nombran los proveedores, también vacío.
+- Un cliente que sólo envía `tailwindActive: true`, como los anteriores a `1.12`, cuenta como si `bradlc.vscode-tailwindcss` estuviera activa; si el proyecto no declara ningún proveedor, el servidor respeta esa señal y deja igualmente las clases generadas. La extensión actual sigue enviando `tailwindActive` para los servidores anteriores.

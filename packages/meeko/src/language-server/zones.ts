@@ -7,6 +7,7 @@ import type { VirtualComponent } from './model'
 import { parseSfc } from '../compiler/parser/sfc'
 import { isPageFile } from '../compiler/transforms/route-block'
 import { extractRouteRender } from '../framework/routes-discovery'
+import { joinList, t } from './l10n'
 import { continuationStart, nodeAt, templateBinding, unwrap } from './reactivity'
 
 /** Where code of a `.meeko` runs. */
@@ -25,27 +26,44 @@ export interface ExecutionZone {
 	/** Zero-based, inclusive. */
 	readonly startLine: number
 	readonly endLine: number
-	/** Short label, such as "Sólo servidor". */
+	/** Short label, such as "Server only". */
 	readonly label: string
 	/** One-paragraph explanation for a hover. */
 	readonly detail: string
 }
 
-const labels: Readonly<Record<ExecutionZoneKind, string>> = {
-	server: 'Sólo servidor',
-	shared: 'Servidor y navegador',
-	browser: 'Sólo navegador',
+/** Short label of a zone kind. */
+function kindLabel(kind: ExecutionZoneKind): string {
+	switch (kind) {
+		case 'server':
+			return t('Server only')
+		case 'shared':
+			return t('Server and browser')
+		case 'browser':
+			return t('Browser only')
+	}
 }
 
-const details: Readonly<Record<ExecutionZoneReason, string>> = {
-	'server-block': '`<script server>` declara las opciones de ruta y el loader de la página. Sólo se ejecuta en el servidor y nunca entra en el bundle del navegador.',
-	'client-route-block': 'Este `<script server>` declara `render: "client"`, así que sus opciones de ruta y su loader se ejecutan en el navegador.',
-	setup: 'El setup del componente se ejecuta en el servidor durante el SSR y otra vez en el navegador al hidratar. Mantenlo libre de APIs exclusivas del navegador.',
-	'client-page': 'La página declara `render: "client"`: el servidor sólo renderiza sus layouts y el setup de la página se ejecuta en el navegador.',
-	continuation: 'Después del primer `await` de un composable de navegador (`useElementRef`, `useSocket`), el setup continúa en el navegador, una vez montado el componente.',
-	onMounted: 'Los callbacks de `onMounted` se ejecutan en el navegador después de montar el componente, nunca durante el SSR.',
-	'browser-function': 'Esta función sólo se usa desde código de navegador (manejadores `on:*`, `onMounted` o la continuación del setup), así que nunca se ejecuta durante el SSR.',
-	'inline-handler': 'Este manejador `on:*` sólo se ejecuta en el navegador, cuando ocurre el evento.',
+/** Explanation of a zone for its hover, by the reason it runs where it does. */
+function reasonDetail(reason: ExecutionZoneReason): string {
+	switch (reason) {
+		case 'server-block':
+			return t('`<script server>` declares the route options and the page loader. It only runs on the server and never enters the browser bundle.')
+		case 'client-route-block':
+			return t('This `<script server>` declares `render: "client"`, so its route options and loader run in the browser.')
+		case 'setup':
+			return t('The component setup runs on the server during SSR and again in the browser on hydration. Keep it free of browser-only APIs.')
+		case 'client-page':
+			return t('The page declares `render: "client"`: the server only renders its layouts, and the page setup runs in the browser.')
+		case 'continuation':
+			return t('After the first `await` of a browser composable (`useElementRef`, `useSocket`), the setup continues in the browser, once the component is mounted.')
+		case 'onMounted':
+			return t('`onMounted` callbacks run in the browser after the component mounts, never during SSR.')
+		case 'browser-function':
+			return t('This function is only used from browser code (`on:*` handlers, `onMounted` or the setup continuation), so it never runs during SSR.')
+		case 'inline-handler':
+			return t('This `on:*` handler only runs in the browser, when the event happens.')
+	}
 }
 
 type FunctionNode = ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction
@@ -119,23 +137,19 @@ function isValueReference(identifier: ts.Identifier): boolean {
 	return true
 }
 
-function joinList(items: readonly string[]): string {
-	return items.length <= 1 ? items.join('') : `${items.slice(0, -1).join(', ')} y ${items.at(-1)}`
-}
-
 /** Hover text of a browser function: where it is used. */
 function browserFunctionDetail(fn: SetupFunction): string {
 	const handlers = [...fn.browserUses].filter((use) => use.startsWith('on:')).sort()
 	const parts: string[] = []
-	if (handlers.length) parts.push(`como manejador de ${joinList(handlers.map((handler) => `\`${handler}\``))}`)
-	if (fn.browserUses.has('onMounted')) parts.push('en `onMounted`')
-	if (fn.browserUses.has('continuation')) parts.push('en la continuación del setup, tras el primer `await` de navegador')
+	if (handlers.length) parts.push(t('as the handler of {0}', joinList(handlers.map((handler) => `\`${handler}\``))))
+	if (fn.browserUses.has('onMounted')) parts.push(t('in `onMounted`'))
+	if (fn.browserUses.has('continuation')) parts.push(t('in the setup continuation, after the first browser `await`'))
 	const callers = [...fn.callers]
 		.filter((caller) => caller !== fn && caller.browser)
 		.map((caller) => `\`${caller.name}\``)
 		.sort()
-	if (callers.length) parts.push(`desde ${callers.length === 1 ? 'la función' : 'las funciones'} de navegador ${joinList(callers)}`)
-	return `Sólo se usa ${joinList(parts)}, así que nunca se ejecuta durante el SSR.`
+	if (callers.length) parts.push(callers.length === 1 ? t('from the browser function {0}', joinList(callers)) : t('from the browser functions {0}', joinList(callers)))
+	return t('Only used {0}, so it never runs during SSR.', joinList(parts))
 }
 
 /** The source text around `[start, end)` holds only that code on its lines. */
@@ -321,7 +335,7 @@ function browserRanges(component: VirtualComponent, document: SfcDocument, split
 			start: span.sourceStart,
 			end: span.sourceEnd,
 			reason: 'inline-handler',
-			detail: `Esta función es el manejador de \`${binding}\`: sólo se ejecuta en el navegador, cuando ocurre el evento.`,
+			detail: t('This function is the handler of `{0}`: it only runs in the browser, when the event happens.', binding),
 		})
 	}
 	return ranges
@@ -377,7 +391,7 @@ export function executionZones(component: VirtualComponent, sourceRoots: readonl
 	}
 	const source = component.source
 	const kinds = new Map<number, { reason: ExecutionZoneReason; detail: string }>()
-	const mark = (start: number, end: number, reason: ExecutionZoneReason, detail = details[reason]): void => {
+	const mark = (start: number, end: number, reason: ExecutionZoneReason, detail = reasonDetail(reason)): void => {
 		const last = lineAt(source, Math.max(start, end - 1))
 		for (let line = lineAt(source, start); line <= last; line++) kinds.set(line, { reason, detail })
 	}
@@ -416,7 +430,7 @@ export function executionZones(component: VirtualComponent, sourceRoots: readonl
 			continue
 		}
 		const kind = reasonKind(reason)
-		zones.push({ kind, reason, startLine: line, endLine: line, label: labels[kind], detail })
+		zones.push({ kind, reason, startLine: line, endLine: line, label: kindLabel(kind), detail })
 	}
 	return zones
 }

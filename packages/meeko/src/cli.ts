@@ -20,12 +20,13 @@ import { initFrameworkProject } from './framework/init'
 import { setModuleDevelopmentMode, warnLegacyLayerEntries } from './framework/module-loader'
 import { prerenderProject } from './framework/prerender'
 import { assertBuildAdapter, buildProject, developmentServerPorts, prepareProject, previewProject, startProject, stopDevelopmentServer } from './framework/project'
+import { writeGlobalStylesheetSnapshot } from './framework/stylesheet-snapshot'
 import { prepareFrameworkTypeDeclarations } from './framework/type-declarations'
 import { initProject } from './init'
 import { generateTypes } from './types'
 
 const usage =
-	'Uso: meeko dev [directorio]\n     meeko check [directorio]\n     meeko check <componente.meeko> [--json]\n     meeko doctor [directorio] [--json]\n     meeko build [directorio] [--adapter <node|cloudflare|deno|bun|static>]\n     meeko start [directorio]\n     meeko preview [directorio] [--adapter <node|cloudflare|bun|deno|static>]\n     meeko clean [directorio] [--all] [--dry-run]\n     meeko auth hash  (pide una contraseña sin mostrarla, o la lee de stdin, e imprime su hash)\n     meeko check-app <directorio>\n     meeko compile <componente.meeko> <salida.ts>\n     meeko types <componente.meeko>\n     meeko routes <directorio>\n     meeko prerender <directorio>\n     meeko init <directorio>\n     meeko init-framework <directorio>\n     meeko lsp --stdio | --node-ipc | --socket=<puerto> | --pipe=<nombre>\n     meeko <comando> --help  (la ayuda de un comando)\n     meeko --help | --version\n\n' +
+	'Uso: meeko dev [directorio]\n     meeko check [directorio]\n     meeko check <componente.meeko> [--json]\n     meeko styles [directorio]\n     meeko doctor [directorio] [--json]\n     meeko build [directorio] [--adapter <node|cloudflare|deno|bun|static>]\n     meeko start [directorio]\n     meeko preview [directorio] [--adapter <node|cloudflare|bun|deno|static>]\n     meeko clean [directorio] [--all] [--dry-run]\n     meeko auth hash  (pide una contraseña sin mostrarla, o la lee de stdin, e imprime su hash)\n     meeko check-app <directorio>\n     meeko compile <componente.meeko> <salida.ts>\n     meeko types <componente.meeko>\n     meeko routes <directorio>\n     meeko prerender <directorio>\n     meeko init <directorio>\n     meeko init-framework <directorio>\n     meeko lsp --stdio | --node-ipc | --socket=<puerto> | --pipe=<nombre>\n     meeko <comando> --help  (la ayuda de un comando)\n     meeko --help | --version\n\n' +
 	'Variables de entorno:\n' +
 	'     MEEKO_PORT, MEEKO_HOST  puerto y dirección de dev, start y preview; sustituyen a server.port y\n' +
 	'                      server.host de meeko.config.ts (por defecto, 127.0.0.1:4173; preview\n' +
@@ -46,8 +47,9 @@ const usage =
 /** Help of each command: `meeko <command> --help` or `meeko help <command>`. */
 const commandHelp: Readonly<Record<string, string>> = {
 	doctor: 'Uso: meeko doctor [directorio] [--json]\n\nInspecciona versiones, resolución de paquetes, servidor LSP disponible y artefactos .meeko.\nNo ejecuta meeko.config ni módulos, no lee .env y no modifica archivos. --json produce un\ninforme estructurado. Los avisos no impiden usar el proyecto; los errores dan salida 1.\n',
-	dev: 'Uso: meeko dev [directorio]\n\nArranca el servidor de desarrollo con Vite, SSR y HMR. Antes de escuchar prepara .meeko/\n(entradas, tipos y tsconfig.*.json). Por defecto, el directorio actual. Avisa si otro meeko dev\nya sirve el mismo proyecto.\n',
-	check: 'Uso: meeko check [directorio]\n     meeko check <componente.meeko> [--json]\n\nCon un directorio (por defecto, el actual), prepara .meeko/, comprueba los componentes .meeko y\nejecuta TypeScript sobre los proyectos app, server y shared. Con un componente, sólo lo comprueba\na él; --json imprime sus diagnósticos en JSON.\n',
+	dev: 'Uso: meeko dev [directorio]\n\nArranca el servidor de desarrollo con Vite, SSR y HMR. Antes de escuchar prepara .meeko/\n(entradas, tipos y tsconfig.*.json). Por defecto, el directorio actual. Avisa si otro meeko dev\nya sirve el mismo proyecto. Con dev.portless en meeko.config.ts lo publica en\nhttps://<nombre>.localhost mediante portless (PORTLESS=0 lo desactiva).\n',
+	check: 'Uso: meeko check [directorio]\n     meeko check <componente.meeko> [--json]\n\nCon un directorio (por defecto, el actual), prepara .meeko/, comprueba los componentes .meeko y\nejecuta TypeScript sobre los proyectos app, server y shared, y escribe .meeko/styles/main.css\ncomo meeko styles (si no compila, sólo avisa). Con un componente, sólo lo comprueba a él; --json\nimprime sus diagnósticos en JSON.\n',
+	styles: 'Uso: meeko styles [directorio]\n\nEscribe .meeko/styles/main.css, la hoja global procesada que meeko dev mantiene (imports\nincluidos, hojas de los módulos y plugins de CSS de Vite aplicados), sin arrancar el servidor. La\nlee el editor y meekoSortClasses: "stylesheet" de Prettier: ejecútalo en CI o tras clonar para\nque ordene como en local. Sin hojas de estilos no escribe nada; si no compilan, sale con 1.\n',
 	build: 'Uso: meeko build [directorio] [--adapter <node|cloudflare|deno|bun|static>]\n\nComprueba el proyecto como meeko check y escribe la salida de producción en\n.meeko/output/<adaptador>/. --adapter sustituye a server.adapter de meeko.config.ts.\n',
 	start: 'Uso: meeko start [directorio]\n\nSirve el build de Node de .meeko/output/node; ejecute antes meeko build.\n',
 	preview: 'Uso: meeko preview [directorio] [--adapter <node|cloudflare|bun|deno|static>]\n\nEjecuta la salida de meeko build en su runtime: Node en este proceso; Bun, Deno y wrangler dev\ncomo proceso hijo; static con un servidor de archivos.\n',
@@ -107,8 +109,9 @@ async function assertDirectory(path: string): Promise<void> {
 
 /**
  * Makes the project root the working directory of this process and returns its absolute path.
- * Tools that take the cwd as their base (`@tailwindcss/postcss` scans it for sources) would
- * otherwise work on the folder `meeko` was launched from. A relative path is resolved first,
+ * Tools that take the cwd as their base (configuration loaders, CSS plugins that scan for
+ * sources, the project's own scripts) would otherwise work on the folder `meeko` was launched
+ * from. A relative path is resolved first,
  * against the original cwd; the arguments a supervised `dev` relaunches itself with are
  * rewritten so the child, which inherits the new cwd, still finds the project.
  */
@@ -189,12 +192,12 @@ const helpCommand = command === '--help' || command === '-h' || command === 'hel
 const versionCommand = command === '--version' || command === '-v'
 if (command !== 'lsp' && !helpCommand && !versionCommand) {
 	if (command === undefined) problem ??= 'Falta el comando'
-	else if (!projectCommand && !legacyCommand && command !== 'check' && command !== 'clean' && command !== 'auth' && command !== 'doctor') problem ??= `Comando desconocido: ${command}`
+	else if (!projectCommand && !legacyCommand && command !== 'check' && command !== 'styles' && command !== 'clean' && command !== 'auth' && command !== 'doctor') problem ??= `Comando desconocido: ${command}`
 	if (command === 'auth' && input !== 'hash') problem ??= input === undefined ? 'Falta el subcomando de auth: meeko auth hash' : `Subcomando desconocido de auth: ${input}`
 	// `check` accepts `--json` after the component; every other option was consumed above.
 	const option = argv.slice(1).find((argument, index) => argument.startsWith('-') && !(command === 'check' && argument === '--json' && index === 1))
 	if (option !== undefined) problem ??= command === 'check' && option === '--json' ? '--json va después del componente .meeko de check' : `Opción desconocida para ${command}: ${option}`
-	if (!projectCommand && command !== 'check' && command !== 'clean' && command !== 'auth' && command !== 'doctor' && !input) problem ??= `Falta ${command === 'compile' || command === 'types' ? 'el componente .meeko' : 'el directorio'} de ${command}`
+	if (!projectCommand && command !== 'check' && command !== 'styles' && command !== 'clean' && command !== 'auth' && command !== 'doctor' && !input) problem ??= `Falta ${command === 'compile' || command === 'types' ? 'el componente .meeko' : 'el directorio'} de ${command}`
 	if (command === 'compile' && !output) problem ??= 'Falta el archivo de salida de compile'
 	const extra = argv[command === 'compile' || (command === 'check' && output === '--json') ? 3 : 2]
 	if (extra !== undefined) problem ??= `Argumento de más para ${command}: ${extra}`
@@ -273,7 +276,18 @@ if (problem !== undefined) {
 			loadProjectEnv(root)
 			warnLegacyLayerEntries(root, await loadCheckedMeekoConfig(root))
 			writeDiagnostics(await checkFrameworkProject(root))
+			// The processed global stylesheet for the editor and Prettier, as `meeko dev` keeps it: a failure only warns.
+			await writeGlobalStylesheetSnapshot(root, (message) => process.stderr.write(`[meeko] ${message}\n`)).catch((error: unknown) => process.stderr.write(`[meeko] .meeko/styles/main.css no se pudo escribir: ${error instanceof Error ? error.message : String(error)}\n`))
 			process.stdout.write(`${root}: OK\n`)
+		} else if (command === 'styles') {
+			const root = await enterProject(input ?? '.')
+			// The configuration and the CSS plugins may read the project's variables, as in `meeko dev`.
+			loadProjectEnv(root)
+			const reports: string[] = []
+			const result = await writeGlobalStylesheetSnapshot(root, (message) => reports.push(message))
+			for (const message of reports) process.stderr.write(`[meeko] ${message}\n`)
+			if (result === 'failed') process.exitCode = 1
+			else process.stdout.write(result === 'written' ? `${join(root, '.meeko', 'styles', 'main.css')}\n` : `${root}: sin hojas de estilos\n`)
 		} else if (command === 'init' || command === 'init-framework') {
 			if (!input) throw new Error('Falta el directorio de destino')
 			const target = command === 'init' ? await initProject(input) : await initFrameworkProject(input)

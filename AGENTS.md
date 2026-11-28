@@ -28,11 +28,15 @@ Requiere Node.js 24+ y pnpm 12.14.0. En Windows usa PowerShell 7.
 - `pnpm build`: construye el workspace. `pnpm build:packages` y `pnpm build:apps` seleccionan paquetes o apps.
 - `pnpm tooling:build`: prepara los paquetes usados por ESLint y Prettier.
 - `pnpm dev`: inicia en paralelo los sitios del framework (4173), UI (4174), i18n (4175) y dashboard (4310) con Turbo; `pnpm dev:site`, `pnpm dev:ui`, `pnpm dev:i18n` y `pnpm dev:dashboard` inician cada uno por separado.
+- Con el proxy de portless en marcha (`pnpm exec portless proxy start`), `pnpm dev` y `dev:site`, `dev:ui`, `dev:i18n` y `dev:dashboard` responden también por nombre (`https://ui.meeko.localhost`): cada app lo declara con `dev.portless` en su `meeko.config.ts`, así que no hace falta envolver el script ni mantener una lista de nombres. `PORTLESS=0` lo desactiva.
+- `pnpm exec meeko styles <app>` escribe `.meeko/styles/main.css` sin arrancar el servidor, con el mismo contenido que `meeko dev`: ejecútalo antes de `prettier --check` en una copia limpia o en CI para que `meekoSortClasses: "stylesheet"` ordene como en local. `meeko check` también la escribe.
 - `pnpm dev:i18n`: inicia la web de i18n; `pnpm build --filter=meeko-i18n-site` genera su build Node.
 - `pnpm check`: comprueba tipos de los cinco paquetes principales.
 - `pnpm test`: ejecuta las pruebas del núcleo; `pnpm verify`: amplía la validación con ejemplos, compilación y DevTools.
+- `pnpm test:changed`: ejecuta sólo las pruebas asociadas a los archivos editados (`--base <ref>` para una rama, `--list` para ver el plan, `--no-build`, `--timeout <s>`, `--max-transitive <n>`); nunca lanza `*.e2e.*` ni la suite completa.
 - `pnpm lint` y `pnpm format:check`: revisan lint y formato.
-- `pnpm ci:local`: ejecuta en local los jobs de `.github/workflows/ci.yml` y los gates que sólo tiene `publish.yml` (`--only package-gates`) sin detenerse en el primer fallo y resume al final los fallidos y los omitidos por falta de una herramienta (`pwsh`, `bun`, `deno`, Redis). Pásalo antes de subir a una PR; `--only checks,core-tests`, `--skip performance`, `--no-build` y `--list` lo acotan.
+- `pnpm ci:local`: ejecuta en local los jobs de `.github/workflows/ci.yml` y los gates de publicación (`--only package-gates`) sin detenerse en el primer fallo y resume al final los fallidos y los omitidos por falta de una herramienta (`pwsh`, `bun`, `deno`, Redis). Ejecútalo sólo cuando se pida, normalmente antes de una PR; `--only checks,core-tests`, `--skip performance`, `--no-build` y `--list` lo acotan.
+- `pnpm package:smoke`, `pnpm package:workspace-smoke` y `pnpm -F meeko-language run test:host:isolated` son scripts de Node y no necesitan `pwsh`; los `.ps1` homónimos son envoltorios por compatibilidad. En Linux, `test:host:isolated` y `test:host:untrusted` necesitan `xvfb-run -a`; con `MEEKO_HOST_VSCODE=<ruta a code>` reutilizan un VS Code ya descargado.
 - `pnpm -F @meekojs/eslint-plugin test`: ejecuta las pruebas del plugin seleccionado.
 
 ## Estilo y nombres
@@ -45,17 +49,19 @@ La configuración raíz usa `defineEslint`, Perfectionist y unused-imports. Los 
 
 Predomina `node:test`, con `tsx` para TypeScript; las reglas ESLint también usan RuleTester. Nombra pruebas unitarias `*.test.ts` o `*.test.mjs`; los escenarios de navegador usan `*.e2e.ts`.
 
-Añade regresiones de comportamiento. Para cambios del compilador, cubre SSR, hidratación, actualizaciones y liberación de recursos cuando corresponda. Ejecuta pruebas del paquete afectado y `pnpm e2e` para cambios de navegador. No hay un umbral numérico de cobertura configurado.
+Añade regresiones de comportamiento. Para cambios del compilador, cubre SSR, hidratación, actualizaciones y liberación de recursos cuando corresponda. No hay un umbral numérico de cobertura configurado.
+
+Ejecuta sólo las pruebas de lo que editaste: los archivos de prueba que tocaste o añadiste y los que cubren directamente el código modificado. `pnpm test:changed` las elige y las ejecuta; a mano, `node --import tsx --test tests/<archivo>.test.ts`. No ejecutes la suite completa de un paquete, `pnpm test`, `pnpm verify`, `pnpm e2e` ni `pnpm ci:local` salvo que se pida explícitamente; si un cambio puede afectar a algo que no probaste, dilo en el resumen en vez de ejecutarlo todo.
 
 ## Trabajo con varios agentes
 
 Claude Code y Codex leen este archivo. Una sola sesión coordina: reparte tareas, integra, revisa el diff final y resuelve conflictos. Los agentes trabajadores no hacen commit ni push y no lanzan otros agentes salvo que la tarea lo indique.
 
-- Lanza trabajadores con `hc` (herdr) en segundo plano: `hc run --bg --name <tarea> --cwd <worktree> <plantilla> "<tarea>"`. Espera con `hc wait --children all`, nunca con `sleep`; lee resultados con `hc read <tarea>` y, al aceptarlos, cierra con `hc kill` y `hc rm`.
+- En Claude Code, delega con subagentes como indica `CLAUDE.md` (modelo y esfuerzo explícitos, `isolation: worktree`). Para Codex, o para combinar agentes de ambos, lanza trabajadores con `hc` (herdr) en segundo plano: `hc run --bg --name <tarea> --cwd <worktree> <plantilla> "<tarea>"`. Espera con `hc wait --children all`, nunca con `sleep`; lee resultados con `hc read <tarea>` y, al aceptarlos, cierra con `hc kill` y `hc rm`.
 - Elige la plantilla por complejidad: `*-quick` para cambios acotados y mecánicos; `*-impl` para features y bugs normales; `claude-impl` para compilador, runtime, hidratación o cambios entre paquetes; `*-review` para revisión independiente de sólo lectura. Revisa con el agente contrario al que implementó. Codex se lanza siempre con `--no-daemon` y su sandbox no puede usar `hc send`: recoge su informe con `hc read` cuando `hc wait` indique `done`.
-- Usa un worktree por tarea, siempre bajo `.claude/worktrees/<tarea>`. Claude los crea solo (`claude -w <tarea>` o subagentes con `isolation: worktree`); para Codex u otros, `git worktree add .claude/worktrees/<tarea> -b <rama>` y `pnpm install` dentro. Nunca asignes los mismos archivos a dos agentes y elimina el worktree con `git worktree remove` al integrar.
+- Usa un worktree por tarea, siempre bajo `.claude/worktrees/<tarea>`. Claude los crea solo (`claude -w <tarea>` o subagentes con `isolation: worktree`); para Codex u otros, `git worktree add .claude/worktrees/<tarea> -b <rama>` y `pnpm install` dentro. Un worktree creado por un subagente puede partir de un commit anterior al de la rama de trabajo: indícale el commit base y que haga `git reset --hard <commit>` antes de empezar. Nunca asignes los mismos archivos a dos agentes y elimina el worktree con `git worktree remove` al integrar.
 - En un worktree no uses Serena: está ligada al checkout principal y editaría `main`. Las plantillas de `hc` ya la desactivan.
-- Los especialistas viven en `.codex/agents/*.toml`, que es la fuente única. `pnpm agents:sync` genera `.claude/agents/*.md` y `pnpm agents:check` (incluido en `pnpm verify`) detecta desajustes; no edites los archivos generados.
+- Hoy no hay especialistas definidos. Si se añaden, viven en `.codex/agents/*.toml`, que es la fuente única: `pnpm agents:sync` genera `.claude/agents/*.md` y `pnpm agents:check` (incluido en `pnpm verify`) detecta desajustes; no edites los archivos generados.
 
 ### Git y recursos seguros
 
@@ -72,4 +78,8 @@ Los hooks de `.claude/settings.json` (`.claude/hooks/`) aplican parte de estas r
 
 El historial usa prefijos como `feat(scope):`, `fix:` y `chore(release):`; `CONTRIBUTING.md` pide descripciones concretas en español e imperativo.
 
-Mantén cada cambio enfocado. En la PR explica problema, comportamiento resultante, pruebas ejecutadas e incidencias relacionadas. Añade capturas para cambios visuales. Conserva cambios ajenos y excluye secretos, cachés y artefactos locales.
+Trabaja en local. No hagas `git push`, no abras ni actualices una PR y no lances CI hasta que se pida explícitamente; una petición anterior no autoriza las siguientes. No propongas abrir una PR al terminar cada tarea.
+
+Haz un commit al terminar cada tarea, en cuanto sus pruebas afectadas pasen, sin esperar a que se pida: un commit por tarea, sólo con los archivos de esa tarea.
+
+Mantén cada cambio enfocado. Cuando se pida una PR, explica problema, comportamiento resultante, pruebas ejecutadas e incidencias relacionadas. Añade capturas para cambios visuales. Conserva cambios ajenos y excluye secretos, cachés y artefactos locales.

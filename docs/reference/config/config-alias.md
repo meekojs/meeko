@@ -2,7 +2,7 @@
 title: alias
 group: config
 since: 1.5.0
-description: Aliases de ruta propios, o cambios de ~/, @/, #shared/ y #server/, que valen en Vite, en los tsconfig generados, en el editor y en @utilities.
+description: Aliases de ruta propios, o cambios de ~/, @/, #shared/ y #server/, que valen en Vite, en los tsconfig generados, y en el editor.
 symbols:
   - "config:alias"
 related:
@@ -57,7 +57,7 @@ import { Button } from "ui/Button";
 | Dentro de `app/`                          | En `app/` y en el servidor; en `shared/`, `MEEK118`.                    |
 | Otra carpeta (`shared/`, la raíz, `lib/`) | En todo el proyecto.                                                    |
 
-Se aplica en Vite (`meeko dev`, `meeko build` y todos los adaptadores), en los `tsconfig` que genera Meeko (los que usan `meeko check` y el editor), en el servidor de lenguaje y en los módulos de `@utilities`. Un alias propio apunta exactamente a su carpeta; no se busca en los layers como los de Meeko. Cambiar uno de Meeko (`"@/": "src/"`) lo convierte en un alias propio, con el ámbito de su carpeta nueva.
+Se aplica en Vite (`meeko dev`, `meeko build` y todos los adaptadores), en los `tsconfig` que genera Meeko (los que usan `meeko check` y el editor), y en el servidor de lenguaje. Un alias propio apunta exactamente a su carpeta; no se busca en los layers como los de Meeko. Cambiar uno de Meeko (`"@/": "src/"`) lo convierte en un alias propio, con el ámbito de su carpeta nueva.
 
 ## Ejemplos
 

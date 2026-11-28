@@ -96,28 +96,29 @@ export default defineMeekoModule({ meta: { name: "style-provider" }, setup(_opti
 		provider,
 		'styles/main.css',
 		`@import "./tokens.css";
-@utilities "./utilities.ts";
-.module-probe { padding-left: 11px; background-image: url("./marker.svg"); --cascade: module; }`,
+.module-probe { padding-left: 11px; background-image: url("./marker.svg"); --cascade: module; }
+.dependency-probe { border-top-width: from-border-file; border-top-style: solid; }`,
 	)
 	await put(provider, 'styles/tokens.css', '.module-probe { background-color: rgb(10, 20, 30); }')
-	await put(
-		provider,
-		'styles/utilities.ts',
-		`import { defineUtilities } from "@meekojs/meeko/postcss";
-export default defineUtilities(({ rule }) => rule(".utility-probe", { "border-top-width": "3px", "border-top-style": "solid" }));`,
-	)
+	// A value that the consumer's PostCSS plugin reads from a file and reports as a dependency of the sheet.
+	await put(provider, 'styles/border.txt', '3px')
 	await put(provider, 'styles/marker.svg', `<svg xmlns="http://www.w3.org/2000/svg"><!--${'x'.repeat(5000)}--><rect width="1" height="1"/></svg>`)
 	await put(root, 'meeko.config.mjs', `export default { modules: [${JSON.stringify(pathToFileURL(join(provider, 'index.mjs')).href)}] };`)
 	await put(
 		root,
 		'postcss.config.mjs',
-		`import { meekoUtilities } from "@meekojs/meeko/postcss";
-export default { plugins: [meekoUtilities(), { postcssPlugin: "consumer-css", Declaration(node) {
+		`import { readFileSync } from "node:fs";
+const border = ${JSON.stringify(join(provider, 'styles', 'border.txt'))};
+export default { plugins: [{ postcssPlugin: "consumer-css", Declaration(node, { result }) {
   if (node.prop === "padding-left" && node.value === "11px") node.value = "17px";
+  if (node.value === "from-border-file") {
+    node.value = readFileSync(border, "utf8").trim();
+    result.messages.push({ type: "dependency", plugin: "consumer-css", file: border, parent: result.opts.from });
+  }
 } }] };`,
 	)
 	await put(root, 'app/styles/main.css', '.module-probe { --cascade: app; }')
-	await put(root, 'app/pages/index.meeko', '<script server lang="ts">export const route = { render: "prerender" };</script><template><div class="module-probe utility-probe">Styled module</div></template>')
+	await put(root, 'app/pages/index.meeko', '<script server lang="ts">export const route = { render: "prerender" };</script><template><div class="module-probe dependency-probe">Styled module</div></template>')
 }
 
 test('module styles use consumer PostCSS, import assets and enter SSR/static hashed CSS before app overrides', { timeout: 180_000 }, async (context) => {
@@ -132,7 +133,7 @@ test('module styles use consumer PostCSS, import assets and enter SSR/static has
 		const css = (await Promise.all(styles.map((file) => readFile(join(directory, file), 'utf8')))).join('\n')
 		assert.match(css, /padding-left:\s*17px/)
 		assert.match(css, /border-top-width:\s*3px/)
-		assert.doesNotMatch(css, /@utilities|@import|\/@fs\//)
+		assert.doesNotMatch(css, /from-border-file|@import|\/@fs\//)
 		assert.ok(css.search(/--cascade:\s*module/) < css.search(/--cascade:\s*app/), css)
 		assert.ok(
 			files.some((file) => /^marker-.*\.svg$/.test(file)),
@@ -253,13 +254,14 @@ test('linked module CSS has SSR links, CSS-only HMR and a processed editor snaps
 	)
 	assert.match(await snapshot(), /padding-left: 17px/)
 	assert.match(await snapshot(), /border-top-width: 3px/)
-	await put(provider, 'styles/utilities.ts', `import { defineUtilities } from "@meekojs/meeko/postcss"; export default defineUtilities(({ rule }) => rule(".utility-probe", { "border-top-width": "5px", "border-top-style": "solid" }));`)
+	// A file that a PostCSS plugin reports as a dependency is part of the sheet's graph, like an import.
+	await put(provider, 'styles/border.txt', '5px')
 	await styled(() => getComputedStyle(document.querySelector('.module-probe')!).borderTopWidth === '5px')
 	await until(
 		async () => (await snapshot()).includes('border-top-width: 5px'),
 		() => logs,
 	)
-	assert.equal(await page.evaluate(() => (window as unknown as { moduleStyleState?: number }).moduleStyleState), 123, '@utilities updates without a document reload')
+	assert.equal(await page.evaluate(() => (window as unknown as { moduleStyleState?: number }).moduleStyleState), 123, 'a PostCSS dependency updates without a document reload')
 	// Optional app CSS may disappear and return; module CSS and the snapshot stay available.
 	await rm(join(root, 'app/styles/main.css'))
 	await styled(() => {

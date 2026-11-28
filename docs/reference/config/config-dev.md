@@ -11,7 +11,7 @@ related:
   - docs/framework.md#configuración
 ---
 
-`dev` agrupa las opciones de `meeko dev`; no afectan a `meeko build`, `meeko start` ni a ninguna salida de producción. Tiene dos: `serverLogs`, que activa o desactiva los logs del servidor en la consola del navegador, y, desde `1.10`, `allowedHosts`, los hosts desde los que se puede abrir `meeko dev` (un proxy, un túnel o un nombre de la red local).
+`dev` agrupa las opciones de `meeko dev`; no afectan a `meeko build`, `meeko start` ni a ninguna salida de producción. Tiene tres: `serverLogs`, que activa o desactiva los logs del servidor en la consola del navegador; desde `1.10`, `allowedHosts`, los hosts desde los que se puede abrir `meeko dev` (un proxy, un túnel o un nombre de la red local); y, desde `1.12`, `portless`, que lo publica en una URL con nombre.
 
 Con `serverLogs` activo (el valor por defecto), lo que el código de servidor escribe con `console.log`, `info`, `warn`, `error` o `debug` mientras atiende una petición aparece también en la consola del navegador, agrupado por petición, como `features.devLogs` de Nuxt. La terminal lo sigue mostrando igual.
 
@@ -26,10 +26,11 @@ export default defineMeekoConfig({ dev: { serverLogs: false } });
 
 ## Opciones
 
-| Opción         | Tipo               | Por defecto | Descripción                                                                                                                                                                                                         |
-| -------------- | ------------------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `serverLogs`   | `boolean`          | `true`      | Reenvía los logs del servidor de cada petición a la consola del navegador en `meeko dev`.                                                                                                                           |
-| `allowedHosts` | `string[] \| true` | ninguno     | Desde `1.10`. Hosts, sufijos `.dominio` u orígenes completos desde los que se puede abrir `meeko dev`; `true`, cualquiera. Véase [Abrir meeko dev desde otro dispositivo](#abrir-meeko-dev-desde-otro-dispositivo). |
+| Opción         | Tipo                          | Por defecto | Descripción                                                                                                                                                                                                         |
+| -------------- | ----------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `serverLogs`   | `boolean`                     | `true`      | Reenvía los logs del servidor de cada petición a la consola del navegador en `meeko dev`.                                                                                                                           |
+| `portless`     | `boolean \| { name: string }` | desactivado | Desde `1.12`. Publica `meeko dev` en `https://<name>.localhost` con [portless](https://portless.sh). Véase [URL con nombre con portless](#url-con-nombre-con-portless).                                             |
+| `allowedHosts` | `string[] \| true`            | ninguno     | Desde `1.10`. Hosts, sufijos `.dominio` u orígenes completos desde los que se puede abrir `meeko dev`; `true`, cualquiera. Véase [Abrir meeko dev desde otro dispositivo](#abrir-meeko-dev-desde-otro-dispositivo). |
 
 ## Resultado
 
@@ -77,6 +78,27 @@ Cuando `meeko dev` rechaza una petición, dice qué configurar:
 - **Origin.** La respuesta sigue siendo `403 INVALID_ORIGIN`, y la terminal (y, con `serverLogs`, la consola del navegador) avisa una vez por origen: `[meeko] meeko dev rechazó una petición con Origin "https://mi-pc.local" (403 INVALID_ORIGIN). Si abre la aplicación a través de un proxy o un túnel, añada "mi-pc.local" a dev.allowedHosts …`.
 
 `allowedHosts` no existe fuera de `meeko dev`: `meeko build`, `meeko start`, `meeko preview` y las salidas de los adaptadores no lo leen, y un `SessionManager` con `production: true` lo ignora aunque se lo pasen. En producción, un origen adicional se declara en `allowedOrigins` de `SessionManager` (o `socket.allowedOrigins`), y el de un proxy, con `MEEKO_PUBLIC_ORIGIN`.
+
+## URL con nombre con portless
+
+`portless` (desde `1.12`) deja abrir `meeko dev` en `https://<name>.localhost` en vez de en un puerto, sin envolver el script con `portless`: la opción es por proyecto y se activa en `meeko.config.ts`.
+
+```ts
+// meeko.config.ts
+import { defineMeekoConfig } from "@meekojs/meeko/framework";
+
+export default defineMeekoConfig({ dev: { portless: { name: "ui.meeko" } } });
+```
+
+- `true` deriva el nombre del `name` del `package.json` del proyecto, sin ámbito y saneado como etiqueta DNS (`@acme/Web_App` da `web-app`).
+- `{ name }` lo fija. Admite subdominios (`ui.meeko` da `ui.meeko.localhost`); cada etiqueta usa letras, dígitos y guiones.
+- Ausente o `false`: `meeko dev` no toca portless.
+
+`meeko dev` arranca en su puerto de siempre y registra la ruta con `portless alias <name> <puerto>`, con el puerto que ha elegido de verdad; la quita al cerrar (Ctrl+C, SIGTERM y el reinicio de un `@meekojs/meeko` enlazado). La URL, tal como la devuelve `portless get <name>` (con su puerto, HTTPS y TLD configurados), se muestra al arrancar en una línea `Portless: …` y su host se añade a `allowedHosts`.
+
+El proxy de portless no lo arranca Meeko: `portless alias` sólo registra la ruta. Si no escucha, `meeko dev` avisa y sigue; arránquelo con `portless proxy start` (o `portless proxy start --no-tls -p 1355 --unprivileged` sin privilegios, con `PORTLESS_PORT=1355 PORTLESS_HTTPS=0` en `meeko dev`). Las variables `PORTLESS_*` (`PORTLESS_STATE_DIR`, `PORTLESS_TLD`…) se heredan del entorno.
+
+`portless` no es una dependencia de `@meekojs/meeko`: se usa el de `node_modules/.bin` del proyecto o de sus carpetas superiores y, si no está, el del `PATH`. Si falta, `meeko dev` avisa de cómo instalarlo (`pnpm add -D portless`) y sigue en su puerto; lo mismo ocurre si portless falla. `PORTLESS=0` lo desactiva. Con `portless <name> meeko dev` (variable `PORTLESS_URL` definida) `meeko dev` ya corre dentro de portless: no registra nada y sólo acepta el host de esa URL.
 
 ## Ejemplos
 

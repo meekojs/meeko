@@ -1,5 +1,5 @@
 {
-	"source-hash": "f582f7ac18a963e6f3805fba637a2a00c5c7d1b9851e22c22aeaf0f045fb3ea8",
+	"source-hash": "7acf826951b8b962e8b8e583058c146f84f9959eb97cbc380e16099f76213ce1",
 	"groups": {
 		"components": {
 			"title": "Components",
@@ -99,6 +99,9 @@
 		},
 		"cli:check": {
 			"description": "Checks a project or a `.meeko` component with TypeScript and Meeko's diagnostics."
+		},
+		"cli:styles": {
+			"description": "Writes `.meeko/styles/main.css` without starting `meeko dev`, for the editor and for sorting classes in CI."
 		},
 		"cli:doctor": {
 			"description": "Inspects Node, packages, configuration, `.meeko/` artifacts and the language server without running the project."

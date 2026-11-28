@@ -14,8 +14,9 @@ function scriptOf(words) {
 	return `${filter}:${rest[0] === 'run' ? rest[1] : rest[0]}`
 }
 
-test('every job of ci.yml has a local job, except the aggregate check', () => {
-	const ids = [...workflow.slice(workflow.indexOf('\njobs:\n')).matchAll(/^ {2}([\w-]+):\n/gm)].map((match) => match[1]).filter((id) => id !== 'test')
+test('every job of ci.yml has a local job, except the aggregate check and the path filter', () => {
+	// `changes` only decides which jobs a PR runs; locally every job runs.
+	const ids = [...workflow.slice(workflow.indexOf('\njobs:\n')).matchAll(/^ {2}([\w-]+):\n/gm)].map((match) => match[1]).filter((id) => id !== 'test' && id !== 'changes')
 	assert.ok(ids.length > 5, 'the jobs of ci.yml are found')
 	assert.deepEqual(
 		ids.filter((id) => !jobs.some((job) => job.id === id)),

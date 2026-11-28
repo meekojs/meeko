@@ -5,6 +5,7 @@ import { CompletionItemKind, InsertTextFormat, MarkupKind } from 'vscode-languag
 
 import { nativeTagName, tagAt, templateRegion } from './embedded'
 import { attributeValueType, closedValues, htmlAttributeSource } from './html-data-source'
+import { t } from './l10n'
 
 // Completion of what goes inside the template's directives, from what the script declares:
 // the names of `ref:`, and in the values (`on:click="…"`, `model="…"`, `if:when="…"`, `each:of="…"`,
@@ -40,7 +41,7 @@ export function refNameCompletion(source: string, range: Range, present: Readonl
 				label: `ref:${name}`,
 				kind: CompletionItemKind.Reference,
 				detail: `useElementRef("${name}")`,
-				documentation: { kind: MarkupKind.Markdown, value: free ? `El script lee \`useElementRef("${name}")\` y ninguna etiqueta lo tiene todavía.` : `Otra etiqueta ya tiene \`ref:${name}\`; sólo una lista puede repetirlo.` },
+				documentation: { kind: MarkupKind.Markdown, value: free ? t('The script reads `useElementRef("{0}")` and no tag has it yet.', name) : t('Another tag already has `ref:{0}`; only a list can repeat it.', name) },
 				sortText: `${free ? '0' : '1'}${name}`,
 				filterText: `ref:${name}`,
 				textEdit: { range, newText: `ref:${name}` },

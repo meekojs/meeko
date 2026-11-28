@@ -300,6 +300,7 @@ Los archivos de runtime de un módulo (plugins, componentes, autoimports, middle
 | `addServerHandler({ route, handler })`         | Atiende una ruta exacta con el export por defecto de `handler`, `(request) => Response`, después del middleware de servidor.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `addPublicFile(path, contents, options?)`      | Añade un archivo público. `meeko build` lo escribe en la salida del cliente, antes de calcular el manifiesto de assets; `meeko dev` lo sirve. Choca con un archivo de `public/` del mismo nombre. Desde `1.8`, `options.headers` añade cabeceras a su respuesta en `meeko dev` y en los adaptadores con servidor; por ejemplo, `Access-Control-Allow-Origin` en una fuente que usa un `<iframe sandbox srcdoc>`. En producción actúan como `server.headers` para esa ruta, que gana si fija la misma. En `meeko dev`, los archivos públicos no pasan por la aplicación: llevan sólo estas cabeceras y `server.headers` no les afecta. El adaptador `static` no las escribe. |
 | `addStylesheet(file)`                          | Registra un archivo `.css` procesado por Vite y el PostCSS del proyecto. Acepta una ruta relativa a `rootDir` o una URL de archivo del módulo. Las hojas se deduplican por archivo real y conservan el orden de registro; `app/styles/main.css` se carga al final. Incluye HMR, resolución de imports y assets, CSS en el HTML de SSR y assets con hash en producción.                                                                                                                                                                                                                                                                                                      |
+| `addClassProvider(provider)`                   | Desde `1.12`, declara un [proveedor externo de clases](editors.md#proveedores-de-clases) para el editor: `{ name, vscode?, languages? }`, como `{ name: "Tailwind CSS", vscode: ["bradlc.vscode-tailwindcss"], languages: ["tailwindcss"] }`. Son datos: no cambia lo que compilan `meeko dev` ni `meeko build`. En `auto`, el editor deja a esa extensión, mientras está activa, las clases que sólo tiene la hoja procesada. `meeko dev` y `meeko check` guardan la declaración en `.meeko/manifests/class-providers.json` para el editor de un workspace no confiable. Un módulo que admite versiones anteriores de Meeko la llama sólo si existe.                       |
 | `addHead(input)`                               | Añade entradas a `document.head`: `meta`, `link`, `script` y `style` se concatenan en el orden de los módulos; `title`, `titleTemplate`, `htmlAttrs` y `bodyAttrs` se quedan con el último valor; `document.head` del proyecto se aplica al final. Recibe un `DocumentHead`: `titleTemplate` es una cadena y `title` es el título del sitio, sin plantilla.                                                                                                                                                                                                                                                                                                                 |
 | `addVitePlugin(plugin)`                        | Añade un plugin de Vite a `meeko dev` y a cada build de `meeko build`, después del de Meeko.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `extendViteConfig(fn)`                         | Modifica la configuración inline de Vite de cada paso; `fn(config, { command, ssr })` cambia el objeto o devuelve otro.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
@@ -451,7 +452,7 @@ Se admiten `target`, `lib`, `exactOptionalPropertyTypes`, `noUncheckedIndexedAcc
 
 ## Aliases de ruta
 
-Desde `1.5`, Meeko define cuatro aliases de ruta, sin configuración. Funcionan igual en Vite (`meeko dev` y `meeko build`, en el navegador y en SSR, con todos los adaptadores: `node`, `bun`, `deno`, `cloudflare` y `static`), en los `tsconfig` que genera Meeko (`.meeko/tsconfig.app.json`, `server` y `shared`, que usan `meeko check` y el editor) y en los módulos de [`@utilities`](#utilidades-generadas-con-typescript) y lo que importan (salvo con `meekoUtilities({ autoImports: false })`, que no lee la configuración):
+Desde `1.5`, Meeko define cuatro aliases de ruta, sin configuración. Funcionan igual en Vite (`meeko dev` y `meeko build`, en el navegador y en SSR, con todos los adaptadores: `node`, `bun`, `deno`, `cloudflare` y `static`), en los `tsconfig` que genera Meeko (`.meeko/tsconfig.app.json`, `server` y `shared`, que usan `meeko check` y el editor):
 
 | Alias      | Apunta a             | Dónde se puede usar                                                                                                      |
 | ---------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------ |
@@ -513,7 +514,7 @@ export default defineMeekoConfig({
 - **Ámbito.** El de la carpeta a la que apunta, con la misma regla que los aliases de Meeko: dentro de `server/`, sólo en el código de servidor (`db/` en un componente da `MEEK108`); dentro de `app/`, en `app/` y en el servidor, no en `shared/` (`MEEK118`); en cualquier otra carpeta (`shared/`, la raíz, `lib/`), en todo el proyecto.
 - **Una sola carpeta.** Un alias propio apunta exactamente a su carpeta; no se busca en los layers como los de Meeko. Cambiar uno de Meeko (`"@/": "src/"`) lo convierte en un alias propio, con el ámbito de su carpeta nueva.
 - **Validación.** Una clave sin `/` final, con espacios, `*` o `\`, o que empieza por `.` o `/`, y un valor que no es una ruta relativa dentro del proyecto ni `false`, detienen `meeko dev`, `meeko build` y `meeko check` con un error de `meeko.config.ts` (`alias "lib" debe ser un prefijo que termine en / …`), que el editor, en un workspace de confianza, marca en `alias` (`MEEK_CONFIG`). Una carpeta que no existe no es un error: el import falla al resolverse.
-- **Dónde se aplica.** En Vite, en los `tsconfig` generados, en el editor y en `@utilities`, igual que los de Meeko. En un workspace no confiable, el editor lee `alias` sin ejecutar la configuración sólo si es un objeto literal de cadenas y `false`; si no lo es, usa los aliases por defecto.
+- **Dónde se aplica.** En Vite, en los `tsconfig` generados y en el editor, igual que los de Meeko. En un workspace no confiable, el editor lee `alias` sin ejecutar la configuración sólo si es un objeto literal de cadenas y `false`; si no lo es, usa los aliases por defecto.
 
 Node carga `meeko.config.ts` directamente, sin Vite: la configuración y los módulos que importa no pueden usar los aliases.
 
@@ -521,7 +522,7 @@ Node carga `meeko.config.ts` directamente, sin Vite: la configuración y los mó
 
 Los aliases de Meeko se buscan en el proyecto y después en cada layer, en el orden de las fuentes (véase [Layers](#layers)); gana el primer archivo que existe. Así, en un archivo de `layers/base`, `@/lib/format` es `layers/base/app/lib/format.ts` mientras el proyecto no tenga `app/lib/format.ts`; si lo tiene, gana el del proyecto, como sus `app.meeko` y layout raíz sustituyen a los del layer. Para fijar el archivo del propio layer, use una ruta relativa.
 
-No se resuelven contra el `app/` del layer que importa porque los `paths` de TypeScript valen para todo un proyecto, no para cada archivo: con esta regla, Vite, `meeko check`, el editor y `@utilities` eligen siempre el mismo archivo. Los `tsconfig` generados lo declaran con una lista de carpetas por alias (`"@/*": ["../app/*", "./types/app/*", "../layers/base/app/*", …]`, donde `./types/…` son las declaraciones de los componentes).
+No se resuelven contra el `app/` del layer que importa porque los `paths` de TypeScript valen para todo un proyecto, no para cada archivo: con esta regla, Vite, `meeko check` y el editor eligen siempre el mismo archivo. Los `tsconfig` generados lo declaran con una lista de carpetas por alias (`"@/*": ["../app/*", "./types/app/*", "../layers/base/app/*", …]`, donde `./types/…` son las declaraciones de los componentes).
 
 ### Prioridad y conflictos de los aliases
 
@@ -573,7 +574,40 @@ export default defineServerRuntime(({ production, prerendering }) => ({
 
 `app/styles/main.css` es opcional y se carga automáticamente como hoja global en desarrollo y en el build. Vite la incluye en el asset CSS de producción; Meeko enlaza ese asset en el HTML SSR y prerenderizado. Los bloques `<style>` de `.meeko` siguen disponibles para estilos locales.
 
-<a id="postcss-y-tailwind"></a>**PostCSS y Tailwind.** Vite procesa con PostCSS tanto `app/styles/main.css` como los `<style>` de los componentes, con el `postcss.config.*` de la raíz del proyecto. Para Tailwind 4, instale `tailwindcss` y `@tailwindcss/postcss`, declare el plugin y cargue Tailwind en la hoja global; Tailwind lee las clases de los `.meeko`:
+<a id="postcss-y-tailwind"></a>**El CSS lo elige el proyecto: PostCSS y Tailwind.** Meeko no impone una solución de CSS: el proyecto usa CSS plano, Tailwind, UnoCSS u otra. Meeko pasa `app/styles/main.css`, las hojas que registran los módulos con `addStylesheet` y los `<style>` de los componentes por el pipeline de CSS de Vite, que aplica el `postcss.config.*` de la raíz del proyecto si existe y los plugins de Vite que el proyecto o un [módulo](#módulos) registren con `addVitePlugin` o `extendViteConfig`. Meeko no declara `tailwindcss` ni ningún otro motor de CSS como dependencia; PostCSS se usa dentro de Meeko sólo como analizador interno para aplicar el ámbito de un `<style scoped>`.
+
+Para usar Tailwind 4 por cuenta propia hay dos caminos; use uno solo. Con `@meekojs/ui` no hace falta ninguno: su módulo ya registra `@tailwindcss/vite` y la aplicación importa `tailwindcss/theme.css`, `tailwindcss/utilities.css` y `@meekojs/ui` en `app/styles/main.css`.
+
+**`@tailwindcss/vite` (recomendado).** Meeko no lee `vite.config.*`, pero un [módulo](#módulos) puede registrar el plugin de Vite de Tailwind con `addVitePlugin` (instale `tailwindcss` y `@tailwindcss/vite` en el proyecto). `meeko dev` y `meeko build` lo aplican a `app/styles/main.css` y a los `<style>` de los componentes, con `@theme`, `@apply` con ámbito y las clases de `bind:class`, porque Tailwind lee el texto de los `.meeko`. Detecta las fuentes desde la raíz de Vite, que es la del proyecto:
+
+```js
+// modules/tailwind.mjs
+import { defineMeekoModule } from '@meekojs/meeko/framework'
+import tailwindcss from '@tailwindcss/vite'
+
+export default defineMeekoModule({
+	meta: { name: 'tailwind' },
+	setup(_options, meeko) {
+		meeko.addVitePlugin(tailwindcss())
+		// Desde 1.12: el editor deja a Tailwind CSS IntelliSense las clases que genera Tailwind.
+		meeko.addClassProvider({ name: 'Tailwind CSS', vscode: ['bradlc.vscode-tailwindcss'], languages: ['tailwindcss'] })
+	},
+})
+```
+
+```js
+// meeko.config.mjs
+export default { modules: ['./modules/tailwind.mjs'] }
+```
+
+```css
+/* app/styles/main.css */
+@import 'tailwindcss';
+```
+
+Un host de Vite propio que sólo usa el plugin `meeko()` no recibe los `addVitePlugin`; ahí se añade `tailwindcss()` a su `plugins`.
+
+**`@tailwindcss/postcss`.** Alternativa sin módulo: instale `tailwindcss` y `@tailwindcss/postcss`, declare el plugin en el `postcss.config.*` del proyecto y cargue Tailwind en la hoja global; Tailwind lee las clases de los `.meeko`:
 
 ```js
 // postcss.config.mjs
@@ -585,163 +619,26 @@ export default { plugins: { '@tailwindcss/postcss': {} } }
 @import 'tailwindcss';
 ```
 
+Sin módulo, el proyecto declara Tailwind al editor en `css.classProviders` de `meeko.config.ts` (véase [`css`](reference/config/config-css.md)), para que deje a Tailwind CSS IntelliSense las clases que genera Tailwind.
+
 En un `<style scoped>`, `@apply` necesita `@reference "tailwindcss";` (o la ruta de la hoja con su tema) al principio del bloque. Desde `1.2`, el CSS de cada componente es el módulo `Componente.meeko?meeko-style=…&lang.css`, junto a su archivo, así que los plugins de PostCSS resuelven `@reference` y los `@import` relativos desde la carpeta del componente. El selector ya lleva el atributo de ámbito cuando Tailwind expande `@apply`, así que las declaraciones heredan el scope:
 
-```html
-<!-- app/components/Card.meeko -->
-<style scoped>
-	@reference '../styles/main.css'; /* con el @theme del proyecto */
-
-	.card {
-		@apply rounded-lg bg-brand p-4;
-	}
-</style>
-```
-
-Tailwind genera también las clases que sólo aparecen en literales de `bind:class` (`bind:class="open.value ? 'ring-4' : undefined"`), porque lee el texto de los `.meeko`. `meekoUtilities()` convive con Tailwind si va antes en la lista de plugins (`plugins: [meekoUtilities(), tailwindcss()]`, con `import tailwindcss from '@tailwindcss/postcss'`): Tailwind recibe ya las reglas generadas en lugar de `@utilities`.
+Tailwind genera también las clases que sólo aparecen en literales de `bind:class` (`bind:class="open.value ? 'ring-4' : undefined"`), porque lee el texto de los `.meeko`.
 
 `@tailwindcss/postcss` detecta las fuentes desde el directorio de trabajo (`process.cwd()`), no desde la raíz del proyecto. Los comandos de la CLI que reciben el proyecto (`dev`, `build`, `start`, `preview`, `check`, `routes`, `prerender` y `check-app`) cambian el directorio de trabajo a esa raíz antes de cargar la configuración y PostCSS, así que `meeko dev ../app` funciona desde cualquier carpeta; las rutas relativas del argumento se resuelven antes, contra la carpeta de lanzamiento. Las APIs programáticas (`buildProject`, `startProject`…) no tocan el cwd del proceso: llámelas con el cwd en la raíz o fije el origen con `@import 'tailwindcss' source('../..');` (relativo a la hoja) o con la opción `base` del plugin. Desde una carpeta mayor, Tailwind recorre todo su contenido; desde la raíz de un disco puede agotar la memoria.
 
-Durante el SSR y el prerender, Meeko incrusta en el documento el CSS de los `<style>` de los componentes ya procesado por PostCSS y los plugins CSS de Vite (desde `1.8`; antes llegaba sin procesar), así que un `@apply` con ámbito o un `@utilities` dentro de un componente se aplican desde el primer pintado, sin esperar al JavaScript. Es el mismo CSS que el asset del componente; los `<style>` en línea conservan el nonce o los hashes de la CSP, la deduplicación y el orden del árbol (layouts, página e hijos). Van al final del `<head>`, después de `app/styles/main.css`, de las hojas de los módulos y del `head` de `document`, que es donde el cliente añade después el CSS de los componentes: una regla con ámbito y una global de igual especificidad se resuelven igual en el primer pintado que tras hidratar (desde `1.8`; antes la global ganaba sólo hasta que cargaba el JavaScript). En `meeko dev`, el cliente de Vite adopta esos `<style>` en lugar de añadir una copia, y la HMR los sustituye: una regla que se borra del `<style>` deja de aplicarse sin recargar. La página de error de un fallo del servidor, que no se hidrata, también incrusta su CSS.
+Durante el SSR y el prerender, Meeko incrusta en el documento el CSS de los `<style>` de los componentes ya procesado por PostCSS y los plugins CSS de Vite (desde `1.8`; antes llegaba sin procesar), así que un `@apply` con ámbito dentro de un componente se aplica desde el primer pintado, sin esperar al JavaScript. Es el mismo CSS que el asset del componente; los `<style>` en línea conservan el nonce o los hashes de la CSP, la deduplicación y el orden del árbol (layouts, página e hijos). Van al final del `<head>`, después de `app/styles/main.css`, de las hojas de los módulos y del `head` de `document`, que es donde el cliente añade después el CSS de los componentes: una regla con ámbito y una global de igual especificidad se resuelven igual en el primer pintado que tras hidratar (desde `1.8`; antes la global ganaba sólo hasta que cargaba el JavaScript). En `meeko dev`, el cliente de Vite adopta esos `<style>` en lugar de añadir una copia, y la HMR los sustituye: una regla que se borra del `<style>` deja de aplicarse sin recargar. La página de error de un fallo del servidor, que no se hidrata, también incrusta su CSS.
 
-**`@tailwindcss/vite`.** Meeko no lee `vite.config.*`, pero un [módulo](#módulos) puede registrar el plugin de Vite de Tailwind con `addVitePlugin`. Sustituye a `@tailwindcss/postcss` (no declare los dos); `meeko dev` y `meeko build` lo aplican a `app/styles/main.css` y a los `<style>` de los componentes, con `@theme`, `@apply` con ámbito y las clases de `bind:class`. A diferencia del plugin de PostCSS, detecta las fuentes desde la raíz de Vite, que es la del proyecto:
+**Orden de las clases con Prettier.** `meekoSortClasses: "stylesheet"` ordena según `app/styles/main.css` procesada con el `postcss.config.*` del proyecto, pero no carga los plugins de Vite: con Tailwind sólo como `@tailwindcss/vite` (el caso de `@meekojs/ui`) no ve sus utilidades. Con `@tailwindcss/postcss` sí las ve; con `@tailwindcss/vite`, use `"alphabetical"` u `"off"`. Véase [Orden por la hoja global](editors.md#orden-por-la-hoja-global).
 
-```js
-// modules/tailwind.mjs
-import { defineMeekoModule } from '@meekojs/meeko/framework'
-import tailwindcss from '@tailwindcss/vite'
+<a id="utilidades-generadas-con-typescript"></a>**Utilidades generadas con TypeScript (retirado).** El plugin de PostCSS `meekoUtilities()`, `defineUtilities`, la entrada `@meekojs/meeko/postcss` y la at-rule `@utilities` se retiraron sin periodo de obsolescencia. Para sustituirlas, escriba las reglas en CSS, use `@utility` de Tailwind 4 (el editor la reconoce), un plugin de PostCSS propio o un script de build que genere el CSS. Véase [Cambios de Meeko](../packages/meeko/CHANGELOG.md).
 
-export default defineMeekoModule({
-	meta: { name: 'tailwind' },
-	setup(_options, meeko) {
-		meeko.addVitePlugin(tailwindcss())
-	},
-})
-```
-
-```js
-// meeko.config.mjs
-export default { modules: ['./modules/tailwind.mjs'] }
-```
-
-Un host de Vite propio que sólo usa el plugin `meeko()` no recibe los `addVitePlugin`; ahí se añade `tailwindcss()` a su `plugins`. Con `@tailwindcss/vite`, `meekoSortClasses: "stylesheet"` no ve las utilidades (procesa la hoja sin los plugins de Vite de los módulos); use `"tailwind"`.
-
-**Orden de las clases con Prettier.** Con `meekoSortClasses: "tailwind"` (desde `1.8`), el plugin de Prettier (`@meekojs/prettier-plugin` o `@meekojs/meeko/prettier`) ordena las clases de cada `class="…"` estático con el orden oficial de Tailwind CSS 4, el de `prettier-plugin-tailwindcss` (que no reconoce el parser `meeko`). Carga el design system de `app/styles/main.css`, o de la hoja que indique `meekoTailwindStylesheet` (relativa a la raíz del proyecto), con sus `@import`, `@theme`, `@plugin` y `@utility`, usando el `tailwindcss` instalado en el proyecto; funciona igual con `@tailwindcss/postcss` que con `@tailwindcss/vite`. Las clases que Tailwind no conoce, como las de `meekoUtilities()` o las del `<style>` del componente, van primero y en su orden. No toca `bind:class` ni el `class` de una etiqueta de componente.
-
-```json
-{ "plugins": ["@meekojs/prettier-plugin"], "meekoSortClasses": "tailwind", "meekoTailwindStylesheet": "app/styles/main.css" }
-```
-
-```html
-<!-- antes -->
-<div class="text-white custom p-4 bg-brand flex hover:bg-brand/80"></div>
-<!-- después -->
-<div class="custom flex bg-brand p-4 text-white hover:bg-brand/80"></div>
-```
-
-Si `tailwindcss` 4 no está instalado, la hoja no existe o Tailwind la rechaza, las clases no se ordenan (sólo se normalizan) y se avisa una vez. El design system se reutiliza mientras no cambien la hoja ni lo que importa. En un workspace no confiable del editor, `"tailwind"` se comporta como `"off"`, igual que `"stylesheet"`, porque ejecutaría los `@plugin` del proyecto.
-
-<a id="utilidades-generadas-con-typescript"></a>**Utilidades generadas con TypeScript.** Desde `1.2`, el plugin de PostCSS `meekoUtilities()` de `@meekojs/meeko/postcss` genera reglas con una función de TypeScript en lugar de repetirlas a mano. La at-rule `@utilities "<ruta>" [layer(<nombre>)];` se sustituye por las reglas que devuelve el export por defecto del módulo:
-
-```ts
-// postcss.config.ts
-import { meekoUtilities } from '@meekojs/meeko/postcss'
-
-export default { plugins: [meekoUtilities()] }
-// O, con la forma de objeto: { plugins: { "@meekojs/meeko/postcss": {} } }
-```
-
-```css
-/* app/styles/main.css */
-@layer tokens, utilities;
-@import './tokens/colors.css' layer(tokens);
-@utilities "./utilities/color.ts" layer(utilities);
-```
-
-```ts
-// app/styles/utilities/palette.ts
-export const colors = ['gray', 'blue', 'red'] as const
-export const steps = Array.from({ length: 12 }, (_, i) => i + 1)
-```
-
-```ts
-// app/styles/utilities/color.ts
-import { defineUtilities } from '@meekojs/meeko/postcss'
-import { colors, steps } from './palette'
-
-export default defineUtilities(({ rule, atRule }) => [
-	colors.map((name) => rule(`.color[data-color='${name}']`, Object.fromEntries(steps.map((step) => [`--color-${step}`, `var(--${name}-${step})`])))),
-	rule('.color', { color: 'var(--color-11)' }, rule('&:hover', { backgroundColor: 'var(--color-3)' }), atRule('media', '(prefers-contrast: more)', { color: 'var(--color-12)' })),
-])
-```
-
-Genera `@layer utilities { .color[data-color='gray'] { --color-1: var(--gray-1); … } … .color { color: var(--color-11); &:hover { … } @media (prefers-contrast: more) { … } } }`. Un bucle de preprocesador, como `@each $size in sm, md, lg` de `postcss-each` (que no forma parte de PostCSS: sin ese plugin, la regla llega al navegador tal cual y no hace nada), se escribe como un `map` de TypeScript:
-
-```ts
-// app/styles/utilities/button-sizes.ts
-import { defineUtilities } from '@meekojs/meeko/postcss'
-
-const sizes = { sm: '0.25rem 0.5rem', md: '0.5rem 1rem', lg: '0.75rem 1.5rem' }
-
-export default defineUtilities(({ rule }) => Object.entries(sizes).map(([size, padding]) => rule(`.button[data-size='${size}']`, { padding })))
-```
-
-La at-rule:
-
-- **Ruta.** Entre comillas y relativa a la hoja que contiene la at-rule: la hoja global, un archivo que esta importa con `@import` o el `<style>` de un `.meeko`, que resuelve desde la carpeta del componente. Admite `.ts`, `.mts`, `.js` y `.mjs`. Sin archivo de origen (CSS procesado sin la opción `from` de PostCSS), la ruta es relativa a `meekoUtilities({ root })`, por defecto `process.cwd()`.
-- **`layer(x)`** envuelve el resultado en `@layer x { … }`; `layer` sin nombre crea una capa anónima. Sin `layer`, las reglas quedan en el lugar de la at-rule.
-- **No lleva bloque** `{ … }`. Puede aparecer varias veces y dentro de otras reglas o at-rules.
-- **Va después de los `@import`.** Para CSS es una regla más, y los `@import` deben preceder a cualquier regla: Vite avisa (`@import statements must precede all other statements`) y no incluye un `@import` que sigue a un `@utilities`.
-- **No colisiona con Tailwind.** El nombre es `@utilities`; `@utility`, de Tailwind 4, no se toca.
-
-El módulo exporta por defecto `defineUtilities(fn)` o una función sin envolver. `fn` recibe los helpers, puede ser `async` y devuelve un nodo, un array de salidas (anidado a cualquier profundidad, se aplana en orden) o `null`, `false` y `undefined`, que se omiten, para escribir `condición && rule(…)`.
-
-| Helper                                             | Genera                                                                                                                                                                                                                                                                                                                    |
-| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `rule(selector, declaraciones?, ...hijas)`         | Una regla. Las hijas (otras `rule` con `&`, `atRule`, `css` o arrays) se anidan dentro con anidamiento CSS nativo, como si las escribiera a mano. Si el segundo argumento no es un objeto de declaraciones, es la primera hija.                                                                                           |
-| `atRule(nombre, params, declaraciones?, ...hijas)` | Una at-rule, sin `@` en el nombre: `atRule("media", "(min-width: 48rem)", …)`, `atRule("supports", "(display: grid)", …)`, `atRule("property", "--angle", { syntax: "'<angle>'", inherits: "false", initialValue: "0deg" })`. Con sólo `nombre` y `params` es una sentencia: `atRule("layer", "a, b")` da `@layer a, b;`. |
-| `` css`…` `` o `css("…")`                          | CSS literal, que se analiza con PostCSS, para lo que no cabe en los helpers (`@keyframes`, varias reglas copiadas). Conserva las barras invertidas (`content: "\201C"`).                                                                                                                                                  |
-
-Las declaraciones son un objeto: las claves en camelCase pasan a kebab-case (`borderRadius` → `border-radius`, `WebkitAppearance` → `-webkit-appearance`, `msFlex` → `-ms-flex`); las claves en kebab-case (`"border-radius"`) y las propiedades personalizadas `--*` se escriben tal cual. Un valor es una cadena, que puede terminar en `!important`, o un número, que se escribe sin unidades (`opacity: 0.5`, `zIndex: 10`). `undefined` omite la declaración y un array escribe una declaración por valor, para los valores de respaldo (`display: ["-webkit-box", "flex"]`, también un array `as const`).
-
-Desde `1.3`, las declaraciones están tipadas con [csstype](https://github.com/frenic/csstype): el editor autocompleta las propiedades estándar y con prefijo de proveedor, y las palabras clave de su valor (`position: "sticky"`), y una propiedad mal escrita (`backgroundColr`) o una palabra clave que no existe es un error de tipos en el editor y al comprobar el módulo con TypeScript. Las longitudes y los tiempos son cadenas con unidad (`padding: "4px"`, `transitionDuration: "200ms"`), salvo el `0`: `padding: 4` es un error, porque se escribiría `padding: 4`, que el navegador descarta. Los números valen donde CSS los admite sin unidad (`opacity`, `zIndex`, `flexGrow`, `lineHeight`, `fontWeight`…). En `atRule`, el objeto admite además los descriptores de `@font-face` (`src`, `fontDisplay`, `unicodeRange`…), `@property` (`syntax`, `inherits`, `initialValue`), `@page`, `@counter-style`, `@font-palette-values` y `@view-transition` (tipo `UtilityAtRuleDeclarations`). Un objeto que se construye fuera de la llamada pierde las palabras clave (`const base = { position: "absolute" }` es `{ position: string }`): anótelo con `UtilityDeclarations` o use `as const`. Un objeto con claves dinámicas, como el `{ [k: string]: string }` de `Object.fromEntries` en el ejemplo de la paleta o un `Record<string, string>`, se acepta sin comprobar sus claves. A la inversa, `UtilityDeclarations` ya no tiene firma de índice: leerlo con una clave `string` (`decls[key]`) es el error `TS7053` con `noImplicitAny`; use `Object.entries(decls)` o una clave `keyof UtilityDeclarations`. Para una propiedad o una at-rule que csstype todavía no conoce, escriba el CSS con `` css`…` ``.
-
-Los tipos `UtilityHelpers`, `UtilityDeclarations`, `UtilityAtRuleDeclarations` (desde `1.3`), `UtilityValue`, `UtilityOutput`, `UtilityNode`, `UtilityRule`, `UtilityAtRule`, `UtilityCss`, `UtilityFunction` y `MeekoUtilitiesOptions` se exportan desde el mismo subpath.
-
-Los errores detienen la hoja con el archivo CSS y la línea del `@utilities`, que Vite muestra en su overlay: un módulo que no existe o con otra extensión, un módulo que no compila, un export por defecto que no es una función, una excepción de la función (con su mensaje), un selector, un nombre de propiedad, un valor o unos parámetros de at-rule no válidos (un `;` o una llave en un valor, un número `NaN`) y un valor de la salida que no es un nodo de los helpers, por ejemplo una cadena de CSS sin `css`. Tras corregir el módulo, la siguiente edición regenera la hoja.
-
-**Carga del módulo y actualización en caliente.** `import()` nativo guarda en caché cada módulo del grafo durante toda la vida del proceso: una query en el módulo de entrada lo recarga a él, pero no a los archivos locales que importa. Por eso el plugin empaqueta el módulo con rolldown, el bundler que Vite 8 ya incluye (no añade dependencias): los archivos locales, también los que llegan por un alias de `tsconfig` o por `#imports` del mismo paquete, forman un único módulo ES que se importa desde una URL `data:`, y los paquetes de `node_modules` quedan externos y se cargan una vez con Node, como en cualquier programa. Así se admite todo TypeScript, imports sin extensión incluidos, e `import.meta.url`, `import.meta.dirname` e `import.meta.filename` siguen describiendo el archivo original. El resultado se reutiliza mientras ningún archivo del grafo cambie de fecha de modificación o de tamaño, de modo que una hoja que se transforma muchas veces no vuelve a empaquetar nada. El plugin publica cada archivo del grafo como dependencia de la hoja (mensajes `dependency` de PostCSS), así que en `meeko dev` editar `color.ts` o `palette.ts` regenera la hoja y Vite actualiza el CSS en caliente, sin recargar la página ni reiniciar el servidor. Guarde estos módulos fuera de las carpetas que Meeko vigila por sus autoimports y sus rutas (`app/components`, `app/composables`, `app/utils`, `app/stores`, `app/pages`, `app/layouts`, `shared/…`, `server/utils`, las de `imports`…): un cambio en ellas recarga la página entera, como cualquier otro archivo de esas carpetas; `app/styles/` es el lugar natural. Fuera de Vite 8 (por ejemplo, `postcss-cli`), si no encuentra rolldown, el plugin importa el módulo con la eliminación de tipos nativa de Node, que exige imports con extensión y sintaxis de TypeScript borrable, recarga sólo el módulo de entrada y lo advierte una vez.
-
-**Autoimports.** Desde `1.4`, el módulo de `@utilities` y los módulos locales en TypeScript que importa reciben los mismos autoimports de valores que el resto del proyecto: el plugin aplica, dentro del bundle de rolldown, el registro y la transformación del plugin de Vite, así que un `app/styles/utilities/color.ts` puede usar sin import la constante `THEME_COLORS` de `app/theme/constants.ts` si `meeko.config.ts` declara `imports: { appDirs: ["app/theme"] }`, igual que un componente. Como en el editor y en `meeko check`, cada módulo recibe los de su ámbito según su carpeta (`app/`, `shared/` o `server/` de la aplicación o de un layer); un módulo fuera de esas carpetas no recibe ninguno. Los módulos de `@utilities` se ejecutan en Node mientras se genera el CSS, así que el registro se limita a lo que tiene sentido ahí:
-
-| Llegan                                                                                                                                                                                                                                                                                                                       | No llegan                                                                                                                                                                                                                                                                                                             |
-| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Los exports de valores de `app/composables`, `app/utils`, `app/stores`, `app/types` e `imports.appDirs`; los de `shared/*` e `imports.sharedDirs` (también los `.shared.ts`); los de las mismas carpetas de los layers, y los que añaden los módulos con `addAutoImportsDir` y `addAutoImports` con ámbito `app` o `shared`. | Los de `server/utils`, `imports.serverDirs` y los `.server.ts`; los `.client.ts`; los componentes `.meeko`; los clientes generados (`api`, `rpc`, `socket`, `useApi`…), y las API del framework para componentes y la aplicación en marcha (`signal`, `computed`, `useState`, `href`, `useRoute`, `defineApiRoute`…). |
-
-Usar uno de la segunda columna no da un `ReferenceError` opaco: el nombre se sustituye por un valor que, al usarse (leerlo, llamarlo, convertirlo en texto), lanza un error con el autoimport, su origen y el motivo, que el plugin muestra en la línea del `@utilities`: `"./utilities/color.ts" lanzó un error al generar las utilidades: app/styles/utilities/color.ts usa el autoimport SECRET, que no está disponible al generar el CSS de @utilities: viene de server/utils/secret.ts, que sólo existe en el servidor. …`. Como el error sólo aparece si el valor se usa, un archivo de autoimports que el módulo importa y que además exporta, por ejemplo, un composable con `signal` sigue sirviendo para leer sus constantes. `defineUtilities` no es un autoimport: impórtelo de `@meekojs/meeko/postcss`, porque declararlo global lo ofrecería también a los componentes y llevaría PostCSS al bundle del navegador. Los tipos son los de `app/` (`.meeko/tsconfig.app.json`), así que `meeko check` y el editor dan `TS2304` al usar en `app/styles/` un export de `server/utils`, como en el resto de `app/`; en cambio aceptan los nombres del navegador y del framework de la tabla, que fallan al generar la hoja con el error anterior.
-
-El proyecto es la carpeta más cercana al módulo con un `meeko.config.*`, sin pasar de su `package.json`, o la de ese `package.json` si depende de `@meekojs/meeko`; su configuración se ejecuta como en `meeko dev`, con los `setup` de sus módulos, una vez por hoja y sólo si el módulo se va a empaquetar con rolldown. Si leerla falla (una configuración o un `setup` que lanza), la hoja se genera igual, sin autoimports, con un aviso de PostCSS que da el motivo. Los archivos de autoimports que el módulo usa forman parte de su grafo: son dependencias de la hoja, y cambiarlos la regenera. Añadir o quitar un export en una carpeta de autoimports también vuelve a empaquetar el módulo en la siguiente transformación, aunque ningún archivo de su grafo haya cambiado; en `meeko dev`, esos cambios recargan la página entera, como en cualquier otra carpeta de autoimports. `meekoUtilities({ autoImports: false })` desactiva los autoimports y empaqueta los módulos como en `1.3`. Fuera de un proyecto Meeko (un `postcss-cli` o un bundler en otro proyecto) no hay registro y nada cambia. Sin rolldown, con el `import()` nativo, Node no permite añadir imports: el módulo no recibe autoimports, la configuración no se ejecuta y el aviso de carga nativa lo indica; escriba los imports.
-
-Las reglas generadas en un `<style scoped>` no reciben el atributo de ámbito: Meeko aplica el ámbito al compilar el bloque y PostCSS genera las reglas después, así que son globales, como las de `app/styles/main.css`. El plugin sólo se ejecuta en Node, durante `meeko dev` y el build; `@meekojs/meeko/postcss` no forma parte del runtime del navegador ni del servidor.
-
-**Con Tailwind.** Declare `meekoUtilities()` antes de `@tailwindcss/postcss`:
-
-```ts
-// postcss.config.ts
-import tailwindcss from '@tailwindcss/postcss'
-import { meekoUtilities } from '@meekojs/meeko/postcss'
-
-export default { plugins: [meekoUtilities(), tailwindcss()] }
-```
-
-En ese orden, Tailwind recibe las reglas generadas como el resto de la hoja y procesa, por ejemplo, el `@apply` de un `` css`…` ``; con `layer(utilities)` quedan en la misma capa `utilities` que las de Tailwind. En el orden inverso, Tailwind compila primero cada hoja que importa `tailwindcss` y elimina las at-rules que no conoce, `@utilities` incluida, sin error; el plugin lo advierte una vez por proceso. En una hoja sin `@import "tailwindcss"`, como el `<style>` de un componente, el orden no importa.
-
-<a id="hoja-global-procesada-para-el-editor"></a>**Hoja global procesada para el editor.** Las clases que generan las `@utilities`, y las de los archivos que la hoja importa, no están escritas en ningún archivo CSS del proyecto. Por eso `meeko dev` escribe `app/styles/main.css` ya procesada en `.meeko/styles/main.css`: la misma hoja que sirve en `/app/styles/main.css?direct`, con los `@import` resueltos, las `@utilities` expandidas y el resto de plugins de PostCSS aplicados, sin minificar y con un comentario inicial que indica que es generada. La escribe en segundo plano en cuanto el servidor escucha, sin retrasar el arranque, y la reescribe cada vez que cambian la hoja o algo de lo que depende: un archivo importado, un módulo de `@utilities` o un archivo que ese módulo importa. También tras un reinicio de Vite (por ejemplo, al cambiar `.env`).
+<a id="hoja-global-procesada-para-el-editor"></a>**Hoja global procesada para el editor.** Las clases que produce el pipeline de CSS (un plugin de PostCSS o de Vite, como el de Tailwind), y las de los archivos que la hoja importa, pueden no estar escritas en ningún archivo CSS del proyecto. Por eso `meeko dev` escribe `app/styles/main.css` ya procesada en `.meeko/styles/main.css`: la misma hoja que sirve en `/app/styles/main.css?direct`, con los `@import` resueltos y los plugins de PostCSS y de Vite aplicados, sin minificar y con un comentario inicial que indica que es generada. La escribe en segundo plano en cuanto el servidor escucha, sin retrasar el arranque, y la reescribe cada vez que cambian la hoja o algo de lo que depende: un archivo importado o un archivo del que depende un plugin. También tras un reinicio de Vite (por ejemplo, al cambiar `.env`).
 
 - Sólo sustituye el archivo cuando cambia su contenido, y de forma atómica (escribe un temporal y lo renombra), así que un lector nunca ve media hoja. Vite no vigila `.meeko/`: escribirla no recarga la página ni provoca otra regeneración.
-- Si la hoja no compila (un error de PostCSS o de un módulo de `@utilities`), el archivo conserva la última versión buena, el servidor sigue funcionando y la consola lo indica una vez: `[meeko] .meeko/styles/main.css conserva la versión anterior: app/styles/main.css no compila (…)`. El siguiente cambio que la arregla la regenera.
+- Si la hoja no compila (un error de PostCSS o de un plugin), el archivo conserva la última versión buena, el servidor sigue funcionando y la consola lo indica una vez: `[meeko] .meeko/styles/main.css conserva la versión anterior: app/styles/main.css no compila (…)`. El siguiente cambio que la arregla la regenera.
 - Sin `app/styles/main.css` no hay archivo; si la hoja se borra con `meeko dev` en marcha, también se borra el archivo.
-- `meeko build` no lo escribe: el CSS del build está minificado y mezcla la hoja global con los `<style>` de los componentes. El archivo se conserva al detener `meeko dev`, así que basta con haberlo ejecutado una vez; `meeko clean` lo elimina con el resto de `.meeko/`.
+- `meeko build` no lo escribe: el CSS del build está minificado y mezcla la hoja global con los `<style>` de los componentes. El archivo se conserva al detener `meeko dev`, así que basta con haberlo ejecutado una vez; `meeko clean` lo elimina con el resto de `.meeko/`. Sin servidor (en CI, tras clonar) lo escribe [`meeko styles`](reference/commands/meeko-styles.md), y también `meeko check`, con el mismo contenido: véase [`meeko check`](reference/commands/meeko-check.md#la-hoja-de-estilos-para-el-editor-y-prettier).
 - Nada lo carga en ejecución y no debe editarse a mano. Las `url()` aparecen como las reescribe Vite en desarrollo.
 
 Sirve a las extensiones del editor que completan clases a partir de hojas CSS en disco. Con [HTML CSS Support](https://marketplace.visualstudio.com/items?itemName=ecmel.vscode-html-css) (`ecmel.vscode-html-css`) en VS Code:
